@@ -1,0 +1,111 @@
+# Environnement local Lalanda (S0)
+# Voir ADR-0004 (MongoDB replica set), ADR-0007 (round-trip Excel), ADR-0009 (infra DO/Spaces).
+
+services:
+  mongo:
+    image: mongo:7.0
+    container_name: lalanda-mongo
+    restart: unless-stopped
+    command: ['--replSet', 'rs0', '--bind_ip_all', '--port', '27017']
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo-data:/data/db
+      - mongo-config:/data/configdb
+    healthcheck:
+      test:
+        - CMD
+        - mongosh
+        - --quiet
+        - --eval
+        - "db.adminCommand('ping').ok"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  mongo-init:
+    image: mongo:7.0
+    container_name: lalanda-mongo-init
+    depends_on:
+      mongo:
+        condition: service_healthy
+    restart: 'no'
+    entrypoint:
+      - bash
+      - -c
+      - |
+        echo "Initiating replica set rs0..."
+        mongosh --host mongo:27017 --quiet --eval '
+          try {
+            const status = rs.status();
+            print("Replica set already initiated: " + status.set);
+          } catch (err) {
+            if (err.codeName === "NotYetInitialized") {
+              rs.initiate({
+                _id: "rs0",
+                members: [{ _id: 0, host: "mongo:27017" }]
+              });
+              print("Replica set rs0 initiated.");
+            } else {
+              throw err;
+            }
+          }
+        '
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: lalanda-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: lalanda-minio
+    restart: unless-stopped
+    command: server /data --console-address ':9001'
+    environment:
+      MINIO_ROOT_USER: lalanda
+      MINIO_ROOT_PASSWORD: lalanda-dev-secret
+    ports:
+      - '9000:9000' # API S3
+      - '9001:9001' # Console web
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: lalanda-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: 'no'
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -e
+        mc alias set local http://minio:9000 lalanda lalanda-dev-secret
+        mc mb --ignore-existing local/lalanda-exports
+        mc mb --ignore-existing local/lalanda-snapshots
+        mc mb --ignore-existing local/lalanda-uploads
+        echo "MinIO buckets ready."
+
+volumes:
+  mongo-data:
+  mongo-config:
+  redis-data:
+  minio-data:

@@ -1,0 +1,12 @@
+node_modules
+dist
+build
+.next
+.turbo
+coverage
+pnpm-lock.yaml
+sources/
+
+# La documentation garde son style rédactionnel — pas reformatée par prettier.
+docs/
+CLAUDE.md

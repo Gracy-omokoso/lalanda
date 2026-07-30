@@ -1,30 +1,58 @@
 # Lalanda
 
-Lalanda est un SaaS de planification et de pilotage financier conçu pour guider entrepreneurs et PME depuis leur modèle économique jusqu’au suivi du réalisé.
+Lalanda est un SaaS de planification et de pilotage financier destiné aux entrepreneurs et PME (RDC-first, extensible), avec Business Model Canvas dynamique, plan financier 5 ans, prévisionnel/réalisé, Country Packs SYSCOHADA et exports Excel/PDF bancables.
 
-Le produit réunit un Business Model Canvas dynamique, des objectifs à 1 an et 5 ans, un assistant de saisie, un plan financier sur cinq ans, des diagnostics, le suivi prévisionnel/réalisé et des Country Packs comptables et fiscaux versionnés.
+## Démarrage
 
-La première cible fonctionnelle est la RDC avec SYSCOHADA. L’architecture reste extensible à d’autres pays, uniquement via des packs validés.
+Prérequis : Node 20, pnpm 9, Docker Desktop.
+
+```bash
+corepack enable
+pnpm install
+docker compose up -d       # MongoDB (replica set), Redis, MinIO
+pnpm dev                   # web + api en parallèle
+```
+
+Endpoints de santé :
+
+- API : http://localhost:3001/health
+- Web : http://localhost:3000
 
 ## Documentation
 
-Commencer par [docs/README.md](docs/README.md). Ce dossier constitue la source de vérité du produit.
+- **Charte produit** : [`docs/00-CHARTE-PRODUIT.md`](docs/00-CHARTE-PRODUIT.md)
+- **Décisions** : [`docs/adr/`](docs/adr/) (ADR) + [`docs/decisions.md`](docs/decisions.md) (micro-décisions)
+- **Brief fondateur** (source directrice, immuable) : [`sources/brief/lalanda-brief.md`](sources/brief/lalanda-brief.md)
+- **Documentation complète** : [`docs/README.md`](docs/README.md)
 
-Claude Code lit aussi [CLAUDE.md](CLAUDE.md), qui impose les règles de travail essentielles.
+Claude Code lit aussi [`CLAUDE.md`](CLAUDE.md), qui impose les règles de travail essentielles.
 
-## État
+## Structure
 
-La documentation fondatrice produit, UX, métier et technique est structurée. Le code applicatif n’est pas encore initialisé; l’analyse détaillée du brief et du classeur source doit précéder le Sprint S1.
+```
+lalanda/
+├── apps/
+│   ├── web/               # Next.js 15 + Tailwind + shadcn/ui
+│   └── api/               # NestJS 10 + Mongoose (jobs BullMQ inclus)
+├── packages/
+│   ├── engine/            # Compilateur DSL + moteur (HyperFormula) + export xlsx
+│   ├── templates/         # Manifestes YAML + seeds sectoriels
+│   ├── shared/            # Types, Zod, Money, env config, logger Pino
+│   └── ui/                # Composants partagés shadcn
+├── sources/               # Brief et classeur (lecture seule)
+├── docs/
+└── docker-compose.yml
+```
 
 ## Principes non négociables
 
-- Une seule source de vérité pour les calculs.
-- Des résultats déterministes, auditables et testés.
-- Une séparation stricte entre prévisionnel, scénarios et réalisé.
-- L’IA explique et conseille; elle ne calcule pas les états financiers.
-- Les règles pays sont datées, sourcées et versionnées.
-- L’isolation des organisations et la traçabilité sont intégrées dès la conception.
+- Une seule source de vérité pour les calculs (`packages/engine`).
+- Résultats déterministes, auditables, testés (golden files + round-trip LibreOffice).
+- Séparation stricte prévisionnel / scénarios / réalisé.
+- L'IA explique et conseille ; **elle ne calcule jamais** les états financiers.
+- Country Packs versionnés, datés, sourcés.
+- Isolation multi-tenant par `organizationId` de bout en bout.
 
-## Plan d’exécution
+## Plan d'exécution
 
-La roadmap et les 19 lots de spécification/développement sont décrits dans [docs/25-SPRINTS.md](docs/25-SPRINTS.md).
+Voir [`sources/brief/lalanda-brief.md`](sources/brief/lalanda-brief.md) §11 (S0 → S14). Statut d'avancement dans [`docs/25-SPRINTS.md`](docs/25-SPRINTS.md).
