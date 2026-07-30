@@ -1,0 +1,71 @@
+# Pricing, essai et entitlements
+
+**Statut :** Draft à valider commercialement  
+**Version :** 0.1
+
+## Principes
+
+- Quatre packs commerciaux maximum.
+- Essai gratuit de 14 jours.
+- Paiement mensuel ou annuel.
+- Prix annuel présenté avec économie réelle.
+- Limites appliquées par entitlements, pas par conditions dispersées.
+- Les montants restent à valider avant commercialisation.
+
+## Packs proposés
+
+| Capacité | Starter | Pro | Business | Enterprise |
+|---|---:|---:|---:|---:|
+| Organisations | 1 | 1 | plusieurs | configurable |
+| Projets actifs | limité | supérieur | élevé | configurable |
+| Membres | 1 | petite équipe | équipe étendue | configurable |
+| Plan 5 ans | oui | oui | oui | oui |
+| Canvas | oui | oui | oui | oui |
+| PDF | oui | oui | oui | oui |
+| Excel | option/limité | oui | oui | oui |
+| Réalisé/analytics | essentiel | complet | complet | complet |
+| Scénarios | limité | plusieurs | avancé | avancé |
+| Copilote IA | quota | quota supérieur | quota équipe | contrat |
+| API/SSO | non | non | option | oui |
+| Multi-entités | non | non | oui | oui |
+| Support | standard | prioritaire | prioritaire | dédié |
+
+Les nombres exacts sont des paramètres de catalogue, pas du code.
+
+## Essai
+
+- commence au niveau de l’organisation;
+- dure 14 jours calendaires;
+- une seule période d’essai par organisation économique selon règles antifraude;
+- accès fonctionnel généreux mais quotas raisonnables;
+- rappels avant expiration;
+- aucune suppression immédiate à l’expiration;
+- passage en lecture limitée pendant une période de grâce à définir;
+- export des données disponible selon politique.
+
+La carte bancaire obligatoire ou non est une décision commerciale à tester.
+
+## États d’abonnement
+
+`trialing`, `active`, `past_due`, `grace`, `suspended`, `canceled`.
+
+Chaque transition est idempotente et pilotée par des événements de paiement vérifiés.
+
+## Entitlements
+
+Exemples : `projects.max`, `members.max`, `scenarios.max`, `actuals.enabled`, `excel_export.enabled`, `ai.monthly_quota`, `api.enabled`, `sso.enabled`.
+
+L’interface peut expliquer une limite, mais l’API l’impose.
+
+## Changements de plan
+
+- montée en gamme immédiate avec prorata selon fournisseur;
+- baisse à la prochaine échéance;
+- ressources au-dessus de la future limite signalées;
+- aucune suppression automatique de projet;
+- annulation et reprise documentées;
+- factures et taxes conservées selon obligations.
+
+## Validation commerciale requise
+
+Étude de la volonté de payer par segment, coûts d’IA et d’exports, moyens de paiement locaux, devises de facturation, fiscalité de vente numérique, politique de remboursement et remise annuelle.
