@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+.next/
+.turbo/
+*.tsbuildinfo
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+.idea/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Docker volumes
+.docker-data/
+
+# Golden files temporary outputs
+packages/engine/__golden__/**/actual.*.json
+packages/engine/__golden__/**/actual.*.xlsx
+packages/engine/__golden__/**/actual.*.csv
