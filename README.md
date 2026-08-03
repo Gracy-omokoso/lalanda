@@ -4,19 +4,52 @@ Lalanda est un SaaS de planification et de pilotage financier destiné aux entre
 
 ## Démarrage
 
-Prérequis : Node 20, pnpm 9, Docker Desktop.
+Prérequis : **Node 20**, **pnpm 9**. Docker est optionnel (voir plus bas).
+
+### 1. Installer les dépendances
 
 ```bash
 corepack enable
 pnpm install
-docker compose up -d       # MongoDB (replica set), Redis, MinIO
-pnpm dev                   # web + api en parallèle
+```
+
+### 2. Configurer l'environnement
+
+```bash
+cp .env.example .env
+```
+
+Renseigne au minimum dans `.env` :
+
+- `MONGODB_URI` — URI d'un cluster **MongoDB Atlas** (M0 gratuit suffit) ou d'un Mongo local (voir §Docker).
+- `OPENAI_API_KEY` — clé OpenAI (peut être une valeur factice tant que l'IA n'est pas utilisée).
+- Les autres valeurs par défaut fonctionnent.
+
+**MongoDB Atlas** : après avoir créé ton cluster, ajoute ton IP dans **Network Access → ADD CURRENT IP ADDRESS**, sinon les connexions timeout silencieusement.
+
+### 3. Démarrer
+
+```bash
+pnpm --filter @lalanda/shared build   # première fois seulement
+pnpm dev                               # lance web + api en parallèle
 ```
 
 Endpoints de santé :
 
-- API : http://localhost:3001/health
-- Web : http://localhost:3000
+- API : http://localhost:3001/health → `{status: ok, mongo: up}`
+- Web : http://localhost:3000/health → `{status: ok, api: up}`
+
+### Docker (optionnel)
+
+Un `docker-compose.yml` est fourni pour lancer MongoDB (replica set), Redis et MinIO en local — utile à partir de S8 (BullMQ + stockage objet). Pas requis pour le dev quotidien avec Atlas.
+
+```bash
+docker compose up -d
+```
+
+### Emplacement du projet
+
+Le projet **doit vivre hors de `~/Documents` et `~/Desktop`** — ces dossiers sont synchronisés iCloud Drive par défaut sur macOS, ce qui offloade `node_modules` et provoque des `ETIMEDOUT` aléatoires. Emplacement recommandé : `~/Code/lalanda`.
 
 ## Documentation
 
