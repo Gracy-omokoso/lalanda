@@ -17,3 +17,4 @@ Les décisions structurantes passent par un ADR dans [`adr/`](adr/).
 - 2026-07-31 — Le projet vit désormais dans `~/Code/lalanda` (hors iCloud) — `~/Documents` est syncé iCloud par défaut sur macOS, ce qui offloade `node_modules` et déclenche des `ETIMEDOUT` sur `readFileSync`. Règle : jamais de projet Node lourd dans `~/Documents` ou `~/Desktop`.
 - 2026-07-31 — Dev sans Docker local, DB dev = MongoDB Atlas M0 (`cluster0.qbpsuky`) — plus léger et plus proche de la prod (DO Managed) que `docker-compose` local. Docker reste utile pour Redis/MinIO à partir de S8 (files d'attente + stockage objet). Le `docker-compose.yml` est conservé pour ceux qui veulent tout en local.
 - 2026-07-31 — Atlas Network Access : l'IP du dev doit être whitelistée dans Atlas → Network Access. Documenté dans `README.md` section « Démarrage ».
+- 2026-07-31 — Excel = export-only, jamais d'import (ADR-0010). SheetJS retiré. Brief §11 S11 superseded. Toute saisie se fait dans Lalanda.
