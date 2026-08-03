@@ -15,6 +15,8 @@ const CommonEnvSchema = z.object({
 export const ApiEnvSchema = CommonEnvSchema.extend({
   API_PORT: z.coerce.number().int().positive().default(3001),
   API_URL: z.string().url().default('http://localhost:3001'),
+  /** URL du front, utilisée pour whitelister CORS. */
+  WEB_URL: z.string().url().default('http://localhost:3000'),
 
   MONGODB_URI: z.string().min(1),
   MONGODB_DB: z.string().default('lalanda'),
