@@ -40,9 +40,10 @@ Une formule n'existe **qu'une seule fois**, dans `packages/engine`. Le `.xlsx` e
 | [ADR-0004](adr/ADR-0004-base-de-donnees-mongodb.md) | MongoDB 7 + Mongoose 8 |
 | [ADR-0005](adr/ADR-0005-moteur-formules-hyperformula.md) | Moteur HyperFormula |
 | [ADR-0006](adr/ADR-0006-auth-better-auth.md) | Auth better-auth |
-| [ADR-0007](adr/ADR-0007-generation-pdf-excel.md) | ExcelJS + Puppeteer + SheetJS |
+| [ADR-0007](adr/ADR-0007-generation-pdf-excel.md) | ExcelJS + Puppeteer (SheetJS retiré) |
 | [ADR-0008](adr/ADR-0008-ia-openai.md) | Fournisseur IA : OpenAI |
 | [ADR-0009](adr/ADR-0009-infrastructure-digitalocean.md) | Infrastructure DigitalOcean + Caddy |
+| [ADR-0010](adr/ADR-0010-excel-export-only.md) | Excel export-only, saisie exclusivement dans Lalanda |
 
 ## Micro-décisions
 
