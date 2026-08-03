@@ -18,8 +18,13 @@ import { AppModule } from './app.module.js';
 async function bootstrap(): Promise<void> {
   const env = parseEnv(ApiEnvSchema, process.env);
 
-  const app = await NestFactory.create(AppModule, {
-    bufferLogs: true,
+  // Logs visibles dès le démarrage — évite les silent-hangs (ex : Mongo IP non whitelistée).
+  const app = await NestFactory.create(AppModule);
+
+  // CORS pour permettre à apps/web de :3000 d'appeler l'API sur :3001.
+  app.enableCors({
+    origin: [env.WEB_URL ?? 'http://localhost:3000'],
+    credentials: true,
   });
 
   await app.listen(env.API_PORT, '0.0.0.0');

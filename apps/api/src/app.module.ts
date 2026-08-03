@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { LoggerModule } from 'nestjs-pino';
 
+import { EvaluateController } from './evaluate/evaluate.controller.js';
 import { HealthController } from './health/health.controller.js';
 
 @Module({
@@ -32,9 +33,15 @@ import { HealthController } from './health/health.controller.js';
         dbName: process.env['MONGODB_DB'] ?? 'lalanda',
         // Discipline MongoDB — ADR-0004.
         autoIndex: process.env['NODE_ENV'] !== 'production',
+        // Fast-fail : évite les hangs silencieux en cas d'IP non whitelistée
+        // ou de réseau bloqué. 8 s < 30 s par défaut = feedback rapide en dev.
+        serverSelectionTimeoutMS: 8000,
+        // Ne pas mettre en file les commandes en attente de connexion : renvoie
+        // une erreur immédiate côté HTTP au lieu de laisser pendre la requête.
+        bufferCommands: false,
       }),
     }),
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, EvaluateController],
 })
 export class AppModule {}
