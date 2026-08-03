@@ -11,21 +11,30 @@ loadDotenv({ path: envPath });
 import 'reflect-metadata';
 
 import { NestFactory } from '@nestjs/core';
+import { toNodeHandler } from 'better-auth/node';
 import { ApiEnvSchema, parseEnv } from '@lalanda/shared';
 
 import { AppModule } from './app.module.js';
+import { getAuth } from './auth/auth.js';
 
 async function bootstrap(): Promise<void> {
   const env = parseEnv(ApiEnvSchema, process.env);
 
-  // Logs visibles dès le démarrage — évite les silent-hangs (ex : Mongo IP non whitelistée).
   const app = await NestFactory.create(AppModule);
 
-  // CORS pour permettre à apps/web de :3000 d'appeler l'API sur :3001.
+  // CORS — apps/web (:3000) doit pouvoir envoyer cookies (credentials: true).
   app.enableCors({
-    origin: [env.WEB_URL ?? 'http://localhost:3000'],
+    origin: [env.WEB_URL],
     credentials: true,
   });
+
+  // Monte better-auth : `.all('/auth/*', ...)` sur l'app Express sous-jacente
+  // préserve `req.url` (contrairement à `app.use('/auth', ...)` qui strippe le prefix
+  // et empêche better-auth de matcher son basePath).
+  const expressApp = app.getHttpAdapter().getInstance() as {
+    all: (path: string, ...handlers: unknown[]) => void;
+  };
+  expressApp.all('/auth/*', toNodeHandler(getAuth()));
 
   await app.listen(env.API_PORT, '0.0.0.0');
   // eslint-disable-next-line no-console

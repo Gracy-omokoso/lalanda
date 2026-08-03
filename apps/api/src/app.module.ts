@@ -2,8 +2,11 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { LoggerModule } from 'nestjs-pino';
 
+import { AuthModule } from './auth/auth.module.js';
 import { EvaluateController } from './evaluate/evaluate.controller.js';
 import { HealthController } from './health/health.controller.js';
+import { OrganizationsModule } from './organizations/organizations.module.js';
+import { ProjectsModule } from './projects/projects.module.js';
 
 @Module({
   imports: [
@@ -31,16 +34,14 @@ import { HealthController } from './health/health.controller.js';
       useFactory: () => ({
         uri: process.env['MONGODB_URI'] ?? 'mongodb://localhost:27017/lalanda',
         dbName: process.env['MONGODB_DB'] ?? 'lalanda',
-        // Discipline MongoDB — ADR-0004.
         autoIndex: process.env['NODE_ENV'] !== 'production',
-        // Fast-fail : évite les hangs silencieux en cas d'IP non whitelistée
-        // ou de réseau bloqué. 8 s < 30 s par défaut = feedback rapide en dev.
         serverSelectionTimeoutMS: 8000,
-        // Ne pas mettre en file les commandes en attente de connexion : renvoie
-        // une erreur immédiate côté HTTP au lieu de laisser pendre la requête.
         bufferCommands: false,
       }),
     }),
+    OrganizationsModule,
+    AuthModule,
+    ProjectsModule,
   ],
   controllers: [HealthController, EvaluateController],
 })
