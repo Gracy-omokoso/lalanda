@@ -1,43 +1,17 @@
-import Link from 'next/link';
+// La home redirige selon l'état d'auth :
+// - session présente → /projects (dashboard)
+// - sinon → /login
+// La détection se fait par le middleware Next.js sur le cookie de session
+// (voir src/middleware.ts). Ici on garde une redirection serveur explicite
+// qui fait office de fallback si le middleware ne matche pas cette route.
 
-import { PlanWizard } from './_components/plan-wizard';
+import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 
-export default function HomePage(): React.ReactElement {
-  return (
-    <main className="mx-auto flex min-h-screen max-w-4xl flex-col gap-8 px-6 py-10">
-      <header className="flex flex-col gap-2">
-        <h1 className="text-3xl font-semibold tracking-tight">Lalanda</h1>
-        <p className="text-base opacity-70">
-          Planification financière bancable — SYSCOHADA, RDC-first.
-        </p>
-      </header>
+const SESSION_COOKIE_NAMES = ['better-auth.session_token', '__Secure-better-auth.session_token'];
 
-      <section className="rounded-xl border border-black/10 bg-white/40 p-6 shadow-sm dark:border-white/10 dark:bg-white/5">
-        <h2 className="mb-4 text-xl font-semibold">Démo · Template « hello-world »</h2>
-        <p className="mb-6 text-sm opacity-70">
-          Ajuste les hypothèses, l&apos;API évalue les formules avec le moteur (
-          <code className="rounded bg-black/5 px-1 py-0.5 text-xs dark:bg-white/10">
-            packages/engine
-          </code>
-          ) et affiche les résultats.
-        </p>
-        <PlanWizard />
-      </section>
-
-      <footer className="flex gap-4 text-xs opacity-50">
-        <Link href="/health" className="underline underline-offset-4">
-          /health
-        </Link>
-        <a
-          href="https://github.com/Gracy-omokoso/lalanda"
-          className="underline underline-offset-4"
-          target="_blank"
-          rel="noreferrer"
-        >
-          GitHub
-        </a>
-        <span>Sprint S3 — démo API + wizard.</span>
-      </footer>
-    </main>
-  );
+export default async function HomePage(): Promise<never> {
+  const jar = await cookies();
+  const authed = SESSION_COOKIE_NAMES.some((n) => jar.get(n)?.value);
+  redirect(authed ? '/projects' : '/login');
 }
