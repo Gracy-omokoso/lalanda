@@ -17,13 +17,18 @@ import {
   type EvaluateRequest,
   type EvaluateResponse,
 } from './evaluate.dto.js';
-import { getTemplate, listTemplateSlugs } from './template-registry.js';
+import {
+  getTemplate,
+  listTemplateSlugs,
+  listTemplateSummaries,
+  type TemplateSummary,
+} from './template-registry.js';
 
 @Controller('evaluate')
 export class EvaluateController {
   @Get('templates')
-  listTemplates(): { slugs: string[] } {
-    return { slugs: listTemplateSlugs() };
+  listTemplates(): { slugs: string[]; templates: TemplateSummary[] } {
+    return { slugs: listTemplateSlugs(), templates: listTemplateSummaries() };
   }
 
   /**

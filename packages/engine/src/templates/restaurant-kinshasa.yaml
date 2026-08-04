@@ -1,0 +1,138 @@
+# Template sectoriel : restaurant à Kinshasa (S6-lite).
+#
+# Portée : moyennes mensuelles sur un exercice type. Pas de mensualisation par mois
+# distinct (arrive en S7 avec l'extension DSL — voir brief §7).
+# Fiscalité : IBP SYSCOHADA/RDC 30 % (attesté brief §7). TVA 16 % RDC sera modélisée
+# séparément quand le ParameterPack cd-2026 arrivera (S7).
+# Défauts calibrés pour un restaurant type de 40 places à Gombe (brief §7).
+
+slug: restaurant-kinshasa
+version: 1.0.0
+secteur: restauration
+pays: [CD]
+devise_base: USD
+horizon_mois: 12
+
+groupes_hypotheses:
+  - id: activite
+    label: 'Activité'
+  - id: couts_variables
+    label: 'Coûts variables'
+  - id: charges_fixes
+    label: 'Charges fixes'
+  - id: fiscalite
+    label: 'Fiscalité'
+
+drivers:
+  - id: couverts_jour
+    groupe: activite
+    label: 'Couverts servis par jour'
+    type: number
+    defaut: 60
+    min: 0
+    max: 500
+    unite: 'couverts'
+    aide: 'Nombre moyen de repas servis par jour. Un restaurant de 40 places à Gombe tourne entre 50 et 90 couverts/jour.'
+
+  - id: jours_ouverture_mois
+    groupe: activite
+    label: 'Jours d''ouverture par mois'
+    type: number
+    defaut: 26
+    min: 1
+    max: 31
+    unite: 'jours'
+    aide: 'Ouvert 6 j/7 = 26 jours. 7 j/7 = 30. Fermé le dimanche uniquement = 26.'
+
+  - id: ticket_moyen
+    groupe: activite
+    label: 'Ticket moyen par couvert'
+    type: money
+    devise: USD
+    defaut: 12
+    min: 0
+    aide: 'Total moyen dépensé par client (plat + boisson + accompagnement). Gombe milieu de gamme : 10-15 USD.'
+
+  - id: food_cost_pct
+    groupe: couts_variables
+    label: 'Coût matière (food cost)'
+    type: percent
+    defaut: 0.32
+    min: 0
+    max: 1
+    aide: 'Part du CA absorbée par l''achat des matières premières. Médiane sectorielle restauration : 30-35 %.'
+
+  - id: personnel_mois
+    groupe: charges_fixes
+    label: 'Masse salariale mensuelle'
+    type: money
+    devise: USD
+    defaut: 2500
+    min: 0
+    aide: 'Salaires bruts totaux (chef, aide-cuisine, serveurs, gérant). Charges CNSS/IPR incluses. Ordre de grandeur pour 5-7 personnes.'
+
+  - id: loyer_mois
+    groupe: charges_fixes
+    label: 'Loyer mensuel'
+    type: money
+    devise: USD
+    defaut: 800
+    min: 0
+    aide: 'Loyer d''un local de 80-120 m² à Gombe ou Kintambo : 600-1200 USD.'
+
+  - id: charges_diverses_mois
+    groupe: charges_fixes
+    label: 'Charges d''exploitation diverses'
+    type: money
+    devise: USD
+    defaut: 600
+    min: 0
+    aide: 'Électricité (groupe + SNEL), eau (REGIDESO), gaz, entretien, sécurité, télécoms, consommables.'
+
+  - id: ibp_pct
+    groupe: fiscalite
+    label: 'Impôt sur les bénéfices (IBP)'
+    type: percent
+    defaut: 0.30
+    min: 0
+    max: 1
+    aide: 'RDC / SYSCOHADA : IBP normal 30 %. Régime réel simplifié à partir de 80 M FC de CA annuel.'
+
+feuilles:
+  - id: activite
+    label: 'Compte d''exploitation mensuel'
+    lignes:
+      - id: ca
+        label: 'Chiffre d''affaires'
+        formule: 'couverts_jour * jours_ouverture_mois * ticket_moyen'
+        format: money
+
+      - id: cout_matiere
+        label: 'Coût matière'
+        formule: 'ca * food_cost_pct'
+        format: money
+
+      - id: marge_matiere
+        label: 'Marge sur matière'
+        formule: 'ca - cout_matiere'
+        format: money
+
+      - id: charges_operationnelles
+        label: 'Charges opérationnelles'
+        formule: 'personnel_mois + loyer_mois + charges_diverses_mois'
+        format: money
+
+      - id: excedent_brut
+        label: 'Excédent brut d''exploitation'
+        formule: 'marge_matiere - charges_operationnelles'
+        format: money
+
+      - id: ibp
+        label: 'Impôt sur les bénéfices'
+        formule: 'excedent_brut * ibp_pct'
+        format: money
+
+      - id: resultat_net
+        label: 'Résultat net mensuel'
+        formule: 'excedent_brut - ibp'
+        format: money

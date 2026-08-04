@@ -1,0 +1,123 @@
+# Template sectoriel : prestation de services (conseil, agence, freelance) — S6-lite.
+#
+# Portée : moyennes mensuelles. Modèle de facturation à la journée (T&M).
+# La facturation au forfait, la mensualisation et le suivi par mission arrivent en S7.
+# Fiscalité : IBP SYSCOHADA/RDC 30 %.
+
+slug: prestation-services
+version: 1.0.0
+secteur: services
+pays: [CD]
+devise_base: USD
+horizon_mois: 12
+
+groupes_hypotheses:
+  - id: activite
+    label: 'Activité'
+  - id: charges_fixes
+    label: 'Charges fixes'
+  - id: fiscalite
+    label: 'Fiscalité'
+
+drivers:
+  - id: tarif_journalier_moyen
+    groupe: activite
+    label: 'Tarif journalier moyen'
+    type: money
+    devise: USD
+    defaut: 200
+    min: 0
+    aide: 'Prix moyen d''une journée facturée à un client. Conseil / agence à Kinshasa : 150-350 USD selon expertise et positionnement.'
+
+  - id: jours_facturables_mois
+    groupe: activite
+    label: 'Jours facturables par mois'
+    type: number
+    defaut: 15
+    min: 0
+    max: 22
+    unite: 'jours'
+    aide: 'Nombre de jours effectivement facturés à un client. Sur 22 jours ouvrés, un taux de facturation sain est 60-80 % (soit 13-17 jours). Le reste est absorbé par la prospection, l''administratif et la formation.'
+
+  - id: personnel_operationnel_mois
+    groupe: charges_fixes
+    label: 'Équipe et sous-traitance mensuelles'
+    type: money
+    devise: USD
+    defaut: 1000
+    min: 0
+    aide: 'Coût de l''équipe salariée et/ou des sous-traitants récurrents. À zéro pour un freelance seul.'
+
+  - id: bureau_mois
+    groupe: charges_fixes
+    label: 'Bureau ou coworking'
+    type: money
+    devise: USD
+    defaut: 300
+    min: 0
+    aide: 'Loyer d''un poste en coworking (Kin''s Business Hub, Ingenious City, Silikin Village) ou petit bureau. Coworking : 150-400 USD/poste/mois.'
+
+  - id: outils_logiciels_mois
+    groupe: charges_fixes
+    label: 'Logiciels et abonnements'
+    type: money
+    devise: USD
+    defaut: 150
+    min: 0
+    aide: 'Suite bureautique, outils métier, IA, comptabilité, stockage cloud, VPN. Ordre de grandeur pour une petite structure.'
+
+  - id: marketing_mois
+    groupe: charges_fixes
+    label: 'Marketing et acquisition'
+    type: money
+    devise: USD
+    defaut: 200
+    min: 0
+    aide: 'Publicité, référencement, événements, contenus. Généralement 5-10 % du CA visé.'
+
+  - id: charges_diverses_mois
+    groupe: charges_fixes
+    label: 'Charges d''exploitation diverses'
+    type: money
+    devise: USD
+    defaut: 150
+    min: 0
+    aide: 'Télécoms, déplacements, fournitures, honoraires comptables, assurance responsabilité civile professionnelle.'
+
+  - id: ibp_pct
+    groupe: fiscalite
+    label: 'Impôt sur les bénéfices (IBP)'
+    type: percent
+    defaut: 0.30
+    min: 0
+    max: 1
+    aide: 'RDC / SYSCOHADA : IBP normal 30 %.'
+
+feuilles:
+  - id: activite
+    label: 'Compte d''exploitation mensuel'
+    lignes:
+      - id: ca
+        label: 'Chiffre d''affaires'
+        formule: 'tarif_journalier_moyen * jours_facturables_mois'
+        format: money
+
+      - id: charges_operationnelles
+        label: 'Charges opérationnelles'
+        formule: 'personnel_operationnel_mois + bureau_mois + outils_logiciels_mois + marketing_mois + charges_diverses_mois'
+        format: money
+
+      - id: excedent_brut
+        label: 'Excédent brut d''exploitation'
+        formule: 'ca - charges_operationnelles'
+        format: money
+
+      - id: ibp
+        label: 'Impôt sur les bénéfices'
+        formule: 'excedent_brut * ibp_pct'
+        format: money
+
+      - id: resultat_net
+        label: 'Résultat net mensuel'
+        formule: 'excedent_brut - ibp'
+        format: money
