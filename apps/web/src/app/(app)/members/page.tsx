@@ -20,6 +20,10 @@ export default function MembersPage(): React.ReactElement {
 
   useEffect(() => {
     void bootstrap();
+    // Effet unique au montage — les recharges sont déclenchées explicitement après
+    // création ou révocation. Le linter Next impose de citer la deps ; on la désactive
+    // localement plutôt que capturer bootstrap avec useCallback (surcoût inutile pour un effect one-shot).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function bootstrap(): Promise<void> {

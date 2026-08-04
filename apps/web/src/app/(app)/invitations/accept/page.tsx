@@ -4,6 +4,7 @@
 // Le user connecté (middleware Next.js impose l'auth pour tout /(app)/*) tape sur
 // POST /invitations/accept ; le service vérifie que son email match l'invitation.
 
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
@@ -59,12 +60,12 @@ export default function AcceptInvitationPage(): React.ReactElement {
         {message}
       </p>
       {status === 'error' ? (
-        <a
+        <Link
           href="/projects"
           className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-sm transition hover:bg-[var(--surface-muted)]"
         >
           Retour au dashboard
-        </a>
+        </Link>
       ) : null}
     </section>
   );
