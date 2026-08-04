@@ -61,6 +61,16 @@ export interface TemplateMeta {
   drivers: TemplateDriverMeta[];
 }
 
+/** Résumé de template — servi par GET /evaluate/templates (S6). */
+export interface TemplateSummary {
+  slug: string;
+  version: string;
+  secteur?: string;
+  pays?: string[];
+  devise_base?: 'USD' | 'CDF';
+  horizon_mois?: number;
+}
+
 // ─── Organisations (S5c) ───────────────────────────────────────
 export interface OrganizationView {
   id: string;
@@ -135,15 +145,19 @@ export const api = {
     jsonRequest<{ organizations: OrganizationView[] }>(`/organizations`, { method: 'GET' }),
   createOrganization: (input: { name: string }) =>
     jsonRequest<OrganizationView>(`/organizations`, { method: 'POST', body: input }),
+  listTemplates: () =>
+    jsonRequest<{ slugs: string[]; templates: TemplateSummary[] }>(`/evaluate/templates`, {
+      method: 'GET',
+    }),
   getTemplate: (slug: string) =>
     jsonRequest<{ template: TemplateMeta }>(`/evaluate/templates/${encodeURIComponent(slug)}`, {
       method: 'GET',
     }),
   listProjects: () => jsonRequest<{ projects: ProjectView[] }>(`/projects`, { method: 'GET' }),
-  createProject: (input: { name: string; templateSlug?: string }) =>
+  createProject: (input: { name: string; templateSlug: string }) =>
     jsonRequest<ProjectView>(`/projects`, {
       method: 'POST',
-      body: { templateSlug: 'hello-world', ...input },
+      body: input,
     }),
   getProject: (id: string) =>
     jsonRequest<ProjectView>(`/projects/${encodeURIComponent(id)}`, { method: 'GET' }),

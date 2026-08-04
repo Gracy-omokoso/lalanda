@@ -1,0 +1,135 @@
+# Template sectoriel : quincaillerie et négoce (S6-lite).
+#
+# Portée : moyennes mensuelles. Le modèle négoce = achat/revente pure, sans transformation.
+# La rotation de stock et le BFR seront modélisés en S7 (extension DSL).
+# Fiscalité : IBP SYSCOHADA/RDC 30 %.
+
+slug: quincaillerie-negoce
+version: 1.0.0
+secteur: negoce
+pays: [CD]
+devise_base: USD
+horizon_mois: 12
+
+groupes_hypotheses:
+  - id: activite
+    label: 'Activité'
+  - id: couts_variables
+    label: "Coûts d'achat"
+  - id: charges_fixes
+    label: 'Charges fixes'
+  - id: fiscalite
+    label: 'Fiscalité'
+
+drivers:
+  - id: ca_moyen_jour
+    groupe: activite
+    label: "Chiffre d'affaires moyen par jour"
+    type: money
+    devise: USD
+    defaut: 500
+    min: 0
+    aide: 'Ventes moyennes journalières toutes catégories confondues. Une quincaillerie de quartier à Kinshasa : 300-800 USD/jour selon zone et achalandage.'
+
+  - id: jours_ouverture_mois
+    groupe: activite
+    label: "Jours d'ouverture par mois"
+    type: number
+    defaut: 26
+    min: 1
+    max: 31
+    unite: 'jours'
+    aide: 'Ouvert 6 j/7 = 26 jours. Beaucoup de commerces à Kinshasa ferment le dimanche.'
+
+  - id: marge_commerciale_pct
+    groupe: couts_variables
+    label: 'Marge commerciale sur ventes'
+    type: percent
+    defaut: 0.25
+    min: 0
+    max: 1
+    aide: 'Marge brute exprimée en % du prix de vente : (PV - PA) / PV. Quincaillerie/négoce : typiquement 20-30 %. Fer, ciment : plus bas. Petits accessoires : plus haut.'
+
+  - id: personnel_mois
+    groupe: charges_fixes
+    label: 'Masse salariale mensuelle'
+    type: money
+    devise: USD
+    defaut: 1200
+    min: 0
+    aide: 'Salaires bruts totaux (2 vendeurs + gérant). Charges CNSS/IPR incluses. Ordre de grandeur pour 3 personnes.'
+
+  - id: loyer_mois
+    groupe: charges_fixes
+    label: 'Loyer mensuel'
+    type: money
+    devise: USD
+    defaut: 500
+    min: 0
+    aide: "Local commercial de 40-80 m² en zone d'activité (Kinshasa hors Gombe) : 300-700 USD."
+
+  - id: transport_stock_mois
+    groupe: charges_fixes
+    label: "Transport et logistique d'approvisionnement"
+    type: money
+    devise: USD
+    defaut: 300
+    min: 0
+    aide: 'Frais de transport et de manutention des stocks (retraits port, camion, débardage). Varie selon la fréquence de réapprovisionnement.'
+
+  - id: charges_diverses_mois
+    groupe: charges_fixes
+    label: "Charges d'exploitation diverses"
+    type: money
+    devise: USD
+    defaut: 300
+    min: 0
+    aide: 'Électricité, sécurité, télécoms, consommables, patente et taxes locales mensualisées.'
+
+  - id: ibp_pct
+    groupe: fiscalite
+    label: 'Impôt sur les bénéfices (IBP)'
+    type: percent
+    defaut: 0.30
+    min: 0
+    max: 1
+    aide: 'RDC / SYSCOHADA : IBP normal 30 %.'
+
+feuilles:
+  - id: activite
+    label: "Compte d'exploitation mensuel"
+    lignes:
+      - id: ca
+        label: "Chiffre d'affaires"
+        formule: 'ca_moyen_jour * jours_ouverture_mois'
+        format: money
+
+      - id: cout_achat_marchandises
+        label: "Coût d'achat des marchandises vendues"
+        formule: 'ca * (1 - marge_commerciale_pct)'
+        format: money
+
+      - id: marge_brute
+        label: 'Marge brute'
+        formule: 'ca - cout_achat_marchandises'
+        format: money
+
+      - id: charges_operationnelles
+        label: 'Charges opérationnelles'
+        formule: 'personnel_mois + loyer_mois + transport_stock_mois + charges_diverses_mois'
+        format: money
+
+      - id: excedent_brut
+        label: "Excédent brut d'exploitation"
+        formule: 'marge_brute - charges_operationnelles'
+        format: money
+
+      - id: ibp
+        label: 'Impôt sur les bénéfices'
+        formule: 'excedent_brut * ibp_pct'
+        format: money
+
+      - id: resultat_net
+        label: 'Résultat net mensuel'
+        formule: 'excedent_brut - ibp'
+        format: money
