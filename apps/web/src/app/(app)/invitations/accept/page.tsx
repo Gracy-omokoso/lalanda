@@ -3,16 +3,17 @@
 // Page d'acceptation d'invitation par URL — /invitations/accept?token=xxx
 // Le user connecté (middleware Next.js impose l'auth pour tout /(app)/*) tape sur
 // POST /invitations/accept ; le service vérifie que son email match l'invitation.
+// Next 15 : useSearchParams() doit vivre sous <Suspense> pour le pré-rendu statique.
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 
 import { api, setActiveOrgCookie } from '@/lib/api';
 
 type Status = 'pending' | 'ok' | 'error';
 
-export default function AcceptInvitationPage(): React.ReactElement {
+function AcceptFlow(): React.ReactElement {
   const router = useRouter();
   const params = useSearchParams();
   const token = params.get('token') ?? '';
@@ -46,8 +47,7 @@ export default function AcceptInvitationPage(): React.ReactElement {
   }, [token, router]);
 
   return (
-    <section className="mx-auto flex max-w-md flex-col items-center gap-4 py-16 text-center">
-      <h2 className="text-2xl font-semibold tracking-tight">Invitation</h2>
+    <>
       <p
         className={
           status === 'error'
@@ -67,6 +67,19 @@ export default function AcceptInvitationPage(): React.ReactElement {
           Retour au dashboard
         </Link>
       ) : null}
+    </>
+  );
+}
+
+export default function AcceptInvitationPage(): React.ReactElement {
+  return (
+    <section className="mx-auto flex max-w-md flex-col items-center gap-4 py-16 text-center">
+      <h2 className="text-2xl font-semibold tracking-tight">Invitation</h2>
+      <Suspense
+        fallback={<p className="text-sm text-[var(--foreground-muted)]">Chargement…</p>}
+      >
+        <AcceptFlow />
+      </Suspense>
     </section>
   );
 }
