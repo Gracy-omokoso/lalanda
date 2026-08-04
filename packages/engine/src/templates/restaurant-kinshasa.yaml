@@ -36,7 +36,7 @@ drivers:
 
   - id: jours_ouverture_mois
     groupe: activite
-    label: 'Jours d''ouverture par mois'
+    label: "Jours d'ouverture par mois"
     type: number
     defaut: 26
     min: 1
@@ -60,7 +60,7 @@ drivers:
     defaut: 0.32
     min: 0
     max: 1
-    aide: 'Part du CA absorbée par l''achat des matières premières. Médiane sectorielle restauration : 30-35 %.'
+    aide: "Part du CA absorbée par l'achat des matières premières. Médiane sectorielle restauration : 30-35 %."
 
   - id: personnel_mois
     groupe: charges_fixes
@@ -78,11 +78,11 @@ drivers:
     devise: USD
     defaut: 800
     min: 0
-    aide: 'Loyer d''un local de 80-120 m² à Gombe ou Kintambo : 600-1200 USD.'
+    aide: "Loyer d'un local de 80-120 m² à Gombe ou Kintambo : 600-1200 USD."
 
   - id: charges_diverses_mois
     groupe: charges_fixes
-    label: 'Charges d''exploitation diverses'
+    label: "Charges d'exploitation diverses"
     type: money
     devise: USD
     defaut: 600
@@ -100,10 +100,10 @@ drivers:
 
 feuilles:
   - id: activite
-    label: 'Compte d''exploitation mensuel'
+    label: "Compte d'exploitation mensuel"
     lignes:
       - id: ca
-        label: 'Chiffre d''affaires'
+        label: "Chiffre d'affaires"
         formule: 'couverts_jour * jours_ouverture_mois * ticket_moyen'
         format: money
 
@@ -123,7 +123,7 @@ feuilles:
         format: money
 
       - id: excedent_brut
-        label: 'Excédent brut d''exploitation'
+        label: "Excédent brut d'exploitation"
         formule: 'marge_matiere - charges_operationnelles'
         format: money
 

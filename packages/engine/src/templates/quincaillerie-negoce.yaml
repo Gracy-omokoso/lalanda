@@ -15,7 +15,7 @@ groupes_hypotheses:
   - id: activite
     label: 'Activité'
   - id: couts_variables
-    label: 'Coûts d''achat'
+    label: "Coûts d'achat"
   - id: charges_fixes
     label: 'Charges fixes'
   - id: fiscalite
@@ -24,7 +24,7 @@ groupes_hypotheses:
 drivers:
   - id: ca_moyen_jour
     groupe: activite
-    label: 'Chiffre d''affaires moyen par jour'
+    label: "Chiffre d'affaires moyen par jour"
     type: money
     devise: USD
     defaut: 500
@@ -33,7 +33,7 @@ drivers:
 
   - id: jours_ouverture_mois
     groupe: activite
-    label: 'Jours d''ouverture par mois'
+    label: "Jours d'ouverture par mois"
     type: number
     defaut: 26
     min: 1
@@ -66,11 +66,11 @@ drivers:
     devise: USD
     defaut: 500
     min: 0
-    aide: 'Local commercial de 40-80 m² en zone d''activité (Kinshasa hors Gombe) : 300-700 USD.'
+    aide: "Local commercial de 40-80 m² en zone d'activité (Kinshasa hors Gombe) : 300-700 USD."
 
   - id: transport_stock_mois
     groupe: charges_fixes
-    label: 'Transport et logistique d''approvisionnement'
+    label: "Transport et logistique d'approvisionnement"
     type: money
     devise: USD
     defaut: 300
@@ -79,7 +79,7 @@ drivers:
 
   - id: charges_diverses_mois
     groupe: charges_fixes
-    label: 'Charges d''exploitation diverses'
+    label: "Charges d'exploitation diverses"
     type: money
     devise: USD
     defaut: 300
@@ -97,15 +97,15 @@ drivers:
 
 feuilles:
   - id: activite
-    label: 'Compte d''exploitation mensuel'
+    label: "Compte d'exploitation mensuel"
     lignes:
       - id: ca
-        label: 'Chiffre d''affaires'
+        label: "Chiffre d'affaires"
         formule: 'ca_moyen_jour * jours_ouverture_mois'
         format: money
 
       - id: cout_achat_marchandises
-        label: 'Coût d''achat des marchandises vendues'
+        label: "Coût d'achat des marchandises vendues"
         formule: 'ca * (1 - marge_commerciale_pct)'
         format: money
 
@@ -120,7 +120,7 @@ feuilles:
         format: money
 
       - id: excedent_brut
-        label: 'Excédent brut d''exploitation'
+        label: "Excédent brut d'exploitation"
         formule: 'marge_brute - charges_operationnelles'
         format: money
 
