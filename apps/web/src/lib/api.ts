@@ -61,6 +61,38 @@ export interface TemplateMeta {
   drivers: TemplateDriverMeta[];
 }
 
+// ─── Organisations (S5c) ───────────────────────────────────────
+export interface OrganizationView {
+  id: string;
+  name: string;
+  slug: string;
+  type: string;
+  pays: string;
+  role: 'owner' | 'member';
+}
+
+export const ACTIVE_ORG_COOKIE = 'active_org_id';
+
+/**
+ * Positionne le cookie `active_org_id` côté client (non-HttpOnly pour l'UI).
+ * Le guard côté API le lit à la requête suivante et scope les données à cette org.
+ * SameSite=Lax : le cookie n'est pas envoyé sur requêtes cross-site (protection CSRF de base).
+ */
+export function setActiveOrgCookie(orgId: string): void {
+  if (typeof document === 'undefined') return;
+  const oneYear = 60 * 60 * 24 * 365;
+  document.cookie = `${ACTIVE_ORG_COOKIE}=${encodeURIComponent(orgId)}; Max-Age=${oneYear}; Path=/; SameSite=Lax`;
+}
+
+export function readActiveOrgCookie(): string | undefined {
+  if (typeof document === 'undefined') return undefined;
+  for (const part of document.cookie.split(';')) {
+    const [k, ...rest] = part.trim().split('=');
+    if (k === ACTIVE_ORG_COOKIE) return decodeURIComponent(rest.join('=') ?? '') || undefined;
+  }
+  return undefined;
+}
+
 interface JsonRequestInit {
   method?: string;
   headers?: Record<string, string>;
@@ -99,6 +131,10 @@ async function jsonRequest<T>(path: string, init: JsonRequestInit = {}): Promise
 }
 
 export const api = {
+  listOrganizations: () =>
+    jsonRequest<{ organizations: OrganizationView[] }>(`/organizations`, { method: 'GET' }),
+  createOrganization: (input: { name: string }) =>
+    jsonRequest<OrganizationView>(`/organizations`, { method: 'POST', body: input }),
   getTemplate: (slug: string) =>
     jsonRequest<{ template: TemplateMeta }>(`/evaluate/templates/${encodeURIComponent(slug)}`, {
       method: 'GET',

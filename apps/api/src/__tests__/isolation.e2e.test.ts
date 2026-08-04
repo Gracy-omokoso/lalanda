@@ -180,4 +180,73 @@ suite('isolation multi-tenant (brief §11 S4)', () => {
     const list = await request(app.getHttpServer()).get('/projects');
     expect(list.status).toBe(401);
   });
+
+  // ─── S5c : multi-org ─────────────────────────────────────────────
+  it('Alice crée une 2e org, ses projets restent scopés par org active (cookie)', async () => {
+    const cookiesA = await registerAndLogin(userA);
+
+    // Projet dans l'org auto-provisionnée
+    const p1 = await request(app.getHttpServer())
+      .post('/projects')
+      .set('Cookie', cookiesA)
+      .send({ name: 'Projet org 1', templateSlug: 'hello-world' });
+    expect(p1.status).toBe(201);
+
+    // Crée une 2e org
+    const org2Res = await request(app.getHttpServer())
+      .post('/organizations')
+      .set('Cookie', cookiesA)
+      .send({ name: `Second Workspace ${tag}` });
+    expect(org2Res.status).toBe(201);
+    const org2Id: string = org2Res.body.id;
+
+    // Passe l'org active à org2 via cookie
+    const cookiesWithActiveOrg = [...cookiesA, `active_org_id=${org2Id}`];
+
+    // Liste des projets dans org2 → vide (P1 est dans org1)
+    const listInOrg2 = await request(app.getHttpServer())
+      .get('/projects')
+      .set('Cookie', cookiesWithActiveOrg);
+    expect(listInOrg2.status).toBe(200);
+    expect(listInOrg2.body.projects.map((p: { id: string }) => p.id)).not.toContain(p1.body.id);
+
+    // Crée un projet dans org2
+    const p2 = await request(app.getHttpServer())
+      .post('/projects')
+      .set('Cookie', cookiesWithActiveOrg)
+      .send({ name: 'Projet org 2', templateSlug: 'hello-world' });
+    expect(p2.status).toBe(201);
+    expect(p2.body.organizationId).toBe(org2Id);
+
+    // Retour à org1 (sans cookie active_org_id → fallback primary) → ne voit que P1
+    const listInOrg1 = await request(app.getHttpServer()).get('/projects').set('Cookie', cookiesA);
+    expect(listInOrg1.status).toBe(200);
+    const ids1 = listInOrg1.body.projects.map((p: { id: string }) => p.id);
+    expect(ids1).toContain(p1.body.id);
+    expect(ids1).not.toContain(p2.body.id);
+  }, 30_000);
+
+  it("cookie active_org_id vers une org dont on n'est pas membre → fallback silencieux primary", async () => {
+    const cookiesA = await registerAndLogin(userA);
+    const cookiesB = await registerAndLogin(userB);
+
+    // Récupère l'id de l'org primaire de Bob
+    const bobOrgs = await request(app.getHttpServer())
+      .get('/organizations')
+      .set('Cookie', cookiesB);
+    expect(bobOrgs.status).toBe(200);
+    const bobOrgId: string = bobOrgs.body.organizations[0].id;
+
+    // Alice tente de forcer l'org de Bob via cookie
+    const cookiesAliceSpoof = [...cookiesA, `active_org_id=${bobOrgId}`];
+    const list = await request(app.getHttpServer())
+      .get('/projects')
+      .set('Cookie', cookiesAliceSpoof);
+    expect(list.status).toBe(200);
+    // La liste ne contient que les projets de l'org d'Alice, jamais ceux de Bob.
+    // (le guard ignore le cookie et retombe sur la primary org d'Alice)
+    for (const p of list.body.projects as Array<{ organizationId: string }>) {
+      expect(p.organizationId).not.toBe(bobOrgId);
+    }
+  }, 30_000);
 });
