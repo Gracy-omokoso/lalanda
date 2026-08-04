@@ -7,9 +7,10 @@ import {
   Controller,
   Get,
   NotFoundException,
+  Param,
   Post,
 } from '@nestjs/common';
-import { EngineError, evaluateTemplate } from '@lalanda/engine';
+import { EngineError, evaluateTemplate, type Template } from '@lalanda/engine';
 
 import {
   EvaluateRequestSchema,
@@ -23,6 +24,22 @@ export class EvaluateController {
   @Get('templates')
   listTemplates(): { slugs: string[] } {
     return { slugs: listTemplateSlugs() };
+  }
+
+  /**
+   * Retourne le Template complet — métadonnées + drivers avec label/aide/min/max/etc.
+   * Consommé par le frontend pour générer le wizard dynamiquement (S5a).
+   */
+  @Get('templates/:slug')
+  getTemplateBySlug(@Param('slug') slug: string): { template: Template } {
+    const template = getTemplate(slug);
+    if (!template) {
+      throw new NotFoundException({
+        code: 'TEMPLATE_NOT_FOUND',
+        message: `Template inconnu : ${slug}`,
+      });
+    }
+    return { template };
   }
 
   @Post()

@@ -1,17 +1,86 @@
 slug: hello-world
 version: 1.0.0
+secteur: demo
+pays: [CD]
+devise_base: USD
 horizon_mois: 12
+
+groupes_hypotheses:
+  - id: activite
+    label: 'Activité'
+  - id: charges
+    label: "Charges d'exploitation"
+  - id: fiscalite
+    label: 'Fiscalité'
+
 drivers:
-  - { id: prix_unitaire, type: number, defaut: 10 }
-  - { id: quantite_mois, type: number, defaut: 100 }
-  - { id: cout_variable_pct, type: percent, defaut: 0.4 }
-  - { id: charges_fixes_mois, type: number, defaut: 500 }
-  - { id: taux_impot, type: percent, defaut: 0.3 }
+  - id: prix_unitaire
+    groupe: activite
+    label: 'Prix unitaire'
+    type: money
+    devise: USD
+    defaut: 10
+    min: 0
+    aide: 'Prix de vente moyen par unité vendue.'
+  - id: quantite_mois
+    groupe: activite
+    label: 'Quantité vendue par mois'
+    type: number
+    defaut: 100
+    min: 0
+    unite: 'unités'
+    aide: 'Volume moyen mensuel de ventes.'
+  - id: cout_variable_pct
+    groupe: charges
+    label: 'Coût variable (% du CA)'
+    type: percent
+    defaut: 0.4
+    min: 0
+    max: 1
+    aide: "Part du chiffre d'affaires absorbée par les coûts variables (matières, sous-traitance, commissions)."
+  - id: charges_fixes_mois
+    groupe: charges
+    label: 'Charges fixes par mois'
+    type: money
+    devise: USD
+    defaut: 500
+    min: 0
+    aide: 'Loyers, salaires fixes, abonnements, assurances — tout ce qui ne dépend pas du volume vendu.'
+  - id: taux_impot
+    groupe: fiscalite
+    label: "Taux d'impôt sur les bénéfices"
+    type: percent
+    defaut: 0.3
+    min: 0
+    max: 1
+    aide: 'RDC / SYSCOHADA : IBP normal 30 %.'
+
 feuilles:
   - id: activite
+    label: "Résultat d'exploitation"
     lignes:
-      - { id: ca, formule: 'prix_unitaire * quantite_mois' }
-      - { id: cout_variable, formule: 'ca * cout_variable_pct' }
-      - { id: marge_brute, formule: 'ca - cout_variable' }
-      - { id: resultat_avant_impot, formule: 'marge_brute - charges_fixes_mois' }
-      - { id: resultat_net, formule: 'resultat_avant_impot * (1 - taux_impot)' }
+      - {
+          id: ca,
+          label: "Chiffre d'affaires",
+          formule: 'prix_unitaire * quantite_mois',
+          format: money,
+        }
+      - {
+          id: cout_variable,
+          label: 'Coût variable',
+          formule: 'ca * cout_variable_pct',
+          format: money,
+        }
+      - { id: marge_brute, label: 'Marge brute', formule: 'ca - cout_variable', format: money }
+      - {
+          id: resultat_avant_impot,
+          label: 'Résultat avant impôt',
+          formule: 'marge_brute - charges_fixes_mois',
+          format: money,
+        }
+      - {
+          id: resultat_net,
+          label: 'Résultat net',
+          formule: 'resultat_avant_impot * (1 - taux_impot)',
+          format: money,
+        }
