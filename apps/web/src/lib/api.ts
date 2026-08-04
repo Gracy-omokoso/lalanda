@@ -28,6 +28,39 @@ export interface EvaluateResponse {
   lines: LineResult[];
 }
 
+// ─── Métadonnées de template (S5a) ─────────────────────────────
+// Forme partielle du Template du moteur — juste ce dont le wizard a besoin.
+// Le typage strict vit dans @lalanda/engine ; ici on reste tolérant pour rester
+// résilient aux évolutions du DSL.
+export interface TemplateDriverMeta {
+  id: string;
+  groupe?: string;
+  label?: string;
+  type: 'number' | 'percent' | 'money';
+  devise?: 'USD' | 'CDF';
+  defaut?: number;
+  min?: number;
+  max?: number;
+  unite?: string;
+  aide?: string;
+}
+
+export interface TemplateGroupMeta {
+  id: string;
+  label: string;
+}
+
+export interface TemplateMeta {
+  slug: string;
+  version: string;
+  secteur?: string;
+  pays?: string[];
+  devise_base?: 'USD' | 'CDF';
+  horizon_mois?: number;
+  groupes_hypotheses?: TemplateGroupMeta[];
+  drivers: TemplateDriverMeta[];
+}
+
 interface JsonRequestInit {
   method?: string;
   headers?: Record<string, string>;
@@ -66,6 +99,10 @@ async function jsonRequest<T>(path: string, init: JsonRequestInit = {}): Promise
 }
 
 export const api = {
+  getTemplate: (slug: string) =>
+    jsonRequest<{ template: TemplateMeta }>(`/evaluate/templates/${encodeURIComponent(slug)}`, {
+      method: 'GET',
+    }),
   listProjects: () => jsonRequest<{ projects: ProjectView[] }>(`/projects`, { method: 'GET' }),
   createProject: (input: { name: string; templateSlug?: string }) =>
     jsonRequest<ProjectView>(`/projects`, {
