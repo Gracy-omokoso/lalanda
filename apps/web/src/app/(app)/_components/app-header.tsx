@@ -37,7 +37,17 @@ export function AppHeader(): React.ReactElement {
       </Link>
 
       <div className="flex items-center gap-3 text-sm">
-        {session?.user ? <OrgSwitcher /> : null}
+        {session?.user ? (
+          <>
+            <Link
+              href="/members"
+              className="hidden text-[var(--foreground-muted)] transition hover:text-[var(--foreground)] sm:inline"
+            >
+              Membres
+            </Link>
+            <OrgSwitcher />
+          </>
+        ) : null}
         <ThemeToggle />
         {isPending ? (
           <span className="opacity-50">…</span>

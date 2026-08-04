@@ -81,6 +81,19 @@ export interface OrganizationView {
   role: 'owner' | 'member';
 }
 
+// ─── Invitations (S5d) ─────────────────────────────────────────
+export interface InvitationView {
+  id: string;
+  organizationId: string;
+  email: string;
+  role: 'owner' | 'member';
+  invitedBy: string;
+  expiresAt: string;
+  acceptedAt: string | null;
+  revokedAt: string | null;
+  createdAt: string;
+}
+
 export const ACTIVE_ORG_COOKIE = 'active_org_id';
 
 /**
@@ -170,5 +183,30 @@ export const api = {
     jsonRequest<ProjectView>(`/projects/${encodeURIComponent(id)}/drivers`, {
       method: 'POST',
       body: { driverValues },
+    }),
+  // ─── Invitations (S5d) ─────────────────────────────────────
+  listOrgInvitations: (orgId: string) =>
+    jsonRequest<{ invitations: InvitationView[] }>(
+      `/organizations/${encodeURIComponent(orgId)}/invitations`,
+      { method: 'GET' },
+    ),
+  createInvitation: (orgId: string, input: { email: string; role?: 'owner' | 'member' }) =>
+    jsonRequest<{ invitation: InvitationView; token: string }>(
+      `/organizations/${encodeURIComponent(orgId)}/invitations`,
+      { method: 'POST', body: input },
+    ),
+  revokeInvitation: (orgId: string, invitationId: string) =>
+    jsonRequest<{ invitation: InvitationView }>(
+      `/organizations/${encodeURIComponent(orgId)}/invitations/${encodeURIComponent(invitationId)}`,
+      { method: 'DELETE' },
+    ),
+  listMyPendingInvitations: () =>
+    jsonRequest<{ invitations: (InvitationView & { token: string })[] }>(`/invitations/pending`, {
+      method: 'GET',
+    }),
+  acceptInvitation: (token: string) =>
+    jsonRequest<{ organizationId: string }>(`/invitations/accept`, {
+      method: 'POST',
+      body: { token },
     }),
 };
