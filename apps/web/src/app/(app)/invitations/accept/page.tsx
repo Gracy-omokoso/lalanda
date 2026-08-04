@@ -75,9 +75,7 @@ export default function AcceptInvitationPage(): React.ReactElement {
   return (
     <section className="mx-auto flex max-w-md flex-col items-center gap-4 py-16 text-center">
       <h2 className="text-2xl font-semibold tracking-tight">Invitation</h2>
-      <Suspense
-        fallback={<p className="text-sm text-[var(--foreground-muted)]">Chargement…</p>}
-      >
+      <Suspense fallback={<p className="text-sm text-[var(--foreground-muted)]">Chargement…</p>}>
         <AcceptFlow />
       </Suspense>
     </section>
