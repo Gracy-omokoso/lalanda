@@ -1,25 +1,71 @@
 @import 'tailwindcss';
 
 @theme {
-  /* Poppins sera activée en S5 via next/font/local. */
   --font-sans:
-    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    var(--font-poppins), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
 }
 
-:root {
-  --background: #ffffff;
-  --foreground: #0a0a0a;
+/* ─── Design tokens ──────────────────────────────────────────────
+ * Palette : neutre chaud + accent SYSCOHADA-inspired (vert eau, sobre).
+ * Le thème est piloté par [data-theme="light"|"dark"] posé sur <html>
+ * par le script inline dans layout.tsx (évite le FOUC).
+ */
+
+:root,
+[data-theme='light'] {
+  --background: #fbfaf7; /* off-white chaud */
+  --surface: #ffffff;
+  --surface-muted: #f3f2ee;
+  --border: #e5e2db;
+  --foreground: #1a1a17;
+  --foreground-muted: #6b6a63;
+  --accent: #0e7c66; /* vert SYSCOHADA sobre */
+  --accent-foreground: #ffffff;
+  --danger: #b91c1c;
+  --danger-bg: #fef2f2;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #fafafa;
-  }
+[data-theme='dark'] {
+  --background: #101013;
+  --surface: #17171b;
+  --surface-muted: #1f1f24;
+  --border: #2a2a30;
+  --foreground: #f5f5f2;
+  --foreground-muted: #9a9a92;
+  --accent: #4ecdb0;
+  --accent-foreground: #0a0a0a;
+  --danger: #f87171;
+  --danger-bg: #2a1616;
+}
+
+html {
+  color-scheme: light dark;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'ss01', 'cv01';
+  letter-spacing: -0.005em;
+}
+
+/* Focus visible plus doux, sur toutes les couleurs de fond */
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Reset des couleurs par défaut pour les inputs numériques (Chrome/Safari) */
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
 }

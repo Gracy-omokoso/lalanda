@@ -33,10 +33,15 @@ export default function LoginPage(): React.ReactElement {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <h2 className="text-xl font-semibold">Connexion</h2>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-2xl font-semibold tracking-tight">Bon retour</h2>
+        <p className="text-sm text-[var(--foreground-muted)]">
+          Connecte-toi pour retrouver tes plans financiers.
+        </p>
+      </div>
 
-      <label className="flex flex-col gap-1 text-sm">
+      <label className="flex flex-col gap-1.5 text-sm">
         <span className="font-medium">Email</span>
         <input
           type="email"
@@ -44,11 +49,11 @@ export default function LoginPage(): React.ReactElement {
           autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="rounded-md border border-black/15 bg-white px-3 py-2 text-sm dark:border-white/20 dark:bg-black/30"
+          className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
         />
       </label>
 
-      <label className="flex flex-col gap-1 text-sm">
+      <label className="flex flex-col gap-1.5 text-sm">
         <span className="font-medium">Mot de passe</span>
         <input
           type="password"
@@ -56,12 +61,12 @@ export default function LoginPage(): React.ReactElement {
           autoComplete="current-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="rounded-md border border-black/15 bg-white px-3 py-2 text-sm dark:border-white/20 dark:bg-black/30"
+          className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
         />
       </label>
 
       {error ? (
-        <div className="rounded-md border border-red-400 bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
+        <div className="rounded-md border border-[var(--danger)]/30 bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger)]">
           {error}
         </div>
       ) : null}
@@ -69,14 +74,17 @@ export default function LoginPage(): React.ReactElement {
       <button
         type="submit"
         disabled={loading}
-        className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white transition hover:bg-black/80 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-white/90"
+        className="mt-2 rounded-md bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-[var(--accent-foreground)] transition hover:opacity-90 disabled:opacity-50"
       >
         {loading ? 'Connexion…' : 'Se connecter'}
       </button>
 
-      <p className="text-center text-sm opacity-70">
+      <p className="text-center text-sm text-[var(--foreground-muted)]">
         Pas encore de compte ?{' '}
-        <Link href="/register" className="underline underline-offset-4">
+        <Link
+          href="/register"
+          className="text-[var(--accent)] underline underline-offset-4 hover:opacity-80"
+        >
           Créer un compte
         </Link>
       </p>

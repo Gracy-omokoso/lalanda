@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import { signOut, useSession } from '@/lib/auth-client';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 export function AppHeader(): React.ReactElement {
   const router = useRouter();
@@ -16,21 +17,37 @@ export function AppHeader(): React.ReactElement {
   }
 
   return (
-    <header className="flex items-center justify-between border-b border-black/10 pb-4 dark:border-white/10">
-      <Link href="/projects" className="flex flex-col">
-        <span className="text-lg font-semibold tracking-tight">Lalanda</span>
-        <span className="text-xs opacity-60">Planification financière bancable</span>
+    <header className="flex items-center justify-between border-b border-[var(--border)] pb-4">
+      <Link href="/projects" className="group flex items-center gap-3">
+        <span
+          aria-hidden="true"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent)] font-semibold text-[var(--accent-foreground)]"
+        >
+          L
+        </span>
+        <div className="flex flex-col leading-tight">
+          <span className="text-base font-semibold tracking-tight group-hover:text-[var(--accent)]">
+            Lalanda
+          </span>
+          <span className="text-[11px] text-[var(--foreground-muted)]">
+            Planification financière bancable
+          </span>
+        </div>
       </Link>
-      <div className="flex items-center gap-4 text-sm">
+
+      <div className="flex items-center gap-3 text-sm">
+        <ThemeToggle />
         {isPending ? (
           <span className="opacity-50">…</span>
         ) : session?.user ? (
           <>
-            <span className="opacity-70">{session.user.email}</span>
+            <span className="hidden text-[var(--foreground-muted)] sm:inline">
+              {session.user.email}
+            </span>
             <button
               type="button"
               onClick={handleSignOut}
-              className="rounded-md border border-black/15 px-3 py-1.5 text-sm transition hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
+              className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm transition hover:bg-[var(--surface-muted)]"
             >
               Déconnexion
             </button>

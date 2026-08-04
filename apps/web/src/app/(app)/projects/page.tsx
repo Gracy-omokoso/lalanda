@@ -45,9 +45,14 @@ export default function ProjectsPage(): React.ReactElement {
   return (
     <section className="flex flex-col gap-6">
       <div className="flex items-baseline justify-between">
-        <h2 className="text-xl font-semibold">Mes projets</h2>
+        <div className="flex flex-col gap-1">
+          <h2 className="text-2xl font-semibold tracking-tight">Mes projets</h2>
+          <p className="text-sm text-[var(--foreground-muted)]">
+            Chaque projet = un plan financier basé sur un template sectoriel.
+          </p>
+        </div>
         {projects ? (
-          <span className="text-xs opacity-60">
+          <span className="text-xs text-[var(--foreground-muted)]">
             {projects.length} projet{projects.length > 1 ? 's' : ''}
           </span>
         ) : null}
@@ -55,9 +60,9 @@ export default function ProjectsPage(): React.ReactElement {
 
       <form
         onSubmit={handleCreate}
-        className="flex flex-col gap-3 rounded-xl border border-black/10 bg-white/40 p-4 dark:border-white/10 dark:bg-white/5 sm:flex-row sm:items-end"
+        className="flex flex-col gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:flex-row sm:items-end"
       >
-        <label className="flex flex-1 flex-col gap-1 text-sm">
+        <label className="flex flex-1 flex-col gap-1.5 text-sm">
           <span className="font-medium">Nouveau projet</span>
           <input
             type="text"
@@ -66,29 +71,31 @@ export default function ProjectsPage(): React.ReactElement {
             placeholder="Ex : Restaurant Kinshasa 2026"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            className="rounded-md border border-black/15 bg-white px-3 py-2 text-sm dark:border-white/20 dark:bg-black/30"
+            className="rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
           />
         </label>
         <button
           type="submit"
           disabled={creating || !newName.trim()}
-          className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white transition hover:bg-black/80 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-white/90"
+          className="rounded-md bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-[var(--accent-foreground)] transition hover:opacity-90 disabled:opacity-50"
         >
           {creating ? 'Création…' : 'Créer'}
         </button>
       </form>
 
       {error ? (
-        <div className="rounded-md border border-red-400 bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
+        <div className="rounded-md border border-[var(--danger)]/30 bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger)]">
           {error}
         </div>
       ) : null}
 
       {projects === null ? (
-        <p className="text-sm opacity-60">Chargement…</p>
+        <p className="text-sm text-[var(--foreground-muted)]">Chargement…</p>
       ) : projects.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-black/15 p-6 text-center text-sm opacity-70 dark:border-white/20">
-          Aucun projet pour l&apos;instant. Crée ton premier plan financier ci-dessus.
+        <div className="rounded-xl border border-dashed border-[var(--border)] p-8 text-center">
+          <p className="text-sm text-[var(--foreground-muted)]">
+            Aucun projet pour l&apos;instant. Crée ton premier plan financier ci-dessus.
+          </p>
         </div>
       ) : (
         <ul className="flex flex-col gap-2">
@@ -96,16 +103,21 @@ export default function ProjectsPage(): React.ReactElement {
             <li key={p.id}>
               <Link
                 href={`/projects/${p.id}`}
-                className="flex items-center justify-between rounded-lg border border-black/10 bg-white/40 px-4 py-3 text-sm transition hover:bg-black/5 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
+                className="group flex items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3.5 text-sm transition hover:border-[var(--accent)]/40 hover:bg-[var(--surface-muted)]"
               >
                 <div className="flex flex-col gap-1">
                   <span className="font-medium">{p.name}</span>
-                  <span className="text-xs opacity-60">
+                  <span className="text-xs text-[var(--foreground-muted)]">
                     Template <code>{p.templateSlug}</code> · mis à jour{' '}
                     {new Date(p.updatedAt).toLocaleString('fr-FR')}
                   </span>
                 </div>
-                <span className="text-xs opacity-50">→</span>
+                <span
+                  aria-hidden="true"
+                  className="text-lg opacity-40 transition group-hover:translate-x-0.5 group-hover:opacity-80"
+                >
+                  →
+                </span>
               </Link>
             </li>
           ))}

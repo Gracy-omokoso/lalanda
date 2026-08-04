@@ -24,7 +24,6 @@ export default function RegisterPage(): React.ReactElement {
         setError(res.error.message ?? 'Impossible de créer le compte');
         return;
       }
-      // better-auth avec autoSignIn: true (config API) → la session est déjà créée.
       router.push('/projects');
       router.refresh();
     } catch (err) {
@@ -35,10 +34,15 @@ export default function RegisterPage(): React.ReactElement {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <h2 className="text-xl font-semibold">Créer un compte</h2>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-2xl font-semibold tracking-tight">Créer un compte</h2>
+        <p className="text-sm text-[var(--foreground-muted)]">
+          Une organisation personnelle est créée automatiquement.
+        </p>
+      </div>
 
-      <label className="flex flex-col gap-1 text-sm">
+      <label className="flex flex-col gap-1.5 text-sm">
         <span className="font-medium">Nom</span>
         <input
           type="text"
@@ -48,11 +52,11 @@ export default function RegisterPage(): React.ReactElement {
           autoComplete="name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="rounded-md border border-black/15 bg-white px-3 py-2 text-sm dark:border-white/20 dark:bg-black/30"
+          className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
         />
       </label>
 
-      <label className="flex flex-col gap-1 text-sm">
+      <label className="flex flex-col gap-1.5 text-sm">
         <span className="font-medium">Email</span>
         <input
           type="email"
@@ -60,11 +64,11 @@ export default function RegisterPage(): React.ReactElement {
           autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="rounded-md border border-black/15 bg-white px-3 py-2 text-sm dark:border-white/20 dark:bg-black/30"
+          className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
         />
       </label>
 
-      <label className="flex flex-col gap-1 text-sm">
+      <label className="flex flex-col gap-1.5 text-sm">
         <span className="font-medium">Mot de passe</span>
         <input
           type="password"
@@ -73,13 +77,13 @@ export default function RegisterPage(): React.ReactElement {
           autoComplete="new-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="rounded-md border border-black/15 bg-white px-3 py-2 text-sm dark:border-white/20 dark:bg-black/30"
+          className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
         />
-        <span className="text-xs opacity-60">Minimum 8 caractères.</span>
+        <span className="text-xs text-[var(--foreground-muted)]">Minimum 8 caractères.</span>
       </label>
 
       {error ? (
-        <div className="rounded-md border border-red-400 bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
+        <div className="rounded-md border border-[var(--danger)]/30 bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger)]">
           {error}
         </div>
       ) : null}
@@ -87,14 +91,17 @@ export default function RegisterPage(): React.ReactElement {
       <button
         type="submit"
         disabled={loading}
-        className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white transition hover:bg-black/80 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-white/90"
+        className="mt-2 rounded-md bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-[var(--accent-foreground)] transition hover:opacity-90 disabled:opacity-50"
       >
         {loading ? 'Création…' : 'Créer mon compte'}
       </button>
 
-      <p className="text-center text-sm opacity-70">
+      <p className="text-center text-sm text-[var(--foreground-muted)]">
         Déjà un compte ?{' '}
-        <Link href="/login" className="underline underline-offset-4">
+        <Link
+          href="/login"
+          className="text-[var(--accent)] underline underline-offset-4 hover:opacity-80"
+        >
           Se connecter
         </Link>
       </p>

@@ -154,14 +154,14 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
   }
 
   if (!project || !template) {
-    return <p className="text-sm opacity-60">{error ?? 'Chargement…'}</p>;
+    return <p className="text-sm text-[var(--foreground-muted)]">{error ?? 'Chargement…'}</p>;
   }
 
   return (
     <div className="flex flex-col gap-6">
       <header className="flex items-baseline justify-between">
-        <h2 className="text-xl font-semibold">{project.name}</h2>
-        <span className="text-xs opacity-60">
+        <h2 className="text-2xl font-semibold tracking-tight">{project.name}</h2>
+        <span className="text-xs text-[var(--foreground-muted)]">
           Template <code>{template.slug}</code> v{template.version}
         </span>
       </header>
@@ -176,7 +176,7 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
         >
           {groups.map((group) => (
             <fieldset key={group.id} className="flex flex-col gap-4">
-              <legend className="text-sm font-semibold uppercase tracking-wide opacity-60">
+              <legend className="text-xs font-semibold uppercase tracking-wider text-[var(--foreground-muted)]">
                 {group.label}
               </legend>
               {group.drivers.map((d) => {
@@ -187,7 +187,7 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
                     <span className="flex items-baseline justify-between gap-2 font-medium">
                       <span>{d.label ?? d.id}</span>
                       {d.min !== undefined || d.max !== undefined ? (
-                        <span className="text-xs font-normal opacity-40">
+                        <span className="text-xs font-normal text-[var(--foreground-muted)]/60">
                           {d.min !== undefined ? `min ${isPercent(d) ? d.min * 100 : d.min}` : ''}
                           {d.min !== undefined && d.max !== undefined ? ' · ' : ''}
                           {d.max !== undefined ? `max ${isPercent(d) ? d.max * 100 : d.max}` : ''}
@@ -202,11 +202,17 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
                         min={d.min !== undefined ? (isPercent(d) ? d.min * 100 : d.min) : undefined}
                         max={d.max !== undefined ? (isPercent(d) ? d.max * 100 : d.max) : undefined}
                         onChange={(e) => updateDriver(d, e.target.value)}
-                        className="w-full rounded-md border border-black/15 bg-white px-3 py-2 text-sm dark:border-white/20 dark:bg-black/30"
+                        className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
                       />
-                      <span className="w-16 text-xs opacity-60">{driverSuffix(d)}</span>
+                      <span className="w-16 text-xs text-[var(--foreground-muted)]">
+                        {driverSuffix(d)}
+                      </span>
                     </div>
-                    {d.aide ? <span className="text-xs italic opacity-60">{d.aide}</span> : null}
+                    {d.aide ? (
+                      <span className="text-xs italic text-[var(--foreground-muted)]">
+                        {d.aide}
+                      </span>
+                    ) : null}
                   </label>
                 );
               })}
@@ -216,7 +222,7 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
             <button
               type="submit"
               disabled={loading}
-              className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white transition hover:bg-black/80 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-white/90"
+              className="rounded-md bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-[var(--accent-foreground)] transition hover:opacity-90 disabled:opacity-50"
             >
               {loading ? 'Calcul…' : 'Recalculer'}
             </button>
@@ -224,12 +230,12 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
               type="button"
               onClick={() => void handleSave()}
               disabled={saving || !dirty}
-              className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/5 disabled:opacity-40 dark:border-white/20 dark:hover:bg-white/10"
+              className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-medium transition hover:bg-[var(--surface-muted)] disabled:opacity-40"
             >
               {saving ? 'Sauvegarde…' : dirty ? 'Enregistrer' : 'Enregistré'}
             </button>
             {savedAt ? (
-              <span className="text-xs opacity-60">
+              <span className="text-xs text-[var(--foreground-muted)]">
                 Sauvegardé à {new Date(savedAt).toLocaleTimeString('fr-FR')}
               </span>
             ) : null}
@@ -237,30 +243,34 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
         </form>
 
         <div className="flex flex-col gap-3">
-          <h3 className="text-sm font-semibold uppercase tracking-wide opacity-60">Résultats</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--foreground-muted)]">
+            Résultats
+          </h3>
           {error ? (
-            <div className="rounded-md border border-red-400 bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
+            <div className="rounded-md border border-[var(--danger)]/30 bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger)]">
               <strong>Erreur :</strong> {error}
             </div>
           ) : null}
           {lines ? (
             <table className="w-full border-collapse text-sm">
               <thead>
-                <tr className="border-b border-black/10 text-left dark:border-white/10">
-                  <th className="py-2 pr-2 font-medium opacity-60">Ligne</th>
-                  <th className="py-2 pl-2 text-right font-medium opacity-60">Valeur</th>
+                <tr className="border-b border-[var(--border)] text-left">
+                  <th className="py-2 pr-2 font-medium text-[var(--foreground-muted)]">Ligne</th>
+                  <th className="py-2 pl-2 text-right font-medium text-[var(--foreground-muted)]">
+                    Valeur
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {lines.map((line) => (
                   <tr
                     key={line.lineId}
-                    className={`border-b border-black/5 dark:border-white/5 ${
-                      line.lineId === 'resultat_net' ? 'font-semibold' : ''
+                    className={`border-b border-[var(--border)] ${
+                      line.lineId === 'resultat_net' ? 'font-semibold text-[var(--accent)]' : ''
                     }`}
                   >
-                    <td className="py-2 pr-2">{line.label}</td>
-                    <td className="py-2 pl-2 text-right tabular-nums">
+                    <td className="py-2.5 pr-2">{line.label}</td>
+                    <td className="py-2.5 pl-2 text-right tabular-nums">
                       {formatValue(line.value, line.format, currency)}
                     </td>
                   </tr>
@@ -268,7 +278,7 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
               </tbody>
             </table>
           ) : (
-            <p className="text-sm opacity-60">…</p>
+            <p className="text-sm text-[var(--foreground-muted)]">…</p>
           )}
         </div>
       </div>
