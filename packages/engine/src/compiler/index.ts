@@ -36,6 +36,10 @@ export interface CompiledLine {
   readonly formulaExcel: string;
   readonly location: CellLocation;
   readonly format: Ligne['format'];
+  /** (S10) Nom du paramètre du pack qui sert de seuil. */
+  readonly seuil_pack?: string;
+  /** (S10) Direction du seuil : min = vert si ≥, max = vert si ≤. */
+  readonly seuil_direction?: 'min' | 'max';
 }
 
 export interface CompiledTemplate {
@@ -108,6 +112,8 @@ export function compileTemplate(template: Template): CompiledTemplate {
         formulaExcel: `=${excelFormula}`,
         location: loc,
         format: ligne.format,
+        seuil_pack: ligne.seuil_pack,
+        seuil_direction: ligne.seuil_direction,
       });
       dependencyEdges.set(ligne.id, edgesForLine);
     });

@@ -116,15 +116,14 @@ describe('prestation-services', () => {
     expect(v.get('resultat_net')).toBeCloseTo(840, 6);
   });
 
-  it('descend à zéro de facturation → excédent négatif, IBP négatif (limite du DSL S1, corrigé en S7)', () => {
-    // Note : le DSL S1 n'a pas de MAX(0, ...) → l'IBP peut être négatif sur perte.
-    // Ce comportement sera corrigé en S7 avec les feuilles typées syscohada_resultat.
+  it('descend à zéro de facturation → excédent négatif, IBP = 0 (fix S10 via IF)', () => {
+    // Depuis S10 : `IF(excedent_brut > 0, excedent_brut * ibp_taux, 0)` empêche l'IBP
+    // négatif sur perte. Le résultat net = excédent - 0 = excédent (perte pure).
     const { lines } = evaluateTemplate(template, { jours_facturables_mois: 0 });
     const v = byId(lines);
     expect(v.get('ca')).toBe(0);
     expect(v.get('excedent_brut')).toBe(-1800);
-    // ibp = -1800 * 0.30 = -540 ; resultat_net = -1800 - (-540) = -1260
-    expect(v.get('ibp')).toBeCloseTo(-540, 6);
-    expect(v.get('resultat_net')).toBeCloseTo(-1260, 6);
+    expect(v.get('ibp')).toBe(0); // ← fix S10 : plus de « crédit d'impôt » fantôme sur perte
+    expect(v.get('resultat_net')).toBe(-1800);
   });
 });

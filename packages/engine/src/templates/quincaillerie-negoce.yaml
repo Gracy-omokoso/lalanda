@@ -127,10 +127,32 @@ feuilles:
 
       - id: ibp
         label: 'Impôt sur les bénéfices'
-        formule: 'excedent_brut * ibp_taux'
+        formule: 'IF(excedent_brut > 0, excedent_brut * ibp_taux, 0)'
         format: money
 
       - id: resultat_net
         label: 'Résultat net mensuel'
         formule: 'excedent_brut - ibp'
         format: money
+
+  - id: ratios
+    label: 'Ratios financiers'
+    lignes:
+      - id: marge_ebe_pct
+        label: 'Marge EBE (EBE / CA)'
+        formule: 'IFERROR(excedent_brut / ca, 0)'
+        format: percent
+        seuil_pack: ratio_marge_ebe_min
+        seuil_direction: min
+
+      - id: marge_nette_pct
+        label: 'Marge nette (Résultat / CA)'
+        formule: 'IFERROR(resultat_net / ca, 0)'
+        format: percent
+        seuil_pack: ratio_marge_nette_min
+        seuil_direction: min
+
+      - id: marge_commerciale_effective
+        label: 'Marge commerciale effective'
+        formule: 'IFERROR(marge_brute / ca, 0)'
+        format: percent

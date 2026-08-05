@@ -102,6 +102,16 @@ params:
     valeur: 0.30
     aide: 'Capitaux propres / total passif — seuil vert.'
     source: 'Standards SYSCOHADA / IFC'
+  ratio_marge_ebe_min:
+    valeur: 0.10
+    aide: 'EBE / CA minimum — signal fort de rentabilité opérationnelle.'
+    source: 'Standards analyse crédit PME'
+    a_confirmer: true
+  ratio_marge_nette_min:
+    valeur: 0.05
+    aide: 'Résultat net / CA minimum — capacité de constitution de fonds propres.'
+    source: 'Standards analyse crédit PME'
+    a_confirmer: true
 
   # ─── Coût du crédit constaté ─────────────────────────────────
   taux_credit_investissement_usd_pct:

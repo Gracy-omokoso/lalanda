@@ -274,46 +274,145 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
           </div>
         </form>
 
-        <div className="flex flex-col gap-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--foreground-muted)]">
-            Résultats
-          </h3>
+        <div className="flex flex-col gap-6">
           {error ? (
             <div className="rounded-md border border-[var(--danger)]/30 bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger)]">
               <strong>Erreur :</strong> {error}
             </div>
           ) : null}
           {lines ? (
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-[var(--border)] text-left">
-                  <th className="py-2 pr-2 font-medium text-[var(--foreground-muted)]">Ligne</th>
-                  <th className="py-2 pl-2 text-right font-medium text-[var(--foreground-muted)]">
-                    Valeur
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {lines.map((line) => (
-                  <tr
-                    key={line.lineId}
-                    className={`border-b border-[var(--border)] ${
-                      line.lineId === 'resultat_net' ? 'font-semibold text-[var(--accent)]' : ''
-                    }`}
-                  >
-                    <td className="py-2.5 pr-2">{line.label}</td>
-                    <td className="py-2.5 pl-2 text-right tabular-nums">
-                      {formatValue(line.value, line.format, currency)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            (() => {
+              // Groupement par feuille pour rendre chacune séparément.
+              const bySheet = new Map<string, typeof lines>();
+              for (const l of lines) {
+                const arr = bySheet.get(l.sheetId) ?? [];
+                arr.push(l);
+                bySheet.set(l.sheetId, arr);
+              }
+              return (
+                <>
+                  {[...bySheet.entries()].map(([sheetId, sheetLines]) =>
+                    sheetId === 'ratios' ? (
+                      <RatiosCard key={sheetId} lines={sheetLines} />
+                    ) : (
+                      <ResultsTable
+                        key={sheetId}
+                        sheetId={sheetId}
+                        lines={sheetLines}
+                        currency={currency}
+                      />
+                    ),
+                  )}
+                </>
+              );
+            })()
           ) : (
             <p className="text-sm text-[var(--foreground-muted)]">…</p>
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Sous-composants d'affichage (S10) ───────────────────────
+
+function ResultsTable({
+  sheetId,
+  lines,
+  currency,
+}: {
+  sheetId: string;
+  lines: LineResult[];
+  currency: string;
+}): React.ReactElement {
+  // Labels lisibles pour les feuilles connues (extensible via une map côté client).
+  const sheetLabels: Record<string, string> = {
+    activite: "Compte d'exploitation mensuel",
+  };
+  return (
+    <div className="flex flex-col gap-2">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--foreground-muted)]">
+        {sheetLabels[sheetId] ?? sheetId}
+      </h3>
+      <table className="w-full border-collapse text-sm">
+        <thead>
+          <tr className="border-b border-[var(--border)] text-left">
+            <th className="py-2 pr-2 font-medium text-[var(--foreground-muted)]">Ligne</th>
+            <th className="py-2 pl-2 text-right font-medium text-[var(--foreground-muted)]">
+              Valeur
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {lines.map((line) => (
+            <tr
+              key={line.lineId}
+              className={`border-b border-[var(--border)] ${
+                line.lineId === 'resultat_net' ? 'font-semibold text-[var(--accent)]' : ''
+              }`}
+            >
+              <td className="py-2.5 pr-2">{line.label}</td>
+              <td className="py-2.5 pl-2 text-right tabular-nums">
+                {formatValue(line.value, line.format, currency)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Couleurs des feux tricolores — cohérentes avec la palette produit. */
+const STATUT_COLORS: Record<
+  'vert' | 'orange' | 'rouge',
+  { dot: string; text: string; label: string }
+> = {
+  vert: { dot: '#16a34a', text: 'text-[#15803d]', label: 'OK' },
+  orange: { dot: '#ea580c', text: 'text-[#c2410c]', label: 'Vigilance' },
+  rouge: { dot: '#dc2626', text: 'text-[#b91c1c]', label: 'Critique' },
+};
+
+function RatiosCard({ lines }: { lines: LineResult[] }): React.ReactElement {
+  return (
+    <div className="flex flex-col gap-3">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--foreground-muted)]">
+        Ratios financiers
+      </h3>
+      <ul className="flex flex-col gap-2">
+        {lines.map((line) => {
+          const seuilInfo = line.seuil ? STATUT_COLORS[line.seuil.statut] : null;
+          return (
+            <li
+              key={line.lineId}
+              className="flex flex-col gap-1 rounded-md border border-[var(--border)] bg-[var(--surface)] p-3"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  {seuilInfo ? (
+                    <span
+                      aria-hidden="true"
+                      className="inline-block h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: seuilInfo.dot }}
+                    />
+                  ) : null}
+                  <span className="text-sm font-medium">{line.label}</span>
+                </div>
+                <span className="text-sm font-semibold tabular-nums">
+                  {formatValue(line.value, line.format, 'USD')}
+                </span>
+              </div>
+              {line.seuil && seuilInfo ? (
+                <div className={`text-[11px] ${seuilInfo.text}`}>
+                  {seuilInfo.label} — seuil {line.seuil.direction === 'min' ? '≥' : '≤'}{' '}
+                  {formatValue(line.seuil.valeur, line.format, 'USD')}
+                </div>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

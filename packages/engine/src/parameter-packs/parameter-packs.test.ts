@@ -111,3 +111,52 @@ feuilles:
     expect(drivers.get('ibp_taux')).toBeCloseTo(0.3, 6);
   });
 });
+
+describe('Feux tricolores (S10) — seuil_pack + seuil_direction', () => {
+  const templateWithSeuils = parseTemplate(`
+slug: seuil-test
+version: 1.0.0
+drivers:
+  - { id: ca, type: money, defaut: 10000 }
+  - { id: charges, type: money, defaut: 8500 }
+feuilles:
+  - id: main
+    lignes:
+      - { id: marge_ebe, formule: '(ca - charges) / ca', format: percent, seuil_pack: ratio_marge_ebe_min, seuil_direction: min }
+`);
+  const packCd = loadPack('cd-2026'); // ratio_marge_ebe_min = 0.10
+
+  it('vert quand valeur ≥ seuil', () => {
+    // marge = (10000 - 8500) / 10000 = 0.15 ≥ 0.10 → vert
+    const { lines } = evaluateTemplate(templateWithSeuils, {}, { parameterPack: packCd });
+    const marge = lines.find((l) => l.lineId === 'marge_ebe');
+    expect(marge?.seuil?.statut).toBe('vert');
+    expect(marge?.seuil?.valeur).toBeCloseTo(0.1, 6);
+    expect(marge?.seuil?.direction).toBe('min');
+  });
+
+  it('orange dans la zone de tolérance ±10 %', () => {
+    // marge = (10000 - 9050) / 10000 = 0.095 → dans [0.09, 0.10[ → orange
+    const { lines } = evaluateTemplate(
+      templateWithSeuils,
+      { charges: 9050 },
+      { parameterPack: packCd },
+    );
+    expect(lines.find((l) => l.lineId === 'marge_ebe')?.seuil?.statut).toBe('orange');
+  });
+
+  it('rouge nettement sous le seuil', () => {
+    // marge = (10000 - 9500) / 10000 = 0.05 < 0.09 → rouge
+    const { lines } = evaluateTemplate(
+      templateWithSeuils,
+      { charges: 9500 },
+      { parameterPack: packCd },
+    );
+    expect(lines.find((l) => l.lineId === 'marge_ebe')?.seuil?.statut).toBe('rouge');
+  });
+
+  it('pas de seuil si pas de pack ou seuil absent du pack', () => {
+    const { lines } = evaluateTemplate(templateWithSeuils, {});
+    expect(lines.find((l) => l.lineId === 'marge_ebe')?.seuil).toBeUndefined();
+  });
+});

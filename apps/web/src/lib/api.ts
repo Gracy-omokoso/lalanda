@@ -38,6 +38,12 @@ export interface LineResult {
   formulaSource: string;
   value: number;
   format: 'money' | 'number' | 'percent';
+  /** (S10) Feu tricolore, présent seulement pour les lignes avec seuil_pack + pack chargé. */
+  seuil?: {
+    valeur: number;
+    direction: 'min' | 'max';
+    statut: 'vert' | 'orange' | 'rouge';
+  };
 }
 
 export interface EvaluateResponse {

@@ -46,7 +46,8 @@ const GroupeSchema = z
 
 // ─── Feuilles et lignes ───────────────────────────────────────
 // S1 : uniquement des feuilles calculées avec des lignes explicites.
-// Les feuilles typées (syscohada_resultat, cashflow_mensuel, syscohada_bilan) arriveront à partir de S2/S7.
+// S10 : ligne peut porter un seuil (feu tricolore) référençant un paramètre du pack.
+// Les feuilles typées (syscohada_resultat, cashflow_mensuel, syscohada_bilan) arrivent en S11.
 const LigneSchema = z
   .object({
     id: IdSchema,
@@ -54,10 +55,22 @@ const LigneSchema = z
     /**
      * Expression source dans le DSL. Peut référencer un `driver.id`, une autre `ligne.id`,
      * et utiliser les opérateurs `+ - * / ^` avec parenthèses.
-     * S1 n'accepte AUCUNE fonction custom.
+     * Depuis S10 : accepte aussi les fonctions Excel MAX, MIN, IF, ABS, ROUND, SUM, IFERROR,
+     * AND, OR, NOT (évaluées nativement par HyperFormula).
      */
     formule: z.string().min(1),
     format: z.enum(['money', 'number', 'percent']).default('number'),
+    /**
+     * (S10, feuille ratios) — id d'un paramètre du ParameterPack qui sert de seuil de
+     * référence pour le feu tricolore. Ex. `ratio_dscr_min`. Si absent, pas de feu.
+     */
+    seuil_pack: IdSchema.optional(),
+    /**
+     * (S10, feuille ratios) — direction du seuil :
+     * - `min` : la valeur doit être ≥ seuil pour être verte (ex. DSCR, autonomie).
+     * - `max` : la valeur doit être ≤ seuil pour être verte (ex. endettement).
+     */
+    seuil_direction: z.enum(['min', 'max']).optional(),
   })
   .strict();
 
