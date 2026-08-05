@@ -174,4 +174,28 @@ describe('prestation-services', () => {
     const v = byId(lines);
     expect(v.get('payback_annees')).toBeCloseTo(5000 / 10080, 6);
   });
+
+  it('S12b : plan de financement — besoins + ressources + écart', () => {
+    // Défauts prestation-services : investissements 6000, bfr 4000, apport 3500, emprunt 5000
+    // Total besoins = 10 000, total ressources = 8 500, écart = -1 500 (sous-financé)
+    const { lines } = evaluateTemplate(template, {});
+    const v = byId(lines);
+    expect(v.get('pf_investissements')).toBe(6000);
+    expect(v.get('pf_bfr')).toBe(4000);
+    expect(v.get('pf_total_besoins')).toBe(10000);
+    expect(v.get('pf_apport')).toBe(3500);
+    expect(v.get('pf_emprunt')).toBe(5000);
+    expect(v.get('pf_total_ressources')).toBe(8500);
+    expect(v.get('pf_ecart')).toBe(-1500);
+  });
+
+  it('S12b : ratio apport = 35 % (défauts) → orange (seuil pack 25 %)', () => {
+    // apport 3500 / besoins 10 000 = 0.35 ≥ 0.25 seuil → VERT
+    const { lines } = evaluateTemplate(template, {});
+    const v = byId(lines);
+    expect(v.get('apport_pct')).toBeCloseTo(0.35, 6);
+    // Sans pack : pas de statut de feu tricolore
+    const apportLine = lines.find((l) => l.lineId === 'apport_pct');
+    expect(apportLine?.seuil).toBeUndefined();
+  });
 });

@@ -137,6 +137,34 @@ drivers:
     max: 3
     aide: "Croissance annuelle du chiffre d'affaires. 5-15 % typique pour un commerce établi, plus en démarrage."
 
+  # ─── Plan de financement initial (S12b) ─────────────────────
+  - id: investissements_initiaux
+    groupe: financement
+    label: 'Investissements initiaux'
+    type: money
+    devise: USD
+    defaut: 15000
+    min: 0
+    aide: 'Stock initial + rayonnage + comptoir + caisse. Pour une quincaillerie de 40-80 m² : 10-20 k USD.'
+
+  - id: bfr_initial
+    groupe: financement
+    label: 'Trésorerie de sécurité (BFR)'
+    type: money
+    devise: USD
+    defaut: 3000
+    min: 0
+    aide: 'Trésorerie de démarrage. Le négoce a un cycle stock long → prévoir plus si DSO clients élevé.'
+
+  - id: apport_capital
+    groupe: financement
+    label: 'Apport personnel'
+    type: money
+    devise: USD
+    defaut: 6000
+    min: 0
+    aide: 'Apport en fonds propres. ≥ 25 % du total des besoins pour être bancable.'
+
 feuilles:
   - id: activite
     label: "Compte d'exploitation mensuel"
@@ -194,6 +222,39 @@ feuilles:
         formule: 'service_dette_annuel - (emprunt_capital / (emprunt_duree_mois / 12))'
         format: money
 
+  # Feuille "plan_financement" (S12b) — besoins vs ressources.
+  - id: plan_financement
+    label: 'Plan de financement initial'
+    lignes:
+      - id: pf_investissements
+        label: 'Investissements'
+        formule: 'investissements_initiaux'
+        format: money
+      - id: pf_bfr
+        label: 'BFR (trésorerie de sécurité)'
+        formule: 'bfr_initial'
+        format: money
+      - id: pf_total_besoins
+        label: 'TOTAL BESOINS'
+        formule: 'pf_investissements + pf_bfr'
+        format: money
+      - id: pf_apport
+        label: 'Apport personnel'
+        formule: 'apport_capital'
+        format: money
+      - id: pf_emprunt
+        label: 'Emprunt bancaire'
+        formule: 'emprunt_capital'
+        format: money
+      - id: pf_total_ressources
+        label: 'TOTAL RESSOURCES'
+        formule: 'pf_apport + pf_emprunt'
+        format: money
+      - id: pf_ecart
+        label: 'Écart (ressources − besoins)'
+        formule: 'pf_total_ressources - pf_total_besoins'
+        format: money
+
   # Feuille "projection" (S12-lite) — 3 ans avec taux de croissance annuel du CA.
   - id: projection
     label: 'Projection sur 3 ans'
@@ -249,6 +310,13 @@ feuilles:
         formule: 'IFERROR((excedent_brut * 12) / service_dette_annuel, 0)'
         format: number
         seuil_pack: ratio_dscr_min
+        seuil_direction: min
+
+      - id: apport_pct
+        label: 'Ratio apport personnel sur besoins'
+        formule: 'IFERROR(apport_capital / pf_total_besoins, 0)'
+        format: percent
+        seuil_pack: ratio_apport_min_pct
         seuil_direction: min
 
       - id: payback_annees
