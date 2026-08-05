@@ -4,8 +4,12 @@
 // - drivers, labels, aide, min/max, unité, devise viennent tous du serveur
 // - regroupement par `groupes_hypotheses` si le template en définit
 // Aucune logique métier locale — le moteur reste la source de vérité (brief §3-1).
+//
+// S13d : panneau résultats en onglets + bandeau ratios sticky.
+// L'onglet actif est persisté dans l'URL via `?tab=...` (useSearchParams sous Suspense).
 
-import { useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   api,
@@ -14,6 +18,9 @@ import {
   type TemplateDriverMeta,
   type TemplateMeta,
 } from '@/lib/api';
+
+import { RatiosStickyBanner } from './ratios-sticky-banner';
+import { SheetTabs, type SheetTab } from './sheet-tabs';
 
 interface DriverGroup {
   id: string;
@@ -74,6 +81,29 @@ function groupDrivers(template: TemplateMeta): DriverGroup[] {
   if (orphans.length > 0) result.push({ id: '_other', label: 'Autres', drivers: orphans });
   return result;
 }
+
+// ─── Configuration onglets (S13d) ─────────────────────────────
+// Labels FR de fallback si l'API ne les fournit pas.
+const SHEET_LABELS: Record<string, string> = {
+  ratios: 'Ratios bancaires',
+  activite: "Compte d'exploitation",
+  tresorerie: 'Trésorerie mensuelle',
+  projection: 'Projection 3 ans',
+  financement: 'Financement',
+  plan_financement: 'Plan de financement',
+};
+
+// Ordre canonique des onglets (gauche → droite) — S13d.
+const TAB_ORDER: string[] = [
+  'ratios',
+  'activite',
+  'tresorerie',
+  'projection',
+  'financement',
+  'plan_financement',
+];
+
+const DEFAULT_TAB = 'ratios';
 
 export function ProjectPlan({ projectId }: { projectId: string }): React.ReactElement {
   const [project, setProject] = useState<ProjectView | null>(null);
@@ -274,42 +304,102 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
           </div>
         </form>
 
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-4">
           {error ? (
             <div className="rounded-md border border-[var(--danger)]/30 bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger)]">
               <strong>Erreur :</strong> {error}
             </div>
           ) : null}
           {lines ? (
-            (() => {
-              // Groupement par feuille pour rendre chacune séparément.
-              const bySheet = new Map<string, typeof lines>();
-              for (const l of lines) {
-                const arr = bySheet.get(l.sheetId) ?? [];
-                arr.push(l);
-                bySheet.set(l.sheetId, arr);
-              }
-              return (
-                <>
-                  {[...bySheet.entries()].map(([sheetId, sheetLines]) =>
-                    sheetId === 'ratios' ? (
-                      <RatiosCard key={sheetId} lines={sheetLines} />
-                    ) : (
-                      <ResultsTable
-                        key={sheetId}
-                        sheetId={sheetId}
-                        lines={sheetLines}
-                        currency={currency}
-                      />
-                    ),
-                  )}
-                </>
-              );
-            })()
+            // useSearchParams doit vivre sous <Suspense> pour le pré-rendu statique Next 15.
+            <Suspense
+              fallback={<p className="text-sm text-[var(--foreground-muted)]">Chargement…</p>}
+            >
+              <ResultsTabs lines={lines} currency={currency} />
+            </Suspense>
           ) : (
             <p className="text-sm text-[var(--foreground-muted)]">…</p>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Panneau résultats en onglets (S13d) ─────────────────────
+
+interface ResultsTabsProps {
+  lines: LineResult[];
+  currency: string;
+}
+
+function ResultsTabs({ lines, currency }: ResultsTabsProps): React.ReactElement {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Regroupement par feuille.
+  const bySheet = useMemo(() => {
+    const map = new Map<string, LineResult[]>();
+    for (const l of lines) {
+      const arr = map.get(l.sheetId) ?? [];
+      arr.push(l);
+      map.set(l.sheetId, arr);
+    }
+    return map;
+  }, [lines]);
+
+  // Onglets à afficher : ordre canonique + toute feuille inconnue à la suite.
+  const tabs: SheetTab[] = useMemo(() => {
+    const seen = new Set<string>();
+    const ordered: SheetTab[] = [];
+    for (const id of TAB_ORDER) {
+      if (bySheet.has(id)) {
+        ordered.push({ id, label: SHEET_LABELS[id] ?? id });
+        seen.add(id);
+      }
+    }
+    for (const id of bySheet.keys()) {
+      if (!seen.has(id)) ordered.push({ id, label: SHEET_LABELS[id] ?? id });
+    }
+    return ordered;
+  }, [bySheet]);
+
+  // Onglet actif : ?tab=... si valide, sinon défaut (ratios) sinon 1er dispo.
+  const requestedTab = searchParams.get('tab');
+  const fallbackTab = bySheet.has(DEFAULT_TAB) ? DEFAULT_TAB : (tabs[0]?.id ?? DEFAULT_TAB);
+  const activeTab = requestedTab && bySheet.has(requestedTab) ? requestedTab : fallbackTab;
+
+  const setActiveTab = useCallback(
+    (id: string) => {
+      const next = new URLSearchParams(searchParams.toString());
+      next.set('tab', id);
+      // replace : n'empile pas dans l'historique navigateur pour un simple switch UI.
+      router.replace(`?${next.toString()}`, { scroll: false });
+    },
+    [router, searchParams],
+  );
+
+  const ratiosLines = bySheet.get('ratios') ?? [];
+  const activeLines = bySheet.get(activeTab) ?? [];
+
+  return (
+    <div className="flex flex-col gap-4">
+      <RatiosStickyBanner
+        lines={ratiosLines}
+        currency={currency}
+        onSelect={() => setActiveTab('ratios')}
+      />
+      <SheetTabs tabs={tabs} activeId={activeTab} onChange={setActiveTab} />
+      <div
+        role="tabpanel"
+        id={`sheet-panel-${activeTab}`}
+        aria-labelledby={`sheet-tab-${activeTab}`}
+      >
+        {activeTab === 'ratios' ? (
+          <RatiosCard lines={activeLines} />
+        ) : (
+          <ResultsTable sheetId={activeTab} lines={activeLines} currency={currency} />
+        )}
       </div>
     </div>
   );
@@ -326,14 +416,10 @@ function ResultsTable({
   lines: LineResult[];
   currency: string;
 }): React.ReactElement {
-  // Labels lisibles pour les feuilles connues (extensible via une map côté client).
-  const sheetLabels: Record<string, string> = {
-    activite: "Compte d'exploitation mensuel",
-  };
   return (
     <div className="flex flex-col gap-2">
       <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--foreground-muted)]">
-        {sheetLabels[sheetId] ?? sheetId}
+        {SHEET_LABELS[sheetId] ?? sheetId}
       </h3>
       <table className="w-full border-collapse text-sm">
         <thead>
