@@ -1,0 +1,81 @@
+# ParameterPack — Sénégal, 2026. Zone UEMOA, SYSCOHADA révisé.
+
+slug: sn-2026
+pays: SN
+annee: 2026
+systeme_comptable: syscohada-revise-2017
+devise_principale: XOF
+label: 'Sénégal — 2026'
+description: >
+  Fiscalité sénégalaise 2026. IS 30 %, TVA 18 %, IPRES + CSS ~23 % employeur.
+  Zone UEMOA.
+
+avertissement: >
+  Charges sociales SN (IPRES pension + CSS prestations familiales + AT) réparties sur
+  plusieurs organismes. Vérifier CGI SN et grille IPRES à jour.
+
+params:
+  # ─── Impôt sur les sociétés ──────────────────────────────────
+  ibp_taux:
+    valeur: 0.30
+    aide: 'IS Sénégal — taux normal sociétés.'
+    source: 'CGI SN Livre I'
+  ibp_minimum_forfaitaire_xof:
+    valeur: 500000
+    aide: 'IMF minimum annuel.'
+    source: 'CGI SN'
+    a_confirmer: true
+
+  # ─── TVA ─────────────────────────────────────────────────────
+  tva_taux_normal:
+    valeur: 0.18
+    aide: 'TVA harmonisée UEMOA.'
+    source: 'Directive UEMOA + CGI SN'
+
+  # ─── Charges sociales ────────────────────────────────────────
+  ipres_employeur_pct:
+    valeur: 0.084
+    aide: 'IPRES régime général — part employeur.'
+    source: 'IPRES'
+    a_confirmer: true
+  ipres_salarie_pct:
+    valeur: 0.056
+    aide: 'IPRES régime général — part salariale.'
+    source: 'IPRES'
+    a_confirmer: true
+  css_employeur_pct:
+    valeur: 0.07
+    aide: 'Caisse Sécurité Sociale — prestations familiales + accidents travail.'
+    source: 'CSS SN'
+    a_confirmer: true
+  charges_sociales_employeur_pct_total:
+    valeur: 0.154
+    aide: 'Total charges patronales estimé (IPRES + CSS).'
+    a_confirmer: true
+
+  # ─── Impôt sur les traitements et salaires ───────────────────
+  its_taux_moyen_estimatif:
+    valeur: 0.15
+    aide: >
+      Taux moyen estimatif. Barème réel progressif SN par tranches annuelles :
+      0 %, 20 %, 30 %, 35 %, 37 %, 40 %.
+    source: 'CGI SN'
+    a_confirmer: true
+
+  # ─── Ratios bancaires ────────────────────────────────────────
+  ratio_dscr_min:
+    valeur: 1.25
+    aide: 'DSCR minimum banques UEMOA.'
+  ratio_apport_min_pct:
+    valeur: 0.25
+    aide: 'Apport minimum crédit investissement.'
+  ratio_autonomie_financiere_min:
+    valeur: 0.30
+    aide: 'Standards SYSCOHADA.'
+
+  # ─── Coût du crédit ──────────────────────────────────────────
+  taux_credit_investissement_xof_pct:
+    valeur: 0.085
+    aide: 'Taux annuel moyen crédit PME XOF sous supervision BCEAO.'
+    source: 'BCEAO'
+    a_confirmer: true

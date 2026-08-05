@@ -89,14 +89,17 @@ drivers:
     min: 0
     aide: 'Électricité (groupe + SNEL), eau (REGIDESO), gaz, entretien, sécurité, télécoms, consommables.'
 
-  - id: ibp_pct
+  # Note : `ibp_taux` vient désormais du ParameterPack attaché au projet (S9).
+  # Le driver reste déclaré pour être visible/surchargeable dans le wizard —
+  # la valeur du pack écrase la `defaut` au moment de l'évaluation.
+  - id: ibp_taux
     groupe: fiscalite
     label: 'Impôt sur les bénéfices (IBP)'
     type: percent
     defaut: 0.30
     min: 0
     max: 1
-    aide: 'RDC / SYSCOHADA : IBP normal 30 %. Régime réel simplifié à partir de 80 M FC de CA annuel.'
+    aide: 'Taux fourni par le ParameterPack du pays. Surchargeable si le régime de la société diffère du taux standard.'
 
 feuilles:
   - id: activite
@@ -129,7 +132,7 @@ feuilles:
 
       - id: ibp
         label: 'Impôt sur les bénéfices'
-        formule: 'excedent_brut * ibp_pct'
+        formule: 'excedent_brut * ibp_taux'
         format: money
 
       - id: resultat_net

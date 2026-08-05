@@ -15,6 +15,7 @@ export interface ReportOrg {
 export interface ReportProject {
   name: string;
   templateSlug: string;
+  pays: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -27,16 +28,26 @@ export interface ReportLine {
   format: 'money' | 'number' | 'percent';
 }
 
+/** Métadonnées légères du pack — juste ce qui est imprimé dans la page de garde. */
+export interface ReportParameterPack {
+  slug: string;
+  label: string;
+  annee: number;
+  systeme_comptable: string;
+  avertissement?: string;
+}
+
 export interface ReportData {
   organization: ReportOrg;
   project: ReportProject;
   template: Template;
+  parameterPack?: ReportParameterPack;
   driverValues: Record<string, number>;
   lines: ReportLine[];
   /** ISO-8601. */
   generatedAt: string;
-  /** Devise d'affichage — reprise du template si présente, USD sinon. */
-  currency: 'USD' | 'CDF';
+  /** Devise d'affichage — reprise du pack/template/USD. */
+  currency: 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR';
 }
 
 function escapeHtml(input: string): string {
@@ -84,7 +95,16 @@ function formatDate(iso: string): string {
  * Le CSS est inline pour n'avoir aucune dépendance réseau au rendu.
  */
 export function renderReportHtml(data: ReportData): string {
-  const { organization: org, project, template, driverValues, lines, generatedAt, currency } = data;
+  const {
+    organization: org,
+    project,
+    template,
+    parameterPack,
+    driverValues,
+    lines,
+    generatedAt,
+    currency,
+  } = data;
 
   // Groupement des drivers par groupe pour affichage lisible (fallback : un seul bloc).
   const groups = template.groupes_hypotheses ?? [];
@@ -194,11 +214,13 @@ export function renderReportHtml(data: ReportData): string {
     <div class="grid">
       <div class="meta">
         <div>Organisation&nbsp;: <strong>${escapeHtml(org.name)}</strong></div>
-        <div>Pays&nbsp;: <strong>${escapeHtml(org.pays)}</strong></div>
-        <div>Devise&nbsp;: <strong>${escapeHtml(currency)}</strong></div>
+        <div>Pays du projet&nbsp;: <strong>${escapeHtml(project.pays)}</strong></div>
+        <div>Devise d'affichage&nbsp;: <strong>${escapeHtml(currency)}</strong></div>
+        ${parameterPack ? `<div>Cadre fiscal&nbsp;: <strong>${escapeHtml(parameterPack.label)}</strong></div>` : ''}
       </div>
       <div class="meta">
         <div>Template&nbsp;: <strong>${escapeHtml(template.slug)}</strong> v${escapeHtml(template.version)}</div>
+        ${parameterPack ? `<div>Système comptable&nbsp;: <strong>${escapeHtml(parameterPack.systeme_comptable)}</strong></div>` : ''}
         <div>Créé le&nbsp;: <strong>${escapeHtml(formatDate(project.createdAt))}</strong></div>
         <div>Généré le&nbsp;: <strong>${escapeHtml(formatDate(generatedAt))}</strong></div>
       </div>
@@ -211,10 +233,20 @@ export function renderReportHtml(data: ReportData): string {
   <h2>Résultats</h2>
   <div class="cols">${resultBlocks}</div>
 
+  ${
+    parameterPack?.avertissement
+      ? `<section class="card" style="margin-top:8mm;background:#fef9e7;border:1px solid #f0c95a;padding:4mm;">
+    <h3 style="color:#8a6d00;">⚠ Avertissement — cadre fiscal ${escapeHtml(parameterPack.label)}</h3>
+    <p style="margin:0;font-size:9pt;">${escapeHtml(parameterPack.avertissement)}</p>
+  </section>`
+      : ''
+  }
+
   <footer class="stamp">
     <div class="disclaimer">
       Document généré par Lalanda. Les valeurs sont indicatives et n'engagent que leur émetteur. Le
-      moteur de calcul reste la seule source de vérité.
+      moteur de calcul reste la seule source de vérité. Ne remplace pas l'avis d'un expert-comptable
+      agréé pour un dépôt bancaire officiel.
     </div>
     <div>${escapeHtml(new Date(generatedAt).toISOString())}</div>
   </footer>

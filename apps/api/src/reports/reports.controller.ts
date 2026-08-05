@@ -18,6 +18,7 @@ import { AuthGuard } from '../auth/auth.guard.js';
 import { CurrentOrgId } from '../auth/current-user.decorator.js';
 import { getTemplate } from '../evaluate/template-registry.js';
 import { OrganizationsService } from '../organizations/organizations.service.js';
+import { getParameterPack } from '../parameter-packs/parameter-pack-registry.js';
 import { ProjectsService } from '../projects/projects.service.js';
 import { ReportsService } from './reports.service.js';
 
@@ -57,17 +58,39 @@ export class ReportsController {
       });
     }
     const org = await this.organizations.findOrgById(orgId);
+    const pack = project.parameterPackSlug
+      ? getParameterPack(project.parameterPackSlug)
+      : undefined;
 
-    const evaluation = evaluateTemplate(template, project.driverValues);
+    const evaluation = evaluateTemplate(template, project.driverValues, {
+      parameterPack: pack,
+    });
+    // Devise d'affichage : projet > pack > template > USD.
+    const currency =
+      (project.deviseAffichage as 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR' | undefined) ??
+      pack?.devise_principale ??
+      template.devise_base ??
+      'USD';
+
     const pdf = await this.reports.renderPdf({
       organization: { name: org.name, pays: org.pays },
       project: {
         name: project.name,
         templateSlug: project.templateSlug,
+        pays: project.pays ?? org.pays,
         createdAt: project.createdAt.toISOString(),
         updatedAt: project.updatedAt.toISOString(),
       },
       template,
+      parameterPack: pack
+        ? {
+            slug: pack.slug,
+            label: pack.label,
+            annee: pack.annee,
+            systeme_comptable: pack.systeme_comptable,
+            avertissement: pack.avertissement,
+          }
+        : undefined,
       driverValues: Object.fromEntries(evaluation.drivers),
       lines: evaluation.lines.map((l) => ({
         sheetId: l.sheetId,
@@ -77,7 +100,7 @@ export class ReportsController {
         format: l.format,
       })),
       generatedAt: new Date().toISOString(),
-      currency: template.devise_base ?? 'USD',
+      currency: currency as 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR',
     });
 
     res.setHeader('content-disposition', `attachment; filename="${pdfFilename(project.name)}"`);

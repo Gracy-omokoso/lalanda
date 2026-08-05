@@ -9,6 +9,10 @@ export interface CreateProjectInput {
   createdBy: string;
   name: string;
   templateSlug: string;
+  pays: string;
+  parameterPackSlug: string;
+  systemeComptable: string;
+  deviseAffichage: string;
   driverValues?: Record<string, number>;
 }
 
@@ -22,8 +26,12 @@ export class ProjectsService {
       createdBy: input.createdBy,
       name: input.name,
       templateSlug: input.templateSlug,
+      pays: input.pays,
+      parameterPackSlug: input.parameterPackSlug,
+      systemeComptable: input.systemeComptable,
+      deviseAffichage: input.deviseAffichage,
       driverValues: input.driverValues ?? {},
-      _schemaVersion: 1,
+      _schemaVersion: 2,
     });
   }
 

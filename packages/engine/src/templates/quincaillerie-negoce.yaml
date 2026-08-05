@@ -86,14 +86,15 @@ drivers:
     min: 0
     aide: 'Électricité, sécurité, télécoms, consommables, patente et taxes locales mensualisées.'
 
-  - id: ibp_pct
+  # Voir note S9 : `ibp_taux` vient du ParameterPack du projet, `defaut` = fallback.
+  - id: ibp_taux
     groupe: fiscalite
     label: 'Impôt sur les bénéfices (IBP)'
     type: percent
     defaut: 0.30
     min: 0
     max: 1
-    aide: 'RDC / SYSCOHADA : IBP normal 30 %.'
+    aide: 'Taux fourni par le ParameterPack du pays. Surchargeable si le régime le justifie.'
 
 feuilles:
   - id: activite
@@ -126,7 +127,7 @@ feuilles:
 
       - id: ibp
         label: 'Impôt sur les bénéfices'
-        formule: 'excedent_brut * ibp_pct'
+        formule: 'excedent_brut * ibp_taux'
         format: money
 
       - id: resultat_net

@@ -20,11 +20,31 @@ export class Project {
   @Prop({ type: String, required: true })
   templateSlug!: string;
 
+  /**
+   * Pays ISO-2 du projet — définit le contexte fiscal/comptable.
+   * Redondant avec l'org.pays au moment de la création mais nécessaire au projet
+   * car un même utilisateur peut avoir des projets dans plusieurs pays (ex. holding).
+   */
+  @Prop({ type: String, required: true, default: 'CD', maxlength: 2 })
+  pays!: string;
+
+  /** Slug du ParameterPack chargé pour ce projet (ex. `cd-2026`). */
+  @Prop({ type: String, required: true, default: 'cd-2026' })
+  parameterPackSlug!: string;
+
+  /** Système comptable — dérivé du pack mais persisté pour cohérence historique. */
+  @Prop({ type: String, required: true, default: 'syscohada-revise-2017' })
+  systemeComptable!: string;
+
+  /** Devise principale d'affichage — copiée depuis le pack, surchargée par le user. */
+  @Prop({ type: String, required: true, default: 'USD' })
+  deviseAffichage!: string;
+
   /** Valeurs des drivers saisies par l'utilisateur — surcharges du défaut du template. */
   @Prop({ type: Object, default: {} })
   driverValues!: Record<string, number>;
 
-  @Prop({ type: Number, required: true, default: 1 })
+  @Prop({ type: Number, required: true, default: 2 })
   _schemaVersion!: number;
 
   // Champs auto-ajoutés par `timestamps: true` (Mongoose). Déclarés pour le typage.

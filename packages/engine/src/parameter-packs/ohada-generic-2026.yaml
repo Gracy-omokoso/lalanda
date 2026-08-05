@@ -1,0 +1,73 @@
+# ParameterPack — Fallback générique OHADA, 2026.
+# Utilisé quand aucun pack pays spécifique n'est disponible (Bénin, Togo, Mali,
+# Burkina, Niger, Guinée, Guinée-Bissau, Tchad, Centrafrique, Comores, Congo-Brazza,
+# Gabon, Guinée-Équatoriale). Les valeurs sont des médianes prudentes.
+
+slug: ohada-generic-2026
+pays: XX
+pays_couverts: [BJ, TG, ML, BF, NE, GN, GW, TD, CF, KM, CG, GA, GQ]
+annee: 2026
+systeme_comptable: syscohada-revise-2017
+devise_principale: XOF
+label: 'OHADA générique — 2026'
+description: >
+  Fallback pour les 13 pays OHADA sans pack dédié. Valeurs médianes prudentes,
+  à remplacer dès que possible par un pack pays spécifique.
+
+avertissement: >
+  Pack générique. Les taux et charges varient significativement d'un pays OHADA à
+  l'autre. À utiliser uniquement pour prototypage — pas pour dépôt bancaire officiel
+  sans validation d'un expert local.
+
+params:
+  # ─── Impôt sur les sociétés ──────────────────────────────────
+  ibp_taux:
+    valeur: 0.28
+    aide: "Taux IS médian zone OHADA (25 % Côte d'Ivoire → 33 % Cameroun)."
+    a_confirmer: true
+
+  # ─── TVA ─────────────────────────────────────────────────────
+  tva_taux_normal:
+    valeur: 0.18
+    aide: 'TVA médiane UEMOA/CEMAC (18-19.25 %).'
+    source: 'Directives UEMOA / CEMAC'
+    a_confirmer: true
+
+  # ─── Charges sociales ────────────────────────────────────────
+  charges_sociales_employeur_pct_total:
+    valeur: 0.12
+    aide: 'Médiane charges patronales zone OHADA (7 % SN → 17 % CM).'
+    a_confirmer: true
+  charges_sociales_salarie_pct_total:
+    valeur: 0.06
+    aide: 'Médiane part salariale.'
+    a_confirmer: true
+
+  # ─── Impôt sur salaires ──────────────────────────────────────
+  its_taux_moyen_estimatif:
+    valeur: 0.15
+    aide: 'Taux moyen estimatif — chaque pays a son barème progressif propre.'
+    a_confirmer: true
+
+  # ─── Ratios bancaires ────────────────────────────────────────
+  ratio_dscr_min:
+    valeur: 1.25
+    aide: 'Standard bancaire zone OHADA.'
+  ratio_apport_min_pct:
+    valeur: 0.25
+    aide: 'Standard apport crédit investissement.'
+  ratio_autonomie_financiere_min:
+    valeur: 0.30
+    aide: 'Standards SYSCOHADA.'
+
+  # ─── Coût du crédit ──────────────────────────────────────────
+  taux_credit_investissement_xof_pct:
+    valeur: 0.09
+    aide: 'Taux crédit PME médian UEMOA.'
+    source: 'BCEAO'
+    a_confirmer: true
+  taux_credit_investissement_xaf_pct:
+    valeur: 0.10
+    aide: 'Taux crédit PME médian CEMAC.'
+    source: 'BEAC'
+    a_confirmer: true
