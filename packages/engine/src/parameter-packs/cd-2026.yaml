@@ -118,6 +118,10 @@ params:
     aide: "Délai de récupération de l'investissement maximum acceptable. Au-delà de 5 ans le dossier est jugé long ; au-delà de 7 ans il est retoqué."
     source: 'Standards analyse crédit PME RDC'
     a_confirmer: true
+  tresorerie_min_seuil:
+    valeur: 0
+    aide: "Trésorerie minimale attendue à n'importe quel mois de l'année 1. Une trésorerie négative à un seul mois retoque le dossier — la banque vérifie systématiquement."
+    source: 'Retours cellules PME Rawbank / BCDC'
 
   # ─── Coût du crédit constaté ─────────────────────────────────
   taux_credit_investissement_usd_pct:

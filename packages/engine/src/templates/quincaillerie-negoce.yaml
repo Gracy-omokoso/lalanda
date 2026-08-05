@@ -255,6 +255,43 @@ feuilles:
         formule: 'pf_total_ressources - pf_total_besoins'
         format: money
 
+  # Feuille "tresorerie" (S13a) — plan de trésorerie mensuel année 1 (simplifié).
+  - id: tresorerie
+    label: 'Trésorerie mensuelle année 1'
+    lignes:
+      - id: tresorerie_initiale
+        label: "Trésorerie à l'ouverture (M0)"
+        formule: 'apport_capital + emprunt_capital - investissements_initiaux - bfr_initial'
+        format: money
+      - id: solde_mensuel_operationnel
+        label: 'Solde mensuel opérationnel'
+        formule: 'resultat_net - mensualite_emprunt'
+        format: money
+      - id: tresorerie_fin_m1
+        label: 'Trésorerie fin mois 1'
+        formule: 'tresorerie_initiale + solde_mensuel_operationnel * 1'
+        format: money
+      - id: tresorerie_fin_m3
+        label: 'Trésorerie fin mois 3'
+        formule: 'tresorerie_initiale + solde_mensuel_operationnel * 3'
+        format: money
+      - id: tresorerie_fin_m6
+        label: 'Trésorerie fin mois 6'
+        formule: 'tresorerie_initiale + solde_mensuel_operationnel * 6'
+        format: money
+      - id: tresorerie_fin_m9
+        label: 'Trésorerie fin mois 9'
+        formule: 'tresorerie_initiale + solde_mensuel_operationnel * 9'
+        format: money
+      - id: tresorerie_fin_m12
+        label: 'Trésorerie fin mois 12'
+        formule: 'tresorerie_initiale + solde_mensuel_operationnel * 12'
+        format: money
+      - id: tresorerie_min_annee_1
+        label: 'Trésorerie minimale sur les 12 mois'
+        formule: 'MIN(tresorerie_initiale, tresorerie_fin_m12)'
+        format: money
+
   # Feuille "projection" (S12-lite) — 3 ans avec taux de croissance annuel du CA.
   - id: projection
     label: 'Projection sur 3 ans'
@@ -310,6 +347,13 @@ feuilles:
         formule: 'IFERROR((excedent_brut * 12) / service_dette_annuel, 0)'
         format: number
         seuil_pack: ratio_dscr_min
+        seuil_direction: min
+
+      - id: tresorerie_min_ok
+        label: 'Trésorerie mini sur 12 mois'
+        formule: 'tresorerie_min_annee_1'
+        format: money
+        seuil_pack: tresorerie_min_seuil
         seuil_direction: min
 
       - id: apport_pct

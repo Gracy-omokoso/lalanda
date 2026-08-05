@@ -72,6 +72,9 @@ params:
     unite: 'années'
     aide: "Délai de récupération de l'investissement maximum acceptable."
     a_confirmer: true
+  tresorerie_min_seuil:
+    valeur: 0
+    aide: "Trésorerie minimale attendue à n'importe quel mois de l'année 1."
 
   # ─── Coût du crédit ──────────────────────────────────────────
   taux_credit_investissement_xof_pct:
