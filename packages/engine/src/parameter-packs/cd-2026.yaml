@@ -112,6 +112,12 @@ params:
     aide: 'Résultat net / CA minimum — capacité de constitution de fonds propres.'
     source: 'Standards analyse crédit PME'
     a_confirmer: true
+  ratio_payback_max:
+    valeur: 5
+    unite: 'années'
+    aide: "Délai de récupération de l'investissement maximum acceptable. Au-delà de 5 ans le dossier est jugé long ; au-delà de 7 ans il est retoqué."
+    source: 'Standards analyse crédit PME RDC'
+    a_confirmer: true
 
   # ─── Coût du crédit constaté ─────────────────────────────────
   taux_credit_investissement_usd_pct:

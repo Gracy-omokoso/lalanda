@@ -148,4 +148,30 @@ describe('prestation-services', () => {
     expect(v.get('service_dette_annuel')).toBe(0);
     expect(v.get('dscr')).toBe(0);
   });
+
+  it('S12-lite : projection 3 ans avec taux_croissance_ca 0.20', () => {
+    // Défauts : ca_mois = 3000, resultat_net_mois = 840, taux_croissance = 0.20
+    // ca_annuel_1 = 3000 * 12 = 36 000
+    // ca_annuel_2 = 36 000 * 1.20 = 43 200
+    // ca_annuel_3 = 43 200 * 1.20 = 51 840
+    // resultat_annuel_1 = 840 * 12 = 10 080
+    // resultat_annuel_2 = 10 080 * 1.20 = 12 096
+    // resultat_annuel_3 = 12 096 * 1.20 = 14 515.2
+    // cumul = 10 080 + 12 096 + 14 515.2 = 36 691.2
+    const { lines } = evaluateTemplate(template, {});
+    const v = byId(lines);
+    expect(v.get('ca_annuel_1')).toBe(36000);
+    expect(v.get('ca_annuel_2')).toBeCloseTo(43200, 6);
+    expect(v.get('ca_annuel_3')).toBeCloseTo(51840, 6);
+    expect(v.get('resultat_annuel_1')).toBeCloseTo(10080, 6);
+    expect(v.get('resultat_cumule_3ans')).toBeCloseTo(36691.2, 3);
+  });
+
+  it('S12-lite : payback = emprunt / résultat annuel année 1', () => {
+    // Défauts : emprunt 5000, resultat_annuel_1 = 10 080 → payback = 5000 / 10 080 ≈ 0.496 ans
+    // Bien en dessous de 5 ans → VERT
+    const { lines } = evaluateTemplate(template, {});
+    const v = byId(lines);
+    expect(v.get('payback_annees')).toBeCloseTo(5000 / 10080, 6);
+  });
 });
