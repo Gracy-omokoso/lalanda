@@ -7,6 +7,7 @@ import { EvaluateController } from './evaluate/evaluate.controller.js';
 import { HealthController } from './health/health.controller.js';
 import { OrganizationsModule } from './organizations/organizations.module.js';
 import { ProjectsModule } from './projects/projects.module.js';
+import { ReportsModule } from './reports/reports.module.js';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { ProjectsModule } from './projects/projects.module.js';
     OrganizationsModule,
     AuthModule,
     ProjectsModule,
+    ReportsModule,
   ],
   controllers: [HealthController, EvaluateController],
 })
