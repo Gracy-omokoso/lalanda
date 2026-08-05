@@ -16,7 +16,7 @@ const RESERVED = new Set([
   'true',
   'false',
   'null',
-  // Fonctions Excel natives autorisées.
+  // Fonctions Excel natives autorisées (mathématique + logique).
   'max',
   'min',
   'if',
@@ -27,6 +27,12 @@ const RESERVED = new Set([
   'and',
   'or',
   'not',
+  // Fonctions financières (S11) — évaluées nativement par HyperFormula.
+  'pmt', // mensualité constante d'un emprunt : PMT(taux_periodique, n_periodes, -capital)
+  'pv', // valeur actuelle d'une série de paiements
+  'fv', // valeur future
+  'npv', // VAN — valeur actuelle nette
+  'irr', // TRI — taux de rendement interne
 ]);
 
 /**

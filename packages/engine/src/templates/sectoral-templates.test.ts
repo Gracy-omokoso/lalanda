@@ -126,4 +126,26 @@ describe('prestation-services', () => {
     expect(v.get('ibp')).toBe(0); // ← fix S10 : plus de « crédit d'impôt » fantôme sur perte
     expect(v.get('resultat_net')).toBe(-1800);
   });
+
+  it('S11-lite : calcule la mensualité PMT + DSCR', () => {
+    // Défauts : capital 5000 USD, taux 14 %/an, durée 36 mois.
+    // Mensualité PMT théorique ≈ 170.87 USD → service annuel ≈ 2050 USD.
+    // Excédent mensuel par défaut = 1200 → EBE annuel = 14 400.
+    // DSCR = 14 400 / 2050 ≈ 7.02 → largement au-dessus du seuil 1.25 → VERT.
+    const { lines } = evaluateTemplate(template, {});
+    const v = byId(lines);
+    expect(v.get('mensualite_emprunt')).toBeGreaterThan(170);
+    expect(v.get('mensualite_emprunt')).toBeLessThan(172);
+    expect(v.get('service_dette_annuel')).toBeGreaterThan(2050);
+    expect(v.get('dscr')).toBeGreaterThan(6.9);
+    expect(v.get('dscr')).toBeLessThan(7.1);
+  });
+
+  it('S11-lite : sans emprunt → DSCR = 0 (division par zéro protégée par IFERROR)', () => {
+    const { lines } = evaluateTemplate(template, { emprunt_capital: 0 });
+    const v = byId(lines);
+    expect(v.get('mensualite_emprunt')).toBe(0);
+    expect(v.get('service_dette_annuel')).toBe(0);
+    expect(v.get('dscr')).toBe(0);
+  });
 });

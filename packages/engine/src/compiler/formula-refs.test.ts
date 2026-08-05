@@ -46,4 +46,12 @@ describe('extractReferencedIds', () => {
       'max_prix',
     ]);
   });
+
+  it('ignore les fonctions financières (PMT, PV, FV, NPV, IRR)', () => {
+    // PMT(taux/12, n, -capital) : ne doit extraire que taux_annuel, duree_mois, capital.
+    expect([...extractReferencedIds('PMT(taux_annuel / 12, duree_mois, -capital)')].sort()).toEqual(
+      ['capital', 'duree_mois', 'taux_annuel'],
+    );
+    expect([...extractReferencedIds('NPV(taux, flux)')].sort()).toEqual(['flux', 'taux']);
+  });
 });
