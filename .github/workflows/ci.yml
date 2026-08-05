@@ -37,6 +37,10 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+        env:
+          # Puppeteer (S8-lite) télécharge Chromium au postinstall. La CI n'a besoin
+          # que du typecheck/tests ; le PDF réel se génère en dev/prod. On skip 80MB de download.
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
 
       - name: Check formatting
         run: pnpm format:check

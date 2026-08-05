@@ -209,4 +209,19 @@ export const api = {
       method: 'POST',
       body: { token },
     }),
+  // ─── Reports PDF (S8-lite) ─────────────────────────────────
+  async downloadProjectPdf(id: string): Promise<{ blob: Blob; filename: string }> {
+    const res = await fetch(`${API_URL}/projects/${encodeURIComponent(id)}/report/pdf`, {
+      method: 'GET',
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`HTTP ${res.status} — ${text.slice(0, 200)}`);
+    }
+    const cd = res.headers.get('content-disposition') ?? '';
+    const match = cd.match(/filename="([^"]+)"/);
+    const filename = match?.[1] ?? 'plan-financier.pdf';
+    return { blob: await res.blob(), filename };
+  },
 };

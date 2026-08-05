@@ -85,6 +85,7 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   const groups = useMemo(() => (template ? groupDrivers(template) : []), [template]);
   const currency = template?.devise_base ?? 'USD';
@@ -138,6 +139,28 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
       setError(err instanceof Error ? err.message : 'Impossible de sauvegarder');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDownloadPdf(): Promise<void> {
+    setDownloadingPdf(true);
+    setError(null);
+    try {
+      // Le PDF utilise les driverValues persistés — s'assurer qu'ils sont à jour côté serveur.
+      if (dirty) await handleSave();
+      const { blob, filename } = await api.downloadProjectPdf(projectId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible de générer le PDF');
+    } finally {
+      setDownloadingPdf(false);
     }
   }
 
@@ -233,6 +256,15 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
               className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-medium transition hover:bg-[var(--surface-muted)] disabled:opacity-40"
             >
               {saving ? 'Sauvegarde…' : dirty ? 'Enregistrer' : 'Enregistré'}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleDownloadPdf()}
+              disabled={downloadingPdf}
+              title="Télécharger le rapport PDF"
+              className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-medium transition hover:bg-[var(--surface-muted)] disabled:opacity-40"
+            >
+              {downloadingPdf ? 'Génération…' : 'Télécharger PDF'}
             </button>
             {savedAt ? (
               <span className="text-xs text-[var(--foreground-muted)]">

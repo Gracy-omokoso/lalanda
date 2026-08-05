@@ -42,3 +42,7 @@ coverage/
 packages/engine/__golden__/**/actual.*.json
 packages/engine/__golden__/**/actual.*.xlsx
 packages/engine/__golden__/**/actual.*.csv
+
+# Smoke test artifacts (S8-lite PDF)
+apps/api/scripts/smoke-*.pdf
+apps/api/scripts/smoke-*.html
