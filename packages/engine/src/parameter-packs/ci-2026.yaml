@@ -85,6 +85,11 @@ params:
     valeur: 0.05
     aide: 'Résultat net / CA minimum.'
     a_confirmer: true
+  ratio_payback_max:
+    valeur: 5
+    unite: 'années'
+    aide: "Délai de récupération de l'investissement maximum acceptable."
+    a_confirmer: true
 
   # ─── Coût du crédit ──────────────────────────────────────────
   taux_credit_investissement_xof_pct:

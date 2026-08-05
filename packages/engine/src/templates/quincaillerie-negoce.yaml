@@ -127,6 +127,16 @@ drivers:
     unite: 'mois'
     aide: "Durée d'amortissement. 36-60 mois typiques pour crédit stock commerce."
 
+  # ─── Projection pluriannuelle (S12-lite) ────────────────────
+  - id: taux_croissance_ca
+    groupe: activite
+    label: 'Taux de croissance annuel du CA'
+    type: percent
+    defaut: 0.10
+    min: -1
+    max: 3
+    aide: "Croissance annuelle du chiffre d'affaires. 5-15 % typique pour un commerce établi, plus en démarrage."
+
 feuilles:
   - id: activite
     label: "Compte d'exploitation mensuel"
@@ -184,6 +194,39 @@ feuilles:
         formule: 'service_dette_annuel - (emprunt_capital / (emprunt_duree_mois / 12))'
         format: money
 
+  # Feuille "projection" (S12-lite) — 3 ans avec taux de croissance annuel du CA.
+  - id: projection
+    label: 'Projection sur 3 ans'
+    lignes:
+      - id: ca_annuel_1
+        label: 'CA année 1'
+        formule: 'ca * 12'
+        format: money
+      - id: ca_annuel_2
+        label: 'CA année 2'
+        formule: 'ca_annuel_1 * (1 + taux_croissance_ca)'
+        format: money
+      - id: ca_annuel_3
+        label: 'CA année 3'
+        formule: 'ca_annuel_2 * (1 + taux_croissance_ca)'
+        format: money
+      - id: resultat_annuel_1
+        label: 'Résultat net année 1'
+        formule: 'resultat_net * 12'
+        format: money
+      - id: resultat_annuel_2
+        label: 'Résultat net année 2'
+        formule: 'resultat_annuel_1 * (1 + taux_croissance_ca)'
+        format: money
+      - id: resultat_annuel_3
+        label: 'Résultat net année 3'
+        formule: 'resultat_annuel_2 * (1 + taux_croissance_ca)'
+        format: money
+      - id: resultat_cumule_3ans
+        label: 'Résultat cumulé sur 3 ans'
+        formule: 'resultat_annuel_1 + resultat_annuel_2 + resultat_annuel_3'
+        format: money
+
   - id: ratios
     label: 'Ratios financiers'
     lignes:
@@ -207,6 +250,13 @@ feuilles:
         format: number
         seuil_pack: ratio_dscr_min
         seuil_direction: min
+
+      - id: payback_annees
+        label: "Délai de récupération de l'investissement"
+        formule: 'IFERROR(emprunt_capital / resultat_annuel_1, 0)'
+        format: number
+        seuil_pack: ratio_payback_max
+        seuil_direction: max
 
       - id: marge_commerciale_effective
         label: 'Marge commerciale effective'
