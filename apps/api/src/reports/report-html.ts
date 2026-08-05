@@ -1,9 +1,21 @@
-// Rendu HTML d'un rapport de plan financier (S8-lite).
+// Rendu HTML d'un rapport de plan financier (S8-lite → S13e bancable).
 //
 // Contient uniquement de la mise en forme : les valeurs proviennent du moteur
 // (packages/engine). Aucun calcul ici (brief §3-1, CLAUDE.md).
 // Le template est un string ES6 — pas de framework de templating, pas d'injection
 // côté serveur, on échappe explicitement les valeurs qui viennent du user.
+//
+// Structure S13e (dossier bancable RDC — Rawbank/BCDC/TMB/PADMPME) :
+//   Page 1  — Page de garde
+//   Page 2  — Sommaire
+//   Sect. 1 — Hypothèses du plan          (drivers du template, groupés)
+//   Sect. 2 — Compte d'exploitation mensuel (feuille `activite`)
+//   Sect. 3 — Plan de financement initial   (feuille `plan_financement`)
+//   Sect. 4 — Plan de trésorerie année 1    (feuille `tresorerie`)
+//   Sect. 5 — Projection sur 3 ans          (feuille `projection`)
+//   Sect. 6 — Financement de l'emprunt      (feuille `financement`)
+//   Sect. 7 — Ratios bancaires              (feuille `ratios`, pastilles feux)
+//   Fin     — Avertissement légal du ParameterPack (si présent)
 
 import type { Template } from '@lalanda/engine';
 
@@ -95,6 +107,22 @@ function formatDate(iso: string): string {
   }).format(d);
 }
 
+// Ordre canonique des sections bancables (brief S13e). Les feuilles absentes du template
+// sont silencieusement ignorées — on ne montre pas de section vide.
+interface SectionSpec {
+  n: number;
+  sheetId: string;
+  title: string;
+}
+const BANCABLE_SECTIONS: readonly SectionSpec[] = [
+  { n: 2, sheetId: 'activite', title: "Compte d'exploitation mensuel" },
+  { n: 3, sheetId: 'plan_financement', title: 'Plan de financement initial' },
+  { n: 4, sheetId: 'tresorerie', title: 'Plan de trésorerie année 1' },
+  { n: 5, sheetId: 'projection', title: 'Projection sur 3 ans' },
+  { n: 6, sheetId: 'financement', title: "Financement de l'emprunt" },
+  { n: 7, sheetId: 'ratios', title: 'Ratios bancaires' },
+] as const;
+
 /**
  * Rend le HTML complet du rapport. À passer à `page.setContent(...)` de Puppeteer.
  * Le CSS est inline pour n'avoir aucune dépendance réseau au rendu.
@@ -131,10 +159,20 @@ export function renderReportHtml(data: ReportData): string {
     arr.push(l);
     linesBySheet.set(l.sheetId, arr);
   }
-  const sheetLabels = new Map<string, string>(
-    template.feuilles.map((f) => [f.id, f.label ?? f.id]),
-  );
 
+  // Feux tricolores (S10) — palette conforme à l'UI.
+  const statutColor: Record<'vert' | 'orange' | 'rouge', string> = {
+    vert: '#16a34a',
+    orange: '#ea580c',
+    rouge: '#dc2626',
+  };
+  const statutLabel: Record<'vert' | 'orange' | 'rouge', string> = {
+    vert: 'OK',
+    orange: 'Vigilance',
+    rouge: 'Critique',
+  };
+
+  // Section 1 — Hypothèses (drivers par groupe, colonnes de cartes).
   const driverBlocks = groupOrder
     .filter((gid) => (driversByGroup.get(gid) ?? []).length > 0)
     .map((gid) => {
@@ -158,60 +196,94 @@ export function renderReportHtml(data: ReportData): string {
     })
     .join('');
 
-  // Feux tricolores (S10) — palette conforme à l'UI.
-  const statutColor: Record<'vert' | 'orange' | 'rouge', string> = {
-    vert: '#16a34a',
-    orange: '#ea580c',
-    rouge: '#dc2626',
-  };
-  const statutLabel: Record<'vert' | 'orange' | 'rouge', string> = {
-    vert: 'OK',
-    orange: 'Vigilance',
-    rouge: 'Critique',
-  };
+  /** Rend une ligne standard (non-ratios). Applique un surlignage rouge si `highlightRedIds` contient le lineId ET valeur < 0. */
+  function renderLineRow(l: ReportLine, highlightRedIds: ReadonlySet<string>): string {
+    const isCritical = highlightRedIds.has(l.lineId) && Number.isFinite(l.value) && l.value < 0;
+    const rowStyle = isCritical ? ' class="critical"' : '';
+    const valStyle = isCritical ? ' num critical-val' : ' num';
+    return `<tr${rowStyle}>
+      <td>${escapeHtml(l.label)}</td>
+      <td class="${valStyle}">${escapeHtml(formatValue(l.value, l.format, currency))}</td>
+    </tr>`;
+  }
 
-  const resultBlocks = [...linesBySheet.entries()]
-    .map(([sheetId, sheetLines]) => {
-      // Rendu spécial pour la feuille "ratios" : chaque ligne peut porter un feu tricolore.
-      if (sheetId === 'ratios') {
-        const rows = sheetLines
-          .map((l) => {
-            const dot = l.seuil
-              ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${statutColor[l.seuil.statut]};margin-right:6px;vertical-align:middle;"></span>`
-              : '';
-            const seuilNote = l.seuil
-              ? `<div style="font-size:8pt;color:${statutColor[l.seuil.statut]};margin-top:1mm;">${escapeHtml(statutLabel[l.seuil.statut])} — seuil ${l.seuil.direction === 'min' ? '≥' : '≤'} ${escapeHtml(formatValue(l.seuil.valeur, l.format, currency))}</div>`
-              : '';
-            return `<tr>
-              <td>${dot}${escapeHtml(l.label)}${seuilNote}</td>
-              <td class="num">${escapeHtml(formatValue(l.value, l.format, currency))}</td>
-            </tr>`;
-          })
-          .join('');
-        return `<section class="card">
-          <h3>${escapeHtml(sheetLabels.get(sheetId) ?? sheetId)}</h3>
-          <table class="kv">
-            <tbody>${rows}</tbody>
-          </table>
-        </section>`;
-      }
-      // Rendu standard pour les autres feuilles.
-      const rows = sheetLines
-        .map(
-          (l) => `<tr>
-          <td>${escapeHtml(l.label)}</td>
+  /** Rend une feuille "ratios" avec pastilles feux + note de seuil. */
+  function renderRatiosBody(sheetLines: ReportLine[]): string {
+    const rows = sheetLines
+      .map((l) => {
+        const dot = l.seuil
+          ? `<span class="dot" style="background:${statutColor[l.seuil.statut]};"></span>`
+          : '';
+        const seuilNote = l.seuil
+          ? `<div class="seuil-note" style="color:${statutColor[l.seuil.statut]};">${escapeHtml(statutLabel[l.seuil.statut])} — seuil ${l.seuil.direction === 'min' ? '≥' : '≤'} ${escapeHtml(formatValue(l.seuil.valeur, l.format, currency))}</div>`
+          : '';
+        return `<tr>
+          <td>${dot}${escapeHtml(l.label)}${seuilNote}</td>
           <td class="num">${escapeHtml(formatValue(l.value, l.format, currency))}</td>
-        </tr>`,
-        )
-        .join('');
-      return `<section class="card">
-        <h3>${escapeHtml(sheetLabels.get(sheetId) ?? sheetId)}</h3>
-        <table class="kv">
-          <tbody>${rows}</tbody>
-        </table>
+        </tr>`;
+      })
+      .join('');
+    return `<table class="kv">
+      <tbody>${rows}</tbody>
+    </table>`;
+  }
+
+  /** Rend une feuille standard (activite, plan_financement, tresorerie, projection, financement). */
+  function renderStandardSheet(
+    sheetLines: ReportLine[],
+    highlightRedIds: ReadonlySet<string>,
+  ): string {
+    const rows = sheetLines.map((l) => renderLineRow(l, highlightRedIds)).join('');
+    return `<table class="kv">
+      <tbody>${rows}</tbody>
+    </table>`;
+  }
+
+  // IDs à mettre en avant en rouge si négatifs (brief S13e).
+  const PF_RED = new Set<string>(['pf_ecart']);
+  const TRESO_RED = new Set<string>(['tresorerie_min_annee_1']);
+  const EMPTY_RED = new Set<string>();
+
+  // Rendu des sections bancables (2 à 7). Filtre celles dont la feuille n'a pas de lignes.
+  const bancableSections = BANCABLE_SECTIONS.filter(
+    (s) => (linesBySheet.get(s.sheetId) ?? []).length > 0,
+  );
+
+  const sectionBlocks = bancableSections
+    .map((spec) => {
+      const sheetLines = linesBySheet.get(spec.sheetId) ?? [];
+      let body: string;
+      let legend = '';
+      if (spec.sheetId === 'ratios') {
+        legend = `<p class="legend">
+          <span class="dot" style="background:${statutColor.vert};"></span> vert : OK
+          &nbsp;&nbsp;
+          <span class="dot" style="background:${statutColor.orange};"></span> orange : vigilance
+          &nbsp;&nbsp;
+          <span class="dot" style="background:${statutColor.rouge};"></span> rouge : critique
+        </p>`;
+        body = renderRatiosBody(sheetLines);
+      } else if (spec.sheetId === 'plan_financement') {
+        body = renderStandardSheet(sheetLines, PF_RED);
+      } else if (spec.sheetId === 'tresorerie') {
+        body = renderStandardSheet(sheetLines, TRESO_RED);
+      } else {
+        body = renderStandardSheet(sheetLines, EMPTY_RED);
+      }
+      return `<section class="section">
+        <h2 class="section-title">Section ${spec.n} — ${escapeHtml(spec.title)}</h2>
+        ${legend}
+        ${body}
       </section>`;
     })
     .join('');
+
+  // Sommaire : puces (pas de vraie numérotation de page — Puppeteer + HTML rend
+  // ça compliqué, on assume et on garde des puces claires).
+  const tocItems = [
+    `<li>Section 1 — Hypothèses du plan</li>`,
+    ...bancableSections.map((s) => `<li>Section ${s.n} — ${escapeHtml(s.title)}</li>`),
+  ].join('');
 
   return `<!doctype html>
 <html lang="fr">
@@ -226,59 +298,99 @@ export function renderReportHtml(data: ReportData): string {
       --border: #e2e8f0;
       --accent: #0e7c66;
       --surface: #f8fafc;
+      --critical: #dc2626;
     }
+    /* Marges A4 gérées par @page — le body n'a plus de padding. */
+    @page { size: A4; margin: 15mm 15mm 20mm 15mm; }
     * { box-sizing: border-box; }
     html, body { padding: 0; margin: 0; color: var(--ink); font-family: 'Helvetica', 'Arial', sans-serif; font-size: 11pt; line-height: 1.4; }
-    body { padding: 20mm 15mm 25mm 15mm; }
-    header.cover { border-bottom: 3px solid var(--accent); padding-bottom: 10mm; margin-bottom: 10mm; }
-    header.cover h1 { margin: 0 0 4mm 0; font-size: 22pt; color: var(--accent); letter-spacing: -0.5px; }
-    header.cover .meta { color: var(--muted); font-size: 10pt; }
-    header.cover .meta strong { color: var(--ink); }
-    header.cover .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; margin-top: 6mm; }
-    h2 { margin: 12mm 0 4mm 0; font-size: 14pt; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 2mm; }
+
+    /* ---- Page de garde (page 1) ---- */
+    .cover-page { break-after: page; page-break-after: always; min-height: 250mm; display: flex; flex-direction: column; justify-content: center; }
+    .cover-page .brand { font-size: 48pt; font-weight: 700; color: var(--accent); letter-spacing: -1.5px; margin: 0 0 4mm 0; }
+    .cover-page .project-name { font-size: 20pt; color: var(--ink); margin: 0 0 12mm 0; font-weight: 600; }
+    .cover-page .accent-rule { height: 3px; background: var(--accent); width: 40mm; margin-bottom: 10mm; }
+    .cover-page .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm 8mm; margin-top: 8mm; }
+    .cover-page .meta-item { color: var(--muted); font-size: 10pt; }
+    .cover-page .meta-item strong { color: var(--ink); display: block; margin-top: 1mm; font-size: 11pt; }
+    .cover-page .tagline { color: var(--muted); font-size: 11pt; margin: 0 0 15mm 0; font-style: italic; }
+
+    /* ---- Sommaire (page 2) ---- */
+    .toc-page { break-after: page; page-break-after: always; }
+    .toc-page h2 { margin: 0 0 8mm 0; font-size: 18pt; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 3mm; }
+    .toc-page ol.toc { list-style: none; padding: 0; margin: 0; }
+    .toc-page ol.toc li { padding: 3mm 0; border-bottom: 1px dotted var(--border); font-size: 12pt; }
+    .toc-page ol.toc li::before { content: "▸ "; color: var(--accent); font-weight: 700; }
+
+    /* ---- Sections numérotées (chacune démarre sur une nouvelle page) ---- */
+    .section { break-before: page; page-break-before: always; }
+    .section:first-of-type { /* Section 1 vient juste après le TOC : break-before naturel */ }
+    .section-title { margin: 0 0 6mm 0; font-size: 16pt; color: var(--accent); border-bottom: 2px solid var(--accent); padding-bottom: 2mm; }
+    .legend { margin: 0 0 5mm 0; font-size: 9.5pt; color: var(--muted); background: var(--surface); padding: 2.5mm 3mm; border-radius: 2mm; }
+
+    /* ---- Cartes et tableaux ---- */
     .card { break-inside: avoid; margin-bottom: 6mm; }
     .card h3 { margin: 0 0 3mm 0; font-size: 11pt; color: var(--ink); }
     table.kv { width: 100%; border-collapse: collapse; }
-    table.kv td { padding: 2.5mm 3mm; border-bottom: 1px solid var(--border); font-size: 10pt; }
+    table.kv td { padding: 2.5mm 3mm; border-bottom: 1px solid var(--border); font-size: 10pt; vertical-align: top; }
     table.kv tr:last-child td { border-bottom: none; }
     table.kv td.num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+    table.kv tr.critical td { background: #fef2f2; }
+    table.kv td.critical-val { color: var(--critical); }
     .cols { column-count: 2; column-gap: 8mm; }
     .cols .card { break-inside: avoid; -webkit-column-break-inside: avoid; }
+
+    /* ---- Pastilles feux (ratios) ---- */
+    .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+    .seuil-note { font-size: 8pt; margin-top: 1mm; }
+
+    /* ---- Avertissement légal ---- */
+    .disclaimer-box { margin-top: 8mm; background: #fef9e7; border: 1px solid #f0c95a; padding: 4mm; break-inside: avoid; }
+    .disclaimer-box h3 { color: #8a6d00; margin: 0 0 2mm 0; font-size: 11pt; }
+    .disclaimer-box p { margin: 0; font-size: 9pt; }
     footer.stamp { margin-top: 10mm; padding-top: 4mm; border-top: 1px solid var(--border); color: var(--muted); font-size: 8.5pt; display: flex; justify-content: space-between; }
     footer.stamp .disclaimer { max-width: 60%; }
   </style>
 </head>
 <body>
-  <header class="cover">
-    <h1>${escapeHtml(project.name)}</h1>
-    <p class="meta">Plan financier prévisionnel — moyennes mensuelles</p>
-    <div class="grid">
-      <div class="meta">
-        <div>Organisation&nbsp;: <strong>${escapeHtml(org.name)}</strong></div>
-        <div>Pays du projet&nbsp;: <strong>${escapeHtml(project.pays)}</strong></div>
-        <div>Devise d'affichage&nbsp;: <strong>${escapeHtml(currency)}</strong></div>
-        ${parameterPack ? `<div>Cadre fiscal&nbsp;: <strong>${escapeHtml(parameterPack.label)}</strong></div>` : ''}
-      </div>
-      <div class="meta">
-        <div>Template&nbsp;: <strong>${escapeHtml(template.slug)}</strong> v${escapeHtml(template.version)}</div>
-        ${parameterPack ? `<div>Système comptable&nbsp;: <strong>${escapeHtml(parameterPack.systeme_comptable)}</strong></div>` : ''}
-        <div>Créé le&nbsp;: <strong>${escapeHtml(formatDate(project.createdAt))}</strong></div>
-        <div>Généré le&nbsp;: <strong>${escapeHtml(formatDate(generatedAt))}</strong></div>
-      </div>
+  <!-- Page 1 : garde -->
+  <section class="cover-page">
+    <div class="accent-rule"></div>
+    <h1 class="brand">LALANDA</h1>
+    <p class="tagline">Plan financier prévisionnel bancable</p>
+    <h2 class="project-name">${escapeHtml(project.name)}</h2>
+    <div class="meta-grid">
+      <div class="meta-item">Organisation<strong>${escapeHtml(org.name)}</strong></div>
+      <div class="meta-item">Pays du projet<strong>${escapeHtml(project.pays)}</strong></div>
+      <div class="meta-item">Cadre fiscal<strong>${parameterPack ? escapeHtml(parameterPack.label) : '—'}</strong></div>
+      <div class="meta-item">Système comptable<strong>${parameterPack ? escapeHtml(parameterPack.systeme_comptable) : '—'}</strong></div>
+      <div class="meta-item">Devise d'affichage<strong>${escapeHtml(currency)}</strong></div>
+      <div class="meta-item">Template<strong>${escapeHtml(template.slug)} v${escapeHtml(template.version)}</strong></div>
+      <div class="meta-item">Créé le<strong>${escapeHtml(formatDate(project.createdAt))}</strong></div>
+      <div class="meta-item">Généré le<strong>${escapeHtml(formatDate(generatedAt))}</strong></div>
     </div>
-  </header>
+  </section>
 
-  <h2>Hypothèses</h2>
-  <div class="cols">${driverBlocks}</div>
+  <!-- Page 2 : sommaire -->
+  <section class="toc-page">
+    <h2>Sommaire</h2>
+    <ol class="toc">${tocItems}</ol>
+  </section>
 
-  <h2>Résultats</h2>
-  <div class="cols">${resultBlocks}</div>
+  <!-- Section 1 : Hypothèses -->
+  <section class="section">
+    <h2 class="section-title">Section 1 — Hypothèses du plan</h2>
+    <div class="cols">${driverBlocks}</div>
+  </section>
+
+  <!-- Sections 2 à 7 : feuilles bancables -->
+  ${sectionBlocks}
 
   ${
     parameterPack?.avertissement
-      ? `<section class="card" style="margin-top:8mm;background:#fef9e7;border:1px solid #f0c95a;padding:4mm;">
-    <h3 style="color:#8a6d00;">⚠ Avertissement — cadre fiscal ${escapeHtml(parameterPack.label)}</h3>
-    <p style="margin:0;font-size:9pt;">${escapeHtml(parameterPack.avertissement)}</p>
+      ? `<section class="disclaimer-box">
+    <h3>⚠ Avertissement — cadre fiscal ${escapeHtml(parameterPack.label)}</h3>
+    <p>${escapeHtml(parameterPack.avertissement)}</p>
   </section>`
       : ''
   }

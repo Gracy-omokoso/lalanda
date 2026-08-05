@@ -22,6 +22,7 @@ const html = renderReportHtml({
   project: {
     name: `Test ${slug}`,
     templateSlug: slug,
+    pays: 'CD',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
