@@ -98,6 +98,7 @@ export class ReportsController {
         label: l.label,
         value: l.value,
         format: l.format,
+        seuil: l.seuil,
       })),
       generatedAt: new Date().toISOString(),
       currency: currency as 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR',

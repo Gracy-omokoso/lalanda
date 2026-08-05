@@ -77,6 +77,14 @@ params:
   ratio_autonomie_financiere_min:
     valeur: 0.30
     aide: 'Standards SYSCOHADA.'
+  ratio_marge_ebe_min:
+    valeur: 0.10
+    aide: 'EBE / CA minimum.'
+    a_confirmer: true
+  ratio_marge_nette_min:
+    valeur: 0.05
+    aide: 'Résultat net / CA minimum.'
+    a_confirmer: true
 
   # ─── Coût du crédit ──────────────────────────────────────────
   taux_credit_investissement_xof_pct:

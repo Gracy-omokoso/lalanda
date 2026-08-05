@@ -168,6 +168,7 @@ export class ProjectsController {
           formulaSource: l.formulaSource,
           value: l.value,
           format: l.format,
+          seuil: l.seuil,
         })),
       };
     } catch (err) {
@@ -190,6 +191,11 @@ interface EvaluatedLine {
   formulaSource: string;
   value: number;
   format: 'money' | 'number' | 'percent';
+  seuil?: {
+    valeur: number;
+    direction: 'min' | 'max';
+    statut: 'vert' | 'orange' | 'rouge';
+  };
 }
 
 function toView(doc: ProjectDocument): ProjectView {

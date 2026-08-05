@@ -27,4 +27,23 @@ describe('extractReferencedIds', () => {
     const ids = extractReferencedIds('2 + 3 * (4 - 1)');
     expect(ids.size).toBe(0);
   });
+
+  it('ignore les fonctions Excel natives (MAX, MIN, IF, ABS, ROUND, SUM, IFERROR)', () => {
+    expect([...extractReferencedIds('MAX(0, profit)')]).toEqual(['profit']);
+    expect([...extractReferencedIds('IF(excedent > 0, excedent, 0)')]).toEqual(['excedent']);
+    expect([...extractReferencedIds('MIN(a, b)').values()].sort()).toEqual(['a', 'b']);
+    expect([...extractReferencedIds('ROUND(x * y, 2)').values()].sort()).toEqual(['x', 'y']);
+    expect([...extractReferencedIds('IFERROR(a / b, 0)').values()].sort()).toEqual(['a', 'b']);
+    expect([...extractReferencedIds('SUM(x, y, z)').values()].sort()).toEqual(['x', 'y', 'z']);
+    expect([...extractReferencedIds('ABS(delta)')]).toEqual(['delta']);
+    expect([...extractReferencedIds('AND(a > 0, b > 0)').values()].sort()).toEqual(['a', 'b']);
+  });
+
+  it('ne confond pas un id préfixé/suffixé par un nom de fonction (ex: if_actif, max_prix)', () => {
+    // `\b` isole les mots — `if` ne matche pas à l'intérieur de `if_actif`.
+    expect([...extractReferencedIds('if_actif * max_prix')].sort()).toEqual([
+      'if_actif',
+      'max_prix',
+    ]);
+  });
 });

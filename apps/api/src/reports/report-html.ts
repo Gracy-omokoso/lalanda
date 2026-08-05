@@ -26,6 +26,11 @@ export interface ReportLine {
   label: string;
   value: number;
   format: 'money' | 'number' | 'percent';
+  seuil?: {
+    valeur: number;
+    direction: 'min' | 'max';
+    statut: 'vert' | 'orange' | 'rouge';
+  };
 }
 
 /** Métadonnées légères du pack — juste ce qui est imprimé dans la page de garde. */
@@ -153,8 +158,44 @@ export function renderReportHtml(data: ReportData): string {
     })
     .join('');
 
+  // Feux tricolores (S10) — palette conforme à l'UI.
+  const statutColor: Record<'vert' | 'orange' | 'rouge', string> = {
+    vert: '#16a34a',
+    orange: '#ea580c',
+    rouge: '#dc2626',
+  };
+  const statutLabel: Record<'vert' | 'orange' | 'rouge', string> = {
+    vert: 'OK',
+    orange: 'Vigilance',
+    rouge: 'Critique',
+  };
+
   const resultBlocks = [...linesBySheet.entries()]
     .map(([sheetId, sheetLines]) => {
+      // Rendu spécial pour la feuille "ratios" : chaque ligne peut porter un feu tricolore.
+      if (sheetId === 'ratios') {
+        const rows = sheetLines
+          .map((l) => {
+            const dot = l.seuil
+              ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${statutColor[l.seuil.statut]};margin-right:6px;vertical-align:middle;"></span>`
+              : '';
+            const seuilNote = l.seuil
+              ? `<div style="font-size:8pt;color:${statutColor[l.seuil.statut]};margin-top:1mm;">${escapeHtml(statutLabel[l.seuil.statut])} — seuil ${l.seuil.direction === 'min' ? '≥' : '≤'} ${escapeHtml(formatValue(l.seuil.valeur, l.format, currency))}</div>`
+              : '';
+            return `<tr>
+              <td>${dot}${escapeHtml(l.label)}${seuilNote}</td>
+              <td class="num">${escapeHtml(formatValue(l.value, l.format, currency))}</td>
+            </tr>`;
+          })
+          .join('');
+        return `<section class="card">
+          <h3>${escapeHtml(sheetLabels.get(sheetId) ?? sheetId)}</h3>
+          <table class="kv">
+            <tbody>${rows}</tbody>
+          </table>
+        </section>`;
+      }
+      // Rendu standard pour les autres feuilles.
       const rows = sheetLines
         .map(
           (l) => `<tr>

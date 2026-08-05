@@ -35,6 +35,17 @@ export interface LineResult {
   readonly formulaExcel: string;
   readonly value: number;
   readonly format: CompiledLine['format'];
+  /**
+   * (S10) Statut du feu tricolore : présent uniquement si la ligne déclare `seuil_pack`
+   * ET que le pack fournit la valeur du seuil. Comparaison :
+   * - `min` → `value >= seuil` = vert, à ±10 % = orange, sinon rouge
+   * - `max` → `value <= seuil` = vert, à ±10 % = orange, sinon rouge
+   */
+  readonly seuil?: {
+    readonly valeur: number;
+    readonly direction: 'min' | 'max';
+    readonly statut: 'vert' | 'orange' | 'rouge';
+  };
 }
 
 export interface EvaluationResult {
@@ -94,6 +105,7 @@ export function evaluateCompiled(
         const raw = hf.getCellValue({ sheet: sheetIdxHf, row: i, col: 1 });
         const value = coerceCellValue(raw, ligne.id);
         const compiledLine = compiled.lineIndex.get(ligne.id)!;
+        const seuil = computeSeuil(compiledLine, value, options.parameterPack);
         lines.push({
           sheetId: compiledLine.sheetId,
           lineId: compiledLine.lineId,
@@ -102,6 +114,7 @@ export function evaluateCompiled(
           formulaExcel: compiledLine.formulaExcel,
           value,
           format: compiledLine.format,
+          ...(seuil ? { seuil } : {}),
         });
       });
     }
@@ -113,6 +126,37 @@ export function evaluateCompiled(
 }
 
 // ─── Helpers ──────────────────────────────────────────────────
+
+/**
+ * Calcule le statut d'un feu tricolore pour une ligne :
+ * - vert si la valeur respecte le seuil du pack ;
+ * - orange si elle est dans une bande de tolérance ±10 % ;
+ * - rouge sinon.
+ * Retourne undefined si la ligne n'a pas de seuil OU si le pack n'a pas la valeur.
+ */
+function computeSeuil(
+  compiledLine: CompiledLine,
+  value: number,
+  pack: ParameterPack | undefined,
+): { valeur: number; direction: 'min' | 'max'; statut: 'vert' | 'orange' | 'rouge' } | undefined {
+  if (!compiledLine.seuil_pack || !compiledLine.seuil_direction || !pack) return undefined;
+  const param = pack.params[compiledLine.seuil_pack];
+  if (!param) return undefined;
+  const seuil = param.valeur;
+  const direction = compiledLine.seuil_direction;
+  const tolerance = 0.1; // ±10 % pour la zone orange
+  let statut: 'vert' | 'orange' | 'rouge';
+  if (direction === 'min') {
+    if (value >= seuil) statut = 'vert';
+    else if (value >= seuil * (1 - tolerance)) statut = 'orange';
+    else statut = 'rouge';
+  } else {
+    if (value <= seuil) statut = 'vert';
+    else if (value <= seuil * (1 + tolerance)) statut = 'orange';
+    else statut = 'rouge';
+  }
+  return { valeur: seuil, direction, statut };
+}
 
 function resolveDriverValues(
   compiled: CompiledTemplate,
