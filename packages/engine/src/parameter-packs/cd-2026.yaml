@@ -1,0 +1,121 @@
+# ParameterPack — République Démocratique du Congo, année de référence 2026.
+#
+# Sources : DGI (Direction Générale des Impôts), INSS (ex-CNSS), textes SYSCOHADA
+# révisés 2017, retours terrain Rawbank / Equity BCDC / PADMPME.
+#
+# Toute valeur marquée `a_confirmer: true` doit être re-validée avant usage bancaire
+# (arrêté fiscal 2026 DGI publié en janvier, barèmes INSS actualisés à l'inflation).
+
+slug: cd-2026
+pays: CD
+annee: 2026
+systeme_comptable: syscohada-revise-2017
+devise_principale: USD
+devise_secondaire: CDF
+label: 'RDC — 2026'
+description: >
+  Fiscalité congolaise 2026. IBP 30 %, TVA 16 %, INSS/CNSS 5 %+5 %, INPP 2 %, ONEM 0.2 %.
+  Devise principale USD, affichage secondaire CDF au taux BCC du jour de génération.
+
+avertissement: >
+  Ce pack reflète les règles fiscales et sociales RDC connues à la date de rédaction.
+  Certains barèmes indexés sur l'inflation (IPR, plafond INSS) et les taxes locales
+  (patente communale) doivent être vérifiés auprès d'un expert-comptable OHADA agréé
+  avant tout dépôt de dossier bancaire.
+
+params:
+  # ─── Impôt sur les bénéfices ─────────────────────────────────
+  ibp_taux:
+    valeur: 0.30
+    aide: 'Impôt sur les Bénéfices et Profits (IBP). Taux normal sociétés.'
+    source: 'Loi de finances RDC, taux constant depuis plusieurs années'
+  ibp_minimum_forfaitaire_usd:
+    valeur: 268
+    aide: 'Minimum forfaitaire annuel (~750 000 CDF au taux BCC ~2 800 CDF/USD).'
+    source: 'Code général des impôts RDC'
+    a_confirmer: true
+
+  # ─── TVA ─────────────────────────────────────────────────────
+  tva_taux_normal:
+    valeur: 0.16
+    aide: 'TVA taux normal RDC.'
+    source: 'Ordonnance-Loi 10/001 du 20/08/2010, réforme TVA'
+  tva_taux_reduit:
+    valeur: 0.08
+    aide: 'TVA taux réduit (produits première nécessité).'
+    source: 'Ordonnance-Loi 10/001'
+  tva_seuil_assujettissement_cdf:
+    valeur: 80000000
+    aide: 'Seuil annuel de CA (CDF) au-delà duquel régime réel obligatoire.'
+    source: 'DGI, régime des micro-entrepreneurs'
+
+  # ─── Charges sociales sur salaires ───────────────────────────
+  cnss_employeur_pct:
+    valeur: 0.05
+    aide: 'INSS (ex-CNSS) — part patronale sur salaires bruts.'
+    source: 'Loi 016/2002 régime général sécurité sociale'
+  cnss_salarie_pct:
+    valeur: 0.05
+    aide: 'INSS — part salariale, précomptée sur le brut.'
+    source: 'Loi 016/2002'
+  inpp_pct:
+    valeur: 0.02
+    aide: 'Institut National de Préparation Professionnelle — formation.'
+    source: 'Loi INPP'
+  onem_pct:
+    valeur: 0.002
+    aide: "Office National de l'Emploi."
+    source: 'Décret ONEM'
+  charges_sociales_employeur_pct_total:
+    valeur: 0.072
+    aide: 'Total charges sociales patronales = INSS 5 % + INPP 2 % + ONEM 0.2 %.'
+
+  # ─── IPR (barème progressif) ─────────────────────────────────
+  # Barème par tranches mensuelles en CDF. Modélisation simplifiée par un taux moyen
+  # constaté pour usage dans le prévisionnel — le calcul exact vient dans la feuille
+  # paie détaillée quand elle sera modélisée (S7-full).
+  ipr_taux_moyen_estimatif:
+    valeur: 0.15
+    aide: >
+      Taux moyen IPR appliqué en simulation. Le barème réel est progressif
+      3 % / 15 % / 30 % / 40 % par tranches mensuelles (bornes indexées inflation).
+    source: 'Code impôts RDC — voir barème détaillé DGI'
+    a_confirmer: true
+
+  # ─── Précompte BIC (retenue à la source fournisseurs) ────────
+  precompte_bic_non_immatricule_pct:
+    valeur: 0.01
+    aide: 'Précompte BIC dû sur paiements à fournisseurs non immatriculés (sans NIF).'
+    source: 'DGI'
+
+  # ─── Ratios bancaires attendus (RDC / OHADA) ─────────────────
+  # Ces valeurs guident les feux tricolores dans le PDF et l'UI.
+  ratio_dscr_min:
+    valeur: 1.25
+    aide: 'Debt Service Coverage Ratio minimum attendu par les banques RDC.'
+    source: 'Retours cellules PME Rawbank / BCDC'
+  ratio_apport_min_pct:
+    valeur: 0.25
+    aide: "Ratio apport personnel / total besoins minimum pour crédit d'investissement."
+    source: 'Politique de crédit Rawbank / BCDC (PADMPME exige 30 %)'
+  ratio_autonomie_financiere_min:
+    valeur: 0.30
+    aide: 'Capitaux propres / total passif — seuil vert.'
+    source: 'Standards SYSCOHADA / IFC'
+
+  # ─── Coût du crédit constaté ─────────────────────────────────
+  taux_credit_investissement_usd_pct:
+    valeur: 0.14
+    aide: 'Taux annuel moyen constaté sur crédit investissement PME en USD.'
+    source: 'Grille tarifaire Rawbank / BCDC 2024-2025, à réactualiser 2026'
+    a_confirmer: true
+  taux_credit_investissement_cdf_pct:
+    valeur: 0.21
+    aide: 'Taux annuel moyen constaté sur crédit investissement PME en CDF.'
+    source: 'Grille bancaire — plus élevé pour couvrir risque de change'
+    a_confirmer: true
+  taux_credit_padmpme_bonifie_pct:
+    valeur: 0.095
+    aide: 'Taux bonifié dispositif PADMPME (Banque Mondiale).'
+    source: 'PADMPME'
+    a_confirmer: true

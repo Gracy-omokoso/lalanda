@@ -9,9 +9,26 @@ export interface ProjectView {
   createdBy: string;
   name: string;
   templateSlug: string;
+  pays: string;
+  parameterPackSlug: string;
+  systemeComptable: string;
+  deviseAffichage: string;
   driverValues: Record<string, number>;
   createdAt: string;
   updatedAt: string;
+}
+
+// ─── Parameter Packs (multi-pays, S9) ─────────────────────────
+export interface ParameterPackSummary {
+  slug: string;
+  pays: string;
+  pays_couverts?: string[];
+  annee: number;
+  systeme_comptable: string;
+  devise_principale: 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR';
+  devise_secondaire?: 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR';
+  label: string;
+  description?: string;
 }
 
 export interface LineResult {
@@ -166,8 +183,16 @@ export const api = {
     jsonRequest<{ template: TemplateMeta }>(`/evaluate/templates/${encodeURIComponent(slug)}`, {
       method: 'GET',
     }),
+  listParameterPacks: () =>
+    jsonRequest<{ packs: ParameterPackSummary[] }>(`/parameter-packs`, { method: 'GET' }),
   listProjects: () => jsonRequest<{ projects: ProjectView[] }>(`/projects`, { method: 'GET' }),
-  createProject: (input: { name: string; templateSlug: string }) =>
+  createProject: (input: {
+    name: string;
+    templateSlug: string;
+    pays?: string;
+    parameterPackSlug?: string;
+    deviseAffichage?: 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR';
+  }) =>
     jsonRequest<ProjectView>(`/projects`, {
       method: 'POST',
       body: input,

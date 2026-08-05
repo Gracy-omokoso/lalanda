@@ -5,6 +5,7 @@ import { CellError, ErrorType, HyperFormula, type Sheet } from 'hyperformula';
 
 import { CycleError, EngineError, MissingDriverValueError } from '../dsl/errors.js';
 import type { Template } from '../dsl/schema.js';
+import { packToDriverValues, type ParameterPack } from '../parameter-packs/index.js';
 import {
   DRIVERS_SHEET,
   compileTemplate,
@@ -14,6 +15,16 @@ import {
 
 /** Valeurs de drivers fournies par le scénario. Clé = driver.id. */
 export type DriverValues = ReadonlyMap<string, number> | Record<string, number>;
+
+/**
+ * Options d'évaluation.
+ * `parameterPack` : les valeurs du pack sont pré-remplies comme drivers par défaut,
+ * mais l'utilisateur peut toujours surcharger via `values`. Précédence (fort→faible) :
+ * user values > pack > template.defaut.
+ */
+export interface EvaluateOptions {
+  parameterPack?: ParameterPack;
+}
 
 /** Résultat pour une ligne évaluée. */
 export interface LineResult {
@@ -33,17 +44,22 @@ export interface EvaluationResult {
 }
 
 /** Compile un template et l'évalue avec les valeurs de drivers données. */
-export function evaluateTemplate(template: Template, values: DriverValues): EvaluationResult {
+export function evaluateTemplate(
+  template: Template,
+  values: DriverValues,
+  options: EvaluateOptions = {},
+): EvaluationResult {
   const compiled = compileTemplate(template);
-  return evaluateCompiled(compiled, values);
+  return evaluateCompiled(compiled, values, options);
 }
 
 /** Évalue un template déjà compilé. Utile quand on veut lancer plusieurs scénarios. */
 export function evaluateCompiled(
   compiled: CompiledTemplate,
   values: DriverValues,
+  options: EvaluateOptions = {},
 ): EvaluationResult {
-  const driverValues = resolveDriverValues(compiled, values);
+  const driverValues = resolveDriverValues(compiled, values, options.parameterPack);
 
   const sheets: Record<string, Sheet> = {};
 
@@ -101,12 +117,17 @@ export function evaluateCompiled(
 function resolveDriverValues(
   compiled: CompiledTemplate,
   values: DriverValues,
+  pack: ParameterPack | undefined,
 ): Map<string, number> {
   const provided = values instanceof Map ? values : new Map(Object.entries(values));
+  // Précédence : user > pack > template.defaut.
+  const packValues = pack ? packToDriverValues(pack) : {};
   const resolved = new Map<string, number>();
   for (const d of compiled.template.drivers) {
     if (provided.has(d.id)) {
       resolved.set(d.id, provided.get(d.id)!);
+    } else if (Object.prototype.hasOwnProperty.call(packValues, d.id)) {
+      resolved.set(d.id, packValues[d.id]!);
     } else if (d.defaut !== undefined) {
       resolved.set(d.id, d.defaut);
     } else {

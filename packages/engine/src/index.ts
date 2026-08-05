@@ -44,6 +44,17 @@ export {
   type LineResult,
 } from './evaluator/index.js';
 
+// ParameterPacks (multi-pays / multi-fiscalité)
+export {
+  ParameterPackSchema,
+  packToDriverValues,
+  parseParameterPack,
+  toSummary as parameterPackToSummary,
+  type ParameterPack,
+  type ParameterPackSummary,
+  type Param,
+} from './parameter-packs/index.js';
+
 /** Placeholder — sera retiré quand toutes les APIs seront stables. */
 export function engineHealth(): { ok: true; version: string } {
   return { ok: true, version: ENGINE_VERSION };

@@ -1,0 +1,86 @@
+# ParameterPack — Côte d'Ivoire, 2026.
+# Zone UEMOA (Union Économique et Monétaire Ouest-Africaine), SYSCOHADA révisé.
+# Devise : FCFA XOF (parité EUR fixe : 1 EUR = 655.957 XOF).
+
+slug: ci-2026
+pays: CI
+annee: 2026
+systeme_comptable: syscohada-revise-2017
+devise_principale: XOF
+label: "Côte d'Ivoire — 2026"
+description: >
+  Fiscalité ivoirienne 2026. IS 25 %, TVA 18 %, CNPS ~14.4 % employeur.
+  Zone UEMOA — parité EUR/XOF fixe 1 EUR = 655.957 XOF.
+
+avertissement: >
+  Certaines valeurs (charges sociales, patente) sont soumises aux Lois de Finances
+  annuelles ivoiriennes. Vérifier la DGI Côte d'Ivoire avant dépôt bancaire.
+
+params:
+  # ─── Impôt sur les sociétés ──────────────────────────────────
+  ibp_taux:
+    valeur: 0.25
+    aide: "Impôt sur les Sociétés (IS) — taux normal Côte d'Ivoire."
+    source: 'Code général des impôts CI, Livre I'
+  ibp_minimum_forfaitaire_xof:
+    valeur: 3000000
+    aide: 'IMF (Impôt Minimum Forfaitaire) annuel — 0.5 % du CA HT, minimum 3 MFCFA.'
+    source: 'CGI CI'
+    a_confirmer: true
+
+  # ─── TVA ─────────────────────────────────────────────────────
+  tva_taux_normal:
+    valeur: 0.18
+    aide: 'TVA taux normal — harmonisé UEMOA.'
+    source: 'Directive UEMOA + CGI CI'
+  tva_taux_reduit:
+    valeur: 0.09
+    aide: 'TVA taux réduit (secteurs spécifiques).'
+    source: 'CGI CI'
+
+  # ─── Charges sociales ────────────────────────────────────────
+  cnps_employeur_pct:
+    valeur: 0.144
+    aide: >
+      CNPS + prestations familiales + accidents travail — part patronale totale.
+      Somme approximative : prestations familiales 5.75 %, retraite 7.7 %, AT 2-3 %.
+    source: "CNPS Côte d'Ivoire"
+    a_confirmer: true
+  cnps_salarie_pct:
+    valeur: 0.063
+    aide: 'CNPS retraite — part salariale.'
+    source: 'CNPS CI'
+    a_confirmer: true
+  charges_sociales_employeur_pct_total:
+    valeur: 0.144
+    aide: 'Total charges sociales patronales.'
+    a_confirmer: true
+
+  # ─── ITS (Impôt sur Traitements et Salaires) ─────────────────
+  its_taux_moyen_estimatif:
+    valeur: 0.12
+    aide: >
+      Taux moyen ITS appliqué en simulation. Barème progressif réel :
+      0 %, 1.5 %, 5 %, 10 %, 15 %, 20 %, 25 %, 35 %, 60 %.
+    source: 'CGI CI'
+    a_confirmer: true
+
+  # ─── Ratios bancaires (BCEAO / grandes banques CI) ───────────
+  ratio_dscr_min:
+    valeur: 1.25
+    aide: 'Debt Service Coverage Ratio minimum banques UEMOA.'
+    source: 'Grilles SGBCI / BICICI / SIB'
+  ratio_apport_min_pct:
+    valeur: 0.25
+    aide: 'Apport personnel minimum standard.'
+    source: 'Standards bancaires UEMOA'
+  ratio_autonomie_financiere_min:
+    valeur: 0.30
+    aide: 'Standards SYSCOHADA.'
+
+  # ─── Coût du crédit ──────────────────────────────────────────
+  taux_credit_investissement_xof_pct:
+    valeur: 0.085
+    aide: 'Taux annuel moyen crédit investissement PME XOF, sous supervision BCEAO.'
+    source: 'BCEAO — statistiques monétaires'
+    a_confirmer: true

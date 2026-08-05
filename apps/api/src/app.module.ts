@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module.js';
 import { EvaluateController } from './evaluate/evaluate.controller.js';
 import { HealthController } from './health/health.controller.js';
 import { OrganizationsModule } from './organizations/organizations.module.js';
+import { ParameterPacksModule } from './parameter-packs/parameter-packs.module.js';
 import { ProjectsModule } from './projects/projects.module.js';
 import { ReportsModule } from './reports/reports.module.js';
 
@@ -42,6 +43,7 @@ import { ReportsModule } from './reports/reports.module.js';
     }),
     OrganizationsModule,
     AuthModule,
+    ParameterPacksModule,
     ProjectsModule,
     ReportsModule,
   ],
