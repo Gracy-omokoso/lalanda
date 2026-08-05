@@ -22,6 +22,8 @@ groupes_hypotheses:
     label: 'Charges fixes'
   - id: fiscalite
     label: 'Fiscalité'
+  - id: financement
+    label: 'Financement'
 
 drivers:
   - id: couverts_jour
@@ -101,6 +103,37 @@ drivers:
     max: 1
     aide: 'Taux fourni par le ParameterPack du pays. Surchargeable si le régime de la société diffère du taux standard.'
 
+  # ─── Financement (S11-lite) ─────────────────────────────────
+  # Emprunt bancaire pour financer l'installation. Le service annuel de la dette
+  # (mensualité × 12) alimente le ratio DSCR = EBE_annuel / service_dette_annuel.
+  - id: emprunt_capital
+    groupe: financement
+    label: 'Capital emprunté'
+    type: money
+    devise: USD
+    defaut: 25000
+    min: 0
+    aide: "Montant total du crédit d'investissement (matériel cuisine, aménagements, dépôt loyer). 0 = pas d'emprunt."
+
+  - id: emprunt_taux_annuel
+    groupe: financement
+    label: "Taux d'intérêt annuel"
+    type: percent
+    defaut: 0.14
+    min: 0
+    max: 1
+    aide: 'Taux nominal annuel. Valeur fournie par le ParameterPack (taux_credit_investissement_usd_pct ≈ 14 % en RDC, 8.5 % zone UEMOA).'
+
+  - id: emprunt_duree_mois
+    groupe: financement
+    label: 'Durée du prêt'
+    type: number
+    defaut: 60
+    min: 1
+    max: 240
+    unite: 'mois'
+    aide: "Durée d'amortissement en mois. Typiquement 36 à 84 mois pour un crédit PME investissement."
+
 feuilles:
   - id: activite
     label: "Compte d'exploitation mensuel"
@@ -140,6 +173,27 @@ feuilles:
         formule: 'excedent_brut - ibp'
         format: money
 
+  # Feuille "financement" (S11-lite) — mensualité PMT + service annuel de la dette.
+  # PMT retourne un flux négatif par convention (sortie de trésorerie) → on utilise
+  # -PMT pour manipuler des valeurs positives dans les formules aval.
+  - id: financement
+    label: 'Financement — emprunt bancaire'
+    lignes:
+      - id: mensualite_emprunt
+        label: 'Mensualité constante'
+        formule: 'IFERROR(-PMT(emprunt_taux_annuel / 12, emprunt_duree_mois, emprunt_capital), 0)'
+        format: money
+
+      - id: service_dette_annuel
+        label: 'Service annuel de la dette'
+        formule: 'mensualite_emprunt * 12'
+        format: money
+
+      - id: interets_annuels_estimes
+        label: 'Intérêts année 1 (estimation)'
+        formule: 'service_dette_annuel - (emprunt_capital / (emprunt_duree_mois / 12))'
+        format: money
+
   # Feuille "ratios" (S10) : chaque ligne peut porter un `seuil_pack` qui pointe vers un
   # paramètre du ParameterPack, avec direction min/max. L'évaluateur y attache un feu
   # tricolore vert/orange/rouge que l'UI et le PDF affichent.
@@ -158,6 +212,15 @@ feuilles:
         formule: 'IFERROR(resultat_net / ca, 0)'
         format: percent
         seuil_pack: ratio_marge_nette_min
+        seuil_direction: min
+
+      # DSCR (S11-lite) — Debt Service Coverage Ratio, indicateur bancaire n°1.
+      # EBE annuel / service annuel de la dette. Doit être ≥ 1.25 pour être bancable.
+      - id: dscr
+        label: 'DSCR (couverture du service de la dette)'
+        formule: 'IFERROR((excedent_brut * 12) / service_dette_annuel, 0)'
+        format: number
+        seuil_pack: ratio_dscr_min
         seuil_direction: min
 
       - id: taux_effort_matiere

@@ -20,6 +20,8 @@ groupes_hypotheses:
     label: 'Charges fixes'
   - id: fiscalite
     label: 'Fiscalité'
+  - id: financement
+    label: 'Financement'
 
 drivers:
   - id: ca_moyen_jour
@@ -96,6 +98,35 @@ drivers:
     max: 1
     aide: 'Taux fourni par le ParameterPack du pays. Surchargeable si le régime le justifie.'
 
+  # ─── Financement (S11-lite) ─────────────────────────────────
+  - id: emprunt_capital
+    groupe: financement
+    label: 'Capital emprunté'
+    type: money
+    devise: USD
+    defaut: 12000
+    min: 0
+    aide: "Crédit d'investissement (stock initial + rayonnage + local). 0 = pas d'emprunt."
+
+  - id: emprunt_taux_annuel
+    groupe: financement
+    label: "Taux d'intérêt annuel"
+    type: percent
+    defaut: 0.14
+    min: 0
+    max: 1
+    aide: 'Taux nominal annuel — voir ParameterPack (taux_credit_investissement_usd_pct).'
+
+  - id: emprunt_duree_mois
+    groupe: financement
+    label: 'Durée du prêt'
+    type: number
+    defaut: 48
+    min: 1
+    max: 240
+    unite: 'mois'
+    aide: "Durée d'amortissement. 36-60 mois typiques pour crédit stock commerce."
+
 feuilles:
   - id: activite
     label: "Compte d'exploitation mensuel"
@@ -135,6 +166,24 @@ feuilles:
         formule: 'excedent_brut - ibp'
         format: money
 
+  - id: financement
+    label: 'Financement — emprunt bancaire'
+    lignes:
+      - id: mensualite_emprunt
+        label: 'Mensualité constante'
+        formule: 'IFERROR(-PMT(emprunt_taux_annuel / 12, emprunt_duree_mois, emprunt_capital), 0)'
+        format: money
+
+      - id: service_dette_annuel
+        label: 'Service annuel de la dette'
+        formule: 'mensualite_emprunt * 12'
+        format: money
+
+      - id: interets_annuels_estimes
+        label: 'Intérêts année 1 (estimation)'
+        formule: 'service_dette_annuel - (emprunt_capital / (emprunt_duree_mois / 12))'
+        format: money
+
   - id: ratios
     label: 'Ratios financiers'
     lignes:
@@ -150,6 +199,13 @@ feuilles:
         formule: 'IFERROR(resultat_net / ca, 0)'
         format: percent
         seuil_pack: ratio_marge_nette_min
+        seuil_direction: min
+
+      - id: dscr
+        label: 'DSCR (couverture du service de la dette)'
+        formule: 'IFERROR((excedent_brut * 12) / service_dette_annuel, 0)'
+        format: number
+        seuil_pack: ratio_dscr_min
         seuil_direction: min
 
       - id: marge_commerciale_effective
