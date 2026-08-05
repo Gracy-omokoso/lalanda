@@ -144,6 +144,36 @@ drivers:
     max: 3
     aide: "Croissance annuelle attendue du chiffre d'affaires. 10-20 % typique pour un projet en démarrage. Ne pas dépasser 40 % sans justification écrite pour un dossier bancaire."
 
+  # ─── Plan de financement initial (S12b) ─────────────────────
+  # 3 besoins × 3 ressources → contrôle ressources ≥ besoins.
+  # Le ratio apport / total_besoins alimente `apport_pct` dans la feuille ratios.
+  - id: investissements_initiaux
+    groupe: financement
+    label: 'Investissements initiaux'
+    type: money
+    devise: USD
+    defaut: 30000
+    min: 0
+    aide: "Matériel de cuisine + aménagements + mobilier + caisse enregistreuse + dépôt de loyer. Pour un restaurant 40 places à Gombe : 25-45 k USD selon niveau d'équipement."
+
+  - id: bfr_initial
+    groupe: financement
+    label: 'Trésorerie de sécurité (BFR)'
+    type: money
+    devise: USD
+    defaut: 5000
+    min: 0
+    aide: 'Trésorerie de démarrage pour absorber les décalages (paiement fournisseurs avant encaissement clients, 3 mois de charges fixes recommandés).'
+
+  - id: apport_capital
+    groupe: financement
+    label: 'Apport personnel'
+    type: money
+    devise: USD
+    defaut: 10000
+    min: 0
+    aide: 'Apport en fonds propres (cash + apports en nature évalués). Doit représenter ≥ 25 % du total des besoins (30 % pour PADMPME) — voir ParameterPack (ratio_apport_min_pct).'
+
 feuilles:
   - id: activite
     label: "Compte d'exploitation mensuel"
@@ -202,6 +232,40 @@ feuilles:
       - id: interets_annuels_estimes
         label: 'Intérêts année 1 (estimation)'
         formule: 'service_dette_annuel - (emprunt_capital / (emprunt_duree_mois / 12))'
+        format: money
+
+  # Feuille "plan_financement" (S12b) — besoins vs ressources initiaux.
+  # Contrôle bancaire : ressources doivent ≥ besoins ; apport doit ≥ 25 % des besoins.
+  - id: plan_financement
+    label: 'Plan de financement initial'
+    lignes:
+      - id: pf_investissements
+        label: 'Investissements'
+        formule: 'investissements_initiaux'
+        format: money
+      - id: pf_bfr
+        label: 'BFR (trésorerie de sécurité)'
+        formule: 'bfr_initial'
+        format: money
+      - id: pf_total_besoins
+        label: 'TOTAL BESOINS'
+        formule: 'pf_investissements + pf_bfr'
+        format: money
+      - id: pf_apport
+        label: 'Apport personnel'
+        formule: 'apport_capital'
+        format: money
+      - id: pf_emprunt
+        label: 'Emprunt bancaire'
+        formule: 'emprunt_capital'
+        format: money
+      - id: pf_total_ressources
+        label: 'TOTAL RESSOURCES'
+        formule: 'pf_apport + pf_emprunt'
+        format: money
+      - id: pf_ecart
+        label: 'Écart (ressources − besoins)'
+        formule: 'pf_total_ressources - pf_total_besoins'
         format: money
 
   # Feuille "projection" (S12-lite) — 3 ans avec taux de croissance annuel du CA.
@@ -267,6 +331,15 @@ feuilles:
         formule: 'IFERROR((excedent_brut * 12) / service_dette_annuel, 0)'
         format: number
         seuil_pack: ratio_dscr_min
+        seuil_direction: min
+
+      # Ratio apport (S12b) — apport / total des besoins. Doit être ≥ 25 % (30 % PADMPME).
+      # Seuil bancaire critique — un dossier avec apport < 20 % est retoqué sans lecture.
+      - id: apport_pct
+        label: 'Ratio apport personnel sur besoins'
+        formule: 'IFERROR(apport_capital / pf_total_besoins, 0)'
+        format: percent
+        seuil_pack: ratio_apport_min_pct
         seuil_direction: min
 
       # Payback (S12-lite) — délai de récupération de l'investissement en années.
