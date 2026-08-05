@@ -198,4 +198,29 @@ describe('prestation-services', () => {
     const apportLine = lines.find((l) => l.lineId === 'apport_pct');
     expect(apportLine?.seuil).toBeUndefined();
   });
+
+  it('S13a : trésorerie mensuelle — scénario défauts prestation-services', () => {
+    // Défauts prestation :
+    //   apport 3500 + emprunt 5000 - invest 6000 - bfr 4000 = -1500 (tresorerie_initiale)
+    //   solde_mensuel = resultat_net 840 - mensualite_emprunt (~170 USD) ≈ 670
+    //   tresorerie_fin_m12 = -1500 + 670 × 12 ≈ 6540
+    //   tresorerie_min = MIN(-1500, 6540) = -1500 ← CRITIQUE (négatif au démarrage)
+    const { lines } = evaluateTemplate(template, {});
+    const v = byId(lines);
+    expect(v.get('tresorerie_initiale')).toBe(-1500);
+    expect(v.get('solde_mensuel_operationnel')).toBeGreaterThan(650);
+    expect(v.get('solde_mensuel_operationnel')).toBeLessThan(700);
+    expect(v.get('tresorerie_fin_m12')).toBeGreaterThan(6000);
+    // Min = tresorerie_initiale car solde > 0 (donc trésorerie monte)
+    expect(v.get('tresorerie_min_annee_1')).toBe(-1500);
+  });
+
+  it('S13a : trésorerie positive si apport initial suffisant', () => {
+    // apport 20 000 → tresorerie_initiale = 20 000 + 5000 - 6000 - 4000 = 15 000
+    // → tresorerie_min = MIN(15 000, positif) = 15 000 → VERT
+    const { lines } = evaluateTemplate(template, { apport_capital: 20000 });
+    const v = byId(lines);
+    expect(v.get('tresorerie_initiale')).toBe(15000);
+    expect(v.get('tresorerie_min_annee_1')).toBe(15000);
+  });
 });
