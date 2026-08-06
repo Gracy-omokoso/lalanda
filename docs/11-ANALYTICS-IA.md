@@ -83,3 +83,29 @@ Le contexte est minimal, structuré et autorisé : métriques nécessaires, déf
 ## Qualité
 
 Tests sur exactitude des citations numériques, absence de fuite inter-tenant, refus des instructions malveillantes, stabilité des formats et qualité des recommandations. L’IA est évaluée séparément du moteur financier.
+
+## Actions correctives sur les ratios (S14a)
+
+L’endpoint `POST /ai/corrective-actions` lit les lignes de la feuille `ratios`
+produites par un `evaluate` et propose 2 à 4 corrections concrètes pour les
+ratios en zone rouge ou orange (DSCR, apport, payback, trésorerie mini, etc.).
+
+Règles :
+
+- l’IA n’effectue AUCUN calcul et ne modifie AUCUNE feuille officielle;
+- elle ne cite que des valeurs présentes dans l’entrée (valeur courante ou seuil);
+- les suggestions restent qualitatives (« réduire », « renégocier », « phaser »);
+- la réponse est validée par schéma Zod strict avant renvoi;
+- toute action référençant un ratio hors périmètre est rejetée.
+
+Backends :
+
+- LLM : OpenAI `gpt-4o-mini` via SDK officiel; clé lue dans la variable
+  d’environnement `OPENAI_API_KEY` (jamais versionnée);
+- fallback déterministe : si la clé est absente, si le SDK n’est pas installé,
+  ou si la réponse LLM est invalide, un jeu de règles codées en dur retourne
+  une suggestion par ratio surveillé. Ce chemin est entièrement testable sans
+  réseau et sert de filet de sécurité en production.
+
+Le champ `source` de la réponse (`"llm"` ou `"fallback"`) permet à l’interface
+d’indiquer clairement à l’utilisateur d’où viennent les suggestions.

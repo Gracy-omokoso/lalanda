@@ -75,6 +75,54 @@ Exige la permission, une confirmation des avertissements autorisés et crée un 
 
 Les messages ne divulguent ni secrets ni ressources d’une autre organisation.
 
+## Copilote IA — actions correctives (S14a)
+
+`POST /ai/corrective-actions`
+
+Entrée :
+
+```json
+{
+  "templateSlug": "prestation-services",
+  "drivers": { "prix_jour": 500 },
+  "devise": "USD",
+  "lines": [
+    {
+      "sheetId": "ratios",
+      "lineId": "dscr",
+      "label": "DSCR (couverture du service de la dette)",
+      "value": 0.9,
+      "format": "number",
+      "seuil": { "valeur": 1.25, "direction": "min", "statut": "rouge" }
+    }
+  ]
+}
+```
+
+Sortie :
+
+```json
+{
+  "source": "fallback",
+  "actions": [
+    {
+      "ratio": "dscr",
+      "severity": "rouge",
+      "suggestion": "Réduire le service de la dette ou renforcer l'EBE …",
+      "expected_impact": "Amener le DSCR à au moins 1,25 (actuellement 0,90)."
+    }
+  ]
+}
+```
+
+Contraintes :
+
+- l’IA ne recalcule rien et ne modifie aucune feuille officielle;
+- 0 à 4 actions retournées, priorisées rouge → orange;
+- fallback déterministe automatique si `OPENAI_API_KEY` est absente ou si la
+  réponse du LLM est invalide;
+- le champ `source` vaut `"llm"` ou `"fallback"` pour tracer l’origine.
+
 ## Webhooks
 
 Paiements et intégrations utilisent signatures, tolérance temporelle, anti-rejeu, journal et traitement idempotent.
