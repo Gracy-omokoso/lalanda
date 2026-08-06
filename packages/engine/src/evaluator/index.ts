@@ -12,10 +12,7 @@ import {
   type CompiledLine,
   type CompiledTemplate,
 } from '../compiler/index.js';
-import {
-  calculerAmortissements,
-  type FeuilleAmortissements,
-} from '../amortissements/index.js';
+import { calculerAmortissements, type FeuilleAmortissements } from '../amortissements/index.js';
 
 /** Valeurs de drivers fournies par le scénario. Clé = driver.id. */
 export type DriverValues = ReadonlyMap<string, number> | Record<string, number>;
@@ -168,7 +165,12 @@ function computeAmortissementsSheet(template: Template): FeuilleAmortissements |
  */
 function appendAmortissementsLines(lines: LineResult[], feuille: FeuilleAmortissements): void {
   const idSafe = (label: string): string =>
-    'immo_' + label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'immo';
+    'immo_' +
+      label
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 40) || 'immo';
 
   // Une ligne par immobilisation : label = "Dotation <immo> — année N"
   feuille.lignes.forEach((ligne, immoIdx) => {

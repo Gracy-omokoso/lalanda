@@ -166,13 +166,21 @@ export function calculerAmortissements(
 /** Extrait l'année d'une date YYYY-MM-DD. */
 function extractAnnee(date: string): number {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
-  if (!m) throw new EngineError('INVALID_FORMULA', `Date d'acquisition invalide : "${date}" (attendu YYYY-MM-DD)`);
+  if (!m)
+    throw new EngineError(
+      'INVALID_FORMULA',
+      `Date d'acquisition invalide : "${date}" (attendu YYYY-MM-DD)`,
+    );
   return Number.parseInt(m[1]!, 10);
 }
 
 /** Extrait année + mois (1-12) d'une date YYYY-MM-DD. */
 function extractDate(date: string): { annee: number; mois: number } {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
-  if (!m) throw new EngineError('INVALID_FORMULA', `Date d'acquisition invalide : "${date}" (attendu YYYY-MM-DD)`);
+  if (!m)
+    throw new EngineError(
+      'INVALID_FORMULA',
+      `Date d'acquisition invalide : "${date}" (attendu YYYY-MM-DD)`,
+    );
   return { annee: Number.parseInt(m[1]!, 10), mois: Number.parseInt(m[2]!, 10) };
 }

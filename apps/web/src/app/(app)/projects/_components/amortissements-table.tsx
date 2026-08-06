@@ -144,8 +144,8 @@ export function AmortissementsTable({ amortissements, currency }: Props): React.
           </section>
 
           <p className="text-[11px] italic text-[var(--foreground-muted)]">
-            Durées standard SYSCOHADA révisé (AUDCIF 2017), méthode linéaire. À faire valider par
-            un expert-comptable local pour tout dépôt bancaire officiel.
+            Durées standard SYSCOHADA révisé (AUDCIF 2017), méthode linéaire. À faire valider par un
+            expert-comptable local pour tout dépôt bancaire officiel.
           </p>
         </>
       )}

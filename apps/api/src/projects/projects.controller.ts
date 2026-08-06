@@ -132,7 +132,11 @@ export class ProjectsController {
     @CurrentOrgId() orgId: string,
     @Param('id') id: string,
     @Body() body: unknown,
-  ): Promise<{ project: ProjectView; lines: EvaluatedLine[]; amortissements?: AmortissementsView }> {
+  ): Promise<{
+    project: ProjectView;
+    lines: EvaluatedLine[];
+    amortissements?: AmortissementsView;
+  }> {
     const parsed = EvaluateProjectSchema.safeParse(body ?? {});
     if (!parsed.success) {
       throw new BadRequestException({ code: 'INVALID_REQUEST', issues: parsed.error.issues });

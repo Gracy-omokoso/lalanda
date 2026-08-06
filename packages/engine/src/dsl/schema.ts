@@ -110,9 +110,7 @@ const ImmobilisationSchema = z
     /** Montant HT amortissable (base d'amortissement = montant_ht − valeur_residuelle). */
     montant_ht: z.number().finite().nonnegative(),
     /** Date d'acquisition au format YYYY-MM-DD (utilisée pour le prorata temporis). */
-    date_acquisition: z
-      .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/, 'date invalide (attendu YYYY-MM-DD)'),
+    date_acquisition: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'date invalide (attendu YYYY-MM-DD)'),
     /** Valeur résiduelle en fin de vie (optionnel, défaut = 0). */
     valeur_residuelle: z.number().finite().nonnegative().optional(),
     /** Surcharge explicite de la durée standard SYSCOHADA (années). */

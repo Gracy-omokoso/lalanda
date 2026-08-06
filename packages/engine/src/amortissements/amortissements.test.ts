@@ -215,7 +215,7 @@ feuilles:
 
 // ─── Non-régression ───────────────────────────────────────────
 
-describe("non-régression — template sans immobilisations", () => {
+describe('non-régression — template sans immobilisations', () => {
   it("ne produit ni feuille ni lignes 'amortissements'", () => {
     const template = parseTemplate(`
 slug: no-immo
