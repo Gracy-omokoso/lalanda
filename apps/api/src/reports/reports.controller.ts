@@ -128,10 +128,7 @@ export class ReportsController {
   }
 
   @Get(':id/report/xlsx')
-  @Header(
-    'content-type',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  )
+  @Header('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
   async downloadXlsx(
     @CurrentOrgId() orgId: string,
     @Param('id') id: string,

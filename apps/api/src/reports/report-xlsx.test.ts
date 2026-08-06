@@ -77,9 +77,7 @@ describe('mapDslToExcelFormula', () => {
       'PMT(taux_annuel / 12, duree_mois, -capital)',
       resolver,
     );
-    expect(formula).toBe(
-      "PMT('Hypothèses'!B5 / 12, 'Hypothèses'!B6, -'Hypothèses'!B7)",
-    );
+    expect(formula).toBe("PMT('Hypothèses'!B5 / 12, 'Hypothèses'!B6, -'Hypothèses'!B7)");
     expect(allResolved).toBe(true);
   });
 
@@ -137,7 +135,7 @@ describe('renderReportXlsx', () => {
     };
   }
 
-  it("produit un Buffer .xlsx non vide", async () => {
+  it('produit un Buffer .xlsx non vide', async () => {
     const buf = await renderReportXlsx(buildData());
     expect(Buffer.isBuffer(buf)).toBe(true);
     expect(buf.byteLength).toBeGreaterThan(0);

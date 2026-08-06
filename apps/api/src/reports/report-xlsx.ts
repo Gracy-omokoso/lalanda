@@ -206,8 +206,7 @@ export async function renderReportXlsx(data: ReportData): Promise<Buffer> {
   }
 
   // Résolveur commun : cherche d'abord dans les drivers, puis dans les lignes.
-  const resolver = (id: string): CellRef | undefined =>
-    driverRefs.get(id) ?? lineRefs.get(id);
+  const resolver = (id: string): CellRef | undefined => driverRefs.get(id) ?? lineRefs.get(id);
 
   // Écriture effective.
   for (const [sheetId, sheetLines] of linesBySheet) {
