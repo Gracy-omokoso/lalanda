@@ -1,4 +1,7 @@
-// Route de génération PDF d'un rapport de projet (S8-lite).
+// Routes de génération de rapports de projet.
+// - PDF (S8-lite → S13e) : dossier bancable rendu via Puppeteer.
+// - XLSX (S14b) : classeur avec une feuille par feuille moteur et formules Excel natives.
+//
 // La route est côté /projects pour rester cohérente avec le scope (projet appartient à une org).
 
 import {
@@ -21,16 +24,19 @@ import { OrganizationsService } from '../organizations/organizations.service.js'
 import { getParameterPack } from '../parameter-packs/parameter-pack-registry.js';
 import { ProjectsService } from '../projects/projects.service.js';
 import { ReportsService } from './reports.service.js';
+import type { ReportData } from './report-html.js';
 
-function pdfFilename(name: string): string {
-  const safe = name
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-zA-Z0-9-_ ]/g, '')
-    .trim()
-    .replace(/\s+/g, '-')
-    .slice(0, 80);
-  return `${safe || 'plan-financier'}.pdf`;
+/** Slug de fichier — retire diacritiques/caractères spéciaux, borne à 80 caractères. */
+function fileSlug(name: string): string {
+  return (
+    name
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-zA-Z0-9-_ ]/g, '')
+      .trim()
+      .replace(/\s+/g, '-')
+      .slice(0, 80) || 'plan-financier'
+  );
 }
 
 @Controller('projects')
@@ -42,13 +48,12 @@ export class ReportsController {
     @Inject(ReportsService) private readonly reports: ReportsService,
   ) {}
 
-  @Get(':id/report/pdf')
-  @Header('content-type', 'application/pdf')
-  async downloadPdf(
-    @CurrentOrgId() orgId: string,
-    @Param('id') id: string,
-    @Res({ passthrough: false }) res: Response,
-  ): Promise<void> {
+  /**
+   * Prépare le `ReportData` partagé par PDF et Excel : lookup projet + org + pack,
+   * évaluation moteur, résolution de la devise d'affichage.
+   * Factorise pour garantir que les deux exports partent des mêmes chiffres.
+   */
+  private async buildReportData(orgId: string, id: string): Promise<ReportData> {
     const project = await this.projects.findScoped(id, orgId);
     const template = getTemplate(project.templateSlug);
     if (!template) {
@@ -72,7 +77,7 @@ export class ReportsController {
       template.devise_base ??
       'USD';
 
-    const pdf = await this.reports.renderPdf({
+    return {
       organization: { name: org.name, pays: org.pays },
       project: {
         name: project.name,
@@ -102,10 +107,43 @@ export class ReportsController {
       })),
       generatedAt: new Date().toISOString(),
       currency: currency as 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR',
-    });
+    };
+  }
 
-    res.setHeader('content-disposition', `attachment; filename="${pdfFilename(project.name)}"`);
+  @Get(':id/report/pdf')
+  @Header('content-type', 'application/pdf')
+  async downloadPdf(
+    @CurrentOrgId() orgId: string,
+    @Param('id') id: string,
+    @Res({ passthrough: false }) res: Response,
+  ): Promise<void> {
+    const data = await this.buildReportData(orgId, id);
+    const pdf = await this.reports.renderPdf(data);
+    res.setHeader(
+      'content-disposition',
+      `attachment; filename="${fileSlug(data.project.name)}.pdf"`,
+    );
     res.setHeader('content-length', String(pdf.byteLength));
     res.end(pdf);
+  }
+
+  @Get(':id/report/xlsx')
+  @Header(
+    'content-type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  )
+  async downloadXlsx(
+    @CurrentOrgId() orgId: string,
+    @Param('id') id: string,
+    @Res({ passthrough: false }) res: Response,
+  ): Promise<void> {
+    const data = await this.buildReportData(orgId, id);
+    const xlsx = await this.reports.renderXlsx(data);
+    res.setHeader(
+      'content-disposition',
+      `attachment; filename="${fileSlug(data.project.name)}.xlsx"`,
+    );
+    res.setHeader('content-length', String(xlsx.byteLength));
+    res.end(xlsx);
   }
 }

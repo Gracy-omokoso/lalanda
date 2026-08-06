@@ -8,6 +8,7 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 
 import { renderReportHtml, type ReportData } from './report-html.js';
+import { renderReportXlsx } from './report-xlsx.js';
 
 // Type minimal — on n'importe pas les types de puppeteer statiquement pour éviter
 // une dépendance de compilation forte sur la présence de Chromium.
@@ -63,6 +64,14 @@ export class ReportsService implements OnModuleDestroy {
    * cette méthode. Le contrôleur doit s'assurer que le trafic prod atteint bien un
    * environnement où `puppeteer` a téléchargé Chromium (ou où CHROME_PATH pointe vers un binaire).
    */
+  /**
+   * Génère l'export Excel (.xlsx) — une feuille par feuille moteur, formules DSL
+   * traduites en formules Excel natives. Voir `report-xlsx.ts` pour le détail du mapping.
+   */
+  async renderXlsx(data: ReportData): Promise<Buffer> {
+    return renderReportXlsx(data);
+  }
+
   async renderPdf(data: ReportData): Promise<Buffer> {
     const html = this.renderHtml(data);
     const browser = await this.getBrowser();
