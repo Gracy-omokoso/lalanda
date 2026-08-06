@@ -255,4 +255,20 @@ export const api = {
     const filename = match?.[1] ?? 'plan-financier.pdf';
     return { blob: await res.blob(), filename };
   },
+  // ─── Reports Excel (S14b) ──────────────────────────────────
+  // Une feuille par feuille moteur, formules DSL préservées en formules Excel natives.
+  async downloadProjectXlsx(id: string): Promise<{ blob: Blob; filename: string }> {
+    const res = await fetch(`${API_URL}/projects/${encodeURIComponent(id)}/report/xlsx`, {
+      method: 'GET',
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`HTTP ${res.status} — ${text.slice(0, 200)}`);
+    }
+    const cd = res.headers.get('content-disposition') ?? '';
+    const match = cd.match(/filename="([^"]+)"/);
+    const filename = match?.[1] ?? 'plan-financier.xlsx';
+    return { blob: await res.blob(), filename };
+  },
 };
