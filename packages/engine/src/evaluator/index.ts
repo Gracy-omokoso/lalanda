@@ -12,6 +12,7 @@ import {
   type CompiledLine,
   type CompiledTemplate,
 } from '../compiler/index.js';
+import { calculerAmortissements, type FeuilleAmortissements } from '../amortissements/index.js';
 
 /** Valeurs de drivers fournies par le scénario. Clé = driver.id. */
 export type DriverValues = ReadonlyMap<string, number> | Record<string, number>;
@@ -52,6 +53,12 @@ export interface EvaluationResult {
   readonly compiled: CompiledTemplate;
   readonly drivers: ReadonlyMap<string, number>;
   readonly lines: readonly LineResult[];
+  /**
+   * (S14c) Feuille amortissements SYSCOHADA calculée si le template déclare une
+   * liste d'immobilisations. `undefined` sinon — comportement rétrocompatible :
+   * un template sans `immobilisations` ne produit ni lignes ni feuille supplémentaires.
+   */
+  readonly amortissements?: FeuilleAmortissements;
 }
 
 /** Compile un template et l'évalue avec les valeurs de drivers données. */
@@ -119,9 +126,145 @@ export function evaluateCompiled(
       });
     }
 
-    return { compiled, drivers: driverValues, lines };
+    // (S14c) Feuille amortissements — calculée hors HyperFormula car sa forme
+    // (colonnes = années × immobilisations) ne se prête pas au modèle ligne/formule DSL.
+    const amortissements = computeAmortissementsSheet(compiled.template);
+    if (amortissements) {
+      appendAmortissementsLines(lines, amortissements);
+      applyDapToProjection(lines, amortissements);
+    }
+
+    return {
+      compiled,
+      drivers: driverValues,
+      lines,
+      ...(amortissements ? { amortissements } : {}),
+    };
   } finally {
     hf.destroy();
+  }
+}
+
+// ─── Feuille amortissements (S14c) ────────────────────────────
+
+/**
+ * Calcule la feuille amortissements si le template déclare `immobilisations`.
+ * Retourne `undefined` sinon (non-régression : templates existants inchangés).
+ */
+function computeAmortissementsSheet(template: Template): FeuilleAmortissements | undefined {
+  const immobilisations = template.immobilisations;
+  if (!immobilisations || immobilisations.length === 0) return undefined;
+  const horizon = template.horizon_projection_annees ?? 3;
+  return calculerAmortissements(immobilisations, horizon);
+}
+
+/**
+ * Ajoute au tableau `lines` une ligne par (immobilisation × année) plus une ligne
+ * total DAP par année et une ligne total VNC par année. Le `sheetId` est
+ * `amortissements` — nouveau sheetId réservé côté API et web.
+ */
+function appendAmortissementsLines(lines: LineResult[], feuille: FeuilleAmortissements): void {
+  const idSafe = (label: string): string =>
+    'immo_' +
+      label
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 40) || 'immo';
+
+  // Une ligne par immobilisation : label = "Dotation <immo> — année N"
+  feuille.lignes.forEach((ligne, immoIdx) => {
+    ligne.dotations.forEach((dot, i) => {
+      const anneeNum = i + 1;
+      lines.push({
+        sheetId: 'amortissements',
+        lineId: `${idSafe(ligne.label)}_${immoIdx}_dotation_a${anneeNum}`,
+        label: `${ligne.label} — dotation année ${anneeNum}`,
+        formulaSource: `linéaire ${ligne.duree_annees} ans, prorata ${ligne.prorata_premiere_annee.toFixed(2)}`,
+        formulaExcel: '',
+        value: dot,
+        format: 'money',
+      });
+    });
+    ligne.vnc.forEach((v, i) => {
+      const anneeNum = i + 1;
+      lines.push({
+        sheetId: 'amortissements',
+        lineId: `${idSafe(ligne.label)}_${immoIdx}_vnc_a${anneeNum}`,
+        label: `${ligne.label} — VNC fin année ${anneeNum}`,
+        formulaSource: `montant_ht − Σ dotations`,
+        formulaExcel: '',
+        value: v,
+        format: 'money',
+      });
+    });
+  });
+
+  // Totaux par année.
+  feuille.dap_par_annee.forEach((total, i) => {
+    const anneeNum = i + 1;
+    lines.push({
+      sheetId: 'amortissements',
+      lineId: `dap_total_a${anneeNum}`,
+      label: `TOTAL Dotations aux amortissements — année ${anneeNum}`,
+      formulaSource: 'Σ dotations toutes immobilisations',
+      formulaExcel: '',
+      value: total,
+      format: 'money',
+    });
+  });
+  feuille.vnc_par_annee.forEach((total, i) => {
+    const anneeNum = i + 1;
+    lines.push({
+      sheetId: 'amortissements',
+      lineId: `vnc_total_a${anneeNum}`,
+      label: `TOTAL VNC — fin année ${anneeNum}`,
+      formulaSource: 'Σ VNC toutes immobilisations',
+      formulaExcel: '',
+      value: total,
+      format: 'money',
+    });
+  });
+}
+
+/**
+ * Injecte l'impact des amortissements sur la projection annuelle si celle-ci existe.
+ * Convention MVP : si des lignes `resultat_annuel_1..N` existent dans la feuille
+ * `projection`, on ajoute des lignes `resultat_annuel_N_apres_amortissements`
+ * (résultat net − DAP). On ne mute PAS les lignes existantes pour préserver la
+ * traçabilité (le CR "hors amortissements" reste lisible côté rapport bancaire).
+ *
+ * Si une ligne `dotations_amortissements` existe explicitement dans le template,
+ * on la surcharge avec le total année 1 (la feuille amortissements devient la
+ * source unique — cf. brief S14c "remplace toute DAP saisie manuelle").
+ */
+function applyDapToProjection(lines: LineResult[], feuille: FeuilleAmortissements): void {
+  // 1) Surcharge éventuelle d'une ligne DAP manuelle (année 1 par défaut).
+  const dapAnnee1 = feuille.dap_par_annee[0] ?? 0;
+  const manualDap = lines.findIndex((l) => l.lineId === 'dotations_amortissements');
+  if (manualDap >= 0) {
+    lines[manualDap] = {
+      ...lines[manualDap]!,
+      value: dapAnnee1,
+      formulaSource: '(surchargé) Σ dotations amortissements année 1',
+    };
+  }
+
+  // 2) Ajout des lignes "résultat après amortissements" pour l'horizon disponible.
+  for (let i = 0; i < feuille.horizon_annees; i++) {
+    const anneeNum = i + 1;
+    const resAnnuel = lines.find((l) => l.lineId === `resultat_annuel_${anneeNum}`);
+    if (!resAnnuel) continue;
+    const dap = feuille.dap_par_annee[i] ?? 0;
+    lines.push({
+      sheetId: resAnnuel.sheetId,
+      lineId: `resultat_annuel_${anneeNum}_apres_amort`,
+      label: `Résultat net année ${anneeNum} (après amortissements)`,
+      formulaSource: `${resAnnuel.lineId} − DAP année ${anneeNum}`,
+      formulaExcel: '',
+      value: resAnnuel.value - dap,
+      format: 'money',
+    });
   }
 }
 
