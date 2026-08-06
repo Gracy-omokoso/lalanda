@@ -13,12 +13,14 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   api,
+  type AmortissementsView,
   type LineResult,
   type ProjectView,
   type TemplateDriverMeta,
   type TemplateMeta,
 } from '@/lib/api';
 
+import { AmortissementsTable } from './amortissements-table';
 import { RatiosStickyBanner } from './ratios-sticky-banner';
 import { SheetTabs, type SheetTab } from './sheet-tabs';
 
@@ -91,9 +93,10 @@ const SHEET_LABELS: Record<string, string> = {
   projection: 'Projection 3 ans',
   financement: 'Financement',
   plan_financement: 'Plan de financement',
+  amortissements: 'Amortissements',
 };
 
-// Ordre canonique des onglets (gauche → droite) — S13d.
+// Ordre canonique des onglets (gauche → droite) — S13d + S14c.
 const TAB_ORDER: string[] = [
   'ratios',
   'activite',
@@ -101,6 +104,7 @@ const TAB_ORDER: string[] = [
   'projection',
   'financement',
   'plan_financement',
+  'amortissements',
 ];
 
 const DEFAULT_TAB = 'ratios';
@@ -110,6 +114,7 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
   const [template, setTemplate] = useState<TemplateMeta | null>(null);
   const [values, setValues] = useState<Record<string, number>>({});
   const [lines, setLines] = useState<LineResult[] | null>(null);
+  const [amortissements, setAmortissements] = useState<AmortissementsView | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -150,6 +155,7 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
     try {
       const res = await api.evaluateProject(projectId, payload, false);
       setLines(res.lines);
+      setAmortissements(res.amortissements);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur d'évaluation");
     } finally {
@@ -315,7 +321,7 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
             <Suspense
               fallback={<p className="text-sm text-[var(--foreground-muted)]">Chargement…</p>}
             >
-              <ResultsTabs lines={lines} currency={currency} />
+              <ResultsTabs lines={lines} currency={currency} amortissements={amortissements} />
             </Suspense>
           ) : (
             <p className="text-sm text-[var(--foreground-muted)]">…</p>
@@ -331,9 +337,10 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
 interface ResultsTabsProps {
   lines: LineResult[];
   currency: string;
+  amortissements?: AmortissementsView;
 }
 
-function ResultsTabs({ lines, currency }: ResultsTabsProps): React.ReactElement {
+function ResultsTabs({ lines, currency, amortissements }: ResultsTabsProps): React.ReactElement {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -349,11 +356,13 @@ function ResultsTabs({ lines, currency }: ResultsTabsProps): React.ReactElement 
   }, [lines]);
 
   // Onglets à afficher : ordre canonique + toute feuille inconnue à la suite.
+  // (S14c) 'amortissements' est ajouté même si aucune ligne (rendu piloté par la
+  // struct dédiée `amortissements`).
   const tabs: SheetTab[] = useMemo(() => {
     const seen = new Set<string>();
     const ordered: SheetTab[] = [];
     for (const id of TAB_ORDER) {
-      if (bySheet.has(id)) {
+      if (bySheet.has(id) || (id === 'amortissements' && amortissements)) {
         ordered.push({ id, label: SHEET_LABELS[id] ?? id });
         seen.add(id);
       }
@@ -362,12 +371,15 @@ function ResultsTabs({ lines, currency }: ResultsTabsProps): React.ReactElement 
       if (!seen.has(id)) ordered.push({ id, label: SHEET_LABELS[id] ?? id });
     }
     return ordered;
-  }, [bySheet]);
+  }, [bySheet, amortissements]);
 
   // Onglet actif : ?tab=... si valide, sinon défaut (ratios) sinon 1er dispo.
+  // (S14c) 'amortissements' est un onglet valide même sans lignes (rendu par AmortissementsTable).
   const requestedTab = searchParams.get('tab');
+  const isValidTab = (id: string): boolean =>
+    bySheet.has(id) || (id === 'amortissements' && amortissements !== undefined);
   const fallbackTab = bySheet.has(DEFAULT_TAB) ? DEFAULT_TAB : (tabs[0]?.id ?? DEFAULT_TAB);
-  const activeTab = requestedTab && bySheet.has(requestedTab) ? requestedTab : fallbackTab;
+  const activeTab = requestedTab && isValidTab(requestedTab) ? requestedTab : fallbackTab;
 
   const setActiveTab = useCallback(
     (id: string) => {
@@ -397,6 +409,8 @@ function ResultsTabs({ lines, currency }: ResultsTabsProps): React.ReactElement 
       >
         {activeTab === 'ratios' ? (
           <RatiosCard lines={activeLines} />
+        ) : activeTab === 'amortissements' && amortissements ? (
+          <AmortissementsTable amortissements={amortissements} currency={currency} />
         ) : (
           <ResultsTable sheetId={activeTab} lines={activeLines} currency={currency} />
         )}

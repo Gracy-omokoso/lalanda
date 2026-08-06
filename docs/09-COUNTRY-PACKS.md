@@ -77,6 +77,34 @@ Le pays est choisi à la création du projet. Un changement après validation d�
 
 Les changements exigent permissions dédiées, double validation pour les règles critiques, aperçu des projets affectés, tests, journal d’audit et capacité de retrait rapide.
 
+## Amortissements SYSCOHADA révisé (AUDCIF 2017)
+
+Les durées standard livrées dans les packs OHADA (RDC, CI, SN, générique) sont
+consommées par la feuille moteur `amortissements` (méthode linéaire, prorata
+temporis 1re année). Elles servent de valeur par défaut par catégorie
+d’immobilisation et peuvent être surchargées ligne par ligne quand la nature
+de l’actif justifie une durée différente à l’intérieur des plages admises.
+
+| Catégorie                     | Durée standard | Plage indicative |
+| ----------------------------- | -------------- | ---------------- |
+| Constructions                 | 20 ans         | 20 ans           |
+| Matériel et outillage         | 10 ans         | 5 à 10 ans       |
+| Matériel de transport         | 5 ans          | 4 à 5 ans        |
+| Matériel informatique         | 3 ans          | 3 ans            |
+| Mobilier de bureau            | 10 ans         | 10 ans           |
+| Aménagements, agencements     | 10 ans         | 10 ans           |
+| Logiciels                     | 3 ans          | 3 ans            |
+
+**Sources :** Acte Uniforme SYSCOHADA relatif au droit comptable et à
+l’information financière (AUDCIF), révisé 2017, Titre I chapitre 3 —
+immobilisations amortissables ; guide d’application SYSCOHADA révisé,
+tables sectorielles indicatives.
+
+**Avertissement :** ces durées sont conformes aux usages du référentiel
+SYSCOHADA mais restent indicatives. Pour un dossier bancaire officiel, elles
+doivent être revalidées par un expert-comptable local, en particulier
+lorsque plusieurs valeurs sont admises (matériel : 5-10, transport : 4-5).
+
 ## Critères d’acceptation
 
 - Toute valeur réglementaire affiche source et date.

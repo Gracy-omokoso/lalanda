@@ -132,7 +132,7 @@ export class ProjectsController {
     @CurrentOrgId() orgId: string,
     @Param('id') id: string,
     @Body() body: unknown,
-  ): Promise<{ project: ProjectView; lines: EvaluatedLine[] }> {
+  ): Promise<{ project: ProjectView; lines: EvaluatedLine[]; amortissements?: AmortissementsView }> {
     const parsed = EvaluateProjectSchema.safeParse(body ?? {});
     if (!parsed.success) {
       throw new BadRequestException({ code: 'INVALID_REQUEST', issues: parsed.error.issues });
@@ -170,6 +170,26 @@ export class ProjectsController {
           format: l.format,
           seuil: l.seuil,
         })),
+        // (S14c) Feuille amortissements structurée (colonnes = années × immobilisations).
+        // Absent si le template ne déclare pas d'immobilisations.
+        amortissements: result.amortissements
+          ? {
+              horizonAnnees: result.amortissements.horizon_annees,
+              lignes: result.amortissements.lignes.map((li) => ({
+                label: li.label,
+                categorie: li.categorie,
+                montantHt: li.montant_ht,
+                valeurResiduelle: li.valeur_residuelle,
+                dureeAnnees: li.duree_annees,
+                dateAcquisition: li.date_acquisition,
+                prorataPremiereAnnee: li.prorata_premiere_annee,
+                dotations: [...li.dotations],
+                vnc: [...li.vnc],
+              })),
+              dapParAnnee: [...result.amortissements.dap_par_annee],
+              vncParAnnee: [...result.amortissements.vnc_par_annee],
+            }
+          : undefined,
       };
     } catch (err) {
       if (err instanceof EngineError) {
@@ -182,6 +202,23 @@ export class ProjectsController {
       throw err;
     }
   }
+}
+
+interface AmortissementsView {
+  horizonAnnees: number;
+  lignes: {
+    label: string;
+    categorie: string;
+    montantHt: number;
+    valeurResiduelle: number;
+    dureeAnnees: number;
+    dateAcquisition: string;
+    prorataPremiereAnnee: number;
+    dotations: number[];
+    vnc: number[];
+  }[];
+  dapParAnnee: number[];
+  vncParAnnee: number[];
 }
 
 interface EvaluatedLine {

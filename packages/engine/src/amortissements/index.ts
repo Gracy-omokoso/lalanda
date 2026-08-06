@@ -150,8 +150,8 @@ export function calculerAmortissements(
     });
 
     for (let i = 0; i < horizonAnnees; i++) {
-      dapParAnnee[i] += dotations[i]!;
-      vncParAnnee[i] += vnc[i]!;
+      dapParAnnee[i] = (dapParAnnee[i] ?? 0) + (dotations[i] ?? 0);
+      vncParAnnee[i] = (vncParAnnee[i] ?? 0) + (vnc[i] ?? 0);
     }
   }
 

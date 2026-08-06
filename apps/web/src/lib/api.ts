@@ -46,9 +46,31 @@ export interface LineResult {
   };
 }
 
+/** (S14c) Feuille amortissements SYSCOHADA renvoyée par l'API. */
+export interface AmortissementsLigne {
+  label: string;
+  categorie: string;
+  montantHt: number;
+  valeurResiduelle: number;
+  dureeAnnees: number;
+  dateAcquisition: string;
+  prorataPremiereAnnee: number;
+  dotations: number[];
+  vnc: number[];
+}
+
+export interface AmortissementsView {
+  horizonAnnees: number;
+  lignes: AmortissementsLigne[];
+  dapParAnnee: number[];
+  vncParAnnee: number[];
+}
+
 export interface EvaluateResponse {
   project: ProjectView;
   lines: LineResult[];
+  /** (S14c) Absent si le template ne déclare pas d'immobilisations. */
+  amortissements?: AmortissementsView;
 }
 
 // ─── Métadonnées de template (S5a) ─────────────────────────────
