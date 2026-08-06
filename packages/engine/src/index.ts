@@ -13,6 +13,8 @@ export {
   type Feuille,
   type Ligne,
   type Template,
+  type Immobilisation,
+  type CategorieImmobilisation,
 } from './dsl/schema.js';
 export { parseTemplate } from './dsl/parser.js';
 export {
@@ -43,6 +45,15 @@ export {
   type EvaluationResult,
   type LineResult,
 } from './evaluator/index.js';
+
+// Amortissements (S14c) — feuille SYSCOHADA révisé.
+export {
+  calculerAmortissements,
+  DUREES_SYSCOHADA,
+  LABELS_CATEGORIE,
+  type FeuilleAmortissements,
+  type LigneAmortissement,
+} from './amortissements/index.js';
 
 // ParameterPacks (multi-pays / multi-fiscalité)
 export {
