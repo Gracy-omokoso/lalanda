@@ -39,14 +39,12 @@ export async function createOpenAIClient(): Promise<OpenAIChatClient | null> {
   let mod: { default: OpenAIConstructor } | { OpenAI: OpenAIConstructor };
   try {
     mod = (await import('openai')) as unknown as
-      | { default: OpenAIConstructor }
-      | { OpenAI: OpenAIConstructor };
+      { default: OpenAIConstructor } | { OpenAI: OpenAIConstructor };
   } catch {
     // SDK non installé → on retourne null, le service tombera en fallback.
     return null;
   }
-  const OpenAICtor: OpenAIConstructor =
-    'default' in mod ? mod.default : mod.OpenAI;
+  const OpenAICtor: OpenAIConstructor = 'default' in mod ? mod.default : mod.OpenAI;
   const client: OpenAIInstance = new OpenAICtor({ apiKey });
 
   return {

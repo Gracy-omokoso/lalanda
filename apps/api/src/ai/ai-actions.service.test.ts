@@ -68,7 +68,7 @@ describe('buildFallbackActions — un cas par ratio surveillé', () => {
     expect(a?.expected_impact).toContain('1,25');
   });
 
-  it('apport_pct rouge : suggestion parle d\'apport et cite le seuil en %', () => {
+  it("apport_pct rouge : suggestion parle d'apport et cite le seuil en %", () => {
     const p = extractProblematiques([
       ratioLine('apport_pct', 'Apport', 0.1, 0.25, 'rouge', 'min', 'percent'),
     ]);
@@ -79,9 +79,7 @@ describe('buildFallbackActions — un cas par ratio surveillé', () => {
   });
 
   it('payback_annees rouge : suggestion parle de retour sur investissement', () => {
-    const p = extractProblematiques([
-      ratioLine('payback_annees', 'Payback', 7, 5, 'rouge', 'max'),
-    ]);
+    const p = extractProblematiques([ratioLine('payback_annees', 'Payback', 7, 5, 'rouge', 'max')]);
     const [a] = buildFallbackActions(p);
     expect(a?.ratio).toBe('payback_annees');
     expect(a?.suggestion).toMatch(/investissement|marge|phaser/i);
@@ -99,9 +97,7 @@ describe('buildFallbackActions — un cas par ratio surveillé', () => {
   });
 
   it('ratio inconnu → action générique fournie sans exception', () => {
-    const p = extractProblematiques([
-      ratioLine('autre_ratio', 'Autre', 0.5, 1, 'orange', 'min'),
-    ]);
+    const p = extractProblematiques([ratioLine('autre_ratio', 'Autre', 0.5, 1, 'orange', 'min')]);
     const [a] = buildFallbackActions(p);
     expect(a?.ratio).toBe('autre_ratio');
     expect(a?.severity).toBe('orange');
@@ -152,8 +148,8 @@ describe('AiActionsService.correctiveActions', () => {
         {
           ratio: 'apport_pct',
           severity: 'rouge',
-          suggestion: "Chercher un co-investisseur",
-          expected_impact: "Apport à 25 %",
+          suggestion: 'Chercher un co-investisseur',
+          expected_impact: 'Apport à 25 %',
         },
       ],
     });

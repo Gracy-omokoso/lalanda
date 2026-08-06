@@ -25,11 +25,7 @@ import {
 
 /** Injectable pour permettre le mock en test (aucun appel réseau réel). */
 export interface OpenAIChatClient {
-  chatJson(args: {
-    system: string;
-    user: string;
-    model: string;
-  }): Promise<string>;
+  chatJson(args: { system: string; user: string; model: string }): Promise<string>;
 }
 
 const DEFAULT_MODEL = 'gpt-4o-mini';
@@ -51,9 +47,7 @@ export class AiActionsService {
   constructor(private readonly openai: OpenAIChatClient | null = null) {}
 
   /** Point d'entrée : renvoie 0 à 4 actions correctives ancrées sur les ratios. */
-  async correctiveActions(
-    req: CorrectiveActionsRequest,
-  ): Promise<CorrectiveActionsResponse> {
+  async correctiveActions(req: CorrectiveActionsRequest): Promise<CorrectiveActionsResponse> {
     const problematiques = extractProblematiques(req.lines);
     if (problematiques.length === 0) {
       // Aucun feu rouge/orange → rien à suggérer.
@@ -157,8 +151,7 @@ function ratioToFallbackAction(p: Problematique, devise?: string): CorrectiveAct
           `Réduire le service de la dette ou renforcer l'EBE : renégocier la durée du prêt, ` +
           `demander un différé d'amortissement, ou baisser une charge d'exploitation ` +
           `significative (loyer, personnel non-opérationnel).`,
-        expected_impact:
-          `Amener le DSCR à au moins ${seuilFmt} (actuellement ${valFmt}) pour repasser au vert bancaire.`,
+        expected_impact: `Amener le DSCR à au moins ${seuilFmt} (actuellement ${valFmt}) pour repasser au vert bancaire.`,
       };
 
     case 'apport_pct':
@@ -169,8 +162,7 @@ function ratioToFallbackAction(p: Problematique, devise?: string): CorrectiveAct
           `Augmenter l'apport personnel ou réduire les besoins de financement : ` +
           `mobiliser une épargne complémentaire, chercher un co-investisseur, ou ` +
           `étaler certains investissements non critiques sur la seconde année.`,
-        expected_impact:
-          `Porter l'apport à au moins ${seuilFmt} des besoins (actuellement ${valFmt}) pour rassurer la banque.`,
+        expected_impact: `Porter l'apport à au moins ${seuilFmt} des besoins (actuellement ${valFmt}) pour rassurer la banque.`,
       };
 
     case 'payback_annees':
@@ -181,8 +173,7 @@ function ratioToFallbackAction(p: Problematique, devise?: string): CorrectiveAct
           `Raccourcir le retour sur investissement : phaser l'investissement en deux tranches, ` +
           `démarrer sur du matériel d'occasion, ou améliorer la marge nette dès l'année 1 ` +
           `(prix, mix produit, réduction des charges variables).`,
-        expected_impact:
-          `Ramener le payback sous ${seuilFmt} ans (actuellement ${valFmt}).`,
+        expected_impact: `Ramener le payback sous ${seuilFmt} ans (actuellement ${valFmt}).`,
       };
 
     case 'tresorerie_min_ok':
@@ -193,8 +184,7 @@ function ratioToFallbackAction(p: Problematique, devise?: string): CorrectiveAct
           `Sécuriser la trésorerie sur 12 mois : constituer une réserve initiale plus large, ` +
           `négocier des délais fournisseurs, ou mettre en place une facilité de caisse ` +
           `bancaire pour couvrir les mois creux.`,
-        expected_impact:
-          `Maintenir un solde mensuel minimum strictement positif${cur} (actuellement ${valFmt}, seuil ${seuilFmt}).`,
+        expected_impact: `Maintenir un solde mensuel minimum strictement positif${cur} (actuellement ${valFmt}, seuil ${seuilFmt}).`,
       };
 
     case 'marge_ebe_pct':
@@ -205,8 +195,7 @@ function ratioToFallbackAction(p: Problematique, devise?: string): CorrectiveAct
           `Améliorer la marge EBE : arbitrer les charges opérationnelles récurrentes ` +
           `(loyer, personnel non-facturable, marketing), ou augmenter le prix moyen si ` +
           `la position concurrentielle le permet.`,
-        expected_impact:
-          `Faire remonter la marge EBE au-dessus de ${seuilFmt} (actuellement ${valFmt}).`,
+        expected_impact: `Faire remonter la marge EBE au-dessus de ${seuilFmt} (actuellement ${valFmt}).`,
       };
 
     case 'marge_nette_pct':
@@ -216,8 +205,7 @@ function ratioToFallbackAction(p: Problematique, devise?: string): CorrectiveAct
         suggestion:
           `Améliorer la marge nette : optimiser la structure de coûts, réduire ` +
           `les charges financières, ou revoir la politique tarifaire.`,
-        expected_impact:
-          `Amener la marge nette au-dessus de ${seuilFmt} (actuellement ${valFmt}).`,
+        expected_impact: `Amener la marge nette au-dessus de ${seuilFmt} (actuellement ${valFmt}).`,
       };
 
     default:
@@ -234,11 +222,7 @@ function ratioToFallbackAction(p: Problematique, devise?: string): CorrectiveAct
   }
 }
 
-function formatValue(
-  v: number,
-  fmt: 'money' | 'number' | 'percent',
-  devise?: string,
-): string {
+function formatValue(v: number, fmt: 'money' | 'number' | 'percent', devise?: string): string {
   if (fmt === 'percent') return `${(v * 100).toFixed(1).replace('.', ',')} %`;
   if (fmt === 'money') {
     const rounded = Math.round(v).toLocaleString('fr-FR');
@@ -256,10 +240,10 @@ export function buildSystemPrompt(): string {
   return [
     'Tu es un assistant financier francophone au service de PME (contexte OHADA).',
     'Ta seule tâche : proposer des ACTIONS CORRECTIVES concrètes pour les ratios en zone rouge ou orange.',
-    "Contraintes strictes :",
-    "- Réponds UNIQUEMENT en JSON valide, sans texte hors du JSON.",
+    'Contraintes strictes :',
+    '- Réponds UNIQUEMENT en JSON valide, sans texte hors du JSON.',
     "- N'invente AUCUN chiffre absent de l'entrée : les seules valeurs numériques que tu peux citer sont celles présentes dans les ratios fournis (valeur courante ou seuil).",
-    "- Ne recalcule rien, ne modifie aucune feuille officielle : tu proposes des directions, pas des calculs.",
+    '- Ne recalcule rien, ne modifie aucune feuille officielle : tu proposes des directions, pas des calculs.',
     '- Rédige en français, ton professionnel, phrases courtes et actionnables.',
     '- Retourne exactement un objet { "actions": [...] } avec 1 à 4 actions.',
     'Schéma de chaque action :',
@@ -293,10 +277,7 @@ export function buildUserPrompt(
 }
 
 /** Parse la réponse brute du LLM, valide chaque action et écarte les inventions. */
-export function parseLlmActions(
-  raw: string,
-  problematiques: Problematique[],
-): CorrectiveAction[] {
+export function parseLlmActions(raw: string, problematiques: Problematique[]): CorrectiveAction[] {
   const parsed = JSON.parse(raw) as unknown;
   if (!parsed || typeof parsed !== 'object' || !('actions' in parsed)) {
     throw new Error('Réponse LLM sans champ "actions"');
@@ -315,6 +296,6 @@ export function parseLlmActions(
     actions.push(a);
   }
   if (actions.length === 0) throw new Error('Aucune action retournée');
-  if (actions.length > 4) throw new Error('Trop d\'actions (>4) retournées');
+  if (actions.length > 4) throw new Error("Trop d'actions (>4) retournées");
   return actions;
 }
