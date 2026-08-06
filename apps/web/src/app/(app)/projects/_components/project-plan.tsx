@@ -121,6 +121,7 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
   const [dirty, setDirty] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [downloadingXlsx, setDownloadingXlsx] = useState(false);
 
   const groups = useMemo(() => (template ? groupDrivers(template) : []), [template]);
   const currency = template?.devise_base ?? 'USD';
@@ -185,19 +186,38 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
       // Le PDF utilise les driverValues persistés — s'assurer qu'ils sont à jour côté serveur.
       if (dirty) await handleSave();
       const { blob, filename } = await api.downloadProjectPdf(projectId);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      triggerDownload(blob, filename);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Impossible de générer le PDF');
     } finally {
       setDownloadingPdf(false);
     }
+  }
+
+  async function handleDownloadXlsx(): Promise<void> {
+    setDownloadingXlsx(true);
+    setError(null);
+    try {
+      // Comme le PDF, l'Excel utilise les driverValues persistés — synchroniser si dirty.
+      if (dirty) await handleSave();
+      const { blob, filename } = await api.downloadProjectXlsx(projectId);
+      triggerDownload(blob, filename);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Impossible de générer l'Excel");
+    } finally {
+      setDownloadingXlsx(false);
+    }
+  }
+
+  function triggerDownload(blob: Blob, filename: string): void {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   }
 
   function updateDriver(driver: TemplateDriverMeta, raw: string): void {
@@ -301,6 +321,15 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
               className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-medium transition hover:bg-[var(--surface-muted)] disabled:opacity-40"
             >
               {downloadingPdf ? 'Génération…' : 'Télécharger PDF'}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleDownloadXlsx()}
+              disabled={downloadingXlsx}
+              title="Exporter le plan financier en Excel (formules préservées)"
+              className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-medium transition hover:bg-[var(--surface-muted)] disabled:opacity-40"
+            >
+              {downloadingXlsx ? 'Génération…' : 'Exporter Excel'}
             </button>
             {savedAt ? (
               <span className="text-xs text-[var(--foreground-muted)]">
