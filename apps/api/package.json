@@ -23,6 +23,7 @@
     "mongodb": "^6.11.0",
     "mongoose": "^8.9.5",
     "nestjs-pino": "^4.3.0",
+    "openai": "^4.104.0",
     "pino-http": "^10.3.0",
     "puppeteer": "^25.5.0",
     "reflect-metadata": "^0.2.2",

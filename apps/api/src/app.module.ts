@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { LoggerModule } from 'nestjs-pino';
 
+import { AiModule } from './ai/ai.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { EvaluateController } from './evaluate/evaluate.controller.js';
 import { HealthController } from './health/health.controller.js';
@@ -46,6 +47,7 @@ import { ReportsModule } from './reports/reports.module.js';
     ParameterPacksModule,
     ProjectsModule,
     ReportsModule,
+    AiModule,
   ],
   controllers: [HealthController, EvaluateController],
 })
