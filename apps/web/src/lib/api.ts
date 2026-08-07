@@ -382,6 +382,70 @@ export interface AttainmentView {
   objectifs: ObjectiveAttainment[];
 }
 
+// ─── Suivi prévisionnel vs réalisé (S18b — docs/08) ────────────
+
+export interface ActualPeriodView {
+  id: string;
+  projectId: string;
+  /** Année d'EXERCICE (1..5), pas une année calendaire. */
+  year: number;
+  month: number;
+  status: 'open' | 'closed';
+  values: Record<string, number>;
+  closedAt: string | null;
+  closedBy: string | null;
+  reopenedLog: { reopenedAt: string; reopenedBy: string; reason: string }[];
+  updatedAt: string;
+}
+
+/** Pourquoi une ligne du réalisé n'a pas de contrepartie dans le plan comparé. */
+export type NonComparableRaison = 'LIGNE_ABSENTE_DU_PLAN' | 'LIGNE_HORS_COMPTE_EXPLOITATION';
+
+export interface VarianceLineView {
+  lineId: string;
+  label: string;
+  sens: 'produit' | 'charge';
+  /** false → aucune base prévue : tous les champs de comparaison sont `null`. */
+  comparable: boolean;
+  raison: NonComparableRaison | null;
+  prevuMensuel: number | null;
+  prevuCumule: number | null;
+  realiseCumule: number;
+  ecart: number | null;
+  /** Fraction (0.05 = +5 %) — null si la base prévue est nulle ou absente. */
+  ecartPct: number | null;
+  statut: 'favorable' | 'defavorable' | null;
+}
+
+export interface VariancesView {
+  year: number;
+  planVersion: number;
+  monthsCounted: number[];
+  convention: 'annuel/12';
+  lines: VarianceLineView[];
+}
+
+export interface ProjectionLineView {
+  lineId: string;
+  label: string;
+  sens: 'produit' | 'charge';
+  comparable: boolean;
+  raison: NonComparableRaison | null;
+  planAnnuel: number | null;
+  realiseClos: number;
+  previsionnelRestant: number | null;
+  totalProjete: number | null;
+  ecartVsPlan: number | null;
+}
+
+export interface UpdatedProjectionView {
+  year: number;
+  planVersion: number;
+  monthsClosed: number[];
+  convention: 'annuel/12';
+  lines: ProjectionLineView[];
+}
+
 export const ACTIVE_ORG_COOKIE = 'active_org_id';
 
 /**
@@ -551,6 +615,42 @@ export const api = {
     jsonRequest<AttainmentView>(`/projects/${encodeURIComponent(id)}/objectives/attainment`, {
       method: 'GET',
     }),
+  // ─── Réalisé, clôture, écarts (S18b — docs/08) ─────────────
+  // Aucun calcul côté client : les écarts, statuts et projections viennent tous
+  // de l'API (docs/26 — aucune règle financière dans un composant UI).
+  listActualPeriods: (id: string, year: number) =>
+    jsonRequest<{ year: number; periods: ActualPeriodView[] }>(
+      `/projects/${encodeURIComponent(id)}/actual-periods?year=${year}`,
+      { method: 'GET' },
+    ),
+  // 409 { code: 'PERIOD_CLOSED' } si la période est clôturée — la protéger est
+  // une règle serveur, l'UI ne fait que refléter le refus.
+  upsertActualPeriod: (id: string, year: number, month: number, values: Record<string, number>) =>
+    jsonRequest<ActualPeriodView>(
+      `/projects/${encodeURIComponent(id)}/actual-periods/${year}/${month}`,
+      { method: 'PUT', body: { values } },
+    ),
+  closeActualPeriod: (id: string, year: number, month: number) =>
+    jsonRequest<ActualPeriodView>(
+      `/projects/${encodeURIComponent(id)}/actual-periods/${year}/${month}/close`,
+      { method: 'POST' },
+    ),
+  // Owner uniquement, motif obligatoire et journalisé (docs/08 § Périodes).
+  reopenActualPeriod: (id: string, year: number, month: number, reason: string) =>
+    jsonRequest<ActualPeriodView>(
+      `/projects/${encodeURIComponent(id)}/actual-periods/${year}/${month}/reopen`,
+      { method: 'POST', body: { reason } },
+    ),
+  // 409 { code: 'NO_APPROVED_PLAN' } tant qu'aucun plan n'a été validé.
+  getVariances: (id: string, year: number) =>
+    jsonRequest<VariancesView>(`/projects/${encodeURIComponent(id)}/variances?year=${year}`, {
+      method: 'GET',
+    }),
+  getUpdatedProjection: (id: string, year: number) =>
+    jsonRequest<UpdatedProjectionView>(
+      `/projects/${encodeURIComponent(id)}/updated-projection?year=${year}`,
+      { method: 'GET' },
+    ),
   // ─── Reports PDF (S8-lite) ─────────────────────────────────
   // `planVersion` (S16c) : export depuis le snapshot figé du plan validé vN — aucun recalcul.
   async downloadProjectPdf(
