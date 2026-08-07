@@ -1,0 +1,33 @@
+# Reverse proxy Lalanda — Caddy 2 (ADR-0009 : HTTPS automatique Let's Encrypt).
+# Les domaines et l'email ACME viennent de .env.production via docker-compose.prod.yml
+# (variables APP_DOMAIN, API_DOMAIN, ACME_EMAIL injectées dans le conteneur caddy).
+
+{
+	email {$ACME_EMAIL}
+	# Certificats stockés dans le volume caddy-data (voir docker-compose.prod.yml).
+}
+
+# En-têtes communs aux deux vhosts.
+(securite) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# Caddy n'a pas à révéler sa version.
+		-Server
+	}
+	encode zstd gzip
+}
+
+# ─── Front (Next.js) ─────────────────────────────────────────────────────────
+{$APP_DOMAIN} {
+	import securite
+	reverse_proxy web:3000
+}
+
+# ─── API (NestJS) ────────────────────────────────────────────────────────────
+{$API_DOMAIN} {
+	import securite
+	reverse_proxy api:3001
+}

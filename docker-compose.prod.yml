@@ -1,0 +1,196 @@
+# Stack de production Lalanda — ADR-0009 (DigitalOcean Droplet + Caddy + Docker).
+#
+# Usage sur le VPS (voir scripts/deploy-vps.sh) :
+#   cp .env.production.example .env.production   # puis remplir les secrets
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# Topologie réseau :
+#   - `edge`    : exposé via Caddy (seul service à publier 80/443).
+#   - `interne` : réseau isolé (internal) — mongo/redis/minio ne sont jamais
+#     joignables depuis l'extérieur, uniquement par l'API.
+#
+# Les images proviennent de GHCR (voir .github/workflows/deploy.yml).
+# `LALANDA_TAG` épingle une version (ex: v0.2.0) ; défaut = latest.
+
+name: lalanda-prod
+
+services:
+  # ─── Reverse proxy TLS (Caddy) ────────────────────────────────────────────
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      APP_DOMAIN: '${APP_DOMAIN:?APP_DOMAIN manquant (ex app.lalanda.example)}'
+      API_DOMAIN: '${API_DOMAIN:?API_DOMAIN manquant (ex api.lalanda.example)}'
+      ACME_EMAIL: "${ACME_EMAIL:?ACME_EMAIL manquant (contact Let's Encrypt)}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - edge
+    depends_on:
+      web:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost:2019/metrics']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ─── Web (Next.js standalone) ─────────────────────────────────────────────
+  web:
+    image: ghcr.io/gracy-omokoso/lalanda-web:${LALANDA_TAG:-latest}
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    networks:
+      - edge
+    # Le healthcheck est défini dans l'image (HEALTHCHECK /health).
+
+  # ─── API (NestJS) ─────────────────────────────────────────────────────────
+  api:
+    image: ghcr.io/gracy-omokoso/lalanda-api:${LALANDA_TAG:-latest}
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    networks:
+      - edge # joignable par Caddy
+      - interne # accès mongo/redis/minio
+    depends_on:
+      mongo-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    # Le healthcheck est défini dans l'image (HEALTHCHECK /health, état Mongo inclus).
+
+  # ─── MongoDB replica set rs0 (ADR-0004 : transactions) ────────────────────
+  mongo:
+    image: mongo:7.0
+    restart: unless-stopped
+    command: ['--replSet', 'rs0', '--bind_ip_all', '--port', '27017']
+    volumes:
+      - mongo-data:/data/db
+      - mongo-config:/data/configdb
+    networks:
+      - interne
+    healthcheck:
+      test:
+        - CMD
+        - mongosh
+        - --quiet
+        - --eval
+        - "db.adminCommand('ping').ok"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  mongo-init:
+    image: mongo:7.0
+    depends_on:
+      mongo:
+        condition: service_healthy
+    restart: 'no'
+    networks:
+      - interne
+    entrypoint:
+      - bash
+      - -c
+      - |
+        mongosh --host mongo:27017 --quiet --eval '
+          try {
+            const status = rs.status();
+            print("Replica set déjà initialisé : " + status.set);
+          } catch (err) {
+            if (err.codeName === "NotYetInitialized") {
+              rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "mongo:27017" }] });
+              print("Replica set rs0 initialisé.");
+            } else {
+              throw err;
+            }
+          }
+        '
+
+  # ─── Redis (BullMQ) ───────────────────────────────────────────────────────
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redis-data:/data
+    networks:
+      - interne
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ─── Stockage objet (MinIO en attendant la bascule DO Spaces) ─────────────
+  # ADR-0009 vise DigitalOcean Spaces ; MinIO fournit la même API S3 sur le
+  # Droplet tant que les credentials Spaces ne sont pas provisionnés.
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:?S3_ACCESS_KEY manquant}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?S3_SECRET_KEY manquant}
+    volumes:
+      - minio-data:/data
+    networks:
+      - interne
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: 'no'
+    networks:
+      - interne
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?}
+      S3_BUCKET_EXPORTS: ${S3_BUCKET_EXPORTS:-lalanda-exports}
+      S3_BUCKET_SNAPSHOTS: ${S3_BUCKET_SNAPSHOTS:-lalanda-snapshots}
+      S3_BUCKET_UPLOADS: ${S3_BUCKET_UPLOADS:-lalanda-uploads}
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -e
+        mc alias set local http://minio:9000 "$$S3_ACCESS_KEY" "$$S3_SECRET_KEY"
+        mc mb --ignore-existing "local/$$S3_BUCKET_EXPORTS"
+        mc mb --ignore-existing "local/$$S3_BUCKET_SNAPSHOTS"
+        mc mb --ignore-existing "local/$$S3_BUCKET_UPLOADS"
+        echo "Buckets MinIO prêts."
+
+networks:
+  edge:
+    driver: bridge
+  interne:
+    driver: bridge
+    internal: true # aucun accès sortant/entrant hors du réseau Docker
+
+volumes:
+  caddy-data: # certificats TLS Let's Encrypt — à sauvegarder
+  caddy-config:
+  mongo-data:
+  mongo-config:
+  redis-data:
+  minio-data:
