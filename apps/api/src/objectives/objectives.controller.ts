@@ -1,0 +1,128 @@
+// Endpoints des objectifs financiers (S18d — docs/01 + docs/10 § Objectifs).
+//
+//   GET /projects/:id/objectives            → cibles courantes (toutes optionnelles)
+//   PUT /projects/:id/objectives            → remplacement complet (absent = effacé)
+//   GET /projects/:id/objectives/attainment → taux d'atteinte vs DERNIER PLAN VALIDÉ
+//                                             (409 NO_APPROVED_PLAN si aucun)
+//
+// Isolation : toutes les routes passent par `projects.findScoped(id, orgId)` — un
+// projet d'une autre org renvoie 404 (même convention que plans/ et canvas/).
+
+import {
+  BadRequestException,
+  Body,
+  ConflictException,
+  Controller,
+  Get,
+  Inject,
+  Param,
+  Put,
+  UseGuards,
+} from '@nestjs/common';
+
+import { AuthGuard } from '../auth/auth.guard.js';
+import { CurrentOrgId } from '../auth/current-user.decorator.js';
+import { PlansService } from '../plans/plans.service.js';
+import { ProjectsService } from '../projects/projects.service.js';
+import {
+  computeAttainment,
+  type ObjectiveAttainment,
+  type ObjectiveNotEvaluable,
+} from './attainment.js';
+import { OBJECTIVE_KEYS, PutObjectivesSchema, type ObjectiveKey } from './objectives.dto.js';
+import type { FinancialObjectivesDocument } from './objectives.schema.js';
+import { ObjectivesService } from './objectives.service.js';
+
+export interface ObjectivesView {
+  projectId: string;
+  ca_cible_an1?: number;
+  ca_cible_an5?: number;
+  resultat_net_cible_an1?: number;
+  tresorerie_cible?: number;
+  updatedAt: string | null;
+}
+
+export interface AttainmentView {
+  planVersion: number;
+  planApprovedAt: string;
+  objectifs: ObjectiveAttainment[];
+  non_evaluables: ObjectiveNotEvaluable[];
+}
+
+@Controller('projects')
+@UseGuards(AuthGuard)
+export class ObjectivesController {
+  constructor(
+    @Inject(ProjectsService) private readonly projects: ProjectsService,
+    @Inject(ObjectivesService) private readonly objectives: ObjectivesService,
+    @Inject(PlansService) private readonly plans: PlansService,
+  ) {}
+
+  @Get(':id/objectives')
+  async get(@CurrentOrgId() orgId: string, @Param('id') id: string): Promise<ObjectivesView> {
+    const project = await this.projects.findScoped(id, orgId);
+    const doc = await this.objectives.find(orgId, String(project._id));
+    return toView(String(project._id), doc);
+  }
+
+  @Put(':id/objectives')
+  async put(
+    @CurrentOrgId() orgId: string,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ): Promise<ObjectivesView> {
+    const parsed = PutObjectivesSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException({ code: 'INVALID_REQUEST', issues: parsed.error.issues });
+    }
+    const project = await this.projects.findScoped(id, orgId);
+    const doc = await this.objectives.replace(orgId, String(project._id), parsed.data);
+    return toView(String(project._id), doc);
+  }
+
+  @Get(':id/objectives/attainment')
+  async attainment(
+    @CurrentOrgId() orgId: string,
+    @Param('id') id: string,
+  ): Promise<AttainmentView> {
+    const project = await this.projects.findScoped(id, orgId);
+    const projectId = String(project._id);
+
+    // Dernier plan validé — la machine d'état plans/ garantit au plus UN
+    // plan `approved` par projet (les précédents passent à `superseded`).
+    const planDocs = await this.plans.listByProject(orgId, projectId);
+    const approved = planDocs.find((p) => p.status === 'approved');
+    if (!approved) {
+      throw new ConflictException({
+        code: 'NO_APPROVED_PLAN',
+        message:
+          "Aucun plan validé pour ce projet — validez d'abord un plan pour mesurer l'atteinte des objectifs.",
+      });
+    }
+
+    const doc = await this.objectives.find(orgId, projectId);
+    const targets: Partial<Record<ObjectiveKey, number | undefined>> = {};
+    if (doc) {
+      for (const key of OBJECTIVE_KEYS) targets[key] = doc[key];
+    }
+
+    const { objectifs, non_evaluables } = computeAttainment(targets, approved.result);
+    return {
+      planVersion: approved.version,
+      planApprovedAt: approved.approvedAt.toISOString(),
+      objectifs,
+      non_evaluables,
+    };
+  }
+}
+
+function toView(projectId: string, doc: FinancialObjectivesDocument | null): ObjectivesView {
+  return {
+    projectId,
+    ca_cible_an1: doc?.ca_cible_an1,
+    ca_cible_an5: doc?.ca_cible_an5,
+    resultat_net_cible_an1: doc?.resultat_net_cible_an1,
+    tresorerie_cible: doc?.tresorerie_cible,
+    updatedAt: doc ? doc.updatedAt.toISOString() : null,
+  };
+}
