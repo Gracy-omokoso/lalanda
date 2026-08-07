@@ -25,6 +25,7 @@ import { toEvaluationView, type EvaluationView } from '../evaluate/evaluation-vi
 import { getTemplate } from '../evaluate/template-registry.js';
 import { getParameterPack } from '../parameter-packs/parameter-pack-registry.js';
 import { ProjectsService } from '../projects/projects.service.js';
+import { findDriverRangeViolations } from './driver-range.js';
 import { computePlanFingerprint } from './fingerprint.js';
 import type { FinancialPlanDocument } from './plan.schema.js';
 import { PlansService } from './plans.service.js';
@@ -78,6 +79,18 @@ export class PlansController {
     const pack = project.parameterPackSlug
       ? getParameterPack(project.parameterPackSlug)
       : undefined;
+
+    // Bornes du DSL : la saisie hors bornes est tolérée en brouillon (docs/06 — les
+    // erreurs bloquantes empêchent la validation, pas la sauvegarde), mais figer un
+    // plan officiel avec de telles valeurs ne l'est pas. Contrôle AVANT tout gel.
+    const violations = findDriverRangeViolations(template, project.driverValues);
+    if (violations.length > 0) {
+      throw new BadRequestException({
+        code: 'DRIVERS_OUT_OF_RANGE',
+        message: `${violations.length} hypothèse(s) hors des bornes du modèle : le plan ne peut pas être validé.`,
+        details: { drivers: violations },
+      });
+    }
 
     // On valide les drivers PERSISTÉS du projet — pas de surcharge one-shot :
     // ce qui est figé est exactement ce qui est enregistré et visible dans l'UI.
