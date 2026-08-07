@@ -22,16 +22,16 @@ export function AppHeader(): React.ReactElement {
       <Link href="/projects" className="group flex items-center gap-3">
         <span
           aria-hidden="true"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent)] font-semibold text-[var(--accent-foreground)]"
+          className="font-display inline-flex h-8 w-8 items-center justify-center rounded-md border-2 border-[var(--accent)] text-sm font-black text-[var(--accent)]"
         >
           L
         </span>
         <div className="flex flex-col leading-tight">
-          <span className="text-base font-semibold tracking-tight group-hover:text-[var(--accent)]">
+          <span className="font-display text-base font-bold tracking-tight group-hover:text-[var(--accent)]">
             Lalanda
           </span>
-          <span className="text-[11px] text-[var(--foreground-muted)]">
-            Planification financière bancable
+          <span className="font-mono text-[0.6rem] tracking-[0.14em] text-[var(--foreground-muted)]">
+            PLAN FINANCIER BANCABLE
           </span>
         </div>
       </Link>

@@ -4,39 +4,69 @@
   --font-sans:
     var(--font-poppins), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
     'Helvetica Neue', Arial, sans-serif;
+  --font-display: var(--font-archivo), var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+  --font-mono:
+    var(--font-plex-mono), ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 /* ─── Design tokens ──────────────────────────────────────────────
- * Palette : neutre chaud + accent SYSCOHADA-inspired (vert eau, sobre).
- * Le thème est piloté par [data-theme="light"|"dark"] posé sur <html>
- * par le script inline dans layout.tsx (évite le FOUC).
+ * Direction : « dossier bancaire » — encre vert-billet, papier registre,
+ * chiffres tabulaires mono, tampon ocre. Le produit fabrique des documents
+ * qu'un chargé d'affaires prend au sérieux ; l'interface emprunte leur langage.
+ *
+ * Rôles fixes (identiques dans les deux thèmes) :
+ *   --ink / --ink-2 / --on-ink / --on-ink-muted : panneaux sombres « encre »
+ *   --stamp : ocre tampon (CTA sur encre, sceau BANCABLE)
+ *   --ok / --warn / --ko : feux tricolores ratios (jamais seuls — toujours texte)
+ * Le thème est piloté par [data-theme="light"|"dark"] sur <html>.
  */
 
 :root,
 [data-theme='light'] {
-  --background: #fbfaf7; /* off-white chaud */
-  --surface: #ffffff;
-  --surface-muted: #f3f2ee;
-  --border: #e5e2db;
-  --foreground: #1a1a17;
-  --foreground-muted: #6b6a63;
-  --accent: #0e7c66; /* vert SYSCOHADA sobre */
+  --background: #f7f5ee; /* papier registre */
+  --surface: #fffdf8;
+  --surface-muted: #efece2;
+  --border: #ddd8c9;
+  --border-strong: #b8b2a0;
+  --foreground: #17201b;
+  --foreground-muted: #5c665f;
+  --accent: #0e7c66;
   --accent-foreground: #ffffff;
-  --danger: #b91c1c;
-  --danger-bg: #fef2f2;
+  --danger: #b3261e;
+  --danger-bg: #fbeeed;
 }
 
 [data-theme='dark'] {
-  --background: #101013;
-  --surface: #17171b;
-  --surface-muted: #1f1f24;
-  --border: #2a2a30;
-  --foreground: #f5f5f2;
-  --foreground-muted: #9a9a92;
-  --accent: #4ecdb0;
-  --accent-foreground: #0a0a0a;
-  --danger: #f87171;
-  --danger-bg: #2a1616;
+  --background: #0c1512;
+  --surface: #121d18;
+  --surface-muted: #18251f;
+  --border: #24312a;
+  --border-strong: #3a4a41;
+  --foreground: #eff3ee;
+  --foreground-muted: #98a69c;
+  --accent: #3fbf9f;
+  --accent-foreground: #06120e;
+  --danger: #f28b82;
+  --danger-bg: #2a1614;
+}
+
+:root {
+  --ink: #0b1f1a;
+  --ink-2: #0e2a22;
+  --on-ink: #f6f4ed;
+  --on-ink-muted: #a8b8ae;
+  --ink-border: #23423a;
+  --stamp: #dfa033;
+  --stamp-strong: #8a5f14;
+  --ok: #0e7c66;
+  --warn: #b07818;
+  --ko: #b3261e;
+}
+
+[data-theme='dark'] {
+  --ok: #3fbf9f;
+  --warn: #d9a441;
+  --ko: #f28b82;
 }
 
 html {
@@ -53,14 +83,17 @@ body {
   letter-spacing: -0.005em;
 }
 
-/* Focus visible plus doux, sur toutes les couleurs de fond */
+/* Focus visible sur toutes les couleurs de fond */
 *:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: 4px;
 }
+.bg-ink *:focus-visible {
+  outline-color: var(--stamp);
+}
 
-/* Reset des couleurs par défaut pour les inputs numériques (Chrome/Safari) */
+/* Reset inputs numériques (Chrome/Safari) */
 input[type='number']::-webkit-outer-spin-button,
 input[type='number']::-webkit-inner-spin-button {
   -webkit-appearance: none;
@@ -68,4 +101,131 @@ input[type='number']::-webkit-inner-spin-button {
 }
 input[type='number'] {
   -moz-appearance: textfield;
+}
+
+/* ─── Panneaux encre ─────────────────────────────────────────── */
+
+.bg-ink {
+  background-color: var(--ink);
+  color: var(--on-ink);
+}
+
+/* Réglure de registre : fines lignes horizontales, à peine visibles. */
+.ink-ruled {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 47px,
+    rgba(246, 244, 237, 0.045) 47px,
+    rgba(246, 244, 237, 0.045) 48px
+  );
+}
+
+/* ─── Document « dossier » ───────────────────────────────────── */
+
+.doc-card {
+  background: #fdfbf4;
+  color: #17201b;
+  border: 1px solid #d8d2bf;
+  border-radius: 6px;
+  box-shadow:
+    0 1px 2px rgba(11, 31, 26, 0.18),
+    0 12px 32px -12px rgba(11, 31, 26, 0.45),
+    0 24px 64px -24px rgba(11, 31, 26, 0.4);
+}
+
+/* Ligne de registre : libellé, pointillés conducteurs, valeur. */
+.ledger-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+.ledger-row .leader {
+  flex: 1;
+  border-bottom: 1px dotted #b8b2a0;
+  transform: translateY(-0.3em);
+  min-width: 1rem;
+}
+
+/* Tampon BANCABLE */
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 2.5px solid var(--stamp);
+  color: var(--stamp-strong);
+  border-radius: 6px;
+  padding: 0.3rem 0.7rem;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transform: rotate(-6deg);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='40'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.82 0.18'/%3E%3C/filter%3E%3Crect width='120' height='40' filter='url(%23n)'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='40'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.82 0.18'/%3E%3C/filter%3E%3Crect width='120' height='40' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ─── Chiffres financiers ────────────────────────────────────── */
+
+.fig {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* ─── Feux tricolores (jamais couleur seule : toujours accompagnés d'un libellé) */
+
+.dot {
+  display: inline-block;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 9999px;
+  flex: none;
+}
+.dot-ok {
+  background: var(--ok);
+}
+.dot-warn {
+  background: var(--warn);
+}
+.dot-ko {
+  background: var(--ko);
+}
+
+/* ─── Entrée du hero ─────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: no-preference) {
+  .hero-doc {
+    animation: heroDocIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: 0.15s;
+  }
+  .hero-stamp {
+    animation: stampIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation-delay: 0.75s;
+  }
+  @keyframes heroDocIn {
+    from {
+      opacity: 0;
+      transform: translateY(18px) rotate(0.5deg);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) rotate(-1.25deg);
+    }
+  }
+  @keyframes stampIn {
+    from {
+      opacity: 0;
+      transform: rotate(-6deg) scale(1.6);
+    }
+    to {
+      opacity: 1;
+      transform: rotate(-6deg) scale(1);
+    }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-doc {
+    transform: rotate(-1.25deg);
+  }
 }
