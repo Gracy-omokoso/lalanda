@@ -26,6 +26,26 @@ const poppins = localFont({
   ],
 });
 
+// Archivo (variable 100→900) — face display des titres, direction « dossier bancaire ».
+const archivo = localFont({
+  src: [{ path: '../../public/fonts/archivo-var.woff2', weight: '100 900', style: 'normal' }],
+  display: 'swap',
+  variable: '--font-archivo',
+  fallback: ['ui-sans-serif', 'system-ui', 'Arial', 'sans-serif'],
+});
+
+// IBM Plex Mono — chiffres tabulaires, libellés registre, tampons.
+const plexMono = localFont({
+  src: [
+    { path: '../../public/fonts/plexmono-400.woff2', weight: '400', style: 'normal' },
+    { path: '../../public/fonts/plexmono-500.woff2', weight: '500', style: 'normal' },
+    { path: '../../public/fonts/plexmono-600.woff2', weight: '600', style: 'normal' },
+  ],
+  display: 'swap',
+  variable: '--font-plex-mono',
+  fallback: ['ui-monospace', 'SF Mono', 'Menlo', 'Consolas', 'monospace'],
+});
+
 export const metadata: Metadata = {
   title: 'Lalanda — Planification financière bancable',
   description:
@@ -49,7 +69,11 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>): React.ReactElement {
   return (
-    <html lang="fr" className={poppins.variable} suppressHydrationWarning>
+    <html
+      lang="fr"
+      className={`${poppins.variable} ${archivo.variable} ${plexMono.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         <script dangerouslySetInnerHTML={{ __html: setInitialThemeScript }} />
       </head>

@@ -69,16 +69,16 @@ const TIERS: Tier[] = [
 export default function PricingPage(): React.ReactElement {
   return (
     <>
-      <section className="border-b border-[var(--border)]">
+      <section className="bg-ink ink-ruled">
         <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
           <div className="mx-auto max-w-2xl text-center">
-            <p className="mb-4 text-sm font-medium uppercase tracking-wider text-[var(--accent)]">
-              Tarifs
+            <p className="font-mono mb-4 text-xs font-medium tracking-[0.18em] text-[var(--on-ink-accent)]">
+              TARIFS
             </p>
-            <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
+            <h1 className="font-display text-4xl font-black tracking-tight text-[var(--on-ink)] sm:text-5xl">
               Trois offres, un même moteur financier.
             </h1>
-            <p className="mt-4 text-lg text-[var(--foreground-muted)]">
+            <p className="mt-5 text-lg text-[var(--on-ink-muted)]">
               Tous les calculs et exports fonctionnent dès l&apos;offre gratuite. Vous ne payez que
               pour lever la limite de projets, retirer le filigrane et débloquer les fonctions
               collaboratives.
@@ -108,25 +108,29 @@ function TierCard({ tier }: { tier: Tier }): React.ReactElement {
   const borderClass = tier.highlighted ? 'border-[var(--accent)]' : 'border-[var(--border)]';
 
   return (
-    <div className={`flex flex-col rounded-xl border ${borderClass} bg-[var(--surface)] p-8`}>
+    <div
+      className={`flex flex-col rounded-lg border ${borderClass} bg-[var(--surface)] p-8 ${
+        tier.highlighted ? 'shadow-[0_16px_48px_-20px_rgba(11,31,26,0.35)]' : ''
+      }`}
+    >
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold tracking-tight">{tier.name}</h2>
+        <h2 className="font-display text-xl font-bold tracking-tight">{tier.name}</h2>
         {tier.highlighted ? (
-          <span className="rounded-full bg-[var(--accent)] px-2.5 py-1 text-xs font-medium text-[var(--accent-foreground)]">
-            Populaire
+          <span className="font-mono rounded border-2 border-[var(--stamp)] px-2 py-0.5 text-[0.62rem] font-semibold tracking-[0.12em] text-[var(--stamp-strong)]">
+            POPULAIRE
           </span>
         ) : null}
       </div>
       <p className="mt-2 text-sm text-[var(--foreground-muted)]">{tier.tagline}</p>
 
       <div className="mt-6 flex items-baseline gap-1">
-        <span className="text-4xl font-semibold tracking-tight">{tier.price}</span>
+        <span className="fig text-4xl font-semibold tracking-tight">{tier.price}</span>
         {tier.priceSuffix ? (
           <span className="text-sm text-[var(--foreground-muted)]">{tier.priceSuffix}</span>
         ) : null}
       </div>
       {tier.altPrice ? (
-        <p className="mt-1 text-xs text-[var(--foreground-muted)]">{tier.altPrice}</p>
+        <p className="fig mt-1 text-xs text-[var(--foreground-muted)]">{tier.altPrice}</p>
       ) : null}
 
       <ul className="mt-6 flex flex-1 flex-col gap-3 text-sm">

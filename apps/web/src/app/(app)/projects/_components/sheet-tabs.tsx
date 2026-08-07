@@ -34,8 +34,8 @@ export function SheetTabs({ tabs, activeId, onChange }: SheetTabsProps): React.R
             onClick={() => onChange(tab.id)}
             className={
               isActive
-                ? 'border-b-2 border-[var(--accent)] px-4 py-2.5 -mb-px text-sm font-semibold text-[var(--foreground)] transition'
-                : 'border-b-2 border-transparent px-4 py-2.5 -mb-px text-sm font-medium text-[var(--foreground-muted)] transition hover:text-[var(--foreground)]'
+                ? 'font-mono border-b-2 border-[var(--accent)] px-3.5 py-2.5 -mb-px text-[0.72rem] font-semibold uppercase tracking-[0.08em] text-[var(--foreground)] transition'
+                : 'font-mono border-b-2 border-transparent px-3.5 py-2.5 -mb-px text-[0.72rem] font-medium uppercase tracking-[0.08em] text-[var(--foreground-muted)] transition hover:text-[var(--foreground)]'
             }
           >
             {tab.label}

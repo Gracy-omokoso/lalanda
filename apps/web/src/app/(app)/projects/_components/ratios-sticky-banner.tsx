@@ -6,11 +6,11 @@
 
 import type { LineResult } from '@/lib/api';
 
-/** Couleurs des feux tricolores — cohérentes avec RatiosCard. */
+/** Couleurs des feux tricolores — tokens globaux (globals.css), thème-aware. */
 const STATUT_DOT: Record<'vert' | 'orange' | 'rouge', string> = {
-  vert: '#16a34a',
-  orange: '#ea580c',
-  rouge: '#dc2626',
+  vert: 'var(--ok)',
+  orange: 'var(--warn)',
+  rouge: 'var(--ko)',
 };
 
 function formatValue(
@@ -74,7 +74,7 @@ export function RatiosStickyBanner({
               style={{ backgroundColor: color }}
             />
             <span className="font-medium text-[var(--foreground)]">{line.label}</span>
-            <span className="font-semibold tabular-nums text-[var(--foreground)]">
+            <span className="fig font-semibold text-[var(--foreground)]">
               {formatValue(line.value, line.format, currency)}
             </span>
           </button>
