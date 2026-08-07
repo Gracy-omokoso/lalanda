@@ -84,6 +84,8 @@ export default function ProjectsPage(): React.ReactElement {
   const [newName, setNewName] = useState('');
 
   const [error, setError] = useState<string | null>(null);
+  // (S16b) Limite de projets du plan atteinte (403 PLAN_LIMIT_PROJECTS de l'API).
+  const [planLimit, setPlanLimit] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
@@ -136,6 +138,7 @@ export default function ProjectsPage(): React.ReactElement {
     if (!newName.trim()) return;
     setCreating(true);
     setError(null);
+    setPlanLimit(null);
     try {
       const created = await api.createProject({
         name: newName.trim(),
@@ -147,7 +150,13 @@ export default function ProjectsPage(): React.ReactElement {
       setNewName('');
       router.push(`/projects/${created.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Impossible de créer le projet');
+      // (S16b) L'API impose la limite de projets du plan : message dédié + lien tarifs.
+      const detail = (err as { detail?: { code?: string; limit?: number } }).detail;
+      if (detail?.code === 'PLAN_LIMIT_PROJECTS') {
+        setPlanLimit(detail.limit ?? 1);
+      } else {
+        setError(err instanceof Error ? err.message : 'Impossible de créer le projet');
+      }
       setCreating(false);
     }
   }
@@ -348,6 +357,16 @@ export default function ProjectsPage(): React.ReactElement {
           </button>
         </fieldset>
       </form>
+
+      {planLimit !== null ? (
+        <div className="rounded-md border border-[var(--accent)]/30 bg-[var(--surface)] p-3 text-sm">
+          Votre offre actuelle est limitée à {planLimit} projet{planLimit > 1 ? 's' : ''}. Passez à
+          l&apos;offre Pro pour créer des projets illimités.{' '}
+          <Link href="/pricing" className="font-medium text-[var(--accent)] underline">
+            Voir les offres
+          </Link>
+        </div>
+      ) : null}
 
       {error ? (
         <div className="rounded-md border border-[var(--danger)]/30 bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger)]">
