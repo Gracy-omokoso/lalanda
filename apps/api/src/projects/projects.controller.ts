@@ -15,6 +15,11 @@ import { EngineError, evaluateTemplate } from '@lalanda/engine';
 import { AuthGuard } from '../auth/auth.guard.js';
 import { CurrentOrgId, CurrentUser } from '../auth/current-user.decorator.js';
 import { BillingService } from '../billing/billing.service.js';
+import {
+  toEvaluationView,
+  type AmortissementsView,
+  type EvaluatedLineView,
+} from '../evaluate/evaluation-view.js';
 import { getTemplate } from '../evaluate/template-registry.js';
 import {
   findDefaultPackForCountry,
@@ -156,7 +161,7 @@ export class ProjectsController {
     @Body() body: unknown,
   ): Promise<{
     project: ProjectView;
-    lines: EvaluatedLine[];
+    lines: EvaluatedLineView[];
     amortissements?: AmortissementsView;
   }> {
     const parsed = EvaluateProjectSchema.safeParse(body ?? {});
@@ -185,37 +190,14 @@ export class ProjectsController {
 
     try {
       const result = evaluateTemplate(template, drivers, { parameterPack: pack });
+      // (S16c) Mapping factorisé dans evaluation-view.ts — même forme que le
+      // snapshot figé d'un plan validé (module plans/).
+      const view = toEvaluationView(result);
       return {
         project: toView(project),
-        lines: result.lines.map((l) => ({
-          sheetId: l.sheetId,
-          lineId: l.lineId,
-          label: l.label,
-          formulaSource: l.formulaSource,
-          value: l.value,
-          format: l.format,
-          seuil: l.seuil,
-        })),
-        // (S14c) Feuille amortissements structurée (colonnes = années × immobilisations).
-        // Absent si le template ne déclare pas d'immobilisations.
-        amortissements: result.amortissements
-          ? {
-              horizonAnnees: result.amortissements.horizon_annees,
-              lignes: result.amortissements.lignes.map((li) => ({
-                label: li.label,
-                categorie: li.categorie,
-                montantHt: li.montant_ht,
-                valeurResiduelle: li.valeur_residuelle,
-                dureeAnnees: li.duree_annees,
-                dateAcquisition: li.date_acquisition,
-                prorataPremiereAnnee: li.prorata_premiere_annee,
-                dotations: [...li.dotations],
-                vnc: [...li.vnc],
-              })),
-              dapParAnnee: [...result.amortissements.dap_par_annee],
-              vncParAnnee: [...result.amortissements.vnc_par_annee],
-            }
-          : undefined,
+        lines: view.lines,
+        // (S14c) Absent si le template ne déclare pas d'immobilisations.
+        amortissements: view.amortissements,
       };
     } catch (err) {
       if (err instanceof EngineError) {
@@ -228,37 +210,6 @@ export class ProjectsController {
       throw err;
     }
   }
-}
-
-interface AmortissementsView {
-  horizonAnnees: number;
-  lignes: {
-    label: string;
-    categorie: string;
-    montantHt: number;
-    valeurResiduelle: number;
-    dureeAnnees: number;
-    dateAcquisition: string;
-    prorataPremiereAnnee: number;
-    dotations: number[];
-    vnc: number[];
-  }[];
-  dapParAnnee: number[];
-  vncParAnnee: number[];
-}
-
-interface EvaluatedLine {
-  sheetId: string;
-  lineId: string;
-  label: string;
-  formulaSource: string;
-  value: number;
-  format: 'money' | 'number' | 'percent';
-  seuil?: {
-    valeur: number;
-    direction: 'min' | 'max';
-    statut: 'vert' | 'orange' | 'rouge';
-  };
 }
 
 function toView(doc: ProjectDocument): ProjectView {

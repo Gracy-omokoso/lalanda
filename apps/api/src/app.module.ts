@@ -9,6 +9,7 @@ import { EvaluateController } from './evaluate/evaluate.controller.js';
 import { HealthController } from './health/health.controller.js';
 import { OrganizationsModule } from './organizations/organizations.module.js';
 import { ParameterPacksModule } from './parameter-packs/parameter-packs.module.js';
+import { PlansModule } from './plans/plans.module.js';
 import { ProjectsModule } from './projects/projects.module.js';
 import { ReportsModule } from './reports/reports.module.js';
 import { ThrottlingModule } from './security/throttling.module.js';
@@ -50,6 +51,7 @@ import { ThrottlingModule } from './security/throttling.module.js';
     BillingModule,
     ParameterPacksModule,
     ProjectsModule,
+    PlansModule,
     ReportsModule,
     AiModule,
   ],
