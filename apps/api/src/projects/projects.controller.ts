@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Inject,
   NotFoundException,
@@ -13,6 +14,7 @@ import { EngineError, evaluateTemplate } from '@lalanda/engine';
 
 import { AuthGuard } from '../auth/auth.guard.js';
 import { CurrentOrgId, CurrentUser } from '../auth/current-user.decorator.js';
+import { BillingService } from '../billing/billing.service.js';
 import { getTemplate } from '../evaluate/template-registry.js';
 import {
   findDefaultPackForCountry,
@@ -40,7 +42,10 @@ interface ProjectView {
 @Controller('projects')
 @UseGuards(AuthGuard)
 export class ProjectsController {
-  constructor(@Inject(ProjectsService) private readonly projects: ProjectsService) {}
+  constructor(
+    @Inject(ProjectsService) private readonly projects: ProjectsService,
+    @Inject(BillingService) private readonly billing: BillingService,
+  ) {}
 
   @Get()
   async list(@CurrentOrgId() orgId: string): Promise<{ projects: ProjectView[] }> {
@@ -58,6 +63,23 @@ export class ProjectsController {
     if (!parsed.success) {
       throw new BadRequestException({ code: 'INVALID_REQUEST', issues: parsed.error.issues });
     }
+
+    // Entitlements (S16b) : l'API impose la limite de projets du plan (docs/13).
+    // NB : check-then-create sans transaction — une course peut dépasser d'un projet,
+    // acceptable pour un quota commercial (pas une invariante de sécurité).
+    const { plan, entitlements } = await this.billing.getPlanEntitlements(orgId);
+    if (entitlements.maxProjects !== null) {
+      const count = await this.projects.countByOrg(orgId);
+      if (count >= entitlements.maxProjects) {
+        throw new ForbiddenException({
+          code: 'PLAN_LIMIT_PROJECTS',
+          limit: entitlements.maxProjects,
+          plan,
+          message: `Limite de ${entitlements.maxProjects} projet(s) atteinte pour le plan ${plan}.`,
+        });
+      }
+    }
+
     // Validation : le template doit exister dans le registre.
     if (!getTemplate(parsed.data.templateSlug)) {
       throw new NotFoundException({

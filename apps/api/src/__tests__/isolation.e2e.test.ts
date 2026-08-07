@@ -91,6 +91,11 @@ suite('isolation multi-tenant (brief §11 S4)', () => {
             .collection('memberships')
             .deleteMany({})
             .catch(() => {}),
+          // (S16b) Abonnements de test seedés via BillingService.
+          db
+            .collection('subscriptions')
+            .deleteMany({})
+            .catch(() => {}),
         ]);
       }
     } catch {
@@ -126,8 +131,23 @@ suite('isolation multi-tenant (brief §11 S4)', () => {
     return cookies.map((c: string) => c.split(';')[0]!);
   }
 
+  /**
+   * (S16b) Ce test crée plusieurs projets dans l'org d'Alice ; le plan free est
+   * limité à 1 projet depuis les entitlements. On passe l'org en `pro` (illimité)
+   * via le service interne — l'isolation multi-tenant testée ici est indépendante
+   * du plan. Les limites de plan ont leur propre suite : entitlements.e2e.test.ts.
+   */
+  async function upgradeActiveOrgToPro(cookies: string[]): Promise<void> {
+    const orgs = await request(app.getHttpServer()).get('/organizations').set('Cookie', cookies);
+    expect(orgs.status).toBe(200);
+    const orgId: string = orgs.body.organizations[0].id;
+    const { BillingService } = await import('../billing/billing.service.js');
+    await app.get(BillingService).setPlan(orgId, 'pro');
+  }
+
   it("Alice s'inscrit, crée un projet, le voit dans /projects", async () => {
     const cookiesA = await registerAndLogin(userA);
+    await upgradeActiveOrgToPro(cookiesA);
 
     const created = await request(app.getHttpServer())
       .post('/projects')

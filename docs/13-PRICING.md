@@ -66,6 +66,43 @@ L’interface peut expliquer une limite, mais l’API l’impose.
 - annulation et reprise documentées;
 - factures et taxes conservées selon obligations.
 
+## Implémenté (S16b)
+
+Première tranche d'entitlements appliqués côté API — sans intégration paiement.
+
+### Modèle
+
+- Collection `subscriptions` (`apps/api/src/billing/subscription.schema.ts`) :
+  `organizationId` (unique), `plan: free | pro | business`, `status: active`,
+  `_schemaVersion`. Une organisation **sans** document est en plan `free`.
+- Catalogue typé `PLAN_ENTITLEMENTS` (`apps/api/src/billing/entitlements.ts`) :
+  - `free` : `maxProjects: 1`, `pdfWatermark: true`;
+  - `pro` : projets illimités, PDF sans filigrane;
+  - `business` : tout Pro + `seats: 20`.
+
+### Limites appliquées par l'API
+
+- `POST /projects` : limite atteinte → `403 { code: 'PLAN_LIMIT_PROJECTS', limit, plan }`.
+  Le web affiche un message avec lien vers `/pricing` (pas d'UI d'upgrade).
+- Export PDF : filigrane discret « Généré avec Lalanda — offre gratuite » répété
+  sur chaque page si le plan est `free` (décidé côté API, jamais par l'UI).
+- `GET /organizations/current/subscription` → `{ plan, entitlements, usage: { projects } }`.
+
+### Hors périmètre S16b
+
+- **Aucune intégration paiement** : pas d'endpoint public de changement de plan.
+  `BillingService.setPlan` est interne (seed, support, tests) en attendant les
+  événements de paiement vérifiés décrits plus haut.
+- Essai 14 jours, états `trialing`/`past_due`/`grace`/…, quotas scénarios/membres/IA.
+
+### Divergence page publique / ce document
+
+La page `/pricing` (apps/web) publie **trois** offres — Free, Pro (9 USD/mois),
+Business (49 USD/mois) — alors que ce document décrit **quatre** packs
+(Starter/Pro/Business/Enterprise) encore à valider commercialement. S16b implémente
+la promesse publique (la page), qui fait foi tant que la grille ci-dessus n'est pas
+arbitrée. À réconcilier lors de la validation commerciale.
+
 ## Validation commerciale requise
 
 Étude de la volonté de payer par segment, coûts d’IA et d’exports, moyens de paiement locaux, devises de facturation, fiscalité de vente numérique, politique de remboursement et remise annuelle.

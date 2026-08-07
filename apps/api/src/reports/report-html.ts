@@ -65,7 +65,15 @@ export interface ReportData {
   generatedAt: string;
   /** Devise d'affichage — reprise du pack/template/USD. */
   currency: 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR';
+  /**
+   * (S16b) Filigrane « offre gratuite » — décidé côté API selon l'entitlement
+   * `pdfWatermark` du plan de l'organisation. Absent/false = pas de filigrane.
+   */
+  watermark?: boolean;
 }
+
+/** Texte du filigrane — aligné sur la promesse de la page /pricing. */
+export const WATERMARK_TEXT = 'Généré avec Lalanda — offre gratuite';
 
 function escapeHtml(input: string): string {
   return input
@@ -137,6 +145,7 @@ export function renderReportHtml(data: ReportData): string {
     lines,
     generatedAt,
     currency,
+    watermark,
   } = data;
 
   // Groupement des drivers par groupe pour affichage lisible (fallback : un seul bloc).
@@ -344,6 +353,13 @@ export function renderReportHtml(data: ReportData): string {
     .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
     .seuil-note { font-size: 8pt; margin-top: 1mm; }
 
+    /* ---- Filigrane offre gratuite (S16b) ---- */
+    /* position:fixed en contexte print Chromium : répété sur chaque page, en bas du
+       bloc de contenu. Discret : petit corps, gris clair, centré — n'obstrue pas les
+       chiffres. NB vérifié empiriquement : un bottom négatif (dans la marge @page)
+       est replié en haut de page par Chromium — rester à 0. */
+    .watermark { position: fixed; bottom: 0; left: 0; right: 0; text-align: center; font-size: 7.5pt; color: #94a3b8; letter-spacing: 0.4px; }
+
     /* ---- Avertissement légal ---- */
     .disclaimer-box { margin-top: 8mm; background: #fef9e7; border: 1px solid #f0c95a; padding: 4mm; break-inside: avoid; }
     .disclaimer-box h3 { color: #8a6d00; margin: 0 0 2mm 0; font-size: 11pt; }
@@ -353,6 +369,7 @@ export function renderReportHtml(data: ReportData): string {
   </style>
 </head>
 <body>
+  ${watermark ? `<div class="watermark">${escapeHtml(WATERMARK_TEXT)}</div>` : ''}
   <!-- Page 1 : garde -->
   <section class="cover-page">
     <div class="accent-rule"></div>
