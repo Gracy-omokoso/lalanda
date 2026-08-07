@@ -17,6 +17,12 @@ interface BuildAuthOptions {
   secret: string;
   trustedOrigins: string[];
   /**
+   * S16a : vérification d'email bloquante à la connexion (better-auth).
+   * Piloté par AUTH_REQUIRE_EMAIL_VERIFICATION (défaut false en dev — aucun SMTP
+   * branché ; à activer en production dès qu'un fournisseur d'envoi existe).
+   */
+  requireEmailVerification?: boolean;
+  /**
    * Callback invoqué APRÈS la création d'un user (better-auth `databaseHooks.user.create.after`).
    * Utilisé pour auto-provisionner l'organisation personnelle + membership owner.
    */
@@ -41,8 +47,9 @@ export async function buildAuth(opts: BuildAuthOptions): Promise<ReturnType<type
     trustedOrigins: opts.trustedOrigins,
     emailAndPassword: {
       enabled: true,
-      // S4a : vérification d'email non bloquante ; l'envoi réel viendra à S6 (ADR SMTP).
-      requireEmailVerification: false,
+      // S16a : bloquant seulement si AUTH_REQUIRE_EMAIL_VERIFICATION=true (prod avec SMTP).
+      // Défaut false : aucun fournisseur d'envoi d'email n'est branché (ADR SMTP à venir).
+      requireEmailVerification: opts.requireEmailVerification ?? false,
       autoSignIn: true,
     },
     databaseHooks: {
