@@ -161,6 +161,93 @@ export interface PlanDetailView extends PlanSummaryView {
   result: { lines: LineResult[]; amortissements?: AmortissementsView };
 }
 
+// ─── Business Model Canvas (S18d — docs/05) ────────────────────
+/** Les 9 blocs BMC, dans l'ordre canonique docs/05. */
+export const CANVAS_BLOCKS = [
+  'segments_clients',
+  'proposition_valeur',
+  'canaux',
+  'relations_clients',
+  'revenus',
+  'ressources_cles',
+  'activites_cles',
+  'partenaires_cles',
+  'couts',
+] as const;
+
+export type CanvasBlockId = (typeof CANVAS_BLOCKS)[number];
+
+export interface CanvasCard {
+  id: string;
+  texte: string;
+  ordre: number;
+}
+
+export type CanvasBlocks = Record<CanvasBlockId, CanvasCard[]>;
+
+export interface CanvasView {
+  projectId: string;
+  /** 0 = jamais sauvegardé (l'API renvoie alors 9 blocs vides, pas un 404). */
+  version: number;
+  blocs: CanvasBlocks;
+  updatedBy: string | null;
+  updatedAt: string | null;
+}
+
+export interface CanvasRevisionView {
+  version: number;
+  blocs: CanvasBlocks;
+  savedBy: string;
+  savedAt: string;
+}
+
+/** Contraintes de validation côté API — dupliquées ici pour le feedback immédiat. */
+export const CANVAS_MAX_CARD_TEXT = 500;
+export const CANVAS_MAX_CARDS_PER_BLOCK = 20;
+
+// ─── Objectifs financiers et taux d'atteinte (S18d — docs/01) ──
+export const OBJECTIVE_KEYS = [
+  'ca_cible_an1',
+  'ca_cible_an5',
+  'resultat_net_cible_an1',
+  'resultat_net_cible_an5',
+  'tresorerie_cible',
+] as const;
+
+export type ObjectiveKey = (typeof OBJECTIVE_KEYS)[number];
+
+export type ObjectivesInput = Partial<Record<ObjectiveKey, number>>;
+
+export interface ObjectivesView extends ObjectivesInput {
+  projectId: string;
+  updatedAt: string | null;
+}
+
+export type AttainmentStatut = 'atteint' | 'partiel' | 'non_atteint' | 'indisponible';
+
+export interface ObjectiveAttainment {
+  objectif: ObjectiveKey;
+  label: string;
+  cible: number;
+  lineId: string | null;
+  valeur: number | null;
+  /**
+   * Taux d'atteinte en %, calculé PAR L'API (docs/26 : aucune règle financière
+   * dans un composant UI). `null` = non mesurable — ne jamais afficher 0.
+   */
+  atteinte: number | null;
+  statut: AttainmentStatut;
+  raison: 'LIGNE_INDISPONIBLE' | null;
+}
+
+export interface AttainmentView {
+  source: 'plan_valide';
+  planVersion: number;
+  planApprovedAt: string;
+  seuilPartielPct: number;
+  objectifs: ObjectiveAttainment[];
+}
+
 export const ACTIVE_ORG_COOKIE = 'active_org_id';
 
 /**
@@ -295,6 +382,35 @@ export const api = {
     }),
   getPlan: (id: string, version: number) =>
     jsonRequest<PlanDetailView>(`/projects/${encodeURIComponent(id)}/plans/${version}`, {
+      method: 'GET',
+    }),
+  // ─── Business Model Canvas (S18d) ──────────────────────────
+  // PUT = remplacement complet des 9 blocs (l'API refuse tout bloc inconnu).
+  getCanvas: (id: string) =>
+    jsonRequest<CanvasView>(`/projects/${encodeURIComponent(id)}/canvas`, { method: 'GET' }),
+  putCanvas: (id: string, blocs: CanvasBlocks) =>
+    jsonRequest<CanvasView>(`/projects/${encodeURIComponent(id)}/canvas`, {
+      method: 'PUT',
+      body: blocs,
+    }),
+  listCanvasRevisions: (id: string) =>
+    jsonRequest<{ revisions: CanvasRevisionView[] }>(
+      `/projects/${encodeURIComponent(id)}/canvas/revisions`,
+      { method: 'GET' },
+    ),
+  // ─── Objectifs financiers (S18d) ───────────────────────────
+  getObjectives: (id: string) =>
+    jsonRequest<ObjectivesView>(`/projects/${encodeURIComponent(id)}/objectives`, {
+      method: 'GET',
+    }),
+  putObjectives: (id: string, objectives: ObjectivesInput) =>
+    jsonRequest<ObjectivesView>(`/projects/${encodeURIComponent(id)}/objectives`, {
+      method: 'PUT',
+      body: objectives,
+    }),
+  /** 409 { code: 'NO_APPROVED_PLAN' } tant qu'aucun plan n'est validé. */
+  getAttainment: (id: string) =>
+    jsonRequest<AttainmentView>(`/projects/${encodeURIComponent(id)}/objectives/attainment`, {
       method: 'GET',
     }),
   // ─── Reports PDF (S8-lite) ─────────────────────────────────

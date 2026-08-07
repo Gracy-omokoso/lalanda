@@ -65,7 +65,11 @@ export class CanvasService {
     });
 
     await this.revisionModel
-      .deleteMany({ projectId, version: { $lte: doc.version - MAX_CANVAS_REVISIONS } })
+      .deleteMany({
+        organizationId,
+        projectId,
+        version: { $lte: doc.version - MAX_CANVAS_REVISIONS },
+      })
       .exec();
 
     return doc;

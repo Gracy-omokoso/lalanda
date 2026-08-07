@@ -3,10 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
 import { OBJECTIVE_KEYS, type PutObjectivesInput } from './objectives.dto.js';
-import {
-  FinancialObjectives,
-  type FinancialObjectivesDocument,
-} from './objectives.schema.js';
+import { FinancialObjectives, type FinancialObjectivesDocument } from './objectives.schema.js';
 
 @Injectable()
 export class ObjectivesService {

@@ -26,8 +26,8 @@ import { PlansService } from '../plans/plans.service.js';
 import { ProjectsService } from '../projects/projects.service.js';
 import {
   computeAttainment,
+  PARTIAL_THRESHOLD_PCT,
   type ObjectiveAttainment,
-  type ObjectiveNotEvaluable,
 } from './attainment.js';
 import { OBJECTIVE_KEYS, PutObjectivesSchema, type ObjectiveKey } from './objectives.dto.js';
 import type { FinancialObjectivesDocument } from './objectives.schema.js';
@@ -38,15 +38,23 @@ export interface ObjectivesView {
   ca_cible_an1?: number;
   ca_cible_an5?: number;
   resultat_net_cible_an1?: number;
+  resultat_net_cible_an5?: number;
   tresorerie_cible?: number;
   updatedAt: string | null;
 }
 
 export interface AttainmentView {
+  /**
+   * Base de comparaison. docs/01 prévoit trois bases distinctes (plan validé,
+   * réalisé, dernière projection) ; S18d n'implémente que le plan validé —
+   * le champ rend la base explicite pour l'UI et pour les bases à venir.
+   */
+  source: 'plan_valide';
   planVersion: number;
   planApprovedAt: string;
+  /** Seuil (%) séparant « partiel » de « non atteint », pour affichage. */
+  seuilPartielPct: number;
   objectifs: ObjectiveAttainment[];
-  non_evaluables: ObjectiveNotEvaluable[];
 }
 
 @Controller('projects')
@@ -106,12 +114,12 @@ export class ObjectivesController {
       for (const key of OBJECTIVE_KEYS) targets[key] = doc[key];
     }
 
-    const { objectifs, non_evaluables } = computeAttainment(targets, approved.result);
     return {
+      source: 'plan_valide',
       planVersion: approved.version,
       planApprovedAt: approved.approvedAt.toISOString(),
-      objectifs,
-      non_evaluables,
+      seuilPartielPct: PARTIAL_THRESHOLD_PCT,
+      objectifs: computeAttainment(targets, approved.result),
     };
   }
 }
@@ -122,6 +130,7 @@ function toView(projectId: string, doc: FinancialObjectivesDocument | null): Obj
     ca_cible_an1: doc?.ca_cible_an1,
     ca_cible_an5: doc?.ca_cible_an5,
     resultat_net_cible_an1: doc?.resultat_net_cible_an1,
+    resultat_net_cible_an5: doc?.resultat_net_cible_an5,
     tresorerie_cible: doc?.tresorerie_cible,
     updatedAt: doc ? doc.updatedAt.toISOString() : null,
   };

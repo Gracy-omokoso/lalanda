@@ -73,3 +73,19 @@ Chaque validation du Canvas crée un instantané. Les exports et plans peuvent r
 - Les liens financiers sont traçables et confirmés.
 - La suppression d’une carte ne supprime pas automatiquement une hypothèse déjà validée.
 - L’historique indique auteur, date et changement.
+
+## Implémenté (S18d)
+
+Première tranche : les neuf blocs éditables, versionnés et isolés par organisation. Les fonctions collaboratives et les liens carte ↔ hypothèse financière restent à faire (voir « Reste à faire »).
+
+- **Modèle `Canvas`** (collection `canvases`, module `apps/api/src/canvas/`) : un document par projet, `blocs` = les neuf blocs de la section « Blocs » (ids `segments_clients`, `proposition_valeur`, `canaux`, `relations_clients`, `revenus`, `ressources_cles`, `activites_cles`, `partenaires_cles`, `couts`), chaque bloc étant une liste ordonnée de cartes `{ id, texte, ordre }`. `version`, `updatedBy`, `_schemaVersion`, index unique `{projectId}`.
+- **Aucun montant dans le Canvas** (§ Relations financières) : le modèle ne porte aucune donnée chiffrée et ne participe à aucun calcul. Le Canvas guide les hypothèses ; les chiffres restent la propriété du moteur financier.
+- **Versionnement** (§ Versionnement) : chaque `PUT` incrémente `version` et écrit un instantané dans `canvas_revisions` (`version`, `blocs`, `savedBy`, `createdAt`). Rétention **bornée aux 20 dernières révisions** par projet — les plus anciennes sont purgées à l’écriture. Index unique `{projectId, version}` : deux écritures concurrentes ne peuvent pas produire deux instantanés de la même version.
+- **Endpoints** (AuthGuard + scope organisation, 404 cross-tenant — jamais 403) : `GET /projects/:id/canvas` (un projet sans canvas renvoie neuf blocs vides et `version: 0`, pas un 404), `PUT /projects/:id/canvas` (remplacement complet des neuf blocs), `GET /projects/:id/canvas/revisions` (20 dernières révisions, plus récentes en premier).
+- **Validation zod** (`canvas.dto.ts`, schéma dérivé de la liste des blocs pour éviter toute divergence) : objet `.strict()` — un **bloc inconnu** ou un **champ de carte inconnu** est refusé en `400 INVALID_REQUEST` ; `texte` de 1 à **500 caractères** ; **20 cartes maximum par bloc** ; ids de cartes uniques dans un bloc.
+- **Web** : onglet « Canvas » de la vue projet (`/projects/:id/canvas`) — grille des neuf blocs disposée en nappe BMC sur grand écran, édition **inline** des cartes, **auto-save au blur** (aucune écriture si le contenu utile est inchangé : pas de révision inutile), indicateur de version permanent et historique des révisions dépliable.
+- **Isolation** : toutes les routes passent par le projet scopé à l’organisation ; testé de bout en bout (`apps/api/src/__tests__/canvas.e2e.test.ts`).
+
+### Reste à faire
+
+Priorité, hypothèses/preuves, statut à valider/validé/rejeté, liens entre cartes, liens confirmés vers les hypothèses financières, glisser-déposer, filtres, mode atelier, vue cohérence, restauration d’une révision, export A4 paysage et signalement des incohérences par le wizard.

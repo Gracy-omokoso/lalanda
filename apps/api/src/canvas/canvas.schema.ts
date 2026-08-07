@@ -35,7 +35,9 @@ export type CanvasBlocks = Record<CanvasBlockId, CanvasCard[]>;
 
 /** Blocs vides — état initial d'un canvas jamais sauvegardé. */
 export function emptyCanvasBlocks(): CanvasBlocks {
-  return Object.fromEntries(CANVAS_BLOCKS.map((b) => [b, []])) as CanvasBlocks;
+  const blocs = {} as CanvasBlocks;
+  for (const bloc of CANVAS_BLOCKS) blocs[bloc] = [];
+  return blocs;
 }
 
 @Schema({ collection: 'canvases', timestamps: true, strict: true })

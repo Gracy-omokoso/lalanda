@@ -28,6 +28,10 @@ export class FinancialObjectives {
   @Prop({ type: Number, min: 0 })
   resultat_net_cible_an1?: number;
 
+  /** Résultat net cible à 5 ans. */
+  @Prop({ type: Number, min: 0 })
+  resultat_net_cible_an5?: number;
+
   /** Trésorerie cible (fin de première année). */
   @Prop({ type: Number, min: 0 })
   tresorerie_cible?: number;
