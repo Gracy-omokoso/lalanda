@@ -23,48 +23,50 @@
 
 :root,
 [data-theme='light'] {
-  --background: #f7f5ee; /* papier registre */
-  --surface: #fffdf8;
-  --surface-muted: #efece2;
-  --border: #ddd8c9;
-  --border-strong: #b8b2a0;
-  --foreground: #17201b;
-  --foreground-muted: #5c665f;
-  --accent: #0e7c66;
+  --background: #eee7d7; /* crème charte */
+  --surface: #ffffff;
+  --surface-muted: #f5f0e4;
+  --border: #dcd4c2;
+  --border-strong: #9e947e;
+  --foreground: #14191b;
+  --foreground-muted: #6c685a;
+  --accent: #005263;
   --accent-foreground: #ffffff;
   --danger: #b3261e;
   --danger-bg: #fbeeed;
 }
 
 [data-theme='dark'] {
-  --background: #0c1512;
-  --surface: #121d18;
-  --surface-muted: #18251f;
-  --border: #24312a;
-  --border-strong: #3a4a41;
-  --foreground: #eff3ee;
-  --foreground-muted: #98a69c;
-  --accent: #3fbf9f;
-  --accent-foreground: #06120e;
+  --background: #07171c;
+  --surface: #0c2129;
+  --surface-muted: #102a33;
+  --border: #1c3a44;
+  --border-strong: #2f5561;
+  --foreground: #eee7d7;
+  --foreground-muted: #96c9d7;
+  --accent: #00acca;
+  --accent-foreground: #04252c;
   --danger: #f28b82;
   --danger-bg: #2a1614;
 }
 
 :root {
-  --ink: #0b1f1a;
-  --ink-2: #0e2a22;
-  --on-ink: #f6f4ed;
-  --on-ink-muted: #a8b8ae;
-  --ink-border: #23423a;
-  --stamp: #dfa033;
-  --stamp-strong: #8a5f14;
-  --ok: #0e7c66;
+  --ink: #005263; /* pétrole principal charte */
+  --ink-2: #003f4c;
+  --on-ink: #eee7d7;
+  --on-ink-muted: #97aeb4;
+  --on-ink-accent: #96c9d7; /* bleu clair principal 2 */
+  --ink-border: #196c7e;
+  --stamp: #00acca; /* cyan principal — encre de tampon bancaire */
+  --stamp-foreground: #06272e;
+  --stamp-strong: #005263;
+  --ok: #1e8e3e;
   --warn: #b07818;
   --ko: #b3261e;
 }
 
 [data-theme='dark'] {
-  --ok: #3fbf9f;
+  --ok: #4bc07a;
   --warn: #d9a441;
   --ko: #f28b82;
 }
@@ -116,22 +118,22 @@ input[type='number'] {
     to bottom,
     transparent 0,
     transparent 47px,
-    rgba(246, 244, 237, 0.045) 47px,
-    rgba(246, 244, 237, 0.045) 48px
+    rgba(238, 231, 215, 0.05) 47px,
+    rgba(238, 231, 215, 0.05) 48px
   );
 }
 
 /* ─── Document « dossier » ───────────────────────────────────── */
 
 .doc-card {
-  background: #fdfbf4;
-  color: #17201b;
-  border: 1px solid #d8d2bf;
+  background: #fbf7ec;
+  color: #14191b;
+  border: 1px solid #d6cdb9;
   border-radius: 6px;
   box-shadow:
-    0 1px 2px rgba(11, 31, 26, 0.18),
-    0 12px 32px -12px rgba(11, 31, 26, 0.45),
-    0 24px 64px -24px rgba(11, 31, 26, 0.4);
+    0 1px 2px rgba(0, 63, 76, 0.18),
+    0 12px 32px -12px rgba(0, 63, 76, 0.45),
+    0 24px 64px -24px rgba(0, 63, 76, 0.4);
 }
 
 /* Ligne de registre : libellé, pointillés conducteurs, valeur. */
@@ -142,7 +144,7 @@ input[type='number'] {
 }
 .ledger-row .leader {
   flex: 1;
-  border-bottom: 1px dotted #b8b2a0;
+  border-bottom: 1px dotted #b4a98f;
   transform: translateY(-0.3em);
   min-width: 1rem;
 }

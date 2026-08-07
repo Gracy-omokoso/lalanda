@@ -21,7 +21,7 @@ export default function MarketingLayout({
           <Link href="/" className="flex items-center gap-3">
             <span
               aria-hidden="true"
-              className="font-display inline-flex h-9 w-9 items-center justify-center rounded-md border-2 border-[var(--stamp)] text-base font-black text-[var(--stamp)]"
+              className="font-display inline-flex h-9 w-9 items-center justify-center rounded-md border-2 border-[var(--on-ink-accent)] text-base font-black text-[var(--on-ink-accent)]"
             >
               L
             </span>
@@ -49,7 +49,7 @@ export default function MarketingLayout({
             </Link>
             <Link
               href="/register"
-              className="rounded-md bg-[var(--stamp)] px-3 py-2 text-sm font-semibold text-[var(--ink)] transition hover:brightness-110 sm:px-4"
+              className="rounded-md bg-[var(--stamp)] px-3 py-2 text-sm font-semibold text-[var(--stamp-foreground)] transition hover:brightness-110 sm:px-4"
             >
               Créer un compte
             </Link>
@@ -65,7 +65,7 @@ export default function MarketingLayout({
           <div className="flex items-center gap-3">
             <span
               aria-hidden="true"
-              className="font-display inline-flex h-7 w-7 items-center justify-center rounded border-2 border-[var(--stamp)] text-xs font-black text-[var(--stamp)]"
+              className="font-display inline-flex h-7 w-7 items-center justify-center rounded border-2 border-[var(--on-ink-accent)] text-xs font-black text-[var(--on-ink-accent)]"
             >
               L
             </span>

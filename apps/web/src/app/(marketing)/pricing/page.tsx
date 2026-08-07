@@ -72,7 +72,7 @@ export default function PricingPage(): React.ReactElement {
       <section className="bg-ink ink-ruled">
         <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
           <div className="mx-auto max-w-2xl text-center">
-            <p className="font-mono mb-4 text-xs font-medium tracking-[0.18em] text-[var(--stamp)]">
+            <p className="font-mono mb-4 text-xs font-medium tracking-[0.18em] text-[var(--on-ink-accent)]">
               TARIFS
             </p>
             <h1 className="font-display text-4xl font-black tracking-tight text-[var(--on-ink)] sm:text-5xl">

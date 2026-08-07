@@ -13,7 +13,7 @@ export default function LandingPage(): React.ReactElement {
       <section className="bg-ink ink-ruled">
         <div className="mx-auto grid max-w-6xl items-center gap-12 px-6 py-16 sm:py-20 lg:grid-cols-[1.1fr_0.9fr] lg:py-24">
           <div>
-            <p className="font-mono mb-5 text-xs font-medium tracking-[0.18em] text-[var(--stamp)]">
+            <p className="font-mono mb-5 text-xs font-medium tracking-[0.18em] text-[var(--on-ink-accent)]">
               SYSCOHADA · RDC · AFRIQUE DE L&apos;OUEST ET CENTRALE
             </p>
             <h1 className="font-display text-[2.6rem] font-black leading-[0.98] tracking-tight text-[var(--on-ink)] sm:text-6xl lg:text-[4.2rem]">
@@ -27,7 +27,7 @@ export default function LandingPage(): React.ReactElement {
             <div className="mt-9 flex flex-wrap items-center gap-3">
               <Link
                 href="/register"
-                className="rounded-md bg-[var(--stamp)] px-6 py-3.5 text-sm font-semibold text-[var(--ink)] transition hover:brightness-110"
+                className="rounded-md bg-[var(--stamp)] px-6 py-3.5 text-sm font-semibold text-[var(--stamp-foreground)] transition hover:brightness-110"
               >
                 Créer mon dossier
               </Link>
@@ -46,31 +46,31 @@ export default function LandingPage(): React.ReactElement {
           {/* Artefact produit : prévisionnel an 1 tamponné */}
           <div aria-hidden="true" className="hidden justify-self-end lg:block">
             <div className="doc-card hero-doc w-[26rem] p-7">
-              <div className="flex items-baseline justify-between border-b border-[#d8d2bf] pb-3">
-                <span className="font-mono text-[0.65rem] font-semibold tracking-[0.16em] text-[#5c665f]">
+              <div className="flex items-baseline justify-between border-b border-[#d6cdb9] pb-3">
+                <span className="font-mono text-[0.65rem] font-semibold tracking-[0.16em] text-[#6c685a]">
                   PRÉVISIONNEL — EXERCICE 1
                 </span>
-                <span className="font-mono text-[0.65rem] tracking-wide text-[#5c665f]">USD</span>
+                <span className="font-mono text-[0.65rem] tracking-wide text-[#6c685a]">USD</span>
               </div>
               <div className="mt-5 space-y-3.5 text-[0.83rem]">
                 <div className="ledger-row">
-                  <span className="text-[#39423c]">Chiffre d&apos;affaires</span>
+                  <span className="text-[#33424a]">Chiffre d&apos;affaires</span>
                   <span className="leader" />
                   <span className="fig font-medium">262 800</span>
                 </div>
                 <div className="ledger-row">
-                  <span className="text-[#39423c]">Excédent brut d&apos;exploitation</span>
+                  <span className="text-[#33424a]">Excédent brut d&apos;exploitation</span>
                   <span className="leader" />
                   <span className="fig font-medium">47 300</span>
                 </div>
                 <div className="ledger-row">
-                  <span className="text-[#39423c]">Annuité de crédit</span>
+                  <span className="text-[#33424a]">Annuité de crédit</span>
                   <span className="leader" />
                   <span className="fig font-medium">33 310</span>
                 </div>
-                <div className="mt-2 border-t border-[#d8d2bf] pt-3.5 space-y-3.5">
+                <div className="mt-2 border-t border-[#d6cdb9] pt-3.5 space-y-3.5">
                   <div className="ledger-row">
-                    <span className="flex items-center gap-2 text-[#39423c]">
+                    <span className="flex items-center gap-2 text-[#33424a]">
                       <span className="dot dot-ok" />
                       DSCR
                     </span>
@@ -78,7 +78,7 @@ export default function LandingPage(): React.ReactElement {
                     <span className="fig font-semibold">1,42</span>
                   </div>
                   <div className="ledger-row">
-                    <span className="flex items-center gap-2 text-[#39423c]">
+                    <span className="flex items-center gap-2 text-[#33424a]">
                       <span className="dot dot-ok" />
                       Apport propre
                     </span>
@@ -86,7 +86,7 @@ export default function LandingPage(): React.ReactElement {
                     <span className="fig font-semibold">28 %</span>
                   </div>
                   <div className="ledger-row">
-                    <span className="flex items-center gap-2 text-[#39423c]">
+                    <span className="flex items-center gap-2 text-[#33424a]">
                       <span className="dot dot-warn" />
                       Trésorerie minimum
                     </span>
@@ -96,7 +96,7 @@ export default function LandingPage(): React.ReactElement {
                 </div>
               </div>
               <div className="mt-7 flex items-end justify-between">
-                <div className="font-mono text-[0.6rem] leading-relaxed tracking-wide text-[#8a8574]">
+                <div className="font-mono text-[0.6rem] leading-relaxed tracking-wide text-[#9e947e]">
                   SYSCOHADA RÉVISÉ
                   <br />
                   PACK RDC 2026 — IBP 30 % · TVA 16 %
@@ -239,11 +239,11 @@ export default function LandingPage(): React.ReactElement {
             </p>
           </div>
           <div className="doc-card p-6 sm:p-8">
-            <div className="mb-6 flex items-baseline justify-between border-b border-[#d8d2bf] pb-3">
-              <span className="font-mono text-[0.65rem] font-semibold tracking-[0.16em] text-[#5c665f]">
+            <div className="mb-6 flex items-baseline justify-between border-b border-[#d6cdb9] pb-3">
+              <span className="font-mono text-[0.65rem] font-semibold tracking-[0.16em] text-[#6c685a]">
                 RATIOS BANCAIRES — SYNTHÈSE
               </span>
-              <span className="font-mono text-[0.65rem] tracking-wide text-[#5c665f]">
+              <span className="font-mono text-[0.65rem] tracking-wide text-[#6c685a]">
                 PACK RDC 2026
               </span>
             </div>
@@ -254,7 +254,7 @@ export default function LandingPage(): React.ReactElement {
               <RatioPill label="Apport" value="28 %" status="ok" hint="Seuil ≥ 25 %" />
               <RatioPill label="Trésorerie mini" value="+ 3 200 USD" status="ok" hint="Seuil ≥ 0" />
             </div>
-            <p className="mt-6 text-sm text-[#5c665f]">
+            <p className="mt-6 text-sm text-[#6c685a]">
               Payback investissement : 3 ans 4 mois (seuil ≤ 5 ans). Dossier acceptable en
               l&apos;état par un analyste bancaire local.
             </p>
@@ -275,7 +275,7 @@ export default function LandingPage(): React.ReactElement {
           <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
             <Link
               href="/register"
-              className="rounded-md bg-[var(--stamp)] px-6 py-3.5 text-sm font-semibold text-[var(--ink)] transition hover:brightness-110"
+              className="rounded-md bg-[var(--stamp)] px-6 py-3.5 text-sm font-semibold text-[var(--stamp-foreground)] transition hover:brightness-110"
             >
               Créer un compte gratuit
             </Link>
@@ -392,15 +392,15 @@ function RatioPill({
   const dotClass = status === 'ok' ? 'dot-ok' : status === 'ko' ? 'dot-ko' : 'dot-warn';
 
   return (
-    <div className="rounded-md border border-[#d8d2bf] bg-[#f7f5ee] p-4">
+    <div className="rounded-md border border-[#d6cdb9] bg-[#eee7d7] p-4">
       <div className="flex items-center gap-2">
         <span aria-hidden="true" className={`dot ${dotClass}`} />
-        <span className="font-mono text-[0.62rem] font-medium tracking-[0.12em] text-[#5c665f]">
+        <span className="font-mono text-[0.62rem] font-medium tracking-[0.12em] text-[#6c685a]">
           {label.toUpperCase()}
         </span>
       </div>
-      <div className="fig mt-2 text-2xl font-semibold tracking-tight text-[#17201b]">{value}</div>
-      <div className="fig mt-1 text-[0.65rem] text-[#5c665f]">{hint}</div>
+      <div className="fig mt-2 text-2xl font-semibold tracking-tight text-[#14191b]">{value}</div>
+      <div className="fig mt-1 text-[0.65rem] text-[#6c685a]">{hint}</div>
     </div>
   );
 }
