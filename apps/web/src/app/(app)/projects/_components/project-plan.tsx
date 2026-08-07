@@ -395,9 +395,7 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
               </span>
             ) : null}
           </div>
-          {planNotice ? (
-            <p className="text-xs text-[var(--accent)]">{planNotice}</p>
-          ) : null}
+          {planNotice ? <p className="text-xs text-[var(--accent)]">{planNotice}</p> : null}
           <PlanVersionsList plans={plans} onDownload={handleDownloadPlanExport} />
         </form>
 

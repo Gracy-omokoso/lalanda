@@ -190,7 +190,7 @@ suite('plans validés figés et versionnés (S16c — FIN-003)', () => {
     expect(detail1.body.status).toBe('superseded');
   }, 30_000);
 
-  it("export xlsx ?planVersion=1 : repart du snapshot, pas des drivers courants", async () => {
+  it('export xlsx ?planVersion=1 : repart du snapshot, pas des drivers courants', async () => {
     const res = await request(app.getHttpServer())
       .get(`/projects/${projectId}/report/xlsx?planVersion=1`)
       .set('Cookie', cookiesA)
@@ -229,7 +229,7 @@ suite('plans validés figés et versionnés (S16c — FIN-003)', () => {
     expect(invalid.status).toBe(400);
   }, 30_000);
 
-  it("isolation org : un autre user reçoit 404 sur les endpoints plans", async () => {
+  it('isolation org : un autre user reçoit 404 sur les endpoints plans', async () => {
     const cookiesB = await registerAndLogin(userB);
 
     const post = await request(app.getHttpServer())

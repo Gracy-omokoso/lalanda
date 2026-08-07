@@ -42,7 +42,7 @@ describe('computePlanFingerprint', () => {
     expect(a).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it("change si un driver change", () => {
+  it('change si un driver change', () => {
     const a = computePlanFingerprint(base);
     const b = computePlanFingerprint({
       ...base,
@@ -64,7 +64,11 @@ describe('computePlanFingerprint', () => {
   });
 
   it('distingue « pack absent » de « pack présent »', () => {
-    const a = computePlanFingerprint({ ...base, parameterPackSlug: undefined, packVersion: undefined });
+    const a = computePlanFingerprint({
+      ...base,
+      parameterPackSlug: undefined,
+      packVersion: undefined,
+    });
     const b = computePlanFingerprint(base);
     expect(a).not.toBe(b);
   });

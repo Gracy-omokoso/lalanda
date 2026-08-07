@@ -97,10 +97,7 @@ export class PlansService {
 
   /** Versions d'un projet, plus récentes en premier. Le scope org est TOUJOURS appliqué. */
   listByProject(organizationId: string, projectId: string): Promise<FinancialPlanDocument[]> {
-    return this.model
-      .find({ organizationId, projectId })
-      .sort({ version: -1 })
-      .exec();
+    return this.model.find({ organizationId, projectId }).sort({ version: -1 }).exec();
   }
 
   /** Détail d'une version précise. 404 si absente ou hors scope org. */

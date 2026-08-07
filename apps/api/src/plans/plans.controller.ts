@@ -86,7 +86,11 @@ export class PlansController {
       evaluation = evaluateTemplate(template, project.driverValues, { parameterPack: pack });
     } catch (err) {
       if (err instanceof EngineError) {
-        throw new BadRequestException({ code: err.code, message: err.message, details: err.details });
+        throw new BadRequestException({
+          code: err.code,
+          message: err.message,
+          details: err.details,
+        });
       }
       throw err;
     }
