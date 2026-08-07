@@ -1,0 +1,112 @@
+# Déploiement Lalanda (S17a — ADR-0009).
+#
+# Déclenché sur tag `v*` (ex: v0.2.0) :
+#   1. build + push des images api et web sur GHCR (aucun secret requis :
+#      GITHUB_TOKEN suffit pour ghcr.io) ;
+#   2. job `deploy` sur le Droplet — DÉSACTIVÉ PAR DÉFAUT tant que les secrets
+#      DigitalOcean ne sont pas configurés. Pour l'activer :
+#        a. créer la variable de repo `DEPLOY_ENABLED=true`
+#           (Settings → Secrets and variables → Actions → Variables) ;
+#        b. créer les secrets `DO_SSH_HOST`, `DO_SSH_USER`, `DO_SSH_KEY`
+#           (clé privée dédiée au déploiement, restreinte sur le Droplet) ;
+#        c. préparer le Droplet : docker + compose installés, dépôt des fichiers
+#           docker-compose.prod.yml, Caddyfile et .env.production dans
+#           /opt/lalanda (voir scripts/deploy-vps.sh).
+#      Sans la variable, le job est simplement « skipped » — le workflow ne
+#      casse jamais si les secrets manquent.
+
+name: Deploy
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build-push:
+    name: Build & push ${{ matrix.app }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        include:
+          - app: api
+            dockerfile: apps/api/Dockerfile
+          - app: web
+            dockerfile: apps/web/Dockerfile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ghcr.io exige un nom d'image en minuscules — le owner peut contenir des majuscules.
+      - name: Compute image name
+        id: image
+        run: echo "name=${{ env.REGISTRY }}/${GITHUB_REPOSITORY_OWNER,,}/lalanda-${{ matrix.app }}" >> "$GITHUB_OUTPUT"
+
+      - name: Docker metadata (tags)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image.outputs.name }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,scope=${{ matrix.app }},mode=max
+          # NEXT_PUBLIC_API_URL est inlinée au build du web (voir apps/web/Dockerfile).
+          # Configurer la variable de repo NEXT_PUBLIC_API_URL avec l'URL publique
+          # de l'API (ex: https://api.lalanda.example) ; fallback localhost sinon.
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'http://localhost:3001' }}
+
+  deploy:
+    name: Deploy sur le Droplet (désactivé par défaut)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    needs: build-push
+    # Gate d'activation — voir l'en-tête du fichier. Tant que la variable de
+    # repo DEPLOY_ENABLED ne vaut pas 'true', ce job est skippé (pas d'échec).
+    if: vars.DEPLOY_ENABLED == 'true'
+    environment: production
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DO_SSH_HOST }}
+          username: ${{ secrets.DO_SSH_USER }}
+          key: ${{ secrets.DO_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd /opt/lalanda
+            # Tag GHCR sans le préfixe « v » (aligné sur metadata-action {{version}}).
+            TAG="${{ github.ref_name }}"
+            export LALANDA_TAG="${TAG#v}"
+            ./scripts/deploy-vps.sh

@@ -46,3 +46,6 @@ packages/engine/__golden__/**/actual.*.csv
 # Smoke test artifacts (S8-lite PDF)
 apps/api/scripts/smoke-*.pdf
 apps/api/scripts/smoke-*.html
+
+# Env de production (VPS uniquement, jamais commité)
+.env.production

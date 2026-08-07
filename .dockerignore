@@ -1,0 +1,41 @@
+# Contexte de build Docker — on exclut tout ce qui n'entre pas dans les images.
+# Les builds se font depuis la racine du monorepo :
+#   docker build -f apps/api/Dockerfile .
+#   docker build -f apps/web/Dockerfile .
+
+# Dépendances (réinstallées dans l'image avec pnpm --frozen-lockfile)
+node_modules
+**/node_modules
+.pnpm-store
+
+# Sorties de build (reconstruites dans l'image)
+**/dist
+**/.next
+**/.turbo
+*.tsbuildinfo
+
+# Secrets et environnements — JAMAIS dans une image
+.env
+.env.*
+!.env.example
+
+# Git / CI / éditeurs
+.git
+.github
+.vscode
+.idea
+
+# Docs, sources et artefacts hors runtime
+docs
+sources
+coverage
+.docker-data
+**/*.log
+.DS_Store
+
+# Docker lui-même
+Dockerfile
+**/Dockerfile
+docker-compose*.yml
+Caddyfile
+scripts
