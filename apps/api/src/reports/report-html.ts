@@ -354,9 +354,11 @@ export function renderReportHtml(data: ReportData): string {
     .seuil-note { font-size: 8pt; margin-top: 1mm; }
 
     /* ---- Filigrane offre gratuite (S16b) ---- */
-    /* position:fixed en contexte print Chromium : répété sur chaque page. Discret :
-       petit corps, gris clair, bas de page — n'obstrue pas les chiffres. */
-    .watermark { position: fixed; bottom: -14mm; left: 0; right: 0; text-align: center; font-size: 7.5pt; color: #94a3b8; letter-spacing: 0.4px; }
+    /* position:fixed en contexte print Chromium : répété sur chaque page, en bas du
+       bloc de contenu. Discret : petit corps, gris clair, centré — n'obstrue pas les
+       chiffres. NB vérifié empiriquement : un bottom négatif (dans la marge @page)
+       est replié en haut de page par Chromium — rester à 0. */
+    .watermark { position: fixed; bottom: 0; left: 0; right: 0; text-align: center; font-size: 7.5pt; color: #94a3b8; letter-spacing: 0.4px; }
 
     /* ---- Avertissement légal ---- */
     .disclaimer-box { margin-top: 8mm; background: #fef9e7; border: 1px solid #f0c95a; padding: 4mm; break-inside: avoid; }

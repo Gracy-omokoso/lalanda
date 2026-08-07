@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 
+import { OrganizationsModule } from '../organizations/organizations.module.js';
 import { Project, ProjectSchema } from '../projects/project.schema.js';
 import { BillingController } from './billing.controller.js';
 import { BillingService } from './billing.service.js';
@@ -14,6 +15,8 @@ import { Subscription, SubscriptionSchema } from './subscription.schema.js';
  */
 @Module({
   imports: [
+    // AuthGuard (BillingController) résout l'org active via OrganizationsService.
+    OrganizationsModule,
     MongooseModule.forFeature([
       { name: Subscription.name, schema: SubscriptionSchema },
       { name: Project.name, schema: ProjectSchema },
