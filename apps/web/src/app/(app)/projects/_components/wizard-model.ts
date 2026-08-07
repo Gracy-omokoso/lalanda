@@ -43,7 +43,7 @@ interface ResolvedEtape {
  */
 function resolveEtapes(template: TemplateMeta): ResolvedEtape[] {
   const groupes = template.groupes_hypotheses ?? [];
-  const declared = template.etapes ?? [];
+  const declared = template.wizard?.etapes ?? [];
 
   if (declared.length === 0) {
     if (groupes.length === 0) {

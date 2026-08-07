@@ -43,23 +43,25 @@ describe('buildWizardSteps', () => {
       template({
         drivers,
         groupes_hypotheses: groupes,
-        etapes: [
-          { id: 'fin', label: 'Financement', groupes: ['financement'], ordre: 2 },
-          { id: 'ca', label: 'Chiffre d’affaires', groupes: ['activite'], ordre: 1 },
-        ],
+        wizard: {
+          etapes: [
+            { id: 'fin', label: 'Financement', groupes: ['financement'], ordre: 2 },
+            { id: 'ca', label: 'Chiffre d’affaires', groupes: ['activite'], ordre: 1 },
+          ],
+        },
       }),
     );
     expect(steps.map((s) => s.id)).toEqual(['ca', 'fin', ETAPE_SYNTHESE]);
     expect(steps[0]?.drivers.map((d) => d.id)).toEqual(['ca', 'jours']);
   });
 
-  it('fallback : une étape par groupe quand aucune étape n’est déclarée', () => {
+  it('fallback : une étape par groupe quand aucun bloc wizard n’est déclaré', () => {
     const steps = buildWizardSteps(template({ drivers, groupes_hypotheses: groupes }));
     expect(steps.map((s) => s.id)).toEqual(['activite', 'financement', ETAPE_SYNTHESE]);
     expect(steps.map((s) => s.label)).toEqual(['Activité', 'Financement', 'Synthèse']);
   });
 
-  it('fallback : une étape unique quand il n’y a ni étapes ni groupes', () => {
+  it('fallback : une étape unique quand il n’y a ni wizard ni groupes', () => {
     const steps = buildWizardSteps(template({ drivers: [driver({ id: 'x' })] }));
     expect(steps.map((s) => s.id)).toEqual(['hypotheses', ETAPE_SYNTHESE]);
     expect(steps[0]?.drivers).toHaveLength(1);
@@ -70,7 +72,7 @@ describe('buildWizardSteps', () => {
       template({
         drivers,
         groupes_hypotheses: groupes,
-        etapes: [{ id: 'tout', label: 'Tout', groupes: ['activite', 'financement'] }],
+        wizard: { etapes: [{ id: 'tout', label: 'Tout', groupes: ['activite', 'financement'] }] },
       }),
     );
     expect(steps.map((s) => s.id)).toEqual(['tout', ETAPE_SYNTHESE]);
@@ -82,7 +84,7 @@ describe('buildWizardSteps', () => {
       template({
         drivers,
         groupes_hypotheses: groupes,
-        etapes: [{ id: 'ca', label: 'CA', groupes: ['activite'] }],
+        wizard: { etapes: [{ id: 'ca', label: 'CA', groupes: ['activite'] }] },
       }),
     );
     expect(steps.map((s) => s.id)).toEqual(['ca', 'financement', ETAPE_SYNTHESE]);
@@ -108,10 +110,12 @@ describe('buildWizardSteps', () => {
       template({
         drivers: [driver({ id: 'ca', groupe: 'activite' })],
         groupes_hypotheses: [...groupes, { id: 'vide', label: 'Vide' }],
-        etapes: [
-          { id: 'ca', label: 'CA', groupes: ['activite'] },
-          { id: 'rien', label: 'Rien', groupes: ['vide'] },
-        ],
+        wizard: {
+          etapes: [
+            { id: 'ca', label: 'CA', groupes: ['activite'] },
+            { id: 'rien', label: 'Rien', groupes: ['vide'] },
+          ],
+        },
       }),
     );
     expect(steps.map((s) => s.id)).toEqual(['ca', ETAPE_SYNTHESE]);

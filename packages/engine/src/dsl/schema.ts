@@ -68,6 +68,20 @@ const EtapeSchema = z
 
 export type Etape = z.infer<typeof EtapeSchema>;
 
+/**
+ * Bloc de présentation du wizard — regroupe TOUTES les clés destinées à l'interface
+ * de saisie, et rien d'autre. Le compilateur et l'évaluateur l'ignorent intégralement
+ * (voir ADR-0011, Contrat 3 : frontière explicite entre structure financière et
+ * présentation, pour que deux chantiers puissent éditer le même template).
+ */
+const WizardSchema = z
+  .object({
+    etapes: z.array(EtapeSchema).min(1, 'le bloc wizard doit déclarer au moins une étape'),
+  })
+  .strict();
+
+export type WizardPresentation = z.infer<typeof WizardSchema>;
+
 // ─── Feuilles et lignes ───────────────────────────────────────
 // S1 : uniquement des feuilles calculées avec des lignes explicites.
 // S10 : ligne peut porter un seuil (feu tricolore) référençant un paramètre du pack.
@@ -206,10 +220,10 @@ export const TemplateSchema = z
     parameter_pack: z.string().optional(),
     groupes_hypotheses: z.array(GroupeSchema).optional(),
     /**
-     * (S18c) Découpage du wizard de saisie en étapes. Purement présentationnel.
+     * (S18c) Bloc de présentation du wizard de saisie — aucune sémantique de calcul.
      * Absent → fallback « une étape par groupe d'hypothèses » (voir {@link resolveEtapes}).
      */
-    etapes: z.array(EtapeSchema).optional(),
+    wizard: WizardSchema.optional(),
     drivers: z.array(DriverSchema).min(1, 'au moins un driver requis'),
     feuilles: z.array(FeuilleSchema).min(1, 'au moins une feuille requise'),
     sorties: z.array(IdSchema).optional(),
@@ -270,7 +284,7 @@ export function collectIds(template: Template): CollectedIds {
   // (S18c) Les étapes vivent dans leur propre espace de noms (elles ne sont jamais
   // référencées par une formule) — on vérifie juste l'unicité et la validité des
   // groupes rattachés, pour qu'un renommage de groupe casse bruyamment au build.
-  for (const e of template.etapes ?? []) {
+  for (const e of template.wizard?.etapes ?? []) {
     if (etapes.has(e.id)) throw new DuplicateIdError('etape', e.id);
     etapes.add(e.id);
     for (const groupeId of e.groupes) {
@@ -315,13 +329,13 @@ export interface ResolvedEtape {
  * 2. tout groupe d'hypothèses non rattaché à une étape est ajouté en fin de liste
  *    comme étape autonome (résilience : un groupe ajouté par un template n'est
  *    jamais perdu, même si `etapes` n'a pas été mis à jour);
- * 3. aucune `etapes` déclarée → fallback « une étape par groupe d'hypothèses »;
+ * 3. aucun bloc `wizard` déclaré → fallback « une étape par groupe d'hypothèses »;
  * 4. aucun groupe non plus → une unique étape `hypotheses` qui porte tous les drivers
  *    (le groupe `_all` est virtuel : il ne correspond à aucun `groupe` de driver).
  */
 export function resolveEtapes(template: Template): ResolvedEtape[] {
   const groupes = template.groupes_hypotheses ?? [];
-  const declared = template.etapes ?? [];
+  const declared = template.wizard?.etapes ?? [];
 
   if (declared.length === 0) {
     if (groupes.length === 0) {

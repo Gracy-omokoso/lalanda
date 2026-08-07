@@ -83,16 +83,18 @@ Avant le calcul officiel, Lalanda affiche :
 
 ### Structure
 
-Le découpage en étapes est déclaré par le template via un champ **optionnel** `etapes`
-(`packages/engine/src/dsl/schema.ts`) : `id`, `label`, `description`, `groupes` rattachés
-et `ordre`. Le champ est purement présentationnel — le moteur l’ignore à l’évaluation.
+Le découpage en étapes est déclaré par le template via un bloc **optionnel**
+`wizard: { etapes: [...] }` (`packages/engine/src/dsl/schema.ts`, conforme à ADR-0011
+Contrat 3). Chaque étape porte `id`, `label`, `description`, `groupes` rattachés et
+`ordre`. Le bloc est purement présentationnel : le compilateur et l’évaluateur
+l’ignorent, et son absence laisse les templates S6–S14 valides à l’identique.
 
 Résolution (`resolveEtapes`, mêmes règles côté web dans `buildWizardSteps`) :
 
 1. étapes déclarées, triées par `ordre` croissant, celles sans `ordre` restant dans
    l’ordre de déclaration et passant en dernier;
 2. tout groupe d’hypothèses non rattaché à une étape est ajouté en fin de parcours;
-3. sans `etapes` : **une étape par groupe d’hypothèses**;
+3. sans bloc `wizard` : **une étape par groupe d’hypothèses**;
 4. sans groupes non plus : une étape unique portant tous les drivers;
 5. une étape finale « Synthèse » est toujours ajoutée par l’interface.
 

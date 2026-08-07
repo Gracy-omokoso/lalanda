@@ -107,33 +107,50 @@ const avecGroupes = {
 };
 
 describe('TemplateSchema — etapes', () => {
-  it('accepte un template sans etapes (champ optionnel)', () => {
-    expect(TemplateSchema.parse(minimal).etapes).toBeUndefined();
+  it('accepte un template sans bloc wizard (champ optionnel)', () => {
+    expect(TemplateSchema.parse(minimal).wizard).toBeUndefined();
   });
 
   it('accepte des etapes valides', () => {
     const parsed = TemplateSchema.parse({
       ...avecGroupes,
-      etapes: [
-        {
-          id: 'chiffre_affaires',
-          label: "Chiffre d'affaires",
-          description: 'Combien vendez-vous ?',
-          groupes: ['activite'],
-          ordre: 1,
-        },
-        { id: 'financement', label: 'Financement', groupes: ['financement'], ordre: 2 },
-      ],
+      wizard: {
+        etapes: [
+          {
+            id: 'chiffre_affaires',
+            label: "Chiffre d'affaires",
+            description: 'Combien vendez-vous ?',
+            groupes: ['activite'],
+            ordre: 1,
+          },
+          { id: 'financement', label: 'Financement', groupes: ['financement'], ordre: 2 },
+        ],
+      },
     });
-    expect(parsed.etapes).toHaveLength(2);
-    expect(parsed.etapes?.[0]?.description).toBe('Combien vendez-vous ?');
+    expect(parsed.wizard?.etapes).toHaveLength(2);
+    expect(parsed.wizard?.etapes[0]?.description).toBe('Combien vendez-vous ?');
+  });
+
+  it('rejette un bloc wizard sans aucune etape', () => {
+    expect(() => TemplateSchema.parse({ ...avecGroupes, wizard: { etapes: [] } })).toThrow(
+      /au moins une étape/,
+    );
+  });
+
+  it('rejette une clé inconnue dans le bloc wizard (strict)', () => {
+    expect(() =>
+      TemplateSchema.parse({
+        ...avecGroupes,
+        wizard: { etapes: [{ id: 'x', label: 'X', groupes: ['activite'] }], theme: 'sombre' },
+      }),
+    ).toThrow();
   });
 
   it('rejette une etape sans groupe rattaché', () => {
     expect(() =>
       TemplateSchema.parse({
         ...avecGroupes,
-        etapes: [{ id: 'vide', label: 'Vide', groupes: [] }],
+        wizard: { etapes: [{ id: 'vide', label: 'Vide', groupes: [] }] },
       }),
     ).toThrow(/au moins un groupe/);
   });
@@ -142,7 +159,7 @@ describe('TemplateSchema — etapes', () => {
     expect(() =>
       TemplateSchema.parse({
         ...avecGroupes,
-        etapes: [{ id: 'x', groupes: ['activite'] }],
+        wizard: { etapes: [{ id: 'x', groupes: ['activite'] }] },
       }),
     ).toThrow();
   });
@@ -151,7 +168,7 @@ describe('TemplateSchema — etapes', () => {
     expect(() =>
       TemplateSchema.parse({
         ...avecGroupes,
-        etapes: [{ id: 'Étape-1', label: 'X', groupes: ['activite'] }],
+        wizard: { etapes: [{ id: 'Étape-1', label: 'X', groupes: ['activite'] }] },
       }),
     ).toThrow(/identifiant invalide/);
   });
@@ -160,7 +177,7 @@ describe('TemplateSchema — etapes', () => {
     expect(() =>
       TemplateSchema.parse({
         ...avecGroupes,
-        etapes: [{ id: 'x', label: 'X', groupes: ['activite'], couleur: 'rouge' }],
+        wizard: { etapes: [{ id: 'x', label: 'X', groupes: ['activite'], couleur: 'rouge' }] },
       }),
     ).toThrow();
   });
@@ -169,7 +186,7 @@ describe('TemplateSchema — etapes', () => {
     expect(() =>
       TemplateSchema.parse({
         ...avecGroupes,
-        etapes: [{ id: 'x', label: 'X', groupes: ['activite'], ordre: 0 }],
+        wizard: { etapes: [{ id: 'x', label: 'X', groupes: ['activite'], ordre: 0 }] },
       }),
     ).toThrow();
   });
@@ -179,7 +196,7 @@ describe('collectIds — etapes', () => {
   it("collecte les ids d'etapes", () => {
     const parsed = TemplateSchema.parse({
       ...avecGroupes,
-      etapes: [{ id: 'ca', label: 'CA', groupes: ['activite'] }],
+      wizard: { etapes: [{ id: 'ca', label: 'CA', groupes: ['activite'] }] },
     });
     expect(collectIds(parsed).etapes.has('ca')).toBe(true);
   });
@@ -191,10 +208,12 @@ describe('collectIds — etapes', () => {
   it("rejette un id d'etape dupliqué", () => {
     const parsed = TemplateSchema.parse({
       ...avecGroupes,
-      etapes: [
-        { id: 'ca', label: 'CA', groupes: ['activite'] },
-        { id: 'ca', label: 'CA bis', groupes: ['financement'] },
-      ],
+      wizard: {
+        etapes: [
+          { id: 'ca', label: 'CA', groupes: ['activite'] },
+          { id: 'ca', label: 'CA bis', groupes: ['financement'] },
+        ],
+      },
     });
     expect(() => collectIds(parsed)).toThrow(DuplicateIdError);
   });
@@ -202,7 +221,7 @@ describe('collectIds — etapes', () => {
   it('rejette une etape qui référence un groupe inconnu', () => {
     const parsed = TemplateSchema.parse({
       ...avecGroupes,
-      etapes: [{ id: 'ca', label: 'CA', groupes: ['inexistant'] }],
+      wizard: { etapes: [{ id: 'ca', label: 'CA', groupes: ['inexistant'] }] },
     });
     expect(() => collectIds(parsed)).toThrow(UnknownGroupeError);
   });
@@ -226,10 +245,12 @@ describe('resolveEtapes', () => {
     const resolved = resolveEtapes(
       TemplateSchema.parse({
         ...avecGroupes,
-        etapes: [
-          { id: 'fin', label: 'Financement', groupes: ['financement'], ordre: 2 },
-          { id: 'ca', label: 'CA', groupes: ['activite'], ordre: 1 },
-        ],
+        wizard: {
+          etapes: [
+            { id: 'fin', label: 'Financement', groupes: ['financement'], ordre: 2 },
+            { id: 'ca', label: 'CA', groupes: ['activite'], ordre: 1 },
+          ],
+        },
       }),
     );
     expect(resolved.map((e) => e.id)).toEqual(['ca', 'fin']);
@@ -239,10 +260,12 @@ describe('resolveEtapes', () => {
     const resolved = resolveEtapes(
       TemplateSchema.parse({
         ...avecGroupes,
-        etapes: [
-          { id: 'sans', label: 'Sans ordre', groupes: ['financement'] },
-          { id: 'avec', label: 'Avec ordre', groupes: ['activite'], ordre: 5 },
-        ],
+        wizard: {
+          etapes: [
+            { id: 'sans', label: 'Sans ordre', groupes: ['financement'] },
+            { id: 'avec', label: 'Avec ordre', groupes: ['activite'], ordre: 5 },
+          ],
+        },
       }),
     );
     expect(resolved.map((e) => e.id)).toEqual(['avec', 'sans']);
@@ -254,7 +277,7 @@ describe('resolveEtapes', () => {
     const resolved = resolveEtapes(
       TemplateSchema.parse({
         ...avecGroupes,
-        etapes: [{ id: 'ca', label: 'CA', groupes: ['activite'], ordre: 1 }],
+        wizard: { etapes: [{ id: 'ca', label: 'CA', groupes: ['activite'], ordre: 1 }] },
       }),
     );
     expect(resolved.map((e) => e.id)).toEqual(['ca', 'financement']);
@@ -265,7 +288,7 @@ describe('resolveEtapes', () => {
     const resolved = resolveEtapes(
       TemplateSchema.parse({
         ...avecGroupes,
-        etapes: [{ id: 'tout', label: 'Tout', groupes: ['activite', 'financement'] }],
+        wizard: { etapes: [{ id: 'tout', label: 'Tout', groupes: ['activite', 'financement'] }] },
       }),
     );
     expect(resolved).toHaveLength(1);
@@ -276,7 +299,7 @@ describe('resolveEtapes', () => {
     const resolved = resolveEtapes(
       TemplateSchema.parse({
         ...avecGroupes,
-        etapes: [{ id: 'ca', label: 'CA', groupes: ['activite', 'financement'] }],
+        wizard: { etapes: [{ id: 'ca', label: 'CA', groupes: ['activite', 'financement'] }] },
       }),
     );
     expect(resolved[0]).not.toHaveProperty('description');

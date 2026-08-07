@@ -18,6 +18,7 @@ export {
   type Feuille,
   type Ligne,
   type ResolvedEtape,
+  type WizardPresentation,
   type Template,
   type Immobilisation,
   type CategorieImmobilisation,

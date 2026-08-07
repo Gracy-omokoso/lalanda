@@ -227,7 +227,8 @@ export interface TemplateMeta {
   devise_base?: 'USD' | 'CDF';
   horizon_mois?: number;
   groupes_hypotheses?: TemplateGroupMeta[];
-  etapes?: TemplateEtapeMeta[];
+  /** (S18c) Bloc de présentation du wizard — voir ADR-0011, Contrat 3. */
+  wizard?: { etapes: TemplateEtapeMeta[] };
   drivers: TemplateDriverMeta[];
 }
 
