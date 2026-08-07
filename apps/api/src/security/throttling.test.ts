@@ -45,7 +45,7 @@ describe('rate limiting (S16a)', () => {
         req,
       );
 
-    it("trace par id utilisateur quand AuthGuard a posé req.user", async () => {
+    it('trace par id utilisateur quand AuthGuard a posé req.user', async () => {
       await expect(
         getTracker({ user: { id: 'u42', email: 'a@b.c' }, ip: '10.0.0.1' }),
       ).resolves.toBe('user:u42');

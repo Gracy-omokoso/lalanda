@@ -113,9 +113,7 @@ suite('auth sur /evaluate (S16a)', () => {
     expect(list.status).toBe(200);
     expect(list.body.slugs).toContain('hello-world');
 
-    const one = await request(server)
-      .get('/evaluate/templates/hello-world')
-      .set('Cookie', cookies);
+    const one = await request(server).get('/evaluate/templates/hello-world').set('Cookie', cookies);
     expect(one.status).toBe(200);
     expect(one.body.template.slug).toBe('hello-world');
 

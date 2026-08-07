@@ -15,7 +15,7 @@ const MINIMAL_ENV = {
 };
 
 describe('ApiEnvSchema (S16a)', () => {
-  it("démarre sans REDIS_URL ni S3_* (requis seulement à partir des exports asynchrones)", () => {
+  it('démarre sans REDIS_URL ni S3_* (requis seulement à partir des exports asynchrones)', () => {
     const parsed = ApiEnvSchema.safeParse(MINIMAL_ENV);
     expect(parsed.success, JSON.stringify(parsed.success ? null : parsed.error.issues)).toBe(true);
   });
