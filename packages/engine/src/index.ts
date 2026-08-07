@@ -11,6 +11,7 @@ export {
   TemplateSchema,
   collectIds,
   resolveEtapes,
+  findUnknownWizardGroupes,
   type CollectedIds,
   type Driver,
   type DriverType,
@@ -31,7 +32,6 @@ export {
   EngineError,
   MissingDriverValueError,
   UnknownDriverError,
-  UnknownGroupeError,
   UnknownLineError,
   type EngineErrorCode,
 } from './dsl/errors.js';

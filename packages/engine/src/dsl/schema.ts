@@ -3,6 +3,12 @@
 // S1 : sous-ensemble minimal (drivers scalaires, formules ponctuelles, pas de temporalité, pas de custom functions).
 
 import { z } from 'zod';
+import {
+  GROUPE_TOUS,
+  findUnknownWizardGroupes,
+  resolveWizardEtapes,
+  type ResolvedEtape,
+} from '@lalanda/shared/wizard';
 
 // ─── Identifiants ─────────────────────────────────────────────
 // Snake_case ASCII, [a-z0-9_], commence par une lettre, 1..64 chars.
@@ -254,7 +260,7 @@ export type Template = z.infer<typeof TemplateSchema>;
 // ─── Validation croisée (unicité des id) ──────────────────────
 // Ces vérifications ne sont pas exprimables en Zod pur → helper séparé.
 
-import { DuplicateIdError, UnknownGroupeError, type EngineError } from './errors.js';
+import { DuplicateIdError, type EngineError } from './errors.js';
 
 export interface CollectedIds {
   readonly drivers: ReadonlySet<string>;
@@ -281,15 +287,16 @@ export function collectIds(template: Template): CollectedIds {
     if (groupes.has(g.id)) throw new DuplicateIdError('groupe', g.id);
     groupes.add(g.id);
   }
-  // (S18c) Les étapes vivent dans leur propre espace de noms (elles ne sont jamais
-  // référencées par une formule) — on vérifie juste l'unicité et la validité des
-  // groupes rattachés, pour qu'un renommage de groupe casse bruyamment au build.
+  // (S18c) Les étapes vivent dans leur propre espace de noms — elles ne sont jamais
+  // référencées par une formule. Seule l'unicité des ids est vérifiée ici.
+  //
+  // Un groupe rattaché mais inexistant n'est PAS une erreur d'exécution : une clé de
+  // présentation ne doit jamais empêcher un template de parser ni le moteur d'évaluer
+  // (ADR-0011, Contrat 3). `resolveEtapes` l'ignore, et la cohérence des templates
+  // livrés est vérifiée par `findUnknownWizardGroupes` dans leurs tests.
   for (const e of template.wizard?.etapes ?? []) {
     if (etapes.has(e.id)) throw new DuplicateIdError('etape', e.id);
     etapes.add(e.id);
-    for (const groupeId of e.groupes) {
-      if (!groupes.has(groupeId)) throw new UnknownGroupeError(groupeId, e.id);
-    }
   }
   for (const d of template.drivers) {
     if (drivers.has(d.id)) throw new DuplicateIdError('driver', d.id);
@@ -312,53 +319,16 @@ export function collectIds(template: Template): CollectedIds {
 
 // ─── Résolution des étapes du wizard (S18c) ───────────────────
 
-/** Étape prête à afficher : toujours au moins un groupe, ordre déjà appliqué. */
-export interface ResolvedEtape {
-  readonly id: string;
-  readonly label: string;
-  readonly description?: string;
-  readonly groupes: readonly string[];
-}
-
 /**
  * Calcule la liste ordonnée des étapes de saisie d'un template.
  *
- * Règles (présentation uniquement, aucun impact sur les calculs) :
- * 1. `etapes` déclarées → triées par `ordre` croissant, les étapes sans `ordre`
- *    conservant leur ordre de déclaration et passant en dernier;
- * 2. tout groupe d'hypothèses non rattaché à une étape est ajouté en fin de liste
- *    comme étape autonome (résilience : un groupe ajouté par un template n'est
- *    jamais perdu, même si `etapes` n'a pas été mis à jour);
- * 3. aucun bloc `wizard` déclaré → fallback « une étape par groupe d'hypothèses »;
- * 4. aucun groupe non plus → une unique étape `hypotheses` qui porte tous les drivers
- *    (le groupe `_all` est virtuel : il ne correspond à aucun `groupe` de driver).
+ * L'algorithme vit dans @lalanda/shared : le web l'applique à l'identique, sans
+ * réimplémentation (revue CTO S18c, point I5). Voir {@link resolveWizardEtapes}
+ * pour les règles de tri, de filtrage et de fallback.
  */
 export function resolveEtapes(template: Template): ResolvedEtape[] {
-  const groupes = template.groupes_hypotheses ?? [];
-  const declared = template.wizard?.etapes ?? [];
-
-  if (declared.length === 0) {
-    if (groupes.length === 0) {
-      return [{ id: 'hypotheses', label: 'Hypothèses', groupes: ['_all'] }];
-    }
-    return groupes.map((g) => ({ id: g.id, label: g.label, groupes: [g.id] }));
-  }
-
-  const ordered = declared
-    .map((e, index) => ({ e, index }))
-    .sort((a, b) => {
-      const oa = a.e.ordre ?? Number.POSITIVE_INFINITY;
-      const ob = b.e.ordre ?? Number.POSITIVE_INFINITY;
-      return oa === ob ? a.index - b.index : oa - ob;
-    })
-    .map(({ e }): ResolvedEtape => {
-      const base: ResolvedEtape = { id: e.id, label: e.label, groupes: [...e.groupes] };
-      return e.description === undefined ? base : { ...base, description: e.description };
-    });
-
-  const couverts = new Set(ordered.flatMap((e) => e.groupes));
-  const orphelins = groupes.filter((g) => !couverts.has(g.id));
-  return [...ordered, ...orphelins.map((g) => ({ id: g.id, label: g.label, groupes: [g.id] }))];
+  return resolveWizardEtapes(template.groupes_hypotheses ?? [], template.wizard?.etapes ?? []);
 }
 
-export { DuplicateIdError, UnknownGroupeError, type EngineError };
+export { DuplicateIdError, type EngineError };
+export { GROUPE_TOUS, findUnknownWizardGroupes, type ResolvedEtape };

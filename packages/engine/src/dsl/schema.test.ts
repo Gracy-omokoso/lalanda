@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { DuplicateIdError, UnknownGroupeError } from './errors.js';
-import { TemplateSchema, collectIds, resolveEtapes } from './schema.js';
+import { DuplicateIdError } from './errors.js';
+import { TemplateSchema, collectIds, findUnknownWizardGroupes, resolveEtapes } from './schema.js';
 
 const minimal = {
   slug: 'demo',
@@ -218,16 +218,82 @@ describe('collectIds — etapes', () => {
     expect(() => collectIds(parsed)).toThrow(DuplicateIdError);
   });
 
-  it('rejette une etape qui référence un groupe inconnu', () => {
+  it("n'échoue PAS sur une etape qui référence un groupe inconnu", () => {
+    // ADR-0011 Contrat 3 : une clé de présentation ne doit jamais empêcher un
+    // template de parser. Un renommage de groupe côté structure financière ne peut
+    // donc pas faire tomber le moteur — l'étape est simplement ignorée.
     const parsed = TemplateSchema.parse({
       ...avecGroupes,
       wizard: { etapes: [{ id: 'ca', label: 'CA', groupes: ['inexistant'] }] },
     });
-    expect(() => collectIds(parsed)).toThrow(UnknownGroupeError);
+    expect(() => collectIds(parsed)).not.toThrow();
+    expect(collectIds(parsed).etapes.has('ca')).toBe(true);
+  });
+});
+
+describe('findUnknownWizardGroupes', () => {
+  it('ne signale rien quand tous les groupes existent', () => {
+    const parsed = TemplateSchema.parse({
+      ...avecGroupes,
+      wizard: { etapes: [{ id: 'ca', label: 'CA', groupes: ['activite'] }] },
+    });
+    expect(
+      findUnknownWizardGroupes(parsed.groupes_hypotheses ?? [], parsed.wizard?.etapes ?? []),
+    ).toEqual([]);
+  });
+
+  it('signale un groupe inconnu pour le lint des templates livrés', () => {
+    const parsed = TemplateSchema.parse({
+      ...avecGroupes,
+      wizard: {
+        etapes: [{ id: 'ca', label: 'CA', groupes: ['activite', 'disparu'] }],
+      },
+    });
+    expect(
+      findUnknownWizardGroupes(parsed.groupes_hypotheses ?? [], parsed.wizard?.etapes ?? []),
+    ).toEqual([{ etapeId: 'ca', groupeId: 'disparu' }]);
   });
 });
 
 describe('resolveEtapes', () => {
+  it("ignore un groupe inconnu et conserve les groupes valides de l'étape", () => {
+    const resolved = resolveEtapes(
+      TemplateSchema.parse({
+        ...avecGroupes,
+        wizard: {
+          etapes: [{ id: 'ca', label: 'CA', groupes: ['activite', 'disparu'], ordre: 1 }],
+        },
+      }),
+    );
+    expect(resolved[0]?.groupes).toEqual(['activite']);
+  });
+
+  it('écarte une étape dont tous les groupes ont disparu, sans perdre les autres', () => {
+    const resolved = resolveEtapes(
+      TemplateSchema.parse({
+        ...avecGroupes,
+        wizard: {
+          etapes: [
+            { id: 'fantome', label: 'Fantôme', groupes: ['disparu'], ordre: 1 },
+            { id: 'ca', label: 'CA', groupes: ['activite'], ordre: 2 },
+          ],
+        },
+      }),
+    );
+    // L'étape fantôme disparaît ; `financement`, non rattaché, revient en fin de liste.
+    expect(resolved.map((e) => e.id)).toEqual(['ca', 'financement']);
+  });
+
+  it('retombe sur le fallback groupes quand toutes les étapes sont écartées', () => {
+    const resolved = resolveEtapes(
+      TemplateSchema.parse({
+        ...avecGroupes,
+        wizard: { etapes: [{ id: 'fantome', label: 'Fantôme', groupes: ['disparu'] }] },
+      }),
+    );
+    expect(resolved.map((e) => e.id)).toEqual(['activite', 'financement']);
+  });
+
   it("fallback : une etape par groupe d'hypothèses quand etapes est absent", () => {
     const resolved = resolveEtapes(TemplateSchema.parse(avecGroupes));
     expect(resolved).toEqual([

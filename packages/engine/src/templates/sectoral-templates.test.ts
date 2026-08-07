@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { parseTemplate } from '../dsl/parser.js';
-import { resolveEtapes } from '../dsl/schema.js';
+import { findUnknownWizardGroupes, resolveEtapes } from '../dsl/schema.js';
 import { evaluateTemplate } from '../evaluator/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -256,6 +256,18 @@ describe('etapes du wizard — templates sectoriels', () => {
           expect(d.groupe).toBeDefined();
           expect(couverts.has(d.groupe as string)).toBe(true);
         }
+      });
+
+      it('ne référence aucun groupe d’hypothèses inexistant', () => {
+        // Lint des templates LIVRÉS. À l'exécution un groupe inconnu est ignoré pour
+        // ne jamais faire tomber le moteur (ADR-0011 Contrat 3) ; dans le dépôt il
+        // signale un bloc `wizard` désynchronisé après un renommage — à corriger ici.
+        expect(
+          findUnknownWizardGroupes(
+            template.groupes_hypotheses ?? [],
+            template.wizard?.etapes ?? [],
+          ),
+        ).toEqual([]);
       });
 
       it('donne un libellé et une description à chaque étape', () => {
