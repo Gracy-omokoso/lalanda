@@ -7,6 +7,10 @@
 // 3. Écarts corrects sur un cas chiffré, sens produit/charge respecté.
 // 4. ADR-0011 friction n°3 : une ligne du réalisé absente du plan validé est
 //    renvoyée « non comparable » — jamais un écart de 100 %.
+// 4bis. Ligne du plan jamais saisie → `saisi: false` et réalisé `null`, jamais −100 %.
+// 4ter. Exercice non publié par le plan comparé → `EXERCICE_ABSENT_DU_PLAN`.
+// 4quater. Solde saisi incohérent avec ses composants → diagnostic `INCOHERENCE_SOLDE`.
+// 4quinquies. `null` efface une cellule ; un lineId hors plan est refusé (`UNKNOWN_LINE`).
 // 5. Période clôturée protégée : PUT refusé → 409 { code: 'PERIOD_CLOSED' }.
 // 6. Réouverture : motif obligatoire (400), owner uniquement (403 pour un member),
 //    journalisée dans `reopenedLog`, puis la saisie redevient possible.
@@ -19,7 +23,7 @@ import { INestApplication } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { toNodeHandler } from 'better-auth/node';
 import { config as loadDotenv } from 'dotenv';
-import mongoose from 'mongoose';
+import mongoose, { type Model } from 'mongoose';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import request from 'supertest';
@@ -54,19 +58,23 @@ interface VarianceLineBody {
   sens: 'produit' | 'charge';
   comparable: boolean;
   raison: string | null;
+  saisi: boolean;
+  base: 'projection' | 'activite_x12' | null;
   prevuMensuel: number | null;
   prevuCumule: number | null;
-  realiseCumule: number;
+  realiseCumule: number | null;
   ecart: number | null;
   ecartPct: number | null;
-  statut: 'favorable' | 'defavorable' | null;
+  statut: 'favorable' | 'defavorable' | 'conforme' | null;
+  diagnostics: { code: string; message: string; months: number[] }[];
 }
 
 interface ProjectionLineBody {
   lineId: string;
   comparable: boolean;
+  raison: string | null;
   planAnnuel: number | null;
-  realiseClos: number;
+  realiseClos: number | null;
   previsionnelRestant: number | null;
   totalProjete: number | null;
   ecartVsPlan: number | null;
@@ -125,7 +133,10 @@ suite('périodes réalisées, clôture et écarts (S18b — docs/08)', () => {
 
   afterAll(async () => {
     try {
-      const db = mongoose.connection.db;
+      // Nest ouvre SA connexion : `mongoose.connection` (la connexion globale par
+      // défaut) n'est pas celle de l'app et laisserait le nettoyage sans effet.
+      const { getConnectionToken } = await import('@nestjs/mongoose');
+      const db = app.get<mongoose.Connection>(getConnectionToken()).db;
       if (db) {
         await Promise.all([
           db
@@ -174,7 +185,7 @@ suite('périodes réalisées, clôture et écarts (S18b — docs/08)', () => {
   }
 
   // ─── 1. Aucune référence sans plan validé ──────────────────
-  it('sans plan validé : écarts et projection renvoient 409 NO_APPROVED_PLAN', async () => {
+  it('sans plan validé : écarts, projection ET saisie renvoient 409 NO_APPROVED_PLAN', async () => {
     const variances = await request(app.getHttpServer())
       .get(`/projects/${projectId}/variances?year=1`)
       .set('Cookie', cookiesOwner);
@@ -186,6 +197,15 @@ suite('périodes réalisées, clôture et écarts (S18b — docs/08)', () => {
       .set('Cookie', cookiesOwner);
     expect(projection.status).toBe(409);
     expect(projection.body.code).toBe('NO_APPROVED_PLAN');
+
+    // Saisir un réalisé sans référence n'a pas de sens et ouvrirait la porte aux
+    // lignes fantômes : la saisie est bornée par le plan validé courant.
+    const saisie = await request(app.getHttpServer())
+      .put(`/projects/${projectId}/actual-periods/1/1`)
+      .set('Cookie', cookiesOwner)
+      .send({ values: { ca: 1_000 } });
+    expect(saisie.status).toBe(409);
+    expect(saisie.body.code).toBe('NO_APPROVED_PLAN');
   }, 30_000);
 
   // ─── 2. Saisie mensuelle ───────────────────────────────────
@@ -200,8 +220,7 @@ suite('périodes réalisées, clôture et écarts (S18b — docs/08)', () => {
     const m1 = await request(app.getHttpServer())
       .put(`/projects/${projectId}/actual-periods/1/1`)
       .set('Cookie', cookiesOwner)
-      // `caf_totale` n'existe pas dans le plan hello-world : cas ADR-0011 n°3.
-      .send({ values: { ca: 1_200, cout_variable: 300, caf_totale: 500 } });
+      .send({ values: { ca: 1_200, cout_variable: 300 } });
     expect(m1.status).toBe(200);
     expect(m1.body.status).toBe('open');
     expect(m1.body.values.ca).toBe(1_200);
@@ -230,7 +249,7 @@ suite('périodes réalisées, clôture et écarts (S18b — docs/08)', () => {
     expect((list.body.periods as { month: number }[]).map((p) => p.month)).toEqual([1, 2]);
   }, 30_000);
 
-  it('refuse un mois hors bornes et une valeur non numérique (400)', async () => {
+  it('refuse un mois hors bornes, une valeur non numérique et une ligne hors plan (400)', async () => {
     const badMonth = await request(app.getHttpServer())
       .put(`/projects/${projectId}/actual-periods/1/13`)
       .set('Cookie', cookiesOwner)
@@ -244,6 +263,48 @@ suite('périodes réalisées, clôture et écarts (S18b — docs/08)', () => {
       .send({ values: { ca: 'beaucoup' } });
     expect(badValue.status).toBe(400);
     expect(badValue.body.code).toBe('INVALID_VALUES');
+
+    // Ligne inconnue du compte d'exploitation → refusée, pas stockée en fantôme.
+    const ghost = await request(app.getHttpServer())
+      .put(`/projects/${projectId}/actual-periods/1/3`)
+      .set('Cookie', cookiesOwner)
+      .send({ values: { caf_totale: 500 } });
+    expect(ghost.status).toBe(400);
+    expect(ghost.body.code).toBe('UNKNOWN_LINE');
+  }, 30_000);
+
+  it('une valeur null efface la cellule et la ramène à « non saisi »', async () => {
+    const set = await request(app.getHttpServer())
+      .put(`/projects/${projectId}/actual-periods/1/4`)
+      .set('Cookie', cookiesOwner)
+      .send({ values: { ca: 700, cout_variable: 200 } });
+    expect(set.status).toBe(200);
+    expect(set.body.values.ca).toBe(700);
+
+    const erase = await request(app.getHttpServer())
+      .put(`/projects/${projectId}/actual-periods/1/4`)
+      .set('Cookie', cookiesOwner)
+      .send({ values: { ca: null } });
+    expect(erase.status).toBe(200);
+    expect(erase.body.values.ca).toBeUndefined();
+    // Les autres cellules du mois sont intactes.
+    expect(erase.body.values.cout_variable).toBe(200);
+
+    // Un 0 explicite reste une observation, lui.
+    const zero = await request(app.getHttpServer())
+      .put(`/projects/${projectId}/actual-periods/1/4`)
+      .set('Cookie', cookiesOwner)
+      .send({ values: { ca: 0 } });
+    expect(zero.status).toBe(200);
+    expect(zero.body.values.ca).toBe(0);
+
+    // Nettoyage : ce mois ne doit pas polluer les cumuls des tests suivants.
+    const cleanup = await request(app.getHttpServer())
+      .put(`/projects/${projectId}/actual-periods/1/4`)
+      .set('Cookie', cookiesOwner)
+      .send({ values: { ca: null, cout_variable: null } });
+    expect(cleanup.status).toBe(200);
+    expect(Object.keys(cleanup.body.values)).toHaveLength(0);
   }, 30_000);
 
   // ─── 3 & 4. Écarts et lignes non comparables ───────────────
@@ -284,7 +345,106 @@ suite('périodes réalisées, clôture et écarts (S18b — docs/08)', () => {
     expect(byId['resultat_avant_impot']!.sens).toBe('produit');
   }, 30_000);
 
+  it('une ligne du plan jamais saisie n’est pas un écart de −100 %', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/projects/${projectId}/variances?year=1`)
+      .set('Cookie', cookiesOwner);
+    expect(res.status).toBe(200);
+
+    // `resultat_net` fait partie du plan mais n'a jamais été saisi.
+    const net = (res.body.lines as VarianceLineBody[]).find((l) => l.lineId === 'resultat_net')!;
+    expect(net.comparable).toBe(true);
+    expect(net.saisi).toBe(false);
+    expect(net.realiseCumule).toBeNull();
+    expect(net.ecart).toBeNull();
+    expect(net.ecartPct).toBeNull();
+    expect(net.statut).toBeNull();
+    // Le prévu, lui, est une donnée réelle du plan.
+    expect(net.prevuMensuel).toBe(70);
+  }, 30_000);
+
+  it('B1 : un exercice que le plan ne publie pas n’est jamais extrapolé', async () => {
+    // hello-world n'a pas de feuille `projection` : seul l'exercice 1 est publié.
+    const res = await request(app.getHttpServer())
+      .get(`/projects/${projectId}/variances?year=3`)
+      .set('Cookie', cookiesOwner);
+    expect(res.status).toBe(200);
+    expect(res.body.year).toBe(3);
+
+    const lines = res.body.lines as VarianceLineBody[];
+    expect(lines.length).toBeGreaterThan(0);
+    expect(lines.every((l) => l.comparable === false)).toBe(true);
+    expect(lines.every((l) => l.raison === 'EXERCICE_ABSENT_DU_PLAN')).toBe(true);
+    expect(lines.every((l) => l.prevuMensuel === null && l.ecart === null)).toBe(true);
+    expect(lines.every((l) => l.statut === null)).toBe(true);
+
+    const proj = await request(app.getHttpServer())
+      .get(`/projects/${projectId}/updated-projection?year=3`)
+      .set('Cookie', cookiesOwner);
+    expect(proj.status).toBe(200);
+    expect((proj.body.lines as ProjectionLineBody[]).every((l) => l.totalProjete === null)).toBe(
+      true,
+    );
+
+    // L'exercice 1, lui, reste comparé via `activite × 12`.
+    const an1 = await request(app.getHttpServer())
+      .get(`/projects/${projectId}/variances?year=1`)
+      .set('Cookie', cookiesOwner);
+    expect((an1.body.lines as VarianceLineBody[])[0]!.base).toBe('activite_x12');
+  }, 30_000);
+
+  it('I2 : un solde saisi incohérent avec ses composants est signalé', async () => {
+    // marge_brute = ca - cout_variable. Sur M5 : 800 − 300 = 500, on saisit 900.
+    const saisie = await request(app.getHttpServer())
+      .put(`/projects/${projectId}/actual-periods/1/5`)
+      .set('Cookie', cookiesOwner)
+      .send({ values: { ca: 800, cout_variable: 300, marge_brute: 900 } });
+    expect(saisie.status).toBe(200);
+
+    const res = await request(app.getHttpServer())
+      .get(`/projects/${projectId}/variances?year=1`)
+      .set('Cookie', cookiesOwner);
+    const marge = (res.body.lines as VarianceLineBody[]).find((l) => l.lineId === 'marge_brute')!;
+    expect(marge.diagnostics).toHaveLength(1);
+    expect(marge.diagnostics[0]!.code).toBe('INCOHERENCE_SOLDE');
+    expect(marge.diagnostics[0]!.months).toEqual([5]);
+    // La saisie n'est pas corrigée d'office — seulement signalée.
+    expect(marge.realiseCumule).toBe(900);
+
+    // Corrigée, la ligne redevient muette.
+    const fix = await request(app.getHttpServer())
+      .put(`/projects/${projectId}/actual-periods/1/5`)
+      .set('Cookie', cookiesOwner)
+      .send({ values: { marge_brute: 500 } });
+    expect(fix.status).toBe(200);
+    const after = await request(app.getHttpServer())
+      .get(`/projects/${projectId}/variances?year=1`)
+      .set('Cookie', cookiesOwner);
+    expect(
+      (after.body.lines as VarianceLineBody[]).find((l) => l.lineId === 'marge_brute')!.diagnostics,
+    ).toHaveLength(0);
+
+    // Nettoyage pour ne pas perturber les cumuls des tests suivants.
+    await request(app.getHttpServer())
+      .put(`/projects/${projectId}/actual-periods/1/5`)
+      .set('Cookie', cookiesOwner)
+      .send({ values: { ca: null, cout_variable: null, marge_brute: null } });
+  }, 30_000);
+
   it('ADR-0011 : une ligne absente du plan validé est « non comparable », pas 100 %', async () => {
+    // L'API refuse désormais d'écrire une ligne hors plan (cf. UNKNOWN_LINE), mais
+    // le cas existe en base : saisie antérieure au contrôle, ou plan re-validé sur
+    // un template qui ne publie plus la ligne. On simule cet héritage en écrivant
+    // directement dans la collection, puis on vérifie le chemin de LECTURE.
+    const { ActualPeriod } = await import('../actuals/actual-period.schema.js');
+    const { getModelToken } = await import('@nestjs/mongoose');
+    // Le modèle de l'app, pas `mongoose.connection` : Nest ouvre sa propre connexion.
+    const model = app.get<Model<unknown>>(getModelToken(ActualPeriod.name));
+    const injected = await model
+      .updateOne({ projectId, year: 1, month: 2 }, { $set: { 'values.caf_totale': 500 } })
+      .exec();
+    expect(injected.matchedCount).toBe(1);
+
     const res = await request(app.getHttpServer())
       .get(`/projects/${projectId}/variances?year=1`)
       .set('Cookie', cookiesOwner);
@@ -299,8 +459,16 @@ suite('périodes réalisées, clôture et écarts (S18b — docs/08)', () => {
     expect(caf!.ecart).toBeNull();
     expect(caf!.ecartPct).toBeNull();
     expect(caf!.statut).toBeNull();
-    // Le réalisé saisi reste visible — on n'efface pas la donnée de l'utilisateur.
+    // Le réalisé hérité reste visible — on n'efface pas la donnée de l'utilisateur.
     expect(caf!.realiseCumule).toBe(500);
+
+    // Et il reste effaçable via la sentinelle `null`, malgré le contrôle d'écriture.
+    const clean = await request(app.getHttpServer())
+      .put(`/projects/${projectId}/actual-periods/1/2`)
+      .set('Cookie', cookiesOwner)
+      .send({ values: { caf_totale: null } });
+    expect(clean.status).toBe(200);
+    expect(clean.body.values.caf_totale).toBeUndefined();
   }, 30_000);
 
   // ─── 5. Période clôturée protégée ──────────────────────────
@@ -355,12 +523,14 @@ suite('périodes réalisées, clôture et écarts (S18b — docs/08)', () => {
     expect(ca.totalProjete).toBe(12_200);
     expect(ca.ecartVsPlan).toBe(200);
 
-    // Une ligne non comparable n'est jamais projetée.
-    const caf = lines.find((l) => l.lineId === 'caf_totale')!;
-    expect(caf.comparable).toBe(false);
-    expect(caf.planAnnuel).toBeNull();
-    expect(caf.totalProjete).toBeNull();
-    expect(caf.realiseClos).toBe(500);
+    // Ligne du plan absente du mois clôturé : observation manquante, pas un zéro
+    // (sinon la projection afficherait un effondrement inventé).
+    const net = lines.find((l) => l.lineId === 'resultat_net')!;
+    expect(net.comparable).toBe(true);
+    expect(net.planAnnuel).toBe(840);
+    expect(net.realiseClos).toBeNull();
+    expect(net.totalProjete).toBeNull();
+    expect(net.ecartVsPlan).toBeNull();
   }, 30_000);
 
   // ─── 6. Réouverture ────────────────────────────────────────

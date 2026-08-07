@@ -48,7 +48,33 @@ export function raisonLabel(raison: string | null): string {
       return "Cette ligne n'existe pas dans le plan validé comparé — aucun écart ne peut être calculé.";
     case 'LIGNE_HORS_COMPTE_EXPLOITATION':
       return "Cette ligne du plan est hors du compte d'exploitation — elle n'entre pas dans le suivi mensuel.";
+    case 'EXERCICE_ABSENT_DU_PLAN':
+      return "Le plan validé comparé ne publie pas de montant pour cet exercice — l'exercice 1 n'est jamais extrapolé.";
     default:
       return 'Ligne sans référence dans le plan validé comparé.';
   }
+}
+
+/** Origine de la base annuelle, affichée à côté du chiffre (docs/08 § Projection). */
+export function baseLabel(base: string | null): string {
+  switch (base) {
+    case 'projection':
+      return 'série annuelle du plan';
+    case 'activite_x12':
+      return 'mensuel × 12';
+    default:
+      return '—';
+  }
+}
+
+/**
+ * Parse une saisie de montant au clavier français : la virgule est acceptée comme
+ * séparateur décimal (« 1,5 » → 1.5), les espaces de milliers sont ignorés.
+ * Renvoie `null` si l'entrée n'est pas un nombre fini.
+ */
+export function parseAmount(raw: string): number | null {
+  const normalized = raw.replace(/\s/g, '').replace(',', '.');
+  if (normalized === '') return null;
+  const parsed = Number.parseFloat(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
 }

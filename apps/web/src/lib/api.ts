@@ -398,8 +398,21 @@ export interface ActualPeriodView {
   updatedAt: string;
 }
 
-/** Pourquoi une ligne du réalisé n'a pas de contrepartie dans le plan comparé. */
-export type NonComparableRaison = 'LIGNE_ABSENTE_DU_PLAN' | 'LIGNE_HORS_COMPTE_EXPLOITATION';
+/** Pourquoi une ligne n'a pas de contrepartie comparable dans le plan validé. */
+export type NonComparableRaison =
+  'LIGNE_ABSENTE_DU_PLAN' | 'LIGNE_HORS_COMPTE_EXPLOITATION' | 'EXERCICE_ABSENT_DU_PLAN';
+
+/** D'où vient la base annuelle : série `projection` du plan, ou activite × 12. */
+export type BaseSource = 'projection' | 'activite_x12';
+
+export type VarianceStatut = 'favorable' | 'defavorable' | 'conforme';
+
+/** Anomalie signalée sur la saisie — jamais corrigée d'office. */
+export interface VarianceDiagnostic {
+  code: 'INCOHERENCE_SOLDE';
+  message: string;
+  months: number[];
+}
 
 export interface VarianceLineView {
   lineId: string;
@@ -408,13 +421,17 @@ export interface VarianceLineView {
   /** false → aucune base prévue : tous les champs de comparaison sont `null`. */
   comparable: boolean;
   raison: NonComparableRaison | null;
+  /** false → jamais saisie sur la période : réalisé et écart sont `null`, pas 0. */
+  saisi: boolean;
+  base: BaseSource | null;
   prevuMensuel: number | null;
   prevuCumule: number | null;
-  realiseCumule: number;
+  realiseCumule: number | null;
   ecart: number | null;
   /** Fraction (0.05 = +5 %) — null si la base prévue est nulle ou absente. */
   ecartPct: number | null;
-  statut: 'favorable' | 'defavorable' | null;
+  statut: VarianceStatut | null;
+  diagnostics: VarianceDiagnostic[];
 }
 
 export interface VariancesView {
@@ -431,8 +448,10 @@ export interface ProjectionLineView {
   sens: 'produit' | 'charge';
   comparable: boolean;
   raison: NonComparableRaison | null;
+  base: BaseSource | null;
   planAnnuel: number | null;
-  realiseClos: number;
+  /** `null` quand des mois sont clôturés mais que la ligne n'y figure pas. */
+  realiseClos: number | null;
   previsionnelRestant: number | null;
   totalProjete: number | null;
   ecartVsPlan: number | null;
@@ -625,7 +644,13 @@ export const api = {
     ),
   // 409 { code: 'PERIOD_CLOSED' } si la période est clôturée — la protéger est
   // une règle serveur, l'UI ne fait que refléter le refus.
-  upsertActualPeriod: (id: string, year: number, month: number, values: Record<string, number>) =>
+  // Une valeur `null` EFFACE la cellule (retour à « non saisi », distinct d'un 0).
+  upsertActualPeriod: (
+    id: string,
+    year: number,
+    month: number,
+    values: Record<string, number | null>,
+  ) =>
     jsonRequest<ActualPeriodView>(
       `/projects/${encodeURIComponent(id)}/actual-periods/${year}/${month}`,
       { method: 'PUT', body: { values } },

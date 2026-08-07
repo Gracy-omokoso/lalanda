@@ -21,14 +21,24 @@ import {
   type VariancesView,
 } from '@/lib/api';
 
-import { MONTHS, monthLabel } from './actuals-format';
+import { MONTHS, monthLabel, parseAmount } from './actuals-format';
 import { ActualsProjectionTable, ActualsVarianceTable } from './actuals-variance-table';
 
 /** Années d'exercice suivables — même borne que le schéma serveur (1..5). */
 const YEARS = [1, 2, 3, 4, 5];
 
-/** Saisies locales non encore envoyées : `{ [month]: { [lineId]: montant } }`. */
-type Draft = Record<number, Record<string, number>>;
+/**
+ * Saisies locales non encore envoyées : `{ [month]: { [lineId]: montant | null } }`.
+ * `null` est la sentinelle d'EFFACEMENT — vider une cellule déjà enregistrée doit
+ * pouvoir la ramener à « non saisi », ce qu'un simple retrait du draft ne ferait pas
+ * (la valeur serveur réapparaîtrait).
+ */
+type Draft = Record<number, Record<string, number | null>>;
+
+/** Clé d'une cellule de la grille dans les états locaux. */
+function cellKey(month: number, lineId: string): string {
+  return `${month}:${lineId}`;
+}
 
 function errorCode(err: unknown): string | undefined {
   const detail = (err as { detail?: { code?: string } } | undefined)?.detail;
@@ -47,6 +57,8 @@ export function ActualsPanel({ projectId }: { projectId: string }): React.ReactE
   const [projection, setProjection] = useState<UpdatedProjectionView | null>(null);
   const [noPlan, setNoPlan] = useState(false);
   const [draft, setDraft] = useState<Draft>({});
+  /** Texte brut par cellule en cours de frappe, indexé `mois:lineId`. */
+  const [rawCells, setRawCells] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,6 +71,7 @@ export function ActualsPanel({ projectId }: { projectId: string }): React.ReactE
     setLoading(true);
     setError(null);
     setDraft({});
+    setRawCells({});
     try {
       const [project, { periods: fetched }] = await Promise.all([
         api.getProject(projectId),
@@ -96,6 +109,9 @@ export function ActualsPanel({ projectId }: { projectId: string }): React.ReactE
 
   const byMonth = useMemo(() => new Map(periods.map((p) => [p.month, p])), [periods]);
   const rows = variances?.lines ?? [];
+  /** Le plan comparé ne couvre pas l'exercice demandé : à dire, pas à masquer. */
+  const exerciceNonPublie =
+    rows.length > 0 && rows.every((l) => l.raison === 'EXERCICE_ABSENT_DU_PLAN');
   const dirtyMonths = useMemo(
     () =>
       Object.keys(draft)
@@ -105,7 +121,13 @@ export function ActualsPanel({ projectId }: { projectId: string }): React.ReactE
   );
 
   function cellValue(month: number, lineId: string): string {
+    // Texte en cours de frappe : rendu tel quel, sinon « 1, » se normaliserait en
+    // « 1 » sous les doigts de l'utilisateur au clavier français.
+    const typed = rawCells[cellKey(month, lineId)];
+    if (typed !== undefined) return typed;
     const local = draft[month]?.[lineId];
+    // `null` = effacement en attente → la cellule doit rester visuellement vide.
+    if (local === null) return '';
     if (local !== undefined) return String(local);
     const saved = byMonth.get(month)?.values[lineId];
     return saved === undefined ? '' : String(saved);
@@ -113,20 +135,28 @@ export function ActualsPanel({ projectId }: { projectId: string }): React.ReactE
 
   function editCell(month: number, lineId: string, raw: string): void {
     setNotice(null);
+    setRawCells((prev) => ({ ...prev, [cellKey(month, lineId)]: raw }));
     setDraft((prev) => {
       const monthDraft = { ...(prev[month] ?? {}) };
+      const dejaEnregistre = byMonth.get(month)?.values[lineId] !== undefined;
+
       if (raw.trim() === '') {
-        delete monthDraft[lineId];
-        if (Object.keys(monthDraft).length === 0) {
-          const rest = { ...prev };
-          delete rest[month];
-          return rest;
-        }
-        return { ...prev, [month]: monthDraft };
+        // Vider une cellule enregistrée = demander son effacement au serveur.
+        // Vider une cellule jamais enregistrée = simplement annuler la saisie locale.
+        if (dejaEnregistre) monthDraft[lineId] = null;
+        else delete monthDraft[lineId];
+      } else {
+        const parsed = parseAmount(raw);
+        // Saisie intermédiaire non numérique (« 1, », « - ») : on n'écrase rien.
+        if (parsed === null) return prev;
+        monthDraft[lineId] = parsed;
       }
-      const parsed = Number.parseFloat(raw);
-      if (!Number.isFinite(parsed)) return prev;
-      monthDraft[lineId] = parsed;
+
+      if (Object.keys(monthDraft).length === 0) {
+        const rest = { ...prev };
+        delete rest[month];
+        return rest;
+      }
       return { ...prev, [month]: monthDraft };
     });
   }
@@ -144,11 +174,16 @@ export function ActualsPanel({ projectId }: { projectId: string }): React.ReactE
       );
       await load();
     } catch (err) {
-      setError(
-        errorCode(err) === 'PERIOD_CLOSED'
-          ? 'Période clôturée : rouvrez-la (owner, avec motif) avant de modifier le réalisé.'
-          : errorMessage(err, 'Impossible d’enregistrer le réalisé.'),
-      );
+      const code = errorCode(err);
+      if (code === 'PERIOD_CLOSED') {
+        setError('Période clôturée : rouvrez-la (owner, avec motif) avant de modifier le réalisé.');
+      } else if (code === 'UNKNOWN_LINE') {
+        setError(
+          'Une ligne saisie n’appartient pas au compte d’exploitation du plan validé courant. Rechargez la page pour repartir des lignes du plan.',
+        );
+      } else {
+        setError(errorMessage(err, 'Impossible d’enregistrer le réalisé.'));
+      }
     } finally {
       setBusy(false);
     }
@@ -252,9 +287,25 @@ export function ActualsPanel({ projectId }: { projectId: string }): React.ReactE
                 Saisie mensuelle
               </h3>
               <p className="text-xs text-[var(--foreground-muted)]">
-                Référence : plan validé v{variances?.planVersion} · prévu mensuel = plan annuel ÷ 12
+                Référence : plan validé v{variances?.planVersion} · exercice {year} · prévu mensuel
+                = base annuelle ÷ 12
               </p>
             </header>
+
+            {exerciceNonPublie ? (
+              <p
+                role="status"
+                className="rounded-md border border-[var(--warn)]/40 bg-[var(--surface-muted)] px-3 py-2 text-xs"
+              >
+                <strong className="font-semibold">
+                  Le plan validé v{variances?.planVersion} ne publie aucun montant pour l’exercice{' '}
+                  {year}.
+                </strong>{' '}
+                La saisie reste possible et conservée, mais aucun écart n’est calculé : les chiffres
+                de l’exercice 1 ne sont jamais extrapolés sur un exercice ultérieur. Validez un plan
+                dont l’horizon couvre cet exercice pour obtenir la comparaison.
+              </p>
+            ) : null}
 
             <div className="overflow-x-auto">
               <table className="w-full min-w-[60rem] border-collapse text-sm">
@@ -276,9 +327,15 @@ export function ActualsPanel({ projectId }: { projectId: string }): React.ReactE
                         <th key={month} scope="col" className="px-1 py-2 text-center font-medium">
                           <span className="block">{monthLabel(month)}</span>
                           <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-normal">
+                            {/* Clôturé est un état NORMAL de fin de mois, pas une
+                                anomalie : pastille neutre, jamais le rouge des
+                                écarts défavorables. */}
                             <span
                               aria-hidden="true"
-                              className={closed ? 'dot dot-ko' : 'dot dot-ok'}
+                              className="dot"
+                              style={{
+                                backgroundColor: closed ? 'var(--border-strong)' : 'var(--ok)',
+                              }}
                             />
                             <span className="text-[var(--foreground-muted)]">
                               {closed ? 'Clôturé' : 'Ouvert'}
@@ -338,9 +395,11 @@ export function ActualsPanel({ projectId }: { projectId: string }): React.ReactE
                         return (
                           <td key={month} className="px-1 py-1">
                             <input
-                              type="number"
-                              step="any"
+                              // `text` + inputMode décimal : `type=number` rejette la
+                              // virgule décimale des claviers francophones.
+                              type="text"
                               inputMode="decimal"
+                              autoComplete="off"
                               disabled={closed || busy}
                               value={cellValue(month, line.lineId)}
                               onChange={(e) => editCell(month, line.lineId, e.target.value)}

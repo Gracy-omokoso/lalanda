@@ -35,6 +35,7 @@ import { ActualsService } from './actuals.service.js';
 import {
   computeUpdatedProjection,
   computeVariances,
+  referenceLines,
   type ProjectionLine,
   type VarianceLine,
 } from './variance.js';
@@ -57,7 +58,11 @@ export interface VariancesView {
   year: number;
   /** Version du plan validé servant de référence. */
   planVersion: number;
-  /** Mois saisis pris en compte dans le cumul (ouverts + clôturés). */
+  /**
+   * Mois porteurs d'au moins une valeur (ouverts + clôturés). Le cumul d'une
+   * ligne donnée ne couvre que le sous-ensemble de ces mois où ELLE est saisie —
+   * une ligne absente d'un mois n'y vaut pas zéro.
+   */
   monthsCounted: number[];
   /** Convention MVP documentée : prévu mensuel = plan annuel / 12. */
   convention: 'annuel/12';
@@ -92,9 +97,13 @@ export class ActualsController {
     @Param('id') id: string,
     @Param('year') yearRaw: string,
     @Param('month') monthRaw: string,
-    @Body() body: { values?: Record<string, number> },
+    @Body() body: { values?: Record<string, number | null> },
   ): Promise<ActualPeriodView> {
     const project = await this.projects.findScoped(id, orgId);
+    // La saisie est bornée par le compte d'exploitation du plan validé courant :
+    // pas de référence ⇒ pas de saisie possible (même contrat que /variances).
+    const plan = await this.latestApprovedPlan(orgId, String(project._id));
+    const allowed = new Set(referenceLines(plan.result.lines).map((l) => l.lineId));
     const doc = await this.actuals.upsertValues(
       {
         organizationId: orgId,
@@ -103,6 +112,7 @@ export class ActualsController {
         month: Number(monthRaw),
       },
       body?.values ?? {},
+      allowed,
     );
     return toPeriodView(doc);
   }
@@ -178,9 +188,9 @@ export class ActualsController {
     return {
       year,
       planVersion: plan.version,
-      monthsCounted: periods.map((p) => p.month),
+      monthsCounted: periods.filter((p) => Object.keys(p.values).length > 0).map((p) => p.month),
       convention: 'annuel/12',
-      lines: computeVariances(plan.result.lines, periods),
+      lines: computeVariances(plan.result.lines, periods, year),
     };
   }
 
@@ -200,20 +210,20 @@ export class ActualsController {
       planVersion: plan.version,
       monthsClosed: periods.filter((p) => p.status === 'closed').map((p) => p.month),
       convention: 'annuel/12',
-      lines: computeUpdatedProjection(plan.result.lines, periods),
+      lines: computeUpdatedProjection(plan.result.lines, periods, year),
     };
   }
 
   /**
    * Dernier plan au statut `approved` — la seule référence légitime des écarts
-   * (docs/08 : le plan est la référence validée et immuable).
+   * (docs/08 : le plan est la référence validée et immuable). Requête ciblée :
+   * un snapshot embarque un résultat moteur complet, on n'en charge qu'un.
    */
   private async latestApprovedPlan(
     orgId: string,
     projectId: string,
   ): Promise<FinancialPlanDocument> {
-    const all = await this.plans.listByProject(orgId, projectId);
-    const approved = all.find((p) => p.status === 'approved');
+    const approved = await this.plans.findLatestApproved(orgId, projectId);
     if (!approved) {
       throw new ConflictException({
         code: 'NO_APPROVED_PLAN',

@@ -56,15 +56,25 @@ export class ActualsService {
   /**
    * Upsert des valeurs réalisées d'un mois. Fusionne les clés soumises avec les
    * valeurs déjà saisies (saisie incrémentale : CA d'abord, charges ensuite).
+   *
+   * Une valeur `null` EFFACE la ligne du mois (`$unset` logique) : c'est la seule
+   * façon de revenir à « non saisi » après une erreur, distinct d'un montant 0 qui,
+   * lui, est une observation réelle.
+   *
+   * `allowedLineIds` (lignes du compte d'exploitation du plan validé courant) borne
+   * la saisie : un identifiant inconnu est refusé plutôt que stocké en ligne
+   * fantôme impossible à corriger depuis l'interface.
+   *
    * Refusé si la période est clôturée — les périodes clôturées sont protégées
    * (docs/08 § Critères d'acceptation).
    */
   async upsertValues(
     key: PeriodKey,
-    values: Record<string, number>,
+    values: Record<string, number | null>,
+    allowedLineIds: ReadonlySet<string>,
   ): Promise<ActualPeriodDocument> {
     this.assertValidPeriod(key.year, key.month);
-    this.assertValidValues(values);
+    this.assertValidValues(values, allowedLineIds);
 
     const existing = await this.findOne(key);
     if (existing?.status === 'closed') {
@@ -75,7 +85,7 @@ export class ActualsService {
     }
 
     if (existing) {
-      existing.values = { ...existing.values, ...values };
+      existing.values = mergeValues(existing.values, values);
       existing.markModified('values');
       await existing.save();
       return existing;
@@ -88,7 +98,7 @@ export class ActualsService {
         year: key.year,
         month: key.month,
         status: 'open',
-        values,
+        values: mergeValues({}, values),
         reopenedLog: [],
         _schemaVersion: 1,
       });
@@ -118,7 +128,8 @@ export class ActualsService {
         message: `La période ${key.month}/${key.year} est déjà clôturée.`,
       });
     }
-    period ??= await this.upsertValues(key, {});
+    // Aucune valeur à valider : la période naît vide (mois sans activité).
+    period ??= await this.upsertValues(key, {}, new Set<string>());
     period.status = 'closed';
     period.closedAt = new Date();
     period.closedBy = userId;
@@ -191,12 +202,18 @@ export class ActualsService {
       .exec();
   }
 
-  /** 400 si une clé n'est pas un lineId DSL valide ou une valeur pas un nombre fini. */
-  private assertValidValues(values: Record<string, number>): void {
+  /**
+   * 400 si une clé n'est pas un lineId DSL valide, si elle est inconnue du plan
+   * validé courant, ou si la valeur n'est ni un nombre fini ni `null`.
+   */
+  private assertValidValues(
+    values: Record<string, number | null>,
+    allowedLineIds: ReadonlySet<string>,
+  ): void {
     if (typeof values !== 'object' || values === null || Array.isArray(values)) {
       throw new BadRequestException({
         code: 'INVALID_VALUES',
-        message: '`values` doit être un objet { lineId: montant }.',
+        message: '`values` doit être un objet { lineId: montant | null }.',
       });
     }
     const entries = Object.entries(values);
@@ -213,12 +230,34 @@ export class ActualsService {
           message: `Identifiant de ligne invalide : "${lineId}".`,
         });
       }
+      // `null` = effacement : autorisé même sur un id devenu inconnu, pour permettre
+      // de NETTOYER une ligne héritée d'un plan précédent.
+      if (value === null) continue;
+      if (!allowedLineIds.has(lineId)) {
+        throw new BadRequestException({
+          code: 'UNKNOWN_LINE',
+          message: `La ligne "${lineId}" n'appartient pas au compte d'exploitation du plan validé — saisie refusée.`,
+        });
+      }
       if (typeof value !== 'number' || !Number.isFinite(value)) {
         throw new BadRequestException({
           code: 'INVALID_VALUES',
-          message: `Montant invalide pour "${lineId}" — nombre fini attendu.`,
+          message: `Montant invalide pour "${lineId}" — nombre fini ou null attendu.`,
         });
       }
     }
   }
+}
+
+/** Applique la fusion, `null` effaçant la clé (retour à « non saisi »). */
+function mergeValues(
+  current: Record<string, number>,
+  patch: Record<string, number | null>,
+): Record<string, number> {
+  const next: Record<string, number> = { ...current };
+  for (const [lineId, value] of Object.entries(patch)) {
+    if (value === null) delete next[lineId];
+    else next[lineId] = value;
+  }
+  return next;
 }
