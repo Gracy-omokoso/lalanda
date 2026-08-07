@@ -4,6 +4,7 @@ import { LoggerModule } from 'nestjs-pino';
 
 import { AiModule } from './ai/ai.module.js';
 import { AuthModule } from './auth/auth.module.js';
+import { BillingModule } from './billing/billing.module.js';
 import { EvaluateController } from './evaluate/evaluate.controller.js';
 import { HealthController } from './health/health.controller.js';
 import { OrganizationsModule } from './organizations/organizations.module.js';
@@ -44,6 +45,7 @@ import { ReportsModule } from './reports/reports.module.js';
     }),
     OrganizationsModule,
     AuthModule,
+    BillingModule,
     ParameterPacksModule,
     ProjectsModule,
     ReportsModule,

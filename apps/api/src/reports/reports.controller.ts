@@ -19,6 +19,7 @@ import { evaluateTemplate } from '@lalanda/engine';
 
 import { AuthGuard } from '../auth/auth.guard.js';
 import { CurrentOrgId } from '../auth/current-user.decorator.js';
+import { BillingService } from '../billing/billing.service.js';
 import { getTemplate } from '../evaluate/template-registry.js';
 import { OrganizationsService } from '../organizations/organizations.service.js';
 import { getParameterPack } from '../parameter-packs/parameter-pack-registry.js';
@@ -46,6 +47,7 @@ export class ReportsController {
     @Inject(ProjectsService) private readonly projects: ProjectsService,
     @Inject(OrganizationsService) private readonly organizations: OrganizationsService,
     @Inject(ReportsService) private readonly reports: ReportsService,
+    @Inject(BillingService) private readonly billing: BillingService,
   ) {}
 
   /**
@@ -66,6 +68,8 @@ export class ReportsController {
     const pack = project.parameterPackSlug
       ? getParameterPack(project.parameterPackSlug)
       : undefined;
+    // Entitlements (S16b) : le filigrane PDF est décidé ici, côté API — jamais par l'UI.
+    const { entitlements } = await this.billing.getPlanEntitlements(orgId);
 
     const evaluation = evaluateTemplate(template, project.driverValues, {
       parameterPack: pack,
@@ -107,6 +111,7 @@ export class ReportsController {
       })),
       generatedAt: new Date().toISOString(),
       currency: currency as 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR',
+      watermark: entitlements.pdfWatermark,
     };
   }
 
