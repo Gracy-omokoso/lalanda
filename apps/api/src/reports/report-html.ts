@@ -136,9 +136,14 @@ const BANCABLE_SECTIONS: readonly SectionSpec[] = [
   { n: 2, sheetId: 'activite', title: "Compte d'exploitation mensuel" },
   { n: 3, sheetId: 'plan_financement', title: 'Plan de financement initial' },
   { n: 4, sheetId: 'tresorerie', title: 'Plan de trésorerie année 1' },
-  { n: 5, sheetId: 'projection', title: 'Projection sur 3 ans' },
+  { n: 5, sheetId: 'projection', title: 'Projection sur 5 exercices' },
   { n: 6, sheetId: 'financement', title: "Financement de l'emprunt" },
-  { n: 7, sheetId: 'ratios', title: 'Ratios bancaires' },
+  // (S18a, FIN-001) États financiers prévisionnels. Feuilles absentes = sections omises.
+  { n: 7, sheetId: 'bilan', title: 'Bilan prévisionnel' },
+  { n: 8, sheetId: 'caf', title: "Capacité d'autofinancement" },
+  { n: 9, sheetId: 'seuil_rentabilite', title: 'Seuil de rentabilité et point mort' },
+  { n: 10, sheetId: 'amortissements', title: 'Amortissements' },
+  { n: 11, sheetId: 'ratios', title: 'Ratios bancaires' },
 ] as const;
 
 /**
