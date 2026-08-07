@@ -12,9 +12,13 @@
 //   Sect. 2 — Compte d'exploitation mensuel (feuille `activite`)
 //   Sect. 3 — Plan de financement initial   (feuille `plan_financement`)
 //   Sect. 4 — Plan de trésorerie année 1    (feuille `tresorerie`)
-//   Sect. 5 — Projection sur 3 ans          (feuille `projection`)
+//   Sect. 5 — Projection sur 5 exercices     (feuille `projection`)
 //   Sect. 6 — Financement de l'emprunt      (feuille `financement`)
-//   Sect. 7 — Ratios bancaires              (feuille `ratios`, pastilles feux)
+//   Sect. 7 — Bilan prévisionnel            (feuille `bilan`, S18a)
+//   Sect. 8 — Capacité d'autofinancement    (feuille `caf`, S18a)
+//   Sect. 9 — Seuil de rentabilité          (feuille `seuil_rentabilite`, S18a)
+//   Sect. 10 — Amortissements               (feuille `amortissements`)
+//   Sect. 11 — Ratios bancaires             (feuille `ratios`, pastilles feux)
 //   Fin     — Avertissement légal du ParameterPack (si présent)
 
 import type { Template } from '@lalanda/engine';

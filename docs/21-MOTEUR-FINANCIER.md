@@ -102,7 +102,7 @@ ligne/formule du DSL.
 
 **Entrée :** liste d’immobilisations `[{ label, categorie, montant_ht,
 date_acquisition, valeur_residuelle?, duree_annees? }]` plus l’horizon
-`horizon_projection_annees` (défaut 3).
+`horizon_projection_annees` (défaut **5** depuis S18a — voir ci-dessous).
 
 **Règle de calcul :**
 
@@ -136,6 +136,62 @@ date_acquisition, valeur_residuelle?, duree_annees? }]` plus l’horizon
 
 Un template sans `immobilisations` n’active aucun de ces comportements —
 compatibilité totale avec les templates S6 à S13.
+
+## États financiers prévisionnels (S18a — FIN-001)
+
+**Correction d’horizon.** Ce document fixait auparavant
+`horizon_projection_annees` à 3, en contradiction avec docs/07 qui exige
+5 exercices. ADR-0011 § Contradictions 2 tranche en faveur de docs/07 : le
+défaut est désormais **5** (`HORIZON_PROJECTION_DEFAUT`).
+
+Comme la feuille `amortissements`, le module
+`packages/engine/src/etats-financiers/` est calculé **hors HyperFormula** : un
+déroulé pluriannuel avec report de stocks d’un exercice sur l’autre ne se
+modélise pas en lignes/formules ponctuelles du DSL.
+
+**Activation.** Un bloc DSL **optionnel** `structure_financiere` au niveau du
+template. Il ne fait que **désigner** des lignes et des drivers déjà déclarés
+(achats variables, charges fixes, délais clients/fournisseurs/rotation de stock,
+drivers de financement) ; il n’introduit aucune règle de calcul et toutes ses
+clés ont un défaut conventionnel. Un template sans ce bloc ne produit aucune
+feuille supplémentaire — compatibilité S6→S14 totale.
+
+**Sorties** (nommage ADR-0011 § Contrat 2, séries suffixées `_annuel_1..5`) :
+
+| Feuille | Lignes | Contenu |
+|---|---|---|
+| `bilan` | `bilan_*` | actif / passif par exercice, bilan d’ouverture, échéancier de dette, contrôles d’équilibre et autonomie financière |
+| `caf` | `caf_*` | résultat net, dotations, CAF par exercice + CAF cumulée |
+| `seuil_rentabilite` | `sr_*` | ventilation fixe/variable, CA au seuil, point mort, marge de sécurité |
+| `plan_financement` | `pf_bfr_*` | BFR détaillé par exercice et sa variation (pas de feuille dédiée) |
+
+**Règles de calcul :**
+
+- délais convertis sur une **année commerciale de 360 jours** :
+  stocks = achats × rotation / 360, créances = CA × délai clients / 360,
+  fournisseurs = achats × délai fournisseurs / 360 ;
+- achats variables et charges fixes extrapolés au `taux_croissance_ca`, même
+  convention que la projection S12-lite (« coûts variables + fixes croissent
+  proportionnellement ») — cohérence verrouillée par un test :
+  `CA_N − achats_N − charges fixes_N = EBE_N` ;
+- résultat net = résultat du compte d’exploitation − dotations − intérêts ;
+- CAF = résultat net + dotations ;
+- échéancier d’emprunt à mensualité constante (PMT), même convention que la
+  ligne DSL `mensualite_emprunt` ; intérêts = mensualités payées − capital
+  remboursé ;
+- charges fixes du seuil = charges d’exploitation fixes + dotations + intérêts ;
+  CA au seuil = charges fixes / taux de marge sur coûts variables.
+
+**Invariant d’équilibre.** L’égalité actif = passif est obtenue **par
+construction**, sans poste d’ajustement : la trésorerie de clôture est le déroulé
+du tableau de flux (méthode indirecte). La démonstration par récurrence figure en
+tête du module et dans docs/07. Testé à 0,01 près sur 3 templates × 5 exercices,
+rejoué sur 7 scénarios déformants.
+
+**Conventions à revalider par un expert-comptable** (détaillées dans docs/07) :
+année commerciale de 360 jours, économie d’impôt des dotations et intérêts non
+modélisée, dettes fiscales et sociales non modélisées, fournisseurs assis sur les
+seuls achats variables.
 
 ## Compatibilité
 
