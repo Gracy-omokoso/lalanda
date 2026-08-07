@@ -21,19 +21,34 @@ export const ApiEnvSchema = CommonEnvSchema.extend({
   MONGODB_URI: z.string().min(1),
   MONGODB_DB: z.string().default('lalanda'),
 
-  REDIS_URL: z.string().url(),
+  // Requis à partir des exports asynchrones (files d'attente) — optionnel tant que
+  // rien ne le consomme (S16a : aucun worker Redis en production).
+  REDIS_URL: z.string().url().optional(),
 
-  S3_ENDPOINT: z.string().url(),
+  // Requis à partir des exports asynchrones (stockage des fichiers générés) —
+  // optionnels tant que les rapports sont générés en streaming (S16a).
+  S3_ENDPOINT: z.string().url().optional(),
   S3_REGION: z.string().default('us-east-1'),
-  S3_ACCESS_KEY: z.string().min(1),
-  S3_SECRET_KEY: z.string().min(1),
-  S3_BUCKET_EXPORTS: z.string().min(1),
-  S3_BUCKET_SNAPSHOTS: z.string().min(1),
-  S3_BUCKET_UPLOADS: z.string().min(1),
+  S3_ACCESS_KEY: z.string().min(1).optional(),
+  S3_SECRET_KEY: z.string().min(1).optional(),
+  S3_BUCKET_EXPORTS: z.string().min(1).optional(),
+  S3_BUCKET_SNAPSHOTS: z.string().min(1).optional(),
+  S3_BUCKET_UPLOADS: z.string().min(1).optional(),
   S3_FORCE_PATH_STYLE: z.coerce.boolean().default(true),
 
   AUTH_SECRET: z.string().min(32, 'AUTH_SECRET doit faire au moins 32 caractères'),
   AUTH_URL: z.string().url(),
+  /**
+   * Vérification d'email bloquante à l'inscription (better-auth `requireEmailVerification`).
+   * Défaut `false` en dev (aucun SMTP configuré) ; à passer à `true` en production
+   * dès qu'un fournisseur d'envoi d'emails est branché (voir docs/17-SECURITE.md).
+   * Parse strict : seul la chaîne littérale "true" active le flag (z.coerce.boolean
+   * transformerait "false" en true — toute chaîne non vide est truthy).
+   */
+  AUTH_REQUIRE_EMAIL_VERIFICATION: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
 
   OPENAI_API_KEY: z.string().min(1),
   OPENAI_MODEL_REASONING: z.string().default('gpt-4o'),

@@ -4,6 +4,7 @@ import { LoggerModule } from 'nestjs-pino';
 
 import { AiModule } from './ai/ai.module.js';
 import { AuthModule } from './auth/auth.module.js';
+import { BillingModule } from './billing/billing.module.js';
 import { EvaluateController } from './evaluate/evaluate.controller.js';
 import { HealthController } from './health/health.controller.js';
 import { OrganizationsModule } from './organizations/organizations.module.js';
@@ -11,6 +12,7 @@ import { ParameterPacksModule } from './parameter-packs/parameter-packs.module.j
 import { PlansModule } from './plans/plans.module.js';
 import { ProjectsModule } from './projects/projects.module.js';
 import { ReportsModule } from './reports/reports.module.js';
+import { ThrottlingModule } from './security/throttling.module.js';
 
 @Module({
   imports: [
@@ -43,8 +45,10 @@ import { ReportsModule } from './reports/reports.module.js';
         bufferCommands: false,
       }),
     }),
+    ThrottlingModule,
     OrganizationsModule,
     AuthModule,
+    BillingModule,
     ParameterPacksModule,
     ProjectsModule,
     PlansModule,

@@ -1,5 +1,7 @@
 // Endpoint POST /evaluate — évalue un template avec des drivers utilisateur.
-// S3-lite : sans auth, sans persistence. Le moteur reste la seule source de vérité.
+// Sans persistence. Le moteur reste la seule source de vérité.
+// S16a : authentification requise (l'exposition publique « S3-lite » est terminée) —
+// les templates et l'évaluation ne sont servis qu'aux sessions valides.
 
 import {
   BadRequestException,
@@ -9,9 +11,11 @@ import {
   NotFoundException,
   Param,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 import { EngineError, evaluateTemplate, type Template } from '@lalanda/engine';
 
+import { AuthGuard } from '../auth/auth.guard.js';
 import {
   EvaluateRequestSchema,
   type EvaluateRequest,
@@ -25,6 +29,7 @@ import {
 } from './template-registry.js';
 
 @Controller('evaluate')
+@UseGuards(AuthGuard)
 export class EvaluateController {
   @Get('templates')
   listTemplates(): { slugs: string[]; templates: TemplateSummary[] } {

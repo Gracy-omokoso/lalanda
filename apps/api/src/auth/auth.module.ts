@@ -25,6 +25,8 @@ const authProvider: Provider = {
       baseUrl: process.env['API_URL'] ?? 'http://localhost:3001',
       secret: process.env['AUTH_SECRET'] ?? '',
       trustedOrigins: [process.env['WEB_URL'] ?? 'http://localhost:3000'],
+      // Parse strict : seule la chaîne "true" active la vérification (S16a).
+      requireEmailVerification: process.env['AUTH_REQUIRE_EMAIL_VERIFICATION'] === 'true',
       onUserCreated,
     });
   },

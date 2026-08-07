@@ -35,6 +35,11 @@ export class ProjectsService {
     });
   }
 
+  /** Nombre total de projets d'une organisation (S16b — quota `maxProjects`). */
+  countByOrg(organizationId: string): Promise<number> {
+    return this.model.countDocuments({ organizationId }).exec();
+  }
+
   /** Liste les projets d'une organisation, plus récents en premier. */
   listByOrg(organizationId: string, limit = 50): Promise<ProjectDocument[]> {
     return this.model.find({ organizationId }).sort({ updatedAt: -1 }).limit(limit).exec();

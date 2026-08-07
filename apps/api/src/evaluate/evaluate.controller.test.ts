@@ -1,12 +1,24 @@
-// Test unitaire du EvaluateController — pas de HTTP réel, appel direct de la méthode.
+// Test unitaire du EvaluateController — pas de HTTP réel, appel direct de la méthode
+// (les guards ne s'exécutent donc pas ici ; le comportement 401/200 est couvert par
+// le test e2e evaluate-auth.e2e.test.ts, et la présence du guard est vérifiée
+// via les métadonnées de décorateur ci-dessous).
+
+import 'reflect-metadata';
 
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it } from 'vitest';
 
+import { AuthGuard } from '../auth/auth.guard.js';
 import { EvaluateController } from './evaluate.controller.js';
 
 describe('EvaluateController', () => {
   const controller = new EvaluateController();
+
+  it('S16a — le contrôleur entier est protégé par AuthGuard (templates inclus)', () => {
+    // '__guards__' = GUARDS_METADATA de @nestjs/common (constante interne stable).
+    const guards = Reflect.getMetadata('__guards__', EvaluateController) as unknown[];
+    expect(guards).toContain(AuthGuard);
+  });
 
   it('liste les templates disponibles', () => {
     const res = controller.listTemplates();
