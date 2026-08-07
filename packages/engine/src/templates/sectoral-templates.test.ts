@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { parseTemplate } from '../dsl/parser.js';
+import { resolveEtapes } from '../dsl/schema.js';
 import { evaluateTemplate } from '../evaluator/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -223,4 +224,46 @@ describe('prestation-services', () => {
     expect(v.get('tresorerie_initiale')).toBe(15000);
     expect(v.get('tresorerie_min_annee_1')).toBe(15000);
   });
+});
+
+// ─── Étapes du wizard (S18c) ──────────────────────────────────
+// Présentation uniquement : ces assertions garantissent que les 3 templates de
+// lancement offrent une saisie guidée cohérente et qu'aucun groupe d'hypothèses
+// ne se retrouve hors parcours après une évolution de leur structure.
+
+describe('etapes du wizard — templates sectoriels', () => {
+  const slugs = ['restaurant-kinshasa', 'quincaillerie-negoce', 'prestation-services'] as const;
+
+  for (const slug of slugs) {
+    describe(slug, () => {
+      const template = parseTemplate(loadYaml(slug));
+
+      it('déclare des étapes ordonnées, la première étant le chiffre d’affaires', () => {
+        const etapes = resolveEtapes(template);
+        expect(etapes.length).toBeGreaterThanOrEqual(4);
+        expect(etapes[0]?.id).toBe('chiffre_affaires');
+        expect(etapes.at(-1)?.id).toBe('fiscalite');
+      });
+
+      it('couvre tous les groupes d’hypothèses et tous les drivers', () => {
+        const etapes = resolveEtapes(template);
+        const couverts = new Set(etapes.flatMap((e) => e.groupes));
+        for (const g of template.groupes_hypotheses ?? []) {
+          expect(couverts.has(g.id)).toBe(true);
+        }
+        // Aucun driver orphelin : chaque driver est rattaché à un groupe visité.
+        for (const d of template.drivers) {
+          expect(d.groupe).toBeDefined();
+          expect(couverts.has(d.groupe as string)).toBe(true);
+        }
+      });
+
+      it('donne un libellé et une description à chaque étape', () => {
+        for (const e of resolveEtapes(template)) {
+          expect(e.label.length).toBeGreaterThan(0);
+          expect(e.description?.length ?? 0).toBeGreaterThan(0);
+        }
+      });
+    });
+  }
 });
