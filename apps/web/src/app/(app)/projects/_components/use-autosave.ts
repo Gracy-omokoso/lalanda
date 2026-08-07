@@ -9,7 +9,15 @@
 //
 // Conformément à docs/06-WIZARD.md, la sauvegarde n'est PAS conditionnée à la
 // validité des saisies : « les erreurs bloquantes empêchent la validation, pas la
-// sauvegarde ». Seule la validation finale du plan est bloquée.
+// sauvegarde ». Seules la validation d'un plan et les exports sont bloqués.
+//
+// Deux garanties ajoutées après revue CTO S18c :
+//  - aucune perte de saisie : le démontage vide la file, et `beforeunload` avertit
+//    tant qu'un enregistrement reste en attente (docs/06 § Critères : « aucune perte
+//    après actualisation ou déconnexion »);
+//  - aucune réponse périmée : les enregistrements sont numérotés et une réponse
+//    doublée par une plus récente est ignorée, pour ne jamais marquer « enregistré »
+//    un instantané qui ne l'est pas.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -40,6 +48,8 @@ export interface UseAutosaveResult {
   retry: () => void;
   /** Enregistre immédiatement si des modifications sont en attente (avant export, validation…). */
   flush: () => Promise<void>;
+  /** `true` tant qu'une modification n'est pas confirmée côté serveur. */
+  hasUnsaved: boolean;
 }
 
 export function useAutosave<T>({
@@ -61,27 +71,49 @@ export function useAutosave<T>({
   // Dernière charge utile réellement enregistrée — évite un appel réseau inutile
   // lorsque l'utilisateur revient à la valeur d'origine.
   const savedSnapshotRef = useRef<string | null>(null);
+  // Numéro du dernier enregistrement lancé, et promesse en vol s'il y en a une.
+  const seqRef = useRef(0);
+  const inFlightRef = useRef<Promise<void> | null>(null);
 
   valueRef.current = value;
   saveRef.current = save;
 
-  const run = useCallback(async () => {
+  const run = useCallback(async (): Promise<void> => {
+    // Un seul enregistrement à la fois : on attend celui en cours avant d'en lancer
+    // un nouveau, sinon deux réponses concurrentes peuvent se croiser et réécrire
+    // `savedSnapshotRef` avec un instantané périmé.
+    const previous = inFlightRef.current;
+    if (previous) await previous.catch(() => undefined);
+
+    const seq = ++seqRef.current;
     const snapshot = JSON.stringify(valueRef.current);
+    if (savedSnapshotRef.current === snapshot) return;
+
     setState((s) => ({ ...s, status: 'saving', error: null }));
-    try {
-      await saveRef.current(valueRef.current);
-      savedSnapshotRef.current = snapshot;
-      setState({ status: 'saved', savedAt: new Date().toISOString(), error: null });
-    } catch (err) {
-      setState((s) => ({
-        ...s,
-        status: 'error',
-        error: err instanceof Error ? err.message : 'Enregistrement impossible',
-      }));
-    }
+    const attempt = (async () => {
+      try {
+        await saveRef.current(valueRef.current);
+        // Réponse doublée par un enregistrement plus récent → on l'ignore.
+        if (seq !== seqRef.current) return;
+        savedSnapshotRef.current = snapshot;
+        setState({ status: 'saved', savedAt: new Date().toISOString(), error: null });
+      } catch (err) {
+        if (seq !== seqRef.current) return;
+        setState((s) => ({
+          ...s,
+          status: 'error',
+          error: err instanceof Error ? err.message : 'Enregistrement impossible',
+        }));
+      }
+    })();
+    inFlightRef.current = attempt;
+    await attempt;
+    if (inFlightRef.current === attempt) inFlightRef.current = null;
   }, []);
 
   const serialized = JSON.stringify(value);
+  const hasUnsaved =
+    enabled && savedSnapshotRef.current !== null && savedSnapshotRef.current !== serialized;
 
   useEffect(() => {
     if (!enabled) return;
@@ -100,6 +132,36 @@ export function useAutosave<T>({
     };
   }, [serialized, enabled, delay, run]);
 
+  // Filet anti-perte n°1 : quitter/recharger l'onglet avec une saisie en attente
+  // déclenche la confirmation native du navigateur.
+  useEffect(() => {
+    if (!hasUnsaved) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent): void => {
+      e.preventDefault();
+      // Requis par Chrome pour afficher la boîte de dialogue.
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [hasUnsaved]);
+
+  // Filet anti-perte n°2 : navigation interne (un <Link> démonte le composant avant
+  // l'expiration du debounce) → on enregistre immédiatement au démontage.
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      if (
+        savedSnapshotRef.current !== null &&
+        savedSnapshotRef.current !== JSON.stringify(valueRef.current)
+      ) {
+        void run();
+      }
+    };
+  }, [run]);
+
   const retry = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     void run();
@@ -110,11 +172,10 @@ export function useAutosave<T>({
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    if (savedSnapshotRef.current === JSON.stringify(valueRef.current)) return;
     await run();
   }, [run]);
 
-  return { state, retry, flush };
+  return { state, retry, flush, hasUnsaved };
 }
 
 /** Libellé court de l'état d'enregistrement, affiché à côté du wizard. */

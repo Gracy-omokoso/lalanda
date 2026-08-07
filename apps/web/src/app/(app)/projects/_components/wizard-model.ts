@@ -1,19 +1,21 @@
 // Logique pure du wizard de saisie (S18c) — aucune dépendance React, testable seule.
 //
 // Deux responsabilités :
-//  1. découper les drivers du template en étapes ordonnées (miroir de `resolveEtapes`
-//     du moteur, que le web ne peut pas importer : @lalanda/web ne dépend pas de
-//     @lalanda/engine — voir apps/web/package.json);
+//  1. découper les drivers du template en étapes ordonnées — l'ordonnancement lui-même
+//     vient de @lalanda/shared/wizard, partagé avec le moteur : une seule
+//     implémentation, aucune divergence possible (revue CTO S18c, point I5);
 //  2. valider les saisies sur trois niveaux (bloquant / avertissement / information)
 //     conformément à docs/06-WIZARD.md.
 //
 // Règle importante : ce module ne calcule RIEN de financier. Le moteur reste la seule
 // source de vérité des calculs (brief §3-1, CLAUDE.md).
 
+import { GROUPE_TOUS, resolveWizardEtapes } from '@lalanda/shared/wizard';
+
 import type { TemplateDriverMeta, TemplateMeta } from '@/lib/api';
 
-/** Groupe virtuel qui porte tous les drivers quand le template ne déclare aucun groupe. */
-export const GROUPE_TOUS = '_all';
+export { GROUPE_TOUS };
+
 /** Étape virtuelle finale — récapitulatif et validation, ne porte aucun driver. */
 export const ETAPE_SYNTHESE = '_synthese';
 
@@ -29,48 +31,6 @@ export interface WizardStep {
 
 // ─── Découpage en étapes ──────────────────────────────────────
 
-interface ResolvedEtape {
-  id: string;
-  label: string;
-  description?: string;
-  groupes: string[];
-}
-
-/**
- * Résout les étapes déclarées par le template, avec les mêmes règles que le moteur :
- * tri par `ordre` (les étapes sans `ordre` restent dans l'ordre de déclaration et
- * passent en dernier), puis ajout en fin de liste des groupes non rattachés.
- */
-function resolveEtapes(template: TemplateMeta): ResolvedEtape[] {
-  const groupes = template.groupes_hypotheses ?? [];
-  const declared = template.wizard?.etapes ?? [];
-
-  if (declared.length === 0) {
-    if (groupes.length === 0) {
-      return [{ id: 'hypotheses', label: 'Hypothèses', groupes: [GROUPE_TOUS] }];
-    }
-    return groupes.map((g) => ({ id: g.id, label: g.label, groupes: [g.id] }));
-  }
-
-  const ordered = declared
-    .map((e, index) => ({ e, index }))
-    .sort((a, b) => {
-      const oa = a.e.ordre ?? Number.POSITIVE_INFINITY;
-      const ob = b.e.ordre ?? Number.POSITIVE_INFINITY;
-      return oa === ob ? a.index - b.index : oa - ob;
-    })
-    .map(({ e }) => ({
-      id: e.id,
-      label: e.label,
-      ...(e.description === undefined ? {} : { description: e.description }),
-      groupes: [...e.groupes],
-    }));
-
-  const couverts = new Set(ordered.flatMap((e) => e.groupes));
-  const orphelins = groupes.filter((g) => !couverts.has(g.id));
-  return [...ordered, ...orphelins.map((g) => ({ id: g.id, label: g.label, groupes: [g.id] }))];
-}
-
 /**
  * Construit les étapes affichables du wizard : les étapes du DSL peuplées de leurs
  * drivers, puis — le cas échéant — une étape « Autres » pour les drivers dont le
@@ -80,7 +40,10 @@ function resolveEtapes(template: TemplateMeta): ResolvedEtape[] {
  * évolution du template) ; la synthèse est toujours présente.
  */
 export function buildWizardSteps(template: TemplateMeta): WizardStep[] {
-  const etapes = resolveEtapes(template);
+  const etapes = resolveWizardEtapes(
+    template.groupes_hypotheses ?? [],
+    template.wizard?.etapes ?? [],
+  );
   const parGroupe = new Map<string, TemplateDriverMeta[]>();
   const connus = new Set((template.groupes_hypotheses ?? []).map((g) => g.id));
 
@@ -156,6 +119,27 @@ export function parseInput(d: TemplateDriverMeta, raw: string): number | null {
   return isPercentDriver(d) ? parsed / 100 : parsed;
 }
 
+// ─── Provenance d'une valeur (docs/06 : « une valeur suggérée n'est jamais
+// confondue avec une valeur saisie ») ─────────────────────────
+
+/** `saisi` = valeur persistée par l'utilisateur ; `defaut` = suggestion du modèle. */
+export type Provenance = 'saisi' | 'defaut';
+
+/**
+ * Provenance initiale de chaque driver : tout id présent dans les `driverValues`
+ * persistés du projet a été saisi, les autres affichent le défaut du template.
+ */
+export function initialProvenance(
+  drivers: TemplateDriverMeta[],
+  persisted: Record<string, number>,
+): Record<string, Provenance> {
+  const out: Record<string, Provenance> = {};
+  for (const d of drivers) {
+    out[d.id] = Object.prototype.hasOwnProperty.call(persisted, d.id) ? 'saisi' : 'defaut';
+  }
+  return out;
+}
+
 // ─── Validation à trois niveaux ───────────────────────────────
 
 export type IssueLevel = 'error' | 'warning';
@@ -197,6 +181,11 @@ export function validateDriver(d: TemplateDriverMeta, raw: string): FieldIssue |
   if (d.max !== undefined && value > d.max) {
     return { level: 'error', message: `Valeur trop haute — maximum ${formatBound(d, d.max)}.` };
   }
+
+  // Un plancher à 0 exprime « pas de valeur négative », pas une borne atypique :
+  // 0 employé ou 0 emprunt est une situation normale, souvent décrite par l'aide du
+  // driver. On n'avertit donc jamais sur ce cas (revue CTO S18c, mineurs).
+  if (d.min === 0 && value === 0) return null;
 
   if (d.min !== undefined && d.max !== undefined && d.max > d.min) {
     const marge = (d.max - d.min) * MARGE_ATYPIQUE;

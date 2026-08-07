@@ -11,6 +11,7 @@ import {
   blockingDriverIds,
   buildWizardSteps,
   diagnoseStep,
+  initialProvenance,
   initialRawValues,
   parseInput,
   toDisplayString,
@@ -103,6 +104,22 @@ describe('buildWizardSteps', () => {
     );
     const autres = steps.find((s) => s.id === '_autres');
     expect(autres?.drivers.map((d) => d.id)).toEqual(['orphelin', 'nu']);
+  });
+
+  it('ignore un groupe inconnu référencé par une étape', () => {
+    // Une clé de présentation désynchronisée ne doit jamais faire disparaître la
+    // saisie : l'étape garde ses groupes valides et le reste revient en fin de parcours.
+    const steps = buildWizardSteps(
+      template({
+        drivers,
+        groupes_hypotheses: groupes,
+        wizard: {
+          etapes: [{ id: 'ca', label: 'CA', groupes: ['activite', 'disparu'], ordre: 1 }],
+        },
+      }),
+    );
+    expect(steps.map((s) => s.id)).toEqual(['ca', 'financement', ETAPE_SYNTHESE]);
+    expect(steps[0]?.drivers.map((d) => d.id)).toEqual(['ca', 'jours']);
   });
 
   it('écarte une étape dont aucun groupe ne porte de driver', () => {
@@ -216,8 +233,18 @@ describe('validateDriver', () => {
   });
 
   it('avertit sur la borne minimale quand le maximum est absent', () => {
-    const issue = validateDriver(driver({ id: 'n', min: 0 }), '0');
+    const issue = validateDriver(driver({ id: 'n', min: 1 }), '1');
     expect(issue?.level).toBe('warning');
+  });
+
+  it('n’avertit pas sur 0 quand le plancher est 0', () => {
+    // « 0 employé », « 0 emprunt » : une absence, pas une valeur atypique.
+    expect(validateDriver(driver({ id: 'n', min: 0 }), '0')).toBeNull();
+    expect(validateDriver(driver({ id: 'n', min: 0, max: 100 }), '0')).toBeNull();
+  });
+
+  it('bloque toujours une valeur négative sous un plancher à 0', () => {
+    expect(validateDriver(driver({ id: 'n', min: 0 }), '-1')?.level).toBe('error');
   });
 
   it('n’avertit pas quand aucune borne n’est déclarée', () => {
@@ -266,6 +293,26 @@ describe('diagnoseStep / blockingDriverIds', () => {
 
   it('agrège les erreurs bloquantes de tout le wizard', () => {
     expect(blockingDriverIds(steps, { a: '', b: '50', c: 'x' })).toEqual(['a', 'c']);
+  });
+});
+
+describe('initialProvenance', () => {
+  it('distingue une valeur persistée d’une suggestion du modèle', () => {
+    const provenance = initialProvenance(
+      [driver({ id: 'saisi', defaut: 1 }), driver({ id: 'suggere', defaut: 2 })],
+      { saisi: 42 },
+    );
+    expect(provenance).toEqual({ saisi: 'saisi', suggere: 'defaut' });
+  });
+
+  it('traite une valeur persistée égale au défaut comme une saisie', () => {
+    expect(initialProvenance([driver({ id: 'a', defaut: 10 })], { a: 10 })).toEqual({
+      a: 'saisi',
+    });
+  });
+
+  it('traite un 0 persisté comme une saisie, pas comme une absence', () => {
+    expect(initialProvenance([driver({ id: 'a', defaut: 10 })], { a: 0 })).toEqual({ a: 'saisi' });
   });
 });
 

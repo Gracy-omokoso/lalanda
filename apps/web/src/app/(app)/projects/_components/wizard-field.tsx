@@ -12,12 +12,14 @@
 
 import type { TemplateDriverMeta } from '@/lib/api';
 
-import { displayBound, isPercentDriver, validateDriver } from './wizard-model';
+import { displayBound, isPercentDriver, validateDriver, type Provenance } from './wizard-model';
 
 interface WizardFieldProps {
   driver: TemplateDriverMeta;
   raw: string;
   onChange: (raw: string) => void;
+  /** `defaut` → la valeur affichée est une suggestion du modèle, pas une saisie. */
+  provenance: Provenance;
   /** Focus automatique — utilisé pour le premier champ de l'étape affichée. */
   autoFocus?: boolean;
 }
@@ -39,6 +41,7 @@ export function WizardField({
   driver,
   raw,
   onChange,
+  provenance,
   autoFocus = false,
 }: WizardFieldProps): React.ReactElement {
   const issue = validateDriver(driver, raw);
@@ -48,7 +51,13 @@ export function WizardField({
   const fieldId = `driver-${driver.id}`;
   const issueId = `${fieldId}-issue`;
   const helpId = `${fieldId}-help`;
-  const describedBy = [issue ? issueId : null, driver.aide ? helpId : null]
+  const originId = `${fieldId}-origin`;
+  const isSuggested = provenance === 'defaut';
+  const describedBy = [
+    issue ? issueId : null,
+    isSuggested ? originId : null,
+    driver.aide ? helpId : null,
+  ]
     .filter(Boolean)
     .join(' ');
 
@@ -57,8 +66,23 @@ export function WizardField({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={fieldId} className="flex items-baseline justify-between gap-2 text-sm">
-        <span className="font-medium">{driver.label ?? driver.id}</span>
+      <label
+        htmlFor={fieldId}
+        className="flex flex-wrap items-baseline justify-between gap-2 text-sm"
+      >
+        <span className="flex flex-wrap items-baseline gap-2">
+          <span className="font-medium">{driver.label ?? driver.id}</span>
+          {/* Provenance visible : une suggestion n'est jamais confondue avec une
+              saisie (docs/06-WIZARD.md). Le badge disparaît dès la première frappe. */}
+          {isSuggested ? (
+            <span
+              id={originId}
+              className="rounded-full border border-[var(--border)] px-1.5 py-0.5 text-[0.62rem] font-medium uppercase tracking-[0.06em] text-[var(--foreground-muted)]"
+            >
+              Valeur suggérée
+            </span>
+          ) : null}
+        </span>
         {bounds ? (
           <span className="fig text-[0.68rem] text-[var(--foreground-muted)]">{bounds}</span>
         ) : null}

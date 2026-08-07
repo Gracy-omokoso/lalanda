@@ -36,8 +36,10 @@ import {
   blockingDriverIds,
   buildWizardSteps,
   diagnoseStep,
+  initialProvenance,
   initialRawValues,
   parseInput,
+  type Provenance,
 } from './wizard-model';
 import { WizardProgress, type StepIndicator } from './wizard-progress';
 import { WizardSummary } from './wizard-summary';
@@ -105,6 +107,10 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
   const [values, setValues] = useState<Record<string, number>>({});
   /** Texte exact saisi par l'utilisateur — source de la validation, jamais écrêté. */
   const [raw, setRaw] = useState<Record<string, string>>({});
+  /** Saisi par l'utilisateur ou simple suggestion du modèle (docs/06). */
+  const [provenance, setProvenance] = useState<Record<string, Provenance>>({});
+  /** Instantané des valeurs de la dernière évaluation réussie — détecte l'obsolescence. */
+  const [evaluatedSnapshot, setEvaluatedSnapshot] = useState<string | null>(null);
   const [lines, setLines] = useState<LineResult[] | null>(null);
   const [amortissements, setAmortissements] = useState<AmortissementsView | undefined>(undefined);
   const [etatsFinanciers, setEtatsFinanciers] = useState<EtatsFinanciersView | undefined>(
@@ -142,6 +148,9 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
 
   const blocking = useMemo(() => blockingDriverIds(steps, raw), [steps, raw]);
   const activeStep = steps[activeIndex];
+  // Les résultats affichés ne correspondent plus aux hypothèses courantes : le recalcul
+  // est différé (conforme docs/06), mais l'écart doit être visible.
+  const resultsStale = lines !== null && evaluatedSnapshot !== JSON.stringify(values);
 
   // ─── Auto-save débouncé (WIZ-002) ───────────────────────────
   const saveDrivers = useCallback(
@@ -186,6 +195,7 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
       // déjà en place et le prend comme référence, sans écriture réseau.
       setValues(initial);
       setRaw(initialRawValues(tmpl.drivers, initial));
+      setProvenance(initialProvenance(tmpl.drivers, p.driverValues));
       setReady(true);
 
       // (S16c) Versions validées — best-effort, ne bloque pas la vue plan.
@@ -216,6 +226,7 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
       setLines(res.lines);
       setAmortissements(res.amortissements);
       setEtatsFinanciers(res.etatsFinanciers);
+      setEvaluatedSnapshot(JSON.stringify(payload));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur d'évaluation");
     } finally {
@@ -231,6 +242,8 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
    */
   function handleFieldChange(driver: TemplateDriverMeta, text: string): void {
     setRaw((r) => ({ ...r, [driver.id]: text }));
+    // Dès la première frappe, la valeur cesse d'être une suggestion du modèle.
+    setProvenance((p) => (p[driver.id] === 'saisi' ? p : { ...p, [driver.id]: 'saisi' }));
     const parsed = parseInput(driver, text);
     if (parsed !== null) setValues((v) => ({ ...v, [driver.id]: parsed }));
   }
@@ -242,6 +255,15 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
   }
 
   async function handleDownload(kind: 'pdf' | 'xlsx'): Promise<void> {
+    // Un dossier remis à une banque ne part jamais avec des hypothèses hors bornes.
+    // Le serveur reste l'autorité (400 DRIVERS_OUT_OF_RANGE à la validation d'un
+    // plan) ; ici on refuse tôt, avec un message explicite plutôt qu'un bouton inerte.
+    if (blocking.length > 0) {
+      setError(
+        `Export impossible : ${blocking.length} hypothèse${blocking.length > 1 ? 's sont' : ' est'} hors des bornes autorisées. Corrigez-${blocking.length > 1 ? 'les' : 'la'} avant d'exporter.`,
+      );
+      return;
+    }
     const setBusy = kind === 'pdf' ? setDownloadingPdf : setDownloadingXlsx;
     setBusy(true);
     setError(null);
@@ -262,7 +284,12 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
 
   // (S16c) Fige la version courante en plan validé vN+1.
   async function handleApprovePlan(): Promise<void> {
-    if (blocking.length > 0) return;
+    if (blocking.length > 0) {
+      setError(
+        `Validation impossible : ${blocking.length} hypothèse${blocking.length > 1 ? 's sont' : ' est'} hors des bornes autorisées.`,
+      );
+      return;
+    }
     setApproving(true);
     setError(null);
     setPlanNotice(null);
@@ -368,6 +395,7 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
                     key={d.id}
                     driver={d}
                     raw={raw[d.id] ?? ''}
+                    provenance={provenance[d.id] ?? 'defaut'}
                     onChange={(text) => handleFieldChange(d, text)}
                   />
                 ))}
@@ -398,42 +426,62 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
 
           {planNotice ? <p className="text-xs text-[var(--accent)]">{planNotice}</p> : null}
 
-          {/* Exports et versions figées : disponibles depuis la synthèse. */}
-          {activeStep.synthese ? (
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => void handleDownload('pdf')}
-                  disabled={downloadingPdf}
-                  title="Télécharger le rapport PDF"
-                  className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-medium transition hover:bg-[var(--surface-muted)] disabled:opacity-40"
-                >
-                  {downloadingPdf ? 'Génération…' : 'Télécharger PDF'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleDownload('xlsx')}
-                  disabled={downloadingXlsx}
-                  title="Exporter le plan financier en Excel (formules préservées)"
-                  className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-medium transition hover:bg-[var(--surface-muted)] disabled:opacity-40"
-                >
-                  {downloadingXlsx ? 'Génération…' : 'Exporter Excel'}
-                </button>
-              </div>
-              <PlanVersionsList plans={plans} onDownload={handleDownloadPlanExport} />
+          {/* Exports et versions figées : accessibles depuis n'importe quelle étape
+              — les cantonner à la synthèse était une régression de portée vs S16c. */}
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => void handleDownload('pdf')}
+                disabled={downloadingPdf}
+                title="Télécharger le rapport PDF"
+                className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-medium transition hover:bg-[var(--surface-muted)] disabled:opacity-40"
+              >
+                {downloadingPdf ? 'Génération…' : 'Télécharger PDF'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDownload('xlsx')}
+                disabled={downloadingXlsx}
+                title="Exporter le plan financier en Excel (formules préservées)"
+                className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-medium transition hover:bg-[var(--surface-muted)] disabled:opacity-40"
+              >
+                {downloadingXlsx ? 'Génération…' : 'Exporter Excel'}
+              </button>
             </div>
-          ) : null}
+            <PlanVersionsList plans={plans} onDownload={handleDownloadPlanExport} />
+          </div>
         </section>
 
         {/* ─── Colonne résultats : reste accessible à toute étape ─ */}
-        <section aria-label="Résultats du plan" className="flex flex-col gap-4">
+        <section aria-label="Résultats du plan" aria-live="polite" className="flex flex-col gap-4">
           {error ? (
             <div
               role="alert"
               className="rounded-md border border-[var(--danger)]/30 bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger)]"
             >
               <strong>Erreur :</strong> {error}
+            </div>
+          ) : null}
+          {/* Recalcul différé (docs/06) : les chiffres affichés restent ceux de la
+              dernière évaluation, mais leur obsolescence est explicite et corrigeable
+              sans quitter l'étape courante. */}
+          {resultsStale ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--warn)]/40 p-3 text-sm">
+              <p className="flex items-center gap-2 text-[var(--warn)]">
+                <span aria-hidden="true" className="dot dot-warn" />
+                <span>
+                  Résultats obsolètes — vos hypothèses ont changé depuis le dernier calcul.
+                </span>
+              </p>
+              <button
+                type="button"
+                onClick={() => void evaluate(values)}
+                disabled={loading}
+                className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-medium transition hover:bg-[var(--surface-muted)] disabled:opacity-40"
+              >
+                {loading ? 'Calcul…' : 'Recalculer'}
+              </button>
             </div>
           ) : null}
           {lines ? (
