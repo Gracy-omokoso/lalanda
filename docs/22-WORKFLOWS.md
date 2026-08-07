@@ -19,6 +19,12 @@ Transitions d’erreur : `calculation_failed`, retour à `draft` après modifica
 `approved → superseded`  
 Un plan n’est ni modifié ni supprimé par une opération ordinaire.
 
+### Implémenté (S16c — FIN-003)
+
+- Un plan naît `approved` via `POST /projects/:id/plans` (version incrémentale par projet). La validation de vN+1 bascule automatiquement vN en `superseded` — seule mutation autorisée sur un plan existant.
+- Transition refusée : re-valider des entrées identiques (même empreinte SHA-256 canonique des drivers résolus + template + pack + version moteur) → `409 { code: 'PLAN_UNCHANGED' }`. Une validation concurrente sur la même version → `409 { code: 'PLAN_VERSION_CONFLICT' }` (index unique `{projectId, version}`).
+- Les exports `?planVersion=N` référencent la version exacte du plan et son empreinte, et repartent du snapshot figé sans recalcul (voir docs/07 § Version validée). Limite connue : pas de ré-exécution des moteurs historiques — seule la mise en forme utilise le template courant.
+
 ## Période réalisée
 
 `open → review → closed → reopened → closed`
