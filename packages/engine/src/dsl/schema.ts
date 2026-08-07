@@ -44,6 +44,30 @@ const GroupeSchema = z
   })
   .strict();
 
+// ─── Étapes du wizard de saisie (S18c) ────────────────────────
+// PRÉSENTATION UNIQUEMENT — aucune sémantique de calcul. Une étape regroupe un ou
+// plusieurs `groupes_hypotheses` et donne au wizard web un ordre de saisie lisible
+// (contexte → CA → coûts → personnel → investissement → financement → synthèse,
+// voir docs/06-WIZARD.md). Le moteur ignore totalement ce champ lors de l'évaluation.
+const EtapeSchema = z
+  .object({
+    id: IdSchema,
+    /** Titre affiché dans l'indicateur de progression (ex. « Chiffre d'affaires »). */
+    label: z.string().min(1),
+    /** Phrase d'accroche affichée sous le titre de l'étape. */
+    description: z.string().optional(),
+    /** Ids des `groupes_hypotheses` dont les drivers sont saisis à cette étape. */
+    groupes: z.array(IdSchema).min(1, 'une étape doit rattacher au moins un groupe'),
+    /**
+     * Rang d'affichage. Si absent, l'ordre de déclaration fait foi. Les étapes sans
+     * `ordre` passent après celles qui en déclarent un.
+     */
+    ordre: z.number().int().positive().optional(),
+  })
+  .strict();
+
+export type Etape = z.infer<typeof EtapeSchema>;
+
 // ─── Feuilles et lignes ───────────────────────────────────────
 // S1 : uniquement des feuilles calculées avec des lignes explicites.
 // S10 : ligne peut porter un seuil (feu tricolore) référençant un paramètre du pack.
@@ -181,6 +205,11 @@ export const TemplateSchema = z
     horizon_mois: z.number().int().positive().max(120).optional(),
     parameter_pack: z.string().optional(),
     groupes_hypotheses: z.array(GroupeSchema).optional(),
+    /**
+     * (S18c) Découpage du wizard de saisie en étapes. Purement présentationnel.
+     * Absent → fallback « une étape par groupe d'hypothèses » (voir {@link resolveEtapes}).
+     */
+    etapes: z.array(EtapeSchema).optional(),
     drivers: z.array(DriverSchema).min(1, 'au moins un driver requis'),
     feuilles: z.array(FeuilleSchema).min(1, 'au moins une feuille requise'),
     sorties: z.array(IdSchema).optional(),
@@ -211,13 +240,15 @@ export type Template = z.infer<typeof TemplateSchema>;
 // ─── Validation croisée (unicité des id) ──────────────────────
 // Ces vérifications ne sont pas exprimables en Zod pur → helper séparé.
 
-import { DuplicateIdError, type EngineError } from './errors.js';
+import { DuplicateIdError, UnknownGroupeError, type EngineError } from './errors.js';
 
 export interface CollectedIds {
   readonly drivers: ReadonlySet<string>;
   readonly lignes: ReadonlySet<string>;
   readonly feuilles: ReadonlySet<string>;
   readonly groupes: ReadonlySet<string>;
+  /** (S18c) Ids des étapes du wizard — vide si le template n'en déclare pas. */
+  readonly etapes: ReadonlySet<string>;
 }
 
 /**
@@ -230,10 +261,21 @@ export function collectIds(template: Template): CollectedIds {
   const lignes = new Set<string>();
   const feuilles = new Set<string>();
   const groupes = new Set<string>();
+  const etapes = new Set<string>();
 
   for (const g of template.groupes_hypotheses ?? []) {
     if (groupes.has(g.id)) throw new DuplicateIdError('groupe', g.id);
     groupes.add(g.id);
+  }
+  // (S18c) Les étapes vivent dans leur propre espace de noms (elles ne sont jamais
+  // référencées par une formule) — on vérifie juste l'unicité et la validité des
+  // groupes rattachés, pour qu'un renommage de groupe casse bruyamment au build.
+  for (const e of template.etapes ?? []) {
+    if (etapes.has(e.id)) throw new DuplicateIdError('etape', e.id);
+    etapes.add(e.id);
+    for (const groupeId of e.groupes) {
+      if (!groupes.has(groupeId)) throw new UnknownGroupeError(groupeId, e.id);
+    }
   }
   for (const d of template.drivers) {
     if (drivers.has(d.id)) throw new DuplicateIdError('driver', d.id);
@@ -251,7 +293,58 @@ export function collectIds(template: Template): CollectedIds {
     }
   }
 
-  return { drivers, lignes, feuilles, groupes };
+  return { drivers, lignes, feuilles, groupes, etapes };
 }
 
-export { DuplicateIdError, type EngineError };
+// ─── Résolution des étapes du wizard (S18c) ───────────────────
+
+/** Étape prête à afficher : toujours au moins un groupe, ordre déjà appliqué. */
+export interface ResolvedEtape {
+  readonly id: string;
+  readonly label: string;
+  readonly description?: string;
+  readonly groupes: readonly string[];
+}
+
+/**
+ * Calcule la liste ordonnée des étapes de saisie d'un template.
+ *
+ * Règles (présentation uniquement, aucun impact sur les calculs) :
+ * 1. `etapes` déclarées → triées par `ordre` croissant, les étapes sans `ordre`
+ *    conservant leur ordre de déclaration et passant en dernier;
+ * 2. tout groupe d'hypothèses non rattaché à une étape est ajouté en fin de liste
+ *    comme étape autonome (résilience : un groupe ajouté par un template n'est
+ *    jamais perdu, même si `etapes` n'a pas été mis à jour);
+ * 3. aucune `etapes` déclarée → fallback « une étape par groupe d'hypothèses »;
+ * 4. aucun groupe non plus → une unique étape `hypotheses` qui porte tous les drivers
+ *    (le groupe `_all` est virtuel : il ne correspond à aucun `groupe` de driver).
+ */
+export function resolveEtapes(template: Template): ResolvedEtape[] {
+  const groupes = template.groupes_hypotheses ?? [];
+  const declared = template.etapes ?? [];
+
+  if (declared.length === 0) {
+    if (groupes.length === 0) {
+      return [{ id: 'hypotheses', label: 'Hypothèses', groupes: ['_all'] }];
+    }
+    return groupes.map((g) => ({ id: g.id, label: g.label, groupes: [g.id] }));
+  }
+
+  const ordered = declared
+    .map((e, index) => ({ e, index }))
+    .sort((a, b) => {
+      const oa = a.e.ordre ?? Number.POSITIVE_INFINITY;
+      const ob = b.e.ordre ?? Number.POSITIVE_INFINITY;
+      return oa === ob ? a.index - b.index : oa - ob;
+    })
+    .map(({ e }): ResolvedEtape => {
+      const base: ResolvedEtape = { id: e.id, label: e.label, groupes: [...e.groupes] };
+      return e.description === undefined ? base : { ...base, description: e.description };
+    });
+
+  const couverts = new Set(ordered.flatMap((e) => e.groupes));
+  const orphelins = groupes.filter((g) => !couverts.has(g.id));
+  return [...ordered, ...orphelins.map((g) => ({ id: g.id, label: g.label, groupes: [g.id] }))];
+}
+
+export { DuplicateIdError, UnknownGroupeError, type EngineError };

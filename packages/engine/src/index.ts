@@ -10,11 +10,14 @@ export const ENGINE_VERSION = '0.2.0';
 export {
   TemplateSchema,
   collectIds,
+  resolveEtapes,
   type CollectedIds,
   type Driver,
   type DriverType,
+  type Etape,
   type Feuille,
   type Ligne,
+  type ResolvedEtape,
   type Template,
   type Immobilisation,
   type CategorieImmobilisation,
@@ -27,6 +30,7 @@ export {
   EngineError,
   MissingDriverValueError,
   UnknownDriverError,
+  UnknownGroupeError,
   UnknownLineError,
   type EngineErrorCode,
 } from './dsl/errors.js';

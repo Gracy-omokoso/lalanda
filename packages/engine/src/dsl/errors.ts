@@ -8,7 +8,8 @@ export type EngineErrorCode =
   | 'UNKNOWN_LINE'
   | 'CYCLE'
   | 'INVALID_FORMULA'
-  | 'MISSING_DRIVER_VALUE';
+  | 'MISSING_DRIVER_VALUE'
+  | 'UNKNOWN_GROUPE';
 
 export class EngineError extends Error {
   readonly code: EngineErrorCode;
@@ -22,10 +23,21 @@ export class EngineError extends Error {
   }
 }
 
-/** Un identifiant (driver, ligne, feuille) apparaît plus d'une fois dans le template. */
+/** Un identifiant (driver, ligne, feuille, groupe, étape) apparaît plus d'une fois. */
 export class DuplicateIdError extends EngineError {
-  constructor(kind: 'driver' | 'ligne' | 'feuille' | 'groupe', id: string) {
+  constructor(kind: 'driver' | 'ligne' | 'feuille' | 'groupe' | 'etape', id: string) {
     super('DUPLICATE_ID', `Identifiant ${kind} en double : "${id}"`, { kind, id });
+  }
+}
+
+/** (S18c) Une étape du wizard rattache un groupe d'hypothèses qui n'existe pas. */
+export class UnknownGroupeError extends EngineError {
+  constructor(groupeId: string, etapeId: string) {
+    super(
+      'UNKNOWN_GROUPE',
+      `L'étape "${etapeId}" référence un groupe d'hypothèses inconnu : "${groupeId}"`,
+      { groupeId, etapeId },
+    );
   }
 }
 
