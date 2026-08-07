@@ -65,6 +65,16 @@ export interface ReportData {
   generatedAt: string;
   /** Devise d'affichage — reprise du pack/template/USD. */
   currency: 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR';
+  /**
+   * (S16c) Présent si l'export repart d'un plan validé figé (?planVersion=N) :
+   * le PDF affiche « Plan validé v{N} du {date} ». Absent → mention
+   * « BROUILLON — non validé » (les chiffres peuvent encore changer).
+   */
+  plan?: {
+    version: number;
+    /** ISO-8601 — date de validation. */
+    approvedAt: string;
+  };
 }
 
 function escapeHtml(input: string): string {
@@ -137,7 +147,16 @@ export function renderReportHtml(data: ReportData): string {
     lines,
     generatedAt,
     currency,
+    plan,
   } = data;
+
+  // (S16c) Badge de statut : plan validé figé vs brouillon recalculable.
+  const statusBadge = plan
+    ? `<div class="status-badge validated">Plan validé v${plan.version} du ${escapeHtml(formatDate(plan.approvedAt))}</div>`
+    : `<div class="status-badge draft">BROUILLON — non validé</div>`;
+  const statusFooter = plan
+    ? `Plan validé v${plan.version} du ${escapeHtml(formatDate(plan.approvedAt))} — chiffres figés, jamais recalculés.`
+    : `BROUILLON — non validé : les chiffres peuvent changer à chaque recalcul.`;
 
   // Groupement des drivers par groupe pour affichage lisible (fallback : un seul bloc).
   const groups = template.groupes_hypotheses ?? [];
@@ -315,6 +334,11 @@ export function renderReportHtml(data: ReportData): string {
     .cover-page .meta-item strong { color: var(--ink); display: block; margin-top: 1mm; font-size: 11pt; }
     .cover-page .tagline { color: var(--muted); font-size: 11pt; margin: 0 0 15mm 0; font-style: italic; }
 
+    /* ---- Badge statut du plan (S16c) ---- */
+    .status-badge { display: inline-block; align-self: flex-start; padding: 2mm 4mm; border-radius: 2mm; font-size: 10.5pt; font-weight: 700; letter-spacing: 0.3px; margin-bottom: 8mm; }
+    .status-badge.validated { color: var(--accent); border: 2px solid var(--accent); background: #ecfdf5; }
+    .status-badge.draft { color: #b45309; border: 2px dashed #d97706; background: #fffbeb; }
+
     /* ---- Sommaire (page 2) ---- */
     .toc-page { break-after: page; page-break-after: always; }
     .toc-page h2 { margin: 0 0 8mm 0; font-size: 18pt; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 3mm; }
@@ -359,6 +383,7 @@ export function renderReportHtml(data: ReportData): string {
     <h1 class="brand">LALANDA</h1>
     <p class="tagline">Plan financier prévisionnel bancable</p>
     <h2 class="project-name">${escapeHtml(project.name)}</h2>
+    ${statusBadge}
     <div class="meta-grid">
       <div class="meta-item">Organisation<strong>${escapeHtml(org.name)}</strong></div>
       <div class="meta-item">Pays du projet<strong>${escapeHtml(project.pays)}</strong></div>
@@ -397,6 +422,7 @@ export function renderReportHtml(data: ReportData): string {
 
   <footer class="stamp">
     <div class="disclaimer">
+      ${statusFooter}
       Document généré par Lalanda. Les valeurs sont indicatives et n'engagent que leur émetteur. Le
       moteur de calcul reste la seule source de vérité. Ne remplace pas l'avis d'un expert-comptable
       agréé pour un dépôt bancaire officiel.
