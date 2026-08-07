@@ -31,6 +31,22 @@ export interface ParameterPackSummary {
   description?: string;
 }
 
+/** (S18c) Paramètre fiscal d'un pack, avec son doute d'audit `a_confirmer`. */
+export interface ParameterPackParam {
+  valeur: number;
+  unite?: string;
+  aide?: string;
+  source?: string;
+  a_confirmer: boolean;
+}
+
+/** Pack complet servi par `GET /parameter-packs/:slug` — utilisé par la synthèse. */
+export interface ParameterPackDetail extends ParameterPackSummary {
+  params: Record<string, ParameterPackParam>;
+  /** Note d'avertissement légal du pack (également reprise dans le PDF). */
+  avertissement?: string;
+}
+
 export interface LineResult {
   sheetId: string;
   lineId: string;
@@ -190,6 +206,19 @@ export interface TemplateGroupMeta {
   label: string;
 }
 
+/**
+ * (S18c) Étape du wizard de saisie déclarée par le template. Purement
+ * présentationnel — le moteur ignore ce champ. Absent → fallback « une étape par
+ * groupe d'hypothèses » (voir `buildWizardSteps`).
+ */
+export interface TemplateEtapeMeta {
+  id: string;
+  label: string;
+  description?: string;
+  groupes: string[];
+  ordre?: number;
+}
+
 export interface TemplateMeta {
   slug: string;
   version: string;
@@ -198,6 +227,7 @@ export interface TemplateMeta {
   devise_base?: 'USD' | 'CDF';
   horizon_mois?: number;
   groupes_hypotheses?: TemplateGroupMeta[];
+  etapes?: TemplateEtapeMeta[];
   drivers: TemplateDriverMeta[];
 }
 
@@ -425,6 +455,10 @@ export const api = {
     }),
   listParameterPacks: () =>
     jsonRequest<{ packs: ParameterPackSummary[] }>(`/parameter-packs`, { method: 'GET' }),
+  getParameterPack: (slug: string) =>
+    jsonRequest<{ pack: ParameterPackDetail }>(`/parameter-packs/${encodeURIComponent(slug)}`, {
+      method: 'GET',
+    }),
   listProjects: () => jsonRequest<{ projects: ProjectView[] }>(`/projects`, { method: 'GET' }),
   createProject: (input: {
     name: string;
