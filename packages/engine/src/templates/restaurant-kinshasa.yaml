@@ -12,6 +12,39 @@ secteur: restauration
 pays: [CD]
 devise_base: USD
 horizon_mois: 12
+# S18a (FIN-001) : horizon 5 exercices (docs/07 « horizon standard : 5 exercices »).
+horizon_projection_annees: 5
+
+# ─── Immobilisations amortissables (S14c, activées S18a) ──────
+# Le total des `montant_ht` est calé sur le défaut de `investissements_initiaux`
+# (30 000 USD) pour que la base amortissable et le bilan restent cohérents.
+# Durées : catégories SYSCOHADA révisé — voir amortissements/index.ts.
+# Acquisition au 1er janvier → prorata temporis de 12/12 sur l'exercice 1.
+immobilisations:
+  - label: 'Matériel et outillage de cuisine'
+    categorie: materiel_outillage
+    montant_ht: 15000
+    date_acquisition: '2026-01-01'
+  - label: 'Aménagements de la salle et de la cuisine'
+    categorie: amenagements
+    montant_ht: 9000
+    date_acquisition: '2026-01-01'
+  - label: 'Mobilier de salle'
+    categorie: mobilier_bureau
+    montant_ht: 4000
+    date_acquisition: '2026-01-01'
+  - label: 'Caisse enregistreuse et informatique'
+    categorie: materiel_informatique
+    montant_ht: 2000
+    date_acquisition: '2026-01-01'
+
+# ─── États financiers prévisionnels (S18a, FIN-001) ───────────
+# Active les feuilles `bilan`, `caf`, `seuil_rentabilite` et le BFR détaillé
+# (`pf_bfr_*`). Ce bloc ne fait que désigner des lignes et des drivers déjà
+# déclarés ci-dessous ; toutes les autres clés prennent leur valeur par défaut.
+structure_financiere:
+  achats_variables_mensuels: cout_matiere
+  charges_fixes_mensuelles: charges_operationnelles
 
 groupes_hypotheses:
   - id: activite
@@ -158,7 +191,7 @@ drivers:
 
   - id: bfr_initial
     groupe: financement
-    label: 'Trésorerie de sécurité (BFR)'
+    label: 'Fonds de roulement de démarrage'
     type: money
     devise: USD
     defaut: 5000
@@ -173,6 +206,40 @@ drivers:
     defaut: 10000
     min: 0
     aide: 'Apport en fonds propres (cash + apports en nature évalués). Doit représenter ≥ 25 % du total des besoins (30 % pour PADMPME) — voir ParameterPack (ratio_apport_min_pct).'
+
+  # ─── Besoin en fonds de roulement (S18a, FIN-001) ───────────
+  # Défauts sectoriels indicatifs pour un restaurant : encaissement quasi comptant,
+  # denrées périssables donc rotation de stock très courte, crédit fournisseur court.
+  # À revalider par un expert-comptable avant dépôt d'un dossier bancaire.
+  - id: delai_clients_jours
+    groupe: activite
+    label: 'Délai de paiement clients'
+    type: number
+    defaut: 2
+    min: 0
+    max: 360
+    unite: 'jours'
+    aide: 'Restauration : encaissement quasi comptant (cash, mobile money, carte). 0-5 jours. Monter à 15-30 jours si une part significative du CA est facturée à des entreprises.'
+
+  - id: delai_fournisseurs_jours
+    groupe: couts_variables
+    label: 'Délai de paiement fournisseurs'
+    type: number
+    defaut: 15
+    min: 0
+    max: 360
+    unite: 'jours'
+    aide: 'Crédit obtenu des fournisseurs de denrées. Les marchés et grossistes de Kinshasa travaillent souvent au comptant ; 15 jours est un compromis réaliste avec des fournisseurs référencés.'
+
+  - id: rotation_stock_jours
+    groupe: couts_variables
+    label: 'Rotation du stock'
+    type: number
+    defaut: 7
+    min: 0
+    max: 360
+    unite: 'jours'
+    aide: 'Durée moyenne de détention du stock de denrées. Produits frais : 3-7 jours. Un restaurant avec une part importante de boissons et de sec peut monter à 15-20 jours.'
 
 feuilles:
   - id: activite
@@ -314,12 +381,13 @@ feuilles:
         formule: 'MIN(tresorerie_initiale, tresorerie_fin_m12)'
         format: money
 
-  # Feuille "projection" (S12-lite) — 3 ans avec taux de croissance annuel du CA.
-  # Hypothèse simplificatrice : le résultat net croît au même taux que le CA
-  # (couts variables + fixes croissent proportionnellement). Le modèle exact
-  # avec charges fixes qui stagnent → margin expansion arrive en S13.
+  # Feuille "projection" (S12-lite, étendue à 5 exercices en S18a) — taux de
+  # croissance annuel du CA. Hypothèse simplificatrice : le résultat net croît au
+  # même taux que le CA (coûts variables + fixes croissent proportionnellement).
+  # C'est cette même convention qui extrapole les achats et les charges fixes des
+  # états financiers (voir structure_financiere).
   - id: projection
-    label: 'Projection sur 3 ans'
+    label: 'Projection sur 5 exercices'
     lignes:
       - id: ca_annuel_1
         label: 'CA année 1'
@@ -333,6 +401,14 @@ feuilles:
         label: 'CA année 3'
         formule: 'ca_annuel_2 * (1 + taux_croissance_ca)'
         format: money
+      - id: ca_annuel_4
+        label: 'CA année 4'
+        formule: 'ca_annuel_3 * (1 + taux_croissance_ca)'
+        format: money
+      - id: ca_annuel_5
+        label: 'CA année 5'
+        formule: 'ca_annuel_4 * (1 + taux_croissance_ca)'
+        format: money
       - id: resultat_annuel_1
         label: 'Résultat net année 1'
         formule: 'resultat_net * 12'
@@ -345,9 +421,23 @@ feuilles:
         label: 'Résultat net année 3'
         formule: 'resultat_annuel_2 * (1 + taux_croissance_ca)'
         format: money
+      - id: resultat_annuel_4
+        label: 'Résultat net année 4'
+        formule: 'resultat_annuel_3 * (1 + taux_croissance_ca)'
+        format: money
+      - id: resultat_annuel_5
+        label: 'Résultat net année 5'
+        formule: 'resultat_annuel_4 * (1 + taux_croissance_ca)'
+        format: money
+      # Conservée telle quelle pour non-régression (ADR-0011 § Contrat 1 : aucune
+      # ligne existante renommée ni retypée).
       - id: resultat_cumule_3ans
         label: 'Résultat cumulé sur 3 ans'
         formule: 'resultat_annuel_1 + resultat_annuel_2 + resultat_annuel_3'
+        format: money
+      - id: resultat_cumule_5ans
+        label: 'Résultat cumulé sur 5 exercices'
+        formule: 'resultat_cumule_3ans + resultat_annuel_4 + resultat_annuel_5'
         format: money
 
   # Feuille "ratios" (S10) : chaque ligne peut porter un `seuil_pack` qui pointe vers un

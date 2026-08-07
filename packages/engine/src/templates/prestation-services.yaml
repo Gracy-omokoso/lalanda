@@ -10,6 +10,33 @@ secteur: services
 pays: [CD]
 devise_base: USD
 horizon_mois: 12
+# S18a (FIN-001) : horizon 5 exercices (docs/07 « horizon standard : 5 exercices »).
+horizon_projection_annees: 5
+
+# ─── Immobilisations amortissables (S14c, activées S18a) ──────
+# Total des `montant_ht` calé sur le défaut de `investissements_initiaux` (6 000 USD).
+immobilisations:
+  - label: 'Matériel informatique'
+    categorie: materiel_informatique
+    montant_ht: 3500
+    date_acquisition: '2026-01-01'
+  - label: 'Mobilier et aménagement du poste de travail'
+    categorie: mobilier_bureau
+    montant_ht: 1500
+    date_acquisition: '2026-01-01'
+  - label: 'Logiciels et identité visuelle'
+    categorie: logiciels
+    montant_ht: 1000
+    date_acquisition: '2026-01-01'
+
+# ─── États financiers prévisionnels (S18a, FIN-001) ───────────
+# Pas de clé `achats_variables_mensuels` : le modèle de prestation ne comporte
+# aucun achat variable indexé sur le volume — l'équipe et la sous-traitance
+# récurrente sont déclarées en charges fixes. Conséquence assumée et documentée :
+# charges variables = 0, taux de marge sur coûts variables = 100 %, donc le seuil
+# de rentabilité vaut exactement les charges fixes, et le stock est nul.
+structure_financiere:
+  charges_fixes_mensuelles: charges_operationnelles
 
 groupes_hypotheses:
   - id: activite
@@ -148,7 +175,7 @@ drivers:
 
   - id: bfr_initial
     groupe: financement
-    label: 'Trésorerie de sécurité (BFR)'
+    label: 'Fonds de roulement de démarrage'
     type: money
     devise: USD
     defaut: 4000
@@ -163,6 +190,41 @@ drivers:
     defaut: 3500
     min: 0
     aide: 'Apport en fonds propres. ≥ 25 % du total des besoins pour être bancable.'
+
+  # ─── Besoin en fonds de roulement (S18a, FIN-001) ───────────
+  # Défauts sectoriels pour le conseil / l'agence : DSO long (grands comptes,
+  # administrations), aucun stock, fournisseurs marginaux. Le délai clients est
+  # LE poste de BFR du secteur — cohérent avec l'aide du fonds de roulement de
+  # démarrage ci-dessus (« DSO grand compte 60-90 j »).
+  - id: delai_clients_jours
+    groupe: activite
+    label: 'Délai de paiement clients'
+    type: number
+    defaut: 60
+    min: 0
+    max: 360
+    unite: 'jours'
+    aide: 'Délai réel d’encaissement des factures. PME privées : 30-45 jours. Grands comptes, banques, ONG et administrations : 60-90 jours, parfois davantage. C’est le premier poste de trésorerie d’une agence.'
+
+  - id: delai_fournisseurs_jours
+    groupe: charges_fixes
+    label: 'Délai de paiement fournisseurs'
+    type: number
+    defaut: 30
+    min: 0
+    max: 360
+    unite: 'jours'
+    aide: 'Crédit obtenu des fournisseurs. Sans achats variables déclarés, ce délai n’a pas d’effet sur le BFR de ce modèle — il reste saisissable pour un usage futur.'
+
+  - id: rotation_stock_jours
+    groupe: charges_fixes
+    label: 'Rotation du stock'
+    type: number
+    defaut: 0
+    min: 0
+    max: 360
+    unite: 'jours'
+    aide: 'Nul pour une activité de service : il n’y a pas de stock à financer.'
 
 feuilles:
   - id: activite
@@ -281,9 +343,13 @@ feuilles:
         formule: 'MIN(tresorerie_initiale, tresorerie_fin_m12)'
         format: money
 
-  # Feuille "projection" (S12-lite) — 3 ans avec taux de croissance annuel du CA.
+  # Feuille "projection" (S12-lite, étendue à 5 exercices en S18a) — taux de
+  # croissance annuel du CA. Hypothèse simplificatrice : le résultat net croît au
+  # même taux que le CA (coûts variables + fixes croissent proportionnellement).
+  # C'est cette même convention qui extrapole les achats et les charges fixes des
+  # états financiers (voir structure_financiere).
   - id: projection
-    label: 'Projection sur 3 ans'
+    label: 'Projection sur 5 exercices'
     lignes:
       - id: ca_annuel_1
         label: 'CA année 1'
@@ -297,6 +363,14 @@ feuilles:
         label: 'CA année 3'
         formule: 'ca_annuel_2 * (1 + taux_croissance_ca)'
         format: money
+      - id: ca_annuel_4
+        label: 'CA année 4'
+        formule: 'ca_annuel_3 * (1 + taux_croissance_ca)'
+        format: money
+      - id: ca_annuel_5
+        label: 'CA année 5'
+        formule: 'ca_annuel_4 * (1 + taux_croissance_ca)'
+        format: money
       - id: resultat_annuel_1
         label: 'Résultat net année 1'
         formule: 'resultat_net * 12'
@@ -309,9 +383,23 @@ feuilles:
         label: 'Résultat net année 3'
         formule: 'resultat_annuel_2 * (1 + taux_croissance_ca)'
         format: money
+      - id: resultat_annuel_4
+        label: 'Résultat net année 4'
+        formule: 'resultat_annuel_3 * (1 + taux_croissance_ca)'
+        format: money
+      - id: resultat_annuel_5
+        label: 'Résultat net année 5'
+        formule: 'resultat_annuel_4 * (1 + taux_croissance_ca)'
+        format: money
+      # Conservée telle quelle pour non-régression (ADR-0011 § Contrat 1 : aucune
+      # ligne existante renommée ni retypée).
       - id: resultat_cumule_3ans
         label: 'Résultat cumulé sur 3 ans'
         formule: 'resultat_annuel_1 + resultat_annuel_2 + resultat_annuel_3'
+        format: money
+      - id: resultat_cumule_5ans
+        label: 'Résultat cumulé sur 5 exercices'
+        formule: 'resultat_cumule_3ans + resultat_annuel_4 + resultat_annuel_5'
         format: money
 
   - id: ratios
