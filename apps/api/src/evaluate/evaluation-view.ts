@@ -116,6 +116,19 @@ export interface EtatsFinanciersView {
     interets: number;
     capitalRestantCloture: number;
   }[];
+  /**
+   * (S18a) Contrôle de cohérence des immobilisations. `statut: 'incoherent'`
+   * signale que la base amortissable déclarée diffère des investissements portés
+   * au bilan : les dotations sont alors plafonnées pour que l'actif immobilisé ne
+   * puisse pas devenir négatif, et l'interface doit l'afficher en rouge.
+   */
+  coherenceImmobilisations: {
+    baseBilan: number;
+    baseDeclaree: number;
+    ecart: number;
+    statut: 'coherent' | 'incoherent';
+    dotationsPlafonnees: boolean;
+  };
 }
 
 /** Résultat d'évaluation sérialisable — la partie « chiffres » d'un EvaluateResponse. */
@@ -226,6 +239,14 @@ export function toEvaluationView(result: EvaluationResult): EvaluationView {
             interets: d.interets,
             capitalRestantCloture: d.capital_restant_cloture,
           })),
+          coherenceImmobilisations: {
+            baseBilan: result.etatsFinanciers.coherence_immobilisations.base_bilan,
+            baseDeclaree: result.etatsFinanciers.coherence_immobilisations.base_declaree,
+            ecart: result.etatsFinanciers.coherence_immobilisations.ecart,
+            statut: result.etatsFinanciers.coherence_immobilisations.statut,
+            dotationsPlafonnees:
+              result.etatsFinanciers.coherence_immobilisations.dotations_plafonnees,
+          },
         }
       : undefined,
   };

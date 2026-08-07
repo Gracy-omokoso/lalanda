@@ -569,3 +569,196 @@ feuilles:
     }
   });
 });
+
+// ─── Cohérence des immobilisations (revue CTO — I1) ───────────
+
+describe('immobilisations — l’actif immobilisé ne peut jamais devenir négatif', () => {
+  const template = loadTemplate('restaurant-kinshasa');
+
+  it('templates de référence : base amortissable et investissements concordent', () => {
+    for (const slug of TEMPLATES) {
+      const { etatsFinanciers } = evaluateTemplate(loadTemplate(slug), {});
+      const c = etatsFinanciers!.coherence_immobilisations;
+      expect(c.statut, `${slug} : base amortissable`).toBe('coherent');
+      expect(c.dotations_plafonnees).toBe(false);
+      expect(c.ecart).toBeCloseTo(0, 6);
+    }
+  });
+
+  it('investissements réduits sous la base déclarée → VNC plafonnée à zéro, jamais négative', () => {
+    // Défaut restaurant : 30 000 d'immobilisations déclarées. On abaisse le driver
+    // à 5 000 : sans plafonnement, l'amortissement cumulé (3 466/an) dépasserait la
+    // valeur brute dès l'exercice 2 et l'actif immobilisé passerait sous zéro.
+    const { lines, etatsFinanciers } = evaluateTemplate(template, {
+      investissements_initiaux: 5000,
+    });
+    const v = byId(lines);
+
+    const c = etatsFinanciers!.coherence_immobilisations;
+    expect(c.statut).toBe('incoherent');
+    expect(c.dotations_plafonnees).toBe(true);
+
+    for (let n = 1; n <= 5; n++) {
+      const vnc = v.get(`bilan_actif_immobilise_annuel_${n}`)!;
+      expect(vnc, `VNC exercice ${n}`).toBeGreaterThanOrEqual(0);
+      expect(v.get(`bilan_amortissements_cumules_annuel_${n}`)).toBeLessThanOrEqual(5000 + 1e-6);
+    }
+  });
+
+  it('le plafonnement des dotations ne rompt pas l’équilibre du bilan', () => {
+    // Le point critique : la dotation retenue reste la variation du cumul plafonné,
+    // donc VNC_N = VNC_{N−1} − dotation retenue_N, et la récurrence tient toujours.
+    for (const invest of [0, 1000, 5000, 12000, 30000, 90000]) {
+      const v = byId(evaluateTemplate(template, { investissements_initiaux: invest }).lines);
+      for (let n = 1; n <= 5; n++) {
+        expect(
+          Math.abs(v.get(`bilan_ecart_equilibre_annuel_${n}`)!),
+          `investissements ${invest}, exercice ${n}`,
+        ).toBeLessThan(TOLERANCE_EQUILIBRE);
+        expect(v.get(`bilan_actif_immobilise_annuel_${n}`)).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+
+  it('la CAF reste cohérente avec les dotations RETENUES, pas les dotations déclarées', () => {
+    const { lines } = evaluateTemplate(template, { investissements_initiaux: 5000 });
+    const v = byId(lines);
+    let cumul = 0;
+    for (let n = 1; n <= 5; n++) {
+      cumul += v.get(`caf_dotations_annuel_${n}`)!;
+      expect(v.get(`bilan_amortissements_cumules_annuel_${n}`)).toBeCloseTo(cumul, 6);
+      expect(v.get(`caf_totale_annuel_${n}`)).toBeCloseTo(
+        v.get(`caf_resultat_net_annuel_${n}`)! + v.get(`caf_dotations_annuel_${n}`)!,
+        6,
+      );
+    }
+    expect(cumul).toBeCloseTo(5000, 6);
+  });
+
+  it('investissements à zéro → aucune dotation retenue, actif immobilisé nul', () => {
+    const v = byId(
+      evaluateTemplate(template, { investissements_initiaux: 0, bfr_initial: 0 }).lines,
+    );
+    for (let n = 1; n <= 5; n++) {
+      expect(v.get(`caf_dotations_annuel_${n}`)).toBe(0);
+      expect(v.get(`bilan_actif_immobilise_annuel_${n}`)).toBe(0);
+    }
+  });
+});
+
+// ─── Robustesse des entrées (revue CTO — mineurs) ─────────────
+
+describe('robustesse — pas de repli silencieux', () => {
+  it('une projection plus courte que l’horizon échoue explicitement', () => {
+    // Horizon 5 mais projection déclinée sur 3 exercices seulement : sans garde,
+    // les exercices 4 et 5 seraient calculés à zéro sans que rien ne le signale.
+    const tronque = parseTemplate(`
+slug: horizon-tronque
+version: 1.0.0
+horizon_projection_annees: 5
+structure_financiere: {}
+drivers:
+  - { id: taux_croissance_ca, type: percent, defaut: 0.1 }
+  - { id: apport_capital, type: money, defaut: 1000 }
+  - { id: emprunt_capital, type: money, defaut: 0 }
+  - { id: emprunt_taux_annuel, type: percent, defaut: 0.1 }
+  - { id: emprunt_duree_mois, type: number, defaut: 12 }
+  - { id: investissements_initiaux, type: money, defaut: 500 }
+  - { id: bfr_initial, type: money, defaut: 0 }
+  - { id: delai_clients_jours, type: number, defaut: 30 }
+  - { id: delai_fournisseurs_jours, type: number, defaut: 30 }
+  - { id: rotation_stock_jours, type: number, defaut: 0 }
+feuilles:
+  - id: activite
+    lignes:
+      - { id: charges_operationnelles, formule: "100", format: money }
+  - id: projection
+    lignes:
+      - { id: ca_annuel_1, formule: "1000", format: money }
+      - { id: ca_annuel_2, formule: "1100", format: money }
+      - { id: ca_annuel_3, formule: "1210", format: money }
+      - { id: resultat_annuel_1, formule: "100", format: money }
+      - { id: resultat_annuel_2, formule: "110", format: money }
+      - { id: resultat_annuel_3, formule: "121", format: money }
+`);
+    expect(() => evaluateTemplate(tronque, {})).toThrow(/ca_annuel_4/);
+  });
+
+  it('un échéancier cohérent ne produit jamais d’intérêts négatifs masqués', () => {
+    // Le calcul lève désormais plutôt que de ramener silencieusement à zéro.
+    for (const [capital, taux, duree] of [
+      [25000, 0.14, 60],
+      [5000, 0, 36],
+      [100000, 0.35, 12],
+      [1, 0.01, 240],
+    ] as const) {
+      const echeancier = calculerEcheancierDette(capital, taux, duree, 5);
+      expect(echeancier.every((e) => e.interets >= 0)).toBe(true);
+    }
+  });
+});
+
+// ─── Structure de coûts proportionnelle (revue CTO — I2) ──────
+
+describe('seuil de rentabilité — convention de structure de coûts assumée', () => {
+  it('les charges d’exploitation fixes n’apportent AUCUN levier : sans DAP ni intérêts, la marge de sécurité est constante', () => {
+    // Isole précisément la convention 7 : en neutralisant les dotations et les
+    // intérêts (seules charges réellement fixes du modèle), il ne reste que les
+    // charges d'exploitation « fixes » — indexées sur l'activité. Le seuil suit
+    // alors exactement le CA et la marge de sécurité ne bouge plus d'un exercice
+    // à l'autre. C'est la démonstration exécutable de la limite documentée.
+    for (const slug of TEMPLATES) {
+      const v = byId(
+        evaluateTemplate(loadTemplate(slug), {
+          investissements_initiaux: 0,
+          emprunt_capital: 0,
+          bfr_initial: 0,
+        }).lines,
+      );
+      const reference = v.get('sr_marge_securite_annuel_1')!;
+      for (let n = 2; n <= 5; n++) {
+        expect(v.get(`sr_marge_securite_annuel_${n}`), `${slug} exercice ${n}`).toBeCloseTo(
+          reference,
+          6,
+        );
+        const croissanceSeuil =
+          v.get(`sr_ca_seuil_annuel_${n}`)! / v.get(`sr_ca_seuil_annuel_${n - 1}`)!;
+        const croissanceCa = v.get(`ca_annuel_${n}`)! / v.get(`ca_annuel_${n - 1}`)!;
+        expect(croissanceSeuil, `${slug} exercice ${n}`).toBeCloseTo(croissanceCa, 6);
+      }
+    }
+  });
+
+  it('le seul levier opérationnel visible vient des dotations et des intérêts', () => {
+    // Avec les défauts (immobilisations + emprunt), les dotations et les intérêts
+    // sont réellement fixes : le seuil progresse donc MOINS vite que le CA et le
+    // point mort se raccourcit. L'effet existe, mais il est limité à ces deux
+    // postes — les charges d'exploitation, elles, n'y contribuent pas.
+    const v = byId(evaluateTemplate(loadTemplate('restaurant-kinshasa'), {}).lines);
+    for (let n = 2; n <= 5; n++) {
+      const croissanceSeuil =
+        v.get(`sr_ca_seuil_annuel_${n}`)! / v.get(`sr_ca_seuil_annuel_${n - 1}`)!;
+      const croissanceCa = v.get(`ca_annuel_${n}`)! / v.get(`ca_annuel_${n - 1}`)!;
+      expect(croissanceSeuil).toBeLessThan(croissanceCa);
+      // Le point mort se raccourcit d'un exercice à l'autre.
+      expect(v.get(`sr_point_mort_mois_annuel_${n}`)!).toBeLessThan(
+        v.get(`sr_point_mort_mois_annuel_${n - 1}`)!,
+      );
+    }
+  });
+});
+
+// ─── Distinction des « résultat net » (réserve transmise à L) ──
+
+describe('libellés — les trois « résultat net » sont distinguables', () => {
+  it('le résultat net comptable du bilan porte sa qualification dans son libellé', () => {
+    const { lines } = evaluateTemplate(loadTemplate('restaurant-kinshasa'), {});
+    const comptable = lines.find((l) => l.lineId === 'caf_resultat_net_annuel_1')!;
+    const exploitation = lines.find((l) => l.lineId === 'resultat_annuel_1')!;
+
+    expect(comptable.label).toMatch(/après dotations et intérêts/i);
+    expect(comptable.label).not.toBe(exploitation.label);
+    // Et ce sont bien deux grandeurs différentes dès qu'il y a dotations ou dette.
+    expect(comptable.value).not.toBeCloseTo(exploitation.value, 2);
+  });
+});

@@ -149,6 +149,14 @@ export interface EtatsFinanciersView {
   caf: CafExercice[];
   seuilRentabilite: SeuilExercice[];
   echeancierDette: EcheanceDette[];
+  /** (S18a) `incoherent` → l'interface affiche un avertissement rouge sur le bilan. */
+  coherenceImmobilisations: {
+    baseBilan: number;
+    baseDeclaree: number;
+    ecart: number;
+    statut: 'coherent' | 'incoherent';
+    dotationsPlafonnees: boolean;
+  };
 }
 
 export interface EvaluateResponse {

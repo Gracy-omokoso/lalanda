@@ -320,7 +320,7 @@ feuilles:
 
   # Feuille "tresorerie" (S13a) — plan de trésorerie mensuel année 1 (simplifié).
   - id: tresorerie
-    label: 'Trésorerie mensuelle année 1'
+    label: 'Trésorerie mensuelle année 1 — vue simplifiée (hors variation de BFR et hors intérêts)'
     lignes:
       - id: tresorerie_initiale
         label: "Trésorerie à l'ouverture (M0)"
@@ -439,7 +439,7 @@ feuilles:
         seuil_direction: min
 
       - id: tresorerie_min_ok
-        label: 'Trésorerie mini sur 12 mois'
+        label: 'Trésorerie mini sur 12 mois (vue simplifiée — voir onglet Bilan)'
         formule: 'tresorerie_min_annee_1'
         format: money
         seuil_pack: tresorerie_min_seuil

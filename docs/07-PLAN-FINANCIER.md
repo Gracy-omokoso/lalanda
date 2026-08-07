@@ -146,14 +146,77 @@ exercices, et rejoué sur 7 scénarios déformants.
    « Fonds de roulement de démarrage ». La trésorerie d'ouverture du bilan reste
    égale à la ligne existante `tresorerie_initiale`.
 
+### Les trois « résultat net » — à ne pas confondre
+
+Le moteur expose trois grandeurs distinctes qui portent toutes le mot « résultat
+net ». Tout consommateur (écarts, objectifs, exports) doit choisir explicitement.
+
+| `lineId` | Feuille | Périmètre |
+|---|---|---|
+| `resultat_net` | `activite` | **mensuel**, net d'IBP, **avant** dotations et intérêts |
+| `resultat_annuel_N` | `projection` | **annuel**, net d'IBP, **avant** dotations et intérêts |
+| `caf_resultat_net_annuel_N` | `caf` | **annuel**, net d'IBP, **après** dotations et intérêts — c'est celui qui alimente les capitaux propres du bilan |
+
+Seul `caf_resultat_net_annuel_N` est le résultat net comptable au sens du bilan.
+Son libellé porte la mention « (après dotations et intérêts) » pour lever
+l'ambiguïté à la lecture ; un test verrouille cette distinction.
+
 ### Limites connues
 
 - Les scénarios (base / prudent / ambitieux) ne sont toujours pas implémentés.
-- La feuille `tresorerie` reste une vue mensuelle simplifiée de l'année 1 : elle
-  ignore la variation de BFR et les intérêts, contrairement au bilan. Les deux
-  vues ne se recoupent donc qu'à l'ouverture. À unifier quand la mensualisation
-  réelle (extension DSL temporelle) arrivera.
+- **Divergence des deux trésoreries.** La feuille `tresorerie` est une vue
+  mensuelle simplifiée de l'année 1 : elle projette un solde constant et ignore
+  la variation de BFR ainsi que les intérêts, contrairement au bilan. Les deux
+  vues ne se recoupent qu'à l'ouverture et l'écart croît avec le délai clients.
+  Conséquences traitées en S18a : la feuille, son onglet Excel et sa section PDF
+  portent la mention « vue simplifiée », une note de rapprochement est rendue
+  sous le bilan (PDF et dashboard), et le ratio `tresorerie_min_ok` — dont le feu
+  tricolore est calculé sur cette vue optimiste — le signale dans son libellé.
+  L'unification réelle suppose la mensualisation (extension DSL temporelle) :
+  **ticket séparé**.
+- **Pas d'effet de levier opérationnel.** Les charges d'exploitation dites fixes
+  du seuil de rentabilité sont indexées sur la croissance du CA (voir arbitrage
+  ci-dessous) : elles n'apportent aucun levier. Seuls les dotations et les
+  intérêts, réellement fixes, font progresser le seuil moins vite que
+  l'activité. Le levier réel est donc **sous-estimé**. Correctif : distinguer la
+  croissance des charges fixes et variables **dans la projection elle-même**, ce
+  qui revalorise `resultat_annuel_2..3` — **ticket séparé** (rupture de
+  non-régression assumée, à cadrer).
+- **Pas d'investissement de renouvellement.** `bilan_immobilisations_brutes_*`
+  est constant sur les 5 exercices : le modèle ne prévoit aucun capex de
+  remplacement. Sur un horizon de 5 ans, la VNC tend donc vers zéro (elle
+  atteint zéro pour le matériel informatique et les logiciels, amortis en 3 ans)
+  sans qu'aucun réinvestissement ne vienne la reconstituer. Un dossier bancaire
+  sur 5 ans devrait porter un plan de renouvellement : **ticket séparé**.
 - DSCR, VAN, TRI, burn rate et runway restent à faire.
+
+### Arbitrage — pourquoi les charges fixes suivent le CA
+
+La feuille `projection` (S12-lite) pose `resultat_annuel_N = resultat_annuel_1 ×
+(1+g)^(N−1)`, c'est-à-dire une structure de coûts **entièrement
+proportionnelle**. Indexer les charges fixes sur l'inflation dans le seul seuil
+de rentabilité ferait diverger `CA_N − achats_N − charges fixes_N` de l'EBE
+impliqué par `resultat_annuel_N` : le seuil de rentabilité et le compte de
+résultat afficheraient **deux structures de coûts incompatibles dans le même
+dossier bancaire** — exactement le défaut que la divergence des trésoreries a
+révélé. La cohérence a été préférée, la limite est nommée dans le libellé de la
+ligne, affichée sous le tableau et couverte par deux tests. Le correctif de fond
+passe par la projection, donc par un ticket dédié.
+
+### Contrôle de cohérence des immobilisations
+
+Le bilan retient comme immobilisations brutes le driver
+`investissements_initiaux`, tandis que les dotations viennent de la liste
+`immobilisations` du template. Si la base déclarée dépasse le driver,
+l'amortissement cumulé finirait par excéder la valeur brute et **l'actif
+immobilisé passerait sous zéro** — une absurdité que l'équilibre comptable ne
+détecte pas, la trésorerie absorbant l'écart via la CAF.
+
+Le cumul des dotations est donc **plafonné à la valeur brute** ; la dotation
+retenue reste la variation du cumul plafonné, ce qui préserve exactement
+l'invariant d'équilibre. L'incohérence est signalée par
+`bilan_immobilisations_ecart_base_amortissable` et affichée **en rouge** sur le
+dashboard, avec la consigne de corriger avant dépôt.
 
 ## Exports
 

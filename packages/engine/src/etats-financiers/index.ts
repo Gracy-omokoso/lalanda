@@ -47,6 +47,27 @@
 // 6. Le BFR d'ouverture vaut le driver `bfr_initial`, présenté en bloc (non ventilé
 //    stocks/créances/fournisseurs) : c'est le fonds de roulement déployé au
 //    lancement, cohérent avec la ligne existante `tresorerie_initiale`.
+// 7. STRUCTURE DE COÛTS PROPORTIONNELLE. Les charges d'EXPLOITATION dites fixes
+//    du seuil de rentabilité sont indexées sur le taux de croissance du CA, pas
+//    sur l'inflation. Une charge indexée sur le CA n'est pas fixe au sens de
+//    l'analyse de gestion : elle n'apporte AUCUN effet de levier opérationnel.
+//    Neutraliser les dotations et les intérêts rend d'ailleurs `marge_securite`
+//    exactement constante sur tout l'horizon (test dédié).
+//    Le levier que le prévisionnel montre malgré tout provient uniquement des
+//    dotations et des intérêts d'emprunt, seuls postes réellement fixes du
+//    modèle : le seuil progresse un peu moins vite que le CA et le point mort se
+//    raccourcit. L'effet réel est donc SOUS-ESTIMÉ, pas absent — lecture
+//    prudente, mais qui ne doit pas être présentée comme une tendance.
+//    Ce n'est pas un choix de confort : la feuille `projection` (S12-lite) pose
+//    `resultat_annuel_N = resultat_annuel_1 × (1+g)^(N−1)`, donc une structure de
+//    coûts entièrement proportionnelle. Indexer les charges fixes sur l'inflation
+//    ici — et seulement ici — ferait diverger `CA_N − achats_N − charges fixes_N`
+//    de l'EBE impliqué par `resultat_annuel_N` : le seuil de rentabilité et le
+//    compte de résultat afficheraient deux structures de coûts incompatibles dans
+//    le même dossier bancaire. Le vrai correctif est de distinguer croissance des
+//    charges fixes et des charges variables DANS la projection elle-même, ce qui
+//    revalorise `resultat_annuel_2..3` (lignes figées, non-régression) — ticket
+//    séparé, cf. docs/07 § Limites connues.
 
 import { EngineError } from '../dsl/errors.js';
 
@@ -196,10 +217,48 @@ export interface EtatsFinanciers {
   /**
    * Écart entre les immobilisations brutes retenues au bilan (driver
    * `investissements_initiaux`) et la base amortissable déclarée (Σ montant_ht).
-   * Informatif — n'affecte pas l'équilibre du bilan (cf. convention 5).
+   * N'affecte pas l'équilibre du bilan (cf. convention 5), mais un écart non nul
+   * signale une incohérence de saisie — voir `coherence_immobilisations`.
    */
   readonly ecart_base_amortissable: number;
+  /** Contrôle de cohérence entre le driver d'investissement et la base amortissable. */
+  readonly coherence_immobilisations: CoherenceImmobilisations;
 }
+
+/**
+ * Contrôle de cohérence des immobilisations.
+ *
+ * Le bilan retient comme immobilisations brutes le driver
+ * `investissements_initiaux` (pilotable par l'utilisateur), tandis que les
+ * dotations viennent de la liste `immobilisations` du template. Si la base
+ * déclarée dépasse le driver, l'amortissement cumulé finirait par excéder la
+ * valeur brute et l'actif immobilisé passerait SOUS ZÉRO — une absurdité sur un
+ * bilan bancaire, que l'équilibre comptable ne détecte pas (la trésorerie
+ * absorbe l'écart via la CAF).
+ *
+ * Le cumul des dotations est donc plafonné à la valeur brute (`dotations_plafonnees`)
+ * et l'incohérence est signalée explicitement pour affichage en rouge.
+ */
+export interface CoherenceImmobilisations {
+  /** Immobilisations brutes retenues au bilan (driver). */
+  readonly base_bilan: number;
+  /** Base amortissable déclarée par le template (Σ montant_ht). */
+  readonly base_declaree: number;
+  /** `base_bilan − base_declaree`. */
+  readonly ecart: number;
+  readonly statut: 'coherent' | 'incoherent';
+  /**
+   * `true` si le plafonnement a effectivement joué sur au moins un exercice,
+   * c'est-à-dire si les dotations auraient amorti au-delà de la valeur brute.
+   */
+  readonly dotations_plafonnees: boolean;
+}
+
+/** En deçà de ce montant, un écart de base amortissable est du bruit d'arrondi. */
+const TOLERANCE_BASE_AMORTISSABLE = 0.005;
+
+/** Bruit d'arrondi flottant admis sur les intérêts d'un échéancier. */
+const TOLERANCE_ECHEANCIER = 1e-6;
 
 /**
  * Calcule le bloc complet des états financiers prévisionnels sur `horizonAnnees`
@@ -210,6 +269,25 @@ export function calculerEtatsFinanciers(entrees: EntreesEtatsFinanciers): EtatsF
   const n = entrees.horizonAnnees;
   if (!Number.isInteger(n) || n < 1 || n > 30) {
     throw new EngineError('INVALID_FORMULA', `Horizon états financiers invalide : ${n}`);
+  }
+
+  // Les séries d'exploitation DOIVENT couvrir tout l'horizon. Un repli silencieux
+  // sur 0 produirait des exercices vides d'apparence plausible (bilan équilibré,
+  // CA nul) sans que personne ne s'en aperçoive — on échoue explicitement.
+  // `dapAnnuelle` fait exception : un template sans immobilisations n'a
+  // légitimement aucune dotation, la série est alors complétée par des zéros.
+  for (const [nom, serie] of [
+    ['caAnnuel', entrees.caAnnuel],
+    ['resultatAnnuel', entrees.resultatAnnuel],
+    ['achatsVariablesAnnuels', entrees.achatsVariablesAnnuels],
+    ['chargesFixesAnnuelles', entrees.chargesFixesAnnuelles],
+  ] as const) {
+    if (serie.length < n) {
+      throw new EngineError(
+        'INVALID_FORMULA',
+        `États financiers : la série "${nom}" couvre ${serie.length} exercice(s) alors que l'horizon en demande ${n}.`,
+      );
+    }
   }
 
   const echeancier = calculerEcheancierDette(
@@ -251,14 +329,27 @@ export function calculerEtatsFinanciers(entrees: EntreesEtatsFinanciers): EtatsF
   let tresorerie = tresorerieOuverture;
   let amortissementsCumules = 0;
   let resultatsCumules = 0;
+  let dotationsPlafonnees = false;
+
+  // Plafond d'amortissement : on ne peut pas amortir au-delà de la valeur brute
+  // inscrite au bilan. Négatif impossible (le driver est borné à 0 côté DSL).
+  const baseAmortissableBilan = Math.max(0, entrees.investissementsInitiaux);
 
   for (let i = 0; i < n; i++) {
     const annee = i + 1;
     const ca = at(entrees.caAnnuel, i);
     const achats = at(entrees.achatsVariablesAnnuels, i);
     const chargesFixesExploitation = at(entrees.chargesFixesAnnuelles, i);
-    const dap = at(entrees.dapAnnuelle, i);
     const dette = echeancier[i]!;
+
+    // — Dotation retenue (plafonnée, cf. CoherenceImmobilisations) —
+    // La dotation effectivement passée est la variation du cumul plafonné : elle
+    // reste donc cohérente avec la VNC, ce qui préserve l'invariant d'équilibre
+    // (VNC_N = VNC_{N−1} − dotation retenue_N) même en cas de saisie incohérente.
+    const dapDeclaree = at(entrees.dapAnnuelle, i);
+    const cumulPlafonne = Math.min(amortissementsCumules + dapDeclaree, baseAmortissableBilan);
+    const dap = Math.max(0, cumulPlafonne - amortissementsCumules);
+    if (dap < dapDeclaree - TOLERANCE_BASE_AMORTISSABLE) dotationsPlafonnees = true;
 
     // — BFR —
     const stocks = (achats * entrees.rotationStockJours) / JOURS_ANNEE_COMMERCIALE;
@@ -345,6 +436,8 @@ export function calculerEtatsFinanciers(entrees: EntreesEtatsFinanciers): EtatsF
     bfrPrecedent = bfrExercice;
   }
 
+  const ecartBase = entrees.investissementsInitiaux - entrees.immobilisationsBrutesDeclarees;
+
   return {
     horizon_annees: n,
     ouverture,
@@ -353,8 +446,18 @@ export function calculerEtatsFinanciers(entrees: EntreesEtatsFinanciers): EtatsF
     caf,
     bilan,
     seuil_rentabilite: seuil,
-    ecart_base_amortissable:
-      entrees.investissementsInitiaux - entrees.immobilisationsBrutesDeclarees,
+    ecart_base_amortissable: ecartBase,
+    coherence_immobilisations: {
+      base_bilan: entrees.investissementsInitiaux,
+      base_declaree: entrees.immobilisationsBrutesDeclarees,
+      ecart: ecartBase,
+      statut:
+        Math.abs(ecartBase) > TOLERANCE_BASE_AMORTISSABLE &&
+        entrees.immobilisationsBrutesDeclarees > 0
+          ? 'incoherent'
+          : 'coherent',
+      dotations_plafonnees: dotationsPlafonnees,
+    },
   };
 }
 
@@ -418,6 +521,16 @@ export function calculerEcheancierDette(
     const clotureCrd = crd(moisFin);
     const remboursementCapital = ouvertureCrd - clotureCrd;
     const interets = mensualite * nbMensualites - remboursementCapital;
+    // Des intérêts négatifs signifieraient que le capital remboursé dépasse les
+    // mensualités payées : l'échéancier serait faux. On ne masque pas — on lève.
+    // Seul le bruit d'arrondi flottant est ramené à zéro.
+    if (interets < -TOLERANCE_ECHEANCIER) {
+      throw new EngineError(
+        'INVALID_FORMULA',
+        `Échéancier incohérent sur l'exercice ${a + 1} : intérêts négatifs (${interets.toFixed(2)}). ` +
+          `Capital ${capitalValide}, taux ${tauxAnnuel}, durée ${dureeValide} mois.`,
+      );
+    }
     echeancier.push({
       annee: a + 1,
       capital_restant_ouverture: ouvertureCrd,
@@ -430,7 +543,12 @@ export function calculerEcheancierDette(
   return echeancier;
 }
 
-/** Lit un tableau annuel en repliant sur 0 hors bornes (horizon plus long que la série). */
+/**
+ * Lit un tableau annuel. Les séries d'exploitation sont validées en entrée de
+ * `calculerEtatsFinanciers` (erreur explicite si elles ne couvrent pas l'horizon) ;
+ * le repli sur 0 ne concerne donc que `dapAnnuelle`, légitimement vide pour un
+ * template sans immobilisations.
+ */
 function at(serie: readonly number[], index: number): number {
   const v = serie[index];
   return typeof v === 'number' && Number.isFinite(v) ? v : 0;

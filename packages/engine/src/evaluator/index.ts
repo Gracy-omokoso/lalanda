@@ -308,6 +308,13 @@ function applyDapToProjection(lines: LineResult[], feuille: FeuilleAmortissement
  * résultat net (« coûts variables + fixes croissent proportionnellement »,
  * feuille `projection` S12-lite). Cette cohérence est vérifiée par un test :
  * CA_N − achats_N − charges fixes_N = EBE_N.
+ *
+ * Conséquence assumée : les charges d'exploitation dites fixes du seuil de
+ * rentabilité ne le sont pas au sens de l'analyse de gestion et n'apportent aucun
+ * levier ; seuls les dotations et les intérêts en produisent un, si bien que
+ * l'effet de levier opérationnel réel est SOUS-ESTIMÉ. Arbitrage motivé en tête
+ * de `etats-financiers/index.ts` (convention 7) — l'alternative ferait cohabiter
+ * deux structures de coûts incompatibles dans le même dossier bancaire.
  */
 function computeEtatsFinanciersSheet(
   template: Template,
@@ -500,8 +507,8 @@ function appendEtatsFinanciersLines(
     push(
       'caf',
       `caf_resultat_net_annuel_${n}`,
-      `Résultat net — exercice ${n}`,
-      'résultat d’exploitation net d’IBP − dotations − intérêts',
+      `Résultat net comptable (après dotations et intérêts) — exercice ${n}`,
+      'résultat d’exploitation net d’IBP − dotations aux amortissements − intérêts d’emprunt',
       e.resultat_net,
       'money',
     );
@@ -678,7 +685,7 @@ function appendEtatsFinanciersLines(
       'bilan',
       `bilan_resultats_cumules_annuel_${n}`,
       `Résultats cumulés — exercice ${n}`,
-      'Σ résultats nets jusqu’à l’exercice N',
+      'Σ résultats nets comptables (après dotations et intérêts) jusqu’à l’exercice N',
       e.resultats_cumules,
       'money',
     );
@@ -766,8 +773,10 @@ function appendEtatsFinanciersLines(
   push(
     'bilan',
     'bilan_immobilisations_ecart_base_amortissable',
-    'Contrôle — écart investissements / base amortissable déclarée',
-    'investissements initiaux − Σ montant_ht des immobilisations',
+    etats.coherence_immobilisations.statut === 'incoherent'
+      ? 'CONTRÔLE — investissements et base amortissable incohérents'
+      : 'Contrôle — écart investissements / base amortissable déclarée',
+    'investissements initiaux − Σ montant_ht des immobilisations (doit être nul)',
     etats.ecart_base_amortissable,
     'money',
   );
@@ -810,8 +819,8 @@ function appendEtatsFinanciersLines(
     push(
       'seuil_rentabilite',
       `sr_charges_fixes_annuel_${n}`,
-      `Charges fixes — exercice ${n}`,
-      'charges d’exploitation fixes + dotations + intérêts',
+      `Charges de structure (indexées sur l’activité) — exercice ${n}`,
+      'charges d’exploitation fixes (indexées au taux de croissance du CA, convention de projection S12-lite) + dotations + intérêts (seuls postes réellement fixes)',
       e.charges_fixes,
       'money',
     );
@@ -843,7 +852,7 @@ function appendEtatsFinanciersLines(
       'seuil_rentabilite',
       `sr_marge_securite_annuel_${n}`,
       `Marge de sécurité — exercice ${n}`,
-      '(CA − CA seuil) / CA',
+      '(CA − CA seuil) / CA — le levier n’apparaît que via les dotations et les intérêts : effet sous-estimé',
       e.marge_securite,
       'percent',
     );

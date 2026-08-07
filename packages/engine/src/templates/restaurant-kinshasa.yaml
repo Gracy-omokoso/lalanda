@@ -342,7 +342,7 @@ feuilles:
   # Malgré la simplification, résout le piège n°1 CFO-agence : une trésorerie
   # négative à un seul mois retoque le dossier.
   - id: tresorerie
-    label: 'Trésorerie mensuelle année 1'
+    label: 'Trésorerie mensuelle année 1 — vue simplifiée (hors variation de BFR et hors intérêts)'
     lignes:
       - id: tresorerie_initiale
         label: "Trésorerie à l'ouverture (M0)"
@@ -473,7 +473,7 @@ feuilles:
       # Piège n°1 CFO-agence : dossier retoqué systématiquement si la ligne "trésorerie
       # fin de mois" passe en-dessous de zéro à un mois quelconque.
       - id: tresorerie_min_ok
-        label: 'Trésorerie mini sur 12 mois'
+        label: 'Trésorerie mini sur 12 mois (vue simplifiée — voir onglet Bilan)'
         formule: 'tresorerie_min_annee_1'
         format: money
         seuil_pack: tresorerie_min_seuil

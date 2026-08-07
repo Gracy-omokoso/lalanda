@@ -200,6 +200,17 @@ export function BilanTable({ etats, currency }: BilanProps): React.ReactElement 
       <Matrice titre="Actif" intitule="Poste" colonnes={colonnes} rangees={actif} />
       <Matrice titre="Passif" intitule="Poste" colonnes={colonnes} rangees={passif} />
       <Matrice titre="Contrôles" intitule="Indicateur" colonnes={colonnes} rangees={controle} />
+      {etats.coherenceImmobilisations.statut === 'incoherent' ? (
+        <p className="text-[11px] font-semibold text-[var(--ko)]">
+          Immobilisations incohérentes : les investissements portés au bilan (
+          {m(etats.coherenceImmobilisations.baseBilan)}) diffèrent de la base amortissable déclarée
+          ({m(etats.coherenceImmobilisations.baseDeclaree)}).
+          {etats.coherenceImmobilisations.dotationsPlafonnees
+            ? ' Les dotations ont été plafonnées pour que l’actif immobilisé ne devienne pas négatif.'
+            : ''}{' '}
+          Corrigez le montant des investissements initiaux avant de déposer le dossier.
+        </p>
+      ) : null}
       {desequilibre ? (
         <p className="text-[11px] font-semibold text-[var(--ko)]">
           Bilan déséquilibré : l’écart dépasse la tolérance d’arrondi. Signalez cette anomalie — le
@@ -211,6 +222,14 @@ export function BilanTable({ etats, currency }: BilanProps): React.ReactElement 
           près, sans poste d’ajustement.
         </Note>
       )}
+      <Note>
+        <strong>Rapprochement avec l’onglet Trésorerie.</strong> La trésorerie ci-dessus est le
+        déroulé complet du tableau de flux : capacité d’autofinancement, moins la variation du
+        besoin en fonds de roulement, moins le remboursement du capital. L’onglet « Trésorerie »
+        présente une vue mensuelle simplifiée de l’année 1 qui ignore la variation de BFR et les
+        intérêts d’emprunt : les deux vues ne coïncident qu’à l’ouverture, et l’écart grandit avec
+        le délai de paiement clients. C’est le bilan qui fait foi.
+      </Note>
       <Note>
         Les immobilisations brutes reprennent les investissements initiaux ; les dotations
         proviennent de l’onglet Amortissements. L’économie d’impôt liée aux dotations et aux
@@ -366,10 +385,18 @@ export function SeuilTable({
         </p>
       ) : null}
       <Note>
-        Les charges fixes retenues comprennent les charges d’exploitation fixes, les dotations aux
-        amortissements et les intérêts d’emprunt. La marge de sécurité indique de combien le chiffre
-        d’affaires peut reculer avant de repasser sous le seuil. La ventilation fixe / variable suit
-        la convention documentée du modèle sectoriel.
+        Les charges de structure retenues comprennent les charges d’exploitation fixes, les
+        dotations aux amortissements et les intérêts d’emprunt. La marge de sécurité indique de
+        combien le chiffre d’affaires peut reculer avant de repasser sous le seuil.
+      </Note>
+      <Note>
+        <strong>Structure de coûts proportionnelle.</strong> Le modèle indexe les charges
+        d’exploitation sur la croissance du chiffre d’affaires, comme la projection pluriannuelle :
+        elles ne sont donc pas fixes au sens de l’analyse de gestion et n’apportent aucun effet de
+        levier. Seuls les dotations et les intérêts d’emprunt, réellement fixes, font progresser le
+        seuil un peu moins vite que l’activité. L’effet de levier opérationnel réel de votre
+        activité est donc <strong>sous-estimé</strong> : lisez le seuil comme un niveau, pas comme
+        une tendance.
       </Note>
     </div>
   );
