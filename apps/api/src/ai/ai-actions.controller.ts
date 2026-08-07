@@ -2,9 +2,17 @@
 //
 // Prend en entrée le résultat d'un `/evaluate` (feuilles + ratios avec seuil)
 // et retourne 0 à 4 suggestions concrètes. Ne modifie aucun calcul officiel.
+//
+// S16a : endpoint facturé (OpenAI, ADR-0008) → authentification obligatoire
+// + quota strict AI_THROTTLE appliqué par utilisateur (UserThrottlerGuard,
+// après AuthGuard donc req.user disponible) ET par IP (guard global).
 
-import { BadRequestException, Body, Controller, Inject, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Inject, Post, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 
+import { AuthGuard } from '../auth/auth.guard.js';
+import { AI_THROTTLE } from '../security/throttling.js';
+import { UserThrottlerGuard } from '../security/user-throttler.guard.js';
 import {
   CorrectiveActionsRequestSchema,
   type CorrectiveActionsResponse,
@@ -12,10 +20,13 @@ import {
 import { AiActionsService } from './ai-actions.service.js';
 
 @Controller('ai')
+@UseGuards(AuthGuard)
 export class AiActionsController {
   constructor(@Inject(AiActionsService) private readonly service: AiActionsService) {}
 
   @Post('corrective-actions')
+  @Throttle({ default: AI_THROTTLE })
+  @UseGuards(UserThrottlerGuard)
   async corrective(@Body() body: unknown): Promise<CorrectiveActionsResponse> {
     const parsed = CorrectiveActionsRequestSchema.safeParse(body);
     if (!parsed.success) {

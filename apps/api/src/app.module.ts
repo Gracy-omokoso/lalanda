@@ -10,6 +10,7 @@ import { OrganizationsModule } from './organizations/organizations.module.js';
 import { ParameterPacksModule } from './parameter-packs/parameter-packs.module.js';
 import { ProjectsModule } from './projects/projects.module.js';
 import { ReportsModule } from './reports/reports.module.js';
+import { ThrottlingModule } from './security/throttling.module.js';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { ReportsModule } from './reports/reports.module.js';
         bufferCommands: false,
       }),
     }),
+    ThrottlingModule,
     OrganizationsModule,
     AuthModule,
     ParameterPacksModule,

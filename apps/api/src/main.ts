@@ -12,6 +12,7 @@ import 'reflect-metadata';
 
 import { NestFactory } from '@nestjs/core';
 import { toNodeHandler } from 'better-auth/node';
+import helmet from 'helmet';
 import { ApiEnvSchema, parseEnv } from '@lalanda/shared';
 
 import { AppModule } from './app.module.js';
@@ -21,6 +22,12 @@ async function bootstrap(): Promise<void> {
   const env = parseEnv(ApiEnvSchema, process.env);
 
   const app = await NestFactory.create(AppModule);
+
+  // Headers de sécurité (S16a, docs/17-SECURITE.md) — défauts helmet :
+  // X-Content-Type-Options, X-Frame-Options/frame-ancestors via CSP, HSTS, etc.
+  // Les réponses JSON de l'API ne servent aucun document HTML : les défauts suffisent,
+  // et les fetch CORS du front (mode 'cors' + credentials) ne sont pas affectés.
+  app.use(helmet());
 
   // CORS — apps/web (:3000) doit pouvoir envoyer cookies (credentials: true).
   app.enableCors({
