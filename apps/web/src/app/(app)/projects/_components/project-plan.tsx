@@ -119,6 +119,9 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
   const [approving, setApproving] = useState(false);
   const [planNotice, setPlanNotice] = useState<string | null>(null);
   // (S18c) Navigation par étapes.
+  // `ready` n'est levé qu'une fois les valeurs initiales posées : sans lui, l'auto-save
+  // prendrait l'état vide comme référence et réécrirait les drivers au simple chargement.
+  const [ready, setReady] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [visited, setVisited] = useState<Set<string>>(new Set());
 
@@ -148,7 +151,7 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
     },
     [projectId],
   );
-  const autosave = useAutosave({ value: values, save: saveDrivers, enabled: project !== null });
+  const autosave = useAutosave({ value: values, save: saveDrivers, enabled: ready });
 
   useEffect(() => {
     void load();
@@ -179,8 +182,11 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
       // Défauts DSL + overrides du projet.
       const defaults = Object.fromEntries(tmpl.drivers.map((d) => [d.id, d.defaut ?? 0]));
       const initial = { ...defaults, ...p.driverValues };
+      // Ces trois `set` sont dans le même tick : l'auto-save s'active avec `initial`
+      // déjà en place et le prend comme référence, sans écriture réseau.
       setValues(initial);
       setRaw(initialRawValues(tmpl.drivers, initial));
+      setReady(true);
 
       // (S16c) Versions validées — best-effort, ne bloque pas la vue plan.
       try {
