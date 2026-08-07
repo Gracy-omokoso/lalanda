@@ -15,6 +15,7 @@ import {
   api,
   type AmortissementsView,
   type LineResult,
+  type PlanSummaryView,
   type ProjectView,
   type TemplateDriverMeta,
   type TemplateMeta,
@@ -122,6 +123,10 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [downloadingXlsx, setDownloadingXlsx] = useState(false);
+  // (S16c) Plans validés figés.
+  const [plans, setPlans] = useState<PlanSummaryView[]>([]);
+  const [approving, setApproving] = useState(false);
+  const [planNotice, setPlanNotice] = useState<string | null>(null);
 
   const groups = useMemo(() => (template ? groupDrivers(template) : []), [template]);
   const currency = template?.devise_base ?? 'USD';
@@ -144,6 +149,13 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
       const initial = { ...defaults, ...p.driverValues };
       setValues(initial);
       setDirty(false);
+      // (S16c) Versions validées — best-effort, ne bloque pas la vue plan.
+      try {
+        const { plans: planList } = await api.listPlans(projectId);
+        setPlans(planList);
+      } catch {
+        /* la liste des versions n'est pas critique pour l'édition */
+      }
       await evaluate(initial);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur de chargement');
@@ -206,6 +218,43 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
       setError(err instanceof Error ? err.message : "Impossible de générer l'Excel");
     } finally {
       setDownloadingXlsx(false);
+    }
+  }
+
+  // (S16c) Fige la version courante en plan validé vN+1.
+  async function handleApprovePlan(): Promise<void> {
+    setApproving(true);
+    setError(null);
+    setPlanNotice(null);
+    try {
+      // Le plan fige les drivers PERSISTÉS — synchroniser d'abord si modifiés.
+      if (dirty) await handleSave();
+      const plan = await api.approvePlan(projectId);
+      setPlanNotice(`Plan validé v${plan.version} créé — chiffres figés.`);
+      const { plans: planList } = await api.listPlans(projectId);
+      setPlans(planList);
+    } catch (err) {
+      const status = (err as { status?: number }).status;
+      if (status === 409) {
+        setPlanNotice('Aucun changement depuis le dernier plan validé — pas de nouvelle version.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Impossible de valider le plan');
+      }
+    } finally {
+      setApproving(false);
+    }
+  }
+
+  async function handleDownloadPlanExport(version: number, kind: 'pdf' | 'xlsx'): Promise<void> {
+    setError(null);
+    try {
+      const { blob, filename } =
+        kind === 'pdf'
+          ? await api.downloadProjectPdf(projectId, version)
+          : await api.downloadProjectXlsx(projectId, version);
+      triggerDownload(blob, filename);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Impossible de générer l'export");
     }
   }
 
@@ -331,12 +380,25 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
             >
               {downloadingXlsx ? 'Génération…' : 'Exporter Excel'}
             </button>
+            <button
+              type="button"
+              onClick={() => void handleApprovePlan()}
+              disabled={approving}
+              title="Fige les chiffres actuels en version validée immuable (vN+1)"
+              className="rounded-md border border-[var(--accent)] px-4 py-2.5 text-sm font-medium text-[var(--accent)] transition hover:bg-[var(--accent)] hover:text-[var(--accent-foreground)] disabled:opacity-40"
+            >
+              {approving ? 'Validation…' : 'Valider ce plan'}
+            </button>
             {savedAt ? (
               <span className="text-xs text-[var(--foreground-muted)]">
                 Sauvegardé à {new Date(savedAt).toLocaleTimeString('fr-FR')}
               </span>
             ) : null}
           </div>
+          {planNotice ? (
+            <p className="text-xs text-[var(--accent)]">{planNotice}</p>
+          ) : null}
+          <PlanVersionsList plans={plans} onDownload={handleDownloadPlanExport} />
         </form>
 
         <div className="flex flex-col gap-4">
@@ -358,6 +420,71 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── Plans validés figés (S16c) ──────────────────────────────
+
+function PlanVersionsList({
+  plans,
+  onDownload,
+}: {
+  plans: PlanSummaryView[];
+  onDownload: (version: number, kind: 'pdf' | 'xlsx') => Promise<void>;
+}): React.ReactElement | null {
+  if (plans.length === 0) return null;
+  return (
+    <section className="flex flex-col gap-2">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--foreground-muted)]">
+        Plans validés
+      </h3>
+      <ul className="flex flex-col gap-1.5">
+        {plans.map((p) => (
+          <li
+            key={p.id}
+            className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
+          >
+            <div className="flex items-center gap-2">
+              <span className="font-semibold tabular-nums">v{p.version}</span>
+              <span
+                className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                  p.status === 'approved'
+                    ? 'bg-[var(--accent)]/10 text-[var(--accent)]'
+                    : 'bg-[var(--border)] text-[var(--foreground-muted)]'
+                }`}
+              >
+                {p.status === 'approved' ? 'Validé' : 'Remplacé'}
+              </span>
+              <span className="text-xs text-[var(--foreground-muted)]">
+                {new Date(p.approvedAt).toLocaleDateString('fr-FR', {
+                  day: '2-digit',
+                  month: 'long',
+                  year: 'numeric',
+                })}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void onDownload(p.version, 'pdf')}
+                title={`Télécharger le PDF figé du plan v${p.version} (aucun recalcul)`}
+                className="rounded border border-[var(--border)] px-2 py-1 text-xs transition hover:bg-[var(--surface-muted)]"
+              >
+                PDF
+              </button>
+              <button
+                type="button"
+                onClick={() => void onDownload(p.version, 'xlsx')}
+                title={`Télécharger l'Excel figé du plan v${p.version} (aucun recalcul)`}
+                className="rounded border border-[var(--border)] px-2 py-1 text-xs transition hover:bg-[var(--surface-muted)]"
+              >
+                Excel
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

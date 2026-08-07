@@ -139,6 +139,28 @@ export interface InvitationView {
   createdAt: string;
 }
 
+// ─── Plans validés figés et versionnés (S16c — FIN-003) ────────
+export interface PlanSummaryView {
+  id: string;
+  projectId: string;
+  version: number;
+  status: 'approved' | 'superseded';
+  fingerprint: string;
+  approvedAt: string;
+  approvedBy: string;
+  createdAt: string;
+}
+
+export interface PlanDetailView extends PlanSummaryView {
+  driverValues: Record<string, number>;
+  templateSlug: string;
+  templateVersion: string;
+  parameterPackSlug?: string;
+  packVersion?: string;
+  engineVersion: string;
+  result: { lines: LineResult[]; amortissements?: AmortissementsView };
+}
+
 export const ACTIVE_ORG_COOKIE = 'active_org_id';
 
 /**
@@ -262,9 +284,27 @@ export const api = {
       method: 'POST',
       body: { token },
     }),
+  // ─── Plans validés (S16c) ──────────────────────────────────
+  // Fige la version courante du projet en vN+1 ; 409 { code: 'PLAN_UNCHANGED' }
+  // si rien n'a changé depuis le dernier plan validé.
+  approvePlan: (id: string) =>
+    jsonRequest<PlanDetailView>(`/projects/${encodeURIComponent(id)}/plans`, { method: 'POST' }),
+  listPlans: (id: string) =>
+    jsonRequest<{ plans: PlanSummaryView[] }>(`/projects/${encodeURIComponent(id)}/plans`, {
+      method: 'GET',
+    }),
+  getPlan: (id: string, version: number) =>
+    jsonRequest<PlanDetailView>(`/projects/${encodeURIComponent(id)}/plans/${version}`, {
+      method: 'GET',
+    }),
   // ─── Reports PDF (S8-lite) ─────────────────────────────────
-  async downloadProjectPdf(id: string): Promise<{ blob: Blob; filename: string }> {
-    const res = await fetch(`${API_URL}/projects/${encodeURIComponent(id)}/report/pdf`, {
+  // `planVersion` (S16c) : export depuis le snapshot figé du plan validé vN — aucun recalcul.
+  async downloadProjectPdf(
+    id: string,
+    planVersion?: number,
+  ): Promise<{ blob: Blob; filename: string }> {
+    const query = planVersion !== undefined ? `?planVersion=${planVersion}` : '';
+    const res = await fetch(`${API_URL}/projects/${encodeURIComponent(id)}/report/pdf${query}`, {
       method: 'GET',
       credentials: 'include',
     });
@@ -279,8 +319,13 @@ export const api = {
   },
   // ─── Reports Excel (S14b) ──────────────────────────────────
   // Une feuille par feuille moteur, formules DSL préservées en formules Excel natives.
-  async downloadProjectXlsx(id: string): Promise<{ blob: Blob; filename: string }> {
-    const res = await fetch(`${API_URL}/projects/${encodeURIComponent(id)}/report/xlsx`, {
+  // `planVersion` (S16c) : export depuis le snapshot figé du plan validé vN — aucun recalcul.
+  async downloadProjectXlsx(
+    id: string,
+    planVersion?: number,
+  ): Promise<{ blob: Blob; filename: string }> {
+    const query = planVersion !== undefined ? `?planVersion=${planVersion}` : '';
+    const res = await fetch(`${API_URL}/projects/${encodeURIComponent(id)}/report/xlsx${query}`, {
       method: 'GET',
       credentials: 'include',
     });
