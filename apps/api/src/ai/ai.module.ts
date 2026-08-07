@@ -6,6 +6,7 @@
 
 import { Module } from '@nestjs/common';
 
+import { OrganizationsModule } from '../organizations/organizations.module.js';
 import { AiActionsController } from './ai-actions.controller.js';
 import { AiActionsService, type OpenAIChatClient } from './ai-actions.service.js';
 import { createOpenAIClient } from './openai-client.js';
@@ -13,6 +14,9 @@ import { createOpenAIClient } from './openai-client.js';
 export const OPENAI_CHAT_CLIENT = Symbol('OPENAI_CHAT_CLIENT');
 
 @Module({
+  // OrganizationsModule : requis pour instancier AuthGuard (dépend d'OrganizationsService)
+  // dans le contexte de ce module (S16a — /ai devient authentifié).
+  imports: [OrganizationsModule],
   controllers: [AiActionsController],
   providers: [
     {
