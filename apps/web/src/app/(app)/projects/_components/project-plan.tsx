@@ -66,12 +66,14 @@ function formatValue(
 }
 
 // ─── Configuration onglets (S13d) ─────────────────────────────
-// Labels FR de fallback si l'API ne les fournit pas.
+// Libellés courts des onglets. Ils doublent le `label` déclaré par la feuille dans le
+// DSL, que `EvaluationView` n'expose pas encore — à resynchroniser à chaque évolution
+// d'horizon (S18a : la projection est passée de 3 à 5 exercices).
 const SHEET_LABELS: Record<string, string> = {
   ratios: 'Ratios bancaires',
   activite: "Compte d'exploitation",
   tresorerie: 'Trésorerie mensuelle',
-  projection: 'Projection 3 ans',
+  projection: 'Projection 5 exercices',
   financement: 'Financement',
   plan_financement: 'Plan de financement',
   amortissements: 'Amortissements',
@@ -147,6 +149,13 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
   );
 
   const blocking = useMemo(() => blockingDriverIds(steps, raw), [steps, raw]);
+  // (S18a×S18c) Le diagnostic d'incohérence des immobilisations demande de corriger
+  // les investissements initiaux : on retrouve l'étape qui porte ce driver pour
+  // proposer un accès direct, sans supposer un découpage d'étapes particulier.
+  const investissementStepIndex = useMemo(
+    () => steps.findIndex((s) => s.drivers.some((d) => d.id === 'investissements_initiaux')),
+    [steps],
+  );
   const activeStep = steps[activeIndex];
   // Les résultats affichés ne correspondent plus aux hypothèses courantes : le recalcul
   // est différé (conforme docs/06), mais l'écart doit être visible.
@@ -463,6 +472,35 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
               <strong>Erreur :</strong> {error}
             </div>
           ) : null}
+          {/* (S18a, FIN-001) Incohérence des immobilisations : le diagnostic de K
+              n'est rendu que dans l'onglet « Bilan ». Comme il désigne une saisie du
+              wizard (les investissements initiaux), il est aussi remonté ici, visible
+              à chaque étape — un avertissement rouge ne doit pas dépendre de l'onglet
+              ouvert. Le détail chiffré reste dans l'onglet Bilan. */}
+          {etatsFinanciers?.coherenceImmobilisations.statut === 'incoherent' ? (
+            <div
+              role="alert"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--ko)]/40 bg-[var(--danger-bg)] p-3 text-sm"
+            >
+              <p className="flex items-center gap-2 text-[var(--ko)]">
+                <span aria-hidden="true" className="dot dot-ko" />
+                <span>
+                  Immobilisations incohérentes — les investissements portés au bilan diffèrent de la
+                  base amortissable déclarée.
+                </span>
+              </p>
+              {investissementStepIndex >= 0 ? (
+                <button
+                  type="button"
+                  onClick={() => goToStep(investissementStepIndex)}
+                  className="rounded-md border border-[var(--ko)]/50 px-3 py-1.5 text-xs font-medium text-[var(--ko)] transition hover:bg-[var(--ko)]/10"
+                >
+                  Corriger les investissements
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+
           {/* Recalcul différé (docs/06) : les chiffres affichés restent ceux de la
               dernière évaluation, mais leur obsolescence est explicite et corrigeable
               sans quitter l'étape courante. */}

@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { TemplateSchema, type Template } from '@lalanda/engine';
 
+import { getTemplate, listTemplateSlugs } from '../evaluate/template-registry.js';
 import { findDriverRangeViolations } from './driver-range.js';
 
 const template: Template = TemplateSchema.parse({
@@ -73,4 +74,49 @@ describe('findDriverRangeViolations', () => {
     const found = findDriverRangeViolations(template, { borne: 500, plafond: 50, taux: 9 });
     expect(found.map((v) => v.driverId)).toEqual(['borne', 'plafond', 'taux']);
   });
+});
+
+// ─── Templates réellement livrés ──────────────────────────────
+// Le garde doit couvrir TOUT driver borné, y compris ceux ajoutés après coup (S18a a
+// introduit les délais clients/fournisseurs et la rotation de stock). Il parcourt les
+// drivers du template, donc aucun câblage par driver n'est nécessaire : ces tests le
+// vérifient sur les manifestes réels plutôt que sur un template de laboratoire.
+describe('findDriverRangeViolations — templates livrés', () => {
+  for (const slug of listTemplateSlugs()) {
+    describe(slug, () => {
+      const shipped = getTemplate(slug);
+
+      it('accepte les valeurs par défaut du template', () => {
+        const defauts = Object.fromEntries(
+          shipped!.drivers.flatMap((d) => (d.defaut === undefined ? [] : [[d.id, d.defaut]])),
+        );
+        expect(findDriverRangeViolations(shipped!, defauts)).toEqual([]);
+      });
+
+      it('rejette chaque driver borné poussé hors de ses bornes', () => {
+        const bornes = shipped!.drivers.filter((d) => d.min !== undefined || d.max !== undefined);
+        expect(bornes.length).toBeGreaterThan(0);
+        for (const d of bornes) {
+          const horsBornes = d.max !== undefined ? d.max + 1 : (d.min as number) - 1;
+          expect(
+            findDriverRangeViolations(shipped!, { [d.id]: horsBornes }).map((v) => v.driverId),
+          ).toEqual([d.id]);
+        }
+      });
+
+      // Les templates de démonstration (hello-world) ne déclarent pas de BFR : le test
+      // ne s'applique qu'aux templates sectoriels qui l'ont activé en S18a.
+      const aDuBfr = shipped!.drivers.some((d) => d.id === 'delai_clients_jours');
+      it.skipIf(!aDuBfr)('couvre les drivers de BFR introduits en S18a', () => {
+        const bfr = shipped!.drivers.filter((d) =>
+          ['delai_clients_jours', 'delai_fournisseurs_jours', 'rotation_stock_jours'].includes(
+            d.id,
+          ),
+        );
+        expect(bfr).toHaveLength(3);
+        // 400 jours de délai client : hors des bornes, donc non figeable en plan validé.
+        expect(findDriverRangeViolations(shipped!, { delai_clients_jours: 400 })).toHaveLength(1);
+      });
+    });
+  }
 });
