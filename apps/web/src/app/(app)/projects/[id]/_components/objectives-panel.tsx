@@ -347,11 +347,11 @@ function AttainmentRow({
         </span>
       </div>
 
-      {item.raison === 'LIGNE_INDISPONIBLE' ? (
+      {item.raison ? (
         <p className="text-[0.7rem] italic leading-snug text-[#6c685a]">
-          Cette mesure n’existe pas dans le plan validé (ligne{' '}
-          <code className="font-mono">absente du snapshot</code>). Aucun taux n’est affiché plutôt
-          qu’un chiffre trompeur.
+          {item.raison === 'LIGNE_INDISPONIBLE'
+            ? 'Cette mesure n’existe pas dans le plan validé. Aucun taux n’est affiché plutôt qu’un chiffre trompeur.'
+            : 'Cette mesure existe dans le plan validé mais ne porte pas un montant exploitable. Aucun taux n’est affiché plutôt qu’un chiffre trompeur.'}
         </p>
       ) : null}
     </li>

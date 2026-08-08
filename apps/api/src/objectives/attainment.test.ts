@@ -93,6 +93,18 @@ describe('computeAttainment', () => {
     expect(res.find((o) => o.objectif === 'ca_cible_an1')?.atteinte).toBe(100);
   });
 
+  it('valeur non finie → atteinte null + VALEUR_NON_NUMERIQUE (pas un « non atteint »)', () => {
+    const res = computeAttainment({ ca_cible_an1: 100_000 }, view({ ca_annuel_1: Number.NaN }));
+    expect(res[0]).toMatchObject({
+      lineId: 'ca_annuel_1',
+      valeur: null,
+      atteinte: null,
+      statut: 'indisponible',
+      raison: 'VALEUR_NON_NUMERIQUE',
+    });
+    expect(res[0]?.statut).not.toBe('non_atteint');
+  });
+
   it('ignore les objectifs non renseignés', () => {
     const res = computeAttainment({ ca_cible_an1: 50_000 }, view({ ca_annuel_1: 50_000 }));
     expect(res).toHaveLength(1);

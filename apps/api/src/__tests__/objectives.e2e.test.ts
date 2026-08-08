@@ -304,6 +304,13 @@ suite('objectifs financiers et taux d’atteinte (S18d — docs/01)', () => {
       .send({ ca_cible_an1: 1 });
     expect(put.status).toBe(404);
 
+    // Corps malformé + projet hors scope : 404, pas 400 (scope vérifié avant zod).
+    const malforme = await request(server)
+      .put(`/projects/${projectId}/objectives`)
+      .set('Cookie', cookiesB)
+      .send({ objectif_fantaisie: 42 });
+    expect(malforme.status).toBe(404);
+
     // 404 (projet hors scope) prime sur le 409 métier : aucune fuite d'information.
     const attainment = await request(server)
       .get(`/projects/${projectId}/objectives/attainment`)

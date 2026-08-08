@@ -79,11 +79,13 @@ export class ObjectivesController {
     @Param('id') id: string,
     @Body() body: unknown,
   ): Promise<ObjectivesView> {
+    // Scope AVANT validation : un appelant d'une autre org doit recevoir 404,
+    // même avec un corps malformé (cf. même règle dans canvas.controller.ts).
+    const project = await this.projects.findScoped(id, orgId);
     const parsed = PutObjectivesSchema.safeParse(body);
     if (!parsed.success) {
       throw new BadRequestException({ code: 'INVALID_REQUEST', issues: parsed.error.issues });
     }
-    const project = await this.projects.findScoped(id, orgId);
     const doc = await this.objectives.replace(orgId, String(project._id), parsed.data);
     return toView(String(project._id), doc);
   }

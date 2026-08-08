@@ -20,7 +20,14 @@ import type { ObjectiveKey } from './objectives.dto.js';
 /** `indisponible` n'est pas un jugement de performance : la mesure n'existe pas. */
 export type AttainmentStatut = 'atteint' | 'partiel' | 'non_atteint' | 'indisponible';
 
-export type AttainmentRaison = 'LIGNE_INDISPONIBLE';
+/**
+ * - `LIGNE_INDISPONIBLE` : la ligne n'existe pas dans le snapshot.
+ * - `VALEUR_NON_NUMERIQUE` : la ligne existe mais ne porte pas un nombre fini
+ *   (`NaN`, `Infinity`). Inatteignable avec les templates actuels ; sans cette
+ *   garde un `NaN` produirait un « non atteint » silencieux — un faux négatif
+ *   présenté comme un jugement, exactement ce que le risque n°4 interdit.
+ */
+export type AttainmentRaison = 'LIGNE_INDISPONIBLE' | 'VALEUR_NON_NUMERIQUE';
 
 export interface ObjectiveAttainment {
   objectif: ObjectiveKey;
@@ -99,16 +106,16 @@ export function computeAttainment(
     if (cible === undefined || cible === null) continue;
 
     const line = byLineId.get(meta.lineId);
-    if (!line) {
+    if (!line || !Number.isFinite(line.value)) {
       attainments.push({
         objectif: key,
         label: meta.label,
         cible,
-        lineId: null,
+        lineId: line ? line.lineId : null,
         valeur: null,
         atteinte: null,
         statut: 'indisponible',
-        raison: 'LIGNE_INDISPONIBLE',
+        raison: line ? 'VALEUR_NON_NUMERIQUE' : 'LIGNE_INDISPONIBLE',
       });
       continue;
     }

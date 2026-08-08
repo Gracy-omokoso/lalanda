@@ -5,39 +5,63 @@
 // À ne pas confondre avec `SheetTabs` (feuilles de RÉSULTATS à l'intérieur de
 // l'onglet Plan). Ici chaque onglet est une route à part entière — l'URL reste
 // partageable et le retour navigateur fonctionne.
+//
+// ── Point d'extension (arbitrage CTO S18d) ──────────────────────
+// C'est la navigation canonique du projet : les chantiers Wizard et Réalisé s'y
+// branchent au lieu de gérer leur propre système d'onglets. Pour ajouter une
+// section, il suffit d'AJOUTER UNE ENTRÉE à `PROJECT_TABS` ci-dessous et de
+// créer `app/(app)/projects/[id]/<segment>/page.tsx` — aucun autre fichier à
+// toucher, aucun cas particulier à écrire dans le rendu.
+//
+//   { segment: 'realise', label: 'Réalisé' }
+//   { segment: 'wizard',  label: 'Saisie'  }
+//
+// L'ordre du tableau est l'ordre d'affichage. Les sous-routes sont gérées :
+// `/projects/:id/realise/2026-01` garde bien l'onglet « Réalisé » actif.
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-interface ProjectTab {
+export interface ProjectTab {
+  /** Segment d'URL sous `/projects/:id/`. La chaîne vide = page racine du projet. */
   segment: string;
   label: string;
 }
 
-const TABS: ProjectTab[] = [
+export const PROJECT_TABS: ProjectTab[] = [
   { segment: '', label: 'Plan' },
   { segment: 'canvas', label: 'Canvas' },
   { segment: 'objectifs', label: 'Objectifs' },
 ];
 
-export function ProjectTabs({ projectId }: { projectId: string }): React.ReactElement {
+/** Premier segment sous `/projects/:id/` — '' sur la page racine du projet. */
+function activeSegment(pathname: string, base: string): string {
+  if (!pathname.startsWith(base)) return '';
+  return pathname.slice(base.length).split('/').filter(Boolean)[0] ?? '';
+}
+
+export function ProjectTabs({
+  projectId,
+  tabs = PROJECT_TABS,
+}: {
+  projectId: string;
+  tabs?: ProjectTab[];
+}): React.ReactElement {
   const pathname = usePathname();
   const base = `/projects/${projectId}`;
-  // Segment courant relatif au projet ('' pour l'onglet Plan).
-  const current = pathname.startsWith(base) ? pathname.slice(base.length).replace(/^\//, '') : '';
+  const current = activeSegment(pathname, base);
 
   return (
     <nav
       aria-label="Sections du projet"
       className="flex flex-wrap gap-1 border-b border-[var(--border)]"
     >
-      {TABS.map((tab) => {
-        const href = tab.segment ? `${base}/${tab.segment}` : base;
+      {tabs.map((tab) => {
         const isActive = current === tab.segment;
         return (
           <Link
             key={tab.segment || 'plan'}
-            href={href}
+            href={tab.segment ? `${base}/${tab.segment}` : base}
             aria-current={isActive ? 'page' : undefined}
             className={
               isActive

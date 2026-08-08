@@ -130,10 +130,25 @@ export function CanvasBoard({ projectId }: { projectId: string }): React.ReactEl
   const [revisions, setRevisions] = useState<CanvasRevisionView[] | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
 
-  /** Dernier état confirmé par le serveur — référence pour détecter un vrai changement. */
+  /** Dernier état CONFIRMÉ par le serveur. */
   const persisted = useRef<CanvasBlocks>(emptyBlocks());
+  /**
+   * Dernier état qu'on a DÉCIDÉ d'écrire (en vol ou en file d'attente).
+   *
+   * C'est lui — et non `persisted` — qui sert de base à la déduplication.
+   * Comparer à `persisted` pendant qu'un PUT est en vol perd des écritures :
+   * ajouter une carte (PUT en vol) puis la supprimer donne un état identique à
+   * `persisted`, la suppression était donc ignorée… alors que le serveur, lui,
+   * allait recevoir la carte. L'UI affichait « Enregistré » sur un état que le
+   * serveur n'avait pas.
+   */
+  const intended = useRef<CanvasBlocks>(emptyBlocks());
   /** Id de la carte à focaliser après le prochain rendu (ajout de carte). */
   const focusCardId = useRef<string | null>(null);
+  /** Sentinelle : un PUT est en vol. Empêche deux écritures concurrentes. */
+  const inFlight = useRef(false);
+  /** File d'attente d'UN seul élément — seul le dernier état voulu compte. */
+  const queued = useRef<CanvasBlocks | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -143,6 +158,7 @@ export function CanvasBoard({ projectId }: { projectId: string }): React.ReactEl
         if (cancelled) return;
         setBlocs(canvas.blocs);
         persisted.current = canvas.blocs;
+        intended.current = canvas.blocs;
         setVersion(canvas.version);
         setUpdatedAt(canvas.updatedAt);
       } catch (err) {
@@ -165,26 +181,65 @@ export function CanvasBoard({ projectId }: { projectId: string }): React.ReactEl
     if (el instanceof HTMLTextAreaElement) el.focus();
   }, [blocs]);
 
-  /** Auto-save au blur — no-op si le contenu utile est inchangé. */
+  /**
+   * Auto-save au blur — no-op si le contenu utile est inchangé.
+   *
+   * Sérialisation stricte (revue CTO S18d, I2) : un seul PUT en vol à la fois.
+   * Sans cette garde, `persisted.current` n'étant mis à jour qu'au retour de la
+   * réponse, deux blurs rapprochés — ou le blur suivi du clic sur ✕, qui portent
+   * deux charges différentes — partaient en parallèle et pouvaient s'écraser
+   * l'un l'autre. Les demandes émises pendant un vol sont réduites à une seule :
+   * seul le dernier état voulu compte, les intermédiaires n'ont aucune valeur.
+   *
+   * On NE réinjecte PAS la réponse serveur dans `blocs` (I3) : la frappe en
+   * cours dans une autre carte serait écrasée par la version renvoyée. L'état
+   * local reste la vérité de l'édition ; le serveur ne pilote que `version`,
+   * `updatedAt` et la référence de comparaison.
+   */
   const persist = useCallback(
     async (next: CanvasBlocks): Promise<void> => {
       const payload = sanitize(next);
-      if (sameBlocks(payload, persisted.current)) return;
+      // Déduplication contre l'état VOULU (cf. `intended`), pas contre l'état
+      // confirmé : sinon une modification annulant un PUT encore en vol est
+      // silencieusement ignorée, et le serveur garde l'état intermédiaire.
+      if (sameBlocks(payload, intended.current)) return;
+      intended.current = payload;
+
+      if (inFlight.current) {
+        queued.current = payload;
+        return;
+      }
+
+      inFlight.current = true;
       setSave({ kind: 'saving' });
       try {
-        const canvas = await api.putCanvas(projectId, payload);
-        persisted.current = canvas.blocs;
-        setBlocs(canvas.blocs);
-        setVersion(canvas.version);
-        setUpdatedAt(canvas.updatedAt);
-        setSave({ kind: 'saved', at: canvas.updatedAt ?? new Date().toISOString() });
+        let toSend: CanvasBlocks | null = payload;
+        let lastAt = new Date().toISOString();
+        while (toSend) {
+          const canvas = await api.putCanvas(projectId, toSend);
+          persisted.current = canvas.blocs;
+          lastAt = canvas.updatedAt ?? lastAt;
+          setVersion(canvas.version);
+          setUpdatedAt(canvas.updatedAt);
+          // Déjà dédupliqué à l'entrée : ce qui est en file diffère forcément.
+          toSend = queued.current;
+          queued.current = null;
+        }
+        setSave({ kind: 'saved', at: lastAt });
         // L'historique affiché devient obsolète dès qu'une révision est créée.
         setRevisions(null);
       } catch (err) {
+        // Écriture abandonnée : on réaligne `intended` sur le dernier état
+        // confirmé, sinon un nouvel essai au contenu identique serait dédupliqué
+        // et l'utilisateur resterait bloqué sur « non enregistré ».
+        queued.current = null;
+        intended.current = persisted.current;
         setSave({
           kind: 'error',
           message: err instanceof Error ? err.message : 'Enregistrement impossible',
         });
+      } finally {
+        inFlight.current = false;
       }
     },
     [projectId],

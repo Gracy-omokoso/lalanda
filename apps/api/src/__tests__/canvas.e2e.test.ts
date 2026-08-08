@@ -5,6 +5,7 @@
 // 2. PUT → CRUD complet des cartes, version incrémentée à chaque écriture.
 // 3. zod refuse un bloc inconnu, un champ de carte inconnu, un texte > 500 car.
 //    et plus de 20 cartes dans un bloc (400, aucune écriture).
+// 3 bis. Un bloc OMIS est refusé : le PUT ne doit jamais effacer par omission.
 // 4. GET /canvas/revisions est borné aux 20 dernières révisions, plus récentes
 //    en premier, et la plus ancienne conservée suit bien la fenêtre glissante.
 // 5. Isolation org : un user d'une autre org reçoit 404 sur toutes les routes.
@@ -212,6 +213,75 @@ suite('Business Model Canvas (S18d — docs/05)', () => {
     expect(after.body.version).toBe(before.body.version);
   }, 30_000);
 
+  it('refuse un PUT partiel : un bloc omis n’efface jamais silencieusement', async () => {
+    const server = app.getHttpServer();
+
+    // État de départ : deux blocs peuplés.
+    const seed = await request(server)
+      .put(`/projects/${projectId}/canvas`)
+      .set('Cookie', cookiesA)
+      .send(
+        body({
+          segments_clients: [{ id: 'seg1', texte: 'PME', ordre: 0 }],
+          revenus: [{ id: 'rev1', texte: 'Abonnement', ordre: 0 }],
+        }),
+      );
+    expect(seed.status).toBe(200);
+    const versionAvant: number = seed.body.version;
+
+    // Corps vide : autrefois accepté (defaults zod) — il remettait les 9 blocs
+    // à vide en consommant une version ET une révision.
+    const vide = await request(server)
+      .put(`/projects/${projectId}/canvas`)
+      .set('Cookie', cookiesA)
+      .send({});
+    expect(vide.status).toBe(400);
+    expect(vide.body.code).toBe('INVALID_REQUEST');
+
+    // Corps partiel : un seul bloc fourni, les huit autres omis.
+    const partiel = await request(server)
+      .put(`/projects/${projectId}/canvas`)
+      .set('Cookie', cookiesA)
+      .send({ segments_clients: [{ id: 'seg1', texte: 'PME', ordre: 0 }] });
+    expect(partiel.status).toBe(400);
+
+    // Rien n'a bougé : ni les données, ni la version (donc aucune révision).
+    const apres = await request(server)
+      .get(`/projects/${projectId}/canvas`)
+      .set('Cookie', cookiesA);
+    expect(apres.body.version).toBe(versionAvant);
+    expect(apres.body.blocs.segments_clients).toHaveLength(1);
+    expect(apres.body.blocs.revenus).toHaveLength(1);
+
+    // Vider un bloc reste possible — explicitement, avec un tableau vide.
+    const videExplicite = await request(server)
+      .put(`/projects/${projectId}/canvas`)
+      .set('Cookie', cookiesA)
+      .send(body({ segments_clients: [{ id: 'seg1', texte: 'PME', ordre: 0 }] }));
+    expect(videExplicite.status).toBe(200);
+    expect(videExplicite.body.blocs.revenus).toEqual([]);
+  }, 60_000);
+
+  it('zod refuse un id de carte hors motif attendu', async () => {
+    const res = await request(app.getHttpServer())
+      .put(`/projects/${projectId}/canvas`)
+      .set('Cookie', cookiesA)
+      .send(body({ canaux: [{ id: '__proto__', texte: 'Boutique', ordre: 0 }] }));
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('INVALID_REQUEST');
+
+    // Un UUID (forme réellement produite par le client) reste accepté.
+    const uuid = await request(app.getHttpServer())
+      .put(`/projects/${projectId}/canvas`)
+      .set('Cookie', cookiesA)
+      .send(
+        body({
+          canaux: [{ id: '0f9b1c2d-3e4f-5a6b-7c8d-9e0f1a2b3c4d', texte: 'Boutique', ordre: 0 }],
+        }),
+      );
+    expect(uuid.status).toBe(200);
+  }, 30_000);
+
   it('zod refuse un champ de carte inconnu, un texte > 500 car. et > 20 cartes', async () => {
     const server = app.getHttpServer();
 
@@ -315,6 +385,14 @@ suite('Business Model Canvas (S18d — docs/05)', () => {
       .get(`/projects/${projectId}/canvas/revisions`)
       .set('Cookie', cookiesB);
     expect(revisions.status).toBe(404);
+
+    // Corps malformé + projet hors scope : 404 (et pas 400, qui confirmerait
+    // au passage l'existence du projet). Le scope est vérifié avant zod.
+    const malforme = await request(server)
+      .put(`/projects/${projectId}/canvas`)
+      .set('Cookie', cookiesB)
+      .send({ bloc_inconnu: 'nawak' });
+    expect(malforme.status).toBe(404);
 
     // Le canvas de A n'a pas été altéré par la tentative de B.
     const check = await request(server)

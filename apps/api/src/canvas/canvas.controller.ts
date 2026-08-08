@@ -77,11 +77,14 @@ export class CanvasController {
     @Param('id') id: string,
     @Body() body: unknown,
   ): Promise<CanvasView> {
+    // Scope AVANT validation : un appelant d'une autre org doit recevoir 404,
+    // même avec un corps malformé. L'ordre inverse lui répondrait 400 et
+    // confirmerait au passage l'existence du projet.
+    const project = await this.projects.findScoped(id, orgId);
     const parsed = PutCanvasSchema.safeParse(body);
     if (!parsed.success) {
       throw new BadRequestException({ code: 'INVALID_REQUEST', issues: parsed.error.issues });
     }
-    const project = await this.projects.findScoped(id, orgId);
     const doc = await this.canvas.replace(orgId, String(project._id), user.id, parsed.data);
     return toView(doc);
   }

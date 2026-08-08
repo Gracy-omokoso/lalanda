@@ -237,7 +237,11 @@ export interface ObjectiveAttainment {
    */
   atteinte: number | null;
   statut: AttainmentStatut;
-  raison: 'LIGNE_INDISPONIBLE' | null;
+  /**
+   * `LIGNE_INDISPONIBLE` : la ligne n'existe pas dans le plan validé.
+   * `VALEUR_NON_NUMERIQUE` : elle existe mais ne porte pas un nombre exploitable.
+   */
+  raison: 'LIGNE_INDISPONIBLE' | 'VALEUR_NON_NUMERIQUE' | null;
 }
 
 export interface AttainmentView {
