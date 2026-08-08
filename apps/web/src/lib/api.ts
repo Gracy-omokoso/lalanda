@@ -524,6 +524,69 @@ async function jsonRequest<T>(path: string, init: JsonRequestInit = {}): Promise
   return (await res.json()) as T;
 }
 
+// ─── Espace compte (S20b) ──────────────────────────────────
+// Toutes ces routes sont scopées par la SESSION : aucune ne prend d'identifiant
+// d'utilisateur. Un `userId` glissé dans un corps est refusé (400) côté API.
+
+export interface AccountProfileView {
+  id: string;
+  name: string;
+  email: string;
+  /** Faux pour tout le monde tant qu'aucun SMTP n'est branché (docs/17). */
+  emailVerified: boolean;
+  initials: string;
+  locale: string;
+  timezone: string;
+  pendingEmailChange: PendingEmailChangeView | null;
+}
+
+export interface PendingEmailChangeView {
+  newEmail: string;
+  expiresAt: string;
+  requestedAt: string;
+  /** Faux tant qu'aucun SMTP n'existe : le lien de vérification n'est PAS parti. */
+  verificationDelivered: boolean;
+  reason: string | null;
+}
+
+export interface NotificationPreferences {
+  securite: boolean;
+  produit: boolean;
+  projet: boolean;
+  resumeHebdomadaire: boolean;
+}
+
+export interface AccountPreferencesView {
+  locale: string;
+  timezone: string;
+  theme: 'light' | 'dark' | 'system';
+  displayCurrency: 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR';
+  notifications: NotificationPreferences;
+  updatedAt: string | null;
+  /** Valeurs acceptées, servies par l'API — l'UI ne les code pas en dur. */
+  options: { locales: string[]; themes: string[]; currencies: string[] };
+}
+
+/** Session active. Le token n'est JAMAIS exposé : seul un id opaque circule. */
+export interface AccountSessionView {
+  id: string;
+  device: string;
+  browser: string | null;
+  os: string | null;
+  ipAddress: string | null;
+  createdAt: string;
+  lastActiveAt: string;
+  expiresAt: string;
+  current: boolean;
+}
+
+export interface DeletionAssessment {
+  canDelete: boolean;
+  /** Organisations dont l'utilisateur est le dernier propriétaire (docs/12). */
+  blockingOrganizations: Array<{ id: string; name: string; otherMemberCount: number }>;
+  organizationsDeletedWithAccount: Array<{ id: string; name: string }>;
+}
+
 export const api = {
   listOrganizations: () =>
     jsonRequest<{ organizations: OrganizationView[] }>(`/organizations`, { method: 'GET' }),
@@ -676,7 +739,47 @@ export const api = {
       `/projects/${encodeURIComponent(id)}/updated-projection?year=${year}`,
       { method: 'GET' },
     ),
-  // ─── Reports PDF (S8-lite) ─────────────────────────────────
+  // ─── Espace compte (S20b) ──────────────────────────────────
+  getAccountProfile: () => jsonRequest<AccountProfileView>(`/account/profile`, { method: 'GET' }),
+  putAccountProfile: (input: { name: string; locale: string; timezone: string }) =>
+    jsonRequest<AccountProfileView>(`/account/profile`, { method: 'PUT', body: input }),
+  getAccountPreferences: () =>
+    jsonRequest<AccountPreferencesView>(`/account/preferences`, { method: 'GET' }),
+  putAccountPreferences: (input: {
+    theme: 'light' | 'dark' | 'system';
+    displayCurrency: 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR';
+    notifications: NotificationPreferences;
+  }) => jsonRequest<AccountPreferencesView>(`/account/preferences`, { method: 'PUT', body: input }),
+  listAccountSessions: () =>
+    jsonRequest<{ sessions: AccountSessionView[] }>(`/account/sessions`, { method: 'GET' }),
+  /** 404 { code: 'SESSION_NOT_FOUND' } si l'id n'appartient pas à l'appelant. */
+  revokeAccountSession: (id: string) =>
+    jsonRequest<{ revoked: number; wasCurrent: boolean }>(
+      `/account/sessions/${encodeURIComponent(id)}`,
+      { method: 'DELETE' },
+    ),
+  revokeOtherAccountSessions: () =>
+    jsonRequest<{ revoked: number }>(`/account/sessions/revoke-others`, { method: 'POST' }),
+  /**
+   * Ouvre une demande de changement d'adresse. Répond 202 : la demande est
+   * ACCEPTÉE, l'adresse n'est PAS modifiée tant que le token n'est pas vérifié.
+   * 409 { code: 'EMAIL_TAKEN' }, 400 { code: 'INVALID_PASSWORD' }.
+   */
+  requestEmailChange: (input: { newEmail: string; currentPassword: string }) =>
+    jsonRequest<{ pending: PendingEmailChangeView }>(`/account/email/change`, {
+      method: 'POST',
+      body: input,
+    }),
+  cancelEmailChange: () =>
+    jsonRequest<{ canceled: boolean }>(`/account/email/change`, { method: 'DELETE' }),
+  getAccountDeletion: () => jsonRequest<DeletionAssessment>(`/account/deletion`, { method: 'GET' }),
+  /** 409 { code: 'LAST_OWNER' } si l'utilisateur est dernier propriétaire (docs/12). */
+  deleteAccount: (input: { confirmEmail: string; currentPassword: string }) =>
+    jsonRequest<{ deleted: true; deletedOrganizations: number }>(`/account/delete`, {
+      method: 'POST',
+      body: input,
+    }),
+  // ─── Reports PDF (S14a) ────────────────────────────────────
   // `planVersion` (S16c) : export depuis le snapshot figé du plan validé vN — aucun recalcul.
   async downloadProjectPdf(
     id: string,
