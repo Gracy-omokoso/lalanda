@@ -55,8 +55,7 @@ export class PlatformRoleAssignment {
 }
 
 export type PlatformRoleAssignmentDocument = HydratedDocument<PlatformRoleAssignment>;
-export const PlatformRoleAssignmentSchema =
-  SchemaFactory.createForClass(PlatformRoleAssignment);
+export const PlatformRoleAssignmentSchema = SchemaFactory.createForClass(PlatformRoleAssignment);
 
 // Un utilisateur ne détient chaque rôle qu'une fois.
 PlatformRoleAssignmentSchema.index({ userId: 1, role: 1 }, { unique: true });

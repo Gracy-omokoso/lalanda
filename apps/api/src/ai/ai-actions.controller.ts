@@ -11,6 +11,8 @@ import { BadRequestException, Body, Controller, Inject, Post, UseGuards } from '
 import { Throttle } from '@nestjs/throttler';
 
 import { AuthGuard } from '../auth/auth.guard.js';
+import { RequirePermission } from '../authz/authz.decorators.js';
+import { PermissionsGuard } from '../authz/permissions.guard.js';
 import { AI_THROTTLE } from '../security/throttling.js';
 import { UserThrottlerGuard } from '../security/user-throttler.guard.js';
 import {
@@ -20,11 +22,12 @@ import {
 import { AiActionsService } from './ai-actions.service.js';
 
 @Controller('ai')
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, PermissionsGuard)
 export class AiActionsController {
   constructor(@Inject(AiActionsService) private readonly service: AiActionsService) {}
 
   @Post('corrective-actions')
+  @RequirePermission('analytics.read')
   @Throttle({ default: AI_THROTTLE })
   @UseGuards(UserThrottlerGuard)
   async corrective(@Body() body: unknown): Promise<CorrectiveActionsResponse> {

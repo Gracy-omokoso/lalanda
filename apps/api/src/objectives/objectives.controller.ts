@@ -21,6 +21,8 @@ import {
 } from '@nestjs/common';
 
 import { AuthGuard } from '../auth/auth.guard.js';
+import { RequirePermission } from '../authz/authz.decorators.js';
+import { PermissionsGuard } from '../authz/permissions.guard.js';
 import { CurrentOrgId } from '../auth/current-user.decorator.js';
 import { PlansService } from '../plans/plans.service.js';
 import { ProjectsService } from '../projects/projects.service.js';
@@ -58,7 +60,7 @@ export interface AttainmentView {
 }
 
 @Controller('projects')
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, PermissionsGuard)
 export class ObjectivesController {
   constructor(
     @Inject(ProjectsService) private readonly projects: ProjectsService,
@@ -67,6 +69,7 @@ export class ObjectivesController {
   ) {}
 
   @Get(':id/objectives')
+  @RequirePermission('project.read')
   async get(@CurrentOrgId() orgId: string, @Param('id') id: string): Promise<ObjectivesView> {
     const project = await this.projects.findScoped(id, orgId);
     const doc = await this.objectives.find(orgId, String(project._id));
@@ -74,6 +77,7 @@ export class ObjectivesController {
   }
 
   @Put(':id/objectives')
+  @RequirePermission('inputs.update')
   async put(
     @CurrentOrgId() orgId: string,
     @Param('id') id: string,
@@ -91,6 +95,7 @@ export class ObjectivesController {
   }
 
   @Get(':id/objectives/attainment')
+  @RequirePermission('analytics.read')
   async attainment(
     @CurrentOrgId() orgId: string,
     @Param('id') id: string,

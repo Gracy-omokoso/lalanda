@@ -41,6 +41,19 @@ export class Project {
   deviseAffichage!: string;
 
   /** Valeurs des drivers saisies par l'utilisateur — surcharges du défaut du template. */
+  /**
+   * Dernier auteur d'une écriture d'hypothèses — socle de la séparation des
+   * tâches dynamique (R2, ADR-0012 §6) : l'approbateur d'une version de plan ne
+   * peut pas être le dernier à en avoir saisi les entrées.
+   *
+   * `null` sur les projets créés avant S20a : un plan approuvé sur des hypothèses
+   * dont on ignore l'auteur est traité comme « séparé », faute de preuve du
+   * contraire. Refuser rétroactivement bloquerait des projets existants sur une
+   * information qu'on n'a jamais collectée.
+   */
+  @Prop({ type: String, default: null })
+  driversUpdatedBy!: string | null;
+
   @Prop({ type: Object, default: {} })
   driverValues!: Record<string, number>;
 

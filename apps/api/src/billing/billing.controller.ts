@@ -3,6 +3,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
 import { AuthGuard } from '../auth/auth.guard.js';
+import { RequirePermission } from '../authz/authz.decorators.js';
+import { PermissionsGuard } from '../authz/permissions.guard.js';
 import { CurrentOrgId } from '../auth/current-user.decorator.js';
 import { Project, type ProjectDocument } from '../projects/project.schema.js';
 import { BillingService } from './billing.service.js';
@@ -20,7 +22,7 @@ export interface SubscriptionView {
  * guard (cookie `active_org_id` ou org primaire), cohérent avec le reste de l'API.
  */
 @Controller('organizations')
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, PermissionsGuard)
 export class BillingController {
   constructor(
     @Inject(BillingService) private readonly billing: BillingService,
@@ -28,6 +30,7 @@ export class BillingController {
   ) {}
 
   @Get('current/subscription')
+  @RequirePermission('analytics.read')
   async current(@CurrentOrgId() orgId: string): Promise<SubscriptionView> {
     const [{ plan, entitlements }, projectCount] = await Promise.all([
       this.billing.getPlanEntitlements(orgId),

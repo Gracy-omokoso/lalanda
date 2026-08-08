@@ -26,6 +26,8 @@ import {
 } from '@nestjs/common';
 
 import { AuthGuard } from '../auth/auth.guard.js';
+import { RequirePermission } from '../authz/authz.decorators.js';
+import { PermissionsGuard } from '../authz/permissions.guard.js';
 import { CurrentOrgId, CurrentUser } from '../auth/current-user.decorator.js';
 import type { FinancialPlanDocument } from '../plans/plan.schema.js';
 import { PlansService } from '../plans/plans.service.js';
@@ -83,7 +85,7 @@ export interface UpdatedProjectionView {
 }
 
 @Controller('projects')
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, PermissionsGuard)
 export class ActualsController {
   constructor(
     @Inject(ProjectsService) private readonly projects: ProjectsService,
@@ -92,6 +94,7 @@ export class ActualsController {
   ) {}
 
   @Put(':id/actual-periods/:year/:month')
+  @RequirePermission('actuals.import')
   async upsert(
     @CurrentOrgId() orgId: string,
     @Param('id') id: string,
@@ -118,6 +121,7 @@ export class ActualsController {
   }
 
   @Post(':id/actual-periods/:year/:month/close')
+  @RequirePermission('period.close')
   async close(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: { id: string },
@@ -139,6 +143,7 @@ export class ActualsController {
   }
 
   @Post(':id/actual-periods/:year/:month/reopen')
+  @RequirePermission('period.close', 'plan.approve')
   async reopen(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: { id: string },
@@ -162,6 +167,7 @@ export class ActualsController {
   }
 
   @Get(':id/actual-periods')
+  @RequirePermission('project.read')
   async list(
     @CurrentOrgId() orgId: string,
     @Param('id') id: string,
@@ -175,6 +181,7 @@ export class ActualsController {
   }
 
   @Get(':id/variances')
+  @RequirePermission('analytics.read')
   async variances(
     @CurrentOrgId() orgId: string,
     @Param('id') id: string,
@@ -195,6 +202,7 @@ export class ActualsController {
   }
 
   @Get(':id/updated-projection')
+  @RequirePermission('analytics.read')
   async updatedProjection(
     @CurrentOrgId() orgId: string,
     @Param('id') id: string,

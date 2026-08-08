@@ -20,7 +20,12 @@ import type { Response } from 'express';
 import { evaluateTemplate } from '@lalanda/engine';
 
 import { AuthGuard } from '../auth/auth.guard.js';
-import { CurrentOrgId } from '../auth/current-user.decorator.js';
+import { AuditService } from '../authz/audit.service.js';
+import { RequirePermission } from '../authz/authz.decorators.js';
+import { CurrentOrgRole } from '../authz/current-org-role.decorator.js';
+import { PermissionsGuard } from '../authz/permissions.guard.js';
+import type { OrgRole } from '../authz/permissions.js';
+import { CurrentOrgId, CurrentUser } from '../auth/current-user.decorator.js';
 import { BillingService } from '../billing/billing.service.js';
 import { getTemplate } from '../evaluate/template-registry.js';
 import { OrganizationsService } from '../organizations/organizations.service.js';
@@ -44,7 +49,7 @@ function fileSlug(name: string): string {
 }
 
 @Controller('projects')
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, PermissionsGuard)
 export class ReportsController {
   constructor(
     @Inject(ProjectsService) private readonly projects: ProjectsService,
@@ -52,6 +57,7 @@ export class ReportsController {
     @Inject(ReportsService) private readonly reports: ReportsService,
     @Inject(PlansService) private readonly plans: PlansService,
     @Inject(BillingService) private readonly billing: BillingService,
+    @Inject(AuditService) private readonly audit: AuditService,
   ) {}
 
   /** Parse `?planVersion=N` — undefined si absent, 400 si non-entier positif. */
@@ -198,8 +204,11 @@ export class ReportsController {
   }
 
   @Get(':id/report/pdf')
+  @RequirePermission('report.export')
   @Header('content-type', 'application/pdf')
   async downloadPdf(
+    @CurrentUser() user: { id: string },
+    @CurrentOrgRole() role: OrgRole,
     @CurrentOrgId() orgId: string,
     @Param('id') id: string,
     @Res({ passthrough: false }) res: Response,
@@ -208,6 +217,15 @@ export class ReportsController {
     const planVersion = ReportsController.parsePlanVersion(planVersionRaw);
     const data = await this.buildReportData(orgId, id, planVersion);
     const pdf = await this.reports.renderPdf(data);
+    await this.journaliserExport({
+      orgId,
+      userId: user.id,
+      role,
+      projectId: id,
+      format: 'pdf',
+      planVersion,
+      bytes: pdf.byteLength,
+    });
     const suffix = planVersion !== undefined ? `-v${planVersion}` : '';
     res.setHeader(
       'content-disposition',
@@ -218,8 +236,11 @@ export class ReportsController {
   }
 
   @Get(':id/report/xlsx')
+  @RequirePermission('report.export')
   @Header('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
   async downloadXlsx(
+    @CurrentUser() user: { id: string },
+    @CurrentOrgRole() role: OrgRole,
     @CurrentOrgId() orgId: string,
     @Param('id') id: string,
     @Res({ passthrough: false }) res: Response,
@@ -228,6 +249,15 @@ export class ReportsController {
     const planVersion = ReportsController.parsePlanVersion(planVersionRaw);
     const data = await this.buildReportData(orgId, id, planVersion);
     const xlsx = await this.reports.renderXlsx(data);
+    await this.journaliserExport({
+      orgId,
+      userId: user.id,
+      role,
+      projectId: id,
+      format: 'xlsx',
+      planVersion,
+      bytes: xlsx.byteLength,
+    });
     const suffix = planVersion !== undefined ? `-v${planVersion}` : '';
     res.setHeader(
       'content-disposition',
@@ -235,5 +265,40 @@ export class ReportsController {
     );
     res.setHeader('content-length', String(xlsx.byteLength));
     res.end(xlsx);
+  }
+
+  /**
+   * R4 — « les exports sensibles sont journalisés » (docs/12 § Règles critiques).
+   *
+   * Appelée APRÈS le rendu et AVANT l'envoi des octets : si l'écriture du journal
+   * échoue, l'exception remonte, Nest répond 500 et le fichier n'est JAMAIS émis.
+   * C'est le comportement exigé par ADR-0012 §6 R4 — pas d'export non traçable.
+   * D'où `recordStrict()` et non `record()`, qui avale les erreurs.
+   *
+   * Le journal ne contient aucun montant ni contenu de rapport : acteur, rôle,
+   * projet, format, version de plan et taille (docs/17 § Journalisation).
+   */
+  private async journaliserExport(input: {
+    orgId: string;
+    userId: string;
+    role: OrgRole;
+    projectId: string;
+    format: 'pdf' | 'xlsx';
+    planVersion: number | undefined;
+    bytes: number;
+  }): Promise<void> {
+    await this.audit.recordStrict({
+      organizationId: input.orgId,
+      actorUserId: input.userId,
+      actorRole: input.role,
+      action: 'report.export',
+      targetType: 'project',
+      targetId: input.projectId,
+      metadata: {
+        format: input.format,
+        planVersion: input.planVersion ?? null,
+        bytes: input.bytes,
+      },
+    });
   }
 }

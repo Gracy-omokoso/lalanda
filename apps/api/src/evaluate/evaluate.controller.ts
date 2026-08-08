@@ -16,6 +16,8 @@ import {
 import { EngineError, evaluateTemplate, type Template } from '@lalanda/engine';
 
 import { AuthGuard } from '../auth/auth.guard.js';
+import { RequirePermission } from '../authz/authz.decorators.js';
+import { PermissionsGuard } from '../authz/permissions.guard.js';
 import {
   EvaluateRequestSchema,
   type EvaluateRequest,
@@ -29,9 +31,10 @@ import {
 } from './template-registry.js';
 
 @Controller('evaluate')
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, PermissionsGuard)
 export class EvaluateController {
   @Get('templates')
+  @RequirePermission('project.read')
   listTemplates(): { slugs: string[]; templates: TemplateSummary[] } {
     return { slugs: listTemplateSlugs(), templates: listTemplateSummaries() };
   }
@@ -41,6 +44,7 @@ export class EvaluateController {
    * Consommé par le frontend pour générer le wizard dynamiquement (S5a).
    */
   @Get('templates/:slug')
+  @RequirePermission('project.read')
   getTemplateBySlug(@Param('slug') slug: string): { template: Template } {
     const template = getTemplate(slug);
     if (!template) {
@@ -53,6 +57,7 @@ export class EvaluateController {
   }
 
   @Post()
+  @RequirePermission('plan.calculate')
   evaluate(@Body() body: unknown): EvaluateResponse {
     // Validation Zod du payload (source unique de vérité, cohérence avec le moteur).
     const parsed = EvaluateRequestSchema.safeParse(body);

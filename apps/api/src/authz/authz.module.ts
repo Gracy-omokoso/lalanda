@@ -11,6 +11,7 @@ import { AuditEvent, AuditEventSchema } from './audit-event.schema.js';
 import { AuditController } from './audit.controller.js';
 import { AuditService } from './audit.service.js';
 import { AuthzService } from './authz.service.js';
+import { MeController } from './me.controller.js';
 import { PermissionsGuard } from './permissions.guard.js';
 import {
   PlatformRoleAssignment,
@@ -27,7 +28,7 @@ import {
       { name: AuditEvent.name, schema: AuditEventSchema },
     ]),
   ],
-  controllers: [AuditController],
+  controllers: [AuditController, MeController],
   providers: [AuthzService, AuditService, PermissionsGuard],
   exports: [AuthzService, AuditService, PermissionsGuard, MongooseModule],
 })

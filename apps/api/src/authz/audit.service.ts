@@ -26,6 +26,28 @@ export interface AuditRecordInput {
 export class AuditService {
   constructor(@InjectModel(AuditEvent.name) private readonly events: Model<AuditEventDocument>) {}
 
+  /**
+   * Écriture STRICTE : une trace qui n'a pas pu être écrite fait échouer l'appelant.
+   *
+   * Réservé aux actions dont docs/12 exige la journalisation — `report.export`
+   * (R4 : « l'échec d'écriture de l'audit annule l'export »). Le raisonnement est
+   * inverse de celui de `record()` : pour un export, le risque n'est pas de perdre
+   * une ligne de journal, c'est qu'un fichier de données financières sorte de
+   * l'organisation SANS TRACE. Mieux vaut un export refusé qu'un export invisible.
+   */
+  async recordStrict(input: AuditRecordInput): Promise<void> {
+    await this.events.create({
+      organizationId: input.organizationId,
+      actorUserId: input.actorUserId,
+      actorRole: input.actorRole,
+      action: input.action,
+      targetType: input.targetType,
+      targetId: input.targetId,
+      metadata: input.metadata ?? {},
+      _schemaVersion: 1,
+    });
+  }
+
   async record(input: AuditRecordInput): Promise<void> {
     try {
       await this.events.create({

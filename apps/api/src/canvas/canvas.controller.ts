@@ -19,6 +19,8 @@ import {
 } from '@nestjs/common';
 
 import { AuthGuard } from '../auth/auth.guard.js';
+import { RequirePermission } from '../authz/authz.decorators.js';
+import { PermissionsGuard } from '../authz/permissions.guard.js';
 import { CurrentOrgId, CurrentUser } from '../auth/current-user.decorator.js';
 import { ProjectsService } from '../projects/projects.service.js';
 import { PutCanvasSchema } from './canvas.dto.js';
@@ -46,7 +48,7 @@ export interface CanvasRevisionView {
 }
 
 @Controller('projects')
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, PermissionsGuard)
 export class CanvasController {
   constructor(
     @Inject(ProjectsService) private readonly projects: ProjectsService,
@@ -54,6 +56,7 @@ export class CanvasController {
   ) {}
 
   @Get(':id/canvas')
+  @RequirePermission('project.read')
   async get(@CurrentOrgId() orgId: string, @Param('id') id: string): Promise<CanvasView> {
     const project = await this.projects.findScoped(id, orgId);
     const doc = await this.canvas.find(orgId, String(project._id));
@@ -71,6 +74,7 @@ export class CanvasController {
   }
 
   @Put(':id/canvas')
+  @RequirePermission('canvas.update')
   async put(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: { id: string },
@@ -90,6 +94,7 @@ export class CanvasController {
   }
 
   @Get(':id/canvas/revisions')
+  @RequirePermission('project.read')
   async revisions(
     @CurrentOrgId() orgId: string,
     @Param('id') id: string,
