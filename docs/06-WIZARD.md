@@ -89,17 +89,25 @@ Contrat 3). Chaque étape porte `id`, `label`, `description`, `groupes` rattach�
 `ordre`. Le bloc est purement présentationnel : le compilateur et l’évaluateur
 l’ignorent, et son absence laisse les templates S6–S14 valides à l’identique.
 
-Résolution (`resolveEtapes`, mêmes règles côté web dans `buildWizardSteps`) :
+Résolution — implémentation **unique**, dans `@lalanda/shared/wizard`
+(`resolveWizardEtapes`), appelée aussi bien par le moteur (`resolveEtapes`) que par le
+web (`buildWizardSteps`) :
 
 1. étapes déclarées, triées par `ordre` croissant, celles sans `ordre` restant dans
    l’ordre de déclaration et passant en dernier;
-2. tout groupe d’hypothèses non rattaché à une étape est ajouté en fin de parcours;
-3. sans bloc `wizard` : **une étape par groupe d’hypothèses**;
-4. sans groupes non plus : une étape unique portant tous les drivers;
-5. une étape finale « Synthèse » est toujours ajoutée par l’interface.
+2. un groupe référencé mais inexistant est **ignoré**, et une étape dont plus aucun
+   groupe ne subsiste est écartée;
+3. tout groupe d’hypothèses non rattaché à une étape est ajouté en fin de parcours;
+4. sans bloc `wizard` (ou toutes les étapes écartées) : **une étape par groupe
+   d’hypothèses**;
+5. sans groupes non plus : une étape unique portant tous les drivers;
+6. une étape finale « Synthèse » est toujours ajoutée par l’interface.
 
-Une étape référençant un groupe inexistant échoue au build (`UNKNOWN_GROUPE`), de sorte
-qu’un renommage de groupe ne peut pas faire disparaître des champs silencieusement.
+Une clé de présentation ne peut jamais empêcher un template de parser ni le moteur
+d’évaluer (ADR-0011, Contrat 3) : un renommage de groupe côté structure financière
+dégrade le parcours de saisie, il ne met pas le moteur à terre. La cohérence stricte
+est vérifiée par `findUnknownWizardGroupes` en **test de lint sur les templates
+livrés**, où un bloc `wizard` désynchronisé doit être corrigé avant merge.
 
 Les 3 templates de lancement déclarent leurs étapes : chiffre d’affaires → coûts
 variables (hors prestation de services) → charges fixes et personnel → investissement et
@@ -112,15 +120,24 @@ structure financière des templates ne les sépare pas.
 Trois niveaux, appliqués à la frappe (`validateDriver`) :
 
 - **bloquante** : champ vide, texte non numérique, valeur hors `min`/`max` du DSL →
-  bordure danger, message sous le champ, étape marquée en erreur dans la progression,
-  bouton « Valider ce plan » désactivé;
+  bordure danger, message sous le champ, étape marquée en erreur dans la progression;
 - **avertissement** : valeur atypique, c’est-à-dire dans les 5 % extrêmes de l’intervalle
-  autorisé (ou exactement sur une borne unique) → message orange, n’empêche rien;
-- **information** : `aide` du driver, affichée en permanence sous le champ.
+  autorisé (ou exactement sur une borne unique) → message orange, n’empêche rien.
+  Un `0` dont le plancher déclaré est `0` n’est jamais signalé : c’est une absence
+  (pas d’employé, pas d’emprunt), pas une valeur atypique;
+- **information** : `aide` du driver, affichée en permanence sous le champ, et badge
+  « Valeur suggérée » tant que le champ porte le défaut du modèle — retiré dès la
+  première frappe, pour ne jamais confondre suggestion et saisie.
 
 L’écrêtage silencieux sur `min`/`max` hérité de S5a est **supprimé** : la valeur saisie
-est conservée telle quelle et signalée. Conformément aux critères d’acceptation, une
-erreur bloquante empêche la validation du plan, jamais la sauvegarde.
+est conservée telle quelle et signalée.
+
+Le respect des bornes est garanti **côté serveur**, seule autorité : `POST
+/projects/:id/plans` rejette en `400 DRIVERS_OUT_OF_RANGE` (avec la liste des drivers
+fautifs et leurs bornes) avant toute évaluation ou gel. L’interface refuse en plus les
+exports PDF/Excel avec un message explicite. Conformément aux critères d’acceptation,
+une erreur bloquante empêche la **validation et l’export**, jamais la **sauvegarde** :
+un brouillon hors bornes reste persistable, un document remis à une banque non.
 
 ### Auto-save
 
@@ -130,13 +147,25 @@ Enregistrement… », « Enregistré à HH:MM:SS », erreur avec bouton « Rées
 est vidée (`flush`) avant tout export et avant la validation d’un plan, qui figent les
 valeurs persistées.
 
+Deux garanties de non-perte (docs/06 § Critères — « aucune perte après actualisation ou
+déconnexion ») : enregistrement immédiat au démontage du composant (une navigation
+interne pendant le debounce ne perd rien) et confirmation native `beforeunload` tant
+qu’une modification n’est pas acquittée par le serveur. Les enregistrements sont
+sérialisés et numérotés : une réponse doublée par une plus récente est ignorée, pour ne
+jamais marquer « enregistré » un instantané qui ne l’est pas.
+
 ### Synthèse
 
 Récapitulatif par étape avec accès direct en modification, cadre du plan (modèle
 sectoriel et version, devise, Country Pack et année, système comptable), avertissement
 légal du pack et liste de ses paramètres `a_confirmer`, puis « Recalculer » et « Valider
-ce plan ». Les résultats (onglets de feuilles et bandeau de ratios) restent visibles à
-toutes les étapes.
+ce plan ». Les résultats (onglets de feuilles et bandeau de ratios), les exports et la
+liste des plans validés restent accessibles à toutes les étapes.
+
+Le recalcul reste différé — il n’est pas déclenché à chaque frappe — mais l’obsolescence
+est explicite : dès que les hypothèses divergent du dernier calcul, un bandeau
+« Résultats obsolètes » et un bouton « Recalculer » s’affichent au-dessus des résultats,
+depuis n’importe quelle étape.
 
 ### Accessibilité
 
@@ -151,8 +180,9 @@ sur le titre de l’étape après navigation, tables financières défilables su
 - états d’étape « à revoir » / « validée », commentaires et assignation;
 - lignes répétables, duplication d’hypothèse et import contrôlé;
 - résolution des modifications concurrentes;
-- provenance visible d’une valeur suggérée au niveau du champ (elle n’est aujourd’hui
-  exposée que pour les paramètres du pack, dans la synthèse);
+- provenance **fine** d’une valeur suggérée : le champ distingue « saisi » de « défaut
+  du modèle », mais n’expose pas encore l’origine exacte d’un défaut (template ou
+  ParameterPack — cette dernière n’est visible que dans la synthèse);
 - tests de rendu React (apps/web n’a pas d’environnement DOM : seule la logique pure du
   wizard est couverte par vitest).
 
