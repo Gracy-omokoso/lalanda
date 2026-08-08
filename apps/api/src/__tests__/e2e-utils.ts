@@ -74,23 +74,6 @@ export async function makeE2EApp(): Promise<INestApplication> {
   const { getAuth } = await import('../auth/auth.js');
 
   const app = await NestFactory.create(AppModule, { logger: false });
-  // DIAG TEMPORAIRE — trace la cause réelle des 500 en exécution parallèle.
-  {
-    const { BaseExceptionFilter } = await import('@nestjs/core');
-    class DiagFilter extends BaseExceptionFilter {
-      override catch(exception: unknown, host: Parameters<BaseExceptionFilter['catch']>[1]): void {
-        const status = (exception as { status?: number })?.status;
-        if (!status || status >= 500) {
-          const req = host.switchToHttp().getRequest<{ method?: string; url?: string }>();
-          console.error(
-            `DIAG-500 ${req?.method} ${req?.url} :: ${(exception as Error)?.name} :: ${(exception as Error)?.message}\n${(exception as Error)?.stack}`,
-          );
-        }
-        super.catch(exception, host);
-      }
-    }
-    app.useGlobalFilters(new DiagFilter(app.getHttpAdapter()));
-  }
   app.enableCors({
     origin: [process.env['WEB_URL'] ?? 'http://localhost:3000'],
     credentials: true,

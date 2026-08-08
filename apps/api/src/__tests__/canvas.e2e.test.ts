@@ -22,8 +22,6 @@ import 'reflect-metadata';
 
 import { e2eSuite, teardown } from './e2e-utils.js';
 
-import { e2eSuite, teardown } from './e2e-utils.js';
-
 async function makeApp(): Promise<INestApplication> {
   const { AppModule } = await import('../app.module.js');
   const { getAuth } = await import('../auth/auth.js');

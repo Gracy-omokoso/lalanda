@@ -12,7 +12,7 @@
 
 import { useState } from 'react';
 
-import { api, type MemberView, type OrgRole, type RoleOption } from '@/lib/api';
+import { api, type MemberView, type RoleOption } from '@/lib/api';
 
 import {
   afficheDroitCloture,
@@ -30,7 +30,6 @@ interface MembersPanelProps {
   members: readonly MemberView[];
   roleOptions: readonly RoleOption[];
   moiUserId: string | null;
-  monRole: OrgRole | null;
   onChanged: () => Promise<void>;
 }
 
@@ -39,7 +38,6 @@ export function MembersPanel({
   members,
   roleOptions,
   moiUserId,
-  monRole,
   onChanged,
 }: MembersPanelProps): React.ReactElement {
   const [busy, setBusy] = useState<string | null>(null);
@@ -72,7 +70,10 @@ export function MembersPanel({
   }
 
   const cibles = moiUserId ? ciblesDeTransfert(members, moiUserId) : [];
-  const jeSuisProprietaire = monRole === 'owner';
+  // Le rôle de l'acteur est lu dans la LISTE, jamais dans l'organisation chargée
+  // au montage : un transfert de propriété le fait passer de Propriétaire à
+  // Administrateur, et le bloc de transfert doit disparaître dans la foulée.
+  const jeSuisProprietaire = members.some((m) => m.userId === moiUserId && m.role === 'owner');
 
   return (
     <section className="flex flex-col gap-4" aria-labelledby="membres-titre">
