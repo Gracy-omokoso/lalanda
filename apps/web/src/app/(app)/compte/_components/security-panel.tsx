@@ -129,7 +129,11 @@ function PasswordSection(): React.ReactElement {
           ].join(' ')}
         />
         {tooShort ? (
-          <p id="new-password-error" role="alert" className="-mt-2 text-xs font-medium text-[var(--danger)]">
+          <p
+            id="new-password-error"
+            role="alert"
+            className="-mt-2 text-xs font-medium text-[var(--danger)]"
+          >
             <span className="font-semibold">Erreur : </span>8 caractères minimum.
           </p>
         ) : (
@@ -306,7 +310,9 @@ function SessionsSection(): React.ReactElement {
         <p className="text-sm text-[var(--foreground-muted)]">Chargement de vos sessions…</p>
       ) : sessions.length === 0 ? (
         <div className="rounded-xl border border-dashed border-[var(--border)] p-8 text-center">
-          <p className="text-sm text-[var(--foreground-muted)]">Aucune session active à afficher.</p>
+          <p className="text-sm text-[var(--foreground-muted)]">
+            Aucune session active à afficher.
+          </p>
         </div>
       ) : (
         <ul className="flex flex-col gap-2">
@@ -327,7 +333,8 @@ function SessionsSection(): React.ReactElement {
                   ) : null}
                 </span>
                 <span className="fig text-xs text-[var(--foreground-muted)]">
-                  {s.ipAddress ?? '—'} · dernière activité {formatSessionDate(s.lastActiveAt, timezone)}
+                  {s.ipAddress ?? '—'} · dernière activité{' '}
+                  {formatSessionDate(s.lastActiveAt, timezone)}
                 </span>
                 <span className="fig text-xs text-[var(--foreground-muted)]">
                   Ouverte le {formatSessionDate(s.createdAt, timezone)} · expire le{' '}

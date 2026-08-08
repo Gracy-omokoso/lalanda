@@ -750,6 +750,31 @@ export const api = {
     displayCurrency: 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR';
     notifications: NotificationPreferences;
   }) => jsonRequest<AccountPreferencesView>(`/account/preferences`, { method: 'PUT', body: input }),
+  /**
+   * Change UNIQUEMENT le thème, en préservant le reste des préférences.
+   *
+   * `PUT /account/preferences` remplace tout le volet et son schéma est
+   * `.strict()` : il n'existe pas d'écriture partielle. On relit donc les valeurs
+   * courantes avant d'écrire, plutôt que d'envoyer des valeurs par défaut pour la
+   * devise et les notifications — ce qui réinitialiserait en silence des réglages
+   * que l'utilisateur n'a pas touchés.
+   *
+   * Utilisé par le bascule clair/sombre du header : sans cela, un thème choisi
+   * là-bas resterait local et la page Préférences afficherait autre chose.
+   */
+  setAccountTheme: async (theme: 'light' | 'dark' | 'system') => {
+    const current = await jsonRequest<AccountPreferencesView>(`/account/preferences`, {
+      method: 'GET',
+    });
+    return jsonRequest<AccountPreferencesView>(`/account/preferences`, {
+      method: 'PUT',
+      body: {
+        theme,
+        displayCurrency: current.displayCurrency,
+        notifications: current.notifications,
+      },
+    });
+  },
   listAccountSessions: () =>
     jsonRequest<{ sessions: AccountSessionView[] }>(`/account/sessions`, { method: 'GET' }),
   /** 404 { code: 'SESSION_NOT_FOUND' } si l'id n'appartient pas à l'appelant. */

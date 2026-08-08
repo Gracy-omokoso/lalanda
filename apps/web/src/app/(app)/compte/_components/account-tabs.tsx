@@ -32,11 +32,7 @@ export function activeSegment(pathname: string): string {
   return pathname.slice(BASE.length).split('/').filter(Boolean)[0] ?? '';
 }
 
-export function AccountTabs({
-  tabs = ACCOUNT_TABS,
-}: {
-  tabs?: AccountTab[];
-}): React.ReactElement {
+export function AccountTabs({ tabs = ACCOUNT_TABS }: { tabs?: AccountTab[] }): React.ReactElement {
   const pathname = usePathname();
   const current = activeSegment(pathname);
 

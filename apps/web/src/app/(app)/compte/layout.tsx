@@ -18,8 +18,7 @@ export default function AccountLayout({
       <header className="flex flex-col gap-1">
         <h1 className="font-display text-2xl font-bold tracking-tight">Mon compte</h1>
         <p className="max-w-2xl text-sm text-[var(--foreground-muted)]">
-          Vos informations personnelles, la sécurité de votre accès et vos préférences
-          d’affichage.
+          Vos informations personnelles, la sécurité de votre accès et vos préférences d’affichage.
         </p>
       </header>
       <AccountTabs />

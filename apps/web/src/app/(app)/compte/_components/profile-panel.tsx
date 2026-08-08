@@ -173,7 +173,11 @@ export function ProfilePanel(): React.ReactElement {
             ].join(' ')}
           />
           {nameError ? (
-            <p id="account-name-error" role="alert" className="-mt-2 text-xs font-medium text-[var(--danger)]">
+            <p
+              id="account-name-error"
+              role="alert"
+              className="-mt-2 text-xs font-medium text-[var(--danger)]"
+            >
               <span className="font-semibold">Erreur : </span>
               {nameError}
             </p>
@@ -196,7 +200,10 @@ export function ProfilePanel(): React.ReactElement {
               </option>
             ))}
           </select>
-          <p id="account-locale-help" className="-mt-2 text-xs italic text-[var(--foreground-muted)]">
+          <p
+            id="account-locale-help"
+            className="-mt-2 text-xs italic text-[var(--foreground-muted)]"
+          >
             Le français est pour l’instant la seule langue traduite. D’autres langues seront
             proposées ici dès que les libellés le seront aussi.
           </p>
@@ -221,7 +228,10 @@ export function ProfilePanel(): React.ReactElement {
               );
             })}
           </select>
-          <p id="account-timezone-help" className="-mt-2 text-xs italic text-[var(--foreground-muted)]">
+          <p
+            id="account-timezone-help"
+            className="-mt-2 text-xs italic text-[var(--foreground-muted)]"
+          >
             Utilisé pour afficher les dates et heures, notamment vos sessions actives.
           </p>
         </fieldset>
@@ -244,10 +254,7 @@ export function ProfilePanel(): React.ReactElement {
         </div>
       </form>
 
-      <EmailChangeSection
-        profile={profile}
-        onChanged={(next) => setProfile(next)}
-      />
+      <EmailChangeSection profile={profile} onChanged={(next) => setProfile(next)} />
 
       <p className="text-xs text-[var(--foreground-muted)]">
         Devise d’affichage par défaut ({CURRENCY_LABELS['USD']?.split(' —')[0] ?? 'USD'} et autres),
@@ -374,8 +381,8 @@ function EmailChangeSection({
                 Un lien de vérification sera envoyé à la nouvelle adresse et votre compte ne
                 changera qu’après confirmation.{' '}
                 <span className="font-semibold">
-                  Aucun service d’envoi d’emails n’étant encore branché, ce lien ne partira pas :
-                  le changement restera en attente.
+                  Aucun service d’envoi d’emails n’étant encore branché, ce lien ne partira pas : le
+                  changement restera en attente.
                 </span>
               </p>
 
@@ -404,7 +411,11 @@ function EmailChangeSection({
                 ].join(' ')}
               />
               {emailError ? (
-                <p id="new-email-error" role="alert" className="-mt-2 text-xs font-medium text-[var(--danger)]">
+                <p
+                  id="new-email-error"
+                  role="alert"
+                  className="-mt-2 text-xs font-medium text-[var(--danger)]"
+                >
                   <span className="font-semibold">Erreur : </span>
                   {emailError}
                 </p>

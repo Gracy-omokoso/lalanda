@@ -5,8 +5,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   COMMON_TIMEZONES,
+  THEME_LABELS,
   accountErrorMessage,
   formatSessionDate,
+  preferencesAreDirty,
   profileIsDirty,
   timezoneOffsetLabel,
   timezoneOptions,
@@ -51,7 +53,9 @@ describe('timezoneOptions (S20b)', () => {
 describe('timezoneOffsetLabel (S20b)', () => {
   it('donne un décalage UTC lisible', () => {
     // Kinshasa est à UTC+01:00 toute l'année (pas d'heure d'été).
-    expect(timezoneOffsetLabel('Africa/Kinshasa', new Date('2026-01-15T12:00:00Z'))).toBe('UTC+01:00');
+    expect(timezoneOffsetLabel('Africa/Kinshasa', new Date('2026-01-15T12:00:00Z'))).toBe(
+      'UTC+01:00',
+    );
   });
 
   it('suit l’heure d’été là où elle existe', () => {
@@ -75,7 +79,9 @@ describe('formatSessionDate (S20b)', () => {
 
   it('rend une date différente selon le fuseau', () => {
     const iso = '2026-03-10T08:30:00Z';
-    expect(formatSessionDate(iso, 'Africa/Kinshasa')).not.toBe(formatSessionDate(iso, 'Asia/Tokyo'));
+    expect(formatSessionDate(iso, 'Africa/Kinshasa')).not.toBe(
+      formatSessionDate(iso, 'Asia/Tokyo'),
+    );
   });
 
   it('dégrade sur le fuseau local plutôt que de casser, si le fuseau est invalide', () => {
@@ -105,6 +111,49 @@ describe('profileIsDirty (S20b)', () => {
     expect(profileIsDirty({ ...saved, name: 'Alicia' }, saved)).toBe(true);
     expect(profileIsDirty({ ...saved, timezone: 'Europe/Paris' }, saved)).toBe(true);
     expect(profileIsDirty({ ...saved, locale: 'en' }, saved)).toBe(true);
+  });
+});
+
+describe('preferencesAreDirty (S20b)', () => {
+  const saved = {
+    theme: 'system',
+    displayCurrency: 'USD',
+    notifications: { securite: true, produit: true, projet: true, resumeHebdomadaire: false },
+  };
+
+  it('est faux quand rien n’a changé', () => {
+    expect(
+      preferencesAreDirty({ ...saved, notifications: { ...saved.notifications } }, saved),
+    ).toBe(false);
+  });
+
+  it('détecte un changement de thème et de devise', () => {
+    expect(preferencesAreDirty({ ...saved, theme: 'dark' }, saved)).toBe(true);
+    expect(preferencesAreDirty({ ...saved, displayCurrency: 'CDF' }, saved)).toBe(true);
+  });
+
+  it('détecte le basculement d’une seule notification', () => {
+    expect(
+      preferencesAreDirty(
+        { ...saved, notifications: { ...saved.notifications, resumeHebdomadaire: true } },
+        saved,
+      ),
+    ).toBe(true);
+  });
+
+  it('détecte une catégorie servie par l’API mais absente du formulaire', () => {
+    // Sans comparaison sur l'UNION des clés, ce cas passerait pour « rien à
+    // enregistrer » et l'utilisateur ne pourrait plus rien sauvegarder du tout.
+    const form = { ...saved, notifications: { securite: true, produit: true, projet: true } };
+    expect(preferencesAreDirty(form, saved)).toBe(true);
+  });
+});
+
+describe('THEME_LABELS (S20b)', () => {
+  it('propose un libellé pour chacune des trois valeurs servies par l’API', () => {
+    for (const value of ['system', 'light', 'dark']) {
+      expect(THEME_LABELS[value]).toBeTruthy();
+    }
   });
 });
 

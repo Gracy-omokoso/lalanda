@@ -15,6 +15,16 @@ export const THEME_LABELS: Record<string, string> = {
   dark: 'Sombre',
 };
 
+export const THEME_DESCRIPTIONS: Record<string, string> = {
+  system: 'Suit le réglage clair/sombre de votre appareil.',
+  light: 'Papier registre, encre foncée.',
+  dark: 'Fond encre, texte crème.',
+};
+
+// La mécanique du thème (résolution, application, stockage local) vit dans
+// `@/lib/theme` : elle est partagée avec le bascule du header et la
+// synchronisation au chargement, hors de l'espace compte.
+
 /** Devises d'affichage. Même énumération que `projects.dto.ts` côté API. */
 export const CURRENCY_LABELS: Record<string, string> = {
   USD: 'USD — dollar américain',
@@ -24,10 +34,7 @@ export const CURRENCY_LABELS: Record<string, string> = {
   EUR: 'EUR — euro',
 };
 
-export const NOTIFICATION_LABELS: Record<
-  string,
-  { label: string; description: string }
-> = {
+export const NOTIFICATION_LABELS: Record<string, { label: string; description: string }> = {
   securite: {
     label: 'Alertes de sécurité',
     description: 'Connexion depuis un nouvel appareil, changement de mot de passe.',
@@ -85,10 +92,7 @@ export const COMMON_TIMEZONES = [
  * Le résultat est dédoublonné et l'ordre de la liste de référence est conservé,
  * les ajouts venant ensuite.
  */
-export function timezoneOptions(
-  current?: string | null,
-  detected?: string | null,
-): string[] {
+export function timezoneOptions(current?: string | null, detected?: string | null): string[] {
   const options = [...COMMON_TIMEZONES] as string[];
   for (const extra of [current, detected]) {
     const value = extra?.trim();
@@ -163,6 +167,43 @@ export function profileIsDirty(
     form.locale !== saved.locale ||
     form.timezone !== saved.timezone
   );
+}
+
+/**
+ * Volet « préférences » : thème, devise d'affichage, notifications.
+ *
+ * `notifications` est laissé générique — l'interface `NotificationPreferences`
+ * du client d'API n'a pas de signature d'index, et la contraindre ici obligerait
+ * à la dupliquer.
+ */
+export interface PreferencesForm<N extends object = Record<string, boolean>> {
+  theme: string;
+  displayCurrency: string;
+  notifications: N;
+}
+
+/**
+ * Le formulaire de préférences a-t-il divergé des valeurs enregistrées ?
+ *
+ * La comparaison des notifications se fait clé par clé sur l'UNION des deux
+ * ensembles : une comparaison basée sur les seules clés du formulaire déclarerait
+ * « rien à enregistrer » si l'API venait à servir une catégorie que l'UI ne
+ * connaît pas encore — le bouton « Enregistrer » resterait alors grisé sans
+ * raison visible.
+ */
+export function preferencesAreDirty<N extends object>(
+  form: PreferencesForm<N>,
+  saved: PreferencesForm<N>,
+): boolean {
+  if (form.theme !== saved.theme) return true;
+  if (form.displayCurrency !== saved.displayCurrency) return true;
+  const a = form.notifications as Record<string, boolean | undefined>;
+  const b = saved.notifications as Record<string, boolean | undefined>;
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const key of keys) {
+    if (a[key] !== b[key]) return true;
+  }
+  return false;
 }
 
 /** Message d'erreur d'un champ nom, ou `null` s'il est valide. */
