@@ -22,6 +22,7 @@ import {
   ASSIGNABLE_ORG_ROLES,
   ORG_ROLE_DESCRIPTIONS,
   ORG_ROLE_LABELS,
+  canGrantRole,
   grantableRoles,
   type OrgRole,
 } from '../authz/permissions.js';
@@ -33,12 +34,23 @@ const TransferSchema = z.object({ userId: z.string().min(1) });
 
 export interface MemberView {
   userId: string;
+  /** Identité lue chez better-auth. `null` si le compte n'existe plus (voir `identitiesOf`). */
+  email: string | null;
+  name: string | null;
   role: OrgRole;
   roleLabel: string;
   canClosePeriods: boolean;
   acceptedAt: string | null;
   /** L'UI doit-elle interdire toute action sur cette ligne ? (R1, dernier propriétaire) */
   isLastOwner: boolean;
+  /**
+   * L'acteur courant peut-il agir sur CE membre ? (R7 appliqué à la rétrogradation)
+   *
+   * Faux dès que la cible est plus puissante que l'acteur — un `admin` ne peut ni
+   * rétrograder ni révoquer un `owner`. Le serveur refuse déjà (`403
+   * ROLE_ESCALATION`); ceci évite d'afficher des commandes vouées à l'échec.
+   */
+  manageable: boolean;
 }
 
 export interface RoleOption {
@@ -77,10 +89,13 @@ export class MembersController {
     const rows = await this.members.list(orgId);
     const owners = rows.filter((r) => r.role === 'owner').length;
     const grantable = new Set(grantableRoles(actorRole));
+    const identities = await this.members.identitiesOf(rows.map((r) => r.userId));
 
     return {
       members: rows.map((r) => ({
         userId: r.userId,
+        email: identities.get(r.userId)?.email ?? null,
+        name: identities.get(r.userId)?.name ?? null,
         role: r.role,
         roleLabel: ORG_ROLE_LABELS[r.role],
         canClosePeriods: r.canClosePeriods,
@@ -89,6 +104,7 @@ export class MembersController {
         // rétrogradable ni révocable. Le serveur refuse de toute façon (409
         // LAST_OWNER) — ceci évite d'offrir un bouton qui échouera.
         isLastOwner: r.role === 'owner' && owners === 1,
+        manageable: canGrantRole(actorRole, r.role),
       })),
       roleOptions: ASSIGNABLE_ORG_ROLES.map((value) => ({
         value,
@@ -119,7 +135,7 @@ export class MembersController {
       targetUserId,
       role: parsed.data.role,
     });
-    return { member: await this.viewOf(orgId, row) };
+    return { member: await this.viewOf(orgId, actorRole, row) };
   }
 
   /** Accorde ou retire la clôture au Comptable — la seule case ⚙ du modèle. */
@@ -143,7 +159,7 @@ export class MembersController {
       targetUserId,
       value: parsed.data.value,
     });
-    return { member: await this.viewOf(orgId, row) };
+    return { member: await this.viewOf(orgId, actorRole, row) };
   }
 
   @Delete('members/:userId')
@@ -173,6 +189,7 @@ export class MembersController {
   @RequirePermission('organization.manage')
   async transfer(
     @CurrentUser() user: { id: string },
+    @CurrentOrgRole() actorRole: OrgRole,
     @Param('orgId') orgId: string,
     @Body() body: unknown,
   ): Promise<{ previousOwner: MemberView; newOwner: MemberView }> {
@@ -186,24 +203,34 @@ export class MembersController {
       targetUserId: parsed.data.userId,
     });
     return {
-      previousOwner: await this.viewOf(orgId, previousOwner),
-      newOwner: await this.viewOf(orgId, newOwner),
+      previousOwner: await this.viewOf(orgId, actorRole, previousOwner),
+      newOwner: await this.viewOf(orgId, actorRole, newOwner),
     };
   }
 
-  /** Recalcule `isLastOwner` après écriture — l'état a pu changer. */
+  /**
+   * Recalcule `isLastOwner` et `manageable` après écriture — les deux ont pu
+   * changer, et c'est justement le cas intéressant : après un transfert de
+   * propriété, l'ancien propriétaire n'est plus le dernier et le nouveau l'est
+   * peut-être devenu.
+   */
   private async viewOf(
     orgId: string,
+    actorRole: OrgRole,
     row: { userId: string; role: OrgRole; canClosePeriods: boolean; acceptedAt: Date | null },
   ): Promise<MemberView> {
     const owners = (await this.members.list(orgId)).filter((r) => r.role === 'owner').length;
+    const identity = (await this.members.identitiesOf([row.userId])).get(row.userId);
     return {
       userId: row.userId,
+      email: identity?.email ?? null,
+      name: identity?.name ?? null,
       role: row.role,
       roleLabel: ORG_ROLE_LABELS[row.role],
       canClosePeriods: row.canClosePeriods,
       acceptedAt: row.acceptedAt ? row.acceptedAt.toISOString() : null,
       isLastOwner: row.role === 'owner' && owners === 1,
+      manageable: canGrantRole(actorRole, row.role),
     };
   }
 }

@@ -36,6 +36,12 @@ export interface MemberRow {
   acceptedAt: Date | null;
 }
 
+/** Identité affichable d'un membre — hors membership, donc toujours faillible. */
+export interface MemberIdentity {
+  email: string | null;
+  name: string | null;
+}
+
 @Injectable()
 export class MembersService {
   constructor(
@@ -350,6 +356,42 @@ export class MembersService {
     } finally {
       await session.endSession();
     }
+  }
+
+  /**
+   * Email et nom des membres, lus dans la collection `user` de better-auth.
+   *
+   * La membership ne stocke qu'un `userId` : sans cette jointure la page Membres
+   * afficherait des identifiants Mongo, sur lesquels personne ne peut décider
+   * d'un changement de rôle ou d'une révocation.
+   *
+   * Une seule requête `$in` pour toute la liste, et une identité MANQUANTE n'est
+   * pas une erreur : la clé est simplement absente de la Map et l'appelant
+   * retombe sur l'identifiant. Un utilisateur supprimé dont la membership a
+   * survécu doit rester visible — c'est précisément la ligne qu'on veut pouvoir
+   * révoquer.
+   */
+  async identitiesOf(userIds: readonly string[]): Promise<Map<string, MemberIdentity>> {
+    const out = new Map<string, MemberIdentity>();
+    const db = this.connection.db;
+    if (!db || userIds.length === 0) return out;
+
+    const { ObjectId } = await import('mongodb');
+    const ids = userIds.filter((id) => ObjectId.isValid(id)).map((id) => new ObjectId(id));
+    if (ids.length === 0) return out;
+
+    const docs = await db
+      .collection('user')
+      .find({ _id: { $in: ids } }, { projection: { email: 1, name: 1 } })
+      .toArray();
+
+    for (const doc of docs) {
+      const email = typeof doc['email'] === 'string' ? doc['email'] : null;
+      const name =
+        typeof doc['name'] === 'string' && doc['name'].trim() !== '' ? doc['name'] : null;
+      out.set(String(doc['_id']), { email, name });
+    }
+    return out;
   }
 
   private rowOf(d: MembershipDocument): MemberRow {
