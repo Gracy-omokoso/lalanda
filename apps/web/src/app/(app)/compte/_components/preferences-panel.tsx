@@ -88,10 +88,11 @@ export function PreferencesPanel(): React.ReactElement {
         notifications: form.notifications,
       });
       // La réponse d'écriture ne porte pas `options` : on conserve celles déjà
-      // servies pour ne pas vider les menus déroulants après un enregistrement.
-      setSaved((prev) => (prev ? { ...prev, ...updated } : prev));
-      setForm(formOf({ ...(saved as AccountPreferencesView), ...updated }));
-      applyThemePreference(updated.theme);
+      // servies, sinon les menus déroulants se videraient après un enregistrement.
+      const merged: AccountPreferencesView = { ...saved, ...updated };
+      setSaved(merged);
+      setForm(formOf(merged));
+      applyThemePreference(merged.theme);
       setNotice('Préférences enregistrées.');
     } catch (err) {
       const detail = (err as { detail?: { code?: string; message?: string } }).detail;
@@ -139,13 +140,17 @@ export function PreferencesPanel(): React.ReactElement {
 
   return (
     <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-6">
-      {error ? (
+      {/* `loadError` est repris ici : un rechargement raté APRÈS un premier
+          chargement réussi laisse le formulaire à l'écran avec des valeurs
+          périmées. Il faut le dire, sinon l'utilisateur enregistre par-dessus
+          une lecture qu'il croit à jour. */}
+      {(error ?? loadError) ? (
         <div
           role="alert"
           className="rounded-md border border-[var(--danger)]/30 bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger)]"
         >
           <strong>Erreur : </strong>
-          {error}
+          {error ?? loadError}
         </div>
       ) : null}
 
