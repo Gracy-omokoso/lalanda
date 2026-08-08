@@ -21,10 +21,12 @@ import {
 import { ENGINE_VERSION, EngineError, evaluateTemplate } from '@lalanda/engine';
 
 import { AuthGuard } from '../auth/auth.guard.js';
+import { AuditService } from '../authz/audit.service.js';
 import { RequirePermission } from '../authz/authz.decorators.js';
 import { AuthzService } from '../authz/authz.service.js';
+import { CurrentOrgRole } from '../authz/current-org-role.decorator.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
-import { sodDecision } from '../authz/permissions.js';
+import { sodDecision, type OrgRole } from '../authz/permissions.js';
 import { CurrentOrgId, CurrentUser } from '../auth/current-user.decorator.js';
 import { toEvaluationView, type EvaluationView } from '../evaluate/evaluation-view.js';
 import { getTemplate } from '../evaluate/template-registry.js';
@@ -81,6 +83,7 @@ export class PlansController {
     @Inject(ProjectsService) private readonly projects: ProjectsService,
     @Inject(PlansService) private readonly plans: PlansService,
     @Inject(AuthzService) private readonly authz: AuthzService,
+    @Inject(AuditService) private readonly audit: AuditService,
   ) {}
 
   @Post(':id/plans')
@@ -88,6 +91,7 @@ export class PlansController {
   async approve(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: { id: string },
+    @CurrentOrgRole() role: OrgRole,
     @Param('id') id: string,
   ): Promise<PlanDetailView> {
     const project = await this.projects.findScoped(id, orgId);
@@ -185,6 +189,33 @@ export class PlansController {
       result: toEvaluationView(evaluation),
       fingerprint,
     });
+
+    // R2 exige que l'auto-approbation soit marquée « dans le snapshot ET dans
+    // l'audit » (ADR-0012 §6). Le snapshot dit les conditions d'UNE version;
+    // le journal donne la vue transversale — « combien de plans cette
+    // organisation a-t-elle validés sans séparation des tâches ? » — qu'aucune
+    // lecture de plan isolée ne fournit.
+    //
+    // `record()` et non `recordStrict()` : contrairement à l'export (R4), le
+    // plan est DÉJÀ figé et immuable quand on arrive ici. Faire échouer la
+    // requête sur une panne de journal renverrait 500 pour une version pourtant
+    // créée — l'appelant croirait à un échec et rejouerait, pour ne récolter
+    // qu'un 409 PLAN_UNCHANGED. Le refus d'écrire n'annule rien : il ment.
+    await this.audit.record({
+      organizationId: orgId,
+      actorUserId: user.id,
+      actorRole: role,
+      action: 'plan.approve',
+      targetType: 'plan',
+      targetId: String(doc._id),
+      metadata: {
+        projectId: String(project._id),
+        version: doc.version,
+        soleApprover: decision === 'sole_approver',
+        inputsAuthor: project.driversUpdatedBy ?? null,
+      },
+    });
+
     return toDetailView(doc);
   }
 

@@ -173,6 +173,12 @@ e2eSuite('Business Model Canvas (S18d — docs/05)', () => {
       .get(`/projects/${projectId}/canvas`)
       .set('Cookie', cookiesA);
 
+    if (before.body?.version === undefined) {
+      console.error(
+        `DIAG-BEFORE status=${before.status} ct=${before.headers['content-type']} body=${JSON.stringify(before.body)} text=${String(before.text).slice(0, 400)}`,
+      );
+    }
+
     const res = await request(app.getHttpServer())
       .put(`/projects/${projectId}/canvas`)
       .set('Cookie', cookiesA)
