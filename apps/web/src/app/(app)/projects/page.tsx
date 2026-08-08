@@ -24,6 +24,11 @@ const TEMPLATE_LABELS: Record<string, { label: string; description: string }> = 
     label: 'Prestation de services',
     description: 'Conseil, agence, freelance. Tarif journalier, taux de facturation, équipe.',
   },
+  'ecommerce-cod': {
+    label: 'E-commerce (paiement à la livraison)',
+    description:
+      'Import, vente par publicité sociale ou WhatsApp, livraison encaissée en cash. Budget pub, taux de livraison, panier moyen.',
+  },
   'hello-world': {
     label: 'Démo (hello-world)',
     description: 'Template minimal de démonstration. À réserver aux tests.',

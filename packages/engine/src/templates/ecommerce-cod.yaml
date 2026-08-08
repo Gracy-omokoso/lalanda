@@ -1,0 +1,577 @@
+# Template sectoriel : e-commerce à paiement à la livraison (S19b).
+#
+# Modèle : import de marchandise (Alibaba ou grand marché local) → stockage →
+# vente par publicité sociale (Meta, TikTok) sur boutique en ligne ou WhatsApp
+# Business → livraison à domicile encaissée en cash (COD, « cash on delivery »).
+#
+# Trois particularités de ce modèle, qui structurent tout le manifest :
+#
+#  1. La publicité est un COÛT VARIABLE, pas une charge fixe. Le volume de
+#     commandes est directement proportionnel au budget publicitaire : c'est le
+#     budget qui achète le chiffre d'affaires, pas l'inverse.
+#  2. La livraison est payée sur les commandes TENTÉES, pas sur les commandes
+#     encaissées. Un colis refusé à la porte coûte la course sans produire de
+#     recette. C'est le poste qui tue silencieusement la rentabilité en COD.
+#  3. Le BFR est structurellement lourd : le fournisseur d'import est payé
+#     d'avance, la marchandise met des semaines à arriver, et le cash encaissé
+#     par le livreur est reversé avec un décalage.
+#
+# Les ordres de grandeur des défauts sont des repères de terrain (RDC/Afrique
+# francophone) destinés à être ajustés projet par projet — ce ne sont pas des
+# règles comptables. Les taux fiscaux viennent du ParameterPack du pays.
+# Fiscalité : IBP SYSCOHADA/RDC 30 % (fallback).
+
+slug: ecommerce-cod
+version: 1.0.0
+secteur: ecommerce
+pays: [CD]
+devise_base: USD
+horizon_mois: 12
+horizon_projection_annees: 5
+
+# ─── Immobilisations amortissables (S14c) ─────────────────────
+# Total des `montant_ht` calé sur le défaut de `investissements_initiaux`
+# (6 000 USD). Le stock d'import n'est PAS une immobilisation : il relève du
+# fonds de roulement de démarrage (`bfr_initial`).
+immobilisations:
+  - label: 'Moto de livraison'
+    categorie: materiel_transport
+    montant_ht: 2500
+    date_acquisition: '2026-01-01'
+  - label: 'Aménagement du local de stockage et emballage'
+    categorie: amenagements
+    montant_ht: 1500
+    date_acquisition: '2026-01-01'
+  - label: 'Matériel informatique et studio photo produit'
+    categorie: materiel_informatique
+    montant_ht: 1500
+    date_acquisition: '2026-01-01'
+  - label: 'Mobilier'
+    categorie: mobilier_bureau
+    montant_ht: 500
+    date_acquisition: '2026-01-01'
+
+# ─── États financiers prévisionnels (S18a, FIN-001) ───────────
+# `couts_variables_total` agrège marchandise + livraison + publicité : les trois
+# varient avec le volume de commandes. Les seules charges réellement fixes sont
+# le personnel, le local et les abonnements.
+structure_financiere:
+  achats_variables_mensuels: couts_variables_total
+  charges_fixes_mensuelles: charges_operationnelles
+
+groupes_hypotheses:
+  - id: acquisition
+    label: 'Acquisition et ventes'
+  - id: couts_variables
+    label: 'Coûts variables'
+  - id: charges_fixes
+    label: 'Charges fixes'
+  - id: fiscalite
+    label: 'Fiscalité'
+  - id: financement
+    label: 'Financement'
+
+# Découpage du wizard de saisie (S18c) — présentation uniquement, aucun impact calcul.
+wizard:
+  etapes:
+    # Id structurel `chiffre_affaires` (contrat commun aux templates : la première
+    # étape est celle qui détermine le CA) ; le libellé, lui, colle au métier —
+    # ici le CA se pilote par la publicité, pas par un prix de vente.
+    - id: chiffre_affaires
+      label: 'Acquisition et ventes'
+      description: 'Ce que vous dépensez en publicité, ce que ça rapporte en commandes, et combien arrivent réellement à destination.'
+      groupes: [acquisition]
+      ordre: 1
+    - id: couts_variables
+      label: 'Coûts variables'
+      description: 'Marchandise, livraison et publicité : tout ce qui augmente quand vous vendez plus.'
+      groupes: [couts_variables]
+      ordre: 2
+    - id: charges_fixes
+      label: 'Charges fixes et personnel'
+      description: 'Les dépenses dues chaque mois, même sans une seule commande.'
+      groupes: [charges_fixes]
+      ordre: 3
+    - id: investissement_financement
+      label: 'Investissement et financement'
+      description: "Ce que vous achetez au départ, le stock à financer, et d'où vient l'argent."
+      groupes: [financement]
+      ordre: 4
+    - id: fiscalite
+      label: 'Fiscalité'
+      description: 'Paramètres fiscaux pré-remplis par le Country Pack — à confirmer.'
+      groupes: [fiscalite]
+      ordre: 5
+
+drivers:
+  # ─── Acquisition ────────────────────────────────────────────
+  - id: budget_pub_mensuel
+    groupe: acquisition
+    label: 'Budget publicitaire mensuel'
+    type: money
+    devise: USD
+    defaut: 1500
+    min: 0
+    aide: "Dépense mensuelle en publicité Meta (Facebook/Instagram), TikTok et autres réseaux. C'est le moteur du volume : en e-commerce social, les commandes s'arrêtent quand la publicité s'arrête."
+
+  - id: cout_acquisition_commande
+    groupe: acquisition
+    label: 'Coût publicitaire par commande générée'
+    type: money
+    devise: USD
+    defaut: 4
+    min: 0.01
+    aide: "Budget publicitaire divisé par le nombre de commandes reçues (CPA). 2-6 USD est courant en RDC selon le produit et la qualité du créatif. Se dégrade quand l'audience se sature."
+
+  - id: taux_livraison_reussie
+    groupe: acquisition
+    label: 'Taux de livraison réussie'
+    type: percent
+    defaut: 0.70
+    min: 0.01
+    max: 1
+    aide: "Part des commandes effectivement livrées ET encaissées. En paiement à la livraison, 25 à 40 % des commandes échouent (client injoignable, adresse fausse, refus à la porte, changement d'avis). C'est LE chiffre qui décide de la rentabilité — 60-80 % est la fourchette réaliste."
+
+  - id: panier_moyen
+    groupe: acquisition
+    label: 'Panier moyen'
+    type: money
+    devise: USD
+    defaut: 35
+    min: 0
+    aide: 'Montant moyen encaissé par commande livrée. En COD, un panier trop bas ne couvre pas le coût de livraison et de publicité : viser au moins 5 à 8 fois le coût de livraison.'
+
+  - id: taux_croissance_ca
+    groupe: acquisition
+    label: 'Taux de croissance annuel du CA'
+    type: percent
+    defaut: 0.20
+    min: -1
+    max: 3
+    aide: "Croissance annuelle. L'e-commerce croît vite au démarrage, mais suppose de réinvestir en publicité — la croissance n'est pas gratuite."
+
+  # ─── Coûts variables ────────────────────────────────────────
+  - id: marge_commerciale_pct
+    groupe: couts_variables
+    label: 'Marge commerciale sur ventes'
+    type: percent
+    defaut: 0.55
+    min: 0
+    max: 1
+    aide: 'Marge sur le prix de vente : (PV − coût rendu) / PV. Le coût rendu inclut le prix Alibaba ou marché, le fret, la douane et le transitaire. Une marge de 50-65 % est nécessaire pour absorber publicité et livraisons échouées — en dessous de 45 %, le modèle COD est rarement viable.'
+
+  - id: cout_livraison_par_commande
+    groupe: couts_variables
+    label: 'Coût de livraison par commande tentée'
+    type: money
+    devise: USD
+    defaut: 3
+    min: 0
+    aide: "Coût d'une course, que le colis soit encaissé ou non : commission du service de livraison, ou carburant et salaire du livreur salarié rapportés au nombre de courses. Facturé aussi sur les livraisons échouées — c'est ce qui rend le taux de réussite si sensible."
+
+  - id: delai_fournisseurs_jours
+    groupe: couts_variables
+    label: 'Délai de paiement fournisseurs'
+    type: number
+    defaut: 0
+    min: 0
+    max: 360
+    unite: 'jours'
+    aide: "Crédit obtenu du fournisseur. À 0 par défaut : un fournisseur Alibaba se paie d'avance, et le grand marché local se paie comptant. Ne relever ce délai qu'avec un fournisseur qui vous accorde réellement du crédit."
+
+  - id: rotation_stock_jours
+    groupe: couts_variables
+    label: 'Rotation du stock'
+    type: number
+    defaut: 60
+    min: 0
+    max: 360
+    unite: 'jours'
+    aide: "Durée entre le paiement de la marchandise et sa vente. Sur un import maritime, comptez le délai de production, le fret (30-45 jours), le dédouanement, puis l'écoulement : 60-90 jours. Un approvisionnement au marché local descend à 15-30 jours."
+
+  # ─── Charges fixes ──────────────────────────────────────────
+  - id: personnel_mois
+    groupe: charges_fixes
+    label: 'Masse salariale mensuelle'
+    type: money
+    devise: USD
+    defaut: 900
+    min: 0
+    aide: 'Salaires bruts, charges CNSS/IPR incluses. Ordre de grandeur pour un community manager qui gère les publicités et les conversations WhatsApp, plus une personne au conditionnement des colis.'
+
+  - id: local_stockage_mois
+    groupe: charges_fixes
+    label: 'Local de stockage'
+    type: money
+    devise: USD
+    defaut: 250
+    min: 0
+    aide: "Loyer d'un dépôt ou d'une pièce dédiée au stock et à l'emballage. 0 si vous stockez à domicile au démarrage."
+
+  - id: abonnements_mois
+    groupe: charges_fixes
+    label: 'Abonnements et outils'
+    type: money
+    devise: USD
+    defaut: 100
+    min: 0
+    aide: 'Plateforme e-commerce, WhatsApp Business API, nom de domaine, outils de création visuelle. Une boutique WhatsApp seule coûte quasiment rien ; une plateforme hébergée, 30-150 USD/mois.'
+
+  - id: charges_diverses_mois
+    groupe: charges_fixes
+    label: "Charges d'exploitation diverses"
+    type: money
+    devise: USD
+    defaut: 150
+    min: 0
+    aide: 'Emballages, internet et forfaits data, électricité, frais bancaires et de retrait, taxes locales mensualisées.'
+
+  # ─── Encaissement (BFR) ─────────────────────────────────────
+  - id: delai_clients_jours
+    groupe: acquisition
+    label: 'Délai de reversement des encaissements'
+    type: number
+    defaut: 10
+    min: 0
+    max: 360
+    unite: 'jours'
+    aide: 'Délai entre la livraison et la disponibilité réelle du cash. Le client paie à la porte, mais un service de livraison tiers reverse la collecte par lots, souvent à 7-15 jours. 0 seulement si votre propre livreur salarié remet la caisse chaque soir.'
+
+  # ─── Fiscalité ──────────────────────────────────────────────
+  # Voir note S9 : `ibp_taux` vient du ParameterPack du projet, `defaut` = fallback.
+  - id: ibp_taux
+    groupe: fiscalite
+    label: 'Impôt sur les bénéfices (IBP)'
+    type: percent
+    defaut: 0.30
+    min: 0
+    max: 1
+    aide: 'Taux fourni par le ParameterPack du pays. Surchargeable si le régime le justifie.'
+
+  # ─── Financement ────────────────────────────────────────────
+  - id: investissements_initiaux
+    groupe: financement
+    label: 'Investissements initiaux'
+    type: money
+    devise: USD
+    defaut: 6000
+    min: 0
+    aide: "Moto de livraison, aménagement du local, matériel informatique et photo, mobilier — les biens durables amortissables. Le stock de départ ne se saisit PAS ici : c'est du fonds de roulement."
+
+  - id: bfr_initial
+    groupe: financement
+    label: 'Fonds de roulement de démarrage'
+    type: money
+    devise: USD
+    defaut: 14000
+    min: 0
+    aide: "Premier stock importé, avance sur le fret et la douane, et trésorerie pour tenir jusqu'aux premiers reversements. C'est le poste le plus sous-estimé du modèle : fournisseur payé d'avance, marchandise en mer, cash reversé en différé. Le défaut couvre le besoin calculé de la première année — le sous-doter est l'erreur classique qui met en défaut une boutique pourtant rentable. Comparez-le à la ligne « BFR total » de l'onglet Plan de financement."
+
+  - id: apport_capital
+    groupe: financement
+    label: 'Apport personnel'
+    type: money
+    devise: USD
+    defaut: 8000
+    min: 0
+    aide: 'Apport en fonds propres. ≥ 25 % du total des besoins pour être bancable.'
+
+  - id: emprunt_capital
+    groupe: financement
+    label: 'Capital emprunté'
+    type: money
+    devise: USD
+    defaut: 13000
+    min: 0
+    aide: "Crédit d'investissement et de stock. 0 = pas d'emprunt."
+
+  - id: emprunt_taux_annuel
+    groupe: financement
+    label: "Taux d'intérêt annuel"
+    type: percent
+    defaut: 0.14
+    min: 0
+    max: 1
+    aide: 'Taux nominal annuel — voir ParameterPack (taux_credit_investissement_usd_pct).'
+
+  - id: emprunt_duree_mois
+    groupe: financement
+    label: 'Durée du prêt'
+    type: number
+    defaut: 36
+    min: 1
+    max: 240
+    unite: 'mois'
+    aide: "Durée d'amortissement. 24-48 mois typiques pour un crédit de stock et petit équipement."
+
+feuilles:
+  - id: activite
+    label: "Compte d'exploitation mensuel"
+    lignes:
+      - id: commandes_generees
+        label: 'Commandes générées par la publicité'
+        formule: 'IFERROR(budget_pub_mensuel / cout_acquisition_commande, 0)'
+        format: number
+
+      - id: commandes_livrees
+        label: 'Commandes livrées et encaissées'
+        formule: 'commandes_generees * taux_livraison_reussie'
+        format: number
+
+      - id: ca
+        label: "Chiffre d'affaires"
+        formule: 'commandes_livrees * panier_moyen'
+        format: money
+
+      - id: cout_achat_marchandises
+        label: 'Coût des marchandises vendues (rendu dédouané)'
+        formule: 'ca * (1 - marge_commerciale_pct)'
+        format: money
+
+      # Payé sur les commandes TENTÉES : une livraison refusée coûte la course
+      # sans produire de recette. C'est la spécificité du paiement à la livraison.
+      - id: cout_livraison
+        label: 'Coût de livraison (toutes commandes tentées)'
+        formule: 'commandes_generees * cout_livraison_par_commande'
+        format: money
+
+      - id: cout_publicite
+        label: 'Coût publicitaire'
+        formule: 'budget_pub_mensuel'
+        format: money
+
+      - id: couts_variables_total
+        label: 'Total des coûts variables'
+        formule: 'cout_achat_marchandises + cout_livraison + cout_publicite'
+        format: money
+
+      - id: marge_brute
+        label: 'Marge brute après coûts variables'
+        formule: 'ca - couts_variables_total'
+        format: money
+
+      - id: charges_operationnelles
+        label: 'Charges opérationnelles'
+        formule: 'personnel_mois + local_stockage_mois + abonnements_mois + charges_diverses_mois'
+        format: money
+
+      - id: excedent_brut
+        label: "Excédent brut d'exploitation"
+        formule: 'marge_brute - charges_operationnelles'
+        format: money
+
+      - id: ibp
+        label: 'Impôt sur les bénéfices'
+        formule: 'IF(excedent_brut > 0, excedent_brut * ibp_taux, 0)'
+        format: money
+
+      - id: resultat_net
+        label: 'Résultat net mensuel'
+        formule: 'excedent_brut - ibp'
+        format: money
+
+  - id: financement
+    label: 'Financement — emprunt bancaire'
+    lignes:
+      - id: mensualite_emprunt
+        label: 'Mensualité constante'
+        formule: 'IFERROR(-PMT(emprunt_taux_annuel / 12, emprunt_duree_mois, emprunt_capital), 0)'
+        format: money
+
+      - id: service_dette_annuel
+        label: 'Service annuel de la dette'
+        formule: 'mensualite_emprunt * 12'
+        format: money
+
+      - id: interets_annuels_estimes
+        label: 'Intérêts année 1 (estimation)'
+        formule: 'service_dette_annuel - (emprunt_capital / (emprunt_duree_mois / 12))'
+        format: money
+
+  - id: plan_financement
+    label: 'Plan de financement initial'
+    lignes:
+      - id: pf_investissements
+        label: 'Investissements'
+        formule: 'investissements_initiaux'
+        format: money
+      - id: pf_bfr
+        label: 'BFR (stock import et trésorerie de démarrage)'
+        formule: 'bfr_initial'
+        format: money
+      - id: pf_total_besoins
+        label: 'TOTAL BESOINS'
+        formule: 'pf_investissements + pf_bfr'
+        format: money
+      - id: pf_apport
+        label: 'Apport personnel'
+        formule: 'apport_capital'
+        format: money
+      - id: pf_emprunt
+        label: 'Emprunt bancaire'
+        formule: 'emprunt_capital'
+        format: money
+      - id: pf_total_ressources
+        label: 'TOTAL RESSOURCES'
+        formule: 'pf_apport + pf_emprunt'
+        format: money
+      - id: pf_ecart
+        label: 'Écart (ressources − besoins)'
+        formule: 'pf_total_ressources - pf_total_besoins'
+        format: money
+
+  - id: tresorerie
+    label: 'Trésorerie mensuelle année 1 — vue simplifiée (hors variation de BFR et hors intérêts)'
+    lignes:
+      - id: tresorerie_initiale
+        label: "Trésorerie à l'ouverture (M0)"
+        formule: 'apport_capital + emprunt_capital - investissements_initiaux - bfr_initial'
+        format: money
+      - id: solde_mensuel_operationnel
+        label: 'Solde mensuel opérationnel'
+        formule: 'resultat_net - mensualite_emprunt'
+        format: money
+      - id: tresorerie_fin_m1
+        label: 'Trésorerie fin mois 1'
+        formule: 'tresorerie_initiale + solde_mensuel_operationnel * 1'
+        format: money
+      - id: tresorerie_fin_m3
+        label: 'Trésorerie fin mois 3'
+        formule: 'tresorerie_initiale + solde_mensuel_operationnel * 3'
+        format: money
+      - id: tresorerie_fin_m6
+        label: 'Trésorerie fin mois 6'
+        formule: 'tresorerie_initiale + solde_mensuel_operationnel * 6'
+        format: money
+      - id: tresorerie_fin_m9
+        label: 'Trésorerie fin mois 9'
+        formule: 'tresorerie_initiale + solde_mensuel_operationnel * 9'
+        format: money
+      - id: tresorerie_fin_m12
+        label: 'Trésorerie fin mois 12'
+        formule: 'tresorerie_initiale + solde_mensuel_operationnel * 12'
+        format: money
+      - id: tresorerie_min_annee_1
+        label: 'Trésorerie minimale sur les 12 mois'
+        formule: 'MIN(tresorerie_initiale, tresorerie_fin_m12)'
+        format: money
+
+  - id: projection
+    label: 'Projection sur 5 exercices'
+    lignes:
+      - id: ca_annuel_1
+        label: 'CA année 1'
+        formule: 'ca * 12'
+        format: money
+      - id: ca_annuel_2
+        label: 'CA année 2'
+        formule: 'ca_annuel_1 * (1 + taux_croissance_ca)'
+        format: money
+      - id: ca_annuel_3
+        label: 'CA année 3'
+        formule: 'ca_annuel_2 * (1 + taux_croissance_ca)'
+        format: money
+      - id: ca_annuel_4
+        label: 'CA année 4'
+        formule: 'ca_annuel_3 * (1 + taux_croissance_ca)'
+        format: money
+      - id: ca_annuel_5
+        label: 'CA année 5'
+        formule: 'ca_annuel_4 * (1 + taux_croissance_ca)'
+        format: money
+      - id: resultat_annuel_1
+        label: 'Résultat net année 1'
+        formule: 'resultat_net * 12'
+        format: money
+      - id: resultat_annuel_2
+        label: 'Résultat net année 2'
+        formule: 'resultat_annuel_1 * (1 + taux_croissance_ca)'
+        format: money
+      - id: resultat_annuel_3
+        label: 'Résultat net année 3'
+        formule: 'resultat_annuel_2 * (1 + taux_croissance_ca)'
+        format: money
+      - id: resultat_annuel_4
+        label: 'Résultat net année 4'
+        formule: 'resultat_annuel_3 * (1 + taux_croissance_ca)'
+        format: money
+      - id: resultat_annuel_5
+        label: 'Résultat net année 5'
+        formule: 'resultat_annuel_4 * (1 + taux_croissance_ca)'
+        format: money
+      - id: resultat_cumule_3ans
+        label: 'Résultat cumulé sur 3 ans'
+        formule: 'resultat_annuel_1 + resultat_annuel_2 + resultat_annuel_3'
+        format: money
+      - id: resultat_cumule_5ans
+        label: 'Résultat cumulé sur 5 exercices'
+        formule: 'resultat_cumule_3ans + resultat_annuel_4 + resultat_annuel_5'
+        format: money
+
+  - id: ratios
+    label: 'Ratios financiers'
+    lignes:
+      - id: marge_ebe_pct
+        label: 'Marge EBE (EBE / CA)'
+        formule: 'IFERROR(excedent_brut / ca, 0)'
+        format: percent
+        seuil_pack: ratio_marge_ebe_min
+        seuil_direction: min
+
+      - id: marge_nette_pct
+        label: 'Marge nette (Résultat / CA)'
+        formule: 'IFERROR(resultat_net / ca, 0)'
+        format: percent
+        seuil_pack: ratio_marge_nette_min
+        seuil_direction: min
+
+      - id: dscr
+        label: 'DSCR (couverture du service de la dette)'
+        formule: 'IFERROR((excedent_brut * 12) / service_dette_annuel, 0)'
+        format: number
+        seuil_pack: ratio_dscr_min
+        seuil_direction: min
+
+      - id: tresorerie_min_ok
+        label: 'Trésorerie mini sur 12 mois (vue simplifiée — voir onglet Bilan)'
+        formule: 'tresorerie_min_annee_1'
+        format: money
+        seuil_pack: tresorerie_min_seuil
+        seuil_direction: min
+
+      - id: apport_pct
+        label: 'Ratio apport personnel sur besoins'
+        formule: 'IFERROR(apport_capital / pf_total_besoins, 0)'
+        format: percent
+        seuil_pack: ratio_apport_min_pct
+        seuil_direction: min
+
+      - id: payback_annees
+        label: "Délai de récupération de l'investissement"
+        formule: 'IFERROR(emprunt_capital / resultat_annuel_1, 0)'
+        format: number
+        seuil_pack: ratio_payback_max
+        seuil_direction: max
+
+      # ─── Ratios propres au modèle e-commerce COD ──────────────
+      # Sans seuil de pack : ce sont des indicateurs de pilotage, pas des
+      # critères bancaires normés. Ils n'ont donc pas de feu tricolore.
+      - id: roas
+        label: 'ROAS (CA généré par dollar de publicité)'
+        formule: 'IFERROR(ca / cout_publicite, 0)'
+        format: number
+
+      - id: marge_contributive_par_commande_livree
+        label: 'Marge contributive par commande livrée'
+        formule: 'IFERROR(marge_brute / commandes_livrees, 0)'
+        format: money
+
+      - id: cout_complet_par_commande_livree
+        label: "Coût d'acquisition et de livraison par commande livrée"
+        formule: 'IFERROR((cout_publicite + cout_livraison) / commandes_livrees, 0)'
+        format: money
+
+      - id: seuil_taux_livraison
+        label: 'Taux de livraison réussie retenu'
+        formule: 'taux_livraison_reussie'
+        format: percent
