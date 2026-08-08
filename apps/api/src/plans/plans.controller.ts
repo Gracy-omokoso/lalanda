@@ -35,6 +35,21 @@ import { computePlanFingerprint } from './fingerprint.js';
 import type { FinancialPlanDocument } from './plan.schema.js';
 import { PlansService } from './plans.service.js';
 
+/**
+ * Conditions de séparation des tâches au moment du gel (R2, ADR-0012 §6).
+ *
+ * Exposé dans la vue API, et pas seulement stocké : ADR-0012 qualifie
+ * l'auto-approbation d'« information de bancabilité, pas un détail technique ».
+ * Un lecteur du plan — l'entrepreneur, son mentor, un banquier — doit pouvoir
+ * constater qu'une version a été validée par la personne qui l'a saisie.
+ */
+export interface PlanApprovalView {
+  /** L'approbateur était le dernier auteur des hypothèses, faute d'autre habilité. */
+  soleApprover: boolean;
+  /** Dernier auteur des hypothèses figées, `null` si jamais modifiées depuis la création. */
+  inputsAuthor: string | null;
+}
+
 /** Vue légère — liste des versions. */
 export interface PlanSummaryView {
   id: string;
@@ -44,6 +59,7 @@ export interface PlanSummaryView {
   fingerprint: string;
   approvedAt: string;
   approvedBy: string;
+  approval: PlanApprovalView;
   createdAt: string;
 }
 
@@ -206,6 +222,14 @@ function toSummaryView(doc: FinancialPlanDocument): PlanSummaryView {
     fingerprint: doc.fingerprint,
     approvedAt: doc.approvedAt.toISOString(),
     approvedBy: doc.approvedBy,
+    // Défauts défensifs : les plans figés AVANT S20a n'ont pas de bloc `approval`.
+    // Les présenter comme « séparés » serait un mensonge sur des données qu'on
+    // n'a pas — mais `false` est ici la lecture honnête : rien ne prouve qu'ils
+    // aient été auto-approuvés, et la règle R2 n'existait pas encore.
+    approval: {
+      soleApprover: doc.approval?.soleApprover === true,
+      inputsAuthor: doc.approval?.inputsAuthor ?? null,
+    },
     createdAt: doc.createdAt.toISOString(),
   };
 }
