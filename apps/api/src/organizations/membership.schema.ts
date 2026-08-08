@@ -1,10 +1,19 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import type { HydratedDocument } from 'mongoose';
 
+import { ORG_ROLES, type OrgRole } from '../authz/permissions.js';
+
+/** Version courante du schéma — alignée sur la migration S20a. */
+export const MEMBERSHIP_SCHEMA_VERSION = 2;
+
 /**
  * Lien utilisateur ↔ organisation avec rôle (brief §6).
- * S4a : rôles réduits à `owner` et `member`. Les rôles fine-grained (admin, fondateur,
- * comptable, mentor, viewer) arrivent avec les workflows métier (S5-S7).
+ *
+ * S20a : les rôles réduits `owner` / `member` laissent place aux 8 rôles de
+ * docs/12. La migration `apps/api/migrations/20260808-0001-rbac-roles-organisation.mjs`
+ * réécrit l'existant (`owner` → `proprietaire`, `member` → `chef_projet`) et passe
+ * `_schemaVersion` à 2. L'enum n'accepte plus les anciennes valeurs : les entrées
+ * d'API les traduisent (`normalizeOrgRole`) au lieu de les stocker.
  */
 @Schema({ collection: 'memberships', timestamps: true, strict: true })
 export class Membership {
@@ -15,13 +24,18 @@ export class Membership {
   @Prop({ type: String, required: true, index: true })
   organizationId!: string;
 
-  @Prop({ type: String, required: true, enum: ['owner', 'member'], default: 'member' })
-  role!: 'owner' | 'member';
+  @Prop({
+    type: String,
+    required: true,
+    enum: ORG_ROLES as unknown as string[],
+    default: 'lecteur',
+  })
+  role!: OrgRole;
 
   @Prop({ type: Date, default: () => new Date() })
   acceptedAt!: Date;
 
-  @Prop({ type: Number, required: true, default: 1 })
+  @Prop({ type: Number, required: true, default: MEMBERSHIP_SCHEMA_VERSION })
   _schemaVersion!: number;
 }
 

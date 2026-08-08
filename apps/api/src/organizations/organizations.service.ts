@@ -1,8 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
-import { Membership, type MembershipDocument } from './membership.schema.js';
+import { MEMBERSHIP_SCHEMA_VERSION, Membership, type MembershipDocument } from './membership.schema.js';
 import { Organization, type OrganizationDocument } from './organization.schema.js';
 
 @Injectable()
@@ -36,22 +36,27 @@ export class OrganizationsService {
     await this.membershipModel.create({
       userId,
       organizationId: org.id,
-      role: 'owner',
-      _schemaVersion: 1,
+      role: 'proprietaire',
+      _schemaVersion: MEMBERSHIP_SCHEMA_VERSION,
     });
 
     return org;
   }
 
-  /** Retourne la première organisation d'un utilisateur (owner en priorité, puis plus ancienne). */
+  /**
+   * Retourne l'organisation principale d'un utilisateur : celle dont il est
+   * `proprietaire` en priorité, sinon la membership la plus ancienne (l'org
+   * auto-provisionnée à l'inscription).
+   *
+   * S20a : le tri `{ role: -1 }` d'origine reposait sur l'ordre alphabétique de
+   * `owner` > `member`. Avec huit rôles cet accident n'est plus une règle — la
+   * priorité est désormais explicite.
+   */
   async findPrimaryOrgForUser(userId: string): Promise<OrganizationDocument | null> {
-    // `role: -1` en descendant → 'owner' vient avant 'member' alphabétiquement.
-    // `createdAt: 1` → plus ancienne membership d'abord (l'org auto-provisionnée à l'inscription).
-    const primary = await this.membershipModel
-      .findOne({ userId })
-      .sort({ role: -1, createdAt: 1 })
-      .exec();
-    if (!primary) return null;
+    const memberships = await this.membershipModel.find({ userId }).sort({ createdAt: 1 }).exec();
+    if (memberships.length === 0) return null;
+    const primary =
+      memberships.find((m) => normalizeOrgRole(m.role) === 'proprietaire') ?? memberships[0]!;
     return this.orgModel.findById(primary.organizationId).exec();
   }
 
@@ -112,8 +117,8 @@ export class OrganizationsService {
     await this.membershipModel.create({
       userId,
       organizationId: org.id,
-      role: 'owner',
-      _schemaVersion: 1,
+      role: 'proprietaire',
+      _schemaVersion: MEMBERSHIP_SCHEMA_VERSION,
     });
     return org;
   }

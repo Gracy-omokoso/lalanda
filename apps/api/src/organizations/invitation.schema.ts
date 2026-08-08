@@ -1,6 +1,8 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import type { HydratedDocument } from 'mongoose';
 
+import { ORG_ROLES, type OrgRole } from '../authz/permissions.js';
+
 /**
  * Invitation d'un email à rejoindre une organisation (brief §6, docs/12-ROLES-PERMISSIONS.md).
  *
@@ -26,9 +28,13 @@ export class Invitation {
   @Prop({ type: String, required: true })
   invitedBy!: string;
 
-  /** Rôle attribué à l'acceptation. S5d : owner|member. */
-  @Prop({ type: String, required: true, enum: ['owner', 'member'], default: 'member' })
-  role!: 'owner' | 'member';
+  /**
+   * Rôle attribué à l'acceptation. S20a : l'un des 8 rôles de docs/12.
+   * Défaut `lecteur` — refus par défaut (docs/17 § Autorisation) : inviter sans
+   * préciser de rôle ne doit jamais accorder de droit d'écriture.
+   */
+  @Prop({ type: String, required: true, enum: ORG_ROLES as unknown as string[], default: 'lecteur' })
+  role!: OrgRole;
 
   /**
    * Token opaque partagé dans l'URL d'acceptation. 64 chars hex — non devinable.

@@ -16,6 +16,7 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 
+import type { OrgRole } from '../authz/permissions.js';
 import { OrganizationsService } from '../organizations/organizations.service.js';
 import { getAuth } from './auth.js';
 
@@ -24,6 +25,8 @@ const ACTIVE_ORG_COOKIE = 'active_org_id';
 export interface AuthenticatedRequest extends Request {
   user?: { id: string; email: string; name?: string | null };
   orgId?: string;
+  /** Rôle d'organisation résolu par `PermissionsGuard` (S20a) — voir `authz/`. */
+  orgRole?: OrgRole;
 }
 
 @Injectable()
