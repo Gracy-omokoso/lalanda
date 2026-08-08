@@ -81,6 +81,57 @@ export function ciblesDeTransfert(members: readonly MemberView[], moiUserId: str
   return members.filter((m) => m.userId !== moiUserId && m.role !== 'owner');
 }
 
+/**
+ * Ligne de l'acteur courant dans la liste des membres — `null` s'il ne s'y
+ * trouve pas.
+ *
+ * C'est la SEULE source du rôle de l'acteur dans cette page. `GET /organizations`
+ * est appelé une fois au montage : après un transfert de propriété, son
+ * `roleLabel` dit encore « Propriétaire » alors que l'acteur est devenu
+ * Administrateur. Un rôle périmé affiché à côté de commandes recalculées, elles,
+ * à partir des drapeaux frais, c'est l'interface qui se contredit — et le
+ * transfert est justement l'opération qui rétrograde l'acteur lui-même.
+ */
+export function membreActeur(
+  members: readonly MemberView[],
+  moiUserId: string | null,
+): MemberView | null {
+  if (!moiUserId) return null;
+  return members.find((m) => m.userId === moiUserId) ?? null;
+}
+
+/**
+ * Libellé du rôle de l'acteur, frais si la liste des membres est disponible.
+ *
+ * Le repli sur l'instantané de l'organisation sert les rôles qui n'ont pas
+ * `organization.manage` : ils reçoivent un 403 sur `GET /members`, n'ont donc
+ * aucune liste — et n'ont non plus aucun moyen de changer leur propre rôle
+ * depuis cette page, l'instantané ne peut pas se périmer sous leurs yeux.
+ */
+export function libelleRoleActeur(
+  members: readonly MemberView[],
+  moiUserId: string | null,
+  repli: string | null,
+): string | null {
+  return membreActeur(members, moiUserId)?.roleLabel ?? repli;
+}
+
+/**
+ * L'acteur est-il propriétaire ? Dérivé de la liste vivante, jamais d'un
+ * instantané : c'est ce qui commande l'affichage du bloc de transfert.
+ *
+ * Sans identité connue (`GET /account/profile` en échec), on répond `false` : le
+ * serveur refusera de toute façon un transfert demandé par un non-propriétaire,
+ * et offrir la commande à tout le monde ferait de ce refus la règle plutôt que
+ * l'exception.
+ */
+export function acteurEstProprietaire(
+  members: readonly MemberView[],
+  moiUserId: string | null,
+): boolean {
+  return membreActeur(members, moiUserId)?.role === 'owner';
+}
+
 /** Rôles proposables dans un sélecteur — les non-attribuables sont écartés. */
 export function rolesProposables(options: readonly RoleOption[]): RoleOption[] {
   return options.filter((o) => o.grantable);

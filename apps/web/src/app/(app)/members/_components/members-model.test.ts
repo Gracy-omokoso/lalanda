@@ -9,9 +9,12 @@ import { describe, expect, it } from 'vitest';
 import type { MemberView, RoleOption } from '@/lib/api';
 
 import {
+  acteurEstProprietaire,
   afficheDroitCloture,
   ciblesDeTransfert,
   codeErreur,
+  libelleRoleActeur,
+  membreActeur,
   messageErreur,
   nomAffiche,
   raisonNonModifiable,
@@ -131,6 +134,50 @@ describe('cibles de transfert de propriété', () => {
     expect(ciblesDeTransfert([moi, autreProprio, admin], 'moi').map((m) => m.userId)).toEqual([
       'a1',
     ]);
+  });
+});
+
+describe('rôle de l’acteur — dérivé de la liste vivante, pas d’un instantané', () => {
+  const avant = [
+    membre({ userId: 'moi', role: 'owner', roleLabel: 'Propriétaire' }),
+    membre({ userId: 'a1', role: 'admin', roleLabel: 'Administrateur' }),
+  ];
+  // Ce que renvoie `GET /members` juste après `transferOwnership` : l'acteur a
+  // été rétrogradé, la cible a été promue.
+  const apresTransfert = [
+    membre({ userId: 'moi', role: 'admin', roleLabel: 'Administrateur' }),
+    membre({ userId: 'a1', role: 'owner', roleLabel: 'Propriétaire', isLastOwner: true }),
+  ];
+
+  it('suit le transfert de propriété au lieu de rester au rôle du montage', () => {
+    expect(acteurEstProprietaire(avant, 'moi')).toBe(true);
+    expect(libelleRoleActeur(avant, 'moi', 'Propriétaire')).toBe('Propriétaire');
+
+    // Le repli porte encore l'instantané périmé de `GET /organizations`, chargé
+    // une seule fois au montage : c'est exactement lui qu'il ne faut pas croire.
+    expect(acteurEstProprietaire(apresTransfert, 'moi')).toBe(false);
+    expect(libelleRoleActeur(apresTransfert, 'moi', 'Propriétaire')).toBe('Administrateur');
+  });
+
+  it('retire le bloc de transfert à l’ancien propriétaire', () => {
+    // Sans cela, la commande la moins réversible de la page reste offerte à
+    // quelqu'un que le serveur refusera désormais (`OWNER_ROLE_REQUIRED`).
+    expect(acteurEstProprietaire(apresTransfert, 'moi')).toBe(false);
+    expect(ciblesDeTransfert(apresTransfert, 'moi').map((m) => m.userId)).toEqual([]);
+  });
+
+  it('n’offre pas le transfert quand l’identité de l’acteur est inconnue', () => {
+    // `GET /account/profile` peut échouer : on ne devine pas qui est « Vous ».
+    expect(membreActeur(avant, null)).toBeNull();
+    expect(acteurEstProprietaire(avant, null)).toBe(false);
+  });
+
+  it('retombe sur l’instantané quand l’acteur n’est pas dans la liste', () => {
+    // Cas du rôle sans `organization.manage` : 403 sur `GET /members`, donc
+    // aucune liste — mais aussi aucun moyen de périmer son propre rôle ici.
+    expect(libelleRoleActeur([], 'moi', 'Lecteur')).toBe('Lecteur');
+    expect(libelleRoleActeur([], 'moi', null)).toBeNull();
+    expect(acteurEstProprietaire([], 'moi')).toBe(false);
   });
 });
 
