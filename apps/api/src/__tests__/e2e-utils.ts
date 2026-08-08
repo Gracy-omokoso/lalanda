@@ -147,6 +147,10 @@ export async function purgeTestUsers(db: Db, emails: string[]): Promise<void> {
     db.collection('session').deleteMany({ userId: { $in: userObjectIds } }),
     db.collection('account').deleteMany({ userId: { $in: userObjectIds } }),
     db.collection('memberships').deleteMany({ userId: { $in: userIds } }),
+    // Collections de l'espace compte (S20b) : scopées par UTILISATEUR et non par
+    // organisation, elles ne sont donc pas couvertes par ORG_SCOPED_COLLECTIONS.
+    db.collection('user_preferences').deleteMany({ userId: { $in: userIds } }),
+    db.collection('email_change_requests').deleteMany({ userId: { $in: userIds } }),
   ]);
 
   await db.collection('organizations').deleteMany({ _id: { $in: orgObjectIds } });

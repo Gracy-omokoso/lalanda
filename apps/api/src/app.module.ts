@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { LoggerModule } from 'nestjs-pino';
 
+import { AccountModule } from './account/account.module.js';
 import { ActualsModule } from './actuals/actuals.module.js';
 import { AiModule } from './ai/ai.module.js';
 import { AuthModule } from './auth/auth.module.js';
@@ -51,6 +52,7 @@ import { ThrottlingModule } from './security/throttling.module.js';
     ThrottlingModule,
     OrganizationsModule,
     AuthModule,
+    AccountModule,
     BillingModule,
     ParameterPacksModule,
     ProjectsModule,
