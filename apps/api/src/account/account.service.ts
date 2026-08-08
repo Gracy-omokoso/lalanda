@@ -6,6 +6,7 @@ import { Membership, type MembershipDocument } from '../organizations/membership
 import { Organization, type OrganizationDocument } from '../organizations/organization.schema.js';
 import type { PutPreferencesInput, PutProfileInput } from './account.dto.js';
 import { EmailChangeRequest, type EmailChangeRequestDocument } from './email-change.schema.js';
+import { isOwnerRole } from './owner-role.js';
 import {
   UserPreferences,
   type NotificationPreferences,
@@ -176,21 +177,27 @@ export class AccountService {
    * - d'autres membres et un autre propriétaire → autorisé : la gouvernance survit.
    * - aucun autre membre → autorisé, l'organisation est supprimée avec le compte.
    *   Rien n'est orphelin puisque plus personne n'y a accès.
+   *
+   * Le rôle propriétaire est résolu par `isOwnerRole` et non comparé en dur ici :
+   * voir `owner-role.ts` pour la raison et le point de rebase RBAC (ADR-0012 §7).
    */
   async assessDeletion(userId: string): Promise<DeletionAssessment> {
     const memberships = await this.membershipModel.find({ userId }).exec();
-    const ownedOrgIds = memberships.filter((m) => m.role === 'owner').map((m) => m.organizationId);
+    const ownedOrgIds = memberships.filter((m) => isOwnerRole(m.role)).map((m) => m.organizationId);
 
     const blockingOrganizations: BlockingOrganization[] = [];
     const organizationsDeletedWithAccount: Array<{ id: string; name: string }> = [];
 
     for (const organizationId of ownedOrgIds) {
-      const [otherMemberCount, otherOwnerCount] = await Promise.all([
-        this.membershipModel.countDocuments({ organizationId, userId: { $ne: userId } }).exec(),
-        this.membershipModel
-          .countDocuments({ organizationId, userId: { $ne: userId }, role: 'owner' })
-          .exec(),
-      ]);
+      // Une seule lecture des appartenances, puis comptage EN MÉMOIRE : un
+      // `countDocuments({ role: 'owner' })` ferait une comparaison exacte côté
+      // Mongo, là où `isOwnerRole` tolère casse et espaces. Deux règles
+      // différentes pour la même question finiraient par diverger.
+      const others = await this.membershipModel
+        .find({ organizationId, userId: { $ne: userId } })
+        .exec();
+      const otherMemberCount = others.length;
+      const otherOwnerCount = others.filter((m) => isOwnerRole(m.role)).length;
 
       const org = await this.orgModel.findById(organizationId).exec();
       const name = org?.name ?? 'Organisation';
