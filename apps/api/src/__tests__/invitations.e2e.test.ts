@@ -7,20 +7,15 @@
 import { INestApplication } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { toNodeHandler } from 'better-auth/node';
-import { config as loadDotenv } from 'dotenv';
-import mongoose from 'mongoose';
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, expect, it } from 'vitest';
 
 import 'reflect-metadata';
 
-const envPath = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../.env');
-loadDotenv({ path: envPath });
+import { e2eSuite, teardown } from './e2e-utils.js';
 
-const hasMongo = Boolean(process.env['MONGODB_URI']);
+import { e2eSuite, teardown } from './e2e-utils.js';
 
 async function makeApp(): Promise<INestApplication> {
   const { AppModule } = await import('../app.module.js');
@@ -38,9 +33,7 @@ async function makeApp(): Promise<INestApplication> {
   return app;
 }
 
-const suite = hasMongo ? describe : describe.skip;
-
-suite('invitations (brief §6, docs/12-ROLES-PERMISSIONS.md)', () => {
+e2eSuite('invitations (brief §6, docs/12-ROLES-PERMISSIONS.md)', () => {
   let app: INestApplication;
   const allTestEmails: string[] = [];
 
@@ -62,28 +55,7 @@ suite('invitations (brief §6, docs/12-ROLES-PERMISSIONS.md)', () => {
   }, 60_000);
 
   afterAll(async () => {
-    try {
-      const db = mongoose.connection.db;
-      if (db) {
-        await Promise.all([
-          db.collection('user').deleteMany({ email: { $in: allTestEmails } }),
-          db.collection('session').deleteMany({}),
-          db.collection('account').deleteMany({}),
-          db.collection('invitations').deleteMany({}),
-          db
-            .collection('organizations')
-            .deleteMany({ slug: { $regex: /^owner|^invitee|^outsider|^revoke/ } })
-            .catch(() => {}),
-          db
-            .collection('memberships')
-            .deleteMany({})
-            .catch(() => {}),
-        ]);
-      }
-    } catch {
-      /* best-effort */
-    }
-    await app?.close();
+    await teardown(app, allTestEmails);
   }, 30_000);
 
   async function registerAndLogin(user: {

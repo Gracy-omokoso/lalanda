@@ -14,19 +14,14 @@
 import { INestApplication } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { toNodeHandler } from 'better-auth/node';
-import { config as loadDotenv } from 'dotenv';
-import mongoose from 'mongoose';
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, expect, it } from 'vitest';
 
 import 'reflect-metadata';
 
-const envPath = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../.env');
-loadDotenv({ path: envPath });
+import { e2eSuite, teardown } from './e2e-utils.js';
 
-const hasMongo = Boolean(process.env['MONGODB_URI']);
+import { e2eSuite, teardown } from './e2e-utils.js';
 
 // Import différé — évite de charger better-auth (qui essaie de se connecter) si on skip.
 async function makeApp(): Promise<INestApplication> {
@@ -46,9 +41,7 @@ async function makeApp(): Promise<INestApplication> {
   return app;
 }
 
-const suite = hasMongo ? describe : describe.skip;
-
-suite('isolation multi-tenant (brief §11 S4)', () => {
+e2eSuite('isolation multi-tenant (brief §11 S4)', () => {
   let app: INestApplication;
 
   const tag = Math.random().toString(36).slice(2, 8);
@@ -68,40 +61,7 @@ suite('isolation multi-tenant (brief §11 S4)', () => {
   }, 60_000);
 
   afterAll(async () => {
-    // Nettoyage : supprime les documents de test créés (garde la DB Atlas propre).
-    try {
-      const db = mongoose.connection.db;
-      if (db) {
-        await Promise.all([
-          db.collection('user').deleteMany({ email: { $in: [userA.email, userB.email] } }),
-          db.collection('session').deleteMany({}),
-          db.collection('account').deleteMany({}),
-          db
-            .collection('projects')
-            .deleteMany({ createdBy: { $exists: true } })
-            .catch(() => {}),
-          db
-            .collection('organizations')
-            .deleteMany({
-              ownerId: { $exists: true },
-              slug: { $regex: /^alice|^bob/ },
-            })
-            .catch(() => {}),
-          db
-            .collection('memberships')
-            .deleteMany({})
-            .catch(() => {}),
-          // (S16b) Abonnements de test seedés via BillingService.
-          db
-            .collection('subscriptions')
-            .deleteMany({})
-            .catch(() => {}),
-        ]);
-      }
-    } catch {
-      // Best-effort — pas critique.
-    }
-    await app?.close();
+    await teardown(app, [userA.email, userB.email]);
   }, 30_000);
 
   async function registerAndLogin(user: {

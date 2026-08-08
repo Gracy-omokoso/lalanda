@@ -22,19 +22,15 @@
 import { INestApplication } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { toNodeHandler } from 'better-auth/node';
-import { config as loadDotenv } from 'dotenv';
-import mongoose, { type Model } from 'mongoose';
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
+import type { Model } from 'mongoose';
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, expect, it } from 'vitest';
 
 import 'reflect-metadata';
 
-const envPath = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../.env');
-loadDotenv({ path: envPath });
+import { e2eSuite, teardown } from './e2e-utils.js';
 
-const hasMongo = Boolean(process.env['MONGODB_URI']);
+import { e2eSuite, teardown } from './e2e-utils.js';
 
 async function makeApp(): Promise<INestApplication> {
   const { AppModule } = await import('../app.module.js');
@@ -80,9 +76,7 @@ interface ProjectionLineBody {
   ecartVsPlan: number | null;
 }
 
-const suite = hasMongo ? describe : describe.skip;
-
-suite('périodes réalisées, clôture et écarts (S18b — docs/08)', () => {
+e2eSuite('périodes réalisées, clôture et écarts (S18b — docs/08)', () => {
   let app: INestApplication;
 
   const tag = Math.random().toString(36).slice(2, 8);
@@ -132,36 +126,7 @@ suite('périodes réalisées, clôture et écarts (S18b — docs/08)', () => {
   }, 60_000);
 
   afterAll(async () => {
-    try {
-      // Nest ouvre SA connexion : `mongoose.connection` (la connexion globale par
-      // défaut) n'est pas celle de l'app et laisserait le nettoyage sans effet.
-      const { getConnectionToken } = await import('@nestjs/mongoose');
-      const db = app.get<mongoose.Connection>(getConnectionToken()).db;
-      if (db) {
-        await Promise.all([
-          db
-            .collection('user')
-            .deleteMany({ email: { $in: [owner.email, member.email, outsider.email] } }),
-          db.collection('actual_periods').deleteMany({ projectId }),
-          db.collection('financial_plans').deleteMany({ projectId }),
-          db
-            .collection('invitations')
-            .deleteMany({ organizationId: ownerOrgId })
-            .catch(() => {}),
-          db
-            .collection('projects')
-            .deleteMany({ name: { $regex: `${tag}$` } })
-            .catch(() => {}),
-          db
-            .collection('organizations')
-            .deleteMany({ slug: { $regex: /^actowner|^actmember|^actout/ } })
-            .catch(() => {}),
-        ]);
-      }
-    } catch {
-      // Best-effort.
-    }
-    await app?.close();
+    await teardown(app, [owner.email, member.email, outsider.email]);
   }, 30_000);
 
   async function registerAndLogin(user: {

@@ -13,6 +13,10 @@ concurrency:
 env:
   NODE_VERSION: '20'
   PNPM_VERSION: '9.15.0'
+  MONGO_IMAGE: 'mongo:7.0'
+  # Base dédiée aux tests — jamais `lalanda`, pour qu'un run de CI ne puisse pas
+  # écrire dans une base applicative si l'URI venait à pointer ailleurs.
+  MONGODB_DB: 'lalanda_ci'
 
 jobs:
   quality:
@@ -48,11 +52,95 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      # Les tests e2e ont besoin d'un replica set : le code ouvre des transactions
+      # Mongoose (ADR-0004), indisponibles sur un mongod autonome. Un `services:`
+      # GitHub Actions ne permet pas de passer `--replSet` (aucune surcharge de la
+      # commande du conteneur) ni de lancer `rs.initiate` — on démarre donc le
+      # conteneur à la main, en miroir de `docker-compose.yml`.
+      - name: Démarrer MongoDB (replica set rs0 — ADR-0004)
+        run: |
+          set -euo pipefail
+
+          docker run -d --name lalanda-ci-mongo -p 27017:27017 "$MONGO_IMAGE" \
+            --replSet rs0 --bind_ip_all --port 27017
+
+          echo "Attente de la disponibilité de mongod…"
+          for i in $(seq 1 60); do
+            if docker exec lalanda-ci-mongo mongosh --quiet \
+                 --eval 'db.adminCommand({ ping: 1 }).ok' >/dev/null 2>&1; then
+              echo "mongod répond (tentative $i)."
+              break
+            fi
+            if [ "$i" -eq 60 ]; then
+              echo "::error::mongod n'a pas démarré en 120 s."
+              docker logs lalanda-ci-mongo || true
+              exit 1
+            fi
+            sleep 2
+          done
+
+          # Membre déclaré sur localhost:27017 : c'est l'adresse que le runner
+          # utilise, et `directConnection=true` évite toute redécouverte de
+          # topologie sur un hostname qu'il ne saurait pas résoudre.
+          docker exec lalanda-ci-mongo mongosh --quiet --eval '
+            rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "localhost:27017" }] })
+          '
+
+          echo "Attente de l'élection du primaire…"
+          for i in $(seq 1 60); do
+            if docker exec lalanda-ci-mongo mongosh --quiet \
+                 --eval 'db.hello().isWritablePrimary' 2>/dev/null | grep -qx true; then
+              echo "Replica set rs0 prêt (tentative $i)."
+              break
+            fi
+            if [ "$i" -eq 60 ]; then
+              echo "::error::Aucun primaire élu après 120 s."
+              docker exec lalanda-ci-mongo mongosh --quiet --eval 'rs.status()' || true
+              exit 1
+            fi
+            sleep 2
+          done
+
+          # Garde-fou : sans transactions, les e2e échoueraient avec un message
+          # obscur. On le vérifie ici, une fois, explicitement.
+          docker exec lalanda-ci-mongo mongosh --quiet --eval '
+            const s = db.getMongo().startSession();
+            s.startTransaction();
+            s.getDatabase("'"$MONGODB_DB"'").ci_probe.insertOne({ ok: 1 });
+            s.commitTransaction();
+            s.endSession();
+            print("Transactions opérationnelles.");
+          '
+
       - name: Test
         run: pnpm test
         env:
-          # Env de test minimale — pas de vraies connexions requises pour les unitaires S0.
           NODE_ENV: test
+          LOG_LEVEL: error
+          # Fait échouer toute suite e2e qui tenterait de se skipper (voir
+          # apps/api/src/__tests__/e2e-utils.ts) et active le rapport JSON
+          # consommé par l'étape de vérification suivante.
+          LALANDA_REQUIRE_E2E: '1'
+          MONGODB_URI: mongodb://localhost:27017/${{ env.MONGODB_DB }}?replicaSet=rs0&directConnection=true
+          MONGODB_DB: ${{ env.MONGODB_DB }}
+          # Secrets FACTICES, valides uniquement pour la CI : aucun service externe
+          # n'est appelé par les tests. AUTH_SECRET doit faire ≥ 32 caractères
+          # (packages/shared/src/env), OPENAI_API_KEY est non vide mais inutilisée.
+          AUTH_SECRET: ci-secret-non-production-0123456789abcdef
+          AUTH_URL: http://localhost:3000
+          AUTH_REQUIRE_EMAIL_VERIFICATION: 'false'
+          API_URL: http://localhost:3001
+          WEB_URL: http://localhost:3000
+          OPENAI_API_KEY: sk-ci-cle-factice-non-utilisee
+
+      # Preuve que le job n'est pas « vert parce que skippé » : échoue si une
+      # suite e2e n'a pas réellement tourné.
+      - name: Vérifier l'exécution réelle des e2e
+        run: node scripts/verify-e2e-executed.mjs
+
+      - name: Journaux MongoDB (si échec)
+        if: failure()
+        run: docker logs lalanda-ci-mongo || true
 
       - name: Build
         run: pnpm build
