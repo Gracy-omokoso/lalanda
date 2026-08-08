@@ -30,6 +30,7 @@ export interface ProjectTab {
 
 export const PROJECT_TABS: ProjectTab[] = [
   { segment: '', label: 'Plan' },
+  { segment: 'realise', label: 'Réalisé' },
   { segment: 'canvas', label: 'Canvas' },
   { segment: 'objectifs', label: 'Objectifs' },
 ];

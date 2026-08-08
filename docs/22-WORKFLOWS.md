@@ -31,6 +31,12 @@ Un plan n’est ni modifié ni supprimé par une opération ordinaire.
 
 La réouverture exige permission et motif. Les modifications après réouverture sont auditables.
 
+### Implémenté (S18b)
+
+- Machine d’état réduite à `open ↔ closed` : l’état `review` et le workflow de validation par un tiers ne sont pas livrés. Une période naît `open` au premier `PUT /projects/:id/actual-periods/:year/:month`, ou vide à la clôture d’un mois sans activité.
+- Transitions refusées explicitement : saisir sur une période clôturée → `409 { code: 'PERIOD_CLOSED' }` ; re-clôturer → `409 { code: 'PERIOD_ALREADY_CLOSED' }` ; rouvrir une période ouverte → `409 { code: 'PERIOD_NOT_CLOSED' }`.
+- Réouverture = action sensible : **owner de l’organisation uniquement** (`403 REOPEN_OWNER_ONLY`), motif non vide obligatoire (`400 REOPEN_REASON_REQUIRED`), et trace append-only `{ reopenedAt, reopenedBy, reason }` jamais purgée. Voir docs/08 § Implémenté (S18b).
+
 ## Country Pack
 
 `draft → review → approved → active → retired`

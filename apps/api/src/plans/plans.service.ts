@@ -100,6 +100,21 @@ export class PlansService {
     return this.model.find({ organizationId, projectId }).sort({ version: -1 }).exec();
   }
 
+  /**
+   * Dernier plan `approved` d'un projet, ou `null`. Requête ciblée : contrairement
+   * à `listByProject`, elle ne rapatrie pas tous les snapshots (chaque document
+   * embarque un `result` moteur complet) juste pour en garder un seul.
+   */
+  findLatestApproved(
+    organizationId: string,
+    projectId: string,
+  ): Promise<FinancialPlanDocument | null> {
+    return this.model
+      .findOne({ organizationId, projectId, status: 'approved' })
+      .sort({ version: -1 })
+      .exec();
+  }
+
   /** Détail d'une version précise. 404 si absente ou hors scope org. */
   async findVersion(
     organizationId: string,
