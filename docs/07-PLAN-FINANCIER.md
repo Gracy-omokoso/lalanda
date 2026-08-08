@@ -66,6 +66,158 @@ Une validation fige entrées, moteur, Country Pack, date, auteur et résultats. 
 - **Exports figés** : `?planVersion=N` sur `/projects/:id/report/pdf` et `/report/xlsx` repart du snapshot **sans aucun recalcul moteur** ; le PDF affiche « Plan validé v{N} du {date} ». Sans paramètre, l'export reste un recalcul live marqué « BROUILLON — non validé ».
 - **Limite connue** : on ne ré-exécute pas les moteurs historiques. Les chiffres exportés viennent exclusivement du snapshot ; en revanche la mise en forme (labels des hypothèses, formules Excel reconstruites) s'appuie sur la version **courante** du template au moment de l'export. Si un template évolue fortement, les formules Excel d'un vieux plan peuvent diverger de celles d'origine — les valeurs, elles, restent figées.
 
+## Implémenté (S18a — FIN-001)
+
+Horizon, bilan prévisionnel, BFR, CAF et seuil de rentabilité sont livrés. Le
+module `packages/engine/src/etats-financiers/` calcule ces états hors
+HyperFormula — même parti pris que la feuille `amortissements` (S14c) : un
+déroulé pluriannuel avec report de stocks d'un exercice sur l'autre ne se
+modélise pas en lignes/formules ponctuelles du DSL.
+
+- **Horizon 5 exercices.** `horizon_projection_annees` passe par défaut de 3 à 5
+  et les 3 templates sectoriels déclinent leur projection sur 5 exercices
+  (`ca_annuel_1..5`, `resultat_annuel_1..5`). La ligne `resultat_cumule_3ans`
+  est conservée telle quelle ; `resultat_cumule_5ans` s'y ajoute.
+- **Activation par template.** Un bloc DSL **optionnel** `structure_financiere`
+  désigne les lignes et drivers du modèle (achats variables, charges fixes,
+  délais). Il n'introduit aucune règle de calcul. Un template sans ce bloc est
+  strictement inchangé — compatibilité S6→S14 préservée.
+- **BFR.** Trois drivers par template (`delai_clients_jours`,
+  `delai_fournisseurs_jours`, `rotation_stock_jours`) avec des défauts
+  sectoriels. Détail annuel exposé en `pf_bfr_*` dans `plan_financement`
+  (ADR-0011 § Contrat 2 : pas de feuille dédiée). La variation de BFR alimente
+  la trésorerie.
+- **CAF.** Feuille `caf` : `caf_resultat_net_annuel_N` + `caf_dotations_annuel_N`
+  = `caf_totale_annuel_N`, par exercice. Les dotations sont réintégrées : charge
+  comptable, pas sortie de trésorerie.
+- **Bilan prévisionnel.** Feuille `bilan` : actif (immobilisations nettes via VNC,
+  stocks, créances, trésorerie) et passif (capitaux propres + résultats cumulés,
+  dettes financières via échéancier PMT, fournisseurs, dettes fiscales et
+  sociales), plus un bilan d'ouverture et l'échéancier détaillé de la dette.
+- **Seuil de rentabilité.** Feuille `seuil_rentabilite` : ventilation
+  fixe / variable, CA au seuil, point mort en mois et en jours, marge de
+  sécurité.
+- **Feux tricolores.** `bilan_autonomie_financiere_annuel_N` porte un feu quand
+  le pack fournit `ratio_autonomie_financiere_min` ; sinon la ligne reste
+  informative. Les autres nouvelles lignes sont informatives (aucun paramètre de
+  seuil correspondant dans les packs à ce jour).
+
+### Invariant « bilan équilibré » — comment il est obtenu
+
+**Aucun poste d'ajustement.** L'égalité actif = passif est obtenue par
+construction : la trésorerie de clôture est le déroulé du tableau de flux
+(méthode indirecte), jamais un solde de bouclage.
+
+```
+Actif_N  = VNC_N + Stocks_N + Créances_N + Trésorerie_N
+Passif_N = Capitaux propres_N + Dettes financières_N + Fournisseurs_N + DFS_N
+
+VNC_N   = VNC_{N-1} − DAP_N
+BFR_N   = Stocks_N + Créances_N − Fournisseurs_N − DFS_N
+Tréso_N = Tréso_{N-1} + CAF_N − ΔBFR_N − Remboursement capital_N
+CP_N    = CP_{N-1} + Résultat net_N
+Dette_N = Dette_{N-1} − Remboursement capital_N
+CAF_N   = Résultat net_N + DAP_N
+```
+
+Par récurrence : `Actif_N − Passif_N = (Actif_{N-1} − Passif_{N-1}) − DAP_N +
+CAF_N − RN_N = 0`. L'écart exposé par `bilan_ecart_equilibre_*` n'est donc que
+du bruit d'arrondi flottant. Il est testé à 0,01 près sur les 3 templates × 5
+exercices, et rejoué sur 7 scénarios déformants.
+
+### Conventions retenues — à revalider par un expert-comptable
+
+1. **Année commerciale de 360 jours** pour convertir les délais en montants.
+2. **Économie d'impôt non modélisée.** Le résultat net du bilan est le résultat
+   du compte d'exploitation (déjà net d'IBP) diminué des dotations et des
+   intérêts d'emprunt ; l'IBP reste assis sur l'EBE. Hypothèse volontairement
+   **prudente** : le résultat net, les capitaux propres et la trésorerie sont
+   minorés.
+3. **Dettes fiscales et sociales non modélisées** (IBP supposé réglé sur
+   l'exercice). La ligne existe, à zéro, pour que l'ajout futur reste additif.
+4. **Fournisseurs assis sur les seuls achats variables** ; les charges fixes sont
+   supposées réglées comptant. Hypothèse **prudente** : le BFR est majoré.
+5. **Immobilisations brutes = driver `investissements_initiaux`** (pilotable par
+   l'utilisateur). La liste `immobilisations` ne sert qu'à calculer les
+   dotations ; l'écart éventuel est exposé et ne rompt pas l'équilibre.
+6. **BFR d'ouverture = driver `bfr_initial`**, présenté en bloc. Le driver était
+   intitulé « Trésorerie de sécurité (BFR) » alors que son identifiant et son
+   usage en font du fonds de roulement : le libellé est aligné en
+   « Fonds de roulement de démarrage ». La trésorerie d'ouverture du bilan reste
+   égale à la ligne existante `tresorerie_initiale`.
+
+### Les trois « résultat net » — à ne pas confondre
+
+Le moteur expose trois grandeurs distinctes qui portent toutes le mot « résultat
+net ». Tout consommateur (écarts, objectifs, exports) doit choisir explicitement.
+
+| `lineId` | Feuille | Périmètre |
+|---|---|---|
+| `resultat_net` | `activite` | **mensuel**, net d'IBP, **avant** dotations et intérêts |
+| `resultat_annuel_N` | `projection` | **annuel**, net d'IBP, **avant** dotations et intérêts |
+| `caf_resultat_net_annuel_N` | `caf` | **annuel**, net d'IBP, **après** dotations et intérêts — c'est celui qui alimente les capitaux propres du bilan |
+
+Seul `caf_resultat_net_annuel_N` est le résultat net comptable au sens du bilan.
+Son libellé porte la mention « (après dotations et intérêts) » pour lever
+l'ambiguïté à la lecture ; un test verrouille cette distinction.
+
+### Limites connues
+
+- Les scénarios (base / prudent / ambitieux) ne sont toujours pas implémentés.
+- **Divergence des deux trésoreries.** La feuille `tresorerie` est une vue
+  mensuelle simplifiée de l'année 1 : elle projette un solde constant et ignore
+  la variation de BFR ainsi que les intérêts, contrairement au bilan. Les deux
+  vues ne se recoupent qu'à l'ouverture et l'écart croît avec le délai clients.
+  Conséquences traitées en S18a : la feuille, son onglet Excel et sa section PDF
+  portent la mention « vue simplifiée », une note de rapprochement est rendue
+  sous le bilan (PDF et dashboard), et le ratio `tresorerie_min_ok` — dont le feu
+  tricolore est calculé sur cette vue optimiste — le signale dans son libellé.
+  L'unification réelle suppose la mensualisation (extension DSL temporelle) :
+  **ticket séparé**.
+- **Pas d'effet de levier opérationnel.** Les charges d'exploitation dites fixes
+  du seuil de rentabilité sont indexées sur la croissance du CA (voir arbitrage
+  ci-dessous) : elles n'apportent aucun levier. Seuls les dotations et les
+  intérêts, réellement fixes, font progresser le seuil moins vite que
+  l'activité. Le levier réel est donc **sous-estimé**. Correctif : distinguer la
+  croissance des charges fixes et variables **dans la projection elle-même**, ce
+  qui revalorise `resultat_annuel_2..3` — **ticket séparé** (rupture de
+  non-régression assumée, à cadrer).
+- **Pas d'investissement de renouvellement.** `bilan_immobilisations_brutes_*`
+  est constant sur les 5 exercices : le modèle ne prévoit aucun capex de
+  remplacement. Sur un horizon de 5 ans, la VNC tend donc vers zéro (elle
+  atteint zéro pour le matériel informatique et les logiciels, amortis en 3 ans)
+  sans qu'aucun réinvestissement ne vienne la reconstituer. Un dossier bancaire
+  sur 5 ans devrait porter un plan de renouvellement : **ticket séparé**.
+- DSCR, VAN, TRI, burn rate et runway restent à faire.
+
+### Arbitrage — pourquoi les charges fixes suivent le CA
+
+La feuille `projection` (S12-lite) pose `resultat_annuel_N = resultat_annuel_1 ×
+(1+g)^(N−1)`, c'est-à-dire une structure de coûts **entièrement
+proportionnelle**. Indexer les charges fixes sur l'inflation dans le seul seuil
+de rentabilité ferait diverger `CA_N − achats_N − charges fixes_N` de l'EBE
+impliqué par `resultat_annuel_N` : le seuil de rentabilité et le compte de
+résultat afficheraient **deux structures de coûts incompatibles dans le même
+dossier bancaire** — exactement le défaut que la divergence des trésoreries a
+révélé. La cohérence a été préférée, la limite est nommée dans le libellé de la
+ligne, affichée sous le tableau et couverte par deux tests. Le correctif de fond
+passe par la projection, donc par un ticket dédié.
+
+### Contrôle de cohérence des immobilisations
+
+Le bilan retient comme immobilisations brutes le driver
+`investissements_initiaux`, tandis que les dotations viennent de la liste
+`immobilisations` du template. Si la base déclarée dépasse le driver,
+l'amortissement cumulé finirait par excéder la valeur brute et **l'actif
+immobilisé passerait sous zéro** — une absurdité que l'équilibre comptable ne
+détecte pas, la trésorerie absorbant l'écart via la CAF.
+
+Le cumul des dotations est donc **plafonné à la valeur brute** ; la dotation
+retenue reste la variation du cumul plafonné, ce qui préserve exactement
+l'invariant d'équilibre. L'incohérence est signalée par
+`bilan_immobilisations_ecart_base_amortissable` et affichée **en rouge** sur le
+dashboard, avec la consigne de corriger avant dépôt.
+
 ## Exports
 
 Excel conserve les formules ou pistes d’audit nécessaires selon le modèle choisi; PDF présente les tableaux, hypothèses, diagnostics et avertissements. Chaque export porte version, pays, devise, période et date.

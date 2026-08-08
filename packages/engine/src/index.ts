@@ -1,7 +1,10 @@
 // API publique du moteur Lalanda.
 // Voir docs/adr/ADR-0005 (HyperFormula), brief §3 et §7.
 
-export const ENGINE_VERSION = '0.1.0';
+// S18a (FIN-001) : horizon 5 exercices, bilan prévisionnel, BFR, CAF, seuil de
+// rentabilité. Toute évolution de calcul incrémente cette version — les plans
+// re-validés après ce merge reçoivent un nouveau numéro (ADR-0011 § Contrat 1).
+export const ENGINE_VERSION = '0.2.0';
 
 // DSL
 export {
@@ -15,6 +18,7 @@ export {
   type Template,
   type Immobilisation,
   type CategorieImmobilisation,
+  type StructureFinanciere,
 } from './dsl/schema.js';
 export { parseTemplate } from './dsl/parser.js';
 export {
@@ -41,10 +45,26 @@ export {
 export {
   evaluateCompiled,
   evaluateTemplate,
+  HORIZON_PROJECTION_DEFAUT,
   type DriverValues,
   type EvaluationResult,
   type LineResult,
 } from './evaluator/index.js';
+
+// États financiers prévisionnels (S18a, FIN-001) — BFR, CAF, bilan, seuil.
+export {
+  calculerEtatsFinanciers,
+  calculerEcheancierDette,
+  JOURS_ANNEE_COMMERCIALE,
+  type BilanOuverture,
+  type EntreesEtatsFinanciers,
+  type EtatsFinanciers,
+  type ExerciceBfr,
+  type ExerciceBilan,
+  type ExerciceCaf,
+  type ExerciceDette,
+  type ExerciceSeuil,
+} from './etats-financiers/index.js';
 
 // Amortissements (S14c) — feuille SYSCOHADA révisé.
 export {

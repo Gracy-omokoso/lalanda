@@ -120,6 +120,49 @@ const ImmobilisationSchema = z
 
 export type Immobilisation = z.infer<typeof ImmobilisationSchema>;
 
+// ─── Structure financière (S18a, FIN-001) ─────────────────────
+// Bloc OPTIONNEL qui active les états financiers prévisionnels : BFR, CAF,
+// bilan et seuil de rentabilité (voir packages/engine/src/etats-financiers/).
+//
+// Le bloc ne fait que DÉSIGNER des lignes et des drivers déjà déclarés par le
+// template — il n'introduit aucune règle de calcul. Toutes les clés ont un défaut
+// correspondant aux identifiants conventionnels des templates S6→S14, si bien
+// qu'un template conforme n'a besoin que de `structure_financiere: {}`.
+//
+// Un template SANS ce bloc n'est pas modifié du tout (compatibilité S6→S14).
+const StructureFinanciereSchema = z
+  .object({
+    /**
+     * Ligne mensuelle des achats variables (matières premières, marchandises).
+     * Absente = modèle sans achats variables (prestation de services) : les charges
+     * variables valent 0, le taux de marge sur coûts variables vaut 100 %.
+     */
+    achats_variables_mensuels: IdSchema.optional(),
+    /** Ligne mensuelle des charges fixes d'exploitation (hors dotations et intérêts). */
+    charges_fixes_mensuelles: IdSchema.default('charges_operationnelles'),
+    /** Préfixe des lignes de CA annuel de la projection (`<prefixe>_1` … `<prefixe>_5`). */
+    prefixe_ca_annuel: IdSchema.default('ca_annuel'),
+    /** Préfixe des lignes de résultat annuel de la projection. */
+    prefixe_resultat_annuel: IdSchema.default('resultat_annuel'),
+
+    // ── Drivers de financement ──
+    driver_taux_croissance: IdSchema.default('taux_croissance_ca'),
+    driver_apport: IdSchema.default('apport_capital'),
+    driver_emprunt_capital: IdSchema.default('emprunt_capital'),
+    driver_emprunt_taux_annuel: IdSchema.default('emprunt_taux_annuel'),
+    driver_emprunt_duree_mois: IdSchema.default('emprunt_duree_mois'),
+    driver_investissements: IdSchema.default('investissements_initiaux'),
+    driver_bfr_initial: IdSchema.default('bfr_initial'),
+
+    // ── Drivers de BFR ──
+    driver_delai_clients_jours: IdSchema.default('delai_clients_jours'),
+    driver_delai_fournisseurs_jours: IdSchema.default('delai_fournisseurs_jours'),
+    driver_rotation_stock_jours: IdSchema.default('rotation_stock_jours'),
+  })
+  .strict();
+
+export type StructureFinanciere = z.infer<typeof StructureFinanciereSchema>;
+
 // ─── Template racine ──────────────────────────────────────────
 // Conforme au brief §7 pour les champs présents ; les champs futurs (parameter_pack,
 // horizon_mois, sorties…) sont acceptés en optionnel — ils seront exploités à partir de S2/S7.
@@ -148,10 +191,18 @@ export const TemplateSchema = z
      */
     immobilisations: z.array(ImmobilisationSchema).optional(),
     /**
-     * (S14c) Horizon en années de la feuille amortissements et de la projection cible.
-     * Défaut = 3 (aligné sur le format bancable existant).
+     * (S14c, révisé S18a) Horizon en années de la feuille amortissements et des
+     * états financiers prévisionnels. Défaut = 5 exercices (docs/07 « horizon
+     * standard : 5 exercices » — l'ancien défaut de 3 contredisait docs/07, cf.
+     * ADR-0011 § Contradictions 2).
      */
     horizon_projection_annees: z.number().int().positive().max(30).optional(),
+    /**
+     * (S18a, FIN-001) Active les états financiers prévisionnels : BFR, CAF, bilan
+     * équilibré et seuil de rentabilité sur `horizon_projection_annees` exercices.
+     * Absent = aucune feuille supplémentaire (compatibilité S6→S14).
+     */
+    structure_financiere: StructureFinanciereSchema.optional(),
   })
   .strict();
 

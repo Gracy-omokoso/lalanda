@@ -11,10 +11,17 @@
 //   Sect. 1 — Hypothèses du plan          (drivers du template, groupés)
 //   Sect. 2 — Compte d'exploitation mensuel (feuille `activite`)
 //   Sect. 3 — Plan de financement initial   (feuille `plan_financement`)
-//   Sect. 4 — Plan de trésorerie année 1    (feuille `tresorerie`)
-//   Sect. 5 — Projection sur 3 ans          (feuille `projection`)
+//   Sect. 4 — Plan de trésorerie année 1    (feuille `tresorerie`, vue simplifiée)
+//   Sect. 5 — Projection sur 5 exercices     (feuille `projection`)
 //   Sect. 6 — Financement de l'emprunt      (feuille `financement`)
-//   Sect. 7 — Ratios bancaires              (feuille `ratios`, pastilles feux)
+//   Sect. 7 — Bilan prévisionnel            (feuille `bilan`, S18a)
+//             ⚠ la trésorerie du bilan (sect. 7) et celle de la sect. 4 ne
+//             coïncident qu'à l'ouverture : la sect. 4 ignore la variation de
+//             BFR et les intérêts. Note de rapprochement rendue sous le bilan.
+//   Sect. 8 — Capacité d'autofinancement    (feuille `caf`, S18a)
+//   Sect. 9 — Seuil de rentabilité          (feuille `seuil_rentabilite`, S18a)
+//   Sect. 10 — Amortissements               (feuille `amortissements`)
+//   Sect. 11 — Ratios bancaires             (feuille `ratios`, pastilles feux)
 //   Fin     — Avertissement légal du ParameterPack (si présent)
 
 import type { Template } from '@lalanda/engine';
@@ -132,13 +139,46 @@ interface SectionSpec {
   sheetId: string;
   title: string;
 }
+/**
+ * Notes de rapprochement affichées sous une section.
+ *
+ * (S18a) Le plan de trésorerie mensuel et le bilan prévisionnel donnent DEUX
+ * trésoreries différentes pour le même exercice : la vue mensuelle est un modèle
+ * simplifié année 1 qui ignore la variation de BFR et les intérêts d'emprunt.
+ * Avec un délai clients de 60 jours l'écart se chiffre en dizaines de milliers.
+ * Un lecteur qui compare les deux chiffres dans le même dossier doit trouver
+ * l'explication à côté des chiffres, pas dans la documentation interne.
+ */
+const SECTION_NOTES: Record<string, string> = {
+  tresorerie:
+    'Vue simplifiée : ce plan mensuel projette un solde constant sur 12 mois et ' +
+    'ignore la variation du besoin en fonds de roulement ainsi que les intérêts ' +
+    'd’emprunt. Il ne coïncide donc avec la trésorerie du bilan prévisionnel qu’à ' +
+    'l’ouverture. La trésorerie de clôture faisant foi est celle du bilan.',
+  bilan:
+    'Rapprochement avec la section « Plan de trésorerie » : la trésorerie du bilan ' +
+    'est le déroulé complet du tableau de flux (capacité d’autofinancement, moins ' +
+    'la variation du besoin en fonds de roulement, moins le remboursement du ' +
+    'capital). Le plan mensuel, plus simple, ignore les deux derniers termes — les ' +
+    'deux vues ne se rejoignent qu’à l’ouverture. C’est le bilan qui fait foi.',
+};
+
 const BANCABLE_SECTIONS: readonly SectionSpec[] = [
   { n: 2, sheetId: 'activite', title: "Compte d'exploitation mensuel" },
   { n: 3, sheetId: 'plan_financement', title: 'Plan de financement initial' },
-  { n: 4, sheetId: 'tresorerie', title: 'Plan de trésorerie année 1' },
-  { n: 5, sheetId: 'projection', title: 'Projection sur 3 ans' },
+  {
+    n: 4,
+    sheetId: 'tresorerie',
+    title: 'Plan de trésorerie année 1 — vue simplifiée (hors variation de BFR et hors intérêts)',
+  },
+  { n: 5, sheetId: 'projection', title: 'Projection sur 5 exercices' },
   { n: 6, sheetId: 'financement', title: "Financement de l'emprunt" },
-  { n: 7, sheetId: 'ratios', title: 'Ratios bancaires' },
+  // (S18a, FIN-001) États financiers prévisionnels. Feuilles absentes = sections omises.
+  { n: 7, sheetId: 'bilan', title: 'Bilan prévisionnel' },
+  { n: 8, sheetId: 'caf', title: "Capacité d'autofinancement" },
+  { n: 9, sheetId: 'seuil_rentabilite', title: 'Seuil de rentabilité et point mort' },
+  { n: 10, sheetId: 'amortissements', title: 'Amortissements' },
+  { n: 11, sheetId: 'ratios', title: 'Ratios bancaires' },
 ] as const;
 
 /**
@@ -272,7 +312,7 @@ export function renderReportHtml(data: ReportData): string {
   const TRESO_RED = new Set<string>(['tresorerie_min_annee_1']);
   const EMPTY_RED = new Set<string>();
 
-  // Rendu des sections bancables (2 à 7). Filtre celles dont la feuille n'a pas de lignes.
+  // Rendu des sections bancables. Filtre celles dont la feuille n'a pas de lignes.
   const bancableSections = BANCABLE_SECTIONS.filter(
     (s) => (linesBySheet.get(s.sheetId) ?? []).length > 0,
   );
@@ -302,6 +342,7 @@ export function renderReportHtml(data: ReportData): string {
         <h2 class="section-title">Section ${spec.n} — ${escapeHtml(spec.title)}</h2>
         ${legend}
         ${body}
+        ${SECTION_NOTES[spec.sheetId] ? `<p class="legend">${SECTION_NOTES[spec.sheetId]}</p>` : ''}
       </section>`;
     })
     .join('');

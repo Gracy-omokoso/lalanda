@@ -14,7 +14,7 @@
 // - méthode linéaire uniquement ;
 // - prorata temporis à la 1re année (base 12 mois) ;
 // - VNC = brut − cumul dotations ; s'arrête à la valeur résiduelle ;
-// - horizon = `horizon_projection_annees` (défaut 3).
+// - horizon = `horizon_projection_annees` (défaut 5 depuis S18a).
 
 import type { Immobilisation, CategorieImmobilisation } from '../dsl/schema.js';
 import { EngineError } from '../dsl/errors.js';

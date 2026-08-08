@@ -14,6 +14,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   api,
   type AmortissementsView,
+  type EtatsFinanciersView,
   type LineResult,
   type PlanSummaryView,
   type ProjectView,
@@ -22,6 +23,7 @@ import {
 } from '@/lib/api';
 
 import { AmortissementsTable } from './amortissements-table';
+import { BfrTable, BilanTable, CafTable, SeuilTable } from './etats-financiers-tables';
 import { RatiosStickyBanner } from './ratios-sticky-banner';
 import { SheetTabs, type SheetTab } from './sheet-tabs';
 
@@ -95,6 +97,11 @@ const SHEET_LABELS: Record<string, string> = {
   financement: 'Financement',
   plan_financement: 'Plan de financement',
   amortissements: 'Amortissements',
+  // (S18a, FIN-001) États financiers prévisionnels.
+  bfr: 'BFR',
+  bilan: 'Bilan',
+  caf: 'CAF',
+  seuil_rentabilite: 'Seuil',
 };
 
 // Ordre canonique des onglets (gauche → droite) — S13d + S14c.
@@ -105,6 +112,10 @@ const TAB_ORDER: string[] = [
   'projection',
   'financement',
   'plan_financement',
+  'bfr',
+  'bilan',
+  'caf',
+  'seuil_rentabilite',
   'amortissements',
 ];
 
@@ -116,6 +127,9 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
   const [values, setValues] = useState<Record<string, number>>({});
   const [lines, setLines] = useState<LineResult[] | null>(null);
   const [amortissements, setAmortissements] = useState<AmortissementsView | undefined>(undefined);
+  const [etatsFinanciers, setEtatsFinanciers] = useState<EtatsFinanciersView | undefined>(
+    undefined,
+  );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -169,6 +183,7 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
       const res = await api.evaluateProject(projectId, payload, false);
       setLines(res.lines);
       setAmortissements(res.amortissements);
+      setEtatsFinanciers(res.etatsFinanciers);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur d'évaluation");
     } finally {
@@ -410,7 +425,12 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
             <Suspense
               fallback={<p className="text-sm text-[var(--foreground-muted)]">Chargement…</p>}
             >
-              <ResultsTabs lines={lines} currency={currency} amortissements={amortissements} />
+              <ResultsTabs
+                lines={lines}
+                currency={currency}
+                amortissements={amortissements}
+                etatsFinanciers={etatsFinanciers}
+              />
             </Suspense>
           ) : (
             <p className="text-sm text-[var(--foreground-muted)]">…</p>
@@ -492,9 +512,15 @@ interface ResultsTabsProps {
   lines: LineResult[];
   currency: string;
   amortissements?: AmortissementsView;
+  etatsFinanciers?: EtatsFinanciersView;
 }
 
-function ResultsTabs({ lines, currency, amortissements }: ResultsTabsProps): React.ReactElement {
+function ResultsTabs({
+  lines,
+  currency,
+  amortissements,
+  etatsFinanciers,
+}: ResultsTabsProps): React.ReactElement {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -512,11 +538,20 @@ function ResultsTabs({ lines, currency, amortissements }: ResultsTabsProps): Rea
   // Onglets à afficher : ordre canonique + toute feuille inconnue à la suite.
   // (S14c) 'amortissements' est ajouté même si aucune ligne (rendu piloté par la
   // struct dédiée `amortissements`).
+  // (S18a) 'bfr' est un onglet VIRTUEL : ses lignes vivent dans `plan_financement`
+  // (`pf_bfr_*`, ADR-0011 § Contrat 2), son rendu vient de la struct `etatsFinanciers`.
+  const hasVirtualTab = useCallback(
+    (id: string): boolean =>
+      (id === 'amortissements' && amortissements !== undefined) ||
+      (id === 'bfr' && etatsFinanciers !== undefined),
+    [amortissements, etatsFinanciers],
+  );
+
   const tabs: SheetTab[] = useMemo(() => {
     const seen = new Set<string>();
     const ordered: SheetTab[] = [];
     for (const id of TAB_ORDER) {
-      if (bySheet.has(id) || (id === 'amortissements' && amortissements)) {
+      if (bySheet.has(id) || hasVirtualTab(id)) {
         ordered.push({ id, label: SHEET_LABELS[id] ?? id });
         seen.add(id);
       }
@@ -525,13 +560,12 @@ function ResultsTabs({ lines, currency, amortissements }: ResultsTabsProps): Rea
       if (!seen.has(id)) ordered.push({ id, label: SHEET_LABELS[id] ?? id });
     }
     return ordered;
-  }, [bySheet, amortissements]);
+  }, [bySheet, hasVirtualTab]);
 
   // Onglet actif : ?tab=... si valide, sinon défaut (ratios) sinon 1er dispo.
   // (S14c) 'amortissements' est un onglet valide même sans lignes (rendu par AmortissementsTable).
   const requestedTab = searchParams.get('tab');
-  const isValidTab = (id: string): boolean =>
-    bySheet.has(id) || (id === 'amortissements' && amortissements !== undefined);
+  const isValidTab = (id: string): boolean => bySheet.has(id) || hasVirtualTab(id);
   const fallbackTab = bySheet.has(DEFAULT_TAB) ? DEFAULT_TAB : (tabs[0]?.id ?? DEFAULT_TAB);
   const activeTab = requestedTab && isValidTab(requestedTab) ? requestedTab : fallbackTab;
 
@@ -546,7 +580,11 @@ function ResultsTabs({ lines, currency, amortissements }: ResultsTabsProps): Rea
   );
 
   const ratiosLines = bySheet.get('ratios') ?? [];
-  const activeLines = bySheet.get(activeTab) ?? [];
+  // (S18a) Le détail annuel du BFR a son propre onglet : on l'ôte du tableau brut
+  // du plan de financement, qui doit rester la lecture « besoins / ressources ».
+  const activeLines = (bySheet.get(activeTab) ?? []).filter(
+    (l) => activeTab !== 'plan_financement' || !l.lineId.startsWith('pf_bfr_'),
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -565,6 +603,14 @@ function ResultsTabs({ lines, currency, amortissements }: ResultsTabsProps): Rea
           <RatiosCard lines={activeLines} />
         ) : activeTab === 'amortissements' && amortissements ? (
           <AmortissementsTable amortissements={amortissements} currency={currency} />
+        ) : activeTab === 'bilan' && etatsFinanciers ? (
+          <BilanTable etats={etatsFinanciers} currency={currency} />
+        ) : activeTab === 'bfr' && etatsFinanciers ? (
+          <BfrTable etats={etatsFinanciers} currency={currency} />
+        ) : activeTab === 'caf' && etatsFinanciers ? (
+          <CafTable etats={etatsFinanciers} currency={currency} />
+        ) : activeTab === 'seuil_rentabilite' && etatsFinanciers ? (
+          <SeuilTable etats={etatsFinanciers} currency={currency} />
         ) : (
           <ResultsTable sheetId={activeTab} lines={activeLines} currency={currency} />
         )}

@@ -66,11 +66,106 @@ export interface AmortissementsView {
   vncParAnnee: number[];
 }
 
+/**
+ * (S18a, FIN-001) États financiers prévisionnels renvoyés par l'API.
+ * Les mêmes chiffres existent dans `lines` (feuilles `bilan`, `caf`,
+ * `seuil_rentabilite`, lignes `pf_bfr_*`) ; cette structure sert aux tableaux
+ * matriciels du dashboard (postes × exercices).
+ */
+export interface BilanExercice {
+  annee: number;
+  immobilisationsBrutes: number;
+  amortissementsCumules: number;
+  actifImmobilise: number;
+  stocks: number;
+  creancesClients: number;
+  actifCirculant: number;
+  tresorerieActif: number;
+  totalActif: number;
+  capitalApporte: number;
+  resultatsCumules: number;
+  capitauxPropres: number;
+  dettesFinancieres: number;
+  fournisseurs: number;
+  dettesFiscalesSociales: number;
+  totalPassif: number;
+  ecartEquilibre: number;
+  autonomieFinanciere: number;
+}
+
+export interface BfrExercice {
+  annee: number;
+  stocks: number;
+  creancesClients: number;
+  dettesFournisseurs: number;
+  dettesFiscalesSociales: number;
+  bfr: number;
+  variation: number;
+  bfrJoursCa: number;
+}
+
+export interface CafExercice {
+  annee: number;
+  resultatNet: number;
+  dotationsAmortissements: number;
+  caf: number;
+}
+
+export interface SeuilExercice {
+  annee: number;
+  ca: number;
+  chargesVariables: number;
+  margeSurCoutsVariables: number;
+  tauxMargeVariable: number;
+  chargesFixes: number;
+  caSeuil: number;
+  pointMortMois: number;
+  pointMortJours: number;
+  margeSecurite: number;
+}
+
+export interface EcheanceDette {
+  annee: number;
+  capitalRestantOuverture: number;
+  remboursementCapital: number;
+  interets: number;
+  capitalRestantCloture: number;
+}
+
+export interface EtatsFinanciersView {
+  horizonAnnees: number;
+  ouverture: {
+    actifImmobilise: number;
+    actifCirculant: number;
+    tresorerieActif: number;
+    totalActif: number;
+    capitauxPropres: number;
+    dettesFinancieres: number;
+    totalPassif: number;
+    ecartEquilibre: number;
+  };
+  bilan: BilanExercice[];
+  bfr: BfrExercice[];
+  caf: CafExercice[];
+  seuilRentabilite: SeuilExercice[];
+  echeancierDette: EcheanceDette[];
+  /** (S18a) `incoherent` → l'interface affiche un avertissement rouge sur le bilan. */
+  coherenceImmobilisations: {
+    baseBilan: number;
+    baseDeclaree: number;
+    ecart: number;
+    statut: 'coherent' | 'incoherent';
+    dotationsPlafonnees: boolean;
+  };
+}
+
 export interface EvaluateResponse {
   project: ProjectView;
   lines: LineResult[];
   /** (S14c) Absent si le template ne déclare pas d'immobilisations. */
   amortissements?: AmortissementsView;
+  /** (S18a) Absent si le template ne déclare pas `structure_financiere`. */
+  etatsFinanciers?: EtatsFinanciersView;
 }
 
 // ─── Métadonnées de template (S5a) ─────────────────────────────
@@ -158,7 +253,11 @@ export interface PlanDetailView extends PlanSummaryView {
   parameterPackSlug?: string;
   packVersion?: string;
   engineVersion: string;
-  result: { lines: LineResult[]; amortissements?: AmortissementsView };
+  result: {
+    lines: LineResult[];
+    amortissements?: AmortissementsView;
+    etatsFinanciers?: EtatsFinanciersView;
+  };
 }
 
 export const ACTIVE_ORG_COOKIE = 'active_org_id';

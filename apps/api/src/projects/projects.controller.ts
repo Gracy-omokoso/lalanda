@@ -18,6 +18,7 @@ import { BillingService } from '../billing/billing.service.js';
 import {
   toEvaluationView,
   type AmortissementsView,
+  type EtatsFinanciersView,
   type EvaluatedLineView,
 } from '../evaluate/evaluation-view.js';
 import { getTemplate } from '../evaluate/template-registry.js';
@@ -163,6 +164,7 @@ export class ProjectsController {
     project: ProjectView;
     lines: EvaluatedLineView[];
     amortissements?: AmortissementsView;
+    etatsFinanciers?: EtatsFinanciersView;
   }> {
     const parsed = EvaluateProjectSchema.safeParse(body ?? {});
     if (!parsed.success) {
@@ -198,6 +200,8 @@ export class ProjectsController {
         lines: view.lines,
         // (S14c) Absent si le template ne déclare pas d'immobilisations.
         amortissements: view.amortissements,
+        // (S18a) Absent si le template ne déclare pas `structure_financiere`.
+        etatsFinanciers: view.etatsFinanciers,
       };
     } catch (err) {
       if (err instanceof EngineError) {

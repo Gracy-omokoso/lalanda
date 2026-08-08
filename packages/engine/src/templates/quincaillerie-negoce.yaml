@@ -10,6 +10,35 @@ secteur: negoce
 pays: [CD]
 devise_base: USD
 horizon_mois: 12
+# S18a (FIN-001) : horizon 5 exercices (docs/07 « horizon standard : 5 exercices »).
+horizon_projection_annees: 5
+
+# ─── Immobilisations amortissables (S14c, activées S18a) ──────
+# Total des `montant_ht` calé sur le défaut de `investissements_initiaux`
+# (15 000 USD). Le stock initial n'est PAS une immobilisation : il est financé
+# par `bfr_initial` (voir l'aide des deux drivers).
+immobilisations:
+  - label: 'Rayonnage, comptoir et agencement du magasin'
+    categorie: amenagements
+    montant_ht: 7000
+    date_acquisition: '2026-01-01'
+  - label: 'Outillage et matériel de manutention'
+    categorie: materiel_outillage
+    montant_ht: 4500
+    date_acquisition: '2026-01-01'
+  - label: 'Mobilier de bureau'
+    categorie: mobilier_bureau
+    montant_ht: 2500
+    date_acquisition: '2026-01-01'
+  - label: 'Caisse enregistreuse et informatique'
+    categorie: materiel_informatique
+    montant_ht: 1000
+    date_acquisition: '2026-01-01'
+
+# ─── États financiers prévisionnels (S18a, FIN-001) ───────────
+structure_financiere:
+  achats_variables_mensuels: cout_achat_marchandises
+  charges_fixes_mensuelles: charges_operationnelles
 
 groupes_hypotheses:
   - id: activite
@@ -145,11 +174,11 @@ drivers:
     devise: USD
     defaut: 15000
     min: 0
-    aide: 'Stock initial + rayonnage + comptoir + caisse. Pour une quincaillerie de 40-80 m² : 10-20 k USD.'
+    aide: "Rayonnage + comptoir + outillage + caisse — les biens durables amortissables. Pour une quincaillerie de 40-80 m² : 10-20 k USD. Le stock initial ne se saisit PAS ici : c'est du besoin en fonds de roulement, à porter sur « Fonds de roulement de démarrage »."
 
   - id: bfr_initial
     groupe: financement
-    label: 'Trésorerie de sécurité (BFR)'
+    label: 'Fonds de roulement de démarrage'
     type: money
     devise: USD
     defaut: 3000
@@ -164,6 +193,40 @@ drivers:
     defaut: 6000
     min: 0
     aide: 'Apport en fonds propres. ≥ 25 % du total des besoins pour être bancable.'
+
+  # ─── Besoin en fonds de roulement (S18a, FIN-001) ───────────
+  # Défauts sectoriels indicatifs pour le négoce : une part du CA vendue à crédit
+  # aux artisans et entreprises, stock lourd et lent (fer, ciment, quincaillerie),
+  # crédit fournisseur négocié. À revalider par un expert-comptable.
+  - id: delai_clients_jours
+    groupe: activite
+    label: 'Délai de paiement clients'
+    type: number
+    defaut: 15
+    min: 0
+    max: 360
+    unite: 'jours'
+    aide: 'Moyenne pondérée entre le comptant (particuliers) et le crédit consenti aux artisans, entreprises et chantiers. 0 si vous ne vendez qu’au comptant ; 30-45 jours si les chantiers dominent.'
+
+  - id: delai_fournisseurs_jours
+    groupe: couts_variables
+    label: 'Délai de paiement fournisseurs'
+    type: number
+    defaut: 30
+    min: 0
+    max: 360
+    unite: 'jours'
+    aide: 'Crédit obtenu des grossistes et importateurs. 30 jours est courant avec un fournisseur référencé ; 0 pour un achat sur facture pro forma au port.'
+
+  - id: rotation_stock_jours
+    groupe: couts_variables
+    label: 'Rotation du stock'
+    type: number
+    defaut: 60
+    min: 0
+    max: 360
+    unite: 'jours'
+    aide: 'Durée moyenne de détention du stock. Le négoce de quincaillerie tourne lentement (largeur de gamme, réapprovisionnement par lots) : 45-90 jours. C’est le principal poste de BFR du secteur.'
 
 feuilles:
   - id: activite
@@ -257,7 +320,7 @@ feuilles:
 
   # Feuille "tresorerie" (S13a) — plan de trésorerie mensuel année 1 (simplifié).
   - id: tresorerie
-    label: 'Trésorerie mensuelle année 1'
+    label: 'Trésorerie mensuelle année 1 — vue simplifiée (hors variation de BFR et hors intérêts)'
     lignes:
       - id: tresorerie_initiale
         label: "Trésorerie à l'ouverture (M0)"
@@ -292,9 +355,13 @@ feuilles:
         formule: 'MIN(tresorerie_initiale, tresorerie_fin_m12)'
         format: money
 
-  # Feuille "projection" (S12-lite) — 3 ans avec taux de croissance annuel du CA.
+  # Feuille "projection" (S12-lite, étendue à 5 exercices en S18a) — taux de
+  # croissance annuel du CA. Hypothèse simplificatrice : le résultat net croît au
+  # même taux que le CA (coûts variables + fixes croissent proportionnellement).
+  # C'est cette même convention qui extrapole les achats et les charges fixes des
+  # états financiers (voir structure_financiere).
   - id: projection
-    label: 'Projection sur 3 ans'
+    label: 'Projection sur 5 exercices'
     lignes:
       - id: ca_annuel_1
         label: 'CA année 1'
@@ -308,6 +375,14 @@ feuilles:
         label: 'CA année 3'
         formule: 'ca_annuel_2 * (1 + taux_croissance_ca)'
         format: money
+      - id: ca_annuel_4
+        label: 'CA année 4'
+        formule: 'ca_annuel_3 * (1 + taux_croissance_ca)'
+        format: money
+      - id: ca_annuel_5
+        label: 'CA année 5'
+        formule: 'ca_annuel_4 * (1 + taux_croissance_ca)'
+        format: money
       - id: resultat_annuel_1
         label: 'Résultat net année 1'
         formule: 'resultat_net * 12'
@@ -320,9 +395,23 @@ feuilles:
         label: 'Résultat net année 3'
         formule: 'resultat_annuel_2 * (1 + taux_croissance_ca)'
         format: money
+      - id: resultat_annuel_4
+        label: 'Résultat net année 4'
+        formule: 'resultat_annuel_3 * (1 + taux_croissance_ca)'
+        format: money
+      - id: resultat_annuel_5
+        label: 'Résultat net année 5'
+        formule: 'resultat_annuel_4 * (1 + taux_croissance_ca)'
+        format: money
+      # Conservée telle quelle pour non-régression (ADR-0011 § Contrat 1 : aucune
+      # ligne existante renommée ni retypée).
       - id: resultat_cumule_3ans
         label: 'Résultat cumulé sur 3 ans'
         formule: 'resultat_annuel_1 + resultat_annuel_2 + resultat_annuel_3'
+        format: money
+      - id: resultat_cumule_5ans
+        label: 'Résultat cumulé sur 5 exercices'
+        formule: 'resultat_cumule_3ans + resultat_annuel_4 + resultat_annuel_5'
         format: money
 
   - id: ratios
@@ -350,7 +439,7 @@ feuilles:
         seuil_direction: min
 
       - id: tresorerie_min_ok
-        label: 'Trésorerie mini sur 12 mois'
+        label: 'Trésorerie mini sur 12 mois (vue simplifiée — voir onglet Bilan)'
         formule: 'tresorerie_min_annee_1'
         format: money
         seuil_pack: tresorerie_min_seuil

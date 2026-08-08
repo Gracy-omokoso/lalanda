@@ -64,10 +64,14 @@ const ID_REGEX = /\b([a-zA-Z][a-zA-Z0-9_]*)\b/g;
 const SHEET_TAB_LABELS: Record<string, string> = {
   activite: "Compte d'exploitation",
   plan_financement: 'Plan de financement',
-  tresorerie: 'Trésorerie',
-  projection: 'Projection 3 ans',
+  tresorerie: 'Trésorerie (simplifiée)',
+  projection: 'Projection 5 exercices',
   financement: 'Financement',
   ratios: 'Ratios bancaires',
+  bilan: 'Bilan prévisionnel',
+  caf: 'CAF',
+  seuil_rentabilite: 'Seuil de rentabilité',
+  amortissements: 'Amortissements',
   compte_resultat: 'Compte de résultat',
 };
 
