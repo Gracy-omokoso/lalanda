@@ -25,7 +25,7 @@ import {
 
 import { InvitePanel } from './_components/invite-panel.js';
 import { MembersPanel } from './_components/members-panel.js';
-import { messageErreur } from './_components/members-model.js';
+import { libelleRoleActeur, messageErreur } from './_components/members-model.js';
 
 /** Un refus d'autorisation, à distinguer d'une panne. */
 function estRefus(err: unknown): boolean {
@@ -118,13 +118,19 @@ export default function MembersPage(): React.ReactElement {
     if (org) await recharger(org.id);
   }, [org, recharger]);
 
+  // Le rôle affiché est celui de la liste rechargée après chaque écriture, pas
+  // celui de `GET /organizations` figé au montage : un transfert de propriété
+  // rétrograde l'acteur, et l'en-tête ne doit pas continuer à le sacrer
+  // Propriétaire. L'instantané ne sert que de repli (cf. `libelleRoleActeur`).
+  const monRoleLabel = libelleRoleActeur(members ?? [], moiUserId, org?.roleLabel ?? null);
+
   return (
     <section className="flex flex-col gap-8">
       <div className="flex flex-col gap-1">
         <h2 className="font-display text-2xl font-semibold tracking-tight">Membres</h2>
         <p className="text-sm text-[var(--foreground-muted)]">
           Rôles et accès de {org?.name ?? 'l’organisation active'}
-          {org ? ` · votre rôle : ${org.roleLabel}` : ''}.
+          {monRoleLabel ? ` · votre rôle : ${monRoleLabel}` : ''}.
         </p>
       </div>
 
@@ -151,8 +157,8 @@ export default function MembersPage(): React.ReactElement {
         <div className="rounded-xl border border-dashed border-[var(--border)] p-8 text-center">
           <p className="text-sm font-medium">Cette page est réservée à la gouvernance</p>
           <p className="mt-1 text-sm text-[var(--foreground-muted)]">
-            Votre rôle ({org.roleLabel}) ne donne pas accès à la gestion des membres. Un
-            Propriétaire ou un Administrateur de {org.name} peut vous renseigner.
+            Votre rôle ({monRoleLabel ?? org.roleLabel}) ne donne pas accès à la gestion des
+            membres. Un Propriétaire ou un Administrateur de {org.name} peut vous renseigner.
           </p>
         </div>
       ) : (
