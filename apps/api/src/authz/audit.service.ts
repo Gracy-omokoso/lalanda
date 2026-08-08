@@ -24,9 +24,7 @@ export interface AuditRecordInput {
  */
 @Injectable()
 export class AuditService {
-  constructor(
-    @InjectModel(AuditEvent.name) private readonly events: Model<AuditEventDocument>,
-  ) {}
+  constructor(@InjectModel(AuditEvent.name) private readonly events: Model<AuditEventDocument>) {}
 
   async record(input: AuditRecordInput): Promise<void> {
     try {

@@ -11,6 +11,7 @@ import { z } from 'zod';
 
 import { AuthGuard } from '../auth/auth.guard.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
+import { ORG_ROLE_LABELS, type OrgRole } from '../authz/permissions.js';
 import { OrganizationsService } from './organizations.service.js';
 
 const CreateOrgSchema = z.object({
@@ -25,7 +26,10 @@ export interface OrganizationView {
   slug: string;
   type: string;
   pays: string;
-  role: 'owner' | 'member';
+  role: OrgRole;
+  roleLabel: string;
+  /** Droit conditionnel de clôture (case ⚙) — l'UI en a besoin pour masquer. */
+  canClosePeriods: boolean;
 }
 
 @Controller('organizations')
@@ -37,13 +41,15 @@ export class OrganizationsController {
   async list(@CurrentUser() user: { id: string }): Promise<{ organizations: OrganizationView[] }> {
     const rows = await this.orgs.listForUser(user.id);
     return {
-      organizations: rows.map(({ org, role }) => ({
+      organizations: rows.map(({ org, role, canClosePeriods }) => ({
         id: String(org._id),
         name: org.name,
         slug: org.slug,
         type: org.type,
         pays: org.pays,
         role,
+        roleLabel: ORG_ROLE_LABELS[role],
+        canClosePeriods,
       })),
     };
   }
@@ -65,6 +71,8 @@ export class OrganizationsController {
       type: org.type,
       pays: org.pays,
       role: 'owner',
+      roleLabel: ORG_ROLE_LABELS.owner,
+      canClosePeriods: false,
     };
   }
 }

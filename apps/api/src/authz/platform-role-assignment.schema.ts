@@ -23,7 +23,7 @@ import { PLATFORM_ROLES, type PlatformRole } from './permissions.js';
  * main (ou par migration) tant que la console `/admin` n'existe pas. La lecture,
  * elle, est déjà branchée sur `@RequirePlatformRole`.
  */
-@Schema({ collection: 'platform_role_assignments', timestamps: true, strict: true })
+@Schema({ collection: 'platform_roles', timestamps: true, strict: true })
 export class PlatformRoleAssignment {
   /** Id better-auth de l'utilisateur, en string (cohérent avec `memberships.userId`). */
   @Prop({ type: String, required: true, index: true })

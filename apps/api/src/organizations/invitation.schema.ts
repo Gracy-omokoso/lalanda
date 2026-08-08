@@ -29,11 +29,17 @@ export class Invitation {
   invitedBy!: string;
 
   /**
-   * Rôle attribué à l'acceptation. S20a : l'un des 8 rôles de docs/12.
-   * Défaut `lecteur` — refus par défaut (docs/17 § Autorisation) : inviter sans
-   * préciser de rôle ne doit jamais accorder de droit d'écriture.
+   * Rôle attribué à l'acceptation — docs/12 § Invitations : une invitation
+   * « indique rôle et projets ». S20a : l'un des 8 rôles de docs/12 (les projets
+   * restent hors périmètre, faute d'assignations de projet).
+   *
+   * Défaut `viewer` — moindre privilège (ADR-0012 §7) : inviter sans préciser de
+   * rôle ne doit jamais accorder de droit d'écriture.
+   *
+   * Le rôle est figé à la CRÉATION et revalidé à l'ACCEPTATION : entre les deux,
+   * l'inviteur a pu être rétrogradé. Voir `InvitationsService.acceptByToken`.
    */
-  @Prop({ type: String, required: true, enum: ORG_ROLES as unknown as string[], default: 'lecteur' })
+  @Prop({ type: String, required: true, enum: ORG_ROLES as unknown as string[], default: 'viewer' })
   role!: OrgRole;
 
   /**

@@ -1,13 +1,19 @@
-// Guard d'autorisation (S20a). S'exécute APRÈS `AuthGuard`, qui a rempli
-// `req.user` et `req.orgId` — d'où l'ordre imposé `@UseGuards(AuthGuard, PermissionsGuard)`.
+// Guard d'autorisation (S20a, ADR-0012 §8). S'exécute APRÈS `AuthGuard`, qui a
+// rempli `req.user` et `req.orgId` — d'où l'ordre imposé
+// `@UseGuards(AuthGuard, PermissionsGuard)`.
 //
 // Une route sans `@RequirePermission` ni `@RequirePlatformRole` passe : ce guard
-// n'ajoute pas d'exigence implicite, il applique celles qui sont déclarées.
+// n'ajoute aucune exigence implicite, il applique celles qui sont déclarées. Le
+// « refus par défaut » est garanti ailleurs, par le test de couverture des routes
+// (`routes-coverage.test.ts`) qui fait échouer la CI sur toute route sensible non
+// annotée. Un guard qui refuserait tout par lui-même casserait `/health` et les
+// routes pré-organisation (inscription, acceptation d'invitation).
 
 import {
   ForbiddenException,
   Inject,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
   type CanActivate,
   type ExecutionContext,
@@ -16,11 +22,14 @@ import { Reflector } from '@nestjs/core';
 
 import type { AuthenticatedRequest } from '../auth/auth.guard.js';
 import { AuthzService, forbidden } from './authz.service.js';
+import { REQUIRED_PERMISSIONS_KEY, REQUIRED_PLATFORM_ROLES_KEY } from './authz.decorators.js';
 import {
-  REQUIRED_PERMISSIONS_KEY,
-  REQUIRED_PLATFORM_ROLES_KEY,
-} from './authz.decorators.js';
-import { canAll, firstDeniedAction, type Action, type PlatformRole } from './permissions.js';
+  canAll,
+  canAnyPlatform,
+  firstDeniedAction,
+  type Action,
+  type PlatformRole,
+} from './permissions.js';
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
@@ -61,25 +70,54 @@ export class PermissionsGuard implements CanActivate {
         );
       }
       // Un rôle plateforme suffit : on n'exige pas en plus une appartenance à l'org.
+      // Les actions sur les données CLIENTES restent barrées par `canPlatform()`,
+      // qui exige un accès délégué — voir `canAnyPlatform` ci-dessous.
+      if (actions?.length && !actions.every((a) => canAnyPlatform(held, a))) {
+        throw new ForbiddenException(forbidden(actions.join('+'), held.join(',')));
+      }
       return true;
     }
 
-    const orgId = req.orgId;
+    // Organisation concernée : celle NOMMÉE DANS LA ROUTE si elle en nomme une
+    // (`/organizations/:orgId/…`), sinon l'organisation active du cookie. Sans
+    // cela, un membre d'une org A pourrait viser `/organizations/B/members` et
+    // être évalué contre son rôle dans A.
+    const orgId = this.targetOrgId(req);
     if (!orgId) throw new ForbiddenException({ code: 'NO_ORGANIZATION' });
 
-    const role = await this.authz.roleOf(userId, orgId);
-    if (!role) {
-      // Non-membre : AuthGuard n'aurait pas dû poser cet orgId. Refus explicite.
-      throw new ForbiddenException(forbidden(actions![0]!, null));
+    const resolved = await this.authz.resolveOrgRole(userId, orgId);
+    if (!resolved) {
+      // Non-membre de l'organisation visée. 404 et NON 403 : un 403 confirmerait
+      // l'existence de l'organisation à un tiers (ADR-0011 Contrat 4, ADR-0012 §8).
+      // Le 403 est réservé au rôle insuffisant DANS SA PROPRE organisation.
+      throw new NotFoundException({ code: 'ORG_NOT_FOUND' });
     }
 
-    if (!canAll(role, actions!)) {
-      throw new ForbiddenException(forbidden(firstDeniedAction(role, actions!)!, role));
+    if (!canAll(resolved.role, actions!, resolved.context)) {
+      throw new ForbiddenException(
+        forbidden(firstDeniedAction(resolved.role, actions!, resolved.context)!, resolved.role),
+      );
     }
 
-    // Mémorisé pour les contrôleurs (journalisation d'audit, vues filtrées) —
+    // Mémorisés pour les contrôleurs (journalisation d'audit, vues filtrées) —
     // évite une seconde lecture de la membership.
-    req.orgRole = role;
+    req.orgRole = resolved.role;
+    req.orgRoleContext = resolved.context;
+    req.targetOrgId = orgId;
     return true;
+  }
+
+  /**
+   * `:orgId` de la route s'il existe, sinon l'organisation active.
+   *
+   * Le nom `orgId` est la convention du projet (`invitations.controller.ts`,
+   * `billing.controller.ts`). Une route qui nommerait son paramètre autrement
+   * retomberait sur l'organisation active — d'où le test de couverture qui
+   * vérifie que tout paramètre d'organisation s'appelle bien `orgId`.
+   */
+  private targetOrgId(req: AuthenticatedRequest): string | undefined {
+    const fromPath = (req.params as Record<string, string> | undefined)?.['orgId'];
+    if (typeof fromPath === 'string' && fromPath.length > 0) return fromPath;
+    return req.orgId;
   }
 }

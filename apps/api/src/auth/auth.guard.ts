@@ -16,7 +16,7 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 
-import type { OrgRole } from '../authz/permissions.js';
+import type { OrgPermissionContext, OrgRole } from '../authz/permissions.js';
 import { OrganizationsService } from '../organizations/organizations.service.js';
 import { getAuth } from './auth.js';
 
@@ -27,6 +27,14 @@ export interface AuthenticatedRequest extends Request {
   orgId?: string;
   /** Rôle d'organisation résolu par `PermissionsGuard` (S20a) — voir `authz/`. */
   orgRole?: OrgRole;
+  /** Droits conditionnels du membership (cases ⚙ de la matrice), idem. */
+  orgRoleContext?: OrgPermissionContext;
+  /**
+   * Organisation réellement évaluée par `PermissionsGuard` : le `:orgId` de la
+   * route s'il en porte un, sinon l'organisation active. Distinct de `orgId`,
+   * qui reste toujours l'organisation active du cookie.
+   */
+  targetOrgId?: string;
 }
 
 @Injectable()

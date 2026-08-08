@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -9,8 +10,18 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
+import {
+  canGrantRole,
+  isAssignableRole,
+  normalizeOrgRole,
+  type OrgRole,
+} from '../authz/permissions.js';
 import { Invitation, type InvitationDocument } from './invitation.schema.js';
-import { Membership, type MembershipDocument } from './membership.schema.js';
+import {
+  MEMBERSHIP_SCHEMA_VERSION,
+  Membership,
+  type MembershipDocument,
+} from './membership.schema.js';
 
 /**
  * Durée de vie par défaut d'une invitation (7 jours).
@@ -31,13 +42,22 @@ export class InvitationsService {
     @InjectModel(Membership.name) private readonly membershipModel: Model<MembershipDocument>,
   ) {}
 
-  /** Vérifie que l'utilisateur est owner de l'org — sinon 403. */
-  private async assertOwner(userId: string, organizationId: string): Promise<void> {
+  /**
+   * Rôle de l'appelant dans l'organisation.
+   *
+   * S20a : ne vérifie plus « est-ce un owner ? ». Le droit d'inviter est porté
+   * par l'action `members.invite` et appliqué par `PermissionsGuard` en amont
+   * (ADR-0012 §8 : aucun `if (role === …)` hors de `permissions.ts`). Ce qui
+   * reste ici, c'est la lecture du rôle nécessaire à R7.
+   *
+   * Un non-membre reçoit 404, jamais 403 (ADR-0011 Contrat 4).
+   */
+  private async actorRole(userId: string, organizationId: string): Promise<OrgRole> {
     const m = await this.membershipModel.findOne({ userId, organizationId }).lean().exec();
     if (!m) throw new NotFoundException({ code: 'ORG_NOT_FOUND' });
-    if (m.role !== 'owner') {
-      throw new ForbiddenException({ code: 'OWNER_ROLE_REQUIRED' });
-    }
+    const role = normalizeOrgRole(m.role);
+    if (role === undefined) throw new ForbiddenException({ code: 'UNKNOWN_ROLE' });
+    return role;
   }
 
   /**
@@ -50,9 +70,28 @@ export class InvitationsService {
     organizationId: string;
     invitedBy: string;
     email: string;
-    role?: 'owner' | 'member';
+    role?: OrgRole;
   }): Promise<InvitationDocument> {
-    await this.assertOwner(input.invitedBy, input.organizationId);
+    const actor = await this.actorRole(input.invitedBy, input.organizationId);
+
+    // Défaut `viewer` — moindre privilège (ADR-0012 §7).
+    const role: OrgRole = input.role ?? 'viewer';
+
+    // R7 — une invitation ne doit jamais servir d'escalade de privilège : on ne
+    // peut inviter qu'à un rôle dont l'ensemble d'actions est un sous-ensemble du
+    // sien. Contrôlé ICI et pas seulement dans l'UI, car l'UI ne garde rien.
+    if (!isAssignableRole(role)) {
+      throw new ConflictException({
+        code: 'ROLE_NOT_ASSIGNABLE',
+        message: `Le rôle « ${role} » n'est pas encore attribuable (assignations de projet absentes).`,
+      });
+    }
+    if (!canGrantRole(actor, role)) {
+      throw new ForbiddenException({
+        code: 'ROLE_ESCALATION',
+        message: `Un « ${actor} » ne peut pas inviter au rôle « ${role} ».`,
+      });
+    }
 
     const emailNormalized = input.email.trim().toLowerCase();
     if (!emailNormalized || !emailNormalized.includes('@')) {
@@ -69,10 +108,10 @@ export class InvitationsService {
         organizationId: input.organizationId,
         email: emailNormalized,
         invitedBy: input.invitedBy,
-        role: input.role ?? 'member',
+        role,
         token: generateToken(),
         expiresAt: new Date(Date.now() + DEFAULT_TTL_MS),
-        _schemaVersion: 1,
+        _schemaVersion: MEMBERSHIP_SCHEMA_VERSION,
       });
     } catch (err: unknown) {
       // Duplicate key sur l'index partiel unique → 409 métier.
@@ -91,12 +130,12 @@ export class InvitationsService {
     }
   }
 
-  /** Liste les invitations pending d'une org (owner only). */
+  /** Liste les invitations pending d'une org. Garde : `members.invite`. */
   async listPendingForOrg(
     requestingUserId: string,
     organizationId: string,
   ): Promise<InvitationDocument[]> {
-    await this.assertOwner(requestingUserId, organizationId);
+    await this.actorRole(requestingUserId, organizationId);
     return this.invModel
       .find({
         organizationId,
@@ -123,13 +162,13 @@ export class InvitationsService {
       .exec();
   }
 
-  /** Révoque une invitation. Owner only. */
+  /** Révoque une invitation. Garde : `members.invite`. */
   async revoke(
     requestingUserId: string,
     organizationId: string,
     invitationId: string,
   ): Promise<InvitationDocument> {
-    await this.assertOwner(requestingUserId, organizationId);
+    await this.actorRole(requestingUserId, organizationId);
     const inv = await this.invModel.findById(invitationId).exec();
     if (!inv || inv.organizationId !== organizationId) {
       throw new NotFoundException({ code: 'INVITATION_NOT_FOUND' });
@@ -170,11 +209,37 @@ export class InvitationsService {
       .exec();
 
     if (!existingMembership) {
+      // ── Revalidation du rôle à l'acceptation ────────────────────────────────
+      // Une invitation vit jusqu'à 7 jours. Entre l'émission et l'acceptation,
+      // l'inviteur a pu être rétrogradé ou révoqué. Honorer le rôle figé
+      // reviendrait à laisser un `admin` révoqué continuer de peupler
+      // l'organisation — c'est exactement ce que « révocation immédiate »
+      // (docs/12 § Tests obligatoires) interdit.
+      const inviter = await this.membershipModel
+        .findOne({ userId: inv.invitedBy, organizationId: inv.organizationId })
+        .lean()
+        .exec();
+      const inviterRole = inviter ? normalizeOrgRole(inviter.role) : undefined;
+      const invitedRole = normalizeOrgRole(inv.role);
+      if (
+        inviterRole === undefined ||
+        invitedRole === undefined ||
+        !canGrantRole(inviterRole, invitedRole)
+      ) {
+        throw new ForbiddenException({
+          code: 'INVITATION_INVITER_NO_LONGER_AUTHORIZED',
+          message:
+            "La personne qui a émis cette invitation n'a plus le droit d'attribuer ce rôle. " +
+            'Demandez une nouvelle invitation.',
+        });
+      }
+
       await this.membershipModel.create({
         userId,
         organizationId: inv.organizationId,
-        role: inv.role,
-        _schemaVersion: 1,
+        role: invitedRole,
+        canClosePeriods: false,
+        _schemaVersion: MEMBERSHIP_SCHEMA_VERSION,
       });
     }
 

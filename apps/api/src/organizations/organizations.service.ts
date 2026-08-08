@@ -1,8 +1,13 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
-import { MEMBERSHIP_SCHEMA_VERSION, Membership, type MembershipDocument } from './membership.schema.js';
+import { ORG_ROLE_RANK, normalizeOrgRole, type OrgRole } from '../authz/permissions.js';
+import {
+  MEMBERSHIP_SCHEMA_VERSION,
+  Membership,
+  type MembershipDocument,
+} from './membership.schema.js';
 import { Organization, type OrganizationDocument } from './organization.schema.js';
 
 @Injectable()
@@ -36,7 +41,7 @@ export class OrganizationsService {
     await this.membershipModel.create({
       userId,
       organizationId: org.id,
-      role: 'proprietaire',
+      role: 'owner',
       _schemaVersion: MEMBERSHIP_SCHEMA_VERSION,
     });
 
@@ -44,19 +49,41 @@ export class OrganizationsService {
   }
 
   /**
-   * Retourne l'organisation principale d'un utilisateur : celle dont il est
-   * `proprietaire` en priorité, sinon la membership la plus ancienne (l'org
-   * auto-provisionnée à l'inscription).
+   * Organisation principale d'un utilisateur : le rôle le plus privilégié d'abord,
+   * puis, à rang égal, la membership la plus ancienne (l'org auto-provisionnée à
+   * l'inscription).
    *
-   * S20a : le tri `{ role: -1 }` d'origine reposait sur l'ordre alphabétique de
-   * `owner` > `member`. Avec huit rôles cet accident n'est plus une règle — la
-   * priorité est désormais explicite.
+   * ── Bug corrigé en S20a (ADR-0012 §7, « piège découvert ») ───────────────────
+   *
+   * Le tri d'origine était `.sort({ role: -1, createdAt: 1 })`. Il ne triait pas
+   * par privilège : il exploitait le fait que, sur les deux SEULES valeurs
+   * d'alors, `'owner' > 'member'` en ordre ALPHABÉTIQUE. Avec les huit slugs de
+   * docs/12 cet accident se retourne — `'viewer'`, `'project_manager'` et
+   * `'finance_director'`… trient tous après ou avant `'owner'` sans aucun rapport
+   * avec le privilège. Un utilisateur propriétaire de A et lecteur de B aurait
+   * basculé sur B, silencieusement, sans erreur visible.
+   *
+   * Le tri se fait donc en mémoire sur `ORG_ROLE_RANK`, une donnée explicite. Le
+   * volume est celui des organisations d'UN utilisateur (une poignée) : aucune
+   * raison de complexifier avec un `$addFields` d'agrégation.
+   *
+   * Test de non-régression : `organizations.service.test.ts` (propriétaire de A,
+   * lecteur de B → doit atterrir sur A, quel que soit l'ordre de création).
    */
   async findPrimaryOrgForUser(userId: string): Promise<OrganizationDocument | null> {
     const memberships = await this.membershipModel.find({ userId }).sort({ createdAt: 1 }).exec();
     if (memberships.length === 0) return null;
-    const primary =
-      memberships.find((m) => normalizeOrgRole(m.role) === 'proprietaire') ?? memberships[0]!;
+
+    const rankOf = (m: MembershipDocument): number => {
+      const role = normalizeOrgRole(m.role);
+      // Un rôle inconnu (document corrompu, futur slug non déployé) ne doit pas
+      // gagner le tri : on le classe derrière tous les rôles connus.
+      return role === undefined ? Number.MAX_SAFE_INTEGER : ORG_ROLE_RANK[role];
+    };
+
+    // `find().sort({ createdAt: 1 })` a déjà ordonné par ancienneté; `sort` est
+    // stable en JavaScript, la comparaison par rang préserve donc ce départage.
+    const primary = [...memberships].sort((a, b) => rankOf(a) - rankOf(b))[0]!;
     return this.orgModel.findById(primary.organizationId).exec();
   }
 
@@ -78,15 +105,29 @@ export class OrganizationsService {
    */
   async listForUser(
     userId: string,
-  ): Promise<Array<{ org: OrganizationDocument; role: 'owner' | 'member' }>> {
+  ): Promise<Array<{ org: OrganizationDocument; role: OrgRole; canClosePeriods: boolean }>> {
     const memberships = await this.membershipModel.find({ userId }).sort({ createdAt: 1 }).exec();
     if (memberships.length === 0) return [];
     const orgIds = memberships.map((m) => m.organizationId);
     const orgs = await this.orgModel.find({ _id: { $in: orgIds } }).exec();
-    const byId = new Map(orgs.map((o) => [String(o._id), o]));
-    return memberships
-      .map((m) => ({ org: byId.get(m.organizationId)!, role: m.role }))
-      .filter((x) => x.org);
+    const byId = new Map<string, OrganizationDocument>(
+      orgs.map((o) => [String(o._id), o as OrganizationDocument]),
+    );
+    // `flatMap` plutôt que `map().filter()` : il élimine les organisations
+    // introuvables ET affine le type, sans prédicat de type à maintenir.
+    return memberships.flatMap((m) => {
+      const org = byId.get(m.organizationId);
+      if (!org) return [];
+      return [
+        {
+          org,
+          // Tolère un document non encore migré (`member`) : l'API ne doit pas
+          // s'effondrer si elle tourne avant la migration (compatibilité N-1).
+          role: normalizeOrgRole(m.role) ?? 'viewer',
+          canClosePeriods: m.canClosePeriods === true,
+        },
+      ];
+    });
   }
 
   /**
@@ -117,7 +158,7 @@ export class OrganizationsService {
     await this.membershipModel.create({
       userId,
       organizationId: org.id,
-      role: 'proprietaire',
+      role: 'owner',
       _schemaVersion: MEMBERSHIP_SCHEMA_VERSION,
     });
     return org;
