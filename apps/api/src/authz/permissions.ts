@@ -117,6 +117,35 @@ export function isAction(value: unknown): value is Action {
   return typeof value === 'string' && (ACTIONS as readonly string[]).includes(value);
 }
 
+/**
+ * Slug du rôle propriétaire (ADR-0012 §1, libellé « Propriétaire »).
+ *
+ * Nommé plutôt qu'écrit en dur parce que quelques règles portent sur l'IDENTITÉ du
+ * rôle et non sur ses actions : « le dernier propriétaire ne peut être ni retiré
+ * ni rétrogradé » (docs/12 § Règles critiques, R1) ne se déduit d'aucune case de
+ * la matrice — un `admin` détenant les mêmes actions ne gouvernerait pas pour
+ * autant l'abonnement ni le transfert.
+ */
+export const OWNER_ROLE: OrgRole = 'owner';
+
+/**
+ * Ce rôle est-il celui d'un propriétaire ?
+ *
+ * Volontairement plus tolérant qu'`isOrgRole` : la valeur vient d'un document
+ * Mongo, pas d'un type TypeScript. Une casse inattendue ou des espaces de bord ne
+ * doivent pas faire passer un propriétaire pour un simple membre — ce serait
+ * autoriser la suppression d'un compte qui laisserait derrière lui une
+ * organisation sans gouvernance, exactement ce que R1 interdit. Le faux négatif
+ * est ici plus grave que le faux positif : refuser une suppression de trop se
+ * rattrape, en autoriser une de trop non.
+ *
+ * Provient de `account/owner-role.ts` (S20b), fichier temporaire qui isolait ce
+ * fait en attendant cette matrice; il a été supprimé au rebase de S20a.
+ */
+export function isOwnerRole(role: unknown): boolean {
+  return typeof role === 'string' && role.trim().toLowerCase() === OWNER_ROLE;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Matrice organisation
 // ─────────────────────────────────────────────────────────────────────────────
