@@ -494,7 +494,7 @@ e2eSuite('règles critiques docs/12 appliquées bout en bout (S20a)', () => {
   // INVITATION EXPIRÉE
   // ═══════════════════════════════════════════════════════════════════════════
 
-  it("invitation expirée — le token périmé ne crée aucune membership (400 INVITATION_EXPIRED)", async () => {
+  it('invitation expirée — le token périmé ne crée aucune membership (400 INVITATION_EXPIRED)', async () => {
     await inscrire('invitePerime');
     const invite = comptes['invitePerime']!;
 
