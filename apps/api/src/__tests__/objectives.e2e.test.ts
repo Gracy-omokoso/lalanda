@@ -17,11 +17,13 @@
 import { INestApplication } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { toNodeHandler } from 'better-auth/node';
+import type { Model } from 'mongoose';
 import request from 'supertest';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 
 import 'reflect-metadata';
 
+import type { FinancialPlanDocument } from '../plans/plan.schema.js';
 import { e2eSuite, teardown } from './e2e-utils.js';
 
 async function makeApp(): Promise<INestApplication> {
@@ -64,6 +66,12 @@ e2eSuite('objectifs financiers et taux d’atteinte (S18d — docs/01)', () => {
     password: 'Passw0rd!objb',
     name: 'ObjBob',
   };
+  /** Porte le projet « legacy » : le plan free plafonne à 1 projet par org (S16b). */
+  const userC = {
+    email: `objc-${tag}@lalanda-test.local`,
+    password: 'Passw0rd!objc',
+    name: 'ObjCarl',
+  };
 
   let cookiesA: string[] = [];
   let projectId = '';
@@ -84,7 +92,7 @@ e2eSuite('objectifs financiers et taux d’atteinte (S18d — docs/01)', () => {
   }, 60_000);
 
   afterAll(async () => {
-    await teardown(app, [userA.email, userB.email]);
+    await teardown(app, [userA.email, userB.email, userC.email]);
   }, 30_000);
 
   async function registerAndLogin(user: {
@@ -227,20 +235,81 @@ e2eSuite('objectifs financiers et taux d’atteinte (S18d — docs/01)', () => {
     expect(caPile?.statut).toBe('atteint');
   }, 60_000);
 
-  it('ligne absente du snapshot → atteinte null + LIGNE_INDISPONIBLE (jamais 0)', async () => {
+  it('ligne absente du snapshot (plan validé pré-FIN-001) → atteinte null + LIGNE_INDISPONIBLE (jamais 0)', async () => {
     const server = app.getHttpServer();
 
-    // Les templates S6–S14 projettent 3 exercices : `ca_annuel_5` n'existe pas
-    // encore (il arrivera avec FIN-001). L'objectif à 5 ans doit dégrader
-    // proprement, sans faire échouer l'objectif à 1 an du même appel.
+    // Ce cas exige un plan validé dont le snapshot NE CONTIENT PAS `ca_annuel_5`.
+    //
+    // La première version du test visait `ca_annuel_5` sur un plan fraîchement
+    // validé, en pariant sur le fait que les templates projetaient 3 exercices.
+    // C'était une précondition datée, pas un invariant : FIN-001 (S18a) a livré
+    // l'horizon 5 exercices, la ligne existe, le taux se calcule (0,8 %) et le
+    // test échoue. Viser une ligne « qui n'existe pas encore » finit toujours
+    // par casser — la ligne finit par exister.
+    //
+    // On seede donc explicitement un état ANTÉRIEUR à FIN-001 : un projet dédié
+    // dont le plan validé est ramené à un horizon 3 exercices. C'est exactement
+    // la situation décrite par l'ADR-0011 (risque n°4) et elle reste vraie en
+    // production tant que des plans validés avant FIN-001 existent en base.
+    //
+    // Utilisateur dédié : le plan `free` plafonne à un projet par organisation
+    // (entitlements S16b), l'org de A a déjà le sien.
+    const cookiesC = await registerAndLogin(userC);
+    const createdLegacy = await request(server)
+      .post('/projects')
+      .set('Cookie', cookiesC)
+      .send({ name: `Objectifs legacy ${tag}`, templateSlug: 'prestation-services' });
+    expect(createdLegacy.status).toBe(201);
+    const legacyProjectId = createdLegacy.body.id as string;
+
+    const approve = await request(server)
+      .post(`/projects/${legacyProjectId}/plans`)
+      .set('Cookie', cookiesC)
+      .send({});
+    expect(approve.status).toBe(201);
+
+    // Downgrade du snapshot figé : on retire les exercices 4 et 5 pour retrouver
+    // la forme d'un plan validé pré-FIN-001. Écriture directe dans la collection
+    // — c'est un état hérité qu'aucune route ne peut produire aujourd'hui.
+    const { FinancialPlan } = await import('../plans/plan.schema.js');
+    const { getModelToken } = await import('@nestjs/mongoose');
+    const planModel = app.get<Model<FinancialPlanDocument>>(getModelToken(FinancialPlan.name));
+
+    const plan = await planModel.findOne({ projectId: legacyProjectId, version: 1 }).exec();
+    expect(plan).not.toBeNull();
+
+    // Seules les séries annuelles 4 et 5 sont retirées (convention `_annuel_N`,
+    // ADR-0011 contrat 2). Suffisant et volontairement minimal : aucun objectif
+    // ne pointe vers les feuilles `bilan`/`caf`/`seuil_rentabilite` de FIN-001.
+    const lignes3Exercices = plan!.result.lines.filter((l) => !/_annuel_[45]$/.test(l.lineId));
+    const maj = await planModel
+      .updateOne(
+        { _id: plan!._id },
+        { $set: { result: { ...plan!.result, lines: lignes3Exercices } } },
+      )
+      .exec();
+    expect(maj.modifiedCount).toBe(1);
+
+    // Préconditions du seed, vérifiées et non supposées : la ligne à 1 an est
+    // mesurable, celle à 5 ans est absente. Si le moteur renomme ses lignes,
+    // c'est ici que le test doit échouer — pas en silence sur l'assertion finale.
+    const seede = await planModel.findOne({ _id: plan!._id }).exec();
+    const idsSeedes = seede!.result.lines.map((l) => l.lineId);
+    expect(idsSeedes).toContain('ca_annuel_1');
+    expect(idsSeedes).not.toContain('ca_annuel_5');
+
+    const caLegacy = seede!.result.lines.find((l) => l.lineId === 'ca_annuel_1')!.value;
+    expect(caLegacy).toBeGreaterThan(0);
+
+    // Objectif à 1 an mesurable + objectif à 5 ans non mesurable, dans le MÊME appel.
     await request(server)
-      .put(`/projects/${projectId}/objectives`)
-      .set('Cookie', cookiesA)
-      .send({ ca_cible_an1: caAnnuel1, ca_cible_an5: 9_000_000 });
+      .put(`/projects/${legacyProjectId}/objectives`)
+      .set('Cookie', cookiesC)
+      .send({ ca_cible_an1: caLegacy, ca_cible_an5: 9_000_000 });
 
     const res = await request(server)
-      .get(`/projects/${projectId}/objectives/attainment`)
-      .set('Cookie', cookiesA);
+      .get(`/projects/${legacyProjectId}/objectives/attainment`)
+      .set('Cookie', cookiesC);
     expect(res.status).toBe(200);
 
     const objectifs = res.body.objectifs as AttainmentItem[];
@@ -255,8 +324,33 @@ e2eSuite('objectifs financiers et taux d’atteinte (S18d — docs/01)', () => {
     });
     expect(an5?.atteinte).not.toBe(0);
 
-    // L'objectif mesurable reste évalué normalement.
+    // L'objectif mesurable reste évalué normalement — une ligne manquante ne
+    // contamine pas le reste de la réponse.
     expect(objectifs.find((o) => o.objectif === 'ca_cible_an1')?.atteinte).toBe(100);
+  }, 60_000);
+
+  it('horizon 5 exercices (FIN-001) : `ca_annuel_5` est désormais mesurable', async () => {
+    const server = app.getHttpServer();
+
+    // Contrepartie du test précédent : sur un plan validé APRÈS FIN-001, l'objectif
+    // à 5 ans n'est plus « indisponible » mais bel et bien chiffré. Sans ce cas,
+    // remplacer la précondition périmée par un seed pré-FIN-001 ferait perdre la
+    // couverture de l'horizon 5 exercices livré en S18a.
+    await request(server)
+      .put(`/projects/${projectId}/objectives`)
+      .set('Cookie', cookiesA)
+      .send({ ca_cible_an1: caAnnuel1, ca_cible_an5: 9_000_000 });
+
+    const res = await request(server)
+      .get(`/projects/${projectId}/objectives/attainment`)
+      .set('Cookie', cookiesA);
+    expect(res.status).toBe(200);
+
+    const an5 = (res.body.objectifs as AttainmentItem[]).find((o) => o.objectif === 'ca_cible_an5');
+    expect(an5?.lineId).toBe('ca_annuel_5');
+    expect(an5?.raison).toBeNull();
+    expect(an5?.valeur).toBeGreaterThan(0);
+    expect(an5?.atteinte).toBeGreaterThan(0);
   }, 60_000);
 
   it('isolation org : un autre user reçoit 404 sur toutes les routes objectifs', async () => {
