@@ -4,44 +4,33 @@
 //  - Publiques marketing (`/`, `/pricing`) : accessibles à tous ; si authentifié,
 //    redirect vers `/projects` (l'app est plus utile qu'une plaquette).
 //  - Auth (`/login`, `/register`) : si authentifié, redirect vers `/projects`.
-//  - Protégées (`/projects/*`, `/members`, `/invitations/*`) : si non authentifié,
-//    redirect vers `/login?next=…`.
+//  - Protégées (`/projects/*`, `/members`, `/invitations/*`, `/compte/*`) : si non
+//    authentifié, redirect vers `/login?next=…`.
+//
+// Le classement lui-même vit dans `lib/routes.ts` — logique pure, testée
+// séparément : c'est le genre de liste qu'on oublie de compléter en ajoutant un
+// espace, laissant des pages protégées ouvertes sans que rien ne le signale.
 //
 // Vérification "légère" : présence du cookie de session better-auth.
 // La validation forte est faite par l'AuthGuard côté API à chaque requête.
 
 import { NextResponse, type NextRequest } from 'next/server';
 
+import { isAuthPath, isMarketingPath, isProtectedPath } from '@/lib/routes';
+
 // Noms de cookies possibles émis par better-auth selon la version et l'option `secureCookies`.
 const SESSION_COOKIE_NAMES = ['better-auth.session_token', '__Secure-better-auth.session_token'];
 
-// Routes publiques marketing. Un visiteur non authentifié y accède librement ;
-// un utilisateur authentifié est renvoyé vers l'application.
-const MARKETING_PATHS = new Set<string>(['/', '/pricing']);
-
-// Préfixes des routes protégées. Le middleware redirige vers /login si pas de session.
-const PROTECTED_PREFIXES = ['/projects', '/members', '/invitations'];
-
 function hasSession(req: NextRequest): boolean {
   return SESSION_COOKIE_NAMES.some((name) => req.cookies.get(name)?.value);
-}
-
-function isProtectedPath(pathname: string): boolean {
-  return PROTECTED_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
-  );
 }
 
 export function middleware(req: NextRequest): NextResponse {
   const { pathname } = req.nextUrl;
   const authed = hasSession(req);
 
-  const isMarketing = MARKETING_PATHS.has(pathname);
-  const isAuthPage = pathname === '/login' || pathname === '/register';
-  const isProtected = isProtectedPath(pathname);
-
   // Marketing : accessible à tous ; les authentifiés partent vers l'app.
-  if (isMarketing && authed) {
+  if (isMarketingPath(pathname) && authed) {
     const url = req.nextUrl.clone();
     url.pathname = '/projects';
     url.search = '';
@@ -49,7 +38,7 @@ export function middleware(req: NextRequest): NextResponse {
   }
 
   // Protégé : non authentifié → login avec retour prévu.
-  if (isProtected && !authed) {
+  if (isProtectedPath(pathname) && !authed) {
     const url = req.nextUrl.clone();
     url.pathname = '/login';
     url.searchParams.set('next', pathname);
@@ -57,7 +46,7 @@ export function middleware(req: NextRequest): NextResponse {
   }
 
   // Pages d'auth : déjà authentifié → app.
-  if (isAuthPage && authed) {
+  if (isAuthPath(pathname) && authed) {
     const url = req.nextUrl.clone();
     url.pathname = '/projects';
     url.search = '';
