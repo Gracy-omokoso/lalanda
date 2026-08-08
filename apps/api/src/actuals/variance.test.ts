@@ -176,6 +176,77 @@ describe('resolveAnnualBase', () => {
   });
 });
 
+// ─── Non-régression S18a (FIN-001) : deux « résultat net » coexistent ──
+//
+// Depuis FIN-001, un plan validé contient DEUX grandeurs homonymes pour le même
+// exercice :
+//   - `activite.resultat_net`            → résultat AVANT dotations et intérêts ;
+//   - `caf.caf_resultat_net_annuel_N`    → résultat comptable APRÈS dotations et intérêts.
+// Sur le template restaurant, elles diffèrent d'environ 9 % (74 169 vs 67 434).
+// Les confondre produirait un écart entièrement fictif sur une ligne présentée
+// comme officielle. La résolution de base annuelle exige donc la feuille
+// `projection` ET l'identifiant exact `<lineId>_annuel_<N>` — aucun alias, aucune
+// recherche par « racine ».
+describe('resolveAnnualBase — homonymes de FIN-001 (S18a)', () => {
+  const PLAN_FIN001: PlanLineInput[] = [
+    {
+      sheetId: 'activite',
+      lineId: 'resultat_net',
+      label: 'Résultat net mensuel',
+      value: 6_180.72,
+      format: 'money',
+    },
+    // Série annuelle du CA, étendue à 5 exercices par FIN-001.
+    {
+      sheetId: 'projection',
+      lineId: 'ca_annuel_4',
+      label: 'CA année 4',
+      value: 300_000,
+      format: 'money',
+    },
+    // Série « résultat » de la feuille projection : racine `resultat`, pas `resultat_net`.
+    {
+      sheetId: 'projection',
+      lineId: 'resultat_annuel_2',
+      label: 'Résultat net année 2',
+      value: 81_585,
+      format: 'money',
+    },
+    // Homonyme de la feuille `caf` : autre agrégat, autre valeur.
+    {
+      sheetId: 'caf',
+      lineId: 'resultat_net_annuel_2',
+      label: 'Résultat net comptable (après dotations et intérêts) — exercice 2',
+      value: 67_434,
+      format: 'money',
+    },
+  ];
+
+  it('n’emprunte JAMAIS la feuille caf comme base annuelle', () => {
+    // `resultat_net_annuel_2` existe, mais sur la feuille `caf` : hors référence.
+    expect(resolveAnnualBase(PLAN_FIN001, 'resultat_net', 2)).toBeNull();
+  });
+
+  it('ne rattache pas une série de racine voisine (`resultat` ≠ `resultat_net`)', () => {
+    // `resultat_annuel_2` est publié, mais son identifiant ne correspond pas :
+    // deviner l'équivalence serait exactement l'invention que la doctrine interdit.
+    const lignes = computeVariances(PLAN_FIN001, [period(1, { resultat_net: 6_000 })], 2);
+    const net = lignes.find((l) => l.lineId === 'resultat_net')!;
+    expect(net.comparable).toBe(false);
+    expect(net.raison).toBe('EXERCICE_ABSENT_DU_PLAN');
+    expect(net.ecart).toBeNull();
+  });
+
+  it('exploite automatiquement l’horizon 5 exercices ouvert par FIN-001', () => {
+    // Aucun changement de code n'a été nécessaire : la série `ca_annuel_4` existe,
+    // donc l'exercice 4 devient comparable de lui-même.
+    expect(resolveAnnualBase(PLAN_FIN001, 'ca', 4)).toEqual({
+      planAnnuel: 300_000,
+      source: 'projection',
+    });
+  });
+});
+
 describe('computeVariances — exercice 1, cas chiffré', () => {
   // 2 mois saisis. Prévu cumulé : CA 20 000, coût matière 8 000.
   const periods = [
