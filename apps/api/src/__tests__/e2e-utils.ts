@@ -58,6 +58,62 @@ export function e2eSuite(name: string, fn: () => void): void {
 }
 
 /**
+ * Application Nest de test, montée comme `main.ts` (better-auth en middleware
+ * Express, CORS identique).
+ *
+ * Chaque suite appelle cette fonction et obtient SA PROPRE instance — ce n'est
+ * pas seulement de l'isolation de confort : le `ThrottlerGuard` global (100
+ * req/min) garde son compteur en mémoire dans l'instance. Deux suites qui
+ * partageraient une application partageraient aussi son quota, et la seconde
+ * échouerait en 429 sans rapport avec ce qu'elle teste.
+ */
+export async function makeE2EApp(): Promise<INestApplication> {
+  const { NestFactory } = await import('@nestjs/core');
+  const { toNodeHandler } = await import('better-auth/node');
+  const { AppModule } = await import('../app.module.js');
+  const { getAuth } = await import('../auth/auth.js');
+
+  const app = await NestFactory.create(AppModule, { logger: false });
+  app.enableCors({
+    origin: [process.env['WEB_URL'] ?? 'http://localhost:3000'],
+    credentials: true,
+  });
+  // Doit correspondre au mount de main.ts (préserve req.url pour le basePath).
+  const expressApp = app.getHttpAdapter().getInstance() as {
+    all: (path: string, ...handlers: unknown[]) => void;
+  };
+  expressApp.all('/auth/*', toNodeHandler(getAuth()));
+  await app.init();
+  return app;
+}
+
+/**
+ * Inscrit (ou reconnecte) un utilisateur de test et renvoie ses cookies de session.
+ * Le repli sur `sign-in` sert aux suites qui rejouent un même utilisateur.
+ */
+export async function registerAndLogin(
+  app: INestApplication,
+  user: { email: string; password: string; name: string },
+): Promise<string[]> {
+  const { default: request } = await import('supertest');
+  const server = app.getHttpServer();
+  let res = await request(server)
+    .post('/auth/sign-up/email')
+    .send({ email: user.email, password: user.password, name: user.name });
+  if (res.status >= 400) {
+    res = await request(server)
+      .post('/auth/sign-in/email')
+      .send({ email: user.email, password: user.password });
+  }
+  if (res.status >= 400) {
+    throw new Error(`Authentification impossible pour ${user.email} (${res.status})`);
+  }
+  const raw = res.headers['set-cookie'];
+  const cookies = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  return cookies.map((c: string) => c.split(';')[0]!);
+}
+
+/**
  * Base de données de la connexion Mongoose OUVERTE PAR NEST.
  *
  * Ne jamais lui substituer `mongoose.connection` : c'est la connexion globale du
@@ -89,6 +145,10 @@ const ORG_SCOPED_COLLECTIONS = [
   'canvas_revisions',
   'subscriptions',
   'invitations',
+  // S20a — le journal d'audit porte lui aussi un `organizationId`. Sans cette
+  // ligne, chaque exécution laisserait derrière elle les traces d'export des
+  // suites RBAC.
+  'audit_events',
 ] as const;
 
 /**
