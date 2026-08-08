@@ -1,21 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 
-import { signOut, useSession } from '@/lib/auth-client';
+import { useSession } from '@/lib/auth-client';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { OrgSwitcher } from './org-switcher';
+import { UserMenu } from './user-menu';
 
 export function AppHeader(): React.ReactElement {
-  const router = useRouter();
   const { data: session, isPending } = useSession();
-
-  async function handleSignOut(): Promise<void> {
-    await signOut();
-    router.push('/login');
-    router.refresh();
-  }
 
   return (
     <header className="flex items-center justify-between border-b border-[var(--border)] pb-4">
@@ -48,22 +41,16 @@ export function AppHeader(): React.ReactElement {
             <OrgSwitcher />
           </>
         ) : null}
-        <ThemeToggle />
+        {/* `persist` : dans l'espace applicatif, le thème choisi ici est aussi
+            enregistré sur le compte, pour rester cohérent avec /compte/preferences. */}
+        <ThemeToggle persist />
         {isPending ? (
           <span className="opacity-50">…</span>
         ) : session?.user ? (
-          <>
-            <span className="hidden text-[var(--foreground-muted)] sm:inline">
-              {session.user.email}
-            </span>
-            <button
-              type="button"
-              onClick={handleSignOut}
-              className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm transition hover:bg-[var(--surface-muted)]"
-            >
-              Déconnexion
-            </button>
-          </>
+          // L'adresse email devient le point d'entrée de l'espace compte (S20b) :
+          // Profil / Sécurité / Préférences / Déconnexion. La déconnexion n'est
+          // plus un bouton isolé — elle vit avec le reste des réglages du compte.
+          <UserMenu email={session.user.email} />
         ) : null}
       </div>
     </header>
