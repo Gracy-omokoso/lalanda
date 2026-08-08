@@ -167,6 +167,14 @@ est explicite : dès que les hypothèses divergent du dernier calcul, un bandeau
 « Résultats obsolètes » et un bouton « Recalculer » s’affichent au-dessus des résultats,
 depuis n’importe quelle étape.
 
+### Place dans la navigation
+
+Le wizard n'a pas d'onglet dédié : il **est** le contenu de l'onglet « Plan » de la
+navigation projet (`PROJECT_TABS`, S18d). Saisie guidée et résultats sont deux colonnes
+d'un même écran ; les séparer aurait supprimé l'aperçu immédiat de l'impact d'une
+hypothèse. Un changement d'onglet projet démonte le composant : l'auto-save est vidé au
+démontage, aucune saisie n'est perdue.
+
 ### Accessibilité
 
 `aria-current="step"` sur l’étape courante, `role="progressbar"` doublé d’un compteur
