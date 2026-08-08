@@ -3,6 +3,12 @@
 // S1 : sous-ensemble minimal (drivers scalaires, formules ponctuelles, pas de temporalité, pas de custom functions).
 
 import { z } from 'zod';
+import {
+  GROUPE_TOUS,
+  findUnknownWizardGroupes,
+  resolveWizardEtapes,
+  type ResolvedEtape,
+} from '@lalanda/shared/wizard';
 
 // ─── Identifiants ─────────────────────────────────────────────
 // Snake_case ASCII, [a-z0-9_], commence par une lettre, 1..64 chars.
@@ -43,6 +49,44 @@ const GroupeSchema = z
     label: z.string().min(1),
   })
   .strict();
+
+// ─── Étapes du wizard de saisie (S18c) ────────────────────────
+// PRÉSENTATION UNIQUEMENT — aucune sémantique de calcul. Une étape regroupe un ou
+// plusieurs `groupes_hypotheses` et donne au wizard web un ordre de saisie lisible
+// (contexte → CA → coûts → personnel → investissement → financement → synthèse,
+// voir docs/06-WIZARD.md). Le moteur ignore totalement ce champ lors de l'évaluation.
+const EtapeSchema = z
+  .object({
+    id: IdSchema,
+    /** Titre affiché dans l'indicateur de progression (ex. « Chiffre d'affaires »). */
+    label: z.string().min(1),
+    /** Phrase d'accroche affichée sous le titre de l'étape. */
+    description: z.string().optional(),
+    /** Ids des `groupes_hypotheses` dont les drivers sont saisis à cette étape. */
+    groupes: z.array(IdSchema).min(1, 'une étape doit rattacher au moins un groupe'),
+    /**
+     * Rang d'affichage. Si absent, l'ordre de déclaration fait foi. Les étapes sans
+     * `ordre` passent après celles qui en déclarent un.
+     */
+    ordre: z.number().int().positive().optional(),
+  })
+  .strict();
+
+export type Etape = z.infer<typeof EtapeSchema>;
+
+/**
+ * Bloc de présentation du wizard — regroupe TOUTES les clés destinées à l'interface
+ * de saisie, et rien d'autre. Le compilateur et l'évaluateur l'ignorent intégralement
+ * (voir ADR-0011, Contrat 3 : frontière explicite entre structure financière et
+ * présentation, pour que deux chantiers puissent éditer le même template).
+ */
+const WizardSchema = z
+  .object({
+    etapes: z.array(EtapeSchema).min(1, 'le bloc wizard doit déclarer au moins une étape'),
+  })
+  .strict();
+
+export type WizardPresentation = z.infer<typeof WizardSchema>;
 
 // ─── Feuilles et lignes ───────────────────────────────────────
 // S1 : uniquement des feuilles calculées avec des lignes explicites.
@@ -181,6 +225,11 @@ export const TemplateSchema = z
     horizon_mois: z.number().int().positive().max(120).optional(),
     parameter_pack: z.string().optional(),
     groupes_hypotheses: z.array(GroupeSchema).optional(),
+    /**
+     * (S18c) Bloc de présentation du wizard de saisie — aucune sémantique de calcul.
+     * Absent → fallback « une étape par groupe d'hypothèses » (voir {@link resolveEtapes}).
+     */
+    wizard: WizardSchema.optional(),
     drivers: z.array(DriverSchema).min(1, 'au moins un driver requis'),
     feuilles: z.array(FeuilleSchema).min(1, 'au moins une feuille requise'),
     sorties: z.array(IdSchema).optional(),
@@ -218,6 +267,8 @@ export interface CollectedIds {
   readonly lignes: ReadonlySet<string>;
   readonly feuilles: ReadonlySet<string>;
   readonly groupes: ReadonlySet<string>;
+  /** (S18c) Ids des étapes du wizard — vide si le template n'en déclare pas. */
+  readonly etapes: ReadonlySet<string>;
 }
 
 /**
@@ -230,10 +281,22 @@ export function collectIds(template: Template): CollectedIds {
   const lignes = new Set<string>();
   const feuilles = new Set<string>();
   const groupes = new Set<string>();
+  const etapes = new Set<string>();
 
   for (const g of template.groupes_hypotheses ?? []) {
     if (groupes.has(g.id)) throw new DuplicateIdError('groupe', g.id);
     groupes.add(g.id);
+  }
+  // (S18c) Les étapes vivent dans leur propre espace de noms — elles ne sont jamais
+  // référencées par une formule. Seule l'unicité des ids est vérifiée ici.
+  //
+  // Un groupe rattaché mais inexistant n'est PAS une erreur d'exécution : une clé de
+  // présentation ne doit jamais empêcher un template de parser ni le moteur d'évaluer
+  // (ADR-0011, Contrat 3). `resolveEtapes` l'ignore, et la cohérence des templates
+  // livrés est vérifiée par `findUnknownWizardGroupes` dans leurs tests.
+  for (const e of template.wizard?.etapes ?? []) {
+    if (etapes.has(e.id)) throw new DuplicateIdError('etape', e.id);
+    etapes.add(e.id);
   }
   for (const d of template.drivers) {
     if (drivers.has(d.id)) throw new DuplicateIdError('driver', d.id);
@@ -251,7 +314,21 @@ export function collectIds(template: Template): CollectedIds {
     }
   }
 
-  return { drivers, lignes, feuilles, groupes };
+  return { drivers, lignes, feuilles, groupes, etapes };
+}
+
+// ─── Résolution des étapes du wizard (S18c) ───────────────────
+
+/**
+ * Calcule la liste ordonnée des étapes de saisie d'un template.
+ *
+ * L'algorithme vit dans @lalanda/shared : le web l'applique à l'identique, sans
+ * réimplémentation (revue CTO S18c, point I5). Voir {@link resolveWizardEtapes}
+ * pour les règles de tri, de filtrage et de fallback.
+ */
+export function resolveEtapes(template: Template): ResolvedEtape[] {
+  return resolveWizardEtapes(template.groupes_hypotheses ?? [], template.wizard?.etapes ?? []);
 }
 
 export { DuplicateIdError, type EngineError };
+export { GROUPE_TOUS, findUnknownWizardGroupes, type ResolvedEtape };

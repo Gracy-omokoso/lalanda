@@ -52,6 +52,38 @@ groupes_hypotheses:
   - id: financement
     label: 'Financement'
 
+# Découpage du wizard de saisie (S18c) — présentation uniquement, aucun impact calcul.
+# Ordre inspiré de docs/06-WIZARD.md (CA → coûts → personnel → investissement →
+# financement → fiscalité), adapté aux groupes réellement déclarés ci-dessus :
+# le personnel vit dans `charges_fixes`, l'investissement dans `financement`.
+wizard:
+  etapes:
+    - id: chiffre_affaires
+      label: "Chiffre d'affaires"
+      description: 'Ce que le comptoir encaisse un jour type, et combien de jours par mois.'
+      groupes: [activite]
+      ordre: 1
+    - id: couts_achat
+      label: "Coûts d'achat"
+      description: 'La marge commerciale dégagée sur la marchandise revendue.'
+      groupes: [couts_variables]
+      ordre: 2
+    - id: charges_fixes
+      label: 'Charges fixes et personnel'
+      description: 'Les dépenses dues chaque mois, quel que soit le niveau d’activité.'
+      groupes: [charges_fixes]
+      ordre: 3
+    - id: investissement_financement
+      label: 'Investissement et financement'
+      description: 'Ce que vous installez au départ, et comment vous le financez.'
+      groupes: [financement]
+      ordre: 4
+    - id: fiscalite
+      label: 'Fiscalité'
+      description: 'Paramètres fiscaux pré-remplis par le Country Pack — à confirmer.'
+      groupes: [fiscalite]
+      ordre: 5
+
 drivers:
   - id: ca_moyen_jour
     groupe: activite

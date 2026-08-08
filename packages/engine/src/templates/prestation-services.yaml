@@ -48,6 +48,34 @@ groupes_hypotheses:
   - id: financement
     label: 'Financement'
 
+# Découpage du wizard de saisie (S18c) — présentation uniquement, aucun impact calcul.
+# Ordre inspiré de docs/06-WIZARD.md (CA → coûts → personnel → investissement →
+# financement → fiscalité), adapté aux groupes réellement déclarés ci-dessus :
+# une prestation de services n'a pas de coûts variables ; le personnel opérationnel
+# et l'investissement vivent respectivement dans `charges_fixes` et `financement`.
+wizard:
+  etapes:
+    - id: chiffre_affaires
+      label: "Chiffre d'affaires"
+      description: 'Votre tarif journalier et le nombre de jours réellement facturables.'
+      groupes: [activite]
+      ordre: 1
+    - id: charges_fixes
+      label: 'Charges fixes et personnel'
+      description: 'Les dépenses dues chaque mois, quel que soit le niveau d’activité.'
+      groupes: [charges_fixes]
+      ordre: 2
+    - id: investissement_financement
+      label: 'Investissement et financement'
+      description: 'Ce que vous installez au départ, et comment vous le financez.'
+      groupes: [financement]
+      ordre: 3
+    - id: fiscalite
+      label: 'Fiscalité'
+      description: 'Paramètres fiscaux pré-remplis par le Country Pack — à confirmer.'
+      groupes: [fiscalite]
+      ordre: 4
+
 drivers:
   - id: tarif_journalier_moyen
     groupe: activite

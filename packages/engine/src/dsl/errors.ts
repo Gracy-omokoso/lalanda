@@ -22,9 +22,9 @@ export class EngineError extends Error {
   }
 }
 
-/** Un identifiant (driver, ligne, feuille) apparaît plus d'une fois dans le template. */
+/** Un identifiant (driver, ligne, feuille, groupe, étape) apparaît plus d'une fois. */
 export class DuplicateIdError extends EngineError {
-  constructor(kind: 'driver' | 'ligne' | 'feuille' | 'groupe', id: string) {
+  constructor(kind: 'driver' | 'ligne' | 'feuille' | 'groupe' | 'etape', id: string) {
     super('DUPLICATE_ID', `Identifiant ${kind} en double : "${id}"`, { kind, id });
   }
 }

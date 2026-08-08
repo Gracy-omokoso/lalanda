@@ -18,6 +18,10 @@
       "types": "./dist/money/index.d.ts",
       "import": "./dist/money/index.js"
     },
+    "./wizard": {
+      "types": "./dist/wizard/index.d.ts",
+      "import": "./dist/wizard/index.js"
+    },
     "./logger": {
       "types": "./dist/logger/index.d.ts",
       "import": "./dist/logger/index.js"
