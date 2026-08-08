@@ -7,19 +7,14 @@
 import { INestApplication } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { toNodeHandler } from 'better-auth/node';
-import { config as loadDotenv } from 'dotenv';
-import mongoose from 'mongoose';
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, expect, it } from 'vitest';
 
 import 'reflect-metadata';
 
-const envPath = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../.env');
-loadDotenv({ path: envPath });
+import { e2eSuite, teardown } from './e2e-utils.js';
 
-const hasMongo = Boolean(process.env['MONGODB_URI']);
+import { e2eSuite, teardown } from './e2e-utils.js';
 
 // Import différé — évite de charger better-auth (qui essaie de se connecter) si on skip.
 async function makeApp(): Promise<INestApplication> {
@@ -34,9 +29,7 @@ async function makeApp(): Promise<INestApplication> {
   return app;
 }
 
-const suite = hasMongo ? describe : describe.skip;
-
-suite('auth sur /evaluate (S16a)', () => {
+e2eSuite('auth sur /evaluate (S16a)', () => {
   let app: INestApplication;
 
   const tag = Math.random().toString(36).slice(2, 8);
@@ -51,26 +44,7 @@ suite('auth sur /evaluate (S16a)', () => {
   }, 60_000);
 
   afterAll(async () => {
-    try {
-      const db = mongoose.connection.db;
-      if (db) {
-        await Promise.all([
-          db.collection('user').deleteMany({ email: user.email }),
-          db.collection('session').deleteMany({}),
-          db
-            .collection('organizations')
-            .deleteMany({ slug: { $regex: /^eve/ } })
-            .catch(() => {}),
-          db
-            .collection('memberships')
-            .deleteMany({})
-            .catch(() => {}),
-        ]);
-      }
-    } catch {
-      // Best-effort — pas critique.
-    }
-    await app?.close();
+    await teardown(app, [user.email]);
   }, 30_000);
 
   async function registerAndLogin(): Promise<string[]> {

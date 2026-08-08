@@ -1,0 +1,168 @@
+// Outils partagés des suites e2e (S19a).
+//
+// Deux problèmes réglés ici, tous deux découverts en fin de batch S18 :
+//
+// 1. GARDE ANTI-SKIP. Les suites e2e se mettaient en `describe.skip` dès que
+//    `MONGODB_URI` était absent. La CI ne fournissait pas Mongo : les suites ne
+//    s'exécutaient JAMAIS et les jobs passaient au vert avec zéro couverture
+//    d'intégration. `e2eSuite` conserve le skip confortable en local (un dev sans
+//    docker compose peut lancer les unitaires) mais le REND IMPOSSIBLE dès que
+//    `LALANDA_REQUIRE_E2E=1` : le module lève à la collecte, le fichier échoue,
+//    le job rougit. Un job vert prouve donc que les e2e ont tourné.
+//
+// 2. NETTOYAGE INEFFECTIF. Les `afterAll` utilisaient `mongoose.connection`, la
+//    connexion GLOBALE du driver — que personne n'ouvre ici. Nest ouvre la sienne
+//    via `MongooseModule.forRootAsync`. `mongoose.connection.db` était donc
+//    `undefined`, le `if (db)` sautait tout le bloc en silence et chaque exécution
+//    laissait users, orgs, projets et snapshots derrière elle. `dbOf(app)` va
+//    chercher la connexion réellement utilisée par l'application.
+
+import type { INestApplication } from '@nestjs/common';
+import { config as loadDotenv } from 'dotenv';
+import type { Db, ObjectId } from 'mongodb';
+import type { Connection } from 'mongoose';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { describe } from 'vitest';
+
+/** `.env` à la racine du monorepo — en CI les variables viennent du process. */
+const envPath = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../.env');
+loadDotenv({ path: envPath });
+
+export const hasMongo = Boolean(process.env['MONGODB_URI']);
+
+/** Positionné par la CI : une suite e2e skippée devient une erreur. */
+const requireE2E = process.env['LALANDA_REQUIRE_E2E'] === '1';
+
+/**
+ * `describe` d'une suite e2e nécessitant MongoDB.
+ *
+ * - `MONGODB_URI` présent → la suite tourne;
+ * - absent et `LALANDA_REQUIRE_E2E=1` → throw (le fichier échoue, la CI rougit);
+ * - absent sinon → skip (confort local documenté dans docs/18-TESTS.md).
+ */
+export function e2eSuite(name: string, fn: () => void): void {
+  if (hasMongo) {
+    describe(name, fn);
+    return;
+  }
+  if (requireE2E) {
+    throw new Error(
+      `Suite e2e « ${name} » sur le point d'être skippée alors que LALANDA_REQUIRE_E2E=1.\n` +
+        "MONGODB_URI est absent de l'environnement du process de test.\n" +
+        "Cause fréquente : la variable n'est pas déclarée dans `globalEnv` de turbo.json — " +
+        'Turborepo 2 tourne en envMode strict et ne transmet que les variables listées.',
+    );
+  }
+  describe.skip(name, fn);
+}
+
+/**
+ * Base de données de la connexion Mongoose OUVERTE PAR NEST.
+ *
+ * Ne jamais lui substituer `mongoose.connection` : c'est la connexion globale du
+ * driver, jamais ouverte par l'application, et tout nettoyage écrit dessus est
+ * silencieusement perdu.
+ */
+export async function dbOf(app: INestApplication): Promise<Db> {
+  const { getConnectionToken } = await import('@nestjs/mongoose');
+  const connection = app.get<Connection>(getConnectionToken());
+  const db = connection.db;
+  if (!db) {
+    throw new Error(
+      "La connexion Mongoose de l'application n'expose pas de `db` — nettoyage e2e impossible.",
+    );
+  }
+  return db;
+}
+
+/**
+ * Collections applicatives portant toutes un `organizationId` : la purge d'une
+ * organisation de test les vide intégralement pour cette org.
+ */
+const ORG_SCOPED_COLLECTIONS = [
+  'projects',
+  'financial_plans',
+  'financial_objectives',
+  'actual_periods',
+  'canvases',
+  'canvas_revisions',
+  'subscriptions',
+  'invitations',
+] as const;
+
+/**
+ * Supprime en cascade tout ce qu'une suite e2e a créé, à partir des SEULS emails
+ * de ses utilisateurs de test : users → organisations → données applicatives.
+ *
+ * Pourquoi passer par une cascade plutôt que par des `deleteMany({})` :
+ * vitest exécute les fichiers de test EN PARALLÈLE sur la même base. Les
+ * anciens nettoyages vidaient `session`, `account`, `memberships`,
+ * `subscriptions` et `invitations` sans filtre — inoffensif tant qu'ils
+ * s'exécutaient sur une connexion morte (bug corrigé en S19a), mais destructeur
+ * dès qu'ils écrivent vraiment : l'`afterAll` d'une suite terminée déconnecterait
+ * les suites encore en cours. Tout est donc scopé par utilisateur et par
+ * organisation.
+ *
+ * Attention aux types d'identifiants : better-auth stocke `session.userId` et
+ * `account.userId` en ObjectId, tandis que `organizations.ownerId` et
+ * `memberships.userId` sont des chaînes.
+ */
+export async function purgeTestUsers(db: Db, emails: string[]): Promise<void> {
+  if (emails.length === 0) return;
+
+  const users = await db
+    .collection('user')
+    .find({ email: { $in: emails } }, { projection: { _id: 1 } })
+    .toArray();
+  if (users.length === 0) return;
+
+  const userObjectIds = users.map((u) => u._id as ObjectId);
+  const userIds = userObjectIds.map(String);
+
+  const ownedOrgs = await db
+    .collection('organizations')
+    .find({ ownerId: { $in: userIds } }, { projection: { _id: 1 } })
+    .toArray();
+  const memberships = await db
+    .collection('memberships')
+    .find({ userId: { $in: userIds } }, { projection: { organizationId: 1 } })
+    .toArray();
+
+  const orgObjectIds = ownedOrgs.map((o) => o._id as ObjectId);
+  const orgIds = [
+    ...new Set([
+      ...orgObjectIds.map(String),
+      ...memberships.map((m) => String(m['organizationId'])),
+    ]),
+  ];
+
+  await Promise.all([
+    ...ORG_SCOPED_COLLECTIONS.map((name) =>
+      db.collection(name).deleteMany({ organizationId: { $in: orgIds } }),
+    ),
+    // Les invitations sont aussi indexées par email du destinataire : un invité
+    // qui ne s'est jamais inscrit n'a ni user ni membership à remonter.
+    db.collection('invitations').deleteMany({ email: { $in: emails } }),
+    db.collection('session').deleteMany({ userId: { $in: userObjectIds } }),
+    db.collection('account').deleteMany({ userId: { $in: userObjectIds } }),
+    db.collection('memberships').deleteMany({ userId: { $in: userIds } }),
+  ]);
+
+  await db.collection('organizations').deleteMany({ _id: { $in: orgObjectIds } });
+  await db.collection('user').deleteMany({ _id: { $in: userObjectIds } });
+}
+
+/**
+ * `afterAll` standard d'une suite e2e : purge les données de test puis ferme
+ * l'application. La fermeture est dans un `finally` — un nettoyage qui échoue
+ * doit être visible (il n'est plus avalé en « best-effort »), mais il ne doit
+ * jamais laisser une connexion Mongo ouverte derrière lui.
+ */
+export async function teardown(app: INestApplication | undefined, emails: string[]): Promise<void> {
+  try {
+    if (app) await purgeTestUsers(await dbOf(app), emails);
+  } finally {
+    await app?.close();
+  }
+}

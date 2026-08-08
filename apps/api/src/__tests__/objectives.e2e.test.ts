@@ -17,19 +17,12 @@
 import { INestApplication } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { toNodeHandler } from 'better-auth/node';
-import { config as loadDotenv } from 'dotenv';
-import mongoose from 'mongoose';
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, expect, it } from 'vitest';
 
 import 'reflect-metadata';
 
-const envPath = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../.env');
-loadDotenv({ path: envPath });
-
-const hasMongo = Boolean(process.env['MONGODB_URI']);
+import { e2eSuite, teardown } from './e2e-utils.js';
 
 async function makeApp(): Promise<INestApplication> {
   const { AppModule } = await import('../app.module.js');
@@ -57,9 +50,7 @@ interface AttainmentItem {
   raison: string | null;
 }
 
-const suite = hasMongo ? describe : describe.skip;
-
-suite('objectifs financiers et taux d’atteinte (S18d — docs/01)', () => {
+e2eSuite('objectifs financiers et taux d’atteinte (S18d — docs/01)', () => {
   let app: INestApplication;
 
   const tag = Math.random().toString(36).slice(2, 8);
@@ -93,27 +84,7 @@ suite('objectifs financiers et taux d’atteinte (S18d — docs/01)', () => {
   }, 60_000);
 
   afterAll(async () => {
-    try {
-      const db = mongoose.connection.db;
-      if (db) {
-        await Promise.all([
-          db.collection('user').deleteMany({ email: { $in: [userA.email, userB.email] } }),
-          db.collection('financial_objectives').deleteMany({ projectId }),
-          db.collection('financial_plans').deleteMany({ projectId }),
-          db
-            .collection('projects')
-            .deleteMany({ name: { $regex: `${tag}$` } })
-            .catch(() => {}),
-          db
-            .collection('organizations')
-            .deleteMany({ slug: { $regex: /^obja|^objb/ } })
-            .catch(() => {}),
-        ]);
-      }
-    } catch {
-      // Best-effort.
-    }
-    await app?.close();
+    await teardown(app, [userA.email, userB.email]);
   }, 30_000);
 
   async function registerAndLogin(user: {

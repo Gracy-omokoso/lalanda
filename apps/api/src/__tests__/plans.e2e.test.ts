@@ -13,20 +13,15 @@
 import { INestApplication } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { toNodeHandler } from 'better-auth/node';
-import { config as loadDotenv } from 'dotenv';
 import ExcelJS from 'exceljs';
-import mongoose from 'mongoose';
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, expect, it } from 'vitest';
 
 import 'reflect-metadata';
 
-const envPath = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../.env');
-loadDotenv({ path: envPath });
+import { e2eSuite, teardown } from './e2e-utils.js';
 
-const hasMongo = Boolean(process.env['MONGODB_URI']);
+import { e2eSuite, teardown } from './e2e-utils.js';
 
 async function makeApp(): Promise<INestApplication> {
   const { AppModule } = await import('../app.module.js');
@@ -44,9 +39,7 @@ async function makeApp(): Promise<INestApplication> {
   return app;
 }
 
-const suite = hasMongo ? describe : describe.skip;
-
-suite('plans validés figés et versionnés (S16c — FIN-003)', () => {
+e2eSuite('plans validés figés et versionnés (S16c — FIN-003)', () => {
   let app: INestApplication;
 
   const tag = Math.random().toString(36).slice(2, 8);
@@ -80,26 +73,7 @@ suite('plans validés figés et versionnés (S16c — FIN-003)', () => {
   }, 60_000);
 
   afterAll(async () => {
-    try {
-      const db = mongoose.connection.db;
-      if (db) {
-        await Promise.all([
-          db.collection('user').deleteMany({ email: { $in: [userA.email, userB.email] } }),
-          db.collection('financial_plans').deleteMany({ projectId }),
-          db
-            .collection('projects')
-            .deleteMany({ name: { $regex: `${tag}$` } })
-            .catch(() => {}),
-          db
-            .collection('organizations')
-            .deleteMany({ slug: { $regex: /^plana|^planb/ } })
-            .catch(() => {}),
-        ]);
-      }
-    } catch {
-      // Best-effort.
-    }
-    await app?.close();
+    await teardown(app, [userA.email, userB.email]);
   }, 30_000);
 
   async function registerAndLogin(user: {
