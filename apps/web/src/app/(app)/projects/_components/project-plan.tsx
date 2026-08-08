@@ -454,7 +454,7 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
         </section>
 
         {/* ─── Colonne résultats : reste accessible à toute étape ─ */}
-        <section aria-label="Résultats du plan" aria-live="polite" className="flex flex-col gap-4">
+        <section aria-label="Résultats du plan" className="flex flex-col gap-4">
           {error ? (
             <div
               role="alert"
@@ -467,7 +467,12 @@ export function ProjectPlan({ projectId }: { projectId: string }): React.ReactEl
               dernière évaluation, mais leur obsolescence est explicite et corrigeable
               sans quitter l'étape courante. */}
           {resultsStale ? (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--warn)]/40 p-3 text-sm">
+            // `status` : annonce l'obsolescence sans bavarder à chaque changement
+            // d'onglet, ce qu'aurait fait un aria-live sur tout le panneau.
+            <div
+              role="status"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--warn)]/40 p-3 text-sm"
+            >
               <p className="flex items-center gap-2 text-[var(--warn)]">
                 <span aria-hidden="true" className="dot dot-warn" />
                 <span>
