@@ -226,13 +226,127 @@ describe('prestation-services', () => {
   });
 });
 
+// ─── E-commerce à paiement à la livraison (S19b) ──────────────
+// Trois traits distinguent ce modèle des autres templates, et ce sont eux que
+// les tests verrouillent :
+//   1. la publicité est un coût variable qui pilote le volume de commandes ;
+//   2. la livraison se paie sur les commandes TENTÉES, pas encaissées ;
+//   3. le BFR est lourd (fournisseur payé d'avance, stock long, cash différé).
+
+describe('ecommerce-cod', () => {
+  const template = parseTemplate(loadYaml('ecommerce-cod'));
+
+  it('déclare le bon slug, version et secteur', () => {
+    expect(template.slug).toBe('ecommerce-cod');
+    expect(template.version).toBe('1.0.0');
+    expect(template.secteur).toBe('ecommerce');
+    expect(template.pays).toEqual(['CD']);
+    expect(template.devise_base).toBe('USD');
+  });
+
+  it('évalue les défauts → résultat net mensuel = 719.6875 USD', () => {
+    // commandes_generees = 1500 / 4 = 375
+    // commandes_livrees = 375 * 0.70 = 262.5
+    // ca = 262.5 * 35 = 9187.5
+    // cout_achat = 9187.5 * (1 - 0.55) = 4134.375
+    // cout_livraison = 375 * 3 = 1125   ← sur les commandes TENTÉES
+    // cout_publicite = 1500
+    // couts_variables_total = 6759.375
+    // marge_brute = 9187.5 - 6759.375 = 2428.125
+    // charges_operationnelles = 900 + 250 + 100 + 150 = 1400
+    // excedent_brut = 1028.125 ; ibp = 308.4375 ; resultat_net = 719.6875
+    const { lines } = evaluateTemplate(template, {});
+    const v = byId(lines);
+    expect(v.get('commandes_generees')).toBe(375);
+    expect(v.get('commandes_livrees')).toBe(262.5);
+    expect(v.get('ca')).toBe(9187.5);
+    expect(v.get('couts_variables_total')).toBeCloseTo(6759.375, 6);
+    expect(v.get('excedent_brut')).toBeCloseTo(1028.125, 6);
+    expect(v.get('resultat_net')).toBeCloseTo(719.6875, 6);
+  });
+
+  it('facture la livraison sur les commandes tentées, pas sur les livrées', () => {
+    // Le cœur du modèle COD : dégrader le taux de livraison réduit le CA
+    // mais laisse le coût de livraison inchangé — c'est ce qui creuse la perte.
+    const base = byId(evaluateTemplate(template, {}).lines);
+    const degrade = byId(evaluateTemplate(template, { taux_livraison_reussie: 0.5 }).lines);
+
+    expect(degrade.get('cout_livraison')).toBe(base.get('cout_livraison'));
+    expect(degrade.get('cout_publicite')).toBe(base.get('cout_publicite'));
+    expect(degrade.get('ca')).toBeLessThan(base.get('ca') as number);
+  });
+
+  it('bascule en perte quand le taux de livraison tombe à 50 %', () => {
+    // ca = 375 * 0.5 * 35 = 6562.5 ; cout_achat = 2953.125
+    // couts_variables = 2953.125 + 1125 + 1500 = 5578.125
+    // marge_brute = 984.375 ; excedent_brut = 984.375 - 1400 = -415.625
+    const { lines } = evaluateTemplate(template, { taux_livraison_reussie: 0.5 });
+    const v = byId(lines);
+    expect(v.get('excedent_brut')).toBeCloseTo(-415.625, 6);
+    // Pas d'impôt sur un résultat négatif.
+    expect(v.get('ibp')).toBe(0);
+    expect(v.get('resultat_net')).toBeCloseTo(-415.625, 6);
+  });
+
+  it('paie le fournisseur d’avance : aucun crédit fournisseur par défaut', () => {
+    const delaiFournisseurs = template.drivers.find((d) => d.id === 'delai_fournisseurs_jours');
+    expect(delaiFournisseurs?.defaut).toBe(0);
+    const { lines } = evaluateTemplate(template, {});
+    expect(byId(lines).get('pf_bfr_fournisseurs_annuel_1')).toBe(0);
+  });
+
+  it('dote le fonds de roulement à hauteur du BFR calculé de l’année 1', () => {
+    // Sous-doter le BFR est l'erreur classique du modèle : les défauts doivent
+    // partir d'un scénario finançable, trésorerie positive à l'ouverture.
+    const { lines } = evaluateTemplate(template, {});
+    const v = byId(lines);
+    expect(v.get('pf_ecart')).toBe(1000);
+    expect(v.get('tresorerie_initiale')).toBe(1000);
+    expect(v.get('tresorerie_min_annee_1')).toBe(1000);
+    // Le BFR réel de l'année 1 reste couvert par le fonds de roulement doté.
+    expect(v.get('pf_bfr_total_annuel_1')).toBeCloseTo(16581.25, 6);
+  });
+
+  it('passe les seuils bancaires du pack RDC avec les défauts', () => {
+    const { lines } = evaluateTemplate(template, {});
+    const v = byId(lines);
+    expect(v.get('marge_ebe_pct')).toBeGreaterThan(0.1); // seuil pack : 10 %
+    expect(v.get('marge_nette_pct')).toBeGreaterThan(0.05); // seuil pack : 5 %
+    expect(v.get('dscr')).toBeGreaterThan(1.25); // seuil pack : 1,25
+    expect(v.get('apport_pct')).toBeGreaterThan(0.25); // seuil pack : 25 %
+    expect(v.get('payback_annees')).toBeLessThan(5); // seuil pack : 5 ans
+  });
+
+  it('expose les indicateurs de pilotage propres au modèle', () => {
+    const { lines } = evaluateTemplate(template, {});
+    const v = byId(lines);
+    expect(v.get('roas')).toBeCloseTo(6.125, 6); // 9187.5 / 1500
+    expect(v.get('marge_contributive_par_commande_livree')).toBeCloseTo(9.25, 6);
+    expect(v.get('cout_complet_par_commande_livree')).toBeCloseTo(10, 6); // (1500 + 1125) / 262.5
+  });
+
+  it('équilibre le bilan sur les 5 exercices', () => {
+    const { lines } = evaluateTemplate(template, {});
+    const v = byId(lines);
+    for (const n of [1, 2, 3, 4, 5]) {
+      expect(Math.abs(v.get(`bilan_ecart_equilibre_annuel_${n}`) ?? 1)).toBeLessThan(0.01);
+    }
+    expect(Math.abs(v.get('bilan_ecart_equilibre_ouverture') ?? 1)).toBeLessThan(0.01);
+  });
+});
+
 // ─── Étapes du wizard (S18c) ──────────────────────────────────
-// Présentation uniquement : ces assertions garantissent que les 3 templates de
+// Présentation uniquement : ces assertions garantissent que les templates de
 // lancement offrent une saisie guidée cohérente et qu'aucun groupe d'hypothèses
 // ne se retrouve hors parcours après une évolution de leur structure.
 
 describe('etapes du wizard — templates sectoriels', () => {
-  const slugs = ['restaurant-kinshasa', 'quincaillerie-negoce', 'prestation-services'] as const;
+  const slugs = [
+    'restaurant-kinshasa',
+    'quincaillerie-negoce',
+    'prestation-services',
+    'ecommerce-cod',
+  ] as const;
 
   for (const slug of slugs) {
     describe(slug, () => {

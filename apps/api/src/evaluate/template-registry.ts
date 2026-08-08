@@ -3,6 +3,7 @@
 // S6-lite : 3 templates sectoriels de lancement ajoutés (restaurant-kinshasa,
 // quincaillerie-negoce, prestation-services — brief §8). Les manifests vivent
 // dans packages/engine/src/templates/*.yaml.
+// S19b : ajout du template e-commerce à paiement à la livraison (ecommerce-cod).
 // Les templates réels vivront en MongoDB à partir de S7 (voir @lalanda/templates/README.md).
 
 import { readFileSync } from 'node:fs';
@@ -28,6 +29,10 @@ const templateFiles: Record<string, string> = {
   'prestation-services': resolve(
     __dirname,
     '../../../../packages/engine/src/templates/prestation-services.yaml',
+  ),
+  'ecommerce-cod': resolve(
+    __dirname,
+    '../../../../packages/engine/src/templates/ecommerce-cod.yaml',
   ),
 };
 
