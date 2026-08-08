@@ -15,14 +15,15 @@ import { AuthGuard } from '../auth/auth.guard.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { RequirePermission } from '../authz/authz.decorators.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
-import { ORG_ROLES, ORG_ROLE_LABELS, type OrgRole } from '../authz/permissions.js';
+import { OrgRoleInput } from '../authz/org-role.dto.js';
+import { ORG_ROLE_LABELS, type OrgRole } from '../authz/permissions.js';
 import type { InvitationDocument } from './invitation.schema.js';
 import { InvitationsService } from './invitations.service.js';
 
 const CreateInvitationSchema = z.object({
   email: z.string().email(),
   /** docs/12 § Invitations : une invitation « indique rôle et projets ». */
-  role: z.enum(ORG_ROLES).optional(),
+  role: OrgRoleInput.optional(),
 });
 
 const AcceptInvitationSchema = z.object({

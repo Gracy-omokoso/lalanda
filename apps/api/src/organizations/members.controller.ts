@@ -17,9 +17,9 @@ import { CurrentUser } from '../auth/current-user.decorator.js';
 import { RequirePermission } from '../authz/authz.decorators.js';
 import { CurrentOrgRole } from '../authz/current-org-role.decorator.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
+import { OrgRoleInput } from '../authz/org-role.dto.js';
 import {
   ASSIGNABLE_ORG_ROLES,
-  ORG_ROLES,
   ORG_ROLE_DESCRIPTIONS,
   ORG_ROLE_LABELS,
   grantableRoles,
@@ -27,7 +27,7 @@ import {
 } from '../authz/permissions.js';
 import { MembersService } from './members.service.js';
 
-const ChangeRoleSchema = z.object({ role: z.enum(ORG_ROLES) });
+const ChangeRoleSchema = z.object({ role: OrgRoleInput });
 const CloseRightSchema = z.object({ value: z.boolean() });
 const TransferSchema = z.object({ userId: z.string().min(1) });
 
