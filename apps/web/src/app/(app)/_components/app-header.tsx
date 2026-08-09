@@ -32,6 +32,17 @@ export function AppHeader(): React.ReactElement {
       <div className="flex items-center gap-3 text-sm">
         {session?.user ? (
           <>
+            {/* Les deux entrées sont offertes à TOUT membre : l'espace
+                organisation sert un tableau de bord même à un Lecteur, et la
+                page Membres explique elle-même ce que le rôle permet (S20a).
+                Masquer un lien selon le rôle recopierait la matrice dans le
+                header (ADR-0012 §8) — et se tromperait au premier changement. */}
+            <Link
+              href="/organisation"
+              className="hidden text-[var(--foreground-muted)] transition hover:text-[var(--foreground)] sm:inline"
+            >
+              Organisation
+            </Link>
             <Link
               href="/members"
               className="hidden text-[var(--foreground-muted)] transition hover:text-[var(--foreground)] sm:inline"

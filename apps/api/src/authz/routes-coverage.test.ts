@@ -23,6 +23,7 @@ import { EvaluateController } from '../evaluate/evaluate.controller.js';
 import { HealthController } from '../health/health.controller.js';
 import { LegalController } from '../legal/legal.controller.js';
 import { ObjectivesController } from '../objectives/objectives.controller.js';
+import { OrganizationSpaceController } from '../organization-space/organization-space.controller.js';
 import { InvitationsController } from '../organizations/invitations.controller.js';
 import { MembersController } from '../organizations/members.controller.js';
 import { OrganizationsController } from '../organizations/organizations.controller.js';
@@ -55,6 +56,7 @@ const CONTROLEURS = [
   MeController,
   MembersController,
   ObjectivesController,
+  OrganizationSpaceController,
   OrganizationsController,
   ParameterPacksController,
   PlansController,
@@ -240,6 +242,16 @@ describe('couverture des routes par le RBAC', () => {
       'AuditController.list': ['audit.read'],
       'ProjectsController.create': ['project.create'],
       'CanvasController.put': ['canvas.update'],
+      // ── Espace organisation (S21a) ────────────────────────────────────────
+      // Le tableau de bord est gardé par `analytics.read`, que les HUIT rôles
+      // détiennent : c'est délibéré, l'espace doit être utile à un Lecteur. Le
+      // filtrage réel se fait bloc par bloc dans le service, à partir de la même
+      // matrice — vérifié bout en bout par `organization-space.e2e.test.ts`.
+      'OrganizationSpaceController.dashboard': ['analytics.read'],
+      'OrganizationSpaceController.getSettings': ['organization.manage'],
+      'OrganizationSpaceController.putSettings': ['organization.manage'],
+      // `billing.manage` n'est détenu que par le Propriétaire (ADR-0012 §3).
+      'OrganizationSpaceController.billing': ['billing.manage'],
     };
     for (const [cle, actions] of Object.entries(attendu)) {
       const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle);

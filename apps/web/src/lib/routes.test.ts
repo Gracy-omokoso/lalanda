@@ -16,6 +16,17 @@ describe('isProtectedPath (S20b)', () => {
     expect(isProtectedPath('/compte/preferences')).toBe(true);
   });
 
+  it('protège les quatre pages de l’espace organisation (S21a)', () => {
+    for (const path of [
+      '/organisation',
+      '/organisation/parametres',
+      '/organisation/facturation',
+      '/organisation/journal',
+    ]) {
+      expect(isProtectedPath(path)).toBe(true);
+    }
+  });
+
   it('protège les espaces existants, racine comme sous-routes', () => {
     for (const path of [
       '/projects',
