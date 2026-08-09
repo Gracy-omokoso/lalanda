@@ -23,6 +23,7 @@ import { PaymentsModule } from './payments/payments.module.js';
 import { PlansModule } from './plans/plans.module.js';
 import { ProjectsModule } from './projects/projects.module.js';
 import { ReportsModule } from './reports/reports.module.js';
+import { ScenariosModule } from './scenarios/scenarios.module.js';
 import { ThrottlingModule } from './security/throttling.module.js';
 
 @Module({
@@ -68,6 +69,9 @@ import { ThrottlingModule } from './security/throttling.module.js';
     BillingModule,
     PaymentsModule,
     ParameterPacksModule,
+    // ADR-0015 lot 1-A — avant ProjectsModule, qui consomme `ScenariosService`
+    // pour créer le scénario de référence à la création d'un projet.
+    ScenariosModule,
     ProjectsModule,
     PlansModule,
     ActualsModule,
