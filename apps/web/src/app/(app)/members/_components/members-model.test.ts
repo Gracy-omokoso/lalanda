@@ -22,7 +22,7 @@ import {
   roleParDefaut,
   rolesProposables,
   sousTitre,
-} from './members-model.js';
+} from './members-model';
 
 function membre(over: Partial<MemberView> = {}): MemberView {
   return {

@@ -10,8 +10,8 @@ import { useState } from 'react';
 
 import { api, type InvitationView, type OrgRole, type RoleOption } from '@/lib/api';
 
-import { messageErreur, roleParDefaut, rolesProposables } from './members-model.js';
-import { RoleSelect } from './role-select.js';
+import { messageErreur, roleParDefaut, rolesProposables } from './members-model';
+import { RoleSelect } from './role-select';
 
 interface InvitePanelProps {
   orgId: string;

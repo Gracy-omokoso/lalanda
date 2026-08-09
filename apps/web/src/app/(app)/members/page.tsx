@@ -23,9 +23,9 @@ import {
   type RoleOption,
 } from '@/lib/api';
 
-import { InvitePanel } from './_components/invite-panel.js';
-import { MembersPanel } from './_components/members-panel.js';
-import { libelleRoleActeur, messageErreur } from './_components/members-model.js';
+import { InvitePanel } from './_components/invite-panel';
+import { MembersPanel } from './_components/members-panel';
+import { libelleRoleActeur, messageErreur } from './_components/members-model';
 
 /** Un refus d'autorisation, à distinguer d'une panne. */
 function estRefus(err: unknown): boolean {

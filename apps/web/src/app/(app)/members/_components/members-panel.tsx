@@ -23,8 +23,8 @@ import {
   raisonNonModifiable,
   raisonNonRevocable,
   sousTitre,
-} from './members-model.js';
-import { RoleSelect } from './role-select.js';
+} from './members-model';
+import { RoleSelect } from './role-select';
 
 interface MembersPanelProps {
   orgId: string;
