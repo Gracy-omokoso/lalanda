@@ -13,6 +13,8 @@
 import 'reflect-metadata';
 import { describe, expect, it } from 'vitest';
 
+import { AccountController } from '../account/account.controller.js';
+import { EmailVerificationController } from '../account/email-verification.controller.js';
 import { ActualsController } from '../actuals/actuals.controller.js';
 import { AiActionsController } from '../ai/ai-actions.controller.js';
 import { BillingController } from '../billing/billing.controller.js';
@@ -38,9 +40,11 @@ import { ACTIONS, type Action } from './permissions.js';
  * cette liste au nombre de fichiers `*.controller.ts` réellement présents.
  */
 const CONTROLEURS = [
+  AccountController,
   ActualsController,
   AiActionsController,
   AuditController,
+  EmailVerificationController,
   BillingController,
   CanvasController,
   EvaluateController,
@@ -78,6 +82,31 @@ const SANS_PERMISSION: Record<string, string> = {
   'MeController.permissions':
     'Lecture de ses PROPRES permissions. Exiger une permission pour lire ses permissions ' +
     'serait circulaire.',
+
+  // ── Espace compte (S20b) ────────────────────────────────────────────────
+  // ADR-0012 § risque n°2 : `/compte` est le SEUL espace accessible sans
+  // organisation. Un utilisateur fraîchement inscrit, ou dont la dernière
+  // organisation a été supprimée, doit garder la main sur son propre compte.
+  // Ces routes sont scopées par la session (`CurrentUser`), jamais par une
+  // organisation : leur imposer une permission d'organisation les rendrait
+  // inatteignables précisément quand elles sont le plus nécessaires.
+  'AccountController.getProfile': 'Profil de l’appelant, scopé par sa session.',
+  'AccountController.putProfile': 'Modification de son propre profil.',
+  'AccountController.getPreferences': 'Préférences de l’appelant.',
+  'AccountController.putPreferences': 'Modification de ses propres préférences.',
+  'AccountController.listSessions': 'Ses propres sessions actives.',
+  'AccountController.revokeSession': 'Révocation d’une de ses propres sessions.',
+  'AccountController.revokeOtherSessions': 'Révocation de ses autres sessions.',
+  'AccountController.getEmailChange': 'État de son propre changement d’adresse.',
+  'AccountController.requestEmailChange': 'Demande de changement de sa propre adresse.',
+  'AccountController.cancelEmailChange': 'Annulation de sa propre demande.',
+  'AccountController.deletionEligibility':
+    'Vérifie si l’appelant peut supprimer son compte — refusé s’il est dernier ' +
+    'propriétaire d’une organisation (docs/12 § Règles critiques).',
+  'AccountController.deleteAccount': 'Suppression de son propre compte.',
+  'EmailVerificationController.verify':
+    'Vérification par jeton. L’appelant n’est pas nécessairement authentifié : ' +
+    'le jeton fait autorité, comme pour l’acceptation d’invitation.',
 };
 
 interface RouteInspectee {
