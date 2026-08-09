@@ -85,14 +85,16 @@ describe('vérification d’adresse', () => {
   it('annonce la durée de validité et l’usage unique', () => {
     const mail = renderEmailVerification({ url: 'https://x/1', expiresInHours: 24 });
     expect(mail.text).toContain('valable 24 heures');
-    expect(mail.text).toContain("une seule fois");
+    expect(mail.text).toContain('une seule fois');
   });
 
   it('salue par le nom quand il est connu, neutrement sinon', () => {
-    expect(renderEmailVerification({ url: 'https://x', expiresInHours: 24, name: 'Aline' }).text)
-      .toContain('Bonjour Aline,');
-    expect(renderEmailVerification({ url: 'https://x', expiresInHours: 24, name: '  ' }).text)
-      .toContain('Bonjour,');
+    expect(
+      renderEmailVerification({ url: 'https://x', expiresInHours: 24, name: 'Aline' }).text,
+    ).toContain('Bonjour Aline,');
+    expect(
+      renderEmailVerification({ url: 'https://x', expiresInHours: 24, name: '  ' }).text,
+    ).toContain('Bonjour,');
   });
 });
 
@@ -143,7 +145,7 @@ describe('réinitialisation de mot de passe', () => {
     const mail = renderPasswordReset({ url: 'https://x/p', expiresInMinutes: 30 });
 
     expect(mail.text).toContain('valable 30 minutes');
-    expect(mail.text).toContain("une seule fois");
+    expect(mail.text).toContain('une seule fois');
   });
 
   it('rassure explicitement le destinataire qui n’a rien demandé', () => {

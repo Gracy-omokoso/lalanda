@@ -84,7 +84,9 @@ e2eSuite('Réinitialisation de mot de passe (S22a)', () => {
     return decodeURIComponent(match![1]!);
   }
 
-  async function demanderReinitialisation(email: string): Promise<{ status: number; body: string }> {
+  async function demanderReinitialisation(
+    email: string,
+  ): Promise<{ status: number; body: string }> {
     const { default: request } = await import('supertest');
     const res = await request(app.getHttpServer())
       .post('/auth/request-password-reset')

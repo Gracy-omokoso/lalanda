@@ -170,7 +170,10 @@ e2eSuite('Connexion Google (S22a)', () => {
     // Le hook d'inscription vaut pour TOUS les chemins de création, pas seulement
     // pour l'inscription par mot de passe : sans organisation personnelle, le
     // nouvel arrivant atterrirait dans une application vide.
-    const orgs = await db.collection('organizations').find({ ownerId: String(user!._id) }).toArray();
+    const orgs = await db
+      .collection('organizations')
+      .find({ ownerId: String(user!._id) })
+      .toArray();
     expect(orgs).toHaveLength(1);
   });
 

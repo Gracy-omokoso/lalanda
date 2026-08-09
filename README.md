@@ -27,6 +27,28 @@ Renseigne au minimum dans `.env` :
 
 **MongoDB Atlas** : après avoir créé ton cluster, ajoute ton IP dans **Network Access → ADD CURRENT IP ADDRESS**, sinon les connexions timeout silencieusement.
 
+#### Emails et connexion Google — entièrement optionnels
+
+Les variables `SMTP_*` et `GOOGLE_CLIENT_*` peuvent rester vides : **l'API démarre et fonctionne sans elles** (ADR-0014). Concrètement, sans configuration :
+
+- le bouton « Continuer avec Google » ne s'affiche pas sur `/login` et `/register` ;
+- les emails (vérification d'adresse, invitation, réinitialisation de mot de passe) ne partent pas — ils sont journalisés (destinataire et sujet, jamais le corps) et l'interface annonce honnêtement que rien n'a été délivré. Le lien d'invitation reste copiable depuis l'écran des membres.
+
+**Pour recevoir les emails en local**, le plus simple est MailHog (interface web sur `:8025`, aucune authentification) :
+
+```bash
+docker run -d -p 1025:1025 -p 8025:8025 mailhog/mailhog
+```
+
+puis dans `.env` :
+
+```bash
+SMTP_HOST=localhost
+SMTP_PORT=1025
+```
+
+**Pour activer la connexion Google**, suivre la procédure Google Cloud Console pas à pas dans `docs/adr/ADR-0014-envoi-emails-et-connexion-google.md` § Procédure Google Cloud Console. Renseigner ensuite `GOOGLE_CLIENT_ID` **et** `GOOGLE_CLIENT_SECRET` — les deux ou aucune ; une seule des deux est traitée comme une absence, et l'API le signale au démarrage.
+
 ### 3. Démarrer
 
 ```bash

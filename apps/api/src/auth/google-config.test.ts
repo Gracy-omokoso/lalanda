@@ -25,7 +25,7 @@ describe('resolveGoogleCredentials', () => {
     ).toEqual({ clientId: '1234.apps.googleusercontent.com', clientSecret: 'secret' });
   });
 
-  it("traite une configuration incomplète comme une absence, et la signale", () => {
+  it('traite une configuration incomplète comme une absence, et la signale', () => {
     const idSeul = { GOOGLE_CLIENT_ID: '1234.apps.googleusercontent.com' };
     const secretSeul = { GOOGLE_CLIENT_SECRET: 'secret' };
 
