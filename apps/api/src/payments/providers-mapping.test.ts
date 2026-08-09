@@ -53,7 +53,8 @@ describe('traduction des événements Stripe', () => {
     expect(event.plan).toBe('pro');
     expect(event.interval).toBe('month');
     expect(event.providerSubscriptionId).toBe('sub_1');
-    expect(event.currentPeriodEnd?.toISOString()).toBe('2026-09-06T21:46:40.000Z');
+    // `period_end` = 1788592000 s → borne de fin de période facturée.
+    expect(event.currentPeriodEnd?.toISOString()).toBe('2026-09-05T07:06:40.000Z');
   });
 
   it('un échec de facture devient `payment.failed`', () => {
@@ -97,7 +98,7 @@ describe('traduction des événements Stripe', () => {
     expect(event.plan).toBe('business');
   });
 
-  it("un abonnement passé en `unpaid` déclenche la période de grâce", () => {
+  it('un abonnement passé en `unpaid` déclenche la période de grâce', () => {
     // Seul signal disponible côté Stripe pour « j'ai épuisé mes relances ».
     const event = mapStripeEvent({
       id: 'evt_5',
@@ -155,7 +156,11 @@ describe('création de session Stripe Checkout', () => {
 
   it('envoie le montant, les métadonnées et une clé d’idempotence', async () => {
     const http = vi.fn<HttpClient>(async () =>
-      jsonResponse({ id: 'cs_1', url: 'https://checkout.stripe.com/c/pay/cs_1', customer: 'cus_1' }),
+      jsonResponse({
+        id: 'cs_1',
+        url: 'https://checkout.stripe.com/c/pay/cs_1',
+        customer: 'cus_1',
+      }),
     );
     const provider = new StripeProvider(secrets, http);
     const result = await provider.createCheckout({
@@ -232,7 +237,7 @@ describe('création de session Stripe Checkout', () => {
 // ── PayPal ───────────────────────────────────────────────────────────────────
 
 describe('identification de plan PayPal', () => {
-  it("associe chaque couple vendu à un secret, et refuse Business annuel", () => {
+  it('associe chaque couple vendu à un secret, et refuse Business annuel', () => {
     expect(paypalPlanSecretName('pro', 'month')).toBe('planIdProMonth');
     expect(paypalPlanSecretName('pro', 'year')).toBe('planIdProYear');
     expect(paypalPlanSecretName('business', 'month')).toBe('planIdBusinessMonth');
@@ -381,7 +386,7 @@ describe('vérification en ligne des rappels PayPal', () => {
     ).rejects.toBeInstanceOf(WebhookSignatureError);
   });
 
-  it("REFUSE un certificat hébergé hors des domaines PayPal", async () => {
+  it('REFUSE un certificat hébergé hors des domaines PayPal', async () => {
     const provider = new PayPalProvider(secrets, httpWith('SUCCESS'));
     await expect(
       provider.verifyAndParse({

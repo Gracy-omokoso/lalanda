@@ -47,12 +47,12 @@ describe('plan effectif', () => {
 });
 
 describe('événements échus', () => {
-  it("un essai arrivé à terme produit `trial.expired`", () => {
+  it('un essai arrivé à terme produit `trial.expired`', () => {
     const sub = snapshot({ status: 'trialing', trialEndsAt: addDays(NOW, -1) });
     expect(dueEvents(sub, NOW)).toEqual(['trial.expired']);
   });
 
-  it("un essai encore en cours ne produit rien", () => {
+  it('un essai encore en cours ne produit rien', () => {
     const sub = snapshot({ status: 'trialing', trialEndsAt: addDays(NOW, 3) });
     expect(dueEvents(sub, NOW)).toEqual([]);
   });
@@ -65,17 +65,17 @@ describe('événements échus', () => {
     expect(dueEvents(sub, NOW)).toEqual(['trial.expired']);
   });
 
-  it("une grâce écoulée produit `grace.expired`", () => {
+  it('une grâce écoulée produit `grace.expired`', () => {
     const sub = snapshot({ status: 'grace', graceEndsAt: addDays(NOW, -1) });
     expect(dueEvents(sub, NOW)).toEqual(['grace.expired']);
   });
 
-  it("un abonnement actif ne produit aucun événement temporel", () => {
+  it('un abonnement actif ne produit aucun événement temporel', () => {
     // Le renouvellement vient d'un webhook vérifié, jamais d'une horloge : une
     // horloge qui prolongerait la période créerait des abonnements gratuits.
-    expect(dueEvents(snapshot({ status: 'active', currentPeriodEnd: addDays(NOW, -5) }), NOW)).toEqual(
-      [],
-    );
+    expect(
+      dueEvents(snapshot({ status: 'active', currentPeriodEnd: addDays(NOW, -5) }), NOW),
+    ).toEqual([]);
   });
 
   it("un essai sans date d'échéance ne se termine pas tout seul", () => {
@@ -84,7 +84,7 @@ describe('événements échus', () => {
 });
 
 describe('changement de plan différé', () => {
-  it("est échu quand la date est atteinte", () => {
+  it('est échu quand la date est atteinte', () => {
     const sub = snapshot({ pendingPlan: 'free', pendingPlanEffectiveAt: addDays(NOW, -1) });
     expect(isPendingPlanDue(sub, NOW)).toBe(true);
   });
@@ -94,14 +94,14 @@ describe('changement de plan différé', () => {
     expect(isPendingPlanDue(sub, NOW)).toBe(false);
   });
 
-  it("une date sans plan en attente ne déclenche rien", () => {
+  it('une date sans plan en attente ne déclenche rien', () => {
     const sub = snapshot({ pendingPlan: null, pendingPlanEffectiveAt: addDays(NOW, -5) });
     expect(isPendingPlanDue(sub, NOW)).toBe(false);
   });
 });
 
 describe('essai déjà consommé', () => {
-  it("dépend de `trialStartedAt`, qui ne redevient jamais nul", () => {
+  it('dépend de `trialStartedAt`, qui ne redevient jamais nul', () => {
     expect(hasUsedTrial(null)).toBe(false);
     expect(hasUsedTrial(snapshot({ trialStartedAt: null }))).toBe(false);
     // Résilié APRÈS un essai : l'essai reste consommé (docs/13 § Essai).
@@ -122,7 +122,10 @@ describe('jours restants', () => {
 
 describe("message d'état", () => {
   it("passe en avertissement dans les trois derniers jours d'essai", () => {
-    const large = statusNotice(snapshot({ status: 'trialing', trialEndsAt: addDays(NOW, 10) }), NOW);
+    const large = statusNotice(
+      snapshot({ status: 'trialing', trialEndsAt: addDays(NOW, 10) }),
+      NOW,
+    );
     expect(large?.level).toBe('info');
     const serre = statusNotice(snapshot({ status: 'trialing', trialEndsAt: addDays(NOW, 2) }), NOW);
     expect(serre?.level).toBe('warning');
@@ -134,7 +137,7 @@ describe("message d'état", () => {
     expect(notice?.message).toMatch(/maintenu/i);
   });
 
-  it("une suspension dit que les données sont intactes", () => {
+  it('une suspension dit que les données sont intactes', () => {
     // Le client n'a rien perdu : le message doit le dire, sinon le support
     // reçoit des appels paniqués et l'entreprise perd un client réparable.
     const notice = statusNotice(snapshot({ status: 'suspended' }), NOW);

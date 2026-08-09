@@ -133,7 +133,7 @@ describe("machine d'état de l'abonnement (S22b)", () => {
 
   // ── Les refus qui protègent de l'argent ─────────────────────────────────────
 
-  it("un abonnement suspendu ne se réactive JAMAIS sans paiement vérifié", () => {
+  it('un abonnement suspendu ne se réactive JAMAIS sans paiement vérifié', () => {
     for (const event of SUBSCRIPTION_EVENTS) {
       if (event === 'payment.succeeded' || event === 'subscription.canceled') continue;
       expect(canApply('suspended', event), `suspended × ${event}`).toBe(false);
@@ -141,7 +141,7 @@ describe("machine d'état de l'abonnement (S22b)", () => {
     expect(applyEvent('suspended', 'payment.succeeded')).toBe('active');
   });
 
-  it("une organisation résiliée ne peut pas relancer un second essai", () => {
+  it('une organisation résiliée ne peut pas relancer un second essai', () => {
     // docs/13 § Essai : « une seule période d'essai par organisation ». La
     // machine autorise `canceled → trialing` pour le PREMIER essai ; l'unicité
     // est garantie par `trialStartedAt` côté service (cf. billing.service.ts).
@@ -152,14 +152,14 @@ describe("machine d'état de l'abonnement (S22b)", () => {
     }
   });
 
-  it("la grâce ne se réenclenche pas depuis une suspension", () => {
+  it('la grâce ne se réenclenche pas depuis une suspension', () => {
     // La grâce PRÉCÈDE la suspension ; s'y ramener depuis `suspended` offrirait
     // sept jours d'accès payant supplémentaires à chaque impayé.
     expect(canApply('suspended', 'dunning.exhausted')).toBe(false);
     expect(canApply('suspended', 'grace.expired')).toBe(false);
   });
 
-  it("un échec de paiement pendant la grâce ne prolonge rien", () => {
+  it('un échec de paiement pendant la grâce ne prolonge rien', () => {
     expect(canApply('grace', 'payment.failed')).toBe(false);
   });
 
@@ -189,7 +189,7 @@ describe("machine d'état de l'abonnement (S22b)", () => {
 
   // ── Utilitaires ─────────────────────────────────────────────────────────────
 
-  it("`allowedEvents` ne propose que des transitions réellement applicables", () => {
+  it('`allowedEvents` ne propose que des transitions réellement applicables', () => {
     for (const from of SUBSCRIPTION_STATUSES) {
       const proposes = allowedEvents(from);
       for (const event of proposes) {

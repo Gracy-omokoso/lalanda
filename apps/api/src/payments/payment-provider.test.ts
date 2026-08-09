@@ -30,7 +30,7 @@ describe('cohérence des listes de fournisseurs', () => {
     expect([...PAYMENT_PROVIDERS].sort()).toEqual([...SUBSCRIPTION_PROVIDERS].sort());
   });
 
-  it("chaque moyen de paiement est rattaché à un fournisseur déclaré", () => {
+  it('chaque moyen de paiement est rattaché à un fournisseur déclaré', () => {
     for (const method of PAYMENT_METHODS) {
       const provider = METHOD_PROVIDER[method];
       expect(PAYMENT_PROVIDERS, `moyen « ${method} »`).toContain(provider);
@@ -74,7 +74,7 @@ describe('lecture des en-têtes', () => {
 });
 
 describe('résolution des secrets', () => {
-  it("traite une variable vide comme non configurée", () => {
+  it('traite une variable vide comme non configurée', () => {
     // Une variable déclarée mais laissée vide dans un `.env` d'exemple ne doit
     // pas passer pour une clé : le fournisseur répondrait 401 sans explication.
     const secrets = new EnvPaymentSecrets({ LALANDA_STRIPE_RESTRICTED_KEY: '   ' });
@@ -92,7 +92,11 @@ describe('résolution des secrets', () => {
       LALANDA_STRIPE_RESTRICTED_KEY: 'rk_test_x',
       LALANDA_STRIPE_WEBHOOK_SECRET: 'whsec_x',
     });
-    const { missing, source, values } = await resolveAll(secrets, 'stripe', REQUIRED_SECRETS.stripe);
+    const { missing, source, values } = await resolveAll(
+      secrets,
+      'stripe',
+      REQUIRED_SECRETS.stripe,
+    );
     expect(missing).toEqual([]);
     expect(source).toBe('env');
     expect(values['restrictedKey']).toBe('rk_test_x');

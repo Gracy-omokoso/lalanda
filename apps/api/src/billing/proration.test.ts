@@ -6,12 +6,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { PLAN_PRICES } from './pricing-catalog.js';
-import {
-  addDays,
-  computeProration,
-  directionOf,
-  nextPeriodEnd,
-} from './proration.js';
+import { addDays, computeProration, directionOf, nextPeriodEnd } from './proration.js';
 
 const NOW = new Date('2026-08-09T12:00:00.000Z');
 
@@ -101,24 +96,7 @@ describe('prorata (docs/13)', () => {
     expect(r.amountDueCents).toBe(9000 - 300);
   });
 
-  it("le crédit n'est jamais remboursé : il est reporté", () => {
-    // Annuel Pro (9000) avec 300 jours restants → crédit 7397 ;
-    // cible mensuelle Business impossible (baisse de périodicité), on force donc
-    // un cas où le crédit dépasse le coût via un passage annuel → annuel.
-    const r = computeProration({
-      currentPlan: 'business',
-      targetPlan: 'business',
-      currentInterval: 'month',
-      targetInterval: 'year',
-      currentPeriodEnd: addDays(NOW, 29),
-      now: NOW,
-    });
-    // Business n'a pas de tarif annuel publié : le calcul doit REFUSER plutôt
-    // que deviner un montant.
-    expect(() => r).not.toThrow();
-  });
-
-  it("refuse de deviner un tarif non publié (Business annuel)", () => {
+  it('refuse de deviner un tarif non publié (Business annuel)', () => {
     expect(() =>
       computeProration({
         currentPlan: 'pro',
@@ -131,20 +109,83 @@ describe('prorata (docs/13)', () => {
     ).toThrow(/Aucun tarif publié/);
   });
 
-  it('le report apparaît explicitement quand le crédit dépasse le coût', () => {
-    // Pro annuel (9000) avec 360 jours restants → crédit 8876 ;
-    // cible Pro annuel identique n'est pas un changement ; on prend donc un
-    // passage annuel → annuel entre plans, seul cas où le crédit peut dominer.
+  // ── Invariant de non-remboursement ────────────────────────────────────────
+  //
+  // Balayage exhaustif de tous les changements calculables : 3 plans × 2
+  // périodicités en source, autant en cible, sur 0 → 365 jours restants. Le but
+  // n'est pas d'ajouter des cas, c'est d'interdire une régression silencieuse :
+  // un `amountDueCents` négatif serait un VIREMENT vers le client déclenché par
+  // un changement de plan.
+  const ALL_PLANS = ['free', 'pro', 'business'] as const;
+  const ALL_INTERVALS = ['month', 'year'] as const;
+
+  function sweep(visit: (r: ReturnType<typeof computeProration>) => void): number {
+    let visited = 0;
+    for (const currentPlan of ALL_PLANS) {
+      for (const targetPlan of ALL_PLANS) {
+        for (const currentInterval of ALL_INTERVALS) {
+          for (const targetInterval of ALL_INTERVALS) {
+            for (const remaining of [0, 1, 7, 15, 29, 30, 180, 364, 365]) {
+              let result;
+              try {
+                result = computeProration({
+                  currentPlan,
+                  targetPlan,
+                  currentInterval,
+                  targetInterval,
+                  currentPeriodEnd: addDays(NOW, remaining),
+                  now: NOW,
+                });
+              } catch (error) {
+                // Seul refus toléré : un couple (plan, périodicité) non publié.
+                expect((error as Error).message).toMatch(/Aucun tarif publié/);
+                continue;
+              }
+              visited += 1;
+              visit(result);
+            }
+          }
+        }
+      }
+    }
+    return visited;
+  }
+
+  it('aucun changement de plan ne produit jamais de remboursement', () => {
+    const visited = sweep((r) => {
+      expect(r.amountDueCents).toBeGreaterThanOrEqual(0);
+      expect(r.carriedCreditCents).toBeGreaterThanOrEqual(0);
+      // Décomposition exacte : ce qui n'est pas encaissé est reporté, rien ne
+      // disparaît et rien n'est rendu.
+      expect(r.amountDueCents - r.carriedCreditCents).toBe(r.chargeCents - r.creditCents);
+      // Un crédit et un encaissement simultanés seraient une double écriture.
+      expect(r.amountDueCents === 0 || r.carriedCreditCents === 0).toBe(true);
+    });
+    expect(visited).toBeGreaterThan(200);
+  });
+
+  it('le crédit excédentaire est reporté, jamais remboursé (annuel Pro → mensuel Business)', () => {
+    // Ce cas est le seul de la grille publiée où le crédit dépasse le coût, et
+    // il est bien atteignable : un annuel Pro presque neuf (9000 c) qui passe à
+    // Business mensuel n'est facturé qu'un mois (4900 c).
     const r = computeProration({
       currentPlan: 'pro',
-      targetPlan: 'pro',
+      targetPlan: 'business',
       currentInterval: 'year',
-      targetInterval: 'year',
-      currentPeriodEnd: addDays(NOW, 360),
+      targetInterval: 'month',
+      currentPeriodEnd: addDays(NOW, 364),
       now: NOW,
     });
-    expect(r.direction).toBe('same');
+    expect(r.direction).toBe('upgrade');
+    expect(r.effect).toBe('immediate');
+    // Crédit : 9000 × 364 / 365 = 8975 (arrondi bas).
+    expect(r.creditCents).toBe(8975);
+    // Coût : changement de périodicité ⇒ une période mensuelle entière.
+    expect(r.chargeCents).toBe(4900);
+    // Rien à percevoir, et surtout AUCUN remboursement des 4075 c restants :
+    // ils sont reportés et affichés au client.
     expect(r.amountDueCents).toBe(0);
+    expect(r.carriedCreditCents).toBe(4075);
   });
 
   it('les jours restants sont arrondis vers le bas, en faveur du client', () => {

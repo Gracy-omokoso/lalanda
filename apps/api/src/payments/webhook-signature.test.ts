@@ -50,7 +50,7 @@ describe('en-tête de signature Stripe', () => {
     expect(parsed).toEqual({ timestamp: 1700000000, v1: ['aaa', 'bbb'] });
   });
 
-  it("ignore les schémas inconnus plutôt que de les accepter", () => {
+  it('ignore les schémas inconnus plutôt que de les accepter', () => {
     // `v0` est réservé aux outils de test de Stripe. L'accepter reviendrait à
     // reconnaître un schéma dont on ne maîtrise pas la construction.
     expect(parseStripeSignatureHeader('t=1700000000,v0=aaa')).toBeNull();
@@ -76,7 +76,7 @@ describe('comparaison en temps constant', () => {
     expect(timingSafeEqualHex('zzzz', 'aabb')).toBe(false);
   });
 
-  it("refuse une valeur qui ne diffère que du dernier octet", () => {
+  it('refuse une valeur qui ne diffère que du dernier octet', () => {
     const a = hmacSha256Hex(SECRET, 'charge');
     const b = `${a.slice(0, -1)}${a.endsWith('0') ? '1' : '0'}`;
     expect(timingSafeEqualHex(a, b)).toBe(false);
@@ -132,7 +132,7 @@ describe('vérification de signature Stripe', () => {
     expect(result).toEqual({ valid: false, reason: 'mismatch' });
   });
 
-  it("REFUSE un rappel authentique mais trop ancien (rejeu)", () => {
+  it('REFUSE un rappel authentique mais trop ancien (rejeu)', () => {
     const vieux = new Date(NOW.getTime() - (SIGNATURE_TOLERANCE_SECONDS + 60) * 1000);
     const result = verifyStripeSignature({
       rawBody: BODY,
@@ -177,12 +177,13 @@ describe('vérification de signature Stripe', () => {
 
   it('REFUSE quand aucune des signatures fournies ne correspond', () => {
     const header = `t=${Math.floor(NOW.getTime() / 1000)},v1=${'0'.repeat(64)},v1=${'1'.repeat(64)}`;
-    expect(
-      verifyStripeSignature({ rawBody: BODY, header, secret: SECRET, now: NOW }),
-    ).toEqual({ valid: false, reason: 'mismatch' });
+    expect(verifyStripeSignature({ rawBody: BODY, header, secret: SECRET, now: NOW })).toEqual({
+      valid: false,
+      reason: 'mismatch',
+    });
   });
 
-  it("est sensible au moindre octet du corps, espaces compris", () => {
+  it('est sensible au moindre octet du corps, espaces compris', () => {
     // Un corps re-sérialisé (`JSON.stringify(JSON.parse(x))`) diffère de
     // l'original par les espaces : vérifier une signature sur du JSON reparsé,
     // c'est ne rien vérifier. Ce test fige cette propriété.
@@ -197,7 +198,7 @@ describe('vérification de signature Stripe', () => {
     ).toEqual({ valid: false, reason: 'mismatch' });
   });
 
-  it("REFUSE un corps vide signé pour un autre corps", () => {
+  it('REFUSE un corps vide signé pour un autre corps', () => {
     expect(
       verifyStripeSignature({
         rawBody: Buffer.alloc(0),
