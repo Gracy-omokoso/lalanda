@@ -157,6 +157,18 @@ export class ActualsService {
     reason: string | undefined,
   ): Promise<ActualPeriodDocument> {
     this.assertValidPeriod(key.year, key.month);
+    // (S22e) `reason` vient du corps de requête, typé mais NON validé par le
+    // contrôleur (`@Body() body: { reason?: string }` est une assertion, pas une
+    // garde). Un corps `{"reason": {"x":1}}` rendait `reason.trim` non-fonction
+    // → TypeError → 500 sur une route pourtant privilégiée. On rejette tout ce
+    // qui n'est pas une chaîne en 400, comme la validation applicative des
+    // valeurs plus bas dans ce service.
+    if (reason !== undefined && typeof reason !== 'string') {
+      throw new BadRequestException({
+        code: 'REOPEN_REASON_INVALID',
+        message: 'Le motif de réouverture doit être une chaîne de caractères.',
+      });
+    }
     const trimmedReason = reason?.trim() ?? '';
     if (trimmedReason.length === 0) {
       throw new BadRequestException({

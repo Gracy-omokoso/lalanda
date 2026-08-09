@@ -1,5 +1,27 @@
 # Environnement local Lalanda (S0)
 # Voir ADR-0004 (MongoDB replica set), ADR-0007 (round-trip Excel), ADR-0009 (infra DO/Spaces).
+#
+# (S22e) PUBLICATION SUR LA BOUCLE LOCALE UNIQUEMENT.
+#
+# `- '27017:27017'` se lit « port 27017 » mais signifie `0.0.0.0:27017` : Docker
+# ouvre le port sur TOUTES les interfaces de la machine, et sur macOS il perce
+# en plus le pare-feu applicatif. Mongo tourne ici sans `--auth`, Redis sans
+# `requirepass`, MinIO avec un mot de passe écrit dans ce fichier.
+#
+# Mesuré avant correctif depuis un autre hôte du même réseau (172.20.10.3, wifi
+# partagé) : `mongosh mongodb://172.20.10.3:27017/lalanda` liste les bases et
+# rend `db.user.find({}, {email: 1})` — les adresses email réelles des comptes de
+# développement. `redis-cli -h 172.20.10.3 PING` répond `PONG`, et la console
+# MinIO répond 200. Aucun identifiant n'est demandé nulle part.
+#
+# Le poste d'un développeur n'est pas un réseau de confiance : wifi d'hôtel, de
+# coworking, de conférence. `127.0.0.1:` restreint la publication à la boucle
+# locale sans rien changer pour l'application, qui se connecte à `localhost`.
+# Les conteneurs continuent de se joindre entre eux par le réseau Docker, où
+# aucune publication de port n'intervient.
+#
+# Le fichier de production n'est pas concerné : il ne publie que Caddy et place
+# mongo/redis/minio sur un réseau `internal: true` (docker-compose.prod.yml).
 
 services:
   mongo:
@@ -8,7 +30,7 @@ services:
     restart: unless-stopped
     command: ['--replSet', 'rs0', '--bind_ip_all', '--port', '27017']
     ports:
-      - '27017:27017'
+      - '127.0.0.1:27017:27017'
     volumes:
       - mongo-data:/data/db
       - mongo-config:/data/configdb
@@ -58,7 +80,7 @@ services:
     container_name: lalanda-redis
     restart: unless-stopped
     ports:
-      - '6379:6379'
+      - '127.0.0.1:6379:6379'
     volumes:
       - redis-data:/data
     healthcheck:
@@ -76,8 +98,8 @@ services:
       MINIO_ROOT_USER: lalanda
       MINIO_ROOT_PASSWORD: lalanda-dev-secret
     ports:
-      - '9000:9000' # API S3
-      - '9001:9001' # Console web
+      - '127.0.0.1:9000:9000' # API S3
+      - '127.0.0.1:9001:9001' # Console web
     volumes:
       - minio-data:/data
     healthcheck:

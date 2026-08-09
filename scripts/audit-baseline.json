@@ -1,0 +1,149 @@
+{
+  "generatedAt": "2026-08-09",
+  "advisories": [
+    {
+      "id": "GHSA-2v37-7h3g-55p8",
+      "module": "nanoid",
+      "severity": "high",
+      "title": "nanoid: custom generators can loop indefinitely when size is zero"
+    },
+    {
+      "id": "GHSA-36qx-fr4f-26g5",
+      "module": "next",
+      "severity": "high",
+      "title": "Next.js has a Middleware / Proxy bypass in Pages Router applications using i18n"
+    },
+    {
+      "id": "GHSA-5528-5vmv-3xc2",
+      "module": "multer",
+      "severity": "high",
+      "title": "Multer Vulnerable to Denial of Service via Uncontrolled Recursion"
+    },
+    {
+      "id": "GHSA-5p4m-2wfm-xmqj",
+      "module": "js-yaml",
+      "severity": "high",
+      "title": "JS-YAML: Quadratic CPU consumption in !!omap resolution (3.x and 4.x) — CVE-2026-59870 fix not backported"
+    },
+    {
+      "id": "GHSA-5xrq-8626-4rwp",
+      "module": "vitest",
+      "severity": "critical",
+      "title": "When Vitest UI server is listening, arbitrary file can be read and executed"
+    },
+    {
+      "id": "GHSA-67rr-84xm-4c7r",
+      "module": "next",
+      "severity": "high",
+      "title": "Next.JS vulnerability can lead to DoS via cache poisoning "
+    },
+    {
+      "id": "GHSA-6g55-p6wh-862q",
+      "module": "postcss",
+      "severity": "high",
+      "title": "PostCSS: Arbitrary file read and information disclosure via attacker-controlled sourceMappingURL in CSS comments"
+    },
+    {
+      "id": "GHSA-72gw-mp4g-v24j",
+      "module": "multer",
+      "severity": "high",
+      "title": "Multer vulnerable to Denial of Service via deeply nested field names"
+    },
+    {
+      "id": "GHSA-89xv-2m56-2m9x",
+      "module": "next",
+      "severity": "high",
+      "title": "Next.js: Server-Side Request Forgery in Server Actions on custom servers"
+    },
+    {
+      "id": "GHSA-8h8q-6873-q5fj",
+      "module": "next",
+      "severity": "high",
+      "title": "Next.js Vulnerable to Denial of Service with Server Components"
+    },
+    {
+      "id": "GHSA-9qr9-h5gf-34mp",
+      "module": "next",
+      "severity": "critical",
+      "title": "Next.js is vulnerable to RCE in React flight protocol"
+    },
+    {
+      "id": "GHSA-c4j6-fc7j-m34r",
+      "module": "next",
+      "severity": "high",
+      "title": "Next.js vulnerable to server-side request forgery in applications using WebSocket upgrades"
+    },
+    {
+      "id": "GHSA-f82v-jwr5-mffw",
+      "module": "next",
+      "severity": "critical",
+      "title": "Authorization Bypass in Next.js Middleware"
+    },
+    {
+      "id": "GHSA-f88m-g3jw-g9cj",
+      "module": "sharp",
+      "severity": "high",
+      "title": "sharp inherited vulnerabilities in libvips: CVE-2026-33327, CVE-2026-33328, CVE-2026-35590, CVE-2026-35591"
+    },
+    {
+      "id": "GHSA-fx2h-pf6j-xcff",
+      "module": "vite",
+      "severity": "high",
+      "title": "vite: `server.fs.deny` bypass on Windows alternate paths"
+    },
+    {
+      "id": "GHSA-h25m-26qc-wcjf",
+      "module": "next",
+      "severity": "high",
+      "title": "Next.js HTTP request deserialization can lead to DoS when using insecure React Server Components"
+    },
+    {
+      "id": "GHSA-m99w-x7hq-7vfj",
+      "module": "next",
+      "severity": "high",
+      "title": "Next.js: Denial of Service in App Router using Server Actions"
+    },
+    {
+      "id": "GHSA-mg66-mrh9-m8jx",
+      "module": "next",
+      "severity": "high",
+      "title": "Next.js vulnerable to Denial of Service via connection exhaustion in applications using Cache Components"
+    },
+    {
+      "id": "GHSA-mwv6-3258-q52c",
+      "module": "next",
+      "severity": "high",
+      "title": "Next Vulnerable to Denial of Service with Server Components"
+    },
+    {
+      "id": "GHSA-p9j2-gv94-2wf4",
+      "module": "next",
+      "severity": "high",
+      "title": "Next.js: Server-Side Request Forgery in rewrites via attacker-controlled destination hostname"
+    },
+    {
+      "id": "GHSA-q4gf-8mx6-v5v3",
+      "module": "next",
+      "severity": "high",
+      "title": "Next.js has a Denial of Service with Server Components"
+    },
+    {
+      "id": "GHSA-r28c-9q8g-f849",
+      "module": "postcss",
+      "severity": "high",
+      "title": "PostCSS: Path Traversal in Previous Source Map Auto-Loading (sourceMappingURL) leads to Arbitrary .map File Disclosure"
+    },
+    {
+      "id": "GHSA-v52c-386h-88mc",
+      "module": "multer",
+      "severity": "high",
+      "title": "Multer vulnerable to Denial of Service via resource exhaustion"
+    },
+    {
+      "id": "GHSA-xf7r-hgr6-v32p",
+      "module": "multer",
+      "severity": "high",
+      "title": "Multer vulnerable to Denial of Service via incomplete cleanup"
+    }
+  ]
+}
