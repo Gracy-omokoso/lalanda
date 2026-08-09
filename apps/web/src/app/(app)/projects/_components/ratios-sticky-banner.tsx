@@ -6,6 +6,8 @@
 
 import type { LineResult } from '@/lib/api';
 
+import { LienAideRatios } from './aide-contextuelle';
+
 /** Couleurs des feux tricolores — tokens globaux (globals.css), thème-aware. */
 const STATUT_DOT: Record<'vert' | 'orange' | 'rouge', string> = {
   vert: 'var(--ok)',
@@ -38,12 +40,15 @@ interface RatiosStickyBannerProps {
   lines: LineResult[];
   currency: string;
   onSelect?: () => void;
+  /** Cible d'aide (S22d). Omise, aucun lien n'est rendu. */
+  hrefAide?: string;
 }
 
 export function RatiosStickyBanner({
   lines,
   currency,
   onSelect,
+  hrefAide,
 }: RatiosStickyBannerProps): React.ReactElement | null {
   const withSeuil = lines.filter((l) => l.seuil);
   if (withSeuil.length === 0) return null;
@@ -80,6 +85,7 @@ export function RatiosStickyBanner({
           </button>
         );
       })}
+      {hrefAide ? <LienAideRatios href={hrefAide} /> : null}
     </div>
   );
 }

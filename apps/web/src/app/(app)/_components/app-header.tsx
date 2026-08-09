@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 
 import { api } from '@/lib/api';
 import { useSession } from '@/lib/auth-client';
+import { LIENS_AIDE } from '@/lib/aide/liens';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { OrgSwitcher } from './org-switcher';
 import { UserMenu } from './user-menu';
@@ -59,17 +60,6 @@ export function AppHeader(): React.ReactElement {
       <div className="flex items-center gap-3 text-sm">
         {session?.user ? (
           <>
-            {/* Les deux entrées sont offertes à TOUT membre : l'espace
-                organisation sert un tableau de bord même à un Lecteur, et la
-                page Membres explique elle-même ce que le rôle permet (S20a).
-                Masquer un lien selon le rôle recopierait la matrice dans le
-                header (ADR-0012 §8) — et se tromperait au premier changement. */}
-            <Link
-              href="/organisation"
-              className="hidden text-[var(--foreground-muted)] transition hover:text-[var(--foreground)] sm:inline"
-            >
-              Organisation
-            </Link>
             <Link
               href="/members"
               className="hidden text-[var(--foreground-muted)] transition hover:text-[var(--foreground)] sm:inline"
@@ -87,6 +77,16 @@ export function AppHeader(): React.ReactElement {
             <OrgSwitcher />
           </>
         ) : null}
+        {/* Le centre d'aide est la seule entrée permanente vers le glossaire et
+            l'explication des ratios. Hors session aussi : /aide est public, et
+            une page d'aide atteignable depuis n'importe où vaut mieux qu'un lien
+            qui n'apparaît qu'une fois connecté. */}
+        <Link
+          href={LIENS_AIDE.centre}
+          className="text-[var(--foreground-muted)] transition hover:text-[var(--foreground)]"
+        >
+          Aide
+        </Link>
         {/* `persist` : dans l'espace applicatif, le thème choisi ici est aussi
             enregistré sur le compte, pour rester cohérent avec /compte/preferences. */}
         <ThemeToggle persist />

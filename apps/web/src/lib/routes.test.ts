@@ -82,3 +82,31 @@ describe('isAuthPath / isMarketingPath (S20b)', () => {
     expect(isMarketingPath('/pricing/entreprise')).toBe(false);
   });
 });
+
+describe('le centre d’aide est ouvert à tous, connecté ou non (S22d)', () => {
+  const chemins = [
+    '/aide',
+    '/aide/demarrer',
+    '/aide/ratios-bancaires',
+    '/aide/comprendre-les-chiffres',
+    '/aide/glossaire',
+  ];
+
+  it('ne demande jamais de session', () => {
+    // Un visiteur doit pouvoir lire l'aide avant de créer un compte.
+    for (const chemin of chemins) {
+      expect(isProtectedPath(chemin), chemin).toBe(false);
+      expect(isAuthPath(chemin), chemin).toBe(false);
+    }
+  });
+
+  it('n’est PAS une route marketing — et ce n’est pas un oubli', () => {
+    // `isMarketingPath` déclenche un redirect vers /projects pour un utilisateur
+    // authentifié. Classer /aide ici casserait tous les liens d'aide contextuels
+    // ouverts depuis l'application : l'utilisateur cliquerait sur « Comprendre
+    // cette feuille » et atterrirait sur sa liste de projets.
+    for (const chemin of chemins) {
+      expect(isMarketingPath(chemin), chemin).toBe(false);
+    }
+  });
+});

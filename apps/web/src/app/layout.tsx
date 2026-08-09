@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import localFont from 'next/font/local';
 import './globals.css';
 
+import { CookieBanner } from '@/components/cookie-consent';
+
 // Poppins — brief §4. Chargée via next/font/local avec woff2 auto-hébergés
 // dans public/fonts/ pour éviter la dépendance réseau à fonts.gstatic.com au build.
 // Voir docs/decisions.md 2026-07-30.
@@ -77,7 +79,14 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: setInitialThemeScript }} />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        {/* Bannière de consentement — montée à la racine, donc présente sur les
+            pages publiques COMME dans l'application : un visiteur peut arriver
+            directement sur /login sans jamais voir la page d'accueil. Elle ne
+            s'affiche que tant qu'aucun choix n'a été exprimé (S22c). */}
+        <CookieBanner />
+      </body>
     </html>
   );
 }
