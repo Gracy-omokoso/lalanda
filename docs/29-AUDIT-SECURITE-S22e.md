@@ -1,6 +1,6 @@
 # Audit de sécurité avant mise en production (S22e)
 
-**Statut :** en cours de rédaction (S22e)
+**Statut :** en cours de rédaction (S22e) — **F-06 et F-03 corrigés en S22f** (voir ces findings ; plus aucun finding Élevé ouvert)
 **Portée :** `apps/api`, `apps/web`, `packages/`, chaîne de déploiement (CI, images, compose, reverse proxy).
 **Méthode :** chaque finding porte une **démonstration** — un `curl` rejouable contre l'API locale (`:3001`, pile `docker compose` en marche) ou un test qui échoue. Un constat non démontré n'est pas listé ici. Ce qui est déjà correct n'est pas listé non plus : ce document n'est pas un inventaire de conformité, c'est une liste de ce qui doit changer.
 
@@ -14,13 +14,15 @@ Cette section est la seule à lire avant d'arbitrer une date de livraison.
 
 **Ne bloque PAS strictement, mais à corriger avant l'ouverture commerciale :**
 
-1. **Dépendances (F-06).** `next@15.1.3` porte deux avis critiques exploitables (RCE flight protocol, bypass middleware CVE-2025-29927). Le middleware Lalanda ne fait que du gating d'UX — l'auth réelle est côté API — donc pas de bypass d'autorisation démontré ici, mais deux RCE connues dans le framework front en prod ne se livrent pas. **Bump `next` ≥ 15.2.3 requis** (chantier `apps/web` dédié).
-2. **Rate limiting global partagé (F-03).** Derrière Caddy, le seau de 100 req/min est de fait commun à tous les clients : 100 req/min d'un attaquant renvoient 429 à tout le monde. DoS applicatif trivial. À corriger (tracker `X-Forwarded-For` + `trust proxy`) ou à assumer explicitement.
+1. ~~**Dépendances (F-06).**~~ **CORRIGÉ EN S22f.** `next` monté de 15.1.3 à **15.5.23** : les deux avis critiques (RCE flight protocol, bypass middleware CVE-2025-29927) et onze avis hauts de la même ligne disparaissent. Le cliquet est refermé — plus aucune ligne `next` dans `scripts/audit-baseline.json`.
+2. ~~**Rate limiting global partagé (F-03).**~~ **CORRIGÉ EN S22f.** `trust proxy = 1` + tracker par IP cliente réelle : le seau n'est plus commun, et un `X-Forwarded-For` forgé n'en ouvre pas de neuf. Chaîne de confiance documentée dans `Caddyfile`, `apps/api/src/security/trusted-proxy.ts` et docs/17.
 3. **Écarts doctrine docs/17 (F-07) :** pas de MFA plateforme, pas de SMTP donc pas de vérification d'email ni de notification d'événement critique, journal d'audit non centralisé/alerté. Prise de compte plus facile que ce que la doctrine annonce. Décisions produit (ADR SMTP/MFA), hors périmètre de correction ici.
 
 **Déjà corrigé dans cette PR :** exposition réseau des services de données en dev (F-01), confinement du renderer PDF contre la SSRF (F-02), et — commits antérieurs — DoS par exports PDF concurrents (RenderGate), durcissement CI/deploy (permissions GITHUB_TOKEN, action épinglée par SHA, injection de tag), durcissement du compose de production (`no-new-privileges`, `mem_limit`, `pids_limit`, images figées), CSP web complétée, HSTS, `poweredByHeader: false`.
 
-**Gravité résiduelle après cette PR : rien de « Bloquant » au sens strict (attaquant distant → données clientes) n'a été trouvé.** Les deux findings Élevés restants (F-06, F-03) demandent respectivement un chantier front et une décision d'infrastructure.
+**Corrigé depuis, en S22f (PR dédiée) :** F-06 et F-03, les deux findings Élevés que cet audit laissait ouverts. **Il ne reste aucun finding Élevé ouvert.** F-07 (doctrine : MFA, audit centralisé) reste Moyen et relève d'ADR produit ; F-05 garde un reliquat Faible sur des modules qui n'étaient pas modifiables au moment de l'audit.
+
+**Gravité résiduelle : rien de « Bloquant » au sens strict (attaquant distant → données clientes) n'a été trouvé.**
 
 ---
 
@@ -75,7 +77,7 @@ La classification est faite **par exploitabilité réelle**, pas par catégorie 
   Test de non-régression : `apps/api/src/reports/report-html.confinement.test.ts`.
   **Reste ouvert (hors périmètre applicatif) :** dropper `--no-sandbox` en donnant au conteneur `--cap-add=SYS_ADMIN` ou un profil seccomp Chromium, pour restaurer le bac à sable du renderer lui-même.
 
-### F-03 — Panier de rate limiting global unique : 100 req/min pour TOUS les clients confondus
+### F-03 — Panier de rate limiting global unique : 100 req/min pour TOUS les clients confondus — CORRIGÉ (S22f)
 
 - **Gravité :** Moyen.
 - **Emplacement :** `apps/api/src/security/throttling.module.ts:22` (`ThrottlerModule.forRoot([{ name: 'default', ...GLOBAL_THROTTLE }])`), `apps/api/src/security/throttling.ts:6`.
@@ -87,8 +89,12 @@ La classification est faite **par exploitabilité réelle**, pas par catégorie 
   ```
   La 101ᵉ requête est refusée quelle que soit son IP annoncée, et une IP totalement nouvelle est refusée dans la foulée : le seau est partagé. En production derrière Caddy, 100 requêtes/min d'un attaquant suffisent à renvoyer 429 à tous les utilisateurs légitimes — déni de service applicatif trivial.
 - **Impact :** DoS de disponibilité à très faible coût ; a contrario, un attaquant multi-IP contourne toute limite « par IP » supposée.
-- **Correction proposée (non livrée — à cadrer) :** configurer le `ThrottlerGuard` pour dériver le client de `X-Forwarded-For` **en ne faisant confiance qu'au dernier proxy** (Caddy), via un `getTracker` personnalisé, et fixer `app.set('trust proxy', 1)`. Sans cela, distinguer les clients derrière le proxy est impossible. À défaut de temps, documenter que la limite globale est un plafond de charge, pas une protection par client, et poser une limite basse par session sur les routes coûteuses (déjà fait pour `/ai/corrective-actions`). Le durcissement `pids_limit`/`mem_limit` du compose (déjà en place) borne l'impaction mémoire mais pas ce DoS applicatif.
-- **Note multi-instances :** compteurs en mémoire de process (déjà signalé docs/17 § Restant S16a). Dès deux instances d'API, chaque instance a son propre seau : la limite effective double, et le quota `/ai` par utilisateur devient contournable en frappant l'autre instance. Prérequis : backend Redis partagé (`@nest-lab/throttler-storage-redis`).
+- **Correction (livrée en S22f) :**
+  1. **`app.set('trust proxy', 1)`** (`apps/api/src/main.ts`, posé avant que la moindre requête soit servie ; la valeur et sa justification vivent dans `apps/api/src/security/trusted-proxy.ts`). **Un nombre, pas `true`** : `true` fait confiance à la chaîne `X-Forwarded-For` entière, y compris à la partie écrite par le client ; Express retiendrait l'adresse la plus à gauche — celle que l'attaquant contrôle — et il lui suffirait d'en changer à chaque requête pour obtenir un seau vierge. La limite ne serait pas réparée, elle serait **supprimée**. `1` = Caddy, seul proxy entre le client et l'API (réseau `edge` de `docker-compose.prod.yml` : seul Caddy publie des ports, le conteneur `api` n'est joignable que par lui).
+  2. **`ClientIpThrottlerGuard`** (`apps/api/src/security/client-ip-throttler.guard.ts`) en `APP_GUARD` : tracker explicite `ip:<IP cliente>`, préfixé comme celui par utilisateur pour que les deux seaux ne puissent pas collisionner dans le stockage. Les deux moitiés sont indissociables — le guard sans le réglage compte l'IP de Caddy, le réglage sans un tracker écrit ne tiendrait qu'au défaut de la librairie, que rien dans ce dépôt ne verrouille.
+  3. **Chaîne de confiance documentée aux deux bouts** : `Caddyfile` (pourquoi l'`append` de `X-Forwarded-For` par Caddy rend la dernière adresse infalsifiable, et pourquoi aucun `header_up` ne l'écrase à la main) et docs/17 § « Chaîne de confiance du reverse proxy » (le tableau rang par rang, et ce qu'il faut changer si un CDN s'intercale).
+- **Vérification :** `apps/api/src/security/trusted-proxy.test.ts` — de vraies applications Nest, de vraies requêtes HTTP. Deux IP clientes ont des seaux indépendants ; un `X-Forwarded-For` forgé (y compris une chaîne longue, une IP privée, ou l'IP d'une autre victime) n'ouvre pas de seau neuf ; le quota par utilisateur de `/ai/corrective-actions` reste **par utilisateur** (deux comptes derrière une même IP publique ne se pénalisent pas, un même compte ne regagne rien en changeant de réseau). Un dernier bloc monte la même application **sans** le correctif et reproduit ce finding — sans ce témoin, une suite verte ne dirait pas si elle teste le correctif ou le hasard.
+- **Note multi-instances (toujours ouverte) :** compteurs en mémoire de process (déjà signalé docs/17 § Restant S16a). Dès deux instances d'API, chaque instance a son propre seau : la limite effective double, et le quota `/ai` par utilisateur devient contournable en frappant l'autre instance. Prérequis : backend Redis partagé (`@nest-lab/throttler-storage-redis`). **Ce correctif rend la limite par client réelle ; il ne la rend pas partagée entre instances.**
 
 ### F-04 — Corps de requête non validé sur `reopen` : 500 non géré (robustesse) — CORRIGÉ
 
@@ -106,7 +112,7 @@ La classification est faite **par exploitabilité réelle**, pas par catégorie 
 - **Impact :** marge de sécurité réduite, contrat d'entrée implicite.
 - **Correction (livrée pour le périmètre autorisé) :** `.strict()` ajouté à `CreateProjectSchema`, `UpdateDriversSchema`, `EvaluateProjectSchema` (`projects.dto.ts`) et `EvaluateRequestSchema` (`evaluate.dto.ts`). **Restant, hors périmètre de correction :** `organizations.controller.ts:17`, `invitations.controller.ts`, `members.controller.ts`, `ai-actions.dto.ts` (modules `organizations/`, `ai/` non modifiables ici). Non bloquant.
 
-### F-06 — Dépendances : 3 avis critiques et 21 hauts gelés dans le cliquet, dont Next.js exploitable
+### F-06 — Dépendances : 3 avis critiques et 21 hauts gelés dans le cliquet, dont Next.js exploitable — CORRIGÉ (S22f)
 
 - **Gravité :** Élevé (dette datée ; le correctif principal est un bump `next` hors périmètre de cette PR).
 - **Emplacement :** `scripts/audit-baseline.json` (24 avis gelés), consommé par `scripts/audit-dependencies.mjs` (nouveau job CI, cliquet — voir son en-tête).
@@ -116,7 +122,12 @@ La classification est faite **par exploitabilité réelle**, pas par catégorie 
   - `vitest` — **GHSA-5xrq-8626-4rwp** : lecture/exécution de fichier arbitraire quand le serveur UI de Vitest écoute (dépendance de dev uniquement, non exposée en prod).
 - **Démonstration partielle :** le middleware `apps/web/src/middleware.ts` ne fait que du gating d'UX (redirection), l'authentification réelle est côté API (`AuthGuard`). Le vecteur testé du CVE-2025-29927 (`x-middleware-subrequest`) **n'a pas altéré le gating** sur ce déploiement (`GET /projects` + en-tête → toujours `307 → /login`). L'avis reste néanmoins présent dans la version installée et le middleware Next reste une surface à ne pas charger de décisions d'autorisation.
 - **Impact :** deux RCE/bypass connus dans le framework front en production ; dette figée mais non corrigée.
-- **Correction proposée :** bump `next` ≥ 15.2.3 (idéalement dernière 15.x) et retrait des lignes correspondantes de `audit-baseline.json` — le bump touche `apps/web` mais relève d'un chantier dédié (risque de régression Next). **Échéance recommandée : avant l'ouverture commerciale.** Le cliquet garantit qu'aucune *nouvelle* dette haute/critique n'entre d'ici là (job `Audit des dépendances` en CI).
+- **Correction (livrée en S22f) :** `next` et `eslint-config-next` montés de **15.1.3 à 15.5.23**, dernière stable de la ligne 15.
+  - **Pourquoi 15.5.23 et pas le minimum 15.2.3.** Le minimum aurait fermé les deux critiques et laissé ouverts une dizaine d'avis hauts corrigés entre-temps dans la même ligne (SSRF sur les Server Actions, sur les rewrites à destination contrôlée par l'attaquant et sur les upgrades WebSocket ; DoS sur les Server Components ; empoisonnement de cache ; bypass middleware i18n). Prendre le minimum revenait à rouvrir le même chantier au bump suivant. La ligne 16 n'a pas été prise : c'est une majeure (retrait de `next lint`, changements de `params`/`searchParams`), donc une migration, pas un correctif de CVE.
+  - **Ce que le bump a changé.** `next-env.d.ts` gagne une référence vers `.next/types/routes.d.ts` (typage des routes, 15.5) — fichier généré et versionné, committé pour qu'un `next build` ne laisse pas l'arbre sale ; vérifié qu'un typecheck sur arbre propre, sans `.next`, reste vert. `next lint` est déprécié (retrait annoncé en Next 16) et l'annonce dans la sortie du job : la migration vers l'ESLint CLI change la configuration de lint de l'application, pas sa sécurité, et reste un chantier à part.
+  - **Ce que le bump n'a PAS cassé** (vérifié sur l'application réellement démarrée, sortie `standalone`, pas seulement en build) : les trois route groups (`(marketing)`, `(app)`, `(auth)`) et les groupes imbriqués répondent, le middleware redirige dans les deux sens (protégé → `/login?next=…`, authentifié → `/projects`), les 34 pages statiques et SSG sont générées, la CSP, HSTS, `Permissions-Policy` et `poweredByHeader: false` de `next.config.mjs` sont toujours posés. Le vecteur `x-middleware-subrequest` de CVE-2025-29927 ne franchit toujours pas le gating — désormais parce que la version est corrigée, et non plus seulement parce que le middleware ne portait aucune autorisation.
+  - **Cliquet refermé :** `node scripts/audit-dependencies.mjs --update` retire les **13 avis `next`** devenus caducs. La référence passe de 24 à 11 entrées et ne contient **plus aucune ligne `next`**. Aucun avis encore ouvert n'a été masqué : les 11 restants (`vitest`, `vite`, `postcss`, `multer`, `sharp`, `nanoid`, `js-yaml`) sont inchangés.
+- **Reste ouvert sur ce finding :** l'avis critique `vitest` (GHSA-5xrq-8626-4rwp) et les 10 hauts restants. Tous sont des dépendances de développement ou transitives non exposées en production ; ils gardent leur place dans le cliquet, qui continue de garantir qu'aucune dette *nouvelle* n'entre.
 
 ### F-07 — Écart avec docs/17 : MFA plateforme, SMTP/vérification email et audit centralisé absents
 
