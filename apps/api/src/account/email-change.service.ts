@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import type { Connection, Model } from 'mongoose';
 import { randomBytes } from 'node:crypto';
@@ -42,7 +42,9 @@ export class EmailChangeService {
     @InjectModel(EmailChangeRequest.name)
     private readonly model: Model<EmailChangeRequestDocument>,
     @InjectConnection() private readonly connection: Connection,
-    private readonly mail: MailService,
+    // Jeton explicite : esbuild (vitest) n'émet pas `design:paramtypes`, une
+    // injection par type y serait silencieusement `undefined` (voir mail/).
+    @Inject(MailService) private readonly mail: MailService,
   ) {}
 
   /** Demande en attente et non expirée, ou `null`. */

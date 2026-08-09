@@ -16,7 +16,7 @@
 // Les tests substituent une implémentation en mémoire — aucun envoi réseau n'a
 // lieu dans la suite, jamais (docs/18-TESTS).
 
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 
 import {
   renderEmailVerification,
@@ -73,7 +73,13 @@ export abstract class MailService {
 /** Implémentation par défaut : rendu des gabarits puis remise au transport. */
 @Injectable()
 export class TemplatedMailService extends MailService {
-  constructor(private readonly transport: MailTransport) {
+  // `@Inject(MailTransport)` EXPLICITE, et ce n'est pas de la verbosité : vitest
+  // transpile via esbuild, qui n'implémente pas `emitDecoratorMetadata`. Sans
+  // jeton explicite, Nest ne voit aucun paramètre à injecter et construit la
+  // classe SANS ARGUMENT — silencieusement. Le service existe, l'injection est
+  // `undefined`, et la panne n'apparaît qu'au premier envoi. C'est la convention
+  // suivie partout dans ce dépôt (`@Inject`, `@InjectModel`, `@InjectConnection`).
+  constructor(@Inject(MailTransport) private readonly transport: MailTransport) {
     super();
   }
 

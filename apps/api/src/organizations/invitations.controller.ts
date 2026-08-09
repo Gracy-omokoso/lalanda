@@ -72,7 +72,9 @@ export class InvitationsController {
   constructor(
     @Inject(InvitationsService) private readonly invitations: InvitationsService,
     @Inject(OrganizationsService) private readonly organizations: OrganizationsService,
-    private readonly mail: MailService,
+    // Jeton explicite comme partout ici : esbuild (vitest) n'émet pas
+    // `design:paramtypes`, une injection par type y serait `undefined`.
+    @Inject(MailService) private readonly mail: MailService,
   ) {}
 
   /**
