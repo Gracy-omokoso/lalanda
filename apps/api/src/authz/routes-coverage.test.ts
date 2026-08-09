@@ -29,6 +29,7 @@ import { CanvasController } from '../canvas/canvas.controller.js';
 import { EvaluateController } from '../evaluate/evaluate.controller.js';
 import { HealthController } from '../health/health.controller.js';
 import { LegalController } from '../legal/legal.controller.js';
+import { MfaController } from '../mfa/mfa.controller.js';
 import { ObjectivesController } from '../objectives/objectives.controller.js';
 import { OrganizationSpaceController } from '../organization-space/organization-space.controller.js';
 import { InvitationsController } from '../organizations/invitations.controller.js';
@@ -67,6 +68,7 @@ const CONTROLEURS = [
   LegalController,
   MeController,
   MembersController,
+  MfaController,
   ObjectivesController,
   OrganizationSpaceController,
   OrganizationsController,
@@ -158,6 +160,32 @@ const SANS_PERMISSION: Record<string, string> = {
   // pas une organisation.
   'LegalController.read': 'État de son propre accord, scopé par la session.',
   'LegalController.accept': 'Enregistrement de son propre accord, scopé par la session.',
+
+  // ── Second facteur (S22h) ───────────────────────────────────────────────
+  // Ces routes DOIVENT rester atteignables par quelqu'un que le MFA empêche
+  // d'entrer dans `/admin` — sinon un opérateur nouvellement nommé ne pourrait
+  // jamais s'enrôler, et un opérateur ayant perdu son téléphone ne pourrait
+  // jamais présenter un code de secours : le contrôle serait étanche et
+  // inutilisable. Exiger ici un rôle plateforme, ou une permission
+  // d'organisation, refermerait la seule porte permettant de satisfaire la
+  // condition qui ferme `/admin`. Même circularité que `MeController.permissions`
+  // et `PlatformAccessController.platformAccess`.
+  // Scopées par la session (`req.user`), sans aucun paramètre désignant autrui,
+  // et protégées par un quota par utilisateur (`MFA_VERIFY_THROTTLE`) plus un
+  // verrouillage par compte après cinq échecs consécutifs.
+  'MfaController.status': 'État de son PROPRE second facteur, scopé par la session.',
+  'MfaController.enroll':
+    'Enrôlement de son propre second facteur. Exige le mot de passe courant — une ' +
+    'session volée ne doit pas pouvoir lier l’authentificateur de l’attaquant.',
+  'MfaController.activate': 'Confirmation de son propre enrôlement par un premier code.',
+  'MfaController.verify':
+    'Présentation de son propre second facteur pour la session courante. C’est la ' +
+    'route appelée après un 403 MFA_STEP_UP_REQUIRED : l’exiger derrière un rôle ' +
+    'plateforme serait circulaire.',
+  'MfaController.regenerate':
+    'Régénération de ses propres codes de secours. Mot de passe courant exigé.',
+  'MfaController.disable':
+    'Désactivation de son propre second facteur. Mot de passe ET code exigés.',
 };
 
 interface RouteInspectee {
