@@ -139,13 +139,21 @@ jobs:
           MONGODB_DB: ${{ env.MONGODB_DB }}
           # Secrets FACTICES, valides uniquement pour la CI : aucun service externe
           # n'est appelé par les tests. AUTH_SECRET doit faire ≥ 32 caractères
-          # (packages/shared/src/env), OPENAI_API_KEY est non vide mais inutilisée.
+          # (packages/shared/src/env).
           AUTH_SECRET: ci-secret-non-production-0123456789abcdef
           AUTH_URL: http://localhost:3000
           AUTH_REQUIRE_EMAIL_VERIFICATION: 'false'
           API_URL: http://localhost:3001
           WEB_URL: http://localhost:3000
-          OPENAI_API_KEY: sk-ci-cle-factice-non-utilisee
+          # Clé maîtresse du coffre (S21b — ADR-0013). Décode vers 32 octets, et
+          # la valeur décodée dit ce qu'elle est : « CI-CLE-FACTICE-NON-PRODUCTION-32 ».
+          # Aucune vraie clé, même de test, n'entre dans ce dépôt.
+          SECRETS_MASTER_KEY: Q0ktQ0xFLUZBQ1RJQ0UtTk9OLVBST0RVQ1RJT04tMzI=
+          SECRETS_MASTER_KEY_ID: ci-k1
+          # OPENAI_API_KEY est volontairement ABSENTE depuis S21b : la variable est
+          # devenue un secours optionnel (ADR-0013 option C), et sa présence ferait
+          # remonter `source: "env"` dans les vues d'intégration. Les suites qui
+          # couvrent ce chemin de secours la posent elles-mêmes, le temps du test.
 
       # Preuve que le job n'est pas « vert parce que skippé » : échoue si une
       # suite e2e n'a pas réellement tourné.

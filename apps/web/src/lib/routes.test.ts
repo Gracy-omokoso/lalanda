@@ -27,6 +27,21 @@ describe('isProtectedPath (S20b)', () => {
     }
   });
 
+  it('protège l’espace admin plateforme, racine comme sous-routes (S21b)', () => {
+    // Sans cette entrée, un visiteur non authentifié verrait `/admin/integrations`
+    // se monter avant que l'API ne réponde 401 — c'est-à-dire la structure de
+    // l'espace d'administration, ses onglets et le nom des cinq fournisseurs.
+    for (const path of [
+      '/admin',
+      '/admin/organisations',
+      '/admin/utilisateurs',
+      '/admin/integrations',
+      '/admin/journal',
+    ]) {
+      expect(isProtectedPath(path)).toBe(true);
+    }
+  });
+
   it('protège les espaces existants, racine comme sous-routes', () => {
     for (const path of [
       '/projects',
@@ -50,6 +65,7 @@ describe('isProtectedPath (S20b)', () => {
     // deviendrait inaccessible du seul fait de commencer par « /compte ».
     expect(isProtectedPath('/comptes-annuels')).toBe(false);
     expect(isProtectedPath('/projects-publics')).toBe(false);
+    expect(isProtectedPath('/administration-publique')).toBe(false);
   });
 });
 
