@@ -19,6 +19,7 @@ import {
   ORG_ROLE_RANK,
   OWNER_ROLE,
   PLATFORM_FORBIDDEN_ACTIONS,
+  PLATFORM_MFA_REQUIRED,
   PLATFORM_PERMISSION_MATRIX,
   PLATFORM_ROLES,
   can,
@@ -28,6 +29,8 @@ import {
   isAssignableRole,
   isOwnerRole,
   normalizeOrgRole,
+  platformRoleRequiresMfa,
+  platformRolesRequireMfa,
   sodDecision,
   type Action,
   type OrgRole,
@@ -575,6 +578,65 @@ describe('R1 — identité du rôle propriétaire (repris de S20b)', () => {
   it('n’accepte pas un rôle qui CONTIENT « owner » sans en être un', () => {
     for (const role of ['co_owner', 'owner_delegate', 'not-owner']) {
       expect(isOwnerRole(role), role).toBe(false);
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Exigence de MFA pour les rôles plateforme (S22h — docs/17 § Identité)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('exigence de MFA plateforme (docs/17 § Identité)', () => {
+  // Retranscrite à la main, comme les matrices ci-dessus : un tableau importé de
+  // `permissions.ts` ne vérifierait que son égalité à lui-même. Modifier une
+  // ligne de production doit casser ce test, donc forcer une décision consciente
+  // et une mise à jour de docs/12 et docs/17.
+  const ATTENDU: Record<PlatformRole, boolean> = {
+    platform_super_admin: true,
+    platform_admin: true,
+    platform_support: true,
+    platform_billing: true,
+    platform_template_editor: true,
+    platform_country_pack_manager: true,
+  };
+
+  it('les SIX rôles plateforme exigent un second facteur — aucune exemption', () => {
+    for (const role of PLATFORM_ROLES) {
+      expect(PLATFORM_MFA_REQUIRED[role], role).toBe(ATTENDU[role]);
+      expect(platformRoleRequiresMfa(role), role).toBe(true);
+    }
+  });
+
+  it('la table couvre exactement les rôles déclarés — ni trou ni rôle fantôme', () => {
+    // Une case manquante ne compilerait pas ; une case EN TROP compilerait très
+    // bien et n'exigerait rien de personne.
+    expect(Object.keys(PLATFORM_MFA_REQUIRED).sort()).toEqual([...PLATFORM_ROLES].sort());
+  });
+
+  it('l’exigence est DISJONCTIVE : cumuler les rôles ne dispense pas du facteur', () => {
+    // Point délicat. `@RequirePlatformRole` est un « ou » : détenir l'un des
+    // rôles listés suffit. Si l'exigence de MFA était conjonctive, il suffirait
+    // d'ajouter à son compte un rôle exempté pour se dispenser du second facteur
+    // sur les routes d'un rôle sensible — le cumul de rôles AFFAIBLIRAIT la
+    // contrainte. Le test fige la sémantique même si, aujourd'hui, aucun rôle
+    // n'est exempté : le jour où l'un le sera, c'est ici que le trou apparaîtra.
+    expect(platformRolesRequireMfa(['platform_support', 'platform_super_admin'])).toBe(true);
+    expect(platformRolesRequireMfa(['platform_billing'])).toBe(true);
+  });
+
+  it('aucun rôle détenu ⇒ aucune exigence (le garde a déjà refusé avant)', () => {
+    expect(platformRolesRequireMfa([])).toBe(false);
+  });
+
+  it('l’exigence porte sur les rôles PLATEFORME, pas sur les rôles d’organisation', () => {
+    // docs/17 § Identité vise les « rôles sensibles » et docs/12 § Reste à faire
+    // le rattache explicitement à l'ouverture de `/admin`. Étendre l'exigence
+    // aux huit rôles d'organisation est une DÉCISION PRODUIT (elle imposerait un
+    // second facteur à toute la clientèle), pas une conséquence technique de ce
+    // chantier. Ce test constate l'état livré pour qu'un élargissement futur soit
+    // un changement visible et non un glissement.
+    for (const role of ORG_ROLES) {
+      expect(Object.prototype.hasOwnProperty.call(PLATFORM_MFA_REQUIRED, role), role).toBe(false);
     }
   });
 });

@@ -495,6 +495,78 @@ export const PLATFORM_FORBIDDEN_ACTIONS: readonly Action[] = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
+// EXIGENCE D'AUTHENTIFICATION MULTIFACTEUR (S22h — docs/17 § Identité)
+//
+// docs/17 § Contrôles/Identité : « MFA pour rôles sensibles ». docs/12 le
+// listait en « Reste à faire » avec la mention « À lever avant d'ouvrir /admin
+// en production », et docs/29 F-07 le comptait comme un écart de doctrine.
+//
+// ── Pourquoi cette exigence vit ICI et nulle part ailleurs ────────────────────
+//
+// ADR-0012 §8 : « Aucun `if (role === …)` hors de `permissions.ts` ». Un test de
+// rôle écrit dans un garde, dans un contrôleur ou dans l'interface serait une
+// deuxième source de vérité — et la deuxième source de vérité d'une règle de
+// sécurité est toujours celle qu'on oublie de mettre à jour. L'exigence est donc
+// une DONNÉE de ce fichier, lue par `PermissionsGuard` exactement comme il lit
+// déjà la matrice.
+//
+// ── Pourquoi une table exhaustive et non un booléen global ────────────────────
+//
+// Écrire `const MFA_REQUIRED_FOR_PLATFORM = true` aurait le même effet
+// aujourd'hui, où les six rôles l'exigent. Mais un septième rôle ajouté demain
+// hériterait de l'exigence sans que personne n'ait eu à en décider — ou, pire, un
+// jour où l'on voudrait exempter un rôle, la décision se prendrait par un `if`
+// ailleurs. `Record<PlatformRole, boolean>` NE COMPILE PAS tant que le nouveau
+// rôle n'a pas sa ligne : la décision est forcée, datée et relue en revue.
+//
+// ── Pourquoi les six, sans exception ──────────────────────────────────────────
+//
+// Un rôle plateforme est sensible par définition — c'est le sens du mot
+// « plateforme » ici. Même le plus étroit d'entre eux (`platform_support`, qui
+// n'a aucun accès aux données clientes sans grant délégué) voit la liste des
+// organisations, leurs abonnements et leur activité : de quoi cibler une
+// attaque, sinon la mener. Et `platform_super_admin` écrit les secrets
+// d'intégration : clés OpenAI, Stripe, PayPal, SMTP, S3 (ADR-0013).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Le rôle exige-t-il un second facteur pour être exercé ?
+ *
+ * Table EXHAUSTIVE : une case absente ne compile pas.
+ */
+export const PLATFORM_MFA_REQUIRED: Readonly<Record<PlatformRole, boolean>> = {
+  platform_super_admin: true,
+  platform_admin: true,
+  platform_support: true,
+  platform_billing: true,
+  platform_template_editor: true,
+  platform_country_pack_manager: true,
+};
+
+/** Ce rôle plateforme exige-t-il un second facteur ? */
+export function platformRoleRequiresMfa(role: PlatformRole): boolean {
+  return PLATFORM_MFA_REQUIRED[role];
+}
+
+/**
+ * L'un des rôles détenus exige-t-il un second facteur ?
+ *
+ * Sémantique DISJONCTIVE, et c'est le point délicat. `PermissionsGuard` autorise
+ * une route dès qu'UN rôle suffisant est détenu (`@RequirePlatformRole` est un
+ * « ou »). Si l'exigence de MFA était conjonctive — « seulement si TOUS les rôles
+ * l'exigent » — il suffirait de détenir un rôle exempté en plus d'un rôle
+ * sensible pour se dispenser du second facteur sur les routes du rôle sensible.
+ * Le cumul de rôles deviendrait un moyen d'AFFAIBLIR la contrainte, ce qui est
+ * exactement l'inverse de ce que le cumul signifie.
+ *
+ * Un tableau vide renvoie `false` : quelqu'un sans rôle plateforme n'a aucune
+ * route plateforme à atteindre, et le garde l'a déjà refusé avant d'arriver ici.
+ */
+export function platformRolesRequireMfa(roles: readonly PlatformRole[]): boolean {
+  return roles.some(platformRoleRequiresMfa);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Décision
 // ─────────────────────────────────────────────────────────────────────────────
 
