@@ -82,9 +82,7 @@ export default function RegisterPage(): React.ReactElement {
     try {
       await recordAcceptanceAndContinue();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Impossible d'enregistrer votre acceptation.",
-      );
+      setError(err instanceof Error ? err.message : "Impossible d'enregistrer votre acceptation.");
     } finally {
       setLoading(false);
     }

@@ -55,6 +55,7 @@ Le dossier `docs/` constitue la source de vérité du produit. Les décisions m�
 - [24 — Infrastructure](24-INFRASTRUCTURE.md)
 - [25 — Sprints](25-SPRINTS.md)
 - [26 — Conventions](26-CONVENTIONS.md)
+- [28 — Conformité légale](28-CONFORMITE-LEGALE.md)
 - [ADR](adr/README.md)
 
 ## Cartographie cible

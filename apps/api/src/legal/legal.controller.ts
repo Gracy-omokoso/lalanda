@@ -21,7 +21,15 @@
 // RÉUTILISÉ tel quel, sans modification du module compte : le déclarer dans les
 // providers de `LegalModule` suffit, il n'a aucune dépendance.
 
-import { BadRequestException, Body, Controller, Get, Inject, Post, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Inject,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 
 import { AccountAuthGuard } from '../account/account-auth.guard.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
