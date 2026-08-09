@@ -123,11 +123,12 @@ IntegrationSchema.index({ provider: 1, scope: 1, organizationId: 1 }, { unique: 
  * liste de suppressions aurait laissé passer le nouveau venu en silence.
  */
 IntegrationSchema.set('toJSON', {
-  transform: (_doc, ret: Record<string, unknown>) => {
-    const secrets = ret['secrets'] as Record<string, unknown> | undefined;
+  transform: (_doc, ret) => {
+    const bag = ret as unknown as Record<string, unknown>;
+    const secrets = bag['secrets'] as Record<string, unknown> | undefined;
     if (secrets && typeof secrets === 'object') {
-      ret['secrets'] = Object.fromEntries(Object.keys(secrets).map((name) => [name, true]));
+      bag['secrets'] = Object.fromEntries(Object.keys(secrets).map((name) => [name, true]));
     }
-    return ret;
+    return bag;
   },
 });
