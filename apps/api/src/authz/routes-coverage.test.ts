@@ -17,6 +17,7 @@ import { AccountController } from '../account/account.controller.js';
 import { EmailVerificationController } from '../account/email-verification.controller.js';
 import { ActualsController } from '../actuals/actuals.controller.js';
 import { AdminController } from '../admin/admin.controller.js';
+import { PlatformAccessController } from '../admin/platform-access.controller.js';
 import {
   IntegrationsController,
   ReauthController,
@@ -64,6 +65,7 @@ const CONTROLEURS = [
   OrganizationsController,
   ParameterPacksController,
   PlansController,
+  PlatformAccessController,
   ProjectsController,
   ReportsController,
 ];
@@ -90,6 +92,11 @@ const SANS_PERMISSION: Record<string, string> = {
   'MeController.permissions':
     'Lecture de ses PROPRES permissions. Exiger une permission pour lire ses permissions ' +
     'serait circulaire.',
+  'PlatformAccessController.platformAccess':
+    'Lecture de ses PROPRES rôles plateforme (S21b). Même circularité que ci-dessus, et ' +
+    "surtout : la placer sous /admin la rendrait inaccessible à l'écrasante majorité des " +
+    "utilisateurs, c'est-à-dire précisément à ceux qui ont besoin d'apprendre qu'ils n'ont " +
+    "aucun rôle. N'autorise rien — le serveur refuse de toute façon.",
 
   // ── Espace compte (S20b) ────────────────────────────────────────────────
   // ADR-0012 § risque n°2 : `/compte` est le SEUL espace accessible sans

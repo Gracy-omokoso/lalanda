@@ -638,6 +638,138 @@ export interface DeletionAssessment {
   organizationsDeletedWithAccount: Array<{ id: string; name: string }>;
 }
 
+// ─── Espace admin plateforme (S21b — ADR-0012 §4, ADR-0013) ───
+//
+// Aucune de ces structures ne porte de valeur de secret, et il n'existe
+// volontairement AUCUNE méthode `revealSecret` / `getSecretValue` dans ce
+// fichier : le contrat d'API est en écriture seule (ADR-0013 §4). Le seul
+// fragment qui circule est `last4`, les quatre DERNIERS caractères.
+
+/** Les 6 rôles plateforme. Miroir d'`apps/api/src/authz/permissions.ts`. */
+export const PLATFORM_ROLES = [
+  'platform_super_admin',
+  'platform_admin',
+  'platform_support',
+  'platform_billing',
+  'platform_template_editor',
+  'platform_country_pack_manager',
+] as const;
+
+export type PlatformRole = (typeof PLATFORM_ROLES)[number];
+
+export type Plan = 'free' | 'pro' | 'business';
+
+/**
+ * Ce que l'INTERFACE a le droit d'afficher — jamais ce qu'elle a le droit de
+ * faire. Masquer un onglet est un confort; le serveur refuse de toute façon
+ * (docs/12 § Modèle).
+ */
+export interface PlatformAccessView {
+  roles: Array<{ role: PlatformRole; label: string }>;
+  isPlatformOperator: boolean;
+  canReadAdmin: boolean;
+  canManagePlatform: boolean;
+  canManageIntegrations: boolean;
+  /** Les trois interdits absolus (ADR-0012 §4), pour être AFFICHÉS tels quels. */
+  forbiddenActions: string[];
+}
+
+export interface PlatformOverview {
+  organizations: { total: number; suspended: number };
+  users: { total: number; withPlatformRole: number };
+  projects: { total: number };
+  approvedPlans: { total: number };
+  aiCalls: { last30Days: { llm: number; fallback: number; total: number } };
+  plans: Record<Plan, number>;
+}
+
+export interface AdminOrganizationSummary {
+  id: string;
+  name: string;
+  slug: string;
+  type: string;
+  pays: string;
+  ownerId: string;
+  plan: Plan;
+  memberCount: number;
+  projectCount: number;
+  suspended: boolean;
+  suspendedReason: string | null;
+  createdAt: string;
+}
+
+export interface AdminUserSummary {
+  id: string;
+  email: string;
+  name: string | null;
+  platformRoles: Array<{ role: PlatformRole; label: string; expiresAt: string | null }>;
+  organizationCount: number;
+  disabledAt: string | null;
+  createdAt: string | null;
+}
+
+export interface PlatformAuditEventView {
+  id: string;
+  action: string;
+  actorUserId: string;
+  actorRole: string;
+  targetType: string;
+  targetId: string;
+  metadata: Record<string, string | number | boolean | null>;
+  createdAt: string;
+}
+
+/**
+ * État d'un secret — **jamais sa valeur**.
+ *
+ * `last4` est le SUFFIXE, jamais le préfixe : « les clés Stripe commencent par
+ * `sk_live_` / `rk_test_`, un préfixe révélerait le mode et le type »
+ * (ADR-0013 §4). `null` si la valeur fait moins de 12 caractères.
+ *
+ * `source` répond à la question « quelle clé le processus utilise-t-il
+ * réellement ? » — garde-fou n°1 du chemin de migration (ADR-0013 option C).
+ */
+export interface IntegrationSecretView {
+  configured: boolean;
+  last4: string | null;
+  updatedAt: string | null;
+  updatedBy: string | null;
+  source: 'db' | 'env' | null;
+}
+
+export interface IntegrationView {
+  provider: 'openai' | 'stripe' | 'paypal' | 'smtp' | 's3';
+  label: string;
+  enabled: boolean;
+  config: Record<string, string | number | boolean>;
+  secrets: Record<string, IntegrationSecretView>;
+  lastTest: { at: string; status: 'ok' | 'failed'; detail: string; forced: boolean } | null;
+  requiredSecrets: string[];
+  /** Ce que fait le bouton « Tester », affiché AVANT qu'on le presse. */
+  testDescription: string;
+  updatedAt: string | null;
+}
+
+export type IntegrationProvider = IntegrationView['provider'];
+
+/**
+ * Corps d'un `PUT /admin/integrations/:provider`.
+ *
+ * Sémantique de remplacement (ADR-0013 §4) : une clé absente de `secrets` laisse
+ * la valeur inchangée, `null` la supprime, une chaîne la remplace. Il n'existe
+ * pas de modification partielle d'un secret.
+ */
+export interface UpdateIntegrationBody {
+  enabled?: boolean;
+  config?: Record<string, string | number | boolean>;
+  secrets?: Record<string, string | null>;
+}
+
+export interface ReauthStatus {
+  active: boolean;
+  expiresAt: string | null;
+}
+
 export const api = {
   listOrganizations: () =>
     jsonRequest<{ organizations: OrganizationView[] }>(`/organizations`, { method: 'GET' }),
@@ -888,6 +1020,118 @@ export const api = {
       method: 'POST',
       body: input,
     }),
+  // ─── Espace admin plateforme (S21b) ────────────────────────
+  // Toutes ces routes exigent un rôle plateforme côté API. Le client ne décide
+  // rien : il affiche ce que le serveur veut bien lui rendre, et relaie ses 403.
+
+  /** Scopée par la session, accessible à tous — y compris sans aucun rôle. */
+  getPlatformAccess: () =>
+    jsonRequest<PlatformAccessView>(`/me/platform-access`, { method: 'GET' }),
+
+  getAdminOverview: () => jsonRequest<PlatformOverview>(`/admin/overview`, { method: 'GET' }),
+
+  listAdminOrganizations: (q?: string) =>
+    jsonRequest<{ organizations: AdminOrganizationSummary[] }>(
+      `/admin/organizations${q ? `?q=${encodeURIComponent(q)}` : ''}`,
+      { method: 'GET' },
+    ),
+  setOrganizationPlan: (organizationId: string, plan: Plan) =>
+    jsonRequest<AdminOrganizationSummary>(
+      `/admin/organizations/${encodeURIComponent(organizationId)}/plan`,
+      { method: 'PATCH', body: { plan } },
+    ),
+  /** Motif obligatoire (10 caractères minimum) — il part dans l'audit. */
+  suspendOrganization: (organizationId: string, reason: string) =>
+    jsonRequest<AdminOrganizationSummary>(
+      `/admin/organizations/${encodeURIComponent(organizationId)}/suspend`,
+      { method: 'POST', body: { reason } },
+    ),
+  liftOrganizationSuspension: (organizationId: string) =>
+    jsonRequest<AdminOrganizationSummary>(
+      `/admin/organizations/${encodeURIComponent(organizationId)}/suspend`,
+      { method: 'DELETE' },
+    ),
+
+  listAdminUsers: (q?: string) =>
+    jsonRequest<{ users: AdminUserSummary[] }>(
+      `/admin/users${q ? `?q=${encodeURIComponent(q)}` : ''}`,
+      { method: 'GET' },
+    ),
+  /** 400 { code: 'SELF_DEMOTION_FORBIDDEN' } si l'on se retire son propre super-admin. */
+  grantPlatformRole: (
+    userId: string,
+    role: PlatformRole,
+    input: { reason?: string; expiresAt?: string } = {},
+  ) =>
+    jsonRequest<AdminUserSummary>(`/admin/users/${encodeURIComponent(userId)}/platform-roles`, {
+      method: 'POST',
+      body: { role, ...input },
+    }),
+  revokePlatformRole: (userId: string, role: PlatformRole) =>
+    jsonRequest<AdminUserSummary>(
+      `/admin/users/${encodeURIComponent(userId)}/platform-roles/${encodeURIComponent(role)}`,
+      { method: 'DELETE' },
+    ),
+  setUserDisabled: (userId: string, disabled: boolean) =>
+    jsonRequest<AdminUserSummary>(`/admin/users/${encodeURIComponent(userId)}/disabled`, {
+      method: 'PATCH',
+      body: { disabled },
+    }),
+
+  /** Journal de PORTÉE PLATEFORME uniquement — aucun événement d'organisation cliente. */
+  listPlatformAuditEvents: (
+    filtre: { action?: string; actorUserId?: string; limit?: number } = {},
+  ) => {
+    const params = new URLSearchParams();
+    if (filtre.action) params.set('action', filtre.action);
+    if (filtre.actorUserId) params.set('actorUserId', filtre.actorUserId);
+    params.set('limit', String(filtre.limit ?? 100));
+    return jsonRequest<{ events: PlatformAuditEventView[] }>(
+      `/admin/audit-events?${params.toString()}`,
+      { method: 'GET' },
+    );
+  },
+
+  // ─── Intégrations chiffrées (S21b — ADR-0013) ──────────────
+  // Écriture seule : aucune de ces méthodes ne peut rendre une valeur en clair,
+  // et il n'existe pas d'endpoint qui le pourrait.
+
+  listIntegrations: () =>
+    jsonRequest<{ integrations: IntegrationView[] }>(`/admin/integrations`, { method: 'GET' }),
+  getIntegration: (provider: IntegrationProvider) =>
+    jsonRequest<IntegrationView>(`/admin/integrations/${provider}`, { method: 'GET' }),
+  /**
+   * 422 { code: 'INTEGRATION_TEST_FAILED' } si le test de connexion échoue — et
+   * dans ce cas RIEN n'est enregistré (ADR-0013 §5). `force` passe outre; la
+   * dérogation est tracée dans l'audit et `lastTest.status` reste `failed`.
+   *
+   * 401 { code: 'REAUTH_REQUIRED' } si la ré-authentification date de plus de
+   * dix minutes.
+   */
+  updateIntegration: (provider: IntegrationProvider, body: UpdateIntegrationBody, force = false) =>
+    jsonRequest<IntegrationView>(`/admin/integrations/${provider}${force ? '?force=true' : ''}`, {
+      method: 'PUT',
+      body,
+    }),
+  testIntegration: (provider: IntegrationProvider) =>
+    jsonRequest<{ ok: boolean; latencyMs: number; detail: string }>(
+      `/admin/integrations/${provider}/test`,
+      { method: 'POST' },
+    ),
+  deleteIntegrationSecret: (provider: IntegrationProvider, name: string) =>
+    jsonRequest<IntegrationView>(
+      `/admin/integrations/${provider}/secrets/${encodeURIComponent(name)}`,
+      { method: 'DELETE' },
+    ),
+
+  /** Fenêtre de ré-authentification (ADR-0013 §5) — dix minutes, liée à la session. */
+  getReauthStatus: () => jsonRequest<ReauthStatus>(`/admin/reauth`, { method: 'GET' }),
+  confirmReauth: (password: string) =>
+    jsonRequest<{ active: true; expiresAt: string }>(`/admin/reauth`, {
+      method: 'POST',
+      body: { password },
+    }),
+
   // ─── Reports PDF (S14a) ────────────────────────────────────
   // `planVersion` (S16c) : export depuis le snapshot figé du plan validé vN — aucun recalcul.
   async downloadProjectPdf(

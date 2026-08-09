@@ -16,7 +16,19 @@ export const MARKETING_PATHS = ['/', '/pricing'] as const;
  * espace dans ce cas (ADR-0012 §9). La distinction ne concerne pas ce fichier :
  * le middleware ne regarde que le cookie de session, jamais l'organisation.
  */
-export const PROTECTED_PREFIXES = ['/projects', '/members', '/invitations', '/compte'] as const;
+export const PROTECTED_PREFIXES = [
+  '/projects',
+  '/members',
+  '/invitations',
+  '/compte',
+  // S21b — espace admin plateforme. Le middleware n'y vérifie QUE la session :
+  // il ne connaît pas les rôles plateforme, et prétendre le contraire donnerait
+  // un faux sentiment de protection. Le rôle est vérifié par `PermissionsGuard`
+  // à chaque appel d'API, et l'espace se referme sur un écran de refus explicite
+  // (voir `admin/layout.tsx`). C'est délibérément une redirection de CONFORT,
+  // pas un contrôle d'accès.
+  '/admin',
+] as const;
 
 /**
  * Ce chemin exige-t-il une session ?

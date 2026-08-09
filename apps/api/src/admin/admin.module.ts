@@ -19,6 +19,7 @@ import {
   OrganizationSuspension,
   OrganizationSuspensionSchema,
 } from './organization-suspension.schema.js';
+import { PlatformAccessController } from './platform-access.controller.js';
 
 @Module({
   imports: [
@@ -31,7 +32,10 @@ import {
       { name: AiUsageEvent.name, schema: AiUsageEventSchema },
     ]),
   ],
-  controllers: [AdminController],
+  // `PlatformAccessController` sert `/me/platform-access` et NON `/admin/*` :
+  // voir l'en-tête du fichier pour la raison — un utilisateur sans rôle doit
+  // pouvoir apprendre qu'il n'en a pas.
+  controllers: [AdminController, PlatformAccessController],
   providers: [AdminService, AiUsageService],
   // `AiUsageService` est exporté pour `AiModule`, qui compte ses propres appels.
   exports: [AiUsageService],
