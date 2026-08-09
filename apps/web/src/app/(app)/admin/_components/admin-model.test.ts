@@ -78,6 +78,8 @@ function integration(over: Partial<IntegrationView> = {}): IntegrationView {
       forced: false,
     },
     requiredSecrets: ['restrictedKey'],
+    configFields: ['publishableKey', 'webhookEndpoint', 'accountCountry'],
+    requiredConfig: [],
     testDescription: 'GET /v1/account — sans coût.',
     updatedAt: '2026-08-01T10:00:00.000Z',
     ...over,
