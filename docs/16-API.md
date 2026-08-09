@@ -188,6 +188,46 @@ Un bloc fermé vaut `null` et **n’est jamais chargé** — pas de requête, do
 
 **Codes d’erreur propres à cet espace** : `400 INVALID_REQUEST`, `403 FORBIDDEN`, `403 NO_ORGANIZATION`, `404 ORG_NOT_FOUND`.
 
+## Espace admin plateforme — implémenté (S21b)
+
+`apps/api/src/admin/` et `apps/api/src/integrations/`. Écrans correspondants : docs/04 § Implémenté (S21b). Modèle de rôles : ADR-0012 §4. Stockage des secrets : ADR-0013.
+
+```text
+GET    /me/platform-access                       rôles plateforme de l'appelant — toute session
+GET    /admin/overview                           compteurs de la plateforme — rôle plateforme
+GET    /admin/organizations?q=&limit=            organisations clientes — rôle plateforme
+GET    /admin/organizations/:organizationId      détail d'une organisation — rôle plateforme
+PATCH  /admin/organizations/:organizationId/plan changement de plan — super_admin | admin
+POST   /admin/organizations/:organizationId/suspend   suspension motivée — super_admin | admin
+DELETE /admin/organizations/:organizationId/suspend   levée de suspension — super_admin | admin
+GET    /admin/users?q=                           comptes — rôle plateforme
+POST   /admin/users/:userId/platform-roles       attribution de rôle — super_admin
+DELETE /admin/users/:userId/platform-roles/:role retrait de rôle — super_admin
+PATCH  /admin/users/:userId/disabled             désactivation — super_admin | admin
+GET    /admin/audit-events?action=&actorUserId=  journal PLATEFORME — rôle plateforme
+GET    /admin/integrations                       état des 5 fournisseurs — super_admin
+GET    /admin/integrations/:provider             état d'un fournisseur — super_admin
+PUT    /admin/integrations/:provider[?force]     écriture de secrets et config — super_admin
+POST   /admin/integrations/:provider/test        test de connexion — super_admin
+DELETE /admin/integrations/:provider/secrets/:name  suppression d'un secret — super_admin
+GET    /admin/reauth                             état de la fenêtre de 10 min — super_admin
+POST   /admin/reauth                             ouverture de la fenêtre — super_admin
+```
+
+**`:organizationId` et non `:orgId`.** Le nom du paramètre est porteur : `PermissionsGuard` traite un `:orgId` de route comme « l’organisation dont il faut résoudre le rôle de l’appelant », et un opérateur de plateforme n’est membre d’aucune organisation cliente. Nommée `:orgId`, la route de changement de plan répondrait `404 ORG_NOT_FOUND` à un super-administrateur parfaitement légitime.
+
+**Trois actions restent refusées à tous les rôles plateforme** — `plan.approve`, `period.close`, `report.export` (ADR-0012 §4). Aucune route d’administration ne les déclare, et `routes-coverage.test.ts` échoue si l’une venait à le faire : une route qui les porterait serait morte (le contrôle la refuserait de toute façon) mais **trompeuse**, car elle promettrait dans `/admin` un pouvoir que la plateforme n’a pas. `GET /me/platform-access` renvoie ces trois actions dans `forbiddenActions[]` pour qu’elles soient **affichées** et non seulement absentes.
+
+**Écriture seule sur les secrets.** Aucun endpoint ne rend une valeur de secret, et il n’en existe pas de désactivé ou de réservé : le contrat n’a pas de forme de lecture. Ce qui circule d’un secret tient en cinq champs — `configured`, `last4`, `updatedAt`, `updatedBy`, `source`. `last4` est un **suffixe** : un préfixe révélerait le type et le mode de la clé (`sk_live_`, `rk_test_`), et vaut `null` sous douze caractères. `configFields[]` et `requiredConfig[]` servent des **noms** de champs, jamais des valeurs, pour que l’interface puisse proposer un champ de configuration encore vide sans recopier le catalogue de `providers.ts`.
+
+**Sémantique de remplacement du `PUT`.** Une clé absente de `secrets` laisse la valeur inchangée, `null` la supprime, une chaîne la remplace. Il n’existe pas de modification partielle d’un secret : la valeur enregistrée n’étant jamais rendue, il n’y a rien à modifier partiellement.
+
+**Test avant enregistrement.** `PUT` exécute le test de connexion du fournisseur **avant** d’écrire. En échec : `422 INTEGRATION_TEST_FAILED` et **rien n’est enregistré**. `?force=true` passe outre — la dérogation est inscrite au journal avec l’identité de son auteur et `lastTest.status` reste `failed`.
+
+**Ré-authentification.** Toute écriture d’intégration exige une confirmation du mot de passe datant de moins de dix minutes, sinon `401 REAUTH_REQUIRED`. Une session volée ne suffit donc pas à remplacer une clé de paiement. Quota dédié : dix écritures par heure et par utilisateur (`429`).
+
+**Codes d’erreur propres à cet espace** : `400 UNKNOWN_FIELD`, `400 UNKNOWN_PROVIDER`, `400 UNKNOWN_ROLE`, `400 UNKNOWN_PLAN`, `400 SELF_DEMOTION_FORBIDDEN`, `400 SELF_DISABLE_FORBIDDEN`, `401 REAUTH_REQUIRED`, `422 INTEGRATION_TEST_FAILED`, `503 VAULT_UNAVAILABLE`, `503 SECRET_KEY_UNAVAILABLE`.
+
 ## Webhooks
 
 Paiements et intégrations utilisent signatures, tolérance temporelle, anti-rejeu, journal et traitement idempotent.
