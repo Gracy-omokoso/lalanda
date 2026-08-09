@@ -90,21 +90,21 @@ La classification est faite **par exploitabilité réelle**, pas par catégorie 
 - **Correction proposée (non livrée — à cadrer) :** configurer le `ThrottlerGuard` pour dériver le client de `X-Forwarded-For` **en ne faisant confiance qu'au dernier proxy** (Caddy), via un `getTracker` personnalisé, et fixer `app.set('trust proxy', 1)`. Sans cela, distinguer les clients derrière le proxy est impossible. À défaut de temps, documenter que la limite globale est un plafond de charge, pas une protection par client, et poser une limite basse par session sur les routes coûteuses (déjà fait pour `/ai/corrective-actions`). Le durcissement `pids_limit`/`mem_limit` du compose (déjà en place) borne l'impaction mémoire mais pas ce DoS applicatif.
 - **Note multi-instances :** compteurs en mémoire de process (déjà signalé docs/17 § Restant S16a). Dès deux instances d'API, chaque instance a son propre seau : la limite effective double, et le quota `/ai` par utilisateur devient contournable en frappant l'autre instance. Prérequis : backend Redis partagé (`@nest-lab/throttler-storage-redis`).
 
-### F-04 — Corps de requête non validé sur `reopen` : 500 non géré (robustesse)
+### F-04 — Corps de requête non validé sur `reopen` : 500 non géré (robustesse) — CORRIGÉ
 
 - **Gravité :** Faible.
 - **Emplacement :** `apps/api/src/actuals/actuals.controller.ts:153` (`@Body() body: { reason?: string }` — assertion de type, pas validation) → `apps/api/src/actuals/actuals.service.ts:160` (`reason?.trim()`).
 - **Exploitabilité :** route `POST /projects/:id/actual-periods/:year/:month/reopen`, protégée par `@RequirePermission('period.close', 'plan.approve')` — donc réservée à un rôle propriétaire/admin de sa propre organisation. Un corps `{"reason": {"x":1}}` fait que `reason.trim` vaut `undefined` → `TypeError` → **500** non intercepté. Pas d'injection (aucun opérateur n'atteint Mongo), pas de franchissement de tenant : simple défaut de robustesse produisant une 500 au lieu d'un 400.
 - **Impact :** bruit d'erreur 500 et absence de contrat d'entrée clair sur une route privilégiée.
-- **Correction proposée :** valider `body` par un schéma zod (`z.object({ reason: z.string().optional() }).strict()`) comme les autres routes du contrôleur, et renvoyer `400 INVALID_REQUEST`. Cheap ; à faire dans le même geste que le durcissement des DTO (voir F-05).
+- **Correction (livrée) :** garde de type dans `actuals.service.ts` (boundary de validation applicative de ce module) — un `reason` non-chaîne renvoie `400 REOPEN_REASON_INVALID` au lieu de crasher. Test e2e `actuals.e2e.test.ts` (cas `{"reason": {"$ne": null}}` → 400).
 
-### F-05 — DTO d'entrée non `.strict()` sur plusieurs contrôleurs (durcissement)
+### F-05 — DTO d'entrée non `.strict()` sur plusieurs contrôleurs (durcissement) — PARTIELLEMENT CORRIGÉ
 
 - **Gravité :** Faible (pas de mass-assignment aujourd'hui).
 - **Emplacement :** `apps/api/src/projects/projects.dto.ts:3,19,23`, `apps/api/src/evaluate/evaluate.dto.ts:6`, `organizations.controller.ts:17`, `invitations.controller.ts`, `members.controller.ts`, `ai-actions.dto.ts`.
 - **Exploitabilité :** aucune dans l'état — Zod v3 (`zod@3.25.76`) **strippe** les clés inconnues par défaut et chaque contrôleur consomme `parsed.data`, jamais le `body` brut. Il n'y a donc pas d'affectation de masse. Mais un objet non `.strict()` accepte silencieusement des champs superflus au lieu de les rejeter en `400` : le jour où un handler lit `body` directement, ou où un champ sensible est ajouté au schéma sans le vouloir côté client, l'écart devient exploitable.
 - **Impact :** marge de sécurité réduite, contrat d'entrée implicite.
-- **Correction proposée :** ajouter `.strict()` aux schémas d'entrée listés (les schémas de `account`, `objectives`, `canvas` et `packages/engine` le sont déjà). Non bloquant.
+- **Correction (livrée pour le périmètre autorisé) :** `.strict()` ajouté à `CreateProjectSchema`, `UpdateDriversSchema`, `EvaluateProjectSchema` (`projects.dto.ts`) et `EvaluateRequestSchema` (`evaluate.dto.ts`). **Restant, hors périmètre de correction :** `organizations.controller.ts:17`, `invitations.controller.ts`, `members.controller.ts`, `ai-actions.dto.ts` (modules `organizations/`, `ai/` non modifiables ici). Non bloquant.
 
 ### F-06 — Dépendances : 3 avis critiques et 21 hauts gelés dans le cliquet, dont Next.js exploitable
 
