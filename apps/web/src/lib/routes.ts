@@ -6,7 +6,17 @@
 // genre de liste qu'on oublie de compléter en ajoutant un espace, ce qui laisse
 // des pages protégées ouvertes sans que rien ne le signale.
 
-/** Routes marketing publiques. Un authentifié y est renvoyé vers l'application. */
+/**
+ * Routes marketing publiques. Un authentifié y est renvoyé vers l'application.
+ *
+ * LES PAGES LÉGALES N'EN FONT PAS PARTIE, et c'est délibéré (S22c). Elles vivent
+ * dans le même route group `(marketing)` mais ne doivent déclencher AUCUNE
+ * redirection : un membre connecté qui clique sur « CGU » depuis le footer
+ * applicatif doit lire les CGU, pas atterrir sur `/projects`. N'étant ni
+ * marketing, ni auth, ni protégées, elles traversent le middleware sans
+ * traitement — la liste faisant foi est `lib/legal.ts`, et `legal.test.ts`
+ * vérifie qu'aucune d'elles n'a glissé dans les tableaux de ce fichier.
+ */
 export const MARKETING_PATHS = ['/', '/pricing'] as const;
 
 /**
