@@ -508,6 +508,17 @@ e2eSuite('périodes réalisées, clôture et écarts (S18b — docs/08)', () => 
     expect(sansMotif.status).toBe(400);
     expect(sansMotif.body.code).toBe('REOPEN_REASON_REQUIRED');
 
+    // a-bis) (S22e) Motif d'un type non-chaîne → 400 REOPEN_REASON_INVALID, PAS
+    //   un 500. Le corps `reason` n'est pas validé par le contrôleur; sans garde,
+    //   `reason.trim()` lançait un TypeError non intercepté sur cette route
+    //   pourtant privilégiée. Voir docs/29-AUDIT-SECURITE-S22e.md § F-04.
+    const motifNonChaine = await request(app.getHttpServer())
+      .post(`/projects/${projectId}/actual-periods/1/1/reopen`)
+      .set('Cookie', cookiesOwner)
+      .send({ reason: { $ne: null } });
+    expect(motifNonChaine.status).toBe(400);
+    expect(motifNonChaine.body.code).toBe('REOPEN_REASON_INVALID');
+
     // b) Un membre de la MÊME org sans droit de réouverture est refusé (403) —
     //    pas un 404 : il a bien accès au projet, c'est la permission qui manque.
     //

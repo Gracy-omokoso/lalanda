@@ -3,12 +3,15 @@
 
 import { z } from 'zod';
 
-export const EvaluateRequestSchema = z.object({
-  /** Slug d'un template connu. S3-lite : uniquement `hello-world`. */
-  templateSlug: z.string().min(1).default('hello-world'),
-  /** Map driver.id → valeur. Les drivers absents utilisent le `defaut` du template. */
-  drivers: z.record(z.string(), z.number().finite()).default({}),
-});
+export const EvaluateRequestSchema = z
+  .object({
+    /** Slug d'un template connu. S3-lite : uniquement `hello-world`. */
+    templateSlug: z.string().min(1).default('hello-world'),
+    /** Map driver.id → valeur. Les drivers absents utilisent le `defaut` du template. */
+    drivers: z.record(z.string(), z.number().finite()).default({}),
+  })
+  // (S22e) Refuse toute clé inconnue en 400 — contrat d'entrée explicite.
+  .strict();
 
 export type EvaluateRequest = z.infer<typeof EvaluateRequestSchema>;
 
