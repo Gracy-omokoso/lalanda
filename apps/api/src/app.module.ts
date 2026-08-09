@@ -11,6 +11,7 @@ import { BillingModule } from './billing/billing.module.js';
 import { CanvasModule } from './canvas/canvas.module.js';
 import { EvaluateController } from './evaluate/evaluate.controller.js';
 import { HealthController } from './health/health.controller.js';
+import { LegalModule } from './legal/legal.module.js';
 import { ObjectivesModule } from './objectives/objectives.module.js';
 import { OrganizationSpaceModule } from './organization-space/organization-space.module.js';
 import { OrganizationsModule } from './organizations/organizations.module.js';
@@ -66,6 +67,7 @@ import { ThrottlingModule } from './security/throttling.module.js';
     ObjectivesModule,
     ReportsModule,
     AiModule,
+    LegalModule,
   ],
   controllers: [HealthController, EvaluateController],
 })
