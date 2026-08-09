@@ -852,6 +852,79 @@ export interface OrganizationBillingView {
   paiement: { integre: false; message: string };
 }
 
+// ─── Abonnements et paiements (S22b — docs/13) ────────────────
+//
+// Aucune règle commerciale n'est dupliquée ici : les montants, les jours
+// restants, l'éligibilité à l'essai et la disponibilité des moyens de paiement
+// sont TOUS calculés par l'API. L'interface les affiche. C'est la règle
+// « l'interface explique, l'API impose » appliquée à la facturation — un client
+// qui déciderait lui-même qu'un essai est encore valable se l'accorderait.
+
+export type SubscriptionStatus =
+  'trialing' | 'active' | 'past_due' | 'grace' | 'suspended' | 'canceled';
+
+export type BillingInterval = 'month' | 'year';
+
+/** Moyens de paiement connus. `card` → Stripe, `paypal` → PayPal, le reste → manuel. */
+export type PaymentMethod = 'card' | 'paypal' | 'mobile_money' | 'bank_transfer';
+
+export interface SubscriptionStateView {
+  /** Plan EFFECTIF — ce à quoi l'organisation a droit aujourd'hui. */
+  plan: Plan;
+  entitlements: Entitlements;
+  usage: { projects: number };
+  /** Plan SOUSCRIT — peut différer du plan effectif (essai, suspension). */
+  subscribedPlan: Plan;
+  status: SubscriptionStatus;
+  billingInterval: BillingInterval;
+  paidAccess: boolean;
+  trial: {
+    used: boolean;
+    endsAt: string | null;
+    daysLeft: number | null;
+    eligible: boolean;
+    days: number;
+  };
+  currentPeriodEnd: string | null;
+  grace: { endsAt: string | null; daysLeft: number | null; days: number };
+  pendingChange: { plan: Plan; interval: BillingInterval; effectiveAt: string | null } | null;
+  provider: string | null;
+  notice: { level: 'info' | 'warning' | 'critical'; message: string } | null;
+}
+
+/** Chiffrage d'un changement de plan, hors taxes (docs/13 § Validation commerciale). */
+export interface PlanQuoteView {
+  plan: Plan;
+  interval: BillingInterval;
+  direction: 'upgrade' | 'downgrade' | 'same';
+  effect: 'immediate' | 'period_end';
+  amountDueCents: number;
+  creditCents: number;
+  carriedCreditCents: number;
+  currency: string;
+  taxIncluded: false;
+  effectiveAt: string | null;
+}
+
+/** Instructions de dépôt du fournisseur manuel (mobile money, virement). */
+export interface PaymentInstructionsView {
+  title: string;
+  steps: string[];
+  accounts: { label: string; value: string }[];
+  expectedDelayHours: number;
+}
+
+export interface CheckoutResultView {
+  provider: string;
+  mode: string;
+  reference: string;
+  amountDueCents: number;
+  /** Présent pour un fournisseur à redirection (Stripe, PayPal). */
+  redirectUrl?: string;
+  /** Présent pour le fournisseur manuel. */
+  instructions?: PaymentInstructionsView;
+}
+
 /**
  * Permissions effectives de l'appelant sur son organisation active (S20a).
  *
@@ -1246,6 +1319,56 @@ export const api = {
     }),
   getOrganizationBilling: () =>
     jsonRequest<OrganizationBillingView>(`/organizations/current/billing`, { method: 'GET' }),
+  // ─── Abonnements et paiements (S22b) ───────────────────────
+  /**
+   * État d'abonnement de l'organisation active. Lisible par tout rôle disposant
+   * de `analytics.read` : savoir que l'abonnement est suspendu n'est pas une
+   * information de facturation, c'est une explication à un blocage subi.
+   */
+  getSubscription: () =>
+    jsonRequest<SubscriptionStateView>(`/organizations/current/subscription`, { method: 'GET' }),
+  /** Démarre l'essai de 14 jours. 409 { code: 'TRIAL_ALREADY_USED' | 'SUBSCRIPTION_ACTIVE' }. */
+  startTrial: () =>
+    jsonRequest<SubscriptionStateView>(`/organizations/current/subscription/trial`, {
+      method: 'POST',
+    }),
+  /**
+   * Chiffre un changement AVANT tout paiement. 409 { code: 'PLAN_NOT_SELLABLE' }
+   * pour un couple (plan, périodicité) non publié — Business annuel notamment.
+   */
+  getPlanQuote: (plan: Plan, interval: BillingInterval) =>
+    jsonRequest<PlanQuoteView>(
+      `/organizations/current/subscription/quote?plan=${encodeURIComponent(plan)}&interval=${encodeURIComponent(interval)}`,
+      { method: 'GET' },
+    ),
+  /**
+   * Programme une BAISSE de gamme à l'échéance. Une montée en gamme est refusée
+   * ici (409 { code: 'UPGRADE_REQUIRES_PAYMENT' }) : elle passe par `startCheckout`.
+   */
+  changePlan: (plan: Plan, interval: BillingInterval) =>
+    jsonRequest<SubscriptionStateView>(`/organizations/current/subscription/plan`, {
+      method: 'POST',
+      body: { plan, interval },
+    }),
+  /** Résilie. Aucune donnée n'est supprimée (docs/13). */
+  cancelSubscription: () =>
+    jsonRequest<SubscriptionStateView>(`/organizations/current/subscription/cancel`, {
+      method: 'POST',
+    }),
+  /**
+   * Moyens de paiement RÉELLEMENT utilisables. PUBLIC — la page tarifs l'appelle
+   * sans session pour n'annoncer que ce qui marche.
+   */
+  getPaymentMethods: () =>
+    jsonRequest<{ methods: { method: PaymentMethod; available: boolean }[] }>(`/payments/methods`, {
+      method: 'GET',
+    }),
+  /**
+   * Ouvre un encaissement. Le MONTANT n'est jamais envoyé par le client : il est
+   * recalculé côté API. 503 si le fournisseur du moyen choisi n'est pas configuré.
+   */
+  startCheckout: (input: { plan: Plan; interval: BillingInterval; method: PaymentMethod }) =>
+    jsonRequest<CheckoutResultView>(`/payments/checkout`, { method: 'POST', body: input }),
   /**
    * Journal d'audit de l'organisation active — lecture seule, `audit.read`.
    * `actions` accompagne les événements : le vocabulaire des filtres vient du

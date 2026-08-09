@@ -66,6 +66,17 @@ export function AppHeader(): React.ReactElement {
             >
               Membres
             </Link>
+            {/* S22b — le tunnel de souscription est une route autonome, donc il
+                lui faut une entrée. Offerte à tout membre pour la même raison
+                que les deux précédentes : la page dit elle-même que la gestion
+                de l'abonnement revient au Propriétaire, et un rôle qui subit
+                une limite de plan a besoin de comprendre pourquoi. */}
+            <Link
+              href="/souscription"
+              className="hidden text-[var(--foreground-muted)] transition hover:text-[var(--foreground)] sm:inline"
+            >
+              Abonnement
+            </Link>
             {operateur ? (
               <Link
                 href="/admin"

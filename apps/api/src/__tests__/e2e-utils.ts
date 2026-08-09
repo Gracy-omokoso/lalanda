@@ -73,7 +73,8 @@ export async function makeE2EApp(): Promise<INestApplication> {
   const { AppModule } = await import('../app.module.js');
   const { getAuth } = await import('../auth/auth.js');
 
-  const app = await NestFactory.create(AppModule, { logger: false });
+  // `rawBody` : voir main.ts — les rappels de paiement en dépendent (S22b).
+  const app = await NestFactory.create(AppModule, { logger: false, rawBody: true });
   app.enableCors({
     origin: [process.env['WEB_URL'] ?? 'http://localhost:3000'],
     credentials: true,
