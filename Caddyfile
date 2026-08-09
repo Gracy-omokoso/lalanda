@@ -27,6 +27,32 @@
 }
 
 # ─── API (NestJS) ────────────────────────────────────────────────────────────
+#
+# (S22f, F-03) CHAÎNE DE CONFIANCE DE L'IP CLIENTE — ne pas modifier sans lire
+# `apps/api/src/security/trusted-proxy.ts`, les deux moitiés forment une paire.
+#
+#   client ─── Internet ───▶ caddy:443 ───▶ api:3001
+#
+# `reverse_proxy` pose ici les en-têtes `X-Forwarded-*` par son comportement par
+# défaut. Le point qui compte pour la sécurité est la sémantique d'APPEND de
+# `X-Forwarded-For` : Caddy ajoute l'adresse du pair TCP qu'il observe RÉELLEMENT
+# à la suite de ce que le client avait écrit. La chaîne reçue par l'API est donc
+#
+#   X-Forwarded-For: <ce que le client a inventé>, <IP réelle vue par Caddy>
+#
+# — la valeur posée par Caddy est toujours la DERNIÈRE, et c'est la seule que le
+# client ne puisse pas falsifier. L'API règle `trust proxy = 1` : elle ne croit
+# qu'un seul rang, celui-ci, et ignore tout le préfixe. C'est ce qui fait que le
+# seau de rate limiting est bien par client réel, et qu'un attaquant ne peut ni
+# saturer le seau des autres ni s'en fabriquer un neuf par requête.
+#
+# Aucun `header_up X-Forwarded-For` n'est posé à la main : écraser l'en-tête
+# reviendrait à faire dépendre la chaîne d'un ordre d'application de directives
+# non garanti, alors que l'append est le comportement documenté et stable.
+#
+# SI UN CDN OU UN LOAD BALANCER EST AJOUTÉ DEVANT CADDY, le rang de confiance de
+# l'API doit augmenter d'autant, sinon l'IP retenue devient celle du CDN et le
+# seau redevient partagé.
 {$API_DOMAIN} {
 	import securite
 	reverse_proxy api:3001

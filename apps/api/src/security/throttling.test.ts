@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { APP_GUARD, Reflector } from '@nestjs/core';
 import { ThrottlerGuard } from '@nestjs/throttler';
 
+import { ClientIpThrottlerGuard } from './client-ip-throttler.guard.js';
 import { AI_THROTTLE, GLOBAL_THROTTLE } from './throttling.js';
 import { ThrottlingModule } from './throttling.module.js';
 import { UserThrottlerGuard } from './user-throttler.guard.js';
@@ -21,9 +22,14 @@ describe('rate limiting (S16a)', () => {
     expect(AI_THROTTLE).toEqual({ ttl: 60_000, limit: 10 });
   });
 
-  it('ThrottlingModule enregistre le ThrottlerGuard en guard global (APP_GUARD)', () => {
+  it('ThrottlingModule enregistre le guard par IP cliente en guard global (APP_GUARD)', () => {
     const providers = Reflect.getMetadata('providers', ThrottlingModule) as unknown[];
-    expect(providers).toContainEqual({ provide: APP_GUARD, useClass: ThrottlerGuard });
+    // (S22f, F-03) `ClientIpThrottlerGuard` et non `ThrottlerGuard` : derrière
+    // Caddy, le tracker par défaut compte l'adresse du proxy pour tous les
+    // clients — un seau unique, donc un DoS à 100 requêtes. Le comportement est
+    // couvert par `trusted-proxy.test.ts`; on verrouille ici le câblage.
+    expect(providers).toContainEqual({ provide: APP_GUARD, useClass: ClientIpThrottlerGuard });
+    expect(ClientIpThrottlerGuard.prototype).toBeInstanceOf(ThrottlerGuard);
     expect(providers).toContain(UserThrottlerGuard);
   });
 
