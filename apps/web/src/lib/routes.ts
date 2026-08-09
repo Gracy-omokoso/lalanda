@@ -21,6 +21,10 @@ export const PROTECTED_PREFIXES = [
   '/members',
   '/invitations',
   '/compte',
+  // S21a — l'espace organisation exige une session ET une organisation active.
+  // Le middleware ne vérifie que la première : l'absence d'organisation est un
+  // 403 côté API, que les pages traitent comme un état, pas comme une panne.
+  '/organisation',
   // S21b — espace admin plateforme. Le middleware n'y vérifie QUE la session :
   // il ne connaît pas les rôles plateforme, et prétendre le contraire donnerait
   // un faux sentiment de protection. Le rôle est vérifié par `PermissionsGuard`

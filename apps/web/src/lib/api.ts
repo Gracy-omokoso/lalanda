@@ -638,6 +638,234 @@ export interface DeletionAssessment {
   organizationsDeletedWithAccount: Array<{ id: string; name: string }>;
 }
 
+// ─── Espace organisation (S21a) ────────────────────────────────
+// Miroir de `apps/api/src/organization-space/organization-space.dto.ts`, qui
+// reste la source de vérité — le web ne peut pas importer de l'API.
+//
+// Règle qui gouverne ces types : `null` n'est jamais un synonyme de « vide ».
+// `sections.gouvernance === null` signifie « le serveur n'a pas chargé ce bloc
+// parce que votre rôle ne l'ouvre pas », ce qui n'est pas la même chose qu'un
+// bloc chargé et sans contenu. L'interface doit distinguer les deux : dans un
+// cas elle explique, dans l'autre elle affiche un état vide.
+
+export type DisplayCurrency = 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR';
+
+/** Les 15 actions granulaires (docs/12). Union fermée, alignée sur l'API. */
+export type OrgAction =
+  | 'organization.manage'
+  | 'billing.manage'
+  | 'members.invite'
+  | 'project.create'
+  | 'project.read'
+  | 'project.update'
+  | 'canvas.update'
+  | 'inputs.update'
+  | 'plan.calculate'
+  | 'plan.approve'
+  | 'actuals.import'
+  | 'period.close'
+  | 'analytics.read'
+  | 'report.export'
+  | 'audit.read';
+
+export type Plan = 'free' | 'pro' | 'business';
+
+export interface Entitlements {
+  maxProjects: number | null;
+  pdfWatermark: boolean;
+  seats?: number;
+}
+
+export interface ConsommationView {
+  plan: Plan;
+  /** `limite: null` = illimité, jamais un grand nombre. */
+  projets: { utilise: number; limite: number | null };
+  /** `limite: null` = sièges non contractuels sur ce plan, jamais 0. */
+  sieges: { utilise: number; limite: number | null };
+}
+
+export interface GouvernanceSection {
+  projets: number;
+  plansValidesCeMois: number;
+  membresActifs: number;
+  consommation: ConsommationView;
+}
+
+export interface RatioRougeView {
+  projectId: string;
+  projectName: string;
+  planVersion: number;
+  lineId: string;
+  label: string;
+  valeur: number;
+  seuilValeur: number;
+  seuilDirection: 'min' | 'max';
+}
+
+export interface PlanEnAttenteView {
+  projectId: string;
+  projectName: string;
+  derniereVersion: number | null;
+  raison: 'AUCUN_PLAN' | 'HYPOTHESES_MODIFIEES';
+  modifieLe: string | null;
+}
+
+export interface EcartProjetView {
+  projectId: string;
+  projectName: string;
+  year: number;
+  planVersion: number;
+  lignesDefavorables: number;
+  /** `null` quand la base prévue est nulle — ne jamais afficher 0 % à la place. */
+  pireEcart: { lineId: string; label: string; ecartPct: number } | null;
+}
+
+export interface ValidationSection {
+  ratiosRouges: RatioRougeView[];
+  plansEnAttente: PlanEnAttenteView[];
+  ecartsDefavorables: EcartProjetView[];
+}
+
+export interface PeriodeRefView {
+  projectId: string;
+  projectName: string;
+  year: number;
+  month: number;
+}
+
+export interface AnomalieView {
+  projectId: string;
+  projectName: string;
+  year: number;
+  lineId: string;
+  label: string;
+  code: 'INCOHERENCE_SOLDE';
+  message: string;
+  months: number[];
+}
+
+export interface ComptabiliteSection {
+  peutCloturer: boolean;
+  periodesASaisir: PeriodeRefView[];
+  periodesACloturer: PeriodeRefView[];
+  anomalies: AnomalieView[];
+}
+
+export interface ProjetResumeView {
+  id: string;
+  name: string;
+  deviseAffichage: string;
+  updatedAt: string;
+  dernierPlan: { version: number; approvedAt: string; soleApprover: boolean } | null;
+}
+
+export interface ValidationRecenteView {
+  projectId: string;
+  projectName: string;
+  version: number;
+  approvedAt: string;
+  soleApprover: boolean;
+}
+
+export interface ProjetsSection {
+  projets: ProjetResumeView[];
+  dernieresValidations: ValidationRecenteView[];
+}
+
+/** Bloc fermé par le rôle. Ne porte AUCUNE donnée : un nom, une action, une raison. */
+export interface BlocMasqueView {
+  section: 'gouvernance' | 'validation' | 'comptabilite' | 'projets';
+  titre: string;
+  action: OrgAction;
+  raison: string;
+}
+
+export interface OrganizationDashboardView {
+  organization: {
+    id: string;
+    name: string;
+    slug: string;
+    type: string;
+    pays: string;
+    deviseAffichage: DisplayCurrency;
+    logoUrl: string | null;
+  };
+  role: OrgRole;
+  roleLabel: string;
+  actions: OrgAction[];
+  lectureSeule: boolean;
+  sections: {
+    gouvernance: GouvernanceSection | null;
+    validation: ValidationSection | null;
+    comptabilite: ComptabiliteSection | null;
+    projets: ProjetsSection | null;
+  };
+  masque: BlocMasqueView[];
+}
+
+export interface OrganizationSettingsView {
+  id: string;
+  name: string;
+  slug: string;
+  type: string;
+  pays: string;
+  deviseAffichage: DisplayCurrency;
+  logoUrl: string | null;
+  updatedAt: string | null;
+  options: { currencies: string[] };
+}
+
+export interface DepassementView {
+  code: 'PROJETS' | 'SIEGES';
+  libelle: string;
+  utilise: number;
+  limite: number;
+}
+
+export interface HistoriqueAbonnementView {
+  plan: Plan;
+  status: string;
+  depuis: string;
+  evenement: string;
+}
+
+export interface OrganizationBillingView {
+  plan: Plan;
+  entitlements: Entitlements;
+  consommation: ConsommationView;
+  depassements: DepassementView[];
+  historique: HistoriqueAbonnementView[];
+  paiement: { integre: false; message: string };
+}
+
+/**
+ * Permissions effectives de l'appelant sur son organisation active (S20a).
+ *
+ * Servies par `GET /me/permissions`. Elles ne servent QU'À MASQUER ce qui serait
+ * de toute façon refusé (ADR-0012 §8) : le serveur refuse quand même, et une
+ * divergence produit au pire un onglet en trop.
+ */
+export interface MyPermissionsView {
+  organizationId: string;
+  role: OrgRole;
+  roleLabel: string;
+  actions: OrgAction[];
+  grantableRoles: Array<{ value: OrgRole; label: string; description: string }>;
+  canClosePeriods: boolean;
+}
+
+/** Événement du journal d'audit (S20a, filtrable par action depuis S21a). */
+export interface AuditEventView {
+  id: string;
+  action: string;
+  actorUserId: string;
+  actorRole: string;
+  targetType: string;
+  targetId: string;
+  metadata: Record<string, string | number | boolean | null>;
+  createdAt: string;
+}
+
 // ─── Espace admin plateforme (S21b — ADR-0012 §4, ADR-0013) ───
 //
 // Aucune de ces structures ne porte de valeur de secret, et il n'existe
@@ -656,8 +884,6 @@ export const PLATFORM_ROLES = [
 ] as const;
 
 export type PlatformRole = (typeof PLATFORM_ROLES)[number];
-
-export type Plan = 'free' | 'pro' | 'business';
 
 /**
  * Ce que l'INTERFACE a le droit d'afficher — jamais ce qu'elle a le droit de
@@ -708,6 +934,7 @@ export interface AdminUserSummary {
   createdAt: string | null;
 }
 
+/** Événement du journal d’audit PLATEFORME (S21b) — jamais de valeur de secret. */
 export interface PlatformAuditEventView {
   id: string;
   action: string;
@@ -955,6 +1182,47 @@ export const api = {
       `/projects/${encodeURIComponent(id)}/updated-projection?year=${year}`,
       { method: 'GET' },
     ),
+  /** Permissions de l'appelant — alimente le masquage, jamais l'autorisation. */
+  getMyPermissions: () => jsonRequest<MyPermissionsView>(`/me/permissions`, { method: 'GET' }),
+  // ─── Espace organisation (S21a) ────────────────────────────
+  // Quatre routes, trois niveaux d'accès. Un 403 sur `settings` ou `billing`
+  // est une réponse NORMALE pour un rôle qui n'a pas la permission : l'appelant
+  // masque le bloc, il n'affiche pas une panne (même pattern que /members, S20a).
+  //
+  // Le tableau de bord, lui, répond 200 à TOUS les rôles ; ce sont ses blocs qui
+  // valent `null`. L'interface ne décide donc jamais elle-même qui voit quoi —
+  // elle rend ce que le serveur a bien voulu charger (docs/12 § Modèle).
+  getOrganizationDashboard: () =>
+    jsonRequest<OrganizationDashboardView>(`/organizations/current/dashboard`, { method: 'GET' }),
+  getOrganizationSettings: () =>
+    jsonRequest<OrganizationSettingsView>(`/organizations/current/settings`, { method: 'GET' }),
+  putOrganizationSettings: (input: {
+    name: string;
+    pays: string;
+    deviseAffichage: DisplayCurrency;
+    logoUrl: string | null;
+  }) =>
+    jsonRequest<OrganizationSettingsView>(`/organizations/current/settings`, {
+      method: 'PUT',
+      body: input,
+    }),
+  getOrganizationBilling: () =>
+    jsonRequest<OrganizationBillingView>(`/organizations/current/billing`, { method: 'GET' }),
+  /**
+   * Journal d'audit de l'organisation active — lecture seule, `audit.read`.
+   * `actions` accompagne les événements : le vocabulaire des filtres vient du
+   * serveur, il n'est pas figé dans l'interface.
+   */
+  listAuditEvents: (options: { action?: string; limit?: number } = {}) => {
+    const params = new URLSearchParams();
+    if (options.action) params.set('action', options.action);
+    if (options.limit !== undefined) params.set('limit', String(options.limit));
+    const query = params.toString();
+    return jsonRequest<{ events: AuditEventView[]; actions: string[] }>(
+      `/audit-events${query ? `?${query}` : ''}`,
+      { method: 'GET' },
+    );
+  },
   // ─── Espace compte (S20b) ──────────────────────────────────
   getAccountProfile: () => jsonRequest<AccountProfileView>(`/account/profile`, { method: 'GET' }),
   putAccountProfile: (input: { name: string; locale: string; timezone: string }) =>

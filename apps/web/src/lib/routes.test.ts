@@ -16,6 +16,17 @@ describe('isProtectedPath (S20b)', () => {
     expect(isProtectedPath('/compte/preferences')).toBe(true);
   });
 
+  it('protège les quatre pages de l’espace organisation (S21a)', () => {
+    for (const path of [
+      '/organisation',
+      '/organisation/parametres',
+      '/organisation/facturation',
+      '/organisation/journal',
+    ]) {
+      expect(isProtectedPath(path)).toBe(true);
+    }
+  });
+
   it('protège l’espace admin plateforme, racine comme sous-routes (S21b)', () => {
     // Sans cette entrée, un visiteur non authentifié verrait `/admin/integrations`
     // se monter avant que l'API ne réponde 401 — c'est-à-dire la structure de

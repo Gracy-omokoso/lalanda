@@ -14,6 +14,7 @@ import { EvaluateController } from './evaluate/evaluate.controller.js';
 import { HealthController } from './health/health.controller.js';
 import { IntegrationsModule } from './integrations/integrations.module.js';
 import { ObjectivesModule } from './objectives/objectives.module.js';
+import { OrganizationSpaceModule } from './organization-space/organization-space.module.js';
 import { OrganizationsModule } from './organizations/organizations.module.js';
 import { ParameterPacksModule } from './parameter-packs/parameter-packs.module.js';
 import { PlansModule } from './plans/plans.module.js';
@@ -54,6 +55,7 @@ import { ThrottlingModule } from './security/throttling.module.js';
     }),
     ThrottlingModule,
     OrganizationsModule,
+    OrganizationSpaceModule,
     AuthModule,
     AccountModule,
     AuthzModule,
