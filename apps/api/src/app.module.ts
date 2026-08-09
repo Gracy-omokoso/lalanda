@@ -15,6 +15,7 @@ import { HealthController } from './health/health.controller.js';
 import { IntegrationsModule } from './integrations/integrations.module.js';
 import { LegalModule } from './legal/legal.module.js';
 import { MailModule } from './mail/mail.module.js';
+import { MfaModule } from './mfa/mfa.module.js';
 import { ObjectivesModule } from './objectives/objectives.module.js';
 import { OrganizationSpaceModule } from './organization-space/organization-space.module.js';
 import { OrganizationsModule } from './organizations/organizations.module.js';
@@ -63,6 +64,8 @@ import { ThrottlingModule } from './security/throttling.module.js';
     OrganizationsModule,
     OrganizationSpaceModule,
     AuthModule,
+    // S22h — avant AuthzModule, dont `PermissionsGuard` consomme `MfaGateService`.
+    MfaModule,
     AccountModule,
     AuthzModule,
     BillingModule,

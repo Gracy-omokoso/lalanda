@@ -6,6 +6,7 @@
 import { Global, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 
+import { MfaModule } from '../mfa/mfa.module.js';
 import { OrganizationsModule } from '../organizations/organizations.module.js';
 import { AuditEvent, AuditEventSchema } from './audit-event.schema.js';
 import { AuditController } from './audit.controller.js';
@@ -23,6 +24,11 @@ import {
   imports: [
     // `Membership` vient d'OrganizationsModule, qui ré-exporte son MongooseModule.
     OrganizationsModule,
+    // S22h — `PermissionsGuard` demande à `MfaGateService` si le second facteur
+    // est satisfait. L'import va dans CE sens uniquement : `MfaModule` ne
+    // réimporte pas `AuthzModule` (il s'appuie sur sa globalité), sans quoi le
+    // cycle rendrait l'injection du garde silencieusement `undefined`.
+    MfaModule,
     MongooseModule.forFeature([
       { name: PlatformRoleAssignment.name, schema: PlatformRoleAssignmentSchema },
       { name: AuditEvent.name, schema: AuditEventSchema },

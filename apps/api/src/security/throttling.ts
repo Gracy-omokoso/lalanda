@@ -20,3 +20,25 @@ export const AI_THROTTLE = { ttl: 60_000, limit: 10 } as const;
  * l'heure. La lecture n'est pas comptée — consulter `/admin` ne consomme rien.
  */
 export const INTEGRATION_WRITE_THROTTLE = { ttl: 3_600_000, limit: 10 } as const;
+
+/**
+ * Quota des routes `/account/mfa/*` (S22h — docs/17 § Identité).
+ *
+ * 20 requêtes par 15 minutes et PAR UTILISATEUR. Le seau par IP cliente
+ * (`ClientIpThrottlerGuard`, 100 req/min) protège l'API ; il ne protège pas un
+ * compte précis, puisqu'un attaquant qui change d'IP obtient un seau neuf — c'est
+ * la limite explicitement notée au finding F-03. Un seau par utilisateur, lui,
+ * suit le compte visé quelle que soit l'origine des requêtes.
+ *
+ * L'ordre de grandeur vient de l'usage légitime : saisir un code, se tromper,
+ * recommencer, éventuellement rentrer un code de secours — quelques essais, pas
+ * vingt. À 20 essais par quart d'heure, deviner un code à six chiffres demande en
+ * moyenne 500 000 essais, soit ~7 ans de tentatives ininterrompues, et le
+ * verrouillage par compte après cinq échecs consécutifs
+ * (`MFA_MAX_FAILED_ATTEMPTS`) intervient bien avant.
+ *
+ * Les deux mécanismes sont complémentaires et aucun ne remplace l'autre : ce
+ * quota compte les REQUÊTES et est remis à zéro par le temps qui passe ; le
+ * verrouillage compte les ÉCHECS CONSÉCUTIFS et est remis à zéro par un succès.
+ */
+export const MFA_VERIFY_THROTTLE = { ttl: 900_000, limit: 20 } as const;

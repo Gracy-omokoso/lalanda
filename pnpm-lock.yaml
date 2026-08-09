@@ -80,6 +80,9 @@ importers:
       puppeteer:
         specifier: ^25.5.0
         version: 25.5.0
+      qrcode-generator:
+        specifier: ^2.0.4
+        version: 2.0.4
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -3336,6 +3339,9 @@ packages:
     resolution: {integrity: sha512-qpp73xblxNr+bF0nSXTodM3v+zcK5IPo/GkjLsdUqRf/qpLJp/1KxBUbstoMMnwnPw9xD6OMei8kmYf6CLWfGw==}
     engines: {node: '>=22.12.0'}
     hasBin: true
+
+  qrcode-generator@2.0.4:
+    resolution: {integrity: sha512-mZSiP6RnbHl4xL2Ap5HfkjLnmxfKcPWpWe/c+5XxCuetEenqmNFf1FH/ftXPCtFG5/TDobjsjz6sSNL0Sr8Z9g==}
 
   qs@6.14.2:
     resolution: {integrity: sha512-V/yCWTTF7VJ9hIh18Ugr2zhJMP01MY7c5kh4J870L7imm6/DIzBsNLTXzMwUA3yZ5b/KBqLx8Kp3uRvd7xSe3Q==}
@@ -6965,6 +6971,8 @@ snapshots:
       - proxy-agent
       - utf-8-validate
       - yauzl
+
+  qrcode-generator@2.0.4: {}
 
   qs@6.14.2:
     dependencies:
