@@ -638,7 +638,36 @@ export interface DeletionAssessment {
   organizationsDeletedWithAccount: Array<{ id: string; name: string }>;
 }
 
+// ─── Acceptation des conditions (S22c) ─────────────────────
+// Scopée par la SESSION : aucune de ces routes ne prend d'identifiant
+// d'utilisateur, et l'API refuse en 400 un `userId` glissé dans le corps.
+
+export interface TermsAcceptanceView {
+  /** Version du corpus en vigueur, celle qu'il faut accepter. */
+  currentVersion: string;
+  /** Dernière version acceptée, `null` si l'utilisateur n'a jamais accepté. */
+  acceptedVersion: string | null;
+  acceptedAt: string | null;
+  /** `false` aussi bien pour « jamais accepté » que pour « version périmée ». */
+  isCurrent: boolean;
+}
+
 export const api = {
+  /**
+   * Enregistre l'accord de l'utilisateur connecté.
+   *
+   * La version est transmise par le client PARCE QU'ELLE ATTESTE du texte
+   * réellement affiché au moment où la case a été cochée : un déploiement
+   * pendant que le formulaire était ouvert suffirait sinon à enregistrer un
+   * accord sur un texte que l'utilisateur n'a pas eu sous les yeux.
+   */
+  acceptTerms: (version: string) =>
+    jsonRequest<TermsAcceptanceView>(`/legal/terms/acceptance`, {
+      method: 'POST',
+      body: { version },
+    }),
+  getTermsAcceptance: () =>
+    jsonRequest<TermsAcceptanceView>(`/legal/terms/acceptance`, { method: 'GET' }),
   listOrganizations: () =>
     jsonRequest<{ organizations: OrganizationView[] }>(`/organizations`, { method: 'GET' }),
   createOrganization: (input: { name: string }) =>
