@@ -186,6 +186,40 @@ mobile money est un paiement ponctuel, il n'existe pas de mandat de prélèvemen
 L'abonnement arrive à échéance et repasse par `past_due` comme les autres.
 L'interface le dit explicitement au moment du choix.
 
+### Notifications : ce que S22b n'envoie pas, et pourquoi
+
+**S22b n'envoie aucun email.** Ce n'est pas un oubli, et surtout ce n'est pas une
+seconde interface d'envoi : le module `mail/` livré par S22a (`MailService`,
+repli journal sans SMTP) reste le seul chemin d'envoi du dépôt. S22b n'en a
+créé aucun autre et n'en créera pas.
+
+L'information d'abonnement circule aujourd'hui **dans l'application**, par
+`statusNotice()` (`subscription-lifecycle.ts`), calculée à la lecture : fin
+d'essai proche, échec de paiement, période de grâce, suspension. C'est cohérent
+avec l'absence d'ordonnanceur (ADR-0009 : ni `@nestjs/schedule`, ni worker).
+
+Deux cas restent ouverts, et ils ne se valent pas :
+
+- **Rappel de fin d'essai — non réalisable en l'état.** Un rappel « il vous reste
+  3 jours » n'a de sens qu'envoyé *sans* que l'utilisateur soit là. Or le seul
+  déclencheur disponible est la lecture de l'abonnement, c'est-à-dire un
+  utilisateur déjà devant l'écran — à qui la bannière a déjà tout dit. Sans
+  ordonnanceur, l'email n'ajoute rien. Il demande une décision d'architecture,
+  pas quelques lignes.
+- **Échec de paiement — réalisable, non fait, assumé.** Le webhook est un
+  déclencheur événementiel : il n'a besoin d'aucun cron. Le blocage est le
+  destinataire. `BillingService` ne dépend que du modèle `Subscription` et d'un
+  `AuditService` optionnel ; `subscription.schema.ts` ne stocke aucune adresse.
+  Notifier suppose donc de résoudre organisation → propriétaire → email, soit une
+  dépendance nouvelle vers les utilisateurs dans un service dont la surface a été
+  tenue volontairement étroite. C'est un ajout défendable, mais c'en est un — pas
+  un branchement. Il n'a pas été fait au moment de l'intégration pour ne pas
+  glisser une fonctionnalité non testée dans une fusion.
+
+Recommandation : traiter l'email d'échec de paiement en premier (valeur réelle,
+coût maîtrisé, `MailService` déjà disponible et `@Global`), et ne rouvrir le
+rappel de fin d'essai qu'avec la décision sur l'ordonnanceur.
+
 ### Valeurs posées par défaut, à arbitrer
 
 - **Période de grâce : 7 jours.** Ce document la laisse « à définir ». Assez pour
