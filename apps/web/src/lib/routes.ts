@@ -41,6 +41,13 @@ export const PROTECTED_PREFIXES = [
   // paiement. Un tunnel logé sous un onglet obligerait chacun de ces chemins à
   // traverser un écran qui n'a rien à voir avec la décision en cours.
   '/souscription',
+  // S21b — espace admin plateforme. Le middleware n'y vérifie QUE la session :
+  // il ne connaît pas les rôles plateforme, et prétendre le contraire donnerait
+  // un faux sentiment de protection. Le rôle est vérifié par `PermissionsGuard`
+  // à chaque appel d'API, et l'espace se referme sur un écran de refus explicite
+  // (voir `admin/layout.tsx`). C'est délibérément une redirection de CONFORT,
+  // pas un contrôle d'accès.
+  '/admin',
 ] as const;
 
 /**

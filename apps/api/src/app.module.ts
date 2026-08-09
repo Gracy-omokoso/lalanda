@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { LoggerModule } from 'nestjs-pino';
 
 import { AccountModule } from './account/account.module.js';
+import { AdminModule } from './admin/admin.module.js';
 import { ActualsModule } from './actuals/actuals.module.js';
 import { AiModule } from './ai/ai.module.js';
 import { AuthModule } from './auth/auth.module.js';
@@ -11,6 +12,7 @@ import { BillingModule } from './billing/billing.module.js';
 import { CanvasModule } from './canvas/canvas.module.js';
 import { EvaluateController } from './evaluate/evaluate.controller.js';
 import { HealthController } from './health/health.controller.js';
+import { IntegrationsModule } from './integrations/integrations.module.js';
 import { LegalModule } from './legal/legal.module.js';
 import { MailModule } from './mail/mail.module.js';
 import { ObjectivesModule } from './objectives/objectives.module.js';
@@ -72,6 +74,9 @@ import { ThrottlingModule } from './security/throttling.module.js';
     CanvasModule,
     ObjectivesModule,
     ReportsModule,
+    // S21b — avant AiModule, qui consomme `SecretsService` et `AiUsageService`.
+    IntegrationsModule,
+    AdminModule,
     AiModule,
     LegalModule,
   ],

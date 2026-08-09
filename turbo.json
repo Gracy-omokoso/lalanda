@@ -39,6 +39,13 @@
     "OPENAI_API_KEY",
     "OPENAI_MODEL_REASONING",
     "OPENAI_MODEL_LITE",
+    // Coffre des secrets d'intégration (S21b — ADR-0013). Sans ces entrées, les
+    // suites e2e du module `integrations` tourneraient sans clé maîtresse et
+    // vérifieraient un chemin dégradé au lieu du chemin réel.
+    "SECRETS_MASTER_KEY",
+    "SECRETS_MASTER_KEY_ID",
+    "SECRETS_MASTER_KEY_PREVIOUS",
+    "SECRETS_MASTER_KEY_PREVIOUS_ID",
     "LALANDA_REQUIRE_E2E"
   ],
   "tasks": {

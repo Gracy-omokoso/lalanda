@@ -73,6 +73,11 @@ export const ApiEnvSchema = CommonEnvSchema.extend({
    *
    * `SMTP_USER` / `SMTP_PASSWORD` restent facultatifs même avec un hôte : un
    * relais interne ou un MailHog de développement n'authentifie personne.
+   *
+   * NOTE S21b — ces variables coexistent avec le fournisseur `smtp` du coffre
+   * d'intégrations (ADR-0013). Elles configurent l'envoi transactionnel au
+   * démarrage; le coffre vise la rotation sans redéploiement. Leur unification
+   * relève du sprint de sortie de la migration, comme `OPENAI_API_KEY`.
    */
   SMTP_HOST: z.string().min(1).optional(),
   SMTP_PORT: z.coerce.number().int().positive().max(65535).optional(),
@@ -81,9 +86,66 @@ export const ApiEnvSchema = CommonEnvSchema.extend({
   /** Expéditeur affiché — `"Lalanda <no-reply@exemple.com>"` ou une simple adresse. */
   SMTP_FROM: z.string().min(1).optional(),
 
-  OPENAI_API_KEY: z.string().min(1),
+  /**
+   * OPTIONNELLE depuis S21b (ADR-0013 § Conséquences).
+   *
+   * La clé OpenAI vit désormais dans la collection `integrations`, chiffrée. Cette
+   * variable reste acceptée comme SECOURS pendant la migration (ADR-0013 option C,
+   * « chemin de migration borné ») : `SecretsService` résout base d'abord,
+   * environnement ensuite, et affiche la source effective dans `/admin`.
+   *
+   * À RETIRER au sprint de sortie de la migration. Tant qu'elle est là, elle peut
+   * masquer une clé pourtant rotée en base — c'est exactement le risque que la
+   * date de sortie existe pour borner.
+   */
+  OPENAI_API_KEY: z.string().min(1).optional(),
   OPENAI_MODEL_REASONING: z.string().default('gpt-4o'),
   OPENAI_MODEL_LITE: z.string().default('gpt-4o-mini'),
+
+  // ─── Coffre des secrets d'intégration (S21b — ADR-0013 §2, §3, §8) ────────
+  //
+  // « Paradoxe d'amorçage : la clé qui protège le coffre ne peut pas être rangée
+  // dans le coffre » (ADR-0013 §8). Ces quatre variables sont donc les seules du
+  // dispositif à rester dans l'environnement, et elles doivent être sauvegardées
+  // HORS LIGNE, séparément des sauvegardes de base — sans quoi la séparation
+  // coffre/clé disparaît et le chiffrement ne protège plus de rien (§10).
+  //
+  // PERDRE `SECRETS_MASTER_KEY` rend les secrets définitivement irrécupérables.
+  // Ce n'est pas une perte de données au sens propre : la copie faisant autorité
+  // de chaque clé vit chez le fournisseur (console Stripe, OpenAI…) et la reprise
+  // consiste à re-saisir les cinq secrets depuis `/admin`.
+
+  /**
+   * Clé maîtresse — 32 octets encodés en base64 (44 caractères).
+   * Générer : `openssl rand -base64 32`.
+   *
+   * REQUISE : sans elle, aucun secret ne peut être ni lu ni écrit, et l'API
+   * démarrerait dans un état où `/admin` accepte des saisies qu'elle ne peut pas
+   * chiffrer. Le refus de démarrer est préférable à cette panne différée
+   * (brief §9-4, ADR-0013 § Conséquences).
+   */
+  SECRETS_MASTER_KEY: z.string().refine((v) => Buffer.from(v, 'base64').length === 32, {
+    message:
+      'SECRETS_MASTER_KEY doit décoder vers exactement 32 octets. ' +
+      'Générer : openssl rand -base64 32',
+  }),
+
+  /** Identifiant court de la clé courante (`k1`, `k2`…) — pilote la rotation. */
+  SECRETS_MASTER_KEY_ID: z.string().min(1).default('k1'),
+
+  /**
+   * Clé PRÉCÉDENTE, présente uniquement le temps d'une rotation (ADR-0013 §3).
+   * Retirer après `secrets:rewrap` et vérification qu'aucun document ne porte
+   * plus l'ancien `keyId`.
+   */
+  SECRETS_MASTER_KEY_PREVIOUS: z
+    .string()
+    .refine((v) => Buffer.from(v, 'base64').length === 32, {
+      message: 'SECRETS_MASTER_KEY_PREVIOUS doit décoder vers exactement 32 octets.',
+    })
+    .optional(),
+
+  SECRETS_MASTER_KEY_PREVIOUS_ID: z.string().min(1).optional(),
 });
 
 export type ApiEnv = z.infer<typeof ApiEnvSchema>;

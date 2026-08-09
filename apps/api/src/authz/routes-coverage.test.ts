@@ -16,6 +16,12 @@ import { describe, expect, it } from 'vitest';
 import { AccountController } from '../account/account.controller.js';
 import { EmailVerificationController } from '../account/email-verification.controller.js';
 import { ActualsController } from '../actuals/actuals.controller.js';
+import { AdminController } from '../admin/admin.controller.js';
+import { PlatformAccessController } from '../admin/platform-access.controller.js';
+import {
+  IntegrationsController,
+  ReauthController,
+} from '../integrations/integrations.controller.js';
 import { AiActionsController } from '../ai/ai-actions.controller.js';
 import { AuthProvidersController } from '../auth/auth-providers.controller.js';
 import { BillingController } from '../billing/billing.controller.js';
@@ -36,7 +42,7 @@ import { ReportsController } from '../reports/reports.controller.js';
 import { AuditController } from './audit.controller.js';
 import { REQUIRED_PERMISSIONS_KEY, REQUIRED_PLATFORM_ROLES_KEY } from './authz.decorators.js';
 import { MeController } from './me.controller.js';
-import { ACTIONS, type Action } from './permissions.js';
+import { ACTIONS, PLATFORM_FORBIDDEN_ACTIONS, type Action } from './permissions.js';
 
 /**
  * TOUS les contrôleurs de l'application. Un contrôleur absent de cette liste
@@ -46,8 +52,11 @@ import { ACTIONS, type Action } from './permissions.js';
 const CONTROLEURS = [
   AccountController,
   ActualsController,
+  AdminController,
   AiActionsController,
   AuditController,
+  IntegrationsController,
+  ReauthController,
   AuthProvidersController,
   EmailVerificationController,
   BillingController,
@@ -64,6 +73,7 @@ const CONTROLEURS = [
   ParameterPacksController,
   PaymentsController,
   PlansController,
+  PlatformAccessController,
   ProjectsController,
   ReportsController,
 ];
@@ -90,6 +100,11 @@ const SANS_PERMISSION: Record<string, string> = {
   'MeController.permissions':
     'Lecture de ses PROPRES permissions. Exiger une permission pour lire ses permissions ' +
     'serait circulaire.',
+  'PlatformAccessController.platformAccess':
+    'Lecture de ses PROPRES rôles plateforme (S21b). Même circularité que ci-dessus, et ' +
+    "surtout : la placer sous /admin la rendrait inaccessible à l'écrasante majorité des " +
+    "utilisateurs, c'est-à-dire précisément à ceux qui ont besoin d'apprendre qu'ils n'ont " +
+    "aucun rôle. N'autorise rien — le serveur refuse de toute façon.",
 
   // ── Espace compte (S20b) ────────────────────────────────────────────────
   // ADR-0012 § risque n°2 : `/compte` est le SEUL espace accessible sans
@@ -151,7 +166,17 @@ interface RouteInspectee {
   rolesPlateforme: string[] | undefined;
 }
 
-/** Handlers d'un contrôleur = méthodes du prototype portant un chemin Nest. */
+/**
+ * Handlers d'un contrôleur = méthodes du prototype portant un chemin Nest.
+ *
+ * La métadonnée est cherchée sur la MÉTHODE puis, à défaut, sur la CLASSE.
+ * `PermissionsGuard` fait exactement cela (`getAllAndOverride([handler,
+ * controller])`) : un `@RequirePlatformRole` posé au niveau du contrôleur
+ * s'applique à toutes ses routes. Sans ce repli, les contrôleurs `/admin` de
+ * S21b — qui déclarent leur plancher une seule fois, en tête de classe —
+ * apparaîtraient comme autant de trous alors qu'ils sont mieux protégés que s'ils
+ * répétaient l'annotation route par route.
+ */
 function routesDe(controleur: new (...args: never[]) => unknown): RouteInspectee[] {
   const proto = controleur.prototype as Record<string, unknown>;
   return (
@@ -162,10 +187,10 @@ function routesDe(controleur: new (...args: never[]) => unknown): RouteInspectee
       .filter((nom) => Reflect.getMetadata('path', proto[nom] as object) !== undefined)
       .map((nom) => ({
         cle: `${controleur.name}.${nom}`,
-        actions: Reflect.getMetadata(REQUIRED_PERMISSIONS_KEY, proto[nom] as object) as
-          Action[] | undefined,
-        rolesPlateforme: Reflect.getMetadata(REQUIRED_PLATFORM_ROLES_KEY, proto[nom] as object) as
-          string[] | undefined,
+        actions: (Reflect.getMetadata(REQUIRED_PERMISSIONS_KEY, proto[nom] as object) ??
+          Reflect.getMetadata(REQUIRED_PERMISSIONS_KEY, controleur)) as Action[] | undefined,
+        rolesPlateforme: (Reflect.getMetadata(REQUIRED_PLATFORM_ROLES_KEY, proto[nom] as object) ??
+          Reflect.getMetadata(REQUIRED_PLATFORM_ROLES_KEY, controleur)) as string[] | undefined,
       }))
   );
 }
@@ -197,9 +222,30 @@ describe('couverture des routes par le RBAC', () => {
     }
     await parcourir(racine);
 
-    // Un fichier `*.controller.ts` de plus que de contrôleurs inspectés = un
-    // contrôleur qui échapperait silencieusement au contrôle de couverture.
-    expect(trouves.length).toBe(CONTROLEURS.length);
+    // Un fichier `*.controller.ts` dont le contrôleur principal n'est pas
+    // inspecté échapperait silencieusement au contrôle de couverture.
+    //
+    // La comparaison porte sur les NOMS et non sur un simple comptage : depuis
+    // S21b, `integrations.controller.ts` déclare DEUX contrôleurs
+    // (`IntegrationsController` et `ReauthController`), et l'égalité
+    // « un fichier = un contrôleur » ne tient plus. Un comptage laisserait passer
+    // un fichier oublié dès qu'un autre fichier en déclare deux — exactement le
+    // genre de compensation qui rend un test vert pour la mauvaise raison.
+    const inspectes = new Set(CONTROLEURS.map((c) => c.name));
+    const attendusDepuisFichiers = trouves.map(
+      (fichier) =>
+        `${fichier
+          .replace(/\.controller\.ts$/, '')
+          .split(/[-.]/)
+          .map((mot) => mot.charAt(0).toUpperCase() + mot.slice(1))
+          .join('')}Controller`,
+    );
+    const manquants = attendusDepuisFichiers.filter((nom) => !inspectes.has(nom));
+    expect(
+      manquants,
+      `Contrôleurs non inspectés :\n  ${manquants.join('\n  ')}\n` +
+        'Ajoutez-les à CONTROLEURS, sinon leurs routes échappent au contrôle de couverture.',
+    ).toEqual([]);
   });
 
   it('chaque route déclare une permission, ou figure dans la liste des exceptions', () => {
@@ -277,6 +323,79 @@ describe('couverture des routes par le RBAC', () => {
       const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle);
       expect(route, `route introuvable : ${cle}`).toBeDefined();
       expect(route!.actions, cle).toEqual(actions);
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Espace admin plateforme (S21b — ADR-0012 §4)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('espace admin plateforme', () => {
+  const CONTROLEURS_ADMIN = [AdminController, IntegrationsController, ReauthController];
+  const ROUTES_ADMIN = CONTROLEURS_ADMIN.flatMap((c) =>
+    routesDe(c as new (...args: never[]) => unknown),
+  );
+
+  it("l'introspection trouve bien les routes d'admin", () => {
+    expect(ROUTES_ADMIN.length).toBeGreaterThan(10);
+  });
+
+  it('chaque route /admin exige un rôle plateforme — aucune exception', () => {
+    // Il n'y a PAS de liste d'exceptions ici, contrairement aux routes métier :
+    // `/admin` n'a aucune route pré-organisation, aucune sonde publique, aucun
+    // flux par jeton. Une route d'administration sans rôle exigé est un trou, et
+    // rien d'autre.
+    const trous = ROUTES_ADMIN.filter((r) => !r.rolesPlateforme?.length).map((r) => r.cle);
+    expect(trous, `Routes /admin sans rôle plateforme exigé :\n  ${trous.join('\n  ')}`).toEqual(
+      [],
+    );
+  });
+
+  it("aucune route /admin n'expose l'un des trois interdits absolus", () => {
+    // ADR-0012 §4 : `plan.approve`, `period.close` et `report.export` sont
+    // refusés à TOUS les rôles plateforme, super-administrateur compris.
+    // `canPlatform()` les refuserait de toute façon — mais une route qui les
+    // déclarerait serait morte, donc trompeuse : elle promettrait dans /admin une
+    // capacité qui répondrait 403 à tout le monde. Le trou n'est pas dans
+    // l'autorisation, il est dans l'interface.
+    for (const route of ROUTES_ADMIN) {
+      for (const action of route.actions ?? []) {
+        expect(
+          PLATFORM_FORBIDDEN_ACTIONS,
+          `${route.cle} déclare l'action interdite « ${action} » (ADR-0012 §4)`,
+        ).not.toContain(action);
+      }
+    }
+  });
+
+  it('les écritures sensibles sont réservées au super-administrateur', () => {
+    // Attribuer un rôle plateforme, c'est distribuer du pouvoir sur la
+    // plateforme; écrire un secret d'intégration, c'est détenir les clés de
+    // paiement. Ni l'un ni l'autre ne descend sous `platform_super_admin`.
+    const attendu: Record<string, string[]> = {
+      'AdminController.grantRole': ['platform_super_admin'],
+      'AdminController.revokeRole': ['platform_super_admin'],
+      'IntegrationsController.update': ['platform_super_admin'],
+      'IntegrationsController.deleteSecret': ['platform_super_admin'],
+      'IntegrationsController.test': ['platform_super_admin'],
+      'IntegrationsController.list': ['platform_super_admin'],
+      'IntegrationsController.detail': ['platform_super_admin'],
+    };
+    for (const [cle, roles] of Object.entries(attendu)) {
+      const route = ROUTES_ADMIN.find((r) => r.cle === cle);
+      expect(route, `route introuvable : ${cle}`).toBeDefined();
+      expect(route!.rolesPlateforme, cle).toEqual(roles);
+    }
+  });
+
+  it("aucune route d'intégration ne porte un nom qui promettrait une lecture de secret", () => {
+    // ADR-0013 §4 : « Il n'existe pas de `GET …/reveal`, ni de paramètre
+    // `?includeValues`, ni de mode debug. En ajouter un est un changement d'ADR. »
+    // Ce test attrape le jour où quelqu'un en ajoutera un sans lire l'ADR.
+    const interdits = /reveal|decrypt|plaintext|unmask|show.?secret/i;
+    for (const route of routesDe(IntegrationsController as never)) {
+      expect(interdits.test(route.cle), `route suspecte : ${route.cle}`).toBe(false);
     }
   });
 });
