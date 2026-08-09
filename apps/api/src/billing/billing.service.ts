@@ -168,6 +168,31 @@ export class BillingService {
     return { plan: state.effectivePlan, entitlements: state.entitlements };
   }
 
+  /**
+   * Organisation propriétaire d'un abonnement CHEZ LE FOURNISSEUR, ou `null`.
+   *
+   * Sert au rattachement d'un rappel dépourvu de métadonnées (abonnement créé
+   * hors tunnel, reprise depuis la console du fournisseur). Le couple
+   * (fournisseur, identifiant d'abonnement) est la SEULE clé acceptée : un
+   * rapprochement plus souple — par email, ou « le dernier client connu de ce
+   * fournisseur » — attribuerait l'abonnement d'un inconnu à une organisation
+   * arbitraire. Mieux vaut un rappel orphelin visible qu'un plan Business
+   * silencieusement offert au mauvais client.
+   *
+   * `providerSubscriptionId` est indexé (voir `subscription.schema.ts`).
+   */
+  async findOrganizationByProviderSubscription(
+    provider: SubscriptionProvider,
+    providerSubscriptionId: string,
+  ): Promise<string | null> {
+    if (!providerSubscriptionId) return null;
+    const doc = await this.model
+      .findOne({ provider, providerSubscriptionId })
+      .select({ organizationId: 1 })
+      .exec();
+    return doc?.organizationId ?? null;
+  }
+
   // ── Écriture ───────────────────────────────────────────────────────────────
 
   /**

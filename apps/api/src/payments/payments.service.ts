@@ -495,30 +495,27 @@ export class PaymentsService {
    * Retrouve l'organisation d'un événement.
    *
    * Deux sources, dans cet ordre : les métadonnées posées par nous à la
-   * souscription, puis l'identifiant d'abonnement fournisseur déjà enregistré.
-   * La seconde couvre le cas réel où un abonnement a été créé hors tunnel
-   * (reprise depuis la console du fournisseur, migration).
+   * souscription, puis l'abonnement fournisseur DÉJÀ ENREGISTRÉ sur une
+   * organisation. La seconde couvre le cas réel d'un renouvellement dont les
+   * métadonnées ont été perdues, ou d'un abonnement repris depuis la console du
+   * fournisseur.
    *
-   * Aucune correspondance par email : deux organisations peuvent partager un
-   * propriétaire, et un rapprochement par email accorderait un abonnement à la
-   * mauvaise. Mieux vaut un événement orphelin visible qu'un abonnement
-   * silencieusement attribué au mauvais client.
+   * Le rattachement est une jointure EXACTE sur (fournisseur, identifiant
+   * d'abonnement). Aucune correspondance par email, et surtout aucune heuristique
+   * du type « le dernier événement rattaché de ce fournisseur » : deux
+   * organisations peuvent partager un propriétaire, et un rapprochement approché
+   * accorderait un abonnement payé à la mauvaise. Mieux vaut un événement
+   * orphelin visible qu'un abonnement silencieusement attribué au mauvais client.
    */
   private async resolveOrganization(parsed: NormalizedWebhookEvent): Promise<string | null> {
     if (parsed.organizationId) return parsed.organizationId;
     if (!parsed.providerSubscriptionId) return null;
+    if (parsed.provider === 'manual') return null;
 
-    const previous = await this.events
-      .findOne({
-        provider: parsed.provider,
-        organizationId: { $ne: null },
-        rawType: { $exists: true },
-      })
-      .sort({ createdAt: -1 })
-      .exec();
-    // Volontairement conservateur : on ne rattache que si un événement
-    // ANTÉRIEUR du même abonnement a déjà été rattaché. Sinon, orphelin.
-    return previous?.organizationId ?? null;
+    return this.billing.findOrganizationByProviderSubscription(
+      parsed.provider,
+      parsed.providerSubscriptionId,
+    );
   }
 }
 
