@@ -37,11 +37,24 @@ const apiOrigin = (() => {
   }
 })();
 
+/**
+ * `next dev` sert ses chunks avec le devtool webpack `eval-source-map` : chaque
+ * module client est enveloppé dans un `eval()`. Un `script-src` sans
+ * `'unsafe-eval'` fait donc lever une EvalError à TOUT le bundle client — la
+ * page s'affiche (le HTML vient du serveur) mais React n'hydrate jamais : aucun
+ * gestionnaire d'événement, aucun formulaire soumis, connexion impossible. Le
+ * symptôme trompe, parce que le rendu paraît normal.
+ *
+ * Le build de production ne passe pas par `eval` : la permission est réservée au
+ * développement et n'atteint donc jamais l'image livrée.
+ */
+const isDev = process.env.NODE_ENV !== 'production';
+
 const csp = [
   "default-src 'self'",
   // Voir la limite assumée ci-dessus : `'unsafe-inline'` reste nécessaire tant
   // que le nonce n'est pas câblé dans layout.tsx.
-  "script-src 'self' 'unsafe-inline'",
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
   // Next injecte ses styles critiques en ligne; les polices next/font sont servies
   // depuis l'origine.
   "style-src 'self' 'unsafe-inline'",
