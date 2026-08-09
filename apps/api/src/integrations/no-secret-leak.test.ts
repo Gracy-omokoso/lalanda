@@ -565,6 +565,24 @@ describe('gardes anti-vacuité', () => {
     expect(vue.secrets['apiKey']?.source).toBe('db');
   });
 
+  it('`configFields` ne désigne jamais un secret', async () => {
+    // `configFields` est servi pour que `/admin/integrations` puisse proposer un
+    // champ de configuration encore vide. Un nom de secret qui s'y glisserait
+    // ferait rendre ce secret par l'interface dans un `<input type="text">`,
+    // stocké en clair et affiché à l'écran — la fuite ne viendrait pas d'une
+    // valeur échappée mais d'un champ MAL CLASSÉ. La disjonction est garantie par
+    // `providers.ts`; ce test la vérifie sur la réponse réellement servie.
+    for (const provider of INTEGRATION_PROVIDERS) {
+      const vue = await ctx.controller.detail(provider);
+      const secrets = new Set(PROVIDER_SPECS[provider].secrets);
+      for (const cle of vue.configFields) {
+        expect(secrets.has(cle)).toBe(false);
+      }
+      expect(vue.configFields.length).toBeGreaterThan(0);
+      expect(vue.requiredConfig.every((c) => vue.configFields.includes(c))).toBe(true);
+    }
+  });
+
   it('la campagne a réellement inspecté un nombre substantiel de charges', () => {
     // 5 routes × 5 fournisseurs + erreurs + documents + audit. Un effondrement de
     // ce compteur signalerait des assertions devenues inatteignables.
