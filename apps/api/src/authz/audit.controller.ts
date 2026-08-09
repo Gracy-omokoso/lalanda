@@ -27,15 +27,25 @@ export interface AuditEventView {
 export class AuditController {
   constructor(@Inject(AuditService) private readonly audit: AuditService) {}
 
+  /**
+   * `?action=` (S21a) filtre le journal sur une action exacte. `actions` renvoie
+   * le vocabulaire réellement présent pour cette organisation — l'interface
+   * n'invente pas la liste des filtres proposés.
+   */
   @Get()
   @RequirePermission('audit.read')
   async list(
     @CurrentOrgId() orgId: string,
     @Query('limit') limitRaw?: string,
-  ): Promise<{ events: AuditEventView[] }> {
+    @Query('action') action?: string,
+  ): Promise<{ events: AuditEventView[]; actions: string[] }> {
     const limit = Number.parseInt(limitRaw ?? '', 10);
-    const docs = await this.audit.listForOrg(orgId, Number.isFinite(limit) ? limit : 100);
+    const [docs, actions] = await Promise.all([
+      this.audit.listForOrg(orgId, Number.isFinite(limit) ? limit : 100, action),
+      this.audit.actionsForOrg(orgId),
+    ]);
     return {
+      actions,
       events: docs.map((d) => ({
         id: String(d._id),
         action: d.action,
