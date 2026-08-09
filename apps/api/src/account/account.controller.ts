@@ -78,8 +78,10 @@ export interface PendingEmailChangeView {
   expiresAt: string;
   requestedAt: string;
   /**
-   * `false` tant qu'aucun SMTP n'est configuré : l'email de vérification n'a PAS
-   * été envoyé et l'utilisateur ne peut pas terminer le changement seul.
+   * `true` seulement si l'email de vérification a RÉELLEMENT été remis au serveur
+   * SMTP. `false` quand aucun SMTP n'est configuré ou que l'envoi a échoué :
+   * l'utilisateur ne peut alors pas terminer le changement seul, et l'interface
+   * doit le dire plutôt que d'inviter à consulter une boîte qui ne recevra rien.
    */
   verificationDelivered: boolean;
   /** Raison lisible quand `verificationDelivered` est faux. */
@@ -221,6 +223,7 @@ export class AccountController {
       user.email,
       parsed.data.newEmail,
       headers,
+      user.name ?? null,
     );
     // 202 et non 200 : la demande est ACCEPTÉE, le changement n'est pas appliqué.
     return { pending: toPendingView(created)! };
@@ -287,8 +290,8 @@ function toPendingView(
     verificationDelivered: delivered,
     reason: delivered
       ? null
-      : 'SMTP_NON_CONFIGURE : aucun fournisseur d’envoi d’email n’est branché — ' +
-        'le lien de vérification n’a pas pu être envoyé (docs/17).',
+      : 'EMAIL_NON_DELIVRE : le lien de vérification n’a pas pu être envoyé — ' +
+        'aucun serveur SMTP configuré, ou envoi en échec (docs/17, ADR-0014).',
   };
 }
 
