@@ -15,6 +15,26 @@
 
 name: lalanda-prod
 
+# (S22e) Durcissement commun à tous les conteneurs de la pile.
+#
+# `no-new-privileges` neutralise setuid/setgid à l'intérieur du conteneur : une
+# exécution de code dans l'API — le scénario réaliste étant une évasion du
+# renderer Chromium, qui tourne avec `--no-sandbox` — ne peut plus regagner de
+# privilèges par un binaire setuid. C'est la contrepartie applicative du fait
+# que le conteneur api est le seul à toucher à la fois `edge` et `interne`.
+#
+# Le plafond de journalisation n'est pas de la sécurité au sens strict, mais un
+# `json-file` sans borne remplit le disque du Droplet, et un disque plein arrête
+# mongod : c'est une panne de disponibilité à part entière.
+x-durcissement: &durcissement
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: '10m'
+      max-file: '5'
+
 services:
   # ─── Reverse proxy TLS (Caddy) ────────────────────────────────────────────
   caddy:
@@ -33,6 +53,8 @@ services:
       - caddy-config:/config
     networks:
       - edge
+    <<: *durcissement
+    mem_limit: 256m
     depends_on:
       web:
         condition: service_healthy
@@ -49,10 +71,25 @@ services:
   web:
     image: ghcr.io/gracy-omokoso/lalanda-web:${LALANDA_TAG:-latest}
     restart: unless-stopped
-    env_file:
-      - .env.production
+    # (S22e) PLUS de `env_file: .env.production` ici. Le front n'a besoin que de
+    # trois variables non secrètes (vérifié : `process.env` n'apparaît que dans
+    # health/route.ts, lib/api.ts et lib/auth-client.ts, toutes pour
+    # NEXT_PUBLIC_API_URL). Le fichier complet lui donnait AUTH_SECRET,
+    # OPENAI_API_KEY, S3_SECRET_KEY et MONGODB_URI — de quoi forger une session
+    # de n'importe quelle organisation depuis n'importe quelle SSRF ou page
+    # d'erreur bavarde de Next, pour aucun bénéfice fonctionnel.
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      WEB_URL: ${WEB_URL:?WEB_URL manquant}
+      # Lue à l'exécution par apps/web/src/app/health/route.ts (le stage runtime
+      # de apps/web/Dockerfile ne la porte pas, seul le stage de build l'inline
+      # dans le bundle client).
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL manquant}
     networks:
       - edge
+    <<: *durcissement
+    mem_limit: 512m
     # Le healthcheck est défini dans l'image (HEALTHCHECK /health).
 
   # ─── API (NestJS) ─────────────────────────────────────────────────────────
@@ -71,6 +108,17 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+    <<: *durcissement
+    # (S22e) Borne mémoire OBLIGATOIRE ici, pas cosmétique : le conteneur api
+    # lance Chromium pour chaque export PDF. Le portillon de `reports/` borne
+    # désormais la concurrence côté applicatif, mais un conteneur sans
+    # `mem_limit` sur un Droplet unique laisse l'OOM killer de l'hôte arbitrer —
+    # et il emporte statistiquement le plus gros processus, c'est-à-dire mongod.
+    # Avec une limite, c'est l'API qui meurt et redémarre : la base survit.
+    mem_limit: 1500m
+    # Chromium éclate en une dizaine de processus par rendu; un emballement doit
+    # buter sur une borne avant d'épuiser la table des processus de l'hôte.
+    pids_limit: 512
     # Le healthcheck est défini dans l'image (HEALTHCHECK /health, état Mongo inclus).
 
   # ─── MongoDB replica set rs0 (ADR-0004 : transactions) ────────────────────
@@ -94,6 +142,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+    <<: *durcissement
+    mem_limit: 1g
 
   mongo-init:
     image: mongo:7.0
@@ -135,12 +185,16 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+    <<: *durcissement
+    mem_limit: 256m
 
   # ─── Stockage objet (MinIO en attendant la bascule DO Spaces) ─────────────
   # ADR-0009 vise DigitalOcean Spaces ; MinIO fournit la même API S3 sur le
   # Droplet tant que les credentials Spaces ne sont pas provisionnés.
   minio:
-    image: minio/minio:latest
+    # (S22e) `latest` figé : une image de stockage objet qui change sous les
+    # pieds d'un `docker compose pull` est un changement non revu en production.
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
     restart: unless-stopped
     command: server /data
     environment:
@@ -155,9 +209,11 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
+    <<: *durcissement
+    mem_limit: 512m
 
   minio-init:
-    image: minio/mc:latest
+    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
     depends_on:
       minio:
         condition: service_healthy
