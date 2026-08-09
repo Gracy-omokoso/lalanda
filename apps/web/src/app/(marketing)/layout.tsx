@@ -42,6 +42,12 @@ export default function MarketingLayout({
               Tarifs
             </Link>
             <Link
+              href="/aide"
+              className="hidden rounded-md px-3 py-2 text-sm font-medium text-[var(--on-ink-muted)] transition hover:text-[var(--on-ink)] sm:inline-flex"
+            >
+              Aide
+            </Link>
+            <Link
               href="/login"
               className="rounded-md px-3 py-2 text-sm font-medium text-[var(--on-ink-muted)] transition hover:text-[var(--on-ink)]"
             >
@@ -74,6 +80,12 @@ export default function MarketingLayout({
           <div className="flex items-center gap-5">
             <Link href="/pricing" className="transition hover:text-[var(--on-ink)]">
               Tarifs
+            </Link>
+            <Link href="/aide" className="transition hover:text-[var(--on-ink)]">
+              Aide
+            </Link>
+            <Link href="/aide/glossaire" className="transition hover:text-[var(--on-ink)]">
+              Glossaire
             </Link>
             <Link href="/login" className="transition hover:text-[var(--on-ink)]">
               Connexion
