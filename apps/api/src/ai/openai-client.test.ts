@@ -174,7 +174,9 @@ describe('createOpenAIClient — comportements préexistants préservés', () =>
   });
 
   it('réponse vide → erreur explicite', async () => {
-    createMock.mockResolvedValue({ choices: [{ message: { content: '' }, finish_reason: 'stop' }] });
+    createMock.mockResolvedValue({
+      choices: [{ message: { content: '' }, finish_reason: 'stop' }],
+    });
     const client = await createOpenAIClient(keyOk);
     await expect(client?.chatJson(PROMPT)).rejects.toThrow(/vide/);
   });

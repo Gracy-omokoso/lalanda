@@ -156,8 +156,7 @@ export async function createOpenAIClient(
   let mod: { default: OpenAIConstructor } | { OpenAI: OpenAIConstructor };
   try {
     mod = (await import('openai')) as unknown as
-      | { default: OpenAIConstructor }
-      | { OpenAI: OpenAIConstructor };
+      { default: OpenAIConstructor } | { OpenAI: OpenAIConstructor };
   } catch {
     // SDK non installé → on retourne null, le service tombera en fallback.
     return null;
