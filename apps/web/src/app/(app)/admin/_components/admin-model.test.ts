@@ -12,6 +12,7 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { PLATFORM_ROLES } from '@/lib/api';
 import type {
   AdminUserSummary,
   IntegrationSecretView,
@@ -31,6 +32,7 @@ import {
   formaterRestant,
   libelleAction,
   libelleChamp,
+  libelleRole,
   libelleSource,
   MARGE_REAUTH_MS,
   messageErreur,
@@ -489,5 +491,20 @@ describe('navigation de l’espace admin', () => {
     expect(segmentActif('/projects')).toBe('');
     // `/administration` n'est PAS `/admin` : le préfixe seul ne suffit pas.
     expect(segmentActif('/administration/xyz')).toBe('');
+  });
+});
+
+describe('libellés des rôles plateforme', () => {
+  it('traduit les six rôles, sans en oublier un', () => {
+    // Un rôle sans libellé s'afficherait en clé technique dans le sélecteur
+    // d'attribution — lisible par qui a écrit `permissions.ts`, par personne
+    // d'autre. Le test échoue quand un septième rôle est ajouté côté API.
+    for (const role of PLATFORM_ROLES) {
+      expect(libelleRole(role)).not.toBe(role);
+    }
+  });
+
+  it('retombe sur la clé technique plutôt que de masquer un rôle inconnu', () => {
+    expect(libelleRole('platform_futur')).toBe('platform_futur');
   });
 });

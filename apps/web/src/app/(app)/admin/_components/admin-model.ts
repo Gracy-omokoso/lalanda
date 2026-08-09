@@ -439,6 +439,28 @@ export const LIBELLES_PLAN: Record<Plan, string> = {
   business: 'Business',
 };
 
+/**
+ * Libellés français des six rôles plateforme.
+ *
+ * Purement présentationnel, comme `LIBELLES_CHAMPS` : la source de vérité reste
+ * `apps/api/src/authz/permissions.ts`, et les vues servies par l'API portent
+ * déjà leur propre `label`. Cette table ne sert qu'aux rôles qu'on peut
+ * ATTRIBUER — donc à ceux que l'utilisateur ne détient pas encore, et dont
+ * aucune vue ne porte le libellé. Un rôle inconnu retombe sur sa clé technique.
+ */
+const LIBELLES_ROLES: Record<PlatformRole, string> = {
+  platform_super_admin: 'Super-administrateur de plateforme',
+  platform_admin: 'Administrateur de plateforme',
+  platform_support: 'Support',
+  platform_billing: 'Facturation',
+  platform_template_editor: 'Éditeur de modèles',
+  platform_country_pack_manager: 'Gestionnaire de packs pays',
+};
+
+export function libelleRole(role: string): string {
+  return LIBELLES_ROLES[role as PlatformRole] ?? role;
+}
+
 /** Longueur minimale du motif de suspension — l'API refuse en deçà. */
 export const MOTIF_SUSPENSION_MIN = 10;
 
