@@ -132,6 +132,21 @@ export function isLegalPath(pathname: string): boolean {
 }
 
 /**
+ * Ces textes ont-ils été relus et validés par un juriste ?
+ *
+ * `false` tant que la relecture n'a pas eu lieu — et tant que c'est le cas,
+ * chaque page affiche un bandeau qui le dit AU LECTEUR, pas seulement à l'équipe.
+ * Un projet de CGU présenté comme des CGU définitives est une affirmation fausse
+ * faite à l'utilisateur au moment précis où il décide de s'engager ; le bandeau
+ * est ce qui empêche cette page de mentir tant qu'elle n'est pas validée.
+ *
+ * Ne basculer cette valeur à `true` qu'APRÈS une relecture juridique effective,
+ * dans le même lot que les corrections qu'elle aura demandées.
+ * Voir docs/28-CONFORMITE-LEGALE.md.
+ */
+export const LEGAL_REVIEWED_BY_COUNSEL = false;
+
+/**
  * Adresse de contact affichée sur les pages légales et pour l'exercice des
  * droits. Laissée en marqueur : elle doit exister et être relevée avant la mise
  * en production — publier une adresse qui ne reçoit personne est pire que ne
