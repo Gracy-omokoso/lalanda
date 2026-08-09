@@ -16,7 +16,16 @@ export const MARKETING_PATHS = ['/', '/pricing'] as const;
  * espace dans ce cas (ADR-0012 §9). La distinction ne concerne pas ce fichier :
  * le middleware ne regarde que le cookie de session, jamais l'organisation.
  */
-export const PROTECTED_PREFIXES = ['/projects', '/members', '/invitations', '/compte'] as const;
+export const PROTECTED_PREFIXES = [
+  '/projects',
+  '/members',
+  '/invitations',
+  '/compte',
+  // S21a — l'espace organisation exige une session ET une organisation active.
+  // Le middleware ne vérifie que la première : l'absence d'organisation est un
+  // 403 côté API, que les pages traitent comme un état, pas comme une panne.
+  '/organisation',
+] as const;
 
 /**
  * Ce chemin exige-t-il une session ?

@@ -70,12 +70,39 @@ export class AuditService {
     }
   }
 
-  /** Derniers événements d'une organisation — jamais inter-organisations. */
-  async listForOrg(organizationId: string, limit = 100): Promise<AuditEventDocument[]> {
+  /**
+   * Derniers événements d'une organisation — jamais inter-organisations.
+   *
+   * `action` (S21a) filtre sur une action exacte. Le filtre est appliqué EN BASE
+   * et non après coup : filtrer les 100 derniers événements côté client ferait
+   * disparaître une action rare dès que le journal grossit, ce qui est le contraire
+   * d'un journal d'audit.
+   */
+  async listForOrg(
+    organizationId: string,
+    limit = 100,
+    action?: string,
+  ): Promise<AuditEventDocument[]> {
+    const filtre: Record<string, unknown> = { organizationId };
+    if (action !== undefined && action !== '') filtre['action'] = action;
     return this.events
-      .find({ organizationId })
+      .find(filtre)
       .sort({ createdAt: -1 })
       .limit(Math.min(Math.max(limit, 1), 500))
       .exec();
+  }
+
+  /**
+   * Actions réellement présentes dans le journal d'une organisation — alimente le
+   * sélecteur de filtre.
+   *
+   * Servi par l'API plutôt que codé en dur côté interface : le vocabulaire des
+   * événements grandit à chaque lot (`report.export` en S20a,
+   * `organization.settings_updated` en S21a) et une liste figée dans le front
+   * proposerait des filtres sans résultat, ou en oublierait.
+   */
+  async actionsForOrg(organizationId: string): Promise<string[]> {
+    const actions = await this.events.distinct('action', { organizationId }).exec();
+    return actions.filter((a): a is string => typeof a === 'string').sort();
   }
 }
