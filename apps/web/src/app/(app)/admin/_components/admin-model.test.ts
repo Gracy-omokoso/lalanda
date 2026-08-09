@@ -21,6 +21,7 @@ import type {
 
 import {
   ACTIONS_FILTRABLES,
+  ADMIN_TABS,
   aideChamp,
   avertissementSource,
   codeErreur,
@@ -36,12 +37,14 @@ import {
   metadonneesLisibles,
   motifSuspensionValide,
   offreDerogation,
+  ongletsVisibles,
   raisonNonDesactivable,
   raisonNonRevocable,
   reauthRestantMs,
   reauthUtilisable,
   resumeDernierTest,
   secretsManquants,
+  segmentActif,
   statutIntegration,
   statutErreur,
 } from './admin-model';
@@ -441,5 +444,50 @@ describe('journal d’audit plateforme', () => {
     expect(cles).not.toContain('userAgent');
     // Une métadonnée nulle n'apparaît pas : une ligne « — » n'informe personne.
     expect(cles).not.toContain('vide');
+  });
+});
+
+describe('navigation de l’espace admin', () => {
+  const TOUT = { canManagePlatform: true, canManageIntegrations: true };
+  const RIEN = { canManagePlatform: false, canManageIntegrations: false };
+
+  it('propose les cinq onglets à qui gère les intégrations', () => {
+    expect(ongletsVisibles(TOUT).map((t) => t.segment)).toEqual([
+      '',
+      'organisations',
+      'utilisateurs',
+      'integrations',
+      'journal',
+    ]);
+  });
+
+  it('masque le seul onglet dont l’ouverture révélerait quelque chose', () => {
+    // Les autres onglets restent proposés : ils affichent un refus explicite,
+    // ce qui vaut mieux qu'une navigation qui varie sans qu'on sache pourquoi.
+    // Intégrations est l'exception — son contenu EST la liste des fournisseurs.
+    const segments = ongletsVisibles(RIEN).map((t) => t.segment);
+    expect(segments).not.toContain('integrations');
+    expect(segments).toContain('journal');
+  });
+
+  it('n’ouvre jamais un onglet que le serveur n’a pas ouvert', () => {
+    for (const tab of ADMIN_TABS) {
+      if (tab.besoin === null) continue;
+      expect(ongletsVisibles(RIEN)).not.toContainEqual(tab);
+    }
+  });
+
+  it('garde l’onglet parent allumé sur une sous-page', () => {
+    expect(segmentActif('/admin')).toBe('');
+    expect(segmentActif('/admin/')).toBe('');
+    expect(segmentActif('/admin/organisations')).toBe('organisations');
+    expect(segmentActif('/admin/organisations/org_123')).toBe('organisations');
+    expect(segmentActif('/admin/integrations')).toBe('integrations');
+  });
+
+  it('ne revendique rien hors de l’espace admin', () => {
+    expect(segmentActif('/projects')).toBe('');
+    // `/administration` n'est PAS `/admin` : le préfixe seul ne suffit pas.
+    expect(segmentActif('/administration/xyz')).toBe('');
   });
 });

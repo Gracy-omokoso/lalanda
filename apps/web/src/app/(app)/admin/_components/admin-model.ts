@@ -26,6 +26,61 @@ import type {
   Plan,
 } from '@/lib/api';
 
+// ── Navigation ───────────────────────────────────────────────────────────────
+
+export const ADMIN_BASE = '/admin';
+
+/**
+ * Les cinq sections de l'espace, dans un ordre stable.
+ *
+ * `besoin` dit quel drapeau SERVEUR ouvre l'onglet — jamais un rôle recopié
+ * côté client. `null` = visible dès qu'on est entré dans l'espace, ce qui est
+ * déjà conditionné par `canReadAdmin`.
+ */
+export interface OngletAdmin {
+  segment: string;
+  label: string;
+  besoin: 'canManagePlatform' | 'canManageIntegrations' | null;
+}
+
+export const ADMIN_TABS: readonly OngletAdmin[] = [
+  { segment: '', label: 'Tableau de bord', besoin: null },
+  { segment: 'organisations', label: 'Organisations', besoin: null },
+  { segment: 'utilisateurs', label: 'Utilisateurs', besoin: null },
+  { segment: 'integrations', label: 'Intégrations', besoin: 'canManageIntegrations' },
+  { segment: 'journal', label: 'Journal', besoin: null },
+] as const;
+
+/**
+ * Onglets à afficher.
+ *
+ * Filtrer est un CONFORT : `PermissionsGuard` refuse de toute façon, et l'onglet
+ * Intégrations est le seul qu'on masque parce qu'il est le seul dont l'ouverture
+ * révélerait quelque chose — la liste des fournisseurs branchés et l'état de
+ * chacun. Les autres onglets se contentent d'un refus explicite à l'arrivée.
+ */
+export function ongletsVisibles(acces: {
+  canManagePlatform: boolean;
+  canManageIntegrations: boolean;
+}): OngletAdmin[] {
+  return ADMIN_TABS.filter((tab) => tab.besoin === null || acces[tab.besoin]);
+}
+
+/**
+ * Segment actif déduit du chemin. `/admin` et `/admin/` donnent `''`.
+ *
+ * Comparaison sur le PREMIER segment seulement : une future sous-page
+ * `/admin/organisations/xyz` doit garder l'onglet Organisations allumé.
+ */
+export function segmentActif(pathname: string): string {
+  // Frontière de SEGMENT, pas simple préfixe : `/administration` commence par
+  // `/admin` sans en faire partie, et un `startsWith` nu allumerait un onglet
+  // depuis une page étrangère à l'espace.
+  if (pathname !== ADMIN_BASE && !pathname.startsWith(`${ADMIN_BASE}/`)) return '';
+  const reste = pathname.slice(ADMIN_BASE.length).replace(/^\/+/, '');
+  return reste.split('/')[0] ?? '';
+}
+
 // ── Erreurs ──────────────────────────────────────────────────────────────────
 
 /**

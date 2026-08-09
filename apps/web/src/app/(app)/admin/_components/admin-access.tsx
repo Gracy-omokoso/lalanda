@@ -49,11 +49,7 @@ export function useAccesPlateforme(): PlatformAccessView {
   return acces;
 }
 
-export function AdminAccessGate({
-  children,
-}: {
-  children: React.ReactNode;
-}): React.ReactElement {
+export function AdminAccessGate({ children }: { children: React.ReactNode }): React.ReactElement {
   const [acces, setAcces] = useState<PlatformAccessView | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [chargement, setChargement] = useState(true);
