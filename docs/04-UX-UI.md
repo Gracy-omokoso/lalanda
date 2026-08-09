@@ -157,3 +157,59 @@ Les blocs fermés du tableau de bord sont listés sobrement en bas de page — n
 - **Logo par URL, pas par envoi de fichier** : aucun stockage de fichiers n’est branché, comme pour la photo de profil de l’espace compte. L’écran le dit au lieu de proposer un bouton inerte.
 - **Aucune intégration de paiement** (docs/13 § hors périmètre S16b) : la page facturation affiche l’offre et la consommation, pas un bouton « changer de plan » qui ne mènerait nulle part. Un dépassement précise que **rien n’est supprimé** — seules les créations au-delà de la limite sont refusées.
 - **Le tableau de bord n’est pas un export** : les agrégations coûteuses balaient les 20 projets les plus récemment modifiés. Le détail complet vit sur la page de chaque projet, et la réponse ne prétend nulle part à l’exhaustivité.
+
+## Implémenté (S21b) — Espace admin plateforme
+
+`/admin` livre l’exploitation de la plateforme en cinq onglets. Écrans : `apps/web/src/app/(app)/admin/`. API : `apps/api/src/admin/` et `apps/api/src/integrations/` (voir docs/16 § Espace admin plateforme).
+
+### Pages
+
+| Route | Contenu | Ouvert à |
+|---|---|---|
+| `/admin` | Compteurs de la plateforme, appels IA, interdits affichés | tout rôle plateforme lisant `/admin` |
+| `/admin/organisations` | Liste, détail, changement de plan, suspension motivée | lecture : tout rôle ; écriture : `canManagePlatform` |
+| `/admin/utilisateurs` | Recherche, rôles plateforme, désactivation | lecture : tout rôle ; écriture : `canManagePlatform` |
+| `/admin/integrations` | Les cinq fournisseurs à secret | `platform_super_admin` |
+| `/admin/journal` | Journal des actes d’administration | tout rôle plateforme lisant `/admin` |
+
+L’entrée est un lien « Administration » dans le header, affiché sur le drapeau `canReadAdmin` servi par `GET /me/platform-access`. Un échec de cet appel **ne montre pas** le lien : le défaut est de ne rien proposer plutôt que de proposer une page qui répondrait 403.
+
+### Ce que l’espace protège, et ce qu’il ne protège pas
+
+À ne pas confondre, car la confusion produirait un faux sentiment de sécurité :
+
+- **Le middleware web ne vérifie que la session.** `lib/routes.ts` inscrit `/admin` dans les préfixes protégés : un visiteur non authentifié est renvoyé vers `/login`. Le middleware **ignore tout des rôles plateforme** — il n’en connaît aucun et n’en lira jamais.
+- **`AdminAccessGate` masque, il n’autorise pas.** Il remplace un mur de bannières 403 par un refus lisible, qui dit ce qui manque. S’il disparaissait, aucune donnée ne fuirait.
+- **`PermissionsGuard` + `@RequirePlatformRole` sont le contrôle réel**, sur chaque route `/admin/*` de l’API. S’il disparaissait, tout fuirait.
+
+Un opérateur qui force `/admin/integrations` sans le rôle voit l’écran de refus, et **aucun appel** n’est émis vers les endpoints d’intégration.
+
+### Un seul onglet est masqué, et on sait pourquoi
+
+Seul « Intégrations » disparaît de la navigation quand le rôle ne l’ouvre pas : son contenu **est** la liste des fournisseurs branchés et l’état de chacun, information qu’un onglet visible révélerait déjà. Les quatre autres onglets restent proposés et affichent un refus explicite à l’arrivée — une navigation qui varie sans qu’on sache pourquoi coûte plus qu’elle ne protège.
+
+### Le champ de secret est un remplacement
+
+Il est toujours vide au chargement, et **il ne peut pas en être autrement** : la valeur enregistrée n’existe nulle part côté client, aucun endpoint ne la rend, aucun état de l’interface ne la détient. Ce que l’écran montre d’un secret : statut, empreinte `•••• 1234`, source (coffre chiffré ou variable d’environnement), date et auteur de la dernière modification, résultat du dernier test.
+
+Conséquence assumée : on ne peut pas corriger un caractère d’une clé, on la re-saisit entière. C’est le prix d’une interface qui ne peut pas divulguer ce qu’elle n’a jamais reçu.
+
+**Statut de configuration et résultat du dernier test sont deux colonnes distinctes.** Les confondre ferait apparaître comme opérationnelle une intégration complète dont la clé a été révoquée la veille. Cinq états sont distingués : non configurée, incomplète, configurée mais inactive, active, dernier test en échec.
+
+**La dérogation n’apparaît qu’après un échec.** Le bouton « enregistrer sans test concluant » n’existe que si le serveur a répondu `INTEGRATION_TEST_FAILED`. Une case « forcer » offerte d’emblée ferait du contournement le geste normal, et le test avant enregistrement ne protégerait plus de rien.
+
+**La source `env` est signalée comme un reste de migration** (ADR-0013 §8), pas comme un état normal : l’écran invite à ré-enregistrer la valeur dans le coffre pour qu’elle devienne rotable sans redéploiement.
+
+### États et accessibilité
+
+- **Couleur** : aucun statut n’est porté par la seule couleur. « Dernier test en échec » est écrit ; la pastille n’est qu’un renfort.
+- **Contrôle désactivé** : sa raison est écrite **à côté**, jamais laissée au seul attribut `title`. Un bouton grisé sans explication se lit comme un bug — c’est le cas du super-administrateur qui ne peut pas se retirer son propre rôle, ou désactiver son propre compte.
+- **Limite annoncée** : la désactivation d’un compte révoque ses sessions mais **n’empêche pas encore la reconnexion**. L’écran le dit. Un opérateur qui croit avoir barré l’accès alors qu’il n’a que déconnecté prendrait une décision de sécurité sur une prémisse fausse.
+- **`role="alert"`** sur les échecs uniquement : un lecteur d’écran qui annonce chaque succès finit par être coupé.
+- **Fenêtre de ré-authentification** : le temps restant est affiché en continu, et le mot de passe est redemandé quinze secondes avant l’expiration réelle — une fenêtre qui se referme pendant la saisie d’une clé produirait un refus au pire moment.
+
+### Ce que l’espace ne fait pas
+
+- **Aucune donnée cliente n’y est lisible.** Le tableau de bord sert des compteurs, jamais un classement de clients ni un montant. La page Organisations affiche des volumes (membres, projets), jamais leur contenu. Il n’existe pas d’écran pour consulter le journal d’audit d’une organisation cliente depuis `/admin`.
+- **Trois actes restent refusés à tous**, super-administrateur compris : valider un plan, clôturer une période, exporter un rapport. Ils sont **affichés** sur le tableau de bord, pas seulement absents : une absence s’interprète comme un oubli, une interdiction écrite ne s’interprète pas.
+- **La recherche de comptes est un geste dirigé.** Il n’y a pas de « tout parcourir » : un annuaire feuilletable de toutes les adresses de tous les clients serait une base de données personnelles offerte à quiconque obtient un rôle support.
