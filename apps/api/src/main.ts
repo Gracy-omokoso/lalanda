@@ -21,7 +21,12 @@ import { getAuth } from './auth/auth.js';
 async function bootstrap(): Promise<void> {
   const env = parseEnv(ApiEnvSchema, process.env);
 
-  const app = await NestFactory.create(AppModule);
+  // `rawBody: true` conserve les octets EXACTS du corps dans `req.rawBody`.
+  // Indispensable aux rappels de paiement : une signature porte sur des octets,
+  // et re-sérialiser du JSON parsé (ordre des clés, espaces, échappement) ne
+  // reproduit pas la charge signée. Sans cette option, `payments/` refuse tout
+  // rappel — un refus bruyant, jamais une acceptation par défaut.
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   // Headers de sécurité (S16a, docs/17-SECURITE.md) — défauts helmet :
   // X-Content-Type-Options, X-Frame-Options/frame-ancestors via CSP, HSTS, etc.

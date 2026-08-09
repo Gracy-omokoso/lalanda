@@ -27,6 +27,7 @@ import { InvitationsController } from '../organizations/invitations.controller.j
 import { MembersController } from '../organizations/members.controller.js';
 import { OrganizationsController } from '../organizations/organizations.controller.js';
 import { ParameterPacksController } from '../parameter-packs/parameter-packs.controller.js';
+import { PaymentsController } from '../payments/payments.controller.js';
 import { PlansController } from '../plans/plans.controller.js';
 import { ProjectsController } from '../projects/projects.controller.js';
 import { ReportsController } from '../reports/reports.controller.js';
@@ -57,6 +58,7 @@ const CONTROLEURS = [
   OrganizationSpaceController,
   OrganizationsController,
   ParameterPacksController,
+  PaymentsController,
   PlansController,
   ProjectsController,
   ReportsController,
@@ -109,6 +111,17 @@ const SANS_PERMISSION: Record<string, string> = {
   'EmailVerificationController.verify':
     'Vérification par jeton. L’appelant n’est pas nécessairement authentifié : ' +
     'le jeton fait autorité, comme pour l’acceptation d’invitation.',
+
+  // ── Paiements (S22b) ────────────────────────────────────────────────────
+  'PaymentsController.webhook':
+    'Rappel de fournisseur de paiement. AUTHENTIFIÉ PAR SIGNATURE et non par ' +
+    'session : Stripe et PayPal ne portent aucun cookie. La vérification a lieu ' +
+    'avant toute lecture du corps, et un secret absent provoque un 503 — jamais ' +
+    'une acceptation. Voir payments/webhook-signature.ts.',
+  'PaymentsController.methods':
+    'Liste les moyens de paiement disponibles. Appelée par la page tarifs ' +
+    'PUBLIQUE, sans session. Ne renvoie aucun secret ni motif détaillé ' +
+    'd’indisponibilité — seulement « carte : oui/non ».',
 };
 
 interface RouteInspectee {
