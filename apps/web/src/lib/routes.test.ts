@@ -27,6 +27,14 @@ describe('isProtectedPath (S20b)', () => {
     }
   });
 
+  it('protège le tunnel de souscription et son retour fournisseur (S22b)', () => {
+    // Le retour de paiement est la page la plus exposée du tunnel : le
+    // fournisseur y renvoie le client avec une URL devinable. Sans session, elle
+    // doit mener à la connexion, jamais afficher un état d'abonnement.
+    expect(isProtectedPath('/souscription')).toBe(true);
+    expect(isProtectedPath('/souscription/retour')).toBe(true);
+  });
+
   it('protège les espaces existants, racine comme sous-routes', () => {
     for (const path of [
       '/projects',

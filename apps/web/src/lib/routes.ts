@@ -25,6 +25,12 @@ export const PROTECTED_PREFIXES = [
   // Le middleware ne vérifie que la première : l'absence d'organisation est un
   // 403 côté API, que les pages traitent comme un état, pas comme une panne.
   '/organisation',
+  // S22b — tunnel de souscription. Route AUTONOME et non un onglet de
+  // `/organisation` : on y arrive depuis la page tarifs publique, depuis une
+  // bannière d'essai qui expire, ou depuis le retour d'un fournisseur de
+  // paiement. Un tunnel logé sous un onglet obligerait chacun de ces chemins à
+  // traverser un écran qui n'a rien à voir avec la décision en cours.
+  '/souscription',
 ] as const;
 
 /**
