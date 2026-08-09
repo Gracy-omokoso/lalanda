@@ -1,9 +1,11 @@
-import { BadRequestException, ConflictException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import type { Connection, Model } from 'mongoose';
 import { randomBytes } from 'node:crypto';
 
 import { getAuth } from '../auth/auth.js';
+import { emailChangeVerificationUrl } from '../mail/mail.links.js';
+import { MailService } from '../mail/mail.service.js';
 import { EmailChangeRequest, type EmailChangeRequestDocument } from './email-change.schema.js';
 
 /** Durée de validité d'un lien de vérification. Assez long pour un email lu le lendemain,
@@ -11,24 +13,25 @@ import { EmailChangeRequest, type EmailChangeRequestDocument } from './email-cha
 const TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Changement d'adresse email vérifié (S20b).
+ * Changement d'adresse email vérifié (S20b, livraison réelle en S22a).
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * LIMITE CONNUE ET ASSUMÉE : LA VÉRIFICATION N'EST PAS DÉLIVRÉE.
+ * L'EMAIL EST MAINTENANT ENVOYÉ — QUAND UN SMTP EXISTE.
  *
- * Aucun fournisseur SMTP n'est configuré dans le produit (docs/17 § Restant,
- * S16a : `AUTH_REQUIRE_EMAIL_VERIFICATION` reste à `false` faute d'envoi). Le flux
- * ci-dessous est COMPLET côté serveur — demande, token opaque, expiration,
- * vérification, application, annulation — mais l'email contenant le lien n'est
- * envoyé nulle part. `notifiedAt` reste donc `null` et l'API annonce
- * `verificationDelivered: false` à chaque demande.
+ * Jusqu'à S22a, le flux était complet côté serveur mais l'email n'était envoyé
+ * nulle part : `notifiedAt` restait `null` et l'utilisateur ne pouvait pas
+ * terminer un changement d'adresse par lui-même. S22a branche `MailService`.
  *
- * Conséquence pratique : tant que SMTP n'est pas branché, un utilisateur final ne
- * peut PAS terminer un changement d'adresse par lui-même. C'est délibéré. La
- * seule alternative — appliquer le changement sans vérification — ouvrirait un
- * chemin de prise de compte (docs/17 § Menaces prioritaires) et transformerait un
- * manque d'infrastructure en faille. Un bouton qui ment est pire qu'un bouton qui
- * explique pourquoi il attend.
+ * Ce qui N'A PAS changé, et ne doit pas changer : `notifiedAt` n'est renseigné
+ * que si l'envoi a RÉELLEMENT abouti. Sans SMTP configuré, le transport se replie
+ * sur un log serveur et renvoie `delivered: false` — le champ reste `null` et
+ * l'API continue d'annoncer `verificationDelivered: false`. Marquer l'envoi comme
+ * fait dès qu'on a « appelé la fonction d'envoi » reviendrait à afficher
+ * « vérifiez votre boîte » à quelqu'un qui ne recevra jamais rien.
+ *
+ * Ce qui n'a pas changé non plus : l'adresse ne bouge qu'à la présentation du
+ * token. Appliquer le changement sans vérification ouvrirait un chemin de prise
+ * de compte (docs/17 § Menaces prioritaires).
  * ─────────────────────────────────────────────────────────────────────────────
  */
 @Injectable()
@@ -39,6 +42,9 @@ export class EmailChangeService {
     @InjectModel(EmailChangeRequest.name)
     private readonly model: Model<EmailChangeRequestDocument>,
     @InjectConnection() private readonly connection: Connection,
+    // Jeton explicite : esbuild (vitest) n'émet pas `design:paramtypes`, une
+    // injection par type y serait silencieusement `undefined` (voir mail/).
+    @Inject(MailService) private readonly mail: MailService,
   ) {}
 
   /** Demande en attente et non expirée, ou `null`. */
@@ -58,6 +64,7 @@ export class EmailChangeService {
     currentEmail: string,
     newEmail: string,
     headers: Headers,
+    userName?: string | null,
   ): Promise<EmailChangeRequestDocument> {
     if (newEmail === currentEmail.toLowerCase()) {
       throw new BadRequestException({
@@ -86,17 +93,32 @@ export class EmailChangeService {
       expiresAt: new Date(Date.now() + TOKEN_TTL_MS),
       verifiedAt: null,
       canceledAt: null,
-      // Reste null : aucun envoi n'a lieu (cf. en-tête de classe).
+      // Renseigné juste après, et SEULEMENT si l'envoi aboutit (cf. en-tête de classe).
       notifiedAt: null,
       _schemaVersion: 1,
     });
 
-    // Trace d'exploitation SANS le token : docs/17 § Journalisation interdit
-    // qu'un secret apparaisse dans les logs. On journalise le fait, pas le moyen.
-    this.logger.warn(
-      `Changement d'email demandé pour l'utilisateur ${userId} : email de vérification NON ENVOYÉ ` +
-        `(aucun SMTP configuré). La demande expire le ${created.expiresAt.toISOString()}.`,
-    );
+    // L'email part vers la NOUVELLE adresse : c'est elle dont on veut la preuve
+    // de contrôle. L'envoyer à l'ancienne prouverait l'inverse de ce qu'on cherche.
+    const delivery = await this.mail.sendEmailVerification({
+      to: created.newEmail,
+      url: emailChangeVerificationUrl(created.token),
+      name: userName ?? null,
+      isEmailChange: true,
+      expiresInHours: TOKEN_TTL_MS / 3_600_000,
+    });
+
+    if (delivery.delivered) {
+      created.notifiedAt = new Date();
+      await created.save();
+    } else {
+      // Trace d'exploitation SANS le token : docs/17 § Journalisation interdit
+      // qu'un secret apparaisse dans les logs. On journalise le fait, pas le moyen.
+      this.logger.warn(
+        `Changement d'email demandé pour l'utilisateur ${userId} : email de vérification NON DÉLIVRÉ ` +
+          `(${delivery.reason ?? 'raison inconnue'}). La demande expire le ${created.expiresAt.toISOString()}.`,
+      );
+    }
 
     void headers; // réservé : l'envoi réel utilisera la locale de la requête.
     return created;

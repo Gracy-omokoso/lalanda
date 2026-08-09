@@ -1,7 +1,7 @@
 # Sécurité, confidentialité et continuité
 
 **Statut :** Draft  
-**Version :** 0.2
+**Version :** 0.3
 
 ## Implémenté (S16a)
 
@@ -17,7 +17,7 @@ Durcissement de production livré au sprint S16a :
 - **Headers de sécurité** :
   - API : `helmet` avec ses défauts (nosniff, protection frame, HSTS…) ;
   - Web (`apps/web/next.config.mjs`) : `X-Frame-Options: DENY`, CSP `frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`.
-- **Vérification d'email** : flag better-auth `requireEmailVerification` piloté par `AUTH_REQUIRE_EMAIL_VERIFICATION` (défaut `false` en dev — aucun SMTP branché). **En production, passer à `true` dès qu'un fournisseur d'envoi d'emails est configuré** (ADR SMTP à venir).
+- **Vérification d'email** : flag better-auth `requireEmailVerification` piloté par `AUTH_REQUIRE_EMAIL_VERIFICATION` (défaut `false` en dev — aucun SMTP branché). **En production, passer à `true` dès qu'un fournisseur d'envoi d'emails est configuré** — c'est possible depuis S22a (ADR-0014), et c'est la parade au pré-enregistrement d'un compte non vérifié à l'adresse d'un tiers.
 - **Schéma d'environnement** : `REDIS_URL` et les variables `S3_*` deviennent optionnelles — requises à partir des exports asynchrones ; rien ne les consomme aujourd'hui.
 
 ### Restant (hors périmètre S16a)
@@ -44,20 +44,23 @@ Espace compte livré au sprint S20b (`apps/api/src/account/`, `apps/web/src/app/
 - **Frontière sans organisation** (ADR-0012 §9) : `/compte` reste joignable pour un utilisateur sans aucune organisation — sinon un compte dont l’organisation a été supprimée serait enfermé dehors, sans moyen de consulter ses sessions ni de supprimer son compte. Un test e2e dédié couvre ce cas et vérifie d’abord, en précondition, qu’une route métier échoue bien en `403 NO_ORGANIZATION`.
 - **Journalisation** : la demande de changement d’email est tracée sans le token. On journalise le fait, jamais le moyen.
 
-### Bloqué par l’absence de SMTP — à ne pas confondre avec « fait »
+### Bloqué par l’absence de SMTP — LEVÉ EN S22a (ADR-0014)
 
-Aucun fournisseur d’envoi d’emails n’est configuré (cf. § Restant de S16a, toujours d’actualité). Conséquences concrètes, assumées et affichées dans l’interface :
+> Cette section décrivait un blocage **structurel** : le produit ne savait envoyer aucun email. S22a a branché un module d’envoi (`apps/api/src/mail/`, ADR-0014). Le blocage devient **configurationnel** : il ne subsiste que tant que `SMTP_HOST` n’est pas renseigné, et il est alors annoncé honnêtement plutôt que masqué. Le texte d’origine est conservé ci-dessous parce qu’il décrit exactement l’état d’un déploiement sans SMTP — qui reste un état supporté.
 
-- **le changement d’adresse email ne peut pas aboutir** : le flux serveur est complet (demande, token, expiration, vérification, application, annulation) mais l’email contenant le lien n’est envoyé nulle part. `verificationDelivered` vaut `false` et la réponse porte un motif lisible. Un utilisateur final ne peut donc pas terminer l’opération seul aujourd’hui ;
-- **`emailVerified` vaut `false` pour tout le monde** : la valeur est lue en base et affichée telle quelle, plutôt que de présenter un compte « vérifié » qui ne l’est pas ;
+Sans fournisseur d’envoi configuré, les conséquences restent celles-ci, assumées et affichées dans l’interface :
+
+- **le changement d’adresse email ne peut pas aboutir** : le flux serveur est complet (demande, token, expiration, vérification, application, annulation) mais l’email contenant le lien n’est envoyé nulle part. `verificationDelivered` vaut `false` et la réponse porte un motif lisible. Un utilisateur final ne peut donc pas terminer l’opération seul ;
+- **`emailVerified` vaut `false` pour tout le monde** (sauf comptes Google, dont Google atteste l’adresse) : la valeur est lue en base et affichée telle quelle, plutôt que de présenter un compte « vérifié » qui ne l’est pas ;
 - **aucune notification n’est envoyée** : les préférences de notification sont enregistrées et seront respectées à la mise en service, mais cocher une case ne déclenche aucun message ;
-- **`AUTH_REQUIRE_EMAIL_VERIFICATION` reste à `false`.**
+- **`AUTH_REQUIRE_EMAIL_VERIFICATION` doit rester à `false`.**
 
-Appliquer le changement d’adresse sans vérification lèverait le blocage en une ligne — et ouvrirait un chemin de prise de compte (§ Menaces prioritaires), transformant un manque d’infrastructure en faille. Le blocage est donc maintenu jusqu’à la mise en service d’un SMTP.
+Appliquer le changement d’adresse sans vérification lèverait le blocage en une ligne — et ouvrirait un chemin de prise de compte (§ Menaces prioritaires), transformant un manque d’infrastructure en faille. Le blocage est donc maintenu tant qu’aucun SMTP n’est en service.
 
-### Restant sur ce périmètre
+**Avec SMTP configuré** (`SMTP_HOST`, cf. ADR-0014) : les trois emails partent réellement, le changement d’adresse se termine depuis la page publique `/verification-email`, les invitations arrivent dans les boîtes, et `AUTH_REQUIRE_EMAIL_VERIFICATION=true` devient activable — **ce qu’il faut faire**, car c’est la parade au pré-enregistrement décrit dans ADR-0014 § Risque accepté.
 
-- envoi d’email réel, prérequis de tout ce qui précède ;
+### Restant sur le périmètre S20b
+
 - notification à l’ancienne adresse lors d’un changement (protection contre la prise de compte silencieuse) ;
 - index unique sur `user.email` : la collection appartient à better-auth et n’en porte aucun ; l’unicité est aujourd’hui applicative et laisse une fenêtre de concurrence théorique. Poser l’index demande une migration des doublons éventuels — à traiter par un ADR dédié ;
 - délai de grâce / restauration après suppression de compte : la suppression est immédiate et définitive.
@@ -87,6 +90,27 @@ Coffre et espace d’administration livrés au sprint S21b (`apps/api/src/integr
 - **La rotation de la clé maîtresse est outillée** (re-chiffrement, `secret.rewrapped` au journal) **mais n’est pas automatisée** ni planifiée.
 - **La désactivation d’un compte révoque ses sessions sans verrouiller la reconnexion.** Le verrou au moment de la connexion reste à livrer ; l’interface l’annonce plutôt que de laisser croire l’accès barré.
 - **`OPENAI_API_KEY` et `S3_SECRET_KEY` restent lues en secours.** C’est un chemin de migration borné (ADR-0013 §8), à retirer au sprint de sortie — pas un mode de fonctionnement.
+
+## Implémenté (S22a) — envoi d’emails, connexion Google, mot de passe oublié
+
+Détail complet et arbitrages : **ADR-0014**. Points de sécurité :
+
+- **Mot de passe oublié**, flux inexistant jusqu’ici : un compte dont le mot de passe était perdu était un compte perdu. Délégué à better-auth (qui possède la politique de hachage de la collection `account`), avec jeton à **usage unique**, expiration **30 minutes**, et **révocation de toutes les sessions** à la réinitialisation — une réinitialisation signifie souvent « quelqu’un d’autre avait accès ».
+- **Aucune énumération d’adresses** sur la demande de réinitialisation : code de réponse et corps strictement identiques pour une adresse connue et une adresse inconnue, temps de réponse compris (better-auth simule la génération du jeton et la lecture en base). L’interface ne « rattrape » pas cette uniformité en distinguant les cas. Vérifié par test e2e comparant les deux réponses.
+- **Connexion Google** : liaison de comptes acceptée **uniquement** si Google atteste lui-même `email_verified` (`trustedProviders` volontairement vide). `prompt: 'select_account'` forcé, pour qu’un poste partagé ne reconnecte pas silencieusement la session Google du collègue.
+- **Risque accepté et sa parade** : `requireLocalEmailVerified: false` ouvre le scénario de pré-enregistrement. Voir ADR-0014 § Risque accepté — la parade est `AUTH_REQUIRE_EMAIL_VERIFICATION=true` en production.
+- **Journalisation** : le repli sans SMTP journalise le destinataire et le sujet, **jamais le corps** — il contient le lien porteur du jeton. Le `console.log` du jeton d’invitation qui existait depuis S5d est supprimé.
+- **Contenu des emails** : aucune ressource distante (pas d’image, donc pas de pixel de suivi révélant l’IP et l’heure d’ouverture), destination du bouton écrite en clair sous celui-ci, données utilisateur échappées. Vérifié par tests.
+
+### Restant sur ce périmètre
+
+- MFA et OTP SMS (ADR-0006 : le fournisseur SMS reste à choisir) ;
+- signature DKIM/SPF/DMARC du domaine expéditeur — hors code, à faire côté DNS lors de la mise en service, sans quoi les messages partiront en indésirables ;
+- file d’attente d’envoi : un email est aujourd’hui envoyé dans la requête HTTP qui le déclenche. Acceptable à trois messages transactionnels, à revoir dès qu’un envoi groupé existera ;
+- identifiants SMTP par organisation, depuis le coffre d’`integrations/` (ADR-0013) : la prise existe (`MailCredentialsProvider`), l’implémentation viendra avec le module ;
+- **aucune reprise sur échec d’envoi** : un envoi raté est journalisé, pas réessayé — un incident SMTP de quelques minutes perd les messages émis pendant sa durée. L’utilisateur peut redemander un lien, et une invitation reste récupérable par son lien copiable ;
+- **aucun quota propre aux envois** : `/auth/*` s’appuie sur la limitation de tentatives de better-auth, mais rien ne borne spécifiquement le nombre d’emails qu’une même adresse peut faire déclencher ;
+- **notification à l’ancienne adresse lors d’un changement d’email** (§ Restant sur le périmètre S20b) : le mécanisme d’envoi existe désormais, le message reste à écrire et à brancher.
 
 ## Menaces prioritaires
 
