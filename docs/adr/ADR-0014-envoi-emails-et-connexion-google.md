@@ -103,7 +103,16 @@ Note : `requireLocalEmailVerified` est marqué déprécié par better-auth, qui 
 
 ## Procédure Google Cloud Console
 
-À suivre à la lettre. Compter dix minutes.
+À suivre à la lettre. Compter dix minutes. Aucun paiement, aucune carte bancaire.
+
+> **Note de navigation.** Google a réorganisé cette partie de la console : la configuration
+> OAuth vit désormais sous **« Google Auth Platform »**
+> (<https://console.cloud.google.com/auth/overview>), découpée en *Branding*, *Audience*,
+> *Clients* et *Accès aux données*. Les anciens chemins donnés ci-dessous
+> (*API et services → Écran de consentement OAuth* / *Identifiants*) y redirigent, et
+> **les valeurs à saisir sont identiques** dans les deux présentations. Correspondance :
+> informations sur l'application → *Branding* ; type d'utilisateur et utilisateurs test →
+> *Audience* ; champs d'application → *Accès aux données* ; ID client OAuth → *Clients*.
 
 ### 1. Projet
 
@@ -170,6 +179,14 @@ GOOGLE_CLIENT_SECRET=GOCSPX-xxxxxxxxxxxxxxxx
 
 Dans `.env` en développement, dans `.env.production` (ou les secrets GitHub → Droplet, ADR-0009) en production. **Jamais dans le dépôt.** Redémarrer l'API : le bouton apparaît sur `/login` et `/register`.
 
+**Contrôle en une commande**, avant même d'ouvrir le navigateur :
+
+```bash
+curl -s "$API_URL/auth-providers"    # attendu : {"google":true}
+```
+
+S'il répond `{"google":false}`, l'une des deux variables manque ou n'a pas été rechargée — un avertissement le dit explicitement dans les journaux de démarrage de l'API. Ce contrôle distingue une erreur de **configuration** (ici) d'une erreur de **déclaration chez Google** (`redirect_uri_mismatch`, qui n'apparaît qu'au clic).
+
 ### 5. Passage en production
 
 Écran de consentement OAuth → **Publier l'application**. Tant que l'application reste en mode `Test`, seuls les utilisateurs test peuvent se connecter, et leurs jetons de rafraîchissement expirent au bout de sept jours. Avec les seuls scopes `email`/`profile`/`openid`, la publication est immédiate et **ne déclenche aucune vérification Google**.
@@ -182,6 +199,16 @@ Dans `.env` en développement, dans `.env.production` (ou les secrets GitHub →
 - **`docs/17` § « Bloqué par l'absence de SMTP » est levé** dans son principe : le blocage n'est plus structurel, il est configurationnel.
 - L'invitation continue de renvoyer son jeton dans la réponse de création, même avec SMTP actif : un email peut être classé en indésirable ou refusé par un domaine d'entreprise, et un lien copiable évite de rendre l'invitation dépendante d'une infrastructure qu'on ne maîtrise pas. Le champ `emailDelivered` dit lequel des deux chemins a fonctionné.
 - Le `console.log` du jeton d'invitation est supprimé (`docs/17` § Journalisation : aucun secret dans les logs — ce jeton valait une entrée dans l'organisation).
+
+### Limites connues
+
+Écrites ici pour qu'elles ne soient pas redécouvertes en production comme des surprises :
+
+- **Aucune reprise sur échec.** Un envoi qui échoue est journalisé, pas réessayé (option file d'attente écartée ci-dessus). Un incident SMTP de quelques minutes perd les messages émis pendant sa durée ; l'utilisateur peut redemander un lien, et une invitation reste récupérable par son lien copiable.
+- **Aucune observabilité de délivrabilité** : ni taux d'ouverture, ni retour de rejet (*bounce*). SMTP ne les expose pas. Un domaine qui commencerait à rejeter nos messages ne se verrait que par la plainte d'un utilisateur.
+- **SPF, DKIM et DMARC sont hors périmètre du code.** Sans ces enregistrements DNS sur le domaine expéditeur, les messages partiront en indésirables quelle que soit la qualité du code (à traiter à la mise en service, docs/24).
+- **Aucun quota propre aux envois.** `/auth/*` s'appuie sur la limitation de tentatives de better-auth ; rien ne borne spécifiquement le nombre d'emails qu'une même adresse peut faire déclencher. À revoir si le formulaire de réinitialisation devenait un vecteur de nuisance.
+- **Un seul fournisseur social.** Microsoft et Apple ne sont pas branchés ; la structure les accepterait sans changement d'architecture.
 
 ## Plan de validation
 
