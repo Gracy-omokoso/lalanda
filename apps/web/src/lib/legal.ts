@@ -19,6 +19,10 @@
 // ajoutée mais absente du footer, donc introuvable par un utilisateur qui la
 // cherche — et donc juridiquement inopposable.
 
+import { LEGAL_VERSION, PUBLISHER_NAME, legalTodo } from '@lalanda/shared/legal';
+
+export { LEGAL_VERSION, PUBLISHER_NAME };
+
 /** Identifiants des documents légaux publiés. */
 export type LegalSlug = 'cgu' | 'cgv' | 'confidentialite' | 'mentions-legales' | 'cookies';
 
@@ -37,23 +41,14 @@ export interface LegalDocument {
 }
 
 /**
- * VERSION DU CORPUS CONTRACTUEL.
+ * VERSION DU CORPUS CONTRACTUEL — définie dans `@lalanda/shared/legal`.
  *
- * C'est cette valeur qui est enregistrée avec l'acceptation d'un utilisateur
- * (`termsVersion`, cf. `apps/api/src/legal/`). Elle couvre l'ENSEMBLE des
- * documents opposables — CGU, CGV et politique de confidentialité — plutôt qu'un
- * document isolé : un utilisateur accepte un état du corpus à une date, pas cinq
- * numéros de version indépendants qu'il faudrait recouper pour savoir ce qu'il a
- * réellement lu.
- *
- * RÈGLE D'ÉVOLUTION : toute modification SUBSTANTIELLE (nouvelle finalité de
- * traitement, nouveau sous-traitant, changement de prix ou de durée
- * d'engagement, extension des usages interdits) impose de faire avancer cette
- * version. Les acceptations antérieures deviennent alors périmées et l'accord
- * est redemandé — c'est exactement ce que `GET /legal/terms/acceptance` permet
- * de détecter. Une correction de typographie ne la fait PAS avancer.
+ * Elle est réexportée ici pour que les pages n'aient qu'un seul import à faire,
+ * mais elle n'est PAS déclarée dans ce fichier : l'API l'enregistre avec chaque
+ * acceptation (`termsVersion`) et doit lire exactement la même valeur. Deux
+ * déclarations parallèles produiraient la panne la plus discrète possible — une
+ * acceptation « à jour » pour un utilisateur qui a lu l'ancienne version.
  */
-export const LEGAL_VERSION = '2026-08-09';
 
 /**
  * Documents publiés. L'ordre est celui des footers.
@@ -152,9 +147,33 @@ export const LEGAL_REVIEWED_BY_COUNSEL = false;
  * en production — publier une adresse qui ne reçoit personne est pire que ne
  * rien publier.
  */
-export const CONTACT_PLACEHOLDER = '[À COMPLÉTER : adresse email de contact]';
+export const CONTACT_PLACEHOLDER = legalTodo('adresse email de contact');
 
 /** Marqueur de champ que l'éditeur doit renseigner avant publication. */
-export function todo(label: string): string {
-  return `[À COMPLÉTER : ${label}]`;
-}
+export const todo = legalTodo;
+
+/**
+ * INFORMATIONS SUR L'ÉDITEUR QUI RESTENT À ÉTABLIR.
+ *
+ * Le nom — `PUBLISHER_NAME`, Televerx LLC — est établi. Rien d'autre ne l'est.
+ * Cette liste sert de récapitulatif unique : les mentions légales l'affichent
+ * telle quelle, et le document de conformité s'y réfère. Chaque entrée est un
+ * fait manquant, jamais un fait supposé.
+ *
+ * La forme « LLC » suggère une immatriculation aux États-Unis. C'EST UNE
+ * INDICATION, PAS UNE CONCLUSION : l'État d'immatriculation reste inconnu, et
+ * les conséquences (droit applicable, juridiction compétente, régime de
+ * transfert de données pour des utilisateurs situés dans l'UE) sont des
+ * questions à faire trancher par un juriste — pas à trancher ici.
+ * Voir docs/28-CONFORMITE-LEGALE.md.
+ */
+export const PUBLISHER_UNKNOWNS: readonly string[] = [
+  'forme juridique complète et État ou pays d’immatriculation de Televerx LLC',
+  'numéro d’enregistrement de la société',
+  'adresse du siège social',
+  'capital social, si la forme juridique en fait état',
+  'nom du représentant légal et du directeur de la publication',
+  'adresse email de contact',
+  'numéro de téléphone, si l’éditeur souhaite en publier un',
+  'identité et adresse de l’hébergeur (cible ADR-0009 : DigitalOcean, non provisionné)',
+] as const;

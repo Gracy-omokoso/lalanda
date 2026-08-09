@@ -29,6 +29,10 @@
     "./ai": {
       "types": "./dist/ai/index.d.ts",
       "import": "./dist/ai/index.js"
+    },
+    "./legal": {
+      "types": "./dist/legal/index.d.ts",
+      "import": "./dist/legal/index.js"
     }
   },
   "scripts": {

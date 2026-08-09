@@ -7,14 +7,17 @@
 // conforme à un droit applicable. Une relecture juridique est un PRÉALABLE à
 // toute mise en production. Voir docs/28-CONFORMITE-LEGALE.md.
 //
-// Les informations sur l'éditeur sont volontairement laissées en marqueurs
-// `[À COMPLÉTER]` : rien n'y est inventé.
+// ÉDITEUR : Televerx LLC (`PUBLISHER_NAME`). C'est le SEUL élément
+// d'identification établi. Adresse, État d'immatriculation, numéro
+// d'enregistrement, représentant légal et adresse de contact restent des
+// marqueurs `[À COMPLÉTER]` VISIBLES dans la page — les déduire de la forme
+// « LLC » produirait un document faux publié sous le nom d'une société réelle.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { legalDocument } from '@/lib/legal';
+import { PUBLISHER_NAME, legalDocument } from '@/lib/legal';
 import { LegalList, LegalPage, ToComplete, type LegalSection } from '../_components/legal-page';
 
 const doc = legalDocument('cgu');
@@ -32,8 +35,16 @@ const SECTIONS: readonly LegalSection[] = [
       <>
         <p>
           Les présentes conditions encadrent l&apos;utilisation de Lalanda, un service en ligne de
-          construction de plans financiers. Elles s&apos;appliquent à toute personne qui crée un
-          compte ou utilise le service, à titre gratuit comme payant.
+          construction de plans financiers édité par <strong>{PUBLISHER_NAME}</strong> (ci-après
+          «&nbsp;l&apos;éditeur&nbsp;», «&nbsp;nous&nbsp;»). Elles s&apos;appliquent à toute
+          personne qui crée un compte ou utilise le service, à titre gratuit comme payant.
+        </p>
+        <p>
+          Les coordonnées complètes de l&apos;éditeur figurent dans les{' '}
+          <Link href="/mentions-legales" className="underline underline-offset-4">
+            mentions légales
+          </Link>
+          .
         </p>
         <p>
           En cochant la case d&apos;acceptation lors de la création de votre compte, vous déclarez
@@ -131,13 +142,13 @@ const SECTIONS: readonly LegalSection[] = [
     body: (
       <>
         <p>
-          Vous restez propriétaire des données que vous saisissez ou importez : hypothèses, chiffres,
-          documents, contenus de projet. Nous n&apos;en revendiquons aucune propriété.
+          Vous restez propriétaire des données que vous saisissez ou importez : hypothèses,
+          chiffres, documents, contenus de projet. Nous n&apos;en revendiquons aucune propriété.
         </p>
         <p>
           Vous nous accordez uniquement les droits techniques nécessaires à la fourniture du service
-          — héberger, afficher, sauvegarder, calculer, exporter vos données à votre demande — pour la
-          durée où vous utilisez le service.
+          — héberger, afficher, sauvegarder, calculer, exporter vos données à votre demande — pour
+          la durée où vous utilisez le service.
         </p>
         <p>
           Nous n&apos;utilisons pas vos données de projet pour entraîner des modèles d&apos;IA. Les
@@ -158,7 +169,7 @@ const SECTIONS: readonly LegalSection[] = [
       <>
         <p>
           Le service, son interface, ses modèles sectoriels, ses moteurs de calcul, sa documentation
-          et sa marque restent la propriété de l&apos;éditeur ou de ses partenaires. Votre
+          et sa marque restent la propriété de {PUBLISHER_NAME} ou de ses partenaires. Votre
           abonnement vous donne un droit d&apos;usage personnel, non exclusif et non cessible,
           limité à la durée de votre accès.
         </p>
@@ -202,10 +213,10 @@ const SECTIONS: readonly LegalSection[] = [
           l&apos;intervention d&apos;un professionnel qualifié.
         </p>
         <p>
-          Les résultats produits dépendent entièrement des hypothèses que vous saisissez. Vous restez
-          responsable de ces hypothèses, de leur vraisemblance, et de l&apos;usage que vous faites
-          des documents obtenus — en particulier auprès d&apos;une banque, d&apos;un investisseur ou
-          d&apos;une administration.
+          Les résultats produits dépendent entièrement des hypothèses que vous saisissez. Vous
+          restez responsable de ces hypothèses, de leur vraisemblance, et de l&apos;usage que vous
+          faites des documents obtenus — en particulier auprès d&apos;une banque, d&apos;un
+          investisseur ou d&apos;une administration.
         </p>
         <p>
           Les paramètres fiscaux et comptables intégrés au service sont fournis à titre indicatif,
@@ -222,8 +233,8 @@ const SECTIONS: readonly LegalSection[] = [
       <>
         <p>
           Nous nous efforçons d&apos;assurer un service disponible et performant, sans garantir une
-          disponibilité ininterrompue. Le service peut être suspendu pour maintenance, mise à jour ou
-          incident de sécurité.
+          disponibilité ininterrompue. Le service peut être suspendu pour maintenance, mise à jour
+          ou incident de sécurité.
         </p>
         <p>
           Pour une interruption programmée d&apos;ampleur, nous cherchons à prévenir à
@@ -324,14 +335,18 @@ const SECTIONS: readonly LegalSection[] = [
       <>
         <p>
           <ToComplete>
-            droit applicable au contrat — dépend du pays d’immatriculation de l’éditeur et des pays
-            servis (zone OHADA, Union européenne pour la diaspora)
+            droit applicable au contrat. La dénomination «&nbsp;{PUBLISHER_NAME}&nbsp;» indique une
+            forme de société de type américain, sans que l’État d’immatriculation soit établi à ce
+            jour. Le choix du droit applicable dépend de ce point et des pays réellement servis
+            (zone OHADA, Union européenne pour la diaspora) — à faire trancher par un juriste
           </ToComplete>
         </p>
         <p>
           <ToComplete>
             juridiction compétente, et le cas échéant clause de médiation préalable ou dispositif de
-            médiation de la consommation applicable aux utilisateurs particuliers
+            médiation de la consommation applicable aux utilisateurs particuliers. Un utilisateur
+            consommateur conserve, dans plusieurs droits, le bénéfice des tribunaux de son lieu de
+            résidence quelle que soit la clause retenue
           </ToComplete>
         </p>
         <p>
