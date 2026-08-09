@@ -11,6 +11,8 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { api, type ParameterPackSummary, type ProjectView, type TemplateSummary } from '@/lib/api';
 
+import { PremiersPas } from './_components/premiers-pas';
+
 const TEMPLATE_LABELS: Record<string, { label: string; description: string }> = {
   'restaurant-kinshasa': {
     label: 'Restaurant',
@@ -382,11 +384,7 @@ export default function ProjectsPage(): React.ReactElement {
       {projects === null ? (
         <p className="text-sm text-[var(--foreground-muted)]">Chargement…</p>
       ) : projects.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-[var(--border)] p-8 text-center">
-          <p className="text-sm text-[var(--foreground-muted)]">
-            Aucun projet pour l&apos;instant. Crée ton premier plan financier ci-dessus.
-          </p>
-        </div>
+        <PremiersPas />
       ) : (
         <ul className="flex flex-col gap-2">
           {projects.map((p) => (

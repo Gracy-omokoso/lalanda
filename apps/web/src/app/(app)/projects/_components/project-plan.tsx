@@ -25,7 +25,9 @@ import {
   type TemplateDriverMeta,
   type TemplateMeta,
 } from '@/lib/api';
+import { LIENS_AIDE } from '@/lib/aide/liens';
 
+import { LienAideFeuille } from './aide-contextuelle';
 import { AmortissementsTable } from './amortissements-table';
 import { BfrTable, BilanTable, CafTable, SeuilTable } from './etats-financiers-tables';
 import { RatiosStickyBanner } from './ratios-sticky-banner';
@@ -737,8 +739,13 @@ function ResultsTabs({
         lines={ratiosLines}
         currency={currency}
         onSelect={() => setActiveTab('ratios')}
+        hrefAide={LIENS_AIDE.bandeauRatios}
       />
       <SheetTabs tabs={tabs} activeId={activeTab} onChange={setActiveTab} />
+      <LienAideFeuille
+        idFeuille={activeTab}
+        libelleFeuille={SHEET_LABELS[activeTab] ?? activeTab}
+      />
       <div
         role="tabpanel"
         id={`sheet-panel-${activeTab}`}

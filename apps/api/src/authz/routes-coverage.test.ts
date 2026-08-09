@@ -22,6 +22,7 @@ import { BillingController } from '../billing/billing.controller.js';
 import { CanvasController } from '../canvas/canvas.controller.js';
 import { EvaluateController } from '../evaluate/evaluate.controller.js';
 import { HealthController } from '../health/health.controller.js';
+import { LegalController } from '../legal/legal.controller.js';
 import { ObjectivesController } from '../objectives/objectives.controller.js';
 import { OrganizationSpaceController } from '../organization-space/organization-space.controller.js';
 import { InvitationsController } from '../organizations/invitations.controller.js';
@@ -53,6 +54,7 @@ const CONTROLEURS = [
   EvaluateController,
   HealthController,
   InvitationsController,
+  LegalController,
   MeController,
   MembersController,
   ObjectivesController,
@@ -117,6 +119,17 @@ const SANS_PERMISSION: Record<string, string> = {
     'Dit à la page de connexion si le bouton Google doit s’afficher. Consultée AVANT ' +
     'toute session, par définition : exiger une permission d’organisation la rendrait ' +
     'inutilisable. Ne renvoie qu’un booléen, aucun identifiant ni secret.',
+  // ── Acceptation des conditions (S22c) ───────────────────────────────────
+  // Même raisonnement que l'espace compte, poussé plus loin : l'acceptation est
+  // demandée à l'INSCRIPTION, à l'instant où l'organisation personnelle vient
+  // d'être créée par un hook non transactionnel. Exiger une permission
+  // d'organisation ferait échouer l'enregistrement de l'accord sur le seul écran
+  // où il est donné — et un accord perdu se redemande, mais un accord refusé
+  // pour une raison technique ressemble à un accord jamais donné.
+  // C'est en outre un fait PERSONNEL : un utilisateur accepte des conditions,
+  // pas une organisation.
+  'LegalController.read': 'État de son propre accord, scopé par la session.',
+  'LegalController.accept': 'Enregistrement de son propre accord, scopé par la session.',
 };
 
 interface RouteInspectee {
