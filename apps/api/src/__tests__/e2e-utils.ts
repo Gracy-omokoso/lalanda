@@ -212,6 +212,8 @@ export async function purgeTestUsers(db: Db, emails: string[]): Promise<void> {
     // organisation, elles ne sont donc pas couvertes par ORG_SCOPED_COLLECTIONS.
     db.collection('user_preferences').deleteMany({ userId: { $in: userIds } }),
     db.collection('email_change_requests').deleteMany({ userId: { $in: userIds } }),
+    // S22c — preuve d'acceptation des conditions, scopée par utilisateur elle aussi.
+    db.collection('terms_acceptances').deleteMany({ userId: { $in: userIds } }),
   ]);
 
   await db.collection('organizations').deleteMany({ _id: { $in: orgObjectIds } });

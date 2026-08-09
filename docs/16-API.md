@@ -151,7 +151,30 @@ Ces routes passent par `AccountAuthGuard` et non `AuthGuard` : elles résolvent 
 
 **Codes d’erreur propres à cet espace** : `400 INVALID_PASSWORD`, `400 EMAIL_MISMATCH`, `400 EMAIL_UNCHANGED`, `400 INVALID_TOKEN`, `404 SESSION_NOT_FOUND`, `409 EMAIL_TAKEN`, `409 LAST_OWNER`.
 
-**Bloqué par l’absence de SMTP.** `POST /account/email/change` répond `202` : la demande est *acceptée*, le changement n’est **pas** appliqué. Le lien de vérification est généré mais n’est envoyé nulle part, faute de fournisseur d’envoi d’emails (docs/17 § Restant). La réponse le dit explicitement — `pending.verificationDelivered: false` et un `reason` lisible — plutôt que de laisser croire à un email parti. Un utilisateur final ne peut donc pas terminer un changement d’adresse aujourd’hui. L’alternative, appliquer le changement sans vérification, ouvrirait un chemin de prise de compte (docs/17 § Menaces prioritaires) : elle est refusée.
+**Livraison du lien de vérification (mis à jour en S22a).** `POST /account/email/change` répond toujours `202` : la demande est *acceptée*, le changement n’est **pas** appliqué — l’adresse ne bouge qu’à la présentation du jeton. Depuis S22a (ADR-0014), le lien part réellement par email **si un SMTP est configuré**, vers la nouvelle adresse, et atterrit sur la page publique `/verification-email` qui appelle `POST /account-email/verify`.
+
+`pending.verificationDelivered` ne vaut `true` que si l’envoi a **réellement** abouti ; sinon il reste `false` avec un `reason` lisible (`EMAIL_NON_DELIVRE`) — sans SMTP, ou sur échec d’envoi. Marquer l’envoi comme fait dès qu’on a appelé la fonction d’envoi reviendrait à afficher « consultez votre boîte » à quelqu’un qui ne recevra jamais rien. L’alternative — appliquer le changement sans vérification — ouvrirait un chemin de prise de compte (docs/17 § Menaces prioritaires) : elle reste refusée.
+
+## Authentification — moyens de connexion (S22a)
+
+`apps/api/src/auth/`. Détail et arbitrages : ADR-0014.
+
+```text
+GET  /auth-providers                 { "google": true|false } — public, aucun secret
+POST /auth/sign-in/social            better-auth — { provider: "google", callbackURL }
+GET  /auth/callback/google           better-auth — URI de redirection à déclarer chez Google
+POST /auth/request-password-reset    better-auth — { email } → 200 TOUJOURS
+POST /auth/reset-password            better-auth — { newPassword, token }
+POST /auth/verify-email              better-auth — vérification d'adresse à l'inscription
+```
+
+**`GET /auth-providers` est la source de vérité unique du bouton Google.** La page de connexion l’interroge et n’affiche le bouton que si `google` vaut `true`. Une variable `NEXT_PUBLIC_*` côté web serait une seconde source de vérité, et la panne qui en découle est toujours la même : un bouton affiché vers un fournisseur non configuré. La route ne renvoie qu’un booléen — ni `clientId`, ni secret.
+
+**`POST /auth/request-password-reset` répond `200` et le MÊME corps que l’adresse existe ou non.** C’est la règle de non-énumération : un formulaire qui répond « adresse inconnue » devient un annuaire des comptes. better-auth simule la génération du jeton et la lecture en base pour ne pas se trahir non plus par son temps de réponse. L’interface ne rattrape pas cette uniformité : elle passe à l’écran de confirmation dès que la requête aboutit.
+
+**Le jeton de réinitialisation est à usage unique et expire en 30 minutes** ; la réinitialisation révoque toutes les sessions de l’utilisateur. Sans SMTP configuré, la route répond quand même `200` — le service d’envoi existe toujours, c’est son transport qui se replie sur un log serveur.
+
+**Sans `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`**, `GET /auth-providers` renvoie `{ "google": false }` et `POST /auth/sign-in/social` répond `404 PROVIDER_NOT_FOUND` — une erreur métier lisible, pas une exception.
 
 ## Espace organisation — implémenté (S21a)
 

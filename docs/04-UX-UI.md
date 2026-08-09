@@ -157,3 +157,31 @@ Les blocs fermés du tableau de bord sont listés sobrement en bas de page — n
 - **Logo par URL, pas par envoi de fichier** : aucun stockage de fichiers n’est branché, comme pour la photo de profil de l’espace compte. L’écran le dit au lieu de proposer un bouton inerte.
 - **Aucune intégration de paiement** (docs/13 § hors périmètre S16b) : la page facturation affiche l’offre et la consommation, pas un bouton « changer de plan » qui ne mènerait nulle part. Un dépassement précise que **rien n’est supprimé** — seules les créations au-delà de la limite sont refusées.
 - **Le tableau de bord n’est pas un export** : les agrégations coûteuses balaient les 20 projets les plus récemment modifiés. Le détail complet vit sur la page de chaque projet, et la réponse ne prétend nulle part à l’exhaustivité.
+
+## Implémenté (S22a) — Connexion Google, mot de passe oublié, confirmation d’adresse
+
+Écrans : `apps/web/src/app/(auth)/`. API et arbitrages : ADR-0014.
+
+### Pages
+
+| Route | Contenu | Accès |
+|---|---|---|
+| `/login` | + bouton Google, + lien « Mot de passe oublié ? », bandeaux `?verifie=1` et `?erreur=google` | public |
+| `/register` | + bouton Google | public |
+| `/mot-de-passe-oublie` | Demande d’un lien de réinitialisation | public |
+| `/nouveau-mot-de-passe?token=…` | Choix du nouveau mot de passe | public, jeton porteur |
+| `/verification-email?token=…` | Confirme un changement d’adresse (flux S20b) | public, jeton porteur |
+
+Les trois dernières restent **publiques dans les deux sens** : elles ne figurent ni dans `PROTECTED_PREFIXES` ni dans `isAuthPath` (`lib/routes.ts`). Un visiteur anonyme y accède, et quelqu’un de déjà connecté n’en est pas éjecté vers `/projects` avant d’avoir confirmé — le lien arrive dans une boîte email, souvent ouverte sur un autre appareil que celui où la demande a été faite.
+
+### Le bouton Google n’apparaît que si l’API sait le traiter
+
+Sa visibilité vient de `GET /auth-providers`, pas d’une variable de build côté web. Tant que la réponse n’est pas arrivée, le composant ne rend **rien** — ni bouton grisé, ni squelette : faire apparaître puis disparaître un bouton donne l’impression d’une fonctionnalité retirée, et déplace le formulaire sous le curseur de quelqu’un qui a déjà commencé à saisir son mot de passe.
+
+Le même intitulé sert à la connexion et à l’inscription (« Continuer avec Google ») : côté Google, créer un compte et s’y connecter sont la même action. Deux libellés laisseraient croire à deux comptes distincts selon la porte empruntée.
+
+### « Mot de passe oublié » ne dit jamais si l’adresse existe
+
+L’écran de confirmation est **le même** que l’adresse soit connue ou non : « Si un compte existe pour cette adresse, un lien vient d’y être envoyé. » Distinguer les deux cas ferait de ce formulaire un annuaire des comptes (docs/17 § Menaces prioritaires). Seule une panne réseau produit un message d’erreur — « nous n’avons pas pu traiter votre demande » ne dit rien sur l’existence du compte, et taire la panne laisserait quelqu’un attendre un email jamais demandé.
+
+Sur `/nouveau-mot-de-passe`, la confirmation du mot de passe est comparée **avant** l’appel réseau : le lien ne sert qu’une fois, une faute de frappe ne doit pas le consommer. Après succès, redirection vers `/login` et non vers l’application : toutes les sessions viennent d’être révoquées côté serveur.

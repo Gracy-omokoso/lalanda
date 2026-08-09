@@ -16,10 +16,11 @@ import type { HydratedDocument } from 'mongoose';
  * hors périmètre de ce lot (refonte RBAC en cours en parallèle). Le flux est donc
  * porté par ce module, avec la même sémantique.
  *
- * LIVRAISON DE L'EMAIL : inexistante. Aucun fournisseur SMTP n'est configuré
- * (docs/17 § Restant, S16a). `notifiedAt` reste `null` et l'API annonce
- * explicitement `verificationDelivered: false` — le flux est complet côté serveur
- * mais NON UTILISABLE par un utilisateur final tant que SMTP n'est pas branché.
+ * LIVRAISON DE L'EMAIL : branchée en S22a (`MailService`, ADR-0014). `notifiedAt`
+ * n'est renseigné que si l'envoi a RÉELLEMENT abouti ; sans SMTP configuré, le
+ * transport se replie sur un log serveur, le champ reste `null` et l'API annonce
+ * `verificationDelivered: false`. Ce champ reste donc la preuve en base de ce qui
+ * est parti, jamais un succès simulé.
  *
  * Le token suit la convention des invitations (S5d) : 32 octets aléatoires en
  * 64 caractères hexadécimaux, opaque, indexé unique.
