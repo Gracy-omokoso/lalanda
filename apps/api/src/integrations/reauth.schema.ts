@@ -11,7 +11,9 @@ import type { HydratedDocument } from 'mongoose';
 
 @Schema({ collection: 'platform_reauth', timestamps: true, strict: true })
 export class PlatformReauth {
-  @Prop({ type: String, required: true, index: true })
+  // Pas d'`index: true` ici : l'index composé `{ userId, sessionFingerprint }`
+  // plus bas couvre déjà toute recherche par `userId` (préfixe d'index composé).
+  @Prop({ type: String, required: true })
   userId!: string;
 
   /** SHA-256 du jeton de session. Jamais le jeton lui-même. */

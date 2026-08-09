@@ -7,10 +7,11 @@
 // + quota strict AI_THROTTLE appliqué par utilisateur (UserThrottlerGuard,
 // après AuthGuard donc req.user disponible) ET par IP (guard global).
 
-import { BadRequestException, Body, Controller, Inject, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Inject, Post, Req, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 
-import { AuthGuard } from '../auth/auth.guard.js';
+import { AiUsageService } from '../admin/ai-usage.service.js';
+import { AuthGuard, type AuthenticatedRequest } from '../auth/auth.guard.js';
 import { RequirePermission } from '../authz/authz.decorators.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
 import { AI_THROTTLE } from '../security/throttling.js';
@@ -24,13 +25,19 @@ import { AiActionsService } from './ai-actions.service.js';
 @Controller('ai')
 @UseGuards(AuthGuard, PermissionsGuard)
 export class AiActionsController {
-  constructor(@Inject(AiActionsService) private readonly service: AiActionsService) {}
+  constructor(
+    @Inject(AiActionsService) private readonly service: AiActionsService,
+    @Inject(AiUsageService) private readonly usage: AiUsageService,
+  ) {}
 
   @Post('corrective-actions')
   @RequirePermission('analytics.read')
   @Throttle({ default: AI_THROTTLE })
   @UseGuards(UserThrottlerGuard)
-  async corrective(@Body() body: unknown): Promise<CorrectiveActionsResponse> {
+  async corrective(
+    @Req() req: AuthenticatedRequest,
+    @Body() body: unknown,
+  ): Promise<CorrectiveActionsResponse> {
     const parsed = CorrectiveActionsRequestSchema.safeParse(body);
     if (!parsed.success) {
       throw new BadRequestException({
@@ -38,6 +45,17 @@ export class AiActionsController {
         issues: parsed.error.issues,
       });
     }
-    return this.service.correctiveActions(parsed.data);
+    const result = await this.service.correctiveActions(parsed.data);
+    // Comptage APRÈS la réponse du service et à partir de `result.source` : c'est
+    // la seule manière de distinguer un appel FACTURÉ d'un fallback déterministe.
+    // Compter avant l'appel gonflerait la consommation OpenAI de tous les cas où
+    // aucune clé n'est configurée (S21b — tableau de bord `/admin`).
+    await this.usage.record({
+      organizationId: req.orgId ?? 'inconnue',
+      userId: req.user?.id ?? 'inconnu',
+      action: 'ai.corrective_actions',
+      source: result.source === 'llm' ? 'llm' : 'fallback',
+    });
+    return result;
   }
 }
