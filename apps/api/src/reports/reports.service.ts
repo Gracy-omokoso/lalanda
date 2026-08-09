@@ -26,8 +26,16 @@ interface BrowserLike {
   newPage(): Promise<PageLike>;
   close(): Promise<void>;
 }
+interface HttpRequestLike {
+  url(): string;
+  abort(): Promise<void>;
+  continue(): Promise<void>;
+}
 interface PageLike {
   setContent(html: string, opts?: { waitUntil?: string; timeout?: number }): Promise<void>;
+  setJavaScriptEnabled(enabled: boolean): Promise<void>;
+  setRequestInterception(enabled: boolean): Promise<void>;
+  on(event: 'request', handler: (req: HttpRequestLike) => void): void;
   pdf(opts: Record<string, unknown>): Promise<Buffer>;
   close(): Promise<void>;
 }
@@ -115,6 +123,29 @@ export class ReportsService implements OnModuleDestroy {
     const browser = await this.getBrowser();
     const page = await browser.newPage();
     try {
+      // (S22e) Confinement du renderer. Chromium tourne ici avec `--no-sandbox`
+      // (obligatoire dans le conteneur, sans SYS_ADMIN) et sur le réseau qui
+      // joint mongo:27017, minio:9000 et l'endpoint de métadonnées cloud
+      // 169.254.169.254. Le rapport est du HTML statique à CSS inline : il n'a
+      // besoin NI de JavaScript NI du moindre appel réseau. Mesuré avant ce
+      // durcissement : un `<script>fetch('http://127.0.0.1:9000/...')</script>`
+      // injecté s'exécutait et joignait MinIO. Un seul oubli futur d'`escapeHtml`
+      // (report-html.ts) cesserait alors d'être un défaut cosmétique dans un PDF
+      // pour devenir une SSRF exfiltrante déclenchée par qui télécharge le PDF.
+      //
+      // Deux barrières indépendantes, chacune suffisante :
+      //   1. JavaScript coupé — aucun script de la page ne peut s'exécuter;
+      //   2. interception réseau — toute requête sortante est avortée, y compris
+      //      celles qu'un `<img>`/`<link>` déclencherait sans JavaScript.
+      await page.setJavaScriptEnabled(false);
+      await page.setRequestInterception(true);
+      page.on('request', (req) => {
+        // Le HTML est fourni par `setContent` (document `about:blank`), il n'y a
+        // donc AUCUNE requête légitime : tout ce qui part est une ressource que
+        // le contenu a tenté de charger, on l'avorte. `void` : le handler est
+        // synchrone, on ne bloque pas la boucle d'événements de Puppeteer.
+        void req.abort().catch(() => req.continue().catch(() => undefined));
+      });
       // domcontentloaded : suffisant car le HTML embarque CSS inline et n'a aucune ressource externe.
       // networkidle0 était flaky avec setContent (pas de navigation → 30s timeout systématique).
       await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT_MS });
