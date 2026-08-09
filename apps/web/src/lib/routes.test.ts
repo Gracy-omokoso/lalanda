@@ -27,14 +27,14 @@ describe('isProtectedPath (S20b)', () => {
     }
   });
 
-<<<<<<< HEAD
   it('protège le tunnel de souscription et son retour fournisseur (S22b)', () => {
     // Le retour de paiement est la page la plus exposée du tunnel : le
     // fournisseur y renvoie le client avec une URL devinable. Sans session, elle
     // doit mener à la connexion, jamais afficher un état d'abonnement.
     expect(isProtectedPath('/souscription')).toBe(true);
     expect(isProtectedPath('/souscription/retour')).toBe(true);
-=======
+  });
+
   it('protège l’espace admin plateforme, racine comme sous-routes (S21b)', () => {
     // Sans cette entrée, un visiteur non authentifié verrait `/admin/integrations`
     // se monter avant que l'API ne réponde 401 — c'est-à-dire la structure de
@@ -48,7 +48,6 @@ describe('isProtectedPath (S20b)', () => {
     ]) {
       expect(isProtectedPath(path)).toBe(true);
     }
->>>>>>> origin/main
   });
 
   it('protège les espaces existants, racine comme sous-routes', () => {

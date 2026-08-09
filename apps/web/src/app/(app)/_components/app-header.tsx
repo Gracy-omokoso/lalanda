@@ -66,7 +66,6 @@ export function AppHeader(): React.ReactElement {
             >
               Membres
             </Link>
-<<<<<<< HEAD
             {/* S22b — le tunnel de souscription est une route autonome, donc il
                 lui faut une entrée. Offerte à tout membre pour la même raison
                 que les deux précédentes : la page dit elle-même que la gestion
@@ -78,7 +77,6 @@ export function AppHeader(): React.ReactElement {
             >
               Abonnement
             </Link>
-=======
             {operateur ? (
               <Link
                 href="/admin"
@@ -87,7 +85,6 @@ export function AppHeader(): React.ReactElement {
                 Administration
               </Link>
             ) : null}
->>>>>>> origin/main
             <OrgSwitcher />
           </>
         ) : null}
