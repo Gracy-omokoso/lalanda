@@ -17,6 +17,7 @@ import { ApiEnvSchema, parseEnv } from '@lalanda/shared';
 
 import { AppModule } from './app.module.js';
 import { getAuth } from './auth/auth.js';
+import { applyTrustedProxy } from './security/trusted-proxy.js';
 
 async function bootstrap(): Promise<void> {
   const env = parseEnv(ApiEnvSchema, process.env);
@@ -40,7 +41,16 @@ async function bootstrap(): Promise<void> {
   // et empêche better-auth de matcher son basePath).
   const expressApp = app.getHttpAdapter().getInstance() as {
     all: (path: string, ...handlers: unknown[]) => void;
+    set: (setting: string, value: unknown) => unknown;
   };
+
+  // (S22f, F-03) Chaîne de confiance du reverse proxy — DOIT être posé avant que
+  // la moindre requête soit servie : sans lui, `req.ip` vaut l'adresse de Caddy
+  // pour tous les clients et le rate limiting devient un compteur global
+  // (déni de service applicatif à 100 requêtes). Le nombre de rangs et sa
+  // justification vivent dans `security/trusted-proxy.js`.
+  applyTrustedProxy(expressApp);
+
   expressApp.all('/auth/*', toNodeHandler(getAuth()));
 
   await app.listen(env.API_PORT, '0.0.0.0');
