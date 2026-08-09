@@ -99,6 +99,14 @@ services:
     env_file:
       - .env.production
     networks:
+      # (S22f, F-03) Cette ligne est le troisième maillon de la chaîne de
+      # confiance du reverse proxy : l'API règle `trust proxy = 1` — UN seul
+      # rang — et cette affirmation n'est vraie que parce que `edge` ne publie
+      # que les ports de caddy. Aucun autre client ne peut atteindre :3001
+      # directement, donc aucun ne peut se présenter avec un `X-Forwarded-For`
+      # qui court-circuiterait le rang de confiance. Publier ce port, ou glisser
+      # un proxy supplémentaire devant caddy, invalide le réglage de l'API :
+      # voir apps/api/src/security/trusted-proxy.ts.
       - edge # joignable par Caddy
       - interne # accès mongo/redis/minio
     depends_on:
