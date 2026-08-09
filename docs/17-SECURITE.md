@@ -11,7 +11,7 @@ Durcissement de production livré au sprint S16a :
 
 - **Authentification sur `/evaluate`** : `GET /evaluate/templates`, `GET /evaluate/templates/:slug` et `POST /evaluate` exigent une session valide (`AuthGuard`). L'exposition publique « S3-lite » est terminée. Couvert par tests unitaires (métadonnées de guard) et e2e (401 sans session, 200 avec).
 - **Rate limiting** (`@nestjs/throttler`, `apps/api/src/security/`) :
-  - global : 100 req/min/IP sur toutes les routes NestJS (`ThrottlerGuard` en `APP_GUARD`) ;
+  - global : 100 req/min/IP sur toutes les routes NestJS (`ClientIpThrottlerGuard` en `APP_GUARD` — voir § Chaîne de confiance du reverse proxy pour ce que « IP » veut dire ici) ;
   - quota strict sur `POST /ai/corrective-actions` (endpoint facturé OpenAI, ADR-0008) : authentification obligatoire + 10 req/min **par utilisateur** (`UserThrottlerGuard`, compteur indexé sur l'id de session) et par IP ;
   - les routes `/auth/*` (better-auth, montées en middleware Express) ne passent pas par ces guards — better-auth applique sa propre limitation de tentatives.
 - **Headers de sécurité** :
@@ -111,6 +111,44 @@ Détail complet et arbitrages : **ADR-0014**. Points de sécurité :
 - **aucune reprise sur échec d’envoi** : un envoi raté est journalisé, pas réessayé — un incident SMTP de quelques minutes perd les messages émis pendant sa durée. L’utilisateur peut redemander un lien, et une invitation reste récupérable par son lien copiable ;
 - **aucun quota propre aux envois** : `/auth/*` s’appuie sur la limitation de tentatives de better-auth, mais rien ne borne spécifiquement le nombre d’emails qu’une même adresse peut faire déclencher ;
 - **notification à l’ancienne adresse lors d’un changement d’email** (§ Restant sur le périmètre S20b) : le mécanisme d’envoi existe désormais, le message reste à écrire et à brancher.
+
+## Implémenté (S22f) — chaîne de confiance du reverse proxy
+
+Correctif du finding **F-03** de docs/29-AUDIT-SECURITE-S22e.md. Le sujet n'est pas un réglage : c'est la réponse à la question « quelle valeur, dans une requête HTTP, l'API a-t-elle le droit d'appeler *l'identité du client* ? ». Toute limite par client repose dessus.
+
+### Le problème
+
+Derrière Caddy, l'API ne voit qu'une seule adresse TCP : celle du conteneur du proxy. `req.ip` valait donc la même chose pour tout le monde et le seau de 100 req/min était **un compteur global** : 100 requêtes d'un attaquant renvoyaient `429` à tous les utilisateurs légitimes. Le rate limiting nominalement « par IP » était en réalité une porte de déni de service.
+
+### La chaîne, rang par rang
+
+```
+client ─── Internet ───▶ caddy:443 ───▶ api:3001
+```
+
+| Rang | Qui écrit | Peut-on le croire ? |
+| --- | --- | --- |
+| 0 | Le **client** peut envoyer n'importe quel `X-Forwarded-For` | Non — donnée hostile, jamais une identité |
+| 1 | **Caddy** (`reverse_proxy`) *append* l'adresse du pair TCP qu'il observe réellement | Oui — c'est notre propre proxy, et cette valeur est toujours la dernière de la chaîne |
+| — | Aucun autre proxy : le réseau `edge` de `docker-compose.prod.yml` ne publie que les ports de Caddy, le conteneur `api` n'est joignable que par lui | — |
+
+D'où **`app.set('trust proxy', 1)`** (`apps/api/src/main.ts`, valeur et justification dans `apps/api/src/security/trusted-proxy.ts`). Express tronque la chaîne au premier maillon non fiable et retient l'adresse posée par Caddy — l'IP cliente réelle. Le préfixe forgé par le client est ignoré.
+
+**Pourquoi un nombre et pas `true`.** `trust proxy: true` fait confiance à la chaîne entière, y compris à la partie écrite par le client : Express retiendrait l'adresse la plus à gauche, celle que l'attaquant contrôle, et il lui suffirait d'en changer à chaque requête pour obtenir un seau vierge. La limite ne serait pas réparée, elle serait supprimée. Un rang de confiance est une affirmation sur la topologie du déploiement : elle doit être écrite, datée et vérifiable.
+
+**Ce qui change si la topologie change.** Un CDN ou un load balancer ajouté devant Caddy ajoute un rang : sans mise à jour du nombre, l'IP retenue redevient celle de l'infrastructure et le seau redevient partagé. Le nombre est donc une constante nommée, commentée, et non un littéral perdu dans `main.ts`.
+
+### Ce qui n'a pas changé
+
+Le quota de `POST /ai/corrective-actions` (10 req/min, endpoint facturé OpenAI, ADR-0008) reste indexé **par utilisateur** et non par IP : deux comptes derrière une même IP publique ne se pénalisent pas, et un même compte ne regagne rien en changeant de réseau. Les clés des deux seaux sont préfixées (`ip:` / `user:`) pour ne jamais collisionner dans le stockage.
+
+### Vérification
+
+`apps/api/src/security/trusted-proxy.test.ts` monte de vraies applications Nest et leur envoie de vraies requêtes : seaux indépendants par IP cliente, `X-Forwarded-For` forgé sans effet, quota par utilisateur préservé. Un bloc témoin monte la même application **sans** le correctif et reproduit le finding — sans lui, une suite verte ne dirait pas si elle teste le correctif ou le hasard.
+
+### Restant
+
+Compteurs en mémoire de process (déjà noté § Restant S16a) : dès deux instances d'API, chaque instance a son propre seau. Prérequis à lever avant la mise à l'échelle horizontale — backend Redis partagé (`@nest-lab/throttler-storage-redis`).
 
 ## Menaces prioritaires
 
