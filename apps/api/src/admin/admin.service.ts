@@ -27,11 +27,7 @@ import type { Connection, Model } from 'mongoose';
 
 import { BillingService } from '../billing/billing.service.js';
 import { PLANS, type Plan } from '../billing/entitlements.js';
-import {
-  isPlatformRole,
-  PLATFORM_ROLE_LABELS,
-  type PlatformRole,
-} from '../authz/permissions.js';
+import { isPlatformRole, PLATFORM_ROLE_LABELS, type PlatformRole } from '../authz/permissions.js';
 import {
   PlatformRoleAssignment,
   type PlatformRoleAssignmentDocument,
@@ -106,21 +102,18 @@ export class AdminService {
     const db = this.connection.db;
     const since = new Date(Date.now() - 30 * 24 * 3600_000);
 
-    const [orgTotal, suspended, projectTotal, approvedPlans, roleRows, aiCalls] =
-      await Promise.all([
+    const [orgTotal, suspended, projectTotal, approvedPlans, roleRows, aiCalls] = await Promise.all(
+      [
         this.orgs.countDocuments({}).exec(),
         this.suspensions.countDocuments({ liftedAt: null }).exec(),
         db ? db.collection('projects').countDocuments({}) : Promise.resolve(0),
         // Un plan `superseded` a bien été validé un jour : le compteur porte sur
         // l'acte de validation, pas sur le nombre de plans encore courants.
         db ? db.collection('financial_plans').countDocuments({}) : Promise.resolve(0),
-        this.platformRoles
-          .find({ revokedAt: null })
-          .select({ userId: 1 })
-          .lean()
-          .exec(),
+        this.platformRoles.find({ revokedAt: null }).select({ userId: 1 }).lean().exec(),
         this.aiUsage.countSince(since),
-      ]);
+      ],
+    );
 
     const userTotal = db ? await db.collection('user').countDocuments({}) : 0;
 
@@ -152,7 +145,10 @@ export class AdminService {
 
   // ── Organisations ──────────────────────────────────────────────────────────
 
-  async listOrganizations(query: { q?: string; limit?: number }): Promise<AdminOrganizationSummary[]> {
+  async listOrganizations(query: {
+    q?: string;
+    limit?: number;
+  }): Promise<AdminOrganizationSummary[]> {
     const limit = Math.min(Math.max(query.limit ?? 50, 1), 200);
     const filter: Record<string, unknown> = {};
     if (query.q) {
@@ -164,7 +160,10 @@ export class AdminService {
   }
 
   async getOrganization(orgId: string): Promise<AdminOrganizationSummary> {
-    const doc = await this.orgs.findById(orgId).exec().catch(() => null);
+    const doc = await this.orgs
+      .findById(orgId)
+      .exec()
+      .catch(() => null);
     if (!doc) throw new NotFoundException({ code: 'ORG_NOT_FOUND' });
     return this.summarizeOrganization(doc);
   }
@@ -209,7 +208,10 @@ export class AdminService {
     if (!PLANS.includes(plan)) {
       throw new BadRequestException({ code: 'UNKNOWN_PLAN', message: `Plan inconnu : ${plan}.` });
     }
-    const org = await this.orgs.findById(orgId).exec().catch(() => null);
+    const org = await this.orgs
+      .findById(orgId)
+      .exec()
+      .catch(() => null);
     if (!org) throw new NotFoundException({ code: 'ORG_NOT_FOUND' });
 
     const previous = await this.billing.getPlan(orgId);
@@ -237,10 +239,15 @@ export class AdminService {
     reason: string,
     actor: AdminActor,
   ): Promise<AdminOrganizationSummary> {
-    const org = await this.orgs.findById(orgId).exec().catch(() => null);
+    const org = await this.orgs
+      .findById(orgId)
+      .exec()
+      .catch(() => null);
     if (!org) throw new NotFoundException({ code: 'ORG_NOT_FOUND' });
 
-    const existing = await this.suspensions.findOne({ organizationId: orgId, liftedAt: null }).exec();
+    const existing = await this.suspensions
+      .findOne({ organizationId: orgId, liftedAt: null })
+      .exec();
     if (!existing) {
       await this.suspensions.create({
         organizationId: orgId,
@@ -266,7 +273,10 @@ export class AdminService {
   }
 
   async liftSuspension(orgId: string, actor: AdminActor): Promise<AdminOrganizationSummary> {
-    const org = await this.orgs.findById(orgId).exec().catch(() => null);
+    const org = await this.orgs
+      .findById(orgId)
+      .exec()
+      .catch(() => null);
     if (!org) throw new NotFoundException({ code: 'ORG_NOT_FOUND' });
     await this.suspensions
       .updateOne(
@@ -309,7 +319,11 @@ export class AdminService {
         .find({ userId: { $in: ids }, revokedAt: null })
         .lean()
         .exec(),
-      this.memberships.find({ userId: { $in: ids } }).select({ userId: 1 }).lean().exec(),
+      this.memberships
+        .find({ userId: { $in: ids } })
+        .select({ userId: 1 })
+        .lean()
+        .exec(),
     ]);
 
     const rolesByUser = new Map<string, AdminUserSummary['platformRoles']>();
@@ -363,7 +377,10 @@ export class AdminService {
 
     const expiresAt = input.expiresAt ? new Date(input.expiresAt) : null;
     if (expiresAt && Number.isNaN(expiresAt.getTime())) {
-      throw new BadRequestException({ code: 'INVALID_DATE', message: 'Date d’expiration invalide.' });
+      throw new BadRequestException({
+        code: 'INVALID_DATE',
+        message: 'Date d’expiration invalide.',
+      });
     }
     await this.platformRoles
       .findOneAndUpdate(

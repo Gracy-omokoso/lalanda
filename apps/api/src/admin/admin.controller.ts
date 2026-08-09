@@ -150,7 +150,11 @@ export class AdminController {
   ): Promise<AdminOrganizationSummary> {
     const parsed = SuspendOrganizationSchema.safeParse(body);
     if (!parsed.success) throw invalid('Motif de suspension requis (10 caractères minimum).');
-    return this.admin.suspendOrganization(organizationId, parsed.data.reason, await this.actorOf(req));
+    return this.admin.suspendOrganization(
+      organizationId,
+      parsed.data.reason,
+      await this.actorOf(req),
+    );
   }
 
   @Delete('organizations/:organizationId/suspend')
@@ -252,4 +256,3 @@ function toInt(raw: string | undefined): number | undefined {
 function invalid(message: string): BadRequestException {
   return new BadRequestException({ code: 'VALIDATION_ERROR', message });
 }
-

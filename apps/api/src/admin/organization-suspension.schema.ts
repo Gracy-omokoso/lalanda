@@ -51,8 +51,7 @@ export class OrganizationSuspension {
 }
 
 export type OrganizationSuspensionDocument = HydratedDocument<OrganizationSuspension>;
-export const OrganizationSuspensionSchema =
-  SchemaFactory.createForClass(OrganizationSuspension);
+export const OrganizationSuspensionSchema = SchemaFactory.createForClass(OrganizationSuspension);
 
 // Une seule suspension ACTIVE par organisation; l'historique reste illimité.
 // L'index est PARTIEL : sans `partialFilterExpression`, la contrainte d'unicité

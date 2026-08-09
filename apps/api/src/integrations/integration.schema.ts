@@ -115,20 +115,42 @@ export const IntegrationSchema = SchemaFactory.createForClass(Integration);
 IntegrationSchema.index({ provider: 1, scope: 1, organizationId: 1 }, { unique: true });
 
 /**
- * DEUXIÈME BARRIÈRE — `toJSON` ampute le document de tout matériel cryptographique.
+ * DEUXIÈME BARRIÈRE — le document est amputé de tout matériel cryptographique dès
+ * qu'il quitte l'état hydraté.
  *
  * Volontairement destructif plutôt que sélectif : on ne retire pas « les champs
  * sensibles de `secrets` », on remplace `secrets` par une table de booléens. Un
  * futur champ ajouté à `EncryptedValue` serait alors couvert d'office, là où une
  * liste de suppressions aurait laissé passer le nouveau venu en silence.
+ *
+ * Idempotente : appliquée deux fois (`toObject` puis `toJSON`), elle produit le
+ * même résultat — `Object.keys` d'une table de booléens redonne les mêmes noms.
  */
-IntegrationSchema.set('toJSON', {
-  transform: (_doc, ret) => {
-    const bag = ret as unknown as Record<string, unknown>;
-    const secrets = bag['secrets'] as Record<string, unknown> | undefined;
-    if (secrets && typeof secrets === 'object') {
-      bag['secrets'] = Object.fromEntries(Object.keys(secrets).map((name) => [name, true]));
-    }
-    return bag;
-  },
-});
+function amputerLeMaterielChiffre(_doc: unknown, ret: unknown): unknown {
+  const bag = ret as Record<string, unknown>;
+  const secrets = bag['secrets'] as Record<string, unknown> | undefined;
+  if (secrets && typeof secrets === 'object') {
+    bag['secrets'] = Object.fromEntries(Object.keys(secrets).map((name) => [name, true]));
+  }
+  return bag;
+}
+
+IntegrationSchema.set('toJSON', { transform: amputerLeMaterielChiffre });
+
+/**
+ * La MÊME amputation sur `toObject`, et ce n'est pas de la redondance décorative.
+ *
+ * `toJSON` ne couvre que `JSON.stringify`. Or `console.log(doc)`, `` `${doc}` ``,
+ * `String(doc)` et la sérialisation d'une trace de pile passent tous par
+ * `util.inspect`, que Mongoose fait suivre à `toObject` — pas à `toJSON`. Sans
+ * cette ligne, un `logger.debug({ doc })` égaré recopie `ciphertext`, `iv`,
+ * `salt`, `authTag` et `keyId` dans les journaux, c'est-à-dire vers l'agrégateur
+ * externe qu'ADR-0013 §10 nomme comme non assaini.
+ *
+ * C'est le pendant, au niveau du DOCUMENT, de ce que `Secret` fait au niveau de
+ * la VALEUR (§2) : intercepter les trois chemins par lesquels un objet devient du
+ * texte, et pas seulement celui auquel on pense.
+ *
+ * Découvert par `no-secret-leak.test.ts`, qui sérialise aussi `String(doc)`.
+ */
+IntegrationSchema.set('toObject', { transform: amputerLeMaterielChiffre });

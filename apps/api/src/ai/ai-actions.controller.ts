@@ -7,7 +7,15 @@
 // + quota strict AI_THROTTLE appliqué par utilisateur (UserThrottlerGuard,
 // après AuthGuard donc req.user disponible) ET par IP (guard global).
 
-import { BadRequestException, Body, Controller, Inject, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Inject,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 
 import { AiUsageService } from '../admin/ai-usage.service.js';

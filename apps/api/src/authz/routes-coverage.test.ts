@@ -294,7 +294,9 @@ describe('espace admin plateforme', () => {
     // flux par jeton. Une route d'administration sans rôle exigé est un trou, et
     // rien d'autre.
     const trous = ROUTES_ADMIN.filter((r) => !r.rolesPlateforme?.length).map((r) => r.cle);
-    expect(trous, `Routes /admin sans rôle plateforme exigé :\n  ${trous.join('\n  ')}`).toEqual([]);
+    expect(trous, `Routes /admin sans rôle plateforme exigé :\n  ${trous.join('\n  ')}`).toEqual(
+      [],
+    );
   });
 
   it("aucune route /admin n'expose l'un des trois interdits absolus", () => {
