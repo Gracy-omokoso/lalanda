@@ -188,9 +188,86 @@ Un bloc fermé vaut `null` et **n’est jamais chargé** — pas de requête, do
 
 **Codes d’erreur propres à cet espace** : `400 INVALID_REQUEST`, `403 FORBIDDEN`, `403 NO_ORGANIZATION`, `404 ORG_NOT_FOUND`.
 
+## Abonnements et paiements — implémenté (S22b)
+
+`apps/api/src/billing/` et `apps/api/src/payments/`. Règles métier : docs/13 § Implémenté (S22b).
+
+```text
+GET  /organizations/current/subscription        état complet du cycle de vie — analytics.read
+POST /organizations/current/subscription/trial  essai 14 jours, sans carte — billing.manage
+GET  /organizations/current/subscription/quote  chiffrage d'un changement — billing.manage
+POST /organizations/current/subscription/plan   baisse de gamme programmée — billing.manage
+POST /organizations/current/subscription/cancel résiliation — billing.manage
+POST /payments/checkout                         ouvre un encaissement — billing.manage
+GET  /payments/methods                          moyens réellement disponibles — PUBLIC
+POST /payments/webhooks/:provider               rappel fournisseur — SIGNATURE
+GET  /payments/manual/pending                   dépôts à confirmer — rôle plateforme
+POST /payments/manual/:reference/confirm        confirme un dépôt reçu — rôle plateforme
+POST /payments/manual/:reference/reject         refuse, motif obligatoire — rôle plateforme
+POST /payments/maintenance/sweep                balayage des échéances — rôle plateforme
+```
+
+**`plan` répond le plan EFFECTIF, pas le plan souscrit.** C'est un changement de
+sémantique par rapport à S16b, pas de forme : une organisation Business suspendue
+pour impayé doit être vue comme `free` par tout ce qui applique une limite.
+`subscribedPlan` porte l'autre valeur, pour l'affichage. Les champs S16b
+(`plan`, `entitlements`, `usage`) restent à leur place — rompre le contrat de la
+route qui décide de l'accès payant n'aurait aucune justification.
+
+**Le montant n'est jamais lu depuis la requête.** `POST /payments/checkout` ne
+reçoit que l'intention (offre, périodicité, moyen) ; le montant est recalculé à
+partir du catalogue et du prorata. L'accepter depuis le corps permettrait de
+souscrire Business à un centime.
+
+**Une montée en gamme ne passe pas par `/subscription/plan`.** Cette route ne
+programme que des baisses ; une montée y est refusée
+(`409 UPGRADE_REQUIRES_PAYMENT`). L'autoriser donnerait Business à qui sait
+envoyer un POST.
+
+**Trois régimes d'accès dans un même contrôleur**, et c'est pourquoi
+`PaymentsController` n'a pas de garde de classe : les rappels sont authentifiés
+par **signature**, `GET /payments/methods` est public, et l'administration
+manuelle exige un **rôle plateforme** — jamais `billing.manage`, qui appartient
+au Propriétaire de l'organisation et lui permettrait de confirmer ses propres
+paiements.
+
+**Codes d'erreur propres à cet espace** : `409 TRIAL_ALREADY_USED`,
+`409 SUBSCRIPTION_ACTIVE`, `409 PLAN_NOT_SELLABLE`, `409 UPGRADE_REQUIRES_PAYMENT`,
+`409 ALREADY_CANCELED`, `400 DOWNGRADE_NOT_PAYABLE`, `400 WEBHOOK_RAW_BODY_MISSING`,
+`400 WEBHOOK_SIGNATURE_INVALID`, `404 UNKNOWN_WEBHOOK_PROVIDER`,
+`404 MANUAL_REQUEST_NOT_FOUND`, `400 MANUAL_REQUEST_CLOSED`,
+`400 MANUAL_REQUEST_EXPIRED`, `400 REJECTION_NOTE_REQUIRED`,
+`503 PAYMENT_PROVIDER_UNAVAILABLE`.
+
 ## Webhooks
 
 Paiements et intégrations utilisent signatures, tolérance temporelle, anti-rejeu, journal et traitement idempotent.
+
+**Implémenté (S22b)** — `POST /payments/webhooks/:provider`, `manual` exclu (il
+n'a pas de rappel : une route de rappel manuel serait un point d'entrée non
+authentifié capable d'accorder un abonnement).
+
+1. **Signature d'abord.** Vérifiée avant toute lecture du corps, sur le corps
+   **brut** (`rawBody: true` au bootstrap ; sans lui, la route répond
+   `400 WEBHOOK_RAW_BODY_MISSING` plutôt que d'accepter à l'aveugle). Comparaison
+   en temps constant, tolérance d'horodatage de 5 minutes dans les deux sens.
+   Sans secret configuré : **503**, jamais une acceptation.
+2. **Idempotence ensuite.** Index unique `{provider, eventId}` sur
+   `payment_events`, l'insertion faisant office de verrou. L'ordre compte :
+   dédupliquer avant de vérifier laisserait un inconnu écrire en base et
+   **pré-empter** l'identifiant d'un vrai événement, qui serait ensuite ignoré
+   comme doublon — un déni de service silencieux sur l'encaissement.
+3. **Rattachement.** Métadonnées, puis jointure exacte
+   `subscriptions.{provider, providerSubscriptionId}`. Aucun rapprochement par
+   email ni par proximité : un rappel non rattachable reste orphelin
+   (`status: 'unmatched'`, trace `failed`) et n'accorde rien.
+4. **Réponses.** `200 { received: true, status }` avec `status` ∈
+   `processed | duplicate | ignored | unmatched`. Seule une signature invalide
+   produit un **400** : tout fournisseur retente ce qui n'est pas 2xx, et
+   répondre 500 sur un événement inconnu déclenche trois jours de réémissions
+   avant désactivation du point d'entrée.
+5. **Journal.** Chaque événement traité est écrit dans `audit_events` avec
+   `actorUserId: 'system'`.
 
 ## API publique
 

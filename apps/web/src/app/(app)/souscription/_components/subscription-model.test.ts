@@ -250,9 +250,13 @@ describe('refus de l’API', () => {
       'UPGRADE_REQUIRES_PAYMENT',
       'DOWNGRADE_NOT_PAYABLE',
       'ALREADY_CANCELED',
-      'PROVIDER_UNAVAILABLE',
+      // Code EXACT de `ProviderUnavailableError` — un `PROVIDER_UNAVAILABLE`
+      // approximatif ne serait jamais reconnu et le client verrait le message
+      // générique au moment de payer.
+      'PAYMENT_PROVIDER_UNAVAILABLE',
       'NO_SUBSCRIPTION',
       'INVALID_PLAN_OR_INTERVAL',
+      'INVALID_CHECKOUT_REQUEST',
     ];
     for (const code of codes) {
       const message = messageRefus(refus(code), 'défaut');

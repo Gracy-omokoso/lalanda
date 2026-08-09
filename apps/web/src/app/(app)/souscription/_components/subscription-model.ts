@@ -251,8 +251,11 @@ export function messageRefus(error: unknown, defaut: string): string {
       return "Une baisse de gamme ne se paie pas : elle prend effet à l'échéance.";
     case 'ALREADY_CANCELED':
       return 'Cet abonnement est déjà clos.';
-    case 'PROVIDER_UNAVAILABLE':
+    // Code exact levé par `ProviderUnavailableError` (payment-provider.ts).
+    case 'PAYMENT_PROVIDER_UNAVAILABLE':
       return "Ce moyen de paiement n'est pas disponible actuellement. Essayez-en un autre.";
+    case 'INVALID_CHECKOUT_REQUEST':
+      return 'La demande de paiement est incomplète. Reprenez le choix de l’offre.';
     case 'NO_SUBSCRIPTION':
       return 'Aucun abonnement à modifier pour cette organisation.';
     case 'INVALID_PLAN_OR_INTERVAL':
