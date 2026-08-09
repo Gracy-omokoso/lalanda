@@ -7,7 +7,6 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
-import { Membership, type MembershipDocument } from '../organizations/membership.schema.js';
 import { ActualPeriod, type ActualPeriodDocument } from './actual-period.schema.js';
 
 /** Identifiants de ligne du DSL : snake_case ASCII, mêmes règles que le moteur. */
@@ -34,7 +33,6 @@ export interface PeriodKey {
 export class ActualsService {
   constructor(
     @InjectModel(ActualPeriod.name) private readonly model: Model<ActualPeriodDocument>,
-    @InjectModel(Membership.name) private readonly memberships: Model<MembershipDocument>,
   ) {}
 
   /** Valide year/month d'URL — 400 sinon (année d'exercice 1..5, mois 1..12). */
@@ -138,8 +136,20 @@ export class ActualsService {
   }
 
   /**
-   * Réouverture closed → open — OWNER uniquement (docs/22 : « La réouverture
-   * exige permission et motif »), motif obligatoire, journalisée.
+   * Réouverture closed → open — motif obligatoire, journalisée.
+   *
+   * S20a : le contrôle d'accès a QUITTÉ ce service. Il était ici un
+   * `membership.role !== 'owner'` codé en dur, exactement ce qu'ADR-0012 §8
+   * interdit (« aucun `if (role === …)` hors de `permissions.ts` »). La règle est
+   * désormais déclarée sur la route :
+   * `@RequirePermission('period.close', 'plan.approve')` — la « deuxième
+   * permission distincte » de docs/12 § Règles critiques, obtenue sans inventer
+   * de seizième action (R3).
+   *
+   * Conséquence voulue : un Comptable à qui on a accordé `canClosePeriods` peut
+   * clôturer mais NE PEUT PAS rouvrir, faute de `plan.approve`. Un
+   * `finance_director`, lui, peut désormais rouvrir — il ne le pouvait pas avant,
+   * alors qu'il porte l'autorité financière.
    */
   async reopen(
     key: PeriodKey,
@@ -152,17 +162,6 @@ export class ActualsService {
       throw new BadRequestException({
         code: 'REOPEN_REASON_REQUIRED',
         message: 'Un motif de réouverture est obligatoire (trace d’audit docs/08).',
-      });
-    }
-
-    const membership = await this.memberships
-      .findOne({ userId, organizationId: key.organizationId })
-      .lean()
-      .exec();
-    if (membership?.role !== 'owner') {
-      throw new ForbiddenException({
-        code: 'REOPEN_OWNER_ONLY',
-        message: 'Seul un owner de l’organisation peut rouvrir une période clôturée.',
       });
     }
 

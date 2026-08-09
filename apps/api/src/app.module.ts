@@ -6,6 +6,7 @@ import { AccountModule } from './account/account.module.js';
 import { ActualsModule } from './actuals/actuals.module.js';
 import { AiModule } from './ai/ai.module.js';
 import { AuthModule } from './auth/auth.module.js';
+import { AuthzModule } from './authz/authz.module.js';
 import { BillingModule } from './billing/billing.module.js';
 import { CanvasModule } from './canvas/canvas.module.js';
 import { EvaluateController } from './evaluate/evaluate.controller.js';
@@ -53,6 +54,7 @@ import { ThrottlingModule } from './security/throttling.module.js';
     OrganizationsModule,
     AuthModule,
     AccountModule,
+    AuthzModule,
     BillingModule,
     ParameterPacksModule,
     ProjectsModule,

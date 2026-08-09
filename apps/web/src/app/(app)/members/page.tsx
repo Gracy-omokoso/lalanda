@@ -1,185 +1,187 @@
 'use client';
 
-// Page /members — gestion des invitations de l'organisation active (S5d).
-// L'org active = celle du cookie `active_org_id`, résolue côté API par AuthGuard.
-// Le formulaire de création n'est visible que si le user connecté est owner de cette org
-// (détecté via /organizations qui renvoie le rôle).
+// Page /members — gouvernance de l'organisation active (S5d, refondue en S20a).
+//
+// L'organisation active vient du cookie `active_org_id`, résolue côté API.
+//
+// Deux appels seulement, tous deux gardés par le serveur :
+//   GET /organizations/:id/members     → `organization.manage` (owner, admin)
+//   GET /organizations/:id/invitations → `members.invite`      (owner, admin)
+//
+// Un 403 sur le premier n'est PAS une erreur à afficher en rouge : c'est la
+// réponse normale pour un Analyste ou un Lecteur qui arrive ici par le menu. La
+// page dit alors ce que son rôle permet, au lieu de crier une panne.
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
-import { api, readActiveOrgCookie, type InvitationView, type OrganizationView } from '@/lib/api';
+import {
+  api,
+  readActiveOrgCookie,
+  type InvitationView,
+  type MemberView,
+  type OrganizationView,
+  type RoleOption,
+} from '@/lib/api';
+
+import { InvitePanel } from './_components/invite-panel';
+import { MembersPanel } from './_components/members-panel';
+import { libelleRoleActeur, messageErreur } from './_components/members-model';
+
+/** Un refus d'autorisation, à distinguer d'une panne. */
+function estRefus(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'status' in err &&
+    ((err as { status: number }).status === 403 || (err as { status: number }).status === 404)
+  );
+}
 
 export default function MembersPage(): React.ReactElement {
-  const [activeOrg, setActiveOrg] = useState<OrganizationView | null>(null);
-  const [invitations, setInvitations] = useState<InvitationView[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [org, setOrg] = useState<OrganizationView | null>(null);
+  const [moiUserId, setMoiUserId] = useState<string | null>(null);
+  const [members, setMembers] = useState<MemberView[] | null>(null);
+  const [roleOptions, setRoleOptions] = useState<RoleOption[]>([]);
+  const [invitations, setInvitations] = useState<InvitationView[]>([]);
+  const [peutInviter, setPeutInviter] = useState(false);
+  const [refuse, setRefuse] = useState(false);
+  const [erreur, setErreur] = useState<string | null>(null);
+  const [chargement, setChargement] = useState(true);
 
-  const [email, setEmail] = useState('');
-  const [creating, setCreating] = useState(false);
-  const [lastCreatedToken, setLastCreatedToken] = useState<string | null>(null);
-
-  useEffect(() => {
-    void bootstrap();
-    // Effet unique au montage — les recharges sont déclenchées explicitement après
-    // création ou révocation. Le linter Next impose de citer la deps ; on la désactive
-    // localement plutôt que capturer bootstrap avec useCallback (surcoût inutile pour un effect one-shot).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  async function bootstrap(): Promise<void> {
+  const recharger = useCallback(async (orgId: string): Promise<void> => {
+    setErreur(null);
     try {
-      const { organizations } = await api.listOrganizations();
-      const activeId = readActiveOrgCookie();
-      const active = organizations.find((o) => o.id === activeId) ?? organizations[0] ?? null;
-      setActiveOrg(active);
-      if (active) await refreshInvitations(active.id);
+      const { members, roleOptions } = await api.listMembers(orgId);
+      setMembers(members);
+      setRoleOptions(roleOptions);
+      setRefuse(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur de chargement');
+      if (estRefus(err)) {
+        setRefuse(true);
+        setMembers([]);
+        return;
+      }
+      setErreur(messageErreur(err, 'Impossible de charger les membres.'));
+      return;
     }
-  }
 
-  async function refreshInvitations(orgId: string): Promise<void> {
-    setError(null);
+    // Les invitations sont secondaires : leur refus ne doit pas vider la liste
+    // des membres déjà obtenue.
+    //
+    // C'est aussi ce qui détermine `peutInviter` : la route est gardée par
+    // `members.invite`, donc sa réponse EST la réponse à « ai-je le droit
+    // d'inviter ? ». Le déduire d'un `role === 'owner' || role === 'admin'`
+    // recopierait la matrice dans l'interface (ADR-0012 §8) et se tromperait au
+    // premier rôle qui gagne ou perd l'action.
     try {
       const { invitations } = await api.listOrgInvitations(orgId);
       setInvitations(invitations);
+      setPeutInviter(true);
     } catch (err) {
-      // Un non-owner reçoit 403 → on affiche liste vide sans hurler.
-      if (err instanceof Error && 'status' in err && (err as { status: number }).status === 403) {
-        setInvitations([]);
-      } else {
-        setError(err instanceof Error ? err.message : 'Erreur de chargement');
+      if (!estRefus(err)) {
+        setErreur(messageErreur(err, 'Impossible de charger les invitations.'));
+      }
+      setInvitations([]);
+      setPeutInviter(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let annule = false;
+    async function demarrer(): Promise<void> {
+      try {
+        const [{ organizations }, profil] = await Promise.all([
+          api.listOrganizations(),
+          // Sert uniquement à repérer « Vous » dans la liste et à exclure
+          // l'acteur des cibles de transfert.
+          api.getAccountProfile().catch(() => null),
+        ]);
+        if (annule) return;
+        const activeId = readActiveOrgCookie();
+        const active = organizations.find((o) => o.id === activeId) ?? organizations[0] ?? null;
+        setOrg(active);
+        setMoiUserId(profil?.id ?? null);
+        if (active) await recharger(active.id);
+      } catch (err) {
+        if (!annule) setErreur(messageErreur(err, 'Erreur de chargement.'));
+      } finally {
+        if (!annule) setChargement(false);
       }
     }
-  }
+    void demarrer();
+    return () => {
+      annule = true;
+    };
+  }, [recharger]);
 
-  async function handleCreate(e: React.FormEvent<HTMLFormElement>): Promise<void> {
-    e.preventDefault();
-    if (!activeOrg || !email.trim()) return;
-    setCreating(true);
-    setError(null);
-    setLastCreatedToken(null);
-    try {
-      const { token } = await api.createInvitation(activeOrg.id, { email: email.trim() });
-      setLastCreatedToken(token);
-      setEmail('');
-      await refreshInvitations(activeOrg.id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Impossible de créer l'invitation");
-    } finally {
-      setCreating(false);
-    }
-  }
+  const rafraichir = useCallback(async (): Promise<void> => {
+    if (org) await recharger(org.id);
+  }, [org, recharger]);
 
-  async function handleRevoke(inv: InvitationView): Promise<void> {
-    if (!activeOrg) return;
-    if (!confirm(`Révoquer l'invitation pour ${inv.email} ?`)) return;
-    setError(null);
-    try {
-      await api.revokeInvitation(activeOrg.id, inv.id);
-      await refreshInvitations(activeOrg.id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Impossible de révoquer');
-    }
-  }
-
-  const isOwner = activeOrg?.role === 'owner';
-  const acceptBaseUrl =
-    typeof window !== 'undefined' ? `${window.location.origin}/invitations/accept` : '';
+  // Le rôle affiché est celui de la liste rechargée après chaque écriture, pas
+  // celui de `GET /organizations` figé au montage : un transfert de propriété
+  // rétrograde l'acteur, et l'en-tête ne doit pas continuer à le sacrer
+  // Propriétaire. L'instantané ne sert que de repli (cf. `libelleRoleActeur`).
+  const monRoleLabel = libelleRoleActeur(members ?? [], moiUserId, org?.roleLabel ?? null);
 
   return (
-    <section className="flex flex-col gap-6">
+    <section className="flex flex-col gap-8">
       <div className="flex flex-col gap-1">
-        <h2 className="text-2xl font-semibold tracking-tight">Membres</h2>
+        <h2 className="font-display text-2xl font-semibold tracking-tight">Membres</h2>
         <p className="text-sm text-[var(--foreground-muted)]">
-          Invitations en attente pour {activeOrg?.name ?? "l'organisation active"}. Les invitations
-          expirent après 7 jours.
+          Rôles et accès de {org?.name ?? 'l’organisation active'}
+          {monRoleLabel ? ` · votre rôle : ${monRoleLabel}` : ''}.
         </p>
       </div>
 
-      {isOwner ? (
-        <form
-          onSubmit={handleCreate}
-          className="flex flex-col gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:flex-row sm:items-end"
+      {erreur ? (
+        <div
+          role="alert"
+          className="rounded-md border border-[var(--danger)]/30 bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger)]"
         >
-          <label className="flex flex-1 flex-col gap-1.5 text-sm">
-            <span className="font-medium">Inviter un email</span>
-            <input
-              type="email"
-              required
-              placeholder="collegue@exemple.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={creating || !email.trim()}
-            className="rounded-md bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-[var(--accent-foreground)] transition hover:opacity-90 disabled:opacity-50"
-          >
-            {creating ? 'Envoi…' : 'Inviter'}
-          </button>
-        </form>
-      ) : activeOrg ? (
-        <p className="rounded-md border border-dashed border-[var(--border)] p-3 text-xs text-[var(--foreground-muted)]">
-          Seul un owner peut inviter ou révoquer des membres.
-        </p>
-      ) : null}
-
-      {lastCreatedToken ? (
-        <div className="rounded-md border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-3 text-xs">
-          <p className="mb-1 font-medium">Invitation créée. Partage ce lien avec l&apos;invité :</p>
-          <code className="block break-all rounded bg-[var(--surface)] p-2 font-mono text-[11px]">
-            {`${acceptBaseUrl}?token=${lastCreatedToken}`}
-          </code>
-          <p className="mt-2 text-[var(--foreground-muted)]">
-            (L&apos;envoi email automatique arrive avec S12. Pour l&apos;instant l&apos;invité peut
-            aussi accepter directement depuis la bannière de son dashboard.)
-          </p>
+          {erreur}
         </div>
       ) : null}
 
-      {error ? (
-        <div className="rounded-md border border-[var(--danger)]/30 bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger)]">
-          {error}
-        </div>
-      ) : null}
-
-      {invitations === null ? (
+      {chargement ? (
         <p className="text-sm text-[var(--foreground-muted)]">Chargement…</p>
-      ) : invitations.length === 0 ? (
+      ) : !org ? (
         <div className="rounded-xl border border-dashed border-[var(--border)] p-8 text-center">
           <p className="text-sm text-[var(--foreground-muted)]">
-            Aucune invitation en attente pour cette organisation.
+            Aucune organisation active. Créez-en une pour inviter des membres.
+          </p>
+        </div>
+      ) : refuse ? (
+        // Le refus est une INFORMATION, pas une panne : la matrice réserve la
+        // gestion des membres au Propriétaire et à l'Administrateur (docs/12).
+        <div className="rounded-xl border border-dashed border-[var(--border)] p-8 text-center">
+          <p className="text-sm font-medium">Cette page est réservée à la gouvernance</p>
+          <p className="mt-1 text-sm text-[var(--foreground-muted)]">
+            Votre rôle ({monRoleLabel ?? org.roleLabel}) ne donne pas accès à la gestion des
+            membres. Un Propriétaire ou un Administrateur de {org.name} peut vous renseigner.
           </p>
         </div>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {invitations.map((inv) => (
-            <li
-              key={inv.id}
-              className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm"
-            >
-              <div className="flex flex-col gap-0.5">
-                <span className="font-medium">{inv.email}</span>
-                <span className="text-xs text-[var(--foreground-muted)]">
-                  rôle <code>{inv.role}</code> · expire le{' '}
-                  {new Date(inv.expiresAt).toLocaleDateString('fr-FR')}
-                </span>
-              </div>
-              {isOwner ? (
-                <button
-                  type="button"
-                  onClick={() => handleRevoke(inv)}
-                  className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs text-[var(--foreground-muted)] transition hover:border-[var(--danger)]/40 hover:text-[var(--danger)]"
-                >
-                  Révoquer
-                </button>
-              ) : null}
-            </li>
-          ))}
-        </ul>
+        <>
+          <MembersPanel
+            orgId={org.id}
+            members={members ?? []}
+            roleOptions={roleOptions}
+            moiUserId={moiUserId}
+            onChanged={rafraichir}
+          />
+          {/* `key` sur les options : le rôle par défaut du formulaire est calculé
+              à l'initialisation, il doit être recalculé si la portée de l'acteur
+              change (typiquement après un transfert de propriété). */}
+          <InvitePanel
+            key={roleOptions.map((o) => `${o.value}:${o.grantable}`).join(',')}
+            orgId={org.id}
+            invitations={invitations}
+            roleOptions={roleOptions}
+            peutInviter={peutInviter}
+            onChanged={rafraichir}
+          />
+        </>
       )}
     </section>
   );

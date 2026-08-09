@@ -9,6 +9,7 @@
 
 import {
   BadRequestException,
+  ConflictException,
   Controller,
   Get,
   Inject,
@@ -20,6 +21,12 @@ import {
 import { ENGINE_VERSION, EngineError, evaluateTemplate } from '@lalanda/engine';
 
 import { AuthGuard } from '../auth/auth.guard.js';
+import { AuditService } from '../authz/audit.service.js';
+import { RequirePermission } from '../authz/authz.decorators.js';
+import { AuthzService } from '../authz/authz.service.js';
+import { CurrentOrgRole } from '../authz/current-org-role.decorator.js';
+import { PermissionsGuard } from '../authz/permissions.guard.js';
+import { sodDecision, type OrgRole } from '../authz/permissions.js';
 import { CurrentOrgId, CurrentUser } from '../auth/current-user.decorator.js';
 import { toEvaluationView, type EvaluationView } from '../evaluate/evaluation-view.js';
 import { getTemplate } from '../evaluate/template-registry.js';
@@ -30,6 +37,21 @@ import { computePlanFingerprint } from './fingerprint.js';
 import type { FinancialPlanDocument } from './plan.schema.js';
 import { PlansService } from './plans.service.js';
 
+/**
+ * Conditions de séparation des tâches au moment du gel (R2, ADR-0012 §6).
+ *
+ * Exposé dans la vue API, et pas seulement stocké : ADR-0012 qualifie
+ * l'auto-approbation d'« information de bancabilité, pas un détail technique ».
+ * Un lecteur du plan — l'entrepreneur, son mentor, un banquier — doit pouvoir
+ * constater qu'une version a été validée par la personne qui l'a saisie.
+ */
+export interface PlanApprovalView {
+  /** L'approbateur était le dernier auteur des hypothèses, faute d'autre habilité. */
+  soleApprover: boolean;
+  /** Dernier auteur des hypothèses figées, `null` si jamais modifiées depuis la création. */
+  inputsAuthor: string | null;
+}
+
 /** Vue légère — liste des versions. */
 export interface PlanSummaryView {
   id: string;
@@ -39,6 +61,7 @@ export interface PlanSummaryView {
   fingerprint: string;
   approvedAt: string;
   approvedBy: string;
+  approval: PlanApprovalView;
   createdAt: string;
 }
 
@@ -54,17 +77,21 @@ export interface PlanDetailView extends PlanSummaryView {
 }
 
 @Controller('projects')
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, PermissionsGuard)
 export class PlansController {
   constructor(
     @Inject(ProjectsService) private readonly projects: ProjectsService,
     @Inject(PlansService) private readonly plans: PlansService,
+    @Inject(AuthzService) private readonly authz: AuthzService,
+    @Inject(AuditService) private readonly audit: AuditService,
   ) {}
 
   @Post(':id/plans')
+  @RequirePermission('plan.approve')
   async approve(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: { id: string },
+    @CurrentOrgRole() role: OrgRole,
     @Param('id') id: string,
   ): Promise<PlanDetailView> {
     const project = await this.projects.findScoped(id, orgId);
@@ -119,10 +146,40 @@ export class PlansController {
       engineVersion: ENGINE_VERSION,
     });
 
+    // ── R2 — séparation validation / saisie (ADR-0012 §6) ──────────────────────
+    //
+    // Le volet STATIQUE est déjà appliqué par `@RequirePermission('plan.approve')`.
+    // Ici, le volet DYNAMIQUE : l'approbateur ne peut pas être le dernier auteur
+    // des hypothèses qu'il fige.
+    //
+    // L'échappatoire `soleApprover` est ce qui rend le produit utilisable pour une
+    // organisation d'une seule personne — l'entrepreneur seul, cas majoritaire en
+    // RDC. Sans elle, un compte solo ne pourrait JAMAIS valider son plan, puisqu'il
+    // est nécessairement l'auteur de ses propres hypothèses. L'auto-approbation est
+    // donc autorisée, mais MARQUÉE dans le snapshot : un plan validé sans
+    // séparation des tâches le dit, c'est une information de bancabilité.
+    const decision = sodDecision({
+      approverUserId: user.id,
+      lastInputAuthorUserId: project.driversUpdatedBy ?? null,
+      approverCountInOrg: await this.authz.countApprovers(orgId),
+    });
+    if (decision === 'self_forbidden') {
+      throw new ConflictException({
+        code: 'SELF_APPROVAL_FORBIDDEN',
+        message:
+          'Vous avez saisi les dernières hypothèses de ce plan : sa validation revient à ' +
+          'une autre personne habilitée. (Séparation des tâches, docs/12.)',
+      });
+    }
+
     const doc = await this.plans.approve({
       organizationId: orgId,
       projectId: String(project._id),
       approvedBy: user.id,
+      approval: {
+        soleApprover: decision === 'sole_approver',
+        inputsAuthor: project.driversUpdatedBy ?? null,
+      },
       driverValues: resolvedDrivers,
       templateSlug: template.slug,
       templateVersion: template.version,
@@ -132,10 +189,38 @@ export class PlansController {
       result: toEvaluationView(evaluation),
       fingerprint,
     });
+
+    // R2 exige que l'auto-approbation soit marquée « dans le snapshot ET dans
+    // l'audit » (ADR-0012 §6). Le snapshot dit les conditions d'UNE version;
+    // le journal donne la vue transversale — « combien de plans cette
+    // organisation a-t-elle validés sans séparation des tâches ? » — qu'aucune
+    // lecture de plan isolée ne fournit.
+    //
+    // `record()` et non `recordStrict()` : contrairement à l'export (R4), le
+    // plan est DÉJÀ figé et immuable quand on arrive ici. Faire échouer la
+    // requête sur une panne de journal renverrait 500 pour une version pourtant
+    // créée — l'appelant croirait à un échec et rejouerait, pour ne récolter
+    // qu'un 409 PLAN_UNCHANGED. Le refus d'écrire n'annule rien : il ment.
+    await this.audit.record({
+      organizationId: orgId,
+      actorUserId: user.id,
+      actorRole: role,
+      action: 'plan.approve',
+      targetType: 'plan',
+      targetId: String(doc._id),
+      metadata: {
+        projectId: String(project._id),
+        version: doc.version,
+        soleApprover: decision === 'sole_approver',
+        inputsAuthor: project.driversUpdatedBy ?? null,
+      },
+    });
+
     return toDetailView(doc);
   }
 
   @Get(':id/plans')
+  @RequirePermission('project.read')
   async list(
     @CurrentOrgId() orgId: string,
     @Param('id') id: string,
@@ -146,6 +231,7 @@ export class PlansController {
   }
 
   @Get(':id/plans/:version')
+  @RequirePermission('project.read')
   async detail(
     @CurrentOrgId() orgId: string,
     @Param('id') id: string,
@@ -167,6 +253,14 @@ function toSummaryView(doc: FinancialPlanDocument): PlanSummaryView {
     fingerprint: doc.fingerprint,
     approvedAt: doc.approvedAt.toISOString(),
     approvedBy: doc.approvedBy,
+    // Défauts défensifs : les plans figés AVANT S20a n'ont pas de bloc `approval`.
+    // Les présenter comme « séparés » serait un mensonge sur des données qu'on
+    // n'a pas — mais `false` est ici la lecture honnête : rien ne prouve qu'ils
+    // aient été auto-approuvés, et la règle R2 n'existait pas encore.
+    approval: {
+      soleApprover: doc.approval?.soleApprover === true,
+      inputsAuthor: doc.approval?.inputsAuthor ?? null,
+    },
     createdAt: doc.createdAt.toISOString(),
   };
 }

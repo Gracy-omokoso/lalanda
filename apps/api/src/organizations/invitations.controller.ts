@@ -13,12 +13,17 @@ import { z } from 'zod';
 
 import { AuthGuard } from '../auth/auth.guard.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
+import { RequirePermission } from '../authz/authz.decorators.js';
+import { PermissionsGuard } from '../authz/permissions.guard.js';
+import { OrgRoleInput } from '../authz/org-role.dto.js';
+import { ORG_ROLE_LABELS, type OrgRole } from '../authz/permissions.js';
 import type { InvitationDocument } from './invitation.schema.js';
 import { InvitationsService } from './invitations.service.js';
 
 const CreateInvitationSchema = z.object({
   email: z.string().email(),
-  role: z.enum(['owner', 'member']).optional(),
+  /** docs/12 § Invitations : une invitation « indique rôle et projets ». */
+  role: OrgRoleInput.optional(),
 });
 
 const AcceptInvitationSchema = z.object({
@@ -34,7 +39,8 @@ export interface InvitationView {
   id: string;
   organizationId: string;
   email: string;
-  role: 'owner' | 'member';
+  role: OrgRole;
+  roleLabel: string;
   invitedBy: string;
   expiresAt: string;
   acceptedAt: string | null;
@@ -48,6 +54,7 @@ function toView(doc: InvitationDocument): InvitationView {
     organizationId: doc.organizationId,
     email: doc.email,
     role: doc.role,
+    roleLabel: ORG_ROLE_LABELS[doc.role] ?? doc.role,
     invitedBy: doc.invitedBy,
     expiresAt: doc.expiresAt.toISOString(),
     acceptedAt: doc.acceptedAt ? doc.acceptedAt.toISOString() : null,
@@ -57,7 +64,7 @@ function toView(doc: InvitationDocument): InvitationView {
 }
 
 @Controller()
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, PermissionsGuard)
 export class InvitationsController {
   constructor(@Inject(InvitationsService) private readonly invitations: InvitationsService) {}
 
@@ -67,6 +74,7 @@ export class InvitationsController {
    * via son propre canal (email, message). Livraison SMTP réelle = S12.
    */
   @Post('organizations/:orgId/invitations')
+  @RequirePermission('members.invite')
   async create(
     @CurrentUser() user: { id: string; email: string },
     @Param('orgId') orgId: string,
@@ -94,6 +102,7 @@ export class InvitationsController {
   }
 
   @Get('organizations/:orgId/invitations')
+  @RequirePermission('members.invite')
   async list(
     @CurrentUser() user: { id: string },
     @Param('orgId') orgId: string,
@@ -103,6 +112,7 @@ export class InvitationsController {
   }
 
   @Delete('organizations/:orgId/invitations/:id')
+  @RequirePermission('members.invite')
   async revoke(
     @CurrentUser() user: { id: string },
     @Param('orgId') orgId: string,

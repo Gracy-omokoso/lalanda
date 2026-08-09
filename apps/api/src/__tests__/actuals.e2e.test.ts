@@ -499,7 +499,7 @@ e2eSuite('périodes réalisées, clôture et écarts (S18b — docs/08)', () => 
   }, 30_000);
 
   // ─── 6. Réouverture ────────────────────────────────────────
-  it('réouverture : motif obligatoire, owner uniquement, journalisée', async () => {
+  it('réouverture : motif obligatoire, double permission (R3), journalisée', async () => {
     // a) Sans motif → 400.
     const sansMotif = await request(app.getHttpServer())
       .post(`/projects/${projectId}/actual-periods/1/1/reopen`)
@@ -508,13 +508,20 @@ e2eSuite('périodes réalisées, clôture et écarts (S18b — docs/08)', () => 
     expect(sansMotif.status).toBe(400);
     expect(sansMotif.body.code).toBe('REOPEN_REASON_REQUIRED');
 
-    // b) Un simple `member` de la MÊME org est refusé (403) — pas un 404 : il a
-    //    bien accès au projet, c'est la permission de réouverture qui manque.
+    // b) Un membre de la MÊME org sans droit de réouverture est refusé (403) —
+    //    pas un 404 : il a bien accès au projet, c'est la permission qui manque.
+    //
+    //    S20a — le rôle et le code d'erreur ont changé, VOLONTAIREMENT (ADR-0012
+    //    §6 R3). Avant, la réouverture était réservée à `owner` par un test de
+    //    rôle codé en dur (`REOPEN_OWNER_ONLY`). Elle exige désormais DEUX
+    //    permissions, `period.close` ET `plan.approve` — la « deuxième permission
+    //    distincte » de docs/12. On invite donc un `analyst`, qui détient
+    //    ni l'une ni l'autre, et on attend le refus générique de la matrice.
     const cookiesMember = await registerAndLogin(member);
     const invite = await request(app.getHttpServer())
       .post(`/organizations/${ownerOrgId}/invitations`)
       .set('Cookie', cookiesOwner)
-      .send({ email: member.email, role: 'member' });
+      .send({ email: member.email, role: 'analyst' });
     expect(invite.status).toBe(201);
     const accept = await request(app.getHttpServer())
       .post('/invitations/accept')
@@ -528,7 +535,8 @@ e2eSuite('périodes réalisées, clôture et écarts (S18b — docs/08)', () => 
       .set('Cookie', memberScoped)
       .send({ reason: 'erreur de saisie' });
     expect(parMember.status).toBe(403);
-    expect(parMember.body.code).toBe('REOPEN_OWNER_ONLY');
+    expect(parMember.body.code).toBe('FORBIDDEN');
+    expect(parMember.body.action).toBe('period.close');
 
     // c) L'owner rouvre avec motif → trace d'audit append-only.
     const reopen = await request(app.getHttpServer())

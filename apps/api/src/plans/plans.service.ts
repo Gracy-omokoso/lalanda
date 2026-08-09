@@ -17,6 +17,8 @@ export interface ApprovePlanInput {
   engineVersion: string;
   result: EvaluationView;
   fingerprint: string;
+  /** Conditions de séparation des tâches au moment du gel (R2, ADR-0012 §6). */
+  approval: { soleApprover: boolean; inputsAuthor: string | null };
 }
 
 @Injectable()
@@ -56,6 +58,7 @@ export class PlansService {
         projectId: input.projectId,
         version: (latest?.version ?? 0) + 1,
         status: 'approved',
+        approval: input.approval,
         driverValues: input.driverValues,
         templateSlug: input.templateSlug,
         templateVersion: input.templateVersion,

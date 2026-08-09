@@ -2,11 +2,11 @@ import { ConflictException, Injectable } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import type { Connection, Model } from 'mongoose';
 
+import { isOwnerRole } from '../authz/permissions.js';
 import { Membership, type MembershipDocument } from '../organizations/membership.schema.js';
 import { Organization, type OrganizationDocument } from '../organizations/organization.schema.js';
 import type { PutPreferencesInput, PutProfileInput } from './account.dto.js';
 import { EmailChangeRequest, type EmailChangeRequestDocument } from './email-change.schema.js';
-import { isOwnerRole } from './owner-role.js';
 import {
   UserPreferences,
   type NotificationPreferences,
@@ -178,8 +178,10 @@ export class AccountService {
    * - aucun autre membre → autorisé, l'organisation est supprimée avec le compte.
    *   Rien n'est orphelin puisque plus personne n'y a accès.
    *
-   * Le rôle propriétaire est résolu par `isOwnerRole` et non comparé en dur ici :
-   * voir `owner-role.ts` pour la raison et le point de rebase RBAC (ADR-0012 §7).
+   * Le rôle propriétaire est résolu par `isOwnerRole` et non comparé en dur ici.
+   * Cette fonction vient de `authz/permissions.ts`, source de vérité unique des
+   * rôles (ADR-0012 §8) : elle tolère la casse et les espaces, parce que la valeur
+   * comparée sort d'un document Mongo et non d'un type TypeScript.
    */
   async assessDeletion(userId: string): Promise<DeletionAssessment> {
     const memberships = await this.membershipModel.find({ userId }).exec();

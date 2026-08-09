@@ -22,8 +22,6 @@ import 'reflect-metadata';
 
 import { e2eSuite, teardown } from './e2e-utils.js';
 
-import { e2eSuite, teardown } from './e2e-utils.js';
-
 async function makeApp(): Promise<INestApplication> {
   const { AppModule } = await import('../app.module.js');
   const { getAuth } = await import('../auth/auth.js');
@@ -172,6 +170,12 @@ e2eSuite('Business Model Canvas (S18d — docs/05)', () => {
     const before = await request(app.getHttpServer())
       .get(`/projects/${projectId}/canvas`)
       .set('Cookie', cookiesA);
+
+    if (before.body?.version === undefined) {
+      console.error(
+        `DIAG-BEFORE status=${before.status} ct=${before.headers['content-type']} body=${JSON.stringify(before.body)} text=${String(before.text).slice(0, 400)}`,
+      );
+    }
 
     const res = await request(app.getHttpServer())
       .put(`/projects/${projectId}/canvas`)

@@ -72,6 +72,26 @@ export class FinancialPlan {
   @Prop({ type: String, required: true })
   approvedBy!: string;
 
+  /**
+   * Séparation des tâches au moment du gel (R2, ADR-0012 §6).
+   *
+   * `soleApprover: true` signifie que l'approbateur était AUSSI le dernier auteur
+   * des hypothèses, et que l'organisation ne comptait qu'un seul principal
+   * habilité à approuver — le cas de l'entrepreneur seul, majoritaire en RDC.
+   * L'auto-approbation est alors autorisée mais MARQUÉE : « un plan approuvé sans
+   * séparation des tâches le dit; c'est une information de bancabilité, pas un
+   * détail technique ».
+   *
+   * Le champ vit dans le SNAPSHOT : il décrit les conditions du gel et ne doit
+   * jamais être recalculé a posteriori depuis l'état courant de l'organisation.
+   */
+  @Prop({
+    type: Object,
+    required: true,
+    default: () => ({ soleApprover: false, inputsAuthor: null }),
+  })
+  approval!: { soleApprover: boolean; inputsAuthor: string | null };
+
   @Prop({ type: Number, required: true, default: 1 })
   _schemaVersion!: number;
 

@@ -101,7 +101,10 @@ e2eSuite('invitations (brief §6, docs/12-ROLES-PERMISSIONS.md)', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.invitation.email).toBe(invitee.email.toLowerCase());
-    expect(res.body.invitation.role).toBe('member');
+    // S20a : le rôle par défaut d'une invitation passe de `member` à `viewer`.
+    // Changement VOULU (ADR-0012 §7) — moindre privilège : inviter sans préciser
+    // de rôle ne doit accorder aucun droit d'écriture.
+    expect(res.body.invitation.role).toBe('viewer');
     expect(res.body.invitation.acceptedAt).toBeNull();
     expect(res.body.token).toMatch(/^[0-9a-f]{64}$/);
   }, 30_000);
@@ -180,7 +183,8 @@ e2eSuite('invitations (brief §6, docs/12-ROLES-PERMISSIONS.md)', () => {
       (o) => o.id === ownerOrgId,
     );
     expect(found).toBeDefined();
-    expect(found?.role).toBe('member');
+    // Idem : l'invitation sans rôle explicite crée désormais un `viewer`.
+    expect(found?.role).toBe('viewer');
 
     // Pending vide (pour ce token) après acceptation.
     const after = await request(app.getHttpServer())

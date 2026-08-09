@@ -63,9 +63,13 @@ export class ProjectsService {
     id: string,
     organizationId: string,
     driverValues: Record<string, number>,
+    updatedBy?: string,
   ): Promise<ProjectDocument> {
     const project = await this.findScoped(id, organizationId);
     project.driverValues = driverValues;
+    // Trace de l'auteur pour la séparation des tâches (R2). `updatedBy` est
+    // optionnel pour ne pas casser les appels internes qui n'ont pas d'acteur.
+    if (updatedBy !== undefined) project.driversUpdatedBy = updatedBy;
     await project.save();
     return project;
   }

@@ -13,6 +13,11 @@ import {
 import { EngineError, evaluateTemplate } from '@lalanda/engine';
 
 import { AuthGuard } from '../auth/auth.guard.js';
+import { forbidden } from '../authz/authz.service.js';
+import { RequirePermission } from '../authz/authz.decorators.js';
+import { CurrentOrgRole } from '../authz/current-org-role.decorator.js';
+import { PermissionsGuard } from '../authz/permissions.guard.js';
+import { can, type OrgRole } from '../authz/permissions.js';
 import { CurrentOrgId, CurrentUser } from '../auth/current-user.decorator.js';
 import { BillingService } from '../billing/billing.service.js';
 import {
@@ -46,7 +51,7 @@ interface ProjectView {
 }
 
 @Controller('projects')
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, PermissionsGuard)
 export class ProjectsController {
   constructor(
     @Inject(ProjectsService) private readonly projects: ProjectsService,
@@ -54,12 +59,14 @@ export class ProjectsController {
   ) {}
 
   @Get()
+  @RequirePermission('project.read')
   async list(@CurrentOrgId() orgId: string): Promise<{ projects: ProjectView[] }> {
     const docs = await this.projects.listByOrg(orgId);
     return { projects: docs.map(toView) };
   }
 
   @Post()
+  @RequirePermission('project.create')
   async create(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: { id: string },
@@ -136,13 +143,16 @@ export class ProjectsController {
   }
 
   @Get(':id')
+  @RequirePermission('project.read')
   async findOne(@CurrentOrgId() orgId: string, @Param('id') id: string): Promise<ProjectView> {
     const doc = await this.projects.findScoped(id, orgId);
     return toView(doc);
   }
 
   @Post(':id/drivers')
+  @RequirePermission('inputs.update')
   async updateDrivers(
+    @CurrentUser() user: { id: string },
     @CurrentOrgId() orgId: string,
     @Param('id') id: string,
     @Body() body: unknown,
@@ -151,12 +161,27 @@ export class ProjectsController {
     if (!parsed.success) {
       throw new BadRequestException({ code: 'INVALID_REQUEST', issues: parsed.error.issues });
     }
-    const doc = await this.projects.updateDrivers(id, orgId, parsed.data.driverValues);
+    const doc = await this.projects.updateDrivers(id, orgId, parsed.data.driverValues, user.id);
     return toView(doc);
   }
 
+  /**
+   * Évaluation à la volée. Deux comportements sous une seule route :
+   * un calcul sans effet (`plan.calculate`), et — quand `persist` est vrai — une
+   * ÉCRITURE des hypothèses, qui relève d'`inputs.update`.
+   *
+   * Pourquoi le second contrôle est dans le corps et pas dans le décorateur :
+   * `@RequirePermission` est conjonctif, donc exiger les deux au niveau de la
+   * route refuserait le calcul NON persistant à tout rôle dépourvu
+   * d'`inputs.update`, ce qui casserait l'exploration de scénarios. Scinder en
+   * deux routes serait plus propre mais changerait le contrat public de l'API —
+   * hors périmètre de S20a.
+   */
   @Post(':id/evaluate')
+  @RequirePermission('plan.calculate')
   async evaluate(
+    @CurrentUser() user: { id: string },
+    @CurrentOrgRole() role: OrgRole,
     @CurrentOrgId() orgId: string,
     @Param('id') id: string,
     @Body() body: unknown,
@@ -174,7 +199,13 @@ export class ProjectsController {
 
     const drivers = parsed.data.driverValues ?? project.driverValues;
     if (parsed.data.persist && parsed.data.driverValues) {
-      project = await this.projects.updateDrivers(id, orgId, parsed.data.driverValues);
+      // Écriture déguisée en calcul : elle exige `inputs.update`, que
+      // `plan.calculate` n'implique pas (un `analyst` calcule, un `accountant`
+      // ne calcule pas). Décision prise par la matrice, jamais par un test de rôle.
+      if (!can(role, 'inputs.update')) {
+        throw new ForbiddenException(forbidden('inputs.update', role));
+      }
+      project = await this.projects.updateDrivers(id, orgId, parsed.data.driverValues, user.id);
     }
 
     const template = getTemplate(project.templateSlug);

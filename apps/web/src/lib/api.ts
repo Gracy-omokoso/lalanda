@@ -242,27 +242,78 @@ export interface TemplateSummary {
   horizon_mois?: number;
 }
 
-// ─── Organisations (S5c) ───────────────────────────────────────
+// ─── Rôles d'organisation (S20a — ADR-0012 §1) ─────────────────
+/**
+ * Les 8 rôles d'organisation. Miroir de `apps/api/src/authz/permissions.ts`,
+ * SOURCE DE VÉRITÉ — le web ne peut pas importer de l'API.
+ *
+ * Volontairement limité à l'union de slugs : les LIBELLÉS et les DESCRIPTIONS ne
+ * sont pas recopiés ici. Ils arrivent du serveur (`roleLabel`, `roleOptions`),
+ * qui les lit de la matrice. Deux tables de traduction finiraient par diverger,
+ * et c'est celle de l'interface qui aurait tort.
+ */
+export const ORG_ROLES = [
+  'owner',
+  'admin',
+  'finance_director',
+  'accountant',
+  'analyst',
+  'project_manager',
+  'advisor',
+  'viewer',
+] as const;
+
+export type OrgRole = (typeof ORG_ROLES)[number];
+
+// ─── Organisations (S5c, rôles S20a) ───────────────────────────
 export interface OrganizationView {
   id: string;
   name: string;
   slug: string;
   type: string;
   pays: string;
-  role: 'owner' | 'member';
+  role: OrgRole;
+  roleLabel: string;
+  /** Droit conditionnel de clôture (case ⚙). */
+  canClosePeriods: boolean;
 }
 
-// ─── Invitations (S5d) ─────────────────────────────────────────
+// ─── Invitations (S5d, rôles S20a) ─────────────────────────────
 export interface InvitationView {
   id: string;
   organizationId: string;
   email: string;
-  role: 'owner' | 'member';
+  role: OrgRole;
+  roleLabel: string;
   invitedBy: string;
   expiresAt: string;
   acceptedAt: string | null;
   revokedAt: string | null;
   createdAt: string;
+}
+
+// ─── Membres (S20a — ADR-0012 §6) ──────────────────────────────
+export interface MemberView {
+  userId: string;
+  /** `null` si le compte n'existe plus : la ligne reste affichée et révocable. */
+  email: string | null;
+  name: string | null;
+  role: OrgRole;
+  roleLabel: string;
+  canClosePeriods: boolean;
+  acceptedAt: string | null;
+  /** R1 — dernier propriétaire : ni rétrogradable ni révocable. */
+  isLastOwner: boolean;
+  /** R7 — l'acteur courant peut-il agir sur cette ligne ? */
+  manageable: boolean;
+}
+
+export interface RoleOption {
+  value: OrgRole;
+  label: string;
+  description: string;
+  /** R7 — l'acteur courant peut-il attribuer ce rôle ? */
+  grantable: boolean;
 }
 
 // ─── Plans validés figés et versionnés (S16c — FIN-003) ────────
@@ -636,7 +687,7 @@ export const api = {
       `/organizations/${encodeURIComponent(orgId)}/invitations`,
       { method: 'GET' },
     ),
-  createInvitation: (orgId: string, input: { email: string; role?: 'owner' | 'member' }) =>
+  createInvitation: (orgId: string, input: { email: string; role?: OrgRole }) =>
     jsonRequest<{ invitation: InvitationView; token: string }>(
       `/organizations/${encodeURIComponent(orgId)}/invitations`,
       { method: 'POST', body: input },
@@ -655,6 +706,39 @@ export const api = {
       method: 'POST',
       body: { token },
     }),
+  // ─── Membres (S20a) ────────────────────────────────────────
+  // `roleOptions` accompagne la liste : les rôles attribuables et leur
+  // `grantable` dépendent du rôle de l'APPELANT (R7), le client ne peut pas
+  // les déduire seul.
+  listMembers: (orgId: string) =>
+    jsonRequest<{ members: MemberView[]; roleOptions: RoleOption[] }>(
+      `/organizations/${encodeURIComponent(orgId)}/members`,
+      { method: 'GET' },
+    ),
+  changeMemberRole: (orgId: string, userId: string, role: OrgRole) =>
+    jsonRequest<{ member: MemberView }>(
+      `/organizations/${encodeURIComponent(orgId)}/members/${encodeURIComponent(userId)}/role`,
+      { method: 'PATCH', body: { role } },
+    ),
+  /** Droit conditionnel de clôture (case ⚙) — n'a de sens que pour un Comptable. */
+  setMemberCloseRight: (orgId: string, userId: string, value: boolean) =>
+    jsonRequest<{ member: MemberView }>(
+      `/organizations/${encodeURIComponent(orgId)}/members/${encodeURIComponent(
+        userId,
+      )}/close-right`,
+      { method: 'PATCH', body: { value } },
+    ),
+  revokeMember: (orgId: string, userId: string) =>
+    jsonRequest<{ revoked: true }>(
+      `/organizations/${encodeURIComponent(orgId)}/members/${encodeURIComponent(userId)}`,
+      { method: 'DELETE' },
+    ),
+  /** Seule manière pour un propriétaire unique de se rétrograder (R1). */
+  transferOwnership: (orgId: string, userId: string) =>
+    jsonRequest<{ previousOwner: MemberView; newOwner: MemberView }>(
+      `/organizations/${encodeURIComponent(orgId)}/transfer-ownership`,
+      { method: 'POST', body: { userId } },
+    ),
   // ─── Plans validés (S16c) ──────────────────────────────────
   // Fige la version courante du projet en vN+1 ; 409 { code: 'PLAN_UNCHANGED' }
   // si rien n'a changé depuis le dernier plan validé.
