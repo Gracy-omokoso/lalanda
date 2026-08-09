@@ -17,6 +17,7 @@ import { AccountController } from '../account/account.controller.js';
 import { EmailVerificationController } from '../account/email-verification.controller.js';
 import { ActualsController } from '../actuals/actuals.controller.js';
 import { AiActionsController } from '../ai/ai-actions.controller.js';
+import { AuthProvidersController } from '../auth/auth-providers.controller.js';
 import { BillingController } from '../billing/billing.controller.js';
 import { CanvasController } from '../canvas/canvas.controller.js';
 import { EvaluateController } from '../evaluate/evaluate.controller.js';
@@ -45,6 +46,7 @@ const CONTROLEURS = [
   ActualsController,
   AiActionsController,
   AuditController,
+  AuthProvidersController,
   EmailVerificationController,
   BillingController,
   CanvasController,
@@ -109,6 +111,12 @@ const SANS_PERMISSION: Record<string, string> = {
   'EmailVerificationController.verify':
     'Vérification par jeton. L’appelant n’est pas nécessairement authentifié : ' +
     'le jeton fait autorité, comme pour l’acceptation d’invitation.',
+
+  // ── Moyens de connexion disponibles (S22a) ──────────────────────────────
+  'AuthProvidersController.list':
+    'Dit à la page de connexion si le bouton Google doit s’afficher. Consultée AVANT ' +
+    'toute session, par définition : exiger une permission d’organisation la rendrait ' +
+    'inutilisable. Ne renvoie qu’un booléen, aucun identifiant ni secret.',
 };
 
 interface RouteInspectee {
