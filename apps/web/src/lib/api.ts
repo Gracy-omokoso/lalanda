@@ -972,6 +972,15 @@ export interface IntegrationView {
   secrets: Record<string, IntegrationSecretView>;
   lastTest: { at: string; status: 'ok' | 'failed'; detail: string; forced: boolean } | null;
   requiredSecrets: string[];
+  /**
+   * Liste blanche des clés de `config` — des NOMS de champs, jamais de valeurs.
+   *
+   * `config` ne porte que ce qui est déjà enregistré; cette liste permet à
+   * l'interface de proposer un champ encore vide sans recopier le catalogue de
+   * `apps/api/src/integrations/providers.ts`, qui reste la source de vérité.
+   */
+  configFields: string[];
+  requiredConfig: string[];
   /** Ce que fait le bouton « Tester », affiché AVANT qu'on le presse. */
   testDescription: string;
   updatedAt: string | null;

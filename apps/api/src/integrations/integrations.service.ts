@@ -67,6 +67,22 @@ export interface IntegrationView {
   lastTest: { at: string; status: 'ok' | 'failed'; detail: string; forced: boolean } | null;
   /** Secrets sans lesquels l'intégration ne peut pas fonctionner. */
   requiredSecrets: string[];
+  /**
+   * Liste blanche des clés de `config`, servie pour que l'interface puisse
+   * proposer un champ ENCORE VIDE.
+   *
+   * `config` ne porte que les valeurs déjà enregistrées : sans cette liste, une
+   * clé jamais saisie serait invisible et donc insaisissable. Recopier la liste
+   * blanche côté web serait la seconde source de vérité qu'ADR-0013 §1 refuse —
+   * elle dériverait au premier fournisseur modifié, et le symptôme serait un
+   * champ que l'interface propose et que l'API rejette en 400.
+   *
+   * Ce sont des NOMS de champs, jamais des valeurs : rien de secret n'y transite,
+   * et `no-secret-leak.test.ts` le vérifie sur la réponse entière.
+   */
+  configFields: string[];
+  /** Sous-ensemble de `configFields` exigé pour que le test de connexion tourne. */
+  requiredConfig: string[];
   /** Ce que fait le bouton « Tester » — affiché avant qu'on le presse. */
   testDescription: string;
   updatedAt: string | null;
@@ -156,6 +172,8 @@ export class IntegrationsService {
           }
         : null,
       requiredSecrets: [...spec.requiredSecrets],
+      configFields: [...spec.config],
+      requiredConfig: [...spec.requiredConfig],
       testDescription: spec.testDescription,
       updatedAt: doc
         ? new Date((doc as unknown as { updatedAt: Date }).updatedAt).toISOString()

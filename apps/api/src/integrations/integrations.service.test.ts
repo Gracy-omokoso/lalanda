@@ -355,16 +355,23 @@ describe('vue de lecture — la seule forme jamais renvoyée (ADR-0013 §4)', ()
     expect(Object.keys(vue).sort()).toEqual(
       [
         'config',
+        'configFields',
         'enabled',
         'label',
         'lastTest',
         'provider',
+        'requiredConfig',
         'requiredSecrets',
         'secrets',
         'testDescription',
         'updatedAt',
       ].sort(),
     );
+    // `configFields` et `requiredConfig` sont des NOMS de champs. Le test est
+    // écrit en liste FERMÉE et non en « contient » : c'est ce qui l'a fait
+    // échouer quand ces deux clés ont été ajoutées, et c'est la seule forme qui
+    // signale l'apparition d'un champ que personne n'a examiné.
+    expect(vue.configFields).toEqual(['publishableKey', 'webhookEndpoint', 'accountCountry']);
     expect(Object.keys(vue.secrets['restrictedKey']!).sort()).toEqual(
       ['configured', 'last4', 'source', 'updatedAt', 'updatedBy'].sort(),
     );
