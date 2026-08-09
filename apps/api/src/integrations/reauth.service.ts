@@ -27,41 +27,26 @@
 
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { createHash } from 'node:crypto';
 import type { Model } from 'mongoose';
 
 import { getAuth } from '../auth/auth.js';
+import { sessionFingerprint } from '../auth/session-fingerprint.js';
 import { PlatformReauth, type PlatformReauthDocument } from './reauth.schema.js';
 
 /** Durée de la fenêtre d'écriture ouverte par une ré-authentification (ADR-0013 §5). */
 export const REAUTH_WINDOW_MS = 10 * 60_000;
 
-/** Noms de cookies de session better-auth — mêmes valeurs que le middleware web. */
-const SESSION_COOKIE_NAMES = ['better-auth.session_token', '__Secure-better-auth.session_token'];
-
 /**
  * Empreinte de la session appelante.
  *
- * Le jeton de session VAUT le cookie de connexion (docs/17 § S20b) : il n'est ni
- * stocké ni journalisé. Seule son empreinte SHA-256 est conservée, ce qui suffit
- * à comparer deux sessions sans jamais détenir de quoi en usurper une.
- *
- * Retourne `null` si aucun cookie de session n'est présent — la fenêtre est alors
- * impossible à ouvrir, ce qui est le comportement voulu : sans session, il n'y a
- * rien à ré-authentifier.
+ * L'implémentation a été DÉPLACÉE dans `auth/session-fingerprint.ts` (S22h) :
+ * le MFA plateforme en a besoin pour lier son second facteur à une session
+ * précise, exactement comme cette fenêtre-ci lie sa ré-authentification. Deux
+ * copies d'une primitive de sécurité divergent au premier correctif appliqué à
+ * une seule des deux. Ré-exporté sans changement de signature ni de
+ * comportement, pour les appelants existants.
  */
-export function sessionFingerprint(cookieHeader: string | undefined): string | null {
-  if (!cookieHeader) return null;
-  for (const part of cookieHeader.split(';')) {
-    const [rawName, ...rest] = part.trim().split('=');
-    if (rawName && SESSION_COOKIE_NAMES.includes(rawName)) {
-      const value = decodeURIComponent(rest.join('=') ?? '');
-      if (!value) return null;
-      return createHash('sha256').update(value).digest('hex');
-    }
-  }
-  return null;
-}
+export { sessionFingerprint };
 
 @Injectable()
 export class ReauthService {
