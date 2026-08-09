@@ -30,6 +30,16 @@ export interface OpenAIChatClient {
 
 const DEFAULT_MODEL = 'gpt-4o-mini';
 
+/**
+ * Préfixe stable de toute trace de repli (S22h).
+ *
+ * Stable = greppable : un opérateur peut compter les replis et voir d'un coup
+ * d'œil s'ils viennent d'un plafond de jetons, d'un délai dépassé ou d'une
+ * absence de configuration. Un repli qui ne se voit pas dans les journaux est
+ * un échec silencieux, même quand la réponse rendue à l'utilisateur est bonne.
+ */
+export const FALLBACK_LOG_PREFIX = 'Repli déterministe :';
+
 /** Registre local des libellés FR par identifiant de ratio (fallback + prompt). */
 const RATIO_LABELS: Record<string, string> = {
   dscr: 'DSCR (couverture du service de la dette)',
@@ -44,6 +54,13 @@ const RATIO_LABELS: Record<string, string> = {
 export class AiActionsService {
   private readonly logger = new Logger(AiActionsService.name);
 
+  /**
+   * Évite de répéter à chaque requête l'avertissement « aucun client OpenAI ».
+   * L'absence de client est un ÉTAT de configuration, pas un incident par
+   * appel : le signaler une fois le rend visible sans noyer les journaux.
+   */
+  private clientAbsentSignale = false;
+
   constructor(private readonly openai: OpenAIChatClient | null = null) {}
 
   /** Point d'entrée : renvoie 0 à 4 actions correctives ancrées sur les ratios. */
@@ -56,6 +73,13 @@ export class AiActionsService {
 
     // Pas de client OpenAI configuré → fallback déterministe direct.
     if (!this.openai) {
+      if (!this.clientAbsentSignale) {
+        this.clientAbsentSignale = true;
+        this.logger.warn(
+          `${FALLBACK_LOG_PREFIX} raison=ClientAbsent — aucun client OpenAI configuré ` +
+            `(SDK absent ou aucune clé) ; toutes les suggestions viennent du repli déterministe.`,
+        );
+      }
       return {
         actions: buildFallbackActions(problematiques, req.devise),
         source: 'fallback',
@@ -76,9 +100,14 @@ export class AiActionsService {
       });
       return parsed;
     } catch (err) {
-      // Toute erreur (réseau, JSON invalide, zod refuse) → fallback silencieux.
+      // Toute erreur (réseau, délai dépassé, réponse tronquée, JSON invalide,
+      // zod refuse) → repli déterministe. L'utilisateur ne voit AUCUNE erreur,
+      // mais le repli n'est jamais silencieux côté exploitation : la RAISON est
+      // nommée par son type, pas seulement par son message. Sans cela, un
+      // dépassement de borne (S22h) se lit comme une banale erreur de syntaxe
+      // JSON et personne ne sait qu'il faut relever un plafond.
       this.logger.warn(
-        `LLM indisponible ou réponse invalide, fallback déterministe : ${
+        `${FALLBACK_LOG_PREFIX} raison=${err instanceof Error ? err.name : 'Inconnue'} — ${
           err instanceof Error ? err.message : String(err)
         }`,
       );
