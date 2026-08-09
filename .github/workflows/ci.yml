@@ -10,6 +10,13 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# (S22e) Sans bloc `permissions`, le GITHUB_TOKEN hérite du défaut du dépôt ou de
+# l'organisation — historiquement en écriture sur tous les scopes. Ce workflow
+# exécute `pnpm install`, donc les scripts `postinstall` de 827 dépendances : un
+# paquet compromis disposerait de ce jeton. La CI n'écrit rien, elle lit.
+permissions:
+  contents: read
+
 env:
   NODE_VERSION: '20'
   PNPM_VERSION: '9.15.0'
@@ -48,6 +55,13 @@ jobs:
 
       - name: Check formatting
         run: pnpm format:check
+
+      # (S22e, docs/17 § Application « dépendances surveillées ») Aucun scan de
+      # dépendances n'existait : rien n'échouait jamais sur une CVE. Cliquet et
+      # non seuil absolu — voir l'en-tête de scripts/audit-dependencies.mjs pour
+      # le raisonnement et scripts/audit-baseline.json pour la dette gelée.
+      - name: Audit des dépendances (cliquet)
+        run: node scripts/audit-dependencies.mjs
 
       - name: Typecheck
         run: pnpm typecheck

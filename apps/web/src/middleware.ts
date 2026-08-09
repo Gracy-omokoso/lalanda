@@ -41,6 +41,13 @@ export function middleware(req: NextRequest): NextResponse {
   if (isProtectedPath(pathname) && !authed) {
     const url = req.nextUrl.clone();
     url.pathname = '/login';
+    // (S22e) On repart d'une query vide, comme les deux autres branches : sans
+    // cela la chaîne de requête d'origine — entièrement contrôlée par
+    // l'appelant — est recopiée dans le `Location` du redirect, à côté du
+    // `next` que nous posons. Rien ne la consomme aujourd'hui; le jour où
+    // `/login` lira ses paramètres, la source de `next` ne serait plus
+    // distinguable de ce que l'attaquant a joint.
+    url.search = '';
     url.searchParams.set('next', pathname);
     return NextResponse.redirect(url);
   }

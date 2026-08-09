@@ -358,6 +358,11 @@ export function renderReportHtml(data: ReportData): string {
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
+  <!-- (S22e) Troisième barrière, à l'intérieur du document lui-même : même si le
+       renderer était un jour relancé sans le confinement de reports.service.ts,
+       cette CSP interdit tout script et toute ressource hors styles inline. Le
+       rapport n'utilise que du CSS inline (voir le <style> ci-dessous). -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:" />
   <title>${escapeHtml(project.name)} — Plan financier</title>
   <style>
     /* Palette identique à l'accent Lalanda (SYSCOHADA vert) — cohérence UI/PDF. */
