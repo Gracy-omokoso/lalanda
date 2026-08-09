@@ -28,6 +28,8 @@ import { api } from '@/lib/api';
 import { signUp } from '@/lib/auth-client';
 import { LEGAL_VERSION } from '@/lib/legal';
 
+import { GoogleButton } from '../_components/google-button';
+
 export default function RegisterPage(): React.ReactElement {
   const router = useRouter();
   const [name, setName] = useState('');
@@ -124,6 +126,11 @@ export default function RegisterPage(): React.ReactElement {
           Une organisation personnelle est créée automatiquement.
         </p>
       </div>
+
+      {/* Le même bouton qu'à la connexion, et c'est voulu : côté Google, créer un
+          compte et s'y connecter sont la même action. Un intitulé différent ferait
+          croire à deux comptes distincts selon la porte empruntée. */}
+      <GoogleButton label="Continuer avec Google" />
 
       <label className="flex flex-col gap-1.5 text-sm">
         <span className="font-medium">Nom</span>

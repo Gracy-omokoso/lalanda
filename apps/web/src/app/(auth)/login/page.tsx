@@ -1,10 +1,43 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useState } from 'react';
 
 import { signIn } from '@/lib/auth-client';
+
+import { GoogleButton } from '../_components/google-button';
+
+/**
+ * Bandeaux pilotés par l'URL : `?verifie=1` après un clic sur le lien de
+ * vérification d'adresse, `?erreur=google` quand la connexion Google a échoué.
+ *
+ * Isolé dans son propre composant sous `<Suspense>` : Next 15 refuse de
+ * pré-rendre statiquement une page qui appelle `useSearchParams()` en dehors
+ * d'une frontière de suspense.
+ */
+function UrlNotices(): React.ReactElement | null {
+  const params = useSearchParams();
+
+  if (params.get('verifie') === '1') {
+    return (
+      <div className="rounded-md border border-[var(--accent)]/30 bg-[var(--surface)] p-3 text-sm">
+        Votre adresse est confirmée. Connectez-vous pour continuer.
+      </div>
+    );
+  }
+  if (params.get('erreur') === 'google') {
+    return (
+      <div
+        role="alert"
+        className="rounded-md border border-[var(--danger)]/30 bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger)]"
+      >
+        La connexion Google n’a pas abouti. Réessayez, ou connectez-vous avec votre mot de passe.
+      </div>
+    );
+  }
+  return null;
+}
 
 export default function LoginPage(): React.ReactElement {
   const router = useRouter();
@@ -41,6 +74,12 @@ export default function LoginPage(): React.ReactElement {
         </p>
       </div>
 
+      <Suspense fallback={null}>
+        <UrlNotices />
+      </Suspense>
+
+      <GoogleButton label="Continuer avec Google" />
+
       <label className="flex flex-col gap-1.5 text-sm">
         <span className="font-medium">Email</span>
         <input
@@ -54,7 +93,15 @@ export default function LoginPage(): React.ReactElement {
       </label>
 
       <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium">Mot de passe</span>
+        <span className="flex items-center justify-between gap-2">
+          <span className="font-medium">Mot de passe</span>
+          <Link
+            href="/mot-de-passe-oublie"
+            className="text-xs text-[var(--accent)] underline underline-offset-4 hover:opacity-80"
+          >
+            Mot de passe oublié ?
+          </Link>
+        </span>
         <input
           type="password"
           required

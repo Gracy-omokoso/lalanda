@@ -50,6 +50,37 @@ export const ApiEnvSchema = CommonEnvSchema.extend({
     .default('false')
     .transform((v) => v === 'true'),
 
+  /**
+   * Connexion Google (ADR-0006, mise en œuvre S22a — ADR-0014).
+   *
+   * OPTIONNELLES, toutes les deux : sans elles l'API démarre normalement, le
+   * bouton « Continuer avec Google » ne s'affiche pas, et la connexion par mot
+   * de passe reste le seul chemin. Renseigner UNE SEULE des deux est en revanche
+   * une configuration bancale — l'API le signale au démarrage et traite le cas
+   * comme une absence (voir `resolveGoogleCredentials` dans apps/api).
+   */
+  GOOGLE_CLIENT_ID: z.string().min(1).optional(),
+  GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
+
+  /**
+   * Envoi d'emails transactionnels (S22a — ADR-0014).
+   *
+   * TOUTES OPTIONNELLES. Sans `SMTP_HOST`, aucun envoi n'a lieu : les messages
+   * sont journalisés (destinataire et sujet, jamais le corps ni les jetons) et
+   * les appels rapportent `delivered: false`. C'est un état NORMAL du produit en
+   * développement — faire dépendre le démarrage d'un serveur de mail
+   * transformerait une fonctionnalité optionnelle en point de panne global.
+   *
+   * `SMTP_USER` / `SMTP_PASSWORD` restent facultatifs même avec un hôte : un
+   * relais interne ou un MailHog de développement n'authentifie personne.
+   */
+  SMTP_HOST: z.string().min(1).optional(),
+  SMTP_PORT: z.coerce.number().int().positive().max(65535).optional(),
+  SMTP_USER: z.string().min(1).optional(),
+  SMTP_PASSWORD: z.string().min(1).optional(),
+  /** Expéditeur affiché — `"Lalanda <no-reply@exemple.com>"` ou une simple adresse. */
+  SMTP_FROM: z.string().min(1).optional(),
+
   OPENAI_API_KEY: z.string().min(1),
   OPENAI_MODEL_REASONING: z.string().default('gpt-4o'),
   OPENAI_MODEL_LITE: z.string().default('gpt-4o-mini'),

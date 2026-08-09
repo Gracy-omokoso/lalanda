@@ -1,0 +1,117 @@
+// Acheminement d'un message (S22a).
+//
+// ── Le repli n'est pas un accident ────────────────────────────────────────────
+// Sans `SMTP_HOST`, l'application DÉMARRE et fonctionne : le message est
+// journalisé, `delivered` vaut `false`, et l'appelant le dit à l'utilisateur.
+// C'est exactement le comportement d'avant S22a (docs/17 § Bloqué par l'absence
+// de SMTP), conservé tel quel. Rendre le démarrage dépendant d'un serveur de mail
+// transformerait une fonctionnalité optionnelle en point de panne du produit
+// entier — un développeur sans MailHog ne pourrait plus lancer l'API.
+//
+// ── Ce qui n'apparaît JAMAIS dans les journaux ────────────────────────────────
+// docs/17 § Journalisation : « aucun token, secret […] ne doit apparaître dans les
+// logs ». Le repli journalise donc le destinataire et le sujet, jamais le corps —
+// le corps contient précisément le lien porteur du jeton. Un opérateur qui a
+// besoin du lien active un vrai SMTP (MailHog en local) ; il ne le lit pas dans
+// journalctl.
+
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { createTransport, type Transporter } from 'nodemailer';
+
+import { MailCredentialsProvider } from './mail-credentials.provider.js';
+import { DELIVERED, type MailDeliveryResult, type MailMessage } from './mail.types.js';
+
+/** Contrat d'acheminement. Substituable en test par un espion sans réseau. */
+@Injectable()
+export abstract class MailTransport {
+  abstract send(message: MailMessage): Promise<MailDeliveryResult>;
+}
+
+/**
+ * Transport SMTP (nodemailer) avec repli journal.
+ *
+ * Le transporteur nodemailer est mis en cache et réutilisé entre les envois : il
+ * maintient un pool de connexions, et en recréer un à chaque message rouvrirait
+ * une connexion TLS par email. Le cache est invalidé dès que les identifiants
+ * changent — indispensable le jour où ils viennent de la base (voir
+ * `MailCredentialsProvider`) et non plus d'un environnement figé au démarrage.
+ */
+@Injectable()
+export class SmtpMailTransport extends MailTransport {
+  private readonly logger = new Logger('MailTransport');
+  private cached: { fingerprint: string; transporter: Transporter } | null = null;
+
+  // Jeton d'injection EXPLICITE : voir `mail.service.ts` — esbuild (vitest)
+  // n'émet pas `design:paramtypes`, et une injection par type y devient
+  // silencieusement `undefined`.
+  constructor(
+    @Inject(MailCredentialsProvider) private readonly credentials: MailCredentialsProvider,
+  ) {
+    super();
+  }
+
+  async send(message: MailMessage): Promise<MailDeliveryResult> {
+    const creds = await this.credentials.resolve();
+
+    if (!creds) {
+      // Repli : ni token ni corps dans le journal (cf. en-tête de fichier).
+      this.logger.warn(
+        `Email NON ENVOYÉ (aucun SMTP configuré) → destinataire=${message.to} ` +
+          `sujet="${message.subject}". Renseignez SMTP_HOST pour activer l'envoi.`,
+      );
+      return { delivered: false, reason: 'SMTP_NOT_CONFIGURED' };
+    }
+
+    try {
+      const transporter = this.transporterFor(creds);
+      await transporter.sendMail({
+        from: creds.from,
+        to: message.to,
+        subject: message.subject,
+        text: message.text,
+        html: message.html,
+      });
+      return DELIVERED;
+    } catch (err) {
+      // Un envoi qui échoue ne doit pas faire échouer l'opération métier qui l'a
+      // déclenché : une invitation créée reste créée, son lien reste copiable
+      // depuis l'interface. On trace la panne SANS le message d'origine.
+      this.logger.error(
+        `Envoi SMTP en échec → destinataire=${message.to} sujet="${message.subject}" : ` +
+          (err instanceof Error ? err.message : String(err)),
+      );
+      return { delivered: false, reason: 'SMTP_ERROR' };
+    }
+  }
+
+  /** Transporteur du jeu d'identifiants courant, recréé seulement s'il a changé. */
+  private transporterFor(creds: {
+    host: string;
+    port: number;
+    secure: boolean;
+    user?: string | undefined;
+    password?: string | undefined;
+  }): Transporter {
+    // Le mot de passe entre dans l'empreinte (une rotation doit recréer le
+    // transporteur) mais n'est jamais journalisé ni exposé : l'empreinte reste en
+    // mémoire du process.
+    const fingerprint = JSON.stringify([
+      creds.host,
+      creds.port,
+      creds.secure,
+      creds.user ?? null,
+      creds.password ?? null,
+    ]);
+    if (this.cached?.fingerprint === fingerprint) return this.cached.transporter;
+
+    const transporter = createTransport({
+      host: creds.host,
+      port: creds.port,
+      secure: creds.secure,
+      ...(creds.user ? { auth: { user: creds.user, pass: creds.password ?? '' } } : {}),
+    });
+
+    this.cached = { fingerprint, transporter };
+    return transporter;
+  }
+}

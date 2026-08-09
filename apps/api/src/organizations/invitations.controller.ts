@@ -17,8 +17,11 @@ import { RequirePermission } from '../authz/authz.decorators.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
 import { OrgRoleInput } from '../authz/org-role.dto.js';
 import { ORG_ROLE_LABELS, type OrgRole } from '../authz/permissions.js';
+import { invitationUrl } from '../mail/mail.links.js';
+import { MailService } from '../mail/mail.service.js';
 import type { InvitationDocument } from './invitation.schema.js';
 import { InvitationsService } from './invitations.service.js';
+import { OrganizationsService } from './organizations.service.js';
 
 const CreateInvitationSchema = z.object({
   email: z.string().email(),
@@ -66,20 +69,34 @@ function toView(doc: InvitationDocument): InvitationView {
 @Controller()
 @UseGuards(AuthGuard, PermissionsGuard)
 export class InvitationsController {
-  constructor(@Inject(InvitationsService) private readonly invitations: InvitationsService) {}
+  constructor(
+    @Inject(InvitationsService) private readonly invitations: InvitationsService,
+    @Inject(OrganizationsService) private readonly organizations: OrganizationsService,
+    // Jeton explicite comme partout ici : esbuild (vitest) n'émet pas
+    // `design:paramtypes`, une injection par type y serait `undefined`.
+    @Inject(MailService) private readonly mail: MailService,
+  ) {}
 
   /**
    * Owner d'une org crée une invitation pour un email.
-   * Le token brut est renvoyé UNIQUEMENT dans cette réponse — l'owner doit le partager
-   * via son propre canal (email, message). Livraison SMTP réelle = S12.
+   *
+   * L'invitation part MAINTENANT par email (S22a). Le token brut reste néanmoins
+   * renvoyé dans cette réponse — et ce n'est pas une redondance :
+   *  • sans SMTP configuré, c'est le SEUL moyen d'inviter quelqu'un (le lien est
+   *    copiable depuis l'interface), et c'est le mode de fonctionnement documenté
+   *    du produit hors production;
+   *  • même avec SMTP, un email peut être classé en indésirable ou refusé par un
+   *    domaine d'entreprise. Un lien copiable évite de rendre l'invitation
+   *    dépendante d'une infrastructure qu'on ne maîtrise pas.
+   * `emailDelivered` dit lequel des deux chemins a fonctionné, sans mentir.
    */
   @Post('organizations/:orgId/invitations')
   @RequirePermission('members.invite')
   async create(
-    @CurrentUser() user: { id: string; email: string },
+    @CurrentUser() user: { id: string; email: string; name?: string | null },
     @Param('orgId') orgId: string,
     @Body() body: unknown,
-  ): Promise<{ invitation: InvitationView; token: string }> {
+  ): Promise<{ invitation: InvitationView; token: string; emailDelivered: boolean }> {
     const parsed = CreateInvitationSchema.safeParse(body);
     if (!parsed.success) {
       throw new BadRequestException({ code: 'INVALID_REQUEST', issues: parsed.error.issues });
@@ -93,12 +110,27 @@ export class InvitationsController {
       email: parsed.data.email,
       role: parsed.data.role,
     });
-    // Log serveur en attendant SMTP (S12). Un opérateur peut copier le lien depuis les logs.
-    // eslint-disable-next-line no-console
-    console.log(
-      `[invitations] org=${orgId} email=${inv.email} token=${inv.token} expires=${inv.expiresAt.toISOString()}`,
-    );
-    return { invitation: toView(inv), token: inv.token };
+    // Le nom de l'organisation est LU ICI et pas figé dans l'invitation : entre
+    // l'émission et la lecture de l'email, il n'a pas le temps de changer, et le
+    // dupliquer en base créerait un second endroit à mettre à jour lors d'un
+    // renommage.
+    const org = await this.organizations.findOrgById(orgId);
+
+    // Un envoi en échec ne doit PAS annuler l'invitation : elle existe en base, son
+    // lien est copiable depuis l'interface. `MailService` ne lève jamais — il
+    // rapporte. (L'ancien `console.log` du token est supprimé : docs/17
+    // § Journalisation interdit qu'un secret apparaisse dans les logs, et ce
+    // token vaut une entrée dans l'organisation.)
+    const delivery = await this.mail.sendInvitation({
+      to: inv.email,
+      url: invitationUrl(inv.token),
+      organizationName: org.name,
+      roleLabel: ORG_ROLE_LABELS[inv.role] ?? inv.role,
+      inviterName: user.name ?? null,
+      expiresAt: inv.expiresAt,
+    });
+
+    return { invitation: toView(inv), token: inv.token, emailDelivered: delivery.delivered };
   }
 
   @Get('organizations/:orgId/invitations')
