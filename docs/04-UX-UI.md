@@ -15,7 +15,7 @@ Lalanda doit permettre à un utilisateur non comptable de progresser sans perdre
 - **Aide** : glossaire, guides, sources pays et support.
 - **Administration plateforme** : organisations, Country Packs, templates, abonnements et journaux.
 
-La traduction de cette architecture en barre du haut et en menu du compte est arrêtée par **ADR-0015** — voir § Décidé (ADR-0015) en fin de document.
+La traduction de cette architecture en barre du haut et en menu du compte est arrêtée par **ADR-0016** — voir § Décidé (ADR-0016) en fin de document.
 
 ## Disposition d’un projet
 
@@ -131,7 +131,7 @@ Deux fonctions sont incomplètes **par manque d’infrastructure, pas par oubli*
 
 L’entrée doit être offerte à **tout membre** : masquer le lien selon le rôle recopierait la matrice dans le header (ADR-0012 §8) et se tromperait au premier changement.
 
-> **Correction (2026-08-10).** Ce paragraphe affirmait que l’entrée se faisait « par le lien "Organisation" du header ». **Ce lien n’a jamais existé** : `apps/web/src/app/(app)/_components/app-header.tsx` ne contient aucun `href="/organisation"`, et la seule référence à l’espace hors de lui-même est `souscription/_components/subscription-funnel.tsx:456`, qui pointe vers `/organisation/facturation`. L’espace n’est donc atteignable qu’en tapant l’URL. ADR-0015 pose l’entrée manquante dans le menu du compte.
+> **Correction (2026-08-10).** Ce paragraphe affirmait que l’entrée se faisait « par le lien "Organisation" du header ». **Ce lien n’a jamais existé** : `apps/web/src/app/(app)/_components/app-header.tsx` ne contient aucun `href="/organisation"`, et la seule référence à l’espace hors de lui-même est `souscription/_components/subscription-funnel.tsx:456`, qui pointe vers `/organisation/facturation`. L’espace n’est donc atteignable qu’en tapant l’URL. ADR-0016 pose l’entrée manquante dans le menu du compte.
 
 ### Un tableau de bord, pas quatre
 
@@ -246,9 +246,9 @@ L’écran de confirmation est **le même** que l’adresse soit connue ou non :
 
 Sur `/nouveau-mot-de-passe`, la confirmation du mot de passe est comparée **avant** l’appel réseau : le lien ne sert qu’une fois, une faute de frappe ne doit pas le consommer. Après succès, redirection vers `/login` et non vers l’application : toutes les sessions viennent d’être révoquées côté serveur.
 
-## Décidé (ADR-0015) — Navigation applicative
+## Décidé (ADR-0016) — Navigation applicative
 
-Spécification complète, justifications et décisions ouvertes : [ADR-0015](adr/ADR-0015-navigation-applicative.md). Cette section en donne la forme retenue ; elle décrit une **cible**, non l’implémenté.
+Spécification complète, justifications et décisions ouvertes : [ADR-0016](adr/ADR-0016-navigation-applicative.md). Cette section en donne la forme retenue ; elle décrit une **cible**, non l’implémenté.
 
 ### Barre du haut
 
