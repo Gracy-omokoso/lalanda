@@ -18,7 +18,7 @@ export default function AuthLayout({
         <Link
           href="/"
           aria-label="Lalanda — accueil"
-          className="flex flex-col gap-1.5 transition hover:opacity-80"
+          className="flex shrink-0 flex-col gap-1.5 transition hover:opacity-80"
         >
           <BrandLogo hauteur={34} />
           <span className="text-xs text-[var(--foreground-muted)]">

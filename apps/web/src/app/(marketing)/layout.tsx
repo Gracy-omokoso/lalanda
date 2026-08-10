@@ -28,9 +28,9 @@ export default function MarketingLayout({
           <Link
             href="/"
             aria-label="Lalanda — accueil"
-            className="flex items-center gap-3 transition hover:opacity-80"
+            className="flex shrink-0 items-center gap-3 transition hover:opacity-80"
           >
-            <BrandLogo hauteur={34} fond="encre" />
+            <BrandLogo hauteur={30} fond="encre" />
             <span className="font-mono hidden border-l border-[var(--ink-border)] pl-3 text-[0.65rem] tracking-wide text-[var(--on-ink-muted)] sm:block">
               PLAN FINANCIER BANCABLE
             </span>

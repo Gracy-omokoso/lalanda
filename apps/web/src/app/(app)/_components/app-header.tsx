@@ -50,7 +50,7 @@ export function AppHeader(): React.ReactElement {
       <Link
         href="/projects"
         aria-label="Lalanda — tableau de bord"
-        className="flex items-center transition hover:opacity-80"
+        className="flex shrink-0 items-center transition hover:opacity-80"
       >
         {/* Sous 640 px le lockup complet (120 px de large) écraserait le
             sélecteur d'organisation : il cède la place à l'aigle seul, qui
