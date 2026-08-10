@@ -1,15 +1,18 @@
 // Le lockup de marque — aigle + mot-symbole.
 //
 // Deux fichiers, un par fond de destination (voir `public/marque/README.md`) :
-// `fond-clair` porte un badge OPAQUE encre (#07171c) et un mot-symbole encre;
-// `fond-sombre` le MÊME badge opaque encre, avec un mot-symbole crème.
+// `fond-clair` est entièrement en encre (#07171c), `fond-sombre` entièrement en
+// crème (#eee7d7). Chacun est MONOCHROME, un seul aplat, badge et mot-symbole
+// compris — livraison du décideur du 2026-08-10, qui remplace une paire au
+// badge encre commun.
 //
-// Les deux versions partagent donc leur badge : seule la couleur du
-// mot-symbole distingue les deux fichiers. C'est le choix du décideur
-// (logo v2, 2026-08-10), qui remplace une première version au badge
-// transparent cerclé cyan. Conséquence à connaître : le badge ne laisse plus
-// passer le fond, il pose son propre carré encre. Sur les panneaux `.bg-ink`
-// (#005263) le carré se voit donc comme une forme distincte — c'est voulu.
+// **L'aigle n'est pas peint : il est découpé dans le badge.** Ces pixels sont
+// transparents, donc l'aigle prend la couleur de ce qu'il y a derrière — crème
+// en thème clair, encre en thème sombre, pétrole sur un panneau `.bg-ink`. Les
+// trois gardent un contraste franc badge/aigle. Corollaire : ne pas poser ce
+// lockup sur une photo ou un dégradé, l'aigle y ramasserait n'importe quoi;
+// `logo-lalanda-blanc.png` / `-noir.png` existent pour ces cas.
+//
 // Il n'existe pas de SVG : la source livrée est du PNG, et rien ici n'en
 // fabrique un.
 //
