@@ -276,7 +276,7 @@ Le compte est représenté par **une seule entrée**. `/compte` est l’espace d
 
 ### Membres rejoint l’organisation
 
-`/members` devient `/organisation/membres`, cinquième onglet de l’espace, filtré par `organization.manage` — l’action qui garde déjà l’appel remplissant la page. L’ancienne URL répond en **redirection permanente (308)**. Aucun email n’en dépend : les quatre liens sortants sont centralisés dans `apps/api/src/mail/mail.links.ts` et aucun ne pointe vers `/members`.
+`/members` devient `/organisation/membres`, **deuxième** onglet de l’espace — juste après « Tableau de bord », les personnes avant les réglages — filtré par `organization.manage` — l’action qui garde déjà l’appel remplissant la page. L’ancienne URL répond en **redirection permanente (308)**. Aucun email n’en dépend : les quatre liens sortants sont centralisés dans `apps/api/src/mail/mail.links.ts` et aucun ne pointe vers `/members`.
 
 ### Mobile et clavier
 
