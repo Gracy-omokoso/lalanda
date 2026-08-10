@@ -90,6 +90,15 @@ export class ReportsController {
   ): Promise<ReportData> {
     const project = await this.projects.findScoped(id, orgId);
     const org = await this.organizations.findOrgById(orgId);
+    // Entitlements (S16b) : le filigrane PDF est décidé ici, côté API — jamais par l'UI.
+    //
+    // S22i : cette résolution vivait dans la seule branche live, APRÈS le retour
+    // anticipé du plan figé. Un export `?planVersion=N` sortait donc sans
+    // filigrane quel que soit le plan de l'organisation — c'est-à-dire que la
+    // limite d'une offre `free` se contournait en exportant la version validée,
+    // précisément l'export qu'on dépose en banque. Elle est désormais résolue
+    // avant l'embranchement : les deux chemins la posent.
+    const { entitlements } = await this.billing.getPlanEntitlements(orgId);
 
     if (planVersion !== undefined) {
       const plan = await this.plans.findVersion(orgId, String(project._id), planVersion);
@@ -143,6 +152,7 @@ export class ReportsController {
         generatedAt: new Date().toISOString(),
         currency: currency as 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR',
         plan: { version: plan.version, approvedAt: plan.approvedAt.toISOString() },
+        watermark: entitlements.pdfWatermark,
       };
     }
 
@@ -156,9 +166,6 @@ export class ReportsController {
     const pack = project.parameterPackSlug
       ? getParameterPack(project.parameterPackSlug)
       : undefined;
-    // Entitlements (S16b) : le filigrane PDF est décidé ici, côté API — jamais par l'UI.
-    const { entitlements } = await this.billing.getPlanEntitlements(orgId);
-
     const evaluation = evaluateTemplate(template, project.driverValues, {
       parameterPack: pack,
     });
