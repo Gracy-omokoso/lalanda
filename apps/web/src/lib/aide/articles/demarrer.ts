@@ -161,7 +161,7 @@ export const DEMARRER: ArticleAide = {
         },
         {
           type: 'exemple',
-          titre: 'Ordre de grandeur — restaurant à Kinshasa, exercice 1',
+          titre: 'Ordre de grandeur — restaurant urbain, exercice 1',
           lignes: [
             { libelle: 'Couverts par jour', valeur: '60' },
             { libelle: 'Jours d’ouverture par mois', valeur: '26' },
