@@ -65,7 +65,7 @@ export interface UserMenuFacts {
  * derrière est filtré par les permissions réelles, là où le filtrage existe
  * déjà.
  */
-const ITEMS: readonly (UserMenuItem & { besoin: keyof UserMenuFacts | null })[] = [
+const ITEMS: readonly UserMenuItem[] = [
   {
     kind: 'link',
     id: 'tableau-de-bord',
@@ -73,7 +73,6 @@ const ITEMS: readonly (UserMenuItem & { besoin: keyof UserMenuFacts | null })[] 
     label: 'Tableau de bord',
     hint: 'Vos projets et leur avancement',
     group: 1,
-    besoin: null,
   },
   {
     kind: 'link',
@@ -82,7 +81,6 @@ const ITEMS: readonly (UserMenuItem & { besoin: keyof UserMenuFacts | null })[] 
     label: 'Mon compte',
     hint: 'Profil, sécurité, préférences',
     group: 1,
-    besoin: null,
   },
   {
     kind: 'link',
@@ -91,7 +89,6 @@ const ITEMS: readonly (UserMenuItem & { besoin: keyof UserMenuFacts | null })[] 
     label: 'Organisation',
     hint: 'Membres, paramètres, facturation, journal',
     group: 2,
-    besoin: null,
   },
   {
     kind: 'link',
@@ -100,7 +97,6 @@ const ITEMS: readonly (UserMenuItem & { besoin: keyof UserMenuFacts | null })[] 
     label: 'Abonnement',
     hint: 'Plan, essai et changement d’offre',
     group: 2,
-    besoin: null,
   },
   {
     kind: 'link',
@@ -109,10 +105,20 @@ const ITEMS: readonly (UserMenuItem & { besoin: keyof UserMenuFacts | null })[] 
     label: 'Administration',
     hint: 'Plateforme : organisations, packs, journaux',
     group: 2,
-    besoin: 'canReadAdmin',
   },
-  { kind: 'action', id: 'signout', label: 'Déconnexion', group: 3, besoin: null },
+  { kind: 'action', id: 'signout', label: 'Déconnexion', group: 3 },
 ] as const;
+
+/**
+ * Fait serveur exigé par une entrée. Une entrée absente de cette table est
+ * inconditionnelle.
+ *
+ * Table séparée, et non un champ de plus sur chaque entrée : elle rend visible
+ * en une ligne le point le plus important de l'ADR-0016 §5 — UNE SEULE entrée
+ * est conditionnée. Le jour où cette table grossit, c'est une décision, pas un
+ * détail noyé dans six objets.
+ */
+const CONDITIONS: Readonly<Record<string, keyof UserMenuFacts>> = { admin: 'canReadAdmin' };
 
 /**
  * Entrées réellement proposées.
@@ -124,9 +130,10 @@ const ITEMS: readonly (UserMenuItem & { besoin: keyof UserMenuFacts | null })[] 
  * qui répondra 403 (ADR-0016 §5).
  */
 export function entreesMenu(faits: UserMenuFacts): UserMenuItem[] {
-  return ITEMS.filter((item) => item.besoin === null || faits[item.besoin]).map(
-    ({ besoin: _besoin, ...item }) => item,
-  );
+  return ITEMS.filter((item) => {
+    const besoin = CONDITIONS[item.id];
+    return besoin === undefined || faits[besoin];
+  });
 }
 
 /**

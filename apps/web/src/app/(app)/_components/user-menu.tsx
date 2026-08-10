@@ -1,45 +1,68 @@
 'use client';
 
-// Menu utilisateur du header (S20b) : Profil · Sécurité · Préférences · Déconnexion.
+// Menu du compte (S20b, refondu par ADR-0016 E1/E3).
 //
-// Le déclencheur est l'ADRESSE EMAIL de l'utilisateur, qui était déjà affichée
-// mais inerte. Elle devient le point d'entrée de l'espace compte : c'est là que
-// l'utilisateur cherche ses propres réglages, et cela évite d'ajouter un
-// sixième élément dans une barre déjà chargée.
+// C'est le point d'entrée UNIQUE vers tout ce qui n'est pas un projet :
+// Tableau de bord · Mon compte · Organisation · Abonnement · Administration ·
+// Déconnexion. Avant, trois de ces destinations vivaient dans la barre avec
+// `hidden sm:inline` — donc INATTEIGNABLES sous 640 px, sans autre chemin. Le
+// menu, lui, existe à toutes les largeurs.
 //
-// CLAVIER (docs/04 § Accessibilité — « navigation clavier complète ») :
-//   Entrée / Espace  ouvre le menu (comportement natif du <button>)
-//   ↓ / ↑            ouvre le menu et se place sur le premier / dernier élément
-//   Échap            ferme et REND LE FOCUS au déclencheur
-//   Tab              sort du menu et le ferme
+// Le déclencheur est l'AVATAR (photo à venir, initiales aujourd'hui) et non plus
+// l'adresse email. Le contenu et l'ordre des entrées vivent dans
+// `user-menu-model.ts`, testé sans DOM.
+//
+// CLAVIER (docs/04 § Accessibilité — « navigation clavier complète »).
+// Rien de ce tableau ne doit régresser, l'ajout d'entrées et de séparateurs ne
+// change aucune de ces règles :
+//   Entrée / Espace  ouvrent (comportement natif du <button>)
+//   ↓ / ↑            sur le déclencheur : ouvrent ET placent le focus sur le
+//                    premier / dernier élément
+//   ↓ / ↑            dans le menu : circulent
+//   Début / Fin      vont aux extrémités
+//   Tab              sort du menu ET le ferme (un menu ouvert derrière le focus
+//                    est une zone morte à l'écran)
+//   Échap            ferme ET REND LE FOCUS au déclencheur
 // Sans le retour de focus sur Échap, la tabulation repartirait du début du
 // document : on perdrait sa place à chaque ouverture accidentelle.
+//
+// La collecte des éléments navigables interroge le DOM (`[role="menuitem"]`),
+// elle reste donc juste quand « Administration » disparaît — À CONDITION que
+// seules les vraies entrées portent ce rôle. L'en-tête d'identité et les
+// séparateurs n'en portent pas et ne sont pas focusables : sinon la circulation
+// clavier aurait des trous où il n'y a rien à activer.
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 
-interface MenuEntry {
-  href: string;
-  label: string;
-  /** Court rappel de ce que la section contient, pour ne pas deviner. */
-  hint: string;
-}
+import { oublierProfil, useProfil } from './profile-context';
+import { entreeActive, entreesMenu, libelleDeclencheur, separateurAvant } from './user-menu-model';
 
-/** Même ordre que les onglets de `/compte` — l'utilisateur retrouve sa carte. */
-const ENTRIES: MenuEntry[] = [
-  { href: '/compte', label: 'Profil', hint: 'Nom, langue, fuseau, adresse email' },
-  { href: '/compte/securite', label: 'Sécurité', hint: 'Mot de passe, sessions actives' },
-  { href: '/compte/preferences', label: 'Préférences', hint: 'Thème, devise, notifications' },
-];
-
-export function UserMenu({ email }: { email: string }): React.ReactElement {
+export function UserMenu({
+  email,
+  canReadAdmin,
+}: {
+  email: string;
+  /**
+   * `GET /me/platform-access`, déjà chargé par le header. Le menu n'émet aucun
+   * appel supplémentaire au titre de la visibilité, et ne déduit AUCUN droit
+   * d'un rôle qu'il aurait recopié (ADR-0012 §8) : masquer est un confort, le
+   * contrôle est `PermissionsGuard` côté API.
+   */
+  canReadAdmin: boolean;
+}): React.ReactElement {
   const router = useRouter();
+  const pathname = usePathname();
+  const { profil } = useProfil();
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const items = entreesMenu({ canReadAdmin });
+  const actif = entreeActive(pathname, items);
 
   const close = useCallback((focusTrigger: boolean): void => {
     setOpen(false);
@@ -66,7 +89,7 @@ export function UserMenu({ email }: { email: string }): React.ReactElement {
   }, [open, close]);
 
   /** Éléments focusables du menu, dans l'ordre visuel. */
-  function items(): HTMLElement[] {
+  function elements(): HTMLElement[] {
     const root = menuRef.current;
     if (!root) return [];
     return Array.from(root.querySelectorAll<HTMLElement>('[role="menuitem"]'));
@@ -76,7 +99,7 @@ export function UserMenu({ email }: { email: string }): React.ReactElement {
     setOpen(true);
     // Après le rendu : les éléments n'existent pas encore au moment du clic.
     requestAnimationFrame(() => {
-      const list = items();
+      const list = elements();
       (position === 'first' ? list[0] : list[list.length - 1])?.focus();
     });
   }
@@ -92,7 +115,7 @@ export function UserMenu({ email }: { email: string }): React.ReactElement {
   }
 
   function onMenuKeyDown(e: React.KeyboardEvent<HTMLDivElement>): void {
-    const list = items();
+    const list = elements();
     if (list.length === 0) return;
     const index = list.indexOf(document.activeElement as HTMLElement);
     if (e.key === 'ArrowDown') {
@@ -119,6 +142,9 @@ export function UserMenu({ email }: { email: string }): React.ReactElement {
     try {
       const { signOut } = await import('@/lib/auth-client');
       await signOut();
+      // Le profil de la personne qui part ne doit pas rester en cache pour
+      // celle qui se connecte ensuite.
+      oublierProfil();
       setOpen(false);
       router.push('/login');
       router.refresh();
@@ -126,6 +152,8 @@ export function UserMenu({ email }: { email: string }): React.ReactElement {
       setSigningOut(false);
     }
   }
+
+  const nom = profil?.name?.trim() ?? '';
 
   return (
     <div ref={rootRef} className="relative">
@@ -136,18 +164,12 @@ export function UserMenu({ email }: { email: string }): React.ReactElement {
         onKeyDown={onTriggerKeyDown}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={`Menu du compte — ${email}`}
-        className="inline-flex max-w-[13rem] items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm transition hover:bg-[var(--surface-muted)]"
+        // Le nom accessible porte l'IDENTITÉ : l'avatar est `aria-hidden`, donc
+        // c'est la seule chose qu'un lecteur d'écran entend de ce bouton.
+        aria-label={libelleDeclencheur({ nom, email })}
+        className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] p-1 pr-2 transition hover:bg-[var(--surface-muted)]"
       >
-        <span
-          aria-hidden="true"
-          className="font-display inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[var(--accent)] text-[0.6rem] font-black text-[var(--accent)]"
-        >
-          {initialsOfEmail(email)}
-        </span>
-        {/* L'adresse complète disparaît sous 640 px : les initiales suffisent, et
-            la barre reste utilisable sur mobile (docs/04 § Responsive). */}
-        <span className="hidden truncate text-[var(--foreground-muted)] sm:inline">{email}</span>
+        <Avatar initiales={profil?.initials ?? null} taille="sm" />
         <span aria-hidden="true" className="text-xs opacity-50">
           ▾
         </span>
@@ -156,42 +178,67 @@ export function UserMenu({ email }: { email: string }): React.ReactElement {
       {open ? (
         <div
           ref={menuRef}
-          role="menu"
-          aria-label="Mon compte"
           onKeyDown={onMenuKeyDown}
-          className="absolute right-0 z-20 mt-2 w-64 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-lg"
+          // Largeur bornée par la fenêtre : à 375 px le panneau tient dans
+          // l'écran sans provoquer de défilement horizontal. Hauteur bornée
+          // aussi, avec défilement INTERNE à la liste — l'en-tête d'identité
+          // reste visible pendant qu'on fait défiler les entrées.
+          className="absolute right-0 z-20 mt-2 flex w-[min(19rem,calc(100vw-2rem))] max-h-[min(30rem,calc(100vh-6rem))] flex-col overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-lg"
         >
-          <p className="truncate border-b border-[var(--border)] px-3 py-2 text-xs text-[var(--foreground-muted)]">
-            Connecté en tant que{' '}
-            <span className="font-medium text-[var(--foreground)]">{email}</span>
-          </p>
+          {/* En-tête d'identité — INERTE : aucun `role="menuitem"`, aucun
+              élément focusable. Il informe, il ne s'active pas. */}
+          <div className="flex shrink-0 items-center gap-3 border-b border-[var(--border)] px-3 py-3">
+            <Avatar initiales={profil?.initials ?? null} taille="md" />
+            <div className="flex min-w-0 flex-col leading-tight">
+              {nom ? <span className="truncate text-sm font-medium">{nom}</span> : null}
+              <span className="truncate text-xs text-[var(--foreground-muted)]">{email}</span>
+            </div>
+          </div>
 
-          <ul className="py-1">
-            {ENTRIES.map((entry) => (
-              <li key={entry.href}>
-                <Link
-                  href={entry.href}
-                  role="menuitem"
-                  onClick={() => setOpen(false)}
-                  className="flex flex-col gap-0.5 px-3 py-2 text-sm transition hover:bg-[var(--surface-muted)]"
-                >
-                  <span className="font-medium">{entry.label}</span>
-                  <span className="text-xs text-[var(--foreground-muted)]">{entry.hint}</span>
-                </Link>
-              </li>
+          <div role="menu" aria-label="Mon compte" className="flex-1 overflow-y-auto py-1">
+            {/* Les enfants directs de `role="menu"` sont EXCLUSIVEMENT des
+                `menuitem` et des `separator` — pas de div d'emballage : un
+                conteneur sans rôle au milieu d'un menu casse l'arbre
+                d'accessibilité. D'où le Fragment. */}
+            {items.map((item, i) => (
+              <Fragment key={item.id}>
+                {separateurAvant(items, i) ? (
+                  // `role="separator"` : annoncé comme une frontière, jamais
+                  // atteint par la circulation clavier.
+                  <div role="separator" className="my-1 border-t border-[var(--border)]" />
+                ) : null}
+
+                {item.kind === 'link' ? (
+                  <Link
+                    href={item.href}
+                    role="menuitem"
+                    // Même règle que les onglets : l'entrée courante est
+                    // annoncée, l'information ne repose pas sur la seule couleur.
+                    aria-current={actif === item.id ? 'page' : undefined}
+                    onClick={() => setOpen(false)}
+                    className={[
+                      'flex flex-col gap-0.5 px-3 py-2 text-sm transition hover:bg-[var(--surface-muted)]',
+                      actif === item.id
+                        ? 'border-l-2 border-[var(--accent)] bg-[var(--surface-muted)] pl-[0.625rem]'
+                        : '',
+                    ].join(' ')}
+                  >
+                    <span className="font-medium">{item.label}</span>
+                    <span className="text-xs text-[var(--foreground-muted)]">{item.hint}</span>
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={signingOut}
+                    onClick={() => void handleSignOut()}
+                    className="w-full px-3 py-2 text-left text-sm transition hover:bg-[var(--surface-muted)] disabled:opacity-50"
+                  >
+                    {signingOut ? 'Déconnexion…' : item.label}
+                  </button>
+                )}
+              </Fragment>
             ))}
-          </ul>
-
-          <div className="border-t border-[var(--border)] p-1">
-            <button
-              type="button"
-              role="menuitem"
-              disabled={signingOut}
-              onClick={() => void handleSignOut()}
-              className="w-full rounded-md px-3 py-2 text-left text-sm transition hover:bg-[var(--surface-muted)] disabled:opacity-50"
-            >
-              {signingOut ? 'Déconnexion…' : 'Déconnexion'}
-            </button>
           </div>
         </div>
       ) : null}
@@ -200,16 +247,41 @@ export function UserMenu({ email }: { email: string }): React.ReactElement {
 }
 
 /**
- * Initiales de repli calculées depuis l'adresse.
+ * Pastille d'identité — deux tailles, deux emplacements, et deux seulement
+ * (ADR-0016 §7) : le déclencheur dans la barre et l'en-tête du panneau ouvert.
+ * Le grand format reste sur `/compte`.
  *
- * Le header ne connaît que la session better-auth (email, éventuellement nom) et
- * n'appelle PAS `/account/profile` : une requête réseau par page pour deux
- * lettres dans un coin de l'écran serait un mauvais échange. Les initiales
- * calculées côté serveur restent celles du profil, sur la page profil.
+ * DIMENSIONS FIXES, quel que soit le contenu. C'est ce qui garantit que la barre
+ * ne bouge pas entre le premier rendu (pastille neutre) et l'arrivée des
+ * initiales — et, le jour venu, l'arrivée de la photo.
+ *
+ * PENDANT LE CHARGEMENT, LA PASTILLE RESTE NEUTRE : aucune lettre. Afficher des
+ * initiales provisoires calculées depuis l'adresse puis les remplacer par celles
+ * du profil serait exactement le défaut qu'on corrige — en pire, parce que
+ * visible à chaque chargement de page.
+ *
+ * E4 — la photo se branche ICI et nulle part ailleurs : une `<img>` en
+ * `object-cover` par-dessus les initiales, qui retombe sur elles si le
+ * chargement échoue (une URL expire, un bucket répond 403). Le nom du champ et
+ * la forme de l'URL ne sont pas encore figés côté API : rien n'est présumé.
  */
-export function initialsOfEmail(email: string): string {
-  const local = email.split('@')[0] ?? '';
-  const parts = local.split(/[._-]+/).filter((p) => p.length > 0);
-  if (parts.length >= 2) return (parts[0]![0]! + parts[1]![0]!).toUpperCase();
-  return (local.slice(0, 2) || '?').toUpperCase();
+function Avatar({
+  initiales,
+  taille,
+}: {
+  initiales: string | null;
+  taille: 'sm' | 'md';
+}): React.ReactElement {
+  const dimensions =
+    taille === 'sm' ? 'h-7 w-7 text-[0.6rem] border' : 'h-10 w-10 text-xs border-2';
+  return (
+    <span
+      // L'identité est déjà dans le nom accessible du bouton (déclencheur) et
+      // dans le texte voisin (panneau) : la répéter serait du bruit.
+      aria-hidden="true"
+      className={`font-display inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border-[var(--accent)] bg-[var(--surface)] font-black text-[var(--accent)] ${dimensions}`}
+    >
+      {initiales ?? ''}
+    </span>
+  );
 }
