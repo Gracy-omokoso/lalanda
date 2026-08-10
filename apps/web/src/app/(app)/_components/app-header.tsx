@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useSession } from '@/lib/auth-client';
 import { LIENS_AIDE } from '@/lib/aide/liens';
+import { BrandLogo, BrandMark } from '@/components/brand-logo';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { OrgSwitcher } from './org-switcher';
 import { UserMenu } from './user-menu';
@@ -41,24 +42,22 @@ export function AppHeader(): React.ReactElement {
 
   return (
     <header className="flex items-center justify-between border-b border-[var(--border)] pb-4">
-      <Link href="/projects" className="group flex items-center gap-3">
-        <span
-          aria-hidden="true"
-          className="font-display inline-flex h-8 w-8 items-center justify-center rounded-md border-2 border-[var(--accent)] text-sm font-black text-[var(--accent)]"
-        >
-          L
-        </span>
-        {/* Le bloc texte se replie sous 640 px, le carré « L » reste : c'est le
-            seul élément de la barre qui peut disparaître sans rien rendre
-            inatteignable, puisque le carré porte le même lien. */}
-        <div className="hidden flex-col leading-tight sm:flex">
-          <span className="font-display text-base font-bold tracking-tight group-hover:text-[var(--accent)]">
-            Lalanda
-          </span>
-          <span className="font-mono text-[0.6rem] tracking-[0.14em] text-[var(--foreground-muted)]">
-            PLAN FINANCIER BANCABLE
-          </span>
-        </div>
+      {/* `aria-label` explicite, et images décoratives : le lockup porte déjà
+          le mot « Lalanda » en pixels, un `alt` renseigné le ferait annoncer en
+          double. Surtout, le nom du lien ne doit pas dépendre de la largeur —
+          sous 640 px le lockup cède la place à l'aigle seul, et un lien dont le
+          seul contenu est une image `alt=""` serait muet. */}
+      <Link
+        href="/projects"
+        aria-label="Lalanda — tableau de bord"
+        className="flex items-center transition hover:opacity-80"
+      >
+        {/* Sous 640 px le lockup complet (120 px de large) écraserait le
+            sélecteur d'organisation : il cède la place à l'aigle seul, qui
+            porte le même lien. C'est le repli qu'ADR-0016 décrivait déjà pour
+            la marque — la destination ne disparaît à aucune largeur. */}
+        <BrandMark taille={30} className="sm:hidden" />
+        <BrandLogo hauteur={30} className="hidden sm:inline-block" />
       </Link>
 
       {/* RÈGLE (ADR-0016 §6) : aucun lien de cette barre ne porte `hidden sm:*`
