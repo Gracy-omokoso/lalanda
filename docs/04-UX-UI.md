@@ -76,6 +76,73 @@ La saisie guidée fonctionne sur mobile. Les tableaux financiers complexes cible
 
 Le français est la langue initiale. Les libellés métier ne doivent pas être codés en dur dans le moteur. La structure prépare l’ajout d’autres langues et conserve les noms légaux locaux dans le Country Pack.
 
+## Implémenté (ADR-0016) — Navigation applicative
+
+La barre du haut et le menu du compte. Décision et justifications : `docs/adr/ADR-0016-navigation-applicative.md`. Écrans : `apps/web/src/app/(app)/_components/`.
+
+### Barre du haut
+
+Cinq éléments, à toutes les largeurs : **marque · sélecteur d’organisation · Aide · thème · avatar**.
+
+- Le **sélecteur d’organisation** reste dans la barre parce que ce n’est pas une destination : c’est le contrôle qui décide de quelle organisation on lit les chiffres. L’enfermer dans un menu, dans un produit où l’isolation par organisation est une règle de fond, serait une régression.
+- **Aide** reste offerte **hors session** — le menu du compte n’existe pas pour un visiteur anonyme, l’y déplacer reviendrait à la supprimer pour lui.
+- La **marque** mène à `/projects`; sous 640 px son bloc texte se replie et le carré « L » subsiste, portant le même lien.
+
+**Règle à tenir en revue : aucun lien de la barre ne porte `hidden sm:*` s’il n’a pas d’autre chemin d’accès.** « Membres », « Abonnement » et « Administration » le faisaient : sous 640 px, ces trois pages étaient **inatteignables**. C’est le défaut corrigé ici.
+
+### Menu du compte
+
+Déclenché par l’**avatar**, disponible à toutes les largeurs. Six entrées, deux groupes — ce qui appartient à la personne, puis ce qui appartient à l’organisation et à la plateforme :
+
+| Entrée | Destination | Condition |
+|---|---|---|
+| *En-tête d’identité : avatar, nom, adresse* | — (inerte, non focusable) | — |
+| Tableau de bord | `/projects` | aucune |
+| Mon compte | `/compte` (onglets Profil · Sécurité · Préférences) | aucune |
+| Organisation | `/organisation` | aucune — tout membre |
+| Abonnement | `/souscription` | aucune — tout membre |
+| Administration | `/admin` | `canReadAdmin` (`GET /me/platform-access`) |
+| Déconnexion | — (action) | session |
+
+**« Tableau de bord » mène à `/projects`, et aucune page de synthèse n’existe.** La page d’accueil transverse décrite plus haut dans ce document (« projets récents, alertes, tâches ») n’est pas construite : le menu ne la promet pas.
+
+**Une seule entrée est conditionnée**, et sur un drapeau que la barre charge déjà — le menu n’émet aucun appel au titre de sa visibilité et ne recopie aucune matrice de rôles (ADR-0012 §8). Masquer reste un confort : `PermissionsGuard` refuse de toute façon côté API. La liste des entrées, leur ordre et leur conditionnement vivent dans `user-menu-model.ts`, testés sans DOM.
+
+### Clavier
+
+| Touche | Effet |
+|---|---|
+| `Entrée` / `Espace` | ouvrent le menu |
+| `↓` / `↑` sur le déclencheur | ouvrent **et placent le focus** sur la première / dernière entrée |
+| `↓` / `↑` dans le menu | circulent, avec bouclage |
+| `Début` / `Fin` | vont aux extrémités |
+| `Tab` | sort du menu **et le ferme** — un menu ouvert derrière le focus est une zone morte |
+| `Échap` | ferme **et rend le focus au déclencheur** |
+
+Seules les vraies entrées portent `role="menuitem"` : l’en-tête d’identité et les séparateurs ne sont pas focusables, ce qui garde la circulation sans trou quand « Administration » est masquée. Le nom accessible du déclencheur annonce l’identité (« Menu du compte — <nom ou adresse> »), l’avatar restant `aria-hidden`. L’entrée de l’espace courant porte `aria-current="page"`, déduite du **premier segment** du chemin : `/compte/securite` allume « Mon compte », `/comptes-annuels` n’allume rien.
+
+### Mobile
+
+Sous 640 px : la marque se réduit au carré, **Aide devient une icône qui garde son `aria-label`** — jamais une icône muette —, le thème et l’avatar restent. Toutes les destinations retirées de la barre sont dans le menu, disponible à toutes les largeurs : plus aucune page ne devient inatteignable sur téléphone. Le panneau est borné en largeur (il tient dans un écran de 375 px sans provoquer de défilement horizontal) et en hauteur, avec défilement interne à la liste, l’en-tête d’identité restant visible.
+
+### Avatar : une seule autorité
+
+**Les initiales sont calculées par le serveur**, à partir du **nom affiché**, avec repli sur l’adresse. Le header n’en calcule aucune. Auparavant deux calculs coexistaient et divergeaient : « Marie-Claire Nsimba » <mcn@…> affichait `MN` sur `/compte` et `MC` dans la barre. Le profil fait autorité — c’est là que la personne saisit son nom et voit le résultat.
+
+Le profil est lu **une fois** et partagé entre la barre et l’espace `/compte`. Changer son nom met donc à jour les initiales de la barre sans rechargement.
+
+**Pendant le chargement, la pastille reste neutre — aucune lettre.** Afficher des initiales provisoires puis les remplacer serait le défaut qu’on corrige, en pire : visible à chaque chargement de page. Ses dimensions sont fixes dans tous les états, pour que la barre ne bouge pas.
+
+L’avatar apparaît à **trois endroits et trois seulement** : le déclencheur du menu (petit), l’en-tête du panneau ouvert (moyen) et `/compte` (grand). Il est décoratif partout — `aria-hidden` — car l’identité est déjà portée par le texte voisin ou par le nom accessible du bouton.
+
+### Une URL a changé
+
+`/members` est devenu `/organisation/membres` : la page appliquait des permissions d’organisation tout en vivant à la racine des routes. L’ancienne URL répond en **redirection permanente (308)**, déclarée dans `next.config.mjs`. Aucun email ne pointait vers `/members` (les liens sortants sont centralisés dans `apps/api/src/mail/mail.links.ts`) ; la redirection couvre les favoris et les liens partagés hors du produit. Le chemin d’API `GET /organizations/:id/members` n’a pas changé.
+
+### Ce que cette structure engage pour la suite
+
+Le menu du compte est désormais le point d’entrée unique vers tout ce qui n’est pas un projet. Chaque nouvel espace devra déclarer s’il est **un onglet d’un espace existant** ou **une entrée du menu** — jamais un lien de plus dans la barre.
+
 ## Implémenté (S20b) — Espace compte
 
 `/compte` livre les réglages personnels de l’utilisateur, en trois onglets. Écrans : `apps/web/src/app/(app)/compte/`. API : `apps/api/src/account/` (voir docs/16 § Espace compte).
@@ -84,11 +151,11 @@ Le français est la langue initiale. Les libellés métier ne doivent pas être 
 
 | Route | Contenu |
 |---|---|
-| `/compte` | Profil : initiales, nom affiché, langue, fuseau horaire, changement d’adresse email |
+| `/compte` | Profil : photo ou initiales, nom affiché, langue, fuseau horaire, changement d’adresse email |
 | `/compte/securite` | Mot de passe, sessions actives avec révocation unitaire ou groupée, suppression du compte |
 | `/compte/preferences` | Thème, devise d’affichage par défaut, notifications |
 
-L’entrée se fait par l’adresse email du header, devenue un menu : Profil · Sécurité · Préférences · Déconnexion. La déconnexion n’est plus un bouton isolé — elle vit avec le reste des réglages du compte.
+L’entrée se fait par l’entrée **« Mon compte »** du menu de l’avatar (ADR-0016). Une seule entrée pour l’espace : Sécurité et Préférences restent des onglets internes, non dupliqués dans le menu. La déconnexion vit dans ce même menu, avec le reste des réglages du compte.
 
 ### Frontière d’accès
 
@@ -100,7 +167,19 @@ L’entrée se fait par l’adresse email du header, devenue un menu : Profil ·
 - **Clavier** : menu utilisateur navigable aux flèches, `Début`/`Fin`, `Échap` qui ferme **et rend le focus** au déclencheur ; onglets et formulaires atteignables sans souris ; focus visible hérité de `globals.css`.
 - **Lecteurs d’écran** : `aria-current="page"` sur l’onglet actif, `aria-describedby` reliant chaque champ à son aide ou à son erreur, `aria-invalid` sur les champs en faute, `role="alert"` sur les messages d’échec.
 - **Couleur** : « session actuelle », « adresse vérifiée » et l’état des thèmes sont portés par du texte, jamais par la seule couleur.
-- **Mobile** : une colonne, lignes de session empilées, adresse email du header repliée sur les initiales sous 640 px.
+- **Mobile** : une colonne, lignes de session empilées ; le menu du compte s’ouvre depuis l’avatar à toutes les largeurs (voir § Navigation applicative).
+
+### Photo de profil
+
+Envoi et retrait depuis `/compte`. Trois règles portent l’écran :
+
+- **Les initiales sont l’état normal**, pas un état d’erreur. Une absence de photo ne produit ni bordure pointillée, ni point d’interrogation. Le serveur sert **toujours** les initiales, photo comprise : elles sont le repli pendant le chargement de l’image, à l’expiration de son URL et si le stockage ne répond pas.
+- **Une image qui échoue à se charger retombe sur les initiales**, sans case brisée. L’URL de la photo porte un jeton à durée limitée et peut expirer pendant que la page est ouverte ; c’est le seul filet à ce moment-là. L’URL n’est donc jamais conservée d’une page à l’autre — elle est refrappée à chaque lecture du profil.
+- **Le retrait existe.** Une photo qu’on ne peut pas enlever est un piège. L’endpoint est idempotent : un double clic est sans conséquence.
+
+Quand le stockage d’images ne répond pas, le bouton est **désactivé et la raison est écrite**, plutôt que de laisser choisir un fichier pour répondre par une erreur ensuite. Les bornes affichées (formats, taille) viennent du serveur : la validation côté client est un confort, l’API reste l’autorité et tranche sur le contenu réel du fichier.
+
+La CSP autorise l’origine de l’API dans `img-src`, sans quoi le navigateur bloquerait l’image — un blocage qui ne se voit qu’en console, jamais dans un test de rendu.
 
 ### Thème persisté sur le compte
 
@@ -112,7 +191,6 @@ Deux fonctions sont incomplètes **par manque d’infrastructure, pas par oubli*
 
 - **Changement d’adresse email** : la demande est enregistrée et le lien de vérification est généré, mais aucun email ne part — aucun fournisseur SMTP n’est configuré (docs/17 § Restant). Le changement ne peut donc pas aboutir aujourd’hui, et l’écran l’explique avant la saisie comme après. L’adresse du compte reste inchangée.
 - **Notifications** : les préférences sont bien enregistrées et seront respectées dès la mise en service de l’envoi d’emails ; d’ici là, cocher une case ne déclenche aucun message.
-- **Photo de profil** : remplacée par des initiales calculées côté serveur — l’upload demande un stockage de fichiers qui n’est pas branché.
 
 ## Implémenté (S21a) — Espace organisation
 
@@ -123,11 +201,12 @@ Deux fonctions sont incomplètes **par manque d’infrastructure, pas par oubli*
 | Route | Contenu | Ouvert à |
 |---|---|---|
 | `/organisation` | Tableau de bord différencié par rôle | tout membre |
+| `/organisation/membres` | Rôles, accès et invitations (venu de `/members`, ADR-0016) | `organization.manage` |
 | `/organisation/parametres` | Nom, pays par défaut, devise d’affichage, logo | `organization.manage` |
 | `/organisation/facturation` | Offre, consommation, dépassements, historique | `billing.manage` |
 | `/organisation/journal` | Journal d’audit, filtrable par action | `audit.read` |
 
-L’entrée se fait par le lien « Organisation » du header, offert à **tout membre** : masquer le lien selon le rôle recopierait la matrice dans le header (ADR-0012 §8) et se tromperait au premier changement.
+L’entrée se fait par l’entrée **« Organisation » du menu du compte**, offerte à **tout membre** : masquer l’entrée selon le rôle recopierait la matrice côté client (ADR-0012 §8) et se tromperait au premier changement. Ce qu’il y a derrière est filtré par les permissions réelles, là où le filtrage existe déjà — les onglets. (Jusqu’à l’ADR-0016, ce document décrivait un lien « Organisation » dans le header qui **n’existait pas** : l’espace n’était atteignable qu’en tapant son URL.)
 
 ### Un tableau de bord, pas quatre
 
@@ -140,7 +219,7 @@ La phrase d’accueil est dérivée des blocs réellement ouverts, jamais du nom
 Un Lecteur, un Analyste ou un Comptable doit trouver ici un espace **utile**. Deux mécanismes, à ne pas confondre :
 
 - **Onglets** filtrés par les permissions réelles de l’appelant (`GET /me/permissions`), pas par une copie de la matrice côté client. Tant que les permissions ne sont pas connues, seul le tableau de bord est proposé — afficher les quatre onglets puis en retirer trois au chargement fait clignoter l’interface et promet des pages qui répondront 403.
-- **Pages atteintes par l’URL** : le serveur refuse de toute façon. La page traduit alors le 403 en une phrase qui dit ce que le rôle **permet** (« Les paramètres sont modifiables par un Propriétaire ou un Administrateur ; votre rôle vous donne accès au tableau de bord et à vos projets »), et non en bannière rouge. Même pattern que `/members` en S20a.
+- **Pages atteintes par l’URL** : le serveur refuse de toute façon. La page traduit alors le 403 en une phrase qui dit ce que le rôle **permet** (« Les paramètres sont modifiables par un Propriétaire ou un Administrateur ; votre rôle vous donne accès au tableau de bord et à vos projets »), et non en bannière rouge. Même pattern que l’onglet Membres, d’où il vient (S20a).
 
 Les blocs fermés du tableau de bord sont listés sobrement en bas de page — nom, raison, aucune donnée. Le cas qui surprend le plus, l’Administrateur refusé sur la facturation, a sa propre phrase : l’abonnement relève du seul Propriétaire (docs/12).
 
@@ -154,7 +233,7 @@ Les blocs fermés du tableau de bord sont listés sobrement en bas de page — n
 
 ### Limites annoncées à l’utilisateur
 
-- **Logo par URL, pas par envoi de fichier** : aucun stockage de fichiers n’est branché, comme pour la photo de profil de l’espace compte. L’écran le dit au lieu de proposer un bouton inerte.
+- **Logo par URL, pas par envoi de fichier** : le logo d’organisation n’a pas encore d’endpoint d’envoi, contrairement à la photo de profil de l’espace compte. L’écran le dit au lieu de proposer un bouton inerte.
 - **Aucune intégration de paiement** (docs/13 § hors périmètre S16b) : la page facturation affiche l’offre et la consommation, pas un bouton « changer de plan » qui ne mènerait nulle part. Un dépassement précise que **rien n’est supprimé** — seules les créations au-delà de la limite sont refusées.
 - **Le tableau de bord n’est pas un export** : les agrégations coûteuses balaient les 20 projets les plus récemment modifiés. Le détail complet vit sur la page de chaque projet, et la réponse ne prétend nulle part à l’exhaustivité.
 
@@ -172,7 +251,7 @@ Les blocs fermés du tableau de bord sont listés sobrement en bas de page — n
 | `/admin/integrations` | Les cinq fournisseurs à secret | `platform_super_admin` |
 | `/admin/journal` | Journal des actes d’administration | tout rôle plateforme lisant `/admin` |
 
-L’entrée est un lien « Administration » dans le header, affiché sur le drapeau `canReadAdmin` servi par `GET /me/platform-access`. Un échec de cet appel **ne montre pas** le lien : le défaut est de ne rien proposer plutôt que de proposer une page qui répondrait 403.
+L’entrée est l’entrée **« Administration » du menu du compte**, affichée sur le drapeau `canReadAdmin` servi par `GET /me/platform-access`. Un échec de cet appel **ne la montre pas** : le défaut est de ne rien proposer plutôt que de proposer une page qui répondrait 403.
 
 ### Ce que l’espace protège, et ce qu’il ne protège pas
 
