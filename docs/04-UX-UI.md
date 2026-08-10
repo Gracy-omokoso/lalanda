@@ -334,7 +334,7 @@ Le carré « L » provisoire est remplacé par le lockup réel (aigle + mot-symb
 | Fichier | Contenu | Où |
 |---|---|---|
 | `logo-lalanda-fond-clair.png` | Badge opaque encre, mot-symbole encre | Fond clair |
-| `logo-lalanda-fond-sombre.png` | Badge transparent cerclé cyan, mot-symbole crème | Fond sombre, et panneaux `.bg-ink` |
+| `logo-lalanda-fond-sombre.png` | Badge sombre + aigle couleur, mot-symbole crème | Fond sombre, et panneaux `.bg-ink` |
 
 Les monochromes livrés (`logo-lalanda-blanc.png`, `logo-lalanda-noir.png`) sont rangés avec les autres comme déclinaisons disponibles pour l’impression et les aplats de couleur. **Ils ne sont branchés nulle part dans l’application** — aucun emploi ne leur a été inventé.
 

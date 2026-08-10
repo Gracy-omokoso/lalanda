@@ -2,11 +2,14 @@
 //
 // Deux fichiers, un par fond de destination (voir `public/marque/README.md`) :
 // `fond-clair` porte un badge OPAQUE encre (#07171c) et un mot-symbole encre;
-// `fond-sombre` un badge TRANSPARENT cerclé cyan et un mot-symbole crème —
-// vérifié au pixel, pas au coup d'œil : un visualiseur d'images compose la
-// transparence sur du blanc et fait croire à un badge blanc plein. Le badge
-// laissant passer le fond, la version fond sombre s'adapte à n'importe quel
-// fond foncé, y compris le pétrole des panneaux `.bg-ink`.
+// `fond-sombre` le MÊME badge opaque encre, avec un mot-symbole crème.
+//
+// Les deux versions partagent donc leur badge : seule la couleur du
+// mot-symbole distingue les deux fichiers. C'est le choix du décideur
+// (logo v2, 2026-08-10), qui remplace une première version au badge
+// transparent cerclé cyan. Conséquence à connaître : le badge ne laisse plus
+// passer le fond, il pose son propre carré encre. Sur les panneaux `.bg-ink`
+// (#005263) le carré se voit donc comme une forme distincte — c'est voulu.
 // Il n'existe pas de SVG : la source livrée est du PNG, et rien ici n'en
 // fabrique un.
 //
