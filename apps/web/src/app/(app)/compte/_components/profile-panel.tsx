@@ -7,9 +7,9 @@
 // toujours un profil, et l'absence de préférences enregistrées se traduit par
 // des valeurs par défaut servies par l'API, pas par un écran vide.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-import { api, type AccountProfileView } from '@/lib/api';
+import { api, type AccountProfileView, type AvatarLimitsView } from '@/lib/api';
 
 import { publierProfil, useProfil } from '../../_components/profile-context';
 
@@ -131,15 +131,10 @@ export function ProfilePanel(): React.ReactElement {
         </div>
       ) : null}
 
-      {/* Identité — initiales, nom, adresse. */}
+      {/* Identité — photo ou initiales, nom, adresse. */}
       <section className="flex flex-col gap-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
         <div className="flex items-center gap-4">
-          <span
-            aria-hidden="true"
-            className="font-display inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-2 border-[var(--accent)] text-lg font-black text-[var(--accent)]"
-          >
-            {profile.initials}
-          </span>
+          <AvatarGrandFormat profile={profile} />
           <div className="flex min-w-0 flex-col gap-0.5">
             <span className="truncate font-medium">{profile.name || '—'}</span>
             <span className="truncate text-sm text-[var(--foreground-muted)]">{profile.email}</span>
@@ -149,10 +144,7 @@ export function ProfilePanel(): React.ReactElement {
             </span>
           </div>
         </div>
-        <p className="text-xs italic text-[var(--foreground-muted)]">
-          La photo de profil n’est pas disponible : elle demande un stockage de fichiers qui n’est
-          pas encore branché. Vos initiales en tiennent lieu.
-        </p>
+        <AvatarControls profile={profile} />
       </section>
 
       <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col gap-4">
@@ -466,5 +458,221 @@ function EmailChangeSection({
         </>
       )}
     </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Photo de profil (ADR-0016 E4)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Grand format de l'avatar — le seul des trois emplacements qui vive hors du
+ * header (ADR-0016 §7).
+ *
+ * Les initiales sont rendues DESSOUS, toujours. L'image se pose par-dessus et
+ * s'efface d'elle-même sur `onError` : l'URL porte un jeton à durée limitée et
+ * peut expirer pendant que la page est ouverte. Sans ce repli, on afficherait
+ * une case brisée à quelqu'un qui n'a rien fait.
+ *
+ * Dimensions fixes : la mise en page ne doit pas sauter entre les initiales et
+ * l'arrivée de l'image.
+ */
+function AvatarGrandFormat({ profile }: { profile: AccountProfileView }): React.ReactElement {
+  const [cassee, setCassee] = useState(false);
+  useEffect(() => {
+    setCassee(false);
+  }, [profile.avatarUrl]);
+
+  return (
+    <span
+      aria-hidden="true"
+      className="font-display relative inline-flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[var(--accent)] bg-[var(--surface)] text-lg font-black text-[var(--accent)]"
+    >
+      {profile.initials}
+      {profile.avatarUrl !== null && !cassee ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={profile.avatarUrl}
+          alt=""
+          onError={() => setCassee(true)}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      ) : null}
+    </span>
+  );
+}
+
+/** Octets en unité lisible — pour dire une limite, pas pour compter juste. */
+function formatOctets(octets: number): string {
+  const mio = octets / (1024 * 1024);
+  return mio >= 1
+    ? `${mio.toFixed(mio < 10 ? 1 : 0).replace('.', ',')} Mio`
+    : `${Math.round(octets / 1024)} Kio`;
+}
+
+/**
+ * Refus de l'API traduits en phrases qui disent QUOI FAIRE.
+ *
+ * Les codes viennent du contrat d'envoi. Un code inconnu retombe sur le message
+ * du serveur plutôt que sur une phrase inventée qui masquerait la vraie cause.
+ */
+const REFUS_AVATAR: Record<string, string> = {
+  FILE_TOO_LARGE: 'Cette image est trop lourde. Choisissez un fichier plus léger.',
+  UNSUPPORTED_IMAGE_TYPE: 'Ce format n’est pas accepté. Utilisez un PNG, un JPEG ou un WebP.',
+  IMAGE_DIMENSIONS_REJECTED: 'Les dimensions de cette image sont hors des bornes acceptées.',
+  EMPTY_FILE: 'Le fichier est vide.',
+  MALFORMED_IMAGE: 'Ce fichier n’est pas une image lisible.',
+  STORAGE_UNAVAILABLE:
+    'Le stockage des images ne répond pas pour l’instant. Réessayez dans un moment.',
+};
+
+function messageAvatar(err: unknown, repli: string): string {
+  const detail = (err as { detail?: { code?: string; message?: string } }).detail;
+  const code = detail?.code;
+  if (code && REFUS_AVATAR[code]) return REFUS_AVATAR[code];
+  if ((err as { status?: number }).status === 429) {
+    return 'Trop d’envois en peu de temps. Réessayez dans un moment.';
+  }
+  return detail?.message ?? (err instanceof Error && err.message !== '' ? err.message : repli);
+}
+
+/**
+ * Choix, envoi et retrait de la photo.
+ *
+ * LE RETRAIT EXISTE, et ce n'est pas un détail : une photo qu'on ne peut pas
+ * enlever est un piège. L'endpoint est idempotent — un double clic ne produit
+ * ni 404 ni erreur.
+ *
+ * Quand `storageAvailable` est faux, le bouton est DÉSACTIVÉ et la raison est
+ * écrite. Laisser choisir un fichier pour répondre 503 ensuite ferait perdre du
+ * temps et donnerait l'impression d'un bug côté utilisateur.
+ */
+function AvatarControls({ profile }: { profile: AccountProfileView }): React.ReactElement {
+  const [limites, setLimites] = useState<AvatarLimitsView | null>(null);
+  const [occupe, setOccupe] = useState(false);
+  const [erreur, setErreur] = useState<string | null>(null);
+  const champRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let annule = false;
+    void api
+      .getAvatarLimits()
+      .then((l) => {
+        if (!annule) setLimites(l);
+      })
+      // Les bornes inconnues ne bloquent pas l'envoi : l'API reste l'autorité et
+      // refusera elle-même. On perd le confort, pas la fonction.
+      .catch(() => undefined);
+    return () => {
+      annule = true;
+    };
+  }, []);
+
+  async function envoyer(file: File): Promise<void> {
+    setErreur(null);
+
+    // Validation côté client — un CONFORT, qui évite d'envoyer des octets pour
+    // rien. L'API tranche de toute façon, et sur le contenu réel du fichier.
+    if (limites) {
+      if (file.size > limites.maxBytes) {
+        setErreur(`Cette image dépasse ${formatOctets(limites.maxBytes)}.`);
+        return;
+      }
+      if (file.type !== '' && !limites.acceptedTypes.includes(file.type)) {
+        setErreur(REFUS_AVATAR['UNSUPPORTED_IMAGE_TYPE']!);
+        return;
+      }
+    }
+
+    setOccupe(true);
+    try {
+      const res = await api.postAccountAvatar(file);
+      // Le profil partagé est mis à jour sur place : la pastille du header suit
+      // immédiatement, sans relire le profil.
+      publierProfil({
+        ...profile,
+        avatar: res.avatar,
+        avatarUrl: res.avatarUrl,
+        initials: res.initials,
+      });
+    } catch (err) {
+      setErreur(messageAvatar(err, 'Impossible d’envoyer cette image.'));
+    } finally {
+      setOccupe(false);
+      // Le champ est vidé pour que re-choisir LE MÊME fichier redéclenche bien
+      // un `change` après un échec.
+      if (champRef.current) champRef.current.value = '';
+    }
+  }
+
+  async function retirer(): Promise<void> {
+    setErreur(null);
+    setOccupe(true);
+    try {
+      const res = await api.deleteAccountAvatar();
+      publierProfil({ ...profile, avatar: null, avatarUrl: null, initials: res.initials });
+    } catch (err) {
+      setErreur(messageAvatar(err, 'Impossible de retirer cette image.'));
+    } finally {
+      setOccupe(false);
+    }
+  }
+
+  const stockageHs = limites !== null && !limites.storageAvailable;
+  const accept = limites?.acceptedTypes.join(',') ?? 'image/png,image/jpeg,image/webp';
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <label
+          className={[
+            'rounded-md border border-[var(--border)] px-3 py-2 text-sm transition',
+            stockageHs || occupe
+              ? 'cursor-not-allowed opacity-50'
+              : 'cursor-pointer hover:bg-[var(--surface-muted)]',
+          ].join(' ')}
+        >
+          {occupe ? 'Envoi…' : profile.avatar ? 'Changer la photo' : 'Ajouter une photo'}
+          <input
+            ref={champRef}
+            type="file"
+            accept={accept}
+            disabled={stockageHs || occupe}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void envoyer(file);
+            }}
+            className="sr-only"
+          />
+        </label>
+
+        {profile.avatar ? (
+          <button
+            type="button"
+            onClick={() => void retirer()}
+            disabled={stockageHs || occupe}
+            className="rounded-md border border-[var(--border)] px-3 py-2 text-sm transition hover:bg-[var(--surface-muted)] disabled:opacity-50"
+          >
+            Retirer la photo
+          </button>
+        ) : null}
+      </div>
+
+      {erreur ? (
+        <p role="alert" className="text-xs text-[var(--danger)]">
+          {erreur}
+        </p>
+      ) : null}
+
+      <p className="text-xs text-[var(--foreground-muted)]">
+        {stockageHs
+          ? 'L’envoi de photo est indisponible : le stockage des images ne répond pas. Vos initiales tiennent lieu de photo.'
+          : profile.avatar
+            ? 'Sans photo, vos initiales sont affichées.'
+            : `Vos initiales sont affichées tant qu’aucune photo n’est posée.${
+                limites ? ` PNG, JPEG ou WebP, ${formatOctets(limites.maxBytes)} au plus.` : ''
+              }`}
+      </p>
+    </div>
   );
 }

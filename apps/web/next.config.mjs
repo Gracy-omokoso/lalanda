@@ -59,7 +59,13 @@ const csp = [
   // depuis l'origine.
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
-  "img-src 'self' data: blob:",
+  // Les photos de profil sont servies par l'API, pas par l'origine web : le
+  // bucket reste privé et l'API sert les octets derrière un jeton signé
+  // (ADR-0016 §7). Sans cette origine, le navigateur BLOQUE l'image — et le
+  // symptôme n'apparaît qu'en console, jamais dans un test de rendu.
+  // Réutilise `apiOrigin`, la même constante que `connect-src` : une seconde
+  // lecture de `NEXT_PUBLIC_API_URL` pourrait diverger de la première.
+  `img-src 'self' data: blob: ${apiOrigin}`,
   // Le seul appel sortant légitime est l'API. Tout autre hôte est une exfiltration.
   `connect-src 'self' ${apiOrigin}`,
   // Aucun plugin, aucune iframe, aucun worker tiers.

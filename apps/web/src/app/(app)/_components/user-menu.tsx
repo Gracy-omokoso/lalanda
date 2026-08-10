@@ -169,7 +169,11 @@ export function UserMenu({
         aria-label={libelleDeclencheur({ nom, email })}
         className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] p-1 pr-2 transition hover:bg-[var(--surface-muted)]"
       >
-        <Avatar initiales={profil?.initials ?? null} taille="sm" />
+        <Avatar
+          initiales={profil?.initials ?? null}
+          photoUrl={profil?.avatarUrl ?? null}
+          taille="sm"
+        />
         <span aria-hidden="true" className="text-xs opacity-50">
           ▾
         </span>
@@ -188,7 +192,11 @@ export function UserMenu({
           {/* En-tête d'identité — INERTE : aucun `role="menuitem"`, aucun
               élément focusable. Il informe, il ne s'active pas. */}
           <div className="flex shrink-0 items-center gap-3 border-b border-[var(--border)] px-3 py-3">
-            <Avatar initiales={profil?.initials ?? null} taille="md" />
+            <Avatar
+              initiales={profil?.initials ?? null}
+              photoUrl={profil?.avatarUrl ?? null}
+              taille="md"
+            />
             <div className="flex min-w-0 flex-col leading-tight">
               {nom ? <span className="truncate text-sm font-medium">{nom}</span> : null}
               <span className="truncate text-xs text-[var(--foreground-muted)]">{email}</span>
@@ -260,28 +268,58 @@ export function UserMenu({
  * du profil serait exactement le défaut qu'on corrige — en pire, parce que
  * visible à chaque chargement de page.
  *
- * E4 — la photo se branche ICI et nulle part ailleurs : une `<img>` en
- * `object-cover` par-dessus les initiales, qui retombe sur elles si le
- * chargement échoue (une URL expire, un bucket répond 403). Le nom du champ et
- * la forme de l'URL ne sont pas encore figés côté API : rien n'est présumé.
+ * LES INITIALES SONT SOUS L'IMAGE, toujours rendues. L'image se pose par-dessus
+ * en `object-cover`. Trois raisons, et chacune se produit :
+ *   - l'URL porte un jeton à durée limitée; elle peut expirer PENDANT que la
+ *     page est ouverte, et `onError` est alors le seul filet;
+ *   - le magasin d'objets peut tomber, ce que le profil ne sait pas au moment
+ *     où il sert l'URL;
+ *   - entre le rendu et l'arrivée des octets, il y a un délai — sans les
+ *     initiales dessous, ce serait un trou.
+ * L'absence de photo n'est PAS un état d'erreur : ni bordure pointillée, ni
+ * point d'interrogation. Les initiales sont l'état normal du produit.
+ *
+ * `<img>` natif et non `next/image` : l'URL est signée, éphémère et sur une
+ * autre origine — l'optimiseur de Next la re-téléchargerait côté serveur pour
+ * la mettre en cache, ce qui est exactement ce qu'un jeton à durée limitée
+ * interdit.
  */
 function Avatar({
   initiales,
+  photoUrl,
   taille,
 }: {
   initiales: string | null;
+  photoUrl: string | null;
   taille: 'sm' | 'md';
 }): React.ReactElement {
+  const [photoCassee, setPhotoCassee] = useState(false);
   const dimensions =
     taille === 'sm' ? 'h-7 w-7 text-[0.6rem] border' : 'h-10 w-10 text-xs border-2';
+
+  // Une nouvelle URL mérite une nouvelle chance : sans cette remise à zéro, une
+  // photo remplacée après un échec resterait masquée jusqu'au rechargement.
+  useEffect(() => {
+    setPhotoCassee(false);
+  }, [photoUrl]);
+
   return (
     <span
       // L'identité est déjà dans le nom accessible du bouton (déclencheur) et
       // dans le texte voisin (panneau) : la répéter serait du bruit.
       aria-hidden="true"
-      className={`font-display inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border-[var(--accent)] bg-[var(--surface)] font-black text-[var(--accent)] ${dimensions}`}
+      className={`font-display relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border-[var(--accent)] bg-[var(--surface)] font-black text-[var(--accent)] ${dimensions}`}
     >
       {initiales ?? ''}
+      {photoUrl !== null && !photoCassee ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={photoUrl}
+          alt=""
+          onError={() => setPhotoCassee(true)}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      ) : null}
     </span>
   );
 }
