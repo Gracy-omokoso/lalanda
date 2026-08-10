@@ -24,6 +24,7 @@ import { PlansModule } from './plans/plans.module.js';
 import { ProjectsModule } from './projects/projects.module.js';
 import { ReportsModule } from './reports/reports.module.js';
 import { ThrottlingModule } from './security/throttling.module.js';
+import { StorageModule } from './storage/storage.module.js';
 
 @Module({
   imports: [
@@ -60,6 +61,10 @@ import { ThrottlingModule } from './security/throttling.module.js';
     // `MailModule` est @Global et sans dépendance : déclaré avant `AuthModule`,
     // dont la factory better-auth injecte `MailService` au bootstrap (S22a).
     MailModule,
+    // `StorageModule` est @Global et sans dépendance, comme `MailModule` :
+    // déclaré avant ses consommateurs (AccountModule pour la photo de profil ;
+    // exports et instantanés plus tard — docs/24).
+    StorageModule,
     OrganizationsModule,
     OrganizationSpaceModule,
     AuthModule,

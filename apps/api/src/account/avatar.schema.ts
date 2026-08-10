@@ -21,8 +21,13 @@ import type { HydratedDocument } from 'mongoose';
  */
 @Schema({ collection: 'user_avatars', timestamps: true, strict: true })
 export class UserAvatar {
-  /** Propriétaire. TOUJOURS issu de la session, jamais du corps de la requête. */
-  @Prop({ type: String, required: true, index: true })
+  /**
+   * Propriétaire. TOUJOURS issu de la session, jamais du corps de la requête.
+   *
+   * Pas d'`index: true` ici : l'index unique est déclaré en bas de fichier, et
+   * le déclarer deux fois produit un avertissement Mongoose au démarrage.
+   */
+  @Prop({ type: String, required: true })
   userId!: string;
 
   /**

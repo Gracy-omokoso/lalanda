@@ -14,6 +14,7 @@ import 'reflect-metadata';
 import { describe, expect, it } from 'vitest';
 
 import { AccountController } from '../account/account.controller.js';
+import { AvatarImageController } from '../account/avatar-image.controller.js';
 import { EmailVerificationController } from '../account/email-verification.controller.js';
 import { ActualsController } from '../actuals/actuals.controller.js';
 import { AdminController } from '../admin/admin.controller.js';
@@ -58,6 +59,7 @@ const CONTROLEURS = [
   IntegrationsController,
   ReauthController,
   AuthProvidersController,
+  AvatarImageController,
   EmailVerificationController,
   BillingController,
   CanvasController,
@@ -127,6 +129,20 @@ const SANS_PERMISSION: Record<string, string> = {
     'Vérifie si l’appelant peut supprimer son compte — refusé s’il est dernier ' +
     'propriétaire d’une organisation (docs/12 § Règles critiques).',
   'AccountController.deleteAccount': 'Suppression de son propre compte.',
+  'AccountController.uploadAvatar': 'Téléversement de sa PROPRE photo de profil.',
+  'AccountController.deleteAvatar': 'Retrait de sa propre photo de profil.',
+  'AccountController.avatarLimits':
+    'Bornes de validation d’un téléversement (taille, dimensions, formats). ' +
+    'Aucune donnée d’aucun utilisateur — des constantes, servies pour que ' +
+    'l’interface ne les code pas en dur.',
+  'AvatarImageController.serve':
+    'Sert les octets d’une photo de profil. AUTHENTIFIÉE PAR JETON SIGNÉ et non ' +
+    'par session — même régime que la vérification d’email ci-dessous, et pour ' +
+    'la même raison : la ressource est consommée par une balise <img> qui ne ' +
+    'porte pas les cookies en cross-origin. Le jeton scelle un identifiant ' +
+    'd’objet de 128 bits tiré au hasard, avec expiration ; signature invalide, ' +
+    'jeton expiré et objet inconnu rendent tous 404. Décision et limites : ' +
+    'account/avatar-url.ts.',
   'EmailVerificationController.verify':
     'Vérification par jeton. L’appelant n’est pas nécessairement authentifié : ' +
     'le jeton fait autorité, comme pour l’acceptation d’invitation.',
