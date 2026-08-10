@@ -97,8 +97,34 @@ export class SecretsService {
     provider: IntegrationProvider,
     name: string,
   ): Promise<ResolvedSecret | null> {
+    // Le document est lu AVANT de tester le coffre, et c'est délibéré (S22l) :
+    // `enabled` est un interrupteur d'exploitation, il doit valoir même quand
+    // `SECRETS_MASTER_KEY` est absente. Autrement, un déploiement sans coffre
+    // ignorerait la désactivation et repartirait sur l'environnement — le
+    // scénario où l'interrupteur ment le plus gravement, puisque personne ne
+    // fait le lien entre une clé maîtresse manquante et une intégration qu'on
+    // croyait coupée.
+    const doc = await this.model.findOne({ provider, scope: 'platform' }).exec();
+
+    // ── Interrupteur (S22l) ───────────────────────────────────────────────────
+    //
+    // Une intégration désactivée ne fournit RIEN, et ne retombe PAS sur
+    // l'environnement. `/admin` annonce « Les secrets sont en place mais
+    // l'intégration n'est pas activée » : jusqu'ici la résolution ignorait
+    // `enabled` et servait la clé quand même, si bien que couper l'interrupteur
+    // n'arrêtait aucun appel ni aucune facturation.
+    //
+    // Le refus du secours par l'environnement est le point important. ADR-0013
+    // §C rejette l'hybride permanent pour une raison précise — « une variable
+    // d'environnement oubliée masque silencieusement une clé pourtant rotée en
+    // base » — et retomber sur `env` ici produirait exactement ce défaut :
+    // l'opérateur coupe, les appels continuent depuis une variable qu'il ne
+    // regarde pas. Un enregistrement présent et désactivé est une décision
+    // explicite; l'absence d'enregistrement, elle, reste un amorçage et laisse
+    // le secours jouer.
+    if (doc && !doc.enabled) return null;
+
     if (this.keyring) {
-      const doc = await this.model.findOne({ provider, scope: 'platform' }).exec();
       const record = doc?.secrets?.[name] as EncryptedValue | undefined;
       if (doc && record) {
         // L'exception remonte volontairement : `SECRET_KEY_UNAVAILABLE` et une
