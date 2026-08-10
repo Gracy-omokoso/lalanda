@@ -62,6 +62,20 @@ export function isPartialGoogleConfig(env: Record<string, string | undefined>): 
   return hasId !== hasSecret;
 }
 
+/**
+ * Réglage `advanced` de better-auth pour le domaine du cookie de session.
+ *
+ * Extrait pour être testable : le défaut (aucun domaine) et le cas production
+ * (domaine parent) sont deux comportements qu'on ne veut pas voir diverger en
+ * silence. Voir `cookieDomain` dans BuildAuthOptions pour le pourquoi.
+ */
+export function buildAdvancedCookieOptions(
+  cookieDomain: string | undefined,
+): Record<string, unknown> {
+  if (!cookieDomain) return {};
+  return { advanced: { crossSubDomainCookies: { enabled: true, domain: cookieDomain } } };
+}
+
 interface BuildAuthOptions {
   mongodbUri: string;
   mongodbDb: string;
@@ -89,6 +103,30 @@ interface BuildAuthOptions {
   mail: MailService;
   /** Identifiants Google, ou `null` : le fournisseur social n'est alors pas déclaré. */
   google?: GoogleCredentials | null;
+  /**
+   * Domaine porté par le cookie de session (S22m). `undefined` = cookie
+   * réservé à l'hôte qui l'émet, c'est-à-dire le comportement par défaut.
+   *
+   * ── Pourquoi cette option existe ────────────────────────────────────────
+   *
+   * En production, le front vit sur `lalanda.co` et l'API sur
+   * `api.lalanda.co`. Sans `Domain`, better-auth émet un cookie réservé à
+   * `api.lalanda.co` : le navigateur ne l'envoie JAMAIS à `lalanda.co`, donc
+   * le middleware Next n'y voit aucune session et renvoie sur `/login`.
+   * L'utilisateur se connectait réellement, puis rebondissait aussitôt — une
+   * boucle sans message d'erreur, le pire symptôme à diagnostiquer.
+   *
+   * En développement, front et API partagent l'hôte `localhost` (les cookies
+   * ignorent le port) : le défaut suffit, et le problème n'apparaissait pas.
+   *
+   * ── Ce que ça élargit, et qu'il faut assumer ────────────────────────────
+   *
+   * Poser `Domain=lalanda.co` rend le cookie lisible par TOUS les
+   * sous-domaines. Un sous-domaine hostile — oublié, expiré, repris par un
+   * tiers — pourrait le recevoir. C'est le prix de l'architecture à deux
+   * hôtes; il se paie en gardant la maîtrise de la zone DNS.
+   */
+  cookieDomain?: string;
 }
 
 export async function buildAuth(opts: BuildAuthOptions): Promise<ReturnType<typeof betterAuth>> {
@@ -107,6 +145,11 @@ export async function buildAuth(opts: BuildAuthOptions): Promise<ReturnType<type
     basePath: '/auth', // aligne avec le mount Express dans main.ts (`.all('/auth/*', …)`)
     secret: opts.secret,
     trustedOrigins: opts.trustedOrigins,
+    // Voir `cookieDomain` dans BuildAuthOptions. L'objet `advanced` n'est posé
+    // que si un domaine est fourni : sans cela, better-auth retomberait sur le
+    // nom d'hôte de `baseURL` (donc `api.lalanda.co`), qui ne couvre PAS le
+    // front — exactement le défaut qu'on corrige.
+    ...buildAdvancedCookieOptions(opts.cookieDomain),
     emailAndPassword: {
       enabled: true,
       // S16a : bloquant seulement si AUTH_REQUIRE_EMAIL_VERIFICATION=true (prod avec SMTP).

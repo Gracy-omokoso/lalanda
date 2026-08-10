@@ -45,6 +45,10 @@ const authProvider: Provider = {
       trustedOrigins: [process.env['WEB_URL'] ?? 'http://localhost:3000'],
       // Parse strict : seule la chaîne "true" active la vérification (S16a).
       requireEmailVerification: process.env['AUTH_REQUIRE_EMAIL_VERIFICATION'] === 'true',
+      // S22m — nécessaire dès que le front et l'API vivent sur deux hôtes
+      // distincts (`lalanda.co` / `api.lalanda.co`). Absente en développement,
+      // où les deux partagent `localhost`.
+      cookieDomain: process.env['AUTH_COOKIE_DOMAIN'],
       onUserCreated,
       mail,
       google,
