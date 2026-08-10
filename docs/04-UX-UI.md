@@ -86,7 +86,7 @@ Cinq éléments, à toutes les largeurs : **marque · sélecteur d’organisatio
 
 - Le **sélecteur d’organisation** reste dans la barre parce que ce n’est pas une destination : c’est le contrôle qui décide de quelle organisation on lit les chiffres. L’enfermer dans un menu, dans un produit où l’isolation par organisation est une règle de fond, serait une régression.
 - **Aide** reste offerte **hors session** — le menu du compte n’existe pas pour un visiteur anonyme, l’y déplacer reviendrait à la supprimer pour lui.
-- La **marque** mène à `/projects`; sous 640 px son bloc texte se replie et le carré « L » subsiste, portant le même lien.
+- La **marque** mène à `/projects`; sous 640 px le lockup complet cède la place à l’aigle seul, portant le même lien (voir « Identité visuelle » plus bas).
 
 **Règle à tenir en revue : aucun lien de la barre ne porte `hidden sm:*` s’il n’a pas d’autre chemin d’accès.** « Membres », « Abonnement » et « Administration » le faisaient : sous 640 px, ces trois pages étaient **inatteignables**. C’est le défaut corrigé ici.
 
@@ -123,7 +123,7 @@ Seules les vraies entrées portent `role="menuitem"` : l’en-tête d’identit�
 
 ### Mobile
 
-Sous 640 px : la marque se réduit au carré, **Aide devient une icône qui garde son `aria-label`** — jamais une icône muette —, le thème et l’avatar restent. Toutes les destinations retirées de la barre sont dans le menu, disponible à toutes les largeurs : plus aucune page ne devient inatteignable sur téléphone. Le panneau est borné en largeur (il tient dans un écran de 375 px sans provoquer de défilement horizontal) et en hauteur, avec défilement interne à la liste, l’en-tête d’identité restant visible.
+Sous 640 px : la marque se réduit à l’aigle seul, **Aide devient une icône qui garde son `aria-label`** — jamais une icône muette —, le thème et l’avatar restent. Toutes les destinations retirées de la barre sont dans le menu, disponible à toutes les largeurs : plus aucune page ne devient inatteignable sur téléphone. Le panneau est borné en largeur (il tient dans un écran de 375 px sans provoquer de défilement horizontal) et en hauteur, avec défilement interne à la liste, l’en-tête d’identité restant visible.
 
 ### Avatar : une seule autorité
 
@@ -320,3 +320,55 @@ Le même intitulé sert à la connexion et à l’inscription (« Continuer avec
 L’écran de confirmation est **le même** que l’adresse soit connue ou non : « Si un compte existe pour cette adresse, un lien vient d’y être envoyé. » Distinguer les deux cas ferait de ce formulaire un annuaire des comptes (docs/17 § Menaces prioritaires). Seule une panne réseau produit un message d’erreur — « nous n’avons pas pu traiter votre demande » ne dit rien sur l’existence du compte, et taire la panne laisserait quelqu’un attendre un email jamais demandé.
 
 Sur `/nouveau-mot-de-passe`, la confirmation du mot de passe est comparée **avant** l’appel réseau : le lien ne sert qu’une fois, une faute de frappe ne doit pas le consommer. Après succès, redirection vers `/login` et non vers l’application : toutes les sessions viennent d’être révoquées côté serveur.
+
+---
+
+## Implémenté — Identité visuelle
+
+Le carré « L » provisoire est remplacé par le lockup réel (aigle + mot-symbole). Actifs et correspondance des noms : `apps/web/public/marque/README.md`. Composant : `apps/web/src/components/brand-logo.tsx`.
+
+**La source est du PNG et rien d’autre.** Il n’existe pas de SVG de la marque. Aucune vectorisation n’a été fabriquée : un tracé reconstitué serait un logo différent qui aurait l’air du bon.
+
+### Deux fichiers, un par fond de destination
+
+| Fichier | Contenu | Où |
+|---|---|---|
+| `logo-lalanda-fond-clair.png` | Badge opaque encre, mot-symbole encre | Fond clair |
+| `logo-lalanda-fond-sombre.png` | Badge transparent cerclé cyan, mot-symbole crème | Fond sombre, et panneaux `.bg-ink` |
+
+Les monochromes livrés (`logo-lalanda-blanc.png`, `logo-lalanda-noir.png`) sont rangés avec les autres comme déclinaisons disponibles pour l’impression et les aplats de couleur. **Ils ne sont branchés nulle part dans l’application** — aucun emploi ne leur a été inventé.
+
+### La bascule de thème est du CSS, pas du JavaScript
+
+Les deux fichiers sont dans le HTML servi; `[data-theme]` en masque un (`globals.css`, section « Marque »). Le script anti-FOUC de `layout.tsx` pose l’attribut avant le premier paint : la bonne version est la seule jamais peinte. Choisir le fichier en JS aurait imposé de lire le thème après le montage — donc de peindre d’abord la mauvaise image, ou rien, et d’exposer un écart d’hydratation. La bascule à chaud ne coûte qu’un changement d’attribut : les deux fichiers sont déjà chargés.
+
+Les deux balises portent les mêmes dimensions : **la boîte est identique dans les deux thèmes**, vérifié au `getBoundingClientRect()` avant et après bascule — même largeur, même hauteur, même position. Rien ne bouge.
+
+### Les bandeaux marketing ne basculent pas
+
+L’en-tête et le pied marketing sont des panneaux `.bg-ink`, et `--ink` (`#005263`) est **le même dans les deux thèmes**. Ils portent donc la version fond sombre en permanence. Y brancher la bascule poserait le lockup à mot-symbole encre sur de l’encre en thème clair.
+
+### Accessibilité
+
+Le logo est un **lien vers l’accueil**, pas une décoration — y compris sur les pages d’authentification, qui n’offraient aucune sortie vers le site public.
+
+Les images, elles, sont décoratives (`alt=""`) et le **lien** porte le nom accessible (`aria-label="Lalanda — …"`). Deux raisons : le lockup va par paire et un `alt` renseigné se lirait en double; et le nom du lien ne doit pas dépendre de la largeur, puisque sous 640 px le bloc texte n’est plus là. Un lien dont le seul contenu serait une image `alt=""` serait un lien muet.
+
+Dimensions explicites (`width`/`height` en attributs) : la place est réservée avant le décodage, donc pas de reflow. Le style ne fixe que la hauteur, la largeur reste `auto` — le ratio du fichier est préservé exactement.
+
+**`shrink-0` sur le lien de marque n’est pas cosmétique.** Sans lui, flexbox rétrécit le lien dans une barre à l’étroit et l’image suit en largeur alors que sa hauteur reste imposée : le logo est écrasé horizontalement. Constaté à 375 px sur l’en-tête marketing (128 px demandés, 96 px rendus).
+
+### Favicon et icône d’application
+
+Convention de fichiers Next 15 : `app/icon.png` et `app/apple-icon.png` — elles émettent les `<link>` **et** servent les octets avec un hash de contenu, sans URL à tenir à jour à deux endroits.
+
+Les deux ne viennent pas du même fichier, et le choix a été **vérifié au rendu** (rastérisation à 16 et 32 px sur les gris de barre d’onglets) plutôt que supposé :
+
+- **Favicon** ← l’aigle seul. Il occupe tout le cadre et reste lisible sur barre claire comme sombre.
+- **Icône iOS** ← l’aigle sur badge. iOS pose l’icône d’accueil opaque : un PNG transparent y serait composé sur du noir.
+
+L’hypothèse de départ était l’inverse — le badge à 16 px se réduit en fait à un carré noir, sa marge rétrécissant l’aigle d’environ 40 %. Refaire la comparaison si l’un des fichiers est régénéré.
+
+### Ce qui n’est pas fait ici
+
+Le filigrane des PDF (`logo-lalanda-for-filgran25.png`) relève des exports, pas de l’interface : il n’est pas copié sous `public/`.
