@@ -51,6 +51,22 @@ export const ApiEnvSchema = CommonEnvSchema.extend({
     .transform((v) => v === 'true'),
 
   /**
+   * Domaine porté par le cookie de session (S22m). OPTIONNELLE.
+   *
+   * À renseigner UNIQUEMENT quand le front et l'API vivent sur deux hôtes
+   * distincts d'un même domaine — en production, `lalanda.co` et
+   * `api.lalanda.co`. La valeur est alors le domaine PARENT (`lalanda.co`),
+   * pas l'hôte de l'API : c'est ce qui rend le cookie lisible par les deux.
+   *
+   * Absente, le cookie reste réservé à l'hôte qui l'émet. C'est le bon défaut
+   * en développement, où front et API partagent `localhost`.
+   *
+   * Le renseigner à tort élargit la portée du cookie de session à tous les
+   * sous-domaines : à ne poser que si l'architecture l'exige.
+   */
+  AUTH_COOKIE_DOMAIN: z.string().min(1).optional(),
+
+  /**
    * Connexion Google (ADR-0006, mise en œuvre S22a — ADR-0014).
    *
    * OPTIONNELLES, toutes les deux : sans elles l'API démarre normalement, le

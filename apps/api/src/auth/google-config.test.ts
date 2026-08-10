@@ -8,7 +8,11 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { isPartialGoogleConfig, resolveGoogleCredentials } from './auth.js';
+import {
+  buildAdvancedCookieOptions,
+  isPartialGoogleConfig,
+  resolveGoogleCredentials,
+} from './auth.js';
 
 describe('resolveGoogleCredentials', () => {
   it('retourne null sur un environnement vide — cas du développement sans Google', () => {
@@ -48,5 +52,21 @@ describe('resolveGoogleCredentials', () => {
     expect(isPartialGoogleConfig({ GOOGLE_CLIENT_ID: '  ', GOOGLE_CLIENT_SECRET: '  ' })).toBe(
       false,
     );
+  });
+});
+
+describe('domaine du cookie de session (S22m)', () => {
+  // Régression de production : front sur `lalanda.co`, API sur `api.lalanda.co`.
+  // Sans `Domain`, le cookie posé par l'API n'était jamais envoyé au front —
+  // le middleware Next n'y voyait aucune session et renvoyait sur /login.
+  // L'utilisateur se connectait réellement, puis rebondissait, sans message.
+  it('ne pose AUCUN réglage avancé quand le domaine est absent (cas développement)', () => {
+    expect(buildAdvancedCookieOptions(undefined)).toEqual({});
+  });
+
+  it('pose le domaine PARENT quand il est fourni, pour couvrir les deux hôtes', () => {
+    expect(buildAdvancedCookieOptions('lalanda.co')).toEqual({
+      advanced: { crossSubDomainCookies: { enabled: true, domain: 'lalanda.co' } },
+    });
   });
 });
