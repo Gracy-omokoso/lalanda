@@ -159,7 +159,7 @@ export const RATIOS_BANCAIRES: ArticleAide = {
         },
         {
           type: 'exemple',
-          titre: 'Restaurant à Kinshasa — un DSCR qui ne passe pas',
+          titre: 'Restaurant urbain — un DSCR qui ne passe pas',
           lignes: [
             { libelle: 'EBE annuel (3 868 USD × 12)', valeur: '46 400 USD' },
             { libelle: 'Emprunt', valeur: '150 000 USD' },
@@ -180,7 +180,7 @@ export const RATIOS_BANCAIRES: ArticleAide = {
           ordonnee: true,
           items: [
             '**Allonger la durée du crédit.** C’est le levier le plus puissant et le plus immédiat, comme ci-dessus. Il coûte plus d’intérêts au total, mais c’est lui qui rend le dossier finançable.',
-            '**Négocier le taux.** En RDC, un crédit d’investissement en USD se situe autour de 14 %, et autour de 21 % en francs congolais. Un financement bonifié type **PADMPME** descend vers 9,5 % : sur le même emprunt de 150 000 USD sur 5 ans, cela fait passer le service annuel de 41 900 à 37 800 USD.',
+            '**Négocier le taux.** Les taux dépendent du pays, de la devise et du guichet : renseignez-vous sur ceux pratiqués chez vous. À titre d’illustration, en RDC un crédit d’investissement en USD se situe autour de 14 %, et autour de 21 % en francs congolais ; un financement bonifié type **PADMPME** descend vers 9,5 %. Sur le même emprunt de 150 000 USD sur 5 ans, passer de 14 % à 9,5 % fait tomber le service annuel de 41 900 à 37 800 USD.',
             '**Augmenter votre apport pour emprunter moins.** Chaque dollar d’apport supplémentaire est un dollar de moins à rembourser — et cela améliore simultanément votre [ratio d’apport](/aide/ratios-bancaires#apport).',
             '**Réduire l’investissement de départ.** Matériel d’occasion, aménagement échelonné, équipement loué plutôt qu’acheté : tout ce qui sort du plan de financement allège l’emprunt.',
             '**Augmenter l’EBE.** C’est le vrai travail de fond : monter les prix, augmenter les volumes, faire baisser le ratio matière, renégocier le loyer. Voir [les marges](/aide/ratios-bancaires#marges).',
@@ -207,7 +207,7 @@ export const RATIOS_BANCAIRES: ArticleAide = {
           ton: 'attention',
           titre: 'Certains guichets exigent davantage',
           texte:
-            'En RDC, le **PADMPME** demande **30 %** d’apport, soit cinq points de plus que le seuil générique appliqué par Lalanda. Un ratio vert à 26 % dans l’outil peut donc être insuffisant pour ce guichet précis. Vérifiez l’exigence du financeur que vous visez avant de figer votre montage.',
+            'Les dispositifs publics et les fonds de garantie fixent souvent leur propre plancher, au-dessus du seuil générique de 25 % appliqué par Lalanda. En RDC par exemple, le **PADMPME** demande **30 %** d’apport : un ratio vert à 26 % dans l’outil peut donc être insuffisant pour ce guichet précis. Vérifiez l’exigence du financeur que vous visez avant de figer votre montage.',
         },
         {
           type: 'paragraphe',
