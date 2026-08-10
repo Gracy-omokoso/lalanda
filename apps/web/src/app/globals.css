@@ -105,6 +105,29 @@ input[type='number'] {
   -moz-appearance: textfield;
 }
 
+/* ─── Marque ─────────────────────────────────────────────────────
+ * Le lockup existe en deux fichiers, un par fond de destination. Les DEUX sont
+ * dans le HTML servi et c'est le CSS qui en masque un : `data-theme` est posé
+ * sur <html> par le script anti-FOUC de `app/layout.tsx` avant le premier
+ * paint, donc la bonne version est la seule jamais peinte — pas de flash de la
+ * mauvaise variante, et rien à lire côté JS, donc pas d'écart d'hydratation.
+ * La bascule à chaud ne change qu'un attribut : les deux fichiers sont déjà
+ * chargés, il n'y a ni requête ni rendu React au moment du clic.
+ *
+ * Sans attribut `data-theme` (HTML servi avant l'exécution du script, ou
+ * JavaScript désactivé) c'est le lockup fond clair qui s'affiche — cohérent
+ * avec le bloc de tokens `:root, [data-theme='light']` ci-dessus, qui pose lui
+ * aussi le thème clair par défaut. Les deux images portant les mêmes
+ * dimensions, la boîte ne change pas : aucun saut de mise en page.
+ * Composant : `src/components/brand-logo.tsx`.
+ */
+[data-theme='dark'] .marque-fond-clair {
+  display: none;
+}
+:root:not([data-theme='dark']) .marque-fond-sombre {
+  display: none;
+}
+
 /* ─── Panneaux encre ─────────────────────────────────────────── */
 
 .bg-ink {
