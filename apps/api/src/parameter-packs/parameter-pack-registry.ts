@@ -2,21 +2,15 @@
 // hardcodé S9-lite, MongoDB à partir de S12+ (packs signés + versionnés en base).
 
 import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { engineAsset } from '../engine-assets.js';
 
 import { parseParameterPack, type ParameterPack } from '@lalanda/engine';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
 const packFiles: Record<string, string> = {
-  'cd-2026': resolve(__dirname, '../../../../packages/engine/src/parameter-packs/cd-2026.yaml'),
-  'ci-2026': resolve(__dirname, '../../../../packages/engine/src/parameter-packs/ci-2026.yaml'),
-  'sn-2026': resolve(__dirname, '../../../../packages/engine/src/parameter-packs/sn-2026.yaml'),
-  'ohada-generic-2026': resolve(
-    __dirname,
-    '../../../../packages/engine/src/parameter-packs/ohada-generic-2026.yaml',
-  ),
+  'cd-2026': engineAsset('parameter-packs/cd-2026.yaml'),
+  'ci-2026': engineAsset('parameter-packs/ci-2026.yaml'),
+  'sn-2026': engineAsset('parameter-packs/sn-2026.yaml'),
+  'ohada-generic-2026': engineAsset('parameter-packs/ohada-generic-2026.yaml'),
 };
 
 const packs = new Map<string, ParameterPack>();
