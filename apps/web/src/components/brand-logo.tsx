@@ -10,6 +10,13 @@
 // Il n'existe pas de SVG : la source livrée est du PNG, et rien ici n'en
 // fabrique un.
 //
+// ── `<img>` natif, pas `next/image` ──────────────────────────────────────────
+// Même choix qu'ailleurs dans ce dépôt (`user-menu.tsx`, `dashboard-panel.tsx`).
+// L'optimiseur n'apporterait rien ici : ce sont des aplats de ~15 ko servis
+// depuis `public/`, donc en `'self'` au sens de la CSP, et déjà en cache après
+// le premier écran. Il ajouterait en revanche une dépendance à `sharp` dans
+// l'image de production et un `srcset` par variante de thème.
+//
 // ── Pourquoi les deux <img> sont rendues, et pas une seule choisie en JS ──────
 // Le thème vit dans `data-theme` sur <html>, posé par le script anti-FOUC de
 // `app/layout.tsx` AVANT le premier paint et modifié à chaud par `ThemeToggle`.
@@ -66,7 +73,6 @@ export function BrandLogo({
   // style — le logo est alors écrasé horizontalement. Constaté à 375 px sur
   // l'en-tête marketing : 128 px demandés, 96 px rendus, mot-symbole comprimé.
   const commun = {
-    alt: '',
     'aria-hidden': true as const,
     width: largeur,
     height: hauteur,
@@ -77,8 +83,10 @@ export function BrandLogo({
 
   if (fond === 'encre') {
     return (
+      // eslint-disable-next-line @next/next/no-img-element -- voir l'en-tête
       <img
         {...commun}
+        alt=""
         src="/marque/logo-lalanda-fond-sombre.png"
         className={`shrink-0 ${className}`}
       />
@@ -87,13 +95,17 @@ export function BrandLogo({
 
   return (
     <>
+      {/* eslint-disable-next-line @next/next/no-img-element -- voir l'en-tête */}
       <img
         {...commun}
+        alt=""
         src="/marque/logo-lalanda-fond-clair.png"
         className={`marque-fond-clair shrink-0 ${className}`}
       />
+      {/* eslint-disable-next-line @next/next/no-img-element -- voir l'en-tête */}
       <img
         {...commun}
+        alt=""
         src="/marque/logo-lalanda-fond-sombre.png"
         className={`marque-fond-sombre shrink-0 ${className}`}
       />
@@ -120,6 +132,7 @@ export function BrandMark({
   className?: string;
 }): React.ReactElement {
   return (
+    // eslint-disable-next-line @next/next/no-img-element -- voir l'en-tête
     <img
       src="/marque/aigle-seul.png"
       alt=""
