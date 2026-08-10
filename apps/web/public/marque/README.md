@@ -15,8 +15,8 @@ CSP (`apps/web/next.config.mjs`) : aucune origine à ajouter.
 | `logo-lalanda-fond-sombre.png` | 1024×273 | Lockup : badge blanc cerclé cyan, mot-symbole crème | Interface **sur fond sombre**, et panneaux `.bg-ink` |
 | `logo-lalanda-blanc.png` | 1024×273 | Lockup monochrome blanc | Déclinaison disponible (photo, aplat de couleur). **Non branchée dans l'application.** |
 | `logo-lalanda-noir.png` | 1024×273 | Lockup monochrome noir | Déclinaison disponible (impression mono). **Non branchée dans l'application.** |
-| `app-icone-lalanda.png` | 1024×1024 | Icône d'app : aigle sur badge sombre bord à bord | Source de `src/app/icon.png` et `src/app/apple-icon.png` |
-| `aigle-seul.png` | 1024×1024 | Aigle seul, sans badge, fond transparent | Référence. **Non branché** — voir « Pourquoi pas l'aigle seul » plus bas |
+| `app-icone-lalanda.png` | 1024×1024 | Icône d'app : aigle sur badge sombre bord à bord | Source de `src/app/apple-icon.png` (écran d'accueil iOS) |
+| `aigle-seul.png` | 1024×1024 | Aigle seul, sans badge, fond transparent | Source de `src/app/icon.png` (favicon) |
 
 ## Correspondance avec les noms d'origine
 
@@ -40,17 +40,30 @@ monochromes.
 `logo-lalanda-for-filgran25.png` (gris 25 %, filigrane des PDF) n'est
 volontairement pas copié ici : il relève des exports, pas de l'interface web.
 
-## Pourquoi pas l'aigle seul en favicon
+## Deux icônes, deux fichiers différents — et pourquoi
 
-`aigle-seul.png` (le fichier livré sous le nom `favicon.png`) est un aigle en
-teal sombre sur fond transparent. Dans une barre d'onglets en thème sombre, le
-fond transparent prend la couleur de la barre et la masse teal du logo s'y fond :
-il ne reste qu'un éclat cyan et le bec crème, sans silhouette lisible.
+Le doute portait sur `aigle-seul.png` : un aigle teal sur fond transparent
+risquait de se fondre dans une barre d'onglets sombre. **Vérification faite au
+rendu réel** (rastérisation à 16 et 32 px sur les gris de barre d'onglets
+`#dee1e6`, `#35363a`, `#202124`), c'est l'inverse :
 
-`app-icone-lalanda.png` porte son propre badge sombre : l'aigle garde partout le
-fond pour lequel il a été dessiné, et l'icône reste identifiable sur une barre
-d'onglets claire comme sombre. C'est donc lui qui alimente `src/app/icon.png` et
-`src/app/apple-icon.png`.
+- **Aigle seul** : lisible partout. Sa masse teal est plus claire qu'une barre
+  sombre et plus foncée qu'une barre claire, et le bec crème donne un point
+  d'accroche dans les deux cas. Il occupe tout le cadre, donc il survit à 16 px.
+- **Badge** : à 16 px il se réduit à un carré noir. Le badge ajoute une marge
+  qui rétrécit l'aigle d'environ 40 %, et le contraste aigle/badge (teal sur
+  presque noir) est plus faible que le contraste aigle/barre d'onglets. Sur une
+  barre sombre, le carré se confond en plus avec la barre.
+
+D'où la répartition :
+
+| Fichier livré | Source | Raison |
+|---|---|---|
+| `src/app/icon.png` (512×512) | `aigle-seul.png` | Favicon : cadre plein, lisible à 16 px sur barre claire comme sombre |
+| `src/app/apple-icon.png` (180×180) | `app-icone-lalanda.png` | iOS pose l'icône d'accueil **opaque** : un PNG transparent y est composé sur du noir. Le badge est fait pour ça, et à 180 px la lisibilité n'est pas en jeu |
+
+Si l'un des deux est un jour régénéré, refaire la comparaison plutôt que
+supposer : les deux hypothèses intuitives étaient fausses.
 
 ## Où c'est branché
 
