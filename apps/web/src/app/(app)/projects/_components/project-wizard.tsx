@@ -333,23 +333,22 @@ function WizardInner({ projectId }: { projectId: string }): React.ReactElement {
           >
             ← Précédent
           </button>
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Sortie vers les résultats : disponible à TOUTES les étapes. On ne
-                force personne à dérouler l'assistant jusqu'au bout pour relire
-                un ratio — la saisie est reprenable, pas linéaire. */}
-            <button
-              type="button"
-              onClick={() => void handleVoirResultats()}
-              disabled={calculating}
-              className={
-                isLast
-                  ? 'rounded-md bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-[var(--accent-foreground)] transition hover:opacity-90 disabled:opacity-40'
-                  : 'rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-medium transition hover:bg-[var(--surface-muted)] disabled:opacity-40'
-              }
-            >
-              {calculating ? 'Enregistrement…' : 'Voir les résultats →'}
-            </button>
-            {!isLast ? (
+          {/* Sortie vers les résultats : disponible à TOUTES les étapes de
+              saisie. On ne force personne à dérouler l'assistant jusqu'au bout
+              pour relire un ratio — la saisie est reprenable, pas linéaire.
+              L'étape de synthèse fait exception : elle porte déjà sa propre
+              paire d'actions, et deux boutons identiques dans le même écran
+              feraient hésiter sur ce qui les distingue (rien). */}
+          {!isLast ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => void handleVoirResultats()}
+                disabled={calculating}
+                className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-medium transition hover:bg-[var(--surface-muted)] disabled:opacity-40"
+              >
+                {calculating ? 'Enregistrement…' : 'Voir les résultats →'}
+              </button>
               <button
                 type="button"
                 onClick={() => goToStep(activeIndex + 1)}
@@ -357,8 +356,8 @@ function WizardInner({ projectId }: { projectId: string }): React.ReactElement {
               >
                 Suivant →
               </button>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </div>
       </section>
     </div>
