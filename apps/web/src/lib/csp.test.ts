@@ -25,6 +25,13 @@ async function cspFor(nodeEnv: string): Promise<string> {
   vi.stubEnv('NODE_ENV', nodeEnv);
 
   const { default: config } = await import('../../next.config.mjs');
+  // Garde explicite : `headers` est optionnel dans le type `NextConfig`, et sans
+  // elle `pnpm typecheck` échoue sur ce fichier (deux erreurs préexistantes à
+  // l'ADR-0016). Si le bloc disparaissait de la configuration, le test doit dire
+  // CELA plutôt que buter sur un appel d'`undefined`.
+  if (typeof config.headers !== 'function') {
+    throw new Error('next.config.mjs ne déclare aucun bloc headers()');
+  }
   const groups = await config.headers();
   const header = groups
     .flatMap((group: { headers: { key: string; value: string }[] }) => group.headers)
