@@ -23,6 +23,8 @@
 
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 
+import { IconeAide } from '@/components/icons';
+
 /** Marge minimale conservée entre la bulle et le bord de la fenêtre (px). */
 export const MARGE_ECRAN = 12;
 
@@ -129,9 +131,13 @@ export function Infobulle({ id, texte, libelle }: InfobulleProps): React.ReactEl
         onBlur={() => setOuverte(false)}
         onClick={() => setOuverte(true)}
         onKeyDown={surTouche}
-        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-[var(--border-strong)] text-[0.6rem] font-semibold leading-none text-[var(--foreground-muted)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[var(--foreground-muted)] transition hover:text-[var(--accent)]"
       >
-        <span aria-hidden="true">?</span>
+        {/* Le cercle vient du tracé de l'icône, plus d'une bordure CSS autour
+            d'un caractère « ? » : un point d'interrogation typographique change
+            de dessin avec la police et ne s'aligne pas sur la graisse du reste.
+            Même jeu d'icônes que le bouton de thème. */}
+        <IconeAide className="h-4 w-4" />
         <span className="sr-only">Aide : {libelle}</span>
       </button>
 

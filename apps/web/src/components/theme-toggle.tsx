@@ -12,6 +12,7 @@
 
 import { useEffect, useState } from 'react';
 
+import { IconeLune, IconeSoleil } from '@/components/icons';
 import { applyThemePreference, type ResolvedTheme } from '@/lib/theme';
 
 function readTheme(): ResolvedTheme {
@@ -50,9 +51,20 @@ export function ThemeToggle({ persist = false }: { persist?: boolean }): React.R
       onClick={toggle}
       aria-label={theme === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre'}
       title={theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
-      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] text-sm transition hover:bg-[var(--surface-muted)]"
+      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground-muted)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]"
     >
-      <span aria-hidden="true">{mounted && theme === 'dark' ? '☀️' : '🌙'}</span>
+      {/* Icônes au trait plutôt qu'emoji : un emoji est dessiné par la police du
+          système — il change d'aspect d'une plateforme à l'autre, arrive en
+          couleur dans une interface qui n'en a pas et ignore la graisse des
+          traits voisins. Le SVG suit `currentColor` et l'épaisseur du reste.
+          Avant le montage, `theme` vaut encore « light » côté serveur : on
+          affiche donc la lune, cohérente avec le rendu initial (pas de
+          clignotement d'hydratation). */}
+      {mounted && theme === 'dark' ? (
+        <IconeSoleil className="h-4 w-4" />
+      ) : (
+        <IconeLune className="h-4 w-4" />
+      )}
     </button>
   );
 }
