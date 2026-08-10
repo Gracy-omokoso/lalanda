@@ -106,7 +106,7 @@ export const COMPRENDRE_LES_CHIFFRES: ArticleAide = {
         },
         {
           type: 'exemple',
-          titre: 'Restaurant à Kinshasa — un mois type',
+          titre: 'Restaurant urbain — un mois type',
           lignes: [
             { libelle: 'Chiffre d’affaires', valeur: '18 720 USD' },
             { libelle: 'Coût matière (35 %)', valeur: '−6 552 USD' },
@@ -345,7 +345,7 @@ export const COMPRENDRE_LES_CHIFFRES: ArticleAide = {
         },
         {
           type: 'exemple',
-          titre: 'Lecture — quincaillerie à Lubumbashi, exercice 1',
+          titre: 'Lecture — quincaillerie de quartier, exercice 1',
           lignes: [
             { libelle: 'Chiffre d’affaires prévu', valeur: '180 000 USD' },
             { libelle: 'Seuil de rentabilité', valeur: '146 000 USD' },

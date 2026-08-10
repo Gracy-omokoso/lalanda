@@ -92,7 +92,7 @@ drivers:
     devise: USD
     defaut: 500
     min: 0
-    aide: 'Ventes moyennes journalières toutes catégories confondues. Une quincaillerie de quartier à Kinshasa : 300-800 USD/jour selon zone et achalandage.'
+    aide: 'Ventes moyennes journalières toutes catégories confondues. Une quincaillerie de quartier en zone urbaine : 300-800 USD/jour selon zone et achalandage.'
 
   - id: jours_ouverture_mois
     groupe: activite
@@ -102,7 +102,7 @@ drivers:
     min: 1
     max: 31
     unite: 'jours'
-    aide: 'Ouvert 6 j/7 = 26 jours. Beaucoup de commerces à Kinshasa ferment le dimanche.'
+    aide: 'Ouvert 6 j/7 = 26 jours. Beaucoup de commerces de la zone ferment le dimanche.'
 
   - id: marge_commerciale_pct
     groupe: couts_variables
@@ -120,7 +120,7 @@ drivers:
     devise: USD
     defaut: 1200
     min: 0
-    aide: 'Salaires bruts totaux (2 vendeurs + gérant). Charges CNSS/IPR incluses. Ordre de grandeur pour 3 personnes.'
+    aide: 'Salaires bruts totaux (2 vendeurs + gérant). Charges sociales et impôts sur salaires inclus. Ordre de grandeur pour 3 personnes.'
 
   - id: loyer_mois
     groupe: charges_fixes
@@ -129,7 +129,7 @@ drivers:
     devise: USD
     defaut: 500
     min: 0
-    aide: "Local commercial de 40-80 m² en zone d'activité (Kinshasa hors Gombe) : 300-700 USD."
+    aide: "Local commercial de 40-80 m² en zone d'activité, hors quartier d'affaires central : 300-700 USD."
 
   - id: transport_stock_mois
     groupe: charges_fixes

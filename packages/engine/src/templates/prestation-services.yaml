@@ -84,7 +84,7 @@ drivers:
     devise: USD
     defaut: 200
     min: 0
-    aide: "Prix moyen d'une journée facturée à un client. Conseil / agence à Kinshasa : 150-350 USD selon expertise et positionnement."
+    aide: "Prix moyen d'une journée facturée à un client. Conseil / agence en capitale de la zone : 150-350 USD selon expertise et positionnement."
 
   - id: jours_facturables_mois
     groupe: activite

@@ -197,7 +197,7 @@ drivers:
     devise: USD
     defaut: 900
     min: 0
-    aide: 'Salaires bruts, charges CNSS/IPR incluses. Ordre de grandeur pour un community manager qui gère les publicités et les conversations WhatsApp, plus une personne au conditionnement des colis.'
+    aide: 'Salaires bruts, charges sociales et impôts sur salaires inclus. Ordre de grandeur pour un community manager qui gère les publicités et les conversations WhatsApp, plus une personne au conditionnement des colis.'
 
   - id: local_stockage_mois
     groupe: charges_fixes

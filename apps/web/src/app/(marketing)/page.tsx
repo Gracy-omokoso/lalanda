@@ -14,15 +14,16 @@ export default function LandingPage(): React.ReactElement {
         <div className="mx-auto grid max-w-6xl items-center gap-12 px-6 py-16 sm:py-20 lg:grid-cols-[1.1fr_0.9fr] lg:py-24">
           <div>
             <p className="font-mono mb-5 text-xs font-medium tracking-[0.18em] text-[var(--on-ink-accent)]">
-              SYSCOHADA · RDC · AFRIQUE DE L&apos;OUEST ET CENTRALE
+              SYSCOHADA · AFRIQUE DE L&apos;OUEST ET CENTRALE
             </p>
             <h1 className="font-display text-[2.6rem] font-black leading-[0.98] tracking-tight text-[var(--on-ink)] sm:text-6xl lg:text-[4.2rem]">
               Le dossier que votre banquier attend.
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-relaxed text-[var(--on-ink-muted)]">
               Compte d&apos;exploitation, trésorerie, plan de financement, ratios — générés en 30
-              minutes, avec la fiscalité de votre pays déjà intégrée. Prêt à déposer chez Rawbank,
-              Equity BCDC, TMB ou PADMPME.
+              minutes, avec la fiscalité de votre pays déjà intégrée. Prêt à déposer dans votre
+              banque, votre institution de microfinance ou votre dispositif public d&apos;appui aux
+              PME.
             </p>
             <div className="mt-9 flex flex-wrap items-center gap-3">
               <Link
@@ -110,11 +111,11 @@ export default function LandingPage(): React.ReactElement {
         {/* Ligne banques */}
         <div className="border-t border-[var(--ink-border)]">
           <div className="font-mono mx-auto flex max-w-6xl flex-wrap items-center gap-x-8 gap-y-2 px-6 py-4 text-[0.65rem] tracking-[0.18em] text-[var(--on-ink-muted)]">
-            <span>DOSSIERS CONFORMES AUX ATTENTES DE</span>
-            <span className="text-[var(--on-ink)]">RAWBANK</span>
-            <span className="text-[var(--on-ink)]">EQUITY BCDC</span>
-            <span className="text-[var(--on-ink)]">TMB</span>
-            <span className="text-[var(--on-ink)]">PADMPME</span>
+            <span>DOSSIERS CONFORMES AUX ATTENTES DES</span>
+            <span className="text-[var(--on-ink)]">BANQUES COMMERCIALES</span>
+            <span className="text-[var(--on-ink)]">INSTITUTIONS DE MICROFINANCE</span>
+            <span className="text-[var(--on-ink)]">FONDS DE GARANTIE</span>
+            <span className="text-[var(--on-ink)]">DISPOSITIFS PUBLICS PME</span>
           </div>
         </div>
       </section>
@@ -235,7 +236,7 @@ export default function LandingPage(): React.ReactElement {
               Les feux tricolores du banquier
             </h2>
             <p className="mt-3 text-[var(--foreground-muted)]">
-              Exemple réel — restaurant à Kinshasa, 60 couverts par jour, ticket moyen 12 USD.
+              Exemple — restaurant urbain de 40 places, 60 couverts par jour, ticket moyen 12 USD.
             </p>
           </div>
           <div className="doc-card p-6 sm:p-8">
