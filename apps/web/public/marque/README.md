@@ -12,7 +12,7 @@ CSP (`apps/web/next.config.mjs`) : aucune origine à ajouter.
 | Fichier | Dimensions | Contenu | Où il sert |
 |---|---|---|---|
 | `logo-lalanda-fond-clair.png` | 1024×273 | Lockup : badge sombre + aigle couleur, mot-symbole encre | Interface **sur fond clair** |
-| `logo-lalanda-fond-sombre.png` | 1024×273 | Lockup : badge blanc cerclé cyan, mot-symbole crème | Interface **sur fond sombre**, et panneaux `.bg-ink` |
+| `logo-lalanda-fond-sombre.png` | 1024×273 | Lockup : badge sombre + aigle couleur (le même que ci-dessus), mot-symbole crème | Interface **sur fond sombre**, et panneaux `.bg-ink` |
 | `logo-lalanda-blanc.png` | 1024×273 | Lockup monochrome blanc | Déclinaison disponible (photo, aplat de couleur). **Non branchée dans l'application.** |
 | `logo-lalanda-noir.png` | 1024×273 | Lockup monochrome noir | Déclinaison disponible (impression mono). **Non branchée dans l'application.** |
 | `app-icone-lalanda.png` | 1024×1024 | Icône d'app : aigle sur badge sombre bord à bord | Source de `src/app/apple-icon.png` (écran d'accueil iOS) |
@@ -26,11 +26,16 @@ Les fichiers ont été renommés à la copie : `for-ligth` portait une coquille,
 | Nom d'origine | Nom ici |
 |---|---|
 | `logo-lalanda-for-ligth.png` | `logo-lalanda-fond-clair.png` |
-| `logo-lalanda-for-dark.png` | `logo-lalanda-fond-sombre.png` |
+| `logo-lalanda-v2.png` | `logo-lalanda-fond-sombre.png` |
 | `logo-lalanda-for-white.png` | `logo-lalanda-blanc.png` |
 | `logo-lalanda-for-black.png` | `logo-lalanda-noir.png` |
 | `app-icone-lalanda.png` | inchangé |
 | `favicon.png` | `aigle-seul.png` |
+
+**`logo-lalanda-for-dark.png` n'est plus la source du fond sombre.** Le
+décideur l'a remplacé le 2026-08-10 par `logo-lalanda-v2.png`, qui reprend le
+badge encre opaque du fond clair avec un mot-symbole crème. L'ancien fichier
+existe toujours dans le dossier source : ne pas le ré-importer.
 
 `for-ligth` / `for-dark` désignent le **fond de destination**; `for-white` /
 `for-black` désignent la **couleur du logo** lui-même. Les noms retenus ici
