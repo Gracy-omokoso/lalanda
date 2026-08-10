@@ -26,6 +26,13 @@
 
 import type { Template } from '@lalanda/engine';
 
+import {
+  LOGO_LIGHT_DATA_URI,
+  LOGO_LIGHT_SIZE,
+  LOGO_WATERMARK_DATA_URI,
+  LOGO_WATERMARK_SIZE,
+} from './assets/brand.js';
+
 export interface ReportOrg {
   name: string;
   pays: string;
@@ -381,7 +388,13 @@ export function renderReportHtml(data: ReportData): string {
 
     /* ---- Page de garde (page 1) ---- */
     .cover-page { break-after: page; page-break-after: always; min-height: 250mm; display: flex; flex-direction: column; justify-content: center; }
-    .cover-page .brand { font-size: 48pt; font-weight: 700; color: var(--accent); letter-spacing: -1.5px; margin: 0 0 4mm 0; }
+    /* En-tête de marque. Le lockup remplace le mot « LALANDA » composé en texte.
+       62 mm de large sur 180 mm de largeur utile : lisible à bout de bras, et il
+       reste sous le nom du projet en poids visuel — c'est le projet que le
+       banquier doit lire en premier, pas l'éditeur du logiciel.
+       align-self : sans lui, l'étirement par défaut du conteneur flex gonflerait
+       l'image à toute la largeur de la page. */
+    .cover-page .brand-logo { align-self: flex-start; width: 62mm; height: auto; margin: 0 0 5mm 0; }
     .cover-page .project-name { font-size: 20pt; color: var(--ink); margin: 0 0 12mm 0; font-weight: 600; }
     .cover-page .accent-rule { height: 3px; background: var(--accent); width: 40mm; margin-bottom: 10mm; }
     .cover-page .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm 8mm; margin-top: 8mm; }
@@ -423,12 +436,19 @@ export function renderReportHtml(data: ReportData): string {
     .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
     .seuil-note { font-size: 8pt; margin-top: 1mm; }
 
-    /* ---- Filigrane offre gratuite (S16b) ---- */
+    /* ---- Filigrane offre gratuite (S16b, logo ajouté S22h) ---- */
     /* position:fixed en contexte print Chromium : répété sur chaque page, en bas du
        bloc de contenu. Discret : petit corps, gris clair, centré — n'obstrue pas les
        chiffres. NB vérifié empiriquement : un bottom négatif (dans la marge @page)
-       est replié en haut de page par Chromium — rester à 0. */
-    .watermark { position: fixed; bottom: 0; left: 0; right: 0; text-align: center; font-size: 7.5pt; color: #94a3b8; letter-spacing: 0.4px; }
+       est replié en haut de page par Chromium — rester à 0.
+       Le logo vient EN PLUS du texte, jamais à sa place : c'est le texte qui porte
+       l'information commerciale (« offre gratuite »), un logo seul ne dirait pas
+       pourquoi le document est marqué. Composition sur une ligne, logo puis texte,
+       centrés l'un sur l'autre via align-items. */
+    .watermark { position: fixed; bottom: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: center; gap: 2.5mm; font-size: 7.5pt; color: #94a3b8; letter-spacing: 0.4px; }
+    /* 22 mm : la hauteur du lockup (5.9 mm) reste sous celle d'une ligne de texte —
+       le bandeau ne grandit pas et ne mange pas la marge basse. */
+    .watermark img { width: 22mm; height: auto; display: block; }
 
     /* ---- Avertissement légal ---- */
     .disclaimer-box { margin-top: 8mm; background: #fef9e7; border: 1px solid #f0c95a; padding: 4mm; break-inside: avoid; }
@@ -439,11 +459,17 @@ export function renderReportHtml(data: ReportData): string {
   </style>
 </head>
 <body>
-  ${watermark ? `<div class="watermark">${escapeHtml(WATERMARK_TEXT)}</div>` : ''}
+  ${
+    watermark
+      ? `<div class="watermark"><img src="${LOGO_WATERMARK_DATA_URI}" width="${LOGO_WATERMARK_SIZE.width}" height="${LOGO_WATERMARK_SIZE.height}" alt="" />${escapeHtml(WATERMARK_TEXT)}</div>`
+      : ''
+  }
   <!-- Page 1 : garde -->
   <section class="cover-page">
     <div class="accent-rule"></div>
-    <h1 class="brand">LALANDA</h1>
+    <!-- En-tête de marque. Attribut alt renseigné : si l'image manquait un jour,
+         le dossier porterait encore le nom de son éditeur au lieu d'un blanc. -->
+    <img class="brand-logo" src="${LOGO_LIGHT_DATA_URI}" width="${LOGO_LIGHT_SIZE.width}" height="${LOGO_LIGHT_SIZE.height}" alt="Lalanda" />
     <p class="tagline">Plan financier prévisionnel bancable</p>
     <h2 class="project-name">${escapeHtml(project.name)}</h2>
     ${statusBadge}
