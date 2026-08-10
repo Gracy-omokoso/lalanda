@@ -12,6 +12,8 @@
 //      est la forme la plus directe de cette contrainte.
 //
 // Usage : node apps/api/src/reports/assets/generate-brand.mjs
+// La sortie est écrite déjà conforme à Prettier (retour à la ligne avant les
+// littéraux longs) : `pnpm format:check` doit rester vert sans passe manuelle.
 //
 // ── Dimensions des PNG d'entrée, et pourquoi elles diffèrent ────────────────
 // Règle générale : encoder à la taille d'affichage, pas à la taille de la source.
@@ -85,7 +87,8 @@ for (const s of sources) {
  *
  * ${width}×${height} px — ${(buf.length / 1024).toFixed(1)} Kio bruts, ${(b64.length / 1024).toFixed(1)} Kio une fois en base64.
  */
-export const ${s.constant} = 'data:image/png;base64,${b64}';
+export const ${s.constant} =
+  'data:image/png;base64,${b64}';
 
 /** Dimensions natives — servent aux attributs \`width\`/\`height\` de l'\`<img>\`. */
 export const ${s.dims} = { width: ${width}, height: ${height} } as const;

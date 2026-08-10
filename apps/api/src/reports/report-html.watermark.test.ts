@@ -87,7 +87,7 @@ describe('renderReportHtml — filigrane offre gratuite', () => {
   });
 });
 
-describe("renderReportHtml — en-tête de marque de la page de garde", () => {
+describe('renderReportHtml — en-tête de marque de la page de garde', () => {
   it('affiche le lockup couleur, quel que soit le plan', () => {
     for (const watermark of [true, false, undefined]) {
       const html = renderReportHtml(buildData(watermark));
