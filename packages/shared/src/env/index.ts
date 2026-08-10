@@ -160,11 +160,39 @@ export const WebEnvSchema = CommonEnvSchema.extend({
 export type WebEnv = z.infer<typeof WebEnvSchema>;
 
 /**
+ * Retire les variables dont la valeur est une chaîne VIDE, pour qu'elles soient
+ * traitées comme absentes.
+ *
+ * Pourquoi c'est nécessaire : dans un fichier `.env`, `SMTP_HOST=` est la façon
+ * habituelle d'écrire « non configuré », et c'est exactement ce que fait
+ * `.env.production.example`. Mais pour Zod, une chaîne vide est PRÉSENTE : un
+ * `z.string().min(1).optional()` la refuse, et l'API sortait en `exit 1` au
+ * démarrage. Autrement dit, suivre la procédure de déploiement documentée
+ * empêchait le service de démarrer — sur SIX variables toutes facultatives
+ * (Google, SMTP, OpenAI).
+ *
+ * La distinction absente / vide n'a aucun sens pour une variable d'environnement
+ * facultative : les deux veulent dire la même chose. On la supprime ici, une
+ * fois, plutôt que d'ajouter un `.or(z.literal(''))` sur chaque champ — qui
+ * serait à réécrire à chaque nouvelle variable, donc oublié.
+ *
+ * Une variable OBLIGATOIRE laissée vide reste refusée : elle disparaît de
+ * l'objet, et son absence est signalée comme telle.
+ */
+function withoutEmptyValues(raw: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const nettoye: NodeJS.ProcessEnv = {};
+  for (const [cle, valeur] of Object.entries(raw)) {
+    if (valeur !== '') nettoye[cle] = valeur;
+  }
+  return nettoye;
+}
+
+/**
  * Parse et valide un schéma d'env. Sort du process avec un message explicite si invalide.
  * À appeler au démarrage de chaque service (brief §9-4).
  */
 export function parseEnv<T extends z.ZodTypeAny>(schema: T, raw: NodeJS.ProcessEnv): z.infer<T> {
-  const parsed = schema.safeParse(raw);
+  const parsed = schema.safeParse(withoutEmptyValues(raw));
   if (!parsed.success) {
     const issues = parsed.error.issues
       .map((i) => `  - ${i.path.join('.')}: ${i.message}`)

@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { ApiEnvSchema } from './index.js';
+import { ApiEnvSchema, parseEnv } from './index.js';
 
 /**
  * Clé maîtresse FACTICE — 32 octets de `A` en base64. Valeur évidemment fausse
@@ -100,5 +100,43 @@ describe('coffre des secrets d’intégration (S21b — ADR-0013)', () => {
     expect(ApiEnvSchema.safeParse({ ...MINIMAL_ENV, OPENAI_API_KEY: 'sk-factice' }).success).toBe(
       true,
     );
+  });
+});
+
+describe('variables facultatives laissées vides (S22l)', () => {
+  // `.env.production.example` livre `GOOGLE_CLIENT_ID=`, `SMTP_HOST=` etc. —
+  // la façon habituelle d'écrire « non configuré » dans un fichier .env.
+  // Zod voyait une chaîne PRÉSENTE et refusait le `min(1)` : l'API sortait en
+  // exit 1 au démarrage, en production, en suivant la procédure documentée.
+  const base = {
+    NODE_ENV: 'production',
+    MONGODB_URI: 'mongodb://mongo:27017/lalanda',
+    MONGODB_DB: 'lalanda',
+    AUTH_SECRET: 'x'.repeat(32),
+    AUTH_URL: 'https://api.exemple.co',
+    API_URL: 'https://api.exemple.co',
+    WEB_URL: 'https://exemple.co',
+    SECRETS_MASTER_KEY: 'Q0ktQ0xFLUZBQ1RJQ0UtTk9OLVBST0RVQ1RJT04tMzI=',
+  } as NodeJS.ProcessEnv;
+
+  it('accepte une variable facultative vide, et la rend indéfinie', () => {
+    const env = parseEnv(ApiEnvSchema, {
+      ...base,
+      GOOGLE_CLIENT_ID: '',
+      GOOGLE_CLIENT_SECRET: '',
+      SMTP_HOST: '',
+      SMTP_USER: '',
+      SMTP_PASSWORD: '',
+      OPENAI_API_KEY: '',
+    });
+
+    expect(env.GOOGLE_CLIENT_ID).toBeUndefined();
+    expect(env.SMTP_HOST).toBeUndefined();
+    expect(env.OPENAI_API_KEY).toBeUndefined();
+  });
+
+  it('conserve une variable facultative réellement renseignée', () => {
+    const env = parseEnv(ApiEnvSchema, { ...base, SMTP_HOST: 'smtp.exemple.co' });
+    expect(env.SMTP_HOST).toBe('smtp.exemple.co');
   });
 });
