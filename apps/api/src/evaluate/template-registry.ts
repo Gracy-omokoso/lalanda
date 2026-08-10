@@ -7,33 +7,19 @@
 // Les templates réels vivront en MongoDB à partir de S7 (voir @lalanda/templates/README.md).
 
 import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { engineAsset } from '../engine-assets.js';
 
 import { parseTemplate, type Template } from '@lalanda/engine';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
-// Chemins résolus depuis apps/api/src/evaluate → packages/engine/src/*.
+// Chemins résolus par le résolveur de modules (voir src/engine-assets.ts) :
+// fonctionne dans le dépôt comme dans l'image de production.
 // Fonctionne à la fois en dev (tsx) et en build : les paths relatifs restent stables au sein du monorepo.
 const templateFiles: Record<string, string> = {
-  'hello-world': resolve(__dirname, '../../../../packages/engine/src/toy-template.yaml'),
-  'restaurant-kinshasa': resolve(
-    __dirname,
-    '../../../../packages/engine/src/templates/restaurant-kinshasa.yaml',
-  ),
-  'quincaillerie-negoce': resolve(
-    __dirname,
-    '../../../../packages/engine/src/templates/quincaillerie-negoce.yaml',
-  ),
-  'prestation-services': resolve(
-    __dirname,
-    '../../../../packages/engine/src/templates/prestation-services.yaml',
-  ),
-  'ecommerce-cod': resolve(
-    __dirname,
-    '../../../../packages/engine/src/templates/ecommerce-cod.yaml',
-  ),
+  'hello-world': engineAsset('toy-template.yaml'),
+  'restaurant-kinshasa': engineAsset('templates/restaurant-kinshasa.yaml'),
+  'quincaillerie-negoce': engineAsset('templates/quincaillerie-negoce.yaml'),
+  'prestation-services': engineAsset('templates/prestation-services.yaml'),
+  'ecommerce-cod': engineAsset('templates/ecommerce-cod.yaml'),
 };
 
 const templates = new Map<string, Template>();
