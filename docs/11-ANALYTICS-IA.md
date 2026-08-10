@@ -109,3 +109,32 @@ Backends :
 
 Le champ `source` de la réponse (`"llm"` ou `"fallback"`) permet à l’interface
 d’indiquer clairement à l’utilisateur d’où viennent les suggestions.
+
+## Bornes techniques des appels OpenAI (S22h)
+
+Chaque appel au modèle est borné. Ce n’est pas une mesure de coût — un appel
+`gpt-4o-mini` se compte en millièmes de dollar — mais une mesure technique :
+sans plafond, une réponse anormalement longue ou un prompt qui boucle occupe
+une requête HTTP, de la mémoire et du temps sans limite.
+
+| Borne | Variable | Défaut | Bornes acceptées |
+|---|---|---|---|
+| Jetons en sortie (`max_tokens`) | `OPENAI_MAX_OUTPUT_TOKENS` | 1024 | 256 – 4096 |
+| Délai maximal d’un appel | `OPENAI_TIMEOUT_MS` | 15000 ms | 1000 – 60000 |
+
+Règles :
+
+- **un déploiement sans configuration est borné**, jamais illimité : les défauts
+  s’appliquent d’office;
+- une valeur invalide ou hors bornes est **ignorée au profit du défaut**, avec un
+  avertissement — jamais appliquée en silence;
+- le plafond de jetons est dimensionné sur la réponse légitime la plus longue :
+  4 actions (maximum du schéma) ≈ 470 jetons en français, soit ~2,2× de marge;
+- un dépassement (réponse tronquée `finish_reason="length"`, ou délai écoulé)
+  **retombe sur le repli déterministe** : l’utilisateur reçoit des suggestions
+  normales, aucune erreur ne remonte;
+- **aucun repli n’est silencieux** : chaque repli est journalisé avec un préfixe
+  stable (`Repli déterministe :`) et la cause nommée par son type
+  (`OpenAITimeoutError`, `OpenAITruncatedResponseError`, `ClientAbsent`…).
+  L’absence totale de client OpenAI est signalée une fois par processus — c’est
+  un état de configuration, pas un incident par requête.

@@ -1,15 +1,18 @@
 // Tests unitaires du service d'actions correctives (S14a — agent D).
 // Aucun appel réseau réel : le client OpenAI est mocké intégralement.
 
+import { Logger } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
   AiActionsService,
+  FALLBACK_LOG_PREFIX,
   buildFallbackActions,
   extractProblematiques,
   parseLlmActions,
   type OpenAIChatClient,
 } from './ai-actions.service.js';
+import { OpenAITimeoutError, OpenAITruncatedResponseError } from './openai-client.js';
 import type { EvaluateLine } from './ai-actions.dto.js';
 
 /** Fabrique une ligne "ratio" typée avec seuil. */
@@ -229,5 +232,104 @@ describe('AiActionsService.correctiveActions', () => {
     });
     expect(res.source).toBe('fallback');
     expect(res.actions).toHaveLength(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// S22h — dépassement des bornes : repli propre ET journalisé
+//
+// Règle : l'utilisateur ne doit voir aucune erreur, mais l'exploitation doit
+// voir chaque repli. Un repli invisible est un échec silencieux.
+// ---------------------------------------------------------------------------
+
+describe('AiActionsService — dépassement de borne → repli journalisé', () => {
+  const lignesRouges: EvaluateLine[] = [
+    ratioLine('dscr', 'DSCR', 0.9, 1.25, 'rouge', 'min'),
+    ratioLine('apport_pct', 'Apport', 0.1, 0.25, 'rouge', 'min', 'percent'),
+  ];
+
+  const requete = { templateSlug: 'x', drivers: {}, lines: lignesRouges };
+
+  /** Capture les `warn` du Logger Nest émis par le service. */
+  function captureWarns(): { warns: string[]; restore: () => void } {
+    const warns: string[] = [];
+    const spy = vi
+      .spyOn(Logger.prototype, 'warn')
+      .mockImplementation((msg: unknown) => void warns.push(String(msg)));
+    return { warns, restore: () => spy.mockRestore() };
+  }
+
+  it('délai maximal dépassé → repli déterministe, aucune erreur remontée, type journalisé', async () => {
+    const { warns, restore } = captureWarns();
+    try {
+      const client: OpenAIChatClient = {
+        chatJson: vi.fn().mockRejectedValue(new OpenAITimeoutError(15_000)),
+      };
+      const res = await new AiActionsService(client).correctiveActions(requete);
+
+      // Côté utilisateur : une réponse normale, pas une exception.
+      expect(res.source).toBe('fallback');
+      expect(res.actions).toHaveLength(2);
+      // Côté exploitation : le repli est visible ET sa cause est nommée.
+      expect(warns).toHaveLength(1);
+      expect(warns[0]).toContain(FALLBACK_LOG_PREFIX);
+      expect(warns[0]).toContain('OpenAITimeoutError');
+    } finally {
+      restore();
+    }
+  });
+
+  it('réponse tronquée par le plafond de jetons → repli déterministe, type journalisé', async () => {
+    const { warns, restore } = captureWarns();
+    try {
+      const client: OpenAIChatClient = {
+        chatJson: vi.fn().mockRejectedValue(new OpenAITruncatedResponseError(1_024)),
+      };
+      const res = await new AiActionsService(client).correctiveActions(requete);
+
+      expect(res.source).toBe('fallback');
+      expect(res.actions).toHaveLength(2);
+      expect(warns).toHaveLength(1);
+      expect(warns[0]).toContain(FALLBACK_LOG_PREFIX);
+      expect(warns[0]).toContain('OpenAITruncatedResponseError');
+      // Le plafond en cause est lisible : sans lui, on ne sait pas quoi relever.
+      expect(warns[0]).toContain('1024');
+    } finally {
+      restore();
+    }
+  });
+
+  it('JSON tronqué qui atteint quand même le parsing → repli, jamais de réponse partielle', async () => {
+    const { warns, restore } = captureWarns();
+    try {
+      // Cas de ceinture-bretelles : un contenu coupé sans finish_reason exploitable.
+      const client: OpenAIChatClient = {
+        chatJson: vi.fn().mockResolvedValue('{"actions":[{"ratio":"dscr","severity":"rou'),
+      };
+      const res = await new AiActionsService(client).correctiveActions(requete);
+
+      expect(res.source).toBe('fallback');
+      expect(res.actions).toHaveLength(2);
+      expect(res.actions.every((a) => a.suggestion.length > 0)).toBe(true);
+      expect(warns[0]).toContain(FALLBACK_LOG_PREFIX);
+    } finally {
+      restore();
+    }
+  });
+
+  it('aucun client configuré → repli journalisé UNE fois (pas d’état muet, pas de spam)', async () => {
+    const { warns, restore } = captureWarns();
+    try {
+      const svc = new AiActionsService(null);
+      await svc.correctiveActions(requete);
+      await svc.correctiveActions(requete);
+      await svc.correctiveActions(requete);
+
+      expect(warns).toHaveLength(1);
+      expect(warns[0]).toContain(FALLBACK_LOG_PREFIX);
+      expect(warns[0]).toContain('ClientAbsent');
+    } finally {
+      restore();
+    }
   });
 });
