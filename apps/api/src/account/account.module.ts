@@ -3,10 +3,14 @@ import { MongooseModule } from '@nestjs/mongoose';
 
 import { Membership, MembershipSchema } from '../organizations/membership.schema.js';
 import { Organization, OrganizationSchema } from '../organizations/organization.schema.js';
+import { ThrottlingModule } from '../security/throttling.module.js';
 import { AccountAuthGuard } from './account-auth.guard.js';
 import { AccountSessionsService } from './account-sessions.service.js';
 import { AccountController } from './account.controller.js';
 import { AccountService } from './account.service.js';
+import { AvatarImageController } from './avatar-image.controller.js';
+import { AvatarService } from './avatar.service.js';
+import { UserAvatar, UserAvatarSchema } from './avatar.schema.js';
 import { EmailChangeRequest, EmailChangeRequestSchema } from './email-change.schema.js';
 import { EmailChangeService } from './email-change.service.js';
 import { EmailVerificationController } from './email-verification.controller.js';
@@ -27,12 +31,21 @@ import { UserPreferences, UserPreferencesSchema } from './user-preferences.schem
     MongooseModule.forFeature([
       { name: UserPreferences.name, schema: UserPreferencesSchema },
       { name: EmailChangeRequest.name, schema: EmailChangeRequestSchema },
+      { name: UserAvatar.name, schema: UserAvatarSchema },
       { name: Membership.name, schema: MembershipSchema },
       { name: Organization.name, schema: OrganizationSchema },
     ]),
+    // `UserThrottlerGuard` borne les téléversements de photo par utilisateur.
+    ThrottlingModule,
   ],
-  controllers: [AccountController, EmailVerificationController],
-  providers: [AccountService, AccountSessionsService, EmailChangeService, AccountAuthGuard],
+  controllers: [AccountController, EmailVerificationController, AvatarImageController],
+  providers: [
+    AccountService,
+    AccountSessionsService,
+    EmailChangeService,
+    AvatarService,
+    AccountAuthGuard,
+  ],
   exports: [AccountService],
 })
 export class AccountModule {}

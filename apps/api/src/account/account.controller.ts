@@ -12,6 +12,9 @@
 //   DELETE /account/email/change         → annule la demande
 //   GET    /account/deletion             → le compte peut-il être supprimé ?
 //   POST   /account/delete               → suppression définitive
+//   POST   /account/avatar               → téléverse la photo (corps BINAIRE brut)
+//   DELETE /account/avatar               → retire la photo
+//   GET    /account/avatar/:token        → sert l'image (jeton signé — avatar-url.ts)
 //
 // RÈGLE D'ISOLATION, VALABLE POUR TOUTES LES ROUTES CI-DESSOUS :
 // le propriétaire des données est TOUJOURS `@CurrentUser().id`, c'est-à-dire
@@ -29,18 +32,34 @@ import {
   Delete,
   Get,
   HttpCode,
+  HttpException,
   Inject,
   Param,
   Post,
   Put,
   Req,
+  ServiceUnavailableException,
+  UnsupportedMediaTypeException,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 
 import { getAuth } from '../auth/auth.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
+import { ObjectStorageUnavailableError } from '../storage/object-storage.service.js';
+import { UserThrottlerGuard } from '../security/user-throttler.guard.js';
 import { AccountAuthGuard } from './account-auth.guard.js';
+import { AvatarService, type AvatarRecord } from './avatar.service.js';
+import { AVATAR_URL_TTL_SECONDS, avatarUrlFor } from './avatar-url.js';
+import {
+  ACCEPTED_IMAGE_TYPES,
+  MAX_IMAGE_BYTES,
+  MAX_IMAGE_DIMENSION,
+  MIN_IMAGE_DIMENSION,
+  validateAndSanitizeImage,
+} from './image-validation.js';
+import { readRequestBody } from './request-body.js';
 import {
   DeleteAccountSchema,
   PutPreferencesSchema,
@@ -65,12 +84,49 @@ export interface ProfileView {
   name: string;
   email: string;
   emailVerified: boolean;
-  /** Initiales calculées côté serveur — pas d'upload de photo dans ce lot. */
+  /**
+   * Initiales calculées côté serveur.
+   *
+   * TOUJOURS SERVIES, y compris quand une photo existe. Ce n'est pas une
+   * redondance : c'est le repli dont l'interface a besoin pendant le chargement
+   * de l'image, si l'URL a expiré, ou si le stockage est momentanément
+   * indisponible. Une pastille vide serait un défaut visible ; des initiales ne
+   * le sont jamais.
+   */
   initials: string;
+  /**
+   * URL absolue de la photo de profil, ou `null` s'il n'y en a pas.
+   *
+   * Jeton signé à durée limitée (`AVATAR_URL_TTL_SECONDS`) : une URL fraîche est
+   * frappée À CHAQUE lecture de profil. L'interface ne doit donc pas la
+   * conserver au-delà de la vie de sa page. Voir avatar-url.ts pour la décision.
+   */
+  avatarUrl: string | null;
+  /** Métadonnées de la photo, `null` sans photo. Sert au cadrage et à l'accessibilité. */
+  avatar: AvatarView | null;
   locale: string;
   timezone: string;
   /** Demande de changement d'email en attente, ou `null`. */
   pendingEmailChange: PendingEmailChangeView | null;
+}
+
+export interface AvatarView {
+  /** Type MIME RÉEL, déduit du contenu à l'upload. */
+  contentType: string;
+  width: number;
+  height: number;
+  /** Taille des octets ASSAINIS effectivement stockés, pas de ceux reçus. */
+  byteSize: number;
+  updatedAt: string;
+}
+
+/** Bornes servies à l'interface : elle ne les code pas en dur (comme `options` des préférences). */
+export interface AvatarLimitsView {
+  maxBytes: number;
+  minDimension: number;
+  maxDimension: number;
+  acceptedTypes: readonly string[];
+  urlTtlSeconds: number;
 }
 
 export interface PendingEmailChangeView {
@@ -97,17 +153,25 @@ export class AccountController {
     @Inject(AccountService) private readonly account: AccountService,
     @Inject(AccountSessionsService) private readonly sessions: AccountSessionsService,
     @Inject(EmailChangeService) private readonly emailChange: EmailChangeService,
+    @Inject(AvatarService) private readonly avatars: AvatarService,
   ) {}
 
   // ─── Profil ────────────────────────────────────────────────────────────────
 
   @Get('profile')
   async getProfile(@CurrentUser() user: SessionUser): Promise<ProfileView> {
-    const [prefs, pending] = await Promise.all([
+    const [prefs, pending, avatar] = await Promise.all([
       this.account.getPreferences(user.id),
       this.emailChange.findPending(user.id),
+      this.avatars.find(user.id),
     ]);
-    return toProfileView(user, prefs, pending, await this.account.readEmailVerified(user.id));
+    return toProfileView(
+      user,
+      prefs,
+      pending,
+      await this.account.readEmailVerified(user.id),
+      avatar,
+    );
   }
 
   @Put('profile')
@@ -140,7 +204,118 @@ export class AccountController {
       prefs,
       pending,
       await this.account.readEmailVerified(user.id),
+      await this.avatars.find(user.id),
     );
+  }
+
+  // ─── Photo de profil ───────────────────────────────────────────────────────
+  //
+  // Aucune de ces routes n'accepte d'identifiant d'utilisateur : le propriétaire
+  // est `@CurrentUser().id`, comme partout dans ce contrôleur. Téléverser « chez
+  // quelqu'un d'autre » n'est pas un contrôle qui pourrait manquer — il n'existe
+  // aucun paramètre pour le demander.
+
+  /**
+   * Téléverse la photo de profil. Le corps est le FICHIER BRUT, pas du multipart.
+   *
+   * Quota propre : vingt écritures par heure et par utilisateur. Le seau global
+   * (100 req/min par IP) ne borne pas ce qui compte ici — chaque appel écrit dans
+   * un magasin d'objets, et un remplacement en boucle remplirait le bucket
+   * d'orphelins bien en deçà de cette limite.
+   */
+  @Post('avatar')
+  @HttpCode(201)
+  @Throttle({ default: { ttl: 3_600_000, limit: 20 } })
+  @UseGuards(UserThrottlerGuard)
+  async uploadAvatar(
+    @CurrentUser() user: SessionUser,
+    @Req() req: Request,
+  ): Promise<{ avatar: AvatarView; avatarUrl: string; initials: string }> {
+    // Le type ANNONCÉ ne sert qu'à écarter tôt un envoi manifestement inadapté et
+    // à rendre le refus lisible. Il ne fait AUTORITÉ SUR RIEN : le type retenu
+    // est celui que `validateAndSanitizeImage` déduit du contenu.
+    const annonce = (req.headers['content-type'] ?? '').split(';')[0]!.trim().toLowerCase();
+    if (annonce && !ACCEPTED_IMAGE_TYPES.includes(annonce as never)) {
+      if (annonce !== 'application/octet-stream') {
+        throw new UnsupportedMediaTypeException({
+          code: 'UNSUPPORTED_IMAGE_TYPE',
+          message: `Type « ${annonce} » non accepté. Attendu : ${ACCEPTED_IMAGE_TYPES.join(', ')}.`,
+        });
+      }
+    }
+
+    const lecture = await readRequestBody(req, MAX_IMAGE_BYTES);
+    if (!lecture.ok) {
+      if (lecture.reason === 'TOO_LARGE') {
+        throw new HttpException(
+          {
+            code: 'FILE_TOO_LARGE',
+            message: `Le fichier dépasse ${MAX_IMAGE_BYTES / 1024 / 1024} Mio.`,
+          },
+          413,
+        );
+      }
+      throw new BadRequestException({ code: 'UPLOAD_ABORTED', message: 'Envoi interrompu.' });
+    }
+
+    const verdict = validateAndSanitizeImage(lecture.body);
+    if (!verdict.ok) throw imageRejection(verdict.code, verdict.message);
+
+    let enregistre: AvatarRecord;
+    try {
+      enregistre = await this.avatars.replace(user.id, verdict);
+    } catch (cause) {
+      throw storageFailure(cause);
+    }
+
+    return {
+      avatar: toAvatarView(enregistre)!,
+      avatarUrl: avatarUrlFor(enregistre.objectId),
+      // Les initiales voyagent avec la photo : l'interface a de quoi afficher
+      // quelque chose immédiatement, avant même que l'image soit chargée.
+      initials: initialsOf(user.name?.trim() ?? '', user.email),
+    };
+  }
+
+  /**
+   * Retire la photo de profil. Idempotent : `removed: false` si aucune photo.
+   *
+   * Cette route existe parce qu'une photo qu'on ne peut pas retirer est un piège.
+   * Elle ne renvoie jamais 404 pour « pas de photo » — l'état demandé est atteint.
+   */
+  @Delete('avatar')
+  async deleteAvatar(
+    @CurrentUser() user: SessionUser,
+  ): Promise<{ removed: boolean; initials: string }> {
+    let removed: boolean;
+    try {
+      removed = await this.avatars.remove(user.id);
+    } catch (cause) {
+      throw storageFailure(cause);
+    }
+    return { removed, initials: initialsOf(user.name?.trim() ?? '', user.email) };
+  }
+
+  /**
+   * Bornes de validation, servies pour que l'interface ne les code pas en dur.
+   *
+   * `avatar-limits` et non `avatar/limits` : `GET /account/avatar/:token` vit
+   * dans un autre contrôleur, et un chemin sous `avatar/` entrerait en collision
+   * avec ce paramètre selon l'ordre d'enregistrement des contrôleurs. Une
+   * ambiguïté de routage qui dépend d'un ordre est un bogue en attente.
+   */
+  @Get('avatar-limits')
+  avatarLimits(): AvatarLimitsView & { storageAvailable: boolean } {
+    return {
+      maxBytes: MAX_IMAGE_BYTES,
+      minDimension: MIN_IMAGE_DIMENSION,
+      maxDimension: MAX_IMAGE_DIMENSION,
+      acceptedTypes: ACCEPTED_IMAGE_TYPES,
+      urlTtlSeconds: AVATAR_URL_TTL_SECONDS,
+      // L'interface peut désactiver le bouton et l'expliquer, plutôt que de
+      // laisser l'utilisateur découvrir un 503 après avoir choisi un fichier.
+      storageAvailable: this.avatars.storageAvailability().available,
+    };
   }
 
   // ─── Préférences ───────────────────────────────────────────────────────────
@@ -295,11 +470,59 @@ function toPendingView(
   };
 }
 
+export function toAvatarView(record: AvatarRecord | null): AvatarView | null {
+  if (!record) return null;
+  // Champs recopiés un par un — `objectId` reste volontairement DEHORS : il ne
+  // circule que scellé dans un jeton signé (avatar-url.ts).
+  return {
+    contentType: record.contentType,
+    width: record.width,
+    height: record.height,
+    byteSize: record.byteSize,
+    updatedAt: record.updatedAt.toISOString(),
+  };
+}
+
+/** Traduit un refus de validation en réponse HTTP, code métier conservé. */
+function imageRejection(code: string, message: string): HttpException {
+  const statut =
+    code === 'FILE_TOO_LARGE'
+      ? 413
+      : code === 'UNSUPPORTED_IMAGE_TYPE'
+        ? 415
+        : code === 'IMAGE_DIMENSIONS_REJECTED'
+          ? 422
+          : 400;
+  return new HttpException({ code, message }, statut);
+}
+
+/**
+ * Un stockage non configuré ou injoignable donne 503, jamais 500.
+ *
+ * La distinction est utile : 503 dit « le service ne peut pas répondre
+ * maintenant », ce qui est vrai et réessayable. Un 500 laisserait croire à un
+ * défaut de la requête, et un `S3_BUCKET_UPLOADS` oublié se chercherait dans le
+ * mauvais code pendant longtemps. Même parti que `503 VAULT_UNAVAILABLE`
+ * (ADR-0013) : on annonce l'indisponibilité plutôt que d'accepter une écriture
+ * qu'on ne saurait pas honorer.
+ */
+function storageFailure(cause: unknown): HttpException {
+  if (cause instanceof ObjectStorageUnavailableError) {
+    return new ServiceUnavailableException({ code: 'STORAGE_UNAVAILABLE', message: cause.reason });
+  }
+  if (cause instanceof HttpException) return cause;
+  return new ServiceUnavailableException({
+    code: 'STORAGE_FAILURE',
+    message: 'Le stockage des fichiers n’a pas pu traiter la demande.',
+  });
+}
+
 function toProfileView(
   user: SessionUser,
   prefs: PreferencesView,
   pending: Parameters<typeof toPendingView>[0],
   emailVerified: boolean,
+  avatar: AvatarRecord | null,
 ): ProfileView {
   const name = user.name?.trim() ?? '';
   return {
@@ -307,7 +530,10 @@ function toProfileView(
     name,
     email: user.email,
     emailVerified,
+    // Servies MÊME avec une photo — voir le commentaire de `ProfileView.initials`.
     initials: initialsOf(name, user.email),
+    avatarUrl: avatar ? avatarUrlFor(avatar.objectId) : null,
+    avatar: toAvatarView(avatar),
     locale: prefs.locale,
     timezone: prefs.timezone,
     pendingEmailChange: toPendingView(pending),
@@ -315,10 +541,12 @@ function toProfileView(
 }
 
 /**
- * Initiales d'affichage — l'avatar de ce lot (pas d'upload de fichier : le
- * stockage S3 n'est pas branché, cf. docs/17 § Schéma d'environnement).
+ * Initiales d'affichage — le REPLI quand il n'y a pas de photo, et la valeur
+ * servie pendant le chargement de l'image quand il y en a une.
+ *
  * Repli sur l'email quand aucun nom n'est renseigné, pour ne jamais rendre une
- * pastille vide.
+ * pastille vide. Cette fonction est la seule source des initiales : la route
+ * d'upload et celle de retrait la réutilisent au lieu de la recalculer.
  */
 export function initialsOf(name: string, email: string): string {
   const words = name.split(/\s+/).filter((w) => w.length > 0);
