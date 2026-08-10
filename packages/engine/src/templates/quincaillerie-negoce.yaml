@@ -120,7 +120,7 @@ drivers:
     devise: USD
     defaut: 1200
     min: 0
-    aide: 'Salaires bruts totaux (2 vendeurs + gérant). Charges CNSS/IPR incluses. Ordre de grandeur pour 3 personnes.'
+    aide: 'Salaires bruts totaux (2 vendeurs + gérant). Charges sociales et impôts sur salaires inclus. Ordre de grandeur pour 3 personnes.'
 
   - id: loyer_mois
     groupe: charges_fixes
