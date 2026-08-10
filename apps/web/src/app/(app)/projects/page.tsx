@@ -349,7 +349,7 @@ export default function ProjectsPage(): React.ReactElement {
               type="text"
               required
               maxLength={200}
-              placeholder="Ex : Restaurant Kinshasa 2026"
+              placeholder="Ex : Restaurant du centre-ville 2026"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               className="rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
