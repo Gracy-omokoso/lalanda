@@ -61,8 +61,14 @@ services:
       api:
         condition: service_healthy
     healthcheck:
+      # `127.0.0.1` et NON `localhost` : dans l'image alpine, `localhost` résout
+      # d'abord en IPv6 `[::1]`, alors que l'API d'administration de Caddy
+      # n'écoute qu'en IPv4. Le contrôle échouait donc en permanence
+      # (« connection refused ») pendant que le site servait normalement — un
+      # contrôle de santé qui rapporte rouge sur un service sain est pire que
+      # pas de contrôle : il apprend à ignorer l'alerte.
       test:
-        ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost:2019/metrics']
+        ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://127.0.0.1:2019/metrics']
       interval: 30s
       timeout: 5s
       retries: 3
