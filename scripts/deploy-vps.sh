@@ -43,8 +43,14 @@ if [[ ! -f ".env.production" ]]; then
   exit 1
 fi
 
-if grep -q "CHANGE-ME" .env.production; then
+# Les COMMENTAIRES sont exclus, et c'est indispensable : `.env.production.example`
+# documente la clé OpenAI par une ligne commentée `# OPENAI_API_KEY=sk-CHANGE-ME`
+# (elle est optionnelle depuis S21b, la vraie se saisit dans /admin). Un `grep`
+# brut la trouvait et refusait TOUT premier déploiement, en accusant des secrets
+# pourtant tous remplis. Le garde-fou doit porter sur les valeurs affectées.
+if grep -vE '^[[:space:]]*#' .env.production | grep -q "CHANGE-ME"; then
   echo "❌ .env.production contient encore des valeurs CHANGE-ME — remplir les secrets avant de déployer." >&2
+  grep -vE '^[[:space:]]*#' .env.production | grep -n "CHANGE-ME" | cut -d= -f1 >&2
   exit 1
 fi
 
