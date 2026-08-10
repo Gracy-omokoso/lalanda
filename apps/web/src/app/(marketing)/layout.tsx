@@ -5,6 +5,7 @@
 
 import Link from 'next/link';
 
+import { BrandLogo } from '@/components/brand-logo';
 import { LegalLinks } from '@/components/legal-links';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { PUBLISHER_NAME } from '@/lib/legal';
@@ -20,21 +21,19 @@ export default function MarketingLayout({
     <div className="flex min-h-screen flex-col">
       <header className="bg-ink border-b border-[var(--ink-border)]">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <Link href="/" className="flex items-center gap-3">
-            <span
-              aria-hidden="true"
-              className="font-display inline-flex h-9 w-9 items-center justify-center rounded-md border-2 border-[var(--on-ink-accent)] text-base font-black text-[var(--on-ink-accent)]"
-            >
-              L
+          {/* `fond="encre"` et non la bascule de thème : ce bandeau est un
+              panneau `.bg-ink`, et `--ink` vaut `#005263` dans les DEUX thèmes.
+              Y brancher la bascule poserait le lockup à mot-symbole encre sur
+              de l'encre en thème clair — illisible. */}
+          <Link
+            href="/"
+            aria-label="Lalanda — accueil"
+            className="flex items-center gap-3 transition hover:opacity-80"
+          >
+            <BrandLogo hauteur={34} fond="encre" />
+            <span className="font-mono hidden border-l border-[var(--ink-border)] pl-3 text-[0.65rem] tracking-wide text-[var(--on-ink-muted)] sm:block">
+              PLAN FINANCIER BANCABLE
             </span>
-            <div className="flex flex-col leading-tight">
-              <span className="font-display text-base font-bold tracking-tight text-[var(--on-ink)]">
-                Lalanda
-              </span>
-              <span className="font-mono hidden text-[0.65rem] tracking-wide text-[var(--on-ink-muted)] sm:block">
-                PLAN FINANCIER BANCABLE
-              </span>
-            </div>
           </Link>
           <nav className="flex items-center gap-2 sm:gap-4">
             <Link
@@ -71,14 +70,12 @@ export default function MarketingLayout({
       <footer className="bg-ink border-t border-[var(--ink-border)]">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10 text-sm text-[var(--on-ink-muted)]">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            {/* Pied de page également sur encre, donc `fond="encre"`. Le
+                lockup ayant remplacé le carré, la phrase ne réamorce plus par
+                « Lalanda » : le mot est déjà là, en pixels, juste à gauche. */}
             <div className="flex items-center gap-3">
-              <span
-                aria-hidden="true"
-                className="font-display inline-flex h-7 w-7 items-center justify-center rounded border-2 border-[var(--on-ink-accent)] text-xs font-black text-[var(--on-ink-accent)]"
-              >
-                L
-              </span>
-              <span>Lalanda — plans financiers bancables pour l&apos;Afrique francophone.</span>
+              <BrandLogo hauteur={26} fond="encre" />
+              <span>Plans financiers bancables pour l&apos;Afrique francophone.</span>
             </div>
             <div className="flex items-center gap-5">
               <Link href="/pricing" className="transition hover:text-[var(--on-ink)]">
