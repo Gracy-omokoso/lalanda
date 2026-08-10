@@ -1,17 +1,23 @@
-import { ProjectPlan } from '../_components/project-plan';
+import { ProjectResults } from '../_components/project-results';
 
 interface Props {
   params: Promise<{ id: string }>;
 }
 
-// Fil d'Ariane et onglets projet vivent dans `layout.tsx` (S18d).
+// Page racine d'un projet = vue RÉSULTATS (S23a). Fil d'Ariane et onglets
+// projet vivent dans `layout.tsx` (S18d).
 //
-// (S18c) Le wizard de saisie n'ajoute PAS d'entrée à `PROJECT_TABS` : il remplace la
-// saisie de cette page plutôt que de vivre à côté. Saisie guidée et résultats sont
-// deux colonnes d'un même écran — les séparer en deux onglets casserait l'aperçu de
-// l'impact d'une hypothèse, qui est l'intérêt du parcours. L'onglet « Plan » reste
-// donc le point d'entrée unique.
+// ── Renversement assumé de l'arbitrage S18c ────────────────────
+// S18c posait que l'assistant « est » le contenu de cette page, en deux
+// colonnes avec les feuilles de résultats, pour montrer l'impact d'une
+// hypothèse pendant la frappe. À l'usage, onze feuilles plus le bandeau de
+// ratios plus les exports saturaient l'écran : les deux moitiés se gênaient.
+// La saisie part sur `/projects/:id/saisie`, la lecture reste ici.
+//
+// La racine reste la vue de lecture — et non la saisie — pour deux raisons :
+// les liens `?tab=` déjà partagés continuent d'ouvrir la bonne feuille, et
+// l'entrée par défaut dans un projet est de le consulter, pas de le modifier.
 export default async function ProjectDetailPage({ params }: Props): Promise<React.ReactElement> {
   const { id } = await params;
-  return <ProjectPlan projectId={id} />;
+  return <ProjectResults projectId={id} />;
 }

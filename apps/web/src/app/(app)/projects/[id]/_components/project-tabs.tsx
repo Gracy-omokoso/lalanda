@@ -18,6 +18,14 @@
 //
 // L'ordre du tableau est l'ordre d'affichage. Les sous-routes sont gérées :
 // `/projects/:id/realise/2026-01` garde bien l'onglet « Réalisé » actif.
+//
+// ── S23a : « Plan » devient « Saisie » + « Résultats » ──────────
+// L'ancien onglet « Plan » portait les deux à la fois. Il est scindé pour que
+// la barre dise la vérité sur ce qu'on va trouver derrière : on saisit dans
+// « Saisie », on lit dans « Résultats ». La saisie est placée en premier —
+// c'est l'ordre du parcours (docs/03 « Construction du plan ») — mais c'est
+// « Résultats » qui occupe la racine du projet, parce que consulter est plus
+// fréquent que modifier et que les liens `?tab=` déjà partagés y pointent.
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -29,7 +37,8 @@ export interface ProjectTab {
 }
 
 export const PROJECT_TABS: ProjectTab[] = [
-  { segment: '', label: 'Plan' },
+  { segment: 'saisie', label: 'Saisie' },
+  { segment: '', label: 'Résultats' },
   { segment: 'realise', label: 'Réalisé' },
   { segment: 'canvas', label: 'Canvas' },
   { segment: 'objectifs', label: 'Objectifs' },

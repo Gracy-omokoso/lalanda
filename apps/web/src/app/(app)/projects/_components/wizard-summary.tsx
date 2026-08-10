@@ -28,6 +28,12 @@ interface WizardSummaryProps {
   approving: boolean;
   /** Ids des drivers en erreur bloquante — la validation reste interdite tant qu'il en reste. */
   blocking: string[];
+  /**
+   * Libellé de l'action de gauche. Depuis l'éclatement saisie / résultats (S23a)
+   * elle ne recalcule plus sur place : elle enregistre et emmène vers l'écran de
+   * lecture. Le comportement est décidé par l'appelant; seul le mot change ici.
+   */
+  recalculerLabel?: string;
 }
 
 function unitLabel(
@@ -52,6 +58,7 @@ export function WizardSummary({
   recalculating,
   approving,
   blocking,
+  recalculerLabel = 'Recalculer',
 }: WizardSummaryProps): React.ReactElement {
   const saisie = indicators.filter((i) => !i.step.synthese);
   const enErreur = saisie.filter((i) => i.status === 'error');
@@ -177,7 +184,7 @@ export function WizardSummary({
           disabled={recalculating}
           className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-medium transition hover:bg-[var(--surface-muted)] disabled:opacity-40"
         >
-          {recalculating ? 'Calcul…' : 'Recalculer'}
+          {recalculating ? 'Enregistrement…' : recalculerLabel}
         </button>
         <button
           type="button"
