@@ -11,6 +11,8 @@ import { useEffect, useState } from 'react';
 
 import { api, type AccountProfileView } from '@/lib/api';
 
+import { publierProfil, useProfil } from '../../_components/profile-context';
+
 import {
   CURRENCY_LABELS,
   LOCALE_LABELS,
@@ -30,35 +32,39 @@ interface FormState {
 }
 
 export function ProfilePanel(): React.ReactElement {
-  const [profile, setProfile] = useState<AccountProfileView | null>(null);
-  const [form, setForm] = useState<FormState>({ name: '', locale: 'fr', timezone: 'UTC' });
+  // Le profil vient du store PARTAGÉ avec le header (ADR-0016 §7), et non plus
+  // d'un `api.getAccountProfile()` propre à ce panneau : les initiales n'ont
+  // qu'une autorité, celle du serveur, et une seule lecture les alimente aux
+  // deux endroits qui les affichent.
+  const { profil, erreur: erreurProfil } = useProfil();
+  const [form, setForm] = useState<FormState | null>(null);
   const [locales, setLocales] = useState<string[]>(['fr']);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
 
+  // Amorce du formulaire à l'arrivée du profil. La garde `form === null` fait
+  // que la saisie en cours n'est JAMAIS écrasée par une republication du store
+  // — après enregistrement, c'est `handleSubmit` qui repose les valeurs.
+  useEffect(() => {
+    if (profil !== null && form === null) {
+      setForm({ name: profil.name, locale: profil.locale, timezone: profil.timezone });
+    }
+  }, [profil, form]);
+
+  // Les langues proposées sont un réglage secondaire : leur échec ne doit pas
+  // vider la page, il se signale dans le bandeau et laisse le repli « fr ».
   useEffect(() => {
     let cancelled = false;
-    void (async () => {
-      try {
-        const [p, prefs] = await Promise.all([
-          api.getAccountProfile(),
-          api.getAccountPreferences(),
-        ]);
-        if (cancelled) return;
-        setProfile(p);
-        setForm({ name: p.name, locale: p.locale, timezone: p.timezone });
-        setLocales(prefs.options.locales);
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Impossible de charger votre profil');
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
+    void api
+      .getAccountPreferences()
+      .then((prefs) => {
+        if (!cancelled) setLocales(prefs.options.locales);
+      })
+      .catch(() => {
+        if (!cancelled) setError('Impossible de charger la liste des langues.');
+      });
     return () => {
       cancelled = true;
     };
@@ -66,6 +72,7 @@ export function ProfilePanel(): React.ReactElement {
 
   async function handleSubmit(e: React.FormEvent): Promise<void> {
     e.preventDefault();
+    if (form === null) return;
     const invalid = validateName(form.name);
     setNameError(invalid);
     if (invalid) return;
@@ -78,7 +85,10 @@ export function ProfilePanel(): React.ReactElement {
         locale: form.locale,
         timezone: form.timezone,
       });
-      setProfile(updated);
+      // Republié dans le store partagé : les initiales de la barre suivent le
+      // changement de nom immédiatement, sans second appel ni rechargement.
+      // C'est la contrepartie utile de l'autorité unique du serveur.
+      publierProfil(updated);
       setForm({ name: updated.name, locale: updated.locale, timezone: updated.timezone });
       setSavedAt(new Date().toISOString());
     } catch (err) {
@@ -89,15 +99,17 @@ export function ProfilePanel(): React.ReactElement {
     }
   }
 
-  if (loading) {
-    return <p className="text-sm text-[var(--foreground-muted)]">Chargement de votre profil…</p>;
-  }
+  const profile = profil;
 
-  if (!profile) {
-    return (
+  if (profile === null || form === null) {
+    // Un échec de lecture n'est pas une attente : on ne laisse pas tourner un
+    // « Chargement… » sur une requête qui a déjà répondu non.
+    return erreurProfil !== null ? (
       <div className="rounded-md border border-[var(--danger)]/30 bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger)]">
-        <strong>Erreur :</strong> {error ?? 'Profil indisponible.'}
+        <strong>Erreur :</strong> {erreurProfil}
       </div>
+    ) : (
+      <p className="text-sm text-[var(--foreground-muted)]">Chargement de votre profil…</p>
     );
   }
 
@@ -159,7 +171,7 @@ export function ProfilePanel(): React.ReactElement {
             autoComplete="name"
             value={form.name}
             onChange={(e) => {
-              setForm((f) => ({ ...f, name: e.target.value }));
+              setForm((f) => (f === null ? f : { ...f, name: e.target.value }));
               if (nameError) setNameError(validateName(e.target.value));
             }}
             aria-invalid={nameError !== null}
@@ -190,7 +202,7 @@ export function ProfilePanel(): React.ReactElement {
             id="account-locale"
             name="locale"
             value={form.locale}
-            onChange={(e) => setForm((f) => ({ ...f, locale: e.target.value }))}
+            onChange={(e) => setForm((f) => (f === null ? f : { ...f, locale: e.target.value }))}
             aria-describedby="account-locale-help"
             className="-mt-2 rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
           >
@@ -215,7 +227,7 @@ export function ProfilePanel(): React.ReactElement {
             id="account-timezone"
             name="timezone"
             value={form.timezone}
-            onChange={(e) => setForm((f) => ({ ...f, timezone: e.target.value }))}
+            onChange={(e) => setForm((f) => (f === null ? f : { ...f, timezone: e.target.value }))}
             aria-describedby="account-timezone-help"
             className="-mt-2 rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
           >
@@ -254,7 +266,7 @@ export function ProfilePanel(): React.ReactElement {
         </div>
       </form>
 
-      <EmailChangeSection profile={profile} onChanged={(next) => setProfile(next)} />
+      <EmailChangeSection profile={profile} onChanged={publierProfil} />
 
       <p className="text-xs text-[var(--foreground-muted)]">
         Devise d’affichage par défaut ({CURRENCY_LABELS['USD']?.split(' —')[0] ?? 'USD'} et autres),
