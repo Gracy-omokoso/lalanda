@@ -164,7 +164,12 @@ jobs:
 
           # `--network host` : le client parle au MinIO publié sur le runner,
           # sans réseau Docker dédié à créer pour trois commandes.
-          docker run --rm --network host "$MC_IMAGE" sh -c '
+          #
+          # `--entrypoint sh` est OBLIGATOIRE : l'image `minio/mc` a `mc` pour
+          # point d'entrée, donc sans cette surcharge le `sh -c` ci-dessous est
+          # passé EN ARGUMENT à `mc`, qui répond « `sh` is not a recognized
+          # command » et sort en 1. `docker-compose.yml` fait la même surcharge.
+          docker run --rm --network host --entrypoint sh "$MC_IMAGE" -c '
             set -e
             mc alias set ci http://localhost:9000 lalanda lalanda-dev-secret
             mc mb --ignore-existing ci/lalanda-ci-uploads
