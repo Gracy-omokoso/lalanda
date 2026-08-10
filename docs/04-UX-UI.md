@@ -15,6 +15,8 @@ Lalanda doit permettre à un utilisateur non comptable de progresser sans perdre
 - **Aide** : glossaire, guides, sources pays et support.
 - **Administration plateforme** : organisations, Country Packs, templates, abonnements et journaux.
 
+La traduction de cette architecture en barre du haut et en menu du compte est arrêtée par **ADR-0015** — voir § Décidé (ADR-0015) en fin de document.
+
 ## Disposition d’un projet
 
 ```text
@@ -127,7 +129,9 @@ Deux fonctions sont incomplètes **par manque d’infrastructure, pas par oubli*
 | `/organisation/facturation` | Offre, consommation, dépassements, historique | `billing.manage` |
 | `/organisation/journal` | Journal d’audit, filtrable par action | `audit.read` |
 
-L’entrée se fait par le lien « Organisation » du header, offert à **tout membre** : masquer le lien selon le rôle recopierait la matrice dans le header (ADR-0012 §8) et se tromperait au premier changement.
+L’entrée doit être offerte à **tout membre** : masquer le lien selon le rôle recopierait la matrice dans le header (ADR-0012 §8) et se tromperait au premier changement.
+
+> **Correction (2026-08-10).** Ce paragraphe affirmait que l’entrée se faisait « par le lien "Organisation" du header ». **Ce lien n’a jamais existé** : `apps/web/src/app/(app)/_components/app-header.tsx` ne contient aucun `href="/organisation"`, et la seule référence à l’espace hors de lui-même est `souscription/_components/subscription-funnel.tsx:456`, qui pointe vers `/organisation/facturation`. L’espace n’est donc atteignable qu’en tapant l’URL. ADR-0015 pose l’entrée manquante dans le menu du compte.
 
 ### Un tableau de bord, pas quatre
 
@@ -241,3 +245,47 @@ Le même intitulé sert à la connexion et à l’inscription (« Continuer avec
 L’écran de confirmation est **le même** que l’adresse soit connue ou non : « Si un compte existe pour cette adresse, un lien vient d’y être envoyé. » Distinguer les deux cas ferait de ce formulaire un annuaire des comptes (docs/17 § Menaces prioritaires). Seule une panne réseau produit un message d’erreur — « nous n’avons pas pu traiter votre demande » ne dit rien sur l’existence du compte, et taire la panne laisserait quelqu’un attendre un email jamais demandé.
 
 Sur `/nouveau-mot-de-passe`, la confirmation du mot de passe est comparée **avant** l’appel réseau : le lien ne sert qu’une fois, une faute de frappe ne doit pas le consommer. Après succès, redirection vers `/login` et non vers l’application : toutes les sessions viennent d’être révoquées côté serveur.
+
+## Décidé (ADR-0015) — Navigation applicative
+
+Spécification complète, justifications et décisions ouvertes : [ADR-0015](adr/ADR-0015-navigation-applicative.md). Cette section en donne la forme retenue ; elle décrit une **cible**, non l’implémenté.
+
+### Barre du haut
+
+Logo (→ `/projects`) · sélecteur d’organisation · Aide · thème · avatar. Cinq éléments.
+
+Le sélecteur d’organisation reste visible parce que ce n’est pas une destination mais un **sélecteur de contexte** : il change ce que toutes les autres pages affichent. Aide reste visible parce qu’elle est offerte **hors session**, où le menu du compte n’existe pas.
+
+Partent de la barre : « Membres » (devient un onglet d’organisation), « Abonnement » et « Administration » (deviennent des entrées du menu).
+
+### Menu du compte, déclenché par l’avatar
+
+| # | Libellé | Destination | Condition |
+|---|---|---|---|
+| — | *En-tête d’identité : avatar, nom, adresse* | — | session |
+| 1 | Tableau de bord | `/projects` | aucune |
+| 2 | Mon compte | `/compte` (onglets Profil · Sécurité · Préférences) | aucune |
+| 3 | Organisation | `/organisation` | aucune |
+| 4 | Abonnement | `/souscription` | aucune |
+| 5 | Administration | `/admin` | `canReadAdmin` |
+| 6 | Déconnexion | — | session |
+
+Une seule entrée est conditionnée, par un drapeau **serveur** que le header charge déjà. Le menu ne lit aucun rôle et ne recopie aucune matrice (ADR-0012 §8). **Masquer reste un confort** : le contrôle d’accès est `PermissionsGuard` côté API.
+
+Le compte est représenté par **une seule entrée**. `/compte` est l’espace des paramètres du compte et Profil en est le premier onglet : deux entrées auraient mené à la même URL. Coût accepté : Sécurité et Préférences passent à deux clics.
+
+### Membres rejoint l’organisation
+
+`/members` devient `/organisation/membres`, cinquième onglet de l’espace, filtré par `organization.manage` — l’action qui garde déjà l’appel remplissant la page. L’ancienne URL répond en **redirection permanente (308)**. Aucun email n’en dépend : les quatre liens sortants sont centralisés dans `apps/api/src/mail/mail.links.ts` et aucun ne pointe vers `/members`.
+
+### Mobile et clavier
+
+**Aucun lien ne porte `hidden sm:*` s’il n’a pas d’autre chemin d’accès.** C’est le défaut corrigé : trois pages étaient inatteignables sous 640 px. Tout ce qui quitte la barre entre dans le menu, disponible à toutes les largeurs ; Aide se réduit à une icône portant un `aria-label`, jamais à rien.
+
+Le menu conserve intégralement le clavier livré en S20b — `↓`/`↑` depuis le déclencheur, circulation aux flèches, `Début`/`Fin`, `Tab` qui sort et ferme, `Échap` qui ferme **et rend le focus** — et y ajoute : séparateurs et en-tête d’identité non focusables, `aria-current="page"` sur l’entrée courante (comparaison sur le **premier segment** : `/compte/securite` allume « Mon compte »).
+
+### Avatar
+
+**Les initiales calculées côté serveur font autorité** (`initialsOf`, sur le nom affiché, repli sur l’adresse). Le calcul concurrent du header, fondé sur l’adresse seule, est supprimé : il faisait changer les lettres d’une même personne selon l’écran. Pendant le chargement, la pastille reste **neutre** — des initiales provisoires puis remplacées seraient le même défaut, visible à chaque page.
+
+Photo si elle existe, initiales sinon, la règle de repli vivant côté serveur. L’avatar n’apparaît qu’à deux endroits : le déclencheur du menu et l’en-tête du panneau ouvert. Une photo qui échoue à se charger retombe sur les initiales ; ses dimensions sont fixes, pour que la barre ne bouge pas entre les deux états. Le contrat d’API de l’envoi de photo n’est pas figé (chantier en cours côté API) : la navigation ne présume ni du nom du champ, ni de la forme de l’URL. Reste à trancher si la CSP doit accepter une origine distante (`img-src 'self' data: blob:` aujourd’hui), question commune avec le logo d’organisation.
