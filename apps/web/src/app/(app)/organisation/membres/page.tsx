@@ -1,6 +1,13 @@
 'use client';
 
-// Page /members — gouvernance de l'organisation active (S5d, refondue en S20a).
+// Page /organisation/membres — gouvernance de l'organisation active
+// (S5d, refondue en S20a, déplacée sous /organisation par l'ADR-0016 E2).
+//
+// Elle vivait à la racine sous `/members` alors que ses deux appels sont scopés
+// par organisation et gardés par des permissions d'organisation : c'était de la
+// gouvernance logée hors de l'espace dont elle applique les règles. L'ancienne
+// URL répond désormais en 308 (`next.config.mjs`) — pour les favoris, aucun
+// email ne pointait ici (`apps/api/src/mail/mail.links.ts`).
 //
 // L'organisation active vient du cookie `active_org_id`, résolue côté API.
 //
@@ -23,6 +30,8 @@ import {
   type RoleOption,
 } from '@/lib/api';
 
+import { useProfil } from '../../_components/profile-context';
+
 import { InvitePanel } from './_components/invite-panel';
 import { MembersPanel } from './_components/members-panel';
 import { libelleRoleActeur, messageErreur } from './_components/members-model';
@@ -38,8 +47,13 @@ function estRefus(err: unknown): boolean {
 }
 
 export default function MembersPage(): React.ReactElement {
+  // Le profil vient du store partagé avec le header (ADR-0016 §7) : il sert
+  // uniquement à repérer « Vous » dans la liste et à exclure l'acteur des cibles
+  // de transfert. Une page de plus qui le lisait pour son compte, c'était une
+  // requête de plus pour une donnée déjà en mémoire.
+  const { profil } = useProfil();
+  const moiUserId = profil?.id ?? null;
   const [org, setOrg] = useState<OrganizationView | null>(null);
-  const [moiUserId, setMoiUserId] = useState<string | null>(null);
   const [members, setMembers] = useState<MemberView[] | null>(null);
   const [roleOptions, setRoleOptions] = useState<RoleOption[]>([]);
   const [invitations, setInvitations] = useState<InvitationView[]>([]);
@@ -90,17 +104,11 @@ export default function MembersPage(): React.ReactElement {
     let annule = false;
     async function demarrer(): Promise<void> {
       try {
-        const [{ organizations }, profil] = await Promise.all([
-          api.listOrganizations(),
-          // Sert uniquement à repérer « Vous » dans la liste et à exclure
-          // l'acteur des cibles de transfert.
-          api.getAccountProfile().catch(() => null),
-        ]);
+        const { organizations } = await api.listOrganizations();
         if (annule) return;
         const activeId = readActiveOrgCookie();
         const active = organizations.find((o) => o.id === activeId) ?? organizations[0] ?? null;
         setOrg(active);
-        setMoiUserId(profil?.id ?? null);
         if (active) await recharger(active.id);
       } catch (err) {
         if (!annule) setErreur(messageErreur(err, 'Erreur de chargement.'));

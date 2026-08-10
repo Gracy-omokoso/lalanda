@@ -59,7 +59,13 @@ const csp = [
   // depuis l'origine.
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
-  "img-src 'self' data: blob:",
+  // Les photos de profil sont servies par l'API, pas par l'origine web : le
+  // bucket reste privé et l'API sert les octets derrière un jeton signé
+  // (ADR-0016 §7). Sans cette origine, le navigateur BLOQUE l'image — et le
+  // symptôme n'apparaît qu'en console, jamais dans un test de rendu.
+  // Réutilise `apiOrigin`, la même constante que `connect-src` : une seconde
+  // lecture de `NEXT_PUBLIC_API_URL` pourrait diverger de la première.
+  `img-src 'self' data: blob: ${apiOrigin}`,
   // Le seul appel sortant légitime est l'API. Tout autre hôte est une exfiltration.
   `connect-src 'self' ${apiOrigin}`,
   // Aucun plugin, aucune iframe, aucun worker tiers.
@@ -114,6 +120,37 @@ const nextConfig = {
         // Toutes les routes, assets inclus.
         source: '/:path*',
         headers: securityHeaders,
+      },
+    ];
+  },
+  /**
+   * Redirections d'URL publiées — voir ADR-0016 §3.
+   *
+   * `/members` est devenu `/organisation/membres` : la page était de la
+   * gouvernance d'organisation logée à la racine des routes, alors que ses deux
+   * appels sont scopés par organisation et gardés par des permissions
+   * d'organisation.
+   *
+   * La redirection n'existe PAS pour les emails — vérification faite, aucun lien
+   * sortant ne pointait ici : `apps/api/src/mail/mail.links.ts` centralise les
+   * quatre liens envoyés et aucun n'est `/members`. Elle existe pour les favoris
+   * et les liens partagés hors du produit : une URL publiée ne se retire pas.
+   *
+   * `permanent: true` ⇒ **308**, et non 301 : le 308 préserve la méthode et le
+   * corps de la requête. Le 301 autorise historiquement les navigateurs à
+   * transformer un POST en GET, ce qui ferait disparaître une soumission au lieu
+   * de la déplacer.
+   *
+   * `source` est un chemin EXACT : `/membres-honoraires` ou `/members-archive`
+   * ne doivent pas être happés. Aucune sous-route n'existait sous `/members`,
+   * donc rien à propager.
+   */
+  async redirects() {
+    return [
+      {
+        source: '/members',
+        destination: '/organisation/membres',
+        permanent: true,
       },
     ];
   },

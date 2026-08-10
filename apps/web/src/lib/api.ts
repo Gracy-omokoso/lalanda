@@ -575,6 +575,45 @@ async function jsonRequest<T>(path: string, init: JsonRequestInit = {}): Promise
   return (await res.json()) as T;
 }
 
+/**
+ * Envoi d'un fichier en CORPS BRUT.
+ *
+ * Volontairement distinct de `jsonRequest`, qui impose
+ * `content-type: application/json` et sérialise son corps : les deux ne
+ * pouvaient pas cohabiter dans la même fonction sans un drapeau qui aurait fini
+ * par être posé au mauvais endroit.
+ *
+ * Le `Content-Type` est celui du fichier choisi. On ne le devine pas depuis
+ * l'extension : c'est le navigateur qui le renseigne, et c'est l'API qui
+ * tranche pour de bon en analysant le contenu.
+ */
+async function binaryRequest<T>(path: string, file: Blob): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'content-type': file.type },
+    body: file,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let detail: unknown = text;
+    try {
+      detail = JSON.parse(text);
+    } catch {
+      /* garde le texte brut */
+    }
+    const err = new Error(
+      typeof detail === 'object' && detail !== null && 'message' in detail
+        ? String((detail as { message: unknown }).message)
+        : `HTTP ${res.status}`,
+    ) as Error & { status: number; detail: unknown };
+    err.status = res.status;
+    err.detail = detail;
+    throw err;
+  }
+  return (await res.json()) as T;
+}
+
 // ─── Espace compte (S20b) ──────────────────────────────────
 // Toutes ces routes sont scopées par la SESSION : aucune ne prend d'identifiant
 // d'utilisateur. Un `userId` glissé dans un corps est refusé (400) côté API.
@@ -585,10 +624,58 @@ export interface AccountProfileView {
   email: string;
   /** Faux pour tout le monde tant qu'aucun SMTP n'est branché (docs/17). */
   emailVerified: boolean;
+  /**
+   * Initiales calculées par le serveur depuis le NOM AFFICHÉ (repli sur
+   * l'adresse). TOUJOURS servies, photo comprise : c'est le repli pendant le
+   * chargement de l'image, à l'expiration de son URL et si le stockage tombe.
+   * Autorité unique — `apps/web` n'en calcule aucune (ADR-0016 §7).
+   */
   initials: string;
   locale: string;
   timezone: string;
+  /**
+   * URL absolue de la photo, ou `null`. Elle porte un jeton à DURÉE LIMITÉE et
+   * est refrappée à chaque lecture de profil.
+   *
+   * NE PAS LA PERSISTER au-delà de la page — ni localStorage, ni cache client :
+   * une URL conservée devient un 404 silencieux, et l'image casse chez
+   * l'utilisateur sans que rien ne le signale côté serveur.
+   */
+  avatarUrl: string | null;
+  /** Métadonnées de la photo, ou `null` si aucune n'est posée. */
+  avatar: AvatarView | null;
   pendingEmailChange: PendingEmailChangeView | null;
+}
+
+export interface AvatarView {
+  contentType: string;
+  width: number;
+  height: number;
+  byteSize: number;
+  updatedAt: string;
+}
+
+/**
+ * Bornes servies par `GET /account/avatar-limits`.
+ *
+ * Elles pilotent l'interface — `accept` du champ fichier, message de taille,
+ * bouton désactivé quand `storageAvailable` est faux. La validation côté client
+ * reste un CONFORT : l'API est l'autorité et refuse de toute façon.
+ */
+export interface AvatarLimitsView {
+  maxBytes: number;
+  minDimension: number;
+  maxDimension: number;
+  acceptedTypes: string[];
+  urlTtlSeconds: number;
+  /** Faux quand le magasin d'objets ne répond pas : l'envoi échouerait en 503. */
+  storageAvailable: boolean;
+}
+
+export interface AvatarUploadResult {
+  avatar: AvatarView;
+  avatarUrl: string;
+  initials: string;
 }
 
 export interface PendingEmailChangeView {
@@ -1388,6 +1475,19 @@ export const api = {
   getAccountProfile: () => jsonRequest<AccountProfileView>(`/account/profile`, { method: 'GET' }),
   putAccountProfile: (input: { name: string; locale: string; timezone: string }) =>
     jsonRequest<AccountProfileView>(`/account/profile`, { method: 'PUT', body: input }),
+  /**
+   * Envoi de la photo — CORPS BINAIRE BRUT, PAS de multipart.
+   *
+   * L'API ne porte aucune dépendance multipart : elle lit le corps tel quel et
+   * se fie au `Content-Type`. Un `FormData` produirait un corps encapsulé que
+   * l'analyse d'image rejetterait en `MALFORMED_IMAGE` — d'où le passage direct
+   * du `File`, qui porte déjà son type.
+   */
+  postAccountAvatar: (file: File) => binaryRequest<AvatarUploadResult>(`/account/avatar`, file),
+  /** Idempotent : jamais de 404, un double clic est sans conséquence. */
+  deleteAccountAvatar: () =>
+    jsonRequest<{ removed: boolean; initials: string }>(`/account/avatar`, { method: 'DELETE' }),
+  getAvatarLimits: () => jsonRequest<AvatarLimitsView>(`/account/avatar-limits`, { method: 'GET' }),
   getAccountPreferences: () =>
     jsonRequest<AccountPreferencesView>(`/account/preferences`, { method: 'GET' }),
   putAccountPreferences: (input: {

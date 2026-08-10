@@ -99,3 +99,22 @@ describe('bornes de destination', () => {
     }
   });
 });
+
+describe('images de profil (ADR-0016 §7, E4)', () => {
+  it('autorise l’origine de l’API dans img-src, sinon la photo est bloquée', async () => {
+    // Les photos sont servies par l'API derrière un jeton signé, pas par
+    // l'origine web : `img-src 'self'` seul les bloque. Le symptôme n'apparaît
+    // qu'en console du navigateur — aucun test de rendu ne le verrait.
+    expect(directive(await cspFor('production'), 'img-src')).toBe(
+      "img-src 'self' data: blob: http://localhost:3001",
+    );
+  });
+
+  it('n’ouvre img-src à aucun autre hôte, dans les deux environnements', async () => {
+    for (const env of ['development', 'production']) {
+      const imgSrc = directive(await cspFor(env), 'img-src');
+      expect(imgSrc).not.toContain('*');
+      expect(imgSrc).not.toContain('https:');
+    }
+  });
+});
