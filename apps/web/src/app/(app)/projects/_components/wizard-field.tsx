@@ -10,6 +10,7 @@
 // - le niveau est doublé par un préfixe textuel (« Erreur : », « À vérifier : ») :
 //   jamais d'information portée par la seule couleur (docs/04-UX-UI.md).
 
+import { Infobulle } from '@/components/infobulle';
 import type { TemplateDriverMeta } from '@/lib/api';
 
 import { displayBound, isPercentDriver, validateDriver, type Provenance } from './wizard-model';
@@ -66,12 +67,15 @@ export function WizardField({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label
-        htmlFor={fieldId}
-        className="flex flex-wrap items-baseline justify-between gap-2 text-sm"
-      >
+      {/* Ce n'est plus le `<label>` qui porte toute la ligne : il ne peut pas
+          contenir le bouton d'aide (un clic sur un bouton dans un label est
+          renvoyé au champ, la bulle deviendrait inatteignable à la souris). Le
+          `<label for>` explicite reste, il n'enveloppe plus que son texte. */}
+      <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
         <span className="flex flex-wrap items-baseline gap-2">
-          <span className="font-medium">{driver.label ?? driver.id}</span>
+          <label htmlFor={fieldId} className="font-medium">
+            {driver.label ?? driver.id}
+          </label>
           {/* Provenance visible : une suggestion n'est jamais confondue avec une
               saisie (docs/06-WIZARD.md). Le badge disparaît dès la première frappe. */}
           {isSuggested ? (
@@ -82,11 +86,16 @@ export function WizardField({
               Valeur suggérée
             </span>
           ) : null}
+          {/* Niveau « information » : l'aide passe dans une bulle au survol, au
+              focus ou au clic. Elle reste citée par `aria-describedby`. */}
+          {driver.aide ? (
+            <Infobulle id={helpId} texte={driver.aide} libelle={driver.label ?? driver.id} />
+          ) : null}
         </span>
         {bounds ? (
           <span className="fig text-[0.68rem] text-[var(--foreground-muted)]">{bounds}</span>
         ) : null}
-      </label>
+      </div>
 
       <div className="flex items-center gap-2">
         <input
@@ -117,6 +126,9 @@ export function WizardField({
         ) : null}
       </div>
 
+      {/* Les avertissements NE passent PAS dans une bulle : « À vérifier :
+          valeur inhabituellement basse » est un signal que l'utilisateur doit
+          voir sans le chercher. Seul le texte descriptif est masqué. */}
       {issue ? (
         <p
           id={issueId}
@@ -129,13 +141,6 @@ export function WizardField({
         >
           <span className="font-semibold">{hasError ? 'Erreur : ' : 'À vérifier : '}</span>
           {issue.message}
-        </p>
-      ) : null}
-
-      {/* Niveau « information » : aide contextuelle, toujours visible. */}
-      {driver.aide ? (
-        <p id={helpId} className="text-xs italic text-[var(--foreground-muted)]">
-          {driver.aide}
         </p>
       ) : null}
     </div>
