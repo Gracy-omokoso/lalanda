@@ -106,7 +106,7 @@ export const COMPRENDRE_LES_CHIFFRES: ArticleAide = {
         },
         {
           type: 'exemple',
-          titre: 'Restaurant à Kinshasa — un mois type',
+          titre: 'Restaurant urbain — un mois type',
           lignes: [
             { libelle: 'Chiffre d’affaires', valeur: '18 720 USD' },
             { libelle: 'Coût matière (35 %)', valeur: '−6 552 USD' },
