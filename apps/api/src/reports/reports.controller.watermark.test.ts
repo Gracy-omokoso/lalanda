@@ -61,10 +61,7 @@ function buildController(pdfWatermark: boolean): ReportsController {
 }
 
 /** `buildReportData` est privé : le test l'atteint explicitement, sans l'exposer. */
-function buildReportData(
-  controller: ReportsController,
-  planVersion?: number,
-): Promise<ReportData> {
+function buildReportData(controller: ReportsController, planVersion?: number): Promise<ReportData> {
   const internals = controller as unknown as {
     buildReportData(orgId: string, id: string, planVersion?: number): Promise<ReportData>;
   };

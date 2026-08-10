@@ -24,8 +24,7 @@ export interface StorageConfig {
 }
 
 export type StorageAvailability =
-  | { available: true; config: StorageConfig }
-  | { available: false; reason: string };
+  { available: true; config: StorageConfig } | { available: false; reason: string };
 
 /**
  * Résout la configuration à chaque appel plutôt qu'une fois au démarrage.

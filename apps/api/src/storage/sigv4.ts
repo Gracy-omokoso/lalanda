@@ -54,7 +54,10 @@ export interface SignV4Input {
  */
 export function signV4(input: SignV4Input): Record<string, string> {
   const now = input.now ?? new Date();
-  const amzDate = now.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const amzDate = now
+    .toISOString()
+    .replace(/[-:]/g, '')
+    .replace(/\.\d{3}/, '');
   const dateStamp = amzDate.slice(0, 8);
 
   const payloadHash = createHash('sha256')

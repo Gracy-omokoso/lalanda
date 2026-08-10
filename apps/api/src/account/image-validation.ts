@@ -240,7 +240,8 @@ function assainirPng(buf: Buffer): { width: number; height: number; bytes: Buffe
     const fin = offset + 12 + longueur;
     if (fin > buf.length) throw new Error(`PNG tronqué : bloc « ${type} » incomplet.`);
 
-    if (!vuIhdr && type !== 'IHDR') throw new Error('PNG invalide : IHDR n’est pas le premier bloc.');
+    if (!vuIhdr && type !== 'IHDR')
+      throw new Error('PNG invalide : IHDR n’est pas le premier bloc.');
 
     if (type === 'IHDR') {
       if (longueur !== 13) throw new Error('PNG invalide : IHDR de taille incorrecte.');
@@ -269,7 +270,8 @@ function assainirPng(buf: Buffer): { width: number; height: number; bytes: Buffe
     }
   }
 
-  if (!vuIhdr || !vuIdat || !vuIend) throw new Error('PNG incomplet : IHDR, IDAT ou IEND manquant.');
+  if (!vuIhdr || !vuIdat || !vuIend)
+    throw new Error('PNG incomplet : IHDR, IDAT ou IEND manquant.');
   return { width, height, bytes: Buffer.concat(sortie) };
 }
 
@@ -352,7 +354,8 @@ const WEBP_BLOCS_CONSERVES = new Set(['VP8 ', 'VP8L', 'VP8X', 'ALPH', 'ICCP']);
 
 function assainirWebp(buf: Buffer): { width: number; height: number; bytes: Buffer } {
   const taillleRiff = buf.readUInt32LE(4);
-  if (taillleRiff + 8 > buf.length) throw new Error('WebP tronqué : taille RIFF au-delà du fichier.');
+  if (taillleRiff + 8 > buf.length)
+    throw new Error('WebP tronqué : taille RIFF au-delà du fichier.');
 
   const blocs: Buffer[] = [];
   let width = 0;

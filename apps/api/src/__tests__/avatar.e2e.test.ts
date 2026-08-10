@@ -76,9 +76,9 @@ const SVG_HOSTILE = Buffer.from(
 /** MinIO joignable ? Sans lui, on dit ce qu'on n'a pas pu prouver. */
 const S3_CONFIGURE = Boolean(
   process.env['S3_ENDPOINT'] &&
-    process.env['S3_ACCESS_KEY'] &&
-    process.env['S3_SECRET_KEY'] &&
-    process.env['S3_BUCKET_UPLOADS'],
+  process.env['S3_ACCESS_KEY'] &&
+  process.env['S3_SECRET_KEY'] &&
+  process.env['S3_BUCKET_UPLOADS'],
 );
 const itS3 = S3_CONFIGURE ? it : it.skip;
 

@@ -4,7 +4,10 @@ import { describe, expect, it } from 'vitest';
 import { readRequestBody } from './request-body.js';
 
 /** Flux minimal imitant une requête : des morceaux, et des en-têtes qui mentent. */
-function requete(morceaux: Buffer[], headers: Record<string, unknown> = {}): Readable & {
+function requete(
+  morceaux: Buffer[],
+  headers: Record<string, unknown> = {},
+): Readable & {
   headers: Record<string, unknown>;
 } {
   const flux = Readable.from(morceaux) as Readable & { headers: Record<string, unknown> };
