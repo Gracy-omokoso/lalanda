@@ -2,7 +2,7 @@
 //
 // Sources vérifiées dans le code au moment de la rédaction :
 //  - liste et ordre des onglets : apps/web/src/app/(app)/projects/_components/
-//    project-plan.tsx (SHEET_LABELS, TAB_ORDER, DEFAUT_TAB = 'ratios')
+//    results-model.ts (libellés et ordre des onglets) — S23a, ex project-plan.tsx
 //  - lignes de chaque feuille : packages/engine/src/templates/*.yaml
 //  - bilan / BFR / CAF / seuil / amortissements : packages/engine/src/
 //    etats-financiers/index.ts + apps/web/.../etats-financiers-tables.tsx

@@ -6,7 +6,7 @@
 //  - seuils : packages/engine/src/parameter-packs/{cd,ci,sn,ohada-generic}-2026.yaml
 //    § « Ratios bancaires attendus » — valeurs IDENTIQUES dans les 4 packs
 //  - feu tricolore : statutSeuil() dans packages/engine/src/evaluator/index.ts
-//    (tolérance ±10 %) ; libellés OK / Vigilance / Critique dans project-plan.tsx
+//    (tolérance ±10 %) ; libellés OK / Vigilance / Critique dans results-model.ts (ex project-plan.tsx)
 //  - autonomie financière : etats-financiers/index.ts + evaluator (seuil attaché
 //    mais JAMAIS rendu — cf. section `autonomie-financiere`)
 //  - VAN / TRI : npv et irr sont dans la whitelist du compilateur

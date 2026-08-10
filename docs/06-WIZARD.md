@@ -169,11 +169,31 @@ depuis n’importe quelle étape.
 
 ### Place dans la navigation
 
-Le wizard n'a pas d'onglet dédié : il **est** le contenu de l'onglet « Plan » de la
-navigation projet (`PROJECT_TABS`, S18d). Saisie guidée et résultats sont deux colonnes
-d'un même écran ; les séparer aurait supprimé l'aperçu immédiat de l'impact d'une
-hypothèse. Un changement d'onglet projet démonte le composant : l'auto-save est vidé au
-démontage, aucune saisie n'est perdue.
+> **Décision révisée le 2026-08-10.** Ce paragraphe décrivait l'arbitrage de S18d :
+> « le wizard n'a pas d'onglet dédié, il **est** le contenu de l'onglet Plan », saisie
+> et résultats en deux colonnes d'un même écran. Motif de l'époque : conserver
+> l'aperçu immédiat de l'impact d'une hypothèse. **Ce n'est plus le cas.**
+>
+> À l'usage, les deux colonnes saturaient l'écran : l'assistant était comprimé, et les
+> onze feuilles de résultats illisibles dans une demi-largeur. Le décideur a tranché
+> pour la séparation après appréciation du produit en ligne.
+
+L'assistant occupe **son propre écran**, en pleine largeur : `/projects/:id/saisie`.
+Les résultats occupent la racine du projet, `/projects/:id`, en **lecture seule**, et
+sont organisés en onglets — un par feuille réellement produite par le moteur, l'onglet
+courant porté par `?tab=` pour qu'un lien soit partageable.
+
+Modifier une hypothèse suppose donc de revenir explicitement dans l'assistant. C'est
+le prix de la séparation, et c'est assumé : la lecture d'un dossier bancaire et sa
+saisie sont deux gestes différents, faits à des moments différents.
+
+**Aucune saisie n'est perdue au passage.** Le bouton « Voir les résultats » vide la
+file d'auto-save AVANT de naviguer, et ne navigue pas si l'enregistrement échoue — la
+fenêtre de 800 ms de l'auto-save ne peut donc pas avaler la dernière frappe.
+
+**« Valider ce plan » reste en fin d'assistant**, et à cet endroit seulement : figer
+une version est un acte versionné, et deux chemins pour un même acte fort est une
+invitation à l'erreur.
 
 ### Accessibilité
 

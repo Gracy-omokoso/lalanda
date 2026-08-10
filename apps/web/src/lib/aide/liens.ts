@@ -35,7 +35,8 @@ export const LIENS_AIDE = {
  * Aide de la feuille de résultats affichée, par identifiant d'onglet.
  *
  * Les clés correspondent aux identifiants d'onglet de la vue projet (`?tab=`) —
- * cf. `TAB_ORDER` dans `projects/_components/project-plan.tsx`.
+ * cf. `TAB_ORDER` dans `projects/_components/results-model.ts` (S23a :
+ * `project-plan.tsx` a été éclaté en saisie / lecture).
  *
  * Renvoie `undefined` pour un onglet sans article dédié : l'appelant n'affiche
  * alors aucun lien, plutôt que d'en proposer un qui déçoit.
