@@ -140,7 +140,9 @@ export class ObjectStorageService {
       return await fetch(url, {
         method,
         headers,
-        body: opts.body as unknown as BodyInit | undefined,
+        // `undici` accepte un Buffer tel quel ; les typages de ce projet
+        // n'embarquent pas la lib DOM qui déclarerait `BodyInit`.
+        body: opts.body as never,
         signal: controller.signal,
       });
     } catch (cause) {
