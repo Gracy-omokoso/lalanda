@@ -77,21 +77,33 @@ export function Infobulle({ id, texte, libelle }: InfobulleProps): React.ReactEl
 
   // Mesure avant peinture : la bulle ne doit jamais être vue hors écran, même
   // une frame.
+  //
+  // La correction est aussi recalculée au redimensionnement : sans ça, une bulle
+  // ouverte avant une rotation d'écran garde le décalage de l'ancienne largeur
+  // et ressort du cadre — constaté en repassant la fenêtre en 375 px, bulle
+  // ouverte, avant d'ajouter l'écouteur.
   useLayoutEffect(() => {
     if (!ouverte) return;
-    const declencheur = declencheurRef.current;
-    const bulle = bulleRef.current;
-    if (!declencheur || !bulle) return;
 
-    const rd = declencheur.getBoundingClientRect();
-    const rb = bulle.getBoundingClientRect();
-    setDecalage(
-      decalageInfobulle({
-        centreDeclencheur: rd.left + rd.width / 2,
-        largeurBulle: rb.width,
-        largeurFenetre: window.innerWidth,
-      }),
-    );
+    const mesurer = (): void => {
+      const declencheur = declencheurRef.current;
+      const bulle = bulleRef.current;
+      if (!declencheur || !bulle) return;
+
+      const rd = declencheur.getBoundingClientRect();
+      const rb = bulle.getBoundingClientRect();
+      setDecalage(
+        decalageInfobulle({
+          centreDeclencheur: rd.left + rd.width / 2,
+          largeurBulle: rb.width,
+          largeurFenetre: window.innerWidth,
+        }),
+      );
+    };
+
+    mesurer();
+    window.addEventListener('resize', mesurer);
+    return () => window.removeEventListener('resize', mesurer);
   }, [ouverte]);
 
   const surTouche = useCallback((e: React.KeyboardEvent) => {
