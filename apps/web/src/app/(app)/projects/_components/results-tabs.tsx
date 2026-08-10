@@ -79,15 +79,21 @@ export function ResultsTabs({
         hrefAide={LIENS_AIDE.bandeauRatios}
       />
       <SheetTabs tabs={tabs} activeId={activeTab} onChange={setActiveTab} />
-      <LienAideFeuille idFeuille={activeTab} libelleFeuille={SHEET_LABELS[activeTab] ?? activeTab} />
-      <div role="tabpanel" id={`sheet-panel-${activeTab}`} aria-labelledby={`sheet-tab-${activeTab}`}>
+      <LienAideFeuille
+        idFeuille={activeTab}
+        libelleFeuille={SHEET_LABELS[activeTab] ?? activeTab}
+      />
+      <div
+        role="tabpanel"
+        id={`sheet-panel-${activeTab}`}
+        aria-labelledby={`sheet-tab-${activeTab}`}
+      >
         {/* Réserve de portée de la feuille : elle vient du label déclaré par le
             DSL, que l'onglet raccourcit. Elle est placée AVANT le tableau — une
             réserve lue après les chiffres arrive trop tard. */}
         {avertissement ? (
           <p className="mb-3 rounded-md border border-[var(--warn)]/40 bg-[var(--surface-muted)] p-3 text-[0.78rem] leading-relaxed text-[var(--foreground-muted)]">
-            <strong className="text-[var(--warn)]">Portée de cette feuille.</strong>{' '}
-            {avertissement}
+            <strong className="text-[var(--warn)]">Portée de cette feuille.</strong> {avertissement}
           </p>
         ) : null}
         {activeTab === 'ratios' ? (

@@ -127,9 +127,7 @@ export function ProjectResults({ projectId }: { projectId: string }): React.Reac
   }
 
   if (!project || !template) {
-    return (
-      <p className="text-sm text-[var(--foreground-muted)]">{loadError ?? 'Chargement…'}</p>
-    );
+    return <p className="text-sm text-[var(--foreground-muted)]">{loadError ?? 'Chargement…'}</p>;
   }
 
   const currency = template.devise_base ?? 'USD';
@@ -156,8 +154,8 @@ export function ProjectResults({ projectId }: { projectId: string }): React.Reac
 
       {isUntouched(project) ? (
         <p className="rounded-md border border-[var(--warn)]/40 bg-[var(--surface-muted)] p-3 text-sm">
-          Ces chiffres reposent encore entièrement sur les valeurs suggérées par le modèle
-          sectoriel — ce ne sont pas les vôtres.{' '}
+          Ces chiffres reposent encore entièrement sur les valeurs suggérées par le modèle sectoriel
+          — ce ne sont pas les vôtres.{' '}
           <Link href={saisieHref} className="font-medium text-[var(--accent)] hover:underline">
             Saisissez vos hypothèses
           </Link>{' '}
