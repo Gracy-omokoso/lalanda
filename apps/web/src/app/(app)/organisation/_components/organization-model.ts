@@ -42,6 +42,16 @@ export interface OrganizationTab {
  */
 export const ORGANIZATION_TABS: readonly OrganizationTab[] = [
   { segment: '', label: 'Tableau de bord', action: null },
+  // ADR-0016 E2 — « Membres » arrive de `/members`, à la racine des routes, où
+  // il était une page d'organisation logée hors de l'organisation. En DEUXIÈME
+  // position, juste après le tableau de bord : les personnes viennent avant les
+  // réglages.
+  //
+  // L'action retenue est celle qui garde l'appel remplissant la page
+  // (`GET /organizations/:id/members` → `organization.manage`), et non une
+  // action choisie par ressemblance : le jour où la matrice bouge, l'onglet
+  // suit l'appel qu'il ouvre.
+  { segment: 'membres', label: 'Membres', action: 'organization.manage' },
   { segment: 'parametres', label: 'Paramètres', action: 'organization.manage' },
   { segment: 'facturation', label: 'Facturation', action: 'billing.manage' },
   { segment: 'journal', label: 'Journal', action: 'audit.read' },

@@ -35,6 +35,7 @@ describe('onglets de l’espace organisation (S21a)', () => {
     expect(segmentActif('/organisation')).toBe('');
     expect(segmentActif('/organisation/parametres')).toBe('parametres');
     expect(segmentActif('/organisation/journal/2026')).toBe('journal');
+    expect(segmentActif('/organisation/membres')).toBe('membres');
     expect(segmentActif('/projects')).toBe('');
   });
 
@@ -53,6 +54,7 @@ describe('onglets de l’espace organisation (S21a)', () => {
     ];
     expect(ongletsVisibles(owner).map((t) => t.segment)).toEqual([
       '',
+      'membres',
       'parametres',
       'facturation',
       'journal',
@@ -60,10 +62,46 @@ describe('onglets de l’espace organisation (S21a)', () => {
 
     // Administrateur : gouvernance et audit, mais PAS la facturation (ADR-0012 §3).
     const admin: OrgAction[] = ['analytics.read', 'organization.manage', 'audit.read'];
-    expect(ongletsVisibles(admin).map((t) => t.segment)).toEqual(['', 'parametres', 'journal']);
+    expect(ongletsVisibles(admin).map((t) => t.segment)).toEqual([
+      '',
+      'membres',
+      'parametres',
+      'journal',
+    ]);
 
     // Lecteur : le tableau de bord et rien d'autre.
     expect(ongletsVisibles(['project.read', 'analytics.read']).map((t) => t.segment)).toEqual(['']);
+  });
+
+  it('place « Membres » en deuxième position — les personnes avant les réglages', () => {
+    // ADR-0016 E2. L'ordre du tableau EST l'ordre d'affichage : le vérifier ici
+    // évite qu'un ajout ultérieur ne glisse une entrée entre les deux sans que
+    // rien ne le signale.
+    expect(ORGANIZATION_TABS.map((t) => t.segment)).toEqual([
+      '',
+      'membres',
+      'parametres',
+      'facturation',
+      'journal',
+    ]);
+  });
+
+  it('garde « Membres » derrière l’action qui garde l’appel remplissant la page', () => {
+    // `GET /organizations/:id/members` est gardé par `organization.manage` :
+    // l'onglet ne doit pas promettre une page qui répondra 403.
+    const membres = ORGANIZATION_TABS.find((t) => t.segment === 'membres');
+    expect(membres?.action).toBe('organization.manage');
+  });
+
+  it('masque « Membres » aux rôles sans organization.manage', () => {
+    // Masquer reste un CONFORT : `PermissionsGuard` refuse de toute façon, et la
+    // page atteinte par URL directe explique ce que le rôle permet.
+    const comptable: OrgAction[] = ['project.read', 'analytics.read', 'actuals.import'];
+    expect(ongletsVisibles(comptable).map((t) => t.segment)).not.toContain('membres');
+  });
+
+  it('ne propose PAS « Membres » tant que les permissions sont inconnues', () => {
+    expect(ongletsVisibles(null).map((t) => t.segment)).not.toContain('membres');
   });
 
   it('le tableau de bord n’exige aucune action : il est ouvert à tout membre', () => {
