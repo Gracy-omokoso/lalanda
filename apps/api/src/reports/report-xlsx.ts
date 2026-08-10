@@ -24,6 +24,36 @@
 // Aucune donnée sensible n'est injectée en tant que formule : les labels et valeurs
 // numériques sont écrits via `cell.value = ...`, jamais concaténés dans une formule
 // (protection contre l'injection de formule côté client).
+//
+// ── Pas de logo dans ce classeur, et pourquoi (S22h) ─────────────────────────
+// Le logo a été posé en en-tête du PDF et dans son filigrane. Il ne l'est pas ici.
+// Ce n'est pas un oubli : les deux emplacements possibles s'excluent.
+//
+//   1. Là où il serait VU — la feuille « Hypothèses », premier onglet ouvert —
+//      il est dangereux. Chaque cellule B de cette feuille est l'ancre d'une
+//      formule de tout le reste du classeur (`'Hypothèses'!B2`, …). Une image
+//      ExcelJS flotte au-dessus de la grille : ancrée en haut, elle masque
+//      l'en-tête et les premiers drivers, donc elle dégrade la lecture. Pour lui
+//      faire de la place il faudrait décaler les lignes, c'est-à-dire changer le
+//      `rowIdx = i + 2` de la boucle des drivers ET celui de la boucle qui
+//      pré-indexe `lineRefs` — deux endroits distincts, écrits séparément. Un
+//      décalage appliqué à l'un et pas à l'autre ne casse pas la génération : il
+//      produit des formules qui pointent silencieusement sur la ligne voisine.
+//      Un classeur dont les formules mentent vaut moins qu'un classeur sans logo.
+//
+//   2. Là où il serait SANS RISQUE — la feuille « Métadonnées », dernier onglet,
+//      sans formule et référencée par aucune autre — il est sans intérêt : c'est
+//      précisément la feuille que personne n'ouvre pour y chercher une marque.
+//
+// S'ajoute une raison qui tranche à elle seule : docs/23-RAPPORTS-EXPORTS.md
+// exige une « validation LibreOffice » des exports Excel. Embarquer une partie
+// « drawing » dans le classeur bancable sans pouvoir exécuter cette validation
+// reviendrait à livrer un binaire non vérifié dans le document qu'on dépose en
+// banque. À reconsidérer quand LibreOffice sera dans la chaîne de contrôle.
+//
+// La marque reste portée par les métadonnées du fichier : `workbook.creator`,
+// `workbook.company` et `workbook.title` ci-dessous — visibles dans les
+// propriétés du document, sans un pixel posé sur une cellule.
 
 import ExcelJS from 'exceljs';
 import type { Template } from '@lalanda/engine';
