@@ -9,28 +9,28 @@ CSP (`apps/web/next.config.mjs`) : aucune origine à ajouter.
 
 ## Contenu
 
-| Fichier | Dimensions | Contenu | Où il sert |
-|---|---|---|---|
-| `logo-lalanda-fond-clair.png` | 1024×273 | Lockup : badge sombre + aigle couleur, mot-symbole encre | Interface **sur fond clair** |
-| `logo-lalanda-fond-sombre.png` | 1024×273 | Lockup : badge sombre + aigle couleur (le même que ci-dessus), mot-symbole crème | Interface **sur fond sombre**, et panneaux `.bg-ink` |
-| `logo-lalanda-blanc.png` | 1024×273 | Lockup monochrome blanc | Déclinaison disponible (photo, aplat de couleur). **Non branchée dans l'application.** |
-| `logo-lalanda-noir.png` | 1024×273 | Lockup monochrome noir | Déclinaison disponible (impression mono). **Non branchée dans l'application.** |
-| `app-icone-lalanda.png` | 1024×1024 | Icône d'app : aigle sur badge sombre bord à bord | Source de `src/app/apple-icon.png` (écran d'accueil iOS) |
-| `aigle-seul.png` | 1024×1024 | Aigle seul, sans badge, fond transparent | Source de `src/app/icon.png` (favicon) |
+| Fichier                        | Dimensions | Contenu                                                                          | Où il sert                                                                             |
+| ------------------------------ | ---------- | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `logo-lalanda-fond-clair.png`  | 1024×273   | Lockup : badge sombre + aigle couleur, mot-symbole encre                         | Interface **sur fond clair**                                                           |
+| `logo-lalanda-fond-sombre.png` | 1024×273   | Lockup : badge sombre + aigle couleur (le même que ci-dessus), mot-symbole crème | Interface **sur fond sombre**, et panneaux `.bg-ink`                                   |
+| `logo-lalanda-blanc.png`       | 1024×273   | Lockup monochrome blanc                                                          | Déclinaison disponible (photo, aplat de couleur). **Non branchée dans l'application.** |
+| `logo-lalanda-noir.png`        | 1024×273   | Lockup monochrome noir                                                           | Déclinaison disponible (impression mono). **Non branchée dans l'application.**         |
+| `app-icone-lalanda.png`        | 1024×1024  | Icône d'app : aigle sur badge sombre bord à bord                                 | Source de `src/app/apple-icon.png` (écran d'accueil iOS)                               |
+| `aigle-seul.png`               | 1024×1024  | Aigle seul, sans badge, fond transparent                                         | Source de `src/app/icon.png` (favicon)                                                 |
 
 ## Correspondance avec les noms d'origine
 
 Les fichiers ont été renommés à la copie : `for-ligth` portait une coquille, et
 `for-light` / `for-white` côte à côte dans du code se confondent à la lecture.
 
-| Nom d'origine | Nom ici |
-|---|---|
-| `logo-lalanda-for-ligth.png` | `logo-lalanda-fond-clair.png` |
-| `logo-lalanda-v2.png` | `logo-lalanda-fond-sombre.png` |
-| `logo-lalanda-for-white.png` | `logo-lalanda-blanc.png` |
-| `logo-lalanda-for-black.png` | `logo-lalanda-noir.png` |
-| `app-icone-lalanda.png` | inchangé |
-| `favicon.png` | `aigle-seul.png` |
+| Nom d'origine                | Nom ici                        |
+| ---------------------------- | ------------------------------ |
+| `logo-lalanda-for-ligth.png` | `logo-lalanda-fond-clair.png`  |
+| `logo-lalanda-v2.png`        | `logo-lalanda-fond-sombre.png` |
+| `logo-lalanda-for-white.png` | `logo-lalanda-blanc.png`       |
+| `logo-lalanda-for-black.png` | `logo-lalanda-noir.png`        |
+| `app-icone-lalanda.png`      | inchangé                       |
+| `favicon.png`                | `aigle-seul.png`               |
 
 **`logo-lalanda-for-dark.png` n'est plus la source du fond sombre.** Le
 décideur l'a remplacé le 2026-08-10 par `logo-lalanda-v2.png`, qui reprend le
@@ -62,9 +62,9 @@ rendu réel** (rastérisation à 16 et 32 px sur les gris de barre d'onglets
 
 D'où la répartition :
 
-| Fichier livré | Source | Raison |
-|---|---|---|
-| `src/app/icon.png` (512×512) | `aigle-seul.png` | Favicon : cadre plein, lisible à 16 px sur barre claire comme sombre |
+| Fichier livré                      | Source                  | Raison                                                                                                                                                      |
+| ---------------------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/app/icon.png` (512×512)       | `aigle-seul.png`        | Favicon : cadre plein, lisible à 16 px sur barre claire comme sombre                                                                                        |
 | `src/app/apple-icon.png` (180×180) | `app-icone-lalanda.png` | iOS pose l'icône d'accueil **opaque** : un PNG transparent y est composé sur du noir. Le badge est fait pour ça, et à 180 px la lisibilité n'est pas en jeu |
 
 Si l'un des deux est un jour régénéré, refaire la comparaison plutôt que

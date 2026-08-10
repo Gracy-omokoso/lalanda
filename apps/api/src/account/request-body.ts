@@ -18,9 +18,7 @@
 
 import type { Readable } from 'node:stream';
 
-export type BodyRead =
-  | { ok: true; body: Buffer }
-  | { ok: false; reason: 'TOO_LARGE' | 'ABORTED' };
+export type BodyRead = { ok: true; body: Buffer } | { ok: false; reason: 'TOO_LARGE' | 'ABORTED' };
 
 export function readRequestBody(
   req: Readable & { headers?: Record<string, unknown> },

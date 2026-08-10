@@ -21,7 +21,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import { encodeS3Path, signV4 } from './sigv4.js';
-import { resolveStorageConfig, type StorageAvailability, type StorageConfig } from './storage.config.js';
+import {
+  resolveStorageConfig,
+  type StorageAvailability,
+  type StorageConfig,
+} from './storage.config.js';
 
 /** Levée quand le stockage est joignable mais refuse ou échoue. */
 export class ObjectStorageError extends Error {
@@ -64,12 +68,7 @@ export class ObjectStorageService {
     return a.available ? a.config.bucketUploads : null;
   }
 
-  async putObject(
-    bucket: string,
-    key: string,
-    body: Buffer,
-    contentType: string,
-  ): Promise<void> {
+  async putObject(bucket: string, key: string, body: Buffer, contentType: string): Promise<void> {
     const res = await this.send('PUT', bucket, key, { body, contentType });
     if (!res.ok) {
       throw new ObjectStorageError(
@@ -165,9 +164,7 @@ export class ObjectStorageService {
     const base = new URL(cfg.endpoint);
     const segments = key.split('/');
     const host = cfg.forcePathStyle ? base.host : `${bucket}.${base.host}`;
-    const path = cfg.forcePathStyle
-      ? encodeS3Path([bucket, ...segments])
-      : encodeS3Path(segments);
+    const path = cfg.forcePathStyle ? encodeS3Path([bucket, ...segments]) : encodeS3Path(segments);
     return { url: `${base.protocol}//${host}${path}`, host, path };
   }
 }

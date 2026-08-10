@@ -90,9 +90,7 @@ describe('signature SigV4', () => {
     expect(avec['Authorization']).toContain(
       'SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date',
     );
-    expect(sans['Authorization']).toContain(
-      'SignedHeaders=host;x-amz-content-sha256;x-amz-date',
-    );
+    expect(sans['Authorization']).toContain('SignedHeaders=host;x-amz-content-sha256;x-amz-date');
   });
 
   it('est déterministe à date fixée et change de scope avec la région', () => {

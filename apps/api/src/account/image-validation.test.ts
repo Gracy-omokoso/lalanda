@@ -213,11 +213,7 @@ describe('attaque — taille et dimensions', () => {
   });
 
   it('refuse les dimensions démesurées dans les trois formats', () => {
-    for (const charge of [
-      png(9000, 9000),
-      jpeg(9000, 9000),
-      webp([vp8l(9000, 9000)]),
-    ]) {
+    for (const charge of [png(9000, 9000), jpeg(9000, 9000), webp([vp8l(9000, 9000)])]) {
       const r = validateAndSanitizeImage(charge);
       expect(r.ok).toBe(false);
       if (!r.ok) expect(r.code).toBe('IMAGE_DIMENSIONS_REJECTED');
@@ -371,7 +367,9 @@ describe('cas nominal', () => {
   it('accepte PNG, JPEG et WebP et rend le type DÉDUIT DU CONTENU', () => {
     expect(accepte(validateAndSanitizeImage(png(200, 100))).contentType).toBe('image/png');
     expect(accepte(validateAndSanitizeImage(jpeg(200, 100))).contentType).toBe('image/jpeg');
-    expect(accepte(validateAndSanitizeImage(webp([vp8l(200, 100)]))).contentType).toBe('image/webp');
+    expect(accepte(validateAndSanitizeImage(webp([vp8l(200, 100)]))).contentType).toBe(
+      'image/webp',
+    );
   });
 
   it('rend les dimensions réelles, non carrées comprises', () => {
