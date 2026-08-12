@@ -13,7 +13,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Les fournisseurs à secret. ADR-0013 § Contexte en déclarait cinq; deux
+ * Les fournisseurs à secret. ADR-0013 § Contexte en déclarait cinq; trois
  * évolutions se sont ajoutées depuis :
  *
  *   - `s3` est devenu `r2` (Cloudflare R2). Le PROTOCOLE ne change pas — R2
@@ -26,6 +26,9 @@
  *   - `elevenlabs` est ajouté pour un futur assistant vocal. CONFIGURATION
  *     SEULEMENT à ce stade : aucune synthèse vocale n'est implémentée, et
  *     l'usage produit n'est pas spécifié.
+ *   - `zeptomail` est ajouté (ADR-0014 § S22m) SANS retirer `smtp` : ADR-0014
+ *     fait de ZeptoMail le chemin d'envoi PRÉFÉRÉ, pas le chemin unique — SMTP
+ *     reste le repli, et un développeur local continue de brancher MailHog.
  */
 export const INTEGRATION_PROVIDERS = [
   'openai',
@@ -34,6 +37,7 @@ export const INTEGRATION_PROVIDERS = [
   'smtp',
   'r2',
   'elevenlabs',
+  'zeptomail',
 ] as const;
 
 export type IntegrationProvider = (typeof INTEGRATION_PROVIDERS)[number];
@@ -159,6 +163,50 @@ export const PROVIDER_SPECS: Readonly<Record<IntegrationProvider, ProviderSpec>>
     // entrée serait recréer l'hybride permanent que l'ADR rejette. »
     envFallback: {},
     testDescription: 'GET /v2/voices — lecture seule, sans coût ni crédit consommé.',
+  },
+  zeptomail: {
+    label: 'ZeptoMail (Zoho)',
+    // `sendMailToken` reprend le nom que Zoho donne à cette valeur dans sa
+    // console (« Send Mail Token »). Un opérateur qui cherche quoi coller ne doit
+    // pas avoir à traduire : le libellé du champ est celui de l'écran d'origine.
+    secrets: ['sendMailToken'],
+    requiredSecrets: ['sendMailToken'],
+    // `apiUrl` SEUL, et il est nécessaire : Zoho exploite trois centres de
+    // données distincts (`api.zeptomail.com`, `.eu`, `.in`) et un jeton émis dans
+    // l'un est refusé par les deux autres. Sans ce champ, un compte européen ne
+    // pourrait jamais être testé depuis `/admin` — le bouton « Tester » rendrait
+    // un 401 qui accuserait le jeton alors que seul le point d'entrée est en
+    // cause, c'est-à-dire le pire message d'erreur possible : celui qui envoie
+    // chercher du mauvais côté.
+    //
+    // Ni adresse d'expédition ni nom d'expéditeur ici : ils ne servent qu'à
+    // l'ENVOI, que cette fiche ne déclenche pas (voir `testDescription`). Les
+    // déclarer donnerait à croire qu'ils sont lus par le transport, ce qui est
+    // faux tant que `MailCredentialsProvider` lit l'environnement.
+    config: ['apiUrl'],
+    // Vide : `https://api.zeptomail.com/v1.1/email` est le défaut, et c'est le
+    // cas de la très grande majorité des comptes.
+    requiredConfig: [],
+    // VIDE, et ce n'est pas un oubli (verrou vérifié par `providers.test.ts`).
+    // ZeptoMail n'a jamais transité par l'environnement au sens d'ADR-0013 : lui
+    // donner ici un secours recréerait l'hybride permanent que l'ADR rejette —
+    // `/admin` afficherait « source : db » pendant qu'une variable oubliée
+    // servirait une autre valeur.
+    //
+    // ⚠️ ASYMÉTRIE À CONNAÎTRE, ET ELLE EST TEMPORAIRE (ADR-0014 § S22m).
+    // Cette fiche alimente aujourd'hui le TEST DE CONNEXION, et lui seul. Le
+    // transport d'envoi, lui, lit encore `ZEPTOMAIL_TOKEN` dans l'environnement,
+    // exactement comme il lit déjà `SMTP_PASSWORD` : le module `mail/` ne dépend
+    // pas d'`integrations/` (ADR-0014 §1, « il expose une prise, il ne va pas
+    // chercher la fiche »), et brancher la prise est un lot à part entière.
+    // Le jour où `DatabaseMailCredentialsProvider` existe, cette fiche devient la
+    // source unique et `ZEPTOMAIL_TOKEN` disparaît. D'ici là l'ordre d'usage est
+    // écrit noir sur blanc dans `.env.production.example` : tester ici, poser
+    // dans l'environnement.
+    envFallback: {},
+    testDescription:
+      'Appel de /v1.1/email avec une charge délibérément incomplète — ' +
+      'le jeton est validé, aucun email ne part.',
   },
 };
 

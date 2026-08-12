@@ -1,7 +1,7 @@
-# ADR-0014 — Envoi d'emails (SMTP) et connexion Google
+# ADR-0014 — Envoi d'emails et connexion Google
 
 Statut : Accepted
-Date : 2026-08-09
+Date : 2026-08-09 — amendé le 2026-08-12 (§ S22m : ZeptoMail)
 Décideurs : Gracy Omokoso
 
 ## Contexte
@@ -19,7 +19,7 @@ Contrainte de départ, non négociable : le produit doit continuer de **démarre
 
 | Option | Retenue | Motif |
 | --- | --- | --- |
-| **SMTP via `nodemailer`, variables optionnelles, repli sur log** | ✅ | Fonctionne avec n'importe quel fournisseur (Gmail, Brevo, SES, MailHog local) sans SDK propriétaire. Le repli conserve exactement le comportement d'avant S22a quand rien n'est configuré. |
+| **SMTP via `nodemailer`, variables optionnelles, repli sur log** | ✅ (S22a) | Fonctionne avec n'importe quel fournisseur (Gmail, Brevo, SES, MailHog local) sans SDK propriétaire. Le repli conserve exactement le comportement d'avant S22a quand rien n'est configuré. |
 | SDK d'un fournisseur (Resend, SendGrid, Postmark) | ❌ | Enferme le produit dans un fournisseur et impose une clé d'API pour le moindre test local. La question du fournisseur reste ouverte : SMTP la garde ouverte. |
 | File d'attente (BullMQ) dès maintenant | ❌ | Redis n'est pas branché en production (`REDIS_URL` optionnel, S16a). Trois emails transactionnels par action utilisateur ne justifient pas une infrastructure. `MailService` est une abstraction : la file s'insérera derrière sans toucher aux appelants. |
 
@@ -46,7 +46,78 @@ Trois étages, chacun déclaré par son abstraction dans le module Nest (`provid
 
 Cinq variables, **toutes optionnelles** : `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`. `SMTP_HOST` seul décide : sans hôte, le message est journalisé (destinataire et sujet, **jamais le corps** — il contient le lien porteur du jeton) et l'appel retourne `delivered: false`. `SMTP_USER`/`SMTP_PASSWORD` restent facultatifs même avec un hôte (relais interne, MailHog).
 
+> **Amendé en S22m.** SMTP n'est plus le seul chemin ni le chemin par défaut : voir **§ 1 bis** ci-dessous. Ce qui précède reste exact pour le chemin SMTP, qui est conservé.
+
 **Aucune méthode ne lève sur échec d'envoi.** Une invitation créée reste créée si son email ne part pas ; son lien reste copiable depuis l'interface. Faire échouer l'opération métier ferait dépendre l'écriture en base de la disponibilité d'un serveur de mail.
+
+### 1 bis. Amendement S22m — l'API ZeptoMail devient le chemin d'envoi
+
+S22a laissait la question du fournisseur ouverte, et c'était le but. Elle est tranchée : **Zoho ZeptoMail**, appelé par son API HTTP, devient le chemin d'envoi préféré. `MailService`, les gabarits et le contrat des appelants sont **inchangés** — c'est précisément ce que l'architecture en trois étages devait permettre, et elle l'a permis.
+
+#### SMTP est CONSERVÉ en repli. Pourquoi
+
+C'est le seul arbitrage réel de ce lot, et la réponse n'est pas « par prudence ».
+
+- **Le développement local.** ADR-0014 écartait les SDK fournisseurs parce qu'ils « imposent une clé d'API pour le moindre test local ». Retirer SMTP referait exactement ce qui avait été refusé : un développeur devrait détenir un jeton ZeptoMail — c'est-à-dire un jeton **de production**, capable d'écrire à de vraies adresses — pour voir un email pendant un test. MailHog n'envoie rien à personne ; c'est une propriété de sécurité, pas un confort.
+- **Le déploiement en cours d'exploitation.** Le bloc SMTP est posé en production. Le retirer du code ferait de la mise à jour une bascule obligatoire au lieu d'un changement réversible.
+- **Le coût de le garder est faible et connu** : une branche dans le transport, et `nodemailer` qui était déjà là.
+
+Ce n'est pas un **repli automatique**. Le chemin est choisi une fois, à la résolution des identifiants, et un échec ne fait **jamais** réessayer l'autre chemin. Un envoi qui échoue en ayant peut-être abouti — délai dépassé après acceptation par Zoho — partirait alors deux fois, et l'utilisateur recevrait deux liens de réinitialisation dont un seul fonctionne. La délivrabilité n'y gagne rien ; l'ambiguïté, elle, est certaine.
+
+#### Précédence
+
+| Configuration | Chemin |
+| --- | --- |
+| `ZEPTOMAIL_TOKEN` posé | API ZeptoMail — même si le bloc SMTP est encore renseigné |
+| sinon `SMTP_HOST` posé | SMTP |
+| sinon | journal, `delivered: false` — **propriété d'origine intacte** |
+
+Que ZeptoMail gagne sur un bloc SMTP encore présent rend la migration atomique : poser le jeton suffit, il n'y a pas à vider SMTP le même jour. Le chemin retenu est **journalisé** au premier envoi (`Chemin d'envoi des emails : …`), et de nouveau s'il change. Sans cette ligne, « par où partent réellement les emails ? » n'aurait pas de réponse observable — deux chemins et un repli silencieux se ressemblent beaucoup vus depuis une boîte de réception vide.
+
+#### Aucune dépendance npm ajoutée
+
+Le paquet `zeptomail` de Zoho **n'a pas pu être installé** : `registry.npmjs.org` est injoignable depuis le poste de développement (IPv6 non routé), `pnpm add` échoue en `ETIMEDOUT`. Ce n'est pas le seul motif, et le second aurait suffi : son `SendMailClient` n'est qu'une enveloppe autour d'un `POST` JSON, et ADR-0013 §10 désigne la chaîne d'approvisionnement npm comme « le maillon faible » du dispositif qui protège les secrets. L'appel est donc écrit directement (`fetch`, en-tête `Authorization: Zoho-enczapikey <jeton>`), comme `storage/sigv4.ts` parle SigV4 sans `@aws-sdk`. Le point d'attache est `apps/api/src/mail/zeptomail.client.ts`, et lui seul : si le paquet devient installable et que l'usage se complique (pièces jointes, gabarits Zoho), la décision se rediscutera à cet endroit.
+
+#### Où vit le jeton — et l'asymétrie à connaître
+
+| | Aujourd'hui | Cible |
+| --- | --- | --- |
+| Test de connexion (`/admin`) | fiche `zeptomail`, secret chiffré en base (ADR-0013) | inchangé |
+| Transport (envoi réel) | `ZEPTOMAIL_TOKEN` dans l'environnement | fiche `zeptomail` |
+
+Le critère de partage d'ADR-0013 §8 désigne bien le coffre : un email part longtemps après la lecture de la base. Mais brancher le transport sur `SecretsService` fait dépendre `MailModule` — `@Global`, chargé avant `AuthModule` dont la factory better-auth injecte `MailService` au bootstrap — du graphe d'`IntegrationsModule`. C'est un lot à part entière, pas un effet de bord de celui-ci ; il consiste à écrire le `DatabaseMailCredentialsProvider` que §1 annonce depuis S22a, et **rien d'autre ne bougera** : ni le service, ni le transport, ni les gabarits.
+
+D'ici là l'ordre d'usage est le suivant, et il est inscrit dans `.env.production.example` : **tester le jeton dans `/admin`, le poser dans l'environnement.** La fiche `/admin` a donc une utilité immédiate et réelle — valider un jeton *avant* de le déployer — mais un jeton qui n'existerait que là ne ferait partir aucun email. Cette asymétrie est temporaire ; elle ne doit pas être découverte.
+
+`envFallback` reste **vide** pour `zeptomail` : lui donner une entrée ferait afficher « source : env » dans `/admin` et recréerait l'hybride permanent qu'ADR-0013 option C rejette.
+
+#### Test de connexion sans coût
+
+ZeptoMail n'expose aucun point de lecture — son API de transaction n'a qu'une route, `POST /v1.1/email`. Le test l'appelle donc, avec une charge **`{}`** : ni destinataire, ni sujet, ni corps. Deux propriétés en découlent, et la première est la seule qui compte pour la facture :
+
+1. **Aucun destinataire n'est émis.** Il n'y a personne à qui écrire ; même une API qui accepterait tout n'aurait aucune adresse à servir. C'est une propriété de la **requête émise**, vérifiable hors ligne, et non une promesse sur le comportement du serveur.
+2. **L'authentification est tranchée avant la validation.** `401`/`403` → jeton refusé. `400` → jeton **accepté**, charge refusée à la validation : c'est le résultat attendu, il ne s'obtient qu'authentifié. Un `2xx` serait une anomalie — l'API aurait accepté une charge vide — et est signalé comme tel plutôt que compté pour un succès.
+
+`apiUrl` figure dans la liste blanche `config` de la fiche : Zoho exploite trois centres de données (`api.zeptomail.com`, `.eu`, `.in`) et un jeton émis dans l'un est refusé par les autres. Sans ce champ, un compte européen serait intestable depuis `/admin`, et le `401` obtenu accuserait le jeton alors que seul le point d'entrée serait en cause.
+
+#### Variables
+
+Toutes optionnelles, la propriété de démarrage sans configuration est intacte.
+
+| Variable | Rôle |
+| --- | --- |
+| `ZEPTOMAIL_TOKEN` | « Send Mail Token » de la console Zoho. Le préfixe `Zoho-enczapikey` est retiré s'il a été collé avec — la console affiche la ligne d'en-tête entière, et le doubler produit un `401` que personne ne relie à un copier-coller. |
+| `ZEPTOMAIL_API_URL` | Centre de données. Défaut `https://api.zeptomail.com/v1.1/email`. |
+| `MAIL_FROM` | Expéditeur affiché, **commun aux deux chemins**. Nom canonique depuis S22m : il ne nomme plus un protocole que ZeptoMail n'utilise pas. |
+| `SMTP_FROM` | Ancien nom de `MAIL_FROM`, toujours lu. Il est **déjà posé en production** ; le retirer d'un coup ferait partir les premiers emails ZeptoMail depuis une adresse déduite. `MAIL_FROM` gagne quand les deux sont là. |
+
+Une seule variable d'expéditeur pour les deux chemins, et c'est délibéré : deux finiraient par diverger, et l'expéditeur affiché dépendrait alors du transport en vigueur — écart invisible en développement, visible par les destinataires en production. ZeptoMail veut `{address, name}` séparés là où SMTP accepte `"Nom <adresse>"` : la conversion se fait dans le client, pas dans la configuration.
+
+#### Ce qui ne change pas
+
+- Sans aucune configuration, l'API démarre, l'email est journalisé, l'appel retourne `delivered: false`. Cette propriété est la raison d'être du repli et reste testée.
+- Aucune méthode ne lève sur échec d'envoi. **Mais aucun échec n'est silencieux** : chaque échec est journalisé avec le chemin emprunté, le destinataire et le sujet — jamais le corps, qui porte le lien et son jeton (docs/17 § Journalisation). C'est la contrepartie indispensable de « ne jamais lever » : sans cette ligne, un email jamais parti ne laisserait aucune trace, et le seul signal serait la plainte d'un utilisateur des jours plus tard.
+- Le motif machine `SMTP_NOT_CONFIGURED` devient `MAIL_NOT_CONFIGURED` (deux chemins possibles : un motif qui n'en nomme qu'un ferait chercher un serveur SMTP absent là où c'est le jeton qui manque), et `ZEPTOMAIL_ERROR` s'ajoute à `SMTP_ERROR`. Ces codes ne sont lus que dans `apps/api/src/mail/`.
 
 ### 2. Trois emails, en français, sans image distante
 
@@ -97,7 +168,16 @@ better-auth refuse la liaison si :
 
 **Pourquoi l'accepter quand même.** Ce produit fonctionne sans SMTP configuré — c'est un état documenté et voulu. Dans cette situation, aucun compte n'est jamais vérifié : avec `true`, la liaison ne fonctionnerait **pour personne**, et l'utilisateur légitime serait définitivement enfermé dehors sur sa propre adresse, avec pour seul recours le support. Le choix n'est donc pas entre « sûr » et « pratique », mais entre deux défaillances, dont l'une frappe tout le monde en permanence.
 
-**La parade, et elle est réelle.** Elle n'est pas de refuser la liaison, mais d'empêcher un compte non vérifié d'exister utilement : `AUTH_REQUIRE_EMAIL_VERIFICATION=true`. Un compte pré-enregistré non vérifié devient alors inutilisable, et le scénario s'effondre. C'est précisément ce que S22a rend enfin possible en branchant l'envoi — jusqu'ici ce drapeau ne pouvait pas être activé faute d'email. **Action de mise en production : activer ce drapeau en même temps que le bloc SMTP** (rappel inscrit dans `.env.production.example`).
+**La parade, et elle est réelle.** Elle n'est pas de refuser la liaison, mais d'empêcher un compte non vérifié d'exister utilement : `AUTH_REQUIRE_EMAIL_VERIFICATION=true`. Un compte pré-enregistré non vérifié devient alors inutilisable, et le scénario s'effondre. C'est précisément ce que S22a rend enfin possible en branchant l'envoi — jusqu'ici ce drapeau ne pouvait pas être activé faute d'email.
+
+**Action de mise en production, amendée en S22m — l'ordre importe.** La consigne d'origine (« activer ce drapeau en même temps que le bloc SMTP ») est trop lâche, et le devient dangereusement maintenant que sept comptes existent dont six non vérifiés : le drapeau à `true` avec un envoi qui *ne marche pas* enferme dehors ces six comptes, sans qu'aucun puisse se délivrer lui-même le lien qui manque — le seul recours serait une intervention en base. La séquence est donc :
+
+1. poser `ZEPTOMAIL_TOKEN`, redémarrer l'API ;
+2. vérifier dans les journaux la ligne `Chemin d'envoi des emails : ZeptoMail (…)` ;
+3. déclencher un envoi réel (réinitialisation de mot de passe sur une adresse qu'on relève) et **constater l'email reçu** ;
+4. alors seulement, passer `AUTH_REQUIRE_EMAIL_VERIFICATION=true` et redémarrer.
+
+Ce drapeau n'est **pas** activé par le lot S22m : c'est une bascule de production, elle appartient au décideur, et elle ne se prend qu'après l'étape 3 (rappel inscrit dans `.env.production.example`).
 
 Note : `requireLocalEmailVerified` est marqué déprécié par better-auth, qui prévoit de rendre la garde inconditionnelle dans une version mineure ultérieure. Ce n'est pas un problème mais un calendrier : le jour où l'option disparaît, `AUTH_REQUIRE_EMAIL_VERIFICATION=true` devra déjà être en place. À surveiller à chaque montée de version.
 
@@ -194,7 +274,7 @@ S'il répond `{"google":false}`, l'une des deux variables manque ou n'a pas ét�
 ## Conséquences
 
 - **Rien ne devient obligatoire.** Sans les sept variables, l'API démarre, le bouton Google ne s'affiche pas, les emails sont journalisés et les opérations métier aboutissent en annonçant honnêtement que rien n'a été délivré. Une suite e2e dédiée retire les sept variables et le vérifie de bout en bout.
-- **Le changement d'adresse email devient enfin terminable** par un utilisateur final (page publique `/verification-email`), à condition qu'un SMTP soit configuré. `notifiedAt` n'est renseigné que si l'envoi a **réellement** abouti : `verificationDelivered` ne ment pas.
+- **Le changement d'adresse email devient enfin terminable** par un utilisateur final (page publique `/verification-email`), à condition qu'un chemin d'envoi soit configuré (S22m : ZeptoMail ou SMTP). `notifiedAt` n'est renseigné que si l'envoi a **réellement** abouti : `verificationDelivered` ne ment pas.
 - **Un compte perdu devient récupérable.** C'est la fin d'un manque qui rendait chaque oubli de mot de passe définitif.
 - **`docs/17` § « Bloqué par l'absence de SMTP » est levé** dans son principe : le blocage n'est plus structurel, il est configurationnel.
 - L'invitation continue de renvoyer son jeton dans la réponse de création, même avec SMTP actif : un email peut être classé en indésirable ou refusé par un domaine d'entreprise, et un lien copiable évite de rendre l'invitation dépendante d'une infrastructure qu'on ne maîtrise pas. Le champ `emailDelivered` dit lequel des deux chemins a fonctionné.
@@ -204,9 +284,10 @@ S'il répond `{"google":false}`, l'une des deux variables manque ou n'a pas ét�
 
 Écrites ici pour qu'elles ne soient pas redécouvertes en production comme des surprises :
 
-- **Aucune reprise sur échec.** Un envoi qui échoue est journalisé, pas réessayé (option file d'attente écartée ci-dessus). Un incident SMTP de quelques minutes perd les messages émis pendant sa durée ; l'utilisateur peut redemander un lien, et une invitation reste récupérable par son lien copiable.
-- **Aucune observabilité de délivrabilité** : ni taux d'ouverture, ni retour de rejet (*bounce*). SMTP ne les expose pas. Un domaine qui commencerait à rejeter nos messages ne se verrait que par la plainte d'un utilisateur.
-- **SPF, DKIM et DMARC sont hors périmètre du code.** Sans ces enregistrements DNS sur le domaine expéditeur, les messages partiront en indésirables quelle que soit la qualité du code (à traiter à la mise en service, docs/24).
+- **Aucune reprise sur échec.** Un envoi qui échoue est journalisé, pas réessayé (option file d'attente écartée ci-dessus, et pas de bascule sur l'autre chemin — voir § 1 bis). Un incident de quelques minutes perd les messages émis pendant sa durée ; l'utilisateur peut redemander un lien, et une invitation reste récupérable par son lien copiable.
+- **Aucune observabilité de délivrabilité côté produit** : ni taux d'ouverture, ni retour de rejet (*bounce*). SMTP ne les expose pas. ZeptoMail, lui, tient un journal d'envoi et des webhooks dans sa console — **non consommés par le code** : un rejet se constate donc dans l'interface Zoho, pas dans Lalanda. C'est un gain d'observabilité réel mais manuel, et il ne doit pas être confondu avec une intégration.
+- **SPF, DKIM et DMARC sont hors périmètre du code.** Sans ces enregistrements DNS sur le domaine expéditeur, les messages partiront en indésirables quelle que soit la qualité du code (à traiter à la mise en service, docs/24). ZeptoMail impose en plus la **vérification du domaine expéditeur** dans sa console : tant qu'elle n'est pas faite, l'API refuse l'envoi — refus explicite, pas silencieux, mais bloquant.
+- **Aucun envoi réel n'a été constaté par ce lot.** Il n'existe pas de jeton ZeptoMail dans cet environnement de développement. Tout ce qui est vérifié l'est hors ligne : la requête émise, les en-têtes, la charge, le traitement des quatre échecs. Que Zoho accepte un envoi reste à établir par l'étape 3 de la séquence ci-dessus.
 - **Aucun quota propre aux envois.** `/auth/*` s'appuie sur la limitation de tentatives de better-auth ; rien ne borne spécifiquement le nombre d'emails qu'une même adresse peut faire déclencher. À revoir si le formulaire de réinitialisation devenait un vecteur de nuisance.
 - **Un seul fournisseur social.** Microsoft et Apple ne sont pas branchés ; la structure les accepterait sans changement d'architecture.
 
@@ -224,7 +305,11 @@ Tests livrés avec le lot, tous sans le moindre envoi réseau :
 | Révocation des sessions à la réinitialisation | idem |
 | Démarrage sans aucune variable Google ni SMTP | `apps/api/src/__tests__/no-mail-no-google.e2e.test.ts` |
 | Repli journal, cache et rotation du transporteur | `apps/api/src/mail/mail.transport.test.ts` (`nodemailer` remplacé par un module factice) |
-| Variables SMTP toutes optionnelles, port illisible sans effet | `apps/api/src/mail/mail-credentials.provider.test.ts` |
+| Variables toutes optionnelles, port illisible sans effet | `apps/api/src/mail/mail-credentials.provider.test.ts` |
+| **S22m** — précédence ZeptoMail > SMTP > journal, expéditeur commun aux deux chemins, préfixe `Zoho-enczapikey` retiré | `apps/api/src/mail/mail-credentials.provider.test.ts` |
+| **S22m** — charge ZeptoMail émise : `Zoho-enczapikey`, `from` découpé, `htmlbody` **et** `textbody`, jeton nulle part hors en-tête | `apps/api/src/mail/mail.transport.test.ts` — serveur HTTP local sur `127.0.0.1`, pas un `fetch` détourné |
+| **S22m** — les quatre échecs : jeton absent, jeton refusé (401), erreur d'API (400), panne réseau. Aucun ne lève, tous sont journalisés | idem — un test vérifie la ligne de journal ET ce qui n'y figure pas (corps, jeton) |
+| **S22m** — le test de connexion ne peut envoyer aucun email : charge `{}`, sans destinataire | `apps/api/src/integrations/connection-tests.test.ts` — rougit si la charge est « complétée » |
 | Emails sans ressource distante, lien présent en texte, échappement des saisies | `apps/api/src/mail/mail.templates.test.ts` |
 | « Les deux variables Google ou rien » | `apps/api/src/auth/google-config.test.ts` |
 
@@ -232,7 +317,8 @@ Tests livrés avec le lot, tous sans le moindre envoi réseau :
 
 - ADR-0006 — Authentification : better-auth (promesse Google)
 - ADR-0009 — Infrastructure DigitalOcean (gestion des secrets, port 25 bloqué en sortie)
-- ADR-0013 — Stockage des secrets d'intégration (futur fournisseur d'identifiants SMTP)
+- ADR-0013 — Stockage des secrets d'intégration (fiche `zeptomail`, futur fournisseur d'identifiants d'envoi)
+- Zoho ZeptoMail — API d'envoi : <https://www.zoho.com/zeptomail/help/api/email-sending.html>
 - `docs/17-SECURITE.md` § Bloqué par l'absence de SMTP
 - better-auth — liaison de comptes : <https://www.better-auth.com/docs/concepts/users-accounts#account-linking>
 - Google — OAuth 2.0 pour applications web : <https://developers.google.com/identity/protocols/oauth2/web-server>

@@ -77,7 +77,15 @@ const SECRETS_SENTINELLES: Record<IntegrationProvider, Record<string, string>> =
   },
   paypal: { clientSecret: 'ANTIFUITE-paypal-0c5d93b7e421' },
   smtp: { password: 'ANTIFUITE-smtp-6e2b47f0a8d1' },
-  s3: { secretKey: 'ANTIFUITE-s3-9a4c81d5f37b' },
+  // `r2` et non `s3` : la clé DOIT être celle d'`INTEGRATION_PROVIDERS`. Une clé
+  // périmée ne produit aucune erreur visible ici — `SECRETS_SENTINELLES[provider]`
+  // vaut alors `undefined`, `amorcerLeParc` enregistre le fournisseur SANS secret,
+  // et la campagne anti-fuite le traverse sans rien avoir à trouver. Le test reste
+  // vert en ne testant plus rien : c'est le mode de panne à surveiller dans ce
+  // fichier.
+  r2: { secretKey: 'ANTIFUITE-r2-9a4c81d5f37b' },
+  elevenlabs: { apiKey: 'ANTIFUITE-elevenlabs-2b7e40f1a6c8' },
+  zeptomail: { sendMailToken: 'ANTIFUITE-zeptomail-7d3f62a0c94e' },
 };
 
 /** `config` valide au regard de la liste blanche de chaque fournisseur. */
@@ -86,7 +94,11 @@ const CONFIG_SENTINELLE: Record<IntegrationProvider, Record<string, string | num
   stripe: { publishableKey: 'pk_test_visible_par_conception' },
   paypal: { clientId: 'client-id-public', environment: 'sandbox' },
   smtp: { host: 'smtp.exemple.test', port: 587, user: 'expediteur@exemple.test' },
-  s3: { endpoint: 'https://exemple.test', bucketExports: 'exports' },
+  r2: { endpoint: 'https://exemple.test', bucketExports: 'exports' },
+  elevenlabs: { baseUrl: 'https://exemple.test' },
+  // ZeptoMail ne déclare qu'`apiUrl` (ADR-0014) : le centre de données Zoho.
+  // Rien d'autre n'est non secret dans cette fiche.
+  zeptomail: { apiUrl: 'https://api.zeptomail.exemple.test/v1.1/email' },
 };
 
 /** Toutes les valeurs en clair du parc — la liste que rien ne doit contenir. */

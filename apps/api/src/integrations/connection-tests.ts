@@ -2,20 +2,22 @@
 // TESTS DE CONNEXION — ADR-0013 §5
 //
 // « Une clé invalide n'entre jamais en base — c'est ce qui évite de découvrir la
-// panne au premier paiement client. » Chacun des six tests est choisi pour être
+// panne au premier paiement client. » Chacun des sept tests est choisi pour être
 // GRATUIT et SANS EFFET DE BORD : lecture de compte, liste de modèles, demande de
 // jeton, `verify()` SMTP sans envoi, `HeadBucket` sans lecture d'objet, liste des
-// voix sans synthèse.
+// voix sans synthèse, et charge d'email délibérément vide.
 //
-// Le critère vaut pour les deux fournisseurs ajoutés ici. R2 est facturé aux
-// opérations et aux octets sortants : `HeadBucket` ne lit aucun objet et n'en
-// écrit aucun. ElevenLabs est facturé AU CARACTÈRE SYNTHÉTISÉ : brancher le
-// bouton « Tester » sur un point de génération coûterait de l'argent à chaque
-// clic, `GET /v2/voices` n'en coûte aucun.
+// Le critère vaut pour les trois derniers. R2 est facturé aux opérations et aux
+// octets sortants : `HeadBucket` ne lit aucun objet et n'en écrit aucun.
+// ElevenLabs est facturé AU CARACTÈRE SYNTHÉTISÉ : brancher le bouton « Tester »
+// sur un point de génération coûterait de l'argent à chaque clic, `GET /v2/voices`
+// n'en coûte aucun. ZeptoMail est facturé À L'EMAIL et n'expose aucun point de
+// lecture : le test appelle donc sa seule route, mais avec une charge SANS
+// DESTINATAIRE — il n'y a personne à qui écrire, donc rien à facturer.
 //
 // ── Pourquoi aucune dépendance n'est ajoutée ─────────────────────────────────
 //
-// Quatre des six tests sont de simples requêtes HTTP (`fetch` natif). Les deux
+// Cinq des sept tests sont de simples requêtes HTTP (`fetch` natif). Les deux
 // autres — SMTP et R2 — auraient justifié `nodemailer` et `@aws-sdk/client-s3`,
 // soit deux arbres de dépendances complets importés dans le processus qui
 // détient `SECRETS_MASTER_KEY`. ADR-0013 §10 nomme la chaîne d'approvisionnement
@@ -23,6 +25,11 @@
 // de paquets transitifs pour deux appels de vérification serait agrandir la
 // surface exacte que l'ADR désigne comme non couverte. Les deux protocoles sont
 // donc parlés directement — une poignée de lignes, aucun nouveau paquet.
+//
+// Le paquet `zeptomail` de Zoho suit la même règle et pour une raison de plus :
+// `registry.npmjs.org` est injoignable depuis le poste de développement (IPv6 non
+// routé). Son `SendMailClient` n'est qu'une enveloppe autour d'un POST JSON — la
+// réécrire tient en dix lignes, ici comme dans `mail/zeptomail.client.ts`.
 //
 // Ces clients de TEST ne remplacent pas les futurs clients d'usage : le jour où
 // des emails partent réellement, `nodemailer` sera un choix défendable, discuté
@@ -101,6 +108,8 @@ async function runProviderTest(input: ConnectionTestInput): Promise<string> {
       return testR2(input);
     case 'elevenlabs':
       return testElevenLabs(input);
+    case 'zeptomail':
+      return testZeptoMail(input);
   }
 }
 
@@ -405,6 +414,124 @@ async function testElevenLabs(input: ConnectionTestInput): Promise<string> {
   if (!res.ok) throw new Error(`ElevenLabs a refusé la requête (HTTP ${res.status}).`);
   const body = (await res.json()) as { voices?: unknown[] };
   return `Clé acceptée — ${body.voices?.length ?? 0} voix accessibles (aucune synthèse déclenchée).`;
+}
+
+// ─── ZeptoMail : /v1.1/email avec une charge incomplète, aucun email envoyé ───
+
+/** Point d'entrée par défaut. `.eu` et `.in` existent — voir `ZEPTOMAIL_API_URL`. */
+export const ZEPTOMAIL_DEFAULT_API_URL = 'https://api.zeptomail.com/v1.1/email';
+
+/**
+ * Préfixe imposé par Zoho dans l'en-tête `Authorization`.
+ *
+ * Ce n'est ni `Bearer` ni `Basic` : ZeptoMail attend littéralement
+ * `Zoho-enczapikey <jeton>`. La console Zoho affiche d'ailleurs la ligne
+ * d'en-tête ENTIÈRE, préfixe compris — un opérateur qui copie ce qu'il voit
+ * colle donc souvent « Zoho-enczapikey wSsV… » au lieu du seul jeton. Le préfixe
+ * est retiré s'il est présent (voir `normaliserJeton`) : le doubler produirait un
+ * 401 que personne ne relie à un copier-coller.
+ */
+const ZEPTOMAIL_AUTH_PREFIX = 'Zoho-enczapikey';
+
+/** Jeton nu, que l'opérateur ait collé le jeton seul ou la ligne d'en-tête entière. */
+export function normaliserJetonZeptoMail(brut: string): string {
+  const t = brut.trim();
+  return t.toLowerCase().startsWith(`${ZEPTOMAIL_AUTH_PREFIX.toLowerCase()} `)
+    ? t.slice(ZEPTOMAIL_AUTH_PREFIX.length + 1).trim()
+    : t;
+}
+
+/**
+ * Validation du jeton SANS envoyer d'email — et sans qu'aucun envoi soit possible.
+ *
+ * ZeptoMail n'expose aucun point de lecture équivalent au `GET /v1/models`
+ * d'OpenAI : son API de transaction n'a qu'une route, `POST /v1.1/email`. Le test
+ * l'appelle donc, mais avec un corps `{}` — ni `from`, ni `to`, ni `subject`, ni
+ * corps de message. Deux propriétés en découlent, et ce sont elles qui rendent le
+ * test gratuit :
+ *
+ *  1. **Aucun destinataire ne peut être servi.** Il n'y a pas d'adresse dans la
+ *     charge ; même une API qui accepterait tout n'aurait personne à qui écrire.
+ *     C'est plus fort qu'une promesse sur le comportement du serveur : c'est une
+ *     propriété de la requête émise, vérifiée hors ligne par le test unitaire.
+ *  2. **L'authentification est tranchée avant la validation.** Un jeton refusé
+ *     répond 401 ; un jeton accepté répond 400 en énumérant les champs
+ *     obligatoires manquants. Cette réponse 400 est le RÉSULTAT ATTENDU : elle ne
+ *     s'obtient qu'authentifié, elle prouve donc le jeton et ne coûte rien.
+ *
+ * Un 2xx serait une anomalie — l'API aurait accepté une charge vide — et est
+ * signalé comme telle plutôt que compté pour un succès. Mieux vaut un test qui
+ * dit « je ne comprends pas cette réponse » qu'un test qui rassure à tort.
+ */
+async function testZeptoMail(input: ConnectionTestInput): Promise<string> {
+  const token = normaliserJetonZeptoMail(requireSecret(input, 'sendMailToken'));
+  if (!token) throw new Error('Secret « sendMailToken » vide après nettoyage : test impossible.');
+
+  // `apiUrl` vient de la fiche `/admin` (liste blanche `config`). Il doit désigner
+  // le MÊME centre de données que `ZEPTOMAIL_API_URL` côté transport : un jeton
+  // émis sur `.com` est refusé par `.eu`. Le message de retour nomme l'hôte joint
+  // pour qu'un écart entre les deux se voie au lieu de se deviner.
+  const apiUrl = str(input.config, 'apiUrl') || ZEPTOMAIL_DEFAULT_API_URL;
+  let cible: URL;
+  try {
+    cible = new URL(apiUrl);
+  } catch {
+    throw new Error(`\`apiUrl\` n'est pas une URL valide : « ${apiUrl} ».`);
+  }
+
+  const res = await fetch(cible.toString(), {
+    method: 'POST',
+    headers: {
+      authorization: `${ZEPTOMAIL_AUTH_PREFIX} ${token}`,
+      'content-type': 'application/json',
+      accept: 'application/json',
+    },
+    // Charge DÉLIBÉRÉMENT VIDE. Voir le point 1 ci-dessus : c'est ce qui rend
+    // l'envoi impossible, pas seulement improbable.
+    body: '{}',
+  });
+
+  if (res.status === 401 || res.status === 403) {
+    throw new Error(
+      `ZeptoMail a refusé le jeton (HTTP ${res.status}). Vérifiez qu'il s'agit d'un ` +
+        `« Send Mail Token » (et non d'une clé d'API Mail Agent), et que le centre de ` +
+        `données est le bon (« ${cible.host} » ici ; Zoho expose aussi .eu et .in).`,
+    );
+  }
+
+  if (res.ok) {
+    // Ne jamais compter ceci pour un succès : si l'API accepte une charge vide,
+    // l'hypothèse sur laquelle repose la gratuité du test ne tient plus et cela
+    // doit se voir.
+    throw new Error(
+      `Réponse inattendue de ${cible.host} (HTTP ${res.status}) : une charge vide aurait dû ` +
+        `être refusée. Le jeton n'est pas validé par ce résultat.`,
+    );
+  }
+
+  // 400 (et tout autre 4xx/5xx non authentifiant) : la requête a franchi
+  // l'authentification et s'est arrêtée à la validation. C'est le succès attendu.
+  const motif = await messageZeptoMail(res);
+  return (
+    `Jeton accepté par ${cible.host} — la charge incomplète a été refusée à la validation ` +
+    `(HTTP ${res.status}${motif ? ` : ${motif}` : ''}). Aucun email n'a été envoyé.`
+  );
+}
+
+/** Message d'erreur de l'API, borné, ou chaîne vide si la réponse est illisible. */
+async function messageZeptoMail(res: Response): Promise<string> {
+  try {
+    const body = (await res.json()) as { error?: { message?: unknown; code?: unknown } };
+    const message = typeof body.error?.message === 'string' ? body.error.message : '';
+    const code = typeof body.error?.code === 'string' ? body.error.code : '';
+    // Borné à 120 caractères : ce texte est réaffiché dans `/admin`, et une
+    // réponse d'API n'a aucune raison d'y déverser un pavé.
+    return [code, message].filter(Boolean).join(' — ').slice(0, 120);
+  } catch {
+    // Une réponse non-JSON n'est pas un échec du test : le code HTTP suffit à
+    // conclure, et le corps n'était qu'un confort de diagnostic.
+    return '';
+  }
 }
 
 /**

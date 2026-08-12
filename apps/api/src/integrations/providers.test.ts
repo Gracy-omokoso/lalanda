@@ -22,18 +22,24 @@ import {
 } from './providers.js';
 
 describe('le catalogue des fournisseurs', () => {
-  it('est exactement celui du code — ADR-0013 augmenté de R2 et d’ElevenLabs', () => {
-    // ADR-0013 § Contexte en nommait cinq. Deux évolutions depuis : `s3` est
-    // devenu `r2` (même protocole, fournisseur cible différent) et `elevenlabs`
-    // est ajouté. La liste reste ÉNUMÉRÉE en dur : c'est ce qui fait rougir le
-    // test le jour où un fournisseur est ajouté sans que la décision soit prise.
+  it('est exactement celui du code — ADR-0013 augmenté de R2, ElevenLabs et ZeptoMail', () => {
+    // ADR-0013 § Contexte en nommait cinq. Trois évolutions depuis : `s3` est
+    // devenu `r2` (même protocole, fournisseur cible différent), `elevenlabs`
+    // est ajouté, et `zeptomail` l'est par ADR-0014. La liste reste ÉNUMÉRÉE en
+    // dur : c'est ce qui fait rougir le test le jour où un fournisseur est
+    // ajouté sans que la décision soit prise. Toute ligne ajoutée doit pointer
+    // son ADR — un fournisseur qui apparaît sans ADR apparaît aussi dans
+    // `/admin`, avec un champ de saisie de secret que personne n'a arbitré.
     expect([...INTEGRATION_PROVIDERS]).toEqual([
+      // ADR-0013 § Contexte — les cinq d'origine, `s3` renommé `r2`.
       'openai',
       'stripe',
       'paypal',
       'smtp',
       'r2',
       'elevenlabs',
+      // ADR-0014 — chemin d'envoi préféré, SMTP conservé en repli.
+      'zeptomail',
     ]);
   });
 
@@ -160,6 +166,21 @@ describe('les arbitrages nommés par ADR-0013 sont bien ceux du code', () => {
   it('SMTP range `user` en config et `password` en secret', () => {
     expect(PROVIDER_SPECS.smtp.config).toContain('user');
     expect(PROVIDER_SPECS.smtp.secrets).toContain('password');
+  });
+
+  it('ZeptoMail n’expose QUE son jeton d’envoi, et rien d’autre en secret (ADR-0014)', () => {
+    // Le jeton « Send Mail Token » vaut le droit d'écrire depuis le domaine :
+    // c'est un secret entier, jamais une moitié publiable comme `r2.accessKey`.
+    expect(PROVIDER_SPECS.zeptomail.secrets).toEqual(['sendMailToken']);
+    // `apiUrl` SEUL en clair — le centre de données Zoho (.com / .eu / .in). Ce
+    // n'est pas un secret et le test de connexion en a besoin : un jeton émis sur
+    // un centre est refusé par les deux autres, et sans ce champ un compte
+    // européen serait intestable depuis `/admin`.
+    expect(PROVIDER_SPECS.zeptomail.config).toEqual(['apiUrl']);
+    // Aucune adresse d'expédition ici : cette fiche ne déclenche AUCUN envoi. La
+    // déclarer donnerait à croire qu'elle est lue par le transport, ce qui est
+    // faux tant que `MailCredentialsProvider` lit l'environnement.
+    expect(PROVIDER_SPECS.zeptomail.config).not.toContain('fromAddress');
   });
 });
 
