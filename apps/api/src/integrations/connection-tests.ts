@@ -2,14 +2,21 @@
 // TESTS DE CONNEXION — ADR-0013 §5
 //
 // « Une clé invalide n'entre jamais en base — c'est ce qui évite de découvrir la
-// panne au premier paiement client. » Chacun des cinq tests est choisi pour être
+// panne au premier paiement client. » Chacun des six tests est choisi pour être
 // GRATUIT et SANS EFFET DE BORD : lecture de compte, liste de modèles, demande de
-// jeton, `verify()` SMTP sans envoi, `HeadBucket` sans lecture d'objet.
+// jeton, `verify()` SMTP sans envoi, `HeadBucket` sans lecture d'objet, liste des
+// voix sans synthèse.
+//
+// Le critère vaut pour les deux fournisseurs ajoutés ici. R2 est facturé aux
+// opérations et aux octets sortants : `HeadBucket` ne lit aucun objet et n'en
+// écrit aucun. ElevenLabs est facturé AU CARACTÈRE SYNTHÉTISÉ : brancher le
+// bouton « Tester » sur un point de génération coûterait de l'argent à chaque
+// clic, `GET /v2/voices` n'en coûte aucun.
 //
 // ── Pourquoi aucune dépendance n'est ajoutée ─────────────────────────────────
 //
-// Trois des cinq tests sont de simples requêtes HTTP (`fetch` natif). Les deux
-// autres — SMTP et S3 — auraient justifié `nodemailer` et `@aws-sdk/client-s3`,
+// Quatre des six tests sont de simples requêtes HTTP (`fetch` natif). Les deux
+// autres — SMTP et R2 — auraient justifié `nodemailer` et `@aws-sdk/client-s3`,
 // soit deux arbres de dépendances complets importés dans le processus qui
 // détient `SECRETS_MASTER_KEY`. ADR-0013 §10 nomme la chaîne d'approvisionnement
 // npm comme « le maillon faible » de tout le dispositif : ajouter des centaines
@@ -90,8 +97,10 @@ async function runProviderTest(input: ConnectionTestInput): Promise<string> {
       return testPayPal(input);
     case 'smtp':
       return testSmtp(input);
-    case 's3':
-      return testS3(input);
+    case 'r2':
+      return testR2(input);
+    case 'elevenlabs':
+      return testElevenLabs(input);
   }
 }
 
@@ -301,20 +310,47 @@ class SmtpSession {
   }
 }
 
-// ─── S3 : HeadBucket signé SigV4 (ADR-0013 §5) ───────────────────────────────
+// ─── R2 : HeadBucket signé SigV4 (ADR-0013 §5) ───────────────────────────────
 
-async function testS3(input: ConnectionTestInput): Promise<string> {
+/** Suffixe d'hôte de l'API S3 de Cloudflare R2. */
+const R2_HOST_SUFFIX = '.r2.cloudflarestorage.com';
+
+/**
+ * HeadBucket sur le bucket des exports — gratuit, sans lecture d'objet.
+ *
+ * Fonctionne à l'identique sur R2, MinIO et Spaces : les trois parlent le même
+ * protocole, signé SigV4 avec le même nom de service `s3`. Le seul écart tient à
+ * la RÉGION.
+ *
+ * R2 n'a pas de région au sens AWS — mais SigV4 en exige une dans le scope, il
+ * n'existe pas de signature sans jeton de région. Cloudflare attend le littéral
+ * `auto` (sa documentation indique que `us-east-1` et la chaîne vide y sont
+ * alias). Le défaut est donc déduit de l'hôte, exactement comme dans
+ * `storage/storage.config.ts`, plutôt que d'exiger de l'opératrice qu'elle
+ * devine une valeur pour un service qui n'a pas de régions : une région erronée
+ * produit un 403 dont le message accuse les identifiants, ce qui envoie chercher
+ * le problème du mauvais côté.
+ */
+async function testR2(input: ConnectionTestInput): Promise<string> {
   const endpoint = str(input.config, 'endpoint');
-  const region = str(input.config, 'region') || 'us-east-1';
   const accessKey = str(input.config, 'accessKey');
   const bucket = str(input.config, 'bucketExports');
   const forcePathStyle = str(input.config, 'forcePathStyle') !== 'false';
-  if (!endpoint) throw new Error('`endpoint` absent de la configuration S3.');
-  if (!accessKey) throw new Error('`accessKey` absent de la configuration S3.');
-  if (!bucket) throw new Error('`bucketExports` absent de la configuration S3.');
+  if (!endpoint) throw new Error('`endpoint` absent de la configuration R2.');
+  if (!accessKey) throw new Error('`accessKey` absent de la configuration R2.');
+  if (!bucket) throw new Error('`bucketExports` absent de la configuration R2.');
   const secretKey = requireSecret(input, 'secretKey');
 
-  const base = new URL(endpoint);
+  let base: URL;
+  try {
+    base = new URL(endpoint);
+  } catch {
+    throw new Error(`\`endpoint\` n'est pas une URL valide : « ${endpoint} ».`);
+  }
+
+  const estR2 = base.host.toLowerCase().endsWith(R2_HOST_SUFFIX);
+  const region = str(input.config, 'region') || (estR2 ? 'auto' : 'us-east-1');
+
   const host = forcePathStyle ? base.host : `${bucket}.${base.host}`;
   const path = forcePathStyle ? `/${bucket}` : '/';
   const url = `${base.protocol}//${host}${path}`;
@@ -324,16 +360,51 @@ async function testS3(input: ConnectionTestInput): Promise<string> {
     host,
     path,
     region,
+    // Le nom de service reste `s3` chez R2 : c'est ce qui rend la signature
+    // identique d'un fournisseur à l'autre.
     service: 's3',
     accessKey,
     secretKey,
   });
 
   const res = await fetch(url, { method: 'HEAD', headers });
-  if (res.status === 403) throw new Error('S3 : identifiants refusés (HTTP 403).');
-  if (res.status === 404) throw new Error(`S3 : bucket « ${bucket} » introuvable (HTTP 404).`);
-  if (!res.ok) throw new Error(`S3 : HeadBucket a échoué (HTTP ${res.status}).`);
-  return `Bucket « ${bucket} » accessible en ${region}.`;
+  if (res.status === 401 || res.status === 403) {
+    throw new Error(
+      `Identifiants refusés (HTTP ${res.status}). Vérifiez la clé d'accès, la clé secrète, ` +
+        `et la région signée (« ${region} » ici ; R2 attend « auto »).`,
+    );
+  }
+  if (res.status === 404) throw new Error(`Bucket « ${bucket} » introuvable (HTTP 404).`);
+  if (!res.ok) throw new Error(`HeadBucket a échoué (HTTP ${res.status}).`);
+  return `Bucket « ${bucket} » accessible (région signée : ${region}).`;
+}
+
+// ─── ElevenLabs : GET /v2/voices (lecture seule, sans crédit) ─────────────────
+
+/**
+ * Liste des voix — le point de lecture le moins coûteux de l'API.
+ *
+ * Choisi pour la même raison que `GET /v1/models` chez OpenAI : il valide la
+ * clé sans rien produire. AUCUNE synthèse n'est déclenchée, donc aucun crédit
+ * n'est consommé — ce qui compte pour un fournisseur facturé au caractère, où un
+ * bouton « Tester » branché sur un point de génération coûterait de l'argent à
+ * chaque clic.
+ *
+ * L'authentification se fait par l'en-tête `xi-api-key`, et non par
+ * `Authorization: Bearer` : c'est l'écart le plus facile à manquer en recopiant
+ * le test d'OpenAI juste au-dessus.
+ */
+async function testElevenLabs(input: ConnectionTestInput): Promise<string> {
+  const apiKey = requireSecret(input, 'apiKey');
+  const baseUrl = str(input.config, 'baseUrl') || 'https://api.elevenlabs.io';
+  const res = await fetch(`${baseUrl.replace(/\/+$/, '')}/v2/voices`, {
+    method: 'GET',
+    headers: { 'xi-api-key': apiKey },
+  });
+  if (res.status === 401) throw new Error('ElevenLabs a refusé la clé (HTTP 401).');
+  if (!res.ok) throw new Error(`ElevenLabs a refusé la requête (HTTP ${res.status}).`);
+  const body = (await res.json()) as { voices?: unknown[] };
+  return `Clé acceptée — ${body.voices?.length ?? 0} voix accessibles (aucune synthèse déclenchée).`;
 }
 
 /**
