@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { avatarObjectKey, isObjectId, newObjectId } from './object-key.js';
 import { encodeS3Path, signV4 } from './sigv4.js';
-import { resolveStorageConfig } from './storage.config.js';
+import { flavorOfHost, resolveStorageConfig } from './storage.config.js';
 
 const FIXED_DATE = new Date('2026-08-10T12:00:00.000Z');
 const CREDS = { region: 'us-east-1', accessKey: 'AKIDEXAMPLE', secretKey: 'sekret' } as const;
@@ -173,5 +173,91 @@ describe('configuration du stockage', () => {
       S3_FORCE_PATH_STYLE: 'false',
     } as NodeJS.ProcessEnv);
     expect(r.available && r.config.forcePathStyle).toBe(false);
+  });
+});
+
+describe('compatibilité Cloudflare R2', () => {
+  const R2 = {
+    S3_ENDPOINT: 'https://abc123def456.r2.cloudflarestorage.com',
+    S3_ACCESS_KEY: 'r2-access-key',
+    S3_SECRET_KEY: 'r2-secret-key',
+    S3_BUCKET_UPLOADS: 'lalanda-uploads',
+  };
+
+  it('reconnaît R2 sur le SUFFIXE d’hôte, pas sur une sous-chaîne', () => {
+    expect(flavorOfHost('abc123.r2.cloudflarestorage.com')).toBe('r2');
+    expect(flavorOfHost('ABC123.R2.CloudflareStorage.com')).toBe('r2');
+    // Un bucket MinIO dont le nom CONTIENT le domaine ne doit pas basculer les
+    // défauts d'un serveur qui n'est pas R2 — d'où le suffixe et non `includes`.
+    expect(flavorOfHost('r2.cloudflarestorage.com.exemple.test')).toBe('s3');
+    expect(flavorOfHost('localhost:9000')).toBe('s3');
+    expect(flavorOfHost('ams3.digitaloceanspaces.com')).toBe('s3');
+  });
+
+  it('signe R2 en région « auto » sans qu’on ait à la déclarer', () => {
+    // R2 n'a pas de région au sens AWS, mais SigV4 en EXIGE une dans le scope :
+    // il n'existe pas de signature sans jeton de région. Cloudflare attend `auto`.
+    const r = resolveStorageConfig(R2 as NodeJS.ProcessEnv);
+    expect(r.available).toBe(true);
+    if (!r.available) return;
+    expect(r.config.flavor).toBe('r2');
+    expect(r.config.region).toBe('auto');
+    // Le style de chemin convient à R2 comme à MinIO : passer à R2 ne demande
+    // pas de toucher à `S3_FORCE_PATH_STYLE`.
+    expect(r.config.forcePathStyle).toBe(true);
+  });
+
+  it('laisse S3_REGION explicite l’emporter sur le défaut déduit', () => {
+    const r = resolveStorageConfig({ ...R2, S3_REGION: 'wnam' } as NodeJS.ProcessEnv);
+    expect(r.available && r.config.region).toBe('wnam');
+  });
+
+  it('ne change RIEN pour MinIO — le déploiement en place garde us-east-1', () => {
+    // C'est CE test qui prouve la non-régression du déploiement en production :
+    // MinIO tourne aujourd'hui et porte les photos de profil.
+    const r = resolveStorageConfig({
+      S3_ENDPOINT: 'http://minio:9000',
+      S3_ACCESS_KEY: 'lalanda',
+      S3_SECRET_KEY: 'lalanda-dev-secret',
+      S3_BUCKET_UPLOADS: 'lalanda-uploads',
+    } as NodeJS.ProcessEnv);
+    expect(r.available).toBe(true);
+    if (!r.available) return;
+    expect(r.config.flavor).toBe('s3');
+    expect(r.config.region).toBe('us-east-1');
+  });
+
+  it('exige les mêmes variables pour R2 que pour MinIO — aucune n’est devinée', () => {
+    const r = resolveStorageConfig({ S3_ENDPOINT: R2.S3_ENDPOINT } as NodeJS.ProcessEnv);
+    expect(r.available).toBe(false);
+    if (r.available) return;
+    expect(r.reason).toContain('S3_ACCESS_KEY');
+    expect(r.reason).toContain('S3_SECRET_KEY');
+    expect(r.reason).toContain('S3_BUCKET_UPLOADS');
+  });
+
+  it('produit un scope de signature accepté par R2', () => {
+    const r = resolveStorageConfig(R2 as NodeJS.ProcessEnv);
+    expect(r.available).toBe(true);
+    if (!r.available) return;
+    const headers = signV4({
+      method: 'PUT',
+      host: 'abc123def456.r2.cloudflarestorage.com',
+      path: '/lalanda-uploads/avatars/ab12',
+      region: r.config.region,
+      accessKey: r.config.accessKey,
+      secretKey: r.config.secretKey,
+      body: Buffer.from('image'),
+      contentType: 'image/webp',
+      now: FIXED_DATE,
+    });
+    // Le nom de SERVICE reste `s3` chez R2 : c'est ce qui permet à `sigv4.ts` de
+    // rester inchangé.
+    expect(headers['Authorization']).toContain('20260810/auto/s3/aws4_request');
+    // `x-amz-content-sha256` porte bien l'empreinte du corps réel, pas celle du
+    // corps vide — l'oubli classique qui fait répondre 403 en accusant la clé.
+    expect(headers['x-amz-content-sha256']).not.toBe(
+      'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    );
   });
 });
