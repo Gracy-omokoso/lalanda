@@ -336,9 +336,16 @@ describe('écriture par remplacement seulement (ADR-0013 §4)', () => {
 // ── 3. Vue de lecture ────────────────────────────────────────────────────────
 
 describe('vue de lecture — la seule forme jamais renvoyée (ADR-0013 §4)', () => {
-  it('liste les cinq fournisseurs même non configurés — l’absence est une information', async () => {
+  it('liste tous les fournisseurs même non configurés — l’absence est une information', async () => {
     const vues = await ctx.service.list();
-    expect(vues.map((v) => v.provider)).toEqual(['openai', 'stripe', 'paypal', 'smtp', 's3']);
+    expect(vues.map((v) => v.provider)).toEqual([
+      'openai',
+      'stripe',
+      'paypal',
+      'smtp',
+      'r2',
+      'elevenlabs',
+    ]);
     for (const vue of vues) {
       expect(vue.enabled).toBe(false);
       expect(vue.lastTest).toBeNull();

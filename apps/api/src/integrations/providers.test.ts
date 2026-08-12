@@ -16,13 +16,43 @@ import {
   isIntegrationProvider,
   isKnownConfigKey,
   isKnownSecretName,
+  LEGACY_PROVIDER_RENAMES,
   PROVIDER_SPECS,
   type IntegrationProvider,
 } from './providers.js';
 
-describe('les cinq fournisseurs', () => {
-  it('sont exactement ceux qu’ADR-0013 nomme', () => {
-    expect([...INTEGRATION_PROVIDERS]).toEqual(['openai', 'stripe', 'paypal', 'smtp', 's3']);
+describe('le catalogue des fournisseurs', () => {
+  it('est exactement celui du code — ADR-0013 augmenté de R2 et d’ElevenLabs', () => {
+    // ADR-0013 § Contexte en nommait cinq. Deux évolutions depuis : `s3` est
+    // devenu `r2` (même protocole, fournisseur cible différent) et `elevenlabs`
+    // est ajouté. La liste reste ÉNUMÉRÉE en dur : c'est ce qui fait rougir le
+    // test le jour où un fournisseur est ajouté sans que la décision soit prise.
+    expect([...INTEGRATION_PROVIDERS]).toEqual([
+      'openai',
+      'stripe',
+      'paypal',
+      'smtp',
+      'r2',
+      'elevenlabs',
+    ]);
+  });
+
+  it('ne propose plus `s3` — il ne survit que comme ancien nom à migrer', () => {
+    // `s3` retiré du catalogue mais déclaré dans `LEGACY_PROVIDER_RENAMES` : un
+    // déploiement en cours d'exploitation porte encore un document `provider:
+    // 's3'`, et la migration doit savoir quoi chercher. L'y laisser ferait
+    // apparaître dans /admin un fournisseur fantôme.
+    expect(isIntegrationProvider('s3')).toBe(false);
+    expect(LEGACY_PROVIDER_RENAMES['s3']).toBe('r2');
+  });
+
+  it('ne renomme jamais vers un fournisseur absent du catalogue', () => {
+    // Une cible erronée produirait, après migration, un document que le service
+    // refuserait de relire — panne découverte au premier chargement d'/admin.
+    for (const [ancien, cible] of Object.entries(LEGACY_PROVIDER_RENAMES)) {
+      expect(isIntegrationProvider(cible), `${ancien} → ${cible}`).toBe(true);
+      expect(isIntegrationProvider(ancien), `${ancien} est encore actif`).toBe(false);
+    }
   });
 
   it('ont tous une spécification complète', () => {
@@ -107,11 +137,18 @@ describe('les arbitrages nommés par ADR-0013 sont bien ceux du code', () => {
     expect(PROVIDER_SPECS.stripe.secrets).toContain('webhookSecret');
   });
 
-  it('S3 range `accessKey` en config et `secretKey` en secret', () => {
+  it('R2 range `accessKey` en config et `secretKey` en secret', () => {
     // « `accessKey` est un IDENTIFIANT, publiable au même titre qu'un nom
     // d'utilisateur — seule la `secretKey` ouvre quoi que ce soit. »
-    expect(PROVIDER_SPECS.s3.config).toContain('accessKey');
-    expect(PROVIDER_SPECS.s3.secrets).toContain('secretKey');
+    expect(PROVIDER_SPECS.r2.config).toContain('accessKey');
+    expect(PROVIDER_SPECS.r2.secrets).toContain('secretKey');
+  });
+
+  it('ElevenLabs range `apiKey` en secret et ne déclare aucun champ d’usage', () => {
+    // Le périmètre est la CONFIGURATION, pas l'usage : ni `voiceId` ni `modelId`,
+    // qui préjugeraient d'une décision produit non prise.
+    expect(PROVIDER_SPECS.elevenlabs.secrets).toContain('apiKey');
+    expect(PROVIDER_SPECS.elevenlabs.config).toEqual(['baseUrl']);
   });
 
   it('PayPal range `clientId` en config et `clientSecret` en secret', () => {
@@ -130,10 +167,14 @@ describe('les variables de secours restent bornées — ADR-0013 option C', () =
   /** Les SEULS secrets qui transitaient déjà par l'environnement avant S21b. */
   const SECOURS_AUTORISES: Partial<Record<IntegrationProvider, Record<string, string>>> = {
     openai: { apiKey: 'OPENAI_API_KEY' },
-    s3: { secretKey: 'S3_SECRET_KEY' },
+    // Le NOM de la variable reste `S3_SECRET_KEY` sous le fournisseur `r2` : elle
+    // nomme le PROTOCOLE, elle est déjà posée en production et lue par le service
+    // MinIO de `docker-compose.prod.yml`. La renommer couperait le secours au
+    // premier déploiement.
+    r2: { secretKey: 'S3_SECRET_KEY' },
   };
 
-  it('seuls OpenAI et S3 ont un secours, et exactement celui-là', () => {
+  it('seuls OpenAI et R2 ont un secours, et exactement celui-là', () => {
     // « Y ajouter une entrée serait recréer l'hybride permanent que l'ADR rejette. »
     // Ce test est donc un verrou d'architecture, pas une vérification de valeur :
     // il rougit le jour où quelqu'un branche Stripe sur une variable
