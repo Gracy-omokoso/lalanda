@@ -45,8 +45,34 @@ import { afterAll, beforeAll, expect, it } from 'vitest';
 
 import 'reflect-metadata';
 
+import { PLANS, PLAN_CATALOG, type Plan } from '@lalanda/shared/pricing';
+
 import { ACTIONS, ORG_PERMISSION_MATRIX, type Action, type OrgRole } from '../authz/permissions.js';
 import { e2eSuite, makeE2EApp, registerAndLogin, teardown } from './e2e-utils.js';
+
+/**
+ * Offre posée sur l'organisation de test : la PREMIÈRE du catalogue dont les
+ * projets sont illimités (`maxProjects === null`).
+ *
+ * Ce n'est pas un détail de confort. Cette suite mesure la MATRICE DE
+ * PERMISSIONS, et son montage crée beaucoup de projets : un projet de sondage,
+ * un projet d'approbation par rôle, puis un projet par rôle autorisé à
+ * `project.create`. Sous une offre plafonnée, le quota se serait épuisé en
+ * cours de route et le 403 `PLAN_LIMIT_PROJECTS` qui en découle est
+ * indiscernable, à l'œil, du 403 d'un rôle insuffisant : la suite se serait mise
+ * à rougir sur des cases pourtant correctes, ou pire, à verdir un refus de rôle
+ * manquant qu'un quota aurait masqué.
+ *
+ * La limite commerciale n'a rien à voir avec l'autorisation. On la neutralise
+ * donc à la source plutôt que d'affaiblir une assertion de permission — une
+ * sonde `project.create` dont on tolérerait le 403 ne vérifierait plus rien.
+ *
+ * Dérivé du catalogue et non écrit en dur : le jour où l'offre illimitée change
+ * de nom, ce montage suit sans qu'on ait à s'en souvenir.
+ */
+const PLAN_PROJETS_ILLIMITES: Plan | undefined = PLANS.find(
+  (plan) => PLAN_CATALOG[plan].entitlements.maxProjects === null,
+);
 
 /**
  * Les sept rôles réellement attribuables — `project_manager` exclu (voir en-tête).
@@ -169,12 +195,16 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
     expect(orgs.status).toBe(200);
     orgId = (orgs.body.organizations as { id: string }[])[0]!.id;
 
-    // Plan `pro` : la sonde `project.create` crée un projet par rôle autorisé, et
-    // le plan `free` est plafonné à un projet (S16b). La limite commerciale n'a
-    // rien à voir avec l'autorisation — la neutraliser évite un 403
-    // PLAN_LIMIT_PROJECTS qu'on confondrait avec un refus de la matrice.
+    // Offre à projets illimités — voir PLAN_PROJETS_ILLIMITES : sans elle, le
+    // quota de projets se confondrait avec un refus de la matrice.
+    expect(
+      PLAN_PROJETS_ILLIMITES,
+      'Aucune offre du catalogue ne propose de projets illimités : le montage de ' +
+        'cette suite ne peut plus neutraliser le quota, et ses 403 deviendraient ' +
+        'ambigus. Réviser le montage avant de toucher aux assertions.',
+    ).toBeDefined();
     const { BillingService } = await import('../billing/billing.service.js');
-    await app.get(BillingService).setPlan(orgId, 'pro');
+    await app.get(BillingService).setPlan(orgId, PLAN_PROJETS_ILLIMITES!);
 
     // ── 2. Un membre par rôle, par le VRAI parcours invitation → acceptation ──
     //
