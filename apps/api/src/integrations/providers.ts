@@ -171,20 +171,38 @@ export const PROVIDER_SPECS: Readonly<Record<IntegrationProvider, ProviderSpec>>
     // pas avoir à traduire : le libellé du champ est celui de l'écran d'origine.
     secrets: ['sendMailToken'],
     requiredSecrets: ['sendMailToken'],
-    // VOLONTAIREMENT VIDE. Les deux seuls réglages non secrets de l'envoi —
-    // l'adresse d'expédition et le point d'entrée régional de l'API — sont déjà
-    // portés par l'environnement (`SMTP_FROM`, `ZEPTOMAIL_API_URL`), d'où le
-    // transport les lit. Les redéclarer ici créerait deux sources de vérité pour
-    // la même valeur, c'est-à-dire le défaut qu'ADR-0013 option C nomme
-    // explicitement : « une variable d'environnement oubliée masque
-    // silencieusement » ce qui a pourtant été saisi en base.
-    config: [],
+    // `apiUrl` SEUL, et il est nécessaire : Zoho exploite trois centres de
+    // données distincts (`api.zeptomail.com`, `.eu`, `.in`) et un jeton émis dans
+    // l'un est refusé par les deux autres. Sans ce champ, un compte européen ne
+    // pourrait jamais être testé depuis `/admin` — le bouton « Tester » rendrait
+    // un 401 qui accuserait le jeton alors que seul le point d'entrée est en
+    // cause, c'est-à-dire le pire message d'erreur possible : celui qui envoie
+    // chercher du mauvais côté.
+    //
+    // Ni adresse d'expédition ni nom d'expéditeur ici : ils ne servent qu'à
+    // l'ENVOI, que cette fiche ne déclenche pas (voir `testDescription`). Les
+    // déclarer donnerait à croire qu'ils sont lus par le transport, ce qui est
+    // faux tant que `MailCredentialsProvider` lit l'environnement.
+    config: ['apiUrl'],
+    // Vide : `https://api.zeptomail.com/v1.1/email` est le défaut, et c'est le
+    // cas de la très grande majorité des comptes.
     requiredConfig: [],
     // VIDE, et ce n'est pas un oubli (verrou vérifié par `providers.test.ts`).
-    // ZeptoMail n'a jamais transité par l'environnement : lui donner un secours
-    // `ZEPTOMAIL_TOKEN` recréerait l'hybride permanent qu'ADR-0013 rejette. Le
-    // critère de partage d'ADR-0013 §8 tranche sans ambiguïté — l'envoi d'un
-    // email a lieu bien après la lecture de la base, donc le coffre.
+    // ZeptoMail n'a jamais transité par l'environnement au sens d'ADR-0013 : lui
+    // donner ici un secours recréerait l'hybride permanent que l'ADR rejette —
+    // `/admin` afficherait « source : db » pendant qu'une variable oubliée
+    // servirait une autre valeur.
+    //
+    // ⚠️ ASYMÉTRIE À CONNAÎTRE, ET ELLE EST TEMPORAIRE (ADR-0014 § S22m).
+    // Cette fiche alimente aujourd'hui le TEST DE CONNEXION, et lui seul. Le
+    // transport d'envoi, lui, lit encore `ZEPTOMAIL_TOKEN` dans l'environnement,
+    // exactement comme il lit déjà `SMTP_PASSWORD` : le module `mail/` ne dépend
+    // pas d'`integrations/` (ADR-0014 §1, « il expose une prise, il ne va pas
+    // chercher la fiche »), et brancher la prise est un lot à part entière.
+    // Le jour où `DatabaseMailCredentialsProvider` existe, cette fiche devient la
+    // source unique et `ZEPTOMAIL_TOKEN` disparaît. D'ici là l'ordre d'usage est
+    // écrit noir sur blanc dans `.env.production.example` : tester ici, poser
+    // dans l'environnement.
     envFallback: {},
     testDescription:
       'Appel de /v1.1/email avec une charge délibérément incomplète — ' +

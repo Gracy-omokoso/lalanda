@@ -168,15 +168,19 @@ describe('les arbitrages nommés par ADR-0013 sont bien ceux du code', () => {
     expect(PROVIDER_SPECS.smtp.secrets).toContain('password');
   });
 
-  it('ZeptoMail n’expose QUE son jeton d’envoi, et rien en clair (ADR-0014)', () => {
+  it('ZeptoMail n’expose QUE son jeton d’envoi, et rien d’autre en secret (ADR-0014)', () => {
     // Le jeton « Send Mail Token » vaut le droit d'écrire depuis le domaine :
-    // c'est un secret entier, jamais une moitié publiable comme `s3.accessKey`.
+    // c'est un secret entier, jamais une moitié publiable comme `r2.accessKey`.
     expect(PROVIDER_SPECS.zeptomail.secrets).toEqual(['sendMailToken']);
-    // `config` VIDE est l'arbitrage, pas un manque : l'adresse d'expédition
-    // (`SMTP_FROM`) et le point d'entrée régional (`ZEPTOMAIL_API_URL`) sont des
-    // réglages d'environnement, et les redéclarer ici donnerait deux sources de
-    // vérité à une même valeur — dont une seule serait lue par le transport.
-    expect(PROVIDER_SPECS.zeptomail.config).toEqual([]);
+    // `apiUrl` SEUL en clair — le centre de données Zoho (.com / .eu / .in). Ce
+    // n'est pas un secret et le test de connexion en a besoin : un jeton émis sur
+    // un centre est refusé par les deux autres, et sans ce champ un compte
+    // européen serait intestable depuis `/admin`.
+    expect(PROVIDER_SPECS.zeptomail.config).toEqual(['apiUrl']);
+    // Aucune adresse d'expédition ici : cette fiche ne déclenche AUCUN envoi. La
+    // déclarer donnerait à croire qu'elle est lue par le transport, ce qui est
+    // faux tant que `MailCredentialsProvider` lit l'environnement.
+    expect(PROVIDER_SPECS.zeptomail.config).not.toContain('fromAddress');
   });
 });
 

@@ -345,6 +345,7 @@ describe('vue de lecture — la seule forme jamais renvoyée (ADR-0013 §4)', ()
       'smtp',
       'r2',
       'elevenlabs',
+      'zeptomail',
     ]);
     for (const vue of vues) {
       expect(vue.enabled).toBe(false);
