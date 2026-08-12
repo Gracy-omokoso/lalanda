@@ -1,4 +1,4 @@
-// Tests de connexion R2 et ElevenLabs — ADR-0013 §5.
+// Tests de connexion R2, ElevenLabs et ZeptoMail — ADR-0013 §5.
 //
 // ── Ce que ces tests prouvent, et ce qu'ils ne prouvent PAS ───────────────────
 //
@@ -408,6 +408,139 @@ describe('test de connexion ElevenLabs — aucune synthèse, aucun crédit', () 
     try {
       const res = await tester.test(entree(srv.origin));
       expect(res.detail).not.toContain('cle-elevenlabs-de-test');
+    } finally {
+      await srv.fermer();
+    }
+  });
+});
+
+// ─── ZeptoMail : charge sans destinataire ────────────────────────────────────
+
+describe('test de connexion ZeptoMail — aucun email ne peut partir', () => {
+  const JETON = 'jeton-zepto-de-test-ne-servant-a-rien';
+
+  /** Réponse type de Zoho à une charge incomplète : le succès attendu du test. */
+  const CHARGE_REFUSEE = {
+    status: 400,
+    body: '{"error":{"code":"TM_3301","message":"Mandatory Field missing"}}',
+  };
+
+  function entree(apiUrl: string, secret = JETON): ConnectionTestInput {
+    return { provider: 'zeptomail', config: { apiUrl }, secrets: { sendMailToken: secret } };
+  }
+
+  it('n’émet AUCUN destinataire — c’est ce qui rend le test gratuit', async () => {
+    // La propriété centrale, et elle porte sur la REQUÊTE ÉMISE, pas sur ce que
+    // le serveur en fait : il n'y a personne à qui écrire dans cette charge. Même
+    // une API qui accepterait tout n'aurait aucune adresse à servir.
+    const srv = await serveurLocal(() => CHARGE_REFUSEE);
+    try {
+      const res = await tester.test(entree(`${srv.origin}/v1.1/email`));
+
+      expect(res.ok, res.detail).toBe(true);
+      expect(srv.recues).toHaveLength(1);
+      const req = srv.recues[0]!;
+      expect(req.method).toBe('POST');
+      expect(req.body).toBe('{}');
+      // Explicitement : ni destinataire, ni sujet, ni corps. Un jour où quelqu'un
+      // « complèterait » la charge pour obtenir une réponse plus jolie, ce test
+      // rougit — et c'est exactement le moment où il doit rougir, parce que la
+      // charge complétée, elle, coûterait un email à chaque clic.
+      expect(req.body).not.toContain('to');
+      expect(req.body).not.toContain('htmlbody');
+    } finally {
+      await srv.fermer();
+    }
+  });
+
+  it('compte le 400 pour un SUCCÈS — il ne s’obtient qu’authentifié', async () => {
+    const srv = await serveurLocal(() => CHARGE_REFUSEE);
+    try {
+      const res = await tester.test(entree(`${srv.origin}/v1.1/email`));
+
+      expect(res.ok, res.detail).toBe(true);
+      expect(res.detail).toContain('Jeton accepté');
+      expect(res.detail).toContain("Aucun email n'a été envoyé");
+      // Le message de l'API est repris : il aide au diagnostic sans rien révéler.
+      expect(res.detail).toContain('TM_3301');
+    } finally {
+      await srv.fermer();
+    }
+  });
+
+  it('traduit un 401 en jeton refusé, et nomme le centre de données joint', async () => {
+    // Le piège que ce message désamorce : un jeton `.com` posé sur un compte `.eu`
+    // rend un 401 dont le texte accuse le jeton. Sans le rappel, l'opératrice
+    // regénère un jeton parfaitement valide et recommence.
+    const srv = await serveurLocal(() => ({ status: 401, body: '{}' }));
+    try {
+      const res = await tester.test(entree(`${srv.origin}/v1.1/email`));
+
+      expect(res.ok).toBe(false);
+      expect(res.detail).toContain('401');
+      expect(res.detail).toContain('Send Mail Token');
+      expect(res.detail).toContain('127.0.0.1');
+    } finally {
+      await srv.fermer();
+    }
+  });
+
+  it('refuse de conclure sur un 2xx — l’hypothèse de gratuité ne tiendrait plus', async () => {
+    // Si l'API acceptait une charge vide, le raisonnement « rien ne peut partir »
+    // reposerait sur du vide. Mieux vaut un test qui dit « je ne comprends pas
+    // cette réponse » qu'un test qui rassure à tort.
+    const srv = await serveurLocal(() => ({ status: 201, body: '{"data":[]}' }));
+    try {
+      const res = await tester.test(entree(`${srv.origin}/v1.1/email`));
+
+      expect(res.ok).toBe(false);
+      expect(res.detail).toContain('inattendue');
+    } finally {
+      await srv.fermer();
+    }
+  });
+
+  it('authentifie par `Zoho-enczapikey`, ni Bearer ni Basic', async () => {
+    const srv = await serveurLocal(() => CHARGE_REFUSEE);
+    try {
+      await tester.test(entree(`${srv.origin}/v1.1/email`));
+      expect(srv.recues[0]!.headers['authorization']).toBe(`Zoho-enczapikey ${JETON}`);
+    } finally {
+      await srv.fermer();
+    }
+  });
+
+  it('retire le préfixe quand la ligne d’en-tête entière a été collée', async () => {
+    // La console Zoho affiche `Zoho-enczapikey wSsV…`. Le doubler produit un 401
+    // que personne ne relie à un copier-coller.
+    const srv = await serveurLocal(() => CHARGE_REFUSEE);
+    try {
+      await tester.test(entree(`${srv.origin}/v1.1/email`, `Zoho-enczapikey ${JETON}`));
+      expect(srv.recues[0]!.headers['authorization']).toBe(`Zoho-enczapikey ${JETON}`);
+    } finally {
+      await srv.fermer();
+    }
+  });
+
+  it('exige le jeton avant toute requête', async () => {
+    const res = await tester.test({ provider: 'zeptomail', config: {}, secrets: {} });
+    expect(res.ok).toBe(false);
+    expect(res.detail).toContain('sendMailToken');
+  });
+
+  it('refuse une `apiUrl` qui n’est pas une URL, sans tenter d’appel', async () => {
+    const res = await tester.test(entree('pas-une-url'));
+    expect(res.ok).toBe(false);
+    expect(res.detail).toContain('URL');
+  });
+
+  it('ne fait fuiter le jeton ni dans la requête hors en-tête, ni dans le retour', async () => {
+    const srv = await serveurLocal(() => ({ status: 401, body: '{}' }));
+    try {
+      const res = await tester.test(entree(`${srv.origin}/v1.1/email`));
+      expect(res.detail).not.toContain(JETON);
+      expect(srv.recues[0]!.body).not.toContain(JETON);
+      expect(srv.recues[0]!.url).not.toContain(JETON);
     } finally {
       await srv.fermer();
     }
