@@ -102,6 +102,14 @@ interface Formulation {
   sansRepere(signe: 'positif' | 'negatif' | 'nul'): string;
   /** Repli du chat quand l'assistant n'est pas joignable. */
   chatIndisponible(interpretation: string): string;
+  /**
+   * Repli du chat quand la réponse citait un chiffre absent du moteur.
+   *
+   * Distinct de `chatIndisponible` : dire « l'assistant est indisponible » alors
+   * qu'il a répondu serait un mensonge, et docs/11 interdit de « masquer une
+   * incertitude ». On nomme le refus et on redirige vers ce qui, lui, calcule.
+   */
+  chatChiffreRefuse(): string;
 }
 
 const FR: Formulation = {
@@ -144,6 +152,10 @@ const FR: Formulation = {
     'L’assistant n’est pas joignable pour le moment, je ne peux donc pas prolonger l’échange. ' +
     'Voici la lecture établie à partir des chiffres du moteur, qui reste valable : ' +
     `${interpretation} Réessayez dans quelques instants.`,
+  chatChiffreRefuse: () =>
+    'Je ne peux pas avancer ce chiffre : seul le moteur financier produit les valeurs de votre ' +
+    'plan, et celle-ci n’en vient pas. Reformulez votre question à partir des montants affichés, ' +
+    'ou modifiez une hypothèse dans la saisie pour que le moteur recalcule.',
 };
 
 /**

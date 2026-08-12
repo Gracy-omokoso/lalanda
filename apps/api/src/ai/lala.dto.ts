@@ -25,6 +25,16 @@ import { EvaluateLineSchema } from './ai-actions.dto.js';
  * client bavard occuper mémoire et jetons sans limite.
  */
 export const MAX_LIGNES_CONTEXTE = 400;
+/**
+ * Lignes interprétées EN UN APPEL.
+ *
+ * Le plafond de jetons en sortie est de 1024 (S22h) : au-delà d'une dizaine de
+ * lectures de deux ou trois phrases, la réponse serait tronquée et retomberait
+ * entièrement sur le déterministe. L'interface demande donc les interprétations
+ * à l'ouverture d'une bulle, ligne par ligne, plutôt que d'en produire trente
+ * d'avance dont vingt-huit ne seront jamais lues.
+ */
+export const MAX_LIGNES_INTERPRETEES = 10;
 /** Un échange reste court : au-delà, le contexte utile s'est déjà déplacé. */
 export const MAX_MESSAGES_ECHANGE = 20;
 /** Longueur d'un message utilisateur — une question, pas un mémoire. */
@@ -39,7 +49,14 @@ export const InterpretationsRequestSchema = z.object({
   /** Libellé court de la feuille tel qu'affiché — sert au cadrage du prompt. */
   sheetLabel: z.string().min(1).max(120).optional(),
   devise: z.string().max(8).optional(),
+  /**
+   * Feuille complète telle que le moteur l'a produite. Elle sert DEUX fois : à
+   * cadrer la lecture, et à borner les chiffres citables — tout ce qui est ici
+   * vient du moteur, rien d'autre n'est autorisé dans le texte rendu.
+   */
   lines: z.array(EvaluateLineSchema).min(1).max(MAX_LIGNES_CONTEXTE),
+  /** Lignes dont on veut l'interprétation, sous-ensemble de `lines`. */
+  lineIds: z.array(z.string().min(1)).min(1).max(MAX_LIGNES_INTERPRETEES),
 });
 export type InterpretationsRequest = z.infer<typeof InterpretationsRequestSchema>;
 
@@ -106,7 +123,20 @@ export const ChatRequestSchema = z.object({
    * malveillantes »).
    */
   messages: z.array(MessageSchema).min(1).max(MAX_MESSAGES_ECHANGE),
-});
+})
+  .refine((r) => r.messages[r.messages.length - 1]?.role === 'user', {
+    // Un échange se termine toujours par la question de l'utilisateur. Sans
+    // cette règle, un client pourrait faire répondre le modèle « à sa propre
+    // réponse » et faire dériver le fil sans qu'aucun humain n'ait rien demandé.
+    message: 'Le dernier message doit être celui de l’utilisateur.',
+    path: ['messages'],
+  })
+  .refine((r) => r.lines.some((l) => l.lineId === r.lineId), {
+    // La ligne d'origine doit exister dans le contexte fourni : sinon Lala
+    // parlerait d'un résultat dont il n'a pas la valeur.
+    message: 'La ligne d’origine est absente des lignes fournies.',
+    path: ['lineId'],
+  });
 export type ChatRequest = z.infer<typeof ChatRequestSchema>;
 
 export const ChatResponseSchema = z.object({
