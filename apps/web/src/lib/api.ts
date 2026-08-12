@@ -769,13 +769,18 @@ export type OrgAction =
   | 'report.export'
   | 'audit.read';
 
-export type Plan = 'free' | 'pro' | 'business';
+/**
+ * Offres — RÉEXPORTÉES du catalogue partagé, jamais réécrites.
+ *
+ * Cette union valait `'free' | 'pro' | 'business'` : elle est restée à trois
+ * paliers pendant que l'API en servait cinq, et TypeScript ne pouvait pas s'en
+ * plaindre puisque les réponses HTTP ne sont pas typées à l'exécution — un
+ * `plan: 'cabinet'` renvoyé par l'API arrivait ici dans une variable qui jurait
+ * qu'il ne pouvait pas exister. Le catalogue est désormais la seule définition.
+ */
+export type { Entitlements, Plan } from '@lalanda/shared/pricing';
 
-export interface Entitlements {
-  maxProjects: number | null;
-  pdfWatermark: boolean;
-  seats?: number;
-}
+import type { Entitlements, Plan } from '@lalanda/shared/pricing';
 
 export interface ConsommationView {
   plan: Plan;

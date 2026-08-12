@@ -1,36 +1,121 @@
 # Pricing, essai et entitlements
 
-**Statut :** Draft à valider commercialement  
-**Version :** 0.1
+**Statut :** Grille arbitrée par le décideur — appliquée par l'API  
+**Version :** 1.0
 
 ## Principes
 
-- Quatre packs commerciaux maximum.
+- Quatre offres en libre-service, plus une offre sur devis.
 - Essai gratuit de 14 jours.
 - Paiement mensuel ou annuel.
 - Prix annuel présenté avec économie réelle.
 - Limites appliquées par entitlements, pas par conditions dispersées.
-- Les montants restent à valider avant commercialisation.
+- **L'interface peut expliquer une limite, mais l'API l'impose.**
 
-## Packs proposés
+## La grille
 
-| Capacité | Starter | Pro | Business | Enterprise |
-|---|---:|---:|---:|---:|
-| Organisations | 1 | 1 | plusieurs | configurable |
-| Projets actifs | limité | supérieur | élevé | configurable |
-| Membres | 1 | petite équipe | équipe étendue | configurable |
-| Plan 5 ans | oui | oui | oui | oui |
-| Canvas | oui | oui | oui | oui |
-| PDF | oui | oui | oui | oui |
-| Excel | option/limité | oui | oui | oui |
-| Réalisé/analytics | essentiel | complet | complet | complet |
-| Scénarios | limité | plusieurs | avancé | avancé |
-| Copilote IA | quota | quota supérieur | quota équipe | contrat |
-| API/SSO | non | non | option | oui |
-| Multi-entités | non | non | oui | oui |
-| Support | standard | prioritaire | prioritaire | dédié |
+| | Free | Pro | Cabinet | Business | Expert |
+|---|---:|---:|---:|---:|---:|
+| Mensuel USD | 0 | 19 | 39 | 79 | sur devis |
+| Annuel USD | — | 190 | 390 | 790 | sur devis |
+| Projets | 1 | 5 | 20 | illimités | illimités |
+| Exports PDF | 3/mois filigranés | 30/mois | 100/mois | illimités | illimités |
+| Messages IA | 20/mois | 500/mois | 1 500/mois | 2 000/mois | illimités |
+| Sièges | 1 | 1 | 3 | 20 | négocié |
+| Suivi du réalisé | non | oui | oui | oui | oui |
+| Export Excel | oui | oui | oui | oui | oui |
+| Historique des versions | non | oui | oui | oui | oui |
+| White-label | non | non | non | oui | oui |
+| Accès API | non | non | non | oui | oui |
+| Temps d'expert humain | non | non | non | non | oui |
+| Support | documentation | email | email | prioritaire | dédié |
 
-Les nombres exacts sont des paramètres de catalogue, pas du code.
+### Où vivent ces nombres
+
+**Un seul endroit : `packages/shared/src/pricing/index.ts` (`PLAN_CATALOG`).**
+
+Ce module est importé par `apps/api` **et** par `apps/web`. Aucun montant, aucune
+limite n'est écrit ailleurs dans le dépôt — ni dans les entitlements de l'API, ni
+dans la page tarifs, ni dans le tunnel de souscription, ni dans les tests. Changer
+un prix, c'est éditer `PLAN_CATALOG`, une seule fois.
+
+Ce n'était pas le cas jusqu'ici : la grille était écrite dans
+`apps/api/src/billing/entitlements.ts`, dans
+`apps/api/src/billing/pricing-catalog.ts`, dans le modèle de la page tarifs, **et
+une quatrième fois dans le test qui vérifiait la cohérence des trois**. C'est ce
+dispositif qui a laissé la page publique annoncer un tarif annuel Business que
+l'API refusait de vendre.
+
+Les montants sont en **centimes entiers**. Aucun flottant ne traverse une facture.
+
+### L'offre Expert n'est pas en libre-service
+
+Elle porte `selfServe: false` et **aucun montant publié** :
+
+- pas de prix sur la page tarifs — une carte « Nous contacter », de forme
+  différente des cartes de prix, qui mène au contact et non à `/register` ;
+- **absente du tunnel de souscription** : la liste des offres proposées vient de
+  `SELF_SERVE_PLANS`, qui l'exclut par construction ;
+- `isSellable('expert', …)` répond `false`, et l'API refuse toute souscription
+  (`PLAN_NOT_SELLABLE`) — y compris par une requête directe ;
+- `computeProration` refuse de chiffrer un passage à Expert (« Aucun tarif
+  publié ») plutôt que de deviner un montant.
+
+Le pack inclut du temps d'expert humain, dont le coût dépasse un mois de Business
+et dépend du dossier. **Les droits Expert s'accordent manuellement, par un rôle
+plateforme.** Mettre un bouton de paiement sous une prestation humaine vendrait un
+engagement qu'on ne peut pas tenir.
+
+### Antériorité des comptes déjà inscrits — ARBITRÉ
+
+Question remontée au décideur : les comptes souscrits sous l'ancienne grille
+(« projets illimités » en Pro) passent-ils aux nouvelles limites ?
+
+**Décision : oui. Tous les comptes passent aux nouvelles limites. Aucune
+antériorité.**
+
+Il n'existe donc **pas** de seconde grille dans le code : ni
+`LEGACY_PLAN_ENTITLEMENTS`, ni champ de version tarifaire sur la collection
+`subscriptions`. Une grille « héritée » conservée au cas où serait une branche que
+rien n'emprunte, que personne ne teste, et qu'un lecteur croirait active.
+
+#### Conséquence traitée : les organisations au-dessus de leur limite
+
+État de la production au moment de la bascule : **7 organisations, 9 projets**.
+Une organisation détient **5 projets**, alors que l'offre gratuite en autorise 1.
+Six organisations n'ont **aucun document d'abonnement** — elles sont
+implicitement gratuites, et `BillingService.getPlanEntitlements()` les sert bien
+en `free` avec des limites complètes, sans écrire en base (vérifié par
+`billing.service.entitlements.test.ts`).
+
+**La limite s'applique aux gestes futurs, jamais au patrimoine déjà là.** Pour
+cette organisation à 5 projets :
+
+- ses 5 projets restent **lisibles, modifiables et exportables**. Rien n'est
+  supprimé, archivé d'office ni rendu inaccessible ;
+- la **création** d'un sixième est refusée en 403 `PLAN_LIMIT_PROJECTS` ;
+- le refus dit ce qu'il faut savoir :
+
+  > Votre organisation compte 5 projets, alors que l'offre Free en autorise 1.
+  > Vos 5 projets restent accessibles, modifiables et exportables — rien n'a été
+  > supprimé. Seule la création d'un nouveau projet est suspendue. Passez à
+  > l'offre Cabinet pour en créer davantage, ou supprimez un projet existant.
+
+- le dépassement est déjà **lisible** dans le tableau de bord de l'organisation
+  (`depassements()`), pour qu'il ne surprenne pas au moment du clic.
+
+Le message distingue deux situations que l'ancien texte (« Limite de 1 projet(s)
+atteinte pour le plan free ») confondait : être **pile à la limite** (l'utilisateur
+a consommé ce qu'il a acheté) et être **au-dessus** (la grille a changé sous ses
+pieds — ce n'est pas sa faute, et le message ne le lui reproche pas). L'offre
+suggérée est la **moins chère qui couvre le besoin**, jamais la plus riche, et
+jamais Expert. La suppression manuelle est toujours proposée en alternative :
+ne proposer que la montée en gamme serait une vente sous contrainte.
+
+Cette garantie tient parce qu'**aucun chemin de lecture ne consulte
+`maxProjects`**. La liste des fichiers autorisés à le faire est fixée par un test
+(`billing/project-limit.surface.test.ts`) : ajouter une consultation dans
+`reports/` ou `evaluate/` fait échouer la suite.
 
 ## Essai
 
@@ -53,9 +138,111 @@ Chaque transition est idempotente et pilotée par des événements de paiement v
 
 ## Entitlements
 
-Exemples : `projects.max`, `members.max`, `scenarios.max`, `actuals.enabled`, `excel_export.enabled`, `ai.monthly_quota`, `api.enabled`, `sso.enabled`.
+`Entitlements` (`packages/shared/src/pricing/index.ts`) porte six champs, tous
+obligatoires : `maxProjects`, `pdfWatermark`, `pdfExportsPerMonth`,
+`aiMessagesPerMonth`, `seats`, `actualsEnabled`. Une nouvelle offre ne compile pas
+tant qu'elle ne les a pas tous renseignés.
+
+**Convention unique : `null` signifie « illimité »**, jamais « inconnu » ni
+« zéro ». Un champ absent serait ambigu — et surtout, un `undefined` passerait le
+test `!== null` des appelants, ce qui désactiverait silencieusement la limite.
 
 L’interface peut expliquer une limite, mais l’API l’impose.
+
+## Quota de messages IA
+
+### Ce qui est compté, et ce qui ne l'est pas
+
+**Seuls les appels réellement traités par le modèle sont décomptés.**
+`ai-actions.service.ts` distingue déjà `source: 'llm'` de `source: 'fallback'` ;
+le comptage filtre sur `'llm'` **dans la requête** (`countBilledForOrganizationSince`).
+
+Un repli déterministe n'appelle aucun modèle : il survient quand aucune clé n'est
+configurée, quand le réseau tombe, ou quand la réponse du modèle est refusée par
+le schéma. **Le décompter ferait payer à l'utilisateur une panne de notre
+configuration** — le jour où une clé expire, tous les appels basculent en repli et
+un quota gratuit se viderait en vingt requêtes sans qu'aucun modèle n'ait
+répondu. Un test couvre exactement ces vingt replis.
+
+### La fenêtre
+
+**Mois calendaire, en UTC.** Explicable en une phrase (« votre quota repart le
+1er »), identique sur toutes les instances quel que soit leur fuseau, et **sans
+état à stocker** : la fenêtre se déduit de l'horloge. Il n'existe aucun compteur à
+remettre à zéro, donc aucune remise à zéro à rater.
+
+Une fenêtre glissante de 30 jours a été écartée : elle est inexplicable au client
+(« mon quota repart quand ? ») et ferait dépendre le reste de l'heure exacte du
+premier appel du mois.
+
+### Le refus
+
+`403 PLAN_LIMIT_AI_MESSAGES`, jamais un 403 nu. Le corps nomme **laquelle** des
+limites est atteinte et **quand** elle repart :
+
+```json
+{
+  "code": "PLAN_LIMIT_AI_MESSAGES",
+  "quota": "ai_messages",
+  "plan": "free",
+  "limit": 20,
+  "used": 20,
+  "resetAt": "2026-09-01T00:00:00.000Z",
+  "resetInDays": 20,
+  "message": "Vous avez utilisé les 20 messages IA inclus ce mois-ci dans l'offre free. Le compteur repart le 1er du mois prochain (dans 20 jours). Vos projets et vos exports restent accessibles.",
+  "upgradeUrl": "/pricing"
+}
+```
+
+**403 et non 429** : ce n'est pas une limitation de débit qu'une seconde d'attente
+lèverait, c'est un droit que le plan n'accorde pas. Un 429 ferait réessayer en
+boucle les clients qui savent réessayer, sur une limite mensuelle.
+
+Le message rappelle que **projets et exports restent accessibles** : sans cela, un
+quota IA épuisé se lit comme une suspension de compte.
+
+### Point d'entrée pour tout nouvel usage de l'IA
+
+**`AiQuotaService` (`apps/api/src/ai/ai-quota.service.ts`), exporté par
+`AiModule`.** C'est le seul endroit qui applique et compte le quota IA. Un
+assistant, un chat ou un générateur d'interprétations **n'écrit aucune limite de
+son côté** — il appelle :
+
+```ts
+const reponse = await this.aiQuota.runGuarded(
+  { organizationId, userId, action: 'ai.lala_chat' },
+  async () => {
+    const r = await this.lala.repondre(question);
+    return { value: r, source: r.source }; // 'llm' | 'fallback'
+  },
+);
+```
+
+`runGuarded` refuse **avant** tout appel payant si le quota est épuisé, exécute,
+puis compte **après** à partir de la source réelle de la réponse. Les deux moitiés
+sont tenues ensemble volontairement : compter avant l'appel décompterait les
+replis, garder après laisserait passer l'appel payant qu'on refuse. Deux méthodes
+séparées (`assertWithinQuota` / `record`) existent pour les cas particuliers, mais
+elles invitent à n'en appeler qu'une.
+
+`action` est une étiquette libre servant au tableau de bord d'exploitation. **Le
+quota est commun à tous les usages d'une organisation** : un quota par usage se
+contournerait en changeant d'écran.
+
+Si l'appelable lève, **rien n'est décompté** : une requête qui n'a produit aucune
+réponse n'a rien consommé du point de vue de l'utilisateur, quoi qu'elle ait coûté
+en interne. Le choix est en sa faveur, délibérément.
+
+### Lecture du quota par l'interface
+
+`GET /ai/quota` → `{ plan, limit, used, remaining, unlimited, resetAt, resetInDays }`.
+
+Sans effet de bord : lire un quota n'en consomme pas. Cette route permet à
+l'interface d'**expliquer** la limite avant qu'on s'y heurte — elle ne l'applique
+pas, et ne serait-elle jamais appelée que rien ne changerait côté `POST`.
+
+Une offre illimitée rend `limit: null` et `remaining: null`, **jamais un grand
+nombre** : une jauge d'interface remplirait « 9 999 restants ».
 
 ## Changements de plan
 
@@ -95,13 +282,15 @@ Première tranche d'entitlements appliqués côté API — sans intégration pai
   événements de paiement vérifiés décrits plus haut.
 - Essai 14 jours, états `trialing`/`past_due`/`grace`/…, quotas scénarios/membres/IA.
 
-### Divergence page publique / ce document
+### Divergence page publique / ce document — RÉSOLUE
 
-La page `/pricing` (apps/web) publie **trois** offres — Free, Pro (9 USD/mois),
-Business (49 USD/mois) — alors que ce document décrit **quatre** packs
-(Starter/Pro/Business/Enterprise) encore à valider commercialement. S16b implémente
-la promesse publique (la page), qui fait foi tant que la grille ci-dessus n'est pas
-arbitrée. À réconcilier lors de la validation commerciale.
+> Signalée en S16b, re-signalée en S22b : la page publiait trois offres, ce
+> document en décrivait quatre autres, et le code suivait la page.
+>
+> **Résolue par la grille arbitrée** (voir § *La grille*). Il n'existe plus qu'une
+> seule définition, dans `packages/shared/src/pricing`, importée par l'API et par
+> la page. La divergence n'est plus « corrigée » : elle est devenue impossible à
+> écrire.
 
 ## Implémenté (S22b)
 
@@ -229,9 +418,25 @@ rappel de fin d'essai qu'avec la décision sur l'ordonnanceur.
   catalogue vaut donc `null` et l'API refuse ce couple (`PLAN_NOT_SELLABLE`)
   plutôt que de deviner un « 490 USD/an » plausible.
 
-## Divergence tarifaire — signalement et avis (S22b)
+## Divergence tarifaire — signalement et avis (S22b) — ARBITRÉ
 
-**Le constat, d'abord.** Trois grilles coexistent :
+> **Ce qui suit est conservé comme trace du raisonnement, pas comme état du
+> produit.** Le décideur a arbitré depuis, et la § *La grille* fait foi. Résumé de
+> ce qui a été retenu de cet avis :
+>
+> | Proposition de S22b | Décision |
+> |---|---|
+> | Insérer un palier intermédiaire (§ 2) | **Retenue** — c'est `cabinet`, 39 USD, 3 sièges, 20 projets. |
+> | Traiter *Enterprise* comme un devis hors grille (§ 2) | **Retenue** — c'est `expert`, `selfServe: false`, sans prix Stripe ni tunnel. |
+> | Ouvrir un annuel Business (§ 4) | **Retenue** — 790 USD/an. |
+> | Pousser l'annuel à deux mois offerts (§ 4) | **Retenue** — les trois offres en libre-service sont à 10 mois payés pour 12 (16 % arrondi bas). |
+> | Compter les appels IA avant de vendre un quota (§ 3) | **Faite** — voir § *Quota de messages IA*. |
+> | Garder Pro à 9 et Business à 49 | **Écartée** — 19 et 79. Les montants relèvent du décideur, pas de cet avis. |
+> | Antériorité des comptes existants | **Écartée** — aucune antériorité (voir § *Antériorité*). |
+> | Appliquer `seats` | **Non faite** — reste ouverte, voir § *Ce qui reste à faire*. |
+> | Devise de règlement et fiscalité (§ 5) | **Toujours ouvertes** — inchangé, et toujours bloquantes avant le premier encaissement. |
+
+**Le constat, d'abord.** Trois grilles coexistaient :
 
 1. ce document, § *Packs proposés* : **quatre** packs (Starter, Pro, Business,
    Enterprise), sans montants;
@@ -328,14 +533,37 @@ De même, la fiscalité de la vente de service numérique n'est pas tranchée : 
 les montants produits par l'API sont explicitement hors taxes, et l'interface le
 dit. **Ce point doit être arbitré avant le premier encaissement réel**, pas après.
 
-### Ce qui est demandé au décideur
+### Ce qui était demandé au décideur
 
-1. Trancher entre la grille à quatre packs de ce document et les trois offres de
-   la page publique. Une seule doit survivre.
-2. Se prononcer sur le palier intermédiaire (§ 2) et sur l'annuel Business (§ 4).
-3. Valider ou corriger la période de grâce de 7 jours.
-4. Arbitrer devise de règlement et fiscalité (§ 5).
+1. ~~Trancher entre la grille de ce document et les offres de la page publique.~~
+   **Fait** — voir § *La grille*.
+2. ~~Se prononcer sur le palier intermédiaire et sur l'annuel Business.~~
+   **Fait** — Cabinet 39, annuel Business 790.
+3. ~~Antériorité des comptes déjà inscrits.~~ **Fait** — aucune antériorité.
+4. **Valider ou corriger la période de grâce de 7 jours.** Toujours ouvert.
+5. **Arbitrer devise de règlement et fiscalité (§ 5).** Toujours ouvert, et
+   toujours bloquant avant le premier encaissement réel.
+
+## Ce qui reste à faire
+
+- **`seats` n'est pas appliqué.** La grille contractualise 1, 1, 3, 20 sièges et
+  « négocié », et le tableau de bord de l'organisation SIGNALE un dépassement
+  (`depassements()`), mais rien ne refuse l'invitation d'un membre au-delà de la
+  limite. Vendre des sièges sans les compter, c'est vendre une différence que
+  rien ne matérialise — le même reproche que S22b adressait au quota IA, qui lui
+  est désormais appliqué.
+- **`pdfExportsPerMonth` n'est pas appliqué.** Le filigrane l'est ; le nombre
+  d'exports par mois ne l'est pas. C'est le poste de coût marginal RÉEL (Puppeteer,
+  donc un Chromium par rendu), et il est aujourd'hui non borné. Le compteur
+  existe déjà pour l'IA (`ai_usage_events`) : le même mécanisme s'applique, avec
+  la même fenêtre mensuelle et le même style de refus.
+- **`scenarios.max` et `api.enabled` / `sso.enabled`** ne sont ni dans
+  `Entitlements` ni appliqués. Le comparatif public les décrit comme éditoriaux et
+  ne promet aucun nombre là où rien n'est compté.
+- **Période de grâce (7 jours)** : valeur par défaut posée, non arbitrée.
+- **Devise de règlement et fiscalité** : voir § 5 ci-dessus.
 
 ## Validation commerciale requise
 
-Étude de la volonté de payer par segment, coûts d’IA et d’exports, moyens de paiement locaux, devises de facturation, fiscalité de vente numérique, politique de remboursement et remise annuelle.
+Reste à étudier : coûts d’exports (Puppeteer), moyens de paiement locaux, devises
+de facturation, fiscalité de vente numérique, politique de remboursement.

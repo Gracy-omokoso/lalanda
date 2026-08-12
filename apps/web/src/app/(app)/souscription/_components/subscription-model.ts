@@ -12,10 +12,11 @@
 // disponibilité des fournisseurs. Tout cela vient du serveur.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { PLAN_CATALOG, PLANS, type Plan } from '@lalanda/shared/pricing';
+
 import type {
   BillingInterval,
   PaymentMethod,
-  Plan,
   PlanQuoteView,
   SubscriptionStateView,
   SubscriptionStatus,
@@ -31,12 +32,16 @@ export const STATUS_LABELS: Readonly<Record<SubscriptionStatus, string>> = {
   canceled: 'Aucun abonnement',
 };
 
-/** Libellé d'une offre. */
-export const PLAN_LABELS: Readonly<Record<Plan, string>> = {
-  free: 'Free',
-  pro: 'Pro',
-  business: 'Business',
-};
+/**
+ * Libellé d'une offre — pris dans le catalogue.
+ *
+ * La table était écrite à la main et s'arrêtait à trois offres : un abonnement
+ * `cabinet` renvoyé par l'API affichait `undefined` dans « Abonnement … actif ».
+ * Dérivée, elle ne peut plus être incomplète.
+ */
+export const PLAN_LABELS: Readonly<Record<Plan, string>> = Object.freeze(
+  Object.fromEntries(PLANS.map((p) => [p, PLAN_CATALOG[p].name])) as Record<Plan, string>,
+);
 
 export const INTERVAL_LABELS: Readonly<Record<BillingInterval, string>> = {
   month: 'Mensuel',

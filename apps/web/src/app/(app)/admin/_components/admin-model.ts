@@ -16,6 +16,8 @@
 // le contrat d'écriture seule d'ADR-0013 §4 ne fait circuler rien d'autre.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { PLAN_CATALOG, PLANS } from '@lalanda/shared/pricing';
+
 import type {
   AdminUserSummary,
   IntegrationProvider,
@@ -444,11 +446,19 @@ export function formaterDate(iso: string | null | undefined): string {
 
 // ── Organisations et comptes ─────────────────────────────────────────────────
 
-export const LIBELLES_PLAN: Record<Plan, string> = {
-  free: 'Gratuit',
-  pro: 'Pro',
-  business: 'Business',
-};
+/**
+ * Libellés d'offre de la console — dérivés du catalogue.
+ *
+ * La table s'arrêtait à trois offres : une organisation `cabinet` s'affichait
+ * `undefined` dans la console d'administration, c'est-à-dire exactement là où on
+ * regarde pour savoir qui paie quoi. Seul `free` garde un libellé propre à la
+ * console (« Gratuit » plutôt que « Free »), le reste vient du catalogue.
+ */
+export const LIBELLES_PLAN: Record<Plan, string> = Object.freeze(
+  Object.fromEntries(
+    PLANS.map((p) => [p, p === 'free' ? 'Gratuit' : PLAN_CATALOG[p].name]),
+  ) as Record<Plan, string>,
+);
 
 /**
  * Libellés français des six rôles plateforme.

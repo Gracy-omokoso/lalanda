@@ -4,6 +4,7 @@
 // vérifient que chacun dit la vérité — en particulier les trois qui annoncent
 // une mauvaise nouvelle, où une phrase imprécise coûte un client.
 
+import { PLAN_ENTITLEMENTS, PLANS } from '@lalanda/shared/pricing';
 import { describe, expect, it } from 'vitest';
 
 import type { PlanQuoteView, SubscriptionStateView, SubscriptionStatus } from '@/lib/api';
@@ -26,7 +27,9 @@ import {
 function etat(patch: Partial<SubscriptionStateView> = {}): SubscriptionStateView {
   return {
     plan: 'free',
-    entitlements: { maxProjects: 1, pdfWatermark: true },
+    // Pris dans le catalogue plutôt que recopiés : ce fixture n'a rien à dire
+    // sur les limites, il a besoin d'un état d'abonnement plausible.
+    entitlements: PLAN_ENTITLEMENTS.free,
     usage: { projects: 0 },
     subscribedPlan: 'free',
     status: 'canceled',
@@ -75,9 +78,26 @@ describe('libellés', () => {
     }
   });
 
-  it('couvre les trois offres', () => {
-    for (const plan of ['free', 'pro', 'business'] as const) {
-      expect(PLAN_LABELS[plan]).toBeTruthy();
+  it('couvre TOUTES les offres du catalogue, pas une liste écrite ici', () => {
+    // La table s'arrêtait à trois offres. Un abonnement `cabinet` renvoyé par
+    // l'API affichait alors « Abonnement undefined actif » — sur l'écran où le
+    // client vérifie ce qu'il paie. La liste vient donc du catalogue.
+    for (const plan of PLANS) {
+      expect(PLAN_LABELS[plan], plan).toBeTruthy();
+      expect(etatAffiche(etat({ status: 'active', subscribedPlan: plan })).titre).toContain(
+        PLAN_LABELS[plan],
+      );
+    }
+  });
+
+  it('ne laisse aucun écran mentionner « undefined »', () => {
+    // Filet large : n'importe quel libellé manquant se voit ici, quel que soit
+    // le statut, plutôt qu'en production sur l'écran de facturation.
+    for (const plan of PLANS) {
+      for (const status of ['active', 'trialing', 'suspended', 'grace'] as SubscriptionStatus[]) {
+        const vue = etatAffiche(etat({ status, plan, subscribedPlan: plan }));
+        expect(`${vue.titre} ${vue.detail}`).not.toContain('undefined');
+      }
     }
   });
 });
