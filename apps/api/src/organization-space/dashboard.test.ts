@@ -245,15 +245,17 @@ describe('périodes du Comptable (S21a)', () => {
 
 describe('consommation et dépassements (S21a)', () => {
   it('traduit « illimité » par `null`, jamais par un grand nombre', () => {
-    const c = consommation('pro', PLAN_ENTITLEMENTS.pro, { projets: 7, membres: 3 });
+    // Business porte `maxProjects: null` dans la grille à cinq paliers (Pro est
+    // désormais plafonné à 5, il ne sert donc plus d'exemple d'illimité).
+    const c = consommation('business', PLAN_ENTITLEMENTS.business, { projets: 7, membres: 3 });
     expect(c.projets).toEqual({ utilise: 7, limite: null });
     expect(depassements(c)).toEqual([]);
   });
 
-  it('traduit l’absence de sièges contractuels par `null`, jamais par 0', () => {
-    // `seats` est absent des offres Free et Pro : « non contractuel à ce stade ».
-    // Un 0 afficherait « 3 membres sur 0 autorisés », ce qui est faux et alarmant.
-    const c = consommation('free', PLAN_ENTITLEMENTS.free, { projets: 1, membres: 3 });
+  it('traduit des sièges négociés au contrat par `null`, jamais par 0', () => {
+    // Expert est la seule offre dont les sièges ne sont pas un nombre : ils sont
+    // négociés. Un 0 afficherait « 3 membres sur 0 autorisés », faux et alarmant.
+    const c = consommation('expert', PLAN_ENTITLEMENTS.expert, { projets: 1, membres: 3 });
     expect(c.sieges).toEqual({ utilise: 3, limite: null });
     expect(depassements(c)).toEqual([]);
   });
@@ -261,10 +263,19 @@ describe('consommation et dépassements (S21a)', () => {
   it('signale un dépassement sans rien supprimer (rétrogradation de plan)', () => {
     // docs/13 § Changements de plan : « aucune suppression automatique de projet ».
     // Une organisation repassée en `free` avec 4 projets doit pouvoir le LIRE.
-    const c = consommation('free', PLAN_ENTITLEMENTS.free, { projets: 4, membres: 2 });
+    const c = consommation('free', PLAN_ENTITLEMENTS.free, { projets: 4, membres: 1 });
     expect(depassements(c)).toEqual([
       { code: 'PROJETS', libelle: 'Projets', utilise: 4, limite: 1 },
     ]);
+  });
+
+  it('cumule les dépassements plutôt que de n’en montrer qu’un', () => {
+    // Free contractualise maintenant 1 siège. Une organisation à 4 projets et
+    // 2 membres dépasse DEUX limites : n'en afficher qu'une laisserait
+    // l'utilisateur corriger la première et se heurter à la seconde sans l'avoir
+    // vue venir.
+    const c = consommation('free', PLAN_ENTITLEMENTS.free, { projets: 4, membres: 2 });
+    expect(depassements(c).map((d) => d.code)).toEqual(['PROJETS', 'SIEGES']);
   });
 
   it('signale un dépassement de sièges sur une offre qui en contractualise', () => {
