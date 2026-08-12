@@ -1,11 +1,18 @@
 // Tests e2e des entitlements (S16b) — l'API impose les limites promises par /pricing.
 //
 // Exigences testées :
-// 1. Org free (défaut, sans document Subscription) : 1er projet OK, 2e refusé
-//    403 { code: 'PLAN_LIMIT_PROJECTS', limit: 1 }.
+// 1. Org free (défaut, sans document Subscription) : la création est autorisée
+//    jusqu'à la limite de l'offre, refusée au-delà avec
+//    403 { code: 'PLAN_LIMIT_PROJECTS', limit, plan }.
 // 2. Org passée en pro (via BillingService, interne — pas d'endpoint public) :
-//    création illimitée (on en crée plusieurs).
+//    la limite gratuite est levée, remplacée par celle de Pro.
 // 3. GET /organizations/current/subscription : { plan, entitlements, usage.projects }.
+//
+// AUCUN MONTANT NI AUCUNE LIMITE N'EST ÉCRIT ICI. Toutes les valeurs attendues
+// sont lues dans `PLAN_ENTITLEMENTS` (`@lalanda/shared/pricing`), la source de
+// vérité unique. Un test qui recopierait la grille ne vérifierait plus que
+// l'API sert la grille : il vérifierait que deux copies coïncident, et c'est
+// exactement la duplication que le catalogue partagé a supprimée.
 //
 // Même convention que isolation.e2e.test.ts : nécessite Mongo (skip sans MONGODB_URI).
 
@@ -17,7 +24,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest';
 
 import 'reflect-metadata';
 
-import { e2eSuite, teardown } from './e2e-utils.js';
+import { PLAN_ENTITLEMENTS } from '@lalanda/shared/pricing';
 
 import { e2eSuite, teardown } from './e2e-utils.js';
 
@@ -80,23 +87,38 @@ e2eSuite('entitlements par plan (S16b)', () => {
     return cookies.map((c: string) => c.split(';')[0]!);
   }
 
-  it('org free : 1er projet OK, 2e refusé 403 PLAN_LIMIT_PROJECTS', async () => {
+  /**
+   * Limite de projets de l'offre gratuite, lue dans le catalogue.
+   *
+   * `null` signifierait « illimité » : la suite n'aurait alors plus rien à
+   * mesurer et passerait au vert sans rien prouver. L'assertion ci-dessous rend
+   * ce cas visible au lieu de le laisser vider le test en silence.
+   */
+  const limiteFree = PLAN_ENTITLEMENTS.free.maxProjects;
+
+  it("org free : la création est refusée au-delà de la limite de l'offre", async () => {
+    expect(
+      limiteFree,
+      "l'offre gratuite doit rester bornée pour que ce test mesure quelque chose",
+    ).not.toBeNull();
     const cookies = await registerAndLogin(userFree);
 
-    const p1 = await request(app.getHttpServer())
-      .post('/projects')
-      .set('Cookie', cookies)
-      .send({ name: `Projet free 1 ${tag}`, templateSlug: 'hello-world' });
-    expect(p1.status).toBe(201);
+    for (let i = 1; i <= limiteFree!; i += 1) {
+      const ok = await request(app.getHttpServer())
+        .post('/projects')
+        .set('Cookie', cookies)
+        .send({ name: `Projet free ${i} ${tag}`, templateSlug: 'hello-world' });
+      expect(ok.status, `projet free n°${i} refusé : ${JSON.stringify(ok.body)}`).toBe(201);
+    }
 
-    const p2 = await request(app.getHttpServer())
+    const refuse = await request(app.getHttpServer())
       .post('/projects')
       .set('Cookie', cookies)
-      .send({ name: `Projet free 2 ${tag}`, templateSlug: 'hello-world' });
-    expect(p2.status).toBe(403);
-    expect(p2.body.code).toBe('PLAN_LIMIT_PROJECTS');
-    expect(p2.body.limit).toBe(1);
-    expect(p2.body.plan).toBe('free');
+      .send({ name: `Projet free ${limiteFree! + 1} ${tag}`, templateSlug: 'hello-world' });
+    expect(refuse.status).toBe(403);
+    expect(refuse.body.code).toBe('PLAN_LIMIT_PROJECTS');
+    expect(refuse.body.limit).toBe(limiteFree);
+    expect(refuse.body.plan).toBe('free');
   }, 30_000);
 
   it('GET /organizations/current/subscription — plan free + usage', async () => {
@@ -106,11 +128,13 @@ e2eSuite('entitlements par plan (S16b)', () => {
       .set('Cookie', cookies);
     expect(res.status).toBe(200);
     expect(res.body.plan).toBe('free');
-    expect(res.body.entitlements).toEqual({ maxProjects: 1, pdfWatermark: true });
-    expect(res.body.usage.projects).toBe(1);
+    // TOUS les entitlements de l'offre, pas un extrait : un `toEqual` partiel
+    // laisserait passer un champ oublié par l'API (quota IA, sièges, filigrane).
+    expect(res.body.entitlements).toEqual(PLAN_ENTITLEMENTS.free);
+    expect(res.body.usage.projects).toBe(limiteFree);
   }, 30_000);
 
-  it('org passée en pro (service interne) : création au-delà de 1 projet', async () => {
+  it('org passée en pro (service interne) : création au-delà de la limite gratuite', async () => {
     const cookies = await registerAndLogin(userPro);
 
     // Récupère l'org primaire de Paula puis la passe en pro via le service interne.
@@ -124,7 +148,13 @@ e2eSuite('entitlements par plan (S16b)', () => {
     // Idempotence de l'upsert (docs/13 : transitions idempotentes).
     await billing.setPlan(orgId, 'pro');
 
-    for (let i = 1; i <= 3; i += 1) {
+    // Autant de projets que Pro en autorise — donc STRICTEMENT plus que l'offre
+    // gratuite, ce qui est l'exigence mesurée ici. Si Pro devenait illimité, on
+    // se contente de dépasser la limite gratuite : c'est la propriété testée.
+    const projetsPro = PLAN_ENTITLEMENTS.pro.maxProjects ?? limiteFree! + 2;
+    expect(projetsPro, 'Pro doit autoriser plus de projets que Free').toBeGreaterThan(limiteFree!);
+
+    for (let i = 1; i <= projetsPro; i += 1) {
       const res = await request(app.getHttpServer())
         .post('/projects')
         .set('Cookie', cookies)
@@ -137,8 +167,8 @@ e2eSuite('entitlements par plan (S16b)', () => {
       .set('Cookie', cookies);
     expect(sub.status).toBe(200);
     expect(sub.body.plan).toBe('pro');
-    expect(sub.body.entitlements).toEqual({ maxProjects: null, pdfWatermark: false });
-    expect(sub.body.usage.projects).toBe(3);
+    expect(sub.body.entitlements).toEqual(PLAN_ENTITLEMENTS.pro);
+    expect(sub.body.usage.projects).toBe(projetsPro);
   }, 30_000);
 
   it('endpoint subscription : 401 sans session', async () => {
