@@ -18,7 +18,7 @@
 // réintroduit une valeur en dur, et que les invariants de présentation tiennent
 // (« illimité » n'est pas « null », Expert n'a pas de tunnel de paiement).
 
-import { PLAN_CATALOG, PLANS } from '@lalanda/shared/pricing';
+import { PLAN_CATALOG, PLANS, SELF_SERVE_PLANS } from '@lalanda/shared/pricing';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -64,6 +64,16 @@ describe('grille tarifaire affichée', () => {
     // gratuit sans un mot du devis, ce qui n'est pas ce que le bouton promet.
     expect(expert.ctaHref).toBeNull();
     expect(expert.cta).not.toContain(String(TRIAL_DAYS));
+  });
+
+  it('n’expose Expert dans AUCUN tunnel de souscription', () => {
+    // `SELF_SERVE_PLANS` est la liste que consomme `subscription-funnel.tsx`
+    // (`OFFRES_PAYANTES`). L'assertion porte donc sur la valeur réelle qui
+    // alimente le tunnel, pas sur une liste réécrite pour le test.
+    expect(SELF_SERVE_PLANS).toEqual(['pro', 'cabinet', 'business']);
+    expect(SELF_SERVE_PLANS).not.toContain('expert');
+    // `free` non plus : il n'y a rien à acheter.
+    expect(SELF_SERVE_PLANS).not.toContain('free');
   });
 
   it('ne pointe aucune offre vers une destination qui n’existe pas', () => {
