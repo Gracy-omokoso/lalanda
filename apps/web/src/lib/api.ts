@@ -1180,6 +1180,66 @@ export interface ReauthStatus {
   expiresAt: string | null;
 }
 
+// ─── Interprétations et assistant « Lala » (S24a) ──────────────
+// L'IA explique les résultats du moteur; elle n'en produit aucun (CLAUDE.md).
+// `source` dit d'où vient le texte affiché : `llm` = rédigé par le modèle,
+// `fallback` = lecture déterministe écrite à partir des seuls chiffres du
+// moteur. L'interface le DIT à l'utilisateur, comme pour les actions
+// correctives (docs/11).
+
+export type TexteIaSource = 'llm' | 'fallback';
+
+export interface InterpretationView {
+  lineId: string;
+  texte: string;
+  source: TexteIaSource;
+}
+
+export interface InterpretationsView {
+  sheetId: string;
+  interpretations: InterpretationView[];
+  source: TexteIaSource;
+  /**
+   * Réserve de portée de la feuille (trésorerie mensuelle simplifiée…).
+   * Renvoyée par l'API quelle que soit la source : elle ne dépend jamais de ce
+   * que le modèle a bien voulu écrire.
+   */
+  avertissementFeuille: string | null;
+  /** Mention anti-conseil, imposée côté serveur. */
+  mention: string;
+}
+
+export interface LalaMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface LalaChatView {
+  reply: string;
+  source: TexteIaSource;
+  avertissementFeuille: string | null;
+  mention: string;
+}
+
+/**
+ * Ligne réduite à ce que l'API attend.
+ *
+ * `formulaSource` est écarté : la formule DSL n'apprend rien à un lecteur de
+ * résultats, et « le contexte envoyé au modèle est minimal » (docs/11 § Contexte
+ * envoyé au modèle). Le champ resterait de toute façon ignoré côté serveur, mais
+ * l'envoyer ferait grossir chaque requête d'une feuille entière de formules.
+ */
+function ligneMinimale(l: LineResult): Omit<LineResult, 'formulaSource'> {
+  return {
+    sheetId: l.sheetId,
+    lineId: l.lineId,
+    label: l.label,
+    value: l.value,
+    format: l.format,
+    ...(l.seuil ? { seuil: l.seuil } : {}),
+  };
+}
+
 export const api = {
   /**
    * Enregistre l'accord de l'utilisateur connecté.
@@ -1659,6 +1719,38 @@ export const api = {
     jsonRequest<{ active: true; expiresAt: string }>(`/admin/reauth`, {
       method: 'POST',
       body: { password },
+    }),
+
+  // ─── Interprétations et chat Lala (S24a) ───────────────────
+  // Les LIGNES DU MOTEUR sont transmises telles quelles : elles servent à la fois
+  // de contexte et de PÉRIMÈTRE des chiffres citables côté serveur. Aucun total
+  // n'est recalculé ici — l'interface ne calcule rien (docs/26).
+  interpretResults: (input: {
+    templateSlug: string;
+    sheetId: string;
+    sheetLabel?: string;
+    devise?: string;
+    lines: LineResult[];
+    lineIds: string[];
+  }) =>
+    jsonRequest<InterpretationsView>(`/ai/interpretations`, {
+      method: 'POST',
+      body: { ...input, lines: input.lines.map(ligneMinimale) },
+    }),
+
+  askLala: (input: {
+    templateSlug: string;
+    sheetId: string;
+    sheetLabel?: string;
+    lineId: string;
+    devise?: string;
+    lines: LineResult[];
+    interpretation?: string;
+    messages: LalaMessage[];
+  }) =>
+    jsonRequest<LalaChatView>(`/ai/lala/messages`, {
+      method: 'POST',
+      body: { ...input, lines: input.lines.map(ligneMinimale) },
     }),
 
   // ─── Reports PDF (S14a) ────────────────────────────────────

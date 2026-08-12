@@ -8,12 +8,15 @@
 
 import { Module } from '@nestjs/common';
 
+import { AccountModule } from '../account/account.module.js';
 import { AdminModule } from '../admin/admin.module.js';
 import { IntegrationsModule } from '../integrations/integrations.module.js';
 import { SecretsService } from '../integrations/secrets.service.js';
 import { OrganizationsModule } from '../organizations/organizations.module.js';
 import { AiActionsController } from './ai-actions.controller.js';
 import { AiActionsService, type OpenAIChatClient } from './ai-actions.service.js';
+import { LalaController } from './lala.controller.js';
+import { LalaService } from './lala.service.js';
 import { createOpenAIClient } from './openai-client.js';
 
 export const OPENAI_CHAT_CLIENT = Symbol('OPENAI_CHAT_CLIENT');
@@ -21,8 +24,10 @@ export const OPENAI_CHAT_CLIENT = Symbol('OPENAI_CHAT_CLIENT');
 @Module({
   // OrganizationsModule : requis pour instancier AuthGuard (dépend d'OrganizationsService)
   // dans le contexte de ce module (S16a — /ai devient authentifié).
-  imports: [OrganizationsModule, IntegrationsModule, AdminModule],
-  controllers: [AiActionsController],
+  // AccountModule : `LalaController` lit la langue dans les préférences de
+  // l'utilisateur plutôt que dans le corps de la requête (S24a).
+  imports: [OrganizationsModule, IntegrationsModule, AdminModule, AccountModule],
+  controllers: [AiActionsController, LalaController],
   providers: [
     {
       provide: OPENAI_CHAT_CLIENT,
@@ -40,7 +45,14 @@ export const OPENAI_CHAT_CLIENT = Symbol('OPENAI_CHAT_CLIENT');
       useFactory: (client: OpenAIChatClient | null) => new AiActionsService(client),
       inject: [OPENAI_CHAT_CLIENT],
     },
+    {
+      // Même client, même politique de repli : Lala et les actions correctives
+      // ne doivent pas pouvoir diverger sur « l'IA est-elle disponible ? ».
+      provide: LalaService,
+      useFactory: (client: OpenAIChatClient | null) => new LalaService(client),
+      inject: [OPENAI_CHAT_CLIENT],
+    },
   ],
-  exports: [AiActionsService],
+  exports: [AiActionsService, LalaService],
 })
 export class AiModule {}

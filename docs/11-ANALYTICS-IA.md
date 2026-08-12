@@ -110,6 +110,88 @@ Backends :
 Le champ `source` de la réponse (`"llm"` ou `"fallback"`) permet à l’interface
 d’indiquer clairement à l’utilisateur d’où viennent les suggestions.
 
+## Interprétation des résultats et assistant « Lala » (S24a)
+
+Deux besoins distincts, deux points d'API.
+
+| Point d'API | Rôle |
+|---|---|
+| `POST /ai/interpretations` | une LECTURE par ligne de résultat affichée |
+| `POST /ai/lala/messages` | l'échange ouvert depuis une interprétation |
+
+### Interprétation ≠ définition ≠ recommandation
+
+Une interprétation lit **ce chiffre-là** : « votre DSCR ressort à 0,82, sous le
+repère de 1,25 ; le feu est rouge ». Elle ne définit pas le concept —
+`/aide/*` le fait déjà — et elle ne prescrit rien : les actions à mener
+relèvent de `POST /ai/corrective-actions`. Chaque texte est accompagné d'une
+mention servie par l'API, jamais laissée au client :
+
+> Lecture d'un chiffre calculé par le moteur financier. Ce n'est ni un conseil
+> en investissement, ni un conseil juridique, comptable ou fiscal.
+
+### Vérification des citations numériques
+
+`docs/11 § Garde-fous` demande la « vérification des nombres cités contre les
+résultats du moteur ». Un prompt qui *demande* de ne pas inventer de chiffre
+n'est pas une vérification, c'est un souhait. `lala-nombres.ts` relit donc le
+texte rendu et rejette tout nombre absent de ce qui a été fourni au modèle :
+
+- valeurs et seuils des lignes transmises, sous leur forme brute **et** sous
+  leur rendu affiché (un pourcentage stocké `0,185` est citable « 18,5 % ») ;
+- nombres déjà présents dans les libellés du moteur (« exercice 3 ») et dans les
+  réserves de portée injectées (« sur 12 mois ») ;
+- le zéro seul, repère de signe qui n'affirme aucune grandeur.
+
+La comparaison porte sur des **magnitudes** canonisées en lecture fr-FR
+(virgule décimale, espace insécable en milliers) : le signe est porté par la
+prose, pas par le nombre extrait. Une interprétation refusée retombe sur sa
+lecture déterministe, **ligne par ligne** — une mauvaise lecture n'emporte pas
+les bonnes.
+
+### Repli déterministe
+
+Même motif que `/ai/corrective-actions` : `interpretationDeterministe` écrit le
+texte à partir des seuls chiffres du moteur, sans réseau. Il sert deux fois — de
+repli quand l'IA est indisponible, et de filet quand l'IA répond mal (chiffre
+inventé, texte vide, texte anormalement long). Le champ `source`, porté **par
+ligne** et globalement, permet à l'interface de dire d'où vient chaque texte :
+elle affiche « Rédigé par Lala » ou « Lecture automatique », jamais l'un pour
+l'autre.
+
+### Trésorerie mensuelle — la réserve est structurelle
+
+La feuille `tresorerie` est une vue simplifiée et **optimiste** qui diverge du
+bilan (docs/07 § Limites connues). Sa réserve n'est pas confiée au modèle :
+le service la renvoie dans `avertissementFeuille` et la RAJOUTE au texte, quelle
+que soit la source. Elle est également rattachée à `tresorerie_min_ok`, qui
+s'affiche dans `ratios` mais dont le feu tricolore est calculé sur cette vue —
+sans quoi le ratio le plus regardé du bandeau serait le seul à la perdre.
+
+### Langue
+
+Lala répond dans la langue des préférences de l'utilisateur, lue côté serveur
+(`AccountService.getPreferences`) et jamais dans le corps de la requête. Le
+registre `LANGUES` de `lala-interpretation.ts` `satisfies
+Record<SupportedLocale, …>` : ajouter une langue à `SUPPORTED_LOCALES` sans
+écrire sa formulation ne compile pas.
+
+### Quotas par offre — point d'accroche
+
+Le quota de messages Lala par abonnement **n'est pas** implémenté dans le module
+IA ; il appartient au chantier offres. Deux accroches lui sont laissées :
+
+- **le garde** : `LalaController` déclare `AuthGuard` → `PermissionsGuard` au
+  niveau du contrôleur, puis `UserThrottlerGuard` au niveau de la méthode. Un
+  garde de quota s'ajoute à ce `@UseGuards` de méthode : il s'exécute donc après
+  l'authentification (`req.user`, `req.orgId` résolus) et avant le service,
+  c'est-à-dire avant tout appel facturé ;
+- **le compteur** : `AiUsageService.record` est appelé après la réponse avec les
+  actions stables `ai.interpretations` et `ai.lala_chat`. Le champ `source`
+  distingue un appel réellement facturé (`llm`) d'un repli déterministe
+  (`fallback`) — un utilisateur dont l'IA est indisponible ne doit pas voir son
+  quota entamé.
+
 ## Bornes techniques des appels OpenAI (S22h)
 
 Chaque appel au modèle est borné. Ce n’est pas une mesure de coût — un appel
