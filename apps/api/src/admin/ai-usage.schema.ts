@@ -41,3 +41,10 @@ export type AiUsageEventDocument = HydratedDocument<AiUsageEvent>;
 export const AiUsageEventSchema = SchemaFactory.createForClass(AiUsageEvent);
 
 AiUsageEventSchema.index({ createdAt: -1 });
+
+// Quota mensuel par organisation : ce décompte est lu AVANT chaque réponse de
+// l'assistant, donc sur le chemin chaud. Sans cet index, chaque message
+// déclencherait un parcours de la collection entière, qui grossit d'une ligne
+// par appel IA de la plateforme. L'ordre des clés suit la requête
+// (`organizationId` et `source` en égalité, `createdAt` en intervalle).
+AiUsageEventSchema.index({ organizationId: 1, source: 1, createdAt: -1 });

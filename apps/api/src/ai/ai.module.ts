@@ -9,11 +9,13 @@
 import { Module } from '@nestjs/common';
 
 import { AdminModule } from '../admin/admin.module.js';
+import { BillingModule } from '../billing/billing.module.js';
 import { IntegrationsModule } from '../integrations/integrations.module.js';
 import { SecretsService } from '../integrations/secrets.service.js';
 import { OrganizationsModule } from '../organizations/organizations.module.js';
 import { AiActionsController } from './ai-actions.controller.js';
 import { AiActionsService, type OpenAIChatClient } from './ai-actions.service.js';
+import { AiQuotaService } from './ai-quota.service.js';
 import { createOpenAIClient } from './openai-client.js';
 
 export const OPENAI_CHAT_CLIENT = Symbol('OPENAI_CHAT_CLIENT');
@@ -21,7 +23,10 @@ export const OPENAI_CHAT_CLIENT = Symbol('OPENAI_CHAT_CLIENT');
 @Module({
   // OrganizationsModule : requis pour instancier AuthGuard (dépend d'OrganizationsService)
   // dans le contexte de ce module (S16a — /ai devient authentifié).
-  imports: [OrganizationsModule, IntegrationsModule, AdminModule],
+  // `BillingModule` : `AiQuotaService` a besoin du plan et des entitlements de
+  // l'organisation pour connaître SA limite. Aucun cycle — `billing/` ne connaît
+  // pas `ai/`, et la règle de quota elle-même (`billing/ai-quota.ts`) est pure.
+  imports: [OrganizationsModule, IntegrationsModule, AdminModule, BillingModule],
   controllers: [AiActionsController],
   providers: [
     {
@@ -40,7 +45,11 @@ export const OPENAI_CHAT_CLIENT = Symbol('OPENAI_CHAT_CLIENT');
       useFactory: (client: OpenAIChatClient | null) => new AiActionsService(client),
       inject: [OPENAI_CHAT_CLIENT],
     },
+    AiQuotaService,
   ],
-  exports: [AiActionsService],
+  // `AiQuotaService` est exporté : c'est le point d'entrée que tout nouvel usage
+  // de l'IA (assistant, interprétations, chat) doit appeler au lieu d'écrire sa
+  // propre limite. Voir l'encadré en tête de `ai-quota.service.ts`.
+  exports: [AiActionsService, AiQuotaService],
 })
 export class AiModule {}
