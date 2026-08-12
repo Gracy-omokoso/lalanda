@@ -13,7 +13,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Les fournisseurs à secret. ADR-0013 § Contexte en déclarait cinq; deux
+ * Les fournisseurs à secret. ADR-0013 § Contexte en déclarait cinq; trois
  * évolutions se sont ajoutées depuis :
  *
  *   - `s3` est devenu `r2` (Cloudflare R2). Le PROTOCOLE ne change pas — R2
@@ -26,6 +26,9 @@
  *   - `elevenlabs` est ajouté pour un futur assistant vocal. CONFIGURATION
  *     SEULEMENT à ce stade : aucune synthèse vocale n'est implémentée, et
  *     l'usage produit n'est pas spécifié.
+ *   - `zeptomail` est ajouté (ADR-0014 § S22m) SANS retirer `smtp` : ADR-0014
+ *     fait de ZeptoMail le chemin d'envoi PRÉFÉRÉ, pas le chemin unique — SMTP
+ *     reste le repli, et un développeur local continue de brancher MailHog.
  */
 export const INTEGRATION_PROVIDERS = [
   'openai',
@@ -34,6 +37,7 @@ export const INTEGRATION_PROVIDERS = [
   'smtp',
   'r2',
   'elevenlabs',
+  'zeptomail',
 ] as const;
 
 export type IntegrationProvider = (typeof INTEGRATION_PROVIDERS)[number];
@@ -159,6 +163,32 @@ export const PROVIDER_SPECS: Readonly<Record<IntegrationProvider, ProviderSpec>>
     // entrée serait recréer l'hybride permanent que l'ADR rejette. »
     envFallback: {},
     testDescription: 'GET /v2/voices — lecture seule, sans coût ni crédit consommé.',
+  },
+  zeptomail: {
+    label: 'ZeptoMail (Zoho)',
+    // `sendMailToken` reprend le nom que Zoho donne à cette valeur dans sa
+    // console (« Send Mail Token »). Un opérateur qui cherche quoi coller ne doit
+    // pas avoir à traduire : le libellé du champ est celui de l'écran d'origine.
+    secrets: ['sendMailToken'],
+    requiredSecrets: ['sendMailToken'],
+    // VOLONTAIREMENT VIDE. Les deux seuls réglages non secrets de l'envoi —
+    // l'adresse d'expédition et le point d'entrée régional de l'API — sont déjà
+    // portés par l'environnement (`SMTP_FROM`, `ZEPTOMAIL_API_URL`), d'où le
+    // transport les lit. Les redéclarer ici créerait deux sources de vérité pour
+    // la même valeur, c'est-à-dire le défaut qu'ADR-0013 option C nomme
+    // explicitement : « une variable d'environnement oubliée masque
+    // silencieusement » ce qui a pourtant été saisi en base.
+    config: [],
+    requiredConfig: [],
+    // VIDE, et ce n'est pas un oubli (verrou vérifié par `providers.test.ts`).
+    // ZeptoMail n'a jamais transité par l'environnement : lui donner un secours
+    // `ZEPTOMAIL_TOKEN` recréerait l'hybride permanent qu'ADR-0013 rejette. Le
+    // critère de partage d'ADR-0013 §8 tranche sans ambiguïté — l'envoi d'un
+    // email a lieu bien après la lecture de la base, donc le coffre.
+    envFallback: {},
+    testDescription:
+      'Appel de /v1.1/email avec une charge délibérément incomplète — ' +
+      'le jeton est validé, aucun email ne part.',
   },
 };
 

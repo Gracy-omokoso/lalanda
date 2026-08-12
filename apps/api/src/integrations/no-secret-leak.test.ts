@@ -78,6 +78,7 @@ const SECRETS_SENTINELLES: Record<IntegrationProvider, Record<string, string>> =
   paypal: { clientSecret: 'ANTIFUITE-paypal-0c5d93b7e421' },
   smtp: { password: 'ANTIFUITE-smtp-6e2b47f0a8d1' },
   s3: { secretKey: 'ANTIFUITE-s3-9a4c81d5f37b' },
+  zeptomail: { sendMailToken: 'ANTIFUITE-zeptomail-7d3f62a0c94e' },
 };
 
 /** `config` valide au regard de la liste blanche de chaque fournisseur. */
@@ -87,6 +88,9 @@ const CONFIG_SENTINELLE: Record<IntegrationProvider, Record<string, string | num
   paypal: { clientId: 'client-id-public', environment: 'sandbox' },
   smtp: { host: 'smtp.exemple.test', port: 587, user: 'expediteur@exemple.test' },
   s3: { endpoint: 'https://exemple.test', bucketExports: 'exports' },
+  // ZeptoMail ne déclare aucune clé de `config` (ADR-0014) : sa liste blanche
+  // est vide, donc la seule charge valide est la charge vide.
+  zeptomail: {},
 };
 
 /** Toutes les valeurs en clair du parc — la liste que rien ne doit contenir. */

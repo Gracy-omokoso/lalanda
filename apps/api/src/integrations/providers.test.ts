@@ -22,18 +22,24 @@ import {
 } from './providers.js';
 
 describe('le catalogue des fournisseurs', () => {
-  it('est exactement celui du code — ADR-0013 augmenté de R2 et d’ElevenLabs', () => {
-    // ADR-0013 § Contexte en nommait cinq. Deux évolutions depuis : `s3` est
-    // devenu `r2` (même protocole, fournisseur cible différent) et `elevenlabs`
-    // est ajouté. La liste reste ÉNUMÉRÉE en dur : c'est ce qui fait rougir le
-    // test le jour où un fournisseur est ajouté sans que la décision soit prise.
+  it('est exactement celui du code — ADR-0013 augmenté de R2, ElevenLabs et ZeptoMail', () => {
+    // ADR-0013 § Contexte en nommait cinq. Trois évolutions depuis : `s3` est
+    // devenu `r2` (même protocole, fournisseur cible différent), `elevenlabs`
+    // est ajouté, et `zeptomail` l'est par ADR-0014. La liste reste ÉNUMÉRÉE en
+    // dur : c'est ce qui fait rougir le test le jour où un fournisseur est
+    // ajouté sans que la décision soit prise. Toute ligne ajoutée doit pointer
+    // son ADR — un fournisseur qui apparaît sans ADR apparaît aussi dans
+    // `/admin`, avec un champ de saisie de secret que personne n'a arbitré.
     expect([...INTEGRATION_PROVIDERS]).toEqual([
+      // ADR-0013 § Contexte — les cinq d'origine, `s3` renommé `r2`.
       'openai',
       'stripe',
       'paypal',
       'smtp',
       'r2',
       'elevenlabs',
+      // ADR-0014 — chemin d'envoi préféré, SMTP conservé en repli.
+      'zeptomail',
     ]);
   });
 
@@ -160,6 +166,17 @@ describe('les arbitrages nommés par ADR-0013 sont bien ceux du code', () => {
   it('SMTP range `user` en config et `password` en secret', () => {
     expect(PROVIDER_SPECS.smtp.config).toContain('user');
     expect(PROVIDER_SPECS.smtp.secrets).toContain('password');
+  });
+
+  it('ZeptoMail n’expose QUE son jeton d’envoi, et rien en clair (ADR-0014)', () => {
+    // Le jeton « Send Mail Token » vaut le droit d'écrire depuis le domaine :
+    // c'est un secret entier, jamais une moitié publiable comme `s3.accessKey`.
+    expect(PROVIDER_SPECS.zeptomail.secrets).toEqual(['sendMailToken']);
+    // `config` VIDE est l'arbitrage, pas un manque : l'adresse d'expédition
+    // (`SMTP_FROM`) et le point d'entrée régional (`ZEPTOMAIL_API_URL`) sont des
+    // réglages d'environnement, et les redéclarer ici donnerait deux sources de
+    // vérité à une même valeur — dont une seule serait lue par le transport.
+    expect(PROVIDER_SPECS.zeptomail.config).toEqual([]);
   });
 });
 
