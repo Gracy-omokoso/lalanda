@@ -27,6 +27,8 @@ import { afterAll, beforeAll, expect, it } from 'vitest';
 
 import 'reflect-metadata';
 
+import { PLAN_ENTITLEMENTS } from '@lalanda/shared/pricing';
+
 import type { OrgRole } from '../authz/permissions.js';
 import { e2eSuite, makeE2EApp, registerAndLogin, teardown } from './e2e-utils.js';
 
@@ -188,8 +190,13 @@ e2eSuite('espace organisation — tableau de bord, paramètres, facturation (S21
     expect(body.sections.gouvernance.membresActifs).toBe(ROLES.length);
     expect(body.sections.gouvernance.plansValidesCeMois).toBeGreaterThanOrEqual(1);
     expect(body.sections.gouvernance.consommation.plan).toBe('pro');
-    // `pro` = projets illimités : la limite doit être `null`, jamais un grand nombre.
-    expect(body.sections.gouvernance.consommation.projets.limite).toBeNull();
+    // La limite affichée est CELLE DU CATALOGUE, jamais une valeur recopiée ici :
+    // le tableau de bord et la page tarifs doivent annoncer le même chiffre.
+    // La convention `null` = illimité doit traverser l'API telle quelle — un
+    // grand nombre substitué à `null` serait un plafond inventé.
+    expect(body.sections.gouvernance.consommation.projets.limite).toBe(
+      PLAN_ENTITLEMENTS.pro.maxProjects,
+    );
   });
 
   it('LE LECTEUR NE VOIT AUCUNE DONNÉE RÉSERVÉE AU PROPRIÉTAIRE', async () => {
