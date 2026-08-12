@@ -39,7 +39,7 @@ import type { SourceChiffree } from './lala-nombres.js';
  * investissement. Elle est donc renvoyée dans la réponse, pas laissée au client.
  */
 export const MENTION_NON_CONSEIL =
-  'Lecture d’un chiffre calculé par le moteur financier. Ce n’est ni un conseil ' +
+  'Explication d’un chiffre calculé par le moteur financier. Ce n’est ni un conseil ' +
   'en investissement, ni un conseil juridique, comptable ou fiscal.';
 
 /**
@@ -158,7 +158,7 @@ const FR: Formulation = {
   },
   chatIndisponible: (interpretation) =>
     'L’assistant n’est pas joignable pour le moment, je ne peux donc pas prolonger l’échange. ' +
-    'Voici la lecture établie à partir des chiffres du moteur, qui reste valable : ' +
+    'Voici l’explication établie à partir des chiffres du moteur, qui reste valable : ' +
     `${interpretation} Réessayez dans quelques instants.`,
   chatChiffreRefuse: () =>
     'Je ne peux pas avancer ce chiffre : seul le moteur financier produit les valeurs de votre ' +
