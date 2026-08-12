@@ -81,10 +81,7 @@ const tester = new HttpConnectionTester();
 
 const CLE_SECRETE = 'secret-r2-de-test-ne-servant-a-rien';
 
-function entreeR2(
-  origin: string,
-  config: Record<string, string> = {},
-): ConnectionTestInput {
+function entreeR2(origin: string, config: Record<string, string> = {}): ConnectionTestInput {
   return {
     provider: 'r2',
     config: {
@@ -136,8 +133,7 @@ describe('test de connexion R2 — la requête émise ne peut rien coûter', () 
       await tester.test(entreeR2(srv.origin));
       const { headers } = srv.recues[0]!;
 
-      const empreinteCorpsVide =
-        'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+      const empreinteCorpsVide = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
       expect(headers['x-amz-content-sha256']).toBe(empreinteCorpsVide);
       expect(headers['x-amz-date']).toMatch(/^\d{8}T\d{6}Z$/);
       expect(String(headers['authorization'])).toMatch(/^AWS4-HMAC-SHA256 Credential=/);
