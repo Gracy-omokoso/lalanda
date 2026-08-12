@@ -81,7 +81,10 @@ export type SessionVocaleResponse = z.infer<typeof SessionVocaleResponseSchema>;
 export const ClotureVocaleRequestSchema = z
   .object({
     sessionId: z.string().min(1).max(128),
-    minutes: z.number().nonnegative().max(24 * 60),
+    minutes: z
+      .number()
+      .nonnegative()
+      .max(24 * 60),
   })
   .strict();
 export type ClotureVocaleRequest = z.infer<typeof ClotureVocaleRequestSchema>;

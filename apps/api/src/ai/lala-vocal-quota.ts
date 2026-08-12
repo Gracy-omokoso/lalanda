@@ -247,7 +247,9 @@ export function voiceQuotaExceededPayload(etat: EtatQuotaVocal): VoiceQuotaExcee
     throw new Error('voiceQuotaExceededPayload appelé sur une offre sans limite de minutes.');
   }
   const jours =
-    etat.reinitialisationDansJours === 1 ? 'demain' : `dans ${etat.reinitialisationDansJours} jours`;
+    etat.reinitialisationDansJours === 1
+      ? 'demain'
+      : `dans ${etat.reinitialisationDansJours} jours`;
 
   const message =
     etat.limiteMinutes === 0
