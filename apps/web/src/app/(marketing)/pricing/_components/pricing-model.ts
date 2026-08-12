@@ -57,8 +57,18 @@ export interface Tier {
   tagline: string;
   features: string[];
   cta: string;
-  /** Destination du bouton. Expert mène au contact, pas à l'inscription. */
-  ctaHref: string;
+  /**
+   * Destination du bouton, ou `null` quand aucune destination n'existe encore.
+   *
+   * `null` pour Expert : **aucune adresse de contact n'est publiée**. C'est un
+   * fait établi du dépôt, pas un oubli — `PUBLISHER_UNKNOWNS` (`lib/legal.ts`)
+   * liste « adresse email de contact » parmi les informations que l'éditeur doit
+   * encore fournir. Un bouton vers `/contact`, page qui n'existe pas, enverrait
+   * un acheteur sérieux sur un 404 au moment précis où il veut parler à
+   * quelqu'un ; une adresse inventée serait pire. L'interface affiche donc le
+   * marqueur « à compléter » du dépôt, visible, plutôt qu'un cul-de-sac.
+   */
+  ctaHref: string | null;
   /**
    * L'offre se souscrit-elle en ligne ?
    *
@@ -111,7 +121,10 @@ function featuresOf(plan: Plan): string[] {
     pro: 'Historique des versions et support par email',
     cabinet: 'Espace multi-clients et support par email',
     business: 'White-label, accès API et support prioritaire',
-    expert: 'Accompagnement par un expert, sur devis',
+    // Ne répète PAS la tagline (« Accompagnement par un expert, sur devis »),
+    // affichée juste au-dessus : une puce qui redit le sous-titre fait perdre
+    // une ligne d'argument.
+    expert: 'Tout Business, plus du temps d’expert humain et un support dédié',
   };
 
   return [projets, pdf, ia, sieges, realise, editorial[plan]];
@@ -141,9 +154,11 @@ export const TIERS: readonly Tier[] = PLANS.map((slug) => {
     tagline: def.tagline,
     features: featuresOf(slug),
     cta: ctaOf(slug),
-    // Expert ne mène pas à `/register` : l'inscription ouvrirait un compte
+    // Expert ne mène PAS à `/register` : l'inscription ouvrirait un compte
     // gratuit sans rien dire du devis, ce qui n'est pas ce que le bouton promet.
-    ctaHref: slug === 'expert' ? '/contact?offre=expert' : '/register',
+    // Et elle ne mène nulle part ailleurs tant qu'aucun canal de contact n'est
+    // publié — voir le commentaire de `ctaHref`.
+    ctaHref: slug === 'expert' ? null : '/register',
     selfServe: def.selfServe,
     // Cabinet est le palier mis en avant : c'est la clientèle réelle (cabinets
     // et incubateurs), et c'est le palier que l'ancienne grille n'avait pas.

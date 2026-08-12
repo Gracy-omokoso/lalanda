@@ -24,6 +24,7 @@
 
 import Link from 'next/link';
 
+import { ToComplete } from '../_components/legal-page';
 import { PaymentMethods } from './_components/payment-methods';
 import {
   annualSavingPercent,
@@ -287,8 +288,10 @@ function TierCard({ tier }: { tier: Tier }): React.ReactElement {
         ))}
       </ul>
 
+      {/* `TierCard` ne sert que les offres à tarif publié, qui ont toutes une
+          destination. Le cas `null` (Expert) passe par `QuoteCard`. */}
       <Link
-        href={tier.ctaHref}
+        href={tier.ctaHref ?? '/register'}
         className={`mt-8 inline-flex items-center justify-center rounded-md px-4 py-2.5 text-sm font-medium transition ${
           tier.highlighted
             ? 'bg-[var(--accent)] text-[var(--accent-foreground)] hover:opacity-90'
@@ -343,12 +346,25 @@ function QuoteCard({ tier }: { tier: Tier }): React.ReactElement {
           l&apos;accord conclu.
         </p>
       </div>
-      <Link
-        href={tier.ctaHref}
-        className="inline-flex shrink-0 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-5 py-2.5 text-sm font-medium text-[var(--foreground)] transition hover:bg-[var(--surface-muted)]"
-      >
-        {tier.cta}
-      </Link>
+      {/* Aucune destination tant qu'aucun canal de contact n'est publié. Un
+          bouton vers une page inexistante enverrait un acheteur sérieux sur un
+          404 au moment où il veut parler à quelqu'un ; le marqueur « à
+          compléter » du dépôt le dit au lieu de le cacher. */}
+      {tier.ctaHref === null ? (
+        <p className="shrink-0 text-sm">
+          <span className="font-semibold">{tier.cta}</span>
+          <span className="mt-2 block">
+            <ToComplete>canal de contact commercial à publier</ToComplete>
+          </span>
+        </p>
+      ) : (
+        <Link
+          href={tier.ctaHref}
+          className="inline-flex shrink-0 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-5 py-2.5 text-sm font-medium text-[var(--foreground)] transition hover:bg-[var(--surface-muted)]"
+        >
+          {tier.cta}
+        </Link>
+      )}
     </div>
   );
 }

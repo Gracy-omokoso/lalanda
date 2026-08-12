@@ -62,8 +62,27 @@ describe('grille tarifaire affichée', () => {
     expect(expert.cta).toBe('Nous contacter');
     // Le bouton ne mène pas à l'inscription : celle-ci ouvrirait un compte
     // gratuit sans un mot du devis, ce qui n'est pas ce que le bouton promet.
-    expect(expert.ctaHref).not.toContain('register');
+    expect(expert.ctaHref).toBeNull();
     expect(expert.cta).not.toContain(String(TRIAL_DAYS));
+  });
+
+  it('ne pointe aucune offre vers une destination qui n’existe pas', () => {
+    // `/contact` n'existe pas et aucune adresse de contact n'est publiée
+    // (`PUBLISHER_UNKNOWNS`). Un bouton vers un 404 sur la seule voie d'accès à
+    // une offre payante est pire que pas de bouton du tout.
+    const routesConnues = ['/register'];
+    for (const tier of TIERS) {
+      if (tier.ctaHref === null) continue;
+      expect(routesConnues, `${tier.slug} → ${tier.ctaHref}`).toContain(tier.ctaHref);
+    }
+  });
+
+  it('ne répète pas la tagline dans les arguments de la carte', () => {
+    // Une puce qui redit le sous-titre affiché juste au-dessus fait perdre une
+    // ligne d'argument sur une carte qui n'en a que six.
+    for (const tier of TIERS) {
+      expect(tier.features, tier.slug).not.toContain(tier.tagline);
+    }
   });
 
   it('ne propose la bascule annuelle que là où un tarif annuel est vendable', () => {
