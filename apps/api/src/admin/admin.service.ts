@@ -120,7 +120,13 @@ export class AdminService {
     // Répartition par plan : une organisation sans document `Subscription` est
     // `free` (règle de `BillingService.getPlan`). Compter les seuls documents
     // existants sous-estimerait donc systématiquement le plan gratuit.
-    const plans: Record<Plan, number> = { free: 0, pro: 0, business: 0 };
+    // Dérivé de `PLANS` et non écrit à la main : la grille est passée de trois à
+    // cinq offres, et un littéral aurait laissé `cabinet` et `expert` invisibles
+    // dans la console sans qu'aucun test ne s'en plaigne.
+    const plans: Record<Plan, number> = Object.fromEntries(PLANS.map((p) => [p, 0])) as Record<
+      Plan,
+      number
+    >;
     const subs = db
       ? await db
           .collection('subscriptions')
@@ -131,7 +137,10 @@ export class AdminService {
       const plan = String(sub['plan']) as Plan;
       if (PLANS.includes(plan)) plans[plan] += 1;
     }
-    plans.free = Math.max(orgTotal - (plans.pro + plans.business), 0);
+    // `free` est le reste : toute organisation sans abonnement actif y retombe,
+    // quels que soient les paliers payants existants.
+    const paid = PLANS.filter((p) => p !== 'free').reduce((n, p) => n + plans[p], 0);
+    plans.free = Math.max(orgTotal - paid, 0);
 
     return {
       organizations: { total: orgTotal, suspended },

@@ -24,20 +24,38 @@
 
 import Link from 'next/link';
 
+import { ToComplete } from '../_components/legal-page';
 import { PaymentMethods } from './_components/payment-methods';
 import {
   annualSavingPercent,
   COMPARISON,
   FAQ,
   formatPrice,
+  PLANS,
   TIERS,
   TRIAL_DAYS,
   type Tier,
 } from './_components/pricing-model';
 
+/**
+ * Offres présentées en grille : celles qui ont un tarif publié.
+ *
+ * Le partage n'est pas cosmétique. Une offre sans montant ne se compare pas
+ * colonne à colonne avec des prix — la mettre dans la même grille invite au clic
+ * d'achat. Elle a donc son propre bloc, plus bas, sans bouton de paiement.
+ */
+const GRID_TIERS = TIERS.filter((t) => t.priceMonthUsd !== null);
+const QUOTE_TIERS = TIERS.filter((t) => t.priceMonthUsd === null);
+
 export const metadata = {
   title: 'Tarifs — Lalanda',
-  description: `Trois offres pour générer votre plan financier bancable : Free, Pro (9 USD/mois) et Business (49 USD/mois). Essai de ${TRIAL_DAYS} jours sans carte bancaire.`,
+  description:
+    // Les montants ne sont pas recopiés : ils viennent du catalogue, comme le
+    // reste de la page. Une méta-description périmée est une promesse périmée,
+    // et c'est elle que lisent les moteurs de recherche.
+    `Cinq offres pour générer votre plan financier bancable : ` +
+    GRID_TIERS.map((t) => `${t.name} (${formatPrice(t.priceMonthUsd)}/mois)`).join(', ') +
+    `, et une offre Expert sur devis. Essai de ${TRIAL_DAYS} jours sans carte bancaire.`,
 };
 
 export default function PricingPage(): React.ReactElement {
@@ -50,7 +68,7 @@ export default function PricingPage(): React.ReactElement {
               TARIFS
             </p>
             <h1 className="font-display text-4xl font-black tracking-tight text-[var(--on-ink)] sm:text-5xl">
-              Trois offres, un même moteur financier.
+              Quatre offres, un même moteur financier.
             </h1>
             <p className="mt-5 text-lg text-[var(--on-ink-muted)]">
               Tous les calculs et exports fonctionnent dès l&apos;offre gratuite. Vous ne payez que
@@ -81,11 +99,14 @@ export default function PricingPage(): React.ReactElement {
 
       <section>
         <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
-          <div className="grid gap-6 lg:grid-cols-3">
-            {TIERS.map((tier) => (
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {GRID_TIERS.map((tier) => (
               <TierCard key={tier.slug} tier={tier} />
             ))}
           </div>
+          {QUOTE_TIERS.map((tier) => (
+            <QuoteCard key={tier.slug} tier={tier} />
+          ))}
           <div className="mt-10">
             <PaymentMethods />
           </div>
@@ -102,8 +123,10 @@ export default function PricingPage(): React.ReactElement {
           {/* Le tableau défile horizontalement sur mobile plutôt que d'être
               réduit à l'illisible : un comparatif tronqué ne compare rien. */}
           <div className="mt-8 overflow-x-auto">
-            <table className="w-full min-w-[40rem] border-collapse text-sm">
-              <caption className="sr-only">Comparatif des offres Free, Pro et Business</caption>
+            <table className="w-full min-w-[52rem] border-collapse text-sm">
+              <caption className="sr-only">
+                Comparatif des offres {TIERS.map((t) => t.name).join(', ')}
+              </caption>
               <thead>
                 <tr className="border-b-2 border-[var(--border)]">
                   <th scope="col" className="py-3 pr-4 text-left font-semibold">
@@ -185,9 +208,12 @@ function ComparisonSectionRows({
               <span className="block text-xs text-[var(--foreground-muted)]">{row.note}</span>
             ) : null}
           </th>
-          <Cell value={row.free} />
-          <Cell value={row.pro} />
-          <Cell value={row.business} />
+          {/* Les colonnes suivent `PLANS` : une offre ajoutée au catalogue
+              apparaît ici sans qu'on ait à toucher au JSX, et surtout aucune
+              cellule ne peut être oubliée en cours de route. */}
+          {PLANS.map((plan) => (
+            <Cell key={plan} value={row.values[plan]} />
+          ))}
         </tr>
       ))}
     </>
@@ -262,8 +288,10 @@ function TierCard({ tier }: { tier: Tier }): React.ReactElement {
         ))}
       </ul>
 
+      {/* `TierCard` ne sert que les offres à tarif publié, qui ont toutes une
+          destination. Le cas `null` (Expert) passe par `QuoteCard`. */}
       <Link
-        href="/register"
+        href={tier.ctaHref ?? '/register'}
         className={`mt-8 inline-flex items-center justify-center rounded-md px-4 py-2.5 text-sm font-medium transition ${
           tier.highlighted
             ? 'bg-[var(--accent)] text-[var(--accent-foreground)] hover:opacity-90'
@@ -272,10 +300,70 @@ function TierCard({ tier }: { tier: Tier }): React.ReactElement {
       >
         {tier.cta}
       </Link>
-      {tier.slug === 'free' ? null : (
+      {tier.selfServe ? (
         <p className="mt-3 text-center text-xs text-[var(--foreground-muted)]">
           Sans carte bancaire. Sans engagement.
         </p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Offre sans tarif publié — bloc de contact, pas carte de prix.
+ *
+ * Volontairement d'une AUTRE forme que `TierCard` : pleine largeur, pas de
+ * colonne de montant, pas de mention d'essai. Un pack qui inclut du temps
+ * d'expert humain ne s'achète pas au même geste qu'un abonnement mensuel, et
+ * lui donner l'apparence d'une carte de prix inviterait précisément ce geste.
+ * Aucun tunnel de paiement ne part d'ici.
+ */
+function QuoteCard({ tier }: { tier: Tier }): React.ReactElement {
+  return (
+    <div className="mt-6 flex flex-col gap-6 rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface-muted)] p-8 sm:flex-row sm:items-center sm:justify-between">
+      <div className="max-w-2xl">
+        <div className="flex items-center gap-3">
+          <h2 className="font-display text-xl font-bold tracking-tight">{tier.name}</h2>
+          <span className="font-mono rounded border border-[var(--border)] px-2 py-0.5 text-[0.62rem] font-semibold tracking-[0.12em] text-[var(--foreground-muted)]">
+            SUR DEVIS
+          </span>
+        </div>
+        <p className="mt-2 text-sm text-[var(--foreground-muted)]">{tier.tagline}</p>
+        <ul className="mt-4 flex flex-col gap-2 text-sm sm:flex-row sm:flex-wrap sm:gap-x-6">
+          {tier.features.map((feature) => (
+            <li key={feature} className="flex items-start gap-2">
+              <span
+                aria-hidden="true"
+                className="mt-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent)]"
+              />
+              <span>{feature}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-4 text-xs text-[var(--foreground-muted)]">
+          Cette offre inclut du temps d&apos;accompagnement par un expert. Son montant dépend de
+          votre dossier : il est établi après un échange, et les accès sont ouverts une fois
+          l&apos;accord conclu.
+        </p>
+      </div>
+      {/* Aucune destination tant qu'aucun canal de contact n'est publié. Un
+          bouton vers une page inexistante enverrait un acheteur sérieux sur un
+          404 au moment où il veut parler à quelqu'un ; le marqueur « à
+          compléter » du dépôt le dit au lieu de le cacher. */}
+      {tier.ctaHref === null ? (
+        <p className="shrink-0 text-sm">
+          <span className="font-semibold">{tier.cta}</span>
+          <span className="mt-2 block">
+            <ToComplete>canal de contact commercial à publier</ToComplete>
+          </span>
+        </p>
+      ) : (
+        <Link
+          href={tier.ctaHref}
+          className="inline-flex shrink-0 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-5 py-2.5 text-sm font-medium text-[var(--foreground)] transition hover:bg-[var(--surface-muted)]"
+        >
+          {tier.cta}
+        </Link>
       )}
     </div>
   );

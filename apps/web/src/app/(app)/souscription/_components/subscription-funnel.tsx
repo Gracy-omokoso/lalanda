@@ -15,9 +15,15 @@
 //    alors qu'aucune clé n'est configurée envoie le client sur un 503 après
 //    qu'il a pris sa décision — le pire moment.
 //
-// 3. LA PÉRIODICITÉ ANNUELLE N'EST OFFERTE QUE LÀ OÙ ELLE EXISTE. Business n'a
-//    pas de tarif annuel publié ; l'API refuse ce couple. La bascule est donc
-//    masquée plutôt que de mener à un refus.
+// 3. LA PÉRIODICITÉ ANNUELLE N'EST OFFERTE QUE LÀ OÙ ELLE EXISTE. La bascule est
+//    masquée quand le couple (offre, périodicité) n'est pas vendable, plutôt que
+//    de mener à un refus de l'API en bout de tunnel.
+//
+// 4. L'OFFRE EXPERT N'ENTRE PAS DANS CE TUNNEL. Elle n'a aucun prix publié et
+//    inclut du temps d'expert humain : il n'existe donc rien à chiffrer ni à
+//    encaisser. La liste des offres proposées vient de `SELF_SERVE_PLANS`
+//    (catalogue partagé), qui l'exclut par construction — et non d'une liste
+//    écrite ici, qu'il aurait fallu penser à ne pas compléter.
 //
 // ── Ce que ce composant ne fait jamais ───────────────────────────────────────
 //
@@ -26,6 +32,7 @@
 // mène nulle part), et elle est testée dans `pricing-model.test.ts`.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { SELF_SERVE_PLANS } from '@lalanda/shared/pricing';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -59,8 +66,14 @@ import {
   type Ton,
 } from './subscription-model';
 
-/** Offres réellement souscriptibles — `free` n'est pas un achat. */
-const OFFRES_PAYANTES: Plan[] = ['pro', 'business'];
+/**
+ * Offres réellement souscriptibles EN LIGNE.
+ *
+ * Vient du catalogue : `free` n'est pas un achat, et `expert` ne se vend pas
+ * sans accord commercial. Une liste écrite ici aurait affiché Expert dès que
+ * quelqu'un aurait ajouté un palier « payant » sans se demander s'il se vend.
+ */
+const OFFRES_PAYANTES: readonly Plan[] = SELF_SERVE_PLANS;
 
 export function SubscriptionFunnel(): React.ReactElement {
   const [state, setState] = useState<SubscriptionStateView | null>(null);

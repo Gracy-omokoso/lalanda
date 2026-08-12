@@ -180,6 +180,11 @@ export class Subscription {
   @Prop({ type: [SubscriptionTransitionSchema], default: [] })
   statusHistory!: SubscriptionTransition[];
 
+  // Il n'existe volontairement AUCUN champ de version de grille tarifaire ici.
+  // Le décideur a tranché : aucune antériorité, la grille courante s'applique à
+  // tous les abonnements. Stocker une version qu'aucune lecture ne consulte
+  // laisserait croire à un mécanisme d'antériorité actif. Voir `entitlements.ts`.
+
   @Prop({ type: Number, required: true, default: SUBSCRIPTION_SCHEMA_VERSION })
   _schemaVersion!: number;
 

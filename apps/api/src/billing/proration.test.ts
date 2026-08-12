@@ -5,6 +5,7 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { PLANS } from './entitlements.js';
 import { PLAN_PRICES } from './pricing-catalog.js';
 import { addDays, computeProration, directionOf, nextPeriodEnd } from './proration.js';
 
@@ -42,7 +43,7 @@ describe('prorata (docs/13)', () => {
   });
 
   it('une montée en gamme est immédiate et créditée du non-consommé', () => {
-    // Business 49 USD, Pro 9 USD, 15 jours restants sur 30.
+    // Business 79 USD, Pro 19 USD, 15 jours restants sur 30.
     const r = computeProration({
       currentPlan: 'pro',
       targetPlan: 'business',
@@ -54,12 +55,30 @@ describe('prorata (docs/13)', () => {
     expect(r.direction).toBe('upgrade');
     expect(r.effect).toBe('immediate');
     expect(r.remainingDays).toBe(15);
-    // Crédit : 900 × 15 / 30 = 450 (arrondi bas).
-    expect(r.creditCents).toBe(450);
-    // Coût : 4900 × 15 / 30 = 2450 (arrondi haut).
-    expect(r.chargeCents).toBe(2450);
-    expect(r.amountDueCents).toBe(2000);
+    // Crédit : 1900 × 15 / 30 = 950 (arrondi bas).
+    expect(r.creditCents).toBe(950);
+    // Coût : 7900 × 15 / 30 = 3950 (arrondi haut).
+    expect(r.chargeCents).toBe(3950);
+    expect(r.amountDueCents).toBe(3000);
     expect(r.carriedCreditCents).toBe(0);
+  });
+
+  it('le palier Cabinet se prorate comme les autres', () => {
+    // Le palier inséré dans la nouvelle grille n'est pas un cas particulier :
+    // ce test existe pour qu'il ne le devienne pas par omission.
+    const r = computeProration({
+      currentPlan: 'pro',
+      targetPlan: 'cabinet',
+      currentInterval: 'month',
+      targetInterval: 'month',
+      currentPeriodEnd: addDays(NOW, 15),
+      now: NOW,
+    });
+    expect(r.direction).toBe('upgrade');
+    // Crédit : 1900 × 15 / 30 = 950. Coût : 3900 × 15 / 30 = 1950.
+    expect(r.creditCents).toBe(950);
+    expect(r.chargeCents).toBe(1950);
+    expect(r.amountDueCents).toBe(1000);
   });
 
   it('sans période en cours, la montée facture une période entière', () => {
@@ -91,32 +110,58 @@ describe('prorata (docs/13)', () => {
     });
     expect(r.direction).toBe('upgrade');
     expect(r.chargeCents).toBe(PLAN_PRICES.pro.yearCents);
-    // Crédit du mensuel non consommé : 900 × 10 / 30 = 300.
-    expect(r.creditCents).toBe(300);
-    expect(r.amountDueCents).toBe(9000 - 300);
+    // Crédit du mensuel non consommé : 1900 × 10 / 30 = 633 (arrondi bas).
+    expect(r.creditCents).toBe(633);
+    expect(r.amountDueCents).toBe(19000 - 633);
   });
 
-  it('refuse de deviner un tarif non publié (Business annuel)', () => {
-    expect(() =>
-      computeProration({
-        currentPlan: 'pro',
-        targetPlan: 'business',
-        currentInterval: 'month',
-        targetInterval: 'year',
-        currentPeriodEnd: addDays(NOW, 10),
-        now: NOW,
-      }),
-    ).toThrow(/Aucun tarif publié/);
+  it('refuse de deviner un tarif non publié (Expert, quelle que soit la périodicité)', () => {
+    // Business a désormais un tarif annuel publié ; le seul couple non
+    // commercialisé est Expert, qui n'a AUCUN montant — le pack inclut du temps
+    // d'expert humain, chiffré au cas par cas. Deviner un prix ici serait
+    // inventer une règle commerciale (CLAUDE.md).
+    for (const targetInterval of ['month', 'year'] as const) {
+      expect(() =>
+        computeProration({
+          currentPlan: 'pro',
+          targetPlan: 'expert',
+          currentInterval: 'month',
+          targetInterval,
+          currentPeriodEnd: addDays(NOW, 10),
+          now: NOW,
+        }),
+      ).toThrow(/Aucun tarif publié/);
+    }
+  });
+
+  it("l'annuel Business est désormais publié et se calcule", () => {
+    // Il valait `null` sous l'ancienne grille : le couple était refusé. La
+    // nouvelle grille l'ouvre (790 USD/an), et ce test le constate plutôt que de
+    // laisser le refus disparaître sans témoin.
+    const r = computeProration({
+      currentPlan: 'business',
+      targetPlan: 'business',
+      currentInterval: 'month',
+      targetInterval: 'year',
+      currentPeriodEnd: addDays(NOW, 10),
+      now: NOW,
+    });
+    expect(r.chargeCents).toBe(PLAN_PRICES.business.yearCents);
+    expect(r.chargeCents).toBe(79000);
   });
 
   // ── Invariant de non-remboursement ────────────────────────────────────────
   //
-  // Balayage exhaustif de tous les changements calculables : 3 plans × 2
+  // Balayage exhaustif de tous les changements calculables : les CINQ plans × 2
   // périodicités en source, autant en cible, sur 0 → 365 jours restants. Le but
   // n'est pas d'ajouter des cas, c'est d'interdire une régression silencieuse :
   // un `amountDueCents` négatif serait un VIREMENT vers le client déclenché par
   // un changement de plan.
-  const ALL_PLANS = ['free', 'pro', 'business'] as const;
+  //
+  // La liste est reprise de `PLANS` et non recopiée : une sixième offre entre
+  // dans le balayage sans qu'on ait à y penser, ce qui est précisément le cas où
+  // on n'y penserait pas.
+  const ALL_PLANS = PLANS;
   const ALL_INTERVALS = ['month', 'year'] as const;
 
   function sweep(visit: (r: ReturnType<typeof computeProration>) => void): number {
@@ -165,9 +210,9 @@ describe('prorata (docs/13)', () => {
   });
 
   it('le crédit excédentaire est reporté, jamais remboursé (annuel Pro → mensuel Business)', () => {
-    // Ce cas est le seul de la grille publiée où le crédit dépasse le coût, et
-    // il est bien atteignable : un annuel Pro presque neuf (9000 c) qui passe à
-    // Business mensuel n'est facturé qu'un mois (4900 c).
+    // Cas où le crédit dépasse le coût, bien atteignable : un annuel Pro presque
+    // neuf (19 000 c) qui passe à Business mensuel n'est facturé qu'un mois
+    // (7 900 c).
     const r = computeProration({
       currentPlan: 'pro',
       targetPlan: 'business',
@@ -178,14 +223,14 @@ describe('prorata (docs/13)', () => {
     });
     expect(r.direction).toBe('upgrade');
     expect(r.effect).toBe('immediate');
-    // Crédit : 9000 × 364 / 365 = 8975 (arrondi bas).
-    expect(r.creditCents).toBe(8975);
+    // Crédit : 19 000 × 364 / 365 = 18 947 (arrondi bas).
+    expect(r.creditCents).toBe(18947);
     // Coût : changement de périodicité ⇒ une période mensuelle entière.
-    expect(r.chargeCents).toBe(4900);
-    // Rien à percevoir, et surtout AUCUN remboursement des 4075 c restants :
+    expect(r.chargeCents).toBe(7900);
+    // Rien à percevoir, et surtout AUCUN remboursement des 11 047 c restants :
     // ils sont reportés et affichés au client.
     expect(r.amountDueCents).toBe(0);
-    expect(r.carriedCreditCents).toBe(4075);
+    expect(r.carriedCreditCents).toBe(11047);
   });
 
   it('les jours restants sont arrondis vers le bas, en faveur du client', () => {

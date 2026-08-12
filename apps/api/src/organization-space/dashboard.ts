@@ -252,9 +252,10 @@ export function moisACloturer(periodes: readonly PeriodeInput[]): number[] {
  * Consommation face aux limites. `limite: null` = illimité (docs/13 : « les
  * nombres exacts sont des paramètres de catalogue, pas du code »).
  *
- * `seats` est optionnel dans `Entitlements` : absent, il signifie « non
- * contractuel à ce stade », ce qui se traduit par `null` — surtout pas par 0, qui
- * afficherait « 3 membres sur 0 autorisés ».
+ * `seats` vaut `null` sur l'offre Expert, dont les sièges sont négociés au
+ * contrat : cela se lit « illimité / non plafonné ici », surtout pas 0, qui
+ * afficherait « 3 membres sur 0 autorisés ». Les autres offres portent toutes un
+ * nombre depuis la grille à cinq paliers.
  */
 export function consommation(
   plan: Plan,

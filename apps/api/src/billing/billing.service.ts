@@ -36,7 +36,12 @@ import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
 import { AuditService } from '../authz/audit.service.js';
-import { PLAN_ENTITLEMENTS, type Entitlements, type Plan } from './entitlements.js';
+import {
+  PLAN_ENTITLEMENTS,
+  resolveEntitlements,
+  type Entitlements,
+  type Plan,
+} from './entitlements.js';
 import {
   GRACE_DAYS,
   TRIAL_DAYS,
@@ -626,7 +631,10 @@ export class BillingService {
       effectivePlan: effective,
       status: doc.status,
       billingInterval: doc.billingInterval ?? 'month',
-      entitlements: PLAN_ENTITLEMENTS[effective],
+      // Décision du décideur : aucune antériorité, la grille courante s'applique
+      // à tous les abonnements, y compris ceux souscrits avant elle. Voir
+      // `entitlements.ts` § ANTÉRIORITÉ.
+      entitlements: resolveEntitlements(effective),
       paidAccess: grantsPaidAccess(doc.status),
       trialEndsAt: doc.trialEndsAt ?? null,
       trialDaysLeft: doc.status === 'trialing' ? daysUntil(doc.trialEndsAt, now) : null,

@@ -11,6 +11,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Get,
   Inject,
   Post,
   Req,
@@ -18,7 +19,6 @@ import {
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 
-import { AiUsageService } from '../admin/ai-usage.service.js';
 import { AuthGuard, type AuthenticatedRequest } from '../auth/auth.guard.js';
 import { RequirePermission } from '../authz/authz.decorators.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
@@ -29,14 +29,47 @@ import {
   type CorrectiveActionsResponse,
 } from './ai-actions.dto.js';
 import { AiActionsService } from './ai-actions.service.js';
+import { AiQuotaService } from './ai-quota.service.js';
 
 @Controller('ai')
 @UseGuards(AuthGuard, PermissionsGuard)
 export class AiActionsController {
   constructor(
     @Inject(AiActionsService) private readonly service: AiActionsService,
-    @Inject(AiUsageService) private readonly usage: AiUsageService,
+    @Inject(AiQuotaService) private readonly quota: AiQuotaService,
   ) {}
+
+  /**
+   * Quota IA du mois — lecture seule, sans effet.
+   *
+   * Existe pour que l'interface puisse dire « il vous reste N messages, le
+   * compteur repart le 1er » AVANT que l'utilisateur ne se heurte au refus.
+   * C'est le rôle légitime de l'interface face à une limite : l'expliquer. Ce
+   * n'est pas elle qui l'applique — `POST /ai/*` la fait respecter de son côté,
+   * et cette route ne serait-elle jamais appelée que rien ne changerait.
+   */
+  @Get('quota')
+  @RequirePermission('analytics.read')
+  async quotaStatus(@Req() req: AuthenticatedRequest): Promise<{
+    plan: string;
+    limit: number | null;
+    used: number;
+    remaining: number | null;
+    unlimited: boolean;
+    resetAt: string;
+    resetInDays: number;
+  }> {
+    const status = await this.quota.status(req.orgId ?? 'inconnue');
+    return {
+      plan: status.plan,
+      limit: status.limit,
+      used: status.used,
+      remaining: status.remaining,
+      unlimited: status.unlimited,
+      resetAt: status.resetAt.toISOString(),
+      resetInDays: status.resetInDays,
+    };
+  }
 
   @Post('corrective-actions')
   @RequirePermission('analytics.read')
@@ -53,17 +86,21 @@ export class AiActionsController {
         issues: parsed.error.issues,
       });
     }
-    const result = await this.service.correctiveActions(parsed.data);
-    // Comptage APRÈS la réponse du service et à partir de `result.source` : c'est
-    // la seule manière de distinguer un appel FACTURÉ d'un fallback déterministe.
-    // Compter avant l'appel gonflerait la consommation OpenAI de tous les cas où
-    // aucune clé n'est configurée (S21b — tableau de bord `/admin`).
-    await this.usage.record({
-      organizationId: req.orgId ?? 'inconnue',
-      userId: req.user?.id ?? 'inconnu',
-      action: 'ai.corrective_actions',
-      source: result.source === 'llm' ? 'llm' : 'fallback',
-    });
-    return result;
+    // `runGuarded` tient ensemble les deux moitiés de la règle : refus AVANT
+    // l'appel si le quota du mois est épuisé, comptage APRÈS à partir de la
+    // source RÉELLE de la réponse. Compter avant l'appel décompterait les replis
+    // déterministes, c'est-à-dire facturerait les cas où aucune clé n'est
+    // configurée ; garder après laisserait passer l'appel payant qu'on refuse.
+    return this.quota.runGuarded(
+      {
+        organizationId: req.orgId ?? 'inconnue',
+        userId: req.user?.id ?? 'inconnu',
+        action: 'ai.corrective_actions',
+      },
+      async () => {
+        const result = await this.service.correctiveActions(parsed.data);
+        return { value: result, source: result.source };
+      },
+    );
   }
 }

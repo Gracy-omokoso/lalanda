@@ -9,6 +9,8 @@
 // en interface. Une divergence produit au pire un onglet en trop — jamais un
 // droit en trop.
 
+import { PLAN_CATALOG, PLANS } from '@lalanda/shared/pricing';
+
 import type {
   BlocMasqueView,
   ConsommationView,
@@ -139,11 +141,20 @@ export function limiteAtteinte(utilise: number, limite: number | null): boolean 
   return limite !== null && utilise >= limite;
 }
 
-/** Libellés des plans commerciaux — repris de la page /pricing. */
-const PLANS: Record<string, string> = { free: 'Gratuit', pro: 'Pro', business: 'Business' };
+/**
+ * Libellés des offres — dérivés du catalogue partagé.
+ *
+ * La table était écrite à la main et s'arrêtait à trois offres. Le repli
+ * `?? plan` la rendait indolore en apparence : une organisation Cabinet
+ * affichait « cabinet », en minuscules et en anglais interne, au milieu de
+ * libellés soignés. Un repli qui masque un trou est pire qu'une absence.
+ */
+const LIBELLES: Record<string, string> = Object.fromEntries(
+  PLANS.map((p) => [p, p === 'free' ? 'Gratuit' : PLAN_CATALOG[p].name]),
+);
 
 export function libellePlan(plan: string): string {
-  return PLANS[plan] ?? plan;
+  return LIBELLES[plan] ?? plan;
 }
 
 /**

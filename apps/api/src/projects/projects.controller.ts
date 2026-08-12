@@ -20,6 +20,7 @@ import { PermissionsGuard } from '../authz/permissions.guard.js';
 import { can, type OrgRole } from '../authz/permissions.js';
 import { CurrentOrgId, CurrentUser } from '../auth/current-user.decorator.js';
 import { BillingService } from '../billing/billing.service.js';
+import { projectLimitExceededPayload, projectLimitStatus } from '../billing/project-limit.js';
 import {
   toEvaluationView,
   type AmortissementsView,
@@ -80,16 +81,23 @@ export class ProjectsController {
     // Entitlements (S16b) : l'API impose la limite de projets du plan (docs/13).
     // NB : check-then-create sans transaction — une course peut dépasser d'un projet,
     // acceptable pour un quota commercial (pas une invariante de sécurité).
+    //
+    // Le refus est construit par `billing/project-limit.ts` et non écrit ici,
+    // parce qu'il doit distinguer deux situations que le code appelant n'a aucune
+    // raison de connaître : être PILE à la limite (l'utilisateur a consommé ce
+    // qu'il a acheté) et être AU-DESSUS (la grille a changé sous ses pieds — une
+    // organisation détient 5 projets sur une offre qui en autorise 1). Le second
+    // cas n'est pas la faute de l'utilisateur, et le message doit le dire.
+    //
+    // C'est le SEUL endroit du dépôt qui bloque sur `maxProjects` : lire,
+    // modifier et exporter un projet existant ne consulte jamais cette limite.
+    // Un dépassement suspend les créations, il ne ferme rien.
     const { plan, entitlements } = await this.billing.getPlanEntitlements(orgId);
     if (entitlements.maxProjects !== null) {
       const count = await this.projects.countByOrg(orgId);
-      if (count >= entitlements.maxProjects) {
-        throw new ForbiddenException({
-          code: 'PLAN_LIMIT_PROJECTS',
-          limit: entitlements.maxProjects,
-          plan,
-          message: `Limite de ${entitlements.maxProjects} projet(s) atteinte pour le plan ${plan}.`,
-        });
+      const status = projectLimitStatus(plan, entitlements, count);
+      if (status.blocked) {
+        throw new ForbiddenException(projectLimitExceededPayload(status));
       }
     }
 
