@@ -33,6 +33,10 @@
     "./legal": {
       "types": "./dist/legal/index.d.ts",
       "import": "./dist/legal/index.js"
+    },
+    "./pricing": {
+      "types": "./dist/pricing/index.d.ts",
+      "import": "./dist/pricing/index.js"
     }
   },
   "scripts": {
