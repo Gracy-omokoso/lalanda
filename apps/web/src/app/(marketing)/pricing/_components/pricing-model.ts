@@ -1,117 +1,169 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// CONTENU DE LA PAGE TARIFS (S22b) — données pures, testées
+// CONTENU DE LA PAGE TARIFS — dérivé du catalogue, jamais recopié
 //
-// Extrait de la page pour une raison précise : cette page est une PROMESSE
-// COMMERCIALE. Chaque ligne doit correspondre à ce que l'API applique
-// réellement (`apps/api/src/billing/entitlements.ts` et `pricing-catalog.ts`).
-// Une promesse dans un JSX de 400 lignes ne se relit pas ; une table de données
-// avec un test qui la confronte au catalogue, si.
+// Cette page est une PROMESSE COMMERCIALE : chaque ligne doit correspondre à ce
+// que l'API applique réellement. La version précédente le garantissait par un
+// test qui RECOPIAIT les valeurs de l'API (`API_PRICES`, `API_ENTITLEMENTS`) —
+// donc une troisième copie, qui a fini par diverger comme les deux autres.
+//
+// Ici, plus aucune valeur n'est écrite : montants, limites et noms viennent de
+// `@lalanda/shared/pricing`, le module qu'importe aussi `apps/api`. Une page qui
+// annoncerait autre chose que l'API ne peut plus être écrite — il faudrait
+// modifier le catalogue, et l'API changerait avec elle.
+//
+// ── Ce qui reste éditorial, et pourquoi ──────────────────────────────────────
+//
+// Les phrases (arguments, FAQ) restent ici : ce sont des choix de rédaction, pas
+// des engagements chiffrés. Dès qu'une phrase contient un NOMBRE, ce nombre est
+// interpolé depuis le catalogue plutôt que tapé — c'est la ligne de partage.
 //
 // ── Ce qui n'est PAS ici ─────────────────────────────────────────────────────
 //
-// Les moyens de paiement. Ils ne sont pas une donnée statique : ils dépendent
-// de ce qui est configuré en production à l'instant où la page est lue. Ils
-// viennent de `GET /payments/methods` (voir `payment-methods.tsx`). Écrire
-// « mobile money » en dur, comme le faisait la version précédente de cette page,
-// promettait un moyen de paiement que rien ne garantissait.
+// Les moyens de paiement. Ils dépendent de ce qui est configuré en production à
+// l'instant où la page est lue, et viennent de `GET /payments/methods` (voir
+// `payment-methods.tsx`).
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type PlanSlug = 'free' | 'pro' | 'business';
+import {
+  annualSavingPercent as catalogAnnualSaving,
+  formatQuota,
+  hasAnnualOffer as catalogHasAnnualOffer,
+  isSelfServePlan,
+  PLAN_CATALOG,
+  PLANS,
+  TRIAL_DAYS as CATALOG_TRIAL_DAYS,
+  TRIAL_PLAN as CATALOG_TRIAL_PLAN,
+  usdFromCents,
+  type Entitlements,
+  type Plan,
+} from '@lalanda/shared/pricing';
 
-/**
- * Durée de l'essai, en jours. Doit valoir `TRIAL_DAYS`
- * (`apps/api/src/billing/pricing-catalog.ts`) — le test le rappelle.
- */
-export const TRIAL_DAYS = 14;
+export type PlanSlug = Plan;
+export { PLANS };
 
-/** Plan accordé pendant l'essai — `TRIAL_PLAN` côté API. */
-export const TRIAL_PLAN: PlanSlug = 'pro';
+/** Durée de l'essai, en jours — valeur du catalogue, pas une constante locale. */
+export const TRIAL_DAYS = CATALOG_TRIAL_DAYS;
+
+/** Plan accordé pendant l'essai. */
+export const TRIAL_PLAN: PlanSlug = CATALOG_TRIAL_PLAN;
 
 export interface Tier {
   slug: PlanSlug;
   name: string;
-  /** Prix mensuel affiché. `null` = offre gratuite. */
+  /** Prix mensuel affiché en USD. `null` = aucun tarif publié (offre sur devis). */
   priceMonthUsd: number | null;
-  /** Prix annuel affiché, ou `null` si aucune offre annuelle n'est PUBLIÉE. */
+  /** Prix annuel affiché en USD. `null` = aucune offre annuelle publiée. */
   priceYearUsd: number | null;
   tagline: string;
   features: string[];
   cta: string;
+  /** Destination du bouton. Expert mène au contact, pas à l'inscription. */
+  ctaHref: string;
+  /**
+   * L'offre se souscrit-elle en ligne ?
+   *
+   * `false` pour Expert : le pack inclut du temps d'expert humain. La carte
+   * affiche « Nous contacter » et n'ouvre AUCUN tunnel de paiement — un bouton
+   * d'achat sous une prestation humaine vend un engagement qu'on ne peut pas
+   * tenir. `free` est également `false` : il n'y a rien à acheter.
+   */
+  selfServe: boolean;
   highlighted?: boolean;
 }
 
 /**
- * Les trois offres.
+ * Arguments d'une offre, avec les nombres pris dans ses entitlements.
  *
- * Business n'a PAS de prix annuel : aucun n'est publié, et en inventer un
- * (« 490 USD/an ») serait un engagement commercial pris par un développeur.
- * L'API refuse d'ailleurs de vendre ce couple (`PLAN_NOT_SELLABLE`) — la page et
- * l'API disent donc la même chose, ce qui est le minimum attendu d'une grille
- * tarifaire.
+ * Écrire « Projets illimités » sous Pro pendant que l'API en autorise 5 est
+ * exactement le litige que cette page doit rendre impossible : les quatre
+ * premières puces sont donc CALCULÉES, et seule la dernière est éditoriale.
  */
-export const TIERS: readonly Tier[] = [
-  {
-    slug: 'free',
-    name: 'Free',
-    priceMonthUsd: null,
-    priceYearUsd: null,
-    tagline: 'Pour tester Lalanda sur un premier projet.',
-    features: [
-      '1 projet',
-      '1 scénario',
-      'Export PDF avec filigrane',
-      'Accès à tous les templates sectoriels',
-      'Packs pays RDC, CI, SN, OHADA',
-    ],
-    cta: "S'inscrire gratuitement",
-  },
-  {
-    slug: 'pro',
-    name: 'Pro',
-    priceMonthUsd: 9,
-    priceYearUsd: 90,
-    tagline: 'Pour un entrepreneur qui monte plusieurs dossiers.',
-    features: [
-      'Projets illimités',
-      'Jusqu’à 3 scénarios par projet',
-      'Export PDF sans filigrane',
-      'Historique des versions',
-      'Support par email',
-    ],
-    cta: `Essayer ${TRIAL_DAYS} jours`,
-    highlighted: true,
-  },
-  {
-    slug: 'business',
-    name: 'Business',
-    priceMonthUsd: 49,
-    priceYearUsd: null,
-    tagline: 'Pour cabinets, incubateurs et institutions financières.',
-    features: [
-      'Tout Pro, plus :',
-      'White-label (logo et couleurs)',
-      '20 sièges inclus',
-      'Accès API',
-      'Support prioritaire',
-    ],
-    cta: `Essayer ${TRIAL_DAYS} jours`,
-  },
-] as const;
+function featuresOf(plan: Plan): string[] {
+  const e: Entitlements = PLAN_CATALOG[plan].entitlements;
+
+  const projets =
+    e.maxProjects === null
+      ? 'Projets illimités'
+      : `${e.maxProjects} ${e.maxProjects > 1 ? 'projets' : 'projet'}`;
+
+  const pdf = e.pdfWatermark
+    ? `${formatQuota(e.pdfExportsPerMonth, 'exports PDF')} par mois, avec filigrane`
+    : e.pdfExportsPerMonth === null
+      ? 'Exports PDF illimités, sans filigrane'
+      : `${e.pdfExportsPerMonth} exports PDF par mois, sans filigrane`;
+
+  const ia =
+    e.aiMessagesPerMonth === null
+      ? 'Assistant IA sans limite de messages'
+      : `${e.aiMessagesPerMonth.toLocaleString('fr-FR')} messages IA par mois`;
+
+  const sieges =
+    e.seats === null
+      ? 'Sièges négociés au contrat'
+      : `${e.seats} ${e.seats > 1 ? 'sièges inclus' : 'siège'}`;
+
+  const realise = e.actualsEnabled
+    ? 'Suivi du réalisé (prévisionnel vs. réel)'
+    : 'Prévisionnel seul (sans suivi du réalisé)';
+
+  const editorial: Record<Plan, string> = {
+    free: 'Accès à tous les templates et packs pays',
+    pro: 'Historique des versions et support par email',
+    cabinet: 'Espace multi-clients et support par email',
+    business: 'White-label, accès API et support prioritaire',
+    expert: 'Accompagnement par un expert, sur devis',
+  };
+
+  return [projets, pdf, ia, sieges, realise, editorial[plan]];
+}
+
+function ctaOf(plan: Plan): string {
+  if (plan === 'free') return "S'inscrire gratuitement";
+  // Expert n'a pas d'essai à proposer : il n'a pas de tunnel du tout.
+  if (!isSelfServePlan(plan)) return 'Nous contacter';
+  return `Essayer ${TRIAL_DAYS} jours`;
+}
+
+/**
+ * Les cinq offres, dans l'ordre du catalogue.
+ *
+ * Aucun montant n'est écrit ici. Ajouter un palier au catalogue le fait
+ * apparaître sur la page ; en retirer un l'en retire. C'est le seul agencement
+ * où la page ne peut pas mentir.
+ */
+export const TIERS: readonly Tier[] = PLANS.map((slug) => {
+  const def = PLAN_CATALOG[slug];
+  return {
+    slug,
+    name: def.name,
+    priceMonthUsd: usdFromCents(def.price.monthCents),
+    priceYearUsd: usdFromCents(def.price.yearCents),
+    tagline: def.tagline,
+    features: featuresOf(slug),
+    cta: ctaOf(slug),
+    // Expert ne mène pas à `/register` : l'inscription ouvrirait un compte
+    // gratuit sans rien dire du devis, ce qui n'est pas ce que le bouton promet.
+    ctaHref: slug === 'expert' ? '/contact?offre=expert' : '/register',
+    selfServe: def.selfServe,
+    // Cabinet est le palier mis en avant : c'est la clientèle réelle (cabinets
+    // et incubateurs), et c'est le palier que l'ancienne grille n'avait pas.
+    ...(slug === 'cabinet' ? { highlighted: true } : {}),
+  };
+});
 
 /**
  * Une ligne du comparatif.
  *
- * `true`/`false` produisent une coche ou un tiret ; une chaîne est affichée
- * telle quelle. Un comparatif dont chaque cellule serait une phrase libre
- * deviendrait illisible sur mobile.
+ * `values` est indexé par plan plutôt que par trois champs nommés : avec cinq
+ * offres, `free/pro/business` obligerait à toucher chaque ligne pour ajouter une
+ * colonne, et une cellule oubliée s'afficherait vide — ce qu'un lecteur
+ * interprète comme « non inclus ». Le type force les cinq clés.
  */
 export interface ComparisonRow {
   label: string;
   /** Précision affichée en petit sous le libellé. */
   note?: string;
-  free: string | boolean;
-  pro: string | boolean;
-  business: string | boolean;
+  values: Readonly<Record<Plan, string | boolean>>;
 }
 
 export interface ComparisonSection {
@@ -119,72 +171,151 @@ export interface ComparisonSection {
   rows: ComparisonRow[];
 }
 
+/** Construit une ligne à partir d'une fonction des entitlements du plan. */
+function rowFromEntitlements(
+  label: string,
+  read: (e: Entitlements) => string | boolean,
+  note?: string,
+): ComparisonRow {
+  return {
+    label,
+    ...(note === undefined ? {} : { note }),
+    values: Object.fromEntries(PLANS.map((p) => [p, read(PLAN_CATALOG[p].entitlements)])) as Record<
+      Plan,
+      string | boolean
+    >,
+  };
+}
+
+/** Construit une ligne dont les valeurs sont éditoriales (aucun entitlement). */
+function row(label: string, values: Record<Plan, string | boolean>, note?: string): ComparisonRow {
+  return { label, ...(note === undefined ? {} : { note }), values };
+}
+
 /**
  * Comparatif détaillé.
  *
- * Les lignes qui portent une limite APPLIQUÉE par l'API (projets, filigrane)
- * sont confrontées au catalogue par le test. Les autres décrivent des fonctions
- * dont l'accès n'est pas encore restreint par un entitlement : elles reprennent
- * mot pour mot ce que les cartes annoncent, sans rien y ajouter.
+ * Les lignes qui portent une limite APPLIQUÉE par l'API sont construites depuis
+ * les entitlements — elles ne peuvent pas diverger. Les autres décrivent des
+ * fonctions dont l'accès n'est pas encore restreint par un entitlement : elles
+ * sont éditoriales et le disent.
  */
 export const COMPARISON: readonly ComparisonSection[] = [
   {
     title: 'Modélisation',
     rows: [
-      { label: 'Projets', free: '1', pro: 'Illimités', business: 'Illimités' },
-      { label: 'Scénarios par projet', free: '1', pro: "Jusqu'à 3", business: "Jusqu'à 3" },
-      {
-        label: 'Templates sectoriels',
-        note: 'Tous les templates, dès la formule gratuite.',
-        free: true,
-        pro: true,
-        business: true,
-      },
-      {
-        label: 'Packs pays (RDC, CI, SN, OHADA)',
-        note: 'Paramètres fiscaux sourcés et datés.',
-        free: true,
-        pro: true,
-        business: true,
-      },
-      {
-        label: 'Moteur de calcul complet',
-        note: 'Bilan, compte de résultat, trésorerie, seuil de rentabilité.',
-        free: true,
-        pro: true,
-        business: true,
-      },
+      rowFromEntitlements('Projets', (e) =>
+        e.maxProjects === null ? 'Illimités' : String(e.maxProjects),
+      ),
+      row('Scénarios par projet', {
+        free: '1',
+        pro: "Jusqu'à 3",
+        cabinet: "Jusqu'à 3",
+        business: "Jusqu'à 3",
+        expert: "Jusqu'à 3",
+      }),
+      row(
+        'Templates sectoriels',
+        { free: true, pro: true, cabinet: true, business: true, expert: true },
+        'Tous les templates, dès la formule gratuite.',
+      ),
+      row(
+        'Packs pays (RDC, CI, SN, OHADA)',
+        { free: true, pro: true, cabinet: true, business: true, expert: true },
+        'Paramètres fiscaux sourcés et datés.',
+      ),
+      row(
+        'Moteur de calcul complet',
+        { free: true, pro: true, cabinet: true, business: true, expert: true },
+        'Bilan, compte de résultat, trésorerie, seuil de rentabilité.',
+      ),
+      rowFromEntitlements(
+        'Suivi du réalisé',
+        (e) => e.actualsEnabled,
+        'Saisie mensuelle du réel et écarts avec le prévisionnel.',
+      ),
     ],
   },
   {
     title: 'Restitution',
     rows: [
-      {
-        label: 'Export PDF',
-        free: 'Avec filigrane',
-        pro: 'Sans filigrane',
-        business: 'Sans filigrane',
-      },
-      { label: 'Export Excel', free: true, pro: true, business: true },
-      { label: 'Historique des versions', free: false, pro: true, business: true },
-      { label: 'White-label (logo, couleurs)', free: false, pro: false, business: true },
+      rowFromEntitlements(
+        'Exports PDF',
+        (e) => {
+          const quota =
+            e.pdfExportsPerMonth === null ? 'Illimités' : `${e.pdfExportsPerMonth}/mois`;
+          return e.pdfWatermark ? `${quota}, avec filigrane` : `${quota}, sans filigrane`;
+        },
+        'Le filigrane est appliqué par l’API, jamais par l’interface.',
+      ),
+      row('Export Excel', {
+        free: true,
+        pro: true,
+        cabinet: true,
+        business: true,
+        expert: true,
+      }),
+      row('Historique des versions', {
+        free: false,
+        pro: true,
+        cabinet: true,
+        business: true,
+        expert: true,
+      }),
+      row('White-label (logo, couleurs)', {
+        free: false,
+        pro: false,
+        cabinet: false,
+        business: true,
+        expert: true,
+      }),
+    ],
+  },
+  {
+    title: 'Assistant IA',
+    rows: [
+      rowFromEntitlements(
+        'Messages par mois',
+        (e) =>
+          e.aiMessagesPerMonth === null
+            ? 'Illimités'
+            : e.aiMessagesPerMonth.toLocaleString('fr-FR'),
+        'Le quota repart le 1er de chaque mois. Une réponse rendue sans appel au modèle n’est pas décomptée.',
+      ),
     ],
   },
   {
     title: 'Équipe et intégration',
     rows: [
-      {
-        label: 'Sièges inclus',
-        note: 'Membres de l’organisation.',
-        free: '1',
-        pro: '1',
-        business: '20',
-      },
-      { label: 'Accès API', free: false, pro: false, business: true },
-      { label: 'Support', free: 'Documentation', pro: 'Email', business: 'Prioritaire' },
+      rowFromEntitlements(
+        'Sièges inclus',
+        (e) => (e.seats === null ? 'Négociés' : String(e.seats)),
+        'Membres de l’organisation.',
+      ),
+      row('Accès API', {
+        free: false,
+        pro: false,
+        cabinet: false,
+        business: true,
+        expert: true,
+      }),
+      row('Temps d’expert humain', {
+        free: false,
+        pro: false,
+        cabinet: false,
+        business: false,
+        expert: true,
+      }),
+      row('Support', {
+        free: 'Documentation',
+        pro: 'Email',
+        cabinet: 'Email',
+        business: 'Prioritaire',
+        expert: 'Dédié',
+      }),
     ],
   },
-] as const;
+];
 
 export interface FaqEntry {
   question: string;
@@ -196,9 +327,9 @@ export interface FaqEntry {
  *
  * Écrite pour répondre aux objections RÉELLES d'un tunnel de souscription, pas
  * pour meubler : carte bancaire exigée ou non, ce qui arrive aux données à la
- * fin de l'essai, ce que devient un projet après une baisse de gamme, et la
- * fiscalité — qui n'est PAS arbitrée et qu'il serait malhonnête de passer sous
- * silence sur une page de prix.
+ * fin de l'essai, ce que devient un projet après une baisse de gamme, comment se
+ * comptent les messages IA, et la fiscalité — qui n'est PAS arbitrée et qu'il
+ * serait malhonnête de passer sous silence sur une page de prix.
  */
 export const FAQ: readonly FaqEntry[] = [
   {
@@ -215,11 +346,26 @@ export const FAQ: readonly FaqEntry[] = [
       'les consulter et à les exporter.',
   },
   {
+    question: 'Comment sont comptés les messages de l’assistant IA ?',
+    answer:
+      'Un message est décompté lorsqu’il a réellement été traité par le modèle. Lorsque ' +
+      'l’assistant répond à partir de ses règles internes, sans appeler le modèle, rien n’est ' +
+      'décompté. Le compteur repart à zéro le 1er de chaque mois, et l’application vous indique ' +
+      'à tout moment ce qu’il vous reste ainsi que la date de réinitialisation.',
+  },
+  {
     question: 'Puis-je changer d’offre en cours de mois ?',
     answer:
       'Oui. Une montée en gamme est immédiate et vous n’êtes facturé que de la différence : la ' +
       'part non consommée de votre offre actuelle est déduite. Une baisse prend effet à la ' +
       'prochaine échéance, sans perte de la période déjà réglée.',
+  },
+  {
+    question: 'Pourquoi l’offre Expert n’a-t-elle pas de prix affiché ?',
+    answer:
+      'Parce qu’elle inclut du temps d’un expert humain, dont le volume dépend de votre dossier. ' +
+      'Elle ne se souscrit donc pas en ligne : nous établissons un devis après un échange, et ' +
+      'les accès sont ouverts une fois l’accord conclu.',
   },
   {
     question: 'Que se passe-t-il si un paiement échoue ?',
@@ -241,7 +387,7 @@ export const FAQ: readonly FaqEntry[] = [
       'Oui, depuis l’espace organisation. La résiliation prend effet à l’échéance de la période ' +
       'en cours et ne supprime aucune donnée.',
   },
-] as const;
+];
 
 /** Libellé d'affichage d'un moyen de paiement (`GET /payments/methods`). */
 export const PAYMENT_METHOD_LABELS: Readonly<Record<string, string>> = {
@@ -255,39 +401,32 @@ export const PAYMENT_METHOD_LABELS: Readonly<Record<string, string>> = {
 export const MANUAL_METHODS: readonly string[] = ['mobile_money', 'bank_transfer'];
 
 /**
- * Formate un prix mensuel. `null` → « 0 USD » : l'offre gratuite est un prix,
- * pas une absence de prix, et l'écrire « Gratuit » dans une colonne de montants
- * casse l'alignement des chiffres.
+ * Formate un prix mensuel.
+ *
+ * `null` ne veut PAS dire zéro ici : il signifie « aucun tarif publié », et
+ * l'afficher « 0 USD » annoncerait l'offre Expert comme gratuite. Le gratuit,
+ * lui, porte un vrai 0 dans le catalogue.
  */
 export function formatPrice(usd: number | null): string {
-  return `${usd ?? 0} USD`;
+  return usd === null ? 'Sur devis' : `${usd} USD`;
 }
 
 /**
  * Économie annuelle en pourcentage, arrondie à l'entier inférieur.
- *
- * `null` quand l'un des deux prix n'est pas publié — c'est le cas de Business.
- * Arrondi vers le BAS : annoncer « 17 % » quand l'économie réelle est de 16,6 %
- * est une surpromesse, fût-elle minuscule.
+ * Déléguée au catalogue : la page et l'API annoncent le même chiffre.
  */
 export function annualSavingPercent(tier: Tier): number | null {
-  if (tier.priceMonthUsd === null || tier.priceYearUsd === null) return null;
-  const fullYear = tier.priceMonthUsd * 12;
-  if (fullYear <= 0) return null;
-  const saved = fullYear - tier.priceYearUsd;
-  if (saved <= 0) return null;
-  return Math.floor((saved / fullYear) * 100);
+  return catalogAnnualSaving(tier.slug);
 }
 
 /**
- * Cette offre propose-t-elle une facturation annuelle ?
+ * Cette offre propose-t-elle une facturation annuelle vendable en ligne ?
  *
  * Consommé par le tunnel pour n'afficher la bascule mensuel/annuel que là où
- * elle mène quelque part. Sans ce garde-fou, un client choisirait « annuel » sur
- * Business et recevrait un refus de l'API — un cul-de-sac dans un tunnel de
- * paiement.
+ * elle mène quelque part. Le catalogue exige AUSSI le libre-service : sans quoi
+ * Expert, s'il recevait un tarif annuel un jour, deviendrait achetable en un
+ * clic sans que personne n'ait touché au tunnel.
  */
 export function hasAnnualOffer(slug: PlanSlug): boolean {
-  const tier = TIERS.find((t) => t.slug === slug);
-  return tier?.priceYearUsd !== null && tier?.priceYearUsd !== undefined;
+  return catalogHasAnnualOffer(slug);
 }
