@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // CATALOGUE DES INTÉGRATIONS — ADR-0013 §1
 //
-// Ce fichier déclare, pour chacun des cinq fournisseurs, ce qui est SECRET et ce
+// Ce fichier déclare, pour chaque fournisseur, ce qui est SECRET et ce
 // qui ne l'est pas. C'est la liste blanche dont ADR-0013 §1 dit que « toute clé
 // hors liste blanche est refusée en 400 » : sans elle, un opérateur pressé
 // glisserait `secretKey` dans `config` et le stockerait en clair.
@@ -12,10 +12,44 @@
 //   - `config`  : noms de valeurs en clair, requêtables et affichables.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Les cinq fournisseurs à secret (ADR-0013 § Contexte). */
-export const INTEGRATION_PROVIDERS = ['openai', 'stripe', 'paypal', 'smtp', 's3'] as const;
+/**
+ * Les fournisseurs à secret. ADR-0013 § Contexte en déclarait cinq; deux
+ * évolutions se sont ajoutées depuis :
+ *
+ *   - `s3` est devenu `r2` (Cloudflare R2). Le PROTOCOLE ne change pas — R2
+ *     expose une API compatible S3, signée SigV4 avec le même nom de service
+ *     `s3` — seul le fournisseur cible change. Les documents `integrations`
+ *     portant encore `provider: 's3'` sont repris par `provider-rename.ts` : le
+ *     renommage ne peut pas être un simple `$set`, l'AAD des secrets contient le
+ *     nom du fournisseur (ADR-0013 §2) et un chiffré renommé à la main ne se
+ *     déchiffrerait plus.
+ *   - `elevenlabs` est ajouté pour un futur assistant vocal. CONFIGURATION
+ *     SEULEMENT à ce stade : aucune synthèse vocale n'est implémentée, et
+ *     l'usage produit n'est pas spécifié.
+ */
+export const INTEGRATION_PROVIDERS = [
+  'openai',
+  'stripe',
+  'paypal',
+  'smtp',
+  'r2',
+  'elevenlabs',
+] as const;
 
 export type IntegrationProvider = (typeof INTEGRATION_PROVIDERS)[number];
+
+/**
+ * Nom de fournisseur retiré du catalogue, encore possiblement présent en base.
+ *
+ * `s3` n'est plus un fournisseur valide, mais un déploiement en cours
+ * d'exploitation en porte un document. Il est déclaré ici pour que la migration
+ * sache quoi chercher, et NON ajouté à `INTEGRATION_PROVIDERS` : l'y laisser
+ * ferait apparaître dans `/admin` un sixième fournisseur fantôme dont personne
+ * ne saurait dire s'il faut le remplir.
+ */
+export const LEGACY_PROVIDER_RENAMES: Readonly<Record<string, IntegrationProvider>> = {
+  s3: 'r2',
+};
 
 export function isIntegrationProvider(value: unknown): value is IntegrationProvider {
   return typeof value === 'string' && (INTEGRATION_PROVIDERS as readonly string[]).includes(value);
@@ -84,10 +118,16 @@ export const PROVIDER_SPECS: Readonly<Record<IntegrationProvider, ProviderSpec>>
     envFallback: {},
     testDescription: 'verify() sur le transport — aucun email envoyé.',
   },
-  s3: {
-    label: 'S3 / Spaces',
+  r2: {
+    // Le libellé nomme le fournisseur visé ET le protocole : un exploitant qui
+    // tourne encore sur MinIO doit reconnaître où ranger ses identifiants, sans
+    // quoi il croirait l'entrée inapplicable à son installation.
+    label: 'Cloudflare R2 (API compatible S3)',
     secrets: ['secretKey'],
     requiredSecrets: ['secretKey'],
+    // Liste INCHANGÉE par rapport à l'ancienne entrée `s3` : R2 se configure avec
+    // exactement les mêmes champs. C'est ce qui permet à la migration de recopier
+    // `config` tel quel, sans traduction et donc sans occasion de se tromper.
     config: [
       'endpoint',
       'region',
@@ -98,14 +138,32 @@ export const PROVIDER_SPECS: Readonly<Record<IntegrationProvider, ProviderSpec>>
       'forcePathStyle',
     ],
     requiredConfig: ['endpoint', 'bucketExports'],
-    // ADR-0013 §8 : transitoire, au même titre qu'`OPENAI_API_KEY`.
+    // ADR-0013 §8 : transitoire, au même titre qu'`OPENAI_API_KEY`. Le NOM de la
+    // variable reste `S3_SECRET_KEY` — elle nomme le protocole, elle est déjà
+    // posée en production et lue par le service MinIO de `docker-compose.prod.yml`.
+    // La renommer couperait le secours au premier déploiement.
     envFallback: { secretKey: 'S3_SECRET_KEY' },
     testDescription: 'HeadBucket sur le bucket des exports — sans coût.',
+  },
+  elevenlabs: {
+    label: 'ElevenLabs',
+    secrets: ['apiKey'],
+    requiredSecrets: ['apiKey'],
+    // `baseUrl` seul : ElevenLabs publie des points d'entrée régionaux, et le
+    // surcharger est aussi ce qui rend le test simulable. Aucun `voiceId`, aucun
+    // `modelId` — le périmètre est la CONFIGURATION, pas l'usage, et déclarer un
+    // champ d'usage aujourd'hui préjugerait d'une décision produit non prise.
+    config: ['baseUrl'],
+    requiredConfig: [],
+    // Vide : cette clé n'a jamais transité par l'environnement. « Y ajouter une
+    // entrée serait recréer l'hybride permanent que l'ADR rejette. »
+    envFallback: {},
+    testDescription: 'GET /v2/voices — lecture seule, sans coût ni crédit consommé.',
   },
 };
 
 /**
- * `accessKey` de S3 est dans `config` et non dans `secrets` : c'est un
+ * `accessKey` de R2 est dans `config` et non dans `secrets` : c'est un
  * IDENTIFIANT, publiable au même titre qu'un nom d'utilisateur — seule la
  * `secretKey` ouvre quoi que ce soit. Même raisonnement pour `stripe.publishableKey`
  * (publique par conception, ADR-0013 §7) et `smtp.user`.
