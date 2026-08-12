@@ -346,7 +346,7 @@ describe('libellés et aides de champs', () => {
 
   it('dit explicitement ce qui est stocké EN CLAIR', () => {
     expect(aideChamp('stripe', 'publishableKey')).toContain('en clair');
-    expect(aideChamp('s3', 'accessKey')).toContain('en clair');
+    expect(aideChamp('r2', 'accessKey')).toContain('en clair');
     expect(aideChamp('paypal', 'clientId')).toContain('en clair');
   });
 

@@ -359,8 +359,19 @@ const AIDES_CHAMPS: Partial<Record<IntegrationProvider, Record<string, string>>>
     webhookSecret: 'Vérifié à chaque webhook reçu — sans lui, un webhook peut être falsifié.',
     publishableKey: 'Publique par conception : stockée en clair, jamais chiffrée.',
   },
-  s3: {
+  r2: {
     accessKey: 'Identifiant, pas un secret : stocké en clair, comme un nom d’utilisateur.',
+    endpoint:
+      'Point d’accès Cloudflare R2 : https://<ID_DE_COMPTE>.r2.cloudflarestorage.com. La région n’existe pas chez R2 — la signature emploie le littéral « auto ».',
+  },
+  elevenlabs: {
+    apiKey:
+      'Sert à l’assistant vocal. Le test de connexion ne fait que LIRE la liste des voix : aucune synthèse n’est déclenchée, donc aucun coût.',
+  },
+  zeptomail: {
+    sendMailToken:
+      'Send Mail Token du Mail Agent Zoho — pas la clé d’API du compte. Le domaine expéditeur doit être vérifié côté Zoho, sinon l’API refuse l’envoi.',
+    apiUrl: 'À changer seulement pour un compte régional (.eu, .in). Par défaut api.zeptomail.com.',
   },
   paypal: {
     clientId: 'Identifiant public de l’application, stocké en clair.',
