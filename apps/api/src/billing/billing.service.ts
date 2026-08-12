@@ -36,7 +36,13 @@ import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
 import { AuditService } from '../authz/audit.service.js';
-import { PLAN_ENTITLEMENTS, type Entitlements, type Plan } from './entitlements.js';
+import {
+  PLAN_ENTITLEMENTS,
+  PRICING_VERSION,
+  resolveEntitlements,
+  type Entitlements,
+  type Plan,
+} from './entitlements.js';
 import {
   GRACE_DAYS,
   TRIAL_DAYS,
@@ -217,6 +223,12 @@ export class BillingService {
             currentPeriodEnd: nextPeriodEnd(now, 'month'),
             _schemaVersion: SUBSCRIPTION_SCHEMA_VERSION,
           },
+          // `$setOnInsert` et non `$set` : un abonnement QUI EXISTE DÉJÀ garde sa
+          // version de grille. Le poser à chaque écriture ferait basculer un
+          // abonné historique sur la nouvelle grille au premier changement de
+          // plan, c'est-à-dire lui retirer sans le dire une promesse déjà
+          // vendue — précisément la décision qui n'est pas la nôtre.
+          $setOnInsert: { pricingVersion: PRICING_VERSION },
         },
         { new: true, upsert: true },
       )
@@ -266,6 +278,10 @@ export class BillingService {
         organizationId: input.organizationId,
         plan: 'free',
         status: 'canceled',
+        // Document CRÉÉ maintenant : l'organisation n'a jamais rien souscrit,
+        // elle n'a donc aucune promesse antérieure à conserver et relève de la
+        // grille courante.
+        pricingVersion: PRICING_VERSION,
         _schemaVersion: SUBSCRIPTION_SCHEMA_VERSION,
       });
 
@@ -300,6 +316,10 @@ export class BillingService {
         organizationId: input.organizationId,
         plan: 'free',
         status: 'canceled',
+        // Document CRÉÉ maintenant : l'organisation n'a jamais rien souscrit,
+        // elle n'a donc aucune promesse antérieure à conserver et relève de la
+        // grille courante.
+        pricingVersion: PRICING_VERSION,
         _schemaVersion: SUBSCRIPTION_SCHEMA_VERSION,
       });
 
@@ -626,7 +646,11 @@ export class BillingService {
       effectivePlan: effective,
       status: doc.status,
       billingInterval: doc.billingInterval ?? 'month',
-      entitlements: PLAN_ENTITLEMENTS[effective],
+      // `resolveEntitlements` et non `PLAN_ENTITLEMENTS[…]` : un abonnement
+      // souscrit sous l'ancienne grille garde ce qui lui a été VENDU tant que le
+      // décideur n'a pas tranché la bascule (voir `entitlements.ts` §
+      // ANTÉRIORITÉ). Un document sans `pricingVersion` est antérieur.
+      entitlements: resolveEntitlements(effective, doc.pricingVersion),
       paidAccess: grantsPaidAccess(doc.status),
       trialEndsAt: doc.trialEndsAt ?? null,
       trialDaysLeft: doc.status === 'trialing' ? daysUntil(doc.trialEndsAt, now) : null,

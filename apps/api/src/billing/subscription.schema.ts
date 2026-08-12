@@ -180,6 +180,22 @@ export class Subscription {
   @Prop({ type: [SubscriptionTransitionSchema], default: [] })
   statusHistory!: SubscriptionTransition[];
 
+  /**
+   * Version de la GRILLE TARIFAIRE acceptée par cet abonnement.
+   *
+   * À ne pas confondre avec `_schemaVersion`, qui décrit la forme du document.
+   * Celui-ci décrit une PROMESSE COMMERCIALE : un abonnement souscrit sous
+   * l'ancienne grille (« projets illimités en Pro ») n'a jamais accepté la
+   * nouvelle, et `resolveEntitlements()` continue de le servir à l'ancienne.
+   *
+   * `null` = antérieur à la grille à cinq paliers. C'est la valeur des documents
+   * déjà en base, qu'aucune migration ne touche — voir `entitlements.ts` §
+   * ANTÉRIORITÉ, et docs/13 § Antériorité des comptes déjà inscrits. La décision
+   * de basculer ces comptes appartient au décideur, pas au code.
+   */
+  @Prop({ type: Number, default: null })
+  pricingVersion!: number | null;
+
   @Prop({ type: Number, required: true, default: SUBSCRIPTION_SCHEMA_VERSION })
   _schemaVersion!: number;
 
