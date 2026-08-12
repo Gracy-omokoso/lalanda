@@ -1,17 +1,42 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // ENTITLEMENTS — ce que l'API applique réellement
 //
-// Les VALEURS ne sont plus ici : elles vivent dans `@lalanda/shared/pricing`,
-// importé aussi par la page tarifs. Ce module reste le point d'entrée des
-// consommateurs de l'API (`projects/`, `reports/`, `billing.service.ts`), dont
-// aucun n'a besoin de changer d'import.
+// Les VALEURS ne sont pas ici : elles vivent dans `@lalanda/shared/pricing`,
+// importé aussi par la page tarifs. Ce module est le point d'entrée des
+// consommateurs de l'API (`projects/`, `reports/`, `ai/`, `billing.service.ts`),
+// dont aucun n'a besoin de connaître le catalogue partagé.
 //
-// Ce qui est PROPRE à l'API et vit donc ici : l'antériorité des organisations
-// déjà inscrites sous l'ancienne grille (voir plus bas).
+// Règle de docs/13, qui est le fond du sujet : « l'interface peut expliquer une
+// limite, mais l'API l'impose ». Un quota contourné en appelant l'API
+// directement n'est pas un quota.
 //
-// Règle de docs/13 rappelée une fois de plus parce qu'elle est le fond du
-// sujet : « l'interface peut expliquer une limite, mais l'API l'impose ». Un
-// quota contourné en appelant l'API directement n'est pas un quota.
+// ── ANTÉRIORITÉ : ARBITRÉE, ET IL N'Y EN A PAS ───────────────────────────────
+//
+// La question a été posée au décideur : les comptes déjà inscrits sous l'ancienne
+// grille (« projets illimités en Pro ») passent-ils aux nouvelles limites, ou
+// gardent-ils leurs droits ? **Décision : tous les comptes passent aux nouvelles
+// limites. Aucune antériorité.**
+//
+// Il n'existe donc PAS de seconde grille dans ce fichier, et c'est délibéré : un
+// `LEGACY_PLAN_ENTITLEMENTS` conservé « au cas où » serait une branche que rien
+// n'emprunte, que personne ne teste, et qu'un lecteur croirait active.
+// `PLAN_ENTITLEMENTS` est la seule grille, appliquée à tout le monde.
+//
+// ── CE QUE LA DÉCISION IMPLIQUE, ET QUI EST TRAITÉ AILLEURS ──────────────────
+//
+// Une organisation peut se retrouver AU-DESSUS de sa limite du jour au
+// lendemain : en production, une organisation détient 5 projets alors que l'offre
+// gratuite en autorise 1. La limite s'applique alors aux GESTES FUTURS, jamais au
+// patrimoine déjà là :
+//
+//   · les 5 projets restent lisibles, exportables et modifiables;
+//   · la CRÉATION d'un sixième est refusée, avec un message qui dit combien
+//     l'organisation en a, combien son offre autorise, et quoi faire;
+//   · rien n'est supprimé, archivé d'office ni rendu inaccessible.
+//
+// Voir `apps/api/src/projects/projects.controller.ts` (refus à la création) et
+// `apps/api/src/organization-space/dashboard.ts` (`depassements()`, qui rend le
+// dépassement LISIBLE au lieu de le laisser surprendre l'utilisateur).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import {
@@ -23,68 +48,16 @@ import {
 
 export { PLANS, type Entitlements, type Plan };
 
-/** Grille courante — celle de `@lalanda/shared/pricing`. */
+/** LA grille, appliquée à toutes les organisations sans exception. */
 export const PLAN_ENTITLEMENTS: Readonly<Record<Plan, Entitlements>> = CATALOG_ENTITLEMENTS;
-
-/**
- * Version de la grille tarifaire portée par un abonnement.
- *
- * Un abonnement créé AVANT cette version n'a jamais accepté la nouvelle grille :
- * il est servi par `LEGACY_PLAN_ENTITLEMENTS`. Voir `resolveEntitlements`.
- */
-export const PRICING_VERSION = 2;
-
-/**
- * ANTÉRIORITÉ — décision ouverte, défaut le moins destructeur.
- *
- * ── Le problème ────────────────────────────────────────────────────────────
- *
- * L'ancienne grille promettait à Pro des « projets illimités ». La nouvelle en
- * accorde 5. Appliquer la nouvelle grille aux abonnés existants retirerait donc
- * une promesse déjà vendue et déjà payée — sur un produit en ligne, à des
- * comptes réels. Le décideur n'a pas tranché entre bascule et antériorité.
- *
- * ── Le défaut implémenté ───────────────────────────────────────────────────
- *
- * Antériorité, parce que c'est le seul des deux choix qui est RÉVERSIBLE : un
- * abonné conservé peut être basculé plus tard par une migration d'une ligne
- * (poser `pricingVersion: PRICING_VERSION`), alors qu'un abonné basculé par
- * erreur a déjà perdu son accès entre-temps.
- *
- * ── Ce que l'antériorité couvre, et ce qu'elle ne couvre pas ───────────────
- *
- * Elle préserve UNIQUEMENT ce qui a été promis : la limite de projets (et le
- * filigrane, et les sièges, identiques par ailleurs). Elle NE crée PAS de droits
- * illimités sur les axes que l'ancienne grille ne mentionnait pas — messages IA
- * et exports PDF n'étaient ni promis, ni comptés, ni facturés. Les servir
- * « illimités » à vie sous couvert d'antériorité serait accorder plus que ce
- * qui a été vendu, et laisser un trou de coût ouvert pour toujours.
- *
- * L'antériorité ne s'applique donc qu'aux organisations qui possèdent DÉJÀ un
- * document d'abonnement. Une organisation sans document (jamais souscrit, jamais
- * essayé) n'a rien à conserver : elle est servie par la grille courante.
- */
-export const LEGACY_PLAN_ENTITLEMENTS: Readonly<Record<Plan, Entitlements>> = Object.freeze({
-  free: PLAN_ENTITLEMENTS.free,
-  // La seule divergence réelle : « projets illimités » était la promesse Pro.
-  pro: Object.freeze({ ...PLAN_ENTITLEMENTS.pro, maxProjects: null }),
-  cabinet: PLAN_ENTITLEMENTS.cabinet,
-  business: PLAN_ENTITLEMENTS.business,
-  expert: PLAN_ENTITLEMENTS.expert,
-});
 
 /**
  * Limites applicables à une organisation.
  *
- * `pricingVersion` vient du document d'abonnement. `null` ou `undefined` =
- * document antérieur à la nouvelle grille (aucune migration n'a été appliquée,
- * volontairement — voir docs/13).
+ * Fonction d'une ligne, conservée comme POINT DE PASSAGE unique : le jour où une
+ * grille change à nouveau, la question de l'antériorité se posera ici et nulle
+ * part ailleurs. Les appelants n'ont pas à savoir qu'elle a été posée une fois.
  */
-export function resolveEntitlements(
-  plan: Plan,
-  pricingVersion: number | null | undefined,
-): Entitlements {
-  return (pricingVersion ?? 0) >= PRICING_VERSION
-    ? PLAN_ENTITLEMENTS[plan]
-    : LEGACY_PLAN_ENTITLEMENTS[plan];
+export function resolveEntitlements(plan: Plan): Entitlements {
+  return PLAN_ENTITLEMENTS[plan];
 }

@@ -1,19 +1,18 @@
-// Tests des entitlements appliqués par l'API.
+// Entitlements appliqués par l'API.
 //
 // Les VALEURS de la grille sont testées à leur source
 // (`packages/shared/src/pricing/pricing.test.ts`). Ici on teste ce que ce module
-// ajoute et qui n'appartient qu'à l'API : l'ANTÉRIORITÉ des abonnements
-// antérieurs à la nouvelle grille.
+// garantit à ses appelants (`projects/`, `reports/`, `ai/`) :
+//
+//   · la grille exposée est bien celle du catalogue partagé, pas une copie;
+//   · il n'existe QU'UNE grille — la décision « aucune antériorité » est
+//     vérifiable, pas seulement écrite en commentaire.
 
+import { PLAN_CATALOG } from '@lalanda/shared/pricing';
 import { describe, expect, it } from 'vitest';
 
-import {
-  LEGACY_PLAN_ENTITLEMENTS,
-  PLAN_ENTITLEMENTS,
-  PLANS,
-  PRICING_VERSION,
-  resolveEntitlements,
-} from './entitlements.js';
+import * as entitlementsModule from './entitlements.js';
+import { PLAN_ENTITLEMENTS, PLANS, resolveEntitlements } from './entitlements.js';
 
 describe('catalogue exposé par l’API', () => {
   it('couvre exactement les cinq offres de la grille', () => {
@@ -29,60 +28,65 @@ describe('catalogue exposé par l’API', () => {
 
   it('reprend la grille partagée sans la recopier', () => {
     // Une valeur recopiée ici finirait par diverger de la page tarifs — c'est
-    // exactement le défaut que le catalogue partagé corrige.
-    expect(PLAN_ENTITLEMENTS.pro.maxProjects).toBe(5);
-    expect(PLAN_ENTITLEMENTS.cabinet.aiMessagesPerMonth).toBe(1500);
-    expect(PLAN_ENTITLEMENTS.business.maxProjects).toBeNull();
+    // exactement le défaut que le catalogue partagé corrige. On compare donc à
+    // la source, sans écrire un seul nombre.
+    for (const plan of PLANS) {
+      expect(PLAN_ENTITLEMENTS[plan]).toBe(PLAN_CATALOG[plan].entitlements);
+    }
+  });
+
+  it('rend des limites complètes pour chaque offre', () => {
+    // Un champ absent se lirait `undefined`, qu'un `!== null` laisserait passer
+    // comme s'il s'agissait d'un nombre : une limite muette est une limite
+    // désactivée.
+    for (const plan of PLANS) {
+      const e = PLAN_ENTITLEMENTS[plan];
+      for (const cle of [
+        'maxProjects',
+        'pdfExportsPerMonth',
+        'aiMessagesPerMonth',
+        'seats',
+      ] as const) {
+        expect(e[cle] === null || typeof e[cle] === 'number', `${plan}.${cle}`).toBe(true);
+      }
+      expect(typeof e.pdfWatermark).toBe('boolean');
+      expect(typeof e.actualsEnabled).toBe('boolean');
+    }
   });
 });
 
-describe('antériorité des abonnements existants', () => {
-  it('sert la grille courante à un abonnement créé sous cette grille', () => {
-    expect(resolveEntitlements('pro', PRICING_VERSION)).toBe(PLAN_ENTITLEMENTS.pro);
-    expect(resolveEntitlements('pro', PRICING_VERSION).maxProjects).toBe(5);
-  });
-
-  it('préserve les projets illimités promis à un Pro antérieur', () => {
-    // C'est LA promesse que l'ancienne page vendait : « Projets illimités ».
-    // La retirer à un abonné payant serait la seule vraie régression de ce lot.
-    expect(resolveEntitlements('pro', null).maxProjects).toBeNull();
-    expect(resolveEntitlements('pro', undefined).maxProjects).toBeNull();
-    expect(resolveEntitlements('pro', 1).maxProjects).toBeNull();
-  });
-
-  it("n'accorde PAS de quotas illimités sur les axes jamais vendus", () => {
-    // Messages IA et exports PDF n'étaient ni promis, ni comptés. Les servir
-    // illimités à vie donnerait plus que ce qui a été acheté, et laisserait un
-    // trou de coût ouvert pour toujours.
-    const ancien = resolveEntitlements('pro', null);
-    expect(ancien.aiMessagesPerMonth).toBe(PLAN_ENTITLEMENTS.pro.aiMessagesPerMonth);
-    expect(ancien.pdfExportsPerMonth).toBe(PLAN_ENTITLEMENTS.pro.pdfExportsPerMonth);
-  });
-
-  it('ne change rien pour Free, Cabinet, Business et Expert', () => {
-    // Free et Business ont la même limite de projets dans les deux grilles ;
-    // Cabinet et Expert n'existaient pas avant, personne ne peut y avoir droit
-    // à titre antérieur.
-    for (const plan of ['free', 'cabinet', 'business', 'expert'] as const) {
-      expect(LEGACY_PLAN_ENTITLEMENTS[plan]).toBe(PLAN_ENTITLEMENTS[plan]);
-      expect(resolveEntitlements(plan, null)).toEqual(PLAN_ENTITLEMENTS[plan]);
-    }
-  });
-
-  it("l'antériorité n'est jamais moins généreuse que la grille courante", () => {
-    // Une antériorité qui RETIRERAIT quelque chose serait un contresens : elle
-    // existe pour ne rien retirer.
+describe('antériorité — arbitrée, et il n’y en a pas', () => {
+  it('applique la grille courante à toutes les offres', () => {
+    // DÉCISION DU DÉCIDEUR : tous les comptes existants passent aux nouvelles
+    // limites. `resolveEntitlements` ne prend donc AUCUN paramètre d'ancienneté.
     for (const plan of PLANS) {
-      const courant = PLAN_ENTITLEMENTS[plan];
-      const ancien = LEGACY_PLAN_ENTITLEMENTS[plan];
-      for (const cle of ['maxProjects', 'pdfExportsPerMonth', 'aiMessagesPerMonth'] as const) {
-        if (courant[cle] === null) {
-          expect(ancien[cle], `${plan}.${cle}`).toBeNull();
-        } else if (ancien[cle] !== null) {
-          expect(ancien[cle]!, `${plan}.${cle}`).toBeGreaterThanOrEqual(courant[cle]!);
-        }
-      }
-      expect(ancien.actualsEnabled || !courant.actualsEnabled).toBe(true);
+      expect(resolveEntitlements(plan)).toBe(PLAN_ENTITLEMENTS[plan]);
     }
+  });
+
+  it('sert 5 projets à un Pro, y compris à un abonné historique', () => {
+    // L'ancienne grille promettait « projets illimités » en Pro. La décision est
+    // de ne pas conserver cette promesse : le test fixe ce choix pour qu'un
+    // retour en arrière soit un changement visible et non un glissement.
+    expect(resolveEntitlements('pro').maxProjects).toBe(5);
+  });
+
+  it('n’expose aucune seconde grille', () => {
+    // Une grille « héritée » conservée au cas où serait une branche que rien
+    // n'emprunte et qu'un lecteur croirait active. Ce test la garde absente.
+    const exportes = Object.keys(entitlementsModule);
+    expect(exportes).not.toContain('LEGACY_PLAN_ENTITLEMENTS');
+    expect(exportes).not.toContain('PRICING_VERSION');
+  });
+
+  it('resolveEntitlements ignore tout argument supplémentaire', () => {
+    // Un appelant resté sur l'ancienne signature `(plan, pricingVersion)` ne doit
+    // pas obtenir silencieusement autre chose que la grille courante.
+    const resolveLache = resolveEntitlements as unknown as (
+      plan: string,
+      version?: unknown,
+    ) => unknown;
+    expect(resolveLache('pro', null)).toBe(PLAN_ENTITLEMENTS.pro);
+    expect(resolveLache('pro', 1)).toBe(PLAN_ENTITLEMENTS.pro);
   });
 });
