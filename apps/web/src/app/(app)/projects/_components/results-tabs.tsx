@@ -13,10 +13,17 @@ import { useCallback, useMemo } from 'react';
 
 import type { AmortissementsView, EtatsFinanciersView, LineResult } from '@/lib/api';
 import { LIENS_AIDE } from '@/lib/aide/liens';
+import { LalaChat } from '@/components/lala-chat';
 
 import { LienAideFeuille } from './aide-contextuelle';
 import { AmortissementsTable } from './amortissements-table';
 import { BfrTable, BilanTable, CafTable, SeuilTable } from './etats-financiers-tables';
+import {
+  BoutonInterpretation,
+  PanneauInterpretation,
+  useInterpretations,
+  type EtatInterpretations,
+} from './interpretation-resultat';
 import { RatiosStickyBanner } from './ratios-sticky-banner';
 import {
   SHEET_LABELS,
@@ -32,6 +39,8 @@ import { SheetTabs } from './sheet-tabs';
 interface ResultsTabsProps {
   lines: LineResult[];
   currency: string;
+  /** Modèle sectoriel — cadre l'interprétation, ne change aucun calcul (S24a). */
+  templateSlug: string;
   amortissements?: AmortissementsView;
   etatsFinanciers?: EtatsFinanciersView;
 }
@@ -39,6 +48,7 @@ interface ResultsTabsProps {
 export function ResultsTabs({
   lines,
   currency,
+  templateSlug,
   amortissements,
   etatsFinanciers,
 }: ResultsTabsProps): React.ReactElement {
@@ -69,6 +79,20 @@ export function ResultsTabs({
 
   const activeLines = linesForTab(bySheet, activeTab);
   const avertissement = SHEET_WARNINGS[activeTab];
+  const sheetLabel = SHEET_LABELS[activeTab] ?? activeTab;
+
+  // Les interprétations sont attachées AUX LIGNES : les onglets rendus depuis
+  // une struct dédiée (amortissements, bilan, BFR, CAF, seuil) n'en portent pas
+  // encore — voir la note en fin de fichier.
+  const interpretations = useInterpretations({
+    templateSlug,
+    sheetId: activeTab,
+    sheetLabel,
+    devise: currency,
+    lines: activeLines,
+  });
+  const ligneChat = interpretations.chatLigne;
+  const lectureChat = ligneChat ? interpretations.lecture(ligneChat) : undefined;
 
   return (
     <div className="flex flex-col gap-4">
@@ -79,10 +103,7 @@ export function ResultsTabs({
         hrefAide={LIENS_AIDE.bandeauRatios}
       />
       <SheetTabs tabs={tabs} activeId={activeTab} onChange={setActiveTab} />
-      <LienAideFeuille
-        idFeuille={activeTab}
-        libelleFeuille={SHEET_LABELS[activeTab] ?? activeTab}
-      />
+      <LienAideFeuille idFeuille={activeTab} libelleFeuille={sheetLabel} />
       <div
         role="tabpanel"
         id={`sheet-panel-${activeTab}`}
@@ -97,7 +118,12 @@ export function ResultsTabs({
           </p>
         ) : null}
         {activeTab === 'ratios' ? (
-          <RatiosCard lines={activeLines} currency={currency} />
+          <RatiosCard
+            lines={activeLines}
+            currency={currency}
+            sheetId={activeTab}
+            interpretations={interpretations}
+          />
         ) : activeTab === 'amortissements' && amortissements ? (
           <AmortissementsTable amortissements={amortissements} currency={currency} />
         ) : activeTab === 'bilan' && etatsFinanciers ? (
@@ -109,9 +135,33 @@ export function ResultsTabs({
         ) : activeTab === 'seuil_rentabilite' && etatsFinanciers ? (
           <SeuilTable etats={etatsFinanciers} currency={currency} />
         ) : (
-          <ResultsTable sheetId={activeTab} lines={activeLines} currency={currency} />
+          <ResultsTable
+            sheetId={activeTab}
+            lines={activeLines}
+            currency={currency}
+            interpretations={interpretations}
+          />
         )}
       </div>
+
+      {/* Le chat est monté UNE FOIS, hors des tableaux : un panneau modal rendu
+          dans une cellule hériterait de son `overflow-x: auto` et se retrouverait
+          coupé au bord de la table. */}
+      {ligneChat && lectureChat ? (
+        <LalaChat
+          templateSlug={templateSlug}
+          sheetId={activeTab}
+          sheetLabel={sheetLabel}
+          devise={currency}
+          lines={activeLines}
+          ligne={ligneChat}
+          valeurAffichee={formatValue(ligneChat.value, ligneChat.format, currency)}
+          interpretation={lectureChat.texte}
+          avertissementFeuille={lectureChat.avertissementFeuille}
+          mention={lectureChat.mention}
+          onClose={interpretations.fermerChat}
+        />
+      ) : null}
     </div>
   );
 }
@@ -122,10 +172,12 @@ function ResultsTable({
   sheetId,
   lines,
   currency,
+  interpretations,
 }: {
   sheetId: string;
   lines: LineResult[];
   currency: string;
+  interpretations: EtatInterpretations;
 }): React.ReactElement {
   return (
     <div className="flex flex-col gap-2">
@@ -144,19 +196,48 @@ function ResultsTable({
             </tr>
           </thead>
           <tbody>
-            {lines.map((line) => (
-              <tr
-                key={line.lineId}
-                className={`border-b border-[var(--border)] ${
-                  line.lineId === 'resultat_net' ? 'font-semibold text-[var(--accent)]' : ''
-                }`}
-              >
-                <td className="py-2.5 pr-2">{line.label}</td>
-                <td className="fig py-2.5 pl-2 text-right">
-                  {formatValue(line.value, line.format, currency)}
-                </td>
-              </tr>
-            ))}
+            {lines.map((line) => {
+              const ouvert = interpretations.ouvertId === line.lineId;
+              return [
+                <tr
+                  key={line.lineId}
+                  className={`border-b border-[var(--border)] ${
+                    line.lineId === 'resultat_net' ? 'font-semibold text-[var(--accent)]' : ''
+                  }`}
+                >
+                  <td className="py-2.5 pr-2">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span>{line.label}</span>
+                      <BoutonInterpretation
+                        ligne={line}
+                        sheetId={sheetId}
+                        etat={interpretations}
+                      />
+                    </span>
+                  </td>
+                  <td className="fig py-2.5 pl-2 text-right align-top">
+                    {formatValue(line.value, line.format, currency)}
+                  </td>
+                </tr>,
+                // La bulle occupe SA PROPRE ligne, sur toute la largeur : dans une
+                // cellule, elle serait comprimée à la largeur du libellé et
+                // s'étirerait sur trente lignes à 375 px.
+                <tr
+                  key={`${line.lineId}-interpretation`}
+                  hidden={!ouvert}
+                  className="border-b border-[var(--border)]"
+                >
+                  <td colSpan={2} className="pb-3 pt-0">
+                    <PanneauInterpretation
+                      ligne={line}
+                      valeurAffichee={formatValue(line.value, line.format, currency)}
+                      sheetId={sheetId}
+                      etat={interpretations}
+                    />
+                  </td>
+                </tr>,
+              ];
+            })}
           </tbody>
         </table>
       </div>
@@ -177,9 +258,13 @@ const STATUT_COLORS: Record<
 function RatiosCard({
   lines,
   currency,
+  sheetId,
+  interpretations,
 }: {
   lines: LineResult[];
   currency: string;
+  sheetId: string;
+  interpretations: EtatInterpretations;
 }): React.ReactElement {
   return (
     <div className="flex flex-col gap-3">
@@ -215,6 +300,15 @@ function RatiosCard({
                   {formatValue(line.seuil.valeur, line.format, currency)}
                 </div>
               ) : null}
+              <div className="mt-0.5 flex">
+                <BoutonInterpretation ligne={line} sheetId={sheetId} etat={interpretations} />
+              </div>
+              <PanneauInterpretation
+                ligne={line}
+                valeurAffichee={formatValue(line.value, line.format, currency)}
+                sheetId={sheetId}
+                etat={interpretations}
+              />
             </li>
           );
         })}

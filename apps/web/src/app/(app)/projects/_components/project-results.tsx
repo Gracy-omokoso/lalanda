@@ -202,6 +202,7 @@ export function ProjectResults({ projectId }: { projectId: string }): React.Reac
           <ResultsTabs
             lines={lines}
             currency={currency}
+            templateSlug={template.slug}
             amortissements={amortissements}
             etatsFinanciers={etatsFinanciers}
           />
