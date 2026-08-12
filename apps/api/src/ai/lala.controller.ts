@@ -32,7 +32,15 @@
 // `ai-actions.controller.ts`, et pour la même raison : c'est le seul moment où
 // l'on sait si l'appel a été facturé.
 
-import { BadRequestException, Body, Controller, Inject, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Inject,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 
 import { AccountService } from '../account/account.service.js';

@@ -58,7 +58,9 @@ const TRESO_MIN: EvaluateLine = {
   seuil: { valeur: 0, direction: 'min', statut: 'rouge' },
 };
 
-function requeteInterpretations(over: Partial<InterpretationsRequest> = {}): InterpretationsRequest {
+function requeteInterpretations(
+  over: Partial<InterpretationsRequest> = {},
+): InterpretationsRequest {
   return {
     templateSlug: 'commerce-detail',
     sheetId: 'ratios',
@@ -100,7 +102,10 @@ const interpretationsJson = (entrees: Array<{ lineId: string; texte: string }>):
 describe('IA indisponible — une lecture déterministe reste servie', () => {
   it('sans client OpenAI, chaque ligne demandée reçoit une interprétation', async () => {
     const svc = new LalaService(null);
-    const res = await svc.interpretations(requeteInterpretations({ lineIds: ['dscr', 'marge_nette_pct'] }), 'fr');
+    const res = await svc.interpretations(
+      requeteInterpretations({ lineIds: ['dscr', 'marge_nette_pct'] }),
+      'fr',
+    );
 
     expect(res.source).toBe('fallback');
     expect(res.interpretations).toHaveLength(2);
@@ -162,7 +167,9 @@ describe('bornes techniques — la réponse dégradée ne remonte jamais en erre
     const res = await svc.chat(requeteChat(), 'fr');
 
     expect(res.source).toBe('fallback');
-    const trace = warn.mock.calls.map((c) => String(c[0])).find((m) => m.includes(FALLBACK_LOG_PREFIX));
+    const trace = warn.mock.calls
+      .map((c) => String(c[0]))
+      .find((m) => m.includes(FALLBACK_LOG_PREFIX));
     expect(trace).toContain('OpenAITimeoutError');
     warn.mockRestore();
   });
@@ -224,7 +231,10 @@ describe('une interprétation ne contient jamais un chiffre absent du moteur', (
       client(
         interpretationsJson([
           { lineId: 'dscr', texte: 'Votre DSCR atteindra 3,40 l’an prochain.' },
-          { lineId: 'marge_nette_pct', texte: 'Votre marge nette ressort à 18,5 %, au-dessus du repère de 10 %.' },
+          {
+            lineId: 'marge_nette_pct',
+            texte: 'Votre marge nette ressort à 18,5 %, au-dessus du repère de 10 %.',
+          },
         ]),
       ),
     );
@@ -240,12 +250,16 @@ describe('une interprétation ne contient jamais un chiffre absent du moteur', (
 
   it('une ligne oubliée par le modèle retombe sur son déterministe', async () => {
     const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
-    const svc = new LalaService(client(interpretationsJson([{ lineId: 'dscr', texte: 'Votre DSCR est à 0,82.' }])));
+    const svc = new LalaService(
+      client(interpretationsJson([{ lineId: 'dscr', texte: 'Votre DSCR est à 0,82.' }])),
+    );
     const res = await svc.interpretations(
       requeteInterpretations({ lineIds: ['dscr', 'marge_nette_pct'] }),
       'fr',
     );
-    expect(res.interpretations.find((i) => i.lineId === 'marge_nette_pct')?.source).toBe('fallback');
+    expect(res.interpretations.find((i) => i.lineId === 'marge_nette_pct')?.source).toBe(
+      'fallback',
+    );
     warn.mockRestore();
   });
 
@@ -262,7 +276,9 @@ describe('une interprétation ne contient jamais un chiffre absent du moteur', (
   it('le chat aussi : une réponse qui chiffre un levier est refusée et NOMMÉE', async () => {
     const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     const svc = new LalaService(
-      client(JSON.stringify({ reponse: 'En baissant le loyer de 250 USD, le DSCR passerait à 1,30.' })),
+      client(
+        JSON.stringify({ reponse: 'En baissant le loyer de 250 USD, le DSCR passerait à 1,30.' }),
+      ),
     );
     const res = await svc.chat(requeteChat(), 'fr');
 
@@ -311,7 +327,11 @@ describe('trésorerie mensuelle — réserve structurelle, pas discrétionnaire'
 
   it('la réserve accompagne la réponse même quand le texte vient du modèle', async () => {
     const svc = new LalaService(
-      client(interpretationsJson([{ lineId: 'tresorerie_solde_m3', texte: 'Le solde du mois 3 s’élève à 1 500 $US.' }])),
+      client(
+        interpretationsJson([
+          { lineId: 'tresorerie_solde_m3', texte: 'Le solde du mois 3 s’élève à 1 500 $US.' },
+        ]),
+      ),
     );
     const res = await svc.interpretations(reqTreso, 'fr');
 
@@ -319,7 +339,9 @@ describe('trésorerie mensuelle — réserve structurelle, pas discrétionnaire'
     expect(res.avertissementFeuille).toMatch(/OPTIMISTE/);
     expect(res.avertissementFeuille).toMatch(/c’est le bilan qui fait foi/i);
     // Elle est aussi RAJOUTÉE au texte : la bulle ne peut pas être lue sans.
-    expect(res.interpretations[0]?.texte).toMatch(/jamais être présentée comme la trésorerie de référence/i);
+    expect(res.interpretations[0]?.texte).toMatch(
+      /jamais être présentée comme la trésorerie de référence/i,
+    );
   });
 
   it('la réserve suit `tresorerie_min_ok`, qui s’affiche pourtant dans `ratios`', async () => {

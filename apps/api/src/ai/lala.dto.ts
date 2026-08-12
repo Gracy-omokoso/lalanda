@@ -106,24 +106,25 @@ export const MessageSchema = z.object({
 });
 export type Message = z.infer<typeof MessageSchema>;
 
-export const ChatRequestSchema = z.object({
-  templateSlug: z.string().min(1),
-  sheetId: z.string().min(1),
-  sheetLabel: z.string().min(1).max(120).optional(),
-  /** Ligne d'où part la conversation — celle dont on veut « plus d'éclairage ». */
-  lineId: z.string().min(1),
-  devise: z.string().max(8).optional(),
-  lines: z.array(EvaluateLineSchema).min(1).max(MAX_LIGNES_CONTEXTE),
-  /** Interprétation déjà affichée, reprise pour que l'échange la prolonge. */
-  interpretation: z.string().max(4000).optional(),
-  /**
-   * Historique de l'échange, le DERNIER message étant la question posée.
-   * Le rôle `system` n'est pas acceptable ici : le cadrage appartient au
-   * serveur, jamais au client (docs/11 § Garde-fous, « refus des instructions
-   * malveillantes »).
-   */
-  messages: z.array(MessageSchema).min(1).max(MAX_MESSAGES_ECHANGE),
-})
+export const ChatRequestSchema = z
+  .object({
+    templateSlug: z.string().min(1),
+    sheetId: z.string().min(1),
+    sheetLabel: z.string().min(1).max(120).optional(),
+    /** Ligne d'où part la conversation — celle dont on veut « plus d'éclairage ». */
+    lineId: z.string().min(1),
+    devise: z.string().max(8).optional(),
+    lines: z.array(EvaluateLineSchema).min(1).max(MAX_LIGNES_CONTEXTE),
+    /** Interprétation déjà affichée, reprise pour que l'échange la prolonge. */
+    interpretation: z.string().max(4000).optional(),
+    /**
+     * Historique de l'échange, le DERNIER message étant la question posée.
+     * Le rôle `system` n'est pas acceptable ici : le cadrage appartient au
+     * serveur, jamais au client (docs/11 § Garde-fous, « refus des instructions
+     * malveillantes »).
+     */
+    messages: z.array(MessageSchema).min(1).max(MAX_MESSAGES_ECHANGE),
+  })
   .refine((r) => r.messages[r.messages.length - 1]?.role === 'user', {
     // Un échange se termine toujours par la question de l'utilisateur. Sans
     // cette règle, un client pourrait faire répondre le modèle « à sa propre

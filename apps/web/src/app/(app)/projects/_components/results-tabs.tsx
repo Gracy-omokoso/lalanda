@@ -208,11 +208,7 @@ function ResultsTable({
                   <td className="py-2.5 pr-2">
                     <span className="flex flex-wrap items-center gap-2">
                       <span>{line.label}</span>
-                      <BoutonInterpretation
-                        ligne={line}
-                        sheetId={sheetId}
-                        etat={interpretations}
-                      />
+                      <BoutonInterpretation ligne={line} sheetId={sheetId} etat={interpretations} />
                     </span>
                   </td>
                   <td className="fig py-2.5 pl-2 text-right align-top">

@@ -132,7 +132,10 @@ export class LalaService {
       const id = l.ligne.lineId;
       const deterministe = deterministes.get(id) ?? '';
       const texte = brutes.get(id);
-      const refus = texte === undefined ? 'absente' : motifDeRefus(texte, autorises, MAX_CARACTERES_INTERPRETATION);
+      const refus =
+        texte === undefined
+          ? 'absente'
+          : motifDeRefus(texte, autorises, MAX_CARACTERES_INTERPRETATION);
       if (texte === undefined || refus !== null) {
         this.logger.warn(
           `${FALLBACK_LOG_PREFIX} raison=InterpretationRefusee ligne=${id} — ${refus ?? 'absente'}`,
@@ -143,7 +146,8 @@ export class LalaService {
       // sa discrétion : c'est ce qui garantit qu'une lecture de la trésorerie
       // mensuelle ne peut pas être servie sans sa réserve.
       const reserveLigne = reservePour(req.sheetId, id, locale);
-      const complet = reserveLigne && !texte.includes(reserveLigne) ? `${texte} ${reserveLigne}` : texte;
+      const complet =
+        reserveLigne && !texte.includes(reserveLigne) ? `${texte} ${reserveLigne}` : texte;
       return { lineId: id, texte: complet, source: 'llm' };
     });
 
@@ -260,7 +264,7 @@ function reglesCommunes(locale: SupportedLocale | undefined): string[] {
     'Tu es « Lala », assistante financière de Lalanda, en contexte OHADA / SYSCOHADA.',
     'RÈGLE ABSOLUE : tu EXPLIQUES des chiffres déjà calculés, tu n’en PRODUIS aucun.',
     '- Ne recalcule rien, n’additionne rien, ne convertis rien, ne projette rien.',
-    "- Ne cite AUCUN nombre absent des données fournies : recopie les valeurs affichées telles quelles.",
+    '- Ne cite AUCUN nombre absent des données fournies : recopie les valeurs affichées telles quelles.',
     '- Ne propose aucune valeur destinée à être saisie dans le plan.',
     '- Ne donne jamais de conseil en investissement, juridique, comptable ou fiscal.',
     '- Ne promets aucun résultat et ne masque aucune incertitude.',
@@ -323,7 +327,9 @@ export function promptUtilisateurChat(
     `Feuille : ${req.sheetId}${req.sheetLabel ? ` (${req.sheetLabel})` : ''}`,
     `Modèle sectoriel : ${req.templateSlug}`,
     req.devise ? `Devise : ${req.devise}` : null,
-    reserveFeuille ? `Réserve de portée (à respecter, à rappeler si le sujet y touche) : ${reserveFeuille}` : null,
+    reserveFeuille
+      ? `Réserve de portée (à respecter, à rappeler si le sujet y touche) : ${reserveFeuille}`
+      : null,
     '',
     'Résultat dont part la conversation :',
     JSON.stringify(origine ? ligneJson(origine) : { lineId: req.lineId }, null, 2),
@@ -333,7 +339,9 @@ export function promptUtilisateurChat(
     JSON.stringify(decorees.map(ligneJson), null, 2),
     '',
     'Échange :',
-    req.messages.map((m) => `${m.role === 'user' ? 'Utilisateur' : 'Lala'} : ${m.content}`).join('\n'),
+    req.messages
+      .map((m) => `${m.role === 'user' ? 'Utilisateur' : 'Lala'} : ${m.content}`)
+      .join('\n'),
   ]
     .filter(Boolean)
     .join('\n');
@@ -361,7 +369,10 @@ function ligneJson(l: LigneAffichee): Record<string, unknown> {
 // ─── Parsing strict des réponses ─────────────────────────────────────────────
 
 /** Interprétations rendues par le modèle, indexées par `lineId` demandé. */
-export function parseInterpretationsLlm(raw: string, attendus: ReadonlySet<string>): Map<string, string> {
+export function parseInterpretationsLlm(
+  raw: string,
+  attendus: ReadonlySet<string>,
+): Map<string, string> {
   const parsed: unknown = JSON.parse(raw);
   if (!parsed || typeof parsed !== 'object' || !('interpretations' in parsed)) {
     throw new Error('Réponse LLM sans champ "interpretations"');

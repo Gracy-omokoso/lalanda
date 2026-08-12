@@ -78,7 +78,11 @@ const LIGNES_RATTACHEES_TRESORERIE = new Set(['tresorerie_min_ok']);
  * optimiste (docs/07). Sans ce rattachement, le ratio le plus regardé du
  * bandeau serait le seul à perdre sa réserve.
  */
-export function reservePour(sheetId: string, lineId?: string, locale?: SupportedLocale): string | null {
+export function reservePour(
+  sheetId: string,
+  lineId?: string,
+  locale?: SupportedLocale,
+): string | null {
   const reserves = reglagesLangue(locale).reserves;
   if (lineId && LIGNES_RATTACHEES_TRESORERIE.has(lineId)) return reserves['tresorerie'] ?? null;
   return reserves[sheetId] ?? null;
@@ -95,7 +99,11 @@ interface Formulation {
   /** Lecture d'une valeur : « « X » s'établit à Y. » */
   valeur(label: string, affichee: string): string;
   /** Position par rapport au repère du Country Pack. */
-  position(direction: 'min' | 'max', seuil: string, cote: 'au-dessus' | 'en-dessous' | 'egal'): string;
+  position(
+    direction: 'min' | 'max',
+    seuil: string,
+    cote: 'au-dessus' | 'en-dessous' | 'egal',
+  ): string;
   /** Glose du feu tricolore. */
   feu(statut: 'vert' | 'orange' | 'rouge'): string;
   /** Lecture d'une ligne sans repère. */
@@ -195,7 +203,9 @@ export function formatValeur(
 ): string {
   const intl = reglagesLangue(locale).intl;
   if (format === 'percent') {
-    return new Intl.NumberFormat(intl, { style: 'percent', maximumFractionDigits: 2 }).format(value);
+    return new Intl.NumberFormat(intl, { style: 'percent', maximumFractionDigits: 2 }).format(
+      value,
+    );
   }
   if (format === 'money' && devise) {
     return new Intl.NumberFormat(intl, {
@@ -260,7 +270,11 @@ export function interpretationDeterministe(
   const seuil = l.ligne.seuil;
   if (seuil && l.seuilAffiche) {
     const cote =
-      l.ligne.value === seuil.valeur ? 'egal' : l.ligne.value > seuil.valeur ? 'au-dessus' : 'en-dessous';
+      l.ligne.value === seuil.valeur
+        ? 'egal'
+        : l.ligne.value > seuil.valeur
+          ? 'au-dessus'
+          : 'en-dessous';
     morceaux.push(f.position(seuil.direction, l.seuilAffiche, cote));
     morceaux.push(f.feu(seuil.statut));
   } else {

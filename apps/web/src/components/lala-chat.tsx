@@ -31,14 +31,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import {
-  api,
-  type LalaMessage,
-  type LineResult,
-  type TexteIaSource,
-} from '@/lib/api';
+import { api, type LalaMessage, type LineResult, type TexteIaSource } from '@/lib/api';
 
-import { etiquetteSource, messagesAEnvoyer, peutEnvoyer } from '@/app/(app)/projects/_components/interpretation-model';
+import {
+  etiquetteSource,
+  messagesAEnvoyer,
+  peutEnvoyer,
+} from '@/app/(app)/projects/_components/interpretation-model';
 
 /** Un tour de parole affiché, avec la provenance de la réponse. */
 interface TourAffiche extends LalaMessage {

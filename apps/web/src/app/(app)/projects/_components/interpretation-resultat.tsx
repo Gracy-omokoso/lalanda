@@ -284,7 +284,10 @@ export function PanneauInterpretation({
             className="self-start rounded-md border border-[var(--accent)] px-3 py-1.5 text-[0.75rem] font-medium text-[var(--accent)] transition hover:bg-[var(--accent)] hover:text-[var(--accent-foreground)]"
           >
             Discuter avec Lala
-            <span className="sr-only"> à propos de « {ligne.label} », {valeurAffichee}</span>
+            <span className="sr-only">
+              {' '}
+              à propos de « {ligne.label} », {valeurAffichee}
+            </span>
           </button>
 
           <p className="border-t border-[var(--border)] pt-2 text-[0.63rem] leading-snug text-[var(--foreground-muted)]">

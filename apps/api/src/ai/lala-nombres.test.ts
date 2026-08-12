@@ -55,9 +55,7 @@ describe('canoniseTokenFr — lecture française', () => {
 
 describe('tokensNumeriques', () => {
   it('s’arrête au premier caractère non numérique', () => {
-    expect(tokensNumeriques('sur 12 mois, soit 1 234,56 USD')).toEqual(
-      new Set(['12', '1234.56']),
-    );
+    expect(tokensNumeriques('sur 12 mois, soit 1 234,56 USD')).toEqual(new Set(['12', '1234.56']));
   });
 
   it('un texte sans chiffre ne rend rien', () => {

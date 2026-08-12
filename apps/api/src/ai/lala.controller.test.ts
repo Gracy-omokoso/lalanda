@@ -49,7 +49,9 @@ function makeController(
   interpretations: ReturnType<typeof vi.fn>;
   chat: ReturnType<typeof vi.fn>;
 } {
-  const interpretations = vi.fn().mockResolvedValue(over.interpretations ?? REPONSE_INTERPRETATIONS);
+  const interpretations = vi
+    .fn()
+    .mockResolvedValue(over.interpretations ?? REPONSE_INTERPRETATIONS);
   const chat = vi.fn().mockResolvedValue(over.chat ?? REPONSE_CHAT);
   const svc = { interpretations, chat } as unknown as LalaService;
 
@@ -91,9 +93,9 @@ const CORPS_CHAT = {
 describe('LalaController — validation', () => {
   it('400 sur un payload d’interprétation invalide, sans rien consommer', async () => {
     const { controller, record, interpretations } = makeController();
-    await expect(controller.interpretations(fakeRequest(), { sheetId: 'ratios' })).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    await expect(
+      controller.interpretations(fakeRequest(), { sheetId: 'ratios' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
     expect(interpretations).not.toHaveBeenCalled();
     expect(record).not.toHaveBeenCalled();
   });
@@ -162,7 +164,9 @@ describe('LalaController — comptage (couture du quota d’offre)', () => {
   it('un repli déterministe n’est PAS compté comme un appel facturé', async () => {
     const { controller, record } = makeController();
     await controller.chat(fakeRequest(), CORPS_CHAT);
-    expect(record).toHaveBeenCalledWith(expect.objectContaining({ action: ACTION_CHAT, source: 'fallback' }));
+    expect(record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: ACTION_CHAT, source: 'fallback' }),
+    );
   });
 });
 
