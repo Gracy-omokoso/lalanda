@@ -31,9 +31,28 @@ import { afterAll, beforeAll, expect, it } from 'vitest';
 
 import 'reflect-metadata';
 
+import { BILLING_INTERVALS, PLAN_ENTITLEMENTS, PLANS, priceCents } from '@lalanda/shared/pricing';
+
 import { addDays } from '../billing/proration.js';
 import { hmacSha256Hex } from '../payments/webhook-signature.js';
 import { dbOf, e2eSuite, makeE2EApp, teardown } from './e2e-utils.js';
+
+/**
+ * Un couple (plan, périodicité) SANS TARIF PUBLIÉ, cherché dans le catalogue.
+ *
+ * Écrire ici « business / annuel », comme le faisait ce fichier, revenait à
+ * parier sur l'état de la grille : le jour où le tarif annuel Business a été
+ * publié, le test a continué de passer pour une raison fausse — il interrogeait
+ * un couple désormais vendable, et l'API répondait 200 à bon droit. La cible est
+ * donc DÉRIVÉE : n'importe quel couple dont `priceCents()` répond `null`.
+ *
+ * `null` est le seul signal qui compte ici. Il dit « aucun montant n'a été
+ * arbitré » — typiquement l'offre Expert, chiffrée au cas par cas — et l'API
+ * doit refuser plutôt que d'inventer un prix plausible.
+ */
+const COUPLE_SANS_TARIF = PLANS.flatMap((plan) =>
+  BILLING_INTERVALS.map((interval) => ({ plan, interval })),
+).find(({ plan, interval }) => priceCents(plan, interval) === null);
 
 /**
  * Secrets de TEST, posés avant le montage de l'application.
@@ -277,12 +296,24 @@ e2eSuite('abonnements de bout en bout (S22b)', () => {
   }, 30_000);
 
   it('un couple (plan, périodicité) non publié est refusé — aucun tarif deviné', async () => {
-    // Business annuel n'a pas de prix publié : l'API refuse plutôt que d'inventer.
+    // Sans couple sans tarif dans la grille, ce test n'a plus de cible : il doit
+    // le DIRE, pas passer au vert en n'interrogeant rien.
+    expect(
+      COUPLE_SANS_TARIF,
+      'Aucun couple (plan, périodicité) sans tarif publié dans PLAN_CATALOG : ' +
+        "cette exigence n'a plus de cible. Vérifier que le refus reste couvert " +
+        'avant de conclure quoi que ce soit — surtout pas de retirer le test.',
+    ).toBeDefined();
+
     const res = await request(app.getHttpServer())
       .get('/organizations/current/subscription/quote')
-      .query({ plan: 'business', interval: 'year' })
+      .query({ plan: COUPLE_SANS_TARIF!.plan, interval: COUPLE_SANS_TARIF!.interval })
       .set('Cookie', aliceCookies);
-    expect(res.status).toBe(409);
+    expect(
+      res.status,
+      `${COUPLE_SANS_TARIF!.plan}/${COUPLE_SANS_TARIF!.interval} n'a aucun tarif publié ` +
+        `mais l'API a répondu ${res.status} ${JSON.stringify(res.body).slice(0, 200)}`,
+    ).toBe(409);
     expect(res.body.code).toBe('PLAN_NOT_SELLABLE');
   }, 30_000);
 
@@ -550,8 +581,11 @@ e2eSuite('abonnements de bout en bout (S22b)', () => {
     expect(checkout.status).toBe(200);
     expect(checkout.body.provider).toBe('manual');
     expect(checkout.body.mode).toBe('instructions');
-    // Tarif plein : Alice n'a aucune période payée en cours.
-    expect(checkout.body.amountDueCents).toBe(900);
+    // Tarif plein : Alice n'a aucune période payée en cours. Le montant attendu
+    // est LU dans le catalogue — le recopier ici (« 900 ») a déjà fait échouer
+    // cette suite au premier changement de grille, et un chiffre figé dans un
+    // test ne prouve rien sur le prix réellement publié.
+    expect(checkout.body.amountDueCents).toBe(priceCents('pro', 'month'));
     const reference: string = checkout.body.reference;
     expect(reference).toMatch(/^LLD-/);
     // La référence est répétée dans les instructions — sans elle, un dépôt
@@ -589,10 +623,11 @@ e2eSuite('abonnements de bout en bout (S22b)', () => {
     expect(state.body.status).toBe('active');
     expect(state.body.plan).toBe('pro');
     expect(state.body.provider).toBe('manual');
-    // Les entitlements SUIVENT le plan : Pro lève la limite de projets
-    // (`null` = illimité) et retire le filigrane.
-    expect(state.body.entitlements.maxProjects).toBeNull();
-    expect(state.body.entitlements.pdfWatermark).toBe(false);
+    // Les entitlements SUIVENT le plan : ceux servis sont EXACTEMENT ceux du
+    // catalogue pour Pro. Un paiement encaissé qui n'ouvrirait pas les droits
+    // payés est le défaut redouté ici, et il se voit sur la grille entière —
+    // pas seulement sur les deux champs qu'on aurait pensé à citer.
+    expect(state.body.entitlements).toEqual(PLAN_ENTITLEMENTS.pro);
 
     // Et la création de projet qui échouait plus haut réussit maintenant.
     const project = await request(server)
