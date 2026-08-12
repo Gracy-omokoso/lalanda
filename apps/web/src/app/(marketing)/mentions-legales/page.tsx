@@ -19,7 +19,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { PUBLISHER_NAME, PUBLISHER_UNKNOWNS, legalDocument } from '@/lib/legal';
+import { CONTACT_LEGAL, PUBLISHER_NAME, PUBLISHER_UNKNOWNS, legalDocument } from '@/lib/legal';
 import { LegalList, LegalPage, ToComplete, type LegalSection } from '../_components/legal-page';
 
 const doc = legalDocument('mentions-legales');
@@ -72,7 +72,9 @@ const SECTIONS: readonly LegalSection[] = [
           <div>
             <dt className="font-semibold">Contact</dt>
             <dd>
-              <ToComplete>adresse email de contact</ToComplete>
+              <a href={`mailto:${CONTACT_LEGAL}`} className="underline underline-offset-2">
+                {CONTACT_LEGAL}
+              </a>
             </dd>
           </div>
         </dl>
@@ -167,8 +169,11 @@ const SECTIONS: readonly LegalSection[] = [
       <>
         <p>
           Pour signaler un contenu illicite, une atteinte à vos droits ou un problème de sécurité,
-          écrivez à <ToComplete>adresse email de contact</ToComplete> en décrivant précisément les
-          faits et les éléments permettant de les localiser.
+          écrivez à{' '}
+          <a href={`mailto:${CONTACT_LEGAL}`} className="underline underline-offset-2">
+            {CONTACT_LEGAL}
+          </a>{' '}
+          en décrivant précisément les faits et les éléments permettant de les localiser.
         </p>
         <p>
           Une faille de sécurité signalée de bonne foi ne fera l&apos;objet d&apos;aucune poursuite

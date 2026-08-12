@@ -346,10 +346,9 @@ function QuoteCard({ tier }: { tier: Tier }): React.ReactElement {
           l&apos;accord conclu.
         </p>
       </div>
-      {/* Aucune destination tant qu'aucun canal de contact n'est publié. Un
-          bouton vers une page inexistante enverrait un acheteur sérieux sur un
-          404 au moment où il veut parler à quelqu'un ; le marqueur « à
-          compléter » du dépôt le dit au lieu de le cacher. */}
+      {/* `ctaHref` reste nullable : le jour où une offre sur devis n'a pas encore
+          de canal publié, la carte doit pouvoir le DIRE plutôt que de mener
+          nulle part. Expert, lui, a désormais son adresse. */}
       {tier.ctaHref === null ? (
         <p className="shrink-0 text-sm">
           <span className="font-semibold">{tier.cta}</span>

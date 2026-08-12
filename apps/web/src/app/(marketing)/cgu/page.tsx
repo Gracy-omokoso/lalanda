@@ -17,7 +17,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { PUBLISHER_NAME, legalDocument } from '@/lib/legal';
+import { CONTACT_LEGAL, PUBLISHER_NAME, legalDocument } from '@/lib/legal';
 import { LegalList, LegalPage, ToComplete, type LegalSection } from '../_components/legal-page';
 
 const doc = legalDocument('cgu');
@@ -351,8 +351,10 @@ const SECTIONS: readonly LegalSection[] = [
         </p>
         <p>
           En cas de difficulté, nous vous invitons à nous contacter d&apos;abord :{' '}
-          <ToComplete>adresse email de contact</ToComplete>. Nous cherchons une solution amiable
-          avant toute procédure.
+          <a href={`mailto:${CONTACT_LEGAL}`} className="underline underline-offset-2">
+            {CONTACT_LEGAL}
+          </a>
+          . Nous cherchons une solution amiable avant toute procédure.
         </p>
       </>
     ),

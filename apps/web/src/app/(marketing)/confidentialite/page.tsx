@@ -24,7 +24,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { PUBLISHER_NAME, legalDocument } from '@/lib/legal';
+import { CONTACT_LEGAL, PUBLISHER_NAME, legalDocument } from '@/lib/legal';
 import {
   LegalList,
   LegalPage,
@@ -56,7 +56,9 @@ const SECTIONS: readonly LegalSection[] = [
         </p>
         <p>
           Pour toute question sur vos données ou pour exercer vos droits&nbsp;:{' '}
-          <ToComplete>adresse email de contact dédiée aux demandes sur les données</ToComplete>
+          <a href={`mailto:${CONTACT_LEGAL}`} className="underline underline-offset-2">
+            {CONTACT_LEGAL}
+          </a>
         </p>
         <p>
           <ToComplete>
@@ -390,9 +392,12 @@ const SECTIONS: readonly LegalSection[] = [
         />
         <p>
           Pour exercer un droit qui ne dispose pas d&apos;un bouton dans l&apos;interface, écrivez à{' '}
-          <ToComplete>adresse email de contact</ToComplete>. Nous répondons dans un délai
-          raisonnable et pouvons vous demander de confirmer votre identité, afin qu&apos;une demande
-          ne serve pas à obtenir les données de quelqu&apos;un d&apos;autre.
+          <a href={`mailto:${CONTACT_LEGAL}`} className="underline underline-offset-2">
+            {CONTACT_LEGAL}
+          </a>
+          . Nous répondons dans un délai raisonnable et pouvons vous demander de confirmer votre
+          identité, afin qu&apos;une demande ne serve pas à obtenir les données de quelqu&apos;un
+          d&apos;autre.
         </p>
       </>
     ),

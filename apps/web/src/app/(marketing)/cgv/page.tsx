@@ -23,7 +23,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { PUBLISHER_NAME, legalDocument } from '@/lib/legal';
+import { CONTACT_FACTURATION, PUBLISHER_NAME, legalDocument } from '@/lib/legal';
 import { LegalList, LegalPage, ToComplete, type LegalSection } from '../_components/legal-page';
 
 const doc = legalDocument('cgv');
@@ -352,8 +352,10 @@ const SECTIONS: readonly LegalSection[] = [
         </p>
         <p>
           Avant toute procédure, écrivez-nous&nbsp;:{' '}
-          <ToComplete>adresse email de contact</ToComplete>. La plupart des désaccords commerciaux
-          se règlent par un échange.
+          <a href={`mailto:${CONTACT_FACTURATION}`} className="underline underline-offset-2">
+            {CONTACT_FACTURATION}
+          </a>
+          . La plupart des désaccords commerciaux se règlent par un échange.
         </p>
       </>
     ),

@@ -21,6 +21,8 @@
 import { PLAN_CATALOG, PLANS, SELF_SERVE_PLANS } from '@lalanda/shared/pricing';
 import { describe, expect, it } from 'vitest';
 
+import { CONTACT_CLIENT, CONTACT_FACTURATION, CONTACT_TECHNIQUE } from '@/lib/legal';
+
 import {
   annualSavingPercent,
   COMPARISON,
@@ -62,7 +64,10 @@ describe('grille tarifaire affichée', () => {
     expect(expert.cta).toBe('Nous contacter');
     // Le bouton ne mène pas à l'inscription : celle-ci ouvrirait un compte
     // gratuit sans un mot du devis, ce qui n'est pas ce que le bouton promet.
-    expect(expert.ctaHref).toBeNull();
+    // Il ouvre le courrier vers l'adresse commerciale publiée — la garantie
+    // porte sur l'ABSENCE de tunnel d'achat, pas sur l'absence de destination.
+    expect(expert.ctaHref).toBe(`mailto:${CONTACT_CLIENT}`);
+    expect(expert.ctaHref).not.toContain('/register');
     expect(expert.cta).not.toContain(String(TRIAL_DAYS));
   });
 
@@ -77,13 +82,17 @@ describe('grille tarifaire affichée', () => {
   });
 
   it('ne pointe aucune offre vers une destination qui n’existe pas', () => {
-    // `/contact` n'existe pas et aucune adresse de contact n'est publiée
-    // (`PUBLISHER_UNKNOWNS`). Un bouton vers un 404 sur la seule voie d'accès à
-    // une offre payante est pire que pas de bouton du tout.
+    // Un bouton vers un 404 sur la seule voie d'accès à une offre payante est
+    // pire que pas de bouton du tout. Deux destinations sont donc admises, et
+    // deux seulement : une route interne qui existe, ou un `mailto:` vers une
+    // adresse RÉELLEMENT publiée par l'éditeur. Une adresse inventée serait le
+    // même cul-de-sac qu'une page absente, en moins visible.
     const routesConnues = ['/register'];
+    const adressesPubliees = [CONTACT_CLIENT, CONTACT_TECHNIQUE, CONTACT_FACTURATION];
     for (const tier of TIERS) {
       if (tier.ctaHref === null) continue;
-      expect(routesConnues, `${tier.slug} → ${tier.ctaHref}`).toContain(tier.ctaHref);
+      const destinationsValides = [...routesConnues, ...adressesPubliees.map((a) => `mailto:${a}`)];
+      expect(destinationsValides, `${tier.slug} → ${tier.ctaHref}`).toContain(tier.ctaHref);
     }
   });
 

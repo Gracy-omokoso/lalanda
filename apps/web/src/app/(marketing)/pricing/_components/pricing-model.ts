@@ -24,6 +24,7 @@
 // `payment-methods.tsx`).
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { CONTACT_CLIENT } from '@/lib/legal';
 import {
   annualSavingPercent as catalogAnnualSaving,
   formatQuota,
@@ -63,10 +64,10 @@ export interface Tier {
    * `null` pour Expert : **aucune adresse de contact n'est publiée**. C'est un
    * fait établi du dépôt, pas un oubli — `PUBLISHER_UNKNOWNS` (`lib/legal.ts`)
    * liste « adresse email de contact » parmi les informations que l'éditeur doit
-   * encore fournir. Un bouton vers `/contact`, page qui n'existe pas, enverrait
-   * un acheteur sérieux sur un 404 au moment précis où il veut parler à
-   * quelqu'un ; une adresse inventée serait pire. L'interface affiche donc le
-   * marqueur « à compléter » du dépôt, visible, plutôt qu'un cul-de-sac.
+   * Pour Expert, c'est un `mailto:` vers l'adresse commerciale et non une page
+   * `/contact` : cette page n'existe pas, et un bouton qui mène à un 404 au
+   * moment précis où un acheteur veut parler à quelqu'un est le pire endroit
+   * où en poser un. Le courrier arrive là où quelqu'un le relève.
    */
   ctaHref: string | null;
   /**
@@ -156,9 +157,8 @@ export const TIERS: readonly Tier[] = PLANS.map((slug) => {
     cta: ctaOf(slug),
     // Expert ne mène PAS à `/register` : l'inscription ouvrirait un compte
     // gratuit sans rien dire du devis, ce qui n'est pas ce que le bouton promet.
-    // Et elle ne mène nulle part ailleurs tant qu'aucun canal de contact n'est
-    // publié — voir le commentaire de `ctaHref`.
-    ctaHref: slug === 'expert' ? null : '/register',
+    // Il ouvre le courrier vers l'adresse commerciale, publiée le 2026-08-12.
+    ctaHref: slug === 'expert' ? `mailto:${CONTACT_CLIENT}` : '/register',
     selfServe: def.selfServe,
     // Cabinet est le palier mis en avant : c'est la clientèle réelle (cabinets
     // et incubateurs), et c'est le palier que l'ancienne grille n'avait pas.

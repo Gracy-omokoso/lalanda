@@ -142,12 +142,31 @@ export function isLegalPath(pathname: string): boolean {
 export const LEGAL_REVIEWED_BY_COUNSEL = false;
 
 /**
- * Adresse de contact affichée sur les pages légales et pour l'exercice des
- * droits. Laissée en marqueur : elle doit exister et être relevée avant la mise
- * en production — publier une adresse qui ne reçoit personne est pire que ne
- * rien publier.
+ * Adresses de contact publiées, fournies par l'éditeur le 2026-08-12.
+ *
+ * Elles remplacent le marqueur qui tenait cette place. La règle qui justifiait
+ * ce marqueur reste vraie et se déplace simplement d'un cran : **publier une
+ * adresse qui ne reçoit personne est pire que ne rien publier**. Ces trois
+ * boîtes doivent être relevées — une page légale qui affiche une adresse morte
+ * prive l'utilisateur du recours qu'elle prétend lui ouvrir.
+ *
+ * Le découpage suit celui de l'éditeur : une porte par nature de demande, pour
+ * qu'une question de facturation n'attende pas derrière une question technique.
  */
-export const CONTACT_PLACEHOLDER = legalTodo('adresse email de contact');
+export const CONTACT_CLIENT = 'contact@lalanda.co';
+export const CONTACT_TECHNIQUE = 'support@lalanda.co';
+export const CONTACT_FACTURATION = 'billing@lalanda.co';
+
+/**
+ * Adresse affichée sur les pages légales et pour l'exercice des droits.
+ *
+ * `CONTACT_CLIENT` et non une adresse dédiée : l'éditeur n'en a pas déclaré
+ * pour la protection des données. **Point à faire trancher par un juriste** —
+ * une demande d'accès ou d'effacement arrivant dans une boîte commerciale n'est
+ * pas illégale, mais les délais de réponse sont contraignants et une boîte
+ * partagée les tient mal. Voir docs/28-CONFORMITE-LEGALE.md.
+ */
+export const CONTACT_LEGAL = CONTACT_CLIENT;
 
 /** Marqueur de champ que l'éditeur doit renseigner avant publication. */
 export const todo = legalTodo;
@@ -173,7 +192,6 @@ export const PUBLISHER_UNKNOWNS: readonly string[] = [
   'adresse du siège social',
   'capital social, si la forme juridique en fait état',
   'nom du représentant légal et du directeur de la publication',
-  'adresse email de contact',
   'numéro de téléphone, si l’éditeur souhaite en publier un',
   'identité et adresse de l’hébergeur (cible ADR-0009 : DigitalOcean, non provisionné)',
 ] as const;
