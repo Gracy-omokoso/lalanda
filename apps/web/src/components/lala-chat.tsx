@@ -17,7 +17,7 @@
 //     c'est ce qui empêche l'échange de se dérouler comme si cette vue était la
 //     trésorerie de référence du projet. Elle vient de l'API, pas du composant.
 //  2. **L'origine de chaque réponse est dite** : « Rédigé par Lala » ou
-//     « Lecture automatique ». Une réponse de repli qui se présenterait comme
+//     « Explication automatique ». Une réponse de repli qui se présenterait comme
 //     une réponse d'IA serait un mensonge d'interface.
 //  3. **La mention anti-conseil est en pied de panneau**, tout le temps, pas
 //     dans un pli. Ce produit sert à monter des dossiers bancaires.

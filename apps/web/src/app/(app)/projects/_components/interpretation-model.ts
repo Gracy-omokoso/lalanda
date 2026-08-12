@@ -44,9 +44,9 @@ export function etiquetteSource(source: TexteIaSource): EtiquetteSource {
     };
   }
   return {
-    texte: 'Lecture automatique',
+    texte: 'Explication automatique',
     titre:
-      'Lecture établie directement à partir des chiffres du moteur, sans l’assistante IA — ' +
+      'Explication établie directement à partir des chiffres du moteur, sans l’assistante IA — ' +
       'soit qu’elle soit indisponible, soit que sa réponse ait été écartée.',
   };
 }

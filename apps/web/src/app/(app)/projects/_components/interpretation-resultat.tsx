@@ -250,7 +250,7 @@ export function PanneauInterpretation({
 
       {chargement ? (
         <p aria-live="polite" className="text-[var(--foreground-muted)]">
-          Lecture de ce résultat…
+          Explication de ce résultat…
         </p>
       ) : erreur ? (
         <div role="alert" className="flex flex-col gap-2">

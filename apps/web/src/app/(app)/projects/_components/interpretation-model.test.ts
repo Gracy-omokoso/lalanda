@@ -22,7 +22,7 @@ describe('etiquetteSource — l’origine du texte est dite, jamais devinée', (
   it('un repli déterministe ne se fait PAS passer pour de l’IA', () => {
     const e = etiquetteSource('fallback');
     expect(e.texte).not.toMatch(/Lala/);
-    expect(e.texte).toBe('Lecture automatique');
+    expect(e.texte).toBe('Explication automatique');
     // L'infobulle nomme les deux causes possibles, sans en masquer une.
     expect(e.titre).toMatch(/indisponible/);
     expect(e.titre).toMatch(/écartée/);
