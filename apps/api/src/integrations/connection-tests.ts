@@ -2,14 +2,21 @@
 // TESTS DE CONNEXION — ADR-0013 §5
 //
 // « Une clé invalide n'entre jamais en base — c'est ce qui évite de découvrir la
-// panne au premier paiement client. » Chacun des cinq tests est choisi pour être
+// panne au premier paiement client. » Chacun des six tests est choisi pour être
 // GRATUIT et SANS EFFET DE BORD : lecture de compte, liste de modèles, demande de
-// jeton, `verify()` SMTP sans envoi, `HeadBucket` sans lecture d'objet.
+// jeton, `verify()` SMTP sans envoi, `HeadBucket` sans lecture d'objet, liste des
+// voix sans synthèse.
+//
+// Le critère vaut pour les deux fournisseurs ajoutés ici. R2 est facturé aux
+// opérations et aux octets sortants : `HeadBucket` ne lit aucun objet et n'en
+// écrit aucun. ElevenLabs est facturé AU CARACTÈRE SYNTHÉTISÉ : brancher le
+// bouton « Tester » sur un point de génération coûterait de l'argent à chaque
+// clic, `GET /v2/voices` n'en coûte aucun.
 //
 // ── Pourquoi aucune dépendance n'est ajoutée ─────────────────────────────────
 //
-// Trois des cinq tests sont de simples requêtes HTTP (`fetch` natif). Les deux
-// autres — SMTP et S3 — auraient justifié `nodemailer` et `@aws-sdk/client-s3`,
+// Quatre des six tests sont de simples requêtes HTTP (`fetch` natif). Les deux
+// autres — SMTP et R2 — auraient justifié `nodemailer` et `@aws-sdk/client-s3`,
 // soit deux arbres de dépendances complets importés dans le processus qui
 // détient `SECRETS_MASTER_KEY`. ADR-0013 §10 nomme la chaîne d'approvisionnement
 // npm comme « le maillon faible » de tout le dispositif : ajouter des centaines
