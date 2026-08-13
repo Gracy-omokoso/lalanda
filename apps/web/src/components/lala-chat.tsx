@@ -22,6 +22,16 @@
 //  3. **La mention anti-conseil est en pied de panneau**, tout le temps, pas
 //     dans un pli. Ce produit sert à monter des dossiers bancaires.
 //
+// ── L'appel vocal, et pourquoi il est cloisonné ──────────────────────────────
+//
+// `LalaAppelVocal` est monté sous l'en-tête, SANS aucune prop. Le chat écrit
+// explique CE résultat : il reçoit `ligne`, `lines`, l'interprétation, et ses
+// réponses passent par le garde-fou qui rejette tout nombre absent du moteur.
+// L'appel vocal, lui, explique des NOTIONS — « c'est quoi un DSCR ? » — et ne
+// reçoit rien du projet, parce qu'en temps réel la parole part avant qu'on
+// puisse la relire : le garde-fou numérique n'y est pas applicable. Ne pas lui
+// donner les chiffres est donc la seule protection qui tienne.
+//
 // ── Forme ────────────────────────────────────────────────────────────────────
 //
 // Plein écran sous 640 px (le fil a besoin de toute la hauteur pour être
@@ -32,6 +42,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api, type LalaMessage, type LineResult, type TexteIaSource } from '@/lib/api';
+
+import { LalaAppelVocal } from './lala-appel-vocal';
 
 import {
   etiquetteSource,
@@ -190,6 +202,14 @@ export function LalaChat({
           <span className="sr-only">Fermer l’échange</span>
         </button>
       </header>
+
+      {/* L'appel vocal vit ICI, entre l'en-tête et le fil, et non dans le fil.
+          `LalaAppelVocal` ne reçoit AUCUNE prop — voir sa signature : c'est ce
+          qui garantit qu'aucun chiffre du projet ne peut lui parvenir, ni
+          aujourd'hui ni après une modification distraite. Le vocal explique des
+          notions; le fil ci-dessous explique CE résultat-là. Les deux ne
+          partagent donc ni contexte ni historique, et c'est voulu. */}
+      <LalaAppelVocal />
 
       <div ref={filRef} className="flex-1 overflow-y-auto px-4 py-3">
         {/* La réserve de portée ouvre le fil et n'en sort jamais. */}
