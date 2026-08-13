@@ -16,20 +16,20 @@
 // Le compteur de messages n'est PAS touché : une conversation vocale ne
 // décompte aucun message texte, et un message texte ne décompte aucune minute.
 //
-// ── VALEURS NON ARBITRÉES ────────────────────────────────────────────────────
+// ── VALEURS ARBITRÉES LE 2026-08-12 ──────────────────────────────────────────
 //
-// ╔══════════════════════════════════════════════════════════════════════════╗
-// ║ Les minutes par offre ci-dessous sont une PROPOSITION remontée au         ║
-// ║ décideur, pas une décision. Elles ne figurent VOLONTAIREMENT pas dans     ║
-// ║ `@lalanda/shared/pricing` : ce catalogue alimente la page tarifs          ║
-// ║ publique, et y écrire un chiffre non arbitré reviendrait à le publier.    ║
-// ║                                                                          ║
-// ║ Tant que l'arbitrage n'est pas rendu, chaque valeur reste surchargeable   ║
-// ║ par variable d'environnement (`LALA_VOCAL_MINUTES_PRO`…), ce qui permet   ║
-// ║ d'ajuster en production sans redéploiement ni migration de grille.        ║
-// ║ Le jour de l'arbitrage, la grille rejoint le catalogue partagé et ce      ║
-// ║ fichier n'en garde que la RÈGLE.                                          ║
-// ╚══════════════════════════════════════════════════════════════════════════╝
+// Le décideur a retenu la proposition telle quelle. Les minutes ci-dessous sont
+// donc une DÉCISION, plus une suggestion.
+//
+// Elles restent hors de `@lalanda/shared/pricing`, et c'est délibéré : ce
+// catalogue alimente la page tarifs PUBLIQUE, où la voix n'est pas annoncée à
+// ce jour. Décider une limite et la publier sont deux gestes distincts — le
+// second est une promesse commerciale, qui appartient au décideur.
+//
+// Chaque valeur reste surchargeable par variable d'environnement
+// (`LALA_VOCAL_MINUTES_PRO`…) : ajuster un plafond en production ne doit pas
+// exiger un redéploiement, surtout sur un poste dont le coût réel se découvre
+// à l'usage.
 //
 // ── Le raisonnement derrière la proposition ─────────────────────────────────
 //
@@ -46,7 +46,7 @@
 //   business 240 min                            — à caler sur le prix réel.
 //   expert   négocié au contrat, comme les sièges.
 //
-// Ces valeurs sont à confirmer, pas à croire.
+// Ces valeurs ont été confirmées par le décideur le 2026-08-12.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { PLANS, monthWindowReset, monthWindowStart, type Plan } from '@lalanda/shared/pricing';
@@ -71,13 +71,13 @@ export const VOICE_QUOTA_ERROR_CODE = 'PLAN_LIMIT_VOICE_MINUTES' as const;
 export const DUREE_MAX_SESSION_MINUTES = 10;
 
 /**
- * Grille PROPOSÉE, en minutes par mois calendaire. `null` = illimité.
+ * Grille ARBITRÉE, en minutes par mois calendaire. `null` = illimité.
  *
  * `satisfies Record<Plan, …>` : ajouter une offre à `PLANS` sans décider de ses
  * minutes ne compile pas. Un quota vocal oublié sur une nouvelle offre se
  * traduirait sinon par « illimité » — le défaut le plus cher possible.
  */
-export const MINUTES_VOCALES_PROPOSEES = {
+export const MINUTES_VOCALES_PAR_OFFRE = {
   free: 0,
   pro: 30,
   cabinet: 90,
@@ -105,7 +105,7 @@ export function minutesAutorisees(
   plan: Plan,
   env: Record<string, string | undefined> = process.env,
 ): { minutes: number | null; avertissement: string | null } {
-  const defaut: number | null = MINUTES_VOCALES_PROPOSEES[plan];
+  const defaut: number | null = MINUTES_VOCALES_PAR_OFFRE[plan];
   const nom = `${PREFIXE_ENV_MINUTES}${plan.toUpperCase()}`;
   const brut = env[nom];
   if (brut === undefined || brut.trim() === '') return { minutes: defaut, avertissement: null };
