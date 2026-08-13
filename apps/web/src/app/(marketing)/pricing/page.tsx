@@ -32,6 +32,7 @@ import {
   FAQ,
   formatPrice,
   PLANS,
+  nombreOffresEnLettres,
   TIERS,
   TRIAL_DAYS,
   type Tier,
@@ -53,7 +54,7 @@ export const metadata = {
     // Les montants ne sont pas recopiés : ils viennent du catalogue, comme le
     // reste de la page. Une méta-description périmée est une promesse périmée,
     // et c'est elle que lisent les moteurs de recherche.
-    `Cinq offres pour générer votre plan financier bancable : ` +
+    `${nombreOffresEnLettres()} offres pour générer votre plan financier bancable : ` +
     GRID_TIERS.map((t) => `${t.name} (${formatPrice(t.priceMonthUsd)}/mois)`).join(', ') +
     `, et une offre Expert sur devis. Essai de ${TRIAL_DAYS} jours sans carte bancaire.`,
 };
@@ -68,12 +69,12 @@ export default function PricingPage(): React.ReactElement {
               TARIFS
             </p>
             <h1 className="font-display text-4xl font-black tracking-tight text-[var(--on-ink)] sm:text-5xl">
-              Quatre offres, un même moteur financier.
+              {nombreOffresEnLettres()} offres, un même moteur financier.
             </h1>
             <p className="mt-5 text-lg text-[var(--on-ink-muted)]">
-              Tous les calculs et exports fonctionnent dès l&apos;offre gratuite. Vous ne payez que
-              pour lever la limite de projets, retirer le filigrane et débloquer les fonctions
-              collaboratives.
+              Le moteur financier est le même dans toutes les offres : mêmes calculs, mêmes états,
+              mêmes packs pays. Ce qui change, c&apos;est le volume — projets, exports, messages à
+              l&apos;assistant — le filigrane et les fonctions collaboratives.
             </p>
 
             <div className="mt-8 inline-flex flex-col items-center gap-3 rounded-lg border border-[var(--on-ink-accent)]/40 bg-[var(--on-ink)]/5 px-6 py-5">

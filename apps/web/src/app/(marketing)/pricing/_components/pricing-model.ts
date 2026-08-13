@@ -215,6 +215,34 @@ function row(label: string, values: Record<Plan, string | boolean>, note?: strin
  * fonctions dont l'accès n'est pas encore restreint par un entitlement : elles
  * sont éditoriales et le disent.
  */
+/**
+ * Le nombre d'offres, écrit en toutes lettres, DÉRIVÉ du catalogue.
+ *
+ * Le titre de la page l'annonçait en dur : il disait « Quatre offres » alors
+ * que la grille en comptait cinq depuis l'ajout du palier Cabinet. Un compte
+ * écrit à la main se périme au premier changement de grille, et il se périme
+ * sur la première phrase que lit un acheteur.
+ *
+ * Au-delà de dix, on rend le chiffre : une grille à ce point fournie aurait de
+ * toute façon un autre problème que son titre.
+ */
+export function nombreOffresEnLettres(): string {
+  const lettres = [
+    'Aucune',
+    'Une',
+    'Deux',
+    'Trois',
+    'Quatre',
+    'Cinq',
+    'Six',
+    'Sept',
+    'Huit',
+    'Neuf',
+    'Dix',
+  ];
+  return lettres[TIERS.length] ?? String(TIERS.length);
+}
+
 export const COMPARISON: readonly ComparisonSection[] = [
   {
     title: 'Modélisation',

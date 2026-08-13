@@ -24,15 +24,16 @@ import { describe, expect, it } from 'vitest';
 import { CONTACT_CLIENT, CONTACT_FACTURATION, CONTACT_TECHNIQUE } from '@/lib/legal';
 
 import {
-  annualSavingPercent,
   COMPARISON,
   FAQ,
-  formatPrice,
-  hasAnnualOffer,
   PAYMENT_METHOD_LABELS,
   TIERS,
   TRIAL_DAYS,
   TRIAL_PLAN,
+  annualSavingPercent,
+  formatPrice,
+  hasAnnualOffer,
+  nombreOffresEnLettres,
 } from './pricing-model';
 
 describe('grille tarifaire affichée', () => {
@@ -322,5 +323,21 @@ describe('moyens de paiement', () => {
     for (const method of ['card', 'paypal', 'mobile_money', 'bank_transfer']) {
       expect(PAYMENT_METHOD_LABELS[method]).toBeTruthy();
     }
+  });
+});
+
+describe('le compte d’offres annoncé (S24c)', () => {
+  it('suit le catalogue au lieu d’être écrit à la main', () => {
+    // Le titre de la page annonçait « Quatre offres » alors que la grille en
+    // comptait cinq depuis l'ajout de Cabinet. Le compte est désormais dérivé :
+    // ce test échoue si quelqu'un le refige.
+    expect(nombreOffresEnLettres()).toBe('Cinq');
+    expect(TIERS).toHaveLength(5);
+  });
+
+  it('rend un mot français, pas un chiffre, dans la plage utile', () => {
+    // La phrase est « … offres, un même moteur financier » : un chiffre y
+    // sonnerait comme une fiche technique, pas comme un titre.
+    expect(nombreOffresEnLettres()).toMatch(/^[A-ZÉ][a-zé]+$/);
   });
 });
