@@ -25,6 +25,7 @@ import {
 } from '../integrations/integrations.controller.js';
 import { AiActionsController } from '../ai/ai-actions.controller.js';
 import { LalaController } from '../ai/lala.controller.js';
+import { LalaVocalController } from '../ai/lala-vocal.controller.js';
 import { AuthProvidersController } from '../auth/auth-providers.controller.js';
 import { BillingController } from '../billing/billing.controller.js';
 import { CanvasController } from '../canvas/canvas.controller.js';
@@ -68,6 +69,7 @@ const CONTROLEURS = [
   HealthController,
   InvitationsController,
   LalaController,
+  LalaVocalController,
   LegalController,
   MeController,
   MembersController,
