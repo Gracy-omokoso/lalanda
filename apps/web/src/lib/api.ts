@@ -1226,6 +1226,61 @@ export interface LalaChatView {
   mention: string;
 }
 
+// ─── Appel vocal avec Lala ───────────────────────────────────────────────────
+//
+// ╔══════════════════════════════════════════════════════════════════════════╗
+// ║ AUCUNE DE CES REQUÊTES NE TRANSPORTE DE DONNÉE DE PROJET.                ║
+// ║                                                                          ║
+// ║ Comparer avec `askLala` juste en dessous : le chat ÉCRIT envoie `lines`, ║
+// ║ `sheetId`, `devise` — c'est ce qui permet à l'API de vérifier les nombres ║
+// ║ cités par le modèle (`lala-nombres.ts`). L'agent VOCAL n'a pas cet        ║
+// ║ équivalent : en temps réel, la parole part avant qu'on puisse la relire. ║
+// ║ La seule protection est de ne rien lui donner, et elle commence ici.     ║
+// ║                                                                          ║
+// ║ `ouvrirAppelVocal()` poste donc un corps VIDE. L'API le valide contre un ║
+// ║ schéma strict et sans champ : y ajouter quoi que ce soit produit un 400. ║
+// ╚══════════════════════════════════════════════════════════════════════════╝
+
+/** Ce que l'interface sait du quota de minutes vocales. */
+export interface QuotaVocalView {
+  plan: string;
+  /** `null` = illimité (offre négociée au contrat). */
+  limiteMinutes: number | null;
+  minutesConsommees: number;
+  minutesRestantes: number | null;
+  reinitialisationLe: string;
+}
+
+/** Pourquoi l'appel vocal n'est pas ouvert, quand il ne l'est pas. */
+export type MotifVocalIndisponible = 'non_configure' | 'quota_epuise' | 'offre_sans_voix';
+
+export interface EtatVocalView {
+  disponible: boolean;
+  motif: MotifVocalIndisponible | null;
+  message: string | null;
+  quota: QuotaVocalView | null;
+}
+
+export interface SessionVocaleView {
+  /**
+   * Jeton de session signé par ElevenLabs, produit PAR L'API.
+   *
+   * La clé d'API ElevenLabs, elle, ne quitte jamais le serveur : elle est lue
+   * dans le coffre chiffré et sert à signer cette URL. Ce que le navigateur
+   * reçoit est un jeton de session à durée de vie courte, pas un identifiant
+   * réutilisable. Il ne se journalise pas et ne se met pas en cache.
+   */
+  signedUrl: string;
+  sessionId: string;
+  dureeMaxSecondes: number;
+  mention: string;
+  quota: QuotaVocalView;
+}
+
+export interface ClotureVocaleView {
+  quota: QuotaVocalView;
+}
+
 /**
  * Ligne réduite à ce que l'API attend.
  *
@@ -1757,6 +1812,35 @@ export const api = {
       method: 'POST',
       body: { ...input, lines: input.lines.map(ligneMinimale) },
     }),
+
+  // ─── Appel vocal — voir l'encadré au-dessus de `QuotaVocalView` ───────────
+  //
+  // Aucune de ces trois méthodes ne prend de paramètre décrivant le projet.
+  // Ce n'est pas une simplification : c'est la frontière.
+
+  /** État du bouton d'appel. Lire un quota n'en consomme pas. */
+  etatAppelVocal: () => jsonRequest<EtatVocalView>('/ai/lala/vocal/etat'),
+
+  /**
+   * Ouvre une session vocale.
+   *
+   * Aucun argument, et aucun corps : l'API n'accepte rien d'autre que
+   * l'identité déjà portée par le cookie de session. Si cette signature gagne
+   * un jour un paramètre, c'est que la frontière a été franchie.
+   */
+  ouvrirAppelVocal: () =>
+    jsonRequest<SessionVocaleView>('/ai/lala/vocal/sessions', { method: 'POST', body: {} }),
+
+  /**
+   * Rapporte la durée réelle d'une session terminée.
+   *
+   * `minutes` est une DURÉE, pas un contenu : c'est le seul chiffre qui remonte
+   * d'une conversation vocale, et il ne dit rien de ce qui s'y est dit. Ne pas
+   * l'appeler n'est jamais avantageux — le serveur a déjà débité le plafond de
+   * session, et cet appel ne peut que le corriger à la baisse.
+   */
+  cloturerAppelVocal: (input: { sessionId: string; minutes: number }) =>
+    jsonRequest<ClotureVocaleView>('/ai/lala/vocal/cloture', { method: 'POST', body: input }),
 
   // ─── Reports PDF (S14a) ────────────────────────────────────
   // `planVersion` (S16c) : export depuis le snapshot figé du plan validé vN — aucun recalcul.
