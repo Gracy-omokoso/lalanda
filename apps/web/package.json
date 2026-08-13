@@ -13,6 +13,7 @@
     "clean": "rimraf .next .turbo"
   },
   "dependencies": {
+    "@elevenlabs/react": "1.12.0",
     "@lalanda/shared": "workspace:*",
     "@lalanda/ui": "workspace:*",
     "better-auth": "^1.1.7",
