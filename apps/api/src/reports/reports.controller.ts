@@ -3,6 +3,26 @@
 // - XLSX (S14b) : classeur avec une feuille par feuille moteur et formules Excel natives.
 //
 // La route est côté /projects pour rester cohérente avec le scope (projet appartient à une org).
+//
+// ── Quota d'exports PDF : ce qui est plafonné, et ce qui ne l'est pas ────────
+//
+// Le PDF passe par `PdfExportQuotaService.runGuarded()` : la grille vend 3 / 30
+// / 100 / illimités exports par mois (docs/13 § La grille) et chaque rendu
+// démarre un Chromium (~140 Mo). `render-gate.ts` borne déjà la CONCURRENCE ;
+// la garde borne le VOLUME par organisation. Les deux sont nécessaires.
+//
+// **L'Excel n'est pas plafonné, et ce n'est pas un oubli.** La grille l'annonce
+// « oui » dans les CINQ offres, Free comprise. C'est du calcul pur (ExcelJS,
+// aucun navigateur) : son coût marginal ne justifie aucun plafond, et en poser
+// un vendrait une limite que la page publique ne mentionne nulle part. C'est
+// aussi ce qui rend le refus PDF supportable — un utilisateur à quota épuisé
+// garde un moyen de sortir ses chiffres, et le message du refus le lui dit.
+//
+// Le quota ne rend AUCUN plan inaccessible : il ne s'applique qu'à la
+// production d'un nouveau rendu. Lecture, modification, plan figé et classeur
+// restent ouverts. Même philosophie que la limite de projets (docs/13 §
+// Antériorité), pour la même raison — un dossier bancaire en cours ne se ferme
+// pas parce qu'une grille tarifaire a changé.
 
 import {
   BadRequestException,
@@ -27,6 +47,7 @@ import { PermissionsGuard } from '../authz/permissions.guard.js';
 import type { OrgRole } from '../authz/permissions.js';
 import { CurrentOrgId, CurrentUser } from '../auth/current-user.decorator.js';
 import { BillingService } from '../billing/billing.service.js';
+import { PdfExportQuotaService } from '../billing/pdf-export-quota.service.js';
 import { getTemplate } from '../evaluate/template-registry.js';
 import { OrganizationsService } from '../organizations/organizations.service.js';
 import { getParameterPack } from '../parameter-packs/parameter-pack-registry.js';
@@ -58,6 +79,7 @@ export class ReportsController {
     @Inject(PlansService) private readonly plans: PlansService,
     @Inject(BillingService) private readonly billing: BillingService,
     @Inject(AuditService) private readonly audit: AuditService,
+    @Inject(PdfExportQuotaService) private readonly pdfQuota: PdfExportQuotaService,
   ) {}
 
   /** Parse `?planVersion=N` — undefined si absent, 400 si non-entier positif. */
@@ -223,16 +245,34 @@ export class ReportsController {
   ): Promise<void> {
     const planVersion = ReportsController.parsePlanVersion(planVersionRaw);
     const data = await this.buildReportData(orgId, id, planVersion);
-    const pdf = await this.reports.renderPdf(data);
-    await this.journaliserExport({
-      orgId,
-      userId: user.id,
-      role,
-      projectId: id,
-      format: 'pdf',
-      planVersion,
-      bytes: pdf.byteLength,
-    });
+
+    // `runGuarded` tient ensemble les deux moitiés de la règle : refus AVANT le
+    // rendu si le quota du mois est épuisé, comptage APRÈS à partir de l'issue
+    // RÉELLE. Compter avant décompterait les rendus abandonnés — c'est-à-dire
+    // ferait payer à l'utilisateur une saturation de Chromium ; garder après
+    // aurait déjà consommé les ~140 Mo qu'on prétend refuser.
+    //
+    // Le rendu ET le journal d'audit sont DANS la garde, volontairement : R4
+    // (ADR-0012 §6) veut qu'un audit en échec annule l'export, et un export
+    // annulé n'a rien livré. Le décompter ferait payer notre panne de
+    // journalisation. Le choix est en faveur du client, comme côté IA.
+    const pdf = await this.pdfQuota.runGuarded(
+      { organizationId: orgId, userId: user.id, projectId: id },
+      async () => {
+        const octets = await this.reports.renderPdf(data);
+        await this.journaliserExport({
+          orgId,
+          userId: user.id,
+          role,
+          projectId: id,
+          format: 'pdf',
+          planVersion,
+          bytes: octets.byteLength,
+        });
+        return octets;
+      },
+    );
+
     const suffix = planVersion !== undefined ? `-v${planVersion}` : '';
     res.setHeader(
       'content-disposition',
