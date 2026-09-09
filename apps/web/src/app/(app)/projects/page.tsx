@@ -316,12 +316,12 @@ export default function ProjectsPage(): React.ReactElement {
             1. Contexte fiscal du projet
           </legend>
           <div className="grid gap-3 sm:grid-cols-3">
-            <label className="flex flex-col gap-1.5 text-sm">
+            <label className="flex min-w-0 flex-col gap-1.5 text-sm">
               <span className="font-medium">Pays</span>
               <select
                 value={country}
                 onChange={(e) => setCountry(e.target.value)}
-                className="rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
+                className="w-full min-w-0 truncate rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
               >
                 {COUNTRIES.map((c) => (
                   <option key={c.code} value={c.code}>
@@ -330,7 +330,7 @@ export default function ProjectsPage(): React.ReactElement {
                 ))}
               </select>
             </label>
-            <label className="flex flex-col gap-1.5 text-sm">
+            <label className="flex min-w-0 flex-col gap-1.5 text-sm">
               <span className="font-medium">Cadre fiscal</span>
               <select
                 value={packSlug}
@@ -341,7 +341,7 @@ export default function ProjectsPage(): React.ReactElement {
                   if (p) setCurrency(p.devise_principale);
                 }}
                 disabled={!packs}
-                className="rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)] disabled:opacity-50"
+                className="w-full min-w-0 truncate rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)] disabled:opacity-50"
               >
                 {packsForCountry.length === 0 ? (
                   <option>Chargement…</option>
@@ -354,12 +354,12 @@ export default function ProjectsPage(): React.ReactElement {
                 )}
               </select>
             </label>
-            <label className="flex flex-col gap-1.5 text-sm">
+            <label className="flex min-w-0 flex-col gap-1.5 text-sm">
               <span className="font-medium">Devise d&apos;affichage</span>
               <select
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
-                className="rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
+                className="w-full min-w-0 truncate rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
               >
                 {currencyOptions.map((c) => (
                   <option key={c} value={c}>
@@ -447,7 +447,7 @@ export default function ProjectsPage(): React.ReactElement {
               placeholder="Ex : Restaurant du centre-ville 2026"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              className="rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
+              className="w-full min-w-0 truncate rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
             />
           </label>
           <button

@@ -161,7 +161,12 @@ export function CustomStartModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4"
+      // `w-[100vw]` et non `inset-0` : mesuré à 375 px, la page de création
+      // déborde horizontalement (le menu de compte de l'en-tête sort de 16 px).
+      // Un `inset-0` s'étire alors sur la zone de débordement — 391 px — et la
+      // croix de fermeture du dialogue passe HORS ÉCRAN, sur l'écran même où
+      // elle est vitale. `100vw` vaut la fenêtre, débordement ou pas.
+      className="fixed left-0 top-0 z-50 flex h-[100dvh] w-[100vw] items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4"
       onMouseDown={(e) => {
         // Uniquement le fond : un glissé commencé DANS le dialogue et relâché
         // dehors ne doit pas le fermer (sélection de texte).
