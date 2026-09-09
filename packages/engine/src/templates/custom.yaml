@@ -1,0 +1,488 @@
+# Template GÉNÉRIQUE : « Mon secteur n'est pas dans la liste ».
+#
+# Portée : moyennes mensuelles, même ossature que les quatre modèles sectoriels
+# (CA → coûts variables → charges fixes → investissement et financement →
+# fiscalité), mais SANS aucune hypothèse de secteur.
+#
+# ── Ce que « neutre » veut dire ici, concrètement ─────────────
+# Les modèles sectoriels s'autorisent des repères chiffrés dans l'aide de leurs
+# drivers (« une quincaillerie de quartier fait 300-800 USD/jour »), parce qu'ils
+# savent de quel métier ils parlent. Ce modèle-ci ne le sait pas : il ne nomme
+# NI secteur, NI ville, NI fourchette de marché. Une fourchette inventée pour un
+# métier inconnu serait une hypothèse déguisée en conseil — et l'utilisateur la
+# recopierait. L'aide explique donc ce que le champ mesure et où le trouver dans
+# ses propres documents, jamais ce qu'il « devrait » valoir.
+#
+# Les `defaut` restent nécessaires (le moteur doit pouvoir évaluer un projet
+# vierge) mais ils ne prétendent rien : l'interface les affiche avec le badge
+# « Valeur suggérée » tant qu'ils n'ont pas été confirmés (docs/06).
+#
+# Fiscalité : aucune règle propre — `ibp_taux` vient du ParameterPack du pays.
+
+slug: custom
+version: 1.0.0
+secteur: generique
+# Pas de restriction de pays : le cadre fiscal vient du ParameterPack choisi à la
+# création du projet, pas du modèle.
+devise_base: USD
+horizon_mois: 12
+horizon_projection_annees: 5
+
+# ─── Immobilisations amortissables ────────────────────────────
+# Ventilation par CATÉGORIE SYSCOHADA (AUDCIF 2017) et non par bien : sans
+# connaître le métier, on ne peut nommer ni « rayonnage » ni « four ». Le total
+# des `montant_ht` est calé sur le défaut de `investissements_initiaux`
+# (8 000 USD) ; l'écart éventuel après saisie est exposé par la feuille bilan
+# (`bilan_immobilisations_ecart_base_amortissable`), il ne rompt aucun équilibre.
+immobilisations:
+  - label: 'Aménagements et installations'
+    categorie: amenagements
+    montant_ht: 3000
+    date_acquisition: '2026-01-01'
+  - label: 'Matériel et outillage'
+    categorie: materiel_outillage
+    montant_ht: 2500
+    date_acquisition: '2026-01-01'
+  - label: 'Mobilier'
+    categorie: mobilier_bureau
+    montant_ht: 1500
+    date_acquisition: '2026-01-01'
+  - label: 'Matériel informatique'
+    categorie: materiel_informatique
+    montant_ht: 1000
+    date_acquisition: '2026-01-01'
+
+# ─── États financiers prévisionnels (S18a, FIN-001) ───────────
+structure_financiere:
+  achats_variables_mensuels: couts_variables
+  charges_fixes_mensuelles: charges_operationnelles
+
+groupes_hypotheses:
+  - id: activite
+    label: 'Activité'
+  - id: couts_variables
+    label: 'Coûts variables'
+  - id: charges_fixes
+    label: 'Charges fixes'
+  - id: fiscalite
+    label: 'Fiscalité'
+  - id: financement
+    label: 'Financement'
+
+# Découpage du wizard de saisie (S18c) — présentation uniquement, aucun impact
+# calcul. Même ordre et mêmes ids d'étapes que les modèles sectoriels, pour qu'un
+# lien profond `?champ=` et les tests de parcours restent valables partout.
+wizard:
+  etapes:
+    - id: chiffre_affaires
+      label: "Chiffre d'affaires"
+      description: 'Ce que votre activité encaisse un jour type, et combien de jours par mois.'
+      groupes: [activite]
+      ordre: 1
+    - id: couts_achat
+      label: 'Coûts variables'
+      description: 'Ce que chaque vente vous coûte avant vos charges fixes.'
+      groupes: [couts_variables]
+      ordre: 2
+    - id: charges_fixes
+      label: 'Charges fixes et personnel'
+      description: 'Les dépenses dues chaque mois, quel que soit le niveau d’activité.'
+      groupes: [charges_fixes]
+      ordre: 3
+    - id: investissement_financement
+      label: 'Investissement et financement'
+      description: 'Ce que vous installez au départ, et comment vous le financez.'
+      groupes: [financement]
+      ordre: 4
+    - id: fiscalite
+      label: 'Fiscalité'
+      description: 'Paramètres fiscaux pré-remplis par le Country Pack — à confirmer.'
+      groupes: [fiscalite]
+      ordre: 5
+
+drivers:
+  - id: ca_moyen_jour
+    groupe: activite
+    label: "Chiffre d'affaires moyen par jour"
+    type: money
+    devise: USD
+    defaut: 300
+    min: 0
+    aide: 'Total encaissé un jour ordinaire, toutes ventes confondues, avant toute dépense. Si vous facturez au mois, divisez par le nombre de jours travaillés du mois.'
+
+  - id: jours_ouverture_mois
+    groupe: activite
+    label: "Jours d'activité par mois"
+    type: number
+    defaut: 26
+    min: 1
+    max: 31
+    unite: 'jours'
+    aide: 'Nombre de jours où vous vendez réellement dans un mois. Ouvert 6 jours sur 7 = 26 ; du lundi au vendredi = 22.'
+
+  - id: taux_croissance_ca
+    groupe: activite
+    label: 'Taux de croissance annuel du CA'
+    type: percent
+    defaut: 0.10
+    min: -1
+    max: 3
+    aide: "Progression du chiffre d'affaires d'une année sur l'autre, appliquée aux exercices 2 à 5. Une croissance que vous ne savez pas justifier devant un banquier est une croissance à baisser."
+
+  - id: delai_clients_jours
+    groupe: activite
+    label: 'Délai de paiement clients'
+    type: number
+    defaut: 0
+    min: 0
+    max: 360
+    unite: 'jours'
+    aide: 'Nombre de jours entre la vente et l’encaissement, en moyenne. 0 si vous êtes payé comptant. Chaque jour de délai est de la trésorerie qui vous manque.'
+
+  - id: marge_brute_pct
+    groupe: couts_variables
+    label: 'Marge brute sur les ventes'
+    type: percent
+    defaut: 0.30
+    min: 0
+    max: 1
+    aide: 'Part du prix de vente qui reste une fois payé ce que la vente a directement coûté (marchandise, matières, sous-traitance liée à la commande) : (prix de vente − coût direct) / prix de vente. Les charges qui tombent même sans vente ne se comptent pas ici, mais à l’étape suivante.'
+
+  - id: delai_fournisseurs_jours
+    groupe: couts_variables
+    label: 'Délai de paiement fournisseurs'
+    type: number
+    defaut: 0
+    min: 0
+    max: 360
+    unite: 'jours'
+    aide: 'Nombre de jours que vos fournisseurs vous accordent avant paiement. 0 si vous payez à la commande. C’est le seul poste de besoin en fonds de roulement qui joue en votre faveur.'
+
+  - id: rotation_stock_jours
+    groupe: couts_variables
+    label: 'Rotation du stock'
+    type: number
+    defaut: 0
+    min: 0
+    max: 360
+    unite: 'jours'
+    aide: 'Nombre de jours pendant lesquels une marchandise reste chez vous avant d’être vendue. 0 si vous ne stockez rien (activité de service, production à la commande).'
+
+  - id: personnel_mois
+    groupe: charges_fixes
+    label: 'Masse salariale mensuelle'
+    type: money
+    devise: USD
+    defaut: 800
+    min: 0
+    aide: 'Total des rémunérations versées chaque mois, charges sociales et impôts sur salaires compris, vous-même inclus si vous vous versez un salaire. 0 si vous travaillez seul sans vous rémunérer.'
+
+  - id: loyer_mois
+    groupe: charges_fixes
+    label: 'Loyer mensuel'
+    type: money
+    devise: USD
+    defaut: 300
+    min: 0
+    aide: 'Loyer du local professionnel, charges locatives incluses. 0 si vous travaillez depuis chez vous ou dans un local dont vous êtes propriétaire.'
+
+  - id: charges_diverses_mois
+    groupe: charges_fixes
+    label: "Autres charges d'exploitation mensuelles"
+    type: money
+    devise: USD
+    defaut: 200
+    min: 0
+    aide: 'Tout ce qui tombe chaque mois quel que soit le niveau d’activité : énergie, télécoms, transport, assurance, sécurité, entretien, taxes locales mensualisées, honoraires. Additionnez-les en un seul montant.'
+
+  # `ibp_taux` vient du ParameterPack du projet ; `defaut` n'est qu'un filet.
+  - id: ibp_taux
+    groupe: fiscalite
+    label: 'Impôt sur les bénéfices (IBP)'
+    type: percent
+    defaut: 0.30
+    min: 0
+    max: 1
+    aide: 'Taux fourni par le ParameterPack du pays choisi à la création du projet. Ne le modifiez que si votre régime fiscal en prévoit un autre.'
+
+  - id: investissements_initiaux
+    groupe: financement
+    label: 'Investissements initiaux'
+    type: money
+    devise: USD
+    defaut: 8000
+    min: 0
+    aide: 'Somme des biens durables achetés au démarrage : aménagement du local, matériel, mobilier, informatique. Le stock de départ ne se saisit PAS ici — c’est du besoin en fonds de roulement, à porter sur « Fonds de roulement de démarrage ».'
+
+  - id: bfr_initial
+    groupe: financement
+    label: 'Fonds de roulement de démarrage'
+    type: money
+    devise: USD
+    defaut: 2000
+    min: 0
+    aide: 'Argent immobilisé avant le premier encaissement : stock de départ, avances aux fournisseurs, trésorerie de sécurité des premiers mois. Plus vos clients paient tard et plus votre stock tourne lentement, plus ce montant doit être élevé.'
+
+  - id: apport_capital
+    groupe: financement
+    label: 'Apport personnel'
+    type: money
+    devise: USD
+    defaut: 5000
+    min: 0
+    aide: 'Ce que vous mettez de votre poche, en fonds propres. Le seuil attendu par les banques figure dans le ParameterPack du pays (ratio_apport_min_pct) et s’affiche en feu tricolore sur la feuille de ratios.'
+
+  - id: emprunt_capital
+    groupe: financement
+    label: 'Capital emprunté'
+    type: money
+    devise: USD
+    defaut: 6000
+    min: 0
+    aide: 'Montant du crédit demandé. 0 si vous ne comptez pas emprunter.'
+
+  - id: emprunt_taux_annuel
+    groupe: financement
+    label: "Taux d'intérêt annuel"
+    type: percent
+    defaut: 0.14
+    min: 0
+    max: 1
+    aide: 'Taux nominal annuel du crédit. Le taux constaté dans votre pays figure dans le ParameterPack (taux_credit_investissement_usd_pct).'
+
+  - id: emprunt_duree_mois
+    groupe: financement
+    label: 'Durée du prêt'
+    type: number
+    defaut: 48
+    min: 1
+    max: 240
+    unite: 'mois'
+    aide: 'Durée de remboursement, en mois. Une durée plus longue allège la mensualité et alourdit le coût total.'
+
+feuilles:
+  - id: activite
+    label: "Compte d'exploitation mensuel"
+    lignes:
+      - id: ca
+        label: "Chiffre d'affaires"
+        formule: 'ca_moyen_jour * jours_ouverture_mois'
+        format: money
+
+      - id: couts_variables
+        label: 'Coûts variables (achats et coûts directs)'
+        formule: 'ca * (1 - marge_brute_pct)'
+        format: money
+
+      - id: marge_brute
+        label: 'Marge brute'
+        formule: 'ca - couts_variables'
+        format: money
+
+      - id: charges_operationnelles
+        label: 'Charges opérationnelles'
+        formule: 'personnel_mois + loyer_mois + charges_diverses_mois'
+        format: money
+
+      - id: excedent_brut
+        label: "Excédent brut d'exploitation"
+        formule: 'marge_brute - charges_operationnelles'
+        format: money
+
+      - id: ibp
+        label: 'Impôt sur les bénéfices'
+        formule: 'IF(excedent_brut > 0, excedent_brut * ibp_taux, 0)'
+        format: money
+
+      - id: resultat_net
+        label: 'Résultat net mensuel'
+        formule: 'excedent_brut - ibp'
+        format: money
+
+  - id: financement
+    label: 'Financement — emprunt bancaire'
+    lignes:
+      - id: mensualite_emprunt
+        label: 'Mensualité constante'
+        formule: 'IFERROR(-PMT(emprunt_taux_annuel / 12, emprunt_duree_mois, emprunt_capital), 0)'
+        format: money
+
+      - id: service_dette_annuel
+        label: 'Service annuel de la dette'
+        formule: 'mensualite_emprunt * 12'
+        format: money
+
+      - id: interets_annuels_estimes
+        label: 'Intérêts année 1 (estimation)'
+        formule: 'service_dette_annuel - (emprunt_capital / (emprunt_duree_mois / 12))'
+        format: money
+
+  - id: plan_financement
+    label: 'Plan de financement initial'
+    lignes:
+      - id: pf_investissements
+        label: 'Investissements'
+        formule: 'investissements_initiaux'
+        format: money
+      - id: pf_bfr
+        label: 'BFR (trésorerie de sécurité)'
+        formule: 'bfr_initial'
+        format: money
+      - id: pf_total_besoins
+        label: 'TOTAL BESOINS'
+        formule: 'pf_investissements + pf_bfr'
+        format: money
+      - id: pf_apport
+        label: 'Apport personnel'
+        formule: 'apport_capital'
+        format: money
+      - id: pf_emprunt
+        label: 'Emprunt bancaire'
+        formule: 'emprunt_capital'
+        format: money
+      - id: pf_total_ressources
+        label: 'TOTAL RESSOURCES'
+        formule: 'pf_apport + pf_emprunt'
+        format: money
+      - id: pf_ecart
+        label: 'Écart (ressources − besoins)'
+        formule: 'pf_total_ressources - pf_total_besoins'
+        format: money
+
+  - id: tresorerie
+    label: 'Trésorerie mensuelle année 1 — vue simplifiée (hors variation de BFR et hors intérêts)'
+    lignes:
+      - id: tresorerie_initiale
+        label: "Trésorerie à l'ouverture (M0)"
+        formule: 'apport_capital + emprunt_capital - investissements_initiaux - bfr_initial'
+        format: money
+      - id: solde_mensuel_operationnel
+        label: 'Solde mensuel opérationnel'
+        formule: 'resultat_net - mensualite_emprunt'
+        format: money
+      - id: tresorerie_fin_m1
+        label: 'Trésorerie fin mois 1'
+        formule: 'tresorerie_initiale + solde_mensuel_operationnel * 1'
+        format: money
+      - id: tresorerie_fin_m3
+        label: 'Trésorerie fin mois 3'
+        formule: 'tresorerie_initiale + solde_mensuel_operationnel * 3'
+        format: money
+      - id: tresorerie_fin_m6
+        label: 'Trésorerie fin mois 6'
+        formule: 'tresorerie_initiale + solde_mensuel_operationnel * 6'
+        format: money
+      - id: tresorerie_fin_m9
+        label: 'Trésorerie fin mois 9'
+        formule: 'tresorerie_initiale + solde_mensuel_operationnel * 9'
+        format: money
+      - id: tresorerie_fin_m12
+        label: 'Trésorerie fin mois 12'
+        formule: 'tresorerie_initiale + solde_mensuel_operationnel * 12'
+        format: money
+      - id: tresorerie_min_annee_1
+        label: 'Trésorerie minimale sur les 12 mois'
+        formule: 'MIN(tresorerie_initiale, tresorerie_fin_m12)'
+        format: money
+
+  - id: projection
+    label: 'Projection sur 5 exercices'
+    lignes:
+      - id: ca_annuel_1
+        label: 'CA année 1'
+        formule: 'ca * 12'
+        format: money
+      - id: ca_annuel_2
+        label: 'CA année 2'
+        formule: 'ca_annuel_1 * (1 + taux_croissance_ca)'
+        format: money
+      - id: ca_annuel_3
+        label: 'CA année 3'
+        formule: 'ca_annuel_2 * (1 + taux_croissance_ca)'
+        format: money
+      - id: ca_annuel_4
+        label: 'CA année 4'
+        formule: 'ca_annuel_3 * (1 + taux_croissance_ca)'
+        format: money
+      - id: ca_annuel_5
+        label: 'CA année 5'
+        formule: 'ca_annuel_4 * (1 + taux_croissance_ca)'
+        format: money
+      - id: resultat_annuel_1
+        label: 'Résultat net année 1'
+        formule: 'resultat_net * 12'
+        format: money
+      - id: resultat_annuel_2
+        label: 'Résultat net année 2'
+        formule: 'resultat_annuel_1 * (1 + taux_croissance_ca)'
+        format: money
+      - id: resultat_annuel_3
+        label: 'Résultat net année 3'
+        formule: 'resultat_annuel_2 * (1 + taux_croissance_ca)'
+        format: money
+      - id: resultat_annuel_4
+        label: 'Résultat net année 4'
+        formule: 'resultat_annuel_3 * (1 + taux_croissance_ca)'
+        format: money
+      - id: resultat_annuel_5
+        label: 'Résultat net année 5'
+        formule: 'resultat_annuel_4 * (1 + taux_croissance_ca)'
+        format: money
+      - id: resultat_cumule_3ans
+        label: 'Résultat cumulé sur 3 ans'
+        formule: 'resultat_annuel_1 + resultat_annuel_2 + resultat_annuel_3'
+        format: money
+      - id: resultat_cumule_5ans
+        label: 'Résultat cumulé sur 5 exercices'
+        formule: 'resultat_cumule_3ans + resultat_annuel_4 + resultat_annuel_5'
+        format: money
+
+  - id: ratios
+    label: 'Ratios financiers'
+    lignes:
+      - id: marge_ebe_pct
+        label: 'Marge EBE (EBE / CA)'
+        formule: 'IFERROR(excedent_brut / ca, 0)'
+        format: percent
+        seuil_pack: ratio_marge_ebe_min
+        seuil_direction: min
+
+      - id: marge_nette_pct
+        label: 'Marge nette (Résultat / CA)'
+        formule: 'IFERROR(resultat_net / ca, 0)'
+        format: percent
+        seuil_pack: ratio_marge_nette_min
+        seuil_direction: min
+
+      - id: dscr
+        label: 'DSCR (couverture du service de la dette)'
+        formule: 'IFERROR((excedent_brut * 12) / service_dette_annuel, 0)'
+        format: number
+        seuil_pack: ratio_dscr_min
+        seuil_direction: min
+
+      - id: tresorerie_min_ok
+        label: 'Trésorerie mini sur 12 mois (vue simplifiée — voir onglet Bilan)'
+        formule: 'tresorerie_min_annee_1'
+        format: money
+        seuil_pack: tresorerie_min_seuil
+        seuil_direction: min
+
+      - id: apport_pct
+        label: 'Ratio apport personnel sur besoins'
+        formule: 'IFERROR(apport_capital / pf_total_besoins, 0)'
+        format: percent
+        seuil_pack: ratio_apport_min_pct
+        seuil_direction: min
+
+      - id: payback_annees
+        label: "Délai de récupération de l'investissement"
+        formule: 'IFERROR(emprunt_capital / resultat_annuel_1, 0)'
+        format: number
+        seuil_pack: ratio_payback_max
+        seuil_direction: max
+
+      - id: marge_brute_effective
+        label: 'Marge brute effective'
+        formule: 'IFERROR(marge_brute / ca, 0)'
+        format: percent

@@ -4,6 +4,10 @@
 // quincaillerie-negoce, prestation-services — brief §8). Les manifests vivent
 // dans packages/engine/src/templates/*.yaml.
 // S19b : ajout du template e-commerce à paiement à la livraison (ecommerce-cod).
+// S23b : ajout du modèle générique `custom` — même ossature d'étapes que les
+// modèles sectoriels, sans aucune hypothèse de secteur. Il est enregistré EN
+// DERNIER : `listTemplateSlugs()` conserve l'ordre d'enregistrement, et un modèle
+// « je ne me reconnais dans aucun des précédents » n'a de sens qu'après eux.
 // Les templates réels vivront en MongoDB à partir de S7 (voir @lalanda/templates/README.md).
 
 import { readFileSync } from 'node:fs';
@@ -20,6 +24,7 @@ const templateFiles: Record<string, string> = {
   'quincaillerie-negoce': engineAsset('templates/quincaillerie-negoce.yaml'),
   'prestation-services': engineAsset('templates/prestation-services.yaml'),
   'ecommerce-cod': engineAsset('templates/ecommerce-cod.yaml'),
+  custom: engineAsset('templates/custom.yaml'),
 };
 
 const templates = new Map<string, Template>();
