@@ -214,6 +214,89 @@ sur le titre de l’étape après navigation, tables financières défilables su
 - tests de rendu React (apps/web n’a pas d’environnement DOM : seule la logique pure du
   wizard est couverte par vitest).
 
+## Modèle générique et questionnaire de cadrage (S23b)
+
+### Le modèle `custom`
+
+Un cinquième modèle, `packages/engine/src/templates/custom.yaml`, sert les
+utilisateurs dont le secteur n'est pas dans la liste. Il reprend **exactement
+l'ossature d'étapes** des modèles sectoriels (mêmes ids, même ordre : chiffre
+d'affaires → coûts variables → charges fixes et personnel → investissement et
+financement → fiscalité), de sorte que les liens profonds `?champ=` et les tests
+de parcours restent valables partout.
+
+Sa particularité est **éditoriale** : il ne nomme aucun secteur ni aucune ville.
+Les modèles sectoriels s'autorisent des fourchettes de marché dans l'aide de
+leurs drivers parce qu'ils savent de quel métier ils parlent ; celui-ci ne le
+sait pas, et une fourchette inventée pour un métier inconnu serait une hypothèse
+déguisée en conseil — que l'utilisateur recopierait. L'aide dit donc ce que le
+champ mesure et où le trouver dans ses propres documents. Un test le vérifie sur
+tous les libellés, aides, étapes et immobilisations. Les trois drivers de BFR
+partent à `0` pour la même raison : une absence assumée plutôt qu'une moyenne
+sectorielle qui ne serait celle de personne.
+
+### Les deux chemins
+
+Choisir ce modèle ouvre un dialogue à deux chemins, nommés par le **livrable**
+avec lequel on repart :
+
+- **« Mon plan financier, tout de suite »** — l'utilisateur nomme son projet et
+  entre directement dans l'assistant, à l'étape du chiffre d'affaires. C'est le
+  seul modèle qui atterrit sur `/projects/:id/saisie` plutôt que sur les
+  résultats;
+- **« Mon Business Model Canvas d'abord »** — un questionnaire d'une quinzaine
+  d'écrans, un champ par écran, **dans le dialogue**.
+
+« Commencer directement » et « en savoir plus » ont été écartés : ils décrivent
+un geste et une promesse vague, et ne permettent pas de choisir sans avoir
+essayé.
+
+### Le questionnaire
+
+- **un champ par étape**, progression `Étape n sur N` doublée d'une barre
+  `role="progressbar"`, focus déplacé sur le titre à chaque changement d'étape;
+- **retour arrière sans perte** : les réponses vivent dans l'état du dialogue et
+  les sorties sont des fonctions pures de ces réponses — corriger une étape déjà
+  passée équivaut à l'avoir saisie ainsi du premier coup;
+- **trois échappatoires**, à toutes les étapes : « Passer » (avance sans rien
+  écrire), « Arrêter ici et passer à la saisie » (crée le projet avec ce qui a
+  été répondu), et le retour aux deux choix (conserve les réponses). Un
+  questionnaire dont on ne peut pas sortir est un piège;
+- **une seule réponse obligatoire**, le nom du projet : sans lui aucun projet ne
+  peut être créé, donc aucune sortie n'est possible.
+
+### Les champs numériques
+
+Ils sont rendus par `WizardField`, le composant de l'assistant : mêmes bornes,
+même unité, même validation à trois niveaux, même badge « Valeur suggérée ». Une
+question numérique ne porte que l'**id de son driver** ; libellé, unité et bornes
+viennent du template, jamais d'une copie.
+
+Tant que l'utilisateur n'a pas touché le champ, la valeur affichée est le défaut
+du modèle et **rien n'est posé**. Sans cette distinction, passer une étape
+reviendrait à saisir le défaut sans le savoir — et un défaut du modèle
+deviendrait, silencieusement, une hypothèse de l'utilisateur.
+
+Drivers couverts : `ca_moyen_jour`, `jours_ouverture_mois`, `marge_brute_pct`,
+`personnel_mois`, `loyer_mois`. Tout le reste part des défauts et se complète
+dans l'assistant.
+
+### Ce qui est annoncé à l'arrivée
+
+L'assistant affiche un encadré « Ce que vos réponses ont prérempli » : le nombre
+de cartes de Canvas écrites (avec le lien vers le Canvas), puis **chaque
+hypothèse préremplie, nommée, avec sa valeur et son unité**. Un montant posé sans
+qu'on sache d'où il vient n'est jamais relu — il a l'air d'avoir été saisi.
+
+### Restes propres à ce parcours
+
+- les réponses ne survivent pas à une fermeture complète du dialogue par la croix
+  (elles survivent au retour aux deux choix, pas à un rechargement de page);
+- `relations_clients` et `activites_cles` ne sont pas couverts par le
+  questionnaire (voir docs/05);
+- « charges » du brief est couvert par deux drivers sur trois : les autres
+  charges d'exploitation restent à saisir dans l'assistant.
+
 ## Critères d’acceptation
 
 - Aucune perte après actualisation ou déconnexion.

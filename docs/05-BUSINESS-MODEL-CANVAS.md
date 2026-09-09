@@ -87,6 +87,58 @@ Première tranche : les neuf blocs éditables, versionnés et isolés par organi
 - **Web** : onglet « Canvas » de la vue projet (`/projects/:id/canvas`) — grille des neuf blocs disposée en nappe BMC sur grand écran, édition **inline** des cartes, **auto-save au blur** (aucune écriture si le contenu utile est inchangé : pas de révision inutile), indicateur de version permanent et historique des révisions dépliable.
 - **Isolation** : toutes les routes passent par le projet scopé à l’organisation ; testé de bout en bout (`apps/api/src/__tests__/canvas.e2e.test.ts`).
 
+## Préremplissage par le questionnaire de cadrage (S23b)
+
+Le modèle générique `custom` (« mon secteur n'est pas dans la liste ») propose, à
+la création du projet, un questionnaire de cadrage d'une quinzaine d'écrans dont
+les réponses en texte **préremplissent le Canvas**.
+
+**La règle qui gouverne ce préremplissage.** Le questionnaire mélange deux
+natures de réponse, et les confondre serait une faute grave :
+
+- une réponse **en texte** alimente le Canvas, et lui seul. Elle ne produit
+  **aucun chiffre** — conformément à « le Canvas guide les hypothèses sans
+  générer silencieusement des montants » (§ Relations financières);
+- un chiffre du plan financier est **demandé comme un nombre**, dans un champ
+  numérique porté par le driver du moteur, avec son unité et ses bornes.
+
+Aucun montant n'est jamais extrait d'une phrase libre, ni par expression
+régulière, ni par l'IA. « Mon coût de revient tourne autour de 12 000 » ne
+devient pas `cout_revient: 12000`. La séparation est portée par les types
+(`apps/web/src/app/(app)/projects/_components/custom-questionnaire-model.ts` :
+une question en texte n'a pas de champ `driverId`) et vérifiée par un test qui
+soumet des réponses en texte truffées de chiffres et exige un dictionnaire de
+drivers vide.
+
+**Correspondance question → bloc.**
+
+| Question | Bloc |
+|---|---|
+| Produit, service ou les deux ? | `revenus` |
+| Le problème rencontré aujourd'hui | `proposition_valeur` |
+| Votre solution | `proposition_valeur` |
+| Ce qu'on achète concrètement | `proposition_valeur` |
+| À qui vendez-vous | `segments_clients` |
+| Par où vous vendez et livrez | `canaux` |
+| Ce dont vous avez besoin pour démarrer | `ressources_cles` |
+| Fournisseurs et partenaires | `partenaires_cles` |
+| Ce qui coûtera le plus cher | `couts` |
+
+`relations_clients` et `activites_cles` ne sont **pas** couverts : ils restent
+vides et se remplissent dans l'écran Canvas. Arbitrage assumé — mieux vaut un
+questionnaire qu'on termine et un Canvas à compléter qu'un questionnaire de vingt
+écrans abandonné au tiers.
+
+**Écriture.** Un seul `PUT /projects/:id/canvas` à la sortie du questionnaire,
+avec les neuf blocs (les non couverts en `[]`). Ids de cartes déterministes
+(`cadrage-<question>`), textes tronqués à 500 caractères. Aucun `PUT` si aucune
+carte n'a été produite : pas de version ni de révision inutile. Une question
+passée ne produit pas de carte, et l'ordre des suivantes se resserre.
+
+**Ce qui est annoncé à l'écran.** L'assistant de saisie affiche, à l'arrivée, le
+nombre de cartes écrites et un lien vers le Canvas — en rappelant qu'aucun
+montant n'en a été tiré.
+
 ### Reste à faire
 
 Priorité, hypothèses/preuves, statut à valider/validé/rejeté, liens entre cartes, liens confirmés vers les hypothèses financières, glisser-déposer, filtres, mode atelier, vue cohérence, restauration d’une révision, export A4 paysage et signalement des incohérences par le wizard.

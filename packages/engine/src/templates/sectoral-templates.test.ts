@@ -335,6 +335,110 @@ describe('ecommerce-cod', () => {
   });
 });
 
+// ─── Modèle générique « custom » (S23b) ───────────────────────
+// Ce modèle sert le parcours « secteur personnalisé ». Sa particularité n'est pas
+// financière — il reprend l'ossature du négoce — mais ÉDITORIALE : il ne doit
+// nommer aucun secteur ni aucune ville, sans quoi il redevient un modèle sectoriel
+// déguisé et souffle à l'utilisateur des ordres de grandeur qui ne sont pas les siens.
+
+describe('custom', () => {
+  const template = parseTemplate(loadYaml('custom'));
+
+  it('déclare le bon slug, version et secteur', () => {
+    expect(template.slug).toBe('custom');
+    expect(template.version).toBe('1.0.0');
+    expect(template.secteur).toBe('generique');
+    // Aucune restriction de pays : le cadre fiscal vient du ParameterPack du projet.
+    expect(template.pays).toBeUndefined();
+    expect(template.devise_base).toBe('USD');
+  });
+
+  it('évalue les défauts → résultat net mensuel = 728 USD', () => {
+    // ca = 300 * 26 = 7800
+    // couts_variables = 7800 * (1 - 0.30) = 5460
+    // marge_brute = 2340
+    // charges_operationnelles = 800 + 300 + 200 = 1300
+    // excedent_brut = 1040 ; ibp = 312 ; resultat_net = 728
+    const { lines } = evaluateTemplate(template, {});
+    const v = byId(lines);
+    expect(v.get('ca')).toBe(7800);
+    expect(v.get('couts_variables')).toBeCloseTo(5460, 6);
+    expect(v.get('marge_brute')).toBeCloseTo(2340, 6);
+    expect(v.get('charges_operationnelles')).toBe(1300);
+    expect(v.get('excedent_brut')).toBeCloseTo(1040, 6);
+    expect(v.get('ibp')).toBeCloseTo(312, 6);
+    expect(v.get('resultat_net')).toBeCloseTo(728, 6);
+  });
+
+  it('ne présume aucun délai ni aucun stock : le BFR de départ est nul', () => {
+    // Un modèle générique ne sait pas si l'utilisateur vend au comptant ou à
+    // crédit, ni s'il stocke quoi que ce soit. Les trois drivers de BFR partent
+    // donc à 0 — une absence assumée, jamais une moyenne inventée.
+    for (const id of ['delai_clients_jours', 'delai_fournisseurs_jours', 'rotation_stock_jours']) {
+      expect(template.drivers.find((d) => d.id === id)?.defaut).toBe(0);
+    }
+    expect(byId(evaluateTemplate(template, {}).lines).get('pf_bfr_total_annuel_1')).toBe(0);
+  });
+
+  it('passe les seuils bancaires du pack avec les défauts', () => {
+    const { lines } = evaluateTemplate(template, {});
+    const v = byId(lines);
+    expect(v.get('marge_ebe_pct')).toBeGreaterThan(0.1); // seuil pack : 10 %
+    expect(v.get('marge_nette_pct')).toBeGreaterThan(0.05); // seuil pack : 5 %
+    expect(v.get('dscr')).toBeGreaterThan(1.25); // seuil pack : 1,25
+    expect(v.get('apport_pct')).toBeGreaterThan(0.25); // seuil pack : 25 %
+    expect(v.get('payback_annees')).toBeLessThan(5); // seuil pack : 5 ans
+    expect(v.get('tresorerie_min_annee_1')).toBeGreaterThan(0);
+  });
+
+  it('équilibre le bilan sur les 5 exercices', () => {
+    const { lines } = evaluateTemplate(template, {});
+    const v = byId(lines);
+    for (const n of [1, 2, 3, 4, 5]) {
+      expect(Math.abs(v.get(`bilan_ecart_equilibre_annuel_${n}`) ?? 1)).toBeLessThan(0.01);
+    }
+    expect(Math.abs(v.get('bilan_ecart_equilibre_ouverture') ?? 1)).toBeLessThan(0.01);
+  });
+
+  it('ne nomme aucun secteur ni aucune ville dans les libellés et les aides', () => {
+    // Garde éditoriale. Sans elle, une bonne intention (« ajoutons un exemple
+    // parlant ») réintroduit en une ligne le biais sectoriel que ce modèle existe
+    // précisément pour éviter.
+    const interdits = [
+      'quincaillerie',
+      'restaurant',
+      'restauration',
+      'négoce',
+      'negoce',
+      'commerce de détail',
+      'boutique',
+      'magasin',
+      'e-commerce',
+      'freelance',
+      'agence',
+      'kinshasa',
+      'abidjan',
+      'dakar',
+      'douala',
+      'rdc',
+      'congo',
+    ];
+    const textes = [
+      ...template.drivers.flatMap((d) => [d.label ?? '', d.aide ?? '']),
+      ...(template.wizard?.etapes ?? []).flatMap((e) => [e.label, e.description ?? '']),
+      ...(template.groupes_hypotheses ?? []).map((g) => g.label),
+      ...template.feuilles.flatMap((f) => [f.label ?? '', ...f.lignes.map((l) => l.label ?? '')]),
+      ...(template.immobilisations ?? []).map((i) => i.label),
+    ].map((t) => t.toLowerCase());
+
+    for (const texte of textes) {
+      for (const mot of interdits) {
+        expect(texte, `« ${texte} » nomme « ${mot} »`).not.toContain(mot);
+      }
+    }
+  });
+});
+
 // ─── Étapes du wizard (S18c) ──────────────────────────────────
 // Présentation uniquement : ces assertions garantissent que les templates de
 // lancement offrent une saisie guidée cohérente et qu'aucun groupe d'hypothèses
@@ -346,6 +450,10 @@ describe('etapes du wizard — templates sectoriels', () => {
     'quincaillerie-negoce',
     'prestation-services',
     'ecommerce-cod',
+    // (S23b) Le modèle générique suit exactement le même contrat de parcours :
+    // même ids d'étapes, même ordre. C'est ce qui rend les liens profonds
+    // `?champ=` et le questionnaire de cadrage valables sur tous les modèles.
+    'custom',
   ] as const;
 
   for (const slug of slugs) {

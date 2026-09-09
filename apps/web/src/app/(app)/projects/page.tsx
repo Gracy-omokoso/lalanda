@@ -7,10 +7,12 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { api, type ParameterPackSummary, type ProjectView, type TemplateSummary } from '@/lib/api';
 
+import { aDesCartes, CUSTOM_TEMPLATE_SLUG } from './_components/custom-questionnaire-model';
+import { CustomStartModal, type CadrageResultat } from './_components/custom-start-modal';
 import { PremiersPas } from './_components/premiers-pas';
 
 const TEMPLATE_LABELS: Record<string, { label: string; description: string }> = {
@@ -30,6 +32,11 @@ const TEMPLATE_LABELS: Record<string, { label: string; description: string }> = 
     label: 'E-commerce (paiement à la livraison)',
     description:
       'Import, vente par publicité sociale ou WhatsApp, livraison encaissée en cash. Budget pub, taux de livraison, panier moyen.',
+  },
+  custom: {
+    label: 'Mon secteur n’est pas dans la liste',
+    description:
+      'Modèle générique, sans hypothèse de métier. Deux façons de démarrer : vos chiffres tout de suite, ou quelques questions sur votre projet d’abord.',
   },
   'hello-world': {
     label: 'Démo (hello-world)',
@@ -95,6 +102,17 @@ export default function ProjectsPage(): React.ReactElement {
   const [planLimit, setPlanLimit] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
 
+  // (S23b) Modal du modèle générique : deux chemins puis le questionnaire de cadrage.
+  const [modalCustom, setModalCustom] = useState(false);
+  /**
+   * Projet déjà créé par un cadrage dont une écriture ULTÉRIEURE a échoué (Canvas
+   * ou drivers). Un « Réessayer » ne doit pas créer un second projet : il reprend
+   * là où l'échec s'est produit.
+   */
+  const projetCadrageRef = useRef<string | null>(null);
+  /** Champ « Nom du projet » — le chemin direct y renvoie le curseur. */
+  const nomRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     void Promise.all([refreshProjects(), refreshTemplates(), refreshPacks()]);
   }, []);
@@ -155,7 +173,16 @@ export default function ProjectsPage(): React.ReactElement {
         deviseAffichage: (currency as 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR') || undefined,
       });
       setNewName('');
-      router.push(`/projects/${created.id}`);
+      // (S23b) Le modèle générique dépose sur l'assistant de saisie, à l'étape
+      // du chiffre d'affaires — c'est le chemin « mon plan financier tout de
+      // suite », et la demande est explicite : « il commence à saisir le chiffre
+      // d'affaires ». Les modèles sectoriels gardent leur atterrissage habituel
+      // sur les résultats, où les valeurs par défaut donnent déjà à lire.
+      router.push(
+        created.templateSlug === CUSTOM_TEMPLATE_SLUG
+          ? `/projects/${created.id}/saisie`
+          : `/projects/${created.id}`,
+      );
     } catch (err) {
       // (S16b) L'API impose la limite de projets du plan : message dédié + lien tarifs.
       const detail = (err as { detail?: { code?: string; limit?: number } }).detail;
@@ -166,6 +193,60 @@ export default function ProjectsPage(): React.ReactElement {
       }
       setCreating(false);
     }
+  }
+
+  /**
+   * Sortie du questionnaire de cadrage (S23b) — normale ou anticipée.
+   *
+   * Trois écritures, dans cet ordre, chacune sautée si elle n'a rien à écrire :
+   * créer le projet, poser le Canvas, poser les drivers déjà répondus. En cas
+   * d'échec, la promesse est rejetée : le modal reste ouvert avec le message et
+   * TOUTES les réponses. `projetCadrageRef` retient le projet déjà créé pour
+   * qu'un second essai n'en crée pas un doublon.
+   *
+   * Ce qui n'est PAS fait ici : deviner un montant. `driverValues` ne contient
+   * que des réponses saisies dans des champs numériques (voir
+   * `custom-questionnaire-model.ts`).
+   */
+  async function handleCadrageTermine(resultat: CadrageResultat): Promise<void> {
+    setError(null);
+    setPlanLimit(null);
+
+    let projectId = projetCadrageRef.current;
+    if (!projectId) {
+      const created = await api.createProject({
+        name: resultat.nom,
+        templateSlug: CUSTOM_TEMPLATE_SLUG,
+        pays: country,
+        parameterPackSlug: packSlug || undefined,
+        deviseAffichage: (currency as 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR') || undefined,
+      });
+      projectId = created.id;
+      projetCadrageRef.current = projectId;
+    }
+
+    if (aDesCartes(resultat.blocs)) {
+      await api.putCanvas(projectId, resultat.blocs);
+    }
+    const idsDrivers = Object.keys(resultat.driverValues);
+    if (idsDrivers.length > 0) {
+      await api.updateDrivers(projectId, resultat.driverValues);
+    }
+
+    // Le récapitulatif de préremplissage est porté par l'URL : l'assistant
+    // possède déjà le template, il n'a besoin que de savoir QUOI annoncer.
+    // Sans cette annonce, un chiffre posé sans qu'on sache d'où il vient ne
+    // serait jamais relu (docs/06 § « une valeur suggérée n'est jamais
+    // confondue avec une valeur saisie »).
+    const params = new URLSearchParams();
+    if (idsDrivers.length > 0) params.set('prerempli', idsDrivers.join(','));
+    if (resultat.nbCartes > 0) params.set('cartes', String(resultat.nbCartes));
+    const query = params.toString();
+
+    setNewName('');
+    projetCadrageRef.current = null;
+    setModalCustom(false);
+    router.push(`/projects/${projectId}/saisie${query ? `?${query}` : ''}`);
   }
 
   // Packs pertinents pour le pays sélectionné : match direct ou générique le couvrant.
@@ -179,9 +260,14 @@ export default function ProjectsPage(): React.ReactElement {
     );
   }, [packs, country]);
 
+  // Les modèles sectoriels d'abord, par ordre alphabétique ; puis le modèle
+  // générique — « mon secteur n'est pas dans la liste » n'a de sens qu'APRÈS la
+  // liste ; la démo en dernier.
+  const RANG_FIN: Record<string, number> = { [CUSTOM_TEMPLATE_SLUG]: 1, 'hello-world': 2 };
   const orderedTemplates = (templates ?? []).slice().sort((a, b) => {
-    if (a.slug === 'hello-world') return 1;
-    if (b.slug === 'hello-world') return -1;
+    const ra = RANG_FIN[a.slug] ?? 0;
+    const rb = RANG_FIN[b.slug] ?? 0;
+    if (ra !== rb) return ra - rb;
     return a.slug.localeCompare(b.slug);
   });
 
@@ -230,12 +316,12 @@ export default function ProjectsPage(): React.ReactElement {
             1. Contexte fiscal du projet
           </legend>
           <div className="grid gap-3 sm:grid-cols-3">
-            <label className="flex flex-col gap-1.5 text-sm">
+            <label className="flex min-w-0 flex-col gap-1.5 text-sm">
               <span className="font-medium">Pays</span>
               <select
                 value={country}
                 onChange={(e) => setCountry(e.target.value)}
-                className="rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
+                className="w-full min-w-0 truncate rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
               >
                 {COUNTRIES.map((c) => (
                   <option key={c.code} value={c.code}>
@@ -244,7 +330,7 @@ export default function ProjectsPage(): React.ReactElement {
                 ))}
               </select>
             </label>
-            <label className="flex flex-col gap-1.5 text-sm">
+            <label className="flex min-w-0 flex-col gap-1.5 text-sm">
               <span className="font-medium">Cadre fiscal</span>
               <select
                 value={packSlug}
@@ -255,7 +341,7 @@ export default function ProjectsPage(): React.ReactElement {
                   if (p) setCurrency(p.devise_principale);
                 }}
                 disabled={!packs}
-                className="rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)] disabled:opacity-50"
+                className="w-full min-w-0 truncate rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)] disabled:opacity-50"
               >
                 {packsForCountry.length === 0 ? (
                   <option>Chargement…</option>
@@ -268,12 +354,12 @@ export default function ProjectsPage(): React.ReactElement {
                 )}
               </select>
             </label>
-            <label className="flex flex-col gap-1.5 text-sm">
+            <label className="flex min-w-0 flex-col gap-1.5 text-sm">
               <span className="font-medium">Devise d&apos;affichage</span>
               <select
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
-                className="rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
+                className="w-full min-w-0 truncate rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
               >
                 {currencyOptions.map((c) => (
                   <option key={c} value={c}>
@@ -320,6 +406,14 @@ export default function ProjectsPage(): React.ReactElement {
                         value={t.slug}
                         checked={active}
                         onChange={() => setTemplateSlug(t.slug)}
+                        // (S23b) Le modèle générique ouvre son modal à CHAQUE
+                        // clic, y compris quand il est déjà sélectionné :
+                        // `onChange` ne se déclenche pas sur un radio déjà
+                        // coché, et l'utilisateur qui reclique cherche
+                        // précisément à revoir les deux chemins.
+                        onClick={() => {
+                          if (t.slug === CUSTOM_TEMPLATE_SLUG) setModalCustom(true);
+                        }}
                         className="accent-[var(--accent)]"
                       />
                       <span className="font-medium">{meta.label}</span>
@@ -346,13 +440,14 @@ export default function ProjectsPage(): React.ReactElement {
           <label className="flex flex-1 flex-col gap-1.5 text-sm">
             <span className="font-medium">Nom du projet</span>
             <input
+              ref={nomRef}
               type="text"
               required
               maxLength={200}
               placeholder="Ex : Restaurant du centre-ville 2026"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              className="rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
+              className="w-full min-w-0 truncate rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
             />
           </label>
           <button
@@ -364,6 +459,22 @@ export default function ProjectsPage(): React.ReactElement {
           </button>
         </fieldset>
       </form>
+
+      {modalCustom ? (
+        <CustomStartModal
+          nomInitial={newName}
+          onFermer={() => setModalCustom(false)}
+          onDirect={() => {
+            // Chemin direct : rien n'est créé ici. Le formulaire reste maître —
+            // le modèle générique est sélectionné, il ne manque que le nom, et
+            // « Créer le projet » déposera sur l'assistant de saisie.
+            setModalCustom(false);
+            setTemplateSlug(CUSTOM_TEMPLATE_SLUG);
+            requestAnimationFrame(() => nomRef.current?.focus());
+          }}
+          onCadrageTermine={handleCadrageTermine}
+        />
+      ) : null}
 
       {planLimit !== null ? (
         <div className="rounded-md border border-[var(--accent)]/30 bg-[var(--surface)] p-3 text-sm">
