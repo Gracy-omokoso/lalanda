@@ -40,6 +40,7 @@ import { PermissionsGuard } from '../authz/permissions.guard.js';
 import { Project, type ProjectDocument } from '../projects/project.schema.js';
 import { BillingService, toConflict, type SubscriptionState } from './billing.service.js';
 import { PLANS, type Entitlements, type Plan } from './entitlements.js';
+import { PdfExportQuotaService } from './pdf-export-quota.service.js';
 import {
   BILLING_CURRENCY,
   GRACE_DAYS,
@@ -91,6 +92,7 @@ export class BillingController {
   constructor(
     @Inject(BillingService) private readonly billing: BillingService,
     @InjectModel(Project.name) private readonly projects: Model<ProjectDocument>,
+    @Inject(PdfExportQuotaService) private readonly pdfQuota: PdfExportQuotaService,
   ) {}
 
   @Get('current/subscription')
@@ -101,6 +103,47 @@ export class BillingController {
       this.projects.countDocuments({ organizationId: orgId }).exec(),
     ]);
     return toView(state, projectCount);
+  }
+
+  /**
+   * Quota d'exports PDF du mois — lecture seule, sans effet.
+   *
+   * Existe pour que l'interface puisse dire « il vous reste N exports, le
+   * compteur repart le 1er » AVANT que l'utilisateur ne se heurte au refus.
+   * C'est le rôle légitime de l'interface face à une limite : l'expliquer. Ce
+   * n'est pas elle qui l'applique — `GET /projects/:id/report/pdf` la fait
+   * respecter de son côté, et cette route ne serait-elle jamais appelée que rien
+   * ne changerait.
+   *
+   * Elle est SÉPARÉE de `GET current/subscription` volontairement : cette
+   * dernière est lue à chaque affichage d'écran, et lui greffer un décompte de
+   * collection ferait payer à tout le monde une information que peu d'écrans
+   * utilisent. Même forme que `GET /ai/quota`, pour que les deux quotas se
+   * lisent pareil.
+   */
+  @Get('current/quota/pdf-exports')
+  @RequirePermission('analytics.read')
+  async pdfExportQuota(@CurrentOrgId() orgId: string): Promise<{
+    plan: Plan;
+    limit: number | null;
+    used: number;
+    remaining: number | null;
+    unlimited: boolean;
+    resetAt: string;
+    resetInDays: number;
+  }> {
+    const status = await this.pdfQuota.status(orgId);
+    return {
+      plan: status.plan,
+      limit: status.limit,
+      used: status.used,
+      // `null` sur une offre illimitée, jamais un grand nombre : une jauge
+      // d'interface remplirait « 9 999 restants ».
+      remaining: status.remaining,
+      unlimited: status.unlimited,
+      resetAt: status.resetAt.toISOString(),
+      resetInDays: status.resetInDays,
+    };
   }
 
   /**
