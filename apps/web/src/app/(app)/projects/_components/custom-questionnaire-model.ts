@@ -208,7 +208,8 @@ export const QUESTIONS: readonly QuestionCadrage[] = [
     // que le moteur consomme.
     id: 'q_marge_brute_pct',
     kind: 'nombre',
-    question: 'Sur 100 encaissés, combien vous reste-t-il une fois payé ce que la vente vous a directement coûté ?',
+    question:
+      'Sur 100 encaissés, combien vous reste-t-il une fois payé ce que la vente vous a directement coûté ?',
     driverId: 'marge_brute_pct',
   },
   {

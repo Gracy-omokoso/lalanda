@@ -23,6 +23,7 @@
 // des hypothèses périmées. Le démontage garde son propre filet (use-autosave,
 // filet n°2) pour les navigations qui ne passent pas par ce bouton.
 
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -44,6 +45,7 @@ import {
   initialProvenance,
   initialRawValues,
   parseInput,
+  toDisplayString,
   type Provenance,
 } from './wizard-model';
 import { WizardProgress, type StepIndicator } from './wizard-progress';
@@ -268,6 +270,14 @@ function WizardInner({ projectId }: { projectId: string }): React.ReactElement {
         </div>
       ) : null}
 
+      <AvisPreremplissage
+        projectId={projectId}
+        template={template}
+        values={values}
+        idsPreremplis={searchParams.get('prerempli')}
+        nbCartes={searchParams.get('cartes')}
+      />
+
       {/* L'assistant occupe désormais toute la largeur ; sur grand écran le
           contenu est borné pour que les champs ne s'étirent pas sur 1 400 px. */}
       <section aria-label="Saisie des hypothèses" className="flex w-full max-w-3xl flex-col gap-5">
@@ -360,6 +370,98 @@ function WizardInner({ projectId }: { projectId: string }): React.ReactElement {
           ) : null}
         </div>
       </section>
+    </div>
+  );
+}
+
+// ─── Avis de préremplissage (S23b) ───────────────────────────
+
+/**
+ * Dit ce qui a été prérempli par le questionnaire de cadrage, et l'affiche
+ * CHIFFRE PAR CHIFFRE.
+ *
+ * Ce n'est pas une politesse. Un montant posé dans un dossier bancaire sans
+ * qu'on sache d'où il vient n'est jamais relu : il a l'air d'avoir été saisi.
+ * L'avis nomme donc chaque hypothèse préremplie, sa valeur et son unité, et
+ * renvoie vers l'étape qui la porte (`?champ=`) pour la corriger d'un clic.
+ *
+ * Les cartes du Canvas sont comptées, pas listées : elles sont lisibles telles
+ * quelles dans l'onglet Canvas, et le lien y mène.
+ */
+function AvisPreremplissage({
+  projectId,
+  template,
+  values,
+  idsPreremplis,
+  nbCartes,
+}: {
+  projectId: string;
+  template: TemplateMeta;
+  values: Record<string, number>;
+  idsPreremplis: string | null;
+  nbCartes: string | null;
+}): React.ReactElement | null {
+  const ids = (idsPreremplis ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const cartes = Number.parseInt(nbCartes ?? '', 10);
+  const nCartes = Number.isFinite(cartes) && cartes > 0 ? cartes : 0;
+  if (ids.length === 0 && nCartes === 0) return null;
+
+  const drivers = ids
+    .map((id) => template.drivers.find((d) => d.id === id))
+    .filter((d): d is TemplateDriverMeta => d !== undefined);
+
+  return (
+    <div className="flex max-w-3xl flex-col gap-2 rounded-lg border border-[var(--accent)]/30 bg-[var(--surface)] p-4 text-sm">
+      <p className="font-medium">Ce que vos réponses ont prérempli</p>
+
+      {nCartes > 0 ? (
+        <p className="text-[var(--foreground-muted)]">
+          {nCartes} carte{nCartes > 1 ? 's' : ''} dans votre{' '}
+          <Link
+            href={`/projects/${projectId}/canvas`}
+            className="font-medium text-[var(--accent)] underline underline-offset-2"
+          >
+            Business Model Canvas
+          </Link>
+          . Aucun montant n’en a été tiré : le Canvas décrit votre projet, il ne calcule rien.
+        </p>
+      ) : null}
+
+      {drivers.length > 0 ? (
+        <>
+          <p className="text-[var(--foreground-muted)]">
+            {drivers.length} hypothèse{drivers.length > 1 ? 's' : ''} financière
+            {drivers.length > 1 ? 's' : ''}, telle{drivers.length > 1 ? 's' : ''} que vous
+            {drivers.length > 1 ? ' les' : ' l’'}avez saisie{drivers.length > 1 ? 's' : ''} — à
+            relire et corriger si besoin :
+          </p>
+          <ul className="flex flex-col gap-1">
+            {drivers.map((d) => (
+              <li key={d.id} className="flex flex-wrap items-baseline gap-x-2">
+                <span className="text-[var(--foreground-muted)]">{d.label ?? d.id}</span>
+                <span className="fig font-semibold">
+                  {toDisplayString(d, values[d.id] ?? d.defaut ?? 0)}
+                  {d.type === 'percent'
+                    ? ' %'
+                    : d.type === 'money'
+                      ? ` ${d.devise ?? 'USD'}`
+                      : d.unite
+                        ? ` ${d.unite}`
+                        : ''}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+
+      <p className="text-xs text-[var(--foreground-muted)]">
+        Tout le reste part des valeurs par défaut du modèle, signalées par le badge « Valeur
+        suggérée ». Vous complétez ici — vous ne recommencez pas.
+      </p>
     </div>
   );
 }

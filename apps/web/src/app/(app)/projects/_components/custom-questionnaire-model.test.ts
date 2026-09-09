@@ -23,7 +23,13 @@ import {
 /** Sous-ensemble des drivers du modèle `custom` touchés par le questionnaire. */
 const DRIVERS: TemplateDriverMeta[] = [
   { id: 'ca_moyen_jour', label: "Chiffre d'affaires moyen par jour", type: 'money', min: 0 },
-  { id: 'jours_ouverture_mois', label: "Jours d'activité par mois", type: 'number', min: 1, max: 31 },
+  {
+    id: 'jours_ouverture_mois',
+    label: "Jours d'activité par mois",
+    type: 'number',
+    min: 1,
+    max: 31,
+  },
   { id: 'marge_brute_pct', label: 'Marge brute sur les ventes', type: 'percent', min: 0, max: 1 },
   { id: 'personnel_mois', label: 'Masse salariale mensuelle', type: 'money', min: 0 },
   { id: 'loyer_mois', label: 'Loyer mensuel', type: 'money', min: 0 },
@@ -238,7 +244,11 @@ describe('retour en arrière', () => {
     // Les sorties sont des fonctions pures des réponses. Le composant conserve
     // l'état des réponses en remontant, donc corriger une étape déjà passée est
     // exactement équivalent à l'avoir saisie ainsi du premier coup.
-    const corrige: Reponses = { ...COMPLET, clients: 'Les artisans uniquement.', q_ca_moyen_jour: '600' };
+    const corrige: Reponses = {
+      ...COMPLET,
+      clients: 'Les artisans uniquement.',
+      q_ca_moyen_jour: '600',
+    };
     expect(buildCanvasBlocks(corrige).segments_clients[0]?.texte).toBe('Les artisans uniquement.');
     expect(buildDriverValues(corrige, DRIVERS).ca_moyen_jour).toBe(600);
     // Les autres réponses sont intactes.
