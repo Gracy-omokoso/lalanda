@@ -57,6 +57,11 @@ function buildController(pdfWatermark: boolean): ReportsController {
     { findVersion: async () => plan } as never,
     { getPlanEntitlements: async () => ({ entitlements: { pdfWatermark } }) } as never,
     {} as never,
+    // Garde de quota d'exports PDF : `buildReportData` ne l'appelle pas — le
+    // quota borne le RENDU, pas l'assemblage des données. Un double vide suffit
+    // donc, et le fait qu'il suffise est en soi la preuve que la construction
+    // du rapport ne dépend d'aucun quota.
+    {} as never,
   );
 }
 
