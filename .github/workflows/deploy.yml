@@ -126,4 +126,11 @@ jobs:
             cd /opt/lalanda
             # Tag GHCR sans le préfixe « v » (aligné sur metadata-action {{version}}).
             export LALANDA_TAG="${LALANDA_REF_NAME#v}"
+            # Forme stricte X.Y.Z avant tout usage : la valeur entre dans `sed`.
+            [[ "$LALANDA_TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "tag invalide : $LALANDA_TAG" >&2; exit 1; }
+            # La version déployée est INSCRITE dans .env.production. Sans cela, le
+            # premier `docker compose up` manuel (changement de variable, reprise
+            # après incident) relirait l'ancienne valeur et redescendrait de
+            # version sans rien dire.
+            sed -i "s/^LALANDA_TAG=.*/LALANDA_TAG=${LALANDA_TAG}/" .env.production
             ./scripts/deploy-vps.sh
