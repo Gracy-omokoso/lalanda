@@ -137,10 +137,26 @@ acceptations passées y font référence.
 - Le refus est bloqué **deux fois** : par l’attribut `required` et par une
   vérification dans le gestionnaire de soumission. Un `required` retiré par
   l’inspecteur ne suffit pas à créer un compte sans accord.
-- L’accord est **enregistré**, pas seulement vérifié : `POST
-  /legal/terms/acceptance` avec la version **affichée à cet écran**. Si
-  l’enregistrement échoue, on ne navigue pas en silence — le compte existe mais
-  l’accord n’est pas prouvé, et l’utilisateur se voit proposer de réessayer.
+- L’accord est **enregistré**, pas seulement vérifié, et **au moment même où le
+  compte naît** (v0.4.3) : la version **affichée à cet écran** part dans la
+  requête d’inscription (`termsVersion`), et les `databaseHooks` de better-auth
+  (`apps/api/src/auth/auth.ts`) la **refusent** si elle n’a jamais été publiée
+  (400 `TERMS_NOT_ACCEPTED`, aucun compte créé) puis l’**enregistrent** une fois
+  le compte écrit. Cela vaut pour tout appel à `/auth/sign-up/email`, pas
+  seulement pour le formulaire.
+
+  *Pourquoi ce changement.* Jusqu’à la v0.4.2, l’accord partait **après**
+  l’inscription par `POST /legal/terms/acceptance`, qui exige une session. Le
+  18 oct. 2026, l’activation de `AUTH_REQUIRE_EMAIL_VERIFICATION=true` a supprimé
+  cette session (on ne se connecte qu’une fois l’adresse confirmée) : l’appel
+  tombait en 401, le compte existait **sans preuve d’accord**, et rien ne la
+  redemandait ensuite. La route `POST /legal/terms/acceptance` subsiste pour une
+  future ré-acceptation (nouvelle version des textes).
+
+  *Limite connue.* Un compte créé par **Google** ne passe pas par ce formulaire
+  et n’enregistre pas d’accord. Au 18 oct. 2026, 3 comptes sur 12 n’ont aucun
+  accord enregistré (comptes antérieurs à S22c ou créés par Google). Un écran de
+  ré-acceptation à la connexion fermerait les deux cas — non tranché.
 
 Côté API (`apps/api/src/legal/`), la collection `terms_acceptances` conserve
 `userId`, `termsVersion` et `acceptedAt`. L’enregistrement est **idempotent par

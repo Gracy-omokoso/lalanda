@@ -14,6 +14,7 @@
 //   4. les sessions ouvertes ailleurs tombent quand le mot de passe change.
 
 import type { INestApplication } from '@nestjs/common';
+import { LEGAL_VERSION } from '@lalanda/shared/legal';
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 
 import { MailTransport } from '../mail/mail.transport.js';
@@ -60,7 +61,7 @@ e2eSuite('Réinitialisation de mot de passe (S22a)', () => {
     const { default: request } = await import('supertest');
     const inscription = await request(app.getHttpServer())
       .post('/auth/sign-up/email')
-      .send({ email: EMAIL, password: ANCIEN, name: 'Reset Test' });
+      .send({ email: EMAIL, password: ANCIEN, name: 'Reset Test', termsVersion: LEGAL_VERSION });
     expect(inscription.status).toBeLessThan(400);
   }, 60_000);
 

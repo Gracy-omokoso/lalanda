@@ -17,6 +17,7 @@
 // Même convention que isolation.e2e.test.ts : nécessite Mongo (skip sans MONGODB_URI).
 
 import { INestApplication } from '@nestjs/common';
+import { LEGAL_VERSION } from '@lalanda/shared/legal';
 import { NestFactory } from '@nestjs/core';
 import { toNodeHandler } from 'better-auth/node';
 import request from 'supertest';
@@ -73,9 +74,12 @@ e2eSuite('entitlements par plan (S16b)', () => {
     name: string;
   }): Promise<string[]> {
     const server = app.getHttpServer();
-    let res = await request(server)
-      .post('/auth/sign-up/email')
-      .send({ email: user.email, password: user.password, name: user.name });
+    let res = await request(server).post('/auth/sign-up/email').send({
+      email: user.email,
+      password: user.password,
+      name: user.name,
+      termsVersion: LEGAL_VERSION,
+    });
     if (res.status >= 400) {
       res = await request(server)
         .post('/auth/sign-in/email')

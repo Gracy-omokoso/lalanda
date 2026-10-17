@@ -18,6 +18,7 @@
 //    chercher la connexion réellement utilisée par l'application.
 
 import type { INestApplication } from '@nestjs/common';
+import { LEGAL_VERSION } from '@lalanda/shared/legal';
 import { config as loadDotenv } from 'dotenv';
 import type { Db, ObjectId } from 'mongodb';
 import type { Connection } from 'mongoose';
@@ -98,9 +99,12 @@ export async function registerAndLogin(
 ): Promise<string[]> {
   const { default: request } = await import('supertest');
   const server = app.getHttpServer();
-  let res = await request(server)
-    .post('/auth/sign-up/email')
-    .send({ email: user.email, password: user.password, name: user.name });
+  let res = await request(server).post('/auth/sign-up/email').send({
+    email: user.email,
+    password: user.password,
+    name: user.name,
+    termsVersion: LEGAL_VERSION,
+  });
   if (res.status >= 400) {
     res = await request(server)
       .post('/auth/sign-in/email')

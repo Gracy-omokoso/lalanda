@@ -12,6 +12,7 @@
 // MONGODB_URI n'est pas défini — protège la CI qui n'aurait pas encore Atlas configuré.
 
 import { INestApplication } from '@nestjs/common';
+import { LEGAL_VERSION } from '@lalanda/shared/legal';
 import { NestFactory } from '@nestjs/core';
 import { toNodeHandler } from 'better-auth/node';
 import request from 'supertest';
@@ -72,9 +73,12 @@ e2eSuite('isolation multi-tenant (brief §11 S4)', () => {
     const server = app.getHttpServer();
     // Tente d'abord sign-up ; si le user existe déjà (deuxième `it` dans le même run),
     // on tombe en fallback sur sign-in pour récupérer une session fraîche.
-    let res = await request(server)
-      .post('/auth/sign-up/email')
-      .send({ email: user.email, password: user.password, name: user.name });
+    let res = await request(server).post('/auth/sign-up/email').send({
+      email: user.email,
+      password: user.password,
+      name: user.name,
+      termsVersion: LEGAL_VERSION,
+    });
     if (res.status >= 400) {
       res = await request(server)
         .post('/auth/sign-in/email')

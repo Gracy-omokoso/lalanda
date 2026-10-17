@@ -16,6 +16,7 @@
 // `SMTP_HOST` il ne tente aucune connexion — c'est précisément ce qu'on teste.
 
 import type { INestApplication } from '@nestjs/common';
+import { LEGAL_VERSION } from '@lalanda/shared/legal';
 import { randomBytes } from 'node:crypto';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 
@@ -50,9 +51,12 @@ e2eSuite('Démarrage sans configuration Google ni SMTP (S22a)', () => {
     app = await makeE2EApp();
 
     const { default: request } = await import('supertest');
-    const res = await request(app.getHttpServer())
-      .post('/auth/sign-up/email')
-      .send({ email: EMAIL, password: MOT_DE_PASSE, name: 'Sans Config' });
+    const res = await request(app.getHttpServer()).post('/auth/sign-up/email').send({
+      email: EMAIL,
+      password: MOT_DE_PASSE,
+      name: 'Sans Config',
+      termsVersion: LEGAL_VERSION,
+    });
     // L'inscription déclenche un email de vérification qui ne partira pas.
     // Elle doit réussir malgré tout.
     expect(res.status).toBeLessThan(400);
