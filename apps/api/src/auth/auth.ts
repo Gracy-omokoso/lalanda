@@ -2,8 +2,10 @@
 // Une seule instance partagée par tout le process (utilisée par le middleware express
 // et par les guards pour extraire la session).
 
+import { isKnownLegalVersion } from '@lalanda/shared/legal';
 import { betterAuth } from 'better-auth';
 import { mongodbAdapter } from 'better-auth/adapters/mongodb';
+import { APIError } from 'better-auth/api';
 import { MongoClient, type Db } from 'mongodb';
 
 import { passwordResetUrl, signupVerificationUrl } from '../mail/mail.links.js';
@@ -29,6 +31,23 @@ export const PASSWORD_RESET_TTL_SECONDS = 30 * 60;
  * est relevée par son propriétaire. Un email lu le lendemain doit encore marcher.
  */
 export const EMAIL_VERIFICATION_TTL_SECONDS = 24 * 60 * 60;
+
+/**
+ * Ce que les `databaseHooks` de better-auth reçoivent en second argument : le
+ * contexte de la route qui a déclenché l'écriture. Seuls `path` et `body` sont
+ * lus ici ; le type est volontairement partiel (better-auth ne l'exporte pas
+ * sous une forme stable).
+ */
+interface SignUpHookContext {
+  path?: string;
+  body?: unknown;
+}
+
+/** `termsVersion` du corps d'inscription, ou chaîne vide s'il est absent ou mal typé. */
+export function termsVersionOf(ctx: SignUpHookContext): string {
+  const body = ctx.body as { termsVersion?: unknown } | undefined;
+  return typeof body?.termsVersion === 'string' ? body.termsVersion : '';
+}
 
 /** Identifiants d'une application OAuth Google. Voir ADR-0014 pour l'obtention. */
 export interface GoogleCredentials {
@@ -93,6 +112,12 @@ interface BuildAuthOptions {
    * Utilisé pour auto-provisionner l'organisation personnelle + membership owner.
    */
   onUserCreated?: (user: { id: string; email: string; name?: string | null }) => Promise<void>;
+  /**
+   * Enregistre l'acceptation des conditions d'un compte créé par email + mot de
+   * passe, AU MOMENT de sa création (v0.4.3). Voir le commentaire de
+   * `databaseHooks.user.create`.
+   */
+  onTermsAccepted?: (userId: string, version: string) => Promise<void>;
   /**
    * Envoi des emails d'authentification (S22a). OBLIGATOIRE : sans lui,
    * better-auth refuserait la route de réinitialisation avec
@@ -277,16 +302,44 @@ export async function buildAuth(opts: BuildAuthOptions): Promise<ReturnType<type
       },
     },
 
+    // ── Acceptation des conditions À LA CRÉATION (v0.4.3) ─────────────────────
+    // La page d'inscription envoyait l'accord APRÈS `signUp`, par un appel qui
+    // exige une session. Avec AUTH_REQUIRE_EMAIL_VERIFICATION=true, l'inscription
+    // n'ouvre plus de session : l'appel tombait en 401 et le compte existait SANS
+    // preuve d'acceptation — rien ne la redemandait ensuite. L'accord voyage donc
+    // désormais DANS la requête d'inscription (`termsVersion`, champ ignoré par
+    // better-auth qui ne garde que les champs déclarés) et il est :
+    //   - EXIGÉ avant création (`before`) : pas de compte mot de passe sans accord
+    //     sur un texte réellement publié, même par un appel direct à l'API ;
+    //   - ENREGISTRÉ après création (`after`), avec la version cochée par
+    //     l'utilisateur, jamais celle du serveur (cf. legal.controller.ts).
+    // Limité à `/sign-up/email` : un compte Google n'a pas de case à cocher dans
+    // ce parcours, et ce correctif ne change pas ce cas.
     databaseHooks: {
       user: {
         create: {
-          after: async (user: { id: string; email: string; name?: string | null }) => {
+          before: async (_user: unknown, ctx?: SignUpHookContext) => {
+            if (ctx?.path !== '/sign-up/email') return;
+            if (!isKnownLegalVersion(termsVersionOf(ctx))) {
+              throw new APIError('BAD_REQUEST', {
+                code: 'TERMS_NOT_ACCEPTED',
+                message: 'Vous devez accepter les conditions pour créer un compte.',
+              });
+            }
+          },
+          after: async (
+            user: { id: string; email: string; name?: string | null },
+            ctx?: SignUpHookContext,
+          ) => {
             if (opts.onUserCreated) {
               await opts.onUserCreated({
                 id: String(user.id),
                 email: user.email,
                 name: user.name ?? null,
               });
+            }
+            if (ctx?.path === '/sign-up/email' && opts.onTermsAccepted) {
+              await opts.onTermsAccepted(String(user.id), termsVersionOf(ctx));
             }
           },
         },

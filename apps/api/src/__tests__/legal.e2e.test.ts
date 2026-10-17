@@ -19,7 +19,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest';
 
 import 'reflect-metadata';
 
-import { e2eSuite, makeE2EApp, registerAndLogin, teardown } from './e2e-utils.js';
+import { dbOf, e2eSuite, makeE2EApp, registerAndLogin, teardown } from './e2e-utils.js';
 
 e2eSuite('acceptation des conditions (S22c)', () => {
   let app: INestApplication;
@@ -56,7 +56,10 @@ e2eSuite('acceptation des conditions (S22c)', () => {
       .expect(401);
   });
 
-  it('rend un compte fraîchement inscrit comme n’ayant pas accepté', async () => {
+  it('enregistre l’accord dès l’inscription, sans appel séparé (v0.4.3)', async () => {
+    // `registerAndLogin` inscrit avec `termsVersion` : l'accord naît avec le
+    // compte. Avant la v0.4.3, il fallait ce POST après coup — et il tombait en
+    // 401 dès que la vérification d'adresse était exigée.
     const res = await request(app.getHttpServer())
       .get('/legal/terms/acceptance')
       .set('Cookie', cookies)
@@ -64,10 +67,10 @@ e2eSuite('acceptation des conditions (S22c)', () => {
 
     expect(res.body).toMatchObject({
       currentVersion: LEGAL_VERSION,
-      acceptedVersion: null,
-      acceptedAt: null,
-      isCurrent: false,
+      acceptedVersion: LEGAL_VERSION,
+      isCurrent: true,
     });
+    expect(res.body.acceptedAt).not.toBeNull();
   });
 
   it('enregistre l’accord et le rend courant', async () => {
@@ -121,6 +124,13 @@ e2eSuite('acceptation des conditions (S22c)', () => {
   });
 
   it('n’expose l’accord d’un utilisateur à aucun autre', async () => {
+    // Depuis la v0.4.3, les deux comptes acceptent en s'inscrivant. Pour que
+    // l'isolation reste OBSERVABLE, l'accord du second est retiré en base : s'il
+    // voyait celui du premier, il le lirait encore.
+    const db = await dbOf(app);
+    const autreUser = await db.collection('user').findOne({ email: autre.email });
+    await db.collection('terms_acceptances').deleteMany({ userId: String(autreUser!._id) });
+
     const res = await request(app.getHttpServer())
       .get('/legal/terms/acceptance')
       .set('Cookie', autreCookies)
@@ -129,5 +139,11 @@ e2eSuite('acceptation des conditions (S22c)', () => {
     // Le premier utilisateur a accepté ; le second ne doit rien en voir.
     expect(res.body.acceptedVersion).toBeNull();
     expect(res.body.isCurrent).toBe(false);
+
+    const premier = await request(app.getHttpServer())
+      .get('/legal/terms/acceptance')
+      .set('Cookie', cookies)
+      .expect(200);
+    expect(premier.body.acceptedVersion).toBe(LEGAL_VERSION);
   });
 });

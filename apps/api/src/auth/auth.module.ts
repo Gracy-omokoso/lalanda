@@ -3,6 +3,8 @@
 
 import { Global, Inject, Logger, Module, type OnModuleInit, type Provider } from '@nestjs/common';
 
+import { LegalModule } from '../legal/legal.module.js';
+import { LegalService } from '../legal/legal.service.js';
 import { MailModule } from '../mail/mail.module.js';
 import { MailService } from '../mail/mail.service.js';
 import { OrganizationsModule } from '../organizations/organizations.module.js';
@@ -15,7 +17,7 @@ export const AUTH_TOKEN = Symbol('BETTER_AUTH');
 
 const authProvider: Provider = {
   provide: AUTH_TOKEN,
-  useFactory: async (orgs: OrganizationsService, mail: MailService) => {
+  useFactory: async (orgs: OrganizationsService, mail: MailService, legal: LegalService) => {
     const onUserCreated = async (user: {
       id: string;
       email: string;
@@ -50,16 +52,22 @@ const authProvider: Provider = {
       // où les deux partagent `localhost`.
       cookieDomain: process.env['AUTH_COOKIE_DOMAIN'],
       onUserCreated,
+      // Preuve d'acceptation des conditions, posée à la création du compte
+      // (v0.4.3) : l'inscription n'ouvre plus de session quand la vérification
+      // d'adresse est exigée, l'ancien appel post-inscription tombait en 401.
+      onTermsAccepted: async (userId: string, version: string) => {
+        await legal.recordAcceptance(userId, version, new Date());
+      },
       mail,
       google,
     });
   },
-  inject: [OrganizationsService, MailService],
+  inject: [OrganizationsService, MailService, LegalService],
 };
 
 @Global()
 @Module({
-  imports: [OrganizationsModule, MailModule],
+  imports: [OrganizationsModule, MailModule, LegalModule],
   controllers: [AuthProvidersController],
   providers: [authProvider, AuthGuard],
   exports: [authProvider, AuthGuard],

@@ -13,18 +13,25 @@
 //
 // ── L'ACCEPTATION EST ENREGISTRÉE, PAS SEULEMENT VÉRIFIÉE ─────────────────────
 //
-// Cocher la case ne suffit pas : l'accord est envoyé à l'API avec la version du
-// corpus AFFICHÉE À CET ÉCRAN. Si cet enregistrement échoue, on ne navigue PAS
-// en silence — le compte existe déjà, mais l'accord n'est pas prouvé, et
-// l'utilisateur se voit proposer de réessayer. Avaler l'échec produirait
-// exactement la situation qu'on cherche à éviter : un compte actif dont on ne
-// peut pas montrer qu'il a accepté quoi que ce soit.
+// Cocher la case ne suffit pas : la version du corpus AFFICHÉE À CET ÉCRAN part
+// avec la demande de création (`termsVersion`), et l'API l'enregistre au moment
+// même où le compte naît (v0.4.3, `databaseHooks` d'auth.ts). Elle REFUSE de
+// créer un compte mot de passe sans version publiée.
+//
+// Avant la v0.4.3, l'accord partait APRÈS l'inscription par un appel qui exige
+// une session. Une fois la vérification d'adresse obligatoire, l'inscription
+// n'ouvre plus de session : l'appel tombait en 401, le compte existait sans
+// preuve d'accord, et l'écran « Une dernière étape » n'avait aucune issue.
+//
+// ── APRÈS L'INSCRIPTION ──────────────────────────────────────────────────────
+// Session ouverte (vérification non exigée) → l'application. Pas de session
+// (vérification exigée) → écran « confirmez votre adresse » : le lien est déjà
+// parti (`sendOnSignUp`).
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { api } from '@/lib/api';
 import { signUp } from '@/lib/auth-client';
 import { LEGAL_VERSION } from '@/lib/legal';
 
@@ -39,16 +46,8 @@ export default function RegisterPage(): React.ReactElement {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  /** Le compte existe, mais l'acceptation n'a pas pu être enregistrée. */
-  const [acceptancePending, setAcceptancePending] = useState(false);
-
-  /** Enregistre l'accord et navigue. Réutilisé par le bouton « Réessayer ». */
-  async function recordAcceptanceAndContinue(): Promise<void> {
-    await api.acceptTerms(LEGAL_VERSION);
-    setAcceptancePending(false);
-    router.push('/projects');
-    router.refresh();
-  }
+  /** Compte créé, adresse à confirmer : l'inscription n'a pas ouvert de session. */
+  const [verificationSent, setVerificationSent] = useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
@@ -61,16 +60,21 @@ export default function RegisterPage(): React.ReactElement {
     setLoading(true);
     setError(null);
     try {
-      const res = await signUp.email({ email, password, name });
+      // `termsVersion` n'est pas dans le type du client better-auth (ce n'est pas
+      // un champ du modèle user) mais il part bien dans le corps : l'API le lit
+      // dans son crochet de création et refuse l'inscription sans lui.
+      const signUpBody = { email, password, name, termsVersion: LEGAL_VERSION };
+      const res = await signUp.email(signUpBody as Parameters<typeof signUp.email>[0]);
       if (res.error) {
         setError(res.error.message ?? 'Impossible de créer le compte');
         return;
       }
-      try {
-        await recordAcceptanceAndContinue();
-      } catch {
-        setAcceptancePending(true);
+      if (!res.data?.token) {
+        setVerificationSent(true);
+        return;
       }
+      router.push('/projects');
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur d'inscription");
     } finally {
@@ -78,42 +82,28 @@ export default function RegisterPage(): React.ReactElement {
     }
   }
 
-  async function handleRetryAcceptance(): Promise<void> {
-    setLoading(true);
-    setError(null);
-    try {
-      await recordAcceptanceAndContinue();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Impossible d'enregistrer votre acceptation.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  if (acceptancePending) {
+  if (verificationSent) {
     return (
-      <div className="flex flex-col gap-4">
-        <h2 className="text-2xl font-semibold tracking-tight">Une dernière étape</h2>
-        <div className="rounded-md border border-[var(--warn)] bg-[var(--surface-muted)] p-4 text-sm leading-6">
+      <div className="flex flex-col gap-4" role="status">
+        <h2 className="text-2xl font-semibold tracking-tight">Confirmez votre adresse</h2>
+        <div className="rounded-md border border-[var(--accent)]/30 bg-[var(--surface)] p-4 text-sm leading-6">
           <p>
-            Votre compte a bien été créé, mais nous n&apos;avons pas pu enregistrer votre
-            acceptation des conditions. Nous préférons vous le dire plutôt que de considérer que
-            c&apos;est fait.
+            Votre compte est créé. Nous venons d&apos;envoyer un lien de confirmation à {email}.
+          </p>
+          <p className="mt-2 text-[var(--foreground-muted)]">
+            Cliquez sur ce lien pour activer votre compte — il est valable 24 heures. Pensez à
+            regarder dans les indésirables.
           </p>
         </div>
-        {error ? (
-          <div className="rounded-md border border-[var(--danger)]/30 bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger)]">
-            {error}
-          </div>
-        ) : null}
-        <button
-          type="button"
-          onClick={handleRetryAcceptance}
-          disabled={loading}
-          className="rounded-md bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-[var(--accent-foreground)] transition hover:opacity-90 disabled:opacity-50"
-        >
-          {loading ? 'Enregistrement…' : 'Réessayer'}
-        </button>
+        <p className="text-center text-sm text-[var(--foreground-muted)]">
+          Lien expiré ou perdu ? Connectez-vous : un nouveau lien vous sera envoyé.{' '}
+          <Link
+            href="/login"
+            className="text-[var(--accent)] underline underline-offset-4 hover:opacity-80"
+          >
+            Se connecter
+          </Link>
+        </p>
       </div>
     );
   }

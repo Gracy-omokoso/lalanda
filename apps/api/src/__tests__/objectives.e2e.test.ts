@@ -15,6 +15,7 @@
 // dérivées de la valeur lue dans le plan validé.
 
 import { INestApplication } from '@nestjs/common';
+import { LEGAL_VERSION } from '@lalanda/shared/legal';
 import { NestFactory } from '@nestjs/core';
 import { toNodeHandler } from 'better-auth/node';
 import type { Model } from 'mongoose';
@@ -101,9 +102,12 @@ e2eSuite('objectifs financiers et taux d’atteinte (S18d — docs/01)', () => {
     name: string;
   }): Promise<string[]> {
     const server = app.getHttpServer();
-    let res = await request(server)
-      .post('/auth/sign-up/email')
-      .send({ email: user.email, password: user.password, name: user.name });
+    let res = await request(server).post('/auth/sign-up/email').send({
+      email: user.email,
+      password: user.password,
+      name: user.name,
+      termsVersion: LEGAL_VERSION,
+    });
     if (res.status >= 400) {
       res = await request(server)
         .post('/auth/sign-in/email')
