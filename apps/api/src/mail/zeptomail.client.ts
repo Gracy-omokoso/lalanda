@@ -115,6 +115,18 @@ export async function envoyerViaZeptoMail(
       // qu'aucun test de gabarit ne s'en aperçoive — les gabarits, eux, la
       // produiraient toujours.
       textbody: message.text,
+      // Images référencées par `cid:` dans le HTML. Champ omis quand il n'y en a
+      // pas : un tableau vide n'apporte rien et élargit la charge validée par Zoho.
+      ...(message.inlineImages?.length
+        ? {
+            inline_images: message.inlineImages.map((img) => ({
+              cid: img.cid,
+              name: img.filename,
+              mime_type: img.contentType,
+              content: img.contentBase64,
+            })),
+          }
+        : {}),
     }),
     signal: AbortSignal.timeout(ZEPTOMAIL_TIMEOUT_MS),
   });

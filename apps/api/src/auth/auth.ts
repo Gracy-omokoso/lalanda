@@ -196,6 +196,14 @@ export async function buildAuth(opts: BuildAuthOptions): Promise<ReturnType<type
     // de durcir la connexion, sans enfermer dehors les comptes déjà créés.
     emailVerification: {
       sendOnSignUp: true,
+      // Quand la vérification est exigée, une connexion refusée pour adresse non
+      // vérifiée RENVOIE un lien. Sans cela, un compte dont le premier email s'est
+      // perdu (ou créé avant que l'envoi fonctionne) serait enfermé dehors sans
+      // recours — il n'existe aucun autre bouton « renvoyer ». better-auth ne
+      // l'envoie qu'APRÈS un mot de passe correct : impossible d'en faire un canon
+      // à emails contre une adresse tierce. Sans effet tant que
+      // AUTH_REQUIRE_EMAIL_VERIFICATION n'est pas à true.
+      sendOnSignIn: true,
       autoSignInAfterVerification: true,
       expiresIn: EMAIL_VERIFICATION_TTL_SECONDS,
       sendVerificationEmail: async (data: {

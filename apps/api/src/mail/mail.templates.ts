@@ -5,7 +5,10 @@
 //     image distante se charge depuis un serveur tiers au moment de la lecture :
 //     elle révèle l'IP et l'heure d'ouverture du destinataire, et la plupart des
 //     clients la bloquent de toute façon, laissant un cadre vide à la place du
-//     seul élément de marque. Le monogramme est donc du texte stylé en CSS.
+//     seul élément de marque. Le logo est donc JOINT au message (`cid:`, voir
+//     `mail.logo.ts`) : il voyage avec l'email, s'affiche sans « afficher les
+//     images », et ne révèle rien à l'ouverture. Son `alt` reste lisible si un
+//     client le masque malgré tout.
 //  2. STYLES EN LIGNE UNIQUEMENT. Gmail supprime les blocs <style> dans une
 //     partie de ses rendus ; un email dont la mise en forme vit dans un <style>
 //     arrive nu.
@@ -25,6 +28,7 @@
 // seconde langue existe, ces fonctions prennent une locale — elles sont déjà
 // pures et sans état, c'est le seul changement nécessaire.
 
+import { LOGO_CID, LOGO_DISPLAY_HEIGHT, LOGO_DISPLAY_WIDTH, LOGO_IMAGE } from './mail.logo.js';
 import type { MailMessage } from './mail.types.js';
 
 /** Corps d'un message sans destinataire — le gabarit ne choisit pas à qui il parle. */
@@ -91,8 +95,10 @@ function layout(input: LayoutInput): RenderedMail {
     '<tr><td align="center">',
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background-color:#ffffff;border:1px solid #e5e7eb;border-radius:12px;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,Helvetica,Arial,sans-serif;">',
     '<tr><td style="padding:28px 32px 8px;">',
-    // Monogramme en texte : voir contrainte n°1 (aucune image distante).
-    '<div style="display:inline-block;width:36px;height:36px;line-height:36px;text-align:center;background-color:#111827;color:#ffffff;border-radius:8px;font-weight:700;font-size:18px;">L</div>',
+    // Logo joint au message (`cid:`), voir contrainte n°1. Largeur et hauteur en
+    // attributs ET en style : Outlook ne lit que les premiers, et sans hauteur
+    // fixée le texte saute à l'affichage de l'image.
+    `<img src="cid:${LOGO_CID}" alt="${PRODUCT}" width="${LOGO_DISPLAY_WIDTH}" height="${LOGO_DISPLAY_HEIGHT}" style="display:block;width:${LOGO_DISPLAY_WIDTH}px;height:${LOGO_DISPLAY_HEIGHT}px;border:0;outline:none;text-decoration:none;font-size:20px;font-weight:700;color:#111827;">`,
     `<div style="margin-top:14px;font-size:20px;font-weight:600;color:#111827;">${escapeHtml(input.heading)}</div>`,
     '</td></tr>',
     `<tr><td style="padding:16px 32px 0;">${paragraphs}</td></tr>`,
@@ -123,7 +129,7 @@ function layout(input: LayoutInput): RenderedMail {
     `${PRODUCT} — message automatique, merci de ne pas y répondre.`,
   ].join('\n');
 
-  return { subject: '', html, text };
+  return { subject: '', html, text, inlineImages: [LOGO_IMAGE] };
 }
 
 /** Salutation personnalisée quand le nom est connu, neutre sinon. */

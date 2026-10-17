@@ -126,6 +126,13 @@ export class SmtpMailTransport extends MailTransport {
           subject: message.subject,
           text: message.text,
           html: message.html,
+          // nodemailer rattache une pièce jointe à son `cid:` quand `cid` est posé.
+          attachments: message.inlineImages?.map((img) => ({
+            cid: img.cid,
+            filename: img.filename,
+            contentType: img.contentType,
+            content: Buffer.from(img.contentBase64, 'base64'),
+          })),
         });
         return;
     }

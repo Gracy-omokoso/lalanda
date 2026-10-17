@@ -35,13 +35,28 @@ const ALL = [
 describe('gabarits — propriétés communes aux trois emails', () => {
   it('ne charge aucune ressource distante : ni image, ni feuille de style, ni script', () => {
     for (const mail of ALL) {
-      expect(mail.html).not.toMatch(/<img\b/i);
       expect(mail.html).not.toMatch(/<script\b/i);
       expect(mail.html).not.toMatch(/<link\b/i);
       expect(mail.html).not.toMatch(/background-image\s*:/i);
-      // Le SEUL usage autorisé d'une URL externe est le lien d'action lui-même
-      // (attribut href), jamais un chargement automatique à l'ouverture.
-      expect(mail.html).not.toMatch(/\bsrc\s*=/i);
+      // Le SEUL `src` admis est `cid:` — une image jointe au message. Toute autre
+      // source (http, https, //, data:) se chargerait ou serait bloquée à l'ouverture.
+      const sources = [...mail.html.matchAll(/\bsrc\s*=\s*"([^"]*)"/gi)].map((m) => m[1]);
+      expect(sources.length).toBe((mail.html.match(/\bsrc\s*=/gi) ?? []).length);
+      for (const src of sources) expect(src).toMatch(/^cid:[\w-]+$/);
+    }
+  });
+
+  it('joint au message chaque image référencée par cid:, et le logo dans les trois', () => {
+    for (const mail of ALL) {
+      const cids = [...mail.html.matchAll(/src="cid:([\w-]+)"/g)].map((m) => m[1]);
+      expect(cids).toContain('logo-lalanda');
+      const jointes = (mail.inlineImages ?? []).map((i) => i.cid);
+      for (const cid of cids) expect(jointes).toContain(cid);
+      const logo = mail.inlineImages?.find((i) => i.cid === 'logo-lalanda');
+      expect(logo?.contentType).toBe('image/png');
+      // Signature PNG (\x89PNG) en base64 : le contenu est bien une image, pas vide.
+      expect(logo?.contentBase64.startsWith('iVBORw0KGgo')).toBe(true);
+      expect(mail.html).toMatch(/<img[^>]*\balt="Lalanda"/);
     }
   });
 
