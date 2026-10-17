@@ -15,6 +15,23 @@ export interface MailMessage {
    * message complet, lien compris — pas une invitation à « activer le HTML ».
    */
   text: string;
+  /**
+   * Images jointes AU message et référencées dans le HTML par `cid:<cid>`.
+   * Seule forme d'image admise (ADR-0014 § 2) : elle voyage avec l'email, rien
+   * n'est chargé depuis un serveur à l'ouverture. Chaque transport doit les
+   * transmettre — un `cid:` sans pièce jointe s'affiche comme une image cassée.
+   */
+  inlineImages?: InlineImage[];
+}
+
+/** Image en ligne d'un email : le contenu voyage dans le message lui-même. */
+export interface InlineImage {
+  /** Identifiant référencé dans le HTML (`<img src="cid:…">`), sans chevrons. */
+  cid: string;
+  filename: string;
+  contentType: 'image/png';
+  /** Contenu encodé en base64, sans préfixe `data:`. */
+  contentBase64: string;
 }
 
 /**

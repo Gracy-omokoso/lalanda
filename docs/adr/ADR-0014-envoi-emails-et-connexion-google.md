@@ -123,6 +123,8 @@ Une seule variable d'expéditeur pour les deux chemins, et c'est délibéré : d
 
 Vérification d'adresse (sert l'inscription **et** le changement d'adresse), invitation, réinitialisation de mot de passe. Contraintes de rendu tenues par les gabarits et vérifiées par des tests : aucune ressource distante (une image chargée depuis un tiers révèle l'IP et l'heure d'ouverture du destinataire, et la plupart des clients la bloquent), styles en ligne, tableau de mise en page, variante texte **complète lien compris**, et destination du bouton écrite en clair dessous — un bouton dont on ne peut pas lire la cible a la forme exacte d'un email d'hameçonnage.
 
+**Amendement du 17 oct. 2026 (v0.4.1, décision de Gracy Omokoso) — le logo est JOINT, pas hébergé.** Le monogramme « L » en texte cède la place au vrai logo Lalanda. Il voyage **dans** le message, en pièce jointe en ligne référencée par `cid:` (`inline_images` côté ZeptoMail, `attachments` avec `cid` côté SMTP) : rien n'est chargé à l'ouverture, la règle « aucune ressource distante » reste entière. Option écartée : un logo hébergé sur `lalanda.co` — plus simple, mais c'est exactement la ressource distante que ce paragraphe interdit, et un cadre vide tant que le destinataire n'a pas cliqué « afficher les images ». Coût accepté : ~14 Ko par email. Le logo est embarqué en base64 dans `apps/api/src/mail/mail.logo.ts`, parce que `tsc` ne copie aucun fichier non-TS dans `dist/` — un `.png` voisin manquerait dans l'image Docker. Les tests imposent que tout `src` soit un `cid:` et que chaque `cid:` ait sa pièce jointe.
+
 ### 3. Réinitialisation de mot de passe
 
 - jeton à **usage unique**, expiration **30 minutes** (et non les 60 par défaut) : ce lien vaut une prise de contrôle complète du compte pour qui l'intercepte ;
@@ -176,6 +178,8 @@ better-auth refuse la liaison si :
 2. vérifier dans les journaux la ligne `Chemin d'envoi des emails : ZeptoMail (…)` ;
 3. déclencher un envoi réel (réinitialisation de mot de passe sur une adresse qu'on relève) et **constater l'email reçu** ;
 4. alors seulement, passer `AUTH_REQUIRE_EMAIL_VERIFICATION=true` et redémarrer.
+
+**Amendement du 17 oct. 2026 (v0.4.1) — l'étape 4 exigeait un recours qui n'existait pas.** Constat en production : 5 comptes non vérifiés sur 11, tous en mot de passe, et **aucun** moyen de se faire renvoyer le lien — ni bouton, ni envoi à la connexion. Le drapeau à `true` les aurait enfermés dehors même avec un envoi qui fonctionne. Correctif : `emailVerification.sendOnSignIn: true` — une connexion refusée pour adresse non vérifiée renvoie un lien, et la page de connexion l'annonce (code `EMAIL_NOT_VERIFIED`) au lieu d'afficher une erreur. better-auth n'envoie ce lien qu'**après** un mot de passe correct : un tiers ne peut pas s'en servir pour bombarder une adresse. L'étape 4 ne se prend donc qu'**une fois la v0.4.1 déployée**.
 
 Ce drapeau n'est **pas** activé par le lot S22m : c'est une bascule de production, elle appartient au décideur, et elle ne se prend qu'après l'étape 3 (rappel inscrit dans `.env.production.example`).
 

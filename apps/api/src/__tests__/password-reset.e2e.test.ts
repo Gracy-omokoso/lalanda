@@ -118,7 +118,11 @@ e2eSuite('Réinitialisation de mot de passe (S22a)', () => {
     expect(mail.text).toContain('/nouveau-mot-de-passe?token=');
     // Durée annoncée = durée réellement appliquée (30 min, cf. auth.ts).
     expect(mail.text).toContain('valable 30 minutes');
-    expect(mail.html).not.toMatch(/<img\b/i);
+    // Seule image admise : le logo JOINT au message (`cid:`), jamais une
+    // ressource chargée à l'ouverture (ADR-0014 § 2, amendement v0.4.1).
+    expect(mail.html).not.toMatch(/\bsrc\s*=\s*"(?!cid:)/i);
+    expect(mail.html).toContain('src="cid:logo-lalanda"');
+    expect(mail.inlineImages?.map((i) => i.cid)).toEqual(['logo-lalanda']);
   });
 
   it('refuse un jeton EXPIRÉ', async () => {

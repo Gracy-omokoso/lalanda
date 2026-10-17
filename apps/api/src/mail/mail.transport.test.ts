@@ -54,6 +54,20 @@ const message = {
   text: 'corps',
 };
 
+const messageAvecImage = {
+  ...message,
+  html: '<img src="cid:logo-lalanda" alt="Lalanda"><p>corps</p>',
+  inlineImages: [
+    {
+      cid: 'logo-lalanda',
+      filename: 'lalanda.png',
+      contentType: 'image/png' as const,
+      // Les huit octets de signature PNG, en base64.
+      contentBase64: 'iVBORw0KGgo=',
+    },
+  ],
+};
+
 const creds = (over: Partial<SmtpCredentials> = {}): SmtpCredentials => ({
   kind: 'smtp',
   host: 'smtp.exemple.com',
@@ -107,6 +121,25 @@ describe('chemin SMTP', () => {
       text: 'corps',
       html: '<p>corps</p>',
     });
+  });
+
+  it('joint les images `cid:` comme pièces jointes en ligne', async () => {
+    const transport = new SmtpMailTransport(new StubCredentials(creds()));
+
+    await transport.send(messageAvecImage);
+
+    const envoye = sendMail.mock.calls[0]![0] as { attachments: Array<Record<string, unknown>> };
+    expect(envoye.attachments).toHaveLength(1);
+    expect(envoye.attachments[0]).toMatchObject({
+      cid: 'logo-lalanda',
+      filename: 'lalanda.png',
+      contentType: 'image/png',
+    });
+    // nodemailer reçoit les octets, pas la chaîne base64 (qu'il réencoderait).
+    expect(Buffer.isBuffer(envoye.attachments[0]!['content'])).toBe(true);
+    expect((envoye.attachments[0]!['content'] as Buffer).subarray(0, 4).toString('latin1')).toBe(
+      '\x89PNG',
+    );
   });
 
   it("n'authentifie pas quand aucun utilisateur n'est fourni (relais interne, MailHog)", async () => {
@@ -256,6 +289,29 @@ describe('chemin ZeptoMail', () => {
       // ADR-0014 §2 impose une variante texte complète. La perdre au transport la
       // rendrait invisible aux tests de gabarits, qui continueraient de la produire.
       expect(charge['textbody']).toBe('corps');
+      // Sans image, le champ est omis plutôt qu'envoyé vide.
+      expect(charge).not.toHaveProperty('inline_images');
+    } finally {
+      await srv.fermer();
+    }
+  });
+
+  it('joint les images `cid:` dans `inline_images`, au format de Zoho', async () => {
+    const srv = await serveurLocal(() => ({ status: 201 }));
+    try {
+      await new SmtpMailTransport(new StubCredentials(credsZepto(`${srv.origin}/v1.1/email`))).send(
+        messageAvecImage,
+      );
+
+      const charge = JSON.parse(srv.recues[0]!.body) as Record<string, unknown>;
+      expect(charge['inline_images']).toEqual([
+        {
+          cid: 'logo-lalanda',
+          name: 'lalanda.png',
+          mime_type: 'image/png',
+          content: 'iVBORw0KGgo=',
+        },
+      ]);
     } finally {
       await srv.fermer();
     }
