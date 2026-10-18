@@ -751,7 +751,7 @@ export interface TermsAcceptanceView {
 
 export type DisplayCurrency = 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR';
 
-/** Les 15 actions granulaires (docs/12). Union fermée, alignée sur l'API. */
+/** Les 16 actions granulaires (docs/12, ADR-0021 §8). Union fermée, alignée sur l'API. */
 export type OrgAction =
   | 'organization.manage'
   | 'billing.manage'
@@ -767,7 +767,10 @@ export type OrgAction =
   | 'period.close'
   | 'analytics.read'
   | 'report.export'
-  | 'audit.read';
+  | 'audit.read'
+  // ADR-0021 §8 — identité fiscale et facture normalisée. Propriétaire et
+  // Directeur financier seulement ; interdite à tout rôle plateforme.
+  | 'fiscal.manage';
 
 /**
  * Offres — RÉEXPORTÉES du catalogue partagé, jamais réécrites.
@@ -1183,6 +1186,159 @@ export interface UpdateIntegrationBody {
 export interface ReauthStatus {
   active: boolean;
   expiresAt: string | null;
+}
+
+// ─── Fiscalité et facture normalisée (S25b — ADR-0021 §10) ───
+// Miroir du CONTRAT HTTP de l'ADR-0021 §10. L'API (`apps/api/src/fiscal/`)
+// reste la source de vérité ; le web ne peut pas l'importer.
+//
+// Aucun de ces types ne porte la valeur d'un jeton e-MCF. Le jeton ne voyage
+// que dans le CORPS d'un `POST` ou d'un `PUT` (création d'un point de vente,
+// remplacement du jeton) ; l'API ne le renvoie jamais — seulement `last4`.
+
+/**
+ * Fenêtre de ré-authentification de la SESSION d'un membre (`/me/reauth`).
+ * Distincte de `ReauthStatus` (`/admin/reauth`), dont la forme diffère.
+ */
+export interface MeReauthStatus {
+  valid: boolean;
+  expiresAt: string | null;
+}
+
+export type FiscalLegalForm =
+  | 'entreprise_individuelle'
+  | 'sarl'
+  | 'sarlu'
+  | 'sa'
+  | 'sas'
+  | 'sasu'
+  | 'snc'
+  | 'scs'
+  | 'gie'
+  | 'cooperative'
+  | 'asbl'
+  | 'etablissement_public'
+  | 'autre';
+
+export interface FiscalHeadOffice {
+  line1: string;
+  line2: string | null;
+  commune: string | null;
+  city: string;
+  province: string | null;
+  /** ISO-2. */
+  country: string;
+}
+
+/** Corps COMPLET de `PUT /organizations/current/fiscal-profile` (champs inconnus refusés). */
+export interface FiscalProfileBody {
+  legalName: string;
+  tradeName: string | null;
+  legalForm: FiscalLegalForm | null;
+  legalFormOther: string | null;
+  nif: string;
+  rccm: string | null;
+  nationalId: string | null;
+  vatRegistered: boolean;
+  headOffice: FiscalHeadOffice;
+  phone: string;
+  email: string;
+}
+
+export interface FiscalProfile extends FiscalProfileBody {
+  updatedAt: string;
+}
+
+export interface FiscalProfileView {
+  /** `null` tant qu'aucune fiche n'a été enregistrée. */
+  profile: FiscalProfile | null;
+  /** `nif: true` pendant l'activation de la facture normalisée (409 sinon). */
+  locks: { nif: boolean };
+  options: { legalForms: Array<{ value: FiscalLegalForm; label: string }> };
+}
+
+export type EdefEnvironment = 'test' | 'production';
+
+export type PointOfSaleStatus =
+  'disabled' | 'token_missing' | 'nif_mismatch' | 'token_expired' | 'failing' | 'active';
+
+export interface PointOfSaleView {
+  id: string;
+  label: string;
+  environment: EdefEnvironment;
+  expectedNim: string | null;
+  enabled: boolean;
+  status: PointOfSaleStatus;
+  /** Jamais la valeur : `last4` = 4 derniers caractères, `null` sous 12 caractères. */
+  token: { configured: boolean; last4: string | null; updatedAt: string | null };
+  /** `null` tant qu'aucun test n'a réussi. */
+  dgi: {
+    nif: string | null;
+    nim: string | null;
+    tokenValidUntil: string | null;
+    emcfStatus: string | null;
+    shopName: string | null;
+    address: string[];
+    contacts: string[];
+    apiVersion: string | null;
+    checkedAt: string;
+  } | null;
+  lastTest: { at: string; ok: boolean; code: string | null; message: string } | null;
+}
+
+export interface NormalizedInvoicingView {
+  state: 'disabled' | 'enabled';
+  environment: EdefEnvironment;
+  firstActivatedAt: string | null;
+  activatedAt: string | null;
+  deactivatedAt: string | null;
+  deactivationReason: string | null;
+  prerequisites: {
+    fiscalProfileComplete: boolean;
+    countryIsCd: boolean;
+    activePointOfSaleInEnvironment: boolean;
+    productionAvailable: boolean;
+    /**
+     * Vestige du contrat d'avant l'amendement du 18 oct. 2026 (les modules
+     * sont retirés) : accepté s'il est servi, jamais lu par l'interface.
+     */
+    salesModuleEnabled?: boolean;
+  };
+  canActivate: boolean;
+  pointsOfSale: PointOfSaleView[];
+}
+
+export interface CreatePointOfSaleBody {
+  label: string;
+  environment: EdefEnvironment;
+  expectedNim: string | null;
+  token: string;
+}
+
+export type EdefReferenceListName =
+  | 'taxGroups'
+  | 'invoiceTypes'
+  | 'paymentTypes'
+  | 'clientTypes'
+  | 'referenceTypes'
+  | 'itemTypes'
+  | 'currencyRates';
+
+export interface EdefReferenceDataView {
+  environment: EdefEnvironment;
+  fetchedAt: string;
+  lists: {
+    taxGroups?: Record<string, number>;
+    invoiceTypes?: Array<{ type: string; description: string }>;
+    paymentTypes?: Array<{ type: string; description: string }>;
+    clientTypes?: Array<{ type: string; description: string }>;
+    referenceTypes?: Array<{ type: string; description: string }>;
+    itemTypes?: Array<{ type: string; description: string }>;
+    currencyRates?: Array<{ type: string; description: string; date: string; rate: number }>;
+  };
+  /** Listes non obtenues, avec la raison. */
+  failures: Partial<Record<EdefReferenceListName, { kind: string; message: string }>>;
+  warnings: Array<{ code: string; group: string; dgi: number; pack: number }>;
 }
 
 // ─── Interprétations et assistant « Lala » (S24a) ──────────────
@@ -1780,6 +1936,95 @@ export const api = {
       method: 'POST',
       body: { password },
     }),
+
+  // ─── Fiscalité et facture normalisée (S25b — ADR-0021 §10) ───
+  //
+  // Ré-authentification de SA PROPRE session (membre d'organisation). Sans mot
+  // de passe : compte créé par Google, fenêtre ouverte seulement si la session
+  // a moins de dix minutes (sinon `401 REAUTH_GOOGLE_REQUIRED`).
+  getMeReauth: () => jsonRequest<MeReauthStatus>(`/me/reauth`, { method: 'GET' }),
+  confirmMeReauth: (password?: string) =>
+    jsonRequest<{ expiresAt: string }>(`/me/reauth`, {
+      method: 'POST',
+      body: password === undefined ? {} : { password },
+    }),
+
+  getFiscalProfile: () =>
+    jsonRequest<FiscalProfileView>(`/organizations/current/fiscal-profile`, { method: 'GET' }),
+  putFiscalProfile: (body: FiscalProfileBody) =>
+    jsonRequest<FiscalProfileView>(`/organizations/current/fiscal-profile`, {
+      method: 'PUT',
+      body,
+    }),
+
+  getNormalizedInvoicing: () =>
+    jsonRequest<NormalizedInvoicingView>(`/organizations/current/normalized-invoicing`, {
+      method: 'GET',
+    }),
+  activateNormalizedInvoicing: (environment: EdefEnvironment) =>
+    jsonRequest<NormalizedInvoicingView>(`/organizations/current/normalized-invoicing/activate`, {
+      method: 'POST',
+      body: { environment },
+    }),
+  deactivateNormalizedInvoicing: (reason: string) =>
+    jsonRequest<NormalizedInvoicingView>(`/organizations/current/normalized-invoicing/deactivate`, {
+      method: 'POST',
+      body: { reason },
+    }),
+  changeNormalizedInvoicingEnvironment: (environment: EdefEnvironment, reason?: string) =>
+    jsonRequest<NormalizedInvoicingView>(
+      `/organizations/current/normalized-invoicing/environment`,
+      {
+        method: 'POST',
+        body: reason === undefined ? { environment } : { environment, reason },
+      },
+    ),
+
+  /**
+   * Le jeton part dans le CORPS, jamais dans l'URL ; l'API le teste auprès de la
+   * DGI AVANT toute écriture (ADR-0021 §4.1) et ne le renvoie jamais.
+   */
+  createPointOfSale: (body: CreatePointOfSaleBody) =>
+    jsonRequest<PointOfSaleView>(`/organizations/current/normalized-invoicing/points-of-sale`, {
+      method: 'POST',
+      body,
+    }),
+  updatePointOfSale: (posId: string, body: { label?: string; expectedNim?: string | null }) =>
+    jsonRequest<PointOfSaleView>(
+      `/organizations/current/normalized-invoicing/points-of-sale/${encodeURIComponent(posId)}`,
+      {
+        method: 'PATCH',
+        body,
+      },
+    ),
+  replacePointOfSaleToken: (posId: string, token: string) =>
+    jsonRequest<PointOfSaleView>(
+      `/organizations/current/normalized-invoicing/points-of-sale/${encodeURIComponent(posId)}/token`,
+      {
+        method: 'PUT',
+        body: { token },
+      },
+    ),
+  testPointOfSale: (posId: string) =>
+    jsonRequest<PointOfSaleView>(
+      `/organizations/current/normalized-invoicing/points-of-sale/${encodeURIComponent(posId)}/test`,
+      {
+        method: 'POST',
+      },
+    ),
+  disablePointOfSale: (posId: string, reason?: string) =>
+    jsonRequest<PointOfSaleView>(
+      `/organizations/current/normalized-invoicing/points-of-sale/${encodeURIComponent(posId)}/disable`,
+      {
+        method: 'POST',
+        body: reason === undefined ? {} : { reason },
+      },
+    ),
+  getPointOfSaleReferenceData: (posId: string) =>
+    jsonRequest<EdefReferenceDataView>(
+      `/organizations/current/normalized-invoicing/points-of-sale/${encodeURIComponent(posId)}/reference-data`,
+      { method: 'GET' },
+    ),
 
   // ─── Interprétations et chat Lala (S24a) ───────────────────
   // Les LIGNES DU MOTEUR sont transmises telles quelles : elles servent à la fois

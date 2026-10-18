@@ -51,11 +51,13 @@ describe('onglets de l’espace organisation (S21a)', () => {
       'organization.manage',
       'billing.manage',
       'audit.read',
+      'fiscal.manage',
     ];
     expect(ongletsVisibles(owner).map((t) => t.segment)).toEqual([
       '',
       'membres',
       'parametres',
+      'fiscalite',
       'facturation',
       'journal',
     ]);
@@ -81,9 +83,28 @@ describe('onglets de l’espace organisation (S21a)', () => {
       '',
       'membres',
       'parametres',
+      'fiscalite',
       'facturation',
       'journal',
     ]);
+  });
+
+  it('montre « Fiscalité » si et seulement si fiscal.manage figure dans les permissions', () => {
+    // ADR-0021 §13 C. Directeur financier : fiscalité oui, paramètres non —
+    // c'est la raison même d'un onglet séparé.
+    const directeur: OrgAction[] = ['project.read', 'plan.approve', 'fiscal.manage'];
+    expect(ongletsVisibles(directeur).map((t) => t.segment)).toEqual(['', 'fiscalite']);
+
+    // Administrateur : paramètres oui, fiscalité non (ADR-0021 §8).
+    const admin: OrgAction[] = ['organization.manage', 'audit.read'];
+    expect(ongletsVisibles(admin).map((t) => t.segment)).not.toContain('fiscalite');
+
+    expect(ongletsVisibles(null).map((t) => t.segment)).not.toContain('fiscalite');
+    expect(ORGANIZATION_TABS.find((t) => t.segment === 'fiscalite')).toEqual({
+      segment: 'fiscalite',
+      label: 'Fiscalité',
+      action: 'fiscal.manage',
+    });
   });
 
   it('garde « Membres » derrière l’action qui garde l’appel remplissant la page', () => {
