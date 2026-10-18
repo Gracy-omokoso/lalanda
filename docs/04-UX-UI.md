@@ -203,6 +203,7 @@ Deux fonctions sont incomplètes **par manque d’infrastructure, pas par oubli*
 | `/organisation` | Tableau de bord différencié par rôle | tout membre |
 | `/organisation/membres` | Rôles, accès et invitations (venu de `/members`, ADR-0016) | `organization.manage` |
 | `/organisation/parametres` | Nom, pays par défaut, devise d’affichage, logo | `organization.manage` |
+| `/organisation/fiscalite` | Fiche fiscale, facture normalisée DGI, points de vente e-MCF (S25b, voir ci-dessous) | `fiscal.manage` |
 | `/organisation/facturation` | Offre, consommation, dépassements, historique | `billing.manage` |
 | `/organisation/journal` | Journal d’audit, filtrable par action | `audit.read` |
 
@@ -236,6 +237,34 @@ Les blocs fermés du tableau de bord sont listés sobrement en bas de page — n
 - **Logo par URL, pas par envoi de fichier** : le logo d’organisation n’a pas encore d’endpoint d’envoi, contrairement à la photo de profil de l’espace compte. L’écran le dit au lieu de proposer un bouton inerte.
 - **Aucune intégration de paiement** (docs/13 § hors périmètre S16b) : la page facturation affiche l’offre et la consommation, pas un bouton « changer de plan » qui ne mènerait nulle part. Un dépassement précise que **rien n’est supprimé** — seules les créations au-delà de la limite sont refusées.
 - **Le tableau de bord n’est pas un export** : les agrégations coûteuses balaient les 20 projets les plus récemment modifiés. Le détail complet vit sur la page de chaque projet, et la réponse ne prétend nulle part à l’exhaustivité.
+
+## Implémenté (S25b) — Onglet Fiscalité
+
+`/organisation/fiscalite` porte l’identité fiscale de l’organisation, son choix d’utiliser la facture normalisée DGI et ses points de vente e-MCF (ADR-0021, chantier C). Écrans : `apps/web/src/app/(app)/organisation/fiscalite/` et `organisation/_components/` (`fiscal-profile-panel.tsx`, `normalized-invoicing-panel.tsx`, `point-of-sale-form.tsx`, `reauth-dialog.tsx`, logique pure dans `fiscal-model.ts`). API : contrat de l’ADR-0021 §10.
+
+### Un onglet à part, ouvert par `fiscal.manage`
+
+L’onglet suit « Paramètres » et n’apparaît que si `fiscal.manage` figure dans `GET /me/permissions` — Propriétaire et Directeur financier. Il n’est pas une section de « Paramètres » : celui-ci est ouvert par `organization.manage`, que le Directeur financier ne détient pas. Un rôle sans la permission qui saisit l’URL lit ce que son rôle permet, pas une panne.
+
+### Ce que la page montre
+
+- **Fiche fiscale** : dénomination, enseigne, forme juridique (liste servie par l’API), NIF, RCCM, identification nationale, assujettissement à la TVA, siège, téléphone, e-mail. Les erreurs du serveur s’affichent **sous chaque champ** ; un chemin inconnu reste visible en tête du formulaire. Le NIF est en lecture seule tant que la facture normalisée est activée, avec la raison écrite. L’interface ne prétend pas valider un NIF : seule la concordance avec la DGI fait foi.
+- **Facture normalisée** : état (« Activée » / « Désactivée »), badge **« Mode test »** partout où l’environnement est le test. Les prérequis manquants sont listés en phrases ; le bouton d’activation reste désactivé tant que le serveur ne dit pas `canActivate`, et l’activation demande une confirmation qui rappelle qu’**aucune facture non normalisée** ne pourra plus être émise. La production n’est proposée que si la plateforme l’a ouverte ; sinon la page écrit « La production sera ouverte après l’homologation de Lalanda par la DGI ».
+- **Désactivation** : motif obligatoire (20 à 500 caractères, compteur affiché) et avertissement — la désactivation est tracée au journal, reste affichée sur la page et les propriétaires sont prévenus par e-mail. Après une désactivation, un bandeau permanent donne la date et le motif. Revenir de la production au test pendant l’activation demande aussi un motif.
+- **Points de vente** : un par e-MCF, chacun avec son état en mots (« Actif », « Jeton manquant », « NIF différent de la fiche », « Jeton expiré », « Dernier test en échec », « Retiré ») et une phrase qui dit quoi faire, la date de fin de validité du jeton et un avertissement à moins de 30 jours, le NIM et le NIF renvoyés par la DGI, le dernier test. Actions : tester la connexion, remplacer le jeton, modifier le nom ou le NIM attendu, consulter les listes de référence DGI, retirer (le jeton est détruit), réactiver avec un nouveau jeton.
+- **Réponses de la DGI** : pour toute erreur issue d’elle, le code et le libellé DGI sont affichés tels quels, en plus de la phrase française.
+
+### Le jeton ne revient jamais
+
+Champ masqué, `autocomplete="off"`, vidé dès l’envoi (réussi ou non). Il ne part que dans le **corps** d’un `POST` ou d’un `PUT` — un test le vérifie — et n’est jamais placé dans l’URL, `localStorage`, `sessionStorage` ni la console. L’écran n’en montre que `****` suivi des quatre derniers caractères servis par l’API (`****` seul pour un jeton court).
+
+### Ré-authentification
+
+Les écritures qui engagent le contribuable exigent une confirmation de moins de dix minutes. Sur `401 REAUTH_REQUIRED`, une boîte de dialogue (`<dialog>` modal : focus piégé, Échap pour annuler) demande le mot de passe (`POST /me/reauth`), puis la requête est **rejouée une seule fois** ; une seconde exigence remonte en erreur au lieu de reboucler. Sur `401 REAUTH_GOOGLE_REQUIRED` (compte sans mot de passe), la boîte propose « Se reconnecter avec Google » : la page est quittée puis retrouvée, la fenêtre est ouverte par `POST /me/reauth` sans mot de passe, et l’action interrompue est **proposée** (bouton « Reprendre ») plutôt que relancée d’office. Cette reprise est gardée dix minutes dans `sessionStorage` et ne contient jamais de jeton : une action qui en portait un (ajout, remplacement) se refait en ressaisissant le jeton.
+
+### États et accessibilité
+
+Chargement, erreur avec « Réessayer », liste de points de vente vide expliquée, succès annoncés en `aria-live`, échecs en `role="alert"`. Chaque statut est écrit ; la couleur des pastilles n’est qu’un renfort. Champs reliés à leur aide et à leur erreur par `aria-describedby`, `aria-invalid` sur un champ refusé. Mobile d’abord : une colonne, boutons pleine largeur, deux colonnes à partir de `sm`.
 
 ## Implémenté (S21b) — Espace admin plateforme
 
