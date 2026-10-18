@@ -28,6 +28,7 @@ import {
   libellePrerequis,
   lireReprise,
   messageFiscal,
+  messageIssue,
   modeReauthExige,
   pointsOrdonnes,
   prerequisManquants,
@@ -400,6 +401,17 @@ describe('erreurs de l’API', () => {
       city: 'Requis',
       nif: 'NIF : 5 à 20 lettres ou chiffres',
     });
+  });
+
+  it('remplace les messages par défaut de Zod, en anglais, et garde ceux de l’API', () => {
+    // Réponse réelle de l'API à une fiche vide (essai local du 19 oct. 2026).
+    expect(messageIssue('too_small', 'String must contain at least 1 character(s)')).toBe(
+      'Ce champ est obligatoire ou trop court.',
+    );
+    expect(messageIssue('invalid_string', 'adresse e-mail invalide')).toBe(
+      'adresse e-mail invalide',
+    );
+    expect(messageIssue('inconnu', undefined)).toBe('Valeur refusée.');
   });
 
   it('affiche le message du serveur pour un 400 sans champ fautif', () => {

@@ -139,7 +139,11 @@ export function erreursParChamp(err: unknown): Record<string, string> {
   const out: Record<string, string> = {};
   for (const issue of issues) {
     if (typeof issue !== 'object' || issue === null) continue;
-    const { path, message } = issue as { path?: unknown; message?: unknown };
+    const { path, message, code } = issue as {
+      path?: unknown;
+      message?: unknown;
+      code?: unknown;
+    };
     // L'API fiscale sert le chemin déjà joint (`"headOffice.city"`) ; Zod brut,
     // un tableau. On accepte les deux.
     const cle = Array.isArray(path)
@@ -149,10 +153,34 @@ export function erreursParChamp(err: unknown): Record<string, string> {
         : '';
     if (cle === '') continue;
     if (out[cle] === undefined) {
-      out[cle] = typeof message === 'string' && message !== '' ? message : 'Valeur refusée.';
+      out[cle] = messageIssue(code, message);
     }
   }
   return out;
+}
+
+/**
+ * Message d'un problème de validation, en français.
+ *
+ * Les messages écrits par l'API (« NIF : 5 à 20 lettres ou chiffres ») passent
+ * tels quels ; les messages PAR DÉFAUT de Zod, en anglais (« String must contain
+ * at least 1 character(s) »), sont remplacés d'après leur code.
+ */
+const MESSAGES_ZOD: Record<string, string> = {
+  too_small: 'Ce champ est obligatoire ou trop court.',
+  too_big: 'Ce champ est trop long.',
+  invalid_type: 'Valeur manquante ou invalide.',
+  invalid_string: 'Format invalide.',
+  invalid_enum_value: 'Choix non reconnu.',
+  unrecognized_keys: 'Champ non reconnu.',
+};
+
+const ZOD_ANGLAIS = /^(String|Number|Array|Expected|Required|Invalid|Unrecognized)\b/;
+
+export function messageIssue(code: unknown, message: unknown): string {
+  if (typeof message === 'string' && message !== '' && !ZOD_ANGLAIS.test(message)) return message;
+  if (typeof code === 'string' && MESSAGES_ZOD[code]) return MESSAGES_ZOD[code]!;
+  return 'Valeur refusée.';
 }
 
 /** Codes de prérequis renvoyés par `409 NORMALIZED_INVOICING_PREREQUISITES`. */

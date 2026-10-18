@@ -66,11 +66,17 @@ export function FiscaliteEspace(): React.ReactElement {
   const [refuse, setRefuse] = useState(false);
   const surRefus = useCallback(() => setRefuse(true), []);
   const surEnregistre = useCallback(() => setVersion((v) => v + 1), []);
+  // L'état de la facture normalisée commande le verrou du NIF : la fiche se
+  // relit après chaque activation ou désactivation.
+  const [versionFiche, setVersionFiche] = useState(0);
+  const surChangementEtat = useCallback(() => setVersionFiche((v) => v + 1), []);
 
   return (
     <div className="flex flex-col gap-10">
-      <FiscalProfilePanel onEnregistre={surEnregistre} onRefus={surRefus} />
-      {refuse ? null : <NormalizedInvoicingPanel version={version} />}
+      <FiscalProfilePanel version={versionFiche} onEnregistre={surEnregistre} onRefus={surRefus} />
+      {refuse ? null : (
+        <NormalizedInvoicingPanel version={version} onChangementEtat={surChangementEtat} />
+      )}
     </div>
   );
 }
@@ -171,7 +177,14 @@ type Formulaire =
   | { type: 'environnement'; cible: EdefEnvironment }
   | { type: 'ajout' };
 
-export function NormalizedInvoicingPanel({ version = 0 }: { version?: number }) {
+export function NormalizedInvoicingPanel({
+  version = 0,
+  onChangementEtat,
+}: {
+  version?: number;
+  /** Prévenu après une écriture réussie : la fiche relit son verrou de NIF. */
+  onChangementEtat?: () => void;
+}) {
   const [vue, setVue] = useState<NormalizedInvoicingView | null>(null);
   const [chargement, setChargement] = useState(true);
   const [refuse, setRefuse] = useState(false);
@@ -258,6 +271,7 @@ export function NormalizedInvoicingPanel({ version = 0 }: { version?: number }) 
       setFormulaire({ type: 'aucun' });
       setMotif('');
       await charger();
+      onChangementEtat?.();
       return true;
     } catch (err) {
       setErreurAction(err);

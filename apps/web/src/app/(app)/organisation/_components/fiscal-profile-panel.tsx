@@ -25,6 +25,7 @@ import {
 import { codeErreur, estRefus, formatDateHeure } from './organization-model';
 
 export function FiscalProfilePanel({
+  version = 0,
   onEnregistre,
   onRefus,
 }: {
@@ -32,6 +33,8 @@ export function FiscalProfilePanel({
   onEnregistre?: () => void;
   /** Prévenu sur un 403/404 : l'appelant masque le reste de l'onglet. */
   onRefus?: () => void;
+  /** Change quand la facture normalisée change d'état : la fiche se relit (verrou du NIF). */
+  version?: number;
 }): React.ReactElement {
   const [vue, setVue] = useState<FiscalProfileView | null>(null);
   const [form, setForm] = useState<FormulaireFiscal>(() => formulaireDepuisProfil(null));
@@ -69,7 +72,7 @@ export function FiscalProfilePanel({
 
   useEffect(() => {
     void charger();
-  }, [charger]);
+  }, [charger, version]);
 
   function maj<K extends keyof FormulaireFiscal>(cle: K, valeur: FormulaireFiscal[K]): void {
     setForm((f) => ({ ...f, [cle]: valeur }));
