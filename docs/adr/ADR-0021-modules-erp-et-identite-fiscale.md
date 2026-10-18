@@ -878,7 +878,7 @@ types réels.
 | Possède | Ne touche pas |
 |---|---|
 | `apps/api/src/erp-modules/**` | `apps/api/src/fiscal/**`, `apps/api/src/edef/**` |
-| `apps/api/src/integrations/**` : `organization-secret.schema.ts`, `organization-secrets.service.ts` (+ tests), `rewrap.ts`, `no-secret-leak.test.ts`, `session-reauth.controller.ts` (`/me/reauth`), `integrations.module.ts` | `integrations/secrets-crypto.ts` (inchangé), `secrets.service.ts` (inchangé) |
+| `apps/api/src/integrations/**` : `organization-secret.schema.ts`, `organization-secrets.service.ts` (+ tests), `rewrap.ts`, `no-secret-leak.test.ts`, `session-reauth.controller.ts` (`/me/reauth`, y compris la ré-authentification par connexion Google récente), `integrations.module.ts` | `integrations/secrets-crypto.ts` (inchangé), `secrets.service.ts` (inchangé) |
 | `apps/api/src/authz/**` | `apps/web/**` |
 | `apps/api/src/platform-config/**`, `apps/api/src/security/throttling.ts`, `packages/shared/src/env/**` | `packages/engine/**` |
 | docs/12, docs/15, docs/16, docs/17 (fin de lot, **après** la fusion de B, à partir de cet ADR) | docs/04, docs/09 |
@@ -890,7 +890,7 @@ types réels.
 | `apps/api/src/fiscal/**` (nouveau) : fiche fiscale, facture normalisée, points de vente, listes de référence, contrôleurs `fiscal-profile.controller.ts` et `normalized-invoicing.controller.ts`, `fiscal.module.ts`, tests ; un faux coffre en mémoire `fiscal/testing/in-memory-organization-secrets.ts` (implémente `OrganizationSecretsPort`) | `apps/api/src/integrations/**` (consommateur seulement) |
 | `apps/api/src/edef/**` (nouveau) : client, types, journal `edef_exchanges`, `testing/fake-edef-server.ts` | `apps/api/src/authz/**`, `apps/api/src/erp-modules/**` (consommateur seulement) |
 | `packages/engine/src/parameter-packs/cd-2026.yaml`, `schema.ts`, `parameter-packs.test.ts` | `ci-2026.yaml`, les modèles sectoriels |
-| docs/09 (ligne sur l'erratum) | `apps/api/src/mail/**` (décision ouverte n° 5), `apps/web/**` |
+| docs/09 (ligne sur l'erratum) ; dans `apps/api/src/mail/` : **ajout pur** du gabarit `renderNormalizedInvoicingDisabled` (`mail.templates.ts` + son test) et de la méthode d'envoi correspondante (`mail.service.ts`) | le reste de `apps/api/src/mail/**`, `apps/web/**` |
 
 #### Chantier C — front-end paramètres
 
