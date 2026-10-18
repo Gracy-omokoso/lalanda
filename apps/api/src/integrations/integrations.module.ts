@@ -2,7 +2,8 @@
 //
 // Exporte `SecretsService` : c'est par lui que les CONSOMMATEURS de secrets
 // (module IA aujourd'hui, transport SMTP et client S3 demain) obtiennent une
-// valeur. Hors `ReauthService` (ADR-0021), rien d'autre n'est exporté — surtout pas
+// valeur. Hors `ReauthService` et le coffre d'organisation `ORGANIZATION_SECRETS`
+// (ADR-0021 §11), rien d'autre n'est exporté — surtout pas
 // `IntegrationsService`, dont les méthodes d'écriture n'ont aucune raison d'être
 // appelées hors de `/admin`.
 
@@ -15,6 +16,9 @@ import { Integration, IntegrationSchema } from './integration.schema.js';
 import { IntegrationsController, ReauthController } from './integrations.controller.js';
 import { IntegrationsService } from './integrations.service.js';
 import { MasterKeyringProvider } from './keyring.provider.js';
+import { OrganizationSecret, OrganizationSecretSchema } from './organization-secret.schema.js';
+import { ORGANIZATION_SECRETS } from './organization-secrets.port.js';
+import { OrganizationSecretsService } from './organization-secrets.service.js';
 import { PlatformAuditService } from './platform-audit.service.js';
 import { PlatformReauth, PlatformReauthSchema } from './reauth.schema.js';
 import { ReauthService } from './reauth.service.js';
@@ -28,6 +32,10 @@ import { SecretsService } from './secrets.service.js';
     MongooseModule.forFeature([
       { name: Integration.name, schema: IntegrationSchema },
       { name: PlatformReauth.name, schema: PlatformReauthSchema },
+      // Coffre de portée organisation (ADR-0021 §4.2). Seuls `OrganizationSecretsService`
+      // et la rotation (`RewrapService`) reçoivent ce modèle : `SecretsService` n'y a
+      // aucun accès, par construction.
+      { name: OrganizationSecret.name, schema: OrganizationSecretSchema },
     ]),
   ],
   controllers: [IntegrationsController, ReauthController],
@@ -38,12 +46,22 @@ import { SecretsService } from './secrets.service.js';
     PlatformAuditService,
     ReauthService,
     RewrapService,
+    OrganizationSecretsService,
+    // Le module fiscal n'injecte que le PORT (`@Inject(ORGANIZATION_SECRETS)`), jamais
+    // la classe concrète : il ne dépend ni de la clé maîtresse ni de ce modèle.
+    { provide: ORGANIZATION_SECRETS, useExisting: OrganizationSecretsService },
     { provide: CONNECTION_TESTER, useClass: HttpConnectionTester },
   ],
   // `ReauthService` est exporté depuis ADR-0021 §11 : les écritures sensibles du
   // module fiscal exigent la même fenêtre de ré-authentification liée à la session
   // qu'`/admin` (ADR-0013 §5), et un seul mécanisme vaut mieux que deux.
-  exports: [SecretsService, PlatformAuditService, RewrapService, ReauthService],
+  exports: [
+    SecretsService,
+    PlatformAuditService,
+    RewrapService,
+    ReauthService,
+    ORGANIZATION_SECRETS,
+  ],
 })
 export class IntegrationsModule implements OnApplicationBootstrap {
   constructor(private readonly secrets: SecretsService) {}
