@@ -1,9 +1,19 @@
-# ADR-0021 — Modules ERP activables, identité fiscale et fondations de la facture normalisée (lot S25b)
+# ADR-0021 — Identité fiscale et fondations de la facture normalisée par organisation (lot S25b)
 
 Statut : Proposed
 Date : 2026-10-18
 Décideurs : Gracy Omokoso (décisions produit du 18 oct. 2026) ; CTO Lalanda (contrat technique)
 
+
+> **Amendement du 18 oct. 2026 (décideuse).** Lalanda n'est pas un ERP à modules
+> activables « à la Dolibarr » : l'exemple ne servait qu'à dire que chaque entreprise
+> configure **ses propres** informations DGI dans RUN. La vision qui fait foi est celle
+> de trois grands ensembles interconnectés, **BUILD → RUN → GROW**, synchronisés, chacun
+> utilisable seul, l'accès aux fonctionnalités étant réglé par les **forfaits
+> d'abonnement**. En conséquence, **tout le mécanisme d'activation de modules est retiré
+> de ce lot** : pas de collection `organization_modules`, pas de `erp-modules/`, pas de
+> routes `/organizations/current/modules`, pas de section « Modules », pas de registre de
+> bloqueurs. Les sections ci-dessous sont corrigées en ce sens.
 ## Contexte
 
 ### Décisions de la décideuse (elles font foi)
@@ -57,16 +67,11 @@ substance. Les faits techniques de l'API viennent de la spécification publique
 
 ## Options considérées
 
-### O1 — Où ranger l'activation des modules
+### O1 — Activation de modules : retirée
 
-1. **Dans `organization_settings`.** Écarté : cette collection porte des préférences
-   d'affichage que « aucun calcul ne consomme » ; un module conditionne des droits et des
-   routes, il ne s'y mélange pas.
-2. **Dans les droits d'abonnement (`billing/entitlements`).** Écarté pour ce lot : le prix
-   des modules n'est pas décidé (décision ouverte n° 2). Une activation est un choix de
-   l'organisation ; un droit d'abonnement, s'il vient, s'y ajoutera comme une condition.
-3. **Collection dédiée `organization_modules`, un document par (organisation, module).**
-   **Retenu.**
+Une collection `organization_modules` avait été retenue, puis **retirée** par l'amendement
+du 18 oct. 2026 : l'accès aux fonctionnalités de RUN se règle par les forfaits
+(`billing/` — droits d'abonnement existants), pas par des interrupteurs de modules.
 
 ### O2 — Permission RBAC
 
@@ -129,52 +134,15 @@ substance. Les faits techniques de l'API viennent de la spécification publique
 
 ## Décision
 
-### 1. Modules ERP activables par organisation (chantier A)
+### 1. Accès à RUN : par le forfait, pas par un interrupteur
 
-**Catalogue fermé, dans le code** (`apps/api/src/erp-modules/erp-modules.types.ts`) :
-
-```ts
-export const ERP_MODULES = ['sales'] as const;
-export type ErpModuleKey = (typeof ERP_MODULES)[number];
-```
-
-Un seul module dans ce lot. « Dépenses et trésorerie » et « CRM » (ADR-0018) entreront
-dans le catalogue **avec** le lot qui les livre : déclarer aujourd'hui un module sans
-contenu serait annoncer une fonctionnalité absente.
-
-**Collection `organization_modules`** — un document par (organisation, module) :
-
-| Champ | Type | Règle |
-|---|---|---|
-| `organizationId` | string | requis |
-| `module` | enum `ERP_MODULES` | requis |
-| `enabled` | boolean | requis |
-| `changedAt` | Date | dernière bascule |
-| `changedBy` | string | identifiant utilisateur |
-| `_schemaVersion` | number | `1` |
-| `createdAt`, `updatedAt` | Date | horodatage Mongoose |
-
-Index unique `{ organizationId: 1, module: 1 }`. **Aucun document = module désactivé.**
-Rien n'est créé à la création d'une organisation : **tout est désactivé par défaut**.
-
-**Dépendances entre modules et fonctions.** Le service expose un registre de **bloqueurs
-de désactivation** : un autre module enregistre au démarrage une fonction qui, pour une
-organisation, renvoie un motif de refus ou `null`. C'est le même patron que
-`scheduler.register` : `erp-modules/` n'importe jamais `fiscal/`. Premier bloqueur (posé
-par le chantier B) : « Ventes » ne se désactive pas tant que la facture normalisée est
-activée.
-
-**Effet sur la navigation web.** Dans ce lot, activer « Ventes » ne fait apparaître
-**aucune** entrée de navigation : il n'existe encore aucune page de ventes. Son seul effet
-visible est de rendre activable la section « Facture normalisée » de l'onglet Fiscalité.
-L'entrée « Ventes » du menu (ADR-0016) arrivera avec les pages de ventes, conditionnée par
-`modules[].enabled` **et** les permissions de vente que ce lot-là créera.
-
-**Journal.** `erp_module.enabled` / `erp_module.disabled` par `AuditService.record`
-(non bloquant : réglage réversible, sans portée fiscale). Une bascule vers l'état déjà en
-place répond 200 sans écrire d'événement.
-
-**Droits d'abonnement.** Aucun contrôle de forfait dans ce lot (décision ouverte n° 2).
+Aucun mécanisme d'activation de modules. L'accès aux fonctionnalités de RUN (ventes,
+facture normalisée) se réglera par les **droits d'abonnement** existants
+(`PLAN_ENTITLEMENTS`, `billing/`) quand la tarification de RUN sera décidée (décision
+ouverte n° 2). **Dans ce lot, aucun contrôle de forfait** : la fiche fiscale et la
+facture normalisée sont accessibles à toute organisation, sous la seule permission
+`fiscal.manage`. La facture normalisée reste un **choix de l'entreprise** (§3), avec ses
+propres identifiants e-MCF, de test ou de production selon son compte DGI.
 
 ### 2. Identité fiscale de l'organisation (chantier B)
 
@@ -246,7 +214,7 @@ Aucun document = désactivé, environnement de test.
 
 - **R1 — Prérequis d'activation**, tous vérifiés côté serveur, sinon
   `409 NORMALIZED_INVOICING_PREREQUISITES` avec la liste `missing` :
-  `sales_module` (module Ventes activé), `fiscal_profile` (fiche enregistrée),
+  `fiscal_profile` (fiche enregistrée),
   `country_cd` (siège en RDC), `active_point_of_sale` (au moins un point de vente à l'état
   `active` dans l'environnement visé), `production_unavailable` (si l'environnement visé
   est la production et qu'elle n'est pas ouverte, §5), `nif_elsewhere` (une autre
@@ -259,8 +227,6 @@ Aucun document = désactivé, environnement de test.
     `'normalized'` si et seulement si `state = 'enabled'`. Ce lot livre la fonction et son
     test ; il n'a aucun appelant ;
   - le NIF est verrouillé (§2) ;
-  - le module Ventes ne se désactive pas (bloqueur §1, code
-    `NORMALIZED_INVOICING_ENABLED`) ;
   - le dernier point de vente `active` de l'environnement courant ne se retire pas
     (`409 LAST_ACTIVE_POINT_OF_SALE`).
 - **R3 — Désactivation : possible, jamais silencieuse.** Elle exige une
@@ -623,8 +589,6 @@ l'organisation active. Erreurs : forme actuelle des contrôleurs (`code`, `messa
 
 | Méthode et chemin | Permission | Ré-auth | Quota | Chantier |
 |---|---|:--:|---|:--:|
-| `GET /organizations/current/modules` | `analytics.read` (tout membre : la navigation en a besoin) | | global | A |
-| `PUT /organizations/current/modules/:moduleKey` | `organization.manage` | | global | A |
 | `GET /me/reauth` · `POST /me/reauth` | aucune (`SANS_PERMISSION`) | | écriture intégration | A |
 | `GET /organizations/current/fiscal-profile` | `fiscal.manage` | | global | B |
 | `PUT /organizations/current/fiscal-profile` | `fiscal.manage` | | global | B |
@@ -643,27 +607,6 @@ l'organisation active. Erreurs : forme actuelle des contrôleurs (`code`, `messa
 utilisateur) ; « test DGI » = nouveau `EDEF_TEST_THROTTLE` (30 par heure et par
 utilisateur). Sans fenêtre de ré-authentification : `401 REAUTH_REQUIRED` — l'interface
 ouvre alors la saisie du mot de passe (`POST /me/reauth`) et **rejoue une fois** la requête.
-
-#### Modules
-
-```jsonc
-// GET /organizations/current/modules  →  200
-{
-  "modules": [
-    {
-      "key": "sales",
-      "label": "Ventes et facturation",
-      "description": "Clients, devis, factures et encaissements. Donne accès à la facture normalisée DGI.",
-      "enabled": false,
-      "changedAt": null,                 // ISO ou null
-      "deactivationBlockedBy": null      // ou { "code": "NORMALIZED_INVOICING_ENABLED", "message": "…" }
-    }
-  ]
-}
-
-// PUT /organizations/current/modules/sales   corps : { "enabled": true }   →  200, l'élément ci-dessus
-// Erreurs : 400 INVALID_REQUEST · 404 MODULE_UNKNOWN · 409 MODULE_DEACTIVATION_BLOCKED { details: { code } }
-```
 
 #### Identité fiscale
 
@@ -792,19 +735,6 @@ Ces fichiers sont livrés par A dans le **jalon A0** (§12), puis ne changent pl
 accord du CTO.
 
 ```ts
-// apps/api/src/erp-modules/erp-modules.types.ts
-export const ERP_MODULES = ['sales'] as const;
-export type ErpModuleKey = (typeof ERP_MODULES)[number];
-export interface DeactivationBlock { code: string; message: string }
-export type DeactivationBlocker = (organizationId: string) => Promise<DeactivationBlock | null>;
-
-// apps/api/src/erp-modules/erp-modules.service.ts (exporté par ErpModulesModule)
-export class ErpModulesService {
-  isEnabled(organizationId: string, module: ErpModuleKey): Promise<boolean>;
-  registerDeactivationBlocker(module: ErpModuleKey, blocker: DeactivationBlocker): void;
-  // + list / setEnabled, utilisés par le contrôleur de A
-}
-
 // apps/api/src/integrations/organization-secrets.port.ts
 import type { ClientSession } from 'mongoose';
 import type { Secret } from './secret-value.js';
@@ -862,14 +792,12 @@ types réels.
 - `authz/permissions.ts`, `authz/permissions.test.ts` (matrice littérale 8 × 16 + 6 × 16
   = 224 assertions), texte « 16 actions » de `authz/routes-coverage.test.ts` ;
 - `authz/audit.service.ts` (paramètre `session`) ;
-- `erp-modules/` : `erp-modules.types.ts`, `erp-module.schema.ts`,
-  `erp-modules.service.ts` (complet, sans contrôleur), `erp-modules.module.ts` ;
 - `integrations/organization-secrets.port.ts` ; export de `ReauthService` dans
   `integrations.module.ts` (le fournisseur `ORGANIZATION_SECRETS` arrive avec A) ;
 - `platform-config/` (`dgi-platform.config.ts`, `platform-config.module.ts`) ;
   `packages/shared/src/env/index.ts` (variables `DGI_*`) ; `.env.example` ;
 - `security/throttling.ts` (`EDEF_TEST_THROTTLE`) ;
-- `app.module.ts` (`ErpModulesModule`, `PlatformConfigModule`) ;
+- `app.module.ts` (`PlatformConfigModule`) ;
 - `docs/12-ROLES-PERMISSIONS.md` (seizième action) et une note « amendé par ADR-0021 » en
   tête d'ADR-0012.
 
@@ -877,7 +805,7 @@ types réels.
 
 | Possède | Ne touche pas |
 |---|---|
-| `apps/api/src/erp-modules/**` | `apps/api/src/fiscal/**`, `apps/api/src/edef/**` |
+| — | `apps/api/src/fiscal/**`, `apps/api/src/edef/**` |
 | `apps/api/src/integrations/**` : `organization-secret.schema.ts`, `organization-secrets.service.ts` (+ tests), `rewrap.ts`, `no-secret-leak.test.ts`, `session-reauth.controller.ts` (`/me/reauth`, y compris la ré-authentification par connexion Google récente), `integrations.module.ts` | `integrations/secrets-crypto.ts` (inchangé), `secrets.service.ts` (inchangé) |
 | `apps/api/src/authz/**` | `apps/web/**` |
 | `apps/api/src/platform-config/**`, `apps/api/src/security/throttling.ts`, `packages/shared/src/env/**` | `packages/engine/**` |
@@ -888,7 +816,7 @@ types réels.
 | Possède | Ne touche pas |
 |---|---|
 | `apps/api/src/fiscal/**` (nouveau) : fiche fiscale, facture normalisée, points de vente, listes de référence, contrôleurs `fiscal-profile.controller.ts` et `normalized-invoicing.controller.ts`, `fiscal.module.ts`, tests ; un faux coffre en mémoire `fiscal/testing/in-memory-organization-secrets.ts` (implémente `OrganizationSecretsPort`) | `apps/api/src/integrations/**` (consommateur seulement) |
-| `apps/api/src/edef/**` (nouveau) : client, types, journal `edef_exchanges`, `testing/fake-edef-server.ts` | `apps/api/src/authz/**`, `apps/api/src/erp-modules/**` (consommateur seulement) |
+| `apps/api/src/edef/**` (nouveau) : client, types, journal `edef_exchanges`, `testing/fake-edef-server.ts` | `apps/api/src/authz/**` |
 | `packages/engine/src/parameter-packs/cd-2026.yaml`, `schema.ts`, `parameter-packs.test.ts` | `ci-2026.yaml`, les modèles sectoriels |
 | docs/09 (ligne sur l'erratum) ; dans `apps/api/src/mail/` : **ajout pur** du gabarit `renderNormalizedInvoicingDisabled` (`mail.templates.ts` + son test) et de la méthode d'envoi correspondante (`mail.service.ts`) | le reste de `apps/api/src/mail/**`, `apps/web/**` |
 
@@ -898,7 +826,7 @@ types réels.
 |---|---|
 | `apps/web/src/lib/api.ts` (types `OrgAction` + `'fiscal.manage'`, vues et méthodes des routes §10) | `apps/api/**`, `packages/**` |
 | `organisation/_components/organization-model.ts` (+ test) : onglet `{ segment: 'fiscalite', label: 'Fiscalité', action: 'fiscal.manage' }`, après « Paramètres » | `app-header.tsx`, menu du compte (ADR-0016), `lib/routes.ts` (`/organisation` déjà protégé) |
-| `organisation/parametres/page.tsx` + nouveau `_components/modules-panel.tsx` (section « Modules », sous les réglages généraux) | `_components/settings-panel.tsx` (inchangé) |
+| — (aucune section « Modules » : retirée par l'amendement) | `_components/settings-panel.tsx` (inchangé) |
 | nouveau `organisation/fiscalite/page.tsx` ; nouveaux `_components/fiscal-profile-panel.tsx`, `normalized-invoicing-panel.tsx`, `point-of-sale-form.tsx`, `reauth-dialog.tsx`, `fiscal-model.ts` (+ test) | |
 | docs/04 (section Fiscalité) | |
 
@@ -922,7 +850,7 @@ reste dans « Paramètres ».
    contre le faux coffre en mémoire ; C code contre le contrat §10 avec des réponses
    simulées dans ses tests.
 3. Fusion **A**, puis **B** (rebasé sur A ; ses tests e2e passent alors par le vrai coffre
-   et le vrai registre de bloqueurs), puis **C** (rebasé, vérifié contre l'API réelle).
+), puis **C** (rebasé, vérifié contre l'API réelle).
 4. A met à jour docs/15, docs/16 et docs/17.
 
 ### 13. Critères d'acceptation et tests
@@ -932,10 +860,6 @@ reste dans « Paramètres ».
 - Matrice : 224 assertions littérales ; `fiscal.manage` accordée à `owner` et
   `finance_director` seulement ; refusée à tout rôle plateforme, y compris sous accès
   délégué ; `PLATFORM_FORBIDDEN_ACTIONS` en contient quatre.
-- Modules : organisation neuve → `sales` désactivé ; activer puis désactiver → deux
-  événements d'audit ; même état → aucun événement ; bloqueur enregistré → `409
-  MODULE_DEACTIVATION_BLOCKED` et `deactivationBlockedBy` renseigné ; Lecteur : `GET` 200,
-  `PUT` 403 ; autre organisation → 404.
 - Coffre : aller-retour `put`/`resolve` ; `describe` ne renvoie jamais la valeur ;
   réécrire `organizationId` ou `ownerId` d'un document en base, ou recopier un chiffré
   vers un autre document → le déchiffrement échoue ; sans clé maîtresse →
@@ -987,10 +911,7 @@ reste dans « Paramètres ».
 #### C
 
 - Onglet « Fiscalité » visible si et seulement si `fiscal.manage` figure dans
-  `/me/permissions` ; section « Modules » de « Paramètres » en lecture seule sans
-  `organization.manage`.
-- Modules : bascule de « Ventes » ; motif de refus affiché quand
-  `deactivationBlockedBy` est renseigné.
+  `/me/permissions`.
 - Fiscalité : formulaire de la fiche (erreurs serveur affichées champ par champ) ; liste des
   points de vente avec leur état en mots (« Jeton expiré », « NIF différent de la fiche »…),
   la date de fin de validité du jeton, un avertissement à moins de 30 jours ; bouton
@@ -1017,7 +938,7 @@ hors périmètre ; aucun fichier de `dgi/` ni aucun jeton dans un commit.
 
 ## Conséquences
 
-- Sept collections nouvelles : `organization_modules`, `organization_secrets`,
+- Six collections nouvelles : `organization_secrets`,
   `organization_fiscal_profiles`, `normalized_invoicing_settings`, `emcf_points_of_sale`,
   `edef_exchanges`, `edef_reference_snapshots`. Leurs
   index sont créés en production par `IndexesService`, sans action manuelle.
@@ -1052,8 +973,8 @@ de la décideuse sur l'environnement de test DGI avant de déclarer le lot livr�
 1. **Qui gère la fiscalité ?** Proposé : Propriétaire et Directeur financier seulement.
    Faut-il l'ouvrir à l'Administrateur, ou au Comptable (souvent celui qui traite avec la
    DGI) ? Changer la matrice est simple ; le choix, lui, engage.
-2. **Les modules sont-ils compris dans tous les forfaits** ou vendus à part ? Proposé pour
-   ce lot : ouverts à tous, sans contrôle de forfait.
+2. **Quels forfaits donnent accès à RUN** (ventes, facture normalisée) ? Proposé pour ce
+   lot : accessible à tous, sans contrôle de forfait, jusqu'à la décision tarifaire.
 3. **Une organisation non assujettie à la TVA** peut-elle activer la facture normalisée ?
    Proposé : oui, c'est son choix (le champ « assujetti » est informatif), en attendant la
    réponse de la DGI sur le groupe des non-assujettis.

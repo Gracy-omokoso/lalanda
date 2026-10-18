@@ -36,6 +36,24 @@ Trois faits du dépôt conditionnent tout le reste :
 2. **Renforcer BUILD seulement.** Écarté par le décideur.
 3. **Trois modules RUN, en commençant par le socle temporel.** Retenu.
 
+## Amendement du 18 oct. 2026 — la vision d'ensemble (décideuse)
+
+Ce qui fait la valeur de Lalanda n'est pas la liste des modules RUN mais la
+**synchronisation raisonnée entre trois grands ensembles interconnectés** :
+
+- **BUILD** — concevoir : idée, modèle économique, plan financier (l'existant) ;
+- **RUN** — exploiter : ventes, facture normalisée DGI, dépenses, trésorerie réelle ;
+- **GROW** — croître : pilotage, recherche de financement, croissance.
+
+Chaque ensemble **fonctionne seul** (une entreprise peut n'utiliser que RUN) et prend
+toute sa valeur **relié aux autres** : le réalisé de RUN se compare aux prévisions de
+BUILD, et GROW s'appuie sur les deux. Partout, quatre natures de données restent
+**distinctes et étiquetées** : **hypothèses** (saisies), **prévisions** (calculées par le
+moteur), **réalisés** (issus de RUN) et **suggestions de l'IA** (jamais confondues avec
+les trois autres, jamais appliquées sans geste de l'utilisateur). L'accès aux
+fonctionnalités est réglé par les **forfaits d'abonnement**, pas par des modules à
+activer. L'ordre ci-dessous reste celui de RUN ; GROW fera l'objet d'un ADR dédié.
+
 ## Décision
 
 **Ordre d'exécution :**
