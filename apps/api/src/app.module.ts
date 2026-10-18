@@ -11,7 +11,9 @@ import { AuthzModule } from './authz/authz.module.js';
 import { BillingModule } from './billing/billing.module.js';
 import { CanvasModule } from './canvas/canvas.module.js';
 import { DatabaseModule } from './database/database.module.js';
+import { EdefModule } from './edef/edef.module.js';
 import { EvaluateController } from './evaluate/evaluate.controller.js';
+import { FiscalModule } from './fiscal/fiscal.module.js';
 import { HealthController } from './health/health.controller.js';
 import { IntegrationsModule } from './integrations/integrations.module.js';
 import { LegalModule } from './legal/legal.module.js';
@@ -94,6 +96,9 @@ import { StorageModule } from './storage/storage.module.js';
     AdminModule,
     AiModule,
     LegalModule,
+    // ADR-0021 — client e-MCF, puis identité fiscale et facture normalisée.
+    EdefModule,
+    FiscalModule,
   ],
   controllers: [HealthController, EvaluateController],
 })

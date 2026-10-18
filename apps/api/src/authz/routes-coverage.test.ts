@@ -31,6 +31,8 @@ import { AuthProvidersController } from '../auth/auth-providers.controller.js';
 import { BillingController } from '../billing/billing.controller.js';
 import { CanvasController } from '../canvas/canvas.controller.js';
 import { EvaluateController } from '../evaluate/evaluate.controller.js';
+import { FiscalProfileController } from '../fiscal/fiscal-profile.controller.js';
+import { NormalizedInvoicingController } from '../fiscal/normalized-invoicing.controller.js';
 import { HealthController } from '../health/health.controller.js';
 import { LegalController } from '../legal/legal.controller.js';
 import { ObjectivesController } from '../objectives/objectives.controller.js';
@@ -67,6 +69,7 @@ const CONTROLEURS = [
   BillingController,
   CanvasController,
   EvaluateController,
+  FiscalProfileController,
   HealthController,
   InvitationsController,
   LalaController,
@@ -74,6 +77,7 @@ const CONTROLEURS = [
   LegalController,
   MeController,
   MembersController,
+  NormalizedInvoicingController,
   ObjectivesController,
   OrganizationSpaceController,
   OrganizationsController,
@@ -352,6 +356,20 @@ describe('couverture des routes par le RBAC', () => {
       'OrganizationSpaceController.putSettings': ['organization.manage'],
       // `billing.manage` n'est détenu que par le Propriétaire (ADR-0012 §3).
       'OrganizationSpaceController.billing': ['billing.manage'],
+      // ── Identité fiscale et facture normalisée (ADR-0021 §8, §10) ─────────
+      // `fiscal.manage` : Propriétaire et Directeur financier seulement.
+      'FiscalProfileController.get': ['fiscal.manage'],
+      'FiscalProfileController.put': ['fiscal.manage'],
+      'NormalizedInvoicingController.get': ['fiscal.manage'],
+      'NormalizedInvoicingController.activate': ['fiscal.manage'],
+      'NormalizedInvoicingController.deactivate': ['fiscal.manage'],
+      'NormalizedInvoicingController.environment': ['fiscal.manage'],
+      'NormalizedInvoicingController.createPointOfSale': ['fiscal.manage'],
+      'NormalizedInvoicingController.patchPointOfSale': ['fiscal.manage'],
+      'NormalizedInvoicingController.replaceToken': ['fiscal.manage'],
+      'NormalizedInvoicingController.testPointOfSale': ['fiscal.manage'],
+      'NormalizedInvoicingController.disablePointOfSale': ['fiscal.manage'],
+      'NormalizedInvoicingController.referenceDataOf': ['fiscal.manage'],
     };
     for (const [cle, actions] of Object.entries(attendu)) {
       const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle);
