@@ -51,6 +51,17 @@ export const ApiEnvSchema = CommonEnvSchema.extend({
     .transform((v) => v === 'true'),
 
   /**
+   * Ordonnanceur (S25a, ADR-0020). Actif par défaut : c'est lui qui exécute les
+   * tâches planifiées (balayage des abonnements, et demain échéances et reprise
+   * des factures normalisées). `false` ne le désactive que pour les tests e2e,
+   * qui pilotent le temps eux-mêmes. Même parse strict que ci-dessus.
+   */
+  SCHEDULER_ENABLED: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
+
+  /**
    * Domaine porté par le cookie de session (S22m). OPTIONNELLE.
    *
    * À renseigner UNIQUEMENT quand le front et l'API vivent sur deux hôtes

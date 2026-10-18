@@ -24,8 +24,14 @@ import type { HydratedDocument } from 'mongoose';
  */
 @Schema({ collection: 'user_preferences', timestamps: true, strict: true })
 export class UserPreferences {
-  /** Propriétaire. Toujours issu de la session, JAMAIS du corps de la requête. */
-  @Prop({ type: String, required: true, index: true })
+  /**
+   * Propriétaire. Toujours issu de la session, JAMAIS du corps de la requête.
+   *
+   * Pas d'`index: true` : l'index UNIQUE déclaré en bas de fichier sert aussi
+   * les recherches. Les deux portaient le même nom automatique (`userId_1`) avec
+   * des options différentes — la création du second échouait (S25a).
+   */
+  @Prop({ type: String, required: true })
   userId!: string;
 
   /**
