@@ -60,6 +60,7 @@ function vueFacture(partiel: Partial<NormalizedInvoicingView> = {}): NormalizedI
       countryIsCd: true,
       activePointOfSaleInEnvironment: true,
       productionAvailable: false,
+      nifAvailable: true,
     },
     canActivate: true,
     pointsOfSale: [],
@@ -296,12 +297,14 @@ describe('facture normalisée', () => {
         countryIsCd: false,
         activePointOfSaleInEnvironment: false,
         productionAvailable: false,
+        nifAvailable: false,
       },
     });
     expect(prerequisManquants(vide)).toEqual([
       'fiscal_profile',
       'country_cd',
       'active_point_of_sale',
+      'nif_elsewhere',
     ]);
     expect(prerequisManquants({ ...vide, environment: 'production' })).toContain(
       'production_unavailable',
@@ -380,6 +383,34 @@ describe('erreurs de l’API', () => {
       issues: [{ path: ['nif'], message: 'Format' }],
     });
     expect(erreursParChamp(ancien)).toEqual({ nif: 'Format' });
+  });
+
+  it('lit le chemin déjà joint que sert l’API fiscale réelle', () => {
+    const reel = erreurApi(400, {
+      code: 'INVALID_REQUEST',
+      message: 'Corps de requête invalide.',
+      details: {
+        issues: [
+          { path: 'headOffice.city', code: 'too_small', message: 'Requis' },
+          { path: 'nif', code: 'invalid_string', message: 'NIF : 5 à 20 lettres ou chiffres' },
+        ],
+      },
+    });
+    expect(erreursFormulaire(reel).champs).toEqual({
+      city: 'Requis',
+      nif: 'NIF : 5 à 20 lettres ou chiffres',
+    });
+  });
+
+  it('affiche le message du serveur pour un 400 sans champ fautif', () => {
+    const dejaActivee = erreurApi(400, {
+      code: 'INVALID_REQUEST',
+      message: 'La facture normalisée est déjà activée dans l’autre environnement.',
+    });
+    expect(messageFiscal(dejaActivee, 'repli')).toContain('déjà activée');
+    expect(messageFiscal(erreurApi(500, { code: 'EMCF_TOKEN_UNREADABLE' }), 'r')).toContain(
+      'illisible',
+    );
   });
 
   it('rattache les erreurs au formulaire, et garde visibles les chemins inconnus', () => {

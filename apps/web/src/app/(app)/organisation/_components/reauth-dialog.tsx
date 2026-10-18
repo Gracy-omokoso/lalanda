@@ -93,6 +93,24 @@ function ReauthModal({
     return () => d?.close();
   }, []);
 
+  // `GET /me/reauth` dit quel moyen le compte possède : un compte créé par
+  // Google n'a pas de mot de passe à saisir, on lui propose Google d'emblée
+  // plutôt qu'un champ voué à l'échec. En cas d'échec de la lecture, le mode
+  // reste celui qu'a imposé le refus du serveur.
+  useEffect(() => {
+    if (modeInitial !== 'password') return;
+    let annule = false;
+    void api
+      .getMeReauth()
+      .then((s) => {
+        if (!annule && s.method === 'google') setMode('google');
+      })
+      .catch(() => undefined);
+    return () => {
+      annule = true;
+    };
+  }, [modeInitial]);
+
   async function confirmer(e: React.FormEvent): Promise<void> {
     e.preventDefault();
     setEnvoi(true);

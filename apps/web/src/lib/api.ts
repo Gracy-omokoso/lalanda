@@ -1203,6 +1203,8 @@ export interface ReauthStatus {
 export interface MeReauthStatus {
   valid: boolean;
   expiresAt: string | null;
+  /** Comment se ré-authentifier : mot de passe, ou connexion Google récente (compte sans mot de passe). */
+  method: 'password' | 'google';
 }
 
 export type FiscalLegalForm =
@@ -1246,7 +1248,7 @@ export interface FiscalProfileBody {
 }
 
 export interface FiscalProfile extends FiscalProfileBody {
-  updatedAt: string;
+  updatedAt: string | null;
 }
 
 export interface FiscalProfileView {
@@ -1298,11 +1300,8 @@ export interface NormalizedInvoicingView {
     countryIsCd: boolean;
     activePointOfSaleInEnvironment: boolean;
     productionAvailable: boolean;
-    /**
-     * Vestige du contrat d'avant l'amendement du 18 oct. 2026 (les modules
-     * sont retirés) : accepté s'il est servi, jamais lu par l'interface.
-     */
-    salesModuleEnabled?: boolean;
+    /** `false` : une autre organisation Lalanda a déjà activé ce NIF dans cet environnement. */
+    nifAvailable: boolean;
   };
   canActivate: boolean;
   pointsOfSale: PointOfSaleView[];

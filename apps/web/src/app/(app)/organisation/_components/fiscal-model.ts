@@ -71,6 +71,10 @@ const MESSAGES_FISCAUX: Record<string, string> = {
     'La DGI a renvoyé une réponse illisible. Rien n’a été enregistré ; réessayez plus tard.',
   EDEF_UNREACHABLE:
     'Le serveur de la DGI ne répond pas. Rien n’a été enregistré ; réessayez plus tard.',
+  EMCF_TOKEN_MISSING:
+    'Aucun jeton n’est enregistré pour ce point de vente. Fournissez-en un avant de lire les listes de la DGI.',
+  EMCF_TOKEN_UNREADABLE:
+    'Le jeton enregistré pour ce point de vente est illisible. Saisissez-le à nouveau avec « Remplacer le jeton ».',
   VAULT_UNAVAILABLE:
     'Le coffre de Lalanda est indisponible : aucun jeton ne peut être enregistré pour le moment. Contactez le support.',
   INVALID_PASSWORD: 'Mot de passe incorrect.',
@@ -93,6 +97,13 @@ export function messageFiscal(err: unknown, repli: string): string {
     return precision
       ? `${MESSAGES_FISCAUX['EDEF_UNREACHABLE']!} (${precision})`
       : MESSAGES_FISCAUX['EDEF_UNREACHABLE']!;
+  }
+  // Un 400 sans problème de champ (activation déjà faite dans l'autre
+  // environnement, motif manquant…) : le message du serveur dit exactement quoi
+  // faire, la phrase générique « vérifiez les champs » serait fausse.
+  if (code === 'INVALID_REQUEST' && Object.keys(erreursParChamp(err)).length === 0) {
+    const m = detailDe(err)?.['message'];
+    if (typeof m === 'string' && m !== '') return m;
   }
   if (code && MESSAGES_FISCAUX[code]) return MESSAGES_FISCAUX[code]!;
   return err instanceof Error && err.message !== '' ? err.message : repli;
@@ -129,8 +140,14 @@ export function erreursParChamp(err: unknown): Record<string, string> {
   for (const issue of issues) {
     if (typeof issue !== 'object' || issue === null) continue;
     const { path, message } = issue as { path?: unknown; message?: unknown };
-    if (!Array.isArray(path) || path.length === 0) continue;
-    const cle = path.map(String).join('.');
+    // L'API fiscale sert le chemin déjà joint (`"headOffice.city"`) ; Zod brut,
+    // un tableau. On accepte les deux.
+    const cle = Array.isArray(path)
+      ? path.map(String).join('.')
+      : typeof path === 'string'
+        ? path
+        : '';
+    if (cle === '') continue;
     if (out[cle] === undefined) {
       out[cle] = typeof message === 'string' && message !== '' ? message : 'Valeur refusée.';
     }
@@ -297,7 +314,7 @@ const EXPLICATIONS: Record<PointOfSaleStatus, string> = {
   nif_mismatch:
     'Le NIF que la DGI associe à ce jeton n’est plus celui de la fiche fiscale. Corrigez la fiche ou remplacez le jeton, puis testez à nouveau.',
   token_expired: 'La DGI a fixé une date de fin de validité qui est dépassée. Remplacez le jeton.',
-  failing: 'Le dernier test de connexion a échoué. Consultez la réponse de la DGI ci-dessous.',
+  failing: 'Le dernier test de connexion a échoué. Consultez la réponse ci-dessous.',
 };
 
 export function explicationEtat(status: PointOfSaleStatus): string {
@@ -406,8 +423,7 @@ export function libellePrerequis(code: string): string {
  * Prérequis manquants déduits de la vue, dans l'ordre où on les règle.
  *
  * La production fermée ne compte que si l'environnement courant est la
- * production. `nif_elsewhere` n'est connu qu'après une tentative refusée : il
- * vient alors de `prerequisManquantsDeErreur`.
+ * production.
  */
 export function prerequisManquants(vue: NormalizedInvoicingView): string[] {
   const p = vue.prerequisites;
@@ -418,6 +434,7 @@ export function prerequisManquants(vue: NormalizedInvoicingView): string[] {
   if (vue.environment === 'production' && !p.productionAvailable) {
     out.push('production_unavailable');
   }
+  if (!p.nifAvailable) out.push('nif_elsewhere');
   return out;
 }
 
