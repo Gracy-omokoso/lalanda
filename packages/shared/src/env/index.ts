@@ -40,7 +40,9 @@ function edefUrl(nom: string) {
     .refine(
       (v) => {
         const u = new URL(v);
-        return u.protocol === 'https:' || (u.protocol === 'http:' && LOOPBACK_HOSTS.has(u.hostname));
+        return (
+          u.protocol === 'https:' || (u.protocol === 'http:' && LOOPBACK_HOSTS.has(u.hostname))
+        );
       },
       { message: `${nom} doit être en https (http accepté seulement vers localhost)` },
     )
