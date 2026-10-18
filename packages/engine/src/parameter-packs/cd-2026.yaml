@@ -17,6 +17,15 @@ description: >
   Fiscalité congolaise 2026. IBP 30 %, TVA 16 %, INSS/CNSS 5 %+5 %, INPP 2 %, ONEM 0.2 %.
   Devise principale USD, affichage secondaire CDF au taux BCC du jour de génération.
 
+# Révisions en place (docs/09 § Modèle de version, erratum) : la révision 1 est
+# implicite. Une révision n'est permise que pour un paramètre qu'aucun modèle ne
+# consomme — sinon, une nouvelle version du pack est exigée.
+revisions:
+  - numero: 2
+    date: '2026-10-18'
+    objet: 'Taux réduit de TVA corrigé à 5 % (groupe C), taux de 1 % ajouté (groupe O), seuil d’assujettissement marqué à confirmer.'
+    parametres: [tva_taux_reduit, tva_taux_reduit_1pct, tva_seuil_assujettissement_cdf]
+
 avertissement: >
   Ce pack reflète les règles fiscales et sociales RDC connues à la date de rédaction.
   Certains barèmes indexés sur l'inflation (IPR, plafond INSS) et les taxes locales
@@ -40,14 +49,25 @@ params:
     valeur: 0.16
     aide: 'TVA taux normal RDC.'
     source: 'Ordonnance-Loi 10/001 du 20/08/2010, réforme TVA'
+  # Erratum (révision n° 2, ADR-0021 §7) : le taux réduit est passé de 8 % à 5 %
+  # en 2026 et un taux de 1 % a été créé. Aucun modèle sectoriel ne consomme ces
+  # paramètres : la correction ne change aucun plan (test verrou dans
+  # parameter-packs.test.ts).
   tva_taux_reduit:
-    valeur: 0.08
-    aide: 'TVA taux réduit (produits première nécessité).'
-    source: 'Ordonnance-Loi 10/001'
+    valeur: 0.05
+    aide: 'TVA taux réduit (groupe C de la facture normalisée).'
+    source: 'Loi de finances 2026 ; communiqué officiel DGI n° 010 du 25 févr. 2026'
+    a_confirmer: true
+  tva_taux_reduit_1pct:
+    valeur: 0.01
+    aide: 'TVA taux réduit à 1 % (groupe O de la facture normalisée).'
+    source: 'Loi de finances 2026 ; communiqué officiel DGI n° 010 du 25 févr. 2026'
+    a_confirmer: true
   tva_seuil_assujettissement_cdf:
     valeur: 80000000
-    aide: 'Seuil annuel de CA (CDF) au-delà duquel régime réel obligatoire.'
+    aide: "Seuil annuel de chiffre d'affaires (CDF) d'assujettissement à la TVA."
     source: 'DGI, régime des micro-entrepreneurs'
+    a_confirmer: true
 
   # ─── Charges sociales sur salaires ───────────────────────────
   cnss_employeur_pct:

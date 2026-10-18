@@ -29,6 +29,8 @@ Un pack suit `draft → review → approved → active → retired`.
 
 Une version active est immuable. Une correction crée une nouvelle version avec date d’effet et notes de migration. Un plan conserve sa version d’origine.
 
+**Erratum en place (ADR-0021 §7).** Seule exception : un paramètre qu’aucun modèle ne consomme (ni driver, ni formule, ni seuil) peut être corrigé dans la version active, parce qu’aucun plan, aucune empreinte et aucun PDF ne change. La correction est tracée par une entrée `revisions` (numéro ≥ 2, date, objet, paramètres corrigés) et verrouillée par un test : le jour où un modèle consomme un paramètre révisé, le test échoue et toute correction ultérieure exige une nouvelle version. Première application : `cd-2026`, révision n° 2 (taux réduit de TVA à 5 %, groupe C ; taux de 1 %, groupe O ; source : loi de finances 2026, communiqué officiel DGI n° 010).
+
 ## Hiérarchie
 
 ```text

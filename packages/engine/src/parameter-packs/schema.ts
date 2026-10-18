@@ -42,6 +42,27 @@ const ParamSchema = z
 export type Param = z.infer<typeof ParamSchema>;
 
 /**
+ * Révision en place d'un pack — erratum tracé (ADR-0021 §7, docs/09).
+ *
+ * La révision 1 est implicite (le pack tel que publié). Une révision n'est
+ * admise que pour corriger un paramètre qu'AUCUN modèle ne consomme : un plan
+ * reste alors strictement reproductible, et l'empreinte (`packVersion` = l'année)
+ * ne change pas. `parametres` nomme les paramètres corrigés : c'est ce que lit le
+ * test verrou, qui tombe le jour où un modèle consommerait l'un d'eux — une
+ * correction devra alors passer par une vraie nouvelle version.
+ */
+const RevisionSchema = z
+  .object({
+    numero: z.number().int().min(2),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'date attendue au format AAAA-MM-JJ'),
+    objet: z.string().min(10),
+    parametres: z.array(IdSchema).min(1),
+  })
+  .strict();
+
+export type ParameterPackRevision = z.infer<typeof RevisionSchema>;
+
+/**
  * Un ParameterPack cible un pays (ISO-2), une année de référence et un système comptable.
  * Le slug par convention = `<pays>-<annee>` (ex. `cd-2026`) ou `<zone>-<annee>` (ex. `ohada-generic-2026`).
  */
@@ -60,6 +81,8 @@ export const ParameterPackSchema = z
     description: z.string().optional(),
     /** Table des paramètres, clé = identifiant (ex. `ibp_taux`), valeur = Param. */
     params: z.record(IdSchema, ParamSchema),
+    /** Errata en place, numérotés à partir de 2 (voir `RevisionSchema`). */
+    revisions: z.array(RevisionSchema).optional(),
     /** Note d'avertissement légal — affichée dans le PDF. */
     avertissement: z.string().optional(),
   })

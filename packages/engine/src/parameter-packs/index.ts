@@ -3,6 +3,7 @@ export {
   packToDriverValues,
   toSummary,
   type ParameterPack,
+  type ParameterPackRevision,
   type ParameterPackSummary,
   type Param,
 } from './schema.js';

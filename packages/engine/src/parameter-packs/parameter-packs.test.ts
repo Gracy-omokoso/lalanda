@@ -3,7 +3,7 @@
 // Objectif principal : figer la sémantique "user > pack > defaut" — un changement
 // de précédence casserait toute la logique multi-pays.
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest';
 import { EngineError } from '../dsl/errors.js';
 import { parseTemplate } from '../dsl/parser.js';
 import { evaluateTemplate } from '../evaluator/index.js';
-import { packToDriverValues, parseParameterPack } from './index.js';
+import { packToDriverValues, parseParameterPack, toSummary } from './index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -158,5 +158,111 @@ feuilles:
   it('pas de seuil si pas de pack ou seuil absent du pack', () => {
     const { lines } = evaluateTemplate(templateWithSeuils, {});
     expect(lines.find((l) => l.lineId === 'marge_ebe')?.seuil).toBeUndefined();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Erratum en place (ADR-0021 §7) — révision n° 2 de cd-2026, et son verrou
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('cd-2026 — révision n° 2 (taux réduits de TVA 2026)', () => {
+  const pack = loadPack('cd-2026');
+
+  it('porte le taux réduit à 5 % (groupe C) et le nouveau taux de 1 % (groupe O)', () => {
+    expect(pack.params['tva_taux_reduit']?.valeur).toBe(0.05);
+    expect(pack.params['tva_taux_reduit_1pct']?.valeur).toBe(0.01);
+    expect(pack.params['tva_taux_reduit']?.a_confirmer).toBe(true);
+    expect(pack.params['tva_taux_reduit_1pct']?.a_confirmer).toBe(true);
+    expect(pack.params['tva_seuil_assujettissement_cdf']?.a_confirmer).toBe(true);
+    // Le taux normal n'est pas touché.
+    expect(pack.params['tva_taux_normal']?.valeur).toBe(0.16);
+  });
+
+  it('cite la loi de finances 2026 et le communiqué officiel DGI n° 010', () => {
+    for (const id of ['tva_taux_reduit', 'tva_taux_reduit_1pct']) {
+      expect(pack.params[id]?.source).toMatch(/Loi de finances 2026/);
+      expect(pack.params[id]?.source).toMatch(/communiqué officiel DGI n° 010/);
+    }
+  });
+
+  it('trace la révision n° 2 et nomme les paramètres corrigés', () => {
+    const revision = pack.revisions?.find((r) => r.numero === 2);
+    expect(revision).toBeDefined();
+    expect(revision!.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(revision!.parametres).toEqual(
+      expect.arrayContaining(['tva_taux_reduit', 'tva_taux_reduit_1pct']),
+    );
+    for (const id of revision!.parametres) expect(pack.params[id], id).toBeDefined();
+  });
+
+  it('toSummary ne change pas de forme (aucune révision exposée au listing)', () => {
+    expect(Object.keys(toSummary(pack))).not.toContain('revisions');
+  });
+
+  it('refuse une révision n° 1, une date mal formée, un objet trop court ou sans paramètre', () => {
+    const base = `
+slug: x-2026
+pays: CD
+annee: 2026
+systeme_comptable: syscohada-revise-2017
+devise_principale: USD
+label: 'X'
+params:
+  p: { valeur: 1 }
+`;
+    for (const rev of [
+      "revisions: [{ numero: 1, date: '2026-01-01', objet: 'Objet assez long', parametres: [p] }]",
+      "revisions: [{ numero: 2, date: '01/01/2026', objet: 'Objet assez long', parametres: [p] }]",
+      "revisions: [{ numero: 2, date: '2026-01-01', objet: 'court', parametres: [p] }]",
+      "revisions: [{ numero: 2, date: '2026-01-01', objet: 'Objet assez long', parametres: [] }]",
+    ]) {
+      expect(() => parseParameterPack(base + rev), rev).toThrow(EngineError);
+    }
+  });
+});
+
+describe('verrou des errata — aucun modèle ne consomme un paramètre révisé en place', () => {
+  // Un erratum en place n'est légitime que parce qu'il ne change AUCUN plan
+  // (ADR-0021 §7) : l'évaluateur ne résout que les drivers du modèle, et aucun
+  // modèle ne lit ces paramètres. Le jour où un modèle les consommera — comme
+  // driver, dans une formule ou comme seuil — ce test tombera : toute correction
+  // ultérieure exigera alors une vraie nouvelle version du pack (docs/09).
+  const engineSrc = resolve(__dirname, '..');
+  const modeles = [
+    ...readdirSync(resolve(engineSrc, 'templates'))
+      .filter((f) => f.endsWith('.yaml'))
+      .map((f) => resolve(engineSrc, 'templates', f)),
+    resolve(engineSrc, 'toy-template.yaml'),
+  ];
+
+  const revises = readdirSync(__dirname)
+    .filter((f) => f.endsWith('.yaml'))
+    .flatMap((f) => {
+      const pack = parseParameterPack(readFileSync(resolve(__dirname, f), 'utf8'));
+      return (pack.revisions ?? []).flatMap((r) =>
+        r.parametres.map((id) => ({ pack: pack.slug, id })),
+      );
+    });
+
+  it('trouve des modèles et au moins un paramètre révisé (le test ne se valide pas à vide)', () => {
+    expect(modeles.length).toBeGreaterThanOrEqual(5);
+    expect(revises.length).toBeGreaterThan(0);
+  });
+
+  it('aucun modèle ne déclare de driver révisé ni ne le cite dans une formule ou un seuil', () => {
+    for (const fichier of modeles) {
+      const yaml = readFileSync(fichier, 'utf8');
+      const template = parseTemplate(yaml);
+      const driverIds = new Set(template.drivers.map((d) => d.id));
+      for (const { pack, id } of revises) {
+        expect(driverIds.has(id), `${fichier} déclare le driver ${id} (révisé dans ${pack})`).toBe(
+          false,
+        );
+        expect(
+          new RegExp(`\\b${id}\\b`).test(yaml),
+          `${fichier} cite ${id} (révisé dans ${pack}) : une correction exige une nouvelle version`,
+        ).toBe(false);
+      }
+    }
   });
 });
