@@ -59,8 +59,15 @@ import { IntegrationsService } from './integrations.service.js';
 import type { PlatformAuditInput, PlatformAuditService } from './platform-audit.service.js';
 import { INTEGRATION_PROVIDERS, PROVIDER_SPECS, type IntegrationProvider } from './providers.js';
 import type { ReauthService } from './reauth.service.js';
+import {
+  OrganizationSecretSchema,
+  type OrganizationSecretDocument,
+} from './organization-secret.schema.js';
+import type { OrganizationSecretRef } from './organization-secrets.port.js';
+import { OrganizationSecretsService } from './organization-secrets.service.js';
 import { MasterKeyring } from './secrets-crypto.js';
 import { SecretsService } from './secrets.service.js';
+import { SessionReauthController } from './session-reauth.controller.js';
 
 // ── Valeurs sentinelles ──────────────────────────────────────────────────────
 
@@ -564,6 +571,226 @@ describe("l'audit ne porte jamais la valeur — ADR-0013 §6", () => {
     // ADR-0013 §4 : « Jamais un préfixe » — un préfixe révélerait le mode et le
     // type d'une clé Stripe (`sk_live_` / `rk_test_`).
     expect(valeur.startsWith(last4)).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Coffre de portée ORGANISATION — ADR-0021 §4.2 et §13 (chantier A)
+//
+// Même propriété que pour `/admin` : la chaîne du jeton e-MCF n'apparaît NULLE PART
+// — ni dans ce que renvoie le coffre, ni dans ses erreurs, ni dans la sérialisation
+// de ses documents, ni dans les journaux émis pendant qu'il travaille. Et le mot de
+// passe soumis à `/me/reauth` n'apparaît dans aucune de ses réponses.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Jeton e-MCF inventé (≥ 12 caractères : `last4` existe). */
+const JETON_EMCF = 'ANTIFUITE-emcf-5b9e27c1d04a8f63';
+/** Mot de passe soumis à `POST /me/reauth`. */
+const MOT_DE_PASSE_MEMBRE = 'ANTIFUITE-membre-mdp-81d3f6a0c2e9';
+const SECRETS_ORGANISATION = [JETON_EMCF, MOT_DE_PASSE_MEMBRE];
+
+function exigerAucuneFuiteOrganisation(label: string, payload: unknown): void {
+  chargesInspectees += 1;
+  const fuites = fuitesDe(payload, [...TOUS_LES_SECRETS, ...SECRETS_ORGANISATION]);
+  expect(
+    fuites,
+    `FUITE — ${label}\n` + fuites.map((f) => `  · ${f.genre} : ${f.detail}`).join('\n'),
+  ).toEqual([]);
+}
+
+const ModeleOrgBase = mongoose.model<OrganizationSecretDocument>(
+  'OrganizationSecretAntiFuite',
+  OrganizationSecretSchema,
+);
+
+/**
+ * Modèle en mémoire couvrant exactement les appels d'`OrganizationSecretsService`
+ * (`findOne`, `updateOne` avec `upsert`, `find`, `deleteOne`). Les documents sont
+ * hydratés par le VRAI schéma : ses transformations `toJSON`/`toObject` sont la
+ * barrière n°2 que ce test éprouve.
+ */
+function modeleOrganisationEnMemoire(): {
+  model: Model<OrganizationSecretDocument>;
+  store: Map<string, OrganizationSecretDocument>;
+} {
+  const store = new Map<string, OrganizationSecretDocument>();
+  const correspond = (doc: OrganizationSecretDocument, filtre: Record<string, unknown>): boolean =>
+    Object.entries(filtre).every(([cle, attendu]) => {
+      const valeur =
+        cle === '_id' ? String(doc._id) : (doc as unknown as Record<string, unknown>)[cle];
+      if (attendu && typeof attendu === 'object' && '$in' in (attendu as object)) {
+        return (attendu as { $in: unknown[] }).$in.map(String).includes(String(valeur));
+      }
+      return String(valeur) === String(attendu);
+    });
+  const chercher = (filtre: Record<string, unknown>): OrganizationSecretDocument[] =>
+    [...store.values()].filter((d) => correspond(d, filtre));
+  const requete = <T>(resultat: () => T): { session: () => unknown; exec: () => Promise<T> } => {
+    const q = { session: () => q, exec: async () => resultat() };
+    return q;
+  };
+  const model = {
+    findOne: (filtre: Record<string, unknown>) => requete(() => chercher(filtre)[0] ?? null),
+    find: (filtre: Record<string, unknown>) => requete(() => chercher(filtre)),
+    deleteOne: (filtre: Record<string, unknown>) =>
+      requete(() => {
+        for (const d of chercher(filtre)) store.delete(String(d._id));
+        return { deletedCount: 1 };
+      }),
+    updateOne: (
+      filtre: Record<string, unknown>,
+      maj: { $set: Record<string, unknown>; $setOnInsert?: Record<string, unknown> },
+    ) =>
+      requete(() => {
+        const existant = chercher(filtre)[0];
+        if (existant) {
+          existant.set(maj.$set);
+          return { modifiedCount: 1 };
+        }
+        const doc = new ModeleOrgBase({ ...filtre, ...maj.$setOnInsert, ...maj.$set });
+        store.set(String(doc._id), doc);
+        return { modifiedCount: 0, upsertedCount: 1 };
+      }),
+  } as unknown as Model<OrganizationSecretDocument>;
+  return { model, store };
+}
+
+/** Capture tout ce qui part vers la console ou les sorties standard pendant `fn`. */
+async function journauxPendant(fn: () => Promise<void>): Promise<string> {
+  const lignes: string[] = [];
+  const methodes = ['log', 'info', 'warn', 'error', 'debug', 'trace'] as const;
+  const originaux = methodes.map((m) => console[m]);
+  const ecrireStdout = process.stdout.write.bind(process.stdout);
+  const ecrireStderr = process.stderr.write.bind(process.stderr);
+  for (const m of methodes) {
+    console[m] = (...args: unknown[]) => {
+      lignes.push(args.map((a) => inspect(a, { depth: 8 })).join(' '));
+    };
+  }
+  const capter = ((chunk: unknown) => {
+    lignes.push(String(chunk));
+    return true;
+  }) as typeof process.stdout.write;
+  process.stdout.write = capter;
+  process.stderr.write = capter;
+  try {
+    await fn();
+  } finally {
+    methodes.forEach((m, i) => (console[m] = originaux[i]!));
+    process.stdout.write = ecrireStdout;
+    process.stderr.write = ecrireStderr;
+  }
+  return lignes.join('\n');
+}
+
+describe('coffre de portée organisation — aucune sortie ne contient le jeton (ADR-0021 §4.2)', () => {
+  const REF: OrganizationSecretRef = {
+    organizationId: 'org-antifuite',
+    kind: 'dgi_emcf_token',
+    ownerId: 'pos-antifuite',
+  };
+  const keyring = MasterKeyring.of([{ keyId: 'k-org', key: randomBytes(32) }], 'k-org');
+
+  it('put, describe, describeMany, resolve, destroy et leurs erreurs — réponses et journaux', async () => {
+    const { model, store } = modeleOrganisationEnMemoire();
+    const coffre = new OrganizationSecretsService(model, keyring);
+    const sansCoffre = new OrganizationSecretsService(model, null);
+    let documentsInspectes = 0;
+
+    const journaux = await journauxPendant(async () => {
+      const ecrit = await coffre.put(REF, JETON_EMCF, 'user-1');
+      exigerAucuneFuiteOrganisation('put', ecrit);
+      // Garde anti-vacuité : la description n'est pas vide.
+      expect(ecrit.last4).toBe(JETON_EMCF.slice(-4));
+
+      exigerAucuneFuiteOrganisation('describe', await coffre.describe(REF));
+      exigerAucuneFuiteOrganisation(
+        'describeMany',
+        await coffre.describeMany(REF.organizationId, REF.kind, [REF.ownerId, 'pos-absent']),
+      );
+
+      const secret = await coffre.resolve(REF);
+      expect(secret?.expose()).toBe(JETON_EMCF); // le coffre n'est pas vide
+      exigerAucuneFuiteOrganisation('Secret résolu (JSON + inspect)', secret);
+      exigerAucuneFuiteOrganisation('Secret résolu (String)', String(secret));
+
+      exigerAucuneFuiteOrganisation(
+        '503 VAULT_UNAVAILABLE (put)',
+        await capturer(() => sansCoffre.put(REF, JETON_EMCF, 'user-1')),
+      );
+      exigerAucuneFuiteOrganisation(
+        '503 VAULT_UNAVAILABLE (resolve)',
+        await capturer(() => sansCoffre.resolve(REF)),
+      );
+      exigerAucuneFuiteOrganisation(
+        'adresse invalide, valeur dans la requête',
+        await capturer(() => coffre.put({ ...REF, ownerId: 'a:b' }, JETON_EMCF, 'user-1')),
+      );
+
+      // Document déplacé vers une autre organisation : l'erreur de déchiffrement ne
+      // recopie ni le jeton ni le chiffré.
+      const doc = [...store.values()][0]!;
+      doc.set('organizationId', 'org-pirate');
+      exigerAucuneFuiteOrganisation(
+        'SecretDecryptionError (document déplacé)',
+        await capturer(() => coffre.resolve({ ...REF, organizationId: 'org-pirate' })),
+      );
+      doc.set('organizationId', REF.organizationId);
+
+      for (const d of store.values()) {
+        documentsInspectes += 1;
+        expect(d.value.ciphertext).toBeTypeOf('string'); // contre-épreuve
+        exigerAucuneFuiteOrganisation('JSON.stringify(document)', JSON.parse(JSON.stringify(d)));
+        exigerAucuneFuiteOrganisation('String(document)', String(d));
+        exigerAucuneFuiteOrganisation('document.toObject()', d.toObject());
+        // `console.log(doc)` passe par util.inspect : capté par `journauxPendant`.
+        console.log(d);
+      }
+
+      await coffre.destroy(REF);
+      expect(await coffre.resolve(REF)).toBeNull();
+    });
+
+    expect(documentsInspectes).toBe(1);
+    expect(journaux).toContain('org-antifuite'); // le console.log a bien été capté
+    exigerAucuneFuiteOrganisation('journaux émis pendant la campagne', journaux);
+  });
+
+  it('POST /me/reauth ne renvoie jamais le mot de passe soumis', async () => {
+    const reauth = {
+      confirm: async () => ({ expiresAt: new Date('2030-01-01T00:00:00.000Z') }),
+      confirmRecentSignIn: async () => ({ expiresAt: new Date('2030-01-01T00:00:00.000Z') }),
+      statusOf: async () => ({ active: true, expiresAt: '2030-01-01T00:00:00.000Z' }),
+      methodOf: async () => 'password' as const,
+    } as unknown as ReauthService;
+    const controleur = new SessionReauthController(reauth);
+
+    const journaux = await journauxPendant(async () => {
+      exigerAucuneFuiteOrganisation(
+        'POST /me/reauth',
+        await controleur.confirm(REQUETE, { password: MOT_DE_PASSE_MEMBRE }),
+      );
+      exigerAucuneFuiteOrganisation(
+        'POST /me/reauth — champ inconnu',
+        await capturer(() =>
+          controleur.confirm(REQUETE, {
+            password: MOT_DE_PASSE_MEMBRE,
+            extra: MOT_DE_PASSE_MEMBRE,
+          }),
+        ),
+      );
+      exigerAucuneFuiteOrganisation(
+        'POST /me/reauth — mot de passe mal typé',
+        await capturer(() => controleur.confirm(REQUETE, { password: [MOT_DE_PASSE_MEMBRE] })),
+      );
+      exigerAucuneFuiteOrganisation('GET /me/reauth', await controleur.status(REQUETE));
+    });
+    exigerAucuneFuiteOrganisation('journaux de /me/reauth', journaux);
+  });
+
+  it('le détecteur voit le jeton e-MCF et le mot de passe (la campagne n’est pas vaine)', () => {
+    expect(fuitesDe({ t: JETON_EMCF }, SECRETS_ORGANISATION)).toHaveLength(1);
+    expect(fuitesDe(new Error(MOT_DE_PASSE_MEMBRE), SECRETS_ORGANISATION)).toHaveLength(1);
   });
 });
 

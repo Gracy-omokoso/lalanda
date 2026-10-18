@@ -23,6 +23,7 @@ import {
   IntegrationsController,
   ReauthController,
 } from '../integrations/integrations.controller.js';
+import { SessionReauthController } from '../integrations/session-reauth.controller.js';
 import { AiActionsController } from '../ai/ai-actions.controller.js';
 import { LalaController } from '../ai/lala.controller.js';
 import { LalaVocalController } from '../ai/lala-vocal.controller.js';
@@ -82,6 +83,7 @@ const CONTROLEURS = [
   PlatformAccessController,
   ProjectsController,
   ReportsController,
+  SessionReauthController,
 ];
 
 /**
@@ -178,6 +180,18 @@ const SANS_PERMISSION: Record<string, string> = {
   // pas une organisation.
   'LegalController.read': 'État de son propre accord, scopé par la session.',
   'LegalController.accept': 'Enregistrement de son propre accord, scopé par la session.',
+
+  // ── Ré-authentification d'un membre d'organisation (ADR-0021 §8) ─────────
+  // On ré-authentifie SA PROPRE session : la fenêtre n'ouvre aucun droit, elle
+  // prouve seulement la présence de la personne. Exiger une permission
+  // d'organisation pour prouver sa présence serait sans objet — ce sont les
+  // routes protégées par la fenêtre qui portent, elles, leur permission.
+  'SessionReauthController.confirm':
+    'Ouvre la fenêtre de ré-authentification de 10 minutes de SA PROPRE session ' +
+    '(mot de passe, ou connexion Google récente pour un compte sans mot de passe).',
+  'SessionReauthController.status':
+    'État de la fenêtre de ré-authentification de SA PROPRE session, et moyen de ' +
+    'preuve attendu (mot de passe ou Google). Aucune donnée d’organisation.',
 };
 
 interface RouteInspectee {
