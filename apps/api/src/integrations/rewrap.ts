@@ -10,6 +10,12 @@
 // être déchiffrés. La migration est rejouable, y compris après une interruption
 // en plein vol — c'est ce qui permet de la relancer sans réfléchir quand un
 // déploiement s'est mal passé au milieu.
+//
+// DEUX COLLECTIONS depuis ADR-0021 §4.2 : `integrations` (portée plateforme) et
+// `organization_secrets` (portée organisation). Même procédure, même idempotence,
+// un `secret.rewrapped` par enregistrement. Oublier la seconde rendrait les jetons
+// e-MCF indéchiffrables au retrait de l'ancienne clé : `remainingKeyIds` couvre
+// donc les deux, et l'exploitant ne retire `_PREVIOUS` que s'il est vide.
 
 import { Injectable, Inject, Logger } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
@@ -17,6 +23,11 @@ import type { ClientSession, Connection, Model } from 'mongoose';
 
 import { Integration, type IntegrationDocument } from './integration.schema.js';
 import { MASTER_KEYRING } from './keyring.provider.js';
+import {
+  OrganizationSecret,
+  type OrganizationSecretDocument,
+} from './organization-secret.schema.js';
+import { encryptedValueOf, organizationSecretLocation } from './organization-secrets.service.js';
 import { PlatformAuditService } from './platform-audit.service.js';
 import { rewrapSecret, type EncryptedValue, type MasterKeyring } from './secrets-crypto.js';
 import { SecretsService } from './secrets.service.js';
@@ -36,6 +47,8 @@ export class RewrapService {
 
   constructor(
     @InjectModel(Integration.name) private readonly model: Model<IntegrationDocument>,
+    @InjectModel(OrganizationSecret.name)
+    private readonly orgSecrets: Model<OrganizationSecretDocument>,
     @InjectConnection() private readonly connection: Connection,
     @Inject(MASTER_KEYRING) private readonly keyring: MasterKeyring | null,
     @Inject(PlatformAuditService) private readonly audit: PlatformAuditService,
@@ -101,6 +114,8 @@ export class RewrapService {
       this.logger.log(`${doc.provider} : ${changedNames.length} secret(s) re-chiffré(s).`);
     }
 
+    await this.rewrapOrganizationSecrets(keyring, actorUserId, report);
+
     this.secrets.invalidateAll();
 
     // Étape 3 de la procédure : « vérifier qu'aucun document ne porte l'ancien
@@ -114,8 +129,66 @@ export class RewrapService {
         if (record.keyId !== keyring.currentKeyId) remaining.add(record.keyId);
       }
     }
+    for (const doc of await this.orgSecrets.find({}).exec()) {
+      if (doc.value.keyId !== keyring.currentKeyId) remaining.add(doc.value.keyId);
+    }
     report.remainingKeyIds = [...remaining];
     return report;
+  }
+
+  /**
+   * Secrets de portée organisation (ADR-0021 §4.2) — un enregistrement par document.
+   *
+   * L'emplacement est celui qu'utilise la lecture (`organizationSecretLocation`) :
+   * une seule définition, sans quoi la rotation re-chiffrerait sous un emplacement
+   * que `resolve` ne reconnaîtrait pas. Pas de cache à invalider : le coffre
+   * d'organisation n'en a pas.
+   */
+  private async rewrapOrganizationSecrets(
+    keyring: MasterKeyring,
+    actorUserId: string,
+    report: RewrapReport,
+  ): Promise<void> {
+    for (const doc of await this.orgSecrets.find({}).exec()) {
+      const outcome = rewrapSecret({
+        location: organizationSecretLocation(doc),
+        record: encryptedValueOf(doc),
+        keyring,
+      });
+      if (!outcome.changed) {
+        report.skipped += 1;
+        continue;
+      }
+      const written = await this.inTransaction(async (session) => {
+        // Écriture conditionnée par l'ancien `keyId` : si une saisie concurrente a
+        // remplacé le jeton entre la lecture et l'écriture, elle l'a chiffré sous la
+        // clé courante, et la rotation ne doit pas l'écraser avec l'ancienne valeur.
+        const res = await this.orgSecrets
+          .updateOne(
+            { _id: doc._id, 'value.keyId': doc.value.keyId, 'value.iv': doc.value.iv },
+            { $set: { value: outcome.record } },
+            session ? { session } : {},
+          )
+          .exec();
+        if (res.modifiedCount === 0) return false;
+        await this.audit.record(
+          {
+            actorUserId,
+            actorRole: 'system',
+            action: 'secret.rewrapped',
+            targetType: 'organization_secret',
+            targetId: String(doc._id),
+            // Ni valeur ni `last4`, et pas l'organisation : le journal plateforme
+            // n'a pas à lister les clients qui détiennent un jeton e-MCF.
+            metadata: { kind: doc.kind, keyId: keyring.currentKeyId },
+          },
+          session,
+        );
+        return true;
+      });
+      // Compté HORS de la transaction : `withTransaction` peut rejouer le rappel.
+      if (written) report.rewrapped += 1;
+    }
   }
 
   private async inTransaction<T>(
