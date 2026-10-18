@@ -1,0 +1,1718 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "e-DEF",
+    "description": "DGI RDC - Tous droits réservés",
+    "contact": {
+      "name": "DGI RDC",
+      "url": "https://www.dgi.gouv.cd"
+    },
+    "version": "2.0"
+  },
+  "servers": [
+    {
+      "url": "/edef"
+    }
+  ],
+  "paths": {
+    "/api/info/status": {
+      "get": {
+        "tags": [
+          "EmcfInfoApi"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/InfoResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InfoResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InfoResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/info/taxGroups": {
+      "get": {
+        "tags": [
+          "EmcfInfoApi"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxGroupsDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxGroupsDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxGroupsDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/info/invoiceTypes": {
+      "get": {
+        "tags": [
+          "EmcfInfoApi"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InvoiceTypeDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InvoiceTypeDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InvoiceTypeDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/info/paymentTypes": {
+      "get": {
+        "tags": [
+          "EmcfInfoApi"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PaymentTypeDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PaymentTypeDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PaymentTypeDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/info/clientTypes": {
+      "get": {
+        "tags": [
+          "EmcfInfoApi"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ClientTypeDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ClientTypeDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ClientTypeDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/info/referenceTypes": {
+      "get": {
+        "tags": [
+          "EmcfInfoApi"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReferenceTypeDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReferenceTypeDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReferenceTypeDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/info/itemTypes": {
+      "get": {
+        "tags": [
+          "EmcfInfoApi"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ItemTypeDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ItemTypeDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ItemTypeDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/info/currencyRates": {
+      "get": {
+        "tags": [
+          "EmcfInfoApi"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CurrencyRateDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CurrencyRateDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CurrencyRateDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/invoice": {
+      "get": {
+        "tags": [
+          "EmcfInvoiceApi"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponseDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "EmcfInvoiceApi"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvoiceRequestDataDto"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvoiceRequestDataDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvoiceRequestDataDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvoiceRequestDataDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/invoice/{uid}": {
+      "get": {
+        "tags": [
+          "EmcfInvoiceApi"
+        ],
+        "parameters": [
+          {
+            "name": "uid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceDetailsDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceDetailsDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceDetailsDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/invoice/{uid}/confirm": {
+      "put": {
+        "tags": [
+          "EmcfInvoiceApi"
+        ],
+        "parameters": [
+          {
+            "name": "uid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinalizeInvoiceRequestDataDto"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinalizeInvoiceRequestDataDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinalizeInvoiceRequestDataDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinalizeInvoiceRequestDataDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinalizeInvoiceResponseDataDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinalizeInvoiceResponseDataDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinalizeInvoiceResponseDataDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/invoice/{uid}/cancel": {
+      "put": {
+        "tags": [
+          "EmcfInvoiceApi"
+        ],
+        "parameters": [
+          {
+            "name": "uid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinalizeInvoiceResponseDataDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinalizeInvoiceResponseDataDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinalizeInvoiceResponseDataDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ClientDto": {
+        "type": "object",
+        "properties": {
+          "nif": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "$ref": "#/components/schemas/ClientTypeEnum"
+          },
+          "typeDesc": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "contact": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ClientTypeDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ClientTypeEnum": {
+        "enum": [
+          "PP",
+          "PM",
+          "PC",
+          "PL",
+          "AO"
+        ],
+        "type": "string"
+      },
+      "CurrencyRateDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "rate": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "EmcfInfoDto": {
+        "type": "object",
+        "properties": {
+          "nim": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "shopName": {
+            "type": "string",
+            "nullable": true
+          },
+          "address1": {
+            "type": "string",
+            "nullable": true
+          },
+          "address2": {
+            "type": "string",
+            "nullable": true
+          },
+          "address3": {
+            "type": "string",
+            "nullable": true
+          },
+          "contact1": {
+            "type": "string",
+            "nullable": true
+          },
+          "contact2": {
+            "type": "string",
+            "nullable": true
+          },
+          "contact3": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "FinalizeInvoiceRequestDataDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "format": "double"
+          },
+          "vtotal": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FinalizeInvoiceResponseDataDto": {
+        "type": "object",
+        "properties": {
+          "dateTime": {
+            "type": "string",
+            "nullable": true
+          },
+          "qrCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "codeDEFDGI": {
+            "type": "string",
+            "nullable": true
+          },
+          "counters": {
+            "type": "string",
+            "nullable": true
+          },
+          "nim": {
+            "type": "string",
+            "nullable": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "errorDesc": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "InfoResponseDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "string",
+            "nullable": true
+          },
+          "nif": {
+            "type": "string",
+            "nullable": true
+          },
+          "nim": {
+            "type": "string",
+            "nullable": true
+          },
+          "tokenValid": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "serverDateTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "emcfList": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EmcfInfoDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "InvoiceDetailsDto": {
+        "type": "object",
+        "properties": {
+          "nif": {
+            "type": "string",
+            "nullable": true
+          },
+          "rn": {
+            "type": "string",
+            "nullable": true
+          },
+          "mode": {
+            "type": "string",
+            "nullable": true
+          },
+          "isf": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "$ref": "#/components/schemas/InvoiceTypeEnum"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemDto"
+            },
+            "nullable": true
+          },
+          "client": {
+            "$ref": "#/components/schemas/ClientDto"
+          },
+          "operator": {
+            "$ref": "#/components/schemas/OperatorDto"
+          },
+          "payment": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentDto"
+            },
+            "nullable": true
+          },
+          "totals": {
+            "$ref": "#/components/schemas/InvoiceResponseDto"
+          },
+          "reference": {
+            "type": "string",
+            "nullable": true
+          },
+          "referenceType": {
+            "type": "string",
+            "nullable": true
+          },
+          "referenceDesc": {
+            "type": "string",
+            "nullable": true
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "errorDesc": {
+            "type": "string",
+            "nullable": true
+          },
+          "curCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "curDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "curRate": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "secElements": {
+            "$ref": "#/components/schemas/FinalizeInvoiceResponseDataDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "InvoiceRequestDataDto": {
+        "type": "object",
+        "properties": {
+          "nif": {
+            "type": "string",
+            "nullable": true
+          },
+          "rn": {
+            "type": "string",
+            "nullable": true
+          },
+          "mode": {
+            "type": "string",
+            "nullable": true
+          },
+          "isf": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "$ref": "#/components/schemas/InvoiceTypeEnum"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemDto"
+            },
+            "nullable": true
+          },
+          "client": {
+            "$ref": "#/components/schemas/ClientDto"
+          },
+          "operator": {
+            "$ref": "#/components/schemas/OperatorDto"
+          },
+          "payment": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentDto"
+            },
+            "nullable": true
+          },
+          "reference": {
+            "type": "string",
+            "nullable": true
+          },
+          "referenceType": {
+            "type": "string",
+            "nullable": true
+          },
+          "referenceDesc": {
+            "type": "string",
+            "nullable": true
+          },
+          "cmta": {
+            "type": "string",
+            "nullable": true
+          },
+          "cmtb": {
+            "type": "string",
+            "nullable": true
+          },
+          "cmtc": {
+            "type": "string",
+            "nullable": true
+          },
+          "cmtd": {
+            "type": "string",
+            "nullable": true
+          },
+          "cmte": {
+            "type": "string",
+            "nullable": true
+          },
+          "cmtf": {
+            "type": "string",
+            "nullable": true
+          },
+          "cmtg": {
+            "type": "string",
+            "nullable": true
+          },
+          "cmth": {
+            "type": "string",
+            "nullable": true
+          },
+          "curCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "curDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "curRate": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "InvoiceResponseDto": {
+        "type": "object",
+        "properties": {
+          "uid": {
+            "type": "string",
+            "nullable": true
+          },
+          "ta": {
+            "type": "number",
+            "format": "double"
+          },
+          "tb": {
+            "type": "number",
+            "format": "double"
+          },
+          "tc": {
+            "type": "number",
+            "format": "double"
+          },
+          "td": {
+            "type": "number",
+            "format": "double"
+          },
+          "te": {
+            "type": "number",
+            "format": "double"
+          },
+          "tf": {
+            "type": "number",
+            "format": "double"
+          },
+          "tg": {
+            "type": "number",
+            "format": "double"
+          },
+          "th": {
+            "type": "number",
+            "format": "double"
+          },
+          "ti": {
+            "type": "number",
+            "format": "double"
+          },
+          "tj": {
+            "type": "number",
+            "format": "double"
+          },
+          "tk": {
+            "type": "number",
+            "format": "double"
+          },
+          "tl": {
+            "type": "number",
+            "format": "double"
+          },
+          "tm": {
+            "type": "number",
+            "format": "double"
+          },
+          "tn": {
+            "type": "number",
+            "format": "double"
+          },
+          "to": {
+            "type": "number",
+            "format": "double"
+          },
+          "tp": {
+            "type": "number",
+            "format": "double"
+          },
+          "trq": {
+            "type": "number",
+            "format": "double"
+          },
+          "trr": {
+            "type": "number",
+            "format": "double"
+          },
+          "trs": {
+            "type": "number",
+            "format": "double"
+          },
+          "trt": {
+            "type": "number",
+            "format": "double"
+          },
+          "tru": {
+            "type": "number",
+            "format": "double"
+          },
+          "trv": {
+            "type": "number",
+            "format": "double"
+          },
+          "trw": {
+            "type": "number",
+            "format": "double"
+          },
+          "trx": {
+            "type": "number",
+            "format": "double"
+          },
+          "try": {
+            "type": "number",
+            "format": "double"
+          },
+          "trz": {
+            "type": "number",
+            "format": "double"
+          },
+          "taa": {
+            "type": "number",
+            "format": "double"
+          },
+          "tab": {
+            "type": "number",
+            "format": "double"
+          },
+          "tac": {
+            "type": "number",
+            "format": "double"
+          },
+          "tad": {
+            "type": "number",
+            "format": "double"
+          },
+          "tae": {
+            "type": "number",
+            "format": "double"
+          },
+          "taf": {
+            "type": "number",
+            "format": "double"
+          },
+          "tag": {
+            "type": "number",
+            "format": "double"
+          },
+          "tah": {
+            "type": "number",
+            "format": "double"
+          },
+          "tai": {
+            "type": "number",
+            "format": "double"
+          },
+          "taj": {
+            "type": "number",
+            "format": "double"
+          },
+          "tak": {
+            "type": "number",
+            "format": "double"
+          },
+          "tal": {
+            "type": "number",
+            "format": "double"
+          },
+          "tam": {
+            "type": "number",
+            "format": "double"
+          },
+          "tan": {
+            "type": "number",
+            "format": "double"
+          },
+          "tao": {
+            "type": "number",
+            "format": "double"
+          },
+          "tap": {
+            "type": "number",
+            "format": "double"
+          },
+          "taq": {
+            "type": "number",
+            "format": "double"
+          },
+          "tar": {
+            "type": "number",
+            "format": "double"
+          },
+          "tas": {
+            "type": "number",
+            "format": "double"
+          },
+          "tat": {
+            "type": "number",
+            "format": "double"
+          },
+          "tau": {
+            "type": "number",
+            "format": "double"
+          },
+          "tav": {
+            "type": "number",
+            "format": "double"
+          },
+          "taw": {
+            "type": "number",
+            "format": "double"
+          },
+          "tax": {
+            "type": "number",
+            "format": "double"
+          },
+          "tay": {
+            "type": "number",
+            "format": "double"
+          },
+          "taz": {
+            "type": "number",
+            "format": "double"
+          },
+          "haa": {
+            "type": "number",
+            "format": "double"
+          },
+          "hab": {
+            "type": "number",
+            "format": "double"
+          },
+          "hac": {
+            "type": "number",
+            "format": "double"
+          },
+          "had": {
+            "type": "number",
+            "format": "double"
+          },
+          "hae": {
+            "type": "number",
+            "format": "double"
+          },
+          "haf": {
+            "type": "number",
+            "format": "double"
+          },
+          "hag": {
+            "type": "number",
+            "format": "double"
+          },
+          "hah": {
+            "type": "number",
+            "format": "double"
+          },
+          "hai": {
+            "type": "number",
+            "format": "double"
+          },
+          "haj": {
+            "type": "number",
+            "format": "double"
+          },
+          "hak": {
+            "type": "number",
+            "format": "double"
+          },
+          "hal": {
+            "type": "number",
+            "format": "double"
+          },
+          "ham": {
+            "type": "number",
+            "format": "double"
+          },
+          "han": {
+            "type": "number",
+            "format": "double"
+          },
+          "hao": {
+            "type": "number",
+            "format": "double"
+          },
+          "hap": {
+            "type": "number",
+            "format": "double"
+          },
+          "haq": {
+            "type": "number",
+            "format": "double"
+          },
+          "har": {
+            "type": "number",
+            "format": "double"
+          },
+          "has": {
+            "type": "number",
+            "format": "double"
+          },
+          "hat": {
+            "type": "number",
+            "format": "double"
+          },
+          "hau": {
+            "type": "number",
+            "format": "double"
+          },
+          "hav": {
+            "type": "number",
+            "format": "double"
+          },
+          "haw": {
+            "type": "number",
+            "format": "double"
+          },
+          "hax": {
+            "type": "number",
+            "format": "double"
+          },
+          "hay": {
+            "type": "number",
+            "format": "double"
+          },
+          "haz": {
+            "type": "number",
+            "format": "double"
+          },
+          "vaa": {
+            "type": "number",
+            "format": "double"
+          },
+          "vab": {
+            "type": "number",
+            "format": "double"
+          },
+          "vac": {
+            "type": "number",
+            "format": "double"
+          },
+          "vad": {
+            "type": "number",
+            "format": "double"
+          },
+          "vae": {
+            "type": "number",
+            "format": "double"
+          },
+          "vaf": {
+            "type": "number",
+            "format": "double"
+          },
+          "vag": {
+            "type": "number",
+            "format": "double"
+          },
+          "vah": {
+            "type": "number",
+            "format": "double"
+          },
+          "vai": {
+            "type": "number",
+            "format": "double"
+          },
+          "vaj": {
+            "type": "number",
+            "format": "double"
+          },
+          "vak": {
+            "type": "number",
+            "format": "double"
+          },
+          "val": {
+            "type": "number",
+            "format": "double"
+          },
+          "vam": {
+            "type": "number",
+            "format": "double"
+          },
+          "van": {
+            "type": "number",
+            "format": "double"
+          },
+          "vao": {
+            "type": "number",
+            "format": "double"
+          },
+          "vap": {
+            "type": "number",
+            "format": "double"
+          },
+          "vaq": {
+            "type": "number",
+            "format": "double"
+          },
+          "var": {
+            "type": "number",
+            "format": "double"
+          },
+          "vas": {
+            "type": "number",
+            "format": "double"
+          },
+          "vat": {
+            "type": "number",
+            "format": "double"
+          },
+          "vau": {
+            "type": "number",
+            "format": "double"
+          },
+          "vav": {
+            "type": "number",
+            "format": "double"
+          },
+          "vaw": {
+            "type": "number",
+            "format": "double"
+          },
+          "vax": {
+            "type": "number",
+            "format": "double"
+          },
+          "vay": {
+            "type": "number",
+            "format": "double"
+          },
+          "vaz": {
+            "type": "number",
+            "format": "double"
+          },
+          "ts": {
+            "type": "number",
+            "format": "double"
+          },
+          "total": {
+            "type": "number",
+            "format": "double"
+          },
+          "curTotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "vtotal": {
+            "type": "number",
+            "format": "double"
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "errorDesc": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "InvoiceTypeDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "InvoiceTypeEnum": {
+        "enum": [
+          "FV",
+          "FT",
+          "FA",
+          "EV",
+          "ET",
+          "EA"
+        ],
+        "type": "string"
+      },
+      "ItemDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "$ref": "#/components/schemas/ItemTypeEnum"
+          },
+          "price": {
+            "type": "number",
+            "format": "double"
+          },
+          "quantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "taxGroup": {
+            "$ref": "#/components/schemas/TaxGroupTypeEnum"
+          },
+          "taxSpecificValue": {
+            "type": "string",
+            "nullable": true
+          },
+          "taxSpecificAmount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "originalPrice": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "priceModification": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ItemTypeDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ItemTypeEnum": {
+        "enum": [
+          "BIE",
+          "SER",
+          "TAX"
+        ],
+        "type": "string"
+      },
+      "OperatorDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PaymentDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/PaymentTypeEnum"
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "curCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "curRate": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PaymentTypeDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PaymentTypeEnum": {
+        "enum": [
+          "ESPECES",
+          "VIREMENT",
+          "CARTEBANCAIRE",
+          "MOBILEMONEY",
+          "CHEQUES",
+          "CREDIT",
+          "AUTRE"
+        ],
+        "type": "string"
+      },
+      "PendingRequestDto": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "uid": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReferenceTypeDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "StatusResponseDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "string",
+            "nullable": true
+          },
+          "nif": {
+            "type": "string",
+            "nullable": true
+          },
+          "nim": {
+            "type": "string",
+            "nullable": true
+          },
+          "tokenValid": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "serverDateTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "pendingRequestsCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pendingRequestsList": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PendingRequestDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "TaxGroupTypeEnum": {
+        "enum": [
+          "A",
+          "B",
+          "C",
+          "D",
+          "E",
+          "F",
+          "G",
+          "H",
+          "I",
+          "J",
+          "K",
+          "L",
+          "M",
+          "N",
+          "O",
+          "P",
+          "Q",
+          "R",
+          "S",
+          "T",
+          "U",
+          "V",
+          "W",
+          "X",
+          "Y",
+          "Z"
+        ],
+        "type": "string"
+      },
+      "TaxGroupsDto": {
+        "type": "object",
+        "properties": {
+          "a": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "b": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "c": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "d": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "e": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "f": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "g": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "h": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "i": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "j": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "k": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "l": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "m": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "n": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "o": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "p": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "q": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "r": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "s": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "securitySchemes": {
+      "Bearer": {
+        "type": "apiKey",
+        "description": "JWT Authorization header using the Bearer scheme (Example: 'Bearer 12345abcdef')",
+        "name": "Authorization",
+        "in": "header"
+      }
+    }
+  },
+  "security": [
+    {
+      "Bearer": [ ]
+    }
+  ]
+}
