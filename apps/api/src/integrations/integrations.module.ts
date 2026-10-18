@@ -2,8 +2,9 @@
 //
 // Exporte `SecretsService` : c'est par lui que les CONSOMMATEURS de secrets
 // (module IA aujourd'hui, transport SMTP et client S3 demain) obtiennent une
-// valeur. Rien d'autre n'est exporté — surtout pas `IntegrationsService`, dont
-// les méthodes d'écriture n'ont aucune raison d'être appelées hors de `/admin`.
+// valeur. Hors `ReauthService` (ADR-0021), rien d'autre n'est exporté — surtout pas
+// `IntegrationsService`, dont les méthodes d'écriture n'ont aucune raison d'être
+// appelées hors de `/admin`.
 
 import { Module, type OnApplicationBootstrap } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -39,7 +40,10 @@ import { SecretsService } from './secrets.service.js';
     RewrapService,
     { provide: CONNECTION_TESTER, useClass: HttpConnectionTester },
   ],
-  exports: [SecretsService, PlatformAuditService, RewrapService],
+  // `ReauthService` est exporté depuis ADR-0021 §11 : les écritures sensibles du
+  // module fiscal exigent la même fenêtre de ré-authentification liée à la session
+  // qu'`/admin` (ADR-0013 §5), et un seul mécanisme vaut mieux que deux.
+  exports: [SecretsService, PlatformAuditService, RewrapService, ReauthService],
 })
 export class IntegrationsModule implements OnApplicationBootstrap {
   constructor(private readonly secrets: SecretsService) {}
