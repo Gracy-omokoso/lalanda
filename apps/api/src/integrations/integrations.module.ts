@@ -21,9 +21,11 @@ import { ORGANIZATION_SECRETS } from './organization-secrets.port.js';
 import { OrganizationSecretsService } from './organization-secrets.service.js';
 import { PlatformAuditService } from './platform-audit.service.js';
 import { PlatformReauth, PlatformReauthSchema } from './reauth.schema.js';
+import { RecentReauthGuard } from './reauth.guard.js';
 import { ReauthService } from './reauth.service.js';
 import { RewrapService } from './rewrap.js';
 import { SecretsService } from './secrets.service.js';
+import { SessionReauthController } from './session-reauth.controller.js';
 
 @Module({
   imports: [
@@ -38,13 +40,14 @@ import { SecretsService } from './secrets.service.js';
       { name: OrganizationSecret.name, schema: OrganizationSecretSchema },
     ]),
   ],
-  controllers: [IntegrationsController, ReauthController],
+  controllers: [IntegrationsController, ReauthController, SessionReauthController],
   providers: [
     MasterKeyringProvider,
     SecretsService,
     IntegrationsService,
     PlatformAuditService,
     ReauthService,
+    RecentReauthGuard,
     RewrapService,
     OrganizationSecretsService,
     // Le module fiscal n'injecte que le PORT (`@Inject(ORGANIZATION_SECRETS)`), jamais
@@ -60,6 +63,7 @@ import { SecretsService } from './secrets.service.js';
     PlatformAuditService,
     RewrapService,
     ReauthService,
+    RecentReauthGuard,
     ORGANIZATION_SECRETS,
   ],
 })
