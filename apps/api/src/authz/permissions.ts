@@ -9,7 +9,8 @@
 // Trois ensembles fermés (docs/26 « états représentés par unions fermées ») :
 //   1. ORG_ROLES       — les 8 rôles d'organisation (ADR-0012 §1);
 //   2. PLATFORM_ROLES  — les 6 rôles plateforme, préfixés `platform_` (§2);
-//   3. ACTIONS         — les 15 actions granulaires, dans l'ordre de docs/12.
+//   3. ACTIONS         — les 16 actions granulaires, dans l'ordre de docs/12
+//                        (la seizième, `fiscal.manage`, vient d'ADR-0021 §8).
 //
 // Refus par défaut (docs/17 § Autorisation) : les matrices sont exhaustives, une
 // case absente ne compile pas, et une case `deny` est un refus.
@@ -84,7 +85,14 @@ export const PLATFORM_ROLES = [
 
 export type PlatformRole = (typeof PLATFORM_ROLES)[number];
 
-/** Les 15 actions granulaires (docs/12 § Actions granulaires, ordre du document). */
+/**
+ * Les 16 actions granulaires (docs/12 § Actions granulaires, ordre du document).
+ *
+ * `fiscal.manage` (ADR-0021 §8) est ajoutée EN FIN de liste, et non à côté
+ * d'`organization.manage` : l'ordre est celui de docs/12, que l'interface et les
+ * tests reprennent tel quel. L'insérer ailleurs déplacerait des lignes sans rien
+ * changer au sens.
+ */
 export const ACTIONS = [
   'organization.manage',
   'billing.manage',
@@ -101,6 +109,7 @@ export const ACTIONS = [
   'analytics.read',
   'report.export',
   'audit.read',
+  'fiscal.manage',
 ] as const;
 
 export type Action = (typeof ACTIONS)[number];
@@ -175,7 +184,7 @@ export type OrgGrant = 'allow' | 'deny' | 'allow_sod' | 'allow_project' | 'condi
 /**
  * MATRICE RÔLE ORGANISATION × ACTION — transcription littérale d'ADR-0012 §3.
  *
- * Le type impose 8 rôles × 15 actions : oublier une case ne compile pas.
+ * Le type impose 8 rôles × 16 actions : oublier une case ne compile pas.
  * `permissions.test.ts` redéclare cette matrice en littéral (elle n'est PAS
  * importée d'ici) : toute modification de production casse le test et force une
  * mise à jour consciente de l'ADR et de docs/12. C'est le garde-fou central.
@@ -202,6 +211,9 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'analytics.read': 'allow',
       'report.export': 'allow',
       'audit.read': 'allow',
+      // ADR-0021 §8 : saisir le jeton e-MCF et basculer le régime de facturation
+      // engagent le contribuable devant la DGI — autorité financière seulement.
+      'fiscal.manage': 'allow',
     },
     // Administrateur — « membres, projets, paramètres ». Gouvernance technique,
     // pas autorité financière : ni `billing.manage`, ni `plan.approve`, ni
@@ -222,6 +234,9 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'analytics.read': 'allow',
       'report.export': 'allow',
       'audit.read': 'allow',
+      // Gouvernance technique : l'identité fiscale et la facture normalisée
+      // engagent le contribuable, comme `plan.approve` (ADR-0021 §8, O2).
+      'fiscal.manage': 'deny',
     },
     // Directeur financier — « plans, validation, réalisé, rapports ». L'autorité
     // financière : approuve et clôture. Cible de la migration des anciens `member`
@@ -242,6 +257,7 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'analytics.read': 'allow',
       'report.export': 'allow',
       'audit.read': 'allow',
+      'fiscal.manage': 'allow',
     },
     // Comptable — « réalisé, mapping, clôture selon permission ». Constate, ne
     // projette pas : ni `inputs.update`, ni `plan.calculate`. Contrepartie de R2.
@@ -261,6 +277,7 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'analytics.read': 'allow',
       'report.export': 'allow',
       'audit.read': 'deny',
+      'fiscal.manage': 'deny',
     },
     // Analyste — « scénarios, analyses, commentaires ». Modélise et calcule,
     // n'approuve ni n'importe le réalisé.
@@ -280,6 +297,7 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'analytics.read': 'allow',
       'report.export': 'allow',
       'audit.read': 'deny',
+      'fiscal.manage': 'deny',
     },
     // Chef de projet — « projets autorisés et saisie ». Tout est `allow_project` :
     // le rôle n'a de sens qu'avec des assignations de projet, qui n'existent pas
@@ -300,6 +318,7 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'analytics.read': 'allow_project',
       'report.export': 'allow_project',
       'audit.read': 'deny',
+      'fiscal.manage': 'deny',
     },
     // Conseiller — « consultation, commentaires, recommandations ». Typiquement
     // EXTERNE (mentor, banquier invité) : pas de `report.export`, on lui ouvre la
@@ -320,6 +339,7 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'analytics.read': 'allow',
       'report.export': 'deny',
       'audit.read': 'deny',
+      'fiscal.manage': 'deny',
     },
     // Lecteur — lecture seulement. `analytics.read` est conservé : le refuser
     // viderait le rôle de son sens (ADR-0012 §3).
@@ -339,6 +359,7 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'analytics.read': 'allow',
       'report.export': 'deny',
       'audit.read': 'deny',
+      'fiscal.manage': 'deny',
     },
   };
 
@@ -383,6 +404,7 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'analytics.read': 'delegated',
     'report.export': 'forbidden',
     'audit.read': 'native',
+    'fiscal.manage': 'forbidden',
   },
   platform_admin: {
     'organization.manage': 'native',
@@ -400,6 +422,7 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'analytics.read': 'forbidden',
     'report.export': 'forbidden',
     'audit.read': 'native',
+    'fiscal.manage': 'forbidden',
   },
   // « Le support ne voit jamais les données financières sans consentement
   // explicite, durée limitée et audit » (docs/12) — d'où trois `delegated` et
@@ -420,6 +443,7 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'analytics.read': 'delegated',
     'report.export': 'forbidden',
     'audit.read': 'delegated',
+    'fiscal.manage': 'forbidden',
   },
   platform_billing: {
     'organization.manage': 'forbidden',
@@ -437,6 +461,7 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'analytics.read': 'forbidden',
     'report.export': 'forbidden',
     'audit.read': 'forbidden',
+    'fiscal.manage': 'forbidden',
   },
   // Vides sur cette matrice : opèrent sur des ressources de portée plateforme
   // (templates, Country Packs) qui n'ont pas d'action granulaire dans docs/12 —
@@ -457,6 +482,7 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'analytics.read': 'forbidden',
     'report.export': 'forbidden',
     'audit.read': 'forbidden',
+    'fiscal.manage': 'forbidden',
   },
   platform_country_pack_manager: {
     'organization.manage': 'forbidden',
@@ -474,16 +500,19 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'analytics.read': 'forbidden',
     'report.export': 'forbidden',
     'audit.read': 'forbidden',
+    'fiscal.manage': 'forbidden',
   },
 };
 
 /**
- * Les trois interdits absolus de la plateforme (ADR-0012 §4).
+ * Les quatre interdits absolus de la plateforme (ADR-0012 §4, amendé par ADR-0021 §8).
  *
  * Aucun rôle plateforme, super-administrateur compris, et aucun accès délégué ne
- * peut approuver un plan, clôturer une période ou exporter un rapport client.
- * Approuver et clôturer engagent le client vis-à-vis de sa banque; exporter
- * produit un fichier de ses données financières.
+ * peut approuver un plan, clôturer une période, exporter un rapport client ni
+ * gérer son identité fiscale. Approuver et clôturer engagent le client vis-à-vis
+ * de sa banque; exporter produit un fichier de ses données financières;
+ * `fiscal.manage` engage le contribuable devant la DGI — un acteur Lalanda ne
+ * saisit jamais son jeton e-MCF et ne bascule jamais son régime de facturation.
  *
  * Cette constante n'est pas décorative : `canPlatform()` la vérifie AVANT la
  * matrice, et un test s'assure qu'aucune case de la matrice ne la contredit.
@@ -492,6 +521,7 @@ export const PLATFORM_FORBIDDEN_ACTIONS: readonly Action[] = [
   'plan.approve',
   'period.close',
   'report.export',
+  'fiscal.manage',
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -560,7 +590,7 @@ export interface PlatformPermissionContext {
 }
 
 /**
- * Autorisation d'un rôle plateforme. Les trois interdits absolus sont vérifiés
+ * Autorisation d'un rôle plateforme. Les quatre interdits absolus sont vérifiés
  * en premier : aucune case de matrice ni aucun grant ne peut les lever.
  */
 export function canPlatform(
