@@ -5,9 +5,10 @@
 //
 // Ré-authentification (ADR-0021 §8) : les écritures sensibles — jeton,
 // activation, désactivation, environnement, retrait — exigent une fenêtre de
-// moins de 10 minutes liée à la session (même mécanisme qu'ADR-0013 §5). Sans
-// elle : `401 REAUTH_REQUIRED`, l'interface ouvre la saisie du mot de passe
-// (`POST /me/reauth`, chantier A) et rejoue la requête une fois.
+// moins de 10 minutes liée à la session (même mécanisme qu'ADR-0013 §5), posée
+// par `@RequireRecentReauth()`. Le garde passe AVANT la validation du corps :
+// sans fenêtre, `401 REAUTH_REQUIRED` avant tout 400. L'interface lit alors
+// `GET /me/reauth` (mot de passe ou reconnexion Google) et rejoue une fois.
 //
 // Quotas : « écriture intégration » (10/h/utilisateur) sur les écritures
 // sensibles, « test DGI » (30/h/utilisateur) sur ce qui sollicite la DGI sans
@@ -32,7 +33,7 @@ import { AuthGuard, type AuthenticatedRequest } from '../auth/auth.guard.js';
 import { CurrentOrgId } from '../auth/current-user.decorator.js';
 import { RequirePermission } from '../authz/authz.decorators.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
-import { ReauthService } from '../integrations/reauth.service.js';
+import { RequireRecentReauth } from '../integrations/reauth.guard.js';
 import { EDEF_TEST_THROTTLE, INTEGRATION_WRITE_THROTTLE } from '../security/throttling.js';
 import { UserThrottlerGuard } from '../security/user-throttler.guard.js';
 import type { FiscalActor } from './fiscal-profile.service.js';
@@ -60,7 +61,6 @@ export class NormalizedInvoicingController {
     @Inject(NormalizedInvoicingService) private readonly invoicing: NormalizedInvoicingService,
     @Inject(PointsOfSaleService) private readonly pointsOfSale: PointsOfSaleService,
     @Inject(ReferenceDataService) private readonly referenceData: ReferenceDataService,
-    @Inject(ReauthService) private readonly reauth: ReauthService,
   ) {}
 
   @Get()
@@ -74,12 +74,12 @@ export class NormalizedInvoicingController {
   @RequirePermission('fiscal.manage')
   @UseGuards(UserThrottlerGuard)
   @Throttle({ default: INTEGRATION_WRITE_THROTTLE })
+  @RequireRecentReauth()
   async activate(
     @Req() req: AuthenticatedRequest,
     @CurrentOrgId() orgId: string,
     @Body() body: unknown,
   ): Promise<NormalizedInvoicingView> {
-    await this.assertReauth(req);
     const parsed = ActivateSchema.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error);
     return this.invoicing.activate(orgId, parsed.data.environment, actorOf(req));
@@ -90,12 +90,12 @@ export class NormalizedInvoicingController {
   @RequirePermission('fiscal.manage')
   @UseGuards(UserThrottlerGuard)
   @Throttle({ default: INTEGRATION_WRITE_THROTTLE })
+  @RequireRecentReauth()
   async deactivate(
     @Req() req: AuthenticatedRequest,
     @CurrentOrgId() orgId: string,
     @Body() body: unknown,
   ): Promise<NormalizedInvoicingView> {
-    await this.assertReauth(req);
     const parsed = DeactivateSchema.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error, 'Un motif de 20 à 500 caractères est exigé.');
     return this.invoicing.deactivate(orgId, parsed.data.reason, {
@@ -109,12 +109,12 @@ export class NormalizedInvoicingController {
   @RequirePermission('fiscal.manage')
   @UseGuards(UserThrottlerGuard)
   @Throttle({ default: INTEGRATION_WRITE_THROTTLE })
+  @RequireRecentReauth()
   async environment(
     @Req() req: AuthenticatedRequest,
     @CurrentOrgId() orgId: string,
     @Body() body: unknown,
   ): Promise<NormalizedInvoicingView> {
-    await this.assertReauth(req);
     const parsed = ChangeEnvironmentSchema.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error);
     return this.invoicing.changeEnvironment(
@@ -129,12 +129,12 @@ export class NormalizedInvoicingController {
   @RequirePermission('fiscal.manage')
   @UseGuards(UserThrottlerGuard)
   @Throttle({ default: INTEGRATION_WRITE_THROTTLE })
+  @RequireRecentReauth()
   async createPointOfSale(
     @Req() req: AuthenticatedRequest,
     @CurrentOrgId() orgId: string,
     @Body() body: unknown,
   ): Promise<PointOfSaleView> {
-    await this.assertReauth(req);
     const parsed = CreatePointOfSaleSchema.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error);
     return this.pointsOfSale.create(
@@ -166,13 +166,13 @@ export class NormalizedInvoicingController {
   @RequirePermission('fiscal.manage')
   @UseGuards(UserThrottlerGuard)
   @Throttle({ default: INTEGRATION_WRITE_THROTTLE })
+  @RequireRecentReauth()
   async replaceToken(
     @Req() req: AuthenticatedRequest,
     @CurrentOrgId() orgId: string,
     @Param('posId') posId: string,
     @Body() body: unknown,
   ): Promise<PointOfSaleView> {
-    await this.assertReauth(req);
     const parsed = ReplaceTokenSchema.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error);
     return this.pointsOfSale.replaceToken(orgId, posId, parsed.data.token, actorOf(req));
@@ -195,13 +195,13 @@ export class NormalizedInvoicingController {
   @RequirePermission('fiscal.manage')
   @UseGuards(UserThrottlerGuard)
   @Throttle({ default: INTEGRATION_WRITE_THROTTLE })
+  @RequireRecentReauth()
   async disablePointOfSale(
     @Req() req: AuthenticatedRequest,
     @CurrentOrgId() orgId: string,
     @Param('posId') posId: string,
     @Body() body: unknown,
   ): Promise<PointOfSaleView> {
-    await this.assertReauth(req);
     const parsed = DisablePointOfSaleSchema.safeParse(body ?? {});
     if (!parsed.success) invalidRequest(parsed.error);
     return this.pointsOfSale.disable(orgId, posId, parsed.data.reason ?? null, actorOf(req));
@@ -216,10 +216,6 @@ export class NormalizedInvoicingController {
     @Param('posId') posId: string,
   ): Promise<ReferenceDataView> {
     return this.referenceData.read(orgId, posId);
-  }
-
-  private async assertReauth(req: AuthenticatedRequest): Promise<void> {
-    await this.reauth.assertRecent(req.user!.id, req.headers.cookie);
   }
 }
 

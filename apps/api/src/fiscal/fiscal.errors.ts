@@ -10,6 +10,7 @@ import {
   BadRequestException,
   ConflictException,
   HttpException,
+  InternalServerErrorException,
   NotFoundException,
   ServiceUnavailableException,
   UnprocessableEntityException,
@@ -17,6 +18,7 @@ import {
 import type { ZodError } from 'zod';
 
 import { VaultUnavailableError } from '../integrations/organization-secrets.port.js';
+import { SecretDecryptionError } from '../integrations/secrets-crypto.js';
 import type { EdefFailure } from '../edef/edef.types.js';
 import { issuesOf } from './fiscal.dto.js';
 
@@ -125,12 +127,27 @@ export function throwTokenCheckFailure(f: TokenCheckFailure): never {
   throw new UnprocessableEntityException(body);
 }
 
-/** `VaultUnavailableError` → 503 ; le reste remonte tel quel. */
+/**
+ * Erreurs du coffre traduites en réponses propres — jamais un 500 brut :
+ *  - `VaultUnavailableError` (clé maîtresse absente) → 503 `VAULT_UNAVAILABLE` ;
+ *  - `SecretDecryptionError` (chiffré altéré, déplacé ou clé retirée) → 500
+ *    `EMCF_TOKEN_UNREADABLE`, sans le message interne (il nomme l'emplacement) :
+ *    la panne reste bruyante (ADR-0013 §3), le remède est de ressaisir le jeton.
+ * Le reste remonte tel quel.
+ */
 export function rethrowVault(err: unknown): never {
   if (err instanceof VaultUnavailableError) {
     throw new ServiceUnavailableException({
       code: 'VAULT_UNAVAILABLE',
       message: 'Le coffre à secrets n’est pas configuré : les jetons e-MCF sont indisponibles.',
+    });
+  }
+  if (err instanceof SecretDecryptionError) {
+    // eslint-disable-next-line no-console
+    console.error('[fiscal] jeton e-MCF indéchiffrable', { code: err.code });
+    throw new InternalServerErrorException({
+      code: 'EMCF_TOKEN_UNREADABLE',
+      message: 'Le jeton enregistré pour ce point de vente est illisible : saisissez-le à nouveau.',
     });
   }
   if (err instanceof HttpException) throw err;

@@ -28,3 +28,30 @@ export async function inFiscalTransaction<T>(
 export function isDuplicateKey(err: unknown): boolean {
   return (err as { code?: number } | null)?.code === 11000;
 }
+
+/** E11000 sur l'index du NIM d'un point de vente (`EMCF_ALREADY_REGISTERED`). */
+export function isNimConflict(err: unknown): boolean {
+  if (!isDuplicateKey(err)) return false;
+  const e = err as { keyPattern?: Record<string, unknown>; message?: string };
+  return Boolean(e.keyPattern?.['dgi.nim']) || /dgi\.nim/.test(e.message ?? '');
+}
+
+/**
+ * Transaction rejouée UNE fois sur un doublon qui n'est pas celui du NIM.
+ *
+ * Dans une transaction, le coffre ne réessaie pas lui-même (`put` : MongoDB a déjà
+ * annulé la transaction sur l'erreur) ; c'est à l'appelant de la rejouer en
+ * entier. Le seul doublon attendu ici est celui de deux écritures concurrentes du
+ * même secret : la seconde tentative trouve le document existant et le remplace.
+ */
+export async function inFiscalTransactionWithReplay<T>(
+  connection: Connection,
+  fn: (session: ClientSession) => Promise<T>,
+): Promise<T> {
+  try {
+    return await inFiscalTransaction(connection, fn);
+  } catch (err) {
+    if (!isDuplicateKey(err) || isNimConflict(err)) throw err;
+    return inFiscalTransaction(connection, fn);
+  }
+}

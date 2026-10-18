@@ -51,7 +51,12 @@ import {
   throwTokenCheckFailure,
   type TokenCheckFailure,
 } from './fiscal.errors.js';
-import { inFiscalTransaction, isDuplicateKey } from './fiscal-transaction.js';
+import {
+  inFiscalTransaction,
+  inFiscalTransactionWithReplay,
+  isDuplicateKey,
+  isNimConflict,
+} from './fiscal-transaction.js';
 import { NormalizedInvoicingStateReader } from './normalized-invoicing-state.reader.js';
 
 export type PointOfSaleStatus =
@@ -214,7 +219,7 @@ export class PointsOfSaleService {
     const now = new Date();
     const ref = secretRef(organizationId, String(id));
     try {
-      await inFiscalTransaction(this.connection, async (session) => {
+      await inFiscalTransactionWithReplay(this.connection, async (session) => {
         await this.model.create(
           [
             {
@@ -252,7 +257,7 @@ export class PointsOfSaleService {
         );
       });
     } catch (err) {
-      if (isDuplicateKey(err)) emcfAlreadyRegistered();
+      if (isNimConflict(err)) emcfAlreadyRegistered();
       rethrowVault(err);
     }
     return this.view(organizationId, String(id));
@@ -305,7 +310,7 @@ export class PointsOfSaleService {
     const before = await this.describe(ref);
     const now = new Date();
     try {
-      await inFiscalTransaction(this.connection, async (session) => {
+      await inFiscalTransactionWithReplay(this.connection, async (session) => {
         await this.model
           .updateOne(
             { _id: pointOfSaleId, organizationId },
@@ -335,7 +340,7 @@ export class PointsOfSaleService {
         );
       });
     } catch (err) {
-      if (isDuplicateKey(err)) emcfAlreadyRegistered();
+      if (isNimConflict(err)) emcfAlreadyRegistered();
       rethrowVault(err);
     }
     return this.view(organizationId, pointOfSaleId);
