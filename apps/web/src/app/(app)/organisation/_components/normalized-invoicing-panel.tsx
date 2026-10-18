@@ -782,11 +782,11 @@ function CartePointDeVente({
         >
           <p>
             Dernier test, le {formatDateHeure(point.lastTest.at)} :{' '}
-            {point.lastTest.ok ? 'connexion réussie' : 'échec'}.
+            {point.lastTest.ok ? 'réussi' : 'en échec'}.
           </p>
           {/* Réponse DGI affichée telle quelle (exigence DGI). */}
           <p className="mt-1 font-mono text-xs">
-            {point.lastTest.code ? `Code : ${point.lastTest.code} · ` : ''}
+            Réponse : {point.lastTest.code ? `code ${point.lastTest.code} · ` : ''}
             {point.lastTest.message}
           </p>
         </div>
