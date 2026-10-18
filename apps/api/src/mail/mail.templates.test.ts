@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 import {
   renderEmailVerification,
   renderInvitation,
+  renderNormalizedInvoicingDisabled,
   renderPasswordReset,
 } from './mail.templates.js';
 
@@ -30,6 +31,14 @@ const ALL = [
     expiresAt: new Date('2026-09-01T10:00:00Z'),
   }),
   renderPasswordReset({ url: 'https://app.exemple.com/p?token=abc', expiresInMinutes: 30 }),
+  // ADR-0021, décision n° 5 — mêmes contraintes ADR-0014 § 2 que les trois autres.
+  renderNormalizedInvoicingDisabled({
+    url: 'https://app.exemple.com/organisation/fiscalite',
+    organizationName: 'Boulangerie du Fleuve',
+    deactivatedAt: new Date('2026-10-20T09:00:00Z'),
+    reason: 'Passage temporaire à un autre logiciel de facturation.',
+    actorName: 'Aline',
+  }),
 ];
 
 describe('gabarits — propriétés communes aux trois emails', () => {
@@ -176,5 +185,44 @@ describe('réinitialisation de mot de passe', () => {
     // Le nom est la seule donnée personnelle admise (elle vient du compte visé) ;
     // ni organisation, ni adresse, ni rôle ne doivent apparaître.
     expect(mail.text).not.toMatch(/@/);
+  });
+});
+
+describe('facture normalisée désactivée (ADR-0021, décision n° 5)', () => {
+  const input = {
+    url: 'https://app.exemple.com/organisation/fiscalite',
+    organizationName: 'Boulangerie du Fleuve',
+    deactivatedAt: new Date('2026-10-20T09:00:00Z'),
+    reason: 'Passage temporaire à un autre logiciel de facturation.',
+    actorName: 'Aline',
+  };
+
+  it('dit quoi, pour quelle organisation, quand, par qui et pourquoi — HTML et texte', () => {
+    const mail = renderNormalizedInvoicingDisabled(input);
+    expect(mail.subject).toContain('facture normalisée désactivée');
+    expect(mail.subject).toContain('Boulangerie du Fleuve');
+    for (const corps of [mail.html, mail.text]) {
+      expect(corps).toContain('Boulangerie du Fleuve');
+      expect(corps).toContain('20 octobre 2026');
+      expect(corps).toContain('Aline');
+      expect(corps).toContain('Passage temporaire à un autre logiciel de facturation.');
+    }
+    expect(mail.text).toContain(input.url);
+  });
+
+  it("reste lisible sans nom d'acteur", () => {
+    const mail = renderNormalizedInvoicingDisabled({ ...input, actorName: null });
+    expect(mail.text).not.toContain(', par ');
+  });
+
+  it('échappe le motif et le nom d’organisation (saisies utilisateur)', () => {
+    const mail = renderNormalizedInvoicingDisabled({
+      ...input,
+      organizationName: '<b>Org</b>',
+      reason: '<img src=x onerror=alert(1)> motif suffisamment long',
+    });
+    expect(mail.html).not.toContain('<img src=x');
+    expect(mail.html).not.toContain('<b>Org</b>');
+    expect(mail.html).toContain('&lt;img src=x');
   });
 });

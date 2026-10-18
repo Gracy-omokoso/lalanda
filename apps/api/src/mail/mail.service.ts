@@ -18,9 +18,11 @@
 
 import { Inject, Injectable } from '@nestjs/common';
 
+import { webUrl } from './mail.links.js';
 import {
   renderEmailVerification,
   renderInvitation,
+  renderNormalizedInvoicingDisabled,
   renderPasswordReset,
 } from './mail.templates.js';
 import { MailTransport } from './mail.transport.js';
@@ -55,6 +57,15 @@ export interface PasswordResetMail {
   expiresInMinutes: number;
 }
 
+/** Facture normalisée DGI désactivée — un envoi par Propriétaire (ADR-0021, décision n° 5). */
+export interface NormalizedInvoicingDisabledMail {
+  to: string;
+  organizationName: string;
+  deactivatedAt: Date;
+  reason: string;
+  actorName?: string | null | undefined;
+}
+
 /**
  * Contrat d'envoi du produit. Voir l'en-tête de fichier.
  *
@@ -68,6 +79,9 @@ export abstract class MailService {
   abstract sendEmailVerification(input: EmailVerificationMail): Promise<MailDeliveryResult>;
   abstract sendInvitation(input: InvitationMail): Promise<MailDeliveryResult>;
   abstract sendPasswordReset(input: PasswordResetMail): Promise<MailDeliveryResult>;
+  abstract sendNormalizedInvoicingDisabled(
+    input: NormalizedInvoicingDisabledMail,
+  ): Promise<MailDeliveryResult>;
 }
 
 /** Implémentation par défaut : rendu des gabarits puis remise au transport. */
@@ -109,6 +123,20 @@ export class TemplatedMailService extends MailService {
       url: input.url,
       name: input.name ?? null,
       expiresInMinutes: input.expiresInMinutes,
+    });
+    return this.transport.send({ to: input.to, ...body });
+  }
+
+  async sendNormalizedInvoicingDisabled(
+    input: NormalizedInvoicingDisabledMail,
+  ): Promise<MailDeliveryResult> {
+    const body = renderNormalizedInvoicingDisabled({
+      // Page Fiscalité de l'espace organisation (ADR-0021 §12, chantier C).
+      url: `${webUrl()}/organisation/fiscalite`,
+      organizationName: input.organizationName,
+      deactivatedAt: input.deactivatedAt,
+      reason: input.reason,
+      actorName: input.actorName ?? null,
     });
     return this.transport.send({ to: input.to, ...body });
   }

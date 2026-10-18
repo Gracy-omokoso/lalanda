@@ -255,6 +255,46 @@ export function renderPasswordReset(input: {
 }
 
 /**
+ * Facture normalisée DGI désactivée (ADR-0021, décision n° 5).
+ *
+ * Envoyé à CHAQUE Propriétaire de l'organisation : la désactivation fait sortir
+ * l'organisation de la facturation certifiée par la DGI, et elle peut avoir été
+ * décidée par un Directeur financier. Le message dit qui, quand et pourquoi —
+ * le motif saisi est recopié tel quel (échappé par la mise en page commune).
+ * Il ne contient ni NIF, ni jeton, ni identifiant e-MCF.
+ */
+export function renderNormalizedInvoicingDisabled(input: {
+  /** Page Fiscalité de l'organisation. */
+  url: string;
+  organizationName: string;
+  deactivatedAt: Date;
+  reason: string;
+  actorName?: string | null;
+}): RenderedMail {
+  const actor = input.actorName?.trim();
+  const rendered = layout({
+    heading: 'Facture normalisée désactivée',
+    paragraphs: [
+      'Bonjour,',
+      `La facture normalisée DGI a été désactivée pour l'organisation « ${input.organizationName} » le ${formatDateFr(input.deactivatedAt)}${actor ? `, par ${actor}` : ''}.`,
+      `Motif indiqué : « ${input.reason} »`,
+      "Tant qu'elle reste désactivée, les factures de cette organisation ne sont plus transmises à la DGI pour normalisation. La désactivation est inscrite au journal d'audit de l'organisation.",
+    ],
+    ctaLabel: "Ouvrir l'onglet Fiscalité",
+    ctaUrl: input.url,
+    footnotes: [
+      'Vous recevez ce message parce que vous êtes Propriétaire de cette organisation sur Lalanda.',
+      "Si cette désactivation n'était pas prévue, connectez-vous et vérifiez le journal d'audit de l'organisation.",
+    ],
+  });
+
+  return {
+    ...rendered,
+    subject: `${PRODUCT} — facture normalisée désactivée pour ${input.organizationName}`,
+  };
+}
+
+/**
  * Date lisible en français, en UTC.
  *
  * UTC et non le fuseau du serveur : un email daté « 14 h » selon le fuseau
