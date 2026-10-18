@@ -7,7 +7,7 @@
 // `IntegrationsService`, dont les méthodes d'écriture n'ont aucune raison d'être
 // appelées hors de `/admin`.
 
-import { Module, type OnApplicationBootstrap } from '@nestjs/common';
+import { Inject, Module, type OnApplicationBootstrap } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 
 import { OrganizationsModule } from '../organizations/organizations.module.js';
@@ -68,7 +68,9 @@ import { SessionReauthController } from './session-reauth.controller.js';
   ],
 })
 export class IntegrationsModule implements OnApplicationBootstrap {
-  constructor(private readonly secrets: SecretsService) {}
+  // `@Inject` explicite : vitest n'émet pas les métadonnées de décorateurs, et sans
+  // lui `secrets` valait `undefined` dans les suites e2e (journal de démarrage perdu).
+  constructor(@Inject(SecretsService) private readonly secrets: SecretsService) {}
 
   /**
    * Journalise la source effective de chaque secret au démarrage — second
