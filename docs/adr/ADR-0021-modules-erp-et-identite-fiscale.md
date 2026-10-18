@@ -48,7 +48,7 @@ ici.
 | L'ordonnanceur et la création des index en production existent | `scheduler/`, `database/indexes.service.ts` (création seule, jamais de suppression) |
 | `cd-2026.yaml` déclare `tva_taux_reduit: 0.08` ; **aucun des cinq modèles sectoriels** ne déclare de driver `tva_*` ; l'évaluateur ne résout que les drivers du modèle | `packages/engine/src/parameter-packs/cd-2026.yaml:43`, `packages/engine/src/templates/*.yaml`, `packages/engine/src/evaluator/index.ts:925-946` |
 | L'empreinte d'un plan hache les drivers résolus et `packVersion` (= l'année) | `apps/api/src/plans/fingerprint.ts` |
-| Le module e-mail est en cours de modification sur d'autres branches (`feat/zeptomail`, `feat/emails-zeptomail`) ; la ré-authentification aussi (`feat/mfa-plateforme`) | `git worktree list` |
+| Les branches `feat/zeptomail` et `feat/emails-zeptomail` sont **entièrement fusionnées** (0 commit hors de `main`) : le module e-mail n'est PAS en cours de modification. `feat/mfa-plateforme` est un travail **abandonné le 9 août 2026** (7 commits WIP non fusionnés) : on ne l'attend pas | `git rev-list --count main..<branche>` (relecture du coordinateur, 18 oct. 2026) |
 
 La documentation DGI du compte développeur n'est pas publique ; elle reste hors dépôt
 (`dgi/`, jamais commité). Cet ADR n'en reprend que ce qui est nécessaire au contrat, en
@@ -1026,14 +1026,16 @@ hors périmètre ; aucun fichier de `dgi/` ni aucun jeton dans un commit.
 - La portée « organisation » du coffre, annoncée par ADR-0013 §10 comme « non écrite »,
   existe — dans une collection distincte, pas dans `integrations`. Le champ `scope` de
   `integrations` reste inutilisé ; il n'est pas retiré (aucune migration pour rien).
-- Les membres d'organisation peuvent désormais se ré-authentifier. Les comptes créés par
-  Google n'ont pas de mot de passe : ils ne pourront pas effectuer les écritures
-  sensibles de ce lot (décision ouverte n° 6).
+- Les membres d'organisation peuvent désormais se ré-authentifier. Un compte **sans mot
+  de passe** (créé par Google) se ré-authentifie par une **connexion Google récente** :
+  `POST /me/reauth` sans mot de passe ouvre la fenêtre si l'utilisateur n'a pas de compte
+  `credential` ET que la session courante a été créée il y a moins de 10 minutes ;
+  sinon `401 REAUTH_GOOGLE_REQUIRED`, et l'interface propose « Se reconnecter avec
+  Google » puis rejoue la requête (chantier A pour l'API, C pour l'interface).
 - Le lot S25f trouvera prêts : le jeton par point de vente, le client et son journal,
   l'ISF, les listes de référence datées et `emissionModeOf`.
-- Risques de coordination : la branche `feat/mfa-plateforme` touche la
-  ré-authentification (A s'aligne sur elle si elle fusionne d'abord) ; les branches
-  ZeptoMail touchent `mail/` (raison pour laquelle ce lot n'y écrit rien).
+- Aucun risque de coordination avec d'autres branches : les branches e-mail sont
+  fusionnées, la branche MFA est abandonnée.
 - Le risque majeur reste hors de notre main : l'homologation définitive pourrait exiger un
   boîtier MCF physique, incompatible avec un logiciel en ligne (ADR-0019). Ce lot reste
   utile dans tous les cas — il est le socle de l'homologation transitoire comme de la
@@ -1058,11 +1060,14 @@ de la décideuse sur l'environnement de test DGI avant de déclarer le lot livr�
 4. **Un même NIF dans deux organisations Lalanda** : proposé de refuser la seconde
    activation, pour garantir une seule série de numérotation par contribuable. À lever si
    un cas réel l'exige.
-5. **Avertir les propriétaires par e-mail** lors d'une désactivation : souhaitable, reporté
-   au lot suivant pour ne pas toucher le module e-mail en cours de refonte. Le journal
-   strict et le bandeau permanent restent la garantie de ce lot. D'accord ?
-6. **Comptes Google sans mot de passe** : ils ne peuvent pas se ré-authentifier. Faut-il
-   leur permettre de définir un mot de passe dans `/compte`, ou attendre le MFA ?
+5. ~~Avertir les propriétaires par e-mail lors d'une désactivation~~ — **TRANCHÉ par le
+   coordinateur** : inclus dans ce lot (chantier B). Le module e-mail n'est pas en refonte.
+   B ajoute un gabarit `renderNormalizedInvoicingDisabled` dans `mail/mail.templates.ts`
+   (mêmes contraintes ADR-0014 § 2 : logo `cid:`, variante texte complète) et l'envoie à
+   chaque Propriétaire de l'organisation ; un échec d'envoi est journalisé, il ne bloque
+   pas la désactivation.
+6. ~~Comptes Google sans mot de passe~~ — **TRANCHÉ par le coordinateur** : ré-authentification
+   par connexion Google récente (voir Conséquences).
 
 ## Liens
 
