@@ -9,7 +9,7 @@ import { APP_GUARD, Reflector } from '@nestjs/core';
 import { ThrottlerGuard } from '@nestjs/throttler';
 
 import { ClientIpThrottlerGuard } from './client-ip-throttler.guard.js';
-import { AI_THROTTLE, GLOBAL_THROTTLE } from './throttling.js';
+import { AI_THROTTLE, EDEF_TEST_THROTTLE, GLOBAL_THROTTLE } from './throttling.js';
 import { ThrottlingModule } from './throttling.module.js';
 import { UserThrottlerGuard } from './user-throttler.guard.js';
 
@@ -20,6 +20,10 @@ describe('rate limiting (S16a)', () => {
 
   it('quota IA : 10 req/min (endpoint facturé OpenAI, ADR-0008)', () => {
     expect(AI_THROTTLE).toEqual({ ttl: 60_000, limit: 10 });
+  });
+
+  it('quota des appels à la DGI : 30 par heure (ADR-0021 §10)', () => {
+    expect(EDEF_TEST_THROTTLE).toEqual({ ttl: 3_600_000, limit: 30 });
   });
 
   it('ThrottlingModule enregistre le guard par IP cliente en guard global (APP_GUARD)', () => {

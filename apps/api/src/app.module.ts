@@ -22,6 +22,7 @@ import { OrganizationsModule } from './organizations/organizations.module.js';
 import { ParameterPacksModule } from './parameter-packs/parameter-packs.module.js';
 import { PaymentsModule } from './payments/payments.module.js';
 import { PlansModule } from './plans/plans.module.js';
+import { PlatformConfigModule } from './platform-config/platform-config.module.js';
 import { ProjectsModule } from './projects/projects.module.js';
 import { ReportsModule } from './reports/reports.module.js';
 import { SchedulerModule } from './scheduler/scheduler.module.js';
@@ -71,6 +72,9 @@ import { StorageModule } from './storage/storage.module.js';
     // déclaré avant ses consommateurs (AccountModule pour la photo de profil ;
     // exports et instantanés plus tard — docs/24).
     StorageModule,
+    // ADR-0021 §5 — paramètres plateforme DGI, @Global et sans dépendance : une
+    // variable `DGI_*` invalide fait échouer le démarrage ici.
+    PlatformConfigModule,
     OrganizationsModule,
     OrganizationSpaceModule,
     AuthModule,
