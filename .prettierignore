@@ -10,3 +10,6 @@ sources/
 # La documentation garde son style rédactionnel — pas reformatée par prettier.
 docs/
 CLAUDE.md
+
+# Copies de travail des agents (git worktrees imbriqués) : chacune a ses propres contrôles.
+.claude/worktrees/

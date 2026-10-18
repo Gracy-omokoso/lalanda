@@ -57,3 +57,6 @@ apps/api/scripts/smoke-*.html
 # Le dépôt est PUBLIC : ces pièces restent locales. Seules les sources publiques
 # vont dans docs/sources/dgi-rdc/.
 /dgi/
+
+# Copies de travail des agents (git worktrees créés dans le dépôt).
+/.claude/worktrees/
