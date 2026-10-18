@@ -106,7 +106,7 @@ describe('EdefClient', () => {
 
   it('erreur métier : le code DGI est remonté', async () => {
     const out = await client.getStatus(ctx(JETONS.business));
-    expect(!out.ok && out.error.dgiErrorCode).toBe('99');
+    expect(!out.ok && out.error.dgiErrorCode).toBe('FAKE-1');
   });
 
   it('délai dépassé : rend la main en moins du délai + 1 s', async () => {

@@ -117,8 +117,8 @@ export async function startFakeEdefServer(opts: {
           return void res.end('{"status": tru');
         case 'business_error':
           return send(res, 200, 'application/json', {
-            errorCode: '99',
-            errorDesc: 'Erreur de traitement (faux serveur)',
+            errorCode: 'FAKE-1',
+            errorDesc: 'Erreur métier simulée (faux serveur)',
           });
         case 'oversized':
           res.writeHead(200, { 'content-type': 'application/json' });
