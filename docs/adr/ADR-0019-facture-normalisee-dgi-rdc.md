@@ -1,7 +1,7 @@
 # ADR-0019 — Facture normalisée DGI (RDC) : intégrée, activable par organisation
 
 Statut : Proposed
-Date : 2026-10-18
+Date : 2026-10-18 (révisé le même jour après lecture de la documentation DGI)
 Décideurs : Gracy Omokoso
 
 ## Contexte
@@ -55,11 +55,15 @@ Routes d'information : `status` (validité du jeton, demandes en attente),
   « Facture normalisée DGI » activé/désactivé. Désactivé par défaut. Activable
   seulement quand les identifiants sont saisis **et** qu'un appel `GET
   /api/info/status` les a validés.
-- **Identifiants DGI par organisation**, saisis par l'utilisateur : NIF, `isf` et
-  jeton e-DEF. Le jeton est un **secret** : stocké chiffré dans `integrations`
-  avec `scope: 'organization'` (ADR-0013 l'avait prévu sans l'écrire), jamais
-  renvoyé en clair, jamais journalisé. Seuls les rôles qui gèrent l'organisation
-  le saisissent.
+- **Identifiants DGI par organisation**, saisis par l'utilisateur : son NIF et le
+  **jeton de son e-MCF** — un e-MCF par point de vente, donc éventuellement
+  plusieurs jetons par organisation. Le jeton est un **secret** : stocké chiffré
+  dans `integrations` avec `scope: 'organization'` (ADR-0013 l'avait prévu sans
+  l'écrire), jamais renvoyé en clair, jamais journalisé. Seuls les rôles qui
+  gèrent l'organisation le saisissent.
+- **L'ISF n'est PAS une donnée client** (correction du 18 oct. 2026) : c'est
+  l'identifiant attribué par la DGI au **logiciel homologué**, donc unique pour
+  Lalanda. C'est un paramètre de la plateforme, pas de l'organisation.
 - **Aucune règle fiscale codée en dur.** Groupes de taxation, types de facture,
   de client et de paiement sont lus par les routes `/api/info/*` et mis en cache
   avec leur date de relevé ; le catalogue associe chaque article à un groupe de
@@ -69,13 +73,50 @@ Routes d'information : `status` (validité du jeton, demandes en attente),
 - **Une facture normalisée est immuable.** Une fois `codeDEFDGI` reçu, elle ne se
   modifie plus ; une correction passe par une **facture d'avoir** référencée
   (`reference`, `referenceType`).
-- **Reprise des demandes en attente.** Une facture envoyée mais ni confirmée ni
-  annulée (coupure réseau, plantage) est retrouvée par `GET /api/info/status`
-  (`pendingRequestsList`) et soldée par l'ordonnanceur ([ADR-0018](ADR-0018-trajectoire-erp-trois-modules.md)).
+- **Confirmation d'un seul tenant, reprise par l'ordonnanceur.** Une facture
+  envoyée expire si elle n'est pas confirmée dans un délai très court (de l'ordre
+  de deux minutes selon la documentation du compte développeur — délai exact
+  demandé à la DGI). L'envoi, la comparaison des totaux et la confirmation se font
+  donc **dans la même requête**, jamais différés. L'ordonnanceur
+  ([ADR-0020](ADR-0020-ordonnanceur-mongodb.md)) ne sert qu'à **rattraper les cas
+  incertains** : la liste des demandes en attente se lit par `GET /api/invoice`
+  (`pendingRequestsList`, et non `/api/info/status` comme écrit initialement).
+  Une confirmation restée sans réponse est un état **incertain** à vérifier
+  auprès de la DGI avant toute nouvelle tentative — sinon, risque de facture
+  certifiée en double.
 - **Le PDF** porte les éléments renvoyés par la DGI : code DEF/DGI, NIM, compteurs,
   date et QR code.
 - **Environnements.** URL de l'API configurable (test / production) ; le mode test
   est affiché tant que l'organisation n'est pas passée en production.
+
+## Contraintes découvertes le 18 oct. 2026 (lecture de la documentation du compte développeur)
+
+La documentation remise sur le compte développeur de la décideuse n'est pas
+publique ; elle reste hors dépôt. Ce qu'elle impose, en substance :
+
+- **Seize groupes de taxation (A à P)** depuis février 2026 : le taux réduit est
+  passé de 8 % à **5 %** (groupe C), et un taux de **1 %** est apparu (groupes O et
+  P). Le jeu de paramètres `cd-2026` du moteur portait encore 8 % (déclaré, utilisé
+  par aucun calcul) : à corriger.
+- **Calcul** : mode de prix (TTC ou HT) unique par facture ; TVA calculée par groupe
+  sur le total du groupe ; arrondi à deux décimales, TVA arrondie vers le haut ;
+  aucun montant nul ou négatif. La DGI recalcule, Lalanda doit trouver le même
+  résultat au centime.
+- **Homologation** : la présentation officielle exige qu'un SFE sache se connecter
+  au boîtier MCF **et** à l'e-MCF pour l'attestation définitive. Une
+  **homologation transitoire** (e-MCF seul) existe, avec engagement de mise en
+  conformité totale sous trois mois. Pour un logiciel en ligne, la connexion au
+  boîtier supposerait une passerelle locale : question posée à la DGI avant tout
+  engagement.
+- **Pièce exigée au dossier** : la garantie qu'aucune facture non normalisée ne
+  peut sortir du logiciel. L'interrupteur par organisation reste compatible à une
+  condition : une organisation qui a activé la facture normalisée ne peut plus
+  émettre de facture non normalisée (désactivation tracée, jamais silencieuse).
+- **Périmètre homologué** : le logiciel ne peut émettre que les types de facture et
+  groupes de taxation validés lors de l'homologation — le choix du périmètre est
+  une décision produit.
+- **32 cas de test officiels** et **49 exigences** de conformité à couvrir avant la
+  demande.
 
 ## Conséquences
 
