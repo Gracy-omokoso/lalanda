@@ -35,7 +35,24 @@ Le support ne voit jamais les données financières sans consentement explicite,
 
 ## Actions granulaires
 
-`organization.manage`, `billing.manage`, `members.invite`, `project.create`, `project.read`, `project.update`, `canvas.update`, `inputs.update`, `plan.calculate`, `plan.approve`, `actuals.import`, `period.close`, `analytics.read`, `report.export`, `audit.read`.
+`organization.manage`, `billing.manage`, `members.invite`, `project.create`, `project.read`, `project.update`, `canvas.update`, `inputs.update`, `plan.calculate`, `plan.approve`, `actuals.import`, `period.close`, `analytics.read`, `report.export`, `audit.read`, `fiscal.manage`.
+
+`fiscal.manage` — « Gérer l'identité fiscale et la facture normalisée » — est la
+seizième action, ajoutée par ADR-0021 §8 (18 oct. 2026). Elle couvre la fiche
+fiscale de l'organisation, l'activation de la facture normalisée DGI et les jetons
+e-MCF de ses points de vente. Elle est réservée au **Propriétaire** et au
+**Directeur financier** : saisir le jeton qui certifie les factures et basculer le
+régime de facturation engagent le contribuable devant la DGI, comme valider un
+plan l'engage devant sa banque. L'Administrateur, qui gère l'organisation, ne la
+détient pas.
+
+| Action | PRO | ADM | DIR | CPT | ANA | CDP | CON | LEC |
+|---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| `fiscal.manage` | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+
+Elle est **interdite à tous les rôles plateforme**, super-administrateur compris et
+même sous accès délégué : un acteur Lalanda ne saisit jamais le jeton d'un
+contribuable et ne bascule jamais son régime de facturation.
 
 ## Règles critiques
 
@@ -67,10 +84,10 @@ Les 8 rôles d'organisation sont livrés, en slugs `snake_case` : `owner`, `admi
 collection distincte : un rôle plateforme est indépendant de toute appartenance à
 une organisation.
 
-Trois actions restent **interdites à tous les rôles plateforme, y compris au
-super-administrateur** : `plan.approve`, `period.close`, `report.export`. Un
-employé de la plateforme ne valide jamais un plan client et n'exporte jamais ses
-données.
+Quatre actions restent **interdites à tous les rôles plateforme, y compris au
+super-administrateur** : `plan.approve`, `period.close`, `report.export` et, depuis
+ADR-0021, `fiscal.manage`. Un employé de la plateforme ne valide jamais un plan
+client, n'exporte jamais ses données et ne touche jamais à son identité fiscale.
 
 ### Migration depuis `owner | member`
 
@@ -115,8 +132,8 @@ portant `audit.read`.
 
 ### Couverture de tests
 
-- Matrice rôle × action : 210 cas unitaires, exhaustifs (une case absente ne
-  compile pas).
+- Matrice rôle × action : 224 cas unitaires (8 × 16 + 6 × 16), exhaustifs (une
+  case absente ne compile pas).
 - Matrice appliquée bout en bout : 91 cas vérifiés sur le réseau — la preuve que
   les guards l'appliquent, pas seulement qu'elle est déclarée.
 - Règles critiques : 18 cas e2e, dont le parcours entrepreneur seul, le dernier

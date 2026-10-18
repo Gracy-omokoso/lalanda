@@ -11,6 +11,137 @@ const CommonEnvSchema = z.object({
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 });
 
+// ─── Facture normalisée DGI — paramètres PLATEFORME (ADR-0021 §5) ───────────
+//
+// Aucun de ces paramètres n'est secret, et aucun ne change en exploitation
+// courante : l'ISF est attribué par la DGI à une VERSION homologuée de Lalanda.
+// Le changer, ou ouvrir la production, est donc un acte de DÉPLOIEMENT relu, pas
+// un réglage de `/admin` (ADR-0021 O4). Les jetons e-MCF, eux, sont des secrets
+// d'organisation et n'ont rien à faire ici (coffre d'organisation, ADR-0021 §4.2).
+
+/** Hôtes de bouclage — seuls autorisés en `http`, pour le faux serveur e-DEF des tests. */
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+/**
+ * URL d'un environnement e-DEF.
+ *
+ * `https` obligatoire (ADR-0021 §5), à une exception près : `http` vers un hôte de
+ * bouclage, parce que le faux serveur des tests (`node:http`, ADR-0021 §6) n'a pas
+ * de certificat. Cette exception est refusée en production (voir
+ * `checkDgiEnv`) : une URL DGI en clair ne peut pas y passer, même par erreur.
+ *
+ * La barre oblique finale est retirée : les appelants concatènent `/api/...`, et
+ * `https://…/edef/` + `/api` produirait un `//` que certains serveurs refusent.
+ */
+function edefUrl(nom: string) {
+  return z
+    .string()
+    .url(`${nom} doit être une URL`)
+    .refine(
+      (v) => {
+        const u = new URL(v);
+        return (
+          u.protocol === 'https:' || (u.protocol === 'http:' && LOOPBACK_HOSTS.has(u.hostname))
+        );
+      },
+      { message: `${nom} doit être en https (http accepté seulement vers localhost)` },
+    )
+    .transform((v) => v.replace(/\/+$/, ''));
+}
+
+/** Champs `DGI_*`, partagés par `ApiEnvSchema` et `DgiEnvSchema`. */
+const DgiEnvShape = {
+  /** Environnement de test de la DGI (compte développeur). */
+  DGI_EDEF_TEST_URL: edefUrl('DGI_EDEF_TEST_URL').default('https://developper.dgirdc.cd/edef'),
+  /** Production DGI — n'est appelée que si `DGI_PRODUCTION_ENABLED=true`. */
+  DGI_EDEF_PRODUCTION_URL: edefUrl('DGI_EDEF_PRODUCTION_URL').default('https://edef.dgirdc.cd'),
+  /**
+   * ISF de test. Format libre : la DGI n'en publie pas pour son environnement de
+   * test, on ne lui en invente pas (ADR-0021 §5).
+   */
+  DGI_ISF_TEST: z.string().min(1).max(32).optional(),
+  /**
+   * ISF de production, attribué à la version homologuée du logiciel. Format
+   * `XXX-XXX-XX` (10 caractères, ADR-0021 §5). Validé dès ce lot, bien qu'il ne
+   * parte avec les factures qu'au lot S25f : la production ne doit pas pouvoir
+   * s'ouvrir sans lui.
+   */
+  DGI_ISF_PRODUCTION: z
+    .string()
+    .regex(
+      /^[A-Z0-9]{3}-[A-Z0-9]{3}-[A-Z0-9]{2}$/,
+      'DGI_ISF_PRODUCTION doit avoir la forme XXX-XXX-XX (majuscules et chiffres)',
+    )
+    .optional(),
+  /**
+   * Ouverture de la production DGI. Fermée tant que Lalanda n'est pas homologué
+   * (ADR-0019). Parse strict : seule la chaîne "true" ouvre — et toute autre
+   * valeur que "true"/"false" refuse le démarrage, plutôt que de deviner.
+   */
+  DGI_PRODUCTION_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
+  /**
+   * Délai d'attente d'un appel e-DEF. Plancher à 10 s : la DGI recommande
+   * d'attendre au moins ce temps avant de conclure à une absence de réponse.
+   */
+  DGI_HTTP_TIMEOUT_MS: z.coerce.number().int().min(10_000).max(60_000).default(15_000),
+};
+
+/**
+ * Règles qui portent sur PLUSIEURS variables à la fois — Zod ne peut pas les
+ * exprimer champ par champ.
+ *
+ * 1. Production ouverte sans ISF de production : refus de démarrer. Sans lui,
+ *    aucune facture normalisée de production ne serait valide.
+ * 2. En `NODE_ENV=production`, les URL e-DEF doivent être en https : l'exception
+ *    de bouclage n'existe que pour les tests.
+ */
+export function checkDgiEnv(
+  env: {
+    NODE_ENV?: string;
+    DGI_EDEF_TEST_URL: string;
+    DGI_EDEF_PRODUCTION_URL: string;
+    DGI_ISF_PRODUCTION?: string | undefined;
+    DGI_PRODUCTION_ENABLED: boolean;
+  },
+  ctx: z.RefinementCtx,
+): void {
+  if (env.DGI_PRODUCTION_ENABLED && env.DGI_ISF_PRODUCTION === undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['DGI_ISF_PRODUCTION'],
+      message:
+        'DGI_PRODUCTION_ENABLED=true exige DGI_ISF_PRODUCTION : la production DGI ne ' +
+        "s'ouvre pas sans l'ISF attribué à la version homologuée de Lalanda.",
+    });
+  }
+  if (env.NODE_ENV === 'production') {
+    for (const cle of ['DGI_EDEF_TEST_URL', 'DGI_EDEF_PRODUCTION_URL'] as const) {
+      if (!env[cle].startsWith('https://')) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [cle],
+          message: `${cle} doit être en https en production.`,
+        });
+      }
+    }
+  }
+}
+
+/**
+ * Variables DGI seules — lues par `platform-config/` dans apps/api, qui ne reçoit
+ * pas l'objet parsé par `main.ts` (les tests e2e démarrent l'application sans
+ * passer par `main.ts`). Mêmes règles que dans `ApiEnvSchema` : une seule
+ * définition, deux points d'entrée.
+ */
+export const DgiEnvSchema = z
+  .object({ NODE_ENV: NodeEnvSchema, ...DgiEnvShape })
+  .superRefine(checkDgiEnv);
+
+export type DgiEnv = z.infer<typeof DgiEnvSchema>;
+
 /** Schéma API (NestJS) — voir apps/api. */
 export const ApiEnvSchema = CommonEnvSchema.extend({
   API_PORT: z.coerce.number().int().positive().default(3001),
@@ -173,7 +304,9 @@ export const ApiEnvSchema = CommonEnvSchema.extend({
     .optional(),
 
   SECRETS_MASTER_KEY_PREVIOUS_ID: z.string().min(1).optional(),
-});
+
+  ...DgiEnvShape,
+}).superRefine(checkDgiEnv);
 
 export type ApiEnv = z.infer<typeof ApiEnvSchema>;
 
@@ -206,7 +339,7 @@ export type WebEnv = z.infer<typeof WebEnvSchema>;
  * Une variable OBLIGATOIRE laissée vide reste refusée : elle disparaît de
  * l'objet, et son absence est signalée comme telle.
  */
-function withoutEmptyValues(raw: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+export function withoutEmptyValues(raw: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const nettoye: NodeJS.ProcessEnv = {};
   for (const [cle, valeur] of Object.entries(raw)) {
     if (valeur !== '') nettoye[cle] = valeur;

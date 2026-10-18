@@ -4,6 +4,14 @@ Statut : Accepted
 Date : 2026-08-08
 Décideurs : CTO Lalanda (délégation Gracy Omokoso), décideur produit
 
+> **Amendé par [ADR-0021](ADR-0021-modules-erp-et-identite-fiscale.md) §8 (18 oct.
+> 2026).** Une seizième action, `fiscal.manage` (« Gérer l'identité fiscale et la
+> facture normalisée »), est ajoutée en fin de liste : accordée au Propriétaire et au
+> Directeur financier seulement, interdite à tous les rôles plateforme et ajoutée aux
+> interdits absolus, qui passent de trois à quatre. Les matrices ci-dessous restent
+> celles de 2026-08 ; la matrice à jour est celle de
+> `apps/api/src/authz/permissions.ts` et de docs/12.
+
 ## Contexte
 
 Le chantier « espaces membres » ouvre trois espaces distincts :

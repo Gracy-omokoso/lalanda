@@ -3,12 +3,12 @@
 // ── Pourquoi la matrice est REDÉCLARÉE ici ───────────────────────────────────
 //
 // Les tableaux ci-dessous ne sont PAS importés de `permissions.ts`. Ils sont
-// retranscrits à la main depuis ADR-0012 §3 et §4. C'est délibéré : un test qui
+// retranscrits à la main depuis ADR-0012 §3 et §4 (et ADR-0021 §8 pour `fiscal.manage`). C'est délibéré : un test qui
 // importerait la matrice de production vérifierait seulement qu'elle est égale à
 // elle-même. Ici, toute modification d'une case de production casse le test, ce
 // qui force une mise à jour CONSCIENTE de l'ADR et de docs/12.
 //
-// 8 rôles × 15 actions + 6 rôles plateforme × 15 actions = 210 cases vérifiées.
+// 8 rôles × 16 actions + 6 rôles plateforme × 16 actions = 224 cases vérifiées.
 
 import { describe, expect, it } from 'vitest';
 
@@ -71,6 +71,8 @@ const ATTENDU_ORG: Record<Action, string> = {
   'analytics.read': 'A   A   A   A   A   P   A   A',
   'report.export': 'A   A   A   A   A   P   .   .',
   'audit.read': 'A   A   A   .   .   .   .   .',
+  // ADR-0021 §8 : autorité financière seulement (Propriétaire, Directeur financier).
+  'fiscal.manage': 'A   .   A   .   .   .   .   .',
 };
 
 const CODE_VERS_GRANT: Record<string, string> = {
@@ -114,6 +116,8 @@ const ATTENDU_PLATEFORME: Record<Action, string> = {
   'analytics.read': 'D   .   D   .   .   .',
   'report.export': '.   .   .   .   .   .',
   'audit.read': 'N   N   D   .   .   .',
+  // ADR-0021 §8 : quatrième interdit absolu, super-administrateur compris.
+  'fiscal.manage': '.   .   .   .   .   .',
 };
 
 const CODE_VERS_GRANT_PLATEFORME: Record<string, string> = {
@@ -127,13 +131,15 @@ function cellules(ligne: string): string[] {
 }
 
 describe('matrice rôle organisation × action (ADR-0012 §3)', () => {
-  it('déclare exactement les 8 rôles et les 15 actions de docs/12', () => {
+  it('déclare exactement les 8 rôles et les 16 actions de docs/12', () => {
     expect([...ORG_ROLES]).toEqual([...ORDRE_ORG]);
-    expect(ACTIONS).toHaveLength(15);
+    expect(ACTIONS).toHaveLength(16);
+    // Ajoutée en fin de liste, comme dans docs/12 (ADR-0021 §8).
+    expect(ACTIONS[15]).toBe('fiscal.manage');
     expect(Object.keys(ATTENDU_ORG).sort()).toEqual([...ACTIONS].sort());
   });
 
-  // 8 × 15 = 120 cases.
+  // 8 × 16 = 128 cases.
   for (const action of ACTIONS) {
     const attendus = cellules(ATTENDU_ORG[action]);
     it(`« ${action} » : les 8 cases correspondent à l'ADR`, () => {
@@ -156,7 +162,7 @@ describe('matrice rôle plateforme × action (ADR-0012 §4)', () => {
     for (const role of PLATFORM_ROLES) expect(role.startsWith('platform_')).toBe(true);
   });
 
-  // 6 × 15 = 90 cases.
+  // 6 × 16 = 96 cases.
   for (const action of ACTIONS) {
     const attendus = cellules(ATTENDU_PLATEFORME[action]);
     it(`« ${action} » : les 6 cases plateforme correspondent à l'ADR`, () => {
@@ -173,10 +179,11 @@ describe('matrice rôle plateforme × action (ADR-0012 §4)', () => {
   }
 });
 
-describe('interdits absolus de la plateforme (ADR-0012 §4)', () => {
-  const interdits: Action[] = ['plan.approve', 'period.close', 'report.export'];
+describe('interdits absolus de la plateforme (ADR-0012 §4, ADR-0021 §8)', () => {
+  const interdits: Action[] = ['plan.approve', 'period.close', 'report.export', 'fiscal.manage'];
 
-  it('sont exactement ceux annoncés', () => {
+  it('sont exactement ceux annoncés, au nombre de quatre', () => {
+    expect(PLATFORM_FORBIDDEN_ACTIONS).toHaveLength(4);
     expect([...PLATFORM_FORBIDDEN_ACTIONS].sort()).toEqual([...interdits].sort());
   });
 
@@ -482,7 +489,7 @@ describe('compatibilité N-1 des anciens rôles', () => {
 });
 
 describe('cohérence structurelle de la matrice', () => {
-  it('chaque rôle déclare une décision pour CHACUNE des 15 actions', () => {
+  it('chaque rôle déclare une décision pour CHACUNE des 16 actions', () => {
     for (const role of ORG_ROLES) {
       for (const action of ACTIONS) {
         expect(ORG_PERMISSION_MATRIX[role][action], `${role} × ${action}`).toBeDefined();
@@ -506,12 +513,25 @@ describe('cohérence structurelle de la matrice', () => {
     for (const action of ecritures) expect(can('viewer', action)).toBe(false);
   });
 
-  it('`owner` détient les 15 actions', () => {
+  it('`owner` détient les 16 actions', () => {
     for (const action of ACTIONS) expect(can('owner', action)).toBe(true);
   });
 
   it('`billing.manage` est réservé au seul `owner`', () => {
     expect(ORG_ROLES.filter((r) => can(r, 'billing.manage'))).toEqual(['owner']);
+  });
+
+  it('`fiscal.manage` est réservé à `owner` et `finance_director` (ADR-0021 §8)', () => {
+    expect(ORG_ROLES.filter((r) => can(r, 'fiscal.manage'))).toEqual(['owner', 'finance_director']);
+    // L'Administrateur gère l'organisation, pas son identité fiscale.
+    expect(can('admin', 'organization.manage')).toBe(true);
+    expect(can('admin', 'fiscal.manage')).toBe(false);
+  });
+
+  it('`fiscal.manage` ne donne pas de nouveau rôle attribuable à un `admin`', () => {
+    // ADR-0021 §8 « conséquences vérifiées sur grantableRoles » : l'Administrateur
+    // ne pouvait déjà pas attribuer `finance_director` (`plan.approve`).
+    expect(grantableRoles('admin').sort()).toEqual(['admin', 'advisor', 'analyst', 'viewer']);
   });
 });
 

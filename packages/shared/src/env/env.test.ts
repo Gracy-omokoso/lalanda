@@ -140,3 +140,95 @@ describe('variables facultatives laissées vides (S22l)', () => {
     expect(env.SMTP_HOST).toBe('smtp.exemple.co');
   });
 });
+
+describe('paramètres plateforme DGI (ADR-0021 §5)', () => {
+  it('valeurs par défaut : URL DGI officielles, production fermée, délai de 15 s', () => {
+    const env = ApiEnvSchema.parse(MINIMAL_ENV);
+    expect(env.DGI_EDEF_TEST_URL).toBe('https://developper.dgirdc.cd/edef');
+    expect(env.DGI_EDEF_PRODUCTION_URL).toBe('https://edef.dgirdc.cd');
+    expect(env.DGI_PRODUCTION_ENABLED).toBe(false);
+    expect(env.DGI_HTTP_TIMEOUT_MS).toBe(15_000);
+    expect(env.DGI_ISF_TEST).toBeUndefined();
+    expect(env.DGI_ISF_PRODUCTION).toBeUndefined();
+  });
+
+  it('refuse de démarrer si la production est ouverte sans ISF de production', () => {
+    const parsed = ApiEnvSchema.safeParse({ ...MINIMAL_ENV, DGI_PRODUCTION_ENABLED: 'true' });
+    expect(parsed.success).toBe(false);
+    const message = parsed.success ? '' : parsed.error.issues.map((i) => i.message).join(' ');
+    expect(message).toContain('DGI_PRODUCTION_ENABLED=true exige DGI_ISF_PRODUCTION');
+  });
+
+  it('ouvre la production avec un ISF au bon format', () => {
+    const env = ApiEnvSchema.parse({
+      ...MINIMAL_ENV,
+      DGI_PRODUCTION_ENABLED: 'true',
+      DGI_ISF_PRODUCTION: 'AB1-CD2-E3',
+    });
+    expect(env.DGI_PRODUCTION_ENABLED).toBe(true);
+  });
+
+  it('refuse un ISF de production mal formé', () => {
+    for (const isf of ['ab1-cd2-e3', 'AB1CD2E3', 'AB1-CD2-E34', '']) {
+      expect(ApiEnvSchema.safeParse({ ...MINIMAL_ENV, DGI_ISF_PRODUCTION: isf }).success, isf).toBe(
+        false,
+      );
+    }
+  });
+
+  it('DGI_PRODUCTION_ENABLED : parse strict, « yes » refusé, « false » reste fermé', () => {
+    expect(ApiEnvSchema.safeParse({ ...MINIMAL_ENV, DGI_PRODUCTION_ENABLED: 'yes' }).success).toBe(
+      false,
+    );
+    expect(ApiEnvSchema.parse({ ...MINIMAL_ENV, DGI_PRODUCTION_ENABLED: 'false' })).toMatchObject({
+      DGI_PRODUCTION_ENABLED: false,
+    });
+  });
+
+  it('DGI_HTTP_TIMEOUT_MS borné entre 10 000 et 60 000', () => {
+    for (const v of ['9999', '60001', 'abc']) {
+      expect(ApiEnvSchema.safeParse({ ...MINIMAL_ENV, DGI_HTTP_TIMEOUT_MS: v }).success, v).toBe(
+        false,
+      );
+    }
+    expect(ApiEnvSchema.parse({ ...MINIMAL_ENV, DGI_HTTP_TIMEOUT_MS: '10000' })).toMatchObject({
+      DGI_HTTP_TIMEOUT_MS: 10_000,
+    });
+  });
+
+  it('DGI_ISF_TEST : format libre, 32 caractères au plus', () => {
+    expect(ApiEnvSchema.parse({ ...MINIMAL_ENV, DGI_ISF_TEST: 'isf test 01' })).toMatchObject({
+      DGI_ISF_TEST: 'isf test 01',
+    });
+    expect(ApiEnvSchema.safeParse({ ...MINIMAL_ENV, DGI_ISF_TEST: 'x'.repeat(33) }).success).toBe(
+      false,
+    );
+  });
+
+  it('URL : https exigé ; http seulement vers localhost, et jamais en production', () => {
+    expect(
+      ApiEnvSchema.safeParse({ ...MINIMAL_ENV, DGI_EDEF_TEST_URL: 'http://dgi.exemple.cd' })
+        .success,
+    ).toBe(false);
+    const local = ApiEnvSchema.parse({
+      ...MINIMAL_ENV,
+      DGI_EDEF_TEST_URL: 'http://127.0.0.1:45678/',
+    });
+    expect(local.DGI_EDEF_TEST_URL).toBe('http://127.0.0.1:45678');
+    expect(
+      ApiEnvSchema.safeParse({
+        ...MINIMAL_ENV,
+        NODE_ENV: 'production',
+        DGI_EDEF_TEST_URL: 'http://127.0.0.1:45678',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('la barre oblique finale est retirée (les appelants concatènent /api/…)', () => {
+    const env = ApiEnvSchema.parse({
+      ...MINIMAL_ENV,
+      DGI_EDEF_PRODUCTION_URL: 'https://edef.dgirdc.cd/',
+    });
+    expect(env.DGI_EDEF_PRODUCTION_URL).toBe('https://edef.dgirdc.cd');
+  });
+});

@@ -20,3 +20,15 @@ export const AI_THROTTLE = { ttl: 60_000, limit: 10 } as const;
  * l'heure. La lecture n'est pas comptée — consulter `/admin` ne consomme rien.
  */
 export const INTEGRATION_WRITE_THROTTLE = { ttl: 3_600_000, limit: 10 } as const;
+
+/**
+ * Quota des appels qui SOLLICITENT LA DGI (ADR-0021 §10) : test de connexion d'un
+ * point de vente e-MCF et lecture des listes de référence.
+ *
+ * 30 par heure et par utilisateur. Plus large que l'écriture d'intégration, parce
+ * qu'un test se rejoue légitimement (jeton tout juste activé à la DGI, panne
+ * passagère) sans rien écrire. Mais borné : chaque appel part vers un service de
+ * l'État avec le jeton du contribuable, et un clic répété en boucle ne doit pas
+ * faire de Lalanda la source d'un afflux sur l'e-DEF.
+ */
+export const EDEF_TEST_THROTTLE = { ttl: 3_600_000, limit: 30 } as const;
