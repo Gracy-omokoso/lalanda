@@ -52,3 +52,8 @@ apps/api/scripts/smoke-*.html
 
 # Env de production (VPS uniquement, jamais commité)
 .env.production
+
+# Documentation DGI remise au compte développeur (formulaires, protocoles, cas de test).
+# Le dépôt est PUBLIC : ces pièces restent locales. Seules les sources publiques
+# vont dans docs/sources/dgi-rdc/.
+/dgi/
