@@ -10,6 +10,7 @@ import { AuthModule } from './auth/auth.module.js';
 import { AuthzModule } from './authz/authz.module.js';
 import { BillingModule } from './billing/billing.module.js';
 import { CanvasModule } from './canvas/canvas.module.js';
+import { DatabaseModule } from './database/database.module.js';
 import { EvaluateController } from './evaluate/evaluate.controller.js';
 import { HealthController } from './health/health.controller.js';
 import { IntegrationsModule } from './integrations/integrations.module.js';
@@ -23,6 +24,7 @@ import { PaymentsModule } from './payments/payments.module.js';
 import { PlansModule } from './plans/plans.module.js';
 import { ProjectsModule } from './projects/projects.module.js';
 import { ReportsModule } from './reports/reports.module.js';
+import { SchedulerModule } from './scheduler/scheduler.module.js';
 import { ThrottlingModule } from './security/throttling.module.js';
 import { StorageModule } from './storage/storage.module.js';
 
@@ -57,6 +59,10 @@ import { StorageModule } from './storage/storage.module.js';
         bufferCommands: false,
       }),
     }),
+    // S25a — index de production, puis ordonnanceur (@Global) : les modules
+    // métier y enregistrent leurs tâches dans leur `onModuleInit`.
+    DatabaseModule,
+    SchedulerModule,
     ThrottlingModule,
     // `MailModule` est @Global et sans dépendance : déclaré avant `AuthModule`,
     // dont la factory better-auth injecte `MailService` au bootstrap (S22a).

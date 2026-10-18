@@ -80,5 +80,9 @@ EmailChangeRequestSchema.index(
   {
     unique: true,
     partialFilterExpression: { verifiedAt: null, canceledAt: null },
+    // Nom explicite : sans lui, cet index et l'index simple de `userId` (déclaré
+    // sur la propriété) recevaient tous deux le nom automatique `userId_1`, et
+    // la création du second échouait (S25a).
+    name: 'userId_pending_unique',
   },
 );

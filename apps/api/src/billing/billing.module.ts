@@ -4,6 +4,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { OrganizationsModule } from '../organizations/organizations.module.js';
 import { Project, ProjectSchema } from '../projects/project.schema.js';
 import { BillingController } from './billing.controller.js';
+import { BillingJobs } from './billing.jobs.js';
 import { BillingService } from './billing.service.js';
 import { PdfExportQuotaService } from './pdf-export-quota.service.js';
 import { PdfExportEvent, PdfExportEventSchema } from './pdf-export-usage.schema.js';
@@ -33,7 +34,7 @@ import { Subscription, SubscriptionSchema } from './subscription.schema.js';
     ]),
   ],
   controllers: [BillingController],
-  providers: [BillingService, PdfExportUsageService, PdfExportQuotaService],
+  providers: [BillingService, PdfExportUsageService, PdfExportQuotaService, BillingJobs],
   // `PdfExportQuotaService` est exporté pour `ReportsModule`, qui garde ses
   // rendus avec. `PdfExportUsageService` ne l'est pas : personne n'a de raison
   // d'écrire dans le compteur sans passer par la garde.

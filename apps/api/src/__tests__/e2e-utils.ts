@@ -69,6 +69,10 @@ export function e2eSuite(name: string, fn: () => void): void {
  * échouerait en 429 sans rapport avec ce qu'elle teste.
  */
 export async function makeE2EApp(): Promise<INestApplication> {
+  // Pas de minuteur d'ordonnanceur pendant les tests : une tâche exécutée au
+  // milieu d'une suite la rendrait non déterministe. La suite de l'ordonnanceur
+  // appelle `tick()` elle-même, en pilotant l'heure.
+  process.env['SCHEDULER_ENABLED'] ??= 'false';
   const { NestFactory } = await import('@nestjs/core');
   const { toNodeHandler } = await import('better-auth/node');
   const { AppModule } = await import('../app.module.js');

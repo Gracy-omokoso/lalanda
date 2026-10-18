@@ -176,6 +176,8 @@ Les données de production ne sont pas copiées en environnement inférieur sans
 - application web;
 - API;
 - workers de calcul, import et export;
+- ordonnanceur des tâches planifiées — dans le processus d'API, tâches stockées dans
+  MongoDB (`scheduled_jobs`), passage toutes les 15 s (S25a, [ADR-0020](adr/ADR-0020-ordonnanceur-mongodb.md));
 - base principale;
 - cache/file;
 - stockage objet;
@@ -226,3 +228,14 @@ Suivi par environnement et composant. Les quotas IA, stockage d’exports et ré
 ## Continuité
 
 Sauvegardes, restauration testée, procédures d’incident, rotation des secrets, dépendances critiques inventoriées et communication d’état.
+
+
+## Index MongoDB en production (S25a)
+
+`autoIndex` est coupé en production (`app.module.ts`). Les index sont créés au
+démarrage par `IndexesService` (`apps/api/src/database/`) : création des index
+manquants de chaque modèle Mongoose et des collections de better-auth, jamais de
+suppression. Un index impossible à construire (doublons) est journalisé en erreur
+sans bloquer le démarrage — chercher `Index MongoDB :` dans les journaux de l'API
+après chaque déploiement. Jusqu'au 18 oct. 2026, aucun index n'existait en
+production (constat et correction : [ADR-0020](adr/ADR-0020-ordonnanceur-mongodb.md)).
