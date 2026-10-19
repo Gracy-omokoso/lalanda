@@ -161,24 +161,30 @@ function parseDiscount(ctx: Ctx, path: (string | number)[], raw: unknown): LineD
   const value = positiveDecimal(ctx, [...path, 'value'], obj['value'], 'price', 'DISCOUNT_INVALID');
   if (value === null) return null;
   if (kind === 'percent' && !/^\d{1,2}\./.test(value)) {
-    issue(ctx, [...path, 'value'], 'DISCOUNT_INVALID', 'Une remise est strictement inférieure à 100 %.');
+    issue(
+      ctx,
+      [...path, 'value'],
+      'DISCOUNT_INVALID',
+      'Une remise est strictement inférieure à 100 %.',
+    );
     return null;
   }
   return { kind, value };
 }
 
-function parseSpecificTax(
-  ctx: Ctx,
-  path: (string | number)[],
-  raw: unknown,
-): SpecificTax | null {
+function parseSpecificTax(ctx: Ctx, path: (string | number)[], raw: unknown): SpecificTax | null {
   if (raw === null || raw === undefined) return null;
   const obj = asObject(ctx, path, raw);
   if (obj === null) return null;
   const kind = obj['kind'];
   const field = kind === 'per_unit' ? 'amount' : kind === 'percent' ? 'rate' : null;
   if (field === null) {
-    issue(ctx, [...path, 'kind'], 'SPECIFIC_TAX_INVALID', 'Taxe spécifique : "per_unit" ou "percent".');
+    issue(
+      ctx,
+      [...path, 'kind'],
+      'SPECIFIC_TAX_INVALID',
+      'Taxe spécifique : "per_unit" ou "percent".',
+    );
     return null;
   }
   if (unknownKeys(ctx, path, obj, ['kind', field])) return null;
@@ -186,7 +192,12 @@ function parseSpecificTax(
   if (value === null) return null;
   if (kind === 'percent') {
     if (!/^\d{1,2}\./.test(value)) {
-      issue(ctx, [...path, field], 'SPECIFIC_TAX_INVALID', 'Un taux est strictement inférieur à 100 %.');
+      issue(
+        ctx,
+        [...path, field],
+        'SPECIFIC_TAX_INVALID',
+        'Un taux est strictement inférieur à 100 %.',
+      );
       return null;
     }
     return { kind: 'percent', rate: value };
@@ -221,10 +232,21 @@ function parseLine(ctx: Ctx, index: number, raw: unknown): LineInput | null {
     if (unknownKeys(ctx, path, obj, ['source', 'originLineIndex', 'quantity'])) return null;
     const idx = obj['originLineIndex'];
     if (typeof idx !== 'number' || !Number.isInteger(idx) || idx < 0 || idx >= MAX_LINES) {
-      issue(ctx, [...path, 'originLineIndex'], 'CREDIT_NOTE_LINE_NOT_IN_ORIGIN', 'Ligne d’origine invalide.');
+      issue(
+        ctx,
+        [...path, 'originLineIndex'],
+        'CREDIT_NOTE_LINE_NOT_IN_ORIGIN',
+        'Ligne d’origine invalide.',
+      );
       return null;
     }
-    const quantity = positiveDecimal(ctx, [...path, 'quantity'], obj['quantity'], 'quantity', 'QUANTITY_INVALID');
+    const quantity = positiveDecimal(
+      ctx,
+      [...path, 'quantity'],
+      obj['quantity'],
+      'quantity',
+      'QUANTITY_INVALID',
+    );
     return quantity === null ? null : { source, originLineIndex: idx, quantity };
   }
 
@@ -236,10 +258,21 @@ function parseLine(ctx: Ctx, index: number, raw: unknown): LineInput | null {
     }
     const id = obj['catalogItemId'];
     if (typeof id !== 'string' || !isObjectIdHex(id)) {
-      issue(ctx, [...path, 'catalogItemId'], 'CATALOG_ITEM_INVALID', 'Identifiant d’article invalide.');
+      issue(
+        ctx,
+        [...path, 'catalogItemId'],
+        'CATALOG_ITEM_INVALID',
+        'Identifiant d’article invalide.',
+      );
       return null;
     }
-    const quantity = positiveDecimal(ctx, [...path, 'quantity'], obj['quantity'], 'quantity', 'QUANTITY_INVALID');
+    const quantity = positiveDecimal(
+      ctx,
+      [...path, 'quantity'],
+      obj['quantity'],
+      'quantity',
+      'QUANTITY_INVALID',
+    );
     const unitPrice =
       obj['unitPrice'] === null || obj['unitPrice'] === undefined
         ? null
@@ -274,14 +307,25 @@ function parseLine(ctx: Ctx, index: number, raw: unknown): LineInput | null {
           `« ${OUT_OF_SCOPE_ITEM_CODE} » est réservé : cochez « opération hors champ ».`,
         );
       } else if (!CODE_PATTERN.test(code)) {
-        issue(ctx, [...path, 'code'], 'CODE_INVALID', 'Code : lettres, chiffres, . _ / - seulement.');
+        issue(
+          ctx,
+          [...path, 'code'],
+          'CODE_INVALID',
+          'Code : lettres, chiffres, . _ / - seulement.',
+        );
       }
     }
     const name = optionalText(ctx, [...path, 'name'], obj['name'], 200);
-    if (name === null) issue(ctx, [...path, 'name'], 'NAME_REQUIRED', 'La désignation est obligatoire.');
+    if (name === null)
+      issue(ctx, [...path, 'name'], 'NAME_REQUIRED', 'La désignation est obligatoire.');
     const taxGroup = isTaxGroupLetter(obj['taxGroup']) ? obj['taxGroup'] : null;
     if (taxGroup === null) {
-      issue(ctx, [...path, 'taxGroup'], 'UNKNOWN_TAX_GROUP', 'Groupe de taxation inconnu : une lettre de A à P.');
+      issue(
+        ctx,
+        [...path, 'taxGroup'],
+        'UNKNOWN_TAX_GROUP',
+        'Groupe de taxation inconnu : une lettre de A à P.',
+      );
     }
     const types: readonly string[] = ITEM_TYPES;
     const itemType =
@@ -305,17 +349,45 @@ function parseLine(ctx: Ctx, index: number, raw: unknown): LineInput | null {
       issue(ctx, [...path, 'outOfScope'], 'INVALID_TYPE', 'Valeur attendue : true ou false.');
     }
     if (outOfScope && taxGroup !== null && taxGroup !== 'A') {
-      issue(ctx, [...path, 'outOfScope'], 'OUT_OF_SCOPE_ONLY_GROUP_A', 'Une opération hors champ relève du groupe A seulement.');
+      issue(
+        ctx,
+        [...path, 'outOfScope'],
+        'OUT_OF_SCOPE_ONLY_GROUP_A',
+        'Une opération hors champ relève du groupe A seulement.',
+      );
     }
     const unit = optionalText(ctx, [...path, 'unit'], obj['unit'], 20);
-    const quantity = positiveDecimal(ctx, [...path, 'quantity'], obj['quantity'], 'quantity', 'QUANTITY_INVALID');
-    const unitPrice = positiveDecimal(ctx, [...path, 'unitPrice'], obj['unitPrice'], 'price', 'PRICE_INVALID');
+    const quantity = positiveDecimal(
+      ctx,
+      [...path, 'quantity'],
+      obj['quantity'],
+      'quantity',
+      'QUANTITY_INVALID',
+    );
+    const unitPrice = positiveDecimal(
+      ctx,
+      [...path, 'unitPrice'],
+      obj['unitPrice'],
+      'price',
+      'PRICE_INVALID',
+    );
     const specificTax = parseSpecificTax(ctx, [...path, 'specificTax'], obj['specificTax']);
     if (specificTax !== null && (taxGroup === 'L' || taxGroup === 'N')) {
-      issue(ctx, [...path, 'specificTax'], 'SPECIFIC_TAX_NOT_ALLOWED', `Pas de taxe spécifique en groupe ${taxGroup}.`);
+      issue(
+        ctx,
+        [...path, 'specificTax'],
+        'SPECIFIC_TAX_NOT_ALLOWED',
+        `Pas de taxe spécifique en groupe ${taxGroup}.`,
+      );
     }
     const discount = parseDiscount(ctx, [...path, 'discount'], obj['discount']);
-    if (name === null || taxGroup === null || itemType === null || quantity === null || unitPrice === null) {
+    if (
+      name === null ||
+      taxGroup === null ||
+      itemType === null ||
+      quantity === null ||
+      unitPrice === null
+    ) {
       return null;
     }
     return {
@@ -333,7 +405,12 @@ function parseLine(ctx: Ctx, index: number, raw: unknown): LineInput | null {
     };
   }
 
-  issue(ctx, [...path, 'source'], 'LINE_SOURCE_INVALID', 'Origine de ligne : "catalog", "free" ou "origin".');
+  issue(
+    ctx,
+    [...path, 'source'],
+    'LINE_SOURCE_INVALID',
+    'Origine de ligne : "catalog", "free" ou "origin".',
+  );
   return null;
 }
 
@@ -399,7 +476,10 @@ function parseCustomer(ctx: Ctx, raw: unknown): CustomerInput | null {
       );
       return null;
     }
-    return { customerId: null, walkInName: optionalText(ctx, ['customer', 'walkIn', 'name'], walkIn['name'], 200) };
+    return {
+      customerId: null,
+      walkInName: optionalText(ctx, ['customer', 'walkIn', 'name'], walkIn['name'], 200),
+    };
   }
   if (unknownKeys(ctx, ['customer'], obj, ['customerId', 'printContactDetails'])) return null;
   const id = obj['customerId'];
@@ -409,7 +489,12 @@ function parseCustomer(ctx: Ctx, raw: unknown): CustomerInput | null {
   }
   const print = obj['printContactDetails'];
   if (print !== undefined && typeof print !== 'boolean') {
-    issue(ctx, ['customer', 'printContactDetails'], 'INVALID_TYPE', 'Valeur attendue : true ou false.');
+    issue(
+      ctx,
+      ['customer', 'printContactDetails'],
+      'INVALID_TYPE',
+      'Valeur attendue : true ou false.',
+    );
   }
   return { customerId: id.toLowerCase(), printContactDetails: print === true };
 }
@@ -431,10 +516,21 @@ function parsePayments(ctx: Ctx, raw: unknown): PaymentInput[] {
     if (obj === null || unknownKeys(ctx, ['payments', i], obj, ['method', 'amount'])) return;
     const method = obj['method'];
     if (typeof method !== 'string' || !methods.includes(method)) {
-      issue(ctx, ['payments', i, 'method'], 'PAYMENT_METHOD_INVALID', `Mode de paiement : ${PAYMENT_METHODS.join(', ')}.`);
+      issue(
+        ctx,
+        ['payments', i, 'method'],
+        'PAYMENT_METHOD_INVALID',
+        `Mode de paiement : ${PAYMENT_METHODS.join(', ')}.`,
+      );
       return;
     }
-    const amount = positiveDecimal(ctx, ['payments', i, 'amount'], obj['amount'], 'price', 'PAYMENT_AMOUNT_INVALID');
+    const amount = positiveDecimal(
+      ctx,
+      ['payments', i, 'amount'],
+      obj['amount'],
+      'price',
+      'PAYMENT_AMOUNT_INVALID',
+    );
     if (amount !== null) out.push({ method: method as PaymentInput['method'], amount });
   });
   return out;
@@ -472,24 +568,45 @@ function parseCreditNote(
   const isCreditType = (CREDIT_NOTE_TYPES as readonly string[]).includes(type);
   if (raw === null || raw === undefined) {
     if (isCreditType) {
-      issue(ctx, ['creditNote'], 'CREDIT_NOTE_REQUIRED_FOR_TYPE', `Un document ${type} est un avoir : sa nature est obligatoire.`);
+      issue(
+        ctx,
+        ['creditNote'],
+        'CREDIT_NOTE_REQUIRED_FOR_TYPE',
+        `Un document ${type} est un avoir : sa nature est obligatoire.`,
+      );
     }
     return null;
   }
   if (!isCreditType) {
-    issue(ctx, ['creditNote'], 'CREDIT_NOTE_NOT_ALLOWED_FOR_TYPE', `Un document ${type} n’est pas un avoir.`);
+    issue(
+      ctx,
+      ['creditNote'],
+      'CREDIT_NOTE_NOT_ALLOWED_FOR_TYPE',
+      `Un document ${type} n’est pas un avoir.`,
+    );
     return null;
   }
   const obj = asObject(ctx, ['creditNote'], raw);
-  if (obj === null || unknownKeys(ctx, ['creditNote'], obj, ['nature', 'originInvoiceId'])) return null;
+  if (obj === null || unknownKeys(ctx, ['creditNote'], obj, ['nature', 'originInvoiceId']))
+    return null;
   const nature = obj['nature'];
   if (typeof nature !== 'string' || !(CREDIT_NOTE_NATURES as readonly string[]).includes(nature)) {
-    issue(ctx, ['creditNote', 'nature'], 'CREDIT_NOTE_NATURE_INVALID', 'Nature : COR, RAN, RAM ou RRR.');
+    issue(
+      ctx,
+      ['creditNote', 'nature'],
+      'CREDIT_NOTE_NATURE_INVALID',
+      'Nature : COR, RAN, RAM ou RRR.',
+    );
     return null;
   }
   const origin = obj['originInvoiceId'] ?? null;
   if (origin !== null && (typeof origin !== 'string' || !isObjectIdHex(origin))) {
-    issue(ctx, ['creditNote', 'originInvoiceId'], 'CREDIT_NOTE_ORIGIN_INVALID', 'Identifiant de facture d’origine invalide.');
+    issue(
+      ctx,
+      ['creditNote', 'originInvoiceId'],
+      'CREDIT_NOTE_ORIGIN_INVALID',
+      'Identifiant de facture d’origine invalide.',
+    );
     return null;
   }
   if (origin === null && nature !== 'RRR') {
@@ -513,7 +630,12 @@ function normalizeDraft(raw: RawDraft, ctx: Ctx): InvoiceDraftInput {
   let pointOfSaleId: string | null = null;
   if (raw.pointOfSaleId !== undefined && raw.pointOfSaleId !== null) {
     if (typeof raw.pointOfSaleId !== 'string' || !isObjectIdHex(raw.pointOfSaleId)) {
-      issue(ctx, ['pointOfSaleId'], 'POINT_OF_SALE_INVALID', 'Identifiant de point de vente invalide.');
+      issue(
+        ctx,
+        ['pointOfSaleId'],
+        'POINT_OF_SALE_INVALID',
+        'Identifiant de point de vente invalide.',
+      );
     } else {
       pointOfSaleId = raw.pointOfSaleId.toLowerCase();
     }
@@ -593,10 +715,21 @@ export const NormalizeInvoiceSchema = z
     if (raw.exchangeRate !== undefined && raw.exchangeRate !== null) {
       const obj = asObject(ctx, ['exchangeRate'], raw.exchangeRate);
       if (obj !== null && !unknownKeys(ctx, ['exchangeRate'], obj, ['rate', 'date'])) {
-        const rate = positiveDecimal(ctx, ['exchangeRate', 'rate'], obj['rate'], 'rate', 'EXCHANGE_RATE_INVALID');
+        const rate = positiveDecimal(
+          ctx,
+          ['exchangeRate', 'rate'],
+          obj['rate'],
+          'rate',
+          'EXCHANGE_RATE_INVALID',
+        );
         const date = obj['date'];
         if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(date) || date.length > 40) {
-          issue(ctx, ['exchangeRate', 'date'], 'EXCHANGE_RATE_DATE_INVALID', 'Date du taux : AAAA-MM-JJ.');
+          issue(
+            ctx,
+            ['exchangeRate', 'date'],
+            'EXCHANGE_RATE_DATE_INVALID',
+            'Date du taux : AAAA-MM-JJ.',
+          );
         } else if (rate !== null) {
           exchangeRate = { rate, date };
         }
@@ -618,10 +751,7 @@ export const ListInvoicesQuerySchema = z
     status: z.enum(INVOICE_LIST_STATUSES).default('all'),
     type: z.enum(INVOICE_TYPES).optional(),
     currency: z.enum(DOCUMENT_CURRENCIES).optional(),
-    customerId: z
-      .string()
-      .refine(isObjectIdHex, 'Identifiant de client invalide.')
-      .optional(),
+    customerId: z.string().refine(isObjectIdHex, 'Identifiant de client invalide.').optional(),
     year: z
       .string()
       .regex(/^\d{4}$/, 'Année : AAAA.')

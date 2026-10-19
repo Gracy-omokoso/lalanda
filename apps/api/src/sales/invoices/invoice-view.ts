@@ -117,6 +117,7 @@ export function invoiceView(doc: InvoiceLean, ctx: InvoiceViewContext): InvoiceV
     typeLabel: INVOICE_TYPE_LABELS[doc.type],
     currency: doc.currency,
     priceMode: doc.priceMode,
+    showUsdCounterValue: doc.showUsdCounterValue ?? false,
     emissionMode: doc.emissionMode ?? null,
     environment: doc.environment ?? null,
     isf: doc.isf ?? null,

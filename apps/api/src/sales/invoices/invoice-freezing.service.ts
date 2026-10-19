@@ -44,7 +44,7 @@ import { Customer, type CustomerDocument } from '../customer.schema.js';
 import { SalesUsageService } from '../sales-usage.service.js';
 import { isObjectIdHex } from '../search.js';
 import { contentSha256Of } from './canonical.js';
-import { assertCreditableOrigin } from './credit-note-rules.js';
+import { assertCreditableOrigin, isZeroQuantity } from './credit-note-rules.js';
 import {
   EXCHANGE_RATE_TOLERANCE_PERCENT,
   ExchangeRateReferenceService,
@@ -87,7 +87,12 @@ const FROZEN_BY: Record<Route, readonly string[]> = {
 };
 
 /** Statuts d'un avoir dont les quantités comptent encore sur l'origine. */
-const COUNTED_CREDIT_STATUSES = ['issued', 'pending_normalization', 'normalized', 'normalization_failed'];
+const COUNTED_CREDIT_STATUSES = [
+  'issued',
+  'pending_normalization',
+  'normalized',
+  'normalization_failed',
+];
 
 /** Total d'un document gelé, dans la grandeur qui fait foi pour son mode. */
 function totalOf(doc: InvoiceLean, mode: EmissionMode): DecimalString | null {
@@ -170,7 +175,14 @@ export class InvoiceFreezingService {
     exchangeRate: { rate: DecimalString; date: string } | null,
     actor: InvoiceActor,
   ): Promise<InvoiceView> {
-    await this.freeze('normalize', organizationId, invoiceId, expectedRevision, exchangeRate, actor);
+    await this.freeze(
+      'normalize',
+      organizationId,
+      invoiceId,
+      expectedRevision,
+      exchangeRate,
+      actor,
+    );
     const doc = await this.drafts.requireOwn(organizationId, invoiceId);
     if (doc.status === 'pending_normalization') {
       // Idempotent, ne lève pas pour un refus DGI (contrat du port).
@@ -219,11 +231,13 @@ export class InvoiceFreezingService {
       const origin = await this.originOf(organizationId, doc, session);
       if (origin && doc.creditNote?.nature !== 'RRR') {
         const credited = remainingQuantities(
-          (origin.credited ?? []).map((c) => ({
-            index: c.lineIndex,
-            quantity: c.quantity,
-            unitPrice: origin.lines.find((l) => l.index === c.lineIndex)?.unitPrice ?? '0',
-          })),
+          (origin.credited ?? [])
+            .filter((c) => !isZeroQuantity(c.quantity))
+            .map((c) => ({
+              index: c.lineIndex,
+              quantity: c.quantity,
+              unitPrice: origin.lines.find((l) => l.index === c.lineIndex)?.unitPrice ?? '0',
+            })),
           doc.lines.map((l) => ({ lineIndex: l.originLineIndex ?? -1, quantity: l.quantity })),
         );
         await this.updateOrigin(organizationId, origin, [...credited], session);
@@ -360,11 +374,9 @@ export class InvoiceFreezingService {
       }
       if (doc.customer.customerId) {
         const customer = await this.customers
-          .findOne(
-            { _id: new Types.ObjectId(doc.customer.customerId), organizationId },
-            null,
-            { session },
-          )
+          .findOne({ _id: new Types.ObjectId(doc.customer.customerId), organizationId }, null, {
+            session,
+          })
           .lean<CustomerLean>()
           .exec();
         if (!customer || !customer.active) {
@@ -398,13 +410,22 @@ export class InvoiceFreezingService {
       const documentCalculation = calculate(doc.priceMode, doc.lines, taxRates);
       issues.push(...documentCalculation.issues);
       const documentTotals = documentCalculation.totals;
-      const paymentsCheck = documentTotals ? checkPayments(documentTotals.total, doc.payments) : null;
+      const paymentsCheck = documentTotals
+        ? checkPayments(documentTotals.total, doc.payments)
+        : null;
       if (paymentsCheck) issues.push(...paymentsCheck.issues);
 
       let conversion: StoredConversion | null = null;
       let normalizedAmounts: StoredNormalizedAmounts | null = null;
       if (route === 'normalize' && documentTotals) {
-        const n = await this.normalizeAmounts(doc, origin, environment, exchangeRate, taxRates.rates, issues);
+        const n = await this.normalizeAmounts(
+          doc,
+          origin,
+          environment,
+          exchangeRate,
+          taxRates.rates,
+          issues,
+        );
         conversion = n?.conversion ?? null;
         normalizedAmounts = n?.amounts ?? null;
       }
@@ -655,7 +676,11 @@ export class InvoiceFreezingService {
       if (exchangeRate !== null) {
         // Garde-fou seulement : ±1 % du taux officiel.
         if (
-          !isExchangeRateWithinTolerance(exchangeRate.rate, reference.rate, EXCHANGE_RATE_TOLERANCE_PERCENT)
+          !isExchangeRateWithinTolerance(
+            exchangeRate.rate,
+            reference.rate,
+            EXCHANGE_RATE_TOLERANCE_PERCENT,
+          )
         ) {
           notIssuable([
             {
@@ -740,7 +765,11 @@ export class InvoiceFreezingService {
         specificTax: n ? n.specificTax : l.specificTax,
       };
     });
-    const cdf = computeInvoiceTotals({ priceMode: doc.priceMode, lines: engineLines(cdfLines), rates });
+    const cdf = computeInvoiceTotals({
+      priceMode: doc.priceMode,
+      lines: engineLines(cdfLines),
+      rates,
+    });
     if (!cdf.ok) {
       issues.push(...cdf.issues);
       return null;
@@ -828,7 +857,9 @@ export class InvoiceFreezingService {
       .updateOne(
         { _id: origin._id, organizationId, creditRevision: origin.creditRevision ?? 0 },
         {
-          $set: { credited: credited.map((c) => ({ lineIndex: c.lineIndex, quantity: c.quantity })) },
+          $set: {
+            credited: credited.map((c) => ({ lineIndex: c.lineIndex, quantity: c.quantity })),
+          },
           $inc: { creditRevision: 1 },
         },
         { session },

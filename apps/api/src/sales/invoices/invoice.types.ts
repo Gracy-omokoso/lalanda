@@ -78,7 +78,12 @@ export interface StoredConversion {
   rate: DecimalString;
   rateDate: string;
   rateSource: ConversionRateSource;
-  reference: { rate: DecimalString; date: string; environment: DgiEnvironment; sha256: string } | null;
+  reference: {
+    rate: DecimalString;
+    date: string;
+    environment: DgiEnvironment;
+    sha256: string;
+  } | null;
   originInvoiceId: string | null;
   conversionVersion: string;
 }

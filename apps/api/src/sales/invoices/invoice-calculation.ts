@@ -55,7 +55,10 @@ export class InvoiceTaxRatesReader {
 
 /** Lignes du document → entrées du moteur (prix dans la devise donnée). */
 export function engineLines(
-  lines: readonly Pick<StoredLine, 'unitPrice' | 'quantity' | 'taxGroup' | 'itemType' | 'specificTax'>[],
+  lines: readonly Pick<
+    StoredLine,
+    'unitPrice' | 'quantity' | 'taxGroup' | 'itemType' | 'specificTax'
+  >[],
 ) {
   return lines.map((l) => ({
     unitPrice: l.unitPrice,
@@ -73,7 +76,11 @@ export function calculate(
   taxRates: StoredTaxRates | null,
 ): StoredCalculation {
   if (taxRates === null) return { ok: false, issues: [], totals: null };
-  const result = computeInvoiceTotals({ priceMode, lines: engineLines(lines), rates: taxRates.rates });
+  const result = computeInvoiceTotals({
+    priceMode,
+    lines: engineLines(lines),
+    rates: taxRates.rates,
+  });
   return result.ok
     ? { ok: true, issues: [], totals: result.totals }
     : { ok: false, issues: result.issues, totals: null };

@@ -22,10 +22,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Types, type ClientSession, type Model } from 'mongoose';
 
 import { isObjectIdHex } from '../search.js';
-import {
-  SalesInvoiceCounter,
-  type SalesInvoiceCounterDocument,
-} from './invoice-counter.schema.js';
+import { SalesInvoiceCounter, type SalesInvoiceCounterDocument } from './invoice-counter.schema.js';
 import { invoiceSearchKey } from './invoice-search.js';
 import { SalesInvoice, type SalesInvoiceDocument } from './invoice.schema.js';
 import type { InvoiceLean } from './invoice.types.js';
@@ -98,7 +95,11 @@ export class InvoiceNumberingService {
     const last = counter.lastIssuedAt ? new Date(counter.lastIssuedAt) : null;
     const issuedAt = last && last > now ? last : now;
     await this.counters
-      .updateOne({ _id: counter._id }, { $set: { lastIssuedAt: issuedAt } }, { session: opts.session })
+      .updateOne(
+        { _id: counter._id },
+        { $set: { lastIssuedAt: issuedAt } },
+        { session: opts.session },
+      )
       .exec();
     return {
       number: formatInvoiceNumber('real', year, counter.last),
@@ -212,7 +213,11 @@ export class InvoiceNumberingService {
     }
     const key = { organizationId, series: parsed.series, year: parsed.year };
     const counter = await this.counters
-      .findOneAndUpdate(key, { $max: { lastIssuedAt: issuedAt } }, { new: true, session: opts.session })
+      .findOneAndUpdate(
+        key,
+        { $max: { lastIssuedAt: issuedAt } },
+        { new: true, session: opts.session },
+      )
       .lean<CounterLean>()
       .exec();
     if (!counter) throw new Error(`Compteur absent pour le numéro réservé ${reserved}.`);

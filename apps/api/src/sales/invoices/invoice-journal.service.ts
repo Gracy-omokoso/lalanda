@@ -53,11 +53,13 @@ export interface JournalAppendInput {
 }
 
 /** Champs couverts par le hachage, dans une forme indépendante du stockage. */
-function hashedFields(e: {
-  organizationId: string;
-  seq: number;
-  at: Date;
-} & JournalAppendInput): Record<string, unknown> {
+function hashedFields(
+  e: {
+    organizationId: string;
+    seq: number;
+    at: Date;
+  } & JournalAppendInput,
+): Record<string, unknown> {
   return {
     organizationId: e.organizationId,
     seq: e.seq,
@@ -136,7 +138,10 @@ export class InvoiceJournalService {
       .exec();
     const prevHash = head.lastHash ?? JOURNAL_GENESIS_HASH;
     const at = new Date();
-    const hash = journalHash(prevHash, hashedFields({ organizationId, seq: head.seq, at, ...input }));
+    const hash = journalHash(
+      prevHash,
+      hashedFields({ organizationId, seq: head.seq, at, ...input }),
+    );
     await this.heads
       .updateOne({ organizationId }, { $set: { lastHash: hash } }, { session: opts.session })
       .exec();
@@ -181,7 +186,11 @@ export class InvoiceJournalService {
     const head = await this.heads.findOne({ organizationId }).lean<SalesJournalHead>().exec();
     let expectedSeq = 1;
     let prevHash = JOURNAL_GENESIS_HASH;
-    const cursor = this.entries.find({ organizationId }).sort({ seq: 1 }).lean<EntryLean>().cursor();
+    const cursor = this.entries
+      .find({ organizationId })
+      .sort({ seq: 1 })
+      .lean<EntryLean>()
+      .cursor();
     for await (const doc of cursor) {
       const entry = doc as EntryLean;
       if (entry.seq !== expectedSeq || entry.prevHash !== prevHash) return false;

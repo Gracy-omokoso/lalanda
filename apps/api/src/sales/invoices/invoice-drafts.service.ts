@@ -37,7 +37,12 @@ import { NormalizedInvoicingService } from '../../fiscal/normalized-invoicing.se
 import { PointsOfSaleService } from '../../fiscal/points-of-sale.service.js';
 import { CatalogItem, type CatalogItemDocument } from '../catalog-item.schema.js';
 import { Customer, type CustomerDocument } from '../customer.schema.js';
-import { catalogItemNotFound, customerNotFound, invalidCursor, type SalesIssue } from '../sales.errors.js';
+import {
+  catalogItemNotFound,
+  customerNotFound,
+  invalidCursor,
+  type SalesIssue,
+} from '../sales.errors.js';
 import { escapeRegex, isObjectIdHex, normalizeForSearch } from '../search.js';
 import { assertCreditableOrigin } from './credit-note-rules.js';
 import { ExchangeRateReferenceService } from './exchange-rate-reference.service.js';
@@ -428,7 +433,9 @@ export class InvoiceDraftsService {
       });
     }
 
-    const customer = origin ? { ...origin.customer } : await this.customerSnapshot(organizationId, input);
+    const customer = origin
+      ? { ...origin.customer }
+      : await this.customerSnapshot(organizationId, input);
     const lines = await this.composeLines(organizationId, input, origin, rates, problems);
 
     // Commentaires (§ S25e.7) : A automatique pour un client AO, saisissable
@@ -500,7 +507,10 @@ export class InvoiceDraftsService {
       .exec();
     if (!doc) customerNotFound();
     if (!doc.active) {
-      invoiceConflict('CUSTOMER_INACTIVE', 'Ce client est désactivé : réactivez-le ou choisissez-en un autre.');
+      invoiceConflict(
+        'CUSTOMER_INACTIVE',
+        'Ce client est désactivé : réactivez-le ou choisissez-en un autre.',
+      );
     }
     return {
       customerId: String(doc._id),
@@ -526,9 +536,7 @@ export class InvoiceDraftsService {
     const originOnly = nature !== null && nature !== 'RRR';
 
     const catalogIds = [
-      ...new Set(
-        input.lines.flatMap((l) => (l.source === 'catalog' ? [l.catalogItemId] : [])),
-      ),
+      ...new Set(input.lines.flatMap((l) => (l.source === 'catalog' ? [l.catalogItemId] : []))),
     ];
     const items = new Map<string, ItemLean>();
     if (catalogIds.length > 0) {
@@ -600,7 +608,14 @@ export class InvoiceDraftsService {
       let priceOverridden: boolean;
       let fields: Pick<
         StoredLine,
-        'catalogItemId' | 'code' | 'name' | 'unit' | 'itemType' | 'taxGroup' | 'outOfScope' | 'specificTax'
+        | 'catalogItemId'
+        | 'code'
+        | 'name'
+        | 'unit'
+        | 'itemType'
+        | 'taxGroup'
+        | 'outOfScope'
+        | 'specificTax'
       >;
       if (line.source === 'catalog') {
         const item = items.get(line.catalogItemId)!;
@@ -637,7 +652,13 @@ export class InvoiceDraftsService {
           });
           continue;
         } else {
-          base = this.priceInMode(item.unitPrice, item.priceMode, input.priceMode, item.taxGroup, rates);
+          base = this.priceInMode(
+            item.unitPrice,
+            item.priceMode,
+            input.priceMode,
+            item.taxGroup,
+            rates,
+          );
           priceOverridden = false;
         }
       } else {
@@ -731,4 +752,3 @@ export class InvoiceDraftsService {
     };
   }
 }
-
