@@ -11,6 +11,8 @@
 // - Le prix est SAISI ET TRANSMIS COMME UNE CHAÎNE. Le mode TTC/HT est
 //   obligatoire, sans valeur par défaut. Rien n'est calculé : la conversion d'un
 //   mode à l'autre appartient au moteur, au moment de la facture.
+// - La devise du prix est au choix, CDF (d'office) ou USD (ADR-0023 E4). Aucune
+//   conversion ici : le passage en CDF n'a lieu qu'à la normalisation.
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
@@ -28,9 +30,13 @@ import { AideEtErreur, Alerte, aria, BOUTON, Champ, CHAMP, Pastille } from './fo
 import {
   appliquerGroupe,
   bandeauGroupes,
+  CATALOG_CURRENCIES,
+  type CatalogCurrency,
   type ChampArticle,
   CHEMINS_ARTICLE,
   codeDgiApercu,
+  corpsContrat,
+  CURRENCY_LABELS,
   erreursFormulaire,
   estRevisionPerimee,
   type FicheOuverte,
@@ -59,6 +65,7 @@ const CHAMPS: readonly ChampArticle[] = [
   'outOfScope',
   'unitPrice',
   'priceMode',
+  'currency',
   'specificKind',
   'specificValue',
 ];
@@ -146,8 +153,11 @@ export function CatalogItemForm({
     try {
       const ecrit =
         vue === null
-          ? await api.createCatalogItem(prep.corps)
-          : await api.updateCatalogItem(vue.id, { ...prep.corps, expectedRevision: vue.revision });
+          ? await api.createCatalogItem(corpsContrat(prep.corps))
+          : await api.updateCatalogItem(vue.id, {
+              ...corpsContrat(prep.corps),
+              expectedRevision: vue.revision,
+            });
       onFermer(ecrit);
     } catch (err) {
       const parChamp = erreursFormulaire(err, CHAMPS, CHEMINS_ARTICLE);
@@ -458,10 +468,39 @@ export function CatalogItemForm({
 
           <fieldset className="flex flex-col gap-4">
             <legend className="mb-2 text-sm font-semibold">Prix</legend>
+            <fieldset
+              className="flex flex-col gap-1.5"
+              aria-describedby={champs.currency ? 'ar-devise-erreur' : 'ar-devise-aide'}
+            >
+              <legend className="text-sm font-medium">
+                Devise
+                <span className="text-[var(--foreground-muted)]" aria-hidden="true">
+                  {' '}
+                  *
+                </span>
+                <span className="sr-only"> (obligatoire)</span>
+              </legend>
+              <div className="flex flex-wrap gap-2">
+                {CATALOG_CURRENCIES.map((d: CatalogCurrency) => (
+                  <RadioCarte
+                    key={d}
+                    name="ar-devise"
+                    checked={form.currency === d}
+                    onChange={() => maj('currency', d)}
+                    label={CURRENCY_LABELS[d]}
+                  />
+                ))}
+              </div>
+              <AideEtErreur
+                id="ar-devise"
+                aide="Le prix et la taxe spécifique par unité s’entendent dans cette devise. Lors de la normalisation d’une facture, ses montants sont convertis en CDF au taux de référence."
+                erreur={champs.currency}
+              />
+            </fieldset>
             <div className="grid gap-4 sm:grid-cols-2">
               <Champ
                 id="ar-price"
-                label="Prix unitaire (CDF)"
+                label={`Prix unitaire (${form.currency})`}
                 requis
                 aide="Hors taxe spécifique. Deux décimales au plus, par exemple 1 234,50."
                 erreur={champs.unitPrice}
@@ -478,7 +517,7 @@ export function CatalogItemForm({
                     className={`${CHAMP} fig text-right`}
                     {...aria('ar-price', champs.unitPrice, true)}
                   />
-                  <span className="text-sm text-[var(--foreground-muted)]">CDF</span>
+                  <span className="text-sm text-[var(--foreground-muted)]">{form.currency}</span>
                 </div>
               </Champ>
               <fieldset
@@ -511,9 +550,6 @@ export function CatalogItemForm({
                 />
               </fieldset>
             </div>
-            <p className="text-xs text-[var(--foreground-muted)]">
-              Devise : franc congolais (CDF), seule devise de la facture normalisée pour l’instant.
-            </p>
           </fieldset>
 
           {tsAdmise ? (
@@ -548,7 +584,7 @@ export function CatalogItemForm({
                   id="ar-ts-valeur"
                   label={
                     form.specificKind === 'per_unit'
-                      ? `Montant par ${form.unit.trim() || 'unité'} (CDF)`
+                      ? `Montant par ${form.unit.trim() || 'unité'} (${form.currency})`
                       : 'Taux (%)'
                   }
                   requis

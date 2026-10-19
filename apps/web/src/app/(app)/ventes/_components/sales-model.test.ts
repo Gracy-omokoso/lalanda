@@ -17,8 +17,12 @@ import {
   actionsLigne,
   appliquerGroupe,
   bandeauGroupes,
+  CATALOG_CURRENCIES,
+  type CatalogItemDisplay,
   codeDgiApercu,
   codeReserve,
+  corpsContrat,
+  CURRENCY_LABELS,
   CUSTOMER_TYPES,
   CHEMINS_ARTICLE,
   erreursFormulaire,
@@ -515,6 +519,7 @@ describe('preparerArticle', () => {
     outOfScope: false,
     unitPrice: '1 234,50',
     priceMode: 'ttc',
+    currency: 'CDF',
     specificKind: 'none',
     specificValue: '',
   };
@@ -535,6 +540,34 @@ describe('preparerArticle', () => {
         specificTax: null,
       },
     });
+  });
+
+  it('transmet la devise choisie, sans conversion (ADR-0023 E4)', () => {
+    const r = preparerArticle(
+      {
+        ...complet,
+        unitPrice: '40',
+        currency: 'USD',
+        specificKind: 'per_unit',
+        specificValue: '1,5',
+      },
+      GROUPES_DGI,
+    );
+    expect(r.ok && r.corps).toMatchObject({
+      unitPrice: '40',
+      currency: 'USD',
+      specificTax: { kind: 'per_unit', amount: '1.5' },
+    });
+    expect(r.ok && corpsContrat(r.corps).currency).toBe('USD');
+  });
+
+  it('devise : CDF d’office, celle de l’article à l’édition', () => {
+    expect(formulaireArticle(null).currency).toBe('CDF');
+    expect(
+      formulaireArticle({ ...ARTICLE, currency: 'USD' } as unknown as CatalogItemView).currency,
+    ).toBe('USD');
+    expect(CATALOG_CURRENCIES).toEqual(['CDF', 'USD']);
+    expect(CURRENCY_LABELS.USD).toBe('Dollar américain (USD)');
   });
 
   it('exige le mode TTC/HT : aucun défaut', () => {
@@ -600,6 +633,14 @@ describe('affichage d’un article', () => {
     expect(libellePrix({ ...ARTICLE, unitPrice: '1234.50', priceMode: 'ht' })).toBe(
       `1${NNBSP}234,50${NBSP}CDF HT`,
     );
+  });
+
+  it('affiche un prix en dollars dans sa devise, sans conversion', () => {
+    const usd: CatalogItemDisplay = { ...ARTICLE, unitPrice: '1234.50', currency: 'USD' };
+    expect(libellePrix(usd)).toBe(`1${NNBSP}234,50${NBSP}USD TTC`);
+    expect(
+      libelleTaxeSpecifique({ ...usd, specificTax: { kind: 'per_unit', amount: '0.25' } }),
+    ).toBe(`Taxe spécifique : 0,25${NBSP}USD par pièce`);
   });
 
   it('écrit la taxe spécifique en mots', () => {
@@ -704,6 +745,17 @@ describe('erreurs de l’API (§ S25c.5)', () => {
           'La référence d’exonération ne concerne que les ambassades et organisations internationales.',
       },
       autres: ['inconnu : Champ bizarre.'],
+    });
+  });
+
+  it('devise refusée : message en français sur le champ « Devise » (ADR-0023 E4)', () => {
+    const err = erreurApi(400, {
+      code: 'INVALID_REQUEST',
+      issues: [{ path: ['currency'], code: 'CURRENCY_NOT_SUPPORTED', message: '' }],
+    });
+    expect(erreursFormulaire(err, ['currency'] as const).champs).toEqual({
+      currency:
+        'Devise non prise en charge : choisissez le franc congolais (CDF) ou le dollar américain (USD).',
     });
   });
 
