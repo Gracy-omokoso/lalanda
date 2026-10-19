@@ -108,12 +108,16 @@ function ChoixClient({
   form,
   setForm,
   verrouille,
+  desactive,
   erreur,
   onType,
 }: {
   form: FormulaireDocument;
   setForm: React.Dispatch<React.SetStateAction<FormulaireDocument>>;
+  /** Avoir : client repris de la facture d'origine. */
   verrouille: boolean;
+  /** Lecture seule (rôle, envoi en cours) : champs visibles mais inactifs. */
+  desactive: boolean;
   erreur: string | undefined;
   onType: (t: CustomerType | null) => void;
 }): React.ReactElement {
@@ -568,7 +572,8 @@ export function InvoiceEditor({
         <ChoixClient
           form={form}
           setForm={setForm}
-          verrouille={verrouOrigine || desactive}
+          verrouille={verrouOrigine}
+          desactive={desactive}
           erreur={erreurs['customer']}
           onType={setTypeClient}
         />

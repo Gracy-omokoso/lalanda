@@ -12,6 +12,7 @@ import { erreursFormulaire } from '../../_components/sales-model';
 
 import {
   actionsDocument,
+  commentaireAModifiable,
   comparerDecimaux,
   enteteDocument,
   formatDateDgi,
@@ -277,6 +278,12 @@ describe('actions : « Émettre » ou « Normaliser », jamais les deux', () => 
 
   it('avoir sur une facture finale, pas sur un avoir ; reprise sans numéro réservé', () => {
     expect(actionsDocument(vue({ status: 'normalized' }), tout)).toEqual(['avoir']);
+    const solde = vue({ status: 'issued' });
+    const credite = vue({
+      status: 'issued',
+      lines: solde.lines.map((l) => ({ ...l, credited: l.quantity, remaining: '0.000' })),
+    });
+    expect(actionsDocument(credite, tout)).toEqual([]);
     expect(actionsDocument(vue({ status: 'issued', type: 'FA' }), tout)).toEqual([]);
     expect(actionsDocument(vue({ status: 'pending_normalization' }), tout)).toEqual([]);
     expect(actionsDocument(vue({ status: 'normalization_failed' }), tout)).toEqual(['reprendre']);
@@ -496,6 +503,17 @@ describe('préparation du corps (contrat § S25e.14)', () => {
       nom: 'Exemple SARL',
       printContactDetails: false,
     });
+  });
+});
+
+describe('commentaire A (§ S25e.7)', () => {
+  it('automatique pour AO, saisissable seulement avec une ligne du groupe D', () => {
+    const f = formulaireVide();
+    expect(commentaireAModifiable(f, null)).toBe(false);
+    expect(commentaireAModifiable(f, 'PM')).toBe(false);
+    f.lignes = [{ ...ligneVide('free'), taxGroup: 'D' }];
+    expect(commentaireAModifiable(f, 'PM')).toBe(true);
+    expect(commentaireAModifiable(f, 'AO')).toBe(false);
   });
 });
 

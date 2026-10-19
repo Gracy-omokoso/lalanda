@@ -292,8 +292,15 @@ export type ActionDocument =
  * « Normaliser » ne coexistent JAMAIS : le brouillon dit lui-même, par
  * `readiness.action`, laquelle s'applique au mode de l'organisation.
  */
+function toutCredite(lignes: InvoiceView['lines'] | undefined): boolean {
+  if (!lignes || lignes.length === 0) return false;
+  return lignes.every((l) => l.remaining !== undefined && comparerDecimaux(l.remaining, '0') === 0);
+}
+
 export function actionsDocument(
-  doc: Pick<InvoiceView, 'status' | 'type' | 'readiness' | 'normalization'>,
+  doc: Pick<InvoiceView, 'status' | 'type' | 'readiness' | 'normalization'> & {
+    lines?: InvoiceView['lines'];
+  },
   droits: { gerer: boolean; facturer: boolean },
 ): ActionDocument[] {
   const out: ActionDocument[] = [];
@@ -305,7 +312,8 @@ export function actionsDocument(
       break;
     case 'issued':
     case 'normalized':
-      if (droits.gerer && !estAvoir(doc.type)) out.push('avoir');
+      // Tout crédité (restants servis par l'API, tous nuls) : rien à reprendre.
+      if (droits.gerer && !estAvoir(doc.type) && !toutCredite(doc.lines)) out.push('avoir');
       break;
     case 'normalization_failed':
       if (droits.gerer && (doc.normalization?.reservedNumber ?? null) === null) {
@@ -669,8 +677,10 @@ export function commentaireAModifiable(
   f: Pick<FormulaireDocument, 'lignes'>,
   typeClient: string | null,
 ): boolean {
+  // A est écrite par le serveur pour un client AO ; sinon, saisissable seulement
+  // avec une ligne du groupe D (§ S25e.7), refusée par le serveur dans tout autre cas.
   if (typeClient === 'AO') return false;
-  return f.lignes.some((l) => l.source === 'free' && l.taxGroup === 'D') || typeClient === null;
+  return f.lignes.some((l) => l.source === 'free' && l.taxGroup === 'D');
 }
 
 export type ChampDocument = string;
