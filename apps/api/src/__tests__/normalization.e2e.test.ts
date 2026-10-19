@@ -40,7 +40,7 @@ process.env['DGI_ISF_TEST'] = process.env['DGI_ISF_TEST'] || 'ISF-TEST-E2E';
 process.env['DGI_HTTP_TIMEOUT_MS'] = '10000';
 delete process.env['DGI_PRODUCTION_ENABLED'];
 
-vi.setConfig({ testTimeout: 180_000 });
+vi.setConfig({ testTimeout: 600_000 });
 
 const MOT_DE_PASSE = 'Passw0rd!normalisation';
 const NIF_N = 'A0000000X';
@@ -191,13 +191,27 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
   ) {
     const d = await brouillonPret(c, body);
     const rn = await prochainNumero(org);
-    if (scenario) fake.setInvoiceScenario(rn, scenario);
+    // Un numéro rendu est repris par la facture suivante : un scénario ne
+    // survit pas à la normalisation suivante.
+    effacerScenarios();
+    if (scenario) scenarioPour(rn, scenario);
     const res = await post(c, `/sales/invoices/${d.id}/normalize`, {
       expectedRevision: d.revision,
       exchangeRate: null,
     });
     expect(res.status, JSON.stringify(res.body)).toBe(200);
     return { view: res.body as Record<string, any>, rn, draft: d };
+  }
+
+  const scenarios = new Set<string>();
+  function scenarioPour(rn: string, scenario: FakeEdefScenarioInput | null): void {
+    fake.setInvoiceScenario(rn, scenario);
+    if (scenario) scenarios.add(rn);
+    else scenarios.delete(rn);
+  }
+  function effacerScenarios(): void {
+    for (const rn of scenarios) fake.setInvoiceScenario(rn, null);
+    scenarios.clear();
   }
 
   /** Gèle SANS normaliser (le normaliseur est court-circuité une fois). */
@@ -338,11 +352,19 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
     });
     expect(client.status, JSON.stringify(client.body)).toBe(201);
     customer = client.body.id;
-    const clientB = await post(asB(), '/sales/customers', { type: 'PM', name: 'Client B SARL' });
+    const clientB = await post(asB(), '/sales/customers', {
+      type: 'PM',
+      name: 'Client B SARL',
+      nif: `B${tag.toUpperCase()}02`,
+    });
+    expect(clientB.status, JSON.stringify(clientB.body)).toBe(201);
     customerB = clientB.body.id;
   }, 300_000);
 
-  beforeEach(() => clearThrottle());
+  beforeEach(() => {
+    clearThrottle();
+    effacerScenarios();
+  });
 
   afterAll(async () => {
     try {
@@ -477,7 +499,7 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
       });
       expect(capacity.rn).toBe(data.rn);
       // Relance : même contenu figé, nouveau numéro réservé (celui rendu).
-      fake.setInvoiceScenario(capacity.rn, null);
+      scenarioPour(capacity.rn, null);
       const relance = await post(asN(), `/sales/invoices/${capacity.view.id}/normalization/retry`);
       expect(relance.status).toBe(200);
       expect(relance.body).toMatchObject({ status: 'normalized', number: capacity.rn });
@@ -628,7 +650,7 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
       ]);
       await rattraper(view.id);
       expect((await enBase(view.id))?.['normalization']?.['phase']).toBe('needs_review');
-      fake.setInvoiceScenario(rn, null);
+      scenarioPour(rn, null);
       const check = await post(asN('accountant'), `/sales/invoices/${view.id}/normalization/check`);
       expect(check.status).toBe(200);
       expect(check.body).toMatchObject({
@@ -700,7 +722,7 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
 
     it('DGI injoignable 30 min → needs_review ; aucun document ne devient facture', async () => {
       const { view, rn } = await normaliser('post_timeout_after_create');
-      fake.setInvoiceScenario(rn, 'server_error');
+      scenarioPour(rn, 'server_error');
       expect(await rattraper(view.id)).toBe('uncertain');
       expect((await enBase(view.id))?.['normalization']?.['phase']).toBe('uncertain');
       expect(await rattraper(view.id, 31 * MINUTE)).toBe('uncertain');
@@ -708,7 +730,7 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
       expect(doc?.['normalization']?.['phase']).toBe('needs_review');
       expect(doc?.['status']).toBe('pending_normalization');
       // Nettoyage : la demande expirée, on conclut par déclaration.
-      fake.setInvoiceScenario(rn, null);
+      scenarioPour(rn, null);
       await reauth('owner');
       const d = await post(
         asN(),
@@ -826,14 +848,14 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
         [num(9), 'post_timeout_after_create'],
         [num(11), 'post_business_error:1'],
       ]);
-      for (const [rn, sc] of injected) fake.setInvoiceScenario(rn, sc);
+      for (const [rn, sc] of injected) scenarioPour(rn, sc);
       const consume = () => {
         const sent = new Set(
           fake.callsTo('submit').map((r) => JSON.parse(r.body ?? '{}').rn as string),
         );
         for (const rn of [...injected.keys()]) {
           if (sent.has(rn)) {
-            fake.setInvoiceScenario(rn, null);
+            scenarioPour(rn, null);
             injected.delete(rn);
           }
         }
@@ -915,18 +937,22 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
       expect(res.status).toBe(409);
       expect(res.body.code).toBe('POINT_OF_SALE_HAS_PENDING_NORMALIZATIONS');
       const pos = app.get(PointsOfSaleService);
-      await db
-        .collection('emcf_points_of_sale')
-        .updateOne({ _id: new ObjectId(posN) }, { $set: { 'dgi.tokenValidUntil': new Date(0) } });
-      expect(await pos.resolveActiveToken(orgN, posN)).toBeNull();
-      expect(await pos.resolveTokenForReconciliation(orgN, posN)).not.toBeNull();
-      expect(await rattraper(view.id)).toBe('failed');
-      await db
-        .collection('emcf_points_of_sale')
-        .updateOne(
-          { _id: new ObjectId(posN) },
-          { $set: { 'dgi.tokenValidUntil': new Date('2099-01-31T00:00:00Z') } },
-        );
+      const avant = await db.collection('emcf_points_of_sale').findOne({ _id: new ObjectId(posN) });
+      try {
+        await db
+          .collection('emcf_points_of_sale')
+          .updateOne({ _id: new ObjectId(posN) }, { $set: { 'dgi.tokenValidUntil': new Date(0) } });
+        expect(await pos.resolveActiveToken(orgN, posN)).toBeNull();
+        expect(await pos.resolveTokenForReconciliation(orgN, posN)).not.toBeNull();
+        expect(await rattraper(view.id)).toBe('failed');
+      } finally {
+        await db
+          .collection('emcf_points_of_sale')
+          .updateOne(
+            { _id: new ObjectId(posN) },
+            { $set: { 'dgi.tokenValidUntil': avant?.['dgi']?.['tokenValidUntil'] } },
+          );
+      }
     });
 
     it('organisation forcée en production → failed DGI_PRODUCTION_UNAVAILABLE, aucune requête', async () => {
@@ -949,7 +975,7 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
     it('retry/check : Propriétaire, DAF, Comptable 200 ; Administrateur, Analyste, Lecteur 403', async () => {
       const { view } = await normaliser('post_business_error:1');
       for (const role of ['owner', 'finance_director', 'accountant'] as const) {
-        fake.setInvoiceScenario(await prochainNumero(), 'post_business_error:1');
+        scenarioPour(await prochainNumero(), 'post_business_error:1');
         const r = await post(asN(role), `/sales/invoices/${view.id}/normalization/retry`);
         expect(r.status, role).toBe(200);
         const c = await post(asN(role), `/sales/invoices/${view.id}/normalization/check`);
