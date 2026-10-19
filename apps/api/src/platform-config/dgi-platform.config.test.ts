@@ -7,7 +7,11 @@ import { NestFactory } from '@nestjs/core';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+  CONFIRM_DEADLINE_MS,
+  DGI_PENDING_EXPIRY_MS,
   DGI_PLATFORM_CONFIG,
+  RECONCILE_DELAY_MS,
+  UNCERTAINTY_CAP_MS,
   loadDgiPlatformConfig,
   type DgiPlatformConfig,
 } from './dgi-platform.config.js';
@@ -20,7 +24,30 @@ describe('loadDgiPlatformConfig', () => {
       isf: { test: null, production: null },
       productionEnabled: false,
       httpTimeoutMs: 15_000,
+      normalizationTimings: {
+        confirmDeadlineMs: 90_000,
+        pendingExpiryMs: 120_000,
+        reconcileDelayMs: 150_000,
+        uncertaintyCapMs: 1_800_000,
+      },
     });
+  });
+
+  it('délais de la normalisation conformes à ADR-0024 § 6', () => {
+    expect(CONFIRM_DEADLINE_MS).toBe(90_000);
+    expect(DGI_PENDING_EXPIRY_MS).toBe(120_000);
+    expect(CONFIRM_DEADLINE_MS).toBeLessThan(DGI_PENDING_EXPIRY_MS);
+    expect(RECONCILE_DELAY_MS).toBeGreaterThan(DGI_PENDING_EXPIRY_MS);
+    expect(UNCERTAINTY_CAP_MS).toBe(30 * 60_000);
+  });
+
+  it('refuse la production ouverte tant que les arrondis ne sont pas étalonnés (ADR-0024 § 7.3)', () => {
+    expect(() =>
+      loadDgiPlatformConfig({
+        DGI_PRODUCTION_ENABLED: 'true',
+        DGI_ISF_PRODUCTION: 'AB1-CD2-E3',
+      }),
+    ).toThrow(/étalonnage des arrondis/);
   });
 
   it('une chaîne vide vaut absence (comme dans .env.production.example)', () => {
@@ -34,12 +61,15 @@ describe('loadDgiPlatformConfig', () => {
     );
   });
 
-  it('ouvre la production avec un ISF valide', () => {
-    const config = loadDgiPlatformConfig({
-      DGI_PRODUCTION_ENABLED: 'true',
-      DGI_ISF_PRODUCTION: 'AB1-CD2-E3',
-      DGI_ISF_TEST: 'TEST-01',
-    });
+  it('ouvre la production avec un ISF valide et un étalonnage enregistré', () => {
+    const config = loadDgiPlatformConfig(
+      {
+        DGI_PRODUCTION_ENABLED: 'true',
+        DGI_ISF_PRODUCTION: 'AB1-CD2-E3',
+        DGI_ISF_TEST: 'TEST-01',
+      },
+      { status: 'calibrated' },
+    );
     expect(config.productionEnabled).toBe(true);
     expect(config.isf).toEqual({ test: 'TEST-01', production: 'AB1-CD2-E3' });
   });
@@ -63,6 +93,7 @@ describe('loadDgiPlatformConfig', () => {
     expect(Object.isFrozen(config)).toBe(true);
     expect(Object.isFrozen(config.baseUrl)).toBe(true);
     expect(Object.isFrozen(config.isf)).toBe(true);
+    expect(Object.isFrozen(config.normalizationTimings)).toBe(true);
   });
 });
 

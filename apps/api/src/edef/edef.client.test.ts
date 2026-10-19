@@ -7,7 +7,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { Secret } from '../integrations/secret-value.js';
-import type { DgiPlatformConfig } from '../platform-config/dgi-platform.config.js';
+import {
+  DEFAULT_NORMALIZATION_TIMINGS,
+  type DgiPlatformConfig,
+} from '../platform-config/dgi-platform.config.js';
 import { EdefExchangeJournal, type EdefExchangeEntry } from './edef-exchange.journal.js';
 import { EdefClient } from './edef.client.js';
 import type { EdefCallContext, EdefFailureKind } from './edef.types.js';
@@ -64,6 +67,7 @@ describe('EdefClient', () => {
       // 300 ms sur une machine chargée — le test « lit le statut » échouait alors au
       // hasard (constaté 2 fois sur 3 le 19 oct. 2026). La production attend 15 s.
       httpTimeoutMs: 1_500,
+      normalizationTimings: DEFAULT_NORMALIZATION_TIMINGS,
     };
     journal = new MemoryJournal();
     client = new EdefClient(config, journal);
