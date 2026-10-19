@@ -116,6 +116,8 @@ function freshNormalization(pointOfSaleId: string) {
     qrCode: null,
     lastError: null,
     normalizedAt: null,
+    // ADR-0024 § 10 : la normalisation part de la phase `queued`.
+    phase: 'queued' as const,
   };
 }
 
