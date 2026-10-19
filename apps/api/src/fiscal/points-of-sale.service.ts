@@ -181,6 +181,23 @@ export class PointsOfSaleService {
     return token ? { token, environment: doc.environment } : null;
   }
 
+  /**
+   * Jeton pour le RATTRAPAGE des normalisations (ADR-0024 § 4.2, ajout F2) :
+   * point de vente activé (`enabled`), même `failing` ou `token_expired` — la
+   * DGI répondra 401 si le jeton est mort. `null` si le point de vente n'existe
+   * pas dans cette organisation, est retiré, ou n'a plus de jeton.
+   */
+  async resolveTokenForReconciliation(
+    organizationId: string,
+    pointOfSaleId: string,
+  ): Promise<{ token: Secret; environment: EdefEnvironment } | null> {
+    if (!Types.ObjectId.isValid(pointOfSaleId)) return null;
+    const doc = await this.model.findOne({ _id: pointOfSaleId, organizationId }).exec();
+    if (!doc || !doc.enabled) return null;
+    const token = await this.resolve(secretRef(organizationId, pointOfSaleId));
+    return token ? { token, environment: doc.environment } : null;
+  }
+
   // ── Écritures ──────────────────────────────────────────────────────────────
 
   async create(
@@ -430,6 +447,24 @@ export class PointsOfSaleService {
   ): Promise<PointOfSaleView> {
     const doc = await this.requireOwn(organizationId, pointOfSaleId);
     if (!doc.enabled) return this.view(organizationId, pointOfSaleId);
+
+    // ADR-0024 § 4.2 (ajout F2) : désactiver détruit le jeton, et sans jeton plus
+    // aucune vérification d'une normalisation non soldée n'est possible.
+    const pendingNormalizations = await this.connection
+      .collection('sales_invoices')
+      .countDocuments({
+        organizationId,
+        status: 'pending_normalization',
+        'normalization.pointOfSaleId': pointOfSaleId,
+      });
+    if (pendingNormalizations > 0) {
+      conflict(
+        'POINT_OF_SALE_HAS_PENDING_NORMALIZATIONS',
+        'Ce point de vente porte une normalisation qui n’est pas encore soldée auprès de la DGI : ' +
+          'attendez sa conclusion avant de le retirer.',
+        { count: pendingNormalizations },
+      );
+    }
 
     const settings = await this.state.read(organizationId);
     if (settings.state === 'enabled' && settings.environment === doc.environment) {
