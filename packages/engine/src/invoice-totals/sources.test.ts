@@ -88,10 +88,14 @@ describe('dépendances du module invoice-totals', () => {
   it('liste les fichiers attendus', () => {
     expect(files.sort()).toEqual([
       'compute.ts',
+      'conversion.ts',
+      'credit-notes.ts',
       'currency.ts',
       'decimal.ts',
       'edef-shape.ts',
       'index.ts',
+      'invoice-checks.types.ts',
+      'payments.ts',
       'pricing.ts',
       'reference-cases.ts',
       'tax-groups.ts',
@@ -104,7 +108,8 @@ describe('dépendances du module invoice-totals', () => {
       const stripped = code(read(file));
       const specifiers = [...stripped.matchAll(/\bfrom\s+['"]([^'"]+)['"]/g)].map((m) => m[1]);
       for (const specifier of specifiers) {
-        expect(specifier, `${file} : ${specifier}`).toMatch(/^\.\/[\w-]+\.js$/);
+        // Le point est admis dans le nom (`invoice-checks.types.js`, ADR-0023), pas le `/`.
+        expect(specifier, `${file} : ${specifier}`).toMatch(/^\.\/[\w.-]+\.js$/);
       }
       expect(/\bimport\s*\(|\brequire\s*\(/.test(stripped), `${file} : import dynamique`).toBe(
         false,
