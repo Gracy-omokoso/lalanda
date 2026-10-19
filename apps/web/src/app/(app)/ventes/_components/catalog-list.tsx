@@ -7,8 +7,9 @@
 // fiche : les filtres et le formulaire proposent la même liste, celle du
 // serveur.
 //
-// Les prix sont affichés tels que l'API les sert, mis en forme à la française
-// (`1 234,50 CDF TTC`) ; aucun n'est converti ni recalculé.
+// Les prix sont affichés tels que l'API les sert, dans leur devise, mis en forme
+// à la française (`1 234,50 CDF TTC`, `40,00 USD HT`) ; aucun n'est converti ni
+// recalculé (ADR-0023 E4).
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';

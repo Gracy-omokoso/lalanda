@@ -7,8 +7,10 @@
 // nombres (docs/26).
 
 import {
+  DOCUMENT_CURRENCIES,
   ITEM_TYPES,
   TAX_GROUP_LETTERS,
+  type DocumentCurrency,
   type ItemType,
   type PriceMode,
   type TaxGroupLetter,
@@ -61,8 +63,9 @@ export class CatalogItem {
   @Prop({ type: String, required: true, enum: ['ttc', 'ht'] })
   priceMode!: PriceMode;
 
-  @Prop({ type: String, required: true, enum: ['CDF'], default: 'CDF' })
-  currency!: 'CDF';
+  /** Devise du prix (ADR-0023 E4) ; les articles antérieurs valent `CDF`. */
+  @Prop({ type: String, required: true, enum: [...DOCUMENT_CURRENCIES], default: 'CDF' })
+  currency!: DocumentCurrency;
 
   @Prop({ type: String, required: true })
   unit!: string;

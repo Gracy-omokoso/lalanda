@@ -352,6 +352,43 @@ export const PRICE_MODE_LABELS: Record<CatalogPriceMode, { court: string; long: 
   ht: { court: 'HT', long: 'HT — hors taxes' },
 };
 
+/**
+ * Devise du prix d'un article (ADR-0023 E4, décision du 19 oct. 2026) : franc
+ * congolais ou dollar, au choix. Aucune conversion ici : le prix s'entend dans
+ * sa devise, et le passage en CDF n'a lieu qu'à la normalisation d'une facture,
+ * par le moteur. `lib/api.ts` (chantier E3) élargit `currency` à ces deux
+ * valeurs ; d'ici là, le contrat web ne connaît que `'CDF'`.
+ */
+export const CATALOG_CURRENCIES = ['CDF', 'USD'] as const;
+export type CatalogCurrency = (typeof CATALOG_CURRENCIES)[number];
+
+export const CURRENCY_LABELS: Record<CatalogCurrency, string> = {
+  CDF: 'Franc congolais (CDF)',
+  USD: 'Dollar américain (USD)',
+};
+
+/** Corps d'article envoyé à l'API, devise CDF ou USD. */
+export type CatalogItemPayload = Omit<CatalogItemBody, 'currency'> & {
+  currency: CatalogCurrency;
+};
+
+/** Article tel que l'API le sert, devise CDF ou USD. */
+export type CatalogItemDisplay = Omit<CatalogItemView, 'currency'> & {
+  currency: CatalogCurrency;
+};
+
+/**
+ * Corps typé selon le contrat web actuel. L'API accepte `USD` (chantier E4) ;
+ * l'assertion tombe d'elle-même quand `lib/api.ts` élargit `currency` (E3).
+ */
+export function corpsContrat(corps: CatalogItemPayload): CatalogItemBody {
+  return corps as CatalogItemBody;
+}
+
+function deviseDe(valeur: string | undefined): CatalogCurrency {
+  return valeur === 'USD' ? 'USD' : 'CDF';
+}
+
 export function groupeDe(
   liste: TaxGroupList | null,
   lettre: TaxGroupLetter | '',
@@ -411,6 +448,8 @@ export interface FormulaireArticle {
   /** Texte saisi, à la française (`"1 234,50"`). */
   unitPrice: string;
   priceMode: CatalogPriceMode | '';
+  /** Devise du prix et du montant de la taxe spécifique par unité. */
+  currency: CatalogCurrency;
   specificKind: TaxeSpecifiqueChoix;
   /** Montant par unité ou taux en %, selon `specificKind`. */
   specificValue: string;
@@ -431,6 +470,8 @@ export function formulaireArticle(vue: CatalogItemView | null): FormulaireArticl
     // Pas de mode par défaut : il est obligatoire (§ S25c.3), et un prix saisi
     // dans le mauvais mode change tous les montants d'une facture.
     priceMode: vue?.priceMode ?? '',
+    // Franc congolais d'office : c'est la devise de tous les articles antérieurs.
+    currency: deviseDe(vue?.currency),
     specificKind: ts?.kind ?? 'none',
     specificValue:
       ts === null ? '' : montantPourSaisie(ts.kind === 'per_unit' ? ts.amount : ts.rate),
@@ -492,7 +533,7 @@ export function codeReserve(code: string): boolean {
 export function preparerArticle(
   f: FormulaireArticle,
   liste: TaxGroupList | null,
-): Preparation<CatalogItemBody, ChampArticle> {
+): Preparation<CatalogItemPayload, ChampArticle> {
   const champs: Partial<Record<ChampArticle, string>> = {};
   const code = f.code.trim();
   if (code !== '') {
@@ -557,23 +598,23 @@ export function preparerArticle(
       outOfScope: f.outOfScope,
       unitPrice: prix.valeur,
       priceMode: f.priceMode,
-      currency: 'CDF',
+      currency: f.currency,
       unit: f.unit.trim(),
       specificTax,
     },
   };
 }
 
-/** `1 234,50 CDF TTC` — prix d'un article tel que l'API le sert. */
+/** `1 234,50 CDF TTC`, `1 234,50 USD HT` — prix d'un article tel que l'API le sert. */
 export function libellePrix(
-  item: Pick<CatalogItemView, 'unitPrice' | 'currency' | 'priceMode'>,
+  item: Pick<CatalogItemDisplay, 'unitPrice' | 'currency' | 'priceMode'>,
 ): string {
   return `${formatMontant(item.unitPrice, item.currency)} ${PRICE_MODE_LABELS[item.priceMode].court}`;
 }
 
 /** Taxe spécifique en mots, ou `null`. */
 export function libelleTaxeSpecifique(
-  item: Pick<CatalogItemView, 'specificTax' | 'currency' | 'unit'>,
+  item: Pick<CatalogItemDisplay, 'specificTax' | 'currency' | 'unit'>,
 ): string | null {
   const ts = item.specificTax;
   if (ts === null) return null;
@@ -768,7 +809,8 @@ const MESSAGES_PROBLEMES: Record<string, string> = {
   ITEM_TYPE_INVALID: 'Choisissez le type d’article : bien, service ou taxe.',
   PRICE_INVALID: 'Montant invalide : des chiffres et une virgule, par exemple 1 234,50.',
   PRICE_MODE_INVALID: 'Indiquez si le prix est TTC ou HT.',
-  CURRENCY_NOT_SUPPORTED: 'Seul le franc congolais (CDF) est admis pour l’instant.',
+  CURRENCY_NOT_SUPPORTED:
+    'Devise non prise en charge : choisissez le franc congolais (CDF) ou le dollar américain (USD).',
   UNIT_REQUIRED: 'L’unité est obligatoire (pièce, kg, heure…).',
   UNIT_TOO_LONG: '20 caractères au plus.',
   SPECIFIC_TAX_INVALID:

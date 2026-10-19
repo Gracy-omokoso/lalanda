@@ -11,10 +11,12 @@
 // `DECIMAL_MUST_BE_STRING` ; aucune conversion par `Number()` n'a lieu ici.
 
 import {
+  DOCUMENT_CURRENCIES,
   ITEM_TYPES,
   OUT_OF_SCOPE_ITEM_CODE,
   isItemTypeAllowed,
   isTaxGroupLetter,
+  type DocumentCurrency,
   type ItemType,
   type PriceMode,
   type SpecificTax,
@@ -237,7 +239,8 @@ export interface CatalogItemInput {
   outOfScope: boolean;
   unitPrice: string;
   priceMode: PriceMode;
-  currency: 'CDF';
+  /** Devise du prix (ADR-0023 E4). Aucune conversion ici : elle n'a lieu qu'à la normalisation. */
+  currency: DocumentCurrency;
   unit: string;
   specificTax: SpecificTax | null;
 }
@@ -442,13 +445,20 @@ function normalizeCatalogItem(raw: RawCatalogItem, ctx: Ctx): CatalogItemInput {
     issue(ctx, 'priceMode', 'PRICE_MODE_INVALID', 'Mode de prix : "ttc" ou "ht".');
   }
 
-  // Devise : CDF seulement dans ce lot (décision ouverte n° 2).
-  if (raw.currency !== undefined && raw.currency !== 'CDF') {
+  // Devise : CDF ou USD au choix (décision du 19 oct. 2026, ADR-0023 E4). Absente,
+  // elle vaut CDF, comme avant l'ouverture du dollar.
+  const currency: DocumentCurrency | null =
+    raw.currency === undefined
+      ? 'CDF'
+      : (DOCUMENT_CURRENCIES as readonly unknown[]).includes(raw.currency)
+        ? (raw.currency as DocumentCurrency)
+        : null;
+  if (currency === null) {
     issue(
       ctx,
       'currency',
       'CURRENCY_NOT_SUPPORTED',
-      'Seul le franc congolais (CDF) est admis : la facture normalisée est libellée en CDF.',
+      'Devise : "CDF" (franc congolais) ou "USD" (dollar américain).',
     );
   }
 
@@ -479,7 +489,7 @@ function normalizeCatalogItem(raw: RawCatalogItem, ctx: Ctx): CatalogItemInput {
     outOfScope,
     unitPrice,
     priceMode: priceMode ?? 'ttc',
-    currency: 'CDF',
+    currency: currency ?? 'CDF',
     unit,
     specificTax,
   };
