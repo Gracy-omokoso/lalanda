@@ -1,8 +1,8 @@
 import { SalesChrome } from './_components/sales-access';
 
 /**
- * Espace Ventes (S25c — ADR-0022) : clients et catalogue, les données maîtres
- * sans lesquelles aucune facture n'est possible.
+ * Espace Ventes : factures, pro forma et avoirs (S25e — ADR-0023), puis
+ * clients et catalogue, les données maîtres (S25c — ADR-0022).
  *
  * Comme `/organisation`, l'espace EXIGE une organisation active : toutes ses
  * routes d'API sont scopées par l'organisation du cookie. Les onglets sont
@@ -19,8 +19,8 @@ export default function SalesLayout({
       <header className="flex flex-col gap-1">
         <h1 className="font-display text-2xl font-bold tracking-tight">Ventes</h1>
         <p className="max-w-2xl text-sm text-[var(--foreground-muted)]">
-          Vos clients et votre catalogue d’articles, prêts pour la facture normalisée de la DGI. Ce
-          que vous pouvez modifier dépend de votre rôle.
+          Vos factures, pro forma et avoirs, vos clients et votre catalogue d’articles, prêts pour
+          la facture normalisée de la DGI. Ce que vous pouvez modifier dépend de votre rôle.
         </p>
       </header>
       <SalesChrome>{children}</SalesChrome>

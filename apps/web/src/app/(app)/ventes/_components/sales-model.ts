@@ -356,8 +356,7 @@ export const PRICE_MODE_LABELS: Record<CatalogPriceMode, { court: string; long: 
  * Devise du prix d'un article (ADR-0023 E4, décision du 19 oct. 2026) : franc
  * congolais ou dollar, au choix. Aucune conversion ici : le prix s'entend dans
  * sa devise, et le passage en CDF n'a lieu qu'à la normalisation d'une facture,
- * par le moteur. `lib/api.ts` (chantier E3) élargit `currency` à ces deux
- * valeurs ; d'ici là, le contrat web ne connaît que `'CDF'`.
+ * par le moteur. `lib/api.ts` (chantier E3) porte ces deux valeurs.
  */
 export const CATALOG_CURRENCIES = ['CDF', 'USD'] as const;
 export type CatalogCurrency = (typeof CATALOG_CURRENCIES)[number];
@@ -378,11 +377,11 @@ export type CatalogItemDisplay = Omit<CatalogItemView, 'currency'> & {
 };
 
 /**
- * Corps typé selon le contrat web actuel. L'API accepte `USD` (chantier E4) ;
- * l'assertion tombe d'elle-même quand `lib/api.ts` élargit `currency` (E3).
+ * Corps du contrat web. `lib/api.ts` accepte `CDF` et `USD` depuis le chantier
+ * E3 : plus aucune assertion de type, le compilateur vérifie la forme.
  */
 export function corpsContrat(corps: CatalogItemPayload): CatalogItemBody {
-  return corps as CatalogItemBody;
+  return corps;
 }
 
 function deviseDe(valeur: string | undefined): CatalogCurrency {

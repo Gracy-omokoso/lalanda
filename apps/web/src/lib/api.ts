@@ -754,7 +754,7 @@ export interface TermsAcceptanceView {
 
 export type DisplayCurrency = 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR';
 
-/** Les 18 actions granulaires (docs/12, ADR-0021 §8, ADR-0022 § S25c.1). Union fermée, alignée sur l'API. */
+/** Les 19 actions granulaires (docs/12, ADR-0021 §8, ADR-0022 § S25c.1, ADR-0023 § S25e.11). Union fermée, alignée sur l'API. */
 export type OrgAction =
   | 'organization.manage'
   | 'billing.manage'
@@ -779,7 +779,11 @@ export type OrgAction =
   // Comptable). La matrice vit côté API ; l'interface ne fait que lire
   // `GET /me/permissions`.
   | 'sales.read'
-  | 'sales.manage';
+  | 'sales.manage'
+  // ADR-0023 § S25e.11 — émettre et normaliser des factures et des avoirs :
+  // engage le contribuable. Propriétaire, Directeur financier, Comptable ;
+  // interdite à tout rôle plateforme.
+  | 'sales.invoice';
 
 /**
  * Offres — RÉEXPORTÉES du catalogue partagé, jamais réécrites.
@@ -1554,7 +1558,8 @@ export interface CatalogItemView {
   /** Décimal canonique à deux décimales (`"464.00"`). */
   unitPrice: string;
   priceMode: CatalogPriceMode;
-  currency: 'CDF';
+  /** Devise du prix (ADR-0023, amendement d'ADR-0022) : `CDF` ou `USD`. */
+  currency: 'CDF' | 'USD';
   unit: string;
   specificTax: CatalogSpecificTax | null;
   active: boolean;
@@ -1579,7 +1584,8 @@ export interface CatalogItemBody {
   /** Chaîne décimale, point comme séparateur (`"1234.5"`) ; l'API la canonicalise. */
   unitPrice: string;
   priceMode: CatalogPriceMode;
-  currency: 'CDF';
+  /** Devise du prix (ADR-0023, amendement d'ADR-0022) : `CDF` ou `USD`. */
+  currency: 'CDF' | 'USD';
   unit: string;
   specificTax: CatalogSpecificTax | null;
 }
@@ -1612,6 +1618,454 @@ export interface TaxGroupList {
   fetchedAt: string | null;
   sha256: string | null;
   groups: TaxGroupOption[];
+}
+
+// ─── Ventes : factures, pro forma et avoirs (S25e — ADR-0023 § S25e.14) ─────
+//
+// Miroir de `apps/api/src/sales/invoices/invoice.contract.ts` (jalon E0, figé),
+// qui reste la source de vérité — le web n'importe ni de l'API ni du moteur.
+// Les formes du moteur dont la vue a besoin (`InvoiceTotals`, remise, contrôle
+// des paiements) sont recopiées à l'identique.
+//
+// Montants : TOUJOURS des chaînes décimales canoniques, dans les deux sens.
+// L'interface n'en calcule aucun : totaux, conversion en CDF, contre-valeur USD
+// et contrôles viennent du moteur, par l'API.
+
+/** Décimal canonique, sans signe ni exposant (`"4064.00"`). Jamais un `number`. */
+export type DecimalString = string;
+
+export type InvoiceStatus =
+  'draft' | 'issued' | 'pending_normalization' | 'normalized' | 'normalization_failed';
+/** Filtre de liste : les statuts, plus `final` (`issued` + `normalized`) et `all`. */
+export type InvoiceListStatus = InvoiceStatus | 'final' | 'all';
+/** Six types e-DEF : vente, acompte, avoir, et leurs pendants à l'export. */
+export type InvoiceType = 'FV' | 'FT' | 'FA' | 'EV' | 'ET' | 'EA';
+export type CreditNoteNature = 'COR' | 'RAN' | 'RAM' | 'RRR';
+export type CreditNoteScope = 'remaining' | 'empty';
+export type DocumentCurrency = 'CDF' | 'USD';
+export type InvoicePriceMode = 'ttc' | 'ht';
+export type EmissionMode = 'standard' | 'normalized';
+/** Ce que l'on peut imprimer : `invoice` seulement pour `issued` et `normalized`. */
+export type DocumentKind = 'proforma' | 'invoice';
+export type InvoiceSeries = 'real' | 'test' | 'proforma';
+export type InvoiceLineSource = 'catalog' | 'free' | 'origin';
+export type CommentLine = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H';
+export type InvoiceComments = Readonly<Record<CommentLine, string | null>>;
+export type ConversionRateSource =
+  'dgi_currency_rates' | 'user_within_tolerance' | 'identity' | 'origin_invoice';
+/** Modes de paiement e-DEF (distincts des moyens de paiement de l'abonnement). */
+export type InvoicePaymentMethod =
+  'ESPECES' | 'VIREMENT' | 'CARTEBANCAIRE' | 'MOBILEMONEY' | 'CHEQUES' | 'CREDIT' | 'AUTRE';
+export type JournalEvent =
+  | 'issued'
+  | 'submitted'
+  | 'number_reserved'
+  | 'normalized'
+  | 'normalization_failed'
+  | 'number_released'
+  | 'returned_to_draft'
+  | 'duplicate_issued'
+  | 'report_issued';
+
+export type LineDiscount =
+  { kind: 'percent'; value: DecimalString } | { kind: 'total_amount'; value: DecimalString };
+
+export interface PaymentInput {
+  method: InvoicePaymentMethod;
+  amount: DecimalString;
+}
+
+export type InvoiceCustomerBody =
+  | { customerId: string; printContactDetails: boolean }
+  | { customerId: null; walkIn: { name: string | null } };
+
+export interface CatalogLineBody {
+  source: 'catalog';
+  catalogItemId: string;
+  quantity: DecimalString;
+  /** `null` : prix de l'article (si l'article est dans la devise du document). */
+  unitPrice: DecimalString | null;
+  discount: LineDiscount | null;
+}
+
+export interface FreeLineBody {
+  source: 'free';
+  code: string | null;
+  name: string;
+  itemType: CatalogItemType;
+  taxGroup: TaxGroupLetter;
+  outOfScope: boolean;
+  unit: string | null;
+  quantity: DecimalString;
+  unitPrice: DecimalString;
+  specificTax: CatalogSpecificTax | null;
+  discount: LineDiscount | null;
+}
+
+/** Ligne d'avoir hors RRR : reprise d'une ligne de l'origine, seule la quantité varie. */
+export interface OriginLineBody {
+  source: 'origin';
+  originLineIndex: number;
+  quantity: DecimalString;
+}
+
+export type InvoiceLineBody = CatalogLineBody | FreeLineBody | OriginLineBody;
+
+/** `POST /sales/invoices` — brouillon. */
+export interface CreateInvoiceBody {
+  type: InvoiceType;
+  currency: DocumentCurrency;
+  priceMode: InvoicePriceMode;
+  customer: InvoiceCustomerBody;
+  /** `null` : le seul point de vente actif, s'il y en a un. */
+  pointOfSaleId: string | null;
+  lines: readonly InvoiceLineBody[];
+  /** Dans la devise du document. */
+  payments: readonly PaymentInput[];
+  /** Seules A et C sont saisissables (§ S25e.7). */
+  comments: { A: string | null; C: string | null };
+  /** Requis pour `FA`/`EA`, interdit sinon. */
+  creditNote: { nature: CreditNoteNature; originInvoiceId: string | null } | null;
+  /** Document en CDF : indiquer la contre-valeur USD à la normalisation. */
+  showUsdCounterValue: boolean;
+}
+
+/** `PUT /sales/invoices/:invoiceId` — corps COMPLET, brouillon seulement. */
+export interface PutInvoiceBody extends CreateInvoiceBody {
+  expectedRevision: number;
+}
+
+export interface CreateCreditNoteBody {
+  nature: CreditNoteNature;
+  scope: CreditNoteScope;
+}
+
+export interface NormalizeInvoiceBody {
+  expectedRevision: number;
+  /** `null` : taux officiel DGI du jour ; sinon un taux à ±1 % de celui-ci. */
+  exchangeRate: { rate: DecimalString; date: string } | null;
+}
+
+export interface ListInvoicesQuery {
+  status?: InvoiceListStatus;
+  type?: InvoiceType;
+  currency?: DocumentCurrency;
+  customerId?: string;
+  year?: number;
+  /** Cherche dans le numéro, la référence de pro forma et le nom du client. */
+  q?: string;
+  limit?: number;
+  cursor?: string;
+}
+
+/** Problème rendu par `computeInvoiceTotals` (message en français, affichable). */
+export interface InvoiceTotalsIssue {
+  code: string;
+  lineIndex: number | null;
+  field: string | null;
+  message: string;
+}
+
+/** Problème des contrôles de paiement, d'avoir ou de conversion (moteur). */
+export interface InvoiceCheckIssue {
+  code: string;
+  lineIndex: number | null;
+  message: string;
+  details?: Readonly<Record<string, string>>;
+}
+
+export interface InvoiceGroupTotals {
+  group: TaxGroupLetter;
+  ratePercent: DecimalString;
+  total: DecimalString;
+  ht: DecimalString;
+  vat: DecimalString;
+  specificTax: DecimalString;
+}
+
+export interface InvoiceTotals {
+  calculationVersion: string;
+  policyId: string;
+  priceMode: InvoicePriceMode;
+  lines: readonly {
+    index: number;
+    amount: DecimalString;
+    specificTaxAmount: DecimalString;
+    specificTaxValue: string | null;
+  }[];
+  groups: readonly InvoiceGroupTotals[];
+  specificTax: DecimalString;
+  total: DecimalString;
+  vatTotal: DecimalString;
+}
+
+export interface InvoiceCustomerView {
+  customerId: string | null;
+  type: CustomerType;
+  typeLabel: string;
+  name: string | null;
+  nif: string | null;
+  exemptionReference: string | null;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  printContactDetails: boolean;
+}
+
+export interface InvoiceLineView {
+  index: number;
+  source: InvoiceLineSource;
+  catalogItemId: string | null;
+  originLineIndex?: number | null;
+  code: string | null;
+  edefCode: string | null;
+  name: string;
+  unit: string | null;
+  itemType: CatalogItemType;
+  taxGroup: TaxGroupLetter;
+  outOfScope: boolean;
+  quantity: DecimalString;
+  originalPrice: DecimalString | null;
+  discount: LineDiscount | null;
+  /** Prix après remise, dans la devise du document. */
+  unitPrice: DecimalString;
+  priceModification: string | null;
+  priceOverridden: boolean;
+  specificTax: CatalogSpecificTax | null;
+  amount: DecimalString | null;
+  /** Facture d'origine seulement : quantités déjà créditées et restantes. */
+  credited?: DecimalString;
+  remaining?: DecimalString;
+}
+
+export interface InvoicePaymentView {
+  method: InvoicePaymentMethod;
+  methodLabel: string;
+  amount: DecimalString;
+}
+
+export interface PaymentsCheck {
+  ok: boolean;
+  issues: readonly InvoiceCheckIssue[];
+  paidTotal: DecimalString;
+  amountOnCredit: DecimalString;
+}
+
+/** En brouillon, `ok: false`, `totals: null` et tous les problèmes. */
+export interface InvoiceCalculationView {
+  ok: boolean;
+  issues: readonly InvoiceTotalsIssue[];
+  totals: InvoiceTotals | null;
+}
+
+export interface DocumentAmountsView {
+  label: string;
+  currency: DocumentCurrency;
+  calculation: InvoiceCalculationView;
+  payments: readonly InvoicePaymentView[];
+  paymentsCheck: PaymentsCheck | null;
+}
+
+export interface ConversionView {
+  from: DocumentCurrency;
+  to: 'CDF';
+  /** CDF pour 1 USD ; "1" si `from` = CDF. */
+  rate: DecimalString;
+  rateDate: string;
+  rateSource: ConversionRateSource;
+  reference: {
+    rate: DecimalString;
+    date: string;
+    environment: EdefEnvironment;
+    sha256: string;
+  } | null;
+  originInvoiceId: string | null;
+  conversionVersion: string;
+}
+
+/** « Montants normalisés (CDF) — font foi » : les seuls qui ont valeur fiscale. */
+export interface NormalizedAmountsView {
+  label: string;
+  currency: 'CDF';
+  lines: readonly {
+    index: number;
+    unitPrice: DecimalString;
+    originalPrice: DecimalString | null;
+    priceModification: string | null;
+    specificTax: CatalogSpecificTax | null;
+  }[];
+  payments: readonly PaymentInput[];
+  calculation: InvoiceTotals;
+  counterValueUsd: { amount: DecimalString; rate: DecimalString; date: string } | null;
+}
+
+export interface CreditNoteView {
+  nature: CreditNoteNature;
+  originInvoiceId: string | null;
+  originNumber: string | null;
+  reference: string | null;
+}
+
+export interface InvoiceCreditNoteSummary {
+  id: string;
+  status: InvoiceStatus;
+  documentKind: DocumentKind;
+  proformaRef: string;
+  number: string | null;
+  nature: CreditNoteNature;
+}
+
+export interface SellerView {
+  legalName: string;
+  tradeName: string | null;
+  nif: string;
+  rccm: string | null;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  vatRegistered: boolean;
+}
+
+export interface OperatorView {
+  userId: string;
+  name: string;
+}
+
+/** Sous-document écrit par S25f (connexion DGI). */
+export interface NormalizationView {
+  attempts: number;
+  reservedNumber: string | null;
+  codeDefDgi: string | null;
+  nim: string | null;
+  counters: string | null;
+  dgiDateTime: string | null;
+  qrCode: string | null;
+  lastError: { code: string; message: string } | null;
+  normalizedAt: string | null;
+}
+
+export interface InvoiceReadiness {
+  /** Brouillon : `issue` (organisation ordinaire) ou `normalize` (mode normalisé). */
+  action: 'issue' | 'normalize';
+  ready: boolean;
+  blockers: readonly { code: string; message: string; lineIndex?: number | null }[];
+}
+
+export interface InvoiceView {
+  id: string;
+  status: InvoiceStatus;
+  documentKind: DocumentKind;
+  /** « Pro forma — non valable comme facture » tant que `documentKind = proforma`. */
+  documentLabel: string;
+  proformaRef: string;
+  number: string | null;
+  series: InvoiceSeries | null;
+  fiscalYear: number | null;
+  issuedAt: string | null;
+  type: InvoiceType;
+  typeLabel: string;
+  currency: DocumentCurrency;
+  priceMode: InvoicePriceMode;
+  /** Document en CDF : contre-valeur USD demandée (relue à la réouverture d'un brouillon). */
+  showUsdCounterValue: boolean;
+  emissionMode: EmissionMode | null;
+  environment: EdefEnvironment | null;
+  isf: string | null;
+  customer: InvoiceCustomerView;
+  pointOfSaleId: string | null;
+  lines: readonly InvoiceLineView[];
+  documentAmounts: DocumentAmountsView;
+  conversion: ConversionView | null;
+  normalizedAmounts: NormalizedAmountsView | null;
+  calculationVersion: string | null;
+  roundingPolicyId: string | null;
+  taxRates: {
+    source: 'dgi_snapshot';
+    environment: EdefEnvironment;
+    fetchedAt: string;
+    sha256: string;
+  } | null;
+  comments: InvoiceComments;
+  creditNote: CreditNoteView | null;
+  creditNotes: readonly InvoiceCreditNoteSummary[];
+  seller: SellerView | null;
+  operator: OperatorView | null;
+  normalization: NormalizationView | null;
+  readiness: InvoiceReadiness;
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InvoiceSummary {
+  id: string;
+  status: InvoiceStatus;
+  documentKind: DocumentKind;
+  proformaRef: string;
+  number: string | null;
+  type: InvoiceType;
+  currency: DocumentCurrency;
+  issuedAt: string | null;
+  customer: { name: string | null; type: CustomerType };
+  documentAmounts: { calculation: { totals: { total: DecimalString } | null } };
+  normalizedAmounts: { calculation: { total: DecimalString } } | null;
+  emissionMode: EmissionMode | null;
+  revision: number;
+}
+
+export interface InvoicePage {
+  items: InvoiceSummary[];
+  nextCursor: string | null;
+}
+
+export interface JournalEntryView {
+  seq: number;
+  at: string;
+  event: JournalEvent;
+  invoiceId: string | null;
+  proformaRef: string | null;
+  number: string | null;
+  series: InvoiceSeries | null;
+  type: InvoiceType | null;
+  creditNature: CreditNoteNature | null;
+  originNumber: string | null;
+  documentTotals: {
+    currency: DocumentCurrency;
+    total: DecimalString;
+    vatTotal: DecimalString;
+  } | null;
+  normalizedTotals: {
+    total: DecimalString;
+    vatTotal: DecimalString;
+    specificTax: DecimalString;
+  } | null;
+  conversion: { rate: DecimalString; rateDate: string; rateSource: ConversionRateSource } | null;
+  contentSha256: string | null;
+  codeDefDgi: string | null;
+  nim: string | null;
+  counters: string | null;
+  /** `null` pour l'ordonnanceur. */
+  actor: OperatorView | null;
+  hash: string;
+}
+
+export interface JournalPage {
+  items: JournalEntryView[];
+  nextCursor: string | null;
+  /** Le chaînage `prevHash` → `hash` est-il intact ? */
+  chainValid: boolean;
+}
+
+/** `GET /sales/exchange-rate-reference`. */
+export interface ExchangeRateReference {
+  currency: 'USD';
+  rate: DecimalString;
+  /** Date DGI conservée telle quelle, décalage horaire compris. */
+  date: string;
+  source: 'dgi_snapshot';
+  environment: EdefEnvironment;
+  fetchedAt: string;
+  tolerancePercent: DecimalString;
 }
 
 /** Chaîne de requête d'une liste des ventes. Les champs absents ou vides ne partent pas. */
@@ -2254,6 +2708,53 @@ export const api = {
     }),
 
   getTaxGroups: () => jsonRequest<TaxGroupList>(`/sales/tax-groups`, { method: 'GET' }),
+
+  // ─── Ventes : factures, pro forma et avoirs (S25e — ADR-0023 § S25e.14) ────
+  // Lecture `sales.read` ; brouillons `sales.manage` ; émission et
+  // normalisation `sales.invoice`. Aucun montant n'est calculé ici.
+  listInvoices: (query: ListInvoicesQuery = {}) =>
+    jsonRequest<InvoicePage>(`/sales/invoices${salesQuery(query)}`, { method: 'GET' }),
+  getInvoice: (invoiceId: string) =>
+    jsonRequest<InvoiceView>(`/sales/invoices/${encodeURIComponent(invoiceId)}`, {
+      method: 'GET',
+    }),
+  createInvoice: (body: CreateInvoiceBody) =>
+    jsonRequest<InvoiceView>(`/sales/invoices`, { method: 'POST', body }),
+  updateInvoice: (invoiceId: string, body: PutInvoiceBody) =>
+    jsonRequest<InvoiceView>(`/sales/invoices/${encodeURIComponent(invoiceId)}`, {
+      method: 'PUT',
+      body,
+    }),
+  /** 204 ; brouillon seulement (`409 INVOICE_NOT_DRAFT` sinon). */
+  deleteInvoice: (invoiceId: string) =>
+    jsonRequest<void>(`/sales/invoices/${encodeURIComponent(invoiceId)}`, { method: 'DELETE' }),
+  /** Crée un brouillon d'avoir prérempli sur une facture finale. */
+  createCreditNote: (invoiceId: string, body: CreateCreditNoteBody) =>
+    jsonRequest<InvoiceView>(`/sales/invoices/${encodeURIComponent(invoiceId)}/credit-notes`, {
+      method: 'POST',
+      body,
+    }),
+  /** Organisation ordinaire : numéro définitif, contenu figé. */
+  issueInvoice: (invoiceId: string, expectedRevision: number) =>
+    jsonRequest<InvoiceView>(`/sales/invoices/${encodeURIComponent(invoiceId)}/issue`, {
+      method: 'POST',
+      body: { expectedRevision },
+    }),
+  /** Organisation en facture normalisée : conversion CDF, gel, « en attente DGI ». */
+  normalizeInvoice: (invoiceId: string, body: NormalizeInvoiceBody) =>
+    jsonRequest<InvoiceView>(`/sales/invoices/${encodeURIComponent(invoiceId)}/normalize`, {
+      method: 'POST',
+      body,
+    }),
+  backToDraft: (invoiceId: string, expectedRevision: number) =>
+    jsonRequest<InvoiceView>(`/sales/invoices/${encodeURIComponent(invoiceId)}/back-to-draft`, {
+      method: 'POST',
+      body: { expectedRevision },
+    }),
+  listJournal: (query: { limit?: number; cursor?: string } = {}) =>
+    jsonRequest<JournalPage>(`/sales/journal${salesQuery(query)}`, { method: 'GET' }),
+  getExchangeRateReference: () =>
+    jsonRequest<ExchangeRateReference>(`/sales/exchange-rate-reference`, { method: 'GET' }),
 
   // ─── Interprétations et chat Lala (S24a) ───────────────────
   // Les LIGNES DU MOTEUR sont transmises telles quelles : elles servent à la fois
