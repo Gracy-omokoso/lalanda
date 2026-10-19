@@ -35,7 +35,7 @@ Le support ne voit jamais les données financières sans consentement explicite,
 
 ## Actions granulaires
 
-`organization.manage`, `billing.manage`, `members.invite`, `project.create`, `project.read`, `project.update`, `canvas.update`, `inputs.update`, `plan.calculate`, `plan.approve`, `actuals.import`, `period.close`, `analytics.read`, `report.export`, `audit.read`, `fiscal.manage`.
+`organization.manage`, `billing.manage`, `members.invite`, `project.create`, `project.read`, `project.update`, `canvas.update`, `inputs.update`, `plan.calculate`, `plan.approve`, `actuals.import`, `period.close`, `analytics.read`, `report.export`, `audit.read`, `fiscal.manage`, `sales.read`, `sales.manage`.
 
 `fiscal.manage` — « Gérer l'identité fiscale et la facture normalisée » — est la
 seizième action, ajoutée par ADR-0021 §8 (18 oct. 2026). Elle couvre la fiche
@@ -53,6 +53,28 @@ détient pas.
 Elle est **interdite à tous les rôles plateforme**, super-administrateur compris et
 même sous accès délégué : un acteur Lalanda ne saisit jamais le jeton d'un
 contribuable et ne bascule jamais son régime de facturation.
+
+`sales.read` — « Consulter les clients et le catalogue » — et `sales.manage` —
+« Gérer les clients et le catalogue » — sont la dix-septième et la dix-huitième
+action, ajoutées par ADR-0022 § S25c.1 (19 oct. 2026). Elles couvrent le fichier
+clients et le catalogue d'articles, données maîtres sans lesquelles aucune facture
+n'est possible. Tenir ces fiches n'engage pas le contribuable devant la DGI :
+l'Administrateur et le Comptable les gèrent ; l'Analyste et le Lecteur les
+consultent ; le Conseiller, externe (banquier, mentor), ne voit pas le fichier
+clients, qui contient des données personnelles ; le Chef de projet n'a rien.
+L'émission d'une facture, qui, elle, engage le contribuable, recevra sa propre
+action au lot S25e. Cette répartition est une proposition soumise à la décideuse
+(ADR-0022, décision ouverte n° 1).
+
+| Action | PRO | ADM | DIR | CPT | ANA | CDP | CON | LEC |
+|---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| `sales.read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ |
+| `sales.manage` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+
+Côté plateforme, `sales.read` n'est possible que **sous accès délégué**, pour le
+super-administrateur et le support (comme `project.read`) ; `sales.manage`, sous
+accès délégué pour le seul super-administrateur (comme `project.update`). Aucune
+des deux n'est un interdit absolu.
 
 ## Règles critiques
 
@@ -132,7 +154,7 @@ portant `audit.read`.
 
 ### Couverture de tests
 
-- Matrice rôle × action : 224 cas unitaires (8 × 16 + 6 × 16), exhaustifs (une
+- Matrice rôle × action : 252 cas unitaires (8 × 18 + 6 × 18), exhaustifs (une
   case absente ne compile pas).
 - Matrice appliquée bout en bout : 91 cas vérifiés sur le réseau — la preuve que
   les guards l'appliquent, pas seulement qu'elle est déclarée.
