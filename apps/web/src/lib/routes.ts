@@ -48,6 +48,9 @@ export const PROTECTED_PREFIXES = [
   // (voir `admin/layout.tsx`). C'est délibérément une redirection de CONFORT,
   // pas un contrôle d'accès.
   '/admin',
+  // S25c (ADR-0022) — clients et catalogue. Exige une session ET une
+  // organisation active, comme `/organisation` ; seule la première est vue ici.
+  '/ventes',
 ] as const;
 
 /**

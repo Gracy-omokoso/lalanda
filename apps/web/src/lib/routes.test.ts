@@ -50,6 +50,15 @@ describe('isProtectedPath (S20b)', () => {
     }
   });
 
+  it('protège l’espace Ventes, racine comme sous-routes (S25c — ADR-0022)', () => {
+    // Le fichier clients contient des données personnelles : sans session, la
+    // page doit mener à la connexion, jamais monter ses listes vides.
+    for (const path of ['/ventes', '/ventes/clients', '/ventes/catalogue']) {
+      expect(isProtectedPath(path)).toBe(true);
+    }
+    expect(isProtectedPath('/ventes-privees')).toBe(false);
+  });
+
   it('protège les espaces existants, racine comme sous-routes', () => {
     for (const path of [
       '/projects',
