@@ -11,6 +11,15 @@ Décideurs : CTO Lalanda (délégation Gracy Omokoso), décideur produit
 > interdits absolus, qui passent de trois à quatre. Les matrices ci-dessous restent
 > celles de 2026-08 ; la matrice à jour est celle de
 > `apps/api/src/authz/permissions.ts` et de docs/12.
+>
+> **Amendé par [ADR-0022](ADR-0022-clients-catalogue-et-calcul-des-factures.md) § S25c.1
+> (19 oct. 2026).** Deux actions, `sales.read` (« Consulter les clients et le
+> catalogue ») et `sales.manage` (« Gérer les clients et le catalogue »), sont ajoutées
+> en fin de liste, dix-septième et dix-huitième. `sales.read` : Propriétaire,
+> Administrateur, Directeur financier, Comptable, Analyste, Lecteur ; `sales.manage` :
+> Propriétaire, Administrateur, Directeur financier, Comptable. Plateforme : sous accès
+> délégué seulement (super-administrateur pour les deux, support pour la lecture) ;
+> les interdits absolus restent quatre.
 
 ## Contexte
 
