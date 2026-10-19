@@ -98,7 +98,7 @@ Déclenché par l’**avatar**, disponible à toutes les largeurs. Sept entrées
 |---|---|---|
 | *En-tête d’identité : avatar, nom, adresse* | — (inerte, non focusable) | — |
 | Tableau de bord | `/projects` | aucune |
-| Ventes | `/ventes` (onglets Clients · Catalogue) | aucune — tout membre (ADR-0022) |
+| Ventes | `/ventes` (onglets Factures · Clients · Catalogue) | aucune — tout membre (ADR-0022, ADR-0023) |
 | Mon compte | `/compte` (onglets Profil · Sécurité · Préférences) | aucune |
 | Organisation | `/organisation` | aucune — tout membre |
 | Abonnement | `/souscription` | aucune — tout membre |
@@ -275,7 +275,7 @@ Chargement, erreur avec « Réessayer », liste de points de vente vide expliqu�
 
 | Route | Contenu | Ouvert à |
 |---|---|---|
-| `/ventes` | redirige vers `/ventes/clients` | — |
+| `/ventes` | redirige vers `/ventes/factures` (S25e) | — |
 | `/ventes/clients` | liste, recherche, fiche client | `sales.read` ; écriture `sales.manage` |
 | `/ventes/catalogue` | liste, recherche, fiche article | `sales.read` ; écriture `sales.manage` |
 
@@ -289,7 +289,7 @@ Le **type** est choisi en premier, sans valeur par défaut, parmi les cinq de la
 
 - **Groupe de taxation** choisi dans la liste de `GET /sales/tax-groups`, avec son libellé et, quand la DGI l’a fourni, son taux. Quand l’API sert sa liste par défaut, un bandeau l’écrit : **« Liste par défaut (février 2026) »**, taux non affichés. Aucun groupe ni taux n’est codé dans l’interface.
 - **Type d’article** restreint aux types admis par le groupe (Taxe seulement en L et N, choisi d’office) ; la case **« Opération hors champ »** n’existe qu’en groupe A, avec le code transmis à la DGI affiché (« HORS CHAMP », orthographe à confirmer) — la référence interne est conservée. La taxe spécifique (montant par unité ou pourcentage) disparaît en L et N.
-- **Prix** saisi à la française (`1 234,50`), transmis **en chaîne**, et **mode TTC/HT obligatoire**, sans valeur par défaut. Devise : CDF seulement (décision ouverte n° 2 de l’ADR-0022).
+- **Prix** saisi à la française (`1 234,50`), transmis **en chaîne**, et **mode TTC/HT obligatoire**, sans valeur par défaut. Devise : CDF ou USD, au choix (ADR-0023, décision du 19 oct. 2026) ; le prix s’entend dans sa devise.
 - Un article dont le groupe n’est plus proposé reste lisible, marqué « Groupe plus proposé » ; il faut en changer pour l’enregistrer.
 
 ### Aucun montant n’est calculé dans le navigateur
@@ -308,8 +308,50 @@ Chargement, liste vide (distincte d’une recherche sans résultat), erreur avec
 
 ### Limites
 
-- Aucune facture n’est encore émise depuis cet espace (lot S25e) ; l’indication « Déjà facturé » ne s’allumera qu’alors.
+- L’indication « Déjà facturé » s’allume à la première émission ou normalisation (S25e).
 - Pas d’import en masse ni d’export du fichier clients dans ce lot.
+
+## Implémenté (S25e) — Espace Ventes : factures, pro forma et avoirs
+
+Onglet **Factures**, premier de `/ventes` (ADR-0023, chantier E3). Écrans : `apps/web/src/app/(app)/ventes/factures/` — `page.tsx`, `nouvelle/`, `[invoiceId]/`, `journal/`, `_components/` (`invoice-list.tsx`, `invoice-editor.tsx`, `invoice-lines.tsx`, `payments-editor.tsx`, `amounts-panel.tsx`, `issue-dialog.tsx`, `normalize-dialog.tsx`, `credit-note-dialog.tsx`, `invoice-detail.tsx`, `journal-list.tsx`, logique pure dans `invoice-model.ts`). API : contrat de l’ADR-0023 § S25e.14.
+
+### Pages et accès
+
+| Route | Contenu | Ouvert à |
+|---|---|---|
+| `/ventes/factures` | liste : Tous · Brouillons · Pro forma en attente DGI · Normalisation refusée · Émises ; filtre par type (dont les avoirs) ; recherche | `sales.read` |
+| `/ventes/factures/nouvelle` | composition d’un document (brouillon) | `sales.manage` |
+| `/ventes/factures/<id>` | brouillon modifiable, ou document figé à consulter | `sales.read` ; brouillon `sales.manage` ; « Émettre » ou « Normaliser » `sales.invoice` |
+| `/ventes/factures/journal` | journal électronique, état du chaînage | `sales.read` |
+
+### Jamais « facture » avant l’heure
+
+Tant que le serveur dit `documentKind = proforma` (brouillon, normalisation en cours ou refusée), l’en-tête est **« Pro forma — non valable comme facture »** avec la référence `PF-AAAA-NNNNNN` ; aucun numéro de la série fiscale n’est affiché, même réservé. Les types sont nommés sans le mot « facture » (Vente, Acompte, Avoir…). « Facture n° … » n’apparaît que pour `issued` (organisation ordinaire) et `normalized`. Un test l’impose.
+
+### Composer, puis émettre ou normaliser
+
+- Client enregistré, ou **vente de comptoir** (personne physique, nom facultatif). Lignes **du catalogue** (prix de l’article, ou prix à saisir si l’article est dans une autre devise : aucune conversion au brouillon) ou **libres** (désignation, groupe de la liste DGI, type admis, taxe spécifique, hors champ en A). Quantité à trois décimales, remise en % ou en montant. **Mode TTC/HT** obligatoire, **devise CDF ou USD**.
+- **Paiements multiples** parmi les sept modes e-DEF, dont **Crédit** (part non réglée). « Un seul paiement égal au total » **recopie** le total servi par l’API.
+- Commentaires : ligne A automatique pour un client AO, saisissable en groupe D ; ligne C libre ; les autres sont réservées.
+- Le brouillon s’enregistre même incomplet ; l’API renvoie ses totaux et la liste de ce qui empêche encore de le figer (`readiness.blockers`), affichée telle quelle.
+- **Un seul bouton** selon le mode de l’organisation, lu dans `readiness.action` : **« Émettre »** (ordinaire : numéro définitif, contenu figé) ou **« Normaliser »** (facture normalisée). Jamais les deux ; aucun sans `sales.invoice` ; désactivé tant que des modifications ne sont pas enregistrées.
+- Fenêtre **« Normaliser »** : taux officiel du jour publié par la DGI (date, environnement, date de relevé), choix d’un autre taux avec rappel de la tolérance ±1 % (contrôlée par le serveur), bandeau **« Mode test »** en environnement de test. Les montants CDF s’affichent **après** la réponse du serveur : l’interface ne les prévoit pas. Taux indisponible : lien vers Organisation › Fiscalité pour rafraîchir les listes.
+
+### Montants : deux jeux, deux libellés
+
+Le panneau des montants a deux colonnes fixes : **« Montants du document (USD) »** (ou CDF) et **« Montants normalisés (CDF) — font foi »**, avec le taux appliqué, sa source et la contre-valeur USD. Tout vient de l’API (moteur `invoice-totals`) ; mise en forme par chaîne, ni `Number()` ni `parseFloat` (test sur la source de `invoice-model.ts` et des composants). La seule opération faite dans le navigateur est une **comparaison** chiffre à chiffre (quantité d’avoir ≤ restant), un confort que le serveur refait.
+
+### Document figé, avoirs, reprise
+
+- Un document émis ou normalisé se consulte seulement (lignes, client, vendeur, code DEF/DGI et NIM quand S25f les aura écrits) ; il se corrige par un avoir.
+- **« Créer un avoir »** : nature (Correction, Annulation, Avoir après reprise, Remise-ristourne-rabais, avec leur sens), total (quantités restantes) ou partiel. Le brouillon d’avoir reprend client, devise et mode de l’origine ; ses lignes d’origine n’ont que la quantité de modifiable, avec le **restant** affiché. Une remise sans facture d’origine (RRR) se compose directement.
+- **« Reprendre en brouillon »** depuis une normalisation refusée, seulement sans numéro réservé ; l’erreur DGI est affichée.
+
+### Limites
+
+- Pas d’impression ni de PDF (S25g) ; normalisation réelle auprès de la DGI : S25f (jusque-là un document normalisé reste « en attente DGI »).
+- La vue du contrat ne renvoie pas `showUsdCounterValue` : la case « contre-valeur en dollars » d’un brouillon en CDF n’est pas relue à la réouverture.
+- Aucun aperçu des montants CDF avant « Normaliser » : le contrat n’a pas de route d’aperçu.
 
 ## Implémenté (S21b) — Espace admin plateforme
 
