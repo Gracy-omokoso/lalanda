@@ -1,7 +1,7 @@
 // Ligne de commande de l'outil d'étalonnage et invite masquée — ADR-0024 § 7.2.
 
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { PassThrough } from 'node:stream';
@@ -12,7 +12,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EdefClient } from '../edef.client.js';
 import { main, parseArgs, type CliIo } from './calibrate.js';
 import { CalibrationRefusal, assertNotTrackedByGit, readHiddenSecret } from './safety.js';
-import { createMemoryEdef } from './testing/memory-edef.js';
 import { DEFAULT_REPORT_DIR } from './report.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -39,7 +38,11 @@ function io(overrides: Partial<CliIo> = {}) {
   const stdin = new PassThrough();
   const stdout = sink();
   const stderr = sink();
-  const makeClient = vi.fn(() => createMemoryEdef({ token: TOKEN }) as unknown as EdefClient);
+  // Ces tests ne vont jamais jusqu'au client : le bout en bout (vrai client,
+  // faux serveur) est dans calibration-fake-server.test.ts.
+  const makeClient = vi.fn((): EdefClient => {
+    throw new Error('client inattendu dans ce test');
+  });
   const value: CliIo = {
     stdin,
     stdout,
@@ -140,19 +143,6 @@ describe('main', () => {
     expect(await main(['probe'], value)).toBe(1);
     expect(stdout.text()).toContain('apres-confirmation  [CONFIRME une facture de test]');
     expect(makeClient).not.toHaveBeenCalled();
-  });
-
-  it('de bout en bout : jeton tapé, rapport écrit, jeton absent de la sortie et du disque', async () => {
-    const { io: value, stdin, stdout, stderr } = io();
-    const done = main(['--sortie', dir], value);
-    setTimeout(() => stdin.write(`${TOKEN}\r`), 10);
-    expect(await done).toBe(0);
-    expect(stderr.text()).toBe('');
-    expect(stdout.text()).toContain('Verdict : politique dgi-cd-2026.1');
-    const files = readdirSync(dir);
-    expect(files.some((f) => /^etalonnage-\d{8}-\d{6}\.json$/.test(f))).toBe(true);
-    const disk = files.map((f) => readFileSync(join(dir, f), 'utf8')).join('\n');
-    expect(stdout.text() + disk).not.toContain(TOKEN);
   });
 });
 

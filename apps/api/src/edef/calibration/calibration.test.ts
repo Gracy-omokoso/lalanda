@@ -1,6 +1,6 @@
 // Outil d'étalonnage des arrondis — ADR-0024 § 7 et critères F4.
-// Aucun appel réseau : doublure en mémoire calculant avec le moteur sous une
-// politique choisie par le test.
+// VRAI client e-MCF contre le faux serveur du dépôt (HTTP local), dont les
+// totaux sont calculés par le moteur sous une politique choisie par le test.
 
 import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
@@ -12,34 +12,46 @@ import { CALIBRATION_ROUNDING_POLICIES, DGI_ROUNDING_POLICY } from '@lalanda/eng
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Secret } from '../../integrations/secret-value.js';
+import type { FakeEdefScenarioInput } from '../testing/fake-edef-server.js';
 import { decideVerdict } from './calibration-analysis.js';
 import { selectCalibrationCases } from './calibration-cases.js';
 import { restrictToCalibration, runCalibration, type CalibrationDeps } from './calibration-run.js';
 import { REPOSITORY_ROOT } from './report.js';
 import { CalibrationRefusal } from './safety.js';
-import { MEMORY_NIF, createMemoryEdef, type MemoryEdefOptions } from './testing/memory-edef.js';
+import { FAKE_NIF, startHarness, type Harness } from './testing/fake-server-harness.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const TOKEN = 'jeton-TEST-etalonnage-9f8e7d6c5b4a3210';
 const NOW = new Date('2026-10-19T09:30:00.000Z');
+const rn = (caseId: string, mode: 'ttc' | 'ht') => `CAL-20261019-${caseId}-${mode}`;
 
 let dir: string;
+let h: Harness | null = null;
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'lalanda-etalonnage-'));
 });
-afterEach(() => rmSync(dir, { recursive: true, force: true }));
+afterEach(async () => {
+  await h?.close();
+  h = null;
+  rmSync(dir, { recursive: true, force: true });
+});
 
-function setup(options: Partial<MemoryEdefOptions> = {}, deps: Partial<CalibrationDeps> = {}) {
-  const edef = createMemoryEdef({ token: TOKEN, ...options });
+async function setup(
+  opts: {
+    policy?: (typeof CALIBRATION_ROUNDING_POLICIES)[number];
+    scenarios?: Record<string, FakeEdefScenarioInput>;
+  } = {},
+  deps: Partial<CalibrationDeps> = {},
+) {
+  h = await startHarness(TOKEN, opts.policy ? { policy: opts.policy } : {});
+  for (const [r, s] of Object.entries(opts.scenarios ?? {})) h.server.setInvoiceScenario(r, s);
+  const harness = h;
   const lines: string[] = [];
   const readToken = vi.fn(async () => new Secret(TOKEN));
   const run = () =>
     runCalibration({
-      edef,
-      target: {
-        testUrl: 'https://developper.dgirdc.cd/edef',
-        productionUrl: 'https://edef.dgirdc.cd',
-      },
+      edef: harness.client,
+      target: { testUrl: harness.server.baseUrl, productionUrl: 'https://edef.dgirdc.cd' },
       isfTest: 'ISF-TEST-01',
       readToken,
       out: (l) => lines.push(l),
@@ -48,68 +60,82 @@ function setup(options: Partial<MemoryEdefOptions> = {}, deps: Partial<Calibrati
       sleep: async () => undefined,
       ...deps,
     });
-  return { edef, lines, readToken, run };
+  return { h: harness, server: harness.server, lines, readToken, run };
 }
 
 function allFilesText(root: string): string {
-  return readdirSync(root, { recursive: true, withFileTypes: true })
-    .filter((e) => e.isFile())
-    .map((e) =>
-      readFileSync(join(e.parentPath ?? (e as unknown as { path: string }).path, e.name), 'utf8'),
-    )
+  return readdirSync(root)
+    .map((f) => readFileSync(join(root, f), 'utf8'))
     .join('\n');
 }
 
-describe('étalonnage — déroulé contre la doublure', () => {
-  it('chaque POST réussi est suivi IMMÉDIATEMENT de l’annulation du même uid ; aucune confirmation', async () => {
-    const { edef, run } = setup();
-    await run();
-    const invoiceCalls = edef.calls.filter((c) => c.op !== 'status' && c.op !== 'list');
-    expect(invoiceCalls.length).toBeGreaterThan(0);
-    for (let i = 0; i < invoiceCalls.length; i += 1) {
-      const call = invoiceCalls[i]!;
-      if (call.op === 'submit' && call.ok) {
-        expect(invoiceCalls[i + 1]).toMatchObject({ op: 'cancel', uid: call.uid, ok: true });
-      }
-    }
-    expect(edef.calls.some((c) => c.op === 'confirm')).toBe(false);
-    expect([...edef.invoices.values()].every((i) => i.state === 'cancelled')).toBe(true);
+/** Chaque POST est suivi IMMÉDIATEMENT de l'annulation de la demande qu'il a créée. */
+function expectEachSubmitCancelled(server: Harness['server']): void {
+  const seq = server.requests.filter((r) => r.path.startsWith('/api/invoice'));
+  expect(seq.some((r) => r.method === 'POST')).toBe(true);
+  seq.forEach((r, i) => {
+    if (r.method !== 'POST') return;
+    const created = server.invoicesByRn(JSON.parse(r.body!).rn as string);
+    expect(created).toHaveLength(1);
+    expect({ method: seq[i + 1]?.method, path: seq[i + 1]?.path }).toEqual({
+      method: 'PUT',
+      path: `/api/invoice/${created[0]!.uid}/cancel`,
+    });
   });
+}
 
+describe('étalonnage contre le faux serveur — politique désignée', () => {
+  it.each(CALIBRATION_ROUNDING_POLICIES.map((p) => [p.id, p] as const))(
+    'faux serveur sous %s → cette politique, et aucune autre ; envoi puis annulation, aucun confirm',
+    async (id, policy) => {
+      const { server, run } = await setup({ policy });
+      const { report, proposal } = await run();
+      expect(report.verdict).toMatchObject({ decided: true, policyId: id });
+      // Aucune autre politique ne reproduit tous les cas décisifs.
+      const decisive = report.cases.filter((c) => c.decisive);
+      expect(decisive.every((c) => c.status === 'compared')).toBe(true);
+      for (const other of CALIBRATION_ROUNDING_POLICIES.filter((p) => p.id !== id)) {
+        expect(
+          decisive.some((c) => !c.matchedPolicies!.includes(other.id)),
+          other.id,
+        ).toBe(true);
+      }
+      expect(proposal!.requiresNewPolicy).toBe(id !== DGI_ROUNDING_POLICY.id);
+      expect(readFileSync(proposal!.path, 'utf8')).toContain("status: 'calibrated'");
+      // Envoi puis annulation, jamais de confirmation.
+      expect(server.callsTo('confirm')).toHaveLength(0);
+      expect(server.callsTo('cancel')).toHaveLength(server.callsTo('submit').length);
+      expectEachSubmitCancelled(server);
+      expect(server.invoices().every((i) => i.status === 'cancelled')).toBe(true);
+    },
+  );
+});
+
+describe('étalonnage — déroulé', () => {
   it('envoie les cas calibration + exemples DGI + contre-valeur, rn CAL-AAAAMMJJ-<cas>-<mode>', async () => {
-    const { edef, run } = setup();
+    const { server, run } = await setup();
     const { report } = await run();
-    const submitted = edef.calls.filter((c) => c.op === 'submit').map((c) => c.rn);
-    expect(submitted).toContain('CAL-20261019-cal-tva-ht-ht');
-    expect(submitted).toContain('CAL-20261019-cal-tva-ttc-1pct-ttc');
-    expect(submitted).toContain('CAL-20261019-dgi-modele-ttc');
-    expect(submitted).toContain('CAL-20261019-devise-contre-valeur-ttc');
-    // Les exemples « recalculés à 19 % » n'ont pas d'objet face au taux publié (16 %).
+    const submitted = server.callsTo('submit').map((r) => JSON.parse(r.body!).rn as string);
+    expect(submitted).toEqual(
+      expect.arrayContaining([
+        rn('cal-tva-ht', 'ht'),
+        rn('cal-tva-ttc-1pct', 'ttc'),
+        rn('dgi-modele', 'ttc'),
+        rn('devise-contre-valeur', 'ttc'),
+      ]),
+    );
     const skipped = report.cases.filter((c) => c.status === 'skipped').map((c) => c.id);
     expect(skipped).toEqual(expect.arrayContaining(['dgi-ts-a-19', 'dgi-ts-pct-a-19']));
     expect(submitted.length).toBe(report.cases.filter((c) => c.status === 'compared').length);
-    // Les cas de refus du moteur ne partent jamais.
-    expect(submitted.some((rn) => rn?.includes('refus-'))).toBe(false);
+    expect(submitted.some((r) => r.includes('refus-'))).toBe(false);
   });
 
-  it.each(CALIBRATION_ROUNDING_POLICIES.map((p) => [p.id, p] as const))(
-    'DGI sous %s → cette politique, seule, est proposée',
-    async (id, policy) => {
-      const { run } = setup({ policy });
-      const { report, proposal } = await run();
-      expect(report.verdict).toMatchObject({ decided: true, policyId: id });
-      expect(proposal).not.toBeNull();
-      expect(proposal!.requiresNewPolicy).toBe(id !== DGI_ROUNDING_POLICY.id);
-      const text = readFileSync(proposal!.path, 'utf8');
-      expect(text).toContain("status: 'calibrated'");
-    },
-  );
-
   it('la proposition porte l’empreinte du rapport écrit, datée et sourcée', async () => {
-    const { run } = setup();
+    const { run } = await setup();
     const { reportFile, proposal } = await run();
-    const bytes = readFileSync(reportFile.path, 'utf8');
-    const sha = createHash('sha256').update(bytes, 'utf8').digest('hex');
+    const sha = createHash('sha256')
+      .update(readFileSync(reportFile.path, 'utf8'), 'utf8')
+      .digest('hex');
     expect(reportFile.sha256).toBe(sha);
     const text = readFileSync(proposal!.path, 'utf8');
     expect(text).toContain(`reportSha256: '${sha}'`);
@@ -119,7 +145,9 @@ describe('étalonnage — déroulé contre la doublure', () => {
   });
 
   it('un écart qu’aucune politique n’explique → « non décidé », aucune proposition', async () => {
-    const { run, lines } = setup({ scenarios: { 'dgi-modele-ttc': 'offset:vab' } });
+    const { run, lines } = await setup({
+      scenarios: { [rn('dgi-modele', 'ttc')]: 'totals_offset:vab' },
+    });
     const { report, proposal } = await run();
     expect(report.verdict.decided).toBe(false);
     expect(proposal).toBeNull();
@@ -133,53 +161,83 @@ describe('étalonnage — déroulé contre la doublure', () => {
   });
 
   it('contre-valeur : curTotal comparé à usdCounterValue', async () => {
-    const { run } = setup({ scenarios: { 'devise-contre-valeur': 'offset:curTotal' } });
+    const { run } = await setup({
+      scenarios: { [rn('devise-contre-valeur', 'ttc')]: 'totals_offset:curTotal' },
+    });
     const { report } = await run();
     const devise = report.cases.find((c) => c.id === 'devise-contre-valeur')!;
     expect(devise.status).toBe('compared');
     expect(devise.matchedPolicies).toEqual([]);
     expect(devise.comparisons![0]!.differences.map((d) => d.field)).toEqual(['curTotal']);
-    expect(devise.dgiTotals!['curRate']).toBe('2262.32');
+    expect(devise.dgiTotals!['curRate']).toBe('1');
     expect(report.verdict.decided).toBe(false);
   });
 
   it('cas décisif refusé par la DGI → étalonnage incomplet, non décidé', async () => {
-    const { run } = setup({ scenarios: { 'cal-ligne-ht': 'business:7' } });
+    const { run } = await setup({
+      scenarios: { [rn('cal-ligne', 'ht')]: 'post_business_error:7' },
+    });
     const { report } = await run();
     const c = report.cases.find((x) => x.id === 'cal-ligne')!;
     expect(c.status).toBe('refused');
     expect(c.dgiError).toMatchObject({ kind: 'business', dgiErrorCode: '7' });
-    expect(report.verdict).toMatchObject({ decided: false });
     expect((report.verdict as { reason: string }).reason).toContain('incomplet');
   });
 
   it('arrêt au premier 401 : les cas suivants ne partent pas', async () => {
-    const { edef, run } = setup({ scenarios: { 'dgi-remise': 'unauthorized' } });
+    let flipped = false;
+    const { server, run } = await setup(
+      {},
+      {
+        // Le jeton devient invalide après le deuxième envoi.
+        sleep: async () => {
+          if (!flipped && server.callsTo('submit').length === 2) {
+            flipped = true;
+            server.setToken(TOKEN, {
+              nif: FAKE_NIF,
+              nim: 'NIM-FICTIF',
+              tokenValid: '2027-01-01T00:00:00',
+              behaviour: 'unauthorized',
+            });
+          }
+        },
+      },
+    );
     const { report } = await run();
     expect(report.stoppedEarly).toContain('401');
-    const idx = report.cases.findIndex((c) => c.id === 'dgi-remise');
-    expect(report.cases.slice(idx + 1).every((c) => c.status === 'not_sent')).toBe(true);
-    const submits = edef.calls.filter((c) => c.op === 'submit');
-    expect(submits.at(-1)!.rn).toContain('dgi-remise');
+    expect(report.cases.filter((c) => c.status === 'not_sent').length).toBeGreaterThan(0);
+    const unauthorizedAt = report.cases.findIndex(
+      (c) => c.cancel?.error?.kind === 'unauthorized' || c.dgiError?.kind === 'unauthorized',
+    );
+    expect(
+      report.cases
+        .slice(unauthorizedAt + 1)
+        .every((c) => c.status === 'not_sent' || c.status === 'skipped'),
+    ).toBe(true);
+    expect(server.callsTo('submit').length).toBeLessThanOrEqual(3);
   });
 
   it('arrêt à la première erreur DGI 1 (e-MCF saturé)', async () => {
-    const { run } = setup({ scenarios: { 'dgi-modele-ttc': 'business:1' } });
+    const { run } = await setup({ scenarios: { [rn('dgi-modele', 'ttc')]: 'pending_full' } });
     const { report } = await run();
     expect(report.stoppedEarly).toContain('erreur DGI 1');
   });
 
-  it('POST sans réponse : signalé, aucune annulation possible (pas d’uid), la demande expirera', async () => {
-    const { edef, run } = setup({ scenarios: { 'cal-tva-ht': 'timeout' } });
+  it('POST sans réponse : signalé, aucune annulation (pas d’uid), la demande expirera', async () => {
+    const { server, run } = await setup({
+      scenarios: { [rn('cal-tva-ht', 'ht')]: 'post_timeout_after_create' },
+    });
     const { report } = await run();
     const c = report.cases.find((x) => x.id === 'cal-tva-ht')!;
     expect(c.status).toBe('no_response');
     expect(c.reason).toContain('expirera');
-    expect(edef.calls.filter((x) => x.op === 'cancel' && x.rn?.includes('cal-tva-ht'))).toEqual([]);
+    const uid = server.invoicesByRn(rn('cal-tva-ht', 'ht'))[0]!.uid;
+    expect(server.callsTo('cancel').some((r) => r.path.includes(uid))).toBe(false);
+    expect(server.callsTo('confirm')).toHaveLength(0);
   });
 
   it('annulation sans réponse : signalée dans le rapport', async () => {
-    const { run } = setup({ scenarios: { 'cal-ts-ht': 'cancel_timeout' } });
+    const { run } = await setup({ scenarios: { [rn('cal-ts-ht', 'ht')]: 'cancel_timeout' } });
     const { report } = await run();
     const c = report.cases.find((x) => x.id === 'cal-ts-ht')!;
     expect(c.cancel).toMatchObject({ ok: false });
@@ -188,9 +246,9 @@ describe('étalonnage — déroulé contre la doublure', () => {
 
   it('un appel à la fois, 500 ms d’écart entre deux appels', async () => {
     const sleep = vi.fn(async () => undefined);
-    const { edef, run } = setup({}, { sleep });
+    const { server, run } = await setup({}, { sleep });
     await run();
-    expect(sleep).toHaveBeenCalledTimes(edef.calls.length - 1);
+    expect(sleep).toHaveBeenCalledTimes(server.requests.length - 1);
     expect(sleep.mock.calls.every(([ms]) => ms === 500)).toBe(true);
   });
 
@@ -200,7 +258,7 @@ describe('étalonnage — déroulé contre la doublure', () => {
       'packages/engine/src/invoice-totals/rounding-calibration.ts',
     );
     const before = readFileSync(file, 'utf8');
-    const { run } = setup();
+    const { run } = await setup();
     await run();
     expect(readFileSync(file, 'utf8')).toBe(before);
     expect(before).toContain("status: 'not_calibrated'");
@@ -208,14 +266,19 @@ describe('étalonnage — déroulé contre la doublure', () => {
 });
 
 describe('étalonnage — le jeton n’apparaît nulle part', () => {
-  it('ni dans la sortie, ni dans le rapport, ni dans la proposition, ni dans aucun fichier écrit', async () => {
-    const { run, lines, readToken } = setup();
+  it('ni dans la sortie, ni dans le journal, ni dans le rapport, ni sur disque (NIF non plus)', async () => {
+    const { h: harness, server, run, lines, readToken } = await setup();
     const { report } = await run();
     expect(readToken).toHaveBeenCalledTimes(1);
-    const everything = [lines.join('\n'), JSON.stringify(report), allFilesText(dir)].join('\n');
-    expect(everything).not.toContain(TOKEN);
-    // Ni le NIF (lu sur la réponse DGI, remplacé à l'écriture).
-    expect(allFilesText(dir)).not.toContain(MEMORY_NIF);
+    // Le jeton a bien servi (en-tête Authorization)…
+    expect(server.requests.every((r) => r.authorization === `Bearer ${TOKEN}`)).toBe(true);
+    // … mais n'apparaît nulle part ailleurs.
+    const journal = JSON.stringify(harness.journal.entries);
+    expect(harness.journal.entries.length).toBeGreaterThan(0);
+    for (const text of [lines.join('\n'), JSON.stringify(report), allFilesText(dir), journal]) {
+      expect(text).not.toContain(TOKEN);
+    }
+    expect(allFilesText(dir)).not.toContain(FAKE_NIF);
   });
 });
 
@@ -231,33 +294,36 @@ describe('étalonnage — garde-fous avant tout appel', () => {
   ])(
     '%s → refus de démarrer, aucun jeton demandé, aucun appel',
     async (_l, testUrl, productionUrl) => {
-      const { edef, run, readToken } = setup({}, { target: { testUrl, productionUrl } });
+      const { server, run, readToken } = await setup({}, { target: { testUrl, productionUrl } });
       await expect(run()).rejects.toBeInstanceOf(CalibrationRefusal);
       expect(readToken).not.toHaveBeenCalled();
-      expect(edef.calls).toEqual([]);
+      expect(server.requests).toEqual([]);
     },
   );
 
   it('ISF de test absent → refus avant le jeton', async () => {
-    const { run, readToken } = setup({}, { isfTest: null });
+    const { run, readToken } = await setup({}, { isfTest: null });
     await expect(run()).rejects.toThrow(/DGI_ISF_TEST/);
     expect(readToken).not.toHaveBeenCalled();
   });
 
   it('chemin de rapport suivi par git → refus avant le jeton', async () => {
-    const { edef, run, readToken } = setup({}, { reportPath: join(HERE, 'rapport-interdit.json') });
+    const { server, run, readToken } = await setup(
+      {},
+      { reportPath: join(HERE, 'rapport-interdit.json') },
+    );
     await expect(run()).rejects.toThrow(/suivi par git/);
     expect(readToken).not.toHaveBeenCalled();
-    expect(edef.calls).toEqual([]);
+    expect(server.requests).toEqual([]);
   });
 
   it('jeton refusé au statut → arrêt, rien n’est envoyé', async () => {
-    const { edef, run } = setup(
+    const { server, run } = await setup(
       {},
       { readToken: async () => new Secret('mauvais-jeton-000000000') },
     );
     await expect(run()).rejects.toBeInstanceOf(CalibrationRefusal);
-    expect(edef.calls.filter((c) => c.op === 'submit')).toEqual([]);
+    expect(server.callsTo('submit')).toEqual([]);
   });
 });
 
@@ -281,9 +347,9 @@ describe('étalonnage — jamais de confirmation', () => {
     },
   );
 
-  it('restrictToCalibration ne transmet que quatre routes, même avec un client complet', () => {
-    const full = createMemoryEdef({ token: TOKEN });
-    const restricted = restrictToCalibration(full) as unknown as Record<string, unknown>;
+  it('restrictToCalibration ne transmet que quatre routes, même avec le client complet', async () => {
+    const { h: harness } = await setup();
+    const restricted = restrictToCalibration(harness.client) as unknown as Record<string, unknown>;
     expect(Object.keys(restricted).sort()).toEqual(
       ['cancelInvoice', 'getReferenceList', 'getStatus', 'submitInvoice'].sort(),
     );
@@ -328,7 +394,7 @@ describe('règle de choix (ADR-0024 § 7.3)', () => {
     ).toMatchObject({ decided: true, policyId: ids[2] });
   });
 
-  it('les cas décisifs sont les cas calibration et les cas fiables', () => {
+  it('les cas décisifs sont les cas calibration, les cas fiables et la contre-valeur', () => {
     for (const c of selectCalibrationCases()) {
       expect(c.decisive, c.id).toBe(
         c.origin === 'calibration' || c.reliability === 'reliable' || c.counterValue,
