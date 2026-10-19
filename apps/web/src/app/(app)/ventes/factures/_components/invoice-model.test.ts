@@ -1,12 +1,13 @@
-// Tests du modèle de l'onglet Factures (ADR-0023, chantier E3), contre des
-// réponses simulées conformes au contrat HTTP § S25e.14.
+// Tests du modèle de l'onglet Factures (ADR-0023, chantier E3 ; ADR-0024,
+// chantier F3), contre des réponses simulées conformes aux contrats HTTP
+// § S25e.14 et ADR-0024 § 9.
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import type { InvoiceSummary, InvoiceView } from '@/lib/api';
+import type { InvoiceSummary, InvoiceView, NormalizationView } from '@/lib/api';
 
 import { erreursFormulaire } from '../../_components/sales-model';
 
@@ -14,7 +15,20 @@ import {
   actionsDocument,
   commentaireAModifiable,
   comparerDecimaux,
+  conduiteApresEchecNormaliser,
+  corpsLisible,
+  ecartsAffiches,
   enteteDocument,
+  etapesNormalisation,
+  JOURNAL_EVENT_LABELS,
+  libelleChampDgi,
+  lignesEchanges,
+  lireMotifDeclaration,
+  phaseNormalisation,
+  presentationNormalisation,
+  prochaineRelecture,
+  RELECTURE,
+  TITRES_PHASE,
   formatDateDgi,
   formatTauxChange,
   formulaireDepuisVue,
@@ -178,6 +192,35 @@ function resume(partiel: Partial<InvoiceSummary> = {}): InvoiceSummary {
   };
 }
 
+const SANS_ACTION: NormalizationView['actions'] = {
+  retry: false,
+  check: false,
+  declareNotNormalized: false,
+  backToDraft: false,
+};
+
+/** Sous-document `normalization` conforme au contrat ADR-0024 § 9.2. */
+function normalisation(partiel: Partial<NormalizationView> = {}): NormalizationView {
+  return {
+    attempts: 1,
+    reservedNumber: 'TEST-2026-000012',
+    codeDefDgi: null,
+    nim: null,
+    counters: null,
+    dgiDateTime: null,
+    qrCode: null,
+    lastError: null,
+    normalizedAt: null,
+    phase: 'queued',
+    dgiRequestId: null,
+    differences: null,
+    nextCheckAt: null,
+    review: null,
+    actions: SANS_ACTION,
+    ...partiel,
+  };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('aucun calcul de montant dans le navigateur (docs/26, ADR-0023 § E3)', () => {
@@ -287,21 +330,21 @@ describe('actions : « Émettre » ou « Normaliser », jamais les deux', () => 
     expect(actionsDocument(vue({ status: 'issued', type: 'FA' }), tout)).toEqual([]);
     expect(actionsDocument(vue({ status: 'pending_normalization' }), tout)).toEqual([]);
     expect(actionsDocument(vue({ status: 'normalization_failed' }), tout)).toEqual(['reprendre']);
+    // ADR-0024 § 9.2 : la reprise suit `actions.backToDraft`, servi par l'API.
     const reserve = vue({
       status: 'normalization_failed',
-      normalization: {
-        attempts: 1,
-        reservedNumber: 'TEST-2026-000005',
-        codeDefDgi: null,
-        nim: null,
-        counters: null,
-        dgiDateTime: null,
-        qrCode: null,
-        lastError: null,
-        normalizedAt: null,
-      },
+      normalization: normalisation({ phase: 'failed', reservedNumber: 'TEST-2026-000005' }),
     });
     expect(actionsDocument(reserve, tout)).toEqual([]);
+    const permise = vue({
+      status: 'normalization_failed',
+      normalization: normalisation({
+        phase: 'failed',
+        actions: { ...SANS_ACTION, backToDraft: true },
+      }),
+    });
+    expect(actionsDocument(permise, tout)).toEqual(['reprendre']);
+    expect(actionsDocument(permise, { gerer: false, facturer: false })).toEqual(['reprendre']);
   });
 });
 
@@ -575,5 +618,578 @@ describe('liste et erreurs', () => {
     expect(
       messageFacture(erreurApi(409, { code: 'EXCHANGE_RATE_REFERENCE_UNAVAILABLE' }), 'r'),
     ).toMatch(/Rafraîchissez/);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Normalisation DGI — chantier F3 (ADR-0024 § 9.3 et critères F3)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Document normalisé, éléments DGI tels que reçus. */
+function normalisee(): InvoiceView {
+  return vue({
+    status: 'normalized',
+    documentKind: 'invoice',
+    documentLabel: 'Facture',
+    number: 'TEST-2026-000012',
+    normalization: normalisation({
+      phase: 'done',
+      codeDefDgi: 'TEST-ABCD-EFGH-IJKL-MNOP-QRST',
+      nim: 'TS01000123',
+      counters: '12/15 FV',
+      dgiDateTime: '19/10/2026 10:03:12',
+      qrCode: 'F;TS01000123;TESTABCDEFGHIJKLMNOPQRST;A0000000X;20261019100312',
+      normalizedAt: '2026-10-19T09:03:12.000Z',
+      dgiRequestId: 'uid-1',
+    }),
+  });
+}
+
+const enAttente = (n: Partial<NormalizationView>): InvoiceView =>
+  vue({ status: 'pending_normalization', normalization: normalisation(n) });
+
+describe('normalisation : chaque ligne du tableau § 9.3', () => {
+  it('normalized / done : « Facture normalisée », éléments DGI tels quels, seul en-tête « Facture »', () => {
+    const v = normalisee();
+    const p = presentationNormalisation(v)!;
+    expect(p.titre).toBe('Facture normalisée');
+    expect(p.ton).toBe('succes');
+    expect(p.boutons).toEqual([]);
+    expect(p.elements).toEqual([
+      { libelle: 'Code DEF/DGI', valeur: 'TEST-ABCD-EFGH-IJKL-MNOP-QRST' },
+      { libelle: 'NIM (identifiant de l’e-MCF)', valeur: 'TS01000123' },
+      { libelle: 'Compteurs', valeur: '12/15 FV' },
+      { libelle: 'Date DGI', valeur: '19/10/2026 10:03:12' },
+    ]);
+    expect(enteteDocument(v).titre).toBe('Facture normalisée n° TEST-2026-000012');
+  });
+
+  it('titre « Facture » seulement pour done : toutes les autres phases restent pro forma', () => {
+    const autres: Array<[InvoiceView['status'], NormalizationView['phase']]> = [
+      ['pending_normalization', 'queued'],
+      ['pending_normalization', 'in_progress'],
+      ['pending_normalization', 'uncertain'],
+      ['pending_normalization', 'needs_review'],
+      ['normalization_failed', 'failed'],
+    ];
+    for (const [status, phase] of autres) {
+      const v = vue({ status, normalization: normalisation({ phase }) });
+      const e = enteteDocument(v);
+      expect(e.titre, phase).toBe(LIBELLE_PRO_FORMA);
+      expect(e.reference, phase).toBe('PF-2026-000045');
+      expect(e.numeroDefinitif, phase).toBe(false);
+      // Le numéro réservé n'apparaît nulle part dans l'en-tête.
+      expect(JSON.stringify(e), phase).not.toContain('TEST-2026-000012');
+      expect(presentationNormalisation(v)!.titre, phase).not.toMatch(/^Facture/);
+    }
+  });
+
+  it('défense : « normalisé » sans code DEF/DGI ne se dit jamais « Facture »', () => {
+    const v = normalisee();
+    const incomplet = { ...v, normalization: { ...v.normalization!, codeDefDgi: null } };
+    expect(enteteDocument(incomplet).titre).toBe(LIBELLE_PRO_FORMA);
+    expect(presentationNormalisation(incomplet)!.elements).toBeNull();
+  });
+
+  it('pending / in_progress : « Transmission à la DGI… », aucun bouton même si actions en propose', () => {
+    const p = presentationNormalisation(
+      enAttente({
+        phase: 'in_progress',
+        actions: { retry: true, check: true, declareNotNormalized: true, backToDraft: true },
+      }),
+    )!;
+    expect(p.titre).toBe('Transmission à la DGI…');
+    expect(p.boutons).toEqual([]);
+    expect(p.resume).toMatch(/non valable comme facture/);
+  });
+
+  it('pending / queued : « En attente d’envoi », lastError expliqué, « Relancer » si actions.retry', () => {
+    const v = enAttente({
+      phase: 'queued',
+      lastError: {
+        code: 'NORMALIZATION_IN_PROGRESS',
+        category: null,
+        message: '',
+        dgiErrorCode: null,
+        dgiMessage: null,
+        retryable: true,
+      },
+      actions: { ...SANS_ACTION, retry: true },
+    });
+    const p = presentationNormalisation(v)!;
+    expect(p.titre).toBe('En attente d’envoi');
+    expect(p.boutons).toEqual(['relancer']);
+    expect(p.erreur?.message).toMatch(/attend son tour/);
+    expect(presentationNormalisation(enAttente({ phase: 'queued' }))!.boutons).toEqual([]);
+  });
+
+  it('pending / uncertain : bandeau explicite, heure de vérification, blocage expliqué', () => {
+    const p = presentationNormalisation(
+      enAttente({
+        phase: 'uncertain',
+        dgiRequestId: 'uid-7',
+        nextCheckAt: '2026-10-19T09:03:30.000Z',
+      }),
+      { timeZone: 'Africa/Kinshasa' },
+    )!;
+    expect(p.titre).toBe('Réponse de la DGI incertaine');
+    expect(p.ton).toBe('alerte');
+    expect(p.consignes[0]).toBe(
+      'Ne refaites pas cette vente : Lalanda vérifie auprès de la DGI vers 10:03.',
+    );
+    expect(p.consignes[1]).toMatch(/autres normalisations de votre organisation attendent/);
+    expect(p.demandeDgi).toBe('uid-7');
+    expect(p.boutons).toEqual([]);
+  });
+
+  it('« Vérifier maintenant » seulement quand l’API l’ouvre (actions.check)', () => {
+    const p = presentationNormalisation(
+      enAttente({ phase: 'uncertain', actions: { ...SANS_ACTION, check: true } }),
+    )!;
+    expect(p.boutons).toEqual(['verifier']);
+  });
+
+  it('pending / needs_review : marche à suivre § 4.4 ; « Déclarer » selon actions seulement', () => {
+    const revue = enAttente({
+      phase: 'needs_review',
+      review: {
+        since: '2026-10-19T09:35:00.000Z',
+        reason: 'Aucune réponse exploitable de la DGI.',
+      },
+      nextCheckAt: '2026-10-19T09:50:00.000Z',
+    });
+    const sans = presentationNormalisation(revue, { timeZone: 'Africa/Kinshasa' })!;
+    expect(sans.titre).toBe('Vérification nécessaire');
+    expect(sans.consignes).toHaveLength(4);
+    expect(sans.consignes[0]).toMatch(/vers 10:50/);
+    expect(sans.consignes[1]).toMatch(/Propriétaire ou le Directeur financier/);
+    expect(sans.consignes[2]).toMatch(/jamais d’éléments de sécurité à la main/);
+    expect(sans.revue).toEqual({
+      depuis: '2026-10-19T09:35:00.000Z',
+      motif: 'Aucune réponse exploitable de la DGI.',
+    });
+    expect(sans.boutons).toEqual([]);
+    const avec = presentationNormalisation({
+      ...revue,
+      normalization: {
+        ...revue.normalization!,
+        actions: { ...SANS_ACTION, declareNotNormalized: true, check: true },
+      },
+    })!;
+    expect(avec.boutons).toEqual(['verifier', 'declarer']);
+  });
+
+  it('normalization_failed / failed : notre message, PUIS code et libellé DGI tels quels', () => {
+    const v = vue({
+      status: 'normalization_failed',
+      normalization: normalisation({
+        phase: 'failed',
+        lastError: {
+          code: 'EDEF_BUSINESS_ERROR',
+          category: 'capacity',
+          message: 'L’e-MCF a trop de demandes en attente.',
+          dgiErrorCode: '1',
+          dgiMessage: 'Too many pending requests  (max 10)',
+          retryable: true,
+        },
+        actions: { ...SANS_ACTION, retry: true },
+      }),
+    });
+    const p = presentationNormalisation(v)!;
+    expect(p.titre).toBe('Normalisation refusée');
+    expect(p.erreur).toEqual({
+      message: 'L’e-MCF a trop de demandes en attente.',
+      conduite: expect.stringMatching(/deux minutes/),
+      codeLalanda: 'EDEF_BUSINESS_ERROR',
+      // Tels quels : ni traduits, ni nettoyés (double espace compris).
+      dgi: { code: '1', libelle: 'Too many pending requests  (max 10)' },
+      lienFiscalite: false,
+    });
+    expect(p.boutons).toEqual(['relancer']);
+  });
+
+  it('écart de calcul : message rassurant, rien n’a été enregistré, tableau des écarts', () => {
+    const v = vue({
+      status: 'normalization_failed',
+      normalization: normalisation({
+        phase: 'failed',
+        dgiRequestId: 'uid-9',
+        differences: [
+          { field: 'vab', ours: '64.00', dgi: '64.01' },
+          { field: 'total', ours: '464.00', dgi: null },
+        ],
+        lastError: {
+          code: 'EDEF_TOTALS_MISMATCH',
+          category: 'totals_mismatch',
+          message: 'Écart de calcul entre Lalanda et la DGI.',
+          dgiErrorCode: null,
+          dgiMessage: null,
+          retryable: false,
+        },
+        actions: { ...SANS_ACTION, backToDraft: true },
+      }),
+    });
+    const p = presentationNormalisation(v)!;
+    expect(p.resume).toMatch(/^Écart de calcul entre Lalanda et la DGI\./);
+    expect(p.erreur?.conduite).toMatch(/Rien n’a été enregistré/);
+    expect(p.erreur?.conduite).toMatch(/aucune facture n’a été créée/);
+    expect(p.erreur?.dgi).toBeNull();
+    expect(p.ecarts).toEqual([
+      { champ: 'vab', libelle: 'TVA du groupe B', lalanda: '64.00', dgi: '64.01' },
+      { champ: 'total', libelle: 'Total à payer', lalanda: '464.00', dgi: 'absent' },
+    ]);
+    // Non réessayable : aucun « Relancer », la reprise vit dans le détail.
+    expect(p.boutons).toEqual([]);
+    expect(actionsDocument(v, { gerer: true, facturer: true })).toEqual(['reprendre']);
+  });
+
+  it('champs e-DEF en mots', () => {
+    expect(libelleChampDgi('tb')).toBe('Taux du groupe B');
+    expect(libelleChampDgi('taa')).toBe('Total du groupe A');
+    expect(libelleChampDgi('hap')).toBe('Hors taxe du groupe P');
+    expect(libelleChampDgi('ts')).toBe('Taxe spécifique');
+    expect(libelleChampDgi('vtotal')).toBe('TVA totale');
+    expect(libelleChampDgi('curTotal')).toBe('Contre-valeur en USD');
+    expect(libelleChampDgi('inconnu')).toBe('inconnu');
+    expect(ecartsAffiches([])).toBeNull();
+  });
+
+  it('erreur avant envoi : phrase de repli et lien vers la Fiscalité ; jeton refusé aussi', () => {
+    const base = {
+      category: 'precondition' as const,
+      dgiErrorCode: null,
+      dgiMessage: null,
+      retryable: false,
+    };
+    const pdv = presentationNormalisation(
+      vue({
+        status: 'normalization_failed',
+        normalization: normalisation({
+          phase: 'failed',
+          lastError: { ...base, code: 'POINT_OF_SALE_NOT_ACTIVE', message: '' },
+        }),
+      }),
+    )!;
+    expect(pdv.erreur?.message).toMatch(/point de vente n’est pas actif/);
+    expect(pdv.erreur?.conduite).toMatch(/rien n’a été transmis/);
+    expect(pdv.erreur?.lienFiscalite).toBe(true);
+    const jeton = presentationNormalisation(
+      vue({
+        status: 'normalization_failed',
+        normalization: normalisation({
+          phase: 'failed',
+          lastError: {
+            ...base,
+            category: 'token_rejected',
+            code: 'EDEF_TOKEN_REJECTED',
+            message: 'Jeton refusé.',
+          },
+        }),
+      }),
+    )!;
+    expect(jeton.erreur?.lienFiscalite).toBe(true);
+    expect(jeton.erreur?.conduite).toMatch(/Renouvelez-le/);
+  });
+
+  it('chaque catégorie d’erreur a sa conduite en français', () => {
+    const categories = [
+      'data',
+      'configuration',
+      'capacity',
+      'temporary',
+      'server',
+      'state',
+      'totals_mismatch',
+      'duplicate_pending',
+      'unknown',
+      'network',
+      'token_rejected',
+      'precondition',
+    ] as const;
+    for (const category of categories) {
+      const p = presentationNormalisation(
+        vue({
+          status: 'normalization_failed',
+          normalization: normalisation({
+            phase: 'failed',
+            lastError: {
+              code: 'X',
+              category,
+              message: 'm',
+              dgiErrorCode: null,
+              dgiMessage: null,
+              retryable: false,
+            },
+          }),
+        }),
+      )!;
+      expect(p.erreur?.conduite, category).toMatch(/^[A-ZÉ]/);
+    }
+  });
+
+  it('phase : document antérieur sans phase → queued ; jamais « done » tant que le statut attend', () => {
+    expect(phaseNormalisation(vue({ status: 'pending_normalization', normalization: null }))).toBe(
+      'queued',
+    );
+    expect(phaseNormalisation(enAttente({ phase: 'done' }))).toBe('in_progress');
+    expect(phaseNormalisation(enAttente({ phase: 'failed' }))).toBe('in_progress');
+    expect(phaseNormalisation(vue({ status: 'draft' }))).toBeNull();
+    expect(phaseNormalisation(vue({ status: 'issued' }))).toBeNull();
+    expect(Object.keys(TITRES_PHASE).sort()).toEqual([
+      'done',
+      'failed',
+      'in_progress',
+      'needs_review',
+      'queued',
+      'uncertain',
+    ]);
+  });
+
+  it('journal : les trois événements d’ADR-0024 ont un libellé', () => {
+    expect(JOURNAL_EVENT_LABELS.normalization_uncertain).toBe('Réponse de la DGI incertaine');
+    expect(JOURNAL_EVENT_LABELS.normalization_review_required).toBe('Vérification nécessaire');
+    expect(JOURNAL_EVENT_LABELS.number_abandoned).toMatch(/Numéro abandonné/);
+  });
+});
+
+describe('normalisation : progression lisible', () => {
+  const etats = (v: InvoiceView | null, enCours = false): string[] =>
+    etapesNormalisation(v, enCours).map((e) => e.etat);
+
+  it('pendant la requête : rien n’est annoncé fait avant la réponse', () => {
+    expect(etats(null, true)).toEqual(['en_cours', 'en_cours', 'en_cours', 'en_cours']);
+    expect(etapesNormalisation(null, true).map((e) => e.libelle)).toEqual([
+      'Gel du document et conversion en CDF',
+      'Envoi à la DGI',
+      'Comparaison des montants',
+      'Confirmation par la DGI',
+    ]);
+  });
+
+  it('après la réponse : déduit de la vue', () => {
+    expect(etats(normalisee())).toEqual(['fait', 'fait', 'fait', 'fait']);
+    expect(
+      etats(
+        vue({
+          status: 'normalization_failed',
+          normalization: normalisation({
+            phase: 'failed',
+            dgiRequestId: 'u',
+            differences: [{ field: 'vab', ours: '1.00', dgi: '1.01' }],
+          }),
+        }),
+      ),
+    ).toEqual(['fait', 'fait', 'echec', 'non_fait']);
+    expect(
+      etats(
+        vue({
+          status: 'normalization_failed',
+          normalization: normalisation({
+            phase: 'failed',
+            lastError: {
+              code: 'C',
+              category: 'data',
+              message: 'm',
+              dgiErrorCode: '12',
+              dgiMessage: 'x',
+              retryable: false,
+            },
+          }),
+        }),
+      ),
+    ).toEqual(['fait', 'echec', 'non_fait', 'non_fait']);
+    expect(
+      etats(
+        vue({
+          status: 'normalization_failed',
+          normalization: normalisation({
+            phase: 'failed',
+            lastError: {
+              code: 'ISF_NOT_CONFIGURED',
+              category: 'precondition',
+              message: 'm',
+              dgiErrorCode: null,
+              dgiMessage: null,
+              retryable: false,
+            },
+          }),
+        }),
+      ),
+    ).toEqual(['fait', 'non_fait', 'non_fait', 'non_fait']);
+    expect(etats(enAttente({ phase: 'uncertain', dgiRequestId: 'u' }))).toEqual([
+      'fait',
+      'fait',
+      'fait',
+      'incertain',
+    ]);
+    expect(etats(enAttente({ phase: 'uncertain' }))).toEqual([
+      'fait',
+      'incertain',
+      'non_fait',
+      'non_fait',
+    ]);
+    expect(etats(enAttente({ phase: 'queued' }))).toEqual([
+      'fait',
+      'a_venir',
+      'a_venir',
+      'a_venir',
+    ]);
+  });
+});
+
+describe('normalisation : relectures bornées dans le temps', () => {
+  const t0 = Date.parse('2026-10-19T09:00:00.000Z');
+
+  it('in_progress : toutes les 3 s pendant une minute, puis plus rien', () => {
+    const v = enAttente({ phase: 'in_progress' });
+    expect(prochaineRelecture(v, t0, t0)).toBe(3_000);
+    expect(prochaineRelecture(v, t0, t0 + 59_999)).toBe(3_000);
+    expect(prochaineRelecture(v, t0, t0 + 60_000)).toBeNull();
+  });
+
+  it('uncertain : toutes les 15 s jusqu’à nextCheckAt + 1 min, puis bouton', () => {
+    const v = enAttente({ phase: 'uncertain', nextCheckAt: '2026-10-19T09:02:30.000Z' });
+    expect(prochaineRelecture(v, t0, t0)).toBe(15_000);
+    expect(prochaineRelecture(v, t0, t0 + 209_999)).toBe(15_000);
+    expect(prochaineRelecture(v, t0, t0 + 210_000)).toBeNull();
+    // Sans heure annoncée : trois minutes.
+    const sans = enAttente({ phase: 'uncertain', nextCheckAt: null });
+    expect(prochaineRelecture(sans, t0, t0 + 179_999)).toBe(15_000);
+    expect(prochaineRelecture(sans, t0, t0 + 180_000)).toBeNull();
+  });
+
+  it('plafond absolu, même si nextCheckAt est lointain', () => {
+    const v = enAttente({ phase: 'uncertain', nextCheckAt: '2026-10-20T09:00:00.000Z' });
+    expect(prochaineRelecture(v, t0, t0 + RELECTURE.plafondMs - 1)).toBe(15_000);
+    expect(prochaineRelecture(v, t0, t0 + RELECTURE.plafondMs)).toBeNull();
+  });
+
+  it('aucune relecture pour les phases stables', () => {
+    for (const phase of ['queued', 'needs_review'] as const) {
+      expect(prochaineRelecture(enAttente({ phase }), t0, t0), phase).toBeNull();
+    }
+    expect(prochaineRelecture(normalisee(), t0, t0)).toBeNull();
+    expect(
+      prochaineRelecture(
+        vue({ status: 'normalization_failed', normalization: normalisation({ phase: 'failed' }) }),
+        t0,
+        t0,
+      ),
+    ).toBeNull();
+  });
+});
+
+describe('normalisation : jamais de renvoi automatique de « Normaliser »', () => {
+  it('erreur réseau, délai ou 5xx → relire le document ; refus 4xx → afficher', () => {
+    expect(conduiteApresEchecNormaliser(new TypeError('Failed to fetch'))).toBe('relire');
+    expect(conduiteApresEchecNormaliser(erreurApi(502, 'Bad Gateway'))).toBe('relire');
+    expect(conduiteApresEchecNormaliser(erreurApi(504, 'Gateway Timeout'))).toBe('relire');
+    expect(conduiteApresEchecNormaliser(erreurApi(500, { code: 'INTERNAL' }))).toBe('relire');
+    expect(conduiteApresEchecNormaliser(erreurApi(409, { code: 'STALE_REVISION' }))).toBe(
+      'afficher',
+    );
+    expect(conduiteApresEchecNormaliser(erreurApi(422, { code: 'INVOICE_NOT_ISSUABLE' }))).toBe(
+      'afficher',
+    );
+    expect(conduiteApresEchecNormaliser(erreurApi(429, 'x'))).toBe('afficher');
+    expect(messageFacture(erreurApi(429, 'x'), 'r')).toMatch(/attendez quelques minutes/);
+  });
+
+  it('la fenêtre n’appelle `normalizeInvoice` qu’à un seul endroit, jamais dans un rattrapage d’erreur', () => {
+    const ici = fileURLToPath(new URL('.', import.meta.url));
+    const code = readFileSync(`${ici}/normalize-dialog.tsx`, 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '');
+    expect(code.match(/api\.normalizeInvoice\(/g)).toHaveLength(1);
+    const apresCatch = code.slice(code.indexOf('catch (err)'));
+    expect(apresCatch).not.toMatch(/normalizeInvoice/);
+    expect(apresCatch).toMatch(/conduiteApresEchecNormaliser/);
+  });
+
+  it('« Mode test » partout où l’environnement est le test', () => {
+    const ici = fileURLToPath(new URL('.', import.meta.url));
+    for (const f of ['normalize-dialog.tsx', 'normalization-status.tsx', 'invoice-detail.tsx']) {
+      expect(readFileSync(`${ici}/${f}`, 'utf8'), f).toMatch(/Mode test/);
+    }
+  });
+});
+
+describe('déclarer « non normalisée »', () => {
+  it('motif de 20 à 500 caractères, espaces de bord retirés', () => {
+    expect(lireMotifDeclaration('   trop court   ').ok).toBe(false);
+    expect(lireMotifDeclaration('a'.repeat(501)).ok).toBe(false);
+    expect(lireMotifDeclaration(`  ${'a'.repeat(20)}  `)).toEqual({
+      ok: true,
+      motif: 'a'.repeat(20),
+    });
+    expect(lireMotifDeclaration('a'.repeat(500)).ok).toBe(true);
+  });
+});
+
+describe('échanges DGI du document', () => {
+  it('lignes lisibles, ordre conservé, corps rendu tel quel', () => {
+    const corps = '{"nif":"A0000000X","rn":"TEST-2026-000012","items":[{"price":1000.10}]}';
+    const lignes = lignesEchanges({
+      items: [
+        {
+          at: '2026-10-19T09:00:00.000Z',
+          exchangeId: 'e1',
+          entry: 'request',
+          method: 'POST',
+          path: '/api/invoice',
+          httpStatus: null,
+          durationMs: null,
+          outcome: null,
+          dgiErrorCode: null,
+          body: corps,
+        },
+        {
+          at: '2026-10-19T09:00:00.150Z',
+          exchangeId: 'e1',
+          entry: 'response',
+          method: 'POST',
+          path: '/api/invoice',
+          httpStatus: 200,
+          durationMs: 150,
+          outcome: 'business',
+          dgiErrorCode: '12',
+          body: '{"errorCode":"12"}',
+        },
+        {
+          at: '2026-10-19T09:03:00.000Z',
+          exchangeId: 'e2',
+          entry: 'complete',
+          method: 'GET',
+          path: '/api/invoice/uid-1',
+          httpStatus: null,
+          durationMs: 15000,
+          outcome: 'timeout',
+          dgiErrorCode: null,
+          body: null,
+        },
+      ],
+    });
+    expect(lignes.map((l) => [l.sens, l.operation, l.resultat])).toEqual([
+      ['Requête envoyée', 'Envoi de la facture', null],
+      ['Réponse reçue', 'Envoi de la facture', 'Refus de la DGI'],
+      ['Lecture', 'Lecture de la demande', 'Sans réponse (délai dépassé)'],
+    ]);
+    // Nombres e-DEF jamais reconvertis : « 1000.10 » reste « 1000.10 ».
+    expect(lignes[0]!.corps).toBe(corps);
+    expect(lignes[1]!.http).toBe('200');
+    expect(lignes[1]!.duree).toBe('150 ms');
+    expect(lignes[1]!.codeDgi).toBe('12');
+    expect(lignes[2]!.corps).toBeNull();
+  });
+
+  it('défense en profondeur : aucun jeton ne s’affiche, même si un corps en portait un', () => {
+    const avecJeton = corpsLisible('{"token":"eyJhbGciOi.secret","nif":"A0000000X"}')!;
+    expect(avecJeton).not.toContain('eyJhbGciOi');
+    expect(avecJeton).toContain('[masqué]');
+    expect(avecJeton).toContain('A0000000X');
+    expect(corpsLisible('Authorization: Bearer abc.def-123')).toBe(
+      'Authorization: Bearer [masqué]',
+    );
+    expect(corpsLisible('texte brut')).toBe('texte brut');
   });
 });

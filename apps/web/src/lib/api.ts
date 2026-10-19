@@ -1665,7 +1665,11 @@ export type JournalEvent =
   | 'number_released'
   | 'returned_to_draft'
   | 'duplicate_issued'
-  | 'report_issued';
+  | 'report_issued'
+  // ADR-0024 § 10
+  | 'normalization_uncertain'
+  | 'normalization_review_required'
+  | 'number_abandoned';
 
 export type LineDiscount =
   { kind: 'percent'; value: DecimalString } | { kind: 'total_amount'; value: DecimalString };
@@ -1931,17 +1935,94 @@ export interface OperatorView {
   name: string;
 }
 
-/** Sous-document écrit par S25f (connexion DGI). */
+/**
+ * Phase exposée (ADR-0024 § 9.2) : `submitting`, `comparing`, `cancelling` et
+ * `confirming` se lisent `in_progress`.
+ */
+export type NormalizationViewPhase =
+  'queued' | 'in_progress' | 'uncertain' | 'needs_review' | 'done' | 'failed';
+
+/** Catégorie d'une erreur de normalisation (ADR-0024 § 5 et § 9.2). */
+export type NormalizationErrorCategory =
+  | 'data'
+  | 'configuration'
+  | 'capacity'
+  | 'temporary'
+  | 'server'
+  | 'state'
+  | 'totals_mismatch'
+  | 'duplicate_pending'
+  | 'unknown'
+  | 'network'
+  | 'token_rejected'
+  | 'precondition';
+
+/** Dernière erreur : NOTRE message, PUIS code et libellé DGI tels quels (ADR-0024 § 5). */
+export interface NormalizationErrorView {
+  /** Code Lalanda. */
+  code: string;
+  category: NormalizationErrorCategory | null;
+  /** Français, à afficher. */
+  message: string;
+  /** Code renvoyé par la DGI, à afficher tel quel. */
+  dgiErrorCode: string | null;
+  /** Libellé renvoyé par la DGI, à afficher tel quel. */
+  dgiMessage: string | null;
+  retryable: boolean;
+}
+
+/** Sous-document écrit par S25f (connexion DGI) — ADR-0023, élargi par ADR-0024 § 9.2. */
 export interface NormalizationView {
   attempts: number;
+  /** JAMAIS affiché comme numéro de facture. */
   reservedNumber: string | null;
   codeDefDgi: string | null;
   nim: string | null;
   counters: string | null;
   dgiDateTime: string | null;
   qrCode: string | null;
-  lastError: { code: string; message: string } | null;
+  lastError: NormalizationErrorView | null;
   normalizedAt: string | null;
+  phase: NormalizationViewPhase;
+  /** `uid` DGI de la demande, utile à l'assistance DGI ; `null` avant l'envoi. */
+  dgiRequestId: string | null;
+  /** Écart de totaux : `[{ field: "vab", ours: "64.00", dgi: "64.01" }]`. */
+  differences: readonly { field: string; ours: string | null; dgi: string | null }[] | null;
+  /** `uncertain` et `needs_review` : prochaine vérification. */
+  nextCheckAt: string | null;
+  /** `needs_review` seulement. */
+  review: { since: string; reason: string } | null;
+  /** Calculé par l'API selon la phase ET les permissions : l'interface n'en déduit rien d'autre. */
+  actions: {
+    retry: boolean;
+    check: boolean;
+    declareNotNormalized: boolean;
+    backToDraft: boolean;
+  };
+}
+
+/**
+ * Entrée du journal des échanges DGI d'un document (ADR-0024 § 6 et § 9.3).
+ * Corps rédigés par l'API ; JAMAIS d'en-tête ni de jeton.
+ */
+export interface DgiExchangeView {
+  at: string;
+  /** Lie la requête à sa réponse. */
+  exchangeId: string;
+  entry: 'request' | 'response' | 'complete';
+  method: string;
+  path: string;
+  httpStatus: number | null;
+  durationMs: number | null;
+  /** `ok` ou un type d'échec du client e-MCF ; `null` pour une entrée `request`. */
+  outcome: string | null;
+  dgiErrorCode: string | null;
+  body: string | null;
+}
+
+/** `GET /sales/invoices/:invoiceId/dgi-exchanges` — ordre chronologique. */
+export interface DgiExchangePage {
+  items: readonly DgiExchangeView[];
 }
 
 export interface InvoiceReadiness {
@@ -2745,6 +2826,35 @@ export const api = {
     jsonRequest<InvoiceView>(`/sales/invoices/${encodeURIComponent(invoiceId)}/normalize`, {
       method: 'POST',
       body,
+    }),
+  // ADR-0024 § 9.1 — un refus de la DGI n'est PAS une erreur HTTP : ces routes
+  // répondent 200 avec l'état obtenu. Aucune n'est rejouée automatiquement.
+  /** Depuis `failed` réessayable ou `queued` ; `409 NORMALIZATION_NOT_RETRYABLE` sinon. */
+  retryNormalization: (invoiceId: string) =>
+    jsonRequest<InvoiceView>(
+      `/sales/invoices/${encodeURIComponent(invoiceId)}/normalization/retry`,
+      { method: 'POST' },
+    ),
+  /** Vérification immédiate auprès de la DGI (`uncertain` échu, `needs_review`). */
+  checkNormalization: (invoiceId: string) =>
+    jsonRequest<InvoiceView>(
+      `/sales/invoices/${encodeURIComponent(invoiceId)}/normalization/check`,
+      { method: 'POST' },
+    ),
+  /**
+   * `needs_review` seulement (`409 NORMALIZATION_NOT_UNDER_REVIEW` sinon) ;
+   * `fiscal.manage` et ré-authentification (`401 REAUTH_REQUIRED`). Motif de 20
+   * à 500 caractères.
+   */
+  declareNotNormalized: (invoiceId: string, reason: string) =>
+    jsonRequest<InvoiceView>(
+      `/sales/invoices/${encodeURIComponent(invoiceId)}/normalization/declare-not-normalized`,
+      { method: 'POST', body: { reason } },
+    ),
+  /** Échanges DGI du document, en ordre chronologique ; jamais d'en-tête ni de jeton. */
+  listDgiExchanges: (invoiceId: string) =>
+    jsonRequest<DgiExchangePage>(`/sales/invoices/${encodeURIComponent(invoiceId)}/dgi-exchanges`, {
+      method: 'GET',
     }),
   backToDraft: (invoiceId: string, expectedRevision: number) =>
     jsonRequest<InvoiceView>(`/sales/invoices/${encodeURIComponent(invoiceId)}/back-to-draft`, {
