@@ -50,7 +50,9 @@ describe('EdefClient', () => {
         [JETONS.business]: { ...profil, behaviour: 'business_error' },
         [JETONS.oversized]: { ...profil, behaviour: 'oversized' },
       },
-      slowMs: 2_000,
+      // Le serveur « lent » répond bien après le délai du client : le cas « délai
+      // dépassé » reste certain, quelle que soit la charge de la machine.
+      slowMs: 4_000,
     });
     config = {
       baseUrl: { test: fake.baseUrl, production: fake.baseUrl },
@@ -58,7 +60,10 @@ describe('EdefClient', () => {
       productionEnabled: false,
       // Délai court : la validation à 10 s minimum porte sur l'environnement, ce
       // test construit la configuration à la main pour rester rapide.
-      httpTimeoutMs: 300,
+      // 1,5 s et non 300 ms : le PREMIER appel ouvre la connexion et dépassait parfois
+      // 300 ms sur une machine chargée — le test « lit le statut » échouait alors au
+      // hasard (constaté 2 fois sur 3 le 19 oct. 2026). La production attend 15 s.
+      httpTimeoutMs: 1_500,
     };
     journal = new MemoryJournal();
     client = new EdefClient(config, journal);
