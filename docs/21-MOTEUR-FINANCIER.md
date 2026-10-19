@@ -193,6 +193,48 @@ année commerciale de 360 jours, économie d’impôt des dotations et intérêt
 modélisée, dettes fiscales et sociales non modélisées, fournisseurs assis sur les
 seuls achats variables.
 
+## Calcul des factures (S25d — ADR-0022)
+
+Module pur `packages/engine/src/invoice-totals/` : il calcule les totaux d'une facture
+normalisée exactement comme la DGI les recalcule, pour que le logiciel compare et
+annule en cas d'écart (ADR-0019). Aucune base, aucun réseau, aucune horloge ; aucune
+bibliothèque ajoutée.
+
+- **Arithmétique exacte.** Montants en chaînes décimales aux frontières (`"464.00"`),
+  calcul en entiers `bigint` à l'échelle 10⁻⁸ (`decimal.ts`, interne). Aucune division
+  implicite : chaque division est un arrondi explicite (`half_up`, `up`, `down`). Un
+  test de lecture des sources interdit le type `number` dans les calculs ; seules les
+  conversions vers et depuis les nombres JSON de l'API en manipulent.
+- **Version.** `INVOICE_TOTALS_VERSION = '1.0.0'`, distincte d'`ENGINE_VERSION` ; une
+  facture enregistre cette version et l'identifiant de politique.
+- **Calcul** (`computeInvoiceTotals`) : un mode de prix par facture (TTC ou HT) ;
+  montant de ligne = prix × quantité ; calcul **par groupe de taxation** sur le total
+  du groupe ; taxe spécifique ajoutée à la base de la TVA ; groupe N entièrement de TVA ;
+  HT + TVA = total pour chaque groupe. Tous les problèmes sont rendus d'un coup (montant
+  nul ou négatif, précision excessive, groupe inconnu ou sans taux, type d'article non
+  admis, taxe spécifique interdite en L et N, montant ≥ 10¹³).
+- **Politique d'arrondi à deux axes** (`RoundingPolicy`) : arrondi du montant de ligne
+  (`per_line` ou `per_group`) et arrondi de la TVA (`up` ou `half_up`). Défaut
+  `dgi-cd-2026.1` = `per_line` + `up`, lecture littérale de la documentation DGI, **à
+  calibrer** dans l'environnement de test (lot S25f). Changer de lecture est une
+  nouvelle politique et une nouvelle version du calcul, jamais une modification d'une
+  facture émise.
+- **Échange avec la DGI** : `toEdefTotals` (champs `ta…tp`, `taa…tap`, `haa…hap`,
+  `vaa…vap`, `ts`, `total`, `vtotal`) et `compareWithEdefResponse` (champ absent = 0 ;
+  une valeur à plus de 2 décimales est une différence, jamais arrondie pour coïncider).
+- **Prix et devise** : `convertUnitPrice` (TTC ↔ HT), `discountedUnitPrice` (remise en
+  prix unitaire réduit), `usdCounterValue` (contre-valeur indicative ; la facture reste
+  en CDF) et `isExchangeRateWithinTolerance` (±1 %).
+- **Cas de référence** (`reference-cases.ts`) : exemples DGI, cas dérivés et cas de
+  calibrage, avec l'attendu sous chacune des quatre politiques. Trois exemples de la
+  documentation DGI sont **faux ou non fiables** (deux calculés à 19 % au lieu de 16 %,
+  un sous-total à 69,00 au lieu de 68,97) : ils documentent l'écart et ne servent pas
+  de non-régression.
+
+Restent à trancher en environnement de test : l'arrondi de la TVA, l'arrondi du montant
+de ligne, l'assiette d'une taxe spécifique en pourcentage en TTC, le contenu de `haa…`
+avec une taxe spécifique, le taux du groupe M, l'arrondi de `curTotal`.
+
 ## Compatibilité
 
 Le moteur peut évoluer, mais les versions historiques restent exécutables ou leurs résultats figés restent disponibles avec preuve d’intégrité.
