@@ -2,7 +2,8 @@
 //
 // - Aucun `number` JavaScript dans les calculs : seuls `decimalToJsonNumber`,
 //   `decimalFromJsonNumber` et `isValidDecimal` (bloc « frontière JSON » de
-//   `edef-shape.ts`) en manipulent.
+//   `edef-shape.ts`) et `decimalFromJsonRate` (bloc « frontière JSON » de
+//   `conversion.ts`, ADR-0023) en manipulent.
 // - Aucun import hors du module : ni `apps/`, ni Mongo, ni Nest, ni réseau ;
 //   aucune horloge.
 
@@ -37,6 +38,15 @@ function withoutJsonBoundary(source: string): string {
   return source.slice(0, start) + source.slice(end);
 }
 
+/**
+ * Les signatures de `credit-notes.ts` figées par le jalon E0 typent les positions de
+ * ligne (`lineIndex: number`, `originLineIndex: number`) : ce sont des index, pas des
+ * montants. Elles seules sont neutralisées avant la recherche.
+ */
+function withoutFrozenIndexTypes(source: string): string {
+  return source.replace(/\b(lineIndex|originLineIndex): number\b/g, '$1: Index');
+}
+
 const FLOAT_PATTERNS: readonly [string, RegExp][] = [
   ['type number', /\bnumber\b/],
   ['Number', /\bNumber\b/],
@@ -54,6 +64,11 @@ describe('aucun number dans les calculs', () => {
     'currency.ts': read('currency.ts'),
     'pricing.ts': read('pricing.ts'),
     'edef-shape.ts (hors frontière JSON)': withoutJsonBoundary(read('edef-shape.ts')),
+    // ADR-0023 (chantier E1).
+    'payments.ts': read('payments.ts'),
+    'conversion.ts (hors frontière JSON)': withoutJsonBoundary(read('conversion.ts')),
+    'credit-notes.ts (hors signatures figées)': withoutFrozenIndexTypes(read('credit-notes.ts')),
+    'check-reference-cases.ts': read('check-reference-cases.ts'),
   };
 
   for (const [file, source] of Object.entries(sources)) {
@@ -64,6 +79,14 @@ describe('aucun number dans les calculs', () => {
       }
     });
   }
+
+  it('la frontière JSON de conversion.ts ne contient que decimalFromJsonRate', () => {
+    const source = read('conversion.ts');
+    const boundary = source.slice(source.indexOf(BOUNDARY_START), source.indexOf(BOUNDARY_END));
+    expect([...boundary.matchAll(/\bfunction (\w+)/g)].map((m) => m[1])).toEqual([
+      'decimalFromJsonRate',
+    ]);
+  });
 
   it('la frontière JSON contient bien les trois fonctions, et elles seules', () => {
     const source = read('edef-shape.ts');
@@ -87,6 +110,7 @@ describe('dépendances du module invoice-totals', () => {
 
   it('liste les fichiers attendus', () => {
     expect(files.sort()).toEqual([
+      'check-reference-cases.ts',
       'compute.ts',
       'conversion.ts',
       'credit-notes.ts',

@@ -43,3 +43,7 @@ export {
   decimalFromJsonRate,
 } from './conversion.js';
 export { checkCreditNote, remainingQuantities } from './credit-notes.js';
+export {
+  INVOICE_CHECK_REFERENCE_CASES,
+  type InvoiceCheckReferenceCase,
+} from './check-reference-cases.js';

@@ -235,6 +235,66 @@ Restent à trancher en environnement de test : l'arrondi de la TVA, l'arrondi du
 de ligne, l'assiette d'une taxe spécifique en pourcentage en TTC, le contenu de `haa…`
 avec une taxe spécifique, le taux du groupe M, l'arrondi de `curTotal`.
 
+### Contrôles des factures et conversion en CDF (S25e — ADR-0023)
+
+Fonctions pures ajoutées au même module, sur la même arithmétique exacte ;
+`computeInvoiceTotals` et `INVOICE_TOTALS_VERSION` sont **inchangés**. Le document
+commercial est composé dans la devise de l'utilisateur (CDF ou USD) ; la normalisation le
+convertit en CDF. L'API n'effectue aucune opération sur un montant : elle appelle ces
+fonctions.
+
+- **Paiements** (`checkPayments`) : au moins un paiement ; chaque montant décimal
+  strictement positif d'au plus 2 décimales ; mode parmi les sept modes e-DEF (`ESPECES`,
+  `VIREMENT`, `CARTEBANCAIRE`, `MOBILEMONEY`, `CHEQUES`, `CREDIT`, `AUTRE`) ; **somme des
+  paiements = total**, exacte en chaînes (0,10 + 0,20 = 0,30). Rend `paidTotal` et
+  `amountOnCredit` (part `CREDIT`, non réglée, conservée pour les futurs encaissements).
+  Tous les problèmes sont rendus d'un coup ; l'écart de somme n'est signalé que si chaque
+  montant est lisible. Le contrat ne prévoit pas de code propre au mode inconnu : il est
+  signalé comme `PAYMENT_AMOUNT_INVALID` avec `details.field = 'method'`.
+- **Réconciliation** (`reconcilePayments`) : après conversion, chaque paiement est arrondi
+  au centime et le total CDF est recalculé à partir des prix convertis ; l'écart est porté
+  sur le **plus gros paiement** (le premier à égalité), pour que la somme des paiements CDF
+  égale exactement le total CDF. Refus si ce paiement devient nul ou négatif.
+- **Taux reçu de la DGI** (`decimalFromJsonRate`) : le nombre JSON de
+  `/api/info/currencyRates` est lu par sa représentation la plus courte, jusqu'à 8
+  décimales (`2262.320000` → `"2262.32"`, `2262.3215` accepté) ; refus d'un nombre non
+  fini, nul, négatif, plus précis ou en notation exponentielle. Seule fonction du fichier
+  qui manipule un `number` (bloc « frontière JSON », vérifié par test).
+- **Conversion** (`convertDocumentToCdf`, `CURRENCY_CONVERSION_VERSION = '1.0.0'`) : on
+  convertit les **prix unitaires**, pas les totaux, parce que la DGI recalcule à partir des
+  articles. Chaque prix unitaire, prix d'origine, taxe spécifique par unité et paiement
+  vaut montant × taux, **arrondi une seule fois** au centime le plus proche (demi vers le
+  haut) sur la valeur exacte. Taxes et remises en pourcentage inchangées ; une ligne
+  remisée recalcule son prix CDF à partir du prix d'origine converti (`discountedUnitPrice`),
+  la remise en montant étant elle-même convertie : le libellé (« Remise 10 % »,
+  « Remise 22 623,21 CDF ») reste exact en CDF. Document en CDF : identité (taux 1).
+  Refus : taux illisible, ≤ 0, à plus de 8 décimales ou ≠ 1 pour un document en CDF
+  (`EXCHANGE_RATE_INVALID`) ; montant converti à 0,00 (`CONVERTED_AMOUNT_ZERO`). Le
+  document CDF est ensuite recalculé par `computeInvoiceTotals` : ses totaux diffèrent de
+  quelques centimes de « total USD × taux », et **seuls les montants CDF ont valeur
+  fiscale**. Le choix du taux (taux officiel DGI par défaut, autre taux à ±1 % par
+  `isExchangeRateWithinTolerance`) appartient à l'API.
+- **Avoirs** (`checkCreditNote`, `remainingQuantities`) : pour un avoir rattaché à une
+  facture (COR, RAN, RAM), chaque ligne vise une ligne de l'origine
+  (`CREDIT_NOTE_LINE_NOT_IN_ORIGIN`), au **prix unitaire identique**
+  (`CREDIT_NOTE_PRICE_MISMATCH`), et la quantité cumulée de tous les avoirs reste ≤ la
+  quantité vendue, au millième près (`CREDIT_NOTE_QUANTITY_EXCEEDED`, avec le restant). Le
+  montant cumulé des avoirs est comparé à celui de l'origine
+  (`CREDIT_NOTE_AMOUNT_EXCEEDS_ORIGIN` : l'arrondi par groupe peut faire dépasser d'un
+  centime ; avertissement en brouillon, refus au gel). Un RRR n'a pas de contrainte de
+  ligne. Nature, type d'origine, devise et mode de prix sont contrôlés par l'API. Un avoir
+  d'une origine normalisée ne se reconvertit pas : ses prix CDF sont recopiés de l'origine.
+- **Cas de référence** (`check-reference-cases.ts`, `INVOICE_CHECK_REFERENCE_CASES`) :
+  paiements, réconciliation, conversion et avoirs, attendus calculés à la main ; les tests
+  les rejouent et les recoupent par une arithmétique propre au test. Des propriétés sur
+  1 000 documents en USD (graine fixe) vérifient chaque prix converti, les invariants
+  d'ADR-0022 sur le document CDF et la réconciliation des paiements au centime.
+
+Une donnée illisible qui aurait dû être refusée en amont (ligne déjà passée par
+`computeInvoiceTotals`, origine figée) lève une erreur de programmation plutôt qu'un
+problème affiché. Reste à confirmer auprès de la DGI : le contrôle ±1 % du taux d'un avoir
+(taux de l'origine ou du jour), le caractère cumulatif du contrôle de montant des avoirs.
+
 ## Compatibilité
 
 Le moteur peut évoluer, mais les versions historiques restent exécutables ou leurs résultats figés restent disponibles avec preuve d’intégrité.
