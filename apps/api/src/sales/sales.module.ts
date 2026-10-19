@@ -6,15 +6,18 @@
 //
 // ADR-0023 (S25e, chantier E2) : documents de vente sous `/sales/invoices`,
 // journal sous `/sales/journal`. Le port de normalisation
-// (`SALES_INVOICE_NORMALIZER`) est fourni ici par `NoopSalesInvoiceNormalizer` ;
-// S25f remplace ce seul fournisseur. `InvoiceNumberingService` et
+// (`SALES_INVOICE_NORMALIZER`) est fourni par `EdefSalesInvoiceNormalizer`
+// (ADR-0024, S25f) ; `NoopSalesInvoiceNormalizer` reste disponible pour les tests. `InvoiceNumberingService` et
 // `InvoiceJournalService` sont exportés pour S25f.
 
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 
+import { APP_INTERCEPTOR } from '@nestjs/core';
+
 import { EdefModule } from '../edef/edef.module.js';
 import { FiscalModule } from '../fiscal/fiscal.module.js';
+import { IntegrationsModule } from '../integrations/integrations.module.js';
 import { OrganizationsModule } from '../organizations/organizations.module.js';
 import { CatalogItem, CatalogItemSchema } from './catalog-item.schema.js';
 import { CatalogItemsController } from './catalog-items.controller.js';
@@ -44,8 +47,16 @@ import { SalesInvoice, SalesInvoiceSchema } from './invoices/invoice.schema.js';
 import { InvoicesController } from './invoices/invoices.controller.js';
 import { SalesJournalHead, SalesJournalHeadSchema } from './invoices/journal-head.schema.js';
 import { JournalController } from './invoices/journal.controller.js';
-import { NoopSalesInvoiceNormalizer } from './invoices/noop-normalizer.js';
 import { SALES_INVOICE_NORMALIZER } from './invoices/normalization.port.js';
+import { NormalizationConsistencyJob } from './normalization/consistency.job.js';
+import { DgiCallLimiter } from './normalization/dgi-call-limiter.js';
+import { EdefSalesInvoiceNormalizer } from './normalization/edef-normalizer.js';
+import { NormalizationActionsInterceptor } from './normalization/normalization-actions.interceptor.js';
+import { NormalizationRecorder } from './normalization/normalization-recorder.js';
+import { NormalizationRoutesService } from './normalization/normalization-routes.service.js';
+import { NormalizationController } from './normalization/normalization.controller.js';
+import { NormalizationReconciliationJob } from './normalization/reconciliation.job.js';
+import { ReferenceRefreshJob } from './normalization/reference-refresh.job.js';
 
 @Module({
   imports: [
@@ -53,6 +64,8 @@ import { SALES_INVOICE_NORMALIZER } from './invoices/normalization.port.js';
     OrganizationsModule,
     FiscalModule,
     EdefModule,
+    // ADR-0024 (F2) : garde de ré-authentification récente de `declare-not-normalized`.
+    IntegrationsModule,
     MongooseModule.forFeature([
       { name: Customer.name, schema: CustomerSchema },
       { name: CatalogItem.name, schema: CatalogItemSchema },
@@ -68,6 +81,8 @@ import { SALES_INVOICE_NORMALIZER } from './invoices/normalization.port.js';
     TaxGroupsController,
     InvoicesController,
     JournalController,
+    // ADR-0024 § 9.1 (F2).
+    NormalizationController,
   ],
   providers: [
     CustomersService,
@@ -81,7 +96,16 @@ import { SALES_INVOICE_NORMALIZER } from './invoices/normalization.port.js';
     InvoiceDraftsService,
     InvoiceFreezingService,
     CreditNotesService,
-    { provide: SALES_INVOICE_NORMALIZER, useClass: NoopSalesInvoiceNormalizer },
+    // ADR-0024 (F2) : normalisation DGI réelle, rattrapage et tâches planifiées.
+    DgiCallLimiter,
+    NormalizationRecorder,
+    EdefSalesInvoiceNormalizer,
+    NormalizationReconciliationJob,
+    ReferenceRefreshJob,
+    NormalizationConsistencyJob,
+    NormalizationRoutesService,
+    { provide: SALES_INVOICE_NORMALIZER, useExisting: EdefSalesInvoiceNormalizer },
+    { provide: APP_INTERCEPTOR, useClass: NormalizationActionsInterceptor },
   ],
   exports: [SalesUsageService, TaxGroupsService, InvoiceNumberingService, InvoiceJournalService],
 })
