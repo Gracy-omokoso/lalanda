@@ -66,4 +66,22 @@ export class EdefReferenceSnapshotsService {
   async count(environment: EdefEnvironment, list: EdefReferenceList): Promise<number> {
     return this.model.countDocuments({ environment, list }).exec();
   }
+
+  /**
+   * Dernier instantané conservé d'une liste dans un environnement, ou `null`
+   * (ADR-0022 § S25c.4). « Dernier » = `fetchedAt` le plus récent ; à égalité,
+   * le dernier inséré. Lecture seule : aucun appel à la DGI.
+   */
+  async latest(
+    environment: EdefEnvironment,
+    list: EdefReferenceList,
+  ): Promise<{ payload: unknown; fetchedAt: Date; sha256: string } | null> {
+    const doc = await this.model
+      .findOne({ environment, list })
+      .sort({ fetchedAt: -1, _id: -1 })
+      .lean()
+      .exec();
+    if (!doc) return null;
+    return { payload: doc.payload, fetchedAt: doc.fetchedAt, sha256: doc.sha256 };
+  }
 }

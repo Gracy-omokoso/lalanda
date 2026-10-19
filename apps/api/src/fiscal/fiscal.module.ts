@@ -54,6 +54,8 @@ import { ReferenceDataService } from './reference-data.service.js';
     NormalizedInvoicingService,
     ReferenceDataService,
   ],
-  exports: [NormalizedInvoicingService, PointsOfSaleService],
+  // `NormalizedInvoicingStateReader` : lecture seule de l'environnement DGI de
+  // l'organisation, consommée par `sales/` (ADR-0022 § S25c.4).
+  exports: [NormalizedInvoicingService, PointsOfSaleService, NormalizedInvoicingStateReader],
 })
 export class FiscalModule {}
