@@ -10,7 +10,13 @@
 // Signatures figées par le jalon E0 ; corps du chantier E1.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { formatAmount, hasAtMostDecimals, parseFixed, splitDecimal, type Fixed } from './decimal.js';
+import {
+  formatAmount,
+  hasAtMostDecimals,
+  parseFixed,
+  splitDecimal,
+  type Fixed,
+} from './decimal.js';
 import {
   PAYMENT_METHODS,
   type InvoiceCheckIssue,

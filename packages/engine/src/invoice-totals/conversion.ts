@@ -107,7 +107,9 @@ function readLine(line: ConvertibleLine, index: Index) {
   const unitPrice = positive(line.unitPrice, 2, `${label}, prix unitaire`);
   positive(line.quantity, 3, `${label}, quantité`);
   const original =
-    line.originalPrice === null ? null : positive(line.originalPrice, 2, `${label}, prix d’origine`);
+    line.originalPrice === null
+      ? null
+      : positive(line.originalPrice, 2, `${label}, prix d’origine`);
   if (line.discount !== null && original === null) {
     throw new RangeError(`${label} : une remise exige un prix d’origine.`);
   }

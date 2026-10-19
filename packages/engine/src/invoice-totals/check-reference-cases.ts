@@ -229,8 +229,20 @@ export const INVOICE_CHECK_REFERENCE_CASES: readonly InvoiceCheckReferenceCase[]
       from: 'USD',
       rate: '2262.33',
       lines: [
-        { unitPrice: '0.50', originalPrice: null, discount: null, quantity: '1', specificTax: null },
-        { unitPrice: '0.33', originalPrice: null, discount: null, quantity: '1', specificTax: null },
+        {
+          unitPrice: '0.50',
+          originalPrice: null,
+          discount: null,
+          quantity: '1',
+          specificTax: null,
+        },
+        {
+          unitPrice: '0.33',
+          originalPrice: null,
+          discount: null,
+          quantity: '1',
+          specificTax: null,
+        },
       ],
       payments: [{ method: 'ESPECES', amount: '0.83' }],
     },
@@ -252,7 +264,13 @@ export const INVOICE_CHECK_REFERENCE_CASES: readonly InvoiceCheckReferenceCase[]
       from: 'USD',
       rate: '2262.3215',
       lines: [
-        { unitPrice: '0.33', originalPrice: null, discount: null, quantity: '3', specificTax: null },
+        {
+          unitPrice: '0.33',
+          originalPrice: null,
+          discount: null,
+          quantity: '3',
+          specificTax: null,
+        },
         {
           unitPrice: '1000.00',
           originalPrice: null,
@@ -267,7 +285,12 @@ export const INVOICE_CHECK_REFERENCE_CASES: readonly InvoiceCheckReferenceCase[]
       ok: true,
       lines: [
         { unitPrice: '746.57', originalPrice: null, priceModification: null, specificTax: null },
-        { unitPrice: '2262321.50', originalPrice: null, priceModification: null, specificTax: null },
+        {
+          unitPrice: '2262321.50',
+          originalPrice: null,
+          priceModification: null,
+          specificTax: null,
+        },
       ],
       // 1 000,99 × 2 262,3215 = 2 264 561,198285 → 2 264 561,20
       payments: ['2264561.20'],
@@ -388,7 +411,13 @@ export const INVOICE_CHECK_REFERENCE_CASES: readonly InvoiceCheckReferenceCase[]
       from: 'CDF',
       rate: '1',
       lines: [
-        { unitPrice: '720.00', originalPrice: null, discount: null, quantity: '5', specificTax: null },
+        {
+          unitPrice: '720.00',
+          originalPrice: null,
+          discount: null,
+          quantity: '5',
+          specificTax: null,
+        },
         {
           unitPrice: '900.00',
           originalPrice: '1000.00',
@@ -421,7 +450,13 @@ export const INVOICE_CHECK_REFERENCE_CASES: readonly InvoiceCheckReferenceCase[]
       from: 'USD',
       rate: '0.4',
       lines: [
-        { unitPrice: '0.01', originalPrice: null, discount: null, quantity: '1', specificTax: null },
+        {
+          unitPrice: '0.01',
+          originalPrice: null,
+          discount: null,
+          quantity: '1',
+          specificTax: null,
+        },
       ],
       payments: [{ method: 'ESPECES', amount: '0.02' }],
     },
