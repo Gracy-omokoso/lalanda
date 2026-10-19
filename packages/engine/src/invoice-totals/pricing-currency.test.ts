@@ -35,6 +35,19 @@ describe('convertUnitPrice', () => {
 });
 
 describe('discountedUnitPrice', () => {
+  it('libelle une remise en montant dans la devise du document (CDF par défaut)', () => {
+    const base = {
+      originalPrice: '100.00',
+      quantity: '2',
+      discount: { kind: 'total_amount', value: '10.00' } as const,
+    };
+    const cdf = discountedUnitPrice(base);
+    const usd = discountedUnitPrice({ ...base, currency: 'USD' });
+    expect(cdf.ok && cdf.priceModification).toMatch(/ CDF$/);
+    expect(usd.ok && usd.priceModification).toMatch(/ USD$/);
+    expect(usd.ok && cdf.ok && usd.unitPrice).toBe(cdf.ok ? cdf.unitPrice : null);
+  });
+
   it('10 % sur 1 000,00 → 900,00, « Remise 10 % »', () => {
     expect(
       discountedUnitPrice({

@@ -93,6 +93,13 @@ export function discountedUnitPrice(input: {
   originalPrice: DecimalString;
   quantity: DecimalString;
   discount: LineDiscount;
+  /**
+   * Devise du document, pour le libellé d'une remise en montant. Facultative :
+   * `CDF` par défaut, ce qui garde le comportement des appels existants (la
+   * conversion au moment de « Normaliser » produit des prix en CDF). Un brouillon
+   * en USD doit la passer, sinon son libellé annoncerait des CDF (ADR-0023).
+   */
+  currency?: 'CDF' | 'USD';
 }): DiscountedUnitPriceResult {
   const original = strictlyPositive(input.originalPrice, 2);
   if (original === null) {
@@ -163,7 +170,7 @@ export function discountedUnitPrice(input: {
   }
   const effective = roundHalfUp(mulExact(original - unitPrice, quantity));
   if (input.discount.kind === 'total_amount') {
-    modification = `Remise ${frenchNumber(formatAmount(effective))} CDF`;
+    modification = `Remise ${frenchNumber(formatAmount(effective))} ${input.currency ?? 'CDF'}`;
   }
   return {
     ok: true,
