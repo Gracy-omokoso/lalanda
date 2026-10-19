@@ -4,6 +4,16 @@ Statut : Proposed
 Date : 2026-08-10
 Décideurs : Gracy Omokoso
 
+> **Amendé par [ADR-0022](ADR-0022-clients-catalogue-et-calcul-des-factures.md) (19 oct.
+> 2026, chantier D2).** Le menu du compte gagne une septième entrée, **« Ventes »** →
+> `/ventes` (onglets Clients · Catalogue), placée juste après « Tableau de bord », dans le
+> premier groupe. Elle est offerte à **tout membre**, même règle qu'« Organisation » (§1, §5) :
+> la conditionner sur `sales.read` demanderait un appel de plus au titre de la visibilité.
+> L'espace filtre ses onglets par `GET /me/permissions` et montre un refus explicite à un
+> rôle sans `sales.read`. « Administration » reste la seule entrée conditionnée. Le tableau
+> du §1 ci-dessous reste celui d'août 2026 ; l'état implémenté est décrit dans
+> `docs/04-UX-UI.md` § Navigation applicative.
+
 ## Contexte
 
 La demande est venue du décideur en ces termes :

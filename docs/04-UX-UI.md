@@ -92,12 +92,13 @@ Cinq éléments, à toutes les largeurs : **marque · sélecteur d’organisatio
 
 ### Menu du compte
 
-Déclenché par l’**avatar**, disponible à toutes les largeurs. Six entrées, deux groupes — ce qui appartient à la personne, puis ce qui appartient à l’organisation et à la plateforme :
+Déclenché par l’**avatar**, disponible à toutes les largeurs. Sept entrées, deux groupes — ce qui appartient à la personne et à son travail quotidien, puis ce qui appartient à l’organisation et à la plateforme :
 
 | Entrée | Destination | Condition |
 |---|---|---|
 | *En-tête d’identité : avatar, nom, adresse* | — (inerte, non focusable) | — |
 | Tableau de bord | `/projects` | aucune |
+| Ventes | `/ventes` (onglets Clients · Catalogue) | aucune — tout membre (ADR-0022) |
 | Mon compte | `/compte` (onglets Profil · Sécurité · Préférences) | aucune |
 | Organisation | `/organisation` | aucune — tout membre |
 | Abonnement | `/souscription` | aucune — tout membre |
@@ -265,6 +266,50 @@ Les écritures qui engagent le contribuable exigent une confirmation de moins de
 ### États et accessibilité
 
 Chargement, erreur avec « Réessayer », liste de points de vente vide expliquée, succès annoncés en `aria-live`, échecs en `role="alert"`. Chaque statut est écrit ; la couleur des pastilles n’est qu’un renfort. Champs reliés à leur aide et à leur erreur par `aria-describedby`, `aria-invalid` sur un champ refusé. Mobile d’abord : une colonne, boutons pleine largeur, deux colonnes à partir de `sm`.
+
+## Implémenté (S25c) — Espace Ventes : clients et catalogue
+
+`/ventes` porte les données maîtres sans lesquelles aucune facture n’est possible : le fichier clients et le catalogue d’articles (ADR-0022, chantier D2). Écrans : `apps/web/src/app/(app)/ventes/` — `clients/`, `catalogue/`, `_components/` (`customer-list.tsx`, `customer-form.tsx`, `catalog-list.tsx`, `catalog-item-form.tsx`, `sales-access.tsx`, logique pure dans `sales-model.ts`). API : contrat de l’ADR-0022 § S25c.5.
+
+### Pages et accès
+
+| Route | Contenu | Ouvert à |
+|---|---|---|
+| `/ventes` | redirige vers `/ventes/clients` | — |
+| `/ventes/clients` | liste, recherche, fiche client | `sales.read` ; écriture `sales.manage` |
+| `/ventes/catalogue` | liste, recherche, fiche article | `sales.read` ; écriture `sales.manage` |
+
+L’entrée **« Ventes » du menu du compte** est offerte à tout membre, comme « Organisation » ; les onglets sont filtrés par `GET /me/permissions`. Un rôle sans `sales.read` (le Conseiller, le Chef de projet) lit un **refus explicite** — le fichier clients contient des données personnelles — et non une page vide. Sans `sales.manage` (Analyste, Lecteur), tout est en **consultation seule** : ni bouton de création, ni action de ligne autre que « Consulter », formulaire désactivé. Tant que les permissions ne sont pas connues, l’écran reste en lecture seule : mieux vaut un bouton qui apparaît qu’un bouton qui répond 403.
+
+### Fiche client : le formulaire suit le type DGI
+
+Le **type** est choisi en premier, sans valeur par défaut, parmi les cinq de la DGI (personne physique, personne morale, personne physique commerçante, profession libérale, ambassade ou organisation internationale), chacun avec une phrase qui dit ce qu’il exige. Les champs suivent : le nom est obligatoire pour tous et s’intitule **« Dénomination »** pour une personne morale ; le NIF est obligatoire pour PM, PC et PL, facultatif sinon ; la **référence du document d’exonération** n’apparaît que pour AO, où elle est obligatoire. Le NIF part tel que saisi : l’API le normalise.
+
+### Fiche article : la liste des groupes vient du serveur
+
+- **Groupe de taxation** choisi dans la liste de `GET /sales/tax-groups`, avec son libellé et, quand la DGI l’a fourni, son taux. Quand l’API sert sa liste par défaut, un bandeau l’écrit : **« Liste par défaut (février 2026) »**, taux non affichés. Aucun groupe ni taux n’est codé dans l’interface.
+- **Type d’article** restreint aux types admis par le groupe (Taxe seulement en L et N, choisi d’office) ; la case **« Opération hors champ »** n’existe qu’en groupe A, avec le code transmis à la DGI affiché (« HORS CHAMP », orthographe à confirmer) — la référence interne est conservée. La taxe spécifique (montant par unité ou pourcentage) disparaît en L et N.
+- **Prix** saisi à la française (`1 234,50`), transmis **en chaîne**, et **mode TTC/HT obligatoire**, sans valeur par défaut. Devise : CDF seulement (décision ouverte n° 2 de l’ADR-0022).
+- Un article dont le groupe n’est plus proposé reste lisible, marqué « Groupe plus proposé » ; il faut en changer pour l’enregistrer.
+
+### Aucun montant n’est calculé dans le navigateur
+
+Les montants sont mis en forme **par manipulation de chaîne** (`1 234,50 CDF`, espace fine insécable pour les milliers), jamais arrondis ni convertis : ni `Number()`, ni `parseFloat`. Un test lit les sources de `sales-model.ts` et des composants pour l’imposer. La conversion d’un prix d’un mode à l’autre appartient au moteur, au moment de la facture (S25e).
+
+### Écritures concurrentes, doublons, suppression
+
+- Modification : corps complet avec la révision lue à l’ouverture. Si quelqu’un d’autre a écrit entre-temps (`409 STALE_REVISION`), la fiche dit « modifiée par quelqu’un d’autre » et propose de la recharger — jamais d’écrasement silencieux.
+- Doublon de NIF ou de code : l’erreur s’affiche sous le champ, avec un lien **« Ouvrir la fiche existante »**.
+- La **suppression** n’est proposée que pour une fiche jamais facturée, après confirmation ; sinon seule la **désactivation** la retire des propositions. Une fiche désactivée se réactive.
+
+### États et accessibilité
+
+Chargement, liste vide (distincte d’une recherche sans résultat), erreur avec « Réessayer », refus expliqué, pagination « Afficher plus » ; succès annoncés en `aria-live`, échecs en `role="alert"`. Erreurs du serveur rangées **sous chaque champ** (lues sous `details.issues` et à la racine du corps, messages Zod anglais remplacés) ; un chemin inconnu reste visible en tête. Champs reliés à leur aide et à leur erreur par `aria-describedby`, `aria-invalid` sur un champ refusé, groupes de boutons radio dans des `fieldset` légendés. Les boutons d’action portent le nom de la fiche (« Modifier — Exemple SARL »). Mobile d’abord : une colonne, filtres empilés, deux colonnes à partir de `sm`. La fiche s’ouvre sur la même page (`?fiche=<id>`, `?fiche=nouveau`) : le bouton « précédent » ramène à la liste.
+
+### Limites
+
+- Aucune facture n’est encore émise depuis cet espace (lot S25e) ; l’indication « Déjà facturé » ne s’allumera qu’alors.
+- Pas d’import en masse ni d’export du fichier clients dans ce lot.
 
 ## Implémenté (S21b) — Espace admin plateforme
 
