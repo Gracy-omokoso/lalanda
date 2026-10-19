@@ -618,11 +618,14 @@ export function formulaireDepuisVue(
           nom: vue.customer.name ?? '',
           printContactDetails: vue.customer.printContactDetails,
         };
-  const paiements = vue.documentAmounts.payments.map((p) => ({
+  const servis = vue.documentAmounts.payments.map((p): PaiementFormulaire => ({
     cle: nouvelleCle('p'),
     method: p.method,
     montant: montantPourSaisie(p.amount),
   }));
+  // Un brouillon sans paiement garde une ligne vide à remplir.
+  const paiements: PaiementFormulaire[] =
+    servis.length > 0 ? servis : [{ cle: nouvelleCle('p'), method: 'ESPECES', montant: '' }];
   return {
     type: vue.type,
     currency: vue.currency,

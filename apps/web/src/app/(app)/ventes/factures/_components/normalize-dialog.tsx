@@ -110,7 +110,16 @@ export function NormalizeDialog({
   if (resultat) {
     const entete = enteteDocument(resultat);
     return (
-      <Dialogue titre="Document normalisé" onFermer={() => onNormalise(resultat)}>
+      <Dialogue
+        titre={
+          resultat.status === 'normalized'
+            ? 'Facture normalisée'
+            : resultat.status === 'normalization_failed'
+              ? 'Normalisation refusée'
+              : 'Pro forma figé — en attente de la DGI'
+        }
+        onFermer={() => onNormalise(resultat)}
+      >
         <p className="text-sm" aria-live="polite">
           <strong>{entete.titre}</strong> — <span className="font-mono">{entete.reference}</span>.{' '}
           {STATUS_LABELS[resultat.status]}.

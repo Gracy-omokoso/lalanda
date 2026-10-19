@@ -82,8 +82,20 @@ function Totaux({ totaux, devise }: { totaux: InvoiceTotals; devise: string }): 
 export function AmountsPanel({
   vue,
 }: {
-  vue: Pick<InvoiceView, 'documentAmounts' | 'normalizedAmounts' | 'conversion' | 'currency'>;
+  vue: Pick<
+    InvoiceView,
+    | 'documentAmounts'
+    | 'normalizedAmounts'
+    | 'conversion'
+    | 'currency'
+    | 'emissionMode'
+    | 'readiness'
+  >;
 }): React.ReactElement {
+  // Organisation ordinaire : document émis tel quel, sans montants normalisés.
+  const ordinaire =
+    vue.emissionMode === 'standard' ||
+    (vue.emissionMode === null && vue.readiness.action === 'issue');
   const doc = vue.documentAmounts;
   const norm = vue.normalizedAmounts;
   const devise = doc.currency;
@@ -164,9 +176,11 @@ export function AmountsPanel({
           </>
         ) : (
           <p className="text-sm text-[var(--foreground-muted)]">
-            {devise === 'CDF'
-              ? 'Calculés à la normalisation, dans les organisations en facture normalisée.'
-              : 'Calculés par le serveur au moment de « Normaliser », au taux officiel du jour, dans les organisations en facture normalisée.'}
+            {ordinaire
+              ? 'Sans objet : votre organisation n’est pas en facture normalisée ; le document vaut dans sa devise.'
+              : devise === 'CDF'
+                ? 'Calculés à la normalisation, dans les organisations en facture normalisée.'
+                : 'Calculés par le serveur au moment de « Normaliser », au taux officiel du jour, dans les organisations en facture normalisée.'}
           </p>
         )}
       </div>
