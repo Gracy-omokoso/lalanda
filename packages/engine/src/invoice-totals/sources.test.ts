@@ -122,6 +122,8 @@ describe('dépendances du module invoice-totals', () => {
       'payments.ts',
       'pricing.ts',
       'reference-cases.ts',
+      // ADR-0024 § 7.3 (jalon F0).
+      'rounding-calibration.ts',
       'tax-groups.ts',
       'types.ts',
     ]);
