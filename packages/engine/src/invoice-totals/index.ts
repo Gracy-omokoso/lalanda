@@ -33,6 +33,8 @@ export {
   type InvoiceTotalsReferenceCase,
   type ReferenceExpectation,
 } from './reference-cases.js';
+// ADR-0024 § 7.3 (jalon F0) : relevé d'étalonnage, livré à `not_calibrated`.
+export { ROUNDING_CALIBRATION, type RoundingCalibrationRecord } from './rounding-calibration.js';
 
 // ADR-0023 § S25e.9 (jalon E0) : types figés et signatures ; corps livrés par E1.
 export * from './invoice-checks.types.js';

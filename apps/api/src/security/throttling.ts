@@ -32,3 +32,14 @@ export const INTEGRATION_WRITE_THROTTLE = { ttl: 3_600_000, limit: 10 } as const
  * faire de Lalanda la source d'un afflux sur l'e-DEF.
  */
 export const EDEF_TEST_THROTTLE = { ttl: 3_600_000, limit: 30 } as const;
+
+/**
+ * Quota de la NORMALISATION des factures (ADR-0024 § 6) : `normalize`,
+ * `normalization/retry` et `normalization/check`.
+ *
+ * 60 par heure et par utilisateur. Chaque appel peut solliciter la DGI (jusqu'à
+ * quatre échanges) avec le jeton du contribuable ; une caisse active normalise
+ * rarement plus d'une facture par minute et par personne. La décision de
+ * réessayer reste humaine : ce plafond borne un clic répété, pas l'activité.
+ */
+export const INVOICE_NORMALIZE_THROTTLE = { ttl: 3_600_000, limit: 60 } as const;

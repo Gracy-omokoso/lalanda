@@ -9,6 +9,13 @@ CTO Lalanda (contrat technique)
 > désormais `'CDF' | 'USD'` (au lieu de `'CDF'` seul) ; le prix d'un article s'entend dans
 > sa devise. (2) La décision ouverte n° 2 d'ADR-0022 (« prix en dollars ? ») est
 > **tranchée** par la décideuse (ci-dessous). Chantier E4 du présent ADR.
+>
+> **Amendé par [ADR-0024](ADR-0024-normalisation-dgi.md) (19 oct. 2026).** Ajouts aux
+> fichiers figés au jalon E0 : `normalization.port.ts` (phases et champs de
+> `InvoiceNormalizationState`), `invoice.contract.ts` (vue `NormalizationView`, trois
+> événements de journal, deux codes 409, `DgiExchangePage`) ; trois méthodes
+> d'`InvoiceNumberingService` (`holdLease`, `dropLease`, `abandon`). Aucun champ retiré,
+> aucun sens changé.
 
 ## Contexte
 

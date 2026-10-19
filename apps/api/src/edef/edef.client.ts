@@ -3,6 +3,9 @@
 // SEULEMENT `GET /api/info/status` et les sept listes `GET /api/info/*`. Aucun
 // appel à `/api/invoice` dans ce lot (émission : lot S25f).
 //
+// Amendé par ADR-0024 (jalon F0) : signatures des cinq routes de facturation
+// (§ 2). Leurs corps sont livrés par le chantier F1 ; d'ici là, elles lèvent.
+//
 // Règles de comportement :
 //  - le client NE LÈVE JAMAIS pour une défaillance distante : il renvoie un
 //    `EdefOutcome`. Il ne lève que pour une erreur de programmation ;
@@ -25,6 +28,15 @@ import {
   type DgiPlatformConfig,
 } from '../platform-config/dgi-platform.config.js';
 import { EdefExchangeJournal, prepareEdefJournalBody } from './edef-exchange.journal.js';
+import type {
+  EdefCancelled,
+  EdefInvoiceCallContext,
+  EdefInvoiceDetails,
+  EdefInvoiceRequest,
+  EdefInvoiceSubmitted,
+  EdefPendingRequests,
+  EdefSecurityElements,
+} from './edef-invoice.types.js';
 import {
   InfoStatusSchema,
   REFERENCE_LIST_SCHEMAS,
@@ -63,6 +75,40 @@ export class EdefClient {
     const schema = REFERENCE_LIST_SCHEMAS[list];
     if (!schema) throw new Error(`Liste e-MCF inconnue : ${String(list)}`);
     return this.get(`/api/info/${list}`, ctx, (json) => schema.safeParse(json));
+  }
+
+  // ── Routes de facturation — ADR-0024 § 2 (signatures F0, corps F1) ─────────
+
+  /** `POST /api/invoice`. Aucun réessai. */
+  submitInvoice(
+    body: EdefInvoiceRequest,
+    ctx: EdefInvoiceCallContext,
+  ): Promise<EdefOutcome<EdefInvoiceSubmitted>> {
+    throw new Error('F1');
+  }
+
+  /** `PUT /api/invoice/{uid}/confirm` avec NOS `total` et `vtotal`. Aucun réessai. */
+  confirmInvoice(
+    uid: string,
+    amounts: { total: number; vtotal: number },
+    ctx: EdefInvoiceCallContext,
+  ): Promise<EdefOutcome<EdefSecurityElements>> {
+    throw new Error('F1');
+  }
+
+  /** `PUT /api/invoice/{uid}/cancel`. Aucun réessai. */
+  cancelInvoice(uid: string, ctx: EdefInvoiceCallContext): Promise<EdefOutcome<EdefCancelled>> {
+    throw new Error('F1');
+  }
+
+  /** `GET /api/invoice` : demandes en attente de l'e-MCF. */
+  getPendingRequests(ctx: EdefCallContext): Promise<EdefOutcome<EdefPendingRequests>> {
+    throw new Error('F1');
+  }
+
+  /** `GET /api/invoice/{uid}`. */
+  getInvoiceDetails(uid: string, ctx: EdefCallContext): Promise<EdefOutcome<EdefInvoiceDetails>> {
+    throw new Error('F1');
   }
 
   private async get<T>(
