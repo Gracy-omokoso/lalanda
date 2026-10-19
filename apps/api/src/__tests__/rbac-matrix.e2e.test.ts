@@ -110,14 +110,6 @@ const ACTIONS_SANS_ROUTE: Record<string, string> = {
     'Aucune route de modification de projet en S20a : `POST /projects/:id/drivers` ' +
     'relève de `inputs.update`, et il n’existe ni `PATCH /projects/:id` ni ' +
     'renommage. L’action est déclarée par docs/12 et attend son endpoint.',
-  'sales.read':
-    'Déclarée par le jalon D0 d’ADR-0022 (contrats seulement) : les routes ' +
-    '`/sales/…` arrivent avec le chantier D1 (`sales/`), qui retirera cette ligne ' +
-    'et écrira la sonde.',
-  'sales.manage':
-    'Déclarée par le jalon D0 d’ADR-0022 (contrats seulement) : les routes ' +
-    'd’écriture `/sales/…` arrivent avec le chantier D1 (`sales/`), qui retirera ' +
-    'cette ligne et écrira la sonde.',
 };
 
 /** Une sonde HTTP : la route qui matérialise une action, et ses statuts légitimes. */
@@ -438,6 +430,25 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
       statutsAutorises: [200],
       envoyer: (c) =>
         request(serveur()).get('/organizations/current/fiscal-profile').set('Cookie', c),
+    },
+    {
+      // ADR-0022 § S25c.1 — tous les rôles sauf Conseiller et Chef de projet.
+      action: 'sales.read',
+      libelle: 'GET /sales/customers',
+      statutsAutorises: [200],
+      envoyer: (c) => request(serveur()).get('/sales/customers').set('Cookie', c),
+    },
+    {
+      // ADR-0022 § S25c.1 — Propriétaire, Administrateur, Directeur financier,
+      // Comptable. Un client PP sans NIF : aucun doublon possible entre rôles.
+      action: 'sales.manage',
+      libelle: 'POST /sales/customers',
+      statutsAutorises: [201],
+      envoyer: (c, role) =>
+        request(serveur())
+          .post('/sales/customers')
+          .set('Cookie', c)
+          .send({ type: 'PP', name: `Sonde ventes ${role} ${tag}` }),
     },
   ];
 

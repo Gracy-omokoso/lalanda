@@ -27,6 +27,7 @@ import { PlansModule } from './plans/plans.module.js';
 import { PlatformConfigModule } from './platform-config/platform-config.module.js';
 import { ProjectsModule } from './projects/projects.module.js';
 import { ReportsModule } from './reports/reports.module.js';
+import { SalesModule } from './sales/sales.module.js';
 import { SchedulerModule } from './scheduler/scheduler.module.js';
 import { ThrottlingModule } from './security/throttling.module.js';
 import { StorageModule } from './storage/storage.module.js';
@@ -99,6 +100,8 @@ import { StorageModule } from './storage/storage.module.js';
     // ADR-0021 — client e-MCF, puis identité fiscale et facture normalisée.
     EdefModule,
     FiscalModule,
+    // ADR-0022 — clients et catalogue (lot S25c).
+    SalesModule,
   ],
   controllers: [HealthController, EvaluateController],
 })

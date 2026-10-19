@@ -45,6 +45,9 @@ import { PaymentsController } from '../payments/payments.controller.js';
 import { PlansController } from '../plans/plans.controller.js';
 import { ProjectsController } from '../projects/projects.controller.js';
 import { ReportsController } from '../reports/reports.controller.js';
+import { CatalogItemsController } from '../sales/catalog-items.controller.js';
+import { CustomersController } from '../sales/customers.controller.js';
+import { TaxGroupsController } from '../sales/tax-groups.controller.js';
 import { AuditController } from './audit.controller.js';
 import { REQUIRED_PERMISSIONS_KEY, REQUIRED_PLATFORM_ROLES_KEY } from './authz.decorators.js';
 import { MeController } from './me.controller.js';
@@ -88,6 +91,10 @@ const CONTROLEURS = [
   ProjectsController,
   ReportsController,
   SessionReauthController,
+  // ADR-0022 — clients et catalogue (S25c).
+  CustomersController,
+  CatalogItemsController,
+  TaxGroupsController,
 ];
 
 /**
@@ -370,6 +377,22 @@ describe('couverture des routes par le RBAC', () => {
       'NormalizedInvoicingController.testPointOfSale': ['fiscal.manage'],
       'NormalizedInvoicingController.disablePointOfSale': ['fiscal.manage'],
       'NormalizedInvoicingController.referenceDataOf': ['fiscal.manage'],
+      // ── Clients et catalogue (ADR-0022 § S25c.5) ──────────────────────────
+      'CustomersController.list': ['sales.read'],
+      'CustomersController.get': ['sales.read'],
+      'CustomersController.create': ['sales.manage'],
+      'CustomersController.put': ['sales.manage'],
+      'CustomersController.deactivate': ['sales.manage'],
+      'CustomersController.reactivate': ['sales.manage'],
+      'CustomersController.remove': ['sales.manage'],
+      'CatalogItemsController.list': ['sales.read'],
+      'CatalogItemsController.get': ['sales.read'],
+      'CatalogItemsController.create': ['sales.manage'],
+      'CatalogItemsController.put': ['sales.manage'],
+      'CatalogItemsController.deactivate': ['sales.manage'],
+      'CatalogItemsController.reactivate': ['sales.manage'],
+      'CatalogItemsController.remove': ['sales.manage'],
+      'TaxGroupsController.list': ['sales.read'],
     };
     for (const [cle, actions] of Object.entries(attendu)) {
       const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle);
