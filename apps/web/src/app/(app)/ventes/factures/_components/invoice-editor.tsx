@@ -145,6 +145,7 @@ function ChoixClient({
   return (
     <fieldset
       className="flex flex-col gap-3"
+      disabled={desactive}
       aria-describedby={erreur ? 'client-erreur' : undefined}
     >
       <legend className="mb-1 text-sm font-semibold">Client</legend>
