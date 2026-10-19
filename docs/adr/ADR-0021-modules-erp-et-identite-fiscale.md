@@ -4,6 +4,12 @@ Statut : Proposed
 Date : 2026-10-18
 Décideurs : Gracy Omokoso (décisions produit du 18 oct. 2026) ; CTO Lalanda (contrat technique)
 
+> **Amendé par [ADR-0024](ADR-0024-normalisation-dgi.md) (19 oct. 2026).** Le journal
+> `edef_exchanges` passe en version 2 (entrées `request` et `response` liées par `exchangeId`,
+> écriture stricte avant tout envoi de facture) ; un point de vente qui porte une
+> normalisation non soldée ne se désactive plus ; la production DGI ne s'ouvre qu'avec un
+> étalonnage des arrondis enregistré. Ajouts seulement.
+
 
 > **Amendement du 18 oct. 2026 (décideuse).** Lalanda n'est pas un ERP à modules
 > activables « à la Dolibarr » : l'exemple ne servait qu'à dire que chaque entreprise
