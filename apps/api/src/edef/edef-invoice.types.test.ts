@@ -48,9 +48,7 @@ describe('EdefSecurityElementsSchema', () => {
     expect(EdefSecurityElementsSchema.safeParse({ ...SECURITY, codeDEFDGI: '' }).success).toBe(
       false,
     );
-    expect(EdefSecurityElementsSchema.safeParse({ ...SECURITY, qrCode: null }).success).toBe(
-      false,
-    );
+    expect(EdefSecurityElementsSchema.safeParse({ ...SECURITY, qrCode: null }).success).toBe(false);
   });
 });
 
@@ -60,8 +58,7 @@ describe('EdefInvoiceDetailsSchema', () => {
       null,
     );
     expect(
-      EdefInvoiceDetailsSchema.parse({ rn: 'R', secElements: { ...SECURITY, nim: null } })
-        .security,
+      EdefInvoiceDetailsSchema.parse({ rn: 'R', secElements: { ...SECURITY, nim: null } }).security,
     ).toBe(null);
   });
 
@@ -107,9 +104,7 @@ describe('EdefInvoiceRequestSchema', () => {
     mode: 'ttc',
     isf: 'TEST-01',
     type: 'FV',
-    items: [
-      { code: null, name: 'Article', type: 'BIE', price: 1160, quantity: 1, taxGroup: 'B' },
-    ],
+    items: [{ code: null, name: 'Article', type: 'BIE', price: 1160, quantity: 1, taxGroup: 'B' }],
     client: { type: 'PP' },
     operator: { name: 'Caisse 1' },
     payment: [{ name: 'ESPECES', amount: 1160 }],

@@ -176,9 +176,7 @@ export const EdefInvoiceRequestSchema: z.ZodType<EdefInvoiceRequest, z.ZodTypeDe
       })
       .strict(),
     operator: z.object({ name: z.string().min(1) }).strict(),
-    payment: z.array(
-      z.object({ name: z.enum(EDEF_PAYMENT_TYPES), amount: finiteNumber }).strict(),
-    ),
+    payment: z.array(z.object({ name: z.enum(EDEF_PAYMENT_TYPES), amount: finiteNumber }).strict()),
     reference: optionalText,
     referenceType: z.enum(EDEF_REFERENCE_TYPES).optional(),
     referenceDesc: optionalText,
