@@ -1535,26 +1535,10 @@ export type CatalogItemType = 'BIE' | 'SER' | 'TAX';
 export type CatalogPriceMode = 'ttc' | 'ht';
 /** Lettres des seize groupes de taxation en vigueur (A à P, ADR-0022). */
 export type TaxGroupLetter =
-  | 'A'
-  | 'B'
-  | 'C'
-  | 'D'
-  | 'E'
-  | 'F'
-  | 'G'
-  | 'H'
-  | 'I'
-  | 'J'
-  | 'K'
-  | 'L'
-  | 'M'
-  | 'N'
-  | 'O'
-  | 'P';
+  'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I' | 'J' | 'K' | 'L' | 'M' | 'N' | 'O' | 'P';
 
 export type CatalogSpecificTax =
-  | { kind: 'per_unit'; amount: string }
-  | { kind: 'percent'; rate: string };
+  { kind: 'per_unit'; amount: string } | { kind: 'percent'; rate: string };
 
 export interface CatalogItemView {
   id: string;
@@ -2256,15 +2240,13 @@ export const api = {
       body,
     }),
   deactivateCatalogItem: (itemId: string) =>
-    jsonRequest<CatalogItemView>(
-      `/sales/catalog-items/${encodeURIComponent(itemId)}/deactivate`,
-      { method: 'POST' },
-    ),
+    jsonRequest<CatalogItemView>(`/sales/catalog-items/${encodeURIComponent(itemId)}/deactivate`, {
+      method: 'POST',
+    }),
   reactivateCatalogItem: (itemId: string) =>
-    jsonRequest<CatalogItemView>(
-      `/sales/catalog-items/${encodeURIComponent(itemId)}/reactivate`,
-      { method: 'POST' },
-    ),
+    jsonRequest<CatalogItemView>(`/sales/catalog-items/${encodeURIComponent(itemId)}/reactivate`, {
+      method: 'POST',
+    }),
   /** 204 ; `409 CATALOG_ITEM_ALREADY_INVOICED` si l'article a déjà été facturé. */
   deleteCatalogItem: (itemId: string) =>
     jsonRequest<void>(`/sales/catalog-items/${encodeURIComponent(itemId)}`, {
