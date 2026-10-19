@@ -20,9 +20,10 @@ const OPERATEUR = { canReadAdmin: true };
 const MEMBRE = { canReadAdmin: false };
 
 describe('contenu et ordre du menu (ADR-0016 §1)', () => {
-  it('liste les six entrées dans l’ordre exact, pour un opérateur', () => {
+  it('liste les sept entrées dans l’ordre exact, pour un opérateur', () => {
     expect(entreesMenu(OPERATEUR).map((e) => e.label)).toEqual([
       'Tableau de bord',
+      'Ventes',
       'Mon compte',
       'Organisation',
       'Abonnement',
@@ -68,6 +69,7 @@ describe('conditionnement par le drapeau serveur (ADR-0016 §5)', () => {
     expect(membre).not.toContain('Administration');
     expect(membre).toEqual([
       'Tableau de bord',
+      'Ventes',
       'Mon compte',
       'Organisation',
       'Abonnement',
@@ -75,7 +77,7 @@ describe('conditionnement par le drapeau serveur (ADR-0016 §5)', () => {
     ]);
   });
 
-  it('n’a qu’UNE seule entrée conditionnée — les cinq autres sont invariantes', () => {
+  it('n’a qu’UNE seule entrée conditionnée — les six autres sont invariantes', () => {
     const avec = entreesMenu(OPERATEUR).map((e) => e.id);
     const sans = entreesMenu(MEMBRE).map((e) => e.id);
     expect(avec.filter((id) => !sans.includes(id))).toEqual(['admin']);
@@ -94,19 +96,35 @@ describe('conditionnement par le drapeau serveur (ADR-0016 §5)', () => {
   });
 });
 
+describe('entrée « Ventes » (ADR-0022, amende ADR-0016 §1)', () => {
+  it('suit immédiatement « Tableau de bord » et mène sur /ventes', () => {
+    const items = entreesMenu(MEMBRE);
+    const i = items.findIndex((e) => e.id === 'ventes');
+    expect(items[i - 1]?.id).toBe('tableau-de-bord');
+    expect(items[i]).toMatchObject({ kind: 'link', href: '/ventes', label: 'Ventes', group: 1 });
+  });
+
+  it('est offerte à tout membre : aucun fait serveur ne la conditionne', () => {
+    // Même règle qu'« Organisation » : la conditionner sur `sales.read`
+    // demanderait un appel de plus ; l'espace filtre lui-même ce qu'il montre.
+    expect(entreesMenu(MEMBRE).some((e) => e.id === 'ventes')).toBe(true);
+    expect(entreesMenu(OPERATEUR).some((e) => e.id === 'ventes')).toBe(true);
+  });
+});
+
 describe('groupes et séparateurs', () => {
   it('sépare personne / organisation / déconnexion, pour un opérateur', () => {
     const items = entreesMenu(OPERATEUR);
     const avant = items.map((_, i) => separateurAvant(items, i));
-    //           TdB    Compte  Orga   Abo    Admin  Déco
-    expect(avant).toEqual([false, false, true, false, false, true]);
+    //           TdB    Ventes Compte  Orga   Abo    Admin  Déco
+    expect(avant).toEqual([false, false, false, true, false, false, true]);
   });
 
   it('ne laisse AUCUN séparateur orphelin quand « Administration » disparaît', () => {
     const items = entreesMenu(MEMBRE);
     const avant = items.map((_, i) => separateurAvant(items, i));
-    //           TdB    Compte  Orga   Abo    Déco
-    expect(avant).toEqual([false, false, true, false, true]);
+    //           TdB    Ventes Compte  Orga   Abo    Déco
+    expect(avant).toEqual([false, false, false, true, false, true]);
     // Deux séparateurs dans les deux cas : le dessin ne dépend pas d'un index
     // codé en dur, donc retirer une entrée ne peut pas produire un trait seul.
     expect(avant.filter(Boolean)).toHaveLength(2);
@@ -126,6 +144,7 @@ describe('entrée active déduite du chemin (ADR-0016 §6.3)', () => {
     expect(entreeActive('/organisation', items)).toBe('organisation');
     expect(entreeActive('/souscription', items)).toBe('souscription');
     expect(entreeActive('/admin', items)).toBe('admin');
+    expect(entreeActive('/ventes', items)).toBe('ventes');
   });
 
   it('allume l’entrée de l’espace depuis n’importe quelle sous-page', () => {
@@ -135,6 +154,8 @@ describe('entrée active déduite du chemin (ADR-0016 §6.3)', () => {
     expect(entreeActive('/organisation/membres', items)).toBe('organisation');
     expect(entreeActive('/organisation/journal/2026', items)).toBe('organisation');
     expect(entreeActive('/projects/abc/plan', items)).toBe('tableau-de-bord');
+    expect(entreeActive('/ventes/clients', items)).toBe('ventes');
+    expect(entreeActive('/ventes/catalogue', items)).toBe('ventes');
   });
 
   it('compare des frontières de segment, jamais des préfixes nus', () => {
@@ -142,6 +163,7 @@ describe('entrée active déduite du chemin (ADR-0016 §6.3)', () => {
     expect(entreeActive('/comptes-annuels', items)).toBeNull();
     expect(entreeActive('/administration-fiscale', items)).toBeNull();
     expect(entreeActive('/projectsomething', items)).toBeNull();
+    expect(entreeActive('/ventes-privees', items)).toBeNull();
   });
 
   it('n’allume rien sur une page hors du menu', () => {

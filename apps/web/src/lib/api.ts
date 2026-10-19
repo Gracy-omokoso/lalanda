@@ -572,6 +572,9 @@ async function jsonRequest<T>(path: string, init: JsonRequestInit = {}): Promise
     err.detail = detail;
     throw err;
   }
+  // `204 No Content` (suppressions des ventes, ADR-0022 § S25c.5) : aucun corps
+  // à lire — `res.json()` lèverait sur une réponse vide.
+  if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
 
@@ -751,7 +754,7 @@ export interface TermsAcceptanceView {
 
 export type DisplayCurrency = 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR';
 
-/** Les 16 actions granulaires (docs/12, ADR-0021 §8). Union fermée, alignée sur l'API. */
+/** Les 18 actions granulaires (docs/12, ADR-0021 §8, ADR-0022 § S25c.1). Union fermée, alignée sur l'API. */
 export type OrgAction =
   | 'organization.manage'
   | 'billing.manage'
@@ -770,7 +773,13 @@ export type OrgAction =
   | 'audit.read'
   // ADR-0021 §8 — identité fiscale et facture normalisée. Propriétaire et
   // Directeur financier seulement ; interdite à tout rôle plateforme.
-  | 'fiscal.manage';
+  | 'fiscal.manage'
+  // ADR-0022 § S25c.1 — clients et catalogue. Consulter (Analyste et Lecteur
+  // compris) et gérer (Propriétaire, Administrateur, Directeur financier,
+  // Comptable). La matrice vit côté API ; l'interface ne fait que lire
+  // `GET /me/permissions`.
+  | 'sales.read'
+  | 'sales.manage';
 
 /**
  * Offres — RÉEXPORTÉES du catalogue partagé, jamais réécrites.
@@ -1455,6 +1464,183 @@ function ligneMinimale(l: LineResult): Omit<LineResult, 'formulaSource'> {
   };
 }
 
+// ─── Ventes : clients et catalogue (S25c — ADR-0022 § S25c.5) ──────────────
+//
+// Contrat HTTP de l'ADR-0022, recopié tel quel. Deux règles le gouvernent :
+//
+// - Les MONTANTS sont des chaînes décimales dans les deux sens (`"464.00"`) :
+//   un `number` JSON est refusé par l'API (`DECIMAL_MUST_BE_STRING`). Aucun de
+//   ces types ne porte un montant en `number`, et l'interface n'en calcule
+//   aucun (docs/26).
+// - Le TAUX d'un groupe de taxation vient de l'instantané DGI de
+//   l'organisation, jamais du code (ADR-0019) ; il vaut `null` quand l'API sert
+//   sa liste par défaut.
+
+/** Les cinq types de client de la DGI (`ClientTypeEnum` de la spécification e-DEF). */
+export type CustomerType = 'PP' | 'PM' | 'PC' | 'PL' | 'AO';
+
+/** Filtre d'état des listes : actifs par défaut. */
+export type SalesStatusFilter = 'active' | 'inactive' | 'all';
+
+export interface CustomerView {
+  id: string;
+  type: CustomerType;
+  typeLabel: string;
+  name: string;
+  nif: string | null;
+  exemptionReference: string | null;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  active: boolean;
+  deactivatedAt: string | null;
+  /** Déjà facturé : la suppression est refusée, seule la désactivation reste. */
+  invoiced: boolean;
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CustomerPage {
+  items: CustomerView[];
+  /** `null` = dernière page. Opaque : se renvoie tel quel. */
+  nextCursor: string | null;
+}
+
+/** Corps de `POST /sales/customers`. Le NIF part tel que saisi : l'API le normalise. */
+export interface CustomerBody {
+  type: CustomerType;
+  name: string;
+  nif: string | null;
+  exemptionReference: string | null;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+}
+
+/** Corps COMPLET de `PUT /sales/customers/:id`, avec la révision attendue. */
+export interface CustomerUpdateBody extends CustomerBody {
+  expectedRevision: number;
+}
+
+export interface CustomerListQuery {
+  q?: string;
+  type?: CustomerType;
+  status?: SalesStatusFilter;
+  limit?: number;
+  cursor?: string;
+}
+
+export type CatalogItemType = 'BIE' | 'SER' | 'TAX';
+export type CatalogPriceMode = 'ttc' | 'ht';
+/** Lettres des seize groupes de taxation en vigueur (A à P, ADR-0022). */
+export type TaxGroupLetter =
+  | 'A'
+  | 'B'
+  | 'C'
+  | 'D'
+  | 'E'
+  | 'F'
+  | 'G'
+  | 'H'
+  | 'I'
+  | 'J'
+  | 'K'
+  | 'L'
+  | 'M'
+  | 'N'
+  | 'O'
+  | 'P';
+
+export type CatalogSpecificTax =
+  | { kind: 'per_unit'; amount: string }
+  | { kind: 'percent'; rate: string };
+
+export interface CatalogItemView {
+  id: string;
+  code: string | null;
+  /** Code transmis à la DGI : « HORS CHAMP » pour une opération hors champ. Calculé par l'API. */
+  edefCode: string | null;
+  name: string;
+  itemType: CatalogItemType;
+  taxGroup: TaxGroupLetter;
+  /** `false` : le groupe n'est plus proposé — il faut en changer pour modifier l'article. */
+  taxGroupAvailable: boolean;
+  outOfScope: boolean;
+  /** Décimal canonique à deux décimales (`"464.00"`). */
+  unitPrice: string;
+  priceMode: CatalogPriceMode;
+  currency: 'CDF';
+  unit: string;
+  specificTax: CatalogSpecificTax | null;
+  active: boolean;
+  deactivatedAt: string | null;
+  invoiced: boolean;
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CatalogItemPage {
+  items: CatalogItemView[];
+  nextCursor: string | null;
+}
+
+export interface CatalogItemBody {
+  code: string | null;
+  name: string;
+  itemType: CatalogItemType;
+  taxGroup: TaxGroupLetter;
+  outOfScope: boolean;
+  /** Chaîne décimale, point comme séparateur (`"1234.5"`) ; l'API la canonicalise. */
+  unitPrice: string;
+  priceMode: CatalogPriceMode;
+  currency: 'CDF';
+  unit: string;
+  specificTax: CatalogSpecificTax | null;
+}
+
+export interface CatalogItemUpdateBody extends CatalogItemBody {
+  expectedRevision: number;
+}
+
+export interface CatalogItemListQuery {
+  q?: string;
+  taxGroup?: TaxGroupLetter;
+  itemType?: CatalogItemType;
+  status?: SalesStatusFilter;
+  limit?: number;
+  cursor?: string;
+}
+
+export interface TaxGroupOption {
+  letter: TaxGroupLetter;
+  label: string;
+  /** Taux en pour cent, en chaîne (`"16"`, `"16.5"`). `null` quand `source = "default"`. */
+  ratePercent: string | null;
+  itemTypes: CatalogItemType[];
+  outOfScopeAllowed: boolean;
+}
+
+export interface TaxGroupList {
+  source: 'dgi_snapshot' | 'default';
+  environment: EdefEnvironment;
+  fetchedAt: string | null;
+  sha256: string | null;
+  groups: TaxGroupOption[];
+}
+
+/** Chaîne de requête d'une liste des ventes. Les champs absents ou vides ne partent pas. */
+export function salesQuery(params: object): string {
+  const search = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v === undefined || v === null || v === '') continue;
+    search.set(k, String(v));
+  }
+  const q = search.toString();
+  return q ? `?${q}` : '';
+}
+
 export const api = {
   /**
    * Enregistre l'accord de l'utilisateur connecté.
@@ -2024,6 +2210,68 @@ export const api = {
       `/organizations/current/normalized-invoicing/points-of-sale/${encodeURIComponent(posId)}/reference-data`,
       { method: 'GET' },
     ),
+
+  // ─── Ventes : clients et catalogue (S25c — ADR-0022 § S25c.5) ─────────────
+  // Scopées par l'organisation ACTIVE (cookie) : aucun identifiant
+  // d'organisation ne part dans l'URL ni le corps. Une fiche d'une autre
+  // organisation répond 404.
+  listCustomers: (query: CustomerListQuery = {}) =>
+    jsonRequest<CustomerPage>(`/sales/customers${salesQuery(query)}`, { method: 'GET' }),
+  getCustomer: (customerId: string) =>
+    jsonRequest<CustomerView>(`/sales/customers/${encodeURIComponent(customerId)}`, {
+      method: 'GET',
+    }),
+  createCustomer: (body: CustomerBody) =>
+    jsonRequest<CustomerView>(`/sales/customers`, { method: 'POST', body }),
+  updateCustomer: (customerId: string, body: CustomerUpdateBody) =>
+    jsonRequest<CustomerView>(`/sales/customers/${encodeURIComponent(customerId)}`, {
+      method: 'PUT',
+      body,
+    }),
+  deactivateCustomer: (customerId: string) =>
+    jsonRequest<CustomerView>(`/sales/customers/${encodeURIComponent(customerId)}/deactivate`, {
+      method: 'POST',
+    }),
+  reactivateCustomer: (customerId: string) =>
+    jsonRequest<CustomerView>(`/sales/customers/${encodeURIComponent(customerId)}/reactivate`, {
+      method: 'POST',
+    }),
+  /** 204 ; `409 CUSTOMER_ALREADY_INVOICED` si le client a déjà été facturé. */
+  deleteCustomer: (customerId: string) =>
+    jsonRequest<void>(`/sales/customers/${encodeURIComponent(customerId)}`, {
+      method: 'DELETE',
+    }),
+
+  listCatalogItems: (query: CatalogItemListQuery = {}) =>
+    jsonRequest<CatalogItemPage>(`/sales/catalog-items${salesQuery(query)}`, { method: 'GET' }),
+  getCatalogItem: (itemId: string) =>
+    jsonRequest<CatalogItemView>(`/sales/catalog-items/${encodeURIComponent(itemId)}`, {
+      method: 'GET',
+    }),
+  createCatalogItem: (body: CatalogItemBody) =>
+    jsonRequest<CatalogItemView>(`/sales/catalog-items`, { method: 'POST', body }),
+  updateCatalogItem: (itemId: string, body: CatalogItemUpdateBody) =>
+    jsonRequest<CatalogItemView>(`/sales/catalog-items/${encodeURIComponent(itemId)}`, {
+      method: 'PUT',
+      body,
+    }),
+  deactivateCatalogItem: (itemId: string) =>
+    jsonRequest<CatalogItemView>(
+      `/sales/catalog-items/${encodeURIComponent(itemId)}/deactivate`,
+      { method: 'POST' },
+    ),
+  reactivateCatalogItem: (itemId: string) =>
+    jsonRequest<CatalogItemView>(
+      `/sales/catalog-items/${encodeURIComponent(itemId)}/reactivate`,
+      { method: 'POST' },
+    ),
+  /** 204 ; `409 CATALOG_ITEM_ALREADY_INVOICED` si l'article a déjà été facturé. */
+  deleteCatalogItem: (itemId: string) =>
+    jsonRequest<void>(`/sales/catalog-items/${encodeURIComponent(itemId)}`, {
+      method: 'DELETE',
+    }),
+
+  getTaxGroups: () => jsonRequest<TaxGroupList>(`/sales/tax-groups`, { method: 'GET' }),
 
   // ─── Interprétations et chat Lala (S24a) ───────────────────
   // Les LIGNES DU MOTEUR sont transmises telles quelles : elles servent à la fois

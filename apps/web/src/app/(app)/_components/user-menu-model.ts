@@ -53,12 +53,13 @@ export interface UserMenuFacts {
 }
 
 /**
- * Les six entrées du menu, dans l'ordre exact de l'ADR-0016 §1.
+ * Les sept entrées du menu, dans l'ordre exact de l'ADR-0016 §1 amendé par
+ * l'ADR-0022 (entrée « Ventes »).
  *
- * Deux groupes : le premier est ce qui appartient à la PERSONNE, le second ce
- * qui appartient à l'organisation et à la plateforme. La déconnexion est seule
- * dans un troisième, parce qu'une action destructive de session ne doit pas
- * border un lien qu'on visait.
+ * Deux groupes : le premier est ce qui appartient à la PERSONNE et à son
+ * travail quotidien, le second ce qui appartient à l'organisation et à la
+ * plateforme. La déconnexion est seule dans un troisième, parce qu'une action
+ * destructive de session ne doit pas border un lien qu'on visait.
  *
  * « Membres » n'y figure pas volontairement : c'est un onglet de `/organisation`
  * (ADR-0016 §3). L'entrée « Organisation » est la porte, et ce qu'il y a
@@ -72,6 +73,20 @@ const ITEMS: readonly UserMenuItem[] = [
     href: '/projects',
     label: 'Tableau de bord',
     hint: 'Vos projets et leur avancement',
+    group: 1,
+  },
+  // ADR-0022 (amende ADR-0016 §1) — l'espace Ventes, juste après le tableau de
+  // bord : c'est un outil de travail quotidien, pas un réglage. Offert à TOUT
+  // membre, même règle qu'« Organisation » : le conditionner sur `sales.read`
+  // exigerait un appel de plus au titre de la visibilité. Ce qu'il y a derrière
+  // est filtré par les permissions réelles, dans l'espace lui-même, et un rôle
+  // sans `sales.read` y lit un refus explicite.
+  {
+    kind: 'link',
+    id: 'ventes',
+    href: '/ventes',
+    label: 'Ventes',
+    hint: 'Clients et catalogue',
     group: 1,
   },
   {
@@ -116,7 +131,7 @@ const ITEMS: readonly UserMenuItem[] = [
  * Table séparée, et non un champ de plus sur chaque entrée : elle rend visible
  * en une ligne le point le plus important de l'ADR-0016 §5 — UNE SEULE entrée
  * est conditionnée. Le jour où cette table grossit, c'est une décision, pas un
- * détail noyé dans six objets.
+ * détail noyé dans sept objets.
  */
 const CONDITIONS: Readonly<Record<string, keyof UserMenuFacts>> = { admin: 'canReadAdmin' };
 
