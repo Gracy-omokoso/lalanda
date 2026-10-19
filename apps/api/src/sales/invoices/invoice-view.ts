@@ -9,17 +9,22 @@
 import type { PaymentInput, PaymentMethod } from '@lalanda/engine';
 
 import { CUSTOMER_TYPE_LABELS } from '../sales.dto.js';
-import type {
-  DocumentKind,
-  InvoiceCreditNoteSummary,
-  InvoiceLineView,
-  InvoiceReadiness,
-  InvoiceStatus,
-  InvoiceSummary,
-  InvoiceType,
-  InvoiceView,
+import {
+  NORMALIZATION_ERROR_CATEGORIES,
+  type DocumentKind,
+  type InvoiceCreditNoteSummary,
+  type InvoiceLineView,
+  type InvoiceReadiness,
+  type InvoiceStatus,
+  type InvoiceSummary,
+  type InvoiceType,
+  type InvoiceView,
+  type NormalizationErrorCategory,
+  type NormalizationView,
+  type NormalizationViewPhase,
 } from './invoice.contract.js';
 import type { InvoiceLean } from './invoice.types.js';
+import type { InvoiceNormalizationState, NormalizationPhase } from './normalization.port.js';
 
 export const PROFORMA_LABEL = 'Pro forma — non valable comme facture';
 export const NORMALIZED_AMOUNTS_LABEL = 'Montants normalisés (CDF) — font foi';
@@ -56,6 +61,63 @@ function documentLabelOf(doc: InvoiceLean): string {
 
 const iso = (d: Date | string | null | undefined): string | null =>
   d === null || d === undefined ? null : new Date(d).toISOString();
+
+// ── Vue `normalization` — ADR-0024 § 9.2 ─────────────────────────────────────
+//
+// PROVISOIRE (jalon F0) : projection directe du sous-document, pour que la vue
+// respecte le contrat dès F0. Le chantier F2 calcule `nextCheckAt` et
+// `actions` selon la phase ET les permissions de la personne ; d'ici là,
+// aucune action n'est proposée par ce bloc.
+
+const IN_PROGRESS_PHASES: ReadonlySet<NormalizationPhase> = new Set([
+  'submitting',
+  'comparing',
+  'cancelling',
+  'confirming',
+]);
+
+function normalizationViewPhase(phase: NormalizationPhase | undefined): NormalizationViewPhase {
+  // Un document gelé avant S25f n'a pas de `phase` : il se lit `queued` (ADR-0024 § 10).
+  if (phase === undefined) return 'queued';
+  return IN_PROGRESS_PHASES.has(phase) ? 'in_progress' : (phase as NormalizationViewPhase);
+}
+
+function errorCategory(category: string | undefined): NormalizationErrorCategory | null {
+  return (NORMALIZATION_ERROR_CATEGORIES as readonly string[]).includes(category ?? '')
+    ? (category as NormalizationErrorCategory)
+    : null;
+}
+
+function normalizationViewOf(n: InvoiceNormalizationState): NormalizationView {
+  const phase = normalizationViewPhase(n.phase as NormalizationPhase | undefined);
+  return {
+    attempts: n.attempts,
+    reservedNumber: n.reservedNumber,
+    codeDefDgi: n.codeDefDgi,
+    nim: n.nim,
+    counters: n.counters,
+    dgiDateTime: n.dgiDateTime,
+    qrCode: n.qrCode,
+    lastError: n.lastError
+      ? {
+          code: n.lastError.code,
+          category: errorCategory(n.lastError.category),
+          message: n.lastError.message,
+          dgiErrorCode: n.lastError.dgiErrorCode ?? null,
+          dgiMessage: n.lastError.dgiMessage ?? null,
+          retryable: n.lastError.retryable ?? false,
+        }
+      : null,
+    normalizedAt: iso(n.normalizedAt),
+    phase,
+    dgiRequestId: n.uid,
+    differences: n.differences ?? null,
+    nextCheckAt:
+      phase === 'uncertain' || phase === 'needs_review' ? iso(n.reconcileAfter ?? null) : null,
+    review: n.review ? { since: iso(n.review.since) ?? '', reason: n.review.reason } : null,
+    actions: { retry: false, check: false, declareNotNormalized: false, backToDraft: false },
+  };
+}
 
 export interface InvoiceViewContext {
   readiness: InvoiceReadiness;
@@ -170,19 +232,7 @@ export function invoiceView(doc: InvoiceLean, ctx: InvoiceViewContext): InvoiceV
     creditNotes: ctx.creditNotes,
     seller: doc.seller ?? null,
     operator: doc.operator ?? null,
-    normalization: n
-      ? {
-          attempts: n.attempts,
-          reservedNumber: n.reservedNumber,
-          codeDefDgi: n.codeDefDgi,
-          nim: n.nim,
-          counters: n.counters,
-          dgiDateTime: n.dgiDateTime,
-          qrCode: n.qrCode,
-          lastError: n.lastError,
-          normalizedAt: iso(n.normalizedAt),
-        }
-      : null,
+    normalization: n ? normalizationViewOf(n) : null,
     readiness: ctx.readiness,
     revision: doc.revision,
     createdAt: iso(doc.createdAt) ?? '',
