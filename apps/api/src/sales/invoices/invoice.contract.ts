@@ -381,6 +381,9 @@ export interface InvoiceView {
   typeLabel: string;
   currency: DocumentCurrency;
   priceMode: PriceMode;
+  /** Document en CDF : contre-valeur USD demandée (relue à la réouverture d'un brouillon).
+   *  Ajout pur au contrat (chantier E2, à la demande d'E3). */
+  showUsdCounterValue: boolean;
   emissionMode: EmissionMode | null;
   environment: DgiEnvironment | null;
   isf: string | null;

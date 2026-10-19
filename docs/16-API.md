@@ -301,6 +301,26 @@ POST   /admin/reauth                             ouverture de la fenêtre — su
 
 **Codes d’erreur propres à cet espace** : `400 UNKNOWN_FIELD`, `400 UNKNOWN_PROVIDER`, `400 UNKNOWN_ROLE`, `400 UNKNOWN_PLAN`, `400 SELF_DEMOTION_FORBIDDEN`, `400 SELF_DISABLE_FORBIDDEN`, `401 REAUTH_REQUIRED`, `422 INTEGRATION_TEST_FAILED`, `503 VAULT_UNAVAILABLE`, `503 SECRET_KEY_UNAVAILABLE`.
 
+## Ventes — documents de vente et journal — implémenté (S25e, ADR-0023)
+
+Contrat complet : ADR-0023 § S25e.14 et `apps/api/src/sales/invoices/invoice.contract.ts`. Toutes les routes exigent l'organisation active ; un document d'une autre organisation répond `404`.
+
+| Méthode et chemin | Permission |
+|---|---|
+| `GET /sales/invoices` · `GET /sales/invoices/:id` | `sales.read` |
+| `POST /sales/invoices` · `PUT` · `DELETE /sales/invoices/:id` (brouillon) | `sales.manage` |
+| `POST /sales/invoices/:id/credit-notes` · `POST …/back-to-draft` | `sales.manage` |
+| `POST /sales/invoices/:id/issue` (ordinaire) · `POST …/normalize` (normalisé) | `sales.invoice` |
+| `GET /sales/journal` · `GET /sales/exchange-rate-reference` | `sales.read` |
+
+**Pro forma d'abord.** Un brouillon porte une référence `PF-AAAA-NNNNNN`, jamais un numéro de facture ; `documentKind` vaut `invoice` seulement pour `issued` et `normalized`. Dans une organisation en facture normalisée, « Normaliser » convertit en CDF (taux officiel DGI du dernier instantané, ±1 % si un autre taux est saisi) et laisse le document `pending_normalization` jusqu'à S25f.
+
+**Numérotation.** Série réelle `AAAA-NNNNNN` par organisation et année civile (Kinshasa), série `TEST-` pour l'environnement de test DGI ; compteur incrémenté dans la transaction du gel, sans trou ni doublon sous concurrence.
+
+**Calculs.** Totaux, paiements, conversion, contre-valeur USD et contrôles d'avoir viennent du moteur `invoice-totals` ; l'API n'en refait aucun.
+
+**Écarts au contrat signalés** : un article dont la devise diffère du document, sans prix saisi, est refusé à l'enregistrement (`400`, problème `CATALOG_CURRENCY_MISMATCH`) au lieu de devenir un bloquant ; `showUsdCounterValue` est renvoyé dans la vue (ajout).
+
 ## Webhooks
 
 Paiements et intégrations utilisent signatures, tolérance temporelle, anti-rejeu, journal et traitement idempotent.

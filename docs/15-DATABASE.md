@@ -74,7 +74,8 @@ Un événement contient acteur, organisation, action, cible, horodatage, adresse
 - entrées par scénario/version/clé/période;
 - réalisé par projet/période/catégorie;
 - audit par organisation/date/action;
-- règles pays par pack/date d’effet/statut.
+- règles pays par pack/date d’effet/statut;
+- documents de vente (`sales_invoices`) : unicité partielle `organizationId + series + number`, unicité `organizationId + proformaRef`; compteurs (`sales_invoice_counters`) uniques par `organizationId + series + year`; journal électronique (`sales_invoice_journal`, ajout seul, chaîné par empreinte) unique par `organizationId + seq`, tête `sales_journal_heads` (ADR-0023).
 
 ## Rétention
 

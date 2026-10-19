@@ -110,10 +110,6 @@ const ACTIONS_SANS_ROUTE: Record<string, string> = {
     'Aucune route de modification de projet en S20a : `POST /projects/:id/drivers` ' +
     'relève de `inputs.update`, et il n’existe ni `PATCH /projects/:id` ni ' +
     'renommage. L’action est déclarée par docs/12 et attend son endpoint.',
-  'sales.invoice':
-    'Déclarée au jalon E0 d’ADR-0023 (contrat seulement) : les routes ' +
-    '`POST /sales/invoices/:id/issue` et `…/normalize` arrivent avec le chantier E2, ' +
-    'qui retirera cette ligne et écrira la sonde.',
 };
 
 /** Une sonde HTTP : la route qui matérialise une action, et ses statuts légitimes. */
@@ -453,6 +449,19 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
           .post('/sales/customers')
           .set('Cookie', c)
           .send({ type: 'PP', name: `Sonde ventes ${role} ${tag}` }),
+    },
+    {
+      // ADR-0023 § S25e.11 — Propriétaire, Directeur financier, Comptable. Un
+      // identifiant inconnu : un rôle autorisé franchit la garde et reçoit 404
+      // INVOICE_NOT_FOUND ; un rôle refusé reçoit 403 AVANT toute lecture.
+      action: 'sales.invoice',
+      libelle: 'POST /sales/invoices/:id/issue (document inconnu)',
+      statutsAutorises: [404],
+      envoyer: (c) =>
+        request(serveur())
+          .post('/sales/invoices/000000000000000000000000/issue')
+          .set('Cookie', c)
+          .send({ expectedRevision: 1 }),
     },
   ];
 
