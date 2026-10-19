@@ -31,7 +31,7 @@ import type {
   NormalizationUncertainStep,
   NormalizeNowOutcome,
 } from '../invoices/normalization.port.js';
-import { DgiCallLimiter } from './dgi-call-limiter.js';
+import { DgiCallGuard } from './dgi-call-guard.js';
 import { NORMALIZATION_CLAIM_MS, isOurRequest, outcomeOf } from './edef-normalizer.js';
 import {
   confirmDeadlineExceeded,
@@ -86,7 +86,7 @@ export class NormalizationReconciliationJob implements OnModuleInit {
     @Inject(NormalizationRecorder) private readonly recorder: NormalizationRecorder,
     @Inject(EdefClient) private readonly edef: EdefClient,
     @Inject(PointsOfSaleService) private readonly pointsOfSale: PointsOfSaleService,
-    @Inject(DgiCallLimiter) private readonly limiter: DgiCallLimiter,
+    @Inject(DgiCallGuard) private readonly guard: DgiCallGuard,
     @Inject(SchedulerService) private readonly scheduler: SchedulerService,
     @Inject(DGI_PLATFORM_CONFIG) private readonly config: DgiPlatformConfig,
   ) {}
@@ -171,7 +171,7 @@ export class NormalizationReconciliationJob implements OnModuleInit {
     const from = [n.phase];
     const uid = n.uid ?? null;
     if (uid === null) return this.checkPending(ref, doc, 'submit', ctx, now);
-    const details = await this.limiter.run(() => this.edef.getInvoiceDetails(uid, ctx));
+    const details = await this.guard.run(() => this.edef.getInvoiceDetails(uid, ctx));
     if (!details.ok) {
       if (details.error.kind === 'unauthorized') return this.tokenDead(ref, doc, now);
       return this.unreachable(ref, doc, 'confirm', now, details.error);
@@ -206,7 +206,7 @@ export class NormalizationReconciliationJob implements OnModuleInit {
     ctx: EdefCallContext,
     now: Date,
   ): Promise<NormalizeNowOutcome> {
-    const pending = await this.limiter.run(() => this.edef.getPendingRequests(ctx));
+    const pending = await this.guard.run(() => this.edef.getPendingRequests(ctx));
     if (!pending.ok) {
       if (pending.error.kind === 'unauthorized') return this.tokenDead(ref, doc, now);
       return this.unreachable(ref, doc, step, now, pending.error);
@@ -228,9 +228,9 @@ export class NormalizationReconciliationJob implements OnModuleInit {
     for (const p of list) {
       // Seulement ce que Lalanda reconnaît (O3) : même `rn`, même NIF, même contenu.
       if (n.uid && p.uid !== n.uid && list.some((q) => q.uid === n.uid)) continue;
-      const details = await this.limiter.run(() => this.edef.getInvoiceDetails(p.uid, ctx));
+      const details = await this.guard.run(() => this.edef.getInvoiceDetails(p.uid, ctx));
       if (!details.ok || !isOurRequest(doc, rn, details.data)) continue;
-      const cancelled = await this.limiter.run(() =>
+      const cancelled = await this.guard.run(() =>
         this.edef.cancelInvoice(p.uid, { ...ctx, invoiceId: ref.invoiceId, rn }),
       );
       if (!cancelled.ok) {
@@ -259,7 +259,7 @@ export class NormalizationReconciliationJob implements OnModuleInit {
     const n = doc.normalization!;
     if (ctx !== null && n.uid) {
       const uid = n.uid;
-      const details = await this.limiter.run(() => this.edef.getInvoiceDetails(uid, ctx));
+      const details = await this.guard.run(() => this.edef.getInvoiceDetails(uid, ctx));
       if (
         details.ok &&
         details.data.security &&

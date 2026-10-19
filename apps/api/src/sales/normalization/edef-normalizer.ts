@@ -24,10 +24,11 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AuditService } from '../../authz/audit.service.js';
 import type {
   EdefInvoiceCallContext,
+  EdefInvoiceRequest,
   EdefSecurityElements,
 } from '../../edef/edef-invoice.types.js';
 import { EdefReferenceSnapshotsService } from '../../edef/edef-reference-snapshots.service.js';
-import { EdefClient } from '../../edef/edef.client.js';
+import { EdefClient, EdefJournalWriteError } from '../../edef/edef.client.js';
 import type { EdefFailure, EdefTypeEntry } from '../../edef/edef.types.js';
 import { normalizeNif } from '../../fiscal/fiscal.dto.js';
 import { PointsOfSaleService } from '../../fiscal/points-of-sale.service.js';
@@ -42,8 +43,7 @@ import type {
   SalesInvoiceNormalizer,
 } from '../invoices/normalization.port.js';
 import type { Secret } from '../../integrations/secret-value.js';
-import { ALERT_CATEGORIES, categoryOfDgiCode } from './dgi-error-policy.js';
-import { DgiCallLimiter } from './dgi-call-limiter.js';
+import { DgiCallGuard } from './dgi-call-guard.js';
 import {
   compareSubmission,
   dgiTotalsAsStrings,
@@ -52,8 +52,11 @@ import {
 } from './edef-values.js';
 import {
   businessRefusal,
+  categoryOfDgiCode,
+  isPlatformAlert,
   confirmDeadlineExceeded,
   inProgressElsewhere,
+  journalUnavailable,
   noResponseError,
   precondition,
   tokenRejected,
@@ -115,7 +118,7 @@ export class EdefSalesInvoiceNormalizer implements SalesInvoiceNormalizer {
     @Inject(PointsOfSaleService) private readonly pointsOfSale: PointsOfSaleService,
     @Inject(EdefReferenceSnapshotsService)
     private readonly snapshots: EdefReferenceSnapshotsService,
-    @Inject(DgiCallLimiter) private readonly limiter: DgiCallLimiter,
+    @Inject(DgiCallGuard) private readonly guard: DgiCallGuard,
     @Inject(AuditService) private readonly audit: AuditService,
     @Inject(DGI_PLATFORM_CONFIG) private readonly config: DgiPlatformConfig,
   ) {}
@@ -146,7 +149,7 @@ export class EdefSalesInvoiceNormalizer implements SalesInvoiceNormalizer {
     // 2. Contrôles avant envoi — avant la prise en main : aucun numéro consommé.
     const pre = await this.preflight(doc);
     if ('error' in pre) {
-      if (ALERT_CATEGORIES.has(pre.error.category) || pre.error.code === 'ISF_NOT_CONFIGURED') {
+      if (isPlatformAlert(pre.error.category) || pre.error.code === 'ISF_NOT_CONFIGURED') {
         this.alert('EDEF_PRECONDITION', organizationId, invoiceId, { code: pre.error.code });
       }
       await this.recorder.failQueued(organizationId, invoiceId, pre.error, actor);
@@ -201,10 +204,18 @@ export class EdefSalesInvoiceNormalizer implements SalesInvoiceNormalizer {
       },
     };
 
+    try {
+      return await this.exchange(attempt, claim.request.body);
+    } catch (err) {
+      if (!(err instanceof EdefJournalWriteError)) throw err;
+      return this.afterJournalFailure(attempt);
+    }
+  }
+
+  /** Étapes 3 à 7 : envoi, comparaison, garde de délai, confirmation. */
+  private async exchange(attempt: Attempt, body: EdefInvoiceRequest): Promise<NormalizeNowOutcome> {
     // 3. Envoi.
-    const submitted = await this.limiter.run(() =>
-      this.edef.submitInvoice(claim.request.body, attempt.ctx),
-    );
+    const submitted = await this.guard.run(() => this.edef.submitInvoice(body, attempt.ctx));
     if (!submitted.ok) return this.afterSubmitFailure(attempt, submitted.error);
 
     // 4. Réponse du `POST` : `uid` + totaux, conservés tels que reçus.
@@ -243,6 +254,26 @@ export class EdefSalesInvoiceNormalizer implements SalesInvoiceNormalizer {
 
     // 7. Confirmation avec NOS montants.
     return this.confirm(attempt, uid, submittedAt);
+  }
+
+  /**
+   * Le journal strict n'a pas pu écrire l'entrée « requête » : RIEN n'est parti
+   * pour cet appel (ADR-0024 O4). Avant le `POST` : retour en `queued`, numéro
+   * rendu. Avant un `confirm` : aucune confirmation acceptée, la demande
+   * expirera — `uncertain(submit)`. Avant un `cancel` : `uncertain(cancel)`.
+   */
+  private async afterJournalFailure(attempt: Attempt): Promise<NormalizeNowOutcome> {
+    this.logger.error(
+      `ALERTE EDEF_JOURNAL_UNAVAILABLE : journal des échanges indisponible, document ${attempt.ref.invoiceId}.`,
+    );
+    const doc = await this.recorder.load(attempt.ref.organizationId, attempt.ref.invoiceId);
+    const phase = doc?.normalization?.phase;
+    const error = journalUnavailable();
+    if (phase === 'submitting') {
+      await this.recorder.backToQueued(attempt.ref, error, attempt.actor);
+      return this.reload(attempt);
+    }
+    return this.uncertain(attempt, phase === 'cancelling' ? 'cancel' : 'submit', error);
   }
 
   // ── Étapes ────────────────────────────────────────────────────────────────
@@ -346,8 +377,8 @@ export class EdefSalesInvoiceNormalizer implements SalesInvoiceNormalizer {
         if (category === 'server' || category === 'duplicate_pending' || category === 'state') {
           return this.uncertain(attempt, 'submit', noResponseError(failure));
         }
-        const error = businessRefusal(failure, category);
-        if (ALERT_CATEGORIES.has(category)) {
+        const error = businessRefusal(failure);
+        if (isPlatformAlert(category)) {
           this.alert('EDEF_REFUSED', attempt.ref.organizationId, attempt.ref.invoiceId, {
             category,
             dgiErrorCode: failure.dgiErrorCode,
@@ -372,7 +403,7 @@ export class EdefSalesInvoiceNormalizer implements SalesInvoiceNormalizer {
       total: decimalToJsonNumber(calc.total),
       vtotal: decimalToJsonNumber(calc.vatTotal),
     };
-    const confirmed = await this.limiter.run(() =>
+    const confirmed = await this.guard.run(() =>
       this.edef.confirmInvoice(uid, amounts, attempt.ctx),
     );
     if (confirmed.ok) return this.record(attempt, confirmed.data);
@@ -390,12 +421,12 @@ export class EdefSalesInvoiceNormalizer implements SalesInvoiceNormalizer {
     }
 
     // Délai, réseau, 5xx, erreur ambiguë : UNE vérification par lecture.
-    const details = await this.limiter.run(() => this.edef.getInvoiceDetails(uid, attempt.ctx));
+    const details = await this.guard.run(() => this.edef.getInvoiceDetails(uid, attempt.ctx));
     if (details.ok && details.data.security && this.isOurs(attempt, details.data)) {
       return this.record(attempt, details.data.security);
     }
     if (details.ok && !details.data.security) {
-      const pending = await this.limiter.run(() => this.edef.getPendingRequests(attempt.ctx));
+      const pending = await this.guard.run(() => this.edef.getPendingRequests(attempt.ctx));
       const stillPending = pending.ok && pending.data.list.some((p) => p.uid === uid);
       const inTime =
         this.clock().getTime() - submittedAt.getTime() <=
@@ -403,7 +434,7 @@ export class EdefSalesInvoiceNormalizer implements SalesInvoiceNormalizer {
       if (stillPending && inTime) {
         // La lecture prouve qu'aucune facture n'est finalisée pour cet `uid` :
         // une seconde confirmation, la dernière, sur le MÊME `uid`.
-        const again = await this.limiter.run(() =>
+        const again = await this.guard.run(() =>
           this.edef.confirmInvoice(uid, amounts, attempt.ctx),
         );
         if (again.ok) return this.record(attempt, again.data);
@@ -428,7 +459,7 @@ export class EdefSalesInvoiceNormalizer implements SalesInvoiceNormalizer {
         dgiErrorCode: cause.dgiErrorCode ?? null,
       });
     }
-    const cancelled = await this.limiter.run(() => this.edef.cancelInvoice(uid, attempt.ctx));
+    const cancelled = await this.guard.run(() => this.edef.cancelInvoice(uid, attempt.ctx));
     const answered =
       cancelled.ok ||
       cancelled.error.kind === 'business' ||

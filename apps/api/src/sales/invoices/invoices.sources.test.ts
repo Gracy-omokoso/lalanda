@@ -71,6 +71,9 @@ describe('documents de vente — lecture des sources', () => {
       'sales/invoices/invoice-drafts.service.ts',
       'sales/invoices/invoice-freezing.service.ts',
       'sales/invoices/invoice-numbering.service.ts',
+      // ADR-0024 (F2) : seul écrivain de la normalisation (`normalization`, statuts
+      // `normalized` et `normalization_failed`).
+      'sales/normalization/normalization-recorder.ts',
     ]);
     // Les champs figés (empreinte, montants normalisés) ne sont posés qu'au gel.
     expect(await filesMatching(/contentSha256(:|,)\s/)).toEqual(

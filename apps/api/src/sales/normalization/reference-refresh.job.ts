@@ -32,7 +32,7 @@ import { PointsOfSaleService } from '../../fiscal/points-of-sale.service.js';
 import { getParameterPack } from '../../parameter-packs/parameter-pack-registry.js';
 import type { EdefEnvironment } from '../../platform-config/dgi-platform.config.js';
 import { SchedulerService } from '../../scheduler/scheduler.service.js';
-import { DgiCallLimiter } from './dgi-call-limiter.js';
+import { DgiCallGuard } from './dgi-call-guard.js';
 
 export const REFRESH_JOB = 'edef.reference.refresh';
 export const REFRESH_DAILY_JOB = 'edef.reference.refresh.daily';
@@ -102,7 +102,7 @@ export class ReferenceRefreshJob implements OnModuleInit, OnApplicationBootstrap
     @Inject(EdefClient) private readonly edef: EdefClient,
     @Inject(EdefReferenceSnapshotsService)
     private readonly snapshots: EdefReferenceSnapshotsService,
-    @Inject(DgiCallLimiter) private readonly limiter: DgiCallLimiter,
+    @Inject(DgiCallGuard) private readonly guard: DgiCallGuard,
     @Inject(SchedulerService) private readonly scheduler: SchedulerService,
     @Inject(AuditService) private readonly audit: AuditService,
   ) {}
@@ -182,7 +182,7 @@ export class ReferenceRefreshJob implements OnModuleInit, OnApplicationBootstrap
     const failed: string[] = [];
     for (const list of lists) {
       const previous = list === 'taxGroups' ? await this.snapshots.latest(environment, list) : null;
-      const out = await this.limiter.run(() => this.edef.getReferenceList(list, ctx));
+      const out = await this.guard.run(() => this.edef.getReferenceList(list, ctx));
       if (this.spacingMs > 0) await sleep(this.spacingMs);
       if (!out.ok) {
         failed.push(list);

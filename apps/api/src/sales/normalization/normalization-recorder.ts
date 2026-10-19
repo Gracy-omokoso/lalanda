@@ -215,6 +215,39 @@ export class NormalizationRecorder {
         if (n.claim && new Date(n.claim.until).getTime() > now.getTime()) {
           return { kind: 'not_queued', doc } as const;
         }
+        // Verrou ATOMIQUE par document, première écriture de la transaction :
+        // mise à jour conditionnée par la phase `queued` et l'absence de prise
+        // en main vivante. Deux requêtes simultanées (double clic, requête
+        // renvoyée par le navigateur) se heurtent ici ; la perdante est rejouée
+        // par `withTransaction`, relit `submitting` et ne fait rien.
+        const lock = await this.invoices
+          .updateOne(
+            {
+              _id: doc._id,
+              organizationId,
+              status: 'pending_normalization',
+              $and: [
+                { $or: [{ 'normalization.phase': 'queued' }, { 'normalization.phase': null }] },
+                {
+                  $or: [
+                    { 'normalization.claim': null },
+                    { 'normalization.claim.until': { $lte: now } },
+                  ],
+                },
+              ],
+            },
+            {
+              $set: {
+                'normalization.claim': {
+                  attemptId,
+                  until: new Date(now.getTime() + input.claimMs),
+                },
+              },
+            },
+            { session },
+          )
+          .exec();
+        if (lock.modifiedCount !== 1) return { kind: 'not_queued', doc } as const;
         const before = n.reservedNumber ?? null;
         const reserved = await this.numbering.reserve(organizationId, invoiceId, input.series, {
           session,
@@ -227,6 +260,7 @@ export class NormalizationRecorder {
               _id: doc._id,
               organizationId,
               status: 'pending_normalization',
+              'normalization.claim.attemptId': attemptId,
               $or: [{ 'normalization.phase': 'queued' }, { 'normalization.phase': null }],
             },
             {
@@ -287,6 +321,60 @@ export class NormalizationRecorder {
       }
       throw err;
     }
+  }
+
+  /**
+   * Rien n'est parti (journal strict indisponible avant le `POST`) : retour en
+   * `queued`, numéro rendu (ou abandonné s'il ne peut plus l'être), main rendue.
+   */
+  async backToQueued(
+    ref: AttemptRef,
+    error: NormalizationError,
+    actor: RecorderActor | null,
+  ): Promise<boolean> {
+    return inFiscalTransaction(this.connection, async (session) => {
+      const doc = await this.findLive(ref, ['submitting'], session);
+      if (!doc) return false;
+      const reserved = doc.normalization?.reservedNumber ?? null;
+      let event: 'number_released' | 'number_abandoned' | null = null;
+      if (reserved !== null) {
+        const { released } = await this.numbering.release(ref.organizationId, ref.invoiceId, {
+          session,
+        });
+        if (released) event = 'number_released';
+        else {
+          await this.numbering.abandon(
+            ref.organizationId,
+            ref.invoiceId,
+            'Journal des échanges indisponible ; numéro suivant déjà pris.',
+            { session },
+          );
+          event = 'number_abandoned';
+        }
+      }
+      await this.invoices
+        .updateOne(this.liveFilter(ref, ['submitting']), {
+          $set: {
+            'normalization.phase': 'queued',
+            'normalization.claim': null,
+            'normalization.reservedNumber': null,
+            'normalization.lastError': error,
+          },
+        })
+        .session(session)
+        .exec();
+      if (event !== null) {
+        await this.appendJournal(
+          ref.organizationId,
+          doc,
+          event,
+          { number: reserved },
+          actor,
+          session,
+        );
+      }
+      return true;
+    });
   }
 
   /** Bail tenu ailleurs : le document reste `queued`, avec la raison (§ 3.1). */
