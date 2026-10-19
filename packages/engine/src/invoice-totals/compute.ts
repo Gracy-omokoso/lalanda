@@ -332,7 +332,7 @@ function computeGroup(
       // × taux / 100, soit base × taux / (100 + t), en une seule division.
       amount =
         priceMode === 'ht'
-          ? roundRatio(base * line.specificTaxFixed, HUNDRED * SCALE, 'half_up')
+          ? roundRatio(base * line.specificTaxFixed, HUNDRED, 'half_up')
           : roundRatio(base * line.specificTaxFixed, HUNDRED + rate, 'half_up');
     }
     lineSpecificTaxes.set(line.index, amount);
@@ -349,10 +349,10 @@ function computeGroup(
     ht = 0n;
   } else if (priceMode === 'ht') {
     ht = groupAmount + specificTax;
-    vat = roundRatio(ht * rate, HUNDRED * SCALE, vatMode);
+    vat = roundRatio(ht * rate, HUNDRED, vatMode);
     total = ht + vat;
   } else {
-    total = groupAmount + roundRatio(specificTax * (HUNDRED + rate), HUNDRED * SCALE, 'half_up');
+    total = groupAmount + roundRatio(specificTax * (HUNDRED + rate), HUNDRED, 'half_up');
     vat = roundRatio(total * rate, HUNDRED + rate, vatMode);
     ht = total - vat;
   }
