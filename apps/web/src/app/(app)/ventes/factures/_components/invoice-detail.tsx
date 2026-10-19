@@ -4,6 +4,8 @@
 // tout autre statut est FIGÉ et se consulte seulement : facture émise ou
 // normalisée (créer un avoir), pro forma en attente DGI, pro forma refusé
 // (reprendre en brouillon). Aucun montant n'est recalculé : tout vient de la vue.
+// En mode normalisé, l'état de la normalisation DGI (ADR-0024 § 9.3) et les
+// échanges avec la DGI s'affichent sous l'en-tête.
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -17,6 +19,7 @@ import { estRefus, formatDate, formatMontant } from '../../_components/sales-mod
 
 import { AmountsPanel } from './amounts-panel';
 import { CreditNoteDialog } from './credit-note-dialog';
+import { DgiExchanges } from './dgi-exchanges';
 import { InvoiceEditor } from './invoice-editor';
 import {
   actionsDocument,
@@ -30,6 +33,7 @@ import {
   tonStatut,
   TYPE_LABELS,
 } from './invoice-model';
+import { NormalizationStatus } from './normalization-status';
 
 export function InvoiceDetail({ invoiceId }: { invoiceId: string }): React.ReactElement {
   const [vue, setVue] = useState<InvoiceView | null>(null);
@@ -142,13 +146,8 @@ function DocumentFige({
         </p>
       </div>
 
-      {n?.lastError ? (
-        <Alerte>
-          <p>
-            Réponse de la DGI : {n.lastError.message}{' '}
-            <span className="font-mono text-xs">({n.lastError.code})</span>
-          </p>
-        </Alerte>
+      {vue.emissionMode === 'normalized' || n !== null ? (
+        <NormalizationStatus vue={vue} onChange={onChange} />
       ) : null}
       {erreur ? (
         <Alerte>
@@ -202,18 +201,6 @@ function DocumentFige({
                 </>
               ) : null}
             </dd>
-          </div>
-        ) : null}
-        {n?.codeDefDgi ? (
-          <div>
-            <dt className="text-xs text-[var(--foreground-muted)]">Code DEF/DGI</dt>
-            <dd className="break-all font-mono">{n.codeDefDgi}</dd>
-          </div>
-        ) : null}
-        {n?.nim ? (
-          <div>
-            <dt className="text-xs text-[var(--foreground-muted)]">NIM</dt>
-            <dd className="font-mono">{n.nim}</dd>
           </div>
         ) : null}
       </dl>
@@ -321,6 +308,8 @@ function DocumentFige({
           La reprise efface la conversion en CDF et redonne un brouillon modifiable.
         </p>
       ) : null}
+
+      {vue.emissionMode === 'normalized' || n !== null ? <DgiExchanges invoiceId={vue.id} /> : null}
 
       {avoir ? (
         <CreditNoteDialog
