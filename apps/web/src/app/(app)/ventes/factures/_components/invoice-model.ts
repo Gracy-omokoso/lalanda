@@ -246,7 +246,8 @@ export function montantsResume(doc: InvoiceSummary): {
 // Liste : filtres
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type FiltreStatut = 'all' | 'draft' | 'pending_normalization' | 'normalization_failed' | 'final';
+export type FiltreStatut =
+  'all' | 'draft' | 'pending_normalization' | 'normalization_failed' | 'final';
 
 export const FILTRES_STATUT: readonly { valeur: FiltreStatut; label: string }[] = [
   { valeur: 'all', label: 'Tous' },
@@ -284,12 +285,7 @@ export function filtreActif(f: FiltresFactures): boolean {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type ActionDocument =
-  | 'modifier'
-  | 'supprimer'
-  | 'emettre'
-  | 'normaliser'
-  | 'avoir'
-  | 'reprendre';
+  'modifier' | 'supprimer' | 'emettre' | 'normaliser' | 'avoir' | 'reprendre';
 
 /**
  * Ce que l'on propose, selon le statut et les droits. « Émettre » et
@@ -331,17 +327,21 @@ export function lireQuantiteSaisie(saisie: string): LectureDecimal {
   const s = saisie.replace(/[\s  ]/g, '').replace(',', '.');
   if (s === '') return { ok: false, erreur: 'Saisissez une quantité.' };
   if (!/^\d+(\.\d*)?$/.test(s)) {
-    return { ok: false, erreur: 'Quantité invalide : des chiffres et une virgule, par exemple 2,5.' };
+    return {
+      ok: false,
+      erreur: 'Quantité invalide : des chiffres et une virgule, par exemple 2,5.',
+    };
   }
-  const [entierBrut = '', decimales = ''] = s.split('.');
+  const [entierBrut = '', decimalesBrutes = ''] = s.split('.');
+  // `2,3750` vaut `2,375` : les zéros de fin ne sont pas une précision.
+  const decimales = decimalesBrutes.replace(/0+$/, '');
   if (decimales.length > 3) return { ok: false, erreur: 'Trois décimales au plus.' };
   const entier = entierBrut.replace(/^0+(?=\d)/, '');
   if (entier.length > 9) return { ok: false, erreur: 'Quantité trop grande.' };
   if (/^0+$/.test(entier) && /^0*$/.test(decimales)) {
     return { ok: false, erreur: 'La quantité doit être supérieure à zéro.' };
   }
-  const dec = decimales.replace(/0+$/, '');
-  return { ok: true, valeur: dec === '' ? entier : `${entier}.${dec}` };
+  return { ok: true, valeur: decimales === '' ? entier : `${entier}.${decimales}` };
 }
 
 /** Taux de change saisi (CDF pour 1 USD) : > 0, huit décimales au plus. */
@@ -349,7 +349,10 @@ export function lireTauxChange(saisie: string): LectureDecimal {
   const s = saisie.replace(/[\s  ]/g, '').replace(',', '.');
   if (s === '') return { ok: false, erreur: 'Saisissez un taux.' };
   if (!/^\d+(\.\d*)?$/.test(s)) {
-    return { ok: false, erreur: 'Taux invalide : des chiffres et une virgule, par exemple 2 270,50.' };
+    return {
+      ok: false,
+      erreur: 'Taux invalide : des chiffres et une virgule, par exemple 2 270,50.',
+    };
   }
   const [entierBrut = '', decimales = ''] = s.split('.');
   if (decimales.length > 8) return { ok: false, erreur: 'Huit décimales au plus.' };
@@ -398,7 +401,9 @@ export function formatTauxChange(rate: string): string {
   const [entier = '0', dec = ''] = rate.split('.');
   // formatMontant complète à deux décimales ; un taux en a parfois davantage,
   // gardées telles quelles.
-  const groupe = formatMontant(entier, '').replace(/,00\s*$/, '').trim();
+  const groupe = formatMontant(entier, '')
+    .replace(/,00\s*$/, '')
+    .trim();
   return `${groupe}${dec === '' ? '' : `,${dec}`} CDF pour 1 USD`;
 }
 
@@ -668,10 +673,12 @@ export function commentaireAModifiable(
 export type ChampDocument = string;
 
 export type PreparationDocument =
-  | { ok: true; corps: CreateInvoiceBody }
-  | { ok: false; champs: Record<ChampDocument, string> };
+  { ok: true; corps: CreateInvoiceBody } | { ok: false; champs: Record<ChampDocument, string> };
 
-function lireRemise(choix: RemiseChoix, valeur: string): { remise: LineDiscount | null; erreur?: string } {
+function lireRemise(
+  choix: RemiseChoix,
+  valeur: string,
+): { remise: LineDiscount | null; erreur?: string } {
   if (choix === 'none') return { remise: null };
   const lu = choix === 'percent' ? lireTauxSaisi(valeur) : lireMontantSaisi(valeur);
   if (!lu.ok) return { remise: null, erreur: lu.erreur };
@@ -690,7 +697,8 @@ export function preparerDocument(f: FormulaireDocument): PreparationDocument {
   const champs: Record<string, string> = {};
   if (f.priceMode === '') champs['priceMode'] = 'Indiquez si les prix sont TTC ou HT.';
   if (f.client === null) champs['customer'] = 'Choisissez un client ou une vente de comptoir.';
-  if (estAvoir(f.type) && f.nature === null) champs['creditNote.nature'] = 'Choisissez la nature de l’avoir.';
+  if (estAvoir(f.type) && f.nature === null)
+    champs['creditNote.nature'] = 'Choisissez la nature de l’avoir.';
 
   const lignes: InvoiceLineBody[] = [];
   f.lignes.forEach((l, i) => {
@@ -705,7 +713,8 @@ export function preparerDocument(f: FormulaireDocument): PreparationDocument {
         champs[`lines.${i}.quantity`] =
           `Au plus ${formatQuantite(l.restant)} : c’est ce qui reste à créditer sur cette ligne.`;
       }
-      if (q.ok) lignes.push({ source: 'origin', originLineIndex: l.originLineIndex, quantity: q.valeur });
+      if (q.ok)
+        lignes.push({ source: 'origin', originLineIndex: l.originLineIndex, quantity: q.valeur });
       return;
     }
     const remise = lireRemise(l.remise, l.remiseValeur);
@@ -735,14 +744,19 @@ export function preparerDocument(f: FormulaireDocument): PreparationDocument {
     // Ligne libre
     if (l.name.trim() === '') champs[`lines.${i}.name`] = 'La désignation est obligatoire.';
     if (l.taxGroup === '') champs[`lines.${i}.taxGroup`] = 'Choisissez le groupe de taxation.';
-    if (l.itemType === '') champs[`lines.${i}.itemType`] = 'Choisissez le type : bien, service ou taxe.';
+    if (l.itemType === '')
+      champs[`lines.${i}.itemType`] = 'Choisissez le type : bien, service ou taxe.';
     const p = lireMontantSaisi(l.prix);
     if (!p.ok) champs[`lines.${i}.unitPrice`] = p.erreur;
     let specificTax: CatalogSpecificTax | null = null;
     if (l.taxe !== 'none') {
       const t = l.taxe === 'percent' ? lireTauxSaisi(l.taxeValeur) : lireMontantSaisi(l.taxeValeur);
       if (!t.ok) champs[`lines.${i}.specificTax`] = t.erreur;
-      else specificTax = l.taxe === 'percent' ? { kind: 'percent', rate: t.valeur } : { kind: 'per_unit', amount: t.valeur };
+      else
+        specificTax =
+          l.taxe === 'percent'
+            ? { kind: 'percent', rate: t.valeur }
+            : { kind: 'per_unit', amount: t.valeur };
     }
     if (q.ok && p.ok && l.taxGroup !== '' && l.itemType !== '' && l.name.trim() !== '') {
       lignes.push({
@@ -773,7 +787,8 @@ export function preparerDocument(f: FormulaireDocument): PreparationDocument {
   if (Object.keys(champs).length > 0 || f.client === null || f.priceMode === '') {
     return { ok: false, champs };
   }
-  const commentaire = (v: string): string | null => (v.trim() === '' ? null : v.trim().slice(0, 255));
+  const commentaire = (v: string): string | null =>
+    v.trim() === '' ? null : v.trim().slice(0, 255);
   return {
     ok: true,
     corps: {
@@ -827,7 +842,8 @@ export function preparerNormalisation(
   saisieTaux: string,
   date: string,
 ): { ok: true; corps: NormalizeInvoiceBody } | { ok: false; champs: Record<string, string> } {
-  if (choix === 'officiel') return { ok: true, corps: { expectedRevision: revision, exchangeRate: null } };
+  if (choix === 'officiel')
+    return { ok: true, corps: { expectedRevision: revision, exchangeRate: null } };
   const champs: Record<string, string> = {};
   const lu = lireTauxChange(saisieTaux);
   if (!lu.ok) champs['rate'] = lu.erreur;
@@ -863,7 +879,8 @@ const MESSAGES_FACTURES: Record<string, string> = {
   NORMALIZATION_IN_PROGRESS:
     'Une autre normalisation est en cours pour votre organisation. Réessayez dans quelques minutes.',
   CUSTOMER_INACTIVE: 'Ce client est désactivé : réactivez-le ou choisissez-en un autre.',
-  CATALOG_ITEM_INACTIVE: 'Un article de ce document est désactivé : réactivez-le ou retirez la ligne.',
+  CATALOG_ITEM_INACTIVE:
+    'Un article de ce document est désactivé : réactivez-le ou retirez la ligne.',
   TAX_GROUP_UNAVAILABLE: 'Un groupe de taxation de ce document n’est plus proposé par la DGI.',
   FISCAL_PROFILE_REQUIRED:
     'Complétez d’abord la fiche fiscale de votre organisation (Organisation › Fiscalité) : une facture porte le NIF et l’adresse du vendeur.',
@@ -880,8 +897,10 @@ const MESSAGES_FACTURES: Record<string, string> = {
   CREDIT_NOTE_ORIGIN_MODE_MISMATCH:
     'Cette facture a été faite dans un autre mode d’émission : l’avoir n’est pas possible dans le logiciel pour l’instant.',
   CREDIT_NOTE_CURRENCY_MISMATCH: 'Un avoir garde la devise de la facture d’origine.',
-  CREDIT_NOTE_PRICE_MODE_MISMATCH: 'Un avoir garde le mode de prix (TTC ou HT) de la facture d’origine.',
-  CREDIT_NOTE_NOTHING_REMAINING: 'Tout a déjà été crédité sur cette facture : il ne reste rien à reprendre.',
+  CREDIT_NOTE_PRICE_MODE_MISMATCH:
+    'Un avoir garde le mode de prix (TTC ou HT) de la facture d’origine.',
+  CREDIT_NOTE_NOTHING_REMAINING:
+    'Tout a déjà été crédité sur cette facture : il ne reste rien à reprendre.',
   NOT_RETURNABLE_TO_DRAFT: 'Ce document ne peut pas être repris en brouillon dans son état actuel.',
   NUMBER_RESERVED:
     'Un numéro de facture est réservé pour ce document : sa reprise appartient à la connexion DGI, pas au brouillon.',
@@ -913,7 +932,11 @@ export function problemesGel(err: unknown): string[] {
   if (!Array.isArray(issues)) return [];
   return issues.map((i: unknown) => {
     if (typeof i !== 'object' || i === null) return 'Problème non précisé.';
-    const { message, code, lineIndex } = i as { message?: unknown; code?: unknown; lineIndex?: unknown };
+    const { message, code, lineIndex } = i as {
+      message?: unknown;
+      code?: unknown;
+      lineIndex?: unknown;
+    };
     const ligne = typeof lineIndex === 'number' ? `Ligne ${String(lineIndex + 1)} : ` : '';
     const texte =
       typeof message === 'string' && message !== ''
@@ -927,7 +950,9 @@ export function problemesGel(err: unknown): string[] {
 
 /** Phrase d'un empêchement (`readiness.blockers`), ligne comprise. */
 export function libelleEmpechement(b: { message: string; lineIndex?: number | null }): string {
-  return typeof b.lineIndex === 'number' ? `Ligne ${String(b.lineIndex + 1)} : ${b.message}` : b.message;
+  return typeof b.lineIndex === 'number'
+    ? `Ligne ${String(b.lineIndex + 1)} : ${b.message}`
+    : b.message;
 }
 
 /** `409 EXCHANGE_RATE_REFERENCE_UNAVAILABLE` (ou 404) : proposer de rafraîchir les listes. */

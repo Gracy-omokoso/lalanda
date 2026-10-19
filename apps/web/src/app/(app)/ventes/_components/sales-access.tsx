@@ -1,6 +1,7 @@
 'use client';
 
-// Chrome de l'espace Ventes : onglets et frontière d'accès (ADR-0022, chantier D2).
+// Chrome de l'espace Ventes : onglets et frontière d'accès (ADR-0022, chantier D2 ;
+// onglet Factures et droit `sales.invoice` : ADR-0023, chantier E3).
 //
 // Les permissions sont lues UNE fois (`GET /me/permissions`) et partagées avec
 // les pages par un contexte : la liste des clients et celle du catalogue en ont
@@ -16,14 +17,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 
 import { api, type OrgAction } from '@/lib/api';
 
-import {
-  ongletsVentes,
-  peutConsulter,
-  peutGerer,
-  SALES_TABS,
-  segmentVentes,
-  VENTES_BASE,
-} from './sales-model';
+import { peutConsulter, peutGerer, SALES_TABS, segmentVentes, VENTES_BASE } from './sales-model';
 
 type EtatPermissions = 'chargement' | 'pret' | 'echec';
 
@@ -31,9 +25,20 @@ interface AccesVentes {
   etat: EtatPermissions;
   /** `true` seulement quand le serveur a confirmé `sales.manage`. */
   gerer: boolean;
+  /** `true` seulement quand le serveur a confirmé `sales.invoice` (ADR-0023 § S25e.11). */
+  facturer: boolean;
 }
 
-const Contexte = createContext<AccesVentes>({ etat: 'chargement', gerer: false });
+const Contexte = createContext<AccesVentes>({ etat: 'chargement', gerer: false, facturer: false });
+
+/**
+ * Onglets de l'espace, dans l'ordre d'affichage : « Factures » en premier
+ * (ADR-0023, chantier E3), puis les données maîtres d'ADR-0022.
+ */
+const ONGLETS: readonly { segment: string; label: string; action: OrgAction }[] = [
+  { segment: 'factures', label: 'Factures', action: 'sales.read' },
+  ...SALES_TABS,
+];
 
 export function useAccesVentes(): AccesVentes {
   return useContext(Contexte);
@@ -64,7 +69,12 @@ export function SalesChrome({ children }: { children: React.ReactNode }): React.
   // Permissions illisibles (panne réseau, organisation absente) : on montre les
   // deux onglets plutôt qu'un espace sans navigation. Chaque page lit alors la
   // réponse du serveur et l'explique — un 403 y devient une phrase, pas une panne.
-  const onglets = etat === 'echec' ? [...SALES_TABS] : ongletsVentes(actions);
+  const onglets =
+    etat === 'echec'
+      ? [...ONGLETS]
+      : actions === null
+        ? []
+        : ONGLETS.filter((t) => actions.includes(t.action));
   const courant = segmentVentes(pathname);
 
   if (etat === 'pret' && !peutConsulter(actions)) {
@@ -81,7 +91,13 @@ export function SalesChrome({ children }: { children: React.ReactNode }): React.
   }
 
   return (
-    <Contexte.Provider value={{ etat, gerer: peutGerer(actions) }}>
+    <Contexte.Provider
+      value={{
+        etat,
+        gerer: peutGerer(actions),
+        facturer: actions !== null && actions.includes('sales.invoice'),
+      }}
+    >
       {onglets.length > 0 ? (
         <nav
           aria-label="Sections des ventes"
