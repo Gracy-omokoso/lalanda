@@ -336,6 +336,8 @@ Codes : `409 NORMALIZATION_NOT_RETRYABLE` (`details.phase`), `409 NORMALIZATION_
 
 Tâches planifiées : `sales.normalization.reconcile` (30 s, lecture et annulation seulement), `edef.reference.refresh` (6 h) et `edef.reference.refresh.daily` (00 h 15, Kinshasa), `sales.normalization.consistency` (quotidienne).
 
+**Écarts au contrat signalés** : `POST …/normalize` ne porte pas encore le quota de normalisation (60/h, fichier `invoices.controller.ts` hors périmètre F2) ; les e-mails d'alerte (décision ouverte n° 3) ne sont pas envoyés ; `lastError.dgiMessage` est le libellé DGI tel que reçu (`dgiErrorDesc` du client e-MCF).
+
 ## Webhooks
 
 Paiements et intégrations utilisent signatures, tolérance temporelle, anti-rejeu, journal et traitement idempotent.

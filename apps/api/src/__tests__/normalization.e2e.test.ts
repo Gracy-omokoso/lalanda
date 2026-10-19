@@ -693,9 +693,14 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
         doNothing.mockRestore();
         expect(fake.callsTo('submit').length).toBe(p + 1);
         const uid = fake.invoicesByRn(rn).at(-1)!.uid;
+        const arrete = (await enBase(doc.id))?.['normalization'];
+        expect(arrete?.['phase'], JSON.stringify(arrete)).toBe('submitting');
         const set: Record<string, unknown> = {
           'normalization.phase': phase,
-          'normalization.claim.until': new Date(Date.now() - 1000),
+          'normalization.claim': {
+            attemptId: arrete?.['attemptId'],
+            until: new Date(Date.now() - 1000),
+          },
         };
         if (phase !== 'submitting') set['normalization.uid'] = uid;
         await db
@@ -721,16 +726,23 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
     });
 
     it('DGI injoignable 30 min → needs_review ; aucun document ne devient facture', async () => {
-      const { view, rn } = await normaliser('post_timeout_after_create');
-      scenarioPour(rn, 'server_error');
-      expect(await rattraper(view.id)).toBe('uncertain');
-      expect((await enBase(view.id))?.['normalization']?.['phase']).toBe('uncertain');
-      expect(await rattraper(view.id, 31 * MINUTE)).toBe('uncertain');
-      const doc = await enBase(view.id);
-      expect(doc?.['normalization']?.['phase']).toBe('needs_review');
-      expect(doc?.['status']).toBe('pending_normalization');
-      // Nettoyage : la demande expirée, on conclut par déclaration.
-      scenarioPour(rn, null);
+      const { view } = await normaliser('post_timeout_after_create');
+      const profil = { nif: NIF_N, nim: NIM, tokenValid: '2099-01-31T00:00:00' };
+      // Toutes les routes du jeton répondent 500 : la DGI est injoignable.
+      fake.setToken(JETON, { ...profil, behaviour: 'server_error' });
+      try {
+        expect(await rattraper(view.id)).toBe('uncertain');
+        expect((await enBase(view.id))?.['normalization']?.['phase']).toBe('uncertain');
+        expect(await rattraper(view.id, 31 * MINUTE)).toBe('uncertain');
+        const doc = await enBase(view.id);
+        expect(doc?.['normalization']?.['phase']).toBe('needs_review');
+        expect(doc?.['status']).toBe('pending_normalization');
+        expect(doc?.['number'] ?? null).toBeNull();
+      } finally {
+        fake.setToken(JETON, profil);
+      }
+      // Nettoyage : la demande a expiré chez la DGI, on conclut par déclaration.
+      fake.advanceClock(121_000);
       await reauth('owner');
       const d = await post(
         asN(),
@@ -1063,7 +1075,8 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
         .findOne({ action: 'edef.alert.tax_rate_changed', organizationId: orgN });
       expect(alerte?.['metadata']?.['groups']).toBe('B');
       // Les taux figés d'un nouveau document n'ont que A–P.
-      fake.setTaxGroups(GROUPES);
+      // Contenu nouveau (un retour à un contenu déjà vu ne crée pas d'instantané).
+      fake.setTaxGroups({ ...GROUPES, q: 9 });
       fake.setToken(JETON_B, { nif: NIF_B, nim: NIM_B, tokenValid: '2099-01-31T00:00:00' });
       await job.run({ full: false });
       const doc = await gelerSansNormaliser();

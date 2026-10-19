@@ -229,7 +229,15 @@ export class NormalizationReconciliationJob implements OnModuleInit {
       // Seulement ce que Lalanda reconnaît (O3) : même `rn`, même NIF, même contenu.
       if (n.uid && p.uid !== n.uid && list.some((q) => q.uid === n.uid)) continue;
       const details = await this.guard.run(() => this.edef.getInvoiceDetails(p.uid, ctx));
-      if (!details.ok || !isOurRequest(doc, rn, details.data)) continue;
+      if (!details.ok) continue;
+      // L'`uid` rendu par NOTRE `POST` désigne notre demande, même si ses totaux
+      // diffèrent des nôtres (c'est le cas d'un écart) : `rn` et NIF suffisent.
+      // Sinon, l'empreinte du contenu (total et TVA) doit aussi coïncider.
+      const ours =
+        p.uid === n.uid
+          ? isOurRequest(doc, rn, { ...details.data, totals: null })
+          : isOurRequest(doc, rn, details.data);
+      if (!ours) continue;
       const cancelled = await this.guard.run(() =>
         this.edef.cancelInvoice(p.uid, { ...ctx, invoiceId: ref.invoiceId, rn }),
       );
