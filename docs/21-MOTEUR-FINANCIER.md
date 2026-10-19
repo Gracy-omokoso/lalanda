@@ -235,6 +235,59 @@ Restent à trancher en environnement de test : l'arrondi de la TVA, l'arrondi du
 de ligne, l'assiette d'une taxe spécifique en pourcentage en TTC, le contenu de `haa…`
 avec une taxe spécifique, le taux du groupe M, l'arrondi de `curTotal`.
 
+### Étalonnage des arrondis contre la DGI (S25f — ADR-0024 § 7)
+
+**État : non étalonné.** Le relevé `packages/engine/src/invoice-totals/rounding-calibration.ts`
+vaut `not_calibrated` : la politique `dgi-cd-2026.1` n'a pas encore été vérifiée contre la
+DGI, et la production DGI refuse de s'ouvrir tant qu'il en est ainsi. Date, source et
+résultat seront inscrits ici après l'étalonnage réel.
+
+**Ce que c'est.** Un outil en ligne de commande (`apps/api/src/edef/calibration/`), réservé
+à l'équipe : aucune page, aucune route, aucun client ne peut le déclencher. Il envoie à
+l'environnement de **test** de la DGI une vingtaine de factures de test (les cas de calibrage
+du moteur, les exemples de la documentation DGI et le cas de contre-valeur), **annule chacune
+aussitôt**, lit les totaux que la DGI a calculés et dit laquelle des quatre façons d'arrondir
+les reproduit. Il ne **confirme jamais** une facture : aucune n'a de valeur fiscale.
+
+**Garde-fous.** Il refuse de démarrer si l'adresse visée est celle de la production DGI. Le
+jeton se tape à une invite **masquée** (rien ne s'affiche à l'écran) ; il n'est jamais passé
+dans la commande, jamais lu dans un fichier ni une variable d'environnement, jamais écrit sur
+disque. Le rapport est écrit dans `dgi/etalonnage/`, dossier que git ignore (le dépôt est
+public) ; il ne contient ni le jeton, ni le NIF, ni le corps des requêtes. L'outil **n'écrit
+jamais** le relevé : il en **propose** le texte, qu'une personne relit et recopie.
+
+**Pas à pas, le jour de l'étalonnage** (le CTO au clavier, la décideuse pour le jeton) :
+
+1. Sur le poste du CTO, dans le dossier du dépôt à jour, vérifier que le fichier `.env` porte
+   `DGI_ISF_TEST` (l'ISF de test) et **ne** modifie **pas** `DGI_EDEF_TEST_URL` (par défaut,
+   l'adresse de test de la DGI).
+2. Lancer : `pnpm --filter @lalanda/api edef:calibrate`
+3. L'écran affiche l'adresse visée (« TEST de la DGI ») puis demande le jeton. La décideuse
+   tape **elle-même** le jeton du point de vente de test de Go Freelance et appuie sur
+   Entrée. Rien ne s'affiche pendant la frappe : c'est normal.
+4. L'outil vérifie le jeton, puis déroule les cas (une ligne par cas, une demi-seconde entre
+   deux appels, quelques dizaines de secondes en tout). Il s'arrête de lui-même si la DGI
+   refuse le jeton ou se dit saturée.
+5. À la fin, il affiche le **verdict** et le chemin du rapport :
+   - « politique … » : une seule façon d'arrondir reproduit tous les cas. Un fichier
+     `….proposition.txt` contient le texte du relevé à recopier ;
+   - « NON DÉCIDÉ » : aucune, ou plusieurs, ou un cas n'a pas abouti. Rien n'est proposé ; le
+     CTO tranche par écrit et la question part à la DGI. Un écart qu'aucune façon d'arrondir
+     n'explique est une correction du moteur, traitée à part.
+6. Le CTO relit le rapport, recopie la proposition dans `rounding-calibration.ts` (et, si la
+   politique observée n'est pas `dgi-cd-2026.1`, crée la nouvelle politique et la version
+   `1.1.0` du calcul, comme l'indique la proposition), lance les tests — le **test verrou**
+   vérifie que chaque cas recopié se recalcule à l'identique — et met à jour cette section.
+   Le rapport reste dans `dgi/etalonnage/` ; seule son empreinte sha256 entre dans le dépôt.
+
+**Sondes** (même outil, sous-commande `probe`, désactivées par défaut). Elles observent ce que
+la documentation DGI ne dit pas : réponse de la DGI sur une facture confirmée, annulée ou
+expirée ; renvoi d'un même numéro. `pnpm --filter @lalanda/api edef:calibrate probe --liste`
+les énumère sans rien envoyer ; chacune se lance par son nom (`--sonde <nom>`). La seule qui
+**confirme** une facture de test (`apres-confirmation`) demande de taper `CONFIRMER` juste
+avant. Leurs observations ne valent pas réponse de la DGI : le réglage
+`EDEF_RECONCILIATION_EVIDENCE` ne change qu'avec une confirmation écrite de la DGI.
+
 ### Contrôles des factures et conversion en CDF (S25e — ADR-0023)
 
 Fonctions pures ajoutées au même module, sur la même arithmétique exacte ;
