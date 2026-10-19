@@ -4,12 +4,13 @@
 //
 // Les tableaux ci-dessous ne sont PAS importés de `permissions.ts`. Ils sont
 // retranscrits à la main depuis ADR-0012 §3 et §4 (et ADR-0021 §8 pour `fiscal.manage`,
-// ADR-0022 § S25c.1 pour `sales.read` et `sales.manage`). C'est délibéré : un test qui
+// ADR-0022 § S25c.1 pour `sales.read` et `sales.manage`, ADR-0023 § S25e.11 pour
+// `sales.invoice`). C'est délibéré : un test qui
 // importerait la matrice de production vérifierait seulement qu'elle est égale à
 // elle-même. Ici, toute modification d'une case de production casse le test, ce
 // qui force une mise à jour CONSCIENTE de l'ADR et de docs/12.
 //
-// 8 rôles × 18 actions + 6 rôles plateforme × 18 actions = 252 cases vérifiées.
+// 8 rôles × 19 actions + 6 rôles plateforme × 19 actions = 266 cases vérifiées.
 
 import { describe, expect, it } from 'vitest';
 
@@ -78,6 +79,9 @@ const ATTENDU_ORG: Record<Action, string> = {
   // le Conseiller, externe, ne voit pas le fichier clients ; le Chef de projet n'a rien.
   'sales.read': 'A   A   A   A   A   .   .   A',
   'sales.manage': 'A   A   A   A   .   .   .   .',
+  // ADR-0023 § S25e.11 : émettre et normaliser engagent le contribuable. Propriétaire,
+  // Directeur financier et Comptable ; l'Administrateur prépare mais n'émet pas.
+  'sales.invoice': 'A   .   A   A   .   .   .   .',
 };
 
 const CODE_VERS_GRANT: Record<string, string> = {
@@ -127,6 +131,8 @@ const ATTENDU_PLATEFORME: Record<Action, string> = {
   // `project.update`. Aucune des deux n'est un interdit absolu.
   'sales.read': 'D   .   D   .   .   .',
   'sales.manage': 'D   .   .   .   .   .',
+  // ADR-0023 § S25e.11 : cinquième interdit absolu, super-administrateur compris.
+  'sales.invoice': '.   .   .   .   .   .',
 };
 
 const CODE_VERS_GRANT_PLATEFORME: Record<string, string> = {
@@ -140,18 +146,20 @@ function cellules(ligne: string): string[] {
 }
 
 describe('matrice rôle organisation × action (ADR-0012 §3)', () => {
-  it('déclare exactement les 8 rôles et les 18 actions de docs/12', () => {
+  it('déclare exactement les 8 rôles et les 19 actions de docs/12', () => {
     expect([...ORG_ROLES]).toEqual([...ORDRE_ORG]);
-    expect(ACTIONS).toHaveLength(18);
+    expect(ACTIONS).toHaveLength(19);
     // Ajoutée en fin de liste, comme dans docs/12 (ADR-0021 §8).
     expect(ACTIONS[15]).toBe('fiscal.manage');
     // Dix-septième et dix-huitième, en fin de liste (ADR-0022 § S25c.1).
     expect(ACTIONS[16]).toBe('sales.read');
     expect(ACTIONS[17]).toBe('sales.manage');
+    // Dix-neuvième, en fin de liste (ADR-0023 § S25e.11).
+    expect(ACTIONS[18]).toBe('sales.invoice');
     expect(Object.keys(ATTENDU_ORG).sort()).toEqual([...ACTIONS].sort());
   });
 
-  // 8 × 18 = 144 cases.
+  // 8 × 19 = 152 cases.
   for (const action of ACTIONS) {
     const attendus = cellules(ATTENDU_ORG[action]);
     it(`« ${action} » : les 8 cases correspondent à l'ADR`, () => {
@@ -174,7 +182,7 @@ describe('matrice rôle plateforme × action (ADR-0012 §4)', () => {
     for (const role of PLATFORM_ROLES) expect(role.startsWith('platform_')).toBe(true);
   });
 
-  // 6 × 18 = 108 cases.
+  // 6 × 19 = 114 cases.
   for (const action of ACTIONS) {
     const attendus = cellules(ATTENDU_PLATEFORME[action]);
     it(`« ${action} » : les 6 cases plateforme correspondent à l'ADR`, () => {
@@ -191,11 +199,17 @@ describe('matrice rôle plateforme × action (ADR-0012 §4)', () => {
   }
 });
 
-describe('interdits absolus de la plateforme (ADR-0012 §4, ADR-0021 §8)', () => {
-  const interdits: Action[] = ['plan.approve', 'period.close', 'report.export', 'fiscal.manage'];
+describe('interdits absolus de la plateforme (ADR-0012 §4, ADR-0021 §8, ADR-0023 § S25e.11)', () => {
+  const interdits: Action[] = [
+    'plan.approve',
+    'period.close',
+    'report.export',
+    'fiscal.manage',
+    'sales.invoice',
+  ];
 
-  it('sont exactement ceux annoncés, au nombre de quatre', () => {
-    expect(PLATFORM_FORBIDDEN_ACTIONS).toHaveLength(4);
+  it('sont exactement ceux annoncés, au nombre de cinq', () => {
+    expect(PLATFORM_FORBIDDEN_ACTIONS).toHaveLength(5);
     expect([...PLATFORM_FORBIDDEN_ACTIONS].sort()).toEqual([...interdits].sort());
   });
 
@@ -504,7 +518,7 @@ describe('compatibilité N-1 des anciens rôles', () => {
 });
 
 describe('cohérence structurelle de la matrice', () => {
-  it('chaque rôle déclare une décision pour CHACUNE des 18 actions', () => {
+  it('chaque rôle déclare une décision pour CHACUNE des 19 actions', () => {
     for (const role of ORG_ROLES) {
       for (const action of ACTIONS) {
         expect(ORG_PERMISSION_MATRIX[role][action], `${role} × ${action}`).toBeDefined();
@@ -528,7 +542,7 @@ describe('cohérence structurelle de la matrice', () => {
     for (const action of ecritures) expect(can('viewer', action)).toBe(false);
   });
 
-  it('`owner` détient les 18 actions', () => {
+  it('`owner` détient les 19 actions', () => {
     for (const action of ACTIONS) expect(can('owner', action)).toBe(true);
   });
 
@@ -568,6 +582,16 @@ describe('cohérence structurelle de la matrice', () => {
     expect(grantableRoles('admin').sort()).toEqual(['admin', 'advisor', 'analyst', 'viewer']);
     expect(PLATFORM_FORBIDDEN_ACTIONS).not.toContain('sales.read');
     expect(PLATFORM_FORBIDDEN_ACTIONS).not.toContain('sales.manage');
+  });
+
+  it('`sales.invoice` implique `sales.manage` et ne change pas les rôles attribuables (ADR-0023)', () => {
+    // Émettre suppose de pouvoir préparer le brouillon.
+    for (const role of ORG_ROLES) {
+      if (can(role, 'sales.invoice')) expect(can(role, 'sales.manage'), role).toBe(true);
+    }
+    // L'Administrateur ne l'a pas : il ne pouvait déjà attribuer ni `finance_director`
+    // ni `accountant`, ses rôles attribuables sont inchangés.
+    expect(grantableRoles('admin').sort()).toEqual(['admin', 'advisor', 'analyst', 'viewer']);
   });
 });
 

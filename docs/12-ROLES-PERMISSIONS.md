@@ -35,7 +35,7 @@ Le support ne voit jamais les données financières sans consentement explicite,
 
 ## Actions granulaires
 
-`organization.manage`, `billing.manage`, `members.invite`, `project.create`, `project.read`, `project.update`, `canvas.update`, `inputs.update`, `plan.calculate`, `plan.approve`, `actuals.import`, `period.close`, `analytics.read`, `report.export`, `audit.read`, `fiscal.manage`, `sales.read`, `sales.manage`.
+`organization.manage`, `billing.manage`, `members.invite`, `project.create`, `project.read`, `project.update`, `canvas.update`, `inputs.update`, `plan.calculate`, `plan.approve`, `actuals.import`, `period.close`, `analytics.read`, `report.export`, `audit.read`, `fiscal.manage`, `sales.read`, `sales.manage`, `sales.invoice`.
 
 `fiscal.manage` — « Gérer l'identité fiscale et la facture normalisée » — est la
 seizième action, ajoutée par ADR-0021 §8 (18 oct. 2026). Elle couvre la fiche
@@ -62,8 +62,8 @@ n'est possible. Tenir ces fiches n'engage pas le contribuable devant la DGI :
 l'Administrateur et le Comptable les gèrent ; l'Analyste et le Lecteur les
 consultent ; le Conseiller, externe (banquier, mentor), ne voit pas le fichier
 clients, qui contient des données personnelles ; le Chef de projet n'a rien.
-L'émission d'une facture, qui, elle, engage le contribuable, recevra sa propre
-action au lot S25e. Cette répartition est une proposition soumise à la décideuse
+L'émission d'une facture, qui, elle, engage le contribuable, a sa propre action
+(`sales.invoice`, ci-dessous). Cette répartition est une proposition soumise à la décideuse
 (ADR-0022, décision ouverte n° 1).
 
 | Action | PRO | ADM | DIR | CPT | ANA | CDP | CON | LEC |
@@ -75,6 +75,23 @@ Côté plateforme, `sales.read` n'est possible que **sous accès délégué**, p
 super-administrateur et le support (comme `project.read`) ; `sales.manage`, sous
 accès délégué pour le seul super-administrateur (comme `project.update`). Aucune
 des deux n'est un interdit absolu.
+
+`sales.invoice` — « Émettre et normaliser des factures et des avoirs » — est la
+dix-neuvième action, ajoutée par ADR-0023 § S25e.11 (19 oct. 2026). Préparer un
+brouillon ou un pro forma relève de `sales.manage` et n'engage personne ; émettre
+une facture (organisation ordinaire) ou la normaliser (organisation en facture
+normalisée) lui attribue un numéro et engage le contribuable. Le **Propriétaire**,
+le **Directeur financier** et le **Comptable**, qui tient la facturation au
+quotidien, la détiennent ; l'**Administrateur** prépare mais n'émet pas. Cette
+répartition est une proposition soumise à la décideuse (ADR-0023, décision ouverte
+n° 1).
+
+| Action | PRO | ADM | DIR | CPT | ANA | CDP | CON | LEC |
+|---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| `sales.invoice` | ✓ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+
+Elle est **interdite à tous les rôles plateforme**, super-administrateur compris et
+même sous accès délégué : le support n'émet jamais au nom d'un contribuable.
 
 ## Règles critiques
 
@@ -106,10 +123,11 @@ Les 8 rôles d'organisation sont livrés, en slugs `snake_case` : `owner`, `admi
 collection distincte : un rôle plateforme est indépendant de toute appartenance à
 une organisation.
 
-Quatre actions restent **interdites à tous les rôles plateforme, y compris au
-super-administrateur** : `plan.approve`, `period.close`, `report.export` et, depuis
-ADR-0021, `fiscal.manage`. Un employé de la plateforme ne valide jamais un plan
-client, n'exporte jamais ses données et ne touche jamais à son identité fiscale.
+Cinq actions restent **interdites à tous les rôles plateforme, y compris au
+super-administrateur** : `plan.approve`, `period.close`, `report.export`, depuis
+ADR-0021 `fiscal.manage` et, depuis ADR-0023, `sales.invoice`. Un employé de la
+plateforme ne valide jamais un plan client, n'exporte jamais ses données, ne touche
+jamais à son identité fiscale et n'émet jamais de facture en son nom.
 
 ### Migration depuis `owner | member`
 
@@ -154,7 +172,7 @@ portant `audit.read`.
 
 ### Couverture de tests
 
-- Matrice rôle × action : 252 cas unitaires (8 × 18 + 6 × 18), exhaustifs (une
+- Matrice rôle × action : 266 cas unitaires (8 × 19 + 6 × 19), exhaustifs (une
   case absente ne compile pas).
 - Matrice appliquée bout en bout : 91 cas vérifiés sur le réseau — la preuve que
   les guards l'appliquent, pas seulement qu'elle est déclarée.

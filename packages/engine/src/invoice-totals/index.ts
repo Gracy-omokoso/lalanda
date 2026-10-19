@@ -33,3 +33,13 @@ export {
   type InvoiceTotalsReferenceCase,
   type ReferenceExpectation,
 } from './reference-cases.js';
+
+// ADR-0023 § S25e.9 (jalon E0) : types figés et signatures ; corps livrés par E1.
+export * from './invoice-checks.types.js';
+export { checkPayments, reconcilePayments } from './payments.js';
+export {
+  CURRENCY_CONVERSION_VERSION,
+  convertDocumentToCdf,
+  decimalFromJsonRate,
+} from './conversion.js';
+export { checkCreditNote, remainingQuantities } from './credit-notes.js';

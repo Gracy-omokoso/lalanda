@@ -110,6 +110,10 @@ const ACTIONS_SANS_ROUTE: Record<string, string> = {
     'Aucune route de modification de projet en S20a : `POST /projects/:id/drivers` ' +
     'relève de `inputs.update`, et il n’existe ni `PATCH /projects/:id` ni ' +
     'renommage. L’action est déclarée par docs/12 et attend son endpoint.',
+  'sales.invoice':
+    'Déclarée au jalon E0 d’ADR-0023 (contrat seulement) : les routes ' +
+    '`POST /sales/invoices/:id/issue` et `…/normalize` arrivent avec le chantier E2, ' +
+    'qui retirera cette ligne et écrira la sonde.',
 };
 
 /** Une sonde HTTP : la route qui matérialise une action, et ses statuts légitimes. */

@@ -4,6 +4,14 @@ Statut : Proposed
 Date : 2026-10-19
 Décideurs : Gracy Omokoso (décisions produit) ; CTO Lalanda (contrat technique)
 
+> **Amendé par [ADR-0023](ADR-0023-factures-et-avoirs.md) (19 oct. 2026).** (1) § S25c.3 :
+> le champ `currency` de `catalog_items` accepte `'CDF' | 'USD'` (au lieu de `'CDF'`
+> seul) ; le prix d'un article s'entend dans sa devise (chantier E4 d'ADR-0023). (2) La
+> décision ouverte n° 2 (« prix en dollars ? ») est tranchée par la décideuse le 19 oct.
+> 2026 : devise au choix, conversion en CDF à la seule normalisation. (3) Le moteur
+> `invoice-totals` reçoit des fonctions pures nouvelles (paiements, conversion, avoirs) ;
+> `computeInvoiceTotals` et `INVOICE_TOTALS_VERSION` sont inchangés.
+
 ## Contexte
 
 ### Où l'on en est
