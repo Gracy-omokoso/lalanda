@@ -9,10 +9,11 @@
 // Trois ensembles fermés (docs/26 « états représentés par unions fermées ») :
 //   1. ORG_ROLES       — les 8 rôles d'organisation (ADR-0012 §1);
 //   2. PLATFORM_ROLES  — les 6 rôles plateforme, préfixés `platform_` (§2);
-//   3. ACTIONS         — les 18 actions granulaires, dans l'ordre de docs/12
+//   3. ACTIONS         — les 19 actions granulaires, dans l'ordre de docs/12
 //                        (la seizième, `fiscal.manage`, vient d'ADR-0021 §8 ;
 //                        la dix-septième et la dix-huitième, `sales.read` et
-//                        `sales.manage`, d'ADR-0022 § S25c.1).
+//                        `sales.manage`, d'ADR-0022 § S25c.1 ; la dix-neuvième,
+//                        `sales.invoice`, d'ADR-0023 § S25e.11).
 //
 // Refus par défaut (docs/17 § Autorisation) : les matrices sont exhaustives, une
 // case absente ne compile pas, et une case `deny` est un refus.
@@ -88,13 +89,14 @@ export const PLATFORM_ROLES = [
 export type PlatformRole = (typeof PLATFORM_ROLES)[number];
 
 /**
- * Les 18 actions granulaires (docs/12 § Actions granulaires, ordre du document).
+ * Les 19 actions granulaires (docs/12 § Actions granulaires, ordre du document).
  *
  * `fiscal.manage` (ADR-0021 §8) est ajoutée EN FIN de liste, et non à côté
  * d'`organization.manage` : l'ordre est celui de docs/12, que l'interface et les
  * tests reprennent tel quel. L'insérer ailleurs déplacerait des lignes sans rien
  * changer au sens. `sales.read` et `sales.manage` (ADR-0022 § S25c.1) suivent la
- * même règle : dix-septième et dix-huitième, en fin de liste.
+ * même règle : dix-septième et dix-huitième, en fin de liste. `sales.invoice`
+ * (ADR-0023 § S25e.11) est la dix-neuvième.
  */
 export const ACTIONS = [
   'organization.manage',
@@ -115,6 +117,7 @@ export const ACTIONS = [
   'fiscal.manage',
   'sales.read',
   'sales.manage',
+  'sales.invoice',
 ] as const;
 
 export type Action = (typeof ACTIONS)[number];
@@ -189,7 +192,7 @@ export type OrgGrant = 'allow' | 'deny' | 'allow_sod' | 'allow_project' | 'condi
 /**
  * MATRICE RÔLE ORGANISATION × ACTION — transcription littérale d'ADR-0012 §3.
  *
- * Le type impose 8 rôles × 18 actions : oublier une case ne compile pas.
+ * Le type impose 8 rôles × 19 actions : oublier une case ne compile pas.
  * `permissions.test.ts` redéclare cette matrice en littéral (elle n'est PAS
  * importée d'ici) : toute modification de production casse le test et force une
  * mise à jour consciente de l'ADR et de docs/12. C'est le garde-fou central.
@@ -224,6 +227,9 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       // sa propre action au lot S25e).
       'sales.read': 'allow',
       'sales.manage': 'allow',
+      // ADR-0023 § S25e.11 : émettre ou normaliser une facture ou un avoir engage
+      // le contribuable — action distincte de la préparation (`sales.manage`).
+      'sales.invoice': 'allow',
     },
     // Administrateur — « membres, projets, paramètres ». Gouvernance technique,
     // pas autorité financière : ni `billing.manage`, ni `plan.approve`, ni
@@ -251,6 +257,9 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       // les tient, contrairement à `fiscal.manage` (ADR-0022 § S25c.1).
       'sales.read': 'allow',
       'sales.manage': 'allow',
+      // Prépare les brouillons mais n'émet pas : émettre engage le contribuable
+      // (ADR-0023 § S25e.11, décision ouverte n° 1).
+      'sales.invoice': 'deny',
     },
     // Directeur financier — « plans, validation, réalisé, rapports ». L'autorité
     // financière : approuve et clôture. Cible de la migration des anciens `member`
@@ -274,6 +283,7 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'fiscal.manage': 'allow',
       'sales.read': 'allow',
       'sales.manage': 'allow',
+      'sales.invoice': 'allow',
     },
     // Comptable — « réalisé, mapping, clôture selon permission ». Constate, ne
     // projette pas : ni `inputs.update`, ni `plan.calculate`. Contrepartie de R2.
@@ -297,6 +307,8 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       // Le Comptable tient la facturation au quotidien (ADR-0022 § S25c.1, O2).
       'sales.read': 'allow',
       'sales.manage': 'allow',
+      // Émet et normalise au quotidien (ADR-0023 § S25e.11).
+      'sales.invoice': 'allow',
     },
     // Analyste — « scénarios, analyses, commentaires ». Modélise et calcule,
     // n'approuve ni n'importe le réalisé.
@@ -320,6 +332,7 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       // Consulte le fichier clients et le catalogue, ne les modifie pas.
       'sales.read': 'allow',
       'sales.manage': 'deny',
+      'sales.invoice': 'deny',
     },
     // Chef de projet — « projets autorisés et saisie ». Tout est `allow_project` :
     // le rôle n'a de sens qu'avec des assignations de projet, qui n'existent pas
@@ -344,6 +357,7 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       // Rôle borné aux projets et non attribuable : rien sur les ventes.
       'sales.read': 'deny',
       'sales.manage': 'deny',
+      'sales.invoice': 'deny',
     },
     // Conseiller — « consultation, commentaires, recommandations ». Typiquement
     // EXTERNE (mentor, banquier invité) : pas de `report.export`, on lui ouvre la
@@ -369,6 +383,7 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       // personnelles, il ne lui est pas ouvert (ADR-0022 § S25c.1).
       'sales.read': 'deny',
       'sales.manage': 'deny',
+      'sales.invoice': 'deny',
     },
     // Lecteur — lecture seulement. `analytics.read` est conservé : le refuser
     // viderait le rôle de son sens (ADR-0012 §3).
@@ -391,6 +406,7 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'fiscal.manage': 'deny',
       'sales.read': 'allow',
       'sales.manage': 'deny',
+      'sales.invoice': 'deny',
     },
   };
 
@@ -440,6 +456,9 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     // `project.read` et `project.update`.
     'sales.read': 'delegated',
     'sales.manage': 'delegated',
+    // ADR-0023 § S25e.11 : un acteur Lalanda n'émet jamais au nom d'un
+    // contribuable, même sous accès délégué — interdit absolu.
+    'sales.invoice': 'forbidden',
   },
   platform_admin: {
     'organization.manage': 'native',
@@ -460,6 +479,7 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'fiscal.manage': 'forbidden',
     'sales.read': 'forbidden',
     'sales.manage': 'forbidden',
+    'sales.invoice': 'forbidden',
   },
   // « Le support ne voit jamais les données financières sans consentement
   // explicite, durée limitée et audit » (docs/12) — d'où trois `delegated` et
@@ -484,6 +504,7 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     // Lecture sous accès délégué, comme `project.read` (ADR-0022 § S25c.1).
     'sales.read': 'delegated',
     'sales.manage': 'forbidden',
+    'sales.invoice': 'forbidden',
   },
   platform_billing: {
     'organization.manage': 'forbidden',
@@ -504,6 +525,7 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'fiscal.manage': 'forbidden',
     'sales.read': 'forbidden',
     'sales.manage': 'forbidden',
+    'sales.invoice': 'forbidden',
   },
   // Vides sur cette matrice : opèrent sur des ressources de portée plateforme
   // (templates, Country Packs) qui n'ont pas d'action granulaire dans docs/12 —
@@ -527,6 +549,7 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'fiscal.manage': 'forbidden',
     'sales.read': 'forbidden',
     'sales.manage': 'forbidden',
+    'sales.invoice': 'forbidden',
   },
   platform_country_pack_manager: {
     'organization.manage': 'forbidden',
@@ -547,18 +570,21 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'fiscal.manage': 'forbidden',
     'sales.read': 'forbidden',
     'sales.manage': 'forbidden',
+    'sales.invoice': 'forbidden',
   },
 };
 
 /**
- * Les quatre interdits absolus de la plateforme (ADR-0012 §4, amendé par ADR-0021 §8).
+ * Les cinq interdits absolus de la plateforme (ADR-0012 §4, amendé par ADR-0021 §8
+ * et ADR-0023 § S25e.11).
  *
  * Aucun rôle plateforme, super-administrateur compris, et aucun accès délégué ne
  * peut approuver un plan, clôturer une période, exporter un rapport client ni
- * gérer son identité fiscale. Approuver et clôturer engagent le client vis-à-vis
+ * gérer son identité fiscale, ni émettre ou normaliser ses factures. Approuver et clôturer engagent le client vis-à-vis
  * de sa banque; exporter produit un fichier de ses données financières;
  * `fiscal.manage` engage le contribuable devant la DGI — un acteur Lalanda ne
- * saisit jamais son jeton e-MCF et ne bascule jamais son régime de facturation.
+ * saisit jamais son jeton e-MCF et ne bascule jamais son régime de facturation ;
+ * `sales.invoice` attribue un numéro de facture et engage de même le contribuable.
  *
  * Cette constante n'est pas décorative : `canPlatform()` la vérifie AVANT la
  * matrice, et un test s'assure qu'aucune case de la matrice ne la contredit.
@@ -568,6 +594,7 @@ export const PLATFORM_FORBIDDEN_ACTIONS: readonly Action[] = [
   'period.close',
   'report.export',
   'fiscal.manage',
+  'sales.invoice',
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -636,7 +663,7 @@ export interface PlatformPermissionContext {
 }
 
 /**
- * Autorisation d'un rôle plateforme. Les quatre interdits absolus sont vérifiés
+ * Autorisation d'un rôle plateforme. Les cinq interdits absolus sont vérifiés
  * en premier : aucune case de matrice ni aucun grant ne peut les lever.
  */
 export function canPlatform(

@@ -20,6 +20,13 @@ Décideurs : CTO Lalanda (délégation Gracy Omokoso), décideur produit
 > Propriétaire, Administrateur, Directeur financier, Comptable. Plateforme : sous accès
 > délégué seulement (super-administrateur pour les deux, support pour la lecture) ;
 > les interdits absolus restent quatre.
+>
+> **Amendé par [ADR-0023](ADR-0023-factures-et-avoirs.md) § S25e.11 (19 oct. 2026).**
+> Une dix-neuvième action, `sales.invoice` (« Émettre et normaliser des factures et des
+> avoirs »), est ajoutée en fin de liste : Propriétaire, Directeur financier et
+> Comptable ; l'Administrateur prépare mais n'émet pas. Interdite à tous les rôles
+> plateforme, super-administrateur compris et même sous accès délégué : les interdits
+> absolus passent de quatre à cinq.
 
 ## Contexte
 

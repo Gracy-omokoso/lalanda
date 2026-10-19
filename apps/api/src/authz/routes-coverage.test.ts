@@ -327,7 +327,7 @@ describe('couverture des routes par le RBAC', () => {
     }
   });
 
-  it('toute action déclarée appartient au vocabulaire des 18 actions', () => {
+  it('toute action déclarée appartient au vocabulaire des 19 actions', () => {
     for (const route of TOUTES_LES_ROUTES) {
       for (const action of route.actions ?? []) {
         expect(ACTIONS, `${route.cle} déclare une action inconnue : ${action}`).toContain(action);
