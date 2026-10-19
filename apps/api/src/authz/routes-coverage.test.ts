@@ -47,6 +47,8 @@ import { ProjectsController } from '../projects/projects.controller.js';
 import { ReportsController } from '../reports/reports.controller.js';
 import { CatalogItemsController } from '../sales/catalog-items.controller.js';
 import { CustomersController } from '../sales/customers.controller.js';
+import { InvoicesController } from '../sales/invoices/invoices.controller.js';
+import { JournalController } from '../sales/invoices/journal.controller.js';
 import { TaxGroupsController } from '../sales/tax-groups.controller.js';
 import { AuditController } from './audit.controller.js';
 import { REQUIRED_PERMISSIONS_KEY, REQUIRED_PLATFORM_ROLES_KEY } from './authz.decorators.js';
@@ -95,6 +97,9 @@ const CONTROLEURS = [
   CustomersController,
   CatalogItemsController,
   TaxGroupsController,
+  // ADR-0023 — documents de vente et journal électronique (S25e).
+  InvoicesController,
+  JournalController,
 ];
 
 /**
@@ -393,6 +398,17 @@ describe('couverture des routes par le RBAC', () => {
       'CatalogItemsController.reactivate': ['sales.manage'],
       'CatalogItemsController.remove': ['sales.manage'],
       'TaxGroupsController.list': ['sales.read'],
+      'InvoicesController.list': ['sales.read'],
+      'InvoicesController.get': ['sales.read'],
+      'InvoicesController.create': ['sales.manage'],
+      'InvoicesController.put': ['sales.manage'],
+      'InvoicesController.remove': ['sales.manage'],
+      'InvoicesController.createCreditNote': ['sales.manage'],
+      'InvoicesController.issue': ['sales.invoice'],
+      'InvoicesController.normalize': ['sales.invoice'],
+      'InvoicesController.backToDraft': ['sales.manage'],
+      'InvoicesController.exchangeRateReference': ['sales.read'],
+      'JournalController.list': ['sales.read'],
     };
     for (const [cle, actions] of Object.entries(attendu)) {
       const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle);

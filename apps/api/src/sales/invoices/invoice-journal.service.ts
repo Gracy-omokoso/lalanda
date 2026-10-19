@@ -9,6 +9,7 @@
 // Exporté : S25f l'appelle pour ses propres transitions (`number_reserved`,
 // `normalized`, `normalization_failed`, `number_released`).
 
+import type { DocumentCurrency } from '@lalanda/engine';
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { ClientSession, Model } from 'mongoose';
@@ -18,7 +19,6 @@ import { JOURNAL_GENESIS_HASH, journalHash } from './canonical.js';
 import type {
   ConversionRateSource,
   CreditNoteNature,
-  DocumentCurrency,
   InvoiceSeries,
   InvoiceType,
   JournalEntryView,

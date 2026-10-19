@@ -614,8 +614,7 @@ export class InvoiceDraftsService {
           outOfScope: item.outOfScope,
           specificTax: specificTaxOf(item.specificTax),
         };
-        // Devise de l'article (CDF tant que le chantier E4 n'est pas fusionné).
-        const itemCurrency: string = item.currency ?? 'CDF';
+        const itemCurrency: string = item.currency;
         const sameCurrency = itemCurrency === input.currency;
         if (!sameCurrency && fields.specificTax?.kind === 'per_unit') {
           problems.push({
@@ -664,7 +663,14 @@ export class InvoiceDraftsService {
         );
       }
 
-      const priced = this.applyDiscount(base, line.quantity, line.discount, at('discount'), problems);
+      const priced = this.applyDiscount(
+        base,
+        line.quantity,
+        line.discount,
+        input.currency,
+        at('discount'),
+        problems,
+      );
       if (priced === null) continue;
       lines.push({
         index,
@@ -708,11 +714,12 @@ export class InvoiceDraftsService {
     base: DecimalString,
     quantity: DecimalString,
     discount: LineDiscount | null,
+    currency: 'CDF' | 'USD',
     path: string,
     problems: SalesIssue[],
   ): Pick<StoredLine, 'unitPrice' | 'originalPrice' | 'priceModification'> | null {
     if (discount === null) return { unitPrice: base, originalPrice: null, priceModification: null };
-    const r = discountedUnitPrice({ originalPrice: base, quantity, discount });
+    const r = discountedUnitPrice({ originalPrice: base, quantity, discount, currency });
     if (!r.ok) {
       problems.push({ path, code: r.issue.code, message: r.issue.message });
       return null;
