@@ -178,7 +178,7 @@ export function NormalizationStatus({
                 ? 'Lalanda renvoie le contenu figé à la DGI. Ne fermez pas cette page.'
                 : 'Lalanda vérifie auprès de la DGI. Ne fermez pas cette page.'}
             </p>
-            <Progression etapes={etapesNormalisation(null, true)} />
+            <Progression etapes={etapesNormalisation(null, true, true)} />
           </>
         ) : (
           <p>{p.resume}</p>
@@ -252,7 +252,7 @@ export function NormalizationStatus({
 
       {p.ecarts && !enCours ? (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[20rem] text-sm">
+          <table className="w-full text-sm">
             <caption className="mb-1 text-left text-xs text-[var(--foreground-muted)]">
               Montants calculés par Lalanda et par la DGI (CDF), tels que conservés
             </caption>
@@ -273,7 +273,7 @@ export function NormalizationStatus({
               {p.ecarts.map((e) => (
                 <tr key={e.champ} className="border-t border-[var(--border)]">
                   <th scope="row" className="py-1 pr-2 text-left font-normal">
-                    {e.libelle} <span className="font-mono text-xs">({e.champ})</span>
+                    {e.libelle} <span className="block font-mono text-xs">({e.champ})</span>
                   </th>
                   <td className="py-1 pr-2 text-right font-mono">{e.lalanda}</td>
                   <td className="py-1 text-right font-mono">{e.dgi}</td>

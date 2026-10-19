@@ -873,6 +873,7 @@ describe('normalisation : chaque ligne du tableau § 9.3', () => {
     expect(pdv.erreur?.message).toMatch(/point de vente n’est pas actif/);
     expect(pdv.erreur?.conduite).toMatch(/rien n’a été transmis/);
     expect(pdv.erreur?.lienFiscalite).toBe(true);
+    expect(pdv.resume).toMatch(/^Le document n’a pas été envoyé à la DGI\./);
     const jeton = presentationNormalisation(
       vue({
         status: 'normalization_failed',
@@ -958,6 +959,13 @@ describe('normalisation : progression lisible', () => {
 
   it('pendant la requête : rien n’est annoncé fait avant la réponse', () => {
     expect(etats(null, true)).toEqual(['en_cours', 'en_cours', 'en_cours', 'en_cours']);
+    // Relance : le gel est acquis, le reste est en cours.
+    expect(etapesNormalisation(null, true, true).map((e) => e.etat)).toEqual([
+      'fait',
+      'en_cours',
+      'en_cours',
+      'en_cours',
+    ]);
     expect(etapesNormalisation(null, true).map((e) => e.libelle)).toEqual([
       'Gel du document et conversion en CDF',
       'Envoi à la DGI',

@@ -236,7 +236,7 @@ export function enteteDocument(
     doc.status === 'pending_normalization'
       ? 'Normalisation en cours auprès de la DGI.'
       : doc.status === 'normalization_failed'
-        ? 'La DGI a refusé la normalisation.'
+        ? 'La normalisation n’a pas abouti : voir le détail ci-dessous.'
         : doc.status === 'draft'
           ? 'Brouillon modifiable.'
           : null;
@@ -1337,12 +1337,15 @@ export function presentationNormalisation(
       };
     case 'failed': {
       const ecart = n?.lastError?.category === 'totals_mismatch' || base.ecarts !== null;
+      const avantEnvoi = n?.lastError?.category === 'precondition';
       return {
         ...base,
         ton: 'attention',
         resume: ecart
           ? `Écart de calcul entre Lalanda et la DGI. ${PRO_FORMA_RESTE}`
-          : `La DGI n’a pas normalisé ce document. ${PRO_FORMA_RESTE}`,
+          : avantEnvoi
+            ? `Le document n’a pas été envoyé à la DGI. ${PRO_FORMA_RESTE}`
+            : `La DGI n’a pas normalisé ce document. ${PRO_FORMA_RESTE}`,
         consignes: a.retry
           ? ['Vous pouvez relancer la normalisation : le contenu figé sera renvoyé à l’identique.']
           : [],
@@ -1419,10 +1422,12 @@ function etatsApresReponse(doc: Pick<InvoiceView, 'status' | 'normalization'>): 
 export function etapesNormalisation(
   doc: Pick<InvoiceView, 'status' | 'normalization'> | null,
   enCours: boolean,
+  /** Relance ou vérification : le document est figé depuis longtemps. */
+  dejaFige = false,
 ): EtapeNormalisation[] {
   const etats: QuatreEtats =
     enCours || doc === null
-      ? ['en_cours', 'en_cours', 'en_cours', 'en_cours']
+      ? [dejaFige ? 'fait' : 'en_cours', 'en_cours', 'en_cours', 'en_cours']
       : etatsApresReponse(doc);
   const cles: EtapeNormalisation['cle'][] = ['gel', 'envoi', 'comparaison', 'confirmation'];
   return cles.map((cle, i) => ({
