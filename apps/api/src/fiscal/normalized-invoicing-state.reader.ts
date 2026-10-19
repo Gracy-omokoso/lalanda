@@ -11,7 +11,7 @@
 
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import type { Model } from 'mongoose';
+import type { ClientSession, Model } from 'mongoose';
 
 import type { EdefEnvironment } from '../platform-config/dgi-platform.config.js';
 import {
@@ -45,8 +45,19 @@ export class NormalizedInvoicingStateReader {
     private readonly model: Model<NormalizedInvoicingSettingsDocument>,
   ) {}
 
-  async read(organizationId: string): Promise<NormalizedInvoicingSnapshot> {
-    const doc = await this.model.findOne({ organizationId }).lean().exec();
+  /**
+   * `opts.session` : lecture DANS la transaction de l'appelant (ADR-0023
+   * § S25e.6 : le mode d'émission est lu dans la transaction qui gèle une
+   * facture). Sans session, comportement inchangé.
+   */
+  async read(
+    organizationId: string,
+    opts: { session?: ClientSession } = {},
+  ): Promise<NormalizedInvoicingSnapshot> {
+    const doc = await this.model
+      .findOne({ organizationId }, null, opts.session ? { session: opts.session } : {})
+      .lean()
+      .exec();
     if (!doc) return DEFAULT_SNAPSHOT;
     return {
       state: doc.state,

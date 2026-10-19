@@ -85,9 +85,14 @@ export class NormalizedInvoicingService {
   /**
    * Mode d'émission des factures (contrat des lots suivants, ADR-0021 §11) :
    * `'normalized'` si et seulement si la facture normalisée est activée.
+   * `opts.session` : lecture dans la transaction de gel d'une facture
+   * (ADR-0023 § S25e.6, étape 2).
    */
-  async emissionModeOf(organizationId: string): Promise<'normalized' | 'standard'> {
-    const settings = await this.state.read(organizationId);
+  async emissionModeOf(
+    organizationId: string,
+    opts: { session?: ClientSession } = {},
+  ): Promise<'normalized' | 'standard'> {
+    const settings = await this.state.read(organizationId, opts);
     return settings.state === 'enabled' ? 'normalized' : 'standard';
   }
 
