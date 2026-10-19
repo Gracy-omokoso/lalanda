@@ -330,7 +330,7 @@ Tant que le serveur dit `documentKind = proforma` (brouillon, normalisation en c
 
 ### Composer, puis émettre ou normaliser
 
-- Client enregistré, ou **vente de comptoir** (personne physique, nom facultatif). Lignes **du catalogue** (prix de l’article, ou prix à saisir si l’article est dans une autre devise : aucune conversion au brouillon) ou **libres** (désignation, groupe de la liste DGI, type admis, taxe spécifique, hors champ en A). Quantité à trois décimales, remise en % ou en montant. **Mode TTC/HT** obligatoire, **devise CDF ou USD**.
+- Client enregistré, ou **vente de comptoir** (personne physique, nom facultatif). Lignes **du catalogue** (prix de l’article, ou prix à saisir si l’article est dans une autre devise : aucune conversion au brouillon ; sinon refus `CATALOG_CURRENCY_MISMATCH` affiché sous la ligne) ou **libres** (désignation, groupe de la liste DGI, type admis, taxe spécifique, hors champ en A). Quantité à trois décimales, remise en % ou en montant. **Mode TTC/HT** obligatoire, **devise CDF ou USD**.
 - **Paiements multiples** parmi les sept modes e-DEF, dont **Crédit** (part non réglée). « Un seul paiement égal au total » **recopie** le total servi par l’API.
 - Commentaires : ligne A automatique pour un client AO, saisissable en groupe D ; ligne C libre ; les autres sont réservées.
 - Le brouillon s’enregistre même incomplet ; l’API renvoie ses totaux et la liste de ce qui empêche encore de le figer (`readiness.blockers`), affichée telle quelle.
@@ -350,7 +350,6 @@ Le panneau des montants a deux colonnes fixes : **« Montants du document (USD) 
 ### Limites
 
 - Pas d’impression ni de PDF (S25g) ; normalisation réelle auprès de la DGI : S25f (jusque-là un document normalisé reste « en attente DGI »).
-- La vue du contrat ne renvoie pas `showUsdCounterValue` : la case « contre-valeur en dollars » d’un brouillon en CDF n’est pas relue à la réouverture.
 - Aucun aperçu des montants CDF avant « Normaliser » : le contrat n’a pas de route d’aperçu.
 
 ## Implémenté (S21b) — Espace admin plateforme

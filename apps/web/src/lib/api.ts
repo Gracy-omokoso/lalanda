@@ -1966,6 +1966,8 @@ export interface InvoiceView {
   typeLabel: string;
   currency: DocumentCurrency;
   priceMode: InvoicePriceMode;
+  /** Document en CDF : contre-valeur USD demandée (relue à la réouverture d'un brouillon). */
+  showUsdCounterValue: boolean;
   emissionMode: EmissionMode | null;
   environment: EdefEnvironment | null;
   isf: string | null;

@@ -343,8 +343,6 @@ export function InvoiceEditor({
   const recharger = (v: InvoiceView): void => {
     setVue(v);
     const f = formulaireDepuisVue(v, origine);
-    // La case de contre-valeur n'est pas renvoyée par la vue : on garde la saisie.
-    f.showUsdCounterValue = form.showUsdCounterValue;
     setForm(f);
     setReference(JSON.stringify(f));
     onChange?.(v);

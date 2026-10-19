@@ -637,7 +637,7 @@ export function formulaireDepuisVue(
     commentC: vue.comments.C ?? '',
     nature: vue.creditNote?.nature ?? null,
     originInvoiceId: vue.creditNote?.originInvoiceId ?? null,
-    showUsdCounterValue: vue.normalizedAmounts?.counterValueUsd != null,
+    showUsdCounterValue: vue.showUsdCounterValue,
   };
 }
 

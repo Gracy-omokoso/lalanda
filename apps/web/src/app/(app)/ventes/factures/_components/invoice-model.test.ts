@@ -8,6 +8,8 @@ import { describe, expect, it } from 'vitest';
 
 import type { InvoiceSummary, InvoiceView } from '@/lib/api';
 
+import { erreursFormulaire } from '../../_components/sales-model';
+
 import {
   actionsDocument,
   comparerDecimaux,
@@ -56,6 +58,7 @@ function vue(partiel: Partial<InvoiceView> = {}): InvoiceView {
     typeLabel: 'Facture de vente',
     currency: 'USD',
     priceMode: 'ht',
+    showUsdCounterValue: false,
     emissionMode: 'normalized',
     environment: 'test',
     isf: 'TEST-ISF',
@@ -330,6 +333,8 @@ describe('montants : recopiés de l’API, mis en forme par chaîne', () => {
   it('taux de change et dates DGI', () => {
     expect(formatTauxChange('2262.32')).toBe(`2${NNBSP}262,32 CDF pour 1 USD`);
     expect(formatTauxChange('2262.3215')).toBe(`2${NNBSP}262,3215 CDF pour 1 USD`);
+    // Taux saisi dont l'API a retiré les zéros finaux (`"2270.00"` → `"2270"`).
+    expect(formatTauxChange('2270')).toBe(`2${NNBSP}270 CDF pour 1 USD`);
     expect(formatDateDgi('2026-10-19T00:00:00+01:00')).toBe('19 oct. 2026');
   });
 });
@@ -451,6 +456,32 @@ describe('préparation du corps (contrat § S25e.14)', () => {
       { source: 'origin', originLineIndex: 0, quantity: '1' },
     ]);
     expect(r.ok && r.corps.creditNote).toEqual({ nature: 'RAM', originInvoiceId: origine.id });
+  });
+
+  it('reprise d’un brouillon : la case de contre-valeur USD est relue de la vue', () => {
+    expect(
+      formulaireDepuisVue(vue({ status: 'draft', currency: 'CDF', showUsdCounterValue: true }))
+        .showUsdCounterValue,
+    ).toBe(true);
+  });
+
+  it('400 CATALOG_CURRENCY_MISMATCH : rangé sous le prix de la ligne', () => {
+    const err = erreurApi(400, {
+      code: 'INVALID_REQUEST',
+      message: 'x',
+      details: {
+        issues: [
+          {
+            path: 'lines.0.unitPrice',
+            code: 'CATALOG_CURRENCY_MISMATCH',
+            message: 'Le prix de cet article est en USD : saisissez le prix unitaire en CDF.',
+          },
+        ],
+      },
+    });
+    const e = erreursFormulaire(err, ['lines.0.unitPrice']);
+    expect(e.champs['lines.0.unitPrice']).toMatch(/en USD/);
+    expect(e.autres).toEqual([]);
   });
 
   it('reprise d’un brouillon : prix avant remise, prix d’article non surchargé laissé vide', () => {
