@@ -1635,11 +1635,7 @@ export interface TaxGroupList {
 export type DecimalString = string;
 
 export type InvoiceStatus =
-  | 'draft'
-  | 'issued'
-  | 'pending_normalization'
-  | 'normalized'
-  | 'normalization_failed';
+  'draft' | 'issued' | 'pending_normalization' | 'normalized' | 'normalization_failed';
 /** Filtre de liste : les statuts, plus `final` (`issued` + `normalized`) et `all`. */
 export type InvoiceListStatus = InvoiceStatus | 'final' | 'all';
 /** Six types e-DEF : vente, acompte, avoir, et leurs pendants à l'export. */
@@ -1656,19 +1652,10 @@ export type InvoiceLineSource = 'catalog' | 'free' | 'origin';
 export type CommentLine = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H';
 export type InvoiceComments = Readonly<Record<CommentLine, string | null>>;
 export type ConversionRateSource =
-  | 'dgi_currency_rates'
-  | 'user_within_tolerance'
-  | 'identity'
-  | 'origin_invoice';
+  'dgi_currency_rates' | 'user_within_tolerance' | 'identity' | 'origin_invoice';
 /** Modes de paiement e-DEF (distincts des moyens de paiement de l'abonnement). */
 export type InvoicePaymentMethod =
-  | 'ESPECES'
-  | 'VIREMENT'
-  | 'CARTEBANCAIRE'
-  | 'MOBILEMONEY'
-  | 'CHEQUES'
-  | 'CREDIT'
-  | 'AUTRE';
+  'ESPECES' | 'VIREMENT' | 'CARTEBANCAIRE' | 'MOBILEMONEY' | 'CHEQUES' | 'CREDIT' | 'AUTRE';
 export type JournalEvent =
   | 'issued'
   | 'submitted'
@@ -1681,8 +1668,7 @@ export type JournalEvent =
   | 'report_issued';
 
 export type LineDiscount =
-  | { kind: 'percent'; value: DecimalString }
-  | { kind: 'total_amount'; value: DecimalString };
+  { kind: 'percent'; value: DecimalString } | { kind: 'total_amount'; value: DecimalString };
 
 export interface PaymentInput {
   method: InvoicePaymentMethod;
