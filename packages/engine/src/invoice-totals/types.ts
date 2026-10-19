@@ -140,5 +140,4 @@ export interface InvoiceTotalsIssue {
  * premier : l'écran de facture doit pouvoir signaler chaque ligne fautive d'un coup.
  */
 export type InvoiceTotalsResult =
-  | { ok: true; totals: InvoiceTotals }
-  | { ok: false; issues: readonly InvoiceTotalsIssue[] }; // TOUS les problèmes, pas le premier
+  { ok: true; totals: InvoiceTotals } | { ok: false; issues: readonly InvoiceTotalsIssue[] };
