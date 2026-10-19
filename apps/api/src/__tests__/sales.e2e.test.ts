@@ -470,7 +470,9 @@ e2eSuite('ventes — clients, catalogue, groupes de taxation (ADR-0022 chantier 
         'SPECIFIC_TAX_NOT_ALLOWED',
       ],
       [{ taxGroup: 'Q' }, 'UNKNOWN_TAX_GROUP'],
-      [{ currency: 'USD' }, 'CURRENCY_NOT_SUPPORTED'],
+      [{ currency: 'EUR' }, 'CURRENCY_NOT_SUPPORTED'],
+      [{ currency: 'usd' }, 'CURRENCY_NOT_SUPPORTED'],
+      [{ currency: null }, 'CURRENCY_NOT_SUPPORTED'],
       [{ specificTax: { kind: 'per_unit', amount: 75 } }, 'DECIMAL_MUST_BE_STRING'],
     ])('%j → 400 %s', async (patch, code) => {
       const res = await post(asA('owner'), '/sales/catalog-items', {
@@ -480,6 +482,59 @@ e2eSuite('ventes — clients, catalogue, groupes de taxation (ADR-0022 chantier 
       });
       expect(res.status).toBe(400);
       expect(issueCodes(res)).toContain(code);
+    });
+
+    it('devise USD (ADR-0023 E4) : article créé, listé, modifié, sans conversion', async () => {
+      const code = `USD-${tag}`;
+      const created = await post(asA('owner'), '/sales/catalog-items', {
+        ...ARTICLE,
+        code,
+        unitPrice: '40',
+        currency: 'USD',
+      });
+      expect(created.status, JSON.stringify(created.body)).toBe(201);
+      expect(created.body).toMatchObject({ currency: 'USD', unitPrice: '40.00' });
+
+      const listed = await get(asA('owner'), `/sales/catalog-items?q=${code}`);
+      expect(listed.status).toBe(200);
+      expect(listed.body.items).toHaveLength(1);
+      expect(listed.body.items[0]).toMatchObject({ currency: 'USD', unitPrice: '40.00' });
+
+      // Modification : le prix reste en USD ; retour au CDF possible, sans conversion.
+      const usd = await put(asA('owner'), `/sales/catalog-items/${created.body.id}`, {
+        ...ARTICLE,
+        code,
+        unitPrice: '42.5',
+        currency: 'USD',
+        expectedRevision: 1,
+      });
+      expect(usd.status, JSON.stringify(usd.body)).toBe(200);
+      expect(usd.body).toMatchObject({ currency: 'USD', unitPrice: '42.50', revision: 2 });
+      const cdf = await put(asA('owner'), `/sales/catalog-items/${created.body.id}`, {
+        ...ARTICLE,
+        code,
+        unitPrice: '96150',
+        currency: 'CDF',
+        expectedRevision: 2,
+      });
+      expect(cdf.status).toBe(200);
+      expect(cdf.body).toMatchObject({ currency: 'CDF', unitPrice: '96150.00' });
+      const lu = await get(asA('owner'), `/sales/catalog-items/${created.body.id}`);
+      expect(lu.body.currency).toBe('CDF');
+    });
+
+    it('devise absente → CDF ; article existant sans le champ lu en CDF', async () => {
+      const { currency: _omise, ...sansDevise } = ARTICLE;
+      const res = await post(asA('owner'), '/sales/catalog-items', { ...sansDevise, code: null });
+      expect(res.status).toBe(201);
+      expect(res.body.currency).toBe('CDF');
+
+      // Article antérieur à E4 : champ retiré directement en base.
+      const a = await createItem({ code: null });
+      await db
+        .collection('catalog_items')
+        .updateOne({ _id: new ObjectId(a.id) }, { $unset: { currency: '' } });
+      expect((await get(asA('owner'), `/sales/catalog-items/${a.id}`)).body.currency).toBe('CDF');
     });
 
     it('hors champ en groupe A : edefCode « HORS CHAMP », code propre conservé', async () => {

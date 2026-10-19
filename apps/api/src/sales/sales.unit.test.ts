@@ -125,6 +125,14 @@ describe('catalogue', () => {
     expect(res.success && res.data.unitPrice).toBe('464.00');
   });
 
+  it('devise : USD admis tel quel, CDF par défaut (ADR-0023 E4)', () => {
+    const usd = CreateCatalogItemSchema.safeParse({ ...ARTICLE, unitPrice: '40', currency: 'USD' });
+    expect(usd.success && usd.data).toMatchObject({ currency: 'USD', unitPrice: '40.00' });
+    const { currency: _omise, ...sansDevise } = ARTICLE;
+    const cdf = CreateCatalogItemSchema.safeParse(sansDevise);
+    expect(cdf.success && cdf.data.currency).toBe('CDF');
+  });
+
   it.each([
     [{ itemType: 'TAX' }, 'ITEM_TYPE_NOT_ALLOWED_FOR_GROUP'],
     [{ taxGroup: 'L' }, 'ITEM_TYPE_NOT_ALLOWED_FOR_GROUP'],
@@ -135,7 +143,9 @@ describe('catalogue', () => {
     [{ unitPrice: '1.234' }, 'PRICE_TOO_PRECISE'],
     [{ unitPrice: '0' }, 'PRICE_NOT_POSITIVE'],
     [{ taxGroup: 'Q' }, 'UNKNOWN_TAX_GROUP'],
-    [{ currency: 'USD' }, 'CURRENCY_NOT_SUPPORTED'],
+    [{ currency: 'EUR' }, 'CURRENCY_NOT_SUPPORTED'],
+    [{ currency: 'usd' }, 'CURRENCY_NOT_SUPPORTED'],
+    [{ currency: null }, 'CURRENCY_NOT_SUPPORTED'],
     [
       { taxGroup: 'N', itemType: 'TAX', specificTax: { kind: 'per_unit', amount: '1' } },
       'SPECIFIC_TAX_NOT_ALLOWED',

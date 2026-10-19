@@ -13,6 +13,7 @@
 
 import {
   OUT_OF_SCOPE_ITEM_CODE,
+  type DocumentCurrency,
   type ItemType,
   type PriceMode,
   type SpecificTax,
@@ -56,7 +57,7 @@ export interface CatalogItemView {
   outOfScope: boolean;
   unitPrice: string;
   priceMode: PriceMode;
-  currency: 'CDF';
+  currency: DocumentCurrency;
   unit: string;
   specificTax: SpecificTax | null;
   active: boolean;
@@ -100,7 +101,8 @@ export function catalogItemView(
     outOfScope: doc.outOfScope,
     unitPrice: doc.unitPrice,
     priceMode: doc.priceMode,
-    currency: doc.currency,
+    // Défensif : un document sans le champ (antérieur à E4) se lit en CDF.
+    currency: doc.currency ?? 'CDF',
     unit: doc.unit,
     specificTax: specificTaxView(doc.specificTax),
     active: doc.active,
