@@ -780,6 +780,14 @@ const MESSAGES_PROBLEMES: Record<string, string> = {
   INVALID_VALUE: 'Valeur refusée.',
 };
 
+const SESSION_EXPIREE = 'Votre session a expiré. Reconnectez-vous pour continuer.';
+
+function statutDe(err: unknown): unknown {
+  return typeof err === 'object' && err !== null && 'status' in err
+    ? (err as { status: unknown }).status
+    : null;
+}
+
 /** Message en français d'une erreur de l'espace Ventes. */
 export function messageVentes(err: unknown, repli: string): string {
   const code = codeErreur(err);
@@ -790,6 +798,8 @@ export function messageVentes(err: unknown, repli: string): string {
     if (typeof m === 'string' && m !== '') return m;
   }
   if (code && MESSAGES_VENTES[code]) return MESSAGES_VENTES[code]!;
+  // 401 sans code connu : la session a expiré. « HTTP 401 » n'apprend rien.
+  if (statutDe(err) === 401) return SESSION_EXPIREE;
   return err instanceof Error && err.message !== '' ? err.message : repli;
 }
 

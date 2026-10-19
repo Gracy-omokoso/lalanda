@@ -839,6 +839,12 @@ describe('erreurs de l’API (§ S25c.5)', () => {
     ).toBe('q : 100 caractères au plus.');
   });
 
+  it('dit qu’une session a expiré plutôt que « HTTP 401 »', () => {
+    expect(messageVentes(erreurApi(401, 'Unauthorized'), 'r')).toBe(
+      'Votre session a expiré. Reconnectez-vous pour continuer.',
+    );
+  });
+
   it('retombe sur le message de l’erreur, puis sur le repli', () => {
     expect(messageVentes(new Error('HTTP 500'), 'Repli')).toBe('HTTP 500');
     expect(messageVentes(null, 'Repli')).toBe('Repli');
