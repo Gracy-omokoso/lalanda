@@ -8,7 +8,10 @@ import type { InvoiceCheckIssue, PaymentInput, PaymentsCheck } from './invoice-c
 import type { DecimalString } from './types.js';
 
 /** Somme des paiements = total, chaque montant > 0 ; part `CREDIT` dans `amountOnCredit`. */
-export function checkPayments(total: DecimalString, payments: readonly PaymentInput[]): PaymentsCheck {
+export function checkPayments(
+  total: DecimalString,
+  payments: readonly PaymentInput[],
+): PaymentsCheck {
   throw new Error('E1');
 }
 

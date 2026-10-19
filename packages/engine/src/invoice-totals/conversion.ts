@@ -4,10 +4,7 @@
 // Jalon E0 : signatures seulement, figées. Les corps appartiennent au chantier E1.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type {
-  CurrencyConversionInput,
-  CurrencyConversionResult,
-} from './invoice-checks.types.js';
+import type { CurrencyConversionInput, CurrencyConversionResult } from './invoice-checks.types.js';
 import type { DecimalString } from './types.js';
 
 /** Taux de change reçu de la DGI (nombre JSON) → décimal canonique, jusqu'à 8 décimales ;
