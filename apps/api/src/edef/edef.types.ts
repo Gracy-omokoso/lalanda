@@ -57,6 +57,13 @@ export interface EdefFailure {
   kind: EdefFailureKind;
   httpStatus: number | null;
   dgiErrorCode: string | null;
+  /**
+   * Libellé d'erreur DGI (`errorDesc`) TEL QUE REÇU, seulement assaini (secrets
+   * rédigés, sauts de ligne aplatis, 300 caractères au plus) : la DGI exige de
+   * l'afficher avec son code (ADR-0024 § 5). Ajout ADR-0024 (F1), facultatif
+   * pour les appelants d'avant ce lot ; le client le renseigne toujours.
+   */
+  dgiErrorDesc?: string | null;
   /** Français, assaini (`redaction.ts`), affichable. */
   message: string;
 }

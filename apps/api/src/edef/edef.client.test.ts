@@ -11,10 +11,10 @@ import {
   DEFAULT_NORMALIZATION_TIMINGS,
   type DgiPlatformConfig,
 } from '../platform-config/dgi-platform.config.js';
-import { EdefExchangeJournal, type EdefExchangeEntry } from './edef-exchange.journal.js';
 import { EdefClient } from './edef.client.js';
 import type { EdefCallContext, EdefFailureKind } from './edef.types.js';
 import { startFakeEdefServer, type FakeEdefServer } from './testing/fake-edef-server.js';
+import { MemoryEdefExchangeJournal as MemoryJournal } from './testing/memory-edef-journal.js';
 
 const FUTUR = '2027-01-31T00:00:00';
 const JETONS = {
@@ -26,13 +26,6 @@ const JETONS = {
   business: 'jeton-metier-0123456789abcde',
   oversized: 'jeton-enorme-0123456789abcde',
 };
-
-class MemoryJournal extends EdefExchangeJournal {
-  entries: EdefExchangeEntry[] = [];
-  async append(entry: EdefExchangeEntry): Promise<void> {
-    this.entries.push(entry);
-  }
-}
 
 describe('EdefClient', () => {
   let fake: FakeEdefServer;
@@ -151,6 +144,9 @@ describe('EdefClient', () => {
     expect(nouveaux.map((e) => e.outcome)).toEqual(['ok', 'unauthorized']);
     for (const e of nouveaux) {
       expect(e.method).toBe('GET');
+      // Journal v2 (ADR-0024 § 6) : une lecture = une seule entrée `complete`.
+      expect(e.entry).toBe('complete');
+      expect(e.exchangeId).toMatch(/^[0-9a-f-]{36}$/);
       expect(e.requestBody).toBeNull();
       expect(Object.keys(e)).not.toContain('headers');
       expect(JSON.stringify(e)).not.toContain(JETONS.ok);
