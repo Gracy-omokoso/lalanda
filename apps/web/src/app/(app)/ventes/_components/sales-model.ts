@@ -475,7 +475,14 @@ const FORMAT_CODE = /^[A-Za-z0-9._/-]+$/;
 
 /** Le code saisi imite-t-il la valeur réservée (casse et espaces ignorés) ? */
 export function codeReserve(code: string): boolean {
-  return code.trim().replace(/\s+/g, ' ').toUpperCase() === OUT_OF_SCOPE_ITEM_CODE;
+  // Même repliement que l'API (`isReservedItemCode`) : casse ignorée, et les
+  // séparateurs « . _ / - » valent une espace (« hors-champ », « HORS_CHAMP »).
+  return (
+    code
+      .toUpperCase()
+      .replace(/[\s._/-]+/g, ' ')
+      .trim() === OUT_OF_SCOPE_ITEM_CODE
+  );
 }
 
 /**
@@ -750,6 +757,27 @@ const MESSAGES_PROBLEMES: Record<string, string> = {
   CODE_RESERVED:
     'Ce code est réservé à la DGI. Pour une opération hors champ, cochez « Opération hors champ ».',
   UNKNOWN_TAX_GROUP: 'Ce groupe de taxation n’est pas proposé. Choisissez-en un dans la liste.',
+  // Codes précisés par l'API (chantier D1).
+  NAME_TOO_LONG: '200 caractères au plus.',
+  PHONE_INVALID: 'Numéro de téléphone invalide, par exemple +243 800 000 000.',
+  EMAIL_INVALID: 'Adresse e-mail invalide.',
+  ADDRESS_TOO_LONG: '255 caractères au plus.',
+  EXEMPTION_REFERENCE_TOO_LONG: '200 caractères au plus.',
+  CODE_INVALID:
+    'Code invalide : 1 à 50 lettres sans accent, chiffres et les signes . _ / - seulement.',
+  ITEM_TYPE_INVALID: 'Choisissez le type d’article : bien, service ou taxe.',
+  PRICE_INVALID: 'Montant invalide : des chiffres et une virgule, par exemple 1 234,50.',
+  PRICE_MODE_INVALID: 'Indiquez si le prix est TTC ou HT.',
+  CURRENCY_NOT_SUPPORTED: 'Seul le franc congolais (CDF) est admis pour l’instant.',
+  UNIT_REQUIRED: 'L’unité est obligatoire (pièce, kg, heure…).',
+  UNIT_TOO_LONG: '20 caractères au plus.',
+  SPECIFIC_TAX_INVALID:
+    'Taxe spécifique invalide : un montant ou un taux strictement positif (taux inférieur à 100 %), deux décimales au plus.',
+  // Codes génériques de forme.
+  UNKNOWN_FIELD: 'Champ non reconnu par le serveur.',
+  FIELD_REQUIRED: 'Ce champ est obligatoire.',
+  INVALID_TYPE: 'Valeur manquante ou invalide.',
+  INVALID_VALUE: 'Valeur refusée.',
 };
 
 /** Message en français d'une erreur de l'espace Ventes. */

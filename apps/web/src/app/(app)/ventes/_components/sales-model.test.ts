@@ -497,7 +497,11 @@ describe('code DGI d’un article', () => {
   it('repère la valeur réservée saisie à la main, casse et espaces ignorés', () => {
     expect(codeReserve('hors champ')).toBe(true);
     expect(codeReserve('  Hors   Champ ')).toBe(true);
-    expect(codeReserve('HORS-CHAMP')).toBe(false);
+    // Même repliement que l'API : les séparateurs . _ / - valent une espace.
+    expect(codeReserve('HORS-CHAMP')).toBe(true);
+    expect(codeReserve('hors_champ')).toBe(true);
+    expect(codeReserve('HORS-CHAMPS')).toBe(false);
+    expect(codeReserve('HC-1')).toBe(false);
   });
 });
 
@@ -718,6 +722,66 @@ describe('erreurs de l’API (§ S25c.5)', () => {
     expect(erreursFormulaire(err, ['unitPrice', 'name'] as const).champs).toEqual({
       unitPrice: 'Deux décimales au plus.',
       name: 'Ce champ est obligatoire ou trop court.',
+    });
+  });
+
+  it('traduit les codes précisés par l’API quand le message manque ou est en anglais', () => {
+    const cas: [string, string, RegExp][] = [
+      ['phone', 'PHONE_INVALID', /téléphone invalide/],
+      ['email', 'EMAIL_INVALID', /e-mail invalide/],
+      ['address', 'ADDRESS_TOO_LONG', /255/],
+      ['name', 'NAME_TOO_LONG', /200/],
+      ['exemptionReference', 'EXEMPTION_REFERENCE_TOO_LONG', /200/],
+      ['code', 'CODE_INVALID', /Code invalide/],
+      ['itemType', 'ITEM_TYPE_INVALID', /type d’article/],
+      ['unitPrice', 'PRICE_INVALID', /Montant invalide/],
+      ['priceMode', 'PRICE_MODE_INVALID', /TTC ou HT/],
+      ['unit', 'UNIT_REQUIRED', /unité est obligatoire/],
+      ['unit', 'UNIT_TOO_LONG', /20/],
+      ['specificTax.rate', 'SPECIFIC_TAX_INVALID', /Taxe spécifique invalide/],
+      ['taxGroup', 'UNKNOWN_TAX_GROUP', /pas proposé/],
+      ['name', 'FIELD_REQUIRED', /obligatoire/],
+      ['outOfScope', 'INVALID_TYPE', /invalide/],
+    ];
+    for (const [path, code, attendu] of cas) {
+      const err = erreurApi(400, {
+        code: 'INVALID_REQUEST',
+        details: { issues: [{ path, code, message: 'Expected string, received number' }] },
+      });
+      const champs = erreursFormulaire(
+        err,
+        [
+          'phone',
+          'email',
+          'address',
+          'name',
+          'exemptionReference',
+          'code',
+          'itemType',
+          'unitPrice',
+          'priceMode',
+          'unit',
+          'specificValue',
+          'taxGroup',
+          'outOfScope',
+        ] as const,
+        CHEMINS_ARTICLE,
+      ).champs as Record<string, string>;
+      const cle = CHEMINS_ARTICLE[path] ?? path;
+      expect(champs[cle], code).toMatch(attendu);
+    }
+  });
+
+  it('range un champ inconnu (UNKNOWN_FIELD, chemin vide) en tête, jamais perdu', () => {
+    const err = erreurApi(400, {
+      code: 'INVALID_REQUEST',
+      details: {
+        issues: [{ path: '', code: 'UNKNOWN_FIELD', message: 'Champ(s) inconnu(s) : foo.' }],
+      },
+    });
+    expect(erreursFormulaire(err, ['name'] as const)).toEqual({
+      champs: {},
+      autres: ['Champ(s) inconnu(s) : foo.'],
     });
   });
 
