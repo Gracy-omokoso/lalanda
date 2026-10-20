@@ -54,3 +54,15 @@ export {
   INVOICE_CHECK_REFERENCE_CASES,
   type InvoiceCheckReferenceCase,
 } from './check-reference-cases.js';
+// ADR-0023 § S25e.6, amendement du 20 oct. 2026 : groupes et assujettissement du vendeur.
+export {
+  NON_VAT_REGISTERED_TAX_GROUP,
+  TAX_GROUPS_RESERVED_TO_VAT_REGISTERED,
+  checkSellerVatStatus,
+  type SellerVatStatusCheck,
+  type SellerVatStatusFinding,
+  type SellerVatStatusInput,
+  type SellerVatStatusIssueCode,
+  type SellerVatStatusLine,
+  type SellerVatStatusWarningCode,
+} from './seller-vat-status.js';
