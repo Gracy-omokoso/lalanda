@@ -1,71 +1,11 @@
 {
-  "generatedAt": "2026-08-09",
+  "generatedAt": "2026-10-20",
   "advisories": [
     {
-      "id": "GHSA-2v37-7h3g-55p8",
-      "module": "nanoid",
+      "id": "GHSA-vfj7-8cjw-p6xm",
+      "module": "braces",
       "severity": "high",
-      "title": "nanoid: custom generators can loop indefinitely when size is zero"
-    },
-    {
-      "id": "GHSA-5528-5vmv-3xc2",
-      "module": "multer",
-      "severity": "high",
-      "title": "Multer Vulnerable to Denial of Service via Uncontrolled Recursion"
-    },
-    {
-      "id": "GHSA-5p4m-2wfm-xmqj",
-      "module": "js-yaml",
-      "severity": "high",
-      "title": "JS-YAML: Quadratic CPU consumption in !!omap resolution (3.x and 4.x) — CVE-2026-59870 fix not backported"
-    },
-    {
-      "id": "GHSA-5xrq-8626-4rwp",
-      "module": "vitest",
-      "severity": "critical",
-      "title": "When Vitest UI server is listening, arbitrary file can be read and executed"
-    },
-    {
-      "id": "GHSA-6g55-p6wh-862q",
-      "module": "postcss",
-      "severity": "high",
-      "title": "PostCSS: Arbitrary file read and information disclosure via attacker-controlled sourceMappingURL in CSS comments"
-    },
-    {
-      "id": "GHSA-72gw-mp4g-v24j",
-      "module": "multer",
-      "severity": "high",
-      "title": "Multer vulnerable to Denial of Service via deeply nested field names"
-    },
-    {
-      "id": "GHSA-f88m-g3jw-g9cj",
-      "module": "sharp",
-      "severity": "high",
-      "title": "sharp inherited vulnerabilities in libvips: CVE-2026-33327, CVE-2026-33328, CVE-2026-35590, CVE-2026-35591"
-    },
-    {
-      "id": "GHSA-fx2h-pf6j-xcff",
-      "module": "vite",
-      "severity": "high",
-      "title": "vite: `server.fs.deny` bypass on Windows alternate paths"
-    },
-    {
-      "id": "GHSA-r28c-9q8g-f849",
-      "module": "postcss",
-      "severity": "high",
-      "title": "PostCSS: Path Traversal in Previous Source Map Auto-Loading (sourceMappingURL) leads to Arbitrary .map File Disclosure"
-    },
-    {
-      "id": "GHSA-v52c-386h-88mc",
-      "module": "multer",
-      "severity": "high",
-      "title": "Multer vulnerable to Denial of Service via resource exhaustion"
-    },
-    {
-      "id": "GHSA-xf7r-hgr6-v32p",
-      "module": "multer",
-      "severity": "high",
-      "title": "Multer vulnerable to Denial of Service via incomplete cleanup"
+      "title": "braces vulnerable to stack-exhaustion denial of service through deeply nested patterns"
     }
   ]
 }
