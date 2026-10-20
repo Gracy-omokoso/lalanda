@@ -45,6 +45,18 @@ describe('documents de vente — lecture des sources', () => {
     expect(fautifs).toEqual([]);
   });
 
+  it('aucune arithmétique de montant dans sales/documents (ADR-0025 : mise en forme seule)', async () => {
+    const fautifs: string[] = [];
+    for (const f of await sources(resolve(SRC, 'sales/documents'))) {
+      const text = (await readFile(f, 'utf8'))
+        .split('\n')
+        .filter((l) => !l.trim().startsWith('//') && !l.trim().startsWith('*'))
+        .join('\n');
+      if (/\bNumber\(|parseFloat|parseInt|\bMath\./.test(text)) fautifs.push(relative(SRC, f));
+    }
+    expect(fautifs).toEqual([]);
+  });
+
   it('compteurs : seul InvoiceNumberingService les écrit', async () => {
     expect(await filesMatching(/InjectModel\(SalesInvoiceCounter\.name\)/)).toEqual([
       'sales/invoices/invoice-numbering.service.ts',
@@ -68,12 +80,23 @@ describe('documents de vente — lecture des sources', () => {
 
   it('sales_invoices : écrit par les brouillons, le gel et la numérotation seulement', async () => {
     expect(await filesMatching(/InjectModel\(SalesInvoice\.name\)/)).toEqual([
+      // ADR-0025 (S25g) : seul écrivain de `duplicateCount`, et de lui seul.
+      'sales/documents/invoice-documents.service.ts',
       'sales/invoices/invoice-drafts.service.ts',
       'sales/invoices/invoice-freezing.service.ts',
       'sales/invoices/invoice-numbering.service.ts',
       // ADR-0024 (F2) : seul écrivain de la normalisation (`normalization`, statuts
       // `normalized` et `normalization_failed`).
       'sales/normalization/normalization-recorder.ts',
+    ]);
+    const documents = await readFile(
+      resolve(SRC, 'sales/documents/invoice-documents.service.ts'),
+      'utf8',
+    );
+    const writes = documents.match(/\$(set|inc|unset|push|pull)\b[^}]*\}/g) ?? [];
+    expect(writes).toEqual(['$inc: { duplicateCount: 1 }']);
+    expect(await filesMatching(/duplicateCount:\s*1\b|\$inc:\s*\{\s*duplicateCount/)).toEqual([
+      'sales/documents/invoice-documents.service.ts',
     ]);
     // Les champs figés (empreinte, montants normalisés) ne sont posés qu'au gel.
     expect(await filesMatching(/contentSha256(:|,)\s/)).toEqual(

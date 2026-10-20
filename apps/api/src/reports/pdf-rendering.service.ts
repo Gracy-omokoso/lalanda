@@ -53,6 +53,12 @@ export interface PdfRenderOptions {
    * rendu : rendu déterministe d'un document figé (ADR-0025 § O2).
    */
   fixedDate?: Date;
+  /**
+   * En-tête et pied répétés sur chaque page (gabarits Chromium, rendus dans les
+   * marges ; aucun JavaScript). Le contenu est fourni DÉJÀ ÉCHAPPÉ par l'appelant.
+   */
+  headerTemplate?: string;
+  footerTemplate?: string;
 }
 
 /** Forme PDF d'une date UTC : `D:AAAAMMJJhhmmss+00'00'` (même longueur que Chromium). */
@@ -177,6 +183,13 @@ export class PdfRenderingService implements OnModuleDestroy {
         printBackground: true,
         margin: opts.margin ?? { top: '0', bottom: '0', left: '0', right: '0' },
         timeout: PAGE_TIMEOUT_MS,
+        ...(opts.headerTemplate !== undefined || opts.footerTemplate !== undefined
+          ? {
+              displayHeaderFooter: true,
+              headerTemplate: opts.headerTemplate ?? '<span></span>',
+              footerTemplate: opts.footerTemplate ?? '<span></span>',
+            }
+          : {}),
       });
       return Buffer.from(pdf);
     } finally {
