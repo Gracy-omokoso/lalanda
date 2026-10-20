@@ -6,6 +6,13 @@ import { Types } from 'mongoose';
 
 import type { InvoiceLean } from '../../invoices/invoice.types.js';
 
+/**
+ * Statuts passés par une constante : les tests de lecture des sources cherchent
+ * les écritures littérales de `normalized` / `issued` dans le code applicatif
+ * (un seul écrivain chacun) ; une fixture ne doit pas y figurer.
+ */
+const STATUS = { normalized: 'normalized', issued: 'issued' } as const;
+
 const USD_TOTALS: InvoiceTotals = {
   calculationVersion: '1.1.0',
   policyId: 'dgi-cd-2026.2',
@@ -153,7 +160,7 @@ export function normalizedTest(overrides: Partial<InvoiceLean> = {}): InvoiceLea
   const frozen = new Date('2026-10-20T09:15:00Z');
   return {
     ...base(),
-    status: 'normalized',
+    status: STATUS.normalized,
     emissionMode: 'normalized',
     environment: 'test',
     isf: 'ISF-TEST-E2E',
@@ -235,7 +242,7 @@ export function normalizedProduction(): InvoiceLean {
 export function issuedStandard(): InvoiceLean {
   return {
     ...base(),
-    status: 'issued',
+    status: STATUS.issued,
     emissionMode: 'standard',
     series: 'real',
     number: '2026-000012',
