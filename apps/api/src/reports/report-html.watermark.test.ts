@@ -5,7 +5,7 @@
 //
 // ⚠ Ces tests ne prouvent PAS qu'une image s'affiche : une chaîne de caractères
 // dans le HTML reste une chaîne de caractères, et une image avortée par
-// l'interception réseau de reports.service.ts laisse un blanc qu'aucune
+// l'interception réseau de pdf-rendering.service.ts laisse un blanc qu'aucune
 // assertion textuelle ne verrait. Ce qu'ils verrouillent, c'est l'invariant qui
 // décide de l'affichage : la source de chaque image est un data URI, jamais une
 // URL réseau. Le rendu lui-même a été vérifié en ouvrant de vrais PDF.
@@ -108,7 +108,7 @@ describe('renderReportHtml — en-tête de marque de la page de garde', () => {
 
 /**
  * L'invariant qui décide de tout. Le rendu PDF coupe JavaScript et avorte TOUTE
- * requête sortante (reports.service.ts, barrière anti-SSRF délibérée). Vérifié en
+ * requête sortante (pdf-rendering.service.ts, barrière anti-SSRF délibérée). Vérifié en
  * rendant les trois cas côte à côte sous ce confinement : un `<img src="http://…">`
  * donne un cadre vide, un `src="file://…"` ne donne rien du tout, le data URI
  * s'affiche. Si quelqu'un remplace un jour ces constantes par une URL — un CDN,

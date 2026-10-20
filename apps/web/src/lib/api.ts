@@ -579,6 +579,49 @@ async function jsonRequest<T>(path: string, init: JsonRequestInit = {}): Promise
 }
 
 /**
+ * PDF d'un document de vente (ADR-0025) ; erreurs sous la forme de `jsonRequest`.
+ * Les en-têtes `content-disposition` et `x-duplicate-number` ne sont lisibles
+ * que si l'API les expose en CORS : sinon, `fallbackName` et `null`.
+ */
+async function invoicePdfRequest(
+  invoiceId: string,
+  kind: 'pdf' | 'duplicate',
+  fallbackName: string,
+): Promise<{ blob: Blob; filename: string; duplicateNumber: number | null }> {
+  const res = await fetch(`${API_URL}/sales/invoices/${encodeURIComponent(invoiceId)}/${kind}`, {
+    method: kind === 'pdf' ? 'GET' : 'POST',
+    credentials: 'include',
+    headers: kind === 'pdf' ? undefined : { 'content-type': 'application/json' },
+    body: kind === 'pdf' ? undefined : '{}',
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let detail: unknown = text;
+    try {
+      detail = JSON.parse(text);
+    } catch {
+      /* garde le texte brut */
+    }
+    const err = new Error(
+      typeof detail === 'object' && detail !== null && 'message' in detail
+        ? String((detail as { message: unknown }).message)
+        : `HTTP ${res.status}`,
+    ) as Error & { status: number; detail: unknown };
+    err.status = res.status;
+    err.detail = detail;
+    throw err;
+  }
+  const cd = res.headers.get('content-disposition') ?? '';
+  const match = cd.match(/filename="([^"]+)"/);
+  const dup = res.headers.get('x-duplicate-number');
+  return {
+    blob: await res.blob(),
+    filename: match?.[1] ?? fallbackName,
+    duplicateNumber: dup === null ? null : Number(dup),
+  };
+}
+
+/**
  * Envoi d'un fichier en CORPS BRUT.
  *
  * Volontairement distinct de `jsonRequest`, qui impose
@@ -2865,6 +2908,14 @@ export const api = {
       method: 'POST',
       body: { expectedRevision },
     }),
+  /**
+   * ADR-0025 : PDF de l'original (`GET`, reproduit à l'identique, `sales.read`)
+   * ou d'un duplicata numéroté (`POST`, journalisé, `sales.manage`).
+   */
+  downloadInvoicePdf: (invoiceId: string, fallbackName: string) =>
+    invoicePdfRequest(invoiceId, 'pdf', fallbackName),
+  downloadInvoiceDuplicate: (invoiceId: string, fallbackName: string) =>
+    invoicePdfRequest(invoiceId, 'duplicate', fallbackName),
   listJournal: (query: { limit?: number; cursor?: string } = {}) =>
     jsonRequest<JournalPage>(`/sales/journal${salesQuery(query)}`, { method: 'GET' }),
   getExchangeRateReference: () =>

@@ -339,6 +339,23 @@ function toutCredite(lignes: InvoiceView['lines'] | undefined): boolean {
   return lignes.every((l) => l.remaining !== undefined && comparerDecimaux(l.remaining, '0') === 0);
 }
 
+/**
+ * Impressions proposées (ADR-0025 § 1, § 7) : le PDF de tout document (un pro
+ * forma tant que `documentKind` vaut `proforma`) ; le duplicata d'une facture
+ * finale seulement, avec le droit de gérer les ventes. Libellés exacts : ce
+ * qu'affichent les boutons.
+ */
+export function impressionsDocument(
+  doc: Pick<InvoiceView, 'documentKind'>,
+  droits: { gerer: boolean },
+): { pdf: string; duplicata: string | null } {
+  const facture = doc.documentKind === 'invoice';
+  return {
+    pdf: facture ? 'Télécharger le PDF' : 'Télécharger le pro forma (PDF)',
+    duplicata: facture && droits.gerer ? 'Duplicata' : null,
+  };
+}
+
 export function actionsDocument(
   doc: Pick<InvoiceView, 'status' | 'type' | 'readiness' | 'normalization'> & {
     lines?: InvoiceView['lines'];

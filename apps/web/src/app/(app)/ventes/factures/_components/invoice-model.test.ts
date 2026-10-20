@@ -13,6 +13,7 @@ import { erreursFormulaire } from '../../_components/sales-model';
 
 import {
   actionsDocument,
+  impressionsDocument,
   commentaireAModifiable,
   comparerDecimaux,
   conduiteApresEchecNormaliser,
@@ -299,6 +300,25 @@ describe('en-tête : jamais « Facture » avant la normalisation (§ S25e.1)', (
     for (const s of ['draft', 'pending_normalization', 'normalization_failed'] as const) {
       expect(STATUS_LABELS[s]).not.toMatch(/facture/i);
     }
+  });
+});
+
+describe('impressions (ADR-0025) : PDF de tout document, duplicata d’une facture finale', () => {
+  it('pro forma : téléchargement libellé pro forma, aucun duplicata', () => {
+    expect(impressionsDocument(vue({ documentKind: 'proforma' }), { gerer: true })).toEqual({
+      pdf: 'Télécharger le pro forma (PDF)',
+      duplicata: null,
+    });
+  });
+
+  it('facture finale : PDF et duplicata avec le droit de gérer, sinon PDF seul', () => {
+    expect(impressionsDocument(vue({ documentKind: 'invoice' }), { gerer: true })).toEqual({
+      pdf: 'Télécharger le PDF',
+      duplicata: 'Duplicata',
+    });
+    expect(impressionsDocument(vue({ documentKind: 'invoice' }), { gerer: false }).duplicata).toBe(
+      null,
+    );
   });
 });
 

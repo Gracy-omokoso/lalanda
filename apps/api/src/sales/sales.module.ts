@@ -19,6 +19,9 @@ import { EdefModule } from '../edef/edef.module.js';
 import { FiscalModule } from '../fiscal/fiscal.module.js';
 import { IntegrationsModule } from '../integrations/integrations.module.js';
 import { OrganizationsModule } from '../organizations/organizations.module.js';
+import { PdfModule } from '../reports/pdf.module.js';
+import { InvoiceDocumentsController } from './documents/invoice-documents.controller.js';
+import { InvoiceDocumentsService } from './documents/invoice-documents.service.js';
 import { CatalogItem, CatalogItemSchema } from './catalog-item.schema.js';
 import { CatalogItemsController } from './catalog-items.controller.js';
 import { CatalogItemsService } from './catalog-items.service.js';
@@ -66,6 +69,8 @@ import { ReferenceRefreshJob } from './normalization/reference-refresh.job.js';
     EdefModule,
     // ADR-0024 (F2) : garde de ré-authentification récente de `declare-not-normalized`.
     IntegrationsModule,
+    // ADR-0025 (S25g) : rendu PDF partagé avec les rapports (un seul Chromium).
+    PdfModule,
     MongooseModule.forFeature([
       { name: Customer.name, schema: CustomerSchema },
       { name: CatalogItem.name, schema: CatalogItemSchema },
@@ -83,6 +88,8 @@ import { ReferenceRefreshJob } from './normalization/reference-refresh.job.js';
     JournalController,
     // ADR-0024 § 9.1 (F2).
     NormalizationController,
+    // ADR-0025 (S25g) : PDF et duplicata.
+    InvoiceDocumentsController,
   ],
   providers: [
     CustomersService,
@@ -96,6 +103,7 @@ import { ReferenceRefreshJob } from './normalization/reference-refresh.job.js';
     InvoiceDraftsService,
     InvoiceFreezingService,
     CreditNotesService,
+    InvoiceDocumentsService,
     // ADR-0024 (F2) : normalisation DGI réelle, rattrapage et tâches planifiées.
     DgiCallGuard,
     NormalizationRecorder,

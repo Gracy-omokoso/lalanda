@@ -47,6 +47,7 @@ import { ProjectsController } from '../projects/projects.controller.js';
 import { ReportsController } from '../reports/reports.controller.js';
 import { CatalogItemsController } from '../sales/catalog-items.controller.js';
 import { CustomersController } from '../sales/customers.controller.js';
+import { InvoiceDocumentsController } from '../sales/documents/invoice-documents.controller.js';
 import { InvoicesController } from '../sales/invoices/invoices.controller.js';
 import { JournalController } from '../sales/invoices/journal.controller.js';
 import { NormalizationController } from '../sales/normalization/normalization.controller.js';
@@ -103,6 +104,7 @@ const CONTROLEURS = [
   JournalController,
   // ADR-0024 § 9.1 (F2)
   NormalizationController,
+  InvoiceDocumentsController,
 ];
 
 /**
@@ -417,6 +419,8 @@ describe('couverture des routes par le RBAC', () => {
       'NormalizationController.check': ['sales.invoice'],
       'NormalizationController.declareNotNormalized': ['fiscal.manage'],
       'NormalizationController.dgiExchanges': ['sales.read'],
+      'InvoiceDocumentsController.pdf': ['sales.read'],
+      'InvoiceDocumentsController.duplicate': ['sales.manage'],
     };
     for (const [cle, actions] of Object.entries(attendu)) {
       const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle);
