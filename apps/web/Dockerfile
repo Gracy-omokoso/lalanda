@@ -41,6 +41,11 @@ COPY apps/web ./apps/web
 ARG NEXT_PUBLIC_API_URL=http://localhost:3001
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 
+# Version de release (ADR-0026 § 6.2) : inlinée au build par next.config.mjs
+# (`NEXT_PUBLIC_APP_VERSION`), affichée en pied de page. Vide : package.json + « -dev ».
+ARG APP_VERSION=
+ENV APP_VERSION=${APP_VERSION}
+
 RUN pnpm --filter @lalanda/web... run build
 
 # ─── Stage 2 : runtime ──────────────────────────────────────────────────────

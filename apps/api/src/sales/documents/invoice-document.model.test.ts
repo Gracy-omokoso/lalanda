@@ -327,6 +327,25 @@ describe('QR code et déterminisme', () => {
     expect(await htmlOf(normalizedTest())).toBe(await htmlOf(normalizedTest()));
   });
 
+  it('version du logiciel : celle FIGÉE au gel, pas celle du rendu (ADR-0026 § 6.2)', async () => {
+    const gelee = normalizedTest({ softwareVersion: '0.9.3' });
+    const m = build(gelee, { currentSoftwareVersion: '0.9.4' });
+    expect(m.softwareVersion).toBe('0.9.3');
+    expect(m.footer).toContain('Établi avec Lalanda v0.9.3 — gabarit 1.0.0');
+    // Même document, même version figée : même HTML, quelle que soit la version qui rend.
+    expect(await htmlOf(gelee, { currentSoftwareVersion: '0.9.4' })).toBe(
+      await htmlOf(gelee, { currentSoftwareVersion: '1.0.0' }),
+    );
+    // Document gelé avant le 20 oct. 2026 : pas de version, pied inchangé.
+    const ancien = build(normalizedTest(), { currentSoftwareVersion: '0.9.4' });
+    expect(ancien.softwareVersion).toBeNull();
+    expect(ancien.footer).toMatch(/^Établi avec Lalanda — gabarit 1\.0\.0/);
+    // Brouillon : la version courante.
+    expect(build(draftUsd(), { currentSoftwareVersion: '0.9.4' }).footer).toContain(
+      'Lalanda v0.9.4',
+    );
+  });
+
   it('les champs saisis sont échappés', async () => {
     const doc = draftUsd();
     const html = await htmlOf({

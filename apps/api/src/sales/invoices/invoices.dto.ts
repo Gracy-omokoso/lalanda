@@ -770,3 +770,28 @@ export const ListJournalQuerySchema = z
     cursor: z.string().min(1).max(512).optional(),
   })
   .strict();
+
+/** Jour civil `AAAA-MM-JJ` réel (le 31 février est refusé). */
+const calendarDay = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date : AAAA-MM-JJ.')
+  .refine((v) => {
+    const d = new Date(`${v}T00:00:00Z`);
+    return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
+  }, 'Date inexistante.');
+
+/** `GET /sales/journal/export` — ADR-0026 § 6.3. */
+export const JournalExportQuerySchema = z
+  .object({
+    from: calendarDay,
+    to: calendarDay,
+    format: z.enum(['json', 'csv']).default('json'),
+    /** CSV seulement : `ventes` (lignes et groupes des factures) ou `echanges` (e-MCF). */
+    dataset: z.enum(['ventes', 'echanges']).default('ventes'),
+  })
+  .strict()
+  .refine((q) => q.from <= q.to, {
+    path: ['to'],
+    message: 'La fin de la période précède son début.',
+    params: { code: 'INVALID_PERIOD' },
+  });

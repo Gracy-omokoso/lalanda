@@ -311,6 +311,7 @@ export function invoiceView(doc: InvoiceLean, ctx: InvoiceViewContext): InvoiceV
     creditNotes: ctx.creditNotes,
     seller: doc.seller ?? null,
     operator: doc.operator ?? null,
+    softwareVersion: doc.softwareVersion ?? null,
     normalization: n
       ? normalizationViewOf(n, doc.status, ctx.permissions ?? NO_NORMALIZATION_PERMISSIONS)
       : null,

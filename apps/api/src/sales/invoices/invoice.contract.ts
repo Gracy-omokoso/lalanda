@@ -477,6 +477,8 @@ export interface InvoiceView {
   creditNotes: readonly InvoiceCreditNoteSummary[];
   seller: SellerView | null;
   operator: OperatorView | null;
+  /** Version de Lalanda qui a gelé le document ; `null` : brouillon, ou gelé avant le 20 oct. 2026. */
+  softwareVersion: string | null;
   normalization: NormalizationView | null;
   readiness: InvoiceReadiness;
   revision: number;
@@ -585,6 +587,150 @@ export interface ExchangeRateReference {
   tolerancePercent: DecimalString;
 }
 
+// ── Export du journal pour les vérificateurs (ADR-0026 § 6.3, écart B3) ─────
+
+/** Ligne d'une facture exportée, dans la devise qui fait foi. */
+export interface ExportedInvoiceLine {
+  index: number;
+  /** Code envoyé à la DGI (« HORS CHAMP » pour une opération hors champ), sinon code interne. */
+  code: string | null;
+  name: string;
+  itemType: string;
+  group: string;
+  unit: string | null;
+  quantity: DecimalString;
+  unitPrice: DecimalString;
+  originalPrice: DecimalString | null;
+  priceModification: string | null;
+  amount: DecimalString;
+  specificTaxAmount: DecimalString;
+}
+
+export interface ExportedGroupTotal {
+  group: string;
+  ratePercent: DecimalString;
+  ht: DecimalString;
+  vat: DecimalString;
+  specificTax: DecimalString;
+  total: DecimalString;
+}
+
+/** Une facture émise ou normalisée, telle que figée (aucun recalcul). */
+export interface ExportedInvoice {
+  id: string;
+  number: string;
+  series: InvoiceSeries | null;
+  type: InvoiceType;
+  typeLabel: string;
+  /** Statut final seulement (`issued` ou `normalized`) : un brouillon n'est pas exporté. */
+  status: Extract<InvoiceStatus, 'issued' | 'normalized'>;
+  issuedAt: string;
+  emissionMode: EmissionMode | null;
+  environment: DgiEnvironment | null;
+  isf: string | null;
+  customer: { type: string; name: string | null; nif: string | null };
+  /** Devise des montants ci-dessous : CDF pour une facture normalisée (fait foi). */
+  currency: DocumentCurrency;
+  amountsSource: 'normalized_cdf' | 'document';
+  documentCurrency: DocumentCurrency;
+  priceMode: PriceMode;
+  lines: ExportedInvoiceLine[];
+  groups: ExportedGroupTotal[];
+  totals: { total: DecimalString; vatTotal: DecimalString; specificTax: DecimalString };
+  payments: { method: string; amount: DecimalString }[];
+  conversion: { rate: DecimalString; rateDate: string; rateSource: ConversionRateSource } | null;
+  counterValueUsd: { amount: DecimalString; rate: DecimalString; date: string } | null;
+  creditNote: {
+    nature: CreditNoteNature;
+    originNumber: string | null;
+    reference: string | null;
+  } | null;
+  dgi: {
+    codeDefDgi: string | null;
+    nim: string | null;
+    counters: string | null;
+    dateTime: string | null;
+    qrCode: string | null;
+  } | null;
+  softwareVersion: string | null;
+  contentSha256: string | null;
+  /** L'empreinte du contenu figé se recalcule-t-elle à l'identique ? */
+  contentIntact: boolean;
+  /** Entrées du journal chaîné qui portent ce document. */
+  journal: { seq: number; event: JournalEvent; at: string; hash: string }[];
+}
+
+/** Entrée du journal chaîné, avec de quoi recalculer son `hash`. */
+export interface ExportedJournalEntry extends JournalEntryView {
+  prevHash: string;
+}
+
+/** Échange avec l'e-MCF (jamais d'en-tête, donc jamais de jeton). */
+export interface ExportedDgiExchange {
+  at: string;
+  exchangeId: string;
+  entry: 'request' | 'response' | 'complete';
+  invoiceId: string | null;
+  rn: string | null;
+  uid: string | null;
+  environment: DgiEnvironment;
+  method: string;
+  path: string;
+  httpStatus: number | null;
+  durationMs: number | null;
+  outcome: string | null;
+  dgiErrorCode: string | null;
+  requestBody: string | null;
+  responseBody: string | null;
+}
+
+/** `GET /sales/journal/export?format=json` — journal électronique d'une période. */
+export interface SalesJournalExport {
+  format: 'lalanda.sales-journal';
+  formatVersion: 1;
+  generatedAt: string;
+  softwareVersion: string;
+  organization: { id: string; legalName: string | null; nif: string | null };
+  /** Jours de Kinshasa (UTC+1), bornes incluses. */
+  period: { from: string; to: string; timeZone: 'Africa/Kinshasa' };
+  chain: {
+    /** Toute la chaîne de l'organisation vérifiée (seq sans trou, hash recalculés, tête). */
+    valid: boolean;
+    algorithm: string;
+    genesisHash: string;
+    entriesInPeriod: number;
+    firstSeq: number | null;
+    lastSeq: number | null;
+    /** `prevHash` de la première entrée de la période : point d'ancrage du recalcul. */
+    anchorPrevHash: string | null;
+    lastHash: string | null;
+  };
+  invoices: ExportedInvoice[];
+  journal: ExportedJournalEntry[];
+  dgiExchanges: ExportedDgiExchange[];
+}
+
+/** Un point de vente e-MCF que l'éditeur peut proposer (ADR-0026, écart C6). */
+export interface SelectablePointOfSale {
+  id: string;
+  label: string;
+  /** NIM relevé par la DGI au dernier test réussi ; `null` sinon. */
+  nim: string | null;
+  /** Nom de l'établissement relevé par la DGI ; `null` sinon. */
+  shopName: string | null;
+}
+
+/**
+ * `GET /sales/points-of-sale` — points de vente ACTIFS dans l'environnement DGI
+ * de l'organisation, pour le choix du point de vente d'un brouillon (lecture
+ * `sales.read` : ni jeton, ni état technique, ni historique de test).
+ */
+export interface SelectablePointsOfSale {
+  emissionMode: EmissionMode;
+  environment: DgiEnvironment;
+  items: readonly SelectablePointOfSale[];
+}
+
 // ── Codes d'erreur ───────────────────────────────────────────────────────────
 
 /** Codes de premier niveau (`code` de la réponse), par statut HTTP (§ S25e.14). */
@@ -606,6 +752,7 @@ export const INVOICE_ERROR_CODES = {
     'CATALOG_ITEM_INACTIVE',
     'TAX_GROUP_UNAVAILABLE',
     'FISCAL_PROFILE_REQUIRED',
+    'POINT_OF_SALE_REQUIRED',
     'POINT_OF_SALE_NOT_ACTIVE',
     'TAX_RATES_UNAVAILABLE',
     'EXCHANGE_RATE_REFERENCE_UNAVAILABLE',
@@ -654,6 +801,7 @@ export type ReadinessBlockerCode =
   | 'PAYMENTS_TOTAL_MISMATCH'
   | 'CATALOG_CURRENCY_MISMATCH'
   | 'POINT_OF_SALE_REQUIRED'
+  | 'POINT_OF_SALE_NOT_ACTIVE'
   | 'TAX_RATES_UNAVAILABLE'
   | 'EXCHANGE_RATE_REFERENCE_UNAVAILABLE'
   | 'CUSTOMER_INACTIVE'

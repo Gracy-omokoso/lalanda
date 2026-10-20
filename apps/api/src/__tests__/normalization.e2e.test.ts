@@ -47,8 +47,10 @@ const NIF_N = 'A0000000X';
 const NIF_B = 'B0000000X';
 const NIM = 'XX01000001-1';
 const NIM_B = 'XX01000002-1';
+const NIM_N2 = 'XX01000003-1';
 const JETON = `ANTIFUITE-normalisation-${tag}-0123456789abcdef`;
 const JETON_B = `ANTIFUITE-normalisation-b-${tag}-0123456789abcdef`;
+const JETON_N2 = `ANTIFUITE-normalisation-n2-${tag}-0123456789abcdef`;
 const MINUTE = 60_000;
 
 /** Taux de test, identiques dans l'instantané et dans le faux serveur (valeurs fictives). */
@@ -253,6 +255,7 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
       tokens: {
         [JETON]: { nif: NIF_N, nim: NIM, tokenValid: '2099-01-31T00:00:00' },
         [JETON_B]: { nif: NIF_B, nim: NIM_B, tokenValid: '2099-01-31T00:00:00' },
+        [JETON_N2]: { nif: NIF_N, nim: NIM_N2, tokenValid: '2099-01-31T00:00:00' },
       },
       taxGroups: GROUPES,
     });
@@ -1040,6 +1043,89 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
       }
     });
 
+    it('deux points de vente actifs : choix obligatoire, message clair, normalisation par le point choisi (ADR-0026 C6)', async () => {
+      await reauth('owner');
+      const second = await post(
+        asN(),
+        '/organizations/current/normalized-invoicing/points-of-sale',
+        { label: 'Dépôt', environment: 'test', expectedNim: null, token: JETON_N2 },
+      );
+      expect(second.status, JSON.stringify(second.body)).toBe(201);
+      const pos2 = second.body.id as string;
+      try {
+        // Liste proposable : lisible par le Lecteur, sans jeton ni état technique.
+        const liste = await get(asN('viewer'), '/sales/points-of-sale');
+        expect(liste.status).toBe(200);
+        expect(liste.body).toMatchObject({ emissionMode: 'normalized', environment: 'test' });
+        expect(liste.body.items.map((p: { id: string }) => p.id).sort()).toEqual(
+          [posN, pos2].sort(),
+        );
+        expect(liste.body.items.find((p: { id: string }) => p.id === pos2)).toEqual({
+          id: pos2,
+          label: 'Dépôt',
+          nim: NIM_N2,
+          shopName: expect.anything(),
+        });
+        expect(JSON.stringify(liste.body)).not.toContain('ANTIFUITE');
+
+        // Sans choix : brouillon enregistré mais bloqué, message qui dit quoi faire.
+        const d = await brouillonPret();
+        expect(d.pointOfSaleId).toBeNull();
+        expect(d.readiness.ready).toBe(false);
+        const bloquant = d.readiness.blockers.find(
+          (b: { code: string }) => b.code === 'POINT_OF_SALE_REQUIRED',
+        );
+        expect(bloquant.message).toMatch(/Plusieurs points de vente/);
+        const refus = await post(asN(), `/sales/invoices/${d.id}/normalize`, {
+          expectedRevision: d.revision,
+          exchangeRate: null,
+        });
+        expect(refus.status).toBe(409);
+        expect(refus.body.code).toBe('POINT_OF_SALE_REQUIRED');
+        expect(refus.body.message).toMatch(/choisissez/);
+
+        // Point de vente d'une autre organisation → 404 ; choix du second → normalisé par lui.
+        const autre = await put(asN(), `/sales/invoices/${d.id}`, {
+          ...corps({ pointOfSaleId: new ObjectId().toHexString() }),
+          payments: [{ method: 'VIREMENT', amount: d.documentAmounts.calculation.totals.total }],
+          expectedRevision: d.revision,
+        });
+        expect(autre.status).toBe(404);
+        expect(autre.body.code).toBe('POINT_OF_SALE_NOT_FOUND');
+        const choisi = await put(asN(), `/sales/invoices/${d.id}`, {
+          ...corps({ pointOfSaleId: pos2 }),
+          payments: [{ method: 'VIREMENT', amount: d.documentAmounts.calculation.totals.total }],
+          expectedRevision: d.revision,
+        });
+        expect(choisi.status, JSON.stringify(choisi.body)).toBe(200);
+        expect(choisi.body.pointOfSaleId).toBe(pos2);
+        expect(choisi.body.readiness.ready).toBe(true);
+        const rn = await prochainNumero();
+        const ok = await post(asN(), `/sales/invoices/${d.id}/normalize`, {
+          expectedRevision: choisi.body.revision,
+          exchangeRate: null,
+        });
+        expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+        expect(ok.body.number).toBe(rn);
+        expect(ok.body.normalization.nim).toBe(NIM_N2);
+      } finally {
+        // Retour à un seul point de vente actif pour la suite.
+        await reauth('owner');
+        const off = await post(
+          asN(),
+          `/organizations/current/normalized-invoicing/points-of-sale/${pos2}/disable`,
+          { reason: 'Fin du scénario à deux points de vente (test).' },
+        );
+        expect(off.status, JSON.stringify(off.body)).toBe(200);
+      }
+      // Choix retiré : le brouillon qui le portait est bloqué avec un message clair.
+      const d2 = await brouillonPret(asN(), corps({ pointOfSaleId: pos2 }));
+      expect(d2.readiness.blockers.map((b: { code: string }) => b.code)).toContain(
+        'POINT_OF_SALE_NOT_ACTIVE',
+      );
+      await request(server()).delete(`/sales/invoices/${d2.id}`).set('Cookie', asN());
+    });
+
     it('organisation forcée en production → failed DGI_PRODUCTION_UNAVAILABLE, aucune requête', async () => {
       const doc = await gelerSansNormaliser();
       await db
@@ -1051,6 +1137,130 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
       expect((await enBase(doc.id))?.['normalization']?.['lastError']?.['code']).toBe(
         'DGI_PRODUCTION_UNAVAILABLE',
       );
+    });
+  });
+
+  // ── Export du journal pour les vérificateurs (ADR-0026 § 6.3) ──────────
+
+  describe('export du journal électronique', () => {
+    const jour = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Africa/Kinshasa',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+    const url = (q: string) => `/sales/journal/export?from=${jour}&to=${jour}${q}`;
+
+    it('JSON : factures figées avec lignes, groupes, éléments DGI ; chaîne recalculable ; échanges sans jeton', async () => {
+      const { view, rn } = await normaliser();
+      const res = await get(asN(), url('&format=json'));
+      expect(res.status, JSON.stringify(res.body)).toBe(200);
+      expect(res.headers['content-type']).toMatch(/application\/json/);
+      expect(res.headers['content-disposition']).toBe(
+        `attachment; filename="journal-ventes_${jour}_${jour}.json"`,
+      );
+      const exp = res.body as Record<string, any>;
+      expect(exp).toMatchObject({
+        format: 'lalanda.sales-journal',
+        formatVersion: 1,
+        organization: { id: orgN, nif: NIF_N },
+        period: { from: jour, to: jour, timeZone: 'Africa/Kinshasa' },
+        chain: { valid: true },
+      });
+      const inv = (exp.invoices as Record<string, any>[]).find((i) => i.number === rn)!;
+      expect(inv).toMatchObject({
+        id: view.id,
+        type: 'FV',
+        status: 'normalized',
+        currency: 'CDF',
+        amountsSource: 'normalized_cdf',
+        customer: { type: 'PM', name: 'Client Exemple SARL' },
+        totals: { total: view.normalizedAmounts.calculation.total },
+        dgi: {
+          codeDefDgi: view.normalization.codeDefDgi,
+          nim: view.normalization.nim,
+          counters: view.normalization.counters,
+        },
+        contentIntact: true,
+      });
+      expect(inv.lines[0]).toMatchObject({
+        code: 'CONSEIL-H',
+        name: 'Conseil (heure)',
+        group: 'B',
+        quantity: '2',
+        unitPrice: view.normalizedAmounts.lines[0].unitPrice,
+      });
+      expect(inv.groups[0]).toMatchObject({ group: 'B' });
+      expect(inv.journal.map((j: { event: string }) => j.event)).toEqual(
+        expect.arrayContaining(['submitted', 'normalized']),
+      );
+      // Toute entrée de la période se recalcule avec ce que l'export contient.
+      const { journalHash } = await import('../sales/invoices/canonical.js');
+      for (const e of exp.journal as Record<string, any>[]) {
+        const { hash, prevHash, ...champs } = e;
+        expect(journalHash(prevHash, { organizationId: orgN, ...champs })).toBe(hash);
+      }
+      const seqs = (exp.journal as { seq: number }[]).map((e) => e.seq);
+      expect(seqs).toEqual([...seqs].sort((a, b) => a - b));
+      expect(exp.chain.lastSeq).toBe(seqs.at(-1));
+      // Échanges e-MCF de la période : requête et réponse de cette facture, sans jeton.
+      const echanges = (exp.dgiExchanges as Record<string, any>[]).filter(
+        (x) => x.invoiceId === view.id,
+      );
+      expect(echanges.map((x) => x.entry)).toEqual(expect.arrayContaining(['request', 'response']));
+      expect(JSON.stringify(exp)).not.toContain('ANTIFUITE');
+      // Isolation : rien de l'organisation N dans l'export de B.
+      const b = await get(asB(), url(''));
+      expect(b.status).toBe(200);
+      expect(JSON.stringify(b.body)).not.toContain(rn);
+      expect(b.body.organization.id).toBe(orgB);
+      // Trace d'audit.
+      const trace = await db
+        .collection('audit_events')
+        .findOne({ organizationId: orgN, action: 'sales_journal.exported' });
+      expect(trace?.['metadata']).toMatchObject({ from: jour, to: jour, format: 'json' });
+    });
+
+    it('CSV : ventes (lignes et groupes) et échanges ; période invalide → 400', async () => {
+      const ventes = await get(asN(), url('&format=csv'));
+      expect(ventes.status).toBe(200);
+      expect(ventes.headers['content-type']).toMatch(/text\/csv/);
+      const rows = ventes.text.replace(/^﻿/, '').trimEnd().split('\r\n');
+      expect(rows[0]).toMatch(/^enregistrement;numero;type;/);
+      expect(rows.some((r) => r.startsWith('ligne;TEST-'))).toBe(true);
+      expect(rows.some((r) => r.startsWith('groupe;TEST-'))).toBe(true);
+      const echanges = await get(asN(), url('&format=csv&dataset=echanges'));
+      expect(echanges.status).toBe(200);
+      expect(echanges.headers['content-disposition']).toContain('echanges-dgi_');
+      expect(echanges.text).toContain('POST');
+      expect(echanges.text).not.toContain('ANTIFUITE');
+
+      for (const q of [
+        `?from=${jour}`,
+        `?from=2026-10-31&to=2026-10-01`,
+        `?from=2026-02-30&to=2026-03-01`,
+        `?from=2025-01-01&to=2026-10-31`,
+        `?from=${jour}&to=${jour}&format=xml`,
+      ]) {
+        const r = await get(asN(), `/sales/journal/export${q}`);
+        expect(r.status, q).toBe(400);
+        expect(r.body.code, q).toBe('INVALID_REQUEST');
+      }
+    });
+
+    it('fiscal.manage : Propriétaire et DAF 200 ; Administrateur, Comptable, Analyste, Lecteur 403', async () => {
+      const attendu: Record<Role, number> = {
+        owner: 200,
+        finance_director: 200,
+        admin: 403,
+        accountant: 403,
+        analyst: 403,
+        viewer: 403,
+      };
+      for (const [role, statut] of Object.entries(attendu) as [Role, number][]) {
+        const r = await get(asN(role), url(''));
+        expect(r.status, role).toBe(statut);
+      }
     });
   });
 

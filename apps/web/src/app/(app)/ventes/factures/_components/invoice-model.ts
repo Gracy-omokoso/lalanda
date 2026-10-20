@@ -43,6 +43,8 @@ import type {
   NormalizationViewPhase,
   NormalizeInvoiceBody,
   OrgAction,
+  SelectablePointOfSale,
+  SelectablePointsOfSale,
   TaxGroupLetter,
 } from '@/lib/api';
 
@@ -566,6 +568,8 @@ export interface FormulaireDocument {
   nature: CreditNoteNature | null;
   originInvoiceId: string | null;
   showUsdCounterValue: boolean;
+  /** Point de vente e-MCF choisi ; `null` : le seul actif, retenu par le serveur. */
+  pointOfSaleId: string | null;
 }
 
 let compteurCle = 0;
@@ -612,6 +616,7 @@ export function formulaireVide(): FormulaireDocument {
     nature: null,
     originInvoiceId: null,
     showUsdCounterValue: false,
+    pointOfSaleId: null,
   };
 }
 
@@ -710,7 +715,62 @@ export function formulaireDepuisVue(
     nature: vue.creditNote?.nature ?? null,
     originInvoiceId: vue.creditNote?.originInvoiceId ?? null,
     showUsdCounterValue: vue.showUsdCounterValue,
+    pointOfSaleId: vue.pointOfSaleId,
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Point de vente (ADR-0026, écart C6)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Ce que l'éditeur montre pour le point de vente, d'après la liste servie par
+ * `GET /sales/points-of-sale` :
+ * - `masque` : organisation en émission ordinaire (pas de point de vente) ;
+ * - `aucun` : facture normalisée sans point de vente actif (rien à choisir) ;
+ * - `unique` : un seul actif, retenu d'office (affiché, non modifiable) ;
+ * - `choix` : plusieurs actifs, choix OBLIGATOIRE (`manquant` tant que rien
+ *   n'est choisi ou que le choix n'est plus actif).
+ */
+export type ChoixPointDeVente =
+  | { mode: 'masque' }
+  | { mode: 'aucun' }
+  | { mode: 'unique'; pointDeVente: SelectablePointOfSale }
+  | {
+      mode: 'choix';
+      options: readonly SelectablePointOfSale[];
+      selection: string;
+      manquant: boolean;
+    };
+
+export function choixPointDeVente(
+  liste: SelectablePointsOfSale | null,
+  choisi: string | null,
+): ChoixPointDeVente {
+  if (liste === null || liste.emissionMode !== 'normalized') return { mode: 'masque' };
+  if (liste.items.length === 0) return { mode: 'aucun' };
+  if (liste.items.length === 1) return { mode: 'unique', pointDeVente: liste.items[0]! };
+  const actif = choisi !== null && liste.items.some((p) => p.id === choisi);
+  return {
+    mode: 'choix',
+    options: liste.items,
+    selection: actif ? choisi : '',
+    manquant: !actif,
+  };
+}
+
+/** Libellé d'un point de vente : nom donné, puis NIM DGI s'il est connu. */
+export function libellePointDeVente(p: SelectablePointOfSale): string {
+  return p.nim ? `${p.label} — NIM ${p.nim}` : p.label;
+}
+
+/**
+ * Valeur initiale du choix pour un NOUVEAU document : le seul point de vente
+ * actif s'il n'y en a qu'un, sinon rien (la personne doit choisir).
+ */
+export function pointDeVenteParDefaut(liste: SelectablePointsOfSale | null): string | null {
+  if (liste === null || liste.emissionMode !== 'normalized') return null;
+  return liste.items.length === 1 ? liste.items[0]!.id : null;
 }
 
 /** Lignes de l'avoir à reprendre de l'origine : celles qui ne sont pas encore dans le brouillon. */
@@ -876,7 +936,7 @@ export function preparerDocument(f: FormulaireDocument): PreparationDocument {
         f.client.mode === 'fiche'
           ? { customerId: f.client.customerId, printContactDetails: f.client.printContactDetails }
           : { customerId: null, walkIn: { name: commentaire(f.client.nom) } },
-      pointOfSaleId: null,
+      pointOfSaleId: f.pointOfSaleId,
       lines: lignes,
       payments,
       comments: { A: commentaire(f.commentA), C: commentaire(f.commentC) },
@@ -961,9 +1021,11 @@ const MESSAGES_FACTURES: Record<string, string> = {
   TAX_GROUP_UNAVAILABLE: 'Un groupe de taxation de ce document n’est plus proposé par la DGI.',
   FISCAL_PROFILE_REQUIRED:
     'Complétez d’abord la fiche fiscale de votre organisation (Organisation › Fiscalité) : une facture porte le NIF et l’adresse du vendeur.',
+  POINT_OF_SALE_REQUIRED:
+    'Choisissez le point de vente e-MCF qui normalisera ce document, enregistrez, puis normalisez.',
   POINT_OF_SALE_NOT_ACTIVE:
-    'Aucun point de vente actif pour l’environnement courant. Activez-en un dans Organisation › Fiscalité.',
-  POINT_OF_SALE_NOT_FOUND: 'Ce point de vente est introuvable.',
+    'Le point de vente de ce document n’est pas actif dans l’environnement courant : choisissez-en un autre, ou vérifiez-le dans Organisation › Fiscalité.',
+  POINT_OF_SALE_NOT_FOUND: 'Ce point de vente est introuvable : choisissez-en un autre.',
   TAX_RATES_UNAVAILABLE:
     'Les taux de TVA de la DGI n’ont pas encore été relevés pour votre organisation. Rafraîchissez les listes de référence de votre point de vente (Organisation › Fiscalité).',
   EXCHANGE_RATE_REFERENCE_UNAVAILABLE:

@@ -20,6 +20,7 @@ import { AuditService } from '../../authz/audit.service.js';
 import { inFiscalTransactionWithReplay } from '../../fiscal/fiscal-transaction.js';
 import { FiscalProfileService } from '../../fiscal/fiscal-profile.service.js';
 import { NormalizedInvoicingStateReader } from '../../fiscal/normalized-invoicing-state.reader.js';
+import { APP_VERSION } from '../../health/app-version.js';
 import { OrganizationsService } from '../../organizations/organizations.service.js';
 import { PdfRenderingService } from '../../reports/pdf-rendering.service.js';
 import { isObjectIdHex } from '../search.js';
@@ -132,6 +133,7 @@ export class InvoiceDocumentsService {
         draftSeller,
         organizationName,
         draftInTestEnvironment,
+        currentSoftwareVersion: APP_VERSION.version,
       });
     } catch (err) {
       if (err instanceof DocumentNotPrintableError) notPrintable(err);

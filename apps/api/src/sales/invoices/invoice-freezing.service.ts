@@ -36,6 +36,7 @@ import { FiscalProfileService } from '../../fiscal/fiscal-profile.service.js';
 import { NormalizedInvoicingStateReader } from '../../fiscal/normalized-invoicing-state.reader.js';
 import { NormalizedInvoicingService } from '../../fiscal/normalized-invoicing.service.js';
 import { PointsOfSaleService } from '../../fiscal/points-of-sale.service.js';
+import { APP_VERSION } from '../../health/app-version.js';
 import {
   DGI_PLATFORM_CONFIG,
   type DgiPlatformConfig,
@@ -266,6 +267,7 @@ export class InvoiceFreezingService {
               isf: null,
               seller: null,
               operator: null,
+              softwareVersion: null,
               frozenAt: null,
               frozenFromRevision: null,
               contentSha256: null,
@@ -366,6 +368,12 @@ export class InvoiceFreezingService {
       }
       let sellerAddress = headOfficeAddress(profile.headOffice);
       if (mode === 'normalized') {
+        if (!doc.pointOfSaleId) {
+          invoiceConflict(
+            'POINT_OF_SALE_REQUIRED',
+            'Aucun point de vente n’est choisi pour ce document : choisissez dans l’éditeur le point de vente e-MCF qui le normalisera, puis enregistrez.',
+          );
+        }
         const pos = doc.pointOfSaleId
           ? await this.pointsOfSale.view(organizationId, doc.pointOfSaleId).catch(() => null)
           : null;
@@ -539,6 +547,8 @@ export class InvoiceFreezingService {
         isf: mode === 'normalized' ? (this.config.isf[environment] ?? null) : null,
         seller,
         operator: { userId: actor.userId, name: actor.name },
+        // ADR-0026 § 6.2 : la version qui a gelé le document, imprimée en pied de PDF.
+        softwareVersion: APP_VERSION.version,
         frozenFromRevision: expectedRevision,
         creditNote,
       };

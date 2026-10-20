@@ -24,6 +24,7 @@ import {
 } from '@/lib/api';
 
 import { FiscalProfilePanel } from './fiscal-profile-panel';
+import { JournalExportPanel } from './journal-export-panel';
 import {
   type ActionReprise,
   MOTIF_MAX,
@@ -77,6 +78,8 @@ export function FiscaliteEspace(): React.ReactElement {
       {refuse ? null : (
         <NormalizedInvoicingPanel version={version} onChangementEtat={surChangementEtat} />
       )}
+      {/* ADR-0026 § 6.3 : export du journal pour les vérificateurs (fiscal.manage). */}
+      {refuse ? null : <JournalExportPanel />}
     </div>
   );
 }

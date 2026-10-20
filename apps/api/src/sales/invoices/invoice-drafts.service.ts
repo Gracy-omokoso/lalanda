@@ -61,6 +61,7 @@ import type {
   InvoiceReadiness,
   InvoiceView,
   ReadinessBlockerCode,
+  SelectablePointsOfSale,
 } from './invoice.contract.js';
 import { SalesInvoice, type SalesInvoiceDocument } from './invoice.schema.js';
 import type {
@@ -204,6 +205,54 @@ export class InvoiceDraftsService {
     };
   }
 
+  /**
+   * Points de vente proposables pour un brouillon (ADR-0026, écart C6) : ceux
+   * qui sont ACTIFS dans l'environnement DGI de l'organisation. Rien de
+   * technique (jeton, état, test) : la liste est lisible en `sales.read`.
+   */
+  async selectablePointsOfSale(organizationId: string): Promise<SelectablePointsOfSale> {
+    const [emissionMode, settings, all] = await Promise.all([
+      this.normalized.emissionModeOf(organizationId),
+      this.state.read(organizationId),
+      this.pointsOfSale.list(organizationId),
+    ]);
+    return {
+      emissionMode,
+      environment: settings.environment,
+      items: all
+        .filter((p) => p.environment === settings.environment && p.status === 'active')
+        .map((p) => ({
+          id: p.id,
+          label: p.label,
+          nim: p.dgi?.nim ?? null,
+          shopName: p.dgi?.shopName ?? null,
+        })),
+    };
+  }
+
+  /**
+   * Factures émises ou normalisées datées de `[from, to[` (export du journal,
+   * ADR-0026 § 6.3) — LECTURE seule, documents figés tels quels, par date.
+   * `limit` + 1 documents au plus : l'appelant détecte le dépassement.
+   */
+  async finalBetween(
+    organizationId: string,
+    from: Date,
+    to: Date,
+    limit: number,
+  ): Promise<InvoiceLean[]> {
+    return this.invoices
+      .find({
+        organizationId,
+        status: { $in: ['issued', 'normalized'] },
+        sortAt: { $gte: from, $lt: to },
+      })
+      .sort({ sortAt: 1, _id: 1 })
+      .limit(limit + 1)
+      .lean<InvoiceLean[]>()
+      .exec();
+  }
+
   async view(organizationId: string, invoiceId: string): Promise<InvoiceView> {
     const doc = await this.requireOwn(organizationId, invoiceId);
     return this.viewOf(organizationId, doc);
@@ -306,10 +355,27 @@ export class InvoiceDraftsService {
       }
     }
     if (mode === 'normalized') {
-      if (doc.pointOfSaleId === null) {
+      // ADR-0026, écart C6 : un message qui dit QUOI faire selon le nombre de
+      // points de vente actifs ; un point de vente choisi puis retiré bloque aussi.
+      const active = (await this.pointsOfSale.list(organizationId)).filter(
+        (p) => p.environment === settings.environment && p.status === 'active',
+      );
+      const pointOfSaleId = doc.pointOfSaleId ?? null;
+      if (pointOfSaleId === null) {
         blockers.push({
           code: 'POINT_OF_SALE_REQUIRED',
-          message: 'Choisissez le point de vente (e-MCF) qui normalisera ce document.',
+          message:
+            active.length === 0
+              ? 'Aucun point de vente e-MCF n’est actif : un responsable fiscal doit en configurer un (Organisation › Fiscalité).'
+              : active.length === 1
+                ? 'Enregistrez le brouillon : le seul point de vente e-MCF actif sera retenu.'
+                : 'Plusieurs points de vente e-MCF sont actifs : choisissez celui qui normalisera ce document, puis enregistrez.',
+        });
+      } else if (!active.some((p) => p.id === pointOfSaleId)) {
+        blockers.push({
+          code: 'POINT_OF_SALE_NOT_ACTIVE',
+          message:
+            'Le point de vente choisi n’est plus actif dans l’environnement DGI de l’entreprise : choisissez-en un autre, puis enregistrez.',
         });
       }
       const needsRate =

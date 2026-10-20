@@ -149,6 +149,117 @@ ligne C (code d'une facture d'acompte) alors que B–H sont « réservées » ; 
 huit lignes de commentaire même vides ; source et date du « taux moyen BCC » et présence de
 la contre-valeur USD sur toutes les factures ; orthographe exacte de « HORS CHAMP ».
 
+## 6. Écarts du dossier d'homologation — corrections du 20 oct. 2026
+
+La liste de travail des écarts (tableau de conformité, onglet 04, vérifié contre `main`) est
+tenue hors dépôt avec le dossier DGI ; ses identifiants (B3, C1, C6…) sont repris ici. Seuls
+les écarts ci-dessous sont traités par cette branche ; les autres restent ouverts.
+
+| Écart | Exigence | Statut | Correction |
+|---|---|---|---|
+| **C1** — version du logiciel invisible (`/health` = `0.1.0` du package.json ; rien à l'écran ni sur le PDF) | tableau de conformité, pièce a ; manuel de contrôle | **Corrigé le 20 oct. 2026** | § 6.2 |
+| **B3** — journal électronique sans lignes ni export (et, en partie, **C2** : pas d'export pour le vérificateur) | 1.20 | **Corrigé le 20 oct. 2026** (export) ; la lecture « empreinte = contenu » reste à faire accepter par la DGI | § 6.3 |
+| **C6** — choix du point de vente impossible à l'écran | exploitation à plusieurs points de vente (aucune exigence numérotée) | **Corrigé le 20 oct. 2026** | § 6.1 |
+
+### 6.1 Choix du point de vente (C6)
+
+- **Avant.** L'éditeur envoyait toujours `pointOfSaleId: null` ; l'API retenait le point de
+  vente d'office s'il n'y en avait qu'**un** actif. Avec deux actifs, le brouillon restait
+  bloqué (« Choisissez le point de vente… ») sans aucun moyen de choisir.
+- **API.** `GET /sales/points-of-sale` (`sales.read`) rend les points de vente **actifs dans
+  l'environnement DGI** de l'organisation, avec le mode d'émission : identifiant, nom, NIM et
+  nom d'établissement relevés par la DGI — **ni jeton, ni état technique, ni test** (la
+  gestion reste en `fiscal.manage`). `sales.read` parce que la personne qui compose un
+  brouillon (`sales.manage`) n'a pas forcément `fiscal.manage`, et qu'un nom et un NIM
+  imprimés sur toute facture ne sont pas confidentiels. Le champ `pointOfSaleId` du brouillon
+  existait déjà ; un point de vente d'une autre organisation répond toujours
+  `404 POINT_OF_SALE_NOT_FOUND`.
+- **Messages.** Le bloquant `POINT_OF_SALE_REQUIRED` dit quoi faire selon le cas (aucun actif ;
+  un seul : enregistrer ; plusieurs : choisir) ; un point de vente choisi puis retiré bloque
+  par `POINT_OF_SALE_NOT_ACTIVE` ; « Normaliser » sans point de vente répond
+  `409 POINT_OF_SALE_REQUIRED` (nouveau code 409) au lieu d'un « point de vente non actif »
+  trompeur.
+- **Écran.** L'éditeur affiche le point de vente en facture normalisée : le seul actif est
+  retenu par défaut (affiché, non modifiable) ; avec plusieurs, une liste **obligatoire**
+  (« Choisir un point de vente… ») et un message sous le champ tant que rien n'est choisi ;
+  aucun actif : un message renvoie à Organisation › Fiscalité.
+- **Tests.** Modèle web (choix, défaut, corps, message) ; e2e `normalization.e2e.test.ts` :
+  deux points de vente actifs, liste lisible par le Lecteur sans jeton, brouillon bloqué avec
+  le bon message, `409 POINT_OF_SALE_REQUIRED`, `404` pour un point de vente étranger,
+  normalisation par le point choisi (NIM du second), choix retiré → bloquant.
+
+### 6.2 Version du logiciel visible (C1)
+
+- **Source unique : l'étiquette de release.** `deploy.yml` (déclenché par `v*`) passe
+  `APP_VERSION` — la version **normalisée par `docker/metadata-action`** (`0.9.3` pour
+  `v0.9.3`, jamais le nom brut du tag, qui n'entre dans aucun script) — aux deux builds.
+  Les Dockerfile la posent en `ENV`. Aucune nouvelle dépendance.
+- **API.** `health/app-version.ts` lit `APP_VERSION` (forme `X.Y.Z[-pré]` vérifiée, « v »
+  retiré), repli sur le `package.json` de l'API suivi de « -dev » (`source: 'package'`) :
+  une version de développement ne se fait jamais passer pour une release. `/health` rend
+  `version` et `versionSource`.
+- **Web.** `next.config.mjs` inline `NEXT_PUBLIC_APP_VERSION` au build (même règle, même
+  repli). Le pied de page de l'application affiche « Lalanda vX.Y.Z » sur tous les écrans
+  (Organisation › Fiscalité compris), et les deux versions si l'API en répond une autre ;
+  le `/health` du web rend aussi sa version.
+- **PDF : version figée au gel.** Choix et justification : ADR-0025 § 10 (amendement du
+  20 oct. 2026). Champ figé optionnel `softwareVersion`, inclus dans `contentSha256` quand il
+  existe ; anciens documents inchangés, sans migration. La vue `InvoiceView` l'expose.
+- **Tests.** Résolution de la version (release, repli « -dev », valeurs refusées) ; `/health` ;
+  version inlinée par `next.config.mjs` ; libellé du pied ; modèle du PDF : version figée
+  imprimée, HTML identique quelle que soit la version qui rend, ancien document sans version,
+  brouillon à la version courante.
+
+### 6.3 Export du journal pour les vérificateurs (B3, exigence 1.20)
+
+- **Ce qui ne change pas.** Le journal chaîné (`sales_invoice_journal`) n'est ni modifié ni
+  réécrit : aucune entrée, aucun champ haché, aucune tête ne bouge. L'export **lit** les
+  documents figés et les entrées existantes ; c'est l'empreinte `contentSha256` de chaque
+  entrée qui relie le journal au contenu complet de la facture (lignes comprises), et
+  l'export met les deux côte à côte.
+- **Route.** `GET /sales/journal/export?from=AAAA-MM-JJ&to=AAAA-MM-JJ&format=json|csv
+  [&dataset=ventes|echanges]` ; jours de Kinshasa, bornes incluses, 1 à 366 jours ; au-delà de
+  5 000 factures, 50 000 entrées ou 20 000 échanges : `400 EXPORT_TOO_LARGE` (réduire la
+  période). Fichier en pièce jointe, `cache-control: no-store`.
+- **Permission : `fiscal.manage`** (Propriétaire, Directeur financier ; interdite à la
+  plateforme, comme `report.export`). Un export est une extraction **en masse** de toutes les
+  ventes et de tous les clients d'une période, acte du contribuable envers l'administration ;
+  `sales.read` (Analyste, Lecteur…) aurait permis cette extraction en un clic à tout lecteur.
+  La consultation page par page reste en `sales.read`. Chaque export est tracé
+  (`sales_journal.exported` : période, format, volumes, état de la chaîne).
+- **Contenu (JSON, complet).** Organisation (NIF), période, version du logiciel ; pour chaque
+  facture **émise ou normalisée** de la période : numéro, série, type, date, client (type, nom,
+  NIF), lignes (code envoyé à la DGI, désignation, type, groupe, quantité, prix, prix d'origine,
+  modification, montant, taxe spécifique), totaux par groupe (taux, base, TVA, taxe
+  spécifique, total), totaux, paiements, conversion et contre-valeur, avoir (nature,
+  référence), Code DEF/DGI, NIM, compteurs, date DGI, QR, empreinte et **`contentIntact`**
+  (empreinte recalculée à l'identique), entrées du journal qui la portent. Montants **qui font
+  foi** recopiés sans calcul : CDF de `normalizedAmounts` pour une facture normalisée, devise
+  du document sinon. Puis les entrées du journal de la période avec `prevHash`, et l'état de
+  la chaîne : `valid` (chaîne **entière** vérifiée), algorithme du hachage écrit en clair,
+  premier et dernier `seq`, `prevHash` d'ancrage — un vérificateur recalcule chaque `hash` hors
+  de Lalanda. Enfin les échanges e-MCF de la période (requêtes et réponses, jamais d'en-tête
+  donc jamais de jeton).
+- **CSV** (séparateur « ; », UTF-8 avec BOM, décimales à point) : `ventes` = une ligne par
+  ligne de facture et une par groupe de taxation, colonnes de la facture répétées (dont Code
+  DEF/DGI, NIM, compteurs, empreinte, `contenu_intact`, `journal_seq`, `chaine_valide`) ;
+  `echanges` = une ligne par entrée du journal des échanges. Un texte commençant par
+  `= + - @` est préfixé d'une apostrophe (pas de formule exécutée à l'ouverture).
+- **Écran.** Organisation › Fiscalité (déjà réservé à `fiscal.manage`) : bloc « Journal
+  électronique — export pour les vérificateurs », dates (mois en cours par défaut), contenu
+  (JSON complet, CSV ventes, CSV échanges), bouton « Exporter le journal ».
+- **Index.** Aucun index ajouté : les factures se lisent par `{organizationId, sortAt}`
+  (existant) ; les entrées par organisation (index `{organizationId, seq}`), volume borné.
+- **Reste ouvert.** Question F 6 du courrier DGI : contenu complet dans le journal, ou
+  empreinte reliant le journal à la facture immuable. Le PART de 1.20 pour les rapports X/Z/A
+  (catégorie P) est hors de ce lot.
+- **Tests.** Unitaires (`journal-export.test.ts` : période, montants qui font foi, code hors
+  champ, `contentIntact`, CSV aligné, échappement) ; modèle web ; e2e
+  (`normalization.e2e.test.ts`) : JSON complet, chaque `hash` de la période recalculé à partir
+  de l'export, échanges sans jeton, isolation entre organisations, trace d'audit, CSV ventes et
+  échanges, périodes invalides → 400, Propriétaire et DAF 200, Administrateur, Comptable,
+  Analyste, Lecteur 403.
+
 ## Conséquences
 
 - Les cas 14 et 29 s'impriment conformément à la DGI ; aucun autre rendu ne change (pour un

@@ -124,6 +124,14 @@ export class SalesInvoice {
   @Prop({ type: Object, default: null })
   operator!: { userId: string; name: string } | null;
 
+  /**
+   * Version du logiciel Lalanda qui a GELÉ le document (ADR-0026 § 6.2), figée
+   * avec lui et imprimée en pied de PDF. Absente des documents gelés avant le
+   * 20 oct. 2026 (pas de migration : leur empreinte et leur PDF sont inchangés).
+   */
+  @Prop({ type: String, required: false })
+  softwareVersion?: string | null;
+
   @Prop({ type: Date, default: null })
   frozenAt!: Date | null;
 

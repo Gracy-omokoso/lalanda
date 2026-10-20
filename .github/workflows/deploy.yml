@@ -88,8 +88,12 @@ jobs:
           # NEXT_PUBLIC_API_URL est inlinée au build du web (voir apps/web/Dockerfile).
           # Configurer la variable de repo NEXT_PUBLIC_API_URL avec l'URL publique
           # de l'API (ex: https://api.lalanda.example) ; fallback localhost sinon.
+          # APP_VERSION (ADR-0026 § 6.2) : version de l'étiquette `vX.Y.Z` SANS le
+          # « v », telle que normalisée par metadata-action (jamais le nom brut du
+          # tag) ; lue par /health, figée sur les factures, affichée par le web.
           build-args: |
             NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'http://localhost:3001' }}
+            APP_VERSION=${{ steps.meta.outputs.version }}
 
   deploy:
     name: Deploy sur le Droplet (désactivé par défaut)
