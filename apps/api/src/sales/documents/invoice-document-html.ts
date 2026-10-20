@@ -81,10 +81,18 @@ function partyHtml(heading: string, p: InvoiceDocumentModel['seller']): string {
 /** Bandeau répété en tête et en pied de CHAQUE page (gabarits Chromium). */
 function bandTemplate(m: InvoiceDocumentModel, where: 'header' | 'footer'): string {
   const parts: string[] = [];
-  if (m.test) parts.push(`<b style="color:#b91c1c">${esc(m.test.banner)}</b>`);
-  if (m.duplicate) parts.push(`<b>${esc(m.duplicate.label)}</b>`);
-  if (where === 'footer') {
-    parts.push(esc(m.footer));
+  if (where === 'header') {
+    if (m.test) parts.push(`<b style="color:#b91c1c">${esc(m.test.banner)}</b>`);
+    if (m.duplicate) parts.push(`<b>${esc(m.duplicate.label)}</b>`);
+  } else {
+    // `footer` porte déjà la mention de test et le numéro de duplicata.
+    parts.push(
+      m.test
+        ? `<b style="color:#b91c1c">${esc(m.footer)}</b>`
+        : m.duplicate
+          ? `<b>${esc(m.footer)}</b>`
+          : esc(m.footer),
+    );
     parts.push('Page <span class="pageNumber"></span> / <span class="totalPages"></span>');
   }
   return `<div style="width:100%;font-size:7.5pt;font-family:Arial,sans-serif;color:#374151;padding:0 12mm;display:flex;justify-content:space-between;gap:4mm;">${parts
