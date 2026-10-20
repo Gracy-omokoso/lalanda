@@ -24,8 +24,12 @@ env:
   # Épinglés, pas `:latest` : un run de CI doit être reproductible, et une image
   # qui bouge sous les pieds transforme une régression amont en « échec
   # mystérieux » sur un commit qui n'a rien changé.
-  MINIO_IMAGE: 'minio/minio:RELEASE.2025-04-22T22-12-26Z'
-  MC_IMAGE: 'minio/mc:RELEASE.2025-04-16T18-13-26Z'
+  #
+  # Le dépôt `minio/minio` a été retiré de Docker Hub (constaté le 20 oct. 2026,
+  # aussi absent de quay.io) : la CI ne pouvait plus le télécharger. On prend
+  # l'image Bitnami figée de la MÊME version que la production (2025-04-22), qui
+  # crée elle-même les buckets (`MINIO_DEFAULT_BUCKETS`) : plus besoin de `mc`.
+  MINIO_IMAGE: 'bitnamilegacy/minio:2025.4.22'
   # Base dédiée aux tests — jamais `lalanda`, pour qu'un run de CI ne puisse pas
   # écrire dans une base applicative si l'URI venait à pointer ailleurs.
   MONGODB_DB: 'lalanda_ci'
@@ -146,12 +150,18 @@ jobs:
           docker run -d --name lalanda-ci-minio -p 9000:9000 \
             -e MINIO_ROOT_USER=lalanda \
             -e MINIO_ROOT_PASSWORD=lalanda-dev-secret \
-            "$MINIO_IMAGE" server /data
+            -e MINIO_DEFAULT_BUCKETS=lalanda-ci-uploads,lalanda-ci-exports,lalanda-ci-snapshots \
+            "$MINIO_IMAGE"
 
+          # L'image Bitnami démarre un premier serveur temporaire pour créer les
+          # buckets, l'arrête, puis lance le définitif et affiche sa bannière
+          # « API: ». Le contrôle de santé seul pourrait répondre pendant la phase
+          # temporaire : on attend la bannière, PUIS la santé.
           echo "Attente de la disponibilité de MinIO…"
           for i in $(seq 1 60); do
-            if curl -fsS http://localhost:9000/minio/health/live >/dev/null 2>&1; then
-              echo "MinIO répond (tentative $i)."
+            if docker logs lalanda-ci-minio 2>&1 | grep -q '^API: ' \
+              && curl -fsS http://localhost:9000/minio/health/live >/dev/null 2>&1; then
+              echo "MinIO répond, buckets de CI prêts (tentative $i)."
               break
             fi
             if [ "$i" -eq 60 ]; then
@@ -161,22 +171,6 @@ jobs:
             fi
             sleep 2
           done
-
-          # `--network host` : le client parle au MinIO publié sur le runner,
-          # sans réseau Docker dédié à créer pour trois commandes.
-          #
-          # `--entrypoint sh` est OBLIGATOIRE : l'image `minio/mc` a `mc` pour
-          # point d'entrée, donc sans cette surcharge le `sh -c` ci-dessous est
-          # passé EN ARGUMENT à `mc`, qui répond « `sh` is not a recognized
-          # command » et sort en 1. `docker-compose.yml` fait la même surcharge.
-          docker run --rm --network host --entrypoint sh "$MC_IMAGE" -c '
-            set -e
-            mc alias set ci http://localhost:9000 lalanda lalanda-dev-secret
-            mc mb --ignore-existing ci/lalanda-ci-uploads
-            mc mb --ignore-existing ci/lalanda-ci-exports
-            mc mb --ignore-existing ci/lalanda-ci-snapshots
-            echo "Buckets de CI prêts."
-          '
 
       - name: Test
         run: pnpm test
