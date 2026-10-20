@@ -82,8 +82,8 @@ ligne). Rien n'est développé ici.
 | 1.19 — total = somme des paiements | OK | `checkPayments` (moteur) au gel | — |
 | 1.26 / 1.27 — avoirs partiels cumulés, plafonnés | OK | `credited` de l'origine, `checkCreditNote` (`alreadyCredited`) `invoice-freezing.service.ts:443-493` ; testé (deux avoirs partiels normalisés sur la même origine, puis dépassement refusé) | — |
 | 1.15 / 2.1 k — numérotation ininterrompue par année | OK | `TEST-AAAA-NNNNNN` / `AAAA-NNNNNN`, compteur par série et par année `sales/invoices/invoice-numbering.service.ts:46-50` ; la campagne vérifie 58 numéros contigus | — |
-| 1.11 — type de client et champs obligatoires | OK, sauf libellé AO | `sales.dto.ts:43-46, 102-137` | libellé AO (§ 3.1) |
-| 2.1 — mentions du PDF | OK, sauf cas 14 et 29 | `invoice-document.model.ts` | § 3 |
+| 1.11 — type de client et champs obligatoires | OK — libellé AO corrigé | `sales.dto.ts:43-46, 102-137` | libellé AO (§ 3.1) |
+| 2.1 — mentions du PDF | OK — cas 14 et 29 corrigés | `invoice-document.model.ts` | § 3 |
 | 1.4 — données imprimées = données échangées | **Écart — corrigé** (code hors champ) | voir cas 29 | § 3.2 |
 
 ## 3. Corrections (minimales)
