@@ -5,6 +5,10 @@ Date : 2026-10-20
 Décideurs : Gracy Omokoso (décisions produit, dont l'exigence du filigrane de test) ;
 CTO Lalanda (contrat technique)
 
+> **Amendé par [ADR-0026](ADR-0026-campagne-homologation.md) § 3** : le code d'article imprimé est
+> le code envoyé à la DGI (« HORS CHAMP » pour une opération hors champ) ; la mention du client
+> AO est « [AO] Ambassades et organisations internationales ».
+>
 > **Complète [ADR-0023](ADR-0023-factures-et-avoirs.md)** (tableau « ce qui s'imprime »,
 > § S25e.1 ; champ `duplicateCount`, § S25e.2 ; événement `duplicate_issued`, § S25e.12) et
 > **[ADR-0024](ADR-0024-normalisation-dgi.md)** (§ 4.3 : `documentKind` est l'unique entrée de

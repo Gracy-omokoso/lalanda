@@ -38,7 +38,7 @@ envoyée porte ce que le cas exige et le PDF ses mentions. Chemins relatifs à
 
 | Cas | Ce qu'il exige | Statut | Preuve (fichier:ligne) | Correction |
 |---|---|---|---|---|
-| 1 | FV, 1 × B + 1 × C, PM | OK | types `sales/invoices/invoice.contract.ts:54` ; client `sales/invoices/invoice-drafts.service.ts:515` ; groupes `sales/normalization/request-builder.ts:107-133` | — |
+| 1 | FV, 1 × B + 1 × C, PM | OK | types `sales/invoices/invoice.contract.ts:54` ; client `sales/invoices/invoice-drafts.service.ts:515` ; groupes `sales/normalization/request-builder.ts:107-134` (`code` ← `edefCode` l. 115) | — |
 | 2 | FV, 1 × A, PM | OK | idem | — |
 | 3 | FV, 2 × B + 3 × A, PM (origine du 11) | OK | idem | — |
 | 4 | quantités 2,375 et 3,5 | OK | `request-builder.ts:117` (`decimalToJsonNumber(line.quantity)`) ; PDF `sales/documents/invoice-document.model.ts:370` | — |
@@ -47,11 +47,11 @@ envoyée porte ce que le cas exige et le PDF ses mentions. Chemins relatifs à
 | 7 | client PL, nom + NIF | OK | idem | — |
 | 8 | taxe spécifique sur B et C, base TVA augmentée | OK | `request-builder.ts:122-125` (`taxSpecificValue`, `taxSpecificAmount`) ; PDF « T.S. » `invoice-document.model.ts:373-376` ; par unité **et** en % (`SpecificTax`, moteur) | — |
 | 9 | FT, mention « D'ACOMPTE » | OK | `invoice-document.model.ts:202` | — |
-| 10 | FA RAN, référence = code DEF/DGI du cas 1 | OK | référence figée au gel `sales/invoices/invoice-freezing.service.ts:518-522` ; envoi `request-builder.ts:166-178` ; mention `invoice-document.model.ts:203-207, 255` | — |
+| 10 | FA RAN, référence = code DEF/DGI du cas 1 | OK | référence figée au gel `sales/invoices/invoice-freezing.service.ts:518-522` ; envoi `request-builder.ts:166-179` ; mention `invoice-document.model.ts:203-207, 255` | — |
 | 11 | FA RAM, quantités ≤ vendues, mêmes prix (cas 3) | OK | lignes d'origine recopiées, seule la quantité varie `invoice-drafts.service.ts:599-620` ; contrôle `checkCreditNote` `invoice-freezing.service.ts:464` | — |
 | 12 | FA COR (cas 6, client PC) | OK | client de l'origine `invoice-drafts.service.ts:453-455` | — |
 | 13 | FA RRR, référence « RRR » | OK | `invoice-freezing.service.ts:519-520` ; PDF « Référence : RRR » `invoice-document.model.ts:254` | — (longueur de la référence : question DGI, § 5) |
-| 14 | AO, 2 × D, ligne A « Réf. Exo. : » | **Écart (PDF)** | ligne A automatique `invoice-drafts.service.ts:460-473` et envoyée `request-builder.ts:180-183` (OK) ; mais la mention imprimée du type est « [AO] Ambassade, organisation internationale » (`sales/sales.dto.ts:40`) alors que la DGI impose « [AO] Ambassades et organisations internationales » (cas de test, tableau « Types de client » ; annexe n° 01/022, p. 13) | Libellé `AO` aligné sur la mention DGI (§ 3.1) |
+| 14 | AO, 2 × D, ligne A « Réf. Exo. : » | **Écart (PDF) — corrigé** | ligne A automatique `invoice-drafts.service.ts:460-473` et envoyée `request-builder.ts:181-184` (OK) ; mais la mention imprimée du type est « [AO] Ambassade, organisation internationale » (`sales/sales.dto.ts:40`) alors que la DGI impose « [AO] Ambassades et organisations internationales » (cas de test, tableau « Types de client » ; annexe n° 01/022, p. 13) | Libellé `AO` aligné sur la mention DGI (§ 3.1) |
 | 15 | EV, 3 × E, « EXPORTATION » | OK | `invoice-document.model.ts:201` | — |
 | 16 | EA RAN, référence = code du cas 15 | OK | `sales/invoices/credit-note-rules.ts:12-16` (EA ↔ EV/ET) | — |
 | 17 | acompte à l'export, 3 × E | OK | type `ET` produit ; mentions « EXPORTATION » + « D'ACOMPTE » | — (ET ou FT : question DGI, § 5) |
@@ -59,14 +59,14 @@ envoyée porte ce que le cas exige et le PDF ses mentions. Chemins relatifs à
 | 19 | 2 × B + 2 × H | OK | idem | — |
 | 20 | 1 × C + 1 × I | OK | idem | — |
 | 21 | 2 × J | OK | idem | — |
-| 22 | 2 × K (vendeur non assujetti) | OK, avertissement | K admis ; avertissement non bloquant `TAX_GROUP_K_WHILE_VAT_REGISTERED` si la fiche fiscale dit « assujetti » (`packages/engine/src/invoice-totals/seller-vat-status.ts:121-133`) | — (fiche du vendeur pour ce cas : décision ouverte n° 2) |
-| 23 | 2 × B + 2 × L (TAX) | OK | `TAX` ⇔ L, N `packages/engine/src/invoice-totals/tax-groups.ts:28-31, 98-101` | — |
-| 24 | 3 × M + 3 × N (TAX), N entièrement TVA | OK | nature `vat_only` de N `tax-groups.ts:64-71` | — |
+| 22 | 2 × K (vendeur non assujetti) | OK, avertissement | K admis ; avertissement non bloquant `TAX_GROUP_K_WHILE_VAT_REGISTERED` si la fiche fiscale dit « assujetti » (`packages/engine/src/invoice-totals/seller-vat-status.ts:124-133`) | — (fiche du vendeur pour ce cas : décision ouverte n° 2) |
+| 23 | 2 × B + 2 × L (TAX) | OK | `TAX` ⇔ L, N `packages/engine/src/invoice-totals/tax-groups.ts:30-31, 103-106` | — |
+| 24 | 3 × M + 3 × N (TAX), N entièrement TVA | OK | nature `vat_only` de N `tax-groups.ts:66-72` | — |
 | 25 | remise 10 % ; remise totale 300 CDF ; prix d'origine affiché | OK | `discountedUnitPrice` (moteur) `invoice-drafts.service.ts:751-770` ; `originalPrice` + `priceModification` envoyés `request-builder.ts:126-130` ; PDF « Prix d'origine … — Remise … » `invoice-document.model.ts:263-280` | — |
-| 26 | total équivalent en USD, taux ±1 % | OK | `showUsdCounterValue` (document CDF), contre-valeur figée `invoice-freezing.service.ts:798-812` ; `curCode`, `curRate`, `curDate` `request-builder.ts:185-190` ; PDF `invoice-document.model.ts:400-404` | — (source du taux : question DGI, § 5) |
+| 26 | total équivalent en USD, taux ±1 % | OK | `showUsdCounterValue` (document CDF), contre-valeur figée `invoice-freezing.service.ts:798-812` ; `curCode`, `curRate`, `curDate` `request-builder.ts:186-191` ; PDF `invoice-document.model.ts:400-404` | — (source du taux : question DGI, § 5) |
 | 27 | 1 × O (1 %) | OK | groupe O | — |
 | 28 | 1 × P (1 %, marché public) | OK | groupe P | — |
-| 29 | 1 × A, code d'article « HORS CHAMP » | **Écart (PDF)** | la requête envoie bien `code: "HORS CHAMP"` (`edefCode`, `invoice-drafts.service.ts:718` ; `request-builder.ts:113`), mais le PDF imprime le code **interne** de l'article (`invoice-document.model.ts:366`) : données imprimées ≠ données échangées (exigence 1.4) | Le PDF imprime le code envoyé à la DGI (§ 3.2) |
+| 29 | 1 × A, code d'article « HORS CHAMP » | **Écart (PDF) — corrigé** | la requête envoie bien `code: "HORS CHAMP"` (`edefCode`, `invoice-drafts.service.ts:718` ; `request-builder.ts:115`), mais le PDF imprime le code **interne** de l'article (`invoice-document.model.ts:366`) : données imprimées ≠ données échangées (exigence 1.4) | Le PDF imprime le code envoyé à la DGI (§ 3.2) |
 
 **Rapports R01–R03 (X, Z, A)** : **non applicables** à ce lot. Exigences de catégorie P
 (« non validées lors de l'homologation transitoire »), absentes du produit ; question posée à
@@ -77,14 +77,14 @@ ligne). Rien n'est développé ici.
 
 | Exigence | Statut | Preuve | Correction |
 |---|---|---|---|
-| 1.24 — au moins 8 lignes de commentaire A–H | OK (conforme à l'annexe) | le modèle et la requête portent les huit lignes `cmta`…`cmth` (`invoice.contract.ts:82-84` ; `request-builder.ts:58-67, 180-183`) ; l'annexe fixe A (« Réf. Exo. : », client AO) et déclare **B à H réservées** : seules A et C sont saisissables (`invoice.contract.ts:157-158`, ADR-0023 § S25e.7), les autres → `400 COMMENT_LINE_RESERVED`. L'hypothèse « seules A et C existent » est donc **infirmée** : huit lignes, dont six réservées par la DGI | — (usage de C et impression des lignes vides : questions DGI, § 5) |
-| 1.18 — six moyens de paiement, plusieurs par facture | OK | `PAYMENT_METHODS` (sept, `AUTRE` compris) `packages/engine/src/invoice-totals/invoice-checks.types.ts:21-29` ; liste `payments[]` (`invoices.dto.ts:505-530`) envoyée telle quelle `request-builder.ts:160-163` ; la campagne couvre les six (§ 4) | — |
+| 1.24 — au moins 8 lignes de commentaire A–H | OK (conforme à l'annexe) | le modèle et la requête portent les huit lignes `cmta`…`cmth` (`invoice.contract.ts:82-84` ; `request-builder.ts:57-66, 181-184`) ; l'annexe fixe A (« Réf. Exo. : », client AO) et déclare **B à H réservées** : seules A et C sont saisissables (`invoice.contract.ts:157-158`, ADR-0023 § S25e.7), les autres → `400 COMMENT_LINE_RESERVED`. L'hypothèse « seules A et C existent » est donc **infirmée** : huit lignes, dont six réservées par la DGI | — (usage de C et impression des lignes vides : questions DGI, § 5) |
+| 1.18 — six moyens de paiement, plusieurs par facture | OK | `PAYMENT_METHODS` (sept, `AUTRE` compris) `packages/engine/src/invoice-totals/invoice-checks.types.ts:21-29` ; liste `payments[]` (`sales/invoices/invoices.dto.ts:502-535`) envoyée telle quelle `request-builder.ts:160-163` ; la campagne couvre les six (§ 4) | — |
 | 1.19 — total = somme des paiements | OK | `checkPayments` (moteur) au gel | — |
 | 1.26 / 1.27 — avoirs partiels cumulés, plafonnés | OK | `credited` de l'origine, `checkCreditNote` (`alreadyCredited`) `invoice-freezing.service.ts:443-493` ; testé (deux avoirs partiels normalisés sur la même origine, puis dépassement refusé) | — |
 | 1.15 / 2.1 k — numérotation ininterrompue par année | OK | `TEST-AAAA-NNNNNN` / `AAAA-NNNNNN`, compteur par série et par année `sales/invoices/invoice-numbering.service.ts:46-50` ; la campagne vérifie 58 numéros contigus | — |
 | 1.11 — type de client et champs obligatoires | OK, sauf libellé AO | `sales.dto.ts:43-46, 102-137` | libellé AO (§ 3.1) |
 | 2.1 — mentions du PDF | OK, sauf cas 14 et 29 | `invoice-document.model.ts` | § 3 |
-| 1.4 — données imprimées = données échangées | **Écart** (code hors champ) | voir cas 29 | § 3.2 |
+| 1.4 — données imprimées = données échangées | **Écart — corrigé** (code hors champ) | voir cas 29 | § 3.2 |
 
 ## 3. Corrections (minimales)
 
@@ -119,6 +119,13 @@ article hors champ reste dans la fiche et dans la vue, il ne s'imprime plus. Ame
   (`compareWithEdefResponse`, 67 champs), mentions du PDF (double du rendu HTML d'ADR-0025).
   Puis : 58 numéros `TEST-` contigus, six moyens de paiement couverts, avoirs partiels
   cumulés (1.27).
+
+**Résultat (20 oct. 2026)** : avant correction, 61 tests, **6 échecs** — les cas 14 et 29 dans
+les deux modes (les deux écarts du § 1), et une attente du test lui-même (la taxe spécifique en
+pourcentage part sous la forme `10.00%`, conforme à la forme `{valeur}%`). Après les
+corrections du § 3 : **61 tests sur 61**, soit 58 normalisations réussies, totaux identiques
+au faux serveur sur les 67 champs, 58 numéros contigus, six moyens de paiement, avoirs
+partiels cumulés. Les 27 autres cas passaient sans modification du code.
 
 Choix de données (libres selon les cas officiels) : prix en CDF, identiques en TTC et en
 HT ; paiements répartis pour couvrir les six moyens, plusieurs sur les cas 1, 6 et 24 ;
