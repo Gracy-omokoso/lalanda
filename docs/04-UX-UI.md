@@ -360,12 +360,13 @@ Composants : `normalize-dialog.tsx` (fenêtre), `normalization-status.tsx` (éta
 - **Jamais de renvoi automatique.** Si la réponse de « Normaliser », « Relancer » ou « Vérifier » se perd (réseau, délai, erreur 5xx d’un mandataire), l’interface **relit** le document et affiche son état, avec la mention « La normalisation n’a pas été renvoyée ». Seul un refus clair de l’API (4xx) s’affiche comme une erreur.
 - **Déclarer non normalisée** : fenêtre qui rappelle les conséquences (retour en « refusée », trou tracé possible dans la série, audit), motif de 20 à 500 caractères ; ré-authentification par la boîte de l’onglet Fiscalité, puis nouvelle tentative unique. Aucune saisie d’éléments de sécurité.
 - **Échanges avec la DGI** : section repliable du détail, chargée à l’ouverture ; chaque requête et chaque réponse (opération, date, route, résultat, statut HTTP, durée, code DGI) et le contenu échangé **tel que servi** (nombres jamais reconvertis). Aucun jeton : l’API n’en sert pas, et l’interface masque malgré tout toute clé ressemblant à un secret.
-- **« Mode test »** dans la fenêtre, le panneau d’état et l’en-tête du détail dès que l’environnement est le test.
+- **« Mode test »** dans la fenêtre, le panneau d’état et l’en-tête du détail dès que l’environnement est le test. Par décision de la décideuse, la mention est **impossible à manquer** : bandeau « Environnement de test DGI — facture sans valeur fiscale » en tête de la fiche, rappel « Environnement de test DGI — sans valeur fiscale » dans la fenêtre « Normaliser », et « (test) » après le numéro d’une facture normalisée en test (« Facture normalisée n° TEST-… (test) »). Un test unitaire l’impose.
 
 ### Limites
 
 - Pas d’impression ni de PDF (S25g) : le QR code DGI, présent dans la vue, n’est pas affiché avant S25g, qui l’imprimera.
 - Aucun aperçu des montants CDF avant « Normaliser » : le contrat n’a pas de route d’aperçu.
+- Pas de badge « TEST » dans la **liste** des factures : le résumé de liste (`InvoiceSummary`) ne porte pas l’environnement. Il faut l’y ajouter côté API ; l’interface ne le devine pas.
 - Ré-authentification par Google pendant « Déclarer non normalisée » : au retour, la déclaration n’est pas reprise automatiquement ; il faut rouvrir la fenêtre.
 
 ## Implémenté (S21b) — Espace admin plateforme
