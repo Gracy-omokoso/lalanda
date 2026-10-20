@@ -248,10 +248,15 @@ export function buildCalibrationRequest(
       }
       return item;
     }),
-    client: ctx.clientTypeDesc ? { type: 'PP', typeDesc: ctx.clientTypeDesc } : { type: 'PP' },
-    operator: { name: 'Étalonnage Lalanda' },
+    // Mention « TEST » partout où la DGI la lira (demande de la décideuse,
+    // 20 oct. 2026) : nom du client, opérateur et commentaire. Ces champs
+    // n'entrent dans aucun calcul de totaux.
+    client: ctx.clientTypeDesc
+      ? { type: 'PP', typeDesc: ctx.clientTypeDesc, name: 'TEST LALANDA - SANS VALEUR FISCALE' }
+      : { type: 'PP', name: 'TEST LALANDA - SANS VALEUR FISCALE' },
+    operator: { name: 'TEST Lalanda (étalonnage)' },
     payment: [{ name: 'ESPECES', amount: decimalToJsonNumber(totals.total) }],
-    cmta: `Étalonnage des arrondis, cas ${c.id} — facture de test annulée aussitôt.`,
+    cmta: `FACTURE DE TEST LALANDA - SANS VALEUR FISCALE - étalonnage, cas ${c.id}.`,
   };
   if (ctx.counterValue) {
     body.curCode = 'USD';
