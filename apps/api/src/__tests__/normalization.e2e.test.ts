@@ -878,6 +878,7 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
       // On échoue VITE (borne de tours, borne de temps, tours sans progrès)
       // avec l'état des documents restants et du bail de numérotation.
       const journalDesTours: string[] = [];
+      const declarations: string[] = [];
       const debut = Date.now();
       let sansProgres = 0;
       let restantsAvant = Number.POSITIVE_INFINITY;
@@ -957,6 +958,9 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
           })
           .toArray();
         for (const d of enRevue) {
+          declarations.push(
+            `${String(d['_id'])} (${d['normalization']?.['review']?.['reason'] ?? '?'})`,
+          );
           await recorder().declareNotNormalized(
             orgN,
             String(d['_id']),
@@ -966,7 +970,9 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
         }
       }
       // eslint-disable-next-line no-console
-      console.info(`[50 normalisations] ${journalDesTours.length} tours, ${Date.now() - debut} ms`);
+      console.info(
+        `[50 normalisations] ${journalDesTours.length} tours, ${Date.now() - debut} ms, déclarations : ${JSON.stringify(declarations)}`,
+      );
       // Jamais deux POST pour un même numéro sans conclusion entre-temps.
       expect(posts() - postsAvant).toBeGreaterThanOrEqual(50);
       const docs = await db
