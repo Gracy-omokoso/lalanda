@@ -48,12 +48,38 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   AUTRE: 'Autre',
 };
 
-export function documentKindOf(status: InvoiceStatus): DocumentKind {
-  return status === 'issued' || status === 'normalized' ? 'invoice' : 'proforma';
+/**
+ * Verrou « pas de facture sans éléments DGI » (ADR-0024 § 4.3, chantier F2) :
+ * `invoice` pour `issued` (organisation ordinaire), et pour `normalized`
+ * SEULEMENT avec un code DEF/DGI et un QR code non vides. Un document
+ * `normalized` incomplet — impossible par construction — reste « Pro forma » et
+ * déclenche une alerte.
+ */
+export function documentKindOf(
+  doc: Pick<InvoiceLean, 'status'> & {
+    normalization?: Pick<InvoiceNormalizationState, 'codeDefDgi' | 'qrCode'> | null;
+  },
+): DocumentKind {
+  if (doc.status === 'issued') return 'invoice';
+  if (doc.status !== 'normalized') return 'proforma';
+  const n = doc.normalization ?? null;
+  if (nonEmpty(n?.codeDefDgi) && nonEmpty(n?.qrCode)) return 'invoice';
+  // eslint-disable-next-line no-console
+  console.error(
+    '[ventes] ALERTE EDEF_NORMALIZED_WITHOUT_SECURITY : document normalisé sans éléments de sécurité, affiché « Pro forma »',
+    {
+      invoiceId: String((doc as { _id?: unknown })._id ?? ''),
+    },
+  );
+  return 'proforma';
+}
+
+function nonEmpty(v: string | null | undefined): boolean {
+  return typeof v === 'string' && v.trim() !== '';
 }
 
 function documentLabelOf(doc: InvoiceLean): string {
-  if (documentKindOf(doc.status) === 'proforma') return PROFORMA_LABEL;
+  if (documentKindOf(doc) === 'proforma') return PROFORMA_LABEL;
   const credit = doc.type === 'FA' || doc.type === 'EA';
   if (doc.status === 'normalized') return credit ? 'Avoir normalisé' : 'Facture normalisée';
   return credit ? 'Avoir' : 'Facture';
@@ -64,10 +90,57 @@ const iso = (d: Date | string | null | undefined): string | null =>
 
 // ── Vue `normalization` — ADR-0024 § 9.2 ─────────────────────────────────────
 //
-// PROVISOIRE (jalon F0) : projection directe du sous-document, pour que la vue
-// respecte le contrat dès F0. Le chantier F2 calcule `nextCheckAt` et
-// `actions` selon la phase ET les permissions de la personne ; d'ici là,
-// aucune action n'est proposée par ce bloc.
+// Projection du sous-document. `actions` dépend de la phase ET des permissions
+// de la personne (chantier F2) : `normalizationActions` ci-dessous. Sans
+// permissions connues (`ctx.permissions` absent), aucune action n'est proposée ;
+// les routes de documents de vente les complètent avec le rôle de la personne
+// (`sales/normalization/normalization-actions.interceptor.ts`).
+
+/** Ce que la personne peut faire, lu dans la matrice RBAC unique (`can()`). */
+export interface NormalizationPermissions {
+  /** `sales.invoice` : Relancer, Vérifier maintenant. */
+  invoice: boolean;
+  /** `sales.manage` : Reprendre en brouillon. */
+  manage: boolean;
+  /** `fiscal.manage` : Déclarer non normalisée. */
+  fiscal: boolean;
+}
+
+export const NO_NORMALIZATION_PERMISSIONS: NormalizationPermissions = Object.freeze({
+  invoice: false,
+  manage: false,
+  fiscal: false,
+});
+
+/**
+ * Actions proposées (ADR-0024 § 9.1 à § 9.3) — calculées ici seulement :
+ * l'interface n'en déduit rien d'autre.
+ *  - `retry` : `queued`, ou `failed` réessayable ;
+ *  - `check` : `uncertain` dont la prochaine vérification est échue, ou `needs_review` ;
+ *  - `declareNotNormalized` : `needs_review` ;
+ *  - `backToDraft` : `normalization_failed` sans numéro réservé.
+ */
+export function normalizationActions(
+  view: Pick<NormalizationView, 'phase' | 'lastError' | 'nextCheckAt' | 'reservedNumber'>,
+  status: InvoiceStatus,
+  can: NormalizationPermissions,
+  now: Date = new Date(),
+): NormalizationView['actions'] {
+  const pending = status === 'pending_normalization';
+  const failed = status === 'normalization_failed';
+  const checkDue =
+    view.phase === 'uncertain' &&
+    (view.nextCheckAt === null || new Date(view.nextCheckAt).getTime() <= now.getTime());
+  return {
+    retry:
+      can.invoice &&
+      ((pending && view.phase === 'queued') ||
+        (failed && view.phase === 'failed' && view.lastError?.retryable === true)),
+    check: can.invoice && pending && (checkDue || view.phase === 'needs_review'),
+    declareNotNormalized: can.fiscal && pending && view.phase === 'needs_review',
+    backToDraft: can.manage && failed && view.reservedNumber === null,
+  };
+}
 
 const IN_PROGRESS_PHASES: ReadonlySet<NormalizationPhase> = new Set([
   'submitting',
@@ -88,9 +161,13 @@ function errorCategory(category: string | undefined): NormalizationErrorCategory
     : null;
 }
 
-function normalizationViewOf(n: InvoiceNormalizationState): NormalizationView {
+function normalizationViewOf(
+  n: InvoiceNormalizationState,
+  status: InvoiceStatus,
+  permissions: NormalizationPermissions,
+): NormalizationView {
   const phase = normalizationViewPhase(n.phase as NormalizationPhase | undefined);
-  return {
+  const view: Omit<NormalizationView, 'actions'> = {
     attempts: n.attempts,
     reservedNumber: n.reservedNumber,
     codeDefDgi: n.codeDefDgi,
@@ -110,13 +187,13 @@ function normalizationViewOf(n: InvoiceNormalizationState): NormalizationView {
       : null,
     normalizedAt: iso(n.normalizedAt),
     phase,
-    dgiRequestId: n.uid,
+    dgiRequestId: n.uid ?? null,
     differences: n.differences ?? null,
     nextCheckAt:
       phase === 'uncertain' || phase === 'needs_review' ? iso(n.reconcileAfter ?? null) : null,
     review: n.review ? { since: iso(n.review.since) ?? '', reason: n.review.reason } : null,
-    actions: { retry: false, check: false, declareNotNormalized: false, backToDraft: false },
   };
+  return { ...view, actions: normalizationActions(view, status, permissions) };
 }
 
 export interface InvoiceViewContext {
@@ -124,6 +201,8 @@ export interface InvoiceViewContext {
   creditNotes: readonly InvoiceCreditNoteSummary[];
   /** Origine finale seulement : quantités créditées et restantes, par ligne. */
   creditedByLine: ReadonlyMap<number, { credited: string; remaining: string }> | null;
+  /** ADR-0024 § 9.2 (F2) : permissions de la personne ; absent → aucune action. */
+  permissions?: NormalizationPermissions;
 }
 
 function paymentViews(payments: readonly PaymentInput[]) {
@@ -135,7 +214,7 @@ function paymentViews(payments: readonly PaymentInput[]) {
 }
 
 export function invoiceView(doc: InvoiceLean, ctx: InvoiceViewContext): InvoiceView {
-  const kind = documentKindOf(doc.status);
+  const kind = documentKindOf(doc);
   const totals = doc.documentAmounts.calculation.totals;
   const lines: InvoiceLineView[] = doc.lines.map((l) => {
     const credited = ctx.creditedByLine?.get(l.index);
@@ -232,7 +311,9 @@ export function invoiceView(doc: InvoiceLean, ctx: InvoiceViewContext): InvoiceV
     creditNotes: ctx.creditNotes,
     seller: doc.seller ?? null,
     operator: doc.operator ?? null,
-    normalization: n ? normalizationViewOf(n) : null,
+    normalization: n
+      ? normalizationViewOf(n, doc.status, ctx.permissions ?? NO_NORMALIZATION_PERMISSIONS)
+      : null,
     readiness: ctx.readiness,
     revision: doc.revision,
     createdAt: iso(doc.createdAt) ?? '',
@@ -241,7 +322,7 @@ export function invoiceView(doc: InvoiceLean, ctx: InvoiceViewContext): InvoiceV
 }
 
 export function invoiceSummary(doc: InvoiceLean): InvoiceSummary {
-  const kind = documentKindOf(doc.status);
+  const kind = documentKindOf(doc);
   const totals = doc.documentAmounts.calculation.totals;
   return {
     id: String(doc._id),
@@ -263,7 +344,7 @@ export function invoiceSummary(doc: InvoiceLean): InvoiceSummary {
 }
 
 export function creditNoteSummary(doc: InvoiceLean): InvoiceCreditNoteSummary {
-  const kind = documentKindOf(doc.status);
+  const kind = documentKindOf(doc);
   return {
     id: String(doc._id),
     status: doc.status,

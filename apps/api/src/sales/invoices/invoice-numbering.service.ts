@@ -292,6 +292,86 @@ export class InvoiceNumberingService {
     return { released: false };
   }
 
+  // ── ADR-0024 § 4.1 et § 4.4 (chantier F2) — ajouts ──────────────────────
+
+  /**
+   * Prolonge le bail de la série du numéro réservé jusqu'à `until` pendant une
+   * normalisation incertaine : aucune autre facture ne prend le numéro suivant
+   * tant qu'on ne sait pas si celui-ci est normalisé. Sans effet si le bail est
+   * tenu, vivant, par une autre facture (il a expiré entre-temps et a été repris).
+   */
+  async holdLease(
+    organizationId: string,
+    invoiceId: string,
+    until: Date,
+    opts: { session: ClientSession },
+  ): Promise<void> {
+    const key = await this.leaseKeyOf(organizationId, invoiceId, opts.session);
+    if (key === null) return;
+    await this.counters
+      .updateOne(
+        {
+          ...key,
+          $or: [
+            { inFlight: null },
+            { 'inFlight.until': { $lte: new Date() } },
+            { 'inFlight.invoiceId': invoiceId },
+          ],
+        },
+        { $set: { inFlight: { invoiceId, until } } },
+        { session: opts.session },
+      )
+      .exec();
+  }
+
+  /**
+   * Relâche le bail SANS rendre le numéro (« vérification nécessaire ») : les
+   * autres factures reprennent, le numéro reste attaché au document.
+   */
+  async dropLease(
+    organizationId: string,
+    invoiceId: string,
+    opts: { session: ClientSession },
+  ): Promise<void> {
+    await this.counters
+      .updateMany(
+        { organizationId, 'inFlight.invoiceId': invoiceId },
+        { $set: { inFlight: null } },
+        { session: opts.session },
+      )
+      .exec();
+  }
+
+  /**
+   * Numéro qui ne peut plus être rendu (d'autres numéros ont été pris depuis) :
+   * il reste consommé — trou TRACÉ dans la série par l'appelant (entrée de
+   * journal `number_abandoned` avec `reason`, audit). Le compteur n'est pas
+   * décrémenté ; le bail éventuel tombe. L'appelant efface
+   * `normalization.reservedNumber`.
+   */
+  async abandon(
+    organizationId: string,
+    invoiceId: string,
+    reason: string,
+    opts: { session: ClientSession },
+  ): Promise<void> {
+    if (reason.trim() === '') throw new Error('Un numéro ne s’abandonne pas sans motif.');
+    await this.dropLease(organizationId, invoiceId, opts);
+  }
+
+  /** Clé du compteur du numéro réservé ; `null` sans numéro réservé de série fiscale. */
+  private async leaseKeyOf(
+    organizationId: string,
+    invoiceId: string,
+    session: ClientSession,
+  ): Promise<{ organizationId: string; series: 'real' | 'test'; year: number } | null> {
+    const invoice = await this.requireInvoice(organizationId, invoiceId, session);
+    const reserved = invoice.normalization?.reservedNumber ?? null;
+    const parsed = reserved === null ? null : parseInvoiceNumber(reserved);
+    if (parsed === null || parsed.series === 'proforma') return null;
+    return { organizationId, series: parsed.series, year: parsed.year };
+  }
+
   private async requireInvoice(
     organizationId: string,
     invoiceId: string,

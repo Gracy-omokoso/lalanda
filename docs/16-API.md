@@ -321,6 +321,23 @@ Contrat complet : ADR-0023 § S25e.14 et `apps/api/src/sales/invoices/invoice.co
 
 **Écarts au contrat signalés** : un article dont la devise diffère du document, sans prix saisi, est refusé à l'enregistrement (`400`, problème `CATALOG_CURRENCY_MISMATCH`) au lieu de devenir un bloquant ; `showUsdCounterValue` est renvoyé dans la vue (ajout).
 
+## Ventes — normalisation DGI — implémenté (S25f, ADR-0024 chantier F2)
+
+Contrat : ADR-0024 § 9. `POST …/normalize` envoie, compare et confirme d'un seul tenant ; un refus de la DGI n'est pas une erreur HTTP (200 avec l'état). La route est idempotente : une requête renvoyée (double clic, navigateur) trouve la prise en main et rend l'état courant sans rien envoyer.
+
+| Méthode et chemin | Permission | Ré-auth | Quota |
+|---|---|:--:|---|
+| `POST /sales/invoices/:id/normalization/retry` | `sales.invoice` | | 60/h/utilisateur |
+| `POST /sales/invoices/:id/normalization/check` | `sales.invoice` | | 60/h/utilisateur |
+| `POST /sales/invoices/:id/normalization/declare-not-normalized` `{ reason }` (20 à 500 caractères) | `fiscal.manage` | ✓ | 10/h/utilisateur |
+| `GET /sales/invoices/:id/dgi-exchanges` | `sales.read` | | global |
+
+Codes : `409 NORMALIZATION_NOT_RETRYABLE` (`details.phase`), `409 NORMALIZATION_NOT_UNDER_REVIEW`, `401 REAUTH_REQUIRED`. Les prérequis manquants avant envoi (`POINT_OF_SALE_NOT_ACTIVE`, `SELLER_NIF_MISMATCH`, `ISF_NOT_CONFIGURED`, `REFERENCE_LISTS_UNAVAILABLE`, `DGI_PRODUCTION_UNAVAILABLE`) sont rendus dans `normalization.lastError`. `normalization.actions` est calculé par l'API selon la phase et les permissions de la personne, sur toute vue de document. Désactiver un point de vente qui porte une normalisation non soldée : `409 POINT_OF_SALE_HAS_PENDING_NORMALIZATIONS`.
+
+Tâches planifiées : `sales.normalization.reconcile` (30 s, lecture et annulation seulement), `edef.reference.refresh` (6 h) et `edef.reference.refresh.daily` (00 h 15, Kinshasa), `sales.normalization.consistency` (quotidienne).
+
+**Écarts au contrat signalés** : `POST …/normalize` ne porte pas encore le quota de normalisation (60/h, fichier `invoices.controller.ts` hors périmètre F2) ; les e-mails d'alerte (décision ouverte n° 3) ne sont pas envoyés ; `lastError.dgiMessage` est le libellé DGI tel que reçu (`dgiErrorDesc` du client e-MCF).
+
 ## Webhooks
 
 Paiements et intégrations utilisent signatures, tolérance temporelle, anti-rejeu, journal et traitement idempotent.

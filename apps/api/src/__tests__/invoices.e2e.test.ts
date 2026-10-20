@@ -26,6 +26,10 @@ import { startFakeEdefServer, type FakeEdefServer } from '../edef/testing/fake-e
 import { inFiscalTransaction } from '../fiscal/fiscal-transaction.js';
 import { NormalizedInvoicingService } from '../fiscal/normalized-invoicing.service.js';
 import { contentSha256Of } from '../sales/invoices/canonical.js';
+import {
+  SALES_INVOICE_NORMALIZER,
+  type SalesInvoiceNormalizer,
+} from '../sales/invoices/normalization.port.js';
 import { InvoiceJournalService } from '../sales/invoices/invoice-journal.service.js';
 import {
   InvoiceNumberingService,
@@ -226,6 +230,8 @@ e2eSuite('ventes — factures et avoirs (ADR-0023 chantier E2)', () => {
             $set: {
               status: 'normalized',
               'normalization.codeDefDgi': `DEF-${invoiceId.slice(-6)}`,
+              // Verrou ADR-0024 § 4.3 : pas de « facture » sans code DEF/DGI ni QR code.
+              'normalization.qrCode': `QR-${invoiceId.slice(-6)}`,
               'normalization.nim': NIM,
               'normalization.normalizedAt': new Date(),
             },
@@ -270,6 +276,13 @@ e2eSuite('ventes — factures et avoirs (ADR-0023 chantier E2)', () => {
     process.env['DGI_EDEF_PRODUCTION_URL'] = 'https://edef.invalid';
     app = await makeE2EApp();
     db = await dbOf(app);
+    // S25f est SIMULÉ dans cette suite (faux S25f ci-dessus) : la normalisation
+    // réelle (ADR-0024, F2) est court-circuitée et a sa propre suite
+    // (`normalization.e2e.test.ts`).
+    vi.spyOn(
+      app.get<SalesInvoiceNormalizer>(SALES_INVOICE_NORMALIZER),
+      'normalizeNow',
+    ).mockResolvedValue('deferred');
     // Un seul port d'écoute : sans cela, supertest ouvre un serveur par requête et
     // cinquante requêtes simultanées finissent en ECONNRESET.
     await new Promise<void>((resolve) => app.getHttpServer().listen(0, '127.0.0.1', resolve));
@@ -927,7 +940,18 @@ e2eSuite('ventes — factures et avoirs (ADR-0023 chantier E2)', () => {
         await numbering().confirm(orgN, y.id, new Date(), { session });
         await connection()
           .collection('sales_invoices')
-          .updateOne({ _id: new ObjectId(y.id) }, { $set: { status: 'normalized' } }, { session });
+          .updateOne(
+            { _id: new ObjectId(y.id) },
+            {
+              $set: {
+                status: 'normalized',
+                // Verrou ADR-0024 § 4.3 : éléments de sécurité exigés pour « facture ».
+                'normalization.codeDefDgi': 'DEF-Y',
+                'normalization.qrCode': 'QR-Y',
+              },
+            },
+            { session },
+          );
       });
       const vue = (await get(asN(), `/sales/invoices/${y.id}`)).body;
       expect(vue).toMatchObject({
