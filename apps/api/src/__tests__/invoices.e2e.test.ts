@@ -747,6 +747,9 @@ e2eSuite('ventes — factures et avoirs (ADR-0023 chantier E2)', () => {
       expect(ids.size).toBe(20);
       const q = await get(asA('viewer'), `/sales/invoices?q=${emise.number}`);
       expect(q.body.items.map((i: { id: string }) => i.id)).toContain(emise.id);
+      // La série du numéro est dans le résumé de liste (badge « TEST » du web).
+      const ligne = q.body.items.find((i: { id: string }) => i.id === emise.id);
+      expect(ligne.series).toBe('real');
       expect((await get(asA('viewer'), '/sales/invoices?cursor=zzz')).body.code).toBe(
         'INVALID_CURSOR',
       );

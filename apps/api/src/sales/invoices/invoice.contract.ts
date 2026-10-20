@@ -495,6 +495,12 @@ export interface InvoiceSummary {
   /** Seul `calculation.total` est repris ; `null` avant la normalisation. */
   normalizedAmounts: { calculation: { total: DecimalString } } | null;
   emissionMode: EmissionMode | null;
+  /**
+   * Série du numéro définitif (`test` = normalisé dans l'environnement de TEST
+   * DGI) ; `null` tant que le document n'a pas de numéro. Ajouté le 20 oct. 2026
+   * pour le badge « TEST » de la liste (demande de la décideuse).
+   */
+  series: InvoiceSeries | null;
   revision: number;
 }
 

@@ -339,6 +339,7 @@ export function invoiceSummary(doc: InvoiceLean): InvoiceSummary {
       ? { calculation: { total: doc.normalizedAmounts.calculation.total } }
       : null,
     emissionMode: doc.emissionMode ?? null,
+    series: kind === 'invoice' ? (doc.series ?? null) : null,
     revision: doc.revision,
   };
 }

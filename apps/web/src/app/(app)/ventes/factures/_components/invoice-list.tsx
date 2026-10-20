@@ -16,7 +16,9 @@ import { formatDate } from '../../_components/sales-model';
 import { useSalesList } from '../../_components/use-sales-list';
 
 import {
+  BADGE_TEST_DGI,
   enteteDocument,
+  resumeEnTestDgi,
   FACTURES_BASE,
   FILTRES_INITIAUX,
   FILTRES_STATUT,
@@ -184,6 +186,14 @@ export function InvoiceList(): React.ReactElement {
                     <div className="flex min-w-0 flex-col gap-1">
                       <span className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-sm font-semibold">{entete.reference}</span>
+                        {resumeEnTestDgi(d) ? (
+                          <span
+                            className="rounded border border-[var(--warn,#b45309)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--warn,#b45309)]"
+                            title="Environnement de test DGI — facture sans valeur fiscale"
+                          >
+                            {BADGE_TEST_DGI}
+                          </span>
+                        ) : null}
                         <Pastille ton={tonStatut(d.status)}>{STATUS_LABELS[d.status]}</Pastille>
                         <span className="text-xs text-[var(--foreground-muted)]">
                           {TYPE_LABELS[d.type]}

@@ -190,6 +190,7 @@ function resume(partiel: Partial<InvoiceSummary> = {}): InvoiceSummary {
     documentAmounts: { calculation: { totals: { total: '1234.5' } } },
     normalizedAmounts: null,
     emissionMode: null,
+    series: null,
     revision: 1,
     ...partiel,
   };
@@ -1262,5 +1263,15 @@ describe('échanges DGI du document', () => {
       'Authorization: Bearer [masqué]',
     );
     expect(corpsLisible('texte brut')).toBe('texte brut');
+  });
+});
+
+describe('badge TEST de la liste (demande de la décideuse)', () => {
+  it('marque « TEST » une facture numérotée dans la série de test DGI, et elle seule', async () => {
+    const { resumeEnTestDgi, BADGE_TEST_DGI } = await import('./invoice-model');
+    expect(BADGE_TEST_DGI).toBe('TEST');
+    expect(resumeEnTestDgi({ series: 'test' })).toBe(true);
+    expect(resumeEnTestDgi({ series: 'real' })).toBe(false);
+    expect(resumeEnTestDgi({ series: null })).toBe(false);
   });
 });

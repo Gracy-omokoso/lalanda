@@ -2091,6 +2091,8 @@ export interface InvoiceSummary {
   documentAmounts: { calculation: { totals: { total: DecimalString } | null } };
   normalizedAmounts: { calculation: { total: DecimalString } } | null;
   emissionMode: EmissionMode | null;
+  /** `test` = normalisé dans l'environnement de TEST DGI ; `null` sans numéro. */
+  series: InvoiceSeries | null;
   revision: number;
 }
 

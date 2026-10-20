@@ -188,6 +188,14 @@ export const MENTION_TEST_DGI = 'Environnement de test DGI — facture sans vale
 /** Rappel de la fenêtre « Normaliser » quand l'organisation est en test. */
 export const RAPPEL_TEST_DGI = 'Environnement de test DGI — sans valeur fiscale';
 
+/** Badge de la liste : document numéroté dans la série de TEST DGI. */
+export const BADGE_TEST_DGI = 'TEST';
+
+/** Une ligne de la liste relève-t-elle de l'environnement de TEST DGI ? */
+export function resumeEnTestDgi(doc: Pick<InvoiceSummary, 'series'>): boolean {
+  return doc.series === 'test';
+}
+
 /** Le document relève-t-il de l'environnement de TEST de la DGI ? (vue complète seulement) */
 export function enTestDgi(doc: Pick<InvoiceView, 'environment'>): boolean {
   return doc.environment === 'test';
