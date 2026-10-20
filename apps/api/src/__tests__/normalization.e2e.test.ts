@@ -1140,6 +1140,130 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
     });
   });
 
+  // ── Export du journal pour les vérificateurs (ADR-0026 § 6.3) ──────────
+
+  describe('export du journal électronique', () => {
+    const jour = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Africa/Kinshasa',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+    const url = (q: string) => `/sales/journal/export?from=${jour}&to=${jour}${q}`;
+
+    it('JSON : factures figées avec lignes, groupes, éléments DGI ; chaîne recalculable ; échanges sans jeton', async () => {
+      const { view, rn } = await normaliser();
+      const res = await get(asN(), url('&format=json'));
+      expect(res.status, JSON.stringify(res.body)).toBe(200);
+      expect(res.headers['content-type']).toMatch(/application\/json/);
+      expect(res.headers['content-disposition']).toBe(
+        `attachment; filename="journal-ventes_${jour}_${jour}.json"`,
+      );
+      const exp = res.body as Record<string, any>;
+      expect(exp).toMatchObject({
+        format: 'lalanda.sales-journal',
+        formatVersion: 1,
+        organization: { id: orgN, nif: NIF_N },
+        period: { from: jour, to: jour, timeZone: 'Africa/Kinshasa' },
+        chain: { valid: true },
+      });
+      const inv = (exp.invoices as Record<string, any>[]).find((i) => i.number === rn)!;
+      expect(inv).toMatchObject({
+        id: view.id,
+        type: 'FV',
+        status: 'normalized',
+        currency: 'CDF',
+        amountsSource: 'normalized_cdf',
+        customer: { type: 'PM', name: 'Client Exemple SARL' },
+        totals: { total: view.normalizedAmounts.calculation.total },
+        dgi: {
+          codeDefDgi: view.normalization.codeDefDgi,
+          nim: view.normalization.nim,
+          counters: view.normalization.counters,
+        },
+        contentIntact: true,
+      });
+      expect(inv.lines[0]).toMatchObject({
+        code: 'CONSEIL-H',
+        name: 'Conseil (heure)',
+        group: 'B',
+        quantity: '2',
+        unitPrice: view.normalizedAmounts.lines[0].unitPrice,
+      });
+      expect(inv.groups[0]).toMatchObject({ group: 'B' });
+      expect(inv.journal.map((j: { event: string }) => j.event)).toEqual(
+        expect.arrayContaining(['submitted', 'normalized']),
+      );
+      // Toute entrée de la période se recalcule avec ce que l'export contient.
+      const { journalHash } = await import('../sales/invoices/canonical.js');
+      for (const e of exp.journal as Record<string, any>[]) {
+        const { hash, prevHash, ...champs } = e;
+        expect(journalHash(prevHash, { organizationId: orgN, ...champs })).toBe(hash);
+      }
+      const seqs = (exp.journal as { seq: number }[]).map((e) => e.seq);
+      expect(seqs).toEqual([...seqs].sort((a, b) => a - b));
+      expect(exp.chain.lastSeq).toBe(seqs.at(-1));
+      // Échanges e-MCF de la période : requête et réponse de cette facture, sans jeton.
+      const echanges = (exp.dgiExchanges as Record<string, any>[]).filter(
+        (x) => x.invoiceId === view.id,
+      );
+      expect(echanges.map((x) => x.entry)).toEqual(expect.arrayContaining(['request', 'response']));
+      expect(JSON.stringify(exp)).not.toContain('ANTIFUITE');
+      // Isolation : rien de l'organisation N dans l'export de B.
+      const b = await get(asB(), url(''));
+      expect(b.status).toBe(200);
+      expect(JSON.stringify(b.body)).not.toContain(rn);
+      expect(b.body.organization.id).toBe(orgB);
+      // Trace d'audit.
+      const trace = await db
+        .collection('audit_events')
+        .findOne({ organizationId: orgN, action: 'sales_journal.exported' });
+      expect(trace?.['metadata']).toMatchObject({ from: jour, to: jour, format: 'json' });
+    });
+
+    it('CSV : ventes (lignes et groupes) et échanges ; période invalide → 400', async () => {
+      const ventes = await get(asN(), url('&format=csv'));
+      expect(ventes.status).toBe(200);
+      expect(ventes.headers['content-type']).toMatch(/text\/csv/);
+      const rows = ventes.text.replace(/^﻿/, '').trimEnd().split('\r\n');
+      expect(rows[0]).toMatch(/^enregistrement;numero;type;/);
+      expect(rows.some((r) => r.startsWith('ligne;TEST-'))).toBe(true);
+      expect(rows.some((r) => r.startsWith('groupe;TEST-'))).toBe(true);
+      const echanges = await get(asN(), url('&format=csv&dataset=echanges'));
+      expect(echanges.status).toBe(200);
+      expect(echanges.headers['content-disposition']).toContain('echanges-dgi_');
+      expect(echanges.text).toContain('POST');
+      expect(echanges.text).not.toContain('ANTIFUITE');
+
+      for (const q of [
+        `?from=${jour}`,
+        `?from=2026-10-31&to=2026-10-01`,
+        `?from=2026-02-30&to=2026-03-01`,
+        `?from=2025-01-01&to=2026-10-31`,
+        `?from=${jour}&to=${jour}&format=xml`,
+      ]) {
+        const r = await get(asN(), `/sales/journal/export${q}`);
+        expect(r.status, q).toBe(400);
+        expect(r.body.code, q).toBe('INVALID_REQUEST');
+      }
+    });
+
+    it('fiscal.manage : Propriétaire et DAF 200 ; Administrateur, Comptable, Analyste, Lecteur 403', async () => {
+      const attendu: Record<Role, number> = {
+        owner: 200,
+        finance_director: 200,
+        admin: 403,
+        accountant: 403,
+        analyst: 403,
+        viewer: 403,
+      };
+      for (const [role, statut] of Object.entries(attendu) as [Role, number][]) {
+        const r = await get(asN(role), url(''));
+        expect(r.status, role).toBe(statut);
+      }
+    });
+  });
+
   // ── RBAC et isolation ──────────────────────────────────────────────────
 
   describe('permissions et isolation', () => {

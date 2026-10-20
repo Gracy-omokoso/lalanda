@@ -230,6 +230,29 @@ export class InvoiceDraftsService {
     };
   }
 
+  /**
+   * Factures émises ou normalisées datées de `[from, to[` (export du journal,
+   * ADR-0026 § 6.3) — LECTURE seule, documents figés tels quels, par date.
+   * `limit` + 1 documents au plus : l'appelant détecte le dépassement.
+   */
+  async finalBetween(
+    organizationId: string,
+    from: Date,
+    to: Date,
+    limit: number,
+  ): Promise<InvoiceLean[]> {
+    return this.invoices
+      .find({
+        organizationId,
+        status: { $in: ['issued', 'normalized'] },
+        sortAt: { $gte: from, $lt: to },
+      })
+      .sort({ sortAt: 1, _id: 1 })
+      .limit(limit + 1)
+      .lean<InvoiceLean[]>()
+      .exec();
+  }
+
   async view(organizationId: string, invoiceId: string): Promise<InvoiceView> {
     const doc = await this.requireOwn(organizationId, invoiceId);
     return this.viewOf(organizationId, doc);

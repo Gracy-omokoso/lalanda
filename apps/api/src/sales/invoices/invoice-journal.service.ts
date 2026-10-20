@@ -19,6 +19,7 @@ import { JOURNAL_GENESIS_HASH, journalHash } from './canonical.js';
 import type {
   ConversionRateSource,
   CreditNoteNature,
+  ExportedJournalEntry,
   InvoiceSeries,
   InvoiceType,
   JournalEntryView,
@@ -176,6 +177,49 @@ export class InvoiceJournalService {
       nextCursor: docs.length > query.limit && last ? encodeSeqCursor(last.seq) : null,
       chainValid: await this.verify(organizationId),
     };
+  }
+
+  /**
+   * Export pour les vérificateurs (ADR-0026 § 6.3) — LECTURE seule : entrées
+   * dont la date tombe dans `[from, to[`, par `seq` croissant, avec `prevHash`
+   * pour que la chaîne se recalcule hors de Lalanda.
+   */
+  async entriesBetween(
+    organizationId: string,
+    from: Date,
+    to: Date,
+    limit: number,
+  ): Promise<ExportedJournalEntry[]> {
+    const docs = await this.entries
+      .find({ organizationId, at: { $gte: from, $lt: to } })
+      .sort({ seq: 1 })
+      .limit(limit)
+      .lean<EntryLean[]>()
+      .exec();
+    return docs.map((d) => ({ ...viewOf(d), prevHash: d.prevHash }));
+  }
+
+  /** Entrées qui portent ces documents (export), par `seq` croissant. */
+  async entriesOfInvoices(
+    organizationId: string,
+    invoiceIds: readonly string[],
+  ): Promise<{ invoiceId: string; seq: number; event: JournalEvent; at: Date; hash: string }[]> {
+    if (invoiceIds.length === 0) return [];
+    const docs = await this.entries
+      .find(
+        { organizationId, invoiceId: { $in: [...invoiceIds] } },
+        { invoiceId: 1, seq: 1, event: 1, at: 1, hash: 1 },
+      )
+      .sort({ seq: 1 })
+      .lean<EntryLean[]>()
+      .exec();
+    return docs.map((d) => ({
+      invoiceId: d.invoiceId ?? '',
+      seq: d.seq,
+      event: d.event,
+      at: new Date(d.at),
+      hash: d.hash,
+    }));
   }
 
   /**

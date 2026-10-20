@@ -50,6 +50,7 @@ import { SalesInvoice, SalesInvoiceSchema } from './invoices/invoice.schema.js';
 import { InvoicesController } from './invoices/invoices.controller.js';
 import { SalesJournalHead, SalesJournalHeadSchema } from './invoices/journal-head.schema.js';
 import { JournalController } from './invoices/journal.controller.js';
+import { JournalExportService } from './invoices/journal-export.service.js';
 import { SALES_INVOICE_NORMALIZER } from './invoices/normalization.port.js';
 import { NormalizationConsistencyJob } from './normalization/consistency.job.js';
 import { DgiCallGuard } from './normalization/dgi-call-guard.js';
@@ -104,6 +105,8 @@ import { ReferenceRefreshJob } from './normalization/reference-refresh.job.js';
     InvoiceFreezingService,
     CreditNotesService,
     InvoiceDocumentsService,
+    // ADR-0026 § 6.3 : export du journal pour les vérificateurs (lecture seule).
+    JournalExportService,
     // ADR-0024 (F2) : normalisation DGI réelle, rattrapage et tâches planifiées.
     DgiCallGuard,
     NormalizationRecorder,

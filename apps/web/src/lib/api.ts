@@ -621,6 +621,47 @@ async function invoicePdfRequest(
   };
 }
 
+/** `GET /sales/journal/export` (ADR-0026 § 6.3) — paramètres. */
+export interface SalesJournalExportQuery {
+  from: string;
+  to: string;
+  format: 'json' | 'csv';
+  dataset: 'ventes' | 'echanges';
+}
+
+/** Export du journal : fichier à enregistrer ; erreurs sous la forme de `jsonRequest`. */
+async function salesJournalExportRequest(
+  q: SalesJournalExportQuery,
+  fallbackName: string,
+): Promise<{ blob: Blob; filename: string }> {
+  const params = new URLSearchParams({ from: q.from, to: q.to, format: q.format });
+  if (q.format === 'csv') params.set('dataset', q.dataset);
+  const res = await fetch(`${API_URL}/sales/journal/export?${params.toString()}`, {
+    method: 'GET',
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let detail: unknown = text;
+    try {
+      detail = JSON.parse(text);
+    } catch {
+      /* garde le texte brut */
+    }
+    const err = new Error(
+      typeof detail === 'object' && detail !== null && 'message' in detail
+        ? String((detail as { message: unknown }).message)
+        : `HTTP ${res.status}`,
+    ) as Error & { status: number; detail: unknown };
+    err.status = res.status;
+    err.detail = detail;
+    throw err;
+  }
+  const cd = res.headers.get('content-disposition') ?? '';
+  const match = cd.match(/filename="([^"]+)"/);
+  return { blob: await res.blob(), filename: match?.[1] ?? fallbackName };
+}
+
 /**
  * Envoi d'un fichier en CORPS BRUT.
  *
@@ -2947,6 +2988,9 @@ export const api = {
     jsonRequest<JournalPage>(`/sales/journal${salesQuery(query)}`, { method: 'GET' }),
   getExchangeRateReference: () =>
     jsonRequest<ExchangeRateReference>(`/sales/exchange-rate-reference`, { method: 'GET' }),
+  /** Export du journal des ventes et des échanges e-MCF (ADR-0026 § 6.3, `fiscal.manage`). */
+  downloadSalesJournalExport: (q: SalesJournalExportQuery, fallbackName: string) =>
+    salesJournalExportRequest(q, fallbackName),
   /** `GET /health` — version du serveur (ADR-0026 § 6.2). Publique, sans session. */
   getHealth: () => jsonRequest<ApiHealth>(`/health`, { method: 'GET' }),
   listSelectablePointsOfSale: () =>
