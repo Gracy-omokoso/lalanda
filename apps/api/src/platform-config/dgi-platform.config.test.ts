@@ -43,11 +43,22 @@ describe('loadDgiPlatformConfig', () => {
 
   it('refuse la production ouverte tant que les arrondis ne sont pas étalonnés (ADR-0024 § 7.3)', () => {
     expect(() =>
-      loadDgiPlatformConfig({
-        DGI_PRODUCTION_ENABLED: 'true',
-        DGI_ISF_PRODUCTION: 'AB1-CD2-E3',
-      }),
+      loadDgiPlatformConfig(
+        {
+          DGI_PRODUCTION_ENABLED: 'true',
+          DGI_ISF_PRODUCTION: 'AB1-CD2-E3',
+        },
+        { status: 'not_calibrated' },
+      ),
     ).toThrow(/étalonnage des arrondis/);
+  });
+
+  it('le relevé versionné (étalonné le 20 oct. 2026) ne bloque plus l’ouverture à lui seul', () => {
+    const config = loadDgiPlatformConfig({
+      DGI_PRODUCTION_ENABLED: 'true',
+      DGI_ISF_PRODUCTION: 'AB1-CD2-E3',
+    });
+    expect(config.productionEnabled).toBe(true);
   });
 
   it('une chaîne vide vaut absence (comme dans .env.production.example)', () => {

@@ -13,6 +13,7 @@ import {
   CALIBRATION_ROUNDING_POLICIES,
   DGI_ROUNDING_POLICY,
   EDEF_TOTALS_FIELDS,
+  INVOICE_TOTALS_VERSION,
   compareWithEdefResponse,
   decimalFromJsonNumber,
   isValidDecimal,
@@ -202,6 +203,18 @@ export interface RecordCase {
   dgiTotals: Readonly<Record<string, string>>;
 }
 
+/** « dgi-cd-2026.2 » → « dgi-cd-2026.3 » : identifiant de la politique qui succéderait. */
+function nextPolicyId(id: string): string {
+  const match = /^(.*\.)(\d+)$/.exec(id);
+  return match ? `${match[1]}${Number(match[2]) + 1}` : `${id}-suivante`;
+}
+
+/** « 1.1.0 » → « 1.2.0 » : version mineure suivante du calcul. */
+function nextMinorVersion(version: string): string {
+  const [major = '1', minor = '0'] = version.split('.');
+  return `${major}.${Number(minor) + 1}.0`;
+}
+
 /**
  * Texte proposé pour `packages/engine/src/invoice-totals/rounding-calibration.ts`,
  * ou `null` si aucune politique n'est décidée. JAMAIS écrit par l'outil.
@@ -217,7 +230,8 @@ export function proposeCalibrationRecord(input: {
   const policy = CALIBRATION_ROUNDING_POLICIES.find((p) => p.id === verdict.policyId);
   if (!policy) return null;
   const requiresNewPolicy = policy.id !== DGI_ROUNDING_POLICY.id;
-  const policyId = requiresNewPolicy ? 'dgi-cd-2026.2' : policy.id;
+  const policyId = requiresNewPolicy ? nextPolicyId(DGI_ROUNDING_POLICY.id) : policy.id;
+  const nextVersion = nextMinorVersion(INVOICE_TOTALS_VERSION);
 
   const q = (v: string): string => JSON.stringify(v).replaceAll('"', "'");
   const cases = input.cases
@@ -242,8 +256,8 @@ export function proposeCalibrationRecord(input: {
     ? [
         `// ATTENTION : la politique observée (${policy.id} : lineAmount '${policy.lineAmount}', vat '${policy.vat}')`,
         `// n'est PAS la politique par défaut (${DGI_ROUNDING_POLICY.id}). Avant de recopier ce relevé :`,
-        `// DGI_ROUNDING_POLICY devient { id: 'dgi-cd-2026.2', lineAmount: '${policy.lineAmount}', vat: '${policy.vat}' }`,
-        "// et INVOICE_TOTALS_VERSION passe à '1.1.0' (ADR-0022, ADR-0024 § 7.3), revue CTO.",
+        `// DGI_ROUNDING_POLICY devient { id: '${policyId}', lineAmount: '${policy.lineAmount}', vat: '${policy.vat}' }`,
+        `// et INVOICE_TOTALS_VERSION passe à '${nextVersion}' (ADR-0022, ADR-0024 § 7.3), revue CTO.`,
       ].join('\n')
     : `// Politique observée = politique par défaut (${policy.id}) : seul le relevé change.`;
 
@@ -258,7 +272,7 @@ export function proposeCalibrationRecord(input: {
     "  environment: 'test',",
     `  source: ${q(`Étalonnage e-DEF test du ${input.calibratedAt}, rapport sha256 ${input.reportSha256} (outil apps/api/src/edef/calibration, ADR-0024 § 7).`)},`,
     `  reportSha256: ${q(input.reportSha256)},`,
-    '  cases: Object.freeze([',
+    "  cases: Object.freeze<RoundingCalibrationRecord['cases']>([",
     cases,
     '  ]),',
     '});',

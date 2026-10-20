@@ -643,7 +643,8 @@ e2eSuite('ventes — factures et avoirs (ADR-0023 chantier E2)', () => {
       expect(emise.taxRates).toMatchObject({ source: 'dgi_snapshot', environment: 'test' });
       const enBase = await docEnBase(emise.id);
       expect(Object.keys(enBase?.['taxRates']?.['rates'] ?? {}).join('')).toBe('ABCDEFGHIJKLMNOP');
-      expect(enBase?.['calculationVersion']).toBe('1.0.0');
+      expect(enBase?.['calculationVersion']).toBe('1.1.0');
+      expect(enBase?.['roundingPolicyId']).toBe('dgi-cd-2026.2');
       expect(contentSha256Of(enBase as Record<string, unknown>)).toBe(enBase?.['contentSha256']);
       const client = await db.collection('customers').findOne({ _id: new ObjectId(customerPM) });
       expect(client?.['firstInvoicedAt']).toBeInstanceOf(Date);

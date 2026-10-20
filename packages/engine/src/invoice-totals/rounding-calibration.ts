@@ -46,7 +46,7 @@ export const ROUNDING_CALIBRATION: RoundingCalibrationRecord = Object.freeze({
   source:
     'Étalonnage e-DEF test du 2026-10-20, rapport sha256 418e8796edde4ebda7a348424e88c4df5f25678eea4e565551c601b0e59cce1d (outil apps/api/src/edef/calibration, ADR-0024 § 7).',
   reportSha256: '418e8796edde4ebda7a348424e88c4df5f25678eea4e565551c601b0e59cce1d',
-  cases: Object.freeze([
+  cases: Object.freeze<RoundingCalibrationRecord['cases']>([
     {
       caseId: 'dgi-modele',
       priceMode: 'ttc',
