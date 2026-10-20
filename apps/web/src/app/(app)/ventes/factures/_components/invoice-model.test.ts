@@ -18,6 +18,7 @@ import {
   conduiteApresEchecNormaliser,
   corpsLisible,
   ecartsAffiches,
+  enTestDgi,
   enteteDocument,
   etapesNormalisation,
   JOURNAL_EVENT_LABELS,
@@ -34,6 +35,8 @@ import {
   formulaireDepuisVue,
   formulaireVide,
   LIBELLE_PRO_FORMA,
+  MENTION_TEST_DGI,
+  RAPPEL_TEST_DGI,
   ligneDepuisOrigine,
   ligneVide,
   lireQuantiteSaisie,
@@ -276,6 +279,8 @@ describe('en-tête : jamais « Facture » avant la normalisation (§ S25e.1)', (
       enteteDocument(vue({ status: 'issued', documentKind: 'invoice', number: '2026-000123' }))
         .titre,
     ).toBe('Facture n° 2026-000123');
+    // La fixture est en environnement de TEST DGI : « (test) » suit le numéro
+    // (demande de la décideuse, chantier F3 d'ADR-0024).
     expect(
       enteteDocument(
         vue({
@@ -285,7 +290,7 @@ describe('en-tête : jamais « Facture » avant la normalisation (§ S25e.1)', (
           type: 'FA',
         }),
       ).titre,
-    ).toBe('Facture d’avoir normalisée n° TEST-2026-000004');
+    ).toBe('Facture d’avoir normalisée n° TEST-2026-000004 (test)');
   });
 
   it('les libellés de type et de statut non finals ne disent pas « facture »', () => {
@@ -661,7 +666,7 @@ describe('normalisation : chaque ligne du tableau § 9.3', () => {
       { libelle: 'Compteurs', valeur: '12/15 FV' },
       { libelle: 'Date DGI', valeur: '19/10/2026 10:03:12' },
     ]);
-    expect(enteteDocument(v).titre).toBe('Facture normalisée n° TEST-2026-000012');
+    expect(enteteDocument(v).titre).toBe('Facture normalisée n° TEST-2026-000012 (test)');
   });
 
   it('titre « Facture » seulement pour done : toutes les autres phases restent pro forma', () => {
@@ -907,25 +912,53 @@ describe('normalisation : chaque ligne du tableau § 9.3', () => {
       'token_rejected',
       'precondition',
     ] as const;
+    const erreur = (category: (typeof categories)[number]) => ({
+      code: 'X',
+      category,
+      message: 'm',
+      dgiErrorCode: null,
+      dgiMessage: null,
+      retryable: false,
+    });
     for (const category of categories) {
       const p = presentationNormalisation(
-        vue({
-          status: 'normalization_failed',
-          normalization: normalisation({
-            phase: 'failed',
-            lastError: {
-              code: 'X',
-              category,
-              message: 'm',
-              dgiErrorCode: null,
-              dgiMessage: null,
-              retryable: false,
-            },
-          }),
-        }),
+        enAttente({ phase: 'uncertain', lastError: erreur(category) }),
       )!;
       expect(p.erreur?.conduite, category).toMatch(/^[A-ZÉ]/);
     }
+    // Une fois le rattrapage conclu (`failed`), « Lalanda vérifie » serait faux :
+    // seul le message de l'API (la conclusion) reste.
+    for (const category of ['server', 'state', 'duplicate_pending', 'network'] as const) {
+      const p = presentationNormalisation(
+        vue({
+          status: 'normalization_failed',
+          normalization: normalisation({ phase: 'failed', lastError: erreur(category) }),
+        }),
+      )!;
+      expect(p.erreur?.conduite, category).toBeNull();
+      expect(p.erreur?.message).toBe('m');
+    }
+  });
+
+  it('mentions « test » impossibles à manquer (demande de la décideuse)', () => {
+    const v = normalisee();
+    expect(v.environment).toBe('test');
+    expect(enteteDocument(v).titre).toBe('Facture normalisée n° TEST-2026-000012 (test)');
+    expect(enteteDocument({ ...v, environment: 'production' }).titre).toBe(
+      'Facture normalisée n° TEST-2026-000012',
+    );
+    expect(enTestDgi(v)).toBe(true);
+    expect(enTestDgi({ environment: 'production' })).toBe(false);
+    expect(MENTION_TEST_DGI).toBe('Environnement de test DGI — facture sans valeur fiscale');
+    expect(RAPPEL_TEST_DGI).toBe('Environnement de test DGI — sans valeur fiscale');
+    const ici = fileURLToPath(new URL('.', import.meta.url));
+    // Fiche : bandeau en tête, avant le titre.
+    const detail = readFileSync(`${ici}/invoice-detail.tsx`, 'utf8');
+    expect(detail).toMatch(/enTestDgi\(vue\)/);
+    expect(detail.indexOf('{MENTION_TEST_DGI}')).toBeGreaterThan(-1);
+    expect(detail.indexOf('{MENTION_TEST_DGI}')).toBeLessThan(detail.indexOf('id="doc-titre"'));
+    // Fenêtre « Normaliser » : rappel quand l'organisation est en test.
+    expect(readFileSync(`${ici}/normalize-dialog.tsx`, 'utf8')).toMatch(/\{RAPPEL_TEST_DGI\}/);
   });
 
   it('phase : document antérieur sans phase → queued ; jamais « done » tant que le statut attend', () => {

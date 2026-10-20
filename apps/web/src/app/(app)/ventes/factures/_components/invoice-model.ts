@@ -183,6 +183,16 @@ export const JOURNAL_EVENT_LABELS: Record<JournalEvent, string> = {
 
 export const LIBELLE_PRO_FORMA = 'Pro forma — non valable comme facture';
 
+/** Bandeau en tête de la fiche d'un document figé en environnement de test DGI. */
+export const MENTION_TEST_DGI = 'Environnement de test DGI — facture sans valeur fiscale';
+/** Rappel de la fenêtre « Normaliser » quand l'organisation est en test. */
+export const RAPPEL_TEST_DGI = 'Environnement de test DGI — sans valeur fiscale';
+
+/** Le document relève-t-il de l'environnement de TEST de la DGI ? (vue complète seulement) */
+export function enTestDgi(doc: Pick<InvoiceView, 'environment'>): boolean {
+  return doc.environment === 'test';
+}
+
 export interface EnteteDocument {
   /** « Facture n° 2026-000123 » ou « Pro forma — non valable comme facture ». */
   titre: string;
@@ -198,7 +208,12 @@ export function enteteDocument(
   doc: Pick<
     InvoiceSummary,
     'documentKind' | 'status' | 'number' | 'proformaRef' | 'type' | 'emissionMode'
-  > & { documentLabel?: string; normalization?: NormalizationView | null },
+  > & {
+    documentLabel?: string;
+    normalization?: NormalizationView | null;
+    /** Vue complète seulement (`InvoiceView.environment`) ; absente du résumé de liste. */
+    environment?: InvoiceView['environment'];
+  },
 ): EnteteDocument {
   const avoir = estAvoir(doc.type);
   // Défense en profondeur (ADR-0024 § 4.3) : un document « normalisé » dont la
@@ -219,8 +234,11 @@ export function enteteDocument(
         : avoir
           ? 'Facture d’avoir'
           : 'Facture';
+    // Demande de la décideuse : un document normalisé en environnement de TEST
+    // DGI ne peut pas passer pour une vraie facture.
+    const test = doc.status === 'normalized' && doc.environment === 'test' ? ' (test)' : '';
     return {
-      titre: `${nature} n° ${doc.number}`,
+      titre: `${nature} n° ${doc.number}${test}`,
       reference: doc.number,
       numeroDefinitif: true,
       mention: null,
@@ -1134,8 +1152,17 @@ export interface ErreurNormalisation {
   lienFiscalite: boolean;
 }
 
+/** Catégories dont la conduite annonce une vérification EN COURS : fausse une fois conclu. */
+const CATEGORIES_EN_VERIFICATION: ReadonlySet<NormalizationErrorCategory> = new Set([
+  'server',
+  'state',
+  'duplicate_pending',
+  'network',
+]);
+
 export function erreurNormalisation(
   e: NonNullable<NormalizationView['lastError']>,
+  phase: NormalizationViewPhase | null = null,
 ): ErreurNormalisation {
   const avant = ERREURS_AVANT_ENVOI[e.code];
   const message =
@@ -1146,7 +1173,12 @@ export function erreurNormalisation(
       : null;
   return {
     message,
-    conduite: e.category ? CONDUITE_CATEGORIE[e.category] : null,
+    // Après le rattrapage (`failed`), « Lalanda vérifie » serait faux : le
+    // message de l'API dit déjà la conclusion.
+    conduite:
+      e.category && !(phase === 'failed' && CATEGORIES_EN_VERIFICATION.has(e.category))
+        ? CONDUITE_CATEGORIE[e.category]
+        : null,
     codeLalanda: e.code,
     dgi,
     lienFiscalite: (avant?.fiscalite ?? false) || e.category === 'token_rejected',
@@ -1276,7 +1308,7 @@ export function presentationNormalisation(
     ton: 'info',
     resume: '',
     consignes: [],
-    erreur: n?.lastError ? erreurNormalisation(n.lastError) : null,
+    erreur: n?.lastError ? erreurNormalisation(n.lastError, phase) : null,
     ecarts: phase === 'failed' ? ecartsAffiches(n?.differences ?? null) : null,
     elements: null,
     demandeDgi: n?.dgiRequestId ?? null,

@@ -24,9 +24,11 @@ import { InvoiceEditor } from './invoice-editor';
 import {
   actionsDocument,
   comparerDecimaux,
+  enTestDgi,
   enteteDocument,
   FACTURES_BASE,
   formatQuantite,
+  MENTION_TEST_DGI,
   messageFacture,
   NATURE_LABELS,
   STATUS_LABELS,
@@ -34,6 +36,10 @@ import {
   TYPE_LABELS,
 } from './invoice-model';
 import { NormalizationStatus } from './normalization-status';
+
+/** Bandeau « test » : impossible à manquer (demande de la décideuse). */
+const BANDEAU_TEST =
+  'rounded-md border-2 border-[var(--warn)] bg-[var(--warn)]/15 px-3 py-2 text-sm font-bold uppercase tracking-wide';
 
 export function InvoiceDetail({ invoiceId }: { invoiceId: string }): React.ReactElement {
   const [vue, setVue] = useState<InvoiceView | null>(null);
@@ -127,6 +133,11 @@ function DocumentFige({
         <Link href={FACTURES_BASE} className="text-sm text-[var(--foreground-muted)] underline">
           ← Documents de vente
         </Link>
+        {enTestDgi(vue) ? (
+          <p role="note" className={`${BANDEAU_TEST} my-1`}>
+            {MENTION_TEST_DGI}
+          </p>
+        ) : null}
         <h2 id="doc-titre" className="font-display text-lg font-bold tracking-tight">
           {entete.titre}
         </h2>

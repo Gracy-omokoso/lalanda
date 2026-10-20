@@ -37,6 +37,7 @@ import {
   messageFacture,
   preparerNormalisation,
   problemesGel,
+  RAPPEL_TEST_DGI,
   rappelTolerance,
   STATUS_LABELS,
   tauxIndisponible,
@@ -207,10 +208,16 @@ export function NormalizeDialog({
   return (
     <Dialogue titre="Normaliser le document" onFermer={onFermer}>
       {environnementTest ? (
-        <p className="rounded-md border border-[var(--warn)]/50 px-3 py-2 text-sm font-medium">
-          Mode test — environnement de test de la DGI : la facture obtenue n’aura aucune valeur
-          fiscale.
-        </p>
+        <div
+          role="note"
+          className="rounded-md border-2 border-[var(--warn)] bg-[var(--warn)]/15 px-3 py-2 text-sm"
+        >
+          <p className="font-bold uppercase tracking-wide">{RAPPEL_TEST_DGI}</p>
+          <p>
+            Mode test : la facture obtenue sera une facture de test de la DGI, sans aucune valeur
+            fiscale.
+          </p>
+        </div>
       ) : null}
       <p className="text-sm">
         Le pro forma <span className="font-mono">{vue.proformaRef}</span> sera figé et{' '}
