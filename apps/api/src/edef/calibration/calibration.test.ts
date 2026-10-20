@@ -101,7 +101,15 @@ describe('étalonnage contre le faux serveur — politique désignée', () => {
         ).toBe(true);
       }
       expect(proposal!.requiresNewPolicy).toBe(id !== DGI_ROUNDING_POLICY.id);
-      expect(readFileSync(proposal!.path, 'utf8')).toContain("status: 'calibrated'");
+      const text = readFileSync(proposal!.path, 'utf8');
+      expect(text).toContain("status: 'calibrated'");
+      // Une politique autre que la politique par défaut (dgi-cd-2026.2, calcul 1.1.0)
+      // appellerait la suivante, jamais un identifiant déjà pris.
+      expect(text).toContain(
+        id === DGI_ROUNDING_POLICY.id ? "policyId: 'dgi-cd-2026.2'" : "policyId: 'dgi-cd-2026.3'",
+      );
+      if (id !== DGI_ROUNDING_POLICY.id) expect(text).toContain("passe à '1.2.0'");
+      expect(text).toContain("cases: Object.freeze<RoundingCalibrationRecord['cases']>([");
       // Envoi puis annulation, jamais de confirmation.
       expect(server.callsTo('confirm')).toHaveLength(0);
       expect(server.callsTo('cancel')).toHaveLength(server.callsTo('submit').length);
@@ -140,7 +148,7 @@ describe('étalonnage — déroulé', () => {
     const text = readFileSync(proposal!.path, 'utf8');
     expect(text).toContain(`reportSha256: '${sha}'`);
     expect(text).toContain("calibratedAt: '2026-10-19'");
-    expect(text).toContain("policyId: 'dgi-cd-2026.1'");
+    expect(text).toContain("policyId: 'dgi-cd-2026.2'");
     expect(text).toContain("caseId: 'cal-ligne'");
   });
 
@@ -261,7 +269,7 @@ describe('étalonnage — déroulé', () => {
     const { run } = await setup();
     await run();
     expect(readFileSync(file, 'utf8')).toBe(before);
-    expect(before).toContain("status: 'not_calibrated'");
+    expect(before).toContain("status: 'calibrated'");
   });
 });
 

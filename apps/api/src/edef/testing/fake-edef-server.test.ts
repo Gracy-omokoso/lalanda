@@ -6,8 +6,8 @@
 // F4 qui passe prouve quelque chose.
 
 import {
-  CALIBRATION_ROUNDING_POLICIES,
   DGI_ROUNDING_POLICY,
+  DGI_ROUNDING_POLICY_2026_1,
   compareWithEdefResponse,
   computeInvoiceTotals,
   decimalToJsonNumber,
@@ -35,9 +35,6 @@ const AUTRE_JETON = 'jeton-autre-emcf-0123456789abcdef';
 const NIM = 'XX01000002-1';
 const TTL_MS = 120_000;
 const MAX_PENDING = 3;
-const HALF_UP = CALIBRATION_ROUNDING_POLICIES.find(
-  (p) => p.lineAmount === 'per_line' && p.vat === 'half_up',
-)!;
 
 let n = 0;
 const rnSuivant = (): string => `TEST-2026-${String(++n).padStart(6, '0')}`;
@@ -129,18 +126,18 @@ describe('faux serveur e-MCF', () => {
       const ours = nos();
       if (!ours.ok) throw new Error('calcul');
       const rep = await soumettre(rnSuivant());
-      expect(rep.raw['vab']).toBe(4.15);
+      expect(rep.raw['vab']).toBe(4.14);
       expect(compareWithEdefResponse(ours.totals, { B: '16' }, rep.raw).differences).toEqual([]);
       await vider();
     });
 
-    it('autre politique (TVA au plus proche) → l’écart apparaît, nommé par le moteur', async () => {
-      fake.setRoundingPolicy(HALF_UP);
+    it('autre politique (ancienne, TVA au centime supérieur) → l’écart apparaît, nommé par le moteur', async () => {
+      fake.setRoundingPolicy(DGI_ROUNDING_POLICY_2026_1);
       try {
         const ours = nos();
         if (!ours.ok) throw new Error('calcul');
         const rep = await soumettre(rnSuivant());
-        expect(rep.raw['vab']).toBe(4.14);
+        expect(rep.raw['vab']).toBe(4.15);
         const fields = compareWithEdefResponse(ours.totals, { B: '16' }, rep.raw).differences.map(
           (d) => d.field,
         );
@@ -184,7 +181,7 @@ describe('faux serveur e-MCF', () => {
 
       const liste = await client.getPendingRequests(lecture());
       expect(liste.ok && liste.data.list.map((p) => p.uid)).not.toContain(uid);
-      const conf = await client.confirmInvoice(uid, { total: 30.03, vtotal: 4.15 }, ctx(rn));
+      const conf = await client.confirmInvoice(uid, { total: 30.03, vtotal: 4.14 }, ctx(rn));
       expect(!conf.ok && conf.error.dgiErrorCode).toBe('20');
       const detail = await client.getInvoiceDetails(uid, lecture());
       expect(detail.ok && detail.data).toMatchObject({ rn, security: null });
@@ -242,7 +239,7 @@ describe('faux serveur e-MCF', () => {
       const ua = (await soumettre(a)).uid;
       const ub = (await soumettre(b)).uid;
       const uc = (await soumettre(c, { type: 'FT' })).uid;
-      const montants = { total: 30.03, vtotal: 4.15 };
+      const montants = { total: 30.03, vtotal: 4.14 };
       const ea = await client.confirmInvoice(ua, montants, ctx(a));
       const eb = await client.confirmInvoice(ub, montants, ctx(b));
       const ec = await client.confirmInvoice(uc, montants, ctx(c));
@@ -273,7 +270,7 @@ describe('faux serveur e-MCF', () => {
     const { uid } = await soumettre(rn);
     await client.getInvoiceDetails(uid, lecture());
     await client.getPendingRequests(lecture());
-    await client.confirmInvoice(uid, { total: 30.03, vtotal: 4.15 }, ctx(rn));
+    await client.confirmInvoice(uid, { total: 30.03, vtotal: 4.14 }, ctx(rn));
     const recues = fake.requests.slice(avant);
     expect(recues.map((r) => `${r.method} ${r.path}`)).toEqual([
       'POST /api/invoice',

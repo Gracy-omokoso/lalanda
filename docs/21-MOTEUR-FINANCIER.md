@@ -205,8 +205,9 @@ bibliothèque ajoutée.
   implicite : chaque division est un arrondi explicite (`half_up`, `up`, `down`). Un
   test de lecture des sources interdit le type `number` dans les calculs ; seules les
   conversions vers et depuis les nombres JSON de l'API en manipulent.
-- **Version.** `INVOICE_TOTALS_VERSION = '1.0.0'`, distincte d'`ENGINE_VERSION` ; une
-  facture enregistre cette version et l'identifiant de politique.
+- **Version.** `INVOICE_TOTALS_VERSION = '1.1.0'` depuis l'étalonnage du 20 oct. 2026
+  (`1.0.0` auparavant), distincte d'`ENGINE_VERSION` ; une facture enregistre cette
+  version et l'identifiant de politique.
 - **Calcul** (`computeInvoiceTotals`) : un mode de prix par facture (TTC ou HT) ;
   montant de ligne = prix × quantité ; calcul **par groupe de taxation** sur le total
   du groupe ; taxe spécifique ajoutée à la base de la TVA ; groupe N entièrement de TVA ;
@@ -215,10 +216,11 @@ bibliothèque ajoutée.
   admis, taxe spécifique interdite en L et N, montant ≥ 10¹³).
 - **Politique d'arrondi à deux axes** (`RoundingPolicy`) : arrondi du montant de ligne
   (`per_line` ou `per_group`) et arrondi de la TVA (`up` ou `half_up`). Défaut
-  `dgi-cd-2026.1` = `per_line` + `up`, lecture littérale de la documentation DGI, **à
-  calibrer** dans l'environnement de test (lot S25f). Changer de lecture est une
-  nouvelle politique et une nouvelle version du calcul, jamais une modification d'une
-  facture émise.
+  `dgi-cd-2026.2` = `per_line` + `half_up`, **étalonné** contre l'environnement de test
+  de la DGI le 20 oct. 2026 (voir plus bas) ; il remplace `dgi-cd-2026.1` = `per_line` +
+  `up`, lecture littérale de la documentation DGI, que l'étalonnage a contredite.
+  Changer de lecture est une nouvelle politique et une nouvelle version du calcul,
+  jamais une modification d'une facture émise.
 - **Échange avec la DGI** : `toEdefTotals` (champs `ta…tp`, `taa…tap`, `haa…hap`,
   `vaa…vap`, `ts`, `total`, `vtotal`) et `compareWithEdefResponse` (champ absent = 0 ;
   une valeur à plus de 2 décimales est une différence, jamais arrondie pour coïncider).
@@ -231,16 +233,40 @@ bibliothèque ajoutée.
   un sous-total à 69,00 au lieu de 68,97) : ils documentent l'écart et ne servent pas
   de non-régression.
 
-Restent à trancher en environnement de test : l'arrondi de la TVA, l'arrondi du montant
-de ligne, l'assiette d'une taxe spécifique en pourcentage en TTC, le contenu de `haa…`
-avec une taxe spécifique, le taux du groupe M, l'arrondi de `curTotal`.
+Tranchés par l'étalonnage du 20 oct. 2026 : l'arrondi de la TVA (au plus proche),
+l'arrondi du montant de ligne (ligne par ligne), l'assiette d'une taxe spécifique en
+pourcentage en TTC et le contenu de `haa…` avec une taxe spécifique (les cas `cal-ts-*`
+reproduits). Le taux du groupe M (0 en test) et l'arrondi de `curTotal` n'ont été
+observés que sur un cas chacun.
 
 ### Étalonnage des arrondis contre la DGI (S25f — ADR-0024 § 7)
 
-**État : non étalonné.** Le relevé `packages/engine/src/invoice-totals/rounding-calibration.ts`
-vaut `not_calibrated` : la politique `dgi-cd-2026.1` n'a pas encore été vérifiée contre la
-DGI, et la production DGI refuse de s'ouvrir tant qu'il en est ainsi. Date, source et
-résultat seront inscrits ici après l'étalonnage réel.
+**État : étalonné le 20 oct. 2026.** Le relevé
+`packages/engine/src/invoice-totals/rounding-calibration.ts` vaut `calibrated`.
+
+- **Date et lieu** : 20 octobre 2026, environnement de **test** de la DGI. 15 factures de
+  test envoyées, 15 annulées aussitôt, **aucune confirmée** (aucune valeur fiscale).
+- **Source** : rapport de l'outil d'étalonnage, conservé hors dépôt dans `dgi/etalonnage/`
+  (non public) ; seule son empreinte sha256 entre dans le dépôt
+  (`418e8796edde4ebda7a348424e88c4df5f25678eea4e565551c601b0e59cce1d`). Le relevé recopie à
+  la main les totaux renvoyés par la DGI pour les 12 cas décisifs (factures fictives, sans
+  NIF ni jeton).
+- **Résultat** : une seule des quatre façons d'arrondir reproduit les 12 cas sans aucune
+  différence : **montant de ligne arrondi ligne par ligne, TVA arrondie au plus proche
+  (demi vers le haut)**. Ce n'est **pas** ce qu'annonçait la documentation DGI, qui décrit un
+  arrondi de la TVA **au centime supérieur** (lecture retenue jusque-là, politique
+  `dgi-cd-2026.1`) ; les cas `cal-tva-ht`, `cal-tva-ttc-1pct`, `cal-ligne`, `cal-ligne-ttc`
+  et l'exemple de remise de la documentation l'ont contredite.
+- **Conséquence** : la politique par défaut devient `dgi-cd-2026.2` (`per_line` +
+  `half_up`) et le calcul passe en version `1.1.0` ; l'algorithme est inchangé, seule la
+  politique par défaut change. L'ancienne politique reste définie
+  (`DGI_ROUNDING_POLICY_2026_1`) : un document enregistré en `1.0.0` garde ses totaux, et
+  les tests vérifient qu'ils se recalculent à l'identique sous elle. Le **test verrou**
+  vérifie que chaque cas du relevé se recalcule à l'identique sous `dgi-cd-2026.2`.
+- **Production** : l'étalonnage n'est plus un obstacle à l'ouverture de la production DGI ;
+  les autres conditions (ISF de production, `DGI_PRODUCTION_ENABLED`) restent exigées.
+- Restent à confirmer hors de cet étalonnage : l'arrondi de `curTotal` (seul le cas de
+  contre-valeur l'a observé) et le taux réel du groupe M en production.
 
 **Ce que c'est.** Un outil en ligne de commande (`apps/api/src/edef/calibration/`), réservé
 à l'équipe : aucune page, aucune route, aucun client ne peut le déclencher. Il envoie à
@@ -275,8 +301,9 @@ jamais** le relevé : il en **propose** le texte, qu'une personne relit et recop
      CTO tranche par écrit et la question part à la DGI. Un écart qu'aucune façon d'arrondir
      n'explique est une correction du moteur, traitée à part.
 6. Le CTO relit le rapport, recopie la proposition dans `rounding-calibration.ts` (et, si la
-   politique observée n'est pas `dgi-cd-2026.1`, crée la nouvelle politique et la version
-   `1.1.0` du calcul, comme l'indique la proposition), lance les tests — le **test verrou**
+   politique observée n'est pas la politique par défaut, crée la politique suivante et la
+   version mineure suivante du calcul, comme l'indique la proposition — ainsi le 20 oct.
+   2026 : `dgi-cd-2026.2` et `1.1.0`), lance les tests — le **test verrou**
    vérifie que chaque cas recopié se recalcule à l'identique — et met à jour cette section.
    Le rapport reste dans `dgi/etalonnage/` ; seule son empreinte sha256 entre dans le dépôt.
 

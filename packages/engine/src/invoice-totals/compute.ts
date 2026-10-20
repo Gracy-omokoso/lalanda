@@ -6,8 +6,8 @@
 // entrent et sortent comme chaînes décimales ; tout le calcul se fait en
 // `bigint` à virgule fixe (`decimal.ts`). Les deux ambiguïtés de la
 // documentation DGI — arrondi de la TVA (a) et arrondi du montant de ligne (b)
-// — sont des axes de `RoundingPolicy` : l'environnement de test DGI les
-// tranchera (lot S25f) sans réécriture de ce fichier.
+// — sont des axes de `RoundingPolicy` : l'environnement de test DGI les a
+// tranchées le 20 oct. 2026 (politique `dgi-cd-2026.2`) sans réécriture du calcul.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import {
@@ -41,18 +41,38 @@ import {
   type TaxRateTable,
 } from './types.js';
 
-/** Version du calcul, enregistrée avec chaque facture (distincte d'`ENGINE_VERSION`). */
-export const INVOICE_TOTALS_VERSION = '1.0.0';
+/**
+ * Version du calcul, enregistrée avec chaque facture (distincte d'`ENGINE_VERSION`).
+ * 1.0.0 : politique par défaut `dgi-cd-2026.1`. 1.1.0 (20 oct. 2026) : politique par
+ * défaut `dgi-cd-2026.2`, issue de l'étalonnage réel (ADR-0024 § 7.3) ; l'algorithme
+ * est inchangé, seule la politique par défaut change.
+ */
+export const INVOICE_TOTALS_VERSION = '1.1.0';
 
 /**
- * Politique par défaut : montant de ligne arrondi ligne par ligne, TVA du groupe
- * arrondie au centime supérieur (lecture littérale de la règle DGI n° 5). À
- * confirmer par la campagne de calibrage du lot S25f.
+ * Politique par défaut du calcul 1.0.0 : montant de ligne arrondi ligne par ligne,
+ * TVA du groupe arrondie au centime supérieur (lecture littérale de la règle DGI
+ * n° 5). L'étalonnage du 20 oct. 2026 l'a contredite : la DGI arrondit la TVA au
+ * plus proche. Conservée pour relire et recalculer à l'identique les documents
+ * calculés en 1.0.0 (`roundingPolicyId: 'dgi-cd-2026.1'`) ; jamais pour un calcul
+ * nouveau.
  */
-export const DGI_ROUNDING_POLICY: RoundingPolicy = Object.freeze({
+export const DGI_ROUNDING_POLICY_2026_1: RoundingPolicy = Object.freeze({
   id: 'dgi-cd-2026.1',
   lineAmount: 'per_line',
   vat: 'up',
+});
+
+/**
+ * Politique par défaut (calcul 1.1.0) : montant de ligne arrondi ligne par ligne,
+ * TVA du groupe arrondie au plus proche, demi vers le haut. Étalonnée contre
+ * l'environnement de test de la DGI le 20 oct. 2026 : seule des quatre lectures
+ * sans aucune différence sur les 12 cas décisifs (relevé `ROUNDING_CALIBRATION`).
+ */
+export const DGI_ROUNDING_POLICY: RoundingPolicy = Object.freeze({
+  id: 'dgi-cd-2026.2',
+  lineAmount: 'per_line',
+  vat: 'half_up',
 });
 
 /** Tout montant doit rester sous 10¹³ : au-delà, un nombre JSON à 2 décimales

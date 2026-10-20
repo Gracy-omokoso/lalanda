@@ -15,7 +15,7 @@
 // construits pour l'occasion. Aucun NIF, nom ni donnée client.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { DGI_ROUNDING_POLICY } from './compute.js';
+import { DGI_ROUNDING_POLICY, DGI_ROUNDING_POLICY_2026_1 } from './compute.js';
 import type {
   DecimalString,
   InvoiceLineInput,
@@ -51,8 +51,14 @@ export interface InvoiceTotalsReferenceCase {
   reliability: 'reliable' | 'unreliable' | 'to_calibrate';
   note: string;
   input: InvoiceTotalsInput;
-  /** Attendu sous `DGI_ROUNDING_POLICY`. */
+  /** Attendu sous `DGI_ROUNDING_POLICY` (`dgi-cd-2026.2`, calcul 1.1.0). */
   expected: ReferenceExpectation;
+  /**
+   * Attendu sous l'ancienne politique par défaut `DGI_ROUNDING_POLICY_2026_1`
+   * (calcul 1.0.0), quand il diffère d'`expected` et que le cas ne porte pas de
+   * `variants` : garde testé le recalcul à l'identique des documents 1.0.0.
+   */
+  expectedUnderPolicy20261?: ReferenceExpectation;
   /** Exemple DGI faux : valeur publiée que le moteur ne doit pas reproduire. */
   dgiPublished?: {
     group: TaxGroupLetter;
@@ -64,17 +70,32 @@ export interface InvoiceTotalsReferenceCase {
   variants?: Readonly<Record<string, ReferenceExpectation>>;
 }
 
-/** Les quatre lectures possibles des ambiguïtés (a) et (b) ; la première est la politique par défaut. */
+/**
+ * Les quatre lectures possibles des ambiguïtés (a) et (b) ; la première est la politique
+ * par défaut. Depuis l'étalonnage du 20 oct. 2026, la lecture « ligne par ligne, TVA au
+ * plus proche » (appelée `cal-per-line-vat-half-up` dans le rapport) EST la politique par
+ * défaut `dgi-cd-2026.2`, et l'ancienne politique par défaut `dgi-cd-2026.1` redevient
+ * une simple candidate.
+ */
 export const CALIBRATION_ROUNDING_POLICIES: readonly RoundingPolicy[] = Object.freeze([
   DGI_ROUNDING_POLICY,
-  Object.freeze({ id: 'cal-per-line-vat-half-up', lineAmount: 'per_line', vat: 'half_up' }),
+  DGI_ROUNDING_POLICY_2026_1,
   Object.freeze({ id: 'cal-per-group-vat-up', lineAmount: 'per_group', vat: 'up' }),
   Object.freeze({ id: 'cal-per-group-vat-half-up', lineAmount: 'per_group', vat: 'half_up' }),
 ] as const);
 
-const [P_LINE_UP, P_LINE_HALF, P_GROUP_UP, P_GROUP_HALF] = CALIBRATION_ROUNDING_POLICIES.map(
-  (policy) => policy.id,
-) as [string, string, string, string];
+function policyIdOf(lineAmount: RoundingPolicy['lineAmount'], vat: RoundingPolicy['vat']): string {
+  const policy = CALIBRATION_ROUNDING_POLICIES.find(
+    (p) => p.lineAmount === lineAmount && p.vat === vat,
+  );
+  if (policy === undefined) throw new Error(`Aucune politique ${lineAmount}/${vat}`);
+  return policy.id;
+}
+
+const P_LINE_UP = policyIdOf('per_line', 'up');
+const P_LINE_HALF = policyIdOf('per_line', 'half_up');
+const P_GROUP_UP = policyIdOf('per_group', 'up');
+const P_GROUP_HALF = policyIdOf('per_group', 'half_up');
 
 // ── Raccourcis d'écriture ────────────────────────────────────────────────────
 
@@ -143,9 +164,13 @@ export const INVOICE_TOTALS_REFERENCE_CASES: readonly InvoiceTotalsReferenceCase
     id: 'dgi-remise',
     origin: 'dgi_example',
     reliability: 'reliable',
-    note: "Exemple DGI de remise : le prix envoyé est le prix après remise (500 au lieu de 1 000, informatif). Fiable pour le montant de ligne ; la TVA est dérivée, l'exemple ne la donne pas.",
+    note: "Exemple DGI de remise : le prix envoyé est le prix après remise (500 au lieu de 1 000, informatif). Fiable pour le montant de ligne ; la TVA est dérivée, l'exemple ne la donne pas. TVA exacte 2 000 × 16 / 116 = 275,862… → 275,86 au plus proche (relevé DGI du 20 oct. 2026), 275,87 au centime supérieur (dgi-cd-2026.1).",
     input: { priceMode: 'ttc', lines: [line('B', '4', '500.00')], rates: B16 },
-    expected: { ...single('B', '2000.00', '1724.13', '275.87'), lineAmounts: ['2000.00'] },
+    expected: { ...single('B', '2000.00', '1724.14', '275.86'), lineAmounts: ['2000.00'] },
+    expectedUnderPolicy20261: {
+      ...single('B', '2000.00', '1724.13', '275.87'),
+      lineAmounts: ['2000.00'],
+    },
   },
   {
     id: 'dgi-ts-19',
@@ -157,7 +182,9 @@ export const INVOICE_TOTALS_REFERENCE_CASES: readonly InvoiceTotalsReferenceCase
       lines: [line('B', '4', '500.00', { specificTax: { kind: 'per_unit', amount: '75.00' } })],
       rates: B16,
     },
-    expected: single('B', '2348.00', '2024.13', '323.87', '300.00'),
+    // TVA exacte 2 348 × 16 / 116 = 323,862… → 323,86 (au plus proche), 323,87 (supérieur).
+    expected: single('B', '2348.00', '2024.14', '323.86', '300.00'),
+    expectedUnderPolicy20261: single('B', '2348.00', '2024.13', '323.87', '300.00'),
     dgiPublished: { group: 'B', total: '2357.00' },
   },
   {
@@ -195,7 +222,9 @@ export const INVOICE_TOTALS_REFERENCE_CASES: readonly InvoiceTotalsReferenceCase
       lines: [line('B', '4', '500.00', { specificTax: { kind: 'percent', rate: '10.00' } })],
       rates: { B: '19' },
     },
-    expected: single('B', '2200.00', '1848.73', '351.27', '168.07'),
+    // TVA exacte 2 200 × 19 / 119 = 351,260… → 351,26 (au plus proche), 351,27 (supérieur).
+    expected: single('B', '2200.00', '1848.74', '351.26', '168.07'),
+    expectedUnderPolicy20261: single('B', '2200.00', '1848.73', '351.27', '168.07'),
   },
   {
     id: 'dgi-sous-total-69',
@@ -288,7 +317,7 @@ export const INVOICE_TOTALS_REFERENCE_CASES: readonly InvoiceTotalsReferenceCase
     reliability: 'to_calibrate',
     note: 'Ambiguïté (a) en HT : TVA exacte 68,9648 → 68,97 (centime supérieur) ou 68,96 (plus proche).',
     input: { priceMode: 'ht', lines: [line('B', '1', '431.03')], rates: B16 },
-    expected: single('B', '500.00', '431.03', '68.97'),
+    expected: single('B', '499.99', '431.03', '68.96'),
     variants: {
       [P_LINE_UP]: single('B', '500.00', '431.03', '68.97'),
       [P_LINE_HALF]: single('B', '499.99', '431.03', '68.96'),
@@ -302,7 +331,7 @@ export const INVOICE_TOTALS_REFERENCE_CASES: readonly InvoiceTotalsReferenceCase
     reliability: 'to_calibrate',
     note: 'Ambiguïté (a) en TTC, groupe O à 1 % : TVA exacte 9,90099 → 9,91 ou 9,90.',
     input: { priceMode: 'ttc', lines: [line('O', '1', '1000.00')], rates: { O: '1' } },
-    expected: single('O', '1000.00', '990.09', '9.91'),
+    expected: single('O', '1000.00', '990.10', '9.90'),
     variants: {
       [P_LINE_UP]: single('O', '1000.00', '990.09', '9.91'),
       [P_LINE_HALF]: single('O', '1000.00', '990.10', '9.90'),
@@ -320,7 +349,7 @@ export const INVOICE_TOTALS_REFERENCE_CASES: readonly InvoiceTotalsReferenceCase
       lines: [line('B', '0.335', '1.00'), line('B', '0.335', '1.00'), line('B', '0.335', '1.00')],
       rates: B16,
     },
-    expected: { ...single('B', '1.19', '1.02', '0.17'), lineAmounts: ['0.34', '0.34', '0.34'] },
+    expected: { ...single('B', '1.18', '1.02', '0.16'), lineAmounts: ['0.34', '0.34', '0.34'] },
     variants: {
       [P_LINE_UP]: single('B', '1.19', '1.02', '0.17'),
       [P_LINE_HALF]: single('B', '1.18', '1.02', '0.16'),
@@ -338,7 +367,7 @@ export const INVOICE_TOTALS_REFERENCE_CASES: readonly InvoiceTotalsReferenceCase
       lines: [line('B', '0.335', '1.00'), line('B', '0.335', '1.00'), line('B', '0.335', '1.00')],
       rates: B16,
     },
-    expected: single('B', '1.02', '0.87', '0.15'),
+    expected: single('B', '1.02', '0.88', '0.14'),
     variants: {
       [P_LINE_UP]: single('B', '1.02', '0.87', '0.15'),
       [P_LINE_HALF]: single('B', '1.02', '0.88', '0.14'),
