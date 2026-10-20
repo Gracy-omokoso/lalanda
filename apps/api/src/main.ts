@@ -39,6 +39,9 @@ async function bootstrap(): Promise<void> {
   app.enableCors({
     origin: [env.WEB_URL],
     credentials: true,
+    // Noms de fichiers des exports et numéro de duplicata (ADR-0025) : lisibles
+    // par le front seulement s'ils sont exposés.
+    exposedHeaders: ['content-disposition', 'x-duplicate-number'],
   });
 
   // Monte better-auth : `.all('/auth/*', ...)` sur l'app Express sous-jacente

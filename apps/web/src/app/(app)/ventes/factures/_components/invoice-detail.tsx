@@ -36,6 +36,7 @@ import {
   TYPE_LABELS,
 } from './invoice-model';
 import { NormalizationStatus } from './normalization-status';
+import { PdfActions } from './pdf-actions';
 
 /** Bandeau « test » : impossible à manquer (demande de la décideuse). */
 const BANDEAU_TEST =
@@ -296,6 +297,8 @@ function DocumentFige({
           </ul>
         </section>
       ) : null}
+
+      <PdfActions vue={vue} />
 
       <div className="flex flex-col gap-2 sm:flex-row">
         {actions.includes('avoir') ? (

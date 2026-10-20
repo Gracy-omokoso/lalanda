@@ -56,6 +56,7 @@ import {
 import { IssueDialog } from './issue-dialog';
 import { NormalizeDialog } from './normalize-dialog';
 import { PaymentsEditor } from './payments-editor';
+import { PdfActions } from './pdf-actions';
 
 /** Chemins du serveur rapprochés des champs de l'écran. */
 function champsConnus(f: FormulaireDocument): string[] {
@@ -672,6 +673,9 @@ export function InvoiceEditor({
       {vue ? (
         <>
           <AmountsPanel vue={vue} />
+
+          {/* ADR-0025 : pro forma de la dernière version ENREGISTRÉE. */}
+          {!modifie && vue.documentAmounts.calculation.ok ? <PdfActions vue={vue} /> : null}
 
           {blockers.length > 0 ? (
             <div className="rounded-xl border border-[var(--warn)]/50 p-4 text-sm">
