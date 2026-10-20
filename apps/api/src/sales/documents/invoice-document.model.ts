@@ -142,7 +142,9 @@ export interface InvoiceDocumentContext {
 
 // ── Mise en forme (chaînes seulement) ─────────────────────────────────────────
 
-const NBSP = ' ';
+// Espace insécable ordinaire (U+00A0), pas l'espace fine (U+202F) : le gras de
+// Helvetica Neue n'a pas ce glyphe et « 209 943,30 » s'imprimait « 209943,30 ».
+const NBSP = '\u00a0';
 
 /** `"1234567.50"` → `"1 234 567,50"`. */
 export function formatAmount(value: string): string {
