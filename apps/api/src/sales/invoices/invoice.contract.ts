@@ -26,6 +26,8 @@ import type {
   PaymentMethod,
   PaymentsCheck,
   PriceMode,
+  SellerVatStatusIssueCode,
+  SellerVatStatusWarningCode,
   SpecificTax,
   TaxGroupLetter,
 } from '@lalanda/engine';
@@ -436,6 +438,8 @@ export interface InvoiceReadiness {
   action: 'issue' | 'normalize';
   ready: boolean;
   blockers: readonly { code: ReadinessBlockerCode; message: string; lineIndex?: number | null }[];
+  /** Points à vérifier qui n'empêchent PAS d'émettre (ADR-0023, amendement du 20 oct. 2026). */
+  warnings: readonly { code: ReadinessWarningCode; message: string; lineIndex?: number | null }[];
 }
 
 export interface InvoiceView {
@@ -635,7 +639,14 @@ export type InvoiceRequestIssueCode =
 
 /** Codes de `details.issues` d'un 422 `INVOICE_NOT_ISSUABLE` : TOUS les problèmes. */
 export type InvoiceNotIssuableIssueCode =
-  InvoiceCheckIssue['code'] | InvoiceTotalsIssue['code'] | 'EXCHANGE_RATE_OUT_OF_TOLERANCE';
+  | InvoiceCheckIssue['code']
+  | InvoiceTotalsIssue['code']
+  | 'EXCHANGE_RATE_OUT_OF_TOLERANCE'
+  // ADR-0023, amendement du 20 oct. 2026 : groupe réservé aux assujettis, vendeur non assujetti.
+  | SellerVatStatusIssueCode;
+
+/** Avertissements d'un brouillon (`readiness.warnings`) : jamais bloquants. */
+export type ReadinessWarningCode = SellerVatStatusWarningCode;
 
 /** Ce qui empêche l'émission ou la normalisation d'un brouillon (`readiness.blockers`). */
 export type ReadinessBlockerCode =

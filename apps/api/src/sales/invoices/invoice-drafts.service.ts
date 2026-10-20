@@ -46,7 +46,12 @@ import {
 import { escapeRegex, isObjectIdHex, normalizeForSearch } from '../search.js';
 import { assertCreditableOrigin } from './credit-note-rules.js';
 import { ExchangeRateReferenceService } from './exchange-rate-reference.service.js';
-import { InvoiceTaxRatesReader, calculate, paymentsCheckOf } from './invoice-calculation.js';
+import {
+  InvoiceTaxRatesReader,
+  calculate,
+  paymentsCheckOf,
+  sellerVatStatusOf,
+} from './invoice-calculation.js';
 import { InvoiceNumberingService } from './invoice-numbering.service.js';
 import { invoiceSearchKey } from './invoice-search.js';
 import { creditNoteSummary, invoiceSummary, invoiceView } from './invoice-view.js';
@@ -248,7 +253,7 @@ export class InvoiceDraftsService {
     mode: EmissionMode,
   ): Promise<InvoiceReadiness> {
     const action = mode === 'normalized' ? 'normalize' : 'issue';
-    if (doc.status !== 'draft') return { action, ready: false, blockers: [] };
+    if (doc.status !== 'draft') return { action, ready: false, blockers: [], warnings: [] };
 
     const blockers: { code: ReadinessBlockerCode; message: string; lineIndex?: number | null }[] =
       [];
@@ -288,6 +293,18 @@ export class InvoiceDraftsService {
     for (const i of doc.documentAmounts.paymentsCheck?.issues ?? []) {
       blockers.push({ code: i.code, message: i.message, lineIndex: i.lineIndex });
     }
+    // Groupes contre l'assujettissement de la fiche fiscale ACTUELLE (le brouillon
+    // n'a pas de vendeur figé) : ce qui bloquera l'émission s'affiche dès l'éditeur.
+    const warnings: InvoiceReadiness['warnings'][number][] = [];
+    if (profile !== null) {
+      const vat = sellerVatStatusOf(profile.vatRegistered, doc);
+      for (const i of vat.issues) {
+        blockers.push({ code: i.code, message: i.message, lineIndex: i.lineIndex });
+      }
+      for (const w of vat.warnings) {
+        warnings.push({ code: w.code, message: w.message, lineIndex: w.lineIndex });
+      }
+    }
     if (mode === 'normalized') {
       if (doc.pointOfSaleId === null) {
         blockers.push({
@@ -305,7 +322,7 @@ export class InvoiceDraftsService {
         });
       }
     }
-    return { action, ready: blockers.length === 0, blockers };
+    return { action, ready: blockers.length === 0, blockers, warnings };
   }
 
   // ── Écritures ──────────────────────────────────────────────────────────────
