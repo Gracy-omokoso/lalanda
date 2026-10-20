@@ -2030,6 +2030,8 @@ export interface InvoiceReadiness {
   action: 'issue' | 'normalize';
   ready: boolean;
   blockers: readonly { code: string; message: string; lineIndex?: number | null }[];
+  /** Points à vérifier qui n'empêchent pas d'émettre (ADR-0023, amendement du 20 oct. 2026). */
+  warnings?: readonly { code: string; message: string; lineIndex?: number | null }[];
 }
 
 export interface InvoiceView {
