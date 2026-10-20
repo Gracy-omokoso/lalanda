@@ -151,7 +151,8 @@ describe('convertDocumentToCdf', () => {
       payments: [{ method: 'VIREMENT', amount: '90492.80' }],
     });
     expect(CURRENCY_CONVERSION_VERSION).toBe('1.0.0');
-    expect(INVOICE_TOTALS_VERSION).toBe('1.0.0');
+    // Versions distinctes : l'étalonnage (calcul 1.1.0) n'a pas touché la conversion.
+    expect(INVOICE_TOTALS_VERSION).toBe('1.1.0');
   });
 
   it('arrondi au plus proche, demi vers le haut, sur la valeur exacte', () => {

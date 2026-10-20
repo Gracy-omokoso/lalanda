@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CALIBRATION_ROUNDING_POLICIES,
   DGI_ROUNDING_POLICY,
+  DGI_ROUNDING_POLICY_2026_1,
   INVOICE_TOTALS_REFERENCE_CASES,
   INVOICE_TOTALS_VERSION,
   TAX_GROUP_LETTERS,
@@ -68,14 +69,23 @@ function expectMatches(result: InvoiceTotalsResult, expected: ReferenceExpectati
 // ── Cas de référence ─────────────────────────────────────────────────────────
 
 describe('constantes', () => {
-  it('version du calcul et politique par défaut (ADR-0022 § S25d.3)', () => {
-    expect(INVOICE_TOTALS_VERSION).toBe('1.0.0');
+  it('version du calcul et politique par défaut, étalonnée le 20 oct. 2026 (ADR-0024 § 7.3)', () => {
+    expect(INVOICE_TOTALS_VERSION).toBe('1.1.0');
     expect(DGI_ROUNDING_POLICY).toEqual({
+      id: 'dgi-cd-2026.2',
+      lineAmount: 'per_line',
+      vat: 'half_up',
+    });
+    expect(Object.isFrozen(DGI_ROUNDING_POLICY)).toBe(true);
+  });
+
+  it('l’ancienne politique par défaut (calcul 1.0.0) reste définie, inchangée', () => {
+    expect(DGI_ROUNDING_POLICY_2026_1).toEqual({
       id: 'dgi-cd-2026.1',
       lineAmount: 'per_line',
       vat: 'up',
     });
-    expect(Object.isFrozen(DGI_ROUNDING_POLICY)).toBe(true);
+    expect(Object.isFrozen(DGI_ROUNDING_POLICY_2026_1)).toBe(true);
   });
 });
 
@@ -86,6 +96,55 @@ describe('cas de référence sous DGI_ROUNDING_POLICY (ADR-0022 § S25d.6)', () 
     });
   }
 
+  it('l’attendu par défaut d’un cas de calibrage est sa variante dgi-cd-2026.2', () => {
+    for (const testCase of INVOICE_TOTALS_REFERENCE_CASES) {
+      if (testCase.variants === undefined) continue;
+      const { lineAmounts: _ignored, ...expected } = testCase.expected as Extract<
+        ReferenceExpectation,
+        { ok: true }
+      >;
+      expect(expected, testCase.id).toEqual(testCase.variants[DGI_ROUNDING_POLICY.id]);
+    }
+  });
+});
+
+describe('documents calculés en 1.0.0 : recalcul à l’identique sous dgi-cd-2026.1', () => {
+  for (const testCase of INVOICE_TOTALS_REFERENCE_CASES) {
+    const expected =
+      testCase.variants?.[DGI_ROUNDING_POLICY_2026_1.id] ??
+      testCase.expectedUnderPolicy20261 ??
+      testCase.expected;
+    it(`${testCase.id} sous dgi-cd-2026.1`, () => {
+      const result = computeInvoiceTotals({
+        ...testCase.input,
+        policy: DGI_ROUNDING_POLICY_2026_1,
+      });
+      expectMatches(result, expected, `${testCase.id}/dgi-cd-2026.1`);
+      if (result.ok) expect(result.totals.policyId).toBe('dgi-cd-2026.1');
+    });
+  }
+
+  it('les cas où les deux politiques divergent sont bien ceux annoncés', () => {
+    const diverging = INVOICE_TOTALS_REFERENCE_CASES.filter((c) => {
+      const a = computeInvoiceTotals(c.input);
+      const b = computeInvoiceTotals({ ...c.input, policy: DGI_ROUNDING_POLICY_2026_1 });
+      return a.ok && b.ok && a.totals.vatTotal !== b.totals.vatTotal;
+    }).map((c) => c.id);
+    expect(diverging.sort()).toEqual(
+      [
+        'cal-ligne',
+        'cal-ligne-ttc',
+        'cal-tva-ht',
+        'cal-tva-ttc-1pct',
+        'dgi-remise',
+        'dgi-ts-19',
+        'dgi-ts-pct-a-19',
+      ].sort(),
+    );
+  });
+});
+
+describe('cas de référence (suite)', () => {
   it('couvre les cas exigés par l’ADR', () => {
     const ids = new Set(INVOICE_TOTALS_REFERENCE_CASES.map((c) => c.id));
     for (const id of [
@@ -237,12 +296,22 @@ describe('exactitude', () => {
         rates: { B: '16' },
       }),
     );
-    // 999 999 999,99999 → 1 000 000 000,00 ; TVA = 1e9 × 16 / 116 = 137 931 034,482… → 137 931 034,49
+    // 999 999 999,99999 → 1 000 000 000,00 ; TVA = 1e9 × 16 / 116 = 137 931 034,482…
+    // → 137 931 034,48 au plus proche (dgi-cd-2026.2) ; 137 931 034,49 au centime supérieur.
     expect(small.groups[0]).toMatchObject({
       total: '1000000000.00',
-      vat: '137931034.49',
-      ht: '862068965.51',
+      vat: '137931034.48',
+      ht: '862068965.52',
     });
+    const smallV1 = totalsOf(
+      computeInvoiceTotals({
+        priceMode: 'ttc',
+        lines: [line('B', '0.001', '999999999999.99')],
+        rates: { B: '16' },
+        policy: DGI_ROUNDING_POLICY_2026_1,
+      }),
+    );
+    expect(smallV1.groups[0]).toMatchObject({ vat: '137931034.49', ht: '862068965.51' });
   });
 
   it('refuse un total qui atteint 10¹³ en additionnant des groupes', () => {
@@ -293,8 +362,8 @@ describe('forme du résultat', () => {
       specificTax: '400.00',
     });
     expect(totals.specificTax).toBe('400.00');
-    expect(totals.calculationVersion).toBe('1.0.0');
-    expect(totals.policyId).toBe('dgi-cd-2026.1');
+    expect(totals.calculationVersion).toBe('1.1.0');
+    expect(totals.policyId).toBe('dgi-cd-2026.2');
     expect(totals.priceMode).toBe('ht');
   });
 

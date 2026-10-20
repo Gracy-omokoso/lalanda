@@ -8,8 +8,8 @@
 // 3. Un relevé `calibrated` est complet : date, source, empreinte du rapport,
 //    au moins un cas.
 //
-// Tant que le relevé est `not_calibrated` (livraison F0), il ne porte aucun cas :
-// seules les règles 1 et la forme sont vérifiées.
+// Livré à `not_calibrated` (F0, aucun cas) ; rempli le 20 oct. 2026 après
+// l'étalonnage réel (12 cas décisifs, politique dgi-cd-2026.2).
 
 import { describe, expect, it } from 'vitest';
 
@@ -84,6 +84,20 @@ describe('relevé d’étalonnage des arrondis (verrou ADR-0024 § 7.3)', () => 
     expect(Object.isFrozen(ROUNDING_CALIBRATION)).toBe(true);
   });
 
+  it('étalonné le 20 oct. 2026 : 12 cas décisifs, rapport désigné par son empreinte', () => {
+    expect(ROUNDING_CALIBRATION).toMatchObject({
+      status: 'calibrated',
+      policyId: 'dgi-cd-2026.2',
+      calibratedAt: '2026-10-20',
+      reportSha256: '418e8796edde4ebda7a348424e88c4df5f25678eea4e565551c601b0e59cce1d',
+    });
+    expect(ROUNDING_CALIBRATION.cases).toHaveLength(12);
+    // La lecture retenue (`cal-per-line-vat-half-up` dans le rapport) reproduit chaque cas.
+    for (const c of ROUNDING_CALIBRATION.cases) {
+      expect(c.matchedPolicies, c.caseId).toContain('cal-per-line-vat-half-up');
+    }
+  });
+
   it('chaque cas du relevé se recalcule à l’identique des totaux DGI', () => {
     expect(recordDifferences(ROUNDING_CALIBRATION)).toEqual([]);
   });
@@ -110,21 +124,22 @@ describe('relevé d’étalonnage des arrondis (verrou ADR-0024 § 7.3)', () => 
         {
           caseId: 'cal-tva-ht',
           priceMode: 'ht',
-          matchedPolicies: ['cal-per-line-vat-half-up'],
-          // TVA « au plus proche » : 68,96 — la politique par défaut donne 68,97.
+          matchedPolicies: ['dgi-cd-2026.1'],
+          // TVA « au centime supérieur » (ancienne politique dgi-cd-2026.1) : 68,97 —
+          // la politique étalonnée dgi-cd-2026.2 donne 68,96.
           dgiTotals: {
             tb: '16',
-            tab: '499.99',
+            tab: '500',
             hab: '431.03',
-            vab: '68.96',
-            total: '499.99',
-            vtotal: '68.96',
+            vab: '68.97',
+            total: '500',
+            vtotal: '68.97',
           },
         },
       ],
     };
     expect(recordDifferences(tampered)).toEqual(
-      expect.arrayContaining([expect.stringContaining('vab 68.97 ≠ 68.96')]),
+      expect.arrayContaining([expect.stringContaining('vab 68.96 ≠ 68.97')]),
     );
   });
 

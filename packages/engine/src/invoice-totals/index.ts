@@ -7,7 +7,12 @@
 export * from './types.js';
 export * from './tax-groups.js';
 
-export { DGI_ROUNDING_POLICY, INVOICE_TOTALS_VERSION, computeInvoiceTotals } from './compute.js';
+export {
+  DGI_ROUNDING_POLICY,
+  DGI_ROUNDING_POLICY_2026_1,
+  INVOICE_TOTALS_VERSION,
+  computeInvoiceTotals,
+} from './compute.js';
 export {
   EDEF_TOTALS_FIELDS,
   compareWithEdefResponse,
@@ -33,7 +38,7 @@ export {
   type InvoiceTotalsReferenceCase,
   type ReferenceExpectation,
 } from './reference-cases.js';
-// ADR-0024 § 7.3 (jalon F0) : relevé d'étalonnage, livré à `not_calibrated`.
+// ADR-0024 § 7.3 : relevé d'étalonnage, rempli après l'étalonnage réel du 20 oct. 2026.
 export { ROUNDING_CALIBRATION, type RoundingCalibrationRecord } from './rounding-calibration.js';
 
 // ADR-0023 § S25e.9 (jalon E0) : types figés et signatures ; corps livrés par E1.
