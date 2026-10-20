@@ -185,6 +185,34 @@ describe('mentions DGI par type', () => {
     expect(m.lines[0]).toMatchObject({ itemType: '[SER]', group: '[B]', quantity: '2 heure' });
     expect(m.priceModeLabel).toBe('Prix unitaires HT');
   });
+
+  it('client AO : mention imposée par la DGI (ADR-0026 § 3.1)', () => {
+    const doc = normalizedTest();
+    const m = build({
+      ...doc,
+      customer: { ...doc.customer, type: 'AO', exemptionReference: 'EXO-1' },
+      comments: { A: 'Réf. Exo. : EXO-1', C: null },
+    });
+    expect(m.customer.lines[0]).toBe('[AO] Ambassades et organisations internationales');
+    expect(m.comments).toEqual(['Réf. Exo. : EXO-1']);
+  });
+
+  it('opération hors champ : le code imprimé est celui envoyé, « HORS CHAMP » (ADR-0026 § 3.2)', () => {
+    const doc = normalizedTest();
+    const m = build({
+      ...doc,
+      lines: doc.lines.map((l) => ({
+        ...l,
+        code: 'INDEM-1',
+        edefCode: 'HORS CHAMP',
+        taxGroup: 'A' as const,
+        outOfScope: true,
+      })),
+    });
+    expect(m.lines[0]).toMatchObject({ code: 'HORS CHAMP', group: '[A] hors champ' });
+    // Article ordinaire : le code envoyé est le code de l'article.
+    expect(build(doc).lines[0]?.code).toBe('CONSEIL-H');
+  });
 });
 
 describe('montants — imprimés tels que figés', () => {
