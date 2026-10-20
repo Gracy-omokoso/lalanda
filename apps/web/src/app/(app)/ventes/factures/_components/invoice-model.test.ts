@@ -940,6 +940,36 @@ describe('normalisation : chaque ligne du tableau § 9.3', () => {
     }
   });
 
+  it('déclarée non normalisée (demande envoyée) : jamais « rien n’a été transmis »', () => {
+    // Forme observée contre l'API réelle (F2) : catégorie `precondition` après un envoi.
+    const v = vue({
+      status: 'normalization_failed',
+      normalization: normalisation({
+        phase: 'failed',
+        dgiRequestId: '5ac45769-uid',
+        lastError: {
+          code: 'DECLARED_NOT_NORMALIZED',
+          category: 'precondition',
+          message: 'Déclarée non normalisée après vérification auprès de la DGI.',
+          dgiErrorCode: null,
+          dgiMessage: null,
+          retryable: true,
+        },
+        actions: { ...SANS_ACTION, retry: true },
+      }),
+    });
+    const p = presentationNormalisation(v)!;
+    expect(p.resume).toMatch(/^La DGI n’a pas normalisé ce document\./);
+    expect(p.erreur?.conduite).toBeNull();
+    expect(p.erreur?.message).toMatch(/^Déclarée non normalisée/);
+    expect(etapesNormalisation(v, false).map((e) => e.etat)).toEqual([
+      'fait',
+      'fait',
+      'fait',
+      'echec',
+    ]);
+  });
+
   it('mentions « test » impossibles à manquer (demande de la décideuse)', () => {
     const v = normalisee();
     expect(v.environment).toBe('test');

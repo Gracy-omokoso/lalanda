@@ -1163,6 +1163,8 @@ const CATEGORIES_EN_VERIFICATION: ReadonlySet<NormalizationErrorCategory> = new 
 export function erreurNormalisation(
   e: NonNullable<NormalizationView['lastError']>,
   phase: NormalizationViewPhase | null = null,
+  /** Une demande existe à la DGI (`dgiRequestId`) : « rien n'a été transmis » serait faux. */
+  envoye = false,
 ): ErreurNormalisation {
   const avant = ERREURS_AVANT_ENVOI[e.code];
   const message =
@@ -1176,7 +1178,9 @@ export function erreurNormalisation(
     // Après le rattrapage (`failed`), « Lalanda vérifie » serait faux : le
     // message de l'API dit déjà la conclusion.
     conduite:
-      e.category && !(phase === 'failed' && CATEGORIES_EN_VERIFICATION.has(e.category))
+      e.category &&
+      !(phase === 'failed' && CATEGORIES_EN_VERIFICATION.has(e.category)) &&
+      !(e.category === 'precondition' && envoye)
         ? CONDUITE_CATEGORIE[e.category]
         : null,
     codeLalanda: e.code,
@@ -1308,7 +1312,9 @@ export function presentationNormalisation(
     ton: 'info',
     resume: '',
     consignes: [],
-    erreur: n?.lastError ? erreurNormalisation(n.lastError, phase) : null,
+    erreur: n?.lastError
+      ? erreurNormalisation(n.lastError, phase, (n.dgiRequestId ?? null) !== null)
+      : null,
     ecarts: phase === 'failed' ? ecartsAffiches(n?.differences ?? null) : null,
     elements: null,
     demandeDgi: n?.dgiRequestId ?? null,
@@ -1369,7 +1375,8 @@ export function presentationNormalisation(
       };
     case 'failed': {
       const ecart = n?.lastError?.category === 'totals_mismatch' || base.ecarts !== null;
-      const avantEnvoi = n?.lastError?.category === 'precondition';
+      const avantEnvoi =
+        n?.lastError?.category === 'precondition' && (n.dgiRequestId ?? null) === null;
       return {
         ...base,
         ton: 'attention',
@@ -1438,7 +1445,7 @@ function etatsApresReponse(doc: Pick<InvoiceView, 'status' | 'normalization'>): 
     case 'failed':
       if (ecart) return ['fait', 'fait', 'echec', 'non_fait'];
       if (cat === 'totals_mismatch') return ['fait', 'fait', 'fait', 'echec'];
-      if (cat === 'precondition') return ['fait', 'non_fait', 'non_fait', 'non_fait'];
+      if (cat === 'precondition' && !envoye) return ['fait', 'non_fait', 'non_fait', 'non_fait'];
       return envoye ? ['fait', 'fait', 'fait', 'echec'] : ['fait', 'echec', 'non_fait', 'non_fait'];
     default:
       return ['a_venir', 'a_venir', 'a_venir', 'a_venir'];
