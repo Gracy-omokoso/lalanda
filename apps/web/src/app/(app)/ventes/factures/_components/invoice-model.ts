@@ -24,6 +24,7 @@ import type {
   ConversionRateSource,
   CreateInvoiceBody,
   CreditNoteNature,
+  DgiExchangePage,
   DocumentCurrency,
   ExchangeRateReference,
   InvoiceLineBody,
@@ -37,6 +38,9 @@ import type {
   JournalEvent,
   LineDiscount,
   ListInvoicesQuery,
+  NormalizationErrorCategory,
+  NormalizationView,
+  NormalizationViewPhase,
   NormalizeInvoiceBody,
   OrgAction,
   TaxGroupLetter,
@@ -168,6 +172,9 @@ export const JOURNAL_EVENT_LABELS: Record<JournalEvent, string> = {
   returned_to_draft: 'Repris en brouillon',
   duplicate_issued: 'Duplicata imprimé',
   report_issued: 'Rapport émis',
+  normalization_uncertain: 'Réponse de la DGI incertaine',
+  normalization_review_required: 'Vérification nécessaire',
+  number_abandoned: 'Numéro abandonné (trou tracé dans la série)',
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -175,6 +182,16 @@ export const JOURNAL_EVENT_LABELS: Record<JournalEvent, string> = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const LIBELLE_PRO_FORMA = 'Pro forma — non valable comme facture';
+
+/** Bandeau en tête de la fiche d'un document figé en environnement de test DGI. */
+export const MENTION_TEST_DGI = 'Environnement de test DGI — facture sans valeur fiscale';
+/** Rappel de la fenêtre « Normaliser » quand l'organisation est en test. */
+export const RAPPEL_TEST_DGI = 'Environnement de test DGI — sans valeur fiscale';
+
+/** Le document relève-t-il de l'environnement de TEST de la DGI ? (vue complète seulement) */
+export function enTestDgi(doc: Pick<InvoiceView, 'environment'>): boolean {
+  return doc.environment === 'test';
+}
 
 export interface EnteteDocument {
   /** « Facture n° 2026-000123 » ou « Pro forma — non valable comme facture ». */
@@ -191,10 +208,24 @@ export function enteteDocument(
   doc: Pick<
     InvoiceSummary,
     'documentKind' | 'status' | 'number' | 'proformaRef' | 'type' | 'emissionMode'
-  > & { documentLabel?: string },
+  > & {
+    documentLabel?: string;
+    normalization?: NormalizationView | null;
+    /** Vue complète seulement (`InvoiceView.environment`) ; absente du résumé de liste. */
+    environment?: InvoiceView['environment'];
+  },
 ): EnteteDocument {
   const avoir = estAvoir(doc.type);
-  if (doc.documentKind === 'invoice' && doc.number !== null) {
+  // Défense en profondeur (ADR-0024 § 4.3) : un document « normalisé » dont la
+  // vue complète ne porte pas son code DEF/DGI ne se dit pas « Facture ».
+  // (`documentKind` de l'API est le verrou principal ; ceci ne joue que sur un
+  // sous-document présent mais incomplet.)
+  const elementsManquants =
+    doc.status === 'normalized' &&
+    doc.normalization !== undefined &&
+    doc.normalization !== null &&
+    !doc.normalization.codeDefDgi;
+  if (doc.documentKind === 'invoice' && doc.number !== null && !elementsManquants) {
     const nature =
       doc.status === 'normalized'
         ? avoir
@@ -203,8 +234,11 @@ export function enteteDocument(
         : avoir
           ? 'Facture d’avoir'
           : 'Facture';
+    // Demande de la décideuse : un document normalisé en environnement de TEST
+    // DGI ne peut pas passer pour une vraie facture.
+    const test = doc.status === 'normalized' && doc.environment === 'test' ? ' (test)' : '';
     return {
-      titre: `${nature} n° ${doc.number}`,
+      titre: `${nature} n° ${doc.number}${test}`,
       reference: doc.number,
       numeroDefinitif: true,
       mention: null,
@@ -220,7 +254,7 @@ export function enteteDocument(
     doc.status === 'pending_normalization'
       ? 'Normalisation en cours auprès de la DGI.'
       : doc.status === 'normalization_failed'
-        ? 'La DGI a refusé la normalisation.'
+        ? 'La normalisation n’a pas abouti : voir le détail ci-dessous.'
         : doc.status === 'draft'
           ? 'Brouillon modifiable.'
           : null;
@@ -316,7 +350,12 @@ export function actionsDocument(
       if (droits.gerer && !estAvoir(doc.type) && !toutCredite(doc.lines)) out.push('avoir');
       break;
     case 'normalization_failed':
-      if (droits.gerer && (doc.normalization?.reservedNumber ?? null) === null) {
+      // ADR-0024 § 9.2 : l'API dit elle-même, par `actions`, si la reprise est
+      // possible pour cette personne. Sans ce bloc (document antérieur), la
+      // règle d'ADR-0023 : droit de gérer et aucun numéro réservé.
+      if (doc.normalization?.actions) {
+        if (doc.normalization.actions.backToDraft) out.push('reprendre');
+      } else if (droits.gerer && (doc.normalization?.reservedNumber ?? null) === null) {
         out.push('reprendre');
       }
       break;
@@ -918,12 +957,23 @@ const MESSAGES_FACTURES: Record<string, string> = {
   NUMBER_RESERVED:
     'Un numéro de facture est réservé pour ce document : sa reprise appartient à la connexion DGI, pas au brouillon.',
   INVOICE_NOT_ISSUABLE: 'Le document ne peut pas encore être figé. Corrigez les points ci-dessous.',
+  // ADR-0024 § 9.1
+  NORMALIZATION_NOT_RETRYABLE:
+    'Cette normalisation ne peut pas être relancée dans son état actuel. Rechargez la page pour voir où elle en est.',
+  NORMALIZATION_NOT_UNDER_REVIEW:
+    'Ce document n’est plus en « vérification nécessaire » : Lalanda a peut-être conclu entre-temps. Rechargez la page.',
+  REAUTH_REQUIRED: 'Confirmez votre identité pour poursuivre.',
+  REAUTH_GOOGLE_REQUIRED: 'Reconnectez-vous avec Google pour poursuivre.',
 };
+
+const TROP_DE_NORMALISATIONS =
+  'Vous avez lancé beaucoup de normalisations en une heure : par sécurité, attendez quelques minutes avant de recommencer.';
 
 /** Message en français d'une erreur des documents de vente. */
 export function messageFacture(err: unknown, repli: string): string {
   const code = codeErreur(err);
   if (code && MESSAGES_FACTURES[code]) return MESSAGES_FACTURES[code]!;
+  if (statutHttp(err) === 429) return TROP_DE_NORMALISATIONS;
   return messageVentes(err, repli);
 }
 
@@ -971,4 +1021,624 @@ export function libelleEmpechement(b: { message: string; lineIndex?: number | nu
 /** `409 EXCHANGE_RATE_REFERENCE_UNAVAILABLE` (ou 404) : proposer de rafraîchir les listes. */
 export function tauxIndisponible(err: unknown): boolean {
   return codeErreur(err) === 'EXCHANGE_RATE_REFERENCE_UNAVAILABLE';
+}
+
+/** Statut HTTP d'une erreur de l'API, ou `null` (réseau, délai, erreur du navigateur). */
+function statutHttp(err: unknown): number | null {
+  if (typeof err !== 'object' || err === null || !('status' in err)) return null;
+  const s = (err as { status: unknown }).status;
+  return typeof s === 'number' ? s : null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Normalisation DGI : déroulé, états, relectures (S25f — ADR-0024 § 9)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Trois règles de plus, imposées par `invoice-model.test.ts` :
+//
+// 4. LA REQUÊTE « NORMALISER » N'EST JAMAIS RENVOYÉE AUTOMATIQUEMENT. Après une
+//    coupure côté navigateur, on RELIT le document (la route est idempotente,
+//    § 9.3) : un second envoi pourrait, au pire, coûter un doublon fiscal.
+// 5. LES RELECTURES SONT BORNÉES DANS LE TEMPS (3 s pendant 1 min ; 15 s jusqu'à
+//    la vérification annoncée + 1 min ; 15 min au plus). Au-delà, un bouton.
+// 6. LES BOUTONS VIENNENT DE `actions`, calculé par l'API selon la phase ET les
+//    droits. L'interface n'en déduit rien d'autre.
+
+/** Phase lue sur un document figé ; `null` pour un brouillon ou une facture émise. */
+export function phaseNormalisation(
+  doc: Pick<InvoiceView, 'status' | 'normalization'>,
+): NormalizationViewPhase | null {
+  switch (doc.status) {
+    case 'normalized':
+      return 'done';
+    case 'normalization_failed':
+      return 'failed';
+    case 'pending_normalization': {
+      // Document gelé avant S25f : pas de phase → `queued` (ADR-0024 § 10).
+      const p = doc.normalization?.phase ?? 'queued';
+      // Un document encore « en attente » ne se dit JAMAIS normalisé ni refusé :
+      // une phase finale sur ce statut ne peut être qu'une écriture en cours.
+      return p === 'done' || p === 'failed' ? 'in_progress' : p;
+    }
+    default:
+      return null;
+  }
+}
+
+/** Titres du tableau § 9.3, pour la fenêtre et pour le détail. */
+export const TITRES_PHASE: Record<NormalizationViewPhase, string> = {
+  done: 'Facture normalisée',
+  in_progress: 'Transmission à la DGI…',
+  queued: 'En attente d’envoi',
+  uncertain: 'Réponse de la DGI incertaine',
+  needs_review: 'Vérification nécessaire',
+  failed: 'Normalisation refusée',
+};
+
+/** Ce que dit chaque catégorie d'erreur, et ce qu'il faut faire (ADR-0024 § 5). */
+export const CONDUITE_CATEGORIE: Record<NormalizationErrorCategory, string> = {
+  data: 'La DGI juge la facture mal formée. Reprenez-la en brouillon pour la corriger, puis normalisez-la de nouveau. L’équipe Lalanda est aussi alertée : ses contrôles auraient dû le voir avant l’envoi.',
+  configuration:
+    'Un réglage de la plateforme Lalanda manque pour la DGI. L’équipe Lalanda est alertée ; vous pourrez relancer quand elle l’aura corrigé.',
+  capacity:
+    'L’e-MCF de votre point de vente a trop de demandes en attente, sans doute envoyées par un autre logiciel. Réessayez dans deux minutes.',
+  temporary:
+    'Le service de la DGI est momentanément indisponible pour ce contrôle. Vous pouvez relancer dans quelques minutes.',
+  server:
+    'Le serveur de la DGI a signalé une erreur. Lalanda vérifie auprès de la DGI avant de conclure : ne refaites pas cette vente.',
+  state:
+    'La DGI a donné une réponse ambiguë sur l’état de la demande. Lalanda vérifie auprès d’elle avant de conclure.',
+  totals_mismatch:
+    'Rien n’a été enregistré : la demande a été annulée auprès de la DGI, aucune facture n’a été créée et le numéro n’a pas été consommé. L’écart est signalé à l’équipe Lalanda.',
+  duplicate_pending:
+    'Une demande portant ce numéro attend déjà à la DGI. Lalanda l’annule et vérifie avant de conclure : ne refaites pas cette vente.',
+  unknown:
+    'La DGI a renvoyé une erreur que Lalanda ne connaît pas encore. L’équipe Lalanda est alertée ; le code et le libellé de la DGI ci-dessous l’aideront.',
+  network:
+    'La DGI n’a pas pu être jointe. Lalanda vérifie avant de conclure : ne refaites pas cette vente.',
+  token_rejected:
+    'La DGI a refusé le jeton de votre point de vente. Renouvelez-le dans Organisation › Fiscalité, puis relancez.',
+  precondition: 'Un prérequis manquait avant l’envoi : rien n’a été transmis à la DGI.',
+};
+
+/**
+ * Codes Lalanda posés AVANT tout envoi (§ 9.1) : phrase de repli si le serveur
+ * n'en donne pas, et lien vers l'onglet Fiscalité quand c'est là que se règle
+ * le problème.
+ */
+const ERREURS_AVANT_ENVOI: Record<string, { message: string; fiscalite: boolean }> = {
+  POINT_OF_SALE_NOT_ACTIVE: {
+    message:
+      'Le point de vente n’est pas actif (jeton expiré ou en échec). Vérifiez-le dans Organisation › Fiscalité.',
+    fiscalite: true,
+  },
+  SELLER_NIF_MISMATCH: {
+    message:
+      'Le NIF du document ne correspond pas à celui du point de vente enregistré auprès de la DGI.',
+    fiscalite: true,
+  },
+  ISF_NOT_CONFIGURED: {
+    message:
+      'L’identifiant du logiciel auprès de la DGI (ISF) n’est pas encore configuré par la plateforme. L’équipe Lalanda est alertée.',
+    fiscalite: false,
+  },
+  REFERENCE_LISTS_UNAVAILABLE: {
+    message:
+      'Les listes de référence de la DGI (types de client, types de référence) n’ont pas été relevées. Rafraîchissez-les depuis votre point de vente.',
+    fiscalite: true,
+  },
+  DGI_PRODUCTION_UNAVAILABLE: {
+    message:
+      'L’environnement de production de la DGI n’est pas encore ouvert dans Lalanda : rien n’a été transmis.',
+    fiscalite: false,
+  },
+  NORMALIZATION_IN_PROGRESS: {
+    message:
+      'Une autre facture de votre organisation est en cours de normalisation, ou en vérification auprès de la DGI. Celle-ci attend son tour : les numéros de facture se suivent sans trou.',
+    fiscalite: false,
+  },
+};
+
+export interface ErreurNormalisation {
+  /** Notre phrase, en français. */
+  message: string;
+  /** Ce qu'il faut faire, selon la catégorie. */
+  conduite: string | null;
+  /** Code Lalanda, pour l'assistance. */
+  codeLalanda: string;
+  /** Code et libellé DGI, TELS QUELS (exigence DGI) ; `null` si la DGI n'en a pas donné. */
+  dgi: { code: string | null; libelle: string | null } | null;
+  /** Le problème se règle dans Organisation › Fiscalité. */
+  lienFiscalite: boolean;
+}
+
+/** Catégories dont la conduite annonce une vérification EN COURS : fausse une fois conclu. */
+const CATEGORIES_EN_VERIFICATION: ReadonlySet<NormalizationErrorCategory> = new Set([
+  'server',
+  'state',
+  'duplicate_pending',
+  'network',
+]);
+
+export function erreurNormalisation(
+  e: NonNullable<NormalizationView['lastError']>,
+  phase: NormalizationViewPhase | null = null,
+  /** Une demande existe à la DGI (`dgiRequestId`) : « rien n'a été transmis » serait faux. */
+  envoye = false,
+): ErreurNormalisation {
+  const avant = ERREURS_AVANT_ENVOI[e.code];
+  const message =
+    e.message.trim() !== '' ? e.message : (avant?.message ?? 'La normalisation n’a pas abouti.');
+  const dgi =
+    e.dgiErrorCode !== null || e.dgiMessage !== null
+      ? { code: e.dgiErrorCode, libelle: e.dgiMessage }
+      : null;
+  return {
+    message,
+    // Après le rattrapage (`failed`), « Lalanda vérifie » serait faux : le
+    // message de l'API dit déjà la conclusion.
+    conduite:
+      e.category &&
+      !(phase === 'failed' && CATEGORIES_EN_VERIFICATION.has(e.category)) &&
+      !(e.category === 'precondition' && envoye)
+        ? CONDUITE_CATEGORIE[e.category]
+        : null,
+    codeLalanda: e.code,
+    dgi,
+    lienFiscalite: (avant?.fiscalite ?? false) || e.category === 'token_rejected',
+  };
+}
+
+/** Champ de totaux e-DEF (`vab`, `ts`…) en mots. */
+export function libelleChampDgi(champ: string): string {
+  const m = /^(t|ta|ha|va)([a-p])$/.exec(champ);
+  if (m) {
+    const groupe = (m[2] ?? '').toUpperCase();
+    const nature =
+      m[1] === 't' ? 'Taux' : m[1] === 'ta' ? 'Total' : m[1] === 'ha' ? 'Hors taxe' : 'TVA';
+    return `${nature} du groupe ${groupe}`;
+  }
+  const fixes: Record<string, string> = {
+    ts: 'Taxe spécifique',
+    total: 'Total à payer',
+    vtotal: 'TVA totale',
+    curTotal: 'Contre-valeur en USD',
+  };
+  return fixes[champ] ?? champ;
+}
+
+export interface EcartAffiche {
+  champ: string;
+  libelle: string;
+  /** Valeurs TELLES QUE CONSERVÉES par l'API : aucune conversion, aucun arrondi. */
+  lalanda: string;
+  dgi: string;
+}
+
+export function ecartsAffiches(
+  differences: NormalizationView['differences'],
+): EcartAffiche[] | null {
+  if (!differences || differences.length === 0) return null;
+  return differences.map((d) => ({
+    champ: d.field,
+    libelle: libelleChampDgi(d.field),
+    lalanda: d.ours ?? '—',
+    dgi: d.dgi ?? 'absent',
+  }));
+}
+
+/** Heure locale `HH:MM` d'un instant ISO ; `null` si illisible. */
+export function formatHeure(iso: string | null, timeZone?: string): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleTimeString('fr-FR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    ...(timeZone ? { timeZone } : {}),
+  });
+}
+
+/** Date et heure d'un instant ISO (`19 oct. 2026, 09:03:12`). */
+export function formatInstant(iso: string, timeZone?: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString('fr-FR', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    ...(timeZone ? { timeZone } : {}),
+  });
+}
+
+/** Éléments de sécurité DGI, chaînes affichées TELLES QUE REÇUES. */
+export function elementsDgi(
+  n: NormalizationView | null,
+): { libelle: string; valeur: string }[] | null {
+  if (!n || !n.codeDefDgi) return null;
+  const out = [{ libelle: 'Code DEF/DGI', valeur: n.codeDefDgi }];
+  if (n.nim) out.push({ libelle: 'NIM (identifiant de l’e-MCF)', valeur: n.nim });
+  if (n.counters) out.push({ libelle: 'Compteurs', valeur: n.counters });
+  if (n.dgiDateTime) out.push({ libelle: 'Date DGI', valeur: n.dgiDateTime });
+  return out;
+}
+
+export type BoutonNormalisation = 'relancer' | 'verifier' | 'declarer';
+
+export interface PresentationNormalisation {
+  phase: NormalizationViewPhase;
+  titre: string;
+  /** Ton du bandeau : `alerte` pour l'incertitude et la vérification nécessaire. */
+  ton: 'info' | 'succes' | 'attention' | 'alerte';
+  /** Phrase principale. */
+  resume: string;
+  /** Ce que la personne doit faire (ou ne pas faire), dans l'ordre. */
+  consignes: string[];
+  erreur: ErreurNormalisation | null;
+  ecarts: EcartAffiche[] | null;
+  elements: { libelle: string; valeur: string }[] | null;
+  /** Identifiant de la demande à la DGI, utile à l'assistance DGI. */
+  demandeDgi: string | null;
+  /** Selon `actions` SEULEMENT (règle 6). « Reprendre en brouillon » vit dans le détail. */
+  boutons: BoutonNormalisation[];
+  /** Motif et date du passage en vérification nécessaire. */
+  revue: { depuis: string; motif: string } | null;
+}
+
+const PRO_FORMA_RESTE = 'Le document reste un pro forma, non valable comme facture.';
+
+/** Ce que l'interface affiche pour un document figé en mode normalisé (§ 9.3). */
+export function presentationNormalisation(
+  doc: Pick<InvoiceView, 'status' | 'normalization'>,
+  options: { timeZone?: string } = {},
+): PresentationNormalisation | null {
+  const phase = phaseNormalisation(doc);
+  if (phase === null) return null;
+  const n = doc.normalization;
+  const heure = formatHeure(n?.nextCheckAt ?? null, options.timeZone);
+  const a = n?.actions ?? { retry: false, check: false, declareNotNormalized: false };
+  const boutons: BoutonNormalisation[] = [];
+  if (phase !== 'done' && phase !== 'in_progress') {
+    if (a.retry) boutons.push('relancer');
+    if (a.check) boutons.push('verifier');
+    if (a.declareNotNormalized) boutons.push('declarer');
+  }
+  const base: PresentationNormalisation = {
+    phase,
+    titre: TITRES_PHASE[phase],
+    ton: 'info',
+    resume: '',
+    consignes: [],
+    erreur: n?.lastError
+      ? erreurNormalisation(n.lastError, phase, (n.dgiRequestId ?? null) !== null)
+      : null,
+    ecarts: phase === 'failed' ? ecartsAffiches(n?.differences ?? null) : null,
+    elements: null,
+    demandeDgi: n?.dgiRequestId ?? null,
+    boutons,
+    revue: n?.review ? { depuis: n.review.since, motif: n.review.reason } : null,
+  };
+  switch (phase) {
+    case 'done':
+      return {
+        ...base,
+        ton: 'succes',
+        erreur: null,
+        resume:
+          'La DGI a confirmé la facture. Ses éléments de sécurité sont enregistrés tels qu’elle les a renvoyés.',
+        elements: elementsDgi(n),
+      };
+    case 'in_progress':
+      return {
+        ...base,
+        erreur: null,
+        resume: `Lalanda envoie le document à la DGI, compare les montants qu’elle calcule aux siens, puis demande la confirmation. Cela prend d’habitude moins d’une seconde. ${PRO_FORMA_RESTE}`,
+        consignes: ['Ne refaites pas cette vente pendant la transmission.'],
+      };
+    case 'queued':
+      return {
+        ...base,
+        ton: 'attention',
+        resume: `Le document est figé et attend d’être envoyé à la DGI. ${PRO_FORMA_RESTE}`,
+        consignes: a.retry
+          ? ['Relancez l’envoi quand le point signalé est réglé.']
+          : ['Une personne habilitée à normaliser pourra relancer l’envoi.'],
+      };
+    case 'uncertain':
+      return {
+        ...base,
+        ton: 'alerte',
+        resume: `La DGI n’a pas répondu de façon certaine : Lalanda ne sait pas encore si la facture a été normalisée. ${PRO_FORMA_RESTE}`,
+        consignes: [
+          heure
+            ? `Ne refaites pas cette vente : Lalanda vérifie auprès de la DGI vers ${heure}.`
+            : 'Ne refaites pas cette vente : Lalanda vérifie auprès de la DGI dans quelques minutes.',
+          'Pendant cette vérification, les autres normalisations de votre organisation attendent leur tour (au plus une trentaine de minutes) : c’est ce qui garde les numéros de facture dans l’ordre, sans doublon.',
+        ],
+      };
+    case 'needs_review':
+      return {
+        ...base,
+        ton: 'alerte',
+        resume: `Lalanda n’a pas pu établir si la DGI a normalisé cette facture. Rien n’est imprimé ni renvoyé comme facture. ${PRO_FORMA_RESTE}`,
+        consignes: [
+          heure
+            ? `Attendez la prochaine vérification automatique (vers ${heure}) : elle suffit souvent quand la DGI était injoignable.`
+            : 'Attendez la prochaine vérification automatique : elle suffit souvent quand la DGI était injoignable.',
+          'Sinon, le Propriétaire ou le Directeur financier vérifie auprès de la DGI (site de vérification ou assistance DGI), en donnant l’identifiant de la demande indiqué ici.',
+          'S’il est établi que la facture n’a pas été normalisée, il le déclare dans Lalanda, avec un motif écrit. Personne ne saisit jamais d’éléments de sécurité à la main.',
+          'Les autres factures de votre organisation peuvent de nouveau être normalisées ; le numéro réservé reste attaché à ce document.',
+        ],
+      };
+    case 'failed': {
+      const ecart = n?.lastError?.category === 'totals_mismatch' || base.ecarts !== null;
+      const avantEnvoi =
+        n?.lastError?.category === 'precondition' && (n.dgiRequestId ?? null) === null;
+      return {
+        ...base,
+        ton: 'attention',
+        resume: ecart
+          ? `Écart de calcul entre Lalanda et la DGI. ${PRO_FORMA_RESTE}`
+          : avantEnvoi
+            ? `Le document n’a pas été envoyé à la DGI. ${PRO_FORMA_RESTE}`
+            : `La DGI n’a pas normalisé ce document. ${PRO_FORMA_RESTE}`,
+        consignes: a.retry
+          ? ['Vous pouvez relancer la normalisation : le contenu figé sera renvoyé à l’identique.']
+          : [],
+      };
+    }
+  }
+}
+
+// ── Progression : gel, envoi, comparaison, confirmation ─────────────────────
+
+export type EtatEtape = 'en_cours' | 'fait' | 'echec' | 'incertain' | 'non_fait' | 'a_venir';
+
+export interface EtapeNormalisation {
+  cle: 'gel' | 'envoi' | 'comparaison' | 'confirmation';
+  libelle: string;
+  etat: EtatEtape;
+}
+
+const LIBELLES_ETAPES: Record<EtapeNormalisation['cle'], string> = {
+  gel: 'Gel du document et conversion en CDF',
+  envoi: 'Envoi à la DGI',
+  comparaison: 'Comparaison des montants',
+  confirmation: 'Confirmation par la DGI',
+};
+
+export const LIBELLES_ETAT_ETAPE: Record<EtatEtape, string> = {
+  en_cours: 'en cours',
+  fait: 'fait',
+  echec: 'échec',
+  incertain: 'réponse incertaine',
+  non_fait: 'non effectué',
+  a_venir: 'à venir',
+};
+
+type QuatreEtats = [EtatEtape, EtatEtape, EtatEtape, EtatEtape];
+
+function etatsApresReponse(doc: Pick<InvoiceView, 'status' | 'normalization'>): QuatreEtats {
+  const phase = phaseNormalisation(doc);
+  const n = doc.normalization;
+  const envoye = (n?.dgiRequestId ?? null) !== null;
+  const ecart = (n?.differences?.length ?? 0) > 0;
+  const cat = n?.lastError?.category ?? null;
+  switch (phase) {
+    case 'done':
+      return ['fait', 'fait', 'fait', 'fait'];
+    case 'queued':
+      return ['fait', 'a_venir', 'a_venir', 'a_venir'];
+    case 'in_progress':
+      return envoye
+        ? ['fait', 'fait', 'en_cours', 'en_cours']
+        : ['fait', 'en_cours', 'a_venir', 'a_venir'];
+    case 'uncertain':
+    case 'needs_review':
+      if (ecart) return ['fait', 'fait', 'echec', 'non_fait'];
+      return envoye
+        ? ['fait', 'fait', 'fait', 'incertain']
+        : ['fait', 'incertain', 'non_fait', 'non_fait'];
+    case 'failed':
+      if (ecart) return ['fait', 'fait', 'echec', 'non_fait'];
+      if (cat === 'totals_mismatch') return ['fait', 'fait', 'fait', 'echec'];
+      if (cat === 'precondition' && !envoye) return ['fait', 'non_fait', 'non_fait', 'non_fait'];
+      return envoye ? ['fait', 'fait', 'fait', 'echec'] : ['fait', 'echec', 'non_fait', 'non_fait'];
+    default:
+      return ['a_venir', 'a_venir', 'a_venir', 'a_venir'];
+  }
+}
+
+/**
+ * Où en est chaque étape. Pendant la requête (`enCours`), l'API ne dit pas
+ * laquelle se joue : toutes sont « en cours », aucune n'est annoncée faite
+ * avant la réponse. Ensuite, l'état se DÉDUIT de la vue renvoyée — phase,
+ * catégorie d'erreur, présence d'un identifiant de demande DGI, écarts.
+ */
+export function etapesNormalisation(
+  doc: Pick<InvoiceView, 'status' | 'normalization'> | null,
+  enCours: boolean,
+  /** Relance ou vérification : le document est figé depuis longtemps. */
+  dejaFige = false,
+): EtapeNormalisation[] {
+  const etats: QuatreEtats =
+    enCours || doc === null
+      ? [dejaFige ? 'fait' : 'en_cours', 'en_cours', 'en_cours', 'en_cours']
+      : etatsApresReponse(doc);
+  const cles: EtapeNormalisation['cle'][] = ['gel', 'envoi', 'comparaison', 'confirmation'];
+  return cles.map((cle, i) => ({
+    cle,
+    libelle: LIBELLES_ETAPES[cle],
+    etat: etats[i] ?? 'a_venir',
+  }));
+}
+
+// ── Relectures bornées (règle 5) ────────────────────────────────────────────
+
+export const RELECTURE = {
+  /** `in_progress` : toutes les 3 s… */
+  enCoursMs: 3_000,
+  /** … pendant une minute au plus. */
+  enCoursDureeMs: 60_000,
+  /** `uncertain` : toutes les 15 s… */
+  incertainMs: 15_000,
+  /** … jusqu'à la vérification annoncée plus une minute. */
+  margeMs: 60_000,
+  /** `uncertain` sans heure annoncée : trois minutes. */
+  incertainSansDateMs: 180_000,
+  /** Plafond absolu, quoi que dise `nextCheckAt`. */
+  plafondMs: 900_000,
+} as const;
+
+/**
+ * Délai avant la prochaine relecture (`GET`), ou `null` : on s'arrête. `debut`
+ * est l'instant où la page a vu la phase courante pour la première fois.
+ */
+export function prochaineRelecture(
+  doc: Pick<InvoiceView, 'status' | 'normalization'>,
+  debut: number,
+  maintenant: number,
+): number | null {
+  const ecoule = maintenant - debut;
+  if (ecoule >= RELECTURE.plafondMs) return null;
+  const phase = phaseNormalisation(doc);
+  if (phase === 'in_progress') {
+    return ecoule < RELECTURE.enCoursDureeMs ? RELECTURE.enCoursMs : null;
+  }
+  if (phase === 'uncertain') {
+    const prevue = doc.normalization?.nextCheckAt;
+    const annonce = prevue ? Date.parse(prevue) : Number.NaN;
+    const limite = Number.isNaN(annonce)
+      ? debut + RELECTURE.incertainSansDateMs
+      : annonce + RELECTURE.margeMs;
+    return maintenant < limite ? RELECTURE.incertainMs : null;
+  }
+  return null;
+}
+
+/**
+ * Après l'échec de `POST …/normalize` côté navigateur : `afficher` l'erreur
+ * (refus clair de l'API, 4xx), ou `relire` le document (réseau, délai, 5xx d'un
+ * mandataire : la requête a pu aboutir côté serveur). JAMAIS « renvoyer »
+ * (règle 4).
+ */
+export function conduiteApresEchecNormaliser(err: unknown): 'afficher' | 'relire' {
+  const s = statutHttp(err);
+  return s !== null && s >= 400 && s < 500 ? 'afficher' : 'relire';
+}
+
+// ── Déclarer « non normalisée » (§ 4.4) ─────────────────────────────────────
+
+export const MOTIF_MIN = 20;
+export const MOTIF_MAX = 500;
+
+export function lireMotifDeclaration(
+  saisie: string,
+): { ok: true; motif: string } | { ok: false; erreur: string } {
+  const motif = saisie.trim();
+  if (motif.length < MOTIF_MIN) {
+    return {
+      ok: false,
+      erreur: `Décrivez en ${String(MOTIF_MIN)} caractères au moins comment vous avez établi que la facture n’a pas été normalisée.`,
+    };
+  }
+  if (motif.length > MOTIF_MAX) {
+    return { ok: false, erreur: `Le motif ne doit pas dépasser ${String(MOTIF_MAX)} caractères.` };
+  }
+  return { ok: true, motif };
+}
+
+// ── Échanges DGI du document (§ 6, § 9.3) ───────────────────────────────────
+
+const RESULTATS_ECHANGE: Record<string, string> = {
+  ok: 'Réussi',
+  production_disabled: 'Production fermée : aucun appel',
+  unauthorized: 'Jeton refusé (401)',
+  timeout: 'Sans réponse (délai dépassé)',
+  network: 'DGI injoignable',
+  server: 'Erreur du serveur DGI',
+  business: 'Refus de la DGI',
+  invalid_response: 'Réponse illisible',
+};
+
+function operationEchange(method: string, path: string): string {
+  const m = method.toUpperCase();
+  if (m === 'POST' && /\/api\/invoice\/?$/.test(path)) return 'Envoi de la facture';
+  if (m === 'PUT' && /\/confirm\/?$/.test(path)) return 'Confirmation';
+  if (m === 'PUT' && /\/cancel\/?$/.test(path)) return 'Annulation';
+  if (m === 'GET' && /\/api\/invoice\/[^/]+\/?$/.test(path)) return 'Lecture de la demande';
+  if (m === 'GET' && /\/api\/invoice\/?$/.test(path)) return 'Demandes en attente';
+  if (/\/api\/info\/status/.test(path)) return 'Statut de l’e-MCF';
+  return 'Échange';
+}
+
+/** Clés masquées par défense en profondeur : l'API n'en renvoie jamais. */
+const CLES_SECRETES = /token|authorization|password|secret|bearer/i;
+
+function masquer(valeur: unknown): unknown {
+  if (Array.isArray(valeur)) return valeur.map(masquer);
+  if (typeof valeur === 'object' && valeur !== null) {
+    return Object.fromEntries(
+      Object.entries(valeur).map(([k, v]) => [k, CLES_SECRETES.test(k) ? '[masqué]' : masquer(v)]),
+    );
+  }
+  return valeur;
+}
+
+/**
+ * Corps d'un échange, à afficher. Le TEXTE servi est rendu tel quel (les
+ * nombres e-DEF ne sont jamais reconvertis) ; `JSON.parse` ne sert qu'à repérer
+ * une clé ressemblant à un secret. Si l'une existe — l'API n'en renvoie jamais,
+ * l'interface s'en assure — le corps est réécrit avec la valeur masquée. Tout
+ * « Bearer … » est masqué aussi.
+ */
+export function corpsLisible(body: string | null): string | null {
+  if (body === null || body === '') return null;
+  const sansJeton = body.replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/g, 'Bearer [masqué]');
+  try {
+    const lu: unknown = JSON.parse(sansJeton);
+    if (typeof lu !== 'object' || lu === null) return sansJeton;
+    const masque = masquer(lu);
+    return JSON.stringify(masque) === JSON.stringify(lu)
+      ? sansJeton
+      : JSON.stringify(masque, null, 2);
+  } catch {
+    return sansJeton;
+  }
+}
+
+export interface LigneEchange {
+  cle: string;
+  date: string;
+  sens: string;
+  operation: string;
+  route: string;
+  resultat: string | null;
+  http: string | null;
+  duree: string | null;
+  codeDgi: string | null;
+  corps: string | null;
+}
+
+export function lignesEchanges(page: DgiExchangePage): LigneEchange[] {
+  return page.items.map((e, i) => ({
+    cle: `${e.exchangeId}-${e.entry}-${String(i)}`,
+    date: e.at,
+    sens:
+      e.entry === 'request'
+        ? 'Requête envoyée'
+        : e.entry === 'response'
+          ? 'Réponse reçue'
+          : 'Lecture',
+    operation: operationEchange(e.method, e.path),
+    route: `${e.method.toUpperCase()} ${e.path}`,
+    resultat: e.outcome === null ? null : (RESULTATS_ECHANGE[e.outcome] ?? e.outcome),
+    http: e.httpStatus === null ? null : String(e.httpStatus),
+    duree: e.durationMs === null ? null : `${String(e.durationMs)} ms`,
+    codeDgi: e.dgiErrorCode,
+    corps: corpsLisible(e.body),
+  }));
 }

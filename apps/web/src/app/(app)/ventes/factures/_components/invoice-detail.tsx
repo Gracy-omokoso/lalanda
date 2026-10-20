@@ -4,6 +4,8 @@
 // tout autre statut est FIGÉ et se consulte seulement : facture émise ou
 // normalisée (créer un avoir), pro forma en attente DGI, pro forma refusé
 // (reprendre en brouillon). Aucun montant n'est recalculé : tout vient de la vue.
+// En mode normalisé, l'état de la normalisation DGI (ADR-0024 § 9.3) et les
+// échanges avec la DGI s'affichent sous l'en-tête.
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -17,19 +19,27 @@ import { estRefus, formatDate, formatMontant } from '../../_components/sales-mod
 
 import { AmountsPanel } from './amounts-panel';
 import { CreditNoteDialog } from './credit-note-dialog';
+import { DgiExchanges } from './dgi-exchanges';
 import { InvoiceEditor } from './invoice-editor';
 import {
   actionsDocument,
   comparerDecimaux,
+  enTestDgi,
   enteteDocument,
   FACTURES_BASE,
   formatQuantite,
+  MENTION_TEST_DGI,
   messageFacture,
   NATURE_LABELS,
   STATUS_LABELS,
   tonStatut,
   TYPE_LABELS,
 } from './invoice-model';
+import { NormalizationStatus } from './normalization-status';
+
+/** Bandeau « test » : impossible à manquer (demande de la décideuse). */
+const BANDEAU_TEST =
+  'rounded-md border-2 border-[var(--warn)] bg-[var(--warn)]/15 px-3 py-2 text-sm font-bold uppercase tracking-wide';
 
 export function InvoiceDetail({ invoiceId }: { invoiceId: string }): React.ReactElement {
   const [vue, setVue] = useState<InvoiceView | null>(null);
@@ -123,6 +133,11 @@ function DocumentFige({
         <Link href={FACTURES_BASE} className="text-sm text-[var(--foreground-muted)] underline">
           ← Documents de vente
         </Link>
+        {enTestDgi(vue) ? (
+          <p role="note" className={`${BANDEAU_TEST} my-1`}>
+            {MENTION_TEST_DGI}
+          </p>
+        ) : null}
         <h2 id="doc-titre" className="font-display text-lg font-bold tracking-tight">
           {entete.titre}
         </h2>
@@ -142,13 +157,8 @@ function DocumentFige({
         </p>
       </div>
 
-      {n?.lastError ? (
-        <Alerte>
-          <p>
-            Réponse de la DGI : {n.lastError.message}{' '}
-            <span className="font-mono text-xs">({n.lastError.code})</span>
-          </p>
-        </Alerte>
+      {vue.emissionMode === 'normalized' || n !== null ? (
+        <NormalizationStatus vue={vue} onChange={onChange} />
       ) : null}
       {erreur ? (
         <Alerte>
@@ -202,18 +212,6 @@ function DocumentFige({
                 </>
               ) : null}
             </dd>
-          </div>
-        ) : null}
-        {n?.codeDefDgi ? (
-          <div>
-            <dt className="text-xs text-[var(--foreground-muted)]">Code DEF/DGI</dt>
-            <dd className="break-all font-mono">{n.codeDefDgi}</dd>
-          </div>
-        ) : null}
-        {n?.nim ? (
-          <div>
-            <dt className="text-xs text-[var(--foreground-muted)]">NIM</dt>
-            <dd className="font-mono">{n.nim}</dd>
           </div>
         ) : null}
       </dl>
@@ -321,6 +319,8 @@ function DocumentFige({
           La reprise efface la conversion en CDF et redonne un brouillon modifiable.
         </p>
       ) : null}
+
+      {vue.emissionMode === 'normalized' || n !== null ? <DgiExchanges invoiceId={vue.id} /> : null}
 
       {avoir ? (
         <CreditNoteDialog

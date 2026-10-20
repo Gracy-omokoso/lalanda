@@ -347,10 +347,27 @@ Le panneau des montants a deux colonnes fixes : **« Montants du document (USD) 
 - **« Créer un avoir »** : nature (Correction, Annulation, Avoir après reprise, Remise-ristourne-rabais, avec leur sens), total (quantités restantes) ou partiel. Le brouillon d’avoir reprend client, devise et mode de l’origine ; ses lignes d’origine n’ont que la quantité de modifiable, avec le **restant** affiché. Une remise sans facture d’origine (RRR) se compose directement.
 - **« Reprendre en brouillon »** depuis une normalisation refusée, seulement sans numéro réservé ; l’erreur DGI est affichée.
 
+### Normalisation DGI : déroulé et états (S25f — ADR-0024, chantier F3)
+
+Composants : `normalize-dialog.tsx` (fenêtre), `normalization-status.tsx` (état, dans la fenêtre et le détail), `declare-not-normalized-dialog.tsx`, `dgi-exchanges.tsx` ; logique pure dans `invoice-model.ts` (section « Normalisation DGI »). Contrat : ADR-0024 § 9.
+
+- **Progression.** Une seule requête gèle, envoie à la DGI, compare les montants et confirme. Pendant qu’elle dure, la fenêtre liste les quatre étapes (gel et conversion, envoi, comparaison, confirmation) **toutes « en cours »** : l’API ne dit pas laquelle se joue, l’interface n’en annonce aucune faite avant la réponse. Ensuite, l’état de chaque étape est **déduit de la vue renvoyée** (fait, échec, réponse incertaine, non effectué).
+- **États** (tableau § 9.3) : « Facture normalisée » (seul cas d’en-tête « Facture n° … » ; code DEF/DGI, NIM, compteurs et date DGI affichés **tels que reçus**) · « Transmission à la DGI… » · « En attente d’envoi » (avec la raison, par exemple une autre facture en cours) · « Réponse de la DGI incertaine » (« Ne refaites pas cette vente : Lalanda vérifie auprès de la DGI vers HH:MM », blocage des autres normalisations expliqué) · « Vérification nécessaire » (marche à suivre en trois temps, motif et date, identifiant de la demande DGI à donner à l’assistance) · « Normalisation refusée ». Partout ailleurs que « normalisée », le document reste **« Pro forma — non valable comme facture »**.
+- **Erreurs.** Notre phrase en français, **puis** le code et le libellé DGI **tels quels** (exigence DGI), la conduite selon la catégorie (données, saturation de l’e-MCF, jeton refusé, prérequis avant envoi…) et la référence Lalanda. Un prérequis qui se règle dans Organisation › Fiscalité (point de vente, listes de référence, jeton) y renvoie par un lien.
+- **Écart de calcul.** Message rassurant : rien n’a été enregistré, la demande a été annulée auprès de la DGI, aucune facture créée, numéro non consommé ; tableau des montants en écart (Lalanda / DGI, valeurs conservées par l’API, aucune conversion).
+- **Boutons** : « Relancer », « Vérifier maintenant », « Déclarer non normalisée » et « Reprendre en brouillon » s’affichent **selon `normalization.actions`** seulement, calculé par l’API selon la phase et les droits. « Actualiser » (simple relecture) reste disponible quand la mise à jour automatique s’arrête.
+- **Relectures bornées.** Transmission : toutes les 3 s pendant une minute. Incertaine : toutes les 15 s jusqu’à la vérification annoncée plus une minute (trois minutes sans heure annoncée), quinze minutes au plus. Au-delà, un bouton.
+- **Jamais de renvoi automatique.** Si la réponse de « Normaliser », « Relancer » ou « Vérifier » se perd (réseau, délai, erreur 5xx d’un mandataire), l’interface **relit** le document et affiche son état, avec la mention « La normalisation n’a pas été renvoyée ». Seul un refus clair de l’API (4xx) s’affiche comme une erreur.
+- **Déclarer non normalisée** : fenêtre qui rappelle les conséquences (retour en « refusée », trou tracé possible dans la série, audit), motif de 20 à 500 caractères ; ré-authentification par la boîte de l’onglet Fiscalité, puis nouvelle tentative unique. Aucune saisie d’éléments de sécurité.
+- **Échanges avec la DGI** : section repliable du détail, chargée à l’ouverture ; chaque requête et chaque réponse (opération, date, route, résultat, statut HTTP, durée, code DGI) et le contenu échangé **tel que servi** (nombres jamais reconvertis). Aucun jeton : l’API n’en sert pas, et l’interface masque malgré tout toute clé ressemblant à un secret.
+- **« Mode test »** dans la fenêtre, le panneau d’état et l’en-tête du détail dès que l’environnement est le test. Par décision de la décideuse, la mention est **impossible à manquer** : bandeau « Environnement de test DGI — facture sans valeur fiscale » en tête de la fiche, rappel « Environnement de test DGI — sans valeur fiscale » dans la fenêtre « Normaliser », et « (test) » après le numéro d’une facture normalisée en test (« Facture normalisée n° TEST-… (test) »). Un test unitaire l’impose.
+
 ### Limites
 
-- Pas d’impression ni de PDF (S25g) ; normalisation réelle auprès de la DGI : S25f (jusque-là un document normalisé reste « en attente DGI »).
+- Pas d’impression ni de PDF (S25g) : le QR code DGI, présent dans la vue, n’est pas affiché avant S25g, qui l’imprimera.
 - Aucun aperçu des montants CDF avant « Normaliser » : le contrat n’a pas de route d’aperçu.
+- Pas de badge « TEST » dans la **liste** des factures : le résumé de liste (`InvoiceSummary`) ne porte pas l’environnement. Il faut l’y ajouter côté API ; l’interface ne le devine pas.
+- Ré-authentification par Google pendant « Déclarer non normalisée » : au retour, la déclaration n’est pas reprise automatiquement ; il faut rouvrir la fenêtre.
 
 ## Implémenté (S21b) — Espace admin plateforme
 

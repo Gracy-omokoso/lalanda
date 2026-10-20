@@ -8,32 +8,43 @@
 //    rappel ±1 % s'affiche, c'est le SERVEUR qui contrôle.
 // 3. La conversion en CDF et le recalcul sont faits par le moteur, côté
 //    serveur ; l'aperçu des montants CDF affiché ensuite est celui RENVOYÉ par
-//    l'API. Le document reste un pro forma « normalisation en cours » jusqu'à
-//    la réponse de la DGI (lot S25f).
+//    l'API.
+// 4. Déroulé réel (S25f — ADR-0024 § 3 et § 9.3) : une seule requête gèle,
+//    envoie à la DGI, compare et confirme. Pendant qu'elle dure (d'habitude
+//    moins d'une seconde, une minute au pire), la progression s'affiche sans
+//    annoncer d'étape faite. Ensuite, l'état renvoyé (`NormalizationStatus`).
+// 5. Une coupure côté navigateur ne RENVOIE JAMAIS la requête : on relit le
+//    document et l'on affiche son état (`conduiteApresEchecNormaliser`).
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { api, type ExchangeRateReference, type InvoiceView } from '@/lib/api';
 
-import { Alerte, BOUTON, CHAMP, aria } from '../../_components/form-ui';
+import { Alerte, BOUTON, CHAMP, Pastille, aria } from '../../_components/form-ui';
 import { formatDate } from '../../_components/sales-model';
 
 import { AmountsPanel } from './amounts-panel';
 import { Dialogue } from './dialog-ui';
 import {
   type ChoixTaux,
+  conduiteApresEchecNormaliser,
   enteteDocument,
+  etapesNormalisation,
   formatDateDgi,
   formatTauxChange,
   jourDgi,
   messageFacture,
   preparerNormalisation,
   problemesGel,
+  RAPPEL_TEST_DGI,
   rappelTolerance,
   STATUS_LABELS,
   tauxIndisponible,
+  TITRES_PHASE,
+  phaseNormalisation,
 } from './invoice-model';
+import { NormalizationStatus, Progression } from './normalization-status';
 
 export function NormalizeDialog({
   vue,
@@ -64,6 +75,8 @@ export function NormalizeDialog({
     taux: boolean;
   } | null>(null);
   const [resultat, setResultat] = useState<InvoiceView | null>(null);
+  /** La réponse s'est perdue : `resultat` est le document RELU, pas la réponse. */
+  const [relu, setRelu] = useState(false);
 
   useEffect(() => {
     let annule = false;
@@ -97,11 +110,37 @@ export function NormalizeDialog({
     try {
       setResultat(await api.normalizeInvoice(vue.id, prep.corps));
     } catch (err) {
-      setErreur({
-        message: messageFacture(err, 'Normalisation impossible.'),
-        details: problemesGel(err),
-        taux: tauxIndisponible(err),
-      });
+      if (conduiteApresEchecNormaliser(err) === 'relire') {
+        // Réseau, délai, mandataire : la requête a pu aboutir côté serveur. On
+        // RELIT le document — la route est idempotente, on ne la renvoie pas.
+        try {
+          const lu = await api.getInvoice(vue.id);
+          if (lu.status === 'draft') {
+            setErreur({
+              message:
+                'La réponse du serveur s’est perdue et le document est toujours un brouillon : rien n’a été figé. Vous pouvez réessayer.',
+              details: [],
+              taux: false,
+            });
+          } else {
+            setRelu(true);
+            setResultat(lu);
+          }
+        } catch {
+          setErreur({
+            message:
+              'La réponse du serveur s’est perdue et le document n’a pas pu être relu. Fermez cette fenêtre et rechargez la page pour voir son état : ne refaites pas cette vente.',
+            details: [],
+            taux: false,
+          });
+        }
+      } else {
+        setErreur({
+          message: messageFacture(err, 'Normalisation impossible.'),
+          details: problemesGel(err),
+          taux: tauxIndisponible(err),
+        });
+      }
     } finally {
       setEnvoi(false);
     }
@@ -109,28 +148,34 @@ export function NormalizeDialog({
 
   if (resultat) {
     const entete = enteteDocument(resultat);
+    const phase = phaseNormalisation(resultat);
     return (
       <Dialogue
-        titre={
-          resultat.status === 'normalized'
-            ? 'Facture normalisée'
-            : resultat.status === 'normalization_failed'
-              ? 'Normalisation refusée'
-              : 'Pro forma figé — en attente de la DGI'
-        }
+        titre={phase ? TITRES_PHASE[phase] : 'Pro forma figé'}
         onFermer={() => onNormalise(resultat)}
       >
-        <p className="text-sm" aria-live="polite">
-          <strong>{entete.titre}</strong> — <span className="font-mono">{entete.reference}</span>.{' '}
-          {STATUS_LABELS[resultat.status]}.
+        <p className="flex flex-wrap items-center gap-2 text-sm" aria-live="polite">
+          <span>
+            <strong>{entete.titre}</strong>
+            {entete.numeroDefinitif ? (
+              '.'
+            ) : (
+              <>
+                {' — '}
+                <span className="font-mono">{entete.reference}</span>.{' '}
+                {STATUS_LABELS[resultat.status]}.
+              </>
+            )}
+          </span>
+          {resultat.environment === 'test' ? <Pastille ton="attention">Mode test</Pastille> : null}
         </p>
-        {resultat.documentKind === 'proforma' ? (
+        {relu ? (
           <p className="text-sm text-[var(--foreground-muted)]">
-            Le contenu est figé et converti. Il reste un pro forma, non valable comme facture,
-            jusqu’à la confirmation de la DGI : le numéro de facture ne sera attribué qu’à ce
-            moment.
+            La réponse du serveur s’est perdue en chemin : voici l’état du document, relu à
+            l’instant. La normalisation n’a pas été renvoyée.
           </p>
         ) : null}
+        <NormalizationStatus vue={resultat} onChange={setResultat} />
         <AmountsPanel vue={resultat} />
         <div className="flex justify-end">
           <button type="button" className={BOUTON} onClick={() => onNormalise(resultat)}>
@@ -141,20 +186,47 @@ export function NormalizeDialog({
     );
   }
 
+  if (envoi) {
+    return (
+      <Dialogue titre="Transmission à la DGI…" onFermer={() => undefined}>
+        <div aria-live="polite" className="flex flex-col gap-3 text-sm">
+          {environnementTest ? <Pastille ton="attention">Mode test</Pastille> : null}
+          <p>
+            Lalanda fige le document, l’envoie à la DGI, compare les montants qu’elle calcule aux
+            siens, puis demande sa confirmation. Cela prend d’habitude moins d’une seconde, une
+            minute au plus si la DGI est lente.
+          </p>
+          <Progression etapes={etapesNormalisation(null, true)} />
+          <p className="font-semibold">
+            Ne fermez pas cette fenêtre et ne refaites pas cette vente.
+          </p>
+        </div>
+      </Dialogue>
+    );
+  }
+
   return (
     <Dialogue titre="Normaliser le document" onFermer={onFermer}>
       {environnementTest ? (
-        <p className="rounded-md border border-[var(--warn)]/50 px-3 py-2 text-sm font-medium">
-          Mode test — environnement de test de la DGI : la facture obtenue n’aura aucune valeur
-          fiscale.
-        </p>
+        <div
+          role="note"
+          className="rounded-md border-2 border-[var(--warn)] bg-[var(--warn)]/15 px-3 py-2 text-sm"
+        >
+          <p className="font-bold uppercase tracking-wide">{RAPPEL_TEST_DGI}</p>
+          <p>
+            Mode test : la facture obtenue sera une facture de test de la DGI, sans aucune valeur
+            fiscale.
+          </p>
+        </div>
       ) : null}
       <p className="text-sm">
         Le pro forma <span className="font-mono">{vue.proformaRef}</span> sera figé et{' '}
         {vue.currency === 'USD'
           ? 'converti en francs congolais : chaque prix unitaire est converti au taux choisi, puis le document est recalculé en CDF.'
           : 'transmis en francs congolais, sans conversion.'}{' '}
-        Il ne sera plus modifiable. Il deviendra une facture seulement quand la DGI l’aura confirmé.
+        Il ne sera plus modifiable. Lalanda l’enverra aussitôt à la DGI, comparera les montants
+        qu’elle calcule aux siens, puis demandera sa confirmation : il deviendra une facture
+        seulement quand la DGI l’aura confirmé.
       </p>
 
       {besoinTaux ? (
