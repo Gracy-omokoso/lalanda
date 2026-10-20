@@ -316,7 +316,7 @@ commerciale de l'offre BUILD) ; le portillon borne la mémoire.
   un million de, milliards, décimales) ; contenu du QR = `qrCode` exact ; HTML déterministe ;
   échappement des champs utilisateur.
 - Rendu réel (si Chromium) : deux rendus du même document → mêmes octets ; PDF d'exemple
-  test et production écrits dans `apps/api/.pdf-samples/` (ignoré par Git).
+  test et production écrits dans `apps/api/.vitest/pdf-samples/` (ignoré par Git).
 - E2E (faux serveur e-MCF, jamais la DGI) : original d'une facture normalisée et d'un pro
   forma ; duplicata 1 puis 2, `duplicateCount` et journal ; duplicata d'un pro forma → 409 ;
   `contentSha256` inchangé ; RBAC (Analyste : original oui, duplicata 403) ; autre
