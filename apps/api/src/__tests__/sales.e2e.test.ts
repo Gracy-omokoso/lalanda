@@ -254,7 +254,7 @@ e2eSuite('ventes — clients, catalogue, groupes de taxation (ADR-0022 chantier 
         exemptionReference: 'EXO-2026-001',
       });
       expect(ao.status).toBe(201);
-      expect(ao.body.typeLabel).toBe('Ambassade, organisation internationale');
+      expect(ao.body.typeLabel).toBe('Ambassades et organisations internationales');
       expect(ao.body.exemptionReference).toBe('EXO-2026-001');
     });
 

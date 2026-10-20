@@ -211,7 +211,7 @@ export const CUSTOMER_TYPES: readonly CustomerTypeOption[] = [
   },
   {
     value: 'AO',
-    label: 'Ambassade, organisation internationale',
+    label: 'Ambassades et organisations internationales',
     aide: 'La référence du document d’exonération est obligatoire ; elle est imprimée sur la facture.',
   },
 ];
