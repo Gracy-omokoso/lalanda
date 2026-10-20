@@ -155,8 +155,16 @@ export function NormalizeDialog({
       >
         <p className="flex flex-wrap items-center gap-2 text-sm" aria-live="polite">
           <span>
-            <strong>{entete.titre}</strong> — <span className="font-mono">{entete.reference}</span>.{' '}
-            {STATUS_LABELS[resultat.status]}.
+            <strong>{entete.titre}</strong>
+            {entete.numeroDefinitif ? (
+              '.'
+            ) : (
+              <>
+                {' — '}
+                <span className="font-mono">{entete.reference}</span>.{' '}
+                {STATUS_LABELS[resultat.status]}.
+              </>
+            )}
           </span>
           {resultat.environment === 'test' ? <Pastille ton="attention">Mode test</Pastille> : null}
         </p>
