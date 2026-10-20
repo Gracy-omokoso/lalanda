@@ -149,6 +149,43 @@ ligne C (code d'une facture d'acompte) alors que B–H sont « réservées » ; 
 huit lignes de commentaire même vides ; source et date du « taux moyen BCC » et présence de
 la contre-valeur USD sur toutes les factures ; orthographe exacte de « HORS CHAMP ».
 
+## 6. Écarts du dossier d'homologation — corrections du 20 oct. 2026
+
+La liste de travail des écarts (tableau de conformité, onglet 04, vérifié contre `main`) est
+tenue hors dépôt avec le dossier DGI ; ses identifiants (B3, C1, C6…) sont repris ici. Seuls
+les écarts ci-dessous sont traités par cette branche ; les autres restent ouverts.
+
+| Écart | Exigence | Statut | Correction |
+|---|---|---|---|
+| **C6** — choix du point de vente impossible à l'écran | exploitation à plusieurs points de vente (aucune exigence numérotée) | **Corrigé le 20 oct. 2026** | § 6.1 |
+
+### 6.1 Choix du point de vente (C6)
+
+- **Avant.** L'éditeur envoyait toujours `pointOfSaleId: null` ; l'API retenait le point de
+  vente d'office s'il n'y en avait qu'**un** actif. Avec deux actifs, le brouillon restait
+  bloqué (« Choisissez le point de vente… ») sans aucun moyen de choisir.
+- **API.** `GET /sales/points-of-sale` (`sales.read`) rend les points de vente **actifs dans
+  l'environnement DGI** de l'organisation, avec le mode d'émission : identifiant, nom, NIM et
+  nom d'établissement relevés par la DGI — **ni jeton, ni état technique, ni test** (la
+  gestion reste en `fiscal.manage`). `sales.read` parce que la personne qui compose un
+  brouillon (`sales.manage`) n'a pas forcément `fiscal.manage`, et qu'un nom et un NIM
+  imprimés sur toute facture ne sont pas confidentiels. Le champ `pointOfSaleId` du brouillon
+  existait déjà ; un point de vente d'une autre organisation répond toujours
+  `404 POINT_OF_SALE_NOT_FOUND`.
+- **Messages.** Le bloquant `POINT_OF_SALE_REQUIRED` dit quoi faire selon le cas (aucun actif ;
+  un seul : enregistrer ; plusieurs : choisir) ; un point de vente choisi puis retiré bloque
+  par `POINT_OF_SALE_NOT_ACTIVE` ; « Normaliser » sans point de vente répond
+  `409 POINT_OF_SALE_REQUIRED` (nouveau code 409) au lieu d'un « point de vente non actif »
+  trompeur.
+- **Écran.** L'éditeur affiche le point de vente en facture normalisée : le seul actif est
+  retenu par défaut (affiché, non modifiable) ; avec plusieurs, une liste **obligatoire**
+  (« Choisir un point de vente… ») et un message sous le champ tant que rien n'est choisi ;
+  aucun actif : un message renvoie à Organisation › Fiscalité.
+- **Tests.** Modèle web (choix, défaut, corps, message) ; e2e `normalization.e2e.test.ts` :
+  deux points de vente actifs, liste lisible par le Lecteur sans jeton, brouillon bloqué avec
+  le bon message, `409 POINT_OF_SALE_REQUIRED`, `404` pour un point de vente étranger,
+  normalisation par le point choisi (NIM du second), choix retiré → bloquant.
+
 ## Conséquences
 
 - Les cas 14 et 29 s'impriment conformément à la DGI ; aucun autre rendu ne change (pour un

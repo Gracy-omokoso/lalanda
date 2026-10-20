@@ -47,8 +47,10 @@ const NIF_N = 'A0000000X';
 const NIF_B = 'B0000000X';
 const NIM = 'XX01000001-1';
 const NIM_B = 'XX01000002-1';
+const NIM_N2 = 'XX01000003-1';
 const JETON = `ANTIFUITE-normalisation-${tag}-0123456789abcdef`;
 const JETON_B = `ANTIFUITE-normalisation-b-${tag}-0123456789abcdef`;
+const JETON_N2 = `ANTIFUITE-normalisation-n2-${tag}-0123456789abcdef`;
 const MINUTE = 60_000;
 
 /** Taux de test, identiques dans l'instantané et dans le faux serveur (valeurs fictives). */
@@ -253,6 +255,7 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
       tokens: {
         [JETON]: { nif: NIF_N, nim: NIM, tokenValid: '2099-01-31T00:00:00' },
         [JETON_B]: { nif: NIF_B, nim: NIM_B, tokenValid: '2099-01-31T00:00:00' },
+        [JETON_N2]: { nif: NIF_N, nim: NIM_N2, tokenValid: '2099-01-31T00:00:00' },
       },
       taxGroups: GROUPES,
     });
@@ -1038,6 +1041,89 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
             { $set: { 'dgi.tokenValidUntil': avant?.['dgi']?.['tokenValidUntil'] } },
           );
       }
+    });
+
+    it('deux points de vente actifs : choix obligatoire, message clair, normalisation par le point choisi (ADR-0026 C6)', async () => {
+      await reauth('owner');
+      const second = await post(
+        asN(),
+        '/organizations/current/normalized-invoicing/points-of-sale',
+        { label: 'Dépôt', environment: 'test', expectedNim: null, token: JETON_N2 },
+      );
+      expect(second.status, JSON.stringify(second.body)).toBe(201);
+      const pos2 = second.body.id as string;
+      try {
+        // Liste proposable : lisible par le Lecteur, sans jeton ni état technique.
+        const liste = await get(asN('viewer'), '/sales/points-of-sale');
+        expect(liste.status).toBe(200);
+        expect(liste.body).toMatchObject({ emissionMode: 'normalized', environment: 'test' });
+        expect(liste.body.items.map((p: { id: string }) => p.id).sort()).toEqual(
+          [posN, pos2].sort(),
+        );
+        expect(liste.body.items.find((p: { id: string }) => p.id === pos2)).toEqual({
+          id: pos2,
+          label: 'Dépôt',
+          nim: NIM_N2,
+          shopName: expect.anything(),
+        });
+        expect(JSON.stringify(liste.body)).not.toContain('ANTIFUITE');
+
+        // Sans choix : brouillon enregistré mais bloqué, message qui dit quoi faire.
+        const d = await brouillonPret();
+        expect(d.pointOfSaleId).toBeNull();
+        expect(d.readiness.ready).toBe(false);
+        const bloquant = d.readiness.blockers.find(
+          (b: { code: string }) => b.code === 'POINT_OF_SALE_REQUIRED',
+        );
+        expect(bloquant.message).toMatch(/Plusieurs points de vente/);
+        const refus = await post(asN(), `/sales/invoices/${d.id}/normalize`, {
+          expectedRevision: d.revision,
+          exchangeRate: null,
+        });
+        expect(refus.status).toBe(409);
+        expect(refus.body.code).toBe('POINT_OF_SALE_REQUIRED');
+        expect(refus.body.message).toMatch(/choisissez/);
+
+        // Point de vente d'une autre organisation → 404 ; choix du second → normalisé par lui.
+        const autre = await put(asN(), `/sales/invoices/${d.id}`, {
+          ...corps({ pointOfSaleId: new ObjectId().toHexString() }),
+          payments: [{ method: 'VIREMENT', amount: d.documentAmounts.calculation.totals.total }],
+          expectedRevision: d.revision,
+        });
+        expect(autre.status).toBe(404);
+        expect(autre.body.code).toBe('POINT_OF_SALE_NOT_FOUND');
+        const choisi = await put(asN(), `/sales/invoices/${d.id}`, {
+          ...corps({ pointOfSaleId: pos2 }),
+          payments: [{ method: 'VIREMENT', amount: d.documentAmounts.calculation.totals.total }],
+          expectedRevision: d.revision,
+        });
+        expect(choisi.status, JSON.stringify(choisi.body)).toBe(200);
+        expect(choisi.body.pointOfSaleId).toBe(pos2);
+        expect(choisi.body.readiness.ready).toBe(true);
+        const rn = await prochainNumero();
+        const ok = await post(asN(), `/sales/invoices/${d.id}/normalize`, {
+          expectedRevision: choisi.body.revision,
+          exchangeRate: null,
+        });
+        expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+        expect(ok.body.number).toBe(rn);
+        expect(ok.body.normalization.nim).toBe(NIM_N2);
+      } finally {
+        // Retour à un seul point de vente actif pour la suite.
+        await reauth('owner');
+        const off = await post(
+          asN(),
+          `/organizations/current/normalized-invoicing/points-of-sale/${pos2}/disable`,
+          { reason: 'Fin du scénario à deux points de vente (test).' },
+        );
+        expect(off.status, JSON.stringify(off.body)).toBe(200);
+      }
+      // Choix retiré : le brouillon qui le portait est bloqué avec un message clair.
+      const d2 = await brouillonPret(asN(), corps({ pointOfSaleId: pos2 }));
+      expect(d2.readiness.blockers.map((b: { code: string }) => b.code)).toContain(
+        'POINT_OF_SALE_NOT_ACTIVE',
+      );
+      await request(server()).delete(`/sales/invoices/${d2.id}`).set('Cookie', asN());
     });
 
     it('organisation forcée en production → failed DGI_PRODUCTION_UNAVAILABLE, aucune requête', async () => {

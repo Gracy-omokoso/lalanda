@@ -20,6 +20,7 @@ import {
   type DocumentCurrency,
   type InvoiceType,
   type InvoiceView,
+  type SelectablePointsOfSale,
   type TaxGroupList,
 } from '@/lib/api';
 
@@ -35,6 +36,7 @@ import { AmountsPanel } from './amounts-panel';
 import { InvoiceLines } from './invoice-lines';
 import {
   actionsDocument,
+  choixPointDeVente,
   commentaireAModifiable,
   CURRENCY_LABELS,
   enteteDocument,
@@ -44,8 +46,10 @@ import {
   formulaireDepuisVue,
   formulaireVide,
   libelleEmpechement,
+  libellePointDeVente,
   messageFacture,
   NATURE_LABELS,
+  pointDeVenteParDefaut,
   preparerDocument,
   PRICE_MODE_DOC_LABELS,
   STATUS_LABELS,
@@ -70,6 +74,7 @@ function champsConnus(f: FormulaireDocument): string[] {
     'creditNote.nature',
     'comments.A',
     'comments.C',
+    'pointOfSaleId',
   ];
   f.lignes.forEach((_, i) => {
     base.push(`lines.${i}`);
@@ -284,6 +289,85 @@ function ChoixClient({
   );
 }
 
+/**
+ * Point de vente e-MCF du document (ADR-0026, écart C6) : affiché d'office
+ * quand il n'y en a qu'un actif, à CHOISIR quand il y en a plusieurs.
+ */
+function ChoixPointDeVenteChamp({
+  form,
+  setForm,
+  liste,
+  desactive,
+  erreur,
+}: {
+  form: FormulaireDocument;
+  setForm: React.Dispatch<React.SetStateAction<FormulaireDocument>>;
+  liste: SelectablePointsOfSale | null;
+  desactive: boolean;
+  erreur: string | undefined;
+}): React.ReactElement | null {
+  const choix = choixPointDeVente(liste, form.pointOfSaleId);
+  if (choix.mode === 'masque') return null;
+  if (choix.mode === 'aucun') {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <p className="text-sm font-medium">Point de vente e-MCF</p>
+        <p className="text-sm text-[var(--danger)]">
+          Aucun point de vente e-MCF n’est actif : la normalisation est impossible tant qu’un
+          responsable fiscal n’en a pas configuré un (Organisation › Fiscalité).
+        </p>
+      </div>
+    );
+  }
+  if (choix.mode === 'unique') {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <p className="text-sm font-medium">Point de vente e-MCF</p>
+        <p className="text-sm">{libellePointDeVente(choix.pointDeVente)}</p>
+        <p className="text-xs text-[var(--foreground-muted)]">
+          Seul point de vente actif : il normalisera ce document.
+        </p>
+      </div>
+    );
+  }
+  const message =
+    erreur ??
+    (choix.manquant
+      ? 'Plusieurs points de vente sont actifs : choisissez celui qui normalisera ce document.'
+      : undefined);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor="doc-pdv" className="text-sm font-medium">
+        Point de vente e-MCF
+        <span className="sr-only"> (obligatoire)</span>
+      </label>
+      <select
+        id="doc-pdv"
+        value={choix.selection}
+        onChange={(e) =>
+          setForm((f) => ({ ...f, pointOfSaleId: e.target.value === '' ? null : e.target.value }))
+        }
+        className={CHAMP}
+        disabled={desactive}
+        required
+        {...aria('doc-pdv', message)}
+      >
+        <option value="">Choisir un point de vente…</option>
+        {choix.options.map((p) => (
+          <option key={p.id} value={p.id}>
+            {libellePointDeVente(p)}
+          </option>
+        ))}
+      </select>
+      {message ? (
+        <p id="doc-pdv-erreur" className="text-xs font-medium text-[var(--danger)]">
+          {message}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function InvoiceEditor({
   vueInitiale,
   onChange,
@@ -305,6 +389,7 @@ export function InvoiceEditor({
     vueInitiale?.customer.type ?? null,
   );
   const [groupes, setGroupes] = useState<TaxGroupList | null>(null);
+  const [pointsDeVente, setPointsDeVente] = useState<SelectablePointsOfSale | null>(null);
   const [erreurs, setErreurs] = useState<Record<string, string>>({});
   const [autres, setAutres] = useState<string[]>([]);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -323,6 +408,31 @@ export function InvoiceEditor({
       .then(setGroupes)
       .catch(() => undefined);
   }, []);
+
+  // Points de vente proposables ; un NOUVEAU document prend le seul actif.
+  useEffect(() => {
+    let annule = false;
+    api
+      .listSelectablePointsOfSale()
+      .then((l) => {
+        if (annule) return;
+        setPointsDeVente(l);
+        if (vueInitiale === null) {
+          const parDefaut = pointDeVenteParDefaut(l);
+          setForm((f) => (f.pointOfSaleId === null ? { ...f, pointOfSaleId: parDefaut } : f));
+          setReference((r) => {
+            const f = JSON.parse(r) as FormulaireDocument;
+            return JSON.stringify(
+              f.pointOfSaleId === null ? { ...f, pointOfSaleId: parDefaut } : f,
+            );
+          });
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      annule = true;
+    };
+  }, [vueInitiale]);
 
   // Avoir hors RRR : la facture d'origine donne les restants par ligne.
   useEffect(() => {
@@ -548,6 +658,14 @@ export function InvoiceEditor({
             </p>
           </div>
         </div>
+
+        <ChoixPointDeVenteChamp
+          form={form}
+          setForm={setForm}
+          liste={pointsDeVente}
+          desactive={desactive}
+          erreur={erreurs['pointOfSaleId']}
+        />
 
         <fieldset className="flex flex-col gap-2" disabled={desactive || verrouOrigine}>
           <legend className="mb-1 text-sm font-semibold">

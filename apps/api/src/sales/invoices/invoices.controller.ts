@@ -4,6 +4,10 @@
 // brouillon et la reprise en brouillon, `sales.invoice` pour émettre et
 // normaliser (engage le contribuable ; interdite à la plateforme). Organisation
 // active seulement ; un document d'une autre organisation répond 404.
+//
+// La liste des points de vente proposables (`GET /sales/points-of-sale`,
+// ADR-0026 écart C6) est en `sales.read` : elle ne montre ni jeton ni état
+// technique (la gestion des points de vente reste en `fiscal.manage`).
 
 import {
   Body,
@@ -30,7 +34,12 @@ import { CreditNotesService } from './credit-notes.service.js';
 import { ExchangeRateReferenceService } from './exchange-rate-reference.service.js';
 import { InvoiceDraftsService } from './invoice-drafts.service.js';
 import { InvoiceFreezingService } from './invoice-freezing.service.js';
-import type { ExchangeRateReference, InvoicePage, InvoiceView } from './invoice.contract.js';
+import type {
+  ExchangeRateReference,
+  InvoicePage,
+  InvoiceView,
+  SelectablePointsOfSale,
+} from './invoice.contract.js';
 import type { InvoiceActor } from './invoice.types.js';
 import {
   BackToDraftSchema,
@@ -189,6 +198,13 @@ export class InvoicesController {
       parsed.data.expectedRevision,
       actorOf(user, role),
     );
+  }
+
+  /** ADR-0026, écart C6 : points de vente proposables dans l'éditeur. */
+  @Get('points-of-sale')
+  @RequirePermission('sales.read')
+  async pointsOfSale(@CurrentOrgId() orgId: string): Promise<SelectablePointsOfSale> {
+    return this.drafts.selectablePointsOfSale(orgId);
   }
 
   @Get('exchange-rate-reference')

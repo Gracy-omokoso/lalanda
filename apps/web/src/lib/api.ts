@@ -1764,7 +1764,7 @@ export interface CreateInvoiceBody {
   currency: DocumentCurrency;
   priceMode: InvoicePriceMode;
   customer: InvoiceCustomerBody;
-  /** `null` : le seul point de vente actif, s'il y en a un. */
+  /** `null` : le seul point de vente actif, s'il y en a un (sinon à choisir, ADR-0026 C6). */
   pointOfSaleId: string | null;
   lines: readonly InvoiceLineBody[];
   /** Dans la devise du document. */
@@ -2182,6 +2182,21 @@ export interface JournalPage {
   nextCursor: string | null;
   /** Le chaînage `prevHash` → `hash` est-il intact ? */
   chainValid: boolean;
+}
+
+/** Point de vente e-MCF proposable dans l'éditeur (ADR-0026, écart C6). */
+export interface SelectablePointOfSale {
+  id: string;
+  label: string;
+  nim: string | null;
+  shopName: string | null;
+}
+
+/** `GET /sales/points-of-sale` — points de vente ACTIFS dans l'environnement de l'organisation. */
+export interface SelectablePointsOfSale {
+  emissionMode: EmissionMode;
+  environment: EdefEnvironment;
+  items: SelectablePointOfSale[];
 }
 
 /** `GET /sales/exchange-rate-reference`. */
@@ -2920,6 +2935,8 @@ export const api = {
     jsonRequest<JournalPage>(`/sales/journal${salesQuery(query)}`, { method: 'GET' }),
   getExchangeRateReference: () =>
     jsonRequest<ExchangeRateReference>(`/sales/exchange-rate-reference`, { method: 'GET' }),
+  listSelectablePointsOfSale: () =>
+    jsonRequest<SelectablePointsOfSale>(`/sales/points-of-sale`, { method: 'GET' }),
 
   // ─── Interprétations et chat Lala (S24a) ───────────────────
   // Les LIGNES DU MOTEUR sont transmises telles quelles : elles servent à la fois

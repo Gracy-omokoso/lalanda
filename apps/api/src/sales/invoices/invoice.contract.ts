@@ -585,6 +585,27 @@ export interface ExchangeRateReference {
   tolerancePercent: DecimalString;
 }
 
+/** Un point de vente e-MCF que l'éditeur peut proposer (ADR-0026, écart C6). */
+export interface SelectablePointOfSale {
+  id: string;
+  label: string;
+  /** NIM relevé par la DGI au dernier test réussi ; `null` sinon. */
+  nim: string | null;
+  /** Nom de l'établissement relevé par la DGI ; `null` sinon. */
+  shopName: string | null;
+}
+
+/**
+ * `GET /sales/points-of-sale` — points de vente ACTIFS dans l'environnement DGI
+ * de l'organisation, pour le choix du point de vente d'un brouillon (lecture
+ * `sales.read` : ni jeton, ni état technique, ni historique de test).
+ */
+export interface SelectablePointsOfSale {
+  emissionMode: EmissionMode;
+  environment: DgiEnvironment;
+  items: readonly SelectablePointOfSale[];
+}
+
 // ── Codes d'erreur ───────────────────────────────────────────────────────────
 
 /** Codes de premier niveau (`code` de la réponse), par statut HTTP (§ S25e.14). */
@@ -606,6 +627,7 @@ export const INVOICE_ERROR_CODES = {
     'CATALOG_ITEM_INACTIVE',
     'TAX_GROUP_UNAVAILABLE',
     'FISCAL_PROFILE_REQUIRED',
+    'POINT_OF_SALE_REQUIRED',
     'POINT_OF_SALE_NOT_ACTIVE',
     'TAX_RATES_UNAVAILABLE',
     'EXCHANGE_RATE_REFERENCE_UNAVAILABLE',
@@ -654,6 +676,7 @@ export type ReadinessBlockerCode =
   | 'PAYMENTS_TOTAL_MISMATCH'
   | 'CATALOG_CURRENCY_MISMATCH'
   | 'POINT_OF_SALE_REQUIRED'
+  | 'POINT_OF_SALE_NOT_ACTIVE'
   | 'TAX_RATES_UNAVAILABLE'
   | 'EXCHANGE_RATE_REFERENCE_UNAVAILABLE'
   | 'CUSTOMER_INACTIVE'

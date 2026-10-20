@@ -366,6 +366,12 @@ export class InvoiceFreezingService {
       }
       let sellerAddress = headOfficeAddress(profile.headOffice);
       if (mode === 'normalized') {
+        if (!doc.pointOfSaleId) {
+          invoiceConflict(
+            'POINT_OF_SALE_REQUIRED',
+            'Aucun point de vente n’est choisi pour ce document : choisissez dans l’éditeur le point de vente e-MCF qui le normalisera, puis enregistrez.',
+          );
+        }
         const pos = doc.pointOfSaleId
           ? await this.pointsOfSale.view(organizationId, doc.pointOfSaleId).catch(() => null)
           : null;

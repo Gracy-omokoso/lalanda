@@ -13,6 +13,7 @@ import { erreursFormulaire } from '../../_components/sales-model';
 
 import {
   actionsDocument,
+  choixPointDeVente,
   impressionsDocument,
   commentaireAModifiable,
   comparerDecimaux,
@@ -27,6 +28,7 @@ import {
   lignesEchanges,
   lireMotifDeclaration,
   phaseNormalisation,
+  pointDeVenteParDefaut,
   presentationNormalisation,
   prochaineRelecture,
   RELECTURE,
@@ -42,6 +44,7 @@ import {
   ligneVide,
   lireQuantiteSaisie,
   lireTauxChange,
+  libellePointDeVente,
   messageFacture,
   montantsResume,
   paiementUnique,
@@ -437,6 +440,63 @@ describe('saisie : formes seulement', () => {
     expect(comparerDecimaux('10', '9.999')).toBe(1);
     expect(comparerDecimaux('9007199254740993', '9007199254740992')).toBe(1);
     expect(comparerDecimaux('x', '1')).toBeNull();
+  });
+});
+
+describe('point de vente (ADR-0026, écart C6)', () => {
+  const pdv = (id: string, nim: string | null = null) => ({
+    id,
+    label: `Boutique ${id}`,
+    nim,
+    shopName: null,
+  });
+  const liste = (items: ReturnType<typeof pdv>[], emissionMode: 'standard' | 'normalized') => ({
+    emissionMode,
+    environment: 'test' as const,
+    items,
+  });
+
+  it('émission ordinaire ou liste inconnue : rien à choisir', () => {
+    expect(choixPointDeVente(null, null)).toEqual({ mode: 'masque' });
+    expect(choixPointDeVente(liste([pdv('a')], 'standard'), null)).toEqual({ mode: 'masque' });
+    expect(pointDeVenteParDefaut(liste([pdv('a')], 'standard'))).toBeNull();
+  });
+
+  it('aucun actif ; un seul actif : retenu par défaut', () => {
+    expect(choixPointDeVente(liste([], 'normalized'), null)).toEqual({ mode: 'aucun' });
+    const un = liste([pdv('a', 'XX01000001-1')], 'normalized');
+    expect(choixPointDeVente(un, null)).toMatchObject({ mode: 'unique' });
+    expect(pointDeVenteParDefaut(un)).toBe('a');
+    expect(libellePointDeVente(un.items[0]!)).toBe('Boutique a — NIM XX01000001-1');
+    expect(libellePointDeVente(pdv('b'))).toBe('Boutique b');
+  });
+
+  it('plusieurs actifs : choix obligatoire, choix retiré = à refaire', () => {
+    const deux = liste([pdv('a'), pdv('b')], 'normalized');
+    expect(pointDeVenteParDefaut(deux)).toBeNull();
+    expect(choixPointDeVente(deux, null)).toMatchObject({
+      mode: 'choix',
+      selection: '',
+      manquant: true,
+    });
+    expect(choixPointDeVente(deux, 'b')).toMatchObject({ selection: 'b', manquant: false });
+    expect(choixPointDeVente(deux, 'retire')).toMatchObject({ selection: '', manquant: true });
+  });
+
+  it('le choix part dans le corps et se relit depuis la vue', () => {
+    const f = formulaireVide();
+    expect(f.pointOfSaleId).toBeNull();
+    f.priceMode = 'ttc';
+    f.client = { mode: 'comptoir', nom: '' };
+    f.pointOfSaleId = 'b';
+    const r = preparerDocument(f);
+    expect(r.ok && r.corps.pointOfSaleId).toBe('b');
+    expect(formulaireDepuisVue(vue({ status: 'draft' })).pointOfSaleId).toBe('pos');
+  });
+
+  it('message clair quand la normalisation est refusée faute de point de vente', () => {
+    const err = erreurApi(409, { code: 'POINT_OF_SALE_REQUIRED', message: '' });
+    expect(messageFacture(err, 'x')).toMatch(/Choisissez le point de vente/);
   });
 });
 
