@@ -9,7 +9,7 @@
 // Chromium, et c'est le filet qui survivrait même à une régression du service.
 //
 // Les deux autres (JavaScript coupé, interception réseau) sont câblées dans
-// reports.service.ts et vérifiées par démonstration Puppeteer dans l'audit; les
+// pdf-rendering.service.ts et vérifiées par démonstration Puppeteer dans l'audit; les
 // répéter ici imposerait de booter un vrai navigateur pour un gain marginal.
 
 import { readFileSync } from 'node:fs';
