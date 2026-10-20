@@ -26,6 +26,16 @@ export class EdefReferenceSnapshot {
   @Prop({ type: Date, required: true })
   fetchedAt!: Date;
 
+  /**
+   * Dernière fois que la DGI a renvoyé CE contenu. C'est elle, et non
+   * `fetchedAt` (premier relevé), qui désigne l'instantané en vigueur : si une
+   * valeur revient à un contenu déjà conservé (taux 5 % → 8 % → 5 %), aucun
+   * nouveau document n'est écrit, mais `lastSeenAt` le remet en tête. Absent des
+   * documents antérieurs au 20 oct. 2026 : ils passent après ceux qui l'ont.
+   */
+  @Prop({ type: Date, default: null })
+  lastSeenAt!: Date | null;
+
   @Prop({ type: Number, required: true, default: 1 })
   _schemaVersion!: number;
 }
@@ -34,5 +44,7 @@ export type EdefReferenceSnapshotDocument = HydratedDocument<EdefReferenceSnapsh
 export const EdefReferenceSnapshotSchema = SchemaFactory.createForClass(EdefReferenceSnapshot);
 // Dernier instantané d'une liste dans un environnement.
 EdefReferenceSnapshotSchema.index({ environment: 1, list: 1, fetchedAt: -1 });
+// Instantané en vigueur : le contenu vu le plus récemment.
+EdefReferenceSnapshotSchema.index({ environment: 1, list: 1, lastSeenAt: -1, fetchedAt: -1 });
 // Un contenu donné n'est conservé qu'une fois par liste et par environnement.
 EdefReferenceSnapshotSchema.index({ environment: 1, list: 1, sha256: 1 }, { unique: true });

@@ -37,9 +37,14 @@ export class EdefReferenceSnapshotsService {
   ) {}
 
   /**
-   * Enregistre la liste si son contenu diffère de tout instantané déjà conservé.
+   * Enregistre la liste si son contenu diffère de tout instantané déjà conservé,
+   * et marque dans tous les cas ce contenu comme vu maintenant (`lastSeenAt`).
    * `created` dit si un document a été écrit. Idempotent sous concurrence : deux
    * lectures simultanées du même contenu se rencontrent sur l'index unique.
+   *
+   * Sans `lastSeenAt`, un retour à une valeur déjà conservée (5 % → 8 % → 5 %)
+   * ne réécrivait rien et `latest()` continuait de servir la valeur
+   * intermédiaire, devenue fausse (constat du 20 oct. 2026, chantier F2).
    */
   async record(
     environment: EdefEnvironment,
@@ -47,10 +52,14 @@ export class EdefReferenceSnapshotsService {
     payload: unknown,
   ): Promise<{ sha256: string; created: boolean }> {
     const sha256 = createHash('sha256').update(canonicalJson(payload)).digest('hex');
+    const now = new Date();
     const res = await this.model
       .updateOne(
         { environment, list, sha256 },
-        { $setOnInsert: { payload, fetchedAt: new Date(), _schemaVersion: 1 } },
+        {
+          $setOnInsert: { payload, fetchedAt: now, _schemaVersion: 1 },
+          $set: { lastSeenAt: now },
+        },
         { upsert: true },
       )
       .exec()
@@ -69,8 +78,9 @@ export class EdefReferenceSnapshotsService {
 
   /**
    * Dernier instantané conservé d'une liste dans un environnement, ou `null`
-   * (ADR-0022 § S25c.4). « Dernier » = `fetchedAt` le plus récent ; à égalité,
-   * le dernier inséré. Lecture seule : aucun appel à la DGI.
+   * (ADR-0022 § S25c.4). « Dernier » = le contenu VU le plus récemment
+   * (`lastSeenAt`), puis `fetchedAt`, puis le dernier inséré. Lecture seule :
+   * aucun appel à la DGI.
    */
   async latest(
     environment: EdefEnvironment,
@@ -78,7 +88,7 @@ export class EdefReferenceSnapshotsService {
   ): Promise<{ payload: unknown; fetchedAt: Date; sha256: string } | null> {
     const doc = await this.model
       .findOne({ environment, list })
-      .sort({ fetchedAt: -1, _id: -1 })
+      .sort({ lastSeenAt: -1, fetchedAt: -1, _id: -1 })
       .lean()
       .exec();
     if (!doc) return null;
