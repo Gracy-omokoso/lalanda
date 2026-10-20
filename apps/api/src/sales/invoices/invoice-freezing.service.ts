@@ -51,7 +51,12 @@ import {
   kinshasaDay,
   type ExchangeRateReferenceValue,
 } from './exchange-rate-reference.service.js';
-import { InvoiceTaxRatesReader, calculate, engineLines } from './invoice-calculation.js';
+import {
+  InvoiceTaxRatesReader,
+  calculate,
+  engineLines,
+  sellerVatStatusOf,
+} from './invoice-calculation.js';
 import { InvoiceDraftsService } from './invoice-drafts.service.js';
 import { InvoiceJournalService, type JournalAppendInput } from './invoice-journal.service.js';
 import { InvoiceNumberingService } from './invoice-numbering.service.js';
@@ -411,6 +416,9 @@ export class InvoiceFreezingService {
       const issues: NotIssuableIssue[] = [];
       const documentCalculation = calculate(doc.priceMode, doc.lines, taxRates);
       issues.push(...documentCalculation.issues);
+      // Groupes contre l'assujettissement lu sur la fiche fiscale (celui qui sera
+      // figé dans `seller`) : bloquant en émission comme en normalisation.
+      issues.push(...sellerVatStatusOf(profile.vatRegistered, doc).issues);
       const documentTotals = documentCalculation.totals;
       const paymentsCheck = documentTotals
         ? checkPayments(documentTotals.total, doc.payments)

@@ -1285,4 +1285,119 @@ e2eSuite('ventes — factures et avoirs (ADR-0023 chantier E2)', () => {
       expect((await get(asA('viewer'), '/sales/journal')).body.chainValid).toBe(false);
     });
   });
+
+  // ── Assujettissement du vendeur (ADR-0023, amendement du 20 oct. 2026) ────
+
+  describe('vendeur non assujetti à la TVA', () => {
+    const corpsB = (extra: Record<string, unknown> = {}) =>
+      corps({ customer: { customerId: null, walkIn: { name: null } }, ...extra });
+    const corpsN = (extra: Record<string, unknown> = {}) =>
+      corps({ customer: { customerId: null, walkIn: { name: 'Client comptoir' } }, ...extra });
+    const LIGNE_K = { ...LIGNE, code: 'CONSEIL-K', taxGroup: 'K' };
+    const assujetti = async (c: string[], nif: string, vatRegistered: boolean) => {
+      const res = await put(c, '/organizations/current/fiscal-profile', {
+        ...fiche(nif),
+        vatRegistered,
+      });
+      expect(res.status, JSON.stringify(res.body)).toBe(200);
+    };
+    const blockerCodes = (d: Record<string, any>) =>
+      (d.readiness.blockers as { code: string }[]).map((b) => b.code);
+    let origineB: Record<string, any>;
+
+    it('constat de production : groupe B en brouillon → empêchement visible, totaux calculés', async () => {
+      // Facture émise quand l'organisation était assujettie : elle servira d'origine.
+      origineB = await emettre(asB(), corpsB());
+      await assujetti(asB(), 'B2222222X', false);
+      const d = await brouillonPret(asB(), corpsB());
+      expect(d.status).toBe('draft');
+      expect(d.documentAmounts.calculation.ok).toBe(true);
+      expect(d.readiness.ready).toBe(false);
+      const b = (d.readiness.blockers as Record<string, any>[]).find(
+        (x) => x.code === 'TAX_GROUP_REQUIRES_VAT_REGISTRATION',
+      );
+      expect(b).toMatchObject({ lineIndex: 0 });
+      expect(b?.message).toContain(
+        'Votre profil fiscal indique que l’entreprise n’est pas assujettie à la TVA',
+      );
+      expect(b?.message).toContain('Utilisez le groupe K');
+      expect(d.readiness.warnings).toEqual([]);
+    });
+
+    it('émettre en groupe B → 422 INVOICE_NOT_ISSUABLE, aucun numéro consommé', async () => {
+      const d = await brouillonPret(asB(), corpsB());
+      const res = await post(asB(), `/sales/invoices/${d.id}/issue`, {
+        expectedRevision: d.revision,
+      });
+      expect(res.status).toBe(422);
+      expect(res.body.code).toBe('INVOICE_NOT_ISSUABLE');
+      expect(codes(res)).toEqual(['TAX_GROUP_REQUIRES_VAT_REGISTRATION']);
+      expect(res.body.details.issues[0]).toMatchObject({
+        lineIndex: 0,
+        details: { taxGroup: 'B' },
+      });
+      const enBase = await docEnBase(d.id);
+      expect(enBase?.['status']).toBe('draft');
+      expect(enBase?.['number'] ?? null).toBeNull();
+    });
+
+    it('groupe K → émis normalement, TVA nulle, vendeur figé non assujetti', async () => {
+      const d = await brouillonPret(asB(), corpsB({ lines: [LIGNE_K] }));
+      expect(blockerCodes(d)).not.toContain('TAX_GROUP_REQUIRES_VAT_REGISTRATION');
+      expect(d.readiness).toMatchObject({ ready: true, warnings: [] });
+      const res = await post(asB(), `/sales/invoices/${d.id}/issue`, {
+        expectedRevision: d.revision,
+      });
+      expect(res.status, JSON.stringify(res.body)).toBe(200);
+      expect(res.body.status).toBe('issued');
+      expect(res.body.seller).toMatchObject({ vatRegistered: false });
+      expect(res.body.documentAmounts.calculation.totals.vatTotal).toBe('0.00');
+    });
+
+    it('la facture déjà émise en B reste intacte et s’annule par un avoir', async () => {
+      const enBase = await docEnBase(origineB.id);
+      expect(enBase?.['status']).toBe('issued');
+      expect(contentSha256Of(enBase as Record<string, unknown>)).toBe(enBase?.['contentSha256']);
+      const avoir = await emettre(
+        asB(),
+        corpsB({
+          type: 'FA',
+          creditNote: { nature: 'RAN', originInvoiceId: origineB.id },
+          lines: [{ source: 'origin', originLineIndex: 0, quantity: '2' }],
+        }),
+      );
+      expect(avoir).toMatchObject({ status: 'issued', type: 'FA' });
+      expect(avoir.lines[0]).toMatchObject({ taxGroup: 'B' });
+    });
+
+    it('vendeur assujetti en groupe K → avertissement, jamais bloquant', async () => {
+      await assujetti(asB(), 'B2222222X', true);
+      const d = await brouillonPret(asB(), corpsB({ lines: [LIGNE_K] }));
+      expect(d.readiness.ready).toBe(true);
+      expect(d.readiness.warnings).toMatchObject([
+        { code: 'TAX_GROUP_K_WHILE_VAT_REGISTERED', lineIndex: 0 },
+      ]);
+      const res = await post(asB(), `/sales/invoices/${d.id}/issue`, {
+        expectedRevision: d.revision,
+      });
+      expect(res.status, JSON.stringify(res.body)).toBe(200);
+    });
+
+    it('normaliser en groupe B pour un vendeur non assujetti → 422, rien n’est envoyé', async () => {
+      await assujetti(asN(), NIF_N, false);
+      try {
+        const d = await brouillonPret(asN(), corpsN());
+        expect(blockerCodes(d)).toContain('TAX_GROUP_REQUIRES_VAT_REGISTRATION');
+        const res = await post(asN(), `/sales/invoices/${d.id}/normalize`, {
+          expectedRevision: d.revision,
+          exchangeRate: null,
+        });
+        expect(res.status).toBe(422);
+        expect(codes(res)).toContain('TAX_GROUP_REQUIRES_VAT_REGISTRATION');
+        expect((await docEnBase(d.id))?.['status']).toBe('draft');
+      } finally {
+        await assujetti(asN(), NIF_N, true);
+      }
+    });
+  });
 });

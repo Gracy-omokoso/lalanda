@@ -532,6 +532,36 @@ Après la validation de la transaction, `normalize` appelle
 l'état qui en résulte. Dans S25e, l'implémentation par défaut ne fait rien : le document
 reste `pending_normalization` (pro forma).
 
+**Amendement du 20 oct. 2026 — groupes de taxation et assujettissement du vendeur.**
+Constat en production : une facture standard `2026-000001` a été émise en groupe B (16 %)
+alors que la fiche fiscale figée indiquait `seller.vatRegistered: false`, sans aucun
+avertissement. Règle désormais appliquée par le moteur (`checkSellerVatStatus`,
+`packages/engine/src/invoice-totals/seller-vat-status.ts`), reprise en substance des
+définitions DGI des groupes (documentation du compte développeur, « Groupes de taxation »
+v1.2 p. 1–4 ; annexe de la note de service 01/022 p. 3–7 ; cas de test officiel « vendeur
+non assujetti » : FV, 2 × K) :
+
+| Vendeur | Groupes | Effet |
+|---|---|---|
+| non assujetti | **B C D F G M N O P**, et **A exonéré** (définitions DGI : opération « réalisée par une entreprise assujettie », ou TVA facturée) | **bloquant** : `422 INVOICE_NOT_ISSUABLE`, code `TAX_GROUP_REQUIRES_VAT_REGISTRATION`, en `issue` comme en `normalize` (étape 6) ; message « Votre profil fiscal indique que l'entreprise n'est pas assujettie à la TVA : … Utilisez le groupe K (opérations des non-assujettis) ou mettez à jour le profil fiscal. » |
+| non assujetti | **K**, **A hors champ**, **E H I J L** (hors base de TVA, sans condition d'assujettissement dans la définition DGI) | permis |
+| assujetti | **K** (« entreprises n'ayant pas atteint le seuil d'assujettissement ») | **avertissement** non bloquant |
+
+- Au gel, l'assujettissement lu est celui de la fiche fiscale (celui qui est figé dans
+  `seller`). En brouillon (pro forma), la fiche **actuelle** sert : le problème bloquant
+  apparaît dans `readiness.blockers`, l'avertissement dans `readiness.warnings` (champ
+  ajouté à `InvoiceReadiness`, toujours présent, vide hors brouillon), et l'éditeur les
+  affiche.
+- Un **avoir rattaché à une origine** n'est pas contrôlé : il reprend les groupes de la
+  facture d'origine, immuable ; sans cela, une facture émise à tort en B ne pourrait plus
+  être annulée. Un avoir RRR sans origine est contrôlé comme une facture.
+- Les documents déjà émis ne sont pas modifiés. La facture `2026-000001` se corrige, si la
+  décideuse le veut, par un avoir (`RAN` ou `COR`) puis une nouvelle facture en K.
+- Écart avec ADR-0021 (décision ouverte 3, « le champ assujetti est informatif ») : le champ
+  reste sans effet sur l'activation de la facture normalisée, mais il conditionne désormais
+  les groupes admis. Le périmètre des groupes E, H, I, J, L et A hors champ pour un
+  non-assujetti est ajouté aux questions à la DGI (question 9).
+
 **Fenêtre résiduelle.** Le mode est lu dans la transaction ; si l'activation se valide
 pendant une émission déjà commencée, une facture `issued` peut naître quelques
 millisecondes après l'activation. Elle est **détectée** : test de cohérence et contrôle S25f
@@ -911,7 +941,7 @@ que S25g lit pour choisir l'intitulé du PDF. En brouillon, `calculation` peut v
 | 409 | `FISCAL_PROFILE_REQUIRED` · `POINT_OF_SALE_NOT_ACTIVE` · `TAX_RATES_UNAVAILABLE` · `EXCHANGE_RATE_REFERENCE_UNAVAILABLE` | prérequis de gel |
 | 409 | `CREDIT_NOTE_ORIGIN_TYPE` · `CREDIT_NOTE_ORIGIN_NOT_FINAL` · `CREDIT_NOTE_ORIGIN_MODE_MISMATCH` · `CREDIT_NOTE_CURRENCY_MISMATCH` · `CREDIT_NOTE_PRICE_MODE_MISMATCH` · `CREDIT_NOTE_NOTHING_REMAINING` | avoir |
 | 409 | `NOT_RETURNABLE_TO_DRAFT` · `NUMBER_RESERVED` | reprise en brouillon refusée |
-| 422 | `INVOICE_NOT_ISSUABLE` | moteur ou contrôles refusent au gel ; `details.issues` : **tous** les problèmes (`PAYMENTS_TOTAL_MISMATCH`, `CREDIT_NOTE_QUANTITY_EXCEEDED`, `EXCHANGE_RATE_OUT_OF_TOLERANCE`, `CONVERTED_AMOUNT_ZERO`, codes de `computeInvoiceTotals`…) |
+| 422 | `INVOICE_NOT_ISSUABLE` | moteur ou contrôles refusent au gel ; `details.issues` : **tous** les problèmes (`PAYMENTS_TOTAL_MISMATCH`, `CREDIT_NOTE_QUANTITY_EXCEEDED`, `EXCHANGE_RATE_OUT_OF_TOLERANCE`, `CONVERTED_AMOUNT_ZERO`, `TAX_GROUP_REQUIRES_VAT_REGISTRATION` (20 oct. 2026), codes de `computeInvoiceTotals`…) |
 
 ## Découpage en chantiers parallèles
 
@@ -1155,6 +1185,9 @@ chaîné ; port de normalisation ; `sales.invoice` interdite à la plateforme.
 7. Un avoir peut-il référencer une facture ordinaire émise avant l'activation ?
 8. Les groupes Q, R (8 %) et S renvoyés par `/api/info/taxGroups` en environnement de test
    sont-ils l'ancien régime, à ignorer ? Seront-ils absents en production ?
+9. (20 oct. 2026) Un vendeur non assujetti doit-il facturer **uniquement** en groupe K, ou
+   peut-il aussi utiliser A (hors champ), E, H, I, J et L ? Le logiciel l'admet aujourd'hui
+   (§ S25e.6, amendement du 20 oct. 2026) et bloque B C D F G M N O P et A exonéré.
 
 ## Liens
 

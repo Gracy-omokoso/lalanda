@@ -422,6 +422,7 @@ export function InvoiceEditor({
   const aModifiable = commentaireAModifiable(form, typeClient);
   const modeNormalise = vue?.readiness.action === 'normalize';
   const blockers = useMemo(() => vue?.readiness.blockers ?? [], [vue]);
+  const avertissements = useMemo(() => vue?.readiness.warnings ?? [], [vue]);
 
   return (
     <section aria-labelledby="doc-titre" className="flex flex-col gap-5">
@@ -681,6 +682,17 @@ export function InvoiceEditor({
               <ul className="mt-1 list-disc pl-5">
                 {blockers.map((b, i) => (
                   <li key={i}>{libelleEmpechement(b)}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {avertissements.length > 0 ? (
+            <div role="note" className="rounded-xl border border-[var(--border)] p-4 text-sm">
+              <p className="font-medium">À vérifier (n’empêche pas d’émettre) :</p>
+              <ul className="mt-1 list-disc pl-5">
+                {avertissements.map((w, i) => (
+                  <li key={i}>{libelleEmpechement(w)}</li>
                 ))}
               </ul>
             </div>

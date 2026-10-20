@@ -124,6 +124,8 @@ describe('dépendances du module invoice-totals', () => {
       'reference-cases.ts',
       // ADR-0024 § 7.3 (jalon F0).
       'rounding-calibration.ts',
+      // ADR-0023, amendement du 20 oct. 2026.
+      'seller-vat-status.ts',
       'tax-groups.ts',
       'types.ts',
     ]);

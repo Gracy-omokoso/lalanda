@@ -7,10 +7,12 @@
 import {
   DEFAULT_TAX_GROUPS,
   checkPayments,
+  checkSellerVatStatus,
   computeInvoiceTotals,
   type PaymentInput,
   type PaymentsCheck,
   type PriceMode,
+  type SellerVatStatusCheck,
   type TaxGroupLetter,
 } from '@lalanda/engine';
 import { Inject, Injectable } from '@nestjs/common';
@@ -18,7 +20,12 @@ import { Inject, Injectable } from '@nestjs/common';
 import { EdefReferenceSnapshotsService } from '../../edef/edef-reference-snapshots.service.js';
 import { rateFromSnapshot } from '../tax-groups.service.js';
 import type { DgiEnvironment } from './invoice.contract.js';
-import type { StoredCalculation, StoredLine, StoredTaxRates } from './invoice.types.js';
+import type {
+  StoredCalculation,
+  StoredCreditNote,
+  StoredLine,
+  StoredTaxRates,
+} from './invoice.types.js';
 
 @Injectable()
 export class InvoiceTaxRatesReader {
@@ -92,4 +99,30 @@ export function paymentsCheckOf(
   payments: readonly PaymentInput[],
 ): PaymentsCheck | null {
   return calculation.totals === null ? null : checkPayments(calculation.totals.total, payments);
+}
+
+const NOTHING_TO_REPORT: SellerVatStatusCheck = Object.freeze({
+  ok: true,
+  issues: [],
+  warnings: [],
+});
+
+/**
+ * Groupes des lignes contre l'assujettissement du vendeur, par le moteur
+ * (ADR-0023 § S25e.6, amendement du 20 oct. 2026). Un avoir rattaché à une
+ * origine reprend les groupes de la facture d'origine, immuable : il n'est pas
+ * contrôlé, sans quoi une facture émise à tort en B ne pourrait plus être annulée.
+ */
+export function sellerVatStatusOf(
+  vatRegistered: boolean,
+  doc: {
+    lines: readonly Pick<StoredLine, 'taxGroup' | 'outOfScope'>[];
+    creditNote: StoredCreditNote | null;
+  },
+): SellerVatStatusCheck {
+  if (doc.creditNote?.originInvoiceId) return NOTHING_TO_REPORT;
+  return checkSellerVatStatus({
+    vatRegistered,
+    lines: doc.lines.map((l) => ({ taxGroup: l.taxGroup, outOfScope: l.outOfScope })),
+  });
 }
