@@ -477,6 +477,8 @@ export interface InvoiceView {
   creditNotes: readonly InvoiceCreditNoteSummary[];
   seller: SellerView | null;
   operator: OperatorView | null;
+  /** Version de Lalanda qui a gelé le document ; `null` : brouillon, ou gelé avant le 20 oct. 2026. */
+  softwareVersion: string | null;
   normalization: NormalizationView | null;
   readiness: InvoiceReadiness;
   revision: number;

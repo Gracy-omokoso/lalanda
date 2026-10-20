@@ -21,6 +21,8 @@
 // reste de la politique a donc été durci maintenant, et la migration par nonce
 // est un finding ouvert de docs/29-AUDIT-SECURITE-S22e.md.
 
+import { readFileSync } from 'node:fs';
+
 /**
  * Destination des `fetch` du navigateur : l'API vit sur une autre origine
  * (`NEXT_PUBLIC_API_URL`, inlinée au build — voir apps/web/Dockerfile). Sans
@@ -99,9 +101,25 @@ const securityHeaders = [
   },
 ];
 
+/**
+ * Version du logiciel (ADR-0026 § 6.2) : l'étiquette de release `vX.Y.Z` passée
+ * au build de l'image (`APP_VERSION`, voir apps/web/Dockerfile et deploy.yml),
+ * sinon la version du package.json suivie de « -dev ». Inlinée dans le bundle
+ * sous `NEXT_PUBLIC_APP_VERSION`.
+ */
+const appVersion = (() => {
+  const release = (process.env.APP_VERSION ?? '').trim().replace(/^v/, '');
+  if (/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(release)) return release;
+  const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
+  return `${pkg.version}-dev`;
+})();
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  env: {
+    NEXT_PUBLIC_APP_VERSION: appVersion,
+  },
   // Build autonome pour l'image Docker (apps/web/Dockerfile, ADR-0009) :
   // `.next/standalone` embarque server.js + les seules dépendances tracées.
   output: 'standalone',

@@ -85,6 +85,12 @@ export interface DocumentSecurity {
 
 export interface InvoiceDocumentModel {
   layoutVersion: string;
+  /**
+   * Version de Lalanda imprimée en pied (ADR-0026 § 6.2) : celle FIGÉE au gel
+   * pour un document gelé, la version courante pour un brouillon ; `null` pour
+   * un document gelé avant le 20 oct. 2026 (rien n'est imprimé : PDF inchangé).
+   */
+  softwareVersion: string | null;
   kind: DocumentKind;
   /** Intitulé — choisi par `documentKind` (ADR-0024 § 4.3). */
   title: string;
@@ -138,6 +144,11 @@ export interface InvoiceDocumentContext {
   organizationName: string;
   /** Brouillon d'une organisation en facture normalisée dans l'environnement de test. */
   draftInTestEnvironment: boolean;
+  /**
+   * Version courante du logiciel, imprimée sur un BROUILLON seulement (un
+   * document gelé imprime la sienne, `doc.softwareVersion`). Absente : rien.
+   */
+  currentSoftwareVersion?: string | null;
 }
 
 // ── Mise en forme (chaînes seulement) ─────────────────────────────────────────
@@ -423,8 +434,13 @@ export function buildInvoiceDocument(
     .filter(nonEmpty)
     .map((v) => v);
 
+  // ADR-0026 § 6.2 : version FIGÉE au gel ; même document + même version ⇒ même PDF.
+  const softwareVersion =
+    doc.status === 'draft' ? (ctx.currentSoftwareVersion ?? null) : (doc.softwareVersion ?? null);
   const footerParts = [
-    `Établi avec Lalanda — gabarit ${INVOICE_PDF_LAYOUT_VERSION}`,
+    softwareVersion !== null
+      ? `Établi avec Lalanda v${softwareVersion} — gabarit ${INVOICE_PDF_LAYOUT_VERSION}`
+      : `Établi avec Lalanda — gabarit ${INVOICE_PDF_LAYOUT_VERSION}`,
     final ? `N° ${number}` : `Réf. ${doc.proformaRef}`,
   ];
   if (duplicate) footerParts.push(duplicate.label);
@@ -433,6 +449,7 @@ export function buildInvoiceDocument(
   const baseName = final ? number! : doc.proformaRef;
   return {
     layoutVersion: INVOICE_PDF_LAYOUT_VERSION,
+    softwareVersion,
     kind,
     title: titleOf(doc, kind),
     natureMentions: natureMentionsOf(doc, kind),

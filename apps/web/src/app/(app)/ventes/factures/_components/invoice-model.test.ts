@@ -171,6 +171,7 @@ function vue(partiel: Partial<InvoiceView> = {}): InvoiceView {
     creditNotes: [],
     seller: null,
     operator: null,
+    softwareVersion: null,
     normalization: null,
     readiness: { action: 'normalize', ready: false, blockers: [] },
     revision: 8,

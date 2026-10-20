@@ -9,13 +9,19 @@ CTO Lalanda (contrat technique)
 > le code envoyé à la DGI (« HORS CHAMP » pour une opération hors champ) ; la mention du client
 > AO est « [AO] Ambassades et organisations internationales ».
 >
+> **Amendé le 20 oct. 2026 ([ADR-0026](ADR-0026-campagne-homologation.md) § 6.2, § 10
+> ci-dessous)** : le pied imprime la version de Lalanda **figée au gel** (nouveau champ figé
+> optionnel `softwareVersion`) ; le déterminisme vaut pour un même document **et** une même
+> version figée.
+>
 > **Complète [ADR-0023](ADR-0023-factures-et-avoirs.md)** (tableau « ce qui s'imprime »,
 > § S25e.1 ; champ `duplicateCount`, § S25e.2 ; événement `duplicate_issued`, § S25e.12) et
 > **[ADR-0024](ADR-0024-normalisation-dgi.md)** (§ 4.3 : `documentKind` est l'unique entrée de
 > l'intitulé du PDF ; éléments de sécurité imprimés tels que reçus). **Réutilise
 > [ADR-0007](ADR-0007-generation-pdf-excel.md)** (Puppeteer) et l'infrastructure de rendu des
 > rapports (navigateur partagé, portillon S22e, confinement réseau et JavaScript). Aucun
-> champ figé n'est ajouté ni retiré ; aucun événement de journal n'est ajouté.
+> champ figé n'est ajouté ni retiré (jusqu'à l'amendement du 20 oct. 2026, § 10) ; aucun
+> événement de journal n'est ajouté.
 
 ## Contexte
 
@@ -302,6 +308,34 @@ commerciale de l'offre BUILD) ; le portillon borne la mémoire.
   `invoice-documents.service.ts` (lecture, duplicata), `invoice-documents.controller.ts`.
 - Web : boutons « Télécharger le PDF » (tout document imprimable) et « Duplicata » (document
   final, `sales.manage`) sur la fiche.
+
+### 10. Amendement du 20 oct. 2026 — version du logiciel en pied de page
+
+Exigence : un vérificateur doit pouvoir lire la version du logiciel qui a établi une facture
+(tableau de conformité, pièce a ; manuel de contrôle « voir la version »). Le pied imprimait
+seulement « Établi avec Lalanda — gabarit 1.0.0 ».
+
+- **Ce qui s'imprime.** « Établi avec Lalanda v**X.Y.Z** — gabarit 1.0.0 ». X.Y.Z est la
+  version de release (étiquette `vX.Y.Z` injectée au build de l'image ; hors image,
+  `package.json` suivi de « -dev »).
+- **Quelle version : celle du GEL, pas celle du rendu.** Le gel recopie la version courante
+  dans le champ figé `softwareVersion`, qui entre dans `contentSha256` ; le PDF d'un document
+  gelé imprime ce champ. Un brouillon (pro forma non figé) imprime la version courante.
+  Option écartée : imprimer la version du processus qui rend le PDF. Elle aurait (1) fait
+  mentir le document — une facture gelée par la v0.9.3 et retéléchargée après une mise à
+  jour se dirait « établie avec v0.9.4 » ; (2) rompu la règle « l'original se retélécharge
+  à l'identique » (§ O3) à chaque release.
+- **Déterminisme (O2) reformulé.** Même document figé ⇒ même PDF, octet pour octet : la
+  version imprimée fait partie du contenu figé, elle ne dépend plus de qui rend. Seul un
+  changement de **gabarit** (`INVOICE_PDF_LAYOUT_VERSION`) peut encore changer le rendu d'un
+  document déjà gelé ; il reste soumis à la décision ouverte O2.2 (conserver les PDF émis).
+- **Documents gelés avant le 20 oct. 2026.** Champ absent, **aucune migration** : le champ est
+  optionnel et n'entre dans l'empreinte que s'il a une valeur, donc `contentSha256` des
+  anciens documents se recalcule à l'identique ; leur pied reste « Établi avec Lalanda —
+  gabarit 1.0.0 », leur PDF est inchangé.
+- **Retour en brouillon** (normalisation refusée) : `softwareVersion` est remis à `null`
+  avec les autres champs figés ; le gel suivant pose la version de ce moment.
+- Le journal chaîné n'est pas modifié : il porte déjà `contentSha256`, qui couvre la version.
 
 ## Conséquences
 

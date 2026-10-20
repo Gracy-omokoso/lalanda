@@ -3,9 +3,13 @@
 
 import { NextResponse } from 'next/server';
 
+import { WEB_APP_VERSION } from '@/lib/app-version';
+
 interface WebHealth {
   status: 'ok' | 'degraded';
   service: 'lalanda-web';
+  /** Version de release inlinée au build (ADR-0026 § 6.2). */
+  version: string;
   api: 'up' | 'down' | 'unreachable';
 }
 
@@ -24,6 +28,7 @@ export async function GET(): Promise<NextResponse<WebHealth>> {
   return NextResponse.json({
     status: api === 'up' ? 'ok' : 'degraded',
     service: 'lalanda-web',
+    version: WEB_APP_VERSION,
     api,
   });
 }

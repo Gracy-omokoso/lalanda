@@ -42,6 +42,13 @@ export const FROZEN_CONTENT_FIELDS = [
   'frozenFromRevision',
 ] as const;
 
+/**
+ * Champs figés OPTIONNELS : n'entrent dans l'empreinte que s'ils ont une valeur.
+ * Un document gelé avant leur apparition garde ainsi la même empreinte
+ * (`softwareVersion`, ADR-0026 § 6.2, 20 oct. 2026).
+ */
+export const OPTIONAL_FROZEN_CONTENT_FIELDS = ['softwareVersion'] as const;
+
 /** Valeur JSON pure : les dates deviennent des chaînes ISO, `undefined` disparaît. */
 function plain(value: unknown): unknown {
   if (value instanceof Date) return value.toISOString();
@@ -67,6 +74,10 @@ export function sha256Hex(text: string): string {
 export function contentSha256Of(doc: Readonly<Record<string, unknown>>): string {
   const content: Record<string, unknown> = {};
   for (const field of FROZEN_CONTENT_FIELDS) content[field] = plain(doc[field] ?? null);
+  for (const field of OPTIONAL_FROZEN_CONTENT_FIELDS) {
+    const value = doc[field];
+    if (value !== undefined && value !== null) content[field] = plain(value);
+  }
   return sha256Hex(canonicalJson(content));
 }
 

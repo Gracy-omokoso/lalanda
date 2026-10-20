@@ -157,6 +157,7 @@ les écarts ci-dessous sont traités par cette branche ; les autres restent ouve
 
 | Écart | Exigence | Statut | Correction |
 |---|---|---|---|
+| **C1** — version du logiciel invisible (`/health` = `0.1.0` du package.json ; rien à l'écran ni sur le PDF) | tableau de conformité, pièce a ; manuel de contrôle | **Corrigé le 20 oct. 2026** | § 6.2 |
 | **C6** — choix du point de vente impossible à l'écran | exploitation à plusieurs points de vente (aucune exigence numérotée) | **Corrigé le 20 oct. 2026** | § 6.1 |
 
 ### 6.1 Choix du point de vente (C6)
@@ -185,6 +186,28 @@ les écarts ci-dessous sont traités par cette branche ; les autres restent ouve
   deux points de vente actifs, liste lisible par le Lecteur sans jeton, brouillon bloqué avec
   le bon message, `409 POINT_OF_SALE_REQUIRED`, `404` pour un point de vente étranger,
   normalisation par le point choisi (NIM du second), choix retiré → bloquant.
+
+### 6.2 Version du logiciel visible (C1)
+
+- **Source unique : l'étiquette de release.** `deploy.yml` (déclenché par `v*`) passe
+  `APP_VERSION` — la version **normalisée par `docker/metadata-action`** (`0.9.3` pour
+  `v0.9.3`, jamais le nom brut du tag, qui n'entre dans aucun script) — aux deux builds.
+  Les Dockerfile la posent en `ENV`. Aucune nouvelle dépendance.
+- **API.** `health/app-version.ts` lit `APP_VERSION` (forme `X.Y.Z[-pré]` vérifiée, « v »
+  retiré), repli sur le `package.json` de l'API suivi de « -dev » (`source: 'package'`) :
+  une version de développement ne se fait jamais passer pour une release. `/health` rend
+  `version` et `versionSource`.
+- **Web.** `next.config.mjs` inline `NEXT_PUBLIC_APP_VERSION` au build (même règle, même
+  repli). Le pied de page de l'application affiche « Lalanda vX.Y.Z » sur tous les écrans
+  (Organisation › Fiscalité compris), et les deux versions si l'API en répond une autre ;
+  le `/health` du web rend aussi sa version.
+- **PDF : version figée au gel.** Choix et justification : ADR-0025 § 10 (amendement du
+  20 oct. 2026). Champ figé optionnel `softwareVersion`, inclus dans `contentSha256` quand il
+  existe ; anciens documents inchangés, sans migration. La vue `InvoiceView` l'expose.
+- **Tests.** Résolution de la version (release, repli « -dev », valeurs refusées) ; `/health` ;
+  version inlinée par `next.config.mjs` ; libellé du pied ; modèle du PDF : version figée
+  imprimée, HTML identique quelle que soit la version qui rend, ancien document sans version,
+  brouillon à la version courante.
 
 ## Conséquences
 

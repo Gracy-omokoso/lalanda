@@ -59,6 +59,12 @@ ENV NODE_ENV=production \
     PUPPETEER_SKIP_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
+# Version de release (étiquette vX.Y.Z, sans « v ») — ADR-0026 § 6.2. Passée par
+# deploy.yml (`--build-arg APP_VERSION=…`) ; lue par /health et figée sur chaque
+# facture au gel. Vide (build local) : l'API se replie sur package.json + « -dev ».
+ARG APP_VERSION=
+ENV APP_VERSION=${APP_VERSION}
+
 WORKDIR /app
 COPY --from=build --chown=node:node /out ./
 

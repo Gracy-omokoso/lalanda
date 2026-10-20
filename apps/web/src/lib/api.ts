@@ -2116,6 +2116,8 @@ export interface InvoiceView {
   creditNotes: readonly InvoiceCreditNoteSummary[];
   seller: SellerView | null;
   operator: OperatorView | null;
+  /** Version de Lalanda qui a gelé le document ; `null` : brouillon, ou gelé avant le 20 oct. 2026. */
+  softwareVersion: string | null;
   normalization: NormalizationView | null;
   readiness: InvoiceReadiness;
   revision: number;
@@ -2182,6 +2184,16 @@ export interface JournalPage {
   nextCursor: string | null;
   /** Le chaînage `prevHash` → `hash` est-il intact ? */
   chainValid: boolean;
+}
+
+/** `GET /health` de l'API (version de release : ADR-0026 § 6.2). */
+export interface ApiHealth {
+  status: 'ok' | 'degraded';
+  service: 'lalanda-api';
+  version: string;
+  versionSource: 'release' | 'package';
+  uptimeSec: number;
+  checks: { mongo: 'up' | 'down' };
 }
 
 /** Point de vente e-MCF proposable dans l'éditeur (ADR-0026, écart C6). */
@@ -2935,6 +2947,8 @@ export const api = {
     jsonRequest<JournalPage>(`/sales/journal${salesQuery(query)}`, { method: 'GET' }),
   getExchangeRateReference: () =>
     jsonRequest<ExchangeRateReference>(`/sales/exchange-rate-reference`, { method: 'GET' }),
+  /** `GET /health` — version du serveur (ADR-0026 § 6.2). Publique, sans session. */
+  getHealth: () => jsonRequest<ApiHealth>(`/health`, { method: 'GET' }),
   listSelectablePointsOfSale: () =>
     jsonRequest<SelectablePointsOfSale>(`/sales/points-of-sale`, { method: 'GET' }),
 
