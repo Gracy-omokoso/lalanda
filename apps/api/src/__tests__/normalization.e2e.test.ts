@@ -874,17 +874,67 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
       };
       const postsAvant = posts();
       let decale = 0;
-      for (let round = 0; round < 200; round++) {
+      // Diagnostic : un passage qui ne conclut aucun document est un blocage.
+      // On échoue VITE (borne de tours, borne de temps, tours sans progrès)
+      // avec l'état des documents restants et du bail de numérotation.
+      const journalDesTours: string[] = [];
+      const debut = Date.now();
+      let sansProgres = 0;
+      let restantsAvant = Number.POSITIVE_INFINITY;
+      const etat = async (): Promise<string> => {
+        const restants = await db
+          .collection('sales_invoices')
+          .find({ _id: { $in: ids.map((i) => new ObjectId(i)) }, status: 'pending_normalization' })
+          .toArray();
+        const compteur = await db
+          .collection('sales_invoice_counters')
+          .findOne({ organizationId: orgN, series: 'test' });
+        return JSON.stringify(
+          {
+            bail: compteur?.['inFlight'] ?? null,
+            dernier: compteur?.['last'] ?? null,
+            restants: restants.map((d) => ({
+              id: String(d['_id']),
+              phase: d['normalization']?.['phase'],
+              etape: d['normalization']?.['uncertainStep'] ?? null,
+              numero: d['normalization']?.['reservedNumber'] ?? null,
+              erreur: d['normalization']?.['lastError']?.['code'] ?? null,
+              claim: d['normalization']?.['claim'] ?? null,
+              reconcileAfter: d['normalization']?.['reconcileAfter'] ?? null,
+            })),
+            tours: journalDesTours.slice(-15),
+          },
+          null,
+          1,
+        );
+      };
+      for (let round = 0; ; round++) {
         const pending = await db
           .collection('sales_invoices')
           .find({ _id: { $in: ids.map((i) => new ObjectId(i)) }, status: 'pending_normalization' })
           .toArray();
         if (pending.length === 0) break;
-        await Promise.all(pending.map((d) => normalizer().run(orgN, String(d._id), null)));
+        if (pending.length < restantsAvant) sansProgres = 0;
+        else sansProgres += 1;
+        restantsAvant = pending.length;
+        if (round >= 150 || sansProgres >= 15 || Date.now() - debut > 240_000) {
+          throw new Error(`Normalisations bloquées au tour ${round} : ${await etat()}`);
+        }
+        const t0 = Date.now();
+        const issues = await Promise.all(
+          pending.map((d) => normalizer().run(orgN, String(d._id), null)),
+        );
         consume();
         decale += 151_000;
-        await reconciliation().run(new Date(Date.now() + decale));
-        // Les refus réessayables sont relancés comme le ferait une personne.
+        const rattrapes = await reconciliation().run(new Date(Date.now() + decale));
+        const histo: Record<string, number> = {};
+        for (const o of issues) histo[o] = (histo[o] ?? 0) + 1;
+        journalDesTours.push(
+          `tour ${round} : ${pending.length} en attente, ${JSON.stringify(histo)}, rattrapés ${rattrapes}, ${Date.now() - t0} ms`,
+        );
+        // Ce que ferait une personne : relancer les refus réessayables, et
+        // déclarer « non normalisée » une facture en vérification nécessaire
+        // (la DGI simulée ne l'a pas finalisée : aucun confirm accepté).
         await db.collection('sales_invoices').updateMany(
           {
             _id: { $in: ids.map((i) => new ObjectId(i)) },
@@ -899,7 +949,24 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
             },
           },
         );
+        const enRevue = await db
+          .collection('sales_invoices')
+          .find({
+            _id: { $in: ids.map((i) => new ObjectId(i)) },
+            'normalization.phase': 'needs_review',
+          })
+          .toArray();
+        for (const d of enRevue) {
+          await recorder().declareNotNormalized(
+            orgN,
+            String(d['_id']),
+            'Vérifié auprès de la DGI simulée : non normalisée.',
+            { userId: 'test', name: 'Test', role: 'owner' },
+          );
+        }
       }
+      // eslint-disable-next-line no-console
+      console.info(`[50 normalisations] ${journalDesTours.length} tours, ${Date.now() - debut} ms`);
       // Jamais deux POST pour un même numéro sans conclusion entre-temps.
       expect(posts() - postsAvant).toBeGreaterThanOrEqual(50);
       const docs = await db
