@@ -31,13 +31,18 @@ import { normalizeNif } from '../fiscal/fiscal.dto.js';
 export const CUSTOMER_TYPES = ['PP', 'PM', 'PC', 'PL', 'AO'] as const;
 export type CustomerType = (typeof CUSTOMER_TYPES)[number];
 
-/** Libellés des cinq types DGI (`ClientTypeEnum` de la spécification e-DEF v2.0). */
+/**
+ * Libellés des cinq types DGI (`ClientTypeEnum` de la spécification e-DEF v2.0).
+ * Imprimés « [AO] … » sur la facture : ce sont les mentions imposées par la DGI
+ * (cas de test v1.2, tableau « Types de client » ; annexe de la note n° 01/022,
+ * p. 13 — ADR-0026 § 3.1).
+ */
 export const CUSTOMER_TYPE_LABELS: Record<CustomerType, string> = {
   PP: 'Personne physique',
   PM: 'Personne morale',
   PC: 'Personne physique commerçante',
   PL: 'Profession libérale',
-  AO: 'Ambassade, organisation internationale',
+  AO: 'Ambassades et organisations internationales',
 };
 
 /** Types pour lesquels la DGI exige le NIF (ADR-0022 § Règles DGI). */

@@ -363,7 +363,9 @@ export function buildInvoiceDocument(
     const t = lineTotals.get(l.index);
     if (!t) throw new DocumentNotPrintableError(`Ligne ${l.index} absente du calcul figé.`);
     return {
-      code: l.code,
+      // Code ENVOYÉ à la DGI (« HORS CHAMP » pour une opération hors champ) :
+      // données imprimées = données échangées (ADR-0026 § 3.2).
+      code: l.edefCode ?? l.code,
       name: l.name,
       itemType: `[${l.itemType}]`,
       group: groupLabel(l),
