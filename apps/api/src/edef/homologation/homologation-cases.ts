@@ -11,9 +11,10 @@
 //
 // Ce module est une DONNÉE réutilisable : il produit les corps de requête de
 // l'API LALANDA (`POST /sales/invoices`), jamais une requête e-MCF. Le test e2e
-// `invoices.homologation.e2e.test.ts` le joue contre le FAUX serveur e-MCF ; un
-// futur script pourra le rejouer contre l'environnement de test DGI réel, par
-// l'API Lalanda. Il n'appelle rien lui-même.
+// `invoices.homologation.e2e.test.ts` le joue contre le FAUX serveur e-MCF ; la
+// ligne de commande `edef:homologation` (ADR-0026 § 7) le rejoue contre
+// l'environnement de test DGI réel, par les services de Lalanda. Il n'appelle
+// rien lui-même.
 //
 // Aucune arithmétique de montant : la part « reste » d'un paiement est fixée par
 // `reconcilePayments` du moteur (qui porte l'écart sur le plus gros paiement).
