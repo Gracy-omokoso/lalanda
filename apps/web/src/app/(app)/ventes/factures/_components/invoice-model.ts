@@ -14,7 +14,7 @@
 //    confort que le serveur refait de toute façon.
 // 2. JAMAIS « FACTURE » AVANT L'HEURE. Tant que `documentKind = proforma`,
 //    l'en-tête est « Pro forma — non valable comme facture » avec la référence
-//    `PF-…` ; aucun numéro de la série fiscale n'est affiché (§ S25e.1).
+//    `PF…` (`PF-…` avant ADR-0027) ; aucun numéro de la série fiscale n'est affiché (§ S25e.1).
 // 3. RIEN N'AUTORISE. Masquer un bouton est un confort : l'API refuse de toute
 //    façon (`PermissionsGuard`, mode d'émission lu dans la transaction).
 
@@ -204,9 +204,9 @@ export function enTestDgi(doc: Pick<InvoiceView, 'environment'>): boolean {
 }
 
 export interface EnteteDocument {
-  /** « Facture n° 2026-000123 » ou « Pro forma — non valable comme facture ». */
+  /** « Facture n° IN2610-000123 » ou « Pro forma — non valable comme facture ». */
   titre: string;
-  /** Référence affichée : numéro définitif, ou `PF-…`. */
+  /** Référence affichée : numéro définitif, ou `PF…` (`PF-…` avant ADR-0027). */
   reference: string;
   /** `true` : la référence est un numéro de la série fiscale. */
   numeroDefinitif: boolean;

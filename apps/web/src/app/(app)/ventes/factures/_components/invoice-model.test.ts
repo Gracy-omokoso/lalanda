@@ -299,6 +299,29 @@ describe('en-tête : jamais « Facture » avant la normalisation (§ S25e.1)', (
     ).toBe('Facture d’avoir normalisée n° TEST-2026-000004 (test)');
   });
 
+  it('numérotation ADR-0027 (IN, AV, TEST-, PF) : affichée telle quelle, à côté des anciennes formes', () => {
+    expect(
+      enteteDocument(vue({ status: 'issued', documentKind: 'invoice', number: 'IN2610-000042' }))
+        .titre,
+    ).toBe('Facture n° IN2610-000042');
+    const avoir = enteteDocument(
+      vue({
+        status: 'normalized',
+        documentKind: 'invoice',
+        number: 'TEST-AV2610-000043',
+        type: 'FA',
+      }),
+    );
+    expect(avoir.titre).toBe('Facture d’avoir normalisée n° TEST-AV2610-000043 (test)');
+    expect(avoir).toMatchObject({ reference: 'TEST-AV2610-000043', numeroDefinitif: true });
+    const pf = enteteDocument(vue({ status: 'draft', proformaRef: 'PF2610-000003' }));
+    expect(pf).toMatchObject({
+      titre: LIBELLE_PRO_FORMA,
+      reference: 'PF2610-000003',
+      numeroDefinitif: false,
+    });
+  });
+
   it('les libellés de type et de statut non finals ne disent pas « facture »', () => {
     for (const l of Object.values(TYPE_LABELS)) expect(l).not.toMatch(/facture/i);
     for (const s of ['draft', 'pending_normalization', 'normalization_failed'] as const) {

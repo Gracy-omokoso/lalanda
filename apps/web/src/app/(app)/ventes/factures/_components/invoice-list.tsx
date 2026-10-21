@@ -2,7 +2,7 @@
 
 // Liste des documents de vente (ADR-0023 § S25e.14) : filtres par statut et
 // par type, recherche (numéro, référence de pro forma, client), pagination par
-// curseur. Un document non final s'affiche par sa référence `PF-…`, jamais
+// curseur. Un document non final s'affiche par sa référence `PF…`, jamais
 // comme une facture (§ S25e.1).
 
 import Link from 'next/link';
@@ -105,7 +105,7 @@ export function InvoiceList(): React.ReactElement {
             value={filtres.q}
             onChange={(e) => setFiltres((f) => ({ ...f, q: e.target.value }))}
             maxLength={100}
-            placeholder="Numéro, référence PF-… ou client"
+            placeholder="Numéro (IN…, AV…), référence PF… ou client"
             className={CHAMP}
           />
         </div>
