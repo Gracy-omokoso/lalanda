@@ -154,6 +154,29 @@ describe.skipIf(!hasChromium)('rendu PDF réel (Chromium)', () => {
     300_000,
   );
 
+  it('vignette PNG d’un aperçu : même confinement, première page', async () => {
+    const template = allTemplates()[1]!;
+    const m = modelFor(normalizedProduction(), template, { sample: true });
+    const r = renderDocumentHtml(m, await qrCodeSvg(m.security!.qrContent), {
+      template,
+      options: template.defaults,
+      identity: IDENTITY,
+      logos: renderLogos(true),
+    });
+    const png = await renderer.renderPng(r.html, {
+      width: 794,
+      height: 1123,
+      deviceScaleFactor: 1,
+    });
+    expect(
+      png.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])),
+    ).toBe(true);
+    // Largeur et hauteur de l'IHDR : 794 × 1123.
+    expect(png.readUInt32BE(16)).toBe(794);
+    expect(png.readUInt32BE(20)).toBe(1123);
+    await writeFile(resolve(OUT, `apercu-${template.id}.png`), png);
+  }, 300_000);
+
   it('un duplicata diffère de l’original', async () => {
     expect(sha(await render(normalizedTest(), 1))).not.toBe(sha(await render(normalizedTest())));
   }, 300_000);

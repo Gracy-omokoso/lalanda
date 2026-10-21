@@ -76,6 +76,9 @@ function headOfficeAddress(h: {
     .join(', ');
 }
 
+/** Page A4 à 96 ppp, densité 1,5 : vignette nette d'un aperçu de modèle. */
+const PREVIEW_PAGE = { width: 794, height: 1123, deviceScaleFactor: 1.5 } as const;
+
 /** Nom et version du modèle, imprimés en pied ; `null` : présentation d'origine. */
 function layoutOf(p: FrozenPresentation | null): { label: string; version: string } | null {
   if (!p) return null;
@@ -223,7 +226,8 @@ export class InvoiceDocumentsService {
     organizationId: string,
     templateId: InvoiceTemplateId,
     override: Partial<TemplateOptions>,
-  ): Promise<{ pdf: Buffer; fileName: string }> {
+    format: 'pdf' | 'png' = 'pdf',
+  ): Promise<{ body: Buffer; fileName: string; contentType: string }> {
     const presentation = await this.branding.presentationForPreview(
       organizationId,
       templateId,
@@ -242,8 +246,21 @@ export class InvoiceDocumentsService {
         sample: true,
       },
     );
-    const pdf = await this.render(organizationId, model, presentation);
-    return { pdf, fileName: `apercu-modele-${latestTemplate(templateId).id}.pdf` };
+    const base = `apercu-modele-${latestTemplate(templateId).id}`;
+    if (format === 'pdf') {
+      const pdf = await this.render(organizationId, model, presentation);
+      return { body: pdf, fileName: `${base}.pdf`, contentType: 'application/pdf' };
+    }
+    // Vignette : première page, mêmes HTML et confinement que le PDF. Les marges
+    // de page (`@page`) ne s'appliquent pas à une capture : on les pose en padding.
+    const r = await this.html(organizationId, model, presentation);
+    const m = r.margin;
+    const html = r.html.replace(
+      '</head>',
+      `<style>body{padding:${m.top} ${m.right} 0 ${m.left}}</style></head>`,
+    );
+    const png = await this.pdf.renderPng(html, PREVIEW_PAGE);
+    return { body: png, fileName: `${base}.png`, contentType: 'image/png' };
   }
 
   /** Fiche vendeur courante (fiche fiscale), ou `null`. */

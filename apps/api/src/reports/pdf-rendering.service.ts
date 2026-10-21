@@ -42,7 +42,19 @@ interface PageLike {
   setRequestInterception(enabled: boolean): Promise<void>;
   on(event: 'request', handler: (req: HttpRequestLike) => void): void;
   pdf(opts: Record<string, unknown>): Promise<Uint8Array>;
+  setViewport(v: { width: number; height: number; deviceScaleFactor?: number }): Promise<void>;
+  emulateMediaType(type: string | null): Promise<void>;
+  screenshot(opts: Record<string, unknown>): Promise<Uint8Array | string>;
   close(): Promise<void>;
+}
+
+/** Image de la première page d'un document (aperçu de modèle, ADR-0028 § 8). */
+export interface PngRenderOptions {
+  /** Largeur et hauteur CSS de la page (A4 à 96 ppp : 794 × 1123). */
+  width: number;
+  height: number;
+  /** Densité (1 à 2) : 1,5 donne une vignette nette sans alourdir la réponse. */
+  deviceScaleFactor?: number;
 }
 
 export interface PdfRenderOptions {
@@ -145,6 +157,67 @@ export class PdfRenderingService implements OnModuleDestroy {
         });
       }
       throw err;
+    }
+  }
+
+  /**
+   * Image PNG de la première page — MÊME portillon, MÊME confinement (JavaScript
+   * coupé, réseau avorté) que le PDF : seul le format de sortie change.
+   */
+  async renderPng(html: string, opts: PngRenderOptions): Promise<Buffer> {
+    try {
+      return await this.gate.run(() =>
+        this.withConfinedPage(
+          html,
+          async (page) => {
+            await page.emulateMediaType('print');
+            const shot = await page.screenshot({
+              type: 'png',
+              clip: { x: 0, y: 0, width: opts.width, height: opts.height },
+            });
+            return typeof shot === 'string' ? Buffer.from(shot, 'base64') : Buffer.from(shot);
+          },
+          opts,
+        ),
+      );
+    } catch (err) {
+      if (err instanceof RenderGateBusyError) {
+        throw new ServiceUnavailableException({
+          code: 'REPORT_RENDER_BUSY',
+          message: 'Le service de génération PDF est saturé. Réessayez dans quelques secondes.',
+          retryAfterSec: err.retryAfterSec,
+        });
+      }
+      throw err;
+    }
+  }
+
+  private async withConfinedPage<T>(
+    html: string,
+    fn: (page: PageLike) => Promise<T>,
+    viewport?: PngRenderOptions,
+  ): Promise<T> {
+    const browser = await this.getBrowser();
+    const page = await browser.newPage();
+    try {
+      // Les deux barrières de `renderUnthrottled` (voir son commentaire, S22e) :
+      // JavaScript coupé, toute requête réseau avortée.
+      await page.setJavaScriptEnabled(false);
+      await page.setRequestInterception(true);
+      page.on('request', (req) => {
+        void req.abort().catch(() => req.continue().catch(() => undefined));
+      });
+      if (viewport) {
+        await page.setViewport({
+          width: viewport.width,
+          height: viewport.height,
+          deviceScaleFactor: Math.min(2, Math.max(1, viewport.deviceScaleFactor ?? 1)),
+        });
+      }
+      await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT_MS });
+      return await fn(page);
+    } finally {
+      await page.close().catch(() => undefined);
     }
   }
 

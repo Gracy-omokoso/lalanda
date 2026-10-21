@@ -5,7 +5,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { esc } from '../invoice-document-html.js';
-import { TEST_BANNER } from '../invoice-document.model.js';
+import { TEST_BANNER, buildInvoiceDocument } from '../invoice-document.model.js';
+import { sampleInvoice } from '../sample-invoice.js';
 import { qrCodeSvg } from '../invoice-qr.js';
 import { FAKE_QR, normalizedTest } from '../testing/invoice-fixtures.js';
 import {
@@ -284,6 +285,26 @@ describe('zone DGI imposée — le vérificateur refuse un modèle incomplet', (
         logos,
       }),
     ).toThrow(/URI de données refusée/);
+  });
+});
+
+describe('aperçu : la facture fictive EXEMPLE passe chaque modèle', () => {
+  it.each(allTemplates().map((t) => [t.label, t] as const))('%s', async (_l, template) => {
+    const m = buildInvoiceDocument(sampleInvoice('org-x'), {
+      duplicateNumber: null,
+      draftSeller: null,
+      organizationName: 'Organisation',
+      draftInTestEnvironment: false,
+      layout: { label: template.label, version: template.version },
+      sample: true,
+    });
+    expect(m.test).toBeNull();
+    expect(m.sample).not.toBeNull();
+    expect(m.total).toBe('631\u00a0193,30');
+    const qr = await qrCodeSvg(m.security!.qrContent);
+    const r = renderDocumentHtml(m, qr, presentation(template, template.defaults, true));
+    expect(r.html).toContain('EXEMPLE-000042');
+    expect(r.footerTemplate).toContain('Exemple fictif');
   });
 });
 

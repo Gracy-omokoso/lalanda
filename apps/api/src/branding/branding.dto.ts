@@ -51,6 +51,8 @@ export const PreviewQuerySchema = z
     palette: z.enum(PALETTES).optional(),
     accent: HexColorSchema.optional(),
     font: z.string().max(64).optional(),
+    /** `png` : vignette de la première page ; défaut `pdf`. */
+    format: z.enum(['pdf', 'png']).optional(),
   })
   .strict();
 

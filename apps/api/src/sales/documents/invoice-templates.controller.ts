@@ -2,7 +2,8 @@
 //
 //   GET /sales/invoice-templates                       (`sales.read`)           catalogue + choix courant
 //   PUT /sales/invoice-template                        (`organization.manage`)  enregistre le choix
-//   GET /sales/invoice-templates/:templateId/preview   (`sales.read`)           aperçu PDF, facture FICTIVE
+//   GET /sales/invoice-templates/:templateId/preview   (`sales.read`)           aperçu, facture FICTIVE
+//       `?format=png` : vignette de la première page (galerie) ; défaut : PDF complet
 //
 // Choisir le modèle est une action d'administration de l'organisation (comme
 // son identité visuelle) : le contenu fiscal d'une facture n'en dépend pas. La
@@ -162,22 +163,28 @@ export class InvoiceTemplatesController {
     }
     const parsed = PreviewQuerySchema.safeParse(query);
     if (!parsed.success) invalid(parsed.error);
-    const { palette, accent, font } = parsed.data;
+    const { palette, accent, font, format } = parsed.data;
     if (font !== undefined && !fontAllowed(latestTemplate(templateId), font)) {
       throw new BadRequestException({
         code: 'FONT_NOT_ALLOWED',
         message: 'Cette police n’est pas proposée par ce modèle.',
       });
     }
-    const out = await this.documents.preview(orgId, templateId, {
-      ...(palette ? { palette } : {}),
-      ...(accent ? { accent } : {}),
-      ...(font ? { font: font as TemplateFontChoice } : {}),
-    });
-    res.setHeader('content-type', 'application/pdf');
+    const out = await this.documents.preview(
+      orgId,
+      templateId,
+      {
+        ...(palette ? { palette } : {}),
+        ...(accent ? { accent } : {}),
+        ...(font ? { font: font as TemplateFontChoice } : {}),
+      },
+      format ?? 'pdf',
+    );
+    res.setHeader('content-type', out.contentType);
     res.setHeader('content-disposition', `inline; filename="${out.fileName}"`);
-    res.setHeader('content-length', String(out.pdf.byteLength));
+    res.setHeader('content-length', String(out.body.byteLength));
     res.setHeader('cache-control', 'no-store');
-    res.end(out.pdf);
+    res.setHeader('x-content-type-options', 'nosniff');
+    res.end(out.body);
   }
 }

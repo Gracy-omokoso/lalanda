@@ -661,6 +661,24 @@ e2eSuite('modèles de facture et identité visuelle (ADR-0028)', () => {
     expect(await db.collection('sales_invoices').countDocuments({ number: 'EXEMPLE-000042' })).toBe(
       0,
     );
+    // Vignette PNG : même moteur, rendu par la capture d'écran confinée.
+    const pngSpy = vi
+      .spyOn(app.get(PdfRenderingService), 'renderPng')
+      .mockImplementation(async (html) => Buffer.from(`PNG-FAKE\n${html}`, 'utf8'));
+    const vignette = await binary(
+      get(asN(), '/sales/invoice-templates/bandeau/preview?format=png'),
+    );
+    expect(vignette.status).toBe(200);
+    expect(vignette.headers['content-type']).toContain('image/png');
+    expect(text(vignette)).toContain('data-template="bandeau@1.0.0"');
+    expect(pngSpy).toHaveBeenCalledWith(expect.any(String), {
+      width: 794,
+      height: 1123,
+      deviceScaleFactor: 1.5,
+    });
+    expect((await get(asN(), '/sales/invoice-templates/bandeau/preview?format=gif')).status).toBe(
+      400,
+    );
     expect((await get(asN(), '/sales/invoice-templates/inconnu/preview')).status).toBe(400);
     expect(
       (await get(asN(), '/sales/invoice-templates/editoriale/preview?font=inter')).status,

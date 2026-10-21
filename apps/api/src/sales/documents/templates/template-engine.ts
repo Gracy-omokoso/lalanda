@@ -63,7 +63,8 @@ const DATA_URI = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
 const BASE_CSS = `
   @page { size: A4; }
   * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; }
+  :root { color-scheme: light; }
+  html, body { margin: 0; padding: 0; background: #ffffff; }
   body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .qr svg { width: 100%; height: 100%; display: block; }
   .dgi-watermark { position: fixed; top: 38%; left: 0; right: 0; text-align: center; font-family: Arial, sans-serif; font-size: 150pt; font-weight: 800; letter-spacing: 12pt; color: rgba(185, 28, 28, 0.13); transform: rotate(-30deg); z-index: 1000; pointer-events: none; }
