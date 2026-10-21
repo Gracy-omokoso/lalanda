@@ -6,12 +6,17 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useSession } from '@/lib/auth-client';
 import { LIENS_AIDE } from '@/lib/aide/liens';
-import { BrandLogo, BrandMark } from '@/components/brand-logo';
+import { BrandMark } from '@/components/brand-logo';
+import { IconeNav } from '@/components/icones-navigation';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { OrgSwitcher } from './org-switcher';
 import { UserMenu } from './user-menu';
 
-export function AppHeader(): React.ReactElement {
+export function AppHeader({
+  onOuvrirNavigation,
+}: {
+  /** Ouvre le tiroir de navigation (sous 1024 px). Absent : pas de bouton. */
+  onOuvrirNavigation?: () => void;
+} = {}): React.ReactElement {
   const { data: session, isPending } = useSession();
 
   // Drapeau qui conditionne l'entrée « Administration » DU MENU (ADR-0016 §1) —
@@ -41,41 +46,43 @@ export function AppHeader(): React.ReactElement {
   }, [session?.user]);
 
   return (
-    <header className="flex items-center justify-between border-b border-[var(--border)] pb-4">
-      {/* `aria-label` explicite, et images décoratives : le lockup porte déjà
-          le mot « Lalanda » en pixels, un `alt` renseigné le ferait annoncer en
-          double. Surtout, le nom du lien ne doit pas dépendre de la largeur —
-          sous 640 px le lockup cède la place à l'aigle seul, et un lien dont le
-          seul contenu est une image `alt=""` serait muet. */}
+    // ADR-0030 § 2 : barre du haut de la zone de contenu. Le sélecteur
+    // d'organisation et la marque complète sont passés en tête de la barre
+    // latérale ; sous 1024 px, ils vivent dans le tiroir ouvert par le bouton
+    // « Menu ». La barre tient ainsi dans 360 px sans déborder (audit A2) —
+    // l'avatar, porte du menu du compte, n'est plus jamais coupé.
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--background)_88%,transparent)] px-4 backdrop-blur sm:px-6 lg:px-8">
+      {onOuvrirNavigation ? (
+        <button
+          type="button"
+          onClick={onOuvrirNavigation}
+          aria-label="Ouvrir la navigation"
+          aria-haspopup="dialog"
+          className="-ml-2 inline-flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] text-[var(--foreground)] transition hover:bg-[var(--surface-muted)] lg:hidden"
+        >
+          <IconeNav id="menu" className="h-5 w-5" />
+        </button>
+      ) : null}
+      {/* `aria-label` explicite, et image décorative : le nom du lien ne doit
+          pas dépendre de la largeur (ADR-0016, « Identité visuelle »). Sur
+          grand écran la marque est dans la barre latérale : ici, l'aigle seul,
+          et seulement sous 1024 px. */}
       <Link
         href="/projects"
-        aria-label="Lalanda — tableau de bord"
-        className="flex shrink-0 items-center transition hover:opacity-80"
+        aria-label="Lalanda — plans financiers"
+        className="flex shrink-0 items-center transition hover:opacity-80 lg:hidden"
       >
-        {/* Sous 640 px le lockup complet (120 px de large) écraserait le
-            sélecteur d'organisation : il cède la place à l'aigle seul, qui
-            porte le même lien. C'est le repli qu'ADR-0016 décrivait déjà pour
-            la marque — la destination ne disparaît à aucune largeur. */}
-        <BrandMark taille={30} className="sm:hidden" />
-        <BrandLogo hauteur={30} className="hidden sm:inline-block" />
+        <BrandMark taille={28} />
       </Link>
 
-      {/* RÈGLE (ADR-0016 §6) : aucun lien de cette barre ne porte `hidden sm:*`
-          s'il n'a pas d'autre chemin d'accès. « Membres », « Abonnement » et
-          « Administration » le faisaient — ils étaient donc introuvables sur
-          téléphone. Ils vivent désormais dans le menu du compte, disponible à
-          toutes les largeurs. */}
-      <div className="flex items-center gap-2 text-sm sm:gap-3">
-        {session?.user ? <OrgSwitcher /> : null}
-        {/* Le centre d'aide est la seule entrée permanente vers le glossaire et
-            l'explication des ratios. Hors session aussi : /aide est public, et
-            une page d'aide atteignable depuis n'importe où vaut mieux qu'un lien
-            qui n'apparaît qu'une fois connecté — le menu du compte n'existe pas
-            pour un visiteur anonyme, y déplacer Aide reviendrait à la supprimer
-            pour lui.
+      <div className="flex-1" />
 
-            Sous 640 px il se réduit à une icône, mais JAMAIS à une icône muette :
-            `aria-label` porte le nom, le point d'interrogation est décoratif. */}
+      {/* RÈGLE (ADR-0016 §6) : aucun lien de cette barre ne porte `hidden sm:*`
+          s'il n'a pas d'autre chemin d'accès. */}
+      <div className="flex items-center gap-2 text-sm sm:gap-3">
+        {/* Le centre d'aide est la seule entrée permanente vers le glossaire et
+            l'explication des ratios. Sous 640 px il se réduit à une icône, mais
+            JAMAIS à une icône muette : `aria-label` porte le nom. */}
         <Link
           href={LIENS_AIDE.centre}
           aria-label="Aide"
@@ -84,7 +91,7 @@ export function AppHeader(): React.ReactElement {
         >
           <span
             aria-hidden="true"
-            className="font-display inline-flex h-7 w-7 items-center justify-center rounded-full border border-[var(--border)] text-xs font-bold sm:hidden"
+            className="font-display inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--border)] text-xs font-bold sm:hidden"
           >
             ?
           </span>
@@ -94,11 +101,10 @@ export function AppHeader(): React.ReactElement {
             enregistré sur le compte, pour rester cohérent avec /compte/preferences. */}
         <ThemeToggle persist />
         {isPending ? (
-          <span className="opacity-50">…</span>
+          // Pastille neutre, dimensions fixes : la barre ne bouge pas au chargement.
+          <span aria-hidden="true" className="h-8 w-8 rounded-full bg-[var(--surface-muted)]" />
         ) : session?.user ? (
-          // L'AVATAR est le point d'entrée de tout ce qui n'est pas un projet
-          // (ADR-0016 §1) : Tableau de bord · Mon compte · Organisation ·
-          // Abonnement · Administration · Déconnexion.
+          // L'AVATAR ouvre le menu du compte, inchangé (ADR-0016 §1).
           <UserMenu email={session.user.email} canReadAdmin={operateur} />
         ) : null}
       </div>

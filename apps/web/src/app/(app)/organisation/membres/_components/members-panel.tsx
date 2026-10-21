@@ -273,7 +273,7 @@ function TransferBlock({
             value={choix}
             disabled={occupe}
             onChange={(e) => setChoix(e.target.value)}
-            className="flex-1 rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)] disabled:opacity-50"
+            className="flex-1 rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)] disabled:opacity-50"
           >
             <option value="">Choisir un membre…</option>
             {cibles.map((c) => (

@@ -5,17 +5,20 @@
 // à son aide et à son erreur par `aria-describedby`, `aria-invalid` sur un champ
 // refusé, astérisque doublé d'un « (obligatoire) » lu par les lecteurs d'écran.
 
+// ADR-0030 : alignées sur les jetons du design system. Le champ est posé sur
+// `--surface` et bordé par `--border-strong` (≥ 3:1, WCAG 1.4.11) : un champ
+// crème sur fond crème ne se distinguait que par une bordure à 1,3:1 (audit A7).
 export const CHAMP =
-  'w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)] aria-[invalid=true]:border-[var(--danger)] disabled:opacity-60';
+  'w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)] aria-[invalid=true]:border-[var(--danger)] disabled:opacity-60';
 
 export const BOUTON =
-  'rounded-md border border-[var(--border-strong)] px-4 py-2 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-50';
+  'inline-flex items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-strong)] bg-[var(--surface)] px-4 py-2 text-sm font-medium transition hover:border-[var(--accent)] hover:bg-[var(--surface-muted)] disabled:opacity-50';
 
 export const BOUTON_PETIT =
-  'rounded-md border border-[var(--border)] px-3 py-1.5 text-xs font-medium transition hover:border-[var(--accent)] disabled:opacity-50';
+  'rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-medium transition hover:border-[var(--accent)] disabled:opacity-50';
 
 export const BOUTON_DANGER =
-  'rounded-md border border-[var(--danger)]/40 px-3 py-1.5 text-xs font-medium text-[var(--danger)] transition hover:bg-[var(--danger-bg)] disabled:opacity-50';
+  'rounded-[var(--radius-sm)] border border-[var(--danger)]/40 px-3 py-1.5 text-xs font-medium text-[var(--danger)] transition hover:bg-[var(--danger-bg)] disabled:opacity-50';
 
 /** `aria-invalid` et `aria-describedby` reliant l'aide et l'erreur du champ. */
 export function aria(

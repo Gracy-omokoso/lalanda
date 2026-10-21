@@ -130,7 +130,7 @@ const BOUTON =
 const BOUTON_DANGER =
   'rounded-md border border-[var(--danger)]/60 px-4 py-2 text-sm font-medium text-[var(--danger)] transition hover:bg-[var(--danger-bg)] disabled:opacity-50';
 const ZONE =
-  'w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)]';
+  'w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)]';
 
 /** Motif de 20 à 500 caractères, avec compteur annoncé. */
 function ChampMotif({

@@ -12,10 +12,11 @@
 // §8. Masquer reste un confort : le serveur refuse de toute façon, et la page
 // atteinte par URL directe l'explique.
 
-import Link from 'next/link';
+import { TabsNav } from '@lalanda/ui';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
+import { renderNextLink } from '@/components/next-link';
 import { api, type OrgAction } from '@/lib/api';
 
 import { ORGANIZATION_BASE, ongletsVisibles, segmentActif } from './organization-model';
@@ -44,29 +45,17 @@ export function OrganizationTabs(): React.ReactElement {
   const onglets = ongletsVisibles(actions);
 
   return (
-    <nav
-      aria-label="Sections de l’organisation"
-      className="flex flex-wrap gap-1 border-b border-[var(--border)]"
-    >
-      {onglets.map((tab) => {
-        const isActive = courant === tab.segment;
-        return (
-          <Link
-            key={tab.segment || 'tableau-de-bord'}
-            href={tab.segment ? `${ORGANIZATION_BASE}/${tab.segment}` : ORGANIZATION_BASE}
-            // `aria-current="page"` : l'onglet courant est annoncé au lecteur
-            // d'écran, l'information ne repose pas sur la seule bordure colorée.
-            aria-current={isActive ? 'page' : undefined}
-            className={
-              isActive
-                ? 'font-mono -mb-px border-b-2 border-[var(--accent)] px-3.5 py-2.5 text-[0.72rem] font-semibold uppercase tracking-[0.08em] text-[var(--foreground)] transition'
-                : 'font-mono -mb-px border-b-2 border-transparent px-3.5 py-2.5 text-[0.72rem] font-medium uppercase tracking-[0.08em] text-[var(--foreground-muted)] transition hover:text-[var(--foreground)]'
-            }
-          >
-            {tab.label}
-          </Link>
-        );
-      })}
-    </nav>
+    // `aria-current="page"` sur l'onglet courant (posé par `TabsNav`) : il est
+    // annoncé au lecteur d'écran, l'information ne repose pas sur la bordure.
+    <TabsNav
+      label="Sections de l’organisation"
+      renderLink={renderNextLink}
+      items={onglets.map((tab) => ({
+        href: tab.segment ? `${ORGANIZATION_BASE}/${tab.segment}` : ORGANIZATION_BASE,
+        // ADR-0030 : la racine est le pilotage (module GROW de la navigation).
+        label: tab.segment === '' ? 'Pilotage' : tab.label,
+        current: courant === tab.segment,
+      }))}
+    />
   );
 }

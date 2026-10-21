@@ -22,7 +22,7 @@ import { messageFiscal } from './fiscal-model';
 const BOUTON =
   'rounded-md border border-[var(--border-strong)] px-4 py-2 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-50';
 const CHAMP =
-  'rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)]';
+  'rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)]';
 
 function telecharger(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);

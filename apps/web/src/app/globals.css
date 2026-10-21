@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+/* Jetons du design system — voir « Design tokens » plus bas. */
+@import '@lalanda/ui/tokens.css';
 
 @theme {
   --font-sans:
@@ -9,46 +11,20 @@
     var(--font-plex-mono), ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
 }
 
+/* Composants du design system : Tailwind doit lire leurs classes (le paquet est
+ * hors de `apps/web`, et un lien symbolique de node_modules n'est pas scanné). */
+@source '../../../../packages/ui/src';
+
 /* ─── Design tokens ──────────────────────────────────────────────
- * Direction : « dossier bancaire » — encre vert-billet, papier registre,
- * chiffres tabulaires mono, tampon ocre. Le produit fabrique des documents
- * qu'un chargé d'affaires prend au sérieux ; l'interface emprunte leur langage.
+ * Source unique : `packages/ui/src/styles/tokens.css` (ADR-0030 § 4), miroir
+ * typé et contrastes vérifiés par `packages/ui/src/tokens.test.ts`. Les noms
+ * historiques (`--background`, `--surface`, `--accent`…) y sont conservés.
  *
- * Rôles fixes (identiques dans les deux thèmes) :
+ * Restent ici les rôles FIXES de la marque (identiques dans les deux thèmes) :
  *   --ink / --ink-2 / --on-ink / --on-ink-muted : panneaux sombres « encre »
- *   --stamp : ocre tampon (CTA sur encre, sceau BANCABLE)
- *   --ok / --warn / --ko : feux tricolores ratios (jamais seuls — toujours texte)
+ *   --stamp : cyan tampon (CTA sur encre, sceau BANCABLE)
  * Le thème est piloté par [data-theme="light"|"dark"] sur <html>.
  */
-
-:root,
-[data-theme='light'] {
-  --background: #eee7d7; /* crème charte */
-  --surface: #ffffff;
-  --surface-muted: #f5f0e4;
-  --border: #dcd4c2;
-  --border-strong: #9e947e;
-  --foreground: #14191b;
-  --foreground-muted: #6c685a;
-  --accent: #005263;
-  --accent-foreground: #ffffff;
-  --danger: #b3261e;
-  --danger-bg: #fbeeed;
-}
-
-[data-theme='dark'] {
-  --background: #07171c;
-  --surface: #0c2129;
-  --surface-muted: #102a33;
-  --border: #1c3a44;
-  --border-strong: #2f5561;
-  --foreground: #eee7d7;
-  --foreground-muted: #96c9d7;
-  --accent: #00acca;
-  --accent-foreground: #04252c;
-  --danger: #f28b82;
-  --danger-bg: #2a1614;
-}
 
 :root {
   --ink: #005263; /* pétrole principal charte */
@@ -60,15 +36,15 @@
   --stamp: #00acca; /* cyan principal — encre de tampon bancaire */
   --stamp-foreground: #06272e;
   --stamp-strong: #005263;
-  --ok: #1e8e3e;
-  --warn: #b07818;
-  --ko: #b3261e;
 }
 
-[data-theme='dark'] {
-  --ok: #4bc07a;
-  --warn: #d9a441;
-  --ko: #f28b82;
+/* Surfaces de marque (pages publiques, authentification) : elles gardent le
+ * crème de charte en thème clair. L'outil quotidien, lui, passe sur un fond
+ * plus clair et plus contrasté (ADR-0030, décision D5). */
+:root:not([data-theme='dark']) .surface-marque {
+  --background: #eee7d7;
+  --surface-muted: #f5f0e4;
+  background: var(--background);
 }
 
 html {
@@ -85,14 +61,29 @@ body {
   letter-spacing: -0.005em;
 }
 
+/* Tiroir de navigation mobile (ADR-0030) — joué seulement sans
+ * `prefers-reduced-motion: reduce` (classe `motion-safe:`). */
+@keyframes tiroir {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
 /* Focus visible sur toutes les couleurs de fond */
 *:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
   border-radius: 4px;
 }
 .bg-ink *:focus-visible {
   outline-color: var(--stamp);
+}
+/* Barre latérale (panneau pétrole, ADR-0030) : anneau cyan, ≥ 3:1 sur --nav-bg. */
+.nav-panel *:focus-visible {
+  outline-color: var(--nav-accent);
 }
 
 /* Reset inputs numériques (Chrome/Safari) */
@@ -157,6 +148,12 @@ input[type='number'] {
     0 1px 2px rgba(0, 63, 76, 0.18),
     0 12px 32px -12px rgba(0, 63, 76, 0.45),
     0 24px 64px -24px rgba(0, 63, 76, 0.4);
+}
+
+/* Dans l'application (ADR-0030), le « dossier » reste un papier mais perd son
+ * ombre de présentation : deux niveaux d'ombre seulement dans l'outil. */
+#contenu .doc-card {
+  box-shadow: var(--shadow-card);
 }
 
 /* Ligne de registre : libellé, pointillés conducteurs, valeur. */

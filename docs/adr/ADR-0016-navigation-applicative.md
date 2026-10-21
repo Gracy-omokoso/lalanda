@@ -4,6 +4,12 @@ Statut : Proposed
 Date : 2026-08-10
 Décideurs : Gracy Omokoso
 
+> **Amendé par [ADR-0030](ADR-0030-refonte-ui-ux.md) (21 oct. 2026, proposé, en revue).**
+> La navigation principale passe dans une **barre latérale par module** (BUILD · RUN ·
+> GROW · Organisation) ; le sélecteur d'organisation y est placé en tête. Le menu du compte
+> et ses sept entrées sont conservés à l'identique ; la barre du haut garde Aide, thème et
+> avatar, plus un bouton de navigation sous 1024 px.
+
 > **Amendé par [ADR-0022](ADR-0022-clients-catalogue-et-calcul-des-factures.md) (19 oct.
 > 2026, chantier D2).** Le menu du compte gagne une septième entrée, **« Ventes »** →
 > `/ventes` (onglets Clients · Catalogue), placée juste après « Tableau de bord », dans le

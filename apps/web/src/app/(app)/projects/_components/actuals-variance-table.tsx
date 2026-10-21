@@ -9,6 +9,8 @@
 //   toutes lettres et des tirets, jamais un écart fabriqué ;
 // - la méthode de calcul de la base annuelle est affichée (docs/08 § Projection).
 
+import { DataNature } from '@lalanda/ui';
+
 import type { ProjectionLineView, VarianceLineView } from '@/lib/api';
 
 import { baseLabel, money, percent, raisonLabel, signedMoney } from './actuals-format';
@@ -124,6 +126,11 @@ export function ActualsVarianceTable({
         <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--foreground-muted)]">
           Écarts cumulés
         </h3>
+        {/* ADR-0018 / ADR-0030 : deux natures de données côte à côte, nommées. */}
+        <span className="flex gap-1.5">
+          <DataNature nature="prevision" />
+          <DataNature nature="realise" />
+        </span>
         <p className="text-xs text-[var(--foreground-muted)]">
           {monthsCounted.length === 0
             ? 'Aucun mois saisi'
@@ -242,6 +249,10 @@ export function ActualsProjectionTable({
         <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--foreground-muted)]">
           Projection actualisée
         </h3>
+        <span className="flex gap-1.5">
+          <DataNature nature="realise" />
+          <DataNature nature="prevision" />
+        </span>
         <p className="text-xs text-[var(--foreground-muted)]">
           {monthsClosed.length} mois clôturé{monthsClosed.length > 1 ? 's' : ''} observé
           {monthsClosed.length > 1 ? 's' : ''} + {restants} mois estimé{restants > 1 ? 's' : ''}

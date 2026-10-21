@@ -10,6 +10,7 @@
 // La suppression n'est proposée que pour un client JAMAIS facturé (§ O7) ;
 // sinon, seule la désactivation le retire des propositions.
 
+import { buttonClasses } from '@lalanda/ui';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useState } from 'react';
 
@@ -121,13 +122,19 @@ export function CustomerList(): React.ReactElement {
           <h2 id="clients-titre" className="font-display text-lg font-bold tracking-tight">
             Clients
           </h2>
-          <p className="max-w-2xl text-sm text-[var(--foreground-muted)]">
+          {/* ADR-0030 : sur téléphone, lue par les lecteurs d'écran mais non
+              affichée — la liste se voit sans défiler. */}
+          <p className="max-w-2xl text-sm text-[var(--foreground-muted)] max-sm:sr-only">
             Chaque client porte l’un des cinq types de la DGI ; la facture reprendra ses
             informations telles qu’elles sont au moment de l’émission.
           </p>
         </div>
         {gerer ? (
-          <button type="button" onClick={() => ouvrir(FICHE_NOUVELLE)} className={BOUTON}>
+          <button
+            type="button"
+            onClick={() => ouvrir(FICHE_NOUVELLE)}
+            className={buttonClasses('primary', 'md')}
+          >
             Nouveau client
           </button>
         ) : null}
@@ -137,9 +144,9 @@ export function CustomerList(): React.ReactElement {
         role="search"
         aria-label="Rechercher un client"
         onSubmit={(e) => e.preventDefault()}
-        className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]"
+        className="grid grid-cols-2 gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]"
       >
-        <div className="flex flex-col gap-1.5">
+        <div className="col-span-2 flex flex-col gap-1.5 sm:col-span-1">
           <label htmlFor="cl-q" className="text-sm font-medium">
             Rechercher
           </label>

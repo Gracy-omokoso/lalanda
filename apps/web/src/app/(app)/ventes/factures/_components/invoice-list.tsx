@@ -5,6 +5,7 @@
 // curseur. Un document non final s'affiche par sa référence `PF…`, jamais
 // comme une facture (§ S25e.1).
 
+import { buttonClasses } from '@lalanda/ui';
 import Link from 'next/link';
 import { useCallback, useState } from 'react';
 
@@ -48,17 +49,24 @@ export function InvoiceList(): React.ReactElement {
           <h2 id="factures-titre" className="font-display text-lg font-bold tracking-tight">
             Documents de vente
           </h2>
-          <p className="max-w-2xl text-sm text-[var(--foreground-muted)]">
+          {/* ADR-0030 : non affichée sur téléphone, lue par les lecteurs d'écran. */}
+          <p className="max-w-2xl text-sm text-[var(--foreground-muted)] max-sm:sr-only">
             Un document reste un pro forma tant qu’il n’est pas émis ou normalisé. Une facture émise
             ne se modifie plus : elle se corrige par un avoir.
           </p>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Link href={`${FACTURES_BASE}/journal`} className={`${BOUTON} text-center`}>
+        <div className="flex gap-2">
+          <Link
+            href={`${FACTURES_BASE}/journal`}
+            className={buttonClasses('secondary', 'md', 'flex-1 sm:flex-none')}
+          >
             Journal
           </Link>
           {gerer ? (
-            <Link href={`${FACTURES_BASE}/nouvelle`} className={`${BOUTON} text-center`}>
+            <Link
+              href={`${FACTURES_BASE}/nouvelle`}
+              className={buttonClasses('primary', 'md', 'flex-1 sm:flex-none')}
+            >
               Nouveau document
             </Link>
           ) : null}
@@ -67,7 +75,8 @@ export function InvoiceList(): React.ReactElement {
 
       <fieldset className="flex flex-col gap-2">
         <legend className="mb-1 text-sm font-medium">Afficher</legend>
-        <div className="flex flex-wrap gap-2">
+        {/* Une ligne qui défile sur téléphone (ADR-0030), plusieurs sur bureau. */}
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0">
           {FILTRES_STATUT.map((f) => {
             const actif = filtres.statut === f.valeur;
             return (
@@ -78,8 +87,8 @@ export function InvoiceList(): React.ReactElement {
                 onClick={() => setFiltres((x) => ({ ...x, statut: f.valeur }))}
                 className={
                   actif
-                    ? 'rounded-full border border-[var(--accent)] px-3 py-1 text-xs font-semibold'
-                    : 'rounded-full border border-[var(--border)] px-3 py-1 text-xs text-[var(--foreground-muted)] hover:border-[var(--accent)]'
+                    ? 'shrink-0 whitespace-nowrap rounded-full border border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--accent)]'
+                    : 'shrink-0 whitespace-nowrap rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs text-[var(--foreground-muted)] hover:border-[var(--accent)]'
                 }
               >
                 {f.label}

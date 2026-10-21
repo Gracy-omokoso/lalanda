@@ -76,6 +76,31 @@ La saisie guidée fonctionne sur mobile. Les tableaux financiers complexes cible
 
 Le français est la langue initiale. Les libellés métier ne doivent pas être codés en dur dans le moteur. La structure prépare l’ajout d’autres langues et conserve les noms légaux locaux dans le Country Pack.
 
+## Implémenté (ADR-0030, en revue) — Refonte : navigation par module, design system, mise en route
+
+Décision, audit et décisions ouvertes : `docs/adr/ADR-0030-refonte-ui-ux.md`. Captures avant/après : `docs/refonte-ui/`. Branche `feat/refonte-ui`, **non publiée** sans revue de la dirigeante.
+
+### Coquille
+
+- **Barre latérale par module** (`(app)/_components/sidebar.tsx`, logique dans `nav-model.ts`, testée) : BUILD (Plans financiers) · RUN (Factures, Clients, Catalogue) · GROW (Pilotage = tableau de bord de l'organisation) · Organisation (Mise en route, Identité visuelle, Fiscalité, Membres, Paramètres, Abonnement). Les trois modules sont reliés par un **rail de trajectoire**. Entrées filtrées par `GET /me/permissions` ; tant qu'elles ne sont pas connues, seules les entrées sans condition s'affichent.
+- **Repli** en rail d'icônes sur bureau (mémorisé par appareil) ; chaque icône garde son nom accessible.
+- **Sélecteur d'organisation** en tête de la barre, avec l'**offre effective** (`GET /organizations/current/subscription`).
+- **Barre du haut** réduite à Aide, thème, avatar (menu du compte inchangé, ADR-0016) et, sous 1024 px, le bouton du **tiroir** de navigation (dialogue modal, focus piégé, `Échap` rend le focus).
+- **Barre d'actions basse** sur téléphone, si le rôle a `sales.read` : Plans · Factures · **Facturer** (si `sales.manage`) · Clients · Menu.
+- Pied : liens légaux et version du logiciel, à toutes les largeurs (ADR-0026 § 6.2). Lien d'évitement « Aller au contenu ».
+
+### Design system
+
+Jetons dans `packages/ui/src/styles/tokens.css` (anciens noms conservés), contrastes vérifiés par test. Composants partagés : `PageHeader` (surtitre de module), `TabsNav` (une ligne défilante sur téléphone), `Stepper`, `Button`, `Badge`, `Alert`, `EmptyState`, `Skeleton`, `DataNature` (hypothèse · prévision · réalisé · suggestion IA : libellé + forme, couleur du module d'origine). Champs de saisie sur `--surface` bordés par `--border-strong` (≥ 3:1). Pages publiques et d'accès : crème de charte conservé (`.surface-marque`).
+
+### Accès selon l'offre
+
+Une fonction non incluse reste visible avec un cadenas et un texte lu (« non inclus dans votre offre ») : onglet « Réalisé » d'un projet quand `actualsEnabled` est faux. La limite de projets s'affiche sur `/projects` avant la création.
+
+### Mise en route
+
+`/organisation/mise-en-route` : identité visuelle → profil fiscal → points de vente → modules. Les étapes 1 à 3 sont les panneaux existants. La progression se **déduit des données enregistrées** (logo principal ou couleur ; fiche fiscale ; au moins un point de vente) : reprenable sur tout appareil, sans état serveur nouveau. Une étape fermée au rôle dit qui peut la faire et ne compte pas dans le total. Une organisation créée depuis le sélecteur y arrive directement ; une carte « Mise en route n/4 » reste dans la barre tant qu'une étape est ouverte. Le choix des modules (étape 4) range la barre latérale et ne retire aucun accès ; il est mémorisé dans le navigateur, par organisation (décision ouverte D3).
+
 ## Implémenté (ADR-0016) — Navigation applicative
 
 La barre du haut et le menu du compte. Décision et justifications : `docs/adr/ADR-0016-navigation-applicative.md`. Écrans : `apps/web/src/app/(app)/_components/`.

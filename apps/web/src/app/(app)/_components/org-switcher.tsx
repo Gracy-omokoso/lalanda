@@ -1,16 +1,27 @@
 'use client';
 
-// Dropdown : liste des orgs du user, marque l'active, permet d'en créer une nouvelle.
+// Sélecteur d'organisation : liste des orgs du user, marque l'active, permet d'en créer une nouvelle.
 // L'org active est stockée dans le cookie `active_org_id`, lu par l'AuthGuard côté API.
 // Un switch = set cookie + router.refresh() pour recharger les données côté serveur.
+//
+// ADR-0030 § 2 : il vit en tête de la barre latérale (panneau pétrole) et dans
+// le tiroir mobile, et affiche sous le nom l'OFFRE EFFECTIVE de l'organisation
+// active — lue par la coquille, jamais déduite ici. Une organisation créée ici
+// ouvre directement sa mise en route.
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
+import { IconeNav } from '@/components/icones-navigation';
 import { api, readActiveOrgCookie, setActiveOrgCookie, type OrganizationView } from '@/lib/api';
 
-export function OrgSwitcher(): React.ReactElement {
+import { PLAN_LABELS, STATUS_LABELS } from '../souscription/_components/subscription-model';
+import { useShell } from './shell-context';
+
+export function OrgSwitcher({ replie = false }: { replie?: boolean }): React.ReactElement {
   const router = useRouter();
+  const { subscription, rafraichir } = useShell();
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const [orgs, setOrgs] = useState<OrganizationView[] | null>(null);
   const [activeId, setActiveId] = useState<string | undefined>();
   const [open, setOpen] = useState(false);
@@ -26,8 +37,18 @@ export function OrgSwitcher(): React.ReactElement {
     function onClickOutside(e: MouseEvent): void {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
     }
+    function onKey(e: KeyboardEvent): void {
+      if (e.key === 'Escape' && rootRef.current?.contains(document.activeElement)) {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    }
     document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onClickOutside);
+      document.removeEventListener('keydown', onKey);
+    };
   }, []);
 
   async function refresh(): Promise<void> {
@@ -47,33 +68,55 @@ export function OrgSwitcher(): React.ReactElement {
     setActiveOrgCookie(orgId);
     setActiveId(orgId);
     setOpen(false);
+    rafraichir();
     router.push('/projects');
     router.refresh();
   }
 
   const active = orgs?.find((o) => o.id === activeId) ?? orgs?.[0];
+  // Offre effective (essai, suspension compris) : c'est ce à quoi l'organisation
+  // a droit aujourd'hui, pas ce qu'elle a souscrit (docs/13).
+  const offre = subscription
+    ? subscription.status === 'trialing'
+      ? `${PLAN_LABELS[subscription.plan]} · ${STATUS_LABELS.trialing.toLowerCase()}`
+      : `Offre ${PLAN_LABELS[subscription.plan]}`
+    : null;
 
   return (
     <div ref={rootRef} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-sm transition hover:bg-[var(--surface-muted)]"
+        title={replie ? (active?.name ?? 'Organisation') : undefined}
+        aria-label={`Organisation active : ${active?.name ?? 'chargement'}${offre ? ` — ${offre}` : ''}. Changer d’organisation`}
+        className={
+          replie
+            ? 'flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] border border-[var(--nav-border)] font-display text-sm font-bold text-[var(--nav-fg)] transition hover:bg-[var(--nav-active-bg)]'
+            : 'flex w-full items-center gap-3 rounded-[var(--radius-md)] border border-[var(--nav-border)] px-3 py-2 text-left text-[var(--nav-fg)] transition hover:bg-[var(--nav-active-bg)]'
+        }
         aria-haspopup="menu"
         aria-expanded={open}
       >
-        <span className="max-w-[160px] truncate font-medium">
-          {active?.name ?? 'Organisation…'}
-        </span>
-        <span aria-hidden className="text-xs opacity-50">
-          ▾
-        </span>
+        {replie ? (
+          <span aria-hidden="true">{(active?.name ?? '·').slice(0, 1).toUpperCase()}</span>
+        ) : (
+          <>
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="truncate text-sm font-semibold">
+                {active?.name ?? 'Organisation…'}
+              </span>
+              <span className="truncate text-xs text-[var(--nav-muted)]">{offre ?? '\u00a0'}</span>
+            </span>
+            <IconeNav id="selecteur" className="h-4 w-4 shrink-0 text-[var(--nav-muted)]" />
+          </>
+        )}
       </button>
 
       {open && orgs ? (
         <div
           role="menu"
-          className="absolute right-0 z-20 mt-2 w-64 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-lg"
+          className="absolute left-0 z-40 mt-2 w-64 text-[var(--foreground)] overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-lg"
         >
           <ul className="max-h-72 overflow-y-auto py-1">
             {orgs.map((o) => (
@@ -124,7 +167,9 @@ export function OrgSwitcher(): React.ReactElement {
             setActiveOrgCookie(org.id);
             await refresh();
             setActiveId(org.id);
-            router.push('/projects');
+            rafraichir();
+            // ADR-0030 § 8 : une organisation neuve commence par sa mise en route.
+            router.push('/organisation/mise-en-route');
             router.refresh();
           }}
         />
@@ -171,7 +216,7 @@ function CreateOrgModal({
         <div className="flex flex-col gap-1">
           <h3 className="text-lg font-semibold">Nouvelle organisation</h3>
           <p className="text-sm text-[var(--foreground-muted)]">
-            Tu deviens owner. Chaque projet appartient à une organisation.
+            Vous en devenez Propriétaire. Une mise en route en quatre étapes vous attend ensuite.
           </p>
         </div>
         <label className="flex flex-col gap-1.5 text-sm">
@@ -184,7 +229,7 @@ function CreateOrgModal({
             placeholder="Ex : Ma PME SARL"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
+            className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
           />
         </label>
         {error ? (

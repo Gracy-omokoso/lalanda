@@ -18,7 +18,7 @@ export default function MarketingLayout({
   const year = new Date().getFullYear();
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="surface-marque flex min-h-screen flex-col">
       <header className="bg-ink border-b border-[var(--ink-border)]">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           {/* `fond="encre"` et non la bascule de thème : ce bandeau est un

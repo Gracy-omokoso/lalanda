@@ -39,14 +39,16 @@ export default function AuthLayout({
   children: React.ReactNode;
 }): React.ReactElement {
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col px-6 py-6">
-      <div className="flex justify-end">
-        <ThemeToggle />
-      </div>
+    // `surface-marque` : les pages d'accès gardent le crème de charte (ADR-0030, D5).
+    <div className="surface-marque min-h-screen">
+      <div className="mx-auto flex min-h-screen max-w-md flex-col px-6 py-6">
+        <div className="flex justify-end">
+          <ThemeToggle />
+        </div>
 
-      <main className="flex flex-1 flex-col">
-        <div className="my-auto flex flex-col gap-8 py-8">
-          {/* La marque est un lien vers l'accueil : ces pages sont souvent la
+        <main className="flex flex-1 flex-col">
+          <div className="my-auto flex flex-col gap-8 py-8">
+            {/* La marque est un lien vers l'accueil : ces pages sont souvent la
               première du produit qu'on voit (un lien d'email, un partage), et
               elles n'offraient aucune sortie vers le site public. Le lockup
               porte déjà le mot « Lalanda », d'où la baseline seule en dessous.
@@ -59,20 +61,21 @@ export default function AuthLayout({
               aucun nom accessible — d'où l'`aria-label` ici, sans quoi le lien
               serait muet. C'est le seul logo de la page depuis la suppression
               de la barre du haut : pas de nom en double. */}
-          <Link
-            href="/"
-            aria-label="Lalanda — accueil"
-            className="flex flex-col items-center gap-2 self-center transition hover:opacity-80"
-          >
-            <BrandLogo hauteur={44} />
-            <span className="text-xs text-[var(--foreground-muted)]">
-              Plan financier bancable en 30 min
-            </span>
-          </Link>
+            <Link
+              href="/"
+              aria-label="Lalanda — accueil"
+              className="flex flex-col items-center gap-2 self-center transition hover:opacity-80"
+            >
+              <BrandLogo hauteur={44} />
+              <span className="text-xs text-[var(--foreground-muted)]">
+                Plan financier bancable en 30 min
+              </span>
+            </Link>
 
-          {children}
-        </div>
-      </main>
+            {children}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
