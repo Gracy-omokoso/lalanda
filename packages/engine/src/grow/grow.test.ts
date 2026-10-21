@@ -257,7 +257,7 @@ describe('burn rate et runway', () => {
   it('runway = solde déclaré ÷ burn ; solde absent, périmé, en autre devise', () => {
     const base = { actuals: project(closed3) };
     const ok = computeInvestorIndicators(
-      inputs({ ...base, declaredCash: { amount: 1200, currency: 'USD', asOf: '2026-07-23' } }),
+      inputs({ ...base, declaredCash: { amount: '1200.00', currency: 'USD', asOf: '2026-07-23' } }),
     );
     expect(ok.indicateurs.runway).toMatchObject({ disponible: true, valeur: 6, unite: 'mois' });
 
@@ -265,11 +265,11 @@ describe('burn rate et runway', () => {
       raison: 'TRESORERIE_NON_DECLAREE',
     });
     const stale = computeInvestorIndicators(
-      inputs({ ...base, declaredCash: { amount: 1200, currency: 'USD', asOf: '2026-07-22' } }),
+      inputs({ ...base, declaredCash: { amount: '1200.00', currency: 'USD', asOf: '2026-07-22' } }),
     );
     expect(stale.indicateurs.runway).toMatchObject({ raison: 'SOLDE_PERIME' });
     const cdf = computeInvestorIndicators(
-      inputs({ ...base, declaredCash: { amount: 1200, currency: 'CDF', asOf: AS_OF } }),
+      inputs({ ...base, declaredCash: { amount: '1200.00', currency: 'CDF', asOf: AS_OF } }),
     );
     expect(cdf.indicateurs.runway).toMatchObject({ raison: 'DEVISE_DIFFERENTE' });
   });
@@ -279,7 +279,7 @@ describe('burn rate et runway', () => {
     const r = computeInvestorIndicators(
       inputs({
         actuals: project(profitable),
-        declaredCash: { amount: 10, currency: 'USD', asOf: AS_OF },
+        declaredCash: { amount: '10.00', currency: 'USD', asOf: AS_OF },
       }),
     );
     expect(r.indicateurs.burn_rate).toMatchObject({ disponible: true, valeur: 0 });
@@ -409,7 +409,7 @@ function healthyInputs(): GrowInputs {
   return inputs({
     actuals: project(periods),
     sales,
-    declaredCash: { amount: 1200, currency: 'USD', asOf: AS_OF },
+    declaredCash: { amount: '1200.00', currency: 'USD', asOf: AS_OF },
   });
 }
 
@@ -464,7 +464,7 @@ describe('computeHealthScore', () => {
       inputs({
         actuals: project(periods),
         sales,
-        declaredCash: { amount: 500, currency: 'USD', asOf: AS_OF },
+        declaredCash: { amount: '500.00', currency: 'USD', asOf: AS_OF },
       }),
     );
     const h = computeHealthScore(r, 'GROWTH');
@@ -609,7 +609,7 @@ describe('propriétés', { timeout: 120_000 }, () => {
       sales,
       declaredCash:
         rand() < 0.7
-          ? { amount: Math.round(rand() * 20000), currency: 'USD', asOf: '2026-10-01' }
+          ? { amount: `${Math.round(rand() * 20000)}.00`, currency: 'USD', asOf: '2026-10-01' }
           : null,
       recurringCatalogItemIds: rand() < 0.5 ? ['abo'] : [],
     });

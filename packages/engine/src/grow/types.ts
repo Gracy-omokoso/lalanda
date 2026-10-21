@@ -96,7 +96,8 @@ export interface GrowSalesDocument {
 
 /** Solde de trésorerie déclaré par l'utilisateur dans GROW (hypothèse, ADR-0032 § 1). */
 export interface GrowDeclaredCash {
-  amount: number;
+  /** Décimal canonique ≥ 0, deux décimales au plus (docs/26 : un montant est une chaîne). */
+  amount: string;
   currency: string;
   asOf: GrowDate;
 }

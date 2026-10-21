@@ -7,7 +7,7 @@
 // zéro (docs/08, règle cardinale).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { Fixed } from '../invoice-totals/decimal.js';
+import { parseFixed, type Fixed } from '../invoice-totals/decimal.js';
 import {
   compareMonths,
   daysBetween,
@@ -480,6 +480,14 @@ export function computeInvestorIndicators(inputs: GrowInputs): GrowIndicatorsRes
         sources,
         [HYP_CASH],
       );
+    } else if (parseFixed(cash.amount) === null) {
+      out.runway = unavailable(
+        'runway',
+        'SOLDE_INVALIDE',
+        `Le solde déclaré n’est pas un montant lisible (${JSON.stringify(cash.amount)}).`,
+        sources,
+        [HYP_CASH],
+      );
     } else if (burn.value === 0) {
       out.runway = unavailable(
         'runway',
@@ -490,7 +498,7 @@ export function computeInvestorIndicators(inputs: GrowInputs): GrowIndicatorsRes
       );
     } else {
       out.runway = available('runway', {
-        valeur: round(Math.max(0, cash.amount) / burn.value, 1),
+        valeur: round(fixedToNumber(parseFixed(cash.amount)!) / burn.value, 1),
         unite: 'mois',
         devise: null,
         sources,
