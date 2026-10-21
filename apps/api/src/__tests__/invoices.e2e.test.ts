@@ -650,6 +650,7 @@ e2eSuite('ventes — factures et avoirs (ADR-0023 chantier E2)', () => {
       expect(Object.keys(enBase?.['taxRates']?.['rates'] ?? {}).join('')).toBe('ABCDEFGHIJKLMNOP');
       expect(enBase?.['calculationVersion']).toBe('1.1.0');
       expect(enBase?.['roundingPolicyId']).toBe('dgi-cd-2026.2');
+      expect(enBase).toMatchObject({ fiscalSeq: 1, fiscalYear: year });
       expect(contentSha256Of(enBase as Record<string, unknown>)).toBe(enBase?.['contentSha256']);
       const client = await db.collection('customers').findOne({ _id: new ObjectId(customerPM) });
       expect(client?.['firstInvoicedAt']).toBeInstanceOf(Date);
@@ -744,6 +745,8 @@ e2eSuite('ventes — factures et avoirs (ADR-0023 chantier E2)', () => {
       const seqs = parsed.map((p) => p!.seq);
       expect(seqs).toEqual(Array.from({ length: seqs.length }, (_, i) => i + 1));
       expect(seqs.length).toBeGreaterThanOrEqual(51);
+      // ADR-0027, amendement du 21 oct. 2026 : le rang est stocké tel quel.
+      expect(all.map((d) => d['fiscalSeq'])).toEqual(seqs);
       for (let i = 1; i < all.length; i += 1) {
         expect((all[i]!['issuedAt'] as Date).getTime()).toBeGreaterThanOrEqual(
           (all[i - 1]!['issuedAt'] as Date).getTime(),
@@ -921,6 +924,113 @@ e2eSuite('ventes — factures et avoirs (ADR-0023 chantier E2)', () => {
         .collection('sales_invoice_counters')
         .findOne({ organizationId: org, series: 'test', year: 2026 });
       expect(apres?.['last']).toBe(2);
+    });
+
+    it('rang fiscal : index unique {organisation, série, année, rang}, chaînes différentes comprises', async () => {
+      clearThrottle();
+      await emettre(asA('owner'));
+      await emettre(asA('owner'));
+      const emis = await db
+        .collection('sales_invoices')
+        .find({ organizationId: orgA, status: 'issued', fiscalSeq: { $type: 'number' } })
+        .sort({ fiscalSeq: -1 })
+        .limit(2)
+        .toArray();
+      expect(emis).toHaveLength(2);
+      const [a, b] = emis as [Record<string, any>, Record<string, any>];
+      // `IN…-000001` et `AV…-000001` seraient deux chaînes : le rang, lui, est unique.
+      await expect(
+        db
+          .collection('sales_invoices')
+          .updateOne({ _id: b['_id'] }, { $set: { fiscalSeq: a['fiscalSeq'] } }),
+      ).rejects.toMatchObject({ code: 11000 });
+      // Une autre année, ou l'autre série, ne heurte rien (rétabli aussitôt).
+      await db
+        .collection('sales_invoices')
+        .updateOne({ _id: b['_id'] }, { $set: { fiscalSeq: a['fiscalSeq'], series: 'test' } });
+      await db
+        .collection('sales_invoices')
+        .updateOne({ _id: b['_id'] }, { $set: { fiscalSeq: b['fiscalSeq'], series: 'real' } });
+      const index = (await db.collection('sales_invoices').indexes()).find(
+        (i) => Object.keys(i.key).join('+') === 'organizationId+series+fiscalYear+fiscalSeq',
+      );
+      expect(index).toMatchObject({
+        unique: true,
+        partialFilterExpression: { fiscalSeq: { $type: 'number' } },
+      });
+    });
+
+    it('migration 20261021-0001 : rang renseigné sur l’existant, idempotente, numéro et empreinte intacts', async () => {
+      const chemin = new URL(
+        '../../migrations/20261021-0001-rang-fiscal-factures.mjs',
+        import.meta.url,
+      ).href;
+      const migration = (await import(chemin)) as {
+        up(db: Db): Promise<void>;
+        rankOf(n: string): { series: string; year: number; seq: number } | null;
+      };
+      // Lecture des deux formes, rejet des formes inconnues.
+      expect(migration.rankOf('2026-000001')).toEqual({ series: 'real', year: 2026, seq: 1 });
+      expect(migration.rankOf('TEST-2026-000004')).toEqual({ series: 'test', year: 2026, seq: 4 });
+      expect(migration.rankOf('AV2611-000043')).toEqual({ series: 'real', year: 2026, seq: 43 });
+      expect(migration.rankOf('TEST-IN2610-1000000')).toEqual({
+        series: 'test',
+        year: 2026,
+        seq: 1_000_000,
+      });
+      expect(migration.rankOf('PF2610-000003')).toBeNull();
+      expect(migration.rankOf('IN2613-000001')).toBeNull();
+
+      const avant = await db
+        .collection('sales_invoices')
+        .find({ organizationId: orgA, number: { $type: 'string' } })
+        .toArray();
+      expect(avant.length).toBeGreaterThanOrEqual(3);
+      // Documents d'avant le rang : champ retiré, et deux numéros de l'ancienne forme.
+      await db
+        .collection('sales_invoices')
+        .updateMany({ organizationId: orgA }, { $unset: { fiscalSeq: '' } });
+      const org = `org-migration-${tag}`;
+      const anciens = [
+        { _id: new ObjectId(), number: '2026-000001', series: 'real', fiscalYear: 2026 },
+        { _id: new ObjectId(), number: 'TEST-2026-000001', series: 'test', fiscalYear: null },
+      ];
+      await db.collection('sales_invoices').insertMany(
+        anciens.map((d) => ({
+          ...d,
+          organizationId: org,
+          proformaRef: `PF-migration-${String(d._id)}`,
+          status: 'issued',
+          contentSha256: `empreinte-${String(d._id)}`,
+        })),
+      );
+
+      await migration.up(db);
+      await migration.up(db); // rejouée : rien ne change, aucune erreur
+
+      const apres = await db
+        .collection('sales_invoices')
+        .find({ organizationId: { $in: [orgA, org] }, number: { $type: 'string' } })
+        .toArray();
+      const parId = new Map(apres.map((d) => [String(d['_id']), d]));
+      for (const d of avant) {
+        const m = parId.get(String(d['_id']))!;
+        expect(m['number']).toBe(d['number']);
+        expect(m['contentSha256']).toBe(d['contentSha256']);
+        expect(m['fiscalSeq']).toBe(parseInvoiceNumber(String(d['number']))!.seq);
+        expect(m['fiscalYear']).toBe(d['fiscalYear']);
+      }
+      expect(parId.get(String(anciens[0]!._id))).toMatchObject({
+        number: '2026-000001',
+        fiscalSeq: 1,
+        fiscalYear: 2026,
+        contentSha256: `empreinte-${String(anciens[0]!._id)}`,
+      });
+      expect(parId.get(String(anciens[1]!._id))).toMatchObject({ fiscalSeq: 1, fiscalYear: 2026 });
+      expect(
+        await db.collection('_migrations').findOne({ name: '20261021-0001-rang-fiscal-factures' }),
+      ).toBeTruthy();
+      await db.collection('sales_invoices').deleteMany({ organizationId: org });
     });
 
     it('échec après l’incrément → aucun numéro consommé', async () => {

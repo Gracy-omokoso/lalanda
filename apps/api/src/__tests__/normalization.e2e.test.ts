@@ -406,6 +406,11 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
         reservedNumber: rn,
         actions: { retry: false, check: false, declareNotNormalized: false, backToDraft: false },
       });
+      // ADR-0027, amendement du 21 oct. 2026 : rang de la série d'essai stocké.
+      expect(await enBase(view.id)).toMatchObject({
+        fiscalSeq: Number(rn.slice(-6)),
+        fiscalYear: 2000 + Number(rn.slice(7, 9)),
+      });
       // Date DGI (heure de Kinshasa) → issuedAt.
       const [d, m, y, hh, mm, ss] = rec.security!.dateTime.split(/[/ :]/);
       expect(view.issuedAt).toBe(new Date(`${y}-${m}-${d}T${hh}:${mm}:${ss}+01:00`).toISOString());

@@ -108,6 +108,14 @@ export class SalesInvoice {
   @Prop({ type: Number, default: null })
   fiscalYear!: number | null;
 
+  /**
+   * Rang numérique du numéro définitif dans la série de l'année (ADR-0027,
+   * amendement du 21 oct. 2026) : `42` pour `IN2610-000042` comme pour
+   * `AV2611-000042`. Protégé par l'index unique ci-dessous. `null` sans numéro.
+   */
+  @Prop({ type: Number, default: null })
+  fiscalSeq!: number | null;
+
   @Prop({ type: Date, default: null })
   issuedAt!: Date | null;
 
@@ -216,6 +224,13 @@ SalesInvoiceSchema.index({ organizationId: 1, status: 1 });
 SalesInvoiceSchema.index(
   { organizationId: 1, series: 1, number: 1 },
   { unique: true, partialFilterExpression: { number: { $type: 'string' } } },
+);
+// ADR-0027, amendement du 21 oct. 2026 : un RANG n'existe qu'une fois par
+// organisation, série et année — `IN2610-000042` et `AV2611-000042` sont deux
+// chaînes distinctes, mais pas deux rangs. Filet sous le compteur et le bail.
+SalesInvoiceSchema.index(
+  { organizationId: 1, series: 1, fiscalYear: 1, fiscalSeq: 1 },
+  { unique: true, partialFilterExpression: { fiscalSeq: { $type: 'number' } } },
 );
 SalesInvoiceSchema.index({ organizationId: 1, proformaRef: 1 }, { unique: true });
 SalesInvoiceSchema.index({ organizationId: 1, 'creditNote.originInvoiceId': 1 });
