@@ -192,7 +192,7 @@ ni `ENGINE_VERSION` ni `INVOICE_TOTALS_VERSION`.
 **Import / export CSV** : contacts et opportunités. Séparateur `;` (Excel francophone), `,`
 accepté à l'import, UTF-8 avec BOM à l'export, cellules commençant par `= + - @` neutralisées
 (injection de formule). Import **tout ou rien** : toutes les lignes sont validées, la
-moindre erreur renvoie `400` avec le numéro de ligne et rien n'est créé ; 1 000 lignes au plus.
+moindre erreur renvoie `400` avec le numéro de ligne et rien n'est créé ; 500 lignes et 100 Ko au plus (essai à blanc possible : `dryRun`).
 Rattachement par NIF du client et e-mail du contact. Les exports sont journalisés (audit
 strict : données personnelles).
 

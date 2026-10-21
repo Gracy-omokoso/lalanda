@@ -55,6 +55,11 @@ import { InvoicesController } from '../sales/invoices/invoices.controller.js';
 import { JournalController } from '../sales/invoices/journal.controller.js';
 import { NormalizationController } from '../sales/normalization/normalization.controller.js';
 import { TaxGroupsController } from '../sales/tax-groups.controller.js';
+import { QuotesController } from '../sales/quotes/quotes.controller.js';
+import { CrmActivitiesController } from '../crm/crm-activities.controller.js';
+import { CrmContactsController } from '../crm/crm-contacts.controller.js';
+import { CrmOpportunitiesController } from '../crm/crm-opportunities.controller.js';
+import { CrmSettingsController } from '../crm/crm-settings.controller.js';
 import { AuditController } from './audit.controller.js';
 import { REQUIRED_PERMISSIONS_KEY, REQUIRED_PLATFORM_ROLES_KEY } from './authz.decorators.js';
 import { MeController } from './me.controller.js';
@@ -112,6 +117,12 @@ const CONTROLEURS = [
   BrandingController,
   BrandAssetImageController,
   InvoiceTemplatesController,
+  // ADR-0035 — devis et CRM minimal.
+  QuotesController,
+  CrmSettingsController,
+  CrmContactsController,
+  CrmOpportunitiesController,
+  CrmActivitiesController,
 ];
 
 /**
@@ -443,6 +454,42 @@ describe('couverture des routes par le RBAC', () => {
       'InvoiceTemplatesController.list': ['sales.read'],
       'InvoiceTemplatesController.put': ['organization.manage'],
       'InvoiceTemplatesController.preview': ['sales.read'],
+      // ── Devis (ADR-0035 § 4) : n'engagent pas le contribuable ─────────────
+      'QuotesController.list': ['sales.read'],
+      'QuotesController.get': ['sales.read'],
+      'QuotesController.pdf': ['sales.read'],
+      'QuotesController.create': ['sales.manage'],
+      'QuotesController.put': ['sales.manage'],
+      'QuotesController.remove': ['sales.manage'],
+      'QuotesController.send': ['sales.manage'],
+      'QuotesController.accept': ['sales.manage'],
+      'QuotesController.refuse': ['sales.manage'],
+      'QuotesController.newVersion': ['sales.manage'],
+      'QuotesController.convert': ['sales.manage'],
+      // ── CRM minimal (ADR-0035 § 3) ────────────────────────────────────────
+      'CrmSettingsController.get': ['crm.read'],
+      'CrmSettingsController.put': ['crm.manage'],
+      'CrmSettingsController.pipeline': ['crm.read'],
+      'CrmContactsController.list': ['crm.read'],
+      'CrmContactsController.get': ['crm.read'],
+      'CrmContactsController.create': ['crm.manage'],
+      'CrmContactsController.put': ['crm.manage'],
+      'CrmContactsController.remove': ['crm.manage'],
+      'CrmContactsController.export': ['crm.manage'],
+      'CrmContactsController.import': ['crm.manage'],
+      'CrmOpportunitiesController.list': ['crm.read'],
+      'CrmOpportunitiesController.get': ['crm.read'],
+      'CrmOpportunitiesController.create': ['crm.manage'],
+      'CrmOpportunitiesController.put': ['crm.manage'],
+      'CrmOpportunitiesController.move': ['crm.manage'],
+      'CrmOpportunitiesController.remove': ['crm.manage'],
+      'CrmOpportunitiesController.export': ['crm.manage'],
+      'CrmOpportunitiesController.import': ['crm.manage'],
+      'CrmActivitiesController.list': ['crm.read'],
+      'CrmActivitiesController.create': ['crm.manage'],
+      'CrmActivitiesController.put': ['crm.manage'],
+      'CrmActivitiesController.complete': ['crm.manage'],
+      'CrmActivitiesController.remove': ['crm.manage'],
     };
     for (const [cle, actions] of Object.entries(attendu)) {
       const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle);

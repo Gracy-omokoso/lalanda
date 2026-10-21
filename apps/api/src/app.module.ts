@@ -10,6 +10,7 @@ import { AuthModule } from './auth/auth.module.js';
 import { AuthzModule } from './authz/authz.module.js';
 import { BillingModule } from './billing/billing.module.js';
 import { BrandingModule } from './branding/branding.module.js';
+import { CrmModule } from './crm/crm.module.js';
 import { CanvasModule } from './canvas/canvas.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { EdefModule } from './edef/edef.module.js';
@@ -29,6 +30,7 @@ import { PlatformConfigModule } from './platform-config/platform-config.module.j
 import { ProjectsModule } from './projects/projects.module.js';
 import { ReportsModule } from './reports/reports.module.js';
 import { SalesModule } from './sales/sales.module.js';
+import { QuotesModule } from './sales/quotes/quotes.module.js';
 import { SchedulerModule } from './scheduler/scheduler.module.js';
 import { ThrottlingModule } from './security/throttling.module.js';
 import { StorageModule } from './storage/storage.module.js';
@@ -105,6 +107,9 @@ import { StorageModule } from './storage/storage.module.js';
     BrandingModule,
     // ADR-0022 — clients et catalogue (lot S25c).
     SalesModule,
+    // ADR-0035 — CRM minimal, puis devis (qui consomment ventes et CRM).
+    CrmModule,
+    QuotesModule,
   ],
   controllers: [HealthController, EvaluateController],
 })

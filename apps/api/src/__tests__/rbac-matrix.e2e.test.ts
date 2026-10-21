@@ -463,6 +463,24 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
           .set('Cookie', c)
           .send({ expectedRevision: 1 }),
     },
+    {
+      // ADR-0035 § 3 — mêmes rôles que `sales.read`.
+      action: 'crm.read',
+      libelle: 'GET /crm/pipeline',
+      statutsAutorises: [200],
+      envoyer: (c) => request(serveur()).get('/crm/pipeline').set('Cookie', c),
+    },
+    {
+      // ADR-0035 § 3 — mêmes rôles que `sales.manage`. Un prospect nommé par rôle.
+      action: 'crm.manage',
+      libelle: 'POST /crm/contacts',
+      statutsAutorises: [201],
+      envoyer: (c, role) =>
+        request(serveur())
+          .post('/crm/contacts')
+          .set('Cookie', c)
+          .send({ name: `Sonde CRM ${role} ${tag}`, companyName: 'Sonde' }),
+    },
   ];
 
   // ───────────────────────────────────────────────────────────────────────────
