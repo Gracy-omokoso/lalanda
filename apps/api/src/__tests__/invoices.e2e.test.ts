@@ -40,6 +40,7 @@ import {
   parseInvoiceNumber,
 } from '../sales/invoices/invoice-numbering.service.js';
 import { dbOf, e2eSuite, makeE2EApp, registerAndLogin } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 const tag = randomBytes(4).toString('hex');
 process.env['MONGODB_DB'] = `lalanda_e2e_invoices_${tag}`;
@@ -396,7 +397,7 @@ e2eSuite('ventes — factures et avoirs (ADR-0023 chantier E2)', () => {
     const a2 = await article({ code: 'LICENCE-USD', currency: 'USD', unitPrice: '50.00' });
     expect(a2.status, JSON.stringify(a2.body)).toBe(201);
     itemUsd = a2.body.id;
-  }, 240_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   beforeEach(() => clearThrottle());
 
@@ -407,7 +408,7 @@ e2eSuite('ventes — factures et avoirs (ADR-0023 chantier E2)', () => {
       await app?.close();
       await fake?.close();
     }
-  }, 60_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   // ── Prérequis : aucun instantané de taux ─────────────────────────────────
 
@@ -703,6 +704,11 @@ e2eSuite('ventes — factures et avoirs (ADR-0023 chantier E2)', () => {
       expect(JSON.stringify(ev)).not.toContain('Client Exemple');
     });
 
+    // Délai propre (600 s, celui du test des 50 normalisations) : 50 brouillons
+    // préparés en série puis 50 émissions en concurrence sur le même compteur.
+    // Le délai du fichier (120 s) expirait sous charge pendant la préparation des
+    // brouillons, avant même les émissions, et le test suivant (liste), qui lit
+    // ces factures, échouait en cascade.
     it('50 émissions concurrentes, factures et avoirs mêlés → une seule série IN/AV contiguë, dates croissantes, journal sans trou', async () => {
       const drafts: Record<string, any>[] = [];
       for (let i = 0; i < 50; i += 1) {
@@ -754,7 +760,7 @@ e2eSuite('ventes — factures et avoirs (ADR-0023 chantier E2)', () => {
       expect(journal.body.chainValid).toBe(true);
       const seqJ = (journal.body.items as { seq: number }[]).map((e) => e.seq).reverse();
       expect(seqJ).toEqual(Array.from({ length: seqJ.length }, (_, i) => i + 1));
-    });
+    }, 600_000);
 
     it('liste : statut final, recherche par numéro, curseur', async () => {
       const page = await get(asA('viewer'), '/sales/invoices?status=final&limit=10');

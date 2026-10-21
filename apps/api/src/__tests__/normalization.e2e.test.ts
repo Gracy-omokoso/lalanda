@@ -31,6 +31,7 @@ import { NormalizationRecorder } from '../sales/normalization/normalization-reco
 import { NormalizationReconciliationJob } from '../sales/normalization/reconciliation.job.js';
 import { ReferenceRefreshJob } from '../sales/normalization/reference-refresh.job.js';
 import { dbOf, e2eSuite, makeE2EApp, registerAndLogin } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 const tag = randomBytes(4).toString('hex');
 process.env['MONGODB_DB'] = `lalanda_e2e_normalisation_${tag}`;
@@ -41,7 +42,8 @@ process.env['DGI_ISF_TEST'] = process.env['DGI_ISF_TEST'] || 'ISF-TEST-E2E';
 process.env['DGI_HTTP_TIMEOUT_MS'] = '10000';
 delete process.env['DGI_PRODUCTION_ENABLED'];
 
-vi.setConfig({ testTimeout: 600_000 });
+const DELAI_TEST_MS = 600_000;
+vi.setConfig({ testTimeout: DELAI_TEST_MS });
 
 const MOT_DE_PASSE = 'Passw0rd!normalisation';
 const NIF_N = 'A0000000X';
@@ -360,7 +362,7 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
     });
     expect(clientB.status, JSON.stringify(clientB.body)).toBe(201);
     customerB = clientB.body.id;
-  }, 300_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   beforeEach(() => {
     clearThrottle();
@@ -374,7 +376,7 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
       await app?.close();
       await fake?.close();
     }
-  }, 60_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   // ── Nominal ─────────────────────────────────────────────────────────────
 
@@ -845,6 +847,12 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
     });
 
     it('série sans trou ni doublon sous 50 normalisations concurrentes avec coupures', async () => {
+      // Borne de temps du diagnostic : dériver du délai du test, avec une minute
+      // de marge pour l'état et les assertions finales. Une borne fixe (240 s)
+      // expirait sous charge alors que chaque tour progressait : c'était le
+      // délai, pas un blocage. Le blocage, lui, est détecté par l'absence de
+      // progrès (`sansProgres`), indépendante de la vitesse de la machine.
+      const finDuDiagnostic = Date.now() + DELAI_TEST_MS - 60_000;
       const ids: string[] = [];
       for (let i = 0; i < 50; i++) {
         if (i % 20 === 0) clearThrottle();
@@ -919,7 +927,7 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
         if (pending.length < restantsAvant) sansProgres = 0;
         else sansProgres += 1;
         restantsAvant = pending.length;
-        if (round >= 150 || sansProgres >= 15 || Date.now() - debut > 240_000) {
+        if (round >= 150 || sansProgres >= 15 || Date.now() > finDuDiagnostic) {
           throw new Error(`Normalisations bloquées au tour ${round} : ${await etat()}`);
         }
         const t0 = Date.now();

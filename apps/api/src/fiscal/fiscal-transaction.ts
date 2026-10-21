@@ -5,8 +5,32 @@
 // pas du tout » n'a de valeur que si elle est une propriété de la base. Une
 // topologie sans transaction (Mongo autonome) doit échouer bruyamment, pas
 // écrire à moitié.
+//
+// ── Rejeu avec attente ───────────────────────────────────────────────────────
+// `withTransaction` (driver mongodb 6.20) rejoue une transaction en conflit
+// d'écriture (`TransientTransactionError`) IMMÉDIATEMENT, en boucle, pendant au
+// plus 120 s. Quand N transactions visent le même document — le compteur de
+// numérotation sous 50 émissions ou normalisations simultanées —, elles se
+// rejouent au même instant et s'annulent de nouveau : chaque vague n'en valide
+// qu'une, les autres consomment leur budget. Constaté sous charge le 21 oct.
+// 2026 : une normalisation a reçu « Write conflict during plan execution »
+// APRÈS 120 s de rejeux, soit une erreur 500 alors qu'aucune règle n'était
+// violée. Les rejeux sont donc espacés d'une attente exponentielle avec gigue
+// (5 ms, ×1,5, plafond 500 ms), qui désynchronise les concurrents. L'attente a
+// lieu au DÉBUT d'une nouvelle tentative, avant toute commande : la transaction
+// n'existe pas encore côté serveur, rien n'est verrouillé pendant l'attente.
 
 import type { ClientSession, Connection } from 'mongoose';
+
+const BACKOFF_INITIAL_MS = 5;
+const BACKOFF_GROWTH = 1.5;
+const BACKOFF_MAX_MS = 500;
+
+/** Attente avant la tentative n° `attempt` (≥ 2) : gigue pleine sous un plafond exponentiel. */
+export function transactionBackoffMs(attempt: number, random: () => number = Math.random): number {
+  const ceiling = Math.min(BACKOFF_INITIAL_MS * BACKOFF_GROWTH ** (attempt - 2), BACKOFF_MAX_MS);
+  return random() * ceiling;
+}
 
 export async function inFiscalTransaction<T>(
   connection: Connection,
@@ -15,7 +39,12 @@ export async function inFiscalTransaction<T>(
   const session = await connection.startSession();
   try {
     let result!: T;
+    let attempt = 0;
     await session.withTransaction(async () => {
+      attempt += 1;
+      if (attempt > 1) {
+        await new Promise((resolve) => setTimeout(resolve, transactionBackoffMs(attempt)));
+      }
       result = await fn(session);
     });
     return result;

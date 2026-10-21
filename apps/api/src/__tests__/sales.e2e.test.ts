@@ -18,6 +18,7 @@ import { EdefReferenceSnapshotsService } from '../edef/edef-reference-snapshots.
 import { CustomersService } from '../sales/customers.service.js';
 import { SalesUsageService } from '../sales/sales-usage.service.js';
 import { dbOf, e2eSuite, makeE2EApp, registerAndLogin } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 const tag = randomBytes(4).toString('hex');
 process.env['MONGODB_DB'] = `lalanda_e2e_sales_${tag}`;
@@ -154,7 +155,7 @@ e2eSuite('ventes — clients, catalogue, groupes de taxation (ADR-0022 chantier 
       createdAt: new Date(),
       updatedAt: new Date(),
     });
-  }, 180_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   beforeEach(() => {
     // Quota global (100 req/min par IP) : on vide le compteur, on ne désactive pas le garde.
@@ -175,7 +176,7 @@ e2eSuite('ventes — clients, catalogue, groupes de taxation (ADR-0022 chantier 
     } finally {
       await app?.close();
     }
-  }, 60_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   // ── Permissions ─────────────────────────────────────────────────────────
 

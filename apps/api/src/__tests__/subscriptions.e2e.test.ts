@@ -36,6 +36,7 @@ import { BILLING_INTERVALS, PLAN_ENTITLEMENTS, PLANS, priceCents } from '@laland
 import { addDays } from '../billing/proration.js';
 import { hmacSha256Hex } from '../payments/webhook-signature.js';
 import { dbOf, e2eSuite, makeE2EApp, teardown } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 /**
  * Un couple (plan, périodicité) SANS TARIF PUBLIÉ, cherché dans le catalogue.
@@ -159,7 +160,7 @@ e2eSuite('abonnements de bout en bout (S22b)', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
     });
-  }, 90_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
     try {
@@ -172,7 +173,7 @@ e2eSuite('abonnements de bout en bout (S22b)', () => {
     } finally {
       await teardown(app, [alice.email, bob.email, admin.email]);
     }
-  }, 30_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   async function primaryOrgId(cookies: string[]): Promise<string> {
     const res = await request(app.getHttpServer()).get('/organizations').set('Cookie', cookies);

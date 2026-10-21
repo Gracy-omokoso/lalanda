@@ -29,6 +29,7 @@ import { PointsOfSaleService } from '../fiscal/points-of-sale.service.js';
 import { MailTransport } from '../mail/mail.transport.js';
 import type { MailMessage } from '../mail/mail.types.js';
 import { dbOf, e2eSuite, makeE2EApp, registerAndLogin } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 const tag = randomBytes(4).toString('hex');
 process.env['MONGODB_DB'] = `lalanda_e2e_fiscal_${tag}`;
@@ -204,7 +205,7 @@ e2eSuite('fiscalité — fiche, facture normalisée, points de vente (ADR-0021 c
     cookies['ownerB'] = await registerAndLogin(app, compte('ownerB'));
     const orgsB = await request(server()).get('/organizations').set('Cookie', cookies['ownerB']);
     orgB = (orgsB.body.organizations as { id: string }[])[0]!.id;
-  }, 120_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   beforeEach(() => {
     // Les quotas (100 req/min par IP, 10 écritures/h par utilisateur) protègent la
@@ -220,7 +221,7 @@ e2eSuite('fiscalité — fiche, facture normalisée, points de vente (ADR-0021 c
       await app?.close();
       await fake?.close();
     }
-  }, 60_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   // ── RBAC ──────────────────────────────────────────────────────────────────
 
