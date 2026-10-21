@@ -220,3 +220,19 @@ Règles :
   (`OpenAITimeoutError`, `OpenAITruncatedResponseError`, `ClientAbsent`…).
   L’absence totale de client OpenAI est signalée une fois par processus — c’est
   un état de configuration, pas un incident par requête.
+
+## Brief du matin (ADR-0033)
+
+`GET /morning-brief` rend les **faits** (chiffre d'affaires du mois, créances, factures
+normalisées en anomalie, trésorerie « à renseigner »…) et les **alertes et recommandations**
+produits par les règles déterministes du moteur (`packages/engine/src/morning-brief/`) :
+chaque élément cite ses faits et son seuil. `POST /morning-brief/explanation` demande à l'IA
+un paragraphe d'explication (`explain`) ou les actions de la semaine (`this_week`) :
+
+- le modèle ne reçoit que les agrégats de l'organisation de la session, encadrés comme
+  données non fiables — aucun nom, aucune coordonnée, aucun texte saisi par un utilisateur;
+- tout nombre cité est vérifié contre les faits (`lala-nombres.ts`), toute source citée doit
+  exister; un rejet retombe sur le texte déterministe;
+- quota mensuel commun (`ai.morning_brief`), cache par empreinte des faits et par jour;
+- journal `morning_brief_ai_logs` (prompt d'agrégats, réponse, issue), expiration TTL;
+- désactivable par organisation et par la plateforme (`MORNING_BRIEF_AI=off`).
