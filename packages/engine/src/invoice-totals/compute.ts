@@ -12,6 +12,7 @@
 
 import {
   SCALE,
+  fixedOf,
   formatAmount,
   formatTrimmed,
   hasAtMostDecimals,
@@ -28,6 +29,7 @@ import { isItemTypeAllowed, isTaxGroupLetter, taxGroupDefinition } from './tax-g
 import {
   ITEM_TYPES,
   TAX_GROUP_LETTERS,
+  type DecimalString,
   type GroupTotals,
   type InvoiceLineInput,
   type InvoiceTotalsInput,
@@ -493,4 +495,21 @@ export function computeInvoiceTotals(input: InvoiceTotalsInput): InvoiceTotalsRe
       vatTotal: formatAmount(vatTotal),
     },
   };
+}
+
+/**
+ * Total HT d'une facture (ADR-0028, décision ouverte n° 1, tranchée le 21 oct.
+ * 2026) : SOMME des bases HT des groupes (`GroupTotals.ht`, taxe spécifique
+ * comprise), au centime, sans aucun arrondi supplémentaire — chaque base est déjà
+ * arrondie par la politique du calcul. Ce n'est pas une donnée échangée avec la
+ * DGI : elle sert à l'impression (« Total HT » des modèles de facture).
+ *
+ * Fonction pure sur les groupes, et non champ de `InvoiceTotals` : le calcul
+ * figé dans les factures déjà gelées (et leur empreinte) reste inchangé, et ces
+ * factures obtiennent le même total HT que les nouvelles.
+ */
+export function invoiceHtTotal(groups: readonly Pick<GroupTotals, 'ht'>[]): DecimalString {
+  let sum = 0n;
+  for (const g of groups) sum += fixedOf(g.ht);
+  return formatAmount(sum);
 }

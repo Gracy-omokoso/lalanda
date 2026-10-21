@@ -2,6 +2,8 @@
 // contenu » prouvée pour CHAQUE modèle × CHAQUE option × chaque sorte de
 // document (ADR-0028 § 2 ; mentions d'ADR-0025). Sans navigateur.
 
+import { createHash } from 'node:crypto';
+
 import { describe, expect, it } from 'vitest';
 
 import { esc } from '../invoice-document-html.js';
@@ -30,7 +32,12 @@ import {
   templateCatalog,
 } from './registry.js';
 import { renderDocumentHtml, initialsOf, type ResolvedPresentation } from './template-engine.js';
-import { PALETTES, type InvoiceTemplate, type TemplateOptions } from './template.contract.js';
+import {
+  INVOICE_TEMPLATE_IDS,
+  PALETTES,
+  type InvoiceTemplate,
+  type TemplateOptions,
+} from './template.contract.js';
 import { contrastRatio, readableOn } from '../../../branding/colors.js';
 import { themeOf } from './theme.js';
 
@@ -74,7 +81,10 @@ describe('catalogue', () => {
       'Éditoriale',
     ]);
     expect(templateCatalog()).toHaveLength(6);
-    expect(templateAt('bandeau', '1.0.0')).toBe(latestTemplate('bandeau'));
+    // ADR-0028 § 4 : toutes les versions publiées restent ; le choix pointe la dernière.
+    expect(templateAt('bandeau', '1.1.0')).toBe(latestTemplate('bandeau'));
+    expect(templateAt('bandeau', '1.0.0')?.version).toBe('1.0.0');
+    expect(templateCatalog().map((t) => t.version)).toEqual(Array(6).fill('1.1.0'));
     expect(templateAt('bandeau', '9.9.9')).toBeNull();
     expect(templateAt('inconnu', '1.0.0')).toBeNull();
   });
@@ -354,5 +364,76 @@ describe('options et couleurs', () => {
     expect(initialsOf('Exemple SARL')).toBe('ES');
     expect(initialsOf('  société   d’études ')).toBe('SD');
     expect(initialsOf('')).toBe('·');
+  });
+});
+
+// ── « Total HT » (1.1.0) et réimpression des factures gelées en 1.0.0 ─────────
+
+/**
+ * Empreintes du rendu 1.0.0 des six modèles (cas `documentCases`, options par
+ * défaut, logos), relevées le 21 oct. 2026 AVANT l'ajout de la version 1.1.0.
+ * Une facture gelée avec `…@1.0.0` doit se réimprimer octet pour octet : si une
+ * de ces valeurs change, c'est une version publiée qui a bougé — interdit
+ * (ADR-0028 § 4) ; publier une nouvelle version à la place.
+ */
+const EMPREINTES_1_0_0: Record<string, string> = {
+  classique: '4eec7d896bc6dcc914dc91ce7cb7c6542b445982c27d01cd755e1523602bd3b4',
+  bandeau: '76388da8255117832192d78a08b75664199bc51b9daf9f3d4ae1736af9528fdd',
+  laterale: 'd9da0cba8319b91dd0bcfdb15b573d15452ace6044ea2f37ec73fa8f21d29bca',
+  minimal: '366c126e7239281585f53d8ad7b5f17bd339eedc8a315cdeca8a419fa8fea912',
+  compacte: '3fe4616f6de87645171ecf73ddcd4e09a4ae18db62f8258e21cd4cb80331cb8e',
+  editoriale: '805db0d4870ea4e6d68c12103701d0911795f1d70bbcbf5cedd0fcacee14d22a',
+};
+
+function empreinte(t: InvoiceTemplate): string {
+  const h = createHash('sha256');
+  for (const [name, m] of documentCases(t)) {
+    const r = renderDocumentHtml(m, m.security ? QR : null, presentation(t, t.defaults, true));
+    h.update(name);
+    h.update(r.html);
+    h.update(r.headerTemplate);
+    h.update(r.footerTemplate);
+  }
+  return h.digest('hex');
+}
+
+describe('Total HT (ADR-0028, décision ouverte n° 1)', () => {
+  it.each(INVOICE_TEMPLATE_IDS.map((id) => [id]))(
+    '%s@1.0.0 : rendu inchangé, octet pour octet (factures déjà gelées)',
+    (id) => {
+      expect(empreinte(templateAt(id, '1.0.0')!)).toBe(EMPREINTES_1_0_0[id]);
+    },
+  );
+
+  it.each(INVOICE_TEMPLATE_IDS.map((id) => [id]))(
+    '%s : 1.1.0 imprime « Total HT », 1.0.0 non ; rien d’autre ne change',
+    (id) => {
+      const v1 = templateAt(id, '1.0.0')!;
+      const v11 = templateAt(id, '1.1.0')!;
+      for (const [name, m] of documentCases(v1)) {
+        const qr = m.security ? QR : null;
+        const a = renderDocumentHtml(m, qr, presentation(v1, v1.defaults, true)).html;
+        const b = renderDocumentHtml(m, qr, presentation(v11, v11.defaults, true)).html;
+        expect(visibleText(a), name).not.toContain('Total HT');
+        expect(visibleText(b), name).toContain(visibleText(`Total HT ${m.htTotal}`));
+        // Seule différence : la ligne ajoutée et la version nommée.
+        const sans = b
+          .replace(/<div class="sum"><span>Total HT<\/span><span>[^<]*<\/span><\/div>/, '')
+          .replace(/<div>Total HT [^<]*<\/div>/, '')
+          .replaceAll(`${id}@1.1.0`, `${id}@1.0.0`);
+        expect(sans, name).toBe(a);
+      }
+    },
+  );
+
+  it('le montant imprimé est la somme des bases par groupe (moteur)', () => {
+    const m = richModel(latestTemplate('classique'));
+    const html = renderDocumentHtml(
+      m,
+      QR,
+      presentation(latestTemplate('classique'), latestTemplate('classique').defaults),
+    ).html;
+    expect(m.htTotal).toMatch(/\d/);
+    expect(html).toContain(esc(m.htTotal));
   });
 });

@@ -4,6 +4,7 @@
 
 import {
   DGI_LABELS,
+  HT_TOTAL_LABEL,
   commentsHtml,
   creditRefHtml,
   div,
@@ -21,7 +22,7 @@ import type { InvoiceTemplate, TemplateRenderInput } from './template.contract.j
 
 const COLS = '3fr 0.6fr 0.5fr 0.9fr 1.2fr 1.2fr';
 
-function render({ document: m, dgi, brand, theme }: TemplateRenderInput) {
+function render({ document: m, dgi, brand, theme }: TemplateRenderInput, withHtTotal = false) {
   const css = `
   .doc { padding: 4px 60px 0; font-family: ${theme.body}; font-size: 10.5px; line-height: 1.5; color: #1c1917; display: flex; flex-direction: column; gap: 18px; }
   .dgi-test-band, .dgi-sample-band { text-align: center; color: #b91c1c; font-weight: 600; font-size: 10.5px; border: 1px solid #b91c1c; padding: 5px; }
@@ -79,7 +80,7 @@ function render({ document: m, dgi, brand, theme }: TemplateRenderInput) {
         <div>${esc(m.amountsNote)} · ${esc(m.priceModeLabel)}</div>
       </div>
       <div style="flex:1;display:flex;flex-direction:column;gap:3px">
-        ${m.specificTaxTotal ? `<div class="sum"><span>${esc(DGI_LABELS.specificTax)}</span><span>${esc(m.specificTaxTotal)}</span></div>` : ''}
+        ${withHtTotal ? `<div class="sum"><span>${esc(HT_TOTAL_LABEL)}</span><span>${esc(m.htTotal)}</span></div>` : ''}${m.specificTaxTotal ? `<div class="sum"><span>${esc(DGI_LABELS.specificTax)}</span><span>${esc(m.specificTaxTotal)}</span></div>` : ''}
         <div class="sum"><span>${esc(DGI_LABELS.vatTotal)}</span><span>${esc(m.vatTotal)}</span></div>
         <div class="sum" style="align-items:baseline;border-top:1px solid ${theme.accent};border-bottom:1px solid ${theme.accent};padding:6px 0;margin-top:3px"><span class="disp" style="font-size:13px">Total TTC</span><span class="disp" style="font-size:17px;font-weight:600;color:${theme.accent}">${esc(m.total)} ${esc(m.currency)}</span></div>
       </div>
@@ -104,7 +105,11 @@ function render({ document: m, dgi, brand, theme }: TemplateRenderInput) {
   return { css, body };
 }
 
-export const EDITORIALE: InvoiceTemplate = {
+/**
+ * Version 1.0.0 — publiée le 21 oct. 2026, sans « Total HT ». Ne change plus :
+ * elle réimprime à l'identique les factures gelées avec elle (ADR-0028 § 4).
+ */
+export const EDITORIALE_1_0_0: InvoiceTemplate = {
   id: 'editoriale',
   version: '1.0.0',
   label: 'Éditoriale',
@@ -113,4 +118,12 @@ export const EDITORIALE: InvoiceTemplate = {
   fontChoices: ['fraunces+inter', 'source-serif-4+ibm-plex-sans', 'source-serif-4+manrope'],
   page: { top: '12mm', bottom: '16mm', left: '0', right: '0' },
   render,
+};
+
+/** Version 1.1.0 — ligne « Total HT » (somme des bases par groupe, moteur ; ADR-0028
+ *  décision ouverte n° 1, 21 oct. 2026). Seule différence avec 1.0.0. */
+export const EDITORIALE: InvoiceTemplate = {
+  ...EDITORIALE_1_0_0,
+  version: '1.1.0',
+  render: (input) => render(input, true),
 };

@@ -4,6 +4,7 @@
 
 import {
   DGI_LABELS,
+  HT_TOTAL_LABEL,
   commentsHtml,
   creditRefHtml,
   div,
@@ -23,7 +24,7 @@ import type { InvoiceTemplate, TemplateRenderInput } from './template.contract.j
 
 const COLS = '3fr 0.7fr 0.6fr 1fr 1.3fr 1.3fr';
 
-function render({ document: m, dgi, brand, theme }: TemplateRenderInput) {
+function render({ document: m, dgi, brand, theme }: TemplateRenderInput, withHtTotal = false) {
   const [nameLine, ...otherSeller] = m.seller.lines;
   const dark = theme.onAccent === '#ffffff';
   const css = `
@@ -100,7 +101,7 @@ function render({ document: m, dgi, brand, theme }: TemplateRenderInput) {
           <div style="margin-top:6px">${paymentsHtml(m, '')}</div>
         </div>
         <div style="flex:1;background:${theme.soft};border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:4px">
-          ${specificTaxRow(m, (k, v) => `<div class="sum"><span>${esc(k)}</span><span>${esc(v)}</span></div>`)}
+          ${withHtTotal ? `<div class="sum"><span>${esc(HT_TOTAL_LABEL)}</span><span>${esc(m.htTotal)}</span></div>` : ''}${specificTaxRow(m, (k, v) => `<div class="sum"><span>${esc(k)}</span><span>${esc(v)}</span></div>`)}
           <div class="sum"><span>${esc(DGI_LABELS.vatTotal)}</span><span>${esc(m.vatTotal)}</span></div>
           <div class="sum" style="margin-top:auto;padding-top:8px;border-top:1.5px solid ${theme.accent};font-size:15px;font-weight:800;color:${theme.accent}"><span>Total TTC</span><span>${esc(m.total)} ${esc(m.currency)}</span></div>
         </div>
@@ -126,7 +127,11 @@ function render({ document: m, dgi, brand, theme }: TemplateRenderInput) {
   return { css, body };
 }
 
-export const BANDEAU: InvoiceTemplate = {
+/**
+ * Version 1.0.0 — publiée le 21 oct. 2026, sans « Total HT ». Ne change plus :
+ * elle réimprime à l'identique les factures gelées avec elle (ADR-0028 § 4).
+ */
+export const BANDEAU_1_0_0: InvoiceTemplate = {
   id: 'bandeau',
   version: '1.0.0',
   label: 'Bandeau',
@@ -135,4 +140,12 @@ export const BANDEAU: InvoiceTemplate = {
   fontChoices: ['manrope', 'inter', 'ibm-plex-sans', 'source-serif-4'],
   page: { top: '12mm', bottom: '16mm', left: '0', right: '0' },
   render,
+};
+
+/** Version 1.1.0 — ligne « Total HT » (somme des bases par groupe, moteur ; ADR-0028
+ *  décision ouverte n° 1, 21 oct. 2026). Seule différence avec 1.0.0. */
+export const BANDEAU: InvoiceTemplate = {
+  ...BANDEAU_1_0_0,
+  version: '1.1.0',
+  render: (input) => render(input, true),
 };

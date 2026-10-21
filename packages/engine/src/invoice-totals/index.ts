@@ -12,6 +12,7 @@ export {
   DGI_ROUNDING_POLICY_2026_1,
   INVOICE_TOTALS_VERSION,
   computeInvoiceTotals,
+  invoiceHtTotal,
 } from './compute.js';
 export {
   EDEF_TOTALS_FIELDS,
