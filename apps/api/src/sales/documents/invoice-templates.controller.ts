@@ -44,6 +44,7 @@ import {
 import {
   isInvoiceTemplateId,
   LOGO_VARIANTS,
+  type FrozenPackageRef,
   type LogoVariant,
   type TemplateFontChoice,
   type TemplateOptions,
@@ -60,6 +61,8 @@ export interface InvoiceTemplatesView {
     options: TemplateOptionsInput;
     /** Options qui seront figées au prochain gel. */
     resolved: TemplateOptions;
+    /** Paquet sur mesure choisi (`templateId === 'sur-mesure'`, ADR-0029), sinon `null`. */
+    package: FrozenPackageRef | null;
   } | null;
   identity: {
     primaryColor: string | null;
@@ -105,6 +108,7 @@ export class InvoiceTemplatesController {
                 font: (saved.options.font ?? null) as TemplateOptionsInput['font'],
               },
               resolved: frozen.options,
+              package: frozen.package ?? null,
             }
           : null,
       identity: {

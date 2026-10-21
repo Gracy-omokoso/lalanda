@@ -51,3 +51,12 @@ export function avatarObjectKey(objectId: string): string {
 export function brandAssetObjectKey(objectId: string): string {
   return `brand-assets/${objectId}`;
 }
+
+/**
+ * Paquet de modèle de facture sur mesure (ADR-0029 § 6). Même règle : identifiant
+ * tiré au hasard, aucune donnée de l'organisation ; objet IMMUABLE (une facture
+ * gelée le désigne par son empreinte).
+ */
+export function templatePackageObjectKey(objectId: string): string {
+  return `template-packages/${objectId}`;
+}

@@ -16,6 +16,7 @@ import { esc } from '../../invoice-document-html.js';
 import type { InvoiceDocumentModel } from '../../invoice-document.model.js';
 import { DGI_LABELS } from '../dgi-content.js';
 import {
+  CUSTOM_TEMPLATE_KEY,
   LOGO_VARIANTS,
   type PageMargins,
   type TemplateFontChoice,
@@ -30,7 +31,7 @@ import { renderTemplate, type MustacheNode } from './mustache.js';
 import { IssueList } from './report.js';
 
 /** Identifiant figé d'un modèle sur mesure (`presentation.template.id`). */
-export const CUSTOM_TEMPLATE_ID = 'sur-mesure' as const;
+export const CUSTOM_TEMPLATE_ID = CUSTOM_TEMPLATE_KEY;
 
 /**
  * Version du MOTEUR sur mesure (assemblage, zones, règles de rendu). Une
@@ -188,7 +189,9 @@ ${securityZone(m, input)}`,
     label: customLayoutLabel(manifest.name),
     description: manifest.description,
     defaults: {
-      palette: manifest.options.palettes[0]!,
+      palette: manifest.options.palettes.includes('brand')
+        ? 'brand'
+        : manifest.options.palettes[0]!,
       accent: manifest.options.accent.toLowerCase(),
       font: manifest.options.font as TemplateFontChoice,
     },

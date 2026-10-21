@@ -23,6 +23,7 @@ import { OrganizationsModule } from '../organizations/organizations.module.js';
 import { PdfModule } from '../reports/pdf.module.js';
 import { InvoiceDocumentsController } from './documents/invoice-documents.controller.js';
 import { InvoiceDocumentsService } from './documents/invoice-documents.service.js';
+import { InvoiceTemplatePackagesController } from './documents/invoice-template-packages.controller.js';
 import { InvoiceTemplatesController } from './documents/invoice-templates.controller.js';
 import { CatalogItem, CatalogItemSchema } from './catalog-item.schema.js';
 import { CatalogItemsController } from './catalog-items.controller.js';
@@ -97,6 +98,7 @@ import { ReferenceRefreshJob } from './normalization/reference-refresh.job.js';
     InvoiceDocumentsController,
     // ADR-0028 : catalogue des modèles, choix et aperçu.
     InvoiceTemplatesController,
+    InvoiceTemplatePackagesController,
   ],
   providers: [
     CustomersService,

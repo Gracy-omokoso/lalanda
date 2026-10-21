@@ -83,10 +83,12 @@ export class OrganizationBrand {
   /**
    * Modèle de facture choisi et ses options SAISIES (`null` = suivre l'identité).
    * `null` : aucun choix — les factures gardent la présentation d'origine.
+   * `id: 'sur-mesure'` : paquet installé `packageId` (ADR-0029).
    */
   @Prop({ type: Object, default: null })
   invoiceTemplate!: {
     id: string;
+    packageId?: string;
     options: { palette: string | null; accent: string | null; font: string | null };
   } | null;
 

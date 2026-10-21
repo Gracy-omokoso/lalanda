@@ -57,3 +57,13 @@ export const PreviewQuerySchema = z
   .strict();
 
 export const LogoVariantSchema = z.enum(LOGO_VARIANTS);
+
+/** Activation d'un modèle sur mesure installé (ADR-0029 § 8). */
+export const PutCustomTemplateSchema = z
+  .object({
+    packageId: z.string().regex(/^[0-9a-f]{32}$/, 'Identifiant de paquet invalide.'),
+    options: TemplateOptionsInputSchema,
+    expectedRevision: z.number().int().min(0),
+  })
+  .strict();
+export type PutCustomTemplateInput = z.infer<typeof PutCustomTemplateSchema>;

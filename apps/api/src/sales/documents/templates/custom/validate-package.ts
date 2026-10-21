@@ -318,10 +318,20 @@ async function runBattery(
  * Valide des fichiers (archive déjà lue ou dossier). `packageId` : identifiant
  * de l'enregistrement installé, `null` pour une validation hors installation.
  */
+export interface ValidateOptions {
+  /**
+   * Batterie de rendu (défaut : oui). Au RENDU d'une facture, le paquet — déjà
+   * validé à l'installation et vérifié par son empreinte — est recompilé sans
+   * la rejouer : mêmes règles d'analyse, coût d'un seul rendu.
+   */
+  battery?: boolean;
+}
+
 export async function validatePackageFiles(
   files: PackageFiles,
   issues: IssueList = new IssueList(),
   packageId: string | null = null,
+  opts: ValidateOptions = {},
 ): Promise<ValidatedPackage> {
   const report = (
     manifest: TemplateManifest | null,
@@ -386,7 +396,7 @@ export async function validatePackageFiles(
     fontFaces: fonts.css,
     images,
   });
-  const cases = await runBattery(template, issues);
+  const cases = opts.battery === false ? [] : await runBattery(template, issues);
   return { report: report(manifest, digest, cases), template: issues.ok ? template : null, files };
 }
 
@@ -394,6 +404,7 @@ export async function validatePackageFiles(
 export async function validateArchive(
   archive: Buffer,
   packageId: string | null = null,
+  opts: ValidateOptions = {},
 ): Promise<ValidatedPackage> {
   const issues = new IssueList();
   const files = filesFromArchive(archive, issues);
@@ -413,5 +424,5 @@ export async function validateArchive(
       files,
     };
   }
-  return validatePackageFiles(files, issues, packageId);
+  return validatePackageFiles(files, issues, packageId, opts);
 }
