@@ -259,6 +259,7 @@ options, aperçu agrandi, PDF complet, retour à la présentation d'origine.
    conservation des factures.
 5. **SVG** : à rouvrir seulement avec un assainisseur SVG dédié et audité.
 6. Ancien champ « Logo (URL) » des paramètres : à retirer au profit de l'identité visuelle.
+   — **Fait le 21 oct. 2026** (amendement plus bas).
 
 ## Amendement du 21 oct. 2026 — « Total HT » (décision ouverte n° 1)
 
@@ -297,6 +298,18 @@ options, aperçu agrandi, PDF complet, retour à la présentation d'origine.
   charge pas le rendu des modèles.
 - Fiche facture web : ligne « Présentation d'impression » (« Modèle Bandeau — version
   1.1.0 », « · noir et blanc » le cas échéant, ou « Présentation d'origine »).
+
+## Amendement du 21 oct. 2026 — retrait de l'ancien « Logo (URL) » (décision ouverte n° 6)
+
+- API : `logoUrl` disparaît de `PUT /organizations/current/settings` (le schéma est
+  `.strict()` : un client qui l'envoie encore reçoit `400` plutôt qu'un `200` trompeur), de la
+  vue des paramètres et du tableau de bord de l'organisation ; il n'est plus écrit et plus
+  journalisé (`logoDefini` retiré de l'audit `organization.settings_updated`).
+- **Données** : rien n'est supprimé. Le champ reste déclaré dans `organization_settings`
+  (commentaire « retiré ») et une valeur déjà en base reste intacte, même après un nouvel
+  enregistrement des paramètres (test e2e).
+- Web : le champ est retiré de « Paramètres » (lien vers « Identité visuelle » à la place) et
+  le logo par URL n'est plus affiché sur le tableau de bord de l'organisation.
 
 ## Liens
 

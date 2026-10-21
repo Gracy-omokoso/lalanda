@@ -42,9 +42,10 @@ export class OrganizationSettings {
   deviseAffichage!: DisplayCurrency;
 
   /**
-   * URL absolue du logo. URL SEULEMENT : aucun upload, le stockage de fichiers
-   * n'est pas branché (même limite que la photo de profil, docs/04 § S20b).
-   * `null` = pas de logo, l'interface retombe sur les initiales du nom.
+   * ANCIEN champ « Logo (URL) » — RETIRÉ le 21 oct. 2026 (ADR-0028, décision
+   * ouverte n° 6) au profit de l'identité visuelle (`organization_brands`). Plus
+   * jamais lu ni écrit par l'API ; déclaré seulement pour que les valeurs déjà
+   * en base restent intactes (aucune suppression de donnée).
    */
   @Prop({ type: String, default: null })
   logoUrl!: string | null;

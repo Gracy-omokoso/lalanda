@@ -23,7 +23,6 @@ export type DisplayCurrency = (typeof DISPLAY_CURRENCIES)[number];
 /** Réglages servis quand l'organisation n'a encore jamais été paramétrée. */
 export const DEFAULT_ORGANIZATION_SETTINGS = {
   deviseAffichage: 'USD' as DisplayCurrency,
-  logoUrl: null as string | null,
 };
 
 /**
@@ -46,18 +45,10 @@ export const UpdateOrganizationSettingsSchema = z
       .length(2)
       .regex(/^[A-Za-z]{2}$/, 'Code pays ISO-2 attendu (ex. CD).'),
     deviseAffichage: z.enum(DISPLAY_CURRENCIES),
-    // URL seulement, http(s) uniquement : `javascript:` et `data:` sont des
-    // vecteurs d'injection dès qu'on rend l'URL dans un `<img>` (docs/17).
-    logoUrl: z
-      .string()
-      .trim()
-      .url()
-      .max(2048)
-      .refine((u) => u.startsWith('http://') || u.startsWith('https://'), {
-        message: 'Le logo doit être une URL http(s).',
-      })
-      .nullable()
-      .or(z.literal('').transform(() => null)),
+    // Plus de `logoUrl` (ADR-0028, décision ouverte n° 6, retiré le 21 oct. 2026) :
+    // le logo se gère dans l'identité visuelle (`/organizations/current/brand`).
+    // Un client qui l'enverrait encore reçoit 400 (`.strict()`) plutôt qu'un 200
+    // trompeur ; la valeur déjà en base n'est ni lue ni effacée.
   })
   .strict();
 
@@ -74,7 +65,6 @@ export interface OrganizationSettingsView {
   type: string;
   pays: string;
   deviseAffichage: DisplayCurrency;
-  logoUrl: string | null;
   updatedAt: string | null;
   /** Valeurs acceptées, servies par l'API — l'interface ne les code pas en dur. */
   options: { currencies: readonly string[] };
@@ -92,7 +82,6 @@ export interface DashboardOrganization {
   type: string;
   pays: string;
   deviseAffichage: DisplayCurrency;
-  logoUrl: string | null;
 }
 
 /** Consommation face aux limites du plan (S16b) — jamais recalculée ici. */

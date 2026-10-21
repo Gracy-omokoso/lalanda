@@ -1121,7 +1121,6 @@ export interface OrganizationDashboardView {
     type: string;
     pays: string;
     deviseAffichage: DisplayCurrency;
-    logoUrl: string | null;
   };
   role: OrgRole;
   roleLabel: string;
@@ -1143,7 +1142,6 @@ export interface OrganizationSettingsView {
   type: string;
   pays: string;
   deviseAffichage: DisplayCurrency;
-  logoUrl: string | null;
   updatedAt: string | null;
   options: { currencies: string[] };
 }
@@ -2631,7 +2629,6 @@ export const api = {
     name: string;
     pays: string;
     deviseAffichage: DisplayCurrency;
-    logoUrl: string | null;
   }) =>
     jsonRequest<OrganizationSettingsView>(`/organizations/current/settings`, {
       method: 'PUT',

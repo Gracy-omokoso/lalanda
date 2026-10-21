@@ -30,7 +30,7 @@ import 'reflect-metadata';
 import { PLAN_ENTITLEMENTS } from '@lalanda/shared/pricing';
 
 import type { OrgRole } from '../authz/permissions.js';
-import { e2eSuite, makeE2EApp, registerAndLogin, teardown } from './e2e-utils.js';
+import { dbOf, e2eSuite, makeE2EApp, registerAndLogin, teardown } from './e2e-utils.js';
 
 /** Les sept rôles attribuables (`project_manager` ne l'est pas — ADR-0012 §7). */
 const ROLES = [
@@ -361,7 +361,6 @@ e2eSuite('espace organisation — tableau de bord, paramètres, facturation (S21
           name: 'Tentative',
           pays: 'CD',
           deviseAffichage: 'USD',
-          logoUrl: null,
         });
       expect(ecriture.status, `PUT settings ${role}`).toBe(403);
     }
@@ -375,7 +374,8 @@ e2eSuite('espace organisation — tableau de bord, paramètres, facturation (S21
     expect(avant.body.id).toBe(orgId);
     // Aucun réglage écrit encore : les défauts sont servis, pas un 404.
     expect(avant.body.deviseAffichage).toBe('USD');
-    expect(avant.body.logoUrl).toBeNull();
+    // ADR-0028, décision ouverte n° 6 : l'ancien « Logo (URL) » n'est plus servi.
+    expect(avant.body).not.toHaveProperty('logoUrl');
     expect(avant.body.options.currencies).toContain('CDF');
 
     const nouveau = `Coopérative ${tag}`;
@@ -386,7 +386,6 @@ e2eSuite('espace organisation — tableau de bord, paramètres, facturation (S21
         name: nouveau,
         pays: 'cd',
         deviseAffichage: 'CDF',
-        logoUrl: 'https://exemple.test/logo.png',
       })
       .expect(200);
 
@@ -394,7 +393,6 @@ e2eSuite('espace organisation — tableau de bord, paramètres, facturation (S21
     // Le code pays est normalisé en majuscules côté serveur.
     expect(apres.body.pays).toBe('CD');
     expect(apres.body.deviseAffichage).toBe('CDF');
-    expect(apres.body.logoUrl).toBe('https://exemple.test/logo.png');
     // Le slug est un identifiant stable : renommer ne le régénère pas.
     expect(apres.body.slug).toBe(avant.body.slug);
 
@@ -420,19 +418,50 @@ e2eSuite('espace organisation — tableau de bord, paramètres, facturation (S21
         name: `Coopérative ${tag}`,
         pays: 'CD',
         deviseAffichage: 'CDF',
-        logoUrl: null,
       });
     expect(res.status, JSON.stringify(res.body)).toBe(200);
-    expect(res.body.logoUrl).toBeNull();
   });
 
-  it('refuse un logo qui n’est pas une URL http(s) et un champ inconnu', async () => {
+  it('ancien « Logo (URL) » : plus éditable ni affiché, valeur en base conservée (ADR-0028 n° 6)', async () => {
+    const db = await dbOf(app);
+    // Une valeur écrite avant le retrait du champ.
+    await db
+      .collection('organization_settings')
+      .updateOne(
+        { organizationId: orgId },
+        { $set: { logoUrl: 'https://exemple.test/ancien.png' } },
+      );
+    // Plus éditable : le champ est inconnu (`.strict()`), même vide.
+    for (const logoUrl of ['https://exemple.test/logo.png', null]) {
+      const res = await request(serveur())
+        .put('/organizations/current/settings')
+        .set('Cookie', c('owner'))
+        .send({ name: `Coopérative ${tag}`, pays: 'CD', deviseAffichage: 'CDF', logoUrl });
+      expect(res.status, String(logoUrl)).toBe(400);
+    }
+    // Plus affiché : ni dans les paramètres, ni dans le tableau de bord.
+    const lu = await request(serveur())
+      .get('/organizations/current/settings')
+      .set('Cookie', c('owner'))
+      .expect(200);
+    expect(lu.body).not.toHaveProperty('logoUrl');
+    expect((await dashboard('viewer').expect(200)).body.organization).not.toHaveProperty('logoUrl');
+    // Un enregistrement ordinaire ne l'efface pas.
+    await request(serveur())
+      .put('/organizations/current/settings')
+      .set('Cookie', c('owner'))
+      .send({ name: `Coopérative ${tag}`, pays: 'CD', deviseAffichage: 'CDF' })
+      .expect(200);
+    const brut = await db.collection('organization_settings').findOne({ organizationId: orgId });
+    expect(brut?.['logoUrl']).toBe('https://exemple.test/ancien.png');
+  });
+
+  it('refuse un pays ou une devise invalides, et un champ inconnu', async () => {
     for (const corps of [
-      { name: 'X', pays: 'CD', deviseAffichage: 'USD', logoUrl: 'javascript:alert(1)' },
-      { name: 'X', pays: 'CDX', deviseAffichage: 'USD', logoUrl: null },
-      { name: 'X', pays: 'CD', deviseAffichage: 'BTC', logoUrl: null },
+      { name: 'X', pays: 'CDX', deviseAffichage: 'USD' },
+      { name: 'X', pays: 'CD', deviseAffichage: 'BTC' },
       // `.strict()` : un champ inconnu est refusé plutôt qu'ignoré en silence.
-      { name: 'X', pays: 'CD', deviseAffichage: 'USD', logoUrl: null, plan: 'business' },
+      { name: 'X', pays: 'CD', deviseAffichage: 'USD', plan: 'business' },
     ]) {
       const res = await request(serveur())
         .put('/organizations/current/settings')
@@ -546,7 +575,7 @@ e2eSuite('espace organisation — tableau de bord, paramètres, facturation (S21
     await request(serveur())
       .put('/organizations/current/settings')
       .set('Cookie', forge)
-      .send({ name: 'Détournée', pays: 'FR', deviseAffichage: 'EUR', logoUrl: null })
+      .send({ name: 'Détournée', pays: 'FR', deviseAffichage: 'EUR' })
       .expect(200);
 
     const inchangee = await request(serveur())
