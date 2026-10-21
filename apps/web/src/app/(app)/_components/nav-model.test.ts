@@ -43,6 +43,7 @@ describe('entrées et ordre', () => {
       'clients',
       'catalogue',
       'pilotage',
+      'brief',
       'mise-en-route',
       'identite',
       'fiscalite',
@@ -58,9 +59,10 @@ describe('entrées et ordre', () => {
     ]);
   });
 
-  it('ne promet que des pages existantes : GROW se limite au pilotage', () => {
+  it('ne promet que des pages existantes : GROW se limite au pilotage et au brief', () => {
     expect(NAV_ITEMS.filter((i) => i.group === 'grow').map((i) => i.href)).toEqual([
       '/organisation',
+      '/organisation/brief',
     ]);
   });
 
@@ -68,6 +70,7 @@ describe('entrées et ordre', () => {
     expect(ids(entreesVisibles(null))).toEqual([
       'plans',
       'pilotage',
+      'brief',
       'mise-en-route',
       'abonnement',
     ]);
@@ -132,6 +135,7 @@ describe('entrée active', () => {
     ['/ventes/clients', 'clients'],
     ['/organisation', 'pilotage'],
     ['/organisation/fiscalite', 'fiscalite'],
+    ['/organisation/brief', 'brief'],
     ['/organisation/mise-en-route', 'mise-en-route'],
     ['/souscription/retour', 'abonnement'],
   ])('%s allume %s', (chemin, attendu) => {
