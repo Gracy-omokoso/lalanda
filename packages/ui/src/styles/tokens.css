@@ -1,0 +1,94 @@
+/* ─── Jetons du design system Lalanda (ADR-0030 § 4) ─────────────────────────
+ *
+ * Miroir typé : `src/tokens.ts`. Les deux fichiers doivent dire la même chose :
+ * `tokens.test.ts` le vérifie, et vérifie les contrastes des paires employées.
+ *
+ * Les noms historiques (`--background`, `--surface`, `--accent`…) sont gardés :
+ * tous les écrans existants lisent déjà leurs couleurs ici, et changent d'aspect
+ * sans être réécrits.
+ *
+ * Le thème est piloté par [data-theme="light"|"dark"] sur <html>, posé avant le
+ * premier paint par le script de `apps/web/src/app/layout.tsx`.
+ */
+
+:root,
+[data-theme='light'] {
+  --background: #f4f2ed;
+  --surface: #ffffff;
+  --surface-muted: #ece8df;
+  --border: #d9d3c6;
+  --border-strong: #8f8775;
+  --foreground: #14191b;
+  --foreground-muted: #575449;
+  --accent: #005263;
+  --accent-foreground: #ffffff;
+  --accent-soft: #ddeef1;
+  --focus: #007c93;
+  --danger: #b3261e;
+  --danger-bg: #fbedec;
+  --ok: #1b7a36;
+  --warn: #8a5a06;
+  --ko: #b3261e;
+
+  /* Module d'origine — aussi la couleur de la nature de donnée qu'il produit. */
+  --module-build: #005263;
+  --module-run: #00758c;
+  --module-grow: #9c4f18;
+  --nature-hypothese: #4e5a63;
+
+  /* Barre latérale — panneau pétrole. */
+  --nav-bg: #00323d;
+  --nav-fg: #eee7d7;
+  --nav-muted: #9fc0c8;
+  --nav-border: #0d4855;
+  --nav-active-bg: #0b4a58;
+  --nav-accent: #00acca;
+  --nav-build: #96c9d7;
+  --nav-run: #00acca;
+  --nav-grow: #e39a5e;
+
+  --shadow-card: 0 1px 2px rgba(20, 25, 27, 0.06), 0 1px 1px rgba(20, 25, 27, 0.04);
+  --shadow-pop: 0 12px 32px -8px rgba(0, 50, 61, 0.28), 0 2px 6px rgba(0, 50, 61, 0.12);
+}
+
+[data-theme='dark'] {
+  --background: #08181d;
+  --surface: #0e232a;
+  --surface-muted: #132e36;
+  --border: #21414b;
+  --border-strong: #5a7c86;
+  --foreground: #eee7d7;
+  --foreground-muted: #a7bec4;
+  --accent: #3cc4dd;
+  --accent-foreground: #03242b;
+  --accent-soft: #12343d;
+  --focus: #5ad2e8;
+  --danger: #f28b82;
+  --danger-bg: #2c1715;
+  --ok: #5cc285;
+  --warn: #e0ae4f;
+  --ko: #f28b82;
+
+  --module-build: #96c9d7;
+  --module-run: #3cc4dd;
+  --module-grow: #e39a5e;
+  --nature-hypothese: #b4c2c8;
+
+  --nav-bg: #04141a;
+  --nav-fg: #eee7d7;
+  --nav-muted: #93aeb5;
+  --nav-border: #14303a;
+  --nav-active-bg: #0f2f39;
+  --nav-accent: #3cc4dd;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-pop: 0 16px 40px -8px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+:root {
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --sidebar-width: 16rem;
+  --sidebar-rail: 4.5rem;
+}
