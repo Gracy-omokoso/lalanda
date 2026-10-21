@@ -9,6 +9,7 @@
 // le moteur garantit la zone DGI, pas la lisibilité du reste.
 // Consultation : `sales.read` ; téléversement et activation : `organization.manage`.
 
+import { buttonClasses } from '@lalanda/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
@@ -30,8 +31,9 @@ import {
 } from './custom-package-model';
 import { PALETTE_LABELS } from './template-model';
 
-const BOUTON =
-  'rounded-md border border-[var(--border-strong)] px-3 py-1.5 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-50';
+/** Boutons du design system (ADR-0030). */
+const BOUTON = buttonClasses('secondary', 'sm');
+const BOUTON_PRINCIPAL = buttonClasses('primary', 'sm');
 
 function messageDe(err: unknown, repli: string): string {
   const d = (err as { detail?: unknown } | null)?.detail;
@@ -458,7 +460,7 @@ function VersionPaquet({
               {gerer ? (
                 <button
                   type="button"
-                  className={BOUTON}
+                  className={BOUTON_PRINCIPAL}
                   disabled={!vu || occupe}
                   title={vu ? undefined : 'Attendez l’aperçu avant d’activer.'}
                   onClick={async () => {
