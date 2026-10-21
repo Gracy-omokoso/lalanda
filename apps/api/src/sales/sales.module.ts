@@ -30,6 +30,14 @@ import { CatalogItemsService } from './catalog-items.service.js';
 import { Customer, CustomerSchema } from './customer.schema.js';
 import { CustomersController } from './customers.controller.js';
 import { CustomersService } from './customers.service.js';
+import {
+  SalesInvoiceSettlement,
+  SalesInvoiceSettlementSchema,
+} from './receipts/invoice-settlement.schema.js';
+import { SalesReceipt, SalesReceiptSchema } from './receipts/receipt.schema.js';
+import { ReceiptsController } from './receipts/receipts.controller.js';
+import { ReceiptsService } from './receipts/receipts.service.js';
+import { SettlementClock, SettlementsService } from './receipts/settlements.service.js';
 import { SalesUsageService } from './sales-usage.service.js';
 import { TaxGroupsController } from './tax-groups.controller.js';
 import { TaxGroupsService } from './tax-groups.service.js';
@@ -83,6 +91,9 @@ import { ReferenceRefreshJob } from './normalization/reference-refresh.job.js';
       { name: SalesInvoiceCounter.name, schema: SalesInvoiceCounterSchema },
       { name: SalesInvoiceJournalEntry.name, schema: SalesInvoiceJournalEntrySchema },
       { name: SalesJournalHead.name, schema: SalesJournalHeadSchema },
+      // ADR-0031 : encaissements et règlement des factures.
+      { name: SalesReceipt.name, schema: SalesReceiptSchema },
+      { name: SalesInvoiceSettlement.name, schema: SalesInvoiceSettlementSchema },
     ]),
   ],
   controllers: [
@@ -97,6 +108,8 @@ import { ReferenceRefreshJob } from './normalization/reference-refresh.job.js';
     InvoiceDocumentsController,
     // ADR-0028 : catalogue des modèles, choix et aperçu.
     InvoiceTemplatesController,
+    // ADR-0031 : encaissements et statut de règlement.
+    ReceiptsController,
   ],
   providers: [
     CustomersService,
@@ -113,6 +126,10 @@ import { ReferenceRefreshJob } from './normalization/reference-refresh.job.js';
     InvoiceDocumentsService,
     // ADR-0026 § 6.3 : export du journal pour les vérificateurs (lecture seule).
     JournalExportService,
+    // ADR-0031 : encaissements et statut de règlement.
+    SettlementClock,
+    SettlementsService,
+    ReceiptsService,
     // ADR-0024 (F2) : normalisation DGI réelle, rattrapage et tâches planifiées.
     DgiCallGuard,
     NormalizationRecorder,

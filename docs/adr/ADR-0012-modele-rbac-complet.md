@@ -27,6 +27,12 @@ Décideurs : CTO Lalanda (délégation Gracy Omokoso), décideur produit
 > Comptable ; l'Administrateur prépare mais n'émet pas. Interdite à tous les rôles
 > plateforme, super-administrateur compris et même sous accès délégué : les interdits
 > absolus passent de quatre à cinq.
+>
+> **Amendé par [ADR-0031](ADR-0031-encaissements-et-realise.md) § 4 (21 oct. 2026).**
+> Une vingtième action, `sales.receipt` (« Enregistrer et annuler des encaissements »),
+> est ajoutée en fin de liste : Propriétaire, Directeur financier et Comptable ;
+> l'Administrateur ne l'a pas. Refusée à tous les rôles plateforme par la matrice, sans
+> entrer dans les interdits absolus, qui restent cinq.
 
 ## Contexte
 

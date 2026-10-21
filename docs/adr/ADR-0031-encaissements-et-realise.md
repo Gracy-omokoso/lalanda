@@ -208,7 +208,7 @@ Plateforme : interdite à tous les rôles (matrice), sans entrer dans les interd
 | `GET /sales/settlements?invoiceIds=…` ou `?open=true` · `GET /sales/settlements/:invoiceId` | `sales.read` |
 | `PUT /sales/settlements/:invoiceId/due-date` | `sales.manage` |
 | `GET /sales/actuals-bridge` | `sales.read` |
-| `PUT /sales/actuals-bridge` · `POST /sales/actuals-bridge/sync` | `actuals.import` **et** `sales.read` |
+| `GET /sales/actuals-bridge/candidates` · `PUT /sales/actuals-bridge` · `POST /sales/actuals-bridge/sync` | `actuals.import` **et** `sales.read` |
 
 ### 5. Moteur
 

@@ -17,6 +17,32 @@ import type { HydratedDocument } from 'mongoose';
  *
  * Aucune saisie du réalisé ne touche jamais au plan validé (immuable, S16c).
  */
+/**
+ * Origine d'une valeur réalisée.
+ * - `manual` : saisie dans l'onglet Réalisé ; `replaced` garde la valeur issue des
+ *   ventes qu'elle a remplacée (pont désactivé), pour que l'écart reste visible.
+ * - `run.sales` : écrite par le pont RUN → BUILD (ADR-0031 § 3), jamais à la main.
+ */
+export type ActualValueSource =
+  | {
+      source: 'manual';
+      at: Date;
+      by: string | null;
+      replaced?: { source: 'run.sales'; value: number } | null;
+    }
+  | {
+      source: 'run.sales';
+      at: Date;
+      by: string | null;
+      /** `RECEIVABLES_VERSION` du moteur qui a produit la valeur. */
+      version: string;
+      /** Mois civil d'origine (`AAAA-MM`) et nombre de documents de vente. */
+      calendarMonth: string;
+      documents: number;
+      /** Empreinte d'idempotence : même empreinte, rien n'est réécrit. */
+      fingerprint: string;
+    };
+
 @Schema({ collection: 'actual_periods', timestamps: true, strict: true })
 export class ActualPeriod {
   @Prop({ type: String, required: true, index: true })
@@ -39,6 +65,14 @@ export class ActualPeriod {
   /** Montants réalisés par `lineId` du template (devise du projet). */
   @Prop({ type: Object, required: true, default: {} })
   values!: Record<string, number>;
+
+  /**
+   * Origine de chaque valeur (docs/08 § Saisie et import, ADR-0031 § 3), par
+   * `lineId`. Absente des périodes antérieures au 21 oct. 2026 : une valeur sans
+   * entrée est une saisie manuelle d'auteur inconnu.
+   */
+  @Prop({ type: Object, default: {} })
+  sources!: Record<string, ActualValueSource>;
 
   @Prop({ type: Date })
   closedAt?: Date;

@@ -965,7 +965,7 @@ export interface TermsAcceptanceView {
 
 export type DisplayCurrency = 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR';
 
-/** Les 19 actions granulaires (docs/12, ADR-0021 §8, ADR-0022 § S25c.1, ADR-0023 § S25e.11). Union fermée, alignée sur l'API. */
+/** Les 20 actions granulaires (docs/12, ADR-0021 §8, ADR-0022 § S25c.1, ADR-0023 § S25e.11, ADR-0031 § 4). Union fermée, alignée sur l'API. */
 export type OrgAction =
   | 'organization.manage'
   | 'billing.manage'
@@ -994,7 +994,10 @@ export type OrgAction =
   // ADR-0023 § S25e.11 — émettre et normaliser des factures et des avoirs :
   // engage le contribuable. Propriétaire, Directeur financier, Comptable ;
   // interdite à tout rôle plateforme.
-  | 'sales.invoice';
+  | 'sales.invoice'
+  // ADR-0031 § 4 — enregistrer et annuler des encaissements. Propriétaire,
+  // Directeur financier, Comptable ; interdite à tout rôle plateforme.
+  | 'sales.receipt';
 
 /**
  * Offres — RÉEXPORTÉES du catalogue partagé, jamais réécrites.

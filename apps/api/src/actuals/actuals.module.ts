@@ -7,6 +7,13 @@ import { ProjectsModule } from '../projects/projects.module.js';
 import { ActualPeriod, ActualPeriodSchema } from './actual-period.schema.js';
 import { ActualsController } from './actuals.controller.js';
 import { ActualsService } from './actuals.service.js';
+import { SalesInvoice, SalesInvoiceSchema } from '../sales/invoices/invoice.schema.js';
+import {
+  RunActualsBridge,
+  RunActualsBridgeSchema,
+} from './run-bridge/run-actuals-bridge.schema.js';
+import { RunBridgeController } from './run-bridge/run-bridge.controller.js';
+import { RunBridgeService } from './run-bridge/run-bridge.service.js';
 
 /**
  * Suivi prévisionnel vs réalisé (S18b — docs/08).
@@ -20,10 +27,15 @@ import { ActualsService } from './actuals.service.js';
     OrganizationsModule,
     ProjectsModule,
     PlansModule,
-    MongooseModule.forFeature([{ name: ActualPeriod.name, schema: ActualPeriodSchema }]),
+    MongooseModule.forFeature([
+      { name: ActualPeriod.name, schema: ActualPeriodSchema },
+      // ADR-0031 § 3 : réglage du pont et lecture SEULE des ventes (aucune écriture).
+      { name: RunActualsBridge.name, schema: RunActualsBridgeSchema },
+      { name: SalesInvoice.name, schema: SalesInvoiceSchema },
+    ]),
   ],
-  controllers: [ActualsController],
-  providers: [ActualsService],
+  controllers: [ActualsController, RunBridgeController],
+  providers: [ActualsService, RunBridgeService],
   exports: [ActualsService],
 })
 export class ActualsModule {}

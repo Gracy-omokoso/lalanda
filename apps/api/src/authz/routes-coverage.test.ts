@@ -51,6 +51,8 @@ import { CatalogItemsController } from '../sales/catalog-items.controller.js';
 import { CustomersController } from '../sales/customers.controller.js';
 import { InvoiceDocumentsController } from '../sales/documents/invoice-documents.controller.js';
 import { InvoiceTemplatesController } from '../sales/documents/invoice-templates.controller.js';
+import { ReceiptsController } from '../sales/receipts/receipts.controller.js';
+import { RunBridgeController } from '../actuals/run-bridge/run-bridge.controller.js';
 import { InvoicesController } from '../sales/invoices/invoices.controller.js';
 import { JournalController } from '../sales/invoices/journal.controller.js';
 import { NormalizationController } from '../sales/normalization/normalization.controller.js';
@@ -112,6 +114,9 @@ const CONTROLEURS = [
   BrandingController,
   BrandAssetImageController,
   InvoiceTemplatesController,
+  // ADR-0031 — encaissements, règlement et pont vers le réalisé.
+  ReceiptsController,
+  RunBridgeController,
 ];
 
 /**
@@ -350,7 +355,7 @@ describe('couverture des routes par le RBAC', () => {
     }
   });
 
-  it('toute action déclarée appartient au vocabulaire des 19 actions', () => {
+  it('toute action déclarée appartient au vocabulaire des 20 actions', () => {
     for (const route of TOUTES_LES_ROUTES) {
       for (const action of route.actions ?? []) {
         expect(ACTIONS, `${route.cle} déclare une action inconnue : ${action}`).toContain(action);
@@ -443,6 +448,23 @@ describe('couverture des routes par le RBAC', () => {
       'InvoiceTemplatesController.list': ['sales.read'],
       'InvoiceTemplatesController.put': ['organization.manage'],
       'InvoiceTemplatesController.preview': ['sales.read'],
+      // ADR-0031 § 4 : lire les encaissements et les règlements = lecture des
+      // ventes ; enregistrer, modifier, annuler = `sales.receipt` ; échéance =
+      // `sales.manage` ; écrire le réalisé depuis les ventes = import du réalisé
+      // ET lecture des ventes.
+      'ReceiptsController.list': ['sales.read'],
+      'ReceiptsController.summary': ['sales.read'],
+      'ReceiptsController.get': ['sales.read'],
+      'ReceiptsController.create': ['sales.receipt'],
+      'ReceiptsController.put': ['sales.receipt'],
+      'ReceiptsController.cancel': ['sales.receipt'],
+      'ReceiptsController.settlementsList': ['sales.read'],
+      'ReceiptsController.settlement': ['sales.read'],
+      'ReceiptsController.dueDate': ['sales.manage'],
+      'RunBridgeController.view': ['sales.read'],
+      'RunBridgeController.candidates': ['actuals.import', 'sales.read'],
+      'RunBridgeController.configure': ['actuals.import', 'sales.read'],
+      'RunBridgeController.sync': ['actuals.import', 'sales.read'],
     };
     for (const [cle, actions] of Object.entries(attendu)) {
       const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle);
