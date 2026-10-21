@@ -80,6 +80,8 @@ describe('documents de vente — lecture des sources', () => {
 
   it('sales_invoices : écrit par les brouillons, le gel et la numérotation seulement', async () => {
     expect(await filesMatching(/InjectModel\(SalesInvoice\.name\)/)).toEqual([
+      // ADR-0033 : LECTEUR seulement (brief du matin) — vérifié ci-dessous.
+      'morning-brief/morning-brief.service.ts',
       // ADR-0025 (S25g) : seul écrivain de `duplicateCount`, et de lui seul.
       'sales/documents/invoice-documents.service.ts',
       'sales/invoices/invoice-drafts.service.ts',
@@ -89,6 +91,9 @@ describe('documents de vente — lecture des sources', () => {
       // `normalized` et `normalization_failed`).
       'sales/normalization/normalization-recorder.ts',
     ]);
+    const brief = await readFile(resolve(SRC, 'morning-brief/morning-brief.service.ts'), 'utf8');
+    const briefInvoices = brief.match(/this\.invoices\s*\.\s*\w+/g) ?? [];
+    expect(briefInvoices.map((m) => m.replace(/\s/g, ''))).toEqual(['this.invoices.find']);
     const documents = await readFile(
       resolve(SRC, 'sales/documents/invoice-documents.service.ts'),
       'utf8',
