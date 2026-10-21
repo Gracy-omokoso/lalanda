@@ -9,11 +9,12 @@
 // Trois ensembles fermés (docs/26 « états représentés par unions fermées ») :
 //   1. ORG_ROLES       — les 8 rôles d'organisation (ADR-0012 §1);
 //   2. PLATFORM_ROLES  — les 6 rôles plateforme, préfixés `platform_` (§2);
-//   3. ACTIONS         — les 19 actions granulaires, dans l'ordre de docs/12
+//   3. ACTIONS         — les 21 actions granulaires, dans l'ordre de docs/12
 //                        (la seizième, `fiscal.manage`, vient d'ADR-0021 §8 ;
 //                        la dix-septième et la dix-huitième, `sales.read` et
 //                        `sales.manage`, d'ADR-0022 § S25c.1 ; la dix-neuvième,
-//                        `sales.invoice`, d'ADR-0023 § S25e.11).
+//                        `sales.invoice`, d'ADR-0023 § S25e.11 ; la vingtième et la
+//                        vingt et unième, `crm.read` et `crm.manage`, d'ADR-0035 § 3).
 //
 // Refus par défaut (docs/17 § Autorisation) : les matrices sont exhaustives, une
 // case absente ne compile pas, et une case `deny` est un refus.
@@ -89,14 +90,15 @@ export const PLATFORM_ROLES = [
 export type PlatformRole = (typeof PLATFORM_ROLES)[number];
 
 /**
- * Les 19 actions granulaires (docs/12 § Actions granulaires, ordre du document).
+ * Les 21 actions granulaires (docs/12 § Actions granulaires, ordre du document).
  *
  * `fiscal.manage` (ADR-0021 §8) est ajoutée EN FIN de liste, et non à côté
  * d'`organization.manage` : l'ordre est celui de docs/12, que l'interface et les
  * tests reprennent tel quel. L'insérer ailleurs déplacerait des lignes sans rien
  * changer au sens. `sales.read` et `sales.manage` (ADR-0022 § S25c.1) suivent la
  * même règle : dix-septième et dix-huitième, en fin de liste. `sales.invoice`
- * (ADR-0023 § S25e.11) est la dix-neuvième.
+ * (ADR-0023 § S25e.11) est la dix-neuvième. `crm.read` et `crm.manage` (ADR-0035
+ * § 3) sont la vingtième et la vingt et unième.
  */
 export const ACTIONS = [
   'organization.manage',
@@ -118,6 +120,8 @@ export const ACTIONS = [
   'sales.read',
   'sales.manage',
   'sales.invoice',
+  'crm.read',
+  'crm.manage',
 ] as const;
 
 export type Action = (typeof ACTIONS)[number];
@@ -192,7 +196,7 @@ export type OrgGrant = 'allow' | 'deny' | 'allow_sod' | 'allow_project' | 'condi
 /**
  * MATRICE RÔLE ORGANISATION × ACTION — transcription littérale d'ADR-0012 §3.
  *
- * Le type impose 8 rôles × 19 actions : oublier une case ne compile pas.
+ * Le type impose 8 rôles × 21 actions : oublier une case ne compile pas.
  * `permissions.test.ts` redéclare cette matrice en littéral (elle n'est PAS
  * importée d'ici) : toute modification de production casse le test et force une
  * mise à jour consciente de l'ADR et de docs/12. C'est le garde-fou central.
@@ -230,6 +234,10 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       // ADR-0023 § S25e.11 : émettre ou normaliser une facture ou un avoir engage
       // le contribuable — action distincte de la préparation (`sales.manage`).
       'sales.invoice': 'allow',
+      // ADR-0035 § 3 : le CRM (contacts, prospects, opportunités, activités) suit
+      // la répartition de `sales.*` — données personnelles, sans engagement fiscal.
+      'crm.read': 'allow',
+      'crm.manage': 'allow',
     },
     // Administrateur — « membres, projets, paramètres ». Gouvernance technique,
     // pas autorité financière : ni `billing.manage`, ni `plan.approve`, ni
@@ -260,6 +268,8 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       // Prépare les brouillons mais n'émet pas : émettre engage le contribuable
       // (ADR-0023 § S25e.11, décision ouverte n° 1).
       'sales.invoice': 'deny',
+      'crm.read': 'allow',
+      'crm.manage': 'allow',
     },
     // Directeur financier — « plans, validation, réalisé, rapports ». L'autorité
     // financière : approuve et clôture. Cible de la migration des anciens `member`
@@ -284,6 +294,8 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'sales.read': 'allow',
       'sales.manage': 'allow',
       'sales.invoice': 'allow',
+      'crm.read': 'allow',
+      'crm.manage': 'allow',
     },
     // Comptable — « réalisé, mapping, clôture selon permission ». Constate, ne
     // projette pas : ni `inputs.update`, ni `plan.calculate`. Contrepartie de R2.
@@ -309,6 +321,8 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'sales.manage': 'allow',
       // Émet et normalise au quotidien (ADR-0023 § S25e.11).
       'sales.invoice': 'allow',
+      'crm.read': 'allow',
+      'crm.manage': 'allow',
     },
     // Analyste — « scénarios, analyses, commentaires ». Modélise et calcule,
     // n'approuve ni n'importe le réalisé.
@@ -333,6 +347,8 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'sales.read': 'allow',
       'sales.manage': 'deny',
       'sales.invoice': 'deny',
+      'crm.read': 'allow',
+      'crm.manage': 'deny',
     },
     // Chef de projet — « projets autorisés et saisie ». Tout est `allow_project` :
     // le rôle n'a de sens qu'avec des assignations de projet, qui n'existent pas
@@ -358,6 +374,8 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'sales.read': 'deny',
       'sales.manage': 'deny',
       'sales.invoice': 'deny',
+      'crm.read': 'deny',
+      'crm.manage': 'deny',
     },
     // Conseiller — « consultation, commentaires, recommandations ». Typiquement
     // EXTERNE (mentor, banquier invité) : pas de `report.export`, on lui ouvre la
@@ -384,6 +402,8 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'sales.read': 'deny',
       'sales.manage': 'deny',
       'sales.invoice': 'deny',
+      'crm.read': 'deny',
+      'crm.manage': 'deny',
     },
     // Lecteur — lecture seulement. `analytics.read` est conservé : le refuser
     // viderait le rôle de son sens (ADR-0012 §3).
@@ -407,6 +427,8 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'sales.read': 'allow',
       'sales.manage': 'deny',
       'sales.invoice': 'deny',
+      'crm.read': 'allow',
+      'crm.manage': 'deny',
     },
   };
 
@@ -459,6 +481,9 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     // ADR-0023 § S25e.11 : un acteur Lalanda n'émet jamais au nom d'un
     // contribuable, même sous accès délégué — interdit absolu.
     'sales.invoice': 'forbidden',
+    // ADR-0035 § 3 : comme `sales.read` et `sales.manage`, sous accès délégué.
+    'crm.read': 'delegated',
+    'crm.manage': 'delegated',
   },
   platform_admin: {
     'organization.manage': 'native',
@@ -480,6 +505,8 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'sales.read': 'forbidden',
     'sales.manage': 'forbidden',
     'sales.invoice': 'forbidden',
+    'crm.read': 'forbidden',
+    'crm.manage': 'forbidden',
   },
   // « Le support ne voit jamais les données financières sans consentement
   // explicite, durée limitée et audit » (docs/12) — d'où trois `delegated` et
@@ -505,6 +532,8 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'sales.read': 'delegated',
     'sales.manage': 'forbidden',
     'sales.invoice': 'forbidden',
+    'crm.read': 'delegated',
+    'crm.manage': 'forbidden',
   },
   platform_billing: {
     'organization.manage': 'forbidden',
@@ -526,6 +555,8 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'sales.read': 'forbidden',
     'sales.manage': 'forbidden',
     'sales.invoice': 'forbidden',
+    'crm.read': 'forbidden',
+    'crm.manage': 'forbidden',
   },
   // Vides sur cette matrice : opèrent sur des ressources de portée plateforme
   // (templates, Country Packs) qui n'ont pas d'action granulaire dans docs/12 —
@@ -550,6 +581,8 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'sales.read': 'forbidden',
     'sales.manage': 'forbidden',
     'sales.invoice': 'forbidden',
+    'crm.read': 'forbidden',
+    'crm.manage': 'forbidden',
   },
   platform_country_pack_manager: {
     'organization.manage': 'forbidden',
@@ -571,6 +604,8 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'sales.read': 'forbidden',
     'sales.manage': 'forbidden',
     'sales.invoice': 'forbidden',
+    'crm.read': 'forbidden',
+    'crm.manage': 'forbidden',
   },
 };
 
