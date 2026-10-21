@@ -662,6 +662,133 @@ async function salesJournalExportRequest(
   return { blob: await res.blob(), filename: match?.[1] ?? fallbackName };
 }
 
+// ─── Identité visuelle et modèles de facture (ADR-0028) ─────────────────────
+
+export type LogoVariant = 'primary' | 'horizontal' | 'symbol' | 'light';
+export type InvoiceTemplateId =
+  'classique' | 'bandeau' | 'laterale' | 'minimal' | 'compacte' | 'editoriale';
+export type InvoicePalette = 'brand' | 'mono';
+
+export interface BrandLogoView {
+  variant: LogoVariant;
+  label: string;
+  assetId: string;
+  /** URL signée à durée limitée, révoquée au remplacement du logo. */
+  url: string;
+  contentType: string;
+  width: number;
+  height: number;
+  byteSize: number;
+}
+
+/** `GET /organizations/current/brand` (`organization.manage`). */
+export interface BrandView {
+  logos: Record<LogoVariant, BrandLogoView | null>;
+  primaryColor: string | null;
+  secondaryColor: string | null;
+  font: string | null;
+  revision: number;
+  updatedAt: string | null;
+  fonts: { id: string; label: string }[];
+  variants: { id: LogoVariant; label: string }[];
+  limits: {
+    maxBytes: number;
+    minDimension: number;
+    maxDimension: number;
+    acceptedTypes: readonly string[];
+    urlTtlSeconds: number;
+    storageAvailable: boolean;
+  };
+}
+
+export interface PutBrandIdentityInput {
+  primaryColor: string | null;
+  secondaryColor: string | null;
+  font: string | null;
+  expectedRevision: number;
+}
+
+export interface InvoiceTemplateOptions {
+  palette: InvoicePalette;
+  accent: string;
+  font: string;
+}
+
+export interface InvoiceTemplateOptionsInput {
+  palette: InvoicePalette | null;
+  accent: string | null;
+  font: string | null;
+}
+
+export interface InvoiceTemplateCatalogEntry {
+  id: InvoiceTemplateId;
+  version: string;
+  label: string;
+  description: string;
+  defaults: InvoiceTemplateOptions;
+  palettes: readonly InvoicePalette[];
+  fonts: { id: string; label: string }[];
+  accentSuggestions: string[];
+}
+
+/** `GET /sales/invoice-templates` (`sales.read`). */
+export interface InvoiceTemplatesView {
+  templates: InvoiceTemplateCatalogEntry[];
+  current: {
+    templateId: InvoiceTemplateId;
+    version: string;
+    options: InvoiceTemplateOptionsInput;
+    resolved: InvoiceTemplateOptions;
+  } | null;
+  identity: {
+    primaryColor: string | null;
+    secondaryColor: string | null;
+    font: string | null;
+    logos: Record<LogoVariant, boolean>;
+  };
+  revision: number;
+}
+
+export interface PutInvoiceTemplateInput {
+  templateId: InvoiceTemplateId | null;
+  options: InvoiceTemplateOptionsInput;
+  expectedRevision: number;
+}
+
+/** Aperçu d'un modèle (PNG ou PDF) ; erreurs sous la forme de `jsonRequest`. */
+async function invoiceTemplatePreviewRequest(
+  templateId: InvoiceTemplateId,
+  options: Partial<InvoiceTemplateOptions>,
+  format: 'png' | 'pdf',
+): Promise<Blob> {
+  const params = new URLSearchParams({ format });
+  if (options.palette) params.set('palette', options.palette);
+  if (options.accent) params.set('accent', options.accent);
+  if (options.font) params.set('font', options.font);
+  const res = await fetch(
+    `${API_URL}/sales/invoice-templates/${encodeURIComponent(templateId)}/preview?${params.toString()}`,
+    { method: 'GET', credentials: 'include' },
+  );
+  if (!res.ok) {
+    const text = await res.text();
+    let detail: unknown = text;
+    try {
+      detail = JSON.parse(text);
+    } catch {
+      /* garde le texte brut */
+    }
+    const err = new Error(
+      typeof detail === 'object' && detail !== null && 'message' in detail
+        ? String((detail as { message: unknown }).message)
+        : `HTTP ${res.status}`,
+    ) as Error & { status: number; detail: unknown };
+    err.status = res.status;
+    err.detail = detail;
+    throw err;
+  }
+  return res.blob();
+}
+
 /**
  * Envoi d'un fichier en CORPS BRUT.
  *
@@ -2984,6 +3111,34 @@ export const api = {
     invoicePdfRequest(invoiceId, 'pdf', fallbackName),
   downloadInvoiceDuplicate: (invoiceId: string, fallbackName: string) =>
     invoicePdfRequest(invoiceId, 'duplicate', fallbackName),
+  // ─── Identité visuelle et modèles de facture (ADR-0028) ───────
+  getBrand: () => jsonRequest<BrandView>(`/organizations/current/brand`, { method: 'GET' }),
+  putBrandIdentity: (input: PutBrandIdentityInput) =>
+    jsonRequest<BrandView>(`/organizations/current/brand/identity`, {
+      method: 'PUT',
+      body: input,
+    }),
+  /** Corps BINAIRE brut, comme la photo de profil ; l'API assainit et tranche le type. */
+  uploadBrandLogo: (variant: LogoVariant, file: File) =>
+    binaryRequest<BrandView>(
+      `/organizations/current/brand/logos/${encodeURIComponent(variant)}`,
+      file,
+    ),
+  removeBrandLogo: (variant: LogoVariant) =>
+    jsonRequest<BrandView & { removed: boolean }>(
+      `/organizations/current/brand/logos/${encodeURIComponent(variant)}`,
+      { method: 'DELETE' },
+    ),
+  getInvoiceTemplates: () =>
+    jsonRequest<InvoiceTemplatesView>(`/sales/invoice-templates`, { method: 'GET' }),
+  putInvoiceTemplate: (input: PutInvoiceTemplateInput) =>
+    jsonRequest<InvoiceTemplatesView>(`/sales/invoice-template`, { method: 'PUT', body: input }),
+  /** Aperçu RÉEL rendu par l'API d'une facture fictive marquée EXEMPLE. */
+  getInvoiceTemplatePreview: (
+    templateId: InvoiceTemplateId,
+    options: Partial<InvoiceTemplateOptions>,
+    format: 'png' | 'pdf' = 'png',
+  ) => invoiceTemplatePreviewRequest(templateId, options, format),
   listJournal: (query: { limit?: number; cursor?: string } = {}) =>
     jsonRequest<JournalPage>(`/sales/journal${salesQuery(query)}`, { method: 'GET' }),
   getExchangeRateReference: () =>

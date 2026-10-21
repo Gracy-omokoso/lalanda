@@ -55,6 +55,9 @@ export const ORGANIZATION_TABS: readonly OrganizationTab[] = [
   // suit l'appel qu'il ouvre.
   { segment: 'membres', label: 'Membres', action: 'organization.manage' },
   { segment: 'parametres', label: 'Paramètres', action: 'organization.manage' },
+  // ADR-0028 — logos, couleurs et police des factures : un paramètre de
+  // l'organisation, gardé par l'action de `GET /organizations/current/brand`.
+  { segment: 'identite', label: 'Identité visuelle', action: 'organization.manage' },
   // ADR-0021 §12 — onglet à part, et non section de « Paramètres » : celui-ci
   // est ouvert par `organization.manage`, que le Directeur financier ne détient
   // pas. Ranger la fiscalité dessous la lui cacherait alors qu'il en a le droit.
