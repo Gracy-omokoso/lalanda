@@ -2,6 +2,7 @@
 
 // Liste des devis — ADR-0035 § 5. Lecture : `sales.read` ; création : `sales.manage`.
 
+import { buttonClasses } from '@lalanda/ui';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
@@ -63,12 +64,12 @@ export function QuoteList(): React.ReactElement {
   return (
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <p className="max-w-2xl text-sm text-[var(--foreground-muted)]">
+        <p className="max-w-2xl text-sm text-[var(--foreground-muted)] max-sm:sr-only">
           Un devis propose des prix sans valoir facture. Une fois accepté, il se convertit en
           brouillon de facture, qui suit ensuite son propre circuit (émission ou normalisation DGI).
         </p>
         {gerer ? (
-          <Link href={`${DEVIS_BASE}/nouveau`} className={BOUTON}>
+          <Link href={`${DEVIS_BASE}/nouveau`} className={buttonClasses('primary', 'md')}>
             Nouveau devis
           </Link>
         ) : null}

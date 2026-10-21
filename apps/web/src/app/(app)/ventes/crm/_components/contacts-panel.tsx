@@ -2,12 +2,13 @@
 
 // Contacts et prospects — ADR-0035 § 5 : liste, création, import et export CSV.
 
+import { buttonClasses } from '@lalanda/ui';
 import { useCallback, useEffect, useState } from 'react';
 
 import { api, type CustomerView } from '@/lib/api';
 import { crmApi, type ContactView } from '@/lib/api-crm';
 
-import { Alerte, BOUTON, BOUTON_PETIT, CHAMP, Champ, aria } from '../../_components/form-ui';
+import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from '../../_components/form-ui';
 import { useAccesVentes } from '../../_components/sales-access';
 
 import {
@@ -208,7 +209,10 @@ export function ContactsPanel(): React.ReactElement {
                 />
               </Champ>
             )}
-            <button type="submit" className={`${BOUTON} sm:col-span-3 sm:justify-self-start`}>
+            <button
+              type="submit"
+              className={buttonClasses('primary', 'md', 'sm:col-span-3 sm:justify-self-start')}
+            >
               Ajouter le contact
             </button>
           </form>

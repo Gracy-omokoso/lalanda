@@ -21,6 +21,8 @@ export type NavIconId =
   | 'factures'
   | 'clients'
   | 'catalogue'
+  | 'devis'
+  | 'crm'
   | 'pilotage'
   | 'mise-en-route'
   | 'identite'
@@ -80,6 +82,15 @@ export const NAV_ITEMS: readonly NavItem[] = [
     icon: 'factures',
     action: 'sales.read',
   },
+  // ADR-0035 : devis, document distinct qui se convertit en facture.
+  {
+    id: 'devis',
+    href: '/ventes/devis',
+    label: 'Devis',
+    group: 'run',
+    icon: 'devis',
+    action: 'sales.read',
+  },
   {
     id: 'clients',
     href: '/ventes/clients',
@@ -95,6 +106,15 @@ export const NAV_ITEMS: readonly NavItem[] = [
     group: 'run',
     icon: 'catalogue',
     action: 'sales.read',
+  },
+  // ADR-0035 : CRM minimal (pipeline, contacts, relances).
+  {
+    id: 'crm',
+    href: '/ventes/crm',
+    label: 'CRM',
+    group: 'run',
+    icon: 'crm',
+    action: 'crm.read',
   },
   // Le tableau de bord de l'organisation EST le pilotage : blocs par rôle,
   // ratios au rouge, écarts, validations (S21a). Offert à tout membre.

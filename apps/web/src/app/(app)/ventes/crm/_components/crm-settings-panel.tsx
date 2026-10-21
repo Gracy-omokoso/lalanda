@@ -4,11 +4,12 @@
 // retrait), règle de gain à l'acceptation d'un devis, seuil d'inactivité.
 // Le serveur refuse de retirer une étape utilisée ou d'en changer la nature.
 
+import { buttonClasses } from '@lalanda/ui';
 import { useEffect, useState } from 'react';
 
 import { crmApi, type CrmSettingsView, type PipelineStage } from '@/lib/api-crm';
 
-import { Alerte, BOUTON, BOUTON_PETIT, CHAMP } from '../../_components/form-ui';
+import { Alerte, BOUTON_PETIT, CHAMP } from '../../_components/form-ui';
 import { useAccesVentes } from '../../_components/sales-access';
 
 import { messageCrm, peutGererCrm } from './crm-model';
@@ -218,7 +219,7 @@ export function CrmSettingsPanel(): React.ReactElement {
         {gerer ? (
           <button
             type="button"
-            className={`${BOUTON} self-start`}
+            className={buttonClasses('primary', 'md', 'self-start')}
             onClick={() => void enregistrer()}
           >
             Enregistrer les réglages

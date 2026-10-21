@@ -4,13 +4,14 @@
 // (accepté, refusé, expiré, nouvelle version), PDF au modèle de l'organisation,
 // conversion en brouillon de facture qui ouvre la facture créée.
 
+import { buttonClasses } from '@lalanda/ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
 import { crmApi, type QuoteView } from '@/lib/api-crm';
 
-import { Alerte, BOUTON, BOUTON_PETIT, Pastille } from '../../_components/form-ui';
+import { Alerte, BOUTON_PETIT, Pastille } from '../../_components/form-ui';
 import { formatMontant } from '../../_components/sales-model';
 import { useAccesVentes } from '../../_components/sales-access';
 import { CRM_BASE } from '../../crm/_components/crm-model';
@@ -204,7 +205,7 @@ export function QuoteDetail({ quoteId }: { quoteId: string }): React.ReactElemen
         {gerer && a.convert ? (
           <button
             type="button"
-            className={BOUTON}
+            className={buttonClasses('primary', 'md')}
             disabled={envoi}
             onClick={() =>
               void agir(async () => {

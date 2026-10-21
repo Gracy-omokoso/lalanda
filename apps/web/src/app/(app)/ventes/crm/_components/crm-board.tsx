@@ -5,13 +5,14 @@
 // retard », « prochaines actions » et « inactives ». Totaux par devise et
 // probabilité par étape : recopiés de l'API (moteur).
 
+import { buttonClasses } from '@lalanda/ui';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
 import { api, type CustomerView } from '@/lib/api';
 import { crmApi, type OpportunitySummary, type PipelineView } from '@/lib/api-crm';
 
-import { Alerte, BOUTON, BOUTON_PETIT, CHAMP, Champ, aria } from '../../_components/form-ui';
+import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from '../../_components/form-ui';
 import { useAccesVentes } from '../../_components/sales-access';
 
 import {
@@ -219,7 +220,7 @@ function NouvelleOpportunite({ onCree }: { onCree: () => void }): React.ReactEle
       <button
         type="submit"
         disabled={envoi}
-        className={`${BOUTON} self-end sm:col-span-3 sm:justify-self-start`}
+        className={buttonClasses('primary', 'md', 'self-end sm:col-span-3 sm:justify-self-start')}
       >
         {envoi ? 'Création…' : 'Créer l’opportunité'}
       </button>

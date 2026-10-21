@@ -5,13 +5,14 @@
 // Mêmes lignes qu'un brouillon de facture (`InvoiceLines`), même contrôle de
 // forme ; les montants viennent de l'API (moteur) après chaque enregistrement.
 
+import { buttonClasses } from '@lalanda/ui';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { api, type CustomerView, type InvoiceView, type TaxGroupList } from '@/lib/api';
 import { crmApi, type QuoteView } from '@/lib/api-crm';
 
-import { Alerte, BOUTON, CHAMP, Champ, aria } from '../../_components/form-ui';
+import { Alerte, CHAMP, Champ, aria } from '../../_components/form-ui';
 import { formatMontant } from '../../_components/sales-model';
 import { useAccesVentes } from '../../_components/sales-access';
 import { InvoiceLines } from '../../factures/_components/invoice-lines';
@@ -338,7 +339,11 @@ export function QuoteEditor({
       ) : null}
 
       {gerer ? (
-        <button type="submit" disabled={envoi} className={`${BOUTON} self-start`}>
+        <button
+          type="submit"
+          disabled={envoi}
+          className={buttonClasses('primary', 'md', 'self-start')}
+        >
           {envoi ? 'Enregistrement…' : vue ? 'Enregistrer le brouillon' : 'Créer le devis'}
         </button>
       ) : null}
