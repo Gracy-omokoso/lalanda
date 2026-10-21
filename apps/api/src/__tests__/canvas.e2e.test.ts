@@ -22,6 +22,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest';
 import 'reflect-metadata';
 
 import { e2eSuite, teardown } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 async function makeApp(): Promise<INestApplication> {
   const { AppModule } = await import('../app.module.js');
@@ -87,11 +88,11 @@ e2eSuite('Business Model Canvas (S18d — docs/05)', () => {
       .send({ name: `Canvas ${tag}`, templateSlug: 'hello-world' });
     expect(created.status).toBe(201);
     projectId = created.body.id;
-  }, 60_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
     await teardown(app, [userA.email, userB.email]);
-  }, 30_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   async function registerAndLogin(user: {
     email: string;

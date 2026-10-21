@@ -25,6 +25,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest';
 import 'reflect-metadata';
 
 import { dbOf, e2eSuite, makeE2EApp, registerAndLogin, teardown } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 // ─── Fabriques d'images ──────────────────────────────────────────────────────
 
@@ -110,7 +111,7 @@ e2eSuite('photo de profil (stockage objet — docs/17, docs/24)', () => {
           'Les refus de validation, eux, sont vérifiés — ils précèdent tout appel au stockage.',
       );
     }
-  }, 60_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
     // Nettoyage propre à cette suite : `teardown` partagé ne connaît pas
@@ -128,7 +129,7 @@ e2eSuite('photo de profil (stockage objet — docs/17, docs/24)', () => {
       /* la base a pu être fermée avant : le teardown ci-dessous fait le reste */
     }
     await teardown(app, [userA.email, userB.email]);
-  }, 30_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   const srv = (): ReturnType<INestApplication['getHttpServer']> => app.getHttpServer();
 

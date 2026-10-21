@@ -21,6 +21,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest';
 import 'reflect-metadata';
 
 import { e2eSuite, teardown } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 // Import différé — évite de charger better-auth (qui essaie de se connecter) si on skip.
 async function makeApp(): Promise<INestApplication> {
@@ -57,11 +58,11 @@ e2eSuite('isolation multi-tenant (brief §11 S4)', () => {
 
   beforeAll(async () => {
     app = await makeApp();
-  }, 60_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
     await teardown(app, [userA.email, userB.email]);
-  }, 30_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   async function registerAndLogin(user: {
     email: string;

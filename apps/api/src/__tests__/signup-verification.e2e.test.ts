@@ -23,6 +23,7 @@ import { LegalService } from '../legal/legal.service.js';
 import { MailTransport } from '../mail/mail.transport.js';
 import type { MailMessage } from '../mail/mail.types.js';
 import { dbOf, e2eSuite, makeE2EApp, purgeTestUsers, teardown } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 // Lu par `auth.module.ts` au bootstrap : à poser AVANT `makeE2EApp`.
 process.env['AUTH_REQUIRE_EMAIL_VERIFICATION'] = 'true';
@@ -45,7 +46,7 @@ e2eSuite('inscription avec vérification d’adresse exigée (v0.4.3)', () => {
       envoyes.push(m);
       return { delivered: true };
     });
-  }, 60_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   beforeEach(() => {
     envoyes.length = 0;
@@ -53,7 +54,7 @@ e2eSuite('inscription avec vérification d’adresse exigée (v0.4.3)', () => {
 
   afterAll(async () => {
     await teardown(app, [EMAIL, EMAIL_SANS_ACCORD, EMAIL_VERSION_INCONNUE]);
-  }, 30_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   async function userIdOf(email: string): Promise<string | null> {
     const user = await (await dbOf(app)).collection('user').findOne({ email });

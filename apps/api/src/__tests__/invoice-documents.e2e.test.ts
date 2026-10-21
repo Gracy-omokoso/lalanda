@@ -27,6 +27,7 @@ import { PdfRenderingService } from '../reports/pdf-rendering.service.js';
 import { TEST_BANNER } from '../sales/documents/invoice-document.model.js';
 import { qrCodeSvg } from '../sales/documents/invoice-qr.js';
 import { dbOf, e2eSuite, makeE2EApp, registerAndLogin } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 const tag = randomBytes(4).toString('hex');
 process.env['MONGODB_DB'] = `lalanda_e2e_documents_${tag}`;
@@ -295,7 +296,7 @@ e2eSuite('documents PDF des factures (ADR-0025, S25g)', () => {
     });
     expect(cS.status, JSON.stringify(cS.body)).toBe(201);
     customerS = cS.body.id;
-  }, 300_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   beforeEach(() => clearThrottle());
 
@@ -306,7 +307,7 @@ e2eSuite('documents PDF des factures (ADR-0025, S25g)', () => {
       await app?.close();
       await fake?.close();
     }
-  }, 60_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   it('brouillon → PRO FORMA (filigrane de test), pas de duplicata', async () => {
     const d = await brouillonPret(asN(), customerN);

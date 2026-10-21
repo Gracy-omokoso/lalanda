@@ -31,6 +31,7 @@ import { PLAN_ENTITLEMENTS } from '@lalanda/shared/pricing';
 
 import type { OrgRole } from '../authz/permissions.js';
 import { e2eSuite, makeE2EApp, registerAndLogin, teardown } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 /** Les sept rôles attribuables (`project_manager` ne l'est pas — ADR-0012 §7). */
 const ROLES = [
@@ -151,11 +152,11 @@ e2eSuite('espace organisation — tableau de bord, paramètres, facturation (S21
       .set('Cookie', [...cookiesVoisin, `active_org_id=${orgVoisineId}`])
       .send({ name: NOM_PROJET_VOISIN, templateSlug: 'hello-world' });
     expect(projetVoisin.status).toBe(201);
-  }, 180_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
     await teardown(app, emails);
-  }, 60_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   function dashboard(role: RoleTeste): request.Test {
     return request(serveur()).get('/organizations/current/dashboard').set('Cookie', c(role));

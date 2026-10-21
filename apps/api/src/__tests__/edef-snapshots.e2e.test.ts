@@ -14,6 +14,7 @@ import 'reflect-metadata';
 import { EdefReferenceSnapshot } from '../edef/edef-reference-snapshot.schema.js';
 import { EdefReferenceSnapshotsService } from '../edef/edef-reference-snapshots.service.js';
 import { e2eSuite, makeE2EApp, teardown } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 const LIST = `taxGroups-test-${Math.random().toString(36).slice(2, 8)}`;
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -28,12 +29,12 @@ e2eSuite('instantanés de référence DGI — valeur en vigueur', () => {
     model = app.get<Model<EdefReferenceSnapshot>>(getModelToken(EdefReferenceSnapshot.name));
     await model.createIndexes();
     service = app.get(EdefReferenceSnapshotsService);
-  }, 60_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
     await model.deleteMany({ list: LIST });
     await teardown(app, []);
-  }, 30_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   it('un retour à une valeur déjà conservée redevient la valeur en vigueur', async () => {
     const cinq = { c: 5 };

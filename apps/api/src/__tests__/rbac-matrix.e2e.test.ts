@@ -49,6 +49,7 @@ import { PLANS, PLAN_CATALOG, type Plan } from '@lalanda/shared/pricing';
 
 import { ACTIONS, ORG_PERMISSION_MATRIX, type Action, type OrgRole } from '../authz/permissions.js';
 import { e2eSuite, makeE2EApp, registerAndLogin, teardown } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 /**
  * Offre posée sur l'organisation de test : la PREMIÈRE du catalogue dont les
@@ -286,11 +287,11 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
         .send({ driverValues: { prix_unitaire: 13 + index, quantite_mois: 90 + index } });
       expect(saisie.status, `saisie analyste ${role} : ${JSON.stringify(saisie.body)}`).toBe(201);
     }
-  }, 180_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
     await teardown(app, emails);
-  }, 60_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   // ───────────────────────────────────────────────────────────────────────────
   // Les sondes — une route représentative par action

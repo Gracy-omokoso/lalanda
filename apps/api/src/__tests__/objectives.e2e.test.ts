@@ -26,6 +26,7 @@ import 'reflect-metadata';
 
 import type { FinancialPlanDocument } from '../plans/plan.schema.js';
 import { e2eSuite, teardown } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 async function makeApp(): Promise<INestApplication> {
   const { AppModule } = await import('../app.module.js');
@@ -90,11 +91,11 @@ e2eSuite('objectifs financiers et taux d’atteinte (S18d — docs/01)', () => {
       .send({ name: `Objectifs ${tag}`, templateSlug: 'prestation-services' });
     expect(created.status).toBe(201);
     projectId = created.body.id;
-  }, 60_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
     await teardown(app, [userA.email, userB.email, userC.email]);
-  }, 30_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   async function registerAndLogin(user: {
     email: string;

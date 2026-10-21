@@ -40,6 +40,7 @@ import { PdfRenderingService } from '../reports/pdf-rendering.service.js';
 import { TEST_BANNER } from '../sales/documents/invoice-document.model.js';
 import { qrCodeSvg } from '../sales/documents/invoice-qr.js';
 import { dbOf, e2eSuite, makeE2EApp, registerAndLogin } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 const tag = randomBytes(4).toString('hex');
 process.env['MONGODB_DB'] = `lalanda_e2e_homologation_${tag}`;
@@ -479,7 +480,7 @@ e2eSuite('campagne d’homologation DGI — 29 cas × TTC/HT (ADR-0026, S25h)', 
       expect(res.status, JSON.stringify(res.body)).toBe(201);
       customerIds[c.type] = res.body.id;
     }
-  }, 300_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   beforeEach(() => clearThrottle());
 
@@ -490,7 +491,7 @@ e2eSuite('campagne d’homologation DGI — 29 cas × TTC/HT (ADR-0026, S25h)', 
       await app?.close();
       await fake?.close();
     }
-  }, 60_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   for (const mode of HOMOLOGATION_PRICE_MODES) {
     describe(`mode ${mode.toUpperCase()}`, () => {

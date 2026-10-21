@@ -24,6 +24,7 @@ import { createSign, generateKeyPairSync, type KeyObject } from 'node:crypto';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 
 import { dbOf, e2eSuite, makeE2EApp, registerAndLogin, teardown } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 // ── Configuration Google, posée AVANT tout import de l'application ───────────
 // `buildAuth` lit `process.env` au bootstrap et met son instance en cache pour
@@ -119,7 +120,7 @@ e2eSuite('Connexion Google (S22a)', () => {
     // liaison de comptes est sensible à l'état initial, on repart propre.
     const { purgeTestUsers } = await import('./e2e-utils.js');
     await purgeTestUsers(await dbOf(app), TOUS_LES_EMAILS);
-  }, 60_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
     try {
