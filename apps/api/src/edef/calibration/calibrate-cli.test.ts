@@ -113,6 +113,19 @@ describe('arguments', () => {
     expect(options).toMatchObject({ command: 'etalonner', outDir: DEFAULT_REPORT_DIR });
     expect(() => assertNotTrackedByGit(join(DEFAULT_REPORT_DIR, 'x.json'))).not.toThrow();
   });
+
+  it('git absent (image de production) : accepté hors dépôt, refusé dans un dossier qui contient .git', () => {
+    const path = process.env['PATH'];
+    process.env['PATH'] = '';
+    try {
+      expect(() => assertNotTrackedByGit(join(dir, 'x.json'))).not.toThrow();
+      expect(() => assertNotTrackedByGit(join(API_ROOT, 'src', 'x.json'))).toThrow(
+        CalibrationRefusal,
+      );
+    } finally {
+      process.env['PATH'] = path;
+    }
+  });
 });
 
 describe('main', () => {

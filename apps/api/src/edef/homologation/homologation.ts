@@ -118,19 +118,25 @@ export async function main(argv: readonly string[], io: HomologationIo): Promise
   try {
     const options = parseCampaignArgs(argv);
 
-    // 1. Garde-fous qui ne demandent rien d'autre que l'environnement.
+    // 1. Garde-fous qui ne demandent rien d'autre que l'environnement. La valeur
+    //    BRUTE d'abord : toute valeur autre que vide, « false » ou « 0 » refuse,
+    //    avant même la validation du reste de la configuration.
+    const rawProduction = (io.env['DGI_PRODUCTION_ENABLED'] ?? '').trim().toLowerCase();
     const parsedEnv = DgiEnvSchema.safeParse(withoutEmptyValues(io.env));
+    if (
+      (rawProduction !== '' && rawProduction !== 'false' && rawProduction !== '0') ||
+      (parsedEnv.success && parsedEnv.data.DGI_PRODUCTION_ENABLED)
+    ) {
+      return fail(
+        'Refus : DGI_PRODUCTION_ENABLED est vrai. La campagne d’homologation ne tourne que sur ' +
+          'une plateforme dont la production DGI est fermée.',
+      );
+    }
     if (!parsedEnv.success) {
       return fail(
         `Configuration DGI invalide : ${parsedEnv.error.issues
           .map((i) => `${i.path.join('.')} : ${i.message}`)
           .join(' ; ')}`,
-      );
-    }
-    if (parsedEnv.data.DGI_PRODUCTION_ENABLED) {
-      return fail(
-        'Refus : DGI_PRODUCTION_ENABLED est vrai. La campagne d’homologation ne tourne que sur ' +
-          'une plateforme dont la production DGI est fermée.',
       );
     }
     if (options.outDir !== null) assertNotTrackedByGit(join(options.outDir, STATE_FILE));

@@ -11,7 +11,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import type { Readable, Writable } from 'node:stream';
 
 import { Secret } from '../../integrations/secret-value.js';
@@ -176,9 +176,21 @@ export function readVisibleLine(
   });
 }
 
+/** Un dossier parent (ou lui-même) contient-il `.git` ? */
+function insideGitWorkTree(dir: string): boolean {
+  let current = resolve(dir);
+  for (;;) {
+    if (existsSync(join(current, '.git'))) return true;
+    const parent = dirname(current);
+    if (parent === current) return false;
+    current = parent;
+  }
+}
+
 /**
  * Refuse un chemin de rapport que git suivrait : le dépôt est public. Accepté :
- * un chemin ignoré par git (`dgi/` l'est), ou hors de tout dépôt.
+ * un chemin ignoré par git (`dgi/` l'est), ou hors de tout dépôt — y compris sur
+ * une machine sans git (image de production) quand aucun `.git` n'est en vue.
  */
 export function assertNotTrackedByGit(filePath: string): void {
   const absolute = resolve(filePath);
@@ -195,6 +207,9 @@ export function assertNotTrackedByGit(filePath: string): void {
   } catch (err) {
     const code = (err as { status?: number | null }).status;
     status = typeof code === 'number' ? code : -1;
+    // git absent (image de production, ADR-0026 § 7) : accepté seulement si aucun
+    // dossier parent ne contient de `.git` — il n'y a alors aucun dépôt à protéger.
+    if ((err as { code?: unknown }).code === 'ENOENT' && !insideGitWorkTree(cwd)) return;
   }
   if (status === 0) return; // ignoré par git : accepté
   if (status === 128) return; // hors de tout dépôt git : accepté
