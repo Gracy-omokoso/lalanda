@@ -56,6 +56,7 @@ describe('onglets de l’espace organisation (S21a)', () => {
     expect(ongletsVisibles(owner).map((t) => t.segment)).toEqual([
       '',
       'membres',
+      'brief',
       'parametres',
       'identite',
       'fiscalite',
@@ -68,13 +69,17 @@ describe('onglets de l’espace organisation (S21a)', () => {
     expect(ongletsVisibles(admin).map((t) => t.segment)).toEqual([
       '',
       'membres',
+      'brief',
       'parametres',
       'identite',
       'journal',
     ]);
 
-    // Lecteur : le tableau de bord et rien d'autre.
-    expect(ongletsVisibles(['project.read', 'analytics.read']).map((t) => t.segment)).toEqual(['']);
+    // Lecteur : le tableau de bord et le brief du matin (ADR-0033), rien d'autre.
+    expect(ongletsVisibles(['project.read', 'analytics.read']).map((t) => t.segment)).toEqual([
+      '',
+      'brief',
+    ]);
   });
 
   it('place « Membres » en deuxième position — les personnes avant les réglages', () => {
@@ -84,6 +89,7 @@ describe('onglets de l’espace organisation (S21a)', () => {
     expect(ORGANIZATION_TABS.map((t) => t.segment)).toEqual([
       '',
       'membres',
+      'brief',
       'parametres',
       'identite',
       'fiscalite',

@@ -54,6 +54,10 @@ export const ORGANIZATION_TABS: readonly OrganizationTab[] = [
   // action choisie par ressemblance : le jour où la matrice bouge, l'onglet
   // suit l'appel qu'il ouvre.
   { segment: 'membres', label: 'Membres', action: 'organization.manage' },
+  // ADR-0033 — brief du matin : ouvert par `analytics.read`, l'action de
+  // `GET /morning-brief`, que les huit rôles détiennent. Après « Membres », qui
+  // garde sa deuxième place (ADR-0016 E2).
+  { segment: 'brief', label: 'Brief du matin', action: 'analytics.read' },
   { segment: 'parametres', label: 'Paramètres', action: 'organization.manage' },
   // ADR-0028 — logos, couleurs et police des factures : un paramètre de
   // l'organisation, gardé par l'action de `GET /organizations/current/brand`.
