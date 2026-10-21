@@ -11,8 +11,10 @@
 import 'reflect-metadata';
 
 import type { INestApplication } from '@nestjs/common';
+import { getConnectionToken } from '@nestjs/mongoose';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import type { Db } from 'mongodb';
+import type { Connection } from 'mongoose';
 import { randomBytes } from 'node:crypto';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -164,6 +166,11 @@ e2eSuite('encaissements, règlement et pont vers le réalisé (ADR-0031)', () =>
   beforeAll(async () => {
     app = await makeE2EApp();
     db = await dbOf(app);
+    // `autoIndex` construit les index en arrière-plan : la garde de concurrence des
+    // encaissements repose sur l'index unique de `sales_invoice_settlements` (en
+    // production, `IndexesService` les pose au démarrage). On attend qu'ils existent.
+    const connection = app.get<Connection>(getConnectionToken());
+    await Promise.all(connection.modelNames().map((n) => connection.model(n).init()));
     await new Promise<void>((resolve) => app.getHttpServer().listen(0, '127.0.0.1', resolve));
     for (const c of [...ROLES, 'ownerB', 'ownerC'] as const) {
       emails[c] = `encais-${c}-${tag}@lalanda-test.local`;
