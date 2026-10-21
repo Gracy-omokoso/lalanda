@@ -24,7 +24,6 @@ import { OpportunitiesService } from '../../crm/opportunities.service.js';
 import { conflict, invalidCursor, isDuplicateKey, staleRevision } from '../sales.errors.js';
 import { escapeRegex, isObjectIdHex, normalizeForSearch, searchKeyOf } from '../search.js';
 import { InvoiceDraftsService } from '../invoices/invoice-drafts.service.js';
-import { SalesInvoice, type SalesInvoiceDocument } from '../invoices/invoice.schema.js';
 import type { InvoiceActor, InvoiceLean, StoredLine } from '../invoices/invoice.types.js';
 import type { InvoiceDraftInput, LineInput } from '../invoices/invoices.dto.js';
 import { beforeTimeCursor, decodeTimeCursor, encodeTimeCursor } from '../../crm/time-cursor.js';
@@ -162,7 +161,6 @@ export class QuotesService {
     @InjectModel(SalesQuote.name) private readonly quotes: Model<SalesQuoteDocument>,
     @InjectModel(SalesQuoteCounter.name)
     private readonly counters: Model<SalesQuoteCounterDocument>,
-    @InjectModel(SalesInvoice.name) private readonly invoices: Model<SalesInvoiceDocument>,
     @Inject(InvoiceDraftsService) private readonly drafts: InvoiceDraftsService,
     @Inject(OpportunitiesService) private readonly opportunities: OpportunitiesService,
   ) {}
@@ -246,10 +244,14 @@ export class QuotesService {
   ): Promise<InvoiceLean | null> {
     const id = q.conversion?.invoiceId;
     if (!id || !isObjectIdHex(id)) return null;
-    return this.invoices
-      .findOne({ _id: new Types.ObjectId(id), organizationId })
-      .lean<InvoiceLean>()
-      .exec();
+    // Lecture par le service des brouillons : le devis n'injecte pas le modèle
+    // `sales_invoices`, dont les écrivains sont comptés (invoices.sources.test.ts).
+    try {
+      return await this.drafts.requireOwn(organizationId, id);
+    } catch (err) {
+      if (err instanceof NotFoundException) return null;
+      throw err;
+    }
   }
 
   private async viewOf(organizationId: string, q: QuoteLean): Promise<QuoteView> {

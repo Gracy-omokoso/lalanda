@@ -13,7 +13,6 @@ import { CrmModule } from '../../crm/crm.module.js';
 import { FiscalModule } from '../../fiscal/fiscal.module.js';
 import { OrganizationsModule } from '../../organizations/organizations.module.js';
 import { PdfModule } from '../../reports/pdf.module.js';
-import { SalesInvoice, SalesInvoiceSchema } from '../invoices/invoice.schema.js';
 import { SalesModule } from '../sales.module.js';
 import { QuoteDocumentsService } from './quote-documents.service.js';
 import {
@@ -36,8 +35,6 @@ import { QuotesService } from './quotes.service.js';
     MongooseModule.forFeature([
       { name: SalesQuote.name, schema: SalesQuoteSchema },
       { name: SalesQuoteCounter.name, schema: SalesQuoteCounterSchema },
-      // Lecture seule : le brouillon issu d'une conversion existe-t-il encore ?
-      { name: SalesInvoice.name, schema: SalesInvoiceSchema },
     ]),
   ],
   controllers: [QuotesController],
