@@ -95,6 +95,10 @@ export {
 // (`INVOICE_TOTALS_VERSION`), il ne touche aucun calcul de plan.
 export * from './invoice-totals/index.js';
 
+// Dépenses et trésorerie réelle (ADR-0034) — versionné à part (`TREASURY_VERSION`),
+// il ne touche aucun calcul de plan.
+export * from './treasury/index.js';
+
 /** Placeholder — sera retiré quand toutes les APIs seront stables. */
 export function engineHealth(): { ok: true; version: string } {
   return { ok: true, version: ENGINE_VERSION };

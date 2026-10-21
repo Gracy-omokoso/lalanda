@@ -156,7 +156,8 @@ modifiable), actif ou non.
 (`computeAccountBalances`) :
 
 ```
-solde(D) = solde d'ouverture + Σ entrées datées de ]ouverture, D] − Σ sorties datées de ]ouverture, D]
+solde(D) = solde d'ouverture (au début du jour d'ouverture)
+         + Σ entrées − Σ sorties datées de [ouverture, D]
 ```
 
 | Mouvement | Sens | Origine |
