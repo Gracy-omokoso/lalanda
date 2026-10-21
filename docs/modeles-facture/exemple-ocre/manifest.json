@@ -1,0 +1,28 @@
+{
+  "format": "lalanda.modele-facture",
+  "formatVersion": 1,
+  "id": "lalanda.ocre",
+  "name": "Ocre",
+  "description": "Frise ocre en tête, titre à empattements, tableau aéré et totaux encadrés.",
+  "version": "1.0.0",
+  "contract": 1,
+  "author": { "name": "Lalanda", "email": null, "url": null },
+  "publisher": null,
+  "license": "MIT",
+  "price": null,
+  "options": {
+    "palettes": ["brand", "mono"],
+    "accent": "#9a3412",
+    "fonts": ["source-serif-4", "inter", "ibm-plex-sans"],
+    "font": "inter"
+  },
+  "fonts": [
+    {
+      "family": "Ocre Titre",
+      "file": "polices/ocre-titre-600.woff2",
+      "weight": 600,
+      "style": "normal"
+    }
+  ],
+  "signature": null
+}

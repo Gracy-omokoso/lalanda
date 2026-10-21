@@ -78,13 +78,17 @@ arithmétique : le moteur fournit des chaînes déjà mises en forme.
   2. **Zones du moteur hors du conteneur du modèle.** Le corps est assemblé par le moteur :
      `zone haute` (bandeau de test, bandeau EXEMPLE, DUPLICATA) — `<main class="lx-modele">`
      (le seul endroit où le gabarit écrit) — `zone de sécurité` (cadre DGI, QR, cinq
-     éléments, libellés). Le CSS du modèle est **réécrit** : chaque sélecteur est préfixé par
-     `.lx-modele ` **et** l'ensemble est placé dans `@scope (.lx-modele)` ; il ne peut donc
-     sélectionner que des **descendants** du conteneur. Les sélecteurs `html`, `body`,
-     `:root`, `:host`, les classes réservées `lx-*`, les at-règles (`@import`, `@page`,
-     `@media`, `@font-face`, `@layer`…), l'imbrication CSS et les échappements `\` sont
-     refusés. Le conteneur reçoit du moteur `contain: paint` et `isolation: isolate` : rien de
-     ce qu'il contient ne déborde ni ne s'empile au-dessus des zones du moteur.
+     éléments, libellés). Le CSS du modèle est **réécrit** : chaque sélecteur commence par
+     `.lx-modele:scope` **et** l'ensemble est placé dans `@scope (.lx-modele)` ; il ne peut
+     donc sélectionner que le conteneur et ses **descendants**. Les deux barrières sont
+     indépendantes (prouvé dans Chromium réel : des règles hostiles derrière une seule des
+     deux ne changent pas un octet du PDF). Les sélecteurs `html`, `body`, `main`, `:root`,
+     `:host`, les classes réservées `lx-*`, `:scope ~ …` / `:scope + …` (voisins du
+     conteneur), les pseudo-éléments, les at-règles (`@import`, `@page`, `@media`,
+     `@font-face`, `@layer`…), l'imbrication CSS et les échappements `\` sont refusés. Les
+     zones du moteur sont positionnées au-dessus du conteneur (`z-index`, fond blanc) et le
+     conteneur est isolé (`isolation: isolate`) : un débordement du contenu du modèle ne les
+     recouvre pas.
   3. **Liste blanche de propriétés CSS** (typographie, couleurs opaques, boîtes, flex/grid
      sans placement explicite, bordures, fonds, sauts de page). Absentes, donc refusées :
      `position`, décalages, `z-index`, `transform`, `opacity`, `visibility`, `filter`,
@@ -345,9 +349,10 @@ existant. Paquet invalide : `422 TEMPLATE_PACKAGE_INVALID` avec `details.report`
   feuille énorme) ; HTML (script, `on*`, `style`, `iframe`, `svg`, commentaires, entités,
   caractères invisibles, faux cadre DGI) ; manifeste ; empreinte stable au recompactage ;
   le paquet exemple du dépôt est valide et passe la batterie.
-- Rendu Chromium réel (si disponible) : PDF de l'exemple (test + duplicata, production noir
-  et blanc) dans `apps/api/.vitest/pdf-samples/` ; un paquet hostile (CSS qui vise la zone
-  DGI) imprime quand même la zone.
+- Rendu Chromium réel (si disponible) : PDF de l'exemple (test + duplicata, noir et blanc,
+  30 lignes, pro forma) dans `apps/api/.vitest/pdf-samples/`, déterministe ; des règles qui
+  cacheraient la zone DGI, placées derrière **une seule** des deux barrières de
+  confinement, laissent le PDF identique octet pour octet (témoin : sans barrière, il change).
 - E2E (`invoice-template-packages.e2e.test.ts`) : RBAC, paquet hostile refusé avec rapport,
   installation, version immuable (409), aperçu EXEMPLE (PDF, PNG), activation, gel
   (référence id + version + empreinte), réimpression identique après installation d'une
