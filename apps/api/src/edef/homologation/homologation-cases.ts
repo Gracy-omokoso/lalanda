@@ -11,9 +11,10 @@
 //
 // Ce module est une DONNÉE réutilisable : il produit les corps de requête de
 // l'API LALANDA (`POST /sales/invoices`), jamais une requête e-MCF. Le test e2e
-// `invoices.homologation.e2e.test.ts` le joue contre le FAUX serveur e-MCF ; un
-// futur script pourra le rejouer contre l'environnement de test DGI réel, par
-// l'API Lalanda. Il n'appelle rien lui-même.
+// `invoices.homologation.e2e.test.ts` le joue contre le FAUX serveur e-MCF ; la
+// ligne de commande `edef:homologation` (ADR-0026 § 7) le rejoue contre
+// l'environnement de test DGI réel, par les services de Lalanda. Il n'appelle
+// rien lui-même.
 //
 // Aucune arithmétique de montant : la part « reste » d'un paiement est fixée par
 // `reconcilePayments` du moteur (qui porte l'écart sur le plus gros paiement).
@@ -131,22 +132,27 @@ export interface HomologationCustomer {
 export const HOMOLOGATION_CUSTOMERS: readonly HomologationCustomer[] = Object.freeze([
   {
     type: 'PM',
-    name: 'Société TEST Homologation SARL',
+    name: 'TEST HOMOLOGATION Société PM SARL',
     nif: 'TESTPM0001',
     exemptionReference: null,
   },
-  { type: 'PC', name: 'Commerçant TEST Homologation', nif: 'TESTPC0001', exemptionReference: null },
-  { type: 'PL', name: 'Cabinet TEST Homologation', nif: 'TESTPL0001', exemptionReference: null },
+  {
+    type: 'PC',
+    name: 'TEST HOMOLOGATION Commerçant PC',
+    nif: 'TESTPC0001',
+    exemptionReference: null,
+  },
+  { type: 'PL', name: 'TEST HOMOLOGATION Cabinet PL', nif: 'TESTPL0001', exemptionReference: null },
   {
     type: 'AO',
-    name: 'Organisation internationale TEST',
+    name: 'TEST HOMOLOGATION Organisation internationale AO',
     nif: 'TESTAO0001',
     exemptionReference: 'EXO-TEST-2026-001',
   },
 ]);
 
 /** Nom imprimé du client de comptoir (PP : tous les champs sont facultatifs). */
-export const HOMOLOGATION_WALK_IN_NAME = 'Particulier TEST';
+export const HOMOLOGATION_WALK_IN_NAME = 'TEST HOMOLOGATION Particulier';
 
 // ── Fabrique de lignes ───────────────────────────────────────────────────────
 

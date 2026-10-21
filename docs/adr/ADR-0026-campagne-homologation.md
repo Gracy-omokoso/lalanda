@@ -108,9 +108,9 @@ article hors champ reste dans la fiche et dans la vue, il ne s'imprime plus. Ame
   réutilisables (type, client, lignes, nature d'avoir et cas d'origine, contre-valeur,
   paiements, attendus de la requête et du PDF), avec les corps de requête de l'**API
   Lalanda** (`POST /sales/invoices`) et le calcul des paiements (solde posé par
-  `reconcilePayments`, moteur). Clients et articles **fictifs**, marqués « TEST ». Un futur
-  script pourra rejouer la campagne contre l'environnement de test DGI réel par l'API
-  Lalanda ; il n'est pas écrit ici, et rien n'appelle la DGI.
+  `reconcilePayments`, moteur). Clients et articles **fictifs**, marqués « TEST ». La
+  campagne **réelle** les rejoue par la ligne de commande `edef:homologation` (§ 7) ; le
+  module lui-même n'appelle rien.
 - `apps/api/src/__tests__/invoices.homologation.e2e.test.ts` : un scénario par cas, en TTC
   puis en HT (58 normalisations), contre le **faux serveur e-MCF** ; pour chacun :
   normalisation réussie, requête envoyée conforme (type, mode, groupes, types et codes
@@ -260,12 +260,137 @@ les écarts ci-dessous sont traités par cette branche ; les autres restent ouve
   échanges, périodes invalides → 400, Propriétaire et DAF 200, Administrateur, Comptable,
   Analyste, Lecteur 403.
 
+## 7. Campagne réelle — ligne de commande `edef:homologation` (21 oct. 2026)
+
+**Décision de la dirigeante** : la campagne RÉELLE des 58 normalisations est autorisée sur
+l'environnement de **TEST** de la DGI, avec l'organisation Go Freelance (profil fiscal, point
+de vente e-MCF de test et jeton déjà dans le coffre, en production). Le dossier exige le PDF
+Lalanda de chaque facture normalisée. Le code livré **n'exécute rien de lui-même** : la
+commande se lance à la main (§ 7.6). Sources : `apps/api/src/edef/homologation/`
+(`homologation.ts`, `campaign-run.ts`, `campaign-plan.ts`).
+
+### 7.1 Ce que fait la commande
+
+Contexte applicatif Nest (`AppModule`, **sans serveur HTTP**, ordonnanceur coupé :
+`SCHEDULER_ENABLED=false` dans ce processus seulement), puis les **vrais services**, exactement
+le chemin d'un utilisateur : fiches clients (`CustomersService`), brouillon puis paiements
+(`InvoiceDraftsService`, corps validés par les **mêmes** schémas que l'API —
+`CreateInvoiceSchema`, `PutInvoiceSchema`), « Normaliser » (`InvoiceFreezingService`, qui
+passe par le port de normalisation et le client e-MCF), PDF **original**
+(`InvoiceDocumentsService.original`, tel quel ; tracé `sales_invoice.pdf_exported`). Aucun
+appel direct à la DGI ; la commande ne voit jamais le jeton (il reste chiffré dans le coffre).
+Ordre : les 29 cas en TTC, puis les 29 en HT ; les avoirs 10, 11, 12, 16 suivent leurs
+origines 1, 3, 6, 15 **dans le même mode**. Aucun format de numéro n'est supposé : le numéro
+est lu du document normalisé.
+
+### 7.2 Garde-fous (tous avant le premier brouillon)
+
+| Garde-fou | Effet |
+|---|---|
+| `DGI_PRODUCTION_ENABLED` vrai (valeur brute autre que vide, `false`, `0`), ou `productionEnabled` dans la configuration chargée | refus |
+| URL de test = hôte de production de la DGI (`assertTestTarget`, ADR-0024 § 7.2) | refus |
+| environnement DGI de l'organisation ≠ `test`, ou facture normalisée non active | refus |
+| opérateur non membre, ou rôle sans `sales.manage` **et** `sales.invoice` | refus |
+| nombre de points de vente actifs ≠ 1 (le brouillon retient le seul actif) | refus |
+| dossier `--out` suivi par git (dépôt public) ; sans git, un `.git` parent | refus |
+| avoir dont l'origine n'est ni au plan ni déjà normalisée | refus |
+| confirmation : affiche organisation, environnement, point de vente, opérateur, nombre de normalisations ; il faut taper `OUI` (sauf `--yes` ; sans terminal ni `--yes` : refus) | abandon sinon |
+
+En cours de campagne : **arrêt à la PREMIÈRE erreur** (brouillon refusé, bloquant de
+`readiness`, normalisation refusée ou non aboutie — statut ≠ `normalized`, avec le code et le
+libellé DGI tels que reçus). Aucun cas suivant n'est tenté ; un avoir n'est jamais créé si son
+origine n'est pas normalisée.
+
+### 7.3 Reprise sans renormaliser : étiquette et fichier d'état
+
+- **Étiquette de campagne** : champ interne optionnel `campaign: { id, caseNumber, priceMode }`
+  de `sales_invoices`, posé à la création du brouillon par `InvoiceDraftsService.create`
+  (option passée par la commande seulement ; le contrôleur ne la transmet jamais, les corps
+  HTTP sont `.strict()`), lu par `campaignDocuments`. **Ni envoyé à la DGI, ni imprimé, ni
+  dans `contentSha256`, ni dans la vue.** Pourquoi pas un commentaire : A et C partent à la
+  DGI (`cmta`, `cmtc`) et B, D–H sont réservées (§ 2) — une étiquette y changerait le contenu
+  fiscal envoyé. La règle « un seul écrivain » de `sales_invoices` est respectée (le service
+  de brouillon l'écrit). Identifiant par défaut : `sfe-v1.2` (`--campaign` pour une autre).
+- **Fichier d'état** `etat-campagne.json` dans `--out` (écriture atomique), une entrée par cas
+  réussi ; refusé s'il appartient à une autre organisation ou campagne.
+- **Relance** (même commande) : cas noté → sauté (PDF réécrit s'il manque) ; sinon, d'après
+  l'étiquette en base : document **normalisé** non noté (arrêt brutal entre la normalisation et
+  l'écriture de l'état, ou conteneur recréé) → repris tel quel, **sans renormaliser** ;
+  brouillon laissé en route → supprimé puis recréé ; document **gelé non abouti**
+  (`pending_normalization`, `normalization_failed`, `issued`) → **arrêt**, à régler dans
+  Lalanda (Ventes › Factures) avant de relancer : jamais de seconde normalisation automatique.
+
+### 7.4 Données
+
+- **Clients** : quatre fiches FICTIVES « TEST HOMOLOGATION … » (PM, PC, PL, AO ; NIF fictifs
+  `TEST…0001`), créées une fois puis retrouvées par type, NIF et nom ; le PP est une vente de
+  comptoir « TEST HOMOLOGATION Particulier ». Une fiche au même NIF fictif mais d'un autre nom,
+  ou désactivée : arrêt.
+- **Articles** : les **lignes libres** des cas (désignations « … TEST », codes `TEST-<groupe>`),
+  comme une saisie libre dans l'éditeur — rien de persistant, donc rien à dupliquer. Pas
+  d'articles de catalogue : le code d'article est unique par organisation alors que les cas
+  partagent `TEST-B`, `TEST-C`… entre plusieurs désignations ; les créer obligerait à changer
+  les codes envoyés à la DGI (`items[].code`), que le jeu e2e (§ 4) vérifie.
+
+### 7.5 Sorties (`--out`, jamais de jeton)
+
+- un PDF par facture : `cas-XX-ttc|ht-<numéro>.pdf` (numéro lu du document, caractères hors
+  `[A-Za-z0-9_-]` remplacés par `_`) ;
+- `rapport.json` : par cas et mode — numéro, Code DEF/DGI, NIM, compteurs, date DGI, `uid`,
+  totaux Lalanda (`total`, `vatTotal`, `specificTax`) et DGI (`total`, `vtotal`, `ts`, tels
+  que reçus), comparaison (`compareSubmission`, le comparateur de la normalisation), durée de
+  la normalisation, reprise depuis la base ou non ;
+- `rapport.md` : le tableau lisible des 58 ; `etat-campagne.json`.
+
+### 7.6 Lancer la campagne en production
+
+Prérequis : une release qui contient la commande, déployée ; ne pas déployer pendant la
+campagne (un conteneur recréé perd `/tmp`, la reprise retrouve alors les cas par l'étiquette
+et réécrit les PDF). Listes de référence du point de vente rafraîchies (taux du jour pour le
+cas 26). Identifiants : `_id` de l'organisation Go Freelance (collection `organizations`) et
+de l'utilisatrice qui normalise (collection `user`).
+
+```sh
+ssh <vps> && cd /opt/lalanda
+# 1. Plan, sans rien écrire
+docker exec -it lalanda-prod-api-1 node --enable-source-maps dist/edef/homologation/homologation.js \
+  --org <ORG_ID> --operator <USER_ID> --out /tmp/homologation-sfe-v1.2 --dry-run
+# 2. Campagne : vérifier l'écran de confirmation, taper OUI
+docker exec -it lalanda-prod-api-1 node --enable-source-maps dist/edef/homologation/homologation.js \
+  --org <ORG_ID> --operator <USER_ID> --out /tmp/homologation-sfe-v1.2
+# (en cas d'arrêt : corriger la cause affichée, relancer EXACTEMENT la commande 2)
+# 3. Récupérer PDF et rapports
+mkdir -p /opt/lalanda/dgi/homologation
+docker cp lalanda-prod-api-1:/tmp/homologation-sfe-v1.2 /opt/lalanda/dgi/homologation/
+# puis, depuis le poste : scp -r <vps>:/opt/lalanda/dgi/homologation/homologation-sfe-v1.2 ./dgi/homologation/
+```
+
+`npm run edef:homologation:dist -- …` est l'équivalent dans l'image ; hors image (poste de
+développement), `pnpm --filter @lalanda/api edef:homologation -- …`. Le dossier local `dgi/`
+est ignoré par git (dépôt public) : les PDF n'y entrent jamais.
+
+### 7.7 Tests
+
+- Unitaires `edef/homologation/campaign-plan.test.ts` : arguments (un jeton collé par erreur
+  n'est jamais réaffiché), plan des 58, enchaînements et origine manquante, nom des PDF, état,
+  rapports.
+- E2E `__tests__/homologation-cli.e2e.test.ts` — la vraie commande contre le **faux serveur
+  e-MCF** (jamais la DGI) : refus si production ouverte, organisation hors TEST, opérateur
+  étranger, sans terminal ; `--dry-run` n'écrit rien (ni dossier, ni brouillon, ni client, ni
+  envoi) ; arrêt simulé **juste après la normalisation du cas 12 TTC** puis reprise : le cas 12
+  est retrouvé en base, 58 envois exactement, 58 numéros distincts, 58 PDF, rapports complets,
+  Code DEF/DGI, NIM, compteurs et `uid` égaux à ceux du faux serveur, avoir 12 rattaché au
+  code du cas 6 ; aucun jeton dans les sorties ; relance idempotente (aucun envoi).
+
 ## Conséquences
 
 - Les cas 14 et 29 s'impriment conformément à la DGI ; aucun autre rendu ne change (pour un
   article ordinaire, le code envoyé est le code de l'article).
 - La campagne réelle se prépare sans écrire de code : les 29 cas sont des données, rejouées
-  en CI contre le faux serveur à chaque changement.
+  en CI contre le faux serveur à chaque changement — et par `edef:homologation` (§ 7) contre
+  l'environnement de TEST de la DGI.
+- `sales_invoices` gagne un champ interne optionnel `campaign` (§ 7.3), sans migration ni
+  effet sur le contenu figé.
 
 ## Plan de validation
 
@@ -273,6 +398,7 @@ les écarts ci-dessous sont traités par cette branche ; les autres restent ouve
   A–P, types d'article, clients, six moyens de paiement, corps de requête).
 - Modèle du PDF : code « HORS CHAMP » imprimé ; mention AO.
 - E2E : `invoices.homologation.e2e.test.ts` (faux serveur, jamais la DGI).
+- Campagne réelle : `campaign-plan.test.ts` et `homologation-cli.e2e.test.ts` (§ 7.7).
 
 ## Liens
 

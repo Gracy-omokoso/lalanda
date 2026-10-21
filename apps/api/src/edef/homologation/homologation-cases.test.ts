@@ -123,7 +123,7 @@ describe('cas d’homologation DGI (v1.2)', () => {
     };
     expect(homologationDraftBody(homologationCase(5), 'ttc', ctx).customer).toEqual({
       customerId: null,
-      walkIn: { name: 'Particulier TEST' },
+      walkIn: { name: 'TEST HOMOLOGATION Particulier' },
     });
     const avoir = homologationDraftBody(homologationCase(12), 'ht', ctx);
     expect(avoir).toMatchObject({

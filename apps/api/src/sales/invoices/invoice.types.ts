@@ -139,3 +139,16 @@ export interface InvoiceActor {
   name: string;
   role: string;
 }
+
+/**
+ * Étiquette interne d'un document créé par la campagne d'homologation DGI
+ * (`edef:homologation`, ADR-0026 § 7). Aucun contenu fiscal : ni envoyée, ni
+ * imprimée, ni hachée.
+ */
+export interface InvoiceCampaignLabel {
+  /** Identifiant de campagne (`sfe-v1.2` par défaut). */
+  id: string;
+  /** Numéro du cas officiel, 1 à 29. */
+  caseNumber: number;
+  priceMode: 'ttc' | 'ht';
+}

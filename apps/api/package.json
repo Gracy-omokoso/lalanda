@@ -10,7 +10,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "clean": "rimraf dist .turbo",
-    "edef:calibrate": "tsx src/edef/calibration/calibrate.ts"
+    "edef:calibrate": "tsx src/edef/calibration/calibrate.ts",
+    "edef:homologation": "tsx src/edef/homologation/homologation.ts",
+    "edef:homologation:dist": "node --enable-source-maps dist/edef/homologation/homologation.js"
   },
   "dependencies": {
     "@lalanda/engine": "workspace:*",
