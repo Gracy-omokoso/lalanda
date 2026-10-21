@@ -150,6 +150,12 @@ input[type='number'] {
     0 24px 64px -24px rgba(0, 63, 76, 0.4);
 }
 
+/* Dans l'application (ADR-0030), le « dossier » reste un papier mais perd son
+ * ombre de présentation : deux niveaux d'ombre seulement dans l'outil. */
+#contenu .doc-card {
+  box-shadow: var(--shadow-card);
+}
+
 /* Ligne de registre : libellé, pointillés conducteurs, valeur. */
 .ledger-row {
   display: flex;

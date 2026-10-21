@@ -25,8 +25,8 @@ export function OrganizationChrome({
     <section className="flex flex-col gap-6">
       <PageHeader
         module={pilotage ? 'grow' : undefined}
-        moduleLabel={pilotage ? 'Pilotage' : undefined}
-        title={pilotage ? 'Pilotage de l’organisation' : 'Organisation'}
+        moduleLabel={pilotage ? 'Croître' : undefined}
+        title={pilotage ? 'Pilotage' : 'Organisation'}
         description={
           pilotage
             ? 'Ce qui demande votre attention : validations, ratios, écarts et saisies du réalisé. Ce que vous voyez dépend de votre rôle.'
