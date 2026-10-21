@@ -994,7 +994,12 @@ export type OrgAction =
   // ADR-0023 § S25e.11 — émettre et normaliser des factures et des avoirs :
   // engage le contribuable. Propriétaire, Directeur financier, Comptable ;
   // interdite à tout rôle plateforme.
-  | 'sales.invoice';
+  | 'sales.invoice'
+  // ADR-0034 § 8 — dépenses, comptes et prévision de trésorerie. Consulter
+  // (sauf Chef de projet et Conseiller) et enregistrer (Propriétaire, Directeur
+  // financier, Comptable).
+  | 'treasury.read'
+  | 'treasury.manage';
 
 /**
  * Offres — RÉEXPORTÉES du catalogue partagé, jamais réécrites.

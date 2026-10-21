@@ -51,6 +51,8 @@ export const PROTECTED_PREFIXES = [
   // S25c (ADR-0022) — clients et catalogue. Exige une session ET une
   // organisation active, comme `/organisation` ; seule la première est vue ici.
   '/ventes',
+  // ADR-0034 — dépenses et trésorerie. Session ET organisation active, comme `/ventes`.
+  '/tresorerie',
 ] as const;
 
 /**

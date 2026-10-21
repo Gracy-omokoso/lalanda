@@ -89,6 +89,16 @@ const ITEMS: readonly UserMenuItem[] = [
     hint: 'Clients et catalogue',
     group: 1,
   },
+  // ADR-0034 — dépenses, comptes et prévision de trésorerie. Même règle que
+  // « Ventes » : offerte à tout membre, filtrée dans l'espace par `treasury.read`.
+  {
+    kind: 'link',
+    id: 'tresorerie',
+    href: '/tresorerie',
+    label: 'Trésorerie',
+    hint: 'Dépenses, comptes et prévision',
+    group: 1,
+  },
   {
     kind: 'link',
     id: 'compte',
