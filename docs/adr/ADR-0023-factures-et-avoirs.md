@@ -16,6 +16,12 @@ CTO Lalanda (contrat technique)
 > événements de journal, deux codes 409, `DgiExchangePage`) ; trois méthodes
 > d'`InvoiceNumberingService` (`holdLease`, `dropLease`, `abandon`). Aucun champ retiré,
 > aucun sens changé.
+>
+> **Amendé par [ADR-0027](ADR-0027-numerotation-des-factures.md) (21 oct. 2026).** Format
+> des numéros (§ S25e.3) : `IN{AA}{MM}-NNNNNN` pour les factures, `AV{AA}{MM}-NNNNNN` pour
+> les avoirs sur le même compteur, `TEST-IN…`/`TEST-AV…` en essai, `PF{AA}{MM}-NNNNNN` pour
+> les pro forma. Compteurs, bail et garanties inchangés ; les anciennes formes restent
+> valides. Décision ouverte n° 2 tranchée.
 
 ## Contexte
 
@@ -357,7 +363,9 @@ séries `real`/`test` en mode normalisé), `_schemaVersion: 1`. Index **unique**
   année civile — **à confirmer** par l'expert-comptable (décision ouverte n° 2). Le compteur
   repart à 1 au 1ᵉʳ janvier.
 - **Format** : `AAAA-NNNNNN` (série réelle), `TEST-AAAA-NNNNNN` (essai), `PF-AAAA-NNNNNN`
-  (pro forma) ; au-delà de 999 999, le nombre s'allonge.
+  (pro forma) ; au-delà de 999 999, le nombre s'allonge. **Remplacé par ADR-0027** :
+  `IN{AA}{MM}-NNNNNN` / `AV{AA}{MM}-NNNNNN` (même compteur), `TEST-IN…` / `TEST-AV…`,
+  `PF{AA}{MM}-NNNNNN` ; les numéros déjà attribués gardent l'ancienne forme.
 
 **Interface** (livrée par E2 ; S25f n'utilise que les trois dernières méthodes) :
 
@@ -1154,6 +1162,8 @@ d'avoir, en TTC et en HT ; dans une organisation ordinaire, émettre directement
    chaque 1ᵉʳ janvier (année civile, à confirmer par votre expert-comptable), format
    `2026-000123` ; les pro forma ont leur propre référence `PF-2026-000045`. Voulez-vous un
    préfixe propre à chaque entreprise, ou des séries séparées pour les avoirs ?
+   **Tranché le 21 oct. 2026 (ADR-0027)** : série unique annuelle, `IN{AA}{MM}-NNNNNN` pour
+   les factures et `AV{AA}{MM}-NNNNNN` pour les avoirs, le mois servant de repère.
 3. **Fiche fiscale obligatoire pour toute facture**, même hors facture normalisée (une
    facture doit porter le NIF et l'adresse du vendeur). D'accord ?
 4. **Vente de comptoir sans fiche client** (personne physique non enregistrée) : proposé

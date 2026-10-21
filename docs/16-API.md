@@ -313,9 +313,9 @@ Contrat complet : ADR-0023 § S25e.14 et `apps/api/src/sales/invoices/invoice.co
 | `POST /sales/invoices/:id/issue` (ordinaire) · `POST …/normalize` (normalisé) | `sales.invoice` |
 | `GET /sales/journal` · `GET /sales/exchange-rate-reference` | `sales.read` |
 
-**Pro forma d'abord.** Un brouillon porte une référence `PF-AAAA-NNNNNN`, jamais un numéro de facture ; `documentKind` vaut `invoice` seulement pour `issued` et `normalized`. Dans une organisation en facture normalisée, « Normaliser » convertit en CDF (taux officiel DGI du dernier instantané, ±1 % si un autre taux est saisi) et laisse le document `pending_normalization` jusqu'à S25f.
+**Pro forma d'abord.** Un brouillon porte une référence `PF{AA}{MM}-NNNNNN` (`PF-AAAA-NNNNNN` avant ADR-0027), jamais un numéro de facture ; `documentKind` vaut `invoice` seulement pour `issued` et `normalized`. Dans une organisation en facture normalisée, « Normaliser » convertit en CDF (taux officiel DGI du dernier instantané, ±1 % si un autre taux est saisi) et laisse le document `pending_normalization` jusqu'à S25f.
 
-**Numérotation.** Série réelle `AAAA-NNNNNN` par organisation et année civile (Kinshasa), série `TEST-` pour l'environnement de test DGI ; compteur incrémenté dans la transaction du gel, sans trou ni doublon sous concurrence.
+**Numérotation (ADR-0027).** `IN{AA}{MM}-NNNNNN` pour les factures et `AV{AA}{MM}-NNNNNN` pour les avoirs, sur une seule série par organisation et par année civile (Kinshasa), remise à 1 le 1ᵉʳ janvier ; le mois imprimé est celui de l'attribution, un repère qui ne remet pas le compteur à zéro. Série `TEST-IN…`/`TEST-AV…` pour l'environnement de test DGI ; compteur incrémenté dans la transaction du gel, sans trou ni doublon sous concurrence. Les numéros attribués avant ADR-0027 (`AAAA-NNNNNN`, `TEST-AAAA-NNNNNN`) restent valides et se cherchent par `q`.
 
 **Calculs.** Totaux, paiements, conversion, contre-valeur USD et contrôles d'avoir viennent du moteur `invoice-totals` ; l'API n'en refait aucun.
 
