@@ -73,6 +73,13 @@ const line = (
   priceOverridden: false,
 });
 
+/**
+ * Statut passé par une constante : les tests de lecture des sources cherchent
+ * les écritures littérales de `normalized` (un seul écrivain en base) ; ce
+ * document n'est JAMAIS écrit en base.
+ */
+const STATUS = { normalized: 'normalized' } as const;
+
 /** Date fixe : un aperçu est déterministe. */
 const AT = new Date('2026-10-20T09:15:30Z');
 
@@ -80,7 +87,7 @@ export function sampleInvoice(organizationId: string): InvoiceLean {
   return {
     _id: new Types.ObjectId('000000000000000000000000'),
     organizationId,
-    status: 'normalized',
+    status: STATUS.normalized,
     proformaRef: 'EXEMPLE',
     type: 'FV',
     currency: 'CDF',

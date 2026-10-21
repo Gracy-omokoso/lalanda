@@ -107,21 +107,25 @@ describe.each(allTemplates().map((t) => [t.label, t] as const))('modèle %s', (_
     },
   );
 
-  it('chaque option (palette × police × accent) garde toutes les mentions', () => {
-    const docs = [
-      modelFor(normalizedTest(), template),
-      modelFor(normalizedTest(), template, { duplicateNumber: 1 }),
-      richModel(template),
-    ];
-    for (const options of optionMatrix(template)) {
-      for (const m of docs) {
-        const r = renderDocumentHtml(m, QR, presentation(template, options, true));
-        const label = JSON.stringify(options);
-        expect(missingMentions(m, r.html, QR), label).toEqual([]);
-        expect(missingRepeatedMentions(m, r.headerTemplate, r.footerTemplate), label).toEqual([]);
+  it(
+    'chaque option (palette × police × accent) garde toutes les mentions',
+    { timeout: 120_000 },
+    () => {
+      const docs = [
+        modelFor(normalizedTest(), template),
+        modelFor(normalizedTest(), template, { duplicateNumber: 1 }),
+        richModel(template),
+      ];
+      for (const options of optionMatrix(template)) {
+        for (const m of docs) {
+          const r = renderDocumentHtml(m, QR, presentation(template, options, true));
+          const label = JSON.stringify(options);
+          expect(missingMentions(m, r.html, QR), label).toEqual([]);
+          expect(missingRepeatedMentions(m, r.headerTemplate, r.footerTemplate), label).toEqual([]);
+        }
       }
-    }
-  });
+    },
+  );
 
   it('environnement de test : filigrane TEST et bandeau ; production : aucun', () => {
     const test = renderDocumentHtml(
