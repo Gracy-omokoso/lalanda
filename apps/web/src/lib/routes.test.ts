@@ -59,6 +59,13 @@ describe('isProtectedPath (S20b)', () => {
     expect(isProtectedPath('/ventes-privees')).toBe(false);
   });
 
+  it('protège l’espace Croissance, racine comme sous-routes (ADR-0032)', () => {
+    for (const path of ['/croissance', '/croissance/sante', '/croissance/parcours']) {
+      expect(isProtectedPath(path)).toBe(true);
+    }
+    expect(isProtectedPath('/croissance-externe')).toBe(false);
+  });
+
   it('protège les espaces existants, racine comme sous-routes', () => {
     for (const path of [
       '/projects',

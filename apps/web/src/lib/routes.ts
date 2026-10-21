@@ -51,6 +51,9 @@ export const PROTECTED_PREFIXES = [
   // S25c (ADR-0022) — clients et catalogue. Exige une session ET une
   // organisation active, comme `/organisation` ; seule la première est vue ici.
   '/ventes',
+  // ADR-0032 — espace Croissance (GROW). Session ET organisation active, comme
+  // `/ventes` ; seule la première est vue ici.
+  '/croissance',
 ] as const;
 
 /**

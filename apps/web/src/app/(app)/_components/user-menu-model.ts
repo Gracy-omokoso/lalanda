@@ -53,8 +53,8 @@ export interface UserMenuFacts {
 }
 
 /**
- * Les sept entrées du menu, dans l'ordre exact de l'ADR-0016 §1 amendé par
- * l'ADR-0022 (entrée « Ventes »).
+ * Les huit entrées du menu, dans l'ordre exact de l'ADR-0016 §1 amendé par
+ * l'ADR-0022 (entrée « Ventes ») et l'ADR-0032 (entrée « Croissance »).
  *
  * Deux groupes : le premier est ce qui appartient à la PERSONNE et à son
  * travail quotidien, le second ce qui appartient à l'organisation et à la
@@ -87,6 +87,18 @@ const ITEMS: readonly UserMenuItem[] = [
     href: '/ventes',
     label: 'Ventes',
     hint: 'Clients et catalogue',
+    group: 1,
+  },
+  // ADR-0032 — l'espace Croissance (GROW), après les ventes : santé de
+  // l'entreprise, indicateurs investisseurs, parcours. Offert à tout membre
+  // (`analytics.read` est détenu par les huit rôles) ; l'offre et les droits
+  // d'écriture sont expliqués dans l'espace lui-même.
+  {
+    kind: 'link',
+    id: 'croissance',
+    href: '/croissance',
+    label: 'Croissance',
+    hint: 'Santé, indicateurs investisseurs, parcours',
     group: 1,
   },
   {

@@ -20,10 +20,11 @@ const OPERATEUR = { canReadAdmin: true };
 const MEMBRE = { canReadAdmin: false };
 
 describe('contenu et ordre du menu (ADR-0016 §1)', () => {
-  it('liste les sept entrées dans l’ordre exact, pour un opérateur', () => {
+  it('liste les huit entrées dans l’ordre exact, pour un opérateur', () => {
     expect(entreesMenu(OPERATEUR).map((e) => e.label)).toEqual([
       'Tableau de bord',
       'Ventes',
+      'Croissance',
       'Mon compte',
       'Organisation',
       'Abonnement',
@@ -70,6 +71,7 @@ describe('conditionnement par le drapeau serveur (ADR-0016 §5)', () => {
     expect(membre).toEqual([
       'Tableau de bord',
       'Ventes',
+      'Croissance',
       'Mon compte',
       'Organisation',
       'Abonnement',
@@ -77,7 +79,7 @@ describe('conditionnement par le drapeau serveur (ADR-0016 §5)', () => {
     ]);
   });
 
-  it('n’a qu’UNE seule entrée conditionnée — les six autres sont invariantes', () => {
+  it('n’a qu’UNE seule entrée conditionnée — les autres sont invariantes', () => {
     const avec = entreesMenu(OPERATEUR).map((e) => e.id);
     const sans = entreesMenu(MEMBRE).map((e) => e.id);
     expect(avec.filter((id) => !sans.includes(id))).toEqual(['admin']);
@@ -112,19 +114,29 @@ describe('entrée « Ventes » (ADR-0022, amende ADR-0016 §1)', () => {
   });
 });
 
+describe('entrée « Croissance » (ADR-0032)', () => {
+  it('suit « Ventes », mène sur /croissance et n’est conditionnée par aucun fait', () => {
+    const items = entreesMenu(MEMBRE);
+    const i = items.findIndex((e) => e.id === 'croissance');
+    expect(items[i - 1]?.id).toBe('ventes');
+    expect(items[i]).toMatchObject({ kind: 'link', href: '/croissance', group: 1 });
+    expect(entreeActive('/croissance/parcours', items)).toBe('croissance');
+  });
+});
+
 describe('groupes et séparateurs', () => {
   it('sépare personne / organisation / déconnexion, pour un opérateur', () => {
     const items = entreesMenu(OPERATEUR);
     const avant = items.map((_, i) => separateurAvant(items, i));
-    //           TdB    Ventes Compte  Orga   Abo    Admin  Déco
-    expect(avant).toEqual([false, false, false, true, false, false, true]);
+    //           TdB    Ventes Crois. Compte Orga  Abo    Admin  Déco
+    expect(avant).toEqual([false, false, false, false, true, false, false, true]);
   });
 
   it('ne laisse AUCUN séparateur orphelin quand « Administration » disparaît', () => {
     const items = entreesMenu(MEMBRE);
     const avant = items.map((_, i) => separateurAvant(items, i));
-    //           TdB    Ventes Compte  Orga   Abo    Déco
-    expect(avant).toEqual([false, false, false, true, false, true]);
+    //           TdB    Ventes Crois. Compte Orga  Abo    Déco
+    expect(avant).toEqual([false, false, false, false, true, false, true]);
     // Deux séparateurs dans les deux cas : le dessin ne dépend pas d'un index
     // codé en dur, donc retirer une entrée ne peut pas produire un trait seul.
     expect(avant.filter(Boolean)).toHaveLength(2);

@@ -538,13 +538,13 @@ export function readActiveOrgCookie(): string | undefined {
   return undefined;
 }
 
-interface JsonRequestInit {
+export interface JsonRequestInit {
   method?: string;
   headers?: Record<string, string>;
   body?: unknown;
 }
 
-async function jsonRequest<T>(path: string, init: JsonRequestInit = {}): Promise<T> {
+export async function jsonRequest<T>(path: string, init: JsonRequestInit = {}): Promise<T> {
   const { body, headers, method } = init;
   const res = await fetch(`${API_URL}${path}`, {
     method,
