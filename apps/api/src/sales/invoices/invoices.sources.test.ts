@@ -80,6 +80,9 @@ describe('documents de vente — lecture des sources', () => {
 
   it('sales_invoices : écrit par les brouillons, le gel et la numérotation seulement', async () => {
     expect(await filesMatching(/InjectModel\(SalesInvoice\.name\)/)).toEqual([
+      // ADR-0032 : GROW LIT les factures finales (indicateurs, santé), n'y écrit
+      // jamais — vérifié par `grow/grow-readonly.surface.test.ts`.
+      'grow/grow-reader.service.ts',
       // ADR-0025 (S25g) : seul écrivain de `duplicateCount`, et de lui seul.
       'sales/documents/invoice-documents.service.ts',
       'sales/invoices/invoice-drafts.service.ts',
