@@ -20,6 +20,7 @@ import { IntegrationsModule } from './integrations/integrations.module.js';
 import { LegalModule } from './legal/legal.module.js';
 import { MailModule } from './mail/mail.module.js';
 import { ObjectivesModule } from './objectives/objectives.module.js';
+import { MorningBriefModule } from './morning-brief/morning-brief.module.js';
 import { OrganizationSpaceModule } from './organization-space/organization-space.module.js';
 import { OrganizationsModule } from './organizations/organizations.module.js';
 import { ParameterPacksModule } from './parameter-packs/parameter-packs.module.js';
@@ -105,6 +106,8 @@ import { StorageModule } from './storage/storage.module.js';
     BrandingModule,
     // ADR-0022 — clients et catalogue (lot S25c).
     SalesModule,
+    // ADR-0033 — brief du matin : lit les ventes, réutilise l'IA et l'ordonnanceur.
+    MorningBriefModule,
   ],
   controllers: [HealthController, EvaluateController],
 })

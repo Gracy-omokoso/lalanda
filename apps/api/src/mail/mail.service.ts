@@ -22,8 +22,10 @@ import { webUrl } from './mail.links.js';
 import {
   renderEmailVerification,
   renderInvitation,
+  renderMorningBrief,
   renderNormalizedInvoicingDisabled,
   renderPasswordReset,
+  type MorningBriefMailContent,
 } from './mail.templates.js';
 import { MailTransport } from './mail.transport.js';
 import type { MailDeliveryResult } from './mail.types.js';
@@ -67,6 +69,14 @@ export interface NormalizedInvoicingDisabledMail {
 }
 
 /**
+ * Brief du matin (ADR-0033 § 8) — un envoi par abonné, au plus une fois par jour.
+ * Contenu DÉTERMINISTE seulement : aucun texte rédigé par l'IA ne part par e-mail.
+ */
+export interface MorningBriefMail extends MorningBriefMailContent {
+  to: string;
+}
+
+/**
  * Contrat d'envoi du produit. Voir l'en-tête de fichier.
  *
  * Aucune méthode ne LÈVE sur échec d'envoi : toutes retournent un
@@ -82,6 +92,7 @@ export abstract class MailService {
   abstract sendNormalizedInvoicingDisabled(
     input: NormalizedInvoicingDisabledMail,
   ): Promise<MailDeliveryResult>;
+  abstract sendMorningBrief(input: MorningBriefMail): Promise<MailDeliveryResult>;
 }
 
 /** Implémentation par défaut : rendu des gabarits puis remise au transport. */
@@ -139,5 +150,14 @@ export class TemplatedMailService extends MailService {
       actorName: input.actorName ?? null,
     });
     return this.transport.send({ to: input.to, ...body });
+  }
+
+  async sendMorningBrief(input: MorningBriefMail): Promise<MailDeliveryResult> {
+    const { to, ...content } = input;
+    // Onglet « Brief du matin » de l'espace organisation (ADR-0033).
+    return this.transport.send({
+      to,
+      ...renderMorningBrief(content, `${webUrl()}/organisation/brief`),
+    });
   }
 }

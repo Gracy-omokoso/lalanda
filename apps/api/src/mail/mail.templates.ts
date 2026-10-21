@@ -294,6 +294,46 @@ export function renderNormalizedInvoicingDisabled(input: {
   };
 }
 
+/** Contenu du brief du matin, déjà rédigé par le moteur (ADR-0033 § 8). */
+export interface MorningBriefMailContent {
+  organizationName: string;
+  /** « mercredi 21 octobre 2026 » — jour de Kinshasa. */
+  dateLabel: string;
+  /** Faits clés, déjà formatés (« Chiffre d'affaires HT du mois (CDF) : 1 250,00 CDF »). */
+  facts: string[];
+  alerts: string[];
+  recommendations: string[];
+}
+
+/**
+ * Brief du matin (ADR-0033 § 8).
+ *
+ * Contenu DÉTERMINISTE : faits, alertes et recommandations du moteur. Aucun
+ * paragraphe rédigé par l'IA ne part par e-mail — l'explication se demande dans
+ * l'application, où elle est vérifiée et sourcée. Le nom de l'organisation est
+ * une saisie utilisateur : `layout` l'échappe, comme tout paragraphe.
+ */
+export function renderMorningBrief(input: MorningBriefMailContent, url: string): RenderedMail {
+  const section = (titre: string, lignes: string[], vide: string): string[] =>
+    lignes.length > 0 ? [titre, ...lignes.map((l) => `• ${l}`)] : [`${titre} ${vide}`];
+  const rendered = layout({
+    heading: `Brief du matin — ${input.organizationName}`,
+    paragraphs: [
+      `Situation au ${input.dateLabel}.`,
+      ...input.facts,
+      ...section('Alertes prioritaires :', input.alerts, 'aucune.'),
+      ...section('Recommandations :', input.recommendations, 'aucune.'),
+    ],
+    ctaLabel: 'Ouvrir le brief du matin',
+    ctaUrl: url,
+    footnotes: [
+      'Chiffres calculés par Lalanda à partir de vos factures. Les indicateurs « à renseigner » ou « non disponibles » ne sont pas évalués.',
+      'Vous recevez ce message parce que vous avez activé l’envoi quotidien du brief. Vous pouvez le désactiver depuis la page du brief.',
+    ],
+  });
+  return { ...rendered, subject: `${PRODUCT} — brief du matin, ${input.organizationName}` };
+}
+
 /**
  * Date lisible en français, en UTC.
  *
