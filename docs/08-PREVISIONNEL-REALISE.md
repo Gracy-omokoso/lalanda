@@ -115,6 +115,18 @@ Un écart présenté à côté d’un `planVersion` a valeur officielle. Quand l
 10. **Projection** = réalisé des mois **clôturés** + (base annuelle ÷ 12) × mois restants. Un mois saisi mais non clôturé compte comme estimation : seule la clôture transforme une saisie en observation ferme. Si des mois sont clôturés mais que la ligne n’y figure pas, `realiseClos` et `totalProjete` valent `null` (observation manquante) ; sans aucun mois clôturé, `realiseClos` vaut bien `0` et la projection égale le plan.
 11. **Soldes saisis, non recalculés.** Les soldes du compte d’exploitation (`marge_matiere`, `excedent_brut`, `resultat_net`…) sont calculés par le moteur dans le plan, mais **saisis à la main** dans le réalisé. L’API ne les recalcule pas à la place de l’utilisateur — le moteur reste l’unique source de vérité des calculs — mais signale l’incohérence : si la formule DSL de la ligne est une pure combinaison ± d’autres lignes de référence et que tous ses composants sont saisis, un écart au-delà de la tolérance d’arrondi produit un diagnostic `INCOHERENCE_SOLDE` portant les mois concernés. Les formules avec produit, division ou fonction (`ca * food_cost_pct`, `IF(...)`) sont hors contrôle : les réimplémenter créerait une seconde source de vérité de calcul.
 
+### Réalisé issu des dépenses (ADR-0034)
+
+Le module RUN « Dépenses et trésorerie » peut alimenter le réalisé d'**un** projet relié,
+sur demande et de façon idempotente (`POST /treasury/actuals-bridge/sync`) : les dépenses
+d'exploitation, rattachées par l'utilisateur à une ligne de **charge** du compte
+d'exploitation, sont sommées par mois civil et reportées dans la période d'exercice
+correspondante. Chaque valeur porte son origine dans `sources[ligne]` (`manual`,
+`run.expenses`, `run.sales`) ; une période clôturée et une saisie manuelle ne sont jamais
+modifiées ; une case contenant une dépense dans une autre devise que le projet n'est pas
+reportée. Tant que le report est actif, la saisie manuelle des lignes visées répond
+`409 LINE_FED_BY_RUN`. Le plan validé n'est jamais écrit.
+
 ### Reste à faire
 
 - **Import bancaire et CSV/Excel mappé** (§ Saisie et import) : aujourd’hui la saisie est manuelle et agrégée. La machine d’état `uploaded → mapped → validated → processing → completed` (docs/22 § Import) et l’annulation d’import ne sont pas implémentées.

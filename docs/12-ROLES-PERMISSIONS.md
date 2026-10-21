@@ -35,7 +35,7 @@ Le support ne voit jamais les données financières sans consentement explicite,
 
 ## Actions granulaires
 
-`organization.manage`, `billing.manage`, `members.invite`, `project.create`, `project.read`, `project.update`, `canvas.update`, `inputs.update`, `plan.calculate`, `plan.approve`, `actuals.import`, `period.close`, `analytics.read`, `report.export`, `audit.read`, `fiscal.manage`, `sales.read`, `sales.manage`, `sales.invoice`.
+`organization.manage`, `billing.manage`, `members.invite`, `project.create`, `project.read`, `project.update`, `canvas.update`, `inputs.update`, `plan.calculate`, `plan.approve`, `actuals.import`, `period.close`, `analytics.read`, `report.export`, `audit.read`, `fiscal.manage`, `sales.read`, `sales.manage`, `sales.invoice`, `treasury.read`, `treasury.manage`.
 
 `fiscal.manage` — « Gérer l'identité fiscale et la facture normalisée » — est la
 seizième action, ajoutée par ADR-0021 §8 (18 oct. 2026). Elle couvre la fiche
@@ -92,6 +92,25 @@ n° 1).
 
 Elle est **interdite à tous les rôles plateforme**, super-administrateur compris et
 même sous accès délégué : le support n'émet jamais au nom d'un contribuable.
+
+`treasury.read` — « Consulter les dépenses, les comptes et la prévision de trésorerie » —
+et `treasury.manage` — « Enregistrer des dépenses, des comptes, des virements et des
+dépenses récurrentes » — sont ajoutées par ADR-0034 § 8 (21 oct. 2026), en fin de liste.
+Enregistrer un décaissement est un acte de trésorerie : le **Propriétaire**, le
+**Directeur financier** et le **Comptable** le font ; l'**Administrateur**, l'**Analyste**
+et le **Lecteur** consultent ; le **Conseiller**, externe, ne voit pas le détail des
+dépenses et des fournisseurs ; le **Chef de projet** n'a rien. Relier les dépenses au
+réalisé d'un projet exige en plus `actuals.import`. Cette répartition est une proposition
+soumise à la décideuse (ADR-0034, décision ouverte n° 7).
+
+| Action | PRO | ADM | DIR | CPT | ANA | CDP | CON | LEC |
+|---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| `treasury.read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ |
+| `treasury.manage` | ✓ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+
+Côté plateforme, `treasury.read` n'est possible que **sous accès délégué**, pour le
+super-administrateur et le support ; `treasury.manage`, sous accès délégué pour le seul
+super-administrateur. Aucune des deux n'est un interdit absolu.
 
 ## Règles critiques
 

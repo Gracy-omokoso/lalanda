@@ -1,0 +1,320 @@
+// Collections de la trésorerie RUN — ADR-0034.
+//
+// Toutes portent `organizationId` : chaque requête est scopée par l'organisation
+// active, un document d'une autre organisation est « introuvable » (404). Les
+// montants sont des chaînes décimales (jamais des flottants) ; les dates civiles
+// des chaînes `AAAA-MM-JJ` (jour de Kinshasa, ADR-0027).
+
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import type { HydratedDocument } from 'mongoose';
+
+import type {
+  ExpenseCategory,
+  RecurrenceFrequency,
+  ScenarioHypotheses,
+  TreasuryAccountKind,
+  TreasuryCurrency,
+} from '@lalanda/engine';
+
+// ─── Comptes ─────────────────────────────────────────────────────────────────
+
+@Schema({ collection: 'treasury_accounts', timestamps: true, strict: true })
+export class TreasuryAccount {
+  @Prop({ type: String, required: true })
+  organizationId!: string;
+
+  @Prop({ type: String, required: true })
+  name!: string;
+
+  @Prop({ type: String, required: true, enum: ['cash', 'bank', 'mobile_money'] })
+  kind!: TreasuryAccountKind;
+
+  @Prop({ type: String, default: null })
+  institution!: string | null;
+
+  /** Non modifiable après création. */
+  @Prop({ type: String, required: true, enum: ['CDF', 'USD'] })
+  currency!: TreasuryCurrency;
+
+  /** Solde au DÉBUT du jour d'ouverture, décimal signé. */
+  @Prop({ type: String, required: true })
+  openingBalance!: string;
+
+  /** Non modifiable après création. */
+  @Prop({ type: String, required: true })
+  openingDate!: string;
+
+  @Prop({ type: Boolean, required: true, default: true })
+  active!: boolean;
+
+  @Prop({ type: Number, required: true, default: 1 })
+  revision!: number;
+
+  @Prop({ type: String, required: true })
+  createdBy!: string;
+
+  @Prop({ type: String, required: true })
+  updatedBy!: string;
+
+  @Prop({ type: Number, required: true, default: 1 })
+  _schemaVersion!: number;
+
+  createdAt!: Date;
+  updatedAt!: Date;
+}
+export type TreasuryAccountDocument = HydratedDocument<TreasuryAccount>;
+export const TreasuryAccountSchema = SchemaFactory.createForClass(TreasuryAccount);
+TreasuryAccountSchema.index({ organizationId: 1, active: -1, name: 1 });
+
+// ─── Dépenses ────────────────────────────────────────────────────────────────
+
+export interface ExpenseAttachment {
+  /** Identifiant tiré au hasard (`storage/object-key.ts`) : la clé ne dérive de rien. */
+  objectId: string;
+  contentType: string;
+  size: number;
+  uploadedAt: Date;
+  uploadedBy: string;
+}
+
+@Schema({ collection: 'treasury_expenses', timestamps: true, strict: true })
+export class TreasuryExpense {
+  @Prop({ type: String, required: true })
+  organizationId!: string;
+
+  @Prop({ type: String, required: true })
+  spentOn!: string;
+
+  @Prop({ type: String, required: true })
+  amount!: string;
+
+  @Prop({ type: String, required: true, enum: ['CDF', 'USD'] })
+  currency!: TreasuryCurrency;
+
+  @Prop({ type: String, required: true })
+  category!: ExpenseCategory;
+
+  @Prop({ type: String, required: true })
+  label!: string;
+
+  @Prop({ type: String, default: null })
+  supplierName!: string | null;
+
+  /** Clé de recherche normalisée du fournisseur (minuscules, sans accents). */
+  @Prop({ type: String, default: null })
+  supplierKey!: string | null;
+
+  @Prop({ type: String, default: null })
+  accountId!: string | null;
+
+  /** Déclarée par l'utilisateur ; conservée, jamais utilisée dans un calcul (ADR-0034, d.o. n° 1). */
+  @Prop({ type: String, default: null })
+  deductibleVat!: string | null;
+
+  @Prop({ type: String, default: null })
+  reference!: string | null;
+
+  @Prop({ type: Object, default: null })
+  attachment!: ExpenseAttachment | null;
+
+  /** Occurrence de dépense récurrente confirmée — `null` pour une dépense ponctuelle. */
+  @Prop({ type: String, default: null })
+  recurringExpenseId!: string | null;
+
+  @Prop({ type: String, default: null })
+  occurrenceDate!: string | null;
+
+  @Prop({ type: String, required: true, enum: ['recorded', 'cancelled'], default: 'recorded' })
+  status!: 'recorded' | 'cancelled';
+
+  @Prop({ type: String, default: null })
+  cancelReason!: string | null;
+
+  @Prop({ type: Date, default: null })
+  cancelledAt!: Date | null;
+
+  @Prop({ type: Number, required: true, default: 1 })
+  revision!: number;
+
+  @Prop({ type: String, required: true })
+  createdBy!: string;
+
+  @Prop({ type: String, required: true })
+  updatedBy!: string;
+
+  @Prop({ type: Number, required: true, default: 1 })
+  _schemaVersion!: number;
+
+  createdAt!: Date;
+  updatedAt!: Date;
+}
+export type TreasuryExpenseDocument = HydratedDocument<TreasuryExpense>;
+export const TreasuryExpenseSchema = SchemaFactory.createForClass(TreasuryExpense);
+TreasuryExpenseSchema.index({ organizationId: 1, spentOn: -1, _id: -1 });
+TreasuryExpenseSchema.index({ organizationId: 1, accountId: 1, spentOn: 1 });
+TreasuryExpenseSchema.index({ organizationId: 1, supplierKey: 1 });
+// Confirmer deux fois la même occurrence ne crée qu'une dépense (ADR-0034 § 3).
+// Une occurrence ANNULÉE sort de l'index : elle redevient « à confirmer ».
+TreasuryExpenseSchema.index(
+  { organizationId: 1, recurringExpenseId: 1, occurrenceDate: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { recurringExpenseId: { $type: 'string' }, status: 'recorded' },
+    name: 'treasury_expense_occurrence_unique',
+  },
+);
+
+// ─── Dépenses récurrentes ────────────────────────────────────────────────────
+
+@Schema({ collection: 'treasury_recurring_expenses', timestamps: true, strict: true })
+export class TreasuryRecurringExpense {
+  @Prop({ type: String, required: true })
+  organizationId!: string;
+
+  @Prop({ type: String, required: true })
+  label!: string;
+
+  @Prop({ type: String, required: true })
+  amount!: string;
+
+  @Prop({ type: String, required: true, enum: ['CDF', 'USD'] })
+  currency!: TreasuryCurrency;
+
+  @Prop({ type: String, required: true })
+  category!: ExpenseCategory;
+
+  @Prop({ type: String, default: null })
+  supplierName!: string | null;
+
+  @Prop({ type: String, default: null })
+  accountId!: string | null;
+
+  @Prop({ type: String, required: true, enum: ['weekly', 'monthly', 'quarterly', 'yearly'] })
+  frequency!: RecurrenceFrequency;
+
+  @Prop({ type: String, required: true })
+  startDate!: string;
+
+  @Prop({ type: String, default: null })
+  endDate!: string | null;
+
+  @Prop({ type: Boolean, required: true, default: true })
+  active!: boolean;
+
+  @Prop({ type: Number, required: true, default: 1 })
+  revision!: number;
+
+  @Prop({ type: String, required: true })
+  createdBy!: string;
+
+  @Prop({ type: String, required: true })
+  updatedBy!: string;
+
+  @Prop({ type: Number, required: true, default: 1 })
+  _schemaVersion!: number;
+
+  createdAt!: Date;
+  updatedAt!: Date;
+}
+export type TreasuryRecurringExpenseDocument = HydratedDocument<TreasuryRecurringExpense>;
+export const TreasuryRecurringExpenseSchema =
+  SchemaFactory.createForClass(TreasuryRecurringExpense);
+TreasuryRecurringExpenseSchema.index({ organizationId: 1, active: -1, label: 1 });
+
+// ─── Mouvements hors dépenses (virements, autres entrées et sorties) ─────────
+
+export type TreasuryMovementKind = 'transfer' | 'other_in' | 'other_out';
+
+@Schema({ collection: 'treasury_movements', timestamps: true, strict: true })
+export class TreasuryMovement {
+  @Prop({ type: String, required: true })
+  organizationId!: string;
+
+  @Prop({ type: String, required: true, enum: ['transfer', 'other_in', 'other_out'] })
+  kind!: TreasuryMovementKind;
+
+  @Prop({ type: String, required: true })
+  date!: string;
+
+  @Prop({ type: String, required: true })
+  label!: string;
+
+  /** Compte débité (`transfer`, `other_out`). */
+  @Prop({ type: String, default: null })
+  fromAccountId!: string | null;
+
+  /** Compte crédité (`transfer`, `other_in`). */
+  @Prop({ type: String, default: null })
+  toAccountId!: string | null;
+
+  /** Montant sorti du compte débité. */
+  @Prop({ type: String, default: null })
+  amountOut!: string | null;
+
+  /** Montant entré sur le compte crédité (différent seulement entre deux devises). */
+  @Prop({ type: String, default: null })
+  amountIn!: string | null;
+
+  @Prop({ type: String, default: null })
+  reference!: string | null;
+
+  @Prop({ type: String, required: true, enum: ['recorded', 'cancelled'], default: 'recorded' })
+  status!: 'recorded' | 'cancelled';
+
+  @Prop({ type: String, default: null })
+  cancelReason!: string | null;
+
+  @Prop({ type: String, required: true })
+  createdBy!: string;
+
+  @Prop({ type: String, required: true })
+  updatedBy!: string;
+
+  @Prop({ type: Number, required: true, default: 1 })
+  _schemaVersion!: number;
+
+  createdAt!: Date;
+  updatedAt!: Date;
+}
+export type TreasuryMovementDocument = HydratedDocument<TreasuryMovement>;
+export const TreasuryMovementSchema = SchemaFactory.createForClass(TreasuryMovement);
+TreasuryMovementSchema.index({ organizationId: 1, date: -1, _id: -1 });
+
+// ─── Réglages : minimum de trésorerie, hypothèses, pont vers le réalisé ─────
+
+export interface TreasuryBridgeConfig {
+  enabled: boolean;
+  projectId: string | null;
+  firstMonth: string | null;
+  mapping: Partial<Record<ExpenseCategory, string>>;
+  updatedAt: Date | null;
+  updatedBy: string | null;
+}
+
+@Schema({ collection: 'treasury_settings', timestamps: true, strict: true })
+export class TreasurySettings {
+  @Prop({ type: String, required: true, unique: true })
+  organizationId!: string;
+
+  /** Minimum de trésorerie par devise ; absent = 0 (ADR-0034, d.o. n° 5). */
+  @Prop({ type: Object, default: {} })
+  minimumBalances!: Partial<Record<TreasuryCurrency, string>>;
+
+  /** Hypothèses des trois scénarios ; absentes = valeurs par défaut proposées. */
+  @Prop({ type: Object, default: null })
+  scenarios!: Record<'optimistic' | 'probable' | 'pessimistic', ScenarioHypotheses> | null;
+
+  @Prop({ type: Object, default: null })
+  bridge!: TreasuryBridgeConfig | null;
+
+  @Prop({ type: Number, required: true, default: 1 })
+  revision!: number;
+
+  @Prop({ type: Number, required: true, default: 1 })
+  _schemaVersion!: number;
+
+  createdAt!: Date;
+  updatedAt!: Date;
+}
+export type TreasurySettingsDocument = HydratedDocument<TreasurySettings>;
+export const TreasurySettingsSchema = SchemaFactory.createForClass(TreasurySettings);

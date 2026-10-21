@@ -338,6 +338,25 @@ Tâches planifiées : `sales.normalization.reconcile` (30 s, lecture et annulati
 
 **Écarts au contrat signalés** : `POST …/normalize` ne porte pas encore le quota de normalisation (60/h, fichier `invoices.controller.ts` hors périmètre F2) ; les e-mails d'alerte (décision ouverte n° 3) ne sont pas envoyés ; `lastError.dgiMessage` est le libellé DGI tel que reçu (`dgiErrorDesc` du client e-MCF).
 
+## Dépenses et trésorerie — implémenté (ADR-0034)
+
+Contrat : ADR-0034. Organisation active seulement ; une ressource d'une autre organisation répond `404`. Montants en chaînes décimales ; soldes, agrégats, rapprochement et prévision calculés par le moteur (`packages/engine/src/treasury/`).
+
+| Méthode et chemin | Permission |
+|---|---|
+| `GET /treasury/categories` · `/expenses` · `/expenses/:id` · `/expenses/summary` · `/suppliers` | `treasury.read` |
+| `POST /treasury/expenses` · `PUT /treasury/expenses/:id` · `POST …/:id/cancel` | `treasury.manage` |
+| `POST /treasury/expenses/:id/attachment` (corps binaire, image 2 Mio, 20/h/utilisateur) · `DELETE …/attachment` | `treasury.manage` |
+| `GET /treasury/expenses/:id/attachment` (octets assainis, en-têtes inertes) | `treasury.read` |
+| `GET /treasury/recurring-expenses` · `/recurring-expenses/due` | `treasury.read` |
+| `POST /treasury/recurring-expenses` · `PUT …/:id` · `POST …/:id/occurrences/:date/confirm` (idempotent) | `treasury.manage` |
+| `GET /treasury/accounts` · `/accounts/:id` · `/movements` · `/forecast?currency=` · `/settings` · `/actuals-bridge` | `treasury.read` |
+| `POST /treasury/accounts` · `PUT …/:id` · `POST /treasury/transfers` · `POST /treasury/movements` · `POST …/:id/cancel` · `PUT /treasury/settings` | `treasury.manage` |
+| `PUT /treasury/actuals-bridge` · `POST /treasury/actuals-bridge/sync` `{ dryRun }` | `actuals.import` + `treasury.read` |
+| `GET /treasury/reconciliation?year=` | `treasury.read` + `analytics.read` |
+
+Codes : `400 EXPENSE_IN_FUTURE`, `EXPENSE_ACCOUNT_CURRENCY_MISMATCH`, `EXPENSE_BEFORE_ACCOUNT_OPENING`, `ACCOUNT_INACTIVE`, `TRANSFER_AMOUNTS_DIFFER`, `NOT_AN_OCCURRENCE`, `OCCURRENCE_IN_FUTURE`, `UNKNOWN_LINE`, `LINE_NOT_A_CHARGE`, `CATEGORY_NOT_OPERATING` ; `409 STALE_REVISION`, `EXPENSE_CANCELLED`, `NO_APPROVED_PLAN`, `BRIDGE_NOT_CONFIGURED`, `BRIDGE_DISABLED`, `PERIOD_CONFLICT`. Côté réalisé : `PUT /projects/:id/actual-periods/…` répond `409 LINE_FED_BY_RUN` sur une ligne alimentée par le report actif, et chaque période expose `sources` (origine de chaque valeur).
+
 ## Webhooks
 
 Paiements et intégrations utilisent signatures, tolérance temporelle, anti-rejeu, journal et traitement idempotent.

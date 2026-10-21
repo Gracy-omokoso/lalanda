@@ -17,6 +17,19 @@ import type { HydratedDocument } from 'mongoose';
  *
  * Aucune saisie du réalisé ne touche jamais au plan validé (immuable, S16c).
  */
+/** Étiquette d'origine d'une valeur réalisée (ADR-0031 § 3, ADR-0034 § 5). */
+export interface ActualValueSource {
+  source: 'manual' | 'run.expenses' | 'run.sales';
+  at: Date;
+  by: string;
+  /** Version du calcul moteur qui a produit la valeur (sources RUN). */
+  version?: string;
+  /** Nombre de documents agrégés (sources RUN). */
+  documents?: number;
+  /** Empreinte des documents et du montant : base de l'idempotence (sources RUN). */
+  fingerprint?: string;
+}
+
 @Schema({ collection: 'actual_periods', timestamps: true, strict: true })
 export class ActualPeriod {
   @Prop({ type: String, required: true, index: true })
@@ -39,6 +52,15 @@ export class ActualPeriod {
   /** Montants réalisés par `lineId` du template (devise du projet). */
   @Prop({ type: Object, required: true, default: {} })
   values!: Record<string, number>;
+
+  /**
+   * Origine de chaque valeur (docs/08 § Saisie : « chaque donnée conserve source,
+   * auteur, date ») — ADR-0031 § 3 et ADR-0034 § 5. `manual` pour une saisie à la
+   * main, `run.expenses` pour les dépenses, `run.sales` pour les ventes. Absente
+   * sur les périodes antérieures : lue comme « saisie manuelle d'origine inconnue ».
+   */
+  @Prop({ type: Object, default: {} })
+  sources?: Record<string, ActualValueSource>;
 
   @Prop({ type: Date })
   closedAt?: Date;

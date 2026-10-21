@@ -7,7 +7,11 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
-import { ActualPeriod, type ActualPeriodDocument } from './actual-period.schema.js';
+import {
+  ActualPeriod,
+  type ActualPeriodDocument,
+  type ActualValueSource,
+} from './actual-period.schema.js';
 
 /** Identifiants de ligne du DSL : snake_case ASCII, mêmes règles que le moteur. */
 const LINE_ID_PATTERN = /^[a-z][a-z0-9_]*$/;
@@ -70,9 +74,20 @@ export class ActualsService {
     key: PeriodKey,
     values: Record<string, number | null>,
     allowedLineIds: ReadonlySet<string>,
+    options: { userId?: string; lockedLineIds?: ReadonlySet<string> } = {},
   ): Promise<ActualPeriodDocument> {
     this.assertValidPeriod(key.year, key.month);
     this.assertValidValues(values, allowedLineIds);
+    // ADR-0031 § 3, ADR-0034 § 5 : une ligne alimentée par un pont RUN actif ne se
+    // saisit pas à la main, effacement compris — on corrige la source du chiffre.
+    const locked = Object.keys(values).find((l) => options.lockedLineIds?.has(l) === true);
+    if (locked !== undefined) {
+      throw new ConflictException({
+        code: 'LINE_FED_BY_RUN',
+        message: `La ligne "${locked}" est alimentée par RUN (dépenses ou ventes) : désactivez le report pour la saisir à la main.`,
+      });
+    }
+    const sourcesPatch = manualSources(values, options.userId);
 
     const existing = await this.findOne(key);
     if (existing?.status === 'closed') {
@@ -85,6 +100,8 @@ export class ActualsService {
     if (existing) {
       existing.values = mergeValues(existing.values, values);
       existing.markModified('values');
+      existing.sources = mergeSources(existing.sources ?? {}, sourcesPatch);
+      existing.markModified('sources');
       await existing.save();
       return existing;
     }
@@ -97,6 +114,7 @@ export class ActualsService {
         month: key.month,
         status: 'open',
         values: mergeValues({}, values),
+        sources: mergeSources({}, sourcesPatch),
         reopenedLog: [],
         _schemaVersion: 1,
       });
@@ -258,6 +276,35 @@ export class ActualsService {
       }
     }
   }
+}
+
+/**
+ * Étiquettes `manual` des lignes saisies (ADR-0031 § 3) ; `null` pour une ligne
+ * effacée. Sans auteur connu (appel interne), aucune étiquette n'est posée.
+ */
+function manualSources(
+  values: Record<string, number | null>,
+  userId: string | undefined,
+): Record<string, ActualValueSource | null> {
+  const out: Record<string, ActualValueSource | null> = {};
+  if (userId === undefined) return out;
+  const at = new Date();
+  for (const [lineId, value] of Object.entries(values)) {
+    out[lineId] = value === null ? null : { source: 'manual', at, by: userId };
+  }
+  return out;
+}
+
+function mergeSources(
+  current: Record<string, ActualValueSource>,
+  patch: Record<string, ActualValueSource | null>,
+): Record<string, ActualValueSource> {
+  const next: Record<string, ActualValueSource> = { ...current };
+  for (const [lineId, source] of Object.entries(patch)) {
+    if (source === null) delete next[lineId];
+    else next[lineId] = source;
+  }
+  return next;
 }
 
 /** Applique la fusion, `null` effaçant la clé (retour à « non saisi »). */

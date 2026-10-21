@@ -209,8 +209,9 @@ Mêmes principes qu'ADR-0031 § 3, configuration propre (`treasury_settings.brid
   (`MANUAL_VALUE_PRESENT`, `OTHER_SOURCE_PRESENT`) ; valeur issue des dépenses devenue sans
   objet sur une période ouverte → retirée (`removed`). Rejouer la synchronisation ne change
   rien ;
-- **verrou** : tant que le pont est actif, la saisie manuelle d'une ligne portant
-  `run.expenses` est refusée (`409 LINE_FED_BY_RUN`). Une saisie manuelle pose désormais
+- **verrou** : tant que le pont est actif, la saisie manuelle d'une ligne visée par la table
+  de correspondance, sur le projet relié, est refusée, effacement compris
+  (`409 LINE_FED_BY_RUN`) — même règle qu'ADR-0031 sur `(projet, ligne)`. Une saisie manuelle pose désormais
   `sources[ligne] = { source: 'manual', at, by }` ; une période ancienne sans `sources` est
   lue comme « saisie manuelle d'origine inconnue ».
 

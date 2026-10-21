@@ -32,6 +32,7 @@ import { CurrentOrgId, CurrentUser } from '../auth/current-user.decorator.js';
 import type { FinancialPlanDocument } from '../plans/plan.schema.js';
 import { PlansService } from '../plans/plans.service.js';
 import { ProjectsService } from '../projects/projects.service.js';
+import { TreasuryBridgeLocks } from '../treasury/treasury-bridge-locks.service.js';
 import type { ActualPeriodDocument } from './actual-period.schema.js';
 import { ActualsService } from './actuals.service.js';
 import {
@@ -50,6 +51,8 @@ export interface ActualPeriodView {
   month: number;
   status: 'open' | 'closed';
   values: Record<string, number>;
+  /** Origine de chaque valeur (ADR-0031 § 3, ADR-0034 § 5) ; absente = saisie manuelle ancienne. */
+  sources: Record<string, { source: string; at: string }>;
   closedAt: string | null;
   closedBy: string | null;
   reopenedLog: { reopenedAt: string; reopenedBy: string; reason: string }[];
@@ -91,12 +94,14 @@ export class ActualsController {
     @Inject(ProjectsService) private readonly projects: ProjectsService,
     @Inject(PlansService) private readonly plans: PlansService,
     @Inject(ActualsService) private readonly actuals: ActualsService,
+    @Inject(TreasuryBridgeLocks) private readonly runLocks: TreasuryBridgeLocks,
   ) {}
 
   @Put(':id/actual-periods/:year/:month')
   @RequirePermission('actuals.import')
   async upsert(
     @CurrentOrgId() orgId: string,
+    @CurrentUser() user: { id: string },
     @Param('id') id: string,
     @Param('year') yearRaw: string,
     @Param('month') monthRaw: string,
@@ -116,6 +121,10 @@ export class ActualsController {
       },
       body?.values ?? {},
       allowed,
+      {
+        userId: user.id,
+        lockedLineIds: await this.runLocks.lockedLines(orgId, String(project._id)),
+      },
     );
     return toPeriodView(doc);
   }
@@ -256,6 +265,12 @@ function toPeriodView(doc: ActualPeriodDocument): ActualPeriodView {
     month: doc.month,
     status: doc.status,
     values: doc.values,
+    sources: Object.fromEntries(
+      Object.entries(doc.sources ?? {}).map(([lineId, s]) => [
+        lineId,
+        { source: s.source, at: new Date(s.at).toISOString() },
+      ]),
+    ),
     closedAt: doc.closedAt ? doc.closedAt.toISOString() : null,
     closedBy: doc.closedBy ?? null,
     reopenedLog: doc.reopenedLog.map((e) => ({

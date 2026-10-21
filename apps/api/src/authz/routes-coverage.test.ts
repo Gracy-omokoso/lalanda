@@ -55,6 +55,9 @@ import { InvoicesController } from '../sales/invoices/invoices.controller.js';
 import { JournalController } from '../sales/invoices/journal.controller.js';
 import { NormalizationController } from '../sales/normalization/normalization.controller.js';
 import { TaxGroupsController } from '../sales/tax-groups.controller.js';
+import { TreasuryAccountsController } from '../treasury/treasury-accounts.controller.js';
+import { TreasuryActualsController } from '../treasury/treasury-actuals.controller.js';
+import { TreasuryExpensesController } from '../treasury/treasury-expenses.controller.js';
 import { AuditController } from './audit.controller.js';
 import { REQUIRED_PERMISSIONS_KEY, REQUIRED_PLATFORM_ROLES_KEY } from './authz.decorators.js';
 import { MeController } from './me.controller.js';
@@ -112,6 +115,10 @@ const CONTROLEURS = [
   BrandingController,
   BrandAssetImageController,
   InvoiceTemplatesController,
+  // ADR-0034 — dépenses, trésorerie, report au réalisé.
+  TreasuryExpensesController,
+  TreasuryAccountsController,
+  TreasuryActualsController,
 ];
 
 /**
@@ -443,6 +450,39 @@ describe('couverture des routes par le RBAC', () => {
       'InvoiceTemplatesController.list': ['sales.read'],
       'InvoiceTemplatesController.put': ['organization.manage'],
       'InvoiceTemplatesController.preview': ['sales.read'],
+      // ── Dépenses et trésorerie (ADR-0034 § 8) ─────────────────────────────
+      'TreasuryExpensesController.categories': ['treasury.read'],
+      'TreasuryExpensesController.list': ['treasury.read'],
+      'TreasuryExpensesController.summary': ['treasury.read'],
+      'TreasuryExpensesController.suppliers': ['treasury.read'],
+      'TreasuryExpensesController.get': ['treasury.read'],
+      'TreasuryExpensesController.create': ['treasury.manage'],
+      'TreasuryExpensesController.put': ['treasury.manage'],
+      'TreasuryExpensesController.cancel': ['treasury.manage'],
+      'TreasuryExpensesController.attach': ['treasury.manage'],
+      'TreasuryExpensesController.readAttachment': ['treasury.read'],
+      'TreasuryExpensesController.detach': ['treasury.manage'],
+      'TreasuryExpensesController.listRecurring': ['treasury.read'],
+      'TreasuryExpensesController.due': ['treasury.read'],
+      'TreasuryExpensesController.createRecurring': ['treasury.manage'],
+      'TreasuryExpensesController.putRecurring': ['treasury.manage'],
+      'TreasuryExpensesController.confirm': ['treasury.manage'],
+      'TreasuryAccountsController.list': ['treasury.read'],
+      'TreasuryAccountsController.get': ['treasury.read'],
+      'TreasuryAccountsController.create': ['treasury.manage'],
+      'TreasuryAccountsController.put': ['treasury.manage'],
+      'TreasuryAccountsController.ledger': ['treasury.read'],
+      'TreasuryAccountsController.transfer': ['treasury.manage'],
+      'TreasuryAccountsController.other': ['treasury.manage'],
+      'TreasuryAccountsController.cancel': ['treasury.manage'],
+      'TreasuryAccountsController.forecast': ['treasury.read'],
+      'TreasuryAccountsController.settings': ['treasury.read'],
+      'TreasuryAccountsController.putSettings': ['treasury.manage'],
+      // Relier au réalisé exige en plus le droit d'importer le réalisé.
+      'TreasuryActualsController.getBridge': ['treasury.read'],
+      'TreasuryActualsController.putBridge': ['actuals.import', 'treasury.read'],
+      'TreasuryActualsController.sync': ['actuals.import', 'treasury.read'],
+      'TreasuryActualsController.reconciliation': ['treasury.read', 'analytics.read'],
     };
     for (const [cle, actions] of Object.entries(attendu)) {
       const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle);
