@@ -68,7 +68,8 @@ export interface QuoteSummary {
 export interface QuoteView extends QuoteSummary {
   notes: string | null;
   customer: QuoteLean['customer'];
-  lines: StoredLine[];
+  /** Lignes ; `amount` RECOPIÉ du calcul du moteur (`null` sans calcul). */
+  lines: (StoredLine & { amount: string | null })[];
   /** Corps de lignes à renvoyer pour modifier le brouillon (prix saisis conservés). */
   lineInputs: LineInput[];
   documentAmounts: QuoteLean['documentAmounts'];
@@ -297,7 +298,12 @@ export class QuotesService {
       ...this.summary(q, today),
       notes: q.notes ?? null,
       customer: q.customer,
-      lines: q.lines,
+      lines: q.lines.map((l) => ({
+        ...l,
+        amount:
+          q.documentAmounts.calculation.totals?.lines.find((t) => t.index === l.index)?.amount ??
+          null,
+      })),
       lineInputs: q.lines.map((l) => lineInputOf(l, false)),
       documentAmounts: q.documentAmounts,
       sentAt: q.sentAt ? new Date(q.sentAt).toISOString() : null,

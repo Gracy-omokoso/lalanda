@@ -29,9 +29,16 @@ interface AccesVentes {
   gerer: boolean;
   /** `true` seulement quand le serveur a confirmé `sales.invoice` (ADR-0023 § S25e.11). */
   facturer: boolean;
+  /** Actions détenues (`null` tant qu'elles ne sont pas connues) — CRM, ADR-0035. */
+  actions: OrgAction[] | null;
 }
 
-const Contexte = createContext<AccesVentes>({ etat: 'chargement', gerer: false, facturer: false });
+const Contexte = createContext<AccesVentes>({
+  etat: 'chargement',
+  gerer: false,
+  facturer: false,
+  actions: null,
+});
 
 /**
  * Onglets de l'espace, dans l'ordre d'affichage : « Factures » en premier
@@ -39,6 +46,9 @@ const Contexte = createContext<AccesVentes>({ etat: 'chargement', gerer: false, 
  */
 const ONGLETS: readonly { segment: string; label: string; action: OrgAction }[] = [
   { segment: 'factures', label: 'Factures', action: 'sales.read' },
+  // ADR-0035 : devis (document distinct du pro forma) et CRM minimal.
+  { segment: 'devis', label: 'Devis', action: 'sales.read' },
+  { segment: 'crm', label: 'CRM', action: 'crm.read' },
   ...SALES_TABS,
   // ADR-0028 : galerie et aperçus ouverts à `sales.read` ; le CHOIX exige
   // `organization.manage` (la page l'annonce, l'API le refuse).
@@ -101,6 +111,7 @@ export function SalesChrome({ children }: { children: React.ReactNode }): React.
         etat,
         gerer: peutGerer(actions),
         facturer: actions !== null && actions.includes('sales.invoice'),
+        actions,
       }}
     >
       {onglets.length > 0 ? (

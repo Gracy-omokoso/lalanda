@@ -1,7 +1,7 @@
 // Client HTTP typé pour appeler apps/api. Toutes les requêtes envoient les cookies
 // de session (`credentials: 'include'`) — sinon AuthGuard renvoie 401.
 
-const API_URL = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3001';
+export const API_URL = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3001';
 
 export interface ProjectView {
   id: string;
@@ -538,13 +538,14 @@ export function readActiveOrgCookie(): string | undefined {
   return undefined;
 }
 
-interface JsonRequestInit {
+export interface JsonRequestInit {
   method?: string;
   headers?: Record<string, string>;
   body?: unknown;
 }
 
-async function jsonRequest<T>(path: string, init: JsonRequestInit = {}): Promise<T> {
+/** Exportée pour les clients d'API voisins (`api-crm.ts`, ADR-0035). */
+export async function jsonRequest<T>(path: string, init: JsonRequestInit = {}): Promise<T> {
   const { body, headers, method } = init;
   const res = await fetch(`${API_URL}${path}`, {
     method,
@@ -994,7 +995,10 @@ export type OrgAction =
   // ADR-0023 § S25e.11 — émettre et normaliser des factures et des avoirs :
   // engage le contribuable. Propriétaire, Directeur financier, Comptable ;
   // interdite à tout rôle plateforme.
-  | 'sales.invoice';
+  | 'sales.invoice'
+  // ADR-0035 § 3 — CRM minimal : même répartition que `sales.read` / `sales.manage`.
+  | 'crm.read'
+  | 'crm.manage';
 
 /**
  * Offres — RÉEXPORTÉES du catalogue partagé, jamais réécrites.
