@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { qrCodeSvg } from '../../invoice-qr.js';
 import { renderDocumentHtml } from '../template-engine.js';
 import { CUSTOM_ENGINE_VERSION, compileCustomTemplate } from './custom-template.js';
-import { compileCss } from './css-policy.js';
+import { compileCss } from '../../../../security/template-css-policy.js';
 import { DATA_SCHEMA, variableList } from './data-contract.js';
 import { checkHtml, maskMustache } from './html-policy.js';
 import { checkTemplate, parseTemplate, renderTemplate } from './mustache.js';
@@ -25,7 +25,7 @@ import {
   validatePackageFiles,
 } from './validate-package.js';
 import { validationCases } from './validation-cases.js';
-import { crc32, readZip, writeZip } from './zip.js';
+import { crc32, readZip, writeZip } from '../../../../security/zip-reader.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '../../../../../../..');
@@ -682,9 +682,15 @@ describe('contrat de données', () => {
 
   it('le guide documente chaque code d’erreur émis par la validation', () => {
     const guide = readFileSync(GUIDE, 'utf8');
-    const sources = readdirSync(HERE)
-      .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
-      .map((f) => readFileSync(join(HERE, f), 'utf8'))
+    const SECURITY = resolve(HERE, '../../../../security');
+    const sources = [
+      ...readdirSync(HERE)
+        .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
+        .map((f) => join(HERE, f)),
+      join(SECURITY, 'zip-reader.ts'),
+      join(SECURITY, 'template-css-policy.ts'),
+    ]
+      .map((f) => readFileSync(f, 'utf8'))
       .join('\n');
     const emitted = new Set(
       [

@@ -34,7 +34,7 @@ import {
   customLayoutLabel,
   type CompiledCustomTemplate,
 } from './custom-template.js';
-import { compileCss } from './css-policy.js';
+import { compileCss } from '../../../../security/template-css-policy.js';
 import { DATA_SCHEMA } from './data-contract.js';
 import { checkHtml, maskMustache } from './html-policy.js';
 import { ManifestSchema, type TemplateManifest } from './manifest.js';
@@ -42,7 +42,7 @@ import { MustacheRenderError, checkTemplate, parseTemplate } from './mustache.js
 import { filesFromArchive, packageDigest, type PackageFiles } from './package-files.js';
 import { IssueList, type PackageIssue } from './report.js';
 import { validationCases } from './validation-cases.js';
-import { crc32 } from './zip.js';
+import { crc32 } from '../../../../security/zip-reader.js';
 
 export interface PackageSummary {
   id: string;

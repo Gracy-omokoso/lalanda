@@ -1,4 +1,7 @@
-// Lecture (et écriture) d'archives ZIP pour les paquets de modèle — ADR-0029 O3.
+// Lecture (et écriture) d'archives ZIP non fiables — paquets de modèle, ADR-0029 O3.
+//
+// Hors de `sales/documents` (mise en forme seule, ADR-0025) : ce module compte
+// des OCTETS, jamais des montants.
 //
 // Pourquoi un lecteur écrit pour ce besoin plutôt qu'une bibliothèque : une
 // archive téléversée est HOSTILE par hypothèse (bombe de décompression, chemins

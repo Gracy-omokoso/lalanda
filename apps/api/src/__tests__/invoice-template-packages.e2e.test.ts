@@ -35,7 +35,7 @@ import { startFakeEdefServer, type FakeEdefServer } from '../edef/testing/fake-e
 import { PdfRenderingService } from '../reports/pdf-rendering.service.js';
 import { TEST_BANNER } from '../sales/documents/invoice-document.model.js';
 import { qrCodeSvg } from '../sales/documents/invoice-qr.js';
-import { writeZip } from '../sales/documents/templates/custom/zip.js';
+import { writeZip } from '../security/zip-reader.js';
 import { contentSha256Of } from '../sales/invoices/canonical.js';
 import { ObjectStorageService } from '../storage/object-storage.service.js';
 import { dbOf, e2eSuite, makeE2EApp, registerAndLogin } from './e2e-utils.js';

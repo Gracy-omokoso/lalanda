@@ -24,7 +24,7 @@ import { PACKAGE_LIMITS, collectPackageFiles, filesFromArchive } from './package
 import { IssueList, formatIssue } from './report.js';
 import { SAMPLE_IDENTITY, sampleLogos, validatePackageFiles } from './validate-package.js';
 import { validationCases } from './validation-cases.js';
-import { writeZip } from './zip.js';
+import { writeZip } from '../../../../security/zip-reader.js';
 
 interface Args {
   target: string | null;

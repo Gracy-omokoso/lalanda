@@ -110,7 +110,7 @@ arithmétique : le moteur fournit des chaînes déjà mises en forme.
 - **JSON unique** (fichiers en base64) : écarté (illisible pour un humain, mauvaise
   expérience pour un designer).
 - **Archive ZIP d'un dossier normalisé** : retenu. Universelle (« Compresser » sur macOS et
-  Windows). Lue par un lecteur ZIP **écrit pour ce besoin** (`zip.ts`, `node:zlib`), qui
+  Windows). Lue par un lecteur ZIP **écrit pour ce besoin** (`security/zip-reader.ts`, `node:zlib`), qui
   applique les plafonds **avant** et **pendant** la décompression ; aucune dépendance.
 
 ## Décision

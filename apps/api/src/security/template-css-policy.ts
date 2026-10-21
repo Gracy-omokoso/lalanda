@@ -1,5 +1,8 @@
 // Feuille de style d'un gabarit sur mesure — ADR-0029 O2 (barrières 2 et 3).
 //
+// Hors de `sales/documents` (mise en forme seule, ADR-0025) : ce module mesure
+// des LONGUEURS CSS, jamais des montants.
+//
 // Le CSS d'un paquet est du contenu NON FIABLE. Il est :
 //   1. ANALYSÉ par un lecteur volontairement étroit : règles à plat
 //      `sélecteurs { déclarations }`, sans at-règle (`@import`, `@page`,
@@ -16,7 +19,7 @@
 // Risque résiduel assumé (ADR-0029, Conséquences) : une couleur de texte égale
 // à celle du fond n'est pas détectable statiquement.
 
-import { positionOf, type IssueList } from './report.js';
+import { positionOf, type IssueList } from '../sales/documents/templates/custom/report.js';
 
 /** Variables posées par le moteur (valeurs sûres : couleurs opaques, polices intégrées). */
 export const ENGINE_CSS_VARIABLES = [

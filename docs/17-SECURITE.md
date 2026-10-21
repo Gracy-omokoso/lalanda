@@ -153,7 +153,7 @@ Compteurs en mémoire de process (déjà noté § Restant S16a) : dès deux inst
 ## Implémenté (ADR-0029) — modèles de facture sur mesure : contenu non fiable
 
 Un paquet de modèle téléversé par une organisation est traité comme **contenu hostile**
-(`apps/api/src/sales/documents/templates/custom/`) :
+(`apps/api/src/sales/documents/templates/custom/`, lecteur ZIP et politique CSS dans `apps/api/src/security/`) :
 
 - **Archive** : lecteur ZIP propre, sans dépendance ; plafonds avant décompression (taille
   annoncée, 40 entrées, 8 Mio) et pendant (`maxOutputLength`), taux de compression ≤ 200, CRC

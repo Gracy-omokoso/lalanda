@@ -7,7 +7,7 @@
 import { createHash } from 'node:crypto';
 
 import { IssueList } from './report.js';
-import { ZipError, readZip } from './zip.js';
+import { ZipError, readZip } from '../../../../security/zip-reader.js';
 
 export const PACKAGE_LIMITS = {
   /** Archive téléversée. */
