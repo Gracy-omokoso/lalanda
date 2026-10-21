@@ -14,6 +14,10 @@ CTO Lalanda (contrat technique)
 > optionnel `softwareVersion`) ; le déterminisme vaut pour un même document **et** une même
 > version figée.
 >
+> **Amendé le 21 oct. 2026 ([ADR-0028](ADR-0028-modeles-de-facture-et-identite.md), § 11
+> ci-dessous)** : six modèles de présentation au choix de l'organisation ; nouveau champ figé
+> optionnel `presentation` ; le contenu imprimé est inchangé et vérifié à chaque rendu.
+>
 > **Complète [ADR-0023](ADR-0023-factures-et-avoirs.md)** (tableau « ce qui s'imprime »,
 > § S25e.1 ; champ `duplicateCount`, § S25e.2 ; événement `duplicate_issued`, § S25e.12) et
 > **[ADR-0024](ADR-0024-normalisation-dgi.md)** (§ 4.3 : `documentKind` est l'unique entrée de
@@ -336,6 +340,22 @@ seulement « Établi avec Lalanda — gabarit 1.0.0 ».
 - **Retour en brouillon** (normalisation refusée) : `softwareVersion` est remis à `null`
   avec les autres champs figés ; le gel suivant pose la version de ce moment.
 - Le journal chaîné n'est pas modifié : il porte déjà `contentSha256`, qui couvre la version.
+
+### 11. Amendement du 21 oct. 2026 — modèles de présentation (ADR-0028)
+
+- La mise en page n'est plus unique : six modèles (Classique, Bandeau, Latérale, Minimal,
+  Compacte, Éditoriale) au choix de l'organisation, avec son identité visuelle. Les § 1 à § 7
+  (intitulé, montants, mentions, total en lettres, cadre DGI et QR, filigrane de test,
+  duplicata) s'appliquent **à l'identique à chaque modèle** : le contenu reste décidé par
+  `invoice-document.model.ts`, et le moteur de modèles vérifie à chaque rendu que toutes les
+  mentions figurent dans le HTML (sinon aucun PDF).
+- **Déterminisme (O2) reformulé une seconde fois.** Même document figé, même version figée,
+  même **présentation figée** (`presentation` : modèle et version, options, empreinte de
+  l'identité) ⇒ même PDF. Le pied nomme le modèle : « Établi avec Lalanda vX.Y.Z — modèle
+  Bandeau 1.0.0 ».
+- **Documents sans `presentation`** (gelés avant le 21 oct. 2026, ou organisation sans modèle
+  choisi) : présentation d'origine, gabarit 1.0.0, PDF inchangé octet pour octet.
+- Le duplicata reprend la présentation figée de l'original.
 
 ## Conséquences
 
