@@ -14,7 +14,7 @@
 // valeurs moteur en dur (ADR-0011 contrat 1) : les attentes chiffrées sont
 // dérivées de la valeur lue dans le plan validé.
 
-import { INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import { LEGAL_VERSION } from '@lalanda/shared/legal';
 import { NestFactory } from '@nestjs/core';
 import { toNodeHandler } from 'better-auth/node';

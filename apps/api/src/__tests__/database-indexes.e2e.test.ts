@@ -6,7 +6,7 @@
 // garde-fous du code, y compris sur les collections de better-auth, et qu'il est
 // rejouable sans erreur.
 
-import { INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import { getConnectionToken } from '@nestjs/mongoose';
 import type { Connection } from 'mongoose';
 import { afterAll, beforeAll, expect, it } from 'vitest';

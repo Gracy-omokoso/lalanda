@@ -970,7 +970,6 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
           );
         }
       }
-      // eslint-disable-next-line no-console
       console.info(
         `[50 normalisations] ${journalDesTours.length} tours, ${Date.now() - debut} ms, déclarations : ${JSON.stringify(declarations)}`,
       );
@@ -1223,7 +1222,10 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
       const ventes = await get(asN(), url('&format=csv'));
       expect(ventes.status).toBe(200);
       expect(ventes.headers['content-type']).toMatch(/text\/csv/);
-      const rows = ventes.text.replace(/^﻿/, '').trimEnd().split('\r\n');
+      const rows = ventes.text
+        .replace(/^\uFEFF/, '')
+        .trimEnd()
+        .split('\r\n');
       expect(rows[0]).toMatch(/^enregistrement;numero;type;/);
       expect(rows.some((r) => r.startsWith('ligne;TEST-'))).toBe(true);
       expect(rows.some((r) => r.startsWith('groupe;TEST-'))).toBe(true);

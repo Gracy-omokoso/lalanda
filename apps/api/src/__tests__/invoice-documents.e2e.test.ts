@@ -20,7 +20,7 @@ import type { Db } from 'mongodb';
 import { ObjectId } from 'mongodb';
 import { randomBytes } from 'node:crypto';
 import request from 'supertest';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 
 import { startFakeEdefServer, type FakeEdefServer } from '../edef/testing/fake-edef-server.js';
 import { PdfRenderingService } from '../reports/pdf-rendering.service.js';

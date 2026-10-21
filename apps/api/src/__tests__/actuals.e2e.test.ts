@@ -19,7 +19,7 @@
 //
 // Même convention que plans.e2e.test.ts : nécessite MONGODB_URI, sinon skip.
 
-import { INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import { LEGAL_VERSION } from '@lalanda/shared/legal';
 import { NestFactory } from '@nestjs/core';
 import { toNodeHandler } from 'better-auth/node';
@@ -28,8 +28,6 @@ import request from 'supertest';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 
 import 'reflect-metadata';
-
-import { e2eSuite, teardown } from './e2e-utils.js';
 
 import { e2eSuite, teardown } from './e2e-utils.js';
 

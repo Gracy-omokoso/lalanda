@@ -18,7 +18,7 @@
 // `S3_*`. Sans MinIO, les cas qui écrivent réellement sont sautés et le
 // signalent — ils ne sont JAMAIS simulés en succès.
 
-import { INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 
@@ -105,7 +105,6 @@ e2eSuite('photo de profil (stockage objet — docs/17, docs/24)', () => {
     cookiesA = await registerAndLogin(app, userA);
     cookiesB = await registerAndLogin(app, userB);
     if (!S3_CONFIGURE) {
-      // eslint-disable-next-line no-console
       console.warn(
         'S3_* absent : les cas qui écrivent réellement dans le bucket sont SAUTÉS. ' +
           'Les refus de validation, eux, sont vérifiés — ils précèdent tout appel au stockage.',

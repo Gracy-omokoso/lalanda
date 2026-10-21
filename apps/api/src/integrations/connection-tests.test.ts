@@ -26,7 +26,7 @@
 // `<compte>.r2.cloudflarestorage.com` sans le joindre.
 
 import { createServer, type IncomingMessage, type Server } from 'node:http';
-import { AddressInfo } from 'node:net';
+import type { AddressInfo } from 'node:net';
 
 import { afterEach, describe, expect, it } from 'vitest';
 

@@ -102,7 +102,6 @@ class ModuleParUtilisateur {}
  * réel — celui dont on veut précisément observer le comportement.
  */
 async function monter(module: unknown, avecProxyDeConfiance: boolean): Promise<INestApplication> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const app = await NestFactory.create(module as any, { logger: false });
   if (avecProxyDeConfiance) {
     applyTrustedProxy(

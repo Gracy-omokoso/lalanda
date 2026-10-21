@@ -137,7 +137,6 @@ export class NormalizationReconciliationJob implements OnModuleInit {
     const { ref, doc } = claimed;
     const n = doc.normalization!;
     const phase = (n.phase ?? 'queued') as NormalizationPhase;
-    const from = [phase];
     const step = stepOfPhase(phase, n.uncertainStep ?? null);
 
     const resolved = await this.pointsOfSale.resolveTokenForReconciliation(

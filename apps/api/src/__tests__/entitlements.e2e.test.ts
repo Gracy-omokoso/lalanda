@@ -16,7 +16,7 @@
 //
 // Même convention que isolation.e2e.test.ts : nécessite Mongo (skip sans MONGODB_URI).
 
-import { INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import { LEGAL_VERSION } from '@lalanda/shared/legal';
 import { NestFactory } from '@nestjs/core';
 import { toNodeHandler } from 'better-auth/node';

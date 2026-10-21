@@ -656,7 +656,6 @@ export class InvoiceFreezingService {
     let conversion: StoredConversion;
     let reference: ExchangeRateReferenceValue | null = null;
     let normalizedLines: StoredNormalizedLine[] | null = null;
-    let cdfPayments: readonly PaymentInput[];
 
     const originConversion = origin?.status === 'normalized' ? (origin.conversion ?? null) : null;
     if (origin && originConversion) {
@@ -780,7 +779,7 @@ export class InvoiceFreezingService {
         specificTax: l.specificTax,
       }));
     }
-    cdfPayments = converted.payments;
+    const cdfPayments: readonly PaymentInput[] = converted.payments;
 
     // Calcul CDF par le moteur : les montants que S25f enverra et comparera.
     const cdfLines = doc.lines.map((l) => {

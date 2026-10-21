@@ -60,7 +60,6 @@ export async function up(db) {
       .collection(collection)
       .updateMany({ _schemaVersion: 1, role: 'owner' }, { $set: { _schemaVersion: 2 } });
 
-    // eslint-disable-next-line no-console
     console.log(
       `[${NAME}] ${collection}: ${convertis.modifiedCount} member→finance_director, ` +
         `${owners.modifiedCount} owner alignés en v2`,
@@ -73,7 +72,6 @@ export async function up(db) {
   const drapeaux = await db
     .collection('memberships')
     .updateMany({ canClosePeriods: { $exists: false } }, { $set: { canClosePeriods: false } });
-  // eslint-disable-next-line no-console
   console.log(`[${NAME}] memberships: ${drapeaux.modifiedCount} canClosePeriods initialisés`);
 
   // 4. Index introduits par le même lot. `createIndex` est idempotent.

@@ -110,7 +110,7 @@ const HYPOTHESES_SHEET = 'Hypothèses';
 // Excel interdit ces caractères dans un nom d'onglet : \ / ? * [ ] :
 // Longueur max = 31. On tronque et on nettoie.
 function safeSheetName(input: string): string {
-  const cleaned = input.replace(/[\\/?*\[\]:]/g, ' ').trim();
+  const cleaned = input.replace(/[\\/?*[\]:]/g, ' ').trim();
   return cleaned.slice(0, 31) || 'Feuille';
 }
 

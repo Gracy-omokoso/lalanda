@@ -13,7 +13,7 @@
 //      (`sendOnSignIn`) — et un mauvais mot de passe n'en renvoie aucun.
 
 import { LEGAL_VERSION } from '@lalanda/shared/legal';
-import { INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 

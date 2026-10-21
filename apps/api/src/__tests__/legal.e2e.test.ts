@@ -12,7 +12,7 @@
 //    modifiable par un autre — et aucune route ne prend d'identifiant permettant
 //    de le tenter.
 
-import { INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import { LEGAL_VERSION } from '@lalanda/shared/legal';
 import request from 'supertest';
 import { afterAll, beforeAll, expect, it } from 'vitest';

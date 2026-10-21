@@ -4,7 +4,7 @@
 // Chaque `it()` utilise un tag unique pour ses emails et son org : les tests sont donc
 // strictement indépendants et peuvent s'exécuter dans n'importe quel ordre.
 
-import { INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import { LEGAL_VERSION } from '@lalanda/shared/legal';
 import { NestFactory } from '@nestjs/core';
 import { toNodeHandler } from 'better-auth/node';
@@ -13,8 +13,6 @@ import request from 'supertest';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 
 import 'reflect-metadata';
-
-import { e2eSuite, teardown } from './e2e-utils.js';
 
 import { e2eSuite, teardown } from './e2e-utils.js';
 

@@ -11,14 +11,14 @@ import 'reflect-metadata';
 import { BadRequestException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 
-import { AccountService } from '../account/account.service.js';
-import { AiUsageService } from '../admin/ai-usage.service.js';
+import type { AccountService } from '../account/account.service.js';
+import type { AiUsageService } from '../admin/ai-usage.service.js';
 import { AuthGuard, type AuthenticatedRequest } from '../auth/auth.guard.js';
 import { REQUIRED_PERMISSIONS_KEY } from '../authz/authz.decorators.js';
 import { AI_THROTTLE } from '../security/throttling.js';
 import { UserThrottlerGuard } from '../security/user-throttler.guard.js';
 import { ACTION_CHAT, ACTION_INTERPRETATIONS, LalaController } from './lala.controller.js';
-import { LalaService } from './lala.service.js';
+import type { LalaService } from './lala.service.js';
 import type { ChatResponse, InterpretationsResponse } from './lala.dto.js';
 
 const REPONSE_INTERPRETATIONS: InterpretationsResponse = {

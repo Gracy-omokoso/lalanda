@@ -75,6 +75,13 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      # ESLint de tout le monorepo : `next lint` pour apps/web, la configuration
+      # typée partagée (eslint.typescript.mjs) pour l'API, le moteur et shared.
+      # Les règles typées lisent les `dist` des paquets internes : turbo les
+      # construit d'abord (`lint` dépend de `^build`).
+      - name: Lint
+        run: pnpm lint
+
       # Les tests e2e ont besoin d'un replica set : le code ouvre des transactions
       # Mongoose (ADR-0004), indisponibles sur un mongod autonome. Un `services:`
       # GitHub Actions ne permet pas de passer `--replSet` (aucune surcharge de la

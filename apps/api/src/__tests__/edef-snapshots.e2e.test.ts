@@ -4,7 +4,7 @@
 // Défaut corrigé le 20 oct. 2026 : un retour 5 % → 8 % → 5 % n'écrivait aucun
 // nouveau document (contenu déjà connu) et `latest()` servait encore 8 %.
 
-import { INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import { getModelToken } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 import { afterAll, beforeAll, expect, it } from 'vitest';

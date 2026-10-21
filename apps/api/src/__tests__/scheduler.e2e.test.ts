@@ -6,7 +6,7 @@
 // instances sont construites ici, sur le modèle de l'application, et l'heure est
 // passée explicitement à `tick()` : aucun minuteur, aucune attente réelle.
 
-import { INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import { getModelToken } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 import { afterAll, beforeAll, expect, it } from 'vitest';

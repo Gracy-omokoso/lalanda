@@ -17,7 +17,7 @@
 //  8. Changement d'email : la nouvelle adresse n'est PAS appliquée sans
 //     vérification, et l'API annonce que l'email n'a pas pu être envoyé.
 
-import { INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import { LEGAL_VERSION } from '@lalanda/shared/legal';
 import { NestFactory } from '@nestjs/core';
 import { toNodeHandler } from 'better-auth/node';
