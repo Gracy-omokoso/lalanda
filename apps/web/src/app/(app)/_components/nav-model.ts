@@ -19,6 +19,7 @@ export type NavGroupId = ModuleId | 'organisation';
 export type NavIconId =
   | 'plans'
   | 'factures'
+  | 'encaissements'
   | 'clients'
   | 'catalogue'
   | 'pilotage'
@@ -78,6 +79,15 @@ export const NAV_ITEMS: readonly NavItem[] = [
     label: 'Factures',
     group: 'run',
     icon: 'factures',
+    action: 'sales.read',
+  },
+  // ADR-0031 : argent reçu, statut de règlement et pont vers le réalisé.
+  {
+    id: 'encaissements',
+    href: '/ventes/encaissements',
+    label: 'Encaissements',
+    group: 'run',
+    icon: 'encaissements',
     action: 'sales.read',
   },
   {

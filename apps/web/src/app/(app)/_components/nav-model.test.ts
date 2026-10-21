@@ -40,6 +40,7 @@ describe('entrées et ordre', () => {
     expect(ids(entreesVisibles(PROPRIETAIRE))).toEqual([
       'plans',
       'factures',
+      'encaissements',
       'clients',
       'catalogue',
       'pilotage',
@@ -129,6 +130,7 @@ describe('entrée active', () => {
     ['/projects/abc/realise', 'plans'],
     ['/ventes/factures', 'factures'],
     ['/ventes/factures/nouvelle', 'factures'],
+    ['/ventes/encaissements', 'encaissements'],
     ['/ventes/clients', 'clients'],
     ['/organisation', 'pilotage'],
     ['/organisation/fiscalite', 'fiscalite'],
