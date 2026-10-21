@@ -11,6 +11,7 @@
 // à la française (`1 234,50 CDF TTC`, `40,00 USD HT`) ; aucun n'est converti ni
 // recalculé (ADR-0023 E4).
 
+import { buttonClasses } from '@lalanda/ui';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -161,13 +162,18 @@ export function CatalogList(): React.ReactElement {
           <h2 id="catalogue-titre" className="font-display text-lg font-bold tracking-tight">
             Catalogue
           </h2>
-          <p className="max-w-2xl text-sm text-[var(--foreground-muted)]">
+          {/* ADR-0030 : non affichée sur téléphone, lue par les lecteurs d'écran. */}
+          <p className="max-w-2xl text-sm text-[var(--foreground-muted)] max-sm:sr-only">
             Les biens, services et taxes que vous facturez, chacun avec son groupe de taxation DGI
             et son prix TTC ou HT.
           </p>
         </div>
         {gerer ? (
-          <button type="button" onClick={() => ouvrir(FICHE_NOUVELLE)} className={BOUTON}>
+          <button
+            type="button"
+            onClick={() => ouvrir(FICHE_NOUVELLE)}
+            className={buttonClasses('primary', 'md')}
+          >
             Nouvel article
           </button>
         ) : null}
@@ -179,9 +185,9 @@ export function CatalogList(): React.ReactElement {
         role="search"
         aria-label="Rechercher un article"
         onSubmit={(e) => e.preventDefault()}
-        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]"
+        className="grid grid-cols-2 gap-3 lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]"
       >
-        <div className="flex flex-col gap-1.5">
+        <div className="col-span-2 flex flex-col gap-1.5 lg:col-span-1">
           <label htmlFor="ar-q" className="text-sm font-medium">
             Rechercher
           </label>

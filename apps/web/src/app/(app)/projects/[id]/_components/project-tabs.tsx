@@ -27,8 +27,13 @@
 // « Résultats » qui occupe la racine du projet, parce que consulter est plus
 // fréquent que modifier et que les liens `?tab=` déjà partagés y pointent.
 
-import Link from 'next/link';
+import { TabsNav } from '@lalanda/ui';
 import { usePathname } from 'next/navigation';
+
+import { IconeNav } from '@/components/icones-navigation';
+import { renderNextLink } from '@/components/next-link';
+
+import { useShell } from '../../../_components/shell-context';
 
 export interface ProjectTab {
   /** Segment d'URL sous `/projects/:id/`. La chaîne vide = page racine du projet. */
@@ -61,28 +66,28 @@ export function ProjectTabs({
   const base = `/projects/${projectId}`;
   const current = activeSegment(pathname, base);
 
+  // ADR-0030 § 3 — une fonction absente de l'offre reste VISIBLE, avec un
+  // cadenas et le nom écrit de ce qui manque ; la page atteinte garde son propre
+  // refus serveur. Abonnement illisible : rien n'est verrouillé ici.
+  const { subscription } = useShell();
+  const realiseVerrouille = subscription !== null && !subscription.entitlements.actualsEnabled;
+
   return (
-    <nav
-      aria-label="Sections du projet"
-      className="flex flex-wrap gap-1 border-b border-[var(--border)]"
-    >
-      {tabs.map((tab) => {
-        const isActive = current === tab.segment;
-        return (
-          <Link
-            key={tab.segment || 'plan'}
-            href={tab.segment ? `${base}/${tab.segment}` : base}
-            aria-current={isActive ? 'page' : undefined}
-            className={
-              isActive
-                ? 'font-mono -mb-px border-b-2 border-[var(--accent)] px-3.5 py-2.5 text-[0.72rem] font-semibold uppercase tracking-[0.08em] text-[var(--foreground)] transition'
-                : 'font-mono -mb-px border-b-2 border-transparent px-3.5 py-2.5 text-[0.72rem] font-medium uppercase tracking-[0.08em] text-[var(--foreground-muted)] transition hover:text-[var(--foreground)]'
-            }
-          >
-            {tab.label}
-          </Link>
-        );
-      })}
-    </nav>
+    <TabsNav
+      label="Sections du projet"
+      renderLink={renderNextLink}
+      items={tabs.map((tab) => ({
+        href: tab.segment ? `${base}/${tab.segment}` : base,
+        label: tab.label,
+        current: current === tab.segment,
+        adornment:
+          tab.segment === 'realise' && realiseVerrouille ? (
+            <span className="inline-flex items-center gap-0.5 text-[var(--foreground-muted)]">
+              <IconeNav id="cadenas" className="h-3.5 w-3.5" />
+              <span className="sr-only">(non inclus dans votre offre)</span>
+            </span>
+          ) : undefined,
+      }))}
+    />
   );
 }

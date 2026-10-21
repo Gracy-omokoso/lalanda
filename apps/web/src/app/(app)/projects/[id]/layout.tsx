@@ -1,3 +1,4 @@
+import { ModuleMark } from '@lalanda/ui';
 import Link from 'next/link';
 
 import { ProjectTabs } from './_components/project-tabs';
@@ -8,8 +9,9 @@ interface Props {
 }
 
 /**
- * Chrome commun aux sections d'un projet (S18d) : fil d'Ariane + onglets
- * Plan / Canvas / Objectifs. Les pages filles ne rendent que leur contenu.
+ * Chrome commun aux sections d'un projet (S18d, ADR-0030) : fil d'Ariane qui
+ * situe le projet dans le module BUILD, puis les onglets. Les pages filles ne
+ * rendent que leur contenu.
  */
 export default async function ProjectLayout({
   params,
@@ -18,9 +20,16 @@ export default async function ProjectLayout({
   const { id } = await params;
   return (
     <section className="flex flex-col gap-4">
-      <nav className="text-xs opacity-60">
-        <Link href="/projects" className="hover:underline">
-          ← Mes projets
+      <nav aria-label="Fil d’Ariane" className="flex flex-wrap items-center gap-2 text-xs">
+        <ModuleMark module="build" />
+        <span aria-hidden="true" className="text-[var(--foreground-muted)]">
+          /
+        </span>
+        <Link
+          href="/projects"
+          className="font-medium text-[var(--foreground-muted)] underline-offset-2 hover:text-[var(--foreground)] hover:underline"
+        >
+          Plans financiers
         </Link>
       </nav>
       <ProjectTabs projectId={id} />

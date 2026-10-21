@@ -49,7 +49,7 @@ export function RoleSelect({
         aria-describedby={selected ? `${id}-desc` : undefined}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value as OrgRole)}
-        className="rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)] disabled:opacity-50"
+        className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)] disabled:opacity-50"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value} disabled={!o.grantable}>

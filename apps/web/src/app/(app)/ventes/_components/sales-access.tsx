@@ -12,10 +12,11 @@
 // toute façon. Masquer un bouton est un confort ; un rôle sans `sales.read` lit
 // un refus explicite plutôt qu'une page vide.
 
-import Link from 'next/link';
+import { TabsNav } from '@lalanda/ui';
 import { usePathname } from 'next/navigation';
 import { createContext, useContext, useEffect, useState } from 'react';
 
+import { renderNextLink } from '@/components/next-link';
 import { api, type OrgAction } from '@/lib/api';
 
 import { peutConsulter, peutGerer, SALES_TABS, segmentVentes, VENTES_BASE } from './sales-model';
@@ -103,31 +104,19 @@ export function SalesChrome({ children }: { children: React.ReactNode }): React.
       }}
     >
       {onglets.length > 0 ? (
-        <nav
-          aria-label="Sections des ventes"
-          className="flex flex-wrap gap-1 border-b border-[var(--border)]"
-        >
-          {onglets.map((tab) => {
-            const actif = courant === tab.segment;
-            return (
-              <Link
-                key={tab.segment}
-                href={`${VENTES_BASE}/${tab.segment}`}
-                aria-current={actif ? 'page' : undefined}
-                className={
-                  actif
-                    ? 'font-mono -mb-px border-b-2 border-[var(--accent)] px-3.5 py-2.5 text-[0.72rem] font-semibold uppercase tracking-[0.08em] text-[var(--foreground)] transition'
-                    : 'font-mono -mb-px border-b-2 border-transparent px-3.5 py-2.5 text-[0.72rem] font-medium uppercase tracking-[0.08em] text-[var(--foreground-muted)] transition hover:text-[var(--foreground)]'
-                }
-              >
-                {tab.label}
-              </Link>
-            );
-          })}
-        </nav>
+        // ADR-0030 : une seule ligne qui défile sur téléphone, jamais deux.
+        <TabsNav
+          label="Sections des ventes"
+          renderLink={renderNextLink}
+          items={onglets.map((tab) => ({
+            href: `${VENTES_BASE}/${tab.segment}`,
+            label: tab.label,
+            current: courant === tab.segment,
+          }))}
+        />
       ) : (
         // Hauteur réservée : la page ne saute pas quand les onglets arrivent.
-        <div aria-hidden="true" className="h-[2.6rem] border-b border-[var(--border)]" />
+        <div aria-hidden="true" className="h-[2.75rem] border-b border-[var(--border)]" />
       )}
       {children}
     </Contexte.Provider>

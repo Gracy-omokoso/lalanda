@@ -586,7 +586,7 @@ function ChampQuestion({
           placeholder={question.placeholder}
           value={valeur}
           onChange={(e) => onRepondre(question.id, e.target.value)}
-          className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
+          className="w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
         />
       </div>
     );
@@ -613,7 +613,7 @@ function ChampQuestion({
         value={valeur}
         onChange={(e) => onRepondre(question.id, e.target.value)}
         aria-describedby={`${champId}-aide`}
-        className="w-full resize-y rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm leading-snug outline-none transition focus:border-[var(--accent)]"
+        className="w-full resize-y rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm leading-snug outline-none transition focus:border-[var(--accent)]"
       />
     </div>
   );

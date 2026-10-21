@@ -204,7 +204,7 @@ export function SettingsPanel(): React.ReactElement {
 }
 
 const CHAMP =
-  'w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)] disabled:opacity-50';
+  'w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)] disabled:opacity-50';
 
 /** Champ étiqueté avec son aide reliée par `aria-describedby` (docs/04). */
 function Champ({

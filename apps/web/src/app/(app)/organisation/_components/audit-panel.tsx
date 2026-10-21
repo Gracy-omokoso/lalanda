@@ -86,7 +86,7 @@ export function AuditPanel(): React.ReactElement {
             id="filtre-action"
             value={filtre}
             onChange={(e) => setFiltre(e.target.value)}
-            className="rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)]"
+            className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)]"
           >
             <option value="">Toutes les actions</option>
             {actions.map((a) => (

@@ -110,7 +110,7 @@ export function InvitePanel({
                 placeholder="collegue@exemple.cd"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
+                className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
               />
             </div>
             <div className="sm:w-64">

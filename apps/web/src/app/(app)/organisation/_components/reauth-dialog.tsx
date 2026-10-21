@@ -196,7 +196,7 @@ function ReauthModal({
             autoComplete="current-password"
             autoFocus
             required
-            className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)]"
+            className="w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)]"
           />
           {erreur ? (
             <p role="alert" className="text-sm text-[var(--danger)]">

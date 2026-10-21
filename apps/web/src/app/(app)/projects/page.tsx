@@ -5,11 +5,14 @@
 // clairement séparées, pas un vrai wizard multi-étapes — plus rapide pour un
 // utilisateur habitué et lisible pour un nouveau.
 
+import { PageHeader } from '@lalanda/ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { api, type ParameterPackSummary, type ProjectView, type TemplateSummary } from '@/lib/api';
+
+import { useShell } from '../_components/shell-context';
 
 import { aDesCartes, CUSTOM_TEMPLATE_SLUG } from './_components/custom-questionnaire-model';
 import { CustomStartModal, type CadrageResultat } from './_components/custom-start-modal';
@@ -87,6 +90,7 @@ function bestPackForCountry(
 
 export default function ProjectsPage(): React.ReactElement {
   const router = useRouter();
+  const { subscription } = useShell();
   const [projects, setProjects] = useState<ProjectView[] | null>(null);
   const [templates, setTemplates] = useState<TemplateSummary[] | null>(null);
   const [packs, setPacks] = useState<ParameterPackSummary[] | null>(null);
@@ -284,19 +288,23 @@ export default function ProjectsPage(): React.ReactElement {
 
   return (
     <section className="flex flex-col gap-6">
-      <div className="flex items-baseline justify-between">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-2xl font-semibold tracking-tight">Mes projets</h2>
-          <p className="text-sm text-[var(--foreground-muted)]">
-            Un projet = un plan financier prévisionnel dans un pays et un cadre fiscal donnés.
-          </p>
-        </div>
-        {projects ? (
-          <span className="text-xs text-[var(--foreground-muted)]">
-            {projects.length} projet{projects.length > 1 ? 's' : ''}
-          </span>
-        ) : null}
-      </div>
+      <PageHeader
+        module="build"
+        title="Plans financiers"
+        description="Un projet est un plan financier prévisionnel, dans un pays et un cadre fiscal donnés. Vos hypothèses alimentent les prévisions calculées par le moteur ; le réalisé s’y compare, mois par mois."
+        actions={
+          projects ? (
+            // ADR-0030 § 3 (audit A10) : la limite de l'offre se voit AVANT de
+            // créer, pas seulement au refus. Chiffres servis par l'API.
+            <span className="fig text-xs text-[var(--foreground-muted)]">
+              {projects.length} projet{projects.length > 1 ? 's' : ''}
+              {subscription && subscription.entitlements.maxProjects !== null
+                ? ` sur ${subscription.entitlements.maxProjects} inclus dans votre offre`
+                : ''}
+            </span>
+          ) : null
+        }
+      />
 
       <form
         onSubmit={handleCreate}
@@ -321,7 +329,7 @@ export default function ProjectsPage(): React.ReactElement {
               <select
                 value={country}
                 onChange={(e) => setCountry(e.target.value)}
-                className="w-full min-w-0 truncate rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
+                className="w-full min-w-0 truncate rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
               >
                 {COUNTRIES.map((c) => (
                   <option key={c.code} value={c.code}>
@@ -341,7 +349,7 @@ export default function ProjectsPage(): React.ReactElement {
                   if (p) setCurrency(p.devise_principale);
                 }}
                 disabled={!packs}
-                className="w-full min-w-0 truncate rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)] disabled:opacity-50"
+                className="w-full min-w-0 truncate rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)] disabled:opacity-50"
               >
                 {packsForCountry.length === 0 ? (
                   <option>Chargement…</option>
@@ -359,7 +367,7 @@ export default function ProjectsPage(): React.ReactElement {
               <select
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
-                className="w-full min-w-0 truncate rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
+                className="w-full min-w-0 truncate rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
               >
                 {currencyOptions.map((c) => (
                   <option key={c} value={c}>
@@ -447,7 +455,7 @@ export default function ProjectsPage(): React.ReactElement {
               placeholder="Ex : Restaurant du centre-ville 2026"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              className="w-full min-w-0 truncate rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
+              className="w-full min-w-0 truncate rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
             />
           </label>
           <button
