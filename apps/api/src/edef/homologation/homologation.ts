@@ -92,6 +92,8 @@ export interface HomologationIo {
   now?: () => Date;
   /** Tests : pause entre deux normalisations (défaut 500 ms). */
   spacingMs?: number;
+  /** Tests : délai avant un avoir dont l'origine vient d'être normalisée (défaut 20 s). */
+  originSettleMs?: number;
 }
 
 async function defaultContext(): Promise<INestApplicationContext> {
@@ -300,6 +302,7 @@ export async function main(argv: readonly string[], io: HomologationIo): Promise
         now,
         ...(io.hooks ? { hooks: io.hooks } : {}),
         ...(io.spacingMs !== undefined ? { spacingMs: io.spacingMs } : {}),
+        ...(io.originSettleMs !== undefined ? { originSettleMs: io.originSettleMs } : {}),
       });
     } catch (err) {
       writeState(outDir, current, now());
