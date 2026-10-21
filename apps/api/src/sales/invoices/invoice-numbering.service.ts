@@ -16,6 +16,10 @@
 //
 // Année de gestion : année civile au fuseau Africa/Kinshasa (UTC+1, sans heure
 // d'été) — à confirmer par l'expert-comptable (ADR-0023, décision ouverte n° 2).
+//
+// Format (ADR-0027) : `IN{AA}{MM}-NNNNNN` (factures) et `AV{AA}{MM}-NNNNNN`
+// (avoirs) sur UN SEUL compteur par organisation, série et année ; le mois
+// imprimé est celui de l'attribution, il ne remet pas le compteur à zéro.
 
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -23,7 +27,16 @@ import { Types, type ClientSession, type Model } from 'mongoose';
 
 import { isObjectIdHex } from '../search.js';
 import { SalesInvoiceCounter, type SalesInvoiceCounterDocument } from './invoice-counter.schema.js';
+import {
+  fiscalPrefixOf,
+  fiscalYearOf,
+  formatInvoiceNumber,
+  formatProformaRef,
+  parseInvoiceNumber,
+  periodInYear,
+} from './invoice-numbering.js';
 import { invoiceSearchKey } from './invoice-search.js';
+import type { InvoiceType } from './invoice.contract.js';
 import { SalesInvoice, type SalesInvoiceDocument } from './invoice.schema.js';
 import type { InvoiceLean } from './invoice.types.js';
 import { invoiceConflict, invoiceNotFound } from './invoices.errors.js';
@@ -31,34 +44,16 @@ import { invoiceConflict, invoiceNotFound } from './invoices.errors.js';
 /** Durée du bail de normalisation (≤ 3 min, § S25e.3). */
 export const NORMALIZATION_LEASE_MS = 3 * 60 * 1000;
 
-const KINSHASA_YEAR = new Intl.DateTimeFormat('en-US', {
-  timeZone: 'Africa/Kinshasa',
-  year: 'numeric',
-});
-
-/** Année de gestion d'un instant : année civile à Kinshasa. */
-export function fiscalYearOf(at: Date): number {
-  return Number.parseInt(KINSHASA_YEAR.format(at), 10);
-}
-
-type Series = 'real' | 'test' | 'proforma';
-
-const PREFIX: Record<Series, string> = { real: '', test: 'TEST-', proforma: 'PF-' };
-
-/** `AAAA-NNNNNN`, `TEST-AAAA-NNNNNN`, `PF-AAAA-NNNNNN` ; au-delà de 999 999, le nombre s'allonge. */
-export function formatInvoiceNumber(series: Series, year: number, seq: number): string {
-  return `${PREFIX[series]}${year}-${String(seq).padStart(6, '0')}`;
-}
-
-/** Lecture inverse de `formatInvoiceNumber` ; `null` si la forme est inconnue. */
-export function parseInvoiceNumber(
-  value: string,
-): { series: Series; year: number; seq: number } | null {
-  const m = /^(?:(TEST|PF)-)?(\d{4})-(\d{6,})$/.exec(value);
-  if (!m) return null;
-  const series: Series = m[1] === 'TEST' ? 'test' : m[1] === 'PF' ? 'proforma' : 'real';
-  return { series, year: Number.parseInt(m[2]!, 10), seq: Number.parseInt(m[3]!, 10) };
-}
+// Format et lecture des numéros : `invoice-numbering.ts` (ADR-0027), réexportés ici.
+export {
+  fiscalPeriodOf,
+  fiscalPrefixOf,
+  fiscalYearOf,
+  formatInvoiceNumber,
+  formatProformaRef,
+  parseInvoiceNumber,
+  periodInYear,
+} from './invoice-numbering.js';
 
 type CounterLean = SalesInvoiceCounter & { _id: Types.ObjectId };
 
@@ -72,11 +67,12 @@ export class InvoiceNumberingService {
 
   /**
    * Mode ordinaire : numéro définitif de la série réelle, dans la transaction de
-   * l'appelant. `opts.now` sert aux tests du passage d'année.
+   * l'appelant. `opts.type` choisit le préfixe (`IN` ou `AV`), jamais le
+   * compteur. `opts.now` sert aux tests du passage de mois et d'année.
    */
   async assignOnIssue(
     organizationId: string,
-    opts: { session: ClientSession; now?: Date },
+    opts: { session: ClientSession; type: InvoiceType; now?: Date },
   ): Promise<{ number: string; series: 'real'; fiscalYear: number; issuedAt: Date }> {
     const now = opts.now ?? new Date();
     const year = fiscalYearOf(now);
@@ -101,20 +97,28 @@ export class InvoiceNumberingService {
         { session: opts.session },
       )
       .exec();
+    // Mois de la date d'émission figée (bornée ci-dessus) : un rang plus grand
+    // n'a jamais un mois plus ancien, même si deux émissions se croisent à minuit.
     return {
-      number: formatInvoiceNumber('real', year, counter.last),
+      number: formatInvoiceNumber(
+        'real',
+        fiscalPrefixOf(opts.type),
+        periodInYear(year, issuedAt),
+        counter.last,
+      ),
       series: 'real',
       fiscalYear: year,
       issuedAt,
     };
   }
 
-  /** Référence de pro forma `PF-AAAA-NNNNNN` : hors série fiscale, trous admis. */
+  /** Référence de pro forma `PF{AA}{MM}-NNNNNN` : hors série fiscale, trous admis. */
   async nextProformaRef(
     organizationId: string,
     opts: { session?: ClientSession; now?: Date } = {},
   ): Promise<string> {
-    const year = fiscalYearOf(opts.now ?? new Date());
+    const now = opts.now ?? new Date();
+    const year = fiscalYearOf(now);
     const bump = () =>
       this.counters
         .findOneAndUpdate(
@@ -135,7 +139,7 @@ export class InvoiceNumberingService {
       if ((err as { code?: number }).code !== 11000 || opts.session) throw err;
       counter = await bump();
     }
-    return formatInvoiceNumber('proforma', year, counter.last);
+    return formatProformaRef(periodInYear(year, now), counter.last);
   }
 
   /**
@@ -192,7 +196,19 @@ export class InvoiceNumberingService {
         'Une autre facture est en cours de normalisation : réessayez dans quelques instants.',
       );
     }
-    return { number: formatInvoiceNumber(series, year, counter.last), fiscalYear: year };
+    // Mois de l'attribution, borné par la dernière date d'émission de la série :
+    // le mois imprimé ne recule jamais quand le rang avance.
+    const last = counter.lastIssuedAt ? new Date(counter.lastIssuedAt) : null;
+    const at = last && last > now ? last : now;
+    return {
+      number: formatInvoiceNumber(
+        series,
+        fiscalPrefixOf(invoice.type),
+        periodInYear(year, at),
+        counter.last,
+      ),
+      fiscalYear: year,
+    };
   }
 
   /**

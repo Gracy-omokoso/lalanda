@@ -505,7 +505,7 @@ export class InvoiceFreezingService {
       const now = new Date();
       const numbered =
         route === 'issue'
-          ? await this.numbering.assignOnIssue(organizationId, { session, now })
+          ? await this.numbering.assignOnIssue(organizationId, { session, now, type: doc.type })
           : null;
 
       // 8. Contenu figé, empreinte, statut.

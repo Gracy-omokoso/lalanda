@@ -506,7 +506,8 @@ e2eSuite('campagne d’homologation DGI — 29 cas × TTC/HT (ADR-0026, S25h)', 
     it('58 factures normalisées, numéros TEST- contigus sans trou (1.15)', async () => {
       expect(numeros).toHaveLength(58);
       const rangs = numeros.map((n) => {
-        const m = /^TEST-(\d{4})-(\d{6})$/.exec(n);
+        // ADR-0027 : TEST-IN… (factures) et TEST-AV… (avoirs), un seul compteur.
+        const m = /^TEST-(?:IN|AV)(\d{4})-(\d{6})$/.exec(n);
         expect(m, n).not.toBeNull();
         return Number(m![2]);
       });

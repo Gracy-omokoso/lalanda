@@ -24,6 +24,7 @@ import {
   type FakeEdefServer,
 } from '../edef/testing/fake-edef-server.js';
 import { PointsOfSaleService } from '../fiscal/points-of-sale.service.js';
+import { fiscalPeriodOf, formatInvoiceNumber } from '../sales/invoices/invoice-numbering.js';
 import { EdefSalesInvoiceNormalizer } from '../sales/normalization/edef-normalizer.js';
 import { NormalizationConsistencyJob } from '../sales/normalization/consistency.job.js';
 import { NormalizationRecorder } from '../sales/normalization/normalization-recorder.js';
@@ -177,11 +178,8 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
       .collection('sales_invoice_counters')
       .findOne({ organizationId: org, series: 'test' });
     const next = ((counter?.['last'] as number | undefined) ?? 0) + 1;
-    const year = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'Africa/Kinshasa',
-      year: 'numeric',
-    }).format(new Date());
-    return `TEST-${year}-${String(next).padStart(6, '0')}`;
+    // ADR-0027 : TEST-IN{AA}{MM}-NNNNNN (les cas de ce fichier sont des factures).
+    return formatInvoiceNumber('test', 'IN', fiscalPeriodOf(new Date()), next);
   }
 
   /** Normalise un brouillon prêt, avec un scénario du faux serveur pour SON numéro. */

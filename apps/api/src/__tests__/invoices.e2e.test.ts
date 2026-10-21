@@ -26,6 +26,7 @@ import { startFakeEdefServer, type FakeEdefServer } from '../edef/testing/fake-e
 import { inFiscalTransaction } from '../fiscal/fiscal-transaction.js';
 import { NormalizedInvoicingService } from '../fiscal/normalized-invoicing.service.js';
 import { contentSha256Of } from '../sales/invoices/canonical.js';
+import type { InvoiceType } from '../sales/invoices/invoice.contract.js';
 import {
   SALES_INVOICE_NORMALIZER,
   type SalesInvoiceNormalizer,
@@ -33,7 +34,10 @@ import {
 import { InvoiceJournalService } from '../sales/invoices/invoice-journal.service.js';
 import {
   InvoiceNumberingService,
+  fiscalPeriodOf,
   fiscalYearOf,
+  formatInvoiceNumber,
+  parseInvoiceNumber,
 } from '../sales/invoices/invoice-numbering.service.js';
 import { dbOf, e2eSuite, makeE2EApp, registerAndLogin } from './e2e-utils.js';
 
@@ -473,7 +477,7 @@ e2eSuite('ventes — factures et avoirs (ADR-0023 chantier E2)', () => {
   describe('brouillons (pro forma)', () => {
     it('référence PF-, jamais de numéro ; montants USD calculés par le moteur', async () => {
       const d = await brouillon(asA('accountant'), corps());
-      expect(d.proformaRef).toMatch(/^PF-\d{4}-\d{6}$/);
+      expect(d.proformaRef).toMatch(/^PF\d{4}-\d{6}$/);
       expect(d).toMatchObject({
         status: 'draft',
         documentKind: 'proforma',
@@ -632,7 +636,8 @@ e2eSuite('ventes — factures et avoirs (ADR-0023 chantier E2)', () => {
         status: 'issued',
         documentKind: 'invoice',
         documentLabel: 'Facture',
-        number: `${year}-000001`,
+        // ADR-0027 : IN{AA}{MM}, mois de la date d'émission figée (Kinshasa).
+        number: formatInvoiceNumber('real', 'IN', fiscalPeriodOf(new Date(emise.issuedAt)), 1),
         series: 'real',
         fiscalYear: year,
         emissionMode: 'standard',
@@ -698,11 +703,16 @@ e2eSuite('ventes — factures et avoirs (ADR-0023 chantier E2)', () => {
       expect(JSON.stringify(ev)).not.toContain('Client Exemple');
     });
 
-    it('50 émissions concurrentes → numéros contigus sans doublon, dates croissantes, journal sans trou', async () => {
+    it('50 émissions concurrentes, factures et avoirs mêlés → une seule série IN/AV contiguë, dates croissantes, journal sans trou', async () => {
       const drafts: Record<string, any>[] = [];
       for (let i = 0; i < 50; i += 1) {
         if (i % 20 === 0) clearThrottle();
-        drafts.push(await brouillonPret(asA('owner'), corps()));
+        // Un document sur cinq est un avoir (RRR sans origine) : même compteur, préfixe AV.
+        const body =
+          i % 5 === 4
+            ? corps({ type: 'FA', creditNote: { nature: 'RRR', originInvoiceId: null } })
+            : corps();
+        drafts.push(await brouillonPret(asA('owner'), body));
       }
       clearThrottle();
       const res = await Promise.all(
@@ -713,12 +723,25 @@ e2eSuite('ventes — factures et avoirs (ADR-0023 chantier E2)', () => {
         ),
       );
       for (const r of res) expect(r.status, JSON.stringify(r.body)).toBe(200);
-      const all = await db
-        .collection('sales_invoices')
-        .find({ organizationId: orgA, status: 'issued' })
-        .sort({ number: 1 })
-        .toArray();
-      const seqs = all.map((d) => Number.parseInt(String(d['number']).slice(5), 10));
+      const all = (
+        await db
+          .collection('sales_invoices')
+          .find({ organizationId: orgA, status: 'issued' })
+          .toArray()
+      )
+        .map((d) => ({ d, n: parseInvoiceNumber(String(d['number']))! }))
+        .sort((a, b) => a.n.seq - b.n.seq)
+        .map(({ d }) => d);
+      const parsed = all.map((d) => parseInvoiceNumber(String(d['number'])));
+      for (const [i, p] of parsed.entries()) {
+        expect(p, String(all[i]!['number'])).toMatchObject({ series: 'real', legacy: false });
+        expect(p!.prefix).toBe(['FA', 'EA'].includes(String(all[i]!['type'])) ? 'AV' : 'IN');
+        expect(p!.year).toBe(all[i]!['fiscalYear']);
+        // Mois imprimé = mois (Kinshasa) de la date d'émission figée.
+        expect(p!.month).toBe(fiscalPeriodOf(all[i]!['issuedAt'] as Date).month);
+      }
+      expect(parsed.filter((p) => p!.prefix === 'AV').length).toBeGreaterThanOrEqual(10);
+      const seqs = parsed.map((p) => p!.seq);
       expect(seqs).toEqual(Array.from({ length: seqs.length }, (_, i) => i + 1));
       expect(seqs.length).toBeGreaterThanOrEqual(51);
       for (let i = 1; i < all.length; i += 1) {
@@ -746,6 +769,7 @@ e2eSuite('ventes — factures et avoirs (ADR-0023 chantier E2)', () => {
         [...page.body.items, ...suite.body.items].map((i: { id: string }) => i.id),
       );
       expect(ids.size).toBe(20);
+      expect(emise.number).toMatch(/^IN\d{4}-000001$/);
       const q = await get(asA('viewer'), `/sales/invoices?q=${emise.number}`);
       expect(q.body.items.map((i: { id: string }) => i.id)).toContain(emise.id);
       // La série du numéro est dans le résumé de liste (badge « TEST » du web).
@@ -755,35 +779,162 @@ e2eSuite('ventes — factures et avoirs (ADR-0023 chantier E2)', () => {
         'INVALID_CURSOR',
       );
     });
+
+    it('ancienne forme `AAAA-NNNNNN` (avant ADR-0027) : lue, affichée et trouvée par la recherche', async () => {
+      // Copie brute d'un document émis, portant un numéro de l'ancienne forme, comme
+      // ceux déjà figés en production. Aucune réécriture d'un numéro existant.
+      const source = await docEnBase(emise.id);
+      const ancien = '1999-000001';
+      const _id = new ObjectId();
+      await db.collection('sales_invoices').insertOne({
+        ...source,
+        _id,
+        number: ancien,
+        fiscalYear: 1999,
+        proformaRef: 'PF-1999-000001',
+        searchKey: `${ancien} pf-1999-000001`,
+      });
+      const vue = await get(asA('viewer'), `/sales/invoices/${String(_id)}`);
+      expect(vue.status).toBe(200);
+      expect(vue.body).toMatchObject({ number: ancien, series: 'real', documentKind: 'invoice' });
+      const q = await get(asA('viewer'), `/sales/invoices?q=${ancien}`);
+      expect(q.body.items.map((i: { id: string }) => i.id)).toEqual([String(_id)]);
+      const pf = await get(asA('viewer'), '/sales/invoices?q=PF-1999-000001');
+      expect(pf.body.items.map((i: { id: string }) => i.id)).toEqual([String(_id)]);
+      await db.collection('sales_invoices').deleteOne({ _id });
+    });
   });
 
   // ── Numérotation (service) ───────────────────────────────────────────────
 
   describe('numérotation', () => {
+    const attribuer = (org: string, type: InvoiceType, now: Date) =>
+      inFiscalTransaction(connection(), (session) =>
+        numbering().assignOnIssue(org, { session, type, now }),
+      );
+
     it('31 déc. 23 h 59 et 1ᵉʳ janv. 0 h 00 à Kinshasa → deux années', async () => {
       const org = `org-annee-${tag}`;
-      const a = await inFiscalTransaction(connection(), (session) =>
-        numbering().assignOnIssue(org, { session, now: new Date('2030-12-31T23:59:00+01:00') }),
-      );
-      const b = await inFiscalTransaction(connection(), (session) =>
-        numbering().assignOnIssue(org, { session, now: new Date('2031-01-01T00:00:00+01:00') }),
-      );
-      expect(a).toMatchObject({ number: '2030-000001', fiscalYear: 2030 });
-      expect(b).toMatchObject({ number: '2031-000001', fiscalYear: 2031 });
+      const a = await attribuer(org, 'FV', new Date('2030-12-31T23:59:00+01:00'));
+      const b = await attribuer(org, 'FV', new Date('2031-01-01T00:00:00+01:00'));
+      expect(a).toMatchObject({ number: 'IN3012-000001', fiscalYear: 2030 });
+      expect(b).toMatchObject({ number: 'IN3101-000001', fiscalYear: 2031 });
+    });
+
+    it('le mois est un repère : le compteur continue d’un mois à l’autre, AV dans la même série, remise à 1 au 1ᵉʳ janvier (Kinshasa)', async () => {
+      const org = `org-mois-${tag}`;
+      const numeros: string[] = [];
+      const suite: [InvoiceType, string][] = [
+        ['FV', '2030-10-31T23:30:00+01:00'], // octobre à Kinshasa
+        ['FV', '2030-10-31T23:30:00Z'], // 1ᵉʳ nov. 0 h 30 à Kinshasa
+        ['FA', '2030-11-15T10:00:00+01:00'],
+        ['EV', '2030-11-20T10:00:00+01:00'],
+        ['EA', '2030-12-31T23:30:00+01:00'], // encore 2030 à Kinshasa
+        ['FT', '2030-12-31T23:30:00Z'], // 1ᵉʳ janv. 2031 0 h 30 à Kinshasa
+        ['FA', '2031-01-02T09:00:00+01:00'],
+      ];
+      for (const [type, at] of suite) {
+        numeros.push((await attribuer(org, type, new Date(at))).number);
+      }
+      expect(numeros).toEqual([
+        'IN3010-000001',
+        'IN3011-000002',
+        'AV3011-000003',
+        'IN3011-000004',
+        'AV3012-000005',
+        'IN3101-000001',
+        'AV3101-000002',
+      ]);
+    });
+
+    it('continuité avec l’ancienne forme : les compteurs 2026 continuent (IN, AV, TEST-IN, TEST-AV, PF)', async () => {
+      const org = `org-continuite-${tag}`;
+      const oct = new Date('2026-10-21T10:00:00+01:00');
+      const veille = new Date('2026-10-20T08:00:00Z');
+      // État de la production avant ADR-0027 : 2026-000001, TEST-2026-000001,
+      // PF-2026-000001 et PF-2026-000002.
+      const compteur = (series: string, last: number, lastIssuedAt: Date | null) => ({
+        organizationId: org,
+        series,
+        year: 2026,
+        last,
+        lastIssuedAt,
+        inFlight: null,
+        _schemaVersion: 1,
+      });
+      await db
+        .collection('sales_invoice_counters')
+        .insertMany([
+          compteur('real', 1, veille),
+          compteur('test', 1, veille),
+          compteur('proforma', 2, null),
+        ]);
+      expect((await attribuer(org, 'FV', oct)).number).toBe('IN2610-000002');
+      expect((await attribuer(org, 'FA', oct)).number).toBe('AV2610-000003');
+      expect(await numbering().nextProformaRef(org, { now: oct })).toBe('PF2610-000003');
+
+      // Série d'essai (mode normalisé) : documents bruts minimaux, réservation sous bail.
+      const brut = async (type: InvoiceType, reservedNumber: string | null = null) => {
+        const _id = new ObjectId();
+        await db.collection('sales_invoices').insertOne({
+          _id,
+          organizationId: org,
+          type,
+          status: 'pending_normalization',
+          proformaRef: `PF-brut-${String(_id)}`,
+          number: null,
+          normalization: { reservedNumber },
+        });
+        return String(_id);
+      };
+      const reserverBrut = (id: string) =>
+        inFiscalTransaction(connection(), async (session) => {
+          const r = await numbering().reserve(org, id, 'test', { session, now: oct });
+          await connection()
+            .collection('sales_invoices')
+            .updateOne(
+              { _id: new ObjectId(id) },
+              { $set: { 'normalization.reservedNumber': r.number } },
+              { session },
+            );
+          return r;
+        });
+      const rendre = (id: string) =>
+        inFiscalTransaction(connection(), (session) => numbering().release(org, id, { session }));
+
+      const fv = await brut('FV');
+      expect(await reserverBrut(fv)).toEqual({ number: 'TEST-IN2610-000002', fiscalYear: 2026 });
+      expect(await rendre(fv)).toEqual({ released: true });
+      const ea = await brut('EA');
+      // Le rang rendu est repris par le document suivant, avec SON préfixe.
+      expect((await reserverBrut(ea)).number).toBe('TEST-AV2610-000002');
+      expect(await rendre(ea)).toEqual({ released: true });
+
+      // Numéro réservé à l'ancienne forme (normalisation incertaine d'avant le
+      // déploiement) : toujours lu, rendu s'il est le dernier.
+      await db
+        .collection('sales_invoice_counters')
+        .updateOne({ organizationId: org, series: 'test', year: 2026 }, { $set: { last: 3 } });
+      const ancien = await brut('FV', 'TEST-2026-000003');
+      expect(await rendre(ancien)).toEqual({ released: true });
+      const apres = await db
+        .collection('sales_invoice_counters')
+        .findOne({ organizationId: org, series: 'test', year: 2026 });
+      expect(apres?.['last']).toBe(2);
     });
 
     it('échec après l’incrément → aucun numéro consommé', async () => {
       const org = `org-echec-${tag}`;
       await expect(
         inFiscalTransaction(connection(), async (session) => {
-          await numbering().assignOnIssue(org, { session });
+          await numbering().assignOnIssue(org, { session, type: 'FV' });
           throw new Error('échec injecté');
         }),
       ).rejects.toThrow('échec injecté');
       const n = await inFiscalTransaction(connection(), (session) =>
-        numbering().assignOnIssue(org, { session }),
+        numbering().assignOnIssue(org, { session, type: 'FV' }),
       );
-      expect(n.number).toMatch(/-000001$/);
+      expect(n.number).toMatch(/^IN\d{4}-000001$/);
     });
 
     it('deux organisations → séries indépendantes', async () => {
@@ -928,7 +1079,7 @@ e2eSuite('ventes — factures et avoirs (ADR-0023 chantier E2)', () => {
       const x = await normaliser(corpsN());
       const y = await normaliser(corpsN());
       const rx = await reserver(orgN, x.id);
-      expect(rx.number).toMatch(/^TEST-\d{4}-000001$/);
+      expect(rx.number).toMatch(/^TEST-IN\d{4}-000001$/);
       await expect(reserver(orgN, y.id)).rejects.toMatchObject({
         response: { code: 'NORMALIZATION_IN_PROGRESS' },
       });
