@@ -9,6 +9,7 @@ import { AiModule } from './ai/ai.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { AuthzModule } from './authz/authz.module.js';
 import { BillingModule } from './billing/billing.module.js';
+import { BrandingModule } from './branding/branding.module.js';
 import { CanvasModule } from './canvas/canvas.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { EdefModule } from './edef/edef.module.js';
@@ -100,6 +101,8 @@ import { StorageModule } from './storage/storage.module.js';
     // ADR-0021 — client e-MCF, puis identité fiscale et facture normalisée.
     EdefModule,
     FiscalModule,
+    // ADR-0028 — identité visuelle (logos, couleurs, police), avant les ventes.
+    BrandingModule,
     // ADR-0022 — clients et catalogue (lot S25c).
     SalesModule,
   ],

@@ -30,7 +30,8 @@ import {
 } from './registry.js';
 import { renderDocumentHtml, initialsOf, type ResolvedPresentation } from './template-engine.js';
 import { PALETTES, type InvoiceTemplate, type TemplateOptions } from './template.contract.js';
-import { contrastRatio, readableOn, themeOf } from './theme.js';
+import { contrastRatio, readableOn } from '../../../branding/colors.js';
+import { themeOf } from './theme.js';
 
 const QR = await qrCodeSvg(FAKE_QR);
 

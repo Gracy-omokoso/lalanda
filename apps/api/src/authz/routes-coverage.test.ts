@@ -29,6 +29,8 @@ import { LalaController } from '../ai/lala.controller.js';
 import { LalaVocalController } from '../ai/lala-vocal.controller.js';
 import { AuthProvidersController } from '../auth/auth-providers.controller.js';
 import { BillingController } from '../billing/billing.controller.js';
+import { BrandAssetImageController } from '../branding/brand-asset-image.controller.js';
+import { BrandingController } from '../branding/branding.controller.js';
 import { CanvasController } from '../canvas/canvas.controller.js';
 import { EvaluateController } from '../evaluate/evaluate.controller.js';
 import { FiscalProfileController } from '../fiscal/fiscal-profile.controller.js';
@@ -48,6 +50,7 @@ import { ReportsController } from '../reports/reports.controller.js';
 import { CatalogItemsController } from '../sales/catalog-items.controller.js';
 import { CustomersController } from '../sales/customers.controller.js';
 import { InvoiceDocumentsController } from '../sales/documents/invoice-documents.controller.js';
+import { InvoiceTemplatesController } from '../sales/documents/invoice-templates.controller.js';
 import { InvoicesController } from '../sales/invoices/invoices.controller.js';
 import { JournalController } from '../sales/invoices/journal.controller.js';
 import { NormalizationController } from '../sales/normalization/normalization.controller.js';
@@ -105,6 +108,10 @@ const CONTROLEURS = [
   // ADR-0024 § 9.1 (F2)
   NormalizationController,
   InvoiceDocumentsController,
+  // ADR-0028 — identité visuelle et modèles de facture.
+  BrandingController,
+  BrandAssetImageController,
+  InvoiceTemplatesController,
 ];
 
 /**
@@ -170,6 +177,12 @@ const SANS_PERMISSION: Record<string, string> = {
     'd’objet de 128 bits tiré au hasard, avec expiration ; signature invalide, ' +
     'jeton expiré et objet inconnu rendent tous 404. Décision et limites : ' +
     'account/avatar-url.ts.',
+  'BrandAssetImageController.serve':
+    'Sert les octets d’un logo d’organisation à l’interface (ADR-0028 § 7). AUTHENTIFIÉE ' +
+    'PAR JETON SIGNÉ, même régime que la photo de profil : consommée par une balise <img> ' +
+    'cross-origin sans cookie. Identifiant de 128 bits tiré au hasard, expiration, 404 ' +
+    'unique ; servie SEULEMENT si le logo est encore relié à son organisation. Voir ' +
+    'branding/brand-asset-url.ts.',
   'EmailVerificationController.verify':
     'Vérification par jeton. L’appelant n’est pas nécessairement authentifié : ' +
     'le jeton fait autorité, comme pour l’acceptation d’invitation.',
@@ -421,6 +434,15 @@ describe('couverture des routes par le RBAC', () => {
       'NormalizationController.dgiExchanges': ['sales.read'],
       'InvoiceDocumentsController.pdf': ['sales.read'],
       'InvoiceDocumentsController.duplicate': ['sales.manage'],
+      // ADR-0028 : identité visuelle et choix du modèle = administration de
+      // l'organisation ; consultation des modèles et aperçu = lecture des ventes.
+      'BrandingController.get': ['organization.manage'],
+      'BrandingController.putIdentity': ['organization.manage'],
+      'BrandingController.uploadLogo': ['organization.manage'],
+      'BrandingController.removeLogo': ['organization.manage'],
+      'InvoiceTemplatesController.list': ['sales.read'],
+      'InvoiceTemplatesController.put': ['organization.manage'],
+      'InvoiceTemplatesController.preview': ['sales.read'],
     };
     for (const [cle, actions] of Object.entries(attendu)) {
       const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle);
