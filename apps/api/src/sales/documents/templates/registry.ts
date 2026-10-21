@@ -60,7 +60,7 @@ export interface IdentityDefaults {
  * n'entre dans une facture gelée).
  */
 export function resolveOptions(
-  template: InvoiceTemplate,
+  template: Pick<InvoiceTemplate, 'defaults' | 'fontChoices'>,
   input: TemplateOptionsInput | null,
   identity: IdentityDefaults,
 ): TemplateOptions {
@@ -77,7 +77,7 @@ export function resolveOptions(
 }
 
 /** La police demandée est-elle proposée par ce modèle ? */
-export function fontAllowed(template: InvoiceTemplate, font: string): boolean {
+export function fontAllowed(template: Pick<InvoiceTemplate, 'fontChoices'>, font: string): boolean {
   return (template.fontChoices as readonly string[]).includes(font);
 }
 

@@ -43,9 +43,17 @@ export const LEGACY_PAGE_MARGIN: PageMargins = {
   right: '12mm',
 };
 
+/**
+ * Ce que le moteur attend d'un modèle : un modèle intégré (`InvoiceTemplate`)
+ * ou un modèle sur mesure compilé (`custom/custom-template.ts`, ADR-0029).
+ */
+export type RenderableTemplate = Pick<InvoiceTemplate, 'version' | 'page' | 'render'> & {
+  readonly id: string;
+};
+
 /** Présentation résolue d'un rendu : modèle, options figées ou courantes, logos intégrés. */
 export interface ResolvedPresentation {
-  template: InvoiceTemplate;
+  template: RenderableTemplate;
   options: TemplateOptions;
   identity: FrozenIdentity;
   logos: Record<LogoVariant, RenderLogo | null>;
