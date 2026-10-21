@@ -88,6 +88,7 @@ dit à l'écran.
 | `amount`, `currency` | chaîne décimale > 0, deux décimales au plus ; `CDF` ou `USD` |
 | `method` | l'un des **six** moyens de règlement e-DEF : `ESPECES`, `VIREMENT`, `CARTEBANCAIRE`, `MOBILEMONEY`, `CHEQUES`, `AUTRE`. `CREDIT` est refusé : il signifie « non réglé » |
 | `reference` | facultative (n° de virement, de chèque, de transaction mobile), 100 caractères |
+| `accountId` | facultatif : compte de trésorerie qui a reçu l'argent, réservé au module Dépenses et trésorerie (ADR-0034). Identifiant opaque, non vérifié tant que ce module n'est pas intégré |
 | `allocations` | 1 à 20 lettrages `{ invoiceId, amount }`, factures distinctes ; **somme des lettrages = montant** (pas d'encaissement non lettré, décision ouverte n° 4) |
 | `status` | `recorded` ou `cancelled` (annulation motivée, jamais d'effacement) |
 

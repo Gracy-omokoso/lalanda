@@ -351,13 +351,16 @@ e2eSuite('encaissements, règlement et pont vers le réalisé (ADR-0031)', () =>
       const r = await post(
         asA('owner'),
         '/sales/receipts',
-        encaissement([
-          { invoiceId: f2.id, amount: '92.80' },
-          { invoiceId: f3.id, amount: '57.20' },
-        ]),
+        encaissement(
+          [
+            { invoiceId: f2.id, amount: '92.80' },
+            { invoiceId: f3.id, amount: '57.20' },
+          ],
+          { accountId: 'banque-principale' },
+        ),
       );
       expect(r.status, JSON.stringify(r.body)).toBe(201);
-      expect(r.body.amount).toBe('150.00');
+      expect(r.body).toMatchObject({ amount: '150.00', accountId: 'banque-principale' });
       const lot = await get(asA('viewer'), `/sales/settlements?invoiceIds=${f2.id},${f3.id}`);
       expect(lot.status).toBe(200);
       expect(lot.body.items.map((i: { status: string }) => i.status)).toEqual([

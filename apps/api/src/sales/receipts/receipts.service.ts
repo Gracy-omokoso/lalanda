@@ -56,6 +56,7 @@ export interface ReceiptView {
   method: string;
   reference: string | null;
   note: string | null;
+  accountId: string | null;
   allocations: StoredAllocation[];
   cancellation: { at: string; by: string; reason: string } | null;
   calculationVersion: string;
@@ -82,6 +83,7 @@ function toView(r: SalesReceiptLean): ReceiptView {
     method: r.method,
     reference: r.reference,
     note: r.note,
+    accountId: r.accountId ?? null,
     allocations: r.allocations.map((a) => ({
       invoiceId: a.invoiceId,
       invoiceNumber: a.invoiceNumber,
@@ -190,6 +192,7 @@ export class ReceiptsService {
             method: body.method,
             reference: body.reference,
             note: body.note,
+            accountId: body.accountId,
             allocations,
             invoiceIds: allocations.map((a) => a.invoiceId),
             cancellation: null,
@@ -236,6 +239,7 @@ export class ReceiptsService {
             method: body.method,
             reference: body.reference,
             note: body.note,
+            accountId: body.accountId,
             allocations,
             invoiceIds: allocations.map((a) => a.invoiceId),
             calculationVersion: RECEIVABLES_VERSION,

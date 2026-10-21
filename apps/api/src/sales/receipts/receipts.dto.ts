@@ -68,6 +68,13 @@ export const ReceiptBodySchema = z
     }),
     reference: OptionalText(100),
     note: OptionalText(500),
+    // ADR-0034 (non intégré) : compte de trésorerie, identifiant opaque facultatif.
+    accountId: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{1,64}$/, { message: 'Identifiant de compte invalide.' })
+      .nullable()
+      .optional()
+      .transform((v) => v ?? null),
     allocations: z
       .array(z.object({ invoiceId: ObjectIdString, amount: Amount }).strict())
       .min(1)

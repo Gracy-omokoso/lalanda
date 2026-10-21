@@ -2451,6 +2451,8 @@ export interface ReceiptView {
   method: ReceiptMethod;
   reference: string | null;
   note: string | null;
+  /** Compte de trésorerie (ADR-0034, non intégré), facultatif. */
+  accountId: string | null;
   allocations: ReceiptAllocationView[];
   cancellation: { at: string; by: string; reason: string } | null;
   calculationVersion: string;
@@ -2467,6 +2469,7 @@ export interface ReceiptBody {
   method: ReceiptMethod;
   reference: string | null;
   note: string | null;
+  accountId?: string | null;
   allocations: { invoiceId: string; amount: string }[];
 }
 

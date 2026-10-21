@@ -46,6 +46,14 @@ export class SalesReceipt {
   @Prop({ type: String, default: null })
   note!: string | null;
 
+  /**
+   * Compte de trésorerie qui a reçu l'argent (caisse, banque, mobile money),
+   * facultatif. Réservé au module Dépenses et trésorerie (ADR-0034) : identifiant
+   * opaque, non vérifié tant que ce module n'est pas intégré (ADR-0031 § 1).
+   */
+  @Prop({ type: String, default: null })
+  accountId!: string | null;
+
   @Prop({ type: [Object], required: true })
   allocations!: StoredAllocation[];
 
