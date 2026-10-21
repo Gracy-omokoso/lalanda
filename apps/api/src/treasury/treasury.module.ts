@@ -16,7 +16,6 @@ import { ActualPeriod, ActualPeriodSchema } from '../actuals/actual-period.schem
 import { OrganizationsModule } from '../organizations/organizations.module.js';
 import { PlansModule } from '../plans/plans.module.js';
 import { ProjectsModule } from '../projects/projects.module.js';
-import { SalesInvoice, SalesInvoiceSchema } from '../sales/invoices/invoice.schema.js';
 import { TreasuryAccountsController } from './treasury-accounts.controller.js';
 import { TreasuryAccountsService } from './treasury-accounts.service.js';
 import { TreasuryActualsController } from './treasury-actuals.controller.js';
@@ -56,8 +55,8 @@ import {
       { name: TreasuryRecurringExpense.name, schema: TreasuryRecurringExpenseSchema },
       { name: TreasuryMovement.name, schema: TreasuryMovementSchema },
       { name: TreasurySettings.name, schema: TreasurySettingsSchema },
-      // Lecture des échéances clients (factures finales) et écriture du réalisé.
-      { name: SalesInvoice.name, schema: SalesInvoiceSchema },
+      // Écriture du réalisé (report des dépenses). Les factures sont LUES par la
+      // connexion (`treasury-sources.ts`), sans modèle injecté.
       { name: ActualPeriod.name, schema: ActualPeriodSchema },
     ]),
   ],

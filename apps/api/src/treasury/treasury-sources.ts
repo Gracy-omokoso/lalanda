@@ -11,12 +11,11 @@
 //    à la fusion, la source deviendra `computeSettlement` (ADR-0031 § 2).
 
 import { Inject, Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
+import { InjectConnection } from '@nestjs/mongoose';
 import type { ReceivableInput, TreasuryCurrency } from '@lalanda/engine';
-import type { Model } from 'mongoose';
+import type { Connection } from 'mongoose';
 
 import { kinshasaDay } from '../sales/invoices/exchange-rate-reference.service.js';
-import { SalesInvoice, type SalesInvoiceDocument } from '../sales/invoices/invoice.schema.js';
 
 /** Encaissement tel que la trésorerie le consomme. */
 export interface TreasuryReceipt {
@@ -49,16 +48,24 @@ const FINAL_STATUSES = ['issued', 'normalized'];
 /** Factures (et factures d'acompte) : un avoir n'est pas une créance. */
 const RECEIVABLE_TYPES = ['FV', 'FT', 'EV', 'ET'];
 
+/**
+ * Lecture SEULE de `sales_invoices` par la connexion, sans `InjectModel` : le
+ * module Ventes garde la liste fermée de ses écrivains (`invoices.sources.test.ts`)
+ * et la trésorerie n'en fait pas partie.
+ */
+const SALES_INVOICES = 'sales_invoices';
+
 @Injectable()
 export class TreasuryReceivablesReader {
   constructor(
-    @InjectModel(SalesInvoice.name) private readonly invoices: Model<SalesInvoiceDocument>,
+    @InjectConnection() private readonly connection: Connection,
     @Inject(TREASURY_RECEIPTS_SOURCE) private readonly receipts: TreasuryReceiptsSource,
   ) {}
 
   /** Échéances clients ouvertes, toutes devises (la prévision filtre). */
   async openReceivables(organizationId: string): Promise<ReceivableInput[]> {
-    const docs = await this.invoices
+    const docs = (await this.connection
+      .collection(SALES_INVOICES)
       .find(
         {
           organizationId,
@@ -67,19 +74,16 @@ export class TreasuryReceivablesReader {
           type: { $in: RECEIVABLE_TYPES },
           amountOnCredit: { $nin: [null, '0', '0.00'] },
         },
-        { number: 1, currency: 1, amountOnCredit: 1, issuedAt: 1, customer: 1 },
+        { projection: { number: 1, currency: 1, amountOnCredit: 1, issuedAt: 1, customer: 1 } },
       )
-      .lean<
-        {
-          _id: unknown;
-          number: string | null;
-          currency: TreasuryCurrency;
-          amountOnCredit: string | null;
-          issuedAt: Date | null;
-          customer: { name: string | null } | null;
-        }[]
-      >()
-      .exec();
+      .toArray()) as unknown as {
+      _id: unknown;
+      number: string | null;
+      currency: TreasuryCurrency;
+      amountOnCredit: string | null;
+      issuedAt: Date | null;
+      customer: { name: string | null } | null;
+    }[];
     return docs
       .filter((d) => d.amountOnCredit !== null && d.issuedAt !== null)
       .map((d) => ({

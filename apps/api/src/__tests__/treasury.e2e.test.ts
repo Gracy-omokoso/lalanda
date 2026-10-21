@@ -759,6 +759,50 @@ e2eSuite('trésorerie — dépenses, comptes, réalisé, prévision (ADR-0034)',
   // ─── 5. Prévision ─────────────────────────────────────────────────────────
 
   describe('prévision de trésorerie', () => {
+    it('échéance client : la part à crédit d’une facture finale est attendue, un brouillon ne l’est pas', async () => {
+      // Documents insérés directement : seul compte ici ce que la trésorerie LIT
+      // (statut, série, type, part à crédit, date d'émission).
+      const base = {
+        organizationId: orgId,
+        series: 'real',
+        type: 'FV',
+        currency: 'USD',
+        customer: { name: 'Client test' },
+      };
+      await db.collection('sales_invoices').insertMany([
+        {
+          ...base,
+          status: 'issued',
+          number: 'FV-T-1',
+          amountOnCredit: '250.00',
+          issuedAt: new Date(),
+        },
+        { ...base, status: 'draft', number: null, amountOnCredit: '999.00', issuedAt: null },
+        {
+          ...base,
+          status: 'issued',
+          series: 'test',
+          number: 'FV-T-2',
+          amountOnCredit: '77.00',
+          issuedAt: new Date(),
+        },
+      ]);
+      const res = await get(as('owner'), '/treasury/forecast?currency=USD');
+      const opt = (
+        res.body.scenarios as {
+          id: string;
+          flows: { source: string; amount: string; label: string }[];
+        }[]
+      ).find((s) => s.id === 'optimistic')!;
+      const recus = opt.flows.filter((f) => f.source === 'receivable');
+      expect(recus.map((f) => [f.amount, f.label])).toEqual([
+        ['250.00', 'Facture FV-T-1 — Client test'],
+      ]);
+      expect((res.body.uncertainty.findings as { code: string }[]).map((f) => f.code)).toContain(
+        'RECEIVABLES_WITHOUT_DUE_DATE',
+      );
+    });
+
     it('trois scénarios, horizons 7/30/90/180, ouverture = soldes USD, constats explicites', async () => {
       const comptes = await get(as('owner'), '/treasury/accounts');
       const res = await get(as('viewer'), '/treasury/forecast?currency=USD');
