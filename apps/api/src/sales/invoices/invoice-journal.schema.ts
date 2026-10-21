@@ -83,3 +83,10 @@ export type SalesInvoiceJournalEntryDocument = HydratedDocument<SalesInvoiceJour
 export const SalesInvoiceJournalEntrySchema =
   SchemaFactory.createForClass(SalesInvoiceJournalEntry);
 SalesInvoiceJournalEntrySchema.index({ organizationId: 1, seq: 1 }, { unique: true });
+// Alertes de normalisation (ADR-0024, amendement du 21 oct. 2026) : la tâche
+// `sales.normalization.alerts` relit les numéros abandonnés des dernières 24 h,
+// toutes organisations confondues. Index partiel : il ne porte que ces entrées.
+SalesInvoiceJournalEntrySchema.index(
+  { at: 1 },
+  { partialFilterExpression: { event: 'number_abandoned' } },
+);

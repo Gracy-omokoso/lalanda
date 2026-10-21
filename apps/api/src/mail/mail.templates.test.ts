@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 import {
   renderEmailVerification,
   renderInvitation,
+  renderNormalizationAlert,
   renderNormalizedInvoicingDisabled,
   renderPasswordReset,
 } from './mail.templates.js';
@@ -39,6 +40,19 @@ const ALL = [
     reason: 'Passage temporaire à un autre logiciel de facturation.',
     actorName: 'Aline',
   }),
+  // ADR-0024, décision ouverte n° 3 (amendement du 21 oct. 2026) : les quatre causes.
+  ...(
+    ['normalization_uncertain', 'number_abandoned', 'token_rejected', 'token_expired'] as const
+  ).map((cause) =>
+    renderNormalizationAlert({
+      cause,
+      url: 'https://app.exemple.com/ventes/factures/abc',
+      organizationName: 'Boulangerie du Fleuve',
+      subjectLabel: 'PF2610-000042',
+      since: new Date('2026-10-21T09:00:00Z'),
+      number: 'IN2610-000042',
+    }),
+  ),
 ];
 
 describe('gabarits — propriétés communes aux trois emails', () => {
@@ -224,5 +238,66 @@ describe('facture normalisée désactivée (ADR-0021, décision n° 5)', () => {
     expect(mail.html).not.toContain('<img src=x');
     expect(mail.html).not.toContain('<b>Org</b>');
     expect(mail.html).toContain('&lt;img src=x');
+  });
+});
+
+describe('alertes de normalisation (ADR-0024, décision ouverte n° 3)', () => {
+  const base = {
+    url: 'https://app.exemple.com/ventes/factures/abc',
+    organizationName: 'Boulangerie du Fleuve',
+    subjectLabel: 'PF2610-000042',
+    since: new Date('2026-10-21T09:00:00Z'),
+  };
+
+  it('incertitude : quoi, depuis quand, et la consigne de ne pas remettre le document', () => {
+    const mail = renderNormalizationAlert({ ...base, cause: 'normalization_uncertain' });
+    expect(mail.subject).toBe('Lalanda — normalisation incertaine pour PF2610-000042');
+    for (const corps of [mail.html, mail.text]) {
+      expect(corps).toContain('Boulangerie du Fleuve');
+      expect(corps).toContain('21 octobre 2026');
+      expect(corps).toContain('ne doit pas être remis au client');
+    }
+    expect(mail.text).toContain(base.url);
+  });
+
+  it('numéro abandonné : le numéro et le trou tracé', () => {
+    const mail = renderNormalizationAlert({
+      ...base,
+      cause: 'number_abandoned',
+      number: 'TEST-IN2610-000007',
+    });
+    expect(mail.subject).toBe('Lalanda — numéro de facture abandonné (TEST-IN2610-000007)');
+    expect(mail.text).toContain('TEST-IN2610-000007');
+    expect(mail.text).toContain('trou dans la série');
+  });
+
+  it('jeton refusé ou expiré : le point de vente et la marche à suivre', () => {
+    const refuse = renderNormalizationAlert({
+      ...base,
+      cause: 'token_rejected',
+      subjectLabel: 'Boutique',
+    });
+    expect(refuse.subject).toBe('Lalanda — jeton e-MCF refusé par la DGI (Boutique)');
+    const expire = renderNormalizationAlert({
+      ...base,
+      cause: 'token_expired',
+      subjectLabel: 'Boutique',
+    });
+    expect(expire.subject).toBe('Lalanda — jeton e-MCF expiré (Boutique)');
+    for (const mail of [refuse, expire]) {
+      expect(mail.text).toContain('Fiscalité');
+      expect(mail.text).toContain('Propriétaire ou Directeur financier');
+    }
+  });
+
+  it('échappe le nom d’organisation et le libellé (saisies utilisateur)', () => {
+    const mail = renderNormalizationAlert({
+      ...base,
+      cause: 'token_rejected',
+      organizationName: '<b>Org</b>',
+      subjectLabel: '<img src=x onerror=alert(1)>',
+    });
+    expect(mail.html).not.toContain('<b>Org</b>');
+    expect(mail.html).not.toContain('<img src=x');
   });
 });

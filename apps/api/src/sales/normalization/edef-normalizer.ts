@@ -44,6 +44,7 @@ import type {
 } from '../invoices/normalization.port.js';
 import type { Secret } from '../../integrations/secret-value.js';
 import { DgiCallGuard } from './dgi-call-guard.js';
+import { NormalizationAlertsService } from './normalization-alerts.service.js';
 import {
   compareSubmission,
   dgiTotalsAsStrings,
@@ -121,6 +122,7 @@ export class EdefSalesInvoiceNormalizer implements SalesInvoiceNormalizer {
     @Inject(DgiCallGuard) private readonly guard: DgiCallGuard,
     @Inject(AuditService) private readonly audit: AuditService,
     @Inject(DGI_PLATFORM_CONFIG) private readonly config: DgiPlatformConfig,
+    @Inject(NormalizationAlertsService) private readonly alerts: NormalizationAlertsService,
   ) {}
 
   /** Port (ADR-0023 § S25e.10) : appelé après le gel. Idempotent ; ne lève pas pour un refus DGI. */
@@ -363,6 +365,7 @@ export class EdefSalesInvoiceNormalizer implements SalesInvoiceNormalizer {
   ): Promise<NormalizeNowOutcome> {
     switch (failure.kind) {
       case 'unauthorized':
+        this.tokenRejectedAlert(attempt);
         return this.fail(attempt, tokenRejected(failure), ['submitting']);
       case 'production_disabled':
         return this.fail(
@@ -417,6 +420,7 @@ export class EdefSalesInvoiceNormalizer implements SalesInvoiceNormalizer {
     }
     if (failure.kind === 'unauthorized') {
       // La DGI n'a pas traité la confirmation : la demande expirera.
+      this.tokenRejectedAlert(attempt);
       return this.uncertain(attempt, 'submit', tokenRejected(failure));
     }
 
@@ -537,6 +541,14 @@ export class EdefSalesInvoiceNormalizer implements SalesInvoiceNormalizer {
     },
   ): boolean {
     return isOurRequest(attempt.doc, attempt.rn, details);
+  }
+
+  /** Jeton refusé (401) : e-mail aux administrateurs fiscaux, sans attendre ni bloquer. */
+  private tokenRejectedAlert(attempt: Attempt): void {
+    const pointOfSaleId =
+      attempt.doc.normalization?.pointOfSaleId ?? attempt.doc.pointOfSaleId ?? null;
+    if (!pointOfSaleId) return;
+    void this.alerts.tokenRejected(attempt.ref.organizationId, pointOfSaleId, this.clock());
   }
 
   private alert(

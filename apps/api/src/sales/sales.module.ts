@@ -54,10 +54,16 @@ import { SalesJournalHead, SalesJournalHeadSchema } from './invoices/journal-hea
 import { JournalController } from './invoices/journal.controller.js';
 import { JournalExportService } from './invoices/journal-export.service.js';
 import { SALES_INVOICE_NORMALIZER } from './invoices/normalization.port.js';
+import { NormalizationAlertsJob } from './normalization/alerts.job.js';
 import { NormalizationConsistencyJob } from './normalization/consistency.job.js';
 import { DgiCallGuard } from './normalization/dgi-call-guard.js';
 import { EdefSalesInvoiceNormalizer } from './normalization/edef-normalizer.js';
 import { NormalizationActionsInterceptor } from './normalization/normalization-actions.interceptor.js';
+import {
+  NormalizationAlert,
+  NormalizationAlertSchema,
+} from './normalization/normalization-alert.schema.js';
+import { NormalizationAlertsService } from './normalization/normalization-alerts.service.js';
 import { NormalizationRecorder } from './normalization/normalization-recorder.js';
 import { NormalizationRoutesService } from './normalization/normalization-routes.service.js';
 import { NormalizationController } from './normalization/normalization.controller.js';
@@ -83,6 +89,8 @@ import { ReferenceRefreshJob } from './normalization/reference-refresh.job.js';
       { name: SalesInvoiceCounter.name, schema: SalesInvoiceCounterSchema },
       { name: SalesInvoiceJournalEntry.name, schema: SalesInvoiceJournalEntrySchema },
       { name: SalesJournalHead.name, schema: SalesJournalHeadSchema },
+      // ADR-0024, amendement du 21 oct. 2026 : alertes e-mail (dédoublonnage, journal).
+      { name: NormalizationAlert.name, schema: NormalizationAlertSchema },
     ]),
   ],
   controllers: [
@@ -120,6 +128,9 @@ import { ReferenceRefreshJob } from './normalization/reference-refresh.job.js';
     NormalizationReconciliationJob,
     ReferenceRefreshJob,
     NormalizationConsistencyJob,
+    // ADR-0024, décision ouverte n° 3 (amendement du 21 oct. 2026) : alertes e-mail.
+    NormalizationAlertsService,
+    NormalizationAlertsJob,
     NormalizationRoutesService,
     { provide: SALES_INVOICE_NORMALIZER, useExisting: EdefSalesInvoiceNormalizer },
     { provide: APP_INTERCEPTOR, useClass: NormalizationActionsInterceptor },

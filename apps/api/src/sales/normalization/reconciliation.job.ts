@@ -32,6 +32,7 @@ import type {
   NormalizeNowOutcome,
 } from '../invoices/normalization.port.js';
 import { DgiCallGuard } from './dgi-call-guard.js';
+import { NormalizationAlertsService } from './normalization-alerts.service.js';
 import { NORMALIZATION_CLAIM_MS, isOurRequest, outcomeOf } from './edef-normalizer.js';
 import {
   confirmDeadlineExceeded,
@@ -89,6 +90,7 @@ export class NormalizationReconciliationJob implements OnModuleInit {
     @Inject(DgiCallGuard) private readonly guard: DgiCallGuard,
     @Inject(SchedulerService) private readonly scheduler: SchedulerService,
     @Inject(DGI_PLATFORM_CONFIG) private readonly config: DgiPlatformConfig,
+    @Inject(NormalizationAlertsService) private readonly alerts: NormalizationAlertsService,
   ) {}
 
   onModuleInit(): void {
@@ -314,6 +316,9 @@ export class NormalizationReconciliationJob implements OnModuleInit {
     doc: InvoiceLean,
     now: Date,
   ): Promise<NormalizeNowOutcome> {
+    // E-mail aux administrateurs fiscaux (au plus un par heure et par point de vente).
+    const pointOfSaleId = doc.normalization?.pointOfSaleId ?? doc.pointOfSaleId ?? null;
+    if (pointOfSaleId) void this.alerts.tokenRejected(ref.organizationId, pointOfSaleId, now);
     await this.recorder.recordNeedsReview(ref, {
       from: [doc.normalization!.phase],
       reason: 'La DGI a refusé le jeton du point de vente pendant la vérification.',
