@@ -158,6 +158,8 @@ const ORG_SCOPED_COLLECTIONS = [
   // ligne, chaque exécution laisserait derrière elle les traces d'export des
   // suites RBAC.
   'audit_events',
+  // ADR-0032 — fiche GROW de l'organisation.
+  'grow_profiles',
 ] as const;
 
 /**
