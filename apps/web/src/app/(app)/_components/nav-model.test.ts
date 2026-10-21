@@ -28,6 +28,7 @@ const PROPRIETAIRE: OrgAction[] = [
   'sales.manage',
   'sales.invoice',
   'project.read',
+  'treasury.read',
 ];
 const DIRECTEUR_FINANCIER: OrgAction[] = ['fiscal.manage', 'sales.read', 'sales.manage'];
 const LECTEUR: OrgAction[] = ['project.read', 'sales.read'];
@@ -42,6 +43,7 @@ describe('entrées et ordre', () => {
       'factures',
       'clients',
       'catalogue',
+      'tresorerie',
       'pilotage',
       'mise-en-route',
       'identite',
@@ -79,6 +81,9 @@ describe('entrées et ordre', () => {
     expect(df).not.toContain('identite');
     expect(df).not.toContain('membres');
     expect(ids(entreesVisibles(SANS_VENTES))).not.toContain('factures');
+    // ADR-0034 : la trésorerie suit `treasury.read`, indépendamment des ventes.
+    expect(ids(entreesVisibles(LECTEUR))).not.toContain('tresorerie');
+    expect(ids(entreesVisibles(['treasury.read']))).toContain('tresorerie');
   });
 
   it('un groupe sans entrée n’est pas rendu', () => {

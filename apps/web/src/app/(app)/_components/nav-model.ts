@@ -21,6 +21,7 @@ export type NavIconId =
   | 'factures'
   | 'clients'
   | 'catalogue'
+  | 'tresorerie'
   | 'pilotage'
   | 'mise-en-route'
   | 'identite'
@@ -95,6 +96,15 @@ export const NAV_ITEMS: readonly NavItem[] = [
     group: 'run',
     icon: 'catalogue',
     action: 'sales.read',
+  },
+  // ADR-0034 — dépenses, comptes, prévision et réalisé vs prévu.
+  {
+    id: 'tresorerie',
+    href: '/tresorerie',
+    label: 'Trésorerie',
+    group: 'run',
+    icon: 'tresorerie',
+    action: 'treasury.read',
   },
   // Le tableau de bord de l'organisation EST le pilotage : blocs par rôle,
   // ratios au rouge, écarts, validations (S21a). Offert à tout membre.

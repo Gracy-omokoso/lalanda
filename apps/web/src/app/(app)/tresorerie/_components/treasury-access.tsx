@@ -7,10 +7,11 @@
 // API de toute façon ; masquer un bouton est un confort, et un rôle sans
 // `treasury.read` lit un refus explicite plutôt qu'une page vide.
 
-import Link from 'next/link';
+import { TabsNav } from '@lalanda/ui';
 import { usePathname } from 'next/navigation';
 import { createContext, useContext, useEffect, useState } from 'react';
 
+import { renderNextLink } from '@/components/next-link';
 import { api, type OrgAction } from '@/lib/api';
 
 import {
@@ -85,30 +86,18 @@ export function TreasuryChrome({ children }: { children: React.ReactNode }): Rea
       value={{ etat, gerer: peutGererTresorerie(actions), relier: peutRelier(actions) }}
     >
       {onglets.length > 0 ? (
-        <nav
-          aria-label="Sections de la trésorerie"
-          className="flex flex-wrap gap-1 border-b border-[var(--border)]"
-        >
-          {onglets.map((tab) => {
-            const actif = courant === tab.segment;
-            return (
-              <Link
-                key={tab.segment}
-                href={`${TRESORERIE_BASE}/${tab.segment}`}
-                aria-current={actif ? 'page' : undefined}
-                className={
-                  actif
-                    ? 'font-mono -mb-px border-b-2 border-[var(--accent)] px-3.5 py-2.5 text-[0.72rem] font-semibold uppercase tracking-[0.08em] text-[var(--foreground)] transition'
-                    : 'font-mono -mb-px border-b-2 border-transparent px-3.5 py-2.5 text-[0.72rem] font-medium uppercase tracking-[0.08em] text-[var(--foreground-muted)] transition hover:text-[var(--foreground)]'
-                }
-              >
-                {tab.label}
-              </Link>
-            );
-          })}
-        </nav>
+        // ADR-0030 : une seule ligne qui défile sur téléphone, comme les Ventes.
+        <TabsNav
+          label="Sections de la trésorerie"
+          renderLink={renderNextLink}
+          items={onglets.map((tab) => ({
+            href: `${TRESORERIE_BASE}/${tab.segment}`,
+            label: tab.label,
+            current: courant === tab.segment,
+          }))}
+        />
       ) : (
-        <div aria-hidden="true" className="h-[2.6rem] border-b border-[var(--border)]" />
+        <div aria-hidden="true" className="h-[2.75rem] border-b border-[var(--border)]" />
       )}
       {children}
     </Contexte.Provider>
