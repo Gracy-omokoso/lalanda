@@ -392,6 +392,9 @@ export function ActualsPanel({ projectId }: { projectId: string }): React.ReactE
                       </th>
                       {MONTHS.map((month) => {
                         const closed = byMonth.get(month)?.status === 'closed';
+                        // ADR-0031 : valeur écrite par le pont depuis les ventes.
+                        const issuVentes =
+                          byMonth.get(month)?.sources?.[line.lineId]?.source === 'run.sales';
                         return (
                           <td key={month} className="px-1 py-1">
                             <input
@@ -403,8 +406,11 @@ export function ActualsPanel({ projectId }: { projectId: string }): React.ReactE
                               disabled={closed || busy}
                               value={cellValue(month, line.lineId)}
                               onChange={(e) => editCell(month, line.lineId, e.target.value)}
-                              aria-label={`${line.label} — ${monthLabel(month)}${closed ? ' (période clôturée)' : ''}`}
-                              className="fig w-full rounded border border-[var(--border)] bg-[var(--surface)] px-1.5 py-1.5 text-right text-xs outline-none transition focus:border-[var(--accent)] disabled:cursor-not-allowed disabled:bg-[var(--surface-muted)] disabled:text-[var(--foreground-muted)]"
+                              title={
+                                issuVentes ? 'Issu des ventes (factures moins avoirs)' : undefined
+                              }
+                              aria-label={`${line.label} — ${monthLabel(month)}${closed ? ' (période clôturée)' : ''}${issuVentes ? ' (issu des ventes)' : ''}`}
+                              className={`${issuVentes ? 'italic text-[var(--accent)] ' : ''}fig w-full rounded border border-[var(--border)] bg-[var(--surface)] px-1.5 py-1.5 text-right text-xs outline-none transition focus:border-[var(--accent)] disabled:cursor-not-allowed disabled:bg-[var(--surface-muted)] disabled:text-[var(--foreground-muted)]`}
                             />
                           </td>
                         );

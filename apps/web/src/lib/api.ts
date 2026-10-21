@@ -443,11 +443,34 @@ export interface ActualPeriodView {
   month: number;
   status: 'open' | 'closed';
   values: Record<string, number>;
+  /**
+   * Origine de chaque valeur (ADR-0031 § 3) : `manual` (saisie dans cet onglet)
+   * ou `run.sales` (écrite par le pont depuis les ventes). Absente : saisie
+   * antérieure d'origine inconnue.
+   */
+  sources?: Record<string, ActualValueSourceView>;
   closedAt: string | null;
   closedBy: string | null;
   reopenedLog: { reopenedAt: string; reopenedBy: string; reason: string }[];
   updatedAt: string;
 }
+
+export type ActualValueSourceView =
+  | {
+      source: 'manual';
+      at: string;
+      by: string | null;
+      replaced?: { source: 'run.sales'; value: number } | null;
+    }
+  | {
+      source: 'run.sales';
+      at: string;
+      by: string | null;
+      version: string;
+      calendarMonth: string;
+      documents: number;
+      fingerprint: string;
+    };
 
 /** Pourquoi une ligne n'a pas de contrepartie comparable dans le plan validé. */
 export type NonComparableRaison =
@@ -2405,6 +2428,154 @@ export function salesQuery(params: object): string {
   return q ? `?${q}` : '';
 }
 
+// ─── Encaissements, règlement et pont vers le réalisé (ADR-0031) ───────────
+// Miroir de `apps/api/src/sales/receipts/` et `apps/api/src/actuals/run-bridge/`.
+// Montants : chaînes décimales calculées par le moteur ; l'interface n'en
+// calcule aucun.
+
+export type ReceiptMethod =
+  'ESPECES' | 'VIREMENT' | 'CARTEBANCAIRE' | 'MOBILEMONEY' | 'CHEQUES' | 'AUTRE';
+
+export interface ReceiptAllocationView {
+  invoiceId: string;
+  invoiceNumber: string | null;
+  amount: string;
+}
+
+export interface ReceiptView {
+  id: string;
+  status: 'recorded' | 'cancelled';
+  receivedOn: string;
+  amount: string;
+  currency: 'CDF' | 'USD';
+  method: ReceiptMethod;
+  reference: string | null;
+  note: string | null;
+  allocations: ReceiptAllocationView[];
+  cancellation: { at: string; by: string; reason: string } | null;
+  calculationVersion: string;
+  revision: number;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReceiptBody {
+  receivedOn: string;
+  amount: string;
+  currency: 'CDF' | 'USD';
+  method: ReceiptMethod;
+  reference: string | null;
+  note: string | null;
+  allocations: { invoiceId: string; amount: string }[];
+}
+
+export interface MonthlyCurrencyTotal {
+  month: string;
+  currency: 'CDF' | 'USD';
+  total: string;
+  count: number;
+}
+
+export interface ReceiptsSummary {
+  from: string | null;
+  to: string | null;
+  months: MonthlyCurrencyTotal[];
+  version: string;
+}
+
+export type SettlementStatus = 'unpaid' | 'partially_paid' | 'paid' | 'overdue';
+
+export interface SettlementView {
+  invoiceId: string;
+  number: string | null;
+  type: string;
+  currency: 'CDF' | 'USD';
+  customerName: string | null;
+  issuedOn: string | null;
+  total: string | null;
+  dueDate: string | null;
+  status: SettlementStatus | 'not_applicable';
+  reason: 'NOT_FINAL' | 'CREDIT_NOTE' | 'TEST_SERIES' | 'NO_PAYMENTS_DECLARED' | null;
+  settlement: {
+    status: SettlementStatus;
+    overdue: boolean;
+    due: string;
+    credited: string;
+    received: string;
+    outstanding: string;
+    creditBalance: string;
+    version: string;
+  } | null;
+  asOf: string;
+}
+
+export interface ActualsBridgeView {
+  state: 'disabled' | 'not_configured' | 'active';
+  enabled: boolean;
+  projectId: string | null;
+  projectName: string | null;
+  projectCurrency: string | null;
+  revenueLineId: string | null;
+  exerciseStart: string | null;
+  lastSync: {
+    at: string;
+    by: string;
+    version: string;
+    written: number;
+    unchanged: number;
+    removed: number;
+    blocked: number;
+    skipped: number;
+  } | null;
+}
+
+export interface ActualsBridgeCandidate {
+  projectId: string;
+  name: string;
+  currency: string;
+  approvedPlanVersion: number | null;
+  lines: { lineId: string; label: string }[];
+}
+
+export interface ActualsBridgeSettings {
+  enabled: boolean;
+  projectId: string | null;
+  revenueLineId: string | null;
+  exerciseStart: string | null;
+}
+
+export type ActualsSyncOutcome =
+  'written' | 'unchanged' | 'removed' | 'PERIOD_CLOSED' | 'MANUAL_VALUE_PRESENT';
+
+export interface ActualsSyncReport {
+  dryRun: boolean;
+  at: string;
+  version: string;
+  projectId: string;
+  projectCurrency: string;
+  revenueLineId: string;
+  exerciseStart: string;
+  entries: {
+    calendarMonth: string | null;
+    year: number;
+    month: number;
+    lineId: string;
+    value: string | null;
+    storedValue: number | null;
+    outcome: ActualsSyncOutcome;
+    documents: number;
+  }[];
+  skipped: {
+    calendarMonth: string;
+    reason: 'OUTSIDE_PLAN_HORIZON' | 'CURRENCY_NOT_CONVERTIBLE';
+    fiscal: { year: number; month: number } | null;
+    documentIds: string[];
+  }[];
+  excludedDepositIds: string[];
+  counts: { written: number; unchanged: number; removed: number; blocked: number; skipped: number };
+}
+
 export const api = {
   /**
    * Enregistre l'accord de l'utilisateur connecté.
@@ -3114,6 +3285,53 @@ export const api = {
     invoicePdfRequest(invoiceId, 'pdf', fallbackName),
   downloadInvoiceDuplicate: (invoiceId: string, fallbackName: string) =>
     invoicePdfRequest(invoiceId, 'duplicate', fallbackName),
+  // ─── Encaissements et règlement (ADR-0031) ─────────────────────
+  // Lecture `sales.read` ; écriture `sales.receipt` ; échéance `sales.manage`.
+  listReceipts: (
+    query: { status?: 'recorded' | 'cancelled' | 'all'; invoiceId?: string; limit?: number } = {},
+  ) =>
+    jsonRequest<{ items: ReceiptView[] }>(`/sales/receipts${salesQuery(query)}`, { method: 'GET' }),
+  getReceiptsSummary: () =>
+    jsonRequest<ReceiptsSummary>(`/sales/receipts/summary`, { method: 'GET' }),
+  createReceipt: (body: ReceiptBody) =>
+    jsonRequest<ReceiptView>(`/sales/receipts`, { method: 'POST', body }),
+  cancelReceipt: (receiptId: string, reason: string, expectedRevision: number) =>
+    jsonRequest<ReceiptView>(`/sales/receipts/${encodeURIComponent(receiptId)}/cancel`, {
+      method: 'POST',
+      body: { reason, expectedRevision },
+    }),
+  /** Statuts de règlement d'un lot de factures (100 au plus). */
+  getSettlements: (invoiceIds: readonly string[]) =>
+    jsonRequest<{ items: SettlementView[] }>(
+      `/sales/settlements${salesQuery({ invoiceIds: invoiceIds.join(',') })}`,
+      { method: 'GET' },
+    ),
+  /** Factures avec un reste à encaisser, les plus anciennes d'abord. */
+  getOpenSettlements: (currency?: 'CDF' | 'USD') =>
+    jsonRequest<{ items: SettlementView[] }>(
+      `/sales/settlements${salesQuery({ open: 'true', currency })}`,
+      { method: 'GET' },
+    ),
+  setInvoiceDueDate: (invoiceId: string, dueDate: string | null) =>
+    jsonRequest<SettlementView>(`/sales/settlements/${encodeURIComponent(invoiceId)}/due-date`, {
+      method: 'PUT',
+      body: { dueDate },
+    }),
+  // Pont vers le réalisé : lecture `sales.read` ; réglage et synchronisation
+  // `actuals.import` + `sales.read`.
+  getActualsBridge: () =>
+    jsonRequest<ActualsBridgeView>(`/sales/actuals-bridge`, { method: 'GET' }),
+  getActualsBridgeCandidates: () =>
+    jsonRequest<{ items: ActualsBridgeCandidate[] }>(`/sales/actuals-bridge/candidates`, {
+      method: 'GET',
+    }),
+  putActualsBridge: (settings: ActualsBridgeSettings) =>
+    jsonRequest<ActualsBridgeView>(`/sales/actuals-bridge`, { method: 'PUT', body: settings }),
+  syncActualsBridge: (dryRun: boolean) =>
+    jsonRequest<ActualsSyncReport>(`/sales/actuals-bridge/sync`, {
+      method: 'POST',
+      body: { dryRun },
+    }),
   // ─── Identité visuelle et modèles de facture (ADR-0028) ───────
   getBrand: () => jsonRequest<BrandView>(`/organizations/current/brand`, { method: 'GET' }),
   putBrandIdentity: (input: PutBrandIdentityInput) =>

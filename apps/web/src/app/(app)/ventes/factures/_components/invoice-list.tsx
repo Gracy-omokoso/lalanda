@@ -7,14 +7,18 @@
 
 import { buttonClasses } from '@lalanda/ui';
 import Link from 'next/link';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
-import { api, type InvoiceSummary, type InvoiceType } from '@/lib/api';
+import { api, type InvoiceSummary, type InvoiceType, type SettlementView } from '@/lib/api';
 
 import { Alerte, BOUTON, CHAMP, Pastille } from '../../_components/form-ui';
 import { useAccesVentes } from '../../_components/sales-access';
 import { formatDate } from '../../_components/sales-model';
 import { useSalesList } from '../../_components/use-sales-list';
+import {
+  facturesAReglement,
+  pastilleReglement,
+} from '../../encaissements/_components/receipts-model';
 
 import {
   BADGE_TEST_DGI,
@@ -41,6 +45,25 @@ export function InvoiceList(): React.ReactElement {
     [filtres],
   );
   const liste = useSalesList<InvoiceSummary>(charger, JSON.stringify(filtres));
+
+  // ADR-0031 : pastille de règlement des factures définitives affichées, lue
+  // d'un seul appel. C'est un confort : en cas d'échec, la liste reste entière,
+  // sans pastille, et l'onglet Encaissements dit le reste.
+  const [reglements, setReglements] = useState<Record<string, SettlementView>>({});
+  const idsReglement = facturesAReglement(liste.items).join(',');
+  useEffect(() => {
+    if (idsReglement === '') return;
+    let annule = false;
+    api
+      .getSettlements(idsReglement.split(','))
+      .then((r) => {
+        if (!annule) setReglements(Object.fromEntries(r.items.map((v) => [v.invoiceId, v])));
+      })
+      .catch(() => undefined);
+    return () => {
+      annule = true;
+    };
+  }, [idsReglement]);
 
   return (
     <section aria-labelledby="factures-titre" className="flex flex-col gap-4">
@@ -204,6 +227,12 @@ export function InvoiceList(): React.ReactElement {
                           </span>
                         ) : null}
                         <Pastille ton={tonStatut(d.status)}>{STATUS_LABELS[d.status]}</Pastille>
+                        {(() => {
+                          const reglement = pastilleReglement(reglements[d.id]);
+                          return reglement ? (
+                            <Pastille ton={reglement.ton}>{reglement.label}</Pastille>
+                          ) : null;
+                        })()}
                         <span className="text-xs text-[var(--foreground-muted)]">
                           {TYPE_LABELS[d.type]}
                         </span>
