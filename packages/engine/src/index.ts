@@ -95,6 +95,10 @@ export {
 // (`INVOICE_TOTALS_VERSION`), il ne touche aucun calcul de plan.
 export * from './invoice-totals/index.js';
 
+// Brief du matin (ADR-0033) — faits et règles déterministes, versionnés à part
+// (`MORNING_BRIEF_VERSION`).
+export * from './morning-brief/index.js';
+
 /** Placeholder — sera retiré quand toutes les APIs seront stables. */
 export function engineHealth(): { ok: true; version: string } {
   return { ok: true, version: ENGINE_VERSION };
