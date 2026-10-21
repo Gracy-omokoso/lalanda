@@ -31,6 +31,7 @@ import {
   SALES_INVOICE_NORMALIZER,
   type SalesInvoiceNormalizer,
 } from '../sales/invoices/normalization.port.js';
+import { IndexesService } from '../database/indexes.service.js';
 import { InvoiceJournalService } from '../sales/invoices/invoice-journal.service.js';
 import {
   InvoiceNumberingService,
@@ -927,6 +928,8 @@ e2eSuite('ventes — factures et avoirs (ADR-0023 chantier E2)', () => {
     });
 
     it('rang fiscal : index unique {organisation, série, année, rang}, chaînes différentes comprises', async () => {
+      // Index construit en arrière-plan sur une base neuve : on l'attend.
+      await app.get(IndexesService).ensureAll();
       clearThrottle();
       await emettre(asA('owner'));
       await emettre(asA('owner'));

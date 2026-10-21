@@ -24,6 +24,7 @@ import {
   type FakeEdefServer,
 } from '../edef/testing/fake-edef-server.js';
 import { PointsOfSaleService } from '../fiscal/points-of-sale.service.js';
+import { IndexesService } from '../database/indexes.service.js';
 import { MailTransport } from '../mail/mail.transport.js';
 import type { MailMessage } from '../mail/mail.types.js';
 import { fiscalPeriodOf, formatInvoiceNumber } from '../sales/invoices/invoice-numbering.js';
@@ -1330,7 +1331,10 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
         .map((m) => m.to)
         .sort();
 
-    beforeAll(() => {
+    beforeAll(async () => {
+      // Le dédoublonnage repose sur l'index unique de `normalization_alerts` :
+      // on attend qu'il existe (construction en arrière-plan sur une base neuve).
+      await app.get(IndexesService).ensureAll();
       // Faux transport : rien ne part, tout est retenu pour les assertions.
       vi.spyOn(app.get(MailTransport), 'send').mockImplementation(async (m: MailMessage) => {
         envoyes.push(m);

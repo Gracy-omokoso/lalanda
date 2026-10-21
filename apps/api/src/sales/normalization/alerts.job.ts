@@ -18,11 +18,11 @@
 // moment par la normalisation et le rattrapage (`tokenRejected`).
 
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
-import { InjectConnection, InjectModel } from '@nestjs/mongoose';
-import type { Connection, Model } from 'mongoose';
+import { InjectConnection } from '@nestjs/mongoose';
+import type { Connection } from 'mongoose';
 
 import { SchedulerService } from '../../scheduler/scheduler.service.js';
-import { SalesInvoiceJournalEntry } from '../invoices/invoice-journal.schema.js';
+import { InvoiceJournalService } from '../invoices/invoice-journal.service.js';
 import type { InvoiceLean } from '../invoices/invoice.types.js';
 import {
   hourOf,
@@ -44,14 +44,6 @@ export interface AlertsReport {
   tokenExpired: NormalizationAlertOutcome[];
 }
 
-interface JournalRow {
-  organizationId: string;
-  at: Date;
-  invoiceId: string | null;
-  number: string | null;
-  proformaRef: string | null;
-}
-
 interface PointOfSaleRow {
   _id: unknown;
   organizationId: string;
@@ -70,8 +62,7 @@ export function documentLabel(
 export class NormalizationAlertsJob implements OnModuleInit {
   constructor(
     @Inject(NormalizationRecorder) private readonly recorder: NormalizationRecorder,
-    @InjectModel(SalesInvoiceJournalEntry.name)
-    private readonly journal: Model<SalesInvoiceJournalEntry>,
+    @Inject(InvoiceJournalService) private readonly journal: InvoiceJournalService,
     @InjectConnection() private readonly connection: Connection,
     @Inject(NormalizationAlertsService) private readonly alerts: NormalizationAlertsService,
     @Inject(SchedulerService) private readonly scheduler: SchedulerService,
@@ -105,18 +96,10 @@ export class NormalizationAlertsJob implements OnModuleInit {
       );
     }
 
-    const abandoned = await this.journal
-      .find(
-        {
-          event: 'number_abandoned',
-          at: { $gte: new Date(now.getTime() - ABANDONED_LOOKBACK_MS) },
-        },
-        { organizationId: 1, at: 1, invoiceId: 1, number: 1, proformaRef: 1 },
-      )
-      .sort({ at: 1 })
-      .limit(LIMIT)
-      .lean<JournalRow[]>()
-      .exec();
+    const abandoned = await this.journal.abandonedSince(
+      new Date(now.getTime() - ABANDONED_LOOKBACK_MS),
+      LIMIT,
+    );
     for (const entry of abandoned) {
       if (!entry.invoiceId) continue;
       const at = new Date(entry.at);
