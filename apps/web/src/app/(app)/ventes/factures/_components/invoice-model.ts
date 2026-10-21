@@ -1742,3 +1742,16 @@ export function lignesEchanges(page: DgiExchangePage): LigneEchange[] {
     corps: corpsLisible(e.body),
   }));
 }
+
+/**
+ * Présentation d'impression d'un document gelé, en une phrase (ADR-0028 § 6) :
+ * le modèle et la version qui impriment l'original et les duplicatas.
+ * `null` pour un brouillon (le modèle se fige au gel).
+ */
+export function libellePresentation(p: InvoiceView['presentation']): string | null {
+  if (!p) return null;
+  if (p.kind === 'original') return 'Présentation d’origine (aucun modèle choisi au gel)';
+  const nom = p.templateLabel ?? p.templateId ?? 'modèle inconnu';
+  const palette = p.options?.palette === 'mono' ? ' · noir et blanc' : '';
+  return `Modèle ${nom} — version ${p.version ?? '?'}${palette}`;
+}

@@ -15,6 +15,7 @@ import {
   actionsDocument,
   choixPointDeVente,
   impressionsDocument,
+  libellePresentation,
   commentaireAModifiable,
   comparerDecimaux,
   conduiteApresEchecNormaliser,
@@ -172,6 +173,7 @@ function vue(partiel: Partial<InvoiceView> = {}): InvoiceView {
     seller: null,
     operator: null,
     softwareVersion: null,
+    presentation: null,
     normalization: null,
     readiness: { action: 'normalize', ready: false, blockers: [] },
     revision: 8,
@@ -1387,5 +1389,38 @@ describe('badge TEST de la liste (demande de la décideuse)', () => {
     expect(resumeEnTestDgi({ series: 'test' })).toBe(true);
     expect(resumeEnTestDgi({ series: 'real' })).toBe(false);
     expect(resumeEnTestDgi({ series: null })).toBe(false);
+  });
+});
+
+describe('présentation d’impression (ADR-0028 § 6)', () => {
+  it('brouillon : rien ; origine ; modèle et version, noir et blanc signalé', () => {
+    expect(libellePresentation(null)).toBeNull();
+    expect(
+      libellePresentation({
+        kind: 'original',
+        templateId: null,
+        templateLabel: null,
+        version: null,
+        options: null,
+      }),
+    ).toBe('Présentation d’origine (aucun modèle choisi au gel)');
+    expect(
+      libellePresentation({
+        kind: 'template',
+        templateId: 'bandeau',
+        templateLabel: 'Bandeau',
+        version: '1.1.0',
+        options: { palette: 'brand', accent: '#1d4ed8', font: 'manrope' },
+      }),
+    ).toBe('Modèle Bandeau — version 1.1.0');
+    expect(
+      libellePresentation({
+        kind: 'template',
+        templateId: 'minimal',
+        templateLabel: 'Minimal',
+        version: '1.0.0',
+        options: { palette: 'mono', accent: '#0f5132', font: 'inter' },
+      }),
+    ).toBe('Modèle Minimal — version 1.0.0 · noir et blanc');
   });
 });

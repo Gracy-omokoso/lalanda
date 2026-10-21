@@ -286,6 +286,18 @@ options, aperçu agrandi, PDF complet, retour à la présentation d'origine.
 - Maquettes `*.dc.html` : non présentes dans le dépôt ; position retenue « Total HT, TVA,
   Total TTC », ordre usuel, à faire valider visuellement par la décideuse.
 
+## Amendement du 21 oct. 2026 — présentation exposée dans la vue facture
+
+- `InvoiceView.presentation` (`InvoicePresentationView`, ajout au contrat) : `null` pour un
+  brouillon (la présentation se fige au gel) ; `{ kind: 'original', … }` pour un document
+  gelé sans modèle choisi (ou avant le 21 oct. 2026) ; `{ kind: 'template', templateId,
+  templateLabel, version, options }` sinon — le modèle et la **version** qui impriment
+  l'original et les duplicatas. Le nom affiché vient de `INVOICE_TEMPLATE_LABELS`
+  (`template.contract.ts`, égal au `label` de chaque modèle, vérifié par test) : la vue ne
+  charge pas le rendu des modèles.
+- Fiche facture web : ligne « Présentation d'impression » (« Modèle Bandeau — version
+  1.1.0 », « · noir et blanc » le cas échéant, ou « Présentation d'origine »).
+
 ## Liens
 
 - [ADR-0007](ADR-0007-generation-pdf-excel.md), [ADR-0012](ADR-0012-modele-rbac-complet.md),

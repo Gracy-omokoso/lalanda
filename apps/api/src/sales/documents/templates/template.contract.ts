@@ -31,6 +31,20 @@ export const INVOICE_TEMPLATE_IDS = [
 ] as const;
 export type InvoiceTemplateId = (typeof INVOICE_TEMPLATE_IDS)[number];
 
+/**
+ * Noms affichés des modèles, lisibles sans charger leur rendu (vue facture,
+ * ADR-0028 amendement du 21 oct. 2026). Égaux au `label` de chaque modèle
+ * (`invoice-templates.test.ts` le vérifie).
+ */
+export const INVOICE_TEMPLATE_LABELS: Readonly<Record<InvoiceTemplateId, string>> = {
+  classique: 'Classique',
+  bandeau: 'Bandeau',
+  laterale: 'Latérale',
+  minimal: 'Minimal',
+  compacte: 'Compacte',
+  editoriale: 'Éditoriale',
+};
+
 export function isInvoiceTemplateId(v: unknown): v is InvoiceTemplateId {
   return typeof v === 'string' && (INVOICE_TEMPLATE_IDS as readonly string[]).includes(v);
 }

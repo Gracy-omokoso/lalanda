@@ -28,6 +28,7 @@ import {
   enteteDocument,
   FACTURES_BASE,
   formatQuantite,
+  libellePresentation,
   MENTION_TEST_DGI,
   messageFacture,
   NATURE_LABELS,
@@ -194,6 +195,12 @@ function DocumentFige({
             {vue.currency} · {vue.priceMode.toUpperCase()}
           </dd>
         </div>
+        {vue.presentation ? (
+          <div>
+            <dt className="text-xs text-[var(--foreground-muted)]">Présentation d’impression</dt>
+            <dd>{libellePresentation(vue.presentation)}</dd>
+          </div>
+        ) : null}
         {vue.creditNote ? (
           <div>
             <dt className="text-xs text-[var(--foreground-muted)]">Avoir</dt>

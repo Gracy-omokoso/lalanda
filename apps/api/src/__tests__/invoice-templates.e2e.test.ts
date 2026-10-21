@@ -499,8 +499,19 @@ e2eSuite('modèles de facture et identité visuelle (ADR-0028)', () => {
       expect(pro).toContain('data-template="bandeau@1.1.0"');
       expect(pro).toContain('PRO FORMA — non valable comme facture');
 
+      // Brouillon : aucune présentation figée dans la vue.
+      expect((await get(asN(), `/sales/invoices/${d.id}`)).body.presentation).toBeNull();
+
       // Gel.
       const v = await normalisee();
+      // Vue API : modèle et version figés (affichés sur la fiche facture).
+      expect(v.presentation).toEqual({
+        kind: 'template',
+        templateId: 'bandeau',
+        templateLabel: 'Bandeau',
+        version: '1.1.0',
+        options: { palette: 'brand', accent: '#1d4ed8', font: 'manrope' },
+      });
       const doc = await enBase(v.id);
       const p = doc?.['presentation'] as Record<string, any>;
       const b = await brand();

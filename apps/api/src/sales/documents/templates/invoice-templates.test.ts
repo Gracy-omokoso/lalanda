@@ -34,11 +34,13 @@ import {
 import { renderDocumentHtml, initialsOf, type ResolvedPresentation } from './template-engine.js';
 import {
   INVOICE_TEMPLATE_IDS,
+  INVOICE_TEMPLATE_LABELS,
   PALETTES,
   type InvoiceTemplate,
   type TemplateOptions,
 } from './template.contract.js';
 import { contrastRatio, readableOn } from '../../../branding/colors.js';
+import { presentationViewOf } from '../../invoices/invoice-view.js';
 import { themeOf } from './theme.js';
 
 const QR = await qrCodeSvg(FAKE_QR);
@@ -435,5 +437,38 @@ describe('Total HT (ADR-0028, décision ouverte n° 1)', () => {
     ).html;
     expect(m.htTotal).toMatch(/\d/);
     expect(html).toContain(esc(m.htTotal));
+  });
+});
+
+describe('vue API : présentation figée (ADR-0028 § 6)', () => {
+  it('les noms affichés sont ceux des modèles', () => {
+    for (const t of allTemplates()) expect(INVOICE_TEMPLATE_LABELS[t.id]).toBe(t.label);
+  });
+
+  it('brouillon → null ; gelé sans modèle → origine ; gelé avec modèle → modèle et version', () => {
+    expect(presentationViewOf({ status: 'draft', presentation: null })).toBeNull();
+    expect(presentationViewOf({ status: 'issued' })).toEqual({
+      kind: 'original',
+      templateId: null,
+      templateLabel: null,
+      version: null,
+      options: null,
+    });
+    expect(
+      presentationViewOf({
+        status: 'normalized',
+        presentation: {
+          template: { id: 'editoriale', version: '1.0.0' },
+          options: { palette: 'mono', accent: '#7f1d1d', font: 'fraunces+inter' },
+          identity: IDENTITY,
+        },
+      }),
+    ).toEqual({
+      kind: 'template',
+      templateId: 'editoriale',
+      templateLabel: 'Éditoriale',
+      version: '1.0.0',
+      options: { palette: 'mono', accent: '#7f1d1d', font: 'fraunces+inter' },
+    });
   });
 });
