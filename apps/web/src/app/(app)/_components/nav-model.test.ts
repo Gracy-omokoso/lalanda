@@ -43,6 +43,9 @@ describe('entrées et ordre', () => {
       'clients',
       'catalogue',
       'pilotage',
+      'sante',
+      'investisseurs',
+      'parcours',
       'mise-en-route',
       'identite',
       'fiscalite',
@@ -58,9 +61,12 @@ describe('entrées et ordre', () => {
     ]);
   });
 
-  it('ne promet que des pages existantes : GROW se limite au pilotage', () => {
+  it('GROW : le pilotage puis les trois écrans Croissance (ADR-0032)', () => {
     expect(NAV_ITEMS.filter((i) => i.group === 'grow').map((i) => i.href)).toEqual([
       '/organisation',
+      '/croissance/sante',
+      '/croissance/investisseurs',
+      '/croissance/parcours',
     ]);
   });
 
@@ -68,6 +74,9 @@ describe('entrées et ordre', () => {
     expect(ids(entreesVisibles(null))).toEqual([
       'plans',
       'pilotage',
+      'sante',
+      'investisseurs',
+      'parcours',
       'mise-en-route',
       'abonnement',
     ]);
@@ -131,6 +140,8 @@ describe('entrée active', () => {
     ['/ventes/factures/nouvelle', 'factures'],
     ['/ventes/clients', 'clients'],
     ['/organisation', 'pilotage'],
+    ['/croissance/sante', 'sante'],
+    ['/croissance/parcours', 'parcours'],
     ['/organisation/fiscalite', 'fiscalite'],
     ['/organisation/mise-en-route', 'mise-en-route'],
     ['/souscription/retour', 'abonnement'],

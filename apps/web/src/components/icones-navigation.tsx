@@ -71,6 +71,21 @@ const TRACES: Record<
       <path d="M3.34 19a10 10 0 1 1 17.32 0" />
     </>
   ),
+  // ADR-0032 — santé (pouls), indicateurs investisseurs (courbe montante), parcours (drapeau d'étapes).
+  sante: <path d="M22 12h-4l-3 9L9 3l-3 9H2" />,
+  investisseurs: (
+    <>
+      <path d="m22 7-8.5 8.5-5-5L2 17" />
+      <path d="M16 7h6v6" />
+    </>
+  ),
+  parcours: (
+    <>
+      <circle cx="6" cy="19" r="3" />
+      <path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" />
+      <circle cx="18" cy="5" r="3" />
+    </>
+  ),
   'mise-en-route': (
     <>
       <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />

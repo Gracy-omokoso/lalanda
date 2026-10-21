@@ -277,9 +277,11 @@ les ratios et notes sont des nombres arrondis explicitement. Toute réponse port
 
 ### 8. Interface
 
-Espace **Croissance** (`/croissance`), entrée du menu du compte : onglets **Santé**,
-**Indicateurs investisseurs**, **Parcours**. Construit avec les composants et jetons
-existants (la refonte de la coquille est un autre lot). Chaque chiffre porte sa source, sa
+Espace **Croissance** (`/croissance`) : onglets **Santé**, **Indicateurs investisseurs**,
+**Parcours**, en-tête de module GROW (« Croître ») et onglets du design system
+(ADR-0030). Les trois écrans sont branchés dans la navigation latérale, groupe **GROW**,
+sous « Pilotage » (tableau de bord de l'organisation), et dans le menu du compte
+(entrée « Croissance », à côté de « Ventes »). Chaque chiffre porte sa source, sa
 période et ses hypothèses ; chaque indisponibilité dit pourquoi et quoi faire.
 
 ### 9. Hors périmètre — étapes suivantes

@@ -4,10 +4,11 @@
 // Les permissions sont lues une fois (`GET /me/permissions`) et partagées par
 // contexte. Rien ici n'autorise : l'API refuse de toute façon.
 
-import Link from 'next/link';
+import { TabsNav } from '@lalanda/ui';
 import { usePathname } from 'next/navigation';
 import { createContext, useContext, useEffect, useState } from 'react';
 
+import { renderNextLink } from '@/components/next-link';
 import { api, type OrgAction } from '@/lib/api';
 
 import { CROISSANCE_BASE, droitsCroissance, GROW_TABS, segmentCroissance } from './grow-model';
@@ -54,28 +55,15 @@ export function GrowChrome({ children }: { children: React.ReactNode }): React.R
   const courant = segmentCroissance(pathname);
   return (
     <Contexte.Provider value={{ pret, ...droitsCroissance(actions) }}>
-      <nav
-        aria-label="Sections de la croissance"
-        className="flex flex-wrap gap-1 border-b border-[var(--border)]"
-      >
-        {GROW_TABS.map((tab) => {
-          const actif = courant === tab.segment;
-          return (
-            <Link
-              key={tab.segment}
-              href={`${CROISSANCE_BASE}/${tab.segment}`}
-              aria-current={actif ? 'page' : undefined}
-              className={
-                actif
-                  ? 'font-mono -mb-px border-b-2 border-[var(--accent)] px-3.5 py-2.5 text-[0.72rem] font-semibold uppercase tracking-[0.08em] text-[var(--foreground)] transition'
-                  : 'font-mono -mb-px border-b-2 border-transparent px-3.5 py-2.5 text-[0.72rem] font-medium uppercase tracking-[0.08em] text-[var(--foreground-muted)] transition hover:text-[var(--foreground)]'
-              }
-            >
-              {tab.label}
-            </Link>
-          );
-        })}
-      </nav>
+      <TabsNav
+        label="Sections de la croissance"
+        renderLink={renderNextLink}
+        items={GROW_TABS.map((tab) => ({
+          href: `${CROISSANCE_BASE}/${tab.segment}`,
+          label: tab.label,
+          current: courant === tab.segment,
+        }))}
+      />
       {children}
     </Contexte.Provider>
   );
