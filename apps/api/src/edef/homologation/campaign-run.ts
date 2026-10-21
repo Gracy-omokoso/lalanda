@@ -78,8 +78,19 @@ export interface RunCampaignInput {
   hooks?: CampaignHooks;
   /** Pause entre deux normalisations (défaut `CALL_SPACING_MS`, comme l'étalonnage). */
   spacingMs?: number;
+  /**
+   * Délai minimal entre la normalisation d'une facture et celle de son avoir
+   * (défaut `ORIGIN_SETTLE_MS`). Constat du 21 oct. 2026 : un avoir envoyé 1,4 s
+   * après son origine a été refusé par l'e-MCF de test (erreur 11 « la facture
+   * originale est introuvable ») ; la même paire, espacée d'environ 1 s de plus,
+   * était passée en TTC. La DGI met donc un court délai à connaître une facture.
+   */
+  originSettleMs?: number;
   sleep?: (ms: number) => Promise<void>;
 }
+
+/** Délai par défaut avant d'envoyer un avoir dont l'origine vient d'être normalisée. */
+export const ORIGIN_SETTLE_MS = 20_000;
 
 /** Message d'une erreur de service (corps `{ code, message, details }`), sans rien d'autre. */
 export function describeError(err: unknown): string {
@@ -230,6 +241,9 @@ export async function runCampaign(input: RunCampaignInput): Promise<void> {
   const { services, organizationId, actor, campaignId, steps, state, outDir, out } = input;
   const now = input.now ?? (() => new Date());
   const spacing = input.spacingMs ?? CALL_SPACING_MS;
+  const originSettle = input.originSettleMs ?? ORIGIN_SETTLE_MS;
+  /** Instant de normalisation, dans cette exécution, de chaque cas (pour l'avoir qui suit). */
+  const normalizedAtMs = new Map<StepKey, number>();
   const sleep = input.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   let normalizations = 0;
   const save = () => {
@@ -374,6 +388,16 @@ export async function runCampaign(input: RunCampaignInput): Promise<void> {
     }
 
     if (normalizations > 0 && spacing > 0) await sleep(spacing);
+    if (step.originCase !== null && originSettle > 0) {
+      const originAt = normalizedAtMs.get(stepKey(step.mode, step.originCase));
+      const wait = originAt === undefined ? 0 : originAt + originSettle - Date.now();
+      if (wait > 0) {
+        out(
+          `${label} : attente de ${Math.ceil(wait / 1000)} s pour que la DGI enregistre la facture d’origine.`,
+        );
+        await sleep(wait);
+      }
+    }
     normalizations += 1;
     const started = Date.now();
     let result: InvoiceView;
@@ -399,6 +423,7 @@ export async function runCampaign(input: RunCampaignInput): Promise<void> {
         }). Arrêt : aucun cas suivant n’est tenté.`,
       );
     }
+    normalizedAtMs.set(step.key, Date.now());
     await input.hooks?.afterNormalize?.(step);
 
     const doc = (await labelled(step.mode, step.caseNumber)).find(

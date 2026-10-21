@@ -91,6 +91,7 @@ function io(overrides: Partial<HomologationIo> = {}) {
     env: { ...process.env },
     requireTty: false,
     spacingMs: 0,
+    originSettleMs: 0,
     ...overrides,
   };
   return { io: value, stdout, stderr };
