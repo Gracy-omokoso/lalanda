@@ -290,7 +290,8 @@ options }`. Au gel, `presentation` reçoit (champ optionnel d'ADR-0028 § 6, dé
   options, identity }
 ```
 
-Au rendu d'un original ou d'un duplicata, l'archive est relue, son **empreinte recalculée et
+Au rendu d'un original ou d'un duplicata, l'archive est relue, **recompilée avec les mêmes
+règles** (sans rejouer la batterie, déjà passée à l'installation), son **empreinte recalculée et
 comparée** : différente ou absente ⇒ `409 TEMPLATE_PACKAGE_INTEGRITY` (jamais un original
 « presque identique ») ; stockage indisponible ⇒ `503 TEMPLATE_PACKAGE_UNAVAILABLE`. La
 version du **moteur** sur mesure suit la règle d'ADR-0028 § 4 : changer l'assemblage ou les
@@ -369,6 +370,10 @@ existant. Paquet invalide : `422 TEMPLATE_PACKAGE_INVALID` avec `details.report`
 4. **Place de marché** : modèle économique (prix, commission, paiement des auteurs), licence
    par défaut, procédure de certification et de révocation.
 5. **SVG** dans les paquets : refusé, comme pour les logos (ADR-0028 décision ouverte 5).
+6. **Durcissement futur des règles** : un paquet est recompilé à chaque réimpression ; si une
+   faille impose un jour de durcir le validateur, un paquet déjà figé pourrait être refusé.
+   Retenu : la sécurité prime (refus explicite, jamais un rendu non contrôlé) ; à arbitrer alors
+   pour les factures concernées (réimpression avec l'ancien moteur versionné, ou PDF conservé).
 
 ## Liens
 
