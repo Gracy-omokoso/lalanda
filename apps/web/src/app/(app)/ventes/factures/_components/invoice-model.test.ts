@@ -1269,6 +1269,16 @@ describe('normalisation : jamais de renvoi automatique de « Normaliser »', () 
     );
     expect(conduiteApresEchecNormaliser(erreurApi(429, 'x'))).toBe('afficher');
     expect(messageFacture(erreurApi(429, 'x'), 'r')).toMatch(/attendez quelques minutes/);
+    // Plafond par organisation ou par personne : la phrase du serveur, précise.
+    expect(
+      messageFacture(
+        erreurApi(429, {
+          code: 'NORMALIZATION_RATE_LIMITED',
+          message: 'Votre organisation a atteint la limite de 60 normalisations par heure.',
+        }),
+        'r',
+      ),
+    ).toBe('Votre organisation a atteint la limite de 60 normalisations par heure.');
   });
 
   it('la fenêtre n’appelle `normalizeInvoice` qu’à un seul endroit, jamais dans un rattrapage d’erreur', () => {

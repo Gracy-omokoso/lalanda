@@ -770,6 +770,9 @@ export const INVOICE_ERROR_CODES = {
     'NORMALIZATION_NOT_UNDER_REVIEW',
   ],
   422: ['INVOICE_NOT_ISSUABLE'],
+  // ADR-0024 § 6, amendement du 21 oct. 2026 : plafond de normalisation atteint
+  // (`details` : `scope` « organization » | « user », `limit`, `retryAfterSeconds`).
+  429: ['NORMALIZATION_RATE_LIMITED'],
 } as const;
 export type InvoiceErrorCode =
   (typeof INVOICE_ERROR_CODES)[keyof typeof INVOICE_ERROR_CODES][number];

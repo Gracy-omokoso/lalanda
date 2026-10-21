@@ -452,6 +452,8 @@ par organisation et par série (bail), donc **au plus une** demande en attente d
 e-MCF (loin des dix) ; un sémaphore de processus limite à **4** les appels DGI simultanés ;
 nouveau quota `INVOICE_NORMALIZE_THROTTLE` (60 par heure et par utilisateur) sur `normalize`,
 `retry` et `check` ; les tâches de l'ordonnanceur espacent leurs appels d'au moins 500 ms.
+Précisé par l’amendement du 21 oct. 2026 (en fin de document) : plafond **par organisation** en plus, 429
+en français.
 
 ### 7. Étalonnage des arrondis (outil d'exploitation, environnement de TEST seulement)
 
@@ -890,6 +892,48 @@ chaque appel ; bail du numéro prolongé pendant l'incertitude ; vérification a
 `confirm`, sur le même `uid` seulement ; journal strict avant envoi ; aucune saisie humaine
 d'éléments de sécurité ; politique d'arrondi enregistrée dans le moteur ; production
 conditionnée à l'étalonnage ; jeton de chaque organisation pour ses seuls besoins.
+
+## Amendement du 21 oct. 2026 — limite de débit de la normalisation
+
+Tranche la proposition du § 6 (« Débit ») restée à mettre en œuvre : la route `POST
+…/normalize` n'avait **aucun** quota propre (seuls `retry` et `check` en portaient un), et
+aucune limite ne bornait une organisation entière.
+
+**Décision.**
+
+| Seau | Routes | Plafond | Clé |
+|---|---|---|---|
+| organisation | `POST …/normalize` **et** `POST …/normalization/retry`, compteur **commun** | 60 par heure | `org:<organizationId>` |
+| utilisateur | `normalize`, `retry`, `check`, compteur par route | 60 par heure | `user:<userId>` |
+
+- `check` ne lit que la DGI : il n'entame pas le plafond de l'organisation, seulement celui de
+  la personne.
+- Au-delà : **429** `NORMALIZATION_RATE_LIMITED` (ajouté à `INVOICE_ERROR_CODES`), message en
+  français qui dit quel plafond est atteint et combien de minutes attendre (« Votre
+  organisation a atteint la limite de 60 normalisations par heure auprès de la DGI.
+  Réessayez dans 12 minutes. »), `details` : `scope` (`organization` · `user`), `limit`,
+  `retryAfterSeconds` ; en-tête `Retry-After-normalization`. La fiche facture affiche ce
+  message tel quel.
+- Mise en œuvre : `apps/api/src/security/normalization-throttler.guard.ts`
+  (`OrgNormalizationThrottlerGuard`, `UserNormalizationThrottlerGuard`), constantes
+  `INVOICE_NORMALIZE_ORG_THROTTLE` et `INVOICE_NORMALIZE_THROTTLE` (`throttling.ts`).
+- **Infrastructure réutilisée** : le `ThrottlerModule` de `@nestjs/throttler` déjà en place
+  (S16a), stockage en mémoire du processus. Il n'existe **pas** de stockage Redis des quotas
+  (le conteneur Redis de `docker-compose.yml` n'est utilisé par aucun code) ; l'API tourne en
+  une seule instance, le plafond est donc exact. Si l'API se réplique, chaque instance aura
+  son compteur : il faudra un stockage partagé (Redis ou MongoDB) — à décider à ce moment-là.
+- Les guards portent leur limite **sans** `@Throttle` : ce décorateur est lu aussi par le
+  guard global par IP, qui appliquait jusqu'ici 60 par heure **par adresse** à `retry` et
+  `check` — un cabinet qui sert plusieurs organisations derrière un même NAT se serait
+  bloqué lui-même. Le guard global garde sa règle (100 par minute et par IP).
+- **Campagne d'homologation** (`apps/api/src/edef/homologation/**`, 58 normalisations
+  espacées de 500 ms) : vérifié, elle appelle `InvoiceFreezingService.normalize`
+  directement, sans HTTP ; elle n'est pas comptée. Le rattrapage de l'ordonnanceur non plus.
+
+**Tests.** `security/normalization-throttler.test.ts` : 61ᵉ envoi d'une organisation → 429
+(trois personnes différentes), seau commun `normalize`/`retry`, organisations isolées,
+`check` hors seau d'organisation, plafond par personne, message et arrondi des minutes,
+câblage des routes réelles (guards présents, aucun `@Throttle`).
 
 ## Questions à poser à la DGI (complètent ADR-0019, ADR-0022 et ADR-0023)
 

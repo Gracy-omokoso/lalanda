@@ -29,6 +29,10 @@ import { RequirePermission } from '../../authz/authz.decorators.js';
 import { CurrentOrgRole } from '../../authz/current-org-role.decorator.js';
 import { PermissionsGuard } from '../../authz/permissions.guard.js';
 import type { OrgRole } from '../../authz/permissions.js';
+import {
+  OrgNormalizationThrottlerGuard,
+  UserNormalizationThrottlerGuard,
+} from '../../security/normalization-throttler.guard.js';
 import { invalidRequest } from '../sales.errors.js';
 import { CreditNotesService } from './credit-notes.service.js';
 import { ExchangeRateReferenceService } from './exchange-rate-reference.service.js';
@@ -162,6 +166,9 @@ export class InvoicesController {
   @Post('invoices/:invoiceId/normalize')
   @HttpCode(200)
   @RequirePermission('sales.invoice')
+  // ADR-0024 § 6 : 60 envois par heure et par organisation (seau commun avec
+  // `normalization/retry`) et 60 par heure et par utilisateur ; 429 en français.
+  @UseGuards(OrgNormalizationThrottlerGuard, UserNormalizationThrottlerGuard)
   async normalize(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,

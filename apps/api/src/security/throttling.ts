@@ -43,3 +43,12 @@ export const EDEF_TEST_THROTTLE = { ttl: 3_600_000, limit: 30 } as const;
  * réessayer reste humaine : ce plafond borne un clic répété, pas l'activité.
  */
 export const INVOICE_NORMALIZE_THROTTLE = { ttl: 3_600_000, limit: 60 } as const;
+
+/**
+ * Plafond de la NORMALISATION par ORGANISATION (ADR-0024 § 6, amendement du
+ * 21 oct. 2026) : 60 envois à la DGI par heure, `normalize` et
+ * `normalization/retry` confondus, tous utilisateurs de l'organisation réunis.
+ * Borne ce que Lalanda envoie à l'e-DEF pour un même contribuable, même si
+ * plusieurs personnes cliquent en même temps. Voir `normalization-throttler.guard.ts`.
+ */
+export const INVOICE_NORMALIZE_ORG_THROTTLE = { ttl: 3_600_000, limit: 60 } as const;

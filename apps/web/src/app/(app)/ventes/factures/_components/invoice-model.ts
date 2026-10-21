@@ -1060,7 +1060,20 @@ const TROP_DE_NORMALISATIONS =
 export function messageFacture(err: unknown, repli: string): string {
   const code = codeErreur(err);
   if (code && MESSAGES_FACTURES[code]) return MESSAGES_FACTURES[code]!;
-  if (statutHttp(err) === 429) return TROP_DE_NORMALISATIONS;
+  if (statutHttp(err) === 429) {
+    // ADR-0024 § 6 : le serveur dit quel plafond est atteint (organisation ou
+    // personne) et combien de minutes attendre ; sinon, la phrase générique.
+    const detail =
+      typeof err === 'object' && err !== null && 'detail' in err
+        ? (err as { detail: unknown }).detail
+        : null;
+    const m =
+      typeof detail === 'object' && detail !== null
+        ? (detail as { message?: unknown }).message
+        : null;
+    if (code === 'NORMALIZATION_RATE_LIMITED' && typeof m === 'string' && m !== '') return m;
+    return TROP_DE_NORMALISATIONS;
+  }
   return messageVentes(err, repli);
 }
 
