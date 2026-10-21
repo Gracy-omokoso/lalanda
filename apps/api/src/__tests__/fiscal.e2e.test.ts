@@ -211,7 +211,18 @@ e2eSuite('fiscalité — fiche, facture normalisée, points de vente (ADR-0021 c
     // Les quotas (100 req/min par IP, 10 écritures/h par utilisateur) protègent la
     // production ; ici, ils feraient échouer en 429 des cas sans rapport avec ce
     // qu'on teste. On vide le compteur, on ne désactive pas le garde.
-    (app.get(ThrottlerStorage) as unknown as { storage: Map<string, unknown> }).storage.clear();
+    // Les minuteurs d'expiration sont annulés AVEC les compteurs, comme dans les
+    // autres suites : vider seulement `storage` laissait des minuteurs (60 s)
+    // relire une clé disparue. Sous charge, la suite dure assez pour qu'ils se
+    // déclenchent — « Cannot destructure property 'totalHits' », erreur non
+    // gérée qui fait échouer l'exécution alors que tous les tests passent.
+    const store = app.get(ThrottlerStorage) as unknown as {
+      storage: Map<string, unknown>;
+      timeoutIds: Map<string, NodeJS.Timeout[]>;
+    };
+    for (const ids of store.timeoutIds.values()) ids.forEach(clearTimeout);
+    store.timeoutIds.clear();
+    store.storage.clear();
   });
 
   afterAll(async () => {
