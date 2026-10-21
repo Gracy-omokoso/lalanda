@@ -378,3 +378,28 @@ problème affiché. Reste à confirmer auprès de la DGI : le contrôle ±1 % du
 ## Compatibilité
 
 Le moteur peut évoluer, mais les versions historiques restent exécutables ou leurs résultats figés restent disponibles avec preuve d’intégrité.
+
+## GROW : santé, indicateurs investisseurs, parcours (ADR-0032)
+
+Module `packages/engine/src/grow/`, versionné à part (`GROW_VERSION = '1.0.0'`) : il ne
+touche ni `ENGINE_VERSION` ni `INVOICE_TOTALS_VERSION`. Fonctions pures, sans horloge (la
+date du calcul est un paramètre) :
+
+- `computeInvestorIndicators` — MRR, ARR, burn rate, runway, croissance des ventes et du CA
+  réalisé, marges brute et nette, concentration clients, clients revenants. Chaque
+  indicateur rend source (`build.actuals`, `run.sales`, `grow.declared_cash`), période,
+  méthode et hypothèses, ou `disponible: false` avec un code de raison : jamais de `0` par
+  défaut. Seuls les mois réalisés **clôturés** comptent ; les ventes se lisent par mois
+  civil **complet** de Kinshasa, bases HT hors groupes H, I, J, L, N, avoirs déduits,
+  acomptes exclus, sans taux de change ;
+- `computeHealthScore` — notes 0–100 par interpolation entre points d'ancrage
+  (`GROW_SCORING_V1`), pondérées selon le stade (`GROW_WEIGHTS_V1`), score indisponible sous
+  2 axes ou 60 % du poids ; trois risques (`GROW_RISK_RULES_V1`) et trois actions, chacun
+  avec sa preuve (donnée, valeur, seuil, règle) ;
+- `suggestJourneyStage` — étape suggérée par règles explicites (`GROW_JOURNEY_RULES_V1`),
+  conditions rendues remplies / non remplies / inconnues, checklists `GROW_CHECKLISTS_V1`.
+
+Arithmétique des ventes exacte (entiers `bigint`, réutilise l'arithmétique interne
+d'`invoice-totals` sans la modifier) ; ratios et notes arrondis explicitement. Tests :
+cas chiffrés, cas limites et propriétés sur générateur déterministe (bornes et monotonie
+des barèmes, publication du score, invariance par permutation, avoir qui annule sa facture).

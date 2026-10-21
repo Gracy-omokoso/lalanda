@@ -99,3 +99,7 @@ export * from './invoice-totals/index.js';
 export function engineHealth(): { ok: true; version: string } {
   return { ok: true, version: ENGINE_VERSION };
 }
+
+// GROW (ADR-0032) — santé, indicateurs investisseurs, parcours. Versionné à part
+// (`GROW_VERSION`) ; lit le réalisé et les ventes, ne calcule aucun plan.
+export * from './grow/index.js';
