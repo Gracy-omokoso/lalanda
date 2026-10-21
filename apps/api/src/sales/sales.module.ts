@@ -15,6 +15,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 
 import { APP_INTERCEPTOR } from '@nestjs/core';
 
+import { BrandingModule } from '../branding/branding.module.js';
 import { EdefModule } from '../edef/edef.module.js';
 import { FiscalModule } from '../fiscal/fiscal.module.js';
 import { IntegrationsModule } from '../integrations/integrations.module.js';
@@ -22,6 +23,7 @@ import { OrganizationsModule } from '../organizations/organizations.module.js';
 import { PdfModule } from '../reports/pdf.module.js';
 import { InvoiceDocumentsController } from './documents/invoice-documents.controller.js';
 import { InvoiceDocumentsService } from './documents/invoice-documents.service.js';
+import { InvoiceTemplatesController } from './documents/invoice-templates.controller.js';
 import { CatalogItem, CatalogItemSchema } from './catalog-item.schema.js';
 import { CatalogItemsController } from './catalog-items.controller.js';
 import { CatalogItemsService } from './catalog-items.service.js';
@@ -72,6 +74,8 @@ import { ReferenceRefreshJob } from './normalization/reference-refresh.job.js';
     IntegrationsModule,
     // ADR-0025 (S25g) : rendu PDF partagé avec les rapports (un seul Chromium).
     PdfModule,
+    // ADR-0028 : identité visuelle et modèle de facture (gel, rendu, aperçu).
+    BrandingModule,
     MongooseModule.forFeature([
       { name: Customer.name, schema: CustomerSchema },
       { name: CatalogItem.name, schema: CatalogItemSchema },
@@ -91,6 +95,8 @@ import { ReferenceRefreshJob } from './normalization/reference-refresh.job.js';
     NormalizationController,
     // ADR-0025 (S25g) : PDF et duplicata.
     InvoiceDocumentsController,
+    // ADR-0028 : catalogue des modèles, choix et aperçu.
+    InvoiceTemplatesController,
   ],
   providers: [
     CustomersService,

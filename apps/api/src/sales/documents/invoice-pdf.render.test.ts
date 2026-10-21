@@ -21,7 +21,11 @@ import {
   renderInvoiceDocumentHtml,
 } from './invoice-document-html.js';
 import { qrCodeSvg } from './invoice-qr.js';
+import { allTemplates } from './templates/registry.js';
+import { renderDocumentHtml, type ResolvedPresentation } from './templates/template-engine.js';
+import type { InvoiceTemplate, TemplateOptions } from './templates/template.contract.js';
 import { draftUsd, normalizedProduction, normalizedTest } from './testing/invoice-fixtures.js';
+import { IDENTITY, modelFor, renderLogos, richModel } from './testing/template-fixtures.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(HERE, '../../../.vitest/pdf-samples');
@@ -58,6 +62,28 @@ async function render(doc: InvoiceLean, duplicateNumber: number | null = null): 
   });
 }
 
+/** Rendu RÉEL par un modèle (ADR-0028), via le moteur et son vérificateur DGI. */
+async function renderWith(
+  template: InvoiceTemplate,
+  m: ReturnType<typeof modelFor>,
+  options: TemplateOptions = template.defaults,
+): Promise<Buffer> {
+  const qr = m.security ? await qrCodeSvg(m.security.qrContent) : null;
+  const p: ResolvedPresentation = {
+    template,
+    options,
+    identity: IDENTITY,
+    logos: renderLogos(true),
+  };
+  const r = renderDocumentHtml(m, qr, p);
+  return renderer.render(r.html, {
+    margin: r.margin,
+    fixedDate: m.fixedDate,
+    headerTemplate: r.headerTemplate,
+    footerTemplate: r.footerTemplate,
+  });
+}
+
 const sha = (b: Buffer) => createHash('sha256').update(b).digest('hex');
 
 describe.skipIf(!hasChromium)('rendu PDF réel (Chromium)', () => {
@@ -86,6 +112,69 @@ describe.skipIf(!hasChromium)('rendu PDF réel (Chromium)', () => {
     expect(sha(a)).toBe(sha(b));
     // Les dates de métadonnées sont celles du document, pas celles du rendu.
     expect(a.toString('latin1')).toContain('D:20261020091530');
+  }, 300_000);
+
+  it.each(allTemplates().map((t) => [t.label, t] as const))(
+    'modèle %s : PDF exemple, polices intégrées, logo, déterministe',
+    async (_label, template) => {
+      await mkdir(OUT, { recursive: true });
+      const m = modelFor(normalizedTest({ softwareVersion: '0.9.3' }), template);
+      const pdf = await renderWith(template, m);
+      expect(pdf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+      const raw = pdf.toString('latin1');
+      // Polices du modèle intégrées au PDF (sous-ensemble « XXXXXX+Famille »).
+      const family = {
+        inter: 'Inter',
+        'ibm-plex-sans': 'IBMPlexSans',
+        manrope: 'Manrope',
+        'source-serif-4': 'SourceSerif4',
+        'fraunces+inter': 'Fraunces',
+      }[template.defaults.font as string];
+      expect(raw, 'police du modèle intégrée').toMatch(
+        new RegExp(`/FontName\\s*/[A-Z]{6}\\+${family}`),
+      );
+      expect(raw, 'police des codes DGI intégrée').toMatch(
+        /\/FontName\s*\/[A-Z]{6}\+JetBrainsMono/,
+      );
+      expect(raw, 'logo intégré').toContain('/Subtype /Image');
+      await writeFile(resolve(OUT, `modele-${template.id}-test.pdf`), pdf);
+      await writeFile(
+        resolve(OUT, `modele-${template.id}-production-noir-et-blanc.pdf`),
+        await renderWith(template, modelFor(normalizedProduction(), template), {
+          ...template.defaults,
+          palette: 'mono',
+        }),
+      );
+      await writeFile(
+        resolve(OUT, `modele-${template.id}-30-lignes.pdf`),
+        await renderWith(template, richModel(template)),
+      );
+      expect(sha(await renderWith(template, m))).toBe(sha(pdf));
+    },
+    300_000,
+  );
+
+  it('vignette PNG d’un aperçu : même confinement, première page', async () => {
+    const template = allTemplates()[1]!;
+    const m = modelFor(normalizedProduction(), template, { sample: true });
+    const r = renderDocumentHtml(m, await qrCodeSvg(m.security!.qrContent), {
+      template,
+      options: template.defaults,
+      identity: IDENTITY,
+      logos: renderLogos(true),
+    });
+    const png = await renderer.renderPng(r.html, {
+      width: 794,
+      height: 1123,
+      deviceScaleFactor: 1,
+    });
+    expect(
+      png.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])),
+    ).toBe(true);
+    // Largeur et hauteur de l'IHDR : 794 × 1123.
+    expect(png.readUInt32BE(16)).toBe(794);
+    expect(png.readUInt32BE(20)).toBe(1123);
+    await writeFile(resolve(OUT, `apercu-${template.id}.png`), png);
   }, 300_000);
 
   it('un duplicata diffère de l’original', async () => {

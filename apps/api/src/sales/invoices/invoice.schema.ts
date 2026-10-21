@@ -15,6 +15,7 @@ import type { PaymentInput } from '@lalanda/engine';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import type { HydratedDocument } from 'mongoose';
 
+import type { FrozenPresentation } from '../documents/templates/template.contract.js';
 import {
   INVOICE_STATUSES,
   INVOICE_TYPES,
@@ -132,6 +133,17 @@ export class SalesInvoice {
    */
   @Prop({ type: String, required: false })
   softwareVersion?: string | null;
+
+  /**
+   * Présentation FIGÉE au gel (ADR-0028 § 6) : modèle et version, options
+   * résolues, empreinte de l'identité visuelle (logos par identifiant immuable
+   * et SHA-256, couleurs, police). L'original se réimprime avec elle, même si
+   * l'organisation change ensuite de modèle ou de logo. Absente : présentation
+   * d'origine (documents gelés avant le 21 oct. 2026, ou organisation sans
+   * modèle choisi) — pas de migration, empreinte et PDF inchangés.
+   */
+  @Prop({ type: Object, required: false })
+  presentation?: FrozenPresentation | null;
 
   @Prop({ type: Date, default: null })
   frozenAt!: Date | null;

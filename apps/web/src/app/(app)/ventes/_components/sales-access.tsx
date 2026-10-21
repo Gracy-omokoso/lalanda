@@ -1,7 +1,8 @@
 'use client';
 
 // Chrome de l'espace Ventes : onglets et frontière d'accès (ADR-0022, chantier D2 ;
-// onglet Factures et droit `sales.invoice` : ADR-0023, chantier E3).
+// onglet Factures et droit `sales.invoice` : ADR-0023, chantier E3 ; onglet
+// Modèle de facture : ADR-0028).
 //
 // Les permissions sont lues UNE fois (`GET /me/permissions`) et partagées avec
 // les pages par un contexte : la liste des clients et celle du catalogue en ont
@@ -38,6 +39,9 @@ const Contexte = createContext<AccesVentes>({ etat: 'chargement', gerer: false, 
 const ONGLETS: readonly { segment: string; label: string; action: OrgAction }[] = [
   { segment: 'factures', label: 'Factures', action: 'sales.read' },
   ...SALES_TABS,
+  // ADR-0028 : galerie et aperçus ouverts à `sales.read` ; le CHOIX exige
+  // `organization.manage` (la page l'annonce, l'API le refuse).
+  { segment: 'modele-facture', label: 'Modèle de facture', action: 'sales.read' },
 ];
 
 export function useAccesVentes(): AccesVentes {

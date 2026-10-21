@@ -12,11 +12,17 @@
 // SEUL ÉCRIVAIN de `duplicateCount` (test de lecture des sources). Ne touche à
 // aucun champ figé, ni à `revision`.
 
-import { ConflictException, Inject, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Types, type Connection, type Model } from 'mongoose';
 
 import { AuditService } from '../../authz/audit.service.js';
+import { BrandingService } from '../../branding/branding.service.js';
 import { inFiscalTransactionWithReplay } from '../../fiscal/fiscal-transaction.js';
 import { FiscalProfileService } from '../../fiscal/fiscal-profile.service.js';
 import { NormalizedInvoicingStateReader } from '../../fiscal/normalized-invoicing-state.reader.js';
@@ -33,15 +39,20 @@ import {
   buildInvoiceDocument,
   type InvoiceDocumentModel,
 } from './invoice-document.model.js';
-import {
-  invoiceFooterTemplate,
-  invoiceHeaderTemplate,
-  renderInvoiceDocumentHtml,
-} from './invoice-document-html.js';
 import { qrCodeSvg } from './invoice-qr.js';
-
-/** Marges de page : en-tête et pied répétés y sont rendus. */
-const PAGE_MARGIN = { top: '16mm', bottom: '18mm', left: '12mm', right: '12mm' } as const;
+import { sampleInvoice } from './sample-invoice.js';
+import { TemplateDgiContentError } from './templates/dgi-content.js';
+import { latestTemplate, templateAt } from './templates/registry.js';
+import {
+  renderDocumentHtml,
+  type RenderedDocumentHtml,
+  type ResolvedPresentation,
+} from './templates/template-engine.js';
+import type {
+  FrozenPresentation,
+  InvoiceTemplateId,
+  TemplateOptions,
+} from './templates/template.contract.js';
 
 /** Essais d'un duplicata face à des duplicatas concurrents. */
 const DUPLICATE_ATTEMPTS = 3;
@@ -65,6 +76,16 @@ function headOfficeAddress(h: {
     .join(', ');
 }
 
+/** Page A4 à 96 ppp, densité 1,5 : vignette nette d'un aperçu de modèle. */
+const PREVIEW_PAGE = { width: 794, height: 1123, deviceScaleFactor: 1.5 } as const;
+
+/** Nom et version du modèle, imprimés en pied ; `null` : présentation d'origine. */
+function layoutOf(p: FrozenPresentation | null): { label: string; version: string } | null {
+  if (!p) return null;
+  const t = templateAt(p.template.id, p.template.version);
+  return { label: t?.label ?? p.template.id, version: p.template.version };
+}
+
 function notPrintable(err: DocumentNotPrintableError): never {
   throw new ConflictException({
     code: 'DOCUMENT_NOT_PRINTABLE',
@@ -84,6 +105,7 @@ export class InvoiceDocumentsService {
     @Inject(NormalizedInvoicingStateReader) private readonly state: NormalizedInvoicingStateReader,
     @Inject(OrganizationsService) private readonly organizations: OrganizationsService,
     @Inject(PdfRenderingService) private readonly pdf: PdfRenderingService,
+    @Inject(BrandingService) private readonly branding: BrandingService,
   ) {}
 
   private async load(organizationId: string, invoiceId: string): Promise<InvoiceLean> {
@@ -101,6 +123,7 @@ export class InvoiceDocumentsService {
     organizationId: string,
     doc: InvoiceLean,
     duplicateNumber: number | null,
+    presentation: FrozenPresentation | null = null,
   ): Promise<InvoiceDocumentModel> {
     let draftSeller: StoredSeller | null = null;
     let draftInTestEnvironment = false;
@@ -134,6 +157,7 @@ export class InvoiceDocumentsService {
         organizationName,
         draftInTestEnvironment,
         currentSoftwareVersion: APP_VERSION.version,
+        layout: layoutOf(presentation),
       });
     } catch (err) {
       if (err instanceof DocumentNotPrintableError) notPrintable(err);
@@ -141,20 +165,118 @@ export class InvoiceDocumentsService {
     }
   }
 
-  /** HTML imprimé (déterministe pour un même document figé). */
-  async html(model: InvoiceDocumentModel): Promise<string> {
-    const qr = model.security ? await qrCodeSvg(model.security.qrContent) : null;
-    return renderInvoiceDocumentHtml(model, qr);
+  /**
+   * Présentation d'un document (ADR-0028 § 6) : celle FIGÉE au gel pour un
+   * document gelé (absente : présentation d'origine) ; pour un brouillon, le
+   * modèle choisi AUJOURD'HUI par l'organisation.
+   */
+  async presentationOf(
+    organizationId: string,
+    doc: InvoiceLean,
+  ): Promise<FrozenPresentation | null> {
+    if (doc.status === 'draft') return this.branding.presentationToFreeze(organizationId);
+    return doc.presentation ?? null;
   }
 
-  private async render(model: InvoiceDocumentModel): Promise<Buffer> {
-    const html = await this.html(model);
-    return this.pdf.render(html, {
-      margin: PAGE_MARGIN,
+  /** HTML imprimé, en-tête et pied (déterministes pour un même document figé). */
+  async html(
+    organizationId: string,
+    model: InvoiceDocumentModel,
+    presentation: FrozenPresentation | null,
+  ): Promise<RenderedDocumentHtml> {
+    const qr = model.security ? await qrCodeSvg(model.security.qrContent) : null;
+    const resolved: ResolvedPresentation | null = presentation
+      ? await this.branding.resolveForRender(organizationId, presentation)
+      : null;
+    try {
+      return renderDocumentHtml(model, qr, resolved);
+    } catch (err) {
+      if (err instanceof TemplateDgiContentError) {
+        // Défaut d'un MODÈLE, jamais du document : on refuse d'imprimer plutôt
+        // que de produire une facture privée d'une mention obligatoire.
+        throw new InternalServerErrorException({
+          code: 'TEMPLATE_DGI_CONTENT_MISSING',
+          message: err.message,
+        });
+      }
+      throw err;
+    }
+  }
+
+  private async render(
+    organizationId: string,
+    model: InvoiceDocumentModel,
+    presentation: FrozenPresentation | null,
+  ): Promise<Buffer> {
+    const r = await this.html(organizationId, model, presentation);
+    return this.pdf.render(r.html, {
+      margin: r.margin,
       fixedDate: model.fixedDate,
-      headerTemplate: invoiceHeaderTemplate(model),
-      footerTemplate: invoiceFooterTemplate(model),
+      headerTemplate: r.headerTemplate,
+      footerTemplate: r.footerTemplate,
     });
+  }
+
+  /**
+   * Aperçu d'un modèle (ADR-0028 § 8) : document FICTIF marqué EXEMPLE, au nom
+   * et aux couleurs de l'organisation, rendu par le vrai moteur. Rien n'est
+   * enregistré ni journalisé au journal électronique.
+   */
+  async preview(
+    organizationId: string,
+    templateId: InvoiceTemplateId,
+    override: Partial<TemplateOptions>,
+    format: 'pdf' | 'png' = 'pdf',
+  ): Promise<{ body: Buffer; fileName: string; contentType: string }> {
+    const presentation = await this.branding.presentationForPreview(
+      organizationId,
+      templateId,
+      override,
+    );
+    const doc = sampleInvoice(organizationId);
+    const seller = await this.currentSeller(organizationId);
+    const model = buildInvoiceDocument(
+      { ...doc, seller: seller ?? doc.seller },
+      {
+        duplicateNumber: null,
+        draftSeller: null,
+        organizationName: 'Organisation',
+        draftInTestEnvironment: false,
+        layout: layoutOf(presentation),
+        sample: true,
+      },
+    );
+    const base = `apercu-modele-${latestTemplate(templateId).id}`;
+    if (format === 'pdf') {
+      const pdf = await this.render(organizationId, model, presentation);
+      return { body: pdf, fileName: `${base}.pdf`, contentType: 'application/pdf' };
+    }
+    // Vignette : première page, mêmes HTML et confinement que le PDF. Les marges
+    // de page (`@page`) ne s'appliquent pas à une capture : on les pose en padding.
+    const r = await this.html(organizationId, model, presentation);
+    const m = r.margin;
+    const html = r.html.replace(
+      '</head>',
+      `<style>body{padding:${m.top} ${m.right} 0 ${m.left}}</style></head>`,
+    );
+    const png = await this.pdf.renderPng(html, PREVIEW_PAGE);
+    return { body: png, fileName: `${base}.png`, contentType: 'image/png' };
+  }
+
+  /** Fiche vendeur courante (fiche fiscale), ou `null`. */
+  private async currentSeller(organizationId: string): Promise<StoredSeller | null> {
+    const profile = await this.profiles.find(organizationId);
+    if (!profile) return null;
+    return {
+      legalName: profile.legalName,
+      tradeName: profile.tradeName,
+      nif: profile.nif,
+      rccm: profile.rccm,
+      address: headOfficeAddress(profile.headOffice),
+      phone: profile.phone,
+      email: profile.email,
+      vatRegistered: profile.vatRegistered,
+    };
   }
 
   async original(
@@ -163,8 +285,9 @@ export class InvoiceDocumentsService {
     actor: InvoiceActor,
   ): Promise<RenderedInvoiceDocument> {
     const doc = await this.load(organizationId, invoiceId);
-    const model = await this.model(organizationId, doc, null);
-    const pdf = await this.render(model);
+    const presentation = await this.presentationOf(organizationId, doc);
+    const model = await this.model(organizationId, doc, null, presentation);
+    const pdf = await this.render(organizationId, model, presentation);
     await this.audit.recordStrict({
       organizationId,
       actorUserId: actor.userId,
@@ -178,6 +301,9 @@ export class InvoiceDocumentsService {
         type: doc.type,
         reference: model.reference.value,
         test: model.test !== null,
+        template: presentation
+          ? `${presentation.template.id}@${presentation.template.version}`
+          : null,
         bytes: pdf.byteLength,
       },
     });
@@ -201,6 +327,8 @@ export class InvoiceDocumentsService {
       }
       const current = doc.duplicateCount ?? 0;
       const k = current + 1;
+      // Un duplicata est une copie de l'original : même présentation FIGÉE.
+      const presentation = doc.presentation ?? null;
       let model: InvoiceDocumentModel;
       try {
         model = buildInvoiceDocument(doc, {
@@ -208,6 +336,7 @@ export class InvoiceDocumentsService {
           draftSeller: null,
           organizationName: 'Organisation',
           draftInTestEnvironment: false,
+          layout: layoutOf(presentation),
         });
       } catch (err) {
         if (err instanceof DocumentNotPrintableError) {
@@ -226,7 +355,7 @@ export class InvoiceDocumentsService {
         });
       }
       // Rendu AVANT l'incrément : un rendu refusé ne consomme aucun numéro.
-      const pdf = await this.render(model);
+      const pdf = await this.render(organizationId, model, presentation);
 
       const committed = await inFiscalTransactionWithReplay(this.connection, async (session) => {
         const res = await this.invoices

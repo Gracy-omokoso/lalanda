@@ -42,3 +42,12 @@ export function isObjectId(value: string): boolean {
 export function avatarObjectKey(objectId: string): string {
   return `avatars/${objectId}`;
 }
+
+/**
+ * Logo d'organisation (ADR-0028 § 7). Même règle que l'avatar : identifiant tiré
+ * au hasard, AUCUNE dérivation de l'organisation. L'objet est IMMUABLE — une
+ * facture gelée le désigne par son identifiant et son empreinte.
+ */
+export function brandAssetObjectKey(objectId: string): string {
+  return `brand-assets/${objectId}`;
+}

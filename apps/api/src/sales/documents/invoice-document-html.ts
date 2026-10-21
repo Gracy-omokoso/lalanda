@@ -19,7 +19,7 @@ export function esc(input: string): string {
 }
 
 /** Le SVG produit par `qrcode` ne contient que des éléments graphiques : on le vérifie. */
-function safeSvg(svg: string): string {
+export function safeSvg(svg: string): string {
   if (!/^<svg[\s>]/.test(svg.trim()) || /<script|on\w+=|href=|<foreignObject/i.test(svg)) {
     throw new Error('SVG du QR code inattendu.');
   }

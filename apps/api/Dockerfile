@@ -43,6 +43,16 @@ RUN pnpm --filter @lalanda/api... run build
 #    production uniquement, avec @lalanda/shared et @lalanda/engine embarqués.
 RUN pnpm --filter @lalanda/api deploy --prod /out
 
+# 4) Polices des modèles de facture (ADR-0028 § 5) : `assets/fonts` voyage avec
+#    le paquet (`/app/assets/fonts`, lu depuis `dist/` par `invoice-fonts.ts`) et
+#    est intégré aux PDF en `data:` — aucune police chargée en ligne au rendu.
+#    Le build échoue si elles manquent, plutôt que d'imprimer en Arial.
+RUN test -f /out/assets/fonts/NOTICE.md \
+    && test -f /out/assets/fonts/inter/inter-latin-400-normal.woff2 \
+    && test -f /out/assets/fonts/fraunces/OFL.txt \
+    && test -f /out/assets/fonts/jetbrains-mono/jetbrains-mono-latin-500-normal.woff2 \
+    && test -f /out/dist/sales/documents/templates/invoice-fonts.js
+
 # ─── Stage 2 : runtime ──────────────────────────────────────────────────────
 FROM node:20-slim AS runtime
 

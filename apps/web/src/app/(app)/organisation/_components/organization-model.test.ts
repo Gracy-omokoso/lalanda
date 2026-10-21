@@ -57,6 +57,7 @@ describe('onglets de l’espace organisation (S21a)', () => {
       '',
       'membres',
       'parametres',
+      'identite',
       'fiscalite',
       'facturation',
       'journal',
@@ -68,6 +69,7 @@ describe('onglets de l’espace organisation (S21a)', () => {
       '',
       'membres',
       'parametres',
+      'identite',
       'journal',
     ]);
 
@@ -83,6 +85,7 @@ describe('onglets de l’espace organisation (S21a)', () => {
       '',
       'membres',
       'parametres',
+      'identite',
       'fiscalite',
       'facturation',
       'journal',

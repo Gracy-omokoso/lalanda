@@ -12,7 +12,7 @@ node_modules
 **/dist
 **/.next
 **/.turbo
-*.tsbuildinfo
+**/*.tsbuildinfo
 
 # Secrets et environnements — JAMAIS dans une image
 .env

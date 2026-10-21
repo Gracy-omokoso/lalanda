@@ -24,6 +24,9 @@ export const PROFORMA_TITLE = 'PRO FORMA — non valable comme facture';
 export const TEST_BANNER = 'Environnement de test DGI — sans valeur fiscale';
 export const TEST_MARK = 'TEST';
 export const DUPLICATE_MARK = 'DUPLICATA';
+/** Aperçu d'un modèle (ADR-0028 § 8) : document fictif, jamais une facture. */
+export const SAMPLE_BANNER = 'Exemple fictif — aperçu du modèle, sans aucune valeur';
+export const SAMPLE_MARK = 'EXEMPLE';
 
 /** Natures d'avoir, libellés imprimés (documentation DGI, reformulée). */
 export const CREDIT_NATURE_LABELS: Record<CreditNoteNature, string> = {
@@ -100,6 +103,8 @@ export interface InvoiceDocumentModel {
   stateMentions: string[];
   duplicate: { number: number; label: string } | null;
   test: { banner: string; mark: string } | null;
+  /** Aperçu de modèle : document fictif marqué EXEMPLE (ADR-0028 § 8) ; `null` sinon. */
+  sample: { banner: string; mark: string } | null;
   reference: { label: string; value: string };
   date: { label: string; value: string };
   seller: DocumentParty;
@@ -149,6 +154,13 @@ export interface InvoiceDocumentContext {
    * document gelé imprime la sienne, `doc.softwareVersion`). Absente : rien.
    */
   currentSoftwareVersion?: string | null;
+  /**
+   * Présentation qui imprime le document (ADR-0028), nommée en pied de page.
+   * Absente : la présentation d'origine, « gabarit 1.0.0 » — pied inchangé.
+   */
+  layout?: { label: string; version: string } | null;
+  /** Aperçu fictif d'un modèle : filigrane et bandeau EXEMPLE (ADR-0028 § 8). */
+  sample?: boolean;
 }
 
 // ── Mise en forme (chaînes seulement) ─────────────────────────────────────────
@@ -437,18 +449,23 @@ export function buildInvoiceDocument(
   // ADR-0026 § 6.2 : version FIGÉE au gel ; même document + même version ⇒ même PDF.
   const softwareVersion =
     doc.status === 'draft' ? (ctx.currentSoftwareVersion ?? null) : (doc.softwareVersion ?? null);
+  const layoutName = ctx.layout
+    ? `modèle ${ctx.layout.label} ${ctx.layout.version}`
+    : `gabarit ${INVOICE_PDF_LAYOUT_VERSION}`;
+  const sample = ctx.sample ? { banner: SAMPLE_BANNER, mark: SAMPLE_MARK } : null;
   const footerParts = [
     softwareVersion !== null
-      ? `Établi avec Lalanda v${softwareVersion} — gabarit ${INVOICE_PDF_LAYOUT_VERSION}`
-      : `Établi avec Lalanda — gabarit ${INVOICE_PDF_LAYOUT_VERSION}`,
+      ? `Établi avec Lalanda v${softwareVersion} — ${layoutName}`
+      : `Établi avec Lalanda — ${layoutName}`,
     final ? `N° ${number}` : `Réf. ${doc.proformaRef}`,
   ];
   if (duplicate) footerParts.push(duplicate.label);
   if (test) footerParts.push(test.banner);
+  if (sample) footerParts.push(sample.banner);
 
   const baseName = final ? number! : doc.proformaRef;
   return {
-    layoutVersion: INVOICE_PDF_LAYOUT_VERSION,
+    layoutVersion: ctx.layout?.version ?? INVOICE_PDF_LAYOUT_VERSION,
     softwareVersion,
     kind,
     title: titleOf(doc, kind),
@@ -456,6 +473,7 @@ export function buildInvoiceDocument(
     stateMentions: stateMentionsOf(doc, kind),
     duplicate,
     test,
+    sample,
     reference: final
       ? { label: isCredit(doc.type) ? 'Avoir n°' : 'Facture n°', value: number! }
       : { label: 'Référence pro forma', value: doc.proformaRef },

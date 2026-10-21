@@ -31,6 +31,7 @@ import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Types, type ClientSession, type Connection, type Model } from 'mongoose';
 
 import { AuditService } from '../../authz/audit.service.js';
+import { BrandingService } from '../../branding/branding.service.js';
 import { inFiscalTransactionWithReplay } from '../../fiscal/fiscal-transaction.js';
 import { FiscalProfileService } from '../../fiscal/fiscal-profile.service.js';
 import { NormalizedInvoicingStateReader } from '../../fiscal/normalized-invoicing-state.reader.js';
@@ -159,6 +160,7 @@ export class InvoiceFreezingService {
     @Inject(AuditService) private readonly audit: AuditService,
     @Inject(DGI_PLATFORM_CONFIG) private readonly config: DgiPlatformConfig,
     @Inject(SALES_INVOICE_NORMALIZER) private readonly normalizer: SalesInvoiceNormalizer,
+    @Inject(BrandingService) private readonly branding: BrandingService,
   ) {}
 
   /** `POST …/issue` — organisation ordinaire : numéro définitif, contenu figé. */
@@ -268,6 +270,7 @@ export class InvoiceFreezingService {
               seller: null,
               operator: null,
               softwareVersion: null,
+              presentation: null,
               frozenAt: null,
               frozenFromRevision: null,
               contentSha256: null,
@@ -531,6 +534,9 @@ export class InvoiceFreezingService {
                   : (origin?.number ?? null),
           }
         : null;
+      // ADR-0028 § 6 : modèle, options et empreinte de l'identité, lus DANS la
+      // transaction et figés avec le contenu ; `null` = présentation d'origine.
+      const presentation = await this.branding.presentationToFreeze(organizationId, session);
       const frozen = {
         documentAmounts: {
           currency: doc.currency,
@@ -549,6 +555,8 @@ export class InvoiceFreezingService {
         operator: { userId: actor.userId, name: actor.name },
         // ADR-0026 § 6.2 : la version qui a gelé le document, imprimée en pied de PDF.
         softwareVersion: APP_VERSION.version,
+        // Absent (et hors empreinte) sans modèle choisi : document identique à avant.
+        ...(presentation ? { presentation } : {}),
         frozenFromRevision: expectedRevision,
         creditNote,
       };
