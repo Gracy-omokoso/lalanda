@@ -90,6 +90,8 @@ export interface HomologationIo {
   createContext?: () => Promise<INestApplicationContext>;
   hooks?: CampaignHooks;
   now?: () => Date;
+  /** Tests : pause entre deux normalisations (défaut 500 ms). */
+  spacingMs?: number;
 }
 
 async function defaultContext(): Promise<INestApplicationContext> {
@@ -297,6 +299,7 @@ export async function main(argv: readonly string[], io: HomologationIo): Promise
         out,
         now,
         ...(io.hooks ? { hooks: io.hooks } : {}),
+        ...(io.spacingMs !== undefined ? { spacingMs: io.spacingMs } : {}),
       });
     } catch (err) {
       writeState(outDir, current, now());

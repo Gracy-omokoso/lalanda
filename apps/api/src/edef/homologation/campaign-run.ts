@@ -30,6 +30,7 @@ import type { InvoiceView } from '../../sales/invoices/invoice.contract.js';
 import type { InvoiceActor, InvoiceLean } from '../../sales/invoices/invoice.types.js';
 import { CreateInvoiceSchema, PutInvoiceSchema } from '../../sales/invoices/invoices.dto.js';
 import { compareSubmission } from '../../sales/normalization/edef-values.js';
+import { CALL_SPACING_MS } from '../calibration/calibration-run.js';
 import { CreateCustomerSchema, type CustomerType } from '../../sales/sales.dto.js';
 import {
   CampaignStop,
@@ -75,6 +76,9 @@ export interface RunCampaignInput {
   out: (line: string) => void;
   now?: () => Date;
   hooks?: CampaignHooks;
+  /** Pause entre deux normalisations (défaut `CALL_SPACING_MS`, comme l'étalonnage). */
+  spacingMs?: number;
+  sleep?: (ms: number) => Promise<void>;
 }
 
 /** Message d'une erreur de service (corps `{ code, message, details }`), sans rien d'autre. */
@@ -225,6 +229,9 @@ function entryOf(
 export async function runCampaign(input: RunCampaignInput): Promise<void> {
   const { services, organizationId, actor, campaignId, steps, state, outDir, out } = input;
   const now = input.now ?? (() => new Date());
+  const spacing = input.spacingMs ?? CALL_SPACING_MS;
+  const sleep = input.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  let normalizations = 0;
   const save = () => {
     writeState(outDir, state, now());
     writeReports(outDir, buildReport(state, steps, now()));
@@ -366,6 +373,8 @@ export async function runCampaign(input: RunCampaignInput): Promise<void> {
       );
     }
 
+    if (normalizations > 0 && spacing > 0) await sleep(spacing);
+    normalizations += 1;
     const started = Date.now();
     let result: InvoiceView;
     try {
