@@ -142,7 +142,7 @@ que les taux ; absents → `409 REFERENCE_LISTS_UNAVAILABLE` avant tout envoi).
 | Champ e-MCF | Source (document figé) | Règle |
 |---|---|---|
 | `nif` | `seller.nif` | doit égaler `dgi.nif` du point de vente, sinon refus avant envoi (`SELLER_NIF_MISMATCH`) |
-| `rn` | `normalization.reservedNumber` | réservé dans la transaction qui ouvre l'envoi (§ 3) ; `TEST-AAAA-NNNNNN` en test |
+| `rn` | `normalization.reservedNumber` | réservé dans la transaction qui ouvre l'envoi (§ 3) ; `TEST-AAAA-NNNNNN` en test (`TEST-IN{AA}{MM}-NNNNNN` / `TEST-AV…` depuis ADR-0027) |
 | `mode` | `priceMode` | `ttc` ou `ht`, en minuscules |
 | `isf` | `isf` (figé au gel) | `null` → refus avant envoi (`ISF_NOT_CONFIGURED`), alerte plateforme |
 | `type` | `type` | `FV FT FA EV ET EA` |

@@ -326,7 +326,7 @@ Onglet **Factures**, premier de `/ventes` (ADR-0023, chantier E3). Écrans : `ap
 
 ### Jamais « facture » avant l’heure
 
-Tant que le serveur dit `documentKind = proforma` (brouillon, normalisation en cours ou refusée), l’en-tête est **« Pro forma — non valable comme facture »** avec la référence `PF-AAAA-NNNNNN` ; aucun numéro de la série fiscale n’est affiché, même réservé. Les types sont nommés sans le mot « facture » (Vente, Acompte, Avoir…). « Facture n° … » n’apparaît que pour `issued` (organisation ordinaire) et `normalized`. Un test l’impose.
+Tant que le serveur dit `documentKind = proforma` (brouillon, normalisation en cours ou refusée), l’en-tête est **« Pro forma — non valable comme facture »** avec la référence `PF{AA}{MM}-NNNNNN` (`PF-AAAA-NNNNNN` avant ADR-0027) ; aucun numéro de la série fiscale n’est affiché, même réservé. Les types sont nommés sans le mot « facture » (Vente, Acompte, Avoir…). « Facture n° … » n’apparaît que pour `issued` (organisation ordinaire) et `normalized`. Un test l’impose.
 
 ### Composer, puis émettre ou normaliser
 
