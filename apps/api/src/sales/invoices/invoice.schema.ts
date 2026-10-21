@@ -25,6 +25,7 @@ import {
   type InvoiceType,
 } from './invoice.contract.js';
 import type {
+  InvoiceCampaignLabel,
   StoredConversion,
   StoredCreditNote,
   StoredCustomer,
@@ -158,6 +159,17 @@ export class SalesInvoice {
 
   @Prop({ type: Number, required: true, default: 0 })
   duplicateCount!: number;
+
+  /**
+   * Étiquette INTERNE de la campagne d'homologation DGI (ADR-0026 § 7) : posée
+   * à la création du brouillon par la ligne de commande `edef:homologation`, et
+   * par elle seule (aucune route ne l'accepte : les corps HTTP sont `.strict()`).
+   * Ni envoyée à la DGI, ni imprimée, ni dans `contentSha256`, ni dans la vue :
+   * elle sert à reprendre une campagne interrompue sans renormaliser.
+   * Absente des autres documents.
+   */
+  @Prop({ type: Object, required: false })
+  campaign?: InvoiceCampaignLabel | null;
 
   @Prop({ type: Number, required: true, default: 1 })
   revision!: number;

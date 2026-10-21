@@ -66,6 +66,7 @@ import type {
 import { SalesInvoice, type SalesInvoiceDocument } from './invoice.schema.js';
 import type {
   InvoiceActor,
+  InvoiceCampaignLabel,
   InvoiceLean,
   StoredCustomer,
   StoredLine,
@@ -258,6 +259,19 @@ export class InvoiceDraftsService {
     return this.viewOf(organizationId, doc);
   }
 
+  /**
+   * Documents d'une campagne d'homologation (ADR-0026 § 7), tous statuts, dans
+   * l'ordre de création. Lecture seule, réservée à la ligne de commande
+   * `edef:homologation` (aucune route) : sert à reprendre sans renormaliser.
+   */
+  async campaignDocuments(organizationId: string, campaignId: string): Promise<InvoiceLean[]> {
+    return this.invoices
+      .find({ organizationId, 'campaign.id': campaignId })
+      .sort({ createdAt: 1, _id: 1 })
+      .lean<InvoiceLean[]>()
+      .exec();
+  }
+
   async viewOf(organizationId: string, doc: InvoiceLean): Promise<InvoiceView> {
     const mode = await this.normalized.emissionModeOf(organizationId);
     const isOrigin =
@@ -393,10 +407,16 @@ export class InvoiceDraftsService {
 
   // ── Écritures ──────────────────────────────────────────────────────────────
 
+  /**
+   * `opts.campaign` : étiquette interne de la campagne d'homologation (ADR-0026
+   * § 7), passée par la ligne de commande seulement — le contrôleur ne la
+   * transmet jamais. Elle ne change rien au contenu du document.
+   */
   async create(
     organizationId: string,
     input: InvoiceDraftInput,
     actor: InvoiceActor,
+    opts: { campaign?: InvoiceCampaignLabel } = {},
   ): Promise<InvoiceView> {
     const composed = await this.compose(organizationId, input);
     const proformaRef = await this.numbering.nextProformaRef(organizationId);
@@ -406,6 +426,7 @@ export class InvoiceDraftsService {
       status: 'draft',
       proformaRef,
       ...composed,
+      ...(opts.campaign ? { campaign: { ...opts.campaign } } : {}),
       number: null,
       credited: [],
       creditRevision: 0,
