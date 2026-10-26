@@ -348,6 +348,9 @@ export class ReceiptsService {
         message: 'La date de réception ne peut pas être dans le futur.',
       });
     }
+    if (body.accountId !== null) {
+      await this.assertTreasuryAccount(organizationId, body, session);
+    }
     const ids = body.allocations.map((a) => a.invoiceId);
     const contexts = await this.settlements.contexts(organizationId, ids, {
       session,
@@ -401,6 +404,50 @@ export class ReceiptsService {
       invoiceNumber: contexts.get(a.invoiceId)?.invoice.number ?? null,
       amount: a.amount,
     }));
+  }
+
+  /**
+   * Compte de trésorerie qui reçoit l'argent (ADR-0034 § 4, amendement du 26 oct.
+   * 2026) : de l'organisation (404 sinon), actif, de la devise de l'encaissement,
+   * ouvert à la date de réception — mêmes règles qu'une dépense. Lu par la
+   * connexion, dans la transaction : le module Ventes ne dépend pas du module
+   * Trésorerie, qui lit les encaissements par son port.
+   */
+  private async assertTreasuryAccount(
+    organizationId: string,
+    body: ReceiptBody,
+    session: ClientSession,
+  ): Promise<void> {
+    const account = (await this.connection
+      .collection('treasury_accounts')
+      .findOne(
+        { _id: new Types.ObjectId(body.accountId as string), organizationId },
+        { projection: { name: 1, currency: 1, active: 1, openingDate: 1 }, session },
+      )) as { name: string; currency: string; active: boolean; openingDate: string } | null;
+    if (!account) {
+      throw new NotFoundException({
+        code: 'TREASURY_ACCOUNT_NOT_FOUND',
+        message: 'Compte de trésorerie introuvable.',
+      });
+    }
+    if (!account.active) {
+      throw new BadRequestException({
+        code: 'ACCOUNT_INACTIVE',
+        message: `Le compte « ${account.name} » est désactivé.`,
+      });
+    }
+    if (account.currency !== body.currency) {
+      throw new BadRequestException({
+        code: 'RECEIPT_ACCOUNT_CURRENCY_MISMATCH',
+        message: `Le compte « ${account.name} » est tenu en ${account.currency} : l’encaissement doit être dans cette devise (aucun taux n’est appliqué).`,
+      });
+    }
+    if (body.receivedOn < account.openingDate) {
+      throw new BadRequestException({
+        code: 'RECEIPT_BEFORE_ACCOUNT_OPENING',
+        message: `Le compte « ${account.name} » est ouvert depuis le ${account.openingDate} : un encaissement antérieur n’y a pas sa place.`,
+      });
+    }
   }
 
   /** Incrémente la révision de règlement des factures : sérialise les écritures concurrentes. */

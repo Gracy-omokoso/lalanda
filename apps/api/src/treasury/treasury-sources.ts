@@ -1,14 +1,19 @@
-// Sources extérieures à la trésorerie — ADR-0034 § 4 et § 7.
+// Sources extérieures à la trésorerie — ADR-0034 § 4 et § 7, amendement du
+// 26 oct. 2026 (intégration d'ADR-0031).
 //
-// 1. ENCAISSEMENTS (ADR-0031). Le module Encaissements est livré en parallèle ;
-//    la trésorerie le lit par un PORT pour ne dépendre d'aucun de ses fichiers.
-//    Tant qu'il n'est pas fusionné, le fournisseur par défaut rend une liste vide
-//    et se déclare « non intégré » : la prévision le dit (`RECEIPTS_NOT_INTEGRATED`).
+// La trésorerie lit les ventes par un PORT (`TREASURY_RECEIPTS_SOURCE`) :
+//   1. ENCAISSEMENTS : chaque encaissement non annulé rattaché à un compte
+//      (`sales_receipts.accountId`) est une entrée de ce compte ; sans compte, il
+//      reste hors des soldes et la prévision le compte comme incertitude ;
+//   2. ÉCHÉANCES CLIENTS : le reste à encaisser RÉEL de chaque facture
+//      (`computeSettlement`, ADR-0031 § 2 : part à crédit − avoirs imputés −
+//      encaissements) et son échéance facultative.
 //
-// 2. ÉCHÉANCES CLIENTS. Le reste à encaisser d'une facture finale (série réelle,
-//    hors avoirs) est, avant ADR-0031, sa part `CREDIT` déclarée au gel
-//    (`amountOnCredit`). Les avoirs et paiements ultérieurs ne sont pas imputés ;
-//    à la fusion, la source deviendra `computeSettlement` (ADR-0031 § 2).
+// Fournisseur de production : `SalesReceiptsSource` (module Ventes, lecture
+// seule). `NoReceiptsSource` reste pour un montage sans ventes : il se déclare
+// non intégré, et le lecteur retombe alors sur la part `CREDIT` brute déclarée à
+// l'émission (`amountOnCredit`), ce que la prévision signale
+// (`RECEIPTS_NOT_INTEGRATED`).
 
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectConnection } from '@nestjs/mongoose';
@@ -16,6 +21,7 @@ import type { ReceivableInput, TreasuryCurrency } from '@lalanda/engine';
 import type { Connection } from 'mongoose';
 
 import { kinshasaDay } from '../sales/invoices/exchange-rate-reference.service.js';
+import { SalesTreasuryFeed } from '../sales/receipts/treasury-feed.service.js';
 
 /** Encaissement tel que la trésorerie le consomme. */
 export interface TreasuryReceipt {
@@ -31,11 +37,13 @@ export interface TreasuryReceiptsSource {
   /** `false` tant que le module Encaissements n'alimente pas la trésorerie. */
   readonly integrated: boolean;
   listForTreasury(organizationId: string): Promise<TreasuryReceipt[]>;
+  /** Échéances clients réellement restantes ; absent d'une source non intégrée. */
+  openReceivables?(organizationId: string): Promise<ReceivableInput[]>;
 }
 
 export const TREASURY_RECEIPTS_SOURCE = Symbol('TREASURY_RECEIPTS_SOURCE');
 
-/** Fournisseur par défaut : aucun encaissement, et il le dit. */
+/** Fournisseur sans ventes : aucun encaissement, et il le dit. */
 @Injectable()
 export class NoReceiptsSource implements TreasuryReceiptsSource {
   readonly integrated = false;
@@ -44,14 +52,29 @@ export class NoReceiptsSource implements TreasuryReceiptsSource {
   }
 }
 
+/** Fournisseur de production : encaissements et règlements d'ADR-0031. */
+@Injectable()
+export class SalesReceiptsSource implements TreasuryReceiptsSource {
+  readonly integrated = true;
+  constructor(@Inject(SalesTreasuryFeed) private readonly feed: SalesTreasuryFeed) {}
+
+  listForTreasury(organizationId: string): Promise<TreasuryReceipt[]> {
+    return this.feed.receiptsForTreasury(organizationId);
+  }
+
+  openReceivables(organizationId: string): Promise<ReceivableInput[]> {
+    return this.feed.openReceivables(organizationId);
+  }
+}
+
 const FINAL_STATUSES = ['issued', 'normalized'];
 /** Factures (et factures d'acompte) : un avoir n'est pas une créance. */
 const RECEIVABLE_TYPES = ['FV', 'FT', 'EV', 'ET'];
 
 /**
- * Lecture SEULE de `sales_invoices` par la connexion, sans `InjectModel` : le
- * module Ventes garde la liste fermée de ses écrivains (`invoices.sources.test.ts`)
- * et la trésorerie n'en fait pas partie.
+ * Repli SANS module Encaissements : lecture SEULE de `sales_invoices` par la
+ * connexion, sans `InjectModel` (le module Ventes garde la liste fermée de ses
+ * écrivains, `invoices.sources.test.ts`).
  */
 const SALES_INVOICES = 'sales_invoices';
 
@@ -64,6 +87,22 @@ export class TreasuryReceivablesReader {
 
   /** Échéances clients ouvertes, toutes devises (la prévision filtre). */
   async openReceivables(organizationId: string): Promise<ReceivableInput[]> {
+    if (this.receipts.integrated && this.receipts.openReceivables) {
+      return this.receipts.openReceivables(organizationId);
+    }
+    return this.rawCreditParts(organizationId);
+  }
+
+  receiptsIntegrated(): boolean {
+    return this.receipts.integrated;
+  }
+
+  listReceipts(organizationId: string): Promise<TreasuryReceipt[]> {
+    return this.receipts.listForTreasury(organizationId);
+  }
+
+  /** Part `CREDIT` déclarée à l'émission, sans avoirs ni encaissements imputés. */
+  private async rawCreditParts(organizationId: string): Promise<ReceivableInput[]> {
     const docs = (await this.connection
       .collection(SALES_INVOICES)
       .find(
@@ -91,17 +130,8 @@ export class TreasuryReceivablesReader {
         label: `Facture ${d.number ?? ''}${d.customer?.name ? ` — ${d.customer.name}` : ''}`.trim(),
         currency: d.currency,
         outstanding: d.amountOnCredit as string,
-        // ADR-0031 ajoutera l'échéance facultative ; avant, aucune n'existe.
         dueDate: null,
         issuedOn: kinshasaDay(d.issuedAt as Date),
       }));
-  }
-
-  receiptsIntegrated(): boolean {
-    return this.receipts.integrated;
-  }
-
-  listReceipts(organizationId: string): Promise<TreasuryReceipt[]> {
-    return this.receipts.listForTreasury(organizationId);
   }
 }

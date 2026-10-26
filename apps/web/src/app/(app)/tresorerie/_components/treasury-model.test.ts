@@ -102,6 +102,7 @@ describe('libellés exhaustifs', () => {
       'OVERDUE_RECURRING',
       'PLAN_NOT_USED',
       'RECEIPTS_NOT_INTEGRATED',
+      'RECEIPTS_WITHOUT_ACCOUNT',
     ]) {
       expect(FORECAST_FINDING_LABELS[code], code).toBeTruthy();
     }

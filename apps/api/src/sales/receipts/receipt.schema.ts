@@ -48,8 +48,10 @@ export class SalesReceipt {
 
   /**
    * Compte de trésorerie qui a reçu l'argent (caisse, banque, mobile money),
-   * facultatif. Réservé au module Dépenses et trésorerie (ADR-0034) : identifiant
-   * opaque, non vérifié tant que ce module n'est pas intégré (ADR-0031 § 1).
+   * facultatif (ADR-0031 § 1, ADR-0034 § 4). Depuis l'intégration du 26 oct. 2026 :
+   * un compte `treasury_accounts` de l'organisation, actif, de la devise de
+   * l'encaissement et ouvert à sa date ; l'encaissement entre alors dans le
+   * solde de ce compte. Sans compte, il reste hors des soldes (incertitude).
    */
   @Prop({ type: String, default: null })
   accountId!: string | null;

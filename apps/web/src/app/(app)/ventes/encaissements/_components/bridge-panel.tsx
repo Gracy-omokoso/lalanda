@@ -175,7 +175,7 @@ export function BridgePanel(): React.ReactElement {
             <Champ
               id="pont-debut"
               label="Mois qui ouvre l’exercice 1"
-              aide="Le mois civil où commence le premier exercice du plan."
+              aide="Le mois civil où commence le premier exercice du plan. Projet et début d’exercice sont communs au report des dépenses (Trésorerie)."
             >
               <input
                 id="pont-debut"

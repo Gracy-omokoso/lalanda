@@ -332,11 +332,23 @@ e2eSuite('encaissements, règlement et pont vers le réalisé (ADR-0031)', () =>
     });
   });
 
+  /** Compte de trésorerie USD (ADR-0034) qui reçoit des encaissements. */
+  let banque = '';
+
   describe('multi-factures, devise, avoir, annulation', () => {
     let f2: Record<string, any>;
     let f3: Record<string, any>;
 
     it('un encaissement de 150,00 sur deux factures', async () => {
+      const compte = await post(asA('owner'), '/treasury/accounts', {
+        name: 'Banque principale',
+        kind: 'bank',
+        currency: 'USD',
+        openingBalance: '0.00',
+        openingDate: '2026-01-01',
+      });
+      expect(compte.status, JSON.stringify(compte.body)).toBe(201);
+      banque = compte.body.id;
       f2 = await emettre(asA('owner'));
       f3 = await emettre(asA('owner'));
       const mauvais = await post(asA('owner'), '/sales/receipts', {
@@ -356,11 +368,11 @@ e2eSuite('encaissements, règlement et pont vers le réalisé (ADR-0031)', () =>
             { invoiceId: f2.id, amount: '92.80' },
             { invoiceId: f3.id, amount: '57.20' },
           ],
-          { accountId: 'banque-principale' },
+          { accountId: banque },
         ),
       );
       expect(r.status, JSON.stringify(r.body)).toBe(201);
-      expect(r.body).toMatchObject({ amount: '150.00', accountId: 'banque-principale' });
+      expect(r.body).toMatchObject({ amount: '150.00', accountId: banque });
       const lot = await get(asA('viewer'), `/sales/settlements?invoiceIds=${f2.id},${f3.id}`);
       expect(lot.status).toBe(200);
       expect(lot.body.items.map((i: { status: string }) => i.status)).toEqual([
@@ -798,6 +810,182 @@ e2eSuite('encaissements, règlement et pont vers le réalisé (ADR-0031)', () =>
         .find({ organizationId: orgA, action: 'run.actuals.synced' })
         .toArray();
       expect(audit.length).toBeGreaterThanOrEqual(2);
+    });
+
+    // ── Réglage commun aux deux ponts (ADR-0031 § 3, ADR-0034 § 5, amendements
+    //    du 26 oct. 2026 : décision ouverte n° 10 d'ADR-0034 tranchée) ──────────
+
+    it('le report des dépenses lit le rattachement des ventes ; il ne le change pas sous le pont actif', async () => {
+      const vue = await get(asA('viewer'), '/treasury/actuals-bridge');
+      expect(vue.status).toBe(200);
+      expect(vue.body).toMatchObject({
+        status: 'disabled',
+        projectId,
+        firstMonth: mois(),
+        mapping: {},
+      });
+      const autreDebut = await put(asA('owner'), '/treasury/actuals-bridge', {
+        enabled: true,
+        projectId,
+        firstMonth: '2001-01',
+        mapping: { loyer: 'cout_variable' },
+      });
+      expect(autreDebut.status).toBe(409);
+      expect(autreDebut.body).toMatchObject({
+        code: 'RUN_LINK_IN_USE',
+        details: { otherBridge: 'sales' },
+      });
+      const ok = await put(asA('owner'), '/treasury/actuals-bridge', {
+        enabled: true,
+        projectId,
+        firstMonth: mois(),
+        mapping: { loyer: 'cout_variable' },
+      });
+      expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+      expect(ok.body).toMatchObject({ status: 'enabled', projectId, firstMonth: mois() });
+    });
+
+    it('les ventes ne changent pas le rattachement sous le report des dépenses actif ; une ligne, un seul pont', async () => {
+      const debut = await put(asA('owner'), '/sales/actuals-bridge', {
+        enabled: true,
+        projectId,
+        revenueLineId: 'ca',
+        exerciseStart: '2001-01',
+      });
+      expect(debut.status).toBe(409);
+      expect(debut.body).toMatchObject({
+        code: 'RUN_LINK_IN_USE',
+        details: { otherBridge: 'expenses' },
+      });
+      const memeLigne = await put(asA('owner'), '/sales/actuals-bridge', {
+        enabled: true,
+        projectId,
+        revenueLineId: 'cout_variable',
+        exerciseStart: mois(),
+      });
+      expect(memeLigne.status).toBe(409);
+      expect(memeLigne.body.code).toBe('LINE_FED_BY_OTHER_BRIDGE');
+      expect((await get(asA('viewer'), '/sales/actuals-bridge')).body).toMatchObject({
+        state: 'active',
+        revenueLineId: 'ca',
+        exerciseStart: mois(),
+      });
+    });
+
+    it('un seul verrou : chaque ligne dit le pont qui l’alimente', async () => {
+      const ca = await put(asA('owner'), `/projects/${projectId}/actual-periods/1/2`, {
+        values: { ca: 1 },
+      });
+      expect(ca.status).toBe(409);
+      expect(ca.body).toMatchObject({
+        code: 'LINE_FED_BY_RUN',
+        details: { sources: { ca: 'run.sales' } },
+      });
+      const charge = await put(asA('owner'), `/projects/${projectId}/actual-periods/1/2`, {
+        values: { cout_variable: 1 },
+      });
+      expect(charge.status).toBe(409);
+      expect(charge.body).toMatchObject({
+        code: 'LINE_FED_BY_RUN',
+        details: { sources: { cout_variable: 'run.expenses' } },
+      });
+      // Report des dépenses désactivé : sa ligne redevient saisissable, celle des ventes non.
+      const off = await put(asA('owner'), '/treasury/actuals-bridge', {
+        enabled: false,
+        projectId,
+        firstMonth: mois(),
+        mapping: { loyer: 'cout_variable' },
+      });
+      expect(off.status).toBe(200);
+      const libre = await put(asA('owner'), `/projects/${projectId}/actual-periods/1/2`, {
+        values: { cout_variable: 1 },
+      });
+      expect(libre.status, JSON.stringify(libre.body)).toBe(200);
+      expect(
+        (
+          await put(asA('owner'), `/projects/${projectId}/actual-periods/1/2`, {
+            values: { ca: 1 },
+          })
+        ).status,
+      ).toBe(409);
+    });
+  });
+
+  // ── Trésorerie (ADR-0034 § 4 et § 7, intégration du 26 oct. 2026) ─────────
+
+  describe('les encaissements alimentent la trésorerie', () => {
+    it('un encaissement rattaché à un compte entre dans son solde ; sans compte, il n’y entre pas', async () => {
+      const comptes = await get(asA('viewer'), '/treasury/accounts');
+      expect(comptes.status).toBe(200);
+      expect(comptes.body.receiptsIntegrated).toBe(true);
+      const b = (comptes.body.items as { id: string; balance: string }[]).find(
+        (a) => a.id === banque,
+      );
+      // Seul l'encaissement de 150,00 porte ce compte (ouverture 0,00).
+      expect(b?.balance).toBe('150.00');
+    });
+
+    it('compte contrôlé : autre devise, autre organisation, inconnu', async () => {
+      const f = await emettre(asA('owner'));
+      const cdf = await post(asA('owner'), '/treasury/accounts', {
+        name: 'Caisse CDF',
+        kind: 'cash',
+        currency: 'CDF',
+        openingBalance: '0',
+        openingDate: '2026-01-01',
+      });
+      expect(cdf.status).toBe(201);
+      const devise = await post(
+        asA('owner'),
+        '/sales/receipts',
+        encaissement([{ invoiceId: f.id, amount: '1.00' }], { accountId: cdf.body.id }),
+      );
+      expect(devise.status).toBe(400);
+      expect(devise.body.code).toBe('RECEIPT_ACCOUNT_CURRENCY_MISMATCH');
+      const compteB = await post(asB(), '/treasury/accounts', {
+        name: 'Banque B',
+        kind: 'bank',
+        currency: 'USD',
+        openingBalance: '0.00',
+        openingDate: '2026-01-01',
+      });
+      expect(compteB.status).toBe(201);
+      const autreOrg = await post(
+        asA('owner'),
+        '/sales/receipts',
+        encaissement([{ invoiceId: f.id, amount: '1.00' }], { accountId: compteB.body.id }),
+      );
+      expect(autreOrg.status).toBe(404);
+      expect(autreOrg.body.code).toBe('TREASURY_ACCOUNT_NOT_FOUND');
+      const opaque = await post(
+        asA('owner'),
+        '/sales/receipts',
+        encaissement([{ invoiceId: f.id, amount: '1.00' }], { accountId: 'banque-principale' }),
+      );
+      expect(opaque.status).toBe(400);
+    });
+
+    it('la prévision attend le reste RÉELLEMENT à encaisser, pas la part à crédit brute', async () => {
+      const ouvertes = await get(asA('owner'), '/sales/settlements?open=true&currency=USD');
+      expect(ouvertes.status).toBe(200);
+      const restes = (ouvertes.body.items as { settlement: { outstanding: string } }[]).map(
+        (i) => i.settlement.outstanding,
+      );
+      const f = await get(asA('viewer'), '/treasury/forecast?currency=USD');
+      expect(f.status, JSON.stringify(f.body).slice(0, 300)).toBe(200);
+      const optimiste = (
+        f.body.scenarios as { id: string; flows: { source: string; amount: string }[] }[]
+      ).find((s) => s.id === 'optimistic')!;
+      const attendus = optimiste.flows
+        .filter((fl) => fl.source === 'receivable')
+        .map((fl) => fl.amount);
+      expect([...attendus].sort()).toEqual([...restes].sort());
+      // Une facture payée (f1, f2) n'est plus attendue ; une facture partiellement
+      // réglée l'est pour son seul reste.
+      expect(attendus).not.toContain('0.00');
+      const codes = (f.body.uncertainty.findings as { code: string }[]).map((x) => x.code);
+      expect(codes).not.toContain('RECEIPTS_NOT_INTEGRATED');
+      expect(codes).toContain('RECEIPTS_WITHOUT_ACCOUNT');
     });
   });
 });

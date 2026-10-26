@@ -130,6 +130,11 @@ export default function RealisePage(): React.ReactElement {
           </Bandeau>
         ) : null}
         <form onSubmit={(e) => void enregistrer(e)} className="flex flex-col gap-3">
+          <p className="text-xs text-[var(--foreground-muted)]">
+            Le projet et le mois d’ouverture de l’exercice 1 sont communs au pont des ventes
+            (Encaissements) : les changer ici les change là-bas, et c’est refusé tant que l’autre
+            pont est actif.
+          </p>
           <div className="grid gap-3 sm:grid-cols-3">
             <label className="flex flex-col gap-1 text-sm">
               Projet

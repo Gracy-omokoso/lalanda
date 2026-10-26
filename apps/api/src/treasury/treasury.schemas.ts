@@ -282,13 +282,25 @@ TreasuryMovementSchema.index({ organizationId: 1, date: -1, _id: -1 });
 
 // ─── Réglages : minimum de trésorerie, hypothèses, pont vers le réalisé ─────
 
+/**
+ * Part PROPRE au report des dépenses : interrupteur et table de correspondance.
+ * Le projet relié et le mois d'ouverture de l'exercice 1 sont le rattachement
+ * COMMUN aux deux ponts (`run_actuals_bridges`, `RunLinkService`) : ils ne sont
+ * plus stockés ici (ADR-0034, amendement du 26 oct. 2026).
+ */
 export interface TreasuryBridgeConfig {
+  enabled: boolean;
+  mapping: Partial<Record<ExpenseCategory, string>>;
+  updatedAt: Date | null;
+  updatedBy: string | null;
+}
+
+/** Report des dépenses tel qu'il s'applique : part propre + rattachement commun. */
+export interface EffectiveTreasuryBridge {
   enabled: boolean;
   projectId: string | null;
   firstMonth: string | null;
   mapping: Partial<Record<ExpenseCategory, string>>;
-  updatedAt: Date | null;
-  updatedBy: string | null;
 }
 
 @Schema({ collection: 'treasury_settings', timestamps: true, strict: true })

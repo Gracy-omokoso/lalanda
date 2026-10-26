@@ -348,7 +348,9 @@ export type ForecastFindingCode =
   | 'EXPENSES_WITHOUT_ACCOUNT'
   | 'OVERDUE_RECURRING'
   | 'PLAN_NOT_USED'
-  | 'RECEIPTS_NOT_INTEGRATED';
+  | 'RECEIPTS_NOT_INTEGRATED'
+  /** Encaissements (ADR-0031) sans compte de trésorerie : absents des soldes. */
+  | 'RECEIPTS_WITHOUT_ACCOUNT';
 
 export interface ForecastFinding {
   code: ForecastFindingCode;

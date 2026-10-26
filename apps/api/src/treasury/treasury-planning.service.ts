@@ -43,6 +43,7 @@ import {
   referenceLines,
   resolveAnnualBase,
 } from '../actuals/variance.js';
+import { RunLinkService } from '../actuals/run-link/run-link.service.js';
 import { AuditService } from '../authz/audit.service.js';
 import type { FinancialPlanDocument } from '../plans/plan.schema.js';
 import { PlansService } from '../plans/plans.service.js';
@@ -56,6 +57,7 @@ import type { PutBridgeInput, PutSettingsInput } from './treasury.dto.js';
 import {
   TreasuryExpense,
   TreasurySettings,
+  type EffectiveTreasuryBridge,
   type TreasuryBridgeConfig,
   type TreasuryExpenseDocument,
   type TreasurySettingsDocument,
@@ -163,7 +165,29 @@ export class TreasuryPlanningService {
     @Inject(TreasuryRecurringService) private readonly recurring: TreasuryRecurringService,
     @Inject(TreasuryReceivablesReader) private readonly sources: TreasuryReceivablesReader,
     @Inject(AuditService) private readonly audit: AuditService,
+    @Inject(RunLinkService) private readonly runLink: RunLinkService,
   ) {}
+
+  /**
+   * Report des dépenses effectif : interrupteur et correspondance propres, projet
+   * et début d'exercice lus dans le rattachement COMMUN aux deux ponts (ADR-0034,
+   * amendement du 26 oct. 2026).
+   */
+  private async effectiveBridge(
+    organizationId: string,
+    settings?: SettingsLean | null,
+  ): Promise<EffectiveTreasuryBridge | null> {
+    const doc = settings === undefined ? await this.settingsOf(organizationId) : settings;
+    const link = await this.runLink.state(organizationId);
+    const own = doc?.bridge ?? null;
+    if (own === null && link.projectId === null && link.exerciseStart === null) return null;
+    return {
+      enabled: own?.enabled ?? false,
+      projectId: link.projectId,
+      firstMonth: link.exerciseStart,
+      mapping: own?.mapping ?? {},
+    };
+  }
 
   // ─── Réglages ──────────────────────────────────────────────────────────────
 
@@ -250,7 +274,7 @@ export class TreasuryPlanningService {
 
   async getBridge(organizationId: string): Promise<BridgeView & { revision: number }> {
     const doc = await this.settingsOf(organizationId);
-    const bridge = doc?.bridge ?? null;
+    const bridge = await this.effectiveBridge(organizationId, doc);
     let projectName: string | null = null;
     let projectCurrency: string | null = null;
     let planVersion: number | null = null;
@@ -335,10 +359,25 @@ export class TreasuryPlanningService {
     } else if (Object.keys(mapping).length > 0) {
       rejected('BRIDGE_INCOMPLETE', 'Choisissez d’abord le projet relié.');
     }
+    // Une ligne n'est alimentée que par un seul pont : celle du chiffre d'affaires
+    // des ventes n'entre pas dans la correspondance des dépenses.
+    const link = await this.runLink.state(organizationId);
+    const salesLine = link.salesEnabled ? link.salesRevenueLineId : null;
+    if (salesLine !== null && Object.values(mapping).includes(salesLine)) {
+      conflict(
+        'LINE_FED_BY_OTHER_BRIDGE',
+        `La ligne "${salesLine}" est déjà alimentée par les ventes : une dépense ne s'y rattache pas.`,
+      );
+    }
+    // Rattachement commun (projet, début d'exercice) : refusé s'il change sous le
+    // pont des ventes actif (`RUN_LINK_IN_USE`).
+    await this.runLink.setFromExpenses(
+      organizationId,
+      { projectId: input.projectId, exerciseStart: input.firstMonth },
+      actor.userId,
+    );
     const bridge: TreasuryBridgeConfig = {
       enabled: input.enabled,
-      projectId: input.projectId,
-      firstMonth: input.firstMonth,
       mapping,
       updatedAt: new Date(),
       updatedBy: actor.userId,
@@ -404,7 +443,11 @@ export class TreasuryPlanningService {
         });
         continue;
       }
-      if (stored === value && source?.source === 'run.expenses' && source.fingerprint === fingerprint) {
+      if (
+        stored === value &&
+        source?.source === 'run.expenses' &&
+        source.fingerprint === fingerprint
+      ) {
         results.push({ ...base, status: 'unchanged' });
         continue;
       }
@@ -592,8 +635,7 @@ export class TreasuryPlanningService {
 
   /** Projet, plan validé et dépenses du pont configuré — 409 sinon. */
   private async bridgeContext(organizationId: string) {
-    const doc = await this.settingsOf(organizationId);
-    const bridge = doc?.bridge ?? null;
+    const bridge = await this.effectiveBridge(organizationId);
     if (bridge === null || bridge.projectId === null || bridge.firstMonth === null) {
       conflict(
         'BRIDGE_NOT_CONFIGURED',
@@ -610,7 +652,7 @@ export class TreasuryPlanningService {
       firstMonth: bridge.firstMonth,
     });
     return {
-      bridge: bridge as TreasuryBridgeConfig & { projectId: string; firstMonth: string },
+      bridge: bridge as EffectiveTreasuryBridge & { projectId: string; firstMonth: string },
       project,
       plan,
       expenses,
@@ -687,11 +729,26 @@ export class TreasuryPlanningService {
         detail: 'Dépenses des 90 derniers jours sans compte : absentes des soldes.',
       });
     }
+    // ADR-0034 § 4 (amendement du 26 oct. 2026) : un encaissement sans compte
+    // reste hors des soldes, comme une dépense sans compte.
+    if (this.sources.receiptsIntegrated()) {
+      const since = treasuryAddDays(asOf, -90);
+      const receiptsWithoutAccount = ledger.unassignedReceipts.filter(
+        (r) => r.currency === currency && r.receivedOn >= since,
+      ).length;
+      if (receiptsWithoutAccount > 0) {
+        external.push({
+          code: 'RECEIPTS_WITHOUT_ACCOUNT',
+          count: receiptsWithoutAccount,
+          detail: 'Encaissements des 90 derniers jours sans compte : absents des soldes.',
+        });
+      }
+    }
 
     const plan = await this.forecastPlan(
       organizationId,
       currency,
-      settings?.bridge ?? null,
+      await this.effectiveBridge(organizationId, settings),
       external,
     );
     return forecastTreasury({
@@ -713,7 +770,7 @@ export class TreasuryPlanningService {
   private async forecastPlan(
     organizationId: string,
     currency: TreasuryCurrency,
-    bridge: TreasuryBridgeConfig | null,
+    bridge: EffectiveTreasuryBridge | null,
     findings: ForecastFinding[],
   ): Promise<{ lines: ForecastPlanLine[]; mapping: CategoryMapping } | null> {
     const notUsed = (detail: string): null => {

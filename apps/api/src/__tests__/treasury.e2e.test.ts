@@ -201,7 +201,9 @@ e2eSuite('trésorerie — dépenses, comptes, réalisé, prévision (ADR-0034)',
       const list = await get(as('viewer'), '/treasury/accounts');
       expect(list.status).toBe(200);
       expect(list.body.totalsByCurrency).toEqual({ CDF: '500000.00', USD: '980.00' });
-      expect(list.body.receiptsIntegrated).toBe(false);
+      // ADR-0034 § 4, amendement du 26 oct. 2026 : les encaissements d'ADR-0031
+      // alimentent les soldes (aucun ici).
+      expect(list.body.receiptsIntegrated).toBe(true);
     });
 
     it('refuse une devise inconnue et un montant mal formé', async () => {
@@ -774,15 +776,26 @@ e2eSuite('trésorerie — dépenses, comptes, réalisé, prévision (ADR-0034)',
           ...base,
           status: 'issued',
           number: 'FV-T-1',
+          // Index unique (organisation, référence pro forma) des factures : chaque
+          // document en porte une, comme une vraie facture.
+          proformaRef: `PF-T-1-${tag}`,
           amountOnCredit: '250.00',
           issuedAt: new Date(),
         },
-        { ...base, status: 'draft', number: null, amountOnCredit: '999.00', issuedAt: null },
+        {
+          ...base,
+          status: 'draft',
+          number: null,
+          proformaRef: `PF-T-2-${tag}`,
+          amountOnCredit: '999.00',
+          issuedAt: null,
+        },
         {
           ...base,
           status: 'issued',
           series: 'test',
           number: 'FV-T-2',
+          proformaRef: `PF-T-3-${tag}`,
           amountOnCredit: '77.00',
           issuedAt: new Date(),
         },
@@ -831,7 +844,8 @@ e2eSuite('trésorerie — dépenses, comptes, réalisé, prévision (ADR-0034)',
         ]);
       }
       const codes = (res.body.uncertainty.findings as { code: string }[]).map((f) => f.code);
-      expect(codes).toContain('RECEIPTS_NOT_INTEGRATED');
+      // Encaissements intégrés (amendement du 26 oct. 2026) : plus de constat.
+      expect(codes).not.toContain('RECEIPTS_NOT_INTEGRATED');
       expect(codes).toContain('ACCOUNTS_OTHER_CURRENCY');
       expect(codes).toContain('OVERDUE_RECURRING');
 

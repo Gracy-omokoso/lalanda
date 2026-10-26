@@ -38,6 +38,7 @@ import { SalesReceipt, SalesReceiptSchema } from './receipts/receipt.schema.js';
 import { ReceiptsController } from './receipts/receipts.controller.js';
 import { ReceiptsService } from './receipts/receipts.service.js';
 import { SettlementClock, SettlementsService } from './receipts/settlements.service.js';
+import { SalesTreasuryFeed } from './receipts/treasury-feed.service.js';
 import { SalesUsageService } from './sales-usage.service.js';
 import { TaxGroupsController } from './tax-groups.controller.js';
 import { TaxGroupsService } from './tax-groups.service.js';
@@ -138,6 +139,9 @@ import { ReferenceRefreshJob } from './normalization/reference-refresh.job.js';
     SettlementClock,
     SettlementsService,
     ReceiptsService,
+    // ADR-0034 § 4 et § 7 (intégration du 26 oct. 2026) : encaissements et
+    // échéances clients lus par la trésorerie.
+    SalesTreasuryFeed,
     // ADR-0024 (F2) : normalisation DGI réelle, rattrapage et tâches planifiées.
     DgiCallGuard,
     NormalizationRecorder,
@@ -152,6 +156,12 @@ import { ReferenceRefreshJob } from './normalization/reference-refresh.job.js';
     { provide: SALES_INVOICE_NORMALIZER, useExisting: EdefSalesInvoiceNormalizer },
     { provide: APP_INTERCEPTOR, useClass: NormalizationActionsInterceptor },
   ],
-  exports: [SalesUsageService, TaxGroupsService, InvoiceNumberingService, InvoiceJournalService],
+  exports: [
+    SalesUsageService,
+    TaxGroupsService,
+    InvoiceNumberingService,
+    InvoiceJournalService,
+    SalesTreasuryFeed,
+  ],
 })
 export class SalesModule {}

@@ -27,6 +27,7 @@ import type { Model } from 'mongoose';
 import { AuditService } from '../../authz/audit.service.js';
 import { PlansService } from '../../plans/plans.service.js';
 import { ProjectsService } from '../../projects/projects.service.js';
+import { TreasuryBridgeLocks } from '../../treasury/treasury-bridge-locks.service.js';
 import { SalesInvoice, type SalesInvoiceDocument } from '../../sales/invoices/invoice.schema.js';
 import type { InvoiceLean } from '../../sales/invoices/invoice.types.js';
 import { kinshasaDayOf } from '../../sales/receipts/kinshasa-day.js';
@@ -36,6 +37,7 @@ import {
   type ActualValueSource,
   isRunActualSource,
 } from '../actual-period.schema.js';
+import { runLinkInUse, sameRunLink } from '../run-link/run-link.service.js';
 import { referenceLines, type PlanLineInput } from '../variance.js';
 import {
   RunActualsBridge,
@@ -129,6 +131,7 @@ export class RunBridgeService {
     @Inject(ProjectsService) private readonly projects: ProjectsService,
     @Inject(PlansService) private readonly plans: PlansService,
     @Inject(AuditService) private readonly audit: AuditService,
+    @Inject(TreasuryBridgeLocks) private readonly expenses: TreasuryBridgeLocks,
   ) {}
 
   /** Lignes verrouillées par le pont actif pour ce projet (saisie manuelle refusée). */
@@ -204,6 +207,27 @@ export class RunBridgeService {
         });
       }
       await this.assertTarget(organizationId, input.projectId, input.revenueLineId);
+    }
+    // ADR-0031 § 3, amendement du 26 oct. 2026 : projet et début d'exercice sont
+    // le rattachement COMMUN aux deux ponts. Il ne change pas sous le report des
+    // dépenses actif, et une ligne n'est alimentée que par un seul pont.
+    const current = await this.bridges.findOne({ organizationId }).lean().exec();
+    const expenses = await this.expenses.expensesBridge(organizationId);
+    const currentLink = {
+      projectId: current?.projectId ?? null,
+      exerciseStart: current?.exerciseStart ?? null,
+    };
+    if (expenses.enabled && !sameRunLink(currentLink, input)) runLinkInUse('expenses');
+    if (
+      input.enabled &&
+      expenses.enabled &&
+      input.revenueLineId !== null &&
+      expenses.lines.has(input.revenueLineId)
+    ) {
+      throw new ConflictException({
+        code: 'LINE_FED_BY_OTHER_BRIDGE',
+        message: `La ligne « ${input.revenueLineId} » est déjà alimentée par les dépenses : choisissez la ligne du chiffre d’affaires.`,
+      });
     }
     await this.bridges.updateOne(
       { organizationId },

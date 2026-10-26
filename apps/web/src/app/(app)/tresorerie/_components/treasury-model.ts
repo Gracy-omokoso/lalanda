@@ -136,6 +136,7 @@ export const FORECAST_FINDING_LABELS: Readonly<Record<string, string>> = {
   OVERDUE_RECURRING: 'Échéances récurrentes passées non confirmées : comptées demain',
   PLAN_NOT_USED: 'Plan BUILD non utilisé',
   RECEIPTS_NOT_INTEGRATED: 'Encaissements pas encore reliés',
+  RECEIPTS_WITHOUT_ACCOUNT: 'Encaissements sans compte : absents des soldes',
 };
 
 export const RECONCILIATION_FINDING_LABELS: Readonly<Record<ReconciliationFinding, string>> = {

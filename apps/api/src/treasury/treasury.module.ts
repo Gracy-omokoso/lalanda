@@ -5,17 +5,19 @@
 // par le report explicite des dépenses (ADR-0034 § 5). `ObjectStorageService`
 // vient du `StorageModule` global (pièces justificatives).
 //
-// Encaissements (ADR-0031) : lus par le port `TREASURY_RECEIPTS_SOURCE`. Le
-// fournisseur par défaut est vide et se déclare non intégré ; la fusion d'ADR-0031
-// le remplace sans toucher au reste du module.
+// Encaissements (ADR-0031) : lus par le port `TREASURY_RECEIPTS_SOURCE`, fourni
+// depuis l'intégration du 26 oct. 2026 par `SalesReceiptsSource` (encaissements
+// et reste à encaisser réel du module Ventes, en lecture seule).
 
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 
 import { ActualPeriod, ActualPeriodSchema } from '../actuals/actual-period.schema.js';
+import { RunLinkModule } from '../actuals/run-link/run-link.module.js';
 import { OrganizationsModule } from '../organizations/organizations.module.js';
 import { PlansModule } from '../plans/plans.module.js';
 import { ProjectsModule } from '../projects/projects.module.js';
+import { SalesModule } from '../sales/sales.module.js';
 import { TreasuryAccountsController } from './treasury-accounts.controller.js';
 import { TreasuryAccountsService } from './treasury-accounts.service.js';
 import { TreasuryActualsController } from './treasury-actuals.controller.js';
@@ -26,7 +28,7 @@ import { TreasuryMovementsService } from './treasury-movements.service.js';
 import { TreasuryPlanningService } from './treasury-planning.service.js';
 import { TreasuryRecurringService } from './treasury-recurring.service.js';
 import {
-  NoReceiptsSource,
+  SalesReceiptsSource,
   TREASURY_RECEIPTS_SOURCE,
   TreasuryReceivablesReader,
 } from './treasury-sources.js';
@@ -49,6 +51,10 @@ import {
     OrganizationsModule,
     ProjectsModule,
     PlansModule,
+    // Rattachement commun aux deux ponts vers le réalisé (projet, début d'exercice).
+    RunLinkModule,
+    // ADR-0031 : encaissements et règlements (`SalesTreasuryFeed`, lecture seule).
+    SalesModule,
     MongooseModule.forFeature([
       { name: TreasuryAccount.name, schema: TreasuryAccountSchema },
       { name: TreasuryExpense.name, schema: TreasuryExpenseSchema },
@@ -69,7 +75,7 @@ import {
     TreasuryPlanningService,
     TreasuryReceivablesReader,
     TreasuryBridgeLocks,
-    { provide: TREASURY_RECEIPTS_SOURCE, useClass: NoReceiptsSource },
+    { provide: TREASURY_RECEIPTS_SOURCE, useClass: SalesReceiptsSource },
   ],
   exports: [TreasuryBridgeLocks],
 })

@@ -78,6 +78,8 @@ export interface Ledger {
   accounts: (TreasuryAccountInput & { active: boolean; name: string })[];
   movements: TreasuryMovementInput[];
   entries: LedgerEntry[];
+  /** Encaissements (ADR-0031) sans compte de trésorerie : hors des soldes. */
+  unassignedReceipts: { receivedOn: string; currency: TreasuryCurrency }[];
 }
 
 @Injectable()
@@ -158,8 +160,13 @@ export class TreasuryAccountsService {
         });
       }
     }
+    const unassignedReceipts: { receivedOn: string; currency: TreasuryCurrency }[] = [];
     for (const r of receipts) {
-      if (r.accountId === null) continue;
+      if (r.accountId === null || !currencyOf.has(r.accountId)) {
+        // Sans compte (ou compte inconnu) : hors des soldes, compté comme incertitude.
+        unassignedReceipts.push({ receivedOn: r.receivedOn, currency: r.currency });
+        continue;
+      }
       entries.push({
         id: r.id,
         source: 'receipt',
@@ -189,6 +196,7 @@ export class TreasuryAccountsService {
         amount: e.amount,
       })),
       entries,
+      unassignedReceipts,
     };
   }
 

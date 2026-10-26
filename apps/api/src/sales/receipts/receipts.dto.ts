@@ -68,10 +68,12 @@ export const ReceiptBodySchema = z
     }),
     reference: OptionalText(100),
     note: OptionalText(500),
-    // ADR-0034 (non intégré) : compte de trésorerie, identifiant opaque facultatif.
+    // ADR-0034 § 4 (intégré le 26 oct. 2026) : compte de trésorerie qui a reçu
+    // l'argent, facultatif ; vérifié par le service (organisation, actif, devise,
+    // ouverture).
     accountId: z
       .string()
-      .regex(/^[A-Za-z0-9_-]{1,64}$/, { message: 'Identifiant de compte invalide.' })
+      .regex(/^[0-9a-f]{24}$/i, { message: 'Identifiant de compte invalide.' })
       .nullable()
       .optional()
       .transform((v) => v ?? null),
