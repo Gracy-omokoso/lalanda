@@ -39,6 +39,7 @@ import { RewrapService } from '../integrations/rewrap.js';
 import { SecretDecryptionError, MasterKeyring } from '../integrations/secrets-crypto.js';
 import { SecretsService } from '../integrations/secrets.service.js';
 import { dbOf, e2eSuite, makeE2EApp } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 const tag = Math.random().toString(36).slice(2, 8);
 process.env['MONGODB_DB'] = `lalanda_e2e_orgsecrets_${tag}`;
@@ -73,7 +74,7 @@ e2eSuite('coffre de portée organisation (ADR-0021 §4.2)', () => {
     model = app.get<Model<OrganizationSecretDocument>>(getModelToken(OrganizationSecret.name));
     connection = app.get<Connection>(getConnectionToken());
     await model.createIndexes();
-  }, 60_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
     try {
@@ -81,7 +82,7 @@ e2eSuite('coffre de portée organisation (ADR-0021 §4.2)', () => {
     } finally {
       await app?.close();
     }
-  }, 30_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   it('l’application fournit le coffre réel sous ORGANIZATION_SECRETS', () => {
     const fourni = app.get<OrganizationSecretsPort>(ORGANIZATION_SECRETS);

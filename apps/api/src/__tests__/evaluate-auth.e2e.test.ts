@@ -4,7 +4,7 @@
 // Comme isolation.e2e.test.ts : nécessite une vraie connexion Mongo (better-auth).
 // Skippé si MONGODB_URI n'est pas défini — protège la CI sans Atlas.
 
-import { INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import { LEGAL_VERSION } from '@lalanda/shared/legal';
 import { NestFactory } from '@nestjs/core';
 import { toNodeHandler } from 'better-auth/node';
@@ -14,8 +14,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest';
 import 'reflect-metadata';
 
 import { e2eSuite, teardown } from './e2e-utils.js';
-
-import { e2eSuite, teardown } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 // Import différé — évite de charger better-auth (qui essaie de se connecter) si on skip.
 async function makeApp(): Promise<INestApplication> {
@@ -42,11 +41,11 @@ e2eSuite('auth sur /evaluate (S16a)', () => {
 
   beforeAll(async () => {
     app = await makeApp();
-  }, 60_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
     await teardown(app, [user.email]);
-  }, 30_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   async function registerAndLogin(): Promise<string[]> {
     const server = app.getHttpServer();

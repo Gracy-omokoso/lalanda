@@ -37,6 +37,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest';
 import 'reflect-metadata';
 
 import { dbOf, e2eSuite, makeE2EApp, registerAndLogin, teardown } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 e2eSuite('règles critiques docs/12 appliquées bout en bout (S20a)', () => {
   let app: INestApplication;
@@ -202,11 +203,11 @@ e2eSuite('règles critiques docs/12 appliquées bout en bout (S20a)', () => {
     await planPro(orgRevoc);
     await rejoindre('revOwner', orgRevoc, 'revMembre', 'finance_director');
     projetRevoc = await creerProjet('revOwner', orgRevoc, 'Transport Lubumbashi');
-  }, 180_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
     await teardown(app, emails);
-  }, 60_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // R2 — PARCOURS ENTREPRENEUR SEUL

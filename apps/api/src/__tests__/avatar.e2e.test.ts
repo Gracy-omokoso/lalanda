@@ -18,13 +18,14 @@
 // `S3_*`. Sans MinIO, les cas qui écrivent réellement sont sautés et le
 // signalent — ils ne sont JAMAIS simulés en succès.
 
-import { INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 
 import 'reflect-metadata';
 
 import { dbOf, e2eSuite, makeE2EApp, registerAndLogin, teardown } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 // ─── Fabriques d'images ──────────────────────────────────────────────────────
 
@@ -105,13 +106,12 @@ e2eSuite('photo de profil (stockage objet — docs/17, docs/24)', () => {
     cookiesA = await registerAndLogin(app, userA);
     cookiesB = await registerAndLogin(app, userB);
     if (!S3_CONFIGURE) {
-      // eslint-disable-next-line no-console
       console.warn(
         'S3_* absent : les cas qui écrivent réellement dans le bucket sont SAUTÉS. ' +
           'Les refus de validation, eux, sont vérifiés — ils précèdent tout appel au stockage.',
       );
     }
-  }, 60_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
     // Nettoyage propre à cette suite : `teardown` partagé ne connaît pas
@@ -129,7 +129,7 @@ e2eSuite('photo de profil (stockage objet — docs/17, docs/24)', () => {
       /* la base a pu être fermée avant : le teardown ci-dessous fait le reste */
     }
     await teardown(app, [userA.email, userB.email]);
-  }, 30_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   const srv = (): ReturnType<INestApplication['getHttpServer']> => app.getHttpServer();
 

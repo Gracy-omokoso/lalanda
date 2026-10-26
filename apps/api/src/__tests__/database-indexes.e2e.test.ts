@@ -6,7 +6,7 @@
 // garde-fous du code, y compris sur les collections de better-auth, et qu'il est
 // rejouable sans erreur.
 
-import { INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import { getConnectionToken } from '@nestjs/mongoose';
 import type { Connection } from 'mongoose';
 import { afterAll, beforeAll, expect, it } from 'vitest';
@@ -15,6 +15,7 @@ import 'reflect-metadata';
 
 import { IndexesService } from '../database/indexes.service.js';
 import { e2eSuite, makeE2EApp, teardown } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 e2eSuite('index MongoDB de production (S25a)', () => {
   let app: INestApplication;
@@ -23,11 +24,11 @@ e2eSuite('index MongoDB de production (S25a)', () => {
   beforeAll(async () => {
     app = await makeE2EApp();
     connection = app.get<Connection>(getConnectionToken());
-  }, 60_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
     await teardown(app, []);
-  }, 30_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   async function uniqueIndexKeys(collection: string): Promise<string[]> {
     const indexes = await connection.collection(collection).indexes();

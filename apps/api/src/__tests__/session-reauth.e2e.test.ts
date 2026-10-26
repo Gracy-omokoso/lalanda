@@ -20,6 +20,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { REAUTH_WINDOW_MS, ReauthService } from '../integrations/reauth.service.js';
 import { RecentReauthGuard, REQUIRES_RECENT_REAUTH_KEY } from '../integrations/reauth.guard.js';
 import { dbOf, e2eSuite, makeE2EApp, registerAndLogin } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 const tag = Math.random().toString(36).slice(2, 8);
 process.env['MONGODB_DB'] = `lalanda_e2e_reauth_${tag}`;
@@ -76,7 +77,7 @@ e2eSuite('ré-authentification des membres — /me/reauth (ADR-0021 §8)', () =>
   beforeAll(async () => {
     app = await makeE2EApp();
     db = await dbOf(app);
-  }, 60_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
     try {
@@ -84,7 +85,7 @@ e2eSuite('ré-authentification des membres — /me/reauth (ADR-0021 §8)', () =>
     } finally {
       await app?.close();
     }
-  }, 30_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   describe('compte à mot de passe', () => {
     it('sans session : 401', async () => {

@@ -16,7 +16,7 @@
 //
 // Même convention que isolation.e2e.test.ts : nécessite Mongo (skip sans MONGODB_URI).
 
-import { INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import { LEGAL_VERSION } from '@lalanda/shared/legal';
 import { NestFactory } from '@nestjs/core';
 import { toNodeHandler } from 'better-auth/node';
@@ -28,6 +28,7 @@ import 'reflect-metadata';
 import { PLAN_ENTITLEMENTS } from '@lalanda/shared/pricing';
 
 import { e2eSuite, teardown } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 async function makeApp(): Promise<INestApplication> {
   const { AppModule } = await import('../app.module.js');
@@ -62,11 +63,11 @@ e2eSuite('entitlements par plan (S16b)', () => {
 
   beforeAll(async () => {
     app = await makeApp();
-  }, 60_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
     await teardown(app, [userFree.email, userPro.email]);
-  }, 30_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   async function registerAndLogin(user: {
     email: string;

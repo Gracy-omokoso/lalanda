@@ -48,9 +48,9 @@ import {
   TRIAL_DAYS,
   isBillingInterval,
   isSellable,
+  planRank,
   type BillingInterval,
 } from './pricing-catalog.js';
-import { planRank } from './pricing-catalog.js';
 
 /**
  * Vue d'abonnement. Le préfixe S16b (`plan`, `entitlements`, `usage`) est

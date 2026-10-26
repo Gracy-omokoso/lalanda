@@ -114,7 +114,7 @@ export class ProjectsController {
     // - sinon on cherche le meilleur pack pour le `pays` fourni
     // - fallback ultime : cd-2026 (pour ne pas casser l'existant)
     const pays = parsed.data.pays ?? 'CD';
-    let pack = parsed.data.parameterPackSlug
+    const pack = parsed.data.parameterPackSlug
       ? getParameterPack(parsed.data.parameterPackSlug)
       : findDefaultPackForCountry(pays);
     if (!pack) {

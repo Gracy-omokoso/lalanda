@@ -20,6 +20,7 @@ import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 import { MailTransport } from '../mail/mail.transport.js';
 import type { MailMessage } from '../mail/mail.types.js';
 import { dbOf, e2eSuite, makeE2EApp, teardown } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 // Ce fichier doit tester le comportement NU : ni Google, ni SMTP. Les variables
 // sont retirées avant la construction de l'application (`buildAuth` lit
@@ -63,7 +64,7 @@ e2eSuite('Réinitialisation de mot de passe (S22a)', () => {
       .post('/auth/sign-up/email')
       .send({ email: EMAIL, password: ANCIEN, name: 'Reset Test', termsVersion: LEGAL_VERSION });
     expect(inscription.status).toBeLessThan(400);
-  }, 60_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
     try {

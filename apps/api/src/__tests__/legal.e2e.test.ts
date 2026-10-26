@@ -12,7 +12,7 @@
 //    modifiable par un autre — et aucune route ne prend d'identifiant permettant
 //    de le tenter.
 
-import { INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import { LEGAL_VERSION } from '@lalanda/shared/legal';
 import request from 'supertest';
 import { afterAll, beforeAll, expect, it } from 'vitest';
@@ -20,6 +20,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest';
 import 'reflect-metadata';
 
 import { dbOf, e2eSuite, makeE2EApp, registerAndLogin, teardown } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 e2eSuite('acceptation des conditions (S22c)', () => {
   let app: INestApplication;
@@ -42,11 +43,11 @@ e2eSuite('acceptation des conditions (S22c)', () => {
     app = await makeE2EApp();
     cookies = await registerAndLogin(app, user);
     autreCookies = await registerAndLogin(app, autre);
-  }, 60_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
     await teardown(app, [user.email, autre.email]);
-  }, 30_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   it('refuse un appel sans session', async () => {
     await request(app.getHttpServer()).get('/legal/terms/acceptance').expect(401);

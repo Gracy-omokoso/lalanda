@@ -6,7 +6,7 @@
 // instances sont construites ici, sur le modèle de l'application, et l'heure est
 // passée explicitement à `tick()` : aucun minuteur, aucune attente réelle.
 
-import { INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import { getModelToken } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 import { afterAll, beforeAll, expect, it } from 'vitest';
@@ -16,6 +16,7 @@ import 'reflect-metadata';
 import { ScheduledJob } from '../scheduler/scheduled-job.schema.js';
 import { LEASE_MS, POLL_MS, SchedulerService } from '../scheduler/scheduler.service.js';
 import { e2eSuite, makeE2EApp, teardown } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 const tag = Math.random().toString(36).slice(2, 8);
 const T0 = new Date('2030-01-01T10:00:00Z');
@@ -30,12 +31,12 @@ e2eSuite('ordonnanceur (S25a)', () => {
     model = app.get<Model<ScheduledJob>>(getModelToken(ScheduledJob.name));
     // L'index unique sur `key` doit exister pour ces tests comme en production.
     await model.createIndexes();
-  }, 60_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
     await model.deleteMany({ key: { $regex: `^t-${tag}-` } });
     await teardown(app, []);
-  }, 30_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   /** Une instance d'ordonnanceur neuve, comme un second processus d'API. */
   const instance = (): SchedulerService => new SchedulerService(model);

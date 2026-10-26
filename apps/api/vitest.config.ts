@@ -10,6 +10,9 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],
+    // Une base par fichier e2e, délais e2e, préchargement de l'application :
+    // voir l'en-tête du fichier. Sans effet sur les tests unitaires.
+    setupFiles: ['src/__tests__/e2e-database.setup.ts'],
     ...(reportForCI
       ? {
           reporters: ['default', 'json'],

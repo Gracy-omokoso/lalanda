@@ -36,6 +36,7 @@ import { main, type HomologationIo } from '../edef/homologation/homologation.js'
 import { startFakeEdefServer, type FakeEdefServer } from '../edef/testing/fake-edef-server.js';
 import { PdfRenderingService } from '../reports/pdf-rendering.service.js';
 import { dbOf, e2eSuite, makeE2EApp, registerAndLogin } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 const tag = randomBytes(4).toString('hex');
 process.env['MONGODB_DB'] = `lalanda_e2e_homologation_cli_${tag}`;
@@ -210,7 +211,7 @@ e2eSuite('ligne de commande edef:homologation — campagne réelle (ADR-0026 § 
       { type: 'RAM', description: 'Reprise (fictif)' },
       { type: 'RRR', description: 'Remise (fictif)' },
     ]);
-  }, 300_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
     try {
@@ -221,7 +222,7 @@ e2eSuite('ligne de commande edef:homologation — campagne réelle (ADR-0026 § 
       if (out) rmSync(out, { recursive: true, force: true });
       vi.restoreAllMocks();
     }
-  }, 60_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   describe('refus avant tout brouillon', () => {
     it('DGI_PRODUCTION_ENABLED vrai → refus, aucun contexte démarré', async () => {

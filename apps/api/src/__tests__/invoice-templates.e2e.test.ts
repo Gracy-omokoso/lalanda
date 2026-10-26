@@ -38,6 +38,7 @@ import { testLogoBytes } from '../sales/documents/testing/template-fixtures.js';
 import { contentSha256Of } from '../sales/invoices/canonical.js';
 import { ObjectStorageService } from '../storage/object-storage.service.js';
 import { dbOf, e2eSuite, makeE2EApp, registerAndLogin } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 const tag = randomBytes(4).toString('hex');
 process.env['MONGODB_DB'] = `lalanda_e2e_modeles_${tag}`;
@@ -326,7 +327,7 @@ e2eSuite('modèles de facture et identité visuelle (ADR-0028)', () => {
     });
     expect(cN.status, JSON.stringify(cN.body)).toBe(201);
     customerN = cN.body.id;
-  }, 300_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   beforeEach(() => clearThrottle());
 
@@ -347,7 +348,7 @@ e2eSuite('modèles de facture et identité visuelle (ADR-0028)', () => {
       await app?.close();
       await fake?.close();
     }
-  }, 60_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   // ── Sans modèle choisi : présentation d'origine, inchangée ─────────────────
 

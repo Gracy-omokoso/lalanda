@@ -14,8 +14,7 @@
 //  - aucune facture normalisée sans les CINQ éléments de sécurité, tels que
 //    reçus de la DGI : un élément vide est une erreur de programmation.
 
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Types, type ClientSession, type Connection, type Model } from 'mongoose';
 

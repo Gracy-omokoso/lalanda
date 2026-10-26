@@ -17,7 +17,7 @@
 //  8. Changement d'email : la nouvelle adresse n'est PAS appliquée sans
 //     vérification, et l'API annonce que l'email n'a pas pu être envoyé.
 
-import { INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import { LEGAL_VERSION } from '@lalanda/shared/legal';
 import { NestFactory } from '@nestjs/core';
 import { toNodeHandler } from 'better-auth/node';
@@ -27,6 +27,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest';
 import 'reflect-metadata';
 
 import { dbOf, e2eSuite, teardown } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 async function makeApp(): Promise<INestApplication> {
   const { AppModule } = await import('../app.module.js');
@@ -86,11 +87,11 @@ e2eSuite('espace compte (S20b — docs/04, docs/12, docs/17)', () => {
   beforeAll(async () => {
     app = await makeApp();
     cookiesA = await registerAndLogin(userA);
-  }, 60_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
     await teardown(app, [userA.email, userB.email, userOrphan.email, userSolo.email]);
-  }, 30_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   async function registerAndLogin(user: {
     email: string;

@@ -4,7 +4,7 @@
 // Chaque `it()` utilise un tag unique pour ses emails et son org : les tests sont donc
 // strictement indépendants et peuvent s'exécuter dans n'importe quel ordre.
 
-import { INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import { LEGAL_VERSION } from '@lalanda/shared/legal';
 import { NestFactory } from '@nestjs/core';
 import { toNodeHandler } from 'better-auth/node';
@@ -15,8 +15,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest';
 import 'reflect-metadata';
 
 import { e2eSuite, teardown } from './e2e-utils.js';
-
-import { e2eSuite, teardown } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 async function makeApp(): Promise<INestApplication> {
   const { AppModule } = await import('../app.module.js');
@@ -53,11 +52,11 @@ e2eSuite('invitations (brief §6, docs/12-ROLES-PERMISSIONS.md)', () => {
 
   beforeAll(async () => {
     app = await makeApp();
-  }, 60_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
     await teardown(app, allTestEmails);
-  }, 30_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   async function registerAndLogin(user: {
     email: string;

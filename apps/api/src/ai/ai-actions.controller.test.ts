@@ -17,7 +17,7 @@ import type { Plan } from '../billing/entitlements.js';
 import { AI_THROTTLE } from '../security/throttling.js';
 import { UserThrottlerGuard } from '../security/user-throttler.guard.js';
 import { AiActionsController } from './ai-actions.controller.js';
-import { AiActionsService } from './ai-actions.service.js';
+import type { AiActionsService } from './ai-actions.service.js';
 import { AiQuotaService } from './ai-quota.service.js';
 
 /**

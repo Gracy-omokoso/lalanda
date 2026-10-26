@@ -52,12 +52,7 @@ describe('rate limiting (S16a)', () => {
 
   describe('UserThrottlerGuard — compteur indexé par utilisateur', () => {
     // getTracker n'utilise ni options ni storage : on peut instancier avec des stubs.
-    const guard = new UserThrottlerGuard(
-      { throttlers: [] },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      {} as any,
-      new Reflector(),
-    );
+    const guard = new UserThrottlerGuard({ throttlers: [] }, {} as any, new Reflector());
     // Accès à la méthode protégée pour le test.
     const getTracker = (req: Record<string, unknown>): Promise<string> =>
       (guard as unknown as { getTracker(r: Record<string, unknown>): Promise<string> }).getTracker(

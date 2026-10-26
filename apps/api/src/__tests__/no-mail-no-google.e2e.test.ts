@@ -21,6 +21,7 @@ import { randomBytes } from 'node:crypto';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 
 import { dbOf, e2eSuite, makeE2EApp, teardown } from './e2e-utils.js';
+import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 // Retiré AVANT la construction de l'application : `buildAuth` lit `process.env`
 // au bootstrap et met son instance en cache pour tout le process.
@@ -64,11 +65,11 @@ e2eSuite('Démarrage sans configuration Google ni SMTP (S22a)', () => {
     cookies = (Array.isArray(brutes) ? brutes : brutes ? [brutes] : []).map(
       (c: string) => c.split(';')[0]!,
     );
-  }, 60_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
     await teardown(app, [EMAIL, EMAIL_INVITE, EMAIL_CIBLE]);
-  }, 30_000);
+  }, E2E_HOOK_TIMEOUT_MS);
 
   it("n'annonce pas Google et ne propose donc pas le bouton", async () => {
     const { default: request } = await import('supertest');
