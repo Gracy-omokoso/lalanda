@@ -14,7 +14,7 @@
 # de l'API du déploiement cible.
 
 # ─── Stage 1 : build ────────────────────────────────────────────────────────
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 
 RUN corepack enable
 WORKDIR /repo
@@ -49,7 +49,7 @@ ENV APP_VERSION=${APP_VERSION}
 RUN pnpm --filter @lalanda/web... run build
 
 # ─── Stage 2 : runtime ──────────────────────────────────────────────────────
-FROM node:20-alpine AS runtime
+FROM node:22-alpine AS runtime
 
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \

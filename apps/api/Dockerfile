@@ -5,7 +5,7 @@
 #
 # Choix Puppeteer (ADR-0007) : la génération PDF exige Chromium. Plutôt que de
 # laisser Puppeteer télécharger son propre binaire (~170 Mo, glibc requis, liens
-# dynamiques absents d'Alpine), on part de `node:20-slim` (Debian bookworm) et on
+# dynamiques absents d'Alpine), on part de `node:22-slim` (Debian bookworm) et on
 # installe le paquet `chromium` de la distribution. Puppeteer le trouve via
 # `PUPPETEER_EXECUTABLE_PATH` (variable lue nativement par la lib, aucun
 # changement de code) et `PUPPETEER_SKIP_DOWNLOAD=true` évite le double
@@ -13,7 +13,7 @@
 # par ReportsService (apps/api/src/reports/reports.service.ts).
 
 # ─── Stage 1 : build ────────────────────────────────────────────────────────
-FROM node:20-slim AS build
+FROM node:22-slim AS build
 
 # corepack fournit le pnpm épinglé par `packageManager` (pnpm@9.15.0).
 RUN corepack enable
@@ -54,7 +54,7 @@ RUN test -f /out/assets/fonts/NOTICE.md \
     && test -f /out/dist/sales/documents/templates/invoice-fonts.js
 
 # ─── Stage 2 : runtime ──────────────────────────────────────────────────────
-FROM node:20-slim AS runtime
+FROM node:22-slim AS runtime
 
 # Chromium de la distribution + polices (rendu PDF correct, y compris symboles).
 RUN apt-get update \

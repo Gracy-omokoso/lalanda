@@ -10,12 +10,12 @@ Chaîne de déploiement conforme à l'ADR-0009 (DigitalOcean Droplets + Spaces +
 ### Images Docker (multi-stage, non-root, healthchecks)
 
 - `apps/api/Dockerfile` — build pnpm workspace (`pnpm --filter @lalanda/api... build`
-  puis `pnpm deploy --prod`), runtime `node:20-slim` (Debian) avec le paquet
+  puis `pnpm deploy --prod`), runtime `node:22-slim` (Debian) avec le paquet
   `chromium` de la distribution pour Puppeteer/PDF (ADR-0007) via
   `PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium` — Alpine est exclu car le
   Chromium téléchargé par Puppeteer exige glibc. `HEALTHCHECK` sur `/health`.
 - `apps/web/Dockerfile` — `next build` avec `output: 'standalone'`
-  (activé dans `next.config.mjs`), runtime `node:20-alpine`. `HEALTHCHECK` sur
+  (activé dans `next.config.mjs`), runtime `node:22-alpine`. `HEALTHCHECK` sur
   `/health`. Attention : `NEXT_PUBLIC_API_URL` est inlinée au build (build-arg).
 - `.dockerignore` racine : secrets (`.env*`), node_modules, sorties de build.
 

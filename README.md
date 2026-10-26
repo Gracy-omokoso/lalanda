@@ -4,7 +4,7 @@ Lalanda est un SaaS de planification et de pilotage financier destiné aux entre
 
 ## Démarrage
 
-Prérequis : **Node 20**, **pnpm 9**. Docker est optionnel (voir plus bas).
+Prérequis : **Node 22**, **pnpm 9**. Docker est optionnel (voir plus bas).
 
 ### 1. Installer les dépendances
 

@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-10-20",
+  "generatedAt": "2026-10-26",
   "advisories": [
     {
-      "id": "GHSA-vfj7-8cjw-p6xm",
-      "module": "braces",
+      "id": "GHSA-mrhx-c7xc-m3w5",
+      "module": "zod",
       "severity": "high",
-      "title": "braces vulnerable to stack-exhaustion denial of service through deeply nested patterns"
+      "title": "Zod can exhaust memory while validating oversized constrained collections"
     }
   ]
 }
