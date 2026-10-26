@@ -93,6 +93,7 @@ fidèles aux maquettes `*.dc.html` validées.
 Écart assumé avec les maquettes : la ligne « Total HT » n'est pas imprimée — le moteur ne la
 fournit pas et l'API ne calcule rien (la base HT par groupe est imprimée). Voir décisions
 ouvertes.
+**Résorbé le 21 oct. 2026** par les versions 1.1.0 (amendement plus bas).
 
 ### 2. Zone DGI imposée, vérifiée à chaque rendu
 
@@ -249,6 +250,7 @@ options, aperçu agrandi, PDF complet, retour à la présentation d'origine.
 
 1. **« Total HT »** des maquettes : l'imprimer exige que le moteur le fournisse (somme des
    bases par groupe) ; à décider, puis ajouter au moteur (nouvelle version des modèles).
+   — **Tranché le 21 oct. 2026** : imprimé à partir des versions 1.1.0 (amendement plus bas).
 2. **Activation** : aucune organisation n'a de modèle choisi aujourd'hui (présentation
    d'origine). Faut-il basculer les organisations sur « Classique » par défaut ?
 3. **Logo indisponible** au retéléchargement d'un original : refus (retenu) ou impression
@@ -257,6 +259,57 @@ options, aperçu agrandi, PDF complet, retour à la présentation d'origine.
    conservation des factures.
 5. **SVG** : à rouvrir seulement avec un assainisseur SVG dédié et audité.
 6. Ancien champ « Logo (URL) » des paramètres : à retirer au profit de l'identité visuelle.
+   — **Fait le 21 oct. 2026** (amendement plus bas).
+
+## Amendement du 21 oct. 2026 — « Total HT » (décision ouverte n° 1)
+
+- **Moteur** : `invoiceHtTotal(groups)` (`packages/engine/src/invoice-totals/compute.ts`,
+  exportée par `@lalanda/engine`) rend la **somme des bases HT par groupe**
+  (`GroupTotals.ht`, taxe spécifique comprise), au centime, sans arrondi propre : chaque base
+  est déjà arrondie par la politique du calcul. **Aucune règle d'arrondi ne change** ;
+  `INVOICE_TOTALS_VERSION` reste `1.1.0`. C'est une fonction pure et non un champ de
+  `InvoiceTotals` : le calcul figé des factures déjà gelées (et leur `contentSha256`) ne
+  change pas, et ces factures obtiennent le même Total HT que les nouvelles. Propriété
+  vérifiée sur tous les cas de référence : Total HT + TVA = total.
+- **Modèle d'impression** : `InvoiceDocumentModel.htTotal` (mis en forme comme les autres
+  montants). Ce n'est **pas** une mention DGI : le vérificateur de la zone DGI
+  (`dgi-content.ts`) ne l'exige pas, sinon les versions 1.0.0 ne passeraient plus.
+- **Six modèles en version 1.1.0** (Classique, Bandeau, Latérale, Minimal, Compacte,
+  Éditoriale) : une ligne « Total HT » en tête du bloc des totaux, avant la taxe spécifique
+  et la TVA, dans le style de ce bloc. C'est la **seule** différence avec 1.0.0 (test : le
+  HTML 1.1.0 privé de cette ligne et de son numéro de version est identique au HTML 1.0.0).
+  Le choix d'une organisation pointe 1.1.0 ; les versions 1.0.0 restent publiées
+  (`registry.ts`) et **réimpriment octet pour octet** les factures gelées avec elles
+  (empreintes SHA-256 du rendu 1.0.0, relevées avant le changement, figées dans
+  `invoice-templates.test.ts`).
+- **Présentation d'origine** (organisations sans modèle choisi, gabarit 1.0.0) : inchangée,
+  pas de Total HT.
+- Maquettes `*.dc.html` : non présentes dans le dépôt ; position retenue « Total HT, TVA,
+  Total TTC », ordre usuel, à faire valider visuellement par la décideuse.
+
+## Amendement du 21 oct. 2026 — présentation exposée dans la vue facture
+
+- `InvoiceView.presentation` (`InvoicePresentationView`, ajout au contrat) : `null` pour un
+  brouillon (la présentation se fige au gel) ; `{ kind: 'original', … }` pour un document
+  gelé sans modèle choisi (ou avant le 21 oct. 2026) ; `{ kind: 'template', templateId,
+  templateLabel, version, options }` sinon — le modèle et la **version** qui impriment
+  l'original et les duplicatas. Le nom affiché vient de `INVOICE_TEMPLATE_LABELS`
+  (`template.contract.ts`, égal au `label` de chaque modèle, vérifié par test) : la vue ne
+  charge pas le rendu des modèles.
+- Fiche facture web : ligne « Présentation d'impression » (« Modèle Bandeau — version
+  1.1.0 », « · noir et blanc » le cas échéant, ou « Présentation d'origine »).
+
+## Amendement du 21 oct. 2026 — retrait de l'ancien « Logo (URL) » (décision ouverte n° 6)
+
+- API : `logoUrl` disparaît de `PUT /organizations/current/settings` (le schéma est
+  `.strict()` : un client qui l'envoie encore reçoit `400` plutôt qu'un `200` trompeur), de la
+  vue des paramètres et du tableau de bord de l'organisation ; il n'est plus écrit et plus
+  journalisé (`logoDefini` retiré de l'audit `organization.settings_updated`).
+- **Données** : rien n'est supprimé. Le champ reste déclaré dans `organization_settings`
+  (commentaire « retiré ») et une valeur déjà en base reste intacte, même après un nouvel
+  enregistrement des paramètres (test e2e).
+- Web : le champ est retiré de « Paramètres » (lien vers « Identité visuelle » à la place) et
+  le logo par URL n'est plus affiché sur le tableau de bord de l'organisation.
 
 ## Liens
 

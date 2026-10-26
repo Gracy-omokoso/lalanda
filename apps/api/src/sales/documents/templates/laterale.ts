@@ -5,6 +5,7 @@
 
 import {
   DGI_LABELS,
+  HT_TOTAL_LABEL,
   commentsHtml,
   creditRefHtml,
   div,
@@ -23,7 +24,7 @@ import type { InvoiceTemplate, TemplateRenderInput } from './template.contract.j
 
 const COLS = '2.6fr 0.7fr 0.6fr 0.9fr 1.2fr 1.2fr';
 
-function render({ document: m, dgi, brand, theme }: TemplateRenderInput) {
+function render({ document: m, dgi, brand, theme }: TemplateRenderInput, withHtTotal = false) {
   const dark = theme.onSide === '#ffffff';
   const css = `
   .doc { font-family: ${theme.body}; font-size: 11px; line-height: 1.45; color: #111827; display: flex; align-items: stretch; min-height: 268mm; }
@@ -93,7 +94,7 @@ function render({ document: m, dgi, brand, theme }: TemplateRenderInput) {
         ${each(m.groups, (g) => `<div class="sum"><span>Groupe ${esc(g.group)} · ${esc(g.rate)} · base ${esc(g.ht)}</span><span>TVA ${esc(g.vat)} · total ${esc(g.total)}</span></div>`)}
       </div>
       <div style="align-self:flex-end;width:270px;display:flex;flex-direction:column;gap:4px;break-inside:avoid">
-        ${specificTaxRow(m, (k, v) => `<div class="sum"><span>${esc(k)}</span><span>${esc(v)}</span></div>`)}
+        ${withHtTotal ? `<div class="sum"><span>${esc(HT_TOTAL_LABEL)}</span><span>${esc(m.htTotal)}</span></div>` : ''}${specificTaxRow(m, (k, v) => `<div class="sum"><span>${esc(k)}</span><span>${esc(v)}</span></div>`)}
         <div class="sum"><span>${esc(DGI_LABELS.vatTotal)}</span><span>${esc(m.vatTotal)}</span></div>
         <div class="sum" style="background:${theme.soft};padding:8px 10px;border-radius:6px;font-size:14px;font-weight:700"><span>Total TTC (${esc(m.currency)})</span><span>${esc(m.total)}</span></div>
       </div>
@@ -115,7 +116,11 @@ function render({ document: m, dgi, brand, theme }: TemplateRenderInput) {
   return { css, body };
 }
 
-export const LATERALE: InvoiceTemplate = {
+/**
+ * Version 1.0.0 — publiée le 21 oct. 2026, sans « Total HT ». Ne change plus :
+ * elle réimprime à l'identique les factures gelées avec elle (ADR-0028 § 4).
+ */
+export const LATERALE_1_0_0: InvoiceTemplate = {
   id: 'laterale',
   version: '1.0.0',
   label: 'Latérale',
@@ -124,4 +129,12 @@ export const LATERALE: InvoiceTemplate = {
   fontChoices: ['ibm-plex-sans', 'inter', 'manrope', 'source-serif-4'],
   page: { top: '12mm', bottom: '16mm', left: '0', right: '0' },
   render,
+};
+
+/** Version 1.1.0 — ligne « Total HT » (somme des bases par groupe, moteur ; ADR-0028
+ *  décision ouverte n° 1, 21 oct. 2026). Seule différence avec 1.0.0. */
+export const LATERALE: InvoiceTemplate = {
+  ...LATERALE_1_0_0,
+  version: '1.1.0',
+  render: (input) => render(input, true),
 };

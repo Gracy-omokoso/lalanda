@@ -4,13 +4,13 @@
 // `bandeau@1.0.0` se réimprime avec `bandeau@1.0.0`, même quand `1.1.0` existe.
 // Le choix d'une organisation pointe toujours la dernière version.
 
-import { BANDEAU } from './bandeau.js';
-import { CLASSIQUE } from './classique.js';
-import { COMPACTE } from './compacte.js';
-import { EDITORIALE } from './editoriale.js';
+import { BANDEAU, BANDEAU_1_0_0 } from './bandeau.js';
+import { CLASSIQUE, CLASSIQUE_1_0_0 } from './classique.js';
+import { COMPACTE, COMPACTE_1_0_0 } from './compacte.js';
+import { EDITORIALE, EDITORIALE_1_0_0 } from './editoriale.js';
 import { FONTS, isBodyFont, type BodyFontId, type FontId } from './invoice-fonts.js';
-import { LATERALE } from './laterale.js';
-import { MINIMAL } from './minimal.js';
+import { LATERALE, LATERALE_1_0_0 } from './laterale.js';
+import { MINIMAL, MINIMAL_1_0_0 } from './minimal.js';
 import {
   INVOICE_TEMPLATE_IDS,
   PALETTES,
@@ -24,13 +24,14 @@ import {
 } from './template.contract.js';
 
 /** Versions publiées, de la plus ancienne à la plus récente. Ne jamais en retirer. */
+// 1.1.0 (21 oct. 2026) : ligne « Total HT » (ADR-0028, décision ouverte n° 1).
 const VERSIONS: Readonly<Record<InvoiceTemplateId, readonly InvoiceTemplate[]>> = {
-  classique: [CLASSIQUE],
-  bandeau: [BANDEAU],
-  laterale: [LATERALE],
-  minimal: [MINIMAL],
-  compacte: [COMPACTE],
-  editoriale: [EDITORIALE],
+  classique: [CLASSIQUE_1_0_0, CLASSIQUE],
+  bandeau: [BANDEAU_1_0_0, BANDEAU],
+  laterale: [LATERALE_1_0_0, LATERALE],
+  minimal: [MINIMAL_1_0_0, MINIMAL],
+  compacte: [COMPACTE_1_0_0, COMPACTE],
+  editoriale: [EDITORIALE_1_0_0, EDITORIALE],
 };
 
 export function latestTemplate(id: InvoiceTemplateId): InvoiceTemplate {

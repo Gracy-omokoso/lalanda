@@ -103,7 +103,6 @@ export class OrganizationSpaceService {
       type: org.type,
       pays: org.pays,
       deviseAffichage: reglages?.deviseAffichage ?? DEFAULT_ORGANIZATION_SETTINGS.deviseAffichage,
-      logoUrl: reglages?.logoUrl ?? DEFAULT_ORGANIZATION_SETTINGS.logoUrl,
       updatedAt: reglages?.updatedAt ? new Date(reglages.updatedAt).toISOString() : null,
       options: { currencies: DISPLAY_CURRENCIES },
     };
@@ -112,7 +111,7 @@ export class OrganizationSpaceService {
   /**
    * Écrit les paramètres. Deux collections, deux responsabilités :
    * `organizations` porte l'identité (nom, pays), `organization_settings` la
-   * présentation (devise d'affichage, logo) — voir l'en-tête du schéma.
+   * présentation (devise d'affichage) — voir l'en-tête du schéma.
    *
    * Le `slug` n'est PAS régénéré au renommage : il est unique, indexé, et sert
    * d'identifiant stable. Le renommer casserait tout lien déjà partagé.
@@ -137,7 +136,8 @@ export class OrganizationSpaceService {
         {
           $set: {
             deviseAffichage: input.deviseAffichage,
-            logoUrl: input.logoUrl,
+            // `logoUrl` n'est plus écrit (ADR-0028, décision ouverte n° 6) : une
+            // valeur déjà en base reste telle quelle.
             updatedBy: actorUserId,
           },
           $setOnInsert: { organizationId, _schemaVersion: 1 },
@@ -273,7 +273,6 @@ export class OrganizationSpaceService {
         pays: org.pays,
         deviseAffichage: (reglages?.deviseAffichage ??
           DEFAULT_ORGANIZATION_SETTINGS.deviseAffichage) as DisplayCurrency,
-        logoUrl: reglages?.logoUrl ?? DEFAULT_ORGANIZATION_SETTINGS.logoUrl,
       },
       role,
       roleLabel: libelleRole(role),

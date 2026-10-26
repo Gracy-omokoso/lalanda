@@ -14,6 +14,7 @@ import {
   type DocumentKind,
   type InvoiceCreditNoteSummary,
   type InvoiceLineView,
+  type InvoicePresentationView,
   type InvoiceReadiness,
   type InvoiceStatus,
   type InvoiceSummary,
@@ -23,6 +24,10 @@ import {
   type NormalizationView,
   type NormalizationViewPhase,
 } from './invoice.contract.js';
+import {
+  INVOICE_TEMPLATE_LABELS,
+  isInvoiceTemplateId,
+} from '../documents/templates/template.contract.js';
 import type { InvoiceLean } from './invoice.types.js';
 import type { InvoiceNormalizationState, NormalizationPhase } from './normalization.port.js';
 
@@ -312,6 +317,7 @@ export function invoiceView(doc: InvoiceLean, ctx: InvoiceViewContext): InvoiceV
     seller: doc.seller ?? null,
     operator: doc.operator ?? null,
     softwareVersion: doc.softwareVersion ?? null,
+    presentation: presentationViewOf(doc),
     normalization: n
       ? normalizationViewOf(n, doc.status, ctx.permissions ?? NO_NORMALIZATION_PERMISSIONS)
       : null,
@@ -354,5 +360,33 @@ export function creditNoteSummary(doc: InvoiceLean): InvoiceCreditNoteSummary {
     proformaRef: doc.proformaRef,
     number: kind === 'invoice' ? (doc.number ?? null) : null,
     nature: doc.creditNote?.nature ?? 'RRR',
+  };
+}
+
+/**
+ * Présentation figée d'un document (ADR-0028 § 6) : `null` pour un brouillon,
+ * `original` pour un document gelé sans modèle choisi (ou avant le 21 oct. 2026).
+ */
+export function presentationViewOf(
+  doc: Pick<InvoiceLean, 'status' | 'presentation'>,
+): InvoicePresentationView | null {
+  if (doc.status === 'draft') return null;
+  const p = doc.presentation ?? null;
+  if (!p) {
+    return {
+      kind: 'original',
+      templateId: null,
+      templateLabel: null,
+      version: null,
+      options: null,
+    };
+  }
+  const id = p.template.id;
+  return {
+    kind: 'template',
+    templateId: id,
+    templateLabel: isInvoiceTemplateId(id) ? INVOICE_TEMPLATE_LABELS[id] : null,
+    version: p.template.version,
+    options: { palette: p.options.palette, accent: p.options.accent, font: p.options.font },
   };
 }

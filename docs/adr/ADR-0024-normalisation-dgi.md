@@ -452,6 +452,8 @@ par organisation et par série (bail), donc **au plus une** demande en attente d
 e-MCF (loin des dix) ; un sémaphore de processus limite à **4** les appels DGI simultanés ;
 nouveau quota `INVOICE_NORMALIZE_THROTTLE` (60 par heure et par utilisateur) sur `normalize`,
 `retry` et `check` ; les tâches de l'ordonnanceur espacent leurs appels d'au moins 500 ms.
+Précisé par l’amendement du 21 oct. 2026 (en fin de document) : plafond **par organisation** en plus, 429
+en français.
 
 ### 7. Étalonnage des arrondis (outil d'exploitation, environnement de TEST seulement)
 
@@ -874,6 +876,8 @@ constater l'état « incertain » puis sa résolution.
    facturation de l'entreprise pendant des heures. Lequel préférez-vous ?
 3. **Prévenir par e-mail ?** Proposé : un e-mail aux Propriétaires quand une facture passe en
    « vérification nécessaire », et quand un jeton e-MCF expire dans moins de 30 jours. D'accord ?
+   — **Mis en œuvre le 21 oct. 2026** (amendement plus bas), élargi au Directeur financier ;
+   l'avertissement avant expiration reste à trancher.
 4. **Écart de calcul avec la DGI.** Proposé : la facture est annulée auprès de la DGI, la
    personne voit « Écart de calcul entre Lalanda et la DGI — l'équipe Lalanda est prévenue », et
    l'équipe est alertée. Faut-il aussi prévenir l'entreprise par e-mail ?
@@ -890,6 +894,97 @@ chaque appel ; bail du numéro prolongé pendant l'incertitude ; vérification a
 `confirm`, sur le même `uid` seulement ; journal strict avant envoi ; aucune saisie humaine
 d'éléments de sécurité ; politique d'arrondi enregistrée dans le moteur ; production
 conditionnée à l'étalonnage ; jeton de chaque organisation pour ses seuls besoins.
+
+## Amendement du 21 oct. 2026 — limite de débit de la normalisation
+
+Tranche la proposition du § 6 (« Débit ») restée à mettre en œuvre : la route `POST
+…/normalize` n'avait **aucun** quota propre (seuls `retry` et `check` en portaient un), et
+aucune limite ne bornait une organisation entière.
+
+**Décision.**
+
+| Seau | Routes | Plafond | Clé |
+|---|---|---|---|
+| organisation | `POST …/normalize` **et** `POST …/normalization/retry`, compteur **commun** | 60 par heure | `org:<organizationId>` |
+| utilisateur | `normalize`, `retry`, `check`, compteur par route | 60 par heure | `user:<userId>` |
+
+- `check` ne lit que la DGI : il n'entame pas le plafond de l'organisation, seulement celui de
+  la personne.
+- Au-delà : **429** `NORMALIZATION_RATE_LIMITED` (ajouté à `INVOICE_ERROR_CODES`), message en
+  français qui dit quel plafond est atteint et combien de minutes attendre (« Votre
+  organisation a atteint la limite de 60 normalisations par heure auprès de la DGI.
+  Réessayez dans 12 minutes. »), `details` : `scope` (`organization` · `user`), `limit`,
+  `retryAfterSeconds` ; en-tête `Retry-After-normalization`. La fiche facture affiche ce
+  message tel quel.
+- Mise en œuvre : `apps/api/src/security/normalization-throttler.guard.ts`
+  (`OrgNormalizationThrottlerGuard`, `UserNormalizationThrottlerGuard`), constantes
+  `INVOICE_NORMALIZE_ORG_THROTTLE` et `INVOICE_NORMALIZE_THROTTLE` (`throttling.ts`).
+- **Infrastructure réutilisée** : le `ThrottlerModule` de `@nestjs/throttler` déjà en place
+  (S16a), stockage en mémoire du processus. Il n'existe **pas** de stockage Redis des quotas
+  (le conteneur Redis de `docker-compose.yml` n'est utilisé par aucun code) ; l'API tourne en
+  une seule instance, le plafond est donc exact. Si l'API se réplique, chaque instance aura
+  son compteur : il faudra un stockage partagé (Redis ou MongoDB) — à décider à ce moment-là.
+- Les guards portent leur limite **sans** `@Throttle` : ce décorateur est lu aussi par le
+  guard global par IP, qui appliquait jusqu'ici 60 par heure **par adresse** à `retry` et
+  `check` — un cabinet qui sert plusieurs organisations derrière un même NAT se serait
+  bloqué lui-même. Le guard global garde sa règle (100 par minute et par IP).
+- **Campagne d'homologation** (`apps/api/src/edef/homologation/**`, 58 normalisations
+  espacées de 500 ms) : vérifié, elle appelle `InvoiceFreezingService.normalize`
+  directement, sans HTTP ; elle n'est pas comptée. Le rattrapage de l'ordonnanceur non plus.
+
+**Tests.** `security/normalization-throttler.test.ts` : 61ᵉ envoi d'une organisation → 429
+(trois personnes différentes), seau commun `normalize`/`retry`, organisations isolées,
+`check` hors seau d'organisation, plafond par personne, message et arrondi des minutes,
+câblage des routes réelles (guards présents, aucun `@Throttle`).
+
+## Amendement du 21 oct. 2026 — alertes e-mail (décision ouverte n° 3)
+
+Met en œuvre la décision ouverte n° 3, élargie par la décideuse : prévenir par e-mail les
+**administrateurs fiscaux** de l'organisation, pas seulement les Propriétaires.
+
+**Destinataires.** Les rôles qui détiennent `fiscal.manage` (lus dans
+`ORG_PERMISSION_MATRIX`, jamais recopiés) : aujourd'hui Propriétaire et Directeur financier.
+Un message par personne, adresse dédoublonnée.
+
+**Causes, déclencheur et dédoublonnage.**
+
+| Cause | Déclencheur | Fenêtre de dédoublonnage |
+|---|---|---|
+| `normalization_uncertain` | document `pending_normalization` en phase `uncertain` ou `needs_review` depuis **15 min** (`uncertainSince`, à défaut `review.since`) | l'épisode (début de l'incertitude) : **une** alerte |
+| `number_abandoned` | entrée de journal `number_abandoned` (24 dernières heures) | l'heure de l'entrée : une alerte par numéro |
+| `token_rejected` | HTTP 401 de la DGI pendant une normalisation (envoi ou confirmation) ou un rattrapage | l'heure pleine : **au plus une par heure et par point de vente** |
+| `token_expired` | point de vente activé dont `dgi.tokenValidUntil` est passé | l'échéance : une alerte |
+
+- Le refus d'un jeton concerne un point de vente, pas un document : dix factures refusées
+  dans l'heure pour le même jeton ne font qu'**un** message (plus strict que « une par cause
+  et par document et par heure »).
+- Les trois états durables sont relus par la tâche `sales.normalization.alerts` (toutes les
+  5 min, lecture seule de l'état fiscal) : une alerte n'est pas perdue si le processus
+  s'arrête entre l'écriture fiscale et l'envoi. Le refus de jeton, qui n'est pas un état
+  durable, part sur le moment (`NormalizationAlertsService.tokenRejected`, sans attendre ni
+  bloquer la normalisation).
+- **Dédoublonnage** par l'index unique `{ organizationId, cause, subjectId, bucket }` de la
+  collection `normalization_alerts`, écrit **avant** l'envoi : deux passages, deux instances
+  ou deux refus simultanés ne produisent qu'un message. La même ligne **journalise**
+  l'alerte (instant, destinataires trouvés, messages remis) ; le journal serveur en garde une
+  trace (`AlertesNormalisation`). Index partiel ajouté au journal électronique :
+  `{ at: 1 }` sur les seules entrées `number_abandoned`.
+- **Envoi** : `MailService.sendNormalizationAlert`, gabarit `renderNormalizationAlert` (mise
+  en page commune, logo Lalanda joint en `cid:`, variante texte complète, lien en clair vers
+  la fiche du document ou l'onglet Fiscalité). Aucun NIF, jeton, identifiant e-MCF ni montant
+  dans le message. Un échec d'envoi n'interrompt jamais une normalisation.
+
+**Tests.** `mail.templates.test.ts` (quatre causes, propriétés communes, échappement) ;
+`normalization.e2e.test.ts` › « alertes e-mail aux administrateurs fiscaux », avec un faux
+transport : 401 → Propriétaire et DAF seulement, un seul message dans l'heure ; incertitude
+signalée à 16 min et pas à 5, une seule fois pour l'épisode même après « vérification
+nécessaire » ; numéro abandonné après déclaration ; jeton expiré, une fois par échéance.
+
+**Reste ouvert (à la décideuse).** (a) Prévenir **avant** l'expiration du jeton (proposition
+initiale : moins de 30 jours) — non fait, seule l'expiration est signalée ; (b) seuil de
+15 min avant l'alerte d'incertitude (le plafond de 30 min mène de toute façon à
+« vérification nécessaire ») ; (c) prévenir aussi l'équipe Lalanda (aujourd'hui : journal
+serveur et audit seulement, décision ouverte n° 4).
 
 ## Questions à poser à la DGI (complètent ADR-0019, ADR-0022 et ADR-0023)
 

@@ -6,10 +6,11 @@
 // arrivé par l'URL : la page dit alors ce que son rôle permet, elle n'affiche pas
 // une bannière rouge (pattern retenu sur /members en S20a).
 //
-// Limite annoncée plutôt que masquée : le logo se règle par URL, pas par upload —
-// aucun stockage de fichiers n'est branché, exactement comme la photo de profil
-// de l'espace compte (docs/04 § S20b).
+// Le logo ne se règle plus ici : l'ancien champ « Logo (URL) » est retiré au
+// profit de l'identité visuelle (ADR-0028, décision ouverte n° 6, 21 oct. 2026).
+// Une valeur déjà enregistrée reste en base, sans être affichée ni modifiée.
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
 import { api, type DisplayCurrency, type OrganizationSettingsView } from '@/lib/api';
@@ -27,7 +28,6 @@ export function SettingsPanel(): React.ReactElement {
   const [nom, setNom] = useState('');
   const [pays, setPays] = useState('');
   const [devise, setDevise] = useState<DisplayCurrency>('USD');
-  const [logo, setLogo] = useState('');
 
   /** Recharge et RÉINITIALISE le formulaire depuis la réponse du serveur. */
   const appliquer = useCallback((s: OrganizationSettingsView): void => {
@@ -35,7 +35,6 @@ export function SettingsPanel(): React.ReactElement {
     setNom(s.name);
     setPays(s.pays);
     setDevise(s.deviseAffichage);
-    setLogo(s.logoUrl ?? '');
   }, []);
 
   const charger = useCallback(async (): Promise<void> => {
@@ -70,9 +69,6 @@ export function SettingsPanel(): React.ReactElement {
         name: nom.trim(),
         pays: pays.trim().toUpperCase(),
         deviseAffichage: devise,
-        // Un champ vidé signifie « pas de logo ». La chaîne vide n'est pas une
-        // URL : l'envoyer telle quelle ferait échouer la validation serveur.
-        logoUrl: logo.trim() === '' ? null : logo.trim(),
       });
       appliquer(enregistre);
       setNotice('Paramètres enregistrés.');
@@ -168,21 +164,15 @@ export function SettingsPanel(): React.ReactElement {
         </select>
       </Champ>
 
-      <Champ
-        id="org-logo"
-        label="Logo (URL)"
-        aide="Adresse http(s) d’une image déjà en ligne. L’envoi de fichier n’est pas disponible : le stockage n’est pas encore branché. Laissez vide pour n’afficher aucun logo."
-      >
-        <input
-          id="org-logo"
-          type="url"
-          value={logo}
-          onChange={(e) => setLogo(e.target.value)}
-          placeholder="https://…"
-          aria-describedby="org-logo-aide"
-          className={CHAMP}
-        />
-      </Champ>
+      {/* L'ancien champ « Logo (URL) » est retiré (ADR-0028, décision ouverte n° 6) :
+          le logo se gère dans l'identité visuelle, qui le joint aux factures. */}
+      <p className="text-sm text-[var(--foreground-muted)]">
+        Le logo et les couleurs de l’organisation se gèrent dans{' '}
+        <Link className="underline" href="/organisation/identite">
+          Identité visuelle
+        </Link>
+        .
+      </p>
 
       <div className="flex flex-wrap items-center gap-3">
         <button

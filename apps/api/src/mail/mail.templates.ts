@@ -294,6 +294,105 @@ export function renderNormalizedInvoicingDisabled(input: {
   };
 }
 
+/** Causes d'une alerte de normalisation (ADR-0024, décision ouverte n° 3, amendement du 21 oct. 2026). */
+export type NormalizationAlertCause =
+  'normalization_uncertain' | 'number_abandoned' | 'token_rejected' | 'token_expired';
+
+/**
+ * Alerte de normalisation DGI — envoyée aux administrateurs fiscaux de
+ * l'organisation (Propriétaire, Directeur financier : `fiscal.manage`).
+ *
+ * Elle dit ce qui se passe, sur quel document ou quel point de vente, et quoi
+ * faire. Elle ne contient ni NIF, ni jeton, ni identifiant e-MCF, ni montant :
+ * le détail se lit dans Lalanda, derrière la connexion.
+ */
+export function renderNormalizationAlert(input: {
+  cause: NormalizationAlertCause;
+  /** Fiche du document, ou page Fiscalité pour un point de vente. */
+  url: string;
+  organizationName: string;
+  /** Référence lisible : numéro ou référence pro forma, ou nom du point de vente. */
+  subjectLabel: string;
+  /** Instant qui date l'alerte : début de l'incertitude, abandon, refus, expiration. */
+  since: Date;
+  /** Numéro abandonné (cause `number_abandoned`). */
+  number?: string | null;
+}): RenderedMail {
+  const org = input.organizationName;
+  const when = formatDateFr(input.since);
+  const common = `Vous recevez ce message parce que vous gérez la fiscalité de l'organisation « ${org} » sur Lalanda (Propriétaire ou Directeur financier).`;
+  const content = ((): {
+    subject: string;
+    heading: string;
+    paragraphs: string[];
+    ctaLabel: string;
+    footnote: string;
+  } => {
+    switch (input.cause) {
+      case 'normalization_uncertain':
+        return {
+          subject: `normalisation incertaine pour ${input.subjectLabel}`,
+          heading: 'Normalisation DGI à vérifier',
+          paragraphs: [
+            'Bonjour,',
+            `Lalanda ne sait pas encore si la DGI a normalisé le document ${input.subjectLabel} de l'organisation « ${org} » : la réponse de la DGI manque depuis le ${when}.`,
+            "Lalanda revérifie automatiquement auprès de la DGI. Tant que l'état n'est pas établi, ce document n'est pas une facture et ne doit pas être remis au client.",
+            "Si l'état reste incertain, vérifiez auprès de la DGI, puis suivez les indications de la fiche du document.",
+          ],
+          ctaLabel: 'Ouvrir le document',
+          footnote: "Vous ne recevrez pas d'autre message pour cette même incertitude.",
+        };
+      case 'number_abandoned':
+        return {
+          subject: `numéro de facture abandonné (${input.number ?? input.subjectLabel})`,
+          heading: 'Numéro de facture abandonné',
+          paragraphs: [
+            'Bonjour,',
+            `Le numéro ${input.number ?? '(inconnu)'}, réservé pour le document ${input.subjectLabel} de l'organisation « ${org} », n'a pas pu être rendu le ${when} : d'autres numéros avaient déjà été attribués.`,
+            "Ce numéro reste un trou dans la série des factures. Il est tracé, avec son motif, dans le journal électronique de l'organisation : gardez-le pour répondre à un contrôle.",
+          ],
+          ctaLabel: 'Ouvrir le document',
+          footnote: 'Le motif exact figure sur la fiche du document et dans le journal.',
+        };
+      case 'token_rejected':
+        return {
+          subject: `jeton e-MCF refusé par la DGI (${input.subjectLabel})`,
+          heading: 'Jeton e-MCF refusé par la DGI',
+          paragraphs: [
+            'Bonjour,',
+            `Le ${when}, la DGI a refusé le jeton du point de vente « ${input.subjectLabel} » de l'organisation « ${org} ».`,
+            "Tant que le jeton n'est pas renouvelé, les factures de ce point de vente ne peuvent plus être normalisées, ni vérifiées auprès de la DGI.",
+            'Obtenez un nouveau jeton sur le portail de la DGI, puis enregistrez-le dans l’onglet Fiscalité.',
+          ],
+          ctaLabel: "Ouvrir l'onglet Fiscalité",
+          footnote:
+            'Au plus un message par heure et par point de vente tant que le refus persiste.',
+        };
+      case 'token_expired':
+        return {
+          subject: `jeton e-MCF expiré (${input.subjectLabel})`,
+          heading: 'Jeton e-MCF expiré',
+          paragraphs: [
+            'Bonjour,',
+            `Le jeton du point de vente « ${input.subjectLabel} » de l'organisation « ${org} » a expiré le ${when}.`,
+            "Tant qu'il n'est pas renouvelé, les factures de ce point de vente ne peuvent plus être normalisées.",
+            'Obtenez un nouveau jeton sur le portail de la DGI, puis enregistrez-le dans l’onglet Fiscalité.',
+          ],
+          ctaLabel: "Ouvrir l'onglet Fiscalité",
+          footnote: 'Vous ne recevrez pas d’autre message pour cette même échéance.',
+        };
+    }
+  })();
+  const rendered = layout({
+    heading: content.heading,
+    paragraphs: content.paragraphs,
+    ctaLabel: content.ctaLabel,
+    ctaUrl: input.url,
+    footnotes: [common, content.footnote],
+  });
+  return { ...rendered, subject: `${PRODUCT} — ${content.subject}` };
+}
+
 /**
  * Date lisible en français, en UTC.
  *

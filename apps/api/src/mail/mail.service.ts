@@ -18,12 +18,14 @@
 
 import { Inject, Injectable } from '@nestjs/common';
 
-import { webUrl } from './mail.links.js';
+import { fiscalPageUrl, invoicePageUrl } from './mail.links.js';
 import {
   renderEmailVerification,
   renderInvitation,
+  renderNormalizationAlert,
   renderNormalizedInvoicingDisabled,
   renderPasswordReset,
+  type NormalizationAlertCause,
 } from './mail.templates.js';
 import { MailTransport } from './mail.transport.js';
 import type { MailDeliveryResult } from './mail.types.js';
@@ -67,6 +69,21 @@ export interface NormalizedInvoicingDisabledMail {
 }
 
 /**
+ * Alerte de normalisation DGI — un envoi par administrateur fiscal
+ * (ADR-0024, décision ouverte n° 3, amendement du 21 oct. 2026).
+ * Document (`invoiceId`) ou point de vente (sans `invoiceId`).
+ */
+export interface NormalizationAlertMail {
+  to: string;
+  cause: NormalizationAlertCause;
+  organizationName: string;
+  subjectLabel: string;
+  since: Date;
+  invoiceId?: string | null | undefined;
+  number?: string | null | undefined;
+}
+
+/**
  * Contrat d'envoi du produit. Voir l'en-tête de fichier.
  *
  * Aucune méthode ne LÈVE sur échec d'envoi : toutes retournent un
@@ -82,6 +99,7 @@ export abstract class MailService {
   abstract sendNormalizedInvoicingDisabled(
     input: NormalizedInvoicingDisabledMail,
   ): Promise<MailDeliveryResult>;
+  abstract sendNormalizationAlert(input: NormalizationAlertMail): Promise<MailDeliveryResult>;
 }
 
 /** Implémentation par défaut : rendu des gabarits puis remise au transport. */
@@ -132,11 +150,24 @@ export class TemplatedMailService extends MailService {
   ): Promise<MailDeliveryResult> {
     const body = renderNormalizedInvoicingDisabled({
       // Page Fiscalité de l'espace organisation (ADR-0021 §12, chantier C).
-      url: `${webUrl()}/organisation/fiscalite`,
+      url: fiscalPageUrl(),
       organizationName: input.organizationName,
       deactivatedAt: input.deactivatedAt,
       reason: input.reason,
       actorName: input.actorName ?? null,
+    });
+    return this.transport.send({ to: input.to, ...body });
+  }
+
+  async sendNormalizationAlert(input: NormalizationAlertMail): Promise<MailDeliveryResult> {
+    const body = renderNormalizationAlert({
+      cause: input.cause,
+      // Document → sa fiche ; point de vente → l'onglet Fiscalité.
+      url: input.invoiceId ? invoicePageUrl(input.invoiceId) : fiscalPageUrl(),
+      organizationName: input.organizationName,
+      subjectLabel: input.subjectLabel,
+      since: input.since,
+      number: input.number ?? null,
     });
     return this.transport.send({ to: input.to, ...body });
   }

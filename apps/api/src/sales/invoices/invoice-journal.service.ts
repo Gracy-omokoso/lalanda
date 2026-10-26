@@ -199,6 +199,41 @@ export class InvoiceJournalService {
     return docs.map((d) => ({ ...viewOf(d), prevHash: d.prevHash }));
   }
 
+  /**
+   * Numéros abandonnés depuis `since`, toutes organisations (lecture seule) :
+   * alertes e-mail de la normalisation (ADR-0024, amendement du 21 oct. 2026).
+   * Servi par l'index partiel `{ at: 1 }` des entrées `number_abandoned`.
+   */
+  async abandonedSince(
+    since: Date,
+    limit: number,
+  ): Promise<
+    {
+      organizationId: string;
+      at: Date;
+      invoiceId: string | null;
+      number: string | null;
+      proformaRef: string | null;
+    }[]
+  > {
+    const docs = await this.entries
+      .find(
+        { event: 'number_abandoned', at: { $gte: since } },
+        { organizationId: 1, at: 1, invoiceId: 1, number: 1, proformaRef: 1 },
+      )
+      .sort({ at: 1 })
+      .limit(limit)
+      .lean<EntryLean[]>()
+      .exec();
+    return docs.map((d) => ({
+      organizationId: d.organizationId,
+      at: new Date(d.at),
+      invoiceId: d.invoiceId ?? null,
+      number: d.number ?? null,
+      proformaRef: d.proformaRef ?? null,
+    }));
+  }
+
   /** Entrées qui portent ces documents (export), par `seq` croissant. */
   async entriesOfInvoices(
     organizationId: string,

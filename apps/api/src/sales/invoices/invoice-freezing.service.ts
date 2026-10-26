@@ -579,6 +579,7 @@ export class InvoiceFreezingService {
                     number: numbered.number,
                     series: numbered.series,
                     fiscalYear: numbered.fiscalYear,
+                    fiscalSeq: numbered.fiscalSeq,
                     issuedAt: numbered.issuedAt,
                     sortAt: numbered.issuedAt,
                     searchKey: invoiceSearchKey({ ...doc, number: numbered.number }),

@@ -51,6 +51,7 @@ describe('normalisation — lecture des sources', () => {
       'reconciliation.job.ts',
       'reference-refresh.job.ts',
       'consistency.job.ts',
+      'alerts.job.ts',
     ]) {
       const text = await readFile(resolve(ICI, file), 'utf8');
       expect(text, file).not.toMatch(/submitInvoice|confirmInvoice/);

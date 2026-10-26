@@ -8,8 +8,15 @@
 //
 // Aucun calcul : les montants sont ceux figés par le moteur, seulement mis en
 // forme (séparateur de milliers, virgule décimale) par manipulation de chaînes.
+// Le Total HT est la somme des bases par groupe, faite par le moteur
+// (`invoiceHtTotal`, ADR-0028 décision ouverte n° 1), pas ici.
 
-import type { DocumentCurrency, InvoiceTotals, LineTotals } from '@lalanda/engine';
+import {
+  invoiceHtTotal,
+  type DocumentCurrency,
+  type InvoiceTotals,
+  type LineTotals,
+} from '@lalanda/engine';
 
 import { CUSTOMER_TYPE_LABELS } from '../sales.dto.js';
 import type { CreditNoteNature, DocumentKind, InvoiceType } from '../invoices/invoice.contract.js';
@@ -116,6 +123,13 @@ export interface InvoiceDocumentModel {
   lines: DocumentLine[];
   groups: DocumentGroupTotal[];
   specificTaxTotal: string | null;
+  /**
+   * Total HT (ADR-0028, décision ouverte n° 1, 21 oct. 2026) : somme des bases
+   * par groupe, fournie par le moteur (`invoiceHtTotal`). Imprimé par les modèles
+   * à partir de leur version 1.1.0 ; ni la présentation d'origine ni les versions
+   * 1.0.0 ne le lisent (réimpression à l'identique). Hors mentions DGI.
+   */
+  htTotal: string;
   vatTotal: string;
   total: string;
   totalInWords: string;
@@ -496,6 +510,7 @@ export function buildInvoiceDocument(
       total: formatAmount(g.total),
     })),
     specificTaxTotal: totals.specificTax !== '0.00' ? formatAmount(totals.specificTax) : null,
+    htTotal: formatAmount(invoiceHtTotal(totals.groups)),
     vatTotal: formatAmount(totals.vatTotal),
     total: formatAmount(totals.total),
     totalInWords: `${subject} à la somme de : ${words}.`,

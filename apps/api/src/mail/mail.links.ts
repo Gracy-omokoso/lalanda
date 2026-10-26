@@ -57,6 +57,16 @@ export function signupVerificationUrl(token: string): string {
   );
 }
 
+/** Fiche d'un document de vente — `apps/web/src/app/(app)/ventes/factures/[invoiceId]`. */
+export function invoicePageUrl(invoiceId: string): string {
+  return `${webUrl()}/ventes/factures/${encodeURIComponent(invoiceId)}`;
+}
+
+/** Onglet Fiscalité de l'organisation — `apps/web/src/app/(app)/organisation/fiscalite`. */
+export function fiscalPageUrl(): string {
+  return `${webUrl()}/organisation/fiscalite`;
+}
+
 function trimSlash(value: string): string {
   return value.replace(/\/+$/, '');
 }

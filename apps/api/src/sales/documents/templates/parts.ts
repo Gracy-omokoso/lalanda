@@ -127,5 +127,11 @@ export function specificTaxRow(
   return m.specificTaxTotal ? row(DGI_LABELS.specificTax, m.specificTaxTotal) : '';
 }
 
+/**
+ * Libellé de la ligne « Total HT » (modèles 1.1.0 et suivants, ADR-0028 décision
+ * ouverte n° 1). Pas une mention DGI : absente des versions 1.0.0.
+ */
+export const HT_TOTAL_LABEL = 'Total HT';
+
 /** Fragment de texte échappé. */
 export const t = esc;

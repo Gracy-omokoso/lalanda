@@ -934,6 +934,18 @@ export class NormalizationRecorder {
       .exec();
   }
 
+  /** Lecture seule — alertes e-mail : normalisations `uncertain` ou `needs_review`. */
+  async findUncertain(limit: number): Promise<InvoiceLean[]> {
+    return this.invoices
+      .find({
+        status: 'pending_normalization',
+        'normalization.phase': { $in: ['uncertain', 'needs_review'] },
+      })
+      .limit(limit)
+      .lean<InvoiceLean[]>()
+      .exec();
+  }
+
   async findReservedSince(cutoff: Date, limit: number): Promise<InvoiceLean[]> {
     return this.invoices
       .find({

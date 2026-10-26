@@ -73,7 +73,13 @@ export class InvoiceNumberingService {
   async assignOnIssue(
     organizationId: string,
     opts: { session: ClientSession; type: InvoiceType; now?: Date },
-  ): Promise<{ number: string; series: 'real'; fiscalYear: number; issuedAt: Date }> {
+  ): Promise<{
+    number: string;
+    series: 'real';
+    fiscalYear: number;
+    fiscalSeq: number;
+    issuedAt: Date;
+  }> {
     const now = opts.now ?? new Date();
     const year = fiscalYearOf(now);
     const counter = await this.counters
@@ -108,6 +114,7 @@ export class InvoiceNumberingService {
       ),
       series: 'real',
       fiscalYear: year,
+      fiscalSeq: counter.last,
       issuedAt,
     };
   }
@@ -253,6 +260,7 @@ export class InvoiceNumberingService {
             number: reserved,
             series: parsed.series,
             fiscalYear: parsed.year,
+            fiscalSeq: parsed.seq,
             issuedAt: effective,
             sortAt: effective,
             searchKey: invoiceSearchKey({ ...invoice, number: reserved }),

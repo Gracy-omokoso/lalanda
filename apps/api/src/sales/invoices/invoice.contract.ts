@@ -442,6 +442,20 @@ export interface InvoiceReadiness {
   warnings: readonly { code: ReadinessWarningCode; message: string; lineIndex?: number | null }[];
 }
 
+/**
+ * Présentation d'impression FIGÉE au gel (ADR-0028 § 6 ; exposée le 21 oct. 2026).
+ * `template` : modèle et version qui impriment l'original et les duplicatas ;
+ * `original` : aucun modèle choisi au gel — présentation d'origine.
+ */
+export interface InvoicePresentationView {
+  kind: 'template' | 'original';
+  templateId: string | null;
+  /** Nom affiché du modèle ; `null` pour la présentation d'origine ou un modèle inconnu. */
+  templateLabel: string | null;
+  version: string | null;
+  options: { palette: string; accent: string; font: string } | null;
+}
+
 export interface InvoiceView {
   id: string;
   status: InvoiceStatus;
@@ -479,6 +493,8 @@ export interface InvoiceView {
   operator: OperatorView | null;
   /** Version de Lalanda qui a gelé le document ; `null` : brouillon, ou gelé avant le 20 oct. 2026. */
   softwareVersion: string | null;
+  /** `null` : brouillon (la présentation se fige au gel, avec le modèle choisi à ce moment). */
+  presentation: InvoicePresentationView | null;
   normalization: NormalizationView | null;
   readiness: InvoiceReadiness;
   revision: number;
@@ -770,6 +786,9 @@ export const INVOICE_ERROR_CODES = {
     'NORMALIZATION_NOT_UNDER_REVIEW',
   ],
   422: ['INVOICE_NOT_ISSUABLE'],
+  // ADR-0024 § 6, amendement du 21 oct. 2026 : plafond de normalisation atteint
+  // (`details` : `scope` « organization » | « user », `limit`, `retryAfterSeconds`).
+  429: ['NORMALIZATION_RATE_LIMITED'],
 } as const;
 export type InvoiceErrorCode =
   (typeof INVOICE_ERROR_CODES)[keyof typeof INVOICE_ERROR_CODES][number];

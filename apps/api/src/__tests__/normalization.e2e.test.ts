@@ -24,7 +24,11 @@ import {
   type FakeEdefServer,
 } from '../edef/testing/fake-edef-server.js';
 import { PointsOfSaleService } from '../fiscal/points-of-sale.service.js';
+import { IndexesService } from '../database/indexes.service.js';
+import { MailTransport } from '../mail/mail.transport.js';
+import type { MailMessage } from '../mail/mail.types.js';
 import { fiscalPeriodOf, formatInvoiceNumber } from '../sales/invoices/invoice-numbering.js';
+import { NormalizationAlertsJob } from '../sales/normalization/alerts.job.js';
 import { EdefSalesInvoiceNormalizer } from '../sales/normalization/edef-normalizer.js';
 import { NormalizationConsistencyJob } from '../sales/normalization/consistency.job.js';
 import { NormalizationRecorder } from '../sales/normalization/normalization-recorder.js';
@@ -404,6 +408,11 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
         dgiRequestId: rec.uid,
         reservedNumber: rn,
         actions: { retry: false, check: false, declareNotNormalized: false, backToDraft: false },
+      });
+      // ADR-0027, amendement du 21 oct. 2026 : rang de la série d'essai stocké.
+      expect(await enBase(view.id)).toMatchObject({
+        fiscalSeq: Number(rn.slice(-6)),
+        fiscalYear: 2000 + Number(rn.slice(7, 9)),
       });
       // Date DGI (heure de Kinshasa) → issuedAt.
       const [d, m, y, hh, mm, ss] = rec.security!.dateTime.split(/[/ :]/);
@@ -1316,6 +1325,144 @@ e2eSuite('normalisation DGI (ADR-0024 chantier F2)', () => {
             ? await get(asB(), url)
             : await post(asB(), url, { reason: 'Motif suffisamment long pour passer.' });
         expect(res.status, path).toBe(404);
+      }
+    });
+  });
+
+  // ── Alertes e-mail (ADR-0024, décision ouverte n° 3, amendement du 21 oct. 2026) ──
+
+  describe('alertes e-mail aux administrateurs fiscaux', () => {
+    const envoyes: MailMessage[] = [];
+    const alertesJob = () => app.get(NormalizationAlertsJob);
+    /** Messages reçus par `to` dont le sujet contient `motif`. */
+    const recus = (motif: string) => envoyes.filter((m) => m.subject.includes(motif));
+    const destinataires = (motif: string) =>
+      recus(motif)
+        .map((m) => m.to)
+        .sort();
+
+    beforeAll(async () => {
+      // Le dédoublonnage repose sur l'index unique de `normalization_alerts` :
+      // on attend qu'il existe (construction en arrière-plan sur une base neuve).
+      await app.get(IndexesService).ensureAll();
+      // Faux transport : rien ne part, tout est retenu pour les assertions.
+      vi.spyOn(app.get(MailTransport), 'send').mockImplementation(async (m: MailMessage) => {
+        envoyes.push(m);
+        return { delivered: true };
+      });
+    });
+    afterAll(() => {
+      vi.restoreAllMocks();
+    });
+    beforeEach(() => {
+      envoyes.length = 0;
+    });
+
+    it('jeton refusé (401) : Propriétaire et DAF prévenus, une seule fois dans l’heure', async () => {
+      fake.setToken(JETON, {
+        nif: NIF_N,
+        nim: NIM,
+        tokenValid: '2099-01-31T00:00:00',
+        behaviour: 'unauthorized',
+      });
+      try {
+        const premier = await normaliser();
+        expect(premier.view.normalization.lastError).toMatchObject({
+          category: 'token_rejected',
+        });
+        await vi.waitFor(() => expect(recus('jeton e-MCF refusé')).toHaveLength(2));
+        expect(destinataires('jeton e-MCF refusé')).toEqual(
+          [emails['owner'], emails['finance_director']].sort(),
+        );
+        const mail = recus('jeton e-MCF refusé')[0]!;
+        expect(mail.subject).toBe('Lalanda — jeton e-MCF refusé par la DGI (Boutique)');
+        expect(mail.text).toContain('/organisation/fiscalite');
+        // Aucun secret, aucun identifiant fiscal dans le message.
+        expect(mail.text).not.toContain(JETON);
+        expect(mail.text).not.toContain(NIF_N);
+        expect(mail.html).toContain('cid:logo-lalanda');
+
+        // Second refus dans l'heure : pas de nouveau message.
+        await normaliser();
+        await new Promise((r) => setTimeout(r, 300));
+        expect(recus('jeton e-MCF refusé')).toHaveLength(2);
+        const lignes = await db
+          .collection('normalization_alerts')
+          .find({ organizationId: orgN, cause: 'token_rejected' })
+          .toArray();
+        expect(lignes).toHaveLength(1);
+        expect(lignes[0]).toMatchObject({ subjectId: posN, recipients: 2, delivered: 2 });
+      } finally {
+        fake.setToken(JETON, { nif: NIF_N, nim: NIM, tokenValid: '2099-01-31T00:00:00' });
+      }
+    });
+
+    it('normalisation incertaine au-delà de 15 min, puis numéro abandonné : une alerte chacun', async () => {
+      const { view, rn } = await normaliser([
+        'confirm_timeout_after_finalize',
+        'details_without_security',
+      ]);
+      expect(view.normalization).toMatchObject({ phase: 'uncertain' });
+      // 5 minutes : trop tôt.
+      await alertesJob().run(new Date(Date.now() + 5 * MINUTE));
+      expect(recus(rn)).toHaveLength(0);
+      // 16 minutes : une alerte à chaque administrateur fiscal…
+      await alertesJob().run(new Date(Date.now() + 16 * MINUTE));
+      expect(destinataires(`normalisation incertaine pour ${rn}`)).toEqual(
+        [emails['owner'], emails['finance_director']].sort(),
+      );
+      const mail = recus(`normalisation incertaine pour ${rn}`)[0]!;
+      expect(mail.text).toContain(`/ventes/factures/${view.id}`);
+      // … et une seule par épisode, même en « vérification nécessaire » ensuite.
+      expect(await rattraper(view.id)).toBe('uncertain');
+      await alertesJob().run(new Date(Date.now() + 50 * MINUTE));
+      await alertesJob().run(new Date(Date.now() + 3 * 3600_000));
+      expect(recus(`normalisation incertaine pour ${rn}`)).toHaveLength(2);
+
+      // Numéro abandonné : une autre facture prend le suivant, puis déclaration.
+      expect((await normaliser()).view.status).toBe('normalized');
+      await reauth('finance_director');
+      const declare = await post(
+        asN('finance_director'),
+        `/sales/invoices/${view.id}/normalization/declare-not-normalized`,
+        { reason: 'Vérifié auprès de l’assistance DGI : non normalisée (test).' },
+      );
+      expect(declare.status, JSON.stringify(declare.body)).toBe(200);
+      expect(await journal(view.id)).toContain('number_abandoned');
+      envoyes.length = 0;
+      await alertesJob().run();
+      await alertesJob().run();
+      expect(destinataires(`numéro de facture abandonné (${rn})`)).toEqual(
+        [emails['owner'], emails['finance_director']].sort(),
+      );
+      expect(recus(`numéro de facture abandonné (${rn})`)[0]!.text).toContain(rn);
+      const lignes = await db
+        .collection('normalization_alerts')
+        .find({ organizationId: orgN, subjectId: view.id })
+        .toArray();
+      expect(lignes.map((l) => l['cause']).sort()).toEqual([
+        'normalization_uncertain',
+        'number_abandoned',
+      ]);
+    });
+
+    it('jeton expiré : une alerte par échéance', async () => {
+      const pos = { _id: new ObjectId(posN) };
+      const avant = await db.collection('emcf_points_of_sale').findOne(pos);
+      const echeance = new Date(Date.now() - 3600_000);
+      await db
+        .collection('emcf_points_of_sale')
+        .updateOne(pos, { $set: { 'dgi.tokenValidUntil': echeance } });
+      try {
+        await alertesJob().run();
+        await alertesJob().run();
+        expect(destinataires('jeton e-MCF expiré (Boutique)')).toEqual(
+          [emails['owner'], emails['finance_director']].sort(),
+        );
+      } finally {
+        await db
+          .collection('emcf_points_of_sale')
+          .updateOne(pos, { $set: { 'dgi.tokenValidUntil': avant?.['dgi']?.['tokenValidUntil'] } });
       }
     });
   });

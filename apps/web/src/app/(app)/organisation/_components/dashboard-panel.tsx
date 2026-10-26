@@ -116,17 +116,6 @@ export function DashboardPanel(): React.ReactElement {
       {/* ── Identité de l'organisation ─────────────────────────────────── */}
       <section className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-start gap-3">
-          {organization.logoUrl ? (
-            // Logo par URL seulement (aucun stockage de fichiers branché) :
-            // `<img>` brut et non `next/image`, qui exigerait de déclarer chaque
-            // domaine distant dans la configuration.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={organization.logoUrl}
-              alt=""
-              className="h-11 w-11 shrink-0 rounded-md border border-[var(--border)] object-contain"
-            />
-          ) : null}
           <div className="flex flex-col gap-1">
             <h2 className="font-display text-xl font-semibold tracking-tight">
               {organization.name}

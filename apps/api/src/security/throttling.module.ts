@@ -9,6 +9,8 @@
 //   et ne passent PAS par ce guard — better-auth a sa propre limitation de tentatives.
 // - UserThrottlerGuard : exporté pour les quotas par utilisateur au niveau route
 //   (ex. POST /ai/corrective-actions, endpoint facturé OpenAI — ADR-0008).
+// - Org/UserNormalizationThrottlerGuard : plafonds de la normalisation DGI, par
+//   organisation et par utilisateur (ADR-0024 § 6), 429 en français.
 //
 // @Global : expose UserThrottlerGuard et les providers du ThrottlerModule à tous les
 // modules sans réimport (même patron que AuthModule pour AuthGuard).
@@ -18,13 +20,27 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 
 import { ClientIpThrottlerGuard } from './client-ip-throttler.guard.js';
+import {
+  OrgNormalizationThrottlerGuard,
+  UserNormalizationThrottlerGuard,
+} from './normalization-throttler.guard.js';
 import { GLOBAL_THROTTLE } from './throttling.js';
 import { UserThrottlerGuard } from './user-throttler.guard.js';
 
 @Global()
 @Module({
   imports: [ThrottlerModule.forRoot([{ name: 'default', ...GLOBAL_THROTTLE }])],
-  providers: [{ provide: APP_GUARD, useClass: ClientIpThrottlerGuard }, UserThrottlerGuard],
-  exports: [UserThrottlerGuard, ThrottlerModule],
+  providers: [
+    { provide: APP_GUARD, useClass: ClientIpThrottlerGuard },
+    UserThrottlerGuard,
+    OrgNormalizationThrottlerGuard,
+    UserNormalizationThrottlerGuard,
+  ],
+  exports: [
+    UserThrottlerGuard,
+    OrgNormalizationThrottlerGuard,
+    UserNormalizationThrottlerGuard,
+    ThrottlerModule,
+  ],
 })
 export class ThrottlingModule {}

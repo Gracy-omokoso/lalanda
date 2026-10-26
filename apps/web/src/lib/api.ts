@@ -1121,7 +1121,6 @@ export interface OrganizationDashboardView {
     type: string;
     pays: string;
     deviseAffichage: DisplayCurrency;
-    logoUrl: string | null;
   };
   role: OrgRole;
   roleLabel: string;
@@ -1143,7 +1142,6 @@ export interface OrganizationSettingsView {
   type: string;
   pays: string;
   deviseAffichage: DisplayCurrency;
-  logoUrl: string | null;
   updatedAt: string | null;
   options: { currencies: string[] };
 }
@@ -2286,11 +2284,22 @@ export interface InvoiceView {
   operator: OperatorView | null;
   /** Version de Lalanda qui a gelé le document ; `null` : brouillon, ou gelé avant le 20 oct. 2026. */
   softwareVersion: string | null;
+  /** Présentation figée au gel (ADR-0028 § 6) ; `null` : brouillon. */
+  presentation: InvoicePresentationView | null;
   normalization: NormalizationView | null;
   readiness: InvoiceReadiness;
   revision: number;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Modèle et version qui impriment le document (`original` : présentation d'origine). */
+export interface InvoicePresentationView {
+  kind: 'template' | 'original';
+  templateId: string | null;
+  templateLabel: string | null;
+  version: string | null;
+  options: { palette: string; accent: string; font: string } | null;
 }
 
 export interface InvoiceSummary {
@@ -2620,7 +2629,6 @@ export const api = {
     name: string;
     pays: string;
     deviseAffichage: DisplayCurrency;
-    logoUrl: string | null;
   }) =>
     jsonRequest<OrganizationSettingsView>(`/organizations/current/settings`, {
       method: 'PUT',

@@ -119,7 +119,7 @@ rang annuel ; voir la question n° 3 à la DGI.
   distinctes). L'unicité du rang reste garantie, comme avant, par le compteur incrémenté dans
   la transaction et par le bail ; les tests de concurrence le vérifient. Renfort possible,
   hors de ce lot : stocker le rang (`fiscalSeq`) et l'indexer en unique par organisation,
-  série et année.
+  série et année. — **Fait le 21 oct. 2026** (amendement plus bas).
 - Trier par la chaîne du numéro n'est plus chronologique (`AV…` avant `IN…`) : il faut trier
   par rang (`parseInvoiceNumber(…).seq`) ou par `sortAt`, ce que font déjà les listes.
 - Les PDF impriment le numéro tel quel ; le nom de fichier reste `<numéro>.pdf`.
@@ -138,6 +138,41 @@ rang annuel ; voir la question n° 3 à la DGI.
   rendu repris sous bail ; ancienne forme lue, affichée et trouvée par la recherche.
 - `normalization.e2e` et `invoices.homologation.e2e` : numéros `TEST-IN`/`TEST-AV`
   contigus sans trou. Jamais d'appel à la vraie DGI.
+
+## Amendement du 21 oct. 2026 — rang fiscal protégé par un index unique
+
+Réalise le renfort annoncé dans « Conséquences » : l'unicité du **rang** ne repose plus
+seulement sur le compteur et le bail.
+
+- **Champ** `fiscalSeq` (entier, `null` sans numéro) sur chaque document de vente numéroté,
+  séries `real` et `test`, à côté de `fiscalYear` (déjà présent). Écrit au même instant que
+  `number` : `InvoiceNumberingService.assignOnIssue` (mode ordinaire, rang rendu à
+  `InvoiceFreezingService`) et `InvoiceNumberingService.confirm` (mode normalisé, rang lu
+  dans le numéro réservé). Un numéro réservé, rendu ou abandonné n'a pas de `fiscalSeq` :
+  seul un numéro **définitif** occupe un rang.
+- **Index** unique partiel `{ organizationId, series, fiscalYear, fiscalSeq }`,
+  `partialFilterExpression: { fiscalSeq: { $type: 'number' } }` (`invoice.schema.ts`) ;
+  `IndexesService` le crée au démarrage en production, comme les autres. `IN2610-000042` et
+  `AV2611-000042` de la même année et de la même série sont désormais refusés par la base
+  (E11000), même si le compteur se trompait.
+- **Existant** : migration idempotente `apps/api/migrations/20261021-0001-rang-fiscal-factures.mjs`
+  (exécuteur `migrations/run.mjs`, consignée dans `_migrations`). Elle lit le rang et l'année
+  **dans le numéro** (deux formes : `AAAA-NNNNNN`, `TEST-AAAA-NNNNNN`, `IN|AV{AA}{MM}-NNNNNN`,
+  `TEST-…`), écrit `fiscalSeq` (et `fiscalYear` s'il manque) et pose l'index. Elle ne touche
+  **ni** `number`, **ni** `contentSha256`, ni aucun champ figé (le rang n'entre pas dans
+  l'empreinte, `canonical.ts`). Un numéro illisible, ou dont l'année contredit `fiscalYear`,
+  est laissé tel quel et fait échouer la migration à la fin (code non nul) pour qu'on
+  l'examine. Ordre de déploiement indifférent (N-1) : une API démarrée avant la migration
+  crée l'index sur les seuls documents qui ont déjà un rang.
+- Commande de production, une fois après le déploiement (le paquet de l'API embarque
+  `migrations/` et le pilote `mongodb` ; le conteneur porte `MONGODB_URI` et `MONGODB_DB`) :
+  `docker exec lalanda-prod-api-1 node migrations/run.mjs 20261021-0001-rang-fiscal-factures`.
+  Rejouable sans effet.
+
+Tests : `invoices.e2e.test.ts` (rang stocké à l'émission et sous 50 émissions concurrentes,
+doublon de rang refusé par l'index, migration rejouée deux fois sur l'existant sans toucher
+numéro ni empreinte, lecture des deux formes) ; `normalization.e2e.test.ts` (rang de la
+série d'essai à la confirmation).
 
 ## Questions à poser à la DGI
 

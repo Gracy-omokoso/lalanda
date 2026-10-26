@@ -15,6 +15,7 @@ import {
   INVOICE_TOTALS_VERSION,
   TAX_GROUP_LETTERS,
   computeInvoiceTotals,
+  invoiceHtTotal,
   type InvoiceLineInput,
   type InvoiceTotals,
   type InvoiceTotalsInput,
@@ -723,5 +724,48 @@ describe('propriétés (1 000 factures, graine fixe)', () => {
     for (const { input } of invoices.slice(0, 100)) {
       expect(computeInvoiceTotals(input)).toEqual(computeInvoiceTotals(input));
     }
+  });
+});
+
+// ── Total HT (ADR-0028, décision ouverte n° 1) ───────────────────────────────
+
+describe('invoiceHtTotal', () => {
+  it('somme des bases HT par groupe, au centime, sans arrondi propre', () => {
+    expect(invoiceHtTotal([])).toBe('0.00');
+    expect(invoiceHtTotal([{ ht: '3600.00' }, { ht: '400.00' }])).toBe('4000.00');
+    expect(invoiceHtTotal([{ ht: '0.01' }, { ht: '0.02' }, { ht: '999999999999.97' }])).toBe(
+      '1000000000000.00',
+    );
+  });
+
+  it('cas de référence : Total HT + TVA = total, sous la politique par défaut', () => {
+    let vus = 0;
+    for (const c of INVOICE_TOTALS_REFERENCE_CASES) {
+      const result = computeInvoiceTotals(c.input);
+      if (!result.ok) continue;
+      vus += 1;
+      const ht = invoiceHtTotal(result.totals.groups);
+      expect(cents(ht) + cents(result.totals.vatTotal), c.id).toBe(cents(result.totals.total));
+    }
+    expect(vus).toBeGreaterThan(5);
+  });
+
+  it('ne change pas le calcul : InvoiceTotals garde ses champs', () => {
+    const result = computeInvoiceTotals({
+      priceMode: 'ttc',
+      lines: INVOICE_TOTALS_REFERENCE_CASES[0]!.input.lines,
+      rates: { A: '0', B: '16' },
+    });
+    expect(Object.keys(totalsOf(result)).sort()).toEqual([
+      'calculationVersion',
+      'groups',
+      'lines',
+      'policyId',
+      'priceMode',
+      'specificTax',
+      'total',
+      'vatTotal',
+    ]);
+    expect(invoiceHtTotal(totalsOf(result).groups)).toBe('4000.00');
   });
 });

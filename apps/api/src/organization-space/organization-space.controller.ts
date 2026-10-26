@@ -93,15 +93,14 @@ export class OrganizationSpaceController {
       action: 'organization.settings_updated',
       targetType: 'organization',
       targetId: orgId,
-      // Ancien et nouveau nom seulement : ni logo (URL potentiellement longue),
-      // ni donnée personnelle. docs/17 § Journalisation — le journal reste pauvre.
+      // Ancien et nouveau nom seulement, ni donnée personnelle.
+      // docs/17 § Journalisation — le journal reste pauvre.
       metadata: {
         nomAvant: avant.name,
         nomApres: apres.name,
         paysAvant: avant.pays,
         paysApres: apres.pays,
         deviseApres: apres.deviseAffichage,
-        logoDefini: apres.logoUrl !== null,
       },
     });
 

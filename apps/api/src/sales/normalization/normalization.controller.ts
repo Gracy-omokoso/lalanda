@@ -1,8 +1,8 @@
 // Routes de la normalisation DGI — ADR-0024 § 9.1.
 //
 // | Route                                                     | Permission      | Ré-auth | Quota               |
-// | POST /sales/invoices/:id/normalization/retry              | sales.invoice   |         | normalisation       |
-// | POST /sales/invoices/:id/normalization/check              | sales.invoice   |         | normalisation       |
+// | POST /sales/invoices/:id/normalization/retry              | sales.invoice   |         | normalisation (org + utilisateur) |
+// | POST /sales/invoices/:id/normalization/check              | sales.invoice   |         | normalisation (utilisateur) |
 // | POST /sales/invoices/:id/normalization/declare-not-normalized | fiscal.manage | oui   | écriture intégration |
 // | GET  /sales/invoices/:id/dgi-exchanges                    | sales.read      |         | global              |
 //
@@ -21,9 +21,10 @@ import { PermissionsGuard } from '../../authz/permissions.guard.js';
 import type { OrgRole } from '../../authz/permissions.js';
 import { RequireRecentReauth } from '../../integrations/reauth.guard.js';
 import {
-  INTEGRATION_WRITE_THROTTLE,
-  INVOICE_NORMALIZE_THROTTLE,
-} from '../../security/throttling.js';
+  OrgNormalizationThrottlerGuard,
+  UserNormalizationThrottlerGuard,
+} from '../../security/normalization-throttler.guard.js';
+import { INTEGRATION_WRITE_THROTTLE } from '../../security/throttling.js';
 import { UserThrottlerGuard } from '../../security/user-throttler.guard.js';
 import { invalidRequest } from '../sales.errors.js';
 import type { DgiExchangePage, InvoiceView } from '../invoices/invoice.contract.js';
@@ -52,8 +53,7 @@ export class NormalizationController {
   @Post('invoices/:invoiceId/normalization/retry')
   @HttpCode(200)
   @RequirePermission('sales.invoice')
-  @UseGuards(UserThrottlerGuard)
-  @Throttle({ default: INVOICE_NORMALIZE_THROTTLE })
+  @UseGuards(OrgNormalizationThrottlerGuard, UserNormalizationThrottlerGuard)
   async retry(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
@@ -66,8 +66,7 @@ export class NormalizationController {
   @Post('invoices/:invoiceId/normalization/check')
   @HttpCode(200)
   @RequirePermission('sales.invoice')
-  @UseGuards(UserThrottlerGuard)
-  @Throttle({ default: INVOICE_NORMALIZE_THROTTLE })
+  @UseGuards(UserNormalizationThrottlerGuard)
   async check(
     @CurrentOrgId() orgId: string,
     @Param('invoiceId') invoiceId: string,
