@@ -23,6 +23,8 @@ export type NavIconId =
   | 'clients'
   | 'catalogue'
   | 'tresorerie'
+  | 'devis'
+  | 'crm'
   | 'pilotage'
   | 'mise-en-route'
   | 'identite'
@@ -82,6 +84,16 @@ export const NAV_ITEMS: readonly NavItem[] = [
     icon: 'factures',
     action: 'sales.read',
   },
+  // ADR-0035 : devis, document distinct qui se convertit en facture. Rangé
+  // juste après les factures : le commerçant chiffre, puis facture, puis encaisse.
+  {
+    id: 'devis',
+    href: '/ventes/devis',
+    label: 'Devis',
+    group: 'run',
+    icon: 'devis',
+    action: 'sales.read',
+  },
   // ADR-0031 : argent reçu, statut de règlement et pont vers le réalisé.
   {
     id: 'encaissements',
@@ -106,6 +118,16 @@ export const NAV_ITEMS: readonly NavItem[] = [
     group: 'run',
     icon: 'catalogue',
     action: 'sales.read',
+  },
+  // ADR-0035 : CRM minimal (pipeline, contacts, relances), après les données
+  // maîtres de vente qu'il prolonge.
+  {
+    id: 'crm',
+    href: '/ventes/crm',
+    label: 'CRM',
+    group: 'run',
+    icon: 'crm',
+    action: 'crm.read',
   },
   // ADR-0034 — dépenses, comptes, prévision et réalisé vs prévu.
   {

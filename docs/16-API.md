@@ -376,6 +376,35 @@ Codes : `400 EXPENSE_IN_FUTURE`, `EXPENSE_ACCOUNT_CURRENCY_MISMATCH`, `EXPENSE_B
 
 Depuis le 26 oct. 2026 (amendement d'ADR-0034) : `projectId` et `firstMonth` de `PUT /treasury/actuals-bridge` écrivent le rattachement commun aux deux ponts (`409 RUN_LINK_IN_USE` sous le pont des ventes actif ; `409 LINE_FED_BY_OTHER_BRIDGE` pour la ligne de chiffre d'affaires des ventes), et `GET` le rend même réglé côté ventes. Les encaissements rattachés à un compte entrent dans ses soldes et ses mouvements (`source: receipt`, `receiptsIntegrated: true`) ; la prévision attend le reste réellement à encaisser de chaque facture (avoirs et encaissements imputés, échéance de la facture) et signale `RECEIPTS_WITHOUT_ACCOUNT`.
 
+## Ventes — devis — implémenté (ADR-0035)
+
+Un devis est un document **distinct** du pro forma : `DV{AA}{MM}-NNNNNN` (hors série fiscale), versions, validité. Client, lignes et montants ont les formes du brouillon de facture et sont calculés par le même code (moteur). Lecture `sales.read`, tout le reste `sales.manage`.
+
+| Méthode et chemin | Effet |
+|---|---|
+| `GET /sales/quotes?status=&customerId=&opportunityId=&q=&cursor=` | liste ; `status` : `draft`, `sent`, `accepted`, `refused`, `expired` (dérivé : envoyé, validité passée) |
+| `POST /sales/quotes` · `PUT /sales/quotes/:id` (brouillon, `expectedRevision`) | `{ opportunityId?, title?, notes?, validUntil?, currency, priceMode, customer, lines }` |
+| `DELETE /sales/quotes/:id` | brouillon v1 jamais envoyé ; sinon `409 QUOTE_NOT_DELETABLE` |
+| `POST /sales/quotes/:id/send` · `/accept` · `/refuse` (`reason?`) · `/new-version` | `{ expectedRevision }` ; `409 QUOTE_STATUS_CONFLICT`, `409 QUOTE_NOT_READY` (`details.blockers`) |
+| `POST /sales/quotes/:id/convert` | devis accepté → brouillon de facture `FV` à prix fixés ; `{ quote, invoiceId, amountsDiffer }` ; `409 QUOTE_ALREADY_CONVERTED` |
+| `GET /sales/quotes/:id/pdf` | « DEVIS — non valable comme facture », modèle de l'organisation, aucune mention DGI de facture ; audit strict |
+
+L'acceptation applique la règle de gain du CRM (`opportunityOutcome` : `won`, `disabled`, `not_open`, `none`).
+
+## CRM minimal — implémenté (ADR-0035)
+
+Lecture `crm.read` ; écriture, réglages, import et export `crm.manage`.
+
+| Méthode et chemin | Effet |
+|---|---|
+| `GET /crm/settings` · `PUT /crm/settings` | étapes `{ key, label, kind: open\|won\|lost }`, `autoWinOnQuoteAccepted`, `staleAfterDays` ; `409 CRM_STAGE_IN_USE`, `409 CRM_STAGE_KIND_CHANGED` |
+| `GET /crm/pipeline` | colonnes, totaux estimés par devise et probabilité par étape (moteur, `available` ou `unavailable`), inactives, relances en retard, prochaines actions |
+| `GET/POST /crm/contacts`, `GET/PUT/DELETE /crm/contacts/:id` | contact client (`customerId`) ou prospect (`companyName`) ; `409 CRM_CONTACT_IN_USE` |
+| `GET/POST /crm/opportunities`, `GET/PUT/DELETE /crm/opportunities/:id`, `POST …/:id/move` | client ou prospect nommé, montant estimé en chaîne ; `409 CRM_OPPORTUNITY_HAS_QUOTES` |
+| `GET/POST /crm/activities`, `PUT/DELETE /crm/activities/:id`, `POST …/:id/complete` | `call`, `meeting`, `note` (sans échéance), `follow_up` (échéance obligatoire) |
+| `GET /crm/contacts/export` · `GET /crm/opportunities/export` | CSV `;`, UTF-8 avec BOM, formules neutralisées ; audit strict |
+| `POST /crm/contacts/import` · `POST /crm/opportunities/import` `{ csv, dryRun }` | tout ou rien, 500 lignes ; `400 CSV_IMPORT_INVALID` (`details.errors[].line`), `400 CSV_UNREADABLE` |
+
 ## Webhooks
 
 Paiements et intégrations utilisent signatures, tolérance temporelle, anti-rejeu, journal et traitement idempotent.

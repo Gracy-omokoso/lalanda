@@ -162,6 +162,10 @@ import { ReferenceRefreshJob } from './normalization/reference-refresh.job.js';
     InvoiceNumberingService,
     InvoiceJournalService,
     SalesTreasuryFeed,
+    // ADR-0035 : les devis composent et calculent par le code des brouillons, se
+    // convertissent en brouillon de facture et s'impriment par le même moteur.
+    InvoiceDraftsService,
+    InvoiceDocumentsService,
   ],
 })
 export class SalesModule {}

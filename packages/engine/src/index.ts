@@ -101,6 +101,9 @@ export * from './receivables/index.js';
 // Dépenses et trésorerie réelle (ADR-0034) — versionné à part (`TREASURY_VERSION`),
 // il ne touche aucun calcul de plan.
 export * from './treasury/index.js';
+// Indicateurs du CRM minimal (ADR-0035) — sommes par devise et probabilité
+// historique par étape, versionnés à part (`CRM_INDICATORS_VERSION`).
+export * from './crm/index.js';
 
 /** Placeholder — sera retiré quand toutes les APIs seront stables. */
 export function engineHealth(): { ok: true; version: string } {

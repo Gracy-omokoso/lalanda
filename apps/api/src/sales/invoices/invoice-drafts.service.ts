@@ -514,6 +514,24 @@ export class InvoiceDraftsService {
   // ── Composition ────────────────────────────────────────────────────────────
 
   /**
+   * Groupes des lignes contre l'assujettissement de la fiche fiscale ACTUELLE —
+   * le contrôle que l'émission appliquera (moteur `checkSellerVatStatus`). Servi
+   * aux devis (ADR-0035, amendement du 27 oct. 2026) : un vendeur non assujetti ne
+   * remet pas un devis à TVA qu'il ne pourrait pas facturer tel quel. Sans fiche
+   * fiscale, rien à signaler ici : l'émission l'exigera.
+   */
+  async sellerVatIssues(
+    organizationId: string,
+    lines: readonly Pick<StoredLine, 'taxGroup' | 'outOfScope'>[],
+  ): Promise<{ code: string; message: string; lineIndex: number | null }[]> {
+    const profile = await this.profiles.find(organizationId);
+    if (profile === null) return [];
+    return sellerVatStatusOf(profile.vatRegistered, { lines, creditNote: null }).issues.map(
+      (i) => ({ code: i.code, message: i.message, lineIndex: i.lineIndex }),
+    );
+  }
+
+  /**
    * Corps validé → champs du brouillon : instantanés client et lignes, prix
    * résolus, commentaires, calcul du moteur. Les références sont relues en base
    * (404 d'une autre organisation, 409 d'une référence désactivée).

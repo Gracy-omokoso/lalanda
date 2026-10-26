@@ -78,6 +78,19 @@ const TRACES: Record<
       <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" />
     </>
   ),
+  devis: (
+    <>
+      <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+      <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+      <path d="M8 13h8" />
+      <path d="M8 17h5" />
+    </>
+  ),
+  crm: (
+    <>
+      <path d="M3 4h18l-7 8v6l-4 2v-8Z" />
+    </>
+  ),
   pilotage: (
     <>
       <path d="m12 14 4-4" />

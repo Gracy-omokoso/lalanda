@@ -6,12 +6,12 @@
 // retranscrits à la main depuis ADR-0012 §3 et §4 (et ADR-0021 §8 pour `fiscal.manage`,
 // ADR-0022 § S25c.1 pour `sales.read` et `sales.manage`, ADR-0023 § S25e.11 pour
 // `sales.invoice`, ADR-0031 § 4 pour `sales.receipt`, ADR-0034 § 8 pour `treasury.read` et
-// `treasury.manage`). C'est délibéré : un test qui
+// `treasury.manage`, ADR-0035 § 3 pour `crm.read` et `crm.manage`). C'est délibéré : un test qui
 // importerait la matrice de production vérifierait seulement qu'elle est égale à
 // elle-même. Ici, toute modification d'une case de production casse le test, ce
 // qui force une mise à jour CONSCIENTE de l'ADR et de docs/12.
 //
-// 8 rôles × 22 actions + 6 rôles plateforme × 22 actions = 308 cases vérifiées.
+// 8 rôles × 24 actions + 6 rôles plateforme × 24 actions = 336 cases vérifiées.
 
 import { describe, expect, it } from 'vitest';
 
@@ -89,6 +89,9 @@ const ATTENDU_ORG: Record<Action, string> = {
   // dépenses ; l'Administrateur consulte mais n'enregistre pas de décaissement.
   'treasury.read': 'A   A   A   A   A   .   .   A',
   'treasury.manage': 'A   .   A   A   .   .   .   .',
+  // ADR-0035 § 3 : le CRM suit la répartition de `sales.read` / `sales.manage`.
+  'crm.read': 'A   A   A   A   A   .   .   A',
+  'crm.manage': 'A   A   A   A   .   .   .   .',
 };
 
 const CODE_VERS_GRANT: Record<string, string> = {
@@ -145,6 +148,9 @@ const ATTENDU_PLATEFORME: Record<Action, string> = {
   // ADR-0034 § 8 : sous accès délégué, comme `sales.read` et `sales.manage`.
   'treasury.read': 'D   .   D   .   .   .',
   'treasury.manage': 'D   .   .   .   .   .',
+  // ADR-0035 § 3 : comme `sales.read` / `sales.manage`, sous accès délégué.
+  'crm.read': 'D   .   D   .   .   .',
+  'crm.manage': 'D   .   .   .   .   .',
 };
 
 const CODE_VERS_GRANT_PLATEFORME: Record<string, string> = {
@@ -158,9 +164,9 @@ function cellules(ligne: string): string[] {
 }
 
 describe('matrice rôle organisation × action (ADR-0012 §3)', () => {
-  it('déclare exactement les 8 rôles et les 22 actions de docs/12', () => {
+  it('déclare exactement les 8 rôles et les 24 actions de docs/12', () => {
     expect([...ORG_ROLES]).toEqual([...ORDRE_ORG]);
-    expect(ACTIONS).toHaveLength(22);
+    expect(ACTIONS).toHaveLength(24);
     // Ajoutée en fin de liste, comme dans docs/12 (ADR-0021 §8).
     expect(ACTIONS[15]).toBe('fiscal.manage');
     // Dix-septième et dix-huitième, en fin de liste (ADR-0022 § S25c.1).
@@ -173,10 +179,14 @@ describe('matrice rôle organisation × action (ADR-0012 §3)', () => {
     // Vingt et unième et vingt-deuxième, en fin de liste (ADR-0034 § 8, ordre de fusion).
     expect(ACTIONS[20]).toBe('treasury.read');
     expect(ACTIONS[21]).toBe('treasury.manage');
+    // Vingt-troisième et vingt-quatrième, en fin de liste (ADR-0035 § 3, ordre de
+    // fusion — amendement du 27 oct. 2026).
+    expect(ACTIONS[22]).toBe('crm.read');
+    expect(ACTIONS[23]).toBe('crm.manage');
     expect(Object.keys(ATTENDU_ORG).sort()).toEqual([...ACTIONS].sort());
   });
 
-  // 8 × 22 = 176 cases.
+  // 8 × 24 = 192 cases.
   for (const action of ACTIONS) {
     const attendus = cellules(ATTENDU_ORG[action]);
     it(`« ${action} » : les 8 cases correspondent à l'ADR`, () => {
@@ -199,7 +209,7 @@ describe('matrice rôle plateforme × action (ADR-0012 §4)', () => {
     for (const role of PLATFORM_ROLES) expect(role.startsWith('platform_')).toBe(true);
   });
 
-  // 6 × 22 = 132 cases.
+  // 6 × 24 = 144 cases.
   for (const action of ACTIONS) {
     const attendus = cellules(ATTENDU_PLATEFORME[action]);
     it(`« ${action} » : les 6 cases plateforme correspondent à l'ADR`, () => {
@@ -437,7 +447,7 @@ describe('R7 — attribution de rôles sans élévation de privilège', () => {
 
   it("un `viewer` ne peut attribuer que des rôles sans aucun droit d'écriture", () => {
     // L'ensemble d'actions d'`advisor` ({project.read, analytics.read}) est
-    // contenu dans celui de `viewer` (qui y ajoute `sales.read`, ADR-0022) : la
+    // contenu dans celui de `viewer` (qui y ajoute `sales.read`, ADR-0022, et `crm.read`, ADR-0035) : la
     // règle du sous-ensemble laisse donc `viewer` « attribuer » `advisor`.
     // C'est sans conséquence — d'abord parce qu'aucun droit n'est gagné, ensuite
     // parce qu'un `viewer` n'a pas `members.invite` et que le guard le refuse
@@ -446,12 +456,13 @@ describe('R7 — attribution de rôles sans élévation de privilège', () => {
     expect(grantableRoles('viewer').sort()).toEqual(['advisor', 'viewer']);
     for (const cible of grantableRoles('viewer')) {
       for (const action of ACTIONS) {
-        // Les quatre actions de lecture du Lecteur ; tout le reste est une écriture.
+        // Les cinq actions de lecture du Lecteur ; tout le reste est une écriture.
         if (
           action === 'project.read' ||
           action === 'analytics.read' ||
           action === 'sales.read' ||
-          action === 'treasury.read'
+          action === 'treasury.read' ||
+          action === 'crm.read'
         ) {
           continue;
         }
@@ -540,7 +551,7 @@ describe('compatibilité N-1 des anciens rôles', () => {
 });
 
 describe('cohérence structurelle de la matrice', () => {
-  it('chaque rôle déclare une décision pour CHACUNE des 22 actions', () => {
+  it('chaque rôle déclare une décision pour CHACUNE des 24 actions', () => {
     for (const role of ORG_ROLES) {
       for (const action of ACTIONS) {
         expect(ORG_PERMISSION_MATRIX[role][action], `${role} × ${action}`).toBeDefined();
@@ -564,7 +575,7 @@ describe('cohérence structurelle de la matrice', () => {
     for (const action of ecritures) expect(can('viewer', action)).toBe(false);
   });
 
-  it('`owner` détient les 22 actions', () => {
+  it('`owner` détient les 24 actions', () => {
     for (const action of ACTIONS) expect(can('owner', action)).toBe(true);
   });
 
@@ -641,6 +652,20 @@ describe('cohérence structurelle de la matrice', () => {
     // le Lecteur aussi (il lit la trésorerie, le Conseiller non).
     expect(grantableRoles('admin').sort()).toEqual(['admin', 'advisor', 'analyst', 'viewer']);
     expect(grantableRoles('viewer').sort()).toEqual(['advisor', 'viewer']);
+  });
+
+  it('`crm.manage` implique `crm.read` et ne change pas les rôles attribuables (ADR-0035)', () => {
+    for (const role of ORG_ROLES) {
+      if (can(role, 'crm.manage')) expect(can(role, 'crm.read'), role).toBe(true);
+    }
+    for (const role of PLATFORM_ROLES) {
+      if (PLATFORM_PERMISSION_MATRIX[role]['crm.manage'] !== 'forbidden') {
+        expect(PLATFORM_PERMISSION_MATRIX[role]['crm.read'], role).not.toBe('forbidden');
+      }
+    }
+    expect(grantableRoles('admin').sort()).toEqual(['admin', 'advisor', 'analyst', 'viewer']);
+    expect(PLATFORM_FORBIDDEN_ACTIONS).not.toContain('crm.read');
+    expect(PLATFORM_FORBIDDEN_ACTIONS).not.toContain('crm.manage');
   });
 });
 

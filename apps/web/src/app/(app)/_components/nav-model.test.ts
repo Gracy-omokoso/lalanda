@@ -29,6 +29,8 @@ const PROPRIETAIRE: OrgAction[] = [
   'sales.invoice',
   'project.read',
   'treasury.read',
+  'crm.read',
+  'crm.manage',
 ];
 const DIRECTEUR_FINANCIER: OrgAction[] = ['fiscal.manage', 'sales.read', 'sales.manage'];
 const LECTEUR: OrgAction[] = ['project.read', 'sales.read'];
@@ -37,13 +39,28 @@ const SANS_VENTES: OrgAction[] = ['project.read'];
 const ids = (items: { id: string }[]): string[] => items.map((i) => i.id);
 
 describe('entrées et ordre', () => {
+  it('CRM (ADR-0035) : dans RUN, après le catalogue, pour qui détient crm.read', () => {
+    const avecCrm = ids(entreesVisibles([...LECTEUR, 'crm.read']));
+    expect(avecCrm.slice(1, 7)).toEqual([
+      'factures',
+      'devis',
+      'encaissements',
+      'clients',
+      'catalogue',
+      'crm',
+    ]);
+    expect(ids(entreesVisibles(LECTEUR))).not.toContain('crm');
+  });
+
   it('suit la trajectoire BUILD → RUN → GROW → Organisation, pour un propriétaire', () => {
     expect(ids(entreesVisibles(PROPRIETAIRE))).toEqual([
       'plans',
       'factures',
+      'devis',
       'encaissements',
       'clients',
       'catalogue',
+      'crm',
       'tresorerie',
       'pilotage',
       'mise-en-route',

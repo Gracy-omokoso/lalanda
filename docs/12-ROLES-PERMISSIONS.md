@@ -35,7 +35,10 @@ Le support ne voit jamais les données financières sans consentement explicite,
 
 ## Actions granulaires
 
-`organization.manage`, `billing.manage`, `members.invite`, `project.create`, `project.read`, `project.update`, `canvas.update`, `inputs.update`, `plan.calculate`, `plan.approve`, `actuals.import`, `period.close`, `analytics.read`, `report.export`, `audit.read`, `fiscal.manage`, `sales.read`, `sales.manage`, `sales.invoice`, `sales.receipt`, `treasury.read`, `treasury.manage`.
+`organization.manage`, `billing.manage`, `members.invite`, `project.create`, `project.read`, `project.update`, `canvas.update`, `inputs.update`, `plan.calculate`, `plan.approve`, `actuals.import`, `period.close`, `analytics.read`, `report.export`, `audit.read`, `fiscal.manage`, `sales.read`, `sales.manage`, `sales.invoice`, `sales.receipt`, `treasury.read`, `treasury.manage`, `crm.read`, `crm.manage`.
+
+Vingt-quatre actions au total, dans l'ordre ci-dessus (ordre de fusion pour les
+actions ajoutées après la dix-neuvième).
 
 `fiscal.manage` — « Gérer l'identité fiscale et la facture normalisée » — est la
 seizième action, ajoutée par ADR-0021 §8 (18 oct. 2026). Elle couvre la fiche
@@ -128,6 +131,28 @@ Côté plateforme, `treasury.read` n'est possible que **sous accès délégué**
 super-administrateur et le support ; `treasury.manage`, sous accès délégué pour le seul
 super-administrateur. Aucune des deux n'est un interdit absolu.
 
+`crm.read` — « Consulter le CRM » — et `crm.manage` — « Gérer le CRM » — sont la
+vingt-troisième et la vingt-quatrième action, ajoutées par ADR-0035 § 3 (21 oct. 2026),
+en fin de liste (ordre de fusion, amendement du 27 oct. 2026). Elles
+couvrent les contacts et prospects, les opportunités et leur pipeline, les activités
+et relances, les réglages du pipeline et l'import/export CSV. Elles reprennent la
+répartition de `sales.read` / `sales.manage` : le CRM contient des données
+personnelles (le Conseiller, externe, n'y accède pas) et alimente les devis. Les
+**devis** eux-mêmes relèvent de `sales.read` (lire, PDF) et `sales.manage` (préparer,
+marquer envoyé, accepté ou refusé, nouvelle version, convertir en brouillon de
+facture) : un devis n'engage pas le contribuable ; l'émission de la facture qui en
+naît reste en `sales.invoice`. Proposition soumise à la décideuse (ADR-0035, décision
+ouverte n° 1).
+
+| Action | PRO | ADM | DIR | CPT | ANA | CDP | CON | LEC |
+|---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| `crm.read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ |
+| `crm.manage` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+
+Côté plateforme, comme `sales.*` : `crm.read` sous accès délégué pour le
+super-administrateur et le support, `crm.manage` sous accès délégué pour le seul
+super-administrateur. Aucune n'est un interdit absolu.
+
 ## Règles critiques
 
 - Un propriétaire ne peut pas retirer le dernier propriétaire sans transfert.
@@ -207,7 +232,7 @@ portant `audit.read`.
 
 ### Couverture de tests
 
-- Matrice rôle × action : 266 cas unitaires (8 × 19 + 6 × 19), exhaustifs (une
+- Matrice rôle × action : 336 cas unitaires (8 × 24 + 6 × 24), exhaustifs (une
   case absente ne compile pas).
 - Matrice appliquée bout en bout : 91 cas vérifiés sur le réseau — la preuve que
   les guards l'appliquent, pas seulement qu'elle est déclarée.

@@ -34,6 +34,8 @@ interface AccesVentes {
   encaisser: boolean;
   /** `true` quand le serveur a confirmé `actuals.import` : régler le pont vers le réalisé. */
   importerRealise: boolean;
+  /** Actions détenues (`null` tant qu'elles ne sont pas connues) — CRM, ADR-0035. */
+  actions: OrgAction[] | null;
 }
 
 const Contexte = createContext<AccesVentes>({
@@ -42,6 +44,7 @@ const Contexte = createContext<AccesVentes>({
   facturer: false,
   encaisser: false,
   importerRealise: false,
+  actions: null,
 });
 
 /**
@@ -50,9 +53,13 @@ const Contexte = createContext<AccesVentes>({
  */
 const ONGLETS: readonly { segment: string; label: string; action: OrgAction }[] = [
   { segment: 'factures', label: 'Factures', action: 'sales.read' },
+  // ADR-0035 : devis, document distinct du pro forma, qui se convertit en facture.
+  { segment: 'devis', label: 'Devis', action: 'sales.read' },
   // ADR-0031 : lecture ouverte à `sales.read` ; enregistrer exige `sales.receipt`.
   { segment: 'encaissements', label: 'Encaissements', action: 'sales.read' },
   ...SALES_TABS,
+  // ADR-0035 : CRM minimal, après les données maîtres qu'il prolonge.
+  { segment: 'crm', label: 'CRM', action: 'crm.read' },
   // ADR-0028 : galerie et aperçus ouverts à `sales.read` ; le CHOIX exige
   // `organization.manage` (la page l'annonce, l'API le refuse).
   { segment: 'modele-facture', label: 'Modèle de facture', action: 'sales.read' },
@@ -116,6 +123,7 @@ export function SalesChrome({ children }: { children: React.ReactNode }): React.
         facturer: actions !== null && actions.includes('sales.invoice'),
         encaisser: actions !== null && actions.includes('sales.receipt'),
         importerRealise: actions !== null && actions.includes('actuals.import'),
+        actions,
       }}
     >
       {onglets.length > 0 ? (
