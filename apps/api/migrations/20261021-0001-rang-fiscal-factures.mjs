@@ -106,7 +106,6 @@ export async function up(db) {
     { unique: true, partialFilterExpression: { fiscalSeq: { $type: 'number' } } },
   );
 
-  // eslint-disable-next-line no-console
   console.log(`[${NAME}] sales_invoices : ${written} rang(s) renseigné(s), index en place.`);
   if (unreadable.length > 0) {
     throw new Error(
