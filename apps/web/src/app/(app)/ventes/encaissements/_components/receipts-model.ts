@@ -253,6 +253,7 @@ export const OUTCOME_LABELS: Record<ActualsSyncOutcome, string> = {
   PERIOD_CLOSED: 'Période clôturée : non modifiée',
   MANUAL_VALUE_PRESENT:
     'Saisie manuelle conservée : effacez-la pour laisser les ventes l’alimenter',
+  OTHER_SOURCE_PRESENT: 'Ligne alimentée par les dépenses : non écrasée',
 };
 
 export const SKIP_LABELS: Record<ActualsSyncReport['skipped'][number]['reason'], string> = {

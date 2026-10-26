@@ -4,9 +4,11 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { OrganizationsModule } from '../organizations/organizations.module.js';
 import { PlansModule } from '../plans/plans.module.js';
 import { ProjectsModule } from '../projects/projects.module.js';
+import { TreasuryModule } from '../treasury/treasury.module.js';
 import { ActualPeriod, ActualPeriodSchema } from './actual-period.schema.js';
 import { ActualsController } from './actuals.controller.js';
 import { ActualsService } from './actuals.service.js';
+import { RunActualsLocks } from './run-actuals-locks.service.js';
 import { SalesInvoice, SalesInvoiceSchema } from '../sales/invoices/invoice.schema.js';
 import {
   RunActualsBridge,
@@ -27,6 +29,8 @@ import { RunBridgeService } from './run-bridge/run-bridge.service.js';
     OrganizationsModule,
     ProjectsModule,
     PlansModule,
+    // ADR-0034 § 5 : verrou des lignes alimentées par le report des dépenses.
+    TreasuryModule,
     MongooseModule.forFeature([
       { name: ActualPeriod.name, schema: ActualPeriodSchema },
       // ADR-0031 § 3 : réglage du pont et lecture SEULE des ventes (aucune écriture).
@@ -35,7 +39,7 @@ import { RunBridgeService } from './run-bridge/run-bridge.service.js';
     ]),
   ],
   controllers: [ActualsController, RunBridgeController],
-  providers: [ActualsService, RunBridgeService],
+  providers: [ActualsService, RunBridgeService, RunActualsLocks],
   exports: [ActualsService],
 })
 export class ActualsModule {}

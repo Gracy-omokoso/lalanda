@@ -476,6 +476,31 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
           .set('Cookie', c)
           .send({ reason: 'Sonde de la matrice', expectedRevision: 1 }),
     },
+    {
+      // ADR-0034 § 8 — tous les rôles sauf Conseiller et Chef de projet.
+      action: 'treasury.read',
+      libelle: 'GET /treasury/accounts',
+      statutsAutorises: [200],
+      envoyer: (c) => request(serveur()).get('/treasury/accounts').set('Cookie', c),
+    },
+    {
+      // ADR-0034 § 8 — Propriétaire, Directeur financier, Comptable. Une dépense
+      // sans compte : aucun prérequis, aucune collision entre rôles.
+      action: 'treasury.manage',
+      libelle: 'POST /treasury/expenses',
+      statutsAutorises: [201],
+      envoyer: (c, role) =>
+        request(serveur())
+          .post('/treasury/expenses')
+          .set('Cookie', c)
+          .send({
+            spentOn: '2026-01-15',
+            amount: '10.00',
+            currency: 'USD',
+            category: 'charges_diverses',
+            label: `Sonde trésorerie ${role}`,
+          }),
+    },
   ];
 
   // ───────────────────────────────────────────────────────────────────────────

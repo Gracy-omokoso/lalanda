@@ -34,7 +34,7 @@ import { PlansService } from '../plans/plans.service.js';
 import { ProjectsService } from '../projects/projects.service.js';
 import type { ActualPeriodDocument, ActualValueSource } from './actual-period.schema.js';
 import { ActualsService } from './actuals.service.js';
-import { RunBridgeService } from './run-bridge/run-bridge.service.js';
+import { RunActualsLocks } from './run-actuals-locks.service.js';
 import {
   computeUpdatedProjection,
   computeVariances,
@@ -54,7 +54,7 @@ export interface ActualPeriodView {
   month: number;
   status: 'open' | 'closed';
   values: Record<string, number>;
-  /** Origine de chaque valeur (ADR-0031 § 3) : saisie manuelle ou issue des ventes. */
+  /** Origine de chaque valeur (ADR-0031 § 3, ADR-0034 § 5) : saisie manuelle, ventes ou dépenses. */
   sources: Record<string, ActualValueSourceView>;
   closedAt: string | null;
   closedBy: string | null;
@@ -97,7 +97,7 @@ export class ActualsController {
     @Inject(ProjectsService) private readonly projects: ProjectsService,
     @Inject(PlansService) private readonly plans: PlansService,
     @Inject(ActualsService) private readonly actuals: ActualsService,
-    @Inject(RunBridgeService) private readonly bridge: RunBridgeService,
+    @Inject(RunActualsLocks) private readonly runLocks: RunActualsLocks,
   ) {}
 
   @Put(':id/actual-periods/:year/:month')
@@ -126,8 +126,8 @@ export class ActualsController {
       allowed,
       {
         userId: user.id,
-        // ADR-0031 § 3 : ligne alimentée par le pont RUN → BUILD actif.
-        lockedLineIds: await this.bridge.lockedLines(orgId, String(project._id)),
+        // ADR-0031 § 3, ADR-0034 § 5 : lignes alimentées par un pont RUN actif.
+        lockedLines: await this.runLocks.lockedLines(orgId, String(project._id)),
       },
     );
     return toPeriodView(doc);

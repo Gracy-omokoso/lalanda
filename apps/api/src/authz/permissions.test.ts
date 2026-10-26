@@ -5,12 +5,13 @@
 // Les tableaux ci-dessous ne sont PAS importés de `permissions.ts`. Ils sont
 // retranscrits à la main depuis ADR-0012 §3 et §4 (et ADR-0021 §8 pour `fiscal.manage`,
 // ADR-0022 § S25c.1 pour `sales.read` et `sales.manage`, ADR-0023 § S25e.11 pour
-// `sales.invoice`, ADR-0031 § 4 pour `sales.receipt`). C'est délibéré : un test qui
+// `sales.invoice`, ADR-0031 § 4 pour `sales.receipt`, ADR-0034 § 8 pour `treasury.read` et
+// `treasury.manage`). C'est délibéré : un test qui
 // importerait la matrice de production vérifierait seulement qu'elle est égale à
 // elle-même. Ici, toute modification d'une case de production casse le test, ce
 // qui force une mise à jour CONSCIENTE de l'ADR et de docs/12.
 //
-// 8 rôles × 20 actions + 6 rôles plateforme × 20 actions = 280 cases vérifiées.
+// 8 rôles × 22 actions + 6 rôles plateforme × 22 actions = 308 cases vérifiées.
 
 import { describe, expect, it } from 'vitest';
 
@@ -84,6 +85,10 @@ const ATTENDU_ORG: Record<Action, string> = {
   'sales.invoice': 'A   .   A   A   .   .   .   .',
   // ADR-0031 § 4 : enregistrer l'argent reçu, même population que `sales.invoice`.
   'sales.receipt': 'A   .   A   A   .   .   .   .',
+  // ADR-0034 § 8 : trésorerie. Le Conseiller (externe) ne voit pas le détail des
+  // dépenses ; l'Administrateur consulte mais n'enregistre pas de décaissement.
+  'treasury.read': 'A   A   A   A   A   .   .   A',
+  'treasury.manage': 'A   .   A   A   .   .   .   .',
 };
 
 const CODE_VERS_GRANT: Record<string, string> = {
@@ -137,6 +142,9 @@ const ATTENDU_PLATEFORME: Record<Action, string> = {
   'sales.invoice': '.   .   .   .   .   .',
   // ADR-0031 § 4 : interdite à tous les rôles plateforme, sans être un interdit absolu.
   'sales.receipt': '.   .   .   .   .   .',
+  // ADR-0034 § 8 : sous accès délégué, comme `sales.read` et `sales.manage`.
+  'treasury.read': 'D   .   D   .   .   .',
+  'treasury.manage': 'D   .   .   .   .   .',
 };
 
 const CODE_VERS_GRANT_PLATEFORME: Record<string, string> = {
@@ -150,9 +158,9 @@ function cellules(ligne: string): string[] {
 }
 
 describe('matrice rôle organisation × action (ADR-0012 §3)', () => {
-  it('déclare exactement les 8 rôles et les 20 actions de docs/12', () => {
+  it('déclare exactement les 8 rôles et les 22 actions de docs/12', () => {
     expect([...ORG_ROLES]).toEqual([...ORDRE_ORG]);
-    expect(ACTIONS).toHaveLength(20);
+    expect(ACTIONS).toHaveLength(22);
     // Ajoutée en fin de liste, comme dans docs/12 (ADR-0021 §8).
     expect(ACTIONS[15]).toBe('fiscal.manage');
     // Dix-septième et dix-huitième, en fin de liste (ADR-0022 § S25c.1).
@@ -162,10 +170,13 @@ describe('matrice rôle organisation × action (ADR-0012 §3)', () => {
     expect(ACTIONS[18]).toBe('sales.invoice');
     // Vingtième, en fin de liste (ADR-0031 § 4).
     expect(ACTIONS[19]).toBe('sales.receipt');
+    // Vingt et unième et vingt-deuxième, en fin de liste (ADR-0034 § 8, ordre de fusion).
+    expect(ACTIONS[20]).toBe('treasury.read');
+    expect(ACTIONS[21]).toBe('treasury.manage');
     expect(Object.keys(ATTENDU_ORG).sort()).toEqual([...ACTIONS].sort());
   });
 
-  // 8 × 20 = 160 cases.
+  // 8 × 22 = 176 cases.
   for (const action of ACTIONS) {
     const attendus = cellules(ATTENDU_ORG[action]);
     it(`« ${action} » : les 8 cases correspondent à l'ADR`, () => {
@@ -188,7 +199,7 @@ describe('matrice rôle plateforme × action (ADR-0012 §4)', () => {
     for (const role of PLATFORM_ROLES) expect(role.startsWith('platform_')).toBe(true);
   });
 
-  // 6 × 20 = 120 cases.
+  // 6 × 22 = 132 cases.
   for (const action of ACTIONS) {
     const attendus = cellules(ATTENDU_PLATEFORME[action]);
     it(`« ${action} » : les 6 cases plateforme correspondent à l'ADR`, () => {
@@ -435,8 +446,13 @@ describe('R7 — attribution de rôles sans élévation de privilège', () => {
     expect(grantableRoles('viewer').sort()).toEqual(['advisor', 'viewer']);
     for (const cible of grantableRoles('viewer')) {
       for (const action of ACTIONS) {
-        // Les trois actions de lecture du Lecteur ; tout le reste est une écriture.
-        if (action === 'project.read' || action === 'analytics.read' || action === 'sales.read') {
+        // Les quatre actions de lecture du Lecteur ; tout le reste est une écriture.
+        if (
+          action === 'project.read' ||
+          action === 'analytics.read' ||
+          action === 'sales.read' ||
+          action === 'treasury.read'
+        ) {
           continue;
         }
         expect(can(cible, action, { canClosePeriods: true }), `${cible} × ${action}`).toBe(false);
@@ -524,7 +540,7 @@ describe('compatibilité N-1 des anciens rôles', () => {
 });
 
 describe('cohérence structurelle de la matrice', () => {
-  it('chaque rôle déclare une décision pour CHACUNE des 20 actions', () => {
+  it('chaque rôle déclare une décision pour CHACUNE des 22 actions', () => {
     for (const role of ORG_ROLES) {
       for (const action of ACTIONS) {
         expect(ORG_PERMISSION_MATRIX[role][action], `${role} × ${action}`).toBeDefined();
@@ -548,7 +564,7 @@ describe('cohérence structurelle de la matrice', () => {
     for (const action of ecritures) expect(can('viewer', action)).toBe(false);
   });
 
-  it('`owner` détient les 20 actions', () => {
+  it('`owner` détient les 22 actions', () => {
     for (const action of ACTIONS) expect(can('owner', action)).toBe(true);
   });
 
@@ -608,6 +624,23 @@ describe('cohérence structurelle de la matrice', () => {
     for (const role of PLATFORM_ROLES) expect(canPlatform(role, 'sales.receipt')).toBe(false);
     expect(PLATFORM_FORBIDDEN_ACTIONS).not.toContain('sales.receipt');
     expect(grantableRoles('admin').sort()).toEqual(['admin', 'advisor', 'analyst', 'viewer']);
+  });
+
+  it('`treasury.manage` implique `treasury.read` et ne change pas les rôles attribuables (ADR-0034)', () => {
+    for (const role of ORG_ROLES) {
+      if (can(role, 'treasury.manage')) expect(can(role, 'treasury.read'), role).toBe(true);
+    }
+    for (const role of PLATFORM_ROLES) {
+      if (PLATFORM_PERMISSION_MATRIX[role]['treasury.manage'] !== 'forbidden') {
+        expect(PLATFORM_PERMISSION_MATRIX[role]['treasury.read'], role).not.toBe('forbidden');
+      }
+    }
+    expect(PLATFORM_FORBIDDEN_ACTIONS).not.toContain('treasury.read');
+    expect(PLATFORM_FORBIDDEN_ACTIONS).not.toContain('treasury.manage');
+    // L'Administrateur lit sans enregistrer : ses rôles attribuables sont inchangés,
+    // le Lecteur aussi (il lit la trésorerie, le Conseiller non).
+    expect(grantableRoles('admin').sort()).toEqual(['admin', 'advisor', 'analyst', 'viewer']);
+    expect(grantableRoles('viewer').sort()).toEqual(['advisor', 'viewer']);
   });
 });
 

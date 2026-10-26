@@ -32,6 +32,7 @@ import { SalesModule } from './sales/sales.module.js';
 import { SchedulerModule } from './scheduler/scheduler.module.js';
 import { ThrottlingModule } from './security/throttling.module.js';
 import { StorageModule } from './storage/storage.module.js';
+import { TreasuryModule } from './treasury/treasury.module.js';
 
 @Module({
   imports: [
@@ -105,6 +106,8 @@ import { StorageModule } from './storage/storage.module.js';
     BrandingModule,
     // ADR-0022 — clients et catalogue (lot S25c).
     SalesModule,
+    // ADR-0034 : dépenses, comptes de trésorerie, prévision et report au réalisé.
+    TreasuryModule,
   ],
   controllers: [HealthController, EvaluateController],
 })

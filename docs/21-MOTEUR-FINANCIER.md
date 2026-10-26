@@ -375,6 +375,27 @@ Une donnée illisible qui aurait dû être refusée en amont (ligne déjà pass�
 problème affiché. Reste à confirmer auprès de la DGI : le contrôle ±1 % du taux d'un avoir
 (taux de l'origine ou du jour), le caractère cumulatif du contrôle de montant des avoirs.
 
+## Dépenses et trésorerie réelle (ADR-0034)
+
+Module pur `packages/engine/src/treasury/` (`TREASURY_VERSION = '1.0.0'`), versionné à
+part : il ne touche aucun calcul de plan. Aucune base, aucun réseau, aucune horloge (la date
+du jour est un paramètre). Montants en chaînes décimales, arithmétique en centimes entiers
+(`bigint`) ; les taux des scénarios passent en points de base avant toute multiplication.
+
+| Fonction | Rôle |
+|---|---|
+| `occurrencesOf` | occurrences d'une dépense récurrente (même quantième, ramené au dernier jour du mois) |
+| `computeAccountBalances` | solde = ouverture (début du jour d'ouverture) + entrées − sorties, par compte et par devise |
+| `aggregateExpenses` | totaux par mois civil, devise et catégorie (RUN sans BUILD) |
+| `planExpenseActuals` | ce que les dépenses doivent porter au réalisé : cases (exercice, mois, ligne), cases écartées (`OUTSIDE_PLAN_HORIZON`, `CURRENCY_NOT_CONVERTIBLE`), file des non rattachées |
+| `reconcileExpenses` | prévu vs réalisé par ligne et par mois, écarts, constats, contributions des catégories, pièces |
+| `forecastTreasury` | prévision de 0 à 180 jours en trois scénarios à hypothèses explicites, horizons 7/30/90/180, alertes, incertitude |
+
+Tests par propriétés (générateur à graine fixe, arithmétique de contrôle propre au test) :
+récurrences identiques à une énumération naïve, conservation des soldes et des virements,
+conservation des montants reportés + écartés + non rattachés, idempotence, ordre des
+scénarios optimiste ≥ probable ≥ pessimiste chaque jour, clôture = ouverture + flux.
+
 ## Compatibilité
 
 Le moteur peut évoluer, mais les versions historiques restent exécutables ou leurs résultats figés restent disponibles avec preuve d’intégrité.

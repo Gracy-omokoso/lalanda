@@ -444,8 +444,9 @@ export interface ActualPeriodView {
   status: 'open' | 'closed';
   values: Record<string, number>;
   /**
-   * Origine de chaque valeur (ADR-0031 § 3) : `manual` (saisie dans cet onglet)
-   * ou `run.sales` (écrite par le pont depuis les ventes). Absente : saisie
+   * Origine de chaque valeur (ADR-0031 § 3, ADR-0034 § 5) : `manual` (saisie
+   * dans cet onglet), `run.sales` (écrite par le pont depuis les ventes) ou
+   * `run.expenses` (écrite par le report des dépenses). Absente : saisie
    * antérieure d'origine inconnue.
    */
   sources?: Record<string, ActualValueSourceView>;
@@ -455,19 +456,23 @@ export interface ActualPeriodView {
   updatedAt: string;
 }
 
+/** Ponts RUN qui alimentent le réalisé (un seul vocabulaire, unifié le 26 oct. 2026). */
+export type RunActualSource = 'run.sales' | 'run.expenses';
+
 export type ActualValueSourceView =
   | {
       source: 'manual';
       at: string;
       by: string | null;
-      replaced?: { source: 'run.sales'; value: number } | null;
+      replaced?: { source: RunActualSource; value: number } | null;
     }
   | {
-      source: 'run.sales';
+      source: RunActualSource;
       at: string;
       by: string | null;
       version: string;
-      calendarMonth: string;
+      /** Absent des valeurs écrites par les dépenses avant l'unification. */
+      calendarMonth?: string;
       documents: number;
       fingerprint: string;
     };
@@ -988,7 +993,7 @@ export interface TermsAcceptanceView {
 
 export type DisplayCurrency = 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR';
 
-/** Les 20 actions granulaires (docs/12, ADR-0021 §8, ADR-0022 § S25c.1, ADR-0023 § S25e.11, ADR-0031 § 4). Union fermée, alignée sur l'API. */
+/** Les 22 actions granulaires (docs/12, ADR-0021 §8, ADR-0022 § S25c.1, ADR-0023 § S25e.11, ADR-0031 § 4, ADR-0034 § 8).Union fermée, alignée sur l'API. */
 export type OrgAction =
   | 'organization.manage'
   | 'billing.manage'
@@ -1020,7 +1025,12 @@ export type OrgAction =
   | 'sales.invoice'
   // ADR-0031 § 4 — enregistrer et annuler des encaissements. Propriétaire,
   // Directeur financier, Comptable ; interdite à tout rôle plateforme.
-  | 'sales.receipt';
+  | 'sales.receipt'
+  // ADR-0034 § 8 — dépenses, comptes et prévision de trésorerie. Consulter
+  // (sauf Chef de projet et Conseiller) et enregistrer (Propriétaire, Directeur
+  // financier, Comptable).
+  | 'treasury.read'
+  | 'treasury.manage';
 
 /**
  * Offres — RÉEXPORTÉES du catalogue partagé, jamais réécrites.
@@ -2558,7 +2568,12 @@ export interface ActualsBridgeSettings {
 }
 
 export type ActualsSyncOutcome =
-  'written' | 'unchanged' | 'removed' | 'PERIOD_CLOSED' | 'MANUAL_VALUE_PRESENT';
+  | 'written'
+  | 'unchanged'
+  | 'removed'
+  | 'PERIOD_CLOSED'
+  | 'MANUAL_VALUE_PRESENT'
+  | 'OTHER_SOURCE_PRESENT';
 
 export interface ActualsSyncReport {
   dryRun: boolean;

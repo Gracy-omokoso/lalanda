@@ -34,6 +34,7 @@ import {
   ActualPeriod,
   type ActualPeriodDocument,
   type ActualValueSource,
+  isRunActualSource,
 } from '../actual-period.schema.js';
 import { referenceLines, type PlanLineInput } from '../variance.js';
 import {
@@ -72,7 +73,13 @@ export interface BridgeSettingsInput {
 }
 
 export type SyncOutcome =
-  'written' | 'unchanged' | 'removed' | 'PERIOD_CLOSED' | 'MANUAL_VALUE_PRESENT';
+  | 'written'
+  | 'unchanged'
+  | 'removed'
+  | 'PERIOD_CLOSED'
+  | 'MANUAL_VALUE_PRESENT'
+  /** Ligne déjà alimentée par un autre pont RUN (dépenses, ADR-0034) : jamais écrasée. */
+  | 'OTHER_SOURCE_PRESENT';
 
 export interface SyncEntry {
   calendarMonth: string | null;
@@ -290,7 +297,10 @@ export class RunBridgeService {
         continue;
       }
       if (storedValue !== null && source?.source !== 'run.sales') {
-        entries.push({ ...entry, outcome: 'MANUAL_VALUE_PRESENT' });
+        entries.push({
+          ...entry,
+          outcome: isRunActualSource(source) ? 'OTHER_SOURCE_PRESENT' : 'MANUAL_VALUE_PRESENT',
+        });
         continue;
       }
       entries.push({ ...entry, outcome: 'written' });
@@ -342,7 +352,8 @@ export class RunBridgeService {
       written: count('written'),
       unchanged: count('unchanged'),
       removed: count('removed'),
-      blocked: count('PERIOD_CLOSED') + count('MANUAL_VALUE_PRESENT'),
+      blocked:
+        count('PERIOD_CLOSED') + count('MANUAL_VALUE_PRESENT') + count('OTHER_SOURCE_PRESENT'),
       skipped: plan.skipped.length,
     };
     if (!dryRun) {

@@ -6,18 +6,23 @@ import {
   ActualPeriod,
   type ActualPeriodDocument,
   type ActualValueSource,
+  isRunActualSource,
+  type RunActualSource,
 } from './actual-period.schema.js';
 
 /** Identifiants de ligne du DSL : snake_case ASCII, mêmes règles que le moteur. */
 const LINE_ID_PATTERN = /^[a-z][a-z0-9_]*$/;
 const MAX_LINES_PER_PERIOD = 200;
 
-/** Options d'une saisie manuelle (ADR-0031 § 3). */
+/** Options d'une saisie manuelle (ADR-0031 § 3, ADR-0034 § 5). */
 export interface ManualEntryOptions {
   /** Auteur, inscrit dans l'origine de chaque valeur saisie. */
   userId?: string | null;
-  /** Lignes alimentées par le pont RUN → BUILD actif : saisie refusée. */
-  lockedLineIds?: ReadonlySet<string>;
+  /**
+   * Lignes alimentées par un pont RUN → BUILD actif, avec le pont qui les
+   * alimente (`RunActualsLocks`) : saisie refusée.
+   */
+  lockedLines?: ReadonlyMap<string, RunActualSource>;
 }
 
 export interface PeriodKey {
@@ -81,15 +86,25 @@ export class ActualsService {
   ): Promise<ActualPeriodDocument> {
     this.assertValidPeriod(key.year, key.month);
     this.assertValidValues(values, allowedLineIds);
-    // ADR-0031 § 3 : une ligne alimentée par le pont RUN → BUILD actif ne se
-    // saisit pas à la main, effacement compris — on corrige la vente (avoir).
-    const locked = Object.keys(values).filter((lineId) => opts.lockedLineIds?.has(lineId));
+    // ADR-0031 § 3, ADR-0034 § 5 : une ligne alimentée par un pont RUN → BUILD
+    // actif ne se saisit pas à la main, effacement compris — on corrige la source
+    // du chiffre (la vente par un avoir, la dépense elle-même).
+    const locked = Object.keys(values).filter((lineId) => opts.lockedLines?.has(lineId));
     if (locked.length > 0) {
+      const sources = [...new Set(locked.map((l) => opts.lockedLines?.get(l)))];
+      const what =
+        sources.length === 1 && sources[0] === 'run.sales'
+          ? 'par les ventes (pont actif) : corrigez la vente par un avoir'
+          : sources.length === 1 && sources[0] === 'run.expenses'
+            ? 'par les dépenses (report actif) : corrigez la dépense'
+            : 'par RUN (ventes et dépenses) : corrigez la vente ou la dépense';
       throw new ConflictException({
         code: 'LINE_FED_BY_RUN',
-        message:
-          'Cette ligne est alimentée par les ventes (pont actif) : corrigez la vente par un avoir, ou désactivez le pont.',
-        details: { lineIds: locked },
+        message: `Cette ligne est alimentée ${what}, ou désactivez le pont.`,
+        details: {
+          lineIds: locked,
+          sources: Object.fromEntries(locked.map((l) => [l, opts.lockedLines?.get(l)])),
+        },
       });
     }
 
@@ -297,7 +312,8 @@ function mergeValues(
 
 /**
  * Origine des valeurs après une saisie manuelle : `manual` pour chaque ligne
- * écrite (avec la valeur issue des ventes qu'elle remplace, s'il y en avait une),
+ * écrite (avec la valeur RUN — ventes ou dépenses — qu'elle remplace, s'il y en
+ * avait une),
  * entrée retirée pour une ligne effacée.
  */
 function mergeSources(
@@ -320,8 +336,8 @@ function mergeSources(
       at,
       by: opts.userId ?? null,
       replaced:
-        previous?.source === 'run.sales' && typeof previousValue === 'number'
-          ? { source: 'run.sales', value: previousValue }
+        isRunActualSource(previous) && typeof previousValue === 'number'
+          ? { source: previous.source, value: previousValue }
           : previous?.source === 'manual'
             ? (previous.replaced ?? null)
             : null,

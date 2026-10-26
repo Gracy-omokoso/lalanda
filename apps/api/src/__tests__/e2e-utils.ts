@@ -158,6 +158,12 @@ const ORG_SCOPED_COLLECTIONS = [
   // ligne, chaque exécution laisserait derrière elle les traces d'export des
   // suites RBAC.
   'audit_events',
+  // ADR-0034 — dépenses et trésorerie, toutes scopées par organisation.
+  'treasury_accounts',
+  'treasury_expenses',
+  'treasury_recurring_expenses',
+  'treasury_movements',
+  'treasury_settings',
 ] as const;
 
 /**
