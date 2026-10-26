@@ -32,8 +32,9 @@ import { CurrentOrgId, CurrentUser } from '../auth/current-user.decorator.js';
 import type { FinancialPlanDocument } from '../plans/plan.schema.js';
 import { PlansService } from '../plans/plans.service.js';
 import { ProjectsService } from '../projects/projects.service.js';
-import type { ActualPeriodDocument } from './actual-period.schema.js';
+import type { ActualPeriodDocument, ActualValueSource } from './actual-period.schema.js';
 import { ActualsService } from './actuals.service.js';
+import { RunBridgeService } from './run-bridge/run-bridge.service.js';
 import {
   computeUpdatedProjection,
   computeVariances,
@@ -41,6 +42,9 @@ import {
   type ProjectionLine,
   type VarianceLine,
 } from './variance.js';
+
+/** Origine d'une valeur, dates en ISO 8601. */
+export type ActualValueSourceView = Omit<ActualValueSource, 'at'> & { at: string };
 
 /** Vue API d'une période réalisée. */
 export interface ActualPeriodView {
@@ -50,6 +54,8 @@ export interface ActualPeriodView {
   month: number;
   status: 'open' | 'closed';
   values: Record<string, number>;
+  /** Origine de chaque valeur (ADR-0031 § 3) : saisie manuelle ou issue des ventes. */
+  sources: Record<string, ActualValueSourceView>;
   closedAt: string | null;
   closedBy: string | null;
   reopenedLog: { reopenedAt: string; reopenedBy: string; reason: string }[];
@@ -91,12 +97,14 @@ export class ActualsController {
     @Inject(ProjectsService) private readonly projects: ProjectsService,
     @Inject(PlansService) private readonly plans: PlansService,
     @Inject(ActualsService) private readonly actuals: ActualsService,
+    @Inject(RunBridgeService) private readonly bridge: RunBridgeService,
   ) {}
 
   @Put(':id/actual-periods/:year/:month')
   @RequirePermission('actuals.import')
   async upsert(
     @CurrentOrgId() orgId: string,
+    @CurrentUser() user: { id: string },
     @Param('id') id: string,
     @Param('year') yearRaw: string,
     @Param('month') monthRaw: string,
@@ -116,6 +124,11 @@ export class ActualsController {
       },
       body?.values ?? {},
       allowed,
+      {
+        userId: user.id,
+        // ADR-0031 § 3 : ligne alimentée par le pont RUN → BUILD actif.
+        lockedLineIds: await this.bridge.lockedLines(orgId, String(project._id)),
+      },
     );
     return toPeriodView(doc);
   }
@@ -256,6 +269,12 @@ function toPeriodView(doc: ActualPeriodDocument): ActualPeriodView {
     month: doc.month,
     status: doc.status,
     values: doc.values,
+    sources: Object.fromEntries(
+      Object.entries(doc.sources ?? {}).map(([lineId, src]) => [
+        lineId,
+        { ...src, at: new Date(src.at).toISOString() } as ActualValueSourceView,
+      ]),
+    ),
     closedAt: doc.closedAt ? doc.closedAt.toISOString() : null,
     closedBy: doc.closedBy ?? null,
     reopenedLog: doc.reopenedLog.map((e) => ({

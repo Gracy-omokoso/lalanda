@@ -50,6 +50,11 @@ e2eSuite('index MongoDB de production (S25a)', () => {
     expect(await uniqueIndexKeys('financial_plans')).toContain('projectId+version');
     expect(await uniqueIndexKeys('user')).toContain('email');
     expect(await uniqueIndexKeys('session')).toContain('token');
+    // ADR-0031 : verrou de règlement par facture, un seul réglage de pont par organisation.
+    expect(await uniqueIndexKeys('sales_invoice_settlements')).toContain(
+      'organizationId+invoiceId',
+    );
+    expect(await uniqueIndexKeys('run_actuals_bridges')).toContain('organizationId');
   });
 
   it('est rejouable : un second passage ne produit aucun échec', async () => {

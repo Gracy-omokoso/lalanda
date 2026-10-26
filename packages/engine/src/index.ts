@@ -95,6 +95,10 @@ export {
 // (`INVOICE_TOTALS_VERSION`), il ne touche aucun calcul de plan.
 export * from './invoice-totals/index.js';
 
+// Encaissements, règlement des factures et réalisé issu des ventes (ADR-0031) —
+// versionné à part (`RECEIVABLES_VERSION`).
+export * from './receivables/index.js';
+
 /** Placeholder — sera retiré quand toutes les APIs seront stables. */
 export function engineHealth(): { ok: true; version: string } {
   return { ok: true, version: ENGINE_VERSION };

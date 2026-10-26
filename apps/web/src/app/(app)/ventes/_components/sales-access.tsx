@@ -2,7 +2,8 @@
 
 // Chrome de l'espace Ventes : onglets et frontière d'accès (ADR-0022, chantier D2 ;
 // onglet Factures et droit `sales.invoice` : ADR-0023, chantier E3 ; onglet
-// Modèle de facture : ADR-0028).
+// Modèle de facture : ADR-0028 ; onglet Encaissements et droit `sales.receipt` :
+// ADR-0031).
 //
 // Les permissions sont lues UNE fois (`GET /me/permissions`) et partagées avec
 // les pages par un contexte : la liste des clients et celle du catalogue en ont
@@ -29,9 +30,19 @@ interface AccesVentes {
   gerer: boolean;
   /** `true` seulement quand le serveur a confirmé `sales.invoice` (ADR-0023 § S25e.11). */
   facturer: boolean;
+  /** `true` seulement quand le serveur a confirmé `sales.receipt` (ADR-0031 § 4). */
+  encaisser: boolean;
+  /** `true` quand le serveur a confirmé `actuals.import` : régler le pont vers le réalisé. */
+  importerRealise: boolean;
 }
 
-const Contexte = createContext<AccesVentes>({ etat: 'chargement', gerer: false, facturer: false });
+const Contexte = createContext<AccesVentes>({
+  etat: 'chargement',
+  gerer: false,
+  facturer: false,
+  encaisser: false,
+  importerRealise: false,
+});
 
 /**
  * Onglets de l'espace, dans l'ordre d'affichage : « Factures » en premier
@@ -39,6 +50,8 @@ const Contexte = createContext<AccesVentes>({ etat: 'chargement', gerer: false, 
  */
 const ONGLETS: readonly { segment: string; label: string; action: OrgAction }[] = [
   { segment: 'factures', label: 'Factures', action: 'sales.read' },
+  // ADR-0031 : lecture ouverte à `sales.read` ; enregistrer exige `sales.receipt`.
+  { segment: 'encaissements', label: 'Encaissements', action: 'sales.read' },
   ...SALES_TABS,
   // ADR-0028 : galerie et aperçus ouverts à `sales.read` ; le CHOIX exige
   // `organization.manage` (la page l'annonce, l'API le refuse).
@@ -101,6 +114,8 @@ export function SalesChrome({ children }: { children: React.ReactNode }): React.
         etat,
         gerer: peutGerer(actions),
         facturer: actions !== null && actions.includes('sales.invoice'),
+        encaisser: actions !== null && actions.includes('sales.receipt'),
+        importerRealise: actions !== null && actions.includes('actuals.import'),
       }}
     >
       {onglets.length > 0 ? (

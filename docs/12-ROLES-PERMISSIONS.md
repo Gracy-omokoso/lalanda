@@ -35,7 +35,7 @@ Le support ne voit jamais les données financières sans consentement explicite,
 
 ## Actions granulaires
 
-`organization.manage`, `billing.manage`, `members.invite`, `project.create`, `project.read`, `project.update`, `canvas.update`, `inputs.update`, `plan.calculate`, `plan.approve`, `actuals.import`, `period.close`, `analytics.read`, `report.export`, `audit.read`, `fiscal.manage`, `sales.read`, `sales.manage`, `sales.invoice`.
+`organization.manage`, `billing.manage`, `members.invite`, `project.create`, `project.read`, `project.update`, `canvas.update`, `inputs.update`, `plan.calculate`, `plan.approve`, `actuals.import`, `period.close`, `analytics.read`, `report.export`, `audit.read`, `fiscal.manage`, `sales.read`, `sales.manage`, `sales.invoice`, `sales.receipt`.
 
 `fiscal.manage` — « Gérer l'identité fiscale et la facture normalisée » — est la
 seizième action, ajoutée par ADR-0021 §8 (18 oct. 2026). Elle couvre la fiche
@@ -92,6 +92,22 @@ n° 1).
 
 Elle est **interdite à tous les rôles plateforme**, super-administrateur compris et
 même sous accès délégué : le support n'émet jamais au nom d'un contribuable.
+
+`sales.receipt` — « Enregistrer et annuler des encaissements » — est la vingtième
+action, ajoutée par [ADR-0031](adr/ADR-0031-encaissements-et-realise.md) § 4 (21 oct. 2026).
+Enregistrer l'argent reçu sur une facture est un acte de trésorerie : il solde la part à
+crédit et alimente les statuts de règlement. Même population que `sales.invoice`
+(Propriétaire, Directeur financier, Comptable) ; l'Administrateur ne l'a pas (ADR-0031,
+décision ouverte n° 9). Consulter les encaissements relève de `sales.read` ; poser une
+échéance sur une facture, de `sales.manage` ; régler et lancer le pont vers le réalisé,
+de `actuals.import` **et** `sales.read`.
+
+| Action | PRO | ADM | DIR | CPT | ANA | CDP | CON | LEC |
+|---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| `sales.receipt` | ✓ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+
+Elle est refusée à tous les rôles plateforme par la matrice, sans figurer parmi les
+interdits absolus.
 
 ## Règles critiques
 

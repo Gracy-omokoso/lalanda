@@ -2,11 +2,23 @@ import { BadRequestException, ConflictException, Injectable } from '@nestjs/comm
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
-import { ActualPeriod, type ActualPeriodDocument } from './actual-period.schema.js';
+import {
+  ActualPeriod,
+  type ActualPeriodDocument,
+  type ActualValueSource,
+} from './actual-period.schema.js';
 
 /** Identifiants de ligne du DSL : snake_case ASCII, mêmes règles que le moteur. */
 const LINE_ID_PATTERN = /^[a-z][a-z0-9_]*$/;
 const MAX_LINES_PER_PERIOD = 200;
+
+/** Options d'une saisie manuelle (ADR-0031 § 3). */
+export interface ManualEntryOptions {
+  /** Auteur, inscrit dans l'origine de chaque valeur saisie. */
+  userId?: string | null;
+  /** Lignes alimentées par le pont RUN → BUILD actif : saisie refusée. */
+  lockedLineIds?: ReadonlySet<string>;
+}
 
 export interface PeriodKey {
   organizationId: string;
@@ -65,9 +77,21 @@ export class ActualsService {
     key: PeriodKey,
     values: Record<string, number | null>,
     allowedLineIds: ReadonlySet<string>,
+    opts: ManualEntryOptions = {},
   ): Promise<ActualPeriodDocument> {
     this.assertValidPeriod(key.year, key.month);
     this.assertValidValues(values, allowedLineIds);
+    // ADR-0031 § 3 : une ligne alimentée par le pont RUN → BUILD actif ne se
+    // saisit pas à la main, effacement compris — on corrige la vente (avoir).
+    const locked = Object.keys(values).filter((lineId) => opts.lockedLineIds?.has(lineId));
+    if (locked.length > 0) {
+      throw new ConflictException({
+        code: 'LINE_FED_BY_RUN',
+        message:
+          'Cette ligne est alimentée par les ventes (pont actif) : corrigez la vente par un avoir, ou désactivez le pont.',
+        details: { lineIds: locked },
+      });
+    }
 
     const existing = await this.findOne(key);
     if (existing?.status === 'closed') {
@@ -78,8 +102,10 @@ export class ActualsService {
     }
 
     if (existing) {
+      existing.sources = mergeSources(existing.sources ?? {}, existing.values, values, opts);
       existing.values = mergeValues(existing.values, values);
       existing.markModified('values');
+      existing.markModified('sources');
       await existing.save();
       return existing;
     }
@@ -92,6 +118,7 @@ export class ActualsService {
         month: key.month,
         status: 'open',
         values: mergeValues({}, values),
+        sources: mergeSources({}, {}, values, opts),
         reopenedLog: [],
         _schemaVersion: 1,
       });
@@ -264,6 +291,41 @@ function mergeValues(
   for (const [lineId, value] of Object.entries(patch)) {
     if (value === null) delete next[lineId];
     else next[lineId] = value;
+  }
+  return next;
+}
+
+/**
+ * Origine des valeurs après une saisie manuelle : `manual` pour chaque ligne
+ * écrite (avec la valeur issue des ventes qu'elle remplace, s'il y en avait une),
+ * entrée retirée pour une ligne effacée.
+ */
+function mergeSources(
+  current: Record<string, ActualValueSource>,
+  currentValues: Record<string, number>,
+  patch: Record<string, number | null>,
+  opts: ManualEntryOptions,
+): Record<string, ActualValueSource> {
+  const next: Record<string, ActualValueSource> = { ...current };
+  const at = new Date();
+  for (const [lineId, value] of Object.entries(patch)) {
+    if (value === null) {
+      delete next[lineId];
+      continue;
+    }
+    const previous = current[lineId];
+    const previousValue = currentValues[lineId];
+    next[lineId] = {
+      source: 'manual',
+      at,
+      by: opts.userId ?? null,
+      replaced:
+        previous?.source === 'run.sales' && typeof previousValue === 'number'
+          ? { source: 'run.sales', value: previousValue }
+          : previous?.source === 'manual'
+            ? (previous.replaced ?? null)
+            : null,
+    };
   }
   return next;
 }

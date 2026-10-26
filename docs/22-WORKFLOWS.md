@@ -37,6 +37,12 @@ La réouverture exige permission et motif. Les modifications après réouverture
 - Transitions refusées explicitement : saisir sur une période clôturée → `409 { code: 'PERIOD_CLOSED' }` ; re-clôturer → `409 { code: 'PERIOD_ALREADY_CLOSED' }` ; rouvrir une période ouverte → `409 { code: 'PERIOD_NOT_CLOSED' }`.
 - Réouverture = action sensible : **owner de l’organisation uniquement** (`403 REOPEN_OWNER_ONLY`), motif non vide obligatoire (`400 REOPEN_REASON_REQUIRED`), et trace append-only `{ reopenedAt, reopenedBy, reason }` jamais purgée. Voir docs/08 § Implémenté (S18b).
 
+## Encaissement (ADR-0031)
+
+`recorded → cancelled`. Une annulation exige un motif et ne s'efface jamais ; une modification (corps complet, `expectedRevision`) rejoue les contrôles du moteur. Le statut de règlement d'une facture (`unpaid`, `partially_paid`, `paid`, `overdue`) n'est pas une machine d'état : il se recalcule à chaque lecture depuis la part à crédit, les avoirs à crédit, les encaissements et l'échéance.
+
+Synchronisation vers le réalisé : rejouable sans doublon (empreinte par période), jamais sur une période clôturée ni sur une saisie manuelle.
+
 ## Country Pack
 
 `draft → review → approved → active → retired`

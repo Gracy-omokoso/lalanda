@@ -464,6 +464,18 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
           .set('Cookie', c)
           .send({ expectedRevision: 1 }),
     },
+    {
+      // ADR-0031 § 4 — Propriétaire, Directeur financier, Comptable. Encaissement
+      // inconnu : un rôle autorisé reçoit 404 RECEIPT_NOT_FOUND, un rôle refusé 403.
+      action: 'sales.receipt',
+      libelle: 'POST /sales/receipts/:id/cancel (encaissement inconnu)',
+      statutsAutorises: [404],
+      envoyer: (c) =>
+        request(serveur())
+          .post('/sales/receipts/000000000000000000000000/cancel')
+          .set('Cookie', c)
+          .send({ reason: 'Sonde de la matrice', expectedRevision: 1 }),
+    },
   ];
 
   // ───────────────────────────────────────────────────────────────────────────
