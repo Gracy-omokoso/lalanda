@@ -92,10 +92,13 @@ describe('documents de vente — lecture des sources', () => {
       // `normalized` et `normalization_failed`).
       'sales/normalization/normalization-recorder.ts',
       'sales/receipts/settlements.service.ts',
+      // ADR-0034, amendement du 26 oct. 2026 : LECTEUR des échéances pour la trésorerie.
+      'sales/receipts/treasury-feed.service.ts',
     ]);
     for (const lecteur of [
       'actuals/run-bridge/run-bridge.service.ts',
       'sales/receipts/settlements.service.ts',
+      'sales/receipts/treasury-feed.service.ts',
     ]) {
       const code = await readFile(resolve(SRC, lecteur), 'utf8');
       expect(code, lecteur).not.toMatch(
