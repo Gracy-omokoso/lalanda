@@ -1,7 +1,7 @@
 # ADR-0031 — Encaissements, statut de règlement et pont vers le réalisé
 
 Statut : Proposed
-Date : 2026-10-21
+Date : 2026-10-21 (amendé le 2026-10-26)
 Décideurs : Gracy Omokoso (dirigeante) ; CTO Lalanda (contrat technique). Les points
 comptables sont soumis à l'expert-comptable de la dirigeante (§ Décisions ouvertes).
 
@@ -218,6 +218,43 @@ horloge (la date du jour est un paramètre) : `checkReceipt`, `computeSettlement
 `aggregateReceiptsByMonth`, `revenueAmountsFor`, `aggregateRevenueByMonth`,
 `fiscalPeriodOfMonth`, `planRunActuals`. Arithmétique exacte sur les chaînes décimales
 (réutilise l'arithmétique interne d'`invoice-totals` sans la modifier).
+
+## Amendement du 26 oct. 2026 — intégration avec ADR-0034 (Dépenses et trésorerie)
+
+Les deux modules RUN ont été livrés en parallèle puis fusionnés. Ce qui change ici :
+
+1. **Un seul vocabulaire d'origine.** `actual_periods.sources[ligne]` est une union fermée :
+   `manual` (avec `replaced`, la valeur RUN remplacée, de **l'une ou l'autre** source),
+   `run.sales` (ce pont) et `run.expenses` (report des dépenses, ADR-0034 § 5). Les deux
+   ponts écrivent la même forme : `at`, `by`, `version`, `calendarMonth`, `documents`,
+   `fingerprint` (`RunActualValueSource`, `apps/api/src/actuals/actual-period.schema.ts`).
+2. **Un seul verrou.** `RunActualsLocks` réunit les lignes des deux ponts actifs ; la saisie
+   manuelle de l'une d'elles est refusée (`409 LINE_FED_BY_RUN`), et la réponse dit quel pont
+   l'alimente (`details.sources[ligne]` : `run.sales` ou `run.expenses`).
+3. **Un seul rattachement « projet + mois d'ouverture de l'exercice 1 »** (décision ouverte
+   n° 10 d'ADR-0034, tranchée). Deux valeurs différentes rangeraient une vente et une dépense
+   du même mois civil dans deux mois d'exercice différents : le réalisé serait incohérent.
+   Le rattachement vit donc une fois, dans `run_actuals_bridges` (`projectId`,
+   `exerciseStart`), lu par les deux ponts (`RunLinkService`). Chaque pont garde son
+   interrupteur et sa cible (ici `enabled` et `revenueLineId`). Le régler depuis l'un le
+   règle pour l'autre ; c'est **refusé tant que l'autre pont est actif**
+   (`409 RUN_LINK_IN_USE`, `details.otherBridge`) : ses valeurs déjà reportées changeraient
+   de projet ou de mois d'exercice sans décision.
+4. **Une ligne, un pont.** La ligne de chiffre d'affaires ne peut pas être une ligne visée par
+   la correspondance des dépenses actives, et inversement (`409 LINE_FED_BY_OTHER_BRIDGE`). La
+   synchronisation des ventes rend `OTHER_SOURCE_PRESENT` (jamais d'écrasement) si une
+   valeur `run.expenses` occupe la case.
+5. **`accountId` n'est plus opaque.** C'est un compte `treasury_accounts` de l'organisation
+   (`404 TREASURY_ACCOUNT_NOT_FOUND` sinon), actif (`ACCOUNT_INACTIVE`), de la devise de
+   l'encaissement (`400 RECEIPT_ACCOUNT_CURRENCY_MISMATCH`, aucun taux) et ouvert à la date de
+   réception (`400 RECEIPT_BEFORE_ACCOUNT_OPENING`) — mêmes règles qu'une dépense. Un
+   encaissement rattaché entre dans le solde du compte ; sans compte, il reste hors des
+   soldes. La trésorerie lit encaissements et restes à encaisser en lecture seule
+   (`SalesTreasuryFeed`) : voir ADR-0034, amendement du même jour.
+
+Décisions ouvertes inchangées ; la n° 7 (réalisé de trésorerie) reste ouverte : les
+encaissements alimentent les soldes et la prévision de trésorerie, toujours aucune ligne du
+plan.
 
 ## Conséquences
 

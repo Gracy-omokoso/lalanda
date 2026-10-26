@@ -336,6 +336,8 @@ Contrat : [ADR-0031](adr/ADR-0031-encaissements-et-realise.md). Organisation act
 
 Codes : `422 RECEIPT_INVALID` (`details.issues` du moteur : `RECEIPT_ALLOCATIONS_MISMATCH`, `RECEIPT_ALLOCATION_EXCEEDS_BALANCE`…), `422 RECEIPT_BEFORE_INVOICE`, `400 RECEIPT_DATE_IN_FUTURE`, `409 RECEIPT_CURRENCY_MISMATCH`, `409 INVOICE_NOT_SETTLEABLE` (`details.reason` : `NOT_FINAL`, `CREDIT_NOTE`, `TEST_SERIES`, `NO_PAYMENTS_DECLARED`), `409 RECEIPT_CANCELLED`, `409 STALE_REVISION`, `400 DUE_DATE_BEFORE_ISSUE`, `409 BRIDGE_NOT_CONFIGURED`, `409 NO_APPROVED_PLAN`, `409 UNKNOWN_LINE`, `409 PERIOD_CONFLICT`. Saisie manuelle d'une ligne alimentée par le pont actif : `409 LINE_FED_BY_RUN` sur `PUT /projects/:id/actual-periods/:year/:month`, dont la vue porte désormais `sources` (origine de chaque valeur).
 
+Intégration avec la trésorerie (26 oct. 2026, amendements d'ADR-0031 et ADR-0034) : `accountId` d'un encaissement est un compte de trésorerie de l'organisation (`404 TREASURY_ACCOUNT_NOT_FOUND`), actif (`400 ACCOUNT_INACTIVE`), de la même devise (`400 RECEIPT_ACCOUNT_CURRENCY_MISMATCH`) et ouvert à la date de réception (`400 RECEIPT_BEFORE_ACCOUNT_OPENING`). `projectId` et `exerciseStart` du pont sont le rattachement commun aux deux ponts : `409 RUN_LINK_IN_USE` (`details.otherBridge`) s'ils changent sous le report des dépenses actif ; `409 LINE_FED_BY_OTHER_BRIDGE` si la ligne est visée par ce report. La synchronisation rend `OTHER_SOURCE_PRESENT` sur une case déjà alimentée par les dépenses. `LINE_FED_BY_RUN` porte `details.sources[ligne]` (`run.sales` ou `run.expenses`).
+
 ## Ventes — normalisation DGI — implémenté (S25f, ADR-0024 chantier F2)
 
 Contrat : ADR-0024 § 9. `POST …/normalize` envoie, compare et confirme d'un seul tenant ; un refus de la DGI n'est pas une erreur HTTP (200 avec l'état). La route est idempotente : une requête renvoyée (double clic, navigateur) trouve la prise en main et rend l'état courant sans rien envoyer.
@@ -371,6 +373,8 @@ Contrat : ADR-0034. Organisation active seulement ; une ressource d'une autre or
 | `GET /treasury/reconciliation?year=` | `treasury.read` + `analytics.read` |
 
 Codes : `400 EXPENSE_IN_FUTURE`, `EXPENSE_ACCOUNT_CURRENCY_MISMATCH`, `EXPENSE_BEFORE_ACCOUNT_OPENING`, `ACCOUNT_INACTIVE`, `TRANSFER_AMOUNTS_DIFFER`, `NOT_AN_OCCURRENCE`, `OCCURRENCE_IN_FUTURE`, `UNKNOWN_LINE`, `LINE_NOT_A_CHARGE`, `CATEGORY_NOT_OPERATING` ; `409 STALE_REVISION`, `EXPENSE_CANCELLED`, `NO_APPROVED_PLAN`, `BRIDGE_NOT_CONFIGURED`, `BRIDGE_DISABLED`, `PERIOD_CONFLICT`. Côté réalisé : `PUT /projects/:id/actual-periods/…` répond `409 LINE_FED_BY_RUN` sur une ligne alimentée par le report actif, et chaque période expose `sources` (origine de chaque valeur).
+
+Depuis le 26 oct. 2026 (amendement d'ADR-0034) : `projectId` et `firstMonth` de `PUT /treasury/actuals-bridge` écrivent le rattachement commun aux deux ponts (`409 RUN_LINK_IN_USE` sous le pont des ventes actif ; `409 LINE_FED_BY_OTHER_BRIDGE` pour la ligne de chiffre d'affaires des ventes), et `GET` le rend même réglé côté ventes. Les encaissements rattachés à un compte entrent dans ses soldes et ses mouvements (`source: receipt`, `receiptsIntegrated: true`) ; la prévision attend le reste réellement à encaisser de chaque facture (avoirs et encaissements imputés, échéance de la facture) et signale `RECEIPTS_WITHOUT_ACCOUNT`.
 
 ## Webhooks
 

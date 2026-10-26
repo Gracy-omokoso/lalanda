@@ -127,6 +127,14 @@ modifiées ; une case contenant une dépense dans une autre devise que le projet
 reportée. Tant que le report est actif, la saisie manuelle des lignes visées répond
 `409 LINE_FED_BY_RUN`. Le plan validé n'est jamais écrit.
 
+**Réglage commun aux deux ponts (26 oct. 2026, amendements d'ADR-0031 et ADR-0034).** Le
+projet relié et le mois civil qui ouvre l'exercice 1 sont **un seul réglage**, partagé par le
+pont des ventes et le report des dépenses : une vente et une dépense du même mois civil
+tombent toujours dans le même mois d'exercice. Il ne se change pas tant que l'autre pont est
+actif (`409 RUN_LINK_IN_USE`). Une ligne n'est alimentée que par un pont
+(`409 LINE_FED_BY_OTHER_BRIDGE`) ; le refus `409 LINE_FED_BY_RUN` dit lequel
+(`details.sources`).
+
 ### Reste à faire
 
 - **Import bancaire et CSV/Excel mappé** (§ Saisie et import) : aujourd’hui la saisie est manuelle et agrégée. La machine d’état `uploaded → mapped → validated → processing → completed` (docs/22 § Import) et l’annulation d’import ne sont pas implémentées.
@@ -140,4 +148,4 @@ reportée. Tant que le report est actif, la saisie manuelle des lignes visées r
 
 ## Réalisé issu des ventes (ADR-0031)
 
-Le pont RUN → BUILD, **désactivé par défaut et par organisation**, écrit le chiffre d'affaires HT des ventes (factures définitives moins avoirs, groupes H, I, J, L, N exclus, par mois civil d'émission à Kinshasa) dans la ligne de chiffre d'affaires choisie du projet choisi, le mois civil choisi ouvrant l'exercice 1. Chaque valeur porte son origine dans `actual_periods.sources` : `run.sales` (version du moteur, mois civil, nombre de documents, empreinte) ou `manual` (auteur, date, et la valeur des ventes remplacée le cas échéant). Règles : jamais d'écriture dans le plan validé, ni dans une période clôturée (écart rendu `PERIOD_CLOSED`), ni sur une saisie manuelle (`MANUAL_VALUE_PRESENT`) ; aucun taux de change (un mois avec un document dans une autre devise que le projet n'est pas reporté) ; rejouer la synchronisation ne réécrit rien. Tant que le pont est actif, la ligne alimentée refuse la saisie manuelle (`409 LINE_FED_BY_RUN`). Les encaissements sont agrégés par mois et par devise mais n'alimentent encore aucune ligne (décision ouverte n° 7 d'ADR-0031).
+Le pont RUN → BUILD, **désactivé par défaut et par organisation**, écrit le chiffre d'affaires HT des ventes (factures définitives moins avoirs, groupes H, I, J, L, N exclus, par mois civil d'émission à Kinshasa) dans la ligne de chiffre d'affaires choisie du projet choisi, le mois civil choisi ouvrant l'exercice 1. Chaque valeur porte son origine dans `actual_periods.sources` : `run.sales` (version du moteur, mois civil, nombre de documents, empreinte) ou `manual` (auteur, date, et la valeur des ventes remplacée le cas échéant). Règles : jamais d'écriture dans le plan validé, ni dans une période clôturée (écart rendu `PERIOD_CLOSED`), ni sur une saisie manuelle (`MANUAL_VALUE_PRESENT`) ; aucun taux de change (un mois avec un document dans une autre devise que le projet n'est pas reporté) ; rejouer la synchronisation ne réécrit rien. Tant que le pont est actif, la ligne alimentée refuse la saisie manuelle (`409 LINE_FED_BY_RUN`). Les encaissements sont agrégés par mois et par devise mais n'alimentent encore aucune ligne du plan (décision ouverte n° 7 d'ADR-0031) ; depuis le 26 oct. 2026, ils alimentent les soldes des comptes de trésorerie et la prévision (ADR-0034, amendement).

@@ -1,7 +1,7 @@
 # ADR-0034 — Dépenses, trésorerie réelle et rapprochement au prévisionnel
 
 Statut : Proposed
-Date : 2026-10-21
+Date : 2026-10-21 (amendé le 2026-10-26)
 Décideurs : Gracy Omokoso (dirigeante) ; CTO Lalanda (contrat technique). Les points
 comptables et fiscaux sont soumis à l'expert-comptable de la dirigeante (§ Décisions
 ouvertes).
@@ -299,6 +299,35 @@ jour en paramètre : `occurrencesOf`, `computeAccountBalances`, `aggregateExpens
 `planExpenseActuals`, `reconcileExpenses`, `forecastTreasury`. Tests par propriétés
 (générateur pseudo-aléatoire à graine fixe, arithmétique de contrôle propre au test).
 
+## Amendement du 26 oct. 2026 — intégration avec ADR-0031 (Encaissements)
+
+ADR-0031 est fusionné. Ce qui change ici :
+
+1. **Origine, verrou et rattachement communs** : voir ADR-0031, amendement du même jour, §§ 1
+   à 4. En bref : une seule union `sources` (`manual` | `run.sales` | `run.expenses`) ; un
+   seul verrou (`RunActualsLocks`, `409 LINE_FED_BY_RUN` avec le pont en cause) ; **décision
+   ouverte n° 10 tranchée : un réglage commun**. Le projet relié et le mois d'ouverture de
+   l'exercice 1 vivent dans `run_actuals_bridges` ; `treasury_settings.bridge` ne garde que
+   `enabled` et `mapping`. `PUT /treasury/actuals-bridge` garde son contrat (`projectId`,
+   `firstMonth`) mais écrit le rattachement commun, refusé sous le pont des ventes actif
+   (`409 RUN_LINK_IN_USE`) ; `GET` rend le rattachement commun, même réglé côté ventes. Une
+   ligne de la correspondance ne peut pas être la ligne de chiffre d'affaires des ventes
+   actives (`409 LINE_FED_BY_OTHER_BRIDGE`).
+2. **Encaissements branchés (§ 4).** Le port `TREASURY_RECEIPTS_SOURCE` est fourni par
+   `SalesReceiptsSource` (lecture seule de `SalesTreasuryFeed`, module Ventes). Chaque
+   encaissement non annulé portant un `accountId` est une **entrée** de ce compte, datée de
+   `receivedOn` ; `accountId` est vérifié à la saisie (organisation, actif, même devise,
+   postérieur à l'ouverture). Un encaissement sans compte reste hors des soldes ; la prévision
+   le compte comme incertitude (`RECEIPTS_WITHOUT_ACCOUNT`, 90 derniers jours).
+   `RECEIPTS_NOT_INTEGRATED` ne paraît plus qu'avec le fournisseur de repli `NoReceiptsSource`.
+3. **Échéances clients (§ 7).** Le reste à encaisser n'est plus la part `CREDIT` brute
+   (`amountOnCredit`) mais le **reste réel** du moteur (`computeSettlement`, ADR-0031 § 2 :
+   part à crédit − avoirs imputés − encaissements non annulés), daté par l'**échéance
+   facultative** de la facture quand elle existe ; une facture réglée n'est plus attendue.
+   Le délai « sans échéance » du scénario s'applique aux autres.
+
+Décisions ouvertes inchangées, sauf la n° 10 (tranchée ci-dessus).
+
 ## Conséquences
 
 - Nouvelles collections : `treasury_accounts`, `treasury_expenses`,
@@ -344,9 +373,8 @@ activé sur un projet de test.
 9. **Plan des exercices 2 à 5.** La prévision utilise le rythme mensuel du compte
    d'exploitation du plan (exercice 1) ; les exercices suivants ne publient que le CA et le
    résultat (docs/08 § Reste à faire).
-10. **Un seul réglage d'exercice.** Le pont des ventes (ADR-0031) et celui des dépenses ont
-    chacun projet et mois d'ouverture ; deux valeurs différentes rendraient le réalisé
-    incohérent. Proposé à la fusion : un réglage commun.
+10. ~~**Un seul réglage d'exercice.**~~ **Tranchée le 26 oct. 2026** (amendement
+    ci-dessus) : un rattachement commun aux deux ponts, non modifiable sous l'autre pont actif.
 
 ## Liens
 
