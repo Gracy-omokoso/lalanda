@@ -777,6 +777,28 @@ describe('erreurs de l’API (§ S25c.5)', () => {
     });
   });
 
+  it('remplace aussi les messages par défaut de zod 4 (« Too small… », « Too big… »)', () => {
+    const err = erreurApi(400, {
+      code: 'INVALID_REQUEST',
+      issues: [
+        {
+          path: ['name'],
+          code: 'too_small',
+          message: 'Too small: expected string to have >=1 characters',
+        },
+        {
+          path: ['unit'],
+          code: 'too_big',
+          message: 'Too big: expected string to have <=20 characters',
+        },
+      ],
+    });
+    expect(erreursFormulaire(err, ['name', 'unit'] as const).champs).toEqual({
+      name: 'Ce champ est obligatoire ou trop court.',
+      unit: 'Ce champ est trop long.',
+    });
+  });
+
   it('traduit les codes précisés par l’API quand le message manque ou est en anglais', () => {
     const cas: [string, string, RegExp][] = [
       ['phone', 'PHONE_INVALID', /téléphone invalide/],

@@ -164,7 +164,8 @@ export function erreursParChamp(err: unknown): Record<string, string> {
  *
  * Les messages écrits par l'API (« NIF : 5 à 20 lettres ou chiffres ») passent
  * tels quels ; les messages PAR DÉFAUT de Zod, en anglais (« String must contain
- * at least 1 character(s) »), sont remplacés d'après leur code.
+ * at least 1 character(s) » sous zod 3, « Too small: expected string to have
+ * >=1 characters » sous zod 4), sont remplacés d'après leur code.
  */
 const MESSAGES_ZOD: Record<string, string> = {
   too_small: 'Ce champ est obligatoire ou trop court.',
@@ -175,7 +176,8 @@ const MESSAGES_ZOD: Record<string, string> = {
   unrecognized_keys: 'Champ non reconnu.',
 };
 
-const ZOD_ANGLAIS = /^(String|Number|Array|Expected|Required|Invalid|Unrecognized)\b/;
+const ZOD_ANGLAIS =
+  /^(String|Number|Array|Expected|Required|Invalid|Unrecognized|Too (small|big))\b/;
 
 export function messageIssue(code: unknown, message: unknown): string {
   if (typeof message === 'string' && message !== '' && !ZOD_ANGLAIS.test(message)) return message;

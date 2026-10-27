@@ -888,7 +888,8 @@ const MESSAGES_ZOD: Record<string, string> = {
 };
 
 /** Un message du serveur est affichable s'il est en français, pas un message Zod par défaut. */
-const ZOD_ANGLAIS = /^(String|Number|Array|Expected|Required|Invalid|Unrecognized)\b/;
+const ZOD_ANGLAIS =
+  /^(String|Number|Array|Expected|Required|Invalid|Unrecognized|Too (small|big))\b/;
 function utilisable(message: unknown): message is string {
   return typeof message === 'string' && message !== '' && !ZOD_ANGLAIS.test(message);
 }

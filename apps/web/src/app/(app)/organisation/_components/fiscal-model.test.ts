@@ -408,6 +408,13 @@ describe('erreurs de l’API', () => {
     expect(messageIssue('too_small', 'String must contain at least 1 character(s)')).toBe(
       'Ce champ est obligatoire ou trop court.',
     );
+    // Même message sous zod 4 (passage du 27 oct. 2026).
+    expect(messageIssue('too_small', 'Too small: expected string to have >=1 characters')).toBe(
+      'Ce champ est obligatoire ou trop court.',
+    );
+    expect(messageIssue('invalid_type', 'Invalid input: expected string, received undefined')).toBe(
+      'Valeur manquante ou invalide.',
+    );
     expect(messageIssue('invalid_string', 'adresse e-mail invalide')).toBe(
       'adresse e-mail invalide',
     );
