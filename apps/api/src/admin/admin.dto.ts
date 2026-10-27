@@ -35,7 +35,7 @@ export const GrantPlatformRoleSchema = z
      * Expiration facultative (ISO 8601). Recommandée pour `platform_support` :
      * un accès permanent au support contredit « durée limitée » (docs/12).
      */
-    expiresAt: z.string().datetime().optional(),
+    expiresAt: z.iso.datetime().optional(),
   })
   .strict();
 

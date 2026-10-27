@@ -25,6 +25,7 @@ import {
 import { z } from 'zod';
 
 import { normalizeNif } from '../fiscal/fiscal.dto.js';
+import { fixedMessage, typeMessages } from '../validation/zod-compat.js';
 
 // ── Clients ──────────────────────────────────────────────────────────────────
 
@@ -54,7 +55,7 @@ const PHONE_PATTERN = /^\+?[0-9][0-9 .-]{6,19}$/;
 type Ctx = z.RefinementCtx;
 
 function issue(ctx: Ctx, path: string, code: string, message: string): void {
-  ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message, params: { code } });
+  ctx.addIssue({ code: 'custom', path: [path], message, params: { code } });
 }
 
 /** Chaîne facultative : absente, `null` ou vide après `trim` → `null`. */
@@ -68,7 +69,7 @@ const nullableString = z.string().nullable().optional();
 
 const CustomerFields = {
   type: z.enum(CUSTOMER_TYPES, {
-    errorMap: () => ({ message: 'Type de client : PP, PM, PC, PL ou AO.' }),
+    error: fixedMessage('Type de client : PP, PM, PC, PL ou AO.'),
   }),
   name: nullableString,
   nif: nullableString,
@@ -147,7 +148,7 @@ function normalizeCustomer(raw: RawCustomer, ctx: Ctx): CustomerInput {
   }
 
   const email = optionalText(raw.email);
-  if (email !== null && (email.length > 254 || !z.string().email().safeParse(email).success)) {
+  if (email !== null && (email.length > 254 || !z.email().safeParse(email).success)) {
     issue(ctx, 'email', 'EMAIL_INVALID', 'Adresse e-mail invalide.');
   }
 
@@ -173,7 +174,7 @@ export const CreateCustomerSchema = CustomerShape.transform((raw, ctx) =>
 );
 
 const expectedRevision = z
-  .number({ invalid_type_error: 'Révision attendue : un entier.' })
+  .number({ error: typeMessages({ invalid: 'Révision attendue : un entier.' }) })
   .int()
   .min(1);
 
@@ -309,7 +310,7 @@ function normalizeSpecificTax(raw: unknown, ctx: Ctx): SpecificTax | null {
   const extra = Object.keys(obj).filter((k) => k !== 'kind' && k !== field);
   if (extra.length > 0) {
     ctx.addIssue({
-      code: z.ZodIssueCode.unrecognized_keys,
+      code: 'unrecognized_keys',
       keys: extra,
       path: ['specificTax'],
       message: `Champ(s) inconnu(s) : ${extra.join(', ')}.`,
@@ -533,7 +534,7 @@ const ListBase = {
     .regex(/^\d{1,3}$/, 'Limite : un entier de 1 à 100.')
     .transform((v) => Number.parseInt(v, 10))
     .pipe(z.number().int().min(1).max(100))
-    .default('50'),
+    .prefault('50'),
   cursor: z.string().min(1).max(512).optional(),
 };
 

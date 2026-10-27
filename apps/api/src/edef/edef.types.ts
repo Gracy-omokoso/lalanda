@@ -155,13 +155,13 @@ export const InfoStatusSchema = z.object({
  * d'une lettre minuscule sont retenues ; une valeur `null` (groupe non publié)
  * est écartée ; toute autre valeur non numérique rend la réponse non conforme.
  */
-export const TaxGroupsSchema = z.record(z.unknown()).transform((raw, ctx) => {
+export const TaxGroupsSchema = z.record(z.string(), z.unknown()).transform((raw, ctx) => {
   const out: Record<string, number> = {};
   for (const [key, value] of Object.entries(raw)) {
     if (!/^[a-z]$/.test(key)) continue;
     if (value === null || value === undefined) continue;
     if (typeof value !== 'number' || !Number.isFinite(value)) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: [key], message: 'taux non numérique' });
+      ctx.addIssue({ code: 'custom', path: [key], message: 'taux non numérique' });
       return z.NEVER;
     }
     out[key] = value;
@@ -177,13 +177,12 @@ const CurrencyRateSchema = z.object({
   date: nullableString,
   rate: z
     .number()
-    .finite()
     .nullish()
     .transform((v) => v ?? null),
 });
 
 export const REFERENCE_LIST_SCHEMAS: {
-  [L in EdefReferenceList]: z.ZodType<EdefReferenceData[L], z.ZodTypeDef, unknown>;
+  [L in EdefReferenceList]: z.ZodType<EdefReferenceData[L], unknown>;
 } = {
   taxGroups: TaxGroupsSchema,
   invoiceTypes: z.array(TypeEntrySchema),

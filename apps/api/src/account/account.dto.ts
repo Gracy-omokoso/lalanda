@@ -45,7 +45,7 @@ export function isValidTimeZone(value: string): boolean {
 const timezoneSchema = z
   .string()
   .trim()
-  .refine(isValidTimeZone, { message: 'Fuseau horaire IANA inconnu' });
+  .refine(isValidTimeZone, { error: 'Fuseau horaire IANA inconnu' });
 
 /**
  * Email : normalisation lowercase + trim AVANT toute comparaison.
@@ -56,7 +56,7 @@ export const emailSchema = z
   .string()
   .trim()
   .toLowerCase()
-  .email({ message: 'Adresse email invalide' })
+  .email({ error: 'Adresse email invalide' })
   .max(254);
 
 /** PUT /account/profile — nom affiché, langue et fuseau. */

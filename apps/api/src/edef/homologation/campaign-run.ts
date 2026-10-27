@@ -112,7 +112,7 @@ export function describeError(err: unknown): string {
   return err instanceof Error ? err.message : 'erreur inconnue';
 }
 
-function invalid(what: string, issues: { path: (string | number)[]; message: string }[]): never {
+function invalid(what: string, issues: { path: PropertyKey[]; message: string }[]): never {
   throw new CampaignStop(
     `${what} : corps refusé par la validation de l’API (${issues
       .map((i) => `${i.path.join('.')} : ${i.message}`)

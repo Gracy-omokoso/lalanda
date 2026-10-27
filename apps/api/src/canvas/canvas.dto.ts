@@ -53,7 +53,7 @@ const BlockSchema = z
   .array(CanvasCardSchema)
   .max(MAX_CARDS_PER_BLOCK)
   .refine((cards) => new Set(cards.map((c) => c.id)).size === cards.length, {
-    message: 'Ids de cartes dupliqués dans un bloc',
+    error: 'Ids de cartes dupliqués dans un bloc',
   });
 
 export const PutCanvasSchema = z

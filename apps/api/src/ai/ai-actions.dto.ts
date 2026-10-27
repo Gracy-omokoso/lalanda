@@ -15,11 +15,11 @@ export const EvaluateLineSchema = z.object({
   sheetId: z.string(),
   lineId: z.string(),
   label: z.string(),
-  value: z.number().finite(),
+  value: z.number(),
   format: z.enum(['money', 'number', 'percent']),
   seuil: z
     .object({
-      valeur: z.number().finite(),
+      valeur: z.number(),
       direction: z.enum(['min', 'max']),
       statut: SeuilStatutSchema,
     })
@@ -30,7 +30,7 @@ export type EvaluateLine = z.infer<typeof EvaluateLineSchema>;
 /** Payload d'entrée : résultat d'un evaluate (lines complètes + drivers). */
 export const CorrectiveActionsRequestSchema = z.object({
   templateSlug: z.string().min(1),
-  drivers: z.record(z.string(), z.number().finite()).default({}),
+  drivers: z.record(z.string(), z.number()).default({}),
   lines: z.array(EvaluateLineSchema).min(1),
   devise: z.string().optional(),
 });

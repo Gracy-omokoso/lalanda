@@ -4,7 +4,9 @@
 // français. Une ressource d'une autre organisation répond 404, jamais 403.
 
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
-import type { ZodError, ZodIssue } from 'zod';
+import type { ZodError, z } from 'zod';
+
+import { isMissing } from '../validation/zod-compat.js';
 
 export interface SalesIssue {
   path: string;
@@ -17,16 +19,15 @@ export interface SalesIssue {
  * (`params.code` : `NIF_REQUIRED_FOR_TYPE`, `PRICE_TOO_PRECISE`…) ; les erreurs
  * de forme reçoivent un code générique stable.
  */
-function codeOf(issue: ZodIssue): string {
+function codeOf(issue: z.core.$ZodIssue): string {
   if (issue.code === 'custom') {
     const code = (issue.params as { code?: unknown } | undefined)?.code;
     if (typeof code === 'string') return code;
     return 'INVALID_VALUE';
   }
   if (issue.code === 'unrecognized_keys') return 'UNKNOWN_FIELD';
-  if (issue.code === 'invalid_type') {
-    return issue.received === 'undefined' ? 'FIELD_REQUIRED' : 'INVALID_TYPE';
-  }
+  if (isMissing(issue)) return 'FIELD_REQUIRED';
+  if (issue.code === 'invalid_type') return 'INVALID_TYPE';
   return 'INVALID_VALUE';
 }
 

@@ -32,8 +32,8 @@ const ConfigValueSchema = z.union([
 export const UpdateIntegrationSchema = z
   .object({
     enabled: z.boolean().optional(),
-    config: z.record(ConfigValueSchema).optional(),
-    secrets: z.record(SecretValueSchema).optional(),
+    config: z.record(z.string(), ConfigValueSchema).optional(),
+    secrets: z.record(z.string(), SecretValueSchema).optional(),
   })
   .strict();
 

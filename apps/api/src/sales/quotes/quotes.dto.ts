@@ -12,6 +12,7 @@ import { isCalendarDay } from '../../crm/crm-model.js';
 import { isObjectIdHex } from '../search.js';
 import { CreateInvoiceSchema, type InvoiceDraftInput } from '../invoices/invoices.dto.js';
 import type { QuoteStatus } from './quote.schema.js';
+import { typeMessages } from '../../validation/zod-compat.js';
 
 export interface QuoteInput {
   opportunityId: string | null;
@@ -27,16 +28,16 @@ const QuoteFields = {
   title: z.unknown().optional(),
   notes: z.unknown().optional(),
   validUntil: z.unknown().optional(),
-  currency: z.unknown(),
-  priceMode: z.unknown(),
-  customer: z.unknown(),
+  currency: z.unknown().optional(),
+  priceMode: z.unknown().optional(),
+  customer: z.unknown().optional(),
   lines: z.unknown().optional(),
 };
 
 type Ctx = z.RefinementCtx;
 
 function issue(ctx: Ctx, path: (string | number)[], code: string, message: string): void {
-  ctx.addIssue({ code: z.ZodIssueCode.custom, path, message, params: { code } });
+  ctx.addIssue({ code: 'custom', path, message, params: { code } });
 }
 
 function text(ctx: Ctx, path: string, raw: unknown, max: number): string | null {
@@ -86,7 +87,7 @@ function normalizeQuote(raw: Record<string, unknown>, ctx: Ctx): QuoteInput {
     lines: raw['lines'],
   });
   if (!parsed.success) {
-    for (const i of parsed.error.issues) ctx.addIssue({ ...i } as z.IssueData);
+    for (const i of parsed.error.issues) ctx.addIssue({ ...i } as z.core.$ZodRawIssue);
   }
   return {
     opportunityId,
@@ -118,8 +119,10 @@ export const CreateQuoteSchema = z
 
 const expectedRevision = z
   .number({
-    required_error: 'Révision attendue obligatoire.',
-    invalid_type_error: 'Révision attendue : un entier.',
+    error: typeMessages({
+      required: 'Révision attendue obligatoire.',
+      invalid: 'Révision attendue : un entier.',
+    }),
   })
   .int()
   .min(1);
@@ -166,7 +169,7 @@ export const ListQuotesQuerySchema = z
       .regex(/^\d{1,3}$/, 'Limite : un entier de 1 à 100.')
       .transform((v) => Number.parseInt(v, 10))
       .pipe(z.number().int().min(1).max(100))
-      .default('50'),
+      .prefault('50'),
     cursor: z.string().min(1).max(512).optional(),
   })
   .strict();

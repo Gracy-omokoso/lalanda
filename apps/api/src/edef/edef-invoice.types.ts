@@ -133,7 +133,7 @@ export interface EdefInvoiceRequest {
   curDate?: string;
 }
 
-const finiteNumber = z.number().finite();
+const finiteNumber = z.number();
 
 const EdefInvoiceItemSchema = z
   .object({
@@ -157,7 +157,7 @@ const optionalText = z.string().min(1).optional();
  * inconnu (`strict`), un `null` là où la règle est d'omettre, ou un montant non
  * fini sont des erreurs de programmation, pas des données à envoyer.
  */
-export const EdefInvoiceRequestSchema: z.ZodType<EdefInvoiceRequest, z.ZodTypeDef, unknown> = z
+export const EdefInvoiceRequestSchema: z.ZodType<EdefInvoiceRequest, unknown> = z
   .object({
     nif: z.string().min(1),
     rn: z.string().min(1),
@@ -251,9 +251,9 @@ const nullableString = z
   .transform((v) => v ?? null);
 
 /** `InvoiceResponseDto` : un `uid` absent ou vide (sans `errorCode`) est `invalid_response`. */
-export const EdefInvoiceSubmittedSchema: z.ZodType<EdefInvoiceSubmitted, z.ZodTypeDef, unknown> = z
+export const EdefInvoiceSubmittedSchema: z.ZodType<EdefInvoiceSubmitted, unknown> = z
   .object({ uid: z.string().min(1) })
-  .passthrough()
+  .loose()
   .transform((raw) => ({ uid: raw.uid, raw: Object.freeze({ ...raw }) }));
 
 const SecurityElementsShape = z.object({
@@ -278,12 +278,12 @@ function securityElementsOf(
  * doivent être non vides — sinon `invalid_response`, JAMAIS une normalisation
  * (« aucune facture enregistrée sans éléments de sécurité »).
  */
-export const EdefSecurityElementsSchema: z.ZodType<EdefSecurityElements, z.ZodTypeDef, unknown> =
+export const EdefSecurityElementsSchema: z.ZodType<EdefSecurityElements, unknown> =
   SecurityElementsShape.transform((v, ctx) => {
     const elements = securityElementsOf(v);
     if (!elements) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'éléments de sécurité absents ou incomplets',
       });
       return z.NEVER;
@@ -292,12 +292,12 @@ export const EdefSecurityElementsSchema: z.ZodType<EdefSecurityElements, z.ZodTy
   });
 
 /** Réponse d'un `cancel` réussi (même DTO que `confirm`, éléments vides attendus). */
-export const EdefCancelledSchema: z.ZodType<EdefCancelled, z.ZodTypeDef, unknown> = z
+export const EdefCancelledSchema: z.ZodType<EdefCancelled, unknown> = z
   .object({ dateTime: nullableString })
   .transform((v) => ({ dateTime: v.dateTime }));
 
 /** `StatusResponseDto` lu par `GET /api/invoice` ; une entrée sans `uid` est écartée. */
-export const EdefPendingRequestsSchema: z.ZodType<EdefPendingRequests, z.ZodTypeDef, unknown> = z
+export const EdefPendingRequestsSchema: z.ZodType<EdefPendingRequests, unknown> = z
   .object({
     pendingRequestsCount: z.number().int().nonnegative(),
     pendingRequestsList: z
@@ -311,12 +311,12 @@ export const EdefPendingRequestsSchema: z.ZodType<EdefPendingRequests, z.ZodType
   }));
 
 /** `InvoiceDetailsDto`. */
-export const EdefInvoiceDetailsSchema: z.ZodType<EdefInvoiceDetails, z.ZodTypeDef, unknown> = z
+export const EdefInvoiceDetailsSchema: z.ZodType<EdefInvoiceDetails, unknown> = z
   .object({
     rn: nullableString,
     nif: nullableString,
     totals: z
-      .record(z.unknown())
+      .record(z.string(), z.unknown())
       .nullish()
       .transform((v) => (v ? Object.freeze({ ...v }) : null)),
     secElements: SecurityElementsShape.nullish(),

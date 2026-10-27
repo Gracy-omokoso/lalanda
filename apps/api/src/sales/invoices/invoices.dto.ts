@@ -35,6 +35,7 @@ import {
   type CreditNoteNature,
   type InvoiceType,
 } from './invoice.contract.js';
+import { fixedMessage, typeMessages } from '../../validation/zod-compat.js';
 
 /** Au plus 200 lignes par document (§ S25e.2). */
 export const MAX_LINES = 200;
@@ -44,7 +45,7 @@ const CODE_PATTERN = /^[A-Za-z0-9._/-]+$/;
 type Ctx = z.RefinementCtx;
 
 function issue(ctx: Ctx, path: (string | number)[], code: string, message: string): void {
-  ctx.addIssue({ code: z.ZodIssueCode.custom, path, message, params: { code } });
+  ctx.addIssue({ code: 'custom', path, message, params: { code } });
 }
 
 type DecimalKind = 'price' | 'quantity' | 'percent' | 'rate';
@@ -97,7 +98,7 @@ function unknownKeys(
   const extra = Object.keys(obj).filter((k) => !allowed.includes(k));
   if (extra.length === 0) return false;
   ctx.addIssue({
-    code: z.ZodIssueCode.unrecognized_keys,
+    code: 'unrecognized_keys',
     keys: extra,
     path,
     message: `Champ(s) inconnu(s) : ${extra.join(', ')}.`,
@@ -435,15 +436,15 @@ export interface InvoiceDraftInput {
 
 const DraftShape = {
   type: z.enum(INVOICE_TYPES, {
-    errorMap: () => ({ message: 'Type : FV, FT, FA, EV, ET ou EA.' }),
+    error: fixedMessage('Type : FV, FT, FA, EV, ET ou EA.'),
   }),
   currency: z.enum(DOCUMENT_CURRENCIES, {
-    errorMap: () => ({ message: 'Devise : CDF ou USD.' }),
+    error: fixedMessage('Devise : CDF ou USD.'),
   }),
   priceMode: z.enum(['ttc', 'ht'], {
-    errorMap: () => ({ message: 'Mode de prix : "ttc" ou "ht".' }),
+    error: fixedMessage('Mode de prix : "ttc" ou "ht".'),
   }),
-  customer: z.unknown(),
+  customer: z.unknown().optional(),
   pointOfSaleId: z.unknown().optional(),
   lines: z.unknown().optional(),
   payments: z.unknown().optional(),
@@ -677,8 +678,10 @@ export const CreateInvoiceSchema = z
 
 const expectedRevision = z
   .number({
-    required_error: 'Révision attendue obligatoire.',
-    invalid_type_error: 'Révision attendue : un entier.',
+    error: typeMessages({
+      required: 'Révision attendue obligatoire.',
+      invalid: 'Révision attendue : un entier.',
+    }),
   })
   .int()
   .min(1);
@@ -695,7 +698,7 @@ export const PutInvoiceSchema = z
 export const CreateCreditNoteSchema = z
   .object({
     nature: z.enum(CREDIT_NOTE_NATURES, {
-      errorMap: () => ({ message: 'Nature : COR, RAN, RAM ou RRR.' }),
+      error: fixedMessage('Nature : COR, RAN, RAM ou RRR.'),
     }),
     scope: z.enum(CREDIT_NOTE_SCOPES).default('remaining'),
   })
@@ -744,7 +747,7 @@ const limit = (max: number, fallback: string) =>
     .regex(/^\d{1,3}$/, `Limite : un entier de 1 à ${max}.`)
     .transform((v) => Number.parseInt(v, 10))
     .pipe(z.number().int().min(1).max(max))
-    .default(fallback);
+    .prefault(fallback);
 
 export const ListInvoicesQuerySchema = z
   .object({

@@ -8,7 +8,7 @@ export const EvaluateRequestSchema = z
     /** Slug d'un template connu. S3-lite : uniquement `hello-world`. */
     templateSlug: z.string().min(1).default('hello-world'),
     /** Map driver.id → valeur. Les drivers absents utilisent le `defaut` du template. */
-    drivers: z.record(z.string(), z.number().finite()).default({}),
+    drivers: z.record(z.string(), z.number()).default({}),
   })
   // (S22e) Refuse toute clé inconnue en 400 — contrat d'entrée explicite.
   .strict();

@@ -10,6 +10,7 @@ import { z } from 'zod';
 
 import { BODY_FONT_IDS, EDITORIAL_FONT_PAIRS } from '../invoice-fonts.js';
 import { PALETTES } from '../template.contract.js';
+import { typeMessages } from '../../../../validation/zod-compat.js';
 
 export const MANIFEST_FORMAT = 'lalanda.modele-facture';
 export const MANIFEST_FORMAT_VERSION = 1;
@@ -46,7 +47,7 @@ const url = z
 const Person = z
   .object({
     name: text(120),
-    email: z.string().email().max(200).nullable().optional(),
+    email: z.email().max(200).nullable().optional(),
     url: url.nullable().optional(),
   })
   .strict();
@@ -107,7 +108,7 @@ export const ManifestSchema = z
       .number()
       .int()
       .refine((n) => (SUPPORTED_CONTRACTS as readonly number[]).includes(n), {
-        message: `Contrat de données non pris en charge (attendu : ${SUPPORTED_CONTRACTS.join(', ')}).`,
+        error: `Contrat de données non pris en charge (attendu : ${SUPPORTED_CONTRACTS.join(', ')}).`,
       }),
     author: Person,
     publisher: Publisher.nullable(),
@@ -120,7 +121,7 @@ export const ManifestSchema = z
         fonts: z
           .array(
             z.string().refine((s) => BUILTIN_FONT_CHOICES.includes(s), {
-              message: `Police intégrée inconnue. Choix : ${BUILTIN_FONT_CHOICES.join(', ')}.`,
+              error: `Police intégrée inconnue. Choix : ${BUILTIN_FONT_CHOICES.join(', ')}.`,
             }),
           )
           .min(1)
@@ -131,7 +132,7 @@ export const ManifestSchema = z
       .superRefine((o, ctx) => {
         if (!o.fonts.includes(o.font)) {
           ctx.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: 'custom',
             path: ['font'],
             message: 'La police par défaut doit figurer dans « fonts ».',
           });
@@ -140,13 +141,15 @@ export const ManifestSchema = z
           new Set(o.palettes).size !== o.palettes.length ||
           new Set(o.fonts).size !== o.fonts.length
         ) {
-          ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Valeur en double.' });
+          ctx.addIssue({ code: 'custom', message: 'Valeur en double.' });
         }
       }),
     fonts: z.array(FontDeclarationSchema).max(6),
     signature: z.null({
-      invalid_type_error:
-        'Aucune signature n’est encore vérifiée par Lalanda : « signature » doit valoir null.',
+      error: typeMessages({
+        invalid:
+          'Aucune signature n’est encore vérifiée par Lalanda : « signature » doit valoir null.',
+      }),
     }),
   })
   .strict();

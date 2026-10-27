@@ -14,6 +14,7 @@ import { BadRequestException } from '@nestjs/common';
 import { z, type ZodError } from 'zod';
 
 import { IDEA_HYPOTHESIS_STATUSES, MARKET_SIZE_UNITS } from './idea-lab.schemas.js';
+import { typeMessages } from '../validation/zod-compat.js';
 
 export const OBJECT_ID = /^[0-9a-f]{24}$/;
 /** Identifiants générés par le client (hypothèses) ou le serveur (expériences). */
@@ -59,7 +60,9 @@ export const MarketSizeSchema = z
       .default(null),
     scope: z.string().trim().min(1, 'Dites ce qui est compté (périmètre).').max(300),
     source: z
-      .string({ required_error: 'La source de la taille de marché est obligatoire.' })
+      .string({
+        error: typeMessages({ required: 'La source de la taille de marché est obligatoire.' }),
+      })
       .trim()
       .min(3, 'La source de la taille de marché est obligatoire.')
       .max(300),
@@ -120,7 +123,7 @@ export const RatingSchema = z
   .object({
     note: z.number().int('Note entière.').min(0).max(IDEA_NOTE_MAX),
     proof: z
-      .string({ required_error: 'Une note s’accompagne de sa preuve.' })
+      .string({ error: typeMessages({ required: 'Une note s’accompagne de sa preuve.' }) })
       .trim()
       .min(IDEA_PROOF_MIN_LENGTH, 'Une note s’accompagne de sa preuve.')
       .max(1000),
@@ -168,7 +171,7 @@ export const ExperimentSchema = z
     hypothesis: text(500).default(''),
     targetPct: z.number().int().min(0).max(100).nullable().default(null),
     status: z.enum(IDEA_EXPERIMENT_STATUSES).default('a_faire'),
-    results: ResultsSchema.default({}),
+    results: ResultsSchema.prefault({}),
     conclusion: z.enum(IDEA_EXPERIMENT_CONCLUSIONS).nullable().default(null),
     notes: text(2000).default(''),
   })
@@ -197,7 +200,7 @@ export const PromoteSchema = z
 
 export const SettingsSchema = z.object({ aiEnabled: z.boolean() }).strict();
 
-export function parseBody<T>(schema: z.ZodType<T, z.ZodTypeDef, unknown>, body: unknown): T {
+export function parseBody<T>(schema: z.ZodType<T, unknown>, body: unknown): T {
   const parsed = schema.safeParse(body);
   if (!parsed.success) invalidRequest(parsed.error);
   return parsed.data;

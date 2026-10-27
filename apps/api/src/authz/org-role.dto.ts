@@ -20,7 +20,7 @@ export const OrgRoleInput = z.string().transform((value, ctx): OrgRole => {
   const role = normalizeOrgRole(value);
   if (role === undefined) {
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       message: `Rôle d'organisation inconnu : « ${value} ».`,
     });
     return z.NEVER;

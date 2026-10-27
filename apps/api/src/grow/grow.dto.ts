@@ -5,6 +5,8 @@ import { JOURNEY_STAGES } from '@lalanda/engine';
 import { BadRequestException } from '@nestjs/common';
 import { z, type ZodError } from 'zod';
 
+import { typeMessages } from '../validation/zod-compat.js';
+
 const OBJECT_ID = /^[0-9a-f]{24}$/;
 
 export const PutGrowProfileSchema = z
@@ -24,7 +26,9 @@ export const PutChecklistSchema = z.object({ done: z.boolean() }).strict();
 export const PutDeclaredCashSchema = z
   .object({
     amount: z
-      .string({ invalid_type_error: 'Le montant est une chaîne décimale (ex. « 1250.00 »).' })
+      .string({
+        error: typeMessages({ invalid: 'Le montant est une chaîne décimale (ex. « 1250.00 »).' }),
+      })
       .regex(/^\d{1,15}(\.\d{1,2})?$/, 'Montant positif, deux décimales au plus.'),
     currency: z.string().regex(/^[A-Z]{3}$/, 'Code de devise ISO à trois lettres.'),
     asOf: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date AAAA-MM-JJ.'),

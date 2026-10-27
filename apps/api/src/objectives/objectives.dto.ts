@@ -10,11 +10,11 @@ import { z } from 'zod';
  */
 export const PutObjectivesSchema = z
   .object({
-    ca_cible_an1: z.number().finite().min(0).optional(),
-    ca_cible_an5: z.number().finite().min(0).optional(),
-    resultat_net_cible_an1: z.number().finite().min(0).optional(),
-    resultat_net_cible_an5: z.number().finite().min(0).optional(),
-    tresorerie_cible: z.number().finite().min(0).optional(),
+    ca_cible_an1: z.number().min(0).optional(),
+    ca_cible_an5: z.number().min(0).optional(),
+    resultat_net_cible_an1: z.number().min(0).optional(),
+    resultat_net_cible_an5: z.number().min(0).optional(),
+    tresorerie_cible: z.number().min(0).optional(),
   })
   .strict();
 

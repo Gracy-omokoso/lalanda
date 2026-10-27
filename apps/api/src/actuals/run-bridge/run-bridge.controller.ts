@@ -40,7 +40,7 @@ const SettingsSchema = z
       .nullable(),
     exerciseStart: z
       .string()
-      .refine((v) => isCalendarMonth(v), { message: 'Mois attendu au format AAAA-MM.' })
+      .refine((v) => isCalendarMonth(v), { error: 'Mois attendu au format AAAA-MM.' })
       .nullable(),
   })
   .strict();

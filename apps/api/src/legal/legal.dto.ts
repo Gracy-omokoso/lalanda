@@ -25,7 +25,7 @@ import { z } from 'zod';
 export const AcceptTermsSchema = z
   .object({
     version: z.string().min(1).refine(isKnownLegalVersion, {
-      message: 'Version du corpus légal inconnue',
+      error: 'Version du corpus légal inconnue',
     }),
   })
   .strict();

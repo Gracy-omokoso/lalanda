@@ -10,11 +10,12 @@ import { z } from 'zod';
 
 import { parseDecimalInput } from '../sales.dto.js';
 import { isObjectIdHex } from '../search.js';
+import { fixedMessage } from '../../validation/zod-compat.js';
 
 export const MAX_ALLOCATIONS = 20;
 
 function issue(ctx: z.RefinementCtx, code: string, message: string): void {
-  ctx.addIssue({ code: z.ZodIssueCode.custom, message, params: { code } });
+  ctx.addIssue({ code: 'custom', message, params: { code } });
 }
 
 /** Montant décimal positif, deux décimales au plus → chaîne canonique `"150.00"`. */
@@ -39,9 +40,9 @@ const Amount = z.unknown().transform((value, ctx): string => {
 
 const CalendarDay = z
   .string()
-  .refine((v) => isCalendarDate(v), { message: 'Date attendue au format AAAA-MM-JJ.' });
+  .refine((v) => isCalendarDate(v), { error: 'Date attendue au format AAAA-MM-JJ.' });
 
-const ObjectIdString = z.string().refine(isObjectIdHex, { message: 'Identifiant invalide.' });
+const ObjectIdString = z.string().refine(isObjectIdHex, { error: 'Identifiant invalide.' });
 
 const OptionalText = (max: number) =>
   z
@@ -61,10 +62,9 @@ export const ReceiptBodySchema = z
     currency: z.enum(DOCUMENT_CURRENCIES),
     // Le moteur rend le refus détaillé de `CREDIT` ; ici, la seule forme.
     method: z.enum(RECEIPT_METHODS, {
-      errorMap: () => ({
-        message:
-          'Moyen de règlement : espèces, virement, carte bancaire, mobile money, chèque ou autre.',
-      }),
+      error: fixedMessage(
+        'Moyen de règlement : espèces, virement, carte bancaire, mobile money, chèque ou autre.',
+      ),
     }),
     reference: OptionalText(100),
     note: OptionalText(500),
@@ -73,7 +73,7 @@ export const ReceiptBodySchema = z
     // ouverture).
     accountId: z
       .string()
-      .regex(/^[0-9a-f]{24}$/i, { message: 'Identifiant de compte invalide.' })
+      .regex(/^[0-9a-f]{24}$/i, { error: 'Identifiant de compte invalide.' })
       .nullable()
       .optional()
       .transform((v) => v ?? null),
@@ -123,7 +123,7 @@ export const SettlementsQuerySchema = z
   })
   .strict()
   .refine((q) => q.invoiceIds !== undefined || q.open === 'true', {
-    message: 'Indiquez `invoiceIds` ou `open=true`.',
+    error: 'Indiquez `invoiceIds` ou `open=true`.',
   });
 
 export const DueDateBodySchema = z.object({ dueDate: CalendarDay.nullable() }).strict();

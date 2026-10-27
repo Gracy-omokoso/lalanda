@@ -38,7 +38,7 @@ export const QuotaVocalViewSchema = z.object({
   limiteMinutes: z.number().int().nonnegative().nullable(),
   minutesConsommees: z.number().nonnegative(),
   minutesRestantes: z.number().nonnegative().nullable(),
-  reinitialisationLe: z.string().datetime(),
+  reinitialisationLe: z.iso.datetime(),
 });
 export type QuotaVocalView = z.infer<typeof QuotaVocalViewSchema>;
 
@@ -51,7 +51,7 @@ export const SessionVocaleResponseSchema = z.object({
    * session à durée de vie courte — elle ne se journalise pas et ne se met pas
    * en cache.
    */
-  signedUrl: z.string().url(),
+  signedUrl: z.url(),
   /** Identifiant de la session côté Lalanda, à rendre à la clôture. */
   sessionId: z.string().min(1),
   /**

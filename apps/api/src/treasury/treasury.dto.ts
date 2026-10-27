@@ -22,7 +22,7 @@ import { z } from 'zod';
 type Ctx = z.RefinementCtx;
 
 function issue(ctx: Ctx, path: (string | number)[], code: string, message: string): void {
-  ctx.addIssue({ code: z.ZodIssueCode.custom, path, message, params: { code } });
+  ctx.addIssue({ code: 'custom', path, message, params: { code } });
 }
 
 /** Texte nettoyé : espaces de bord retirés ; chaîne vide → `null`. */
@@ -36,17 +36,17 @@ const optionalText = (max: number) =>
       const t = (v ?? '').trim();
       return t === '' ? null : t;
     })
-    .refine((v) => v === null || v.length <= max, { message: `${max} caractères au plus.` });
+    .refine((v) => v === null || v.length <= max, { error: `${max} caractères au plus.` });
 
 const requiredText = (max: number) =>
   z
     .string()
     .transform((v) => v.trim())
-    .refine((v) => v.length >= 1, { message: 'Champ obligatoire.' })
-    .refine((v) => v.length <= max, { message: `${max} caractères au plus.` });
+    .refine((v) => v.length >= 1, { error: 'Champ obligatoire.' })
+    .refine((v) => v.length <= max, { error: `${max} caractères au plus.` });
 
 const calendarDay = z.string().refine(isCalendarDay, {
-  message: 'Date attendue au format AAAA-MM-JJ.',
+  error: 'Date attendue au format AAAA-MM-JJ.',
   params: { code: 'INVALID_DATE' },
 });
 
@@ -60,14 +60,14 @@ const positiveAmount = z.string().refine(
     return c !== null && c > 0n && !v.startsWith('-');
   },
   {
-    message: 'Montant positif attendu (deux décimales au plus).',
+    error: 'Montant positif attendu (deux décimales au plus).',
     params: { code: 'INVALID_AMOUNT' },
   },
 );
 
 /** Montant signé (solde d'ouverture : un découvert est possible). */
 const signedAmount = z.string().refine((v) => treasuryCentsOf(v) !== null, {
-  message: 'Montant attendu (deux décimales au plus).',
+  error: 'Montant attendu (deux décimales au plus).',
   params: { code: 'INVALID_AMOUNT' },
 });
 
@@ -292,7 +292,7 @@ const minimumAmount = z
   .string()
   .nullable()
   .refine((v) => v === null || (treasuryCentsOf(v) !== null && !v.startsWith('-')), {
-    message: 'Minimum positif ou nul attendu.',
+    error: 'Minimum positif ou nul attendu.',
     params: { code: 'INVALID_AMOUNT' },
   });
 
@@ -327,9 +327,9 @@ export const PutBridgeSchema = z
     projectId: objectId.nullable(),
     firstMonth: z
       .string()
-      .refine(isCalendarMonthKey, { message: 'Mois attendu au format AAAA-MM.' })
+      .refine(isCalendarMonthKey, { error: 'Mois attendu au format AAAA-MM.' })
       .nullable(),
-    mapping: z.record(category, lineId),
+    mapping: z.partialRecord(category, lineId),
   })
   .strict()
   .superRefine((raw, ctx) => {

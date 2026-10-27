@@ -17,13 +17,14 @@ import {
   type ActivityKind,
   type PipelineStage,
 } from './crm-model.js';
+import { fixedMessage, typeMessages } from '../validation/zod-compat.js';
 
 type Ctx = z.RefinementCtx;
 
 const PHONE_PATTERN = /^\+?[0-9][0-9 .-]{6,19}$/;
 
 function issue(ctx: Ctx, path: (string | number)[], code: string, message: string): void {
-  ctx.addIssue({ code: z.ZodIssueCode.custom, path, message, params: { code } });
+  ctx.addIssue({ code: 'custom', path, message, params: { code } });
 }
 
 /** Texte facultatif : espaces de bord retirés, vide → `null`. */
@@ -68,7 +69,7 @@ function objectId(ctx: Ctx, path: (string | number)[], raw: unknown, code: strin
 
 export function email(ctx: Ctx, path: (string | number)[], raw: unknown): string | null {
   const e = text(ctx, path, raw, 254);
-  if (e !== null && !z.string().email().safeParse(e).success) {
+  if (e !== null && !z.email().safeParse(e).success) {
     issue(ctx, path, 'EMAIL_INVALID', 'Adresse e-mail invalide.');
   }
   return e === null ? null : e.toLowerCase();
@@ -119,8 +120,10 @@ export function calendarDay(ctx: Ctx, path: (string | number)[], raw: unknown): 
 
 const expectedRevision = z
   .number({
-    required_error: 'Révision attendue obligatoire.',
-    invalid_type_error: 'Révision attendue : un entier.',
+    error: typeMessages({
+      required: 'Révision attendue obligatoire.',
+      invalid: 'Révision attendue : un entier.',
+    }),
   })
   .int()
   .min(1);
@@ -133,7 +136,7 @@ const limit = (max: number, fallback: string) =>
     .regex(/^\d{1,3}$/, `Limite : un entier de 1 à ${max}.`)
     .transform((v) => Number.parseInt(v, 10))
     .pipe(z.number().int().min(1).max(max))
-    .default(fallback);
+    .prefault(fallback);
 
 const idQuery = (message: string) => z.string().refine(isObjectIdHex, message).optional();
 
@@ -155,7 +158,7 @@ export const PutCrmSettingsSchema = z
             key: z.string(),
             label: z.string(),
             kind: z.enum(STAGE_KINDS, {
-              errorMap: () => ({ message: 'Nature : open, won ou lost.' }),
+              error: fixedMessage('Nature : open, won ou lost.'),
             }),
           })
           .strict(),
@@ -173,7 +176,7 @@ export const PutCrmSettingsSchema = z
     }));
     for (const i of stageConfigIssues(stages)) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: i.path.split('.').map((p) => (/^\d+$/.test(p) ? Number(p) : p)),
         message: i.message,
         params: { code: i.code },
@@ -202,7 +205,7 @@ export interface ContactInput {
 }
 
 const ContactFields = {
-  name: z.unknown(),
+  name: z.unknown().optional(),
   jobTitle: z.unknown().optional(),
   email: z.unknown().optional(),
   phone: z.unknown().optional(),
@@ -263,12 +266,12 @@ export interface OpportunityInput {
 }
 
 const OpportunityFields = {
-  title: z.unknown(),
+  title: z.unknown().optional(),
   customerId: z.unknown().optional(),
   prospectName: z.unknown().optional(),
   contactId: z.unknown().optional(),
   amount: z.unknown().optional(),
-  currency: z.enum(['CDF', 'USD'], { errorMap: () => ({ message: 'Devise : CDF ou USD.' }) }),
+  currency: z.enum(['CDF', 'USD'], { error: fixedMessage('Devise : CDF ou USD.') }),
   expectedCloseDate: z.unknown().optional(),
 };
 
@@ -357,9 +360,9 @@ export interface ActivityInput {
 
 const ActivityFields = {
   kind: z.enum(ACTIVITY_KINDS, {
-    errorMap: () => ({ message: 'Nature : call, meeting, note ou follow_up.' }),
+    error: fixedMessage('Nature : call, meeting, note ou follow_up.'),
   }),
-  subject: z.unknown(),
+  subject: z.unknown().optional(),
   notes: z.unknown().optional(),
   dueAt: z.unknown().optional(),
   opportunityId: z.unknown().optional(),

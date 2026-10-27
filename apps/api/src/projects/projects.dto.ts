@@ -13,7 +13,7 @@ export const CreateProjectSchema = z
     parameterPackSlug: z.string().min(1).optional(),
     /** Devise d'affichage. Défaut = devise principale du pack. */
     deviseAffichage: z.enum(['USD', 'CDF', 'XOF', 'XAF', 'EUR']).optional(),
-    driverValues: z.record(z.string(), z.number().finite()).default({}),
+    driverValues: z.record(z.string(), z.number()).default({}),
   })
   // (S22e) `.strict()` : une clé inconnue est refusée en 400 plutôt que strippée
   // en silence. Zod strippe déjà par défaut et le contrôleur ne lit que
@@ -24,14 +24,14 @@ export type CreateProjectInput = z.infer<typeof CreateProjectSchema>;
 
 export const UpdateDriversSchema = z
   .object({
-    driverValues: z.record(z.string(), z.number().finite()),
+    driverValues: z.record(z.string(), z.number()),
   })
   .strict();
 
 export const EvaluateProjectSchema = z
   .object({
     /** Surcharge one-shot des drivers (optionnel — sinon on utilise ceux du projet). */
-    driverValues: z.record(z.string(), z.number().finite()).optional(),
+    driverValues: z.record(z.string(), z.number()).optional(),
     /** Si vrai, persiste les driverValues fournis dans le projet avant l'évaluation. */
     persist: z.boolean().default(false),
   })

@@ -24,7 +24,7 @@ import { InvitationsService } from './invitations.service.js';
 import { OrganizationsService } from './organizations.service.js';
 
 const CreateInvitationSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
   /** docs/12 § Invitations : une invitation « indique rôle et projets ». */
   role: OrgRoleInput.optional(),
 });

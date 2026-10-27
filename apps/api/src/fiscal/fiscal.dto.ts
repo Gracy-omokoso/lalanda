@@ -6,6 +6,7 @@
 import { z } from 'zod';
 
 import { LEGAL_FORMS, type LegalForm } from './fiscal-profile.schema.js';
+import { zod3Code } from '../validation/zod-compat.js';
 
 /** Libellés affichés des formes juridiques — servis par l'API (`options.legalForms`). */
 export const LEGAL_FORM_LABELS: Record<LegalForm, string> = {
@@ -84,14 +85,14 @@ export const PutFiscalProfileSchema = z
   .superRefine((v, ctx) => {
     if (v.legalForm === 'autre' && !v.legalFormOther) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['legalFormOther'],
         message: 'Précisez la forme juridique.',
       });
     }
     if (v.legalForm !== 'autre' && v.legalFormOther !== null) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['legalFormOther'],
         message: 'Réservé à la forme juridique « Autre ».',
       });
@@ -148,10 +149,15 @@ export const DisablePointOfSaleSchema = z
  * Problèmes de validation renvoyés au client — chemin, code et message SEULEMENT.
  *
  * Jamais l'objet d'erreur Zod brut : certains problèmes recopient la valeur reçue
- * (`received`), ce qui remettrait un jeton dans la réponse.
+ * (`received`), ce qui remettrait un jeton dans la réponse. Le code garde son nom
+ * zod 3 (`invalid_string`, `invalid_enum_value`…) : voir `zod3Code`.
  */
 export function issuesOf(
   error: z.ZodError,
 ): Array<{ path: string; code: string; message: string }> {
-  return error.issues.map((i) => ({ path: i.path.join('.'), code: i.code, message: i.message }));
+  return error.issues.map((i) => ({
+    path: i.path.join('.'),
+    code: zod3Code(i),
+    message: i.message,
+  }));
 }
