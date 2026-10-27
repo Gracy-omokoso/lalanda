@@ -18,6 +18,7 @@ export type NavGroupId = ModuleId | 'organisation';
 
 export type NavIconId =
   | 'plans'
+  | 'business-plan'
   | 'factures'
   | 'encaissements'
   | 'clients'
@@ -79,6 +80,17 @@ export const NAV_ITEMS: readonly NavItem[] = [
     label: 'Plans financiers',
     group: 'build',
     icon: 'plans',
+    action: null,
+  },
+  // ADR-0037 — business plan narratif : texte de l'entrepreneur, chiffres du
+  // plan figé, aide IA vérifiée. Lecture sous `project.read`, détenue par tout
+  // membre : offerte à tous, comme « Plans financiers ».
+  {
+    id: 'business-plan',
+    href: '/business-plan',
+    label: 'Business plan',
+    group: 'build',
+    icon: 'business-plan',
     action: null,
   },
   {

@@ -41,7 +41,7 @@ const ids = (items: { id: string }[]): string[] => items.map((i) => i.id);
 describe('entrées et ordre', () => {
   it('CRM (ADR-0035) : dans RUN, après le catalogue, pour qui détient crm.read', () => {
     const avecCrm = ids(entreesVisibles([...LECTEUR, 'crm.read']));
-    expect(avecCrm.slice(1, 7)).toEqual([
+    expect(avecCrm.slice(2, 8)).toEqual([
       'factures',
       'devis',
       'encaissements',
@@ -55,6 +55,7 @@ describe('entrées et ordre', () => {
   it('suit la trajectoire BUILD → RUN → GROW → Organisation, pour un propriétaire', () => {
     expect(ids(entreesVisibles(PROPRIETAIRE))).toEqual([
       'plans',
+      'business-plan',
       'factures',
       'devis',
       'encaissements',
@@ -95,6 +96,7 @@ describe('entrées et ordre', () => {
   it('permissions inconnues : seules les entrées sans condition (pas de clignotement)', () => {
     expect(ids(entreesVisibles(null))).toEqual([
       'plans',
+      'business-plan',
       'pilotage',
       'brief',
       'sante',
@@ -162,6 +164,7 @@ describe('entrée active', () => {
   it.each([
     ['/projects', 'plans'],
     ['/projects/abc/realise', 'plans'],
+    ['/business-plan', 'business-plan'],
     ['/ventes/factures', 'factures'],
     ['/ventes/factures/nouvelle', 'factures'],
     ['/ventes/encaissements', 'encaissements'],
