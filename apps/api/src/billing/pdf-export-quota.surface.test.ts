@@ -35,7 +35,15 @@ const AUTORISES: Readonly<Record<string, string>> = {
 };
 
 /** Le SEUL fichier autorisé à APPLIQUER la garde, c'est-à-dire à refuser un rendu. */
-const PORTEUR_DE_LA_GARDE = 'reports/reports.controller.ts';
+/**
+ * Routes d'export PDF qui APPLIQUENT le quota de l'offre : le dossier financier
+ * (S22i) et, depuis le 27 oct. 2026, le business plan narratif (ADR-0037), dont
+ * l'export PDF est un export du même quota. Aucune autre.
+ */
+const PORTEURS_DE_LA_GARDE = [
+  'reports/reports.controller.ts',
+  'business-plan/business-plan.controller.ts',
+];
 
 /**
  * Fichiers autorisés à seulement NOMMER `PdfExportQuotaService`, et à quel titre.
@@ -122,13 +130,13 @@ describe('surface du quota d’exports PDF', () => {
       [
         'billing/billing.module.ts',
         'billing/pdf-export-quota.service.ts',
-        PORTEUR_DE_LA_GARDE,
+        ...PORTEURS_DE_LA_GARDE,
         ...Object.keys(LECTEURS_SEULS),
       ].sort(),
     );
   });
 
-  it('n’est APPLIQUÉ que depuis la route d’export, et par un seul fichier', () => {
+  it('n’est APPLIQUÉ que depuis les routes d’export PDF déclarées', () => {
     // L'assertion qui porte réellement la garantie. Nommer la garde est
     // inoffensif ; pouvoir refuser un rendu ne l'est pas. Parmi les fichiers qui
     // la tiennent, un seul a le droit de s'en servir pour refuser — sans quoi un
@@ -140,7 +148,7 @@ describe('surface du quota d’exports PDF', () => {
     });
 
     expect([...refuseurs].sort()).toEqual(
-      ['billing/pdf-export-quota.service.ts', PORTEUR_DE_LA_GARDE].sort(),
+      ['billing/pdf-export-quota.service.ts', ...PORTEURS_DE_LA_GARDE].sort(),
     );
   });
 
@@ -166,7 +174,7 @@ describe('surface du quota d’exports PDF', () => {
     // comportement (`reports/reports.controller.quota.test.ts`) montre qu'un
     // classeur sort à quota épuisé ; celui-ci montre qu'aucune ligne ne pourrait
     // le bloquer, y compris dans une variante non testée.
-    const source = readFileSync(join(SRC, PORTEUR_DE_LA_GARDE), 'utf8');
+    const source = readFileSync(join(SRC, 'reports/reports.controller.ts'), 'utf8');
     const debutPdf = source.indexOf('async downloadPdf(');
     const debutXlsx = source.indexOf('async downloadXlsx(');
 
