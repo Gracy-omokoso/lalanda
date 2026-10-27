@@ -420,6 +420,22 @@ L'organisation est toujours celle de la session ; aucun corps ni paramètre ne l
 
 Codes : `400 INVALID_REQUEST` (corps `.strict()`), `403 PLAN_LIMIT_AI_MESSAGES` avant tout appel au modèle. L'explication rend `source: "llm" | "fallback"`, `cached`, `reason` et ses sources ; un nombre ou une source absents des faits font servir le texte déterministe. Tâche planifiée : `morning-brief.daily-email` (15 min, envoi à partir de 7 h à Kinshasa, au plus une fois par jour).
 
+## Idea Lab et validation d'idée — implémenté (ADR-0036)
+
+Organisation de la session ; une idée d'une autre organisation répond `404`. Aucune action RBAC nouvelle.
+
+| Méthode et chemin | Permission | Quota |
+|---|---|---|
+| `GET /idea-lab/ideas` (idées, comparaison du moteur, grille, état de l'IA) · `GET /idea-lab/ideas/:id` (fiche, score, expériences) | `project.read` | global |
+| `POST /idea-lab/ideas` · `PUT /idea-lab/ideas/:id` (fiche complète) · `PUT …/:id/archived` `{ archived }` | `canvas.update` | global |
+| `PUT /idea-lab/ideas/:id/ratings/:criterionId` `{ note, proof, experimentIds }` · `DELETE` | `canvas.update` | global |
+| `POST /idea-lab/ideas/:id/experiments` · `PUT` · `DELETE …/experiments/:experimentId` | `canvas.update` | global |
+| `POST /idea-lab/ideas/:id/promote` `{ projectId }` | `canvas.update` | global |
+| `POST /idea-lab/ideas/:id/assist` `{ intent: "reformuler" \| "questions_entretien" \| "hypotheses" }` | `canvas.update` | IA (`AI_THROTTLE`) + quota mensuel `ai.idea_lab` |
+| `PUT /idea-lab/settings` `{ aiEnabled }` | `organization.manage` | global |
+
+Codes : `400 INVALID_REQUEST` (corps `.strict()` ; taille de marché sans source ; note sans preuve ; expérience terminée sans conclusion), `400 EXPERIMENT_NOT_FOUND` (preuve citant une expérience inconnue), `404 IDEA_NOT_FOUND` · `CRITERION_NOT_FOUND` · `PROJECT_NOT_FOUND`, `403 IDEA_LIMIT_REACHED` (50 idées) · `EXPERIMENT_LIMIT_REACHED` (30), `409 IDEA_CONFLICT` (écriture concurrente), `403 PLAN_LIMIT_AI_MESSAGES` avant tout appel au modèle. L'assistance rend `source: "llm" | "fallback"` et `reason` ; un nombre absent de la fiche fait servir le texte déterministe. La promotion n'ajoute que des cartes de texte au Canvas (`added`, `present`, `ignored`, `empty`) ; un nouveau projet se crée par `POST /projects`.
+
 ## Webhooks
 
 Paiements et intégrations utilisent signatures, tolérance temporelle, anti-rejeu, journal et traitement idempotent.

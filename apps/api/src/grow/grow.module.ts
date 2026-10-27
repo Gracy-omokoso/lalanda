@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 
 import { ActualPeriod, ActualPeriodSchema } from '../actuals/actual-period.schema.js';
 import { BillingModule } from '../billing/billing.module.js';
+import { IdeaLabModule } from '../idea-lab/idea-lab.module.js';
 import { OrganizationsModule } from '../organizations/organizations.module.js';
 import { FinancialPlan, FinancialPlanSchema } from '../plans/plan.schema.js';
 import { Project, ProjectSchema } from '../projects/project.schema.js';
@@ -30,6 +31,8 @@ import { GrowController } from './grow.controller.js';
     // ADR-0034 : soldes des comptes de trésorerie (lecture seule), amendement
     // d'ADR-0032 du 27 oct. 2026.
     TreasuryModule,
+    // ADR-0036 § 5 : faits de l'Idea Lab pour le parcours (lecture seule).
+    IdeaLabModule,
     MongooseModule.forFeature([
       { name: GrowProfile.name, schema: GrowProfileSchema },
       { name: Project.name, schema: ProjectSchema },

@@ -23,6 +23,13 @@
 
 `Project`, `ProjectAccess`, `Canvas`, `CanvasVersion`, `CanvasItem`, `FinancialObjective`, `Scenario`, `InputSet`, `InputValue`.
 
+Idea Lab (ADR-0036), en amont du projet : `idea_lab_ideas` (une fiche par idée, isolée par
+organisation : problème, cible, solution, alternatives, hypothèses, taille de marché
+déclarée **avec sa source**, notes de la grille avec leur preuve, expériences et leurs
+résultats saisis, traces de promotion ; aucun score stocké, le moteur le recalcule),
+`idea_lab_settings` (IA permise ou non, unique par organisation), `idea_lab_ai_logs`
+(tentatives d'assistance IA, empreinte de l'entrée sans le prompt, expiration TTL).
+
 ### Finance
 
 `CalculationRun`, `FinancialPlan`, `FinancialStatement`, `FinancialLine`, `FormulaVersion`, `DiagnosticResult`, `DebtSchedule`, `AssetSchedule`.
@@ -75,7 +82,10 @@ Un événement contient acteur, organisation, action, cible, horodatage, adresse
 - réalisé par projet/période/catégorie;
 - audit par organisation/date/action;
 - règles pays par pack/date d’effet/statut;
-- documents de vente (`sales_invoices`) : unicité partielle `organizationId + series + number`, unicité `organizationId + proformaRef`; compteurs (`sales_invoice_counters`) uniques par `organizationId + series + year`; journal électronique (`sales_invoice_journal`, ajout seul, chaîné par empreinte) unique par `organizationId + seq`, tête `sales_journal_heads` (ADR-0023).
+- documents de vente (`sales_invoices`) : unicité partielle `organizationId + series + number`, unicité `organizationId + proformaRef`; compteurs (`sales_invoice_counters`) uniques par `organizationId + series + year`; journal électronique (`sales_invoice_journal`, ajout seul, chaîné par empreinte) unique par `organizationId + seq`, tête `sales_journal_heads` (ADR-0023);
+- idées (`idea_lab_ideas`) par `organizationId + archived + updatedAt` ; réglages
+  `idea_lab_settings` uniques par `organizationId` ; `idea_lab_ai_logs` à expiration TTL sur
+  `expiresAt` (ADR-0036).
 
 ## Rétention
 

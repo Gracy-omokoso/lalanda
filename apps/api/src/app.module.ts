@@ -17,6 +17,7 @@ import { EdefModule } from './edef/edef.module.js';
 import { EvaluateController } from './evaluate/evaluate.controller.js';
 import { FiscalModule } from './fiscal/fiscal.module.js';
 import { GrowModule } from './grow/grow.module.js';
+import { IdeaLabModule } from './idea-lab/idea-lab.module.js';
 import { HealthController } from './health/health.controller.js';
 import { IntegrationsModule } from './integrations/integrations.module.js';
 import { LegalModule } from './legal/legal.module.js';
@@ -117,6 +118,8 @@ import { TreasuryModule } from './treasury/treasury.module.js';
     QuotesModule,
     // ADR-0033 — brief du matin : lit les ventes, réutilise l'IA et l'ordonnanceur.
     MorningBriefModule,
+    // ADR-0036 — Idea Lab : l'amont de BUILD ; réutilise le Canvas, les projets et l'IA.
+    IdeaLabModule,
     // ADR-0032 — GROW : lit BUILD et RUN, n'écrit que dans `grow_profiles`.
     GrowModule,
   ],

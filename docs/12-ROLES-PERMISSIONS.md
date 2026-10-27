@@ -153,6 +153,11 @@ Côté plateforme, comme `sales.*` : `crm.read` sous accès délégué pour le
 super-administrateur et le support, `crm.manage` sous accès délégué pour le seul
 super-administrateur. Aucune n'est un interdit absolu.
 
+L'Idea Lab ([ADR-0036](adr/ADR-0036-idea-lab-et-validation.md) § 6) **n'ajoute aucune
+action** : lire une idée relève de `project.read`, la modifier (fiche, notes, expériences,
+promotion vers un projet, assistance IA) de `canvas.update`, régler son IA de
+`organization.manage`. Les vingt-quatre actions et la matrice sont inchangées.
+
 ## Règles critiques
 
 - Un propriétaire ne peut pas retirer le dernier propriétaire sans transfert.

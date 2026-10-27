@@ -236,3 +236,23 @@ un paragraphe d'explication (`explain`) ou les actions de la semaine (`this_week
 - quota mensuel commun (`ai.morning_brief`), cache par empreinte des faits et par jour;
 - journal `morning_brief_ai_logs` (prompt d'agrégats, réponse, issue), expiration TTL;
 - désactivable par organisation et par la plateforme (`MORNING_BRIEF_AI=off`).
+
+## Idea Lab (ADR-0036)
+
+`POST /idea-lab/ideas/:id/assist` propose, à la demande, une reformulation (problème, cible,
+solution), des questions d'entretien client ou des hypothèses à tester — niveaux 1 à 3, jamais
+4 ni 5 :
+
+- le modèle ne reçoit que les champs de la fiche, encadrés comme données non fiables ; jamais
+  la taille de marché, les notes d'entretien, le nom de l'organisation ou des membres;
+- **tout nombre de la réponse doit figurer dans la saisie** (`lala-nombres.ts`) : un chiffre de
+  marché, un prix ou un pourcentage proposés par le modèle font rejeter la réponse et servir le
+  texte déterministe;
+- la réponse est une **suggestion** : rien n'est enregistré dans la fiche sans geste de
+  l'utilisateur;
+- quota mensuel commun (`ai.idea_lab`) ; journal `idea_lab_ai_logs` (empreinte de l'entrée,
+  réponse bornée, issue), expiration TTL ; désactivable par organisation et par la plateforme
+  (`IDEA_LAB_AI=off`).
+
+Le score de validation d'une idée est calculé par le moteur (`packages/engine/src/idea-lab/`)
+sur des notes saisies avec leur preuve ; l'IA n'y participe pas.

@@ -233,6 +233,11 @@ Si l'appelable lève, **rien n'est décompté** : une requête qui n'a produit a
 réponse n'a rien consommé du point de vue de l'utilisateur, quoi qu'elle ait coûté
 en interne. Le choix est en sa faveur, délibérément.
 
+L'Idea Lab (ADR-0036) appelle ce même point d'entrée (`ai.idea_lab`). L'Idea Lab lui-même
+est ouvert à **toutes les offres** : il ne calcule aucune donnée financière et ne crée aucun
+projet (un nouveau projet passe par `POST /projects` et sa limite `maxProjects`). La borne de
+50 idées par organisation est technique, pas commerciale (ADR-0036, décision ouverte n° 3).
+
 ### Lecture du quota par l'interface
 
 `GET /ai/quota` → `{ plan, limit, used, remaining, unlimited, resetAt, resetInDays }`.
