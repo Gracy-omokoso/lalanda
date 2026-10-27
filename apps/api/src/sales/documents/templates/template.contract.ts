@@ -102,9 +102,28 @@ export interface FrozenIdentity {
   logos: Record<LogoVariant, FrozenLogoRef | null>;
 }
 
+/**
+ * Paquet de modèle SUR MESURE figé (ADR-0029 § 7) : identifiant de
+ * l'enregistrement installé, identité et version du manifeste, EMPREINTE
+ * canonique du paquet — recalculée et comparée à chaque réimpression.
+ */
+export interface FrozenPackageRef {
+  packageId: string;
+  id: string;
+  name: string;
+  version: string;
+  sha256: string;
+}
+
+/** Identifiant figé d'un modèle sur mesure (`presentation.template.id`). */
+export const CUSTOM_TEMPLATE_KEY = 'sur-mesure' as const;
+
 /** Champ figé `presentation` d'une facture ; absent = présentation d'origine. */
 export interface FrozenPresentation {
-  template: { id: InvoiceTemplateId; version: string };
+  /** Modèle intégré, ou `sur-mesure` + version du MOTEUR sur mesure (ADR-0029). */
+  template: { id: InvoiceTemplateId | typeof CUSTOM_TEMPLATE_KEY; version: string };
+  /** Présent si et seulement si `template.id === 'sur-mesure'`. */
+  package?: FrozenPackageRef;
   options: TemplateOptions;
   identity: FrozenIdentity;
 }

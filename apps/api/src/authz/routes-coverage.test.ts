@@ -50,6 +50,7 @@ import { ReportsController } from '../reports/reports.controller.js';
 import { CatalogItemsController } from '../sales/catalog-items.controller.js';
 import { CustomersController } from '../sales/customers.controller.js';
 import { InvoiceDocumentsController } from '../sales/documents/invoice-documents.controller.js';
+import { InvoiceTemplatePackagesController } from '../sales/documents/invoice-template-packages.controller.js';
 import { InvoiceTemplatesController } from '../sales/documents/invoice-templates.controller.js';
 import { ReceiptsController } from '../sales/receipts/receipts.controller.js';
 import { RunBridgeController } from '../actuals/run-bridge/run-bridge.controller.js';
@@ -135,6 +136,7 @@ const CONTROLEURS = [
   CrmContactsController,
   CrmOpportunitiesController,
   CrmActivitiesController,
+  InvoiceTemplatePackagesController,
 ];
 
 /**
@@ -552,6 +554,10 @@ describe('couverture des routes par le RBAC', () => {
       'CrmActivitiesController.put': ['crm.manage'],
       'CrmActivitiesController.complete': ['crm.manage'],
       'CrmActivitiesController.remove': ['crm.manage'],
+      'InvoiceTemplatePackagesController.list': ['sales.read'],
+      'InvoiceTemplatePackagesController.install': ['organization.manage'],
+      'InvoiceTemplatePackagesController.preview': ['sales.read'],
+      'InvoiceTemplatePackagesController.activate': ['organization.manage'],
     };
     for (const [cle, actions] of Object.entries(attendu)) {
       const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle);

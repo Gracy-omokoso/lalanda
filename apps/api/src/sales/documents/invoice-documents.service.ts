@@ -41,6 +41,11 @@ import {
 } from './invoice-document.model.js';
 import { qrCodeSvg } from './invoice-qr.js';
 import { sampleInvoice } from './sample-invoice.js';
+import {
+  CustomTemplateOutputError,
+  customLayoutLabel,
+} from './templates/custom/custom-template.js';
+import { MustacheRenderError } from './templates/custom/mustache.js';
 import { TemplateDgiContentError } from './templates/dgi-content.js';
 import { latestTemplate, templateAt } from './templates/registry.js';
 import {
@@ -82,6 +87,8 @@ const PREVIEW_PAGE = { width: 794, height: 1123, deviceScaleFactor: 1.5 } as con
 /** Nom et version du modèle, imprimés en pied ; `null` : présentation d'origine. */
 function layoutOf(p: FrozenPresentation | null): { label: string; version: string } | null {
   if (!p) return null;
+  // Modèle sur mesure (ADR-0029) : nom et version du PAQUET figé.
+  if (p.package) return { label: customLayoutLabel(p.package.name), version: p.package.version };
   const t = templateAt(p.template.id, p.template.version);
   return { label: t?.label ?? p.template.id, version: p.template.version };
 }
@@ -199,6 +206,13 @@ export class InvoiceDocumentsService {
           message: err.message,
         });
       }
+      if (err instanceof MustacheRenderError || err instanceof CustomTemplateOutputError) {
+        // Modèle sur mesure dont la sortie est refusée pour CE document (ADR-0029 § 4).
+        throw new InternalServerErrorException({
+          code: 'TEMPLATE_OUTPUT_REJECTED',
+          message: err.message,
+        });
+      }
       throw err;
     }
   }
@@ -233,6 +247,41 @@ export class InvoiceDocumentsService {
       templateId,
       override,
     );
+    return this.previewWith(
+      organizationId,
+      presentation,
+      format,
+      `apercu-modele-${latestTemplate(templateId).id}`,
+    );
+  }
+
+  /** Aperçu d'un modèle SUR MESURE installé (ADR-0029 § 8) : même facture fictive. */
+  async previewPackage(
+    organizationId: string,
+    packageId: string,
+    override: Partial<TemplateOptions>,
+    format: 'pdf' | 'png' = 'pdf',
+  ): Promise<{ body: Buffer; fileName: string; contentType: string }> {
+    const presentation = await this.branding.presentationForPackagePreview(
+      organizationId,
+      packageId,
+      override,
+    );
+    const p = presentation.package!;
+    return this.previewWith(
+      organizationId,
+      presentation,
+      format,
+      `apercu-modele-${p.id.replace(/[^a-z0-9-]/g, '-')}-${p.version}`,
+    );
+  }
+
+  private async previewWith(
+    organizationId: string,
+    presentation: FrozenPresentation,
+    format: 'pdf' | 'png',
+    base: string,
+  ): Promise<{ body: Buffer; fileName: string; contentType: string }> {
     const doc = sampleInvoice(organizationId);
     const seller = await this.currentSeller(organizationId);
     const model = buildInvoiceDocument(
@@ -246,7 +295,6 @@ export class InvoiceDocumentsService {
         sample: true,
       },
     );
-    const base = `apercu-modele-${latestTemplate(templateId).id}`;
     if (format === 'pdf') {
       const pdf = await this.render(organizationId, model, presentation);
       return { body: pdf, fileName: `${base}.pdf`, contentType: 'application/pdf' };

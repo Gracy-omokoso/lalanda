@@ -150,6 +150,31 @@ Le quota de `POST /ai/corrective-actions` (10 req/min, endpoint facturé OpenAI,
 
 Compteurs en mémoire de process (déjà noté § Restant S16a) : dès deux instances d'API, chaque instance a son propre seau. Prérequis à lever avant la mise à l'échelle horizontale — backend Redis partagé (`@nest-lab/throttler-storage-redis`).
 
+## Implémenté (ADR-0029) — modèles de facture sur mesure : contenu non fiable
+
+Un paquet de modèle téléversé par une organisation est traité comme **contenu hostile**
+(`apps/api/src/sales/documents/templates/custom/`, lecteur ZIP et politique CSS dans `apps/api/src/security/`) :
+
+- **Archive** : lecteur ZIP propre, sans dépendance ; plafonds avant décompression (taille
+  annoncée, 40 entrées, 8 Mio) et pendant (`maxOutputLength`), taux de compression ≤ 200, CRC
+  vérifié ; ZIP64, multi-volumes, chiffrement, liens symboliques, chemins absolus ou `..`
+  refusés ; liste fermée de fichiers et de types (aucun SVG, aucun script).
+- **Gabarit** : sous-ensemble de Mustache **interprété** (aucune génération de code, aucune
+  propriété héritée lue, HTML brut et partiels interdits), chaque variable vérifiée contre le
+  contrat typé ; HTML en liste blanche (ni `script`, ni `style`, ni attribut `on*`/`style`, ni
+  `iframe`/`svg`), sortie **re-validée à chaque rendu** ; texte réservé à la zone DGI refusé.
+- **CSS** : liste blanche de propriétés (rien qui positionne, empile, transforme, rogne ou rend
+  transparent), aucune at-règle, aucun `url()` hors images du paquet intégrées en `data:`,
+  confinement par préfixe `.lx-modele:scope` **et** `@scope` (chacune des deux barrières prouvée
+  seule dans Chromium réel).
+- **Zone DGI** posée par le moteur hors du conteneur du modèle, en-tête et pied Chromium hors
+  d'atteinte ; vérification de toutes les mentions à chaque rendu (ADR-0028).
+- **Rendu** : même confinement S22e (JavaScript coupé, réseau avorté, CSP `default-src 'none'`).
+- **Stockage** : clé tirée au hasard, enregistrement immuable, isolation par organisation (cache
+  compris), empreinte canonique recalculée à chaque réimpression.
+- **Risque résiduel documenté** : la lisibilité (couleur du texte égale au fond) n'est pas
+  prouvable statiquement ; l'aperçu est exigé avant activation.
+
 ## Menaces prioritaires
 
 - accès inter-organisation;

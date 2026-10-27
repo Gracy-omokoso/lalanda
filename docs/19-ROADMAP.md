@@ -54,19 +54,25 @@ Explications, alertes, actions, sécurité, performance et nouveaux Country Pack
 Base livrée par [ADR-0028](adr/ADR-0028-modeles-de-facture-et-identite.md) (21 oct. 2026) :
 six modèles intégrés, identité visuelle de l'organisation, présentation figée au gel.
 
-1. **Modèle personnalisé d'une entreprise.** Un modèle écrit comme un **gabarit à variables**
-   (HTML + CSS, sans script), remis à un développeur, à Claude ou à Codex à partir d'une
-   description ou d'une maquette, puis **téléversé et installé** dans Lalanda pour une
-   organisation. Il reçoit les mêmes données typées que les modèles intégrés
-   (`TemplateRenderInput` : contenu imprimé en lecture seule, fragments DGI imposés, marque,
-   thème) et passe par le même moteur : CSP, polices intégrées, filigrane, en-tête et pied
-   imposés, **vérification de toutes les mentions DGI à chaque rendu**, version immuable une
-   fois publiée. À prévoir : langage de gabarit sans exécution de code (pas de JavaScript),
-   validation à l'installation (rendu de la batterie de documents de test, mentions, taille),
-   bac à sable de prévisualisation, révocation.
-2. **Place de marché Lalanda de modèles.** Catalogue de modèles publiés par des designers et
-   développeurs, relus et certifiés par Lalanda (même batterie de vérification), installables
-   en un clic ; versions, compatibilité, éventuelle rémunération des auteurs.
+1. **Modèle personnalisé d'une entreprise — livré** par
+   [ADR-0029](adr/ADR-0029-modeles-de-facture-sur-mesure.md) (21 oct. 2026). Paquet `.zip`
+   (`manifest.json`, `gabarit.html` en sous-ensemble strict de Mustache, `style.css` en liste
+   blanche, images, polices WOFF2) écrit d'après le [guide des créateurs](modeles-facture/README.md)
+   par un développeur, Claude ou Codex, vérifié en local (`pnpm --filter @lalanda/api
+   modele:valider <dossier>`), puis téléversé dans « Ventes › Modèle de facture › Modèles
+   personnalisés » : validation complète et rapport, aperçu EXEMPLE, activation, versions
+   immuables. Zone DGI posée par le moteur hors d'atteinte du modèle ; présentation figée au gel
+   par identifiant + version + empreinte du paquet. Restent ouverts (ADR-0029, décisions
+   ouvertes) : relecture Lalanda avant première activation, retrait d'une version, sonde
+   automatique de lisibilité.
+2. **Place de marché Lalanda de modèles — préparée, non construite.** Déjà en place : format de
+   paquet indépendant de l'organisation, champs `publisher`, `license`, `price` et `author` du
+   manifeste, version du contrat de données (`contract`), **empreinte canonique** du paquet
+   (indépendante de l'outil de compression), champ `signature` réservé. À construire : signature
+   Ed25519 des éditeurs sur l'empreinte (clé publique certifiée par Lalanda), catalogue,
+   certification (même batterie de validation + relecture visuelle + rendu Chromium réel),
+   installation en un clic, compatibilité par `contract`, paiement et rémunération des auteurs,
+   révocation.
 
 ## Définition de terminé
 

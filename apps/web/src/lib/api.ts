@@ -764,10 +764,12 @@ export interface InvoiceTemplateCatalogEntry {
 export interface InvoiceTemplatesView {
   templates: InvoiceTemplateCatalogEntry[];
   current: {
-    templateId: InvoiceTemplateId;
+    /** `sur-mesure` : un modèle personnalisé est en vigueur (ADR-0029). */
+    templateId: InvoiceTemplateId | 'sur-mesure';
     version: string;
     options: InvoiceTemplateOptionsInput;
     resolved: InvoiceTemplateOptions;
+    package?: FrozenPackageRef | null;
   } | null;
   identity: {
     primaryColor: string | null;
@@ -776,6 +778,107 @@ export interface InvoiceTemplatesView {
     logos: Record<LogoVariant, boolean>;
   };
   revision: number;
+}
+
+// ─── Modèles de facture sur mesure (ADR-0029) ──────────────────────────────
+
+/** Paquet figé dans une facture : identifiant, version et empreinte. */
+export interface FrozenPackageRef {
+  packageId: string;
+  id: string;
+  name: string;
+  version: string;
+  sha256: string;
+}
+
+export interface TemplatePackageIssue {
+  code: string;
+  message: string;
+  file?: string;
+  line?: number;
+  column?: number;
+  case?: string;
+}
+
+/** Rapport de validation d'un paquet (téléversement). */
+export interface TemplatePackageReport {
+  ok: boolean;
+  errors: TemplatePackageIssue[];
+  warnings: TemplatePackageIssue[];
+  truncated: boolean;
+  digest: string | null;
+  manifest: { id: string; name: string; version: string } | null;
+  files: { path: string; bytes: number }[];
+  cases: { name: string; ok: boolean }[];
+}
+
+export interface TemplatePackageView {
+  packageId: string;
+  templateId: string;
+  version: string;
+  name: string;
+  description: string;
+  contentSha256: string;
+  byteSize: number;
+  author: { name: string; email?: string | null; url?: string | null };
+  publisher: { id: string; name: string; url?: string | null } | null;
+  license: string;
+  options: {
+    palettes: InvoicePalette[];
+    accent: string;
+    fonts: { id: string; label: string }[];
+    font: string;
+  };
+  installedAt: string;
+  active: boolean;
+}
+
+/** `GET /sales/invoice-template-packages` (`sales.read`). */
+export interface TemplatePackagesView {
+  packages: TemplatePackageView[];
+  current: { packageId: string; options: InvoiceTemplateOptionsInput } | null;
+  revision: number;
+  limits: { maxArchiveBytes: number; storageAvailable: boolean };
+}
+
+export interface TemplatePackageInstallResult extends TemplatePackagesView {
+  installed: TemplatePackageView;
+  created: boolean;
+  report: TemplatePackageReport;
+}
+
+/** Aperçu d'un paquet installé (PNG ou PDF) ; erreurs sous la forme de `jsonRequest`. */
+async function templatePackagePreviewRequest(
+  packageId: string,
+  options: Partial<InvoiceTemplateOptions>,
+  format: 'png' | 'pdf',
+): Promise<Blob> {
+  const params = new URLSearchParams({ format });
+  if (options.palette) params.set('palette', options.palette);
+  if (options.accent) params.set('accent', options.accent);
+  if (options.font) params.set('font', options.font);
+  const res = await fetch(
+    `${API_URL}/sales/invoice-template-packages/${encodeURIComponent(packageId)}/preview?${params.toString()}`,
+    { method: 'GET', credentials: 'include' },
+  );
+  if (!res.ok) {
+    const text = await res.text();
+    let detail: unknown = text;
+    try {
+      detail = JSON.parse(text);
+    } catch {
+      /* garde le texte brut */
+    }
+    const err = new Error(
+      typeof detail === 'object' && detail !== null && 'message' in detail
+        ? String((detail as { message: unknown }).message)
+        : `HTTP ${res.status}`,
+    ) as Error & { status: number; detail: unknown };
+    err.status = res.status;
+    err.detail = detail;
+    throw err;
+  }
+  return res.blob();
 }
 
 export interface PutInvoiceTemplateInput {
@@ -3384,6 +3487,26 @@ export const api = {
     jsonRequest<InvoiceTemplatesView>(`/sales/invoice-templates`, { method: 'GET' }),
   putInvoiceTemplate: (input: PutInvoiceTemplateInput) =>
     jsonRequest<InvoiceTemplatesView>(`/sales/invoice-template`, { method: 'PUT', body: input }),
+  /** Modèles sur mesure installés (ADR-0029). */
+  getInvoiceTemplatePackages: () =>
+    jsonRequest<TemplatePackagesView>(`/sales/invoice-template-packages`, { method: 'GET' }),
+  /** Archive ZIP en corps BRUT ; l'API valide tout et rend le rapport (422 si invalide). */
+  uploadInvoiceTemplatePackage: (file: File) =>
+    binaryRequest<TemplatePackageInstallResult>(`/sales/invoice-template-packages`, file),
+  activateInvoiceTemplatePackage: (input: {
+    packageId: string;
+    options: InvoiceTemplateOptionsInput;
+    expectedRevision: number;
+  }) =>
+    jsonRequest<TemplatePackagesView>(`/sales/invoice-template/custom`, {
+      method: 'PUT',
+      body: input,
+    }),
+  getInvoiceTemplatePackagePreview: (
+    packageId: string,
+    options: Partial<InvoiceTemplateOptions>,
+    format: 'png' | 'pdf' = 'png',
+  ) => templatePackagePreviewRequest(packageId, options, format),
   /** Aperçu RÉEL rendu par l'API d'une facture fictive marquée EXEMPLE. */
   getInvoiceTemplatePreview: (
     templateId: InvoiceTemplateId,

@@ -33,8 +33,12 @@ import {
   resolveOptions,
   templateAt,
 } from '../sales/documents/templates/registry.js';
+import { resolveCustomOptions } from '../sales/documents/templates/custom/custom-options.js';
+import { CUSTOM_ENGINE_VERSION } from '../sales/documents/templates/custom/custom-template.js';
+import type { TemplateManifest } from '../sales/documents/templates/custom/manifest.js';
 import type { ResolvedPresentation } from '../sales/documents/templates/template-engine.js';
 import {
+  CUSTOM_TEMPLATE_KEY,
   HEX_COLOR,
   LOGO_VARIANTS,
   isInvoiceTemplateId,
@@ -43,7 +47,9 @@ import {
   type FrozenPresentation,
   type InvoiceTemplateId,
   type LogoVariant,
+  type Palette,
   type RenderLogo,
+  type TemplateFontChoice,
   type TemplateOptions,
   type TemplateOptionsInput,
 } from '../sales/documents/templates/template.contract.js';
@@ -52,13 +58,22 @@ import {
   ObjectStorageService,
   ObjectStorageUnavailableError,
 } from '../storage/object-storage.service.js';
-import type { PutBrandIdentityInput, PutInvoiceTemplateInput } from './branding.dto.js';
+import type {
+  PutBrandIdentityInput,
+  PutCustomTemplateInput,
+  PutInvoiceTemplateInput,
+} from './branding.dto.js';
 import {
   OrganizationBrand,
   OrganizationBrandAsset,
   type OrganizationBrandAssetDocument,
   type OrganizationBrandDocument,
 } from './branding.schema.js';
+import {
+  TemplatePackagesService,
+  packageNotFound,
+  type TemplatePackageLean,
+} from './template-packages.service.js';
 
 export interface BrandActor {
   userId: string;
@@ -119,6 +134,7 @@ export class BrandingService {
     private readonly assets: Model<OrganizationBrandAssetDocument>,
     @Inject(ObjectStorageService) private readonly storage: ObjectStorageService,
     @Inject(AuditService) private readonly audit: AuditService,
+    @Inject(TemplatePackagesService) private readonly packages: TemplatePackagesService,
   ) {}
 
   storageAvailable(): boolean {
@@ -204,6 +220,17 @@ export class BrandingService {
   ): Promise<FrozenPresentation | null> {
     const state = await this.state(organizationId, session);
     const id = state.invoiceTemplate?.id;
+    if (id === CUSTOM_TEMPLATE_KEY) {
+      const pkg = await this.packages.find(
+        organizationId,
+        state.invoiceTemplate?.packageId ?? '',
+        session,
+      );
+      // Paquet introuvable (ne devrait pas arriver : jamais supprimé) :
+      // présentation d'origine plutôt qu'une facture impossible à geler.
+      if (!pkg) return null;
+      return this.customPresentation(pkg, this.optionsInput(state), this.identityOf(state));
+    }
     if (!isInvoiceTemplateId(id)) return null;
     const template = latestTemplate(id);
     const identity = this.identityOf(state);
@@ -212,6 +239,56 @@ export class BrandingService {
       options: resolveOptions(template, this.optionsInput(state), identity),
       identity,
     };
+  }
+
+  /** Présentation d'un paquet sur mesure (ADR-0029 § 7) : référence figée et options résolues. */
+  private customPresentation(
+    pkg: TemplatePackageLean,
+    input: TemplateOptionsInput | null,
+    identity: FrozenIdentity,
+  ): FrozenPresentation {
+    return {
+      template: { id: CUSTOM_TEMPLATE_KEY, version: CUSTOM_ENGINE_VERSION },
+      package: {
+        packageId: pkg.packageId,
+        id: pkg.templateId,
+        name: pkg.name,
+        version: pkg.version,
+        sha256: pkg.contentSha256,
+      },
+      options: resolveCustomOptions(optionsSourceOf(pkg.manifest), input, identity),
+      identity,
+    };
+  }
+
+  /**
+   * Aperçu d'un paquet installé : les options passées, sinon celles
+   * enregistrées si c'est le modèle choisi, sinon l'identité et le manifeste.
+   */
+  async presentationForPackagePreview(
+    organizationId: string,
+    packageId: string,
+    override: Partial<TemplateOptions>,
+  ): Promise<FrozenPresentation> {
+    const pkg = await this.packages.find(organizationId, packageId);
+    if (!pkg) packageNotFound();
+    const state = await this.state(organizationId);
+    const saved =
+      state.invoiceTemplate?.id === CUSTOM_TEMPLATE_KEY &&
+      state.invoiceTemplate.packageId === packageId
+        ? this.optionsInput(state)
+        : null;
+    const choices = pkg.manifest.options.fonts;
+    return this.customPresentation(
+      pkg,
+      {
+        palette: override.palette ?? saved?.palette ?? null,
+        accent: override.accent ?? saved?.accent ?? null,
+        font:
+          override.font && choices.includes(override.font) ? override.font : (saved?.font ?? null),
+      },
+      this.identityOf(state),
+    );
   }
 
   /**
@@ -251,7 +328,12 @@ export class BrandingService {
     organizationId: string,
     p: FrozenPresentation,
   ): Promise<ResolvedPresentation> {
-    const template = templateAt(p.template.id, p.template.version);
+    const template =
+      p.template.id === CUSTOM_TEMPLATE_KEY
+        ? p.package && p.template.version === CUSTOM_ENGINE_VERSION
+          ? await this.packages.compiled(organizationId, p.package)
+          : null
+        : templateAt(p.template.id, p.template.version);
     if (!template) {
       throw new ConflictException({
         code: 'INVOICE_TEMPLATE_UNAVAILABLE',
@@ -413,6 +495,66 @@ export class BrandingService {
     });
   }
 
+  /** Active un paquet sur mesure installé comme modèle de l'organisation (ADR-0029 § 8). */
+  async putCustomTemplate(
+    organizationId: string,
+    input: PutCustomTemplateInput,
+    actor: BrandActor,
+  ): Promise<void> {
+    const pkg = await this.packages.find(organizationId, input.packageId);
+    if (!pkg) packageNotFound();
+    const o = pkg.manifest.options;
+    if (input.options.font !== null && !o.fonts.includes(input.options.font)) {
+      throw new ConflictException({
+        code: 'FONT_NOT_ALLOWED',
+        message: 'Cette police n’est pas proposée par ce modèle.',
+        details: { packageId: input.packageId, font: input.options.font },
+      });
+    }
+    if (input.options.palette !== null && !o.palettes.includes(input.options.palette)) {
+      throw new ConflictException({
+        code: 'PALETTE_NOT_ALLOWED',
+        message: 'Cette palette n’est pas proposée par ce modèle.',
+        details: { packageId: input.packageId, palette: input.options.palette },
+      });
+    }
+    await this.ensure(organizationId);
+    const res = await this.brands
+      .updateOne(
+        { organizationId, revision: input.expectedRevision },
+        {
+          $set: {
+            invoiceTemplate: {
+              id: CUSTOM_TEMPLATE_KEY,
+              packageId: pkg.packageId,
+              options: input.options,
+            },
+            updatedBy: actor.userId,
+          },
+          $inc: { revision: 1 },
+        },
+      )
+      .exec();
+    if (res.matchedCount !== 1) staleRevision((await this.state(organizationId)).revision);
+    await this.audit.record({
+      organizationId,
+      actorUserId: actor.userId,
+      actorRole: actor.role,
+      action: 'sales.invoice_template_updated',
+      targetType: 'organization',
+      targetId: organizationId,
+      metadata: {
+        templateId: CUSTOM_TEMPLATE_KEY,
+        packageId: pkg.packageId,
+        package: `${pkg.templateId}@${pkg.version}`,
+        contentSha256: pkg.contentSha256,
+        palette: input.options.palette,
+        accent: input.options.accent,
+        font: input.options.font,
+      },
+    });
+  }
+
   /**
    * Téléverse un logo (octets DÉJÀ assainis) et le relie à `variant`.
    * L'ancien logo de cette déclinaison n'est PAS supprimé (factures gelées).
@@ -515,4 +657,22 @@ export class BrandingService {
         if (err?.code !== 11000) throw err;
       });
   }
+}
+
+/** Options d'un paquet (manifeste validé) dans la forme attendue par la résolution. */
+export function optionsSourceOf(m: TemplateManifest): {
+  defaults: TemplateOptions;
+  fontChoices: readonly TemplateFontChoice[];
+  palettes: readonly Palette[];
+} {
+  const palettes = m.options.palettes as Palette[];
+  return {
+    defaults: {
+      palette: palettes.includes('brand') ? 'brand' : palettes[0]!,
+      accent: m.options.accent.toLowerCase(),
+      font: m.options.font as TemplateFontChoice,
+    },
+    fontChoices: m.options.fonts as TemplateFontChoice[],
+    palettes,
+  };
 }

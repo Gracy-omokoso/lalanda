@@ -1,4 +1,4 @@
-// Module d'identité visuelle — ADR-0028 § 7.
+// Module d'identité visuelle — ADR-0028 § 7 ; paquets de modèle sur mesure — ADR-0029.
 //
 // Exporte `BrandingService`, consommé par `sales/` : le gel d'une facture fige
 // la présentation, le rendu PDF résout logos et modèle. Le stockage objet est
@@ -17,6 +17,11 @@ import {
   OrganizationBrandSchema,
 } from './branding.schema.js';
 import { BrandingService } from './branding.service.js';
+import {
+  InvoiceTemplatePackage,
+  InvoiceTemplatePackageSchema,
+} from './template-packages.schema.js';
+import { TemplatePackagesService } from './template-packages.service.js';
 
 @Module({
   imports: [
@@ -25,10 +30,11 @@ import { BrandingService } from './branding.service.js';
     MongooseModule.forFeature([
       { name: OrganizationBrand.name, schema: OrganizationBrandSchema },
       { name: OrganizationBrandAsset.name, schema: OrganizationBrandAssetSchema },
+      { name: InvoiceTemplatePackage.name, schema: InvoiceTemplatePackageSchema },
     ]),
   ],
   controllers: [BrandingController, BrandAssetImageController],
-  providers: [BrandingService],
-  exports: [BrandingService],
+  providers: [BrandingService, TemplatePackagesService],
+  exports: [BrandingService, TemplatePackagesService],
 })
 export class BrandingModule {}

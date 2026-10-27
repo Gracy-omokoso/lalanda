@@ -19,6 +19,7 @@ import {
   type InvoiceTemplatesView,
 } from '@/lib/api';
 
+import { CustomTemplatePackages } from './custom-template-packages';
 import {
   PALETTE_LABELS,
   choisirModele,
@@ -159,6 +160,13 @@ export function InvoiceTemplateGallery(): React.ReactElement {
       <span aria-live="polite" className="text-xs text-[var(--foreground-muted)]">
         {notice ?? ''}
       </span>
+      {vue.current?.templateId === 'sur-mesure' && vue.current.package ? (
+        <p className="text-sm">
+          Modèle personnalisé en vigueur : <strong>{vue.current.package.name}</strong> version{' '}
+          {vue.current.package.version} (voir « Modèles personnalisés » plus bas). Choisir un modèle
+          ci-dessous le remplacera pour les prochaines factures.
+        </p>
+      ) : null}
 
       <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Modèles de facture">
         {vue.templates.map((t) => (
@@ -216,6 +224,8 @@ export function InvoiceTemplateGallery(): React.ReactElement {
           </p>
         )}
       </div>
+
+      <CustomTemplatePackages onChange={() => void charger()} />
     </div>
   );
 }

@@ -19,7 +19,8 @@ export const PALETTE_LABELS: Record<InvoicePalette, string> = {
 
 /** Choix en cours d'édition ; `null` = suivre l'identité, puis le défaut du modèle. */
 export interface SelectionModele {
-  templateId: InvoiceTemplateId | null;
+  /** `sur-mesure` : un modèle personnalisé est en vigueur (section dédiée, ADR-0029). */
+  templateId: InvoiceTemplateId | 'sur-mesure' | null;
   palette: InvoicePalette | null;
   accent: string | null;
   font: string | null;
@@ -77,10 +78,13 @@ export function estModifiee(sel: SelectionModele, v: InvoiceTemplatesView): bool
 }
 
 export function versEnvoi(sel: SelectionModele, revision: number): PutInvoiceTemplateInput {
+  // Un modèle sur mesure s'active par sa propre route : ce formulaire ne
+  // l'envoie jamais (le bouton reste désactivé tant qu'on n'a rien changé).
+  const templateId = sel.templateId === 'sur-mesure' ? null : sel.templateId;
   return {
-    templateId: sel.templateId,
+    templateId,
     options:
-      sel.templateId === null
+      templateId === null
         ? { palette: null, accent: null, font: null }
         : { palette: sel.palette, accent: sel.accent, font: sel.font },
     expectedRevision: revision,

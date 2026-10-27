@@ -1,0 +1,110 @@
+{{! Modèle « Ocre » — paquet d'exemple du guide docs/modeles-facture/.
+    Le moteur pose lui-même, autour de ce gabarit : bandeau de test, DUPLICATA,
+    cadre « Éléments de sécurité DGI » et QR code, filigrane, en-tête et pied.
+    Ce gabarit place tout le reste du contenu imprimé, chaque valeur telle quelle. }}
+<div class="page">
+  <img class="frise" src="images/frise.png" alt="" />
+
+  <header class="tete">
+    <div class="vendeur">
+      {{#brand.logo}}<img class="logo" src="{{brand.logo}}" alt="" />{{/brand.logo}}
+      {{^brand.logo}}<div class="initiales">{{brand.initials}}</div>{{/brand.logo}}
+      <div>
+        <div class="vendeur-nom">{{document.seller.title}}</div>
+        {{#document.seller.lines}}<div class="ligne-info">{{.}}</div>{{/document.seller.lines}}
+      </div>
+    </div>
+    <div class="titre-bloc">
+      <h1 class="titre">{{document.title}}</h1>
+      {{#document.natureMentions}}<span class="nature">{{.}}</span>{{/document.natureMentions}}
+      {{#document.stateMentions}}<div class="etat">{{.}}</div>{{/document.stateMentions}}
+      <div class="numero">{{document.reference.label}} <strong>{{document.reference.value}}</strong></div>
+      <div>{{document.date.label}} : {{document.date.value}}</div>
+    </div>
+  </header>
+
+  <section class="cartes">
+    <div class="carte">
+      <div class="etiquette">Client</div>
+      <div class="client-nom">{{document.customer.title}}</div>
+      {{#document.customer.lines}}<div>{{.}}</div>{{/document.customer.lines}}
+      {{#document.creditReference}}<div class="reference">{{.}}</div>{{/document.creditReference}}
+    </div>
+    <div class="carte">
+      <div class="etiquette">Conditions</div>
+      <div>{{document.amountsNote}}</div>
+      <div>{{document.priceModeLabel}}</div>
+      {{#document.payments}}<div>Paiement — {{label}} : {{amount}}</div>{{/document.payments}}
+    </div>
+  </section>
+
+  <table class="lignes">
+    <thead>
+      <tr>
+        <th>Désignation</th>
+        <th>Type</th>
+        <th>Groupe</th>
+        <th class="nombre">Quantité</th>
+        <th class="nombre">Prix unitaire</th>
+        <th class="nombre">Montant</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#document.lines}}
+      <tr>
+        <td>
+          <div class="designation">{{name}}</div>
+          {{#code}}<div class="detail">{{code}}</div>{{/code}}
+          {{#modification}}<div class="detail">{{modification}}</div>{{/modification}}
+          {{#specificTax}}<div class="detail">{{specificTax}}</div>{{/specificTax}}
+        </td>
+        <td>{{itemType}}</td>
+        <td>{{group}}</td>
+        <td class="nombre">{{quantity}}</td>
+        <td class="nombre">{{unitPrice}}</td>
+        <td class="nombre">{{amount}}</td>
+      </tr>
+      {{/document.lines}}
+    </tbody>
+  </table>
+
+  <section class="bas">
+    <table class="groupes">
+      <thead>
+        <tr>
+          <th>Groupe</th>
+          <th>Taux</th>
+          <th class="nombre">Base</th>
+          <th class="nombre">TVA</th>
+          <th class="nombre">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#document.groups}}
+        <tr>
+          <td>{{group}}</td>
+          <td>{{rate}}</td>
+          <td class="nombre">{{ht}}</td>
+          <td class="nombre">{{vat}}</td>
+          <td class="nombre">{{total}}</td>
+        </tr>
+        {{/document.groups}}
+      </tbody>
+    </table>
+    <div class="totaux">
+      {{#document.specificTaxTotal}}
+      <div class="somme"><span>{{labels.specificTax}}</span><span>{{document.specificTaxTotal}}</span></div>
+      {{/document.specificTaxTotal}}
+      <div class="somme"><span>{{labels.vatTotal}}</span><span>{{document.vatTotal}}</span></div>
+      <div class="somme total"><span>Total TTC ({{document.currency}})</span><span>{{document.total}}</span></div>
+    </div>
+  </section>
+
+  <p class="lettres">{{document.totalInWords}}</p>
+  {{#document.counterValue}}<p class="contre-valeur">{{.}}</p>{{/document.counterValue}}
+
+  <footer class="notes">
+    {{#document.operator}}<div>{{labels.operator}} : {{.}}</div>{{/document.operator}}
+    {{#document.comments}}<div>{{.}}</div>{{/document.comments}}
+  </footer>
+</div>
