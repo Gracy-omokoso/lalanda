@@ -170,6 +170,11 @@ const ORG_SCOPED_COLLECTIONS = [
   'morning_brief_ai_logs',
   // ADR-0032 — fiche GROW de l'organisation.
   'grow_profiles',
+  // ADR-0037 — business plan narratif : documents, versions, réglages, journal IA.
+  'business_plans',
+  'business_plan_versions',
+  'business_plan_settings',
+  'business_plan_ai_logs',
 ] as const;
 
 /**
