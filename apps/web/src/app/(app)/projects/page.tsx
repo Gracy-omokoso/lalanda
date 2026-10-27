@@ -11,8 +11,10 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { api, type ParameterPackSummary, type ProjectView, type TemplateSummary } from '@/lib/api';
+import { ideaLabApi } from '@/lib/idea-lab-api';
 
 import { useShell } from '../_components/shell-context';
+import { ideeDepuisRecherche } from '../idees/_components/idea-model';
 
 import { aDesCartes, CUSTOM_TEMPLATE_SLUG } from './_components/custom-questionnaire-model';
 import { CustomStartModal, type CadrageResultat } from './_components/custom-start-modal';
@@ -116,10 +118,40 @@ export default function ProjectsPage(): React.ReactElement {
   const projetCadrageRef = useRef<string | null>(null);
   /** Champ « Nom du projet » — le chemin direct y renvoie le curseur. */
   const nomRef = useRef<HTMLInputElement>(null);
+  /**
+   * ADR-0036 § 3 — création ouverte depuis une idée (`?idee=<id>`). La création
+   * reste celle-ci (modèle, pays, devise, limite de l'offre) ; une fois le projet
+   * créé, l'idée ajoute ses cartes de texte au Canvas, puis le Canvas s'ouvre.
+   */
+  const [ideeSource, setIdeeSource] = useState<{ id: string; title: string } | null>(null);
 
   useEffect(() => {
     void Promise.all([refreshProjects(), refreshTemplates(), refreshPacks()]);
+    // `window.location` plutôt que `useSearchParams` : la page reste rendue côté
+    // client sans frontière Suspense, et l'identifiant est vérifié (24 hex).
+    const ideeId = ideeDepuisRecherche(window.location.search);
+    if (ideeId) {
+      void ideaLabApi
+        .get(ideeId)
+        .then((idea) => {
+          setIdeeSource({ id: idea.id, title: idea.title });
+          setNewName((n) => (n === '' ? idea.title.slice(0, 200) : n));
+        })
+        .catch(() => undefined);
+    }
   }, []);
+
+  /** Après création depuis une idée : cartes de l'idée vers le Canvas, puis le Canvas. */
+  async function versCanvasDepuisIdee(projectId: string): Promise<boolean> {
+    if (!ideeSource) return false;
+    try {
+      await ideaLabApi.promote(ideeSource.id, projectId);
+    } catch {
+      // Le projet existe : on l'ouvre quand même ; la promotion se refait depuis la fiche.
+    }
+    router.push(`/projects/${projectId}/canvas`);
+    return true;
+  }
 
   // Quand `packs` arrive ou que l'utilisateur change de pays : recalcule le pack par défaut.
   useEffect(() => {
@@ -177,6 +209,7 @@ export default function ProjectsPage(): React.ReactElement {
         deviseAffichage: (currency as 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR') || undefined,
       });
       setNewName('');
+      if (await versCanvasDepuisIdee(created.id)) return;
       // (S23b) Le modèle générique dépose sur l'assistant de saisie, à l'étape
       // du chiffre d'affaires — c'est le chemin « mon plan financier tout de
       // suite », et la demande est explicite : « il commence à saisir le chiffre
@@ -250,6 +283,7 @@ export default function ProjectsPage(): React.ReactElement {
     setNewName('');
     projetCadrageRef.current = null;
     setModalCustom(false);
+    if (await versCanvasDepuisIdee(projectId)) return;
     router.push(`/projects/${projectId}/saisie${query ? `?${query}` : ''}`);
   }
 
@@ -310,6 +344,13 @@ export default function ProjectsPage(): React.ReactElement {
         onSubmit={handleCreate}
         className="flex flex-col gap-6 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5"
       >
+        {ideeSource && (
+          <p role="status" className="rounded-md border border-[var(--border)] p-3 text-sm">
+            Nouveau projet à partir de l’idée « {ideeSource.title} » : son problème, sa cible, sa
+            solution et son modèle de revenus deviendront des cartes du Canvas. Aucun chiffre n’est
+            repris.
+          </p>
+        )}
         <div className="flex flex-col gap-1">
           <h3 className="text-sm font-semibold">Nouveau projet</h3>
           <p className="text-xs text-[var(--foreground-muted)]">

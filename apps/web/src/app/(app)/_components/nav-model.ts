@@ -17,6 +17,8 @@ import type { OrgAction } from '@/lib/api';
 export type NavGroupId = ModuleId | 'organisation';
 
 export type NavIconId =
+  | 'idees'
+  | 'validation'
   | 'plans'
   | 'factures'
   | 'encaissements'
@@ -73,6 +75,26 @@ export const NAV_GROUPS: readonly NavGroup[] = [
  * « Modèle de facture » et « Journal » restent des onglets de l'espace Ventes.
  */
 export const NAV_ITEMS: readonly NavItem[] = [
+  // ADR-0036 — l'amont de BUILD : l'idée, puis sa validation, avant le plan
+  // financier. Lecture sous `project.read` (détenu par les huit rôles), donc
+  // offerte à tout membre, comme « Plans financiers » ; l'écriture
+  // (`canvas.update`) se règle à l'écran et à l'API.
+  {
+    id: 'idees',
+    href: '/idees',
+    label: 'Idées',
+    group: 'build',
+    icon: 'idees',
+    action: null,
+  },
+  {
+    id: 'validation',
+    href: '/idees/validation',
+    label: 'Validation',
+    group: 'build',
+    icon: 'validation',
+    action: null,
+  },
   {
     id: 'plans',
     href: '/projects',
