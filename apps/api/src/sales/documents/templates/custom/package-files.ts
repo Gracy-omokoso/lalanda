@@ -6,7 +6,7 @@
 
 import { createHash } from 'node:crypto';
 
-import { IssueList } from './report.js';
+import type { IssueList } from './report.js';
 import { ZipError, readZip } from '../../../../security/zip-reader.js';
 
 export const PACKAGE_LIMITS = {
@@ -85,6 +85,7 @@ const MAX_BYTES: Record<PackageFileKind, number> = {
  */
 export function checkPath(raw: string): { path: string } | { error: string } {
   if (raw === '' || raw.length > 160) return { error: 'Chemin vide ou trop long.' };
+  // eslint-disable-next-line no-control-regex -- refus délibéré des caractères de contrôle (ADR-0029).
   if (/[\u0000-\u001f\u007f]/.test(raw)) return { error: 'Caractère de contrôle dans le chemin.' };
   if (raw.includes('\\')) return { error: 'Barre oblique inverse « \\ » interdite.' };
   if (raw.startsWith('/') || /^[a-zA-Z]:/.test(raw)) return { error: 'Chemin absolu interdit.' };

@@ -447,6 +447,7 @@ export function compileCss(
     ok = false;
     issues.error({ code, message, file: ctx.file, ...positionOf(src, index) });
   };
+  // eslint-disable-next-line no-control-regex -- refus délibéré des caractères de contrôle (ADR-0029).
   const ctrl = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.exec(src);
   if (ctrl) fail('CSS_SYNTAX', 'Caractère de contrôle interdit.', ctrl.index);
   const before = issues.errors.length;

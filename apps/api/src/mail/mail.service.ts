@@ -18,13 +18,15 @@
 
 import { Inject, Injectable } from '@nestjs/common';
 
-import { fiscalPageUrl, invoicePageUrl } from './mail.links.js';
+import { fiscalPageUrl, invoicePageUrl, webUrl } from './mail.links.js';
 import {
   renderEmailVerification,
   renderInvitation,
+  renderMorningBrief,
   renderNormalizationAlert,
   renderNormalizedInvoicingDisabled,
   renderPasswordReset,
+  type MorningBriefMailContent,
   type NormalizationAlertCause,
 } from './mail.templates.js';
 import { MailTransport } from './mail.transport.js';
@@ -84,6 +86,14 @@ export interface NormalizationAlertMail {
 }
 
 /**
+ * Brief du matin (ADR-0033 § 8) — un envoi par abonné, au plus une fois par jour.
+ * Contenu DÉTERMINISTE seulement : aucun texte rédigé par l'IA ne part par e-mail.
+ */
+export interface MorningBriefMail extends MorningBriefMailContent {
+  to: string;
+}
+
+/**
  * Contrat d'envoi du produit. Voir l'en-tête de fichier.
  *
  * Aucune méthode ne LÈVE sur échec d'envoi : toutes retournent un
@@ -100,6 +110,7 @@ export abstract class MailService {
     input: NormalizedInvoicingDisabledMail,
   ): Promise<MailDeliveryResult>;
   abstract sendNormalizationAlert(input: NormalizationAlertMail): Promise<MailDeliveryResult>;
+  abstract sendMorningBrief(input: MorningBriefMail): Promise<MailDeliveryResult>;
 }
 
 /** Implémentation par défaut : rendu des gabarits puis remise au transport. */
@@ -170,5 +181,14 @@ export class TemplatedMailService extends MailService {
       number: input.number ?? null,
     });
     return this.transport.send({ to: input.to, ...body });
+  }
+
+  async sendMorningBrief(input: MorningBriefMail): Promise<MailDeliveryResult> {
+    const { to, ...content } = input;
+    // Onglet « Brief du matin » de l'espace organisation (ADR-0033).
+    return this.transport.send({
+      to,
+      ...renderMorningBrief(content, `${webUrl()}/organisation/brief`),
+    });
   }
 }

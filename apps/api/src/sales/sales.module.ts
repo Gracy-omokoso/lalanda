@@ -168,6 +168,8 @@ import { ReferenceRefreshJob } from './normalization/reference-refresh.job.js';
     // convertissent en brouillon de facture et s'impriment par le même moteur.
     InvoiceDraftsService,
     InvoiceDocumentsService,
+    // ADR-0033 (amendement du 27 oct. 2026) : le brief lit le reste à encaisser réel.
+    SettlementsService,
   ],
 })
 export class SalesModule {}

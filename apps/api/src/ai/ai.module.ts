@@ -94,6 +94,9 @@ export const OPENAI_CHAT_CLIENT = Symbol('OPENAI_CHAT_CLIENT');
   // `AiQuotaService` est exporté : c'est le point d'entrée que tout nouvel usage
   // de l'IA (assistant, interprétations, chat) doit appeler au lieu d'écrire sa
   // propre limite. Voir l'encadré en tête de `ai-quota.service.ts`.
-  exports: [AiActionsService, LalaService, AiQuotaService, LalaVocalService],
+  //
+  // `OPENAI_CHAT_CLIENT` est exporté pour le brief du matin (ADR-0033) : un seul
+  // client, une seule politique de clé et de bornes pour tous les usages.
+  exports: [AiActionsService, LalaService, AiQuotaService, LalaVocalService, OPENAI_CHAT_CLIENT],
 })
 export class AiModule {}

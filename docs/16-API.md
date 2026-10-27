@@ -407,6 +407,19 @@ Lecture `crm.read` ; écriture, réglages, import et export `crm.manage`.
 | `GET /crm/contacts/export` · `GET /crm/opportunities/export` | CSV `;`, UTF-8 avec BOM, formules neutralisées ; audit strict |
 | `POST /crm/contacts/import` · `POST /crm/opportunities/import` `{ csv, dryRun }` | tout ou rien, 500 lignes ; `400 CSV_IMPORT_INVALID` (`details.errors[].line`), `400 CSV_UNREADABLE` |
 
+## Brief du matin — implémenté (ADR-0033)
+
+L'organisation est toujours celle de la session ; aucun corps ni paramètre ne la désigne.
+
+| Méthode et chemin | Permission | Quota |
+|---|---|---|
+| `GET /morning-brief` | `analytics.read` (faits de ventes : `sales.read`, sinon `hidden`) | global |
+| `POST /morning-brief/explanation` `{ intent: "explain" \| "this_week" }` | `analytics.read` | IA (`AI_THROTTLE`) + quota mensuel `ai.morning_brief` |
+| `GET /morning-brief/preferences` · `PUT /morning-brief/preferences` `{ emailDaily }` | `analytics.read` | global |
+| `PUT /morning-brief/settings` `{ aiEnabled }` | `organization.manage` | global |
+
+Codes : `400 INVALID_REQUEST` (corps `.strict()`), `403 PLAN_LIMIT_AI_MESSAGES` avant tout appel au modèle. L'explication rend `source: "llm" | "fallback"`, `cached`, `reason` et ses sources ; un nombre ou une source absents des faits font servir le texte déterministe. Tâche planifiée : `morning-brief.daily-email` (15 min, envoi à partir de 7 h à Kinshasa, au plus une fois par jour).
+
 ## Webhooks
 
 Paiements et intégrations utilisent signatures, tolérance temporelle, anti-rejeu, journal et traitement idempotent.

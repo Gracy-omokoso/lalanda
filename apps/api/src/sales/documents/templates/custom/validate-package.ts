@@ -31,7 +31,6 @@ import { resolveCustomOptions } from './custom-options.js';
 import {
   CustomTemplateOutputError,
   compileCustomTemplate,
-  customLayoutLabel,
   type CompiledCustomTemplate,
 } from './custom-template.js';
 import { compileCss } from '../../../../security/template-css-policy.js';

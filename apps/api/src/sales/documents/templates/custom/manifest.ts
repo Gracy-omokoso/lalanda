@@ -33,6 +33,7 @@ const text = (max: number) =>
     .min(1)
     .max(max)
     .refine(
+      // eslint-disable-next-line no-control-regex -- refus délibéré des caractères de contrôle (ADR-0029).
       (s) => !/[\u0000-\u001f\u007f<>]/.test(s),
       'Caractères « < », « > » ou de contrôle interdits.',
     );

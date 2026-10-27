@@ -95,6 +95,7 @@ const RESERVED: ReadonlyArray<[RegExp, string]> = [
 ];
 
 /** Caractère de contrôle (hors tabulation et sauts de ligne) ou de format invisible (Cf). */
+// eslint-disable-next-line no-control-regex -- refus délibéré des caractères de contrôle (ADR-0029).
 const INVISIBLE = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\p{Cf}]/u;
 
 export interface HtmlCheckOptions {
@@ -145,7 +146,9 @@ export function checkHtml(html: string, opts: HtmlCheckOptions, issues: IssueLis
         index + m.index,
       );
     }
+    // eslint-disable-next-line no-control-regex -- refus délibéré des caractères de contrôle (ADR-0029).
     const plain = decode(text.replace(/\u0001+/g, ' '));
+    // eslint-disable-next-line no-control-regex -- refus délibéré des caractères de contrôle (ADR-0029).
     joined.push(decode(text.replace(/\u0001+/g, '')));
     for (const [re, label] of RESERVED) {
       if (re.test(plain)) {
@@ -284,6 +287,7 @@ export function checkHtml(html: string, opts: HtmlCheckOptions, issues: IssueLis
               `Classe « ${cls} » : le préfixe « lx- » est réservé au moteur.`,
               valueIndex,
             );
+            // eslint-disable-next-line no-control-regex -- refus délibéré des caractères de contrôle (ADR-0029).
           } else if (!/^[A-Za-z0-9_\u0001-]+$/.test(cls)) {
             fail('TEMPLATE_HTML_SYNTAX', `Nom de classe invalide « ${cls} ».`, valueIndex);
           }

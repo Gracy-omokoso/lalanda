@@ -37,6 +37,7 @@ import { FiscalProfileController } from '../fiscal/fiscal-profile.controller.js'
 import { NormalizedInvoicingController } from '../fiscal/normalized-invoicing.controller.js';
 import { HealthController } from '../health/health.controller.js';
 import { LegalController } from '../legal/legal.controller.js';
+import { MorningBriefController } from '../morning-brief/morning-brief.controller.js';
 import { ObjectivesController } from '../objectives/objectives.controller.js';
 import { OrganizationSpaceController } from '../organization-space/organization-space.controller.js';
 import { InvitationsController } from '../organizations/invitations.controller.js';
@@ -137,6 +138,8 @@ const CONTROLEURS = [
   CrmOpportunitiesController,
   CrmActivitiesController,
   InvoiceTemplatePackagesController,
+  // ADR-0033 — brief du matin.
+  MorningBriefController,
 ];
 
 /**
@@ -558,6 +561,14 @@ describe('couverture des routes par le RBAC', () => {
       'InvoiceTemplatePackagesController.install': ['organization.manage'],
       'InvoiceTemplatePackagesController.preview': ['sales.read'],
       'InvoiceTemplatePackagesController.activate': ['organization.manage'],
+      // ADR-0033 — brief du matin : ouvert à tout membre (`analytics.read`), le
+      // bloc ventes suit `sales.read` dans le service ; l'IA du brief se règle
+      // par organisation.
+      'MorningBriefController.get': ['analytics.read'],
+      'MorningBriefController.explanation': ['analytics.read'],
+      'MorningBriefController.getPreferences': ['analytics.read'],
+      'MorningBriefController.putPreferences': ['analytics.read'],
+      'MorningBriefController.putSettings': ['organization.manage'],
     };
     for (const [cle, actions] of Object.entries(attendu)) {
       const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle);

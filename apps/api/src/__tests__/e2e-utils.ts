@@ -164,6 +164,10 @@ const ORG_SCOPED_COLLECTIONS = [
   'treasury_recurring_expenses',
   'treasury_movements',
   'treasury_settings',
+  // ADR-0033 — brief du matin : réglages, abonnements et journal IA.
+  'morning_brief_settings',
+  'morning_brief_subscriptions',
+  'morning_brief_ai_logs',
 ] as const;
 
 /**

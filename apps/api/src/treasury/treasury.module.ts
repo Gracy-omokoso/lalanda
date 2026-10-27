@@ -77,6 +77,7 @@ import {
     TreasuryBridgeLocks,
     { provide: TREASURY_RECEIPTS_SOURCE, useClass: SalesReceiptsSource },
   ],
-  exports: [TreasuryBridgeLocks],
+  // ADR-0033 (amendement du 27 oct. 2026) : le brief lit les soldes des comptes.
+  exports: [TreasuryBridgeLocks, TreasuryAccountsService],
 })
 export class TreasuryModule {}

@@ -63,8 +63,8 @@ export const NAV_GROUPS: readonly NavGroup[] = [
 /**
  * Les entrées, dans l'ordre d'affichage (ADR-0030 § 2).
  *
- * Ne figurent ici que des pages qui EXISTENT : GROW n'a que « Pilotage » tant
- * que son ADR n'est pas écrit — la barre ne promet rien (règle d'ADR-0016).
+ * Ne figurent ici que des pages qui EXISTENT : GROW n'a que « Pilotage » et
+ * « Brief du matin » (ADR-0033) tant que son ADR n'est pas écrit — la barre ne promet rien (règle d'ADR-0016).
  * « Modèle de facture » et « Journal » restent des onglets de l'espace Ventes.
  */
 export const NAV_ITEMS: readonly NavItem[] = [
@@ -144,6 +144,17 @@ export const NAV_ITEMS: readonly NavItem[] = [
     id: 'pilotage',
     href: '/organisation',
     label: 'Pilotage',
+    group: 'grow',
+    icon: 'pilotage',
+    action: null,
+  },
+  // ADR-0033 — brief du matin : faits, alertes et recommandations du moteur,
+  // explication par l'IA à la demande. Même garde que le pilotage
+  // (`analytics.read`, détenu par les huit rôles), donc offert à tout membre.
+  {
+    id: 'brief',
+    href: '/organisation/brief',
+    label: 'Brief du matin',
     group: 'grow',
     icon: 'pilotage',
     action: null,

@@ -83,6 +83,8 @@ describe('documents de vente — lecture des sources', () => {
       // ADR-0031 : LECTEURS seulement (règlement et pont vers le réalisé), vérifié
       // ci-dessous.
       'actuals/run-bridge/run-bridge.service.ts',
+      // ADR-0033 : LECTEUR seulement (brief du matin) — vérifié ci-dessous.
+      'morning-brief/morning-brief.service.ts',
       // ADR-0025 (S25g) : seul écrivain de `duplicateCount`, et de lui seul.
       'sales/documents/invoice-documents.service.ts',
       'sales/invoices/invoice-drafts.service.ts',
@@ -105,6 +107,9 @@ describe('documents de vente — lecture des sources', () => {
         /this\.invoices\s*\.\s*(update|create|insert|delete|replace|findOneAndUpdate|bulkWrite)/,
       );
     }
+    const brief = await readFile(resolve(SRC, 'morning-brief/morning-brief.service.ts'), 'utf8');
+    const briefInvoices = brief.match(/this\.invoices\s*\.\s*\w+/g) ?? [];
+    expect(briefInvoices.map((m) => m.replace(/\s/g, ''))).toEqual(['this.invoices.find']);
     const documents = await readFile(
       resolve(SRC, 'sales/documents/invoice-documents.service.ts'),
       'utf8',
