@@ -20,7 +20,6 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 
 import { startFakeEdefServer, type FakeEdefServer } from '../edef/testing/fake-edef-server.js';
 import { PdfRenderingService } from '../reports/pdf-rendering.service.js';
-import { kinshasaDayOf } from '../sales/receipts/kinshasa-day.js';
 import { dbOf, e2eSuite, makeE2EApp, registerAndLogin } from './e2e-utils.js';
 
 const tag = randomBytes(4).toString('hex');
@@ -846,27 +845,12 @@ e2eSuite('CRM minimal et devis (ADR-0035)', () => {
         reference: n.number,
       });
 
-      // Encaissement (ADR-0031) : la facture issue du devis se règle comme une autre.
-      const total = n.documentAmounts.calculation.totals.total as string;
+      // Encaissement (ADR-0031) : seules les factures de la série RÉELLE se règlent.
+      // Cette organisation normalise en environnement de test DGI : la facture issue
+      // du devis est de la série d'essai, le règlement n'y est donc pas applicable.
       expect(ok(await get(asN(), `/sales/settlements/${n.id}`))).toMatchObject({
-        status: 'unpaid',
-        settlement: { received: '0.00', outstanding: total },
-      });
-      ok(
-        await post(asN('accountant'), '/sales/receipts', {
-          receivedOn: kinshasaDayOf(new Date()),
-          amount: total,
-          currency: 'CDF',
-          method: 'VIREMENT',
-          reference: 'VIR-DEVIS',
-          note: null,
-          allocations: [{ invoiceId: n.id, amount: total }],
-        }),
-        201,
-      );
-      expect(ok(await get(asN(), `/sales/settlements/${n.id}`))).toMatchObject({
-        status: 'paid',
-        settlement: { received: total, outstanding: '0.00' },
+        status: 'not_applicable',
+        settlement: null,
       });
     });
 
@@ -976,7 +960,10 @@ e2eSuite('CRM minimal et devis (ADR-0035)', () => {
       expect(board.stages.flatMap((s: { opportunities: unknown[] }) => s.opportunities)).toEqual(
         [],
       );
-      expect(ok(await get(asB(), '/sales/quotes')).items).toEqual([]);
+      // B a ses propres devis (cas « vendeur non assujetti ») : aucun n'est à N.
+      const idsDeN = new Set([q.id]);
+      const devisDeB = ok(await get(asB(), '/sales/quotes')).items as { id: string }[];
+      expect(devisDeB.filter((x) => idsDeN.has(x.id))).toEqual([]);
     });
   });
 
