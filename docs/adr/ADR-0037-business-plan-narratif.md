@@ -251,7 +251,9 @@ l'écran et entrée de navigation.
 ## Décisions ouvertes — pour la dirigeante
 
 1. **Offres** : business plan ouvert à toutes les offres (IA et PDF limités par les quotas
-   existants) — ou réservé à Pro et au-delà ?
+   existants) — ou réservé à Pro et au-delà ? **27 oct. 2026 : reporté par la dirigeante** —
+   ouvert à toutes les offres d'ici l'arbitrage global de la répartition par offre
+   (docs/13 § « Répartition des fonctionnalités par offre »).
 2. **Validation sans plan figé** : interdite (proposition) — faut-il l'autoriser pour un
    porteur d'idée qui n'a pas encore de plan ?
 3. **Permissions** : rédaction sous `canvas.update`, validation sous `plan.approve` avec

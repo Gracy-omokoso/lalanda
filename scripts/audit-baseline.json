@@ -1,11 +1,4 @@
 {
-  "generatedAt": "2026-10-26",
-  "advisories": [
-    {
-      "id": "GHSA-mrhx-c7xc-m3w5",
-      "module": "zod",
-      "severity": "high",
-      "title": "Zod can exhaust memory while validating oversized constrained collections"
-    }
-  ]
+  "generatedAt": "2026-10-27",
+  "advisories": []
 }

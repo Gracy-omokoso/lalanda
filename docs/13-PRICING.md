@@ -549,6 +549,31 @@ dit. **Ce point doit être arbitré avant le premier encaissement réel**, pas a
 5. **Arbitrer devise de règlement et fiscalité (§ 5).** Toujours ouvert, et
    toujours bloquant avant le premier encaissement réel.
 
+## Répartition des fonctionnalités par offre — À ARBITRER
+
+Décision de la dirigeante (27 oct. 2026) : **finir d'abord l'ensemble des
+fonctionnalités, les laisser ouvertes, et répartir ensuite** ce qui va dans quelle
+offre. Aucune nouvelle fonctionnalité ne reçoit donc de garde d'offre d'ici là ;
+chacune est inscrite ici avec son état actuel pour que l'arbitrage se fasse en une
+fois, sur une liste complète.
+
+| Fonctionnalité | Accès aujourd'hui | Ce qui la borne déjà | À trancher |
+|---|---|---|---|
+| Projets, plans, scénarios (BUILD) | toutes les offres | `maxProjects` | — |
+| Idea Lab (ADR-0036) | toutes les offres | IA : quota mensuel ; 50 idées (borne technique) | offre(s) ; nombre d'idées comme droit d'offre ? |
+| Business plan rédigé (ADR-0037) | toutes les offres | IA : quota mensuel ; PDF : `pdfExportsPerMonth`, `pdfWatermark` | réservé à une offre payante ? |
+| Dossier financier PDF / Excel | toutes les offres | PDF : quota et filigrane ; Excel non borné | — |
+| Suivi du réalisé | Pro et au-dessus | `actualsEnabled` | — |
+| GROW : santé et indicateurs investisseurs (ADR-0032) | Pro et au-dessus | `actualsEnabled` | confirmer Pro+ |
+| GROW : parcours | toutes les offres | — | — |
+| Ventes : facturation normalisée DGI, avoirs, encaissements | toutes les offres | — | offre(s) |
+| Ventes : CRM, devis | toutes les offres | — | offre(s) |
+| Modèles de facture (6 inclus) et identité visuelle | toutes les offres | — | offre(s) |
+| Modèles de facture sur mesure (marketplace à venir) | toutes les offres | revue avant activation | offre(s) ; conditions de la marketplace |
+| Trésorerie | toutes les offres | — | offre(s) |
+| Brief du matin (ADR-0033) | toutes les offres | IA : quota mensuel | offre(s) |
+| Lala vocal | selon le plan (`lala-vocal.service.ts`) | quota vocal dédié (`lala-vocal-quota.ts`) | — |
+
 ## Ce qui reste à faire
 
 - **`seats` n'est pas appliqué.** La grille contractualise 1, 1, 3, 20 sièges et
@@ -557,7 +582,7 @@ dit. **Ce point doit être arbitré avant le premier encaissement réel**, pas a
   limite. Vendre des sièges sans les compter, c'est vendre une différence que
   rien ne matérialise — le même reproche que S22b adressait au quota IA, qui lui
   est désormais appliqué.
-- **`pdfExportsPerMonth` n'est pas appliqué.** Le filigrane l'est ; le nombre
+- ~~**`pdfExportsPerMonth` n'est pas appliqué.**~~ Appliqué depuis S22i (`PdfExportQuotaService`, dossier financier et business plan). Texte d'origine : le filigrane l'est ; le nombre
   d'exports par mois ne l'est pas. C'est le poste de coût marginal RÉEL (Puppeteer,
   donc un Chromium par rendu), et il est aujourd'hui non borné. Le compteur
   existe déjà pour l'IA (`ai_usage_events`) : le même mécanisme s'applique, avec

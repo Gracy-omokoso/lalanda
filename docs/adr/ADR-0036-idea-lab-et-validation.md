@@ -347,10 +347,15 @@ appel ; vérificateur : réponse simulée citant un nombre absent → rejet. Web
 1. **Grille** : critères, poids (25/25/15/10/10/10/5), échelle 0–4, seuils de disponibilité
    (4 critères, 60 %) et niveaux (40, 70) : propositions non sourcées, à valider, idéalement
    avec un incubateur ou un conseiller qui accompagne des créateurs en RDC.
+   **27 oct. 2026 : V1 acceptée par la dirigeante.** Inspiration assumée, sans être une
+   norme : démarche de découverte client et de validation itérative (hypothèse → expérience →
+   mesure → conclusion), d'où le poids des critères « problème » et « disposition à payer ».
+   Tout ajustement après retours d'usage ou d'un incubateur passe par une grille V2, les idées
+   déjà notées gardant la V1.
 2. **Parcours** : VALIDATION par « plan validé **ou** idée notée » — ou exiger l'idée notée
    (plus juste, mais ferait reculer des organisations existantes) ?
 3. **Nombre d'idées** : 50 par organisation, borne technique ; faut-il en faire un droit
-   d'offre (docs/13) ?
+   d'offre (docs/13) ? **Reporté à l'arbitrage global par offre** (docs/13).
 4. **Conseiller** : lit les idées (`project.read`). Les preuves d'entretien peuvent contenir des
    informations sur des personnes : faut-il les lui masquer, comme le fichier clients ?
 5. **IA** : activée par défaut (rien n'est envoyé sans clic). Confirmer, et confirmer que le
