@@ -108,7 +108,8 @@ function escapeHtml(input: string): string {
     .replaceAll("'", '&#39;');
 }
 
-function formatValue(value: number, format: ReportLine['format'], currency: string): string {
+/** Rendu fr-FR d’une valeur du moteur — partagé avec le business plan (ADR-0037 § 7). */
+export function formatValue(value: number, format: ReportLine['format'], currency: string): string {
   if (!Number.isFinite(value)) return '—';
   if (format === 'percent') {
     return new Intl.NumberFormat('fr-FR', {

@@ -420,6 +420,25 @@ L'organisation est toujours celle de la session ; aucun corps ni paramètre ne l
 
 Codes : `400 INVALID_REQUEST` (corps `.strict()`), `403 PLAN_LIMIT_AI_MESSAGES` avant tout appel au modèle. L'explication rend `source: "llm" | "fallback"`, `cached`, `reason` et ses sources ; un nombre ou une source absents des faits font servir le texte déterministe. Tâche planifiée : `morning-brief.daily-email` (15 min, envoi à partir de 7 h à Kinshasa, au plus une fois par jour).
 
+## Business plan narratif — implémenté (ADR-0037)
+
+Le projet est résolu par `findScoped` (404 hors organisation). Le client n'envoie jamais un chiffre : les tableaux sont relus dans le plan figé rattaché.
+
+| Méthode et chemin | Permission | Quota |
+|---|---|---|
+| `GET /projects/:id/business-plan` | `project.read` | global |
+| `PUT /projects/:id/business-plan/plan` `{ planVersion: number \| null }` | `canvas.update` | global |
+| `PUT /projects/:id/business-plan/sections/:sectionId` `{ text }` | `canvas.update` | global |
+| `POST /projects/:id/business-plan/sections/:sectionId/draft` `{ notes? }` | `canvas.update` | IA (`AI_THROTTLE`) + quota mensuel `ai.business_plan` |
+| `POST …/sections/:sectionId/proposal/accept` · `…/proposal/discard` | `canvas.update` | global |
+| `GET /projects/:id/business-plan/versions` · `…/versions/:version` | `project.read` | global |
+| `POST /projects/:id/business-plan/versions` | `plan.approve` (séparation des tâches) | global |
+| `GET /projects/:id/business-plan/pdf[?version=N]` | `report.export` | exports PDF du mois |
+| `GET /business-plan` · `GET /business-plan/settings` | `project.read` | global |
+| `PUT /business-plan/settings` `{ aiEnabled }` | `organization.manage` | global |
+
+Codes : `400 BUSINESS_PLAN_UNKNOWN_SECTION`, `404 PLAN_NOT_FOUND`, `409 BUSINESS_PLAN_NO_FROZEN_PLAN`, `409 BUSINESS_PLAN_PENDING_AI`, `409 BUSINESS_PLAN_UNCHANGED`, `409 BUSINESS_PLAN_NO_PROPOSAL`, `409 SELF_APPROVAL_FORBIDDEN`, `409 BUSINESS_PLAN_PLAN_MISMATCH`, `403 PLAN_LIMIT_AI_MESSAGES` avant tout appel au modèle. Le brouillon rend `proposal` (ou `null`), `source`, `reason` (`rejetee`, `indisponible`, `desactivee_*`) et `detail` (motif d'un rejet, jamais le texte rejeté).
+
 ## Webhooks
 
 Paiements et intégrations utilisent signatures, tolérance temporelle, anti-rejeu, journal et traitement idempotent.

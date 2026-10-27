@@ -236,3 +236,21 @@ un paragraphe d'explication (`explain`) ou les actions de la semaine (`this_week
 - quota mensuel commun (`ai.morning_brief`), cache par empreinte des faits et par jour;
 - journal `morning_brief_ai_logs` (prompt d'agrégats, réponse, issue), expiration TTL;
 - désactivable par organisation et par la plateforme (`MORNING_BRIEF_AI=off`).
+
+## Business plan narratif (ADR-0037)
+
+Niveau 1 « Generate » seulement : `POST /projects/:id/business-plan/sections/:sectionId/draft`
+propose un brouillon d'UNE section, rangé à côté du texte et marqué « proposé par l'IA »
+jusqu'à acceptation par l'utilisateur.
+
+- contexte : section, questions guides, réponses de l'utilisateur, texte actuel, cartes du
+  Canvas utiles, hypothèses (`nature: "hypothese"`) et résultats de synthèse du plan figé
+  (`nature: "resultat_moteur"`) ; jamais l'organisation, une personne, ni les ventes;
+- contrôle commun factorisé dans `ai/generation-guard.ts` (aussi utilisé par le brief du
+  matin) : un nombre absent des données fournies, une source inconnue, un texte vide ou trop
+  long rejettent la réponse ; en plus, une hypothèse citée doit être écrite « hypothèse »;
+- un rejet n'enregistre rien et ne consomme pas le quota (`ai.business_plan`);
+- journal `business_plan_ai_logs` sans prompt ni réponse (empreintes, longueur, issue,
+  motif), expiration TTL (`BUSINESS_PLAN_AI_LOG_RETENTION_DAYS`, défaut 90);
+- désactivable par organisation (`PUT /business-plan/settings`) et par la plateforme
+  (`BUSINESS_PLAN_AI=off`).

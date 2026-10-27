@@ -47,6 +47,8 @@ export const PROJECT_TABS: ProjectTab[] = [
   { segment: 'realise', label: 'Réalisé' },
   { segment: 'canvas', label: 'Canvas' },
   { segment: 'objectifs', label: 'Objectifs' },
+  // ADR-0037 — le document narratif, après le Canvas qu'il prolonge et les objectifs.
+  { segment: 'business-plan', label: 'Business plan' },
 ];
 
 /** Premier segment sous `/projects/:id/` — '' sur la page racine du projet. */

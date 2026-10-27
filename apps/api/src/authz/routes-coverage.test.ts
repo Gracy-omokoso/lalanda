@@ -31,6 +31,8 @@ import { AuthProvidersController } from '../auth/auth-providers.controller.js';
 import { BillingController } from '../billing/billing.controller.js';
 import { BrandAssetImageController } from '../branding/brand-asset-image.controller.js';
 import { BrandingController } from '../branding/branding.controller.js';
+import { BusinessPlanOrgController } from '../business-plan/business-plan-org.controller.js';
+import { BusinessPlanController } from '../business-plan/business-plan.controller.js';
 import { CanvasController } from '../canvas/canvas.controller.js';
 import { EvaluateController } from '../evaluate/evaluate.controller.js';
 import { FiscalProfileController } from '../fiscal/fiscal-profile.controller.js';
@@ -143,6 +145,9 @@ const CONTROLEURS = [
   MorningBriefController,
   // ADR-0032 — GROW (santé, indicateurs investisseurs, parcours).
   GrowController,
+  // ADR-0037 — business plan narratif (BUILD).
+  BusinessPlanController,
+  BusinessPlanOrgController,
 ];
 
 /**
@@ -572,6 +577,22 @@ describe('couverture des routes par le RBAC', () => {
       'MorningBriefController.getPreferences': ['analytics.read'],
       'MorningBriefController.putPreferences': ['analytics.read'],
       'MorningBriefController.putSettings': ['organization.manage'],
+      // ADR-0037 — business plan narratif : rédiger prolonge le Canvas
+      // (`canvas.update`), valider fige une version (`plan.approve`, séparation
+      // des tâches), exporter suit le dossier financier (`report.export`).
+      'BusinessPlanController.get': ['project.read'],
+      'BusinessPlanController.putPlan': ['canvas.update'],
+      'BusinessPlanController.putSection': ['canvas.update'],
+      'BusinessPlanController.draft': ['canvas.update'],
+      'BusinessPlanController.accept': ['canvas.update'],
+      'BusinessPlanController.discard': ['canvas.update'],
+      'BusinessPlanController.listVersions': ['project.read'],
+      'BusinessPlanController.getVersion': ['project.read'],
+      'BusinessPlanController.validate': ['plan.approve'],
+      'BusinessPlanController.downloadPdf': ['report.export'],
+      'BusinessPlanOrgController.list': ['project.read'],
+      'BusinessPlanOrgController.getSettings': ['project.read'],
+      'BusinessPlanOrgController.putSettings': ['organization.manage'],
     };
     for (const [cle, actions] of Object.entries(attendu)) {
       const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle);

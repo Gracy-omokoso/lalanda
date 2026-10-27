@@ -153,6 +153,14 @@ Côté plateforme, comme `sales.*` : `crm.read` sous accès délégué pour le
 super-administrateur et le support, `crm.manage` sous accès délégué pour le seul
 super-administrateur. Aucune n'est un interdit absolu.
 
+**Business plan narratif (ADR-0037) — aucune action nouvelle.** Lire relève de
+`project.read` ; rédiger, rattacher le plan figé et demander un brouillon à l'IA, de
+`canvas.update` (le document prolonge par écrit le modèle économique) ; valider une version,
+de `plan.approve`, avec la séparation des tâches de R2 (le dernier auteur du document ne le
+valide pas, sauf approbateur unique, marqué) ; exporter le PDF, de `report.export` ; régler
+l'IA du business plan, d'`organization.manage`. Actions dédiées : décision ouverte n° 3
+d'ADR-0037.
+
 ## Règles critiques
 
 - Un propriétaire ne peut pas retirer le dernier propriétaire sans transfert.

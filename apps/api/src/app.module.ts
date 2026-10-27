@@ -10,6 +10,7 @@ import { AuthModule } from './auth/auth.module.js';
 import { AuthzModule } from './authz/authz.module.js';
 import { BillingModule } from './billing/billing.module.js';
 import { BrandingModule } from './branding/branding.module.js';
+import { BusinessPlanModule } from './business-plan/business-plan.module.js';
 import { CrmModule } from './crm/crm.module.js';
 import { CanvasModule } from './canvas/canvas.module.js';
 import { DatabaseModule } from './database/database.module.js';
@@ -119,6 +120,8 @@ import { TreasuryModule } from './treasury/treasury.module.js';
     MorningBriefModule,
     // ADR-0032 — GROW : lit BUILD et RUN, n'écrit que dans `grow_profiles`.
     GrowModule,
+    // ADR-0037 — business plan narratif (BUILD) : lit le plan figé et le Canvas.
+    BusinessPlanModule,
   ],
   controllers: [HealthController, EvaluateController],
 })

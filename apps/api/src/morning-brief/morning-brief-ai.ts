@@ -26,11 +26,8 @@ import {
   type MorningBrief,
 } from '@lalanda/engine';
 
-import {
-  chiffresNonAutorises,
-  construireChiffresAutorises,
-  type SourceChiffree,
-} from '../ai/lala-nombres.js';
+import { motifDeRejetTextes, sansChevrons, sourcesVerifiees } from '../ai/generation-guard.js';
+import { construireChiffresAutorises, type SourceChiffree } from '../ai/lala-nombres.js';
 
 export const MORNING_BRIEF_PROMPT_VERSION = 'brief-1.0.0';
 /** Même modèle que Lala et les actions correctives (ADR-0008). */
@@ -92,7 +89,7 @@ export interface BriefAiPayload {
 
 /** Retire les chevrons : aucune chaîne ne doit pouvoir fermer le bloc de données. */
 export function nettoie(texte: string): string {
-  return texte.replace(/[<>]/g, ' ');
+  return sansChevrons(texte);
 }
 
 export function libellePeriode(brief: MorningBrief): string {
@@ -226,15 +223,7 @@ export function promptUtilisateur(intent: BriefIntent, payload: BriefAiPayload):
 // ── Lecture et contrôle de la réponse ───────────────────────────────────────
 
 function sourcesDe(value: unknown, connues: ReadonlySet<string>): string[] {
-  if (!Array.isArray(value) || value.length === 0) throw new Error('sources absentes');
-  const out: string[] = [];
-  for (const s of value) {
-    if (typeof s !== 'string' || !connues.has(s)) {
-      throw new Error(`source inconnue : ${String(s).slice(0, 60)}`);
-    }
-    if (!out.includes(s)) out.push(s);
-  }
-  return out;
+  return sourcesVerifiees(value, connues);
 }
 
 /** Lit le JSON du modèle. Lève sur toute forme inattendue. */
@@ -270,14 +259,11 @@ export function motifDeRejet(
   autorises: ReadonlySet<string>,
 ): string | null {
   const max = intent === 'explain' ? MAX_CARACTERES_PARAGRAPHE : MAX_CARACTERES_ACTION;
-  for (const item of answer.items) {
-    const t = item.texte.trim();
-    if (t === '') return 'texte vide';
-    if (t.length > max) return `texte trop long (${t.length} > ${max})`;
-    const fautifs = chiffresNonAutorises(t, autorises);
-    if (fautifs.length > 0) return `chiffres absents des faits : ${fautifs.join(', ')}`;
-  }
-  return null;
+  return motifDeRejetTextes(
+    answer.items.map((i) => i.texte),
+    autorises,
+    max,
+  );
 }
 
 // ── Réponse déterministe ─────────────────────────────────────────────────────
