@@ -9,7 +9,7 @@ export type Currency = (typeof CURRENCIES)[number];
 /** Sous-schéma Zod pour la valeur d'un montant. */
 export const MoneySchema = z.object({
   /** Montant en plus petite unité (centimes USD, francs CDF entiers). */
-  amount: z.number().int().finite(),
+  amount: z.number().int(),
   currency: z.enum(CURRENCIES),
 });
 

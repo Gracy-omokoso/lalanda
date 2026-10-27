@@ -35,7 +35,6 @@ const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
  */
 function edefUrl(nom: string) {
   return z
-    .string()
     .url(`${nom} doit être une URL`)
     .refine(
       (v) => {
@@ -44,7 +43,7 @@ function edefUrl(nom: string) {
           u.protocol === 'https:' || (u.protocol === 'http:' && LOOPBACK_HOSTS.has(u.hostname))
         );
       },
-      { message: `${nom} doit être en https (http accepté seulement vers localhost)` },
+      { error: `${nom} doit être en https (http accepté seulement vers localhost)` },
     )
     .transform((v) => v.replace(/\/+$/, ''));
 }
@@ -52,9 +51,9 @@ function edefUrl(nom: string) {
 /** Champs `DGI_*`, partagés par `ApiEnvSchema` et `DgiEnvSchema`. */
 const DgiEnvShape = {
   /** Environnement de test de la DGI (compte développeur). */
-  DGI_EDEF_TEST_URL: edefUrl('DGI_EDEF_TEST_URL').default('https://developper.dgirdc.cd/edef'),
+  DGI_EDEF_TEST_URL: edefUrl('DGI_EDEF_TEST_URL').prefault('https://developper.dgirdc.cd/edef'),
   /** Production DGI — n'est appelée que si `DGI_PRODUCTION_ENABLED=true`. */
-  DGI_EDEF_PRODUCTION_URL: edefUrl('DGI_EDEF_PRODUCTION_URL').default('https://edef.dgirdc.cd'),
+  DGI_EDEF_PRODUCTION_URL: edefUrl('DGI_EDEF_PRODUCTION_URL').prefault('https://edef.dgirdc.cd'),
   /**
    * ISF de test. Format libre : la DGI n'en publie pas pour son environnement de
    * test, on ne lui en invente pas (ADR-0021 §5).
@@ -110,7 +109,7 @@ export function checkDgiEnv(
 ): void {
   if (env.DGI_PRODUCTION_ENABLED && env.DGI_ISF_PRODUCTION === undefined) {
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       path: ['DGI_ISF_PRODUCTION'],
       message:
         'DGI_PRODUCTION_ENABLED=true exige DGI_ISF_PRODUCTION : la production DGI ne ' +
@@ -121,7 +120,7 @@ export function checkDgiEnv(
     for (const cle of ['DGI_EDEF_TEST_URL', 'DGI_EDEF_PRODUCTION_URL'] as const) {
       if (!env[cle].startsWith('https://')) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           path: [cle],
           message: `${cle} doit être en https en production.`,
         });
@@ -145,20 +144,20 @@ export type DgiEnv = z.infer<typeof DgiEnvSchema>;
 /** Schéma API (NestJS) — voir apps/api. */
 export const ApiEnvSchema = CommonEnvSchema.extend({
   API_PORT: z.coerce.number().int().positive().default(3001),
-  API_URL: z.string().url().default('http://localhost:3001'),
+  API_URL: z.url().default('http://localhost:3001'),
   /** URL du front, utilisée pour whitelister CORS. */
-  WEB_URL: z.string().url().default('http://localhost:3000'),
+  WEB_URL: z.url().default('http://localhost:3000'),
 
   MONGODB_URI: z.string().min(1),
   MONGODB_DB: z.string().default('lalanda'),
 
   // Requis à partir des exports asynchrones (files d'attente) — optionnel tant que
   // rien ne le consomme (S16a : aucun worker Redis en production).
-  REDIS_URL: z.string().url().optional(),
+  REDIS_URL: z.url().optional(),
 
   // Requis à partir des exports asynchrones (stockage des fichiers générés) —
   // optionnels tant que les rapports sont générés en streaming (S16a).
-  S3_ENDPOINT: z.string().url().optional(),
+  S3_ENDPOINT: z.url().optional(),
   S3_REGION: z.string().default('us-east-1'),
   S3_ACCESS_KEY: z.string().min(1).optional(),
   S3_SECRET_KEY: z.string().min(1).optional(),
@@ -168,7 +167,7 @@ export const ApiEnvSchema = CommonEnvSchema.extend({
   S3_FORCE_PATH_STYLE: z.coerce.boolean().default(true),
 
   AUTH_SECRET: z.string().min(32, 'AUTH_SECRET doit faire au moins 32 caractères'),
-  AUTH_URL: z.string().url(),
+  AUTH_URL: z.url(),
   /**
    * Vérification d'email bloquante à l'inscription (better-auth `requireEmailVerification`).
    * Défaut `false` en dev (aucun SMTP configuré) ; à passer à `true` en production
@@ -283,7 +282,7 @@ export const ApiEnvSchema = CommonEnvSchema.extend({
    * (brief §9-4, ADR-0013 § Conséquences).
    */
   SECRETS_MASTER_KEY: z.string().refine((v) => Buffer.from(v, 'base64').length === 32, {
-    message:
+    error:
       'SECRETS_MASTER_KEY doit décoder vers exactement 32 octets. ' +
       'Générer : openssl rand -base64 32',
   }),
@@ -299,7 +298,7 @@ export const ApiEnvSchema = CommonEnvSchema.extend({
   SECRETS_MASTER_KEY_PREVIOUS: z
     .string()
     .refine((v) => Buffer.from(v, 'base64').length === 32, {
-      message: 'SECRETS_MASTER_KEY_PREVIOUS doit décoder vers exactement 32 octets.',
+      error: 'SECRETS_MASTER_KEY_PREVIOUS doit décoder vers exactement 32 octets.',
     })
     .optional(),
 
@@ -313,8 +312,8 @@ export type ApiEnv = z.infer<typeof ApiEnvSchema>;
 /** Schéma Web (Next.js) — uniquement les variables client (`NEXT_PUBLIC_*`) et runtime SSR. */
 export const WebEnvSchema = CommonEnvSchema.extend({
   WEB_PORT: z.coerce.number().int().positive().default(3000),
-  WEB_URL: z.string().url().default('http://localhost:3000'),
-  NEXT_PUBLIC_API_URL: z.string().url(),
+  WEB_URL: z.url().default('http://localhost:3000'),
+  NEXT_PUBLIC_API_URL: z.url(),
 });
 
 export type WebEnv = z.infer<typeof WebEnvSchema>;
