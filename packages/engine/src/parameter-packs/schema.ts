@@ -31,7 +31,7 @@ const SlugSchema = z
  */
 const ParamSchema = z
   .object({
-    valeur: z.number().finite(),
+    valeur: z.number(),
     unite: z.string().optional(),
     aide: z.string().optional(),
     source: z.string().optional(),

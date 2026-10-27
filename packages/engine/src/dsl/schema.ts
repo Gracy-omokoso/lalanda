@@ -32,9 +32,9 @@ const DriverSchema = z
     label: z.string().min(1).optional(),
     type: DriverTypeSchema.default('number'),
     devise: CurrencySchema.optional(),
-    defaut: z.number().finite().optional(),
-    min: z.number().finite().optional(),
-    max: z.number().finite().optional(),
+    defaut: z.number().optional(),
+    min: z.number().optional(),
+    max: z.number().optional(),
     unite: z.string().optional(),
     aide: z.string().optional(),
   })
@@ -152,11 +152,11 @@ const ImmobilisationSchema = z
     /** Catégorie SYSCOHADA — détermine la durée par défaut. */
     categorie: CategorieImmobilisationSchema,
     /** Montant HT amortissable (base d'amortissement = montant_ht − valeur_residuelle). */
-    montant_ht: z.number().finite().nonnegative(),
+    montant_ht: z.number().nonnegative(),
     /** Date d'acquisition au format YYYY-MM-DD (utilisée pour le prorata temporis). */
     date_acquisition: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'date invalide (attendu YYYY-MM-DD)'),
     /** Valeur résiduelle en fin de vie (optionnel, défaut = 0). */
-    valeur_residuelle: z.number().finite().nonnegative().optional(),
+    valeur_residuelle: z.number().nonnegative().optional(),
     /** Surcharge explicite de la durée standard SYSCOHADA (années). */
     duree_annees: z.number().int().positive().max(50).optional(),
   })
