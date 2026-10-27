@@ -209,6 +209,7 @@ l'entrepreneur (Canvas, réponses), inutile à l'exploitation. Expiration par in
 | `GET /projects/:id/business-plan/versions` · `…/versions/:version` | `project.read` |
 | `POST /projects/:id/business-plan/versions` (valider) | `plan.approve` (séparation des tâches) |
 | `GET /projects/:id/business-plan/pdf[?version=N]` | `report.export` |
+| `GET /business-plan` (projets et état de leur document) | `project.read` |
 | `GET /business-plan/settings` · `PUT /business-plan/settings` | `project.read` · `organization.manage` |
 
 `canvas.update` est l'action « rédiger le modèle économique » : le business plan narratif en

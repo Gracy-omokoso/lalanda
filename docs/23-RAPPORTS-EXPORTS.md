@@ -184,6 +184,20 @@ Prévu après stabilisation des rapports PDF/Excel. Le format vise les dossiers 
 
 Structure configurable : présentation, promoteurs, Canvas, marché, hypothèses, financement demandé, états, ratios, risques, garanties et annexes. Les exigences d’une banque spécifique sont des templates versionnés.
 
+## Business plan narratif (ADR-0037)
+
+`GET /projects/:id/business-plan/pdf[?version=N]` : neuf sections rédigées par l'entrepreneur
+(résumé, problème et solution, marché et concurrence, modèle économique, stratégie
+commerciale, organisation et équipe, plan financier, besoins de financement, risques), les
+hypothèses titrées comme telles et les tableaux du moteur relus dans le **plan figé
+rattaché**, sans recalcul. Page de garde et pied de page citent la version du document, la
+version du plan financier, sa date de validation et son **empreinte SHA-256**. Une section
+issue d'une proposition de l'IA acceptée porte « Rédaction assistée par l'IA, relue et
+acceptée ». Même rendu que le dossier financier (`PdfRenderingService`, JavaScript et réseau
+coupés, CSP), polices Inter intégrées en `data:`, date de métadonnées fixée à la validation
+pour une version validée, filigrane et quota d'exports de l'offre, journal `report.export`
+strict (`kind: 'business_plan'`). Export Word : décision ouverte n° 5 d'ADR-0037.
+
 ## Sécurité
 
 Exports générés en tâche isolée, analysés, stockés chiffrés, accessibles par URL courte signée, expirables et journalisés. Les modèles empêchent l’injection de formules depuis des entrées utilisateur.
