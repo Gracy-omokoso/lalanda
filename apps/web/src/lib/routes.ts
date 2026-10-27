@@ -56,6 +56,8 @@ export const PROTECTED_PREFIXES = [
   // ADR-0032 — espace Croissance (GROW). Session ET organisation active, comme
   // `/ventes` ; seule la première est vue ici.
   '/croissance',
+  // ADR-0036 — Idea Lab (BUILD). Session ET organisation active, comme `/croissance`.
+  '/idees',
 ] as const;
 
 /**

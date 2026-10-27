@@ -41,7 +41,7 @@ const ids = (items: { id: string }[]): string[] => items.map((i) => i.id);
 describe('entrées et ordre', () => {
   it('CRM (ADR-0035) : dans RUN, après le catalogue, pour qui détient crm.read', () => {
     const avecCrm = ids(entreesVisibles([...LECTEUR, 'crm.read']));
-    expect(avecCrm.slice(2, 8)).toEqual([
+    expect(avecCrm.slice(4, 10)).toEqual([
       'factures',
       'devis',
       'encaissements',
@@ -54,6 +54,8 @@ describe('entrées et ordre', () => {
 
   it('suit la trajectoire BUILD → RUN → GROW → Organisation, pour un propriétaire', () => {
     expect(ids(entreesVisibles(PROPRIETAIRE))).toEqual([
+      'idees',
+      'validation',
       'plans',
       'business-plan',
       'factures',
@@ -93,8 +95,19 @@ describe('entrées et ordre', () => {
     ]);
   });
 
+  it('BUILD : Idées et Validation (ADR-0036) avant les plans financiers', () => {
+    expect(NAV_ITEMS.filter((i) => i.group === 'build').map((i) => i.href)).toEqual([
+      '/idees',
+      '/idees/validation',
+      '/projects',
+      '/business-plan',
+    ]);
+  });
+
   it('permissions inconnues : seules les entrées sans condition (pas de clignotement)', () => {
     expect(ids(entreesVisibles(null))).toEqual([
+      'idees',
+      'validation',
       'plans',
       'business-plan',
       'pilotage',
@@ -162,6 +175,10 @@ describe('choix des modules (mise en route, étape 4)', () => {
 describe('entrée active', () => {
   const tout = entreesVisibles(PROPRIETAIRE);
   it.each([
+    ['/idees', 'idees'],
+    ['/idees/0123456789abcdef01234567', 'idees'],
+    ['/idees/0123456789abcdef01234567/validation', 'idees'],
+    ['/idees/validation', 'validation'],
     ['/projects', 'plans'],
     ['/projects/abc/realise', 'plans'],
     ['/business-plan', 'business-plan'],

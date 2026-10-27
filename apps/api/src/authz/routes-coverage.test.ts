@@ -39,6 +39,7 @@ import { FiscalProfileController } from '../fiscal/fiscal-profile.controller.js'
 import { NormalizedInvoicingController } from '../fiscal/normalized-invoicing.controller.js';
 import { GrowController } from '../grow/grow.controller.js';
 import { HealthController } from '../health/health.controller.js';
+import { IdeaLabController } from '../idea-lab/idea-lab.controller.js';
 import { LegalController } from '../legal/legal.controller.js';
 import { MorningBriefController } from '../morning-brief/morning-brief.controller.js';
 import { ObjectivesController } from '../objectives/objectives.controller.js';
@@ -148,6 +149,8 @@ const CONTROLEURS = [
   // ADR-0037 — business plan narratif (BUILD).
   BusinessPlanController,
   BusinessPlanOrgController,
+  // ADR-0036 — Idea Lab et validation d'idée.
+  IdeaLabController,
 ];
 
 /**
@@ -593,6 +596,21 @@ describe('couverture des routes par le RBAC', () => {
       'BusinessPlanOrgController.list': ['project.read'],
       'BusinessPlanOrgController.getSettings': ['project.read'],
       'BusinessPlanOrgController.putSettings': ['organization.manage'],
+      // ADR-0036 — Idea Lab : lecture `project.read` (tous les rôles), écriture
+      // `canvas.update` (ceux qui écrivent déjà le Canvas) ; aucune action nouvelle.
+      'IdeaLabController.list': ['project.read'],
+      'IdeaLabController.get': ['project.read'],
+      'IdeaLabController.create': ['canvas.update'],
+      'IdeaLabController.update': ['canvas.update'],
+      'IdeaLabController.archive': ['canvas.update'],
+      'IdeaLabController.rate': ['canvas.update'],
+      'IdeaLabController.clearRating': ['canvas.update'],
+      'IdeaLabController.addExperiment': ['canvas.update'],
+      'IdeaLabController.updateExperiment': ['canvas.update'],
+      'IdeaLabController.deleteExperiment': ['canvas.update'],
+      'IdeaLabController.promote': ['canvas.update'],
+      'IdeaLabController.assist': ['canvas.update'],
+      'IdeaLabController.putSettings': ['organization.manage'],
     };
     for (const [cle, actions] of Object.entries(attendu)) {
       const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle);

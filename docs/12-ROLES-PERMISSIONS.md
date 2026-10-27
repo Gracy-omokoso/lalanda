@@ -160,6 +160,10 @@ de `plan.approve`, avec la séparation des tâches de R2 (le dernier auteur du d
 valide pas, sauf approbateur unique, marqué) ; exporter le PDF, de `report.export` ; régler
 l'IA du business plan, d'`organization.manage`. Actions dédiées : décision ouverte n° 3
 d'ADR-0037.
+L'Idea Lab ([ADR-0036](adr/ADR-0036-idea-lab-et-validation.md) § 6) **n'ajoute aucune
+action** : lire une idée relève de `project.read`, la modifier (fiche, notes, expériences,
+promotion vers un projet, assistance IA) de `canvas.update`, régler son IA de
+`organization.manage`. Les vingt-quatre actions et la matrice sont inchangées.
 
 ## Règles critiques
 

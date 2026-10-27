@@ -71,6 +71,13 @@ describe('isProtectedPath (S20b)', () => {
     expect(isProtectedPath('/croissance-externe')).toBe(false);
   });
 
+  it('protège l’Idea Lab, racine comme sous-routes (ADR-0036)', () => {
+    for (const path of ['/idees', '/idees/validation', '/idees/abc/validation']) {
+      expect(isProtectedPath(path)).toBe(true);
+    }
+    expect(isProtectedPath('/idees-recues')).toBe(false);
+  });
+
   it('protège les espaces existants, racine comme sous-routes', () => {
     for (const path of [
       '/projects',

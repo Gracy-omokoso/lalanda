@@ -417,10 +417,32 @@ date du calcul est un paramètre) :
   (`GROW_SCORING_V1`), pondérées selon le stade (`GROW_WEIGHTS_V1`), score indisponible sous
   2 axes ou 60 % du poids ; trois risques (`GROW_RISK_RULES_V1`) et trois actions, chacun
   avec sa preuve (donnée, valeur, seuil, règle) ;
-- `suggestJourneyStage` — étape suggérée par règles explicites (`GROW_JOURNEY_RULES_V1`),
-  conditions rendues remplies / non remplies / inconnues, checklists `GROW_CHECKLISTS_V1`.
+- `suggestJourneyStage` — étape suggérée par règles explicites (`GROW_JOURNEY_RULES_V2`
+  depuis ADR-0036 : VALIDATION par plan validé **ou** idée notée de l'Idea Lab ; seuils de
+  V1 inchangés), conditions rendues remplies / non remplies / inconnues, checklists
+  `GROW_CHECKLISTS_V2`.
 
 Arithmétique des ventes exacte (entiers `bigint`, réutilise l'arithmétique interne
 d'`invoice-totals` sans la modifier) ; ratios et notes arrondis explicitement. Tests :
 cas chiffrés, cas limites et propriétés sur générateur déterministe (bornes et monotonie
 des barèmes, publication du score, invariance par permutation, avoir qui annule sa facture).
+
+## Idea Lab et validation d'idée (ADR-0036)
+
+Module `packages/engine/src/idea-lab/`, versionné à part (`IDEA_LAB_VERSION = '1.0.0'`) ; il
+ne touche ni `ENGINE_VERSION` ni `INVOICE_TOTALS_VERSION`. Fonctions pures :
+
+- `computeValidationScore` — sur la grille versionnée `IDEA_VALIDATION_GRID_V1` (sept
+  critères, poids 25/25/15/10/10/10/5, notes 0–4 **saisies avec une preuve**) :
+  `100 × Σ(poids × note) ÷ (4 × Σ poids renseignés)`, arrondi demi vers le haut, en entiers ;
+  indisponible (`CRITERES_INSUFFISANTS`) sous 4 critères ou 60 % du poids ; le critère
+  « marché » n'est évaluable qu'avec une taille de marché **sourcée** ; signal
+  `CRITERE_CONTREDIT` pour une note 0 ;
+- `summarizeExperiment` / `experimentChecklist` — taux des expériences (entretiens, page
+  d'attente, pré-commande) en fraction exacte et ratio à 4 décimales, seuil atteint en
+  comparaison entière, écart à la conclusion déclarée montré sans correction ;
+- `compareIdeas` — classement (une idée au score indisponible n'est jamais classée devant une
+  idée notée) ; `ideaLabJourneyFacts` — faits remis au parcours GROW.
+
+Aucune taille de marché n'est dérivée ni convertie. Tests : cas chiffrés, seuils exacts,
+propriétés (bornes, écart à la valeur exacte ≤ 0,5, permutation, monotonie).

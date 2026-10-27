@@ -6,7 +6,7 @@
 // le contrôle.
 
 import {
-  GROW_CHECKLISTS_V1,
+  GROW_CHECKLISTS_V2,
   JOURNEY_STAGES,
   kinshasaDateOf,
   type JourneyStage,
@@ -70,10 +70,10 @@ function toView(doc: ProfileLean | null): GrowProfileView {
 
 /** Points de checklist qui se cochent à la main (les autres viennent des données). */
 const MANUAL_ITEMS: ReadonlySet<string> = new Set(
-  JOURNEY_STAGES.flatMap((s) => GROW_CHECKLISTS_V1[s].filter((i) => !i.auto).map((i) => i.id)),
+  JOURNEY_STAGES.flatMap((s) => GROW_CHECKLISTS_V2[s].filter((i) => !i.auto).map((i) => i.id)),
 );
 const AUTO_ITEMS: ReadonlySet<string> = new Set(
-  JOURNEY_STAGES.flatMap((s) => GROW_CHECKLISTS_V1[s].filter((i) => i.auto).map((i) => i.id)),
+  JOURNEY_STAGES.flatMap((s) => GROW_CHECKLISTS_V2[s].filter((i) => i.auto).map((i) => i.id)),
 );
 
 @Injectable()

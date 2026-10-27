@@ -438,6 +438,21 @@ Le projet est résolu par `findScoped` (404 hors organisation). Le client n'envo
 | `PUT /business-plan/settings` `{ aiEnabled }` | `organization.manage` | global |
 
 Codes : `400 BUSINESS_PLAN_UNKNOWN_SECTION`, `404 PLAN_NOT_FOUND`, `409 BUSINESS_PLAN_NO_FROZEN_PLAN`, `409 BUSINESS_PLAN_PENDING_AI`, `409 BUSINESS_PLAN_UNCHANGED`, `409 BUSINESS_PLAN_NO_PROPOSAL`, `409 SELF_APPROVAL_FORBIDDEN`, `409 BUSINESS_PLAN_PLAN_MISMATCH`, `403 PLAN_LIMIT_AI_MESSAGES` avant tout appel au modèle. Le brouillon rend `proposal` (ou `null`), `source`, `reason` (`rejetee`, `indisponible`, `desactivee_*`) et `detail` (motif d'un rejet, jamais le texte rejeté).
+## Idea Lab et validation d'idée — implémenté (ADR-0036)
+
+Organisation de la session ; une idée d'une autre organisation répond `404`. Aucune action RBAC nouvelle.
+
+| Méthode et chemin | Permission | Quota |
+|---|---|---|
+| `GET /idea-lab/ideas` (idées, comparaison du moteur, grille, état de l'IA) · `GET /idea-lab/ideas/:id` (fiche, score, expériences) | `project.read` | global |
+| `POST /idea-lab/ideas` · `PUT /idea-lab/ideas/:id` (fiche complète) · `PUT …/:id/archived` `{ archived }` | `canvas.update` | global |
+| `PUT /idea-lab/ideas/:id/ratings/:criterionId` `{ note, proof, experimentIds }` · `DELETE` | `canvas.update` | global |
+| `POST /idea-lab/ideas/:id/experiments` · `PUT` · `DELETE …/experiments/:experimentId` | `canvas.update` | global |
+| `POST /idea-lab/ideas/:id/promote` `{ projectId }` | `canvas.update` | global |
+| `POST /idea-lab/ideas/:id/assist` `{ intent: "reformuler" \| "questions_entretien" \| "hypotheses" }` | `canvas.update` | IA (`AI_THROTTLE`) + quota mensuel `ai.idea_lab` |
+| `PUT /idea-lab/settings` `{ aiEnabled }` | `organization.manage` | global |
+
+Codes : `400 INVALID_REQUEST` (corps `.strict()` ; taille de marché sans source ; note sans preuve ; expérience terminée sans conclusion), `400 EXPERIMENT_NOT_FOUND` (preuve citant une expérience inconnue), `404 IDEA_NOT_FOUND` · `CRITERION_NOT_FOUND` · `PROJECT_NOT_FOUND`, `403 IDEA_LIMIT_REACHED` (50 idées) · `EXPERIMENT_LIMIT_REACHED` (30), `409 IDEA_CONFLICT` (écriture concurrente), `403 PLAN_LIMIT_AI_MESSAGES` avant tout appel au modèle. L'assistance rend `source: "llm" | "fallback"` et `reason` ; un nombre absent de la fiche fait servir le texte déterministe. La promotion n'ajoute que des cartes de texte au Canvas (`added`, `present`, `ignored`, `empty`) ; un nouveau projet se crée par `POST /projects`.
 
 ## Webhooks
 

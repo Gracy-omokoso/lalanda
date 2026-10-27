@@ -21,6 +21,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
 import { ActualPeriod } from '../actuals/actual-period.schema.js';
+import { IdeaLabService } from '../idea-lab/idea-lab.service.js';
 import { FinancialPlan } from '../plans/plan.schema.js';
 import { Project } from '../projects/project.schema.js';
 import { CatalogItem } from '../sales/catalog-item.schema.js';
@@ -57,6 +58,8 @@ export class GrowReaderService {
     @InjectModel(CatalogItem.name) private readonly catalog: Model<CatalogItem>,
     @Inject(GrowProfileService) private readonly profiles: GrowProfileService,
     @Inject(TreasuryAccountsService) private readonly treasury: TreasuryAccountsService,
+    // ADR-0036 § 5 : faits de l'Idea Lab pour le parcours, lecture seule.
+    @Inject(IdeaLabService) private readonly ideaLab: IdeaLabService,
   ) {}
 
   /** Projets de l'organisation (lecture seule). */
@@ -72,7 +75,7 @@ export class GrowReaderService {
     const asOf = kinshasaDateOf(now.toISOString())!;
     const since = new Date(now.getTime() - SALES_HISTORY_DAYS * 24 * 60 * 60 * 1000);
 
-    const [profile, projects, invoices, approvedPlans, activeCatalogItems, accounts] =
+    const [profile, projects, invoices, approvedPlans, activeCatalogItems, accounts, ideaLab] =
       await Promise.all([
         this.profiles.get(orgId),
         this.listProjects(orgId),
@@ -102,6 +105,9 @@ export class GrowReaderService {
         this.catalog.countDocuments({ organizationId: orgId, active: true }),
         // ADR-0034 : soldes des comptes, calculés par le moteur `treasury`.
         this.treasury.list(orgId),
+        // ADR-0036 § 5 : un Idea Lab illisible laisse ses points « inconnus », il
+        // ne fait pas échouer le parcours.
+        this.ideaLab.journeyFacts(orgId).catch(() => null),
       ]);
 
     const ref = pickReferenceProject(projects, profile.referenceProjectId);
@@ -147,6 +153,7 @@ export class GrowReaderService {
       activeCatalogItems,
       declaredStage: profile.declaredStage,
       checklistDone: profile.checklistDone,
+      ideaLab,
     });
     const health = computeHealthScore(indicators, journey.retenue);
     return { asOf, profile, indicators, journey, health };
