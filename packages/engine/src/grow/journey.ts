@@ -7,6 +7,7 @@
 // FUNDRAISING n'est jamais suggérée : c'est une intention, pas un fait mesurable.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import type { IdeaLabJourneyFacts } from '../idea-lab/compute.js';
 import type { GrowIndicatorsResult } from './types.js';
 
 export const JOURNEY_STAGES = [
@@ -63,6 +64,16 @@ export const GROW_JOURNEY_RULES_V1 = Object.freeze({
   margeNetteScale: 0,
 });
 
+/**
+ * Règles d'étape V2 (ADR-0036 § 5, amendement d'ADR-0032 § 5) : seuils de V1
+ * inchangés ; VALIDATION est atteinte par un plan validé OU une idée de l'Idea
+ * Lab dont le score de validation est disponible.
+ */
+export const GROW_JOURNEY_RULES_V2 = Object.freeze({
+  ...GROW_JOURNEY_RULES_V1,
+  version: 'GROW_JOURNEY_RULES_V2',
+});
+
 export type ConditionState = 'remplie' | 'non_remplie' | 'inconnue';
 
 export interface JourneyCondition {
@@ -86,6 +97,11 @@ export interface JourneyInputs {
   declaredStage: JourneyStage | null;
   /** Points de checklist cochés à la main. */
   checklistDone: readonly string[];
+  /**
+   * Faits de l'Idea Lab (ADR-0036 § 5) ; `null` ou absent = illisibles : les
+   * points automatiques qui en dépendent sont « inconnus », jamais « faits ».
+   */
+  ideaLab?: IdeaLabJourneyFacts | null;
 }
 
 function pct(v: number): string {
@@ -96,9 +112,10 @@ function cmp(ok: boolean | null): ConditionState {
   return ok === null ? 'inconnue' : ok ? 'remplie' : 'non_remplie';
 }
 
-/** Conditions de chaque étape, évaluées sur les faits (table GROW_JOURNEY_RULES_V1). */
+/** Conditions de chaque étape, évaluées sur les faits (table GROW_JOURNEY_RULES_V2). */
 export function stageConditions(input: JourneyInputs): Record<JourneyStage, JourneyCondition[]> {
-  const R = GROW_JOURNEY_RULES_V1;
+  const R = GROW_JOURNEY_RULES_V2;
+  const scoredIdeas = input.ideaLab?.scoredIdeas ?? null;
   const { faits, indicateurs } = input.indicators;
   const salesReadable = faits.devise !== null;
   const clients = salesReadable ? faits.clientsDistincts12Mois : null;
@@ -141,11 +158,15 @@ export function stageConditions(input: JourneyInputs): Record<JourneyStage, Jour
     IDEA: [],
     VALIDATION: [
       {
-        code: 'PLAN_VALIDE',
-        libelle: 'Plan financier validé',
-        etat: cmp(input.approvedPlans >= 1),
-        valeur: String(input.approvedPlans),
-        seuil: '≥ 1',
+        // ADR-0036 § 5 : « ou » — aucune organisation qui l'atteignait par un plan
+        // validé ne recule. Idea Lab illisible : seul le plan décide.
+        code: 'VALIDATION_ENGAGEE',
+        libelle: 'Plan financier validé, ou idée au score de validation disponible',
+        etat: cmp(input.approvedPlans >= 1 || (scoredIdeas !== null && scoredIdeas >= 1)),
+        valeur:
+          `plans validés : ${input.approvedPlans} ; idées notées : ` +
+          (scoredIdeas === null ? 'inconnu' : String(scoredIdeas)),
+        seuil: '≥ 1 plan validé ou ≥ 1 idée notée',
       },
     ],
     MVP: [
@@ -218,10 +239,24 @@ const indAvailable =
   (i) =>
     codes.every((c) => i.indicators.indicateurs[c].disponible);
 
-/** Checklists par étape, versionnées (ADR-0032 § 5). Identifiants stables. */
-export const GROW_CHECKLISTS_V1: Readonly<Record<JourneyStage, readonly ChecklistItemDef[]>> = {
+/** Fait de l'Idea Lab, ou `null` s'il est illisible. */
+const ideaFact =
+  (pick: (f: IdeaLabJourneyFacts) => boolean): AutoCheck =>
+  (i) =>
+    i.ideaLab ? pick(i.ideaLab) : null;
+
+/**
+ * Checklists par étape, versionnées (ADR-0032 § 5 ; V2 : points de l'Idea Lab,
+ * ADR-0036 § 5). Identifiants stables.
+ */
+export const GROW_CHECKLISTS_V2: Readonly<Record<JourneyStage, readonly ChecklistItemDef[]>> = {
   IDEA: [
     { id: 'idea.projet', libelle: 'Créer un premier projet', auto: (i) => i.projects >= 1 },
+    {
+      id: 'idea.lab',
+      libelle: 'Décrire une idée dans l’Idea Lab (problème, cible, solution)',
+      auto: ideaFact((f) => f.ideasDescribed >= 1),
+    },
     { id: 'idea.canvas', libelle: 'Décrire votre modèle économique (Canvas)' },
     { id: 'idea.probleme', libelle: 'Formuler le problème client que vous résolvez' },
   ],
@@ -230,6 +265,16 @@ export const GROW_CHECKLISTS_V1: Readonly<Record<JourneyStage, readonly Checklis
       id: 'validation.plan',
       libelle: 'Valider un plan financier',
       auto: (i) => i.approvedPlans >= 1,
+    },
+    {
+      id: 'validation.grille',
+      libelle: 'Noter une idée sur la grille de validation (score disponible)',
+      auto: ideaFact((f) => f.scoredIdeas >= 1),
+    },
+    {
+      id: 'validation.experience',
+      libelle: 'Mener une expérience de validation jusqu’à son résultat',
+      auto: ideaFact((f) => f.completedExperiments >= 1),
     },
     { id: 'validation.entretiens', libelle: 'Interroger au moins dix clients potentiels' },
     { id: 'validation.seuil', libelle: 'Vérifier le seuil de rentabilité du plan' },
@@ -317,7 +362,7 @@ export const GROW_CHECKLISTS_V1: Readonly<Record<JourneyStage, readonly Checklis
 
 /** Tous les identifiants de checklist, pour valider une saisie. */
 export const GROW_CHECKLIST_IDS: readonly string[] = Object.freeze(
-  JOURNEY_STAGES.flatMap((s) => GROW_CHECKLISTS_V1[s].map((i) => i.id)),
+  JOURNEY_STAGES.flatMap((s) => GROW_CHECKLISTS_V2[s].map((i) => i.id)),
 );
 
 export interface ChecklistItem {
@@ -366,7 +411,7 @@ export function suggestJourneyStage(input: JourneyInputs): JourneyResult {
       atteinte,
       suggerable,
       conditions,
-      checklist: GROW_CHECKLISTS_V1[etape].map((item) => {
+      checklist: GROW_CHECKLISTS_V2[etape].map((item) => {
         if (item.auto)
           return { id: item.id, libelle: item.libelle, mode: 'auto', fait: item.auto(input) };
         return { id: item.id, libelle: item.libelle, mode: 'manuel', fait: done.has(item.id) };
@@ -376,7 +421,7 @@ export function suggestJourneyStage(input: JourneyInputs): JourneyResult {
   const retenue = input.declaredStage ?? suggested;
   return {
     growVersion: input.indicators.growVersion,
-    reglesVersion: GROW_JOURNEY_RULES_V1.version,
+    reglesVersion: GROW_JOURNEY_RULES_V2.version,
     suggeree: suggested,
     declaree: input.declaredStage,
     retenue,

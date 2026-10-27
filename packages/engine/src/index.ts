@@ -116,3 +116,7 @@ export function engineHealth(): { ok: true; version: string } {
 // GROW (ADR-0032) — santé, indicateurs investisseurs, parcours. Versionné à part
 // (`GROW_VERSION`) ; lit le réalisé et les ventes, ne calcule aucun plan.
 export * from './grow/index.js';
+
+// Idea Lab et validation d'idée (ADR-0036) — score de validation sur une grille
+// versionnée, expériences, comparaison. Versionné à part (`IDEA_LAB_VERSION`).
+export * from './idea-lab/index.js';

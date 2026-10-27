@@ -15,6 +15,7 @@ import {
   type GrowActualsSource,
   type GrowInputs,
   type GrowSalesDocument,
+  type IdeaLabJourneyFacts,
   type JourneyInputs,
 } from '../index.js';
 
@@ -90,6 +91,7 @@ function journeyInputs(i: GrowInputs, p: Partial<Omit<JourneyInputs, 'indicators
     activeCatalogItems: p.activeCatalogItems ?? 0,
     declaredStage: p.declaredStage ?? null,
     checklistDone: p.checklistDone ?? [],
+    ideaLab: p.ideaLab ?? null,
   };
 }
 
@@ -571,6 +573,13 @@ describe('suggestJourneyStage', () => {
     const idea = j.etapes[0]!.checklist;
     expect(idea).toEqual([
       { id: 'idea.projet', libelle: 'Créer un premier projet', mode: 'auto', fait: true },
+      // ADR-0036 § 5 : Idea Lab illisible → point automatique inconnu, jamais « fait ».
+      {
+        id: 'idea.lab',
+        libelle: 'Décrire une idée dans l’Idea Lab (problème, cible, solution)',
+        mode: 'auto',
+        fait: null,
+      },
       {
         id: 'idea.canvas',
         libelle: 'Décrire votre modèle économique (Canvas)',
@@ -584,6 +593,44 @@ describe('suggestJourneyStage', () => {
         fait: false,
       },
     ]);
+  });
+});
+
+describe('suggestJourneyStage — règles V2, Idea Lab (ADR-0036 § 5)', () => {
+  const lab = (p: Partial<IdeaLabJourneyFacts> = {}): IdeaLabJourneyFacts => ({
+    ideas: 1,
+    ideasDescribed: 1,
+    scoredIdeas: 0,
+    bestScore: null,
+    completedExperiments: 0,
+    ...p,
+  });
+
+  it('une idée au score disponible suffit à VALIDATION ; version de règles V2', () => {
+    const j = suggestJourneyStage(journeyInputs(inputs(), { ideaLab: lab({ scoredIdeas: 1 }) }));
+    expect(j.suggeree).toBe('VALIDATION');
+    expect(j.reglesVersion).toBe('GROW_JOURNEY_RULES_V2');
+    const cond = j.etapes.find((e) => e.etape === 'VALIDATION')!.conditions[0]!;
+    expect(cond).toMatchObject({ code: 'VALIDATION_ENGAGEE', etat: 'remplie' });
+  });
+
+  it('le plan validé suffit toujours, Idea Lab illisible ou vide (aucun recul)', () => {
+    for (const ideaLab of [null, lab({ ideas: 0, ideasDescribed: 0 })]) {
+      const j = suggestJourneyStage(journeyInputs(inputs(), { approvedPlans: 1, ideaLab }));
+      expect(j.suggeree).toBe('VALIDATION');
+    }
+  });
+
+  it('idée décrite mais non notée : reste IDEA ; checklist automatique depuis l’Idea Lab', () => {
+    const j = suggestJourneyStage(
+      journeyInputs(inputs(), { ideaLab: lab({ completedExperiments: 2 }) }),
+    );
+    expect(j.suggeree).toBe('IDEA');
+    const ideaItems = j.etapes[0]!.checklist;
+    expect(ideaItems.find((i) => i.id === 'idea.lab')!.fait).toBe(true);
+    const validation = j.etapes.find((e) => e.etape === 'VALIDATION')!.checklist;
+    expect(validation.find((i) => i.id === 'validation.grille')!.fait).toBe(false);
+    expect(validation.find((i) => i.id === 'validation.experience')!.fait).toBe(true);
   });
 });
 
