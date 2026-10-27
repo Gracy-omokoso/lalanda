@@ -26,6 +26,9 @@ export type NavIconId =
   | 'devis'
   | 'crm'
   | 'pilotage'
+  | 'sante'
+  | 'investisseurs'
+  | 'parcours'
   | 'mise-en-route'
   | 'identite'
   | 'fiscalite'
@@ -63,8 +66,10 @@ export const NAV_GROUPS: readonly NavGroup[] = [
 /**
  * Les entrées, dans l'ordre d'affichage (ADR-0030 § 2).
  *
- * Ne figurent ici que des pages qui EXISTENT : GROW n'a que « Pilotage » et
- * « Brief du matin » (ADR-0033) tant que son ADR n'est pas écrit — la barre ne promet rien (règle d'ADR-0016).
+ * Ne figurent ici que des pages qui EXISTENT — la barre ne promet rien (règle
+ * d'ADR-0016). GROW : « Pilotage » (tableau de bord de l'organisation), « Brief
+ * du matin » (ADR-0033), puis les trois écrans de l'espace Croissance d'ADR-0032
+ * (santé, indicateurs investisseurs, parcours).
  * « Modèle de facture » et « Journal » restent des onglets de l'espace Ventes.
  */
 export const NAV_ITEMS: readonly NavItem[] = [
@@ -157,6 +162,33 @@ export const NAV_ITEMS: readonly NavItem[] = [
     label: 'Brief du matin',
     group: 'grow',
     icon: 'pilotage',
+    action: null,
+  },
+  // ADR-0032 — espace Croissance. Lecture sous `analytics.read`, que les huit
+  // rôles détiennent : offert à tout membre, comme « Pilotage ». Santé et
+  // indicateurs dépendent de l'offre ; l'écran l'explique, l'API l'impose.
+  {
+    id: 'sante',
+    href: '/croissance/sante',
+    label: 'Santé',
+    group: 'grow',
+    icon: 'sante',
+    action: null,
+  },
+  {
+    id: 'investisseurs',
+    href: '/croissance/investisseurs',
+    label: 'Indicateurs investisseurs',
+    group: 'grow',
+    icon: 'investisseurs',
+    action: null,
+  },
+  {
+    id: 'parcours',
+    href: '/croissance/parcours',
+    label: 'Parcours',
+    group: 'grow',
+    icon: 'parcours',
     action: null,
   },
   // Offerte à tout membre : chaque étape explique elle-même un refus (un

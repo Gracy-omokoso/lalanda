@@ -16,6 +16,7 @@ import { DatabaseModule } from './database/database.module.js';
 import { EdefModule } from './edef/edef.module.js';
 import { EvaluateController } from './evaluate/evaluate.controller.js';
 import { FiscalModule } from './fiscal/fiscal.module.js';
+import { GrowModule } from './grow/grow.module.js';
 import { HealthController } from './health/health.controller.js';
 import { IntegrationsModule } from './integrations/integrations.module.js';
 import { LegalModule } from './legal/legal.module.js';
@@ -116,6 +117,8 @@ import { TreasuryModule } from './treasury/treasury.module.js';
     QuotesModule,
     // ADR-0033 — brief du matin : lit les ventes, réutilise l'IA et l'ordonnanceur.
     MorningBriefModule,
+    // ADR-0032 — GROW : lit BUILD et RUN, n'écrit que dans `grow_profiles`.
+    GrowModule,
   ],
   controllers: [HealthController, EvaluateController],
 })

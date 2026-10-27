@@ -83,6 +83,9 @@ describe('documents de vente — lecture des sources', () => {
       // ADR-0031 : LECTEURS seulement (règlement et pont vers le réalisé), vérifié
       // ci-dessous.
       'actuals/run-bridge/run-bridge.service.ts',
+      // ADR-0032 : GROW LIT les factures finales (indicateurs, santé), n'y écrit
+      // jamais — vérifié par `grow/grow-readonly.surface.test.ts`.
+      'grow/grow-reader.service.ts',
       // ADR-0033 : LECTEUR seulement (brief du matin) — vérifié ci-dessous.
       'morning-brief/morning-brief.service.ts',
       // ADR-0025 (S25g) : seul écrivain de `duplicateCount`, et de lui seul.

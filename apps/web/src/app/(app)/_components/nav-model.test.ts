@@ -64,6 +64,9 @@ describe('entrées et ordre', () => {
       'tresorerie',
       'pilotage',
       'brief',
+      'sante',
+      'investisseurs',
+      'parcours',
       'mise-en-route',
       'identite',
       'fiscalite',
@@ -79,10 +82,13 @@ describe('entrées et ordre', () => {
     ]);
   });
 
-  it('ne promet que des pages existantes : GROW se limite au pilotage et au brief', () => {
+  it('GROW : pilotage, brief du matin, puis les trois écrans Croissance (ADR-0032, ADR-0033)', () => {
     expect(NAV_ITEMS.filter((i) => i.group === 'grow').map((i) => i.href)).toEqual([
       '/organisation',
       '/organisation/brief',
+      '/croissance/sante',
+      '/croissance/investisseurs',
+      '/croissance/parcours',
     ]);
   });
 
@@ -91,6 +97,9 @@ describe('entrées et ordre', () => {
       'plans',
       'pilotage',
       'brief',
+      'sante',
+      'investisseurs',
+      'parcours',
       'mise-en-route',
       'abonnement',
     ]);
@@ -158,6 +167,8 @@ describe('entrée active', () => {
     ['/ventes/encaissements', 'encaissements'],
     ['/ventes/clients', 'clients'],
     ['/organisation', 'pilotage'],
+    ['/croissance/sante', 'sante'],
+    ['/croissance/parcours', 'parcours'],
     ['/organisation/fiscalite', 'fiscalite'],
     ['/organisation/brief', 'brief'],
     ['/organisation/mise-en-route', 'mise-en-route'],

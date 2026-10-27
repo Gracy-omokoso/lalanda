@@ -168,6 +168,8 @@ const ORG_SCOPED_COLLECTIONS = [
   'morning_brief_settings',
   'morning_brief_subscriptions',
   'morning_brief_ai_logs',
+  // ADR-0032 — fiche GROW de l'organisation.
+  'grow_profiles',
 ] as const;
 
 /**

@@ -35,6 +35,7 @@ import { CanvasController } from '../canvas/canvas.controller.js';
 import { EvaluateController } from '../evaluate/evaluate.controller.js';
 import { FiscalProfileController } from '../fiscal/fiscal-profile.controller.js';
 import { NormalizedInvoicingController } from '../fiscal/normalized-invoicing.controller.js';
+import { GrowController } from '../grow/grow.controller.js';
 import { HealthController } from '../health/health.controller.js';
 import { LegalController } from '../legal/legal.controller.js';
 import { MorningBriefController } from '../morning-brief/morning-brief.controller.js';
@@ -140,6 +141,8 @@ const CONTROLEURS = [
   InvoiceTemplatePackagesController,
   // ADR-0033 — brief du matin.
   MorningBriefController,
+  // ADR-0032 — GROW (santé, indicateurs investisseurs, parcours).
+  GrowController,
 ];
 
 /**

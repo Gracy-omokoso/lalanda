@@ -53,6 +53,9 @@ export const PROTECTED_PREFIXES = [
   '/ventes',
   // ADR-0034 — dépenses et trésorerie. Session ET organisation active, comme `/ventes`.
   '/tresorerie',
+  // ADR-0032 — espace Croissance (GROW). Session ET organisation active, comme
+  // `/ventes` ; seule la première est vue ici.
+  '/croissance',
 ] as const;
 
 /**
