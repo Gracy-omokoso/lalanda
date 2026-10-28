@@ -37,6 +37,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 
 import { oublierProfil, useProfil } from './profile-context';
+import { useShell } from './shell-context';
 import { entreeActive, entreesMenu, libelleDeclencheur, separateurAvant } from './user-menu-model';
 
 export function UserMenu({
@@ -61,7 +62,10 @@ export function UserMenu({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const items = entreesMenu({ canReadAdmin });
+  // Les actions de l'organisation sont déjà lues par la coquille
+  // (`GET /me/permissions`) : aucun appel de plus (ADR-0038 § 6).
+  const { actions } = useShell();
+  const items = entreesMenu({ canReadAdmin, actions });
   const actif = entreeActive(pathname, items);
 
   const close = useCallback((focusTrigger: boolean): void => {

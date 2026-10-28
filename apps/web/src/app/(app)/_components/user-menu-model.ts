@@ -13,8 +13,10 @@
 // jamais un droit en trop.
 //
 // Corollaire à ne pas relâcher : AUCUN `if (role === …)` ici. Le seul fait
-// consommé est un drapeau booléen servi par le serveur (`canReadAdmin`, issu de
-// `GET /me/platform-access`).
+// consommé est ce que sert le serveur : un drapeau booléen (`canReadAdmin`, issu de
+// `GET /me/platform-access`) et les actions de `GET /me/permissions`.
+
+import type { OrgAction } from '@/lib/api';
 
 /** Un lien du menu. `id` est stable et sert de clé de rendu comme de clé de test. */
 export interface UserMenuLink {
@@ -44,73 +46,34 @@ export type UserMenuItem = UserMenuLink | UserMenuAction;
 /**
  * Faits servis par le serveur dont dépend la visibilité.
  *
- * `canReadAdmin` est déjà chargé par le header aujourd'hui : le menu n'émet
- * AUCUN appel supplémentaire au titre de la visibilité (ADR-0016 §1).
+ * Tous deux sont déjà chargés par la coquille : le menu n'émet AUCUN appel
+ * supplémentaire au titre de la visibilité (ADR-0016 §1, ADR-0038 § 6).
  */
 export interface UserMenuFacts {
   /** `GET /me/platform-access`. Défaut `false` : voir `entreesMenu`. */
   canReadAdmin: boolean;
+  /**
+   * `GET /me/permissions` (actions de l'organisation active), `null` tant
+   * qu'elles ne sont pas connues ou si l'appel a échoué.
+   */
+  actions?: readonly OrgAction[] | null;
 }
 
 /**
- * Les huit entrées du menu, dans l'ordre exact de l'ADR-0016 §1 amendé par
- * l'ADR-0022 (entrée « Ventes ») et l'ADR-0032 (entrée « Croissance »).
+ * Les entrées du menu, dans l'ordre d'ADR-0038 § 6 (amende ADR-0016 §1).
  *
- * Deux groupes : le premier est ce qui appartient à la PERSONNE et à son
- * travail quotidien, le second ce qui appartient à l'organisation et à la
- * plateforme. La déconnexion est seule dans un troisième, parce qu'une action
- * destructive de session ne doit pas border un lien qu'on visait.
+ * Le travail quotidien (Tableau de bord, Ventes, Trésorerie, Croissance) est
+ * passé dans la barre du haut, par module. Le menu redevient celui du COMPTE et
+ * de l'ORGANISATION :
+ *  1. ce qui appartient à la personne (Mon compte) ;
+ *  2. les réglages de l'organisation, qui ne sont plus un module ;
+ *  3. la plateforme (Administration, opérateurs seulement) ;
+ *  4. la déconnexion, seule : une action destructive de session ne doit pas
+ *     border un lien qu'on visait.
  *
- * « Membres » n'y figure pas volontairement : c'est un onglet de `/organisation`
- * (ADR-0016 §3). L'entrée « Organisation » est la porte, et ce qu'il y a
- * derrière est filtré par les permissions réelles, là où le filtrage existe
- * déjà.
+ * Facturation et Journal d'audit restent des onglets de `/organisation`.
  */
 const ITEMS: readonly UserMenuItem[] = [
-  {
-    kind: 'link',
-    id: 'tableau-de-bord',
-    href: '/projects',
-    label: 'Tableau de bord',
-    hint: 'Vos projets et leur avancement',
-    group: 1,
-  },
-  // ADR-0022 (amende ADR-0016 §1) — l'espace Ventes, juste après le tableau de
-  // bord : c'est un outil de travail quotidien, pas un réglage. Offert à TOUT
-  // membre, même règle qu'« Organisation » : le conditionner sur `sales.read`
-  // exigerait un appel de plus au titre de la visibilité. Ce qu'il y a derrière
-  // est filtré par les permissions réelles, dans l'espace lui-même, et un rôle
-  // sans `sales.read` y lit un refus explicite.
-  {
-    kind: 'link',
-    id: 'ventes',
-    href: '/ventes',
-    label: 'Ventes',
-    hint: 'Clients et catalogue',
-    group: 1,
-  },
-  // ADR-0034 — dépenses, comptes et prévision de trésorerie. Même règle que
-  // « Ventes » : offerte à tout membre, filtrée dans l'espace par `treasury.read`.
-  {
-    kind: 'link',
-    id: 'tresorerie',
-    href: '/tresorerie',
-    label: 'Trésorerie',
-    hint: 'Dépenses, comptes et prévision',
-    group: 1,
-  },
-  // ADR-0032 — l'espace Croissance (GROW), après les modules RUN : santé de
-  // l'entreprise, indicateurs investisseurs, parcours. Offert à tout membre
-  // (`analytics.read` est détenu par les huit rôles) ; l'offre et les droits
-  // d'écriture sont expliqués dans l'espace lui-même.
-  {
-    kind: 'link',
-    id: 'croissance',
-    href: '/croissance',
-    label: 'Croissance',
-    hint: 'Santé, indicateurs investisseurs, parcours',
-    group: 1,
-  },
   {
     kind: 'link',
     id: 'compte',
@@ -119,12 +82,46 @@ const ITEMS: readonly UserMenuItem[] = [
     hint: 'Profil, sécurité, préférences',
     group: 1,
   },
+  // Offerte à tout membre : chaque étape explique elle-même un refus (un
+  // Directeur financier fait la fiscalité mais pas l'identité visuelle).
   {
     kind: 'link',
-    id: 'organisation',
-    href: '/organisation',
-    label: 'Organisation',
-    hint: 'Membres, paramètres, facturation, journal',
+    id: 'mise-en-route',
+    href: '/organisation/mise-en-route',
+    label: 'Mise en route',
+    hint: 'Identité, fiscalité, points de vente, modules',
+    group: 2,
+  },
+  {
+    kind: 'link',
+    id: 'identite',
+    href: '/organisation/identite',
+    label: 'Identité visuelle',
+    hint: 'Logos, couleurs et police des documents',
+    group: 2,
+  },
+  {
+    kind: 'link',
+    id: 'fiscalite',
+    href: '/organisation/fiscalite',
+    label: 'Fiscalité',
+    hint: 'Profil fiscal et facture normalisée DGI',
+    group: 2,
+  },
+  {
+    kind: 'link',
+    id: 'membres',
+    href: '/organisation/membres',
+    label: 'Membres',
+    hint: 'Invitations et rôles',
+    group: 2,
+  },
+  {
+    kind: 'link',
+    id: 'parametres',
+    href: '/organisation/parametres',
+    label: 'Paramètres',
+    hint: 'Nom, pays et devise d’affichage',
     group: 2,
   },
   {
@@ -141,35 +138,44 @@ const ITEMS: readonly UserMenuItem[] = [
     href: '/admin',
     label: 'Administration',
     hint: 'Plateforme : organisations, packs, journaux',
-    group: 2,
+    group: 3,
   },
-  { kind: 'action', id: 'signout', label: 'Déconnexion', group: 3 },
+  { kind: 'action', id: 'signout', label: 'Déconnexion', group: 4 },
 ] as const;
 
 /**
- * Fait serveur exigé par une entrée. Une entrée absente de cette table est
- * inconditionnelle.
- *
- * Table séparée, et non un champ de plus sur chaque entrée : elle rend visible
- * en une ligne le point le plus important de l'ADR-0016 §5 — UNE SEULE entrée
- * est conditionnée. Le jour où cette table grossit, c'est une décision, pas un
- * détail noyé dans sept objets.
+ * Condition d'affichage d'une entrée : un drapeau de plateforme, ou une action
+ * de l'organisation servie par `GET /me/permissions` — jamais un nom de rôle.
+ * Une entrée absente de cette table est inconditionnelle. Les actions sont
+ * celles des onglets de `/organisation` (`organization-model.ts`), pour que le
+ * menu et l'espace ne se contredisent pas.
  */
-const CONDITIONS: Readonly<Record<string, keyof UserMenuFacts>> = { admin: 'canReadAdmin' };
+const CONDITIONS: Readonly<
+  Record<string, { drapeau: 'canReadAdmin' } | { action: OrgAction }>
+> = {
+  identite: { action: 'organization.manage' },
+  fiscalite: { action: 'fiscal.manage' },
+  membres: { action: 'organization.manage' },
+  parametres: { action: 'organization.manage' },
+  admin: { drapeau: 'canReadAdmin' },
+};
 
 /**
  * Entrées réellement proposées.
  *
  * Une entrée conditionnée dont le fait n'est pas encore connu ne s'affiche PAS
  * « en attendant » : `canReadAdmin` vaut `false` tant que
- * `GET /me/platform-access` n'a pas répondu, et un échec de cet appel le laisse
- * à `false`. Le défaut est de ne rien proposer plutôt que de proposer une page
- * qui répondra 403 (ADR-0016 §5).
+ * `GET /me/platform-access` n'a pas répondu, et des actions `null` masquent
+ * toutes les entrées qui en exigent une. Le défaut est de ne rien proposer
+ * plutôt que de proposer une page qui répondra 403 (ADR-0016 §5).
  */
 export function entreesMenu(faits: UserMenuFacts): UserMenuItem[] {
+  const actions = faits.actions ?? null;
   return ITEMS.filter((item) => {
     const besoin = CONDITIONS[item.id];
-    return besoin === undefined || faits[besoin];
+    if (besoin === undefined) return true;
+    if ('drapeau' in besoin) return faits[besoin.drapeau];
+    return actions !== null && actions.includes(besoin.action);
   });
 }
 
