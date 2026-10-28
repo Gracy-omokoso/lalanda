@@ -68,7 +68,7 @@ export function AppHeader({
           grand écran la marque est dans la barre latérale : ici, l'aigle seul,
           et seulement sous 1024 px. */}
       <Link
-        href="/projects"
+        href="/initiatives"
         aria-label="Lalanda — plans financiers"
         className="flex shrink-0 items-center transition hover:opacity-80 lg:hidden"
       >

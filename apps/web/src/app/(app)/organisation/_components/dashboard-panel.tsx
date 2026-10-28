@@ -76,7 +76,7 @@ export function DashboardPanel(): React.ReactElement {
     return (
       <EtatVide titre="Aucune organisation active">
         Créez une organisation ou acceptez une invitation pour ouvrir cet espace.{' '}
-        <Link href="/projects" className="underline hover:text-[var(--accent)]">
+        <Link href="/initiatives" className="underline hover:text-[var(--accent)]">
           Retour aux projets
         </Link>
       </EtatVide>
@@ -173,7 +173,7 @@ export function DashboardPanel(): React.ReactElement {
               {sections.validation.ratiosRouges.map((r) => (
                 <Ligne
                   key={`${r.projectId}-${r.lineId}`}
-                  href={`/projects/${r.projectId}`}
+                  href={`/initiatives/${r.projectId}`}
                   titre={r.label}
                   // Le point rouge ne porte AUCUNE information seul : le seuil
                   // attendu est écrit juste en dessous (docs/04 § Accessibilité).
@@ -191,7 +191,7 @@ export function DashboardPanel(): React.ReactElement {
               {sections.validation.plansEnAttente.map((p) => (
                 <Ligne
                   key={p.projectId}
-                  href={`/projects/${p.projectId}`}
+                  href={`/initiatives/${p.projectId}`}
                   titre={p.projectName}
                   puce="warn"
                   detail={`${libelleRaisonAttente(p)} ${
@@ -209,7 +209,7 @@ export function DashboardPanel(): React.ReactElement {
               {sections.validation.ecartsDefavorables.map((e) => (
                 <Ligne
                   key={e.projectId}
-                  href={`/projects/${e.projectId}/realise`}
+                  href={`/initiatives/${e.projectId}/realise`}
                   titre={e.projectName}
                   puce="warn"
                   detail={
@@ -242,7 +242,7 @@ export function DashboardPanel(): React.ReactElement {
               {sections.comptabilite.periodesASaisir.map((p) => (
                 <Ligne
                   key={`${p.projectId}-${p.year}-${p.month}`}
-                  href={`/projects/${p.projectId}/realise`}
+                  href={`/initiatives/${p.projectId}/realise`}
                   titre={p.projectName}
                   detail={libelleMois(p.year, p.month)}
                 />
@@ -259,7 +259,7 @@ export function DashboardPanel(): React.ReactElement {
               {sections.comptabilite.periodesACloturer.map((p) => (
                 <Ligne
                   key={`${p.projectId}-${p.year}-${p.month}`}
-                  href={`/projects/${p.projectId}/realise`}
+                  href={`/initiatives/${p.projectId}/realise`}
                   titre={p.projectName}
                   detail={libelleMois(p.year, p.month)}
                 />
@@ -274,7 +274,7 @@ export function DashboardPanel(): React.ReactElement {
               {sections.comptabilite.anomalies.map((a) => (
                 <Ligne
                   key={`${a.projectId}-${a.lineId}`}
-                  href={`/projects/${a.projectId}/realise`}
+                  href={`/initiatives/${a.projectId}/realise`}
                   titre={`${a.projectName} · ${a.label}`}
                   puce="warn"
                   // Le message vient du calcul d'écarts, qui SIGNALE sans jamais
@@ -302,7 +302,7 @@ export function DashboardPanel(): React.ReactElement {
                   className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm"
                 >
                   <Link
-                    href={`/projects/${p.id}`}
+                    href={`/initiatives/${p.id}`}
                     className="font-medium hover:text-[var(--accent)]"
                   >
                     {p.name}

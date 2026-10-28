@@ -7,7 +7,7 @@
 //    réouverture exigeant period.close ET plan.approve)
 //  - apps/api/src/actuals/variance.ts (convention annuel/12, raisons de
 //    non-comparabilité, sens déduit de l'identifiant, projection actualisée)
-//  - apps/web/src/app/(app)/projects/[id]/realise/page.tsx + actuals-panel.tsx
+//  - apps/web/src/app/(app)/initiatives/[id]/realise/page.tsx + actuals-panel.tsx
 //  - limites : docs/08-PREVISIONNEL-REALISE.md § Limites
 //
 // ATTENTION : docs/08 et docs/22 décrivent encore une réouverture réservée au

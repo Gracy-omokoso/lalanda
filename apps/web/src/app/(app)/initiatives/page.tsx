@@ -149,7 +149,7 @@ export default function ProjectsPage(): React.ReactElement {
     } catch {
       // Le projet existe : on l'ouvre quand même ; la promotion se refait depuis la fiche.
     }
-    router.push(`/projects/${projectId}/canvas`);
+    router.push(`/initiatives/${projectId}/canvas`);
     return true;
   }
 
@@ -217,8 +217,8 @@ export default function ProjectsPage(): React.ReactElement {
       // sur les résultats, où les valeurs par défaut donnent déjà à lire.
       router.push(
         created.templateSlug === CUSTOM_TEMPLATE_SLUG
-          ? `/projects/${created.id}/saisie`
-          : `/projects/${created.id}`,
+          ? `/initiatives/${created.id}/saisie`
+          : `/initiatives/${created.id}`,
       );
     } catch (err) {
       // (S16b) L'API impose la limite de projets du plan : message dédié + lien tarifs.
@@ -284,7 +284,7 @@ export default function ProjectsPage(): React.ReactElement {
     projetCadrageRef.current = null;
     setModalCustom(false);
     if (await versCanvasDepuisIdee(projectId)) return;
-    router.push(`/projects/${projectId}/saisie${query ? `?${query}` : ''}`);
+    router.push(`/initiatives/${projectId}/saisie${query ? `?${query}` : ''}`);
   }
 
   // Packs pertinents pour le pays sélectionné : match direct ou générique le couvrant.
@@ -550,7 +550,7 @@ export default function ProjectsPage(): React.ReactElement {
           {projects.map((p) => (
             <li key={p.id}>
               <Link
-                href={`/projects/${p.id}`}
+                href={`/initiatives/${p.id}`}
                 className="group flex items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3.5 text-sm transition hover:border-[var(--accent)]/40 hover:bg-[var(--surface-muted)]"
               >
                 <div className="flex flex-col gap-1">

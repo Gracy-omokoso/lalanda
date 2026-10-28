@@ -73,7 +73,7 @@ export default function RegisterPage(): React.ReactElement {
         setVerificationSent(true);
         return;
       }
-      router.push('/projects');
+      router.push('/accueil');
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur d'inscription");

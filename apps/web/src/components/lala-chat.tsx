@@ -49,7 +49,7 @@ import {
   etiquetteSource,
   messagesAEnvoyer,
   peutEnvoyer,
-} from '@/app/(app)/projects/_components/interpretation-model';
+} from '@/app/(app)/initiatives/_components/interpretation-model';
 
 /** Un tour de parole affiché, avec la provenance de la réponse. */
 interface TourAffiche extends LalaMessage {

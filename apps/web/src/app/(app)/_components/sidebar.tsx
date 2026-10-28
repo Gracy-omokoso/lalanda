@@ -56,7 +56,7 @@ export function SidebarNav({
     <div className="flex h-full flex-col">
       <div className={replie ? 'flex justify-center py-5' : 'px-5 pb-4 pt-5'}>
         <Link
-          href="/projects"
+          href="/initiatives"
           aria-label="Lalanda — plans financiers"
           onClick={onNavigate}
           className="inline-flex shrink-0 items-center transition hover:opacity-80"

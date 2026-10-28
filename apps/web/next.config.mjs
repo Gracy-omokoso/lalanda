@@ -170,6 +170,22 @@ const nextConfig = {
         destination: '/organisation/membres',
         permanent: true,
       },
+      // ADR-0038 § 1 — l'objet de BUILD s'appelle désormais « Initiative » à
+      // l'écran : `/projects/...` devient `/initiatives/...`. Les anciennes URL
+      // sont publiées (favoris, liens partagés, liens copiés depuis le tableau
+      // de bord) : 308 permanent, chaîne de requête conservée par Next
+      // (`/projects?idee=…`). Seule la route WEB change : l'API garde
+      // `/projects` et n'est pas servie par cette application.
+      {
+        source: '/projects',
+        destination: '/initiatives',
+        permanent: true,
+      },
+      {
+        source: '/projects/:path*',
+        destination: '/initiatives/:path*',
+        permanent: true,
+      },
     ];
   },
 };

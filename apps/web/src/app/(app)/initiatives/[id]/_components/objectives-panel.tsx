@@ -256,7 +256,7 @@ function AttainmentCard({
           d’abord un plan.
         </p>
         <Link
-          href={`/projects/${projectId}`}
+          href={`/initiatives/${projectId}`}
           className="self-start rounded-md border border-[var(--accent)] px-3 py-1.5 text-xs font-medium text-[var(--accent)] transition hover:bg-[var(--accent)] hover:text-[var(--accent-foreground)]"
         >
           Aller au plan financier

@@ -6,7 +6,7 @@
 //
 // La route vit dans le group `(marketing)` pour hériter de l'en-tête et du pied
 // de page publics, mais elle N'EST PAS dans `MARKETING_PATHS` (`lib/routes.ts`) :
-// ces chemins-là renvoient un utilisateur authentifié vers `/projects`, ce qui
+// ces chemins-là renvoient un utilisateur authentifié vers `/accueil`, ce qui
 // casserait les liens d'aide contextuels ouverts depuis l'application. Ici, le
 // middleware ne fait rien — la page est lisible connecté comme déconnecté.
 

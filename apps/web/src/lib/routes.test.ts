@@ -90,6 +90,23 @@ describe('isProtectedPath (S20b)', () => {
     }
   });
 
+  it('ADR-0038 : accueil, bureaux des modules, initiatives et business plan exigent une session', () => {
+    for (const path of [
+      '/accueil',
+      '/build',
+      '/run',
+      '/grow',
+      '/initiatives',
+      '/initiatives/abc/realise',
+      '/business-plan',
+    ]) {
+      expect(isProtectedPath(path)).toBe(true);
+    }
+    expect(isProtectedPath('/initiatives-publiques')).toBe(false);
+    expect(isProtectedPath('/builder')).toBe(false);
+    expect(isProtectedPath('/running')).toBe(false);
+  });
+
   it('laisse publiques les pages marketing et d’authentification', () => {
     for (const path of ['/', '/pricing', '/login', '/register']) {
       expect(isProtectedPath(path)).toBe(false);

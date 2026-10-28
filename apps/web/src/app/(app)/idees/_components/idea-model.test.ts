@@ -30,7 +30,7 @@ describe('navigation', () => {
 
   it('création de projet ouverte depuis une idée, identifiant vérifié', () => {
     const id = '0123456789abcdef01234567';
-    expect(lienNouveauProjet(id)).toBe(`/projects?idee=${id}`);
+    expect(lienNouveauProjet(id)).toBe(`/initiatives?idee=${id}`);
     expect(ideeDepuisRecherche(`?idee=${id}`)).toBe(id);
     expect(ideeDepuisRecherche('?idee=../../x')).toBeNull();
     expect(ideeDepuisRecherche('')).toBeNull();

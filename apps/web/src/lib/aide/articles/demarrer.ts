@@ -1,7 +1,7 @@
 // Article « Démarrer » — le premier projet, le pays, le modèle, les hypothèses.
 //
 // Sources vérifiées dans le code au moment de la rédaction :
-//  - liste des pays et des modèles : apps/web/src/app/(app)/projects/page.tsx
+//  - liste des pays et des modèles : apps/web/src/app/(app)/initiatives/page.tsx
 //  - packs livrés : packages/engine/src/parameter-packs/{cd,ci,sn,ohada-generic}-2026.yaml
 //  - étapes du wizard : packages/engine/src/templates/*.yaml (bloc `wizard`)
 //    + packages/shared/src/wizard (resolveWizardEtapes), docs/06 § Implémenté (S18c)

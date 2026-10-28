@@ -58,7 +58,7 @@ export function GoogleButton({ label }: { label: string }): React.ReactElement |
       // origine de confiance côté API (`trustedOrigins` = WEB_URL).
       const res = await authClient.signIn.social({
         provider: 'google',
-        callbackURL: `${window.location.origin}/projects`,
+        callbackURL: `${window.location.origin}/accueil`,
         errorCallbackURL: `${window.location.origin}/login?erreur=google`,
       });
       if (res.error) {

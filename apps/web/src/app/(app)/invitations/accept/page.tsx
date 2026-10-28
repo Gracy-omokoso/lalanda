@@ -36,7 +36,7 @@ function AcceptFlow(): React.ReactElement {
         setStatus('ok');
         setMessage("Invitation acceptée. Redirection vers l'organisation…");
         setTimeout(() => {
-          router.push('/projects');
+          router.push('/accueil');
           router.refresh();
         }, 800);
       } catch (err) {
@@ -61,10 +61,10 @@ function AcceptFlow(): React.ReactElement {
       </p>
       {status === 'error' ? (
         <Link
-          href="/projects"
+          href="/accueil"
           className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-sm transition hover:bg-[var(--surface-muted)]"
         >
-          Retour au dashboard
+          Retour à l’accueil
         </Link>
       ) : null}
     </>

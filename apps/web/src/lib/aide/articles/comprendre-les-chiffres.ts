@@ -1,7 +1,7 @@
 // Article « Comprendre les chiffres » — une section par feuille de résultats.
 //
 // Sources vérifiées dans le code au moment de la rédaction :
-//  - liste et ordre des onglets : apps/web/src/app/(app)/projects/_components/
+//  - liste et ordre des onglets : apps/web/src/app/(app)/initiatives/_components/
 //    results-model.ts (libellés et ordre des onglets) — S23a, ex project-plan.tsx
 //  - lignes de chaque feuille : packages/engine/src/templates/*.yaml
 //  - bilan / BFR / CAF / seuil / amortissements : packages/engine/src/

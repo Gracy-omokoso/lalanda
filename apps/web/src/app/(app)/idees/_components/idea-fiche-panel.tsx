@@ -153,7 +153,7 @@ export function IdeaFichePanel({ id }: { id: string }): React.ReactElement {
     setMessage(null);
     try {
       const r = await ideaLabApi.promote(id, projetChoisi);
-      router.push(`/projects/${r.projectId}/canvas`);
+      router.push(`/initiatives/${r.projectId}/canvas`);
     } catch (err) {
       setMessage({ ton: 'ko', texte: messageErreur(err, 'Passage au projet impossible.') });
     }

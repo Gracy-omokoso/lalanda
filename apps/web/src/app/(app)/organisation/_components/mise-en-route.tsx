@@ -63,7 +63,7 @@ export function MiseEnRoute(): React.ReactElement {
     await relire();
     setOccupe(false);
     const suivante = etapeSuivante(id);
-    router.push(suivante ? lienEtape(suivante) : '/projects');
+    router.push(suivante ? lienEtape(suivante) : '/accueil');
   }
 
   return (
@@ -185,9 +185,9 @@ const COULEUR_MODULE: Record<ModuleId, string> = {
 };
 
 const ACCUEIL_MODULE: Record<ModuleId, string> = {
-  build: '/projects',
-  run: '/ventes/factures',
-  grow: '/organisation',
+  build: '/build',
+  run: '/run',
+  grow: '/grow',
 };
 
 /**

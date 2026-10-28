@@ -12,7 +12,7 @@ interface Props {
 // colonnes avec les feuilles de résultats, pour montrer l'impact d'une
 // hypothèse pendant la frappe. À l'usage, onze feuilles plus le bandeau de
 // ratios plus les exports saturaient l'écran : les deux moitiés se gênaient.
-// La saisie part sur `/projects/:id/saisie`, la lecture reste ici.
+// La saisie part sur `/initiatives/:id/saisie`, la lecture reste ici.
 //
 // La racine reste la vue de lecture — et non la saisie — pour deux raisons :
 // les liens `?tab=` déjà partagés continuent d'ouvrir la bonne feuille, et

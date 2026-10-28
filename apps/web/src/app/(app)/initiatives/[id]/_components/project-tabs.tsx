@@ -10,14 +10,14 @@
 // C'est la navigation canonique du projet : les chantiers Wizard et Réalisé s'y
 // branchent au lieu de gérer leur propre système d'onglets. Pour ajouter une
 // section, il suffit d'AJOUTER UNE ENTRÉE à `PROJECT_TABS` ci-dessous et de
-// créer `app/(app)/projects/[id]/<segment>/page.tsx` — aucun autre fichier à
+// créer `app/(app)/initiatives/[id]/<segment>/page.tsx` — aucun autre fichier à
 // toucher, aucun cas particulier à écrire dans le rendu.
 //
 //   { segment: 'realise', label: 'Réalisé' }
 //   { segment: 'wizard',  label: 'Saisie'  }
 //
 // L'ordre du tableau est l'ordre d'affichage. Les sous-routes sont gérées :
-// `/projects/:id/realise/2026-01` garde bien l'onglet « Réalisé » actif.
+// `/initiatives/:id/realise/2026-01` garde bien l'onglet « Réalisé » actif.
 //
 // ── S23a : « Plan » devient « Saisie » + « Résultats » ──────────
 // L'ancien onglet « Plan » portait les deux à la fois. Il est scindé pour que
@@ -36,7 +36,7 @@ import { renderNextLink } from '@/components/next-link';
 import { useShell } from '../../../_components/shell-context';
 
 export interface ProjectTab {
-  /** Segment d'URL sous `/projects/:id/`. La chaîne vide = page racine du projet. */
+  /** Segment d'URL sous `/initiatives/:id/`. La chaîne vide = page racine du projet. */
   segment: string;
   label: string;
 }
@@ -51,7 +51,7 @@ export const PROJECT_TABS: ProjectTab[] = [
   { segment: 'business-plan', label: 'Business plan' },
 ];
 
-/** Premier segment sous `/projects/:id/` — '' sur la page racine du projet. */
+/** Premier segment sous `/initiatives/:id/` — '' sur la page racine du projet. */
 function activeSegment(pathname: string, base: string): string {
   if (!pathname.startsWith(base)) return '';
   return pathname.slice(base.length).split('/').filter(Boolean)[0] ?? '';
@@ -65,7 +65,7 @@ export function ProjectTabs({
   tabs?: ProjectTab[];
 }): React.ReactElement {
   const pathname = usePathname();
-  const base = `/projects/${projectId}`;
+  const base = `/initiatives/${projectId}`;
   const current = activeSegment(pathname, base);
 
   // ADR-0030 § 3 — une fonction absente de l'offre reste VISIBLE, avec un

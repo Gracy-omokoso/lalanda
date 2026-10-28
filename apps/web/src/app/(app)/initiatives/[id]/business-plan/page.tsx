@@ -1,4 +1,4 @@
-// `/projects/:id/business-plan` — business plan narratif du projet (ADR-0037).
+// `/initiatives/:id/business-plan` — business plan narratif du projet (ADR-0037).
 
 import type { Metadata } from 'next';
 

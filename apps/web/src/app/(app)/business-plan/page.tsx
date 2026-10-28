@@ -41,7 +41,7 @@ export default function BusinessPlanOverviewPage(): React.ReactElement {
           title="Aucun projet"
           description="Créez d’abord un plan financier : son business plan s’y rattache."
           action={
-            <Link className="text-sm font-medium underline" href="/projects">
+            <Link className="text-sm font-medium underline" href="/initiatives">
               Plans financiers
             </Link>
           }
@@ -55,7 +55,7 @@ export default function BusinessPlanOverviewPage(): React.ReactElement {
             >
               <div className="flex flex-col gap-1">
                 <Link
-                  href={`/projects/${p.projectId}/business-plan`}
+                  href={`/initiatives/${p.projectId}/business-plan`}
                   className="font-semibold underline-offset-2 hover:underline"
                 >
                   {p.projectName}
