@@ -19,6 +19,12 @@ Décideurs :
 ## Liens
 ```
 
+## Décisions récentes
+
+- [ADR-0030](ADR-0030-refonte-ui-ux.md) — refonte de l'interface (amendé par ADR-0038).
+- [ADR-0038](ADR-0038-navigation-par-modules-et-initiatives.md) — navigation par modules
+  (accueil, bureaux, colonne d'applications) et renommage « Initiative » — **Accepté**, 29 oct. 2026.
+
 ## Premières décisions attendues
 
 - architecture du monorepo;
