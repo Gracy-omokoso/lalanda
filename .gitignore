@@ -5,6 +5,9 @@ node_modules/
 # Build outputs
 dist/
 build/
+# ADR-0038 : `/build` est aussi une ROUTE web (bureau du module BUILD), pas un
+# dossier de sortie : elle doit être versionnée.
+!apps/web/src/app/(app)/build/
 .next/
 .turbo/
 *.tsbuildinfo

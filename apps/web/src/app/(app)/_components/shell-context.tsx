@@ -22,6 +22,8 @@ import { cleModules, ecrireModules, lireModules } from './nav-model';
 export interface ShellFacts {
   /** `null` tant que `GET /me/permissions` n'a pas répondu, ou en cas d'échec. */
   actions: OrgAction[] | null;
+  /** `GET /me/permissions` a-t-il répondu (succès ou échec) ? Distingue « en cours » de « rien ». */
+  chargees: boolean;
   organizationId: string | null;
   /** `null` tant que l'abonnement n'est pas lu, ou s'il ne peut pas l'être. */
   subscription: SubscriptionStateView | null;
@@ -36,6 +38,7 @@ export interface ShellFacts {
 
 const Contexte = createContext<ShellFacts>({
   actions: null,
+  chargees: false,
   organizationId: null,
   subscription: null,
   modules: null,
@@ -71,6 +74,7 @@ const TOUS = '"*"';
 
 export function ShellProvider({ children }: { children: React.ReactNode }): React.ReactElement {
   const [actions, setActions] = useState<OrgAction[] | null>(null);
+  const [chargees, setChargees] = useState(false);
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionStateView | null>(null);
   const [modules, setModulesState] = useState<ModuleId[] | null>(null);
@@ -85,9 +89,12 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
         if (annule) return;
         setActions(p.actions);
         setOrganizationId(p.organizationId);
+        setChargees(true);
       })
       .catch(() => {
-        if (!annule) setActions(null);
+        if (annule) return;
+        setActions(null);
+        setChargees(true);
       });
     void api
       .getSubscription()
@@ -125,6 +132,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
   const valeur = useMemo<ShellFacts>(
     () => ({
       actions,
+      chargees,
       organizationId,
       subscription,
       modules,
@@ -132,7 +140,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
       modulesChoisis,
       rafraichir,
     }),
-    [actions, organizationId, subscription, modules, setModules, modulesChoisis, rafraichir],
+    [actions, chargees, organizationId, subscription, modules, setModules, modulesChoisis, rafraichir],
   );
 
   return <Contexte.Provider value={valeur}>{children}</Contexte.Provider>;
