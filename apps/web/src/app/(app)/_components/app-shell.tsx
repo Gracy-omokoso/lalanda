@@ -1,10 +1,12 @@
 'use client';
 
-// Coquille de l'application (ADR-0030 § 2, § 5, § 6).
+// Coquille de l'application (ADR-0038 § 2 ; ADR-0030 § 5 et § 6).
 //
-//   ≥ 1024 px : barre latérale fixe (repliable en rail) + zone de contenu.
-//   < 1024 px : barre du haut compacte, tiroir de navigation, et — si le rôle
-//               lit les ventes — barre d'actions basse centrée sur RUN.
+//   Barre du haut, pleine largeur : Accueil · BUILD · RUN · GROW (niveau 1).
+//   ≥ 1024 px : dans un module, colonne de ses seules applications (repliable
+//               en rail) + zone de contenu ; hors module, contenu pleine largeur.
+//   < 1024 px : la colonne devient un tiroir, et — si le rôle lit les ventes —
+//               barre d'actions basse centrée sur RUN.
 //
 // La coquille ne décide d'aucun accès : elle lit les faits de `ShellProvider`
 // (permissions et offre servies par l'API) et range.
@@ -18,7 +20,7 @@ import { IconeNav } from '@/components/icones-navigation';
 import { LegalLinks } from '@/components/legal-links';
 
 import { AppHeader } from './app-header';
-import { actionsRapides, entreeActive, NAV_ITEMS } from './nav-model';
+import { actionsRapides, appActive, moduleCourant } from './nav-model';
 import { PendingInvitationsBanner } from './pending-invitations-banner';
 import { ShellProvider, useShell } from './shell-context';
 import { SidebarNav } from './sidebar';
@@ -37,6 +39,8 @@ function Coquille({ children }: { children: React.ReactNode }): React.ReactEleme
   const [replie, setReplie] = useState(false);
   const [tiroir, setTiroir] = useState(false);
   const { actions } = useShell();
+  const pathname = usePathname();
+  const module = moduleCourant(pathname);
   // Réserve la place de la barre basse seulement quand elle existe.
   const avecBarre = actionsRapides(actions).length > 0;
   const boutonTiroir = useRef<HTMLElement | null>(null);
@@ -73,10 +77,12 @@ function Coquille({ children }: { children: React.ReactNode }): React.ReactEleme
     boutonTiroir.current?.focus();
   }, []);
 
+  const grille = replie
+    ? 'lg:grid-cols-[var(--sidebar-rail)_minmax(0,1fr)]'
+    : 'lg:grid-cols-[var(--sidebar-width)_minmax(0,1fr)]';
+
   return (
-    <div
-      className={`min-h-screen lg:grid ${replie ? 'lg:grid-cols-[var(--sidebar-rail)_minmax(0,1fr)]' : 'lg:grid-cols-[var(--sidebar-width)_minmax(0,1fr)]'}`}
-    >
+    <div className="flex min-h-screen flex-col">
       <a
         href="#contenu"
         className="sr-only z-50 rounded-[var(--radius-md)] bg-[var(--surface)] px-4 py-2 text-sm font-medium focus:not-sr-only focus:fixed focus:left-3 focus:top-3"
@@ -84,50 +90,54 @@ function Coquille({ children }: { children: React.ReactNode }): React.ReactEleme
         Aller au contenu
       </a>
 
-      <aside className="nav-panel sticky top-0 hidden h-screen flex-col border-r border-[var(--nav-border)] bg-[var(--nav-bg)] text-[var(--nav-fg)] lg:flex">
-        <div className="min-h-0 flex-1">
-          <SidebarNav replie={replie} />
-        </div>
-        <div
-          className={`border-t border-[var(--nav-border)] p-2 ${replie ? 'flex justify-center' : ''}`}
-        >
-          <button
-            type="button"
-            onClick={basculerRepli}
-            aria-expanded={!replie}
-            aria-label={replie ? 'Déplier la navigation' : 'Replier la navigation'}
-            title={replie ? 'Déplier la navigation' : 'Replier la navigation'}
-            className="flex h-9 items-center gap-2 rounded-[var(--radius-sm)] px-2 text-xs text-[var(--nav-muted)] transition hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-fg)]"
+      <AppHeader onOuvrirNavigation={ouvrirTiroir} />
+
+      <div className={`flex-1 ${module !== null ? `lg:grid ${grille}` : ''}`}>
+        {module !== null ? (
+          <aside className="nav-panel sticky top-14 hidden h-[calc(100vh-3.5rem)] flex-col border-r border-[var(--nav-border)] bg-[var(--nav-bg)] text-[var(--nav-fg)] lg:flex">
+            <div className="min-h-0 flex-1">
+              <SidebarNav module={module} replie={replie} />
+            </div>
+            <div
+              className={`border-t border-[var(--nav-border)] p-2 ${replie ? 'flex justify-center' : ''}`}
+            >
+              <button
+                type="button"
+                onClick={basculerRepli}
+                aria-expanded={!replie}
+                aria-label={replie ? 'Déplier la navigation' : 'Replier la navigation'}
+                title={replie ? 'Déplier la navigation' : 'Replier la navigation'}
+                className="flex h-9 items-center gap-2 rounded-[var(--radius-sm)] px-2 text-xs text-[var(--nav-muted)] transition hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-fg)]"
+              >
+                <IconeNav id="replier" className="h-4 w-4" />
+                {replie ? null : <span>Replier</span>}
+              </button>
+            </div>
+          </aside>
+        ) : null}
+
+        <div className="flex min-w-0 flex-col">
+          <main
+            id="contenu"
+            tabIndex={-1}
+            className={`mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 pt-6 ${avecBarre ? 'pb-28' : 'pb-10'} outline-none sm:px-6 lg:px-8 lg:pb-10 lg:pt-8`}
           >
-            <IconeNav id="replier" className="h-4 w-4" />
-            {replie ? null : <span>Replier</span>}
-          </button>
+            <PendingInvitationsBanner />
+            <div className="flex-1">{children}</div>
+          </main>
+
+          {/* Pied de page légal (S22c) et version du logiciel, visible de tout
+              écran (ADR-0026 § 6.2). */}
+          <footer
+            className={`mx-auto flex ${avecBarre ? 'mb-24' : ''} w-full max-w-6xl flex-col gap-3 border-t border-[var(--border)] px-4 py-5 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:mb-0 lg:px-8`}
+          >
+            <LegalLinks />
+            <AppVersion className="text-xs text-[var(--foreground-muted)]" />
+          </footer>
         </div>
-      </aside>
-
-      <div className="flex min-w-0 flex-col">
-        <AppHeader onOuvrirNavigation={ouvrirTiroir} />
-        <main
-          id="contenu"
-          tabIndex={-1}
-          className={`mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 pt-6 ${avecBarre ? 'pb-28' : 'pb-10'} outline-none sm:px-6 lg:px-8 lg:pb-10 lg:pt-8`}
-        >
-          <PendingInvitationsBanner />
-          <div className="flex-1">{children}</div>
-        </main>
-
-        {/* Pied de page légal (S22c) et version du logiciel, visible de tout
-            écran (ADR-0026 § 6.2). Les pages légales ne sont PAS « marketing » :
-            un membre connecté qui clique ici lit le document. */}
-        <footer
-          className={`mx-auto flex ${avecBarre ? 'mb-24' : ''} w-full max-w-6xl flex-col gap-3 border-t border-[var(--border)] px-4 py-5 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:mb-0 lg:px-8`}
-        >
-          <LegalLinks />
-          <AppVersion className="text-xs text-[var(--foreground-muted)]" />
-        </footer>
       </div>
 
-      {tiroir ? <Tiroir onFermer={fermerTiroir} /> : null}
+      {tiroir ? <Tiroir module={module} onFermer={fermerTiroir} /> : null}
       <BarreBasse onMenu={ouvrirTiroir} />
     </div>
   );
@@ -137,7 +147,13 @@ function Coquille({ children }: { children: React.ReactNode }): React.ReactEleme
  * Tiroir de navigation (< 1024 px) : dialogue modal, focus piégé, `Échap`
  * ferme et rend le focus, défilement de la page bloqué (ADR-0030 § 5).
  */
-function Tiroir({ onFermer }: { onFermer: () => void }): React.ReactElement {
+function Tiroir({
+  module,
+  onFermer,
+}: {
+  module: ReturnType<typeof moduleCourant>;
+  onFermer: () => void;
+}): React.ReactElement {
   const panneau = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const cheminInitial = useRef(pathname);
@@ -202,7 +218,7 @@ function Tiroir({ onFermer }: { onFermer: () => void }): React.ReactElement {
         >
           <IconeNav id="fermer" className="h-5 w-5" />
         </button>
-        <SidebarNav onNavigate={onFermer} />
+        <SidebarNav module={module} tiroir onNavigate={onFermer} />
       </div>
     </div>
   );
@@ -217,7 +233,7 @@ function BarreBasse({ onMenu }: { onMenu: () => void }): React.ReactElement | nu
   const pathname = usePathname();
   const liste = actionsRapides(actions);
   if (liste.length === 0) return null;
-  const active = entreeActive(pathname, NAV_ITEMS);
+  const active = appActive(pathname);
 
   return (
     <nav
@@ -226,7 +242,7 @@ function BarreBasse({ onMenu }: { onMenu: () => void }): React.ReactElement | nu
     >
       <ul className="mx-auto flex max-w-md items-stretch justify-around px-2">
         {liste.map((a) => {
-          const courant = !a.principale && active === a.id;
+          const courant = !a.principale && a.app !== null && active === a.app;
           return (
             <li key={a.id} className="flex flex-1 justify-center">
               {a.principale ? (

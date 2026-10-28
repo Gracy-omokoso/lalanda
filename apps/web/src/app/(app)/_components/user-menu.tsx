@@ -171,7 +171,7 @@ export function UserMenu({
         // Le nom accessible porte l'IDENTITÉ : l'avatar est `aria-hidden`, donc
         // c'est la seule chose qu'un lecteur d'écran entend de ce bouton.
         aria-label={libelleDeclencheur({ nom, email })}
-        className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] p-1 pr-2 transition hover:bg-[var(--surface-muted)]"
+        className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] p-1 pr-2 text-[var(--foreground)] transition hover:bg-[var(--surface-muted)]"
       >
         <Avatar
           initiales={profil?.initials ?? null}
@@ -191,7 +191,7 @@ export function UserMenu({
           // l'écran sans provoquer de défilement horizontal. Hauteur bornée
           // aussi, avec défilement INTERNE à la liste — l'en-tête d'identité
           // reste visible pendant qu'on fait défiler les entrées.
-          className="absolute right-0 z-20 mt-2 flex w-[min(19rem,calc(100vw-2rem))] max-h-[min(30rem,calc(100vh-6rem))] flex-col overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-lg"
+          className="absolute right-0 z-20 mt-2 flex text-[var(--foreground)] w-[min(19rem,calc(100vw-2rem))] max-h-[min(30rem,calc(100vh-6rem))] flex-col overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-lg"
         >
           {/* En-tête d'identité — INERTE : aucun `role="menuitem"`, aucun
               élément focusable. Il informe, il ne s'active pas. */}

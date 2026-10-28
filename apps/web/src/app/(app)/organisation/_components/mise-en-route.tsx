@@ -191,7 +191,7 @@ const ACCUEIL_MODULE: Record<ModuleId, string> = {
 };
 
 /**
- * Étape 4 : par quoi commencer. Le choix range la navigation ; il n'ouvre ni ne
+ * Étape 4 : par quoi commencer. Le choix range l'accueil (ADR-0038 § 5) ; il n'ouvre ni ne
  * ferme aucun accès (ADR-0018 : l'accès est réglé par l'offre). Mémorisé dans
  * le navigateur, par organisation — faute d'API (ADR-0030, décision D3).
  */
@@ -255,10 +255,9 @@ function ChoixModules(): React.ReactElement {
         </p>
       ) : null}
       <p className="text-xs leading-5 text-[var(--foreground-muted)]">
-        Ce choix range votre navigation sur cet appareil ; il ne retire aucun accès. Ce que vous
-        pouvez faire dépend de votre rôle et de votre offre
-        {subscription ? ` (aujourd’hui : ${PLAN_LABELS[subscription.plan]})` : ''}. « Afficher tous
-        les modules », en bas de la navigation, défait ce choix à tout moment.
+        Ce choix place ces modules en tête de votre accueil, sur cet appareil ; il ne masque ni ne
+        retire aucun module. Ce que vous pouvez faire dépend de votre rôle et de votre offre
+        {subscription ? ` (aujourd’hui : ${PLAN_LABELS[subscription.plan]})` : ''}.
       </p>
       <div className="flex flex-wrap items-center gap-3">
         <button
