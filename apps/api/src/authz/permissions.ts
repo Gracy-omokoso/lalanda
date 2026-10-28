@@ -9,7 +9,7 @@
 // Trois ensembles fermés (docs/26 « états représentés par unions fermées ») :
 //   1. ORG_ROLES       — les 8 rôles d'organisation (ADR-0012 §1);
 //   2. PLATFORM_ROLES  — les 6 rôles plateforme, préfixés `platform_` (§2);
-//   3. ACTIONS         — les 24 actions granulaires, dans l'ordre de docs/12
+//   3. ACTIONS         — les 27 actions granulaires, dans l'ordre de docs/12
 //                        (la seizième, `fiscal.manage`, vient d'ADR-0021 §8 ;
 //                        la dix-septième et la dix-huitième, `sales.read` et
 //                        `sales.manage`, d'ADR-0022 § S25c.1 ; la dix-neuvième,
@@ -18,7 +18,9 @@
 //                        vingt-deuxième, `treasury.read` et `treasury.manage`,
 //                        d'ADR-0034 § 8 ; les vingt-troisième et vingt-quatrième,
 //                        `crm.read` et `crm.manage`, d'ADR-0035 § 3 — ordre de
-//                        fusion, amendement du 27 oct. 2026).
+//                        fusion, amendement du 27 oct. 2026 ; les vingt-cinquième
+//                        à vingt-septième, `work.read`, `work.update` et
+//                        `work.manage`, d'ADR-0039 § 7).
 //
 // Refus par défaut (docs/17 § Autorisation) : les matrices sont exhaustives, une
 // case absente ne compile pas, et une case `deny` est un refus.
@@ -94,7 +96,7 @@ export const PLATFORM_ROLES = [
 export type PlatformRole = (typeof PLATFORM_ROLES)[number];
 
 /**
- * Les 24 actions granulaires (docs/12 § Actions granulaires, ordre du document).
+ * Les 27 actions granulaires (docs/12 § Actions granulaires, ordre du document).
  *
  * `fiscal.manage` (ADR-0021 §8) est ajoutée EN FIN de liste, et non à côté
  * d'`organization.manage` : l'ordre est celui de docs/12, que l'interface et les
@@ -103,7 +105,9 @@ export type PlatformRole = (typeof PLATFORM_ROLES)[number];
  * même règle : dix-septième et dix-huitième, en fin de liste. `sales.invoice`
  * (ADR-0023 § S25e.11) est la dix-neuvième, `sales.receipt` (ADR-0031 § 4) la vingtième,
  * `treasury.read` et `treasury.manage` (ADR-0034 § 8) les vingt et unième et vingt-deuxième,
- * `crm.read` et `crm.manage` (ADR-0035 § 3) les vingt-troisième et vingt-quatrième.
+ * `crm.read` et `crm.manage` (ADR-0035 § 3) les vingt-troisième et vingt-quatrième,
+ * `work.read`, `work.update` et `work.manage` (ADR-0039 § 7) les vingt-cinquième à
+ * vingt-septième.
  */
 export const ACTIONS = [
   'organization.manage',
@@ -132,6 +136,10 @@ export const ACTIONS = [
   // ADR-0035 § 3 : CRM minimal (contacts, prospects, opportunités, activités).
   'crm.read',
   'crm.manage',
+  // ADR-0039 § 7 : projets et tâches du RUN (module `work`).
+  'work.read',
+  'work.update',
+  'work.manage',
 ] as const;
 
 export type Action = (typeof ACTIONS)[number];
@@ -206,7 +214,7 @@ export type OrgGrant = 'allow' | 'deny' | 'allow_sod' | 'allow_project' | 'condi
 /**
  * MATRICE RÔLE ORGANISATION × ACTION — transcription littérale d'ADR-0012 §3.
  *
- * Le type impose 8 rôles × 24 actions : oublier une case ne compile pas.
+ * Le type impose 8 rôles × 27 actions : oublier une case ne compile pas.
  * `permissions.test.ts` redéclare cette matrice en littéral (elle n'est PAS
  * importée d'ici) : toute modification de production casse le test et force une
  * mise à jour consciente de l'ADR et de docs/12. C'est le garde-fou central.
@@ -255,6 +263,12 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       // la répartition de `sales.*` — données personnelles, sans engagement fiscal.
       'crm.read': 'allow',
       'crm.manage': 'allow',
+      // ADR-0039 § 7 : gestionnaire de projets et de tâches du RUN (module `work`).
+      // Lire, travailler (cocher, commenter, saisir son temps), gouverner (créer,
+      // archiver, supprimer un projet, colonnes, étiquettes, temps d'autrui).
+      'work.read': 'allow',
+      'work.update': 'allow',
+      'work.manage': 'allow',
     },
     // Administrateur — « membres, projets, paramètres ». Gouvernance technique,
     // pas autorité financière : ni `billing.manage`, ni `plan.approve`, ni
@@ -293,6 +307,10 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'treasury.manage': 'deny',
       'crm.read': 'allow',
       'crm.manage': 'allow',
+      // ADR-0039 § 7 : organiser le travail est de la gouvernance, pas un acte financier.
+      'work.read': 'allow',
+      'work.update': 'allow',
+      'work.manage': 'allow',
     },
     // Directeur financier — « plans, validation, réalisé, rapports ». L'autorité
     // financière : approuve et clôture. Cible de la migration des anciens `member`
@@ -322,6 +340,9 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'treasury.manage': 'allow',
       'crm.read': 'allow',
       'crm.manage': 'allow',
+      'work.read': 'allow',
+      'work.update': 'allow',
+      'work.manage': 'allow',
     },
     // Comptable — « réalisé, mapping, clôture selon permission ». Constate, ne
     // projette pas : ni `inputs.update`, ni `plan.calculate`. Contrepartie de R2.
@@ -353,6 +374,10 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'treasury.manage': 'allow',
       'crm.read': 'allow',
       'crm.manage': 'allow',
+      // ADR-0039 § 7 : contribue sans gouverner (décision ouverte n° 3).
+      'work.read': 'allow',
+      'work.update': 'allow',
+      'work.manage': 'deny',
     },
     // Analyste — « scénarios, analyses, commentaires ». Modélise et calcule,
     // n'approuve ni n'importe le réalisé.
@@ -383,6 +408,10 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'treasury.manage': 'deny',
       'crm.read': 'allow',
       'crm.manage': 'deny',
+      // ADR-0039 § 7 : contribue sans gouverner (décision ouverte n° 3).
+      'work.read': 'allow',
+      'work.update': 'allow',
+      'work.manage': 'deny',
     },
     // Chef de projet — « projets autorisés et saisie ». Tout est `allow_project` :
     // le rôle n'a de sens qu'avec des assignations de projet, qui n'existent pas
@@ -413,6 +442,11 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'treasury.manage': 'deny',
       'crm.read': 'deny',
       'crm.manage': 'deny',
+      // ADR-0039 § 7 : refusé en R1 — rôle non attribuable, borné aux plans BUILD
+      // (décision ouverte n° 1 : l'ouvrir au module dans un lot suivant).
+      'work.read': 'deny',
+      'work.update': 'deny',
+      'work.manage': 'deny',
     },
     // Conseiller — « consultation, commentaires, recommandations ». Typiquement
     // EXTERNE (mentor, banquier invité) : pas de `report.export`, on lui ouvre la
@@ -445,6 +479,10 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'treasury.manage': 'deny',
       'crm.read': 'deny',
       'crm.manage': 'deny',
+      // ADR-0039 § 7 : externe ; un projet client porte des données de clients.
+      'work.read': 'deny',
+      'work.update': 'deny',
+      'work.manage': 'deny',
     },
     // Lecteur — lecture seulement. `analytics.read` est conservé : le refuser
     // viderait le rôle de son sens (ADR-0012 §3).
@@ -473,6 +511,10 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'treasury.manage': 'deny',
       'crm.read': 'allow',
       'crm.manage': 'deny',
+      // ADR-0039 § 7 : lecture seulement, comme `crm.read`.
+      'work.read': 'allow',
+      'work.update': 'deny',
+      'work.manage': 'deny',
     },
   };
 
@@ -532,6 +574,10 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     // ADR-0035 § 3 : comme `sales.read` et `sales.manage`, sous accès délégué.
     'crm.read': 'delegated',
     'crm.manage': 'delegated',
+    // ADR-0039 § 7 : comme `crm.read` et `crm.manage`, sous accès délégué.
+    'work.read': 'delegated',
+    'work.update': 'delegated',
+    'work.manage': 'delegated',
   },
   platform_admin: {
     'organization.manage': 'native',
@@ -558,6 +604,9 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'treasury.manage': 'forbidden',
     'crm.read': 'forbidden',
     'crm.manage': 'forbidden',
+    'work.read': 'forbidden',
+    'work.update': 'forbidden',
+    'work.manage': 'forbidden',
   },
   // « Le support ne voit jamais les données financières sans consentement
   // explicite, durée limitée et audit » (docs/12) — d'où trois `delegated` et
@@ -588,6 +637,10 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'treasury.manage': 'forbidden',
     'crm.read': 'delegated',
     'crm.manage': 'forbidden',
+    // ADR-0039 § 7 : lecture sous accès délégué, comme `crm.read`.
+    'work.read': 'delegated',
+    'work.update': 'forbidden',
+    'work.manage': 'forbidden',
   },
   platform_billing: {
     'organization.manage': 'forbidden',
@@ -614,6 +667,9 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'treasury.manage': 'forbidden',
     'crm.read': 'forbidden',
     'crm.manage': 'forbidden',
+    'work.read': 'forbidden',
+    'work.update': 'forbidden',
+    'work.manage': 'forbidden',
   },
   // Vides sur cette matrice : opèrent sur des ressources de portée plateforme
   // (templates, Country Packs) qui n'ont pas d'action granulaire dans docs/12 —
@@ -643,6 +699,9 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'treasury.manage': 'forbidden',
     'crm.read': 'forbidden',
     'crm.manage': 'forbidden',
+    'work.read': 'forbidden',
+    'work.update': 'forbidden',
+    'work.manage': 'forbidden',
   },
   platform_country_pack_manager: {
     'organization.manage': 'forbidden',
@@ -669,6 +728,9 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'treasury.manage': 'forbidden',
     'crm.read': 'forbidden',
     'crm.manage': 'forbidden',
+    'work.read': 'forbidden',
+    'work.update': 'forbidden',
+    'work.manage': 'forbidden',
   },
 };
 
