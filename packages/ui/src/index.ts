@@ -6,3 +6,4 @@ export * from './components/button.js';
 export * from './components/surfaces.js';
 export * from './components/modules.js';
 export * from './components/navigation.js';
+export * from './components/module-icon.js';
