@@ -77,7 +77,7 @@ export const RATIOS_BANCAIRES: ArticleAide = {
             ],
           ],
           legende:
-            'Ces seuils proviennent du pack pays de votre projet. Ils sont **aujourd’hui identiques dans les quatre packs livrés** (RDC, Côte d’Ivoire, Sénégal, OHADA générique) : seule la fiscalité change d’un pays à l’autre, pas les attentes de ratios.',
+            'Ces seuils proviennent du pack pays de votre initiative. Ils sont **aujourd’hui identiques dans les quatre packs livrés** (RDC, Côte d’Ivoire, Sénégal, OHADA générique) : seule la fiscalité change d’un pays à l’autre, pas les attentes de ratios.',
         },
       ],
     },
@@ -129,7 +129,7 @@ export const RATIOS_BANCAIRES: ArticleAide = {
           ton: 'limite',
           titre: 'Les montants des ratios sont affichés en dollars',
           texte:
-            'Dans l’onglet **Ratios bancaires**, les valeurs monétaires sont libellées en USD quelle que soit la devise d’affichage choisie pour le projet. Les ratios en pourcentage et les ratios sans unité ne sont pas concernés. Si votre projet est en XOF, lisez le montant de trésorerie minimale dans l’onglet **Trésorerie mensuelle** plutôt que dans celui des ratios.',
+            'Dans l’onglet **Ratios bancaires**, les valeurs monétaires sont libellées en USD quelle que soit la devise d’affichage choisie pour l’initiative. Les ratios en pourcentage et les ratios sans unité ne sont pas concernés. Si votre initiative est en XOF, lisez le montant de trésorerie minimale dans l’onglet **Trésorerie mensuelle** plutôt que dans celui des ratios.',
         },
       ],
     },
@@ -169,7 +169,7 @@ export const RATIOS_BANCAIRES: ArticleAide = {
             { libelle: 'DSCR', valeur: '1,11 — Critique' },
           ],
           conclusion:
-            'Même activité, même emprunt, **durée portée à 7 ans** : la mensualité tombe à 2 811 USD, le service annuel à 33 700 USD, et le DSCR remonte à **1,38 — OK**. Le projet n’a pas changé ; son montage, si.',
+            'Même activité, même emprunt, **durée portée à 7 ans** : la mensualité tombe à 2 811 USD, le service annuel à 33 700 USD, et le DSCR remonte à **1,38 — OK**. L’initiative n’a pas changé ; son montage, si.',
         },
         {
           type: 'paragraphe',
@@ -382,7 +382,7 @@ export const RATIOS_BANCAIRES: ArticleAide = {
             '**VAN** (valeur actualisée nette) — non calculée.',
             '**TRI** (taux de rentabilité interne) — non calculé.',
             '**ROI** et **ratio d’endettement** — non calculés. L’autonomie financière est l’indicateur de structure disponible.',
-            '**Scénarios** prudent et ambitieux — non disponibles : un projet porte un seul jeu d’hypothèses. Pour comparer deux montages, créez deux projets.',
+            '**Scénarios** prudent et ambitieux — non disponibles : une initiative porte un seul jeu d’hypothèses. Pour comparer deux montages, créez deux initiatives.',
           ],
         },
         {

@@ -205,7 +205,7 @@ export function LalaChat({
 
       {/* L'appel vocal vit ICI, entre l'en-tête et le fil, et non dans le fil.
           `LalaAppelVocal` ne reçoit AUCUNE prop — voir sa signature : c'est ce
-          qui garantit qu'aucun chiffre du projet ne peut lui parvenir, ni
+          qui garantit qu'aucun chiffre de l’initiative ne peut lui parvenir, ni
           aujourd'hui ni après une modification distraite. Le vocal explique des
           notions; le fil ci-dessous explique CE résultat-là. Les deux ne
           partagent donc ni contexte ni historique, et c'est voulu. */}

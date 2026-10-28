@@ -28,7 +28,7 @@ export default function BusinessPlanOverviewPage(): React.ReactElement {
       <PageHeader
         module="build"
         title="Business plan"
-        description="Le document narratif de chaque projet : votre texte, les chiffres du plan financier validé, et une aide IA qui ne cite que vos données."
+        description="Le document narratif de chaque initiative : votre texte, les chiffres du plan financier validé, et une aide IA qui ne cite que vos données."
       />
       {erreur ? (
         <p role="alert" className="text-sm text-[var(--danger)]">
@@ -38,11 +38,11 @@ export default function BusinessPlanOverviewPage(): React.ReactElement {
         <p className="text-sm text-[var(--foreground-muted)]">Chargement…</p>
       ) : items.length === 0 ? (
         <EmptyState
-          title="Aucun projet"
+          title="Aucune initiative"
           description="Créez d’abord un plan financier : son business plan s’y rattache."
           action={
             <Link className="text-sm font-medium underline" href="/initiatives">
-              Plans financiers
+              Initiatives
             </Link>
           }
         />

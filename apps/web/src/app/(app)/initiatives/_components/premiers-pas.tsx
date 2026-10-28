@@ -21,7 +21,7 @@ const ETAPES: { titre: string; texte: string; lien?: { href: string; libelle: st
   {
     titre: 'Remplacez les valeurs suggérées par les vôtres',
     texte:
-      'Le projet arrive pré-rempli avec des ordres de grandeur du secteur. Ce ne sont pas vos chiffres. Reprenez surtout l’investissement, l’apport et le crédit : ce sont eux que la banque regarde en premier. Vos saisies sont enregistrées automatiquement.',
+      'L’initiative arrive pré-remplie avec des ordres de grandeur du secteur. Ce ne sont pas vos chiffres. Reprenez surtout l’investissement, l’apport et le crédit : ce sont eux que la banque regarde en premier. Vos saisies sont enregistrées automatiquement.',
     lien: { href: '/aide/demarrer#hypotheses-pre-remplies', libelle: 'Les valeurs suggérées' },
   },
   {
@@ -82,7 +82,7 @@ export function PremiersPas(): React.ReactElement {
       </ol>
 
       <p className="mt-7 border-t border-[var(--border)] pt-5 text-[0.88rem] leading-relaxed text-[var(--foreground-muted)]">
-        Créez votre projet avec le formulaire ci-dessus. Si un mot vous arrête — BFR, DSCR, apport,
+        Créez votre initiative avec le formulaire ci-dessus. Si un mot vous arrête — BFR, DSCR, apport,
         point mort — le{' '}
         <Link
           href="/aide/glossaire"

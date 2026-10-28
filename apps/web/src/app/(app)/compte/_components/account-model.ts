@@ -44,12 +44,12 @@ export const NOTIFICATION_LABELS: Record<string, { label: string; description: s
     description: 'Nouvelles fonctionnalités et évolutions importantes.',
   },
   projet: {
-    label: 'Activité des projets',
+    label: 'Activité des initiatives',
     description: 'Plans validés, périodes clôturées, invitations acceptées.',
   },
   resumeHebdomadaire: {
     label: 'Résumé hebdomadaire',
-    description: 'Un récapitulatif par semaine de l’activité de vos projets.',
+    description: 'Un récapitulatif par semaine de l’activité de vos initiatives.',
   },
 };
 

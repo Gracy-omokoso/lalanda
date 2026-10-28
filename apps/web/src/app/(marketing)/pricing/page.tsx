@@ -85,7 +85,7 @@ export default function PricingPage(): React.ReactElement {
                 Vous obtenez l&apos;offre Pro pendant {TRIAL_DAYS} jours. Aucun moyen de paiement
                 n&apos;est demandé, aucun prélèvement n&apos;a lieu au terme : le compte revient à
                 l&apos;offre gratuite, et{' '}
-                <strong className="font-semibold">aucun projet n&apos;est supprimé</strong>.
+                <strong className="font-semibold">aucune initiative n&apos;est supprimée</strong>.
               </p>
               <Link
                 href="/register"

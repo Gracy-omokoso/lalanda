@@ -166,7 +166,7 @@ export const GLOSSAIRE: ArticleAide = {
               statut: 'concept',
               definition:
                 'Le Business Model Canvas : une description de votre modèle économique en neuf blocs — clients, proposition de valeur, canaux, ressources, revenus, coûts. C’est du texte qui accompagne le dossier, pas un calcul.',
-              ou: 'Onglet **Canvas** du projet.',
+              ou: 'Onglet **Canvas** de l’initiative.',
             },
             {
               terme: 'Charges fixes',
@@ -193,7 +193,7 @@ export const GLOSSAIRE: ArticleAide = {
               statut: 'concept',
               definition:
                 'L’ensemble daté et versionné des règles d’un pays : impôt sur les bénéfices, TVA, charges sociales, taux de crédit constatés, seuils de ratios. Un plan garde le pack avec lequel il a été calculé — une mise à jour fiscale ne réécrit jamais un dossier déjà déposé.',
-              ou: 'Choisi à la création du projet. Voir [choisir un pays](/aide/demarrer#choisir-un-pays).',
+              ou: 'Choisi à la création de l’initiative. Voir [choisir un pays](/aide/demarrer#choisir-un-pays).',
             },
             {
               terme: 'Plan validé',
@@ -272,7 +272,7 @@ export const GLOSSAIRE: ArticleAide = {
               terme: 'Scénario',
               statut: 'non_calcule',
               definition:
-                'Un jeu d’hypothèses alternatif — prudent, ambitieux — permettant de comparer plusieurs trajectoires. **Non disponible** : un projet porte un seul jeu d’hypothèses. Pour comparer deux montages, créez deux projets.',
+                'Un jeu d’hypothèses alternatif — prudent, ambitieux — permettant de comparer plusieurs trajectoires. **Non disponible** : une initiative porte un seul jeu d’hypothèses. Pour comparer deux montages, créez deux initiatives.',
             },
             {
               terme: 'Dettes fiscales et sociales',

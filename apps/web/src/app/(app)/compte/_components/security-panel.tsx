@@ -458,8 +458,8 @@ function DeleteAccountSection(): React.ReactElement {
               <>
                 {' '}
                 {assessment.organizationsDeletedWithAccount.length > 1
-                  ? 'Les organisations suivantes seront également supprimées, avec tous leurs projets et plans :'
-                  : 'L’organisation suivante sera également supprimée, avec tous ses projets et plans :'}{' '}
+                  ? 'Les organisations suivantes seront également supprimées, avec toutes leurs initiatives et plans :'
+                  : 'L’organisation suivante sera également supprimée, avec toutes ses initiatives et plans :'}{' '}
                 <strong className="text-[var(--foreground)]">
                   {assessment.organizationsDeletedWithAccount.map((o) => o.name).join(', ')}
                 </strong>

@@ -40,7 +40,7 @@ export const SUIVRE_SON_ACTIVITE: ArticleAide = {
         {
           type: 'paragraphe',
           texte:
-            'Le suivi se trouve dans l’onglet **Réalisé** de votre projet, à côté de l’onglet **Plan**.',
+            'Le suivi se trouve dans l’onglet **Réalisé** de votre initiative, à côté de l’onglet **Plan**.',
         },
       ],
     },
@@ -52,7 +52,7 @@ export const SUIVRE_SON_ACTIVITE: ArticleAide = {
           type: 'liste',
           items: [
             'Vous saisissez **par mois**, ligne par ligne, sur une grille qui reprend les lignes de votre compte d’exploitation.',
-            'Les périodes sont repérées par **exercice (1 à 5) et mois (1 à 12)** — ce sont des repères **relatifs au démarrage** de votre projet, pas des dates du calendrier. Le mois 1 de l’exercice 1 est votre premier mois d’activité, quelle que soit la date réelle.',
+            'Les périodes sont repérées par **exercice (1 à 5) et mois (1 à 12)** — ce sont des repères **relatifs au démarrage** de votre initiative, pas des dates du calendrier. Le mois 1 de l’exercice 1 est votre premier mois d’activité, quelle que soit la date réelle.',
             'Une période se **clôture** quand elle est complète. Une période clôturée peut être **rouverte**, et chaque réouverture est journalisée — on sait toujours qui a rouvert quoi et quand.',
             'La projection actualisée ne prend en compte que les périodes **clôturées** : une saisie en cours ne fausse pas vos prévisions.',
           ],

@@ -426,7 +426,7 @@ function AvisPreremplissage({
           >
             Business Model Canvas
           </Link>
-          . Aucun montant n’en a été tiré : le Canvas décrit votre projet, il ne calcule rien.
+          . Aucun montant n’en a été tiré : le Canvas décrit votre initiative, il ne calcule rien.
         </p>
       ) : null}
 

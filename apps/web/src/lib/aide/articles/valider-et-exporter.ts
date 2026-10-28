@@ -32,12 +32,12 @@ export const VALIDER_ET_EXPORTER: ArticleAide = {
         {
           type: 'paragraphe',
           texte:
-            'Tant que vous saisissez, votre projet est un **brouillon** : il change à chaque modification. Valider un plan en fait une **version figée et immuable**, horodatée, avec ses hypothèses, ses résultats, le modèle et le pack pays utilisés, et la version du moteur de calcul. C’est cette version que vous déposez, et à laquelle vous pourrez vous référer plus tard.',
+            'Tant que vous saisissez, votre initiative est un **brouillon** : elle change à chaque modification. Valider un plan en fait une **version figée et immuable**, horodatée, avec ses hypothèses, ses résultats, le modèle et le pack pays utilisés, et la version du moteur de calcul. C’est cette version que vous déposez, et à laquelle vous pourrez vous référer plus tard.',
         },
         {
           type: 'liste',
           items: [
-            'Les versions sont numérotées **v1, v2, v3…** par projet. Valider à nouveau crée la version suivante ; la précédente passe au statut « remplacée » mais **n’est jamais supprimée ni modifiée**.',
+            'Les versions sont numérotées **v1, v2, v3…** par initiative. Valider à nouveau crée la version suivante ; la précédente passe au statut « remplacée » mais **n’est jamais supprimée ni modifiée**.',
             'Un plan validé conserve une **copie complète des résultats**. Rouvrir une ancienne version ne relance aucun calcul : vous relisez exactement ce que vous aviez déposé, même si le modèle ou la fiscalité ont évolué depuis.',
             'Vous pouvez continuer à modifier vos hypothèses après une validation. Cela ne touche pas le plan figé — cela vous prépare simplement une version suivante.',
           ],
@@ -131,7 +131,7 @@ export const VALIDER_ET_EXPORTER: ArticleAide = {
           ton: 'limite',
           titre: 'L’Excel n’indique pas le numéro de version à l’intérieur',
           texte:
-            'La feuille « Métadonnées » porte l’organisation, le pays, le projet, le modèle et sa version, la devise, la date de génération et le cadre fiscal — mais **pas le numéro de version du plan validé**. Seul le nom du fichier le porte. Ne renommez donc pas vos fichiers Excel à la légère : c’est votre seul moyen de savoir de quelle version ils viennent.',
+            'La feuille « Métadonnées » porte l’organisation, le pays, l’initiative, le modèle et sa version, la devise, la date de génération et le cadre fiscal — mais **pas le numéro de version du plan validé**. Seul le nom du fichier le porte. Ne renommez donc pas vos fichiers Excel à la légère : c’est votre seul moyen de savoir de quelle version ils viennent.',
         },
       ],
     },

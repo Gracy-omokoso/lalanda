@@ -95,7 +95,7 @@ export function BillingPanel(): React.ReactElement {
         <p className="font-display text-2xl font-bold tracking-tight">{libellePlan(vue.plan)}</p>
         <dl className="grid gap-2 sm:grid-cols-2">
           <Rubrique
-            terme="Projets"
+            terme="Initiatives"
             valeur={libelleLimite(
               vue.consommation.projets.utilise,
               vue.consommation.projets.limite,

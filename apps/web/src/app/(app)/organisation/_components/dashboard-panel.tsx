@@ -77,7 +77,7 @@ export function DashboardPanel(): React.ReactElement {
       <EtatVide titre="Aucune organisation active">
         Créez une organisation ou acceptez une invitation pour ouvrir cet espace.{' '}
         <Link href="/initiatives" className="underline hover:text-[var(--accent)]">
-          Retour aux projets
+          Retour aux initiatives
         </Link>
       </EtatVide>
     );
@@ -136,7 +136,7 @@ export function DashboardPanel(): React.ReactElement {
       {sections.gouvernance ? (
         <Bloc titre="Pilotage de l’organisation">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Tuile libelle="Projets" valeur={formatNombre(sections.gouvernance.projets)} />
+            <Tuile libelle="Initiatives" valeur={formatNombre(sections.gouvernance.projets)} />
             <Tuile
               libelle="Plans validés ce mois"
               valeur={formatNombre(sections.gouvernance.plansValidesCeMois)}
@@ -185,7 +185,7 @@ export function DashboardPanel(): React.ReactElement {
 
             <Colonne
               titre="Plans en attente"
-              vide="Tous les projets ont un plan validé à jour."
+              vide="Toutes les initiatives ont un plan validé à jour."
               nombre={sections.validation.plansEnAttente.length}
             >
               {sections.validation.plansEnAttente.map((p) => (
@@ -289,10 +289,10 @@ export function DashboardPanel(): React.ReactElement {
 
       {/* ── Projets — `project.read`, donc tout le monde ────────────────── */}
       {sections.projets ? (
-        <Bloc titre="Projets">
+        <Bloc titre="Initiatives">
           {sections.projets.projets.length === 0 ? (
-            <EtatVide titre="Aucun projet pour l’instant">
-              Les projets de l’organisation apparaîtront ici dès leur création.
+            <EtatVide titre="Aucune initiative pour l’instant">
+              Les initiatives de l’organisation apparaîtront ici dès leur création.
             </EtatVide>
           ) : (
             <ul className="flex flex-col gap-2">

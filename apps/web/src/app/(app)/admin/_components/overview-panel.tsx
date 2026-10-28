@@ -73,7 +73,7 @@ export function OverviewPanel(): React.ReactElement {
             valeur={vue.users.total}
             precision={`dont ${vue.users.withPlatformRole} avec un rôle plateforme`}
           />
-          <Compteur libelle="Projets" valeur={vue.projects.total} />
+          <Compteur libelle="Initiatives" valeur={vue.projects.total} />
           <Compteur
             libelle="Plans validés"
             valeur={vue.approvedPlans.total}

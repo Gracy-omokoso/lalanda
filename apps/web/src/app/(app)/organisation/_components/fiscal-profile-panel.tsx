@@ -117,7 +117,7 @@ export function FiscalProfilePanel({
         <p className="mt-1 text-sm text-[var(--foreground-muted)]">
           L’identité fiscale et la facture normalisée engagent l’organisation devant la DGI : elles
           sont gérées par un Propriétaire ou un Directeur financier. Votre rôle vous donne accès au
-          tableau de bord et à vos projets.
+          tableau de bord et à vos initiatives.
         </p>
       </div>
     );

@@ -13,7 +13,7 @@ export const DEMARRER: ArticleAide = {
   slug: 'demarrer',
   titre: 'Démarrer',
   resume:
-    'Créer votre premier projet, choisir un pays et un modèle, comprendre les valeurs déjà remplies.',
+    'Créer votre première initiative, choisir un pays et un modèle, comprendre les valeurs déjà remplies.',
   ordre: 1,
   sections: [
     {
@@ -29,9 +29,9 @@ export const DEMARRER: ArticleAide = {
           type: 'etapes',
           items: [
             {
-              titre: 'Créer le projet',
+              titre: 'Créer l’initiative',
               texte:
-                'Un projet = un plan financier, dans un pays et un cadre fiscal donnés. Vous choisissez le pays, le cadre fiscal, la devise d’affichage, un modèle sectoriel, et vous nommez le projet.',
+                'Une initiative = un plan financier, dans un pays et un cadre fiscal donnés. Vous choisissez le pays, le cadre fiscal, la devise d’affichage, un modèle sectoriel, et vous nommez l’initiative.',
             },
             {
               titre: 'Ajuster vos hypothèses',
@@ -131,7 +131,7 @@ export const DEMARRER: ArticleAide = {
           ton: 'limite',
           titre: 'On ne change pas de modèle en cours de route',
           texte:
-            'Le modèle est fixé à la création du projet et n’est pas modifiable ensuite. Si vous vous êtes trompé, créez un nouveau projet. C’est volontaire : changer de modèle changerait les formules sous des chiffres déjà validés.',
+            'Le modèle est fixé à la création de l’initiative et n’est pas modifiable ensuite. Si vous vous êtes trompé, créez une nouvelle initiative. C’est volontaire : changer de modèle changerait les formules sous des chiffres déjà validés.',
         },
       ],
     },

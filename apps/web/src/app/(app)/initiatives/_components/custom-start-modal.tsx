@@ -143,7 +143,7 @@ export function CustomStartModal({
 
   async function terminer(): Promise<void> {
     if (!nom) {
-      setErreur('Donnez d’abord un nom à votre projet — c’est le seul champ obligatoire.');
+      setErreur('Donnez d’abord un nom à votre initiative — c’est le seul champ obligatoire.');
       setIndex(0);
       return;
     }
@@ -154,7 +154,7 @@ export function CustomStartModal({
       // Succès : la page navigue. On ne remet pas `envoi` à false, pour ne pas
       // rendre les boutons cliquables une seconde fois pendant la transition.
     } catch (err) {
-      setErreur(err instanceof Error ? err.message : 'La création du projet a échoué.');
+      setErreur(err instanceof Error ? err.message : 'La création de l’initiative a échoué.');
       setEnvoi(false);
     }
   }
@@ -176,7 +176,7 @@ export function CustomStartModal({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Démarrer un projet dans un secteur personnalisé"
+        aria-label="Démarrer une initiative dans un secteur personnalisé"
         className={[
           'flex w-full flex-col bg-[var(--surface)] shadow-2xl',
           // Sous 640 px : plein écran, `dvh` et non `vh` — la barre d'adresse
@@ -283,7 +283,7 @@ function EcranChoix({
         />
         <CarteChoix
           titre="Mon Business Model Canvas d’abord"
-          description="Une quinzaine de questions sur votre projet, une par écran. À la fin, votre Canvas est rempli et votre plan financier part avec les chiffres que vous aurez donnés. Vous pouvez sortir à tout moment."
+          description="Une quinzaine de questions sur votre initiative, une par écran. À la fin, votre Canvas est rempli et votre plan financier part avec les chiffres que vous aurez donnés. Vous pouvez sortir à tout moment."
           badge={dejaRepondu ? 'Reprendre' : undefined}
           onClick={onQuestionnaire}
           enCours={enCours}
@@ -490,7 +490,7 @@ function EcranQuestionnaire({
         </div>
 
         {/* Échappatoire permanente. Elle ne jette rien : tout ce qui a été
-            répondu part avec le projet. */}
+            répondu part avec l’initiative. */}
         <button
           type="button"
           onClick={onTerminer}

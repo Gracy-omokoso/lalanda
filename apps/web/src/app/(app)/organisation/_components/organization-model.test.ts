@@ -274,13 +274,13 @@ describe('composition du tableau de bord (S21a)', () => {
       projets: { utilise: 3, limite: null },
       sieges: { utilise: 5, limite: null },
     };
-    expect(resumeConsommation(sansSieges)).toBe('3 / illimité projets · 5 membres');
+    expect(resumeConsommation(sansSieges)).toBe('3 / illimité initiatives · 5 membres');
 
     const avecSieges: ConsommationView = {
       plan: 'business',
       projets: { utilise: 1, limite: null },
       sieges: { utilise: 21, limite: 20 },
     };
-    expect(resumeConsommation(avecSieges)).toBe('1 / illimité projet · 21 / 20 sièges');
+    expect(resumeConsommation(avecSieges)).toBe('1 / illimité initiative · 21 / 20 sièges');
   });
 });

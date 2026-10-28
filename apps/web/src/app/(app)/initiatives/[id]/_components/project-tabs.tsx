@@ -76,7 +76,7 @@ export function ProjectTabs({
 
   return (
     <TabsNav
-      label="Sections du projet"
+      label="Sections de l’initiative"
       renderLink={renderNextLink}
       items={tabs.map((tab) => ({
         href: tab.segment ? `${base}/${tab.segment}` : base,

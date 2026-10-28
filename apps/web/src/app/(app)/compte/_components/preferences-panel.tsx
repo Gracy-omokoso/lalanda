@@ -230,8 +230,8 @@ export function PreferencesPanel(): React.ReactElement {
           id="display-currency-help"
           className="-mt-1 text-xs italic text-[var(--foreground-muted)]"
         >
-          Devise proposée par défaut à la création d’un projet. Elle ne convertit RIEN et ne modifie
-          aucun projet existant : chaque projet garde la devise dans laquelle il a été saisi.
+          Devise proposée par défaut à la création d’une initiative. Elle ne convertit RIEN et ne modifie
+          aucune initiative existante : chaque initiative garde la devise dans laquelle elle a été saisie.
         </p>
       </fieldset>
 

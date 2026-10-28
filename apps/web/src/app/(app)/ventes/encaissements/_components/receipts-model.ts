@@ -242,8 +242,8 @@ export function messageEncaissement(err: unknown, repli: string): string {
 
 export const BRIDGE_STATE_LABELS: Record<ActualsBridgeView['state'], string> = {
   disabled: 'Désactivé : les ventes n’alimentent aucun plan',
-  not_configured: 'Activé mais incomplet : choisissez le projet, la ligne et le début d’exercice',
-  active: 'Actif : le chiffre d’affaires des ventes alimente le réalisé du projet',
+  not_configured: 'Activé mais incomplet : choisissez l’initiative, la ligne et le début d’exercice',
+  active: 'Actif : le chiffre d’affaires des ventes alimente le réalisé de l’initiative',
 };
 
 export const OUTCOME_LABELS: Record<ActualsSyncOutcome, string> = {
@@ -259,7 +259,7 @@ export const OUTCOME_LABELS: Record<ActualsSyncOutcome, string> = {
 export const SKIP_LABELS: Record<ActualsSyncReport['skipped'][number]['reason'], string> = {
   OUTSIDE_PLAN_HORIZON: 'Hors des cinq exercices du plan',
   CURRENCY_NOT_CONVERTIBLE:
-    'Une vente est dans une autre devise que le projet : aucun taux n’est appliqué, le mois n’est pas reporté',
+    'Une vente est dans une autre devise que l’initiative : aucun taux n’est appliqué, le mois n’est pas reporté',
 };
 
 /** Le résultat d'une synchronisation demande-t-il l'attention de la personne ? */

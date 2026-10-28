@@ -171,7 +171,7 @@ describe('grille tarifaire affichée', () => {
       const texte = tier.features.join(' | ').toLowerCase();
 
       if (e.maxProjects === null) {
-        expect(texte).toContain('projets illimités');
+        expect(texte).toContain('initiatives illimitées');
       } else {
         expect(texte).toContain(String(e.maxProjects));
       }
@@ -188,7 +188,7 @@ describe('comparatif', () => {
   const rowNamed = (label: string) => rows.find((r) => r.label === label)!;
 
   it('reflète la limite de projets réellement appliquée', () => {
-    const row = rowNamed('Projets');
+    const row = rowNamed('Initiatives');
     for (const plan of PLANS) {
       const limite = PLAN_CATALOG[plan].entitlements.maxProjects;
       if (limite === null) {
