@@ -78,6 +78,13 @@ describe('isProtectedPath (S20b)', () => {
     expect(isProtectedPath('/idees-recues')).toBe(false);
   });
 
+  it('ADR-0039 : /projets et ses sous-routes exigent une session', () => {
+    for (const path of ['/projets', '/projets/mes-taches', '/projets/abc/kanban']) {
+      expect(isProtectedPath(path)).toBe(true);
+    }
+    expect(isProtectedPath('/projets-publics')).toBe(false);
+  });
+
   it('protège les espaces existants, racine comme sous-routes', () => {
     for (const path of [
       '/projects',

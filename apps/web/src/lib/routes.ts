@@ -71,6 +71,9 @@ export const PROTECTED_PREFIXES = [
   '/business-plan',
   // ADR-0039 — L2 : boîte de notifications (session ET organisation active).
   '/notifications',
+  // ADR-0039 — projets et tâches du RUN (module `work`). Session ET organisation
+  // active ; `/projets` est distinct de `/projects` (initiatives BUILD).
+  '/projets',
 ] as const;
 
 /**

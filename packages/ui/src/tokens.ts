@@ -145,3 +145,52 @@ export const PAIRES_NAV: ReadonlyArray<
   ['nav-fg', 'nav-active-bg', SEUIL_TEXTE],
   ['nav-accent', 'nav-bg', SEUIL_INTERFACE],
 ];
+
+// ─── Étiquettes (ADR-0039 § 2.1) ─────────────────────────────────────────────
+
+/**
+ * Couleurs d'étiquette : palette FERMÉE, mêmes clés que `WORK_LABEL_COLORS`
+ * (`@lalanda/shared/work`) — le web vérifie l'égalité des deux listes. Une
+ * étiquette ne porte jamais un code couleur libre.
+ */
+export const TAG_COLORS = [
+  'gray',
+  'red',
+  'orange',
+  'yellow',
+  'green',
+  'teal',
+  'blue',
+  'purple',
+  'pink',
+] as const;
+export type TagColor = (typeof TAG_COLORS)[number];
+
+/**
+ * Valeurs par thème (variables `--label-<clé>-bg|fg|dot`). `fg` sur `bg` : texte
+ * (≥ 4,5:1) ; `dot` sur la surface et sur `bg` : repère d'interface (≥ 3:1).
+ */
+export const LABEL_TOKENS = {
+  light: {
+    gray: { bg: '#ECEAE4', fg: '#3F3D36', dot: '#6B675C' },
+    red: { bg: '#FBE4E1', fg: '#8E1F17', dot: '#C2372B' },
+    orange: { bg: '#FCE8D6', fg: '#8A3B0A', dot: '#C25A12' },
+    yellow: { bg: '#FAF0C8', fg: '#6B4E00', dot: '#9A7400' },
+    green: { bg: '#E1F2E3', fg: '#1F5F2C', dot: '#2E8B45' },
+    teal: { bg: '#DCF0EE', fg: '#145A55', dot: '#1C8A82' },
+    blue: { bg: '#E0EAFB', fg: '#1E4796', dot: '#2F64D0' },
+    purple: { bg: '#EEE5F8', fg: '#5B2D8E', dot: '#8150C2' },
+    pink: { bg: '#FBE3EF', fg: '#8C1D58', dot: '#C83D86' },
+  },
+  dark: {
+    gray: { bg: '#24343A', fg: '#D9DEDC', dot: '#9AA6AA' },
+    red: { bg: '#3A1C1A', fg: '#F5B4AD', dot: '#EF7D72' },
+    orange: { bg: '#3A2414', fg: '#F6C49A', dot: '#EE9A55' },
+    yellow: { bg: '#352C0F', fg: '#F0D985', dot: '#D9B83A' },
+    green: { bg: '#173323', fg: '#A6DDB4', dot: '#5CC285' },
+    teal: { bg: '#12332F', fg: '#9EDCD4', dot: '#43B8AC' },
+    blue: { bg: '#172A47', fg: '#ADC8F5', dot: '#6E9CEB' },
+    purple: { bg: '#2A1F3D', fg: '#CDB5F0', dot: '#A584DD' },
+    pink: { bg: '#3A1A2B', fg: '#F3B0D2', dot: '#E07AAE' },
+  },
+} as const satisfies Record<Theme, Record<TagColor, { bg: string; fg: string; dot: string }>>;

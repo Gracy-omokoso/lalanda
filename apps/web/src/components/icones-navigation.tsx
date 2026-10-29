@@ -131,6 +131,16 @@ const TRACES: Record<
       <path d="M3 4h18l-7 8v6l-4 2v-8Z" />
     </>
   ),
+  // ADR-0039 — projets : tableau à trois colonnes de cartes (Kanban), dessiné à
+  // la main dans le style outline des autres icônes.
+  projets: (
+    <>
+      <rect width="18" height="18" x="3" y="3" rx="2" />
+      <path d="M7 7v6" />
+      <path d="M12 7v3" />
+      <path d="M17 7v9" />
+    </>
+  ),
   pilotage: (
     <>
       <path d="m12 14 4-4" />

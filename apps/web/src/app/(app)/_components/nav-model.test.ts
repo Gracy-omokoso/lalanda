@@ -37,6 +37,9 @@ const PROPRIETAIRE: OrgAction[] = [
   'treasury.read',
   'crm.read',
   'crm.manage',
+  'work.read',
+  'work.update',
+  'work.manage',
 ];
 const LECTEUR: OrgAction[] = ['project.read', 'sales.read'];
 const SANS_VENTES: OrgAction[] = ['project.read'];
@@ -79,15 +82,19 @@ describe('applications et ordre', () => {
     ]);
   });
 
-  it('le mot « Plans financiers » a disparu ; « Projets » est réservé (lot R1)', () => {
+  it('le mot « Plans financiers » a disparu ; « Projets » est le seul gestionnaire de RUN (ADR-0039)', () => {
     for (const app of NAV_APPS) {
       expect(app.label).not.toMatch(/plans? financiers?/i);
-      expect(app.label).not.toMatch(/projet/i);
+      if (app.id !== 'projets') expect(app.label).not.toMatch(/projet/i);
     }
+    const projets = NAV_APPS.find((a) => a.id === 'projets')!;
+    expect(projets.module).toBe('run');
+    expect(projets.href).toBe('/projets');
   });
 
   it('RUN, pour un propriétaire', () => {
     expect(ids(appsVisibles(PROPRIETAIRE, 'run'))).toEqual([
+      'projets',
       'factures',
       'devis',
       'encaissements',
@@ -127,6 +134,7 @@ describe('applications et ordre', () => {
     expect(ids(appsVisibles(LECTEUR, 'run'))).not.toContain('crm');
     expect(ids(appsVisibles(LECTEUR, 'run'))).not.toContain('tresorerie');
     expect(ids(appsVisibles(['treasury.read'], 'run'))).toEqual(['tresorerie']);
+    expect(ids(appsVisibles(['work.read'], 'run'))).toEqual(['projets']);
   });
 
   it('chaque application a une description pour sa tuile', () => {
@@ -159,6 +167,31 @@ describe('sous-options', () => {
     expect(sansPermission.sousOptions.every((s) => s.action !== null)).toBe(true);
     // Une application visible sans condition n'expose pas de sous-option conditionnée.
     for (const app of appsVisibles(null)) expect(app.sousOptions).toEqual([]);
+  });
+});
+
+describe('Projets (ADR-0039 § 8)', () => {
+  it('se déroule sur « Mes tâches » et « Tous les projets », sous `work.read`', () => {
+    const [projets] = appsVisibles(['work.read'], 'run');
+    expect(projets!.sousOptions.map((s) => [s.label, s.href])).toEqual([
+      ['Mes tâches', '/projets/mes-taches'],
+      ['Tous les projets', '/projets'],
+    ]);
+    expect(projets!.sousOptions.every((s) => s.action === 'work.read')).toBe(true);
+  });
+
+  it('caché sans `work.read` (Chef de projet, Conseiller externe)', () => {
+    expect(ids(appsVisibles(['project.read', 'analytics.read'] as OrgAction[], 'run'))).toEqual([]);
+  });
+
+  it('allume la bonne sous-option et le module RUN, sans confondre avec /projects', () => {
+    expect(moduleCourant('/projets')).toBe('run');
+    expect(moduleCourant('/projets/abc/kanban')).toBe('run');
+    expect(appActive('/projets/abc/kanban')).toBe('projets');
+    expect(sousOptionActive('/projets/mes-taches')).toBe('projets-mes-taches');
+    expect(sousOptionActive('/projets/abc/liste')).toBe('projets-tous');
+    expect(appActive('/projets-archives')).toBeNull();
+    expect(appActive('/initiatives/abc')).toBe('initiatives');
   });
 });
 
