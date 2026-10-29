@@ -76,7 +76,12 @@ describe('contenu de l’e-mail', () => {
       dueDates: { status: 'unavailable' },
       work: {
         status: 'known',
-        tasks: [t(true, '2026-10-20'), t(true, '2026-10-19'), t(true, '2026-10-21'), t(false, '2026-10-01')],
+        tasks: [
+          t(true, '2026-10-20'),
+          t(true, '2026-10-19'),
+          t(true, '2026-10-21'),
+          t(false, '2026-10-01'),
+        ],
         truncated: false,
       },
     });

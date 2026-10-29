@@ -145,7 +145,10 @@ e2eSuite('brief du matin — tâches et projets à risque (ADR-0039 § 6.5)', ()
     const spy = vi.spyOn(mail, 'sendMorningBrief').mockResolvedValue({ delivered: true } as never);
     try {
       // 9 h à Kinshasa, le jour du test.
-      const report = await f.app().get(MorningBriefEmailJob).run(new Date(`${today}T08:00:00Z`));
+      const report = await f
+        .app()
+        .get(MorningBriefEmailJob)
+        .run(new Date(`${today}T08:00:00Z`));
       expect(report).toMatchObject({ claimed: 2, sent: 2 });
       const factsOf = (who: 'analyst' | 'admin'): string[] => {
         const call = spy.mock.calls.find((c) => c[0].to.includes(`-${who}-`));
