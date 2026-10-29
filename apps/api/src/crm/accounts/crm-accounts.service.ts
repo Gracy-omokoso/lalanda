@@ -25,7 +25,7 @@ import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Types, type ClientSession, type Connection, type Model } from 'mongoose';
 
 import { AuditService } from '../../authz/audit.service.js';
-import { can, normalizeOrgRole } from '../../authz/permissions.js';
+import { can, NO_OVERRIDES, normalizeOrgRole } from '../../authz/permissions.js';
 import { Membership, type MembershipDocument } from '../../organizations/membership.schema.js';
 import { invalidCursor, isDuplicateKey, staleRevision } from '../../sales/sales.errors.js';
 import {
@@ -649,7 +649,8 @@ export class CrmAccountsService {
       .exec();
     if (!m) ownerNotFound();
     const role = normalizeOrgRole(m.role);
-    if (!role || !can(role, 'crm.manage')) ownerNotEligible();
+    // ADR-0041 A3 : passer aux droits effectifs du membre (ajouts et retraits).
+    if (!role || !can(role, 'crm.manage', NO_OVERRIDES)) ownerNotEligible();
   }
 
   /** Autres comptes non fusionnés de même nom normalisé (avertissement, jamais un refus). */
