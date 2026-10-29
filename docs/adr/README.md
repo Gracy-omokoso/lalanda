@@ -45,3 +45,6 @@ Décideurs :
 - [ADR-0040](ADR-0040-crm-complet.md) — CRM complet (R2) : application RUN `/crm`, comptes
   360°, pipeline v2, relances dans « Mes tâches », rapports, rôle Commercial et action
   `sales.quote`. Statut : **proposé** (29 oct. 2026).
+- [ADR-0041](ADR-0041-autorisations-par-membre.md) — Autorisations par membre : le rôle devient un
+  titre et un modèle de départ, avec ajouts et retraits d'actions par membre (amende ADR-0012 et
+  docs/12), après le lot C0 d'ADR-0040. Statut : **proposé, ADR-0041** (29 oct. 2026).
