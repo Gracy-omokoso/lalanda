@@ -33,7 +33,7 @@ import { CurrentOrgId, CurrentUser } from '../auth/current-user.decorator.js';
 import { RequirePermission } from '../authz/authz.decorators.js';
 import { CurrentOrgRole } from '../authz/current-org-role.decorator.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
-import { can, type OrgRole } from '../authz/permissions.js';
+import { can, NO_OVERRIDES, type OrgRole } from '../authz/permissions.js';
 import { BillingService } from '../billing/billing.service.js';
 import {
   GrowProfileService,
@@ -72,7 +72,7 @@ export interface GrowJourneyResponse {
 
 /** Ce que le rôle peut lire de GROW (ADR-0040 § 4.4). Rôle inconnu : rien de sensible. */
 function accessOf(role: OrgRole | undefined): GrowReadAccess {
-  return { treasury: role !== undefined && can(role, 'treasury.read') };
+  return { treasury: role !== undefined && can(role, 'treasury.read', NO_OVERRIDES) };
 }
 
 function actorOf(user: { id: string }, role: OrgRole | undefined): GrowActor {
@@ -159,7 +159,7 @@ export class GrowController {
     await this.assertPlanAllowsGrow(orgId);
     const s = await this.reader.snapshot(orgId, new Date(), accessOf(role));
     // Noms des clients : seulement pour qui lit le fichier clients (`sales.read`).
-    return role !== undefined && can(role, 'sales.read')
+    return role !== undefined && can(role, 'sales.read', NO_OVERRIDES)
       ? s.indicators
       : withoutCustomerNames(s.indicators);
   }
