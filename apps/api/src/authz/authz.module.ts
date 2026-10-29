@@ -11,6 +11,7 @@ import { AuditEvent, AuditEventSchema } from './audit-event.schema.js';
 import { AuditController } from './audit.controller.js';
 import { AuditService } from './audit.service.js';
 import { AuthzService } from './authz.service.js';
+import { CatalogController } from './catalog.controller.js';
 import { MeController } from './me.controller.js';
 import { PermissionsGuard } from './permissions.guard.js';
 import {
@@ -28,7 +29,7 @@ import {
       { name: AuditEvent.name, schema: AuditEventSchema },
     ]),
   ],
-  controllers: [AuditController, MeController],
+  controllers: [AuditController, MeController, CatalogController],
   providers: [AuthzService, AuditService, PermissionsGuard],
   exports: [AuthzService, AuditService, PermissionsGuard, MongooseModule],
 })
