@@ -27,6 +27,8 @@ import {
   formatJour,
   messageDevis,
   tonDevis,
+  peutConvertirDevis,
+  peutPreparerDevis,
 } from './quote-model';
 
 function telecharger(blob: Blob, filename: string): void {
@@ -42,7 +44,10 @@ function telecharger(blob: Blob, filename: string): void {
 
 export function QuoteDetail({ quoteId }: { quoteId: string }): React.ReactElement {
   const router = useRouter();
-  const { gerer, actions } = useAccesVentes();
+  const { actions } = useAccesVentes();
+  // ADR-0040 § 4.1 : écriture `sales.quote` ; conversion `sales.quote` + `sales.manage`.
+  const gerer = peutPreparerDevis(actions);
+  const convertir = peutConvertirDevis(actions);
   const [vue, setVue] = useState<QuoteView | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -203,7 +208,7 @@ export function QuoteDetail({ quoteId }: { quoteId: string }): React.ReactElemen
             Nouvelle version
           </button>
         ) : null}
-        {gerer && a.convert ? (
+        {convertir && a.convert ? (
           <button
             type="button"
             className={buttonClasses('primary', 'md')}

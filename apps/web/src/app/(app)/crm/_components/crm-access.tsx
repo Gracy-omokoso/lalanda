@@ -1,63 +1,70 @@
 'use client';
 
 // Frontière d'accès de l'application CRM (ADR-0040 § 8.1), sortie de Ventes.
-// Même patron que `ventes/_components/sales-access.tsx`, sans rangée d'onglets :
-// Pipeline, Contacts et Réglages sont dans la colonne de gauche (ADR-0038 § 3,
-// révision du 29 oct. 2026).
+// Sans rangée d'onglets : la colonne de gauche est la seule navigation
+// (ADR-0038 § 3, révision du 29 oct. 2026).
 //
-// La condition d'entrée est `crm.read`, et non plus `sales.read` : le CRM a sa
-// propre lecture depuis ADR-0035. Les permissions sont lues UNE fois
-// (`GET /me/permissions`) et partagées avec les écrans par un contexte.
+// La condition d'entrée est `crm.read`. Les droits viennent de la coquille
+// (`useShell().actions`, lus UNE fois par `GET /me/permissions`) — jamais d'un
+// test sur le nom du rôle. Le contexte ajoute les membres de l'organisation
+// (`GET /work/members`, lecture `work.read`) pour afficher le nom d'un
+// responsable ou d'un assigné ; sans cette lecture, l'écran dit « un membre ».
 //
 // Rien ici n'autorise quoi que ce soit — `PermissionsGuard` refuse côté API de
 // toute façon. Un rôle sans `crm.read` lit un refus explicite plutôt qu'une page
 // vide.
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
-import { api, type OrgAction } from '@/lib/api';
+import type { OrgAction } from '@/lib/api';
+import { workApi, type WorkMemberOption } from '@/lib/work-api';
+
+import { useShell } from '../../_components/shell-context';
 
 import { peutLireCrm } from './crm-model';
 
 type EtatPermissions = 'chargement' | 'pret' | 'echec';
 
+export interface MembreCrm {
+  userId: string;
+  name: string;
+}
+
 interface AccesCrm {
   etat: EtatPermissions;
   /** Actions détenues (`null` tant qu'elles ne sont pas connues). */
   actions: OrgAction[] | null;
-  /**
-   * `true` seulement quand le serveur a confirmé `sales.manage` : la fiche
-   * d'opportunité propose alors « Créer un devis ».
-   */
-  gererVentes: boolean;
+  /** Membres connus (nom par identifiant) ; vide si la lecture est refusée. */
+  membres: MembreCrm[];
 }
 
-const Contexte = createContext<AccesCrm>({ etat: 'chargement', actions: null, gererVentes: false });
+const Contexte = createContext<AccesCrm>({ etat: 'chargement', actions: null, membres: [] });
 
 export function useAccesCrm(): AccesCrm {
   return useContext(Contexte);
 }
 
 export function CrmChrome({ children }: { children: React.ReactNode }): React.ReactElement {
-  const [actions, setActions] = useState<OrgAction[] | null>(null);
-  const [etat, setEtat] = useState<EtatPermissions>('chargement');
+  const { actions, chargees } = useShell();
+  const [membres, setMembres] = useState<MembreCrm[]>([]);
+  const lireMembres = actions !== null && actions.includes('work.read');
 
   useEffect(() => {
+    if (!lireMembres) return;
     let annule = false;
-    void api
-      .getMyPermissions()
-      .then((p) => {
-        if (annule) return;
-        setActions(p.actions);
-        setEtat('pret');
+    workApi
+      .listMembers()
+      .then((items: WorkMemberOption[]) => {
+        if (!annule) setMembres(items.map((m) => ({ userId: m.userId, name: m.name })));
       })
-      .catch(() => {
-        if (!annule) setEtat('echec');
-      });
+      .catch(() => undefined);
     return () => {
       annule = true;
     };
-  }, []);
+  }, [lireMembres]);
+
+  const etat: EtatPermissions = !chargees ? 'chargement' : actions === null ? 'echec' : 'pret';
+  const valeur = useMemo<AccesCrm>(() => ({ etat, actions, membres }), [etat, actions, membres]);
 
   if (etat === 'pret' && !peutLireCrm(actions)) {
     return (
@@ -72,15 +79,5 @@ export function CrmChrome({ children }: { children: React.ReactNode }): React.Re
     );
   }
 
-  return (
-    <Contexte.Provider
-      value={{
-        etat,
-        actions,
-        gererVentes: actions !== null && actions.includes('sales.manage'),
-      }}
-    >
-      {children}
-    </Contexte.Provider>
-  );
+  return <Contexte.Provider value={valeur}>{children}</Contexte.Provider>;
 }
