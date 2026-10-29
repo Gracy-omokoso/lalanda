@@ -6,6 +6,7 @@
 // lus sur des API EXISTANTES, puis ce qui concerne toute l'entreprise (alertes
 // du brief du matin, mise en route). Un chiffre illisible n'est pas inventé :
 // la carte affiche une phrase d'appel à sa place. Aucune API nouvelle.
+// ADR-0039 § 6.5 : carte « Mes tâches » (`GET /work/my-tasks`) avec `work.read`.
 
 import { ModuleIcon, type ModuleId } from '@lalanda/ui';
 import Link from 'next/link';
@@ -33,6 +34,8 @@ import {
   chiffresRun,
   type Chiffre,
 } from './_components/accueil-model';
+import { MesTachesCarte } from './_components/mes-taches-carte';
+import { carteVisible } from './_components/mes-taches-model';
 
 interface Faits {
   initiatives: number | null;
@@ -132,6 +135,8 @@ export default function AccueilPage(): React.ReactElement {
           Toute l’entreprise
         </h2>
         <div className="grid gap-4 lg:auto-cols-fr lg:grid-flow-col">
+          {/* ADR-0039 § 6.5 : carte « Mes tâches », seulement avec `work.read`. */}
+          {carteVisible(actions) ? <MesTachesCarte organizationId={organizationId} /> : null}
           <AlertesBrief alertes={faits.alertes} pret={pret} />
           <MiseEnRoute />
         </div>
