@@ -612,9 +612,7 @@ export class WorkProjectsService {
       )
       .exec();
     if (res.matchedCount !== 1) {
-      staleRevision(
-        (await this.requireOwn(current.organizationId, String(current._id))).revision,
-      );
+      staleRevision((await this.requireOwn(current.organizationId, String(current._id))).revision);
     }
   }
 

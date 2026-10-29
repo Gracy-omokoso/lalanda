@@ -352,10 +352,7 @@ export class WorkTasksService {
         .lean<WorkTaskLean[]>()
         .exec(),
       this.tasks
-        .find(
-          { organizationId, 'blockedBy.taskId': id },
-          { number: 1, title: 1, done: 1 },
-        )
+        .find({ organizationId, 'blockedBy.taskId': id }, { number: 1, title: 1, done: 1 })
         .sort({ number: 1 })
         .lean<{ _id: unknown; number: number; title: string; done: boolean }[]>()
         .exec(),
@@ -649,7 +646,9 @@ export class WorkTasksService {
       }
     }
 
-    const column = body.columnKey ? this.columnOf(project, body.columnKey) : this.firstTodo(project);
+    const column = body.columnKey
+      ? this.columnOf(project, body.columnKey)
+      : this.firstTodo(project);
     const assigneeUserId = body.assigneeUserId ?? null;
     if (assigneeUserId) {
       await this.members.requireEligible(
@@ -824,7 +823,8 @@ export class WorkTasksService {
     const base = { projectId: current.projectId, taskId, actorUserId: actor.userId };
     const entries: ActivityInput[] = [];
     const others = changed.filter((f) => !['assigneeUserId', 'dueDate'].includes(f));
-    if (others.length > 0) entries.push({ ...base, kind: 'task.updated', data: { fields: others } });
+    if (others.length > 0)
+      entries.push({ ...base, kind: 'task.updated', data: { fields: others } });
     if (assigneeChanged) {
       entries.push(
         body.assigneeUserId
@@ -1021,7 +1021,11 @@ export class WorkTasksService {
       taskId,
       actorUserId: actor.userId,
       kind: 'task.deleted',
-      data: { number: current.number, title: current.title.slice(0, 300), subtasks: children.length },
+      data: {
+        number: current.number,
+        title: current.title.slice(0, 300),
+        subtasks: children.length,
+      },
     });
     await this.projects.touch(organizationId, current.projectId);
   }

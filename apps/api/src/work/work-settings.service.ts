@@ -61,7 +61,10 @@ export class WorkSettingsService {
   /** Réglages de plusieurs organisations (tâche récurrente des rappels). */
   async dueSoonDaysOf(organizationIds: readonly string[]): Promise<Map<string, number>> {
     const docs = await this.settings
-      .find({ organizationId: { $in: [...organizationIds] } }, { organizationId: 1, dueSoonDays: 1 })
+      .find(
+        { organizationId: { $in: [...organizationIds] } },
+        { organizationId: 1, dueSoonDays: 1 },
+      )
       .lean<SettingsLean[]>()
       .exec();
     const out = new Map<string, number>();

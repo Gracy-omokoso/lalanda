@@ -41,7 +41,12 @@ e2eSuite('collaboration — commentaires, pièces jointes, temps (ADR-0039)', ()
   let projectId = '';
   let taskId = '';
 
-  function upload(who: 'owner' | 'analyst' | 'viewer' | 'ownerB', id: string, body: Buffer, name: string) {
+  function upload(
+    who: 'owner' | 'analyst' | 'viewer' | 'ownerB',
+    id: string,
+    body: Buffer,
+    name: string,
+  ) {
     return f
       .post(who, `/work/tasks/${id}/attachments`)
       .set('Content-Type', 'application/octet-stream')
@@ -98,7 +103,9 @@ e2eSuite('collaboration — commentaires, pièces jointes, temps (ADR-0039)', ()
     });
 
     it('modifier : l’auteur seul ; supprimer : l’auteur ou un gestionnaire', async () => {
-      const c = await f.post('accountant', `/work/tasks/${taskId}/comments`, { body: 'Premier jet' });
+      const c = await f.post('accountant', `/work/tasks/${taskId}/comments`, {
+        body: 'Premier jet',
+      });
       expect(c.status).toBe(201);
       const other = await f.put('analyst', `/work/comments/${c.body.id}`, {
         body: 'Réécrit',

@@ -144,7 +144,10 @@ export class WorkAttachmentsService {
     @Inject(ObjectStorageService) private readonly storage: ObjectStorageService,
   ) {}
 
-  private async requireOwn(organizationId: string, attachmentId: string): Promise<WorkAttachmentLean> {
+  private async requireOwn(
+    organizationId: string,
+    attachmentId: string,
+  ): Promise<WorkAttachmentLean> {
     if (!isWorkId(attachmentId)) attachmentNotFound();
     const doc = await this.attachments
       .findOne({ _id: oid(attachmentId), organizationId, deletedAt: null })
@@ -219,7 +222,11 @@ export class WorkAttachmentsService {
       taskId: String(task._id),
       actorUserId: actor.userId,
       kind: 'attachment.added',
-      data: { attachmentId: String(created._id), contentType: file.contentType, size: file.bytes.length },
+      data: {
+        attachmentId: String(created._id),
+        contentType: file.contentType,
+        size: file.bytes.length,
+      },
     });
     const doc = await this.requireOwn(organizationId, String(created._id));
     return attachmentViewOf(doc, await this.members.refs([actor.userId]));

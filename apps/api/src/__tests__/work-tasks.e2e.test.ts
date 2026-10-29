@@ -208,9 +208,7 @@ e2eSuite('tâches du RUN — Kanban, dépendances, Mes tâches, rappels (ADR-003
         expectedRevision: m.body.task.revision,
       });
       expect(done.status).toBe(200);
-      expect(done.body.suggestions).toEqual([
-        { code: 'PREPARE_INVOICE', taskId: m.body.task.id },
-      ]);
+      expect(done.body.suggestions).toEqual([{ code: 'PREPARE_INVOICE', taskId: m.body.task.id }]);
       expect(f.notifications.map((n) => [n.kind, n.recipientUserId])).toEqual([
         ['work.milestone_completed', f.userId('admin')],
       ]);
@@ -318,7 +316,10 @@ e2eSuite('tâches du RUN — Kanban, dépendances, Mes tâches, rappels (ADR-003
       await task({ title: 'Échéance 29', dueDate: '2026-10-29', assigneeUserId: analyst });
       await task({ title: 'Sans date', assigneeUserId: analyst });
       await task({ title: 'Pas à moi', dueDate: '2026-10-30', assigneeUserId: f.userId('admin') });
-      const archived = await f.post('owner', '/work/projects', { name: 'Archivé', kind: 'internal' });
+      const archived = await f.post('owner', '/work/projects', {
+        name: 'Archivé',
+        kind: 'internal',
+      });
       await f.post('owner', `/work/projects/${archived.body.id}/tasks`, {
         title: 'Archivée',
         dueDate: '2026-10-30',
@@ -339,7 +340,13 @@ e2eSuite('tâches du RUN — Kanban, dépendances, Mes tâches, rappels (ADR-003
       expect(view.today.map((t) => t.title)).toEqual(['Échéance 30']);
       expect(view.overdue.map((t) => t.title)).toEqual(['Échéance 29']);
       expect(view.noDate.map((t) => t.title)).toContain('Sans date');
-      const all = [...view.overdue, ...view.today, ...view.next7Days, ...view.later, ...view.noDate];
+      const all = [
+        ...view.overdue,
+        ...view.today,
+        ...view.next7Days,
+        ...view.later,
+        ...view.noDate,
+      ];
       expect(all.map((t) => t.title)).not.toContain('Archivée');
       expect(all.map((t) => t.title)).not.toContain('Pas à moi');
       expect(view.today[0]!.projectName).toBe('Interne');
@@ -386,8 +393,15 @@ e2eSuite('tâches du RUN — Kanban, dépendances, Mes tâches, rappels (ADR-003
     it('critère 8 : un ancien membre ne reçoit plus de rappel', async () => {
       const job = f.app().get(WorkDueRemindersJob);
       const admin = f.userId('admin');
-      const t = await task({ title: 'Ancien membre', dueDate: '2026-11-02', assigneeUserId: admin });
-      await f.db().collection('memberships').deleteOne({ organizationId: f.orgId(), userId: admin });
+      const t = await task({
+        title: 'Ancien membre',
+        dueDate: '2026-11-02',
+        assigneeUserId: admin,
+      });
+      await f
+        .db()
+        .collection('memberships')
+        .deleteOne({ organizationId: f.orgId(), userId: admin });
       f.notifications.length = 0;
       const report = await job.run(new Date('2026-11-01T08:00:00Z'));
       expect(f.notifications.filter((n) => n.source.entityId === t.id)).toEqual([]);

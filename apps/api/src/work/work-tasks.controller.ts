@@ -232,12 +232,7 @@ export class WorkTasksController {
     @Param('taskId', WorkIdPipe) taskId: string,
     @Param('predecessorTaskId', WorkIdPipe) predecessorTaskId: string,
   ): Promise<WorkTaskWriteResult> {
-    return this.tasks.removeDependency(
-      orgId,
-      taskId,
-      predecessorTaskId,
-      workActorOf(user, role),
-    );
+    return this.tasks.removeDependency(orgId, taskId, predecessorTaskId, workActorOf(user, role));
   }
 
   @Get('tasks/:taskId/activity')

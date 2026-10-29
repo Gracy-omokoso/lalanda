@@ -88,7 +88,8 @@ export class WorkActivityService {
         data: d.data ?? {},
         at: new Date(d.at).toISOString(),
       })),
-      nextCursor: docs.length > limit && last ? encodeTimeCursor(new Date(last.at), String(last._id)) : null,
+      nextCursor:
+        docs.length > limit && last ? encodeTimeCursor(new Date(last.at), String(last._id)) : null,
     };
   }
 

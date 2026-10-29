@@ -90,10 +90,7 @@ export function unsupportedType(message: string): never {
 }
 
 export function projectArchived(): never {
-  conflict(
-    'WORK_PROJECT_ARCHIVED',
-    'Ce projet est archivé : restaurez-le avant de le modifier.',
-  );
+  conflict('WORK_PROJECT_ARCHIVED', 'Ce projet est archivé : restaurez-le avant de le modifier.');
 }
 
 export function iso(d: Date | null | undefined): string | null {

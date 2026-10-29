@@ -424,7 +424,12 @@ export class WorkTimeService {
       taskId: current.taskId,
       actorUserId: actor.userId,
       kind: 'time.deleted',
-      data: { entryId, userId: current.userId, workedOn: current.workedOn, minutes: current.minutes },
+      data: {
+        entryId,
+        userId: current.userId,
+        workedOn: current.workedOn,
+        minutes: current.minutes,
+      },
     });
   }
 

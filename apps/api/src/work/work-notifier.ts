@@ -62,7 +62,12 @@ export class WorkNotifier {
           recipientUserId: recipient,
           kind: n.kind,
           requiredAction: 'work.read',
-          source: { module: 'work', entityType: 'task', entityId: n.taskId, projectId: n.projectId },
+          source: {
+            module: 'work',
+            entityType: 'task',
+            entityId: n.taskId,
+            projectId: n.projectId,
+          },
           title: boundedTitle(n.title),
           href: taskHref(n.projectId, n.taskId),
           actorUserId: n.actorUserId,

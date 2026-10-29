@@ -76,7 +76,10 @@ export class WorkDueRemindersJob implements OnModuleInit {
       done: false,
       assigneeUserId: { $ne: null },
       $or: [
-        { dueDate: { $ne: null, $lt: today }, $expr: { $ne: ['$reminders.overdueFor', '$dueDate'] } },
+        {
+          dueDate: { $ne: null, $lt: today },
+          $expr: { $ne: ['$reminders.overdueFor', '$dueDate'] },
+        },
         {
           dueDate: { $gte: today, $lte: soonEnd },
           $expr: { $ne: ['$reminders.dueSoonFor', '$dueDate'] },
