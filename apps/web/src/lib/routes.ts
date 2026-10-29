@@ -69,6 +69,8 @@ export const PROTECTED_PREFIXES = [
   '/idees',
   // ADR-0037 — business plan narratif (BUILD).
   '/business-plan',
+  // ADR-0039 — L2 : boîte de notifications (session ET organisation active).
+  '/notifications',
 ] as const;
 
 /**

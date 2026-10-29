@@ -107,6 +107,13 @@ describe('isProtectedPath (S20b)', () => {
     expect(isProtectedPath('/running')).toBe(false);
   });
 
+  // ADR-0039 — L2
+  it('ADR-0039 : la boîte de notifications exige une session', () => {
+    expect(isProtectedPath('/notifications')).toBe(true);
+    expect(isProtectedPath('/notifications/preferences')).toBe(true);
+    expect(isProtectedPath('/notifications-publiques')).toBe(false);
+  });
+
   it('laisse publiques les pages marketing et d’authentification', () => {
     for (const path of ['/', '/pricing', '/login', '/register']) {
       expect(isProtectedPath(path)).toBe(false);
