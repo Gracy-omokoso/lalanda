@@ -33,7 +33,6 @@ import {
   messageWork,
 } from './projets-model';
 import {
-  activiteDeTache,
   decoderMentions,
   encoderMentions,
   insererMention,
@@ -666,24 +665,23 @@ function Temps({
 // ─── Historique ─────────────────────────────────────────────────────────────
 
 function Historique({ taskId }: { taskId: string }): React.ReactElement {
-  const { projectId, project } = useProjet();
+  const { project } = useProjet();
   const [items, setItems] = useState<WorkActivityView[] | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [ouvert, setOuvert] = useState(false);
 
   useEffect(() => {
     if (!ouvert) return;
-    // L'historique est servi par projet (ADR-0039 § 4) : on lit les 100
-    // derniers événements et on garde ceux de la tâche. Hypothèse à confronter
-    // à L1 : un filtre `taskId` côté serveur éviterait ce tri.
+    // Route propre à la tâche (`GET /work/tasks/:taskId/activity`) : les 100
+    // derniers événements, le plus récent d'abord.
     workApi
-      .listProjectActivity(projectId, { limit: 100 })
+      .listTaskActivity(taskId, { limit: 100 })
       .then((p) => {
-        setItems(activiteDeTache(p.items, taskId));
+        setItems(p.items);
         setErreur(null);
       })
       .catch((err: unknown) => setErreur(messageWork(err, 'Historique indisponible.')));
-  }, [ouvert, projectId, taskId]);
+  }, [ouvert, taskId]);
 
   const colonnes = new Map((project?.columns ?? []).map((c) => [c.key, c.label]));
   return (

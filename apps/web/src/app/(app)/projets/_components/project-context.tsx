@@ -126,13 +126,13 @@ export function ProjetProvider({
     };
   }, [projectId, version]);
 
-  // Membres éligibles : route supposée (`work-api.ts`) ; repli silencieux.
+  // Membres détenant `work.read` (`GET /work/members`) ; repli sur les membres cités.
   useEffect(() => {
     let annule = false;
     workApi
       .listMembers()
       .then((r) => {
-        if (!annule) setMembresApi(r.members);
+        if (!annule) setMembresApi(r);
       })
       .catch(() => {
         if (!annule) setMembresApi(null);

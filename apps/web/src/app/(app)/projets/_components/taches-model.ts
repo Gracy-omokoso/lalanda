@@ -76,7 +76,7 @@ export function filtrerTaches(tasks: readonly WorkTaskView[], f: FiltresTaches):
 /**
  * Repli quand `GET /work/members` n'est pas disponible : les membres déjà cités
  * par les réponses (responsable du projet, responsables et abonnés des tâches).
- * `canUpdate` y est supposé : le serveur refusera un responsable inéligible
+ * `canUpdate` y est supposé (`canManage` non) : le serveur refusera un responsable inéligible
  * (`WORK_ASSIGNEE_NOT_ELIGIBLE`).
  */
 export function membresConnus(
@@ -86,7 +86,7 @@ export function membresConnus(
 ): WorkMemberOption[] {
   const parId = new Map<string, WorkMemberOption>();
   const ajouter = (m: WorkMemberRef | null) => {
-    if (m && !parId.has(m.userId)) parId.set(m.userId, { ...m, canUpdate: true });
+    if (m && !parId.has(m.userId)) parId.set(m.userId, { ...m, canUpdate: true, canManage: false });
   };
   ajouter(project?.owner ?? null);
   for (const t of tasks) ajouter(t.assignee);
@@ -357,12 +357,4 @@ export function libelleActivite(
   if (de !== null && vers !== null) return `${base} (${de} → ${vers})`;
   if (vers !== null && a.kind === 'task.due_changed') return `${base} (${vers})`;
   return base;
-}
-
-/** Entrées de l'historique propres à une tâche (le flux est celui du projet). */
-export function activiteDeTache(
-  items: readonly WorkActivityView[],
-  taskId: string,
-): WorkActivityView[] {
-  return items.filter((a) => a.taskId === taskId);
 }
