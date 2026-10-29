@@ -72,7 +72,7 @@ import {
   peutConvertirCompte,
   peutGererCrm,
 } from './crm-model';
-import { Bandeau, ChoixMembre, Panneau, PhraseSection, Tuile } from './crm-ui';
+import { Bandeau, ChoixMembre, MontantsLignes, Panneau, PhraseSection, Tuile } from './crm-ui';
 import { MENTION_ESTIME, nomMembre } from './pipeline-model';
 
 type Sections = CrmOverview['sections'];
@@ -813,13 +813,19 @@ export function CompteFiche({ accountId }: { accountId: string }): React.ReactEl
                 <Tuile
                   libelle="En cours (estimé)"
                   valeur={
-                    montantsParDevise(s.opportunities.totals.open).join(' · ') || 'Aucun montant'
+                    <MontantsLignes
+                      montants={montantsParDevise(s.opportunities.totals.open)}
+                      vide="Aucun montant"
+                    />
                   }
                 />
                 <Tuile
                   libelle="Gagnées (estimé)"
                   valeur={
-                    montantsParDevise(s.opportunities.totals.won).join(' · ') || 'Aucun montant'
+                    <MontantsLignes
+                      montants={montantsParDevise(s.opportunities.totals.won)}
+                      vide="Aucun montant"
+                    />
                   }
                 />
               </div>
@@ -855,11 +861,21 @@ export function CompteFiche({ accountId }: { accountId: string }): React.ReactEl
               <div className="grid gap-2 sm:grid-cols-2">
                 <Tuile
                   libelle="Envoyés"
-                  valeur={montantsParDevise(s.quotes.totals.sent).join(' · ') || 'Aucun'}
+                  valeur={
+                    <MontantsLignes
+                      montants={montantsParDevise(s.quotes.totals.sent)}
+                      vide="Aucun"
+                    />
+                  }
                 />
                 <Tuile
                   libelle="Acceptés"
-                  valeur={montantsParDevise(s.quotes.totals.accepted).join(' · ') || 'Aucun'}
+                  valeur={
+                    <MontantsLignes
+                      montants={montantsParDevise(s.quotes.totals.accepted)}
+                      vide="Aucun"
+                    />
+                  }
                 />
               </div>
               <ul className="flex flex-col gap-1 text-sm">

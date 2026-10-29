@@ -85,6 +85,26 @@ export function Tuile({
   );
 }
 
+/** Montants d'une tuile, une devise par ligne (jamais coupés au milieu). */
+export function MontantsLignes({
+  montants,
+  vide,
+}: {
+  montants: readonly string[];
+  vide: string;
+}): React.ReactElement {
+  if (montants.length === 0) return <>{vide}</>;
+  return (
+    <span className="flex flex-col">
+      {montants.map((m) => (
+        <span key={m} className="whitespace-nowrap">
+          {m}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 /** Panneau de section : titre avec icône, action facultative, contenu. */
 export function Panneau({
   titre,
