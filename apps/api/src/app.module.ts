@@ -40,6 +40,7 @@ import { SchedulerModule } from './scheduler/scheduler.module.js';
 import { ThrottlingModule } from './security/throttling.module.js';
 import { StorageModule } from './storage/storage.module.js';
 import { TreasuryModule } from './treasury/treasury.module.js';
+import { WorkBillingModule } from './work/billing/work-billing.module.js';
 import { WorkModule } from './work/work.module.js';
 
 @Module({
@@ -131,6 +132,8 @@ import { WorkModule } from './work/work.module.js';
     BusinessPlanModule,
     // ADR-0039 — projets et tâches du RUN (lot L1) ; notifications par port facultatif.
     WorkModule,
+    // ADR-0039 — lot L4a : devis → projet, jalon → brouillon, liens facture, marge.
+    WorkBillingModule,
   ],
   controllers: [HealthController, EvaluateController],
 })

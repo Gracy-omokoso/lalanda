@@ -22,6 +22,7 @@ import {
 
 import { lireMontantSaisi } from '../../ventes/_components/sales-model';
 import { Bandeau, Section, useAccesTresorerie } from '../_components/treasury-access';
+import { WorkProjectSelect } from '../_components/work-project-select';
 import {
   FREQUENCY_LABELS,
   formatMontantSigne,
@@ -57,6 +58,8 @@ interface Formulaire {
   accountId: string;
   deductibleVat: string;
   reference: string;
+  /** Projet du RUN rattaché (ADR-0039 § 6.4), `''` : aucun. */
+  workProjectId: string;
 }
 
 const VIDE: Formulaire = {
@@ -69,6 +72,7 @@ const VIDE: Formulaire = {
   accountId: '',
   deductibleVat: '',
   reference: '',
+  workProjectId: '',
 };
 
 export default function DepensesPage(): React.ReactElement {
@@ -175,6 +179,7 @@ export default function DepensesPage(): React.ReactElement {
         accountId: form.accountId || null,
         deductibleVat: tva,
         reference: form.reference || null,
+        workProjectId: form.workProjectId || null,
       });
       setForm({
         ...VIDE,
@@ -377,6 +382,11 @@ export default function DepensesPage(): React.ReactElement {
                 ))}
               </select>
             </label>
+            <WorkProjectSelect
+              className={CHAMP}
+              value={form.workProjectId}
+              onChange={(workProjectId) => setForm({ ...form, workProjectId })}
+            />
             <label className="flex flex-col gap-1 text-sm">
               TVA déductible (facultatif)
               <input

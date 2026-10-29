@@ -118,6 +118,11 @@ const ExpenseFields = {
     .optional()
     .transform((v) => (v === undefined || v === null || v.trim() === '' ? null : v.trim())),
   reference: optionalText(100),
+  /**
+   * Projet du RUN (ADR-0039 § 2.10). Absent : `null` à la création, inchangé à la
+   * modification (un client qui ignore le champ ne détache rien) ; `null` : détacher.
+   */
+  workProjectId: objectId.nullable().optional(),
 };
 
 function checkExpense(raw: { amount: string; deductibleVat: string | null }, ctx: Ctx): void {
@@ -159,6 +164,7 @@ export const ListExpensesQuerySchema = z
     category: category.optional(),
     currency: currency.optional(),
     accountId: objectId.optional(),
+    workProjectId: objectId.optional(),
     status: z.enum(['recorded', 'cancelled', 'all']).default('recorded'),
     q: z.string().max(100).optional(),
     limit: z

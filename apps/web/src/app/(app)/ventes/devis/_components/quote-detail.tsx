@@ -18,6 +18,7 @@ import { CRM_BASE } from '../../crm/_components/crm-model';
 import { FACTURES_BASE } from '../../factures/_components/invoice-model';
 
 import { QuoteEditor } from './quote-editor';
+import { QuoteProjectBox } from './quote-project-box';
 import {
   DEVIS_BASE,
   ISSUE_GAIN,
@@ -41,7 +42,7 @@ function telecharger(blob: Blob, filename: string): void {
 
 export function QuoteDetail({ quoteId }: { quoteId: string }): React.ReactElement {
   const router = useRouter();
-  const { gerer } = useAccesVentes();
+  const { gerer, actions } = useAccesVentes();
   const [vue, setVue] = useState<QuoteView | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -266,6 +267,9 @@ export function QuoteDetail({ quoteId }: { quoteId: string }): React.ReactElemen
           )}
         </p>
       ) : null}
+
+      {/* ADR-0039 § 6.1 : devis accepté → projet client (proposé, jamais imposé). */}
+      <QuoteProjectBox quoteId={vue.id} status={vue.status} actions={actions} />
 
       {a.edit ? (
         <QuoteEditor key={vue.revision} vueInitiale={vue} onEnregistre={setVue} />

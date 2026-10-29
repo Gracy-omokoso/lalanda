@@ -72,6 +72,7 @@ import { CrmContactsController } from '../crm/crm-contacts.controller.js';
 import { CrmOpportunitiesController } from '../crm/crm-opportunities.controller.js';
 import { CrmSettingsController } from '../crm/crm-settings.controller.js';
 // ADR-0039 — L1
+import { WorkBillingController } from '../work/billing/work-billing.controller.js';
 import { WorkAttachmentsController } from '../work/work-attachments.controller.js';
 import { WorkCommentsController } from '../work/work-comments.controller.js';
 import { WorkMembersController } from '../work/work-members.controller.js';
@@ -171,6 +172,8 @@ const CONTROLEURS = [
   WorkCommentsController,
   WorkAttachmentsController,
   WorkTimeController,
+  // ADR-0039 — L4a : branchements argent (devis, factures, marge).
+  WorkBillingController,
 ];
 
 /**
@@ -680,6 +683,14 @@ describe('couverture des routes par le RBAC', () => {
       'WorkTimeController.listRates': ['work.read', 'treasury.manage'],
       'WorkTimeController.setRate': ['work.manage', 'treasury.manage'],
       'WorkTimeController.removeRate': ['work.manage', 'treasury.manage'],
+      // ADR-0039 — L4a : les gestes qui touchent l'argent cumulent les actions.
+      'WorkBillingController.createFromQuote': ['work.manage', 'sales.read'],
+      'WorkBillingController.projectForQuote': ['work.read', 'sales.read'],
+      'WorkBillingController.listInvoices': ['work.read', 'sales.read'],
+      'WorkBillingController.linkInvoice': ['work.manage', 'sales.read'],
+      'WorkBillingController.unlinkInvoice': ['work.manage'],
+      'WorkBillingController.prepareInvoice': ['work.read', 'sales.manage'],
+      'WorkBillingController.margin': ['work.read', 'sales.read', 'treasury.read'],
     };
     for (const [cle, actions] of Object.entries(attendu)) {
       const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle);

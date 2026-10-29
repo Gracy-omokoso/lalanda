@@ -120,3 +120,8 @@ export * from './grow/index.js';
 // Idea Lab et validation d'idée (ADR-0036) — score de validation sur une grille
 // versionnée, expériences, comparaison. Versionné à part (`IDEA_LAB_VERSION`).
 export * from './idea-lab/index.js';
+
+// Marge par projet du RUN (ADR-0039 § 5) — encaissé, avoirs remboursés,
+// dépenses rattachées et coût du temps, par devise. Versionné à part
+// (`WORK_MARGIN_VERSION`) ; n'alimente jamais le réalisé ni un plan.
+export * from './work/index.js';
