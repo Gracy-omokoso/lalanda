@@ -111,7 +111,7 @@ export class ObjectivesController {
       throw new ConflictException({
         code: 'NO_APPROVED_PLAN',
         message:
-          "Aucun plan validé pour ce projet — validez d'abord un plan pour mesurer l'atteinte des objectifs.",
+          "Aucun plan validé pour cette initiative — validez d'abord un plan pour mesurer l'atteinte des objectifs.",
       });
     }
 

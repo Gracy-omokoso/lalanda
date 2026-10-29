@@ -152,7 +152,7 @@ export function aiQuotaExceededPayload(status: AiQuotaStatus): AiQuotaExceededPa
     message:
       `Vous avez utilisé les ${status.limit} messages IA inclus ce mois-ci dans l'offre ` +
       `${status.plan}. Le compteur repart le 1er du mois prochain (${jours}). ` +
-      `Vos projets et vos exports restent accessibles.`,
+      `Vos initiatives et vos exports restent accessibles.`,
     upgradeUrl: '/pricing',
   };
 }

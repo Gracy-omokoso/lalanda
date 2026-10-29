@@ -281,7 +281,7 @@ export function depassements(c: ConsommationView): DepassementView[] {
   if (c.projets.limite !== null && c.projets.utilise > c.projets.limite) {
     out.push({
       code: 'PROJETS',
-      libelle: 'Projets',
+      libelle: 'Initiatives',
       utilise: c.projets.utilise,
       limite: c.projets.limite,
     });
@@ -315,7 +315,7 @@ export const BLOCS_DU_TABLEAU_DE_BORD = [
     titre: 'Pilotage de l’organisation',
     action: 'organization.manage',
     raison:
-      'Le suivi des projets, des validations du mois et de la consommation du plan est réservé ' +
+      'Le suivi des initiatives, des validations du mois et de la consommation du plan est réservé ' +
       'au Propriétaire et à l’Administrateur.',
   },
   {
@@ -336,9 +336,9 @@ export const BLOCS_DU_TABLEAU_DE_BORD = [
   },
   {
     section: 'projets',
-    titre: 'Projets',
+    titre: 'Initiatives',
     action: 'project.read',
-    raison: 'La consultation des projets exige au minimum le rôle de Lecteur.',
+    raison: 'La consultation des initiatives exige au minimum le rôle de Lecteur.',
   },
 ] as const satisfies ReadonlyArray<{
   section: BlocMasqueView['section'];

@@ -146,13 +146,13 @@ export function projectLimitExceededPayload(
       : `Passez à l'offre ${PLAN_CATALOG[suggestedPlan].name} pour en créer davantage`;
 
   const message = status.overLimit
-    ? `Votre organisation compte ${status.used} projets, alors que l'offre ${offre} en ` +
-      `autorise ${status.limit}. Vos ${status.used} projets restent accessibles, modifiables ` +
-      `et exportables — rien n'a été supprimé. Seule la création d'un nouveau projet est ` +
-      `suspendue. ${suggestion}${suggestedPlan === null ? '' : ', ou supprimez un projet existant.'}`
-    : `Votre organisation compte ${status.used} projet${status.used > 1 ? 's' : ''}, soit la ` +
-      `totalité des ${status.limit} inclus dans l'offre ${offre}. ` +
-      `${suggestion}${suggestedPlan === null ? '' : ', ou supprimez un projet existant.'}`;
+    ? `Votre organisation compte ${status.used} initiatives, alors que l'offre ${offre} en ` +
+      `autorise ${status.limit}. Vos ${status.used} initiatives restent accessibles, modifiables ` +
+      `et exportables — rien n'a été supprimé. Seule la création d'une nouvelle initiative est ` +
+      `suspendue. ${suggestion}${suggestedPlan === null ? '' : ', ou supprimez une initiative existante.'}`
+    : `Votre organisation compte ${status.used} initiative${status.used > 1 ? 's' : ''}, soit la ` +
+      `totalité des ${status.limit} incluses dans l'offre ${offre}. ` +
+      `${suggestion}${suggestedPlan === null ? '' : ', ou supprimez une initiative existante.'}`;
 
   return {
     code: PROJECT_LIMIT_ERROR_CODE,

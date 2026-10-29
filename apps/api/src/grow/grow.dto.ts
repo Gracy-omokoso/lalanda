@@ -11,7 +11,7 @@ const OBJECT_ID = /^[0-9a-f]{24}$/;
 
 export const PutGrowProfileSchema = z
   .object({
-    referenceProjectId: z.string().regex(OBJECT_ID, 'Identifiant de projet invalide.').nullable(),
+    referenceProjectId: z.string().regex(OBJECT_ID, 'Identifiant d’initiative invalide.').nullable(),
     declaredStage: z.enum(JOURNEY_STAGES).nullable(),
     recurringCatalogItemIds: z
       .array(z.string().regex(OBJECT_ID, 'Identifiant d’article invalide.'))

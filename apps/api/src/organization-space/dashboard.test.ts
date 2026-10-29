@@ -265,7 +265,7 @@ describe('consommation et dépassements (S21a)', () => {
     // Une organisation repassée en `free` avec 4 projets doit pouvoir le LIRE.
     const c = consommation('free', PLAN_ENTITLEMENTS.free, { projets: 4, membres: 1 });
     expect(depassements(c)).toEqual([
-      { code: 'PROJETS', libelle: 'Projets', utilise: 4, limite: 1 },
+      { code: 'PROJETS', libelle: 'Initiatives', utilise: 4, limite: 1 },
     ]);
   });
 

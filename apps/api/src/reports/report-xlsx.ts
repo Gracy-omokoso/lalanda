@@ -319,7 +319,7 @@ export async function renderReportXlsx(data: ReportData): Promise<Buffer> {
   const metaRows: Array<[string, string]> = [
     ['Organisation', organization.name],
     ['Pays', project.pays],
-    ['Projet', project.name],
+    ['Initiative', project.name],
     ['Template', `${template.slug} v${template.version}`],
     ['Devise', currency],
     ['Généré le', data.generatedAt],

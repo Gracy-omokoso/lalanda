@@ -28,7 +28,7 @@ export const BUSINESS_PLAN_PROMPT_VERSION = 'business-plan-1.0.0';
 export const BUSINESS_PLAN_MODEL = 'gpt-4o-mini';
 
 export const MENTION_BUSINESS_PLAN =
-  'Brouillon proposé par l’IA à partir des données du projet et de vos réponses. À relire : ' +
+  'Brouillon proposé par l’IA à partir des données de l’initiative et de vos réponses. À relire : ' +
   'il n’est publié qu’après votre acceptation. Les chiffres et tableaux du plan financier ' +
   'restent ceux du moteur de Lalanda.';
 
