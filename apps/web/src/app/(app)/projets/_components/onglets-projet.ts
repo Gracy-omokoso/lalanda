@@ -27,8 +27,8 @@ export const ONGLETS_PROJET: readonly OngletProjet[] = [
   { segment: 'liste', label: 'Liste', action: null, livre: true },
   { segment: 'kanban', label: 'Kanban', action: null, livre: true },
   // Lot L3b — vues temporelles.
-  { segment: 'calendrier', label: 'Calendrier', action: null, livre: false },
-  { segment: 'chronologie', label: 'Chronologie', action: null, livre: false },
+  { segment: 'calendrier', label: 'Calendrier', action: null, livre: true },
+  { segment: 'chronologie', label: 'Chronologie', action: null, livre: true },
   // Lot L4a — marge encaissée (la carte signale elle-même un `sales.read` manquant).
   { segment: 'marge', label: 'Marge', action: 'treasury.read', livre: true },
   { segment: 'reglages', label: 'Réglages', action: 'work.manage', livre: true },

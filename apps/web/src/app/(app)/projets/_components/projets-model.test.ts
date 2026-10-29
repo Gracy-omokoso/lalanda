@@ -40,27 +40,29 @@ describe('permissions — actions servies par le serveur, jamais un rôle', () =
 });
 
 describe('onglets du projet (point de branchement L3b)', () => {
-  it('Calendrier et Chronologie sont réservés mais jamais affichés tant qu’ils ne sont pas livrés', () => {
-    const segs = ONGLETS_PROJET.map((o) => o.segment);
-    expect(segs).toContain('calendrier');
-    expect(segs).toContain('chronologie');
+  it('Calendrier et Chronologie (lot L3b) sont livrés et affichés, dans l’ordre du § 8', () => {
     const visibles = ongletsVisibles(['work.read', 'work.manage']).map((o) => o.segment);
-    expect(visibles).toEqual(['liste', 'kanban', 'reglages']);
+    expect(visibles).toEqual(['liste', 'kanban', 'calendrier', 'chronologie', 'reglages']);
   });
   it('Réglages exige work.manage', () => {
-    expect(ongletsVisibles(['work.read']).map((o) => o.segment)).toEqual(['liste', 'kanban']);
-    expect(ongletsVisibles(null).map((o) => o.segment)).toEqual(['liste', 'kanban']);
+    const sansGestion = ['liste', 'kanban', 'calendrier', 'chronologie'];
+    expect(ongletsVisibles(['work.read']).map((o) => o.segment)).toEqual(sansGestion);
+    expect(ongletsVisibles(null).map((o) => o.segment)).toEqual(sansGestion);
   });
   it('Marge exige treasury.read (lot L4a)', () => {
     expect(ongletsVisibles(['work.read', 'treasury.read']).map((o) => o.segment)).toEqual([
       'liste',
       'kanban',
+      'calendrier',
+      'chronologie',
       'marge',
     ]);
   });
-  it('un onglet livré par L3b apparaît sans autre changement', () => {
-    const l3b = ONGLETS_PROJET.map((o) => (o.segment === 'calendrier' ? { ...o, livre: true } : o));
-    expect(ongletsVisibles(['work.read'], l3b).map((o) => o.segment)).toEqual([
+  it('un onglet non livré n’est jamais affiché', () => {
+    const retire = ONGLETS_PROJET.map((o) =>
+      o.segment === 'chronologie' ? { ...o, livre: false } : o,
+    );
+    expect(ongletsVisibles(['work.read'], retire).map((o) => o.segment)).toEqual([
       'liste',
       'kanban',
       'calendrier',
