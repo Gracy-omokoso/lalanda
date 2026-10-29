@@ -410,7 +410,7 @@ Lecture `crm.read` ; écriture, réglages, import et export `crm.manage`.
 ## CRM complet — proposé, ADR-0040 (non implémenté)
 
 Contrat **proposé** par [ADR-0040](adr/ADR-0040-crm-complet.md) § 3 ; les routes du pipeline v2
-(lot C2) sont implémentées, voir la section suivante.
+(lot C2) et des rapports (lot C3) sont implémentées, voir les sections suivantes.
 Nouvelle action `sales.quote` (devis) ; nouveau rôle Commercial (`sales_rep`).
 
 | Méthode et chemin | Permission | Effet |
@@ -424,7 +424,7 @@ Nouvelle action `sales.quote` (devis) ; nouveau rôle Commercial (`sales_rep`).
 | `POST /sales/quotes/from-opportunity` | `sales.quote` + `crm.read` | devis brouillon prérempli par les lignes |
 | écritures des devis (`POST`, `PUT`, `DELETE`, `send`, `accept`, `refuse`, `new-version`) | `sales.quote` (au lieu de `sales.manage`) | — |
 | `POST /sales/quotes/:id/convert` | `sales.quote` + `sales.manage` | — |
-| `GET /crm/reports?from=&to=&ownerId=` | `crm.read` | entonnoir, conversion, cycle, par responsable, prévision par mois de clôture, motifs de perte — montants estimés |
+| `GET /crm/reports?from=&to=&ownerId=` | `crm.read` | **implémenté (lot C3)**, voir « Rapports du CRM » ci-dessous |
 | `POST /crm/activities/:id/reopen` | `crm.manage` | décocher une activité |
 | `GET /work/my-tasks` | `work.read` | éléments `source: 'crm'` (relances assignées, avec échéance) si `crm.read` |
 | `POST /work/projects/from-opportunity` | `work.manage` + `crm.read` | opportunité gagnée → projet, jamais automatique ; `409 WORK_PROJECT_EXISTS_FOR_OPPORTUNITY` |
@@ -447,6 +447,36 @@ Montants **estimés**, jamais convertis entre devises ; rien n'alimente le réal
 | `GET /crm/pipeline?ownerId=me\|<id>` | `crm.read` | + `forecast` (`weightedForecast` : par devise `weighted`, `unweighted`, `count`, `notWeightable`), `orphaned { count, ownerIds }`, `calculationVersion` 1.1.0 ; cartes : `ownerId`, `orphaned`, `accountId`, `accountName`, `amountSource`, `lostReasonKey`, `wonAt` |
 | `GET /crm/settings` · `PUT /crm/settings` | `crm.read` · `crm.manage` | + `lostReasons` (six par défaut), `lostReasonRequired` (défaut `true`), `forecastProbability` (toujours `historical` : saisie désactivée) ; retirer un motif utilisé : `409 CRM_LOST_REASON_IN_USE` |
 | `POST /sales/quotes/from-opportunity` `{ opportunityId, validUntil? }` | `sales.quote` + `crm.read` | devis brouillon : devise de l'opportunité, prix HT, client = fiche du compte client sinon client de passage ; montants recalculés par la composition des devis ; `409 CRM_OPPORTUNITY_HAS_NO_LINES`, `409 CRM_LINE_NOT_QUOTABLE` (ligne sans article) |
+
+### Rapports du CRM — implémenté (ADR-0040 C3)
+
+Lot C3 d'[ADR-0040](adr/ADR-0040-crm-complet.md) (§ 3.4, § 7.2 ; critère 14). Lecture seule ;
+calculs du moteur (`crmReports`, `CRM_INDICATORS_VERSION` 1.1.0), montants **estimés** par devise,
+jamais convertis ; rien n'alimente le réalisé, un plan ni un scénario.
+
+| Méthode et chemin | Permission | Effet |
+|---|---|---|
+| `GET /crm/reports?from=&to=&ownerId=me\|<id>` | `crm.read` | `from`/`to` : jours `AAAA-MM-JJ` de Kinshasa, bornes incluses ; défaut : 12 mois glissants jusqu'à aujourd'hui ; 24 mois au plus (`400 CRM_REPORT_PERIOD_TOO_LONG`) ; début après fin ou jour inexistant : `400 CRM_REPORT_PERIOD_INVALID` ; format illisible ou paramètre inconnu : `400 INVALID_REQUEST`. `ownerId` restreint **tous** les blocs (confort : tout `crm.read` voit toute l'organisation) |
+
+Réponse (`CrmReportsView`, `@lalanda/shared/crm`) : `basis: 'estimated'`, `label` (« Montants
+estimés — … ni réalisé, ni plan »), `period`, `asOf`, `minSample` (10) et :
+
+- `funnel` : opportunités **créées** dans la période ; par étape ouverte (ordre des réglages), nombre
+  passé par l'étape (`stageHistory`) et montants par devise ;
+- `conversion` : par étape, part des opportunités passées par l'étape qui ont atteint une étape
+  ultérieure (ouverte ou gagnée) ; `overall` = gagnées / clôturées dans la période ;
+- `cycle` : jours civils de Kinshasa entre création et gain (`won`), ou perte (`lost`) ; moyenne et
+  médiane arrondies au jour, demi vers le haut ;
+- `byOwner` : par responsable, ouvertes (aujourd'hui), gagnées et perdues de la période (nombre,
+  montants par devise), taux de gain, prévision pondérée, trois motifs de perte les plus fréquents ;
+  `ownerName` joint pour un membre actuel, `isMember: false` pour un ancien ;
+- `forecastByMonth` : ouvertes groupées en `overdue` (date prévue passée), `month` (`AAAA-MM`) et
+  `no_date` ; `weighted`, `unweighted`, `notWeightable` par devise (probabilité historique en
+  fraction exacte, comme `GET /crm/pipeline`) ;
+- `lostReasons` : perdues de la période par `lostReasonKey` avec le libellé du réglage.
+
+Tout taux et toute durée sous 10 cas : `{ status: 'unavailable', sample, requiredSample }`.
+`truncated: true` si plus de 20 000 opportunités sont en jeu.
 
 ## Brief du matin — implémenté (ADR-0033)
 
