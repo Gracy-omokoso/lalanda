@@ -51,6 +51,13 @@ describe('onglets du projet (point de branchement L3b)', () => {
     expect(ongletsVisibles(['work.read']).map((o) => o.segment)).toEqual(['liste', 'kanban']);
     expect(ongletsVisibles(null).map((o) => o.segment)).toEqual(['liste', 'kanban']);
   });
+  it('Marge exige treasury.read (lot L4a)', () => {
+    expect(ongletsVisibles(['work.read', 'treasury.read']).map((o) => o.segment)).toEqual([
+      'liste',
+      'kanban',
+      'marge',
+    ]);
+  });
   it('un onglet livré par L3b apparaît sans autre changement', () => {
     const l3b = ONGLETS_PROJET.map((o) => (o.segment === 'calendrier' ? { ...o, livre: true } : o));
     expect(ongletsVisibles(['work.read'], l3b).map((o) => o.segment)).toEqual([

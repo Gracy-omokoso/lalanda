@@ -13,6 +13,7 @@ import { renderNextLink } from '@/components/next-link';
 import { useShell } from '../../_components/shell-context';
 
 import { Alerte, BOUTON_PETIT } from './elements';
+import { PropositionFacture } from './marge/proposition-facture';
 import { ONGLET_DEFAUT, ongletDuChemin, ongletsVisibles } from './onglets-projet';
 import { useProjet } from './project-context';
 import {
@@ -36,6 +37,8 @@ export function EnteteProjet(): React.ReactElement {
     effacerAvertissements,
     effacerErreur,
     recharger,
+    factureProposee,
+    fermerPropositionFacture,
   } = useProjet();
 
   const courant = ongletDuChemin(pathname) ?? ONGLET_DEFAUT;
@@ -177,6 +180,15 @@ export function EnteteProjet(): React.ReactElement {
         >
           <p>{erreur}</p>
         </Alerte>
+      ) : null}
+      {factureProposee ? (
+        <PropositionFacture
+          key={factureProposee}
+          taskId={factureProposee}
+          project={project}
+          onPrepared={recharger}
+          onClose={fermerPropositionFacture}
+        />
       ) : null}
       <div aria-live="polite">
         {avertissements.length > 0 ? (

@@ -36,6 +36,7 @@ import { workApi, type WorkMemberOption } from '@/lib/work-api';
 import { useShell } from '../../_components/shell-context';
 
 import { recalculerBlocages, remplacerTache } from './kanban-model';
+import { suggestionFacture } from './marge/marge-model';
 import { PARAM_TACHE, aujourdhui, codeWork, messageWork } from './projets-model';
 import { membresConnus, messagesAvertissements } from './taches-model';
 
@@ -53,6 +54,9 @@ export interface ContexteProjet {
   /** Messages non bloquants (conflits de dates, suggestions) du dernier geste. */
   avertissements: string[];
   effacerAvertissements: () => void;
+  /** Jalon terminé dont la facture peut être préparée (lot L4a), ou `null`. */
+  factureProposee: string | null;
+  fermerPropositionFacture: () => void;
   effacerErreur: () => void;
   signalerErreur: (err: unknown, repli: string) => void;
   recharger: () => void;
@@ -96,6 +100,7 @@ export function ProjetProvider({
   const [erreur, setErreur] = useState<string | null>(null);
   const [chargement, setChargement] = useState(true);
   const [avertissements, setAvertissements] = useState<string[]>([]);
+  const [factureProposee, setFactureProposee] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
   const tasksRef = useRef<WorkTaskView[]>([]);
   tasksRef.current = tasks;
@@ -157,14 +162,18 @@ export function ProjetProvider({
     (r: WorkTaskWriteResult) => {
       setTasks((t) => remplacerTache(t, r.task));
       const messages = messagesAvertissements(r.warnings, [...tasksRef.current, r.task]);
-      if (r.suggestions.some((s) => s.code === 'PREPARE_INVOICE')) {
-        messages.push(
-          'Jalon terminé : une facture peut être préparée depuis ce jalon (Ventes, lot à venir).',
-        );
+      const facture = suggestionFacture(r.suggestions);
+      if (facture) {
+        // Proposer, jamais imposer : seul un détenteur de `sales.manage` voit le geste.
+        if (actions?.includes('sales.manage')) setFactureProposee(facture.taskId);
+        else
+          messages.push(
+            'Jalon terminé : une facture peut être préparée par un gestionnaire des ventes.',
+          );
       }
       setAvertissements(messages);
     },
-    [setTasks],
+    [setTasks, actions],
   );
 
   const signalerErreur = useCallback(
@@ -206,6 +215,8 @@ export function ProjetProvider({
       chargement,
       avertissements,
       effacerAvertissements: () => setAvertissements([]),
+      factureProposee,
+      fermerPropositionFacture: () => setFactureProposee(null),
       effacerErreur: () => setErreur(null),
       signalerErreur,
       recharger,
@@ -229,6 +240,7 @@ export function ProjetProvider({
       erreur,
       chargement,
       avertissements,
+      factureProposee,
       signalerErreur,
       recharger,
       setTasks,
