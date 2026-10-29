@@ -834,7 +834,22 @@ export interface OrgPermissionContext {
    * défaut, accordable par un `owner` ou un `admin`.
    */
   canClosePeriods?: boolean;
+  // ADR-0041 — A1 : l'écart du membre par rapport à son titre (§ 1). Absents ou vides,
+  // le membre détient exactement la ligne de son rôle. Le retrait l'emporte toujours ;
+  // un ajout est accordé pleinement (`allow`), jamais avec une portée.
+  /** Ajouts : actions que la ligne du rôle refuse et que ce membre détient. */
+  grants?: readonly Action[];
+  /** Retraits : actions que la ligne du rôle accorde et que ce membre ne détient pas. */
+  revokes?: readonly Action[];
 }
+
+/**
+ * ADR-0041 — A1 : contexte d'une décision qui n'a AUCUN membre derrière elle, ou dont
+ * l'appelant ne lit pas encore l'écart (lot A3). Le paramètre `ctx` de `can()` est
+ * obligatoire : passer `NO_OVERRIDES` est un choix écrit, jamais un oubli. Sans écart
+ * ni droit de clôture, la décision est exactement la ligne du rôle.
+ */
+export const NO_OVERRIDES: OrgPermissionContext = Object.freeze({});
 
 /**
  * Autorisation atomique d'un rôle d'organisation — l'unique lecture légitime de
@@ -845,7 +860,10 @@ export interface OrgPermissionContext {
  * RESSOURCE visée, que ce module ne connaît pas. Elles sont appliquées par les
  * services concernés — voir `sodDecision()`.
  */
-export function can(role: OrgRole, action: Action, ctx: OrgPermissionContext = {}): boolean {
+export function can(role: OrgRole, action: Action, ctx: OrgPermissionContext): boolean {
+  // ADR-0041 — A1 : retrait d'abord (il l'emporte), puis ajout (accordé pleinement).
+  if (ctx.revokes?.includes(action) === true) return false;
+  if (ctx.grants?.includes(action) === true) return true;
   switch (ORG_PERMISSION_MATRIX[role][action]) {
     case 'allow':
     case 'allow_sod':
@@ -862,7 +880,7 @@ export function can(role: OrgRole, action: Action, ctx: OrgPermissionContext = {
 export function canAll(
   role: OrgRole,
   actions: readonly Action[],
-  ctx: OrgPermissionContext = {},
+  ctx: OrgPermissionContext,
 ): boolean {
   return actions.every((a) => can(role, a, ctx));
 }
@@ -871,14 +889,35 @@ export function canAll(
 export function firstDeniedAction(
   role: OrgRole,
   actions: readonly Action[],
-  ctx: OrgPermissionContext = {},
+  ctx: OrgPermissionContext,
 ): Action | undefined {
   return actions.find((a) => !can(role, a, ctx));
 }
 
 /** Actions effectivement détenues — exposé à l'UI pour masquer ce qui serait refusé. */
-export function actionsOf(role: OrgRole, ctx: OrgPermissionContext = {}): Action[] {
+export function actionsOf(role: OrgRole, ctx: OrgPermissionContext): Action[] {
   return ACTIONS.filter((a) => can(role, a, ctx));
+}
+
+/**
+ * ADR-0041 — A1 : droits effectifs d'un membre, dans l'ordre d'`ACTIONS`.
+ *
+ *   effectif = ( ligne du rôle, case ⚙ selon `canClosePeriods` ∪ ajouts ) − retraits
+ *
+ * Même calcul qu'`actionsOf` (qui en hérite via `can`) ; le nom dit l'intention.
+ */
+export function effectiveActions(role: OrgRole, ctx: OrgPermissionContext): Action[] {
+  return actionsOf(role, ctx);
+}
+
+/**
+ * ADR-0041 — A1 : ensemble POTENTIEL d'un membre — ses droits effectifs, la case ⚙
+ * comptée comme détenue (sauf retrait). C'est l'ensemble que R7 compare : accorder
+ * plus tard le droit de clôture ne doit jamais faire dépasser l'acteur ni compléter
+ * une paire de séparation des tâches en silence.
+ */
+export function potentialEffectiveActions(role: OrgRole, ctx: OrgPermissionContext): Action[] {
+  return actionsOf(role, { ...ctx, canClosePeriods: true });
 }
 
 /** Contexte d'un principal plateforme sur une organisation cible. */
@@ -947,8 +986,14 @@ function potentialActionsOf(role: OrgRole): Set<Action> {
  * `project_manager` est exclu tant que les assignations de projet n'existent pas
  * (voir `isAssignableRole`) : il apparaîtrait ici sans restreindre quoi que ce soit.
  */
-export function grantableRoles(actorRole: OrgRole): OrgRole[] {
-  const mine = potentialActionsOf(actorRole);
+export function grantableRoles(actorRole: OrgRole, actorCtx?: OrgPermissionContext): OrgRole[] {
+  // ADR-0041 — A1 : avec le contexte de l'acteur, R7 se juge sur ses droits EFFECTIFS
+  // (décision ouverte n° 5, défaut : le titre reste soumis à R7). Sans contexte, sur la
+  // ligne potentielle de son rôle, comme avant : les appelants passent au contexte au lot A4.
+  const mine =
+    actorCtx === undefined
+      ? potentialActionsOf(actorRole)
+      : new Set(effectiveActions(actorRole, actorCtx));
   return ORG_ROLES.filter((candidate) => {
     if (!isAssignableRole(candidate)) return false;
     for (const action of potentialActionsOf(candidate)) {
@@ -958,8 +1003,12 @@ export function grantableRoles(actorRole: OrgRole): OrgRole[] {
   });
 }
 
-export function canGrantRole(actorRole: OrgRole, target: OrgRole): boolean {
-  return grantableRoles(actorRole).includes(target);
+export function canGrantRole(
+  actorRole: OrgRole,
+  target: OrgRole,
+  actorCtx?: OrgPermissionContext,
+): boolean {
+  return grantableRoles(actorRole, actorCtx).includes(target);
 }
 
 /**
@@ -1010,6 +1059,315 @@ export function sodDecision(input: {
 export const APPROVER_ROLES: readonly OrgRole[] = ORG_ROLES.filter(
   (r) => ORG_PERMISSION_MATRIX[r]['plan.approve'] !== 'deny',
 );
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADR-0041 — A1 : autorisations par membre (titre + écart)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Actions réservées au Propriétaire : jamais dans un ajout (G3,
+ * `400 PERMISSION_NOT_DELEGABLE`). Le transfert de propriété, la suppression de
+ * l'organisation, R1 et le consentement à un accès délégué ne sont pas des actions :
+ * ils restent attachés au TITRE `owner` et ne peuvent donc pas être ajoutés.
+ */
+export const NON_DELEGABLE_ACTIONS: readonly Action[] = ['billing.manage'];
+
+/**
+ * Paires incompatibles par ajout (G4). Deux seulement : la paire facturation
+ * `sales.invoice` + `fiscal.manage` a été REFUSÉE par la dirigeante le 29 oct. 2026
+ * (décision ouverte n° 3) — une seule personne peut émettre et piloter la fiscalité.
+ */
+export const SOD_PAIRS: readonly (readonly [Action, Action])[] = [
+  // R2 statique (ADR-0012 § 6) : saisir et valider.
+  ['inputs.update', 'plan.approve'],
+  // R3 : la réouverture d'une période exige les deux.
+  ['period.close', 'plan.approve'],
+];
+
+/**
+ * Socle (décision ouverte n° 4) : tableau de bord, brief, cloche. Non retirable tant
+ * que le membre détient une autre action — c'est une dépendance de toutes les actions.
+ */
+export const BASE_ACTION: Action = 'analytics.read';
+
+/**
+ * Dépendances DIRECTES entre actions (ADR-0041 § 4). Le socle `analytics.read` s'y
+ * ajoute pour toute action (voir `requiredActionsOf`). Le cumul exigé par certaines
+ * routes (marge d'un projet, conversion d'un devis) n'est PAS une dépendance.
+ * Un test vérifie que chaque ligne de la matrice les satisfait déjà.
+ */
+export const ACTION_DEPENDENCIES: Readonly<Partial<Record<Action, readonly Action[]>>> = {
+  'project.create': ['project.read'],
+  'project.update': ['project.read'],
+  'canvas.update': ['project.read'],
+  'inputs.update': ['project.read'],
+  'plan.calculate': ['project.read'],
+  'actuals.import': ['project.read'],
+  'period.close': ['project.read'],
+  // On valide ce qu'un autre a calculé : `plan.calculate` n'est pas exigé.
+  'plan.approve': ['project.read'],
+  'report.export': ['project.read', 'analytics.read'],
+  'sales.manage': ['sales.read'],
+  'sales.quote': ['sales.read'],
+  'sales.receipt': ['sales.read'],
+  'sales.invoice': ['sales.manage'],
+  'treasury.manage': ['treasury.read'],
+  'crm.manage': ['crm.read'],
+  'work.update': ['work.read'],
+  'work.manage': ['work.update'],
+};
+
+/**
+ * Toutes les actions qu'exige `action`, dépendances transitives et socle compris,
+ * dans l'ordre d'`ACTIONS`. `analytics.read` n'exige rien.
+ */
+export function requiredActionsOf(action: Action): Action[] {
+  const required = new Set<Action>();
+  const pending: Action[] = [...(ACTION_DEPENDENCIES[action] ?? [])];
+  if (action !== BASE_ACTION) pending.push(BASE_ACTION);
+  while (pending.length > 0) {
+    const next = pending.pop() as Action;
+    if (required.has(next)) continue;
+    required.add(next);
+    pending.push(...(ACTION_DEPENDENCIES[next] ?? []));
+  }
+  return ACTIONS.filter((a) => required.has(a));
+}
+
+/** Les sept domaines de l'écran (ADR-0041 § 5), dans l'ordre d'affichage. */
+export const ACTION_DOMAINS: readonly {
+  readonly key: string;
+  readonly label: string;
+  readonly actions: readonly Action[];
+}[] = [
+  {
+    key: 'organization',
+    label: 'Organisation et équipe',
+    actions: ['organization.manage', 'members.invite', 'billing.manage', 'audit.read'],
+  },
+  {
+    key: 'plan',
+    label: 'Initiatives et plan financier',
+    actions: [
+      'project.read',
+      'project.create',
+      'project.update',
+      'canvas.update',
+      'inputs.update',
+      'plan.calculate',
+      'plan.approve',
+    ],
+  },
+  {
+    key: 'actuals',
+    label: 'Réalisé et rapports',
+    actions: ['analytics.read', 'actuals.import', 'period.close', 'report.export'],
+  },
+  {
+    key: 'sales',
+    label: 'Ventes et facturation',
+    actions: [
+      'sales.read',
+      'sales.manage',
+      'sales.quote',
+      'sales.invoice',
+      'sales.receipt',
+      'fiscal.manage',
+    ],
+  },
+  { key: 'treasury', label: 'Trésorerie', actions: ['treasury.read', 'treasury.manage'] },
+  { key: 'crm', label: 'CRM', actions: ['crm.read', 'crm.manage'] },
+  {
+    key: 'work',
+    label: 'Projets et tâches',
+    actions: ['work.read', 'work.update', 'work.manage'],
+  },
+];
+
+/** Libellés français des actions (ADR-0041 § 5) — « autorisation », jamais « action ». */
+export const ACTION_LABELS: Readonly<Record<Action, string>> = {
+  'organization.manage': "Gérer l'organisation et les membres",
+  'members.invite': 'Inviter des membres',
+  'billing.manage': "Gérer l'abonnement",
+  'audit.read': "Consulter le journal d'audit",
+  'project.read': 'Consulter les initiatives',
+  'project.create': 'Créer une initiative',
+  'project.update': 'Modifier une initiative',
+  'canvas.update': "Rédiger le modèle économique, l'Idea Lab et le business plan",
+  'inputs.update': 'Saisir les hypothèses',
+  'plan.calculate': 'Calculer le plan',
+  'plan.approve': 'Valider un plan',
+  'analytics.read': 'Consulter le tableau de bord, le brief et les analyses',
+  'actuals.import': 'Saisir et importer le réalisé',
+  'period.close': 'Clôturer une période',
+  'report.export': 'Exporter des rapports',
+  'sales.read': 'Consulter clients, catalogue, devis, factures et encaissements',
+  'sales.manage': 'Gérer les clients, le catalogue et les brouillons de facture',
+  'sales.quote': 'Préparer et envoyer les devis',
+  'sales.invoice': 'Émettre et normaliser les factures et les avoirs',
+  'sales.receipt': 'Enregistrer les encaissements',
+  'fiscal.manage': "Gérer l'identité fiscale et la facture normalisée",
+  'treasury.read': 'Consulter les dépenses, les comptes et la prévision de trésorerie',
+  'treasury.manage': 'Enregistrer les dépenses, les comptes et les virements',
+  'crm.read': 'Consulter le CRM',
+  'crm.manage': 'Gérer prospects, contacts, opportunités et relances',
+  'work.read': 'Consulter les projets et les tâches',
+  'work.update': 'Travailler sur les tâches',
+  'work.manage': 'Gérer les projets',
+};
+
+/**
+ * Refus typé de `validateOverrides` — le code est celui de la réponse HTTP que le
+ * service (lot A4) renverra ; ce module ne lève jamais d'exception HTTP.
+ */
+export type OverrideViolation =
+  /** G2 — 403. */
+  | { readonly code: 'SELF_PERMISSIONS_FORBIDDEN' }
+  /** G3 — 409 : l'écart d'un Propriétaire reste vide. */
+  | { readonly code: 'OWNER_PERMISSIONS_FIXED' }
+  /** G3 — 400. */
+  | { readonly code: 'PERMISSION_NOT_DELEGABLE'; readonly actions: readonly Action[] }
+  /** § 1 — 400 : doublon, ajout et retrait de la même action, ajout ou retrait sans objet. */
+  | { readonly code: 'PERMISSION_OVERRIDE_REDUNDANT'; readonly actions: readonly Action[] }
+  /** G1 — 403 : actions de la cible (avant ou après) que l'acteur ne détient pas. */
+  | { readonly code: 'PERMISSION_ESCALATION'; readonly actions: readonly Action[] }
+  /** G4 — 409. */
+  | { readonly code: 'SOD_CONFLICT'; readonly pair: readonly [Action, Action] }
+  /** § 4 — 400 : l'ensemble demandé est incohérent ; rien n'est complété en silence. */
+  | {
+      readonly code: 'PERMISSION_DEPENDENCY_MISSING';
+      readonly action: Action;
+      readonly missing: readonly Action[];
+    };
+
+export type OverrideValidation =
+  | {
+      readonly ok: true;
+      /** Ajouts et retraits triés dans l'ordre d'`ACTIONS` (forme de stockage). */
+      readonly grants: readonly Action[];
+      readonly revokes: readonly Action[];
+      /** Droits effectifs de la cible après l'opération. */
+      readonly effective: readonly Action[];
+    }
+  | ({ readonly ok: false } & OverrideViolation);
+
+export interface ValidateOverridesInput {
+  readonly actorRole: OrgRole;
+  /** Contexte EFFECTIF actuel de l'acteur (son propre écart et son droit de clôture). */
+  readonly actorCtx: OrgPermissionContext;
+  readonly targetRole: OrgRole;
+  /**
+   * Contexte de la cible AVANT l'opération (modification d'un membre) ; absent pour
+   * une invitation. Son `canClosePeriods` est conservé par l'opération.
+   */
+  readonly targetCtxBefore?: OrgPermissionContext;
+  /** Écart demandé, ENTIER (pas de fusion). */
+  readonly grants: readonly Action[];
+  readonly revokes: readonly Action[];
+  readonly actorIsTarget: boolean;
+}
+
+function sortedActions(actions: Iterable<Action>): Action[] {
+  const set = new Set(actions);
+  return ACTIONS.filter((a) => set.has(a));
+}
+
+/**
+ * Valide un écart (ajouts et retraits) demandé par un acteur pour une cible —
+ * garde-fous G1 à G5 et dépendances d'ADR-0041. Fonction pure : le service des
+ * membres et celui des invitations la rappellent côté serveur (lot A4), l'écran ne
+ * fait que l'anticiper.
+ *
+ * Ordre des contrôles (le premier refus gagne, pour que le code soit prévisible) :
+ *   1. G2 — l'acteur est la cible ;
+ *   2. G3 — Propriétaire non personnalisable ;
+ *   3. G3 — action non délégable ajoutée ;
+ *   4. § 1 — forme : doublon, ajout ∩ retrait, ajout d'une case non `deny`, retrait
+ *      d'une case `deny`, `period.close` d'un Comptable (stocké dans `canClosePeriods`) ;
+ *   5. G1 — ensemble potentiel de la cible, avant puis après, inclus dans les droits
+ *      effectifs de l'acteur ;
+ *   6. G4 — paire de séparation des tâches complétée par ajout ;
+ *   7. § 4 — dépendances et socle, sur l'ensemble potentiel après l'opération.
+ *
+ * Le TITRE reste soumis à R7 par `canGrantRole` (décision ouverte n° 5) : ce contrôle
+ * n'est pas répété ici. G5 découle de la forme : une case `allow_project` n'est pas
+ * `deny`, son ajout est donc refusé comme redondant.
+ */
+export function validateOverrides(input: ValidateOverridesInput): OverrideValidation {
+  const { actorRole, actorCtx, targetRole, targetCtxBefore, grants, revokes } = input;
+
+  if (input.actorIsTarget) return { ok: false, code: 'SELF_PERMISSIONS_FORBIDDEN' };
+
+  if (isOwnerRole(targetRole) && (grants.length > 0 || revokes.length > 0)) {
+    return { ok: false, code: 'OWNER_PERMISSIONS_FIXED' };
+  }
+
+  const notDelegable = sortedActions(grants.filter((a) => NON_DELEGABLE_ACTIONS.includes(a)));
+  if (notDelegable.length > 0) {
+    return { ok: false, code: 'PERMISSION_NOT_DELEGABLE', actions: notDelegable };
+  }
+
+  const row = ORG_PERMISSION_MATRIX[targetRole];
+  const redundant = new Set<Action>();
+  const seen = new Set<Action>();
+  for (const a of [...grants, ...revokes]) {
+    if (seen.has(a)) redundant.add(a);
+    seen.add(a);
+  }
+  for (const a of grants) if (row[a] !== 'deny') redundant.add(a);
+  for (const a of revokes) {
+    if (row[a] === 'deny') redundant.add(a);
+    // § 1 : la case ⚙ du Comptable est stockée dans `canClosePeriods`, jamais dans l'écart.
+    if (row[a] === 'conditional') redundant.add(a);
+  }
+  if (redundant.size > 0) {
+    return { ok: false, code: 'PERMISSION_OVERRIDE_REDUNDANT', actions: sortedActions(redundant) };
+  }
+
+  const after: OrgPermissionContext = {
+    canClosePeriods: targetCtxBefore?.canClosePeriods === true,
+    grants: sortedActions(grants),
+    revokes: sortedActions(revokes),
+  };
+
+  const actorHolds = new Set(effectiveActions(actorRole, actorCtx));
+  if (targetCtxBefore !== undefined) {
+    const beyondBefore = potentialEffectiveActions(targetRole, targetCtxBefore).filter(
+      (a) => !actorHolds.has(a),
+    );
+    if (beyondBefore.length > 0) {
+      return { ok: false, code: 'PERMISSION_ESCALATION', actions: beyondBefore };
+    }
+  }
+  const potentialAfter = potentialEffectiveActions(targetRole, after);
+  const beyondAfter = potentialAfter.filter((a) => !actorHolds.has(a));
+  if (beyondAfter.length > 0) {
+    return { ok: false, code: 'PERMISSION_ESCALATION', actions: beyondAfter };
+  }
+
+  const nativePotential = potentialActionsOf(targetRole);
+  const potentialSet = new Set(potentialAfter);
+  for (const pair of SOD_PAIRS) {
+    const native = nativePotential.has(pair[0]) && nativePotential.has(pair[1]);
+    if (!native && potentialSet.has(pair[0]) && potentialSet.has(pair[1])) {
+      return { ok: false, code: 'SOD_CONFLICT', pair };
+    }
+  }
+
+  for (const action of potentialAfter) {
+    const missing = requiredActionsOf(action).filter((a) => !potentialSet.has(a));
+    if (missing.length > 0) {
+      return { ok: false, code: 'PERMISSION_DEPENDENCY_MISSING', action, missing };
+    }
+  }
+
+  return {
+    ok: true,
+    grants: after.grants ?? [],
+    revokes: after.revokes ?? [],
+    effective: effectiveActions(targetRole, after),
+  };
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Compatibilité et libellés

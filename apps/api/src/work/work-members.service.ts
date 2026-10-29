@@ -12,7 +12,13 @@ import { InjectModel } from '@nestjs/mongoose';
 import type { WorkMemberRef } from '@lalanda/shared/work';
 import type { Model } from 'mongoose';
 
-import { can, normalizeOrgRole, type Action, type OrgRole } from '../authz/permissions.js';
+import {
+  can,
+  NO_OVERRIDES,
+  normalizeOrgRole,
+  type Action,
+  type OrgRole,
+} from '../authz/permissions.js';
 import { MembersService } from '../organizations/members.service.js';
 import { Membership, type MembershipDocument } from '../organizations/membership.schema.js';
 import { invalid, memberNotFound } from './work.common.js';
@@ -55,7 +61,7 @@ export class WorkMembersService {
   /** Vrai si l'utilisateur est membre et détient `action`. */
   async holds(organizationId: string, userId: string, action: Action): Promise<boolean> {
     const role = await this.roleOf(organizationId, userId);
-    return role !== undefined && can(role, action);
+    return role !== undefined && can(role, action, NO_OVERRIDES);
   }
 
   /** Noms courants (nom, à défaut e-mail) ; un inconnu devient « Ancien membre ». */
@@ -91,7 +97,7 @@ export class WorkMembersService {
     for (const id of userIds) {
       const role = roles.get(id);
       if (role === undefined) memberNotFound();
-      if (!can(role, action)) {
+      if (!can(role, action, NO_OVERRIDES)) {
         invalid(path, code, 'Ce membre ne détient pas les droits requis pour ce rôle.');
       }
     }
@@ -107,13 +113,13 @@ export class WorkMembersService {
   /** Membres détenant `work.read` (sélecteurs de responsable et mentions). */
   async list(organizationId: string): Promise<WorkMemberView[]> {
     const roles = await this.roles(organizationId);
-    const readers = [...roles].filter(([, r]) => can(r, 'work.read'));
+    const readers = [...roles].filter(([, r]) => can(r, 'work.read', NO_OVERRIDES));
     const refs = await this.refs(readers.map(([id]) => id));
     return readers
       .map(([id, role]) => ({
         ...WorkMembersService.refOf(refs, id),
-        canUpdate: can(role, 'work.update'),
-        canManage: can(role, 'work.manage'),
+        canUpdate: can(role, 'work.update', NO_OVERRIDES),
+        canManage: can(role, 'work.manage', NO_OVERRIDES),
       }))
       .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
   }

@@ -20,7 +20,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Types, type Model } from 'mongoose';
 
 import { AuditService } from '../authz/audit.service.js';
-import { can } from '../authz/permissions.js';
+import { can, NO_OVERRIDES } from '../authz/permissions.js';
 import { Customer, type CustomerDocument } from '../sales/customer.schema.js';
 import { conflict, invalidCursor, invalidRequestOf, staleRevision } from '../sales/sales.errors.js';
 import { WorkMembersService } from '../work/work-members.service.js';
@@ -308,7 +308,8 @@ export class ActivitiesService {
         message: 'Membre introuvable dans cette organisation.',
       });
     }
-    if (!can(role, 'crm.manage')) {
+    // ADR-0041 A3 : passer aux droits effectifs du membre
+    if (!can(role, 'crm.manage', NO_OVERRIDES)) {
       invalidRequestOf([
         {
           path: 'assigneeUserId',

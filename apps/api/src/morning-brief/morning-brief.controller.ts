@@ -33,7 +33,7 @@ import { AuditService } from '../authz/audit.service.js';
 import { RequirePermission } from '../authz/authz.decorators.js';
 import { CurrentOrgRole } from '../authz/current-org-role.decorator.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
-import { can, type OrgRole } from '../authz/permissions.js';
+import { can, NO_OVERRIDES, type OrgRole } from '../authz/permissions.js';
 import { AI_THROTTLE } from '../security/throttling.js';
 import { UserThrottlerGuard } from '../security/user-throttler.guard.js';
 import { BRIEF_INTENTS, MENTION_BRIEF } from './morning-brief-ai.js';
@@ -93,7 +93,7 @@ export class MorningBriefController {
     return {
       brief,
       ai: { enabled: disabledBy === null, disabledBy, quota, mention: MENTION_BRIEF },
-      canManageAi: can(effective, 'organization.manage'),
+      canManageAi: can(effective, 'organization.manage', NO_OVERRIDES),
     };
   }
 

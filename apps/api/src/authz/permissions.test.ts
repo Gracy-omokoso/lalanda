@@ -18,6 +18,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ACTIONS,
+  NO_OVERRIDES,
   ORG_PERMISSION_MATRIX,
   ORG_ROLES,
   ORG_ROLE_DESCRIPTIONS,
@@ -30,12 +31,14 @@ import {
   can,
   canGrantRole,
   canPlatform,
+  effectiveActions,
   grantableRoles,
   isAssignableRole,
   isOwnerRole,
   normalizeOrgRole,
   sodDecision,
   type Action,
+  type OrgPermissionContext,
   type OrgRole,
   type PlatformRole,
 } from './permissions.js';
@@ -228,6 +231,29 @@ describe('matrice rôle organisation × action (ADR-0012 §3)', () => {
   }
 });
 
+// ADR-0041 — A1 : écart vide ⇒ effectif = ligne du rôle, sur les 252 cases organisation.
+// Ce qui fonde « comportement strictement identique » tant qu'aucun écart n'est stocké.
+describe('ADR-0041 — écart vide : les droits effectifs sont la ligne du rôle', () => {
+  const VIDES: readonly OrgPermissionContext[] = [NO_OVERRIDES, {}, { grants: [], revokes: [] }];
+  for (const role of ORDRE_ORG) {
+    it(`« ${role} » : 28 cases identiques à la matrice, avec et sans droit de clôture`, () => {
+      for (const canClosePeriods of [false, true]) {
+        const attendu = ACTIONS.filter((a) => {
+          const g = ORG_PERMISSION_MATRIX[role][a];
+          return g === 'conditional' ? canClosePeriods : g !== 'deny';
+        });
+        for (const vide of VIDES) {
+          const ctx = { ...vide, canClosePeriods };
+          expect(effectiveActions(role, ctx), role).toEqual(attendu);
+          for (const action of ACTIONS) {
+            expect(can(role, action, ctx), `${role} × ${action}`).toBe(attendu.includes(action));
+          }
+        }
+      }
+    });
+  }
+});
+
 describe('matrice rôle plateforme × action (ADR-0012 §4)', () => {
   it('déclare exactement les 6 rôles plateforme, tous préfixés `platform_`', () => {
     expect([...PLATFORM_ROLES]).toEqual([...ORDRE_PLATEFORME]);
@@ -305,7 +331,7 @@ describe('accès délégué (⚙D)', () => {
 
 describe('droit conditionnel ⚙ (docs/12 « clôture selon permission »)', () => {
   it('le comptable ne clôture pas sans le droit explicite', () => {
-    expect(can('accountant', 'period.close')).toBe(false);
+    expect(can('accountant', 'period.close', NO_OVERRIDES)).toBe(false);
     expect(can('accountant', 'period.close', { canClosePeriods: false })).toBe(false);
   });
 
@@ -344,21 +370,21 @@ describe('R2 — séparation validation / saisie (docs/12 § Règles critiques)'
   });
 
   it('seuls `owner` et `finance_director` peuvent approuver un plan', () => {
-    const approbateurs = ORG_ROLES.filter((r) => can(r, 'plan.approve'));
+    const approbateurs = ORG_ROLES.filter((r) => can(r, 'plan.approve', NO_OVERRIDES));
     expect(approbateurs).toEqual(['owner', 'finance_director']);
   });
 
   it('`admin`, `analyst` et `project_manager` saisissent sans jamais approuver', () => {
     for (const role of ['admin', 'analyst', 'project_manager'] as const) {
-      expect(can(role, 'inputs.update'), `${role} doit pouvoir saisir`).toBe(true);
-      expect(can(role, 'plan.approve'), `${role} ne doit pas approuver`).toBe(false);
+      expect(can(role, 'inputs.update', NO_OVERRIDES), `${role} doit pouvoir saisir`).toBe(true);
+      expect(can(role, 'plan.approve', NO_OVERRIDES), `${role} ne doit pas approuver`).toBe(false);
     }
   });
 
   it('le comptable constate mais ne projette pas', () => {
-    expect(can('accountant', 'actuals.import')).toBe(true);
-    expect(can('accountant', 'inputs.update')).toBe(false);
-    expect(can('accountant', 'plan.calculate')).toBe(false);
+    expect(can('accountant', 'actuals.import', NO_OVERRIDES)).toBe(true);
+    expect(can('accountant', 'inputs.update', NO_OVERRIDES)).toBe(false);
+    expect(can('accountant', 'plan.calculate', NO_OVERRIDES)).toBe(false);
   });
 
   it('toute case `plan.approve` autorisée porte la marque ⓢ', () => {
@@ -423,26 +449,26 @@ describe('R3 — clôture et réouverture exigent des permissions distinctes', (
 
   it('`owner` et `finance_director` détiennent bien les deux', () => {
     for (const role of ['owner', 'finance_director'] as const) {
-      expect(can(role, 'period.close')).toBe(true);
-      expect(can(role, 'plan.approve')).toBe(true);
+      expect(can(role, 'period.close', NO_OVERRIDES)).toBe(true);
+      expect(can(role, 'plan.approve', NO_OVERRIDES)).toBe(true);
     }
   });
 
   it('un `admin` ne peut ni clôturer ni rouvrir', () => {
-    expect(can('admin', 'period.close')).toBe(false);
-    expect(can('admin', 'plan.approve')).toBe(false);
+    expect(can('admin', 'period.close', NO_OVERRIDES)).toBe(false);
+    expect(can('admin', 'plan.approve', NO_OVERRIDES)).toBe(false);
   });
 });
 
 describe('R4 — exports', () => {
   it("`advisor` et `viewer` n'ont pas `report.export`", () => {
-    expect(can('advisor', 'report.export')).toBe(false);
-    expect(can('viewer', 'report.export')).toBe(false);
+    expect(can('advisor', 'report.export', NO_OVERRIDES)).toBe(false);
+    expect(can('viewer', 'report.export', NO_OVERRIDES)).toBe(false);
   });
 
   it('`advisor` conserve la consultation en ligne', () => {
-    expect(can('advisor', 'project.read')).toBe(true);
-    expect(can('advisor', 'analytics.read')).toBe(true);
+    expect(can('advisor', 'project.read', NO_OVERRIDES)).toBe(true);
+    expect(can('advisor', 'analytics.read', NO_OVERRIDES)).toBe(true);
   });
 });
 
@@ -495,7 +521,7 @@ describe('R7 — attribution de rôles sans élévation de privilège', () => {
         expect(can(cible, action, { canClosePeriods: true }), `${cible} × ${action}`).toBe(false);
       }
     }
-    expect(can('viewer', 'members.invite')).toBe(false);
+    expect(can('viewer', 'members.invite', NO_OVERRIDES)).toBe(false);
   });
 
   it('personne ne peut attribuer `owner` sauf un `owner`', () => {
@@ -598,22 +624,25 @@ describe('cohérence structurelle de la matrice', () => {
       'actuals.import',
       'period.close',
     ];
-    for (const action of ecritures) expect(can('viewer', action)).toBe(false);
+    for (const action of ecritures) expect(can('viewer', action, NO_OVERRIDES)).toBe(false);
   });
 
   it('`owner` détient les 28 actions', () => {
-    for (const action of ACTIONS) expect(can('owner', action)).toBe(true);
+    for (const action of ACTIONS) expect(can('owner', action, NO_OVERRIDES)).toBe(true);
   });
 
   it('`billing.manage` est réservé au seul `owner`', () => {
-    expect(ORG_ROLES.filter((r) => can(r, 'billing.manage'))).toEqual(['owner']);
+    expect(ORG_ROLES.filter((r) => can(r, 'billing.manage', NO_OVERRIDES))).toEqual(['owner']);
   });
 
   it('`fiscal.manage` est réservé à `owner` et `finance_director` (ADR-0021 §8)', () => {
-    expect(ORG_ROLES.filter((r) => can(r, 'fiscal.manage'))).toEqual(['owner', 'finance_director']);
+    expect(ORG_ROLES.filter((r) => can(r, 'fiscal.manage', NO_OVERRIDES))).toEqual([
+      'owner',
+      'finance_director',
+    ]);
     // L'Administrateur gère l'organisation, pas son identité fiscale.
-    expect(can('admin', 'organization.manage')).toBe(true);
-    expect(can('admin', 'fiscal.manage')).toBe(false);
+    expect(can('admin', 'organization.manage', NO_OVERRIDES)).toBe(true);
+    expect(can('admin', 'fiscal.manage', NO_OVERRIDES)).toBe(false);
   });
 
   it('`fiscal.manage` ne donne pas de nouveau rôle attribuable à un `admin`', () => {
@@ -632,7 +661,8 @@ describe('cohérence structurelle de la matrice', () => {
     // Gérer sans pouvoir consulter n'aurait aucun sens : l'écran de gestion lit
     // la liste avant d'écrire.
     for (const role of ORG_ROLES) {
-      if (can(role, 'sales.manage')) expect(can(role, 'sales.read'), role).toBe(true);
+      if (can(role, 'sales.manage', NO_OVERRIDES))
+        expect(can(role, 'sales.read', NO_OVERRIDES), role).toBe(true);
     }
     for (const role of PLATFORM_ROLES) {
       if (PLATFORM_PERMISSION_MATRIX[role]['sales.manage'] !== 'forbidden') {
@@ -658,7 +688,8 @@ describe('cohérence structurelle de la matrice', () => {
   it('`sales.invoice` implique `sales.manage` et ne change pas les rôles attribuables (ADR-0023)', () => {
     // Émettre suppose de pouvoir préparer le brouillon.
     for (const role of ORG_ROLES) {
-      if (can(role, 'sales.invoice')) expect(can(role, 'sales.manage'), role).toBe(true);
+      if (can(role, 'sales.invoice', NO_OVERRIDES))
+        expect(can(role, 'sales.manage', NO_OVERRIDES), role).toBe(true);
     }
     // L'Administrateur ne l'a pas : il ne pouvait déjà attribuer ni `finance_director`
     // ni `accountant`, ses rôles attribuables sont inchangés.
@@ -674,7 +705,8 @@ describe('cohérence structurelle de la matrice', () => {
   it('`sales.receipt` implique `sales.read`, n’est pas un interdit absolu et ne change pas les rôles attribuables (ADR-0031)', () => {
     // Lettrer un encaissement suppose de lire les factures.
     for (const role of ORG_ROLES) {
-      if (can(role, 'sales.receipt')) expect(can(role, 'sales.read'), role).toBe(true);
+      if (can(role, 'sales.receipt', NO_OVERRIDES))
+        expect(can(role, 'sales.read', NO_OVERRIDES), role).toBe(true);
     }
     for (const role of PLATFORM_ROLES) expect(canPlatform(role, 'sales.receipt')).toBe(false);
     expect(PLATFORM_FORBIDDEN_ACTIONS).not.toContain('sales.receipt');
@@ -689,7 +721,8 @@ describe('cohérence structurelle de la matrice', () => {
 
   it('`treasury.manage` implique `treasury.read` et ne change pas les rôles attribuables (ADR-0034)', () => {
     for (const role of ORG_ROLES) {
-      if (can(role, 'treasury.manage')) expect(can(role, 'treasury.read'), role).toBe(true);
+      if (can(role, 'treasury.manage', NO_OVERRIDES))
+        expect(can(role, 'treasury.read', NO_OVERRIDES), role).toBe(true);
     }
     for (const role of PLATFORM_ROLES) {
       if (PLATFORM_PERMISSION_MATRIX[role]['treasury.manage'] !== 'forbidden') {
@@ -712,7 +745,8 @@ describe('cohérence structurelle de la matrice', () => {
 
   it('`crm.manage` implique `crm.read` et ne change pas les rôles attribuables (ADR-0035)', () => {
     for (const role of ORG_ROLES) {
-      if (can(role, 'crm.manage')) expect(can(role, 'crm.read'), role).toBe(true);
+      if (can(role, 'crm.manage', NO_OVERRIDES))
+        expect(can(role, 'crm.read', NO_OVERRIDES), role).toBe(true);
     }
     for (const role of PLATFORM_ROLES) {
       if (PLATFORM_PERMISSION_MATRIX[role]['crm.manage'] !== 'forbidden') {
@@ -733,8 +767,10 @@ describe('cohérence structurelle de la matrice', () => {
   it('`work.manage` ⇒ `work.update` ⇒ `work.read`, sans changer les rôles attribuables (ADR-0039)', () => {
     // Trois niveaux emboîtés : gouverner suppose de travailler, travailler suppose de lire.
     for (const role of ORG_ROLES) {
-      if (can(role, 'work.manage')) expect(can(role, 'work.update'), role).toBe(true);
-      if (can(role, 'work.update')) expect(can(role, 'work.read'), role).toBe(true);
+      if (can(role, 'work.manage', NO_OVERRIDES))
+        expect(can(role, 'work.update', NO_OVERRIDES), role).toBe(true);
+      if (can(role, 'work.update', NO_OVERRIDES))
+        expect(can(role, 'work.read', NO_OVERRIDES), role).toBe(true);
     }
     for (const role of PLATFORM_ROLES) {
       const m = PLATFORM_PERMISSION_MATRIX[role];
@@ -746,7 +782,7 @@ describe('cohérence structurelle de la matrice', () => {
       expect(PLATFORM_FORBIDDEN_ACTIONS).not.toContain(action);
     }
     // Le Chef de projet reste non attribuable et sans accès (décision ouverte n° 1).
-    expect(can('project_manager', 'work.read')).toBe(false);
+    expect(can('project_manager', 'work.read', NO_OVERRIDES)).toBe(false);
     expect(grantableRoles('admin').sort()).toEqual([
       'admin',
       'advisor',
@@ -760,11 +796,11 @@ describe('cohérence structurelle de la matrice', () => {
 
 describe('ADR-0040 § 4 — rôle Commercial et action `sales.quote`', () => {
   it('`sales.quote` : exactement les détenteurs de `sales.manage`, plus le Commercial', () => {
-    const quote = ORG_ROLES.filter((r) => can(r, 'sales.quote'));
-    const manage = ORG_ROLES.filter((r) => can(r, 'sales.manage'));
+    const quote = ORG_ROLES.filter((r) => can(r, 'sales.quote', NO_OVERRIDES));
+    const manage = ORG_ROLES.filter((r) => can(r, 'sales.manage', NO_OVERRIDES));
     expect(quote).toEqual([...manage, 'sales_rep']);
     // Préparer un devis suppose de lire les ventes.
-    for (const role of quote) expect(can(role, 'sales.read'), role).toBe(true);
+    for (const role of quote) expect(can(role, 'sales.read', NO_OVERRIDES), role).toBe(true);
     expect(PLATFORM_FORBIDDEN_ACTIONS).not.toContain('sales.quote');
     for (const role of PLATFORM_ROLES) {
       expect(PLATFORM_PERMISSION_MATRIX[role]['sales.quote'], role).toBe(
@@ -796,7 +832,7 @@ describe('ADR-0040 § 4 — rôle Commercial et action `sales.quote`', () => {
       'work.manage',
       'members.invite',
     ] as const) {
-      expect(can('sales_rep', action), action).toBe(false);
+      expect(can('sales_rep', action, NO_OVERRIDES), action).toBe(false);
     }
   });
 
@@ -816,8 +852,8 @@ describe('ADR-0040 § 4 — rôle Commercial et action `sales.quote`', () => {
     expect(canGrantRole('admin', 'sales_rep')).toBe(true);
     // Le Comptable détient les sept actions mais n'a pas `members.invite` : le
     // guard le refuse avant R7 (critère d'acceptation n° 3, vérifié en e2e).
-    expect(can('accountant', 'members.invite')).toBe(false);
-    expect(can('sales_rep', 'members.invite')).toBe(false);
+    expect(can('accountant', 'members.invite', NO_OVERRIDES)).toBe(false);
+    expect(can('sales_rep', 'members.invite', NO_OVERRIDES)).toBe(false);
     expect(grantableRoles('viewer')).not.toContain('sales_rep');
   });
 

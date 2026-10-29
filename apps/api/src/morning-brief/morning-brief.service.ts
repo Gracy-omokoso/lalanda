@@ -27,7 +27,7 @@ import {
   type MorningBrief,
 } from '@lalanda/engine';
 
-import { can, type OrgRole } from '../authz/permissions.js';
+import { can, NO_OVERRIDES, type OrgRole } from '../authz/permissions.js';
 import { SalesInvoice, type SalesInvoiceDocument } from '../sales/invoices/invoice.schema.js';
 import {
   CASH_POSITION_SOURCE,
@@ -148,12 +148,13 @@ export class MorningBriefService {
     userId: string,
     now: Date = new Date(),
   ): Promise<MorningBrief> {
-    const salesVisible = can(role, 'sales.read');
-    const workVisible = can(role, 'work.read');
+    const salesVisible = can(role, 'sales.read', NO_OVERRIDES);
+    const workVisible = can(role, 'work.read', NO_OVERRIDES);
     // ADR-0040 — C0 § 4.4 : une donnée de trésorerie exige `treasury.read`.
-    const cashVisible = can(role, 'treasury.read');
+    const cashVisible = can(role, 'treasury.read', NO_OVERRIDES);
     // ADR-0040 — C4 § 5.5 : relances et pipeline chargés seulement avec `crm.read`.
-    const crmVisible = can(role, 'crm.read');
+    // ADR-0041 A3 : passer aux droits effectifs du membre
+    const crmVisible = can(role, 'crm.read', NO_OVERRIDES);
     const [sales, cash, dueDates, work, crm] = await Promise.all([
       salesVisible ? this.loadSales(organizationId, now) : Promise.resolve('hidden' as const),
       cashVisible ? this.cash.cashOf(organizationId, now) : Promise.resolve('hidden' as const),

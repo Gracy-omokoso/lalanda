@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { Types } from 'mongoose';
 
-import { can, type Action, type OrgRole } from '../authz/permissions.js';
+import { can, NO_OVERRIDES, type Action, type OrgRole } from '../authz/permissions.js';
 import { conflict, invalidRequestOf, type SalesIssue } from '../sales/sales.errors.js';
 import { isObjectIdHex } from '../sales/search.js';
 
@@ -31,7 +31,7 @@ export function workActorOf(user: { id: string }, role: OrgRole | undefined): Wo
 
 /** L'appelant détient-il cette action dans l'organisation active ? */
 export function actorCan(actor: WorkActor, action: Action): boolean {
-  return actor.role !== undefined && can(actor.role, action);
+  return actor.role !== undefined && can(actor.role, action, NO_OVERRIDES);
 }
 
 export function isWorkId(value: unknown): value is string {

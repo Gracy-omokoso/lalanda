@@ -26,7 +26,7 @@ import { buildMorningBrief, type MorningBriefInput } from '@lalanda/engine';
 import { describe, expect, it, vi } from 'vitest';
 
 import { REQUIRED_PERMISSIONS_KEY } from '../authz/authz.decorators.js';
-import { ORG_ROLES, can, type Action } from '../authz/permissions.js';
+import { NO_OVERRIDES, ORG_ROLES, can, type Action } from '../authz/permissions.js';
 import { BusinessPlanController } from '../business-plan/business-plan.controller.js';
 import { IdeaLabController } from '../idea-lab/idea-lab.controller.js';
 import { payloadFor } from '../morning-brief/morning-brief-ai.js';
@@ -109,9 +109,9 @@ describe('contextes servis au modèle (ADR-0040 § 4.4)', () => {
     // Business plan et Idea Lab lisent le plan du projet : le rôle doit déjà voir
     // le réalisé et la trésorerie. Le Chef de projet (non attribuable) excepté.
     for (const role of ORG_ROLES) {
-      if (!can(role, 'canvas.update') || role === 'project_manager') continue;
-      expect(can(role, 'project.read'), role).toBe(true);
-      expect(can(role, 'treasury.read'), role).toBe(true);
+      if (!can(role, 'canvas.update', NO_OVERRIDES) || role === 'project_manager') continue;
+      expect(can(role, 'project.read', NO_OVERRIDES), role).toBe(true);
+      expect(can(role, 'treasury.read', NO_OVERRIDES), role).toBe(true);
     }
   });
 

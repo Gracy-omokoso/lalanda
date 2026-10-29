@@ -21,7 +21,7 @@ import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model, Types } from 'mongoose';
 
-import { can } from '../authz/permissions.js';
+import { can, NO_OVERRIDES } from '../authz/permissions.js';
 import { SchedulerService } from '../scheduler/scheduler.service.js';
 import { WorkMembersService } from '../work/work-members.service.js';
 import { WorkSettingsService } from '../work/work-settings.service.js';
@@ -146,7 +146,8 @@ export class CrmDueRemindersJob implements OnModuleInit {
         if (claim.modifiedCount !== 1) continue;
         report.claimed += 1;
         const role = roles.get(a.assigneeUserId);
-        if (role === undefined || !can(role, 'crm.read')) {
+        // ADR-0041 A3 : passer aux droits effectifs du membre
+        if (role === undefined || !can(role, 'crm.read', NO_OVERRIDES)) {
           report.skipped += 1;
           continue;
         }

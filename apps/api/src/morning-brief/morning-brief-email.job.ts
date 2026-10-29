@@ -21,7 +21,7 @@ import type { Model } from 'mongoose';
 import { formatFr, type BriefFact, type MorningBrief } from '@lalanda/engine';
 
 import { OrganizationSuspension } from '../admin/organization-suspension.schema.js';
-import { can, normalizeOrgRole } from '../authz/permissions.js';
+import { can, NO_OVERRIDES, normalizeOrgRole } from '../authz/permissions.js';
 import { MailService } from '../mail/mail.service.js';
 import { MembersService } from '../organizations/members.service.js';
 import { Membership, type MembershipDocument } from '../organizations/membership.schema.js';
@@ -175,7 +175,7 @@ export class MorningBriefEmailJob implements OnModuleInit {
       this.organizations.findById(organizationId, { name: 1 }).lean().exec(),
     ]);
     const role = normalizeOrgRole(membership?.role);
-    if (!membership || !role || !can(role, 'analytics.read') || suspended || !org) {
+    if (!membership || !role || !can(role, 'analytics.read', NO_OVERRIDES) || suspended || !org) {
       return 'skipped';
     }
     const email = (await this.members.identitiesOf([userId])).get(userId)?.email;

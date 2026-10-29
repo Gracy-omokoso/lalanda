@@ -45,7 +45,7 @@ import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
-import { can } from '../authz/permissions.js';
+import { can, NO_OVERRIDES } from '../authz/permissions.js';
 import { beforeTimeCursor, decodeTimeCursor, encodeTimeCursor } from '../crm/time-cursor.js';
 import { ObjectStorageService } from '../storage/object-storage.service.js';
 import {
@@ -340,7 +340,8 @@ export class WorkTasksService {
       done: false,
     };
     if (archived.length > 0) filter['projectId'] = { $nin: archived };
-    const crmVisible = actor.role !== undefined && can(actor.role, 'crm.read');
+    // ADR-0041 A3 : passer aux droits effectifs du membre
+    const crmVisible = actor.role !== undefined && can(actor.role, 'crm.read', NO_OVERRIDES);
     const [docs, crm] = await Promise.all([
       this.tasks
         .find(filter, LIGHT)
