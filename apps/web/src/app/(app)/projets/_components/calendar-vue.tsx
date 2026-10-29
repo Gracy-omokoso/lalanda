@@ -6,7 +6,8 @@
 //
 // - Mois ou semaine. Une tâche est posée sur son échéance, ou étendue de sa
 //   date de début à son échéance ; un jalon est un losange ◆ (forme, pas
-//   seulement couleur).
+//   seulement couleur). Une relance du CRM (ADR-0040 — C4) porte une étiquette
+//   (« Relance ») et le signe ↻ au lieu d'un numéro de tâche.
 // - Glisser une tâche vers un autre jour déplace son échéance (une tâche datée
 //   glisse en bloc). Équivalents : au clavier, flèches sur la tâche puis Entrée
 //   (Échap annule) ; menu « Déplacer l'échéance… » dans la vue liste.
@@ -27,6 +28,7 @@ import {
   ecartJours,
   libelleEtendue,
   libelleJour,
+  nomElement,
   optionsEcheance,
   periode,
   placerSemaines,
@@ -40,6 +42,19 @@ import { LIBELLES_ECHEANCE, etatEcheance, formatJour } from './projets-model';
 export interface TacheCalendrierUI extends TacheDeplacable {
   number: number;
   title: string;
+  /** ADR-0040 — C4 : élément qui n'est pas une tâche (« Relance ») ; pas de numéro. */
+  etiquette?: string;
+}
+
+/** Numéro de tâche, ou signe de la relance (forme, pas seulement couleur). */
+function Repere({ t, className }: { t: TacheCalendrierUI; className: string }): React.ReactElement {
+  return t.etiquette ? (
+    <span aria-hidden="true" className={className}>
+      ↻
+    </span>
+  ) : (
+    <span className={className}>#{t.number}</span>
+  );
 }
 
 const TYPE_GLISSE = 'application/x-lalanda-tache-calendrier';
@@ -125,14 +140,14 @@ export function CalendrierTaches<T extends TacheCalendrierUI>({
     const cible = addDays(t.dueDate, attente.delta);
     const corps = corpsDeplacement(t, cible);
     if (corps === null) return;
-    setAnnonce(`Échéance de #${t.number} déplacée au ${libelleJour(cible)}.`);
+    setAnnonce(`Échéance de ${nomElement(t)} déplacée au ${libelleJour(cible)}.`);
     onDeplacer(t, corps);
   }
 
   function deplacerVers(t: T, cible: string): void {
     const corps = corpsDeplacement(t, cible);
     if (corps === null) return;
-    setAnnonce(`Échéance de #${t.number} déplacée au ${libelleJour(cible)}.`);
+    setAnnonce(`Échéance de ${nomElement(t)} déplacée au ${libelleJour(cible)}.`);
     onDeplacer(t, corps);
   }
 
@@ -426,7 +441,7 @@ export function CalendrierTaches<T extends TacheCalendrierUI>({
                   onClick={() => onOuvrir(t)}
                   className="text-left underline-offset-2 hover:underline"
                 >
-                  <span className="text-[var(--foreground-muted)]">#{t.number}</span> {t.title}
+                  <Repere t={t} className="text-[var(--foreground-muted)]" /> {t.title}
                 </button>
               </li>
             ))}
@@ -474,8 +489,8 @@ function Puce({
         ? 'border-[var(--accent)] bg-[var(--surface)] text-[var(--foreground)]'
         : 'border-[var(--accent)]/40 bg-[var(--accent-soft)] text-[var(--foreground)]';
   const libelle = [
-    jalon ? 'Jalon' : 'Tâche',
-    `#${t.number} ${t.title}`,
+    jalon ? 'Jalon' : (t.etiquette ?? 'Tâche'),
+    t.etiquette ? t.title : `#${t.number} ${t.title}`,
     libelleEtendue(t),
     t.done ? 'terminée' : null,
     etat ? LIBELLES_ECHEANCE[etat] : null,
@@ -510,7 +525,7 @@ function Puce({
         {enRetard && !t.done ? <span aria-hidden="true">⚠</span> : null}
         {t.done ? <span aria-hidden="true">✓</span> : null}
         <span className={`truncate ${t.done ? 'line-through' : ''}`} aria-hidden="true">
-          <span className="opacity-70">#{t.number}</span> {t.title}
+          <Repere t={t} className="opacity-70" /> {t.title}
         </span>
         {seg.continueApres ? (
           <span aria-hidden="true" className="ml-auto">
@@ -561,11 +576,16 @@ function LigneAgenda({
               <span className="sr-only">Jalon : </span>
             </>
           ) : null}
-          <span className="text-[var(--foreground-muted)]">#{t.number}</span> {t.title}
+          {t.etiquette ? <span className="sr-only">{t.etiquette} : </span> : null}
+          <Repere t={t} className="text-[var(--foreground-muted)]" /> {t.title}
           {t.done ? <span className="sr-only"> (terminée)</span> : null}
         </span>
         <span className="text-xs text-[var(--foreground-muted)]">
-          {t.isMilestone ? 'Jalon' : libelleEtendue(t)}
+          {t.isMilestone
+            ? 'Jalon'
+            : t.etiquette
+              ? `${t.etiquette} · ${libelleEtendue(t)}`
+              : libelleEtendue(t)}
           {etat ? (
             <span className={etat === 'en_retard' ? 'font-medium text-[var(--danger)]' : ''}>
               {' '}
@@ -579,7 +599,7 @@ function LigneAgenda({
       {options.length > 0 ? (
         <span className="shrink-0">
           <label htmlFor={idMenu} className="sr-only">
-            Déplacer l’échéance de #{t.number} {t.title} (actuellement {formatJour(t.dueDate)})
+            Déplacer l’échéance de {nomElement(t)} (actuellement {formatJour(t.dueDate)})
           </label>
           <select
             id={idMenu}

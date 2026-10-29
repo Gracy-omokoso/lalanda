@@ -5,23 +5,39 @@
 // groupées au jour de Kinshasa (en retard · aujourd'hui · 7 jours · plus tard ·
 // sans date). La bascule vers un calendrier est le lot L3b
 // (`mes-taches/calendrier`) : elle n'est pas affichée tant qu'il n'existe pas.
+//
+// ADR-0040 — C4 § 5 : les relances du CRM assignées à l'appelant figurent dans
+// la même liste (pastille « Relance », compte ou opportunité) ; leur case se
+// coche par la route du CRM ; un clic ouvre l'opportunité, le compte ou le contact.
 
-import type { MyTaskItem, MyTasksView } from '@lalanda/shared/work';
+import type { CrmMyTaskItem } from '@lalanda/shared/crm';
+import type { MyTasksView, WorkMyTaskItem } from '@lalanda/shared/work';
 import { EmptyState, PageHeader, Skeleton, buttonClasses } from '@lalanda/ui';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
+import { crmAgendaApi } from '@/lib/crm-agenda-api';
 import { workApi } from '@/lib/work-api';
 
 import { useShell } from '../../_components/shell-context';
 
 import { Alerte, BOUTON_PETIT, BloqueeBadge, Echeance, PrioriteBadge } from './elements';
-import { GROUPES_MES_TACHES, appliquerTache, totalMesTaches } from './mes-taches-model';
+import {
+  GROUPES_MES_TACHES,
+  PASTILLE_RELANCE,
+  appliquerTache,
+  estRelance,
+  peutCocherRelance,
+  retirerElement,
+  sousTitreRelance,
+  totalMesTaches,
+} from './mes-taches-model';
 import { PROJETS_BASE, hrefTache, messageWork, peutTravailler } from './projets-model';
 
 export function MesTaches(): React.ReactElement {
   const { actions } = useShell();
   const travailler = peutTravailler(actions);
+  const cocherRelances = peutCocherRelance(actions);
   const [vue, setVue] = useState<MyTasksView | null>(null);
   const [dueSoon, setDueSoon] = useState(1);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -42,7 +58,18 @@ export function MesTaches(): React.ReactElement {
   }, []);
   useEffect(() => charger(), [charger]);
 
-  async function terminer(t: MyTaskItem): Promise<void> {
+  async function cocherRelance(r: CrmMyTaskItem): Promise<void> {
+    try {
+      await crmAgendaApi.complete(r.activityId, r.revision);
+      setVue((v) => (v ? retirerElement(v, r.id, dueSoon) : v));
+      setAnnonce(`${r.kindLabel} « ${r.subject} » faite.`);
+    } catch (err) {
+      setErreur(messageWork(err, 'Impossible de cocher la relance.'));
+      charger();
+    }
+  }
+
+  async function terminer(t: WorkMyTaskItem): Promise<void> {
     try {
       const r = await workApi.completeTask(t.id, t.revision);
       setVue((v) => (v ? appliquerTache(v, r.task, dueSoon) : v));
@@ -124,40 +151,51 @@ export function MesTaches(): React.ReactElement {
                   <p className="text-sm text-[var(--foreground-muted)]">{g.vide}</p>
                 ) : (
                   <ul className="flex flex-col divide-y divide-[var(--border)] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)]">
-                    {liste.map((t) => (
-                      <li
-                        key={t.id}
-                        className="flex min-w-0 flex-col gap-1.5 px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3"
-                      >
-                        <div className="flex min-w-0 flex-1 items-start gap-2">
-                          <input
-                            type="checkbox"
-                            className="mt-0.5 h-4 w-4 shrink-0"
-                            checked={false}
-                            disabled={!travailler}
-                            aria-label={`Terminer #${t.number} ${t.title}`}
-                            onChange={() => void terminer(t)}
-                          />
-                          <span className="flex min-w-0 flex-col">
-                            <Link
-                              href={hrefTache(t.projectId, t.id)}
-                              className="break-words text-sm font-medium underline-offset-2 hover:underline"
-                            >
-                              <span className="text-[var(--foreground-muted)]">#{t.number}</span>{' '}
-                              {t.title}
-                            </Link>
-                            <span className="truncate text-xs text-[var(--foreground-muted)]">
-                              {t.projectName}
+                    {liste.map((t) =>
+                      estRelance(t) ? (
+                        <LigneRelance
+                          key={t.id}
+                          r={t}
+                          today={vue.asOf}
+                          dueSoonDays={dueSoon}
+                          peutCocher={cocherRelances}
+                          onCocher={() => void cocherRelance(t)}
+                        />
+                      ) : (
+                        <li
+                          key={t.id}
+                          className="flex min-w-0 flex-col gap-1.5 px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3"
+                        >
+                          <div className="flex min-w-0 flex-1 items-start gap-2">
+                            <input
+                              type="checkbox"
+                              className="mt-0.5 h-4 w-4 shrink-0"
+                              checked={false}
+                              disabled={!travailler}
+                              aria-label={`Terminer #${t.number} ${t.title}`}
+                              onChange={() => void terminer(t)}
+                            />
+                            <span className="flex min-w-0 flex-col">
+                              <Link
+                                href={hrefTache(t.projectId, t.id)}
+                                className="break-words text-sm font-medium underline-offset-2 hover:underline"
+                              >
+                                <span className="text-[var(--foreground-muted)]">#{t.number}</span>{' '}
+                                {t.title}
+                              </Link>
+                              <span className="truncate text-xs text-[var(--foreground-muted)]">
+                                {t.projectName}
+                              </span>
                             </span>
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2 pl-6 sm:pl-0">
-                          {t.blocked ? <BloqueeBadge /> : null}
-                          <PrioriteBadge priority={t.priority} />
-                          <Echeance task={t} today={vue.asOf} dueSoonDays={dueSoon} />
-                        </div>
-                      </li>
-                    ))}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 pl-6 sm:pl-0">
+                            {t.blocked ? <BloqueeBadge /> : null}
+                            <PrioriteBadge priority={t.priority} />
+                            <Echeance task={t} today={vue.asOf} dueSoonDays={dueSoon} />
+                          </div>
+                        </li>
+                      ),
+                    )}
                   </ul>
                 )}
               </section>
@@ -166,5 +204,57 @@ export function MesTaches(): React.ReactElement {
         </div>
       )}
     </section>
+  );
+}
+
+/** Relance du CRM dans la liste (ADR-0040 — C4 § 8.2) : pastille, compte, case du CRM. */
+function LigneRelance({
+  r,
+  today,
+  dueSoonDays,
+  peutCocher,
+  onCocher,
+}: {
+  r: CrmMyTaskItem;
+  today: string;
+  dueSoonDays: number;
+  peutCocher: boolean;
+  onCocher: () => void;
+}): React.ReactElement {
+  return (
+    <li className="flex min-w-0 flex-col gap-1.5 px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3">
+      <div className="flex min-w-0 flex-1 items-start gap-2">
+        <input
+          type="checkbox"
+          className="mt-0.5 h-4 w-4 shrink-0"
+          checked={false}
+          disabled={!peutCocher}
+          aria-label={`Marquer faite : ${r.kindLabel.toLowerCase()} « ${r.subject} »`}
+          onChange={onCocher}
+        />
+        <span className="flex min-w-0 flex-col">
+          <Link
+            href={r.href}
+            className="break-words text-sm font-medium underline-offset-2 hover:underline"
+          >
+            {r.subject}
+          </Link>
+          <span className="truncate text-xs text-[var(--foreground-muted)]">
+            {r.kindLabel} · {sousTitreRelance(r)}
+          </span>
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 pl-6 sm:pl-0">
+        <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-strong)] px-2 py-0.5 text-[0.7rem] font-medium">
+          <span aria-hidden="true">↻</span>
+          {PASTILLE_RELANCE}
+        </span>
+        <Echeance
+          task={{ dueDate: r.dueDate, done: false, isMilestone: false }}
+          today={today}
+          dueSoonDays={dueSoonDays}
+        />
+      </div>
+    </li>
   );
 }

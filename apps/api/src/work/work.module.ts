@@ -13,7 +13,10 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 
+import { CrmAgendaModule } from '../crm/agenda/crm-agenda.module.js';
+import { CrmAgendaSource } from '../crm/agenda/crm-agenda.source.js';
 import { OrganizationsModule } from '../organizations/organizations.module.js';
+import { CRM_AGENDA_SOURCE } from './my-tasks.ports.js';
 import { WorkBriefSource } from './brief/work-brief.source.js';
 import { WorkActivityService } from './work-activity.service.js';
 import { WorkAttachmentsController } from './work-attachments.controller.js';
@@ -56,6 +59,8 @@ import {
     // `AuthGuard` résout l'organisation active ; `MembersService` et le modèle
     // `Membership` servent l'éligibilité des membres.
     OrganizationsModule,
+    // ADR-0040 — C4 : relances CRM de « Mes tâches », lecture seule.
+    CrmAgendaModule,
     MongooseModule.forFeature([
       { name: WorkSettings.name, schema: WorkSettingsSchema },
       { name: WorkProject.name, schema: WorkProjectSchema },
@@ -89,6 +94,8 @@ import {
     WorkDueRemindersJob,
     // ADR-0039 § 6.5 (lot L4b) : fournisseur de `WORK_SOURCE` du brief du matin.
     WorkBriefSource,
+    // ADR-0040 — C4 § 5.2 : relances CRM dans « Mes tâches » (agrégées à la lecture).
+    { provide: CRM_AGENDA_SOURCE, useExisting: CrmAgendaSource },
   ],
   exports: [
     MongooseModule,

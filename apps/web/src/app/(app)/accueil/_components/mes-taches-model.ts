@@ -5,8 +5,12 @@
 // la carte montre — compteurs en retard et du jour, puis les cinq premières
 // tâches (en retard d'abord, dans l'ordre rendu par l'API). La carte n'existe
 // que si le rôle détient `work.read`.
+//
+// ADR-0040 — C4 : la liste est mixte ; une relance du CRM (`source: 'crm'`) y
+// figure avec son compte (ou son opportunité) et ouvre le CRM.
 
-import type { MyTaskItem, MyTasksView } from '@lalanda/shared/work';
+import type { CrmMyTaskItem } from '@lalanda/shared/crm';
+import type { MyTaskEntry, MyTaskItem } from '@lalanda/shared/work';
 
 import type { OrgAction } from '@/lib/api';
 
@@ -40,7 +44,23 @@ export function carteVisible(actions: readonly OrgAction[] | null): boolean {
   return actions !== null && actions.includes('work.read');
 }
 
-function ligne(t: MyTaskItem, enRetard: boolean): LigneTache {
+type Element = MyTaskItem | MyTaskEntry;
+
+function estRelance(t: Element): t is CrmMyTaskItem {
+  return 'source' in t && t.source === 'crm';
+}
+
+function ligne(t: Element, enRetard: boolean): LigneTache {
+  if (estRelance(t)) {
+    return {
+      id: t.id,
+      titre: `${t.kindLabel} : ${t.subject}`,
+      projet: t.accountName ?? t.opportunityTitle ?? t.contactName ?? 'Relance client',
+      echeance: enRetard ? `En retard · ${formatJour(t.dueDate, false)}` : 'Aujourd’hui',
+      enRetard,
+      lien: t.href,
+    };
+  }
   return {
     id: t.id,
     titre: t.title,
@@ -52,7 +72,7 @@ function ligne(t: MyTaskItem, enRetard: boolean): LigneTache {
 }
 
 export function carteMesTaches(
-  vue: Pick<MyTasksView, 'overdue' | 'today'>,
+  vue: { overdue: readonly Element[]; today: readonly Element[] },
   max = MAX_TACHES_ACCUEIL,
 ): CarteMesTaches {
   const toutes = [

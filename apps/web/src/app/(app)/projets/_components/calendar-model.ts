@@ -383,3 +383,18 @@ export function libelleEtendue(t: TacheCalendrier): string {
   if (e.debut === e.fin) return formatJour(e.fin, false);
   return `du ${formatJour(e.debut, false)} au ${formatJour(e.fin, false)}`;
 }
+
+// ─── Relances du CRM (ADR-0040 — C4 § 5.2) ──────────────────────────────────
+
+/** Ce que le calendrier lit pour NOMMER un élément : tâche numérotée ou relance. */
+export interface NommableCalendrier {
+  number: number;
+  title: string;
+  /** Présent pour un élément qui n'est pas une tâche (« Relance ») : pas de numéro. */
+  etiquette?: string;
+}
+
+/** « #12 Livrer » pour une tâche ; « Relance « Rappeler ACME » » pour une relance. */
+export function nomElement(t: NommableCalendrier): string {
+  return t.etiquette ? `${t.etiquette} « ${t.title} »` : `#${t.number} ${t.title}`;
+}

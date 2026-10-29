@@ -719,6 +719,8 @@ describe('couverture des routes par le RBAC', () => {
       'CrmAccountsController.remove': ['crm.manage'],
       'CrmAccountsController.merge': ['crm.manage'],
       'CrmAccountConversionController.convert': ['crm.manage', 'sales.manage'],
+      // ADR-0040 — C4 : décocher une activité depuis « Mes tâches » (relances CRM).
+      'CrmActivitiesController.reopen': ['crm.manage'],
       // ADR-0040 — C8 : `crm.read` pour la route ; les sections ventes et projets
       // exigent en plus `sales.read` / `work.read`, sinon elles sont `hidden`.
       'CrmOverviewController.overview': ['crm.read'],

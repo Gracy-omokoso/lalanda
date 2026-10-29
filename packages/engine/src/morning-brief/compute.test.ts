@@ -9,6 +9,7 @@ import {
   kinshasaDay,
 } from './compute.js';
 import type {
+  BriefCrmActivityInput,
   BriefFact,
   BriefInvoiceInput,
   BriefWorkTaskInput,
@@ -48,6 +49,7 @@ function input(
     cash: { status: 'to_fill' },
     dueDates: { status: 'unavailable' },
     work: { status: 'known', tasks: [], truncated: false },
+    crm: { status: 'known', activities: [], openOpportunityCount: 0, truncated: false },
     ...over,
   };
 }
@@ -296,7 +298,9 @@ describe('faits masqués et indisponibles', () => {
   });
 
   it('échéances, pipeline, tâches et projets : non disponibles, jamais à zéro', () => {
-    const brief = buildMorningBrief(input([], { work: { status: 'unavailable' } }));
+    const brief = buildMorningBrief(
+      input([], { work: { status: 'unavailable' }, crm: { status: 'unavailable' } }),
+    );
     for (const id of [
       'echeances.depassees',
       'pipeline',
@@ -456,13 +460,106 @@ describe('projets et tâches — faits et règles R8, R9 (ADR-0039 § 6.5)', () 
     expect(buildMorningBrief(input([], work([], false))).truncated).toBe(false);
   });
 
-  it('version mineure suivante', () => {
-    expect(brief([]).version).toBe('1.1.0');
+  it('version mineure suivante (ADR-0040 — C4)', () => {
+    expect(brief([]).version).toBe('1.2.0');
   });
 
-  it('les neuf règles ont des rangs uniques', () => {
+  it('les dix règles ont des rangs uniques', () => {
     const ranks = MORNING_BRIEF_RULES.map((r) => r.rank);
     expect(new Set(ranks).size).toBe(ranks.length);
-    expect(ranks.length).toBe(9);
+    expect(ranks.length).toBe(10);
+  });
+});
+
+describe('relances du CRM — faits, pipeline et règle R10 (ADR-0040 — C4 § 5.5)', () => {
+  // NOW = 21 oct. 2026 à Kinshasa.
+  function crm(
+    activities: BriefCrmActivityInput[],
+    openOpportunityCount = 0,
+    truncated = false,
+  ): Partial<MorningBriefInput> {
+    return { crm: { status: 'known', activities, openOpportunityCount, truncated } };
+  }
+
+  it('compte mes relances en retard et du jour, et les retards de l’organisation', () => {
+    const b = buildMorningBrief(
+      input(
+        [],
+        crm(
+          [
+            { dueDay: '2026-10-20', mine: true },
+            { dueDay: '2026-09-01', mine: true },
+            { dueDay: '2026-10-21', mine: true },
+            { dueDay: '2026-10-19', mine: false },
+            { dueDay: '2026-10-21', mine: false },
+          ],
+          4,
+        ),
+      ),
+    );
+    expect(fact(b.facts, 'mes_relances.en_retard').value).toBe('2');
+    expect(fact(b.facts, 'mes_relances.aujourdhui').value).toBe('1');
+    expect(fact(b.facts, 'relances.en_retard').value).toBe('3');
+    expect(fact(b.facts, 'pipeline')).toMatchObject({ status: 'known', value: '4', kind: 'count' });
+  });
+
+  it('jour de Kinshasa : à 23 h 30 UTC, l’échéance de la veille UTC est dépassée', () => {
+    const b = buildMorningBrief(
+      input([], {
+        now: '2026-10-21T23:30:00.000Z',
+        ...crm([{ dueDay: '2026-10-21', mine: true }]),
+      }),
+    );
+    expect(fact(b.facts, 'mes_relances.en_retard').value).toBe('1');
+  });
+
+  it('R10 : deux relances en retard (critère 11), rang 10, vers Mes tâches', () => {
+    const b = buildMorningBrief(
+      input(
+        [],
+        crm([
+          { dueDay: '2026-10-20', mine: true },
+          { dueDay: '2026-10-01', mine: true },
+        ]),
+      ),
+    );
+    const r10 = b.recommendations.find((r) => r.ruleId === 'relances_en_retard');
+    expect(r10).toMatchObject({
+      severity: 'attention',
+      rank: 10,
+      actionPath: '/projets/mes-taches',
+      factIds: ['mes_relances.en_retard'],
+      threshold: null,
+    });
+    expect(r10?.message).toBe('2 relances clients ont dépassé leur échéance.');
+  });
+
+  it('R10 : au seuil exact (aucune relance à moi en retard), rien', () => {
+    const b = buildMorningBrief(input([], crm([{ dueDay: '2026-10-20', mine: false }])));
+    expect(b.recommendations.map((r) => r.ruleId)).not.toContain('relances_en_retard');
+  });
+
+  it('sans crm.read : faits masqués (pipeline compris), R10 non évaluée', () => {
+    const b = buildMorningBrief(input([], { crm: 'hidden' }));
+    for (const id of [
+      'mes_relances.en_retard',
+      'mes_relances.aujourdhui',
+      'relances.en_retard',
+      'pipeline',
+    ]) {
+      expect(fact(b.facts, id)).toMatchObject({ status: 'hidden', value: null });
+    }
+    expect(b.rulesSkipped).toContainEqual({ ruleId: 'relances_en_retard', reason: 'hidden' });
+  });
+
+  it('sans source CRM (entrée absente) : non disponible, jamais zéro', () => {
+    const { crm: _omis, ...sans } = input([]);
+    const b = buildMorningBrief(sans);
+    expect(fact(b.facts, 'pipeline')).toMatchObject({ status: 'unavailable', value: null });
+    expect(b.rulesSkipped).toContainEqual({ ruleId: 'relances_en_retard', reason: 'unavailable' });
+  });
+
+  it('lecture bornée des relances : le brief le dit', () => {
+    expect(buildMorningBrief(input([], crm([], 0, true))).truncated).toBe(true);
   });
 });
