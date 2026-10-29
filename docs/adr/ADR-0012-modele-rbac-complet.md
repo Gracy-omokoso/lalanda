@@ -33,6 +33,17 @@ Décideurs : CTO Lalanda (délégation Gracy Omokoso), décideur produit
 > est ajoutée en fin de liste : Propriétaire, Directeur financier et Comptable ;
 > l'Administrateur ne l'a pas. Refusée à tous les rôles plateforme par la matrice, sans
 > entrer dans les interdits absolus, qui restent cinq.
+>
+> **Amendé par [ADR-0039](ADR-0039-projets-et-taches-run.md) § 7 (29 oct. 2026).**
+> Trois actions, `work.read` (« Consulter les projets et les tâches »), `work.update`
+> (« Travailler sur les tâches ») et `work.manage` (« Gérer les projets »), sont ajoutées
+> en fin de liste, vingt-cinquième à vingt-septième (après `treasury.*`, ADR-0034, et
+> `crm.*`, ADR-0035). `work.read` : Propriétaire, Administrateur, Directeur financier,
+> Comptable, Analyste, Lecteur ; `work.update` : les mêmes sans le Lecteur ;
+> `work.manage` : Propriétaire, Administrateur, Directeur financier. Chef de projet et
+> Conseiller : aucune. Plateforme : sous accès délégué seulement (super-administrateur
+> pour les trois, support pour la lecture) ; les interdits absolus restent cinq et les
+> rôles attribuables sont inchangés.
 
 ## Contexte
 

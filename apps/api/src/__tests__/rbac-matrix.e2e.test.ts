@@ -1,7 +1,7 @@
 // PREUVE BOUT-EN-BOUT DE LA MATRICE RBAC (S20a — ADR-0012 § Plan de validation,
 // docs/12 § Tests obligatoires « matrice rôle/action »).
 //
-// ── Pourquoi ce fichier existe, alors que `permissions.test.ts` teste déjà 210 cases ──
+// ── Pourquoi ce fichier existe, alors que `permissions.test.ts` teste déjà 378 cases ──
 //
 // `permissions.test.ts` prouve que la matrice est correctement DÉCLARÉE : il
 // appelle `can()` en mémoire et compare à une transcription littérale d'ADR-0012.
@@ -111,6 +111,19 @@ const ACTIONS_SANS_ROUTE: Record<string, string> = {
     'Aucune route de modification de projet en S20a : `POST /projects/:id/drivers` ' +
     'relève de `inputs.update`, et il n’existe ni `PATCH /projects/:id` ni ' +
     'renommage. L’action est déclarée par docs/12 et attend son endpoint.',
+  // ADR-0039 — lot L0 : les actions existent avant leurs routes. Le lot L1 (API
+  // `work`) ajoute une sonde par action dans SONDES (`GET /work/projects`,
+  // `POST /work/projects/:id/tasks`, `POST /work/projects`) et RETIRE ces trois
+  // dispenses : le test de complétude l'exige dès qu'une sonde existe.
+  'work.read':
+    'Aucune route `work` au lot L0 d’ADR-0039 (socle : contrats et actions). ' +
+    'Sonde attendue au lot L1 : `GET /work/projects` (tous sauf CDP et CON).',
+  'work.update':
+    'Aucune route `work` au lot L0 d’ADR-0039 (socle : contrats et actions). ' +
+    'Sonde attendue au lot L1 : `POST /work/projects/:id/tasks` (sauf CDP, CON, LEC).',
+  'work.manage':
+    'Aucune route `work` au lot L0 d’ADR-0039 (socle : contrats et actions). ' +
+    'Sonde attendue au lot L1 : `POST /work/projects` (PRO, ADM, DIR).',
 };
 
 /** Une sonde HTTP : la route qui matérialise une action, et ses statuts légitimes. */

@@ -1097,7 +1097,7 @@ export interface TermsAcceptanceView {
 
 export type DisplayCurrency = 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR';
 
-/** Les 22 actions granulaires (docs/12, ADR-0021 §8, ADR-0022 § S25c.1, ADR-0023 § S25e.11, ADR-0031 § 4, ADR-0034 § 8).Union fermée, alignée sur l'API. */
+/** Les 27 actions granulaires (docs/12, ADR-0021 §8, ADR-0022 § S25c.1, ADR-0023 § S25e.11, ADR-0031 § 4, ADR-0034 § 8, ADR-0035 § 3, ADR-0039 § 7). Union fermée, alignée sur l'API. */
 export type OrgAction =
   | 'organization.manage'
   | 'billing.manage'
@@ -1137,7 +1137,13 @@ export type OrgAction =
   | 'treasury.manage'
   // ADR-0035 § 3 — CRM minimal : même répartition que `sales.read` / `sales.manage`.
   | 'crm.read'
-  | 'crm.manage';
+  | 'crm.manage'
+  // ADR-0039 § 7 — projets et tâches du RUN (module `work`). Consulter (sauf Chef
+  // de projet et Conseiller), travailler sur les tâches (sauf Lecteur, en plus),
+  // gérer les projets (Propriétaire, Administrateur, Directeur financier).
+  | 'work.read'
+  | 'work.update'
+  | 'work.manage';
 
 /**
  * Offres — RÉEXPORTÉES du catalogue partagé, jamais réécrites.

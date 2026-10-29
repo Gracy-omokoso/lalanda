@@ -572,6 +572,8 @@ fois, sur une liste complète.
 | Modèles de facture sur mesure (marketplace à venir) | toutes les offres | revue avant activation | offre(s) ; conditions de la marketplace |
 | Trésorerie | toutes les offres | — | offre(s) |
 | Brief du matin (ADR-0033) | toutes les offres | IA : quota mensuel | offre(s) |
+| RUN : projets et tâches, temps passé, marge par projet (ADR-0039) | toutes les offres | bornes techniques : 500 projets actifs, 5 000 tâches par projet, 1 Gio de pièces jointes | offre(s) ; temps et marge réservés à une offre payante ? bornes comme droits d'offre ? |
+| Notifications in-app (ADR-0039) | toutes les offres | — | — (socle commun) |
 | Lala vocal | selon le plan (`lala-vocal.service.ts`) | quota vocal dédié (`lala-vocal-quota.ts`) | — |
 
 ## Ce qui reste à faire

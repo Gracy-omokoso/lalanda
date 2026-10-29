@@ -179,6 +179,9 @@ importers:
       tailwind-merge:
         specifier: ^2.5.4
         version: 2.6.1
+      zod:
+        specifier: ^4.6.6
+        version: 4.6.7
     devDependencies:
       '@tailwindcss/postcss':
         specifier: ^4.0.0-beta.7
@@ -250,9 +253,6 @@ importers:
       pino-pretty:
         specifier: ^11.3.0
         version: 11.3.0
-      zod:
-        specifier: ^4.6.6
-        version: 4.6.7
     devDependencies:
       '@types/node':
         specifier: ^22.10.0
@@ -266,12 +266,18 @@ importers:
       vitest:
         specifier: ^4.1.12
         version: 4.1.12(@types/node@22.20.5)(vite@7.3.7(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.1)(yaml@2.9.0))
+      zod:
+        specifier: ^4.6.6
+        version: 4.6.7
 
   packages/templates:
     dependencies:
       '@lalanda/shared':
         specifier: workspace:*
         version: link:../shared
+      zod:
+        specifier: ^4.6.6
+        version: 4.6.7
     devDependencies:
       '@types/node':
         specifier: ^22.10.0

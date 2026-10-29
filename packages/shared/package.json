@@ -37,6 +37,14 @@
     "./pricing": {
       "types": "./dist/pricing/index.d.ts",
       "import": "./dist/pricing/index.js"
+    },
+    "./work": {
+      "types": "./dist/work/index.d.ts",
+      "import": "./dist/work/index.js"
+    },
+    "./notifications": {
+      "types": "./dist/notifications/index.d.ts",
+      "import": "./dist/notifications/index.js"
     }
   },
   "scripts": {
@@ -49,13 +57,16 @@
   },
   "dependencies": {
     "pino": "^9.5.0",
-    "pino-pretty": "^11.3.0",
+    "pino-pretty": "^11.3.0"
+  },
+  "peerDependencies": {
     "zod": "^4.6.6"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
     "rimraf": "^6.0.1",
     "typescript": "^5.6.3",
-    "vitest": "^4.1.12"
+    "vitest": "^4.1.12",
+    "zod": "^4.6.6"
   }
 }

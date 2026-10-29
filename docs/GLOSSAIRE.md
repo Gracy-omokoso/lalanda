@@ -17,13 +17,16 @@
 | Objectif | Cible mesurable, datée et orientée |
 | Plan | Version validée et immuable du prévisionnel |
 | Point mort | Date ou niveau temporel auquel le seuil de rentabilité est atteint |
-| Projets | Réservé au futur gestionnaire de tâches de RUN (lot R1) ; ne désigne plus l'objet de BUILD |
+| Projets | Libellé d'interface du gestionnaire de projets et tâches de RUN (ADR-0039) ; dans le code : module `work` ; ne désigne plus l'objet de BUILD |
+| Notification | Message in-app adressé à un membre (assignation, mention, échéance) ; dans le code : `Notification`, collection `notifications` (ADR-0039) |
 | Prévisionnel | Valeurs estimées avant observation |
 | Projection | Estimation mise à jour combinant réalisé et hypothèses restantes |
+| Projet (RUN) | Chantier client ou interne suivi en tâches, distinct du plan financier ; dans le code : `WorkProject`, collection `work_projects`, actions `work.*` (ADR-0039) |
 | Réalisé | Valeurs effectivement observées |
 | Scénario | Jeu versionné d’hypothèses alternatives |
 | Seuil de rentabilité | Niveau d’activité couvrant les charges |
 | Source de vérité | Composant ou donnée faisant autorité pour un résultat |
+| Tâche, sous-tâche, jalon | Unité de travail d'un projet RUN ; un jalon est une tâche à durée nulle et échéance obligatoire ; dans le code : `WorkTask` (`parentTaskId`, `isMilestone`), collection `work_tasks` (ADR-0039) |
 | VAN | Valeur actualisée nette d’un investissement |
 | TRI | Taux de rentabilité interne |
 

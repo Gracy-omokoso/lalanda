@@ -36,3 +36,9 @@ Décideurs :
 - hébergement et résidence;
 - fournisseur IA et politique de données;
 - stratégie de génération PDF/Excel.
+
+## Décisions récentes (RUN)
+
+- [ADR-0039](ADR-0039-projets-et-taches-run.md) — Projets et tâches (RUN) : gestionnaire de
+  travail (module interne `work`), notifications in-app communes, marge par projet calculée par
+  le moteur. Statut : Proposed (29 oct. 2026).
