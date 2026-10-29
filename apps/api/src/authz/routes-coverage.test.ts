@@ -88,6 +88,8 @@ import { NotificationsController } from '../notifications/notifications.controll
 // ADR-0040 — C1
 import { CrmAccountConversionController } from '../crm/accounts/conversion/crm-account-conversion.controller.js';
 import { CrmAccountsController } from '../crm/accounts/crm-accounts.controller.js';
+// ADR-0040 — C2
+import { QuotesFromOpportunityController } from '../sales/quotes/quotes-from-opportunity.controller.js';
 import { ACTIONS, PLATFORM_FORBIDDEN_ACTIONS, type Action } from './permissions.js';
 
 /**
@@ -180,6 +182,8 @@ const CONTROLEURS = [
   // ADR-0040 — C1 : comptes 360° et conversion prospect → client.
   CrmAccountsController,
   CrmAccountConversionController,
+  // ADR-0040 — C2 : devis prérempli depuis une opportunité.
+  QuotesFromOpportunityController,
 ];
 
 /**
@@ -715,6 +719,10 @@ describe('couverture des routes par le RBAC', () => {
       'CrmAccountsController.remove': ['crm.manage'],
       'CrmAccountsController.merge': ['crm.manage'],
       'CrmAccountConversionController.convert': ['crm.manage', 'sales.manage'],
+      // ADR-0040 — C2 : réassignation en masse (`crm.manage`) ; devis prérempli
+      // depuis une opportunité : préparer un devis ET lire l'opportunité.
+      'CrmOpportunitiesController.reassign': ['crm.manage'],
+      'QuotesFromOpportunityController.create': ['sales.quote', 'crm.read'],
     };
     for (const [cle, actions] of Object.entries(attendu)) {
       const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle);

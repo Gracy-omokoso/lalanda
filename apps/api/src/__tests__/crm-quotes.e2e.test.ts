@@ -442,6 +442,8 @@ e2eSuite('CRM minimal et devis (ADR-0035)', () => {
         await post(asN(), `/crm/opportunities/${o.id}/move`, {
           expectedRevision: cur.revision,
           stageKey: 'lost',
+          // ADR-0040 — C2 : motif obligatoire par défaut ; `lostReason` en reste le détail.
+          lostReasonKey: 'no_budget',
           lostReason: 'Budget reporté',
         }),
       );

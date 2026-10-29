@@ -34,11 +34,13 @@ import {
   ListOpportunitiesQuerySchema,
   MoveOpportunitySchema,
   PutOpportunitySchema,
+  ReassignOpportunitiesSchema,
 } from './crm.dto.js';
 import {
   OpportunitiesService,
   type OpportunityPage,
   type OpportunityView,
+  type OpportunityWriteResult,
 } from './opportunities.service.js';
 
 type User = { id: string };
@@ -53,10 +55,14 @@ export class CrmOpportunitiesController {
 
   @Get()
   @RequirePermission('crm.read')
-  async list(@CurrentOrgId() orgId: string, @Query() query: unknown): Promise<OpportunityPage> {
+  async list(
+    @CurrentOrgId() orgId: string,
+    @CurrentUser() user: User,
+    @Query() query: unknown,
+  ): Promise<OpportunityPage> {
     const parsed = ListOpportunitiesQuerySchema.safeParse(query);
     if (!parsed.success) invalidRequest(parsed.error, 'Paramètres de liste invalides.');
-    return this.opportunities.list(orgId, parsed.data);
+    return this.opportunities.list(orgId, parsed.data, user.id);
   }
 
   @Get('export')
@@ -89,6 +95,21 @@ export class CrmOpportunitiesController {
     );
   }
 
+  /** ADR-0040 — C2 (§ 3.2) : réassignation en masse, avant les routes `:opportunityId`. */
+  @Post('reassign')
+  @HttpCode(200)
+  @RequirePermission('crm.manage')
+  async reassign(
+    @CurrentOrgId() orgId: string,
+    @CurrentUser() user: User,
+    @CurrentOrgRole() role: OrgRole | undefined,
+    @Body() body: unknown,
+  ): Promise<{ reassigned: number }> {
+    const parsed = ReassignOpportunitiesSchema.safeParse(body);
+    if (!parsed.success) invalidRequest(parsed.error);
+    return this.opportunities.reassign(orgId, parsed.data, crmActorOf(user, role));
+  }
+
   @Post()
   @RequirePermission('crm.manage')
   async create(
@@ -96,7 +117,7 @@ export class CrmOpportunitiesController {
     @CurrentUser() user: User,
     @CurrentOrgRole() role: OrgRole | undefined,
     @Body() body: unknown,
-  ): Promise<OpportunityView> {
+  ): Promise<OpportunityWriteResult> {
     const parsed = CreateOpportunitySchema.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error);
     return this.opportunities.create(
@@ -104,6 +125,8 @@ export class CrmOpportunitiesController {
       parsed.data.stageKey,
       parsed.data.opportunity,
       crmActorOf(user, role),
+      'user',
+      parsed.data.lost,
     );
   }
 
@@ -124,7 +147,7 @@ export class CrmOpportunitiesController {
     @CurrentOrgRole() role: OrgRole | undefined,
     @Param('opportunityId') opportunityId: string,
     @Body() body: unknown,
-  ): Promise<OpportunityView> {
+  ): Promise<OpportunityWriteResult> {
     const parsed = PutOpportunitySchema.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error);
     return this.opportunities.put(
@@ -153,7 +176,10 @@ export class CrmOpportunitiesController {
       opportunityId,
       parsed.data.expectedRevision,
       parsed.data.stageKey,
-      parsed.data.lostReason,
+      {
+        lostReasonKey: parsed.data.lostReasonKey,
+        lostReasonDetail: parsed.data.lostReasonDetail,
+      },
       crmActorOf(user, role),
     );
   }

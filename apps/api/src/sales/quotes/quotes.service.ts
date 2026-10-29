@@ -21,7 +21,13 @@ import { Types, type Model } from 'mongoose';
 
 import { addDays, kinshasaDay } from '../../crm/crm-model.js';
 import { OpportunitiesService } from '../../crm/opportunities.service.js';
-import { conflict, invalidCursor, isDuplicateKey, staleRevision } from '../sales.errors.js';
+import {
+  conflict,
+  invalidCursor,
+  invalidRequest,
+  isDuplicateKey,
+  staleRevision,
+} from '../sales.errors.js';
 import { escapeRegex, isObjectIdHex, normalizeForSearch, searchKeyOf } from '../search.js';
 import { InvoiceDraftsService } from '../invoices/invoice-drafts.service.js';
 import type { InvoiceActor, InvoiceLean, StoredLine } from '../invoices/invoice.types.js';
@@ -45,6 +51,8 @@ import {
   type SalesQuoteDocument,
 } from './quote.schema.js';
 import type { ListQuotesQuery, QuoteInput } from './quotes.dto.js';
+// ADR-0040 — C2
+import { CreateQuoteSchema } from './quotes.dto.js';
 
 export interface QuoteSummary {
   id: string;
@@ -391,6 +399,63 @@ export class QuotesService {
     c: { customer: { name: string | null }; title: string | null },
   ) {
     return searchKeyOf([number, c.customer.name, c.title]);
+  }
+
+  /**
+   * ADR-0040 — C2 (§ 3.3) : devis BROUILLON prérempli depuis une opportunité.
+   * Devise de l'opportunité, prix HORS TAXES (ceux de ses lignes), client = fiche
+   * du compte client, sinon client de passage au nom du prospect ; lignes du
+   * catalogue au prix de l'opportunité, fixé explicitement. Le corps passe par
+   * LE MÊME schéma que `POST /sales/quotes`, puis par `create` : les montants
+   * sont recalculés par la composition des devis, jamais recopiés.
+   *
+   * Une ligne libre de l'opportunité n'a ni groupe de taxation ni type DGI : elle
+   * n'est pas chiffrable sans inventer une règle fiscale → 409
+   * `CRM_LINE_NOT_QUOTABLE` (l'écran propose un devis vierge).
+   */
+  async createFromOpportunity(
+    organizationId: string,
+    input: { opportunityId: string; validUntil: string | null },
+    actor: InvoiceActor,
+  ): Promise<QuoteView> {
+    const opp = await this.opportunities.requireOwn(organizationId, input.opportunityId);
+    const lines = opp.lines ?? [];
+    if (lines.length === 0) {
+      conflict(
+        'CRM_OPPORTUNITY_HAS_NO_LINES',
+        'Cette opportunité n’a aucune ligne : créez un devis vierge.',
+      );
+    }
+    const free = lines.flatMap((l, i) => (l.catalogItemId ? [] : [i]));
+    if (free.length > 0) {
+      conflict(
+        'CRM_LINE_NOT_QUOTABLE',
+        'Une ligne sans article du catalogue n’a ni groupe de taxation ni type DGI : choisissez un article, ou créez un devis vierge.',
+        { lineIndexes: free },
+      );
+    }
+    const parsed = CreateQuoteSchema.safeParse({
+      opportunityId: String(opp._id),
+      title: opp.title,
+      validUntil: input.validUntil,
+      currency: opp.currency,
+      priceMode: 'ht',
+      customer: opp.customerId
+        ? { customerId: opp.customerId, printContactDetails: false }
+        : { customerId: null, walkIn: { name: opp.prospectName ?? null } },
+      lines: lines.map((l) => ({
+        source: 'catalog',
+        catalogItemId: l.catalogItemId,
+        quantity: l.quantity,
+        unitPrice: l.unitPrice ?? null,
+        discount:
+          l.discountPercent && !/^0+(\.0+)?$/.test(l.discountPercent)
+            ? { kind: 'percent', value: l.discountPercent }
+            : null,
+      })),
+    });
+    if (!parsed.success) invalidRequest(parsed.error);
+    return this.create(organizationId, parsed.data, actor);
   }
 
   async create(organizationId: string, input: QuoteInput, actor: InvoiceActor): Promise<QuoteView> {

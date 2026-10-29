@@ -179,3 +179,62 @@ export function isCalendarDay(value: string): boolean {
   const d = new Date(`${value}T00:00:00Z`);
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value;
 }
+
+// ── ADR-0040 — C2 : pipeline v2 ─────────────────────────────────────────────
+
+/** Motif de perte paramétrable (ADR-0040 § 2.5). */
+export interface LostReason {
+  key: string;
+  label: string;
+  active: boolean;
+}
+
+export const LOST_REASON_KEY_PATTERN = /^[a-z0-9_-]{1,32}$/;
+export const MAX_LOST_REASONS = 30;
+
+/** Six motifs par défaut (décision ouverte n° 7, valeur retenue par la dirigeante). */
+export const DEFAULT_LOST_REASONS: readonly LostReason[] = Object.freeze([
+  { key: 'price', label: 'Prix', active: true },
+  { key: 'competitor', label: 'Concurrent retenu', active: true },
+  { key: 'no_budget', label: 'Pas de budget', active: true },
+  { key: 'no_response', label: 'Sans réponse', active: true },
+  { key: 'need_dropped', label: 'Besoin abandonné', active: true },
+  { key: 'other', label: 'Autre', active: true },
+]);
+
+/** Origine du montant estimé d'une opportunité (§ 2.3). */
+export const AMOUNT_SOURCES = ['manual', 'lines'] as const;
+export type AmountSource = (typeof AMOUNT_SOURCES)[number];
+
+/** Au plus 50 lignes par opportunité (§ 2.3). */
+export const MAX_OPPORTUNITY_LINES = 50;
+
+/** Problèmes d'une liste de motifs : clés uniques et bien formées, libellés 1–60. */
+export function lostReasonIssues(reasons: readonly LostReason[]): StageIssue[] {
+  const issues: StageIssue[] = [];
+  const seen = new Set<string>();
+  reasons.forEach((r, i) => {
+    if (!LOST_REASON_KEY_PATTERN.test(r.key)) {
+      issues.push({
+        path: `lostReasons.${i}.key`,
+        code: 'LOST_REASON_KEY_INVALID',
+        message: 'Clé : 1 à 32 caractères a-z, 0-9, « _ » ou « - ».',
+      });
+    } else if (seen.has(r.key)) {
+      issues.push({
+        path: `lostReasons.${i}.key`,
+        code: 'LOST_REASON_KEY_DUPLICATE',
+        message: `Clé en double : « ${r.key} ».`,
+      });
+    }
+    seen.add(r.key);
+    if (r.label.length < 1 || r.label.length > 60) {
+      issues.push({
+        path: `lostReasons.${i}.label`,
+        code: 'LOST_REASON_LABEL_INVALID',
+        message: 'Libellé : 1 à 60 caractères.',
+      });
+    }
+  });
+  return issues;
+}

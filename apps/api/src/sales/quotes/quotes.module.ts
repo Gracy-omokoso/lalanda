@@ -22,6 +22,7 @@ import {
   SalesQuoteSchema,
 } from './quote.schema.js';
 import { QuotesController } from './quotes.controller.js';
+import { QuotesFromOpportunityController } from './quotes-from-opportunity.controller.js';
 import { QuotesService } from './quotes.service.js';
 
 @Module({
@@ -37,7 +38,8 @@ import { QuotesService } from './quotes.service.js';
       { name: SalesQuoteCounter.name, schema: SalesQuoteCounterSchema },
     ]),
   ],
-  controllers: [QuotesController],
+  // ADR-0040 — C2 : devis prérempli depuis une opportunité (contrôleur à part).
+  controllers: [QuotesController, QuotesFromOpportunityController],
   providers: [QuotesService, QuoteDocumentsService],
 })
 export class QuotesModule {}
