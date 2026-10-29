@@ -83,6 +83,8 @@ describe('documents de vente — lecture des sources', () => {
       // ADR-0031 : LECTEURS seulement (règlement et pont vers le réalisé), vérifié
       // ci-dessous.
       'actuals/run-bridge/run-bridge.service.ts',
+      // ADR-0040 — C8 : LECTEUR seulement (fiche 360° et fil) — vérifié ci-dessous.
+      'crm/overview/crm-overview.service.ts',
       // ADR-0032 : GROW LIT les factures finales (indicateurs, santé), n'y écrit
       // jamais — vérifié par `grow/grow-readonly.surface.test.ts`.
       'grow/grow-reader.service.ts',
@@ -102,6 +104,7 @@ describe('documents de vente — lecture des sources', () => {
     ]);
     for (const lecteur of [
       'actuals/run-bridge/run-bridge.service.ts',
+      'crm/overview/crm-overview.service.ts',
       'sales/receipts/settlements.service.ts',
       'sales/receipts/treasury-feed.service.ts',
     ]) {

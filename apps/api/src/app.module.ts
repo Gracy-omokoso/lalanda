@@ -14,6 +14,7 @@ import { BusinessPlanModule } from './business-plan/business-plan.module.js';
 import { CrmModule } from './crm/crm.module.js';
 // ADR-0040 — C1
 import { CrmAccountConversionModule } from './crm/accounts/conversion/crm-account-conversion.module.js';
+import { CrmOverviewModule } from './crm/overview/crm-overview.module.js'; // ADR-0040 — C8
 import { CanvasModule } from './canvas/canvas.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { EdefModule } from './edef/edef.module.js';
@@ -123,6 +124,7 @@ import { WorkModule } from './work/work.module.js';
     CrmModule,
     // ADR-0040 — C1 : conversion prospect → client (compose Ventes et CRM).
     CrmAccountConversionModule,
+    CrmOverviewModule, // ADR-0040 — C8 : fiche 360° et fil chronologique.
     QuotesModule,
     // ADR-0039 — boîte de notifications (@Global), avant ses producteurs (work, brief).
     NotificationsModule,

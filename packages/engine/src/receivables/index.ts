@@ -19,3 +19,5 @@ export {
   revenueBaseOf,
   signedAmountToJsonNumber,
 } from './aggregation.js';
+// ADR-0040 — C8 : solde dû d'un client par devise (fiche 360°).
+export * from './outstanding.js';
