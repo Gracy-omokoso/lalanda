@@ -124,6 +124,14 @@ export class TreasuryExpense {
   @Prop({ type: String, default: null })
   occurrenceDate!: string | null;
 
+  /**
+   * Projet du RUN (`work_projects`) auquel la dépense est rattachée — ADR-0039
+   * § 2.10. `null` par défaut ; lu par la marge du projet, sans autre effet
+   * (pont vers le réalisé, catégories, prévision : inchangés).
+   */
+  @Prop({ type: String, default: null })
+  workProjectId!: string | null;
+
   @Prop({ type: String, required: true, enum: ['recorded', 'cancelled'], default: 'recorded' })
   status!: 'recorded' | 'cancelled';
 
@@ -153,6 +161,11 @@ export const TreasuryExpenseSchema = SchemaFactory.createForClass(TreasuryExpens
 TreasuryExpenseSchema.index({ organizationId: 1, spentOn: -1, _id: -1 });
 TreasuryExpenseSchema.index({ organizationId: 1, accountId: 1, spentOn: 1 });
 TreasuryExpenseSchema.index({ organizationId: 1, supplierKey: 1 });
+// ADR-0039 § 2.10 : dépenses d'un projet du RUN (marge, filtre de liste).
+TreasuryExpenseSchema.index(
+  { organizationId: 1, workProjectId: 1 },
+  { partialFilterExpression: { workProjectId: { $type: 'string' } } },
+);
 // Confirmer deux fois la même occurrence ne crée qu'une dépense (ADR-0034 § 3).
 // Une occurrence ANNULÉE sort de l'index : elle redevient « à confirmer ».
 TreasuryExpenseSchema.index(

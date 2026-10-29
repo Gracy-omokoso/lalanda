@@ -3,9 +3,14 @@
 // Isolation : chaque requête porte `organizationId` ; une dépense d'une autre
 // organisation est introuvable (404). Une dépense n'est jamais effacée : elle
 // est annulée avec un motif. Écritures concurrentes : révision attendue.
+//
+// ADR-0039 § 2.10 : une dépense peut être rattachée à un projet du RUN
+// (`workProjectId`). Le projet est LU en lecture seule (`work_projects`, par la
+// connexion, sans importer le module « work ») : projet d'une autre organisation
+// → 404 `EXPENSE_WORK_PROJECT_UNKNOWN` ; projet archivé → 409.
 
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import {
   aggregateExpenses,
   EXPENSE_CATEGORIES,
@@ -13,7 +18,7 @@ import {
   type ExpenseCategory,
   type TreasuryCurrency,
 } from '@lalanda/engine';
-import type { FilterQuery, Model, Types } from 'mongoose';
+import { Types, type Connection, type FilterQuery, type Model } from 'mongoose';
 
 import type { ImageAcceptance } from '../account/image-validation.js';
 import { AuditService } from '../authz/audit.service.js';
@@ -52,6 +57,8 @@ export interface ExpenseView {
   attachment: { contentType: string; size: number; uploadedAt: string } | null;
   recurringExpenseId: string | null;
   occurrenceDate: string | null;
+  /** Projet du RUN rattaché (ADR-0039 § 2.10), ou `null`. */
+  workProjectId: string | null;
   status: 'recorded' | 'cancelled';
   cancelReason: string | null;
   revision: number;
@@ -65,6 +72,9 @@ export interface ExpensePage {
 }
 
 type ExpenseLean = TreasuryExpense & { _id: Types.ObjectId };
+
+/** Collection du module « work », lue en lecture seule (ADR-0039 § 2.10). */
+const WORK_PROJECTS = 'work_projects';
 
 const CATEGORY_LABELS = new Map<string, string>(EXPENSE_CATEGORIES.map((c) => [c.code, c.label]));
 
@@ -90,6 +100,7 @@ export function expenseView(doc: ExpenseLean): ExpenseView {
       : null,
     recurringExpenseId: doc.recurringExpenseId ?? null,
     occurrenceDate: doc.occurrenceDate ?? null,
+    workProjectId: doc.workProjectId ?? null,
     status: doc.status,
     cancelReason: doc.cancelReason ?? null,
     revision: doc.revision,
@@ -118,6 +129,7 @@ export class TreasuryExpensesService {
     @Inject(TreasuryAccountsService) private readonly accounts: TreasuryAccountsService,
     @Inject(ObjectStorageService) private readonly storage: ObjectStorageService,
     @Inject(AuditService) private readonly audit: AuditService,
+    @InjectConnection() private readonly connection: Connection,
   ) {}
 
   async list(organizationId: string, query: ListExpensesQuery): Promise<ExpensePage> {
@@ -128,6 +140,7 @@ export class TreasuryExpensesService {
     if (query.category) and.push({ category: query.category });
     if (query.currency) and.push({ currency: query.currency });
     if (query.accountId) and.push({ accountId: query.accountId });
+    if (query.workProjectId) and.push({ workProjectId: query.workProjectId });
     if (query.q !== undefined && query.q.trim() !== '') {
       const term = escapeRegex(query.q.trim());
       and.push({
@@ -212,9 +225,12 @@ export class TreasuryExpensesService {
     recurrence: { recurringExpenseId: string; occurrenceDate: string } | null = null,
   ): Promise<ExpenseLean> {
     await this.assertRules(organizationId, input);
+    const { workProjectId, ...fields } = input;
+    if (workProjectId) await this.assertWorkProject(organizationId, workProjectId);
     const doc = await this.expenses.create({
       organizationId,
-      ...input,
+      ...fields,
+      workProjectId: workProjectId ?? null,
       supplierKey: input.supplierName ? normalizeForSearch(input.supplierName) : null,
       attachment: null,
       recurringExpenseId: recurrence?.recurringExpenseId ?? null,
@@ -238,6 +254,7 @@ export class TreasuryExpensesService {
         category: input.category,
         currency: input.currency,
         recurring: recurrence !== null,
+        workProjectId: workProjectId ?? null,
       },
     });
     return doc.toObject() as ExpenseLean;
@@ -256,12 +273,19 @@ export class TreasuryExpensesService {
     }
     if (current.revision !== expectedRevision) staleRevision(current.revision);
     await this.assertRules(organizationId, input);
+    // Absent : rattachement inchangé ; seul un NOUVEAU projet est contrôlé (un
+    // projet archivé depuis reste lisible sur la dépense).
+    const { workProjectId, ...fields } = input;
+    if (workProjectId && workProjectId !== (current.workProjectId ?? null)) {
+      await this.assertWorkProject(organizationId, workProjectId);
+    }
     const updated = await this.expenses
       .findOneAndUpdate(
         { _id: current._id, organizationId, revision: expectedRevision, status: 'recorded' },
         {
           $set: {
-            ...input,
+            ...fields,
+            ...(workProjectId !== undefined ? { workProjectId } : {}),
             supplierKey: input.supplierName ? normalizeForSearch(input.supplierName) : null,
             updatedBy: actor.userId,
           },
@@ -279,7 +303,11 @@ export class TreasuryExpensesService {
       action: 'treasury.expense.updated',
       targetType: 'treasury_expense',
       targetId: expenseId,
-      metadata: { category: input.category, currency: input.currency },
+      metadata: {
+        category: input.category,
+        currency: input.currency,
+        ...(workProjectId !== undefined ? { workProjectId } : {}),
+      },
     });
     return expenseView(updated);
   }
@@ -437,6 +465,30 @@ export class TreasuryExpensesService {
         currency: input.currency,
         date: input.spentOn,
       });
+    }
+  }
+
+  /**
+   * Projet du RUN de l'organisation, non archivé (ADR-0039 § 2.10). Lu par la
+   * connexion : la trésorerie n'importe pas le module « work ».
+   */
+  private async assertWorkProject(organizationId: string, workProjectId: string): Promise<void> {
+    const project = Types.ObjectId.isValid(workProjectId)
+      ? await this.connection
+          .collection(WORK_PROJECTS)
+          .findOne(
+            { _id: new Types.ObjectId(workProjectId), organizationId },
+            { projection: { status: 1 } },
+          )
+      : null;
+    if (!project) {
+      notFound('EXPENSE_WORK_PROJECT_UNKNOWN', 'Projet introuvable dans cette organisation.');
+    }
+    if (project['status'] === 'archived') {
+      conflict(
+        'WORK_PROJECT_ARCHIVED',
+        'Ce projet est archivé : restaurez-le avant d’y rattacher une dépense.',
+      );
     }
   }
 
