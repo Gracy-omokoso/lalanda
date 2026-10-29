@@ -39,6 +39,7 @@ import { SchedulerModule } from './scheduler/scheduler.module.js';
 import { ThrottlingModule } from './security/throttling.module.js';
 import { StorageModule } from './storage/storage.module.js';
 import { TreasuryModule } from './treasury/treasury.module.js';
+import { WorkModule } from './work/work.module.js';
 
 @Module({
   imports: [
@@ -125,6 +126,8 @@ import { TreasuryModule } from './treasury/treasury.module.js';
     GrowModule,
     // ADR-0037 — business plan narratif (BUILD) : lit le plan figé et le Canvas.
     BusinessPlanModule,
+    // ADR-0039 — projets et tâches du RUN (lot L1) ; notifications par port facultatif.
+    WorkModule,
   ],
   controllers: [HealthController, EvaluateController],
 })
