@@ -42,3 +42,6 @@ Décideurs :
 - [ADR-0039](ADR-0039-projets-et-taches-run.md) — Projets et tâches (RUN) : gestionnaire de
   travail (module interne `work`), notifications in-app communes, marge par projet calculée par
   le moteur. Statut : Proposed (29 oct. 2026).
+- [ADR-0040](ADR-0040-crm-complet.md) — CRM complet (R2) : application RUN `/crm`, comptes
+  360°, pipeline v2, relances dans « Mes tâches », rapports, rôle Commercial et action
+  `sales.quote`. Statut : **proposé** (29 oct. 2026).
