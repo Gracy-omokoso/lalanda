@@ -32,6 +32,7 @@ Le support ne voit jamais les données financières sans consentement explicite,
 | Chef de projet | projets autorisés et saisie |
 | Conseiller | consultation, commentaires, recommandations |
 | Lecteur | lecture seulement |
+| Commercial (**proposé, ADR-0040**) | CRM, devis, consultation des clients et du catalogue ; ni trésorerie, ni dépenses, ni émission de facture |
 
 ## Actions granulaires
 
@@ -183,6 +184,44 @@ Côté plateforme, comme `crm.*` : `work.read` sous accès délégué pour le
 super-administrateur et le support, `work.update` et `work.manage` sous accès délégué pour
 le seul super-administrateur. Aucune n'est un interdit absolu ; les rôles attribuables
 sont inchangés.
+
+### Proposé, ADR-0040 — rôle Commercial et action `sales.quote` (non appliqué)
+
+> **Statut : proposé** par [ADR-0040](adr/ADR-0040-crm-complet.md) § 4 (29 oct. 2026), décision
+> de la dirigeante sur le principe (D3). Rien de ce qui suit n'est encore dans
+> `permissions.ts` ; le lot C0 l'applique.
+
+- **Action nouvelle `sales.quote`** — « Préparer les devis » (créer, modifier, envoyer, accepter,
+  refuser, nouvelle version, créer depuis une opportunité) — vingt-huitième, en fin de liste.
+  Détenue par tous les détenteurs de `sales.manage` (iso-privilège) et par le Commercial. Les
+  routes d'écriture des devis passent de `sales.manage` à `sales.quote` ; convertir un devis en
+  brouillon de facture exige `sales.quote` **et** `sales.manage`. Plateforme : comme
+  `sales.manage`.
+- **Rôle nouveau Commercial** (`sales_rep`, colonne COM, rang 5) — « CRM, devis et suivi des
+  clients. Ne voit ni la trésorerie ni les dépenses ; n'émet pas de facture. » Sept actions :
+  `analytics.read`, `sales.read` (consulter clients, catalogue, devis, factures, encaissements),
+  `sales.quote`, `crm.read`, `crm.manage`, `work.read`, `work.update`. Tout le reste refusé, dont
+  `sales.manage`, `sales.invoice`, `sales.receipt`, `treasury.*`, `project.*`, `work.manage`.
+  Attribuable par le Propriétaire et l'Administrateur (R7 : sous-ensemble de leurs actions).
+  Aucune migration ; `member` reste normalisé en `finance_director`.
+
+| Action | PRO | ADM | DIR | CPT | ANA | CDP | CON | LEC | COM |
+|---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| `analytics.read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓P | ✓ | ✓ | ✓ |
+| `sales.read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ |
+| `sales.manage` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `sales.quote` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ |
+| `crm.read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ |
+| `crm.manage` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ |
+| `work.read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ |
+| `work.update` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ |
+| toutes les autres actions | — | — | — | — | — | — | — | — | ✗ |
+
+- **Durcissement préalable** (même lot) : une donnée de trésorerie exige `treasury.read` (fait
+  `tresorerie` du brief, faits de trésorerie de GROW) ; les routes de réalisé d'une initiative
+  sous `analytics.read` exigent aussi `project.read`. Effet de bord : le Conseiller perd la
+  trésorerie dans le brief et GROW (ADR-0040, décision ouverte n° 2).
+- Tests visés : matrice 9 × 28 + 6 × 28 = **420** cases.
 
 **Business plan narratif (ADR-0037) — aucune action nouvelle.** Lire relève de
 `project.read` ; rédiger, rattacher le plan figé et demander un brouillon à l'IA, de

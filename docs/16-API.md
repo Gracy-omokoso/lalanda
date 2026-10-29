@@ -407,6 +407,32 @@ Lecture `crm.read` ; écriture, réglages, import et export `crm.manage`.
 | `GET /crm/contacts/export` · `GET /crm/opportunities/export` | CSV `;`, UTF-8 avec BOM, formules neutralisées ; audit strict |
 | `POST /crm/contacts/import` · `POST /crm/opportunities/import` `{ csv, dryRun }` | tout ou rien, 500 lignes ; `400 CSV_IMPORT_INVALID` (`details.errors[].line`), `400 CSV_UNREADABLE` |
 
+## CRM complet — proposé, ADR-0040 (non implémenté)
+
+Contrat **proposé** par [ADR-0040](adr/ADR-0040-crm-complet.md) § 3 ; rien n'est encore servi.
+Nouvelle action `sales.quote` (devis) ; nouveau rôle Commercial (`sales_rep`).
+
+| Méthode et chemin | Permission | Effet |
+|---|---|---|
+| `GET /crm/accounts` · `GET /crm/accounts/:id` | `crm.read` | comptes prospect ou client (lié 1-1 à `customers`) |
+| `POST /crm/accounts` · `PUT` · `DELETE /crm/accounts/:id` · `POST …/archive` · `…/restore` · `…/merge` | `crm.manage` | prospect ; identité d'un compte client : `409 CRM_ACCOUNT_IDENTITY_FROM_CUSTOMER` |
+| `POST /crm/accounts/:id/convert` `{ mode: 'create', customer } \| { mode: 'link', customerId }` | `crm.manage` + `sales.manage` | fiche client créée par les règles de Ventes (NIF) ; `409 CUSTOMER_NIF_EXISTS` |
+| `GET /crm/accounts/:id/overview` · `GET /crm/accounts/:id/timeline` | `crm.read` (sections `hidden` sans `sales.read` / `work.read`) | fiche 360°, solde dû par devise (moteur), fil chronologique agrégé à la lecture |
+| `POST /crm/opportunities/reassign` | `crm.manage` | réassignation en masse des responsables |
+| `POST /crm/opportunities` · `PUT …/:id` · `POST …/:id/move` | `crm.manage` | + `accountId`, `ownerId`, `lines`, `amountSource`, `lostReasonKey` ; `400 CRM_LOST_REASON_REQUIRED` |
+| `POST /sales/quotes/from-opportunity` | `sales.quote` + `crm.read` | devis brouillon prérempli par les lignes |
+| écritures des devis (`POST`, `PUT`, `DELETE`, `send`, `accept`, `refuse`, `new-version`) | `sales.quote` (au lieu de `sales.manage`) | — |
+| `POST /sales/quotes/:id/convert` | `sales.quote` + `sales.manage` | — |
+| `GET /crm/pipeline?ownerId=` | `crm.read` | + prévision pondérée par devise (moteur, part « non pondérable ») |
+| `GET /crm/reports?from=&to=&ownerId=` | `crm.read` | entonnoir, conversion, cycle, par responsable, prévision par mois de clôture, motifs de perte — montants estimés |
+| `POST /crm/activities/:id/reopen` | `crm.manage` | décocher une activité |
+| `GET /work/my-tasks` | `work.read` | éléments `source: 'crm'` (relances assignées, avec échéance) si `crm.read` |
+| `POST /work/projects/from-opportunity` | `work.manage` + `crm.read` | opportunité gagnée → projet, jamais automatique ; `409 WORK_PROJECT_EXISTS_FOR_OPPORTUNITY` |
+
+Notifications ajoutées : `crm.activity_assigned`, `crm.activity_due_soon`, `crm.activity_overdue`,
+`crm.opportunity_assigned`, `crm.opportunity_won`. Brief : faits `mes_relances.*`,
+`relances.en_retard`, `pipeline` connu, règle R10 `relances_en_retard`.
+
 ## Brief du matin — implémenté (ADR-0033)
 
 L'organisation est toujours celle de la session ; aucun corps ni paramètre ne la désigne.

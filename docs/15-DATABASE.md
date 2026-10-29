@@ -86,6 +86,18 @@ Un événement contient acteur, organisation, action, cible, horodatage, adresse
 - idées (`idea_lab_ideas`) par `organizationId + archived + updatedAt` ; réglages
   `idea_lab_settings` uniques par `organizationId` ; `idea_lab_ai_logs` à expiration TTL sur
   `expiresAt` (ADR-0036).
+- CRM (ADR-0035, implémenté) : `crm_settings` unique par `organizationId` ; `crm_contacts`,
+  `crm_opportunities`, `crm_activities` par `organizationId` + date de création et par
+  rattachement (client, opportunité, contact).
+- **Proposé, ADR-0040 (non implémenté)** : `crm_accounts` (compte prospect ou client), unique
+  partiel `organizationId + customerId` (une fiche client a au plus un compte), liste par
+  `organizationId + sortName` ; champs ajoutés : `accountId` (contacts, opportunités,
+  activités), `ownerId`, `lines`, `lostReasonKey` (opportunités), `assigneeUserId`, `dueDay`
+  (jour de Kinshasa), `reminders` (activités), `lostReasons`, `forecastProbability` (réglages) ;
+  index `organizationId + assigneeUserId + done + dueDay` (« Mes tâches »), `organizationId +
+  ownerId + status`, `organizationId + status + expectedCloseDate` ; `work_projects` : unique
+  partiel `organizationId + source.opportunityId`. Migration
+  `20261030-0001-crm-accounts.mjs` (prospects regroupés par nom normalisé exact).
 
 ## Rétention
 
