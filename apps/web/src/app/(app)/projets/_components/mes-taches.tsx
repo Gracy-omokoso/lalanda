@@ -61,9 +61,17 @@ export function MesTaches(): React.ReactElement {
         title="Mes tâches"
         description="Les tâches qui vous sont assignées, tous projets confondus, de la plus urgente à la plus lointaine."
         actions={
-          <Link href={PROJETS_BASE} className={buttonClasses('secondary', 'md')}>
-            Tous les projets
-          </Link>
+          <>
+            <Link
+              href={`${PROJETS_BASE}/mes-taches/calendrier`}
+              className={buttonClasses('secondary', 'md')}
+            >
+              Calendrier
+            </Link>
+            <Link href={PROJETS_BASE} className={buttonClasses('secondary', 'md')}>
+              Tous les projets
+            </Link>
+          </>
         }
       />
       <p className="sr-only" aria-live="polite">
