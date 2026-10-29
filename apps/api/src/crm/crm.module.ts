@@ -42,6 +42,9 @@ import { CrmAccountsReconcileJob } from './accounts/crm-accounts-reconcile.job.j
 import { CrmAccountsSync } from './accounts/crm-accounts-sync.service.js';
 import { CrmAccountsController } from './accounts/crm-accounts.controller.js';
 import { CrmAccountsService } from './accounts/crm-accounts.service.js';
+// ADR-0040 — C2
+import { CatalogItem, CatalogItemSchema } from '../sales/catalog-item.schema.js';
+import { CRM_OPPORTUNITY_EVENTS, NO_OPPORTUNITY_EVENTS } from './opportunity-events.js';
 
 @Module({
   imports: [
@@ -59,6 +62,8 @@ import { CrmAccountsService } from './accounts/crm-accounts.service.js';
       // ADR-0040 — C1 : comptes 360° ; adhésions pour l'éligibilité du responsable.
       { name: CrmAccount.name, schema: CrmAccountSchema },
       { name: Membership.name, schema: MembershipSchema },
+      // ADR-0040 — C2 : articles du catalogue (lignes d'opportunité), en lecture seule.
+      { name: CatalogItem.name, schema: CatalogItemSchema },
     ]),
   ],
   controllers: [
@@ -83,6 +88,8 @@ import { CrmAccountsService } from './accounts/crm-accounts.service.js';
     CrmNotifier,
     CrmDueRemindersJob,
     CrmBriefSource,
+    // ADR-0040 — C2 : point d'extension « opportunité gagnée » (sans effet par défaut).
+    { provide: CRM_OPPORTUNITY_EVENTS, useValue: NO_OPPORTUNITY_EVENTS },
   ],
   exports: [
     OpportunitiesService,

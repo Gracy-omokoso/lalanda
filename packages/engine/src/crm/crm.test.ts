@@ -108,7 +108,7 @@ describe('stageWinRates (ADR-0035 O5)', () => {
   });
 
   it('version distincte, et aucun nombre flottant pour un montant dans les sources', () => {
-    expect(CRM_INDICATORS_VERSION).toBe('1.0.0');
+    expect(CRM_INDICATORS_VERSION).toBe('1.1.0');
     const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'index.ts'), 'utf8');
     expect(src).not.toMatch(/parseFloat|Number\(|toFixed|Math\./);
   });

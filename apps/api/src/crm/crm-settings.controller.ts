@@ -3,7 +3,7 @@
 // `crm.read` pour lire le tableau (Kanban, indicateurs) et les réglages ;
 // `crm.manage` pour modifier les réglages. Organisation active seulement.
 
-import { Body, Controller, Get, Inject, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Put, Query, UseGuards } from '@nestjs/common';
 
 import { AuthGuard } from '../auth/auth.guard.js';
 import { CurrentOrgId, CurrentUser } from '../auth/current-user.decorator.js';
@@ -14,7 +14,7 @@ import type { OrgRole } from '../authz/permissions.js';
 import { invalidRequest } from '../sales/sales.errors.js';
 import { crmActorOf } from './crm-actor.js';
 import { CrmSettingsService, type CrmSettingsView } from './crm-settings.service.js';
-import { PutCrmSettingsSchema } from './crm.dto.js';
+import { PipelineQuerySchema, PutCrmSettingsSchema } from './crm.dto.js';
 import { OpportunitiesService, type PipelineView } from './opportunities.service.js';
 
 @Controller('crm')
@@ -51,7 +51,15 @@ export class CrmSettingsController {
 
   @Get('pipeline')
   @RequirePermission('crm.read')
-  async pipeline(@CurrentOrgId() orgId: string): Promise<PipelineView> {
-    return this.opportunities.pipeline(orgId);
+  async pipeline(
+    @CurrentOrgId() orgId: string,
+    @CurrentUser() user: { id: string },
+    @Query() query: unknown,
+  ): Promise<PipelineView> {
+    // ADR-0040 — C2 : `?ownerId=me|<id>` (confort ; tout `crm.read` voit tout le pipeline).
+    const parsed = PipelineQuerySchema.safeParse(query);
+    if (!parsed.success) invalidRequest(parsed.error, 'Paramètres invalides.');
+    const ownerId = parsed.data.ownerId === 'me' ? user.id : (parsed.data.ownerId ?? null);
+    return this.opportunities.pipeline(orgId, new Date(), ownerId);
   }
 }

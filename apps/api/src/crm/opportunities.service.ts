@@ -12,12 +12,16 @@
 import {
   CRM_INDICATORS_VERSION,
   DEFAULT_WIN_RATE_MIN_SAMPLE,
+  estimatedLinesAmount,
+  probabilitiesFromWinRates,
   stageWinRates,
   sumAmountsByCurrency,
+  weightedForecast,
   type CurrencyTotal,
   type StageWinRate,
+  type WeightedForecast,
 } from '@lalanda/engine';
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Types, type ClientSession, type Model } from 'mongoose';
 
@@ -29,7 +33,12 @@ import {
   type QuoteLean,
   type SalesQuoteDocument,
 } from '../sales/quotes/quote.schema.js';
-import { conflict, invalidCursor, staleRevision } from '../sales/sales.errors.js';
+import {
+  catalogItemNotFound,
+  conflict,
+  invalidCursor,
+  staleRevision,
+} from '../sales/sales.errors.js';
 import { escapeRegex, isObjectIdHex, normalizeForSearch, searchKeyOf } from '../sales/search.js';
 import { ContactsService, customerNamesOf, requireCustomer } from './contacts.service.js';
 import {
@@ -41,7 +50,7 @@ import {
   type PipelineStage,
 } from './crm-model.js';
 import { CrmSettingsService, type CrmActor, type CrmSettingsView } from './crm-settings.service.js';
-import type { ListOpportunitiesQuery, OpportunityInput } from './crm.dto.js';
+import type { ListOpportunitiesQuery, OpportunityInput, OpportunityLineInput } from './crm.dto.js';
 import { opportunityNotFound } from './crm.errors.js';
 import {
   CrmActivity,
@@ -51,6 +60,18 @@ import {
   type CrmStageEvent,
 } from './crm.schemas.js';
 import { beforeTimeCursor, decodeTimeCursor, encodeTimeCursor } from './time-cursor.js';
+// ADR-0040 — C2
+import { Membership, type MembershipDocument } from '../organizations/membership.schema.js';
+import { CatalogItem, type CatalogItemDocument } from '../sales/catalog-item.schema.js';
+import { CrmAccountsService } from './accounts/crm-accounts.service.js';
+import { CrmNotifier } from './crm-notifier.js';
+import type { AmountSource } from './crm-model.js';
+import type { CrmOpportunityLine } from './crm.schemas.js';
+import {
+  CRM_OPPORTUNITY_EVENTS,
+  type CrmOpportunityEvents,
+  type OpportunityWonEvent,
+} from './opportunity-events.js';
 
 export type OpportunityLean = CrmOpportunity & { _id: Types.ObjectId };
 type ActivityLean = CrmActivity & { _id: Types.ObjectId };
@@ -59,6 +80,25 @@ type ActivityLean = CrmActivity & { _id: Types.ObjectId };
 const CLOSED_WINDOW_DAYS = 90;
 const BOARD_LIMIT = 500;
 const HISTORY_LIMIT = 5000;
+/** Opportunités ouvertes lues pour la prévision pondérée (ADR-0040 § 7.1). */
+const FORECAST_LIMIT = 20_000;
+
+/** ADR-0040 — C2 : avertissement d'écriture (jamais un refus). */
+export interface OpportunityWarning {
+  code: 'CRM_LINE_WITHOUT_PRICE';
+  lineIndex: number;
+}
+
+/** Ligne d'opportunité rendue (ADR-0040 § 2.3). */
+export interface OpportunityLineView {
+  catalogItemId: string | null;
+  label: string;
+  quantity: string;
+  unit: string | null;
+  /** Prix unitaire HORS TAXES ; `null` : sans prix (compté pour zéro). */
+  unitPrice: string | null;
+  discountPercent: string | null;
+}
 
 export interface OpportunitySummary {
   id: string;
@@ -79,10 +119,21 @@ export interface OpportunitySummary {
   stale: boolean;
   closedAt: string | null;
   revision: number;
+  // ── ADR-0040 — C2 ──
+  accountId: string | null;
+  accountName: string | null;
+  ownerId: string | null;
+  /** Ouverte et sans responsable membre de l'organisation : à réassigner. */
+  orphaned: boolean;
+  amountSource: AmountSource;
+  lostReasonKey: string | null;
+  wonAt: string | null;
 }
 
 export interface OpportunityView extends OpportunitySummary {
+  /** Détail libre du motif de perte (ADR-0040 : `lostReasonKey` porte le motif). */
   lostReason: string | null;
+  lines: OpportunityLineView[];
   stageHistory: {
     stageKey: string;
     stageLabel: string;
@@ -137,13 +188,25 @@ export interface PipelineView {
   overdueActivities: ActivityBrief[];
   upcomingActivities: ActivityBrief[];
   winRateMinSample: number;
+  // ── ADR-0040 — C2 ──
+  /** Filtre responsable appliqué (`null` : tout le pipeline). */
+  ownerId: string | null;
+  /** Prévision pondérée par devise (moteur), sur les opportunités ouvertes. */
+  forecast: WeightedForecast;
+  /** Opportunités ouvertes orphelines (responsable parti) et leurs anciens responsables. */
+  orphaned: { count: number; ownerIds: string[] };
 }
+
+/** Réponse d'écriture : la vue, plus les avertissements (ADR-0040 § 3.2). */
+export type OpportunityWriteResult = OpportunityView & { warnings: OpportunityWarning[] };
 
 /** Résultat de la règle de gain d'un devis accepté (ADR-0035 § 1). */
 export type QuoteOutcome = 'won' | 'disabled' | 'not_open' | 'none';
 
 @Injectable()
 export class OpportunitiesService {
+  private readonly logger = new Logger(OpportunitiesService.name);
+
   constructor(
     @InjectModel(CrmOpportunity.name)
     private readonly opportunities: Model<CrmOpportunityDocument>,
@@ -153,12 +216,25 @@ export class OpportunitiesService {
     @Inject(ContactsService) private readonly contacts: ContactsService,
     @Inject(CrmSettingsService) private readonly settings: CrmSettingsService,
     @Inject(AuditService) private readonly audit: AuditService,
+    // ADR-0040 — C2
+    @Inject(CrmAccountsService) private readonly accounts: CrmAccountsService,
+    @InjectModel(Membership.name) private readonly memberships: Model<MembershipDocument>,
+    @InjectModel(CatalogItem.name) private readonly items: Model<CatalogItemDocument>,
+    @Inject(CRM_OPPORTUNITY_EVENTS) private readonly events: CrmOpportunityEvents,
+    @Inject(CrmNotifier) private readonly notifier: CrmNotifier,
   ) {}
 
   // ── Lecture ──────────────────────────────────────────────────────────────
 
-  async list(organizationId: string, query: ListOpportunitiesQuery): Promise<OpportunityPage> {
+  async list(
+    organizationId: string,
+    query: ListOpportunitiesQuery,
+    callerId: string | null = null,
+  ): Promise<OpportunityPage> {
     const and: Record<string, unknown>[] = [{ organizationId }];
+    // ADR-0040 — C2 : filtres responsable et compte (confort ; tout `crm.read` voit tout).
+    if (query.ownerId) and.push({ ownerId: query.ownerId === 'me' ? callerId : query.ownerId });
+    if (query.accountId) and.push({ accountId: query.accountId.toLowerCase() });
     if (query.status !== 'all') and.push({ status: query.status });
     if (query.stageKey) and.push({ stageKey: query.stageKey });
     if (query.customerId) and.push({ customerId: query.customerId.toLowerCase() });
@@ -206,6 +282,7 @@ export class OpportunitiesService {
     return {
       ...summary!,
       lostReason: doc.lostReason ?? null,
+      lines: (doc.lines ?? []).map(lineView),
       stageHistory: doc.stageHistory.map((e) => ({
         stageKey: e.stageKey,
         stageLabel: labels.get(e.stageKey) ?? e.stageKey,
@@ -244,7 +321,7 @@ export class OpportunitiesService {
     settings: CrmSettingsView,
     now: Date,
   ): Promise<OpportunitySummary[]> {
-    const [customers, contacts] = await Promise.all([
+    const [customers, contacts, accounts, members] = await Promise.all([
       customerNamesOf(
         this.customers,
         organizationId,
@@ -253,6 +330,14 @@ export class OpportunitiesService {
       this.contacts.namesOf(
         organizationId,
         docs.flatMap((d) => (d.contactId ? [d.contactId] : [])),
+      ),
+      this.accounts.byIds(
+        organizationId,
+        docs.map((d) => d.accountId),
+      ),
+      this.membersAmong(
+        organizationId,
+        docs.map((d) => d.ownerId),
       ),
     ]);
     const labels = new Map(settings.stages.map((s) => [s.key, s.label]));
@@ -277,20 +362,34 @@ export class OpportunitiesService {
         stale: isStale(d.status, last, settings.staleAfterDays, now),
         closedAt: d.closedAt ? new Date(d.closedAt).toISOString() : null,
         revision: d.revision,
+        accountId: d.accountId ?? null,
+        accountName: d.accountId ? (accounts.get(d.accountId)?.name ?? null) : null,
+        ownerId: d.ownerId ?? null,
+        orphaned: d.status === 'open' && !(d.ownerId && members.has(d.ownerId)),
+        amountSource: d.amountSource ?? 'manual',
+        lostReasonKey: d.lostReasonKey ?? null,
+        wonAt: d.wonAt ? new Date(d.wonAt).toISOString() : null,
       };
     });
   }
 
   // ── Pipeline et indicateurs déterministes ────────────────────────────────
 
-  async pipeline(organizationId: string, now = new Date()): Promise<PipelineView> {
+  async pipeline(
+    organizationId: string,
+    now = new Date(),
+    ownerId: string | null = null,
+  ): Promise<PipelineView> {
     const settings = await this.settings.get(organizationId);
     const since = new Date(now.getTime() - CLOSED_WINDOW_DAYS * 86_400_000);
     const staleBefore = new Date(now.getTime() - settings.staleAfterDays * 86_400_000);
-    const [board, history, stale, overdue, upcoming] = await Promise.all([
+    // ADR-0040 — C2 : filtre responsable (confort d'affichage, pas un contrôle d'accès).
+    const owner = ownerId === null ? {} : { ownerId };
+    const [board, history, stale, overdue, upcoming, open] = await Promise.all([
       this.opportunities
         .find({
           organizationId,
+          ...owner,
           $or: [{ status: 'open' }, { closedAt: { $gte: since } }],
         })
         .sort({ lastActivityAt: -1, _id: -1 })
@@ -305,7 +404,7 @@ export class OpportunitiesService {
         .lean<OpportunityLean[]>()
         .exec(),
       this.opportunities
-        .find({ organizationId, status: 'open', lastActivityAt: { $lte: staleBefore } })
+        .find({ organizationId, ...owner, status: 'open', lastActivityAt: { $lte: staleBefore } })
         .sort({ lastActivityAt: 1, _id: 1 })
         .limit(50)
         .lean<OpportunityLean[]>()
@@ -322,6 +421,12 @@ export class OpportunitiesService {
         .limit(20)
         .lean<ActivityLean[]>()
         .exec(),
+      this.opportunities
+        .find({ organizationId, ...owner, status: 'open' })
+        .select({ stageKey: 1, amount: 1, currency: 1, expectedCloseDate: 1, ownerId: 1 })
+        .limit(FORECAST_LIMIT)
+        .lean<OpportunityLean[]>()
+        .exec(),
     ]);
 
     const summaries = await this.summaries(organizationId, board, settings, now);
@@ -334,6 +439,24 @@ export class OpportunitiesService {
       })),
       minSample: DEFAULT_WIN_RATE_MIN_SAMPLE,
     });
+    // ADR-0040 — C2 (§ 7.1) : probabilités historiques seulement (décision n° 6).
+    const forecast = weightedForecast({
+      opportunities: open.map((o) => ({
+        id: String(o._id),
+        stageKey: o.stageKey,
+        amount: o.amount ?? null,
+        currency: o.currency,
+        expectedCloseDate: o.expectedCloseDate ?? null,
+        ownerId: o.ownerId ?? null,
+      })),
+      probabilities: probabilitiesFromWinRates(rates),
+      probabilitySource: 'historical',
+    });
+    const members = await this.membersAmong(
+      organizationId,
+      open.map((o) => o.ownerId),
+    );
+    const orphans = open.filter((o) => !(o.ownerId && members.has(o.ownerId)));
     const titles = await this.titlesOf(
       organizationId,
       [...overdue, ...upcoming].flatMap((a) => (a.opportunityId ? [a.opportunityId] : [])),
@@ -369,7 +492,27 @@ export class OpportunitiesService {
       overdueActivities: overdue.map(brief),
       upcomingActivities: upcoming.map(brief),
       winRateMinSample: DEFAULT_WIN_RATE_MIN_SAMPLE,
+      ownerId,
+      forecast,
+      orphaned: {
+        count: orphans.length,
+        ownerIds: [...new Set(orphans.flatMap((o) => (o.ownerId ? [o.ownerId] : [])))].sort(),
+      },
     };
+  }
+
+  /** Identifiants, parmi `ids`, des membres actuels de l'organisation. */
+  private async membersAmong(
+    organizationId: string,
+    ids: readonly (string | null | undefined)[],
+  ): Promise<Set<string>> {
+    const valid = [...new Set(ids.filter((i): i is string => typeof i === 'string'))];
+    if (valid.length === 0) return new Set();
+    const docs = await this.memberships
+      .find({ organizationId, userId: { $in: valid } }, { userId: 1 })
+      .lean<{ userId: string }[]>()
+      .exec();
+    return new Set(docs.map((d) => d.userId));
   }
 
   private async titlesOf(
@@ -413,16 +556,154 @@ export class OpportunitiesService {
     return searchKeyOf([input.title, input.prospectName]);
   }
 
+  /**
+   * ADR-0040 — C2 : compte, responsable, lignes et montant d'une écriture.
+   * `current` : opportunité modifiée (un champ non envoyé reste inchangé).
+   * Ressources d'une autre organisation : 404 (compte, responsable, article).
+   */
+  private async resolveV2(
+    organizationId: string,
+    input: OpportunityInput,
+    actor: CrmActor,
+    current: OpportunityLean | null,
+  ): Promise<{
+    fields: Record<string, unknown>;
+    input: OpportunityInput;
+    warnings: OpportunityWarning[];
+  }> {
+    // Compte : `accountId` fait foi ; sans lui, `customerId` / `prospectName`
+    // sont résolus (compatibilité N-1, même règle que les contacts de C1).
+    let resolved = input;
+    let accountId: string | null = null;
+    if (input.accountId) {
+      const account = await this.accounts.requireUsable(organizationId, input.accountId);
+      accountId = String(account._id);
+      resolved = {
+        ...input,
+        customerId: account.customerId ?? null,
+        prospectName: account.customerId ? null : account.name,
+      };
+    } else {
+      await requireCustomer(this.customers, organizationId, input.customerId);
+      const account = await this.accounts.resolveLegacy(
+        organizationId,
+        { customerId: input.customerId, companyName: input.prospectName },
+        actor,
+      );
+      accountId = account ? String(account._id) : null;
+    }
+
+    // Responsable : membre détenant `crm.manage` (404 hors organisation, 400 sinon).
+    const ownerId = input.ownerId ?? current?.ownerId ?? actor.userId;
+    if (input.ownerId !== undefined && input.ownerId !== current?.ownerId) {
+      await this.accounts.assertOwner(organizationId, input.ownerId);
+    }
+
+    const amountSource: AmountSource = input.amountSource ?? current?.amountSource ?? 'manual';
+    const lines =
+      input.lines === undefined
+        ? (current?.lines ?? []).map(lineView)
+        : await this.resolveLines(organizationId, input.currency, input.lines);
+    if (input.lines === undefined && current && current.currency !== input.currency) {
+      const priced = lines.findIndex((l) => l.unitPrice !== null);
+      if (priced >= 0) lineCurrencyMismatch(priced);
+    }
+    const warnings: OpportunityWarning[] = lines.flatMap((l, lineIndex) =>
+      l.unitPrice === null ? [{ code: 'CRM_LINE_WITHOUT_PRICE' as const, lineIndex }] : [],
+    );
+    let amount = resolved.amount;
+    if (amountSource === 'lines') {
+      // Total HORS TAXES des lignes, calculé par le moteur (décision ouverte n° 8).
+      const total = estimatedLinesAmount(lines).amount;
+      amount = total === null || total === '0.00' ? null : total;
+    }
+    resolved = { ...resolved, amount };
+    return {
+      input: resolved,
+      fields: { accountId, ownerId, lines, amountSource },
+      warnings,
+    };
+  }
+
+  /** Lignes : articles de l'organisation, libellé, unité et prix HT copiés à l'ajout. */
+  private async resolveLines(
+    organizationId: string,
+    currency: 'CDF' | 'USD',
+    lines: readonly OpportunityLineInput[],
+  ): Promise<OpportunityLineView[]> {
+    const ids = [...new Set(lines.flatMap((l) => (l.catalogItemId ? [l.catalogItemId] : [])))];
+    const items = new Map<string, CatalogItem & { _id: Types.ObjectId }>();
+    if (ids.length > 0) {
+      const docs = await this.items
+        .find({ _id: { $in: ids.map((i) => new Types.ObjectId(i)) }, organizationId })
+        .lean<(CatalogItem & { _id: Types.ObjectId })[]>()
+        .exec();
+      for (const d of docs) items.set(String(d._id), d);
+      if (items.size !== ids.length) catalogItemNotFound();
+    }
+    return lines.map((l, index) => {
+      const item = l.catalogItemId ? items.get(l.catalogItemId)! : null;
+      // Jamais de conversion entre devises (§ 2.6).
+      if (item && item.currency !== currency) lineCurrencyMismatch(index);
+      const copiedPrice = item && item.priceMode === 'ht' ? item.unitPrice : null;
+      return {
+        catalogItemId: item ? String(item._id) : null,
+        label: l.label ?? item?.name ?? '',
+        quantity: l.quantity,
+        unit: l.unit !== undefined ? l.unit : (item?.unit ?? null),
+        // Un article au prix TTC n'est pas recopié : le prix HT se saisit.
+        unitPrice: l.unitPrice !== undefined ? l.unitPrice : copiedPrice,
+        discountPercent: l.discountPercent,
+      };
+    });
+  }
+
+  /** Motif de perte : clé active des réglages, obligatoire si les réglages l'exigent. */
+  private lostReasonFor(settings: CrmSettingsView, lostReasonKey: string | null): string | null {
+    if (lostReasonKey === null) {
+      if (settings.lostReasonRequired) {
+        throw new BadRequestException({
+          code: 'CRM_LOST_REASON_REQUIRED',
+          message: 'Choisissez le motif de la perte.',
+        });
+      }
+      return null;
+    }
+    if (!settings.lostReasons.some((r) => r.key === lostReasonKey && r.active)) {
+      throw new BadRequestException({
+        code: 'CRM_LOST_REASON_UNKNOWN',
+        message: 'Ce motif de perte n’existe pas ou est désactivé.',
+        details: { lostReasonKey },
+      });
+    }
+    return lostReasonKey;
+  }
+
   async create(
     organizationId: string,
     stageKey: string | null,
     input: OpportunityInput,
     actor: CrmActor,
     source: CrmStageEvent['source'] = 'user',
-  ): Promise<OpportunityView> {
-    const doc = await this.build(organizationId, stageKey, input, actor, source);
+    lost: { lostReasonKey: string | null; lostReasonDetail: string | null } = {
+      lostReasonKey: null,
+      lostReasonDetail: null,
+    },
+  ): Promise<OpportunityWriteResult> {
+    const { doc, warnings } = await this.buildV2(
+      organizationId,
+      stageKey,
+      input,
+      actor,
+      source,
+      lost,
+    );
     const created = await this.opportunities.create(doc);
-    return this.get(organizationId, String(created._id));
+    const view = await this.get(organizationId, String(created._id));
+    await this.notifyAssigned(organizationId, view.id, view.title, view.ownerId, actor.userId);
+    if (view.status === 'won')
+      await this.notifyWon(organizationId, created.toObject(), actor.userId, 'user', null);
+    return { ...view, warnings };
   }
 
   /** Document d'une opportunité neuve, références vérifiées (création et import). */
@@ -433,26 +714,49 @@ export class OpportunitiesService {
     actor: CrmActor,
     source: CrmStageEvent['source'],
   ): Promise<Record<string, unknown>> {
+    // L'import CSV (ADR-0035) crée sans motif : motif non exigé (lot C9).
+    return (await this.buildV2(organizationId, stageKey, input, actor, source, null)).doc;
+  }
+
+  private async buildV2(
+    organizationId: string,
+    stageKey: string | null,
+    input: OpportunityInput,
+    actor: CrmActor,
+    source: CrmStageEvent['source'],
+    lost: { lostReasonKey: string | null; lostReasonDetail: string | null } | null,
+  ): Promise<{ doc: Record<string, unknown>; warnings: OpportunityWarning[] }> {
     const settings = await this.settings.get(organizationId);
     const stage = stageKey
       ? this.stageOf(settings, stageKey)
       : settings.stages.find((s) => s.kind === 'open')!;
+    const lostReasonKey =
+      stage.kind === 'lost' && lost !== null
+        ? this.lostReasonFor(settings, lost.lostReasonKey)
+        : null;
     await this.checkRefs(organizationId, input);
+    const v2 = await this.resolveV2(organizationId, input, actor, null);
     const now = new Date();
     return {
-      organizationId,
-      ...input,
-      stageKey: stage.key,
-      status: stage.kind,
-      lostReason: null,
-      closedAt: stage.kind === 'open' ? null : now,
-      lastActivityAt: now,
-      stageHistory: [{ stageKey: stage.key, at: now, by: actor.userId, source, quoteId: null }],
-      searchKey: this.searchKey(input),
-      revision: 1,
-      createdBy: actor.userId,
-      updatedBy: actor.userId,
-      _schemaVersion: 1,
+      warnings: v2.warnings,
+      doc: {
+        organizationId,
+        ...stripV2(v2.input),
+        ...v2.fields,
+        stageKey: stage.key,
+        status: stage.kind,
+        lostReason: stage.kind === 'lost' ? (lost?.lostReasonDetail ?? null) : null,
+        lostReasonKey,
+        wonAt: stage.kind === 'won' ? now : null,
+        closedAt: stage.kind === 'open' ? null : now,
+        lastActivityAt: now,
+        stageHistory: [{ stageKey: stage.key, at: now, by: actor.userId, source, quoteId: null }],
+        searchKey: this.searchKey(v2.input),
+        revision: 1,
+        createdBy: actor.userId,
+        updatedBy: actor.userId,
+        _schemaVersion: 1,
+      },
     };
   }
 
@@ -467,15 +771,21 @@ export class OpportunitiesService {
     expectedRevision: number,
     input: OpportunityInput,
     actor: CrmActor,
-  ): Promise<OpportunityView> {
+  ): Promise<OpportunityWriteResult> {
     const current = await this.requireOwn(organizationId, opportunityId);
     if (current.revision !== expectedRevision) staleRevision(current.revision);
     await this.checkRefs(organizationId, input);
+    const v2 = await this.resolveV2(organizationId, input, actor, current);
     const res = await this.opportunities
       .updateOne(
         { _id: current._id, organizationId, revision: expectedRevision },
         {
-          $set: { ...input, searchKey: this.searchKey(input), updatedBy: actor.userId },
+          $set: {
+            ...stripV2(v2.input),
+            ...v2.fields,
+            searchKey: this.searchKey(v2.input),
+            updatedBy: actor.userId,
+          },
           $inc: { revision: 1 },
         },
       )
@@ -483,7 +793,25 @@ export class OpportunitiesService {
     if (res.matchedCount !== 1) {
       staleRevision((await this.requireOwn(organizationId, opportunityId)).revision);
     }
-    return this.get(organizationId, opportunityId);
+    if (v2.fields['ownerId'] !== current.ownerId) {
+      await this.audit.record({
+        organizationId,
+        actorUserId: actor.userId,
+        actorRole: actor.role,
+        action: 'crm_opportunity.owner_changed',
+        targetType: 'crm_opportunity',
+        targetId: opportunityId,
+        metadata: { from: current.ownerId ?? null, to: v2.fields['ownerId'] as string },
+      });
+      await this.notifyAssigned(
+        organizationId,
+        opportunityId,
+        v2.input.title,
+        v2.fields['ownerId'] as string,
+        actor.userId,
+      );
+    }
+    return { ...(await this.get(organizationId, opportunityId)), warnings: v2.warnings };
   }
 
   /** Changement d'étape : historique, nature, clôture ; même étape → rien n'est écrit. */
@@ -492,7 +820,7 @@ export class OpportunitiesService {
     opportunityId: string,
     expectedRevision: number,
     stageKey: string,
-    lostReason: string | null,
+    lost: { lostReasonKey: string | null; lostReasonDetail: string | null },
     actor: CrmActor,
   ): Promise<OpportunityView> {
     const current = await this.requireOwn(organizationId, opportunityId);
@@ -500,6 +828,9 @@ export class OpportunitiesService {
     const settings = await this.settings.get(organizationId);
     const stage = this.stageOf(settings, stageKey);
     if (stage.key === current.stageKey) return this.get(organizationId, opportunityId);
+    // ADR-0040 — C2 (§ 2.3) : motif obligatoire pour passer en perdu.
+    const lostReasonKey =
+      stage.kind === 'lost' ? this.lostReasonFor(settings, lost.lostReasonKey) : null;
     const now = new Date();
     const res = await this.opportunities
       .updateOne(
@@ -509,7 +840,9 @@ export class OpportunitiesService {
             stageKey: stage.key,
             status: stage.kind,
             closedAt: stage.kind === 'open' ? null : now,
-            lostReason: stage.kind === 'lost' ? lostReason : null,
+            lostReason: stage.kind === 'lost' ? lost.lostReasonDetail : null,
+            lostReasonKey,
+            wonAt: stage.kind === 'won' ? now : null,
             lastActivityAt: now,
             updatedBy: actor.userId,
           },
@@ -529,7 +862,107 @@ export class OpportunitiesService {
     if (res.matchedCount !== 1) {
       staleRevision((await this.requireOwn(organizationId, opportunityId)).revision);
     }
+    if (stage.kind === 'won' && current.status !== 'won') {
+      await this.notifyWon(organizationId, current, actor.userId, 'user', null, now);
+    }
     return this.get(organizationId, opportunityId);
+  }
+
+  /**
+   * Réassignation en masse (départ d'un membre, ADR-0040 § 3.2) : les
+   * opportunités de `fromOwnerId` (ouvertes seulement par défaut) passent à
+   * `toOwnerId`, éligible (`crm.manage`). `fromOwnerId` peut ne plus être membre.
+   */
+  async reassign(
+    organizationId: string,
+    input: { fromOwnerId: string; toOwnerId: string; onlyOpen: boolean },
+    actor: CrmActor,
+  ): Promise<{ reassigned: number }> {
+    await this.accounts.assertOwner(organizationId, input.toOwnerId);
+    if (input.fromOwnerId === input.toOwnerId) return { reassigned: 0 };
+    const filter = {
+      organizationId,
+      ownerId: input.fromOwnerId,
+      ...(input.onlyOpen ? { status: 'open' } : {}),
+    };
+    const targets = await this.opportunities
+      .find(filter, { title: 1 })
+      .lean<{ _id: Types.ObjectId; title: string }[]>()
+      .exec();
+    const res = await this.opportunities
+      .updateMany(
+        { ...filter, _id: { $in: targets.map((t) => t._id) } },
+        { $set: { ownerId: input.toOwnerId, updatedBy: actor.userId }, $inc: { revision: 1 } },
+      )
+      .exec();
+    // Une notification par opportunité au nouveau responsable (sauf l'auteur).
+    for (const t of targets) {
+      await this.notifyAssigned(
+        organizationId,
+        String(t._id),
+        t.title,
+        input.toOwnerId,
+        actor.userId,
+      );
+    }
+    await this.audit.record({
+      organizationId,
+      actorUserId: actor.userId,
+      actorRole: actor.role,
+      action: 'crm_opportunity.reassigned',
+      targetType: 'crm_opportunity',
+      targetId: input.fromOwnerId,
+      metadata: { ...input, reassigned: res.modifiedCount },
+    });
+    return { reassigned: res.modifiedCount };
+  }
+
+  /** `crm.opportunity_assigned` au responsable, sauf s'il est l'auteur (notifier de C4). */
+  private async notifyAssigned(
+    organizationId: string,
+    opportunityId: string,
+    title: string,
+    ownerId: string | null,
+    actorUserId: string,
+  ): Promise<void> {
+    await this.notifier.opportunityEvent({
+      kind: 'crm.opportunity_assigned',
+      organizationId,
+      opportunityId,
+      recipients: [ownerId],
+      title: `Opportunité confiée : ${title}`,
+      href: `/crm/opportunites/${opportunityId}`,
+      actorUserId,
+    });
+  }
+
+  /**
+   * Point d'extension « opportunité gagnée » (ADR-0040 § 6.4) : APRÈS
+   * l'écriture ; une erreur est journalisée, jamais propagée.
+   */
+  private async notifyWon(
+    organizationId: string,
+    doc: Pick<OpportunityLean, '_id' | 'ownerId'>,
+    actorUserId: string,
+    source: OpportunityWonEvent['source'],
+    quoteId: string | null,
+    wonAt = new Date(),
+  ): Promise<void> {
+    try {
+      await this.events.onWon({
+        organizationId,
+        opportunityId: String(doc._id),
+        ownerId: doc.ownerId ?? null,
+        actorUserId,
+        source,
+        quoteId,
+        wonAt,
+      });
+    } catch (err) {
+      this.logger.error(
+        `Événement « opportunité gagnée » non traité (${String(doc._id)}) : ${String(err)}`,
+      );
+    }
   }
 
   /** Suppression : refusée si un devis y est rattaché ; ses activités sont supprimées avec elle. */
@@ -594,6 +1027,9 @@ export class OpportunitiesService {
             status: 'won',
             closedAt: now,
             lostReason: null,
+            // ADR-0040 — C2
+            lostReasonKey: null,
+            wonAt: now,
             lastActivityAt: now,
             updatedBy: actor.userId,
           },
@@ -611,7 +1047,16 @@ export class OpportunitiesService {
         opts.session ? { session: opts.session } : {},
       )
       .exec();
-    return res.modifiedCount === 1 ? 'won' : 'not_open';
+    if (res.modifiedCount !== 1) return 'not_open';
+    // ADR-0040 — C2 : appelé dans la transaction du devis s'il y en a une ; le
+    // fournisseur branché doit donc rester idempotent (voir opportunity-events.ts).
+    const won2 = await this.opportunities
+      .findOne({ _id: new Types.ObjectId(opportunityId), organizationId }, { ownerId: 1 })
+      .session(opts.session ?? null)
+      .lean<OpportunityLean>()
+      .exec();
+    if (won2) await this.notifyWon(organizationId, won2, actor.userId, 'quote', quoteId, now);
+    return 'won';
   }
 
   /** Toutes les opportunités (export CSV), bornées. */
@@ -629,4 +1074,34 @@ export class OpportunitiesService {
       new Date(),
     );
   }
+}
+
+// ── ADR-0040 — C2 : aides pures ─────────────────────────────────────────────
+
+function lineView(l: CrmOpportunityLine): OpportunityLineView {
+  return {
+    catalogItemId: l.catalogItemId ?? null,
+    label: l.label,
+    quantity: l.quantity,
+    unit: l.unit ?? null,
+    unitPrice: l.unitPrice ?? null,
+    discountPercent: l.discountPercent ?? null,
+  };
+}
+
+/** Champs v2 de l'entrée retirés : le service les écrit lui-même (`resolveV2`). */
+function stripV2(
+  input: OpportunityInput,
+): Omit<OpportunityInput, 'accountId' | 'ownerId' | 'lines' | 'amountSource'> {
+  const { accountId: _a, ownerId: _o, lines: _l, amountSource: _s, ...rest } = input;
+  return rest;
+}
+
+function lineCurrencyMismatch(lineIndex: number): never {
+  throw new BadRequestException({
+    code: 'CRM_LINE_CURRENCY_MISMATCH',
+    message:
+      'Le prix de cet article est dans une autre devise que l’opportunité : aucune conversion n’est faite.',
+    details: { lineIndex },
+  });
 }

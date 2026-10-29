@@ -10,6 +10,10 @@ import type { HydratedDocument } from 'mongoose';
 
 import {
   ACTIVITY_KINDS,
+  // ADR-0040 — C2
+  AMOUNT_SOURCES,
+  type AmountSource,
+  type LostReason,
   OPPORTUNITY_STATUSES,
   STAGE_KINDS,
   type ActivityKind,
@@ -32,6 +36,20 @@ export class CrmStage {
 }
 const CrmStageSchema = SchemaFactory.createForClass(CrmStage);
 
+// ADR-0040 — C2 (§ 2.5)
+@Schema({ _id: false, strict: true })
+export class CrmLostReason {
+  @Prop({ type: String, required: true })
+  key!: string;
+
+  @Prop({ type: String, required: true })
+  label!: string;
+
+  @Prop({ type: Boolean, required: true, default: true })
+  active!: boolean;
+}
+const CrmLostReasonSchema = SchemaFactory.createForClass(CrmLostReason);
+
 @Schema({ collection: 'crm_settings', timestamps: true, strict: true })
 export class CrmSettings {
   @Prop({ type: String, required: true })
@@ -45,6 +63,14 @@ export class CrmSettings {
 
   @Prop({ type: Number, required: true })
   staleAfterDays!: number;
+
+  /** ADR-0040 — C2 (§ 2.5) : motifs de perte ; absent → motifs par défaut. */
+  @Prop({ type: [CrmLostReasonSchema], default: undefined })
+  lostReasons?: LostReason[];
+
+  /** ADR-0040 — C2 (§ 2.5) : motif obligatoire pour passer en perdu ; absent → `true`. */
+  @Prop({ type: Boolean, default: undefined })
+  lostReasonRequired?: boolean;
 
   @Prop({ type: Number, required: true, default: 1 })
   revision!: number;
@@ -149,6 +175,33 @@ export class CrmStageEvent {
 }
 const CrmStageEventSchema = SchemaFactory.createForClass(CrmStageEvent);
 
+/**
+ * ADR-0040 — C2 (§ 2.3) : ligne d'opportunité. Libellé, unité et prix sont
+ * COPIÉS de l'article à l'ajout (le catalogue peut changer ensuite). Prix
+ * unitaire HORS TAXES dans la devise de l'opportunité ; `null` : sans prix.
+ */
+@Schema({ _id: false, strict: true })
+export class CrmOpportunityLine {
+  @Prop({ type: String, default: null })
+  catalogItemId!: string | null;
+
+  @Prop({ type: String, required: true })
+  label!: string;
+
+  @Prop({ type: String, required: true })
+  quantity!: string;
+
+  @Prop({ type: String, default: null })
+  unit!: string | null;
+
+  @Prop({ type: String, default: null })
+  unitPrice!: string | null;
+
+  @Prop({ type: String, default: null })
+  discountPercent!: string | null;
+}
+const CrmOpportunityLineSchema = SchemaFactory.createForClass(CrmOpportunityLine);
+
 @Schema({ collection: 'crm_opportunities', timestamps: true, strict: true })
 export class CrmOpportunity {
   @Prop({ type: String, required: true })
@@ -195,6 +248,34 @@ export class CrmOpportunity {
   @Prop({ type: [CrmStageEventSchema], required: true, default: [] })
   stageHistory!: CrmStageEvent[];
 
+  // ── ADR-0040 — C2 (§ 2.3) ────────────────────────────────────────────────
+
+  /**
+   * Compte visé (`crm_accounts`, identifiant hexadécimal en chaîne, comme
+   * `CrmContact.accountId` de C1) ; `customerId` et `prospectName` en sont
+   * recopiés. `null` : opportunité antérieure à la migration, non rattachée.
+   */
+  @Prop({ type: String, default: null })
+  accountId!: string | null;
+
+  /** Responsable : membre détenant `crm.manage` ; défaut : le créateur. */
+  @Prop({ type: String, default: null })
+  ownerId!: string | null;
+
+  @Prop({ type: [CrmOpportunityLineSchema], default: [] })
+  lines!: CrmOpportunityLine[];
+
+  /** `manual` : montant saisi ; `lines` : total HT des lignes, calculé par le moteur. */
+  @Prop({ type: String, enum: AMOUNT_SOURCES as unknown as string[], default: 'manual' })
+  amountSource!: AmountSource;
+
+  /** Clé de `crm_settings.lostReasons` ; `lostReason` en garde le détail libre. */
+  @Prop({ type: String, default: null })
+  lostReasonKey!: string | null;
+
+  @Prop({ type: Date, default: null })
+  wonAt!: Date | null;
+
   @Prop({ type: String, required: true })
   searchKey!: string;
 
@@ -219,6 +300,11 @@ CrmOpportunitySchema.index({ organizationId: 1, createdAt: -1, _id: -1 });
 CrmOpportunitySchema.index({ organizationId: 1, status: 1, lastActivityAt: 1 });
 CrmOpportunitySchema.index({ organizationId: 1, stageKey: 1 });
 CrmOpportunitySchema.index({ organizationId: 1, customerId: 1 });
+// ADR-0040 — C2
+CrmOpportunitySchema.index({ organizationId: 1, accountId: 1 });
+CrmOpportunitySchema.index({ organizationId: 1, ownerId: 1, status: 1 });
+CrmOpportunitySchema.index({ organizationId: 1, status: 1, expectedCloseDate: 1 });
+CrmOpportunitySchema.index({ organizationId: 1, status: 1, closedAt: 1 });
 
 // ── Activités ───────────────────────────────────────────────────────────────
 

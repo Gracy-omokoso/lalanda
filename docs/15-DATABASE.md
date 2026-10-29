@@ -92,12 +92,20 @@ Un événement contient acteur, organisation, action, cible, horodatage, adresse
 - **Proposé, ADR-0040 (non implémenté)** : `crm_accounts` (compte prospect ou client), unique
   partiel `organizationId + customerId` (une fiche client a au plus un compte), liste par
   `organizationId + sortName` ; champs ajoutés : `accountId` (contacts, opportunités,
-  activités), `ownerId`, `lines`, `lostReasonKey` (opportunités), `assigneeUserId`, `dueDay`
-  (jour de Kinshasa), `reminders` (activités), `lostReasons`, `forecastProbability` (réglages) ;
-  index `organizationId + assigneeUserId + done + dueDay` (« Mes tâches »), `organizationId +
-  ownerId + status`, `organizationId + status + expectedCloseDate` ; `work_projects` : unique
+  activités), `assigneeUserId`, `dueDay`
+  (jour de Kinshasa), `reminders` (activités) ;
+  index `organizationId + assigneeUserId + done + dueDay` (« Mes tâches ») ; `work_projects` : unique
   partiel `organizationId + source.opportunityId`. Migration
   `20261030-0001-crm-accounts.mjs` (prospects regroupés par nom normalisé exact).
+
+- **Implémenté, ADR-0040 lot C2 (pipeline v2)** : `crm_opportunities` gagne `accountId`
+  (identifiant de compte en chaîne, comme l'écrit C1), `ownerId`, `lines` (0 à 50 : article,
+  libellé, quantité, unité, prix unitaire HT, remise en %), `amountSource` (`manual` \| `lines`),
+  `lostReasonKey` (`lostReason` reste le détail), `wonAt` ; index `organizationId + accountId`,
+  `organizationId + ownerId + status`, `organizationId + status + expectedCloseDate`,
+  `organizationId + status + closedAt`. `crm_settings` gagne `lostReasons` (`key`, `label`,
+  `active` ; absent → six motifs par défaut) et `lostReasonRequired` (absent → `true`). Champs
+  additifs, `_schemaVersion` inchangé ; aucune migration propre (celle de C1 pose `accountId`).
 
 ## Rétention
 

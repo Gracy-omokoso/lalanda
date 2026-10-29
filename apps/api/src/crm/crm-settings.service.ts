@@ -12,9 +12,11 @@ import type { Model } from 'mongoose';
 import { AuditService } from '../authz/audit.service.js';
 import { conflict, isDuplicateKey, staleRevision } from '../sales/sales.errors.js';
 import {
+  DEFAULT_LOST_REASONS,
   DEFAULT_STAGES,
   DEFAULT_STALE_AFTER_DAYS,
   stageChangeConflicts,
+  type LostReason,
   type PipelineStage,
 } from './crm-model.js';
 import type { CrmSettingsInput } from './crm.dto.js';
@@ -34,6 +36,16 @@ export interface CrmSettingsView {
   stages: PipelineStage[];
   autoWinOnQuoteAccepted: boolean;
   staleAfterDays: number;
+  /** ADR-0040 — C2 (§ 2.5) : motifs de perte (six par défaut). */
+  lostReasons: LostReason[];
+  /** Motif obligatoire pour passer en perdu (défaut : oui). */
+  lostReasonRequired: boolean;
+  /**
+   * Origine des probabilités de la prévision. Toujours `historical` : les
+   * pourcentages saisis par l'organisation sont désactivés (décision ouverte
+   * n° 6, valeur retenue par la dirigeante) ; le moteur sait les lire.
+   */
+  forecastProbability: 'historical';
   /** 0 : réglages par défaut, jamais enregistrés. */
   revision: number;
   updatedAt: string | null;
@@ -57,6 +69,9 @@ export class CrmSettingsService {
         stages: DEFAULT_STAGES.map((s) => ({ ...s })),
         autoWinOnQuoteAccepted: true,
         staleAfterDays: DEFAULT_STALE_AFTER_DAYS,
+        lostReasons: DEFAULT_LOST_REASONS.map((r) => ({ ...r })),
+        lostReasonRequired: true,
+        forecastProbability: 'historical',
         revision: 0,
         updatedAt: null,
       };
@@ -65,6 +80,13 @@ export class CrmSettingsService {
       stages: doc.stages.map((s) => ({ key: s.key, label: s.label, kind: s.kind })),
       autoWinOnQuoteAccepted: doc.autoWinOnQuoteAccepted,
       staleAfterDays: doc.staleAfterDays,
+      lostReasons: (doc.lostReasons ?? DEFAULT_LOST_REASONS).map((r) => ({
+        key: r.key,
+        label: r.label,
+        active: r.active,
+      })),
+      lostReasonRequired: doc.lostReasonRequired ?? true,
+      forecastProbability: 'historical',
       revision: doc.revision,
       updatedAt: new Date(doc.updatedAt).toISOString(),
     };
@@ -98,10 +120,31 @@ export class CrmSettingsService {
       );
     }
 
+    // ADR-0040 — C2 (§ 2.5) : un motif utilisé ne se retire pas, il se désactive.
+    const lostReasons = input.lostReasons ?? current.lostReasons;
+    const kept = new Set(lostReasons.map((r) => r.key));
+    const removedReasons = current.lostReasons.map((r) => r.key).filter((k) => !kept.has(k));
+    if (removedReasons.length > 0) {
+      const usedReasons = (
+        (await this.opportunities
+          .distinct('lostReasonKey', { organizationId, lostReasonKey: { $in: removedReasons } })
+          .exec()) as string[]
+      ).sort();
+      if (usedReasons.length > 0) {
+        conflict(
+          'CRM_LOST_REASON_IN_USE',
+          'Un motif de perte utilisé par des opportunités ne peut pas être retiré : désactivez-le.',
+          { lostReasonKeys: usedReasons },
+        );
+      }
+    }
+
     const set = {
       stages: input.stages,
       autoWinOnQuoteAccepted: input.autoWinOnQuoteAccepted,
       staleAfterDays: input.staleAfterDays,
+      lostReasons,
+      lostReasonRequired: input.lostReasonRequired ?? current.lostReasonRequired,
       updatedBy: actor.userId,
     };
     if (expectedRevision === 0) {
@@ -131,6 +174,8 @@ export class CrmSettingsService {
         stages: input.stages.length,
         autoWinOnQuoteAccepted: input.autoWinOnQuoteAccepted,
         staleAfterDays: input.staleAfterDays,
+        lostReasons: lostReasons.length,
+        lostReasonRequired: set.lostReasonRequired,
       },
     });
     return this.get(organizationId);

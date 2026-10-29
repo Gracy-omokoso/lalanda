@@ -409,7 +409,8 @@ Lecture `crm.read` ; écriture, réglages, import et export `crm.manage`.
 
 ## CRM complet — proposé, ADR-0040 (non implémenté)
 
-Contrat **proposé** par [ADR-0040](adr/ADR-0040-crm-complet.md) § 3 ; rien n'est encore servi.
+Contrat **proposé** par [ADR-0040](adr/ADR-0040-crm-complet.md) § 3 ; les routes du pipeline v2
+(lot C2) sont implémentées, voir la section suivante.
 Nouvelle action `sales.quote` (devis) ; nouveau rôle Commercial (`sales_rep`).
 
 | Méthode et chemin | Permission | Effet |
@@ -423,7 +424,6 @@ Nouvelle action `sales.quote` (devis) ; nouveau rôle Commercial (`sales_rep`).
 | `POST /sales/quotes/from-opportunity` | `sales.quote` + `crm.read` | devis brouillon prérempli par les lignes |
 | écritures des devis (`POST`, `PUT`, `DELETE`, `send`, `accept`, `refuse`, `new-version`) | `sales.quote` (au lieu de `sales.manage`) | — |
 | `POST /sales/quotes/:id/convert` | `sales.quote` + `sales.manage` | — |
-| `GET /crm/pipeline?ownerId=` | `crm.read` | + prévision pondérée par devise (moteur, part « non pondérable ») |
 | `GET /crm/reports?from=&to=&ownerId=` | `crm.read` | entonnoir, conversion, cycle, par responsable, prévision par mois de clôture, motifs de perte — montants estimés |
 | `POST /crm/activities/:id/reopen` | `crm.manage` | décocher une activité |
 | `GET /work/my-tasks` | `work.read` | éléments `source: 'crm'` (relances assignées, avec échéance) si `crm.read` |
@@ -432,6 +432,21 @@ Nouvelle action `sales.quote` (devis) ; nouveau rôle Commercial (`sales_rep`).
 Notifications ajoutées : `crm.activity_assigned`, `crm.activity_due_soon`, `crm.activity_overdue`,
 `crm.opportunity_assigned`, `crm.opportunity_won`. Brief : faits `mes_relances.*`,
 `relances.en_retard`, `pipeline` connu, règle R10 `relances_en_retard`.
+
+### Pipeline v2 — implémenté (ADR-0040 C2)
+
+Lot C2 d'[ADR-0040](adr/ADR-0040-crm-complet.md) (§ 2.3, § 2.5, § 2.6, § 3.2 à § 3.4, § 7.1).
+Montants **estimés**, jamais convertis entre devises ; rien n'alimente le réalisé.
+
+| Méthode et chemin | Permission | Effet |
+|---|---|---|
+| `POST /crm/opportunities` · `PUT /crm/opportunities/:id` | `crm.manage` | + `accountId` (compte de l'organisation, sinon `404 CRM_ACCOUNT_NOT_FOUND` ; `customerId`/`prospectName` sans `accountId` encore acceptés, résolus en compte), `ownerId` (défaut : l'auteur ; membre détenant `crm.manage`, sinon `400 CRM_OWNER_NOT_ELIGIBLE` ou `404 CRM_MEMBER_NOT_FOUND`), `lines` (0 à 50 ; libellé, unité et prix **HT** copiés de l'article ; `400 CRM_LINE_CURRENCY_MISMATCH` ; `404 CATALOG_ITEM_NOT_FOUND`), `amountSource` (`manual` \| `lines` : total HT des lignes calculé par le moteur). Réponse : la vue, plus `warnings: [{ code: 'CRM_LINE_WITHOUT_PRICE', lineIndex }]`. Champ non envoyé au `PUT` : inchangé |
+| `POST /crm/opportunities/:id/move` | `crm.manage` | + `lostReasonKey`, `lostReasonDetail` (`lostReason` accepté comme détail) ; perdu sans motif : `400 CRM_LOST_REASON_REQUIRED` ; motif inconnu ou désactivé : `400 CRM_LOST_REASON_UNKNOWN` ; `wonAt` posé au gain |
+| `POST /crm/opportunities/reassign` `{ fromOwnerId, toOwnerId, onlyOpen = true }` | `crm.manage` | réassignation en masse, journalisée ; rend `{ reassigned }` ; notifie `crm.opportunity_assigned` au nouveau responsable |
+| `GET /crm/opportunities?ownerId=me\|<id>&accountId=` | `crm.read` | filtres ajoutés (confort : tout `crm.read` voit tout le pipeline) |
+| `GET /crm/pipeline?ownerId=me\|<id>` | `crm.read` | + `forecast` (`weightedForecast` : par devise `weighted`, `unweighted`, `count`, `notWeightable`), `orphaned { count, ownerIds }`, `calculationVersion` 1.1.0 ; cartes : `ownerId`, `orphaned`, `accountId`, `accountName`, `amountSource`, `lostReasonKey`, `wonAt` |
+| `GET /crm/settings` · `PUT /crm/settings` | `crm.read` · `crm.manage` | + `lostReasons` (six par défaut), `lostReasonRequired` (défaut `true`), `forecastProbability` (toujours `historical` : saisie désactivée) ; retirer un motif utilisé : `409 CRM_LOST_REASON_IN_USE` |
+| `POST /sales/quotes/from-opportunity` `{ opportunityId, validUntil? }` | `sales.quote` + `crm.read` | devis brouillon : devise de l'opportunité, prix HT, client = fiche du compte client sinon client de passage ; montants recalculés par la composition des devis ; `409 CRM_OPPORTUNITY_HAS_NO_LINES`, `409 CRM_LINE_NOT_QUOTABLE` (ligne sans article) |
 
 ## Brief du matin — implémenté (ADR-0033)
 

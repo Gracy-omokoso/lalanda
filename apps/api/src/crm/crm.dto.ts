@@ -11,6 +11,14 @@ import { parseDecimalInput } from '../sales/sales.dto.js';
 import { isObjectIdHex } from '../sales/search.js';
 import {
   ACTIVITY_KINDS,
+  // ADR-0040 — C2
+  AMOUNT_SOURCES,
+  LOST_REASON_KEY_PATTERN,
+  MAX_LOST_REASONS,
+  MAX_OPPORTUNITY_LINES,
+  lostReasonIssues,
+  type AmountSource,
+  type LostReason,
   STAGE_KINDS,
   isCalendarDay,
   stageConfigIssues,
@@ -146,6 +154,9 @@ export interface CrmSettingsInput {
   stages: PipelineStage[];
   autoWinOnQuoteAccepted: boolean;
   staleAfterDays: number;
+  /** ADR-0040 — C2 : `undefined` : inchangés (corps d'ADR-0035 toujours accepté). */
+  lostReasons?: LostReason[];
+  lostReasonRequired?: boolean;
 }
 
 export const PutCrmSettingsSchema = z
@@ -166,9 +177,32 @@ export const PutCrmSettingsSchema = z
       .max(30),
     autoWinOnQuoteAccepted: z.boolean(),
     staleAfterDays: z.number().int().min(1).max(365),
+    // ADR-0040 — C2 (§ 2.5)
+    lostReasons: z
+      .array(
+        z
+          .object({ key: z.string(), label: z.string(), active: z.boolean().default(true) })
+          .strict(),
+      )
+      .max(MAX_LOST_REASONS)
+      .optional(),
+    lostReasonRequired: z.boolean().optional(),
   })
   .strict()
   .transform((raw, ctx) => {
+    const lostReasons = raw.lostReasons?.map((r) => ({
+      key: r.key.trim(),
+      label: r.label.trim(),
+      active: r.active,
+    }));
+    for (const i of lostReasonIssues(lostReasons ?? [])) {
+      ctx.addIssue({
+        code: 'custom',
+        path: i.path.split('.').map((p) => (/^\d+$/.test(p) ? Number(p) : p)),
+        message: i.message,
+        params: { code: i.code },
+      });
+    }
     const stages = raw.stages.map((s) => ({
       key: s.key.trim(),
       label: s.label.trim(),
@@ -188,6 +222,10 @@ export const PutCrmSettingsSchema = z
         stages,
         autoWinOnQuoteAccepted: raw.autoWinOnQuoteAccepted,
         staleAfterDays: raw.staleAfterDays,
+        ...(lostReasons === undefined ? {} : { lostReasons }),
+        ...(raw.lostReasonRequired === undefined
+          ? {}
+          : { lostReasonRequired: raw.lostReasonRequired }),
       } satisfies CrmSettingsInput,
     };
   });
@@ -273,6 +311,19 @@ export type ListContactsQuery = z.output<typeof ListContactsQuerySchema>;
 
 // ── Opportunités ────────────────────────────────────────────────────────────
 
+/** ADR-0040 — C2 (§ 2.3) : ligne d'opportunité en entrée. */
+export interface OpportunityLineInput {
+  catalogItemId: string | null;
+  /** `null` : recopié de l'article (ligne de catalogue). */
+  label: string | null;
+  quantity: string;
+  /** `undefined` : recopiée de l'article. */
+  unit?: string | null;
+  /** Prix unitaire HT ; `undefined` : recopié de l'article (si son prix est HT). */
+  unitPrice?: string | null;
+  discountPercent: string | null;
+}
+
 export interface OpportunityInput {
   title: string;
   customerId: string | null;
@@ -281,6 +332,11 @@ export interface OpportunityInput {
   amount: string | null;
   currency: 'CDF' | 'USD';
   expectedCloseDate: string | null;
+  // ADR-0040 — C2 : `undefined` = non envoyé (création : défaut ; modification : inchangé).
+  accountId?: string | null;
+  ownerId?: string;
+  lines?: OpportunityLineInput[];
+  amountSource?: AmountSource;
 }
 
 const OpportunityFields = {
@@ -291,19 +347,158 @@ const OpportunityFields = {
   amount: z.unknown().optional(),
   currency: z.enum(['CDF', 'USD'], { error: fixedMessage('Devise : CDF ou USD.') }),
   expectedCloseDate: z.unknown().optional(),
+  // ADR-0040 — C2
+  accountId: z.unknown().optional(),
+  ownerId: z.unknown().optional(),
+  lines: z.unknown().optional(),
+  amountSource: z.unknown().optional(),
 };
+
+/** Décimal > 0 (quantité, 3 décimales) ou ≥ 0 (prix, 2 décimales), canonique. */
+function decimalField(
+  ctx: Ctx,
+  path: (string | number)[],
+  raw: unknown,
+  decimals: 2 | 3,
+  allowZero: boolean,
+  code: string,
+): string | null {
+  const parsed = parseDecimalInput(raw, { maxIntegerDigits: 13, decimals });
+  if (!parsed.ok) {
+    issue(
+      ctx,
+      path,
+      parsed.reason === 'number' ? 'DECIMAL_MUST_BE_STRING' : code,
+      parsed.reason === 'number'
+        ? 'Valeur attendue sous forme de chaîne (par exemple "2"), jamais de nombre.'
+        : `Décimal invalide (${decimals} décimales au plus).`,
+    );
+    return null;
+  }
+  if (parsed.isZero && !allowZero) {
+    issue(ctx, path, code, 'La valeur doit être strictement positive.');
+    return null;
+  }
+  return decimals === 3 ? parsed.canonical.replace(/\.?0+$/, '') : parsed.canonical;
+}
+
+const LINE_KEYS = [
+  'catalogItemId',
+  'label',
+  'quantity',
+  'unit',
+  'unitPrice',
+  'discountPercent',
+] as const;
+
+function normalizeLines(ctx: Ctx, raw: unknown): OpportunityLineInput[] | undefined {
+  if (raw === undefined) return undefined;
+  if (!Array.isArray(raw)) {
+    issue(ctx, ['lines'], 'INVALID_TYPE', 'Liste de lignes attendue.');
+    return [];
+  }
+  if (raw.length > MAX_OPPORTUNITY_LINES) {
+    issue(ctx, ['lines'], 'TOO_MANY_LINES', `${MAX_OPPORTUNITY_LINES} lignes au plus.`);
+    return [];
+  }
+  return raw.map((l: unknown, i): OpportunityLineInput => {
+    const at = (f: string) => ['lines', i, f];
+    if (l === null || typeof l !== 'object' || Array.isArray(l)) {
+      issue(ctx, ['lines', i], 'INVALID_TYPE', 'Objet attendu.');
+      return { catalogItemId: null, label: null, quantity: '1', discountPercent: null };
+    }
+    const o = l as Record<string, unknown>;
+    const extra = Object.keys(o).filter((k) => !(LINE_KEYS as readonly string[]).includes(k));
+    if (extra.length > 0) {
+      ctx.addIssue({
+        code: 'unrecognized_keys',
+        keys: extra,
+        path: ['lines', i],
+        message: `Champ(s) inconnu(s) : ${extra.join(', ')}.`,
+      });
+    }
+    const catalogItemId = objectId(
+      ctx,
+      at('catalogItemId'),
+      o['catalogItemId'],
+      'CATALOG_ITEM_INVALID',
+    );
+    const label = text(ctx, at('label'), o['label'], 200);
+    if (label === null && catalogItemId === null) {
+      issue(ctx, at('label'), 'LABEL_REQUIRED', 'Le libellé est obligatoire (ligne libre).');
+    }
+    let discountPercent: string | null = null;
+    if (o['discountPercent'] !== undefined && o['discountPercent'] !== null) {
+      discountPercent = decimalField(
+        ctx,
+        at('discountPercent'),
+        o['discountPercent'],
+        2,
+        true,
+        'DISCOUNT_INVALID',
+      );
+      // Une remise de 100 % annulerait le prix : même règle que les devis.
+      if (discountPercent !== null && !/^\d{1,2}\./.test(discountPercent)) {
+        issue(ctx, at('discountPercent'), 'DISCOUNT_INVALID', 'Remise : 0 à moins de 100 %.');
+        discountPercent = null;
+      }
+    }
+    const line: OpportunityLineInput = {
+      catalogItemId,
+      label,
+      quantity:
+        decimalField(ctx, at('quantity'), o['quantity'], 3, false, 'QUANTITY_INVALID') ?? '1',
+      discountPercent,
+    };
+    if (o['unit'] !== undefined) line.unit = text(ctx, at('unit'), o['unit'], 20);
+    if (o['unitPrice'] !== undefined) {
+      line.unitPrice =
+        o['unitPrice'] === null
+          ? null
+          : decimalField(ctx, at('unitPrice'), o['unitPrice'], 2, true, 'PRICE_INVALID');
+    }
+    return line;
+  });
+}
 
 export function normalizeOpportunity(raw: Record<string, unknown>, ctx: Ctx): OpportunityInput {
   const customerId = objectId(ctx, ['customerId'], raw['customerId'], 'CUSTOMER_INVALID');
   const prospectName = text(ctx, ['prospectName'], raw['prospectName'], 200);
-  if (customerId === null && prospectName === null) {
+  // ADR-0040 — C2 : le compte remplace client et prospect ; les deux restent
+  // acceptés une version (compatibilité N-1, résolus par le service).
+  const accountId =
+    raw['accountId'] === undefined || raw['accountId'] === null
+      ? undefined
+      : (objectId(ctx, ['accountId'], raw['accountId'], 'ACCOUNT_INVALID') ?? undefined);
+  if (customerId === null && prospectName === null && raw['accountId'] == null) {
     issue(
       ctx,
       ['customerId'],
       'CUSTOMER_OR_PROSPECT_REQUIRED',
-      'Choisissez un client ou nommez le prospect.',
+      'Choisissez un compte, un client ou nommez le prospect.',
     );
   }
+  let ownerId: string | undefined;
+  if (raw['ownerId'] !== undefined) {
+    ownerId = objectId(ctx, ['ownerId'], raw['ownerId'], 'OWNER_INVALID') ?? undefined;
+    if (raw['ownerId'] === null) {
+      issue(ctx, ['ownerId'], 'OWNER_REQUIRED', 'Une opportunité a toujours un responsable.');
+    }
+  }
+  let amountSource: AmountSource | undefined;
+  if (raw['amountSource'] !== undefined) {
+    if ((AMOUNT_SOURCES as readonly unknown[]).includes(raw['amountSource'])) {
+      amountSource = raw['amountSource'] as AmountSource;
+    } else {
+      issue(
+        ctx,
+        ['amountSource'],
+        'AMOUNT_SOURCE_INVALID',
+        'Origine du montant : manual ou lines.',
+      );
+    }
+  }
+  const lines = normalizeLines(ctx, raw['lines']);
   return {
     title: requiredText(
       ctx,
@@ -316,18 +511,50 @@ export function normalizeOpportunity(raw: Record<string, unknown>, ctx: Ctx): Op
     customerId,
     prospectName: customerId === null ? prospectName : null,
     contactId: objectId(ctx, ['contactId'], raw['contactId'], 'CONTACT_INVALID'),
-    amount: estimatedAmount(ctx, ['amount'], raw['amount']),
+    // Montant tiré des lignes : calculé par le service, la saisie est ignorée.
+    amount: amountSource === 'lines' ? null : estimatedAmount(ctx, ['amount'], raw['amount']),
     currency: raw['currency'] as 'CDF' | 'USD',
     expectedCloseDate: calendarDay(ctx, ['expectedCloseDate'], raw['expectedCloseDate']),
+    ...(accountId === undefined ? {} : { accountId }),
+    ...(ownerId === undefined ? {} : { ownerId }),
+    ...(lines === undefined ? {} : { lines }),
+    ...(amountSource === undefined ? {} : { amountSource }),
   };
 }
 
+/** ADR-0040 — C2 : motif de perte (clé des réglages) et détail libre. */
+function lostReasonOf(
+  ctx: Ctx,
+  raw: { lostReasonKey?: unknown; lostReasonDetail?: unknown; lostReason?: unknown },
+): { lostReasonKey: string | null; lostReasonDetail: string | null } {
+  let lostReasonKey: string | null = null;
+  if (raw.lostReasonKey !== undefined && raw.lostReasonKey !== null) {
+    if (typeof raw.lostReasonKey !== 'string' || !LOST_REASON_KEY_PATTERN.test(raw.lostReasonKey)) {
+      issue(ctx, ['lostReasonKey'], 'LOST_REASON_KEY_INVALID', 'Motif de perte invalide.');
+    } else lostReasonKey = raw.lostReasonKey;
+  }
+  // `lostReason` (ADR-0035) reste accepté : c'est le détail.
+  const detailRaw = raw.lostReasonDetail !== undefined ? raw.lostReasonDetail : raw.lostReason;
+  const path = raw.lostReasonDetail !== undefined ? 'lostReasonDetail' : 'lostReason';
+  return { lostReasonKey, lostReasonDetail: text(ctx, [path], detailRaw, 500) };
+}
+
 export const CreateOpportunitySchema = z
-  .object({ ...OpportunityFields, stageKey: z.string().max(30).optional() })
+  .object({
+    ...OpportunityFields,
+    stageKey: z.string().max(30).optional(),
+    // ADR-0040 — C2 : création directe dans une étape « perdue ».
+    lostReasonKey: z.unknown().optional(),
+    lostReasonDetail: z.unknown().optional(),
+  })
   .strict()
   .transform((raw, ctx) => {
-    const { stageKey, ...rest } = raw;
-    return { stageKey: stageKey ?? null, opportunity: normalizeOpportunity(rest, ctx) };
+    const { stageKey, lostReasonKey, lostReasonDetail, ...rest } = raw;
+    return {
+      stageKey: stageKey ?? null,
+      opportunity: normalizeOpportunity(rest, ctx),
+      lost: lostReasonOf(ctx, { lostReasonKey, lostReasonDetail }),
+    };
   });
 
 export const PutOpportunitySchema = z
@@ -343,13 +570,23 @@ export const MoveOpportunitySchema = z
     expectedRevision,
     stageKey: z.string().min(1).max(30),
     lostReason: z.unknown().optional(),
+    // ADR-0040 — C2
+    lostReasonKey: z.unknown().optional(),
+    lostReasonDetail: z.unknown().optional(),
   })
   .strict()
   .transform((raw, ctx) => ({
     expectedRevision: raw.expectedRevision,
     stageKey: raw.stageKey,
-    lostReason: text(ctx, ['lostReason'], raw.lostReason, 500),
+    ...lostReasonOf(ctx, raw),
   }));
+
+/** `ownerId=me|<id>` (ADR-0040 § 3.2). */
+const ownerQuery = z
+  .string()
+  .refine((v) => v === 'me' || isObjectIdHex(v), 'Responsable : « me » ou un identifiant.')
+  .transform((v) => (v === 'me' ? v : v.toLowerCase()))
+  .optional();
 
 export const ListOpportunitiesQuerySchema = z
   .object({
@@ -360,9 +597,29 @@ export const ListOpportunitiesQuerySchema = z
     q: z.string().trim().min(1).max(100).optional(),
     limit: limit(100, '50'),
     cursor: z.string().min(1).max(512).optional(),
+    // ADR-0040 — C2
+    ownerId: ownerQuery,
+    accountId: idQuery('Identifiant de compte invalide.'),
   })
   .strict();
 export type ListOpportunitiesQuery = z.output<typeof ListOpportunitiesQuerySchema>;
+
+/** `GET /crm/pipeline?ownerId=me|<id>` (ADR-0040 § 3.4). */
+export const PipelineQuerySchema = z.object({ ownerId: ownerQuery }).strict();
+
+/** `POST /crm/opportunities/reassign` (ADR-0040 § 3.2). */
+export const ReassignOpportunitiesSchema = z
+  .object({
+    fromOwnerId: z.string().refine(isObjectIdHex, 'Identifiant de responsable invalide.'),
+    toOwnerId: z.string().refine(isObjectIdHex, 'Identifiant de responsable invalide.'),
+    onlyOpen: z.boolean().default(true),
+  })
+  .strict()
+  .transform((raw) => ({
+    fromOwnerId: raw.fromOwnerId.toLowerCase(),
+    toOwnerId: raw.toOwnerId.toLowerCase(),
+    onlyOpen: raw.onlyOpen,
+  }));
 
 // ── Activités ───────────────────────────────────────────────────────────────
 

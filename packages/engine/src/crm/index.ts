@@ -18,7 +18,8 @@
 import { divRound, formatAmount, parseFixed, CENT, type Fixed } from '../invoice-totals/decimal.js';
 import type { DecimalString } from '../invoice-totals/types.js';
 
-export const CRM_INDICATORS_VERSION = '1.0.0';
+// ADR-0040 — C2 : 1.1.0 (fonctions ajoutées, sorties existantes inchangées).
+export const CRM_INDICATORS_VERSION = '1.1.0';
 
 /** Échantillon minimal par défaut d'une probabilité d'étape (ADR-0035, décision ouverte n° 3). */
 export const DEFAULT_WIN_RATE_MIN_SAMPLE = 10;
@@ -109,3 +110,6 @@ export function stageWinRates(input: {
   }
   return out;
 }
+
+// ADR-0040 — C2
+export * from './forecast.js';
