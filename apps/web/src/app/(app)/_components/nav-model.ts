@@ -194,21 +194,22 @@ export const NAV_APPS: readonly NavApp[] = [
   //
   // Sous-options prévues : Pipeline, Comptes, Contacts, Activités, Rapports,
   // Réglages. Ne figurent ici que celles dont l'écran EXISTE (règle d'ADR-0016
-  // rappelée plus haut : la barre ne promet rien). Comptes (`/crm/comptes`),
-  // Activités (`/crm/activites`) et Rapports (`/crm/rapports`, lot C6)
-  // s'insèrent à leur rang quand leur écran est livré ; pas de page « bientôt »
-  // d'ici là. Voir `CRM_SOUS_OPTIONS_PREVUES`.
+  // rappelée plus haut : la barre ne promet rien). Comptes et Activités sont
+  // livrés par C5 ; Rapports (`/crm/rapports`, lot C6) s'insérera à son rang
+  // quand son écran sera livré. Voir `CRM_SOUS_OPTIONS_PREVUES`.
   {
     id: 'crm',
     href: '/crm',
     label: 'CRM',
-    description: 'Pipeline des opportunités, contacts et relances.',
+    description: 'Pipeline des opportunités, comptes, contacts et relances.',
     module: 'run',
     icon: 'crm',
     action: 'crm.read',
     sousOptions: [
       { id: 'crm-pipeline', href: '/crm', label: 'Pipeline', action: 'crm.read' },
+      { id: 'crm-comptes', href: '/crm/comptes', label: 'Comptes', action: 'crm.read' },
       { id: 'crm-contacts', href: '/crm/contacts', label: 'Contacts', action: 'crm.read' },
+      { id: 'crm-activites', href: '/crm/activites', label: 'Activités', action: 'crm.read' },
       { id: 'crm-reglages', href: '/crm/reglages', label: 'Réglages', action: 'crm.read' },
     ],
   },

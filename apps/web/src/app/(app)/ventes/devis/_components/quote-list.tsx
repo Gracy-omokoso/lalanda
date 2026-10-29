@@ -1,6 +1,6 @@
 'use client';
 
-// Liste des devis — ADR-0035 § 5. Lecture : `sales.read` ; création : `sales.manage`.
+// Liste des devis — ADR-0035 § 5. Lecture : `sales.read` ; création : `sales.quote` (ADR-0040 § 4.1).
 
 import { buttonClasses } from '@lalanda/ui';
 import Link from 'next/link';
@@ -18,11 +18,13 @@ import {
   QUOTE_STATUS_LABELS,
   formatJour,
   messageDevis,
+  peutPreparerDevis,
   tonDevis,
 } from './quote-model';
 
 export function QuoteList(): React.ReactElement {
-  const { gerer } = useAccesVentes();
+  const { actions } = useAccesVentes();
+  const gerer = peutPreparerDevis(actions);
   const [statut, setStatut] = useState<QuoteStatus | 'all'>('all');
   const [q, setQ] = useState('');
   const [items, setItems] = useState<QuoteSummary[] | null>(null);

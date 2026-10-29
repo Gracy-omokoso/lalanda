@@ -30,6 +30,7 @@ import {
   metaDepuisDevis,
   preparerDevis,
   type MetaDevis,
+  peutPreparerDevis,
 } from './quote-model';
 
 function ChoixClient({
@@ -160,7 +161,8 @@ export function QuoteEditor({
   onEnregistre?: (v: QuoteView) => void;
 }): React.ReactElement {
   const router = useRouter();
-  const { gerer } = useAccesVentes();
+  const { actions } = useAccesVentes();
+  const gerer = peutPreparerDevis(actions);
   const [vue, setVue] = useState<QuoteView | null>(vueInitiale);
   const [form, setForm] = useState<FormulaireDocument>(() => {
     if (vueInitiale) return formulaireDepuisDevis(vueInitiale);

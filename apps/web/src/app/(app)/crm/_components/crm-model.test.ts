@@ -13,15 +13,21 @@ import {
   erreursImport,
   etapesVoisines,
   formulaireOpportunite,
+  interlocuteur,
+  lienActivite,
+  lienCompte,
   lienOpportunite,
   libelleProbabilite,
   messageCrm,
   montantEstime,
   peutGererCrm,
+  peutConvertirCompte,
   peutLireCrm,
+  peutPreparerDevis,
   preparerActivite,
   preparerContact,
   preparerOpportunite,
+  rattachementContact,
   totauxColonne,
 } from './crm-model';
 
@@ -73,15 +79,15 @@ describe('CRM — modèle d’écran', () => {
     expect(etapesVoisines(ETAPES, 'won')).toEqual({ precedente: ETAPES[1], suivante: null });
   });
 
-  it('opportunité : client ou prospect, montant lu à la française en chaîne', () => {
-    const f = { ...formulaireOpportunite(), title: 'Caisse', cible: 'prospect' as const };
+  it('opportunité : un compte obligatoire, montant lu à la française en chaîne', () => {
+    const f = { ...formulaireOpportunite(), title: 'Caisse' };
     expect(preparerOpportunite(f)).toEqual({
       ok: false,
-      champs: { prospectName: 'Nommez le prospect.' },
+      champs: { accountId: 'Choisissez un compte (prospect ou client).' },
     });
     const ok = preparerOpportunite({
       ...f,
-      prospectName: 'Awa SARL',
+      accountId: 'a1',
       montant: '1 500,5',
       currency: 'USD',
     });
@@ -89,29 +95,78 @@ describe('CRM — modèle d’écran', () => {
       ok: true,
       corps: {
         title: 'Caisse',
-        customerId: null,
-        prospectName: 'Awa SARL',
+        accountId: 'a1',
         contactId: null,
         amount: '1500.5',
         currency: 'USD',
         expectedCloseDate: null,
+        amountSource: 'manual',
       },
+    });
+    // Montant tiré des lignes : la saisie est ignorée, le responsable choisi part.
+    const lignes = preparerOpportunite(
+      { ...f, accountId: 'a1', montant: 'xx', ownerId: 'u2' },
+      'lines',
+    );
+    expect(lignes.ok && lignes.corps).toMatchObject({
+      amount: null,
+      amountSource: 'lines',
+      ownerId: 'u2',
     });
   });
 
-  it('contact rattaché à un client ou prospect ; relance avec échéance', () => {
-    expect(
-      preparerContact({
+  it('liens des comptes et des activités (ADR-0040 § 8.1, § 5.2)', () => {
+    expect(lienCompte('a/1')).toBe('/crm/comptes/a%2F1');
+    expect(lienActivite('x1')).toBe('/crm/activites?activite=x1');
+  });
+
+  it('droits : devis (`sales.quote`), conversion (`crm.manage` + `sales.manage`)', () => {
+    expect(peutPreparerDevis(['sales.quote'])).toBe(true);
+    expect(peutPreparerDevis(['sales.manage'])).toBe(false);
+    expect(peutConvertirCompte(['crm.manage'])).toBe(false);
+    expect(peutConvertirCompte(['crm.manage', 'sales.manage'])).toBe(true);
+    expect(peutConvertirCompte(null)).toBe(false);
+  });
+
+  it('interlocuteur : le client, sinon le compte prospect', () => {
+    expect(interlocuteur({ customerName: 'ACME', prospectName: null, accountName: 'ACME' })).toBe(
+      'ACME',
+    );
+    expect(interlocuteur({ customerName: null, prospectName: null, accountName: 'Awa' })).toBe(
+      'Awa (prospect)',
+    );
+    expect(interlocuteur({ customerName: null, prospectName: null })).toBe('—');
+  });
+
+  it('contact rattaché à un compte, ou sans entreprise ; relance avec échéance', () => {
+    const base = { name: 'Jean', jobTitle: '', email: '', phone: '', accountId: '', notes: '' };
+    expect(preparerContact({ ...base, name: ' ' }).ok).toBe(false);
+    expect(preparerContact(base)).toEqual({
+      ok: true,
+      corps: {
         name: 'Jean',
-        jobTitle: '',
-        email: '',
-        phone: '',
-        rattachement: 'client',
-        customerId: '',
-        companyName: '',
-        notes: '',
-      }).ok,
-    ).toBe(false);
+        jobTitle: null,
+        email: null,
+        phone: null,
+        accountId: null,
+        notes: null,
+      },
+    });
+    expect(
+      preparerContact({ ...base, accountId: 'a1' }).ok &&
+        preparerContact({ ...base, accountId: 'a1' }),
+    ).toMatchObject({
+      corps: { accountId: 'a1' },
+    });
+    expect(rattachementContact({ accountName: null, customerName: null, companyName: null })).toBe(
+      'Sans entreprise',
+    );
+    expect(
+      preparerActivite(
+        { kind: 'call', subject: 'Appel', notes: '', echeance: '', assigneeUserId: 'u9' },
+        null,
+      ),
+    ).toMatchObject({ ok: true, corps: { assigneeUserId: 'u9' } });
     expect(
       preparerActivite({ kind: 'follow_up', subject: 'Relancer', notes: '', echeance: '' }, null),
     ).toEqual({ ok: false, champs: { dueAt: 'Une relance a une échéance.' } });

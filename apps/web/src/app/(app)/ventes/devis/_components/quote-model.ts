@@ -4,7 +4,7 @@
 // des lignes et sa préparation sont ceux des factures (`invoice-model.ts`), le
 // calcul vient de l'API (moteur). Aucun montant n'est calculé ici.
 
-import type { InvoiceView } from '@/lib/api';
+import type { InvoiceView, OrgAction } from '@/lib/api';
 import type { QuoteBody, QuoteStatus, QuoteView } from '@/lib/api-crm';
 
 import {
@@ -15,6 +15,20 @@ import {
 } from '../../factures/_components/invoice-model';
 
 export const DEVIS_BASE = '/ventes/devis';
+
+/**
+ * ADR-0040 § 4.1 et § 8.2 : préparer un devis (créer, modifier, supprimer un
+ * brouillon, envoyer, accepter, refuser, nouvelle version) exige `sales.quote`.
+ * Confort d'affichage : l'API reste seule juge.
+ */
+export function peutPreparerDevis(actions: readonly OrgAction[] | null): boolean {
+  return actions !== null && actions.includes('sales.quote');
+}
+
+/** « Convertir en facture » : `sales.quote` ET `sales.manage` (ADR-0040 § 4.1). */
+export function peutConvertirDevis(actions: readonly OrgAction[] | null): boolean {
+  return peutPreparerDevis(actions) && actions !== null && actions.includes('sales.manage');
+}
 
 /** Intitulé imprimé : un devis n'est jamais une facture, ni un pro forma. */
 export const LIBELLE_DEVIS = 'DEVIS — non valable comme facture';
