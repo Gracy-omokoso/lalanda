@@ -19,7 +19,8 @@
     "clean": "rimraf dist .turbo"
   },
   "dependencies": {
-    "@lalanda/shared": "workspace:*"
+    "@lalanda/shared": "workspace:*",
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
