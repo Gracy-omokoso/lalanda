@@ -47,6 +47,37 @@
   --nav-run: #00acca;
   --nav-grow: #e39a5e;
 
+  /* Étiquettes (ADR-0039 § 2.1) : palette FERMÉE. Fond, texte (≥ 4,5:1 sur le
+   * fond) et repère (≥ 3:1 sur la surface). La couleur n'est jamais seule : le
+   * libellé est toujours écrit et le repère change de forme (`Tag`). */
+  --label-gray-bg: #eceae4;
+  --label-gray-fg: #3f3d36;
+  --label-gray-dot: #6b675c;
+  --label-red-bg: #fbe4e1;
+  --label-red-fg: #8e1f17;
+  --label-red-dot: #c2372b;
+  --label-orange-bg: #fce8d6;
+  --label-orange-fg: #8a3b0a;
+  --label-orange-dot: #c25a12;
+  --label-yellow-bg: #faf0c8;
+  --label-yellow-fg: #6b4e00;
+  --label-yellow-dot: #9a7400;
+  --label-green-bg: #e1f2e3;
+  --label-green-fg: #1f5f2c;
+  --label-green-dot: #2e8b45;
+  --label-teal-bg: #dcf0ee;
+  --label-teal-fg: #145a55;
+  --label-teal-dot: #1c8a82;
+  --label-blue-bg: #e0eafb;
+  --label-blue-fg: #1e4796;
+  --label-blue-dot: #2f64d0;
+  --label-purple-bg: #eee5f8;
+  --label-purple-fg: #5b2d8e;
+  --label-purple-dot: #8150c2;
+  --label-pink-bg: #fbe3ef;
+  --label-pink-fg: #8c1d58;
+  --label-pink-dot: #c83d86;
+
   --shadow-card: 0 1px 2px rgba(20, 25, 27, 0.06), 0 1px 1px rgba(20, 25, 27, 0.04);
   --shadow-pop: 0 12px 32px -8px rgba(0, 50, 61, 0.28), 0 2px 6px rgba(0, 50, 61, 0.12);
 }
@@ -80,6 +111,37 @@
   --nav-border: #14303a;
   --nav-active-bg: #0f2f39;
   --nav-accent: #3cc4dd;
+
+  /* Étiquettes (ADR-0039 § 2.1) : palette FERMÉE. Fond, texte (≥ 4,5:1 sur le
+   * fond) et repère (≥ 3:1 sur la surface). La couleur n'est jamais seule : le
+   * libellé est toujours écrit et le repère change de forme (`Tag`). */
+  --label-gray-bg: #24343a;
+  --label-gray-fg: #d9dedc;
+  --label-gray-dot: #9aa6aa;
+  --label-red-bg: #3a1c1a;
+  --label-red-fg: #f5b4ad;
+  --label-red-dot: #ef7d72;
+  --label-orange-bg: #3a2414;
+  --label-orange-fg: #f6c49a;
+  --label-orange-dot: #ee9a55;
+  --label-yellow-bg: #352c0f;
+  --label-yellow-fg: #f0d985;
+  --label-yellow-dot: #d9b83a;
+  --label-green-bg: #173323;
+  --label-green-fg: #a6ddb4;
+  --label-green-dot: #5cc285;
+  --label-teal-bg: #12332f;
+  --label-teal-fg: #9edcd4;
+  --label-teal-dot: #43b8ac;
+  --label-blue-bg: #172a47;
+  --label-blue-fg: #adc8f5;
+  --label-blue-dot: #6e9ceb;
+  --label-purple-bg: #2a1f3d;
+  --label-purple-fg: #cdb5f0;
+  --label-purple-dot: #a584dd;
+  --label-pink-bg: #3a1a2b;
+  --label-pink-fg: #f3b0d2;
+  --label-pink-dot: #e07aae;
 
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-pop: 0 16px 40px -8px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);

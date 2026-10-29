@@ -5,10 +5,13 @@ import { describe, expect, it } from 'vitest';
 
 import {
   contraste,
+  LABEL_TOKENS,
   NAV_TOKENS,
   PAIRES,
   PAIRES_NAV,
+  SEUIL_INTERFACE,
   SEUIL_TEXTE,
+  TAG_COLORS,
   THEME_TOKENS,
   type Theme,
 } from './tokens';
@@ -67,5 +70,31 @@ describe('contraste()', () => {
   });
   it("l'ancien texte secondaire sur crème était à la limite (audit A7)", () => {
     expect(contraste('#6c685a', '#eee7d7')).toBeLessThan(SEUIL_TEXTE + 0.2);
+  });
+});
+
+describe('étiquettes (ADR-0039 § 2.1) — palette fermée, deux thèmes', () => {
+  for (const theme of ['light', 'dark'] as const) {
+    it(`thème ${theme} : le CSS déclare chaque couleur de la palette`, () => {
+      const css = blocCss(theme);
+      for (const cle of TAG_COLORS) {
+        const t = LABEL_TOKENS[theme][cle];
+        expect(css[`label-${cle}-bg`], `--label-${cle}-bg`).toBe(t.bg.toLowerCase());
+        expect(css[`label-${cle}-fg`], `--label-${cle}-fg`).toBe(t.fg.toLowerCase());
+        expect(css[`label-${cle}-dot`], `--label-${cle}-dot`).toBe(t.dot.toLowerCase());
+      }
+    });
+    for (const cle of TAG_COLORS) {
+      it(`${theme} : ${cle} — texte lisible, repère visible`, () => {
+        const t = LABEL_TOKENS[theme][cle];
+        const surface = THEME_TOKENS[theme].surface;
+        expect(contraste(t.fg, t.bg)).toBeGreaterThanOrEqual(SEUIL_TEXTE);
+        expect(contraste(t.dot, surface)).toBeGreaterThanOrEqual(SEUIL_INTERFACE);
+        expect(contraste(t.dot, t.bg)).toBeGreaterThanOrEqual(SEUIL_INTERFACE);
+      });
+    }
+  }
+  it('neuf couleurs, sans doublon', () => {
+    expect(new Set(TAG_COLORS).size).toBe(9);
   });
 });
