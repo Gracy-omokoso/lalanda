@@ -64,7 +64,7 @@ const RESERVES_FEUILLE_FR: Record<string, string> = {
     'Vue mensuelle simplifiée de l’année 1 : elle ignore la variation du besoin en fonds ' +
     'de roulement et les intérêts d’emprunt. Elle est donc OPTIMISTE et diverge du bilan, ' +
     'd’autant plus que le délai de paiement clients est long. C’est le bilan qui fait foi : ' +
-    'cette feuille ne doit jamais être présentée comme la trésorerie de référence du projet.',
+    'cette feuille ne doit jamais être présentée comme la trésorerie de référence de l’initiative.',
 };
 
 /** Lignes dont le feu tricolore est calculé sur la vue de trésorerie simplifiée. */
@@ -135,7 +135,7 @@ const FR: Formulation = {
           : 'votre valeur est en dessous';
     return (
       `Le repère de référence attend ${compare} ${seuil} : ${ou}. ` +
-      'Ce repère vient du Country Pack chargé pour ce projet; ce n’est pas une norme légale.'
+      'Ce repère vient du Country Pack chargé pour cette initiative; ce n’est pas une norme légale.'
     );
   },
   feu: (statut) =>

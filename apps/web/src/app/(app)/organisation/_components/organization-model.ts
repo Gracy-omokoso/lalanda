@@ -274,7 +274,7 @@ export function accroche(input: {
   comptabilite: boolean;
 }): string {
   if (input.gouvernance) {
-    return 'Vue d’ensemble de l’organisation : projets, validations du mois et consommation du plan.';
+    return 'Vue d’ensemble de l’organisation : initiatives, validations du mois et consommation du plan.';
   }
   if (input.validation) {
     return 'Ce qui appelle une décision : ratios au rouge, plans en attente et écarts du réalisé.';
@@ -283,9 +283,9 @@ export function accroche(input: {
     return 'Votre file de saisie : périodes à renseigner, périodes à clôturer et anomalies signalées.';
   }
   if (input.lectureSeule) {
-    return 'Consultation seule : vos projets et leurs dernières versions validées.';
+    return 'Consultation seule : vos initiatives et leurs dernières versions validées.';
   }
-  return 'Vos projets et leurs dernières versions validées.';
+  return 'Vos initiatives et leurs dernières versions validées.';
 }
 
 /** Blocs fermés, triés dans l'ordre d'affichage des sections. */
@@ -301,7 +301,7 @@ export function masqueOrdonne(masque: readonly BlocMasqueView[]): BlocMasqueView
 
 /** Résumé d'une consommation en une ligne, pour les tuiles du tableau de bord. */
 export function resumeConsommation(c: ConsommationView): string {
-  const projets = `${libelleLimite(c.projets.utilise, c.projets.limite)} projet${
+  const projets = `${libelleLimite(c.projets.utilise, c.projets.limite)} initiative${
     c.projets.utilise > 1 ? 's' : ''
   }`;
   const sieges =

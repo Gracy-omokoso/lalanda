@@ -89,7 +89,7 @@ export function SettingsPanel(): React.ReactElement {
         <p className="text-sm font-medium">Section réservée à la gouvernance</p>
         <p className="mt-1 text-sm text-[var(--foreground-muted)]">
           Les paramètres de l’organisation sont modifiables par un Propriétaire ou un
-          Administrateur. Votre rôle vous donne accès au tableau de bord et à vos projets.
+          Administrateur. Votre rôle vous donne accès au tableau de bord et à vos initiatives.
         </p>
       </div>
     );
@@ -129,7 +129,7 @@ export function SettingsPanel(): React.ReactElement {
       <Champ
         id="org-pays"
         label="Pays par défaut"
-        aide="Code ISO à deux lettres (CD pour la RDC). Sert de valeur par défaut aux nouveaux projets ; les projets existants gardent le leur."
+        aide="Code ISO à deux lettres (CD pour la RDC). Sert de valeur par défaut aux nouvelles initiatives ; les initiatives existantes gardent la leur."
       >
         <input
           id="org-pays"

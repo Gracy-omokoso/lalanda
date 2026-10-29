@@ -160,10 +160,10 @@ export function PaymentReturn(): React.ReactElement {
           Revenir à l’abonnement
         </Link>
         <Link
-          href="/projects"
+          href="/accueil"
           className="inline-flex items-center justify-center rounded-md bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-[var(--accent-foreground)] transition hover:opacity-90"
         >
-          Aller à mes projets
+          Aller à l’accueil
         </Link>
       </div>
     </div>

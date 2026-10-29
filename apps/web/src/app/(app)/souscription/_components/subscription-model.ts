@@ -126,7 +126,7 @@ export function etatAffiche(state: SubscriptionStateView): EtatAffiche {
         titre: `Essai en cours — ${joursOuZero(state.trial.daysLeft)} jour(s) restant(s)`,
         detail:
           state.notice?.message ??
-          `Vous bénéficiez de l'offre ${PLAN_LABELS[state.plan]}. À l'échéance, le compte revient à l'offre gratuite ; aucun projet n'est supprimé.`,
+          `Vous bénéficiez de l'offre ${PLAN_LABELS[state.plan]}. À l'échéance, le compte revient à l'offre gratuite ; aucune initiative n'est supprimée.`,
       };
 
     case 'active':

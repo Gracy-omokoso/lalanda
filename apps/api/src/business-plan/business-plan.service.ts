@@ -216,7 +216,7 @@ export class BusinessPlanService {
     if (!template) {
       throw new NotFoundException({
         code: 'TEMPLATE_NOT_FOUND',
-        message: `Modèle introuvable pour le projet : ${project.templateSlug}`,
+        message: `Modèle introuvable pour l’initiative : ${project.templateSlug}`,
       });
     }
     const currency = currencyOf(project, template);

@@ -182,7 +182,7 @@ export class ReportsController {
     if (!template) {
       throw new NotFoundException({
         code: 'TEMPLATE_NOT_FOUND',
-        message: `Template introuvable pour le projet : ${project.templateSlug}`,
+        message: `Template introuvable pour l’initiative : ${project.templateSlug}`,
       });
     }
     const pack = project.parameterPackSlug

@@ -98,8 +98,8 @@ export function BridgePanel(): React.ReactElement {
         </h2>
         <p className="max-w-2xl text-sm text-[var(--foreground-muted)]">
           Facultatif. Le chiffre d’affaires hors taxes de vos factures (moins les avoirs) devient le
-          réalisé du projet choisi, mois par mois, étiqueté « issu des ventes ». Le plan validé
-          n’est jamais modifié ; une période clôturée et une saisie manuelle non plus.
+          réalisé de l’initiative choisie, mois par mois, étiqueté « issu des ventes ». Le plan
+          validé n’est jamais modifié ; une période clôturée et une saisie manuelle non plus.
         </p>
       </div>
       {vue ? (
@@ -107,7 +107,7 @@ export function BridgePanel(): React.ReactElement {
           <Pastille ton={vue.state === 'not_configured' ? 'attention' : 'neutre'}>
             {BRIDGE_STATE_LABELS[vue.state]}
           </Pastille>
-          {vue.projectName ? <span>Projet : {vue.projectName}</span> : null}
+          {vue.projectName ? <span>Initiative : {vue.projectName}</span> : null}
           {vue.lastSync ? (
             <span className="text-xs text-[var(--foreground-muted)]">
               Dernière synchronisation : {vue.lastSync.written} reporté(s), {vue.lastSync.unchanged}{' '}
@@ -125,7 +125,7 @@ export function BridgePanel(): React.ReactElement {
       {importerRealise ? (
         <div className="flex flex-col gap-3 rounded-xl border border-[var(--border)] p-4">
           <div className="grid gap-3 sm:grid-cols-3">
-            <Champ id="pont-projet" label="Projet qui reçoit le réalisé">
+            <Champ id="pont-projet" label="Initiative qui reçoit le réalisé">
               <select
                 id="pont-projet"
                 value={reglage.projectId ?? ''}
@@ -175,7 +175,7 @@ export function BridgePanel(): React.ReactElement {
             <Champ
               id="pont-debut"
               label="Mois qui ouvre l’exercice 1"
-              aide="Le mois civil où commence le premier exercice du plan. Projet et début d’exercice sont communs au report des dépenses (Trésorerie)."
+              aide="Le mois civil où commence le premier exercice du plan. Initiative et début d’exercice sont communs au report des dépenses (Trésorerie)."
             >
               <input
                 id="pont-debut"

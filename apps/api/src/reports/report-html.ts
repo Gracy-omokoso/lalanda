@@ -476,7 +476,7 @@ export function renderReportHtml(data: ReportData): string {
     ${statusBadge}
     <div class="meta-grid">
       <div class="meta-item">Organisation<strong>${escapeHtml(org.name)}</strong></div>
-      <div class="meta-item">Pays du projet<strong>${escapeHtml(project.pays)}</strong></div>
+      <div class="meta-item">Pays de l’initiative<strong>${escapeHtml(project.pays)}</strong></div>
       <div class="meta-item">Cadre fiscal<strong>${parameterPack ? escapeHtml(parameterPack.label) : '—'}</strong></div>
       <div class="meta-item">Système comptable<strong>${parameterPack ? escapeHtml(parameterPack.systeme_comptable) : '—'}</strong></div>
       <div class="meta-item">Devise d'affichage<strong>${escapeHtml(currency)}</strong></div>

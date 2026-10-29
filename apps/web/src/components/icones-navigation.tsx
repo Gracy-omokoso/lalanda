@@ -33,7 +33,16 @@ function Svg({ className, children }: Props & { children: React.ReactNode }): Re
 }
 
 const TRACES: Record<
-  NavIconId | 'menu' | 'fermer' | 'plus' | 'cadenas' | 'replier' | 'selecteur' | 'coche',
+  | NavIconId
+  | 'menu'
+  | 'fermer'
+  | 'plus'
+  | 'cadenas'
+  | 'replier'
+  | 'selecteur'
+  | 'coche'
+  | 'accueil'
+  | 'chevron',
   React.ReactNode
 > = {
   // ADR-0036 — idées (ampoule), validation (presse-papiers coché).
@@ -226,6 +235,15 @@ const TRACES: Record<
     </>
   ),
   coche: <path d="M20 6 9 17l-5-5" />,
+  // Lucide « house » : l'onglet Accueil de la barre du haut (ADR-0038).
+  accueil: (
+    <>
+      <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" />
+      <path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+    </>
+  ),
+  // Lucide « chevron-down » : une application qui se déroule.
+  chevron: <path d="m6 9 6 6 6-6" />,
 };
 
 export type IconeNavId = keyof typeof TRACES;

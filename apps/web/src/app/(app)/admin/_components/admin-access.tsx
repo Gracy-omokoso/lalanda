@@ -95,8 +95,8 @@ export function AdminAccessGate({ children }: { children: React.ReactNode }): Re
             : 'Vous ne détenez aucun rôle plateforme. Un super-administrateur peut vous en attribuer un.'}
         </p>
         <p className="mt-4">
-          <Link href="/projects" className="underline underline-offset-4 hover:no-underline">
-            Retourner à mes projets
+          <Link href="/accueil" className="underline underline-offset-4 hover:no-underline">
+            Retourner à l’accueil
           </Link>
         </p>
       </Vide>

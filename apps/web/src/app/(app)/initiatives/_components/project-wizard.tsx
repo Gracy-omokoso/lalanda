@@ -6,7 +6,7 @@
 // L'assistant ne partage plus l'écran avec les feuilles de résultats. Il occupe
 // toute la largeur, une étape à la fois, et se termine par un passage explicite
 // à la lecture. Les onze feuilles, le bandeau de ratios, les exports et les
-// versions figées sont partis sur `/projects/:id`.
+// versions figées sont partis sur `/initiatives/:id`.
 //
 // ── Deux « valider » à ne pas confondre ────────────────────────
 //  - **terminer la saisie** : on quitte l'assistant pour lire ses chiffres.
@@ -90,7 +90,7 @@ function WizardInner({ projectId }: { projectId: string }): React.ReactElement {
 
   const currency = template?.devise_base ?? 'USD';
   const steps = useMemo(() => (template ? buildWizardSteps(template) : []), [template]);
-  const resultatsHref = `/projects/${projectId}`;
+  const resultatsHref = `/initiatives/${projectId}`;
 
   const indicators: StepIndicator[] = useMemo(
     () =>
@@ -421,12 +421,12 @@ function AvisPreremplissage({
         <p className="text-[var(--foreground-muted)]">
           {nCartes} carte{nCartes > 1 ? 's' : ''} dans votre{' '}
           <Link
-            href={`/projects/${projectId}/canvas`}
+            href={`/initiatives/${projectId}/canvas`}
             className="font-medium text-[var(--accent)] underline underline-offset-2"
           >
             Business Model Canvas
           </Link>
-          . Aucun montant n’en a été tiré : le Canvas décrit votre projet, il ne calcule rien.
+          . Aucun montant n’en a été tiré : le Canvas décrit votre initiative, il ne calcule rien.
         </p>
       ) : null}
 

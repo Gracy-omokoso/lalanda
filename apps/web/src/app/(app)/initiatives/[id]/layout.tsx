@@ -26,10 +26,10 @@ export default async function ProjectLayout({
           /
         </span>
         <Link
-          href="/projects"
+          href="/initiatives"
           className="font-medium text-[var(--foreground-muted)] underline-offset-2 hover:text-[var(--foreground)] hover:underline"
         >
-          Plans financiers
+          Initiatives
         </Link>
       </nav>
       <ProjectTabs projectId={id} />

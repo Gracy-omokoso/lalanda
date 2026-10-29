@@ -41,7 +41,7 @@ const TEMPLATE_LABELS: Record<string, { label: string; description: string }> = 
   custom: {
     label: 'Mon secteur n’est pas dans la liste',
     description:
-      'Modèle générique, sans hypothèse de métier. Deux façons de démarrer : vos chiffres tout de suite, ou quelques questions sur votre projet d’abord.',
+      'Modèle générique, sans hypothèse de métier. Deux façons de démarrer : vos chiffres tout de suite, ou quelques questions sur votre initiative d’abord.',
   },
   'hello-world': {
     label: 'Démo (hello-world)',
@@ -149,7 +149,7 @@ export default function ProjectsPage(): React.ReactElement {
     } catch {
       // Le projet existe : on l'ouvre quand même ; la promotion se refait depuis la fiche.
     }
-    router.push(`/projects/${projectId}/canvas`);
+    router.push(`/initiatives/${projectId}/canvas`);
     return true;
   }
 
@@ -217,8 +217,8 @@ export default function ProjectsPage(): React.ReactElement {
       // sur les résultats, où les valeurs par défaut donnent déjà à lire.
       router.push(
         created.templateSlug === CUSTOM_TEMPLATE_SLUG
-          ? `/projects/${created.id}/saisie`
-          : `/projects/${created.id}`,
+          ? `/initiatives/${created.id}/saisie`
+          : `/initiatives/${created.id}`,
       );
     } catch (err) {
       // (S16b) L'API impose la limite de projets du plan : message dédié + lien tarifs.
@@ -226,7 +226,7 @@ export default function ProjectsPage(): React.ReactElement {
       if (detail?.code === 'PLAN_LIMIT_PROJECTS') {
         setPlanLimit(detail.limit ?? 1);
       } else {
-        setError(err instanceof Error ? err.message : 'Impossible de créer le projet');
+        setError(err instanceof Error ? err.message : 'Impossible de créer l’initiative');
       }
       setCreating(false);
     }
@@ -284,7 +284,7 @@ export default function ProjectsPage(): React.ReactElement {
     projetCadrageRef.current = null;
     setModalCustom(false);
     if (await versCanvasDepuisIdee(projectId)) return;
-    router.push(`/projects/${projectId}/saisie${query ? `?${query}` : ''}`);
+    router.push(`/initiatives/${projectId}/saisie${query ? `?${query}` : ''}`);
   }
 
   // Packs pertinents pour le pays sélectionné : match direct ou générique le couvrant.
@@ -324,14 +324,14 @@ export default function ProjectsPage(): React.ReactElement {
     <section className="flex flex-col gap-6">
       <PageHeader
         module="build"
-        title="Plans financiers"
-        description="Un projet est un plan financier prévisionnel, dans un pays et un cadre fiscal donnés. Vos hypothèses alimentent les prévisions calculées par le moteur ; le réalisé s’y compare, mois par mois."
+        title="Initiatives"
+        description="Une initiative est un plan financier prévisionnel, dans un pays et un cadre fiscal donnés. Vos hypothèses alimentent les prévisions calculées par le moteur ; le réalisé s’y compare, mois par mois."
         actions={
           projects ? (
             // ADR-0030 § 3 (audit A10) : la limite de l'offre se voit AVANT de
             // créer, pas seulement au refus. Chiffres servis par l'API.
             <span className="fig text-xs text-[var(--foreground-muted)]">
-              {projects.length} projet{projects.length > 1 ? 's' : ''}
+              {projects.length} initiative{projects.length > 1 ? 's' : ''}
               {subscription && subscription.entitlements.maxProjects !== null
                 ? ` sur ${subscription.entitlements.maxProjects} inclus dans votre offre`
                 : ''}
@@ -346,13 +346,13 @@ export default function ProjectsPage(): React.ReactElement {
       >
         {ideeSource && (
           <p role="status" className="rounded-md border border-[var(--border)] p-3 text-sm">
-            Nouveau projet à partir de l’idée « {ideeSource.title} » : son problème, sa cible, sa
-            solution et son modèle de revenus deviendront des cartes du Canvas. Aucun chiffre n’est
-            repris.
+            Nouvelle initiative à partir de l’idée « {ideeSource.title} » : son problème, sa cible,
+            sa solution et son modèle de revenus deviendront des cartes du Canvas. Aucun chiffre
+            n’est repris.
           </p>
         )}
         <div className="flex flex-col gap-1">
-          <h3 className="text-sm font-semibold">Nouveau projet</h3>
+          <h3 className="text-sm font-semibold">Nouvelle initiative</h3>
           <p className="text-xs text-[var(--foreground-muted)]">
             Choisis d&apos;abord le pays et le cadre fiscal, puis le template sectoriel. Les
             hypothèses par défaut sont pré-remplies et modifiables ensuite.
@@ -362,7 +362,7 @@ export default function ProjectsPage(): React.ReactElement {
         {/* Section 1 — Contexte fiscal */}
         <fieldset className="flex flex-col gap-3">
           <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--foreground-muted)]">
-            1. Contexte fiscal du projet
+            1. Contexte fiscal de l’initiative
           </legend>
           <div className="grid gap-3 sm:grid-cols-3">
             <label className="flex min-w-0 flex-col gap-1.5 text-sm">
@@ -487,7 +487,7 @@ export default function ProjectsPage(): React.ReactElement {
         {/* Section 3 — Nom + créer */}
         <fieldset className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <label className="flex flex-1 flex-col gap-1.5 text-sm">
-            <span className="font-medium">Nom du projet</span>
+            <span className="font-medium">Nom de l’initiative</span>
             <input
               ref={nomRef}
               type="text"
@@ -504,7 +504,7 @@ export default function ProjectsPage(): React.ReactElement {
             disabled={creating || !newName.trim() || !templateSlug || !packSlug}
             className="rounded-md bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-[var(--accent-foreground)] transition hover:opacity-90 disabled:opacity-50"
           >
-            {creating ? 'Création…' : 'Créer le projet'}
+            {creating ? 'Création…' : 'Créer l’initiative'}
           </button>
         </fieldset>
       </form>
@@ -527,8 +527,8 @@ export default function ProjectsPage(): React.ReactElement {
 
       {planLimit !== null ? (
         <div className="rounded-md border border-[var(--accent)]/30 bg-[var(--surface)] p-3 text-sm">
-          Votre offre actuelle est limitée à {planLimit} projet{planLimit > 1 ? 's' : ''}. Passez à
-          l&apos;offre Pro pour créer des projets illimités.{' '}
+          Votre offre actuelle est limitée à {planLimit} initiative{planLimit > 1 ? 's' : ''}.
+          Passez à l&apos;offre Pro pour créer des initiatives illimitées.{' '}
           <Link href="/pricing" className="font-medium text-[var(--accent)] underline">
             Voir les offres
           </Link>
@@ -550,7 +550,7 @@ export default function ProjectsPage(): React.ReactElement {
           {projects.map((p) => (
             <li key={p.id}>
               <Link
-                href={`/projects/${p.id}`}
+                href={`/initiatives/${p.id}`}
                 className="group flex items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3.5 text-sm transition hover:border-[var(--accent)]/40 hover:bg-[var(--surface-muted)]"
               >
                 <div className="flex flex-col gap-1">

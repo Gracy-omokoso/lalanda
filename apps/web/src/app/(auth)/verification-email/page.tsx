@@ -15,7 +15,7 @@
 // applicatif, et n'est listée ni dans `PROTECTED_PREFIXES` ni dans `isAuthPath`
 // (`lib/routes.ts`) : le middleware la laisse donc passer dans les deux sens —
 // un visiteur anonyme y accède, et quelqu'un de déjà connecté n'en est pas
-// éjecté vers `/projects` avant d'avoir confirmé.
+// éjecté vers `/accueil` avant d'avoir confirmé.
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';

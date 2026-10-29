@@ -1,12 +1,14 @@
-// Menu du compte — ADR-0016 §1 et §5.
+// Menu du compte — ADR-0016 §1 et §5, amendés par ADR-0038 § 6.
 //
 // Ce que ces tests protègent : l'ORDRE et le CONDITIONNEMENT des entrées. C'est
 // exactement le genre de règle qu'on casse sans s'en apercevoir — une entrée
-// ajoutée au mauvais endroit, un `canReadAdmin` oublié, un séparateur qui reste
+// ajoutée au mauvais endroit, une condition oubliée, un séparateur qui reste
 // seul quand l'entrée qu'il bordait disparaît. Rien de tout cela ne fait échouer
 // un typecheck, et tout se voit à l'écran.
 
 import { describe, expect, it } from 'vitest';
+
+import type { OrgAction } from '@/lib/api';
 
 import {
   entreeActive,
@@ -16,27 +18,36 @@ import {
   type UserMenuItem,
 } from './user-menu-model';
 
-const OPERATEUR = { canReadAdmin: true };
-const MEMBRE = { canReadAdmin: false };
+const PROPRIETAIRE: OrgAction[] = ['organization.manage', 'fiscal.manage', 'billing.manage'];
+const DIRECTEUR_FINANCIER: OrgAction[] = ['fiscal.manage', 'sales.read'];
+const OPERATEUR = { canReadAdmin: true, actions: PROPRIETAIRE };
+const MEMBRE = { canReadAdmin: false, actions: PROPRIETAIRE };
+const INCONNU = { canReadAdmin: false, actions: null };
 
-describe('contenu et ordre du menu (ADR-0016 §1)', () => {
-  it('liste les neuf entrées dans l’ordre exact, pour un opérateur', () => {
-    expect(entreesMenu(OPERATEUR).map((e) => e.label)).toEqual([
-      'Tableau de bord',
-      'Ventes',
-      'Trésorerie',
-      'Croissance',
+const labels = (items: UserMenuItem[]): string[] => items.map((e) => e.label);
+
+describe('contenu et ordre du menu (ADR-0038 § 6)', () => {
+  it('liste les entrées dans l’ordre exact, pour un opérateur propriétaire', () => {
+    expect(labels(entreesMenu(OPERATEUR))).toEqual([
       'Mon compte',
-      'Organisation',
+      'Mise en route',
+      'Identité visuelle',
+      'Fiscalité',
+      'Membres',
+      'Paramètres',
       'Abonnement',
       'Administration',
       'Déconnexion',
     ]);
   });
 
-  it('mène « Tableau de bord » sur /projects — aucune page de synthèse n’existe', () => {
-    const item = entreesMenu(MEMBRE).find((e) => e.id === 'tableau-de-bord');
-    expect(item).toMatchObject({ kind: 'link', href: '/projects' });
+  it('ne porte plus le travail quotidien : il est dans la barre du haut, par module', () => {
+    const hrefs = entreesMenu(OPERATEUR).map((e) => (e.kind === 'link' ? e.href : null));
+    for (const h of ['/projects', '/initiatives', '/ventes', '/tresorerie', '/croissance']) {
+      expect(hrefs).not.toContain(h);
+    }
+    // « Pilotage » (`/organisation`) est rangé dans GROW.
+    expect(hrefs).not.toContain('/organisation');
   });
 
   it('représente le compte par UNE SEULE entrée vers /compte', () => {
@@ -47,15 +58,9 @@ describe('contenu et ordre du menu (ADR-0016 §1)', () => {
     expect(liens[0]).toMatchObject({ href: '/compte', label: 'Mon compte' });
   });
 
-  it('n’expose PAS « Membres » : c’est un onglet de /organisation, pas une entrée', () => {
-    const hrefs = entreesMenu(OPERATEUR).map((e) => (e.kind === 'link' ? e.href : null));
-    expect(hrefs).not.toContain('/members');
-    expect(hrefs).not.toContain('/organisation/membres');
-  });
-
   it('fait de la déconnexion une action, jamais un lien', () => {
     const sortie = entreesMenu(MEMBRE).at(-1);
-    expect(sortie).toEqual({ kind: 'action', id: 'signout', label: 'Déconnexion', group: 3 });
+    expect(sortie).toEqual({ kind: 'action', id: 'signout', label: 'Déconnexion', group: 4 });
     expect(sortie).not.toHaveProperty('href');
   });
 
@@ -65,83 +70,48 @@ describe('contenu et ordre du menu (ADR-0016 §1)', () => {
   });
 });
 
-describe('conditionnement par le drapeau serveur (ADR-0016 §5)', () => {
-  it('masque « Administration » sans canReadAdmin, et ne masque rien d’autre', () => {
-    const membre = entreesMenu(MEMBRE).map((e) => e.label);
-    expect(membre).not.toContain('Administration');
-    expect(membre).toEqual([
-      'Tableau de bord',
-      'Ventes',
-      'Trésorerie',
-      'Croissance',
+describe('conditionnement par les faits serveur (ADR-0016 §5)', () => {
+  it('masque « Administration » sans canReadAdmin', () => {
+    expect(labels(entreesMenu(MEMBRE))).not.toContain('Administration');
+  });
+
+  it('permissions inconnues : seules les entrées sans condition', () => {
+    expect(labels(entreesMenu(INCONNU))).toEqual([
       'Mon compte',
-      'Organisation',
+      'Mise en route',
       'Abonnement',
       'Déconnexion',
     ]);
+    // Rétrocompatible : sans `actions`, même comportement.
+    expect(labels(entreesMenu({ canReadAdmin: false }))).toEqual(labels(entreesMenu(INCONNU)));
   });
 
-  it('n’a qu’UNE seule entrée conditionnée — les autres sont invariantes', () => {
-    const avec = entreesMenu(OPERATEUR).map((e) => e.id);
-    const sans = entreesMenu(MEMBRE).map((e) => e.id);
-    expect(avec.filter((id) => !sans.includes(id))).toEqual(['admin']);
-    expect(sans.filter((id) => !avec.includes(id))).toEqual([]);
-  });
-
-  it('ne propose PAS « Administration » tant que le fait est inconnu', () => {
-    // Le header initialise `canReadAdmin` à `false` et un échec de
-    // `GET /me/platform-access` l'y laisse : ne rien proposer vaut mieux que
-    // proposer une page qui répondra 403.
-    expect(entreesMenu({ canReadAdmin: false }).some((e) => e.id === 'admin')).toBe(false);
+  it('filtre par action serveur, pas par nom de rôle', () => {
+    const df = labels(entreesMenu({ canReadAdmin: false, actions: DIRECTEUR_FINANCIER }));
+    expect(df).toContain('Fiscalité');
+    expect(df).not.toContain('Identité visuelle');
+    expect(df).not.toContain('Membres');
+    expect(df).not.toContain('Paramètres');
   });
 
   it('ne masque JAMAIS « Mon compte » : c’est l’espace de secours sans organisation', () => {
-    expect(entreesMenu(MEMBRE).some((e) => e.id === 'compte')).toBe(true);
-  });
-});
-
-describe('entrée « Ventes » (ADR-0022, amende ADR-0016 §1)', () => {
-  it('suit immédiatement « Tableau de bord » et mène sur /ventes', () => {
-    const items = entreesMenu(MEMBRE);
-    const i = items.findIndex((e) => e.id === 'ventes');
-    expect(items[i - 1]?.id).toBe('tableau-de-bord');
-    expect(items[i]).toMatchObject({ kind: 'link', href: '/ventes', label: 'Ventes', group: 1 });
-  });
-
-  it('est offerte à tout membre : aucun fait serveur ne la conditionne', () => {
-    // Même règle qu'« Organisation » : la conditionner sur `sales.read`
-    // demanderait un appel de plus ; l'espace filtre lui-même ce qu'il montre.
-    expect(entreesMenu(MEMBRE).some((e) => e.id === 'ventes')).toBe(true);
-    expect(entreesMenu(OPERATEUR).some((e) => e.id === 'ventes')).toBe(true);
-  });
-});
-
-describe('entrée « Croissance » (ADR-0032)', () => {
-  it('suit les modules RUN (« Trésorerie »), mène sur /croissance et n’est conditionnée par aucun fait', () => {
-    const items = entreesMenu(MEMBRE);
-    const i = items.findIndex((e) => e.id === 'croissance');
-    expect(items[i - 1]?.id).toBe('tresorerie');
-    expect(items[i]).toMatchObject({ kind: 'link', href: '/croissance', group: 1 });
-    expect(entreeActive('/croissance/parcours', items)).toBe('croissance');
+    expect(entreesMenu(INCONNU).some((e) => e.id === 'compte')).toBe(true);
   });
 });
 
 describe('groupes et séparateurs', () => {
-  it('sépare personne / organisation / déconnexion, pour un opérateur', () => {
+  it('sépare compte / organisation / plateforme / déconnexion, pour un opérateur', () => {
     const items = entreesMenu(OPERATEUR);
     const avant = items.map((_, i) => separateurAvant(items, i));
-    //           TdB    Ventes Tréso  Crois. Compte Orga  Abo    Admin  Déco
-    expect(avant).toEqual([false, false, false, false, false, true, false, false, true]);
+    //           Compte Mise   Ident. Fisc.  Membr. Param. Abo    Admin Déco
+    expect(avant).toEqual([false, true, false, false, false, false, false, true, true]);
   });
 
-  it('ne laisse AUCUN séparateur orphelin quand « Administration » disparaît', () => {
-    const items = entreesMenu(MEMBRE);
+  it('ne laisse AUCUN séparateur orphelin quand des entrées disparaissent', () => {
+    const items = entreesMenu(INCONNU);
     const avant = items.map((_, i) => separateurAvant(items, i));
-    //           TdB    Ventes Tréso  Crois. Compte Orga  Abo    Déco
-    expect(avant).toEqual([false, false, false, false, false, true, false, true]);
-    // Deux séparateurs dans les deux cas : le dessin ne dépend pas d'un index
-    // codé en dur, donc retirer une entrée ne peut pas produire un trait seul.
-    expect(avant.filter(Boolean)).toHaveLength(2);
+    //           Compte Mise   Abo    Déco
+    expect(avant).toEqual([false, true, false, true]);
   });
 
   it('ne pose jamais de séparateur en tête de menu', () => {
@@ -149,46 +119,33 @@ describe('groupes et séparateurs', () => {
   });
 });
 
-describe('entrée active déduite du chemin (ADR-0016 §6.3)', () => {
+describe('entrée active (frontière de segment)', () => {
   const items = entreesMenu(OPERATEUR);
 
-  it('allume l’entrée de la page exacte', () => {
-    expect(entreeActive('/projects', items)).toBe('tableau-de-bord');
+  it('allume l’entrée correspondant au chemin', () => {
     expect(entreeActive('/compte', items)).toBe('compte');
-    expect(entreeActive('/organisation', items)).toBe('organisation');
-    expect(entreeActive('/souscription', items)).toBe('souscription');
-    expect(entreeActive('/admin', items)).toBe('admin');
-    expect(entreeActive('/ventes', items)).toBe('ventes');
-  });
-
-  it('allume l’entrée de l’espace depuis n’importe quelle sous-page', () => {
-    // Le menu ne liste qu'une entrée par espace : elle vaut pour tout l'espace.
     expect(entreeActive('/compte/securite', items)).toBe('compte');
-    expect(entreeActive('/compte/preferences', items)).toBe('compte');
-    expect(entreeActive('/organisation/membres', items)).toBe('organisation');
-    expect(entreeActive('/organisation/journal/2026', items)).toBe('organisation');
-    expect(entreeActive('/projects/abc/plan', items)).toBe('tableau-de-bord');
-    expect(entreeActive('/ventes/clients', items)).toBe('ventes');
-    expect(entreeActive('/ventes/catalogue', items)).toBe('ventes');
+    expect(entreeActive('/organisation/membres', items)).toBe('membres');
+    expect(entreeActive('/organisation/fiscalite', items)).toBe('fiscalite');
+    expect(entreeActive('/souscription/retour', items)).toBe('souscription');
+    expect(entreeActive('/admin/journal', items)).toBe('admin');
   });
 
   it('compare des frontières de segment, jamais des préfixes nus', () => {
-    // `/comptes-annuels` commence par `/compte` sans en faire partie.
     expect(entreeActive('/comptes-annuels', items)).toBeNull();
     expect(entreeActive('/administration-fiscale', items)).toBeNull();
-    expect(entreeActive('/projectsomething', items)).toBeNull();
-    expect(entreeActive('/ventes-privees', items)).toBeNull();
   });
 
   it('n’allume rien sur une page hors du menu', () => {
+    expect(entreeActive('/organisation', items)).toBeNull();
+    expect(entreeActive('/initiatives', items)).toBeNull();
     expect(entreeActive('/aide', items)).toBeNull();
-    expect(entreeActive('/aide/glossaire', items)).toBeNull();
     expect(entreeActive('/', items)).toBeNull();
   });
 
-  it('n’allume pas « Administration » quand elle est masquée', () => {
-    // Sinon un `aria-current="page"` désignerait une entrée absente du DOM.
+  it('n’allume pas une entrée masquée', () => {
     expect(entreeActive('/admin', entreesMenu(MEMBRE))).toBeNull();
+    expect(entreeActive('/organisation/membres', entreesMenu(INCONNU))).toBeNull();
   });
 
   it('retient la correspondance la plus longue', () => {

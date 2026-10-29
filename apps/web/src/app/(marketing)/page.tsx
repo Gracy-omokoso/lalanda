@@ -2,7 +2,7 @@
 // Le hero présente le produit par son artefact : un document prévisionnel
 // SYSCOHADA tamponné BANCABLE, réglure de registre, chiffres mono tabulaires.
 // Le middleware laisse cette route publique ; un visiteur authentifié est
-// redirigé vers /projects.
+// redirigé vers /accueil.
 
 import Link from 'next/link';
 

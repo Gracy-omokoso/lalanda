@@ -927,7 +927,7 @@ export const ORG_ROLE_LABELS: Readonly<Record<OrgRole, string>> = {
 /** Description courte d'un rôle — affichée sous le sélecteur de rôle. */
 export const ORG_ROLE_DESCRIPTIONS: Readonly<Record<OrgRole, string>> = {
   owner: 'Abonnement, membres, suppression et transfert. Valide les plans.',
-  admin: 'Membres, projets et paramètres. Ne valide pas les plans.',
+  admin: 'Membres, initiatives et paramètres. Ne valide pas les plans.',
   finance_director: 'Plans, validation, réalisé et rapports.',
   accountant: 'Réalisé et mapping. Clôture si le droit lui est accordé.',
   analyst: 'Scénarios, hypothèses et analyses. Ne valide pas.',

@@ -95,7 +95,7 @@ describe('organisation à 5 projets sur une offre qui en autorise 1', () => {
     expect(refus.used).toBe(5);
     expect(refus.limit).toBe(1);
     expect(refus.excess).toBe(4);
-    expect(refus.message).toContain('5 projets');
+    expect(refus.message).toContain('5 initiatives');
     expect(refus.message).toContain('autorise 1');
     expect(refus.message).toContain('Free');
   });
@@ -116,7 +116,7 @@ describe('organisation à 5 projets sur une offre qui en autorise 1', () => {
     // soi-même. Ne proposer que la première serait une vente sous contrainte.
     expect(refus.suggestedPlan).toBe('cabinet');
     expect(refus.message).toContain('Cabinet');
-    expect(refus.message).toContain('supprimez un projet existant');
+    expect(refus.message).toContain('supprimez une initiative existante');
     expect(refus.upgradeUrl).toBe('/pricing');
   });
 

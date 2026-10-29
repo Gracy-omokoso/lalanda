@@ -195,7 +195,7 @@ export const ExperimentSchema = z
 export type ExperimentBody = z.infer<typeof ExperimentSchema>;
 
 export const PromoteSchema = z
-  .object({ projectId: z.string().regex(OBJECT_ID, 'Identifiant de projet invalide.') })
+  .object({ projectId: z.string().regex(OBJECT_ID, 'Identifiant d’initiative invalide.') })
   .strict();
 
 export const SettingsSchema = z.object({ aiEnabled: z.boolean() }).strict();

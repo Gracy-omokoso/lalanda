@@ -252,11 +252,11 @@ function AttainmentCard({
           Taux d’atteinte
         </h3>
         <p className="text-sm text-[#14191b]">
-          Aucun plan validé pour ce projet. L’atteinte se mesure contre des chiffres figés : validez
-          d’abord un plan.
+          Aucun plan validé pour cette initiative. L’atteinte se mesure contre des chiffres figés :
+          validez d’abord un plan.
         </p>
         <Link
-          href={`/projects/${projectId}`}
+          href={`/initiatives/${projectId}`}
           className="self-start rounded-md border border-[var(--accent)] px-3 py-1.5 text-xs font-medium text-[var(--accent)] transition hover:bg-[var(--accent)] hover:text-[var(--accent-foreground)]"
         >
           Aller au plan financier

@@ -4,7 +4,7 @@
 //
 // ── Pourquoi cet écran existe ──────────────────────────────────
 // Jusqu'ici le wizard de saisie et les feuilles de résultats cohabitaient en
-// deux colonnes sur `/projects/:id` (S18c). L'intention — voir l'impact d'une
+// deux colonnes sur `/initiatives/:id` (S18c). L'intention — voir l'impact d'une
 // hypothèse pendant qu'on la tape — était bonne, mais avec onze feuilles, le
 // bandeau de ratios, les exports et la liste des plans validés, l'écran ne
 // tenait plus : on saisissait dans un couloir et on lisait des chiffres dans un
@@ -47,7 +47,7 @@ export function ProjectResults({ projectId }: { projectId: string }): React.Reac
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [downloadingXlsx, setDownloadingXlsx] = useState(false);
 
-  const saisieHref = `/projects/${projectId}/saisie`;
+  const saisieHref = `/initiatives/${projectId}/saisie`;
 
   const evaluate = useCallback(
     async (payload: Record<string, number>) => {

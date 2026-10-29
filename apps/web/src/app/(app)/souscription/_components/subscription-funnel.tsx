@@ -244,7 +244,7 @@ export function SubscriptionFunnel(): React.ReactElement {
           <Donnee libelle="Offre appliquée" valeur={PLAN_LABELS[state.plan]} />
           <Donnee libelle="Prochaine échéance" valeur={formatDate(state.currentPeriodEnd)} />
           <Donnee
-            libelle="Projets"
+            libelle="Initiatives"
             valeur={
               state.entitlements.maxProjects === null
                 ? `${state.usage.projects} (illimités)`
@@ -265,7 +265,7 @@ export function SubscriptionFunnel(): React.ReactElement {
           <p className="mt-2 text-sm text-[var(--foreground-muted)]">
             Vous obtenez l’offre Pro pendant {TRIAL_DAYS} jours. Aucun moyen de paiement n’est
             demandé et aucun prélèvement n’a lieu au terme : le compte revient à l’offre gratuite,
-            sans qu’aucun projet ne soit supprimé.
+            sans qu’aucune initiative ne soit supprimée.
           </p>
           <button
             type="button"

@@ -29,9 +29,29 @@ async function redirections(): Promise<RegleRedirection[]> {
   return (await config.redirects()) as RegleRedirection[];
 }
 
-/** Applique les règles à un chemin, comme le ferait Next : première correspondance. */
+/**
+ * Applique les règles à un chemin, comme le ferait Next : première
+ * correspondance. Seul motif pris en charge, celui que la configuration
+ * emploie : un `:path*` final (zéro segment ou plus).
+ */
 function resoudre(regles: readonly RegleRedirection[], chemin: string): RegleRedirection | null {
-  return regles.find((r) => r.source === chemin) ?? null;
+  return (
+    regles.find((r) => {
+      if (r.source === chemin) return true;
+      const suffixe = '/:path*';
+      if (!r.source.endsWith(suffixe)) return false;
+      const base = r.source.slice(0, -suffixe.length);
+      return chemin.startsWith(`${base}/`);
+    }) ?? null
+  );
+}
+
+/** Destination effective d'un chemin (remplace `:path*` par le reste du chemin). */
+function destination(regle: RegleRedirection, chemin: string): string {
+  const suffixe = '/:path*';
+  if (!regle.source.endsWith(suffixe)) return regle.destination;
+  const base = regle.source.slice(0, -suffixe.length);
+  return regle.destination.replace(':path*', chemin.slice(base.length + 1));
 }
 
 describe('/members → /organisation/membres (ADR-0016 §3)', () => {
@@ -54,7 +74,7 @@ describe('/members → /organisation/membres (ADR-0016 §3)', () => {
     // Un `source` transformé en préfixe happerait des routes étrangères et les
     // enverrait toutes sur la page des membres.
     const regles = await redirections();
-    for (const chemin of ['/members-archive', '/membres', '/members/x', '/projects']) {
+    for (const chemin of ['/members-archive', '/membres', '/members/x', '/initiatives']) {
       expect(resoudre(regles, chemin)).toBeNull();
     }
   });
@@ -65,7 +85,29 @@ describe('/members → /organisation/membres (ADR-0016 §3)', () => {
     const regles = await redirections();
     for (const regle of regles) {
       expect(regle.source).not.toBe(regle.destination);
-      expect(resoudre(regles, regle.destination)).toBeNull();
+      expect(resoudre(regles, regle.destination.replace('/:path*', '/x'))).toBeNull();
+    }
+  });
+});
+
+describe('/projects → /initiatives (ADR-0038 § 1)', () => {
+  it.each([
+    ['/projects', '/initiatives'],
+    ['/projects/abc', '/initiatives/abc'],
+    ['/projects/abc/realise', '/initiatives/abc/realise'],
+    ['/projects/abc/business-plan', '/initiatives/abc/business-plan'],
+  ])('%s → %s, en 308', async (ancien, nouveau) => {
+    const regle = resoudre(await redirections(), ancien);
+    expect(regle).not.toBeNull();
+    expect(destination(regle!, ancien)).toBe(nouveau);
+    expect(regle?.permanent).toBe(true);
+    expect(regle?.statusCode).toBeUndefined();
+  });
+
+  it('ne capture pas les chemins qui commencent par le même mot', async () => {
+    const regles = await redirections();
+    for (const chemin of ['/projects-publics', '/projectsx', '/initiatives', '/initiatives/abc']) {
+      expect(resoudre(regles, chemin)).toBeNull();
     }
   });
 });

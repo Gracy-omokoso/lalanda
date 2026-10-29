@@ -31,7 +31,7 @@ export function AmortissementsTable({ amortissements, currency }: Props): React.
 
       {lignes.length === 0 ? (
         <p className="text-sm text-[var(--foreground-muted)]">
-          Aucune immobilisation déclarée pour ce projet.
+          Aucune immobilisation déclarée pour cette initiative.
         </p>
       ) : (
         <>

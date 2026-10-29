@@ -4,6 +4,12 @@ Statut : Proposed
 Date : 2026-08-10
 Décideurs : Gracy Omokoso
 
+> **Amendé par [ADR-0038](ADR-0038-navigation-par-modules-et-initiatives.md) (29 oct. 2026,
+> accepté).** Navigation à trois niveaux : barre du haut Accueil · BUILD · RUN · GROW, bureau
+> de module, colonne des seules applications du module courant. Les réglages de
+> l'organisation passent dans le menu de l'avatar ; « Plans financiers » devient
+> « Initiatives » (`/initiatives`, ancienne route `/projects` redirigée).
+
 > **Amendé par [ADR-0030](ADR-0030-refonte-ui-ux.md) (21 oct. 2026, proposé, en revue).**
 > La navigation principale passe dans une **barre latérale par module** (BUILD · RUN ·
 > GROW · Organisation) ; le sélecteur d'organisation y est placé en tête. Le menu du compte

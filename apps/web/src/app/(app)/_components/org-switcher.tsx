@@ -69,7 +69,7 @@ export function OrgSwitcher({ replie = false }: { replie?: boolean }): React.Rea
     setActiveId(orgId);
     setOpen(false);
     rafraichir();
-    router.push('/projects');
+    router.push('/accueil');
     router.refresh();
   }
 

@@ -1,9 +1,10 @@
-// Navigation latérale par module — ADR-0030 § 2 et § 6.
+// Navigation par modules — ADR-0038 (amende ADR-0030 § 2), barre basse ADR-0030 § 6.
 //
-// Ce que ces tests protègent : l'ordre de la trajectoire (BUILD → RUN → GROW →
-// Organisation), le conditionnement par ACTIONS servies par le serveur, l'entrée
-// allumée par le chemin, et le fait qu'un choix de modules ne cache jamais
-// l'organisation ni ne vide la barre.
+// Ce que ces tests protègent : les applications de chaque module et leur ordre
+// (le parcours BUILD Idées → Validation → Initiatives → Business plan), les
+// sous-options, le conditionnement par ACTIONS servies par le serveur, le
+// module et l'application allumés par le chemin, et le fait que le choix des
+// modules range l'accueil sans jamais rien retirer.
 
 import { describe, expect, it } from 'vitest';
 
@@ -11,13 +12,18 @@ import type { OrgAction } from '@/lib/api';
 
 import {
   actionsRapides,
+  appActive,
+  appsVisibles,
   cleModules,
   ecrireModules,
-  entreeActive,
-  entreesVisibles,
-  groupesVisibles,
+  estAccueil,
+  estBureau,
   lireModules,
-  NAV_ITEMS,
+  moduleCourant,
+  NAV_APPS,
+  NAV_MODULES,
+  ordreAccueil,
+  sousOptionActive,
 } from './nav-model';
 
 const PROPRIETAIRE: OrgAction[] = [
@@ -32,32 +38,56 @@ const PROPRIETAIRE: OrgAction[] = [
   'crm.read',
   'crm.manage',
 ];
-const DIRECTEUR_FINANCIER: OrgAction[] = ['fiscal.manage', 'sales.read', 'sales.manage'];
 const LECTEUR: OrgAction[] = ['project.read', 'sales.read'];
 const SANS_VENTES: OrgAction[] = ['project.read'];
 
 const ids = (items: { id: string }[]): string[] => items.map((i) => i.id);
 
-describe('entrées et ordre', () => {
-  it('CRM (ADR-0035) : dans RUN, après le catalogue, pour qui détient crm.read', () => {
-    const avecCrm = ids(entreesVisibles([...LECTEUR, 'crm.read']));
-    expect(avecCrm.slice(4, 10)).toEqual([
-      'factures',
-      'devis',
-      'encaissements',
-      'clients',
-      'catalogue',
-      'crm',
+describe('modules', () => {
+  it('trois modules, dans l’ordre de la trajectoire, chacun avec son bureau', () => {
+    expect(NAV_MODULES.map((m) => [m.label, m.verb, m.href])).toEqual([
+      ['BUILD', 'Concevoir', '/build'],
+      ['RUN', 'Exploiter', '/run'],
+      ['GROW', 'Croître', '/grow'],
     ]);
-    expect(ids(entreesVisibles(LECTEUR))).not.toContain('crm');
   });
 
-  it('suit la trajectoire BUILD → RUN → GROW → Organisation, pour un propriétaire', () => {
-    expect(ids(entreesVisibles(PROPRIETAIRE))).toEqual([
-      'idees',
-      'validation',
-      'plans',
-      'business-plan',
+  it('aucune application « Organisation » : les réglages sont dans le menu de l’avatar', () => {
+    for (const app of NAV_APPS) {
+      expect(['build', 'run', 'grow']).toContain(app.module);
+      expect(app.href).not.toMatch(
+        /^\/organisation\/(identite|fiscalite|membres|parametres|mise-en-route)/,
+      );
+    }
+  });
+});
+
+describe('applications et ordre', () => {
+  it('BUILD : Idées → Validation → Initiatives → Business plan', () => {
+    const build = appsVisibles(null, 'build');
+    expect(build.map((a) => a.label)).toEqual([
+      'Idées',
+      'Validation',
+      'Initiatives',
+      'Business plan',
+    ]);
+    expect(build.map((a) => a.href)).toEqual([
+      '/idees',
+      '/idees/validation',
+      '/initiatives',
+      '/business-plan',
+    ]);
+  });
+
+  it('le mot « Plans financiers » a disparu ; « Projets » est réservé (lot R1)', () => {
+    for (const app of NAV_APPS) {
+      expect(app.label).not.toMatch(/plans? financiers?/i);
+      expect(app.label).not.toMatch(/projet/i);
+    }
+  });
+
+  it('RUN, pour un propriétaire', () => {
+    expect(ids(appsVisibles(PROPRIETAIRE, 'run'))).toEqual([
       'factures',
       'devis',
       'encaissements',
@@ -65,28 +95,11 @@ describe('entrées et ordre', () => {
       'catalogue',
       'crm',
       'tresorerie',
-      'pilotage',
-      'brief',
-      'sante',
-      'investisseurs',
-      'parcours',
-      'mise-en-route',
-      'identite',
-      'fiscalite',
-      'membres',
-      'parametres',
-      'abonnement',
-    ]);
-    expect(groupesVisibles(entreesVisibles(PROPRIETAIRE)).map((g) => g.group.id)).toEqual([
-      'build',
-      'run',
-      'grow',
-      'organisation',
     ]);
   });
 
-  it('GROW : pilotage, brief du matin, puis les trois écrans Croissance (ADR-0032, ADR-0033)', () => {
-    expect(NAV_ITEMS.filter((i) => i.group === 'grow').map((i) => i.href)).toEqual([
+  it('GROW : pilotage, brief, puis les trois écrans Croissance (ADR-0032, ADR-0033)', () => {
+    expect(appsVisibles(null, 'grow').map((a) => a.href)).toEqual([
       '/organisation',
       '/organisation/brief',
       '/croissance/sante',
@@ -95,61 +108,142 @@ describe('entrées et ordre', () => {
     ]);
   });
 
-  it('BUILD : Idées et Validation (ADR-0036) avant les plans financiers', () => {
-    expect(NAV_ITEMS.filter((i) => i.group === 'build').map((i) => i.href)).toEqual([
-      '/idees',
-      '/idees/validation',
-      '/projects',
-      '/business-plan',
-    ]);
-  });
-
-  it('permissions inconnues : seules les entrées sans condition (pas de clignotement)', () => {
-    expect(ids(entreesVisibles(null))).toEqual([
+  it('permissions inconnues : seules les applications sans condition', () => {
+    expect(ids(appsVisibles(null))).toEqual([
       'idees',
       'validation',
-      'plans',
+      'initiatives',
       'business-plan',
       'pilotage',
       'brief',
       'sante',
       'investisseurs',
       'parcours',
-      'mise-en-route',
-      'abonnement',
     ]);
   });
 
   it('filtre par actions serveur, pas par nom de rôle', () => {
-    const df = ids(entreesVisibles(DIRECTEUR_FINANCIER));
-    expect(df).toContain('fiscalite');
-    expect(df).not.toContain('identite');
-    expect(df).not.toContain('membres');
-    expect(ids(entreesVisibles(SANS_VENTES))).not.toContain('factures');
-    // ADR-0034 : la trésorerie suit `treasury.read`, indépendamment des ventes.
-    expect(ids(entreesVisibles(LECTEUR))).not.toContain('tresorerie');
-    expect(ids(entreesVisibles(['treasury.read']))).toContain('tresorerie');
+    expect(ids(appsVisibles(SANS_VENTES, 'run'))).toEqual([]);
+    expect(ids(appsVisibles(LECTEUR, 'run'))).not.toContain('crm');
+    expect(ids(appsVisibles(LECTEUR, 'run'))).not.toContain('tresorerie');
+    expect(ids(appsVisibles(['treasury.read'], 'run'))).toEqual(['tresorerie']);
   });
 
-  it('un groupe sans entrée n’est pas rendu', () => {
-    expect(groupesVisibles(entreesVisibles(SANS_VENTES)).map((g) => g.group.id)).not.toContain(
-      'run',
-    );
+  it('chaque application a une description pour sa tuile', () => {
+    for (const app of NAV_APPS) expect(app.description.length).toBeGreaterThan(10);
+  });
+});
+
+describe('sous-options', () => {
+  it('Factures se déroule sur « Modèle de facture » et « Journal »', () => {
+    const factures = appsVisibles(LECTEUR, 'run').find((a) => a.id === 'factures');
+    expect(factures?.sousOptions.map((s) => s.label)).toEqual(['Modèle de facture', 'Journal']);
+  });
+
+  it('CRM : Pipeline, Contacts, Réglages ; Trésorerie : Dépenses, Comptes, Réalisé vs prévu', () => {
+    const run = appsVisibles(PROPRIETAIRE, 'run');
+    expect(run.find((a) => a.id === 'crm')?.sousOptions.map((s) => s.label)).toEqual([
+      'Pipeline',
+      'Contacts et prospects',
+      'Réglages du pipeline',
+    ]);
+    expect(run.find((a) => a.id === 'tresorerie')?.sousOptions.map((s) => s.href)).toEqual([
+      '/tresorerie/depenses',
+      '/tresorerie/comptes',
+      '/tresorerie/realise',
+    ]);
+  });
+
+  it('les sous-options sont filtrées comme les applications', () => {
+    const sansPermission = NAV_APPS.find((a) => a.id === 'factures')!;
+    expect(sansPermission.sousOptions.every((s) => s.action !== null)).toBe(true);
+    // Une application visible sans condition n'expose pas de sous-option conditionnée.
+    for (const app of appsVisibles(null)) expect(app.sousOptions).toEqual([]);
+  });
+});
+
+describe('module courant (déduit du chemin)', () => {
+  it.each([
+    ['/build', 'build'],
+    ['/run', 'run'],
+    ['/grow', 'grow'],
+    ['/idees', 'build'],
+    ['/idees/validation', 'build'],
+    ['/initiatives', 'build'],
+    ['/initiatives/abc/realise', 'build'],
+    ['/business-plan', 'build'],
+    ['/ventes/factures/nouvelle', 'run'],
+    ['/ventes/modele-facture', 'run'],
+    ['/ventes/crm/contacts', 'run'],
+    ['/tresorerie/depenses', 'run'],
+    ['/organisation', 'grow'],
+    ['/organisation/brief', 'grow'],
+    ['/croissance/sante', 'grow'],
+  ] as const)('%s est dans %s', (chemin, attendu) => {
+    expect(moduleCourant(chemin)).toBe(attendu);
+  });
+
+  it.each([
+    '/accueil',
+    '/compte',
+    '/compte/securite',
+    '/organisation/fiscalite',
+    '/organisation/membres',
+    '/organisation/mise-en-route',
+    '/souscription',
+    '/admin',
+    '/organisations-amies',
+    '/initiatives-x',
+    '/builder',
+  ])('%s n’est dans aucun module', (chemin) => {
+    expect(moduleCourant(chemin)).toBeNull();
+  });
+
+  it('accueil et bureaux', () => {
+    expect(estAccueil('/accueil')).toBe(true);
+    expect(estAccueil('/accueillir')).toBe(false);
+    expect(estBureau('/run')).toBe(true);
+    expect(estBureau('/ventes/factures')).toBe(false);
+  });
+});
+
+describe('application et sous-option actives', () => {
+  it.each([
+    ['/idees/0123456789abcdef01234567', 'idees'],
+    ['/idees/validation', 'validation'],
+    ['/initiatives', 'initiatives'],
+    ['/initiatives/abc/canvas', 'initiatives'],
+    ['/ventes/factures', 'factures'],
+    ['/ventes/factures/journal', 'factures'],
+    ['/ventes/modele-facture', 'factures'],
+    ['/ventes/crm/abc', 'crm'],
+    ['/organisation', 'pilotage'],
+    ['/organisation/brief', 'brief'],
+    ['/croissance/parcours', 'parcours'],
+  ])('%s allume %s', (chemin, attendu) => {
+    expect(appActive(chemin)).toBe(attendu);
+  });
+
+  it('allume la sous-option, la plus longue gagne', () => {
+    expect(sousOptionActive('/ventes/modele-facture')).toBe('modele-facture');
+    expect(sousOptionActive('/ventes/factures/journal')).toBe('journal-ventes');
+    expect(sousOptionActive('/ventes/factures/abc')).toBeNull();
+    expect(sousOptionActive('/ventes/crm')).toBe('crm-pipeline');
+    expect(sousOptionActive('/ventes/crm/contacts')).toBe('crm-contacts');
+    expect(sousOptionActive('/tresorerie/realise')).toBe('tresorerie-realise');
+  });
+
+  it('compare par segment', () => {
+    expect(appActive('/organisation/fiscalite')).toBeNull();
+    expect(appActive('/ventes/facturesX')).toBeNull();
   });
 });
 
 describe('choix des modules (mise en route, étape 4)', () => {
-  it('filtre les modules sans jamais masquer l’organisation', () => {
-    const visibles = ids(entreesVisibles(PROPRIETAIRE, ['run']));
-    expect(visibles).not.toContain('plans');
-    expect(visibles).not.toContain('pilotage');
-    expect(visibles).toContain('factures');
-    expect(visibles).toContain('mise-en-route');
-    expect(visibles).toContain('abonnement');
-  });
-
-  it('ne donne aucun accès : un module choisi reste soumis aux actions', () => {
-    expect(ids(entreesVisibles(SANS_VENTES, ['run']))).not.toContain('factures');
+  it('range l’accueil sans rien retirer', () => {
+    expect(ordreAccueil(null)).toEqual(['build', 'run', 'grow']);
+    expect(ordreAccueil(['grow'])).toEqual(['grow', 'build', 'run']);
+    expect(ordreAccueil(['run', 'grow'])).toEqual(['run', 'grow', 'build']);
   });
 
   it('relit un stockage valide, ignore le reste', () => {
@@ -161,7 +255,7 @@ describe('choix des modules (mise en route, étape 4)', () => {
     expect(lireModules('["autre"]')).toBeNull();
   });
 
-  it('un choix vide ou complet ne filtre rien', () => {
+  it('un choix vide ou complet ne range rien', () => {
     expect(ecrireModules([])).toBeNull();
     expect(ecrireModules(['grow', 'run', 'build'])).toBeNull();
     expect(ecrireModules(['run'])).toBe('["run"]');
@@ -169,37 +263,6 @@ describe('choix des modules (mise en route, étape 4)', () => {
 
   it('la clé dépend de l’organisation', () => {
     expect(cleModules('a')).not.toBe(cleModules('b'));
-  });
-});
-
-describe('entrée active', () => {
-  const tout = entreesVisibles(PROPRIETAIRE);
-  it.each([
-    ['/idees', 'idees'],
-    ['/idees/0123456789abcdef01234567', 'idees'],
-    ['/idees/0123456789abcdef01234567/validation', 'idees'],
-    ['/idees/validation', 'validation'],
-    ['/projects', 'plans'],
-    ['/projects/abc/realise', 'plans'],
-    ['/business-plan', 'business-plan'],
-    ['/ventes/factures', 'factures'],
-    ['/ventes/factures/nouvelle', 'factures'],
-    ['/ventes/encaissements', 'encaissements'],
-    ['/ventes/clients', 'clients'],
-    ['/organisation', 'pilotage'],
-    ['/croissance/sante', 'sante'],
-    ['/croissance/parcours', 'parcours'],
-    ['/organisation/fiscalite', 'fiscalite'],
-    ['/organisation/brief', 'brief'],
-    ['/organisation/mise-en-route', 'mise-en-route'],
-    ['/souscription/retour', 'abonnement'],
-  ])('%s allume %s', (chemin, attendu) => {
-    expect(entreeActive(chemin, tout)).toBe(attendu);
-  });
-
-  it('compare par segment : /organisations-amies et /ventes/modele-facture n’allument rien', () => {
-    expect(entreeActive('/organisations-amies', tout)).toBeNull();
-    expect(entreeActive('/ventes/modele-facture', tout)).toBeNull();
   });
 });
 
@@ -211,7 +274,8 @@ describe('barre d’actions basse (téléphone)', () => {
 
   it('place « Facturer » au centre quand le rôle peut composer', () => {
     const a = actionsRapides(PROPRIETAIRE);
-    expect(a.map((x) => x.id)).toEqual(['plans', 'factures', 'facturer', 'clients']);
+    expect(a.map((x) => x.label)).toEqual(['Initiatives', 'Factures', 'Facturer', 'Clients']);
+    expect(a[0]?.href).toBe('/initiatives');
     expect(a.find((x) => x.principale)?.href).toBe('/ventes/factures/nouvelle');
   });
 

@@ -69,7 +69,7 @@ export class LalaVocalController {
       throw new BadRequestException({
         code: 'INVALID_REQUEST',
         message:
-          'L’appel vocal ne transporte aucune donnée de projet : cette requête n’accepte aucun champ.',
+          'L’appel vocal ne transporte aucune donnée d’initiative : cette requête n’accepte aucun champ.',
         issues: parsed.error.issues,
       });
     }

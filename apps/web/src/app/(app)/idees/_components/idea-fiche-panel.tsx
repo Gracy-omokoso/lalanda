@@ -153,9 +153,9 @@ export function IdeaFichePanel({ id }: { id: string }): React.ReactElement {
     setMessage(null);
     try {
       const r = await ideaLabApi.promote(id, projetChoisi);
-      router.push(`/projects/${r.projectId}/canvas`);
+      router.push(`/initiatives/${r.projectId}/canvas`);
     } catch (err) {
-      setMessage({ ton: 'ko', texte: messageErreur(err, 'Passage au projet impossible.') });
+      setMessage({ ton: 'ko', texte: messageErreur(err, 'Passage à l’initiative impossible.') });
     }
   }
 
@@ -566,17 +566,17 @@ export function IdeaFichePanel({ id }: { id: string }): React.ReactElement {
           <div className="doc-card flex flex-col gap-3 p-4 text-sm">
             <p className="text-[var(--foreground-muted)]">
               Le problème, la solution, la cible et le modèle de revenus deviennent des cartes du
-              Canvas du projet. Aucun chiffre n’est repris ; vous poursuivez ensuite dans le Canvas
-              et l’assistant de saisie habituels.
+              Canvas de l’initiative. Aucun chiffre n’est repris ; vous poursuivez ensuite dans le
+              Canvas et l’assistant de saisie habituels.
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <select
-                aria-label="Projet existant"
+                aria-label="Initiative existante"
                 value={projetChoisi}
                 onChange={(e) => setProjetChoisi(e.target.value)}
                 className={CHAMP}
               >
-                <option value="">Choisir un projet existant…</option>
+                <option value="">Choisir une initiative existante…</option>
                 {(projets ?? []).map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
@@ -584,11 +584,11 @@ export function IdeaFichePanel({ id }: { id: string }): React.ReactElement {
                 ))}
               </select>
               <Button disabled={projetChoisi === ''} onClick={() => void promouvoir()}>
-                Ajouter au Canvas de ce projet
+                Ajouter au Canvas de cette initiative
               </Button>
               <span className="text-[var(--foreground-muted)]">ou</span>
               <Link href={lienNouveauProjet(id)} className="underline hover:text-[var(--accent)]">
-                Créer un nouveau projet à partir de cette idée
+                Créer une nouvelle initiative à partir de cette idée
               </Link>
             </div>
             {idea.promotions.length > 0 && (

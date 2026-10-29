@@ -46,8 +46,8 @@ export function runLinkInUse(otherBridge: 'sales' | 'expenses'): never {
     code: 'RUN_LINK_IN_USE',
     message:
       otherBridge === 'sales'
-        ? 'Le pont des ventes est actif sur ce projet et ce début d’exercice : désactivez-le avant de changer le rattachement commun.'
-        : 'Le report des dépenses est actif sur ce projet et ce début d’exercice : désactivez-le avant de changer le rattachement commun.',
+        ? 'Le pont des ventes est actif sur cette initiative et ce début d’exercice : désactivez-le avant de changer le rattachement commun.'
+        : 'Le report des dépenses est actif sur cette initiative et ce début d’exercice : désactivez-le avant de changer le rattachement commun.',
     details: { otherBridge },
   });
 }

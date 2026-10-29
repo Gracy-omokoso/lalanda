@@ -1,7 +1,7 @@
 // Article « Comprendre les chiffres » — une section par feuille de résultats.
 //
 // Sources vérifiées dans le code au moment de la rédaction :
-//  - liste et ordre des onglets : apps/web/src/app/(app)/projects/_components/
+//  - liste et ordre des onglets : apps/web/src/app/(app)/initiatives/_components/
 //    results-model.ts (libellés et ordre des onglets) — S23a, ex project-plan.tsx
 //  - lignes de chaque feuille : packages/engine/src/templates/*.yaml
 //  - bilan / BFR / CAF / seuil / amortissements : packages/engine/src/
@@ -32,7 +32,7 @@ export const COMPRENDRE_LES_CHIFFRES: ArticleAide = {
         {
           type: 'paragraphe',
           texte:
-            'Une fois vos hypothèses saisies et le calcul lancé, les résultats s’affichent dans l’onglet **Plan** du projet, répartis en onglets — un par feuille. L’onglet ouvert par défaut est **Ratios bancaires**, parce que c’est celui qui répond à la question « est-ce que mon dossier tient ? ».',
+            'Une fois vos hypothèses saisies et le calcul lancé, les résultats s’affichent dans l’onglet **Plan** de l’initiative, répartis en onglets — un par feuille. L’onglet ouvert par défaut est **Ratios bancaires**, parce que c’est celui qui répond à la question « est-ce que mon dossier tient ? ».',
         },
         {
           type: 'liste',
@@ -212,7 +212,7 @@ export const COMPRENDRE_LES_CHIFFRES: ArticleAide = {
           ton: 'limite',
           titre: 'Ce que la projection ne modélise pas',
           texte:
-            'Les charges dites « fixes » suivent le chiffre d’affaires : il n’y a **pas d’effet de levier opérationnel** modélisé, alors qu’en réalité un loyer ne double pas quand les ventes doublent. Aucun **investissement de renouvellement** n’est prévu non plus : sur cinq ans, votre équipement s’amortit jusqu’à une valeur quasi nulle sans jamais être remplacé. Enfin, les **scénarios alternatifs** (prudent, ambitieux) ne sont pas disponibles — un projet porte un seul jeu d’hypothèses.',
+            'Les charges dites « fixes » suivent le chiffre d’affaires : il n’y a **pas d’effet de levier opérationnel** modélisé, alors qu’en réalité un loyer ne double pas quand les ventes doublent. Aucun **investissement de renouvellement** n’est prévu non plus : sur cinq ans, votre équipement s’amortit jusqu’à une valeur quasi nulle sans jamais être remplacé. Enfin, les **scénarios alternatifs** (prudent, ambitieux) ne sont pas disponibles — une initiative porte un seul jeu d’hypothèses.',
         },
       ],
     },

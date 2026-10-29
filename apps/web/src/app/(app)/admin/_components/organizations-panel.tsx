@@ -150,7 +150,7 @@ function LigneOrganisation({
           <Pastille ton="neutre">{LIBELLES_PLAN[org.plan] ?? org.plan}</Pastille>
           {org.suspended ? <Pastille ton="echec">Suspendue</Pastille> : null}
           <span className="font-mono text-xs text-[var(--foreground-muted)]">
-            {org.memberCount} membre{org.memberCount > 1 ? 's' : ''} · {org.projectCount} projet
+            {org.memberCount} membre{org.memberCount > 1 ? 's' : ''} · {org.projectCount} initiative
             {org.projectCount > 1 ? 's' : ''}
           </span>
         </span>
@@ -239,7 +239,7 @@ function ChangementPlan({
       </h3>
       <p className="max-w-2xl text-xs text-[var(--foreground-muted)]">
         Le changement est immédiat et sans facturation : il n’y a pas de paiement branché. Un
-        rétrogradage ne supprime rien — les projets au-delà de la limite du nouveau plan restent
+        rétrogradage ne supprime rien — les initiatives au-delà de la limite du nouveau plan restent
         lisibles, seule la création est bloquée.
       </p>
       <div className="flex flex-wrap items-center gap-2">

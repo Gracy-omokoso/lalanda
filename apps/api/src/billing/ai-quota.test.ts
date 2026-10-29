@@ -158,7 +158,7 @@ describe('refus opposé à un dépassement', () => {
   it('rassure sur ce qui reste accessible', () => {
     // Un quota IA épuisé ne coupe ni les projets ni les exports. Le taire
     // laisserait croire à une suspension de compte.
-    expect(payload.message).toContain('projets');
+    expect(payload.message).toContain('initiatives');
     expect(payload.message).toContain('exports');
   });
 

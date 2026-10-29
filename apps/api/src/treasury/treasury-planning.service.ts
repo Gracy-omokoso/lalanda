@@ -357,7 +357,7 @@ export class TreasuryPlanningService {
         }
       }
     } else if (Object.keys(mapping).length > 0) {
-      rejected('BRIDGE_INCOMPLETE', 'Choisissez d’abord le projet relié.');
+      rejected('BRIDGE_INCOMPLETE', 'Choisissez d’abord l’initiative reliée.');
     }
     // Une ligne n'est alimentée que par un seul pont : celle du chiffre d'affaires
     // des ventes n'entre pas dans la correspondance des dépenses.
@@ -639,7 +639,7 @@ export class TreasuryPlanningService {
     if (bridge === null || bridge.projectId === null || bridge.firstMonth === null) {
       conflict(
         'BRIDGE_NOT_CONFIGURED',
-        'Reliez d’abord un projet validé (projet, mois d’ouverture de l’exercice 1, correspondance des catégories).',
+        'Reliez d’abord une initiative validée (initiative, mois d’ouverture de l’exercice 1, correspondance des catégories).',
       );
     }
     const project = await this.projects.findScoped(bridge.projectId, organizationId);
@@ -686,7 +686,7 @@ export class TreasuryPlanningService {
     if (!plan) {
       conflict(
         'NO_APPROVED_PLAN',
-        'Aucun plan validé sur ce projet : validez un plan avant de le relier.',
+        'Aucun plan validé sur cette initiative : validez un plan avant de le relier.',
       );
     }
     return plan;
@@ -778,19 +778,19 @@ export class TreasuryPlanningService {
       return null;
     };
     if (bridge === null || bridge.projectId === null) {
-      return notUsed('Aucun projet relié : aucune vente future non facturée n’est prévue.');
+      return notUsed('Aucune initiative reliée : aucune vente future non facturée n’est prévue.');
     }
     const project = await this.projects
       .findScoped(bridge.projectId, organizationId)
       .catch(() => null);
-    if (!project) return notUsed('Le projet relié est introuvable.');
+    if (!project) return notUsed('L’initiative reliée est introuvable.');
     if (project.deviseAffichage !== currency) {
       return notUsed(
-        `Le projet relié est tenu en ${project.deviseAffichage} : aucune conversion n’est faite.`,
+        `L’initiative reliée est tenue en ${project.deviseAffichage} : aucune conversion n’est faite.`,
       );
     }
     const plan = await this.plans.findLatestApproved(organizationId, bridge.projectId);
-    if (!plan) return notUsed('Le projet relié n’a pas de plan validé.');
+    if (!plan) return notUsed('L’initiative reliée n’a pas de plan validé.');
     const refs = referenceLines(plan.result.lines);
     const refIds = new Set(refs.map((l) => l.lineId));
     // Entrées : les seules lignes de PRODUIT (chiffre d'affaires, ventes…). Les

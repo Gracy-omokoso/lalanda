@@ -273,7 +273,7 @@ export function ActualsPanel({ projectId }: { projectId: string }): React.ReactE
         <p className="text-sm text-[var(--foreground-muted)]">Chargement du réalisé…</p>
       ) : noPlan ? (
         <div className="doc-card p-5 text-sm">
-          <p className="font-semibold">Aucun plan validé pour ce projet.</p>
+          <p className="font-semibold">Aucun plan validé pour cette initiative.</p>
           <p className="mt-1 text-[var(--foreground-muted)]">
             Le réalisé se compare toujours à une référence figée. Validez un plan depuis l’onglet
             plan financier, puis revenez saisir les mois écoulés.

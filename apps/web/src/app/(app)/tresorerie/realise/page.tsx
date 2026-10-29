@@ -121,23 +121,23 @@ export default function RealisePage(): React.ReactElement {
 
       <Section
         titre="Relier les dépenses au plan BUILD"
-        description="Les dépenses d’exploitation alimentent le réalisé d’un projet validé, ligne par ligne, selon la correspondance que vous choisissez. Le plan validé n’est jamais modifié ; une période clôturée ou une saisie manuelle ne sont jamais écrasées."
+        description="Les dépenses d’exploitation alimentent le réalisé d’une initiative validée, ligne par ligne, selon la correspondance que vous choisissez. Le plan validé n’est jamais modifié ; une période clôturée ou une saisie manuelle ne sont jamais écrasées."
       >
         {pont?.status === 'not_configured' ? (
           <Bandeau>
-            Aucun projet relié : vos dépenses restent consultables dans l’onglet Dépenses, mais la
-            comparaison au prévisionnel exige un projet BUILD validé.
+            Aucune initiative reliée : vos dépenses restent consultables dans l’onglet Dépenses,
+            mais la comparaison au prévisionnel exige une initiative BUILD validée.
           </Bandeau>
         ) : null}
         <form onSubmit={(e) => void enregistrer(e)} className="flex flex-col gap-3">
           <p className="text-xs text-[var(--foreground-muted)]">
-            Le projet et le mois d’ouverture de l’exercice 1 sont communs au pont des ventes
+            L’initiative et le mois d’ouverture de l’exercice 1 sont communs au pont des ventes
             (Encaissements) : les changer ici les change là-bas, et c’est refusé tant que l’autre
             pont est actif.
           </p>
           <div className="grid gap-3 sm:grid-cols-3">
             <label className="flex flex-col gap-1 text-sm">
-              Projet
+              Initiative
               <select
                 className={CHAMP}
                 value={form.projectId}
@@ -217,7 +217,7 @@ export default function RealisePage(): React.ReactElement {
             </div>
           ) : form.projectId ? (
             <p className="text-sm text-[var(--foreground-muted)]">
-              Enregistrez le projet pour choisir la correspondance avec les lignes de son plan
+              Enregistrez l’initiative pour choisir la correspondance avec les lignes de son plan
               validé.
             </p>
           ) : null}
@@ -408,7 +408,7 @@ function RapportSync({ rapport }: { rapport: SyncReport }): React.ReactElement {
           {rapport.skipped
             .map(
               (s) =>
-                `${libelleMois(s.calendarMonth)} (${s.reason === 'CURRENCY_NOT_CONVERTIBLE' ? 'autre devise que le projet' : 'hors des 5 exercices'})`,
+                `${libelleMois(s.calendarMonth)} (${s.reason === 'CURRENCY_NOT_CONVERTIBLE' ? 'autre devise que l’initiative' : 'hors des 5 exercices'})`,
             )
             .join(', ')}
         </p>

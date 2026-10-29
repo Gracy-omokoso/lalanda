@@ -99,7 +99,7 @@ export class GrowProfileService {
       if (!owned) {
         throw new NotFoundException({
           code: 'PROJECT_NOT_FOUND',
-          message: 'Projet introuvable dans votre organisation.',
+          message: 'Initiative introuvable dans votre organisation.',
         });
       }
     }

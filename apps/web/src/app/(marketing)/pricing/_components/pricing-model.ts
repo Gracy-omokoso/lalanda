@@ -94,8 +94,8 @@ function featuresOf(plan: Plan): string[] {
 
   const projets =
     e.maxProjects === null
-      ? 'Projets illimités'
-      : `${e.maxProjects} ${e.maxProjects > 1 ? 'projets' : 'projet'}`;
+      ? 'Initiatives illimitées'
+      : `${e.maxProjects} ${e.maxProjects > 1 ? 'initiatives' : 'initiative'}`;
 
   const pdf = e.pdfWatermark
     ? `${formatQuota(e.pdfExportsPerMonth, 'exports PDF')} par mois, avec filigrane`
@@ -247,10 +247,10 @@ export const COMPARISON: readonly ComparisonSection[] = [
   {
     title: 'Modélisation',
     rows: [
-      rowFromEntitlements('Projets', (e) =>
+      rowFromEntitlements('Initiatives', (e) =>
         e.maxProjects === null ? 'Illimités' : String(e.maxProjects),
       ),
-      row('Scénarios par projet', {
+      row('Scénarios par initiative', {
         free: '1',
         pro: "Jusqu'à 3",
         cabinet: "Jusqu'à 3",
@@ -382,10 +382,10 @@ export const FAQ: readonly FaqEntry[] = [
       'n’a lieu à son terme : le compte revient simplement à l’offre gratuite.',
   },
   {
-    question: 'Que deviennent mes projets à la fin de l’essai ?',
+    question: 'Que deviennent mes initiatives à la fin de l’essai ?',
     answer:
-      'Ils restent intacts. Le compte repasse en offre gratuite, ce qui limite la CRÉATION de ' +
-      'nouveaux projets, mais aucun projet existant n’est supprimé ni fermé — vous continuez à ' +
+      'Elles restent intactes. Le compte repasse en offre gratuite, ce qui limite la CRÉATION de ' +
+      'nouvelles initiatives, mais aucune initiative existante n’est supprimée ni fermée — vous continuez à ' +
       'les consulter et à les exporter.',
   },
   {

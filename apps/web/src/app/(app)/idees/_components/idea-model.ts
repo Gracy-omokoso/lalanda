@@ -69,7 +69,7 @@ export function droitsIdees(actions: readonly OrgAction[] | null): {
 
 /** Lien vers la création de projet existante, ouverte depuis une idée (ADR-0036 § 3). */
 export function lienNouveauProjet(ideaId: string): string {
-  return `/projects?idee=${encodeURIComponent(ideaId)}`;
+  return `/initiatives?idee=${encodeURIComponent(ideaId)}`;
 }
 
 /** Identifiant d'idée lu dans `?idee=` : 24 caractères hexadécimaux, sinon `null`. */

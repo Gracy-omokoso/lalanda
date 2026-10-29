@@ -37,14 +37,14 @@ export const TRAVAILLER_A_PLUSIEURS: ArticleAide = {
         {
           type: 'paragraphe',
           texte:
-            'Tous vos projets appartiennent à une **organisation**. C’est elle qui porte les membres, les droits et l’abonnement. Un projet n’existe jamais tout seul : il est toujours dans une organisation, et c’est la frontière qui protège vos données — un membre d’une autre organisation ne peut rien voir de la vôtre.',
+            'Toutes vos initiatives appartiennent à une **organisation**. C’est elle qui porte les membres, les droits et l’abonnement. Une initiative n’existe jamais toute seule : elle est toujours dans une organisation, et c’est la frontière qui protège vos données — un membre d’une autre organisation ne peut rien voir de la vôtre.',
         },
         {
           type: 'note',
           ton: 'limite',
-          titre: 'La cloison est l’organisation, pas le projet',
+          titre: 'La cloison est l’organisation, pas l’initiative',
           texte:
-            'Il n’est **pas possible aujourd’hui de limiter un membre à certains projets**. Toute personne que vous invitez voit **tous les projets de l’organisation**, dans la limite de ce que son rôle autorise. Si vous devez réellement cloisonner deux dossiers — par exemple deux associés différents sur deux affaires —, **créez deux organisations distinctes**. C’est aujourd’hui le seul moyen.',
+            'Il n’est **pas possible aujourd’hui de limiter un membre à certaines initiatives**. Toute personne que vous invitez voit **toutes les initiatives de l’organisation**, dans la limite de ce que son rôle autorise. Si vous devez réellement cloisonner deux dossiers — par exemple deux associés différents sur deux affaires —, **créez deux organisations distinctes**. C’est aujourd’hui le seul moyen.',
         },
       ],
     },
@@ -117,7 +117,7 @@ export const TRAVAILLER_A_PLUSIEURS: ArticleAide = {
             ],
             [
               '**Administrateur**',
-              'Gère l’organisation, les membres et les projets, saisit et calcule. **Ne peut pas valider un plan, clôturer une période, ni gérer la facturation.**',
+              'Gère l’organisation, les membres et les initiatives, saisit et calcule. **Ne peut pas valider un plan, clôturer une période, ni gérer la facturation.**',
               'Un associé qui gère l’outil au quotidien.',
             ],
             [
@@ -168,7 +168,7 @@ export const TRAVAILLER_A_PLUSIEURS: ArticleAide = {
           ton: 'limite',
           titre: 'Un rôle « Chef de projet » figure dans le modèle mais n’est pas attribuable',
           texte:
-            'Il n’aurait de sens que restreint à certains projets — ce qui n’existe pas encore. Plutôt que de proposer un rôle qui ne restreindrait rien, il est bloqué à l’attribution.',
+            'Il n’aurait de sens que restreint à certaines initiatives — ce qui n’existe pas encore. Plutôt que de proposer un rôle qui ne restreindrait rien, il est bloqué à l’attribution.',
         },
       ],
     },

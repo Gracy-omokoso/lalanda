@@ -3,7 +3,7 @@
 // Publique et lisible sans session. La route est dans le group `(marketing)`
 // pour l'en-tête et le pied de page, mais volontairement absente de
 // `MARKETING_PATHS` (`lib/routes.ts`) : y figurer renverrait un utilisateur
-// connecté vers `/projects`, ce qui casserait les liens d'aide contextuels
+// connecté vers `/accueil`, ce qui casserait les liens d'aide contextuels
 // ouverts depuis l'application.
 
 import type { Metadata } from 'next';

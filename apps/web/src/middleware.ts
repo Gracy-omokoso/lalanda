@@ -2,9 +2,10 @@
 //
 // Trois catégories de routes :
 //  - Publiques marketing (`/`, `/pricing`) : accessibles à tous ; si authentifié,
-//    redirect vers `/projects` (l'app est plus utile qu'une plaquette).
-//  - Auth (`/login`, `/register`) : si authentifié, redirect vers `/projects`.
-//  - Protégées (`/projects/*`, `/members`, `/invitations/*`, `/compte/*`) : si non
+//    redirect vers `/accueil` (l'app est plus utile qu'une plaquette).
+//  - Auth (`/login`, `/register`) : si authentifié, redirect vers `/accueil`
+//    (page d'arrivée, ADR-0038 § 5).
+//  - Protégées (`/accueil`, `/initiatives/*`, `/members`, `/invitations/*`, `/compte/*`) : si non
 //    authentifié, redirect vers `/login?next=…`.
 //
 // Le classement lui-même vit dans `lib/routes.ts` — logique pure, testée
@@ -32,7 +33,7 @@ export function middleware(req: NextRequest): NextResponse {
   // Marketing : accessible à tous ; les authentifiés partent vers l'app.
   if (isMarketingPath(pathname) && authed) {
     const url = req.nextUrl.clone();
-    url.pathname = '/projects';
+    url.pathname = '/accueil';
     url.search = '';
     return NextResponse.redirect(url);
   }
@@ -55,7 +56,7 @@ export function middleware(req: NextRequest): NextResponse {
   // Pages d'auth : déjà authentifié → app.
   if (isAuthPath(pathname) && authed) {
     const url = req.nextUrl.clone();
-    url.pathname = '/projects';
+    url.pathname = '/accueil';
     url.search = '';
     return NextResponse.redirect(url);
   }

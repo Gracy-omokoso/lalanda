@@ -1,239 +1,263 @@
 'use client';
 
-// Navigation latérale par module (ADR-0030 § 2).
+// Colonne de gauche — niveau 3 de la navigation (ADR-0038 § 2).
 //
-// Un seul composant pour la barre de bureau et le tiroir du téléphone : la
-// liste, l'ordre et l'entrée active viennent de `nav-model.ts`. La signature
-// visuelle est le RAIL DE TRAJECTOIRE : les trois modules sont des nœuds reliés
-// par un trait vertical, BUILD → RUN → GROW — la synchronisation qui fait la
-// valeur du produit, rappelée sur chaque écran. Le reste est sobre.
+// Elle ne liste QUE les applications du module courant ; une application qui
+// a des sous-options se déroule (bouton `aria-expanded`), ouverte d'office
+// quand on est dedans. Un seul composant pour la colonne du bureau et le
+// tiroir du téléphone. Hors module (accueil, compte, réglages), le tiroir liste
+// les trois modules à la place. Tout ce qui décide vient de `nav-model.ts`.
 
+import { ModuleIcon, type ModuleId } from '@lalanda/ui';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
-import { BrandLogo, BrandMark } from '@/components/brand-logo';
+import { BrandLogo } from '@/components/brand-logo';
 import { IconeNav } from '@/components/icones-navigation';
 
 import {
-  MISE_EN_ROUTE_BASE,
-  progression,
-  termine,
-} from '../organisation/_components/onboarding-model';
-import { useMiseEnRoute } from '../organisation/_components/use-mise-en-route';
-import {
-  entreeActive,
-  entreesVisibles,
-  groupesVisibles,
-  type NavGroupId,
-  type NavItem,
+  ACCUEIL_HREF,
+  appActive,
+  appsVisibles,
+  moduleParId,
+  NAV_MODULES,
+  sousOptionActive,
+  type NavApp,
 } from './nav-model';
 import { OrgSwitcher } from './org-switcher';
 import { useShell } from './shell-context';
 
-const COULEUR_NOEUD: Record<NavGroupId, string> = {
-  build: 'bg-[var(--nav-build)]',
-  run: 'bg-[var(--nav-run)]',
-  grow: 'bg-[var(--nav-grow)]',
-  organisation: 'bg-[var(--nav-muted)]',
+const COULEUR_NAV: Record<ModuleId, string> = {
+  build: 'text-[var(--nav-build)]',
+  run: 'text-[var(--nav-run)]',
+  grow: 'text-[var(--nav-grow)]',
 };
 
 export function SidebarNav({
+  module,
   replie = false,
+  tiroir = false,
   onNavigate,
 }: {
+  /** Module courant ; `null` hors module (le tiroir liste alors les modules). */
+  module: ModuleId | null;
   /** Rail d'icônes (bureau, replié). Les noms restent accessibles. */
   replie?: boolean;
+  /** Rendu dans le tiroir du téléphone : marque et sélecteur d'organisation en tête. */
+  tiroir?: boolean;
   /** Appelé au clic sur une entrée (le tiroir mobile se ferme). */
   onNavigate?: () => void;
 }): React.ReactElement {
-  const pathname = usePathname();
-  const { actions, modules, setModules } = useShell();
-  const items = entreesVisibles(actions, modules);
-  const groupes = groupesVisibles(items);
-  const active = entreeActive(pathname, items);
-
   return (
     <div className="flex h-full flex-col">
-      <div className={replie ? 'flex justify-center py-5' : 'px-5 pb-4 pt-5'}>
-        <Link
-          href="/projects"
-          aria-label="Lalanda — plans financiers"
-          onClick={onNavigate}
-          className="inline-flex shrink-0 items-center transition hover:opacity-80"
-        >
-          {replie ? <BrandMark taille={30} /> : <BrandLogo hauteur={28} fond="encre" />}
-        </Link>
-      </div>
+      {tiroir ? (
+        <>
+          <div className="px-5 pb-4 pt-5">
+            <Link
+              href={ACCUEIL_HREF}
+              aria-label="Lalanda — accueil"
+              onClick={onNavigate}
+              className="inline-flex shrink-0 items-center transition hover:opacity-80"
+            >
+              <BrandLogo hauteur={28} fond="encre" />
+            </Link>
+          </div>
+          <div className="px-3">
+            <OrgSwitcher />
+          </div>
+        </>
+      ) : null}
+      {module === null ? (
+        <ListeModules onNavigate={onNavigate} />
+      ) : (
+        <ListeApplications module={module} replie={replie} onNavigate={onNavigate} />
+      )}
+    </div>
+  );
+}
 
-      <div className={replie ? 'flex justify-center px-2' : 'px-3'}>
-        <OrgSwitcher replie={replie} />
-      </div>
+/** Hors module : les trois bureaux, pour le tiroir du téléphone. */
+function ListeModules({
+  onNavigate,
+}: {
+  onNavigate: (() => void) | undefined;
+}): React.ReactElement {
+  return (
+    <nav aria-label="Modules" className="mt-5 flex-1 overflow-y-auto px-3 pb-4">
+      <ul className="flex flex-col gap-1">
+        {NAV_MODULES.map((m) => (
+          <li key={m.id}>
+            <Link
+              href={m.href}
+              onClick={onNavigate}
+              className="flex items-center gap-3 rounded-[var(--radius-sm)] px-2 py-2.5 text-[var(--nav-muted)] transition-colors hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-fg)]"
+            >
+              <ModuleIcon module={m.id} className={`h-5 w-5 ${COULEUR_NAV[m.id]}`} />
+              <span className="flex flex-col">
+                <span className="font-mono text-sm font-semibold tracking-[0.1em] text-[var(--nav-fg)]">
+                  {m.label}
+                </span>
+                <span className="text-xs">{m.verb}</span>
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
 
-      <nav
-        aria-label="Navigation principale"
-        className="mt-5 flex-1 overflow-y-auto overscroll-contain px-3 pb-4"
+function ListeApplications({
+  module,
+  replie,
+  onNavigate,
+}: {
+  module: ModuleId;
+  replie: boolean;
+  onNavigate: (() => void) | undefined;
+}): React.ReactElement {
+  const pathname = usePathname();
+  const { actions } = useShell();
+  const m = moduleParId(module);
+  const apps = appsVisibles(actions, module);
+  const active = appActive(pathname, apps);
+  const sousActive = sousOptionActive(pathname, apps);
+
+  return (
+    <nav
+      aria-label={`Applications ${m.label}`}
+      className="mt-4 flex-1 overflow-y-auto overscroll-contain px-3 pb-4"
+    >
+      <Link
+        href={m.href}
+        onClick={onNavigate}
+        aria-current={pathname === m.href ? 'page' : undefined}
+        aria-label={replie ? `${m.label} — ${m.verb}` : undefined}
+        title={replie ? `${m.label} — ${m.verb}` : undefined}
+        className={`mb-2 flex items-center rounded-[var(--radius-sm)] font-mono text-[0.72rem] uppercase tracking-[0.14em] transition-colors hover:bg-[var(--nav-active-bg)] ${replie ? 'mx-auto h-10 w-10 justify-center' : 'gap-2.5 px-2 py-2'}`}
       >
-        <ul className="flex flex-col">
-          {groupes.map(({ group, items: entrees }, index) => {
-            const estModule = group.id !== 'organisation';
-            const suivantEstModule =
-              groupes[index + 1]?.group.id !== 'organisation' && !!groupes[index + 1];
+        <ModuleIcon module={module} className={`h-4 w-4 ${COULEUR_NAV[module]}`} />
+        {replie ? null : (
+          <>
+            <span className="font-semibold text-[var(--nav-fg)]">{m.label}</span>
+            <span className="normal-case tracking-normal text-[var(--nav-muted)]">{m.verb}</span>
+          </>
+        )}
+      </Link>
+      {apps.length === 0 ? (
+        replie ? null : (
+          <p className="px-2 text-xs leading-5 text-[var(--nav-muted)]">
+            Aucune application de ce module n’est ouverte à votre rôle.
+          </p>
+        )
+      ) : (
+        <ul className={replie ? 'flex flex-col items-center gap-1' : 'flex flex-col gap-0.5'}>
+          {apps.map((app) => (
+            <li key={app.id}>
+              <Application
+                app={app}
+                actif={active === app.id}
+                sousActive={sousActive}
+                replie={replie}
+                onNavigate={onNavigate}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+    </nav>
+  );
+}
+
+function Application({
+  app,
+  actif,
+  sousActive,
+  replie,
+  onNavigate,
+}: {
+  app: NavApp;
+  actif: boolean;
+  sousActive: string | null;
+  replie: boolean;
+  onNavigate: (() => void) | undefined;
+}): React.ReactElement {
+  const aSousOptions = app.sousOptions.length > 0 && !replie;
+  const [ouvert, setOuvert] = useState(actif);
+  // Entrer dans l'application la déroule ; en sortir ne la referme pas de force.
+  useEffect(() => {
+    if (actif) setOuvert(true);
+  }, [actif]);
+
+  const courante = actif && sousActive === null;
+  const base =
+    'group relative flex min-w-0 flex-1 items-center rounded-[var(--radius-sm)] text-sm transition-colors';
+  const etat = actif
+    ? 'bg-[var(--nav-active-bg)] font-semibold text-white'
+    : 'text-[var(--nav-muted)] hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-fg)]';
+  const idListe = `sous-options-${app.id}`;
+
+  return (
+    <>
+      <div className="flex items-center gap-0.5">
+        <Link
+          href={app.href}
+          onClick={onNavigate}
+          aria-current={courante ? 'page' : undefined}
+          // Replié, l'icône est seule à l'écran : le nom passe par `aria-label`,
+          // et `title` le montre au survol. Jamais une icône muette.
+          aria-label={replie ? app.label : undefined}
+          title={replie ? app.label : undefined}
+          className={`${base} ${etat} ${replie ? 'h-10 w-10 flex-none justify-center' : 'gap-3 py-2 pl-2 pr-2'}`}
+        >
+          {actif ? (
+            <span
+              aria-hidden="true"
+              className="absolute bottom-1.5 left-0 top-1.5 w-[3px] rounded-full bg-[var(--nav-accent)]"
+            />
+          ) : null}
+          <IconeNav id={app.icon} className="h-[1.05rem] w-[1.05rem] shrink-0" />
+          {replie ? null : <span className="truncate">{app.label}</span>}
+        </Link>
+        {aSousOptions ? (
+          <button
+            type="button"
+            onClick={() => setOuvert((v) => !v)}
+            aria-expanded={ouvert}
+            aria-controls={idListe}
+            aria-label={`${ouvert ? 'Replier' : 'Déplier'} ${app.label}`}
+            className="inline-flex h-9 w-8 shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-[var(--nav-muted)] transition hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-fg)]"
+          >
+            <IconeNav
+              id="chevron"
+              className={`h-4 w-4 transition-transform motion-reduce:transition-none ${ouvert ? 'rotate-180' : ''}`}
+            />
+          </button>
+        ) : null}
+      </div>
+      {aSousOptions && ouvert ? (
+        <ul
+          id={idListe}
+          className="mb-1 ml-[1.15rem] mt-0.5 border-l border-[var(--nav-border)] pl-3"
+        >
+          {app.sousOptions.map((s) => {
+            const allumee = sousActive === s.id;
             return (
-              <li
-                key={group.id}
-                className={estModule ? 'relative' : 'mt-4 border-t border-[var(--nav-border)] pt-4'}
-              >
-                {/* Rail de trajectoire : relie ce module au suivant. Décoratif. */}
-                {estModule && suivantEstModule && !replie ? (
-                  <span
-                    aria-hidden="true"
-                    className="absolute -bottom-4 left-[calc(0.8125rem-0.5px)] top-6 w-px bg-[var(--nav-border)]"
-                  />
-                ) : null}
-                <h2
-                  className={
-                    replie
-                      ? 'sr-only'
-                      : 'flex items-center gap-2.5 px-2 pb-1 pt-2 font-mono text-[0.68rem] uppercase tracking-[0.14em]'
-                  }
+              <li key={s.id}>
+                <Link
+                  href={s.href}
+                  onClick={onNavigate}
+                  aria-current={allumee ? 'page' : undefined}
+                  className={`block truncate rounded-[var(--radius-sm)] px-2 py-1.5 text-[0.8rem] transition-colors ${allumee ? 'font-semibold text-white' : 'text-[var(--nav-muted)] hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-fg)]'}`}
                 >
-                  {estModule ? (
-                    <span
-                      aria-hidden="true"
-                      className={`relative z-10 h-2.5 w-2.5 rounded-full ring-4 ring-[var(--nav-bg)] ${COULEUR_NOEUD[group.id]}`}
-                    />
-                  ) : null}
-                  <span className="font-semibold text-[var(--nav-fg)]">{group.label}</span>
-                  {group.verb ? (
-                    <span className="normal-case tracking-normal text-[var(--nav-muted)]">
-                      {group.verb}
-                    </span>
-                  ) : null}
-                </h2>
-                {replie && estModule ? (
-                  <span
-                    aria-hidden="true"
-                    className={`mx-auto mb-1 mt-3 block h-1.5 w-1.5 rounded-full ${COULEUR_NOEUD[group.id]}`}
-                  />
-                ) : null}
-                <ul
-                  className={
-                    replie ? 'flex flex-col items-center gap-1' : 'flex flex-col gap-0.5 pb-2'
-                  }
-                >
-                  {entrees.map((item) => (
-                    <li key={item.id}>
-                      <Entree
-                        item={item}
-                        actif={active === item.id}
-                        replie={replie}
-                        retrait={estModule}
-                        onNavigate={onNavigate}
-                      />
-                    </li>
-                  ))}
-                </ul>
+                  {s.label}
+                </Link>
               </li>
             );
           })}
         </ul>
-
-        {modules !== null && !replie ? (
-          <button
-            type="button"
-            onClick={() => setModules([])}
-            className="mt-3 w-full rounded-[var(--radius-sm)] px-2 py-1.5 text-left text-xs text-[var(--nav-muted)] underline-offset-2 transition hover:text-[var(--nav-fg)] hover:underline"
-          >
-            Afficher tous les modules
-          </button>
-        ) : null}
-      </nav>
-
-      {replie ? null : <CarteMiseEnRoute onNavigate={onNavigate} />}
-    </div>
-  );
-}
-
-function Entree({
-  item,
-  actif,
-  replie,
-  retrait,
-  onNavigate,
-}: {
-  item: NavItem;
-  actif: boolean;
-  replie: boolean;
-  retrait: boolean;
-  onNavigate: (() => void) | undefined;
-}): React.ReactElement {
-  const base =
-    'group relative flex items-center rounded-[var(--radius-sm)] text-sm transition-colors';
-  const etat = actif
-    ? 'bg-[var(--nav-active-bg)] font-semibold text-white'
-    : 'text-[var(--nav-muted)] hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-fg)]';
-  return (
-    <Link
-      href={item.href}
-      onClick={onNavigate}
-      aria-current={actif ? 'page' : undefined}
-      // Replié, l'icône est seule à l'écran : le nom passe par `aria-label`, et
-      // `title` le montre au survol. Jamais une icône muette.
-      aria-label={replie ? item.label : undefined}
-      title={replie ? item.label : undefined}
-      className={`${base} ${etat} ${replie ? 'h-10 w-10 justify-center' : `gap-3 py-2 pr-2 ${retrait ? 'pl-8' : 'pl-2'}`}`}
-    >
-      {actif ? (
-        <span
-          aria-hidden="true"
-          className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[var(--nav-accent)]"
-        />
       ) : null}
-      <IconeNav id={item.icon} className="h-[1.05rem] w-[1.05rem] shrink-0" />
-      {replie ? null : <span className="truncate">{item.label}</span>}
-    </Link>
-  );
-}
-
-/**
- * Rappel de la mise en route, tant qu'une étape ouverte au rôle reste à faire.
- * Disparaît d'elle-même quand tout est fait — la page reste atteignable par
- * l'entrée « Mise en route ».
- */
-function CarteMiseEnRoute({
-  onNavigate,
-}: {
-  onNavigate: (() => void) | undefined;
-}): React.ReactElement | null {
-  const { faits, pret } = useMiseEnRoute();
-  const pathname = usePathname();
-  if (!pret || termine(faits) || pathname.startsWith('/organisation/mise-en-route')) return null;
-  const { faites, total } = progression(faits);
-  return (
-    <div className="mx-3 mb-3 rounded-[var(--radius-md)] border border-[var(--nav-border)] p-3">
-      <p className="text-xs font-semibold text-[var(--nav-fg)]">
-        Mise en route · {faites}/{total}
-      </p>
-      <div
-        aria-hidden="true"
-        className="mt-2 h-1 overflow-hidden rounded-full bg-[var(--nav-border)]"
-      >
-        <div
-          className="h-full rounded-full bg-[var(--nav-accent)]"
-          style={{ width: `${total ? Math.round((faites / total) * 100) : 0}%` }}
-        />
-      </div>
-      <Link
-        href={MISE_EN_ROUTE_BASE}
-        onClick={onNavigate}
-        className="mt-2 inline-block text-xs font-medium text-[var(--nav-accent)] underline-offset-2 hover:underline"
-      >
-        Reprendre la mise en route
-        <span className="sr-only">
-          {' '}
-          ({faites} étapes faites sur {total})
-        </span>
-      </Link>
-    </div>
+    </>
   );
 }

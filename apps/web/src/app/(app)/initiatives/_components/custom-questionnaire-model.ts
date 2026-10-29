@@ -106,7 +106,7 @@ export const QUESTIONS: readonly QuestionCadrage[] = [
   {
     id: 'nom_projet',
     kind: 'nom_projet',
-    question: 'Comment s’appelle votre projet ?',
+    question: 'Comment s’appelle votre initiative ?',
     aide: 'C’est le nom qui apparaîtra en tête de votre plan financier. Vous pourrez le changer.',
     placeholder: 'Ex : Mon activité 2026',
   },

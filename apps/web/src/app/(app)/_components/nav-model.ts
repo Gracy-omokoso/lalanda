@@ -1,9 +1,13 @@
-// Logique pure de la navigation latérale par module (ADR-0030 § 2).
+// Logique pure de la navigation par modules (ADR-0038, amende ADR-0030 § 2).
 //
-// Même discipline que `user-menu-model.ts` : ce qui DÉCIDE — la liste des
-// entrées, leur groupe, leur condition d'affichage, l'entrée allumée par le
-// chemin courant, le filtre des modules choisis — vit ici et se teste sans DOM
-// (vitest tourne en environnement `node`). Les `.tsx` ne font qu'assembler.
+// Trois niveaux : la barre du haut (Accueil · BUILD · RUN · GROW), le bureau du
+// module (grille de tuiles) et la colonne de gauche qui ne liste QUE les
+// applications du module courant, avec leurs sous-options dépliables.
+//
+// Même discipline que `user-menu-model.ts` : ce qui DÉCIDE — les applications,
+// leur module, leurs sous-options, leur condition d'affichage, le module et
+// l'application allumés par le chemin — vit ici et se teste sans DOM (vitest
+// tourne en environnement `node`). Les `.tsx` ne font qu'assembler.
 //
 // Rien de ce fichier n'AUTORISE quoi que ce soit. Une entrée masquée est un
 // confort ; `PermissionsGuard` refuse côté API de toute façon (ADR-0012 §8).
@@ -13,8 +17,6 @@
 import type { ModuleId } from '@lalanda/ui';
 
 import type { OrgAction } from '@/lib/api';
-
-export type NavGroupId = ModuleId | 'organisation';
 
 export type NavIconId =
   | 'idees'
@@ -39,301 +41,436 @@ export type NavIconId =
   | 'abonnement'
   | 'parametres';
 
-export interface NavItem {
+/** Une sous-option d'application (ex. « Journal » sous « Factures »). */
+export interface NavSousOption {
+  id: string;
+  href: string;
+  label: string;
+  /** Action exigée pour AFFICHER la sous-option, ou `null`. */
+  action: OrgAction | null;
+}
+
+/** Une application d'un module : une tuile du bureau, une entrée de la colonne. */
+export interface NavApp {
   /** Stable : clé de rendu et clé de test. */
   id: string;
   href: string;
   label: string;
-  group: NavGroupId;
+  /** Courte phrase sous le libellé de la tuile. */
+  description: string;
+  module: ModuleId;
   icon: NavIconId;
-  /** Action exigée pour AFFICHER l'entrée, ou `null` si elle est offerte à tout membre. */
+  /** Action exigée pour AFFICHER l'application, ou `null` si elle est offerte à tout membre. */
   action: OrgAction | null;
+  sousOptions: readonly NavSousOption[];
+  /**
+   * Correspondance EXACTE du chemin. Sert au pilotage (`/organisation`) : ses
+   * pages sœurs (`/organisation/fiscalite`…) sont des réglages hors module, pas
+   * des descendants du pilotage.
+   */
+  exact?: boolean;
 }
 
-export interface NavGroup {
-  id: NavGroupId;
-  /** Libellé lu par les lecteurs d'écran et affiché en en-tête de groupe. */
+export interface NavModule {
+  id: ModuleId;
   label: string;
-  /** Verbe du module (« Concevoir ») ; absent pour Organisation. */
-  verb: string | null;
+  verb: string;
+  /** Destination de l'onglet : le bureau du module. */
+  href: string;
+  description: string;
 }
 
-/** Ordre de la trajectoire : BUILD → RUN → GROW, puis l'organisation. */
-export const NAV_GROUPS: readonly NavGroup[] = [
-  { id: 'build', label: 'BUILD', verb: 'Concevoir' },
-  { id: 'run', label: 'RUN', verb: 'Exploiter' },
-  { id: 'grow', label: 'GROW', verb: 'Croître' },
-  { id: 'organisation', label: 'Organisation', verb: null },
+/** Ordre de la trajectoire : BUILD → RUN → GROW. Fixe (ADR-0038 § 5). */
+export const NAV_MODULES: readonly NavModule[] = [
+  {
+    id: 'build',
+    label: 'BUILD',
+    verb: 'Concevoir',
+    href: '/build',
+    description: 'De l’idée au business plan : valider, chiffrer, rédiger.',
+  },
+  {
+    id: 'run',
+    label: 'RUN',
+    verb: 'Exploiter',
+    href: '/run',
+    description: 'Vendre, facturer, encaisser et suivre la trésorerie au quotidien.',
+  },
+  {
+    id: 'grow',
+    label: 'GROW',
+    verb: 'Croître',
+    href: '/grow',
+    description: 'Piloter l’entreprise, lire ses écarts et préparer sa croissance.',
+  },
 ];
 
+export const MODULE_IDS: readonly ModuleId[] = ['build', 'run', 'grow'];
+
+/** Page d'arrivée après connexion (ADR-0038 § 5). */
+export const ACCUEIL_HREF = '/accueil';
+
 /**
- * Les entrées, dans l'ordre d'affichage (ADR-0030 § 2).
+ * Les applications, dans l'ordre d'affichage (ADR-0038 § 2).
  *
  * Ne figurent ici que des pages qui EXISTENT — la barre ne promet rien (règle
- * d'ADR-0016). GROW : « Pilotage » (tableau de bord de l'organisation), « Brief
- * du matin » (ADR-0033), puis les trois écrans de l'espace Croissance d'ADR-0032
- * (santé, indicateurs investisseurs, parcours).
- * « Modèle de facture » et « Journal » restent des onglets de l'espace Ventes.
+ * d'ADR-0016). Les réglages de l'organisation ne sont plus un module : ils
+ * vivent dans le menu de l'avatar (`user-menu-model.ts`).
  */
-export const NAV_ITEMS: readonly NavItem[] = [
-  // ADR-0036 — l'amont de BUILD : l'idée, puis sa validation, avant le plan
-  // financier. Lecture sous `project.read` (détenu par les huit rôles), donc
-  // offerte à tout membre, comme « Plans financiers » ; l'écriture
-  // (`canvas.update`) se règle à l'écran et à l'API.
+export const NAV_APPS: readonly NavApp[] = [
+  // ─── BUILD : Idées → Validation → Initiatives → Business plan ───────────
+  // ADR-0036 — lecture sous `project.read` (détenu par les huit rôles), donc
+  // offerte à tout membre ; l'écriture se règle à l'écran et à l'API.
   {
     id: 'idees',
     href: '/idees',
     label: 'Idées',
-    group: 'build',
+    description: 'Noter une idée : problème, client cible, proposition de valeur.',
+    module: 'build',
     icon: 'idees',
     action: null,
+    sousOptions: [],
   },
   {
     id: 'validation',
     href: '/idees/validation',
     label: 'Validation',
-    group: 'build',
+    description: 'Tester les hypothèses et comparer les idées sur preuves.',
+    module: 'build',
     icon: 'validation',
     action: null,
+    sousOptions: [],
   },
+  // L'objet appelé « projet » dans le code (`Project`, API `/projects`) :
+  // seul le nom visible et la route web changent (ADR-0038 § 1).
   {
-    id: 'plans',
-    href: '/projects',
-    label: 'Plans financiers',
-    group: 'build',
+    id: 'initiatives',
+    href: '/initiatives',
+    label: 'Initiatives',
+    description: 'Canvas, plan financier, objectifs et réalisé de chaque initiative.',
+    module: 'build',
     icon: 'plans',
     action: null,
+    sousOptions: [],
   },
-  // ADR-0037 — business plan narratif : texte de l'entrepreneur, chiffres du
-  // plan figé, aide IA vérifiée. Lecture sous `project.read`, détenue par tout
-  // membre : offerte à tous, comme « Plans financiers ».
+  // ADR-0037 — business plan narratif, lecture sous `project.read`.
   {
     id: 'business-plan',
     href: '/business-plan',
     label: 'Business plan',
-    group: 'build',
+    description: 'Le document narratif, appuyé sur les chiffres du plan figé.',
+    module: 'build',
     icon: 'business-plan',
     action: null,
+    sousOptions: [],
   },
+
+  // ─── RUN ─────────────────────────────────────────────────────────────────
   {
     id: 'factures',
     href: '/ventes/factures',
     label: 'Factures',
-    group: 'run',
+    description: 'Factures, pro forma et avoirs, facture normalisée DGI.',
+    module: 'run',
     icon: 'factures',
     action: 'sales.read',
+    sousOptions: [
+      // ADR-0028 : galerie ouverte à `sales.read`, le choix exige
+      // `organization.manage` (la page l'annonce, l'API le refuse).
+      {
+        id: 'modele-facture',
+        href: '/ventes/modele-facture',
+        label: 'Modèle de facture',
+        action: 'sales.read',
+      },
+      // ADR-0023 § S25e.12 : journal électronique, lecture `sales.read`.
+      {
+        id: 'journal-ventes',
+        href: '/ventes/factures/journal',
+        label: 'Journal',
+        action: 'sales.read',
+      },
+    ],
   },
-  // ADR-0035 : devis, document distinct qui se convertit en facture. Rangé
-  // juste après les factures : le commerçant chiffre, puis facture, puis encaisse.
+  // ADR-0035 : devis, document distinct qui se convertit en facture.
   {
     id: 'devis',
     href: '/ventes/devis',
     label: 'Devis',
-    group: 'run',
+    description: 'Chiffrer une offre, puis la convertir en facture.',
+    module: 'run',
     icon: 'devis',
     action: 'sales.read',
+    sousOptions: [],
   },
   // ADR-0031 : argent reçu, statut de règlement et pont vers le réalisé.
   {
     id: 'encaissements',
     href: '/ventes/encaissements',
     label: 'Encaissements',
-    group: 'run',
+    description: 'L’argent reçu, les factures à régler et en retard.',
+    module: 'run',
     icon: 'encaissements',
     action: 'sales.read',
+    sousOptions: [],
   },
   {
     id: 'clients',
     href: '/ventes/clients',
     label: 'Clients',
-    group: 'run',
+    description: 'Le fichier clients, prêt pour la facture normalisée.',
+    module: 'run',
     icon: 'clients',
     action: 'sales.read',
+    sousOptions: [],
   },
   {
     id: 'catalogue',
     href: '/ventes/catalogue',
     label: 'Catalogue',
-    group: 'run',
+    description: 'Articles et services, prix et groupes de taxation.',
+    module: 'run',
     icon: 'catalogue',
     action: 'sales.read',
+    sousOptions: [],
   },
-  // ADR-0035 : CRM minimal (pipeline, contacts, relances), après les données
-  // maîtres de vente qu'il prolonge.
+  // ADR-0035 : CRM minimal (pipeline, contacts, relances).
   {
     id: 'crm',
     href: '/ventes/crm',
     label: 'CRM',
-    group: 'run',
+    description: 'Pipeline des opportunités, contacts et relances.',
+    module: 'run',
     icon: 'crm',
     action: 'crm.read',
+    sousOptions: [
+      { id: 'crm-pipeline', href: '/ventes/crm', label: 'Pipeline', action: 'crm.read' },
+      {
+        id: 'crm-contacts',
+        href: '/ventes/crm/contacts',
+        label: 'Contacts et prospects',
+        action: 'crm.read',
+      },
+      {
+        id: 'crm-reglages',
+        href: '/ventes/crm/reglages',
+        label: 'Réglages du pipeline',
+        action: 'crm.read',
+      },
+    ],
   },
   // ADR-0034 — dépenses, comptes, prévision et réalisé vs prévu.
   {
     id: 'tresorerie',
     href: '/tresorerie',
     label: 'Trésorerie',
-    group: 'run',
+    description: 'Dépenses, comptes et soldes, prévision à 7–180 jours.',
+    module: 'run',
     icon: 'tresorerie',
     action: 'treasury.read',
+    sousOptions: [
+      {
+        id: 'tresorerie-depenses',
+        href: '/tresorerie/depenses',
+        label: 'Dépenses',
+        action: 'treasury.read',
+      },
+      {
+        id: 'tresorerie-comptes',
+        href: '/tresorerie/comptes',
+        label: 'Comptes',
+        action: 'treasury.read',
+      },
+      {
+        id: 'tresorerie-realise',
+        href: '/tresorerie/realise',
+        label: 'Réalisé vs prévu',
+        action: 'treasury.read',
+      },
+    ],
   },
+
+  // ─── GROW ────────────────────────────────────────────────────────────────
   // Le tableau de bord de l'organisation EST le pilotage : blocs par rôle,
-  // ratios au rouge, écarts, validations (S21a). Offert à tout membre.
+  // ratios au rouge, écarts, validations (S21a). Rangé dans GROW (ADR-0038 § 6).
   {
     id: 'pilotage',
     href: '/organisation',
     label: 'Pilotage',
-    group: 'grow',
+    description: 'Le tableau de bord de l’organisation, selon votre rôle.',
+    module: 'grow',
     icon: 'pilotage',
     action: null,
+    sousOptions: [],
+    exact: true,
   },
-  // ADR-0033 — brief du matin : faits, alertes et recommandations du moteur,
-  // explication par l'IA à la demande. Même garde que le pilotage
-  // (`analytics.read`, détenu par les huit rôles), donc offert à tout membre.
+  // ADR-0033 — même garde que le pilotage (`analytics.read`, huit rôles).
   {
     id: 'brief',
     href: '/organisation/brief',
     label: 'Brief du matin',
-    group: 'grow',
+    description: 'Les faits, alertes et recommandations du jour.',
+    module: 'grow',
     icon: 'pilotage',
     action: null,
+    sousOptions: [],
   },
-  // ADR-0032 — espace Croissance. Lecture sous `analytics.read`, que les huit
-  // rôles détiennent : offert à tout membre, comme « Pilotage ». Santé et
-  // indicateurs dépendent de l'offre ; l'écran l'explique, l'API l'impose.
+  // ADR-0032 — espace Croissance, lecture sous `analytics.read` (huit rôles).
   {
     id: 'sante',
     href: '/croissance/sante',
     label: 'Santé',
-    group: 'grow',
+    description: 'Le score de santé de l’entreprise et ses risques.',
+    module: 'grow',
     icon: 'sante',
     action: null,
+    sousOptions: [],
   },
   {
     id: 'investisseurs',
     href: '/croissance/investisseurs',
     label: 'Indicateurs investisseurs',
-    group: 'grow',
+    description: 'Les indicateurs qu’un investisseur demande, calculés sur le réel.',
+    module: 'grow',
     icon: 'investisseurs',
     action: null,
+    sousOptions: [],
   },
   {
     id: 'parcours',
     href: '/croissance/parcours',
     label: 'Parcours',
-    group: 'grow',
+    description: 'L’étape de l’entreprise et ce qui reste à franchir.',
+    module: 'grow',
     icon: 'parcours',
     action: null,
-  },
-  // Offerte à tout membre : chaque étape explique elle-même un refus (un
-  // Directeur financier fait la fiscalité mais pas l'identité visuelle).
-  {
-    id: 'mise-en-route',
-    href: '/organisation/mise-en-route',
-    label: 'Mise en route',
-    group: 'organisation',
-    icon: 'mise-en-route',
-    action: null,
-  },
-  {
-    id: 'identite',
-    href: '/organisation/identite',
-    label: 'Identité visuelle',
-    group: 'organisation',
-    icon: 'identite',
-    action: 'organization.manage',
-  },
-  {
-    id: 'fiscalite',
-    href: '/organisation/fiscalite',
-    label: 'Fiscalité',
-    group: 'organisation',
-    icon: 'fiscalite',
-    action: 'fiscal.manage',
-  },
-  {
-    id: 'membres',
-    href: '/organisation/membres',
-    label: 'Membres',
-    group: 'organisation',
-    icon: 'membres',
-    action: 'organization.manage',
-  },
-  {
-    id: 'parametres',
-    href: '/organisation/parametres',
-    label: 'Paramètres',
-    group: 'organisation',
-    icon: 'parametres',
-    action: 'organization.manage',
-  },
-  {
-    id: 'abonnement',
-    href: '/souscription',
-    label: 'Abonnement',
-    group: 'organisation',
-    icon: 'abonnement',
-    action: null,
+    sousOptions: [],
   },
 ];
 
-export const MODULE_IDS: readonly ModuleId[] = ['build', 'run', 'grow'];
+function autorise(action: OrgAction | null, actions: readonly OrgAction[] | null): boolean {
+  return action === null || (actions !== null && actions.includes(action));
+}
 
 /**
- * Entrées réellement proposées.
+ * Applications réellement proposées, avec leurs sous-options filtrées.
  *
- * - `actions === null` (permissions pas encore connues, ou appel en échec) : seules
- *   les entrées sans condition — même règle qu'`ongletsVisibles` (S21a). Montrer
- *   tout puis retirer fait clignoter la barre et promet des pages qui répondront 403.
- * - `modules` : choix de la mise en route (ADR-0030 § 8). `null` = tous. Il ne
- *   filtre que les groupes de module ; l'organisation reste toujours atteignable.
- *   Ce filtre est un rangement, jamais un accès.
+ * `actions === null` (permissions pas encore connues, ou appel en échec) :
+ * seules les entrées sans condition — même règle qu'`ongletsVisibles` (S21a).
+ * Montrer tout puis retirer fait clignoter la barre et promet des pages qui
+ * répondront 403.
  */
-export function entreesVisibles(
+export function appsVisibles(
   actions: readonly OrgAction[] | null,
-  modules: readonly ModuleId[] | null = null,
-): NavItem[] {
-  return NAV_ITEMS.filter((item) => {
-    if (item.action !== null && (actions === null || !actions.includes(item.action))) return false;
-    if (item.group === 'organisation' || modules === null) return true;
-    return modules.includes(item.group);
-  });
+  module: ModuleId | null = null,
+): NavApp[] {
+  return NAV_APPS.filter(
+    (app) => (module === null || app.module === module) && autorise(app.action, actions),
+  ).map((app) => ({
+    ...app,
+    sousOptions: app.sousOptions.filter((s) => autorise(s.action, actions)),
+  }));
 }
 
-/** Les entrées regroupées, dans l'ordre de `NAV_GROUPS` ; un groupe vide n'est pas rendu. */
-export function groupesVisibles(
-  items: readonly NavItem[],
-): Array<{ group: NavGroup; items: NavItem[] }> {
-  return NAV_GROUPS.map((group) => ({
-    group,
-    items: items.filter((i) => i.group === group.id),
-  })).filter((g) => g.items.length > 0);
+/** `true` si `pathname` est `href` ou l'un de ses descendants (frontière de segment). */
+function couvre(pathname: string, href: string): boolean {
+  return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 /**
- * Identifiant de l'entrée correspondant au chemin, ou `null`.
+ * Application et sous-option correspondant au chemin.
  *
- * Frontière de SEGMENT, la correspondance la plus longue gagne (même précaution
- * qu'`entreeActive` du menu du compte) : `/organisation` allume « Pilotage »,
- * `/organisation/fiscalite` allume « Fiscalité » et non « Pilotage »,
- * `/ventes/factures/nouvelle` allume « Factures », `/organisations-amies`
- * n'allume rien.
+ * Frontière de SEGMENT, la correspondance la plus longue gagne, sous-options
+ * comprises : `/ventes/modele-facture` allume « Factures » (par sa
+ * sous-option), `/organisation/fiscalite` n'allume rien (réglage de
+ * l'organisation, hors module), `/organisations-amies` n'allume rien.
+ *
+ * La recherche porte sur TOUTES les applications, pas seulement les visibles :
+ * le module courant d'une page ne dépend pas du chargement des permissions.
  */
-export function entreeActive(pathname: string, items: readonly NavItem[]): string | null {
-  let trouve: NavItem | null = null;
-  for (const item of items) {
-    if (pathname !== item.href && !pathname.startsWith(`${item.href}/`)) continue;
-    if (trouve === null || item.href.length > trouve.href.length) trouve = item;
+export function correspondance(
+  pathname: string,
+  apps: readonly NavApp[] = NAV_APPS,
+): { app: NavApp; sousOption: NavSousOption | null } | null {
+  let trouve: { app: NavApp; sousOption: NavSousOption | null; longueur: number } | null = null;
+  for (const app of apps) {
+    const candidats: Array<{ href: string; sousOption: NavSousOption | null }> = [
+      { href: app.href, sousOption: null },
+      ...app.sousOptions.map((s) => ({ href: s.href, sousOption: s })),
+    ];
+    for (const c of candidats) {
+      const ok =
+        c.sousOption === null && app.exact ? pathname === c.href : couvre(pathname, c.href);
+      if (!ok) continue;
+      // À longueur égale (« Pipeline » = `/ventes/crm`), la sous-option gagne :
+      // c'est elle qu'il faut allumer dans la colonne.
+      if (
+        trouve === null ||
+        c.href.length > trouve.longueur ||
+        (c.href.length === trouve.longueur && trouve.sousOption === null && c.sousOption !== null)
+      ) {
+        trouve = { app, sousOption: c.sousOption, longueur: c.href.length };
+      }
+    }
   }
-  return trouve?.id ?? null;
+  return trouve === null ? null : { app: trouve.app, sousOption: trouve.sousOption };
+}
+
+/** Identifiant de l'application allumée par le chemin, ou `null`. */
+export function appActive(pathname: string, apps: readonly NavApp[] = NAV_APPS): string | null {
+  return correspondance(pathname, apps)?.app.id ?? null;
+}
+
+/** Identifiant de la sous-option allumée par le chemin, ou `null`. */
+export function sousOptionActive(
+  pathname: string,
+  apps: readonly NavApp[] = NAV_APPS,
+): string | null {
+  return correspondance(pathname, apps)?.sousOption?.id ?? null;
+}
+
+/**
+ * Module courant, déduit du chemin (ADR-0038 § 2) : le bureau du module
+ * (`/build`, `/run`, `/grow`), sinon le module de l'application qui
+ * correspond. `null` hors module (accueil, compte, réglages, administration).
+ */
+export function moduleCourant(pathname: string): ModuleId | null {
+  for (const m of NAV_MODULES) if (couvre(pathname, m.href)) return m.id;
+  return correspondance(pathname)?.app.module ?? null;
+}
+
+/** L'onglet Accueil est-il celui de la page ? */
+export function estAccueil(pathname: string): boolean {
+  return couvre(pathname, ACCUEIL_HREF);
+}
+
+/** Le chemin est-il le bureau d'un module (et non l'une de ses applications) ? */
+export function estBureau(pathname: string): boolean {
+  return NAV_MODULES.some((m) => pathname === m.href);
+}
+
+export function moduleParId(id: ModuleId): NavModule {
+  return NAV_MODULES.find((m) => m.id === id)!;
+}
+
+/**
+ * Ordre des cartes de l'accueil (ADR-0038 § 5) : les modules choisis à la mise
+ * en route d'abord, puis les autres, chacun dans l'ordre de la trajectoire.
+ * Un rangement, jamais un accès : aucun module n'est retiré.
+ */
+export function ordreAccueil(modules: readonly ModuleId[] | null): ModuleId[] {
+  if (modules === null) return [...MODULE_IDS];
+  return [
+    ...MODULE_IDS.filter((m) => modules.includes(m)),
+    ...MODULE_IDS.filter((m) => !modules.includes(m)),
+  ];
 }
 
 // ─── Choix des modules (mise en route, étape 4) ─────────────────────────────
 
 /**
- * Clé de stockage du choix des modules, PAR ORGANISATION : une même personne
- * peut ne faire que de la vente dans une entreprise et que du plan dans une
- * autre. Stockage navigateur faute d'API (ADR-0030, décision D3).
+ * Clé de stockage du choix des modules, PAR ORGANISATION. Stockage navigateur
+ * faute d'API (ADR-0030, décision D3).
  */
 export function cleModules(organizationId: string): string {
   return `lalanda.modules.${organizationId}`;
@@ -341,7 +478,7 @@ export function cleModules(organizationId: string): string {
 
 /**
  * Relit un choix stocké. Toute valeur illisible vaut « aucun choix » (`null`,
- * donc tous les modules) : un stockage corrompu ne doit jamais vider la barre.
+ * donc tous les modules) : un stockage corrompu ne doit jamais rien vider.
  */
 export function lireModules(brut: string | null): ModuleId[] | null {
   if (brut === null) return null;
@@ -356,7 +493,7 @@ export function lireModules(brut: string | null): ModuleId[] | null {
   return modules.length > 0 ? modules : null;
 }
 
-/** Sérialise un choix ; un choix vide ou complet s'écrit `null` (rien à filtrer). */
+/** Sérialise un choix ; un choix vide ou complet s'écrit `null` (rien à ranger). */
 export function ecrireModules(modules: readonly ModuleId[]): string | null {
   const propres = MODULE_IDS.filter((m) => modules.includes(m));
   if (propres.length === 0 || propres.length === MODULE_IDS.length) return null;
@@ -366,9 +503,12 @@ export function ecrireModules(modules: readonly ModuleId[]): string | null {
 // ─── Barre d'actions basse (téléphone) ──────────────────────────────────────
 
 export interface ActionRapide {
+  /** Sert aussi d'identifiant d'icône (`plans` = icône des initiatives). */
   id: 'plans' | 'factures' | 'facturer' | 'clients';
   href: string;
   label: string;
+  /** Application allumée par cette action (pour `aria-current`). */
+  app: string | null;
   /** L'action principale, dessinée en relief. */
   principale: boolean;
 }
@@ -379,23 +519,41 @@ export interface ActionRapide {
  * navigation suffit et la barre n'est pas rendue (tableau vide).
  *
  * « Facturer » mène au compositeur existant : il crée un BROUILLON (pro forma),
- * ouvert à `sales.manage` côté API — un rôle en lecture seule y lira le refus
- * du serveur, d'où la condition supplémentaire.
+ * ouvert à `sales.manage` côté API — d'où la condition supplémentaire.
  */
 export function actionsRapides(actions: readonly OrgAction[] | null): ActionRapide[] {
   if (actions === null || !actions.includes('sales.read')) return [];
   const liste: ActionRapide[] = [
-    { id: 'plans', href: '/projects', label: 'Plans', principale: false },
-    { id: 'factures', href: '/ventes/factures', label: 'Factures', principale: false },
+    {
+      id: 'plans',
+      href: '/initiatives',
+      label: 'Initiatives',
+      app: 'initiatives',
+      principale: false,
+    },
+    {
+      id: 'factures',
+      href: '/ventes/factures',
+      label: 'Factures',
+      app: 'factures',
+      principale: false,
+    },
   ];
   if (actions.includes('sales.manage')) {
     liste.push({
       id: 'facturer',
       href: '/ventes/factures/nouvelle',
       label: 'Facturer',
+      app: null,
       principale: true,
     });
   }
-  liste.push({ id: 'clients', href: '/ventes/clients', label: 'Clients', principale: false });
+  liste.push({
+    id: 'clients',
+    href: '/ventes/clients',
+    label: 'Clients',
+    app: 'clients',
+    principale: false,
+  });
   return liste;
 }

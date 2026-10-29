@@ -5,6 +5,12 @@ Date : 2026-10-21
 Décideurs : Gracy Omokoso (demande : « le design Lalanda actuel n'est plus adapté ») ;
 équipe de développement (proposition, en attente de revue — **non publiée**)
 
+> **Amendé par [ADR-0038](ADR-0038-navigation-par-modules-et-initiatives.md) (29 oct. 2026,
+> accepté).** Navigation à trois niveaux : barre du haut Accueil · BUILD · RUN · GROW, bureau
+> de module, colonne des seules applications du module courant. Les réglages de
+> l'organisation passent dans le menu de l'avatar ; « Plans financiers » devient
+> « Initiatives » (`/initiatives`, ancienne route `/projects` redirigée).
+
 > **Amende [ADR-0016](ADR-0016-navigation-applicative.md)** : la navigation principale
 > quitte le menu de l'avatar pour une **barre latérale par module** (BUILD · RUN · GROW ·
 > Organisation). Le menu du compte est conservé tel quel (ses sept entrées, son clavier,

@@ -76,8 +76,8 @@ export function DashboardPanel(): React.ReactElement {
     return (
       <EtatVide titre="Aucune organisation active">
         Créez une organisation ou acceptez une invitation pour ouvrir cet espace.{' '}
-        <Link href="/projects" className="underline hover:text-[var(--accent)]">
-          Retour aux projets
+        <Link href="/initiatives" className="underline hover:text-[var(--accent)]">
+          Retour aux initiatives
         </Link>
       </EtatVide>
     );
@@ -136,7 +136,7 @@ export function DashboardPanel(): React.ReactElement {
       {sections.gouvernance ? (
         <Bloc titre="Pilotage de l’organisation">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Tuile libelle="Projets" valeur={formatNombre(sections.gouvernance.projets)} />
+            <Tuile libelle="Initiatives" valeur={formatNombre(sections.gouvernance.projets)} />
             <Tuile
               libelle="Plans validés ce mois"
               valeur={formatNombre(sections.gouvernance.plansValidesCeMois)}
@@ -173,7 +173,7 @@ export function DashboardPanel(): React.ReactElement {
               {sections.validation.ratiosRouges.map((r) => (
                 <Ligne
                   key={`${r.projectId}-${r.lineId}`}
-                  href={`/projects/${r.projectId}`}
+                  href={`/initiatives/${r.projectId}`}
                   titre={r.label}
                   // Le point rouge ne porte AUCUNE information seul : le seuil
                   // attendu est écrit juste en dessous (docs/04 § Accessibilité).
@@ -185,13 +185,13 @@ export function DashboardPanel(): React.ReactElement {
 
             <Colonne
               titre="Plans en attente"
-              vide="Tous les projets ont un plan validé à jour."
+              vide="Toutes les initiatives ont un plan validé à jour."
               nombre={sections.validation.plansEnAttente.length}
             >
               {sections.validation.plansEnAttente.map((p) => (
                 <Ligne
                   key={p.projectId}
-                  href={`/projects/${p.projectId}`}
+                  href={`/initiatives/${p.projectId}`}
                   titre={p.projectName}
                   puce="warn"
                   detail={`${libelleRaisonAttente(p)} ${
@@ -209,7 +209,7 @@ export function DashboardPanel(): React.ReactElement {
               {sections.validation.ecartsDefavorables.map((e) => (
                 <Ligne
                   key={e.projectId}
-                  href={`/projects/${e.projectId}/realise`}
+                  href={`/initiatives/${e.projectId}/realise`}
                   titre={e.projectName}
                   puce="warn"
                   detail={
@@ -242,7 +242,7 @@ export function DashboardPanel(): React.ReactElement {
               {sections.comptabilite.periodesASaisir.map((p) => (
                 <Ligne
                   key={`${p.projectId}-${p.year}-${p.month}`}
-                  href={`/projects/${p.projectId}/realise`}
+                  href={`/initiatives/${p.projectId}/realise`}
                   titre={p.projectName}
                   detail={libelleMois(p.year, p.month)}
                 />
@@ -259,7 +259,7 @@ export function DashboardPanel(): React.ReactElement {
               {sections.comptabilite.periodesACloturer.map((p) => (
                 <Ligne
                   key={`${p.projectId}-${p.year}-${p.month}`}
-                  href={`/projects/${p.projectId}/realise`}
+                  href={`/initiatives/${p.projectId}/realise`}
                   titre={p.projectName}
                   detail={libelleMois(p.year, p.month)}
                 />
@@ -274,7 +274,7 @@ export function DashboardPanel(): React.ReactElement {
               {sections.comptabilite.anomalies.map((a) => (
                 <Ligne
                   key={`${a.projectId}-${a.lineId}`}
-                  href={`/projects/${a.projectId}/realise`}
+                  href={`/initiatives/${a.projectId}/realise`}
                   titre={`${a.projectName} · ${a.label}`}
                   puce="warn"
                   // Le message vient du calcul d'écarts, qui SIGNALE sans jamais
@@ -289,10 +289,10 @@ export function DashboardPanel(): React.ReactElement {
 
       {/* ── Projets — `project.read`, donc tout le monde ────────────────── */}
       {sections.projets ? (
-        <Bloc titre="Projets">
+        <Bloc titre="Initiatives">
           {sections.projets.projets.length === 0 ? (
-            <EtatVide titre="Aucun projet pour l’instant">
-              Les projets de l’organisation apparaîtront ici dès leur création.
+            <EtatVide titre="Aucune initiative pour l’instant">
+              Les initiatives de l’organisation apparaîtront ici dès leur création.
             </EtatVide>
           ) : (
             <ul className="flex flex-col gap-2">
@@ -302,7 +302,7 @@ export function DashboardPanel(): React.ReactElement {
                   className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm"
                 >
                   <Link
-                    href={`/projects/${p.id}`}
+                    href={`/initiatives/${p.id}`}
                     className="font-medium hover:text-[var(--accent)]"
                   >
                     {p.name}

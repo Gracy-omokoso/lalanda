@@ -69,7 +69,7 @@ export default function LoginPage(): React.ReactElement {
         );
         return;
       }
-      router.push('/projects');
+      router.push('/accueil');
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur de connexion');

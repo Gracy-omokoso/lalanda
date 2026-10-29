@@ -338,7 +338,7 @@ export const PutBridgeSchema = z
         ctx,
         ['projectId'],
         'BRIDGE_INCOMPLETE',
-        'Pour activer le report, choisissez le projet et le mois d’ouverture de l’exercice 1.',
+        'Pour activer le report, choisissez l’initiative et le mois d’ouverture de l’exercice 1.',
       );
     }
   });

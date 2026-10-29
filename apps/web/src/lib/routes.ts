@@ -12,7 +12,7 @@
  * LES PAGES LÉGALES N'EN FONT PAS PARTIE, et c'est délibéré (S22c). Elles vivent
  * dans le même route group `(marketing)` mais ne doivent déclencher AUCUNE
  * redirection : un membre connecté qui clique sur « CGU » depuis le footer
- * applicatif doit lire les CGU, pas atterrir sur `/projects`. N'étant ni
+ * applicatif doit lire les CGU, pas atterrir sur `/accueil`. N'étant ni
  * marketing, ni auth, ni protégées, elles traversent le middleware sans
  * traitement — la liste faisant foi est `lib/legal.ts`, et `legal.test.ts`
  * vérifie qu'aucune d'elles n'a glissé dans les tableaux de ce fichier.
@@ -27,6 +27,15 @@ export const MARKETING_PATHS = ['/', '/pricing'] as const;
  * le middleware ne regarde que le cookie de session, jamais l'organisation.
  */
 export const PROTECTED_PREFIXES = [
+  // ADR-0038 — page d'arrivée et bureaux des trois modules.
+  '/accueil',
+  '/build',
+  '/run',
+  '/grow',
+  // ADR-0038 — les initiatives (nom interne : projets). `/projects` reste listé :
+  // la redirection 308 de `next.config.mjs` passe avant le middleware, mais
+  // une ancienne URL ne doit jamais devenir une page ouverte si elle saute.
+  '/initiatives',
   '/projects',
   '/members',
   '/invitations',
@@ -58,6 +67,8 @@ export const PROTECTED_PREFIXES = [
   '/croissance',
   // ADR-0036 — Idea Lab (BUILD). Session ET organisation active, comme `/croissance`.
   '/idees',
+  // ADR-0037 — business plan narratif (BUILD).
+  '/business-plan',
 ] as const;
 
 /**

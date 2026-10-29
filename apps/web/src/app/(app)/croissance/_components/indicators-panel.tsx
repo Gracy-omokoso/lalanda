@@ -71,8 +71,8 @@ export function IndicatorsPanel(): React.ReactElement {
         <p>
           Calculés le {vue.asOf} depuis vos données réelles :{' '}
           {f.projet
-            ? `réalisé clôturé du projet « ${f.projet.nom} » (${f.moisClotures} mois clôturés)`
-            : 'aucun projet de référence'}
+            ? `réalisé clôturé de l’initiative « ${f.projet.nom} » (${f.moisClotures} mois clôturés)`
+            : 'aucune initiative de référence'}
           {' · '}
           {f.devise
             ? `${f.documentsRetenus} document${f.documentsRetenus > 1 ? 's' : ''} de vente en ${f.devise}`
@@ -229,9 +229,9 @@ function Declarations({
       ) : null}
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="doc-card flex flex-col gap-3 px-4 py-3">
-          <h3 className="font-medium">Projet de référence et revenus récurrents</h3>
+          <h3 className="font-medium">Initiative de référence et revenus récurrents</h3>
           <label className="flex flex-col gap-1 text-sm">
-            Projet dont le réalisé représente l’entreprise
+            Initiative dont le réalisé représente l’entreprise
             <select
               className={champ}
               value={projet}
@@ -239,7 +239,7 @@ function Declarations({
               onChange={(e) => setProjet(e.target.value)}
             >
               <option value="">
-                {profil.projects.length === 1 ? 'Le seul projet (par défaut)' : 'Non choisi'}
+                {profil.projects.length === 1 ? 'La seule initiative (par défaut)' : 'Non choisi'}
               </option>
               {profil.projects.map((p) => (
                 <option key={p.id} value={p.id}>
