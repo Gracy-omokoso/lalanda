@@ -190,6 +190,8 @@ describe('menu et clavier', () => {
     ]);
     expect(o[1]!.label).toBe('Le lendemain (5 nov.)');
     expect(optionsEcheance(t, '2026-11-04').some((x) => x.id === 'auj')).toBe(false);
+    // Aujourd'hui = la veille : pas de doublon dans le menu.
+    expect(optionsEcheance(t, '2026-11-03').filter((x) => x.jour === '2026-11-03')).toHaveLength(1);
     expect(optionsEcheance(tache({ id: oid(2) }), '2026-11-04')).toEqual([]);
   });
 

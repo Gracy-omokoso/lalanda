@@ -368,7 +368,7 @@ type TacheTexte = Pick<
 
 /**
  * Conflits de dates en phrases (la couleur n'est jamais seule) : « #5 Pose
- * commence le 3 nov., avant la fin de #2 Achat (4 nov.) ».
+ * commence le 3 nov., sans attendre la fin de #2 Achat (échéance le 4 nov.) ».
  */
 export function phrasesConflits(tasks: readonly TacheTexte[]): { taskId: string; texte: string }[] {
   const parId = new Map(tasks.map((t) => [t.id, t]));
@@ -378,7 +378,7 @@ export function phrasesConflits(tasks: readonly TacheTexte[]): { taskId: string;
     const debut = t.startDate ?? t.dueDate!;
     return {
       taskId: t.id,
-      texte: `#${t.number} ${t.title} commence le ${formatJour(debut, false)}, avant la fin de #${p.number} ${p.title} (${formatJour(p.dueDate, false)}).`,
+      texte: `#${t.number} ${t.title} commence le ${formatJour(debut, false)}, sans attendre la fin de #${p.number} ${p.title} (échéance le ${formatJour(p.dueDate, false)}).`,
     };
   });
 }

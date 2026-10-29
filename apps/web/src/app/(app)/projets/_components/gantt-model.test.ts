@@ -229,7 +229,8 @@ describe('textes', () => {
     expect(phrasesConflits([A, B, J])).toEqual([
       {
         taskId: J.id,
-        texte: '#3 Livraison commence le 9 nov., avant la fin de #2 Pose (9 nov.).',
+        texte:
+          '#3 Livraison commence le 9 nov., sans attendre la fin de #2 Pose (échéance le 9 nov.).',
       },
     ]);
   });

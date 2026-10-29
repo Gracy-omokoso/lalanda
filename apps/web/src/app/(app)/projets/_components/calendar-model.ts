@@ -333,7 +333,7 @@ export interface OptionEcheance {
 /**
  * Menu « Déplacer l'échéance… » (équivalent clavier et tactile du
  * glisser-déposer) : veille, lendemain, semaine précédente, suivante, et
- * aujourd'hui si l'échéance est ailleurs.
+ * aujourd'hui si aucune autre option n'y mène déjà.
  */
 export function optionsEcheance(t: TacheCalendrier, today: string): OptionEcheance[] {
   if (t.dueDate === null) return [];
@@ -352,7 +352,7 @@ export function optionsEcheance(t: TacheCalendrier, today: string): OptionEchean
       jour: addDays(d, 7),
     },
   ];
-  if (today !== d)
+  if (today !== d && !out.some((o) => o.jour === today))
     out.push({ id: 'auj', label: `Aujourd’hui (${formatJour(today, false)})`, jour: today });
   return out;
 }

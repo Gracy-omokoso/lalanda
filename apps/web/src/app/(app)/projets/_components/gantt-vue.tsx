@@ -447,17 +447,27 @@ export function VueChronologie(): React.ReactElement {
                   <line
                     x1={xAuj}
                     x2={xAuj}
-                    y1={HAUTEUR_ENTETE - 4}
+                    y1={20}
                     y2={hauteur}
                     strokeWidth={2}
                     style={{ stroke: 'var(--accent)' }}
                   />
+                  {/* Pastille dans l'étage des mois : ne chevauche pas les numéros de jour. */}
+                  <rect
+                    x={xAuj - 33}
+                    y={3}
+                    width={66}
+                    height={16}
+                    rx={8}
+                    style={{ fill: 'var(--accent)' }}
+                  />
                   <text
-                    x={xAuj + 4}
-                    y={HAUTEUR_ENTETE - 6}
+                    x={xAuj}
+                    y={14.5}
                     fontSize={10}
                     fontWeight={600}
-                    style={{ fill: 'var(--accent)' }}
+                    textAnchor="middle"
+                    style={{ fill: 'var(--accent-foreground)' }}
                   >
                     Aujourd’hui
                   </text>
