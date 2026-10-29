@@ -76,7 +76,31 @@ La saisie guidée fonctionne sur mobile. Les tableaux financiers complexes cible
 
 Le français est la langue initiale. Les libellés métier ne doivent pas être codés en dur dans le moteur. La structure prépare l’ajout d’autres langues et conserve les noms légaux locaux dans le Country Pack.
 
-## Implémenté (ADR-0030, en revue) — Refonte : navigation par module, design system, mise en route
+## Implémenté (ADR-0038, accepté le 29 oct. 2026) — Navigation par modules et « Initiative »
+
+Décision : `docs/adr/ADR-0038-navigation-par-modules-et-initiatives.md`. Elle **remplace la barre latérale à quatre groupes** décrite dans la section ADR-0030 ci-dessous (design system, mise en route et barre basse restent valables).
+
+### Trois niveaux
+
+1. **Barre du haut** (`(app)/_components/app-header.tsx`) : marque et sélecteur d'organisation (≥ 1024 px), onglets **Accueil · BUILD · RUN · GROW** avec leur icône (`ModuleIcon` de `packages/ui` : blocs empilés, engrenage, pousse sur une courbe montante), Aide, thème (≥ 640 px ; sinon dans Mon compte › Préférences), avatar. Sous 1024 px, les onglets se réduisent à leur icône (nom accessible conservé) et le bouton du tiroir apparaît.
+2. **Bureau du module** (`/build`, `/run`, `/grow`, composant `module-desk.tsx`) : tuiles des applications du module (icône, libellé, description), deux colonnes sur téléphone.
+3. **Page d'application** : la colonne de gauche (`sidebar.tsx`) ne liste que les applications du module courant ; « Factures » (Modèle de facture, Journal), « CRM » (Pipeline, Contacts, Réglages) et « Trésorerie » (Dépenses, Comptes, Réalisé vs prévu) se déroulent. Sur téléphone, la colonne est le tiroir. Hors module (accueil, compte, réglages), pas de colonne.
+
+Le module courant et l'application allumée se déduisent du chemin (`nav-model.ts`, testé) ; `/organisation` seul et `/organisation/brief` sont GROW, les autres `/organisation/*` ne sont d'aucun module.
+
+### Accueil (`/accueil`)
+
+Page d'arrivée après connexion. Trois cartes BUILD · RUN · GROW (nom, verbe, icône dans la couleur du module, chiffres lus sur des API existantes : initiatives et idées actives ; factures à encaisser et en retard si `sales.read` ; alertes du brief et score de santé s'il est calculable). Un chiffre illisible n'est jamais remplacé : la carte montre une phrase d'appel. Dessous : alertes du brief du matin (trois au plus) et rappel de la mise en route. Le choix des modules de la mise en route met les modules choisis en tête de l'accueil ; il ne masque rien.
+
+### Menu de l'avatar
+
+Mon compte · Mise en route · Identité visuelle · Fiscalité · Membres · Paramètres · Abonnement · Administration · Déconnexion, filtrés par `GET /me/permissions` (déjà lu par la coquille) et `canReadAdmin`.
+
+### « Initiative »
+
+L'objet de BUILD (Canvas, plan financier, objectifs, réalisé, business plan) s'appelle **Initiative** à l'écran, dans les messages d'API, le PDF et l'Excel ; routes web `/initiatives/...`, anciennes `/projects/...` redirigées en 308 (`next.config.mjs`). Le nom interne reste `Project` (API `/projects`, permissions `project.*`). Les documents juridiques gardent « projet » jusqu'à leur prochaine version (ADR-0038, point ouvert 1).
+
+## Implémenté (ADR-0030, amendé par ADR-0038) — Refonte : navigation par module, design system, mise en route
 
 Décision, audit et décisions ouvertes : `docs/adr/ADR-0030-refonte-ui-ux.md`. Captures avant/après : `docs/refonte-ui/`. Branche `feat/refonte-ui`, **non publiée** sans revue de la dirigeante.
 
