@@ -30,6 +30,7 @@ export type NavIconId =
   | 'tresorerie'
   | 'devis'
   | 'crm'
+  | 'projets'
   | 'pilotage'
   | 'sante'
   | 'investisseurs'
@@ -166,6 +167,27 @@ export const NAV_APPS: readonly NavApp[] = [
   },
 
   // ─── RUN ─────────────────────────────────────────────────────────────────
+  // ADR-0039 § 8 — le gestionnaire de projets et de tâches, EN TÊTE de RUN (le
+  // travail du jour). « Projets » désigne désormais ce module ; le plan BUILD
+  // s'appelle « Initiative » (ADR-0038). Lecture `work.read` (CDP et CON exclus).
+  {
+    id: 'projets',
+    href: '/projets',
+    label: 'Projets',
+    description: 'Projets clients et internes : tâches, Kanban, échéances.',
+    module: 'run',
+    icon: 'projets',
+    action: 'work.read',
+    sousOptions: [
+      {
+        id: 'projets-mes-taches',
+        href: '/projets/mes-taches',
+        label: 'Mes tâches',
+        action: 'work.read',
+      },
+      { id: 'projets-tous', href: '/projets', label: 'Tous les projets', action: 'work.read' },
+    ],
+  },
   {
     id: 'factures',
     href: '/ventes/factures',
