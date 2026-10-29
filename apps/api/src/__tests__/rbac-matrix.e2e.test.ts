@@ -111,19 +111,6 @@ const ACTIONS_SANS_ROUTE: Record<string, string> = {
     'Aucune route de modification de projet en S20a : `POST /projects/:id/drivers` ' +
     'relève de `inputs.update`, et il n’existe ni `PATCH /projects/:id` ni ' +
     'renommage. L’action est déclarée par docs/12 et attend son endpoint.',
-  // ADR-0039 — lot L0 : les actions existent avant leurs routes. Le lot L1 (API
-  // `work`) ajoute une sonde par action dans SONDES (`GET /work/projects`,
-  // `POST /work/projects/:id/tasks`, `POST /work/projects`) et RETIRE ces trois
-  // dispenses : le test de complétude l'exige dès qu'une sonde existe.
-  'work.read':
-    'Aucune route `work` au lot L0 d’ADR-0039 (socle : contrats et actions). ' +
-    'Sonde attendue au lot L1 : `GET /work/projects` (tous sauf CDP et CON).',
-  'work.update':
-    'Aucune route `work` au lot L0 d’ADR-0039 (socle : contrats et actions). ' +
-    'Sonde attendue au lot L1 : `POST /work/projects/:id/tasks` (sauf CDP, CON, LEC).',
-  'work.manage':
-    'Aucune route `work` au lot L0 d’ADR-0039 (socle : contrats et actions). ' +
-    'Sonde attendue au lot L1 : `POST /work/projects` (PRO, ADM, DIR).',
 };
 
 /** Une sonde HTTP : la route qui matérialise une action, et ses statuts légitimes. */
@@ -532,7 +519,50 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
           .set('Cookie', c)
           .send({ name: `Sonde CRM ${role} ${tag}`, companyName: 'Sonde' }),
     },
+    {
+      // ADR-0039 § 7 — tous les rôles sauf Conseiller et Chef de projet.
+      action: 'work.read',
+      libelle: 'GET /work/projects',
+      statutsAutorises: [200],
+      envoyer: (c) => request(serveur()).get('/work/projects').set('Cookie', c),
+    },
+    {
+      // ADR-0039 § 7 — Propriétaire, Administrateur, Directeur financier,
+      // Comptable, Analyste. Une tâche par rôle dans le projet de sondage.
+      action: 'work.update',
+      libelle: 'POST /work/projects/:id/tasks',
+      statutsAutorises: [201],
+      envoyer: async (c, role) =>
+        request(serveur())
+          .post(`/work/projects/${await projetWorkSonde()}/tasks`)
+          .set('Cookie', c)
+          .send({ title: `Sonde tâche ${role}` }),
+    },
+    {
+      // ADR-0039 § 7 — Propriétaire, Administrateur, Directeur financier.
+      action: 'work.manage',
+      libelle: 'POST /work/projects',
+      statutsAutorises: [201],
+      envoyer: (c, role) =>
+        request(serveur())
+          .post('/work/projects')
+          .set('Cookie', c)
+          .send({ name: `Sonde projet ${role} ${tag}`, kind: 'internal' }),
+    },
   ];
+
+  /** Projet de RUN de sondage (`work`), créé une fois par le propriétaire. */
+  let projetWork = '';
+  async function projetWorkSonde(): Promise<string> {
+    if (projetWork !== '') return projetWork;
+    const res = await request(serveur())
+      .post('/work/projects')
+      .set('Cookie', cookiesDe('owner'))
+      .send({ name: `Sonde RUN ${tag}`, kind: 'internal' });
+    expect(res.status, `projet RUN de sondage : ${JSON.stringify(res.body)}`).toBe(201);
+    projetWork = res.body.id as string;
+    return projetWork;
+  }
 
   // ───────────────────────────────────────────────────────────────────────────
   // Complétude — la sonde ne doit pas pouvoir se vider en silence
