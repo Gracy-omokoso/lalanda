@@ -81,12 +81,19 @@ export class CrmContact {
   @Prop({ type: String, default: null })
   phone!: string | null;
 
-  /** Client de l'organisation ; `null` : prospect (entreprise dans `companyName`). */
+  /** Client de l'organisation ; `null` : prospect (entreprise dans `companyName`). Recopié du compte (ADR-0040 § 2.2). */
   @Prop({ type: String, default: null })
   customerId!: string | null;
 
   @Prop({ type: String, default: null })
   companyName!: string | null;
+
+  /**
+   * ADR-0040 — C1 (§ 2.2) : compte de la personne (`crm_accounts`), `null` :
+   * personne sans entreprise. `customerId` et `companyName` en sont recopiés.
+   */
+  @Prop({ type: String, default: null })
+  accountId!: string | null;
 
   @Prop({ type: String, default: null })
   notes!: string | null;
@@ -117,6 +124,8 @@ export const CrmContactSchema = SchemaFactory.createForClass(CrmContact);
 CrmContactSchema.index({ organizationId: 1, sortName: 1, _id: 1 });
 CrmContactSchema.index({ organizationId: 1, customerId: 1 });
 CrmContactSchema.index({ organizationId: 1, email: 1 });
+// ADR-0040 — C1
+CrmContactSchema.index({ organizationId: 1, accountId: 1 });
 
 // ── Opportunités ────────────────────────────────────────────────────────────
 
