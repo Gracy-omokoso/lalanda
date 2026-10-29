@@ -31,8 +31,7 @@ function queryOf(params: ListNotificationsParams): string {
 export const notificationsApi = {
   list: (params: ListNotificationsParams = {}) =>
     jsonRequest<NotificationPageView>(`/notifications${queryOf(params)}`, { method: 'GET' }),
-  unreadCount: () =>
-    jsonRequest<UnreadCountView>('/notifications/unread-count', { method: 'GET' }),
+  unreadCount: () => jsonRequest<UnreadCountView>('/notifications/unread-count', { method: 'GET' }),
   markRead: (notificationId: string) =>
     jsonRequest<NotificationView>(`/notifications/${encodeURIComponent(notificationId)}/read`, {
       method: 'POST',

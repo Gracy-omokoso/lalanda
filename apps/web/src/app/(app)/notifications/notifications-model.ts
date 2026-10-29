@@ -108,7 +108,10 @@ export function marquerLue(
 }
 
 /** Marque toute la liste locale comme lue. */
-export function toutMarquerLu(items: readonly NotificationView[], lueA: string): NotificationView[] {
+export function toutMarquerLu(
+  items: readonly NotificationView[],
+  lueA: string,
+): NotificationView[] {
   return items.map((n) => (n.readAt === null ? { ...n, readAt: lueA } : n));
 }
 
@@ -146,3 +149,9 @@ export function basculerTypeCoupe(
 export function doitInterroger(visibilite: DocumentVisibilityState | undefined): boolean {
   return visibilite !== 'hidden';
 }
+
+/**
+ * Événement de fenêtre émis après un marquage depuis la page : la cloche relit
+ * alors son compteur sans attendre l'interrogation suivante.
+ */
+export const EVENEMENT_NOTIFICATIONS = 'lalanda:notifications-changees';

@@ -21,6 +21,7 @@ import { LIENS_AIDE } from '@/lib/aide/liens';
 import { useSession } from '@/lib/auth-client';
 
 import { ACCUEIL_HREF, estAccueil, moduleCourant, NAV_MODULES } from './nav-model';
+import { NotificationsBell } from './notifications-bell';
 import { OrgSwitcher } from './org-switcher';
 import { UserMenu } from './user-menu';
 
@@ -164,6 +165,7 @@ export function AppHeader({
         <span className="hidden sm:inline-flex">
           <ThemeToggle persist />
         </span>
+        {session?.user ? <NotificationsBell /> : null}
         {isPending ? (
           <span aria-hidden="true" className="h-8 w-8 rounded-full bg-[var(--nav-active-bg)]" />
         ) : session?.user ? (
