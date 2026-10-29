@@ -45,6 +45,9 @@ import { CrmAccountsService } from './accounts/crm-accounts.service.js';
 // ADR-0040 — C2
 import { CatalogItem, CatalogItemSchema } from '../sales/catalog-item.schema.js';
 import { CRM_OPPORTUNITY_EVENTS, NO_OPPORTUNITY_EVENTS } from './opportunity-events.js';
+// ADR-0040 — C3
+import { CrmReportsController } from './reports/crm-reports.controller.js';
+import { CrmReportsService } from './reports/crm-reports.service.js';
 
 @Module({
   imports: [
@@ -73,6 +76,8 @@ import { CRM_OPPORTUNITY_EVENTS, NO_OPPORTUNITY_EVENTS } from './opportunity-eve
     CrmActivitiesController,
     // ADR-0040 — C1
     CrmAccountsController,
+    // ADR-0040 — C3 : rapports (lecture seule, montants estimés).
+    CrmReportsController,
   ],
   providers: [
     CrmSettingsService,
@@ -90,6 +95,8 @@ import { CRM_OPPORTUNITY_EVENTS, NO_OPPORTUNITY_EVENTS } from './opportunity-eve
     CrmBriefSource,
     // ADR-0040 — C2 : point d'extension « opportunité gagnée » (sans effet par défaut).
     { provide: CRM_OPPORTUNITY_EVENTS, useValue: NO_OPPORTUNITY_EVENTS },
+    // ADR-0040 — C3 : rapports (moteur `crmReports`).
+    CrmReportsService,
   ],
   exports: [
     OpportunitiesService,
