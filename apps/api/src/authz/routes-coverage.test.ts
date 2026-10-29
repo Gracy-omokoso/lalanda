@@ -92,6 +92,8 @@ import { CrmAccountsController } from '../crm/accounts/crm-accounts.controller.j
 import { CrmOverviewController } from '../crm/overview/crm-overview.controller.js';
 // ADR-0040 — C2
 import { QuotesFromOpportunityController } from '../sales/quotes/quotes-from-opportunity.controller.js';
+// ADR-0040 — C3
+import { CrmReportsController } from '../crm/reports/crm-reports.controller.js';
 import { ACTIONS, PLATFORM_FORBIDDEN_ACTIONS, type Action } from './permissions.js';
 
 /**
@@ -188,6 +190,8 @@ const CONTROLEURS = [
   CrmOverviewController,
   // ADR-0040 — C2 : devis prérempli depuis une opportunité.
   QuotesFromOpportunityController,
+  // ADR-0040 — C3 : rapports du CRM.
+  CrmReportsController,
 ];
 
 /**
@@ -733,6 +737,8 @@ describe('couverture des routes par le RBAC', () => {
       // depuis une opportunité : préparer un devis ET lire l'opportunité.
       'CrmOpportunitiesController.reassign': ['crm.manage'],
       'QuotesFromOpportunityController.create': ['sales.quote', 'crm.read'],
+      // ADR-0040 — C3 : rapports en lecture seule, comme le pipeline.
+      'CrmReportsController.reports': ['crm.read'],
     };
     for (const [cle, actions] of Object.entries(attendu)) {
       const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle);

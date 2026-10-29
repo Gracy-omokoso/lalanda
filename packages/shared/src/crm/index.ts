@@ -11,3 +11,6 @@ export * from './accounts.js';
 
 // ADR-0040 — C4
 export * from './agenda.js';
+
+// ADR-0040 — C3
+export * from './reports.js';
