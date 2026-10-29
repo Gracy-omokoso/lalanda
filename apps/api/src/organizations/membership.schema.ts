@@ -1,7 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import type { HydratedDocument } from 'mongoose';
 
-import { ORG_ROLES, type OrgRole } from '../authz/permissions.js';
+import { ACTIONS, ORG_ROLES, type Action, type OrgRole } from '../authz/permissions.js';
 
 /** Version courante du schéma — alignée sur la migration S20a (ADR-0012 §7). */
 export const MEMBERSHIP_SCHEMA_VERSION = 2;
@@ -48,6 +48,26 @@ export class Membership {
   @Prop({ type: Boolean, required: true, default: false })
   canClosePeriods!: boolean;
 
+  /**
+   * ADR-0041 § 1 — ajouts : actions que la ligne du rôle refuse et que ce membre
+   * détient. Sans doublon, dans l'ordre d'`ACTIONS`. Vide par défaut, AUCUNE
+   * migration : un document sans ce champ vaut exactement son titre — toute lecture
+   * passe par `overridesOf()` (`authz/authz.service.ts`), qui traite l'absence comme `[]`.
+   */
+  @Prop({ type: [String], enum: ACTIONS as unknown as string[], default: [] })
+  grants!: Action[];
+
+  /** ADR-0041 § 1 — retraits : actions que la ligne du rôle accorde et que ce membre n'a pas. */
+  @Prop({ type: [String], enum: ACTIONS as unknown as string[], default: [] })
+  revokes!: Action[];
+
+  /**
+   * ADR-0041 G8 — incrémentée à chaque écriture de rôle, d'écart ou de droit de
+   * clôture (lot A4). Tout cache futur de permissions la porte dans sa clé.
+   */
+  @Prop({ type: Number, default: 0 })
+  permissionsRevision!: number;
+
   @Prop({ type: Date, default: () => new Date() })
   acceptedAt!: Date;
 
@@ -63,3 +83,6 @@ MembershipSchema.index({ organizationId: 1, userId: 1 }, { unique: true });
 
 // Recomptage des propriétaires (règle R1) et listing des membres d'une org.
 MembershipSchema.index({ organizationId: 1, role: 1 });
+
+// ADR-0041 § 9.1 — recherche des détenteurs effectifs par ajout (`holdersOf`).
+MembershipSchema.index({ organizationId: 1, grants: 1 });

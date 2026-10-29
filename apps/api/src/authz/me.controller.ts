@@ -2,11 +2,13 @@ import { Controller, Get, Inject, UseGuards } from '@nestjs/common';
 
 import { AuthGuard } from '../auth/auth.guard.js';
 import { CurrentOrgId, CurrentUser } from '../auth/current-user.decorator.js';
-import { AuthzService } from './authz.service.js';
+import { AuthzService, memberPermissionsEnabled } from './authz.service.js';
 import {
+  NON_DELEGABLE_ACTIONS,
   ORG_ROLE_DESCRIPTIONS,
   ORG_ROLE_LABELS,
   actionsOf,
+  effectiveActions,
   grantableRoles,
   isAssignableRole,
   type Action,
@@ -17,8 +19,26 @@ export interface MyPermissionsView {
   organizationId: string;
   role: OrgRole;
   roleLabel: string;
-  /** Liste plate des actions effectives — l'UI masque tout le reste. */
+  /**
+   * Liste plate des actions EFFECTIVES (ADR-0041) — ligne du rôle, case ⚙, ajouts,
+   * retraits. L'UI masque tout le reste.
+   */
   actions: Action[];
+  /** ADR-0041 § 6 — ligne du rôle seule (case ⚙ selon `canClosePeriods`), sans l'écart. */
+  roleActions: Action[];
+  /** ADR-0041 § 6 — ajouts propres à ce membre. */
+  grants: Action[];
+  /** ADR-0041 § 6 — retraits propres à ce membre. */
+  revokes: Action[];
+  /** ADR-0041 § 6 — l'écart n'est pas vide. */
+  customized: boolean;
+  /**
+   * ADR-0041 § 6 — ce que l'appelant pourrait ajouter à autrui (G1, G3) : ses droits
+   * effectifs moins les actions non délégables.
+   */
+  grantableActions: Action[];
+  /** ADR-0041 G8 — révision des autorisations de l'appartenance. */
+  permissionsRevision: number;
   /** Rôles que cet utilisateur peut attribuer (R7) — alimente le sélecteur. */
   grantableRoles: Array<{ value: OrgRole; label: string; description: string }>;
   canClosePeriods: boolean;
@@ -52,13 +72,30 @@ export class MeController {
     // se traite comme une absence totale de droits, pas comme une erreur.
     const role: OrgRole = resolved?.role ?? 'viewer';
     const context = resolved?.context ?? {};
+    const grants = [...(context.grants ?? [])];
+    const revokes = [...(context.revokes ?? [])];
+    const actions = resolved ? effectiveActions(role, context) : [];
 
     return {
       organizationId: orgId,
       role,
       roleLabel: ORG_ROLE_LABELS[role],
-      actions: resolved ? actionsOf(role, context) : [],
-      grantableRoles: grantableRoles(role)
+      actions,
+      roleActions: resolved
+        ? actionsOf(role, { canClosePeriods: context.canClosePeriods === true })
+        : [],
+      grants,
+      revokes,
+      customized: grants.length > 0 || revokes.length > 0,
+      grantableActions: actions.filter((a) => !NON_DELEGABLE_ACTIONS.includes(a)),
+      permissionsRevision: resolved?.permissionsRevision ?? 0,
+      // ADR-0041 G1 / décision n° 5 : R7 jugé sur les droits effectifs de l'appelant
+      // dès que les écarts sont lus. Interrupteur éteint : calcul d'avant, identique à
+      // celui que les services des membres et des invitations appliquent jusqu'au lot A4.
+      grantableRoles: (memberPermissionsEnabled()
+        ? grantableRoles(role, context)
+        : grantableRoles(role)
+      )
         .filter(isAssignableRole)
         .map((value) => ({
           value,

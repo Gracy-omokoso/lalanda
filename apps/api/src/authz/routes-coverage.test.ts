@@ -83,6 +83,7 @@ import { WorkTimeController } from '../work/work-time.controller.js';
 import { AuditController } from './audit.controller.js';
 import { REQUIRED_PERMISSIONS_KEY, REQUIRED_PLATFORM_ROLES_KEY } from './authz.decorators.js';
 import { MeController } from './me.controller.js';
+import { CatalogController } from './catalog.controller.js';
 // ADR-0039 — L2
 import { NotificationsController } from '../notifications/notifications.controller.js';
 // ADR-0040 — C1
@@ -188,6 +189,8 @@ const CONTROLEURS = [
   CrmOverviewController,
   // ADR-0040 — C2 : devis prérempli depuis une opportunité.
   QuotesFromOpportunityController,
+  // ADR-0041 — A2 : catalogue des autorisations.
+  CatalogController,
 ];
 
 /**
@@ -302,6 +305,12 @@ const SANS_PERMISSION: Record<string, string> = {
   'SessionReauthController.status':
     'État de la fenêtre de ré-authentification de SA PROPRE session, et moyen de ' +
     'preuve attendu (mot de passe ou Google). Aucune donnée d’organisation.',
+
+  // ── ADR-0041 — A2 ───────────────────────────────────────────────────────
+  'CatalogController.catalog':
+    'Vocabulaire statique des autorisations (domaines, libellés, dépendances, paires, ' +
+    'actions non délégables, ligne de chaque rôle) tiré de permissions.ts. Ne dit rien ' +
+    'd’aucun membre ni d’aucune organisation : la matrice est publique (docs/12).',
 };
 
 interface RouteInspectee {

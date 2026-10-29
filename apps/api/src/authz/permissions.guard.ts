@@ -93,10 +93,13 @@ export class PermissionsGuard implements CanActivate {
       throw new NotFoundException({ code: 'ORG_NOT_FOUND' });
     }
 
+    // ADR-0041 : décision sur les droits EFFECTIFS — ligne du rôle, case ⚙, ajouts,
+    // retraits — que porte `resolved.context`. Le 403 nomme l'action manquante et dit
+    // si elle manque à cause d'un retrait propre à ce membre.
     if (!canAll(resolved.role, actions!, resolved.context)) {
-      throw new ForbiddenException(
-        forbidden(firstDeniedAction(resolved.role, actions!, resolved.context)!, resolved.role),
-      );
+      const denied = firstDeniedAction(resolved.role, actions!, resolved.context)!;
+      const customized = resolved.context.revokes?.includes(denied) === true;
+      throw new ForbiddenException(forbidden(denied, resolved.role, customized));
     }
 
     // Mémorisés pour les contrôleurs (journalisation d'audit, vues filtrées) —

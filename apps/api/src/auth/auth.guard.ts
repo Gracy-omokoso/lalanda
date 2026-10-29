@@ -27,7 +27,10 @@ export interface AuthenticatedRequest extends Request {
   orgId?: string;
   /** Rôle d'organisation résolu par `PermissionsGuard` (S20a) — voir `authz/`. */
   orgRole?: OrgRole;
-  /** Droits conditionnels du membership (cases ⚙ de la matrice), idem. */
+  /**
+   * Contexte de décision du membership, idem : droit de clôture (case ⚙) et, depuis
+   * ADR-0041, écart du membre (`grants`, `revokes`). À passer à `can()` avec le rôle.
+   */
   orgRoleContext?: OrgPermissionContext;
   /**
    * Organisation réellement évaluée par `PermissionsGuard` : le `:orgId` de la
