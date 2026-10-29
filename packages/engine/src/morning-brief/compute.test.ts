@@ -8,7 +8,12 @@ import {
   formatFr,
   kinshasaDay,
 } from './compute.js';
-import type { BriefFact, BriefInvoiceInput, MorningBriefInput } from './types.js';
+import type {
+  BriefFact,
+  BriefInvoiceInput,
+  BriefWorkTaskInput,
+  MorningBriefInput,
+} from './types.js';
 
 // 21 oct. 2026, 9 h à Kinshasa (8 h UTC).
 const NOW = '2026-10-21T08:00:00.000Z';
@@ -42,6 +47,7 @@ function input(
     sales: { invoices, truncated: false },
     cash: { status: 'to_fill' },
     dueDates: { status: 'unavailable' },
+    work: { status: 'known', tasks: [], truncated: false },
     ...over,
   };
 }
@@ -290,8 +296,15 @@ describe('faits masqués et indisponibles', () => {
   });
 
   it('échéances, pipeline, tâches et projets : non disponibles, jamais à zéro', () => {
-    const brief = buildMorningBrief(input([]));
-    for (const id of ['echeances.depassees', 'pipeline', 'taches_en_retard', 'projets_a_risque']) {
+    const brief = buildMorningBrief(input([], { work: { status: 'unavailable' } }));
+    for (const id of [
+      'echeances.depassees',
+      'pipeline',
+      'mes_taches.en_retard',
+      'mes_taches.aujourdhui',
+      'taches.en_retard',
+      'projets_a_risque',
+    ]) {
       expect(fact(brief.facts, id)).toMatchObject({ status: 'unavailable', value: null });
     }
     expect(brief.predictions).toEqual([]);
@@ -319,5 +332,137 @@ describe('sources du module', () => {
     const { readFile } = await import('node:fs/promises');
     const src = await readFile(new URL('./compute.ts', import.meta.url), 'utf8');
     expect(src).not.toMatch(/parseFloat|toFixed|Number\(\s*inv/);
+  });
+});
+
+// ── ADR-0039 § 6.5 : projets et tâches (faits, R8, R9) ──────────────────────
+
+describe('projets et tâches — faits et règles R8, R9 (ADR-0039 § 6.5)', () => {
+  // NOW = 21 oct. 2026 à Kinshasa.
+  function task(over: Partial<BriefWorkTaskInput> = {}): BriefWorkTaskInput {
+    return {
+      projectId: 'p1',
+      dueDate: '2026-10-20',
+      isMilestone: false,
+      mine: false,
+      projectActive: true,
+      ...over,
+    };
+  }
+  function work(tasks: BriefWorkTaskInput[], truncated = false): Partial<MorningBriefInput> {
+    return { work: { status: 'known', tasks, truncated } };
+  }
+  const brief = (tasks: BriefWorkTaskInput[]): ReturnType<typeof buildMorningBrief> =>
+    buildMorningBrief(input([inv()], work(tasks)));
+
+  it('compte mes tâches en retard et du jour, et les retards de l’organisation', () => {
+    const b = brief([
+      task({ mine: true, dueDate: '2026-10-20' }),
+      task({ mine: true, dueDate: '2026-09-01' }),
+      task({ mine: true, dueDate: '2026-10-21' }),
+      task({ mine: false, dueDate: '2026-10-19' }),
+      task({ mine: false, dueDate: '2026-10-21' }),
+    ]);
+    expect(fact(b.facts, 'mes_taches.en_retard').value).toBe('2');
+    expect(fact(b.facts, 'mes_taches.aujourdhui').value).toBe('1');
+    expect(fact(b.facts, 'taches.en_retard').value).toBe('3');
+  });
+
+  it('le jour est celui de Kinshasa : à 23 h 30 UTC, l’échéance de la veille UTC est dépassée', () => {
+    const b = buildMorningBrief(
+      input([], {
+        now: '2026-10-21T23:30:00.000Z', // 22 oct., 0 h 30 à Kinshasa
+        ...work([task({ mine: true, dueDate: '2026-10-21' })]),
+      }),
+    );
+    expect(fact(b.facts, 'mes_taches.en_retard').value).toBe('1');
+    expect(fact(b.facts, 'mes_taches.aujourdhui').value).toBe('0');
+  });
+
+  it('R8 : deux tâches en retard déclenchent l’alerte vers Mes tâches (critère n° 16)', () => {
+    const b = brief([task({ mine: true }), task({ mine: true, projectId: 'p2' })]);
+    const r8 = b.alerts.find((a) => a.ruleId === 'taches_en_retard');
+    expect(r8).toMatchObject({
+      severity: 'attention',
+      rank: 8,
+      actionPath: '/projets/mes-taches',
+      factIds: ['mes_taches.en_retard'],
+    });
+    expect(r8?.message).toContain('2 tâches');
+  });
+
+  it('R8 : au seuil exact (zéro tâche en retard à moi), rien ne se déclenche', () => {
+    const b = brief([task({ mine: false }), task({ mine: true, dueDate: '2026-10-21' })]);
+    expect(b.recommendations.map((r) => r.ruleId)).not.toContain('taches_en_retard');
+  });
+
+  it('projet à risque : un jalon en retard suffit', () => {
+    const b = brief([task({ isMilestone: true })]);
+    expect(fact(b.facts, 'projets_a_risque').value).toBe('1');
+    const r9 = b.alerts.find((a) => a.ruleId === 'jalon_depasse');
+    expect(r9?.threshold).toEqual(MORNING_BRIEF_THRESHOLDS.S7);
+    expect(r9?.actionPath).toBe('/projets');
+  });
+
+  it('projet à risque : S7 = 3 tâches en retard, pas 2', () => {
+    const deux = brief([task(), task()]);
+    expect(fact(deux.facts, 'projets_a_risque').value).toBe('0');
+    expect(deux.recommendations.map((r) => r.ruleId)).not.toContain('jalon_depasse');
+    const trois = brief([task(), task(), task()]);
+    expect(fact(trois.facts, 'projets_a_risque').value).toBe('1');
+    expect(trois.recommendations.map((r) => r.ruleId)).toContain('jalon_depasse');
+  });
+
+  it('projet à risque : seuls les projets actifs comptent, et un jalon du jour n’est pas en retard', () => {
+    const b = brief([
+      task({ projectId: 'p-pause', projectActive: false, isMilestone: true }),
+      task({ projectId: 'p-jour', isMilestone: true, dueDate: '2026-10-21' }),
+    ]);
+    expect(fact(b.facts, 'projets_a_risque').value).toBe('0');
+    expect(fact(b.facts, 'taches.en_retard').value).toBe('1');
+  });
+
+  it('projets distincts : chacun compté une fois', () => {
+    const b = brief([
+      task({ projectId: 'a', isMilestone: true }),
+      task({ projectId: 'a', isMilestone: true }),
+      task({ projectId: 'b' }),
+      task({ projectId: 'b' }),
+      task({ projectId: 'b' }),
+    ]);
+    expect(fact(b.facts, 'projets_a_risque').value).toBe('2');
+  });
+
+  it('sans work.read : faits masqués, R8 et R9 non évaluées (critère n° 16)', () => {
+    const b = buildMorningBrief(input([], { work: 'hidden' }));
+    for (const id of [
+      'mes_taches.en_retard',
+      'mes_taches.aujourdhui',
+      'taches.en_retard',
+      'projets_a_risque',
+    ]) {
+      expect(fact(b.facts, id)).toMatchObject({ status: 'hidden', value: null });
+    }
+    expect(b.rulesSkipped).toEqual(
+      expect.arrayContaining([
+        { ruleId: 'taches_en_retard', reason: 'hidden' },
+        { ruleId: 'jalon_depasse', reason: 'hidden' },
+      ]),
+    );
+  });
+
+  it('lecture bornée des tâches : le brief le dit', () => {
+    expect(buildMorningBrief(input([], work([], true))).truncated).toBe(true);
+    expect(buildMorningBrief(input([], work([], false))).truncated).toBe(false);
+  });
+
+  it('version mineure suivante', () => {
+    expect(brief([]).version).toBe('1.1.0');
+  });
+
+  it('les neuf règles ont des rangs uniques', () => {
+    const ranks = MORNING_BRIEF_RULES.map((r) => r.rank);
+    expect(new Set(ranks).size).toBe(ranks.length);
+    expect(ranks.length).toBe(9);
   });
 });
