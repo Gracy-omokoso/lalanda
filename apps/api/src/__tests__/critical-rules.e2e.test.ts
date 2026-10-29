@@ -32,7 +32,7 @@
 import type { INestApplication } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import request from 'supertest';
-import { afterAll, beforeAll, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import 'reflect-metadata';
 
@@ -647,4 +647,162 @@ e2eSuite('règles critiques docs/12 appliquées bout en bout (S20a)', () => {
     );
     expect(fuites).toHaveLength(0);
   }, 30_000);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ADR-0041 — A4 : R2 dynamique, R1 et transfert AVEC un écart (critère 8)
+  //
+  // Les écarts s'écrivent par la route `PATCH …/permissions`, interrupteur
+  // `MEMBER_PERMISSIONS_ENABLED` allumé le temps de chaque test. Organisations
+  // propres à ce bloc, comme le veut l'en-tête.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  describe('ADR-0041 — A4 : règles critiques avec écart', () => {
+    const INTERRUPTEUR = process.env['MEMBER_PERMISSIONS_ENABLED'];
+    let orgFdRetire = '';
+    let orgLecteurApprobateur = '';
+    let orgTransfert = '';
+    let projetFdRetire = '';
+    let projetLecteur = '';
+
+    async function ecart(
+      hote: string,
+      orgId: string,
+      cle: string,
+      body: { grants?: string[]; revokes?: string[] },
+    ): Promise<void> {
+      const liste = await request(serveur())
+        .get(`/organizations/${orgId}/members`)
+        .set('Cookie', dans(hote, orgId));
+      const rev = (liste.body.members as { userId: string; permissionsRevision: number }[]).find(
+        (m) => m.userId === comptes[cle]!.userId,
+      )!.permissionsRevision;
+      const res = await request(serveur())
+        .patch(`/organizations/${orgId}/members/${comptes[cle]!.userId}/permissions`)
+        .set('Cookie', dans(hote, orgId))
+        .send({ grants: [], revokes: [], ...body, expectedRevision: rev });
+      expect(res.status, JSON.stringify(res.body)).toBe(200);
+    }
+
+    beforeAll(async () => {
+      orgFdRetire = (await inscrire('a4FdOwner')).orgId;
+      await inscrire('a4Fd');
+      await planPro(orgFdRetire);
+      await rejoindre('a4FdOwner', orgFdRetire, 'a4Fd', 'finance_director');
+      projetFdRetire = await creerProjet('a4FdOwner', orgFdRetire, 'Atelier Bukavu');
+
+      orgLecteurApprobateur = (await inscrire('a4LectOwner')).orgId;
+      await inscrire('a4Lect');
+      await planPro(orgLecteurApprobateur);
+      await rejoindre('a4LectOwner', orgLecteurApprobateur, 'a4Lect', 'viewer');
+      projetLecteur = await creerProjet('a4LectOwner', orgLecteurApprobateur, 'Épicerie Matadi');
+
+      orgTransfert = (await inscrire('a4TrOwner')).orgId;
+      await inscrire('a4TrAdmin');
+      await rejoindre('a4TrOwner', orgTransfert, 'a4TrAdmin', 'admin');
+    }, E2E_HOOK_TIMEOUT_MS);
+
+    afterEach(() => {
+      if (INTERRUPTEUR === undefined) delete process.env['MEMBER_PERMISSIONS_ENABLED'];
+      else process.env['MEMBER_PERMISSIONS_ENABLED'] = INTERRUPTEUR;
+    });
+
+    it('critère 8 — Propriétaire + Directeur financier privé de `plan.approve` : auto-approbation marquée', async () => {
+      process.env['MEMBER_PERMISSIONS_ENABLED'] = 'true';
+      await ecart('a4FdOwner', orgFdRetire, 'a4Fd', { revokes: ['plan.approve'] });
+      await saisirHypotheses('a4FdOwner', orgFdRetire, projetFdRetire, {
+        prix_unitaire: 12,
+        quantite_mois: 90,
+      });
+      const validation = await request(serveur())
+        .post(`/projects/${projetFdRetire}/plans`)
+        .set('Cookie', dans('a4FdOwner', orgFdRetire))
+        .send({});
+      expect(validation.status, JSON.stringify(validation.body)).toBe(201);
+      expect(validation.body.approval).toEqual({
+        soleApprover: true,
+        inputsAuthor: comptes['a4FdOwner']!.userId,
+      });
+    }, 60_000);
+
+    it('critère 8 — Propriétaire + Lecteur ayant reçu `plan.approve` : 409 SELF_APPROVAL_FORBIDDEN', async () => {
+      process.env['MEMBER_PERMISSIONS_ENABLED'] = 'true';
+      await ecart('a4LectOwner', orgLecteurApprobateur, 'a4Lect', { grants: ['plan.approve'] });
+      await saisirHypotheses('a4LectOwner', orgLecteurApprobateur, projetLecteur, {
+        prix_unitaire: 18,
+        quantite_mois: 75,
+      });
+      const refus = await request(serveur())
+        .post(`/projects/${projetLecteur}/plans`)
+        .set('Cookie', dans('a4LectOwner', orgLecteurApprobateur))
+        .send({});
+      expect(refus.status, JSON.stringify(refus.body)).toBe(409);
+      expect(refus.body.code ?? refus.body.message?.code).toBe('SELF_APPROVAL_FORBIDDEN');
+
+      // Et le Lecteur approbateur valide, lui : l'ajout est un vrai `plan.approve`.
+      const validation = await request(serveur())
+        .post(`/projects/${projetLecteur}/plans`)
+        .set('Cookie', dans('a4Lect', orgLecteurApprobateur))
+        .send({});
+      expect(validation.status, JSON.stringify(validation.body)).toBe(201);
+      expect(validation.body.approval.soleApprover).toBe(false);
+    }, 60_000);
+
+    it('R1 avec écart — le dernier propriétaire ne s’attribue pas d’écart en changeant de titre (G2)', async () => {
+      process.env['MEMBER_PERMISSIONS_ENABLED'] = 'true';
+      const refus = await request(serveur())
+        .patch(`/organizations/${orgTransfert}/members/${comptes['a4TrOwner']!.userId}/role`)
+        .set('Cookie', dans('a4TrOwner', orgTransfert))
+        .send({ role: 'admin', revokes: ['audit.read'] });
+      expect(refus.status).toBe(403);
+      expect(refus.body.code).toBe('SELF_PERMISSIONS_FORBIDDEN');
+
+      const r1 = await request(serveur())
+        .patch(`/organizations/${orgTransfert}/members/${comptes['a4TrOwner']!.userId}/role`)
+        .set('Cookie', dans('a4TrOwner', orgTransfert))
+        .send({ role: 'admin' });
+      expect(r1.status).toBe(409);
+      expect(r1.body.code ?? r1.body.message?.code).toBe('LAST_OWNER');
+    }, 60_000);
+
+    it('transfert avec écart — l’écart des deux personnes est effacé et journalisé', async () => {
+      process.env['MEMBER_PERMISSIONS_ENABLED'] = 'true';
+      await ecart('a4TrOwner', orgTransfert, 'a4TrAdmin', { revokes: ['audit.read'] });
+
+      const transfert = await request(serveur())
+        .post(`/organizations/${orgTransfert}/transfer-ownership`)
+        .set('Cookie', dans('a4TrOwner', orgTransfert))
+        .send({ userId: comptes['a4TrAdmin']!.userId });
+      expect(transfert.status, JSON.stringify(transfert.body)).toBe(201);
+      expect(transfert.body.newOwner).toMatchObject({ role: 'owner', grants: [], revokes: [] });
+      expect(transfert.body.previousOwner).toMatchObject({
+        role: 'admin',
+        grants: [],
+        revokes: [],
+        customized: false,
+      });
+
+      const db = await dbOf(app);
+      const nouveau = await db.collection('memberships').findOne({
+        organizationId: orgTransfert,
+        userId: comptes['a4TrAdmin']!.userId,
+      });
+      expect(nouveau?.['revokes']).toEqual([]);
+      const traces = await db
+        .collection('audit_events')
+        .find({ organizationId: orgTransfert, action: 'member.permissions_changed' })
+        .toArray();
+      const cibles = traces.map((t) => t['targetId'] as string);
+      expect(cibles).toContain(comptes['a4TrOwner']!.userId);
+      expect(
+        traces.some(
+          (t) =>
+            t['targetId'] === comptes['a4TrAdmin']!.userId &&
+            (t['metadata'] as { before: { revokes: string[] } }).before.revokes.includes(
+              'audit.read',
+            ) &&
+            (t['metadata'] as { after: { role: string } }).after.role === 'owner',
+        ),
+      ).toBe(true);
+    }, 60_000);
+  });
 });

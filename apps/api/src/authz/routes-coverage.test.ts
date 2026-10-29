@@ -829,3 +829,28 @@ describe('espace admin plateforme', () => {
     }
   });
 });
+
+// ADR-0041 — A4
+describe('ADR-0041 — A4 : routes de gestion des autorisations par membre', () => {
+  it('chaque écriture du titre, de l’écart ou du droit de clôture exige `organization.manage`', () => {
+    const attendu: Record<string, Action[]> = {
+      'MembersController.list': ['organization.manage'],
+      'MembersController.changeRole': ['organization.manage'],
+      'MembersController.setPermissions': ['organization.manage'],
+      'MembersController.setCloseRight': ['organization.manage'],
+      'MembersController.revoke': ['organization.manage'],
+      'MembersController.transfer': ['organization.manage'],
+      // L'invitation porte l'écart : même permission qu'avant, `validateOverrides` fait le reste.
+      'InvitationsController.create': ['members.invite'],
+    };
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle);
+      expect(route, `route introuvable : ${cle}`).toBeDefined();
+      expect(route!.actions, cle).toEqual(actions);
+    }
+  });
+
+  it('la route des autorisations ne figure pas parmi les exceptions sans permission', () => {
+    expect(Object.keys(SANS_PERMISSION)).not.toContain('MembersController.setPermissions');
+  });
+});
