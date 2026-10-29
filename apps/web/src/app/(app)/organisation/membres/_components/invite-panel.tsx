@@ -5,6 +5,11 @@
 // Le rôle est choisi À L'INVITATION, pas après l'acceptation : sans ce choix,
 // tout invité entrerait avec le rôle par défaut du serveur et il faudrait
 // penser à le corriger ensuite — ce que personne ne fait.
+//
+// ADR-0040 — C0 : le Commercial (`sales_rep`) est proposé dès que le serveur le
+// dit attribuable (`roleOptions`, R7 : Propriétaire et Administrateur). Le rôle
+// par défaut reste le moins puissant, choisi par rang (`roleParDefaut`) : le
+// Commercial est le dernier de la liste sans être le moindre privilège.
 
 import { useState } from 'react';
 

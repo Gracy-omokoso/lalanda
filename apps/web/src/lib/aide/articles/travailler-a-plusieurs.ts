@@ -1,9 +1,11 @@
 // Article « Travailler à plusieurs ».
 //
 // Sources vérifiées dans le code au moment de la rédaction :
-//  - rôles et matrice : apps/api/src/authz/permissions.ts (8 rôles org, 15
-//    actions, libellés FR, R1 dernier propriétaire, R2 séparation des tâches,
-//    R7 anti-escalade, project_manager NON ATTRIBUABLE)
+//  - rôles et matrice : apps/api/src/authz/permissions.ts (9 rôles org dont le
+//    Commercial d'ADR-0040, 28 actions, libellés FR, R1 dernier propriétaire,
+//    R2 séparation des tâches, R7 anti-escalade, project_manager NON ATTRIBUABLE)
+//  - trésorerie réservée à `treasury.read` (ADR-0040 § 4.4) : brief du matin et
+//    GROW la masquent au Commercial et au Conseiller
 //  - invitations : apps/api/src/organizations/invitations.controller.ts et
 //    invitations.service.ts (TTL 7 jours, rôle viewer par défaut, correspondance
 //    d'adresse obligatoire) + apps/web/.../members/_components/invite-panel.tsx
@@ -104,7 +106,7 @@ export const TRAVAILLER_A_PLUSIEURS: ArticleAide = {
         {
           type: 'paragraphe',
           texte:
-            'Sept rôles sont attribuables. Choisissez le moins permissif qui permette à la personne de faire son travail — vous pourrez toujours l’élargir ensuite.',
+            'Huit rôles sont attribuables. Choisissez le moins permissif qui permette à la personne de faire son travail — vous pourrez toujours l’élargir ensuite.',
         },
         {
           type: 'tableau',
@@ -136,8 +138,13 @@ export const TRAVAILLER_A_PLUSIEURS: ArticleAide = {
               'Un collaborateur qui construit le prévisionnel.',
             ],
             [
+              '**Commercial**',
+              'Gère le **CRM** (prospects, contacts, opportunités, relances) et **prépare les devis** : les crée, les envoie, les fait accepter ou refuser. Consulte les clients, le catalogue et les factures. **Ne voit ni la trésorerie ni les dépenses**, ne modifie ni les fiches clients ni les prix, ne transforme pas un devis en facture, n’émet ni n’encaisse.',
+              'Un vendeur ou un chargé de clientèle.',
+            ],
+            [
               '**Conseiller**',
-              'Consultation seule — et **sans export de fichier**.',
+              'Consultation seule — **sans la trésorerie** ni le fichier clients, et **sans export de fichier**.',
               'Un mentor, un incubateur, un banquier à qui vous montrez le dossier en ligne.',
             ],
             [
@@ -154,7 +161,7 @@ export const TRAVAILLER_A_PLUSIEURS: ArticleAide = {
           ton: 'info',
           titre: 'Vous ne pouvez pas donner un droit que vous n’avez pas',
           texte:
-            'On ne peut attribuer qu’un rôle dont les droits sont inclus dans les siens. Conséquence concrète : un **administrateur ne peut pas nommer un directeur financier ni un comptable**, parce que ces rôles détiennent des droits — validation, clôture — qu’il n’a pas lui-même. Seul le propriétaire le peut.',
+            'On ne peut attribuer qu’un rôle dont les droits sont inclus dans les siens. Conséquence concrète : un **administrateur ne peut pas nommer un directeur financier ni un comptable**, parce que ces rôles détiennent des droits — validation, clôture — qu’il n’a pas lui-même. Seul le propriétaire le peut. Un administrateur peut en revanche inviter un **Commercial**.',
         },
         {
           type: 'note',
