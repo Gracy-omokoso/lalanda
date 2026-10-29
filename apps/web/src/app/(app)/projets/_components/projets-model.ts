@@ -348,3 +348,27 @@ export function preparerProjet(
   }
   return { ok: false, champs };
 }
+
+// ─── Clés stables (colonnes, étiquettes) ────────────────────────────────────
+
+/**
+ * Clé stable tirée d'un libellé (`^[a-z0-9_-]{1,32}$`, ADR-0039 § 2.1),
+ * unique parmi `existantes` : « En revue client » → `en-revue-client`, puis
+ * `en-revue-client-2`… Une clé ne change plus une fois posée (les tâches la
+ * portent) ; seul le libellé se renomme.
+ */
+export function cleDepuisLibelle(libelle: string, existantes: readonly string[]): string {
+  const base =
+    libelle
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 28) || 'cle';
+  if (!existantes.includes(base)) return base;
+  for (let i = 2; ; i += 1) {
+    const c = `${base}-${i}`;
+    if (!existantes.includes(c)) return c;
+  }
+}

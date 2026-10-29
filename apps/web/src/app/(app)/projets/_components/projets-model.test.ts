@@ -7,6 +7,7 @@ import type { OrgAction } from '@/lib/api';
 import { ONGLETS_PROJET, ongletDuChemin, ongletsVisibles } from './onglets-projet';
 import {
   aujourdhui,
+  cleDepuisLibelle,
   etatEcheance,
   formatJour,
   formatMinutes,
@@ -179,5 +180,15 @@ describe('formulaire de projet — même schéma que le serveur', () => {
       expect(r.champs['name']).toBeDefined();
       expect(r.champs['dueDate']).toMatch(/précède/);
     }
+  });
+});
+
+describe('cleDepuisLibelle', () => {
+  it('slug sans accents, unique, borné', () => {
+    expect(cleDepuisLibelle('En revue client', [])).toBe('en-revue-client');
+    expect(cleDepuisLibelle('Terminé', ['termine'])).toBe('termine-2');
+    expect(cleDepuisLibelle('!!!', [])).toBe('cle');
+    expect(cleDepuisLibelle('x'.repeat(60), []).length).toBeLessThanOrEqual(32);
+    expect(/^[a-z0-9_-]{1,32}$/.test(cleDepuisLibelle('Été 2026 / lot n°3', []))).toBe(true);
   });
 });
