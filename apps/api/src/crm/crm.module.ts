@@ -30,6 +30,13 @@ import {
   CrmSettingsSchema,
 } from './crm.schemas.js';
 import { OpportunitiesService } from './opportunities.service.js';
+// ADR-0040 — C1
+import { Membership, MembershipSchema } from '../organizations/membership.schema.js';
+import { CrmAccount, CrmAccountSchema } from './accounts/crm-account.schema.js';
+import { CrmAccountsReconcileJob } from './accounts/crm-accounts-reconcile.job.js';
+import { CrmAccountsSync } from './accounts/crm-accounts-sync.service.js';
+import { CrmAccountsController } from './accounts/crm-accounts.controller.js';
+import { CrmAccountsService } from './accounts/crm-accounts.service.js';
 
 @Module({
   imports: [
@@ -42,6 +49,9 @@ import { OpportunitiesService } from './opportunities.service.js';
       { name: CrmActivity.name, schema: CrmActivitySchema },
       { name: Customer.name, schema: CustomerSchema },
       { name: SalesQuote.name, schema: SalesQuoteSchema },
+      // ADR-0040 — C1 : comptes 360° ; adhésions pour l'éligibilité du responsable.
+      { name: CrmAccount.name, schema: CrmAccountSchema },
+      { name: Membership.name, schema: MembershipSchema },
     ]),
   ],
   controllers: [
@@ -49,6 +59,8 @@ import { OpportunitiesService } from './opportunities.service.js';
     CrmContactsController,
     CrmOpportunitiesController,
     CrmActivitiesController,
+    // ADR-0040 — C1
+    CrmAccountsController,
   ],
   providers: [
     CrmSettingsService,
@@ -56,7 +68,16 @@ import { OpportunitiesService } from './opportunities.service.js';
     OpportunitiesService,
     ActivitiesService,
     CrmCsvService,
+    // ADR-0040 — C1
+    CrmAccountsService,
+    CrmAccountsSync,
+    CrmAccountsReconcileJob,
   ],
-  exports: [OpportunitiesService],
+  exports: [
+    OpportunitiesService,
+    // ADR-0040 — C1 : comptes (C2, C8) ; synchronisation appelée par Ventes.
+    CrmAccountsService,
+    CrmAccountsSync,
+  ],
 })
 export class CrmModule {}

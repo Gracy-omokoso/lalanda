@@ -16,6 +16,8 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 
 import { BrandingModule } from '../branding/branding.module.js';
+// ADR-0040 — C1
+import { CrmModule } from '../crm/crm.module.js';
 import { EdefModule } from '../edef/edef.module.js';
 import { FiscalModule } from '../fiscal/fiscal.module.js';
 import { IntegrationsModule } from '../integrations/integrations.module.js';
@@ -92,6 +94,8 @@ import { ReferenceRefreshJob } from './normalization/reference-refresh.job.js';
     PdfModule,
     // ADR-0028 : identité visuelle et modèle de facture (gel, rendu, aperçu).
     BrandingModule,
+    // ADR-0040 — C1 : synchronisation fiche client → compte CRM (`CrmAccountsSync`).
+    CrmModule,
     MongooseModule.forFeature([
       { name: Customer.name, schema: CustomerSchema },
       { name: CatalogItem.name, schema: CatalogItemSchema },
@@ -170,6 +174,8 @@ import { ReferenceRefreshJob } from './normalization/reference-refresh.job.js';
     InvoiceDocumentsService,
     // ADR-0033 (amendement du 27 oct. 2026) : le brief lit le reste à encaisser réel.
     SettlementsService,
+    // ADR-0040 — C1 : la conversion prospect → client crée la fiche par Ventes.
+    CustomersService,
   ],
 })
 export class SalesModule {}

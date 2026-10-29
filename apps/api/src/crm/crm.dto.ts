@@ -199,7 +199,15 @@ export interface ContactInput {
   jobTitle: string | null;
   email: string | null;
   phone: string | null;
+  /**
+   * ADR-0040 — C1 (§ 2.2) : compte de la personne. `undefined` : non envoyé — le
+   * service résout alors `customerId` / `companyName` (compatibilité N-1, une
+   * version) ; `null` : personne sans entreprise.
+   */
+  accountId?: string | null;
+  /** Déprécié en entrée (§ 2.2) : écrit par le service à partir du compte. */
   customerId: string | null;
+  /** Déprécié en entrée (§ 2.2) : écrit par le service à partir du compte. */
   companyName: string | null;
   notes: string | null;
 }
@@ -209,6 +217,8 @@ const ContactFields = {
   jobTitle: z.unknown().optional(),
   email: z.unknown().optional(),
   phone: z.unknown().optional(),
+  // ADR-0040 — C1
+  accountId: z.unknown().optional(),
   customerId: z.unknown().optional(),
   companyName: z.unknown().optional(),
   notes: z.unknown().optional(),
@@ -217,11 +227,17 @@ const ContactFields = {
 export function normalizeContact(raw: Record<string, unknown>, ctx: Ctx): ContactInput {
   const customerId = objectId(ctx, ['customerId'], raw['customerId'], 'CUSTOMER_INVALID');
   const companyName = text(ctx, ['companyName'], raw['companyName'], 200);
+  // ADR-0040 — C1 : `accountId` absent ≠ `accountId: null` (voir `ContactInput`).
+  const accountId =
+    raw['accountId'] === undefined
+      ? undefined
+      : objectId(ctx, ['accountId'], raw['accountId'], 'ACCOUNT_INVALID');
   return {
     name: requiredText(ctx, ['name'], raw['name'], 200, 'NAME_REQUIRED', 'Le nom est obligatoire.'),
     jobTitle: text(ctx, ['jobTitle'], raw['jobTitle'], 100),
     email: email(ctx, ['email'], raw['email']),
     phone: phone(ctx, ['phone'], raw['phone']),
+    ...(accountId === undefined ? {} : { accountId }),
     customerId,
     // Rattaché à un client : l'entreprise est celle du client.
     companyName: customerId === null ? companyName : null,
@@ -246,6 +262,8 @@ export const ListContactsQuerySchema = z
   .object({
     q: z.string().trim().min(1).max(100).optional(),
     customerId: idQuery('Identifiant de client invalide.'),
+    // ADR-0040 — C1
+    accountId: idQuery('Identifiant de compte invalide.'),
     kind: z.enum(['all', 'prospect', 'customer_contact']).default('all'),
     limit: limit(100, '50'),
     cursor: z.string().min(1).max(512).optional(),

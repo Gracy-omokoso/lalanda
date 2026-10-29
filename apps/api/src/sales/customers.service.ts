@@ -12,6 +12,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Types, type Model } from 'mongoose';
 
 import { AuditService } from '../authz/audit.service.js';
+// ADR-0040 — C1
+import { CrmAccountsSync } from '../crm/accounts/crm-accounts-sync.service.js';
 import { Customer, type CustomerDocument } from './customer.schema.js';
 import {
   CUSTOMER_TYPE_LABELS,
@@ -99,6 +101,8 @@ export class CustomersService {
   constructor(
     @InjectModel(Customer.name) private readonly customers: Model<CustomerDocument>,
     @Inject(AuditService) private readonly audit: AuditService,
+    // ADR-0040 — C1 : après chaque écriture, hors transaction ; n'échoue jamais.
+    @Inject(CrmAccountsSync) private readonly accountsSync: CrmAccountsSync,
   ) {}
 
   async list(organizationId: string, query: ListCustomersQuery): Promise<CustomerPage> {
@@ -151,6 +155,7 @@ export class CustomersService {
         updatedBy: actor.userId,
         _schemaVersion: 1,
       });
+      await this.accountsSync.onCustomerWritten(organizationId, String(doc._id), actor);
       return customerView(doc.toObject() as CustomerLean);
     } catch (err) {
       if (isDuplicateKey(err)) await this.nifConflict(organizationId, input.nif, null);
@@ -185,6 +190,7 @@ export class CustomersService {
       throw err;
     }
     if (!updated) staleRevision((await this.requireOwn(organizationId, customerId)).revision);
+    await this.accountsSync.onCustomerWritten(organizationId, customerId, actor);
     return customerView(updated);
   }
 
@@ -230,6 +236,7 @@ export class CustomersService {
       targetType: 'customer',
       targetId: String(updated._id),
     });
+    await this.accountsSync.onCustomerWritten(organizationId, customerId, actor);
     return customerView(updated);
   }
 
@@ -255,6 +262,7 @@ export class CustomersService {
       targetType: 'customer',
       targetId: customerId,
     });
+    await this.accountsSync.onCustomerWritten(organizationId, customerId, actor);
   }
 
   private async requireOwn(organizationId: string, customerId: string): Promise<CustomerLean> {
