@@ -13,7 +13,6 @@ import { Alerte, BOUTON_PETIT, CHAMP } from '../../_components/form-ui';
 import { useAccesVentes } from '../../_components/sales-access';
 
 import { messageCrm, peutGererCrm } from './crm-model';
-import { CrmNav } from './crm-nav';
 
 const NATURES: Record<PipelineStage['kind'], string> = {
   open: 'En cours',
@@ -89,7 +88,6 @@ export function CrmSettingsPanel(): React.ReactElement {
 
   return (
     <section className="flex flex-col gap-5">
-      <CrmNav />
       {erreur ? (
         <Alerte>
           <p>{erreur}</p>

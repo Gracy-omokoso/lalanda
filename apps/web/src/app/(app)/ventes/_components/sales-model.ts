@@ -40,38 +40,8 @@ import type {
 // (qui tire le catalogue des offres dans l'espace Ventes).
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Accès et onglets
+// Accès
 // ─────────────────────────────────────────────────────────────────────────────
-
-export const VENTES_BASE = '/ventes';
-
-export interface SalesTab {
-  segment: 'clients' | 'catalogue';
-  label: string;
-  action: OrgAction;
-}
-
-/** L'ordre du tableau est l'ordre d'affichage (ADR-0022, chantier D2). */
-export const SALES_TABS: readonly SalesTab[] = [
-  { segment: 'clients', label: 'Clients', action: 'sales.read' },
-  { segment: 'catalogue', label: 'Catalogue', action: 'sales.read' },
-];
-
-/**
- * Onglets proposés. `null` (permissions pas encore connues) : aucun — afficher
- * puis retirer ferait clignoter l'interface. Un ÉCHEC de lecture des
- * permissions est traité par l'appelant (voir `sales-access.tsx`).
- */
-export function ongletsVentes(actions: readonly OrgAction[] | null): SalesTab[] {
-  if (actions === null) return [];
-  return SALES_TABS.filter((t) => actions.includes(t.action));
-}
-
-/** Premier segment sous `/ventes/` — '' sur la racine. */
-export function segmentVentes(pathname: string): string {
-  if (pathname !== VENTES_BASE && !pathname.startsWith(`${VENTES_BASE}/`)) return '';
-  return pathname.slice(VENTES_BASE.length).split('/').filter(Boolean)[0] ?? '';
-}
 
 export function peutConsulter(actions: readonly OrgAction[] | null): boolean {
   return actions !== null && actions.includes('sales.read');

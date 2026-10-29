@@ -16,29 +16,6 @@ import type {
   RecurrenceFrequency,
 } from '@/lib/treasury-api';
 
-export const TRESORERIE_BASE = '/tresorerie';
-
-export interface TreasuryTab {
-  segment: string;
-  label: string;
-  action: OrgAction;
-}
-
-/** Onglets dans l'ordre d'affichage. */
-export const TREASURY_TABS: readonly TreasuryTab[] = [
-  { segment: 'depenses', label: 'Dépenses', action: 'treasury.read' },
-  { segment: 'comptes', label: 'Trésorerie', action: 'treasury.read' },
-  { segment: 'realise', label: 'Réalisé vs prévu', action: 'treasury.read' },
-];
-
-/** Segment courant sous `/tresorerie` (`depenses` par défaut). */
-export function segmentTresorerie(pathname: string): string {
-  const rest = pathname.startsWith(`${TRESORERIE_BASE}/`)
-    ? pathname.slice(TRESORERIE_BASE.length + 1)
-    : '';
-  return rest.split('/')[0] || 'depenses';
-}
-
 export function peutConsulterTresorerie(actions: readonly OrgAction[] | null): boolean {
   return actions !== null && actions.includes('treasury.read');
 }

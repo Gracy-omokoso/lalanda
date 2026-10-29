@@ -1,27 +1,19 @@
 'use client';
 
-// Chrome de l'espace Trésorerie (ADR-0034) : onglets et frontière d'accès.
+// Chrome de l'espace Trésorerie (ADR-0034) : frontière d'accès. Les sections
+// (Dépenses, Comptes, Réalisé vs prévu) sont dans la colonne de gauche du module
+// RUN (ADR-0038 § 3) : plus de rangée d'onglets en double.
 //
 // Les permissions sont lues une fois (`GET /me/permissions`) et partagées par un
 // contexte. Rien ici n'autorise quoi que ce soit — `PermissionsGuard` refuse côté
 // API de toute façon ; masquer un bouton est un confort, et un rôle sans
 // `treasury.read` lit un refus explicite plutôt qu'une page vide.
 
-import { TabsNav } from '@lalanda/ui';
-import { usePathname } from 'next/navigation';
 import { createContext, useContext, useEffect, useState } from 'react';
 
-import { renderNextLink } from '@/components/next-link';
 import { api, type OrgAction } from '@/lib/api';
 
-import {
-  peutConsulterTresorerie,
-  peutGererTresorerie,
-  peutRelier,
-  segmentTresorerie,
-  TREASURY_TABS,
-  TRESORERIE_BASE,
-} from './treasury-model';
+import { peutConsulterTresorerie, peutGererTresorerie, peutRelier } from './treasury-model';
 
 interface AccesTresorerie {
   etat: 'chargement' | 'pret' | 'echec';
@@ -40,7 +32,6 @@ export function useAccesTresorerie(): AccesTresorerie {
 }
 
 export function TreasuryChrome({ children }: { children: React.ReactNode }): React.ReactElement {
-  const pathname = usePathname();
   const [actions, setActions] = useState<OrgAction[] | null>(null);
   const [etat, setEtat] = useState<AccesTresorerie['etat']>('chargement');
 
@@ -61,14 +52,6 @@ export function TreasuryChrome({ children }: { children: React.ReactNode }): Rea
     };
   }, []);
 
-  const courant = segmentTresorerie(pathname);
-  const onglets =
-    etat === 'echec'
-      ? [...TREASURY_TABS]
-      : actions === null
-        ? []
-        : TREASURY_TABS.filter((t) => actions.includes(t.action));
-
   if (etat === 'pret' && !peutConsulterTresorerie(actions)) {
     return (
       <div className="rounded-xl border border-dashed border-[var(--border)] p-6 text-center sm:p-8">
@@ -85,20 +68,6 @@ export function TreasuryChrome({ children }: { children: React.ReactNode }): Rea
     <Contexte.Provider
       value={{ etat, gerer: peutGererTresorerie(actions), relier: peutRelier(actions) }}
     >
-      {onglets.length > 0 ? (
-        // ADR-0030 : une seule ligne qui défile sur téléphone, comme les Ventes.
-        <TabsNav
-          label="Sections de la trésorerie"
-          renderLink={renderNextLink}
-          items={onglets.map((tab) => ({
-            href: `${TRESORERIE_BASE}/${tab.segment}`,
-            label: tab.label,
-            current: courant === tab.segment,
-          }))}
-        />
-      ) : (
-        <div aria-hidden="true" className="h-[2.75rem] border-b border-[var(--border)]" />
-      )}
       {children}
     </Contexte.Provider>
   );

@@ -42,7 +42,6 @@ import {
   lireTauxSaisi,
   messageVentes,
   montantPourSaisie,
-  ongletsVentes,
   OUT_OF_SCOPE_ITEM_CODE,
   peutConsulter,
   peutGerer,
@@ -52,7 +51,6 @@ import {
   requeteArticles,
   requeteClients,
   requiredFieldsFor,
-  segmentVentes,
   taxeSpecifiqueAdmise,
   typesAdmis,
   type FormulaireArticle,
@@ -300,29 +298,13 @@ describe('lireTauxSaisi', () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('accès et onglets', () => {
-  it('ne propose aucun onglet tant que les permissions sont inconnues', () => {
-    expect(ongletsVentes(null)).toEqual([]);
-  });
-
-  it('propose Clients et Catalogue avec sales.read, rien sans', () => {
-    expect(ongletsVentes(['sales.read']).map((t) => t.label)).toEqual(['Clients', 'Catalogue']);
-    expect(ongletsVentes(['project.read', 'fiscal.manage'])).toEqual([]);
-  });
-
+describe('accès', () => {
   it('sépare consultation et gestion ; inconnu = lecture seule', () => {
     expect(peutConsulter(['sales.read'])).toBe(true);
     expect(peutGerer(['sales.read'])).toBe(false);
     expect(peutGerer(['sales.read', 'sales.manage'])).toBe(true);
     expect(peutConsulter(null)).toBe(false);
     expect(peutGerer(null)).toBe(false);
-  });
-
-  it('déduit l’onglet du chemin, sur des frontières de segment', () => {
-    expect(segmentVentes('/ventes/clients')).toBe('clients');
-    expect(segmentVentes('/ventes/catalogue')).toBe('catalogue');
-    expect(segmentVentes('/ventes')).toBe('');
-    expect(segmentVentes('/ventes-privees/clients')).toBe('');
   });
 });
 

@@ -6,7 +6,6 @@ import {
   FORECAST_FINDING_LABELS,
   RECONCILIATION_FINDING_LABELS,
   SYNC_STATUS_LABELS,
-  TREASURY_TABS,
   estNegatif,
   formatMontantSigne,
   geometrieGraphique,
@@ -18,25 +17,9 @@ import {
   peutConsulterTresorerie,
   peutGererTresorerie,
   peutRelier,
-  segmentTresorerie,
 } from './treasury-model';
 
 describe('navigation et droits', () => {
-  it('trois onglets, tous ouverts à treasury.read', () => {
-    expect(TREASURY_TABS.map((t) => t.label)).toEqual([
-      'Dépenses',
-      'Trésorerie',
-      'Réalisé vs prévu',
-    ]);
-    expect(TREASURY_TABS.every((t) => t.action === 'treasury.read')).toBe(true);
-  });
-
-  it('segment courant, « depenses » par défaut', () => {
-    expect(segmentTresorerie('/tresorerie')).toBe('depenses');
-    expect(segmentTresorerie('/tresorerie/comptes')).toBe('comptes');
-    expect(segmentTresorerie('/tresorerie/realise/x')).toBe('realise');
-  });
-
   it('lire, gérer, relier : chacun exige ses actions', () => {
     expect(peutConsulterTresorerie(null)).toBe(false);
     expect(peutConsulterTresorerie(['treasury.read'])).toBe(true);

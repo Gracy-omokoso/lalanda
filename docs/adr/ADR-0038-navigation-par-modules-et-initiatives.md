@@ -132,6 +132,13 @@ seules les entrées sans condition s'affichent. Masquer est un confort ; l'API r
 bureau explique alors que rien n'est ouvert au rôle) : l'onglet ne disparaît pas sous
 l'utilisateur pendant le chargement.
 
+**Révisé le 29 oct. 2026 (choix de Gracy)** : les rangées d'onglets internes qui
+répétaient la colonne — Ventes (Factures, Devis, Encaissements, Clients, Catalogue, CRM,
+Modèle de facture), Trésorerie (Dépenses, Comptes, Réalisé vs prévu) et la sous-navigation
+du CRM (Pipeline, Contacts, Réglages) — sont retirées. La colonne de gauche, et le tiroir sur
+téléphone, sont la seule navigation entre ces sections ; les espaces gardent leur en-tête
+et leur frontière d'accès (refus explicite sans `sales.read` / `treasury.read`).
+
 ### 4. Icônes de module
 
 Révisé le 29 oct. 2026 (choix de Gracy) : icônes **Lucide** (`lucide-react`, licence ISC),

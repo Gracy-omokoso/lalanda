@@ -30,7 +30,7 @@ import {
   totauxColonne,
   type FormulaireOpportunite,
 } from './crm-model';
-import { CrmNav, CsvActions } from './crm-nav';
+import { CsvActions } from './crm-nav';
 
 function Carte({
   o,
@@ -259,7 +259,6 @@ export function CrmBoard(): React.ReactElement {
 
   return (
     <section className="flex flex-col gap-5">
-      <CrmNav />
       {erreur ? (
         <Alerte>
           <p>{erreur}</p>

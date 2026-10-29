@@ -1,44 +1,15 @@
 'use client';
 
-// Sous-navigation du CRM (ADR-0035 § 5) et import/export CSV partagés.
+// Import/export CSV partagés du CRM (ADR-0035 § 5). La sous-navigation
+// (Pipeline, Contacts, Réglages) est dans la colonne de gauche (ADR-0038 § 3).
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 
 import { type ImportResult } from '@/lib/api-crm';
 
 import { Alerte, BOUTON_PETIT } from '../../_components/form-ui';
 
-import { CRM_BASE, erreursImport, messageCrm } from './crm-model';
-
-const LIENS = [
-  { href: CRM_BASE, label: 'Pipeline' },
-  { href: `${CRM_BASE}/contacts`, label: 'Contacts et prospects' },
-  { href: `${CRM_BASE}/reglages`, label: 'Réglages du pipeline' },
-];
-
-export function CrmNav(): React.ReactElement {
-  const pathname = usePathname();
-  return (
-    <nav aria-label="Sections du CRM" className="flex flex-wrap gap-3 text-sm">
-      {LIENS.map((l) => (
-        <Link
-          key={l.href}
-          href={l.href}
-          aria-current={pathname === l.href ? 'page' : undefined}
-          className={
-            pathname === l.href
-              ? 'font-semibold underline underline-offset-4'
-              : 'text-[var(--foreground-muted)] hover:text-[var(--foreground)]'
-          }
-        >
-          {l.label}
-        </Link>
-      ))}
-    </nav>
-  );
-}
+import { erreursImport, messageCrm } from './crm-model';
 
 function telecharger(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);

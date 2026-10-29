@@ -18,7 +18,7 @@ import {
   preparerContact,
   type FormulaireContact,
 } from './crm-model';
-import { CrmNav, CsvActions } from './crm-nav';
+import { CsvActions } from './crm-nav';
 
 export function ContactsPanel(): React.ReactElement {
   const { actions } = useAccesVentes();
@@ -72,7 +72,6 @@ export function ContactsPanel(): React.ReactElement {
 
   return (
     <section className="flex flex-col gap-5">
-      <CrmNav />
       {erreur ? (
         <Alerte>
           <p>{erreur}</p>

@@ -26,7 +26,6 @@ import {
   preparerActivite,
   type FormulaireActivite,
 } from './crm-model';
-import { CrmNav } from './crm-nav';
 
 export function OpportunityDetail({
   opportunityId,
@@ -92,7 +91,6 @@ export function OpportunityDetail({
 
   return (
     <section className="flex flex-col gap-5">
-      <CrmNav />
       <header className="flex flex-col gap-1">
         <Link href={CRM_BASE} className="text-sm underline underline-offset-2">
           ← Pipeline

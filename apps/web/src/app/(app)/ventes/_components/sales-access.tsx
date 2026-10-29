@@ -1,9 +1,10 @@
 'use client';
 
-// Chrome de l'espace Ventes : onglets et frontière d'accès (ADR-0022, chantier D2 ;
-// onglet Factures et droit `sales.invoice` : ADR-0023, chantier E3 ; onglet
-// Modèle de facture : ADR-0028 ; onglet Encaissements et droit `sales.receipt` :
-// ADR-0031).
+// Chrome de l'espace Ventes : frontière d'accès (ADR-0022, chantier D2 ; droit
+// `sales.invoice` : ADR-0023, chantier E3 ; droit `sales.receipt` : ADR-0031).
+// Les sections (Factures, Devis, Encaissements, Clients, Catalogue, CRM, Modèle
+// de facture) sont dans la colonne de gauche du module RUN (ADR-0038 § 3) : plus
+// de rangée d'onglets en double.
 //
 // Les permissions sont lues UNE fois (`GET /me/permissions`) et partagées avec
 // les pages par un contexte : la liste des clients et celle du catalogue en ont
@@ -13,14 +14,11 @@
 // toute façon. Masquer un bouton est un confort ; un rôle sans `sales.read` lit
 // un refus explicite plutôt qu'une page vide.
 
-import { TabsNav } from '@lalanda/ui';
-import { usePathname } from 'next/navigation';
 import { createContext, useContext, useEffect, useState } from 'react';
 
-import { renderNextLink } from '@/components/next-link';
 import { api, type OrgAction } from '@/lib/api';
 
-import { peutConsulter, peutGerer, SALES_TABS, segmentVentes, VENTES_BASE } from './sales-model';
+import { peutConsulter, peutGerer } from './sales-model';
 
 type EtatPermissions = 'chargement' | 'pret' | 'echec';
 
@@ -47,30 +45,11 @@ const Contexte = createContext<AccesVentes>({
   actions: null,
 });
 
-/**
- * Onglets de l'espace, dans l'ordre d'affichage : « Factures » en premier
- * (ADR-0023, chantier E3), puis les données maîtres d'ADR-0022.
- */
-const ONGLETS: readonly { segment: string; label: string; action: OrgAction }[] = [
-  { segment: 'factures', label: 'Factures', action: 'sales.read' },
-  // ADR-0035 : devis, document distinct du pro forma, qui se convertit en facture.
-  { segment: 'devis', label: 'Devis', action: 'sales.read' },
-  // ADR-0031 : lecture ouverte à `sales.read` ; enregistrer exige `sales.receipt`.
-  { segment: 'encaissements', label: 'Encaissements', action: 'sales.read' },
-  ...SALES_TABS,
-  // ADR-0035 : CRM minimal, après les données maîtres qu'il prolonge.
-  { segment: 'crm', label: 'CRM', action: 'crm.read' },
-  // ADR-0028 : galerie et aperçus ouverts à `sales.read` ; le CHOIX exige
-  // `organization.manage` (la page l'annonce, l'API le refuse).
-  { segment: 'modele-facture', label: 'Modèle de facture', action: 'sales.read' },
-];
-
 export function useAccesVentes(): AccesVentes {
   return useContext(Contexte);
 }
 
 export function SalesChrome({ children }: { children: React.ReactNode }): React.ReactElement {
-  const pathname = usePathname();
   const [actions, setActions] = useState<OrgAction[] | null>(null);
   const [etat, setEtat] = useState<EtatPermissions>('chargement');
 
@@ -90,17 +69,6 @@ export function SalesChrome({ children }: { children: React.ReactNode }): React.
       annule = true;
     };
   }, []);
-
-  // Permissions illisibles (panne réseau, organisation absente) : on montre les
-  // deux onglets plutôt qu'un espace sans navigation. Chaque page lit alors la
-  // réponse du serveur et l'explique — un 403 y devient une phrase, pas une panne.
-  const onglets =
-    etat === 'echec'
-      ? [...ONGLETS]
-      : actions === null
-        ? []
-        : ONGLETS.filter((t) => actions.includes(t.action));
-  const courant = segmentVentes(pathname);
 
   if (etat === 'pret' && !peutConsulter(actions)) {
     return (
@@ -126,21 +94,6 @@ export function SalesChrome({ children }: { children: React.ReactNode }): React.
         actions,
       }}
     >
-      {onglets.length > 0 ? (
-        // ADR-0030 : une seule ligne qui défile sur téléphone, jamais deux.
-        <TabsNav
-          label="Sections des ventes"
-          renderLink={renderNextLink}
-          items={onglets.map((tab) => ({
-            href: `${VENTES_BASE}/${tab.segment}`,
-            label: tab.label,
-            current: courant === tab.segment,
-          }))}
-        />
-      ) : (
-        // Hauteur réservée : la page ne saute pas quand les onglets arrivent.
-        <div aria-hidden="true" className="h-[2.75rem] border-b border-[var(--border)]" />
-      )}
       {children}
     </Contexte.Provider>
   );
