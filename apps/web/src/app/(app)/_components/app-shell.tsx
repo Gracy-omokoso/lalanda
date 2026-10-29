@@ -40,7 +40,7 @@ function Coquille({ children }: { children: React.ReactNode }): React.ReactEleme
   const [tiroir, setTiroir] = useState(false);
   const { actions } = useShell();
   const pathname = usePathname();
-  const module = moduleCourant(pathname);
+  const moduleActif = moduleCourant(pathname);
   // Réserve la place de la barre basse seulement quand elle existe.
   const avecBarre = actionsRapides(actions).length > 0;
   const boutonTiroir = useRef<HTMLElement | null>(null);
@@ -92,11 +92,11 @@ function Coquille({ children }: { children: React.ReactNode }): React.ReactEleme
 
       <AppHeader onOuvrirNavigation={ouvrirTiroir} />
 
-      <div className={`flex-1 ${module !== null ? `lg:grid ${grille}` : ''}`}>
-        {module !== null ? (
+      <div className={`flex-1 ${moduleActif !== null ? `lg:grid ${grille}` : ''}`}>
+        {moduleActif !== null ? (
           <aside className="nav-panel sticky top-14 hidden h-[calc(100vh-3.5rem)] flex-col border-r border-[var(--nav-border)] bg-[var(--nav-bg)] text-[var(--nav-fg)] lg:flex">
             <div className="min-h-0 flex-1">
-              <SidebarNav module={module} replie={replie} />
+              <SidebarNav module={moduleActif} replie={replie} />
             </div>
             <div
               className={`border-t border-[var(--nav-border)] p-2 ${replie ? 'flex justify-center' : ''}`}
@@ -137,7 +137,7 @@ function Coquille({ children }: { children: React.ReactNode }): React.ReactEleme
         </div>
       </div>
 
-      {tiroir ? <Tiroir module={module} onFermer={fermerTiroir} /> : null}
+      {tiroir ? <Tiroir module={moduleActif} onFermer={fermerTiroir} /> : null}
       <BarreBasse onMenu={ouvrirTiroir} />
     </div>
   );
