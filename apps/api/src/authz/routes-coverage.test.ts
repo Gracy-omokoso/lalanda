@@ -697,6 +697,8 @@ describe('couverture des routes par le RBAC', () => {
       'WorkBillingController.unlinkInvoice': ['work.manage'],
       'WorkBillingController.prepareInvoice': ['work.read', 'sales.manage'],
       'WorkBillingController.margin': ['work.read', 'sales.read', 'treasury.read'],
+      // ADR-0040 — C4 : décocher une activité depuis « Mes tâches » (relances CRM).
+      'CrmActivitiesController.reopen': ['crm.manage'],
     };
     for (const [cle, actions] of Object.entries(attendu)) {
       const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle);

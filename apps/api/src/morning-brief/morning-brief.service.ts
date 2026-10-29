@@ -11,7 +11,8 @@
 //     `sales.read` (même matrice que l'espace organisation, `can()`). Masquer
 //     après lecture laisserait la donnée transiter jusqu'au prompt de l'IA.
 //     Même règle pour les tâches et projets (ADR-0039 § 6.5) avec `work.read`,
-//     et pour la trésorerie avec `treasury.read` (ADR-0040 § 4.4).
+//     et pour la trésorerie avec `treasury.read` (ADR-0040 § 4.4), et pour les
+//     relances et le pipeline du CRM avec `crm.read` (ADR-0040 — C4 § 5.5).
 
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -30,10 +31,12 @@ import { can, type OrgRole } from '../authz/permissions.js';
 import { SalesInvoice, type SalesInvoiceDocument } from '../sales/invoices/invoice.schema.js';
 import {
   CASH_POSITION_SOURCE,
+  CRM_SOURCE,
   DUE_DATES_SOURCE,
   OUTSTANDING_SOURCE,
   WORK_SOURCE,
   type CashPositionSource,
+  type CrmSource,
   type DueDatesSource,
   type OutstandingSource,
   type WorkSource,
@@ -130,12 +133,14 @@ export class MorningBriefService {
     @Inject(DUE_DATES_SOURCE) private readonly dueDates: DueDatesSource,
     @Inject(OUTSTANDING_SOURCE) private readonly outstanding: OutstandingSource,
     @Inject(WORK_SOURCE) private readonly work: WorkSource,
+    // ADR-0040 — C4
+    @Inject(CRM_SOURCE) private readonly crm: CrmSource,
   ) {}
 
   /**
    * Brief de l'organisation, vu par ce rôle et pour ce membre : `userId`
    * (session ou destinataire de l'e-mail) ne sert qu'aux faits personnels
-   * `mes_taches.*` (ADR-0039 § 6.5).
+   * `mes_taches.*` (ADR-0039 § 6.5) et `mes_relances.*` (ADR-0040 — C4).
    */
   async build(
     organizationId: string,
@@ -147,7 +152,9 @@ export class MorningBriefService {
     const workVisible = can(role, 'work.read');
     // ADR-0040 — C0 § 4.4 : une donnée de trésorerie exige `treasury.read`.
     const cashVisible = can(role, 'treasury.read');
-    const [sales, cash, dueDates, work] = await Promise.all([
+    // ADR-0040 — C4 § 5.5 : relances et pipeline chargés seulement avec `crm.read`.
+    const crmVisible = can(role, 'crm.read');
+    const [sales, cash, dueDates, work, crm] = await Promise.all([
       salesVisible ? this.loadSales(organizationId, now) : Promise.resolve('hidden' as const),
       cashVisible ? this.cash.cashOf(organizationId, now) : Promise.resolve('hidden' as const),
       // Les échéances sont des données de ventes : même règle de visibilité.
@@ -158,8 +165,9 @@ export class MorningBriefService {
       workVisible
         ? this.work.workOf(organizationId, userId, now)
         : Promise.resolve('hidden' as const),
+      crmVisible ? this.crm.crmOf(organizationId, userId, now) : Promise.resolve('hidden' as const),
     ]);
-    return buildMorningBrief({ now: now.toISOString(), sales, cash, dueDates, work });
+    return buildMorningBrief({ now: now.toISOString(), sales, cash, dueDates, work, crm });
   }
 
   /**

@@ -356,6 +356,12 @@ export interface ActivityInput {
   opportunityId: string | null;
   contactId: string | null;
   customerId: string | null;
+  /**
+   * ADR-0040 — C4 § 2.4 : assigné. `undefined` (champ absent) : le créateur à la
+   * création, l'assigné courant à la modification ; `null` : refusé pour une
+   * activité à échéance non faite (`CRM_ASSIGNEE_REQUIRED`, contrôlé par le service).
+   */
+  assigneeUserId?: string | null;
 }
 
 const ActivityFields = {
@@ -368,6 +374,8 @@ const ActivityFields = {
   opportunityId: z.unknown().optional(),
   contactId: z.unknown().optional(),
   customerId: z.unknown().optional(),
+  // ADR-0040 — C4
+  assigneeUserId: z.unknown().optional(),
 };
 
 function dueAtOf(ctx: Ctx, raw: unknown): Date | null {
@@ -417,6 +425,17 @@ export function normalizeActivity(
     opportunityId: objectId(ctx, ['opportunityId'], raw['opportunityId'], 'OPPORTUNITY_INVALID'),
     contactId: objectId(ctx, ['contactId'], raw['contactId'], 'CONTACT_INVALID'),
     customerId: objectId(ctx, ['customerId'], raw['customerId'], 'CUSTOMER_INVALID'),
+    // ADR-0040 — C4 : absent reste absent (défaut décidé par le service).
+    ...(raw['assigneeUserId'] === undefined
+      ? {}
+      : {
+          assigneeUserId: objectId(
+            ctx,
+            ['assigneeUserId'],
+            raw['assigneeUserId'],
+            'ASSIGNEE_INVALID',
+          ),
+        }),
   };
 }
 
@@ -439,6 +458,14 @@ export const ListActivitiesQuerySchema = z
     opportunityId: idQuery('Identifiant d’opportunité invalide.'),
     contactId: idQuery('Identifiant de contact invalide.'),
     customerId: idQuery('Identifiant de client invalide.'),
+    // ADR-0040 — C4 § 3.5 : assigné (`me` ou identifiant), compte, échéance (jours de Kinshasa).
+    assignee: z
+      .string()
+      .refine((v) => v === 'me' || isObjectIdHex(v), 'Assigné : « me » ou un identifiant.')
+      .optional(),
+    accountId: idQuery('Identifiant de compte invalide.'),
+    dueFrom: z.string().refine(isCalendarDay, 'Date : AAAA-MM-JJ.').optional(),
+    dueTo: z.string().refine(isCalendarDay, 'Date : AAAA-MM-JJ.').optional(),
     limit: limit(200, '50'),
     cursor: z.string().min(1).max(512).optional(),
   })

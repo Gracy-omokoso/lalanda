@@ -14,6 +14,8 @@ import {
   OrganizationSuspensionSchema,
 } from '../admin/organization-suspension.schema.js';
 import { AiModule, OPENAI_CHAT_CLIENT } from '../ai/ai.module.js';
+import { CrmBriefSource } from '../crm/brief/crm-brief.source.js';
+import { CrmModule } from '../crm/crm.module.js';
 import { OrganizationsModule } from '../organizations/organizations.module.js';
 import { SalesInvoice, SalesInvoiceSchema } from '../sales/invoices/invoice.schema.js';
 import { SalesModule } from '../sales/sales.module.js';
@@ -25,6 +27,7 @@ import { MORNING_BRIEF_CHAT_CLIENT, MorningBriefAiService } from './morning-brie
 import { MorningBriefController } from './morning-brief.controller.js';
 import {
   CASH_POSITION_SOURCE,
+  CRM_SOURCE,
   DUE_DATES_SOURCE,
   OUTSTANDING_SOURCE,
   WORK_SOURCE,
@@ -57,6 +60,8 @@ import { MorningBriefService } from './morning-brief.service.js';
     TreasuryModule,
     // ADR-0039 § 6.5 : tâches et projets (`WorkBriefSource`), lecture seule.
     WorkModule,
+    // ADR-0040 — C4 § 5.5 : relances et pipeline (`CrmBriefSource`), lecture seule.
+    CrmModule,
     MongooseModule.forFeature([
       { name: SalesInvoice.name, schema: SalesInvoiceSchema },
       { name: OrganizationSuspension.name, schema: OrganizationSuspensionSchema },
@@ -77,6 +82,8 @@ import { MorningBriefService } from './morning-brief.service.js';
     { provide: OUTSTANDING_SOURCE, useClass: SettlementsOutstanding },
     // ADR-0039 § 6.5 — tâches en retard, du jour, projets à risque.
     { provide: WORK_SOURCE, useExisting: WorkBriefSource },
+    // ADR-0040 — C4 § 5.5 — relances en retard, du jour, opportunités ouvertes.
+    { provide: CRM_SOURCE, useExisting: CrmBriefSource },
   ],
   exports: [MorningBriefService],
 })
