@@ -1,4 +1,4 @@
-// `/ventes/crm/reglages` — réglages du pipeline (ADR-0035) ; écriture `crm.manage`.
+// `/crm/reglages` — réglages du pipeline (ADR-0035) ; écriture `crm.manage`.
 
 import type { Metadata } from 'next';
 

@@ -8,8 +8,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { api, type CustomerView } from '@/lib/api';
 import { crmApi, type ContactView } from '@/lib/api-crm';
 
-import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from '../../_components/form-ui';
-import { useAccesVentes } from '../../_components/sales-access';
+import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from '../../ventes/_components/form-ui';
+import { useAccesCrm } from './crm-access';
 
 import {
   formulaireContact,
@@ -21,7 +21,7 @@ import {
 import { CsvActions } from './crm-nav';
 
 export function ContactsPanel(): React.ReactElement {
-  const { actions } = useAccesVentes();
+  const { actions } = useAccesCrm();
   const gerer = peutGererCrm(actions);
   const [q, setQ] = useState('');
   const [items, setItems] = useState<ContactView[] | null>(null);

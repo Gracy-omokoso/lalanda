@@ -188,6 +188,30 @@ export const NAV_APPS: readonly NavApp[] = [
       { id: 'projets-tous', href: '/projets', label: 'Tous les projets', action: 'work.read' },
     ],
   },
+  // ADR-0040 § 8.1 (amende ADR-0038 § 2) — le CRM est une application RUN à
+  // part, sortie de Ventes : juste après Projets et avant Factures (le
+  // commercial travaille l'opportunité avant de facturer). Lecture `crm.read`.
+  //
+  // Sous-options prévues : Pipeline, Comptes, Contacts, Activités, Rapports,
+  // Réglages. Ne figurent ici que celles dont l'écran EXISTE (règle d'ADR-0016
+  // rappelée plus haut : la barre ne promet rien). Comptes (`/crm/comptes`),
+  // Activités (`/crm/activites`) et Rapports (`/crm/rapports`, lot C6)
+  // s'insèrent à leur rang quand leur écran est livré ; pas de page « bientôt »
+  // d'ici là. Voir `CRM_SOUS_OPTIONS_PREVUES`.
+  {
+    id: 'crm',
+    href: '/crm',
+    label: 'CRM',
+    description: 'Pipeline des opportunités, contacts et relances.',
+    module: 'run',
+    icon: 'crm',
+    action: 'crm.read',
+    sousOptions: [
+      { id: 'crm-pipeline', href: '/crm', label: 'Pipeline', action: 'crm.read' },
+      { id: 'crm-contacts', href: '/crm/contacts', label: 'Contacts', action: 'crm.read' },
+      { id: 'crm-reglages', href: '/crm/reglages', label: 'Réglages', action: 'crm.read' },
+    ],
+  },
   {
     id: 'factures',
     href: '/ventes/factures',
@@ -255,31 +279,6 @@ export const NAV_APPS: readonly NavApp[] = [
     icon: 'catalogue',
     action: 'sales.read',
     sousOptions: [],
-  },
-  // ADR-0035 : CRM minimal (pipeline, contacts, relances).
-  {
-    id: 'crm',
-    href: '/ventes/crm',
-    label: 'CRM',
-    description: 'Pipeline des opportunités, contacts et relances.',
-    module: 'run',
-    icon: 'crm',
-    action: 'crm.read',
-    sousOptions: [
-      { id: 'crm-pipeline', href: '/ventes/crm', label: 'Pipeline', action: 'crm.read' },
-      {
-        id: 'crm-contacts',
-        href: '/ventes/crm/contacts',
-        label: 'Contacts et prospects',
-        action: 'crm.read',
-      },
-      {
-        id: 'crm-reglages',
-        href: '/ventes/crm/reglages',
-        label: 'Réglages du pipeline',
-        action: 'crm.read',
-      },
-    ],
   },
   // ADR-0034 — dépenses, comptes, prévision et réalisé vs prévu.
   {
@@ -370,6 +369,21 @@ export const NAV_APPS: readonly NavApp[] = [
   },
 ];
 
+/**
+ * Ordre cible des sous-options du CRM (ADR-0040 § 8.1). Les identifiants absents
+ * de `NAV_APPS` sont ceux dont l'écran n'est pas encore livré : ils restent
+ * masqués plutôt que de mener à une page vide. Le test de navigation vérifie
+ * que les sous-options affichées suivent cet ordre.
+ */
+export const CRM_SOUS_OPTIONS_PREVUES = [
+  'crm-pipeline',
+  'crm-comptes',
+  'crm-contacts',
+  'crm-activites',
+  'crm-rapports',
+  'crm-reglages',
+] as const;
+
 function autorise(action: OrgAction | null, actions: readonly OrgAction[] | null): boolean {
   return action === null || (actions !== null && actions.includes(action));
 }
@@ -424,7 +438,7 @@ export function correspondance(
       const ok =
         c.sousOption === null && app.exact ? pathname === c.href : couvre(pathname, c.href);
       if (!ok) continue;
-      // À longueur égale (« Pipeline » = `/ventes/crm`), la sous-option gagne :
+      // À longueur égale (« Pipeline » = `/crm`), la sous-option gagne :
       // c'est elle qu'il faut allumer dans la colonne.
       if (
         trouve === null ||

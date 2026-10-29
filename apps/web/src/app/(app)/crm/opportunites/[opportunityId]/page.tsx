@@ -1,8 +1,8 @@
-// `/ventes/crm/[opportunityId]` — fiche d'une opportunité (ADR-0035).
+// `/crm/opportunites/[opportunityId]` — fiche d'une opportunité (ADR-0035).
 
 import type { Metadata } from 'next';
 
-import { OpportunityDetail } from '../_components/opportunity-detail';
+import { OpportunityDetail } from '../../_components/opportunity-detail';
 
 export const metadata: Metadata = { title: 'Opportunité — CRM · Lalanda' };
 

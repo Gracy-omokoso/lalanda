@@ -15,6 +15,7 @@ import {
   appActive,
   appsVisibles,
   cleModules,
+  CRM_SOUS_OPTIONS_PREVUES,
   ecrireModules,
   estAccueil,
   estBureau,
@@ -95,12 +96,12 @@ describe('applications et ordre', () => {
   it('RUN, pour un propriétaire', () => {
     expect(ids(appsVisibles(PROPRIETAIRE, 'run'))).toEqual([
       'projets',
+      'crm',
       'factures',
       'devis',
       'encaissements',
       'clients',
       'catalogue',
-      'crm',
       'tresorerie',
     ]);
   });
@@ -152,14 +153,41 @@ describe('sous-options', () => {
     const run = appsVisibles(PROPRIETAIRE, 'run');
     expect(run.find((a) => a.id === 'crm')?.sousOptions.map((s) => s.label)).toEqual([
       'Pipeline',
-      'Contacts et prospects',
-      'Réglages du pipeline',
+      'Contacts',
+      'Réglages',
     ]);
     expect(run.find((a) => a.id === 'tresorerie')?.sousOptions.map((s) => s.href)).toEqual([
       '/tresorerie/depenses',
       '/tresorerie/comptes',
       '/tresorerie/realise',
     ]);
+  });
+
+  it('ADR-0040 § 8.1 : le CRM est une application RUN à part, sortie de Ventes', () => {
+    const crm = NAV_APPS.find((a) => a.id === 'crm')!;
+    expect(crm.module).toBe('run');
+    expect(crm.href).toBe('/crm');
+    expect(crm.action).toBe('crm.read');
+    expect(crm.icon).toBe('crm');
+    // Plus aucune entrée ne mène sous `/ventes/crm` (redirigé en 308).
+    for (const app of NAV_APPS) {
+      for (const href of [app.href, ...app.sousOptions.map((s) => s.href)]) {
+        expect(href === '/ventes/crm' || href.startsWith('/ventes/crm/')).toBe(false);
+      }
+    }
+    // Ouvert à `crm.read` seul, sans `sales.read`.
+    expect(ids(appsVisibles(['crm.read'], 'run'))).toEqual(['crm']);
+  });
+
+  it('CRM : les sous-options affichées suivent l’ordre cible, sans écran promis', () => {
+    const crm = NAV_APPS.find((a) => a.id === 'crm')!;
+    const affichees = crm.sousOptions.map((s) => s.id);
+    const ordre = CRM_SOUS_OPTIONS_PREVUES.filter((id) => affichees.includes(id));
+    expect(affichees).toEqual(ordre);
+    // Comptes, Activités et Rapports n'ont pas encore d'écran : masqués.
+    expect(affichees).not.toContain('crm-comptes');
+    expect(affichees).not.toContain('crm-activites');
+    expect(affichees).not.toContain('crm-rapports');
   });
 
   it('les sous-options sont filtrées comme les applications', () => {
@@ -207,7 +235,8 @@ describe('module courant (déduit du chemin)', () => {
     ['/business-plan', 'build'],
     ['/ventes/factures/nouvelle', 'run'],
     ['/ventes/modele-facture', 'run'],
-    ['/ventes/crm/contacts', 'run'],
+    ['/crm/contacts', 'run'],
+    ['/crm/opportunites/abc', 'run'],
     ['/tresorerie/depenses', 'run'],
     ['/organisation', 'grow'],
     ['/organisation/brief', 'grow'],
@@ -249,7 +278,8 @@ describe('application et sous-option actives', () => {
     ['/ventes/factures', 'factures'],
     ['/ventes/factures/journal', 'factures'],
     ['/ventes/modele-facture', 'factures'],
-    ['/ventes/crm/abc', 'crm'],
+    ['/crm/opportunites/abc', 'crm'],
+    ['/crm/reglages', 'crm'],
     ['/organisation', 'pilotage'],
     ['/organisation/brief', 'brief'],
     ['/croissance/parcours', 'parcours'],
@@ -261,14 +291,17 @@ describe('application et sous-option actives', () => {
     expect(sousOptionActive('/ventes/modele-facture')).toBe('modele-facture');
     expect(sousOptionActive('/ventes/factures/journal')).toBe('journal-ventes');
     expect(sousOptionActive('/ventes/factures/abc')).toBeNull();
-    expect(sousOptionActive('/ventes/crm')).toBe('crm-pipeline');
-    expect(sousOptionActive('/ventes/crm/contacts')).toBe('crm-contacts');
+    expect(sousOptionActive('/crm')).toBe('crm-pipeline');
+    expect(sousOptionActive('/crm/opportunites/abc')).toBe('crm-pipeline');
+    expect(sousOptionActive('/crm/contacts')).toBe('crm-contacts');
+    expect(sousOptionActive('/crm/reglages')).toBe('crm-reglages');
     expect(sousOptionActive('/tresorerie/realise')).toBe('tresorerie-realise');
   });
 
   it('compare par segment', () => {
     expect(appActive('/organisation/fiscalite')).toBeNull();
     expect(appActive('/ventes/facturesX')).toBeNull();
+    expect(appActive('/crm-public')).toBeNull();
   });
 });
 

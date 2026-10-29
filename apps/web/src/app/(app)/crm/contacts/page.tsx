@@ -1,4 +1,4 @@
-// `/ventes/crm/contacts` — contacts et prospects (ADR-0035).
+// `/crm/contacts` — contacts et prospects (ADR-0035).
 
 import type { Metadata } from 'next';
 

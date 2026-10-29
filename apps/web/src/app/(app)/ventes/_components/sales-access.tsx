@@ -2,7 +2,7 @@
 
 // Chrome de l'espace Ventes : frontière d'accès (ADR-0022, chantier D2 ; droit
 // `sales.invoice` : ADR-0023, chantier E3 ; droit `sales.receipt` : ADR-0031).
-// Les sections (Factures, Devis, Encaissements, Clients, Catalogue, CRM, Modèle
+// Les sections (Factures, Devis, Encaissements, Clients, Catalogue, Modèle
 // de facture) sont dans la colonne de gauche du module RUN (ADR-0038 § 3) : plus
 // de rangée d'onglets en double.
 //

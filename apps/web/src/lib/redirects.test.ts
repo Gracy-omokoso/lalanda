@@ -31,27 +31,42 @@ async function redirections(): Promise<RegleRedirection[]> {
 
 /**
  * Applique les règles à un chemin, comme le ferait Next : première
- * correspondance. Seul motif pris en charge, celui que la configuration
- * emploie : un `:path*` final (zéro segment ou plus).
+ * correspondance. Motifs pris en charge, ceux que la configuration emploie : un
+ * `:path*` final (zéro segment ou plus) et des paramètres `:nom` d'un segment.
  */
-function resoudre(regles: readonly RegleRedirection[], chemin: string): RegleRedirection | null {
-  return (
-    regles.find((r) => {
-      if (r.source === chemin) return true;
-      const suffixe = '/:path*';
-      if (!r.source.endsWith(suffixe)) return false;
-      const base = r.source.slice(0, -suffixe.length);
-      return chemin.startsWith(`${base}/`);
-    }) ?? null
-  );
+function motif(source: string): RegExp {
+  const corps = source
+    .split('/')
+    .slice(1)
+    .map((seg) => {
+      if (seg === ':path*') return '(?:/(.+))?';
+      if (seg.startsWith(':')) return '/([^/]+)';
+      return `/${seg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`;
+    })
+    .join('');
+  return new RegExp(`^${corps}$`);
 }
 
-/** Destination effective d'un chemin (remplace `:path*` par le reste du chemin). */
+function resoudre(regles: readonly RegleRedirection[], chemin: string): RegleRedirection | null {
+  return regles.find((r) => motif(r.source).test(chemin)) ?? null;
+}
+
+/** Destination effective d'un chemin (remplace `:path*` et `:nom` par les segments capturés). */
 function destination(regle: RegleRedirection, chemin: string): string {
-  const suffixe = '/:path*';
-  if (!regle.source.endsWith(suffixe)) return regle.destination;
-  const base = regle.source.slice(0, -suffixe.length);
-  return regle.destination.replace(':path*', chemin.slice(base.length + 1));
+  const m = motif(regle.source).exec(chemin);
+  if (m === null) throw new Error(`${chemin} ne correspond pas à ${regle.source}`);
+  const noms = regle.source
+    .split('/')
+    .filter((seg) => seg.startsWith(':'))
+    .map((seg) => seg.slice(1));
+  let dest = regle.destination;
+  noms.forEach((nom, i) => {
+    const valeur = m[i + 1];
+    if (nom === 'path*')
+      dest = valeur === undefined ? dest.replace('/:path*', '') : dest.replace(':path*', valeur);
+    else dest = dest.replace(`:${nom}`, valeur ?? '');
+  });
+  return dest;
 }
 
 describe('/members → /organisation/membres (ADR-0016 §3)', () => {
@@ -107,6 +122,37 @@ describe('/projects → /initiatives (ADR-0038 § 1)', () => {
   it('ne capture pas les chemins qui commencent par le même mot', async () => {
     const regles = await redirections();
     for (const chemin of ['/projects-publics', '/projectsx', '/initiatives', '/initiatives/abc']) {
+      expect(resoudre(regles, chemin)).toBeNull();
+    }
+  });
+});
+
+describe('/ventes/crm → /crm (ADR-0040 § 8.1, critère 16)', () => {
+  it.each([
+    ['/ventes/crm', '/crm'],
+    ['/ventes/crm/contacts', '/crm/contacts'],
+    ['/ventes/crm/reglages', '/crm/reglages'],
+    ['/ventes/crm/abc123', '/crm/opportunites/abc123'],
+  ])('%s → %s, en 308', async (ancien, nouveau) => {
+    const regle = resoudre(await redirections(), ancien);
+    expect(regle).not.toBeNull();
+    expect(destination(regle!, ancien)).toBe(nouveau);
+    expect(regle?.permanent).toBe(true);
+    expect(regle?.statusCode).toBeUndefined();
+  });
+
+  it('ne capture ni le reste de Ventes, ni les nouvelles routes, ni un chemin plus profond', async () => {
+    const regles = await redirections();
+    for (const chemin of [
+      '/ventes',
+      '/ventes/crmx',
+      '/ventes/clients',
+      '/ventes/devis/abc',
+      '/ventes/crm/abc/historique',
+      '/crm',
+      '/crm/contacts',
+      '/crm/opportunites/abc',
+    ]) {
       expect(resoudre(regles, chemin)).toBeNull();
     }
   });

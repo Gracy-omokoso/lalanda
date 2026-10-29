@@ -9,10 +9,10 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { crmApi, type ActivityView, type OpportunityView } from '@/lib/api-crm';
 
-import { Alerte, BOUTON, BOUTON_PETIT, CHAMP, Champ } from '../../_components/form-ui';
-import { formatMontant } from '../../_components/sales-model';
-import { useAccesVentes } from '../../_components/sales-access';
-import { DEVIS_BASE, QUOTE_STATUS_LABELS } from '../../devis/_components/quote-model';
+import { Alerte, BOUTON, BOUTON_PETIT, CHAMP, Champ } from '../../ventes/_components/form-ui';
+import { formatMontant } from '../../ventes/_components/sales-model';
+import { useAccesCrm } from './crm-access';
+import { DEVIS_BASE, QUOTE_STATUS_LABELS } from '../../ventes/devis/_components/quote-model';
 
 import {
   ACTIVITY_KINDS,
@@ -33,7 +33,7 @@ export function OpportunityDetail({
   opportunityId: string;
 }): React.ReactElement {
   const router = useRouter();
-  const { actions, gerer: gererVentes } = useAccesVentes();
+  const { actions, gererVentes } = useAccesCrm();
   const gerer = peutGererCrm(actions);
   const [vue, setVue] = useState<OpportunityView | null>(null);
   const [activites, setActivites] = useState<ActivityView[]>([]);
