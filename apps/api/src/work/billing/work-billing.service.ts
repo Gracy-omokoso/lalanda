@@ -71,7 +71,7 @@ const INVOICES = 'sales_invoices';
 const LINKABLE_TYPES: readonly string[] = ['FV', 'EV'];
 
 /** Ce qu'on lit d'un devis (`sales_quotes`). */
-interface QuoteRead {
+export interface QuoteRead {
   _id: unknown;
   number: string;
   version: number;
@@ -109,6 +109,24 @@ export interface BillingUser {
 
 function isDuplicateKey(err: unknown): boolean {
   return (err as { code?: number } | null)?.code === 11000;
+}
+
+/** Lignes retenues d'un devis : toutes par défaut ; un indice hors du devis est refusé. */
+export function pickQuoteLines(
+  quote: QuoteRead,
+  lineIndexes: readonly number[] | undefined,
+): { index: number; line: StoredLine }[] {
+  const all = quote.lines.map((line, index) => ({ index, line }));
+  if (lineIndexes === undefined) return all;
+  const bad = lineIndexes.find((i) => i >= quote.lines.length);
+  if (bad !== undefined) {
+    invalid(
+      'lineIndexes',
+      'INVALID_VALUE',
+      `Le devis ${quote.number} n’a pas de ligne d’indice ${bad} (${quote.lines.length} ligne(s)).`,
+    );
+  }
+  return [...lineIndexes].sort((a, b) => a - b).map((i) => all[i]!);
 }
 
 @Injectable()
@@ -165,24 +183,6 @@ export class WorkBillingService {
     return new Map(docs.map((d) => [String(d._id), d]));
   }
 
-  /** Lignes retenues d'un devis : toutes par défaut ; un indice hors du devis est refusé. */
-  private static pickLines(
-    quote: QuoteRead,
-    lineIndexes: readonly number[] | undefined,
-  ): { index: number; line: StoredLine }[] {
-    const all = quote.lines.map((line, index) => ({ index, line }));
-    if (lineIndexes === undefined) return all;
-    const bad = lineIndexes.find((i) => i >= quote.lines.length);
-    if (bad !== undefined) {
-      invalid(
-        'lineIndexes',
-        'INVALID_VALUE',
-        `Le devis ${quote.number} n’a pas de ligne d’indice ${bad} (${quote.lines.length} ligne(s)).`,
-      );
-    }
-    return [...lineIndexes].sort((a, b) => a - b).map((i) => all[i]!);
-  }
-
   private static invoiceActorOf(user: BillingUser, actor: WorkActor): InvoiceActor {
     const name = user.name?.trim();
     return {
@@ -213,7 +213,7 @@ export class WorkBillingService {
         status: quote.status,
       });
     }
-    const picked = WorkBillingService.pickLines(quote, body.lineIndexes);
+    const picked = pickQuoteLines(quote, body.lineIndexes);
 
     const active = await this.projectModel
       .countDocuments({ organizationId, status: { $ne: 'archived' } })
@@ -557,9 +557,7 @@ export class WorkBillingService {
     }
     const lines =
       quote && body.source === 'quote_lines'
-        ? WorkBillingService.pickLines(quote, body.lineIndexes).map(({ line }) =>
-            lineInputOf(line, true),
-          )
+        ? pickQuoteLines(quote, body.lineIndexes).map(({ line }) => lineInputOf(line, true))
         : [];
     // Devise et mode de prix : ceux du devis repris ; sans devis, ceux du devis
     // d'origine du projet s'il en a un, sinon CDF hors taxes (brouillon à compléter).

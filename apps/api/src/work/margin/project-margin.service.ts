@@ -47,7 +47,7 @@ const EXPENSES = 'treasury_expenses';
 const FINAL_STATUSES: readonly string[] = ['issued', 'normalized'];
 const CREDIT_NOTE_TYPES: readonly string[] = ['FA', 'EA'];
 
-interface SalesDocRead {
+export interface SalesDocRead {
   _id: unknown;
   type: string;
   status: string;
@@ -73,7 +73,7 @@ const SALES_PROJECTION = {
 } as const;
 
 /** Document définitif de la série réelle : il porte de l'argent. */
-function isFinal(doc: SalesDocRead): boolean {
+export function isFinal(doc: SalesDocRead): boolean {
   return FINAL_STATUSES.includes(doc.status) && doc.series !== 'test';
 }
 
