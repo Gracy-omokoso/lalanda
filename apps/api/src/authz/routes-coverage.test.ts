@@ -89,6 +89,8 @@ import { NotificationsController } from '../notifications/notifications.controll
 // ADR-0040 — C1
 import { CrmAccountConversionController } from '../crm/accounts/conversion/crm-account-conversion.controller.js';
 import { CrmAccountsController } from '../crm/accounts/crm-accounts.controller.js';
+// ADR-0040 — C8
+import { CrmOverviewController } from '../crm/overview/crm-overview.controller.js';
 import { ACTIONS, PLATFORM_FORBIDDEN_ACTIONS, type Action } from './permissions.js';
 
 /**
@@ -181,6 +183,8 @@ const CONTROLEURS = [
   // ADR-0040 — C1 : comptes 360° et conversion prospect → client.
   CrmAccountsController,
   CrmAccountConversionController,
+  // ADR-0040 — C8 : fiche 360° et fil chronologique.
+  CrmOverviewController,
   // ADR-0041 — A2 : catalogue des autorisations.
   CatalogController,
 ];
@@ -726,6 +730,10 @@ describe('couverture des routes par le RBAC', () => {
       'CrmAccountConversionController.convert': ['crm.manage', 'sales.manage'],
       // ADR-0040 — C4 : décocher une activité depuis « Mes tâches » (relances CRM).
       'CrmActivitiesController.reopen': ['crm.manage'],
+      // ADR-0040 — C8 : `crm.read` pour la route ; les sections ventes et projets
+      // exigent en plus `sales.read` / `work.read`, sinon elles sont `hidden`.
+      'CrmOverviewController.overview': ['crm.read'],
+      'CrmOverviewController.timeline': ['crm.read'],
     };
     for (const [cle, actions] of Object.entries(attendu)) {
       const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle);
