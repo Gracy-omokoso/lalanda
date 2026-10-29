@@ -223,6 +223,28 @@ sont inchangés.
   trésorerie dans le brief et GROW (ADR-0040, décision ouverte n° 2).
 - Tests visés : matrice 9 × 28 + 6 × 28 = **420** cases.
 
+### Proposé, ADR-0041 — autorisations par membre (non appliqué)
+
+> **Statut : proposé** par [ADR-0041](adr/ADR-0041-autorisations-par-membre.md) (29 oct. 2026),
+> à la demande de la dirigeante. Rien de ce qui suit n'est encore dans le code ; les lots A1 à A5
+> l'appliquent **après** le lot C0 d'ADR-0040.
+
+- **Le rôle devient un titre et un modèle de départ.** Chaque appartenance porte des **ajouts**
+  (`grants`) et des **retraits** (`revokes`) d'actions, vides par défaut. Droits effectifs =
+  ligne du rôle + ajouts − retraits ; le retrait l'emporte. La matrice rôle × action ci-dessus
+  reste la vérité des titres et n'est pas modifiée. Aucune migration.
+- **Garde-fous** : on n'accorde que ce que l'on détient (R7 sur les droits effectifs) ; personne
+  ne modifie ses propres autorisations ; `billing.manage` n'est pas délégable et les
+  autorisations d'un Propriétaire ne se personnalisent pas (transfert, suppression, R1 restent
+  attachés au titre) ; paires incompatibles par ajout : `inputs.update` + `plan.approve` (R2),
+  `period.close` + `plan.approve` (R3), `sales.invoice` + `fiscal.manage` (proposition) ; le
+  compte des approbateurs de R2 porte sur les détenteurs effectifs ; portées `allow_project`
+  conservées ; rôles plateforme et accès délégué inchangés ; chaque changement est journalisé
+  (`member.permissions_changed`, avant et après) et prend effet à la requête suivante.
+- **Changement de titre** : l'écart est effacé (proposition). **Dépendances** : refusées par le
+  serveur si incohérentes, complétées par l'écran. **Invitation** : porte déjà l'écart.
+- Les 28 actions sont regroupées en sept domaines avec des libellés en français (ADR-0041 § 5).
+
 **Business plan narratif (ADR-0037) — aucune action nouvelle.** Lire relève de
 `project.read` ; rédiger, rattacher le plan figé et demander un brouillon à l'IA, de
 `canvas.update` (le document prolonge par écrit le modèle économique) ; valider une version,

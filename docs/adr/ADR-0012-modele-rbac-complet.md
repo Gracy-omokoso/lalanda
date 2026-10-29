@@ -44,6 +44,12 @@ Décideurs : CTO Lalanda (délégation Gracy Omokoso), décideur produit
 > Conseiller : aucune. Plateforme : sous accès délégué seulement (super-administrateur
 > pour les trois, support pour la lecture) ; les interdits absolus restent cinq et les
 > rôles attribuables sont inchangés.
+>
+> **Amendement proposé par [ADR-0041](ADR-0041-autorisations-par-membre.md) (29 oct. 2026,
+> proposé, non appliqué).** Le rôle devient un titre et un modèle de départ : chaque appartenance
+> porte des ajouts et des retraits d'actions ; droits effectifs = ligne du rôle + ajouts −
+> retraits. La matrice §3 est inchangée ; R7 est jugée sur les droits effectifs ; R2 compte les
+> approbateurs effectifs ; trois paires sont incompatibles par ajout.
 
 ## Contexte
 
