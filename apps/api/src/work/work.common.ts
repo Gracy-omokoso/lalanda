@@ -131,3 +131,14 @@ export function afterAscCursor(
 export function jsonBytes(value: unknown): number {
   return Buffer.byteLength(JSON.stringify(value) ?? '', 'utf8');
 }
+
+/**
+ * Identifiant de chemin ramené en minuscules : les identifiants sont comparés
+ * comme chaînes (`parentTaskId`, `blockedBy.taskId`), jamais à la casse près.
+ * Un identifiant mal formé passe tel quel : le service répond 404.
+ */
+export class WorkIdPipe {
+  transform(value: unknown): unknown {
+    return typeof value === 'string' && isObjectIdHex(value) ? value.toLowerCase() : value;
+  }
+}
