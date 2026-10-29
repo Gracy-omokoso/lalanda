@@ -71,6 +71,14 @@ import { CrmActivitiesController } from '../crm/crm-activities.controller.js';
 import { CrmContactsController } from '../crm/crm-contacts.controller.js';
 import { CrmOpportunitiesController } from '../crm/crm-opportunities.controller.js';
 import { CrmSettingsController } from '../crm/crm-settings.controller.js';
+// ADR-0039 — L1
+import { WorkAttachmentsController } from '../work/work-attachments.controller.js';
+import { WorkCommentsController } from '../work/work-comments.controller.js';
+import { WorkMembersController } from '../work/work-members.controller.js';
+import { WorkProjectsController } from '../work/work-projects.controller.js';
+import { WorkSettingsController } from '../work/work-settings.controller.js';
+import { WorkTasksController } from '../work/work-tasks.controller.js';
+import { WorkTimeController } from '../work/work-time.controller.js';
 import { AuditController } from './audit.controller.js';
 import { REQUIRED_PERMISSIONS_KEY, REQUIRED_PLATFORM_ROLES_KEY } from './authz.decorators.js';
 import { MeController } from './me.controller.js';
@@ -151,6 +159,14 @@ const CONTROLEURS = [
   BusinessPlanOrgController,
   // ADR-0036 — Idea Lab et validation d'idée.
   IdeaLabController,
+  // ADR-0039 — L1 : projets et tâches du RUN (API cœur).
+  WorkSettingsController,
+  WorkMembersController,
+  WorkProjectsController,
+  WorkTasksController,
+  WorkCommentsController,
+  WorkAttachmentsController,
+  WorkTimeController,
 ];
 
 /**
@@ -611,6 +627,48 @@ describe('couverture des routes par le RBAC', () => {
       'IdeaLabController.promote': ['canvas.update'],
       'IdeaLabController.assist': ['canvas.update'],
       'IdeaLabController.putSettings': ['organization.manage'],
+      // ADR-0039 — L1 : lire `work.read`, travailler `work.update`, gouverner
+      // `work.manage` ; les taux (donnée salariale) cumulent `treasury.manage`.
+      'WorkSettingsController.get': ['work.read'],
+      'WorkSettingsController.put': ['work.manage'],
+      'WorkMembersController.list': ['work.read'],
+      'WorkProjectsController.list': ['work.read'],
+      'WorkProjectsController.create': ['work.manage'],
+      'WorkProjectsController.get': ['work.read'],
+      'WorkProjectsController.update': ['work.manage'],
+      'WorkProjectsController.archive': ['work.manage'],
+      'WorkProjectsController.restore': ['work.manage'],
+      'WorkProjectsController.remove': ['work.manage'],
+      'WorkProjectsController.activityOf': ['work.read'],
+      'WorkTasksController.listProject': ['work.read'],
+      'WorkTasksController.create': ['work.update'],
+      'WorkTasksController.list': ['work.read'],
+      'WorkTasksController.myTasks': ['work.read'],
+      'WorkTasksController.get': ['work.read'],
+      'WorkTasksController.patch': ['work.update'],
+      'WorkTasksController.move': ['work.update'],
+      'WorkTasksController.complete': ['work.update'],
+      'WorkTasksController.reopen': ['work.update'],
+      'WorkTasksController.remove': ['work.manage'],
+      'WorkTasksController.addDependency': ['work.update'],
+      'WorkTasksController.removeDependency': ['work.update'],
+      'WorkTasksController.activityOf': ['work.read'],
+      'WorkCommentsController.list': ['work.read'],
+      'WorkCommentsController.create': ['work.update'],
+      'WorkCommentsController.update': ['work.update'],
+      'WorkCommentsController.remove': ['work.update'],
+      'WorkAttachmentsController.list': ['work.read'],
+      'WorkAttachmentsController.upload': ['work.update'],
+      'WorkAttachmentsController.download': ['work.read'],
+      'WorkAttachmentsController.remove': ['work.update'],
+      'WorkTimeController.list': ['work.read'],
+      'WorkTimeController.create': ['work.update'],
+      'WorkTimeController.update': ['work.update'],
+      'WorkTimeController.remove': ['work.update'],
+      'WorkTimeController.summary': ['work.read'],
+      'WorkTimeController.listRates': ['work.read', 'treasury.manage'],
+      'WorkTimeController.setRate': ['work.manage', 'treasury.manage'],
+      'WorkTimeController.removeRate': ['work.manage', 'treasury.manage'],
     };
     for (const [cle, actions] of Object.entries(attendu)) {
       const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle);
