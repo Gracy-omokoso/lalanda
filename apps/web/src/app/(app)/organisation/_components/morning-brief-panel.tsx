@@ -21,6 +21,8 @@ import {
   type MorningBriefView,
 } from '@/lib/morning-brief-api';
 
+import { BriefTravail } from '../brief/_components/brief-travail';
+
 import {
   ANOMALIES,
   TUILES,
@@ -142,6 +144,9 @@ export function MorningBriefPanel(): React.ReactElement {
           </div>
         </div>
       </section>
+
+      {/* ── Projets et tâches (ADR-0039 § 6.5), absent sans `work.read` ──── */}
+      <BriefTravail brief={brief} />
 
       {/* ── Alertes et recommandations ──────────────────────────────────── */}
       <div className="grid gap-6 lg:grid-cols-2">
