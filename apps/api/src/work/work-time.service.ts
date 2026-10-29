@@ -16,6 +16,7 @@
 // moteur (lot L4a, marge). Journalisé dans `audit_events` (`work.rate.set|removed`).
 
 import {
+  WORK_LIMITS,
   addDays,
   kinshasaDayOf,
   type CreateTimeEntryBody,
@@ -27,7 +28,6 @@ import {
   type WorkMemberRateView,
   type WorkPage,
 } from '@lalanda/shared/work';
-import { WORK_LIMITS } from '@lalanda/shared/work';
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import type { ClientSession, Connection, Model } from 'mongoose';

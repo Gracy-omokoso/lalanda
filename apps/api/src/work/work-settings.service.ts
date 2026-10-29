@@ -10,14 +10,18 @@ import {
   type PutWorkSettingsBody,
   type WorkSettingsView,
 } from '@lalanda/shared/work';
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
 import { isDuplicateKey } from '../sales/sales.errors.js';
 import { conflict, staleRevision, type WorkActor } from './work.common.js';
-import { WorkTask, type WorkTaskDocument } from './work.schemas.js';
-import { WorkSettings, type WorkSettingsDocument } from './work.schemas.js';
+import {
+  WorkSettings,
+  WorkTask,
+  type WorkSettingsDocument,
+  type WorkTaskDocument,
+} from './work.schemas.js';
 
 type SettingsLean = WorkSettings & { _id: unknown };
 
