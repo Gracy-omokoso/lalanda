@@ -11,17 +11,27 @@
 //   WORK_SOURCE           tâches et projets à risque  ADR-0039 § 6.5 (projets et tâches)
 //                         — fournisseur réel dans le module `work`
 //                         (`work/brief/work-brief.source.ts`)
+//   CRM_SOURCE            relances et pipeline       ADR-0040 — C4 § 5.5
+//                         — fournisseur réel dans le module `crm`
+//                         (`crm/brief/crm-brief.source.ts`)
 //
 // Les fournisseurs « non disponible » ci-dessous restent pour les tests.
 // Le pipeline (ADR-0035) et la santé GROW (ADR-0032) suivront le même motif :
 // un jeton, un fournisseur par défaut « non disponible », un fait de plus.
 
-import type { BriefCashInput, BriefDueDatesInput, BriefWorkInput } from '@lalanda/engine';
+import type {
+  BriefCashInput,
+  BriefCrmInput,
+  BriefDueDatesInput,
+  BriefWorkInput,
+} from '@lalanda/engine';
 
 export const CASH_POSITION_SOURCE = Symbol('MORNING_BRIEF_CASH_POSITION_SOURCE');
 export const DUE_DATES_SOURCE = Symbol('MORNING_BRIEF_DUE_DATES_SOURCE');
 export const OUTSTANDING_SOURCE = Symbol('MORNING_BRIEF_OUTSTANDING_SOURCE');
 export const WORK_SOURCE = Symbol('MORNING_BRIEF_WORK_SOURCE');
+// ADR-0040 — C4
+export const CRM_SOURCE = Symbol('MORNING_BRIEF_CRM_SOURCE');
 
 /** Trésorerie disponible de l'organisation. Ne reçoit QUE son identifiant. */
 export interface CashPositionSource {
@@ -67,4 +77,19 @@ export interface WorkSource {
 /** Sans module de travail (tests) : « non disponible ». */
 export const noWork: WorkSource = {
   workOf: async () => ({ status: 'unavailable' }),
+};
+
+/**
+ * Relances et pipeline du CRM (ADR-0040 — C4 § 5.5) : activités non faites à
+ * échéance aujourd'hui ou passée, nombre d'opportunités ouvertes. `userId` ne
+ * sert qu'à marquer les relances assignées à l'appelant (`mine`). Appelé
+ * seulement si le rôle détient `crm.read`.
+ */
+export interface CrmSource {
+  crmOf(organizationId: string, userId: string, now: Date): Promise<BriefCrmInput>;
+}
+
+/** Sans module CRM (tests) : « non disponible ». */
+export const noCrm: CrmSource = {
+  crmOf: async () => ({ status: 'unavailable' }),
 };

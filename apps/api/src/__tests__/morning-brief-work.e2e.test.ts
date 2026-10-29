@@ -101,7 +101,7 @@ e2eSuite('brief du matin — tâches et projets à risque (ADR-0039 § 6.5)', ()
 
   it('critère 16 : deux tâches en retard → mes_taches.en_retard = 2 et la règle R8', async () => {
     const b = await brief('analyst');
-    expect(b.version).toBe('1.1.0');
+    expect(b.version).toBe('1.2.0'); // ADR-0040 — C4
     expect(value(b, 'mes_taches.en_retard')).toBe('2');
     expect(value(b, 'mes_taches.aujourdhui')).toBe('1');
     const r8 = b.alerts.find((x) => x.ruleId === 'taches_en_retard');

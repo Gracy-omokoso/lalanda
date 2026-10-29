@@ -11,6 +11,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import type { HydratedDocument } from 'mongoose';
 
 import {
+  NOTIFICATION_ENTITY_TYPES,
   NOTIFICATION_KINDS,
   NOTIFICATION_SOURCE_MODULES,
   type NotificationKind,
@@ -40,7 +41,12 @@ export class Notification {
         required: true,
         enum: NOTIFICATION_SOURCE_MODULES as unknown as string[],
       },
-      entityType: { type: String, required: true, enum: ['task', 'project'] },
+      // ADR-0040 — C4 : types d'entité partagés (`NOTIFICATION_ENTITY_TYPES`).
+      entityType: {
+        type: String,
+        required: true,
+        enum: NOTIFICATION_ENTITY_TYPES as unknown as string[],
+      },
       entityId: { type: String, required: true },
       projectId: { type: String, required: false },
     },

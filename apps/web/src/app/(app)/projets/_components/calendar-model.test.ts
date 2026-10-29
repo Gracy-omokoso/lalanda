@@ -17,6 +17,7 @@ import {
   periode,
   placerSemaines,
   sansEcheance,
+  nomElement,
 } from './calendar-model';
 import { oid, tache } from './fixtures.test-helpers';
 
@@ -207,5 +208,14 @@ describe('menu et clavier', () => {
     ).toBe('du 3 nov. au 7 nov.');
     expect(libelleEtendue(tache({ id: oid(1), dueDate: '2026-11-07' }))).toBe('7 nov.');
     expect(libelleEtendue(tache({ id: oid(1) }))).toBe('Sans échéance');
+  });
+});
+
+describe('relances du CRM dans le calendrier (ADR-0040 — C4)', () => {
+  it('nomme une tâche par son numéro, une relance par son étiquette', () => {
+    expect(nomElement({ number: 12, title: 'Livrer' })).toBe('#12 Livrer');
+    expect(nomElement({ number: 0, title: 'Rappeler ACME', etiquette: 'Relance' })).toBe(
+      'Relance « Rappeler ACME »',
+    );
   });
 });

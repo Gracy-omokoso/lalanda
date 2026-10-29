@@ -6,6 +6,7 @@
 // CHAÎNES décimales, jamais en `number` (docs/26). Les montants sont produits
 // par le moteur (`packages/engine/src/work/`) : le web les affiche sans calcul.
 
+import type { CrmMyTaskItem } from '../crm/agenda.js';
 import type {
   WorkActivityKind,
   WorkColumn,
@@ -186,16 +187,31 @@ export interface MyTaskItem extends WorkTaskView {
   projectName: string;
 }
 
+/** Tâche du module `work` dans « Mes tâches » (ADR-0040 — C4 § 5.2). */
+export type WorkMyTaskItem = MyTaskItem & { source: 'work' };
+
+export type { CrmMyTaskItem };
+
+/**
+ * Élément de « Mes tâches » : une tâche, ou une relance du CRM agrégée à la
+ * lecture (ADR-0040 — C4 § 5.2). `source` dit quel module la possède, donc quelle
+ * route la coche.
+ */
+export type MyTaskEntry = WorkMyTaskItem | CrmMyTaskItem;
+
 /** `GET /work/my-tasks` — groupes calculés par `groupMyTasks`. */
 export interface MyTasksView {
   /** Jour de Kinshasa utilisé pour le regroupement (`AAAA-MM-JJ`). */
   asOf: string;
-  overdue: MyTaskItem[];
-  today: MyTaskItem[];
-  next7Days: MyTaskItem[];
-  later: MyTaskItem[];
-  noDate: MyTaskItem[];
+  overdue: MyTaskEntry[];
+  today: MyTaskEntry[];
+  next7Days: MyTaskEntry[];
+  later: MyTaskEntry[];
+  noDate: MyTaskEntry[];
+  /** Les deux sources, avec le même `dueSoonDays` de l'organisation. */
   dueSoonCount: number;
+  /** Vrai si une source a dépassé sa borne de lecture (500 par source). */
+  truncated: boolean;
 }
 
 // ── Commentaires et pièces jointes ──────────────────────────────────────────

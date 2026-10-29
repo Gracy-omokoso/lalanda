@@ -9,6 +9,11 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 
 import { OrganizationsModule } from '../organizations/organizations.module.js';
+// ADR-0040 — C4
+import { WorkModule } from '../work/work.module.js';
+import { CrmBriefSource } from './brief/crm-brief.source.js';
+import { CrmNotifier } from './crm-notifier.js';
+import { CrmDueRemindersJob } from './crm-reminders.job.js';
 import { Customer, CustomerSchema } from '../sales/customer.schema.js';
 import { SalesQuote, SalesQuoteSchema } from '../sales/quotes/quote.schema.js';
 import { ActivitiesService } from './activities.service.js';
@@ -42,6 +47,8 @@ import { CrmAccountsService } from './accounts/crm-accounts.service.js';
   imports: [
     // `AuthGuard` résout l'organisation active via `OrganizationsService`.
     OrganizationsModule,
+    // ADR-0040 — C4 : membres (assigné, rappels) et `dueSoonDays` du module work.
+    WorkModule,
     MongooseModule.forFeature([
       { name: CrmSettings.name, schema: CrmSettingsSchema },
       { name: CrmContact.name, schema: CrmContactSchema },
@@ -72,12 +79,19 @@ import { CrmAccountsService } from './accounts/crm-accounts.service.js';
     CrmAccountsService,
     CrmAccountsSync,
     CrmAccountsReconcileJob,
+    // ADR-0040 — C4 : notifications `crm.*`, rappels, source du brief.
+    CrmNotifier,
+    CrmDueRemindersJob,
+    CrmBriefSource,
   ],
   exports: [
     OpportunitiesService,
     // ADR-0040 — C1 : comptes (C2, C8) ; synchronisation appelée par Ventes.
     CrmAccountsService,
     CrmAccountsSync,
+    // ADR-0040 — C4 : brief du matin (`CRM_SOURCE`) ; notifier pour C2 et C7.
+    CrmBriefSource,
+    CrmNotifier,
   ],
 })
 export class CrmModule {}

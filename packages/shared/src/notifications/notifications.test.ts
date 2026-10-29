@@ -2,15 +2,34 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ListNotificationsQuery,
+  NOTIFICATION_ENTITY_TYPES,
   NOTIFICATION_KINDS,
+  NOTIFICATION_SOURCE_MODULES,
   PutNotificationPreferencesBody,
   isNotificationHref,
 } from './index.js';
 
 describe('notifications — contrats partagés', () => {
-  it('déclare les six types du module work, préfixés par leur module', () => {
-    expect(NOTIFICATION_KINDS).toHaveLength(6);
-    for (const kind of NOTIFICATION_KINDS) expect(kind.startsWith('work.')).toBe(true);
+  it('déclare six types work et cinq types crm, préfixés par leur module', () => {
+    expect(NOTIFICATION_KINDS).toHaveLength(11);
+    for (const kind of NOTIFICATION_KINDS) {
+      const module = kind.split('.')[0]!;
+      expect(NOTIFICATION_SOURCE_MODULES as readonly string[]).toContain(module);
+    }
+    expect(NOTIFICATION_KINDS.filter((k) => k.startsWith('crm.'))).toEqual([
+      'crm.activity_assigned',
+      'crm.activity_due_soon',
+      'crm.activity_overdue',
+      'crm.opportunity_assigned',
+      'crm.opportunity_won',
+    ]);
+    expect(NOTIFICATION_ENTITY_TYPES).toEqual([
+      'task',
+      'project',
+      'activity',
+      'opportunity',
+      'account',
+    ]);
   });
 
   it('un lien est un chemin relatif de l’application, jamais une URL absolue', () => {

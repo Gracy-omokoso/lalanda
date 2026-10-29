@@ -72,6 +72,9 @@ const EMAIL_FACTS = [
   // ADR-0039 § 6.5 : les faits PERSONNELS du destinataire (ses propres tâches).
   'mes_taches.en_retard',
   'mes_taches.aujourdhui',
+  // ADR-0040 — C4 § 5.5 : ses propres relances clients (même garde, `crm.read`).
+  'mes_relances.en_retard',
+  'mes_relances.aujourdhui',
 ];
 
 export function emailContent(
