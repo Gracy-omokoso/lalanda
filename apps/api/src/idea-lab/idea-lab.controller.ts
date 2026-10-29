@@ -28,7 +28,7 @@ import { AuditService } from '../authz/audit.service.js';
 import { RequirePermission } from '../authz/authz.decorators.js';
 import { CurrentOrgRole } from '../authz/current-org-role.decorator.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
-import { can, type OrgRole } from '../authz/permissions.js';
+import { can, NO_OVERRIDES, type OrgRole } from '../authz/permissions.js';
 import type { AiQuotaStatus } from '../billing/ai-quota.js';
 import { AI_THROTTLE } from '../security/throttling.js';
 import { UserThrottlerGuard } from '../security/user-throttler.guard.js';
@@ -95,8 +95,8 @@ export class IdeaLabController {
     return {
       ...view,
       ai: { enabled: disabledBy === null, disabledBy, quota, mention: MENTION_IDEA_LAB },
-      canEdit: can(effective, 'canvas.update'),
-      canManageAi: can(effective, 'organization.manage'),
+      canEdit: can(effective, 'canvas.update', NO_OVERRIDES),
+      canManageAi: can(effective, 'organization.manage', NO_OVERRIDES),
     };
   }
 

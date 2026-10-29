@@ -17,7 +17,7 @@ import { forbidden } from '../authz/authz.service.js';
 import { RequirePermission } from '../authz/authz.decorators.js';
 import { CurrentOrgRole } from '../authz/current-org-role.decorator.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
-import { can, type OrgRole } from '../authz/permissions.js';
+import { can, NO_OVERRIDES, type OrgRole } from '../authz/permissions.js';
 import { CurrentOrgId, CurrentUser } from '../auth/current-user.decorator.js';
 import { BillingService } from '../billing/billing.service.js';
 import { projectLimitExceededPayload, projectLimitStatus } from '../billing/project-limit.js';
@@ -210,7 +210,7 @@ export class ProjectsController {
       // Écriture déguisée en calcul : elle exige `inputs.update`, que
       // `plan.calculate` n'implique pas (un `analyst` calcule, un `accountant`
       // ne calcule pas). Décision prise par la matrice, jamais par un test de rôle.
-      if (!can(role, 'inputs.update')) {
+      if (!can(role, 'inputs.update', NO_OVERRIDES)) {
         throw new ForbiddenException(forbidden('inputs.update', role));
       }
       project = await this.projects.updateDrivers(id, orgId, parsed.data.driverValues, user.id);
