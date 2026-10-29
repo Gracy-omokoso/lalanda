@@ -346,9 +346,9 @@ export default function ProjectsPage(): React.ReactElement {
       >
         {ideeSource && (
           <p role="status" className="rounded-md border border-[var(--border)] p-3 text-sm">
-            Nouvelle initiative à partir de l’idée « {ideeSource.title} » : son problème, sa cible, sa
-            solution et son modèle de revenus deviendront des cartes du Canvas. Aucun chiffre n’est
-            repris.
+            Nouvelle initiative à partir de l’idée « {ideeSource.title} » : son problème, sa cible,
+            sa solution et son modèle de revenus deviendront des cartes du Canvas. Aucun chiffre
+            n’est repris.
           </p>
         )}
         <div className="flex flex-col gap-1">
@@ -527,8 +527,8 @@ export default function ProjectsPage(): React.ReactElement {
 
       {planLimit !== null ? (
         <div className="rounded-md border border-[var(--accent)]/30 bg-[var(--surface)] p-3 text-sm">
-          Votre offre actuelle est limitée à {planLimit} initiative{planLimit > 1 ? 's' : ''}. Passez à
-          l&apos;offre Pro pour créer des initiatives illimitées.{' '}
+          Votre offre actuelle est limitée à {planLimit} initiative{planLimit > 1 ? 's' : ''}.
+          Passez à l&apos;offre Pro pour créer des initiatives illimitées.{' '}
           <Link href="/pricing" className="font-medium text-[var(--accent)] underline">
             Voir les offres
           </Link>

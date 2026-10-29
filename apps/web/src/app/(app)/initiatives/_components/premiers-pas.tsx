@@ -82,8 +82,8 @@ export function PremiersPas(): React.ReactElement {
       </ol>
 
       <p className="mt-7 border-t border-[var(--border)] pt-5 text-[0.88rem] leading-relaxed text-[var(--foreground-muted)]">
-        Créez votre initiative avec le formulaire ci-dessus. Si un mot vous arrête — BFR, DSCR, apport,
-        point mort — le{' '}
+        Créez votre initiative avec le formulaire ci-dessus. Si un mot vous arrête — BFR, DSCR,
+        apport, point mort — le{' '}
         <Link
           href="/aide/glossaire"
           className="font-medium text-[var(--accent)] underline decoration-[var(--accent)]/40 underline-offset-2"

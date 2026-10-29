@@ -33,7 +33,7 @@ function Svg({ className, children }: Props & { children: React.ReactNode }): Re
 }
 
 const TRACES: Record<
-    | NavIconId
+  | NavIconId
   | 'menu'
   | 'fermer'
   | 'plus'

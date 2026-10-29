@@ -98,8 +98,8 @@ export function BridgePanel(): React.ReactElement {
         </h2>
         <p className="max-w-2xl text-sm text-[var(--foreground-muted)]">
           Facultatif. Le chiffre d’affaires hors taxes de vos factures (moins les avoirs) devient le
-          réalisé de l’initiative choisie, mois par mois, étiqueté « issu des ventes ». Le plan validé
-          n’est jamais modifié ; une période clôturée et une saisie manuelle non plus.
+          réalisé de l’initiative choisie, mois par mois, étiqueté « issu des ventes ». Le plan
+          validé n’est jamais modifié ; une période clôturée et une saisie manuelle non plus.
         </p>
       </div>
       {vue ? (

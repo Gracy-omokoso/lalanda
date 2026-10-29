@@ -90,14 +90,19 @@ describe('RUN : factures ouvertes', () => {
 
 describe('GROW', () => {
   it('alertes du brief et score de santé arrondi', () => {
-    expect(chiffresGrow({ alertes: 1, sante: 72.4 }).map((c) => `${c.valeur} ${c.libelle}`)).toEqual(
-      ['1 alerte du brief', '72/100 score de santé'],
-    );
+    expect(
+      chiffresGrow({ alertes: 1, sante: 72.4 }).map((c) => `${c.valeur} ${c.libelle}`),
+    ).toEqual(['1 alerte du brief', '72/100 score de santé']);
   });
 });
 
 describe('alertes de l’accueil', () => {
-  const a = (ruleId: string, severity: 'critique' | 'attention' | 'info', rank: number, actionPath = '/ventes/encaissements') => ({
+  const a = (
+    ruleId: string,
+    severity: 'critique' | 'attention' | 'info',
+    rank: number,
+    actionPath = '/ventes/encaissements',
+  ) => ({
     ruleId,
     severity,
     rank,
@@ -108,9 +113,12 @@ describe('alertes de l’accueil', () => {
 
   it('les plus graves d’abord, trois au plus', () => {
     expect(
-      alertesAccueil([a('i', 'info', 1), a('c2', 'critique', 2), a('at', 'attention', 1), a('c1', 'critique', 1)]).map(
-        (x) => x.id,
-      ),
+      alertesAccueil([
+        a('i', 'info', 1),
+        a('c2', 'critique', 2),
+        a('at', 'attention', 1),
+        a('c1', 'critique', 1),
+      ]).map((x) => x.id),
     ).toEqual(['c1', 'c2', 'at']);
   });
 

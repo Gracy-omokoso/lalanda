@@ -125,8 +125,8 @@ export default function RealisePage(): React.ReactElement {
       >
         {pont?.status === 'not_configured' ? (
           <Bandeau>
-            Aucune initiative reliée : vos dépenses restent consultables dans l’onglet Dépenses, mais la
-            comparaison au prévisionnel exige une initiative BUILD validée.
+            Aucune initiative reliée : vos dépenses restent consultables dans l’onglet Dépenses,
+            mais la comparaison au prévisionnel exige une initiative BUILD validée.
           </Bandeau>
         ) : null}
         <form onSubmit={(e) => void enregistrer(e)} className="flex flex-col gap-3">

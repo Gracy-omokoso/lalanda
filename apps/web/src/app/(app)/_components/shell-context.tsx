@@ -140,7 +140,16 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
       modulesChoisis,
       rafraichir,
     }),
-    [actions, chargees, organizationId, subscription, modules, setModules, modulesChoisis, rafraichir],
+    [
+      actions,
+      chargees,
+      organizationId,
+      subscription,
+      modules,
+      setModules,
+      modulesChoisis,
+      rafraichir,
+    ],
   );
 
   return <Contexte.Provider value={valeur}>{children}</Contexte.Provider>;

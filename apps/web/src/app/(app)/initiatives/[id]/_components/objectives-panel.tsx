@@ -252,8 +252,8 @@ function AttainmentCard({
           Taux d’atteinte
         </h3>
         <p className="text-sm text-[#14191b]">
-          Aucun plan validé pour cette initiative. L’atteinte se mesure contre des chiffres figés : validez
-          d’abord un plan.
+          Aucun plan validé pour cette initiative. L’atteinte se mesure contre des chiffres figés :
+          validez d’abord un plan.
         </p>
         <Link
           href={`/initiatives/${projectId}`}

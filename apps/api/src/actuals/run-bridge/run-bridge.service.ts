@@ -419,13 +419,17 @@ export class RunBridgeService {
   /** Projet de l'organisation, plan validé courant, ligne du compte d'exploitation. */
   private async assertTarget(organizationId: string, projectId: string, lineId: string) {
     const project = await this.projects.findScoped(projectId, organizationId).catch(() => {
-      throw new NotFoundException({ code: 'PROJECT_NOT_FOUND', message: 'Initiative introuvable.' });
+      throw new NotFoundException({
+        code: 'PROJECT_NOT_FOUND',
+        message: 'Initiative introuvable.',
+      });
     });
     const plan = await this.plans.findLatestApproved(organizationId, String(project._id));
     if (!plan) {
       throw new ConflictException({
         code: 'NO_APPROVED_PLAN',
-        message: 'Cette initiative n’a pas de plan validé : validez un plan avant de relier les ventes.',
+        message:
+          'Cette initiative n’a pas de plan validé : validez un plan avant de relier les ventes.',
       });
     }
     const allowed = referenceLines(plan.result.lines as PlanLineInput[]).map((l) => l.lineId);

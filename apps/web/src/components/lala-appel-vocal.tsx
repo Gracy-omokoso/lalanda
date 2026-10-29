@@ -278,8 +278,8 @@ export function LalaAppelVocal(): React.ReactElement {
       {etat.nom === 'pret' || enLigne || etat.nom === 'connexion' ? (
         <p className="mt-2 rounded-md border border-[var(--border)] bg-[var(--surface)] p-2 text-[0.66rem] leading-relaxed text-[var(--foreground-muted)]">
           Lala vocale explique des <strong>notions</strong> — « qu’est-ce qu’un DSCR ? », « à quoi
-          sert le BFR ? ». Elle n’a <strong>aucun chiffre de votre initiative</strong> : pour la lecture
-          de vos résultats, l’explication affichée à l’écran fait foi.
+          sert le BFR ? ». Elle n’a <strong>aucun chiffre de votre initiative</strong> : pour la
+          lecture de vos résultats, l’explication affichée à l’écran fait foi.
         </p>
       ) : null}
 

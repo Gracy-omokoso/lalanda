@@ -75,10 +75,7 @@ export function chiffresRun(ouvertes: readonly SettlementView[] | null): Chiffre
  * quand il est calculable (`GET /grow/health` — `disponible: false` n'affiche
  * rien : le score n'est jamais complété par une estimation, ADR-0032).
  */
-export function chiffresGrow(faits: {
-  alertes: number | null;
-  sante: number | null;
-}): Chiffre[] {
+export function chiffresGrow(faits: { alertes: number | null; sante: number | null }): Chiffre[] {
   const sante =
     faits.sante === null || !Number.isFinite(faits.sante)
       ? null

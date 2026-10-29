@@ -121,7 +121,10 @@ export function AppHeader({
                   title={`${m.label} — ${m.verb}`}
                   className={onglet(actif)}
                 >
-                  <ModuleIcon module={m.id} className={`h-[1.1rem] w-[1.1rem] ${COULEUR_NAV[m.id]}`} />
+                  <ModuleIcon
+                    module={m.id}
+                    className={`h-[1.1rem] w-[1.1rem] ${COULEUR_NAV[m.id]}`}
+                  />
                   <span className="hidden font-mono text-[0.8rem] tracking-[0.1em] sm:inline">
                     {m.label}
                   </span>

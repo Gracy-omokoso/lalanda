@@ -242,7 +242,8 @@ export function messageEncaissement(err: unknown, repli: string): string {
 
 export const BRIDGE_STATE_LABELS: Record<ActualsBridgeView['state'], string> = {
   disabled: 'Désactivé : les ventes n’alimentent aucun plan',
-  not_configured: 'Activé mais incomplet : choisissez l’initiative, la ligne et le début d’exercice',
+  not_configured:
+    'Activé mais incomplet : choisissez l’initiative, la ligne et le début d’exercice',
   active: 'Actif : le chiffre d’affaires des ventes alimente le réalisé de l’initiative',
 };
 

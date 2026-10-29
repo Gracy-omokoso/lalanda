@@ -150,9 +150,7 @@ const ITEMS: readonly UserMenuItem[] = [
  * celles des onglets de `/organisation` (`organization-model.ts`), pour que le
  * menu et l'espace ne se contredisent pas.
  */
-const CONDITIONS: Readonly<
-  Record<string, { drapeau: 'canReadAdmin' } | { action: OrgAction }>
-> = {
+const CONDITIONS: Readonly<Record<string, { drapeau: 'canReadAdmin' } | { action: OrgAction }>> = {
   identite: { action: 'organization.manage' },
   fiscalite: { action: 'fiscal.manage' },
   membres: { action: 'organization.manage' },

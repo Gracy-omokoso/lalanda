@@ -278,7 +278,10 @@ function MiseEnRoute(): React.ReactElement | null {
       <h3 className="text-sm font-semibold">
         Mise en route · {faites}/{total}
       </h3>
-      <div aria-hidden="true" className="h-1.5 overflow-hidden rounded-full bg-[var(--surface-muted)]">
+      <div
+        aria-hidden="true"
+        className="h-1.5 overflow-hidden rounded-full bg-[var(--surface-muted)]"
+      >
         <div
           className="h-full rounded-full bg-[var(--accent)]"
           style={{ width: `${total ? Math.round((faites / total) * 100) : 0}%` }}

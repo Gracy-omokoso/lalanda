@@ -78,7 +78,11 @@ export function SidebarNav({
 }
 
 /** Hors module : les trois bureaux, pour le tiroir du téléphone. */
-function ListeModules({ onNavigate }: { onNavigate: (() => void) | undefined }): React.ReactElement {
+function ListeModules({
+  onNavigate,
+}: {
+  onNavigate: (() => void) | undefined;
+}): React.ReactElement {
   return (
     <nav aria-label="Modules" className="mt-5 flex-1 overflow-y-auto px-3 pb-4">
       <ul className="flex flex-col gap-1">
@@ -233,7 +237,10 @@ function Application({
         ) : null}
       </div>
       {aSousOptions && ouvert ? (
-        <ul id={idListe} className="mb-1 ml-[1.15rem] mt-0.5 border-l border-[var(--nav-border)] pl-3">
+        <ul
+          id={idListe}
+          className="mb-1 ml-[1.15rem] mt-0.5 border-l border-[var(--nav-border)] pl-3"
+        >
           {app.sousOptions.map((s) => {
             const allumee = sousActive === s.id;
             return (
@@ -254,4 +261,3 @@ function Application({
     </>
   );
 }
-

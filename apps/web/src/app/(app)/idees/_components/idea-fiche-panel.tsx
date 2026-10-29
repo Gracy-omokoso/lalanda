@@ -566,8 +566,8 @@ export function IdeaFichePanel({ id }: { id: string }): React.ReactElement {
           <div className="doc-card flex flex-col gap-3 p-4 text-sm">
             <p className="text-[var(--foreground-muted)]">
               Le problème, la solution, la cible et le modèle de revenus deviennent des cartes du
-              Canvas de l’initiative. Aucun chiffre n’est repris ; vous poursuivez ensuite dans le Canvas
-              et l’assistant de saisie habituels.
+              Canvas de l’initiative. Aucun chiffre n’est repris ; vous poursuivez ensuite dans le
+              Canvas et l’assistant de saisie habituels.
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <select
