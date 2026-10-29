@@ -9,8 +9,8 @@ import { useEffect, useState } from 'react';
 
 import { crmApi, type CrmSettingsView, type PipelineStage } from '@/lib/api-crm';
 
-import { Alerte, BOUTON_PETIT, CHAMP } from '../../_components/form-ui';
-import { useAccesVentes } from '../../_components/sales-access';
+import { Alerte, BOUTON_PETIT, CHAMP } from '../../ventes/_components/form-ui';
+import { useAccesCrm } from './crm-access';
 
 import { messageCrm, peutGererCrm } from './crm-model';
 
@@ -31,7 +31,7 @@ function cleDepuis(label: string): string {
 }
 
 export function CrmSettingsPanel(): React.ReactElement {
-  const { actions } = useAccesVentes();
+  const { actions } = useAccesCrm();
   const gerer = peutGererCrm(actions);
   const [s, setS] = useState<CrmSettingsView | null>(null);
   const [existantes, setExistantes] = useState<Set<string>>(new Set());

@@ -7,7 +7,7 @@ import { useState } from 'react';
 
 import { type ImportResult } from '@/lib/api-crm';
 
-import { Alerte, BOUTON_PETIT } from '../../_components/form-ui';
+import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { erreursImport, messageCrm } from './crm-model';
 
