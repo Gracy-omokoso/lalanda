@@ -14,6 +14,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 
 import { OrganizationsModule } from '../organizations/organizations.module.js';
+import { WorkBriefSource } from './brief/work-brief.source.js';
 import { WorkActivityService } from './work-activity.service.js';
 import { WorkAttachmentsController } from './work-attachments.controller.js';
 import { WorkAttachmentsService } from './work-attachments.service.js';
@@ -86,6 +87,8 @@ import {
     WorkAttachmentsService,
     WorkTimeService,
     WorkDueRemindersJob,
+    // ADR-0039 § 6.5 (lot L4b) : fournisseur de `WORK_SOURCE` du brief du matin.
+    WorkBriefSource,
   ],
   exports: [
     MongooseModule,
@@ -95,6 +98,7 @@ import {
     WorkSettingsService,
     WorkProjectsService,
     WorkTasksService,
+    WorkBriefSource,
   ],
 })
 export class WorkModule {}

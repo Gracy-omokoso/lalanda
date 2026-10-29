@@ -8,15 +8,20 @@
 //   DUE_DATES_SOURCE      règlements en retard        ADR-0031 (encaissements)
 //   OUTSTANDING_SOURCE    reste à encaisser réel      ADR-0031 (encaissements)
 //
+//   WORK_SOURCE           tâches et projets à risque  ADR-0039 § 6.5 (projets et tâches)
+//                         — fournisseur réel dans le module `work`
+//                         (`work/brief/work-brief.source.ts`)
+//
 // Les fournisseurs « non disponible » ci-dessous restent pour les tests.
 // Le pipeline (ADR-0035) et la santé GROW (ADR-0032) suivront le même motif :
 // un jeton, un fournisseur par défaut « non disponible », un fait de plus.
 
-import type { BriefCashInput, BriefDueDatesInput } from '@lalanda/engine';
+import type { BriefCashInput, BriefDueDatesInput, BriefWorkInput } from '@lalanda/engine';
 
 export const CASH_POSITION_SOURCE = Symbol('MORNING_BRIEF_CASH_POSITION_SOURCE');
 export const DUE_DATES_SOURCE = Symbol('MORNING_BRIEF_DUE_DATES_SOURCE');
 export const OUTSTANDING_SOURCE = Symbol('MORNING_BRIEF_OUTSTANDING_SOURCE');
+export const WORK_SOURCE = Symbol('MORNING_BRIEF_WORK_SOURCE');
 
 /** Trésorerie disponible de l'organisation. Ne reçoit QUE son identifiant. */
 export interface CashPositionSource {
@@ -47,4 +52,19 @@ export const noCashPosition: CashPositionSource = {
 /** Sans module d'encaissements (tests) : « non disponible ». */
 export const noDueDates: DueDatesSource = {
   dueDatesOf: async () => ({ status: 'unavailable' }),
+};
+
+/**
+ * Projets et tâches (ADR-0039 § 6.5) : tâches non terminées à échéance
+ * aujourd'hui ou passée, dans les projets non archivés de l'organisation.
+ * `userId` ne sert qu'à marquer les tâches assignées à l'appelant (`mine`).
+ * Appelé seulement si le rôle détient `work.read`.
+ */
+export interface WorkSource {
+  workOf(organizationId: string, userId: string, now: Date): Promise<BriefWorkInput>;
+}
+
+/** Sans module de travail (tests) : « non disponible ». */
+export const noWork: WorkSource = {
+  workOf: async () => ({ status: 'unavailable' }),
 };

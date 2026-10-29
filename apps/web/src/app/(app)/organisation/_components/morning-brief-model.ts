@@ -101,6 +101,8 @@ const UNITES: Record<BriefThresholdView['unit'], (v: number) => string> = {
   heures: (v) => `${v} h`,
   jours: (v) => `${v} jours`,
   jour_du_mois: (v) => `${v}ᵉ jour du mois`,
+  // ADR-0039 § 6.5 (seuil S7 des projets à risque).
+  tache: (v) => `${v} tâche${v > 1 ? 's' : ''}`,
 };
 
 export function libelleSeuil(t: BriefThresholdView | null): string | null {

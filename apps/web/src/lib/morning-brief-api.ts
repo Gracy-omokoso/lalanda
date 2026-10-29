@@ -23,7 +23,7 @@ export interface BriefFactView {
 export interface BriefThresholdView {
   id: string;
   value: number;
-  unit: 'facture' | 'heures' | 'jours' | 'jour_du_mois';
+  unit: 'facture' | 'heures' | 'jours' | 'jour_du_mois' | 'tache';
   label: string;
   nature: 'parametre_produit_a_valider';
 }

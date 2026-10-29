@@ -28,6 +28,7 @@ import {
   type BriefSkippedRule,
   type BriefSource,
   type BriefThreshold,
+  type BriefWorkInput,
   type MorningBrief,
   type MorningBriefInput,
 } from './types.js';
@@ -40,6 +41,14 @@ export const MORNING_BRIEF_THRESHOLDS = Object.freeze({
   S4: threshold('S4', 30, 'jours', 'Créance déclarée depuis plus de 30 jours'),
   S5: threshold('S5', 14, 'jours', 'Pro forma non modifiée depuis plus de 14 jours'),
   S6: threshold('S6', 10, 'jour_du_mois', 'Aucune facture émise à partir du 10ᵉ jour du mois'),
+  // ADR-0039 § 6.5 : un projet actif est « à risque » s'il a un jalon en retard
+  // ou au moins S7 tâches en retard (décision ouverte n° 11).
+  S7: threshold(
+    'S7',
+    3,
+    'tache',
+    'Projet à risque : un jalon en retard ou au moins 3 tâches en retard',
+  ),
 } as const);
 
 /** Nombre d'alertes et de recommandations affichées (brief § 8). */
@@ -197,24 +206,132 @@ export function buildMorningBriefFacts(input: MorningBriefInput): BriefFact[] {
     },
   });
 
-  // Indicateurs du brief § 8 que Lalanda ne calcule pas encore.
-  for (const [id, label, reference] of [
-    ['pipeline', 'Pipeline commercial', 'ADR-0035'],
-    ['taches_en_retard', 'Tâches en retard', 'brief stratégique § 5.6'],
-    ['projets_a_risque', 'Projets à risque', 'brief stratégique § 5.6'],
-  ] as const) {
-    facts.push({
-      id,
-      label,
-      kind: 'status',
-      status: 'unavailable',
-      value: null,
-      currency: null,
-      source: { module: 'non_livre', collection: null, rule: 'Module non livré', reference },
-    });
-  }
+  // Projets et tâches du RUN (ADR-0039 § 6.5).
+  facts.push(...workFacts(input.work, today));
+
+  // Indicateur du brief § 8 que Lalanda ne calcule pas encore.
+  facts.push({
+    id: 'pipeline',
+    label: 'Pipeline commercial',
+    kind: 'status',
+    status: 'unavailable',
+    value: null,
+    currency: null,
+    source: {
+      module: 'non_livre',
+      collection: null,
+      rule: 'Module non livré',
+      reference: 'ADR-0035',
+    },
+  });
 
   return facts;
+}
+
+// ── Projets et tâches (ADR-0039 § 6.5) ──────────────────────────────────────
+
+const WORK_SOURCE_REF = 'ADR-0039 § 6.5';
+
+function workSource(rule: string): BriefSource {
+  return { module: 'run.work', collection: 'work_tasks', rule, reference: WORK_SOURCE_REF };
+}
+
+/** Squelette des faits de travail : mêmes identifiants, connus, masqués ou non disponibles. */
+const WORK_FACT_SKELETON: readonly Omit<BriefFact, 'status' | 'value'>[] = Object.freeze([
+  {
+    id: 'mes_taches.en_retard',
+    label: 'Mes tâches en retard',
+    kind: 'count',
+    currency: null,
+    source: workSource(
+      'Tâches non terminées qui vous sont assignées, échéance avant aujourd’hui (Kinshasa), hors projets archivés',
+    ),
+  },
+  {
+    id: 'mes_taches.aujourdhui',
+    label: 'Mes tâches du jour',
+    kind: 'count',
+    currency: null,
+    source: workSource(
+      'Tâches non terminées qui vous sont assignées, échéance aujourd’hui (Kinshasa), hors projets archivés',
+    ),
+  },
+  {
+    id: 'taches.en_retard',
+    label: 'Tâches en retard dans l’organisation',
+    kind: 'count',
+    currency: null,
+    source: workSource(
+      'Tâches non terminées de tous les projets non archivés, échéance avant aujourd’hui (Kinshasa)',
+    ),
+  },
+  {
+    id: 'projets_a_risque',
+    label: 'Projets à risque',
+    kind: 'count',
+    currency: null,
+    source: {
+      module: 'run.work',
+      collection: 'work_projects',
+      rule: 'Projets actifs ayant un jalon en retard, ou au moins S7 tâches en retard',
+      reference: WORK_SOURCE_REF,
+    },
+  },
+]);
+
+/** Jour de Kinshasa `AAAA-MM-JJ`. */
+function dayKey(d: { year: number; month: number; day: number }): string {
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  return `${String(d.year).padStart(4, '0')}-${pad(d.month)}-${pad(d.day)}`;
+}
+
+function workFacts(
+  work: BriefWorkInput,
+  today: { year: number; month: number; day: number },
+): BriefFact[] {
+  if (work === 'hidden' || work.status === 'unavailable') {
+    const status = work === 'hidden' ? ('hidden' as const) : ('unavailable' as const);
+    return WORK_FACT_SKELETON.map((f) => ({ ...f, status, value: null }));
+  }
+
+  const todayKey = dayKey(today);
+  let mineOverdue = 0;
+  let mineToday = 0;
+  let orgOverdue = 0;
+  // Par projet actif : tâches en retard, jalon en retard.
+  const perProject = new Map<string, { overdue: number; milestone: boolean }>();
+
+  for (const t of work.tasks) {
+    if (t.dueDate > todayKey) continue; // l'API ne devrait pas les envoyer
+    if (t.dueDate === todayKey) {
+      if (t.mine) mineToday += 1;
+      continue;
+    }
+    orgOverdue += 1;
+    if (t.mine) mineOverdue += 1;
+    if (!t.projectActive) continue;
+    const p = perProject.get(t.projectId) ?? { overdue: 0, milestone: false };
+    p.overdue += 1;
+    if (t.isMilestone) p.milestone = true;
+    perProject.set(t.projectId, p);
+  }
+
+  let atRisk = 0;
+  for (const p of perProject.values()) {
+    if (p.milestone || p.overdue >= MORNING_BRIEF_THRESHOLDS.S7.value) atRisk += 1;
+  }
+
+  const values: Record<string, string> = {
+    'mes_taches.en_retard': String(mineOverdue),
+    'mes_taches.aujourdhui': String(mineToday),
+    'taches.en_retard': String(orgOverdue),
+    projets_a_risque: String(atRisk),
+  };
+  return WORK_FACT_SKELETON.map((f) => ({
+    ...f,
+    status: 'known' as const,
+    value: values[f.id] ?? null,
+  }));
 }
 
 function amountOfSigned(value: string): bigint {
@@ -577,6 +694,47 @@ export const MORNING_BRIEF_RULES: readonly RuleDefinition[] = Object.freeze([
       };
     },
   },
+  // ── ADR-0039 § 6.5 : projets et tâches du RUN ────────────────────────────
+  {
+    id: 'taches_en_retard',
+    rank: 8,
+    severity: 'attention',
+    requires: ['mes_taches.en_retard'],
+    threshold: null,
+    evaluate(ctx) {
+      const n = ctx.count('mes_taches.en_retard');
+      if (n <= 0) return null;
+      return {
+        title: 'Tâches en retard',
+        message:
+          n > 1
+            ? `${n} tâches qui vous sont assignées ont dépassé leur échéance.`
+            : `${n} tâche qui vous est assignée a dépassé son échéance.`,
+        recommendation: 'Ouvrir Mes tâches, puis terminer ou replanifier les tâches en retard.',
+        actionPath: '/projets/mes-taches',
+        factIds: ['mes_taches.en_retard'],
+      };
+    },
+  },
+  {
+    id: 'jalon_depasse',
+    rank: 9,
+    severity: 'attention',
+    requires: ['projets_a_risque'],
+    threshold: MORNING_BRIEF_THRESHOLDS.S7,
+    evaluate(ctx) {
+      const n = ctx.count('projets_a_risque');
+      if (n <= 0) return null;
+      return {
+        title: 'Projets à risque',
+        message: `${n} ${plural(n, 'projet actif a', 'projets actifs ont')} un jalon en retard ou au moins ${MORNING_BRIEF_THRESHOLDS.S7.value} tâches en retard.`,
+        recommendation:
+          'Ouvrir les projets concernés et replanifier le jalon ou les tâches en retard avec leurs responsables.',
+        actionPath: '/projets',
+        factIds: ['projets_a_risque'],
+      };
+    },
+  },
 ] satisfies RuleDefinition[]);
 
 const SEVERITY_ORDER: Record<BriefSeverity, number> = { critique: 0, attention: 1, info: 2 };
@@ -644,6 +802,8 @@ export function buildMorningBrief(input: MorningBriefInput): MorningBrief {
     alertCount: alerts.length,
     rulesSkipped: skipped,
     predictions: [],
-    truncated: input.sales !== 'hidden' && input.sales.truncated,
+    truncated:
+      (input.sales !== 'hidden' && input.sales.truncated) ||
+      (input.work !== 'hidden' && input.work.status === 'known' && input.work.truncated),
   };
 }

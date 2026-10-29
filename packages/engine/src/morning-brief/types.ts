@@ -10,7 +10,11 @@
 // Montants : chaînes décimales canoniques, jamais de `number` (docs/26).
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const MORNING_BRIEF_VERSION = '1.0.0';
+/**
+ * 1.1.0 (ADR-0039 § 6.5) : faits `mes_taches.*`, `taches.en_retard`,
+ * `projets_a_risque` et règles R8, R9 (projets et tâches du RUN).
+ */
+export const MORNING_BRIEF_VERSION = '1.1.0';
 
 export const BRIEF_CURRENCIES = ['CDF', 'USD'] as const;
 export type BriefCurrency = (typeof BRIEF_CURRENCIES)[number];
@@ -63,6 +67,31 @@ export type BriefCashInput =
 export type BriefDueDatesInput =
   { status: 'unavailable' } | { status: 'known'; overdueCount: number };
 
+/**
+ * Tâche NON terminée dont l'échéance est aujourd'hui ou passée (ADR-0039 § 6.5),
+ * lue par l'API dans un projet non archivé. Le moteur décide seul de ce qui est
+ * « en retard » ou « du jour », au jour de Kinshasa de `now`.
+ */
+export interface BriefWorkTaskInput {
+  projectId: string;
+  /** Échéance `AAAA-MM-JJ` (jour de Kinshasa). */
+  dueDate: string;
+  isMilestone: boolean;
+  /** Assignée à l'appelant du brief (ou au destinataire de l'e-mail). */
+  mine: boolean;
+  /** Projet au statut `active` : seul un projet actif peut être « à risque ». */
+  projectActive: boolean;
+}
+
+/**
+ * Projets et tâches (ADR-0039) : `hidden` si le rôle ne détient pas
+ * `work.read` (rien n'est alors lu), `unavailable` sans module de travail (tests).
+ */
+export type BriefWorkInput =
+  | 'hidden'
+  | { status: 'unavailable' }
+  | { status: 'known'; tasks: readonly BriefWorkTaskInput[]; truncated: boolean };
+
 export interface MorningBriefInput {
   /** Instant de référence, ISO 8601. */
   now: string;
@@ -73,6 +102,7 @@ export interface MorningBriefInput {
   sales: { invoices: readonly BriefInvoiceInput[]; truncated: boolean } | 'hidden';
   cash: BriefCashInput;
   dueDates: BriefDueDatesInput;
+  work: BriefWorkInput;
 }
 
 export type BriefFactStatus = 'known' | 'to_fill' | 'unavailable' | 'hidden';
@@ -104,10 +134,10 @@ export interface BriefFact {
 export type BriefSeverity = 'critique' | 'attention' | 'info';
 
 export interface BriefThreshold {
-  /** Identifiant du seuil (S1…S6, ADR-0033 § 3). */
+  /** Identifiant du seuil (S1…S6, ADR-0033 § 3 ; S7, ADR-0039 § 6.5). */
   id: string;
   value: number;
-  unit: 'facture' | 'heures' | 'jours' | 'jour_du_mois';
+  unit: 'facture' | 'heures' | 'jours' | 'jour_du_mois' | 'tache';
   label: string;
   /** Les seuils sont des paramètres produit, pas des règles fiscales ou comptables. */
   nature: 'parametre_produit_a_valider';
@@ -150,6 +180,6 @@ export interface MorningBrief {
   rulesSkipped: readonly BriefSkippedRule[];
   /** Niveau 4 « Predict » : réservé aux projections du moteur (ADR-0033 § 1). */
   predictions: readonly never[];
-  /** Vrai si l'API a dû borner la lecture des documents. */
+  /** Vrai si l'API a dû borner la lecture des documents ou des tâches. */
   truncated: boolean;
 }

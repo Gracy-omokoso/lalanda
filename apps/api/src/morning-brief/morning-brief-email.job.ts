@@ -69,6 +69,9 @@ const EMAIL_FACTS = [
   'normalisation.echec',
   'normalisation.a_verifier',
   'echeances.depassees',
+  // ADR-0039 § 6.5 : les faits PERSONNELS du destinataire (ses propres tâches).
+  'mes_taches.en_retard',
+  'mes_taches.aujourdhui',
 ];
 
 export function emailContent(
@@ -175,7 +178,8 @@ export class MorningBriefEmailJob implements OnModuleInit {
     const email = (await this.members.identitiesOf([userId])).get(userId)?.email;
     if (!email) return 'skipped';
 
-    const brief = await this.briefs.build(organizationId, role, now);
+    // Le brief est construit POUR le destinataire : ses tâches, son rôle.
+    const brief = await this.briefs.build(organizationId, role, userId, now);
     const res = await this.mail.sendMorningBrief({ to: email, ...emailContent(brief, org.name) });
     return res.delivered ? 'sent' : 'failed';
   }
