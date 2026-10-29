@@ -50,6 +50,12 @@ export interface WorkFixture {
 
 export function useWorkFixture(prefix: string): WorkFixture {
   const tag = randomBytes(4).toString('hex');
+  // Base propre à la suite (motif de `treasury.e2e`) : vaut aussi quand
+  // `MONGODB_URI` ne vient que du `.env`, lu après le fichier de setup.
+  process.env['MONGODB_DB'] = `${process.env['MONGODB_DB'] ?? 'lalanda'}_${prefix}_${tag}`.slice(
+    0,
+    63,
+  );
   const password = 'Passw0rd!projets';
   let app: INestApplication;
   let db: Db;
