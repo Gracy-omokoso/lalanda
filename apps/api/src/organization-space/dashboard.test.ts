@@ -9,7 +9,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { VarianceLine } from '../actuals/variance.js';
-import { ORG_ROLES, can, type OrgRole } from '../authz/permissions.js';
+import { NO_OVERRIDES, ORG_ROLES, can, type OrgRole } from '../authz/permissions.js';
 import { PLAN_ENTITLEMENTS } from '../billing/entitlements.js';
 import { DISPLAY_CURRENCIES } from './organization-space.dto.js';
 import {
@@ -312,7 +312,7 @@ describe('visibilité des blocs par rôle (S21a)', () => {
   it('un rôle sans `treasury.read` (Commercial) ne reçoit aucun bloc chiffré (ADR-0040 § 4.4)', () => {
     // Les blocs qui portent des montants ou des écarts du réalisé (validation,
     // saisie du réalisé) et la liste des initiatives lui sont masqués.
-    expect(can('sales_rep', 'treasury.read')).toBe(false);
+    expect(can('sales_rep', 'treasury.read', NO_OVERRIDES)).toBe(false);
     const ouverts = BLOCS_DU_TABLEAU_DE_BORD.filter((b) =>
       blocVisible(b.section, 'sales_rep', sansContexte),
     );
