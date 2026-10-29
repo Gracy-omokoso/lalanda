@@ -14,6 +14,7 @@ import type {
   CreateWorkProjectBody,
   CreateWorkTaskBody,
   MoveWorkTaskBody,
+  MyTaskItem,
   MyTasksView,
   PatchWorkTaskBody,
   PutWorkSettingsBody,
@@ -25,6 +26,7 @@ import type {
   WorkActivityView,
   WorkAttachmentView,
   WorkCommentView,
+  WorkMemberRef,
   WorkPage,
   WorkProjectKind,
   WorkProjectStatus,
@@ -38,27 +40,42 @@ import type {
 
 import { API_URL, jsonRequest, salesQuery } from './api';
 
-/**
- * Liste rendue nue ou en page (`{ items }`). L'ADR § 3 pagine toutes les listes
- * par curseur SAUF les tâches d'un projet, sans fixer l'enveloppe de celle-ci ;
- * commentaires et pièces d'une tâche sont bornés (≤ 10 000 / tâche) mais leur
- * enveloppe n'est pas écrite non plus. HYPOTHÈSE à confronter à L1 : on
- * accepte les deux formes plutôt que de casser à la première réponse.
- */
-export function itemsDe<T>(reponse: T[] | { items: T[] } | null | undefined): T[] {
-  if (Array.isArray(reponse)) return reponse;
-  if (reponse && Array.isArray(reponse.items)) return reponse.items;
-  return [];
+/** Liste bornée non paginée (tâches d'un projet, pièces d'une tâche, membres). */
+export interface WorkItems<T> {
+  items: T[];
 }
 
-type Liste<T> = T[] | WorkPage<T>;
-
-/** Membre proposé comme responsable ou pour une mention. */
-export interface WorkMemberOption {
-  userId: string;
-  name: string;
+/**
+ * Membre de l'organisation détenant `work.read` (`GET /work/members`) : forme
+ * de `WorkMemberView` dans `apps/api/src/work/work-members.service.ts`, qui ne
+ * vit pas (encore) dans `@lalanda/shared/work`.
+ */
+export interface WorkMemberOption extends WorkMemberRef {
   /** Détient `work.update` : peut être responsable d'une tâche (§ 2.3). */
   canUpdate: boolean;
+  /** Détient `work.manage` : peut gérer les projets. */
+  canManage: boolean;
+}
+
+/** Nombre de pages lues au plus pour reconstituer une liste complète. */
+export const PAGES_MAX = 100;
+
+/**
+ * Lit toutes les pages d'une liste par curseur, dans l'ordre servi (borné à
+ * `PAGES_MAX` pages pour ne jamais boucler sur un curseur fautif).
+ */
+export async function toutesLesPages<T>(
+  page: (cursor: string | null) => Promise<WorkPage<T>>,
+): Promise<T[]> {
+  const out: T[] = [];
+  let cursor: string | null = null;
+  for (let i = 0; i < PAGES_MAX; i += 1) {
+    const p = await page(cursor);
+    out.push(...p.items);
+    if (p.nextCursor === null || p.nextCursor === cursor) break;
+    cursor = p.nextCursor;
+  }
+  return out;
 }
 
 export interface ListWorkProjectsParams {
@@ -112,21 +129,28 @@ async function erreurHttp(res: Response): Promise<Error & { status: number; deta
   return err;
 }
 
+/** Une page de commentaires (du plus ancien au plus récent). */
+function listCommentsPage(
+  taskId: string,
+  query: { limit?: number; cursor?: string | null } = {},
+): Promise<WorkPage<WorkCommentView>> {
+  return jsonRequest<WorkPage<WorkCommentView>>(
+    `/work/tasks/${id(taskId)}/comments${salesQuery(query)}`,
+    { method: 'GET' },
+  );
+}
+
 export const workApi = {
   // ─── Réglages ─────────────────────────────────────────────────────────────
   getSettings: () => jsonRequest<WorkSettingsView>('/work/settings', { method: 'GET' }),
   putSettings: (body: PutWorkSettingsBody) =>
     jsonRequest<WorkSettingsView>('/work/settings', { method: 'PUT', body }),
 
-  /**
-   * HYPOTHÈSE à confronter à L1 : membres éligibles (`work.read`, avec
-   * `canUpdate` pour `work.update`). L'ADR § 8 exige que « @ » propose les
-   * membres détenant `work.read`, sans nommer la route ; `GET
-   * /organizations/:id/members` exige `organization.manage`. En cas d'échec,
-   * l'écran se replie sur les membres déjà cités par les réponses.
-   */
+  /** Membres détenant `work.read` (responsables et mentions) ; enveloppe `{ items }`. */
   listMembers: () =>
-    jsonRequest<{ members: WorkMemberOption[] }>('/work/members', { method: 'GET' }),
+    jsonRequest<WorkItems<WorkMemberOption>>('/work/members', { method: 'GET' }).then(
+      (r) => r.items,
+    ),
 
   // ─── Projets ──────────────────────────────────────────────────────────────
   listProjects: (query: ListWorkProjectsParams = {}) =>
@@ -163,20 +187,27 @@ export const workApi = {
   // ─── Tâches ───────────────────────────────────────────────────────────────
   /** Tout le projet (≤ 5 000, projection allégée) : liste, Kanban, calendrier, Gantt. */
   listProjectTasks: (projectId: string, query: ListProjectTasksParams = {}) =>
-    jsonRequest<Liste<WorkTaskView>>(`/work/projects/${id(projectId)}/tasks${salesQuery(query)}`, {
-      method: 'GET',
-    }).then(itemsDe),
+    jsonRequest<WorkItems<WorkTaskView>>(
+      `/work/projects/${id(projectId)}/tasks${salesQuery(query)}`,
+      { method: 'GET' },
+    ).then((r) => r.items),
   createTask: (projectId: string, body: CreateWorkTaskBody) =>
     jsonRequest<WorkTaskWriteResult>(`/work/projects/${id(projectId)}/tasks`, {
       method: 'POST',
       body,
     }),
-  /** Liste transverse (calendrier « Mes tâches », etc.), paginée par curseur. */
+  /** Liste transverse (calendrier « Mes tâches », etc.), paginée par curseur, avec le nom du projet. */
   listTasks: (query: ListWorkTasksParams = {}) =>
-    jsonRequest<WorkPage<WorkTaskView>>(`/work/tasks${salesQuery(query)}`, { method: 'GET' }),
+    jsonRequest<WorkPage<MyTaskItem>>(`/work/tasks${salesQuery(query)}`, { method: 'GET' }),
   myTasks: () => jsonRequest<MyTasksView>('/work/my-tasks', { method: 'GET' }),
   getTask: (taskId: string) =>
     jsonRequest<WorkTaskDetail>(`/work/tasks/${id(taskId)}`, { method: 'GET' }),
+  /** Historique d'une tâche (plus récent d'abord), paginé par curseur. */
+  listTaskActivity: (taskId: string, query: { limit?: number; cursor?: string | null } = {}) =>
+    jsonRequest<WorkPage<WorkActivityView>>(
+      `/work/tasks/${id(taskId)}/activity${salesQuery(query)}`,
+      { method: 'GET' },
+    ),
   patchTask: (taskId: string, body: PatchWorkTaskBody) =>
     jsonRequest<WorkTaskWriteResult>(`/work/tasks/${id(taskId)}`, { method: 'PATCH', body }),
   moveTask: (taskId: string, body: MoveWorkTaskBody) =>
@@ -205,10 +236,10 @@ export const workApi = {
     ),
 
   // ─── Commentaires ─────────────────────────────────────────────────────────
+  listCommentsPage,
+  /** Tous les commentaires de la tâche, pages enchaînées (100 par page, le maximum). */
   listComments: (taskId: string) =>
-    jsonRequest<Liste<WorkCommentView>>(`/work/tasks/${id(taskId)}/comments?limit=100`, {
-      method: 'GET',
-    }).then(itemsDe),
+    toutesLesPages((cursor) => listCommentsPage(taskId, { limit: 100, cursor })),
   createComment: (taskId: string, body: CreateWorkCommentBody) =>
     jsonRequest<WorkCommentView>(`/work/tasks/${id(taskId)}/comments`, { method: 'POST', body }),
   updateComment: (commentId: string, body: UpdateWorkCommentBody) =>
@@ -217,10 +248,11 @@ export const workApi = {
     jsonRequest<void>(`/work/comments/${id(commentId)}`, { method: 'DELETE' }),
 
   // ─── Pièces jointes ───────────────────────────────────────────────────────
+  /** Toutes les pièces actives de la tâche (bornées, sans pagination). */
   listAttachments: (taskId: string) =>
-    jsonRequest<Liste<WorkAttachmentView>>(`/work/tasks/${id(taskId)}/attachments?limit=100`, {
+    jsonRequest<WorkItems<WorkAttachmentView>>(`/work/tasks/${id(taskId)}/attachments`, {
       method: 'GET',
-    }).then(itemsDe),
+    }).then((r) => r.items),
   /** Corps binaire brut, nom en en-tête `X-File-Name` encodé URI (§ 2.5). */
   uploadAttachment: async (taskId: string, file: File): Promise<WorkAttachmentView> => {
     const res = await fetch(`${API_URL}/work/tasks/${id(taskId)}/attachments`, {

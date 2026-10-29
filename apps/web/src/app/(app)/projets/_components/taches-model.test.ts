@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 
 import { oid, tache } from './fixtures.test-helpers';
 import {
-  activiteDeTache,
   candidatsDependance,
   decoderMentions,
   diffTache,
@@ -64,15 +63,17 @@ describe('mentions', () => {
   });
   it('suggestions par début de mot, sans accents', () => {
     const membres = [
-      { ...KEVIN, canUpdate: true },
-      { ...MARIE, canUpdate: false },
+      { ...KEVIN, canUpdate: true, canManage: false },
+      { ...MARIE, canUpdate: false, canManage: false },
     ];
     expect(suggestionsMention(membres, 'mb').map((m) => m.name)).toEqual(['Kevin Mbala']);
     expect(suggestionsMention(membres, '')).toHaveLength(2);
   });
   it('insérer remplace la requête par le nom', () => {
     const q = requeteMention('Voir @ke merci', 8)!;
-    expect(insererMention('Voir @ke merci', q, { ...KEVIN, canUpdate: true })).toEqual({
+    expect(
+      insererMention('Voir @ke merci', q, { ...KEVIN, canUpdate: true, canManage: false }),
+    ).toEqual({
       texte: 'Voir @Kevin Mbala  merci',
       curseur: 18,
     });
@@ -191,24 +192,5 @@ describe('historique', () => {
     expect(libelleActivite({ actor: KEVIN, kind: 'comment.added', data: {} })).toBe(
       'Kevin Mbala a commenté',
     );
-  });
-  it('filtre par tâche', () => {
-    const base = {
-      id: 'x',
-      projectId: 'p',
-      actor: KEVIN,
-      kind: 'task.created' as const,
-      data: {},
-      at: '',
-    };
-    expect(
-      activiteDeTache(
-        [
-          { ...base, taskId: 't1' },
-          { ...base, taskId: null },
-        ],
-        't1',
-      ),
-    ).toHaveLength(1);
   });
 });

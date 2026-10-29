@@ -50,7 +50,7 @@ function NouveauProjet({ onAnnule }: { onAnnule: () => void }): React.ReactEleme
   useEffect(() => {
     workApi
       .listMembers()
-      .then((r) => setMembres(r.members.filter((m) => m.canUpdate)))
+      .then((r) => setMembres(r.filter((m) => m.canUpdate)))
       .catch(() => setMembres([]));
     // Listes de liaison : seulement si le rôle les lit (sinon l'API répondrait 403).
     if (ventes) {
