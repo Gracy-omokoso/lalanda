@@ -4,6 +4,21 @@ import type { ClientSession, Model } from 'mongoose';
 
 import { AuditEvent, type AuditEventDocument } from './audit-event.schema.js';
 
+/**
+ * Valeur d'une métadonnée d'audit. ADR-0041 G7 : `member.permissions_changed` porte
+ * `before` et `after` sous forme d'objets (titre, ajouts, retraits, droit de clôture,
+ * droits effectifs) — d'où la forme récursive. Toujours des détails non sensibles.
+ * Le type de LECTURE (`AuditEvent.metadata`) reste plat : un lecteur qui affiche ces
+ * objets les sérialise.
+ */
+export type AuditMetadataValue =
+  | string
+  | number
+  | boolean
+  | null
+  | readonly AuditMetadataValue[]
+  | { readonly [key: string]: AuditMetadataValue };
+
 export interface AuditRecordInput {
   organizationId: string;
   actorUserId: string;
@@ -11,7 +26,7 @@ export interface AuditRecordInput {
   action: string;
   targetType: string;
   targetId: string;
-  metadata?: Record<string, string | number | boolean | null>;
+  metadata?: Record<string, AuditMetadataValue>;
 }
 
 /**
@@ -90,7 +105,9 @@ export class AuditService {
       action: input.action,
       targetType: input.targetType,
       targetId: input.targetId,
-      metadata: input.metadata ?? {},
+      // Le schéma stocke un objet libre (`type: Object`) ; son type TS reste plat pour
+      // les lecteurs historiques. ADR-0041 G7 y range des objets (`before`, `after`).
+      metadata: (input.metadata ?? {}) as Record<string, string | number | boolean | null>,
       _schemaVersion: 1,
     };
     if (opts.session === undefined) {

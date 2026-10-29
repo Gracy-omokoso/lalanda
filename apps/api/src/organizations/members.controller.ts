@@ -15,21 +15,55 @@ import { z } from 'zod';
 import { AuthGuard } from '../auth/auth.guard.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { RequirePermission } from '../authz/authz.decorators.js';
-import { CurrentOrgRole } from '../authz/current-org-role.decorator.js';
+import { memberPermissionsEnabled } from '../authz/authz.service.js';
+import {
+  CurrentOrgPermissions,
+  type CurrentOrgPermissionsValue,
+} from '../authz/current-org-permissions.decorator.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
 import { OrgRoleInput } from '../authz/org-role.dto.js';
 import {
+  ACTIONS,
   ASSIGNABLE_ORG_ROLES,
   ORG_ROLE_DESCRIPTIONS,
   ORG_ROLE_LABELS,
-  canGrantRole,
   grantableRoles,
+  type Action,
   type OrgRole,
 } from '../authz/permissions.js';
-import { MembersService } from './members.service.js';
+import {
+  MembersService,
+  canManageMember,
+  type ActorPermissions,
+  type MemberRow,
+} from './members.service.js';
 
-const ChangeRoleSchema = z.object({ role: OrgRoleInput });
-const CloseRightSchema = z.object({ value: z.boolean() });
+// ADR-0041 § 6 — actions validées par le vocabulaire (`isAction`), motif ≤ 280.
+const ActionInput = z.enum(ACTIONS as unknown as [Action, ...Action[]]);
+const ActionList = z.array(ActionInput).max(ACTIONS.length * 2);
+const Revision = z.number().int().min(0);
+const Reason = z.string().max(280);
+
+const ChangeRoleSchema = z
+  .object({
+    role: OrgRoleInput,
+    grants: ActionList.optional(),
+    revokes: ActionList.optional(),
+    expectedRevision: Revision.optional(),
+    reason: Reason.optional(),
+  })
+  .strict();
+const CloseRightSchema = z
+  .object({ value: z.boolean(), expectedRevision: Revision.optional() })
+  .strict();
+const PermissionsSchema = z
+  .object({
+    grants: ActionList,
+    revokes: ActionList,
+    expectedRevision: Revision,
+    reason: Reason.optional(),
+  })
+  .strict();
 const TransferSchema = z.object({ userId: z.string().min(1) });
 
 export interface MemberView {
@@ -41,6 +75,16 @@ export interface MemberView {
   roleLabel: string;
   canClosePeriods: boolean;
   acceptedAt: string | null;
+  /** ADR-0041 § 6 — ajouts propres à ce membre. */
+  grants: Action[];
+  /** ADR-0041 § 6 — retraits propres à ce membre. */
+  revokes: Action[];
+  /** ADR-0041 § 6 — droits effectifs (titre + ajouts − retraits, case ⚙). */
+  effective: Action[];
+  /** ADR-0041 § 6 — l'écart n'est pas vide. */
+  customized: boolean;
+  /** ADR-0041 G8 — à renvoyer en `expectedRevision` lors d'une écriture. */
+  permissionsRevision: number;
   /** L'UI doit-elle interdire toute action sur cette ligne ? (R1, dernier propriétaire) */
   isLastOwner: boolean;
   /**
@@ -49,6 +93,7 @@ export interface MemberView {
    * Faux dès que la cible est plus puissante que l'acteur — un `admin` ne peut ni
    * rétrograder ni révoquer un `owner`. Le serveur refuse déjà (`403
    * ROLE_ESCALATION`); ceci évite d'afficher des commandes vouées à l'échec.
+   * ADR-0041 G1 : ensemble potentiel de la cible inclus dans celui de l'acteur.
    */
   manageable: boolean;
 }
@@ -84,28 +129,19 @@ export class MembersController {
   @RequirePermission('organization.manage')
   async list(
     @Param('orgId') orgId: string,
-    @CurrentOrgRole() actorRole: OrgRole,
+    @CurrentOrgPermissions() actor: CurrentOrgPermissionsValue,
   ): Promise<{ members: MemberView[]; roleOptions: RoleOption[] }> {
     const rows = await this.members.list(orgId);
     const owners = rows.filter((r) => r.role === 'owner').length;
-    const grantable = new Set(grantableRoles(actorRole));
+    const grantable = new Set(
+      memberPermissionsEnabled()
+        ? grantableRoles(actor.role, actor.context)
+        : grantableRoles(actor.role),
+    );
     const identities = await this.members.identitiesOf(rows.map((r) => r.userId));
 
     return {
-      members: rows.map((r) => ({
-        userId: r.userId,
-        email: identities.get(r.userId)?.email ?? null,
-        name: identities.get(r.userId)?.name ?? null,
-        role: r.role,
-        roleLabel: ORG_ROLE_LABELS[r.role],
-        canClosePeriods: r.canClosePeriods,
-        acceptedAt: r.acceptedAt ? r.acceptedAt.toISOString() : null,
-        // R1 rendu visible dans l'UI : le dernier propriétaire n'est ni
-        // rétrogradable ni révocable. Le serveur refuse de toute façon (409
-        // LAST_OWNER) — ceci évite d'offrir un bouton qui échouera.
-        isLastOwner: r.role === 'owner' && owners === 1,
-        manageable: canGrantRole(actorRole, r.role),
-      })),
+      members: rows.map((r) => this.toView(r, actor, owners, identities.get(r.userId))),
       roleOptions: ASSIGNABLE_ORG_ROLES.map((value) => ({
         value,
         label: ORG_ROLE_LABELS[value],
@@ -115,11 +151,15 @@ export class MembersController {
     };
   }
 
+  /**
+   * Change le titre. ADR-0041 § 3 : l'écart est EFFACÉ ; un nouvel écart peut être
+   * fourni dans le même appel (`grants`, `revokes`), validé contre le nouveau titre.
+   */
   @Patch('members/:userId/role')
   @RequirePermission('organization.manage')
   async changeRole(
     @CurrentUser() user: { id: string },
-    @CurrentOrgRole() actorRole: OrgRole,
+    @CurrentOrgPermissions() actor: CurrentOrgPermissionsValue,
     @Param('orgId') orgId: string,
     @Param('userId') targetUserId: string,
     @Body() body: unknown,
@@ -131,19 +171,59 @@ export class MembersController {
     const row = await this.members.changeRole({
       organizationId: orgId,
       actorUserId: user.id,
-      actorRole,
+      actor,
       targetUserId,
       role: parsed.data.role,
+      ...(parsed.data.grants !== undefined ? { grants: parsed.data.grants } : {}),
+      ...(parsed.data.revokes !== undefined ? { revokes: parsed.data.revokes } : {}),
+      ...(parsed.data.expectedRevision !== undefined
+        ? { expectedRevision: parsed.data.expectedRevision }
+        : {}),
+      ...(parsed.data.reason !== undefined ? { reason: parsed.data.reason } : {}),
     });
-    return { member: await this.viewOf(orgId, actorRole, row) };
+    return { member: await this.viewOf(orgId, actor, row) };
   }
 
-  /** Accorde ou retire la clôture au Comptable — la seule case ⚙ du modèle. */
+  /**
+   * ADR-0041 § 6 — ajouts et retraits d'un membre. Remplace l'écart entier ;
+   * `expectedRevision` obligatoire (`409 STALE_REVISION`). Interrupteur
+   * `MEMBER_PERMISSIONS_ENABLED` éteint : `409 MEMBER_PERMISSIONS_DISABLED`.
+   */
+  @Patch('members/:userId/permissions')
+  @RequirePermission('organization.manage')
+  async setPermissions(
+    @CurrentUser() user: { id: string },
+    @CurrentOrgPermissions() actor: CurrentOrgPermissionsValue,
+    @Param('orgId') orgId: string,
+    @Param('userId') targetUserId: string,
+    @Body() body: unknown,
+  ): Promise<{ member: MemberView }> {
+    const parsed = PermissionsSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException({ code: 'INVALID_REQUEST', issues: parsed.error.issues });
+    }
+    const row = await this.members.setPermissions({
+      organizationId: orgId,
+      actorUserId: user.id,
+      actor,
+      targetUserId,
+      grants: parsed.data.grants,
+      revokes: parsed.data.revokes,
+      expectedRevision: parsed.data.expectedRevision,
+      ...(parsed.data.reason !== undefined ? { reason: parsed.data.reason } : {}),
+    });
+    return { member: await this.viewOf(orgId, actor, row) };
+  }
+
+  /**
+   * Accorde ou retire la clôture au Comptable — la seule case ⚙ du modèle.
+   * ADR-0041 : conservé (compatibilité N-1), soumis à G2.
+   */
   @Patch('members/:userId/close-right')
   @RequirePermission('organization.manage')
   async setCloseRight(
     @CurrentUser() user: { id: string },
-    @CurrentOrgRole() actorRole: OrgRole,
+    @CurrentOrgPermissions() actor: CurrentOrgPermissionsValue,
     @Param('orgId') orgId: string,
     @Param('userId') targetUserId: string,
     @Body() body: unknown,
@@ -155,25 +235,28 @@ export class MembersController {
     const row = await this.members.setCanClosePeriods({
       organizationId: orgId,
       actorUserId: user.id,
-      actorRole,
+      actor,
       targetUserId,
       value: parsed.data.value,
+      ...(parsed.data.expectedRevision !== undefined
+        ? { expectedRevision: parsed.data.expectedRevision }
+        : {}),
     });
-    return { member: await this.viewOf(orgId, actorRole, row) };
+    return { member: await this.viewOf(orgId, actor, row) };
   }
 
   @Delete('members/:userId')
   @RequirePermission('organization.manage')
   async revoke(
     @CurrentUser() user: { id: string },
-    @CurrentOrgRole() actorRole: OrgRole,
+    @CurrentOrgPermissions() actor: CurrentOrgPermissionsValue,
     @Param('orgId') orgId: string,
     @Param('userId') targetUserId: string,
   ): Promise<{ revoked: true }> {
     await this.members.revoke({
       organizationId: orgId,
       actorUserId: user.id,
-      actorRole,
+      actor,
       targetUserId,
     });
     return { revoked: true };
@@ -183,13 +266,13 @@ export class MembersController {
    * Transfert de propriété — l'unique manière de faire d'un autre membre le
    * propriétaire, et donc l'unique manière pour un propriétaire unique de se
    * rétrograder. Le guard exige `organization.manage`; le service exige en plus
-   * que l'acteur soit lui-même `owner`.
+   * que l'acteur soit lui-même `owner`. ADR-0041 § 3 : efface l'écart des deux.
    */
   @Post('transfer-ownership')
   @RequirePermission('organization.manage')
   async transfer(
     @CurrentUser() user: { id: string },
-    @CurrentOrgRole() actorRole: OrgRole,
+    @CurrentOrgPermissions() actor: CurrentOrgPermissionsValue,
     @Param('orgId') orgId: string,
     @Body() body: unknown,
   ): Promise<{ previousOwner: MemberView; newOwner: MemberView }> {
@@ -203,8 +286,8 @@ export class MembersController {
       targetUserId: parsed.data.userId,
     });
     return {
-      previousOwner: await this.viewOf(orgId, actorRole, previousOwner),
-      newOwner: await this.viewOf(orgId, actorRole, newOwner),
+      previousOwner: await this.viewOf(orgId, actor, previousOwner),
+      newOwner: await this.viewOf(orgId, actor, newOwner),
     };
   }
 
@@ -216,21 +299,41 @@ export class MembersController {
    */
   private async viewOf(
     orgId: string,
-    actorRole: OrgRole,
-    row: { userId: string; role: OrgRole; canClosePeriods: boolean; acceptedAt: Date | null },
+    actor: ActorPermissions,
+    row: MemberRow,
   ): Promise<MemberView> {
     const owners = (await this.members.list(orgId)).filter((r) => r.role === 'owner').length;
     const identity = (await this.members.identitiesOf([row.userId])).get(row.userId);
+    return this.toView(row, actor, owners, identity);
+  }
+
+  private toView(
+    r: MemberRow,
+    actor: ActorPermissions,
+    owners: number,
+    identity: { email: string | null; name: string | null } | undefined,
+  ): MemberView {
     return {
-      userId: row.userId,
+      userId: r.userId,
       email: identity?.email ?? null,
       name: identity?.name ?? null,
-      role: row.role,
-      roleLabel: ORG_ROLE_LABELS[row.role],
-      canClosePeriods: row.canClosePeriods,
-      acceptedAt: row.acceptedAt ? row.acceptedAt.toISOString() : null,
-      isLastOwner: row.role === 'owner' && owners === 1,
-      manageable: canGrantRole(actorRole, row.role),
+      role: r.role,
+      roleLabel: ORG_ROLE_LABELS[r.role],
+      canClosePeriods: r.canClosePeriods,
+      acceptedAt: r.acceptedAt ? r.acceptedAt.toISOString() : null,
+      grants: r.grants,
+      revokes: r.revokes,
+      effective: r.effective,
+      customized: r.grants.length > 0 || r.revokes.length > 0,
+      permissionsRevision: r.permissionsRevision,
+      // R1 rendu visible dans l'UI : le dernier propriétaire n'est ni
+      // rétrogradable ni révocable. Le serveur refuse de toute façon (409
+      // LAST_OWNER) — ceci évite d'offrir un bouton qui échouera.
+      isLastOwner: r.role === 'owner' && owners === 1,
+      manageable: canManageMember(actor, {
+        role: r.role,
+        context: { canClosePeriods: r.canClosePeriods, grants: r.grants, revokes: r.revokes },
+      }),
     };
   }
 }

@@ -16,10 +16,11 @@ import { CurrentUser } from '../auth/current-user.decorator.js';
 import { RequirePermission } from '../authz/authz.decorators.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
 import { OrgRoleInput } from '../authz/org-role.dto.js';
-import { ORG_ROLE_LABELS, type OrgRole } from '../authz/permissions.js';
+import { ACTIONS, ORG_ROLE_LABELS, type Action, type OrgRole } from '../authz/permissions.js';
 import { invitationUrl } from '../mail/mail.links.js';
 import { MailService } from '../mail/mail.service.js';
 import type { InvitationDocument } from './invitation.schema.js';
+import { storedOverridesOf } from './member-permissions.js';
 import { InvitationsService } from './invitations.service.js';
 import { OrganizationsService } from './organizations.service.js';
 
@@ -27,6 +28,15 @@ const CreateInvitationSchema = z.object({
   email: z.email(),
   /** docs/12 § Invitations : une invitation « indique rôle et projets ». */
   role: OrgRoleInput.optional(),
+  // ADR-0041 § 6 — ajouts et retraits choisis dès l'invitation.
+  grants: z
+    .array(z.enum(ACTIONS as unknown as [Action, ...Action[]]))
+    .max(64)
+    .optional(),
+  revokes: z
+    .array(z.enum(ACTIONS as unknown as [Action, ...Action[]]))
+    .max(64)
+    .optional(),
 });
 
 const AcceptInvitationSchema = z.object({
@@ -44,6 +54,9 @@ export interface InvitationView {
   email: string;
   role: OrgRole;
   roleLabel: string;
+  /** ADR-0041 § 6 — écart porté par l'invitation (« l'invitation listée affiche son écart »). */
+  grants: Action[];
+  revokes: Action[];
   invitedBy: string;
   expiresAt: string;
   acceptedAt: string | null;
@@ -58,6 +71,7 @@ function toView(doc: InvitationDocument): InvitationView {
     email: doc.email,
     role: doc.role,
     roleLabel: ORG_ROLE_LABELS[doc.role] ?? doc.role,
+    ...storedOverridesOf(doc),
     invitedBy: doc.invitedBy,
     expiresAt: doc.expiresAt.toISOString(),
     acceptedAt: doc.acceptedAt ? doc.acceptedAt.toISOString() : null,
@@ -109,6 +123,8 @@ export class InvitationsController {
       invitedBy: user.id,
       email: parsed.data.email,
       role: parsed.data.role,
+      ...(parsed.data.grants !== undefined ? { grants: parsed.data.grants } : {}),
+      ...(parsed.data.revokes !== undefined ? { revokes: parsed.data.revokes } : {}),
     });
     // Le nom de l'organisation est LU ICI et pas figé dans l'invitation : entre
     // l'émission et la lecture de l'email, il n'a pas le temps de changer, et le
