@@ -42,7 +42,7 @@ import { RequirePermission } from '../authz/authz.decorators.js';
 import { AuthzService } from '../authz/authz.service.js';
 import { CurrentOrgRole } from '../authz/current-org-role.decorator.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
-import { can, sodDecision, type OrgRole } from '../authz/permissions.js';
+import { can, NO_OVERRIDES, sodDecision, type OrgRole } from '../authz/permissions.js';
 import type { AiQuotaStatus } from '../billing/ai-quota.js';
 import { BillingService } from '../billing/billing.service.js';
 import { PdfExportQuotaService } from '../billing/pdf-export-quota.service.js';
@@ -225,9 +225,9 @@ export class BusinessPlanController {
       blockers: BusinessPlanService.blockers(doc),
       ai: { enabled: disabledBy === null, disabledBy, quota, mention: MENTION_BUSINESS_PLAN },
       permissions: {
-        write: can(role, 'canvas.update'),
-        validate: can(role, 'plan.approve'),
-        export: can(role, 'report.export'),
+        write: can(role, 'canvas.update', NO_OVERRIDES),
+        validate: can(role, 'plan.approve', NO_OVERRIDES),
+        export: can(role, 'report.export', NO_OVERRIDES),
       },
     };
   }

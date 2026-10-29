@@ -15,7 +15,7 @@ import { AuditService } from '../authz/audit.service.js';
 import { RequirePermission } from '../authz/authz.decorators.js';
 import { CurrentOrgRole } from '../authz/current-org-role.decorator.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
-import { can, type OrgRole } from '../authz/permissions.js';
+import { can, NO_OVERRIDES, type OrgRole } from '../authz/permissions.js';
 import { ProjectsService } from '../projects/projects.service.js';
 import {
   BusinessPlanOverviewService,
@@ -58,7 +58,7 @@ export class BusinessPlanOrgController {
     return {
       aiEnabled: disabledBy === null,
       disabledBy,
-      canManage: can(role ?? 'viewer', 'organization.manage'),
+      canManage: can(role ?? 'viewer', 'organization.manage', NO_OVERRIDES),
     };
   }
 

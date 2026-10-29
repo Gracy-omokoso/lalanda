@@ -20,7 +20,7 @@ import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
-import { can } from '../authz/permissions.js';
+import { can, NO_OVERRIDES } from '../authz/permissions.js';
 import { SchedulerService } from '../scheduler/scheduler.service.js';
 import { WorkMembersService } from './work-members.service.js';
 import { WorkNotifier } from './work-notifier.js';
@@ -131,7 +131,7 @@ export class WorkDueRemindersJob implements OnModuleInit {
         if (claim.modifiedCount !== 1) continue;
         report.claimed += 1;
         const role = roles.get(task.assigneeUserId!);
-        if (role === undefined || !can(role, 'work.read')) {
+        if (role === undefined || !can(role, 'work.read', NO_OVERRIDES)) {
           report.skipped += 1;
           continue;
         }
