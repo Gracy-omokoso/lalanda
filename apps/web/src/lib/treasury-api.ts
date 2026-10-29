@@ -59,6 +59,8 @@ export interface ExpenseView {
   attachment: { contentType: string; size: number; uploadedAt: string } | null;
   recurringExpenseId: string | null;
   occurrenceDate: string | null;
+  /** Projet du RUN rattaché (ADR-0039 § 2.10), ou `null`. */
+  workProjectId: string | null;
   status: 'recorded' | 'cancelled';
   cancelReason: string | null;
   revision: number;
@@ -81,6 +83,8 @@ export interface ExpenseBody {
   accountId?: string | null;
   deductibleVat?: string | null;
   reference?: string | null;
+  /** Projet du RUN (ADR-0039 § 2.10) ; absent à la modification : inchangé. */
+  workProjectId?: string | null;
 }
 
 export interface ExpenseSummary {
@@ -379,6 +383,8 @@ export const treasuryApi = {
     to?: string;
     category?: string;
     currency?: string;
+    /** Dépenses d'un projet du RUN (ADR-0039 § 6.4). */
+    workProjectId?: string;
     status?: 'recorded' | 'cancelled' | 'all';
     q?: string;
     cursor?: string | null;
