@@ -14,7 +14,7 @@ import { crmApi, type QuoteView } from '@/lib/api-crm';
 import { Alerte, BOUTON_PETIT, Pastille } from '../../_components/form-ui';
 import { formatMontant } from '../../_components/sales-model';
 import { useAccesVentes } from '../../_components/sales-access';
-import { CRM_BASE } from '../../crm/_components/crm-model';
+import { lienOpportunite } from '../../../crm/_components/crm-model';
 import { FACTURES_BASE } from '../../factures/_components/invoice-model';
 
 import { QuoteEditor } from './quote-editor';
@@ -115,7 +115,7 @@ export function QuoteDetail({ quoteId }: { quoteId: string }): React.ReactElemen
           <p className="text-sm">
             Opportunité :{' '}
             <Link
-              href={`${CRM_BASE}/${encodeURIComponent(vue.opportunity.id)}`}
+              href={lienOpportunite(vue.opportunity.id)}
               className="underline underline-offset-2"
             >
               {vue.opportunity.title ?? 'ouvrir'}
