@@ -74,6 +74,8 @@ import { CrmSettingsController } from '../crm/crm-settings.controller.js';
 import { AuditController } from './audit.controller.js';
 import { REQUIRED_PERMISSIONS_KEY, REQUIRED_PLATFORM_ROLES_KEY } from './authz.decorators.js';
 import { MeController } from './me.controller.js';
+// ADR-0039 — L2
+import { NotificationsController } from '../notifications/notifications.controller.js';
 import { ACTIONS, PLATFORM_FORBIDDEN_ACTIONS, type Action } from './permissions.js';
 
 /**
@@ -151,6 +153,8 @@ const CONTROLEURS = [
   BusinessPlanOrgController,
   // ADR-0036 — Idea Lab et validation d'idée.
   IdeaLabController,
+  // ADR-0039 — L2
+  NotificationsController,
 ];
 
 /**
@@ -611,6 +615,13 @@ describe('couverture des routes par le RBAC', () => {
       'IdeaLabController.promote': ['canvas.update'],
       'IdeaLabController.assist': ['canvas.update'],
       'IdeaLabController.putSettings': ['organization.manage'],
+      // ADR-0039 — L2 : donnée personnelle de l'appelant (convention du brief).
+      'NotificationsController.list': ['analytics.read'],
+      'NotificationsController.unreadCount': ['analytics.read'],
+      'NotificationsController.markRead': ['analytics.read'],
+      'NotificationsController.markAllRead': ['analytics.read'],
+      'NotificationsController.getPreferences': ['analytics.read'],
+      'NotificationsController.putPreferences': ['analytics.read'],
     };
     for (const [cle, actions] of Object.entries(attendu)) {
       const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle);
