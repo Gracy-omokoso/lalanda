@@ -35,9 +35,9 @@ Le support ne voit jamais les données financières sans consentement explicite,
 
 ## Actions granulaires
 
-`organization.manage`, `billing.manage`, `members.invite`, `project.create`, `project.read`, `project.update`, `canvas.update`, `inputs.update`, `plan.calculate`, `plan.approve`, `actuals.import`, `period.close`, `analytics.read`, `report.export`, `audit.read`, `fiscal.manage`, `sales.read`, `sales.manage`, `sales.invoice`, `sales.receipt`, `treasury.read`, `treasury.manage`, `crm.read`, `crm.manage`.
+`organization.manage`, `billing.manage`, `members.invite`, `project.create`, `project.read`, `project.update`, `canvas.update`, `inputs.update`, `plan.calculate`, `plan.approve`, `actuals.import`, `period.close`, `analytics.read`, `report.export`, `audit.read`, `fiscal.manage`, `sales.read`, `sales.manage`, `sales.invoice`, `sales.receipt`, `treasury.read`, `treasury.manage`, `crm.read`, `crm.manage`, `work.read`, `work.update`, `work.manage`.
 
-Vingt-quatre actions au total, dans l'ordre ci-dessus (ordre de fusion pour les
+Vingt-sept actions au total, dans l'ordre ci-dessus (ordre de fusion pour les
 actions ajoutées après la dix-neuvième).
 
 `fiscal.manage` — « Gérer l'identité fiscale et la facture normalisée » — est la
@@ -153,6 +153,37 @@ Côté plateforme, comme `sales.*` : `crm.read` sous accès délégué pour le
 super-administrateur et le support, `crm.manage` sous accès délégué pour le seul
 super-administrateur. Aucune n'est un interdit absolu.
 
+`work.read` — « Consulter les projets et les tâches » —, `work.update` — « Travailler sur
+les tâches » (créer, modifier, déplacer, commenter, joindre, saisir son temps) — et
+`work.manage` — « Gérer les projets » (créer, archiver, supprimer, colonnes, étiquettes,
+réglages, temps d'autrui) — sont la vingt-cinquième à la vingt-septième action, ajoutées
+par [ADR-0039](adr/ADR-0039-projets-et-taches-run.md) § 7 (29 oct. 2026), en fin de liste
+(ordre de fusion). Elles portent le gestionnaire de projets et de tâches du RUN (module
+`work`, affiché « Projets ») — à ne pas confondre avec `project.*`, qui reste l'action du
+plan financier BUILD (affiché « Initiative »). Trois niveaux emboîtés : gérer suppose de
+travailler, travailler suppose de lire. L'Administrateur gère (organiser le travail est de
+la gouvernance, pas un acte financier) ; Comptable et Analyste travaillent sans gouverner
+(décision ouverte n° 3) ; le Lecteur lit ; le Conseiller, externe, n'a rien (un projet
+client porte des données de clients) ; le Chef de projet n'a rien en R1 (rôle non
+attribuable, décision ouverte n° 1). Les gestes qui touchent l'argent **cumulent** les
+actions : marge d'un projet (`work.read` + `sales.read` + `treasury.read`), coûts horaires
+(`treasury.manage`), facture préparée depuis un jalon (`sales.manage`), projet créé depuis
+un devis (`sales.read`). La boîte de notifications in-app, commune à tout Lalanda, n'ajoute
+aucune action : ses routes portent `analytics.read` (donnée personnelle de l'appelant dans
+l'organisation active), et chaque notification est refiltrée à la lecture par l'action
+qu'elle exige (`work.read` pour celles du module `work`).
+
+| Action | PRO | ADM | DIR | CPT | ANA | CDP | CON | LEC |
+|---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| `work.read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ |
+| `work.update` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ |
+| `work.manage` | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+
+Côté plateforme, comme `crm.*` : `work.read` sous accès délégué pour le
+super-administrateur et le support, `work.update` et `work.manage` sous accès délégué pour
+le seul super-administrateur. Aucune n'est un interdit absolu ; les rôles attribuables
+sont inchangés.
+
 **Business plan narratif (ADR-0037) — aucune action nouvelle.** Lire relève de
 `project.read` ; rédiger, rattacher le plan figé et demander un brouillon à l'IA, de
 `canvas.update` (le document prolonge par écrit le modèle économique) ; valider une version,
@@ -163,7 +194,7 @@ d'ADR-0037.
 L'Idea Lab ([ADR-0036](adr/ADR-0036-idea-lab-et-validation.md) § 6) **n'ajoute aucune
 action** : lire une idée relève de `project.read`, la modifier (fiche, notes, expériences,
 promotion vers un projet, assistance IA) de `canvas.update`, régler son IA de
-`organization.manage`. Les vingt-quatre actions et la matrice sont inchangées.
+`organization.manage`. Les actions et la matrice sont inchangées par l'Idea Lab.
 
 ## Règles critiques
 
@@ -244,7 +275,7 @@ portant `audit.read`.
 
 ### Couverture de tests
 
-- Matrice rôle × action : 336 cas unitaires (8 × 24 + 6 × 24), exhaustifs (une
+- Matrice rôle × action : 378 cas unitaires (8 × 27 + 6 × 27), exhaustifs (une
   case absente ne compile pas).
 - Matrice appliquée bout en bout : 91 cas vérifiés sur le réseau — la preuve que
   les guards l'appliquent, pas seulement qu'elle est déclarée.
