@@ -10,7 +10,7 @@ import type { Metadata } from 'next';
 
 import { CarteMarge } from '../../_components/marge/carte-marge';
 
-export const metadata: Metadata = { title: 'Projet — marge — Lalanda' };
+export const metadata: Metadata = { title: 'Projet — Marge — Lalanda' };
 
 export default async function ProjetMargePage({
   params,

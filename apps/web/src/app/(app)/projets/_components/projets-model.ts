@@ -199,7 +199,7 @@ export function progression(p: { openTaskCount: number; doneTaskCount: number })
   const total = p.openTaskCount + p.doneTaskCount;
   if (total === 0) return { texte: 'Aucune tâche', pourcent: 0 };
   return {
-    texte: `${p.doneTaskCount} / ${total} tâche${total > 1 ? 's' : ''} terminée${p.doneTaskCount > 1 ? 's' : ''}`,
+    texte: `${p.doneTaskCount} / ${total} tâche${total > 1 ? 's' : ''} terminée${total > 1 ? 's' : ''}`,
     pourcent: Math.round((p.doneTaskCount / total) * 100),
   };
 }
