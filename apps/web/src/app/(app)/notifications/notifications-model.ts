@@ -48,6 +48,27 @@ export const LIBELLES_TYPES: Record<NotificationKind, { label: string; aide: str
     label: 'Jalon terminé',
     aide: 'Un jalon d’un projet dont vous êtes responsable est terminé.',
   },
+  // ADR-0040 — C4 § 5.4 : relances et opportunités du CRM.
+  'crm.activity_assigned': {
+    label: 'Relance assignée',
+    aide: 'Quelqu’un vous confie un appel, une réunion ou une relance client.',
+  },
+  'crm.activity_due_soon': {
+    label: 'Relance proche',
+    aide: 'Une de vos relances clients arrive à échéance.',
+  },
+  'crm.activity_overdue': {
+    label: 'Relance en retard',
+    aide: 'Une de vos relances clients a dépassé son échéance.',
+  },
+  'crm.opportunity_assigned': {
+    label: 'Opportunité confiée',
+    aide: 'Vous devenez responsable d’une opportunité.',
+  },
+  'crm.opportunity_won': {
+    label: 'Opportunité gagnée',
+    aide: 'Une opportunité dont vous êtes responsable est gagnée.',
+  },
 };
 
 /** Types dans l'ordre d'affichage des préférences. */
