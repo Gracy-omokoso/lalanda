@@ -237,7 +237,7 @@ sont inchangés.
   ne modifie ses propres autorisations ; `billing.manage` n'est pas délégable et les
   autorisations d'un Propriétaire ne se personnalisent pas (transfert, suppression, R1 restent
   attachés au titre) ; paires incompatibles par ajout : `inputs.update` + `plan.approve` (R2),
-  `period.close` + `plan.approve` (R3), `sales.invoice` + `fiscal.manage` (proposition) ; le
+  `period.close` + `plan.approve` (R3) ; le
   compte des approbateurs de R2 porte sur les détenteurs effectifs ; portées `allow_project`
   conservées ; rôles plateforme et accès délégué inchangés ; chaque changement est journalisé
   (`member.permissions_changed`, avant et après) et prend effet à la requête suivante.

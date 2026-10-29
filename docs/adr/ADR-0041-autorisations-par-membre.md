@@ -177,7 +177,7 @@ pour `owner` (`409 OWNER_PERMISSIONS_FIXED`). *Justification :* un propriétaire
 sans gouvernance ; la voie prévue pour réduire un propriétaire est le changement de titre, déjà
 protégé par R1.
 
-**G4 — La séparation des tâches ne se contourne pas par ajouts.** Trois paires sont
+**G4 — La séparation des tâches ne se contourne pas par ajouts.** Deux paires sont
 **incompatibles par ajout** (`SOD_PAIRS`) : si le titre ne détient pas nativement les deux
 actions (au sens de `potentialActionsOf`), l'**ensemble potentiel** du membre (droits effectifs,
 case ⚙ comptée comme détenue) ne peut pas les contenir toutes les deux — ainsi, accorder plus
@@ -187,7 +187,6 @@ tard le droit de clôture ne complète jamais une paire en silence. Refus : `409
 |---|---|---|
 | `inputs.update` + `plan.approve` | R2 statique (ADR-0012 § 6) | un Analyste ne reçoit pas `plan.approve` ; un Lecteur qui a reçu `plan.approve` ne reçoit pas `inputs.update` |
 | `period.close` + `plan.approve` | R3 : la réouverture exige les deux | un Comptable (qui peut se voir accorder la clôture) ne reçoit pas `plan.approve` |
-| `sales.invoice` + `fiscal.manage` | **proposition** (décision ouverte n° 3) : celui qui émet et normalise ne pilote pas le jeton e-MCF, le régime ni la déclaration « non normalisée » de ses propres factures | un Comptable ne reçoit pas `fiscal.manage` |
 
 Le Propriétaire et le Directeur financier, qui cumulent nativement ces paires, ne sont pas
 concernés : leur cumul est celui de la matrice, déjà arbitré (et R2 dynamique s'y applique).
@@ -545,7 +544,7 @@ nouveaux prouve qu'elles valent « exactement le titre ».
 7. `plan.approve` ajouté à un Analyste : `409 SOD_CONFLICT { pair: ['inputs.update','plan.approve'] }` ;
    à un Comptable : `409 SOD_CONFLICT { pair: ['period.close','plan.approve'] }` (R3, droit de
    clôture potentiel) ; `fiscal.manage` ajouté à un
-   Comptable : `409 SOD_CONFLICT` (si la décision ouverte n° 3 est retenue).
+   Comptable : **accepté** (décision n° 3 tranchée : pas de paire émission + fiscalité).
 8. Séparation des tâches dynamique : organisation « Propriétaire + Directeur financier privé de
    `plan.approve` » → le Propriétaire auto-approuve, plan marqué `soleApprover: true` ;
    organisation « Propriétaire + Lecteur ayant reçu `plan.approve` » →
@@ -650,9 +649,10 @@ Chacune a une **valeur par défaut**, appliquée si rien n'est tranché.
    (plus souple, plus difficile à lire).
 2. **Dépendances** : refus par le serveur, complément automatique par l'écran avec message.
    *Défaut : oui.*
-3. **Paire `sales.invoice` + `fiscal.manage`** incompatible par ajout (celui qui émet ne pilote pas
-   le jeton ni la déclaration « non normalisée »). *Défaut : oui.* Les deux autres paires (R2, R3)
-   ne sont pas ouvertes : elles découlent de règles déjà approuvées.
+3. ~~Paire `sales.invoice` + `fiscal.manage`~~ — **tranché le 29 oct. 2026 par la dirigeante :
+   NON.** Une petite équipe où une seule personne émet et pilote la fiscalité doit pouvoir le
+   faire ; aucune paire n'est ajoutée pour la facturation. Les deux autres paires (R2, R3) ne
+   sont pas ouvertes : elles découlent de règles déjà approuvées.
 4. **`analytics.read` socle** (tableau de bord, brief, cloche) : non retirable tant qu'une autre
    autorisation est détenue. *Défaut : oui.*
 5. **Le titre reste soumis à R7** : un Administrateur ne peut toujours pas inviter un Comptable ni
@@ -672,8 +672,10 @@ Chacune a une **valeur par défaut**, appliquée si rien n'est tranché.
 12. **Motif** d'un changement d'écart : facultatif. *Défaut : facultatif, journalisé s'il est
     donné.*
 
-Aucune règle financière, fiscale ou comptable RDC n'est introduite : la paire n° 3 est une règle
-de contrôle interne proposée, pas une obligation DGI.
+Aucune règle financière, fiscale ou comptable RDC n'est introduite.
+
+**29 oct. 2026 — la dirigeante tranche** : n° 3 refusée (pas de paire émission + fiscalité) ;
+toutes les autres décisions prennent leur valeur par défaut.
 
 ## Liens
 
