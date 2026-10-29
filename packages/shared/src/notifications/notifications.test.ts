@@ -10,8 +10,8 @@ import {
 } from './index.js';
 
 describe('notifications — contrats partagés', () => {
-  it('déclare six types work et cinq types crm, préfixés par leur module', () => {
-    expect(NOTIFICATION_KINDS).toHaveLength(11);
+  it('déclare six types work, cinq types crm et un type organization, préfixés par leur module', () => {
+    expect(NOTIFICATION_KINDS).toHaveLength(12);
     for (const kind of NOTIFICATION_KINDS) {
       const module = kind.split('.')[0]!;
       expect(NOTIFICATION_SOURCE_MODULES as readonly string[]).toContain(module);
@@ -29,6 +29,11 @@ describe('notifications — contrats partagés', () => {
       'activity',
       'opportunity',
       'account',
+      'membership',
+    ]);
+    // ADR-0041 — A4.
+    expect(NOTIFICATION_KINDS.filter((k) => k.startsWith('organization.'))).toEqual([
+      'organization.permissions_changed',
     ]);
   });
 
