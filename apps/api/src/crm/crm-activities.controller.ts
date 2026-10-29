@@ -2,6 +2,9 @@
 //
 // `crm.read` pour lire ; `crm.manage` pour écrire. Une activité d'une autre
 // organisation répond 404.
+//
+// ADR-0040 — C4 : `assignee=me|<id>`, `accountId`, `dueFrom`, `dueTo` en liste ;
+// `POST …/reopen` décoche (« Mes tâches » coche et décoche par ces routes).
 
 import {
   Body,
@@ -42,10 +45,14 @@ export class CrmActivitiesController {
 
   @Get()
   @RequirePermission('crm.read')
-  async list(@CurrentOrgId() orgId: string, @Query() query: unknown): Promise<ActivityPage> {
+  async list(
+    @CurrentOrgId() orgId: string,
+    @CurrentUser() user: User,
+    @Query() query: unknown,
+  ): Promise<ActivityPage> {
     const parsed = ListActivitiesQuerySchema.safeParse(query);
     if (!parsed.success) invalidRequest(parsed.error, 'Paramètres de liste invalides.');
-    return this.activities.list(orgId, parsed.data);
+    return this.activities.list(orgId, parsed.data, user.id);
   }
 
   @Post()
@@ -95,6 +102,27 @@ export class CrmActivitiesController {
     const parsed = ExpectedRevisionSchema.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error);
     return this.activities.complete(
+      orgId,
+      activityId,
+      parsed.data.expectedRevision,
+      crmActorOf(user, role),
+    );
+  }
+
+  // ADR-0040 — C4 § 3.5 : décocher (symétrie avec `POST /work/tasks/:id/reopen`).
+  @Post(':activityId/reopen')
+  @HttpCode(200)
+  @RequirePermission('crm.manage')
+  async reopen(
+    @CurrentOrgId() orgId: string,
+    @CurrentUser() user: User,
+    @CurrentOrgRole() role: OrgRole | undefined,
+    @Param('activityId') activityId: string,
+    @Body() body: unknown,
+  ): Promise<ActivityView> {
+    const parsed = ExpectedRevisionSchema.safeParse(body);
+    if (!parsed.success) invalidRequest(parsed.error);
+    return this.activities.reopen(
       orgId,
       activityId,
       parsed.data.expectedRevision,

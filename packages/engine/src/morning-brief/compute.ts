@@ -28,6 +28,7 @@ import {
   type BriefSkippedRule,
   type BriefSource,
   type BriefThreshold,
+  type BriefCrmInput,
   type BriefWorkInput,
   type MorningBrief,
   type MorningBriefInput,
@@ -220,21 +221,8 @@ export function buildMorningBriefFacts(input: MorningBriefInput): BriefFact[] {
   // Projets et tâches du RUN (ADR-0039 § 6.5).
   facts.push(...workFacts(input.work, today));
 
-  // Indicateur du brief § 8 que Lalanda ne calcule pas encore.
-  facts.push({
-    id: 'pipeline',
-    label: 'Pipeline commercial',
-    kind: 'status',
-    status: 'unavailable',
-    value: null,
-    currency: null,
-    source: {
-      module: 'non_livre',
-      collection: null,
-      rule: 'Module non livré',
-      reference: 'ADR-0035',
-    },
-  });
+  // Relances et pipeline du CRM (ADR-0040 — C4 § 5.5).
+  facts.push(...crmFacts(input.crm ?? { status: 'unavailable' }, today));
 
   return facts;
 }
@@ -339,6 +327,87 @@ function workFacts(
     projets_a_risque: String(atRisk),
   };
   return WORK_FACT_SKELETON.map((f) => ({
+    ...f,
+    status: 'known' as const,
+    value: values[f.id] ?? null,
+  }));
+}
+
+// ── Relances et pipeline du CRM (ADR-0040 — C4 § 5.5) ───────────────────────
+
+const CRM_SOURCE_REF = 'ADR-0040 § 5.5';
+
+function crmSource(rule: string, collection = 'crm_activities'): BriefSource {
+  return { module: 'run.crm', collection, rule, reference: CRM_SOURCE_REF };
+}
+
+/** Squelette des faits du CRM : mêmes identifiants, connus, masqués ou non disponibles. */
+const CRM_FACT_SKELETON: readonly Omit<BriefFact, 'status' | 'value'>[] = Object.freeze([
+  {
+    id: 'mes_relances.en_retard',
+    label: 'Mes relances clients en retard',
+    kind: 'count',
+    currency: null,
+    source: crmSource(
+      'Activités CRM non faites qui vous sont assignées, échéance avant aujourd’hui (Kinshasa)',
+    ),
+  },
+  {
+    id: 'mes_relances.aujourdhui',
+    label: 'Mes relances clients du jour',
+    kind: 'count',
+    currency: null,
+    source: crmSource(
+      'Activités CRM non faites qui vous sont assignées, échéance aujourd’hui (Kinshasa)',
+    ),
+  },
+  {
+    id: 'relances.en_retard',
+    label: 'Relances clients en retard dans l’organisation',
+    kind: 'count',
+    currency: null,
+    source: crmSource('Activités CRM non faites, échéance avant aujourd’hui (Kinshasa)'),
+  },
+  {
+    id: 'pipeline',
+    label: 'Opportunités ouvertes',
+    kind: 'count',
+    currency: null,
+    source: crmSource(
+      'Opportunités à une étape ouverte du pipeline ; les montants estimés restent dans le CRM',
+      'crm_opportunities',
+    ),
+  },
+]);
+
+function crmFacts(
+  crm: BriefCrmInput,
+  today: { year: number; month: number; day: number },
+): BriefFact[] {
+  if (crm === 'hidden' || crm.status === 'unavailable') {
+    const status = crm === 'hidden' ? ('hidden' as const) : ('unavailable' as const);
+    return CRM_FACT_SKELETON.map((f) => ({ ...f, status, value: null }));
+  }
+  const todayKey = dayKey(today);
+  let mineOverdue = 0;
+  let mineToday = 0;
+  let orgOverdue = 0;
+  for (const a of crm.activities) {
+    if (a.dueDay > todayKey) continue; // l'API ne devrait pas les envoyer
+    if (a.dueDay === todayKey) {
+      if (a.mine) mineToday += 1;
+      continue;
+    }
+    orgOverdue += 1;
+    if (a.mine) mineOverdue += 1;
+  }
+  const values: Record<string, string> = {
+    'mes_relances.en_retard': String(mineOverdue),
+    'mes_relances.aujourdhui': String(mineToday),
+    'relances.en_retard': String(orgOverdue),
+    pipeline: String(Math.max(0, Math.trunc(crm.openOpportunityCount))),
+  };
+  return CRM_FACT_SKELETON.map((f) => ({
     ...f,
     status: 'known' as const,
     value: values[f.id] ?? null,
@@ -746,6 +815,28 @@ export const MORNING_BRIEF_RULES: readonly RuleDefinition[] = Object.freeze([
       };
     },
   },
+  // ── ADR-0040 — C4 § 5.5 : relances du CRM ────────────────────────────────
+  {
+    id: 'relances_en_retard',
+    rank: 10,
+    severity: 'attention',
+    requires: ['mes_relances.en_retard'],
+    threshold: null,
+    evaluate(ctx) {
+      const n = ctx.count('mes_relances.en_retard');
+      if (n <= 0) return null;
+      return {
+        title: 'Relances clients en retard',
+        message:
+          n > 1
+            ? `${n} relances clients ont dépassé leur échéance.`
+            : `${n} relance client a dépassé son échéance.`,
+        recommendation: 'Ouvrir Mes tâches et rappeler ces clients.',
+        actionPath: '/projets/mes-taches',
+        factIds: ['mes_relances.en_retard'],
+      };
+    },
+  },
 ] satisfies RuleDefinition[]);
 
 const SEVERITY_ORDER: Record<BriefSeverity, number> = { critique: 0, attention: 1, info: 2 };
@@ -815,6 +906,10 @@ export function buildMorningBrief(input: MorningBriefInput): MorningBrief {
     predictions: [],
     truncated:
       (input.sales !== 'hidden' && input.sales.truncated) ||
-      (input.work !== 'hidden' && input.work.status === 'known' && input.work.truncated),
+      (input.work !== 'hidden' && input.work.status === 'known' && input.work.truncated) ||
+      (input.crm !== undefined &&
+        input.crm !== 'hidden' &&
+        input.crm.status === 'known' &&
+        input.crm.truncated),
   };
 }

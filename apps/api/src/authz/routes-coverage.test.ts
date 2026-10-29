@@ -719,6 +719,8 @@ describe('couverture des routes par le RBAC', () => {
       'CrmAccountsController.remove': ['crm.manage'],
       'CrmAccountsController.merge': ['crm.manage'],
       'CrmAccountConversionController.convert': ['crm.manage', 'sales.manage'],
+      // ADR-0040 — C4 : décocher une activité depuis « Mes tâches » (relances CRM).
+      'CrmActivitiesController.reopen': ['crm.manage'],
       // ADR-0040 — C2 : réassignation en masse (`crm.manage`) ; devis prérempli
       // depuis une opportunité : préparer un devis ET lire l'opportunité.
       'CrmOpportunitiesController.reassign': ['crm.manage'],

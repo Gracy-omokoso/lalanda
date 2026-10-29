@@ -8,3 +8,6 @@
 // ADR-0040 — C0
 export * from './constants.js';
 export * from './accounts.js';
+
+// ADR-0040 — C4
+export * from './agenda.js';

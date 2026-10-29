@@ -64,6 +64,7 @@ import { beforeTimeCursor, decodeTimeCursor, encodeTimeCursor } from './time-cur
 import { Membership, type MembershipDocument } from '../organizations/membership.schema.js';
 import { CatalogItem, type CatalogItemDocument } from '../sales/catalog-item.schema.js';
 import { CrmAccountsService } from './accounts/crm-accounts.service.js';
+import { CrmNotifier } from './crm-notifier.js';
 import type { AmountSource } from './crm-model.js';
 import type { CrmOpportunityLine } from './crm.schemas.js';
 import {
@@ -220,6 +221,7 @@ export class OpportunitiesService {
     @InjectModel(Membership.name) private readonly memberships: Model<MembershipDocument>,
     @InjectModel(CatalogItem.name) private readonly items: Model<CatalogItemDocument>,
     @Inject(CRM_OPPORTUNITY_EVENTS) private readonly events: CrmOpportunityEvents,
+    @Inject(CrmNotifier) private readonly notifier: CrmNotifier,
   ) {}
 
   // ── Lecture ──────────────────────────────────────────────────────────────
@@ -698,6 +700,7 @@ export class OpportunitiesService {
     );
     const created = await this.opportunities.create(doc);
     const view = await this.get(organizationId, String(created._id));
+    await this.notifyAssigned(organizationId, view.id, view.title, view.ownerId, actor.userId);
     if (view.status === 'won')
       await this.notifyWon(organizationId, created.toObject(), actor.userId, 'user', null);
     return { ...view, warnings };
@@ -800,6 +803,13 @@ export class OpportunitiesService {
         targetId: opportunityId,
         metadata: { from: current.ownerId ?? null, to: v2.fields['ownerId'] as string },
       });
+      await this.notifyAssigned(
+        organizationId,
+        opportunityId,
+        v2.input.title,
+        v2.fields['ownerId'] as string,
+        actor.userId,
+      );
     }
     return { ...(await this.get(organizationId, opportunityId)), warnings: v2.warnings };
   }
@@ -870,16 +880,31 @@ export class OpportunitiesService {
   ): Promise<{ reassigned: number }> {
     await this.accounts.assertOwner(organizationId, input.toOwnerId);
     if (input.fromOwnerId === input.toOwnerId) return { reassigned: 0 };
+    const filter = {
+      organizationId,
+      ownerId: input.fromOwnerId,
+      ...(input.onlyOpen ? { status: 'open' } : {}),
+    };
+    const targets = await this.opportunities
+      .find(filter, { title: 1 })
+      .lean<{ _id: Types.ObjectId; title: string }[]>()
+      .exec();
     const res = await this.opportunities
       .updateMany(
-        {
-          organizationId,
-          ownerId: input.fromOwnerId,
-          ...(input.onlyOpen ? { status: 'open' } : {}),
-        },
+        { ...filter, _id: { $in: targets.map((t) => t._id) } },
         { $set: { ownerId: input.toOwnerId, updatedBy: actor.userId }, $inc: { revision: 1 } },
       )
       .exec();
+    // Une notification par opportunité au nouveau responsable (sauf l'auteur).
+    for (const t of targets) {
+      await this.notifyAssigned(
+        organizationId,
+        String(t._id),
+        t.title,
+        input.toOwnerId,
+        actor.userId,
+      );
+    }
     await this.audit.record({
       organizationId,
       actorUserId: actor.userId,
@@ -890,6 +915,25 @@ export class OpportunitiesService {
       metadata: { ...input, reassigned: res.modifiedCount },
     });
     return { reassigned: res.modifiedCount };
+  }
+
+  /** `crm.opportunity_assigned` au responsable, sauf s'il est l'auteur (notifier de C4). */
+  private async notifyAssigned(
+    organizationId: string,
+    opportunityId: string,
+    title: string,
+    ownerId: string | null,
+    actorUserId: string,
+  ): Promise<void> {
+    await this.notifier.opportunityEvent({
+      kind: 'crm.opportunity_assigned',
+      organizationId,
+      opportunityId,
+      recipients: [ownerId],
+      title: `Opportunité confiée : ${title}`,
+      href: `/crm/opportunites/${opportunityId}`,
+      actorUserId,
+    });
   }
 
   /**

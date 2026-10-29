@@ -3,6 +3,7 @@
 // testées par `notifications.rules.test.ts`.
 
 import {
+  NOTIFICATION_ENTITY_TYPES,
   NOTIFICATION_KINDS,
   NOTIFICATION_LIMITS,
   NOTIFICATION_SOURCE_MODULES,
@@ -33,6 +34,8 @@ export type EmissionRejection =
 
 const KIND_SET = new Set<string>(NOTIFICATION_KINDS);
 const MODULE_SET = new Set<string>(NOTIFICATION_SOURCE_MODULES);
+// ADR-0040 — C4 : `activity`, `opportunity`, `account` (CRM) s'ajoutent à `task`, `project`.
+const ENTITY_TYPE_SET = new Set<string>(NOTIFICATION_ENTITY_TYPES);
 
 export function isNotificationKind(value: unknown): value is NotificationKind {
   return typeof value === 'string' && KIND_SET.has(value);
@@ -60,7 +63,7 @@ export function rejectEmission(input: NotificationInput): EmissionRejection | nu
   if (
     !s ||
     !MODULE_SET.has(String(s.module)) ||
-    (s.entityType !== 'task' && s.entityType !== 'project') ||
+    !ENTITY_TYPE_SET.has(String(s.entityType)) ||
     !nonEmpty(s.entityId) ||
     (s.projectId !== undefined && !nonEmpty(s.projectId))
   ) {

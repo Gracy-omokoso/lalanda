@@ -5,21 +5,38 @@
 // l'appelant, tous projets non archivés), posées sur leur échéance. Ouvrir une
 // tâche mène au panneau de son projet ; déplacer une échéance passe par le même
 // `PATCH` que l'onglet Calendrier d'un projet.
+//
+// ADR-0040 — C4 § 5.2 : les relances du CRM y sont posées à leur jour
+// d'échéance, avec l'étiquette « Relance » et le signe ↻ (forme et libellé, pas
+// seulement une couleur). Les ouvrir mène à l'opportunité, au compte ou au
+// contact ; les déplacer change `dueAt` par `PUT /crm/activities/:id`, heure de
+// Kinshasa conservée.
 
-import type { MyTaskItem, MyTasksView } from '@lalanda/shared/work';
+import type { MyTaskEntry, MyTasksView, WorkMyTaskItem } from '@lalanda/shared/work';
 import { PageHeader, Skeleton, buttonClasses } from '@lalanda/ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
+import { crmAgendaApi } from '@/lib/crm-agenda-api';
 import { workApi } from '@/lib/work-api';
 
 import { useShell } from '../../_components/shell-context';
 
 import { appliquerCorps } from './calendar-model';
-import { CalendrierTaches } from './calendar-vue';
+import { CalendrierTaches, type TacheCalendrierUI } from './calendar-vue';
 import { Alerte, BOUTON_PETIT } from './elements';
-import { aPlat, appliquerTache, regrouper } from './mes-taches-model';
+import {
+  PASTILLE_RELANCE,
+  aPlat,
+  appliquerRelance,
+  appliquerTache,
+  estRelance,
+  estTache,
+  instantDeplace,
+  regrouper,
+  sousTitreRelance,
+} from './mes-taches-model';
 import {
   MES_TACHES_HREF,
   aujourdhui,
@@ -29,10 +46,32 @@ import {
 } from './projets-model';
 import { messagesAvertissements } from './taches-model';
 
+/** Élément du calendrier : la forme lue par la vue, et l'élément d'origine. */
+type ElementCalendrier = TacheCalendrierUI & { element: MyTaskEntry };
+
+function versCalendrier(e: MyTaskEntry): ElementCalendrier {
+  if (estTache(e)) return { ...e, element: e };
+  return {
+    id: e.id,
+    number: 0,
+    title: e.subject,
+    etiquette: PASTILLE_RELANCE,
+    startDate: null,
+    dueDate: e.dueDate,
+    isMilestone: false,
+    done: false,
+    rank: e.rank,
+    revision: e.revision,
+    element: e,
+  };
+}
+
 export function CalendrierMesTaches(): React.ReactElement {
   const { actions } = useShell();
   const router = useRouter();
   const travailler = peutTravailler(actions);
+  // Une relance n'est assignée qu'à un détenteur de `crm.manage` (§ 5.3) : qui la
+  // voit peut la déplacer ; sinon l'API répond 403 et l'erreur s'affiche.
   const [vue, setVue] = useState<MyTasksView | null>(null);
   const [dueSoon, setDueSoon] = useState(1);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -53,17 +92,45 @@ export function CalendrierMesTaches(): React.ReactElement {
   }, []);
   useEffect(() => charger(), [charger]);
 
-  const taches = vue ? aPlat(vue) : [];
+  const elements = vue ? aPlat(vue).map(versCalendrier) : [];
+  const taches = vue ? aPlat(vue).filter(estTache) : [];
+
+  function deplacerRelance(id: string, jour: string): void {
+    const r = vue ? aPlat(vue).find((e) => e.id === id) : undefined;
+    if (!r || !estRelance(r)) return;
+    const dueAt = instantDeplace(r.dueAt, jour);
+    setVue((v) =>
+      v ? appliquerRelance(v, r.id, { dueDate: jour, dueAt, revision: r.revision }, dueSoon) : v,
+    );
+    crmAgendaApi
+      .moveDue(r, dueAt)
+      .then((a) => {
+        setVue((v) =>
+          v
+            ? appliquerRelance(
+                v,
+                r.id,
+                { dueDate: a.dueDay ?? jour, dueAt: a.dueAt ?? dueAt, revision: a.revision },
+                dueSoon,
+              )
+            : v,
+        );
+      })
+      .catch((err: unknown) => {
+        setErreur(messageWork(err, 'Impossible de déplacer la relance.'));
+        charger();
+      });
+  }
 
   function deplacer(
-    t: MyTaskItem,
+    t: WorkMyTaskItem,
     corps: Parameters<typeof appliquerCorps>[1] & { expectedRevision: number },
   ): void {
     setVue((v) =>
       v
         ? regrouper(
             v,
-            aPlat(v).map((x) => (x.id === t.id ? appliquerCorps(x, corps) : x)),
+            aPlat(v).map((x) => (estTache(x) && x.id === t.id ? appliquerCorps(x, corps) : x)),
             dueSoon,
           )
         : v,
@@ -122,14 +189,25 @@ export function CalendrierMesTaches(): React.ReactElement {
         )
       ) : (
         <CalendrierTaches
-          taches={taches}
+          taches={elements}
           today={vue.asOf || aujourdhui()}
           dueSoonDays={dueSoon}
           peutDeplacer={travailler}
           idPrefixe="mes-taches-cal"
-          sousTitre={(t) => t.projectName}
-          onOuvrir={(t) => router.push(hrefTache(t.projectId, t.id, 'calendrier'))}
-          onDeplacer={deplacer}
+          sousTitre={(t) =>
+            estRelance(t.element) ? sousTitreRelance(t.element) : t.element.projectName
+          }
+          onOuvrir={(t) =>
+            router.push(
+              estRelance(t.element)
+                ? t.element.href
+                : hrefTache(t.element.projectId, t.element.id, 'calendrier'),
+            )
+          }
+          onDeplacer={(t, corps) => {
+            if (estTache(t.element)) deplacer(t.element, corps);
+            else if (corps.dueDate) deplacerRelance(t.id, corps.dueDate);
+          }}
         />
       )}
     </section>

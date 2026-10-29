@@ -308,6 +308,17 @@ CrmOpportunitySchema.index({ organizationId: 1, status: 1, closedAt: 1 });
 
 // ── Activités ───────────────────────────────────────────────────────────────
 
+/** ADR-0040 — C4 : jour d'échéance déjà rappelé, par type (réclamation conditionnelle). */
+@Schema({ _id: false, strict: true })
+export class CrmActivityReminders {
+  @Prop({ type: String, default: null })
+  dueSoonFor!: string | null;
+
+  @Prop({ type: String, default: null })
+  overdueFor!: string | null;
+}
+const CrmActivityRemindersSchema = SchemaFactory.createForClass(CrmActivityReminders);
+
 @Schema({ collection: 'crm_activities', timestamps: true, strict: true })
 export class CrmActivity {
   @Prop({ type: String, required: true })
@@ -340,6 +351,25 @@ export class CrmActivity {
   @Prop({ type: String, default: null })
   customerId!: string | null;
 
+  // ADR-0040 — C4 § 2.4 : compte (posé par la migration de C1, lu s'il existe),
+  // assigné, jour d'échéance dénormalisé et rappels déjà émis.
+
+  /** Compte CRM visé ; `null` tant que la migration des comptes n'est pas passée. */
+  @Prop({ type: String, default: null })
+  accountId!: string | null;
+
+  /** Membre détenant `crm.manage` ; jamais `null` pour une activité à échéance non faite. */
+  @Prop({ type: String, default: null })
+  assigneeUserId!: string | null;
+
+  /** `AAAA-MM-JJ` : jour de Kinshasa de `dueAt`, écrit dans la même mise à jour. */
+  @Prop({ type: String, default: null })
+  dueDay!: string | null;
+
+  /** Jour d'échéance déjà rappelé, par type (motif des rappels de R1). */
+  @Prop({ type: CrmActivityRemindersSchema, default: () => ({}) })
+  reminders!: CrmActivityReminders;
+
   @Prop({ type: Number, required: true, default: 1 })
   revision!: number;
 
@@ -361,3 +391,7 @@ CrmActivitySchema.index({ organizationId: 1, createdAt: -1, _id: -1 });
 CrmActivitySchema.index({ organizationId: 1, done: 1, dueAt: 1 });
 CrmActivitySchema.index({ organizationId: 1, opportunityId: 1 });
 CrmActivitySchema.index({ organizationId: 1, contactId: 1 });
+// ADR-0040 — C4 : Mes tâches et brief ; rappels ; fil du compte.
+CrmActivitySchema.index({ organizationId: 1, assigneeUserId: 1, done: 1, dueDay: 1 });
+CrmActivitySchema.index({ organizationId: 1, done: 1, dueDay: 1 });
+CrmActivitySchema.index({ organizationId: 1, accountId: 1, createdAt: 1 });

@@ -17,12 +17,29 @@ export const NOTIFICATION_KINDS = [
   'work.task_due_soon',
   'work.task_overdue',
   'work.milestone_completed',
+  // ADR-0040 — C4 § 5.4 : relances et opportunités du CRM. `crm.opportunity_won`
+  // est déclaré ici et émis par le lot C7 (opportunité gagnée → projet).
+  'crm.activity_assigned',
+  'crm.activity_due_soon',
+  'crm.activity_overdue',
+  'crm.opportunity_assigned',
+  'crm.opportunity_won',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
 /** Modules producteurs connus. */
-export const NOTIFICATION_SOURCE_MODULES = ['work'] as const;
+export const NOTIFICATION_SOURCE_MODULES = ['work', 'crm'] as const;
 export type NotificationSourceModule = (typeof NOTIFICATION_SOURCE_MODULES)[number];
+
+/** Natures de l'entité d'origine (ADR-0040 — C4 § 5.4 : `activity`, `opportunity`, `account`). */
+export const NOTIFICATION_ENTITY_TYPES = [
+  'task',
+  'project',
+  'activity',
+  'opportunity',
+  'account',
+] as const;
+export type NotificationEntityType = (typeof NOTIFICATION_ENTITY_TYPES)[number];
 
 /** Bornes (ADR-0039 § 2.11). */
 export const NOTIFICATION_LIMITS = {
@@ -59,7 +76,7 @@ export function isNotificationHref(value: unknown): value is string {
 /** Origine d'une notification. */
 export interface NotificationSource {
   module: NotificationSourceModule;
-  entityType: 'task' | 'project';
+  entityType: NotificationEntityType;
   entityId: string;
   projectId?: string;
 }

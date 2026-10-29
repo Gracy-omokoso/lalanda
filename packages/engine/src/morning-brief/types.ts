@@ -14,7 +14,11 @@
  * 1.1.0 (ADR-0039 § 6.5) : faits `mes_taches.*`, `taches.en_retard`,
  * `projets_a_risque` et règles R8, R9 (projets et tâches du RUN).
  */
-export const MORNING_BRIEF_VERSION = '1.1.0';
+/**
+ * 1.2.0 (ADR-0040 — C4 § 5.5) : faits `mes_relances.*`, `relances.en_retard`,
+ * fait `pipeline` connu (nombre d'opportunités ouvertes) et règle R10.
+ */
+export const MORNING_BRIEF_VERSION = '1.2.0';
 
 export const BRIEF_CURRENCIES = ['CDF', 'USD'] as const;
 export type BriefCurrency = (typeof BRIEF_CURRENCIES)[number];
@@ -97,6 +101,32 @@ export type BriefWorkInput =
   | { status: 'unavailable' }
   | { status: 'known'; tasks: readonly BriefWorkTaskInput[]; truncated: boolean };
 
+/**
+ * Relance CRM NON faite dont l'échéance est aujourd'hui ou passée (ADR-0040 § 5.5),
+ * lue par l'API. Le moteur décide seul de ce qui est « en retard » ou « du jour ».
+ */
+export interface BriefCrmActivityInput {
+  /** Jour d'échéance `AAAA-MM-JJ` (jour de Kinshasa). */
+  dueDay: string;
+  /** Assignée à l'appelant du brief (ou au destinataire de l'e-mail). */
+  mine: boolean;
+}
+
+/**
+ * CRM (ADR-0040 — C4 § 5.5) : `hidden` si le rôle ne détient pas `crm.read`
+ * (rien n'est alors lu), `unavailable` sans module CRM (tests).
+ */
+export type BriefCrmInput =
+  | 'hidden'
+  | { status: 'unavailable' }
+  | {
+      status: 'known';
+      activities: readonly BriefCrmActivityInput[];
+      /** Opportunités ouvertes de l'organisation (aucun montant dans le brief). */
+      openOpportunityCount: number;
+      truncated: boolean;
+    };
+
 export interface MorningBriefInput {
   /** Instant de référence, ISO 8601. */
   now: string;
@@ -108,6 +138,8 @@ export interface MorningBriefInput {
   cash: BriefCashInput;
   dueDates: BriefDueDatesInput;
   work: BriefWorkInput;
+  /** Relances et pipeline du CRM ; absent : non disponible (ADR-0040 — C4). */
+  crm?: BriefCrmInput;
 }
 
 export type BriefFactStatus = 'known' | 'to_fill' | 'unavailable' | 'hidden';

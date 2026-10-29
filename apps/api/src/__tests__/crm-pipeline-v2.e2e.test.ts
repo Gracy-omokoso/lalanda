@@ -509,6 +509,16 @@ e2eSuite('Pipeline v2 (ADR-0040 C2)', () => {
       );
       const o = await opp(asN(), { accountId: prospect, ownerId: userIds['admin'] });
       expect(o.ownerId).toBe(userIds['admin']);
+      // `crm.opportunity_assigned` au nouveau responsable (notifier de C4).
+      const assigned = () =>
+        db.collection('notifications').find({
+          organizationId: orgN,
+          kind: 'crm.opportunity_assigned',
+          'source.entityId': o.id,
+        });
+      expect((await assigned().toArray()).map((n) => n['recipientUserId'])).toEqual([
+        userIds['admin'],
+      ]);
       const p = ok(
         await put(asN('sales_rep'), `/crm/opportunities/${o.id}`, {
           expectedRevision: o.revision,
@@ -519,6 +529,8 @@ e2eSuite('Pipeline v2 (ADR-0040 C2)', () => {
         }),
       );
       expect(p.ownerId).toBe(userIds['sales_rep']);
+      // L'auteur qui se confie l'opportunité n'est pas notifié.
+      expect(await assigned().count()).toBe(1);
       // PUT sans `ownerId` ni lignes : inchangés.
       const q = ok(
         await put(asN(), `/crm/opportunities/${o.id}`, {
@@ -592,12 +604,20 @@ e2eSuite('Pipeline v2 (ADR-0040 C2)', () => {
         'FORBIDDEN',
       );
       const r = ok(
-        await post(asN('sales_rep'), '/crm/opportunities/reassign', {
+        await post(asN('owner'), '/crm/opportunities/reassign', {
           fromOwnerId: userIds['admin2'],
           toOwnerId: userIds['sales_rep'],
         }),
       );
       expect(r).toEqual({ reassigned: 2 });
+      expect(
+        await db.collection('notifications').countDocuments({
+          organizationId: orgN,
+          kind: 'crm.opportunity_assigned',
+          recipientUserId: userIds['sales_rep'],
+          'source.entityId': { $in: [a.id, b.id] },
+        }),
+      ).toBe(2);
       for (const o of [a, b]) {
         const v = ok(await get(asN(), `/crm/opportunities/${o.id}`));
         expect(v.ownerId).toBe(userIds['sales_rep']);

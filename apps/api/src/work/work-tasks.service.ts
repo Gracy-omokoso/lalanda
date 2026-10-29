@@ -28,6 +28,7 @@ import {
   type ListProjectTasksQuery,
   type ListWorkTasksQuery,
   type MoveWorkTaskBody,
+  type MyTaskEntry,
   type MyTaskItem,
   type MyTasksView,
   type PatchWorkTaskBody,
@@ -39,10 +40,12 @@ import {
   type WorkTaskWriteResult,
   type WorkWarning,
 } from '@lalanda/shared/work';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { MY_TASKS_MAX_PER_SOURCE, type CrmMyTaskItem } from '@lalanda/shared/crm';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
+import { can, NO_OVERRIDES } from '../authz/permissions.js';
 import { beforeTimeCursor, decodeTimeCursor, encodeTimeCursor } from '../crm/time-cursor.js';
 import { ObjectStorageService } from '../storage/object-storage.service.js';
 import {
@@ -57,6 +60,7 @@ import {
   taskNotFound,
   type WorkActor,
 } from './work.common.js';
+import { CRM_AGENDA_SOURCE, noCrmAgenda, type CrmAgendaReader } from './my-tasks.ports.js';
 import { WorkActivityService, type ActivityInput } from './work-activity.service.js';
 import { dropAttachmentObjects } from './work-attachments.storage.js';
 import { WorkMembersService } from './work-members.service.js';
@@ -80,9 +84,6 @@ import {
 /** Projection allégée : la description ne sert qu'au détail. */
 const LIGHT = { description: 0, reminders: 0 } as const;
 
-/** Plafond de « Mes tâches » et des listes non paginées. */
-const MY_TASKS_MAX = 2_000;
-
 interface ViewContext {
   columns: Map<string, Map<string, WorkColumn>>;
   doneById: Map<string, { done: boolean }>;
@@ -105,7 +106,13 @@ export class WorkTasksService {
     @Inject(WorkActivityService) private readonly activity: WorkActivityService,
     @Inject(WorkNotifier) private readonly notifier: WorkNotifier,
     @Inject(ObjectStorageService) private readonly storage: ObjectStorageService,
-  ) {}
+    // ADR-0040 — C4 : relances CRM, facultatives (tests, module absent).
+    @Optional() @Inject(CRM_AGENDA_SOURCE) crmAgenda: CrmAgendaReader | null = null,
+  ) {
+    this.crmAgenda = crmAgenda ?? noCrmAgenda;
+  }
+
+  private readonly crmAgenda: CrmAgendaReader;
 
   // ── Accès ────────────────────────────────────────────────────────────────
 
@@ -319,6 +326,11 @@ export class WorkTasksService {
   /**
    * `GET /work/my-tasks` — tâches non terminées assignées à l'appelant dans
    * l'organisation active, hors projets archivés, groupées au jour de Kinshasa.
+   *
+   * ADR-0040 — C4 § 5.2 : s'y ajoutent, AGRÉGÉES À LA LECTURE (aucune copie), les
+   * relances CRM non faites assignées à l'appelant — seulement s'il détient
+   * `crm.read`. Chaque élément porte sa `source` ; 500 au plus par source
+   * (`truncated`) ; un seul `dueSoonDays` (réglage de l'organisation).
    */
   async myTasks(organizationId: string, actor: WorkActor, now = new Date()): Promise<MyTasksView> {
     const archived = await this.projects.archivedIds(organizationId);
@@ -328,17 +340,32 @@ export class WorkTasksService {
       done: false,
     };
     if (archived.length > 0) filter['projectId'] = { $nin: archived };
-    const docs = await this.tasks
-      .find(filter, LIGHT)
-      .sort({ dueDate: 1, _id: 1 })
-      .limit(MY_TASKS_MAX)
-      .lean<WorkTaskLean[]>()
-      .exec();
-    const items = await this.withProjectNames(organizationId, docs);
+    // ADR-0041 A3 : passer aux droits effectifs du membre
+    const crmVisible = actor.role !== undefined && can(actor.role, 'crm.read', NO_OVERRIDES);
+    const [docs, crm] = await Promise.all([
+      this.tasks
+        .find(filter, LIGHT)
+        .sort({ dueDate: 1, _id: 1 })
+        .limit(MY_TASKS_MAX_PER_SOURCE + 1)
+        .lean<WorkTaskLean[]>()
+        .exec(),
+      crmVisible
+        ? this.crmAgenda.agendaOf(organizationId, actor.userId, MY_TASKS_MAX_PER_SOURCE)
+        : Promise.resolve({ items: [] as CrmMyTaskItem[], truncated: false }),
+    ]);
+    const workTruncated = docs.length > MY_TASKS_MAX_PER_SOURCE;
+    const work = await this.withProjectNames(
+      organizationId,
+      docs.slice(0, MY_TASKS_MAX_PER_SOURCE),
+    );
+    const items: MyTaskEntry[] = [
+      ...work.map((t) => ({ ...t, source: 'work' as const })),
+      ...crm.items,
+    ];
     const today = kinshasaDayOf(now);
     const { dueSoonDays } = await this.settings.get(organizationId);
     const groups = groupMyTasks(items, today, dueSoonDays);
-    return { asOf: today, ...groups };
+    return { asOf: today, ...groups, truncated: workTruncated || crm.truncated };
   }
 
   async detail(organizationId: string, taskId: string): Promise<WorkTaskDetail> {
