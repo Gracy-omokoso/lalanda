@@ -186,6 +186,33 @@ const nextConfig = {
         destination: '/initiatives/:path*',
         permanent: true,
       },
+      // ADR-0040 § 8.1 — le CRM quitte `/ventes` et devient l'application
+      // `/crm`. 308 permanent, chaîne de requête conservée par Next. L'ordre
+      // compte (première correspondance) : du plus précis au plus général, sans
+      // quoi `/ventes/crm/contacts` serait pris pour une opportunité nommée
+      // « contacts ». La fiche d'opportunité change de forme :
+      // `/ventes/crm/<id>` → `/crm/opportunites/<id>`. Aucune sous-route plus
+      // profonde n'existait sous `/ventes/crm`.
+      {
+        source: '/ventes/crm/contacts',
+        destination: '/crm/contacts',
+        permanent: true,
+      },
+      {
+        source: '/ventes/crm/reglages',
+        destination: '/crm/reglages',
+        permanent: true,
+      },
+      {
+        source: '/ventes/crm',
+        destination: '/crm',
+        permanent: true,
+      },
+      {
+        source: '/ventes/crm/:opportunityId',
+        destination: '/crm/opportunites/:opportunityId',
+        permanent: true,
+      },
     ];
   },
 };

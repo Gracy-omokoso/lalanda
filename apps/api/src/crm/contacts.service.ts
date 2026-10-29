@@ -1,4 +1,9 @@
-// Contacts et prospects — ADR-0035 § 2.
+// Contacts et prospects — ADR-0035 § 2 ; comptes 360° — ADR-0040 § 2.2 (C1).
+//
+// ADR-0040 — C1 : une personne est rattachée à un COMPTE (`accountId`, prospect
+// ou client). `customerId` et `companyName` sont recopiés du compte ; un corps qui
+// les envoie sans `accountId` est résolu par `CrmAccountsService.resolveLegacy`
+// (compatibilité N-1, une version).
 //
 // Un contact est une personne. Rattaché à un client de l'organisation
 // (`customerId`), c'est un contact client ; sans client, c'est un PROSPECT, qui
@@ -11,6 +16,9 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Types, type Model } from 'mongoose';
 
 import { AuditService } from '../authz/audit.service.js';
+// ADR-0040 — C1
+import { CrmAccountsService } from './accounts/crm-accounts.service.js';
+import { contactDenormOf } from './accounts/crm-accounts.denorm.js';
 import { Customer, type CustomerDocument } from '../sales/customer.schema.js';
 import { conflict, customerNotFound, invalidCursor, staleRevision } from '../sales/sales.errors.js';
 import {
@@ -44,6 +52,9 @@ export interface ContactView {
   jobTitle: string | null;
   email: string | null;
   phone: string | null;
+  /** ADR-0040 — C1 : compte de la personne, `null` sans entreprise. */
+  accountId: string | null;
+  accountName: string | null;
   customerId: string | null;
   customerName: string | null;
   companyName: string | null;
@@ -67,6 +78,7 @@ export class ContactsService {
     @InjectModel(CrmActivity.name) private readonly activities: Model<CrmActivityDocument>,
     @InjectModel(Customer.name) private readonly customers: Model<CustomerDocument>,
     @Inject(AuditService) private readonly audit: AuditService,
+    @Inject(CrmAccountsService) private readonly accounts: CrmAccountsService,
   ) {}
 
   // ── Lecture ──────────────────────────────────────────────────────────────
@@ -74,6 +86,7 @@ export class ContactsService {
   async list(organizationId: string, query: ListContactsQuery): Promise<ContactPage> {
     const and: Record<string, unknown>[] = [{ organizationId }];
     if (query.customerId) and.push({ customerId: query.customerId.toLowerCase() });
+    if (query.accountId) and.push({ accountId: query.accountId.toLowerCase() });
     if (query.kind === 'prospect') and.push({ customerId: null });
     if (query.kind === 'customer_contact') and.push({ customerId: { $type: 'string' } });
     if (query.q !== undefined) {
@@ -137,11 +150,17 @@ export class ContactsService {
   }
 
   async views(organizationId: string, docs: readonly ContactLean[]): Promise<ContactView[]> {
-    const names = await customerNamesOf(
-      this.customers,
-      organizationId,
-      docs.map((d) => d.customerId),
-    );
+    const [names, accounts] = await Promise.all([
+      customerNamesOf(
+        this.customers,
+        organizationId,
+        docs.map((d) => d.customerId),
+      ),
+      this.accounts.byIds(
+        organizationId,
+        docs.map((d) => d.accountId),
+      ),
+    ]);
     return docs.map((d) => ({
       id: String(d._id),
       kind: d.customerId ? 'customer_contact' : 'prospect',
@@ -149,6 +168,8 @@ export class ContactsService {
       jobTitle: d.jobTitle ?? null,
       email: d.email ?? null,
       phone: d.phone ?? null,
+      accountId: d.accountId ?? null,
+      accountName: d.accountId ? (accounts.get(d.accountId)?.name ?? null) : null,
       customerId: d.customerId ?? null,
       customerName: d.customerId ? (names.get(d.customerId) ?? null) : null,
       companyName: d.companyName ?? null,
@@ -162,15 +183,15 @@ export class ContactsService {
   // ── Écriture ─────────────────────────────────────────────────────────────
 
   async create(organizationId: string, input: ContactInput, actor: CrmActor): Promise<ContactView> {
-    await requireCustomer(this.customers, organizationId, input.customerId);
+    const fields = await this.linked(organizationId, input, actor);
     const doc = await this.contacts.create({
       organizationId,
-      ...input,
-      ...this.keys(input),
+      ...fields,
+      ...this.keys(fields),
       revision: 1,
       createdBy: actor.userId,
       updatedBy: actor.userId,
-      _schemaVersion: 1,
+      _schemaVersion: 2,
     });
     return this.get(organizationId, String(doc._id));
   }
@@ -182,15 +203,18 @@ export class ContactsService {
     actor: CrmActor,
   ): Promise<number> {
     if (inputs.length === 0) return 0;
+    // Séquentiel : deux lignes d'une même entreprise résolvent le même prospect.
+    const linked: Array<ContactInput & { accountId: string | null }> = [];
+    for (const input of inputs) linked.push(await this.linked(organizationId, input, actor));
     const res = await this.contacts.insertMany(
-      inputs.map((input) => ({
+      linked.map((fields) => ({
         organizationId,
-        ...input,
-        ...this.keys(input),
+        ...fields,
+        ...this.keys(fields),
         revision: 1,
         createdBy: actor.userId,
         updatedBy: actor.userId,
-        _schemaVersion: 1,
+        _schemaVersion: 2,
       })),
     );
     return res.length;
@@ -205,11 +229,14 @@ export class ContactsService {
   ): Promise<ContactView> {
     const current = await this.requireOwn(organizationId, contactId);
     if (current.revision !== expectedRevision) staleRevision(current.revision);
-    await requireCustomer(this.customers, organizationId, input.customerId);
+    const fields = await this.linked(organizationId, input, actor);
     const res = await this.contacts
       .updateOne(
         { _id: current._id, organizationId, revision: expectedRevision },
-        { $set: { ...input, ...this.keys(input), updatedBy: actor.userId }, $inc: { revision: 1 } },
+        {
+          $set: { ...fields, ...this.keys(fields), updatedBy: actor.userId, _schemaVersion: 2 },
+          $inc: { revision: 1 },
+        },
       )
       .exec();
     if (res.matchedCount !== 1)
@@ -256,6 +283,30 @@ export class ContactsService {
       .lean<ContactLean[]>()
       .exec();
     return this.views(organizationId, docs);
+  }
+
+  /**
+   * ADR-0040 — C1 : rattache la personne à son compte et recopie `customerId` et
+   * `companyName`. Compte d'une autre organisation ou client inconnu → 404 ;
+   * compte fusionné → 409 `CRM_ACCOUNT_MERGED`.
+   */
+  private async linked(
+    organizationId: string,
+    input: ContactInput,
+    actor: CrmActor,
+  ): Promise<ContactInput & { accountId: string | null }> {
+    if (input.accountId === null) {
+      return { ...input, accountId: null, customerId: null, companyName: null };
+    }
+    if (input.accountId !== undefined) {
+      const account = await this.accounts.requireUsable(organizationId, input.accountId);
+      return { ...input, accountId: String(account._id), ...contactDenormOf(account) };
+    }
+    // Compatibilité N-1 : `customerId` / `companyName` sans `accountId`.
+    await requireCustomer(this.customers, organizationId, input.customerId);
+    const account = await this.accounts.resolveLegacy(organizationId, input, actor);
+    if (!account) return { ...input, accountId: null };
+    return { ...input, accountId: String(account._id), ...contactDenormOf(account) };
   }
 
   private keys(input: ContactInput): { sortName: string; searchKey: string } {

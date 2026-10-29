@@ -12,12 +12,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { api, type CustomerView } from '@/lib/api';
 import { crmApi, type OpportunitySummary, type PipelineView } from '@/lib/api-crm';
 
-import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from '../../_components/form-ui';
-import { useAccesVentes } from '../../_components/sales-access';
+import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from '../../ventes/_components/form-ui';
+import { useAccesCrm } from './crm-access';
 
 import {
   ACTIVITY_LABELS,
-  CRM_BASE,
+  lienOpportunite,
   etapesVoisines,
   formatEcheance,
   formulaireOpportunite,
@@ -46,10 +46,7 @@ function Carte({
   const { precedente, suivante } = etapesVoisines(board.settings.stages, o.stageKey);
   return (
     <li className="flex flex-col gap-1 rounded-md border border-[var(--border)] bg-[var(--background)] p-3 text-sm">
-      <Link
-        href={`${CRM_BASE}/${encodeURIComponent(o.id)}`}
-        className="font-medium underline-offset-2 hover:underline"
-      >
+      <Link href={lienOpportunite(o.id)} className="font-medium underline-offset-2 hover:underline">
         {o.title}
       </Link>
       <span className="text-xs text-[var(--foreground-muted)]">{interlocuteur(o)}</span>
@@ -229,7 +226,7 @@ function NouvelleOpportunite({ onCree }: { onCree: () => void }): React.ReactEle
 }
 
 export function CrmBoard(): React.ReactElement {
-  const { actions } = useAccesVentes();
+  const { actions } = useAccesCrm();
   const gerer = peutGererCrm(actions);
   const [board, setBoard] = useState<PipelineView | null>(null);
   const [vueListe, setVueListe] = useState(false);
@@ -318,10 +315,7 @@ export function CrmBoard(): React.ReactElement {
                       <>
                         {' '}
                         (
-                        <Link
-                          href={`${CRM_BASE}/${encodeURIComponent(a.opportunityId)}`}
-                          className="underline"
-                        >
+                        <Link href={lienOpportunite(a.opportunityId)} className="underline">
                           {a.opportunityTitle ?? 'opportunité'}
                         </Link>
                         )
@@ -351,7 +345,7 @@ export function CrmBoard(): React.ReactElement {
               <ul className="mt-2 flex flex-col gap-1 text-sm">
                 {board.stale.slice(0, 8).map((o) => (
                   <li key={o.id}>
-                    <Link href={`${CRM_BASE}/${encodeURIComponent(o.id)}`} className="underline">
+                    <Link href={lienOpportunite(o.id)} className="underline">
                       {o.title}
                     </Link>{' '}
                     — {o.daysSinceActivity} j
@@ -381,10 +375,7 @@ export function CrmBoard(): React.ReactElement {
                   s.opportunities.map((o) => (
                     <tr key={o.id} className="border-t border-[var(--border)]">
                       <td>
-                        <Link
-                          href={`${CRM_BASE}/${encodeURIComponent(o.id)}`}
-                          className="underline"
-                        >
+                        <Link href={lienOpportunite(o.id)} className="underline">
                           {o.title}
                         </Link>
                       </td>

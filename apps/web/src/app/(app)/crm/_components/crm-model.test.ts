@@ -7,12 +7,13 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { formatMontant } from '../../_components/sales-model';
+import { formatMontant } from '../../ventes/_components/sales-model';
 
 import {
   erreursImport,
   etapesVoisines,
   formulaireOpportunite,
+  lienOpportunite,
   libelleProbabilite,
   messageCrm,
   montantEstime,
@@ -36,6 +37,11 @@ describe('CRM — modèle d’écran', () => {
     expect(peutLireCrm(['crm.read'])).toBe(true);
     expect(peutGererCrm(['crm.read'])).toBe(false);
     expect(peutGererCrm(null)).toBe(false);
+  });
+
+  it('la fiche d’opportunité vit sous /crm/opportunites (ADR-0040 § 8.1)', () => {
+    expect(lienOpportunite('abc')).toBe('/crm/opportunites/abc');
+    expect(lienOpportunite('a/b')).toBe('/crm/opportunites/a%2Fb');
   });
 
   it('probabilité : jamais de pourcentage sous l’échantillon minimal', () => {

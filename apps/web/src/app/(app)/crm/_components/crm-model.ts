@@ -19,9 +19,15 @@ import type {
 } from '@/lib/api-crm';
 import type { DocumentCurrency, OrgAction } from '@/lib/api';
 
-import { formatMontant, lireMontantSaisi } from '../../_components/sales-model';
+import { formatMontant, lireMontantSaisi } from '../../ventes/_components/sales-model';
 
-export const CRM_BASE = '/ventes/crm';
+/** Application CRM, sortie de Ventes (ADR-0040 § 8.1). */
+export const CRM_BASE = '/crm';
+
+/** Fiche d'une opportunité : `/crm/opportunites/<id>` (ADR-0040 § 8.1). */
+export function lienOpportunite(id: string): string {
+  return `${CRM_BASE}/opportunites/${encodeURIComponent(id)}`;
+}
 
 export function peutLireCrm(actions: readonly OrgAction[] | null): boolean {
   return actions !== null && actions.includes('crm.read');

@@ -85,6 +85,9 @@ import { REQUIRED_PERMISSIONS_KEY, REQUIRED_PLATFORM_ROLES_KEY } from './authz.d
 import { MeController } from './me.controller.js';
 // ADR-0039 — L2
 import { NotificationsController } from '../notifications/notifications.controller.js';
+// ADR-0040 — C1
+import { CrmAccountConversionController } from '../crm/accounts/conversion/crm-account-conversion.controller.js';
+import { CrmAccountsController } from '../crm/accounts/crm-accounts.controller.js';
 import { ACTIONS, PLATFORM_FORBIDDEN_ACTIONS, type Action } from './permissions.js';
 
 /**
@@ -174,6 +177,9 @@ const CONTROLEURS = [
   WorkTimeController,
   // ADR-0039 — L4a : branchements argent (devis, factures, marge).
   WorkBillingController,
+  // ADR-0040 — C1 : comptes 360° et conversion prospect → client.
+  CrmAccountsController,
+  CrmAccountConversionController,
 ];
 
 /**
@@ -697,6 +703,18 @@ describe('couverture des routes par le RBAC', () => {
       'WorkBillingController.unlinkInvoice': ['work.manage'],
       'WorkBillingController.prepareInvoice': ['work.read', 'sales.manage'],
       'WorkBillingController.margin': ['work.read', 'sales.read', 'treasury.read'],
+      // ADR-0040 — C1 : comptes lus sous `crm.read`, gérés sous `crm.manage` ;
+      // convertir un prospect crée une fiche client (NIF, type DGI) : `sales.manage` en plus.
+      'CrmAccountsController.list': ['crm.read'],
+      'CrmAccountsController.create': ['crm.manage'],
+      'CrmAccountsController.migrationReport': ['crm.manage'],
+      'CrmAccountsController.get': ['crm.read'],
+      'CrmAccountsController.update': ['crm.manage'],
+      'CrmAccountsController.archive': ['crm.manage'],
+      'CrmAccountsController.restore': ['crm.manage'],
+      'CrmAccountsController.remove': ['crm.manage'],
+      'CrmAccountsController.merge': ['crm.manage'],
+      'CrmAccountConversionController.convert': ['crm.manage', 'sales.manage'],
       // ADR-0040 — C4 : décocher une activité depuis « Mes tâches » (relances CRM).
       'CrmActivitiesController.reopen': ['crm.manage'],
     };

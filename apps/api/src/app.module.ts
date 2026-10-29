@@ -12,6 +12,8 @@ import { BillingModule } from './billing/billing.module.js';
 import { BrandingModule } from './branding/branding.module.js';
 import { BusinessPlanModule } from './business-plan/business-plan.module.js';
 import { CrmModule } from './crm/crm.module.js';
+// ADR-0040 — C1
+import { CrmAccountConversionModule } from './crm/accounts/conversion/crm-account-conversion.module.js';
 import { CanvasModule } from './canvas/canvas.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { EdefModule } from './edef/edef.module.js';
@@ -119,6 +121,8 @@ import { WorkModule } from './work/work.module.js';
     TreasuryModule,
     // ADR-0035 — CRM minimal, puis devis (qui consomment ventes et CRM).
     CrmModule,
+    // ADR-0040 — C1 : conversion prospect → client (compose Ventes et CRM).
+    CrmAccountConversionModule,
     QuotesModule,
     // ADR-0039 — boîte de notifications (@Global), avant ses producteurs (work, brief).
     NotificationsModule,
