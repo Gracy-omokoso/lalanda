@@ -46,18 +46,27 @@ export function notFound(code: string, message: string): never {
   throw new NotFoundException({ code, message });
 }
 
-export const projectNotFound = (): never =>
+export function projectNotFound(): never {
   notFound('WORK_PROJECT_NOT_FOUND', 'Projet introuvable.');
-export const taskNotFound = (): never => notFound('WORK_TASK_NOT_FOUND', 'Tâche introuvable.');
-export const commentNotFound = (): never =>
+}
+export function taskNotFound(): never {
+  notFound('WORK_TASK_NOT_FOUND', 'Tâche introuvable.');
+}
+export function commentNotFound(): never {
   notFound('WORK_COMMENT_NOT_FOUND', 'Commentaire introuvable.');
-export const attachmentNotFound = (): never =>
+}
+export function attachmentNotFound(): never {
   notFound('WORK_ATTACHMENT_NOT_FOUND', 'Pièce jointe introuvable.');
-export const timeEntryNotFound = (): never =>
+}
+export function timeEntryNotFound(): never {
   notFound('WORK_TIME_ENTRY_NOT_FOUND', 'Saisie de temps introuvable.');
-export const rateNotFound = (): never => notFound('WORK_RATE_NOT_FOUND', 'Taux introuvable.');
-export const memberNotFound = (): never =>
+}
+export function rateNotFound(): never {
+  notFound('WORK_RATE_NOT_FOUND', 'Taux introuvable.');
+}
+export function memberNotFound(): never {
   notFound('WORK_MEMBER_NOT_FOUND', 'Membre introuvable dans cette organisation.');
+}
 
 /** 400 `INVALID_REQUEST` avec un seul problème (règle vérifiée en base ou à l'horloge). */
 export function invalid(path: string, code: string, message: string): never {
