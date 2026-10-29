@@ -48,7 +48,7 @@ e2eSuite('collaboration — commentaires, pièces jointes, temps (ADR-0039)', ()
     name: string,
   ) {
     return f
-      .post(who, `/work/tasks/${id}/attachments`)
+      .postRaw(who, `/work/tasks/${id}/attachments`)
       .set('Content-Type', 'application/octet-stream')
       .set('X-File-Name', encodeURIComponent(name))
       .send(body);

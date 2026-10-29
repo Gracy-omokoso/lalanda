@@ -41,6 +41,8 @@ export interface WorkFixture {
   put: (who: WorkAccount, path: string, body: unknown) => request.Test;
   patch: (who: WorkAccount, path: string, body: unknown) => request.Test;
   del: (who: WorkAccount, path: string) => request.Test;
+  /** POST sans corps préparé (corps binaire des pièces jointes). */
+  postRaw: (who: WorkAccount, path: string) => request.Test;
   /** Notifications émises depuis le dernier `clear()`. */
   notifications: NotificationInput[];
   /** Objets du stockage simulé. */
@@ -181,6 +183,7 @@ export function useWorkFixture(prefix: string): WorkFixture {
         .set('Cookie', as(who))
         .send(body as object),
     del: (who, path) => request(server()).delete(path).set('Cookie', as(who)),
+    postRaw: (who, path) => request(server()).post(path).set('Cookie', as(who)),
     notifications,
     objects,
     issueCodes: (res) =>
