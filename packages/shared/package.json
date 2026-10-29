@@ -45,6 +45,10 @@
     "./notifications": {
       "types": "./dist/notifications/index.d.ts",
       "import": "./dist/notifications/index.js"
+    },
+    "./crm": {
+      "types": "./dist/crm/index.d.ts",
+      "import": "./dist/crm/index.js"
     }
   },
   "scripts": {
