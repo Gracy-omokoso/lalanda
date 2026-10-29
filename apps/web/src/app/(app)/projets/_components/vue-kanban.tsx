@@ -8,6 +8,9 @@
 //
 // Téléphone : une colonne occupe presque l'écran, et la zone du tableau défile
 // horizontalement À L'INTÉRIEUR d'elle-même (la page, elle, ne déborde pas).
+// La zone est `relative` : sans cela, les textes `sr-only` (positionnés en
+// absolu) des colonnes lointaines prennent la page pour bloc conteneur,
+// échappent au défilement et élargissent tout l'écran sur téléphone.
 
 import type { WorkColumn, WorkTaskView } from '@lalanda/shared/work';
 import { Skeleton } from '@lalanda/ui';
@@ -100,7 +103,7 @@ export function VueKanban(): React.ReactElement {
         </p>
       ) : null}
       <div
-        className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-3 sm:mx-0 sm:px-0"
+        className="relative -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-3 sm:mx-0 sm:px-0"
         role="region"
         aria-label="Tableau Kanban"
         tabIndex={0}
