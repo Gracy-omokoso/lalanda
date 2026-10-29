@@ -53,8 +53,13 @@ export interface BriefInvoiceInput {
   normalizationPhase: string | null;
 }
 
-/** Trésorerie : soldes des comptes d'ADR-0034 ; « à renseigner » sans compte. */
+/**
+ * Trésorerie : soldes des comptes d'ADR-0034 ; « à renseigner » sans compte ;
+ * `hidden` si le rôle ne détient pas `treasury.read` (ADR-0040 § 4.4) : rien
+ * n'est alors lu.
+ */
 export type BriefCashInput =
+  | 'hidden'
   | { status: 'to_fill' }
   | {
       status: 'known';

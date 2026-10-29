@@ -154,17 +154,28 @@ export function buildMorningBriefFacts(input: MorningBriefInput): BriefFact[] {
     facts.push(...salesFacts(input.sales.invoices, nowMs, today));
   }
 
-  // Trésorerie (ADR-0034 à venir).
+  // Trésorerie (ADR-0034). ADR-0040 § 4.4 : sans `treasury.read`, le fait est
+  // `hidden` et rien n'a été lu ; la règle R7 ne se déclenche donc pas.
   const cashSource: BriefSource = {
     module: 'treasury',
     collection: null,
     rule:
-      input.cash.status === 'known'
+      input.cash !== 'hidden' && input.cash.status === 'known'
         ? input.cash.sourceLabel
         : 'Aucune trésorerie réelle enregistrée dans Lalanda',
     reference: 'ADR-0033 § 2, ADR-0034',
   };
-  if (input.cash.status === 'known') {
+  if (input.cash === 'hidden') {
+    facts.push({
+      id: 'tresorerie',
+      label: 'Trésorerie disponible',
+      kind: 'status',
+      status: 'hidden',
+      value: null,
+      currency: null,
+      source: { ...cashSource, rule: 'Trésorerie réservée aux rôles qui la consultent' },
+    });
+  } else if (input.cash.status === 'known') {
     for (const c of BRIEF_CURRENCIES) {
       const a = input.cash.amounts.find((x) => x.currency === c);
       if (!a) continue;

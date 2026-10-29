@@ -1,10 +1,11 @@
 // Devis — ADR-0035 § 4.
 //
-// `sales.read` pour lire et imprimer ; `sales.manage` pour préparer, marquer
-// envoyé, accepté ou refusé, créer une nouvelle version et convertir en
-// brouillon de facture. Un devis n'engage pas le contribuable : l'émission de la
-// facture qui en naît reste en `sales.invoice`. Un devis d'une autre
-// organisation répond 404.
+// `sales.read` pour lire et imprimer ; `sales.quote` (ADR-0040 § 4.1) pour
+// préparer, supprimer un brouillon, marquer envoyé, accepté ou refusé et créer
+// une nouvelle version ; `sales.quote` + `sales.manage` pour convertir en
+// brouillon de facture (le brouillon de facture reste un geste de facturation).
+// Un devis n'engage pas le contribuable : l'émission de la facture qui en naît
+// reste en `sales.invoice`. Un devis d'une autre organisation répond 404.
 
 import {
   Body,
@@ -75,7 +76,7 @@ export class QuotesController {
   }
 
   @Post()
-  @RequirePermission('sales.manage')
+  @RequirePermission('sales.quote')
   async create(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
@@ -94,7 +95,7 @@ export class QuotesController {
   }
 
   @Put(':quoteId')
-  @RequirePermission('sales.manage')
+  @RequirePermission('sales.quote')
   async put(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
@@ -115,14 +116,14 @@ export class QuotesController {
 
   @Delete(':quoteId')
   @HttpCode(204)
-  @RequirePermission('sales.manage')
+  @RequirePermission('sales.quote')
   async remove(@CurrentOrgId() orgId: string, @Param('quoteId') quoteId: string): Promise<void> {
     await this.quotes.remove(orgId, quoteId);
   }
 
   @Post(':quoteId/send')
   @HttpCode(200)
-  @RequirePermission('sales.manage')
+  @RequirePermission('sales.quote')
   async send(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
@@ -135,7 +136,7 @@ export class QuotesController {
 
   @Post(':quoteId/accept')
   @HttpCode(200)
-  @RequirePermission('sales.manage')
+  @RequirePermission('sales.quote')
   async accept(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
@@ -148,7 +149,7 @@ export class QuotesController {
 
   @Post(':quoteId/refuse')
   @HttpCode(200)
-  @RequirePermission('sales.manage')
+  @RequirePermission('sales.quote')
   async refuse(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
@@ -169,7 +170,7 @@ export class QuotesController {
 
   @Post(':quoteId/new-version')
   @HttpCode(200)
-  @RequirePermission('sales.manage')
+  @RequirePermission('sales.quote')
   async newVersion(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
@@ -182,7 +183,7 @@ export class QuotesController {
 
   @Post(':quoteId/convert')
   @HttpCode(200)
-  @RequirePermission('sales.manage')
+  @RequirePermission('sales.quote', 'sales.manage')
   async convert(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,

@@ -32,13 +32,13 @@ Le support ne voit jamais les données financières sans consentement explicite,
 | Chef de projet | projets autorisés et saisie |
 | Conseiller | consultation, commentaires, recommandations |
 | Lecteur | lecture seulement |
-| Commercial (**proposé, ADR-0040**) | CRM, devis, consultation des clients et du catalogue ; ni trésorerie, ni dépenses, ni émission de facture |
+| Commercial (`sales_rep`, ADR-0040, appliqué) | CRM, devis, consultation des clients et du catalogue ; ni trésorerie, ni dépenses, ni émission de facture |
 
 ## Actions granulaires
 
-`organization.manage`, `billing.manage`, `members.invite`, `project.create`, `project.read`, `project.update`, `canvas.update`, `inputs.update`, `plan.calculate`, `plan.approve`, `actuals.import`, `period.close`, `analytics.read`, `report.export`, `audit.read`, `fiscal.manage`, `sales.read`, `sales.manage`, `sales.invoice`, `sales.receipt`, `treasury.read`, `treasury.manage`, `crm.read`, `crm.manage`, `work.read`, `work.update`, `work.manage`.
+`organization.manage`, `billing.manage`, `members.invite`, `project.create`, `project.read`, `project.update`, `canvas.update`, `inputs.update`, `plan.calculate`, `plan.approve`, `actuals.import`, `period.close`, `analytics.read`, `report.export`, `audit.read`, `fiscal.manage`, `sales.read`, `sales.manage`, `sales.invoice`, `sales.receipt`, `treasury.read`, `treasury.manage`, `crm.read`, `crm.manage`, `work.read`, `work.update`, `work.manage`, `sales.quote`.
 
-Vingt-sept actions au total, dans l'ordre ci-dessus (ordre de fusion pour les
+Vingt-huit actions au total, dans l'ordre ci-dessus (ordre de fusion pour les
 actions ajoutées après la dix-neuvième).
 
 `fiscal.manage` — « Gérer l'identité fiscale et la facture normalisée » — est la
@@ -185,11 +185,13 @@ super-administrateur et le support, `work.update` et `work.manage` sous accès d
 le seul super-administrateur. Aucune n'est un interdit absolu ; les rôles attribuables
 sont inchangés.
 
-### Proposé, ADR-0040 — rôle Commercial et action `sales.quote` (non appliqué)
+### ADR-0040 — rôle Commercial et action `sales.quote` (appliqué, lot C0)
 
-> **Statut : proposé** par [ADR-0040](adr/ADR-0040-crm-complet.md) § 4 (29 oct. 2026), décision
-> de la dirigeante sur le principe (D3). Rien de ce qui suit n'est encore dans
-> `permissions.ts` ; le lot C0 l'applique.
+> **Statut : appliqué** par le lot C0 d'[ADR-0040](adr/ADR-0040-crm-complet.md) § 4 (29 oct.
+> 2026), décision de la dirigeante sur le principe (D3). La matrice ci-dessous est celle de
+> `apps/api/src/authz/permissions.ts`, vérifiée par `permissions.test.ts` (420 cases) et par la
+> sonde `rbac-matrix.e2e.test.ts` (colonne COM, `sales.quote`). Les décisions ouvertes n° 1 à 5
+> d'ADR-0040 sont appliquées à leur valeur par défaut.
 
 - **Action nouvelle `sales.quote`** — « Préparer les devis » (créer, modifier, envoyer, accepter,
   refuser, nouvelle version, créer depuis une opportunité) — vingt-huitième, en fin de liste.
@@ -217,11 +219,15 @@ sont inchangés.
 | `work.update` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ |
 | toutes les autres actions | — | — | — | — | — | — | — | — | ✗ |
 
-- **Durcissement préalable** (même lot) : une donnée de trésorerie exige `treasury.read` (fait
-  `tresorerie` du brief, faits de trésorerie de GROW) ; les routes de réalisé d'une initiative
-  sous `analytics.read` exigent aussi `project.read`. Effet de bord : le Conseiller perd la
-  trésorerie dans le brief et GROW (ADR-0040, décision ouverte n° 2).
-- Tests visés : matrice 9 × 28 + 6 × 28 = **420** cases.
+- **Durcissement préalable** (même lot, appliqué) : une donnée de trésorerie exige
+  `treasury.read` — le fait `tresorerie` du brief est `hidden` (la trésorerie n'est pas lue, la
+  règle R7 ne se déclenche pas) ; GROW ne lit ni les soldes des comptes ni le solde déclaré, rend
+  l'autonomie (`runway`) indisponible pour la raison `TRESORERIE_MASQUEE` et masque le solde
+  déclaré de `GET /grow/profile`. `GET /projects/:id/variances`, `…/updated-projection` et
+  `…/objectives/attainment` exigent `project.read` + `analytics.read`. Les contextes servis à
+  l'IA sont figés par `apps/api/src/ai/ai-contexts.audit.test.ts`. Effet de bord : le
+  Conseiller perd la trésorerie dans le brief et GROW (ADR-0040, décision ouverte n° 2).
+- Tests : matrice 9 × 28 + 6 × 28 = **420** cases.
 
 ### Proposé, ADR-0041 — autorisations par membre (non appliqué)
 
@@ -281,9 +287,12 @@ Référence : ADR-0012 (Accepted, 2026-08-08). La source de vérité exécutable
 
 ### Rôles
 
-Les 8 rôles d'organisation sont livrés, en slugs `snake_case` : `owner`, `admin`,
+Les 9 rôles d'organisation sont livrés, en slugs `snake_case` : `owner`, `admin`,
 `finance_director`, `accountant`, `analyst`, `project_manager`, `advisor`,
-`viewer`. Les 6 rôles plateforme sont préfixés `platform_` et vivent dans une
+`viewer` et, depuis ADR-0040 (lot C0), `sales_rep` (Commercial, rang 5 — les rangs du Chef
+de projet, du Conseiller et du Lecteur passent à 6, 7 et 8 ; le rang n'est pas un droit).
+Avant d'attribuer `sales_rep`, toutes les instances de l'API doivent être à jour : une
+instance N-1 lit ce slug comme un rôle inconnu et refuse (consigne de déploiement). Les 6 rôles plateforme sont préfixés `platform_` et vivent dans une
 collection distincte : un rôle plateforme est indépendant de toute appartenance à
 une organisation.
 

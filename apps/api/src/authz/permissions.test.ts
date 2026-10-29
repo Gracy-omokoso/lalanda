@@ -7,12 +7,12 @@
 // ADR-0022 § S25c.1 pour `sales.read` et `sales.manage`, ADR-0023 § S25e.11 pour
 // `sales.invoice`, ADR-0031 § 4 pour `sales.receipt`, ADR-0034 § 8 pour `treasury.read` et
 // `treasury.manage`, ADR-0035 § 3 pour `crm.read` et `crm.manage`, ADR-0039 § 7 pour `work.read`,
-// `work.update` et `work.manage`). C'est délibéré : un test qui
+// `work.update` et `work.manage`, ADR-0040 § 4 pour `sales.quote` et le rôle `sales_rep`). C'est délibéré : un test qui
 // importerait la matrice de production vérifierait seulement qu'elle est égale à
 // elle-même. Ici, toute modification d'une case de production casse le test, ce
 // qui force une mise à jour CONSCIENTE de l'ADR et de docs/12.
 //
-// 8 rôles × 27 actions + 6 rôles plateforme × 27 actions = 378 cases vérifiées.
+// 9 rôles × 28 actions + 6 rôles plateforme × 28 actions = 420 cases vérifiées.
 
 import { describe, expect, it } from 'vitest';
 
@@ -20,6 +20,8 @@ import {
   ACTIONS,
   ORG_PERMISSION_MATRIX,
   ORG_ROLES,
+  ORG_ROLE_DESCRIPTIONS,
+  ORG_ROLE_LABELS,
   ORG_ROLE_RANK,
   OWNER_ROLE,
   PLATFORM_FORBIDDEN_ACTIONS,
@@ -56,48 +58,53 @@ const ORDRE_ORG: readonly OrgRole[] = [
   'project_manager',
   'advisor',
   'viewer',
+  // ADR-0040 § 4.3 : neuvième, en fin de liste.
+  'sales_rep',
 ];
 
-//                                        PRO ADM DIR CPT ANA CDP CON LEC
+//                                        PRO ADM DIR CPT ANA CDP CON LEC COM
 const ATTENDU_ORG: Record<Action, string> = {
-  'organization.manage': 'A   A   .   .   .   .   .   .',
-  'billing.manage': 'A   .   .   .   .   .   .   .',
-  'members.invite': 'A   A   .   .   .   .   .   .',
-  'project.create': 'A   A   A   .   .   .   .   .',
-  'project.read': 'A   A   A   A   A   P   A   A',
-  'project.update': 'A   A   A   .   .   P   .   .',
-  'canvas.update': 'A   A   A   .   A   P   .   .',
-  'inputs.update': 'A   A   A   .   A   P   .   .',
-  'plan.calculate': 'A   A   A   .   A   P   .   .',
-  'plan.approve': 'S   .   S   .   .   .   .   .',
-  'actuals.import': 'A   A   A   A   .   .   .   .',
-  'period.close': 'A   .   A   C   .   .   .   .',
-  'analytics.read': 'A   A   A   A   A   P   A   A',
-  'report.export': 'A   A   A   A   A   P   .   .',
-  'audit.read': 'A   A   A   .   .   .   .   .',
+  'organization.manage': 'A   A   .   .   .   .   .   .   .',
+  'billing.manage': 'A   .   .   .   .   .   .   .   .',
+  'members.invite': 'A   A   .   .   .   .   .   .   .',
+  'project.create': 'A   A   A   .   .   .   .   .   .',
+  'project.read': 'A   A   A   A   A   P   A   A   .',
+  'project.update': 'A   A   A   .   .   P   .   .   .',
+  'canvas.update': 'A   A   A   .   A   P   .   .   .',
+  'inputs.update': 'A   A   A   .   A   P   .   .   .',
+  'plan.calculate': 'A   A   A   .   A   P   .   .   .',
+  'plan.approve': 'S   .   S   .   .   .   .   .   .',
+  'actuals.import': 'A   A   A   A   .   .   .   .   .',
+  'period.close': 'A   .   A   C   .   .   .   .   .',
+  'analytics.read': 'A   A   A   A   A   P   A   A   A',
+  'report.export': 'A   A   A   A   A   P   .   .   .',
+  'audit.read': 'A   A   A   .   .   .   .   .   .',
   // ADR-0021 §8 : autorité financière seulement (Propriétaire, Directeur financier).
-  'fiscal.manage': 'A   .   A   .   .   .   .   .',
+  'fiscal.manage': 'A   .   A   .   .   .   .   .   .',
   // ADR-0022 § S25c.1 : données maîtres de vente. Analyste et Lecteur consultent ;
   // le Conseiller, externe, ne voit pas le fichier clients ; le Chef de projet n'a rien.
-  'sales.read': 'A   A   A   A   A   .   .   A',
-  'sales.manage': 'A   A   A   A   .   .   .   .',
+  'sales.read': 'A   A   A   A   A   .   .   A   A',
+  'sales.manage': 'A   A   A   A   .   .   .   .   .',
   // ADR-0023 § S25e.11 : émettre et normaliser engagent le contribuable. Propriétaire,
   // Directeur financier et Comptable ; l'Administrateur prépare mais n'émet pas.
-  'sales.invoice': 'A   .   A   A   .   .   .   .',
+  'sales.invoice': 'A   .   A   A   .   .   .   .   .',
   // ADR-0031 § 4 : enregistrer l'argent reçu, même population que `sales.invoice`.
-  'sales.receipt': 'A   .   A   A   .   .   .   .',
+  'sales.receipt': 'A   .   A   A   .   .   .   .   .',
   // ADR-0034 § 8 : trésorerie. Le Conseiller (externe) ne voit pas le détail des
   // dépenses ; l'Administrateur consulte mais n'enregistre pas de décaissement.
-  'treasury.read': 'A   A   A   A   A   .   .   A',
-  'treasury.manage': 'A   .   A   A   .   .   .   .',
+  'treasury.read': 'A   A   A   A   A   .   .   A   .',
+  'treasury.manage': 'A   .   A   A   .   .   .   .   .',
   // ADR-0035 § 3 : le CRM suit la répartition de `sales.read` / `sales.manage`.
-  'crm.read': 'A   A   A   A   A   .   .   A',
-  'crm.manage': 'A   A   A   A   .   .   .   .',
+  'crm.read': 'A   A   A   A   A   .   .   A   A',
+  'crm.manage': 'A   A   A   A   .   .   .   .   A',
   // ADR-0039 § 7 : projets et tâches du RUN. Le Lecteur lit ; Comptable et Analyste
   // travaillent sans gouverner ; le Conseiller (externe) et le Chef de projet n'ont rien.
-  'work.read': 'A   A   A   A   A   .   .   A',
-  'work.update': 'A   A   A   A   A   .   .   .',
-  'work.manage': 'A   A   A   .   .   .   .   .',
+  'work.read': 'A   A   A   A   A   .   .   A   A',
+  'work.update': 'A   A   A   A   A   .   .   .   A',
+  'work.manage': 'A   A   A   .   .   .   .   .   .',
+  // ADR-0040 § 4.1 : préparer les devis. Iso-privilège avec `sales.manage`, plus
+  // le Commercial (COM) ; convertir un devis exige en plus `sales.manage`.
+  'sales.quote': 'A   A   A   A   .   .   .   .   A',
 };
 
 const CODE_VERS_GRANT: Record<string, string> = {
@@ -161,6 +168,8 @@ const ATTENDU_PLATEFORME: Record<Action, string> = {
   'work.read': 'D   .   D   .   .   .',
   'work.update': 'D   .   .   .   .   .',
   'work.manage': 'D   .   .   .   .   .',
+  // ADR-0040 § 4.1 : comme `sales.manage`, sous accès délégué ; pas un interdit absolu.
+  'sales.quote': 'D   .   .   .   .   .',
 };
 
 const CODE_VERS_GRANT_PLATEFORME: Record<string, string> = {
@@ -174,9 +183,9 @@ function cellules(ligne: string): string[] {
 }
 
 describe('matrice rôle organisation × action (ADR-0012 §3)', () => {
-  it('déclare exactement les 8 rôles et les 27 actions de docs/12', () => {
+  it('déclare exactement les 9 rôles et les 28 actions de docs/12', () => {
     expect([...ORG_ROLES]).toEqual([...ORDRE_ORG]);
-    expect(ACTIONS).toHaveLength(27);
+    expect(ACTIONS).toHaveLength(28);
     // Ajoutée en fin de liste, comme dans docs/12 (ADR-0021 §8).
     expect(ACTIONS[15]).toBe('fiscal.manage');
     // Dix-septième et dix-huitième, en fin de liste (ADR-0022 § S25c.1).
@@ -197,13 +206,15 @@ describe('matrice rôle organisation × action (ADR-0012 §3)', () => {
     expect(ACTIONS[24]).toBe('work.read');
     expect(ACTIONS[25]).toBe('work.update');
     expect(ACTIONS[26]).toBe('work.manage');
+    // Vingt-huitième, en fin de liste (ADR-0040 § 4.1).
+    expect(ACTIONS[27]).toBe('sales.quote');
     expect(Object.keys(ATTENDU_ORG).sort()).toEqual([...ACTIONS].sort());
   });
 
-  // 8 × 27 = 216 cases.
+  // 9 × 28 = 252 cases.
   for (const action of ACTIONS) {
     const attendus = cellules(ATTENDU_ORG[action]);
-    it(`« ${action} » : les 8 cases correspondent à l'ADR`, () => {
+    it(`« ${action} » : les 9 cases correspondent à l'ADR`, () => {
       expect(attendus).toHaveLength(ORDRE_ORG.length);
       ORDRE_ORG.forEach((role, i) => {
         const attendu = CODE_VERS_GRANT[attendus[i]!];
@@ -223,7 +234,7 @@ describe('matrice rôle plateforme × action (ADR-0012 §4)', () => {
     for (const role of PLATFORM_ROLES) expect(role.startsWith('platform_')).toBe(true);
   });
 
-  // 6 × 27 = 162 cases.
+  // 6 × 28 = 168 cases.
   for (const action of ACTIONS) {
     const attendus = cellules(ATTENDU_PLATEFORME[action]);
     it(`« ${action} » : les 6 cases plateforme correspondent à l'ADR`, () => {
@@ -454,7 +465,7 @@ describe('R7 — attribution de rôles sans élévation de privilège', () => {
   });
 
   it('un `admin` peut attribuer les rôles strictement plus faibles que lui', () => {
-    for (const role of ['analyst', 'advisor', 'viewer', 'admin'] as const) {
+    for (const role of ['analyst', 'advisor', 'viewer', 'admin', 'sales_rep'] as const) {
       expect(canGrantRole('admin', role), `admin → ${role}`).toBe(true);
     }
   });
@@ -522,7 +533,7 @@ describe('rang de privilège (correction du tri de l’organisation primaire)', 
     expect(ORG_ROLE_RANK.owner).toBe(0);
   });
 
-  it('couvre les 8 rôles avec des rangs distincts', () => {
+  it('couvre les 9 rôles avec des rangs distincts', () => {
     const rangs = ORG_ROLES.map((r) => ORG_ROLE_RANK[r]);
     expect(new Set(rangs).size).toBe(ORG_ROLES.length);
   });
@@ -550,7 +561,7 @@ describe('compatibilité N-1 des anciens rôles', () => {
     expect(normalizeOrgRole('owner')).toBe('owner');
   });
 
-  it('les 8 slogans S20a se normalisent en eux-mêmes', () => {
+  it('les 9 slugs se normalisent en eux-mêmes', () => {
     for (const role of ORG_ROLES) expect(normalizeOrgRole(role)).toBe(role);
   });
 
@@ -566,7 +577,7 @@ describe('compatibilité N-1 des anciens rôles', () => {
 });
 
 describe('cohérence structurelle de la matrice', () => {
-  it('chaque rôle déclare une décision pour CHACUNE des 27 actions', () => {
+  it('chaque rôle déclare une décision pour CHACUNE des 28 actions', () => {
     for (const role of ORG_ROLES) {
       for (const action of ACTIONS) {
         expect(ORG_PERMISSION_MATRIX[role][action], `${role} × ${action}`).toBeDefined();
@@ -590,7 +601,7 @@ describe('cohérence structurelle de la matrice', () => {
     for (const action of ecritures) expect(can('viewer', action)).toBe(false);
   });
 
-  it('`owner` détient les 27 actions', () => {
+  it('`owner` détient les 28 actions', () => {
     for (const action of ACTIONS) expect(can('owner', action)).toBe(true);
   });
 
@@ -608,7 +619,13 @@ describe('cohérence structurelle de la matrice', () => {
   it('`fiscal.manage` ne donne pas de nouveau rôle attribuable à un `admin`', () => {
     // ADR-0021 §8 « conséquences vérifiées sur grantableRoles » : l'Administrateur
     // ne pouvait déjà pas attribuer `finance_director` (`plan.approve`).
-    expect(grantableRoles('admin').sort()).toEqual(['admin', 'advisor', 'analyst', 'viewer']);
+    expect(grantableRoles('admin').sort()).toEqual([
+      'admin',
+      'advisor',
+      'analyst',
+      'sales_rep',
+      'viewer',
+    ]);
   });
 
   it('`sales.manage` implique `sales.read` pour chaque rôle (ADR-0022 § S25c.1)', () => {
@@ -627,7 +644,13 @@ describe('cohérence structurelle de la matrice', () => {
   it('`sales.read` et `sales.manage` ne changent pas les rôles attribuables (R7)', () => {
     // L'Administrateur détient les deux actions : il peut toujours attribuer
     // exactement les mêmes rôles qu'avant ADR-0022.
-    expect(grantableRoles('admin').sort()).toEqual(['admin', 'advisor', 'analyst', 'viewer']);
+    expect(grantableRoles('admin').sort()).toEqual([
+      'admin',
+      'advisor',
+      'analyst',
+      'sales_rep',
+      'viewer',
+    ]);
     expect(PLATFORM_FORBIDDEN_ACTIONS).not.toContain('sales.read');
     expect(PLATFORM_FORBIDDEN_ACTIONS).not.toContain('sales.manage');
   });
@@ -639,7 +662,13 @@ describe('cohérence structurelle de la matrice', () => {
     }
     // L'Administrateur ne l'a pas : il ne pouvait déjà attribuer ni `finance_director`
     // ni `accountant`, ses rôles attribuables sont inchangés.
-    expect(grantableRoles('admin').sort()).toEqual(['admin', 'advisor', 'analyst', 'viewer']);
+    expect(grantableRoles('admin').sort()).toEqual([
+      'admin',
+      'advisor',
+      'analyst',
+      'sales_rep',
+      'viewer',
+    ]);
   });
 
   it('`sales.receipt` implique `sales.read`, n’est pas un interdit absolu et ne change pas les rôles attribuables (ADR-0031)', () => {
@@ -649,7 +678,13 @@ describe('cohérence structurelle de la matrice', () => {
     }
     for (const role of PLATFORM_ROLES) expect(canPlatform(role, 'sales.receipt')).toBe(false);
     expect(PLATFORM_FORBIDDEN_ACTIONS).not.toContain('sales.receipt');
-    expect(grantableRoles('admin').sort()).toEqual(['admin', 'advisor', 'analyst', 'viewer']);
+    expect(grantableRoles('admin').sort()).toEqual([
+      'admin',
+      'advisor',
+      'analyst',
+      'sales_rep',
+      'viewer',
+    ]);
   });
 
   it('`treasury.manage` implique `treasury.read` et ne change pas les rôles attribuables (ADR-0034)', () => {
@@ -665,7 +700,13 @@ describe('cohérence structurelle de la matrice', () => {
     expect(PLATFORM_FORBIDDEN_ACTIONS).not.toContain('treasury.manage');
     // L'Administrateur lit sans enregistrer : ses rôles attribuables sont inchangés,
     // le Lecteur aussi (il lit la trésorerie, le Conseiller non).
-    expect(grantableRoles('admin').sort()).toEqual(['admin', 'advisor', 'analyst', 'viewer']);
+    expect(grantableRoles('admin').sort()).toEqual([
+      'admin',
+      'advisor',
+      'analyst',
+      'sales_rep',
+      'viewer',
+    ]);
     expect(grantableRoles('viewer').sort()).toEqual(['advisor', 'viewer']);
   });
 
@@ -678,7 +719,13 @@ describe('cohérence structurelle de la matrice', () => {
         expect(PLATFORM_PERMISSION_MATRIX[role]['crm.read'], role).not.toBe('forbidden');
       }
     }
-    expect(grantableRoles('admin').sort()).toEqual(['admin', 'advisor', 'analyst', 'viewer']);
+    expect(grantableRoles('admin').sort()).toEqual([
+      'admin',
+      'advisor',
+      'analyst',
+      'sales_rep',
+      'viewer',
+    ]);
     expect(PLATFORM_FORBIDDEN_ACTIONS).not.toContain('crm.read');
     expect(PLATFORM_FORBIDDEN_ACTIONS).not.toContain('crm.manage');
   });
@@ -700,8 +747,83 @@ describe('cohérence structurelle de la matrice', () => {
     }
     // Le Chef de projet reste non attribuable et sans accès (décision ouverte n° 1).
     expect(can('project_manager', 'work.read')).toBe(false);
-    expect(grantableRoles('admin').sort()).toEqual(['admin', 'advisor', 'analyst', 'viewer']);
+    expect(grantableRoles('admin').sort()).toEqual([
+      'admin',
+      'advisor',
+      'analyst',
+      'sales_rep',
+      'viewer',
+    ]);
     expect(grantableRoles('viewer').sort()).toEqual(['advisor', 'viewer']);
+  });
+});
+
+describe('ADR-0040 § 4 — rôle Commercial et action `sales.quote`', () => {
+  it('`sales.quote` : exactement les détenteurs de `sales.manage`, plus le Commercial', () => {
+    const quote = ORG_ROLES.filter((r) => can(r, 'sales.quote'));
+    const manage = ORG_ROLES.filter((r) => can(r, 'sales.manage'));
+    expect(quote).toEqual([...manage, 'sales_rep']);
+    // Préparer un devis suppose de lire les ventes.
+    for (const role of quote) expect(can(role, 'sales.read'), role).toBe(true);
+    expect(PLATFORM_FORBIDDEN_ACTIONS).not.toContain('sales.quote');
+    for (const role of PLATFORM_ROLES) {
+      expect(PLATFORM_PERMISSION_MATRIX[role]['sales.quote'], role).toBe(
+        PLATFORM_PERMISSION_MATRIX[role]['sales.manage'],
+      );
+    }
+  });
+
+  it('le Commercial détient sept actions sur vingt-huit, et seulement celles-là', () => {
+    expect(ACTIONS.filter((a) => can('sales_rep', a, { canClosePeriods: true }))).toEqual([
+      'analytics.read',
+      'sales.read',
+      'crm.read',
+      'crm.manage',
+      'work.read',
+      'work.update',
+      'sales.quote',
+    ]);
+  });
+
+  it('le Commercial ne voit ni la trésorerie, ni le réalisé, ni n’émet ou n’encaisse (D3)', () => {
+    for (const action of [
+      'treasury.read',
+      'treasury.manage',
+      'project.read',
+      'sales.manage',
+      'sales.invoice',
+      'sales.receipt',
+      'work.manage',
+      'members.invite',
+    ] as const) {
+      expect(can('sales_rep', action), action).toBe(false);
+    }
+  });
+
+  it('rang 5, entre l’Analyste et le Chef de projet ; libellé « Commercial »', () => {
+    expect(ORG_ROLE_RANK.analyst).toBe(4);
+    expect(ORG_ROLE_RANK.sales_rep).toBe(5);
+    expect(ORG_ROLE_RANK.project_manager).toBe(6);
+    expect(ORG_ROLE_RANK.advisor).toBe(7);
+    expect(ORG_ROLE_RANK.viewer).toBe(8);
+    expect(ORG_ROLE_LABELS.sales_rep).toBe('Commercial');
+    expect(ORG_ROLE_DESCRIPTIONS.sales_rep.length).toBeGreaterThan(20);
+  });
+
+  it('attribuable : l’Administrateur l’invite, le Commercial n’attribue rien d’autre que lui-même', () => {
+    expect(isAssignableRole('sales_rep')).toBe(true);
+    expect(canGrantRole('owner', 'sales_rep')).toBe(true);
+    expect(canGrantRole('admin', 'sales_rep')).toBe(true);
+    // Le Comptable détient les sept actions mais n'a pas `members.invite` : le
+    // guard le refuse avant R7 (critère d'acceptation n° 3, vérifié en e2e).
+    expect(can('accountant', 'members.invite')).toBe(false);
+    expect(can('sales_rep', 'members.invite')).toBe(false);
+    expect(grantableRoles('viewer')).not.toContain('sales_rep');
+  });
+
+  it('`member` historique n’est pas un alias du Commercial', () => {
+    expect(normalizeOrgRole('member')).toBe('finance_director');
+    expect(normalizeOrgRole('sales_rep')).toBe('sales_rep');
   });
 });
 
@@ -732,6 +854,7 @@ describe('R1 — identité du rôle propriétaire (repris de S20b)', () => {
       'project_manager',
       'advisor',
       'viewer',
+      'sales_rep',
     ]) {
       expect(isOwnerRole(role)).toBe(false);
     }

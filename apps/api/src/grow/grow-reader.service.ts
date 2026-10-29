@@ -6,12 +6,18 @@
 // méthode d'écriture.
 //
 // Il ne calcule rien : il assemble les entrées du moteur, qui calcule.
+//
+// ADR-0040 — C0 § 4.4 : une donnée de trésorerie exige `treasury.read`. Sans ce
+// droit, ni les soldes des comptes ni le solde déclaré ne sont LUS (masquer après
+// lecture laisserait la donnée transiter), et l'autonomie (`runway`) est rendue
+// indisponible pour la raison `TRESORERIE_MASQUEE` avant le score et le parcours.
 
 import {
   computeHealthScore,
   computeInvestorIndicators,
   kinshasaDateOf,
   suggestJourneyStage,
+  type GrowIndicatorUnavailable,
   type GrowIndicatorsResult,
   type HealthScoreResult,
   type JourneyResult,
@@ -39,6 +45,32 @@ import {
 
 /** Historique de ventes lu : 12 + 12 mois couvrent toutes les fenêtres (ADR-0032 § 3). */
 const SALES_HISTORY_DAYS = 800;
+
+/** Raison rendue pour un fait de trésorerie masqué faute de `treasury.read`. */
+export const GROW_TREASURY_HIDDEN_REASON = 'TRESORERIE_MASQUEE' as const;
+
+/** Ce que l'appelant peut lire (ADR-0040 § 4.4) ; par défaut, tout. */
+export interface GrowReadAccess {
+  /** `treasury.read` : soldes des comptes et solde déclaré. */
+  treasury: boolean;
+}
+
+/**
+ * Indicateurs sans aucun fait de trésorerie : l'autonomie devient indisponible,
+ * sans valeur, sans source ni hypothèse qui citerait un solde.
+ */
+export function withoutTreasury(result: GrowIndicatorsResult): GrowIndicatorsResult {
+  const runway: GrowIndicatorUnavailable = {
+    code: 'runway',
+    libelle: result.indicateurs.runway.libelle,
+    disponible: false,
+    raison: GROW_TREASURY_HIDDEN_REASON,
+    message: 'L’autonomie de trésorerie est réservée aux rôles qui consultent la trésorerie.',
+    sources: [],
+    hypotheses: [],
+  };
+  return { ...result, indicateurs: { ...result.indicateurs, runway } };
+}
 
 export interface GrowSnapshot {
   asOf: string;
@@ -71,7 +103,11 @@ export class GrowReaderService {
   }
 
   /** Tout ce que GROW calcule, à la date du jour (Kinshasa). */
-  async snapshot(orgId: string, now: Date = new Date()): Promise<GrowSnapshot> {
+  async snapshot(
+    orgId: string,
+    now: Date = new Date(),
+    access: GrowReadAccess = { treasury: true },
+  ): Promise<GrowSnapshot> {
     const asOf = kinshasaDateOf(now.toISOString())!;
     const since = new Date(now.getTime() - SALES_HISTORY_DAYS * 24 * 60 * 60 * 1000);
 
@@ -104,7 +140,8 @@ export class GrowReaderService {
         this.plans.countDocuments({ organizationId: orgId, status: 'approved' }),
         this.catalog.countDocuments({ organizationId: orgId, active: true }),
         // ADR-0034 : soldes des comptes, calculés par le moteur `treasury`.
-        this.treasury.list(orgId),
+        // ADR-0040 § 4.4 : lus seulement avec `treasury.read`.
+        access.treasury ? this.treasury.list(orgId) : Promise.resolve(null),
         // ADR-0036 § 5 : un Idea Lab illisible laisse ses points « inconnus », il
         // ne fait pas échouer le parcours.
         this.ideaLab.journeyFacts(orgId).catch(() => null),
@@ -121,21 +158,22 @@ export class GrowReaderService {
             )
             .lean<ActualPeriodForGrow[]>();
 
-    const indicators = computeInvestorIndicators({
+    const computed = computeInvestorIndicators({
       asOf,
       actuals: toGrowActuals(ref, periods),
       sales: invoices.map(toGrowSalesDocument).filter((d) => d !== null),
-      declaredCash: profile.declaredCash
-        ? {
-            amount: profile.declaredCash.amount,
-            currency: profile.declaredCash.currency,
-            asOf: profile.declaredCash.asOf,
-          }
-        : null,
+      declaredCash:
+        access.treasury && profile.declaredCash
+          ? {
+              amount: profile.declaredCash.amount,
+              currency: profile.declaredCash.currency,
+              asOf: profile.declaredCash.asOf,
+            }
+          : null,
       // Trésorerie RÉELLE (amendement d'ADR-0032 du 27 oct. 2026) : prioritaire
       // sur le solde déclaré quand un compte existe dans la devise du réalisé.
       accountsCash:
-        accounts.items.length === 0
+        accounts === null || accounts.items.length === 0
           ? null
           : {
               amounts: Object.entries(accounts.totalsByCurrency).flatMap(([currency, amount]) =>
@@ -146,6 +184,7 @@ export class GrowReaderService {
             },
       recurringCatalogItemIds: profile.recurringCatalogItemIds,
     });
+    const indicators = access.treasury ? computed : withoutTreasury(computed);
     const journey = suggestJourneyStage({
       indicators,
       projects: projects.length,
@@ -156,6 +195,12 @@ export class GrowReaderService {
       ideaLab,
     });
     const health = computeHealthScore(indicators, journey.retenue);
-    return { asOf, profile, indicators, journey, health };
+    return {
+      asOf,
+      profile: access.treasury ? profile : { ...profile, declaredCash: null },
+      indicators,
+      journey,
+      health,
+    };
   }
 }

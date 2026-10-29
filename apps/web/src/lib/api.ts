@@ -244,7 +244,8 @@ export interface TemplateSummary {
 
 // ─── Rôles d'organisation (S20a — ADR-0012 §1) ─────────────────
 /**
- * Les 8 rôles d'organisation. Miroir de `apps/api/src/authz/permissions.ts`,
+ * Les 9 rôles d'organisation (le neuvième, `sales_rep` « Commercial », d'ADR-0040
+ * § 4.2). Miroir de `apps/api/src/authz/permissions.ts`,
  * SOURCE DE VÉRITÉ — le web ne peut pas importer de l'API.
  *
  * Volontairement limité à l'union de slugs : les LIBELLÉS et les DESCRIPTIONS ne
@@ -261,6 +262,8 @@ export const ORG_ROLES = [
   'project_manager',
   'advisor',
   'viewer',
+  // ADR-0040 — C0 : Commercial (CRM, devis, suivi des clients).
+  'sales_rep',
 ] as const;
 
 export type OrgRole = (typeof ORG_ROLES)[number];
@@ -1097,7 +1100,7 @@ export interface TermsAcceptanceView {
 
 export type DisplayCurrency = 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR';
 
-/** Les 27 actions granulaires (docs/12, ADR-0021 §8, ADR-0022 § S25c.1, ADR-0023 § S25e.11, ADR-0031 § 4, ADR-0034 § 8, ADR-0035 § 3, ADR-0039 § 7). Union fermée, alignée sur l'API. */
+/** Les 28 actions granulaires (docs/12, ADR-0021 §8, ADR-0022 § S25c.1, ADR-0023 § S25e.11, ADR-0031 § 4, ADR-0034 § 8, ADR-0035 § 3, ADR-0039 § 7, ADR-0040 § 4.1). Union fermée, alignée sur l'API. */
 export type OrgAction =
   | 'organization.manage'
   | 'billing.manage'
@@ -1143,7 +1146,11 @@ export type OrgAction =
   // gérer les projets (Propriétaire, Administrateur, Directeur financier).
   | 'work.read'
   | 'work.update'
-  | 'work.manage';
+  | 'work.manage'
+  // ADR-0040 § 4.1 — préparer les devis (créer, modifier, envoyer, accepter,
+  // refuser, nouvelle version). Détenteurs de `sales.manage`, plus le Commercial ;
+  // convertir en brouillon de facture exige en plus `sales.manage`.
+  | 'sales.quote';
 
 /**
  * Offres — RÉEXPORTÉES du catalogue partagé, jamais réécrites.

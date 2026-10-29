@@ -6,9 +6,10 @@
 
 import { describe, expect, it } from 'vitest';
 
-import type { MemberView, RoleOption } from '@/lib/api';
+import type { MemberView, OrgRole, RoleOption } from '@/lib/api';
 
 import {
+  RANG_DE_PRIVILEGE,
   acteurEstProprietaire,
   afficheDroitCloture,
   ciblesDeTransfert,
@@ -109,6 +110,41 @@ describe('rôle par défaut à l’invitation', () => {
     // `ASSIGNABLE_ORG_ROLES` suit l'ordre de privilège décroissant d'ADR-0012.
     const options = [option({ value: 'admin' }), option({ value: 'accountant' })];
     expect(roleParDefaut(options)).toBe('accountant');
+  });
+
+  it('le Commercial, dernier de la liste, n’est pas pris pour le moins puissant (ADR-0040)', () => {
+    // Le serveur rend les options dans l'ordre d'`ORG_ROLES`, où `sales_rep` est
+    // ajouté EN FIN : le dernier n'est plus le moindre privilège.
+    const options = [
+      option({ value: 'admin' }),
+      option({ value: 'analyst' }),
+      option({ value: 'advisor' }),
+      option({ value: 'viewer' }),
+      option({ value: 'sales_rep', label: 'Commercial' }),
+    ];
+    expect(roleParDefaut(options)).toBe('viewer');
+    expect(roleParDefaut(options.filter((o) => o.value !== 'viewer'))).toBe('advisor');
+    expect(roleParDefaut([option({ value: 'admin' }), option({ value: 'sales_rep' })])).toBe(
+      'sales_rep',
+    );
+  });
+
+  it('le Commercial est proposé à l’invitation quand le serveur le dit attribuable', () => {
+    const options = [
+      option({ value: 'admin' }),
+      option({ value: 'sales_rep', label: 'Commercial' }),
+      option({ value: 'project_manager', grantable: false }),
+      option({ value: 'viewer' }),
+    ];
+    expect(rolesProposables(options).map((o) => o.value)).toEqual(['admin', 'sales_rep', 'viewer']);
+  });
+
+  it('le rang miroir couvre les neuf rôles, sans ex æquo', () => {
+    const roles = Object.keys(RANG_DE_PRIVILEGE) as OrgRole[];
+    expect(roles).toHaveLength(9);
+    expect(new Set(roles.map((r) => RANG_DE_PRIVILEGE[r])).size).toBe(roles.length);
+    expect(RANG_DE_PRIVILEGE.owner).toBe(0);
+    expect(RANG_DE_PRIVILEGE.sales_rep).toBe(5);
   });
 
   it('n’invente aucun rôle quand l’acteur ne peut rien attribuer', () => {

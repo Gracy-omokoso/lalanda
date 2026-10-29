@@ -95,7 +95,8 @@ export class ObjectivesController {
   }
 
   @Get(':id/objectives/attainment')
-  @RequirePermission('analytics.read')
+  // ADR-0040 — C0 § 4.4 : réalisé de plan (donc dépenses) ⇒ `project.read` en plus.
+  @RequirePermission('project.read', 'analytics.read')
   async attainment(
     @CurrentOrgId() orgId: string,
     @Param('id') id: string,

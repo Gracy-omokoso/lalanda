@@ -10,6 +10,9 @@
 //   DELETE /grow/declared-cash    actuals.import
 //
 // Organisation active seulement (cookie). GROW lit BUILD et RUN, n'y écrit jamais.
+//
+// ADR-0040 — C0 § 4.4 : sans `treasury.read`, aucun fait de trésorerie (solde
+// déclaré, soldes des comptes, autonomie) n'est lu ni rendu, sur les cinq lectures.
 
 import {
   Body,
@@ -37,7 +40,7 @@ import {
   type GrowActor,
   type GrowProfileView,
 } from './grow-profile.service.js';
-import { GrowReaderService } from './grow-reader.service.js';
+import { GrowReaderService, type GrowReadAccess } from './grow-reader.service.js';
 import { withoutCustomerNames } from './grow-sources.js';
 import {
   invalidRequest,
@@ -65,6 +68,11 @@ export interface GrowHealthResponse {
 export interface GrowJourneyResponse {
   asOf: string;
   journey: JourneyResult;
+}
+
+/** Ce que le rôle peut lire de GROW (ADR-0040 § 4.4). Rôle inconnu : rien de sensible. */
+function accessOf(role: OrgRole | undefined): GrowReadAccess {
+  return { treasury: role !== undefined && can(role, 'treasury.read') };
 }
 
 function actorOf(user: { id: string }, role: OrgRole | undefined): GrowActor {
@@ -98,12 +106,17 @@ export class GrowController {
 
   @Get('profile')
   @RequirePermission('analytics.read')
-  async getProfile(@CurrentOrgId() orgId: string): Promise<GrowProfileResponse> {
-    const [profile, projects, { plan, entitlements }] = await Promise.all([
+  async getProfile(
+    @CurrentOrgId() orgId: string,
+    @CurrentOrgRole() role: OrgRole | undefined,
+  ): Promise<GrowProfileResponse> {
+    const [stored, projects, { plan, entitlements }] = await Promise.all([
       this.profiles.get(orgId),
       this.reader.listProjects(orgId),
       this.billing.getPlanEntitlements(orgId),
     ]);
+    // Le solde déclaré est une donnée de trésorerie (ADR-0040 § 4.4).
+    const profile = accessOf(role).treasury ? stored : { ...stored, declaredCash: null };
     return {
       ...profile,
       projects: projects.map((p) => ({
@@ -118,16 +131,22 @@ export class GrowController {
 
   @Get('journey')
   @RequirePermission('analytics.read')
-  async getJourney(@CurrentOrgId() orgId: string): Promise<GrowJourneyResponse> {
-    const s = await this.reader.snapshot(orgId);
+  async getJourney(
+    @CurrentOrgId() orgId: string,
+    @CurrentOrgRole() role: OrgRole | undefined,
+  ): Promise<GrowJourneyResponse> {
+    const s = await this.reader.snapshot(orgId, new Date(), accessOf(role));
     return { asOf: s.asOf, journey: s.journey };
   }
 
   @Get('health')
   @RequirePermission('analytics.read')
-  async getHealth(@CurrentOrgId() orgId: string): Promise<GrowHealthResponse> {
+  async getHealth(
+    @CurrentOrgId() orgId: string,
+    @CurrentOrgRole() role: OrgRole | undefined,
+  ): Promise<GrowHealthResponse> {
     await this.assertPlanAllowsGrow(orgId);
-    const s = await this.reader.snapshot(orgId);
+    const s = await this.reader.snapshot(orgId, new Date(), accessOf(role));
     return { asOf: s.asOf, health: s.health, faits: s.indicators.faits };
   }
 
@@ -138,7 +157,7 @@ export class GrowController {
     @CurrentOrgRole() role: OrgRole | undefined,
   ): Promise<GrowIndicatorsResult> {
     await this.assertPlanAllowsGrow(orgId);
-    const s = await this.reader.snapshot(orgId);
+    const s = await this.reader.snapshot(orgId, new Date(), accessOf(role));
     // Noms des clients : seulement pour qui lit le fichier clients (`sales.read`).
     return role !== undefined && can(role, 'sales.read')
       ? s.indicators

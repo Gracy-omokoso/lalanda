@@ -138,17 +138,39 @@ export function rolesProposables(options: readonly RoleOption[]): RoleOption[] {
 }
 
 /**
+ * Rang de privilège — miroir d'`ORG_ROLE_RANK` (`apps/api/src/authz/permissions.ts`),
+ * `owner` = 0. Sert seulement à choisir un défaut d'affichage : jamais un droit.
+ *
+ * ADR-0040 § 4.3 : le Commercial (`sales_rep`) est au rang 5. Il est le DERNIER de
+ * `ORG_ROLES` (ordre de fusion) sans être le moins puissant : l'ordre des options
+ * ne peut donc plus tenir lieu d'ordre de privilège.
+ */
+export const RANG_DE_PRIVILEGE: Readonly<Record<OrgRole, number>> = {
+  owner: 0,
+  admin: 1,
+  finance_director: 2,
+  accountant: 3,
+  analyst: 4,
+  sales_rep: 5,
+  project_manager: 6,
+  advisor: 7,
+  viewer: 8,
+};
+
+/**
  * Rôle proposé par défaut à l'invitation.
  *
  * `viewer` — le moins puissant — et non le plus utile. Un rôle par défaut
  * généreux se retrouve attribué par inadvertance à chaque invitation expédiée
- * sans lire le formulaire (docs/17 § Autorisation, moindre privilège).
+ * sans lire le formulaire (docs/17 § Autorisation, moindre privilège). À défaut,
+ * le moins puissant des rôles proposables, selon le rang.
  */
 export function roleParDefaut(options: readonly RoleOption[]): OrgRole | null {
   const proposables = rolesProposables(options);
   if (proposables.length === 0) return null;
-  const viewer = proposables.find((o) => o.value === 'viewer');
-  return (viewer ?? proposables[proposables.length - 1]!).value;
+  return proposables.reduce((moindre, o) =>
+    RANG_DE_PRIVILEGE[o.value] > RANG_DE_PRIVILEGE[moindre.value] ? o : moindre,
+  ).value;
 }
 
 /**
