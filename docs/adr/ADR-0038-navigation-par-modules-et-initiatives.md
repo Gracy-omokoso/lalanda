@@ -134,11 +134,13 @@ l'utilisateur pendant le chargement.
 
 ### 4. Icônes de module
 
-Dessinées à la main en SVG, dans le style outline des icônes de navigation (viewBox 24,
-trait `currentColor` 1,75, extrémités arrondies) — **aucune bibliothèque nouvelle** :
-**BUILD** = blocs empilés (fondation), **RUN** = engrenage, **GROW** = pousse sur une
-courbe montante. Composant `ModuleIcon` dans `packages/ui`, réutilisé en petit (barre du
-haut, tiroir) et en grand (cartes de l'accueil, bureaux). Couleur : `--module-build/run/grow`.
+Révisé le 29 oct. 2026 (choix de Gracy) : icônes **Lucide** (`lucide-react`, licence ISC),
+dépendance de `packages/ui` — style outline (viewBox 24, trait `currentColor`, extrémités
+arrondies), qui remplace les trois tracés dessinés à la main. **BUILD** = `Sprout` (l'idée
+qui germe), **RUN** = `Orbit` (ce qui tourne), **GROW** = `Rocket` (ce qui décolle).
+Composant `ModuleIcon` dans `packages/ui`, réutilisé en petit (barre du haut, tiroir) et en
+grand (cartes de l'accueil, bureaux). Couleur : `--module-build/run/grow`. Les autres
+icônes de l'application peuvent passer à Lucide au fil des lots.
 
 ### 5. Accueil (`/accueil`)
 
@@ -146,8 +148,8 @@ Page d'arrivée après connexion (middleware, connexion, inscription, acceptatio
 d'invitation, changement d'organisation, marque). Contenu :
 
 1. **Trois grandes cartes BUILD · RUN · GROW** : nom en grand, verbe dessous (Concevoir /
-   Exploiter / Croître), icône du module en haut à droite dans sa couleur, deux ou trois
-   chiffres utiles **lus sur des API existantes**, lien vers le bureau du module.
+   Exploiter / Croître), icône du module dans une pastille à sa couleur, deux ou trois
+   chiffres utiles en tuiles (grand chiffre, libellé dessous) **lus sur des API existantes**, lien vers le bureau du module.
    - BUILD : nombre d'initiatives (`GET /projects`), nombre d'idées actives
      (`GET /idea-lab/ideas`).
    - RUN (si `sales.read`) : factures à encaisser et factures en retard

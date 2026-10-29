@@ -58,16 +58,26 @@ function lue<T>(r: PromiseSettledResult<T>): T | null {
   return r.status === 'fulfilled' ? r.value : null;
 }
 
-const COULEUR: Record<ModuleId, string> = {
-  build: 'text-[var(--module-build)]',
-  run: 'text-[var(--module-run)]',
-  grow: 'text-[var(--module-grow)]',
-};
-
-const FILET: Record<ModuleId, string> = {
-  build: 'bg-[var(--module-build)]',
-  run: 'bg-[var(--module-run)]',
-  grow: 'bg-[var(--module-grow)]',
+// Classes écrites en entier pour Tailwind (pas de concaténation de noms).
+const TEINTE: Record<ModuleId, { texte: string; pastille: string; fond: string; bord: string }> = {
+  build: {
+    texte: 'text-[var(--module-build)]',
+    pastille: 'bg-[var(--module-build)]',
+    fond: 'bg-[color-mix(in_srgb,var(--module-build)_9%,transparent)]',
+    bord: 'hover:border-[var(--module-build)]',
+  },
+  run: {
+    texte: 'text-[var(--module-run)]',
+    pastille: 'bg-[var(--module-run)]',
+    fond: 'bg-[color-mix(in_srgb,var(--module-run)_9%,transparent)]',
+    bord: 'hover:border-[var(--module-run)]',
+  },
+  grow: {
+    texte: 'text-[var(--module-grow)]',
+    pastille: 'bg-[var(--module-grow)]',
+    fond: 'bg-[color-mix(in_srgb,var(--module-grow)_9%,transparent)]',
+    bord: 'hover:border-[var(--module-grow)]',
+  },
 };
 
 export default function AccueilPage(): React.ReactElement {
@@ -155,52 +165,59 @@ function CarteModule({
   pret: boolean;
 }): React.ReactElement {
   const m = moduleParId(module);
+  const t = TEINTE[module];
   return (
     <Link
       href={m.href}
-      className="group relative flex h-full flex-col gap-5 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-5 transition hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-pop)] sm:p-6"
+      className={`group flex h-full flex-col overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[var(--shadow-pop)] focus-visible:-translate-y-0.5 ${t.bord}`}
     >
-      <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-1 ${FILET[module]}`} />
-      <span className="flex items-start justify-between gap-4">
-        <span className="flex flex-col">
-          <span className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
+      <span className={`flex items-center gap-4 px-5 pb-4 pt-5 sm:px-6 ${t.fond}`}>
+        <span
+          aria-hidden="true"
+          className={`grid h-12 w-12 shrink-0 place-items-center rounded-[var(--radius-md)] text-[var(--surface)] shadow-sm transition duration-200 group-hover:scale-105 ${t.pastille}`}
+        >
+          <ModuleIcon module={module} strokeWidth={1.75} className="h-6 w-6" />
+        </span>
+        <span className="flex min-w-0 flex-col">
+          <span className="font-display text-2xl font-bold leading-tight tracking-tight">
             {m.label}
           </span>
-          <span className="text-sm font-medium text-[var(--foreground-muted)]">{m.verb}</span>
+          <span className={`text-sm font-medium ${t.texte}`}>{m.verb}</span>
         </span>
-        <ModuleIcon module={module} strokeWidth={1.5} className={`h-10 w-10 ${COULEUR[module]}`} />
       </span>
 
-      {!pret ? (
-        <span aria-hidden="true" className="flex flex-col gap-2">
-          <span className="h-5 w-3/4 rounded bg-[var(--surface-muted)]" />
-          <span className="h-5 w-2/3 rounded bg-[var(--surface-muted)]" />
-        </span>
-      ) : chiffres.length > 0 ? (
-        <dl className="flex flex-col gap-1.5">
-          {chiffres.map((c) => (
-            <div key={c.id} className="flex items-baseline gap-2">
-              <dt className="sr-only">{c.libelle}</dt>
-              <dd className="flex items-baseline gap-2">
-                <span
-                  className={`font-mono text-xl font-semibold tabular-nums ${c.attention ? 'text-[var(--danger)]' : ''}`}
+      <span className="flex flex-1 flex-col px-5 py-5 sm:px-6">
+        {!pret ? (
+          <span aria-hidden="true" className="grid grid-cols-2 gap-3">
+            <span className="h-16 rounded-[var(--radius-md)] bg-[var(--surface-muted)]" />
+            <span className="h-16 rounded-[var(--radius-md)] bg-[var(--surface-muted)]" />
+          </span>
+        ) : chiffres.length > 0 ? (
+          <dl className="grid grid-cols-2 gap-3">
+            {chiffres.map((c) => (
+              <div
+                key={c.id}
+                className="flex flex-col-reverse gap-0.5 rounded-[var(--radius-md)] bg-[var(--surface-muted)] px-3 py-2.5"
+              >
+                <dt className="text-xs leading-snug text-[var(--foreground-muted)]">{c.libelle}</dt>
+                <dd
+                  className={`font-display text-2xl font-bold tabular-nums ${c.attention ? 'text-[var(--danger)]' : ''}`}
                 >
                   {c.valeur}
-                </span>
-                <span aria-hidden="true" className="text-sm text-[var(--foreground-muted)]">
-                  {c.libelle}
-                </span>
-              </dd>
-            </div>
-          ))}
-        </dl>
-      ) : (
-        <p className="text-sm text-[var(--foreground-muted)]">{APPELS[module]}</p>
-      )}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <p className="text-sm text-[var(--foreground-muted)]">{APPELS[module]}</p>
+        )}
+      </span>
 
-      <span className={`mt-auto text-sm font-semibold ${COULEUR[module]}`}>
-        Ouvrir {m.label}{' '}
-        <span aria-hidden="true" className="inline-block transition group-hover:translate-x-0.5">
+      <span
+        className={`flex items-center justify-between border-t border-[var(--border)] px-5 py-3 text-sm font-semibold sm:px-6 ${t.texte}`}
+      >
+        Ouvrir {m.label}
+        <span aria-hidden="true" className="transition duration-200 group-hover:translate-x-1">
           →
         </span>
       </span>
