@@ -40,9 +40,11 @@ import {
 import { AuthGuard } from '../auth/auth.guard.js';
 import { CurrentOrgId, CurrentUser } from '../auth/current-user.decorator.js';
 import { RequirePermission } from '../authz/authz.decorators.js';
-import { CurrentOrgRole } from '../authz/current-org-role.decorator.js';
+import {
+  CurrentOrgPermissions,
+  type CurrentOrgPermissionsValue,
+} from '../authz/current-org-permissions.decorator.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
-import type { OrgRole } from '../authz/permissions.js';
 import { invalidRequest } from '../sales/sales.errors.js';
 import { WorkIdPipe, workActorOf } from './work.common.js';
 import { WorkActivityService } from './work-activity.service.js';
@@ -74,12 +76,12 @@ export class WorkProjectsController {
   async create(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Body() body: unknown,
   ): Promise<WorkProjectView> {
     const parsed = CreateWorkProjectBody.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error);
-    return this.projects.create(orgId, parsed.data, workActorOf(user, role));
+    return this.projects.create(orgId, parsed.data, workActorOf(user, perms));
   }
 
   @Get(':projectId')
@@ -96,13 +98,13 @@ export class WorkProjectsController {
   async update(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('projectId', WorkIdPipe) projectId: string,
     @Body() body: unknown,
   ): Promise<WorkProjectView> {
     const parsed = UpdateWorkProjectBody.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error);
-    return this.projects.update(orgId, projectId, parsed.data, workActorOf(user, role));
+    return this.projects.update(orgId, projectId, parsed.data, workActorOf(user, perms));
   }
 
   @Post(':projectId/archive')
@@ -111,7 +113,7 @@ export class WorkProjectsController {
   async archive(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('projectId', WorkIdPipe) projectId: string,
     @Body() body: unknown,
   ): Promise<WorkProjectView> {
@@ -121,7 +123,7 @@ export class WorkProjectsController {
       orgId,
       projectId,
       parsed.data.expectedRevision,
-      workActorOf(user, role),
+      workActorOf(user, perms),
     );
   }
 
@@ -131,7 +133,7 @@ export class WorkProjectsController {
   async restore(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('projectId', WorkIdPipe) projectId: string,
     @Body() body: unknown,
   ): Promise<WorkProjectView> {
@@ -141,7 +143,7 @@ export class WorkProjectsController {
       orgId,
       projectId,
       parsed.data.expectedRevision,
-      workActorOf(user, role),
+      workActorOf(user, perms),
     );
   }
 
@@ -151,10 +153,10 @@ export class WorkProjectsController {
   async remove(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('projectId', WorkIdPipe) projectId: string,
   ): Promise<void> {
-    await this.projects.remove(orgId, projectId, workActorOf(user, role));
+    await this.projects.remove(orgId, projectId, workActorOf(user, perms));
   }
 
   @Get(':projectId/activity')

@@ -31,9 +31,11 @@ import { readRequestBody } from '../account/request-body.js';
 import { AuthGuard } from '../auth/auth.guard.js';
 import { CurrentOrgId, CurrentUser } from '../auth/current-user.decorator.js';
 import { RequirePermission } from '../authz/authz.decorators.js';
-import { CurrentOrgRole } from '../authz/current-org-role.decorator.js';
+import {
+  CurrentOrgPermissions,
+  type CurrentOrgPermissionsValue,
+} from '../authz/current-org-permissions.decorator.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
-import type { OrgRole } from '../authz/permissions.js';
 import { UserThrottlerGuard } from '../security/user-throttler.guard.js';
 import { ObjectStorageUnavailableError } from '../storage/object-storage.service.js';
 import { WorkIdPipe, workActorOf } from './work.common.js';
@@ -81,7 +83,7 @@ export class WorkAttachmentsController {
   async upload(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('taskId', WorkIdPipe) taskId: string,
     @Req() req: Request,
   ): Promise<WorkAttachmentView> {
@@ -103,7 +105,7 @@ export class WorkAttachmentsController {
         taskId,
         file,
         req.headers['x-file-name'],
-        workActorOf(user, role),
+        workActorOf(user, perms),
       );
     } catch (cause) {
       throw storageFailure(cause);
@@ -152,9 +154,9 @@ export class WorkAttachmentsController {
   async remove(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('attachmentId', WorkIdPipe) attachmentId: string,
   ): Promise<void> {
-    await this.attachments.remove(orgId, attachmentId, workActorOf(user, role));
+    await this.attachments.remove(orgId, attachmentId, workActorOf(user, perms));
   }
 }

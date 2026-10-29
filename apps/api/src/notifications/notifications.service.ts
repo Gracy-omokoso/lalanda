@@ -30,7 +30,12 @@ import {
   type UnreadCountView,
 } from '@lalanda/shared/notifications';
 
-import { can, type Action, type OrgRole } from '../authz/permissions.js';
+import {
+  MEMBER_PERMISSIONS_PROJECTION,
+  memberPermissionsOf,
+  type MemberPermissions,
+} from '../authz/authz.service.js';
+import { can, type Action } from '../authz/permissions.js';
 import { beforeTimeCursor, decodeTimeCursor, encodeTimeCursor } from '../crm/time-cursor.js';
 import { Membership, type MembershipDocument } from '../organizations/membership.schema.js';
 import { invalidCursor } from '../sales/sales.errors.js';
@@ -113,7 +118,7 @@ export class NotificationsService implements NotificationsPort {
 
       const member = await this.membershipOf(organizationId, recipientUserId);
       if (!member) return 'not_member';
-      if (!can(member.role, input.requiredAction, member)) return 'not_allowed';
+      if (!can(member.role, input.requiredAction, member.context)) return 'not_allowed';
 
       const prefs = await this.preferencesModel
         .findOne({ organizationId, userId: recipientUserId })
@@ -255,14 +260,19 @@ export class NotificationsService implements NotificationsPort {
 
   // ── Interne ──────────────────────────────────────────────────────────────
 
+  /**
+   * Titre et contexte EFFECTIF du membre (ADR-0041 § 9.4, A3) : droit de clôture,
+   * ajouts et retraits. Un retrait de `requiredAction` masque la notification et
+   * bloque son émission ; un ajout l'ouvre.
+   */
   private async membershipOf(
     organizationId: string,
     userId: string,
-  ): Promise<{ role: OrgRole; canClosePeriods: boolean } | null> {
+  ): Promise<MemberPermissions | null> {
     const m = await this.memberships
-      .findOne({ organizationId, userId }, { role: 1, canClosePeriods: 1 })
+      .findOne({ organizationId, userId }, MEMBER_PERMISSIONS_PROJECTION)
       .lean();
-    return m ? { role: m.role, canClosePeriods: m.canClosePeriods === true } : null;
+    return memberPermissionsOf(m) ?? null;
   }
 
   /**
@@ -276,7 +286,7 @@ export class NotificationsService implements NotificationsPort {
   ): Promise<Record<string, unknown> | null> {
     const member = await this.membershipOf(organizationId, userId);
     if (!member) return null;
-    const held: Action[] = heldActions(member.role, member);
+    const held: Action[] = heldActions(member.role, member.context);
     // `expiresAt` : le moniteur TTL de MongoDB passe toutes les 60 s environ ;
     // une ligne échue n'est plus servie, même avant sa suppression.
     return {

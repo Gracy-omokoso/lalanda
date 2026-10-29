@@ -31,9 +31,13 @@ import { PLAN_CATALOG } from '@lalanda/shared/pricing';
 import { AuthGuard } from '../auth/auth.guard.js';
 import { CurrentOrgId, CurrentUser } from '../auth/current-user.decorator.js';
 import { RequirePermission } from '../authz/authz.decorators.js';
+import {
+  CurrentOrgPermissions,
+  type CurrentOrgPermissionsValue,
+} from '../authz/current-org-permissions.decorator.js';
 import { CurrentOrgRole } from '../authz/current-org-role.decorator.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
-import { can, NO_OVERRIDES, type OrgRole } from '../authz/permissions.js';
+import { can, type OrgRole } from '../authz/permissions.js';
 import { BillingService } from '../billing/billing.service.js';
 import {
   GrowProfileService,
@@ -70,9 +74,12 @@ export interface GrowJourneyResponse {
   journey: JourneyResult;
 }
 
-/** Ce que le rôle peut lire de GROW (ADR-0040 § 4.4). Rôle inconnu : rien de sensible. */
-function accessOf(role: OrgRole | undefined): GrowReadAccess {
-  return { treasury: role !== undefined && can(role, 'treasury.read', NO_OVERRIDES) };
+/**
+ * Ce que le membre peut lire de GROW (ADR-0040 § 4.4), sur ses droits EFFECTIFS
+ * (ADR-0041 § 9.4, A3 : titre + écart). Membre inconnu : rien de sensible.
+ */
+function accessOf(perms: CurrentOrgPermissionsValue | undefined): GrowReadAccess {
+  return { treasury: perms !== undefined && can(perms.role, 'treasury.read', perms.context) };
 }
 
 function actorOf(user: { id: string }, role: OrgRole | undefined): GrowActor {
@@ -108,7 +115,7 @@ export class GrowController {
   @RequirePermission('analytics.read')
   async getProfile(
     @CurrentOrgId() orgId: string,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
   ): Promise<GrowProfileResponse> {
     const [stored, projects, { plan, entitlements }] = await Promise.all([
       this.profiles.get(orgId),
@@ -116,7 +123,7 @@ export class GrowController {
       this.billing.getPlanEntitlements(orgId),
     ]);
     // Le solde déclaré est une donnée de trésorerie (ADR-0040 § 4.4).
-    const profile = accessOf(role).treasury ? stored : { ...stored, declaredCash: null };
+    const profile = accessOf(perms).treasury ? stored : { ...stored, declaredCash: null };
     return {
       ...profile,
       projects: projects.map((p) => ({
@@ -133,9 +140,9 @@ export class GrowController {
   @RequirePermission('analytics.read')
   async getJourney(
     @CurrentOrgId() orgId: string,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
   ): Promise<GrowJourneyResponse> {
-    const s = await this.reader.snapshot(orgId, new Date(), accessOf(role));
+    const s = await this.reader.snapshot(orgId, new Date(), accessOf(perms));
     return { asOf: s.asOf, journey: s.journey };
   }
 
@@ -143,10 +150,10 @@ export class GrowController {
   @RequirePermission('analytics.read')
   async getHealth(
     @CurrentOrgId() orgId: string,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
   ): Promise<GrowHealthResponse> {
     await this.assertPlanAllowsGrow(orgId);
-    const s = await this.reader.snapshot(orgId, new Date(), accessOf(role));
+    const s = await this.reader.snapshot(orgId, new Date(), accessOf(perms));
     return { asOf: s.asOf, health: s.health, faits: s.indicators.faits };
   }
 
@@ -154,12 +161,12 @@ export class GrowController {
   @RequirePermission('analytics.read')
   async getIndicators(
     @CurrentOrgId() orgId: string,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
   ): Promise<GrowIndicatorsResult> {
     await this.assertPlanAllowsGrow(orgId);
-    const s = await this.reader.snapshot(orgId, new Date(), accessOf(role));
+    const s = await this.reader.snapshot(orgId, new Date(), accessOf(perms));
     // Noms des clients : seulement pour qui lit le fichier clients (`sales.read`).
-    return role !== undefined && can(role, 'sales.read', NO_OVERRIDES)
+    return perms !== undefined && can(perms.role, 'sales.read', perms.context)
       ? s.indicators
       : withoutCustomerNames(s.indicators);
   }

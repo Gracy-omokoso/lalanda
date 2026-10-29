@@ -2,7 +2,9 @@
 //
 // Éligibilité d'une personne à un rôle du module (responsable, abonné,
 // mentionné, propriétaire de projet) : membre de l'organisation ET détenteur de
-// l'action requise, vérifiée par `can(rôle, action)` (jamais par un nom de rôle).
+// l'action requise, vérifiée par `can(rôle, action, contexte)` (jamais par un nom
+// de rôle). ADR-0041 § 9.4 (A3) : le contexte porte l'écart du membre — un ajout
+// rend éligible, un retrait rend inéligible.
 //
 //   - pas membre de l'organisation (autre organisation, identifiant forgé) → 404 ;
 //   - membre, mais sans l'action → 400 avec le code métier de la règle.
@@ -13,12 +15,11 @@ import type { WorkMemberRef } from '@lalanda/shared/work';
 import type { Model } from 'mongoose';
 
 import {
-  can,
-  NO_OVERRIDES,
-  normalizeOrgRole,
-  type Action,
-  type OrgRole,
-} from '../authz/permissions.js';
+  MEMBER_PERMISSIONS_PROJECTION,
+  memberPermissionsOf,
+  type MemberPermissions,
+} from '../authz/authz.service.js';
+import { can, type Action, type OrgRole } from '../authz/permissions.js';
 import { MembersService } from '../organizations/members.service.js';
 import { Membership, type MembershipDocument } from '../organizations/membership.schema.js';
 import { invalid, memberNotFound } from './work.common.js';
@@ -40,28 +41,45 @@ export class WorkMembersService {
     @Inject(MembersService) private readonly members: MembersService,
   ) {}
 
-  /** Rôles des membres de l'organisation, par utilisateur. */
-  async roles(organizationId: string, userIds?: readonly string[]): Promise<Map<string, OrgRole>> {
+  /**
+   * Titre et contexte effectif (droit de clôture, ajouts, retraits — ADR-0041) des
+   * membres de l'organisation, par utilisateur.
+   */
+  async permissions(
+    organizationId: string,
+    userIds?: readonly string[],
+  ): Promise<Map<string, MemberPermissions>> {
     const filter: Record<string, unknown> = { organizationId };
     if (userIds) filter['userId'] = { $in: [...new Set(userIds)] };
-    const docs = await this.memberships.find(filter, { userId: 1, role: 1 }).lean().exec();
-    const out = new Map<string, OrgRole>();
+    const docs = await this.memberships
+      .find(filter, { userId: 1, ...MEMBER_PERMISSIONS_PROJECTION })
+      .lean()
+      .exec();
+    const out = new Map<string, MemberPermissions>();
     for (const d of docs) {
-      const role = normalizeOrgRole(d.role);
-      if (role) out.set(d.userId, role);
+      const permissions = memberPermissionsOf(d);
+      if (permissions) out.set(d.userId, permissions);
     }
     return out;
   }
 
-  /** Rôle d'un membre, ou `undefined` s'il n'est pas (ou plus) membre. */
-  async roleOf(organizationId: string, userId: string): Promise<OrgRole | undefined> {
-    return (await this.roles(organizationId, [userId])).get(userId);
+  /** Titre et contexte d'un membre, ou `undefined` s'il n'est pas (ou plus) membre. */
+  async permissionsOf(
+    organizationId: string,
+    userId: string,
+  ): Promise<MemberPermissions | undefined> {
+    return (await this.permissions(organizationId, [userId])).get(userId);
   }
 
-  /** Vrai si l'utilisateur est membre et détient `action`. */
+  /** Rôle (titre) d'un membre, ou `undefined` s'il n'est pas (ou plus) membre. */
+  async roleOf(organizationId: string, userId: string): Promise<OrgRole | undefined> {
+    return (await this.permissionsOf(organizationId, userId))?.role;
+  }
+
+  /** Vrai si l'utilisateur est membre et détient EFFECTIVEMENT `action`. */
   async holds(organizationId: string, userId: string, action: Action): Promise<boolean> {
-    const role = await this.roleOf(organizationId, userId);
-    return role !== undefined && can(role, action, NO_OVERRIDES);
+    const m = await this.permissionsOf(organizationId, userId);
+    return m !== undefined && can(m.role, action, m.context);
   }
 
   /** Noms courants (nom, à défaut e-mail) ; un inconnu devient « Ancien membre ». */
@@ -93,11 +111,11 @@ export class WorkMembersService {
     path: string,
   ): Promise<void> {
     if (userIds.length === 0) return;
-    const roles = await this.roles(organizationId, userIds);
+    const members = await this.permissions(organizationId, userIds);
     for (const id of userIds) {
-      const role = roles.get(id);
-      if (role === undefined) memberNotFound();
-      if (!can(role, action, NO_OVERRIDES)) {
+      const m = members.get(id);
+      if (m === undefined) memberNotFound();
+      if (!can(m.role, action, m.context)) {
         invalid(path, code, 'Ce membre ne détient pas les droits requis pour ce rôle.');
       }
     }
@@ -112,14 +130,14 @@ export class WorkMembersService {
 
   /** Membres détenant `work.read` (sélecteurs de responsable et mentions). */
   async list(organizationId: string): Promise<WorkMemberView[]> {
-    const roles = await this.roles(organizationId);
-    const readers = [...roles].filter(([, r]) => can(r, 'work.read', NO_OVERRIDES));
+    const members = await this.permissions(organizationId);
+    const readers = [...members].filter(([, m]) => can(m.role, 'work.read', m.context));
     const refs = await this.refs(readers.map(([id]) => id));
     return readers
-      .map(([id, role]) => ({
+      .map(([id, m]) => ({
         ...WorkMembersService.refOf(refs, id),
-        canUpdate: can(role, 'work.update', NO_OVERRIDES),
-        canManage: can(role, 'work.manage', NO_OVERRIDES),
+        canUpdate: can(m.role, 'work.update', m.context),
+        canManage: can(m.role, 'work.manage', m.context),
       }))
       .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
   }

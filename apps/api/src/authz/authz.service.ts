@@ -114,6 +114,47 @@ export function holdersFilter(
   };
 }
 
+/**
+ * ADR-0041 § 9.4 (A3) — projection minimale d'une appartenance pour décider de ses
+ * droits EFFECTIFS hors requête (destinataires, éligibilité, tâches planifiées).
+ */
+export const MEMBER_PERMISSIONS_PROJECTION = Object.freeze({
+  role: 1,
+  canClosePeriods: 1,
+  grants: 1,
+  revokes: 1,
+} as const);
+
+/** Titre et contexte (droit de clôture, ajouts, retraits) d'un membre. */
+export interface MemberPermissions {
+  role: OrgRole;
+  context: OrgPermissionContext;
+}
+
+/**
+ * ADR-0041 § 9.4 (A3) — titre et contexte effectif d'une appartenance lue en base
+ * (`.lean()` accepté), ou `undefined` si absente ou de rôle inconnu. Même calcul que
+ * `resolveOrgRole` (qui s'appuie dessus) : écart vide, contexte identique à celui
+ * d'avant ADR-0041 ; interrupteur éteint, l'écart stocké est ignoré (`overridesOf`).
+ */
+export function memberPermissionsOf(
+  doc:
+    | { role?: unknown; canClosePeriods?: unknown; grants?: unknown; revokes?: unknown }
+    | null
+    | undefined,
+  env: NodeJS.ProcessEnv = process.env,
+): MemberPermissions | undefined {
+  if (!doc) return undefined;
+  const role = normalizeOrgRole(doc.role);
+  if (role === undefined) return undefined;
+  const { grants, revokes } = overridesOf(doc, env);
+  const context: OrgPermissionContext = { canClosePeriods: doc.canClosePeriods === true };
+  // Écart vide : contexte identique à celui d'avant ADR-0041 (aucune clé de plus).
+  if (grants.length > 0) context.grants = grants;
+  if (revokes.length > 0) context.revokes = revokes;
+  return { role, context };
+}
+
 @Injectable()
 export class AuthzService {
   constructor(
@@ -139,14 +180,9 @@ export class AuthzService {
       .select({ role: 1, canClosePeriods: 1, grants: 1, revokes: 1, permissionsRevision: 1 })
       .lean()
       .exec();
-    if (!membership) return undefined;
-    const role = normalizeOrgRole(membership.role);
-    if (role === undefined) return undefined;
-    const { grants, revokes } = overridesOf(membership);
-    const context: OrgPermissionContext = { canClosePeriods: membership.canClosePeriods === true };
-    // Écart vide : contexte identique à celui d'avant ADR-0041 (aucune clé de plus).
-    if (grants.length > 0) context.grants = grants;
-    if (revokes.length > 0) context.revokes = revokes;
+    const permissions = memberPermissionsOf(membership);
+    if (!membership || !permissions) return undefined;
+    const { role, context } = permissions;
     const revision = (membership as { permissionsRevision?: unknown }).permissionsRevision;
     return {
       role,

@@ -2,8 +2,10 @@
 // amendement du 21 oct. 2026).
 //
 // Destinataires : les ADMINISTRATEURS FISCAUX de l'organisation, c'est-à-dire
-// les rôles qui détiennent `fiscal.manage` (Propriétaire, Directeur financier) —
-// lus dans la matrice des permissions, jamais recopiés ici.
+// les membres qui détiennent EFFECTIVEMENT `fiscal.manage` (ADR-0041 § 9.3-9.4,
+// lot A3) : par titre (Propriétaire, Directeur financier — lus dans la matrice,
+// jamais recopiés ici) sans retrait, ou par ajout. Interrupteur
+// `MEMBER_PERMISSIONS_ENABLED` éteint : par titre seulement, comme avant.
 //
 // Causes :
 //  - `normalization_uncertain` : une normalisation reste incertaine (phase
@@ -25,7 +27,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Types, type Connection, type Model } from 'mongoose';
 
-import { ORG_PERMISSION_MATRIX, type OrgRole } from '../../authz/permissions.js';
+import { holdersFilter } from '../../authz/authz.service.js';
 import { MailService } from '../../mail/mail.service.js';
 import type { NormalizationAlertCause } from '../../mail/mail.templates.js';
 import { Membership, type MembershipDocument } from '../../organizations/membership.schema.js';
@@ -41,11 +43,6 @@ import {
 
 /** Une normalisation incertaine depuis 15 min déclenche l'alerte. */
 export const UNCERTAIN_ALERT_AFTER_MS = 15 * 60_000;
-
-/** Rôles destinataires : ceux qui détiennent `fiscal.manage`. */
-export const FISCAL_ADMIN_ROLES: readonly OrgRole[] = (
-  Object.keys(ORG_PERMISSION_MATRIX) as OrgRole[]
-).filter((role) => ORG_PERMISSION_MATRIX[role]['fiscal.manage'] === 'allow');
 
 export interface NormalizationAlertInput {
   organizationId: string;
@@ -144,10 +141,8 @@ export class NormalizationAlertsService {
       const [org, admins] = await Promise.all([
         this.organizations.findById(input.organizationId, { name: 1 }).lean().exec(),
         this.memberships
-          .find(
-            { organizationId: input.organizationId, role: { $in: FISCAL_ADMIN_ROLES } },
-            { userId: 1 },
-          )
+          // Détenteurs effectifs de `fiscal.manage` (même filtre que `AuthzService.holdersOf`).
+          .find(holdersFilter(input.organizationId, 'fiscal.manage'), { userId: 1 })
           .lean()
           .exec(),
       ]);

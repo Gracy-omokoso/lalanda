@@ -15,9 +15,12 @@ import { EngineError, evaluateTemplate } from '@lalanda/engine';
 import { AuthGuard } from '../auth/auth.guard.js';
 import { forbidden } from '../authz/authz.service.js';
 import { RequirePermission } from '../authz/authz.decorators.js';
-import { CurrentOrgRole } from '../authz/current-org-role.decorator.js';
+import {
+  CurrentOrgPermissions,
+  type CurrentOrgPermissionsValue,
+} from '../authz/current-org-permissions.decorator.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
-import { can, NO_OVERRIDES, type OrgRole } from '../authz/permissions.js';
+import { can } from '../authz/permissions.js';
 import { CurrentOrgId, CurrentUser } from '../auth/current-user.decorator.js';
 import { BillingService } from '../billing/billing.service.js';
 import { projectLimitExceededPayload, projectLimitStatus } from '../billing/project-limit.js';
@@ -189,7 +192,7 @@ export class ProjectsController {
   @RequirePermission('plan.calculate')
   async evaluate(
     @CurrentUser() user: { id: string },
-    @CurrentOrgRole() role: OrgRole,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue,
     @CurrentOrgId() orgId: string,
     @Param('id') id: string,
     @Body() body: unknown,
@@ -210,8 +213,10 @@ export class ProjectsController {
       // Écriture déguisée en calcul : elle exige `inputs.update`, que
       // `plan.calculate` n'implique pas (un `analyst` calcule, un `accountant`
       // ne calcule pas). Décision prise par la matrice, jamais par un test de rôle.
-      if (!can(role, 'inputs.update', NO_OVERRIDES)) {
-        throw new ForbiddenException(forbidden('inputs.update', role));
+      // ADR-0041 § 9.4 (A3) : sur les droits effectifs du membre (titre + écart).
+      if (!can(perms.role, 'inputs.update', perms.context)) {
+        const customized = perms.context.revokes?.includes('inputs.update') === true;
+        throw new ForbiddenException(forbidden('inputs.update', perms.role, customized));
       }
       project = await this.projects.updateDrivers(id, orgId, parsed.data.driverValues, user.id);
     }

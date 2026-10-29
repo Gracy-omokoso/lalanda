@@ -21,7 +21,7 @@ import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model, Types } from 'mongoose';
 
-import { can, NO_OVERRIDES } from '../authz/permissions.js';
+import { can } from '../authz/permissions.js';
 import { SchedulerService } from '../scheduler/scheduler.service.js';
 import { WorkMembersService } from '../work/work-members.service.js';
 import { WorkSettingsService } from '../work/work-settings.service.js';
@@ -122,7 +122,7 @@ export class CrmDueRemindersJob implements OnModuleInit {
         .lean()
         .exec()) as unknown as Row[];
       if (rows.length === 0) continue;
-      const roles = await this.members.roles(
+      const members = await this.members.permissions(
         organizationId,
         rows.map((r) => r.assigneeUserId),
       );
@@ -145,9 +145,9 @@ export class CrmDueRemindersJob implements OnModuleInit {
           .exec();
         if (claim.modifiedCount !== 1) continue;
         report.claimed += 1;
-        const role = roles.get(a.assigneeUserId);
-        // ADR-0041 A3 : passer aux droits effectifs du membre
-        if (role === undefined || !can(role, 'crm.read', NO_OVERRIDES)) {
+        // ADR-0041 § 9.4 (A3) : droits effectifs de l'assigné (titre + écart).
+        const member = members.get(a.assigneeUserId);
+        if (member === undefined || !can(member.role, 'crm.read', member.context)) {
           report.skipped += 1;
           continue;
         }
