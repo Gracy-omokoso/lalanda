@@ -10,7 +10,8 @@
 //  2. **Moindre privilège.** Le bloc ventes n'est CHARGÉ que si le rôle détient
 //     `sales.read` (même matrice que l'espace organisation, `can()`). Masquer
 //     après lecture laisserait la donnée transiter jusqu'au prompt de l'IA.
-//     Même règle pour les tâches et projets (ADR-0039 § 6.5) avec `work.read`.
+//     Même règle pour les tâches et projets (ADR-0039 § 6.5) avec `work.read`,
+//     et pour la trésorerie avec `treasury.read` (ADR-0040 § 4.4).
 
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -144,9 +145,11 @@ export class MorningBriefService {
   ): Promise<MorningBrief> {
     const salesVisible = can(role, 'sales.read');
     const workVisible = can(role, 'work.read');
+    // ADR-0040 — C0 § 4.4 : une donnée de trésorerie exige `treasury.read`.
+    const cashVisible = can(role, 'treasury.read');
     const [sales, cash, dueDates, work] = await Promise.all([
       salesVisible ? this.loadSales(organizationId, now) : Promise.resolve('hidden' as const),
-      this.cash.cashOf(organizationId, now),
+      cashVisible ? this.cash.cashOf(organizationId, now) : Promise.resolve('hidden' as const),
       // Les échéances sont des données de ventes : même règle de visibilité.
       salesVisible
         ? this.dueDates.dueDatesOf(organizationId, now)

@@ -194,7 +194,8 @@ export class ActualsController {
   }
 
   @Get(':id/variances')
-  @RequirePermission('analytics.read')
+  // ADR-0040 — C0 § 4.4 : réalisé de plan (donc dépenses) ⇒ `project.read` en plus.
+  @RequirePermission('project.read', 'analytics.read')
   async variances(
     @CurrentOrgId() orgId: string,
     @Param('id') id: string,
@@ -215,7 +216,8 @@ export class ActualsController {
   }
 
   @Get(':id/updated-projection')
-  @RequirePermission('analytics.read')
+  // ADR-0040 — C0 § 4.4 : réalisé de plan (donc dépenses) ⇒ `project.read` en plus.
+  @RequirePermission('project.read', 'analytics.read')
   async updatedProjection(
     @CurrentOrgId() orgId: string,
     @Param('id') id: string,

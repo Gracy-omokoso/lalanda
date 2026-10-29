@@ -375,10 +375,10 @@ export function blocsMasques(role: OrgRole, ctx: OrgPermissionContext): BlocMasq
 }
 
 /**
- * Les onze actions de la matrice qui MODIFIENT quelque chose.
+ * Les actions de la matrice qui MODIFIENT quelque chose.
  *
- * Les quatre autres (`project.read`, `analytics.read`, `report.export`,
- * `audit.read`) sont des lectures. `report.export` produit bien un fichier, mais
+ * Les lectures (`project.read`, `analytics.read`, `report.export`, `audit.read`,
+ * `sales.read`, `treasury.read`, `crm.read`, `work.read`) n'y sont pas. `report.export` produit bien un fichier, mais
  * il ne change rien dans l'organisation — le compter comme une écriture ferait
  * passer un Analyste pour un rôle d'écriture au seul motif qu'il exporte.
  */
@@ -394,6 +394,18 @@ export const ACTIONS_ECRITURE: readonly Action[] = [
   'plan.approve',
   'actuals.import',
   'period.close',
+  // ADR-0040 — C0 : les écritures des modules RUN. Sans elles, le Commercial
+  // (CRM, devis, tâches) serait annoncé « lecture seule ». Aucun rôle existant ne
+  // change de statut : le Conseiller et le Lecteur n'en détiennent aucune.
+  'fiscal.manage',
+  'sales.manage',
+  'sales.invoice',
+  'sales.receipt',
+  'treasury.manage',
+  'crm.manage',
+  'work.update',
+  'work.manage',
+  'sales.quote',
 ];
 
 /**

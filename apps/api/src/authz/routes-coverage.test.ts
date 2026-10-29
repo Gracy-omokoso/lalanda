@@ -556,17 +556,23 @@ describe('couverture des routes par le RBAC', () => {
       'TreasuryActualsController.sync': ['actuals.import', 'treasury.read'],
       'TreasuryActualsController.reconciliation': ['treasury.read', 'analytics.read'],
       // ── Devis (ADR-0035 § 4) : n'engagent pas le contribuable ─────────────
+      // ADR-0040 — C0 : écriture sous `sales.quote` ; convertir exige aussi
+      // `sales.manage` (le brouillon de facture reste un geste de facturation).
       'QuotesController.list': ['sales.read'],
       'QuotesController.get': ['sales.read'],
       'QuotesController.pdf': ['sales.read'],
-      'QuotesController.create': ['sales.manage'],
-      'QuotesController.put': ['sales.manage'],
-      'QuotesController.remove': ['sales.manage'],
-      'QuotesController.send': ['sales.manage'],
-      'QuotesController.accept': ['sales.manage'],
-      'QuotesController.refuse': ['sales.manage'],
-      'QuotesController.newVersion': ['sales.manage'],
-      'QuotesController.convert': ['sales.manage'],
+      'QuotesController.create': ['sales.quote'],
+      'QuotesController.put': ['sales.quote'],
+      'QuotesController.remove': ['sales.quote'],
+      'QuotesController.send': ['sales.quote'],
+      'QuotesController.accept': ['sales.quote'],
+      'QuotesController.refuse': ['sales.quote'],
+      'QuotesController.newVersion': ['sales.quote'],
+      'QuotesController.convert': ['sales.quote', 'sales.manage'],
+      // ADR-0040 — C0 § 4.4 : un réalisé de plan exige `project.read`.
+      'ActualsController.variances': ['project.read', 'analytics.read'],
+      'ActualsController.updatedProjection': ['project.read', 'analytics.read'],
+      'ObjectivesController.attainment': ['project.read', 'analytics.read'],
       // ── CRM minimal (ADR-0035 § 3) ────────────────────────────────────────
       'CrmSettingsController.get': ['crm.read'],
       'CrmSettingsController.put': ['crm.manage'],

@@ -1,7 +1,7 @@
 // PREUVE BOUT-EN-BOUT DE LA MATRICE RBAC (S20a — ADR-0012 § Plan de validation,
 // docs/12 § Tests obligatoires « matrice rôle/action »).
 //
-// ── Pourquoi ce fichier existe, alors que `permissions.test.ts` teste déjà 378 cases ──
+// ── Pourquoi ce fichier existe, alors que `permissions.test.ts` teste déjà 420 cases ──
 //
 // `permissions.test.ts` prouve que la matrice est correctement DÉCLARÉE : il
 // appelle `can()` en mémoire et compare à une transcription littérale d'ADR-0012.
@@ -11,7 +11,7 @@
 // `AuthGuard` résolvait le mauvais rôle, ou si le guard lisait la métadonnée
 // d'un autre handler.
 //
-// Ce fichier ferme le trou. Sept sessions HTTP réellement authentifiées, une par
+// Ce fichier ferme le trou. Huit sessions HTTP réellement authentifiées, une par
 // rôle d'organisation attribuable, dans UNE SEULE organisation, contre une route
 // représentative par action. C'est la seule des trois suites qui exerce la chaîne
 // complète : cookie → better-auth → AuthGuard → membership Mongo → PermissionsGuard
@@ -76,7 +76,8 @@ const PLAN_PROJETS_ILLIMITES: Plan | undefined = PLANS.find(
 );
 
 /**
- * Les sept rôles réellement attribuables — `project_manager` exclu (voir en-tête).
+ * Les huit rôles réellement attribuables — `project_manager` exclu (voir en-tête).
+ * `sales_rep` (Commercial, ADR-0040 § 4.2) est le dernier.
  *
  * L'ordre importe : `owner` d'abord, parce que c'est lui qui invite tous les
  * autres. Il n'est pas invité, il est propriétaire de son organisation
@@ -90,6 +91,8 @@ const ROLES_TESTES = [
   'analyst',
   'advisor',
   'viewer',
+  // ADR-0040 — C0.
+  'sales_rep',
 ] as const satisfies readonly OrgRole[];
 
 type RoleTeste = (typeof ROLES_TESTES)[number];
@@ -168,6 +171,7 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
     analyst: 5,
     advisor: 6,
     viewer: 7,
+    sales_rep: 8,
   };
 
   function creerCompte(role: RoleTeste): { email: string; password: string; name: string } {
@@ -404,11 +408,12 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
           .send({}),
     },
     {
+      // ADR-0040 § 4.4 : les écarts du réalisé exigent désormais `project.read` en
+      // plus ; la sonde d'`analytics.read` seule est le brief du matin.
       action: 'analytics.read',
-      libelle: 'GET /projects/:id/variances',
+      libelle: 'GET /morning-brief',
       statutsAutorises: [200],
-      envoyer: (c) =>
-        request(serveur()).get(`/projects/${projetSonde}/variances?year=1`).set('Cookie', c),
+      envoyer: (c) => request(serveur()).get('/morning-brief').set('Cookie', c),
     },
     {
       action: 'report.export',
@@ -520,6 +525,18 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
           .send({ name: `Sonde CRM ${role} ${tag}`, companyName: 'Sonde' }),
     },
     {
+      // ADR-0040 § 4.1 — détenteurs de `sales.manage`, plus le Commercial. Un devis
+      // à un client de passage : aucun prérequis de fiche client.
+      action: 'sales.quote',
+      libelle: 'POST /sales/quotes',
+      statutsAutorises: [201],
+      envoyer: (c, role) =>
+        request(serveur())
+          .post('/sales/quotes')
+          .set('Cookie', c)
+          .send(corpsDevisSonde(`Sonde devis ${role} ${tag}`)),
+    },
+    {
       // ADR-0039 § 7 — tous les rôles sauf Conseiller et Chef de projet.
       action: 'work.read',
       libelle: 'GET /work/projects',
@@ -550,6 +567,31 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
           .send({ name: `Sonde projet ${role} ${tag}`, kind: 'internal' }),
     },
   ];
+
+  /** Devis minimal à un client de passage (ADR-0035 § 4). */
+  function corpsDevisSonde(nom: string): Record<string, unknown> {
+    return {
+      currency: 'CDF',
+      priceMode: 'ht',
+      customer: { customerId: null, walkIn: { name: nom } },
+      lines: [
+        {
+          source: 'free',
+          code: 'SONDE',
+          name: 'Prestation de sondage',
+          itemType: 'SER',
+          taxGroup: 'B',
+          outOfScope: false,
+          unit: 'heure',
+          quantity: '1',
+          unitPrice: '1000.00',
+          specificTax: null,
+          discount: null,
+        },
+      ],
+      title: nom,
+    };
+  }
 
   /** Projet de RUN de sondage (`work`), créé une fois par le propriétaire. */
   let projetWork = '';
@@ -591,7 +633,7 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
     }
   });
 
-  it('les sept rôles ont une session authentifiée dans la même organisation', async () => {
+  it('les huit rôles ont une session authentifiée dans la même organisation', async () => {
     for (const role of ROLES_TESTES) {
       const res = await request(serveur()).get('/me/permissions').set('Cookie', cookiesDe(role));
       expect(res.status, `/me/permissions pour ${role}`).toBe(200);
@@ -754,6 +796,192 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
       .send({ email: `rbac-ok-${tag}@lalanda-test.local`, role: 'viewer' });
     emails.push(`rbac-ok-${tag}@lalanda-test.local`);
     expect(permise.status, JSON.stringify(permise.body)).toBe(201);
+  }, 60_000);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // ADR-0040 — C0 : le Commercial, les devis et le correctif de trésorerie
+  // ───────────────────────────────────────────────────────────────────────────
+
+  it('critère 1 — le Commercial atteint le CRM, les devis et ses tâches', async () => {
+    const c = cookiesDe('sales_rep');
+    const s = serveur();
+    expect((await request(s).get('/crm/pipeline').set('Cookie', c)).status).toBe(200);
+    expect((await request(s).get('/sales/customers').set('Cookie', c)).status).toBe(200);
+    expect((await request(s).get('/work/my-tasks').set('Cookie', c)).status).toBe(200);
+    const devis = await request(s)
+      .post('/sales/quotes')
+      .set('Cookie', c)
+      .send(corpsDevisSonde(`Devis du Commercial ${tag}`));
+    expect(devis.status, JSON.stringify(devis.body)).toBe(201);
+    // Envoyer, accepter, refuser, nouvelle version : la garde laisse passer le
+    // Commercial. L'envoi d'un devis exige des taux DGI relevés (ADR-0035), hors
+    // de propos ici : un brouillon non prêt rend 409 QUOTE_NOT_READY, preuve que la
+    // requête a atteint le service, et un devis inconnu 404 — jamais 403.
+    const envoi = await request(s)
+      .post(`/sales/quotes/${devis.body.id}/send`)
+      .set('Cookie', c)
+      .send({ expectedRevision: devis.body.revision });
+    expect(envoi.status, JSON.stringify(envoi.body)).not.toBe(403);
+    expect([200, 409]).toContain(envoi.status);
+    const z = '000000000000000000000000';
+    for (const geste of ['accept', 'refuse', 'new-version']) {
+      const res = await request(s)
+        .post(`/sales/quotes/${z}/${geste}`)
+        .set('Cookie', c)
+        .send({ expectedRevision: 1 });
+      expect(res.status, `${geste} : ${JSON.stringify(res.body)}`).not.toBe(403);
+    }
+    // Convertir en brouillon de facture : `sales.quote` + `sales.manage`.
+    const conversion = await request(s)
+      .post(`/sales/quotes/${devis.body.id}/convert`)
+      .set('Cookie', c)
+      .send({ expectedRevision: devis.body.revision });
+    expect(conversion.status).toBe(403);
+    expect(conversion.body).toMatchObject({ code: 'FORBIDDEN', action: 'sales.manage' });
+  }, 90_000);
+
+  it('critère 1 — le Commercial n’ouvre ni fiches, ni prix, ni factures, ni trésorerie, ni BUILD', async () => {
+    const c = cookiesDe('sales_rep');
+    const s = serveur();
+    const z = '000000000000000000000000';
+    const refus: [string, () => request.Test, Action][] = [
+      ['POST /sales/customers', () => request(s).post('/sales/customers').send({}), 'sales.manage'],
+      [
+        'PUT /sales/catalog-items/:id',
+        () => request(s).put(`/sales/catalog-items/${z}`).send({}),
+        'sales.manage',
+      ],
+      [
+        'POST /sales/invoices/:id/issue',
+        () => request(s).post(`/sales/invoices/${z}/issue`).send({}),
+        'sales.invoice',
+      ],
+      ['POST /sales/receipts', () => request(s).post('/sales/receipts').send({}), 'sales.receipt'],
+      ['GET /treasury/accounts', () => request(s).get('/treasury/accounts'), 'treasury.read'],
+      ['GET /treasury/expenses', () => request(s).get('/treasury/expenses'), 'treasury.read'],
+      ['GET /projects', () => request(s).get('/projects'), 'project.read'],
+      [
+        'GET /projects/:id/variances',
+        () => request(s).get(`/projects/${projetSonde}/variances?year=1`),
+        'project.read',
+      ],
+      [
+        'GET /projects/:id/updated-projection',
+        () => request(s).get(`/projects/${projetSonde}/updated-projection?year=1`),
+        'project.read',
+      ],
+      [
+        'GET /projects/:id/objectives/attainment',
+        () => request(s).get(`/projects/${projetSonde}/objectives/attainment`),
+        'project.read',
+      ],
+    ];
+    for (const [libelle, envoyer, action] of refus) {
+      const res = await envoyer().set('Cookie', c);
+      expect(res.status, `${libelle} : ${res.status} ${JSON.stringify(res.body)}`).toBe(403);
+      expect(res.body, libelle).toMatchObject({ code: 'FORBIDDEN', action, role: 'sales_rep' });
+    }
+  }, 90_000);
+
+  it('§ 4.4 — les écarts du réalisé restent ouverts aux rôles qui lisent les projets', async () => {
+    // Aucun rôle existant ne perd l'accès : tous les détenteurs d'`analytics.read`
+    // ont `project.read`, le Commercial excepté.
+    for (const role of ROLES_TESTES) {
+      const res = await request(serveur())
+        .get(`/projects/${projetSonde}/variances?year=1`)
+        .set('Cookie', cookiesDe(role));
+      expect(res.status, `${role} : ${JSON.stringify(res.body)}`).toBe(
+        role === 'sales_rep' ? 403 : 200,
+      );
+    }
+  }, 90_000);
+
+  it('critère 2 — brief : trésorerie masquée sans `treasury.read`, visible pour le Lecteur', async () => {
+    for (const role of ROLES_TESTES) {
+      const res = await request(serveur()).get('/morning-brief').set('Cookie', cookiesDe(role));
+      expect(res.status, role).toBe(200);
+      const facts = res.body.brief.facts as { id: string; status: string; value: unknown }[];
+      const tresorerie = facts.filter(
+        (f) => f.id === 'tresorerie' || f.id.startsWith('tresorerie.'),
+      );
+      expect(tresorerie.length, role).toBeGreaterThan(0);
+      if (ORG_PERMISSION_MATRIX[role]['treasury.read'] === 'deny') {
+        expect(tresorerie, role).toEqual([
+          expect.objectContaining({ id: 'tresorerie', status: 'hidden', value: null }),
+        ]);
+        const regles = (res.body.brief.recommendations as { ruleId: string }[]).map(
+          (r) => r.ruleId,
+        );
+        expect(regles, role).not.toContain('tresorerie_a_renseigner');
+      } else {
+        for (const f of tresorerie) expect(f.status, role).not.toBe('hidden');
+      }
+    }
+    // Les deux rôles concernés par le correctif, nommés : le Commercial et le Conseiller.
+    expect(ORG_PERMISSION_MATRIX.sales_rep['treasury.read']).toBe('deny');
+    expect(ORG_PERMISSION_MATRIX.advisor['treasury.read']).toBe('deny');
+    expect(ORG_PERMISSION_MATRIX.viewer['treasury.read']).toBe('allow');
+  }, 90_000);
+
+  it('critère 2 — GROW : aucun fait de trésorerie sans `treasury.read`', async () => {
+    // Un solde déclaré et un compte de trésorerie existent : sans le correctif,
+    // l'autonomie et le profil les citeraient.
+    const declare = await request(serveur())
+      .put('/grow/declared-cash')
+      .set('Cookie', cookiesDe('owner'))
+      .send({ amount: '424242.00', currency: 'USD', asOf: '2026-10-01' });
+    expect(declare.status, JSON.stringify(declare.body)).toBe(200);
+
+    for (const role of ROLES_TESTES) {
+      const c = cookiesDe(role);
+      const sansTresorerie = ORG_PERMISSION_MATRIX[role]['treasury.read'] === 'deny';
+      const health = await request(serveur()).get('/grow/health').set('Cookie', c);
+      const indicators = await request(serveur()).get('/grow/indicators').set('Cookie', c);
+      const journey = await request(serveur()).get('/grow/journey').set('Cookie', c);
+      const profile = await request(serveur()).get('/grow/profile').set('Cookie', c);
+      for (const res of [health, indicators, journey, profile]) {
+        expect(res.status, `${role} ${JSON.stringify(res.body)}`).toBe(200);
+      }
+      const corps = JSON.stringify([health.body, indicators.body, journey.body, profile.body]);
+      if (sansTresorerie) {
+        expect(corps, role).not.toContain('424242');
+        expect(corps, role).not.toContain('grow.declared_cash');
+        expect(corps, role).not.toContain('treasury.accounts');
+        expect(profile.body.declaredCash, role).toBeNull();
+        expect(indicators.body.indicateurs.runway, role).toMatchObject({
+          disponible: false,
+          raison: 'TRESORERIE_MASQUEE',
+        });
+        const axe = (
+          health.body.health.axes as { axe: string; metriques: { raison: string | null }[] }[]
+        ).find((a) => a.axe === 'tresorerie');
+        expect(
+          axe?.metriques.map((m) => m.raison),
+          role,
+        ).toEqual(['TRESORERIE_MASQUEE']);
+      } else {
+        expect(profile.body.declaredCash, role).toMatchObject({ amount: '424242.00' });
+        expect(indicators.body.indicateurs.runway.raison, role).not.toBe('TRESORERIE_MASQUEE');
+      }
+    }
+  }, 120_000);
+
+  it('critère 3 — l’Administrateur invite un Commercial ; le Comptable ne peut pas', async () => {
+    const parAdmin = `rbac-com-admin-${tag}@lalanda-test.local`;
+    const parComptable = `rbac-com-cpt-${tag}@lalanda-test.local`;
+    emails.push(parAdmin, parComptable);
+    const ok = await request(serveur())
+      .post(`/organizations/${orgId}/invitations`)
+      .set('Cookie', cookiesDe('admin'))
+      .send({ email: parAdmin, role: 'sales_rep' });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(201);
+    expect(ok.body.invitation.role).toBe('sales_rep');
+    const refus = await request(serveur())
+      .post(`/organizations/${orgId}/invitations`)
+      .set('Cookie', cookiesDe('accountant'))
+      .send({ email: parComptable, role: 'sales_rep' });
+    expect(refus.status).toBe(403);
+    expect(refus.body).toMatchObject({ code: 'FORBIDDEN', action: 'members.invite' });
   }, 60_000);
 
   /** userId d'un rôle, lu depuis le trombinoscope — l'API ne l'expose pas ailleurs. */

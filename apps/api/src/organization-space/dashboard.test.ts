@@ -9,7 +9,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { VarianceLine } from '../actuals/variance.js';
-import { ORG_ROLES, type OrgRole } from '../authz/permissions.js';
+import { ORG_ROLES, can, type OrgRole } from '../authz/permissions.js';
 import { PLAN_ENTITLEMENTS } from '../billing/entitlements.js';
 import { DISPLAY_CURRENCIES } from './organization-space.dto.js';
 import {
@@ -302,10 +302,29 @@ describe('visibilité des blocs par rôle (S21a)', () => {
     expect(ouverts).toEqual(['owner', 'admin', 'finance_director', 'accountant']);
   });
 
-  it('ouvre les projets à TOUS les rôles, Conseiller et Lecteur compris', () => {
+  it('ouvre les projets à tous les rôles qui lisent les projets, Conseiller et Lecteur compris', () => {
     for (const role of ORG_ROLES) {
-      expect(blocVisible('projets', role, sansContexte), role).toBe(true);
+      // ADR-0040 § 4.2 : le Commercial n'a pas `project.read`.
+      expect(blocVisible('projets', role, sansContexte), role).toBe(role !== 'sales_rep');
     }
+  });
+
+  it('un rôle sans `treasury.read` (Commercial) ne reçoit aucun bloc chiffré (ADR-0040 § 4.4)', () => {
+    // Les blocs qui portent des montants ou des écarts du réalisé (validation,
+    // saisie du réalisé) et la liste des initiatives lui sont masqués.
+    expect(can('sales_rep', 'treasury.read')).toBe(false);
+    const ouverts = BLOCS_DU_TABLEAU_DE_BORD.filter((b) =>
+      blocVisible(b.section, 'sales_rep', sansContexte),
+    );
+    expect(ouverts).toEqual([]);
+    expect(blocsMasques('sales_rep', sansContexte).map((m) => m.section)).toEqual([
+      'gouvernance',
+      'validation',
+      'comptabilite',
+      'projets',
+    ]);
+    // Et il n'est pas annoncé « lecture seule » : il écrit dans le CRM.
+    expect(estLectureSeule('sales_rep', {})).toBe(false);
   });
 
   it('un Lecteur ne voit que les projets, et sait pourquoi pour le reste', () => {
