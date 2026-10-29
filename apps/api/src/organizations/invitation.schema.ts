@@ -1,7 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import type { HydratedDocument } from 'mongoose';
 
-import { ORG_ROLES, type OrgRole } from '../authz/permissions.js';
+import { ACTIONS, ORG_ROLES, type Action, type OrgRole } from '../authz/permissions.js';
 
 /**
  * Invitation d'un email à rejoindre une organisation (brief §6, docs/12-ROLES-PERMISSIONS.md).
@@ -41,6 +41,18 @@ export class Invitation {
    */
   @Prop({ type: String, required: true, enum: ORG_ROLES as unknown as string[], default: 'viewer' })
   role!: OrgRole;
+
+  /**
+   * ADR-0041 § 6 — écart choisi à l'invitation (ajouts et retraits par rapport au
+   * titre `role`), copié sur l'appartenance à l'acceptation (lot A4). Vide par défaut,
+   * aucune migration : une invitation sans ces champs vaut exactement son titre
+   * (lecture par `overridesOf()`).
+   */
+  @Prop({ type: [String], enum: ACTIONS as unknown as string[], default: [] })
+  grants!: Action[];
+
+  @Prop({ type: [String], enum: ACTIONS as unknown as string[], default: [] })
+  revokes!: Action[];
 
   /**
    * Token opaque partagé dans l'URL d'acceptation. 64 chars hex — non devinable.
