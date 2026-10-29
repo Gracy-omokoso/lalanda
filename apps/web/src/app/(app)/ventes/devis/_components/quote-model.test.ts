@@ -10,6 +10,8 @@ import { describe, expect, it } from 'vitest';
 import type { QuoteView } from '@/lib/api-crm';
 
 import {
+  peutConvertirDevis,
+  peutPreparerDevis,
   champsRefuses,
   formatJour,
   formulaireDepuisDevis,
@@ -95,6 +97,17 @@ function devis(): QuoteView {
     revision: 3,
   } as unknown as QuoteView;
 }
+
+describe('Devis — droits (ADR-0040 § 4.1)', () => {
+  it('préparer exige `sales.quote` ; convertir exige aussi `sales.manage`', () => {
+    expect(peutPreparerDevis(['sales.quote'])).toBe(true);
+    expect(peutPreparerDevis(['sales.manage', 'sales.read'])).toBe(false);
+    expect(peutPreparerDevis(null)).toBe(false);
+    expect(peutConvertirDevis(['sales.quote'])).toBe(false);
+    expect(peutConvertirDevis(['sales.manage'])).toBe(false);
+    expect(peutConvertirDevis(['sales.quote', 'sales.manage'])).toBe(true);
+  });
+});
 
 describe('Devis — modèle d’écran', () => {
   it('intitulé distinct du pro forma et de la facture', () => {

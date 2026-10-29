@@ -113,3 +113,6 @@ export function stageWinRates(input: {
 
 // ADR-0040 — C2
 export * from './forecast.js';
+
+// ADR-0040 — C3
+export * from './reports.js';

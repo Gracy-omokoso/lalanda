@@ -149,11 +149,13 @@ describe('sous-options', () => {
     expect(factures?.sousOptions.map((s) => s.label)).toEqual(['Modèle de facture', 'Journal']);
   });
 
-  it('CRM : Pipeline, Contacts, Réglages ; Trésorerie : Dépenses, Comptes, Réalisé vs prévu', () => {
+  it('CRM : Pipeline, Comptes, Contacts, Activités, Réglages ; Trésorerie : Dépenses, Comptes, Réalisé vs prévu', () => {
     const run = appsVisibles(PROPRIETAIRE, 'run');
     expect(run.find((a) => a.id === 'crm')?.sousOptions.map((s) => s.label)).toEqual([
       'Pipeline',
+      'Comptes',
       'Contacts',
+      'Activités',
       'Réglages',
     ]);
     expect(run.find((a) => a.id === 'tresorerie')?.sousOptions.map((s) => s.href)).toEqual([
@@ -184,9 +186,9 @@ describe('sous-options', () => {
     const affichees = crm.sousOptions.map((s) => s.id);
     const ordre = CRM_SOUS_OPTIONS_PREVUES.filter((id) => affichees.includes(id));
     expect(affichees).toEqual(ordre);
-    // Comptes, Activités et Rapports n'ont pas encore d'écran : masqués.
-    expect(affichees).not.toContain('crm-comptes');
-    expect(affichees).not.toContain('crm-activites');
+    // Comptes et Activités sont livrés (C5) ; Rapports attend son écran (C6).
+    expect(affichees).toContain('crm-comptes');
+    expect(affichees).toContain('crm-activites');
     expect(affichees).not.toContain('crm-rapports');
   });
 
@@ -294,6 +296,9 @@ describe('application et sous-option actives', () => {
     expect(sousOptionActive('/crm')).toBe('crm-pipeline');
     expect(sousOptionActive('/crm/opportunites/abc')).toBe('crm-pipeline');
     expect(sousOptionActive('/crm/contacts')).toBe('crm-contacts');
+    expect(sousOptionActive('/crm/comptes')).toBe('crm-comptes');
+    expect(sousOptionActive('/crm/comptes/abc')).toBe('crm-comptes');
+    expect(sousOptionActive('/crm/activites')).toBe('crm-activites');
     expect(sousOptionActive('/crm/reglages')).toBe('crm-reglages');
     expect(sousOptionActive('/tresorerie/realise')).toBe('tresorerie-realise');
   });
