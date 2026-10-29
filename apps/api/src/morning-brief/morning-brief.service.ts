@@ -10,6 +10,7 @@
 //  2. **Moindre privilège.** Le bloc ventes n'est CHARGÉ que si le rôle détient
 //     `sales.read` (même matrice que l'espace organisation, `can()`). Masquer
 //     après lecture laisserait la donnée transiter jusqu'au prompt de l'IA.
+//     Même règle pour les tâches et projets (ADR-0039 § 6.5) avec `work.read`.
 
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -30,9 +31,11 @@ import {
   CASH_POSITION_SOURCE,
   DUE_DATES_SOURCE,
   OUTSTANDING_SOURCE,
+  WORK_SOURCE,
   type CashPositionSource,
   type DueDatesSource,
   type OutstandingSource,
+  type WorkSource,
 } from './morning-brief.ports.js';
 import {
   MorningBriefSettings,
@@ -125,24 +128,35 @@ export class MorningBriefService {
     @Inject(CASH_POSITION_SOURCE) private readonly cash: CashPositionSource,
     @Inject(DUE_DATES_SOURCE) private readonly dueDates: DueDatesSource,
     @Inject(OUTSTANDING_SOURCE) private readonly outstanding: OutstandingSource,
+    @Inject(WORK_SOURCE) private readonly work: WorkSource,
   ) {}
 
-  /** Brief de l'organisation, vu par ce rôle. */
+  /**
+   * Brief de l'organisation, vu par ce rôle et pour ce membre : `userId`
+   * (session ou destinataire de l'e-mail) ne sert qu'aux faits personnels
+   * `mes_taches.*` (ADR-0039 § 6.5).
+   */
   async build(
     organizationId: string,
     role: OrgRole,
+    userId: string,
     now: Date = new Date(),
   ): Promise<MorningBrief> {
     const salesVisible = can(role, 'sales.read');
-    const [sales, cash, dueDates] = await Promise.all([
+    const workVisible = can(role, 'work.read');
+    const [sales, cash, dueDates, work] = await Promise.all([
       salesVisible ? this.loadSales(organizationId, now) : Promise.resolve('hidden' as const),
       this.cash.cashOf(organizationId, now),
       // Les échéances sont des données de ventes : même règle de visibilité.
       salesVisible
         ? this.dueDates.dueDatesOf(organizationId, now)
         : Promise.resolve({ status: 'unavailable' as const }),
+      // Tâches et projets : chargés seulement avec `work.read`.
+      workVisible
+        ? this.work.workOf(organizationId, userId, now)
+        : Promise.resolve('hidden' as const),
     ]);
-    return buildMorningBrief({ now: now.toISOString(), sales, cash, dueDates });
+    return buildMorningBrief({ now: now.toISOString(), sales, cash, dueDates, work });
   }
 
   /**

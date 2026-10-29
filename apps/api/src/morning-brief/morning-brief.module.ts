@@ -3,7 +3,8 @@
 // Lit les factures RUN (`sales_invoices`) en lecture seule, les remet au moteur,
 // et réutilise l'IA existante (client OpenAI partagé, quota commun), l'ordonnanceur
 // et l'envoi d'e-mails. Trésorerie, échéances et reste à encaisser viennent des
-// modules RUN (`morning-brief.run-sources.ts`, amendement du 27 oct. 2026).
+// modules RUN (`morning-brief.run-sources.ts`, amendement du 27 oct. 2026) ;
+// tâches et projets du module `work` (ADR-0039 § 6.5).
 
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -17,6 +18,8 @@ import { OrganizationsModule } from '../organizations/organizations.module.js';
 import { SalesInvoice, SalesInvoiceSchema } from '../sales/invoices/invoice.schema.js';
 import { SalesModule } from '../sales/sales.module.js';
 import { TreasuryModule } from '../treasury/treasury.module.js';
+import { WorkBriefSource } from '../work/brief/work-brief.source.js';
+import { WorkModule } from '../work/work.module.js';
 import { MorningBriefEmailJob } from './morning-brief-email.job.js';
 import { MORNING_BRIEF_CHAT_CLIENT, MorningBriefAiService } from './morning-brief-ai.service.js';
 import { MorningBriefController } from './morning-brief.controller.js';
@@ -24,6 +27,7 @@ import {
   CASH_POSITION_SOURCE,
   DUE_DATES_SOURCE,
   OUTSTANDING_SOURCE,
+  WORK_SOURCE,
 } from './morning-brief.ports.js';
 import {
   SettlementsDueDates,
@@ -51,6 +55,8 @@ import { MorningBriefService } from './morning-brief.service.js';
     SalesModule,
     // ADR-0034 : soldes des comptes (`TreasuryAccountsService`), lecture seule.
     TreasuryModule,
+    // ADR-0039 § 6.5 : tâches et projets (`WorkBriefSource`), lecture seule.
+    WorkModule,
     MongooseModule.forFeature([
       { name: SalesInvoice.name, schema: SalesInvoiceSchema },
       { name: OrganizationSuspension.name, schema: OrganizationSuspensionSchema },
@@ -69,6 +75,8 @@ import { MorningBriefService } from './morning-brief.service.js';
     { provide: CASH_POSITION_SOURCE, useClass: TreasuryCashPosition },
     { provide: DUE_DATES_SOURCE, useClass: SettlementsDueDates },
     { provide: OUTSTANDING_SOURCE, useClass: SettlementsOutstanding },
+    // ADR-0039 § 6.5 — tâches en retard, du jour, projets à risque.
+    { provide: WORK_SOURCE, useExisting: WorkBriefSource },
   ],
   exports: [MorningBriefService],
 })

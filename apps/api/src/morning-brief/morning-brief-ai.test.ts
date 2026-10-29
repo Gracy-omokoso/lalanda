@@ -70,6 +70,7 @@ function sampleBrief(): MorningBrief {
     },
     cash: { status: 'to_fill' },
     dueDates: { status: 'unavailable' },
+    work: { status: 'unavailable' },
   });
 }
 
@@ -90,6 +91,7 @@ describe('contexte envoyé au modèle', () => {
       sales: 'hidden',
       cash: { status: 'to_fill' },
       dueDates: { status: 'unavailable' },
+      work: { status: 'unavailable' },
     });
     const payload = payloadFor(brief);
     expect(payload.faits).toEqual([]);

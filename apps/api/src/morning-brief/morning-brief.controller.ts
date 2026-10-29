@@ -79,13 +79,14 @@ export class MorningBriefController {
   @RequirePermission('analytics.read')
   async get(
     @CurrentOrgId() orgId: string,
+    @CurrentUser() user: { id: string },
     @CurrentOrgRole() role: OrgRole | undefined,
   ): Promise<MorningBriefView> {
     // Repli sur `viewer` : moindre privilège si la membership a changé entre le
     // guard et le handler (même position que l'espace organisation).
     const effective = role ?? 'viewer';
     const [brief, disabledBy, quota] = await Promise.all([
-      this.service.build(orgId, effective),
+      this.service.build(orgId, effective, user.id),
       this.service.aiDisabledBy(orgId),
       this.quota.status(orgId).catch(() => null),
     ]);
@@ -111,7 +112,7 @@ export class MorningBriefController {
     // Le brief est RECALCULÉ ici, pour ce rôle : le client n'envoie aucun fait,
     // il ne peut donc ni en inventer un, ni en glisser un d'une autre organisation.
     const [brief, disabledBy] = await Promise.all([
-      this.service.build(orgId, role ?? 'viewer', now),
+      this.service.build(orgId, role ?? 'viewer', user.id, now),
       this.service.aiDisabledBy(orgId),
     ]);
     return this.ai.answer(

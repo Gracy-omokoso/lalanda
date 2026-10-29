@@ -33,6 +33,7 @@ function brief(): ReturnType<typeof buildMorningBrief> {
     },
     cash: { status: 'to_fill' },
     dueDates: { status: 'unavailable' },
+    work: { status: 'unavailable' },
   });
 }
 
@@ -53,10 +54,49 @@ describe('contenu de l’e-mail', () => {
       sales: 'hidden',
       cash: { status: 'to_fill' },
       dueDates: { status: 'unavailable' },
+      work: { status: 'unavailable' },
     }).facts.find((f) => f.id === 'ca_mois.CDF');
     expect(masque && factLine(masque)).toBe(
       'Chiffre d’affaires HT du mois (CDF) : masqué pour votre rôle',
     );
+  });
+
+  it('porte les tâches PERSONNELLES du destinataire et l’alerte R8 (ADR-0039 § 6.5)', () => {
+    const t = (mine: boolean, dueDate: string) => ({
+      projectId: 'p1',
+      dueDate,
+      isMilestone: false,
+      mine,
+      projectActive: true,
+    });
+    const b = buildMorningBrief({
+      now: NOW,
+      sales: 'hidden',
+      cash: { status: 'to_fill' },
+      dueDates: { status: 'unavailable' },
+      work: {
+        status: 'known',
+        tasks: [t(true, '2026-10-20'), t(true, '2026-10-19'), t(true, '2026-10-21'), t(false, '2026-10-01')],
+        truncated: false,
+      },
+    });
+    const c = emailContent(b, 'Boulangerie');
+    expect(c.facts).toContain('Mes tâches en retard : 2');
+    expect(c.facts).toContain('Mes tâches du jour : 1');
+    // Les tâches des autres membres ne sont pas des faits personnels de l'e-mail.
+    expect(c.facts.some((f) => f.startsWith('Tâches en retard dans l’organisation'))).toBe(false);
+    expect(c.alerts.some((a) => a.startsWith('Tâches en retard — 2 tâches'))).toBe(true);
+  });
+
+  it('sans work.read, les tâches se disent masquées', () => {
+    const b = buildMorningBrief({
+      now: NOW,
+      sales: 'hidden',
+      cash: { status: 'to_fill' },
+      dueDates: { status: 'unavailable' },
+      work: 'hidden',
+    });
+    expect(emailContent(b, 'X').facts).toContain('Mes tâches en retard : masqué pour votre rôle');
   });
 
   it('échappe le nom de l’organisation (saisie utilisateur) et n’embarque aucun texte d’IA', () => {
