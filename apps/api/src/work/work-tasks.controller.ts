@@ -53,7 +53,7 @@ import { CurrentOrgRole } from '../authz/current-org-role.decorator.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
 import type { OrgRole } from '../authz/permissions.js';
 import { invalidRequest } from '../sales/sales.errors.js';
-import { workActorOf } from './work.common.js';
+import { WorkIdPipe, workActorOf } from './work.common.js';
 import { WorkActivityService } from './work-activity.service.js';
 import { WorkTasksService } from './work-tasks.service.js';
 
@@ -73,7 +73,7 @@ export class WorkTasksController {
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
     @CurrentOrgRole() role: OrgRole | undefined,
-    @Param('projectId') projectId: string,
+    @Param('projectId', WorkIdPipe) projectId: string,
     @Query() query: unknown,
   ): Promise<{ items: WorkTaskView[] }> {
     const parsed = ListProjectTasksQuery.safeParse(query);
@@ -87,7 +87,7 @@ export class WorkTasksController {
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
     @CurrentOrgRole() role: OrgRole | undefined,
-    @Param('projectId') projectId: string,
+    @Param('projectId', WorkIdPipe) projectId: string,
     @Body() body: unknown,
   ): Promise<WorkTaskWriteResult> {
     const parsed = CreateWorkTaskBody.safeParse(body);
@@ -122,7 +122,7 @@ export class WorkTasksController {
   @RequirePermission('work.read')
   async get(
     @CurrentOrgId() orgId: string,
-    @Param('taskId') taskId: string,
+    @Param('taskId', WorkIdPipe) taskId: string,
   ): Promise<WorkTaskDetail> {
     return this.tasks.detail(orgId, taskId);
   }
@@ -133,7 +133,7 @@ export class WorkTasksController {
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
     @CurrentOrgRole() role: OrgRole | undefined,
-    @Param('taskId') taskId: string,
+    @Param('taskId', WorkIdPipe) taskId: string,
     @Body() body: unknown,
   ): Promise<WorkTaskWriteResult> {
     const parsed = PatchWorkTaskBody.safeParse(body);
@@ -148,7 +148,7 @@ export class WorkTasksController {
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
     @CurrentOrgRole() role: OrgRole | undefined,
-    @Param('taskId') taskId: string,
+    @Param('taskId', WorkIdPipe) taskId: string,
     @Body() body: unknown,
   ): Promise<WorkTaskWriteResult> {
     const parsed = MoveWorkTaskBody.safeParse(body);
@@ -163,7 +163,7 @@ export class WorkTasksController {
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
     @CurrentOrgRole() role: OrgRole | undefined,
-    @Param('taskId') taskId: string,
+    @Param('taskId', WorkIdPipe) taskId: string,
     @Body() body: unknown,
   ): Promise<WorkTaskWriteResult> {
     const parsed = WorkExpectedRevisionBody.safeParse(body);
@@ -183,7 +183,7 @@ export class WorkTasksController {
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
     @CurrentOrgRole() role: OrgRole | undefined,
-    @Param('taskId') taskId: string,
+    @Param('taskId', WorkIdPipe) taskId: string,
     @Body() body: unknown,
   ): Promise<WorkTaskWriteResult> {
     const parsed = WorkExpectedRevisionBody.safeParse(body);
@@ -198,7 +198,7 @@ export class WorkTasksController {
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
     @CurrentOrgRole() role: OrgRole | undefined,
-    @Param('taskId') taskId: string,
+    @Param('taskId', WorkIdPipe) taskId: string,
   ): Promise<void> {
     await this.tasks.remove(orgId, taskId, workActorOf(user, role));
   }
@@ -210,7 +210,7 @@ export class WorkTasksController {
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
     @CurrentOrgRole() role: OrgRole | undefined,
-    @Param('taskId') taskId: string,
+    @Param('taskId', WorkIdPipe) taskId: string,
     @Body() body: unknown,
   ): Promise<WorkTaskWriteResult> {
     const parsed = AddDependencyBody.safeParse(body);
@@ -229,13 +229,13 @@ export class WorkTasksController {
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
     @CurrentOrgRole() role: OrgRole | undefined,
-    @Param('taskId') taskId: string,
-    @Param('predecessorTaskId') predecessorTaskId: string,
+    @Param('taskId', WorkIdPipe) taskId: string,
+    @Param('predecessorTaskId', WorkIdPipe) predecessorTaskId: string,
   ): Promise<WorkTaskWriteResult> {
     return this.tasks.removeDependency(
       orgId,
       taskId,
-      predecessorTaskId.toLowerCase(),
+      predecessorTaskId,
       workActorOf(user, role),
     );
   }
@@ -244,7 +244,7 @@ export class WorkTasksController {
   @RequirePermission('work.read')
   async activityOf(
     @CurrentOrgId() orgId: string,
-    @Param('taskId') taskId: string,
+    @Param('taskId', WorkIdPipe) taskId: string,
     @Query() query: unknown,
   ): Promise<WorkPage<WorkActivityView>> {
     const parsed = WorkCursorQuery.safeParse(query);
