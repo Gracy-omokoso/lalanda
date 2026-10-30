@@ -7,12 +7,17 @@
 // du brief du matin, mise en route). Un chiffre illisible n'est pas inventé :
 // la carte affiche une phrase d'appel à sa place. Aucune API nouvelle.
 // ADR-0039 § 6.5 : carte « Mes tâches » (`GET /work/my-tasks`) avec `work.read`.
+// ADR-0044 — P6 : la carte RUN ajoute des chiffres des achats et du CRM, chacun
+// lu seulement avec son droit (`purchase.read`, `purchase.approve`, `crm.read`),
+// quatre tuiles au plus.
 
+import type { PayablesView } from '@lalanda/shared/purchases';
 import { ModuleIcon, type ModuleId } from '@lalanda/ui';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
-import { api, type SettlementView } from '@/lib/api';
+import { api, jsonRequest, type SettlementView } from '@/lib/api';
+import { crmApi } from '@/lib/api-crm';
 import { growApi } from '@/lib/grow-api';
 import { ideaLabApi } from '@/lib/idea-lab-api';
 import { morningBriefApi, type BriefRuleOutcomeView } from '@/lib/morning-brief-api';
@@ -27,12 +32,15 @@ import {
 import { useMiseEnRoute } from '../organisation/_components/use-mise-en-route';
 
 import {
+  achatsEnRetard,
   alertesAccueil,
   APPELS,
+  comptePage,
   chiffresBuild,
   chiffresGrow,
   chiffresRun,
   type Chiffre,
+  type FaitsRunModules,
 } from './_components/accueil-model';
 import { MesTachesCarte } from './_components/mes-taches-carte';
 import { carteVisible } from './_components/mes-taches-model';
@@ -43,6 +51,7 @@ interface Faits {
   factures: SettlementView[] | null;
   alertes: BriefRuleOutcomeView[] | null;
   sante: number | null;
+  run: FaitsRunModules;
 }
 
 const VIDE: Faits = {
@@ -51,7 +60,16 @@ const VIDE: Faits = {
   factures: null,
   alertes: null,
   sante: null,
+  run: {},
 };
+
+/** Page lue au plus pour un compte de l'accueil (au-delà : « N+ »). */
+const PAGE_COMPTE = 100;
+
+/** Requête faite seulement avec le droit ; sinon rejetée sans appel (aucun 403 prévisible). */
+function siDroit<T>(droit: boolean, lire: () => Promise<T>): Promise<T> {
+  return droit ? lire() : Promise.reject(new Error('non lu'));
+}
 
 /** Valeur d'une promesse réglée, ou `null` si elle a échoué. */
 function lue<T>(r: PromiseSettledResult<T>): T | null {
@@ -85,6 +103,9 @@ export default function AccueilPage(): React.ReactElement {
   const [faits, setFaits] = useState<Faits>(VIDE);
   const [pret, setPret] = useState(false);
   const lireVentes = actions?.includes('sales.read') ?? false;
+  const lireCrm = actions?.includes('crm.read') ?? false;
+  const lireAchats = actions?.includes('purchase.read') ?? false;
+  const approuverAchats = actions?.includes('purchase.approve') ?? false;
 
   useEffect(() => {
     // On attend les permissions : interroger les ventes sans `sales.read`
@@ -97,7 +118,18 @@ export default function AccueilPage(): React.ReactElement {
       lireVentes ? api.getOpenSettlements() : Promise.reject(new Error('non lu')),
       morningBriefApi.get(),
       growApi.getHealth(),
-    ]).then(([projets, idees, factures, brief, sante]) => {
+      siDroit(lireAchats, () =>
+        jsonRequest<PayablesView>('/purchases/payables', { method: 'GET' }),
+      ),
+      siDroit(lireAchats && approuverAchats, () =>
+        jsonRequest<{ items: unknown[]; nextCursor: string | null }>(
+          `/purchases/approvals/pending?limit=${PAGE_COMPTE}`,
+          { method: 'GET' },
+        ),
+      ),
+      siDroit(lireCrm, () => crmApi.listActivities({ status: 'overdue', limit: PAGE_COMPTE })),
+      siDroit(lireCrm, () => crmApi.listOpportunities({ status: 'open', limit: PAGE_COMPTE })),
+    ]).then(([projets, idees, factures, brief, sante, dettes, validations, relances, opps]) => {
       if (annule) return;
       const score = lue(sante)?.health.score;
       setFaits({
@@ -106,17 +138,23 @@ export default function AccueilPage(): React.ReactElement {
         factures: lue(factures)?.items ?? null,
         alertes: lue(brief)?.brief.alerts ?? null,
         sante: score && score.disponible ? score.valeur : null,
+        run: {
+          achatsEnRetard: achatsEnRetard(lue(dettes)),
+          validationsEnAttente: comptePage(lue(validations)),
+          relancesEnRetard: comptePage(lue(relances)),
+          opportunitesOuvertes: comptePage(lue(opps)),
+        },
       });
       setPret(true);
     });
     return () => {
       annule = true;
     };
-  }, [chargees, lireVentes, organizationId]);
+  }, [chargees, lireVentes, lireCrm, lireAchats, approuverAchats, organizationId]);
 
   const chiffres: Record<ModuleId, Chiffre[]> = {
     build: chiffresBuild(faits),
-    run: chiffresRun(faits.factures),
+    run: chiffresRun(faits.factures, faits.run),
     grow: chiffresGrow({
       alertes: faits.alertes === null ? null : faits.alertes.length,
       sante: faits.sante,

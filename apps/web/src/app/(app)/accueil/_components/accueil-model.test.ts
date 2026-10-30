@@ -11,6 +11,9 @@ import {
   chiffresBuild,
   chiffresGrow,
   chiffresRun,
+  achatsEnRetard,
+  comptePage,
+  MAX_TUILES_RUN,
 } from './accueil-model';
 
 function facture(overdue: boolean, sansReglement = false): SettlementView {
@@ -128,5 +131,59 @@ describe('alertes de l’accueil', () => {
     );
     expect(cheminInterne('//hote/x')).toBe(false);
     expect(cheminInterne('/ventes')).toBe(true);
+  });
+});
+
+describe('RUN : chiffres CRM et Achats (ADR-0044 — P6)', () => {
+  const tout = {
+    achatsEnRetard: { n: 2 },
+    validationsEnAttente: { n: 1 },
+    relancesEnRetard: { n: 3 },
+    opportunitesOuvertes: { n: 5 },
+  };
+
+  it('quatre tuiles au plus : ventes d’abord, puis achats, puis CRM', () => {
+    const c = chiffresRun([facture(true)], tout);
+    expect(c).toHaveLength(MAX_TUILES_RUN);
+    expect(c.map((x) => [x.id, x.valeur, x.libelle, x.attention])).toEqual([
+      ['a-encaisser', '1', 'facture à encaisser', false],
+      ['en-retard', '1', 'facture en retard', true],
+      ['achats-en-retard', '2', 'factures fournisseurs en retard', true],
+      ['validations-achat', '1', 'achat à valider', true],
+    ]);
+  });
+
+  it('sans ventes lisibles : achats et CRM prennent la place', () => {
+    expect(chiffresRun(null, tout).map((x) => x.id)).toEqual([
+      'achats-en-retard',
+      'validations-achat',
+      'relances-en-retard',
+      'opportunites',
+    ]);
+  });
+
+  it('un chiffre non lu (droit manquant, panne) n’est jamais remplacé par zéro', () => {
+    const c = chiffresRun(null, {
+      achatsEnRetard: null,
+      validationsEnAttente: null,
+      relancesEnRetard: { n: 0 },
+    });
+    expect(c.map((x) => [x.id, x.valeur])).toEqual([['relances-en-retard', '0']]);
+    expect(chiffresRun(null, {})).toEqual([]);
+  });
+
+  it('page pleine : « 100+ », au pluriel', () => {
+    const c = chiffresRun(null, { opportunitesOuvertes: { n: 100, auMoins: true } });
+    expect(c[0]).toMatchObject({ valeur: '100+', libelle: 'opportunités ouvertes' });
+  });
+
+  it('comptePage et achatsEnRetard : lus tels quels, `null` reste `null`', () => {
+    expect(comptePage(null)).toBeNull();
+    expect(comptePage({ items: [1, 2], nextCursor: null })).toEqual({ n: 2, auMoins: false });
+    expect(comptePage({ items: [1], nextCursor: 'c' })).toEqual({ n: 1, auMoins: true });
+    expect(achatsEnRetard(null)).toBeNull();
+    expect(
+      achatsEnRetard({ schedule: [{ overdue: { count: 2 } }, { overdue: { count: 1 } }] }),
+    ).toEqual({ n: 3 });
   });
 });

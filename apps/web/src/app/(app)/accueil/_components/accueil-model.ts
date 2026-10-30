@@ -55,19 +55,115 @@ export function chiffresBuild(faits: {
 }
 
 /**
- * RUN : à partir des factures ouvertes (`GET /sales/settlements?open=true`).
- * `null` = non lisible (rôle sans `sales.read`, panne) : aucun chiffre.
+ * Compte lu sur une page d'API : `n` éléments, `auMoins` si la page est pleine et
+ * qu'il en reste (`nextCursor`) — l'accueil affiche alors « 100+ », jamais un
+ * nombre inventé au-delà de ce qui a été lu.
  */
-export function chiffresRun(ouvertes: readonly SettlementView[] | null): Chiffre[] {
-  if (ouvertes === null) return [];
-  const aRegler = ouvertes.filter((f) => f.settlement !== null);
-  const enRetard = aRegler.filter(
-    (f) => f.settlement?.overdue === true || f.status === 'overdue',
-  ).length;
+export interface Compte {
+  n: number;
+  auMoins?: boolean;
+}
+
+/** Compte d'une page `{ items, nextCursor }` ; `null` (illisible) reste `null`. */
+export function comptePage(
+  page: { items: readonly unknown[]; nextCursor: string | null } | null,
+): Compte | null {
+  if (page === null) return null;
+  return { n: page.items.length, auMoins: page.nextCursor !== null };
+}
+
+/** Factures fournisseurs en retard : Σ des nombres par devise de l'échéancier (moteur). */
+export function achatsEnRetard(
+  echeancier: { schedule: ReadonlyArray<{ overdue: { count: number } }> } | null,
+): Compte | null {
+  if (echeancier === null) return null;
+  return { n: echeancier.schedule.reduce((s, c) => s + c.overdue.count, 0) };
+}
+
+function compte(
+  id: string,
+  c: Compte | null | undefined,
+  singulier: string,
+  pluriel: string,
+  attention = false,
+): Chiffre | null {
+  if (!c) return null;
+  const base = chiffre(id, c.n, singulier, pluriel, attention);
+  if (base === null || !c.auMoins) return base;
+  // Page pleine : « 100+ », au pluriel ; jamais un total deviné.
+  return { ...base, valeur: `${base.valeur}+`, libelle: pluriel };
+}
+
+/** Tuiles au plus sur la carte RUN (grille de deux colonnes). */
+export const MAX_TUILES_RUN = 4;
+
+/**
+ * Chiffres CRM et Achats de la carte RUN, chacun lu sur une API EXISTANTE et
+ * seulement si l'utilisateur en a le droit ; `null` ou absent = non lu (droit
+ * manquant, panne) : aucune tuile, jamais un zéro.
+ *
+ * - `achatsEnRetard` : `GET /purchases/payables` (`purchase.read`) ;
+ * - `validationsEnAttente` : `GET /purchases/approvals/pending` (`purchase.approve`) ;
+ * - `relancesEnRetard` : `GET /crm/activities?status=overdue` (`crm.read`) ;
+ * - `opportunitesOuvertes` : `GET /crm/opportunities?status=open` (`crm.read`).
+ */
+export interface FaitsRunModules {
+  achatsEnRetard?: Compte | null;
+  validationsEnAttente?: Compte | null;
+  relancesEnRetard?: Compte | null;
+  opportunitesOuvertes?: Compte | null;
+}
+
+/**
+ * RUN : à partir des factures ouvertes (`GET /sales/settlements?open=true`), puis
+ * les chiffres des achats et du CRM, dans cet ordre, {@link MAX_TUILES_RUN} au plus.
+ * `ouvertes === null` = ventes non lisibles (rôle sans `sales.read`, panne).
+ */
+export function chiffresRun(
+  ouvertes: readonly SettlementView[] | null,
+  modules: FaitsRunModules = {},
+): Chiffre[] {
+  const ventes: Array<Chiffre | null> = [];
+  if (ouvertes !== null) {
+    const aRegler = ouvertes.filter((f) => f.settlement !== null);
+    const enRetard = aRegler.filter(
+      (f) => f.settlement?.overdue === true || f.status === 'overdue',
+    ).length;
+    ventes.push(
+      chiffre('a-encaisser', aRegler.length, 'facture à encaisser', 'factures à encaisser'),
+      chiffre('en-retard', enRetard, 'facture en retard', 'factures en retard', true),
+    );
+  }
   return definis([
-    chiffre('a-encaisser', aRegler.length, 'facture à encaisser', 'factures à encaisser'),
-    chiffre('en-retard', enRetard, 'facture en retard', 'factures en retard', true),
-  ]);
+    ...ventes,
+    compte(
+      'achats-en-retard',
+      modules.achatsEnRetard,
+      'facture fournisseur en retard',
+      'factures fournisseurs en retard',
+      true,
+    ),
+    compte(
+      'validations-achat',
+      modules.validationsEnAttente,
+      'achat à valider',
+      'achats à valider',
+      true,
+    ),
+    compte(
+      'relances-en-retard',
+      modules.relancesEnRetard,
+      'relance client en retard',
+      'relances clients en retard',
+      true,
+    ),
+    compte(
+      'opportunites',
+      modules.opportunitesOuvertes,
+      'opportunité ouverte',
+      'opportunités ouvertes',
+    ),
+  ]).slice(0, MAX_TUILES_RUN);
 }
 
 /**
