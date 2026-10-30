@@ -31,6 +31,10 @@ import { AuthGuard } from '../auth/auth.guard.js';
 import { CurrentOrgId, CurrentUser } from '../auth/current-user.decorator.js';
 import { AuditService } from '../authz/audit.service.js';
 import { RequirePermission } from '../authz/authz.decorators.js';
+import {
+  CurrentOrgPermissions,
+  type CurrentOrgPermissionsValue,
+} from '../authz/current-org-permissions.decorator.js';
 import { CurrentOrgRole } from '../authz/current-org-role.decorator.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
 import { can, NO_OVERRIDES, type OrgRole } from '../authz/permissions.js';
@@ -65,6 +69,9 @@ function parse<T>(schema: z.ZodType<T>, body: unknown): T {
   return parsed.data;
 }
 
+/** Repli de moindre privilège : Lecteur sans écart. */
+const VIEWER_FALLBACK: CurrentOrgPermissionsValue = { role: 'viewer', context: NO_OVERRIDES };
+
 @Controller('morning-brief')
 @UseGuards(AuthGuard, PermissionsGuard)
 export class MorningBriefController {
@@ -80,20 +87,21 @@ export class MorningBriefController {
   async get(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: { id: string },
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
   ): Promise<MorningBriefView> {
     // Repli sur `viewer` : moindre privilège si la membership a changé entre le
     // guard et le handler (même position que l'espace organisation).
-    const effective = role ?? 'viewer';
+    // ADR-0041 § 9.4 (A3) : décisions sur les droits effectifs (titre + écart).
+    const { role: effective, context } = perms ?? VIEWER_FALLBACK;
     const [brief, disabledBy, quota] = await Promise.all([
-      this.service.build(orgId, effective, user.id),
+      this.service.build(orgId, effective, context, user.id),
       this.service.aiDisabledBy(orgId),
       this.quota.status(orgId).catch(() => null),
     ]);
     return {
       brief,
       ai: { enabled: disabledBy === null, disabledBy, quota, mention: MENTION_BRIEF },
-      canManageAi: can(effective, 'organization.manage', NO_OVERRIDES),
+      canManageAi: can(effective, 'organization.manage', context),
     };
   }
 
@@ -104,7 +112,7 @@ export class MorningBriefController {
   async explanation(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: { id: string },
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Body() body: unknown,
   ): Promise<BriefAnswerView> {
     const { intent } = parse(ExplanationRequestSchema, body);
@@ -112,7 +120,13 @@ export class MorningBriefController {
     // Le brief est RECALCULÉ ici, pour ce rôle : le client n'envoie aucun fait,
     // il ne peut donc ni en inventer un, ni en glisser un d'une autre organisation.
     const [brief, disabledBy] = await Promise.all([
-      this.service.build(orgId, role ?? 'viewer', user.id, now),
+      this.service.build(
+        orgId,
+        (perms ?? VIEWER_FALLBACK).role,
+        (perms ?? VIEWER_FALLBACK).context,
+        user.id,
+        now,
+      ),
       this.service.aiDisabledBy(orgId),
     ]);
     return this.ai.answer(

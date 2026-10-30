@@ -37,9 +37,11 @@ import {
 import { AuthGuard } from '../../auth/auth.guard.js';
 import { CurrentOrgId, CurrentUser } from '../../auth/current-user.decorator.js';
 import { RequirePermission } from '../../authz/authz.decorators.js';
-import { CurrentOrgRole } from '../../authz/current-org-role.decorator.js';
+import {
+  CurrentOrgPermissions,
+  type CurrentOrgPermissionsValue,
+} from '../../authz/current-org-permissions.decorator.js';
 import { PermissionsGuard } from '../../authz/permissions.guard.js';
-import type { OrgRole } from '../../authz/permissions.js';
 import { invalidRequest } from '../../sales/sales.errors.js';
 import { ProjectMarginService } from '../margin/project-margin.service.js';
 import { WorkIdPipe, workActorOf } from '../work.common.js';
@@ -62,12 +64,12 @@ export class WorkBillingController {
   async createFromQuote(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: BillingUser,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Body() body: unknown,
   ): Promise<WorkProjectView> {
     const parsed = CreateProjectFromQuoteBody.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error);
-    return this.billing.createFromQuote(orgId, parsed.data, workActorOf(user, role));
+    return this.billing.createFromQuote(orgId, parsed.data, workActorOf(user, perms));
   }
 
   /** Projet créé depuis ce devis, ou `null` : la fiche du devis propose « Ouvrir le projet ». */
@@ -94,13 +96,13 @@ export class WorkBillingController {
   async linkInvoice(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: BillingUser,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('projectId', WorkIdPipe) projectId: string,
     @Body() body: unknown,
   ): Promise<WorkInvoiceLinkView> {
     const parsed = LinkInvoiceBody.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error);
-    return this.billing.link(orgId, projectId, parsed.data.invoiceId, workActorOf(user, role));
+    return this.billing.link(orgId, projectId, parsed.data.invoiceId, workActorOf(user, perms));
   }
 
   @Delete('projects/:projectId/invoices/:invoiceId')
@@ -109,11 +111,11 @@ export class WorkBillingController {
   async unlinkInvoice(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: BillingUser,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('projectId', WorkIdPipe) projectId: string,
     @Param('invoiceId', WorkIdPipe) invoiceId: string,
   ): Promise<void> {
-    await this.billing.unlink(orgId, projectId, invoiceId, workActorOf(user, role));
+    await this.billing.unlink(orgId, projectId, invoiceId, workActorOf(user, perms));
   }
 
   @Post('tasks/:taskId/prepare-invoice')
@@ -121,13 +123,13 @@ export class WorkBillingController {
   async prepareInvoice(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: BillingUser,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('taskId', WorkIdPipe) taskId: string,
     @Body() body: unknown,
   ): Promise<PreparedInvoiceView> {
     const parsed = PrepareInvoiceBody.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error);
-    return this.billing.prepareInvoice(orgId, taskId, parsed.data, workActorOf(user, role), user);
+    return this.billing.prepareInvoice(orgId, taskId, parsed.data, workActorOf(user, perms), user);
   }
 
   @Get('projects/:projectId/margin')
@@ -135,12 +137,12 @@ export class WorkBillingController {
   async margin(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: BillingUser,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('projectId', WorkIdPipe) projectId: string,
     @Query() query: unknown,
   ): Promise<ProjectMarginView> {
     const parsed = ProjectMarginQuery.safeParse(query);
     if (!parsed.success) invalidRequest(parsed.error, 'Paramètres de période invalides.');
-    return this.margins.margin(orgId, projectId, parsed.data, workActorOf(user, role));
+    return this.margins.margin(orgId, projectId, parsed.data, workActorOf(user, perms));
   }
 }

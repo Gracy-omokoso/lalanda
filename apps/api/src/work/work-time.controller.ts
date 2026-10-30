@@ -36,9 +36,11 @@ import {
 import { AuthGuard } from '../auth/auth.guard.js';
 import { CurrentOrgId, CurrentUser } from '../auth/current-user.decorator.js';
 import { RequirePermission } from '../authz/authz.decorators.js';
-import { CurrentOrgRole } from '../authz/current-org-role.decorator.js';
+import {
+  CurrentOrgPermissions,
+  type CurrentOrgPermissionsValue,
+} from '../authz/current-org-permissions.decorator.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
-import type { OrgRole } from '../authz/permissions.js';
 import { invalidRequest } from '../sales/sales.errors.js';
 import { WorkIdPipe, workActorOf } from './work.common.js';
 import { WorkTimeService } from './work-time.service.js';
@@ -55,12 +57,12 @@ export class WorkTimeController {
   async list(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Query() query: unknown,
   ): Promise<WorkPage<TimeEntryView>> {
     const parsed = ListTimeEntriesQuery.safeParse(query);
     if (!parsed.success) invalidRequest(parsed.error, 'Paramètres de liste invalides.');
-    return this.time.list(orgId, parsed.data, workActorOf(user, role));
+    return this.time.list(orgId, parsed.data, workActorOf(user, perms));
   }
 
   @Post('tasks/:taskId/time-entries')
@@ -68,13 +70,13 @@ export class WorkTimeController {
   async create(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('taskId', WorkIdPipe) taskId: string,
     @Body() body: unknown,
   ): Promise<TimeEntryView> {
     const parsed = CreateTimeEntryBody.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error);
-    return this.time.create(orgId, taskId, parsed.data, workActorOf(user, role));
+    return this.time.create(orgId, taskId, parsed.data, workActorOf(user, perms));
   }
 
   @Put('time-entries/:entryId')
@@ -82,13 +84,13 @@ export class WorkTimeController {
   async update(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('entryId', WorkIdPipe) entryId: string,
     @Body() body: unknown,
   ): Promise<TimeEntryView> {
     const parsed = UpdateTimeEntryBody.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error);
-    return this.time.update(orgId, entryId, parsed.data, workActorOf(user, role));
+    return this.time.update(orgId, entryId, parsed.data, workActorOf(user, perms));
   }
 
   @Delete('time-entries/:entryId')
@@ -97,10 +99,10 @@ export class WorkTimeController {
   async remove(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('entryId', WorkIdPipe) entryId: string,
   ): Promise<void> {
-    await this.time.remove(orgId, entryId, workActorOf(user, role));
+    await this.time.remove(orgId, entryId, workActorOf(user, perms));
   }
 
   @Get('projects/:projectId/time-summary')
@@ -123,12 +125,12 @@ export class WorkTimeController {
   async setRate(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Body() body: unknown,
   ): Promise<WorkMemberRateView> {
     const parsed = SetMemberRateBody.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error);
-    return this.time.setRate(orgId, parsed.data, workActorOf(user, role));
+    return this.time.setRate(orgId, parsed.data, workActorOf(user, perms));
   }
 
   @Delete('rates/:rateId')
@@ -137,9 +139,9 @@ export class WorkTimeController {
   async removeRate(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('rateId', WorkIdPipe) rateId: string,
   ): Promise<void> {
-    await this.time.removeRate(orgId, rateId, workActorOf(user, role));
+    await this.time.removeRate(orgId, rateId, workActorOf(user, perms));
   }
 }

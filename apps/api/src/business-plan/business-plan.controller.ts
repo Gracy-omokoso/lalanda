@@ -40,6 +40,10 @@ import { CurrentOrgId, CurrentUser } from '../auth/current-user.decorator.js';
 import { AuditService } from '../authz/audit.service.js';
 import { RequirePermission } from '../authz/authz.decorators.js';
 import { AuthzService } from '../authz/authz.service.js';
+import {
+  CurrentOrgPermissions,
+  type CurrentOrgPermissionsValue,
+} from '../authz/current-org-permissions.decorator.js';
 import { CurrentOrgRole } from '../authz/current-org-role.decorator.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
 import { can, NO_OVERRIDES, sodDecision, type OrgRole } from '../authz/permissions.js';
@@ -176,7 +180,16 @@ export class BusinessPlanController {
     @Inject(PdfRenderingService) private readonly pdf: PdfRenderingService,
   ) {}
 
-  private async view(orgId: string, projectId: string, role: OrgRole): Promise<BusinessPlanView> {
+  /**
+   * ADR-0041 § 9.4 (A3) : les permissions affichées sont les droits EFFECTIFS du
+   * membre (titre + écart). Repli de moindre privilège : Lecteur sans écart.
+   */
+  private async view(
+    orgId: string,
+    projectId: string,
+    perms: CurrentOrgPermissionsValue | undefined,
+  ): Promise<BusinessPlanView> {
+    const { role, context } = perms ?? { role: 'viewer' as const, context: NO_OVERRIDES };
     const project = await this.projects.findScoped(projectId, orgId);
     const pid = String(project._id);
     const doc = await this.service.document(orgId, pid);
@@ -225,9 +238,9 @@ export class BusinessPlanController {
       blockers: BusinessPlanService.blockers(doc),
       ai: { enabled: disabledBy === null, disabledBy, quota, mention: MENTION_BUSINESS_PLAN },
       permissions: {
-        write: can(role, 'canvas.update', NO_OVERRIDES),
-        validate: can(role, 'plan.approve', NO_OVERRIDES),
-        export: can(role, 'report.export', NO_OVERRIDES),
+        write: can(role, 'canvas.update', context),
+        validate: can(role, 'plan.approve', context),
+        export: can(role, 'report.export', context),
       },
     };
   }
@@ -236,10 +249,10 @@ export class BusinessPlanController {
   @RequirePermission('project.read')
   async get(
     @CurrentOrgId() orgId: string,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('id') id: string,
   ): Promise<BusinessPlanView> {
-    return this.view(orgId, id, role ?? 'viewer');
+    return this.view(orgId, id, perms);
   }
 
   @Put(':id/business-plan/plan')
@@ -247,14 +260,14 @@ export class BusinessPlanController {
   async putPlan(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: { id: string },
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('id') id: string,
     @Body() body: unknown,
   ): Promise<BusinessPlanView> {
     const { planVersion } = parse(PlanRequestSchema, body);
     const project = await this.projects.findScoped(id, orgId);
     await this.service.setPlan(orgId, String(project._id), planVersion, user.id);
-    return this.view(orgId, id, role ?? 'viewer');
+    return this.view(orgId, id, perms);
   }
 
   @Put(':id/business-plan/sections/:sectionId')
@@ -262,7 +275,7 @@ export class BusinessPlanController {
   async putSection(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: { id: string },
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('id') id: string,
     @Param('sectionId') sectionRaw: string,
     @Body() body: unknown,
@@ -271,7 +284,7 @@ export class BusinessPlanController {
     const { text } = parse(SectionTextSchema, body);
     const project = await this.projects.findScoped(id, orgId);
     await this.service.writeText(orgId, String(project._id), sectionId, text, user.id);
-    return this.view(orgId, id, role ?? 'viewer');
+    return this.view(orgId, id, perms);
   }
 
   @Post(':id/business-plan/sections/:sectionId/draft')
@@ -318,28 +331,28 @@ export class BusinessPlanController {
   async accept(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: { id: string },
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('id') id: string,
     @Param('sectionId') sectionRaw: string,
   ): Promise<BusinessPlanView> {
     const sectionId = sectionParam(sectionRaw);
     const project = await this.projects.findScoped(id, orgId);
     await this.service.acceptProposal(orgId, String(project._id), sectionId, user.id);
-    return this.view(orgId, id, role ?? 'viewer');
+    return this.view(orgId, id, perms);
   }
 
   @Post(':id/business-plan/sections/:sectionId/proposal/discard')
   @RequirePermission('canvas.update')
   async discard(
     @CurrentOrgId() orgId: string,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('id') id: string,
     @Param('sectionId') sectionRaw: string,
   ): Promise<BusinessPlanView> {
     const sectionId = sectionParam(sectionRaw);
     const project = await this.projects.findScoped(id, orgId);
     await this.service.discardProposal(orgId, String(project._id), sectionId);
-    return this.view(orgId, id, role ?? 'viewer');
+    return this.view(orgId, id, perms);
   }
 
   @Get(':id/business-plan/versions')

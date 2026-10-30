@@ -333,7 +333,7 @@ e2eSuite('tâches du RUN — Kanban, dépendances, Mes tâches, rappels (ADR-003
       // 23 h 30 UTC le 29 = 00 h 30 le 30 à Kinshasa.
       const view = await service.myTasks(
         f.orgId(),
-        { userId: analyst, role: 'analyst' },
+        { userId: analyst, role: 'analyst', context: {} },
         new Date('2026-10-29T23:30:00Z'),
       );
       expect(view.asOf).toBe('2026-10-30');

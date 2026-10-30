@@ -49,9 +49,11 @@ import {
 import { AuthGuard } from '../auth/auth.guard.js';
 import { CurrentOrgId, CurrentUser } from '../auth/current-user.decorator.js';
 import { RequirePermission } from '../authz/authz.decorators.js';
-import { CurrentOrgRole } from '../authz/current-org-role.decorator.js';
+import {
+  CurrentOrgPermissions,
+  type CurrentOrgPermissionsValue,
+} from '../authz/current-org-permissions.decorator.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
-import type { OrgRole } from '../authz/permissions.js';
 import { invalidRequest } from '../sales/sales.errors.js';
 import { WorkIdPipe, workActorOf } from './work.common.js';
 import { WorkActivityService } from './work-activity.service.js';
@@ -72,13 +74,13 @@ export class WorkTasksController {
   async listProject(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('projectId', WorkIdPipe) projectId: string,
     @Query() query: unknown,
   ): Promise<{ items: WorkTaskView[] }> {
     const parsed = ListProjectTasksQuery.safeParse(query);
     if (!parsed.success) invalidRequest(parsed.error, 'Paramètres de liste invalides.');
-    return this.tasks.listProject(orgId, projectId, parsed.data, workActorOf(user, role));
+    return this.tasks.listProject(orgId, projectId, parsed.data, workActorOf(user, perms));
   }
 
   @Post('projects/:projectId/tasks')
@@ -86,13 +88,13 @@ export class WorkTasksController {
   async create(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('projectId', WorkIdPipe) projectId: string,
     @Body() body: unknown,
   ): Promise<WorkTaskWriteResult> {
     const parsed = CreateWorkTaskBody.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error);
-    return this.tasks.create(orgId, projectId, parsed.data, workActorOf(user, role));
+    return this.tasks.create(orgId, projectId, parsed.data, workActorOf(user, perms));
   }
 
   @Get('tasks')
@@ -100,12 +102,12 @@ export class WorkTasksController {
   async list(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Query() query: unknown,
   ): Promise<WorkPage<MyTaskItem>> {
     const parsed = ListWorkTasksQuery.safeParse(query);
     if (!parsed.success) invalidRequest(parsed.error, 'Paramètres de liste invalides.');
-    return this.tasks.listTransverse(orgId, parsed.data, workActorOf(user, role));
+    return this.tasks.listTransverse(orgId, parsed.data, workActorOf(user, perms));
   }
 
   @Get('my-tasks')
@@ -113,9 +115,9 @@ export class WorkTasksController {
   async myTasks(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
   ): Promise<MyTasksView> {
-    return this.tasks.myTasks(orgId, workActorOf(user, role));
+    return this.tasks.myTasks(orgId, workActorOf(user, perms));
   }
 
   @Get('tasks/:taskId')
@@ -132,13 +134,13 @@ export class WorkTasksController {
   async patch(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('taskId', WorkIdPipe) taskId: string,
     @Body() body: unknown,
   ): Promise<WorkTaskWriteResult> {
     const parsed = PatchWorkTaskBody.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error);
-    return this.tasks.patch(orgId, taskId, parsed.data, workActorOf(user, role));
+    return this.tasks.patch(orgId, taskId, parsed.data, workActorOf(user, perms));
   }
 
   @Post('tasks/:taskId/move')
@@ -147,13 +149,13 @@ export class WorkTasksController {
   async move(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('taskId', WorkIdPipe) taskId: string,
     @Body() body: unknown,
   ): Promise<WorkTaskWriteResult> {
     const parsed = MoveWorkTaskBody.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error);
-    return this.tasks.move(orgId, taskId, parsed.data, workActorOf(user, role));
+    return this.tasks.move(orgId, taskId, parsed.data, workActorOf(user, perms));
   }
 
   @Post('tasks/:taskId/complete')
@@ -162,7 +164,7 @@ export class WorkTasksController {
   async complete(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('taskId', WorkIdPipe) taskId: string,
     @Body() body: unknown,
   ): Promise<WorkTaskWriteResult> {
@@ -172,7 +174,7 @@ export class WorkTasksController {
       orgId,
       taskId,
       parsed.data.expectedRevision,
-      workActorOf(user, role),
+      workActorOf(user, perms),
     );
   }
 
@@ -182,13 +184,13 @@ export class WorkTasksController {
   async reopen(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('taskId', WorkIdPipe) taskId: string,
     @Body() body: unknown,
   ): Promise<WorkTaskWriteResult> {
     const parsed = WorkExpectedRevisionBody.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error);
-    return this.tasks.reopen(orgId, taskId, parsed.data.expectedRevision, workActorOf(user, role));
+    return this.tasks.reopen(orgId, taskId, parsed.data.expectedRevision, workActorOf(user, perms));
   }
 
   @Delete('tasks/:taskId')
@@ -197,10 +199,10 @@ export class WorkTasksController {
   async remove(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('taskId', WorkIdPipe) taskId: string,
   ): Promise<void> {
-    await this.tasks.remove(orgId, taskId, workActorOf(user, role));
+    await this.tasks.remove(orgId, taskId, workActorOf(user, perms));
   }
 
   @Post('tasks/:taskId/dependencies')
@@ -209,7 +211,7 @@ export class WorkTasksController {
   async addDependency(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('taskId', WorkIdPipe) taskId: string,
     @Body() body: unknown,
   ): Promise<WorkTaskWriteResult> {
@@ -219,7 +221,7 @@ export class WorkTasksController {
       orgId,
       taskId,
       parsed.data.predecessorTaskId,
-      workActorOf(user, role),
+      workActorOf(user, perms),
     );
   }
 
@@ -228,11 +230,11 @@ export class WorkTasksController {
   async removeDependency(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('taskId', WorkIdPipe) taskId: string,
     @Param('predecessorTaskId', WorkIdPipe) predecessorTaskId: string,
   ): Promise<WorkTaskWriteResult> {
-    return this.tasks.removeDependency(orgId, taskId, predecessorTaskId, workActorOf(user, role));
+    return this.tasks.removeDependency(orgId, taskId, predecessorTaskId, workActorOf(user, perms));
   }
 
   @Get('tasks/:taskId/activity')

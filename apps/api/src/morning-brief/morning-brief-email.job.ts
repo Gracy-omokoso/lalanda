@@ -21,7 +21,8 @@ import type { Model } from 'mongoose';
 import { formatFr, type BriefFact, type MorningBrief } from '@lalanda/engine';
 
 import { OrganizationSuspension } from '../admin/organization-suspension.schema.js';
-import { can, NO_OVERRIDES, normalizeOrgRole } from '../authz/permissions.js';
+import { MEMBER_PERMISSIONS_PROJECTION, memberPermissionsOf } from '../authz/authz.service.js';
+import { can } from '../authz/permissions.js';
 import { MailService } from '../mail/mail.service.js';
 import { MembersService } from '../organizations/members.service.js';
 import { Membership, type MembershipDocument } from '../organizations/membership.schema.js';
@@ -170,19 +171,23 @@ export class MorningBriefEmailJob implements OnModuleInit {
     now: Date,
   ): Promise<'sent' | 'skipped' | 'failed'> {
     const [membership, suspended, org] = await Promise.all([
-      this.memberships.findOne({ organizationId, userId }, { role: 1 }).lean().exec(),
+      this.memberships
+        .findOne({ organizationId, userId }, MEMBER_PERMISSIONS_PROJECTION)
+        .lean()
+        .exec(),
       this.suspensions.exists({ organizationId, liftedAt: null }).exec(),
       this.organizations.findById(organizationId, { name: 1 }).lean().exec(),
     ]);
-    const role = normalizeOrgRole(membership?.role);
-    if (!membership || !role || !can(role, 'analytics.read', NO_OVERRIDES) || suspended || !org) {
+    // ADR-0041 § 9.4 (A3) : droits effectifs du destinataire (titre + écart).
+    const member = memberPermissionsOf(membership);
+    if (!member || !can(member.role, 'analytics.read', member.context) || suspended || !org) {
       return 'skipped';
     }
     const email = (await this.members.identitiesOf([userId])).get(userId)?.email;
     if (!email) return 'skipped';
 
-    // Le brief est construit POUR le destinataire : ses tâches, son rôle.
-    const brief = await this.briefs.build(organizationId, role, userId, now);
+    // Le brief est construit POUR le destinataire : ses tâches, ses droits effectifs.
+    const brief = await this.briefs.build(organizationId, member.role, member.context, userId, now);
     const res = await this.mail.sendMorningBrief({ to: email, ...emailContent(brief, org.name) });
     return res.delivered ? 'sent' : 'failed';
   }

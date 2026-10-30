@@ -29,9 +29,11 @@ import {
 import { AuthGuard } from '../auth/auth.guard.js';
 import { CurrentOrgId, CurrentUser } from '../auth/current-user.decorator.js';
 import { RequirePermission } from '../authz/authz.decorators.js';
-import { CurrentOrgRole } from '../authz/current-org-role.decorator.js';
+import {
+  CurrentOrgPermissions,
+  type CurrentOrgPermissionsValue,
+} from '../authz/current-org-permissions.decorator.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
-import type { OrgRole } from '../authz/permissions.js';
 import { invalidRequest } from '../sales/sales.errors.js';
 import { WorkIdPipe, workActorOf } from './work.common.js';
 import { WorkCommentsService } from './work-comments.service.js';
@@ -60,13 +62,13 @@ export class WorkCommentsController {
   async create(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('taskId', WorkIdPipe) taskId: string,
     @Body() body: unknown,
   ): Promise<WorkCommentView> {
     const parsed = CreateWorkCommentBody.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error);
-    return this.comments.create(orgId, taskId, parsed.data, workActorOf(user, role));
+    return this.comments.create(orgId, taskId, parsed.data, workActorOf(user, perms));
   }
 
   @Put('comments/:commentId')
@@ -74,13 +76,13 @@ export class WorkCommentsController {
   async update(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('commentId', WorkIdPipe) commentId: string,
     @Body() body: unknown,
   ): Promise<WorkCommentView> {
     const parsed = UpdateWorkCommentBody.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error);
-    return this.comments.update(orgId, commentId, parsed.data, workActorOf(user, role));
+    return this.comments.update(orgId, commentId, parsed.data, workActorOf(user, perms));
   }
 
   @Delete('comments/:commentId')
@@ -89,9 +91,9 @@ export class WorkCommentsController {
   async remove(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('commentId', WorkIdPipe) commentId: string,
   ): Promise<void> {
-    await this.comments.remove(orgId, commentId, workActorOf(user, role));
+    await this.comments.remove(orgId, commentId, workActorOf(user, perms));
   }
 }

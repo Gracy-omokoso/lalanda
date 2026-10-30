@@ -176,7 +176,7 @@ describe('brief du matin envoyé au modèle, sans `treasury.read`', () => {
     );
     // Le Conseiller n'a ni `sales.read`, ni `work.read`, ni `treasury.read` :
     // aucune source n'est appelée.
-    const brief = await service.build('org', 'advisor', 'u1', new Date(base.now));
+    const brief = await service.build('org', 'advisor', NO_OVERRIDES, 'u1', new Date(base.now));
     expect(cashOf).not.toHaveBeenCalled();
     expect(brief.facts.find((f) => f.id === 'tresorerie')?.status).toBe('hidden');
   });
