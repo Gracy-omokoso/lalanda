@@ -39,9 +39,10 @@ comme partenaire de développement et d'intégration. »
 ## Conséquences
 
 - Toute acceptation `2026-08-09` devient périmée (`isCurrent: false`).
-- **L'écran de ré-acceptation à la connexion n'existe pas** (docs/28 § 2.3 bis) :
-  tant qu'il n'est pas construit, la décision 4 n'est pas appliquée aux comptes
-  existants.
+- Écran de nouvelle acceptation construit (docs/28 § 2.3 bis) : fenêtre bloquante
+  après connexion tant que l'accord est périmé, sortie par « Se déconnecter » ;
+  `Modal` de `@lalanda/ui` gagne l'option `dismissible={false}`. La garde est
+  côté interface ; l'API ne refuse pas les appels d'un compte à l'accord périmé.
 - L'analyse fondée sur « LLC = États-Unis » est caduque ; les questions de droit
   applicable, juridiction, protection des données et transferts sont reformulées
   pour un éditeur congolais et restent à faire trancher par un juriste

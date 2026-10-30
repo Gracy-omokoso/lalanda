@@ -91,9 +91,8 @@ production », MinIO « en service » sur le Droplet).
 sociale exacte de l’entité contractante DigitalOcean, son adresse, et la région
 réelle du Droplet de production (ADR-0009 dit `ams3` « par défaut », sans
 constat). La section « Transferts » de la politique de confidentialité garde
-donc son marqueur sur le pays d’hébergement. À noter : `docs/24` liste encore
-« provisioning des Droplets » au « Reste à faire » — mention périmée, non
-corrigée ici.
+donc son marqueur sur le pays d’hébergement. `docs/24` consigne depuis le
+30 oct. 2026 que le Droplet de production est provisionné et en service.
 
 ### 1.3 Questions ouvertes à poser au juriste (remplace l’analyse « LLC »)
 
@@ -229,8 +228,30 @@ confidentialité, mentions légales (la politique de cookies ne change pas).
 - `POST /legal/terms/acceptance` accepte `2026-10-30` (et, comme avant, refuse
   une version jamais publiée).
 
-**Ce qui N’EXISTE PAS — la ré-acceptation à la connexion.** Vérifié le
-30 oct. 2026 : aucun écran ni garde ne redemande l’accord.
+**Écran de nouvelle acceptation — livré le 30 oct. 2026.** Constat initial :
+aucun écran ni garde ne redemandait l’accord. Il est construit :
+
+- `apps/web/src/app/(app)/_components/terms-gate.tsx`, monté dans la coquille
+  applicative : après connexion, `GET /legal/terms/acceptance` ; si
+  `isCurrent` est faux, fenêtre **bloquante** (`Modal` de `@lalanda/ui` avec
+  `dismissible={false}` : ni bouton Fermer, ni `Échap`, ni clic sur le fond),
+  liens vers CGU, CGV et confidentialité (nouvel onglet), case « J’ai lu et
+  j’accepte » non pré-cochée, puis `POST /legal/terms/acceptance` avec la
+  version **affichée**. Seule autre sortie : « Se déconnecter ».
+- Décisions dans le modèle pur `terms-gate-model.ts` (testé) : rien n’est
+  affiché tant que la réponse n’est pas arrivée (pas de clignotement) ; un
+  échec de la vérification n’est **pas** bloquant (bandeau « Réessayer ») ;
+  un échec de l’enregistrement affiche un message et laisse réessayer ; si le
+  serveur exige une version plus récente que celle de la page, on demande de
+  recharger au lieu d’enregistrer un accord sur un texte non lu.
+- Couvre aussi les comptes Google et les comptes antérieurs à S22c.
+- e2e `legal.e2e.test.ts` : un accord `2026-08-09` est `isCurrent: false`, puis
+  redevient à jour après acceptation, l’historique gardant les deux.
+
+Limite : la garde est côté interface. L’API ne refuse aucune route à un
+utilisateur dont l’accord est périmé — un appel direct à l’API reste possible.
+
+*Constat initial (avant l’écran), pour mémoire :*
 
 - Côté web, `api.getTermsAcceptance()` et `api.acceptTerms()`
   (`apps/web/src/lib/api.ts`) ne sont **appelés nulle part** ; ni la connexion,
@@ -238,15 +259,7 @@ confidentialité, mentions légales (la politique de cookies ne change pas).
 - Côté API, aucune route n’est refusée à un utilisateur dont l’accord est
   périmé ; la session s’ouvre normalement.
 
-Conséquence : **en l’état, un utilisateur existant ne se voit rien redemander.**
-Les CGU (§ « Modification des conditions ») annoncent pourtant que l’accord
-« vous est redemandé à la prochaine connexion ». Il manque, à construire :
-un écran de ré-acceptation (case non pré-cochée, liens CGU/CGV/confidentialité)
-affiché après connexion tant que `isCurrent` est faux, qui appelle
-`POST /legal/terms/acceptance` avec la version affichée. Cet écran couvrirait
-aussi les comptes Google et les comptes antérieurs à S22c (limite ci-dessus).
-Choix à arbitrer : bloquer l’application jusqu’à l’accord, ou permettre un
-report.
+Retenu : l’application est bloquée jusqu’à l’accord (pas de report).
 
 Côté API (`apps/api/src/legal/`), la collection `terms_acceptances` conserve
 `userId`, `termsVersion` et `acceptedAt`. L’enregistrement est **idempotent par
@@ -317,6 +330,18 @@ conclure, la durée de conservation appliquée de leur côté, et l’instrument
 encadrant le transfert hors du pays de l’utilisateur. Ces points sont à
 **formaliser avant mise en service commerciale**.
 
+### 2.5 bis Envoi d’e-mails : Zoho ZeptoMail (30 oct. 2026)
+
+La politique de confidentialité affirmait qu’aucun e-mail n’était envoyé. C’est
+faux depuis ADR-0014 (amendement S22m) : Lalanda envoie ses e-mails par **Zoho
+ZeptoMail** — vérification d’adresse, réinitialisation du mot de passe,
+invitations, brief du matin et alertes, et documents de vente envoyés aux
+clients des organisations (ADR-0042). ZeptoMail figure désormais dans le tableau
+des prestataires (« En service ») et la limite fausse est retirée. Rien n’est
+affirmé sur ses garanties contractuelles, sa localisation ou ses durées de
+conservation : ces points relèvent du marqueur « Transferts » et des questions
+du § 1.3.
+
 ### 2.6 Pieds de page
 
 Les cinq documents sont liés depuis :
@@ -377,7 +402,6 @@ que personne ne s’en aperçoive.
 |---|---|
 | Dénomination exacte et adresse de l’entité DigitalOcean contractante (§ 1.2) | non publiées |
 | Région réelle du Droplet de production (§ 1.2) | Confidentialité |
-| « Limites actuelles » affirme qu’aucun e-mail n’est envoyé, alors que le module `mail/` (ZeptoMail/SMTP) existe — à vérifier et corriger (hors du lot du 30 oct.) | Confidentialité |
 | Entité contractante d’OpenAI et adresse de son établissement | Confidentialité |
 | DPA OpenAI, conservation, instrument de transfert | Confidentialité |
 

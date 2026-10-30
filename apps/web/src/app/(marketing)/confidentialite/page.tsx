@@ -8,7 +8,7 @@
 //
 // RÈGLE DE RÉDACTION DE CETTE PAGE : elle décrit les traitements RÉELLEMENT
 // effectués par le code de ce dépôt, à la date de sa dernière mise à jour. Ce
-// qui n'existe pas est dit comme n'existant pas (envoi d'emails, paiement), ce
+// qui n'existe pas est dit comme n'existant pas (paiement en ligne), ce
 // qui n'est pas décidé est marqué `[À COMPLÉTER]`. Une politique de
 // confidentialité qui décrit un service imaginaire est une déclaration fausse
 // faite à la personne concernée — c'est le seul document du lot où la formule
@@ -262,9 +262,9 @@ const SECTIONS: readonly LegalSection[] = [
               'En service',
             ],
             [
-              <ToComplete key="m">fournisseur d’envoi d’emails</ToComplete>,
-              'Envoi des emails du service : vérification d’adresse, invitations, notifications.',
-              'Aucun fournisseur configuré — aucun email n’est envoyé à ce jour',
+              'Zoho ZeptoMail',
+              'Envoi des e-mails du service : vérification d’adresse, réinitialisation du mot de passe, invitations, brief du matin et alertes, ainsi que les documents de vente (factures, avoirs, pro forma, devis) que vous adressez à vos clients depuis l’application.',
+              'En service',
             ],
             [
               <ToComplete key="p">prestataire de paiement</ToComplete>,
@@ -274,9 +274,9 @@ const SECTIONS: readonly LegalSection[] = [
           ]}
         />
         <p>
-          Les deux dernières lignes décrivent des rôles prévus, sans prestataire choisi. Nous les
-          faisons figurer pour que cette page ne devienne pas fausse le jour où ils le seront&nbsp;:
-          leur mise en service donnera lieu à une mise à jour de cette politique.
+          La dernière ligne décrit un rôle prévu, sans prestataire choisi. Nous la faisons figurer
+          pour que cette page ne devienne pas fausse le jour où il le sera&nbsp;: sa mise en service
+          donnera lieu à une mise à jour de cette politique.
         </p>
         <p>
           Vos données peuvent par ailleurs être communiquées à une autorité si la loi nous y oblige.
@@ -417,15 +417,11 @@ const SECTIONS: readonly LegalSection[] = [
           des conséquences visibles pour vous&nbsp;:
         </p>
         <LegalList
-          items={[
-            'Aucun email n’est envoyé, faute de fournisseur configuré. La vérification d’adresse et le changement d’adresse email ne peuvent donc pas aboutir aujourd’hui, et aucune notification ne vous parvient — même si vous en avez activé.',
-            'Aucun paiement n’est encaissé : il n’existe pas d’intégration de paiement.',
-          ]}
+          items={['Aucun paiement n’est encaissé : il n’existe pas d’intégration de paiement.']}
         />
         <p>
           Ces manques seront comblés. Ils sont mentionnés ici parce qu&apos;une politique de
-          confidentialité qui décrit des envois d&apos;emails inexistants ou un paiement fictif
-          n&apos;informe personne.
+          confidentialité qui décrit un paiement fictif n&apos;informe personne.
         </p>
       </>
     ),

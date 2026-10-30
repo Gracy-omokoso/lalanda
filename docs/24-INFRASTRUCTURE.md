@@ -49,9 +49,16 @@ Chaîne de déploiement conforme à l'ADR-0009 (DigitalOcean Droplets + Spaces +
   `AAAAMMJJ-NNNN-*.mjs`, `up`/`down` idempotents, exécution avant démarrage,
   registre `_migrations`). Runner à outiller ultérieurement.
 
+### État au 30 oct. 2026
+
+- **Droplet de production provisionné, production en service** sur DigitalOcean
+  (ADR-0009). DigitalOcean est nommé comme hébergeur dans les mentions légales et
+  la politique de confidentialité (ADR-0043, docs/28 § 1.2). La région du Droplet
+  n'est pas consignée dans ce dépôt.
+
 ### Reste à faire
 
-- provisioning des Droplets (staging + production) et DNS ;
+- Droplet de staging, s'il est retenu (voir « environnement staging dédié ») ;
 - secrets GitHub (`DO_SSH_HOST/USER/KEY`) + variables (`DEPLOY_ENABLED`,
   `NEXT_PUBLIC_API_URL`) ;
 - bascule MinIO → Cloudflare R2 (procédure ci-dessous ; le code est prêt, il
