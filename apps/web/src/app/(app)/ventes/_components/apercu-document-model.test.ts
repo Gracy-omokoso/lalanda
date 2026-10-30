@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   adresseValide,
+  destinataireDocument,
   lecteurPdfIntegre,
   lireCopies,
   messageErreurEnvoi,
@@ -48,6 +49,9 @@ describe('textes', () => {
   it('raison sans droit, confirmation, résultat', () => {
     expect(raisonSansDroit('facture')).toMatch(/émettent/);
     expect(raisonSansDroit('devis')).toMatch(/devis/);
+    expect(raisonSansDroit('bon-de-commande')).toMatch(/achats/);
+    expect(destinataireDocument('bon-de-commande')).toBe('Le fournisseur');
+    expect(destinataireDocument('facture')).toBe('Le client');
     expect(
       phraseConfirmation({ to: 'a@b.cd', cc: ['c@d.cd'], subject: 's', message: '' }, 'F.pdf'),
     ).toBe('Envoyer F.pdf à a@b.cd (copie : c@d.cd) ?');

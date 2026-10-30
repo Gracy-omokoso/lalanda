@@ -13,6 +13,7 @@ import type { OrgAction } from '@/lib/api';
 import {
   actionsRapides,
   appActive,
+  ACHATS_SOUS_OPTIONS_PREVUES,
   appsVisibles,
   cleModules,
   CRM_SOUS_OPTIONS_PREVUES,
@@ -41,6 +42,11 @@ const PROPRIETAIRE: OrgAction[] = [
   'work.read',
   'work.update',
   'work.manage',
+  'purchase.read',
+  'purchase.request',
+  'purchase.manage',
+  'purchase.approve',
+  'payables.pay',
 ];
 const LECTEUR: OrgAction[] = ['project.read', 'sales.read'];
 const SANS_VENTES: OrgAction[] = ['project.read'];
@@ -102,6 +108,7 @@ describe('applications et ordre', () => {
       'encaissements',
       'clients',
       'catalogue',
+      'achats',
       'tresorerie',
     ]);
   });
@@ -353,5 +360,56 @@ describe('barre d’actions basse (téléphone)', () => {
 
   it('pas de « Facturer » pour un rôle en lecture seule', () => {
     expect(actionsRapides(LECTEUR).map((x) => x.id)).toEqual(['plans', 'factures', 'clients']);
+  });
+});
+
+describe('ADR-0044 § 8 — application Achats', () => {
+  it('juste avant Trésorerie, visible avec `purchase.read` seul', () => {
+    const achats = NAV_APPS.find((a) => a.id === 'achats')!;
+    expect(achats.module).toBe('run');
+    expect(achats.href).toBe('/achats');
+    expect(achats.icon).toBe('achats');
+    expect(achats.action).toBe('purchase.read');
+    const run = ids(appsVisibles(PROPRIETAIRE, 'run'));
+    expect(run.indexOf('achats')).toBe(run.indexOf('tresorerie') - 1);
+    expect(ids(appsVisibles(['purchase.read'], 'run'))).toEqual(['achats']);
+    expect(ids(appsVisibles(['treasury.read'], 'run'))).not.toContain('achats');
+  });
+
+  it('sous-options livrées, dans l’ordre prévu ; « À approuver » exige `purchase.approve`', () => {
+    const complet = appsVisibles(PROPRIETAIRE, 'run').find((a) => a.id === 'achats')!;
+    expect(complet.sousOptions.map((s) => s.label)).toEqual([
+      'Vue d’ensemble',
+      'Demandes et commandes',
+      'À approuver',
+      'Fournisseurs',
+    ]);
+    const prevues: readonly string[] = ACHATS_SOUS_OPTIONS_PREVUES;
+    const positions = complet.sousOptions.map((s) => prevues.indexOf(s.id));
+    expect(positions.every((p) => p >= 0)).toBe(true);
+    expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+    const demandeur = appsVisibles(['purchase.read', 'purchase.request'], 'run')[0]!;
+    expect(demandeur.sousOptions.map((s) => s.id)).toEqual([
+      'achats-vue',
+      'achats-commandes',
+      'achats-fournisseurs',
+    ]);
+  });
+
+  it('les écrans non livrés restent masqués', () => {
+    const hrefs = NAV_APPS.find((a) => a.id === 'achats')!.sousOptions.map((s) => s.href);
+    for (const absent of ['/achats/receptions', '/achats/factures', '/achats/a-payer']) {
+      expect(hrefs).not.toContain(absent);
+    }
+  });
+
+  it('chemin → module RUN, application et sous-option', () => {
+    expect(moduleCourant('/achats')).toBe('run');
+    expect(appActive('/achats/commandes/abc')).toBe('achats');
+    expect(sousOptionActive('/achats')).toBe('achats-vue');
+    expect(sousOptionActive('/achats/commandes/abc')).toBe('achats-commandes');
+    expect(sousOptionActive('/achats/validations')).toBe('achats-validations');
+    expect(sousOptionActive('/achats/fournisseurs/abc')).toBe('achats-fournisseurs');
+    expect(appActive('/achats-groupes')).toBeNull();
   });
 });
