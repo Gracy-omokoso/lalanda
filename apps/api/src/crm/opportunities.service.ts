@@ -717,9 +717,14 @@ export class OpportunitiesService {
     input: OpportunityInput,
     actor: CrmActor,
     source: CrmStageEvent['source'],
+    // ADR-0040 — C9 : l'import CSV transmet le motif de perte (exigé pour une
+    // opportunité perdue si les réglages l'imposent, comme à la création).
+    lost: { lostReasonKey: string | null; lostReasonDetail: string | null } = {
+      lostReasonKey: null,
+      lostReasonDetail: null,
+    },
   ): Promise<Record<string, unknown>> {
-    // L'import CSV (ADR-0035) crée sans motif : motif non exigé (lot C9).
-    return (await this.buildV2(organizationId, stageKey, input, actor, source, null)).doc;
+    return (await this.buildV2(organizationId, stageKey, input, actor, source, lost)).doc;
   }
 
   private async buildV2(
