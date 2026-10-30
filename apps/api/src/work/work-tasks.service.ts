@@ -42,6 +42,7 @@ import {
 } from '@lalanda/shared/work';
 import { MY_TASKS_MAX_PER_SOURCE, type CrmMyTaskItem } from '@lalanda/shared/crm';
 import { PURCHASES_AGENDA_MAX, type PurchasesMyTaskItem } from '@lalanda/shared/purchases';
+import { HR_LIMITS, type HrMyTaskItem } from '@lalanda/shared/hr';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
@@ -63,10 +64,13 @@ import {
 } from './work.common.js';
 import {
   CRM_AGENDA_SOURCE,
+  HR_AGENDA_SOURCE,
   PURCHASES_AGENDA_SOURCE,
   noCrmAgenda,
+  noHrAgenda,
   noPurchasesAgenda,
   type CrmAgendaReader,
+  type HrAgendaReader,
   type PurchasesAgendaReader,
 } from './my-tasks.ports.js';
 import { WorkActivityService, type ActivityInput } from './work-activity.service.js';
@@ -120,13 +124,17 @@ export class WorkTasksService {
     @Optional()
     @Inject(PURCHASES_AGENDA_SOURCE)
     purchasesAgenda: PurchasesAgendaReader | null = null,
+    // ADR-0045 — H3 (§ 6.1) : validations d'absence, éléments de liste RH (facultatifs).
+    @Optional() @Inject(HR_AGENDA_SOURCE) hrAgenda: HrAgendaReader | null = null,
   ) {
     this.crmAgenda = crmAgenda ?? noCrmAgenda;
     this.purchasesAgenda = purchasesAgenda ?? noPurchasesAgenda;
+    this.hrAgenda = hrAgenda ?? noHrAgenda;
   }
 
   private readonly crmAgenda: CrmAgendaReader;
   private readonly purchasesAgenda: PurchasesAgendaReader;
+  private readonly hrAgenda: HrAgendaReader;
 
   // ── Accès ────────────────────────────────────────────────────────────────
 
@@ -348,6 +356,10 @@ export class WorkTasksService {
    *
    * ADR-0044 — P3 (§ 6.5) : et les demandes d'achat que l'appelant peut approuver
    * (`purchase.approve`), 200 au plus, sans case à cocher.
+   *
+   * ADR-0045 — H3 (§ 6.1) : et les demandes d'absence que l'appelant peut traiter
+   * (manager désigné ou `leave.approve`, séparation des tâches appliquée), plus les
+   * éléments de liste RH qui lui sont assignés ; 200 au plus.
    */
   async myTasks(organizationId: string, actor: WorkActor, now = new Date()): Promise<MyTasksView> {
     const archived = await this.projects.archivedIds(organizationId);
@@ -362,7 +374,9 @@ export class WorkTasksService {
     // ADR-0044 — P3 (§ 6.5) : approbations d'achat, pour les détenteurs EFFECTIFS de
     // `purchase.approve` seulement.
     const approvalsVisible = actorCan(actor, 'purchase.approve');
-    const [docs, crm, purchases] = await Promise.all([
+    // ADR-0045 — H3 : la relation de manager suffit ; tout membre est interrogé.
+    const hrVisible = actorCan(actor, 'analytics.read');
+    const [docs, crm, purchases, hr] = await Promise.all([
       this.tasks
         .find(filter, LIGHT)
         .sort({ dueDate: 1, _id: 1 })
@@ -375,6 +389,17 @@ export class WorkTasksService {
       approvalsVisible
         ? this.purchasesAgenda.approvalsOf(organizationId, actor.userId, PURCHASES_AGENDA_MAX)
         : Promise.resolve({ items: [] as PurchasesMyTaskItem[], truncated: false }),
+      hrVisible
+        ? this.hrAgenda.agendaOf(
+            organizationId,
+            {
+              userId: actor.userId,
+              holdsLeaveApprove: actorCan(actor, 'leave.approve'),
+              seesConfidential: actorCan(actor, 'hr.sensitive.read'),
+            },
+            HR_LIMITS.agendaItemsMax,
+          )
+        : Promise.resolve({ items: [] as HrMyTaskItem[], truncated: false }),
     ]);
     const workTruncated = docs.length > MY_TASKS_MAX_PER_SOURCE;
     const work = await this.withProjectNames(
@@ -385,6 +410,7 @@ export class WorkTasksService {
       ...work.map((t) => ({ ...t, source: 'work' as const })),
       ...crm.items,
       ...purchases.items,
+      ...hr.items,
     ];
     const today = kinshasaDayOf(now);
     const { dueSoonDays } = await this.settings.get(organizationId);
@@ -392,7 +418,7 @@ export class WorkTasksService {
     return {
       asOf: today,
       ...groups,
-      truncated: workTruncated || crm.truncated || purchases.truncated,
+      truncated: workTruncated || crm.truncated || purchases.truncated || hr.truncated,
     };
   }
 

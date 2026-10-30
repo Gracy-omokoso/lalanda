@@ -14,8 +14,15 @@
 // ADR-0044 § 6.5 (lot P3) : un élément `source: 'purchases'` est une demande d'achat
 // que l'appelant peut approuver. Pas de case à cocher (approuver exige une
 // décision) : il ouvre la demande et porte la pastille « Approbation ».
+//
+// ADR-0045 § 6.1 (lot H3) : un élément `source: 'hr'` est soit une absence à valider
+// (`leave_approval`, pastille « Validation d'absence », sans case à cocher : valider
+// est une décision), soit un élément de liste d'entrée ou de sortie (`checklist_item`,
+// lot H4). Le type d'une absence confidentielle arrive déjà masqué (« Absence ») :
+// l'écran n'en sait pas plus.
 
 import type { CrmMyTaskItem } from '@lalanda/shared/crm';
+import type { HrMyTaskItem } from '@lalanda/shared/hr';
 import type { PurchasesMyTaskItem } from '@lalanda/shared/purchases';
 import {
   groupMyTasks,
@@ -27,6 +34,7 @@ import {
 
 import type { OrgAction } from '@/lib/api';
 
+import { formatJours, libellePeriode } from '../../rh/_components/rh-model';
 import { formatMontant } from '../../ventes/_components/sales-model';
 
 export type CleGroupe = 'overdue' | 'today' | 'next7Days' | 'later' | 'noDate';
@@ -74,6 +82,32 @@ export function sousTitreApprobation(e: PurchasesMyTaskItem): string {
   return [e.requestNumber, e.supplierName, formatMontant(e.total, e.currency)]
     .filter((p): p is string => typeof p === 'string' && p !== '')
     .join(' · ');
+}
+
+/** Pastille des absences à valider (ADR-0045 § 8) : forme et libellé, pas une couleur. */
+export const PASTILLE_VALIDATION_ABSENCE = 'Validation d’absence';
+
+export function estElementRh(e: MyTaskEntry): e is HrMyTaskItem {
+  return e.source === 'hr';
+}
+
+/** Titre d'un élément RH : « Bea Kanku — Congés », ou le libellé de l'élément de liste. */
+export function titreElementRh(e: HrMyTaskItem): string {
+  return e.kind === 'leave_approval' ? `${e.employeeName} — ${e.typeLabel}` : e.label;
+}
+
+/** Pastille d'un élément RH : « Validation d'absence », ou la nature de la liste. */
+export function pastilleElementRh(e: HrMyTaskItem): string {
+  return e.kind === 'leave_approval' ? PASTILLE_VALIDATION_ABSENCE : e.kindLabel;
+}
+
+/**
+ * Ligne secondaire : période et durée rendues par l'API (« du 1 mars au 5 mars 2027
+ * (matin) · 3,5 jours »), jamais recalculées ; ou le collaborateur d'un élément de liste.
+ */
+export function sousTitreElementRh(e: HrMyTaskItem): string {
+  if (e.kind === 'checklist_item') return e.employeeName;
+  return `${libellePeriode(e.start, e.end)} · ${formatJours(e.days)}`;
 }
 
 /**

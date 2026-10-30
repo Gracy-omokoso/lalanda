@@ -10,6 +10,7 @@
 // détient `crm.read` (contrôlé par `WorkTasksService.myTasks`).
 
 import type { CrmMyTaskItem } from '@lalanda/shared/crm';
+import type { HrMyTaskItem } from '@lalanda/shared/hr';
 import type { PurchasesMyTaskItem } from '@lalanda/shared/purchases';
 
 export const CRM_AGENDA_SOURCE = Symbol('WORK_CRM_AGENDA_SOURCE');
@@ -50,4 +51,35 @@ export interface PurchasesAgendaReader {
 /** Sans module des achats (tests) : aucune approbation. */
 export const noPurchasesAgenda: PurchasesAgendaReader = {
   approvalsOf: async () => ({ items: [], truncated: false }),
+};
+
+// ── ADR-0045 — H3 (§ 6.1) : validations d'absence et éléments de liste RH ────
+//
+// Même motif : agrégés à la lecture, en lecture seule, par le fournisseur réel
+// `hr/agenda/hr-agenda.source.ts`. Appelé pour tout membre (un manager n'a besoin
+// d'aucune action : la relation suffit) ; les droits EFFECTIFS utiles sont passés.
+
+export const HR_AGENDA_SOURCE = Symbol('WORK_HR_AGENDA_SOURCE');
+
+export interface HrAgendaActor {
+  userId: string;
+  /** `leave.approve` effectif : étape RH, suppléance du manager. */
+  holdsLeaveApprove: boolean;
+  /** `hr.sensitive.read` effectif : voit le type des absences confidentielles. */
+  seesConfidential: boolean;
+}
+
+export interface HrAgendaPage {
+  items: HrMyTaskItem[];
+  /** Vrai si plus de `limit` éléments répondaient. */
+  truncated: boolean;
+}
+
+export interface HrAgendaReader {
+  agendaOf(organizationId: string, actor: HrAgendaActor, limit: number): Promise<HrAgendaPage>;
+}
+
+/** Sans module RH (tests) : aucun élément. */
+export const noHrAgenda: HrAgendaReader = {
+  agendaOf: async () => ({ items: [], truncated: false }),
 };

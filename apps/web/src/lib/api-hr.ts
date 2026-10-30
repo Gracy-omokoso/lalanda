@@ -394,7 +394,8 @@ const id = encodeURIComponent;
 // ─── Adaptation aux contrats du lot H2 (`@lalanda/shared/hr`) ───────────────
 // ADR-0045 — H2 : les vues ci-dessus ont été écrites avant les contrats. Les réponses
 // réelles sont ramenées ici à ces formes, sans calcul : le statut dérivé vient du
-// moteur (`derivedStatus`) ; soldes et demandes de « moi » arrivent avec le lot H3.
+// moteur (`derivedStatus`) ; soldes et demandes de « moi », noms du service, du
+// manager et du type de contrat sont servis par l'API depuis le lot H3.
 
 /** Fiche de l'API → vue des écrans (`upcoming`, `onProbation` lus sur `derivedStatus`). */
 export function employeeFromApi(e: ApiEmployee): HrEmployeeView {
@@ -406,8 +407,12 @@ export function employeeFromApi(e: ApiEmployee): HrEmployeeView {
     employeeNumber: e.employeeNumber,
     jobTitle: e.jobTitle,
     departmentId: e.departmentId,
+    // ADR-0045 — H3 : copies d'affichage servies par l'API.
+    departmentName: e.departmentName,
     managerEmployeeId: e.managerEmployeeId,
+    managerName: e.managerName,
     contractType: e.contractType,
+    contractTypeLabel: e.contractTypeLabel,
     startDate: e.startDate,
     endDate: e.endDate,
     status: e.status,
@@ -430,8 +435,9 @@ export function employeeFromApi(e: ApiEmployee): HrEmployeeView {
 export function meFromApi(m: ApiMe): HrMeView {
   return {
     employee: m.employee ? employeeFromApi(m.employee) : null,
-    balances: [],
-    requests: [],
+    // ADR-0045 — H3 : soldes (moteur) et demandes servis avec « moi ».
+    balances: m.balances,
+    requests: m.requests,
     isManager: m.isManager,
     canApprove: m.canApprove,
   };
@@ -442,6 +448,9 @@ export function teamFromApi(t: ApiTeam): HrTeamView {
   return {
     members: t.items.map((m) => ({
       direct: m.isDirect,
+      // ADR-0045 — H3 : soldes et absences de l'équipe (type masqué si confidentiel).
+      balances: m.balances,
+      absences: m.absences,
       employee: {
         id: m.id,
         firstName: m.displayName,
@@ -450,7 +459,9 @@ export function teamFromApi(t: ApiTeam): HrTeamView {
         employeeNumber: null,
         jobTitle: m.jobTitle,
         departmentId: m.departmentId,
+        departmentName: m.departmentName,
         managerEmployeeId: m.managerEmployeeId,
+        managerName: m.managerName,
         contractType: '',
         startDate: '',
         endDate: null,

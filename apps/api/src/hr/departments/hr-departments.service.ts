@@ -33,12 +33,18 @@ export interface HrActor {
   role: string;
 }
 
-function viewOf(d: DepartmentLean, activeEmployees: number): DepartmentView {
+function viewOf(
+  d: DepartmentLean,
+  activeEmployees: number,
+  heads: ReadonlyMap<string, string> = new Map(),
+): DepartmentView {
   return {
     id: String(d._id),
     name: d.name,
     parentId: d.parentId ?? null,
     headEmployeeId: d.headEmployeeId ?? null,
+    // ADR-0045 — H3 : nom d'usage du responsable, lu à la requête.
+    headName: d.headEmployeeId ? (heads.get(d.headEmployeeId) ?? null) : null,
     active: d.active,
     activeEmployees,
     revision: d.revision,
@@ -63,8 +69,11 @@ export class HrDepartmentsService {
       .sort({ nameKey: 1, _id: 1 })
       .lean<DepartmentLean[]>()
       .exec();
-    const counts = await this.activeCounts(organizationId);
-    return { items: docs.map((d) => viewOf(d, counts.get(String(d._id)) ?? 0)) };
+    const [counts, heads] = await Promise.all([
+      this.activeCounts(organizationId),
+      this.headNames(organizationId, docs),
+    ]);
+    return { items: docs.map((d) => viewOf(d, counts.get(String(d._id)) ?? 0, heads)) };
   }
 
   /** Tous les services de l'organisation (organigramme). */
@@ -74,8 +83,30 @@ export class HrDepartmentsService {
 
   async get(organizationId: string, departmentId: string): Promise<DepartmentView> {
     const doc = await this.requireOwn(organizationId, departmentId);
-    const counts = await this.activeCounts(organizationId);
-    return viewOf(doc, counts.get(departmentId) ?? 0);
+    const [counts, heads] = await Promise.all([
+      this.activeCounts(organizationId),
+      this.headNames(organizationId, [doc]),
+    ]);
+    return viewOf(doc, counts.get(departmentId) ?? 0, heads);
+  }
+
+  /** ADR-0045 — H3 : noms d'usage des responsables affichés (fiches de l'organisation). */
+  private async headNames(
+    organizationId: string,
+    docs: readonly DepartmentLean[],
+  ): Promise<Map<string, string>> {
+    const ids = [...new Set(docs.map((d) => d.headEmployeeId).filter(isObjectIdHexOrNull))];
+    if (ids.length === 0) return new Map();
+    const heads = await this.employees
+      .find(
+        { organizationId, _id: { $in: ids.map((id) => new Types.ObjectId(id)) } },
+        { firstName: 1, lastName: 1, preferredName: 1 },
+      )
+      .lean<EmployeeLean[]>()
+      .exec();
+    return new Map(
+      heads.map((e) => [String(e._id), e.preferredName ?? `${e.firstName} ${e.lastName}`]),
+    );
   }
 
   /** Service de l'organisation, ou 404. */
@@ -281,4 +312,8 @@ export class HrDepartmentsService {
 
 function nameExists(): never {
   conflict('DEPARTMENT_NAME_EXISTS', 'Un autre service actif porte déjà ce nom.');
+}
+
+function isObjectIdHexOrNull(v: string | null | undefined): v is string {
+  return typeof v === 'string' && isObjectIdHex(v);
 }

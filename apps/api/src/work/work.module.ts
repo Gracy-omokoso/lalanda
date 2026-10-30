@@ -18,7 +18,9 @@ import { CrmAgendaSource } from '../crm/agenda/crm-agenda.source.js';
 import { OrganizationsModule } from '../organizations/organizations.module.js';
 import { PurchasesAgendaModule } from '../purchases/agenda/purchases-agenda.module.js';
 import { PurchasesAgendaSource } from '../purchases/agenda/purchases-agenda.source.js';
-import { CRM_AGENDA_SOURCE, PURCHASES_AGENDA_SOURCE } from './my-tasks.ports.js';
+import { HrAgendaModule } from '../hr/agenda/hr-agenda.module.js';
+import { HrAgendaSource } from '../hr/agenda/hr-agenda.source.js';
+import { CRM_AGENDA_SOURCE, HR_AGENDA_SOURCE, PURCHASES_AGENDA_SOURCE } from './my-tasks.ports.js';
 import { WorkBriefSource } from './brief/work-brief.source.js';
 import { WorkActivityService } from './work-activity.service.js';
 import { WorkAttachmentsController } from './work-attachments.controller.js';
@@ -65,6 +67,8 @@ import {
     CrmAgendaModule,
     // ADR-0044 — P3 (§ 6.5) : approbations d'achat de « Mes tâches », lecture seule.
     PurchasesAgendaModule,
+    // ADR-0045 — H3 (§ 6.1) : validations d'absence de « Mes tâches », lecture seule.
+    HrAgendaModule,
     MongooseModule.forFeature([
       { name: WorkSettings.name, schema: WorkSettingsSchema },
       { name: WorkProject.name, schema: WorkProjectSchema },
@@ -102,6 +106,8 @@ import {
     { provide: CRM_AGENDA_SOURCE, useExisting: CrmAgendaSource },
     // ADR-0044 — P3 (§ 6.5) : approbations d'achat dans « Mes tâches ».
     { provide: PURCHASES_AGENDA_SOURCE, useExisting: PurchasesAgendaSource },
+    // ADR-0045 — H3 (§ 6.1) : validations d'absence et éléments de liste RH.
+    { provide: HR_AGENDA_SOURCE, useExisting: HrAgendaSource },
   ],
   exports: [
     MongooseModule,

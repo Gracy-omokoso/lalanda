@@ -59,6 +59,7 @@ import type { HrActor } from '../departments/hr-departments.service.js';
 import { HrPrivateService } from '../private/hr-private.service.js';
 import { employeeNotFound } from '../scope/hr-errors.js';
 import { HrScopeService } from '../scope/hr-scope.service.js';
+import { HrLeaveService } from '../leave/hr-leave.service.js';
 import { HrEmployeesService } from './hr-employees.service.js';
 
 type User = { id: string };
@@ -74,6 +75,8 @@ export class HrEmployeesController {
     @Inject(HrEmployeesService) private readonly employees: HrEmployeesService,
     @Inject(HrScopeService) private readonly scope: HrScopeService,
     @Inject(HrPrivateService) private readonly privates: HrPrivateService,
+    // ADR-0045 — H3
+    @Inject(HrLeaveService) private readonly leave: HrLeaveService,
   ) {}
 
   @Get('employees')
@@ -127,7 +130,11 @@ export class HrEmployeesController {
       employee.status !== 'anonymized' &&
       (viewer.actions.has('hr.sensitive.read') || viewer.scope.selfEmployeeId === employeeId);
     return {
-      employee: this.employees.view(employee, viewer.actions.has('hr.read')),
+      employee: (
+        await this.employees.withNames(orgId, [
+          this.employees.view(employee, viewer.actions.has('hr.read')),
+        ])
+      )[0]!,
       private: canSeeSensitive ? await this.privates.summary(orgId, employeeId) : null,
       viewer: {
         relation,
@@ -213,7 +220,9 @@ export class HrEmployeesController {
     @CurrentUser() user: User,
     @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
   ): Promise<HrMeView> {
-    return this.employees.me(await this.scope.viewerOf(orgId, user.id, perms));
+    const viewer = await this.scope.viewerOf(orgId, user.id, perms);
+    // ADR-0045 — H3 : mes soldes et mes demandes (§ 3.1).
+    return this.leave.completeMe(orgId, viewer, await this.employees.me(viewer));
   }
 
   @Get('team')
@@ -223,7 +232,9 @@ export class HrEmployeesController {
     @CurrentUser() user: User,
     @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
   ): Promise<HrTeamView> {
-    return this.employees.team(await this.scope.viewerOf(orgId, user.id, perms));
+    const viewer = await this.scope.viewerOf(orgId, user.id, perms);
+    // ADR-0045 — H3 : soldes et absences de l'équipe (§ 3.1), type masqué si confidentiel.
+    return this.leave.completeTeam(orgId, viewer, await this.employees.team(orgId, viewer));
   }
 
   @Get('org-chart')

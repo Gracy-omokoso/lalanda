@@ -39,6 +39,12 @@ import {
   type HrWorkPattern,
 } from './constants.js';
 import type { EmployeePrivateSummary } from './private.js';
+// ADR-0045 — H3 : exceptions d'acquisition, soldes et demandes de « moi » et de l'équipe.
+import {
+  LeavePolicyOverridesSchema,
+  type LeaveBalanceView,
+  type LeaveRequestView,
+} from './leave.js';
 
 export * from './private.js';
 
@@ -132,6 +138,8 @@ export const UpdateEmployeeBody = z
     contractType: contractTypeKey.optional(),
     startDate: HrCalendarDay.optional(),
     ...employeeFields,
+    // ADR-0045 — H3 : acquisition propre au collaborateur, par type d'absence (§ 2.1).
+    leavePolicyOverrides: LeavePolicyOverridesSchema.optional(),
   })
   .strict();
 export type UpdateEmployeeBody = z.output<typeof UpdateEmployeeBody>;
@@ -203,8 +211,14 @@ export interface EmployeeView {
   workPhone: string | null;
   jobTitle: string;
   departmentId: string | null;
+  /** ADR-0045 — H3 : nom du service (copie d'affichage, lue à la requête). */
+  departmentName: string | null;
   managerEmployeeId: string | null;
+  /** ADR-0045 — H3 : nom d'usage du manager (copie d'affichage). */
+  managerName: string | null;
   contractType: string;
+  /** ADR-0045 — H3 : libellé du type de contrat (réglages de l'organisation). */
+  contractTypeLabel: string | null;
   startDate: string;
   probationEndDate: string | null;
   contractEndDate: string | null;
@@ -214,6 +228,8 @@ export interface EmployeeView {
   derivedStatus: HrDerivedEmployeeStatus;
   workPattern: HrWorkPattern | null;
   workLocation: string | null;
+  /** ADR-0045 — H3 : exceptions d'acquisition (`hr.read` seulement, `null` sinon). */
+  leavePolicyOverrides: Record<string, { accrual: unknown }> | null;
   notes: string | null;
   revision: number;
   createdAt: string;
@@ -286,6 +302,8 @@ export interface DepartmentView {
   name: string;
   parentId: string | null;
   headEmployeeId: string | null;
+  /** ADR-0045 — H3 : nom d'usage du responsable (copie d'affichage). */
+  headName: string | null;
   active: boolean;
   /** Collaborateurs actifs rattachés directement. */
   activeEmployees: number;
@@ -357,6 +375,10 @@ export interface HrMeView {
   directReportIds: string[];
   teamEmployeeIds: string[];
   orgChartVisible: boolean;
+  /** ADR-0045 — H3 : mes soldes (moteur `leaveBalance`), vide sans fiche reliée. */
+  balances: LeaveBalanceView[];
+  /** ADR-0045 — H3 : mes 50 demandes les plus récentes. */
+  requests: LeaveRequestView[];
 }
 
 /** Fiche réduite d'un membre de l'équipe (aucune donnée sensible, aucune note). */
@@ -365,11 +387,17 @@ export interface HrTeamMemberView {
   displayName: string;
   jobTitle: string;
   departmentId: string | null;
+  /** ADR-0045 — H3 : copies d'affichage. */
+  departmentName: string | null;
   managerEmployeeId: string | null;
+  managerName: string | null;
   isDirect: boolean;
   derivedStatus: HrDerivedEmployeeStatus;
   workEmail: string | null;
   workPhone: string | null;
+  /** ADR-0045 — H3 : soldes (moteur) et absences en cours ou à venir (type masqué si confidentiel). */
+  balances: LeaveBalanceView[];
+  absences: LeaveRequestView[];
 }
 
 export interface HrTeamView {

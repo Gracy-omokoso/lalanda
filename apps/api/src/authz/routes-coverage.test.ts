@@ -84,6 +84,11 @@ import { HrDepartmentsController } from '../hr/departments/hr-departments.contro
 import { HrEmployeesController } from '../hr/employees/hr-employees.controller.js';
 import { HrPrivateController } from '../hr/private/hr-private.controller.js';
 import { HrSettingsController } from '../hr/settings/hr-settings.controller.js';
+// ADR-0045 — H3
+import { HrCalendarController } from '../hr/calendar/hr-calendar.controller.js';
+import { HrHolidaysController } from '../hr/holidays/hr-holidays.controller.js';
+import { HrLeaveTypesController } from '../hr/leave/hr-leave-types.controller.js';
+import { HrLeaveController } from '../hr/leave/hr-leave.controller.js';
 import { QuotesController } from '../sales/quotes/quotes.controller.js';
 import { CrmActivitiesController } from '../crm/crm-activities.controller.js';
 import { CrmContactsController } from '../crm/crm-contacts.controller.js';
@@ -231,6 +236,11 @@ const CONTROLEURS = [
   HrPrivateController,
   HrDepartmentsController,
   HrSettingsController,
+  // ADR-0045 — H3 : types d'absence, fériés, demandes et soldes, calendrier.
+  HrLeaveTypesController,
+  HrHolidaysController,
+  HrLeaveController,
+  HrCalendarController,
 ];
 
 /**
@@ -1105,6 +1115,9 @@ describe('ADR-0045 — H2 : dossiers collaborateurs, services, organigramme, don
       'HrDepartmentsController.update': ['hr.manage'],
       'HrDepartmentsController.archive': ['hr.manage'],
       'HrSettingsController.get': ['hr.read'],
+      // ADR-0045 — H3 : écriture des réglages (§ 3.3) ; le circuit exige `leave.approve`.
+      'HrSettingsController.update': ['hr.manage'],
+      'HrSettingsController.updateApproval': ['leave.approve', 'hr.manage'],
     };
     const routes = TOUTES_LES_ROUTES.filter((r) =>
       /^Hr(Employees|Private|Departments|Settings)Controller\./.test(r.cle),
@@ -1119,5 +1132,48 @@ describe('ADR-0045 — H2 : dossiers collaborateurs, services, organigramme, don
 
   it('`hr.sensitive.read` reste interdit à la plateforme, même sous accès délégué', () => {
     expect(PLATFORM_FORBIDDEN_ACTIONS).toContain('hr.sensitive.read');
+  });
+});
+
+// ADR-0045 — H3
+describe('ADR-0045 — H3 : absences, congés, fériés, calendrier', () => {
+  it('chaque route déclare la permission de l’ADR (§ 3.2) ; relationnelles en `analytics.read`', () => {
+    const attendu: Record<string, Action[]> = {
+      // Lecture des types par tout membre (nom, unité, confidentialité).
+      'HrLeaveTypesController.list': ['analytics.read'],
+      'HrLeaveTypesController.create': ['hr.manage'],
+      'HrLeaveTypesController.update': ['hr.manage'],
+      'HrLeaveTypesController.archive': ['hr.manage'],
+      'HrHolidaysController.list': ['analytics.read'],
+      'HrHolidaysController.create': ['hr.manage'],
+      'HrHolidaysController.remove': ['hr.manage'],
+      // Pour soi ; `hr.manage` pour autrui, vérifié dans le service.
+      'HrLeaveController.create': ['leave.request'],
+      // Relationnelles : soi, équipe (manager), `hr.read` ; validation par le manager
+      // désigné ou `leave.approve` (`leaveApprovalDecision`, dans le service).
+      'HrLeaveController.list': ['analytics.read'],
+      'HrLeaveController.approve': ['analytics.read'],
+      'HrLeaveController.reject': ['analytics.read'],
+      'HrLeaveController.cancel': ['analytics.read'],
+      'HrLeaveController.pending': ['analytics.read'],
+      'HrLeaveController.balances': ['analytics.read'],
+      'HrLeaveController.ledger': ['analytics.read'],
+      'HrLeaveController.adjust': ['hr.manage'],
+      'HrCalendarController.calendar': ['analytics.read'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) =>
+      /^Hr(LeaveTypes|Holidays|Leave|Calendar)Controller\./.test(r.cle),
+    );
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+    }
+  });
+
+  it('changer le circuit exige d’être soi-même validateur ; `leave.approve` nommée en premier', () => {
+    const route = TOUTES_LES_ROUTES.find((r) => r.cle === 'HrSettingsController.updateApproval');
+    expect(route!.actions).toEqual(['leave.approve', 'hr.manage']);
+    for (const cle of Object.keys(SANS_PERMISSION)) expect(cle.startsWith('Hr')).toBe(false);
   });
 });
