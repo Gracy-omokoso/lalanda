@@ -8,6 +8,7 @@
 // neutralisation retirée — un fichier exporté se réimporte tel quel.
 
 import { csvCell } from '../sales/invoices/journal-export.js';
+import { normalizeForSearch } from '../sales/search.js';
 
 const BOM = '﻿';
 
@@ -119,4 +120,61 @@ export function parseCsv(
 /** Montant saisi dans un tableur (« 1 500,00 ») → forme de l'API (« 1500.00 »), sans calcul. */
 export function amountFromSheet(raw: string): string {
   return raw.replace(/[\s\u00a0\u202f]/g, '').replace(',', '.');
+}
+
+// ── ADR-0040 — C9 : rattachements des colonnes v2 (fonctions pures) ─────────
+
+/** Rattachement par nom : exactement un candidat, sinon inconnu ou ambigu. */
+export type UniqueMatch<T> =
+  { kind: 'one'; value: T } | { kind: 'none' } | { kind: 'many'; count: number };
+
+export function uniqueMatch<T>(candidates: readonly T[]): UniqueMatch<T> {
+  if (candidates.length === 0) return { kind: 'none' };
+  if (candidates.length > 1) return { kind: 'many', count: candidates.length };
+  return { kind: 'one', value: candidates[0]! };
+}
+
+export interface SheetLostReason {
+  key: string;
+  label: string;
+  active: boolean;
+}
+
+export type LostReasonCell = { ok: true; key: string | null } | { ok: false; message: string };
+
+/**
+ * Motif de perte d'une ligne d'opportunité (ADR-0040 § 2.5) : désigné par sa clé
+ * ou par son libellé, actif. Exigé pour une opportunité perdue quand les
+ * réglages l'imposent (`lostReasonRequired`) : l'ADR ne prévoit AUCUN motif par
+ * défaut à l'import, un fichier ADR-0035 sans motif donne donc une erreur de
+ * ligne. Réservé aux opportunités perdues.
+ */
+export function lostReasonCell(input: {
+  raw: string;
+  stageKind: 'open' | 'won' | 'lost';
+  required: boolean;
+  reasons: readonly SheetLostReason[];
+}): LostReasonCell {
+  const raw = input.raw.trim();
+  if (raw === '') {
+    if (input.stageKind === 'lost' && input.required) {
+      return {
+        ok: false,
+        message:
+          'motif de perte obligatoire pour une opportunité perdue (colonne « motif_perte » : clé ou libellé d’un motif des réglages).',
+      };
+    }
+    return { ok: true, key: null };
+  }
+  if (input.stageKind !== 'lost') {
+    return { ok: false, message: 'motif de perte réservé aux opportunités perdues.' };
+  }
+  const k = headerKey(raw);
+  const n = normalizeForSearch(raw);
+  const found =
+    input.reasons.find((r) => r.key === k) ??
+    input.reasons.find((r) => normalizeForSearch(r.label) === n);
+  if (!found) return { ok: false, message: `motif de perte inconnu : « ${raw} ».` };
+  if (!found.active) return { ok: false, message: `motif de perte désactivé : « ${raw} ».` };
+  return { ok: true, key: found.key };
 }
