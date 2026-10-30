@@ -12,15 +12,31 @@
 // fausse ou un numéro d'immatriculation deviné ne se distingue pas d'une
 // information vraie et personne ne pense à la vérifier.
 //
-// ÉTABLI : le nom de l'éditeur, Televerx LLC. RIEN D'AUTRE. Tout le reste est
-// rendu en marqueurs `[À COMPLÉTER]` VISIBLES par le lecteur.
+// ÉDITEUR : Go freelance SARLU, SARLU de droit congolais (RDC) — ADR-0043.
+// Seul ce qui est établi est affiché. Les mentions que la dirigeante a choisi de
+// ne pas publier (RCCM, Id. Nat., NIF, siège, capital, gérant, téléphone) ne
+// figurent PAS sur cette page, ni sous forme de marqueur : ce choix est consigné
+// dans docs/28-CONFORMITE-LEGALE.md, pas sur le site.
+// Televerx LLC n'apparaît QUE sur cette page, comme partenaire de développement
+// et d'intégration — jamais comme éditeur.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { CONTACT_LEGAL, PUBLISHER_NAME, PUBLISHER_UNKNOWNS, legalDocument } from '@/lib/legal';
-import { LegalList, LegalPage, ToComplete, type LegalSection } from '../_components/legal-page';
+import {
+  CONTACT_CLIENT,
+  CONTACT_FACTURATION,
+  CONTACT_LEGAL,
+  CONTACT_TECHNIQUE,
+  DEVELOPMENT_PARTNER_NAME,
+  DEVELOPMENT_PARTNER_ROLE,
+  PUBLISHER_GOVERNING_LAW,
+  PUBLISHER_LEGAL_FORM,
+  PUBLISHER_NAME,
+  legalDocument,
+} from '@/lib/legal';
+import { LegalPage, type LegalSection } from '../_components/legal-page';
 
 const doc = legalDocument('mentions-legales');
 
@@ -29,6 +45,14 @@ export const metadata: Metadata = {
   description: doc.summary,
 };
 
+function Mail({ address }: { address: string }): React.ReactElement {
+  return (
+    <a href={`mailto:${address}`} className="underline underline-offset-2">
+      {address}
+    </a>
+  );
+}
+
 const SECTIONS: readonly LegalSection[] = [
   {
     id: 'editeur',
@@ -36,7 +60,8 @@ const SECTIONS: readonly LegalSection[] = [
     body: (
       <>
         <p>
-          Le service Lalanda, accessible en ligne, est édité par <strong>{PUBLISHER_NAME}</strong>.
+          Le service Lalanda, accessible en ligne, est édité par <strong>{PUBLISHER_NAME}</strong>,{' '}
+          {PUBLISHER_LEGAL_FORM} de {PUBLISHER_GOVERNING_LAW}.
         </p>
         <dl className="flex flex-col gap-3">
           <div>
@@ -44,57 +69,42 @@ const SECTIONS: readonly LegalSection[] = [
             <dd>{PUBLISHER_NAME}</dd>
           </div>
           <div>
-            <dt className="font-semibold">Forme juridique et immatriculation</dt>
+            <dt className="font-semibold">Forme juridique</dt>
             <dd>
-              <ToComplete>
-                forme juridique exacte, État ou pays d’immatriculation et numéro d’enregistrement
-              </ToComplete>
-            </dd>
-          </div>
-          <div>
-            <dt className="font-semibold">Siège social</dt>
-            <dd>
-              <ToComplete>adresse complète du siège social</ToComplete>
-            </dd>
-          </div>
-          <div>
-            <dt className="font-semibold">Capital</dt>
-            <dd>
-              <ToComplete>capital social, si la forme juridique en fait état</ToComplete>
-            </dd>
-          </div>
-          <div>
-            <dt className="font-semibold">Représentant légal</dt>
-            <dd>
-              <ToComplete>nom et qualité du représentant légal</ToComplete>
+              {PUBLISHER_LEGAL_FORM}, {PUBLISHER_GOVERNING_LAW}
             </dd>
           </div>
           <div>
             <dt className="font-semibold">Contact</dt>
-            <dd>
-              <a href={`mailto:${CONTACT_LEGAL}`} className="underline underline-offset-2">
-                {CONTACT_LEGAL}
-              </a>
+            <dd className="flex flex-col gap-1">
+              <span>
+                Questions générales : <Mail address={CONTACT_CLIENT} />
+              </span>
+              <span>
+                Assistance technique : <Mail address={CONTACT_TECHNIQUE} />
+              </span>
+              <span>
+                Facturation : <Mail address={CONTACT_FACTURATION} />
+              </span>
             </dd>
           </div>
         </dl>
-        <p className="text-sm text-[var(--foreground-muted)]">
-          La dénomination de l&apos;éditeur est établie. Les autres informations ci-dessus ne le
-          sont pas encore et sont affichées comme telles : nous préférons une page visiblement
-          incomplète à une page qui aurait l&apos;air complète en donnant une adresse ou un numéro
-          que personne n&apos;a vérifié.
-        </p>
       </>
     ),
   },
   {
     id: 'directeur-publication',
     title: 'Directeur de la publication',
+    body: <p>Le directeur de la publication est le représentant légal de {PUBLISHER_NAME}.</p>,
+  },
+  {
+    id: 'partenaire',
+    title: 'Développement et intégration',
     body: (
       <p>
-        <ToComplete>
-          nom du directeur de la publication (à défaut, le représentant légal de {PUBLISHER_NAME})
-        </ToComplete>
+        Le service est développé et intégré avec <strong>{DEVELOPMENT_PARTNER_NAME}</strong>,{' '}
+        {DEVELOPMENT_PARTNER_ROLE}. {PUBLISHER_NAME} reste l&apos;éditeur du service et votre seul
+        cocontractant.
       </p>
     ),
   },
@@ -104,16 +114,12 @@ const SECTIONS: readonly LegalSection[] = [
     body: (
       <>
         <p>
-          <ToComplete>
-            dénomination, adresse et contact de l’hébergeur. La cible technique retenue est
-            DigitalOcean (ADR-0009), mais l’infrastructure de production n’est pas encore
-            provisionnée : tant qu’elle ne l’est pas, nommer un hébergeur reviendrait à annoncer un
-            fait qui n’existe pas
-          </ToComplete>
+          Le service est hébergé par <strong>DigitalOcean</strong>, sur des serveurs virtuels
+          (Droplets).
         </p>
         <p>
-          Les composants d&apos;hébergement effectivement utilisés, et les pays où les données sont
-          stockées, sont décrits dans la{' '}
+          Les prestataires ayant accès aux données, et les transferts qui en découlent, sont décrits
+          dans la{' '}
           <Link href="/confidentialite" className="underline underline-offset-4">
             politique de confidentialité
           </Link>
@@ -183,26 +189,6 @@ const SECTIONS: readonly LegalSection[] = [
       </>
     ),
   },
-  {
-    id: 'a-completer',
-    title: 'Ce qui reste à établir',
-    body: (
-      <>
-        <p>
-          Cette page est publiée incomplète et le dit. Les informations suivantes doivent être
-          fournies par l&apos;éditeur avant toute mise en service commerciale :
-        </p>
-        <LegalList items={PUBLISHER_UNKNOWNS} />
-        <p>
-          La forme «&nbsp;LLC&nbsp;» suggère une immatriculation aux États-Unis. Cette indication
-          n&apos;est pas une conclusion : elle appelle un arbitrage juridique sur le droit
-          applicable, la juridiction compétente et le régime de transfert des données pour les
-          utilisateurs situés dans l&apos;Union européenne. Ces questions sont recensées dans le
-          document de conformité interne et ne sont tranchées nulle part dans ces pages.
-        </p>
-      </>
-    ),
-  },
 ];
 
 export default function MentionsLegalesPage(): React.ReactElement {
@@ -210,12 +196,7 @@ export default function MentionsLegalesPage(): React.ReactElement {
     <LegalPage
       slug="mentions-legales"
       lead={
-        <p>
-          Cette page identifie qui édite Lalanda et comment nous joindre. Elle est publiée dans un
-          état volontairement incomplet : seule la dénomination de l&apos;éditeur est établie à ce
-          jour, et les informations manquantes sont signalées comme telles plutôt que comblées par
-          des valeurs plausibles.
-        </p>
+        <p>Cette page identifie qui édite Lalanda, qui l&apos;héberge et comment nous joindre.</p>
       }
       sections={SECTIONS}
     />

@@ -7,17 +7,16 @@
 // conforme à un droit applicable. Une relecture juridique est un PRÉALABLE à
 // toute mise en production. Voir docs/28-CONFORMITE-LEGALE.md.
 //
-// ÉDITEUR : Televerx LLC (`PUBLISHER_NAME`). C'est le SEUL élément
-// d'identification établi. Adresse, État d'immatriculation, numéro
-// d'enregistrement, représentant légal et adresse de contact restent des
-// marqueurs `[À COMPLÉTER]` VISIBLES dans la page — les déduire de la forme
-// « LLC » produirait un document faux publié sous le nom d'une société réelle.
+// ÉDITEUR : Go freelance SARLU (`PUBLISHER_NAME`), SARLU de droit congolais
+// (RDC) — ADR-0043. Le droit applicable AU CONTRAT et la juridiction compétente
+// ne se déduisent pas de la nationalité de l'éditeur : ils restent à faire
+// trancher par un juriste (docs/28-CONFORMITE-LEGALE.md § 1.3).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { CONTACT_LEGAL, PUBLISHER_NAME, legalDocument } from '@/lib/legal';
+import { CONTACT_LEGAL, PUBLISHER_GOVERNING_LAW, PUBLISHER_NAME, legalDocument } from '@/lib/legal';
 import { LegalList, LegalPage, ToComplete, type LegalSection } from '../_components/legal-page';
 
 const doc = legalDocument('cgu');
@@ -335,10 +334,10 @@ const SECTIONS: readonly LegalSection[] = [
       <>
         <p>
           <ToComplete>
-            droit applicable au contrat. La dénomination «&nbsp;{PUBLISHER_NAME}&nbsp;» indique une
-            forme de société de type américain, sans que l’État d’immatriculation soit établi à ce
-            jour. Le choix du droit applicable dépend de ce point et des pays réellement servis
-            (zone OHADA, Union européenne pour la diaspora) — à faire trancher par un juriste
+            droit applicable au contrat. L’éditeur, {PUBLISHER_NAME}, est une société de{' '}
+            {PUBLISHER_GOVERNING_LAW}. Le choix du droit applicable au contrat, et son articulation
+            avec les règles impératives protégeant les utilisateurs d’autres pays (zone OHADA, Union
+            européenne pour la diaspora), restent à faire trancher par un juriste
           </ToComplete>
         </p>
         <p>

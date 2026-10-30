@@ -31,7 +31,7 @@
  * antérieures deviennent alors périmées et l'accord est redemandé. Une
  * correction de typographie ne la fait PAS avancer.
  */
-export const LEGAL_VERSION = '2026-08-09';
+export const LEGAL_VERSION = '2026-10-30';
 
 /**
  * Versions du corpus ayant réellement existé, la plus ancienne d'abord.
@@ -44,7 +44,12 @@ export const LEGAL_VERSION = '2026-08-09';
  *
  * NE JAMAIS RETIRER D'ENTRÉE : les acceptations passées y font référence.
  */
-export const KNOWN_LEGAL_VERSIONS: readonly string[] = [LEGAL_VERSION] as const;
+export const KNOWN_LEGAL_VERSIONS: readonly string[] = [
+  // Premier corpus publié (S22c), éditeur : Televerx LLC.
+  '2026-08-09',
+  // Changement d'éditeur : Go freelance SARLU, droit congolais (ADR-0043).
+  LEGAL_VERSION,
+] as const;
 
 /** Cette chaîne désigne-t-elle une version du corpus réellement publiée ? */
 export function isKnownLegalVersion(version: string): boolean {
@@ -64,21 +69,58 @@ export function isTermsAcceptanceCurrent(acceptedVersion: string | null | undefi
 }
 
 /**
- * ÉDITEUR DU SERVICE.
+ * ÉDITEUR DU SERVICE (ADR-0043, décision de la dirigeante du 30 oct. 2026).
  *
- * Lalanda est un produit de Televerx LLC. Ce nom est la SEULE information
- * d'identification de l'éditeur qui soit établie à ce jour : adresse, État ou
- * pays d'immatriculation, numéro d'enregistrement, capital, représentant légal
- * et adresse de contact restent inconnus et sont affichés comme
- * `[À COMPLÉTER : …]` dans les pages légales.
+ * Lalanda est porté par Go freelance SARLU, société à responsabilité limitée
+ * unipersonnelle de droit congolais (République démocratique du Congo). C'est
+ * l'UNIQUE endroit où l'identité de l'éditeur est déclarée : les pages légales,
+ * les pieds de page et la documentation la lisent ici.
  *
- * NE RIEN COMPLÉTER ICI PAR DÉDUCTION. Inventer l'adresse ou le numéro
- * d'immatriculation d'une société réelle ne produit pas un document incomplet,
- * mais un document faux — publié sous la signature d'une personne morale
- * existante. Un marqueur visible est un défaut qu'on corrige ; une mention
- * inventée est une affirmation que personne ne pense à vérifier.
+ * NE RIEN COMPLÉTER PAR DÉDUCTION. Les mentions d'immatriculation (RCCM,
+ * Id. Nat., NIF), le siège, le capital, le gérant et le téléphone ne sont PAS
+ * publiés, par choix de la dirigeante (voir `PUBLISHER_UNPUBLISHED_MENTIONS`).
+ * Les inventer produirait un document faux, publié sous le nom d'une personne
+ * morale réelle.
  */
-export const PUBLISHER_NAME = 'Televerx LLC';
+export const PUBLISHER_NAME = 'Go freelance SARLU';
+
+/** Forme juridique de l'éditeur, en toutes lettres. */
+export const PUBLISHER_LEGAL_FORM = 'société à responsabilité limitée unipersonnelle (SARLU)';
+
+/** Droit dont relève l'éditeur en tant que société (et non, en soi, le contrat). */
+export const PUBLISHER_GOVERNING_LAW = 'droit congolais (République démocratique du Congo)';
+
+/**
+ * Partenaire de développement et d'intégration.
+ *
+ * N'apparaît QUE dans les mentions légales (décision du 30 oct. 2026) : ni dans
+ * les pieds de page, ni dans la politique de confidentialité, ni dans les CGU et
+ * CGV. Televerx LLC n'est pas l'éditeur et ne contracte pas avec l'utilisateur.
+ */
+export const DEVELOPMENT_PARTNER_NAME = 'Televerx LLC';
+export const DEVELOPMENT_PARTNER_ROLE = `partenaire de développement et d’intégration de ${PUBLISHER_NAME}`;
+
+/**
+ * Mentions d'identification de l'éditeur VOLONTAIREMENT NON PUBLIÉES.
+ *
+ * Décision de la dirigeante, 30 oct. 2026 : ces informations ne sont pas
+ * fournies et les pages publiques ne les affichent pas, ni sous forme de
+ * marqueur. Plusieurs sont habituellement attendues dans des mentions légales :
+ * le choix est à faire valider par un juriste (docs/28-CONFORMITE-LEGALE.md
+ * § 1.2). Cette liste n'est rendue sur AUCUNE page ; elle sert de registre
+ * interne. Si une mention est fournie un jour, on l'ajoute ici comme constante
+ * et on la retire de la liste.
+ */
+export const PUBLISHER_UNPUBLISHED_MENTIONS: readonly string[] = [
+  'numéro RCCM',
+  'identification nationale (Id. Nat.)',
+  'numéro d’impôt (NIF)',
+  'adresse du siège social',
+  'capital social',
+  'nom du gérant / représentant légal',
+  'nom du directeur de la publication',
+  'numéro de téléphone',
+] as const;
 
 /** Marqueur d'information que l'éditeur doit renseigner avant publication. */
 export function legalTodo(label: string): string {

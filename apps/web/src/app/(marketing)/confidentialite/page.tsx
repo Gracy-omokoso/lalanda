@@ -24,7 +24,13 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { CONTACT_LEGAL, PUBLISHER_NAME, legalDocument } from '@/lib/legal';
+import {
+  CONTACT_LEGAL,
+  PUBLISHER_GOVERNING_LAW,
+  PUBLISHER_LEGAL_FORM,
+  PUBLISHER_NAME,
+  legalDocument,
+} from '@/lib/legal';
 import {
   LegalList,
   LegalPage,
@@ -47,12 +53,12 @@ const SECTIONS: readonly LegalSection[] = [
     body: (
       <>
         <p>
-          Le responsable du traitement est <strong>{PUBLISHER_NAME}</strong>, éditeur de Lalanda.
-          Ses coordonnées complètes figurent dans les{' '}
+          Le responsable du traitement est <strong>{PUBLISHER_NAME}</strong>, éditeur de Lalanda,{' '}
+          {PUBLISHER_LEGAL_FORM} de {PUBLISHER_GOVERNING_LAW}. Ses coordonnées figurent dans les{' '}
           <Link href="/mentions-legales" className="underline underline-offset-4">
             mentions légales
-          </Link>{' '}
-          — plusieurs y sont encore à compléter, et nous le signalons plutôt que de les inventer.
+          </Link>
+          .
         </p>
         <p>
           Pour toute question sur vos données ou pour exercer vos droits&nbsp;:{' '}
@@ -145,7 +151,7 @@ const SECTIONS: readonly LegalSection[] = [
           <ToComplete>
             qualification des bases légales (exécution du contrat, intérêt légitime, obligation
             légale, consentement) au regard du régime de protection des données applicable. Ce point
-            dépend du pays d’immatriculation de l’éditeur et de la localisation des utilisateurs —
+            dépend du droit congolais dont relève l’éditeur et de la localisation des utilisateurs —
             il est ouvert et documenté, pas tranché
           </ToComplete>
         </p>
@@ -251,9 +257,9 @@ const SECTIONS: readonly LegalSection[] = [
               'En service dès qu’une clé d’accès est configurée',
             ],
             [
-              <ToComplete key="h">hébergeur — cible ADR-0009 : DigitalOcean</ToComplete>,
+              'DigitalOcean',
               'Hébergement des serveurs, de la base de données et du stockage des fichiers exportés.',
-              'Non provisionné à ce jour',
+              'En service',
             ],
             [
               <ToComplete key="m">fournisseur d’envoi d’emails</ToComplete>,
@@ -287,16 +293,15 @@ const SECTIONS: readonly LegalSection[] = [
       <>
         <p>
           Certaines données quittent votre pays. C&apos;est déjà le cas pour la fonction
-          d&apos;actions correctives, traitée par OpenAI, et ce le sera pour l&apos;hébergement.
+          d&apos;actions correctives, traitée par OpenAI, et pour l&apos;hébergement, assuré par
+          DigitalOcean.
         </p>
         <p>
           <ToComplete>
             pays d’hébergement retenu, localisation des traitements de chaque prestataire, et
             instrument juridique encadrant ces transferts (clauses contractuelles types ou
-            équivalent). Ce point est lié à la question ouverte du droit applicable : la forme « LLC
-            » de l’éditeur suggère une immatriculation aux États-Unis, ce qui a des conséquences
-            directes sur le régime applicable aux utilisateurs situés dans l’Union européenne —
-            arbitrage juridique requis
+            équivalent), au regard du droit congolais dont relève l’éditeur et des règles propres
+            aux utilisateurs situés dans l’Union européenne — arbitrage juridique requis
           </ToComplete>
         </p>
       </>
@@ -415,7 +420,6 @@ const SECTIONS: readonly LegalSection[] = [
           items={[
             'Aucun email n’est envoyé, faute de fournisseur configuré. La vérification d’adresse et le changement d’adresse email ne peuvent donc pas aboutir aujourd’hui, et aucune notification ne vous parvient — même si vous en avez activé.',
             'Aucun paiement n’est encaissé : il n’existe pas d’intégration de paiement.',
-            'L’infrastructure d’hébergement de production n’est pas provisionnée, ce qui explique que l’hébergeur ne soit pas encore nommé.',
           ]}
         />
         <p>

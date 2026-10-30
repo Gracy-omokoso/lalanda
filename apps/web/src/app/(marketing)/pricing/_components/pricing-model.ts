@@ -61,9 +61,6 @@ export interface Tier {
   /**
    * Destination du bouton, ou `null` quand aucune destination n'existe encore.
    *
-   * `null` pour Expert : **aucune adresse de contact n'est publiée**. C'est un
-   * fait établi du dépôt, pas un oubli — `PUBLISHER_UNKNOWNS` (`lib/legal.ts`)
-   * liste « adresse email de contact » parmi les informations que l'éditeur doit
    * Pour Expert, c'est un `mailto:` vers l'adresse commerciale et non une page
    * `/contact` : cette page n'existe pas, et un bouton qui mène à un 404 au
    * moment précis où un acheteur veut parler à quelqu'un est le pire endroit

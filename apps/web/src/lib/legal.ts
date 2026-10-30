@@ -19,9 +19,24 @@
 // ajoutée mais absente du footer, donc introuvable par un utilisateur qui la
 // cherche — et donc juridiquement inopposable.
 
-import { LEGAL_VERSION, PUBLISHER_NAME, legalTodo } from '@lalanda/shared/legal';
+import {
+  DEVELOPMENT_PARTNER_NAME,
+  DEVELOPMENT_PARTNER_ROLE,
+  LEGAL_VERSION,
+  PUBLISHER_GOVERNING_LAW,
+  PUBLISHER_LEGAL_FORM,
+  PUBLISHER_NAME,
+  legalTodo,
+} from '@lalanda/shared/legal';
 
-export { LEGAL_VERSION, PUBLISHER_NAME };
+export {
+  DEVELOPMENT_PARTNER_NAME,
+  DEVELOPMENT_PARTNER_ROLE,
+  LEGAL_VERSION,
+  PUBLISHER_GOVERNING_LAW,
+  PUBLISHER_LEGAL_FORM,
+  PUBLISHER_NAME,
+};
 
 /** Identifiants des documents légaux publiés. */
 export type LegalSlug = 'cgu' | 'cgv' | 'confidentialite' | 'mentions-legales' | 'cookies';
@@ -66,7 +81,7 @@ export const LEGAL_DOCUMENTS: readonly LegalDocument[] = [
     shortTitle: 'CGU',
     summary:
       "Conditions d'utilisation du service Lalanda : compte, usages autorisés et interdits, propriété intellectuelle, disponibilité, résiliation et responsabilité.",
-    updatedAt: '2026-08-09',
+    updatedAt: '2026-10-30',
   },
   {
     slug: 'cgv',
@@ -75,7 +90,7 @@ export const LEGAL_DOCUMENTS: readonly LegalDocument[] = [
     shortTitle: 'CGV',
     summary:
       'Conditions de vente des abonnements Lalanda : offres et prix, essai de 14 jours, paiement, facturation, reconduction, rétractation, remboursement et impayés.',
-    updatedAt: '2026-08-09',
+    updatedAt: '2026-10-30',
   },
   {
     slug: 'confidentialite',
@@ -84,7 +99,7 @@ export const LEGAL_DOCUMENTS: readonly LegalDocument[] = [
     shortTitle: 'Confidentialité',
     summary:
       'Données collectées par Lalanda, finalités, durées de conservation, sous-traitants (hébergement, IA, paiement, email), transferts et droits des personnes.',
-    updatedAt: '2026-08-09',
+    updatedAt: '2026-10-30',
   },
   {
     slug: 'cookies',
@@ -100,8 +115,9 @@ export const LEGAL_DOCUMENTS: readonly LegalDocument[] = [
     href: '/mentions-legales',
     title: 'Mentions légales',
     shortTitle: 'Mentions légales',
-    summary: 'Éditeur, directeur de publication, hébergeur et contact du service Lalanda.',
-    updatedAt: '2026-08-09',
+    summary:
+      'Éditeur, partenaire de développement, directeur de publication, hébergeur et contact du service Lalanda.',
+    updatedAt: '2026-10-30',
   },
 ] as const;
 
@@ -170,28 +186,3 @@ export const CONTACT_LEGAL = CONTACT_CLIENT;
 
 /** Marqueur de champ que l'éditeur doit renseigner avant publication. */
 export const todo = legalTodo;
-
-/**
- * INFORMATIONS SUR L'ÉDITEUR QUI RESTENT À ÉTABLIR.
- *
- * Le nom — `PUBLISHER_NAME`, Televerx LLC — est établi. Rien d'autre ne l'est.
- * Cette liste sert de récapitulatif unique : les mentions légales l'affichent
- * telle quelle, et le document de conformité s'y réfère. Chaque entrée est un
- * fait manquant, jamais un fait supposé.
- *
- * La forme « LLC » suggère une immatriculation aux États-Unis. C'EST UNE
- * INDICATION, PAS UNE CONCLUSION : l'État d'immatriculation reste inconnu, et
- * les conséquences (droit applicable, juridiction compétente, régime de
- * transfert de données pour des utilisateurs situés dans l'UE) sont des
- * questions à faire trancher par un juriste — pas à trancher ici.
- * Voir docs/28-CONFORMITE-LEGALE.md.
- */
-export const PUBLISHER_UNKNOWNS: readonly string[] = [
-  'forme juridique complète et État ou pays d’immatriculation de Televerx LLC',
-  'numéro d’enregistrement de la société',
-  'adresse du siège social',
-  'capital social, si la forme juridique en fait état',
-  'nom du représentant légal et du directeur de la publication',
-  'numéro de téléphone, si l’éditeur souhaite en publier un',
-  'identité et adresse de l’hébergeur (cible ADR-0009 : DigitalOcean, non provisionné)',
-] as const;
