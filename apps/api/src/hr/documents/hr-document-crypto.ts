@@ -18,6 +18,7 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import {
   decryptSecret,
   encryptSecret,
+  rewrapSecret,
   type EncryptedValue,
   type MasterKeyring,
   type SecretLocation,
@@ -99,4 +100,19 @@ export function openHrDocument(
   } finally {
     dek.fill(0);
   }
+}
+
+/**
+ * Rotation (ADR-0013 § 3, `secrets:rewrap`) : seule la clé de données enveloppée
+ * dépend du trousseau ; elle est re-chiffrée sous la clé courante. L'objet stocké,
+ * chiffré par la clé de données (inchangée), reste valide : rien n'est relu ni réécrit
+ * au stockage. `changed: false` si la clé est déjà à la clé courante.
+ */
+export function rewrapHrDocumentKey(
+  id: HrDocumentIdentity,
+  wrappedKey: EncryptedValue,
+  keyring: MasterKeyring,
+): { changed: boolean; record: EncryptedValue } {
+  const out = rewrapSecret({ location: hrDocumentKeyLocation(id), record: wrappedKey, keyring });
+  return out.changed ? { changed: true, record: { ...out.record, last4: null } } : out;
 }

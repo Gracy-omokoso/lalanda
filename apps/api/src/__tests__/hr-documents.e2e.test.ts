@@ -21,12 +21,26 @@ import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AuditService } from '../authz/audit.service.js';
+import { getConnectionToken, getModelToken } from '@nestjs/mongoose';
+import type { Connection, Model } from 'mongoose';
+
+import { Integration, type IntegrationDocument } from '../integrations/integration.schema.js';
+import {
+  OrganizationSecret,
+  type OrganizationSecretDocument,
+} from '../integrations/organization-secret.schema.js';
+import { PlatformAuditService } from '../integrations/platform-audit.service.js';
+import { RewrapService } from '../integrations/rewrap.js';
+import { MasterKeyring } from '../integrations/secrets-crypto.js';
+import { SecretsService } from '../integrations/secrets.service.js';
+import { HrDocumentsService } from '../hr/documents/hr-documents.service.js';
 import { ObjectStorageService } from '../storage/object-storage.service.js';
 import { e2eSuite } from './e2e-utils.js';
 import { code, fiche, hrFixture, ok, type HrAccount, type HrFixture } from './hr-e2e-fixtures.js';
 
 const tag = randomBytes(4).toString('hex');
-process.env['SECRETS_MASTER_KEY'] = randomBytes(32).toString('base64');
+const CLE_K1 = randomBytes(32);
+process.env['SECRETS_MASTER_KEY'] = CLE_K1.toString('base64');
 process.env['SECRETS_MASTER_KEY_ID'] = 'k1';
 
 vi.setConfig({ testTimeout: 180_000 });
@@ -43,21 +57,25 @@ e2eSuite('RH — documents (ADR-0045 H4)', () => {
   const objects = new Map<string, { body: Buffer; contentType: string }>();
   /** B : fiche du Lecteur ; A : son manager (Analyste) ; C : fiche sans compte. */
   const id = { A: '', B: '', C: '' };
-  const doc = { contrat: '', passeport: '', justificatif: '' };
+  const doc = { contrat: '', passeport: '', justificatif: '', copie: '' };
 
+  /** Envoi `multipart/form-data` : champs de formulaire (écrits ici comme une requête) et partie `file`. */
   const upload = (
     c: HrAccount,
     employeeId: string,
-    query: string,
+    fields: string,
     body: Buffer,
     fileName = 'piece.pdf',
-  ) =>
-    request(fx.app.getHttpServer())
-      .post(`/hr/employees/${employeeId}/documents?${query}`)
-      .set('Cookie', fx.as(c))
-      .set('Content-Type', 'application/octet-stream')
-      .set('X-File-Name', encodeURIComponent(fileName))
-      .send(body);
+  ) => {
+    const req = request(fx.app.getHttpServer())
+      .post(`/hr/employees/${employeeId}/documents`)
+      .set('Cookie', fx.as(c));
+    for (const [k, v] of new URLSearchParams(fields)) req.field(k, v);
+    return req.attach('file', body, {
+      filename: fileName,
+      contentType: 'application/octet-stream',
+    });
+  };
   const del = (c: HrAccount, path: string) =>
     request(fx.app.getHttpServer()).delete(path).set('Cookie', fx.as(c));
   const download = (c: HrAccount, documentId: string) =>
@@ -282,6 +300,7 @@ e2eSuite('RH — documents (ADR-0045 H4)', () => {
       const source = await db
         .collection('hr_documents')
         .findOne({ _id: new ObjectId(doc.passeport) });
+      doc.copie = autre['id'];
       const cible = await db.collection('hr_documents').findOne({ _id: new ObjectId(autre['id']) });
       // Objet ET clé enveloppée de la pièce de B recopiés sur le document de C.
       objects.set(`rh-test/hr-documents/${cible!['objectId']}`, (await objetDe(doc.passeport))!);
@@ -322,6 +341,116 @@ e2eSuite('RH — documents (ADR-0045 H4)', () => {
       );
       // Un membre sans fiche : liste vide.
       expect(ok(await fx.get('sales_rep', '/hr/me'))['documents']).toEqual([]);
+    });
+  });
+
+  describe('métadonnées hors de l’URL et des en-têtes', () => {
+    it('le libellé et la catégorie voyagent dans le formulaire : ni l’URL ni les en-têtes journalisés ne les portent', async () => {
+      const LIBELLE = `Passeport de Bea Mbuyi ${tag}`;
+      const vus: { url: string; headers: string }[] = [];
+      const server = fx.app.getHttpServer() as import('node:http').Server;
+      const ecoute = (req: import('node:http').IncomingMessage) =>
+        vus.push({ url: req.url ?? '', headers: JSON.stringify(req.rawHeaders) });
+      server.on('request', ecoute);
+      try {
+        const v = ok(
+          await upload(
+            'hr_manager',
+            id.C,
+            `category=id_document&label=${encodeURIComponent(LIBELLE)}&expiresOn=2031-02-01`,
+            pdf('pièce'),
+            `${LIBELLE}.pdf`,
+          ),
+          201,
+        );
+        expect(v).toMatchObject({ label: LIBELLE, category: 'id_document', sensitive: true });
+      } finally {
+        server.off('request', ecoute);
+      }
+      const envoi = vus.filter((r) => r.url.includes('/documents'));
+      expect(envoi).toHaveLength(1);
+      // `req.url` est ce que pino-http journalise (et `req.headers` en production).
+      expect(envoi[0]!.url).toBe(`/hr/employees/${id.C}/documents`);
+      for (const morceau of [LIBELLE, encodeURIComponent(LIBELLE), 'id_document', 'Passeport']) {
+        expect(envoi[0]!.url).not.toContain(morceau);
+        expect(envoi[0]!.headers).not.toContain(morceau);
+      }
+      // L'ancien envoi par paramètres d'URL est refusé : le fichier manque.
+      const parUrl = await request(fx.app.getHttpServer())
+        .post(`/hr/employees/${id.C}/documents?category=contract&label=x`)
+        .set('Cookie', fx.as('hr_manager'))
+        .set('Content-Type', 'application/octet-stream')
+        .send(CONTRAT);
+      expect(parUrl.status).toBe(400);
+      // Un champ inconnu est refusé.
+      code(
+        await upload('hr_manager', id.C, 'category=contract&label=x&intrus=1', CONTRAT),
+        400,
+        'INVALID_REQUEST',
+      );
+    });
+  });
+
+  describe('rotation secrets:rewrap', () => {
+    it('après rotation k1 → k2, un document chiffré se relit avec la seule nouvelle clé', async () => {
+      const k1 = { keyId: 'k1', key: CLE_K1 };
+      const k2 = { keyId: 'k2', key: randomBytes(32) };
+      const rewrap = new RewrapService(
+        fx.app.get<Model<IntegrationDocument>>(getModelToken(Integration.name)),
+        fx.app.get<Model<OrganizationSecretDocument>>(getModelToken(OrganizationSecret.name)),
+        fx.app.get<Connection>(getConnectionToken()),
+        MasterKeyring.of([k2, k1], 'k2'),
+        fx.app.get(PlatformAuditService),
+        fx.app.get(SecretsService),
+      );
+      const cles = async () =>
+        (
+          await db
+            .collection('hr_documents')
+            .find({ organizationId: fx.orgN, wrappedKey: { $type: 'object' } })
+            .toArray()
+        ).map((d) => [String(d['_id']), d['wrappedKey']['keyId']] as const);
+      // Le document dont la clé a été recopiée (test plus haut) fait échouer la rotation
+      // bruyamment, comme pour les autres collections ; on l'efface avant de rejouer.
+      await expect(rewrap.run('operateur-1')).rejects.toThrow();
+      await db
+        .collection('hr_documents')
+        .updateOne(
+          { _id: new ObjectId(doc.copie) },
+          { $set: { wrappedKey: null, deletedAt: new Date() } },
+        );
+      const avant = (await cles()).filter(([, keyId]) => keyId === 'k1');
+      expect(avant.length).toBeGreaterThan(0);
+      const objetAvant = (await objetDe(doc.passeport))!.body;
+
+      const premier = await rewrap.run('operateur-1');
+      expect(premier.remainingKeyIds).toEqual([]);
+      expect(premier.rewrapped).toBeGreaterThanOrEqual(avant.length);
+      for (const [, keyId] of await cles()) expect(keyId).toBe('k2');
+      // L'objet chiffré n'est ni relu ni réécrit : seule la clé enveloppée change.
+      expect((await objetDe(doc.passeport))!.body.equals(objetAvant)).toBe(true);
+      const second = await rewrap.run('operateur-1');
+      expect(second.rewrapped).toBe(0);
+      expect(second.remainingKeyIds).toEqual([]);
+
+      // `_PREVIOUS` retirée : l'application ne connaît plus que k2.
+      const service = fx.app.get(HrDocumentsService) as unknown as { keyring: MasterKeyring };
+      const ancien = service.keyring;
+      service.keyring = MasterKeyring.of([k2], 'k2');
+      try {
+        const dl = await download('hr_manager', doc.passeport);
+        expect(dl.status).toBe(200);
+        expect((dl.body as Buffer).equals(PASSEPORT)).toBe(true);
+      } finally {
+        service.keyring = ancien;
+      }
+      const traces = await db
+        .collection('audit_events')
+        .find({ action: 'secret.rewrapped', targetType: 'hr_document' })
+        .toArray();
+      // Une trace par clé re-chiffrée (le premier passage, interrompu, en avait déjà écrit).
+      expect(traces.length).toBe((await cles()).length);
+      for (const t of traces) expect(t['metadata']).toEqual({ keyId: 'k2' });
     });
   });
 

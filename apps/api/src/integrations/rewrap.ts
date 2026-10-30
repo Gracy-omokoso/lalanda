@@ -32,6 +32,8 @@ import {
   maskBankAccount,
   rewrapHrPrivate,
 } from '../hr/private/hr-private-crypto.js';
+// ADR-0045 — H4 : clés enveloppées des documents RH sensibles.
+import { rewrapHrDocumentKey } from '../hr/documents/hr-document-crypto.js';
 import { Integration, type IntegrationDocument } from './integration.schema.js';
 import { MASTER_KEYRING } from './keyring.provider.js';
 import {
@@ -63,6 +65,9 @@ const HR_PRIVATE_FIELD_KEYS = [
   'personalContact',
   'exitNote',
 ] as const;
+
+/** ADR-0045 — H4 : documents RH sensibles (une clé de données enveloppée par document). */
+const HR_DOCUMENTS = 'hr_documents';
 
 @Injectable()
 export class RewrapService {
@@ -142,6 +147,8 @@ export class RewrapService {
     await this.rewrapSupplierPaymentMethods(keyring, actorUserId, report);
     // ADR-0045 — H2 (§ 2.4) : données sensibles du personnel.
     await this.rewrapHrEmployeePrivate(keyring, actorUserId, report);
+    // ADR-0045 — H4 (§ 2.8) : clés enveloppées des documents RH sensibles.
+    await this.rewrapHrDocumentKeys(keyring, actorUserId, report);
 
     this.secrets.invalidateAll();
 
@@ -173,6 +180,14 @@ export class RewrapService {
         const f = doc[field] as { cipher?: EncryptedValue } | null | undefined;
         if (f?.cipher && f.cipher.keyId !== keyring.currentKeyId) remaining.add(f.cipher.keyId);
       }
+    }
+    // ADR-0045 — H4 (§ 2.8) : clés enveloppées des documents RH sensibles.
+    for (const doc of await this.connection
+      .collection(HR_DOCUMENTS)
+      .find({ wrappedKey: { $type: 'object' } }, { projection: { wrappedKey: 1 } })
+      .toArray()) {
+      const k = doc['wrappedKey'] as EncryptedValue;
+      if (k.keyId !== keyring.currentKeyId) remaining.add(k.keyId);
     }
     report.remainingKeyIds = [...remaining];
     return report;
@@ -333,6 +348,66 @@ export class RewrapService {
         return true;
       });
       if (written) report.rewrapped += changed.length;
+    }
+  }
+
+  /**
+   * ADR-0045 — H4 (§ 2.8) : documents RH sensibles. Chaque fichier est chiffré par une
+   * clé de données aléatoire, elle-même enveloppée sous `MASTER_KEYRING` à
+   * l'emplacement qu'utilise la lecture (`hrDocumentKeyLocation`) : seule cette clé
+   * enveloppée est re-chiffrée ; l'objet au stockage, chiffré par la clé de données
+   * inchangée, reste lisible tel quel. Un document supprimé n'a plus de clé (`null`) :
+   * rien à faire. Écriture conditionnée par l'ancien `iv` (une suppression ou un
+   * effacement concurrent gagne) ; la révision n'augmente pas.
+   */
+  private async rewrapHrDocumentKeys(
+    keyring: MasterKeyring,
+    actorUserId: string,
+    report: RewrapReport,
+  ): Promise<void> {
+    const col = this.connection.collection(HR_DOCUMENTS);
+    for (const doc of await col
+      .find(
+        { wrappedKey: { $type: 'object' } },
+        { projection: { organizationId: 1, employeeId: 1, wrappedKey: 1 } },
+      )
+      .toArray()) {
+      const record = doc['wrappedKey'] as EncryptedValue;
+      const outcome = rewrapHrDocumentKey(
+        {
+          organizationId: String(doc['organizationId']),
+          employeeId: String(doc['employeeId']),
+          documentId: String(doc._id),
+        },
+        record,
+        keyring,
+      );
+      if (!outcome.changed) {
+        report.skipped += 1;
+        continue;
+      }
+      const written = await this.inTransaction(async (session) => {
+        const res = await col.updateOne(
+          { _id: doc._id, 'wrappedKey.iv': record.iv, 'wrappedKey.keyId': record.keyId },
+          { $set: { wrappedKey: outcome.record } },
+          session ? { session } : {},
+        );
+        if (res.modifiedCount === 0) return false;
+        await this.audit.record(
+          {
+            actorUserId,
+            actorRole: 'system',
+            action: 'secret.rewrapped',
+            targetType: 'hr_document',
+            targetId: String(doc._id),
+            // Ni clé, ni libellé, ni organisation (motif des fournisseurs).
+            metadata: { keyId: keyring.currentKeyId },
+          },
+          session,
+        );
+        return true;
+      });
+      if (written) report.rewrapped += 1;
     }
   }
 

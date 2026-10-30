@@ -3,10 +3,13 @@
 //   GET    /hr/employees/:employeeId/documents?category=   analytics.read + portée :
 //                                       hr.read (non sensibles), hr.sensitive.read (tous),
 //                                       soi (visibleToEmployee) ; manager : 403
-//   POST   /hr/employees/:employeeId/documents?category=&label=&issuedOn=&expiresOn=
-//          &sensitive=&visibleToEmployee=   analytics.read + : hr.manage (+ hr.sensitive.read
-//                                       si sensible) ; soi pour `leave_justification` ;
-//                                       corps BINAIRE, nom en `X-File-Name`, 30 par heure
+//   POST   /hr/employees/:employeeId/documents   analytics.read + : hr.manage
+//                                       (+ hr.sensitive.read si sensible) ; soi pour
+//                                       `leave_justification` ; 30 par heure ; corps
+//                                       `multipart/form-data` : partie `file` et champs
+//                                       category, label, issuedOn, expiresOn, sensitive,
+//                                       visibleToEmployee — JAMAIS dans l'URL ni dans un
+//                                       en-tête (journaux HTTP : donnée personnelle)
 //   GET    /hr/documents/:documentId/file   comme la liste ; téléchargement INERTE ;
 //                                       audit strict si sensible
 //   DELETE /hr/documents/:documentId     hr.manage (+ hr.sensitive.read si sensible)
@@ -15,13 +18,15 @@
 // les droits EFFECTIFS (`HrScopeService`). Hors portée, autre organisation : 404.
 
 import {
+  HR_DOCUMENT_FILE_FIELD,
   HR_LIMITS,
   ListHrDocumentsQuery,
-  UploadHrDocumentQuery,
+  UploadHrDocumentFields,
   type HrDocumentPage,
   type HrDocumentView,
 } from '@lalanda/shared/hr';
 import {
+  Body,
   Controller,
   Delete,
   Get,
@@ -30,12 +35,14 @@ import {
   Param,
   Post,
   Query,
-  Req,
   Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
-import type { Request, Response } from 'express';
+import type { Response } from 'express';
 
 import { AuthGuard } from '../../auth/auth.guard.js';
 import { CurrentOrgId, CurrentUser } from '../../auth/current-user.decorator.js';
@@ -54,8 +61,9 @@ import { contentDisposition } from '../../work/work-attachments.service.js';
 import { HrScopeService } from '../scope/hr-scope.service.js';
 import {
   HrDocumentsService,
-  readHrDocumentBody,
+  classifyHrDocument,
   type HrDocumentActor,
+  type HrUploadedFile,
 } from './hr-documents.service.js';
 import type { HrDocumentLean } from './hr-document.schema.js';
 
@@ -108,27 +116,40 @@ export class HrDocumentsController {
   @RequirePermission('analytics.read')
   @Throttle({ default: { ttl: 3_600_000, limit: HR_LIMITS.documentUploadsPerHour } })
   @UseGuards(UserThrottlerGuard)
+  // Guards d'abord (droits, débit), puis lecture du formulaire EN MÉMOIRE, bornée :
+  // rien n'est écrit sur disque, ni la pièce ni ses métadonnées.
+  @UseInterceptors(
+    FileInterceptor(HR_DOCUMENT_FILE_FIELD, {
+      limits: {
+        fileSize: HR_LIMITS.documentPdfMaxBytes,
+        files: 1,
+        fields: 8,
+        fieldSize: 1_000,
+        parts: 9,
+      },
+    }),
+  )
   async upload(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
     @CurrentOrgRole() role: OrgRole | undefined,
     @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('employeeId') employeeId: string,
-    @Query() query: unknown,
-    @Req() req: Request,
+    @Body() fields: unknown,
+    @UploadedFile() upload: HrUploadedFile | undefined,
   ): Promise<HrDocumentView> {
-    const parsed = UploadHrDocumentQuery.safeParse(query);
+    const parsed = UploadHrDocumentFields.safeParse({ ...(fields as object) });
     if (!parsed.success) invalidRequest(parsed.error, 'Métadonnées du document invalides.');
     const viewer = await this.scope.viewerOf(orgId, user.id, perms);
     const meta = this.documents.assertCanUpload(viewer, employeeId, parsed.data);
-    const file = await readHrDocumentBody(req);
+    const file = classifyHrDocument(upload);
     try {
       return await this.documents.upload(
         orgId,
         employeeId,
         meta,
         file,
-        req.headers['x-file-name'],
+        upload?.originalname,
         actorOf(user, role),
       );
     } catch (cause) {

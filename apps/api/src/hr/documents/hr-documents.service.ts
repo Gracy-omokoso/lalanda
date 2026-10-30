@@ -27,7 +27,7 @@ import {
   type HrDocumentPage,
   type HrDocumentView,
   type ListHrDocumentsQuery,
-  type UploadHrDocumentQuery,
+  type UploadHrDocumentFields,
 } from '@lalanda/shared/hr';
 import { PURCHASE_ATTACHMENT_LIMITS } from '@lalanda/shared/purchases';
 import {
@@ -41,10 +41,8 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
-import type { Request } from 'express';
 import { Types, type ClientSession, type Connection, type Model } from 'mongoose';
 
-import { readRequestBody } from '../../account/request-body.js';
 import { AuditService } from '../../authz/audit.service.js';
 import { MASTER_KEYRING } from '../../integrations/keyring.provider.js';
 import type { MasterKeyring } from '../../integrations/secrets-crypto.js';
@@ -113,20 +111,25 @@ function forbiddenHr(action: 'hr.read' | 'hr.manage', role: string | null): neve
   });
 }
 
-/** Lit le corps binaire et le classe par son contenu (`415 HR_DOCUMENT_TYPE` sinon). */
-export async function readHrDocumentBody(req: Request): Promise<AcceptedPurchaseAttachment> {
-  const read = await readRequestBody(req, HR_LIMITS.documentPdfMaxBytes);
-  if (!read.ok) {
-    if (read.reason === 'TOO_LARGE') {
-      throw new HttpException(
-        { code: 'FILE_TOO_LARGE', message: 'Le fichier dépasse 10 Mio.' },
-        413,
-      );
-    }
-    throw new BadRequestException({ code: 'UPLOAD_ABORTED', message: 'Envoi interrompu.' });
+/** Partie fichier reçue (formulaire `multipart/form-data`, en mémoire, bornée à 10 Mio). */
+export interface HrUploadedFile {
+  buffer: Buffer;
+  originalname?: string;
+}
+
+/** Classe le fichier par son contenu (`415 HR_DOCUMENT_TYPE` sinon). */
+export function classifyHrDocument(file: HrUploadedFile | undefined): AcceptedPurchaseAttachment {
+  if (!file || !Buffer.isBuffer(file.buffer)) {
+    throw new BadRequestException({
+      code: 'HR_DOCUMENT_FILE_MISSING',
+      message: 'Fichier attendu dans la partie « file » du formulaire.',
+    });
+  }
+  if (file.buffer.length > HR_LIMITS.documentPdfMaxBytes) {
+    throw new HttpException({ code: 'FILE_TOO_LARGE', message: 'Le fichier dépasse 10 Mio.' }, 413);
   }
   try {
-    return classifyPurchaseAttachment(read.body);
+    return classifyPurchaseAttachment(file.buffer);
   } catch (err) {
     if (err instanceof UnsupportedMediaTypeException) {
       throw new UnsupportedMediaTypeException({
@@ -262,8 +265,8 @@ export class HrDocumentsService {
   assertCanUpload(
     viewer: HrViewer,
     employeeId: string,
-    meta: UploadHrDocumentQuery,
-  ): UploadHrDocumentQuery {
+    meta: UploadHrDocumentFields,
+  ): UploadHrDocumentFields {
     const access = this.accessTo(viewer, employeeId);
     const employee = viewer.byId.get(employeeId)!;
     if (employee.status === 'anonymized') {
@@ -285,7 +288,7 @@ export class HrDocumentsService {
   async upload(
     organizationId: string,
     employeeId: string,
-    meta: UploadHrDocumentQuery,
+    meta: UploadHrDocumentFields,
     file: AcceptedPurchaseAttachment,
     rawFileName: unknown,
     actor: HrDocumentActor,

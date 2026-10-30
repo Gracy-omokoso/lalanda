@@ -56,12 +56,14 @@ export function defaultVisibleToEmployee(category: HrDocumentCategory): boolean 
 }
 
 /**
- * `POST /hr/employees/:id/documents?…` — le corps est le fichier BINAIRE (motif des
- * pièces des achats) ; les métadonnées passent en paramètres de requête, le nom du
- * fichier en `X-File-Name`. `sensitive` est IMPOSÉ vrai pour les catégories sensibles
- * (`false` y est refusé), libre (défaut faux) pour les autres.
+ * `POST /hr/employees/:id/documents` — corps `multipart/form-data` : une partie
+ * fichier `file` (son nom sert d'étiquette) et ces champs de formulaire. AUCUNE
+ * métadonnée dans l'URL ni dans un en-tête : un libellé comme « Passeport de … » est
+ * une donnée personnelle, et l'URL comme les en-têtes finissent dans les journaux
+ * HTTP. `sensitive` est IMPOSÉ vrai pour les catégories sensibles (`false` y est
+ * refusé), libre (défaut faux) pour les autres.
  */
-export const UploadHrDocumentQuery = z
+export const UploadHrDocumentFields = z
   .object({
     category: z.enum(HR_DOCUMENT_CATEGORIES, hrFr('Catégorie de document inconnue.')),
     label: hrRequiredText(L.documentLabel, 'Libellé'),
@@ -94,7 +96,10 @@ export const UploadHrDocumentQuery = z
     sensitive: isSensitiveHrDocumentCategory(q.category) ? true : (q.sensitive ?? false),
     visibleToEmployee: q.visibleToEmployee ?? defaultVisibleToEmployee(q.category),
   }));
-export type UploadHrDocumentQuery = z.output<typeof UploadHrDocumentQuery>;
+export type UploadHrDocumentFields = z.output<typeof UploadHrDocumentFields>;
+
+/** Nom de la partie fichier du formulaire d'envoi. */
+export const HR_DOCUMENT_FILE_FIELD = 'file';
 
 /** `GET /hr/employees/:id/documents?category=` */
 export const ListHrDocumentsQuery = z
