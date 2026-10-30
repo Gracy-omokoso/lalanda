@@ -41,6 +41,7 @@ import {
   type WorkWarning,
 } from '@lalanda/shared/work';
 import { MY_TASKS_MAX_PER_SOURCE, type CrmMyTaskItem } from '@lalanda/shared/crm';
+import { PURCHASES_AGENDA_MAX, type PurchasesMyTaskItem } from '@lalanda/shared/purchases';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
@@ -60,7 +61,14 @@ import {
   taskNotFound,
   type WorkActor,
 } from './work.common.js';
-import { CRM_AGENDA_SOURCE, noCrmAgenda, type CrmAgendaReader } from './my-tasks.ports.js';
+import {
+  CRM_AGENDA_SOURCE,
+  PURCHASES_AGENDA_SOURCE,
+  noCrmAgenda,
+  noPurchasesAgenda,
+  type CrmAgendaReader,
+  type PurchasesAgendaReader,
+} from './my-tasks.ports.js';
 import { WorkActivityService, type ActivityInput } from './work-activity.service.js';
 import { dropAttachmentObjects } from './work-attachments.storage.js';
 import { WorkMembersService } from './work-members.service.js';
@@ -108,11 +116,17 @@ export class WorkTasksService {
     @Inject(ObjectStorageService) private readonly storage: ObjectStorageService,
     // ADR-0040 — C4 : relances CRM, facultatives (tests, module absent).
     @Optional() @Inject(CRM_AGENDA_SOURCE) crmAgenda: CrmAgendaReader | null = null,
+    // ADR-0044 — P3 (§ 6.5) : approbations d'achat, facultatives (tests, module absent).
+    @Optional()
+    @Inject(PURCHASES_AGENDA_SOURCE)
+    purchasesAgenda: PurchasesAgendaReader | null = null,
   ) {
     this.crmAgenda = crmAgenda ?? noCrmAgenda;
+    this.purchasesAgenda = purchasesAgenda ?? noPurchasesAgenda;
   }
 
   private readonly crmAgenda: CrmAgendaReader;
+  private readonly purchasesAgenda: PurchasesAgendaReader;
 
   // ── Accès ────────────────────────────────────────────────────────────────
 
@@ -331,6 +345,9 @@ export class WorkTasksService {
    * relances CRM non faites assignées à l'appelant — seulement s'il détient
    * `crm.read`. Chaque élément porte sa `source` ; 500 au plus par source
    * (`truncated`) ; un seul `dueSoonDays` (réglage de l'organisation).
+   *
+   * ADR-0044 — P3 (§ 6.5) : et les demandes d'achat que l'appelant peut approuver
+   * (`purchase.approve`), 200 au plus, sans case à cocher.
    */
   async myTasks(organizationId: string, actor: WorkActor, now = new Date()): Promise<MyTasksView> {
     const archived = await this.projects.archivedIds(organizationId);
@@ -342,7 +359,10 @@ export class WorkTasksService {
     if (archived.length > 0) filter['projectId'] = { $nin: archived };
     // ADR-0041 § 9.4 (A3) : un retrait de `crm.read` masque les relances CRM.
     const crmVisible = actorCan(actor, 'crm.read');
-    const [docs, crm] = await Promise.all([
+    // ADR-0044 — P3 (§ 6.5) : approbations d'achat, pour les détenteurs EFFECTIFS de
+    // `purchase.approve` seulement.
+    const approvalsVisible = actorCan(actor, 'purchase.approve');
+    const [docs, crm, purchases] = await Promise.all([
       this.tasks
         .find(filter, LIGHT)
         .sort({ dueDate: 1, _id: 1 })
@@ -352,6 +372,9 @@ export class WorkTasksService {
       crmVisible
         ? this.crmAgenda.agendaOf(organizationId, actor.userId, MY_TASKS_MAX_PER_SOURCE)
         : Promise.resolve({ items: [] as CrmMyTaskItem[], truncated: false }),
+      approvalsVisible
+        ? this.purchasesAgenda.approvalsOf(organizationId, actor.userId, PURCHASES_AGENDA_MAX)
+        : Promise.resolve({ items: [] as PurchasesMyTaskItem[], truncated: false }),
     ]);
     const workTruncated = docs.length > MY_TASKS_MAX_PER_SOURCE;
     const work = await this.withProjectNames(
@@ -361,11 +384,16 @@ export class WorkTasksService {
     const items: MyTaskEntry[] = [
       ...work.map((t) => ({ ...t, source: 'work' as const })),
       ...crm.items,
+      ...purchases.items,
     ];
     const today = kinshasaDayOf(now);
     const { dueSoonDays } = await this.settings.get(organizationId);
     const groups = groupMyTasks(items, today, dueSoonDays);
-    return { asOf: today, ...groups, truncated: workTruncated || crm.truncated };
+    return {
+      asOf: today,
+      ...groups,
+      truncated: workTruncated || crm.truncated || purchases.truncated,
+    };
   }
 
   async detail(organizationId: string, taskId: string): Promise<WorkTaskDetail> {

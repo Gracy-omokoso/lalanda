@@ -37,7 +37,8 @@ import {
   type SupplierInvoiceKind,
   type SupplierInvoiceStatus,
 } from './constants.js';
-import type { PurchaseAttachmentView } from './receptions.js';
+import type { PurchaseOrderView } from './orders.js';
+import type { PurchaseAttachmentView, PurchaseReceptionView } from './receptions.js';
 import { PurchaseCategoryCode } from './suppliers.js';
 
 const L = PURCHASE_LIMITS;
@@ -324,3 +325,13 @@ export interface SupplierInvoicePrefill {
   costAllocations: { category: string | null; workProjectId: string | null; amount: string }[];
   remainingToInvoice: string;
 }
+
+/**
+ * Fiche d'une demande ou commande (`GET /purchases/orders/:id`, § 3.2) : la vue du lot
+ * P3 et, ajoutées par P4, ses réceptions et ses factures fournisseurs liées.
+ */
+export interface PurchaseOrderLinksView {
+  receptions: PurchaseReceptionView[];
+  invoices: SupplierInvoiceListItem[];
+}
+export type PurchaseOrderDetailView = PurchaseOrderView & PurchaseOrderLinksView;

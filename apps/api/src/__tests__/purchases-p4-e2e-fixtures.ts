@@ -9,9 +9,8 @@
 //   - enregistreur des notifications : il ENVELOPPE le port réel ;
 //   - enregistreur du port de stock (nul en R3, § 6.6).
 //
-// Les commandes appartiennent au lot P3, pas encore fusionné : elles sont posées
-// DIRECTEMENT dans `purchase_orders`, champ par champ comme l'ADR § 2.3 les décrit,
-// et lues par le port `PURCHASE_ORDERS_READER` — exactement le chemin de production.
+// Les commandes sont créées par les routes du lot P3 : demande du Propriétaire,
+// approbation du Directeur financier (séparation des tâches), envoi manuel.
 
 import type { INestApplication } from '@nestjs/common';
 import { ThrottlerStorage } from '@nestjs/throttler';
@@ -72,18 +71,17 @@ export interface P4Fixture {
   stockChanges: PurchaseReceptionChange[];
   objects: Map<string, { body: Buffer; contentType: string }>;
   supplier: (who: P4Account, name: string, extra?: Record<string, unknown>) => Promise<string>;
-  /** Commande posée dans `purchase_orders` (modèle de l'ADR § 2.3, lot P3). */
+  /** Commande créée par les routes du lot P3 (demande, soumission, approbation, envoi). */
   seedOrder: (input: {
     who?: P4Account;
     supplierId: string;
     currency?: 'CDF' | 'USD';
     lines: OrderLineSeed[];
-    status?: string;
+    status?: 'cancelled';
     phase?: 'request' | 'order';
     sent?: boolean;
-    approvedTotal?: string;
     declaredTaxes?: { label: string; amount: string }[];
-  }) => Promise<string>;
+  }) => Promise<{ id: string; line: Record<string, string> }>;
   order: (orderId: string) => Promise<Record<string, any>>;
 }
 
@@ -228,59 +226,59 @@ export function useP4Fixture(prefix: string): P4Fixture {
     },
     seedOrder: async (input) => {
       const who = input.who ?? 'owner';
+      const approver: P4Account = who === 'ownerB' ? 'ownerB' : 'finance_director';
       orderSeq += 1;
-      const lines = input.lines.map((l) => {
-        const kind = l.kind ?? 'goods';
-        return {
-          id: l.id,
-          label: l.label ?? `Ligne ${l.id}`,
-          quantity: l.quantity,
-          unit: l.unit ?? 'pièce',
-          unitPrice: l.unitPrice,
-          discountPercent: l.discountPercent ?? null,
-          kind,
-          receivable: l.receivable ?? kind === 'goods',
-          category: l.category ?? 'achats',
-          workProjectId: l.workProjectId ?? null,
-          itemRef: null,
-        };
+      const created = ok(
+        await post(who, '/purchases/orders', {
+          title: `Commande ${orderSeq}`,
+          supplierId: input.supplierId,
+          currency: input.currency ?? 'USD',
+          lines: input.lines.map((l) => ({
+            label: l.label ?? `Ligne ${l.id}`,
+            quantity: l.quantity,
+            unit: l.unit ?? 'pièce',
+            unitPrice: l.unitPrice,
+            discountPercent: l.discountPercent ?? null,
+            kind: l.kind ?? 'goods',
+            ...(l.receivable === undefined ? {} : { receivable: l.receivable }),
+            category: l.category ?? 'achats',
+            workProjectId: l.workProjectId ?? null,
+          })),
+          ...(input.declaredTaxes ? { declaredTaxes: input.declaredTaxes } : {}),
+        }),
+        201,
+      );
+      const id = created['id'] as string;
+      const lineIds: Record<string, string> = {};
+      input.lines.forEach((l, i) => {
+        lineIds[l.id] = (created['lines'] as { id: string }[])[i]!.id;
       });
-      const total = input.approvedTotal ?? '0.00';
-      const now = new Date();
-      const res = await db.collection('purchase_orders').insertOne({
-        _id: new ObjectId(),
-        organizationId: orgOf(who),
-        phase: input.phase ?? 'order',
-        status: input.status ?? (input.sent === false ? 'approved' : 'sent'),
-        requestNumber: `DA2610-${String(orderSeq).padStart(6, '0')}`,
-        orderNumber:
-          (input.phase ?? 'order') === 'order'
-            ? `BC2610-${String(orderSeq).padStart(6, '0')}`
-            : null,
-        requestedBy: userIds[who],
-        title: `Commande ${orderSeq}`,
-        justification: null,
-        supplierId: input.supplierId,
-        currency: input.currency ?? 'USD',
-        lines,
-        declaredTaxes: input.declaredTaxes ?? [],
-        totals: { subtotal: total, taxes: '0.00', total },
-        expectedOn: null,
-        deliveryAddress: null,
-        requiredApprovals: 1,
-        approvals: [],
-        approvedTotal: total,
-        sentAt: input.sent === false ? null : now,
-        sentVia: input.sent === false ? null : 'manual',
-        cancellation: null,
-        revision: 1,
-        createdBy: userIds[who],
-        updatedBy: userIds[who],
-        _schemaVersion: 1,
-        createdAt: now,
-        updatedAt: now,
-      });
-      return String(res.insertedId);
+      let o = ok(
+        await post(who, `/purchases/orders/${id}/submit`, {
+          expectedRevision: created['revision'],
+        }),
+      );
+      if ((input.phase ?? 'order') === 'order' && o['status'] === 'submitted') {
+        o = ok(
+          await post(approver, `/purchases/orders/${id}/approve`, {
+            expectedRevision: o['revision'],
+          }),
+        );
+      }
+      if ((input.phase ?? 'order') === 'order' && input.sent !== false) {
+        o = ok(
+          await post(who, `/purchases/orders/${id}/mark-sent`, { expectedRevision: o['revision'] }),
+        );
+      }
+      if (input.status === 'cancelled') {
+        ok(
+          await post(who, `/purchases/orders/${id}/cancel`, {
+            reason: 'Essai',
+            expectedRevision: o['revision'],
+          }),
+        );
+      }
+      return { id, line: lineIds };
     },
     order: async (orderId) =>
       (await db

@@ -9,9 +9,24 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 
+import { BrandingModule } from '../branding/branding.module.js';
+import { FiscalModule } from '../fiscal/fiscal.module.js';
 import { MasterKeyringProvider } from '../integrations/keyring.provider.js';
 import { Membership, MembershipSchema } from '../organizations/membership.schema.js';
 import { OrganizationsModule } from '../organizations/organizations.module.js';
+import { PdfModule } from '../reports/pdf.module.js';
+import { SalesModule } from '../sales/sales.module.js';
+// ADR-0044 — P3
+import { PurchaseCounter, PurchaseCounterSchema } from './counters/purchase-counter.schema.js';
+import { PurchaseCountersService } from './counters/purchase-counters.service.js';
+import { PurchaseOrderDocumentsService } from './documents/purchase-order-documents.service.js';
+import { PurchaseOrder, PurchaseOrderSchema } from './orders/purchase-order.schema.js';
+import { PurchaseOrdersController } from './orders/purchase-orders.controller.js';
+import { PurchaseOrdersService } from './orders/purchase-orders.service.js';
+import { PurchasesNotifier } from './purchases-notifier.js';
+import { PurchaseSettings, PurchaseSettingsSchema } from './settings/purchase-settings.schema.js';
+import { PurchaseSettingsController } from './settings/purchase-settings.controller.js';
+import { PurchaseSettingsService } from './settings/purchase-settings.service.js';
 // ADR-0044 — P2
 import { SUPPLIER_PAYABLES_SOURCE } from './suppliers/supplier-payables.port.js';
 import { Supplier, SupplierSchema } from './suppliers/supplier.schema.js';
@@ -22,13 +37,11 @@ import { SuppliersService } from './suppliers/suppliers.service.js';
 import { PurchaseAttachmentsService } from './attachments/purchase-attachments.js';
 import { SupplierInvoice, SupplierInvoiceSchema } from './invoices/supplier-invoice.schema.js';
 import { SupplierInvoicesController } from './invoices/supplier-invoices.controller.js';
+import { SupplierInvoiceSettlements } from './invoices/supplier-invoice-settlements.js';
 import { SupplierInvoicesNotifier } from './invoices/supplier-invoices-notifier.js';
 import { SupplierInvoicesPayablesSource } from './invoices/supplier-invoices-payables.source.js';
 import { SupplierInvoicesService } from './invoices/supplier-invoices.service.js';
-import {
-  MongoPurchaseOrdersReader,
-  PURCHASE_ORDERS_READER,
-} from './receptions/purchase-orders.port.js';
+import { PurchaseOrderFactsReader } from './receptions/purchase-order-facts.js';
 import { PurchaseReceptionsController } from './receptions/purchase-receptions.controller.js';
 import { PurchaseReceptionsService } from './receptions/purchase-receptions.service.js';
 import { PurchaseReception, PurchaseReceptionSchema } from './receptions/reception.schema.js';
@@ -38,10 +51,19 @@ import { PURCHASE_RECEPTION_SINK, noPurchaseReceptionSink } from './stock-sink.p
   imports: [
     // `AuthGuard` résout l'organisation active via `OrganizationsService`.
     OrganizationsModule,
+    // ADR-0044 — P3 : bon de commande PDF et envoi (ADR-0025, ADR-0028, ADR-0042).
+    SalesModule,
+    FiscalModule,
+    BrandingModule,
+    PdfModule,
     MongooseModule.forFeature([
       // ADR-0044 — P2 : fiches fournisseurs ; adhésions (destinataires des alertes).
       { name: Supplier.name, schema: SupplierSchema },
       { name: Membership.name, schema: MembershipSchema },
+      // ADR-0044 — P3 : demandes et commandes, réglages, compteurs.
+      { name: PurchaseOrder.name, schema: PurchaseOrderSchema },
+      { name: PurchaseSettings.name, schema: PurchaseSettingsSchema },
+      { name: PurchaseCounter.name, schema: PurchaseCounterSchema },
       // ADR-0044 — P4 : réceptions et factures fournisseurs.
       { name: PurchaseReception.name, schema: PurchaseReceptionSchema },
       { name: SupplierInvoice.name, schema: SupplierInvoiceSchema },
@@ -50,6 +72,9 @@ import { PURCHASE_RECEPTION_SINK, noPurchaseReceptionSink } from './stock-sink.p
   controllers: [
     // ADR-0044 — P2
     PurchaseSuppliersController,
+    // ADR-0044 — P3
+    PurchaseOrdersController,
+    PurchaseSettingsController,
     // ADR-0044 — P4
     PurchaseReceptionsController,
     SupplierInvoicesController,
@@ -60,19 +85,35 @@ import { PURCHASE_RECEPTION_SINK, noPurchaseReceptionSink } from './stock-sink.p
     // nul jusqu'aux factures et paiements (P4, P5), qui le remplaceront.
     SuppliersService,
     SuppliersNotifier,
+    // ADR-0044 — P3 : cycle demande → bon de commande, réglages, numérotation (DA, BC,
+    // et FF/PF pour P4 et P5), PDF et envoi, notifications d'approbation.
+    PurchaseSettingsService,
+    PurchaseCountersService,
+    PurchasesNotifier,
+    PurchaseOrdersService,
+    PurchaseOrderDocumentsService,
     // ADR-0044 — P4 : le reste dû se lit désormais sur les factures validées (et les
     // paiements du lot P5, lus par la connexion) : le fournisseur nul de P2 est remplacé.
     { provide: SUPPLIER_PAYABLES_SOURCE, useExisting: SupplierInvoicesPayablesSource },
     // ADR-0044 — P4 : réceptions, factures, rapprochement, pièces jointes. Commandes lues
-    // par un port (lot P3) ; port de stock nul en R3 (§ 6.6).
+    // sur le modèle de P3 ; port de stock nul en R3 (§ 6.6).
     PurchaseAttachmentsService,
     SupplierInvoicesService,
     SupplierInvoicesNotifier,
+    SupplierInvoiceSettlements,
     SupplierInvoicesPayablesSource,
     PurchaseReceptionsService,
-    { provide: PURCHASE_ORDERS_READER, useClass: MongoPurchaseOrdersReader },
+    PurchaseOrderFactsReader,
     { provide: PURCHASE_RECEPTION_SINK, useValue: noPurchaseReceptionSink },
   ],
-  exports: [SuppliersService, SupplierInvoicesService],
+  exports: [
+    SuppliersService,
+    // ADR-0044 — P3
+    PurchaseOrdersService,
+    PurchaseSettingsService,
+    PurchaseCountersService,
+    // ADR-0044 — P4
+    SupplierInvoicesService,
+  ],
 })
 export class PurchasesModule {}

@@ -7,6 +7,8 @@
 // par le moteur (`packages/engine/src/work/`) : le web les affiche sans calcul.
 
 import type { CrmMyTaskItem } from '../crm/agenda.js';
+// ADR-0044 — P3 : approbations d'achat dans « Mes tâches » (§ 6.5).
+import type { PurchasesMyTaskItem } from '../purchases/agenda.js';
 import type {
   WorkActivityKind,
   WorkColumn,
@@ -194,14 +196,14 @@ export interface MyTaskItem extends WorkTaskView {
 /** Tâche du module `work` dans « Mes tâches » (ADR-0040 — C4 § 5.2). */
 export type WorkMyTaskItem = MyTaskItem & { source: 'work' };
 
-export type { CrmMyTaskItem };
+export type { CrmMyTaskItem, PurchasesMyTaskItem };
 
 /**
  * Élément de « Mes tâches » : une tâche, ou une relance du CRM agrégée à la
- * lecture (ADR-0040 — C4 § 5.2). `source` dit quel module la possède, donc quelle
- * route la coche.
+ * lecture (ADR-0040 — C4 § 5.2), ou une approbation d'achat (ADR-0044 § 6.5, sans
+ * case à cocher). `source` dit quel module la possède, donc quelle route la coche.
  */
-export type MyTaskEntry = WorkMyTaskItem | CrmMyTaskItem;
+export type MyTaskEntry = WorkMyTaskItem | CrmMyTaskItem | PurchasesMyTaskItem;
 
 /** `GET /work/my-tasks` — groupes calculés par `groupMyTasks`. */
 export interface MyTasksView {

@@ -10,6 +10,7 @@
 // détient `crm.read` (contrôlé par `WorkTasksService.myTasks`).
 
 import type { CrmMyTaskItem } from '@lalanda/shared/crm';
+import type { PurchasesMyTaskItem } from '@lalanda/shared/purchases';
 
 export const CRM_AGENDA_SOURCE = Symbol('WORK_CRM_AGENDA_SOURCE');
 
@@ -26,4 +27,27 @@ export interface CrmAgendaReader {
 /** Sans module CRM (tests) : aucune relance. */
 export const noCrmAgenda: CrmAgendaReader = {
   agendaOf: async () => ({ items: [], truncated: false }),
+};
+
+// ── ADR-0044 — P3 (§ 6.5) : approbations d'achat ─────────────────────────────
+//
+// Même motif : agrégées à la lecture, en lecture seule, par le fournisseur réel
+// `purchases/agenda/purchases-agenda.source.ts`, appelé seulement si l'appelant
+// détient `purchase.approve` (droits effectifs, contrôlé par `myTasks`).
+
+export const PURCHASES_AGENDA_SOURCE = Symbol('WORK_PURCHASES_AGENDA_SOURCE');
+
+export interface PurchasesAgendaPage {
+  items: PurchasesMyTaskItem[];
+  /** Vrai si plus de `limit` demandes répondaient. */
+  truncated: boolean;
+}
+
+export interface PurchasesAgendaReader {
+  approvalsOf(organizationId: string, userId: string, limit: number): Promise<PurchasesAgendaPage>;
+}
+
+/** Sans module des achats (tests) : aucune approbation. */
+export const noPurchasesAgenda: PurchasesAgendaReader = {
+  approvalsOf: async () => ({ items: [], truncated: false }),
 };

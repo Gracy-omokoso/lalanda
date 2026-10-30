@@ -11,6 +11,7 @@
 // coche par la route du CRM ; un clic ouvre l'opportunité, le compte ou le contact.
 
 import type { CrmMyTaskItem } from '@lalanda/shared/crm';
+import type { PurchasesMyTaskItem } from '@lalanda/shared/purchases';
 import type { MyTasksView, WorkMyTaskItem } from '@lalanda/shared/work';
 import { EmptyState, PageHeader, Skeleton, buttonClasses } from '@lalanda/ui';
 import Link from 'next/link';
@@ -25,10 +26,13 @@ import { Alerte, BOUTON_PETIT, BloqueeBadge, Echeance, PrioriteBadge } from './e
 import {
   GROUPES_MES_TACHES,
   PASTILLE_RELANCE,
+  PASTILLE_APPROBATION,
   appliquerTache,
+  estApprobation,
   estRelance,
   peutCocherRelance,
   retirerElement,
+  sousTitreApprobation,
   sousTitreRelance,
   totalMesTaches,
 } from './mes-taches-model';
@@ -152,7 +156,9 @@ export function MesTaches(): React.ReactElement {
                 ) : (
                   <ul className="flex flex-col divide-y divide-[var(--border)] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)]">
                     {liste.map((t) =>
-                      estRelance(t) ? (
+                      estApprobation(t) ? (
+                        <LigneApprobation key={t.id} a={t} today={vue.asOf} dueSoonDays={dueSoon} />
+                      ) : estRelance(t) ? (
                         <LigneRelance
                           key={t.id}
                           r={t}
@@ -204,6 +210,52 @@ export function MesTaches(): React.ReactElement {
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * Approbation d'achat (ADR-0044 § 6.5, § 8) : pastille « Approbation », pas de case à
+ * cocher — approuver exige une décision, le lien ouvre la demande.
+ */
+function LigneApprobation({
+  a,
+  today,
+  dueSoonDays,
+}: {
+  a: PurchasesMyTaskItem;
+  today: string;
+  dueSoonDays: number;
+}): React.ReactElement {
+  return (
+    <li className="flex min-w-0 flex-col gap-1.5 px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3">
+      <div className="flex min-w-0 flex-1 items-start gap-2">
+        <span aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-center text-xs">
+          ✓
+        </span>
+        <span className="flex min-w-0 flex-col">
+          <Link
+            href={a.href}
+            className="break-words text-sm font-medium underline-offset-2 hover:underline"
+          >
+            {a.title}
+          </Link>
+          <span className="truncate text-xs text-[var(--foreground-muted)]">
+            {sousTitreApprobation(a)}
+          </span>
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 pl-6 sm:pl-0">
+        <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-strong)] px-2 py-0.5 text-[0.7rem] font-medium">
+          <span aria-hidden="true">⚖</span>
+          {PASTILLE_APPROBATION}
+        </span>
+        <Echeance
+          task={{ dueDate: a.dueDate, done: false, isMilestone: false }}
+          today={today}
+          dueSoonDays={dueSoonDays}
+        />
+      </div>
+    </li>
   );
 }
 

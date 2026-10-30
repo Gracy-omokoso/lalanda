@@ -27,14 +27,17 @@ import { appliquerCorps } from './calendar-model';
 import { CalendrierTaches, type TacheCalendrierUI } from './calendar-vue';
 import { Alerte, BOUTON_PETIT } from './elements';
 import {
+  PASTILLE_APPROBATION,
   PASTILLE_RELANCE,
   aPlat,
   appliquerRelance,
   appliquerTache,
+  estApprobation,
   estRelance,
   estTache,
   instantDeplace,
   regrouper,
+  sousTitreApprobation,
   sousTitreRelance,
 } from './mes-taches-model';
 import {
@@ -51,6 +54,22 @@ type ElementCalendrier = TacheCalendrierUI & { element: MyTaskEntry };
 
 function versCalendrier(e: MyTaskEntry): ElementCalendrier {
   if (estTache(e)) return { ...e, element: e };
+  // ADR-0044 § 6.5 : une approbation d'achat se lit au jour de soumission, sans se déplacer.
+  if (estApprobation(e)) {
+    return {
+      id: e.id,
+      number: 0,
+      title: e.title,
+      etiquette: PASTILLE_APPROBATION,
+      startDate: null,
+      dueDate: e.dueDate,
+      isMilestone: false,
+      done: false,
+      rank: e.rank,
+      revision: 0,
+      element: e,
+    };
+  }
   return {
     id: e.id,
     number: 0,
@@ -195,18 +214,22 @@ export function CalendrierMesTaches(): React.ReactElement {
           peutDeplacer={travailler}
           idPrefixe="mes-taches-cal"
           sousTitre={(t) =>
-            estRelance(t.element) ? sousTitreRelance(t.element) : t.element.projectName
+            estApprobation(t.element)
+              ? sousTitreApprobation(t.element)
+              : estRelance(t.element)
+                ? sousTitreRelance(t.element)
+                : t.element.projectName
           }
           onOuvrir={(t) =>
             router.push(
-              estRelance(t.element)
+              estRelance(t.element) || estApprobation(t.element)
                 ? t.element.href
                 : hrefTache(t.element.projectId, t.element.id, 'calendrier'),
             )
           }
           onDeplacer={(t, corps) => {
             if (estTache(t.element)) deplacer(t.element, corps);
-            else if (corps.dueDate) deplacerRelance(t.id, corps.dueDate);
+            else if (estRelance(t.element) && corps.dueDate) deplacerRelance(t.id, corps.dueDate);
           }}
         />
       )}

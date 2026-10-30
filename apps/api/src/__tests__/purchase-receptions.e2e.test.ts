@@ -28,25 +28,28 @@ e2eSuite('Réceptions (ADR-0044 P4)', () => {
   const f = useP4Fixture('achrecep');
   let supplierId = '';
   let orderId = '';
+  let L: Record<string, string> = {};
 
-  const reception = (orderLineId: string, quantity: string, id = orderId, extra = {}) => ({
-    orderId: id,
+  type Seeded = { id: string; line: Record<string, string> };
+  const reception = (key: string, quantity: string, o?: Seeded) => ({
+    orderId: o ? o.id : orderId,
     receivedOn: kinshasaToday(),
-    lines: [{ orderLineId, quantity }],
-    ...extra,
+    lines: [{ orderLineId: o ? (o.line[key] ?? key) : (L[key] ?? key), quantity }],
   });
 
   it('prépare un fournisseur et une commande envoyée (10 + 2, plus un service)', async () => {
     supplierId = await f.supplier('owner', 'Socimex', { defaultCurrency: 'USD' });
-    orderId = await f.seedOrder({
+    const o = await f.seedOrder({
       supplierId,
-      approvedTotal: '170.00',
       lines: [
         { id: 'l1', quantity: '10', unitPrice: '5.00' },
         { id: 'l2', quantity: '2', unitPrice: '50.00' },
         { id: 's1', quantity: '1', unitPrice: '20.00', kind: 'service' },
       ],
     });
+    orderId = o.id;
+    L = o.line;
+    expect((await f.order(orderId))['status']).toBe('sent');
   });
 
   it('réception partielle : commande `partially_received`, reste à recevoir, port de stock', async () => {
@@ -64,23 +67,22 @@ e2eSuite('Réceptions (ADR-0044 P4)', () => {
       supplierId,
       status: 'recorded',
       deliveryNoteRef: 'BL-001',
-      lines: [{ orderLineId: 'l1', quantity: '6', label: 'Ligne l1', unit: 'pièce' }],
+      lines: [{ orderLineId: L['l1'], quantity: '6', label: 'Ligne l1', unit: 'pièce' }],
       revision: 1,
     });
     expect(res['order']['status']).toBe('partially_received');
     expect(res['order']['lines'][0]).toMatchObject({
-      orderLineId: 'l1',
+      orderLineId: L['l1'],
       ordered: '10',
       received: '6',
       remaining: '4',
     });
     const order = await f.order(orderId);
     expect(order['status']).toBe('partially_received');
-    expect(order['revision']).toBe(2);
     expect(f.stockChanges.at(-1)).toMatchObject({
       receptionId: res['reception']['id'],
       status: 'recorded',
-      lines: [{ orderLineId: 'l1', itemRef: null, quantity: '6', unit: 'pièce' }],
+      lines: [{ orderLineId: L['l1'], itemRef: null, quantity: '6', unit: 'pièce' }],
     });
     const audit = await f
       .db()
@@ -95,8 +97,8 @@ e2eSuite('Réceptions (ADR-0044 P4)', () => {
         orderId,
         receivedOn: kinshasaToday(),
         lines: [
-          { orderLineId: 'l1', quantity: '4' },
-          { orderLineId: 'l2', quantity: '2' },
+          { orderLineId: L['l1'], quantity: '4' },
+          { orderLineId: L['l2'], quantity: '2' },
         ],
       }),
       201,
@@ -145,33 +147,42 @@ e2eSuite('Réceptions (ADR-0044 P4)', () => {
   });
 
   it('commande approuvée non envoyée : réceptionnable (livraison sur appel)', async () => {
-    const id = await f.seedOrder({
+    const o = await f.seedOrder({
       supplierId,
       sent: false,
-      approvedTotal: '10.00',
       lines: [{ id: 'a', quantity: '2', unitPrice: '5.00' }],
     });
-    const res = f.ok(await f.post('owner', '/purchases/receptions', reception('a', '1', id)), 201);
+    expect((await f.order(o.id))['status']).toBe('approved');
+    const res = f.ok(await f.post('owner', '/purchases/receptions', reception('a', '1', o)), 201);
     expect(res['order']['status']).toBe('partially_received');
   });
 
   it('commande non réceptionnable, date future, lignes forgées ou en double', async () => {
-    for (const status of ['closed', 'cancelled']) {
-      const id = await f.seedOrder({
-        supplierId,
-        status,
-        lines: [{ id: 'x', quantity: '1', unitPrice: '1.00' }],
-      });
-      f.code(
-        await f.post('owner', '/purchases/receptions', reception('x', '1', id)),
-        409,
-        'PURCHASE_ORDER_NOT_RECEIVABLE',
-      );
-    }
+    const cancelled = await f.seedOrder({
+      supplierId,
+      status: 'cancelled',
+      lines: [{ id: 'x', quantity: '1', unitPrice: '1.00' }],
+    });
+    f.code(
+      await f.post('owner', '/purchases/receptions', reception('x', '1', cancelled)),
+      409,
+      'PURCHASE_ORDER_NOT_RECEIVABLE',
+    );
+    const closed = await f.seedOrder({
+      supplierId,
+      lines: [{ id: 'x', quantity: '2', unitPrice: '1.00' }],
+    });
+    f.ok(await f.post('owner', '/purchases/receptions', reception('x', '1', closed)), 201);
+    const rev = (await f.order(closed.id))['revision'];
+    f.ok(await f.post('owner', `/purchases/orders/${closed.id}/close`, { expectedRevision: rev }));
+    f.code(
+      await f.post('owner', '/purchases/receptions', reception('x', '1', closed)),
+      409,
+      'PURCHASE_ORDER_NOT_RECEIVABLE',
+    );
     const request = await f.seedOrder({
       supplierId,
       phase: 'request',
-      status: 'submitted',
       lines: [{ id: 'x', quantity: '1', unitPrice: '1.00' }],
     });
     f.code(
@@ -197,8 +208,8 @@ e2eSuite('Réceptions (ADR-0044 P4)', () => {
         orderId,
         receivedOn: kinshasaToday(),
         lines: [
-          { orderLineId: 'l1', quantity: '1' },
-          { orderLineId: 'l1', quantity: '1' },
+          { orderLineId: L['l1'], quantity: '1' },
+          { orderLineId: L['l1'], quantity: '1' },
         ],
       }),
       400,
@@ -214,6 +225,14 @@ e2eSuite('Réceptions (ADR-0044 P4)', () => {
       400,
       'INVALID_REQUEST',
     );
+  });
+
+  it('la fiche de la commande porte ses réceptions et ses factures (`GET /purchases/orders/:id`)', async () => {
+    const order = f.ok(await f.get('viewer', `/purchases/orders/${orderId}`));
+    expect(order['status']).toBe('partially_received');
+    expect(order['receptions'].length).toBe(4);
+    expect(order['receptions'].map((r: { status: string }) => r.status)).toContain('cancelled');
+    expect(order['invoices']).toEqual([]);
   });
 
   it('liste filtrée par commande, paginée par curseur, et fiche', async () => {

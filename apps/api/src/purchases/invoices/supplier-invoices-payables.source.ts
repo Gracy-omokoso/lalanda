@@ -22,13 +22,13 @@ import {
   type SupplierInvoiceDocument,
   type SupplierInvoiceLean,
 } from './supplier-invoice.schema.js';
-import { SupplierInvoicesService } from './supplier-invoices.service.js';
+import { SupplierInvoiceSettlements } from './supplier-invoice-settlements.js';
 
 @Injectable()
 export class SupplierInvoicesPayablesSource implements SupplierPayablesSource {
   constructor(
     @InjectModel(SupplierInvoice.name) private readonly invoices: Model<SupplierInvoiceDocument>,
-    @Inject(SupplierInvoicesService) private readonly service: SupplierInvoicesService,
+    @Inject(SupplierInvoiceSettlements) private readonly settlements: SupplierInvoiceSettlements,
   ) {}
 
   async remainingBySupplier(
@@ -47,7 +47,7 @@ export class SupplierInvoicesPayablesSource implements SupplierPayablesSource {
       .lean<SupplierInvoiceLean[]>()
       .exec();
     if (docs.length === 0) return out;
-    const settlements = await this.service.settlementsOf(organizationId, docs);
+    const settlements = await this.settlements.of(organizationId, docs);
     const today = todayInKinshasa();
     const bySupplier = new Map<string, SupplierInvoiceLean[]>();
     for (const d of docs) bySupplier.set(d.supplierId, [...(bySupplier.get(d.supplierId) ?? []), d]);

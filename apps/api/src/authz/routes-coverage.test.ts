@@ -68,6 +68,9 @@ import { TreasuryActualsController } from '../treasury/treasury-actuals.controll
 import { TreasuryExpensesController } from '../treasury/treasury-expenses.controller.js';
 // ADR-0044 — P2
 import { PurchaseSuppliersController } from '../purchases/suppliers/purchase-suppliers.controller.js';
+// ADR-0044 — P3
+import { PurchaseOrdersController } from '../purchases/orders/purchase-orders.controller.js';
+import { PurchaseSettingsController } from '../purchases/settings/purchase-settings.controller.js';
 // ADR-0044 — P4
 import { PurchaseReceptionsController } from '../purchases/receptions/purchase-receptions.controller.js';
 import { SupplierInvoicesController } from '../purchases/invoices/supplier-invoices.controller.js';
@@ -202,6 +205,9 @@ const CONTROLEURS = [
   CrmReportsController,
   // ADR-0044 — P2 : fiches fournisseurs.
   PurchaseSuppliersController,
+  // ADR-0044 — P3 : demandes, commandes, approbations, réglages.
+  PurchaseOrdersController,
+  PurchaseSettingsController,
   // ADR-0044 — P4 : réceptions et factures fournisseurs.
   PurchaseReceptionsController,
   SupplierInvoicesController,
@@ -897,6 +903,51 @@ describe('ADR-0044 — P2 : fournisseurs et coordonnées de paiement', () => {
     const routes = TOUTES_LES_ROUTES.filter((r) =>
       r.cle.startsWith('PurchaseSuppliersController.'),
     );
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+    }
+  });
+});
+
+// ADR-0044 — P3
+describe('ADR-0044 — P3 : demandes, bons de commande et réglages', () => {
+  it('chaque route des demandes et commandes déclare la permission de l’ADR (§ 3.2, § 3.3)', () => {
+    const attendu: Record<string, Action[]> = {
+      'PurchaseOrdersController.list': ['purchase.read'],
+      'PurchaseOrdersController.get': ['purchase.read'],
+      'PurchaseOrdersController.pdf': ['purchase.read'],
+      // Sa demande : `purchase.request` ; au-delà, le service exige `purchase.manage`.
+      'PurchaseOrdersController.create': ['purchase.request'],
+      'PurchaseOrdersController.update': ['purchase.request'],
+      'PurchaseOrdersController.remove': ['purchase.request'],
+      'PurchaseOrdersController.submit': ['purchase.request'],
+      'PurchaseOrdersController.duplicate': ['purchase.request'],
+      // Autorité de dépense : approuver, refuser, voir ce qu'on peut approuver.
+      'PurchaseOrdersController.approve': ['purchase.approve'],
+      'PurchaseOrdersController.reject': ['purchase.approve'],
+      'PurchaseOrdersController.pending': ['purchase.approve'],
+      'PurchaseOrdersController.markSent': ['purchase.manage'],
+      'PurchaseOrdersController.cancel': ['purchase.manage'],
+      'PurchaseOrdersController.close': ['purchase.manage'],
+      'PurchaseOrdersController.emailDraft': ['purchase.manage'],
+      'PurchaseOrdersController.email': ['purchase.manage'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) => r.cle.startsWith('PurchaseOrdersController.'));
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+    }
+  });
+
+  it('changer les paliers exige d’être soi-même approbateur (§ 3.7)', () => {
+    const attendu: Record<string, Action[]> = {
+      'PurchaseSettingsController.get': ['purchase.read'],
+      'PurchaseSettingsController.update': ['purchase.manage', 'purchase.approve'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) => r.cle.startsWith('PurchaseSettingsController.'));
     expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
     for (const [cle, actions] of Object.entries(attendu)) {
       const route = routes.find((r) => r.cle === cle);

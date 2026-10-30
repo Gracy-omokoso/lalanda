@@ -1,24 +1,18 @@
 // Lecture des commandes pour les réceptions et le rapprochement (ADR-0044 § 2.3,
 // § 2.4, § 5). ADR-0044 — P4.
 //
-// Les demandes et commandes (`purchase_orders`) appartiennent au lot P3. Ce lot n'en
-// importe aucun modèle : il les lit par ce PORT, dont le fournisseur par défaut lit la
-// collection par la connexion, champ par champ COMME L'ADR LES DÉCRIT (§ 2.3). Si le
-// modèle de P3 diverge, seul ce fichier change (ou P3 fournit son propre lecteur sous
-// le même jeton).
-//
-// Seule écriture : le statut DÉRIVÉ des réceptions (`partially_received`,
-// `received`), « dénormalisé dans la même transaction » (§ 2.3) — d'où la session.
+// Les demandes et commandes (`purchase_orders`) appartiennent au lot P3 : ce lecteur
+// les lit par SON modèle (`PurchaseOrder`), en lecture seule, et les ramène aux faits
+// dont le moteur a besoin. Seule écriture : le statut DÉRIVÉ des réceptions
+// (`partially_received`, `received`), « dénormalisé dans la même transaction »
+// (§ 2.3) — d'où la session.
 
 import type { PurchaseCurrency, PurchaseOrderStatus } from '@lalanda/shared/purchases';
 import { Injectable } from '@nestjs/common';
-import { InjectConnection } from '@nestjs/mongoose';
-import { Types, type ClientSession, type Connection } from 'mongoose';
+import { InjectModel } from '@nestjs/mongoose';
+import { Types, type ClientSession, type Model } from 'mongoose';
 
-export const PURCHASE_ORDERS_READER = Symbol('PURCHASE_ORDERS_READER');
-
-/** Collection du lot P3 (ADR-0044 § 1). */
-export const PURCHASE_ORDERS_COLLECTION = 'purchase_orders';
+import { PurchaseOrder, type PurchaseOrderDocument } from '../orders/purchase-order.schema.js';
 
 export interface PurchaseOrderLineFacts {
   id: string;
@@ -47,27 +41,6 @@ export interface PurchaseOrderFacts {
   lines: PurchaseOrderLineFacts[];
   declaredTaxes: { label: string; amount: string }[];
   revision: number;
-}
-
-export interface PurchaseOrdersReader {
-  /** Commandes de l'organisation parmi `ids` (les autres sont absentes : 404 pour l'appelant). */
-  findOwn(
-    organizationId: string,
-    ids: readonly string[],
-    session?: ClientSession,
-  ): Promise<Map<string, PurchaseOrderFacts>>;
-  /**
-   * Pose le statut dérivé des réceptions. N'écrit que si le statut courant vaut encore
-   * `expectedStatus` (sinon `false` : écriture concurrente).
-   */
-  setReceptionStatus(
-    organizationId: string,
-    orderId: string,
-    expectedStatus: PurchaseOrderStatus,
-    status: PurchaseOrderStatus,
-    actorUserId: string,
-    session: ClientSession,
-  ): Promise<boolean>;
 }
 
 const str = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : null);
@@ -116,9 +89,12 @@ export function orderFactsOf(doc: Record<string, unknown>): PurchaseOrderFacts {
 }
 
 @Injectable()
-export class MongoPurchaseOrdersReader implements PurchaseOrdersReader {
-  constructor(@InjectConnection() private readonly connection: Connection) {}
+export class PurchaseOrderFactsReader {
+  constructor(
+    @InjectModel(PurchaseOrder.name) private readonly orders: Model<PurchaseOrderDocument>,
+  ) {}
 
+  /** Commandes de l'organisation parmi `ids` (les autres sont absentes : 404 pour l'appelant). */
   async findOwn(
     organizationId: string,
     ids: readonly string[],
@@ -127,14 +103,18 @@ export class MongoPurchaseOrdersReader implements PurchaseOrdersReader {
     const oids = ids.filter((id) => Types.ObjectId.isValid(id)).map((id) => new Types.ObjectId(id));
     const out = new Map<string, PurchaseOrderFacts>();
     if (oids.length === 0) return out;
-    const docs = await this.connection
-      .collection(PURCHASE_ORDERS_COLLECTION)
-      .find({ _id: { $in: oids }, organizationId }, session ? { session } : {})
-      .toArray();
-    for (const doc of docs) out.set(String(doc._id), orderFactsOf(doc));
+    const docs = await this.orders
+      .find({ _id: { $in: oids }, organizationId }, null, session ? { session } : {})
+      .lean<Record<string, unknown>[]>()
+      .exec();
+    for (const doc of docs) out.set(String(doc['_id']), orderFactsOf(doc));
     return out;
   }
 
+  /**
+   * Pose le statut dérivé des réceptions. N'écrit que si le statut courant vaut encore
+   * `expectedStatus` (sinon `false` : écriture concurrente).
+   */
   async setReceptionStatus(
     organizationId: string,
     orderId: string,
@@ -144,14 +124,13 @@ export class MongoPurchaseOrdersReader implements PurchaseOrdersReader {
     session: ClientSession,
   ): Promise<boolean> {
     if (expectedStatus === status) return true;
-    const res = await this.connection.collection(PURCHASE_ORDERS_COLLECTION).updateOne(
-      { _id: new Types.ObjectId(orderId), organizationId, status: expectedStatus },
-      {
-        $set: { status, updatedBy: actorUserId, updatedAt: new Date() },
-        $inc: { revision: 1 },
-      },
-      { session },
-    );
+    const res = await this.orders
+      .updateOne(
+        { _id: new Types.ObjectId(orderId), organizationId, status: expectedStatus },
+        { $set: { status, updatedBy: actorUserId }, $inc: { revision: 1 } },
+        { session },
+      )
+      .exec();
     return res.matchedCount === 1;
   }
 }

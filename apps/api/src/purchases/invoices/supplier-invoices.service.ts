@@ -18,8 +18,9 @@
 // détenteur de `purchase.approve`, qui n'en est pas le créateur (sauf approbateur
 // unique), motif journalisé STRICTEMENT dans la même transaction.
 //
-// Les commandes (lot P3) sont lues par le port `PURCHASE_ORDERS_READER` ; les
-// paiements (lot P5) par la connexion (`supplier_payments`, champs de l'ADR § 2.6).
+// Les commandes (lot P3) sont lues sur leur modèle (`PurchaseOrderFactsReader`), les
+// réglages par `PurchaseSettingsService`, les numéros `FF` par `PurchaseCountersService`
+// (lot P3) ; les paiements (lot P5) par la connexion (`supplier_payments`, ADR § 2.6).
 
 import {
   EXPENSE_CATEGORY_CODES,
@@ -29,18 +30,14 @@ import {
   dueDateOf,
   matchInvoice,
   orderRemainingToInvoice,
-  payableSettlement,
   type MatchInvoiceInput,
   type MatchOrderInput,
   type PaymentTerms,
 } from '@lalanda/engine';
 import {
-  PURCHASE_NUMBER_PREFIXES,
-  PURCHASE_SETTINGS_DEFAULTS,
   supplierReferenceKey,
   type CreateSupplierInvoiceBody,
   type ListSupplierInvoicesQuery,
-  type PayableSettlementStatus,
   type SupplierInvoiceListItem,
   type SupplierInvoicePage,
   type SupplierInvoicePrefill,
@@ -62,11 +59,12 @@ import {
   type PurchaseAttachmentDoc,
 } from '../attachments/purchase-attachments.js';
 import {
-  PURCHASE_ORDERS_READER,
+  PurchaseOrderFactsReader,
   type PurchaseOrderFacts,
-  type PurchaseOrdersReader,
-} from '../receptions/purchase-orders.port.js';
+} from '../receptions/purchase-order-facts.js';
 import { PurchaseReception, type PurchaseReceptionLean } from '../receptions/reception.schema.js';
+import { PurchaseCountersService } from '../counters/purchase-counters.service.js';
+import { PurchaseSettingsService } from '../settings/purchase-settings.service.js';
 import { supplierArchived } from '../suppliers/suppliers.errors.js';
 import { SuppliersService } from '../suppliers/suppliers.service.js';
 import {
@@ -92,12 +90,15 @@ import {
   type SupplierInvoiceLean,
   type SupplierInvoiceLine,
 } from './supplier-invoice.schema.js';
+import {
+  NO_DEBT,
+  SupplierInvoiceSettlements,
+  type Settlement,
+} from './supplier-invoice-settlements.js';
 import { SupplierInvoicesNotifier } from './supplier-invoices-notifier.js';
 
 /** Collections lues par la connexion (autres lots). */
 const PAYMENTS = 'supplier_payments';
-const SETTINGS = 'purchase_settings';
-const COUNTERS = 'purchase_counters';
 const SUPPLIERS = 'suppliers';
 const WORK_PROJECTS = 'work_projects';
 
@@ -122,21 +123,6 @@ export interface InvoiceSettings {
   allowSoleApprover: boolean;
 }
 
-interface Settlement {
-  status: PayableSettlementStatus;
-  paid: string;
-  credited: string;
-  remaining: string;
-  overpaid: string;
-}
-
-const NO_DEBT: Settlement = {
-  status: 'unpaid',
-  paid: '0.00',
-  credited: '0.00',
-  remaining: '0.00',
-  overpaid: '0.00',
-};
 
 /** Champs composés d'une facture (création ou mise à jour d'un brouillon). */
 type Composed = Pick<
@@ -192,15 +178,15 @@ export class SupplierInvoicesService {
     private readonly receptions: Model<PurchaseReception>,
     @InjectConnection() private readonly connection: Connection,
     @Inject(SuppliersService) private readonly suppliers: SuppliersService,
-    @Inject(PURCHASE_ORDERS_READER) private readonly orders: PurchaseOrdersReader,
+    @Inject(PurchaseOrderFactsReader) private readonly orders: PurchaseOrderFactsReader,
     @Inject(AuditService) private readonly audit: AuditService,
     @Inject(AuthzService) private readonly authz: AuthzService,
     @Inject(PurchaseAttachmentsService) private readonly attachments: PurchaseAttachmentsService,
     @Inject(SupplierInvoicesNotifier) private readonly notifier: SupplierInvoicesNotifier,
+    @Inject(PurchaseSettingsService) private readonly purchaseSettings: PurchaseSettingsService,
+    @Inject(PurchaseCountersService) private readonly counters: PurchaseCountersService,
+    @Inject(SupplierInvoiceSettlements) private readonly settlements: SupplierInvoiceSettlements,
   ) {}
-
-  /** Index unique des compteurs (`organizationId + kind + year`, § 1), posé une fois. */
-  private countersIndexed = false;
 
   // ── Lecture ──────────────────────────────────────────────────────────────
 
@@ -256,6 +242,21 @@ export class SupplierInvoicesService {
       nextCursor:
         docs.length > query.limit && last ? encodeKeyCursor(last.invoiceDate, String(last._id)) : null,
     };
+  }
+
+  /** Factures qui visent une commande (fiche de la commande, § 3.2), annulées comprises. */
+  async forOrder(organizationId: string, orderId: string): Promise<SupplierInvoiceListItem[]> {
+    const docs = await this.invoices
+      .find({ organizationId, orderIds: orderId })
+      .sort({ invoiceDate: 1, _id: 1 })
+      .lean<SupplierInvoiceLean[]>()
+      .exec();
+    const settlements = await this.settlementsOf(organizationId, docs);
+    const names = await this.supplierNames(
+      organizationId,
+      docs.map((d) => d.supplierId),
+    );
+    return docs.map((d) => this.listItemOf(d, settlements.get(String(d._id)) ?? NO_DEBT, names));
   }
 
   async get(organizationId: string, invoiceId: string): Promise<SupplierInvoiceView> {
@@ -356,7 +357,8 @@ export class SupplierInvoicesService {
   ): Promise<SupplierInvoiceView> {
     const composed = await this.compose(organizationId, body, null);
     await this.assertNoDuplicate(organizationId, composed.supplierId, composed.supplierReferenceKey, null);
-    const internalNumber = await this.nextNumber(organizationId);
+    // `FF{AA}{MM}-NNNNNN`, compteur annuel au jour de Kinshasa, trous admis (§ 2.5).
+    const internalNumber = await this.counters.next(organizationId, 'invoice', new Date());
     let created: SupplierInvoiceDocument;
     try {
       created = await this.invoices.create({
@@ -901,54 +903,7 @@ export class SupplierInvoicesService {
     organizationId: string,
     docs: readonly Pick<SupplierInvoiceLean, '_id' | 'status' | 'kind' | 'total'>[],
   ): Promise<Map<string, Settlement>> {
-    const out = new Map<string, Settlement>();
-    const open = docs.filter((d) => d.status === 'validated' && d.kind === 'invoice');
-    if (open.length === 0) return out;
-    const ids = open.map((d) => String(d._id));
-    const [payments, credits] = await Promise.all([
-      this.connection
-        .collection(PAYMENTS)
-        .find(
-          { organizationId, status: { $ne: 'cancelled' }, 'allocations.invoiceId': { $in: ids } },
-          { projection: { allocations: 1 } },
-        )
-        .toArray(),
-      this.invoices
-        .find(
-          {
-            organizationId,
-            kind: 'credit_note',
-            status: 'validated',
-            creditedInvoiceId: { $in: ids },
-          },
-          { creditedInvoiceId: 1, total: 1 },
-        )
-        .lean<{ creditedInvoiceId: string; total: string }[]>()
-        .exec(),
-    ]);
-    const paidBy = new Map<string, string[]>();
-    for (const p of payments) {
-      for (const a of (p['allocations'] ?? []) as { invoiceId?: unknown; amount?: unknown }[]) {
-        if (typeof a.invoiceId !== 'string' || typeof a.amount !== 'string') continue;
-        paidBy.set(a.invoiceId, [...(paidBy.get(a.invoiceId) ?? []), a.amount]);
-      }
-    }
-    const creditBy = new Map<string, string[]>();
-    for (const c of credits) {
-      creditBy.set(c.creditedInvoiceId, [...(creditBy.get(c.creditedInvoiceId) ?? []), c.total]);
-    }
-    for (const d of open) {
-      const id = String(d._id);
-      const s = payableSettlement({ total: d.total }, paidBy.get(id) ?? [], creditBy.get(id) ?? []);
-      out.set(id, {
-        status: s.status,
-        paid: s.paid,
-        credited: s.credited,
-        remaining: s.remaining,
-        overpaid: s.overpaid,
-      });
-    }
-    return out;
+    return this.settlements.of(organizationId, docs);
   }
 
   // ── Composition et contrôles ─────────────────────────────────────────────
@@ -1312,60 +1267,14 @@ export class SupplierInvoicesService {
   // ── Réglages, numérotation, vues ─────────────────────────────────────────
 
   async settings(organizationId: string): Promise<InvoiceSettings> {
-    const D = PURCHASE_SETTINGS_DEFAULTS;
-    const doc = await this.connection.collection(SETTINGS).findOne({ organizationId });
-    const tol = (doc?.['matchingTolerances'] ?? {}) as Record<string, unknown>;
-    const abs = (tol['amountAbsolute'] ?? {}) as Record<string, unknown>;
-    const dec = (v: unknown, d: string) => (typeof v === 'string' ? v : d);
-    const dueSoon = doc?.['dueSoonDays'];
+    const e = await this.purchaseSettings.effective(organizationId);
     return {
-      pricePercent: dec(tol['pricePercent'], D.matchingTolerances.pricePercent),
-      amountAbsolute: {
-        CDF: dec(abs['CDF'], D.matchingTolerances.amountAbsolute.CDF),
-        USD: dec(abs['USD'], D.matchingTolerances.amountAbsolute.USD),
-      },
-      dueSoonDays:
-        typeof dueSoon === 'number' && Number.isInteger(dueSoon) ? dueSoon : D.dueSoonDays,
-      requireOrderForInvoice:
-        typeof doc?.['requireOrderForInvoice'] === 'boolean'
-          ? (doc['requireOrderForInvoice'] as boolean)
-          : D.requireOrderForInvoice,
-      allowSoleApprover:
-        typeof doc?.['allowSoleApprover'] === 'boolean'
-          ? (doc['allowSoleApprover'] as boolean)
-          : D.allowSoleApprover,
+      pricePercent: e.matchingTolerances.pricePercent,
+      amountAbsolute: e.matchingTolerances.amountAbsolute,
+      dueSoonDays: e.dueSoonDays,
+      requireOrderForInvoice: e.requireOrderForInvoice,
+      allowSoleApprover: e.allowSoleApprover,
     };
-  }
-
-  /** `FF{AA}{MM}-NNNNNN`, compteur annuel au jour de Kinshasa, trous admis (§ 2.5). */
-  private async nextNumber(organizationId: string, now = new Date()): Promise<string> {
-    const day = todayInKinshasa(now);
-    const year = Number(day.slice(0, 4));
-    if (!this.countersIndexed) {
-      await this.connection
-        .collection(COUNTERS)
-        .createIndex({ organizationId: 1, kind: 1, year: 1 }, { unique: true });
-      this.countersIndexed = true;
-    }
-    const bump = () =>
-      this.connection
-        .collection(COUNTERS)
-        .findOneAndUpdate(
-          { organizationId, kind: 'invoice', year },
-          { $inc: { last: 1 }, $setOnInsert: { _schemaVersion: 1 } },
-          { upsert: true, returnDocument: 'after' },
-        );
-    let counter;
-    try {
-      counter = await bump();
-    } catch (err) {
-      if (!isDuplicateKey(err)) throw err;
-      counter = await bump();
-    }
-    const last = Number(counter?.['last'] ?? 0);
-    return `${PURCHASE_NUMBER_PREFIXES.invoice}${day.slice(2, 4)}${day.slice(5, 7)}-${String(
-      last,
-    ).padStart(6, '0')}`;
   }
 
   private async supplierNames(

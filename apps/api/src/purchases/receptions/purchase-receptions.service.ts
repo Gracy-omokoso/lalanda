@@ -4,7 +4,7 @@
 // sur appel, `sent`, `partially_received`, `received` — un excédent est un écart, pas un
 // refus). Le statut de la commande est DÉRIVÉ des réceptions par le moteur
 // (`orderReceptionStatus`) et dénormalisé DANS LA MÊME TRANSACTION que la réception
-// (§ 2.3), par le port `PURCHASE_ORDERS_READER`. Après la transaction : port de stock
+// (§ 2.3), par le lecteur des commandes (`PurchaseOrderFactsReader`, modèle de P3). Après la transaction : port de stock
 // (nul en R3) et rapprochement des brouillons de facture qui visent la commande.
 //
 // Isolation : commande, ligne de commande et réception d'une autre organisation → 404.
@@ -50,11 +50,7 @@ import {
   noPurchaseReceptionSink,
   type PurchaseReceptionSink,
 } from '../stock-sink.port.js';
-import {
-  PURCHASE_ORDERS_READER,
-  type PurchaseOrderFacts,
-  type PurchaseOrdersReader,
-} from './purchase-orders.port.js';
+import { PurchaseOrderFactsReader, type PurchaseOrderFacts } from './purchase-order-facts.js';
 import {
   PurchaseReception,
   type PurchaseReceptionDocument,
@@ -73,7 +69,7 @@ export class PurchaseReceptionsService {
     @InjectModel(PurchaseReception.name)
     private readonly receptions: Model<PurchaseReceptionDocument>,
     @InjectConnection() private readonly connection: Connection,
-    @Inject(PURCHASE_ORDERS_READER) private readonly orders: PurchaseOrdersReader,
+    @Inject(PurchaseOrderFactsReader) private readonly orders: PurchaseOrderFactsReader,
     @Inject(SupplierInvoicesService) private readonly invoices: SupplierInvoicesService,
     @Inject(AuditService) private readonly audit: AuditService,
     @Inject(PurchaseAttachmentsService) private readonly attachments: PurchaseAttachmentsService,
@@ -121,6 +117,21 @@ export class PurchaseReceptionsService {
     const doc = await this.requireOwn(organizationId, receptionId);
     const order = (await this.orders.findOwn(organizationId, [doc.orderId])).get(doc.orderId);
     return viewOf(doc, order);
+  }
+
+  /** Réceptions d'une commande (fiche de la commande, § 3.2), annulées comprises. */
+  async forOrder(organizationId: string, order: PurchaseOrderFacts): Promise<PurchaseReceptionView[]> {
+    const docs = await this.receptions
+      .find({ organizationId, orderId: order.id })
+      .sort({ receivedOn: 1, _id: 1 })
+      .lean<PurchaseReceptionLean[]>()
+      .exec();
+    return docs.map((d) => viewOf(d, order));
+  }
+
+  /** Faits d'une commande de l'organisation, ou `null`. */
+  async orderFacts(organizationId: string, orderId: string): Promise<PurchaseOrderFacts | null> {
+    return (await this.orders.findOwn(organizationId, [orderId])).get(orderId) ?? null;
   }
 
   private async requireOwn(

@@ -10,6 +10,7 @@
 // figure avec son compte (ou son opportunité) et ouvre le CRM.
 
 import type { CrmMyTaskItem } from '@lalanda/shared/crm';
+import type { PurchasesMyTaskItem } from '@lalanda/shared/purchases';
 import type { MyTaskEntry, MyTaskItem } from '@lalanda/shared/work';
 
 import type { OrgAction } from '@/lib/api';
@@ -50,7 +51,22 @@ function estRelance(t: Element): t is CrmMyTaskItem {
   return 'source' in t && t.source === 'crm';
 }
 
+// ADR-0044 § 6.5 (lot P3) : approbation d'achat, au jour de sa soumission.
+function estApprobation(t: Element): t is PurchasesMyTaskItem {
+  return 'source' in t && t.source === 'purchases';
+}
+
 function ligne(t: Element, enRetard: boolean): LigneTache {
+  if (estApprobation(t)) {
+    return {
+      id: t.id,
+      titre: `Approbation : ${t.title}`,
+      projet: t.supplierName ?? t.requestNumber ?? 'Demande d’achat',
+      echeance: enRetard ? `En retard · ${formatJour(t.dueDate, false)}` : 'Aujourd’hui',
+      enRetard,
+      lien: t.href,
+    };
+  }
   if (estRelance(t)) {
     return {
       id: t.id,
