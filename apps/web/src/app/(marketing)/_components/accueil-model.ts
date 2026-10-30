@@ -49,6 +49,8 @@ export const APPS_PAR_MODULE: Readonly<Record<ModuleId, readonly string[]>> = {
   build: ['idees', 'validation', 'initiatives', 'business-plan'],
   run: [
     'projets',
+    // ADR-0045 — ressources humaines, juste après Projets (même ordre que la navigation).
+    'rh',
     'crm',
     'factures',
     'devis',

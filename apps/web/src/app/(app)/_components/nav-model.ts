@@ -32,6 +32,7 @@ export type NavIconId =
   | 'crm'
   | 'projets'
   | 'achats'
+  | 'rh'
   | 'pilotage'
   | 'sante'
   | 'investisseurs'
@@ -48,8 +49,8 @@ export interface NavSousOption {
   id: string;
   href: string;
   label: string;
-  /** Action exigée pour AFFICHER la sous-option, ou `null`. */
-  action: OrgAction | null;
+  /** Action exigée pour AFFICHER la sous-option (liste : l'une d'elles), ou `null`. */
+  action: OrgAction | readonly OrgAction[] | null;
 }
 
 /** Une application d'un module : une tuile du bureau, une entrée de la colonne. */
@@ -62,8 +63,12 @@ export interface NavApp {
   description: string;
   module: ModuleId;
   icon: NavIconId;
-  /** Action exigée pour AFFICHER l'application, ou `null` si elle est offerte à tout membre. */
-  action: OrgAction | null;
+  /**
+   * Action exigée pour AFFICHER l'application, ou `null` si elle est offerte à
+   * tout membre. Une LISTE vaut « l'une de ces actions » (ADR-0045 § 8 : les
+   * Ressources humaines s'ouvrent avec `leave.request` OU `hr.read`).
+   */
+  action: OrgAction | readonly OrgAction[] | null;
   sousOptions: readonly NavSousOption[];
   /**
    * Correspondance EXACTE du chemin. Sert au pilotage (`/organisation`) : ses
@@ -187,6 +192,50 @@ export const NAV_APPS: readonly NavApp[] = [
         action: 'work.read',
       },
       { id: 'projets-tous', href: '/projets', label: 'Tous les projets', action: 'work.read' },
+    ],
+  },
+  // ADR-0045 § 8 — H6 : Ressources humaines, JUSTE APRÈS Projets (le travail,
+  // puis les personnes). Ouverte avec `leave.request` (self-service, presque
+  // tous les membres) OU `hr.read`. « Mon équipe » est offerte à qui demande
+  // des absences : l'écran dit simplement qu'il n'encadre personne si `GET
+  // /hr/me` ne le reconnaît pas manager (la portée est calculée par l'API).
+  // Échéances, rapports et réglages arrivent avec H7 (`RH_SOUS_OPTIONS_PREVUES`).
+  {
+    id: 'rh',
+    href: '/rh',
+    label: 'Ressources humaines',
+    description: 'Mon espace, mes absences, mon équipe, les collaborateurs et l’organigramme.',
+    module: 'run',
+    icon: 'rh',
+    action: ['leave.request', 'hr.read'],
+    sousOptions: [
+      { id: 'rh-moi', href: '/rh/moi', label: 'Mon espace', action: 'leave.request' },
+      { id: 'rh-equipe', href: '/rh/equipe', label: 'Mon équipe', action: 'leave.request' },
+      {
+        id: 'rh-a-valider',
+        href: '/rh/absences',
+        label: 'À valider',
+        action: 'leave.approve',
+      },
+      {
+        id: 'rh-calendrier',
+        href: '/rh/calendrier',
+        label: 'Calendrier',
+        action: 'leave.request',
+      },
+      {
+        id: 'rh-collaborateurs',
+        href: '/rh/collaborateurs',
+        label: 'Collaborateurs',
+        action: 'hr.read',
+      },
+      { id: 'rh-services', href: '/rh/services', label: 'Services', action: 'hr.read' },
+      {
+        id: 'rh-organigramme',
+        href: '/rh/organigramme',
+        label: 'Organigramme',
+        action: ['leave.request', 'hr.read'],
+      },
     ],
   },
   // ADR-0040 § 8.1 (amende ADR-0038 § 2) — le CRM est une application RUN à
@@ -456,8 +505,32 @@ export const ACHATS_SOUS_OPTIONS_PREVUES = [
   'achats-reglages',
 ] as const;
 
-function autorise(action: OrgAction | null, actions: readonly OrgAction[] | null): boolean {
-  return action === null || (actions !== null && actions.includes(action));
+/**
+ * Ordre cible des sous-options des Ressources humaines (ADR-0045 § 8). Les
+ * identifiants absents de `NAV_APPS` (échéances, rapports, réglages : lot H7)
+ * restent masqués plutôt que vides.
+ */
+export const RH_SOUS_OPTIONS_PREVUES = [
+  'rh-moi',
+  'rh-equipe',
+  'rh-a-valider',
+  'rh-calendrier',
+  'rh-collaborateurs',
+  'rh-services',
+  'rh-organigramme',
+  'rh-echeances',
+  'rh-rapports',
+  'rh-reglages',
+] as const;
+
+function autorise(
+  action: OrgAction | readonly OrgAction[] | null,
+  actions: readonly OrgAction[] | null,
+): boolean {
+  if (action === null) return true;
+  if (actions === null) return false;
+  const besoins: readonly OrgAction[] = typeof action === 'string' ? [action] : action;
+  return besoins.some((b) => actions.includes(b));
 }
 
 /**
