@@ -569,7 +569,6 @@ export default function ProjectsPage(): React.ReactElement {
         ) : null}
       </Modal>
 
-
       {error && !creation ? (
         <div className="rounded-md border border-[var(--danger)]/30 bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger)]">
           {error}

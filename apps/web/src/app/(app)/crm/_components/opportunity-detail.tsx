@@ -587,7 +587,7 @@ export function OpportunityDetail({
           {gerer ? (
             <button
               type="button"
-              className={`${BOUTON} self-start`}
+              className={`${BOUTON} gap-2 self-start`}
               onClick={() => {
                 setChampsAct({});
                 setErreurAct(null);
