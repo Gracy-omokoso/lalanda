@@ -253,6 +253,42 @@ sont inchangés.
 - **Lot A4 appliqué** (routes de gestion, invitation avec écart, audit strict, révision,
   notification) **derrière l'interrupteur `MEMBER_PERMISSIONS_ENABLED`, éteint** : voir docs/16.
 
+### Proposé, ADR-0044 — achats et fournisseurs (non appliqué)
+
+> **Statut : proposé** par [ADR-0044](adr/ADR-0044-achats-et-fournisseurs.md) § 4 (30 oct. 2026),
+> R3 du RUN. Rien de ce qui suit n'est encore dans le code ; le lot P0 l'applique. Les valeurs
+> ci-dessous sont les valeurs par défaut des décisions ouvertes n° 1 à 4 d'ADR-0044.
+
+- **Cinq actions nouvelles**, vingt-neuvième à trente-troisième, en fin de liste :
+  `purchase.read` (« Consulter les achats et les fournisseurs »), `purchase.request` (« Demander un
+  achat »), `purchase.manage` (« Gérer les fournisseurs, commandes, réceptions et factures
+  fournisseurs »), `purchase.approve` (« Approuver les demandes d'achat », case ⓢ), `payables.pay`
+  (« Payer les fournisseurs »). Trente-trois actions au total.
+
+| Action | PRO | ADM | DIR | CPT | ANA | CDP | CON | LEC | COM |
+|---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| `purchase.read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✗ |
+| `purchase.request` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| `purchase.manage` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `purchase.approve` | ✓ⓢ | ✗ | ✓ⓢ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `payables.pay` | ✓ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+
+- **Séparation des tâches** (service, fonction pure de `permissions.ts`) : le demandeur et le
+  créateur d'une demande ne l'approuvent pas ; deux approbations exigent deux personnes ;
+  exception **approbateur unique** (un seul détenteur effectif de `purchase.approve`), marquée
+  `soleApprover` et journalisée, comme R2. Forcer une facture fournisseur en écart exige
+  `purchase.approve`.
+- **Aucun rôle nouveau** : le rôle « Acheteur » est écarté par défaut (un acheteur = un membre
+  avec ajout de `purchase.manage`, ADR-0041) ; sa spécification est prête dans ADR-0044 O6.
+- **ADR-0041** : dépendances `purchase.*` → `purchase.read`, `payables.pay` → `purchase.read` +
+  `treasury.read` ; huitième domaine « Achats et fournisseurs » ; paire incompatible par ajout
+  `purchase.approve` + `payables.pay`.
+- **Plateforme** : `purchase.read` sous accès délégué (super-administrateur, support) ;
+  `purchase.request` et `purchase.manage` sous accès délégué (super-administrateur seul) ;
+  `purchase.approve` et `payables.pay` refusées par la matrice.
+- Voir les coordonnées bancaires d'un fournisseur en clair exige `payables.pay` et est journalisé.
+- Tests : matrice 9 × 33 + 6 × 33 = **495** cases.
+
 **Business plan narratif (ADR-0037) — aucune action nouvelle.** Lire relève de
 `project.read` ; rédiger, rattacher le plan figé et demander un brouillon à l'IA, de
 `canvas.update` (le document prolonge par écrit le modèle économique) ; valider une version,

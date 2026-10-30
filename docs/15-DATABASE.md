@@ -107,6 +107,20 @@ Un événement contient acteur, organisation, action, cible, horodatage, adresse
   `active` ; absent → six motifs par défaut) et `lostReasonRequired` (absent → `true`). Champs
   additifs, `_schemaVersion` inchangé ; aucune migration propre (celle de C1 pose `accountId`).
 
+- **Proposé, ADR-0044 (non implémenté)** — achats et fournisseurs : `suppliers` (NIF facultatif,
+  unique partiel `organizationId + nif` ; coordonnées de paiement **chiffrées** AES-256-GCM sous le
+  trousseau d'ADR-0013, seule une forme masquée est lisible ; `legacyKeys` des anciens textes),
+  `purchase_settings` (un par organisation : paliers d'approbation par devise, tolérances),
+  `purchase_counters` (`organizationId + kind + year`, numéros `DA`, `BC`, `FF`, `PF`),
+  `purchase_orders` (demande puis commande ; uniques partiels sur `requestNumber` et
+  `orderNumber` ; `organizationId + status + updatedAt`), `purchase_receptions` (aucune quantité
+  de stock), `supplier_invoices` (unique partiel `organizationId + supplierId +
+  supplierReferenceKey` hors annulées ; `organizationId + status + dueDate`),
+  `supplier_payments`. Champs ajoutés : `treasury_expenses.supplierId` et `origin` (dépense
+  créée par un paiement fournisseur, unique partiel sur `origin.paymentId + invoiceId +
+  allocationIndex`), `treasury_recurring_expenses.supplierId`. Migration
+  `20261031-0001-suppliers-from-expenses.mjs` (fournisseurs texte regroupés par clé exacte).
+
 ## Rétention
 
 La politique définit données actives, exports, journaux, IA, pièces et sauvegardes. La suppression d’une organisation suit une période de récupération puis une purge contrôlée, sous réserve des obligations légales.
