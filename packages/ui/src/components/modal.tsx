@@ -222,7 +222,7 @@ function ModalOuverte({
         // Téléphone : plein écran.
         'm-0 h-dvh max-h-none w-full max-w-none overflow-hidden border-0 bg-[var(--surface)] p-0 text-[var(--foreground)]',
         // Au-delà : centrée, bornée, défilement interne.
-        'sm:m-auto sm:h-auto sm:max-h-[min(90dvh,56rem)] sm:w-[calc(100%-2rem)] sm:rounded-[var(--radius-lg)] sm:border sm:border-[var(--border)] sm:shadow-[var(--shadow-pop)]',
+        'sm:m-auto sm:h-fit sm:max-h-[min(90dvh,56rem)] sm:w-[calc(100%-2rem)] sm:rounded-[var(--radius-lg)] sm:border sm:border-[var(--border)] sm:shadow-[var(--shadow-pop)]',
         MODAL_WIDTHS[size],
         'backdrop:bg-[color-mix(in_srgb,var(--foreground)_45%,transparent)]',
         className,
