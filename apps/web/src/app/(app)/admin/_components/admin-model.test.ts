@@ -37,6 +37,7 @@ import {
   MARGE_REAUTH_MS,
   messageErreur,
   metadonneesLisibles,
+  valeurLisible,
   motifSuspensionValide,
   offreDerogation,
   ongletsVisibles,
@@ -508,5 +509,17 @@ describe('libellés des rôles plateforme', () => {
 
   it('retombe sur la clé technique plutôt que de masquer un rôle inconnu', () => {
     expect(libelleRole('platform_futur')).toBe('platform_futur');
+  });
+});
+
+describe('valeurLisible (métadonnées imbriquées, ADR-0041)', () => {
+  it('joint les listes, sérialise les objets, garde les valeurs simples', () => {
+    expect(valeurLisible(['crm.read', 'sales.read'])).toBe('crm.read, sales.read');
+    expect(valeurLisible([])).toBe('—');
+    expect(valeurLisible({ grants: ['crm.read'], revokes: [] })).toBe(
+      '{"grants":["crm.read"],"revokes":[]}',
+    );
+    expect(valeurLisible(3)).toBe('3');
+    expect(valeurLisible(true)).toBe('true');
   });
 });

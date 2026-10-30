@@ -1422,7 +1422,8 @@ export interface AuditEventView {
   actorRole: string;
   targetType: string;
   targetId: string;
-  metadata: Record<string, string | number | boolean | null>;
+  /** Valeurs simples, ou objets et listes depuis ADR-0041 (avant / après). */
+  metadata: Record<string, unknown>;
   createdAt: string;
 }
 
@@ -1502,7 +1503,8 @@ export interface PlatformAuditEventView {
   actorRole: string;
   targetType: string;
   targetId: string;
-  metadata: Record<string, string | number | boolean | null>;
+  /** Valeurs simples, ou objets et listes depuis ADR-0041 (avant / après). */
+  metadata: Record<string, unknown>;
   createdAt: string;
 }
 

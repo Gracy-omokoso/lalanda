@@ -574,7 +574,14 @@ export function metadonneesLisibles(
   const CACHEES = new Set(['ip', 'userAgent']);
   return Object.entries(event.metadata ?? {})
     .filter(([cle, valeur]) => !CACHEES.has(cle) && valeur !== null && valeur !== '')
-    .map(([cle, valeur]) => ({ cle: libelleMetadonnee(cle), valeur: String(valeur) }));
+    .map(([cle, valeur]) => ({ cle: libelleMetadonnee(cle), valeur: valeurLisible(valeur) }));
+}
+
+/** Une valeur de métadonnée en texte : listes jointes, objets en JSON compact. */
+export function valeurLisible(valeur: unknown): string {
+  if (Array.isArray(valeur)) return valeur.map(valeurLisible).join(', ') || '—';
+  if (valeur !== null && typeof valeur === 'object') return JSON.stringify(valeur);
+  return String(valeur);
 }
 
 const LIBELLES_METADONNEES: Record<string, string> = {
