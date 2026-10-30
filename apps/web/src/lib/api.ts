@@ -576,6 +576,10 @@ export interface JsonRequestInit {
 }
 
 /** Exportée pour les clients d'API voisins (`api-crm.ts`, ADR-0035). */
+// ADR-0041 — A5 : événement émis sur chaque `403`, pour que la coquille relise
+// `GET /me/permissions` (G8). Ajout seul ; `jsonRequest` n'en dépend pas.
+export const EVENEMENT_REFUS_API = 'lalanda:api-403';
+
 export async function jsonRequest<T>(path: string, init: JsonRequestInit = {}): Promise<T> {
   const { body, headers, method } = init;
   const res = await fetch(`${API_URL}${path}`, {
@@ -602,6 +606,10 @@ export async function jsonRequest<T>(path: string, init: JsonRequestInit = {}): 
     ) as Error & { status: number; detail: unknown };
     err.status = res.status;
     err.detail = detail;
+    // ADR-0041 — A5 : signale le refus à la coquille (sans effet hors navigateur).
+    if (res.status === 403 && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(EVENEMENT_REFUS_API, { detail }));
+    }
     throw err;
   }
   // `204 No Content` (suppressions des ventes, ADR-0022 § S25c.5) : aucun corps

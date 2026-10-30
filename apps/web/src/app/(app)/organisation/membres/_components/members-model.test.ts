@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import type { MemberView, OrgRole, RoleOption } from '@/lib/api';
 
 import {
+  badgePersonnalise,
   RANG_DE_PRIVILEGE,
   acteurEstProprietaire,
   afficheDroitCloture,
@@ -241,5 +242,18 @@ describe('messages de refus', () => {
     expect(messageErreur(new Error(''), 'repli')).toBe('repli');
     expect(codeErreur(null)).toBeNull();
     expect(codeErreur(new Error('sans detail'))).toBeNull();
+  });
+});
+
+describe('ADR-0041 — badge « personnalisé » de la liste', () => {
+  it('ne montre rien sans écart, ni pour une réponse sans les champs', () => {
+    expect(badgePersonnalise({ grants: [], revokes: [] })).toBeNull();
+    expect(badgePersonnalise({})).toBeNull();
+  });
+
+  it('compte les ajouts et les retraits', () => {
+    expect(badgePersonnalise({ grants: ['a', 'b'], revokes: ['c'] })).toBe('personnalisé (+2 −1)');
+    expect(badgePersonnalise({ grants: ['a'], revokes: [] })).toBe('personnalisé (+1)');
+    expect(badgePersonnalise({ grants: [], revokes: ['c'] })).toBe('personnalisé (−1)');
   });
 });
