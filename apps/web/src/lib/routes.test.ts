@@ -90,6 +90,14 @@ describe('isProtectedPath (S20b)', () => {
     expect(isProtectedPath('/achats-groupes')).toBe(false);
   });
 
+  it('ADR-0045 : /rh et ses sous-routes exigent une session', () => {
+    for (const path of ['/rh', '/rh/moi', '/rh/collaborateurs/abc', '/rh/organigramme']) {
+      expect(isProtectedPath(path)).toBe(true);
+    }
+    expect(isProtectedPath('/rhum')).toBe(false);
+    expect(isProtectedPath('/rh-public')).toBe(false);
+  });
+
   it('protège l’espace Croissance, racine comme sous-routes (ADR-0032)', () => {
     for (const path of ['/croissance', '/croissance/sante', '/croissance/parcours']) {
       expect(isProtectedPath(path)).toBe(true);

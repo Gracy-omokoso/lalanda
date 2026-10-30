@@ -17,6 +17,7 @@ import {
   appsVisibles,
   cleModules,
   CRM_SOUS_OPTIONS_PREVUES,
+  RH_SOUS_OPTIONS_PREVUES,
   ecrireModules,
   estAccueil,
   estBureau,
@@ -47,6 +48,12 @@ const PROPRIETAIRE: OrgAction[] = [
   'purchase.manage',
   'purchase.approve',
   'payables.pay',
+  // ADR-0045 — H0
+  'hr.read',
+  'hr.manage',
+  'hr.sensitive.read',
+  'leave.request',
+  'leave.approve',
 ];
 const LECTEUR: OrgAction[] = ['project.read', 'sales.read'];
 const SANS_VENTES: OrgAction[] = ['project.read'];
@@ -102,6 +109,7 @@ describe('applications et ordre', () => {
   it('RUN, pour un propriétaire', () => {
     expect(ids(appsVisibles(PROPRIETAIRE, 'run'))).toEqual([
       'projets',
+      'rh',
       'crm',
       'factures',
       'devis',
@@ -421,5 +429,76 @@ describe('ADR-0044 § 8 — application Achats', () => {
     expect(sousOptionActive('/achats/factures/abc')).toBe('achats-factures');
     expect(sousOptionActive('/achats/a-payer')).toBe('achats-a-payer');
     expect(appActive('/achats-groupes')).toBeNull();
+  });
+});
+
+describe('ADR-0045 § 8 — application Ressources humaines (H6)', () => {
+  const rh = NAV_APPS.find((a) => a.id === 'rh')!;
+
+  it('juste après Projets, libellé « Ressources humaines », icône `rh`', () => {
+    expect(rh.module).toBe('run');
+    expect(rh.href).toBe('/rh');
+    expect(rh.icon).toBe('rh');
+    expect(rh.label).toBe('Ressources humaines');
+    const run = ids(appsVisibles(PROPRIETAIRE, 'run'));
+    expect(run.indexOf('rh')).toBe(run.indexOf('projets') + 1);
+  });
+
+  it('visible avec `leave.request` OU `hr.read`, jamais sans', () => {
+    expect(ids(appsVisibles(['leave.request'], 'run'))).toEqual(['rh']);
+    expect(ids(appsVisibles(['hr.read'], 'run'))).toEqual(['rh']);
+    expect(ids(appsVisibles(['work.read'], 'run'))).not.toContain('rh');
+    expect(ids(appsVisibles(null, 'run'))).not.toContain('rh');
+  });
+
+  it('un membre sans `hr.read` ne voit que son espace, son équipe, le calendrier et l’organigramme', () => {
+    const [app] = appsVisibles(['leave.request'], 'run');
+    expect(app!.sousOptions.map((s) => s.id)).toEqual([
+      'rh-moi',
+      'rh-equipe',
+      'rh-calendrier',
+      'rh-organigramme',
+    ]);
+  });
+
+  it('sous-options complètes dans l’ordre prévu ; échéances, rapports et réglages masqués (H7)', () => {
+    const complet = appsVisibles(PROPRIETAIRE, 'run').find((a) => a.id === 'rh')!;
+    expect(complet.sousOptions.map((s) => s.label)).toEqual([
+      'Mon espace',
+      'Mon équipe',
+      'À valider',
+      'Calendrier',
+      'Collaborateurs',
+      'Services',
+      'Organigramme',
+    ]);
+    const prevues: readonly string[] = RH_SOUS_OPTIONS_PREVUES;
+    const positions = complet.sousOptions.map((s) => prevues.indexOf(s.id));
+    expect(positions.every((p) => p >= 0)).toBe(true);
+    expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+    const hrefs = rh.sousOptions.map((s) => s.href);
+    for (const h7 of ['/rh/echeances', '/rh/rapports', '/rh/reglages']) {
+      expect(hrefs).not.toContain(h7);
+    }
+  });
+
+  it('« À valider » exige `leave.approve` ; « Collaborateurs » et « Services » `hr.read`', () => {
+    const approbateur = appsVisibles(['leave.request', 'leave.approve'], 'run')[0]!;
+    expect(approbateur.sousOptions.map((s) => s.id)).toContain('rh-a-valider');
+    const rhLecture = appsVisibles(['hr.read'], 'run')[0]!;
+    expect(rhLecture.sousOptions.map((s) => s.id)).toEqual([
+      'rh-collaborateurs',
+      'rh-services',
+      'rh-organigramme',
+    ]);
+  });
+
+  it('chemin → module RUN, application et sous-option', () => {
+    expect(moduleCourant('/rh')).toBe('run');
+    expect(appActive('/rh/collaborateurs/abc')).toBe('rh');
+    expect(sousOptionActive('/rh/moi')).toBe('rh-moi');
+    expect(sousOptionActive('/rh/collaborateurs/abc/absences')).toBe('rh-collaborateurs');
+    expect(sousOptionActive('/rh/absences')).toBe('rh-a-valider');
+    expect(appActive('/rh-externe')).toBeNull();
   });
 });
