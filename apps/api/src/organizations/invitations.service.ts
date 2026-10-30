@@ -12,14 +12,18 @@ import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import type { ClientSession, Connection, Model } from 'mongoose';
 
 import { AuditService } from '../authz/audit.service.js';
-import { memberPermissionsEnabled, overridesOf } from '../authz/authz.service.js';
+import {
+  MEMBER_PERMISSIONS_PROJECTION,
+  memberPermissionsEnabled,
+  memberPermissionsOf,
+  type MemberPermissions,
+} from '../authz/authz.service.js';
 import {
   canGrantRole,
   isAssignableRole,
   normalizeOrgRole,
   validateOverrides,
   type Action,
-  type OrgPermissionContext,
   type OrgRole,
 } from '../authz/permissions.js';
 import { Invitation, type InvitationDocument } from './invitation.schema.js';
@@ -58,28 +62,8 @@ export class InvitationsService {
     @Inject(AuditService) private readonly audit: AuditService,
   ) {}
 
-  /**
-   * ADR-0041 — droits EFFECTIFS d'un membre (titre + écart, case ⚙), lus en base.
-   * Interrupteur éteint, l'écart est vide (`overridesOf`) : la décision est celle
-   * d'avant ADR-0041.
-   */
-  private actorOf(m: {
-    role: unknown;
-    canClosePeriods?: unknown;
-    grants?: unknown;
-    revokes?: unknown;
-  }): { role: OrgRole; context: OrgPermissionContext } | undefined {
-    const role = normalizeOrgRole(m.role);
-    if (role === undefined) return undefined;
-    const { grants, revokes } = overridesOf(m);
-    return { role, context: { canClosePeriods: m.canClosePeriods === true, grants, revokes } };
-  }
-
   /** R7 sur le titre : droits effectifs de l'acteur interrupteur allumé, ligne du rôle sinon. */
-  private canGrantTitle(
-    actor: { role: OrgRole; context: OrgPermissionContext },
-    role: OrgRole,
-  ): boolean {
+  private canGrantTitle(actor: MemberPermissions, role: OrgRole): boolean {
     return memberPermissionsEnabled()
       ? canGrantRole(actor.role, role, actor.context)
       : canGrantRole(actor.role, role);
@@ -125,9 +109,10 @@ export class InvitationsService {
     assertPermissionsWritable(requestedGrants, requestedRevokes);
     const actorDoc = await this.membershipModel
       .findOne({ userId: input.invitedBy, organizationId: input.organizationId })
+      .select(MEMBER_PERMISSIONS_PROJECTION)
       .lean()
       .exec();
-    const actor = actorDoc ? this.actorOf(actorDoc) : undefined;
+    const actor = actorDoc ? memberPermissionsOf(actorDoc) : undefined;
     if (!actor) throw new ForbiddenException({ code: 'UNKNOWN_ROLE' });
 
     // Défaut `viewer` — moindre privilège (ADR-0012 §7).
@@ -323,9 +308,10 @@ export class InvitationsService {
       // titre ET écart porté par l'invitation (critère 11).
       const inviterDoc = await this.membershipModel
         .findOne({ userId: inv.invitedBy, organizationId: inv.organizationId })
+        .select(MEMBER_PERMISSIONS_PROJECTION)
         .lean()
         .exec();
-      const inviter = inviterDoc ? this.actorOf(inviterDoc) : undefined;
+      const inviter = inviterDoc ? memberPermissionsOf(inviterDoc) : undefined;
       const invitedRole = normalizeOrgRole(inv.role);
       if (
         inviter === undefined ||

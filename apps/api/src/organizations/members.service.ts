@@ -19,7 +19,11 @@ import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import type { ClientSession, Connection, Model } from 'mongoose';
 
 import { AuditService } from '../authz/audit.service.js';
-import { memberPermissionsEnabled, overridesOf } from '../authz/authz.service.js';
+import {
+  memberPermissionsEnabled,
+  memberPermissionsOf,
+  type MemberPermissions,
+} from '../authz/authz.service.js';
 import {
   canGrantRole,
   effectiveActions,
@@ -78,10 +82,7 @@ export interface MemberIdentity {
 }
 
 /** Droits de l'acteur tels que résolus par `PermissionsGuard` (ADR-0041 § 9.3). */
-export interface ActorPermissions {
-  role: OrgRole;
-  context: OrgPermissionContext;
-}
+export type ActorPermissions = MemberPermissions;
 
 /**
  * ADR-0041 G1 — l'acteur peut-il agir sur ce membre ? Interrupteur allumé :
@@ -534,8 +535,7 @@ export class MembersService {
 
   /** Contexte de DÉCISION d'une appartenance (écart vide interrupteur éteint). */
   contextOf(d: MembershipDocument): OrgPermissionContext {
-    const { grants, revokes } = overridesOf(d);
-    return { canClosePeriods: d.canClosePeriods === true, grants, revokes };
+    return memberPermissionsOf(d)?.context ?? { canClosePeriods: d.canClosePeriods === true };
   }
 
   /** État STOCKÉ, pour l'audit (avant / après). */
