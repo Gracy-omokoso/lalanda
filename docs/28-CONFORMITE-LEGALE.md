@@ -126,6 +126,24 @@ droit congolais. Aucune règle de droit congolais n’est pour autant posée ici
    conditionne sa mention éventuelle dans la politique de confidentialité —
    aujourd’hui exclue par décision.
 
+9. **Gestion du personnel des clients (ADR-0045, R4).** Lalanda tient, pour le
+   compte de l’organisation cliente, des dossiers de salariés (registre non
+   sensible ; salaire de base déclaré, coordonnées bancaires, pièces d’identité,
+   coordonnées personnelles chiffrés). À qualifier : rôle de Go freelance SARLU
+   (sous-traitant présumé, l’organisation cliente restant responsable de son
+   traitement), information des salariés, base légale, durée de conservation des
+   dossiers et des pièces après la sortie (réglage `retention` vide par défaut :
+   aucune purge automatique, anonymisation manuelle seulement).
+
+**Registre de traitement — « gestion du personnel » (ADR-0045, lot H2).**
+Finalité : tenue du registre du personnel de l’organisation cliente, organigramme,
+absences, échéances (paie exclue). Catégories : identité et poste ; salaire de
+base déclaré, coordonnées bancaires, pièces d’identité, coordonnées personnelles
+(chiffrés, `hr_employee_private`). Destinataires : détenteurs de `hr.read` pour le
+registre ; de `hr.sensitive.read` (Propriétaire, Directeur financier, Responsable
+RH) pour les données sensibles ; le salarié pour les siennes ; jamais l’IA, les
+exports, les notifications ni la plateforme. Durée : **à fixer avec le juriste**.
+
 Ces points restent marqués comme questions ouvertes dans les pages concernées
 (CGU § droit applicable, politique de confidentialité § transferts et
 conservation).
@@ -380,6 +398,7 @@ que personne ne s’en aperçoive.
 | Mentions obligatoires du parcours d’achat (droit de la consommation) | CGV |
 | Traitement des taxes (TVA ou équivalent) selon le pays de l’acheteur | CGV |
 | Frais de recouvrement selon le droit applicable | CGV |
+| Gestion du personnel des clients : qualification, information des salariés, conservation (§ 1.3, point 9) | Confidentialité, ADR-0045 |
 
 ### 3.2 Décisions commerciales (non arbitrées — rien n’a été inventé)
 
