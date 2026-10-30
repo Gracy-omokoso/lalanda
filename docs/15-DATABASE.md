@@ -121,7 +121,8 @@ Un événement contient acteur, organisation, action, cible, horodatage, adresse
   allocationIndex`), `treasury_recurring_expenses.supplierId`. Migration
   `20261031-0001-suppliers-from-expenses.mjs` (fournisseurs texte regroupés par clé exacte).
 
-- **Proposé, ADR-0045 (non implémenté)** — ressources humaines, paie exclue : `hr_employees`
+- **Implémenté, ADR-0045 (lots H0 à H3 et H5 ; documents et listes au lot H4)** — ressources
+  humaines, paie exclue : `hr_employees`
   (dossier non sensible ; `userId` facultatif, unique partiel `organizationId + userId` ; matricule
   unique partiel ; `organizationId + status + sortName`, `+ departmentId`, `+ managerEmployeeId`,
   partiels sur `contractEndDate` et `probationEndDate`), `hr_employee_private` (un par
@@ -133,6 +134,11 @@ Un événement contient acteur, organisation, action, cible, horodatage, adresse
   + start.date`), `hr_leave_ledger` (ajout seul ; unique partiel des acquisitions par
   `employeeId + typeId + period`), `hr_documents` (pièces sensibles chiffrées côté application ;
   partiel sur `expiresOn`), `hr_checklist_templates`, `hr_checklists`. Aucune migration.
+  Lot H5 : **aucune collection nouvelle** ; le brief, les projets, la feuille de temps et les
+  rapports LISENT `hr_employees`, `hr_leave_requests` (approuvées : employé et dates, jamais le
+  motif), `hr_holidays`, `hr_settings`, `hr_documents.expiresOn` et `hr_employee_private.idExpiries`
+  (en clair, sans numéro) ; jamais une section chiffrée. La marge lit en plus
+  `treasury_expenses.category` (constat `personnel`, marge 1.2.0).
 
 ## Rétention
 

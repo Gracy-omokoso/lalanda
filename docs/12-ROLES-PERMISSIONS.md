@@ -33,7 +33,7 @@ Le support ne voit jamais les données financières sans consentement explicite,
 | Conseiller | consultation, commentaires, recommandations |
 | Lecteur | lecture seulement |
 | Commercial (`sales_rep`, ADR-0040, appliqué) | CRM, devis, consultation des clients et du catalogue ; ni trésorerie, ni dépenses, ni émission de facture |
-| Responsable RH (`hr_manager`, ADR-0045, appliqué) | dossiers du personnel, absences et documents RH ; ni trésorerie, ni ventes, ni achats |
+| Responsable RH (`hr_manager`, ADR-0045, implémenté) | dossiers du personnel, absences et documents RH ; ni trésorerie, ni ventes, ni achats |
 
 ## Actions granulaires
 
@@ -297,17 +297,24 @@ sont inchangés.
 - Voir les coordonnées bancaires d'un fournisseur en clair exige `payables.pay` et est journalisé.
 - Tests : matrice 9 × 33 + 6 × 33 = **495** cases.
 
-### ADR-0045 — ressources humaines (appliqué, lot H0)
+### ADR-0045 — ressources humaines (implémenté, lots H0 à H3 et H5)
 
 > **Statut : appliqué** par le lot H0 d'[ADR-0045](adr/ADR-0045-ressources-humaines.md) § 4
 > (30 oct. 2026), R4 du RUN, **paie exclue**, aux valeurs par défaut des décisions ouvertes n° 1
 > à 3. La matrice ci-dessous est celle de `apps/api/src/authz/permissions.ts`, vérifiée par
 > `permissions.test.ts` (608 cases) ; dépendances et neuvième domaine par `overrides.test.ts` ;
 > la séparation des tâches par `leaveApprovalDecision` (fonction pure, table de vérité testée) ;
-> « attribuable par le seul Propriétaire » par `OWNER_ONLY_ROLES` en plus de R7. Les routes
-> `/hr/**` arrivent aux lots H2 et H3 : d'ici là, les cinq actions figurent dans
-> `ACTIONS_SANS_ROUTE` de la sonde `rbac-matrix.e2e.test.ts`, qui exerce déjà le rôle
-> `hr_manager` sur toutes les autres sondes.
+> « attribuable par le seul Propriétaire » par `OWNER_ONLY_ROLES` en plus de R7.
+> **Implémenté** (30 oct. 2026) : lots H0 (matrice), H2 (dossiers, données sensibles, services,
+> organigramme), H3 (absences, circuit, grand livre) et H5 (brief R13 à R15, absences sur les
+> projets, feuille de temps en lecture, constat de marge, rapports et registre exporté). Les
+> routes `/hr/**` déclarent leurs actions (`routes-coverage.test.ts`, un bloc par lot) et la
+> sonde `rbac-matrix.e2e.test.ts` les exerce. Lot H5 : `GET /hr/reports` exige `hr.read` ;
+> `GET /hr/reports/export.csv` exige `hr.read` **et** `report.export` (le Responsable RH, sans
+> `report.export`, ne l'exporte pas), audit strict `hr.register.exported` ; `GET
+> /work/timesheets` exige `work.read`, et pour autrui `work.manage` ou la relation de manager
+> (404 hors portée) ; le brief, la cloche et les projets ne rendent jamais un type d'absence
+> confidentiel, un motif, un nom (brief) ni un montant.
 
 - **Cinq actions nouvelles**, trente-quatrième à trente-huitième, en fin de liste : `hr.read`
   (« Consulter les dossiers du personnel »), `hr.manage` (« Gérer les dossiers du personnel »),
