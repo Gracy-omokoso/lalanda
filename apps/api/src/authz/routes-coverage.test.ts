@@ -92,6 +92,10 @@ import { HrLeaveController } from '../hr/leave/hr-leave.controller.js';
 // ADR-0045 — H5
 import { HrReportsController } from '../hr/reports/hr-reports.controller.js';
 import { WorkTimesheetsController } from '../work/timesheets/work-timesheets.controller.js';
+// ADR-0045 — H4
+import { HrChecklistsController } from '../hr/checklists/hr-checklists.controller.js';
+import { HrDocumentsController } from '../hr/documents/hr-documents.controller.js';
+import { HrDeadlinesController } from '../hr/reminders/hr-deadlines.controller.js';
 import { QuotesController } from '../sales/quotes/quotes.controller.js';
 import { CrmActivitiesController } from '../crm/crm-activities.controller.js';
 import { CrmContactsController } from '../crm/crm-contacts.controller.js';
@@ -247,6 +251,10 @@ const CONTROLEURS = [
   // ADR-0045 — H5 : rapports et registre ; feuille de temps en lecture.
   HrReportsController,
   WorkTimesheetsController,
+  // ADR-0045 — H4 : documents, listes d'entrée et de sortie, échéances.
+  HrDocumentsController,
+  HrChecklistsController,
+  HrDeadlinesController,
 ];
 
 /**
@@ -1207,5 +1215,38 @@ describe('ADR-0045 — H5 : rapports, registre exporté, feuille de temps', () =
   it('aucune route d’écriture sur la feuille de temps (ni saisie, ni validation)', () => {
     const routes = TOUTES_LES_ROUTES.filter((r) => r.cle.startsWith('WorkTimesheetsController.'));
     expect(routes.map((r) => r.cle)).toEqual(['WorkTimesheetsController.weekly']);
+  });
+});
+
+// ADR-0045 — H4
+describe('ADR-0045 — H4 : documents, listes d’entrée et de sortie, échéances', () => {
+  it('chaque route déclare la permission de l’ADR (§ 3.3) ; relationnelles en `analytics.read`', () => {
+    const attendu: Record<string, Action[]> = {
+      // Relationnelles : `hr.read` (non sensibles), `hr.sensitive.read` (tous), soi
+      // (`visibleToEmployee`, justificatif) — décidé dans le service, droits effectifs.
+      'HrDocumentsController.list': ['analytics.read'],
+      'HrDocumentsController.upload': ['analytics.read'],
+      'HrDocumentsController.download': ['analytics.read'],
+      'HrDocumentsController.remove': ['hr.manage'],
+      'HrChecklistsController.listTemplates': ['hr.read'],
+      'HrChecklistsController.createTemplate': ['hr.manage'],
+      'HrChecklistsController.updateTemplate': ['hr.manage'],
+      'HrChecklistsController.removeTemplate': ['hr.manage'],
+      'HrChecklistsController.instantiate': ['hr.manage'],
+      'HrChecklistsController.list': ['hr.read'],
+      // L'assigné, ou `hr.manage` (sinon 404), décidé dans le service.
+      'HrChecklistsController.done': ['analytics.read'],
+      'HrChecklistsController.undone': ['analytics.read'],
+      'HrDeadlinesController.list': ['hr.read'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) =>
+      /^Hr(Documents|Checklists|Deadlines)Controller\./.test(r.cle),
+    );
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+    }
+    for (const cle of Object.keys(SANS_PERMISSION)) expect(cle.startsWith('Hr')).toBe(false);
   });
 });

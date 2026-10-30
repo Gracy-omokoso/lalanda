@@ -9,10 +9,14 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 
+// ADR-0045 — H4 : lecteur des éléments de liste (port `HR_CHECKLIST_AGENDA`).
+import { Checklist, ChecklistSchema } from '../checklists/checklist.schemas.js';
+import { HrChecklistAgendaSource } from '../checklists/hr-checklist-agenda.reader.js';
 import { Employee, EmployeeSchema } from '../employees/employee.schema.js';
 import { LeaveRequest, LeaveRequestSchema } from '../leave/leave-request.schema.js';
 import { LeaveType, LeaveTypeSchema } from '../leave/leave-type.schema.js';
 import { HrAgendaSource } from './hr-agenda.source.js';
+import { HR_CHECKLIST_AGENDA } from './hr-checklist-agenda.port.js';
 import { HrLeaveApprovalsReader } from './hr-leave-approvals.reader.js';
 
 @Module({
@@ -21,9 +25,17 @@ import { HrLeaveApprovalsReader } from './hr-leave-approvals.reader.js';
       { name: LeaveRequest.name, schema: LeaveRequestSchema },
       { name: LeaveType.name, schema: LeaveTypeSchema },
       { name: Employee.name, schema: EmployeeSchema },
+      // ADR-0045 — H4
+      { name: Checklist.name, schema: ChecklistSchema },
     ]),
   ],
-  providers: [HrLeaveApprovalsReader, HrAgendaSource],
+  providers: [
+    HrLeaveApprovalsReader,
+    HrAgendaSource,
+    // ADR-0045 — H4 : éléments de liste d'entrée et de sortie de l'appelant.
+    HrChecklistAgendaSource,
+    { provide: HR_CHECKLIST_AGENDA, useExisting: HrChecklistAgendaSource },
+  ],
   exports: [HrLeaveApprovalsReader, HrAgendaSource],
 })
 export class HrAgendaModule {}

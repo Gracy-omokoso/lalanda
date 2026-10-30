@@ -17,3 +17,5 @@ export * from './leave.js';
 
 // ADR-0045 — H5 (rapports, registre exporté)
 export * from './reports.js';
+// ADR-0045 — H4 (documents, listes d'entrée et de sortie, échéances)
+export * from './documents.js';
