@@ -666,7 +666,8 @@ export interface DocumentEmailDraft {
   sendable: boolean;
   /** Pourquoi le document ne part pas (`sendable: false`), sinon `null`. */
   reason: string | null;
-  nature: 'invoice' | 'credit_note' | 'proforma' | 'quote' | null;
+  // ADR-0044 § 3.3 (lot P3) : `purchase_order`, bon de commande.
+  nature: 'invoice' | 'credit_note' | 'proforma' | 'quote' | 'purchase_order' | null;
   to: string | null;
   cc: string[];
   subject: string;

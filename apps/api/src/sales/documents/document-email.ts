@@ -10,7 +10,9 @@ import type { InvoiceStatus, InvoiceType } from '../invoices/invoice.contract.js
 import { CREDIT_NOTE_TYPES } from '../invoices/invoice.contract.js';
 
 /** Nature du document envoyé : décide de l'intitulé et de la mention fixe. */
-export type DocumentEmailNature = 'invoice' | 'credit_note' | 'proforma' | 'quote';
+// ADR-0044 § 3.3 (lot P3) : `purchase_order`, le bon de commande envoyé au fournisseur.
+export type DocumentEmailNature =
+  'invoice' | 'credit_note' | 'proforma' | 'quote' | 'purchase_order';
 
 /** Code du 409 d'un document qui ne part pas (ADR-0042 § 2). */
 export const DOCUMENT_NOT_SENDABLE = 'DOCUMENT_NOT_SENDABLE';
@@ -84,12 +86,14 @@ const LABELS: Record<DocumentEmailNature, string> = {
   credit_note: 'Avoir',
   proforma: 'Pro forma',
   quote: 'Devis',
+  purchase_order: 'Bon de commande',
 };
 
 /** Mention fixe, imprimée hors du texte modifiable (§ 2). */
 export function noticeOf(nature: DocumentEmailNature): string | null {
   if (nature === 'proforma') return 'Pro forma — ce document n’est pas une facture.';
   if (nature === 'quote') return 'Devis — ce document n’est pas une facture.';
+  if (nature === 'purchase_order') return 'Bon de commande — ce document n’est pas une facture.';
   return null;
 }
 
@@ -133,6 +137,11 @@ export function documentEmailDefaults(i: DocumentEmailDefaultsInput): {
       corps =
         `Veuillez trouver ci-joint notre devis n° ${i.reference}, d’un montant de ${montant}` +
         (i.validUntil ? `, valable jusqu’au ${i.validUntil}.` : '.');
+      break;
+    case 'purchase_order':
+      corps =
+        `Veuillez trouver ci-joint notre bon de commande n° ${i.reference}, d’un montant de ${montant}. ` +
+        'Ce document n’est pas une facture.';
       break;
   }
   return {

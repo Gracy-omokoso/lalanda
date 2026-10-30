@@ -9,9 +9,24 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 
+import { BrandingModule } from '../branding/branding.module.js';
+import { FiscalModule } from '../fiscal/fiscal.module.js';
 import { MasterKeyringProvider } from '../integrations/keyring.provider.js';
 import { Membership, MembershipSchema } from '../organizations/membership.schema.js';
 import { OrganizationsModule } from '../organizations/organizations.module.js';
+import { PdfModule } from '../reports/pdf.module.js';
+import { SalesModule } from '../sales/sales.module.js';
+// ADR-0044 — P3
+import { PurchaseCounter, PurchaseCounterSchema } from './counters/purchase-counter.schema.js';
+import { PurchaseCountersService } from './counters/purchase-counters.service.js';
+import { PurchaseOrderDocumentsService } from './documents/purchase-order-documents.service.js';
+import { PurchaseOrder, PurchaseOrderSchema } from './orders/purchase-order.schema.js';
+import { PurchaseOrdersController } from './orders/purchase-orders.controller.js';
+import { PurchaseOrdersService } from './orders/purchase-orders.service.js';
+import { PurchasesNotifier } from './purchases-notifier.js';
+import { PurchaseSettings, PurchaseSettingsSchema } from './settings/purchase-settings.schema.js';
+import { PurchaseSettingsController } from './settings/purchase-settings.controller.js';
+import { PurchaseSettingsService } from './settings/purchase-settings.service.js';
 // ADR-0044 — P2
 import {
   SUPPLIER_PAYABLES_SOURCE,
@@ -26,15 +41,27 @@ import { SuppliersService } from './suppliers/suppliers.service.js';
   imports: [
     // `AuthGuard` résout l'organisation active via `OrganizationsService`.
     OrganizationsModule,
+    // ADR-0044 — P3 : bon de commande PDF et envoi (ADR-0025, ADR-0028, ADR-0042).
+    SalesModule,
+    FiscalModule,
+    BrandingModule,
+    PdfModule,
     MongooseModule.forFeature([
       // ADR-0044 — P2 : fiches fournisseurs ; adhésions (destinataires des alertes).
       { name: Supplier.name, schema: SupplierSchema },
       { name: Membership.name, schema: MembershipSchema },
+      // ADR-0044 — P3 : demandes et commandes, réglages, compteurs.
+      { name: PurchaseOrder.name, schema: PurchaseOrderSchema },
+      { name: PurchaseSettings.name, schema: PurchaseSettingsSchema },
+      { name: PurchaseCounter.name, schema: PurchaseCounterSchema },
     ]),
   ],
   controllers: [
     // ADR-0044 — P2
     PurchaseSuppliersController,
+    // ADR-0044 — P3
+    PurchaseOrdersController,
+    PurchaseSettingsController,
   ],
   providers: [
     MasterKeyringProvider,
@@ -43,7 +70,20 @@ import { SuppliersService } from './suppliers/suppliers.service.js';
     SuppliersService,
     SuppliersNotifier,
     { provide: SUPPLIER_PAYABLES_SOURCE, useValue: noSupplierPayables },
+    // ADR-0044 — P3 : cycle demande → bon de commande, réglages, numérotation (DA, BC,
+    // et FF/PF pour P4 et P5), PDF et envoi, notifications d'approbation.
+    PurchaseSettingsService,
+    PurchaseCountersService,
+    PurchasesNotifier,
+    PurchaseOrdersService,
+    PurchaseOrderDocumentsService,
   ],
-  exports: [SuppliersService],
+  exports: [
+    SuppliersService,
+    // ADR-0044 — P3
+    PurchaseOrdersService,
+    PurchaseSettingsService,
+    PurchaseCountersService,
+  ],
 })
 export class PurchasesModule {}

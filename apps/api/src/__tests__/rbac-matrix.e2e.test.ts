@@ -114,14 +114,8 @@ const ACTIONS_SANS_ROUTE: Record<string, string> = {
     'Aucune route de modification de projet en S20a : `POST /projects/:id/drivers` ' +
     'relève de `inputs.update`, et il n’existe ni `PATCH /projects/:id` ni ' +
     'renommage. L’action est déclarée par docs/12 et attend son endpoint.',
-  // ADR-0044 — P0 : actions déclarées avant leurs routes (lots P2 à P5). Chaque lot
-  // retire sa ligne d'ici et écrit la sonde avec sa première route.
-  'purchase.request':
-    'ADR-0044 — P0 pose l’action ; `POST /purchases/orders` (créer une demande) arrive ' +
-    'au lot P3, qui écrira la sonde.',
-  'purchase.approve':
-    'ADR-0044 — P0 pose l’action et `purchaseApprovalDecision` ; `POST /purchases/orders/:id/approve` ' +
-    'arrive au lot P3, qui écrira la sonde.',
+  // ADR-0044 — P0 : actions déclarées avant leurs routes. P3 a retiré
+  // `purchase.request` et `purchase.approve` (sondes en fin de liste).
 };
 
 /** Une sonde HTTP : la route qui matérialise une action, et ses statuts légitimes. */
@@ -606,6 +600,36 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
         request(serveur())
           .post('/purchases/suppliers/000000000000000000000000/payment-methods/x/reveal')
           .set('Cookie', c),
+    },
+    // ADR-0044 — P3 : demandes d'achat et approbations.
+    {
+      // ADR-0044 § 4.1 — tout rôle interne qui travaille (Propriétaire, Administrateur,
+      // Directeur financier, Comptable, Analyste). Brouillon sans fournisseur : aucun
+      // prérequis, aucune collision.
+      action: 'purchase.request',
+      libelle: 'POST /purchases/orders',
+      statutsAutorises: [201],
+      envoyer: (c, role) =>
+        request(serveur())
+          .post('/purchases/orders')
+          .set('Cookie', c)
+          .send({
+            title: `Sonde demande ${role}`,
+            currency: 'USD',
+            lines: [{ label: 'Sonde', quantity: '1', unitPrice: '1.00', kind: 'service' }],
+          }),
+    },
+    {
+      // ADR-0044 § 4.1 — autorité de dépense : Propriétaire et Directeur financier.
+      // Demande inexistante : le 404 prouve que le guard a laissé passer.
+      action: 'purchase.approve',
+      libelle: 'POST /purchases/orders/:id/approve',
+      statutsAutorises: [404],
+      envoyer: (c) =>
+        request(serveur())
+          .post('/purchases/orders/000000000000000000000000/approve')
+          .set('Cookie', c)
+          .send({ expectedRevision: 1 }),
     },
   ];
 
