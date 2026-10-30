@@ -11,6 +11,7 @@ import {
 import type {
   BriefCrmActivityInput,
   BriefFact,
+  BriefHrAbsenceInput,
   BriefInvoiceInput,
   BriefPayableInput,
   BriefWorkTaskInput,
@@ -57,6 +58,13 @@ function input(
       dueSoonDays: 7,
       amountsVisible: true,
       pendingApprovalCount: 0,
+      truncated: false,
+    },
+    hr: {
+      status: 'known',
+      absences: [],
+      pendingApprovalCount: 0,
+      deadlineCount: 0,
       truncated: false,
     },
     ...over,
@@ -470,13 +478,13 @@ describe('projets et tâches — faits et règles R8, R9 (ADR-0039 § 6.5)', () 
   });
 
   it('version mineure suivante (ADR-0044 § 6.4)', () => {
-    expect(brief([]).version).toBe('1.3.0');
+    expect(brief([]).version).toBe('1.4.0');
   });
 
-  it('les douze règles ont des rangs uniques', () => {
+  it('les quinze règles ont des rangs uniques', () => {
     const ranks = MORNING_BRIEF_RULES.map((r) => r.rank);
     expect(new Set(ranks).size).toBe(ranks.length);
-    expect(ranks.length).toBe(12);
+    expect(ranks.length).toBe(15);
   });
 });
 
@@ -703,9 +711,138 @@ describe('achats — dettes fournisseurs, approbations, règles R11 et R12 (ADR-
     });
   });
 
-  it('lecture bornée des factures : le brief le dit ; version 1.3.0', () => {
+  it('lecture bornée des factures : le brief le dit', () => {
     const b = buildMorningBrief(input([], achats([], { truncated: true })));
     expect(b.truncated).toBe(true);
-    expect(b.version).toBe('1.3.0');
+  });
+});
+
+describe('ressources humaines — absences du jour, validations, échéances, R13 à R15 (ADR-0045 § 6.5)', () => {
+  // NOW = 21 oct. 2026 à Kinshasa (mercredi).
+  function rh(
+    over: {
+      absences?: BriefHrAbsenceInput[] | null;
+      pending?: number | null;
+      deadlines?: number | null;
+      truncated?: boolean;
+    } = {},
+  ): Partial<MorningBriefInput> {
+    return {
+      hr: {
+        status: 'known',
+        absences: over.absences === undefined ? [] : over.absences,
+        pendingApprovalCount: over.pending === undefined ? 0 : over.pending,
+        deadlineCount: over.deadlines === undefined ? 0 : over.deadlines,
+        truncated: over.truncated ?? false,
+      },
+    };
+  }
+  const a = (employeeId: string, startDate: string, endDate: string): BriefHrAbsenceInput => ({
+    employeeId,
+    startDate,
+    endDate,
+  });
+
+  it('deux personnes absentes aujourd’hui (une seule fois chacune) : fait à 2 et R13', () => {
+    const b = buildMorningBrief(
+      input(
+        [],
+        rh({
+          absences: [
+            a('e1', '2026-10-19', '2026-10-23'),
+            // Deux demandes de la même personne qui couvrent aujourd'hui : comptée une fois.
+            a('e2', '2026-10-21', '2026-10-21'),
+            a('e2', '2026-10-20', '2026-10-22'),
+            // Hier, demain : hors du jour.
+            a('e3', '2026-10-20', '2026-10-20'),
+            a('e4', '2026-10-22', '2026-10-30'),
+          ],
+        }),
+      ),
+    );
+    expect(fact(b.facts, 'rh.absents_aujourdhui')).toMatchObject({
+      status: 'known',
+      value: '2',
+      kind: 'count',
+      currency: null,
+    });
+    const r13 = b.recommendations.find((r) => r.ruleId === 'absences_du_jour');
+    expect(r13).toMatchObject({
+      rank: 13,
+      severity: 'info',
+      actionPath: '/rh/calendrier',
+      message: '2 personnes de votre équipe sont absentes aujourd’hui.',
+    });
+    // Information : jamais une alerte.
+    expect(b.alerts.some((x) => x.ruleId === 'absences_du_jour')).toBe(false);
+  });
+
+  it('R14 et R15 : validations en attente et échéances proches, en alerte', () => {
+    const b = buildMorningBrief(input([], rh({ pending: 1, deadlines: 3 })));
+    expect(fact(b.facts, 'mes_validations_absence.en_attente').value).toBe('1');
+    expect(fact(b.facts, 'rh.echeances').value).toBe('3');
+    expect(b.alerts.find((x) => x.ruleId === 'validations_absence_en_attente')).toMatchObject({
+      rank: 14,
+      severity: 'attention',
+      actionPath: '/rh/absences?vue=a-valider',
+      message: '1 demande d’absence attend votre validation.',
+    });
+    expect(b.alerts.find((x) => x.ruleId === 'echeances_rh_proches')).toMatchObject({
+      rank: 15,
+      severity: 'attention',
+      actionPath: '/rh/echeances',
+      message: '3 échéances RH dans les prochains jours (fin d’essai, fin de contrat, document).',
+    });
+    // Rien ne se déclenche à zéro.
+    const zero = buildMorningBrief(input([], rh()));
+    expect(
+      zero.recommendations.filter((r) =>
+        ['absences_du_jour', 'validations_absence_en_attente', 'echeances_rh_proches'].includes(
+          r.ruleId,
+        ),
+      ),
+    ).toEqual([]);
+  });
+
+  it('sans portée : chaque fait masqué séparément, règle non évaluée', () => {
+    const b = buildMorningBrief(input([], rh({ absences: null, pending: 2, deadlines: null })));
+    expect(fact(b.facts, 'rh.absents_aujourdhui')).toMatchObject({ status: 'hidden', value: null });
+    expect(fact(b.facts, 'rh.echeances')).toMatchObject({ status: 'hidden', value: null });
+    expect(fact(b.facts, 'mes_validations_absence.en_attente').value).toBe('2');
+    expect(b.rulesSkipped).toContainEqual({ ruleId: 'absences_du_jour', reason: 'hidden' });
+    expect(b.rulesSkipped).toContainEqual({ ruleId: 'echeances_rh_proches', reason: 'hidden' });
+  });
+
+  it('module masqué ou absent : faits masqués ou non disponibles, jamais zéro', () => {
+    const masque = buildMorningBrief(input([], { hr: 'hidden' }));
+    for (const id of [
+      'rh.absents_aujourdhui',
+      'mes_validations_absence.en_attente',
+      'rh.echeances',
+    ])
+      expect(fact(masque.facts, id)).toMatchObject({ status: 'hidden', value: null });
+    const { hr: _omis, ...sans } = input([]);
+    const b = buildMorningBrief(sans);
+    expect(fact(b.facts, 'rh.absents_aujourdhui')).toMatchObject({
+      status: 'unavailable',
+      value: null,
+    });
+    expect(b.rulesSkipped).toContainEqual({ ruleId: 'absences_du_jour', reason: 'unavailable' });
+  });
+
+  it('des nombres seulement : aucun identifiant de fiche ne sort du moteur', () => {
+    const b = buildMorningBrief(
+      input([], rh({ absences: [a('fiche-secrete', '2026-10-21', '2026-10-21')], pending: 1 })),
+    );
+    expect(JSON.stringify(b)).not.toContain('fiche-secrete');
+    for (const f of b.facts.filter((x) => x.source.module === 'run.hr')) {
+      expect(f.kind).toBe('count');
+    }
+  });
+
+  it('lecture bornée : le brief le dit ; version 1.4.0', () => {
+    const b = buildMorningBrief(input([], rh({ truncated: true })));
+    expect(b.truncated).toBe(true);
+    expect(b.version).toBe('1.4.0');
   });
 });

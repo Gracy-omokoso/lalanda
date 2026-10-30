@@ -356,7 +356,7 @@ describe('computeProjectMargin 1.1.0 — coûts engagés (ADR-0044 § 6.1)', () 
 
   it('sans entrée `purchases` : sortie de 1.0.0 (aucune clé `purchases`)', () => {
     const r = computeProjectMargin(base({ invoices: [invoice()] }));
-    expect(r.version).toBe('1.1.0');
+    expect(r.version).toBe(WORK_MARGIN_VERSION);
     expect('purchases' in r).toBe(false);
   });
 
@@ -474,5 +474,69 @@ describe('computeProjectMargin 1.1.0 — coûts engagés (ADR-0044 § 6.1)', () 
     );
     // Parts : 33,34 / 33,33 / 33,33 — le projet a la première et la troisième.
     expect(r.purchases?.[0]?.committed).toBe('66.67');
+  });
+});
+
+// ── ADR-0045 § 6.3 : constat de double comptage salaire + temps (1.2.0) ────
+
+describe('computeProjectMargin 1.2.0 — salaire rattaché et temps valorisé (ADR-0045 § 6.3)', () => {
+  const rates = [
+    { userId: 'u1', currency: 'USD' as const, hourlyCost: '12.00', effectiveFrom: '2026-01-01' },
+  ];
+  const timeEntries = [{ userId: 'u1', workedOn: '2026-10-04', minutes: 120 }];
+  const salaire = {
+    id: 'd-sal',
+    currency: 'USD' as const,
+    spentOn: '2026-10-05',
+    amount: '500.00',
+    category: 'personnel',
+  };
+
+  it('version 1.2.0', () => {
+    expect(WORK_MARGIN_VERSION).toBe('1.2.0');
+  });
+
+  it('dépense `personnel` + temps valorisé, même devise : constat, MONTANT DE LA MARGE INCHANGÉ', () => {
+    const sans = computeProjectMargin(
+      base({
+        invoices: [invoice()],
+        expenses: [{ ...salaire, category: 'fournitures' }],
+        timeEntries,
+        rates,
+      }),
+    );
+    const avec = computeProjectMargin(
+      base({ invoices: [invoice()], expenses: [salaire], timeEntries, rates }),
+    );
+    expect(findingCodes(sans)).not.toContain('PERSONNEL_EXPENSES_AND_TIME_COST');
+    expect(avec.findings).toContainEqual({
+      code: 'PERSONNEL_EXPENSES_AND_TIME_COST',
+      currency: 'USD',
+      count: 1,
+    });
+    // Rien n'est retranché : les devises (marge, dépenses, coût du temps) sont identiques.
+    expect(avec.currencies).toEqual(sans.currencies);
+    expect(avec.byMember).toEqual(sans.byMember);
+  });
+
+  it('pas de constat sans temps valorisé, ni dans une autre devise, ni hors période', () => {
+    const sansTaux = computeProjectMargin(base({ expenses: [salaire], timeEntries }));
+    expect(findingCodes(sansTaux)).not.toContain('PERSONNEL_EXPENSES_AND_TIME_COST');
+    const autreDevise = computeProjectMargin(
+      base({ expenses: [{ ...salaire, currency: 'CDF' }], timeEntries, rates }),
+    );
+    expect(findingCodes(autreDevise)).not.toContain('PERSONNEL_EXPENSES_AND_TIME_COST');
+    const horsPeriode = computeProjectMargin(
+      base({ expenses: [salaire], timeEntries, rates, from: '2026-10-06', to: null }),
+    );
+    expect(findingCodes(horsPeriode)).not.toContain('PERSONNEL_EXPENSES_AND_TIME_COST');
+  });
+
+  it('sans catégorie (appelant de 1.1.0) : sortie identique à 1.1.0 hors version', () => {
+    const { category: _c, ...sansCategorie } = salaire;
+    const r = computeProjectMargin(
+      base({ invoices: [invoice()], expenses: [sansCategorie], timeEntries, rates }),
+    );
+    expect(findingCodes(r)).not.toContain('PERSONNEL_EXPENSES_AND_TIME_COST');
   });
 });

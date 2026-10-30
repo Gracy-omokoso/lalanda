@@ -20,7 +20,16 @@ import type { InvoicedLinesInput, PurchaseOrderLineInput } from '../purchases/ty
  * rendus à part (`purchases`) et jamais soustraits de la marge ; sans entrée
  * `purchases`, la sortie est celle de 1.0.0.
  */
-export const WORK_MARGIN_VERSION = '1.1.0';
+/**
+ * 1.2.0 (ADR-0045 § 6.3) : constat `PERSONNEL_EXPENSES_AND_TIME_COST` — des dépenses
+ * de catégorie `personnel` (salaires) et un coût du temps dans la même devise sur le
+ * même projet comptent peut-être deux fois la même personne. SIGNALÉ, jamais
+ * retranché : aucun montant de la sortie ne change.
+ */
+export const WORK_MARGIN_VERSION = '1.2.0';
+
+/** Catégorie de dépense des salaires et charges sociales (ADR-0034 § 1). */
+export const PERSONNEL_EXPENSE_CATEGORY = 'personnel';
 
 /** Devises de la marge — celles de la facturation et de la trésorerie. */
 export const WORK_MARGIN_CURRENCIES = ['CDF', 'USD'] as const;
@@ -72,6 +81,8 @@ export interface WorkMarginExpenseInput {
   currency: WorkMarginCurrency;
   spentOn: WorkMarginDay;
   amount: WorkMarginAmount;
+  /** Catégorie de la dépense (ADR-0034) ; sert au seul constat de 1.2.0, jamais au calcul. */
+  category?: string | null;
 }
 
 /** Saisie de temps non supprimée. */
@@ -145,6 +156,8 @@ export const PROJECT_MARGIN_FINDING_CODES = [
   'NO_INVOICE_LINKED',
   'DRAFT_INVOICES_IGNORED',
   'AMOUNTS_INCLUDE_TAX',
+  // ADR-0045 § 6.3 (1.2.0) : salaire rattaché ET temps valorisé, même devise.
+  'PERSONNEL_EXPENSES_AND_TIME_COST',
 ] as const;
 export type ProjectMarginFindingCode = (typeof PROJECT_MARGIN_FINDING_CODES)[number];
 
@@ -152,8 +165,13 @@ export interface ProjectMarginFinding {
   code: ProjectMarginFindingCode;
   /** `TIME_WITHOUT_RATE` : minutes non valorisées. */
   minutes?: number;
-  /** `MULTI_CURRENCY` : devises ; `DRAFT_INVOICES_IGNORED` : factures ignorées. */
+  /**
+   * `MULTI_CURRENCY` : devises ; `DRAFT_INVOICES_IGNORED` : factures ignorées ;
+   * `PERSONNEL_EXPENSES_AND_TIME_COST` : dépenses `personnel` de la devise.
+   */
   count?: number;
+  /** `PERSONNEL_EXPENSES_AND_TIME_COST` : devise concernée (un constat par devise). */
+  currency?: WorkMarginCurrency;
 }
 
 /** Marge d'une devise : jamais additionnée à celle d'une autre devise. */

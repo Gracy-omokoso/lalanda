@@ -23,7 +23,12 @@
  * `fournisseurs.a_payer_bientot` (et leurs montants par devise avec
  * `treasury.read`), `mes_approbations.en_attente` ; règles R11 et R12.
  */
-export const MORNING_BRIEF_VERSION = '1.3.0';
+/**
+ * 1.4.0 (ADR-0045 § 6.5) : faits `rh.absents_aujourdhui`,
+ * `mes_validations_absence.en_attente`, `rh.echeances` — des NOMBRES seulement,
+ * jamais un nom, un type d'absence ni un montant ; règles R13 à R15.
+ */
+export const MORNING_BRIEF_VERSION = '1.4.0';
 
 export const BRIEF_CURRENCIES = ['CDF', 'USD'] as const;
 export type BriefCurrency = (typeof BRIEF_CURRENCIES)[number];
@@ -170,6 +175,40 @@ export type BriefPurchasesInput =
       truncated: boolean;
     };
 
+/**
+ * Absence APPROUVÉE d'un collaborateur de la portée de l'appelant (ADR-0045 § 6.5),
+ * lue par l'API : l'identifiant de la fiche et ses jours de début et de fin, rien
+ * d'autre (ni nom, ni type, ni motif). Le moteur décide seul de qui est absent
+ * « aujourd'hui » au jour de Kinshasa de `now`.
+ */
+export interface BriefHrAbsenceInput {
+  employeeId: string;
+  /** Premier jour `AAAA-MM-JJ` (une demi-journée compte). */
+  startDate: string;
+  /** Dernier jour `AAAA-MM-JJ`, inclus. */
+  endDate: string;
+}
+
+/**
+ * Ressources humaines (ADR-0045 § 6.5) : `hidden` si rien n'est visible,
+ * `unavailable` sans module RH (tests). Chaque champ à `null` masque son fait :
+ * pas de portée (ni `hr.read`, ni équipe), ni validation possible (ni manager, ni
+ * `leave.approve`), ni `hr.read` pour les échéances.
+ */
+export type BriefHrInput =
+  | 'hidden'
+  | { status: 'unavailable' }
+  | {
+      status: 'known';
+      /** Absences approuvées de la portée (organisation avec `hr.read`, équipe sinon). */
+      absences: readonly BriefHrAbsenceInput[] | null;
+      /** Demandes que l'appelant peut traiter (séparation des tâches appliquée). */
+      pendingApprovalCount: number | null;
+      /** Échéances RH sous les délais de rappel (moteur RH `hrDeadlines`). */
+      deadlineCount: number | null;
+      truncated: boolean;
+    };
+
 export interface MorningBriefInput {
   /** Instant de référence, ISO 8601. */
   now: string;
@@ -185,6 +224,8 @@ export interface MorningBriefInput {
   crm?: BriefCrmInput;
   /** Dettes fournisseurs et approbations d'achat ; absent : non disponible (ADR-0044). */
   purchases?: BriefPurchasesInput;
+  /** Absences du jour, validations d'absence, échéances RH ; absent : non disponible (ADR-0045). */
+  hr?: BriefHrInput;
 }
 
 export type BriefFactStatus = 'known' | 'to_fill' | 'unavailable' | 'hidden';
