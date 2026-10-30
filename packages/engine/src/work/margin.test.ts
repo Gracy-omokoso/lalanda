@@ -338,3 +338,141 @@ describe('propriétés (graine fixe)', () => {
     }
   });
 });
+
+// ── ADR-0044 § 6.1 : coûts engagés informatifs (1.1.0) ─────────────────────
+
+describe('computeProjectMargin 1.1.0 — coûts engagés (ADR-0044 § 6.1)', () => {
+  const P = 'p-1';
+  const line = (over: Record<string, unknown> = {}) => ({
+    id: 'l1',
+    quantity: '10',
+    unitPrice: '5.00',
+    discountPercent: null,
+    receivable: true,
+    category: 'achats',
+    workProjectId: P,
+    ...over,
+  });
+
+  it('sans entrée `purchases` : sortie de 1.0.0 (aucune clé `purchases`)', () => {
+    const r = computeProjectMargin(base({ invoices: [invoice()] }));
+    expect(r.version).toBe('1.1.0');
+    expect('purchases' in r).toBe(false);
+  });
+
+  it('critère 10 : facture 1 000 (600 au projet, 400 hors projet) payée 500 → committed 300', () => {
+    const r = computeProjectMargin(
+      base({
+        expenses: [{ id: 'd1', currency: 'USD', spentOn: '2026-10-05', amount: '300.00' }],
+        purchases: {
+          projectId: P,
+          payables: [
+            {
+              id: 'ff1',
+              currency: 'USD',
+              remaining: '500.00',
+              costAllocations: [
+                { amount: '600.00', workProjectId: P },
+                { amount: '400.00', workProjectId: null },
+              ],
+            },
+          ],
+          orders: [],
+        },
+      }),
+    );
+    expect(r.purchases).toEqual([
+      { currency: 'USD', committed: '300.00', ordered: '0.00', invoiceCount: 1, orderCount: 0 },
+    ]);
+    // Jamais soustrait : la marge ne voit que la dépense du paiement.
+    expect(r.currencies[0]).toMatchObject({ expenses: '300.00', margin: '-300.00' });
+  });
+
+  it('ordered : reste à facturer HT des lignes du projet, factures validées seulement', () => {
+    const r = computeProjectMargin(
+      base({
+        purchases: {
+          projectId: P,
+          payables: [],
+          orders: [
+            {
+              id: 'bc1',
+              currency: 'CDF',
+              lines: [line(), line({ id: 'l2', workProjectId: 'autre', unitPrice: '1.00' })],
+              invoices: [
+                {
+                  id: 'f1',
+                  kind: 'invoice',
+                  status: 'validated',
+                  lines: [{ orderLineId: 'l1', quantity: '4' }],
+                },
+                {
+                  id: 'f2',
+                  kind: 'invoice',
+                  status: 'draft',
+                  lines: [{ orderLineId: 'l1', quantity: '6' }],
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    );
+    expect(r.purchases).toEqual([
+      { currency: 'CDF', committed: '0.00', ordered: '30.00', invoiceCount: 0, orderCount: 1 },
+    ]);
+    // Aucun engagement n'ouvre une devise dans la marge.
+    expect(r.currencies).toEqual([]);
+  });
+
+  it('reste nul, imputation d’un autre projet : rien', () => {
+    const r = computeProjectMargin(
+      base({
+        purchases: {
+          projectId: P,
+          payables: [
+            {
+              id: 'ff1',
+              currency: 'USD',
+              remaining: '0.00',
+              costAllocations: [{ amount: '10.00', workProjectId: P }],
+            },
+            {
+              id: 'ff2',
+              currency: 'USD',
+              remaining: '10.00',
+              costAllocations: [{ amount: '10.00', workProjectId: 'autre' }],
+            },
+          ],
+          orders: [],
+        },
+      }),
+    );
+    expect(r.purchases).toEqual([]);
+  });
+
+  it('part au plus fort reste : 100,00 réparti 1/3, 1/3, 1/3 → somme exacte', () => {
+    const r = computeProjectMargin(
+      base({
+        purchases: {
+          projectId: P,
+          payables: [
+            {
+              id: 'ff1',
+              currency: 'USD',
+              remaining: '100.00',
+              costAllocations: [
+                { amount: '1.00', workProjectId: P },
+                { amount: '1.00', workProjectId: 'x' },
+                { amount: '1.00', workProjectId: P },
+              ],
+            },
+          ],
+          orders: [],
+        },
+      }),
+    );
+    // Parts : 33,34 / 33,33 / 33,33 — le projet a la première et la troisième.
+    expect(r.purchases?.[0]?.committed).toBe('66.67');
+  });
+});

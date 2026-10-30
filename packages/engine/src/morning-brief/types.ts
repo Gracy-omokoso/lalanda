@@ -18,7 +18,12 @@
  * 1.2.0 (ADR-0040 — C4 § 5.5) : faits `mes_relances.*`, `relances.en_retard`,
  * fait `pipeline` connu (nombre d'opportunités ouvertes) et règle R10.
  */
-export const MORNING_BRIEF_VERSION = '1.2.0';
+/**
+ * 1.3.0 (ADR-0044 § 6.4) : faits `fournisseurs.factures_en_retard`,
+ * `fournisseurs.a_payer_bientot` (et leurs montants par devise avec
+ * `treasury.read`), `mes_approbations.en_attente` ; règles R11 et R12.
+ */
+export const MORNING_BRIEF_VERSION = '1.3.0';
 
 export const BRIEF_CURRENCIES = ['CDF', 'USD'] as const;
 export type BriefCurrency = (typeof BRIEF_CURRENCIES)[number];
@@ -127,6 +132,44 @@ export type BriefCrmInput =
       truncated: boolean;
     };
 
+/**
+ * Facture fournisseur VALIDÉE au reste à payer non nul (ADR-0044 § 6.4), lue par
+ * l'API. Le moteur décide seul de ce qui est « en retard » ou « bientôt » au jour
+ * de Kinshasa de `now` (moteur des achats, `payablesSchedule`). `remaining` sert
+ * aux montants, rendus seulement si `amountsVisible`.
+ */
+export interface BriefPayableInput {
+  currency: BriefCurrency;
+  /** Échéance `AAAA-MM-JJ`. */
+  dueDate: string;
+  /** Reste à payer (moteur `payableSettlement`), chaîne décimale positive. */
+  remaining: string;
+  /** En litige : ni en retard, ni bientôt (rendue à part par l'échéancier). */
+  disputed: boolean;
+}
+
+/**
+ * Achats (ADR-0044 § 6.4) : `hidden` si le rôle ne détient pas `purchase.read`
+ * (rien n'est alors lu), `unavailable` sans module des achats (tests).
+ */
+export type BriefPurchasesInput =
+  | 'hidden'
+  | { status: 'unavailable' }
+  | {
+      status: 'known';
+      payables: readonly BriefPayableInput[];
+      /** Fenêtre « bientôt » des réglages des achats (1 à 30 jours). */
+      dueSoonDays: number;
+      /** Montants par devise : seulement si l'appelant détient aussi `treasury.read`. */
+      amountsVisible: boolean;
+      /**
+       * Demandes soumises que L'APPELANT peut approuver ; `null` s'il ne détient
+       * pas `purchase.approve` (fait masqué).
+       */
+      pendingApprovalCount: number | null;
+      truncated: boolean;
+    };
+
 export interface MorningBriefInput {
   /** Instant de référence, ISO 8601. */
   now: string;
@@ -140,6 +183,8 @@ export interface MorningBriefInput {
   work: BriefWorkInput;
   /** Relances et pipeline du CRM ; absent : non disponible (ADR-0040 — C4). */
   crm?: BriefCrmInput;
+  /** Dettes fournisseurs et approbations d'achat ; absent : non disponible (ADR-0044). */
+  purchases?: BriefPurchasesInput;
 }
 
 export type BriefFactStatus = 'known' | 'to_fill' | 'unavailable' | 'hidden';

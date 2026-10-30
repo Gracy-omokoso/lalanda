@@ -15,6 +15,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { formatAmount, parseFixed } from '../invoice-totals/decimal.js';
+import { DUE_SOON_DAYS_BOUNDS, payablesSchedule } from '../purchases/payables.js';
 import { revenueBaseOf } from '../receivables/aggregation.js';
 import type { RevenueGroupAmount } from '../receivables/types.js';
 import {
@@ -29,6 +30,7 @@ import {
   type BriefSource,
   type BriefThreshold,
   type BriefCrmInput,
+  type BriefPurchasesInput,
   type BriefWorkInput,
   type MorningBrief,
   type MorningBriefInput,
@@ -224,6 +226,9 @@ export function buildMorningBriefFacts(input: MorningBriefInput): BriefFact[] {
   // Relances et pipeline du CRM (ADR-0040 — C4 § 5.5).
   facts.push(...crmFacts(input.crm ?? { status: 'unavailable' }, today));
 
+  // Dettes fournisseurs et approbations d'achat (ADR-0044 § 6.4).
+  facts.push(...purchasesFacts(input.purchases ?? { status: 'unavailable' }, today));
+
   return facts;
 }
 
@@ -412,6 +417,114 @@ function crmFacts(
     status: 'known' as const,
     value: values[f.id] ?? null,
   }));
+}
+
+// ── Achats : dettes fournisseurs et approbations (ADR-0044 § 6.4) ──────────
+
+const PURCHASES_SOURCE_REF = 'ADR-0044 § 6.4';
+
+function purchasesSource(rule: string, collection = 'supplier_invoices'): BriefSource {
+  return { module: 'run.purchases', collection, rule, reference: PURCHASES_SOURCE_REF };
+}
+
+/** Squelette des faits des achats : mêmes identifiants, connus, masqués ou non disponibles. */
+const PURCHASES_FACT_SKELETON: readonly Omit<BriefFact, 'status' | 'value'>[] = Object.freeze([
+  {
+    id: 'fournisseurs.factures_en_retard',
+    label: 'Factures fournisseurs en retard',
+    kind: 'count',
+    currency: null,
+    source: purchasesSource(
+      'Factures fournisseurs validées, reste à payer positif, échéance avant aujourd’hui (Kinshasa), hors litige',
+    ),
+  },
+  {
+    id: 'fournisseurs.a_payer_bientot',
+    label: 'Factures fournisseurs à payer bientôt',
+    kind: 'count',
+    currency: null,
+    source: purchasesSource(
+      'Factures fournisseurs validées, reste à payer positif, échéance dans la fenêtre « bientôt » des réglages des achats, hors litige',
+    ),
+  },
+  {
+    id: 'mes_approbations.en_attente',
+    label: 'Demandes d’achat qui attendent mon approbation',
+    kind: 'count',
+    currency: null,
+    source: purchasesSource(
+      'Demandes soumises que vous pouvez approuver (ni demandeur ni créateur, sauf approbateur unique)',
+      'purchase_orders',
+    ),
+  },
+]);
+
+function purchasesFacts(
+  purchases: BriefPurchasesInput,
+  today: { year: number; month: number; day: number },
+): BriefFact[] {
+  if (purchases === 'hidden' || purchases.status === 'unavailable') {
+    const status = purchases === 'hidden' ? ('hidden' as const) : ('unavailable' as const);
+    return PURCHASES_FACT_SKELETON.map((f) => ({ ...f, status, value: null }));
+  }
+  // Fenêtre bornée comme les réglages des achats : une valeur hors bornes est ramenée.
+  const soon = Math.min(
+    DUE_SOON_DAYS_BOUNDS.max,
+    Math.max(DUE_SOON_DAYS_BOUNDS.min, Math.trunc(purchases.dueSoonDays)),
+  );
+  // Le moteur des achats décide de l'échéancier (en retard, bientôt), par devise.
+  const schedule = payablesSchedule(purchases.payables, dayKey(today), soon);
+  let overdue = 0;
+  let dueSoon = 0;
+  for (const c of schedule.byCurrency) {
+    overdue += c.overdue.count;
+    dueSoon += c.dueSoon.count;
+  }
+  const facts: BriefFact[] = [];
+  for (const f of PURCHASES_FACT_SKELETON) {
+    if (f.id === 'mes_approbations.en_attente') {
+      const n = purchases.pendingApprovalCount;
+      facts.push(
+        n === null
+          ? {
+              ...f,
+              status: 'hidden',
+              value: null,
+              source: { ...f.source, rule: 'Réservé aux membres qui approuvent les achats' },
+            }
+          : { ...f, status: 'known', value: String(Math.max(0, Math.trunc(n))) },
+      );
+      continue;
+    }
+    const value = f.id === 'fournisseurs.factures_en_retard' ? overdue : dueSoon;
+    facts.push({ ...f, status: 'known', value: String(value) });
+  }
+  // Montants par devise : seulement avec `treasury.read` (ADR-0040 § 4.4), et pour
+  // une devise qui porte une dette dans la tranche ; jamais additionnés entre devises.
+  if (purchases.amountsVisible) {
+    for (const c of BRIEF_CURRENCIES) {
+      const row = schedule.byCurrency.find((x) => x.currency === c);
+      if (!row) continue;
+      for (const [prefix, label, bucket] of [
+        ['fournisseurs.factures_en_retard', 'Factures fournisseurs en retard', row.overdue],
+        ['fournisseurs.a_payer_bientot', 'Factures fournisseurs à payer bientôt', row.dueSoon],
+      ] as const) {
+        if (bucket.count === 0) continue;
+        facts.push({
+          id: `${prefix}.${c}`,
+          label: `${label} (${c})`,
+          kind: 'amount',
+          status: 'known',
+          value: bucket.amount,
+          currency: c,
+          source: purchasesSource(
+            'Somme des restes à payer (moteur des achats, `payablesSchedule`), dans la devise',
+          ),
+        });
+      }
+    }
+  }
+  return facts;
 }
 
 function amountOfSigned(value: string): bigint {
@@ -837,6 +950,51 @@ export const MORNING_BRIEF_RULES: readonly RuleDefinition[] = Object.freeze([
       };
     },
   },
+  // ── ADR-0044 § 6.4 : achats ─────────────────────────────────────────────
+  {
+    id: 'factures_fournisseurs_en_retard',
+    rank: 11,
+    severity: 'attention',
+    requires: ['fournisseurs.factures_en_retard'],
+    threshold: null,
+    evaluate(ctx) {
+      const n = ctx.count('fournisseurs.factures_en_retard');
+      if (n <= 0) return null;
+      const amounts = amountsText(ctx, 'fournisseurs.factures_en_retard');
+      return {
+        title: 'Factures fournisseurs en retard',
+        message:
+          (n > 1
+            ? `${n} factures fournisseurs ont dépassé leur échéance`
+            : `${n} facture fournisseur a dépassé son échéance`) +
+          (amounts.text ? ` : ${amounts.text} restent à payer.` : '.'),
+        recommendation: 'Ouvrir l’échéancier et planifier les paiements.',
+        actionPath: '/achats/a-payer',
+        factIds: ['fournisseurs.factures_en_retard', ...amounts.ids],
+      };
+    },
+  },
+  {
+    id: 'approbations_achat_en_attente',
+    rank: 12,
+    severity: 'info',
+    requires: ['mes_approbations.en_attente'],
+    threshold: null,
+    evaluate(ctx) {
+      const n = ctx.count('mes_approbations.en_attente');
+      if (n <= 0) return null;
+      return {
+        title: 'Demandes d’achat à approuver',
+        message:
+          n > 1
+            ? `${n} demandes d’achat attendent votre approbation.`
+            : `${n} demande d’achat attend votre approbation.`,
+        recommendation: 'Ouvrir les demandes à approuver et décider de chacune.',
+        actionPath: '/achats/commandes?vue=a-approuver',
+        factIds: ['mes_approbations.en_attente'],
+      };
+    },
+  },
 ] satisfies RuleDefinition[]);
 
 const SEVERITY_ORDER: Record<BriefSeverity, number> = { critique: 0, attention: 1, info: 2 };
@@ -910,6 +1068,10 @@ export function buildMorningBrief(input: MorningBriefInput): MorningBrief {
       (input.crm !== undefined &&
         input.crm !== 'hidden' &&
         input.crm.status === 'known' &&
-        input.crm.truncated),
+        input.crm.truncated) ||
+      (input.purchases !== undefined &&
+        input.purchases !== 'hidden' &&
+        input.purchases.status === 'known' &&
+        input.purchases.truncated),
   };
 }
