@@ -22,7 +22,7 @@ export default function AchatsLayout({
         module="run"
         moduleLabel="Exploiter"
         title="Achats"
-        description="Vos fournisseurs, vos demandes d’achat et leurs approbations, vos bons de commande. Les montants sont ceux calculés par Lalanda ; ce que vous pouvez faire dépend de vos droits."
+        description="Vos fournisseurs, vos demandes d’achat et leurs approbations, vos bons de commande, réceptions, factures fournisseurs et paiements. Les montants sont ceux calculés par Lalanda ; ce que vous pouvez faire dépend de vos droits."
       />
       <AchatsChrome>{children}</AchatsChrome>
     </section>

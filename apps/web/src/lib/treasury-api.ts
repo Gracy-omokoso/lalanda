@@ -61,11 +61,28 @@ export interface ExpenseView {
   occurrenceDate: string | null;
   /** Projet du RUN rattaché (ADR-0039 § 2.10), ou `null`. */
   workProjectId: string | null;
+  // ADR-0044 — P8 : fiche fournisseur (P2) et dépense possédée par les achats (P5).
+  // Facultatifs tant que l'API ne les sert pas.
+  supplierId?: string | null;
+  origin?: ExpenseOrigin | null;
   status: 'recorded' | 'cancelled';
   cancelReason: string | null;
   revision: number;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * Dépense créée ou rattachée par un paiement fournisseur (ADR-0044 § 2.8) : elle
+ * appartient aux achats et ne se modifie pas depuis la trésorerie.
+ */
+export interface ExpenseOrigin {
+  kind: 'supplier_payment';
+  paymentId: string;
+  invoiceId: string;
+  allocationIndex: number;
+  /** Copie d'affichage du numéro `PF…`, si l'API la rend. */
+  paymentNumber?: string | null;
 }
 
 export interface ExpensePage {

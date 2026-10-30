@@ -14,6 +14,7 @@ import type { CrmMyTaskItem } from '@lalanda/shared/crm';
 import type { PurchasesMyTaskItem } from '@lalanda/shared/purchases';
 import type { MyTasksView, WorkMyTaskItem } from '@lalanda/shared/work';
 import { EmptyState, PageHeader, Skeleton, buttonClasses } from '@lalanda/ui';
+import { ClipboardCheck, Scale } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -227,15 +228,16 @@ function LigneApprobation({
   dueSoonDays: number;
 }): React.ReactElement {
   return (
-    <li className="flex min-w-0 flex-col gap-1.5 px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3">
+    <li className="relative flex min-w-0 flex-col gap-1.5 px-3 py-2.5 hover:bg-[var(--surface-muted)] sm:flex-row sm:items-center sm:gap-3">
       <div className="flex min-w-0 flex-1 items-start gap-2">
-        <span aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-center text-xs">
-          ✓
-        </span>
+        <ClipboardCheck
+          aria-hidden="true"
+          className="mt-0.5 h-4 w-4 shrink-0 text-[var(--module-run)]"
+        />
         <span className="flex min-w-0 flex-col">
           <Link
             href={a.href}
-            className="break-words text-sm font-medium underline-offset-2 hover:underline"
+            className="break-words text-sm font-medium underline-offset-2 after:absolute after:inset-0 hover:underline"
           >
             {a.title}
           </Link>
@@ -246,7 +248,7 @@ function LigneApprobation({
       </div>
       <div className="flex flex-wrap items-center gap-2 pl-6 sm:pl-0">
         <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-strong)] px-2 py-0.5 text-[0.7rem] font-medium">
-          <span aria-hidden="true">⚖</span>
+          <Scale aria-hidden="true" className="h-3 w-3" />
           {PASTILLE_APPROBATION}
         </span>
         <Echeance

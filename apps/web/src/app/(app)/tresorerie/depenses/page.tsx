@@ -6,6 +6,7 @@
 
 import { Modal, buttonClasses } from '@lalanda/ui';
 import { Plus } from 'lucide-react';
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
@@ -25,6 +26,13 @@ import {
 import { lireMontantSaisi } from '../../ventes/_components/sales-model';
 import { Bandeau, Section, useAccesTresorerie } from '../_components/treasury-access';
 import { WorkProjectSelect } from '../_components/work-project-select';
+
+import {
+  MENTION_POSSEDEE,
+  gestesTresorerie,
+  lienPaiement,
+  messageDepensePossedee,
+} from './_components/depense-possedee';
 import {
   FREQUENCY_LABELS,
   formatMontantSigne,
@@ -208,7 +216,7 @@ export default function DepensesPage(): React.ReactElement {
       await treasuryApi.cancelExpense(d.id, motif);
       await charger();
     } catch (err) {
-      setErreur(messageOf(err));
+      setErreur(messageDepensePossedee(codeOf(err)) ?? messageOf(err));
     }
   }
 
@@ -220,9 +228,10 @@ export default function DepensesPage(): React.ReactElement {
       await charger();
     } catch (err) {
       setErreur(
-        codeOf(err) === 'UNSUPPORTED_IMAGE_TYPE'
-          ? 'Seules les photos PNG, JPEG ou WebP sont acceptées (le PDF n’est pas encore accepté).'
-          : messageOf(err),
+        messageDepensePossedee(codeOf(err)) ??
+          (codeOf(err) === 'UNSUPPORTED_IMAGE_TYPE'
+            ? 'Seules les photos PNG, JPEG ou WebP sont acceptées (le PDF n’est pas encore accepté).'
+            : messageOf(err)),
       );
     }
   }
@@ -502,59 +511,75 @@ export default function DepensesPage(): React.ReactElement {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
-                {depenses.map((d) => (
-                  <tr
-                    key={d.id}
-                    className={d.status === 'cancelled' ? 'opacity-50 line-through' : ''}
-                  >
-                    <td className="py-2 pr-3 whitespace-nowrap">{libelleDate(d.spentOn)}</td>
-                    <td className="py-2 pr-3">
-                      {d.label}
-                      {d.supplierName ? (
-                        <span className="block text-xs text-[var(--foreground-muted)]">
-                          {d.supplierName}
-                        </span>
-                      ) : null}
-                      {d.recurringExpenseId ? (
-                        <span className="block text-xs text-[var(--foreground-muted)]">
-                          Échéance récurrente
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="py-2 pr-3">{d.categoryLabel}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums whitespace-nowrap">
-                      {formatMontantSigne(d.amount, d.currency)}
-                    </td>
-                    <td className="py-2 pr-3">
-                      {d.attachment ? (
-                        <button type="button" className={PETIT} onClick={() => void voir(d)}>
-                          Voir
-                        </button>
-                      ) : gerer && d.status === 'recorded' ? (
-                        <label className={PETIT + ' cursor-pointer'}>
-                          Joindre
-                          <input
-                            type="file"
-                            accept="image/png,image/jpeg,image/webp"
-                            className="sr-only"
-                            onChange={(e) => void joindre(d, e.target.files?.[0])}
-                          />
-                        </label>
-                      ) : (
-                        <span className="text-xs text-[var(--foreground-muted)]">—</span>
-                      )}
-                    </td>
-                    <td className="py-2 text-right">
-                      {gerer && d.status === 'recorded' ? (
-                        <button type="button" className={PETIT} onClick={() => void annuler(d)}>
-                          Annuler
-                        </button>
-                      ) : d.status === 'cancelled' ? (
-                        <span className="text-xs">Annulée</span>
-                      ) : null}
-                    </td>
-                  </tr>
-                ))}
+                {depenses.map((d) => {
+                  const gestes = gestesTresorerie(d, gerer);
+                  const paiement = lienPaiement(d);
+                  return (
+                    <tr
+                      key={d.id}
+                      className={d.status === 'cancelled' ? 'opacity-50 line-through' : ''}
+                    >
+                      <td className="py-2 pr-3 whitespace-nowrap">{libelleDate(d.spentOn)}</td>
+                      <td className="py-2 pr-3">
+                        {d.label}
+                        {d.supplierName ? (
+                          <span className="block text-xs text-[var(--foreground-muted)]">
+                            {d.supplierName}
+                          </span>
+                        ) : null}
+                        {d.recurringExpenseId ? (
+                          <span className="block text-xs text-[var(--foreground-muted)]">
+                            Échéance récurrente
+                          </span>
+                        ) : null}
+                        {paiement ? (
+                          <span className="block text-xs text-[var(--foreground-muted)]">
+                            {MENTION_POSSEDEE}{' '}
+                            <Link href={paiement.href} className="underline underline-offset-2">
+                              {paiement.libelle}
+                            </Link>
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="py-2 pr-3">{d.categoryLabel}</td>
+                      <td className="py-2 pr-3 text-right tabular-nums whitespace-nowrap">
+                        {formatMontantSigne(d.amount, d.currency)}
+                      </td>
+                      <td className="py-2 pr-3">
+                        {d.attachment ? (
+                          <button type="button" className={PETIT} onClick={() => void voir(d)}>
+                            Voir
+                          </button>
+                        ) : gestes.joindre ? (
+                          <label className={PETIT + ' cursor-pointer'}>
+                            Joindre
+                            <input
+                              type="file"
+                              accept="image/png,image/jpeg,image/webp"
+                              className="sr-only"
+                              onChange={(e) => void joindre(d, e.target.files?.[0])}
+                            />
+                          </label>
+                        ) : (
+                          <span className="text-xs text-[var(--foreground-muted)]">—</span>
+                        )}
+                      </td>
+                      <td className="py-2 text-right">
+                        {gestes.annuler ? (
+                          <button type="button" className={PETIT} onClick={() => void annuler(d)}>
+                            Annuler
+                          </button>
+                        ) : d.status === 'cancelled' ? (
+                          <span className="text-xs">Annulée</span>
+                        ) : paiement ? (
+                          <span className="text-xs text-[var(--foreground-muted)]">
+                            Lecture seule
+                          </span>
+                        ) : null}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
