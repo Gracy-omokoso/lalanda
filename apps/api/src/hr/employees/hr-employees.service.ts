@@ -50,6 +50,8 @@ import {
   searchKeyOf,
 } from '../../sales/search.js';
 import { HrDepartmentsService, type HrActor } from '../departments/hr-departments.service.js';
+import { leaveTypeNotFound } from '../leave/hr-leave-types.service.js';
+import { LeaveType, type LeaveTypeDocument } from '../leave/leave-type.schema.js';
 import { HrPrivateService } from '../private/hr-private.service.js';
 import {
   employeeNotFound,
@@ -91,8 +93,12 @@ export function employeeViewOf(
     workPhone: e.workPhone ?? null,
     jobTitle: e.jobTitle,
     departmentId: e.departmentId ?? null,
+    // ADR-0045 — H3 : copies d'affichage posées par `withNames`.
+    departmentName: null,
     managerEmployeeId: e.managerEmployeeId ?? null,
+    managerName: null,
     contractType: e.contractType,
+    contractTypeLabel: null,
     startDate: e.startDate,
     probationEndDate: e.probationEndDate ?? null,
     contractEndDate: e.contractEndDate ?? null,
@@ -102,6 +108,9 @@ export function employeeViewOf(
     derivedStatus: employeeStatusOf(engineEmployeeOf(e), today),
     workPattern: e.workPattern ?? null,
     workLocation: e.workLocation ?? null,
+    leavePolicyOverrides: options.withNotes
+      ? ((e.leavePolicyOverrides as EmployeeView['leavePolicyOverrides']) ?? null)
+      : null,
     notes: options.withNotes ? (e.notes ?? null) : null,
     revision: e.revision,
     createdAt: new Date(e.createdAt).toISOString(),
@@ -152,6 +161,8 @@ export class HrEmployeesService {
     @Inject(HrDepartmentsService) private readonly departments: HrDepartmentsService,
     @Inject(HrPrivateService) private readonly privates: HrPrivateService,
     @Inject(HR_EMPLOYEE_LIFECYCLE) lifecycle: HrEmployeeLifecycle | null,
+    // ADR-0045 — H3 : exceptions d'acquisition (`leavePolicyOverrides`).
+    @InjectModel(LeaveType.name) private readonly leaveTypes: Model<LeaveTypeDocument>,
   ) {
     this.lifecycle = lifecycle ?? noHrEmployeeLifecycle;
   }
@@ -182,7 +193,10 @@ export class HrEmployeesService {
     const last = page[page.length - 1];
     const today = hrToday();
     return {
-      items: page.map((d) => employeeViewOf(d, today, { withNotes: true })),
+      items: await this.withNames(
+        organizationId,
+        page.map((d) => employeeViewOf(d, today, { withNotes: true })),
+      ),
       nextCursor:
         docs.length > query.limit && last ? encodeCursor(last.sortName, String(last._id)) : null,
     };
@@ -203,23 +217,73 @@ export class HrEmployeesService {
     return employeeViewOf(e, hrToday(), { withNotes });
   }
 
+  /**
+   * ADR-0045 — H3 : noms du service, du manager et du type de contrat, lus à la
+   * requête (copies d'affichage, jamais stockées).
+   */
+  async withNames<T extends EmployeeView>(organizationId: string, views: T[]): Promise<T[]> {
+    if (views.length === 0) return views;
+    const managerIds = [
+      ...new Set(views.map((v) => v.managerEmployeeId).filter((v): v is string => !!v)),
+    ].filter(isObjectIdHex);
+    const [departments, settings, managers] = await Promise.all([
+      this.departments.all(organizationId),
+      this.settings.view(organizationId),
+      managerIds.length === 0
+        ? Promise.resolve([] as EmployeeLean[])
+        : this.employees
+            .find(
+              { organizationId, _id: { $in: managerIds.map((id) => new Types.ObjectId(id)) } },
+              { firstName: 1, lastName: 1, preferredName: 1 },
+            )
+            .lean<EmployeeLean[]>()
+            .exec(),
+    ]);
+    const dept = new Map(departments.map((d) => [String(d._id), d.name]));
+    const types = new Map(settings.contractTypes.map((t) => [t.key, t.label]));
+    const names = new Map(managers.map((m) => [String(m._id), displayNameOf(m)]));
+    for (const v of views) {
+      v.departmentName = v.departmentId ? (dept.get(v.departmentId) ?? null) : null;
+      v.managerName = v.managerEmployeeId ? (names.get(v.managerEmployeeId) ?? null) : null;
+      v.contractTypeLabel = types.get(v.contractType) ?? null;
+    }
+    return views;
+  }
+
+  private async named(organizationId: string, view: EmployeeView): Promise<EmployeeView> {
+    return (await this.withNames(organizationId, [view]))[0]!;
+  }
+
   async me(viewer: HrViewer): Promise<HrMeView> {
     const selfId = viewer.scope.selfEmployeeId;
     const self = selfId ? viewer.byId.get(selfId) : undefined;
     return {
-      employee: self ? this.view(self, viewer.actions.has('hr.read')) : null,
+      employee: self
+        ? await this.named(self.organizationId, this.view(self, viewer.actions.has('hr.read')))
+        : null,
       private: self ? await this.privates.summary(self.organizationId, String(self._id)) : null,
       isManager: viewer.scope.isManager,
       canApprove: viewer.scope.isManager || viewer.scope.holdsLeaveApprove,
       directReportIds: viewer.scope.directReportIds,
       teamEmployeeIds: viewer.scope.teamEmployeeIds,
       orgChartVisible: viewer.scope.orgChartVisible,
+      // ADR-0045 — H3 : posés par `HrLeaveService.completeMe`.
+      balances: [],
+      requests: [],
     };
   }
 
-  team(viewer: HrViewer): HrTeamView {
+  async team(organizationId: string, viewer: HrViewer): Promise<HrTeamView> {
     const today = hrToday();
     const direct = new Set(viewer.scope.directReportIds);
+    // ADR-0045 — H3 : noms du service et du manager (copies d'affichage).
+    const dept = new Map(
+      (await this.departments.all(organizationId)).map((d) => [String(d._id), d.name]),
+    );
+    const nameOf = (id: string | null | undefined) => {
+      const e = id ? viewer.byId.get(id) : undefined;
+      return e ? displayNameOf(e) : null;
+    };
     const items = viewer.scope.teamEmployeeIds
       .map((id) => viewer.byId.get(id))
       .filter((e): e is EmployeeLean => e !== undefined)
@@ -229,11 +293,16 @@ export class HrEmployeesService {
         displayName: displayNameOf(e),
         jobTitle: e.jobTitle,
         departmentId: e.departmentId ?? null,
+        departmentName: e.departmentId ? (dept.get(e.departmentId) ?? null) : null,
         managerEmployeeId: e.managerEmployeeId ?? null,
+        managerName: nameOf(e.managerEmployeeId),
         isDirect: direct.has(String(e._id)),
         derivedStatus: employeeStatusOf(engineEmployeeOf(e), today),
         workEmail: e.workEmail ?? null,
         workPhone: e.workPhone ?? null,
+        // ADR-0045 — H3 : posés par `HrLeaveService.completeTeam`.
+        balances: [],
+        absences: [],
       }));
     return { items };
   }
@@ -315,7 +384,7 @@ export class HrEmployeesService {
       targetType: 'employee',
       targetId: id,
     });
-    return this.view(await this.requireOwn(organizationId, id), true);
+    return this.named(organizationId, this.view(await this.requireOwn(organizationId, id), true));
   }
 
   async update(
@@ -343,6 +412,17 @@ export class HrEmployeesService {
       departmentId: 'departmentId' in set ? merged.departmentId : undefined,
       managerEmployeeId: 'managerEmployeeId' in set ? merged.managerEmployeeId : undefined,
     });
+    // ADR-0045 — H3 : une exception d'acquisition ne vise qu'un type de l'organisation.
+    if (set['leavePolicyOverrides']) {
+      const typeIds = Object.keys(set['leavePolicyOverrides'] as Record<string, unknown>);
+      const found = await this.leaveTypes
+        .countDocuments({
+          organizationId,
+          _id: { $in: typeIds.map((id) => new Types.ObjectId(id)) },
+        })
+        .exec();
+      if (found !== typeIds.length) leaveTypeNotFound();
+    }
     Object.assign(set, keysOf(merged), { updatedBy: actor.userId });
     try {
       const res = await this.employees
@@ -367,7 +447,10 @@ export class HrEmployeesService {
       targetId: employeeId,
       metadata: { fields: Object.keys(changes).filter((k) => k !== 'notes') },
     });
-    return this.view(await this.requireOwn(organizationId, employeeId), true);
+    return this.named(
+      organizationId,
+      this.view(await this.requireOwn(organizationId, employeeId), true),
+    );
   }
 
   /** Une fiche par membre choisi ; nom tiré du compte, poste à compléter. */
@@ -431,7 +514,12 @@ export class HrEmployeesService {
       .sort({ sortName: 1, _id: 1 })
       .lean<EmployeeLean[]>()
       .exec();
-    return { items: docs.map((d) => this.view(d, true)) };
+    return {
+      items: await this.withNames(
+        organizationId,
+        docs.map((d) => this.view(d, true)),
+      ),
+    };
   }
 
   /** Sortie : date et catégorie ; l'accès à Lalanda n'est PAS retiré (décision ouverte n° 13). */
@@ -494,7 +582,10 @@ export class HrEmployeesService {
       );
     });
     return {
-      employee: this.view(await this.requireOwn(organizationId, employeeId), true),
+      employee: await this.named(
+        organizationId,
+        this.view(await this.requireOwn(organizationId, employeeId), true),
+      ),
       offboardingSuggested: true,
     };
   }
@@ -535,7 +626,10 @@ export class HrEmployeesService {
       targetType: 'employee',
       targetId: employeeId,
     });
-    return this.view(await this.requireOwn(organizationId, employeeId), true);
+    return this.named(
+      organizationId,
+      this.view(await this.requireOwn(organizationId, employeeId), true),
+    );
   }
 
   /**
@@ -609,7 +703,10 @@ export class HrEmployeesService {
         { session },
       );
     });
-    return this.view(await this.requireOwn(organizationId, employeeId), true);
+    return this.named(
+      organizationId,
+      this.view(await this.requireOwn(organizationId, employeeId), true),
+    );
   }
 
   // ── Interne ──────────────────────────────────────────────────────────────

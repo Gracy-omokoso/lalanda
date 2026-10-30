@@ -10,6 +10,7 @@
 // figure avec son compte (ou son opportunité) et ouvre le CRM.
 
 import type { CrmMyTaskItem } from '@lalanda/shared/crm';
+import type { HrMyTaskItem } from '@lalanda/shared/hr';
 import type { PurchasesMyTaskItem } from '@lalanda/shared/purchases';
 import type { MyTaskEntry, MyTaskItem } from '@lalanda/shared/work';
 
@@ -56,7 +57,32 @@ function estApprobation(t: Element): t is PurchasesMyTaskItem {
   return 'source' in t && t.source === 'purchases';
 }
 
+// ADR-0045 § 6.1 (lot H3) : absence à valider, ou élément de liste RH.
+function estElementRh(t: Element): t is HrMyTaskItem {
+  return 'source' in t && t.source === 'hr';
+}
+
 function ligne(t: Element, enRetard: boolean): LigneTache {
+  if (estElementRh(t)) {
+    const echeance = t.dueDate === null ? 'Sans échéance' : formatJour(t.dueDate, false);
+    return t.kind === 'leave_approval'
+      ? {
+          id: t.id,
+          titre: `Validation d’absence : ${t.employeeName}`,
+          projet: t.typeLabel,
+          echeance: enRetard ? `En retard · ${echeance}` : 'Aujourd’hui',
+          enRetard,
+          lien: t.href,
+        }
+      : {
+          id: t.id,
+          titre: `${t.kindLabel} : ${t.label}`,
+          projet: t.employeeName,
+          echeance: enRetard ? `En retard · ${echeance}` : 'Aujourd’hui',
+          enRetard,
+          lien: t.href,
+        };
+  }
   if (estApprobation(t)) {
     return {
       id: t.id,

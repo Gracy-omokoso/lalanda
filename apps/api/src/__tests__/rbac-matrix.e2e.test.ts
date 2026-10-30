@@ -120,17 +120,8 @@ const ACTIONS_SANS_ROUTE: Record<string, string> = {
   // ADR-0044 — P0 : actions déclarées avant leurs routes. P3 a retiré
   // `purchase.request` et `purchase.approve` (sondes en fin de liste).
   // ADR-0045 — H0 : actions déclarées avant leurs routes (module `hr`, lots H2 et H3).
-  // H2 a retiré `hr.read`, `hr.manage` et `hr.sensitive.read` (sondes en fin de liste).
-  // Chaque lot retire sa ligne et écrit sa sonde ; la matrice est déjà couverte case
-  // par case par `permissions.test.ts`, et le rôle `hr_manager` est exercé ici sur
-  // toutes les autres sondes.
-  'leave.request':
-    'Aucune route RH en H0 : `POST /hr/leave-requests` (sonde naturelle) arrive ' +
-    'avec les absences au lot H3 (ADR-0045 § 3.2).',
-  'leave.approve':
-    'Aucune route RH en H0 : la validation (`POST /hr/leave-requests/:id/approve`) ' +
-    'est relationnelle et arrive au lot H3 ; la séparation des tâches est prouvée ' +
-    'par `leaveApprovalDecision` (permissions.test.ts).',
+  // H2 a retiré `hr.read`, `hr.manage` et `hr.sensitive.read` ; H3 a retiré
+  // `leave.request` et `leave.approve` (sondes en fin de liste).
 };
 
 /** Une sonde HTTP : la route qui matérialise une action, et ses statuts légitimes. */
@@ -713,6 +704,41 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
           .post('/hr/employees/000000000000000000000000/anonymize')
           .set('Cookie', c)
           .send({ confirm: true, expectedRevision: 1 }),
+    },
+    // ADR-0045 — H3 : absences et circuit de validation.
+    {
+      // ADR-0045 § 4.1 — tout rôle interne (le Conseiller, externe, non). Aucun compte
+      // de cette suite n'est relié à une fiche : 409 EMPLOYEE_NOT_LINKED prouve que le
+      // guard a laissé passer jusqu'au service.
+      action: 'leave.request',
+      libelle: 'POST /hr/leave-requests (sans fiche reliée)',
+      statutsAutorises: [409],
+      envoyer: (c) =>
+        request(serveur())
+          .post('/hr/leave-requests')
+          .set('Cookie', c)
+          .send({
+            typeId: '000000000000000000000000',
+            start: { date: '2027-03-01', half: 'full' },
+            end: { date: '2027-03-01', half: 'full' },
+          }),
+    },
+    {
+      // ADR-0045 § 3.3, § 4.1 — changer le circuit exige d'être soi-même validateur :
+      // Propriétaire, Directeur financier, Responsable RH. La route déclare
+      // `leave.approve` EN PREMIER : le 403 la nomme pour tout rôle refusé. La révision
+      // courante est relue juste avant (chaque rôle autorisé l'incrémente).
+      action: 'leave.approve',
+      libelle: 'PUT /hr/settings/approval',
+      statutsAutorises: [200],
+      envoyer: async (c) => {
+        const lu = await request(serveur()).get('/hr/settings').set('Cookie', c);
+        const revision = typeof lu.body?.revision === 'number' ? lu.body.revision : 0;
+        return request(serveur())
+          .put('/hr/settings/approval')
+          .set('Cookie', c)
+          .send({ expectedRevision: revision, allowSoleApprover: true });
+      },
     },
   ];
 

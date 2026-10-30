@@ -1,4 +1,5 @@
 import type { CrmMyTaskItem } from '@lalanda/shared/crm';
+import type { HrMyTaskItem } from '@lalanda/shared/hr';
 import type { PurchasesMyTaskItem } from '@lalanda/shared/purchases';
 import type { MyTasksView, WorkMyTaskItem } from '@lalanda/shared/work';
 import { describe, expect, it } from 'vitest';
@@ -6,18 +7,23 @@ import { describe, expect, it } from 'vitest';
 import { oid, tache } from './fixtures.test-helpers';
 import {
   PASTILLE_APPROBATION,
+  PASTILLE_VALIDATION_ABSENCE,
   aPlat,
   appliquerRelance,
   appliquerTache,
   estApprobation,
+  estElementRh,
   estRelance,
   GROUPES_MES_TACHES,
   instantDeplace,
   peutCocherRelance,
   regrouper,
   retirerElement,
+  pastilleElementRh,
   sousTitreApprobation,
+  sousTitreElementRh,
   sousTitreRelance,
+  titreElementRh,
   totalMesTaches,
 } from './mes-taches-model';
 
@@ -188,5 +194,53 @@ describe('approbations d’achat (ADR-0044 § 6.5)', () => {
     const r = regrouper(v, [approbation, item(2, '2026-10-29')], 1);
     expect(r.today.map((e) => e.id)).toEqual(['purchases:o1']);
     expect(r.overdue).toHaveLength(1);
+  });
+});
+
+// ADR-0045 § 6.1 (lot H3) : absences à valider dans « Mes tâches ».
+describe('absences à valider (ADR-0045 § 6.1)', () => {
+  const absence: HrMyTaskItem = {
+    source: 'hr',
+    kind: 'leave_approval',
+    id: 'hr:leave:r1',
+    requestId: 'r1',
+    employeeName: 'Bea Kanku',
+    typeLabel: 'Absence',
+    start: { date: '2027-03-01', half: 'full' },
+    end: { date: '2027-03-05', half: 'am' },
+    days: '3.5',
+    dueDate: '2027-03-01',
+    priority: 'none',
+    rank: '2026-10-30T09:00:00.000Z',
+    done: false,
+    kindLabel: 'Validation d’absence',
+    href: '/rh/absences?vue=a-valider',
+  };
+
+  it('reconnue, ni tâche, ni relance, ni approbation ; libellés de l’API, durée mise en forme', () => {
+    expect(estElementRh(absence)).toBe(true);
+    expect(estRelance(absence)).toBe(false);
+    expect(estApprobation(absence)).toBe(false);
+    expect(estElementRh(item(1, null))).toBe(false);
+    // Le type confidentiel arrive masqué : l'écran affiche ce qu'il reçoit.
+    expect(titreElementRh(absence)).toBe('Bea Kanku — Absence');
+    expect(sousTitreElementRh(absence)).toBe('du 1 mars au 5 mars 2027 (matin) · 3,5 jours');
+    expect(pastilleElementRh(absence)).toBe(PASTILLE_VALIDATION_ABSENCE);
+  });
+
+  it('regroupée au premier jour de l’absence avec les autres éléments', () => {
+    const v: MyTasksView = {
+      asOf: '2027-02-27',
+      overdue: [],
+      today: [],
+      next7Days: [],
+      later: [],
+      noDate: [],
+      dueSoonCount: 0,
+      truncated: false,
+    };
+    const r = regrouper(v, [absence, item(2, null)], 1);
+    expect(r.next7Days.map((e) => e.id)).toEqual(['hr:leave:r1']);
+    expect(r.noDate).toHaveLength(1);
   });
 });

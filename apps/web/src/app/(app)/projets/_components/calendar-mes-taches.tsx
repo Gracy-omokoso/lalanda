@@ -33,12 +33,16 @@ import {
   appliquerRelance,
   appliquerTache,
   estApprobation,
+  estElementRh,
   estRelance,
   estTache,
   instantDeplace,
   regrouper,
+  pastilleElementRh,
   sousTitreApprobation,
+  sousTitreElementRh,
   sousTitreRelance,
+  titreElementRh,
 } from './mes-taches-model';
 import {
   MES_TACHES_HREF,
@@ -54,6 +58,22 @@ type ElementCalendrier = TacheCalendrierUI & { element: MyTaskEntry };
 
 function versCalendrier(e: MyTaskEntry): ElementCalendrier {
   if (estTache(e)) return { ...e, element: e };
+  // ADR-0045 § 6.1 : une absence à valider se lit au premier jour de l'absence, sans se déplacer.
+  if (estElementRh(e)) {
+    return {
+      id: e.id,
+      number: 0,
+      title: titreElementRh(e),
+      etiquette: pastilleElementRh(e),
+      startDate: null,
+      dueDate: e.dueDate,
+      isMilestone: false,
+      done: false,
+      rank: e.rank,
+      revision: 0,
+      element: e,
+    };
+  }
   // ADR-0044 § 6.5 : une approbation d'achat se lit au jour de soumission, sans se déplacer.
   if (estApprobation(e)) {
     return {
@@ -214,15 +234,17 @@ export function CalendrierMesTaches(): React.ReactElement {
           peutDeplacer={travailler}
           idPrefixe="mes-taches-cal"
           sousTitre={(t) =>
-            estApprobation(t.element)
-              ? sousTitreApprobation(t.element)
-              : estRelance(t.element)
-                ? sousTitreRelance(t.element)
-                : t.element.projectName
+            estElementRh(t.element)
+              ? sousTitreElementRh(t.element)
+              : estApprobation(t.element)
+                ? sousTitreApprobation(t.element)
+                : estRelance(t.element)
+                  ? sousTitreRelance(t.element)
+                  : t.element.projectName
           }
           onOuvrir={(t) =>
             router.push(
-              estRelance(t.element) || estApprobation(t.element)
+              estRelance(t.element) || estApprobation(t.element) || estElementRh(t.element)
                 ? t.element.href
                 : hrefTache(t.element.projectId, t.element.id, 'calendrier'),
             )

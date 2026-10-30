@@ -87,3 +87,36 @@ describe('carte « Mes tâches » — approbation d’achat', () => {
     });
   });
 });
+
+// ADR-0045 § 6.1 (lot H3) : une absence à valider ouvre la liste « À valider ».
+describe('carte « Mes tâches » — absence à valider', () => {
+  it('libellé « Validation d’absence », type tel que servi, lien vers « À valider »', () => {
+    const c = carteMesTaches({
+      overdue: [],
+      today: [
+        {
+          source: 'hr',
+          kind: 'leave_approval',
+          id: 'hr:leave:r1',
+          requestId: 'r1',
+          employeeName: 'Bea Kanku',
+          typeLabel: 'Absence',
+          start: { date: '2026-10-30', half: 'full' },
+          end: { date: '2026-10-30', half: 'full' },
+          days: '1',
+          dueDate: '2026-10-30',
+          priority: 'none',
+          rank: '2026-10-29T09:00:00.000Z',
+          done: false,
+          kindLabel: 'Validation d’absence',
+          href: '/rh/absences?vue=a-valider',
+        },
+      ],
+    });
+    expect(c.lignes[0]).toMatchObject({
+      titre: 'Validation d’absence : Bea Kanku',
+      projet: 'Absence',
+      lien: '/rh/absences?vue=a-valider',
+    });
+  });
+});

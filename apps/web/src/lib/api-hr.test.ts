@@ -17,8 +17,11 @@ const fiche: EmployeeView = {
   workPhone: null,
   jobTitle: 'Comptable',
   departmentId: null,
+  departmentName: null,
   managerEmployeeId: null,
+  managerName: null,
   contractType: 'permanent',
+  contractTypeLabel: 'CDI',
   startDate: '2026-01-05',
   probationEndDate: '2026-12-31',
   contractEndDate: null,
@@ -28,6 +31,7 @@ const fiche: EmployeeView = {
   derivedStatus: 'probation',
   workPattern: null,
   workLocation: null,
+  leavePolicyOverrides: null,
   notes: null,
   revision: 2,
   createdAt: '2026-01-05T00:00:00.000Z',
@@ -36,10 +40,14 @@ const fiche: EmployeeView = {
 
 describe('api-hr — contrats du lot H2', () => {
   it('le statut dérivé du moteur devient les drapeaux des écrans', () => {
-    expect(employeeFromApi(fiche)).toMatchObject({ onProbation: true, upcoming: false });
+    expect(employeeFromApi(fiche)).toMatchObject({
+      onProbation: true,
+      upcoming: false,
+      contractTypeLabel: 'CDI',
+    });
   });
 
-  it('« moi » sans soldes ni demandes tant que H3 ne les sert pas', () => {
+  it('« moi » : soldes et demandes servis par l’API (lot H3)', () => {
     expect(
       meFromApi({
         employee: fiche,
@@ -49,6 +57,8 @@ describe('api-hr — contrats du lot H2', () => {
         directReportIds: [],
         teamEmployeeIds: [],
         orgChartVisible: true,
+        balances: [],
+        requests: [],
       }),
     ).toMatchObject({ employee: { id: 'e1' }, balances: [], requests: [], isManager: true });
   });
@@ -61,15 +71,23 @@ describe('api-hr — contrats du lot H2', () => {
           displayName: 'Bea K.',
           jobTitle: 'Assistante',
           departmentId: null,
+          departmentName: null,
           managerEmployeeId: 'e1',
+          managerName: 'Aline Mbuyi',
           isDirect: true,
           derivedStatus: 'active',
           workEmail: null,
           workPhone: null,
+          balances: [],
+          absences: [],
         },
       ],
     });
-    expect(t.members[0]).toMatchObject({ direct: true, employee: { preferredName: 'Bea K.' } });
+    expect(t.members[0]).toMatchObject({
+      direct: true,
+      absences: [],
+      employee: { preferredName: 'Bea K.', managerName: 'Aline Mbuyi' },
+    });
   });
 
   it('organigramme : personnes indexées → liste, nom du service joint', () => {

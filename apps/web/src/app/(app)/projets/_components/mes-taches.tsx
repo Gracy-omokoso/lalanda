@@ -11,6 +11,7 @@
 // coche par la route du CRM ; un clic ouvre l'opportunité, le compte ou le contact.
 
 import type { CrmMyTaskItem } from '@lalanda/shared/crm';
+import type { HrMyTaskItem } from '@lalanda/shared/hr';
 import type { PurchasesMyTaskItem } from '@lalanda/shared/purchases';
 import type { MyTasksView, WorkMyTaskItem } from '@lalanda/shared/work';
 import { EmptyState, PageHeader, Skeleton, buttonClasses } from '@lalanda/ui';
@@ -30,11 +31,15 @@ import {
   PASTILLE_APPROBATION,
   appliquerTache,
   estApprobation,
+  estElementRh,
   estRelance,
   peutCocherRelance,
   retirerElement,
+  pastilleElementRh,
   sousTitreApprobation,
+  sousTitreElementRh,
   sousTitreRelance,
+  titreElementRh,
   totalMesTaches,
 } from './mes-taches-model';
 import { PROJETS_BASE, hrefTache, messageWork, peutTravailler } from './projets-model';
@@ -157,7 +162,9 @@ export function MesTaches(): React.ReactElement {
                 ) : (
                   <ul className="flex flex-col divide-y divide-[var(--border)] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)]">
                     {liste.map((t) =>
-                      estApprobation(t) ? (
+                      estElementRh(t) ? (
+                        <LigneElementRh key={t.id} e={t} today={vue.asOf} dueSoonDays={dueSoon} />
+                      ) : estApprobation(t) ? (
                         <LigneApprobation key={t.id} a={t} today={vue.asOf} dueSoonDays={dueSoon} />
                       ) : estRelance(t) ? (
                         <LigneRelance
@@ -253,6 +260,53 @@ function LigneApprobation({
         </span>
         <Echeance
           task={{ dueDate: a.dueDate, done: false, isMilestone: false }}
+          today={today}
+          dueSoonDays={dueSoonDays}
+        />
+      </div>
+    </li>
+  );
+}
+
+/**
+ * Élément RH (ADR-0045 § 6.1, § 8) : absence à valider — pastille « Validation
+ * d'absence », pas de case à cocher (valider est une décision), le lien ouvre la liste
+ * « À valider » ; ou élément de liste d'entrée ou de sortie (lot H4), même forme.
+ */
+function LigneElementRh({
+  e,
+  today,
+  dueSoonDays,
+}: {
+  e: HrMyTaskItem;
+  today: string;
+  dueSoonDays: number;
+}): React.ReactElement {
+  return (
+    <li className="flex min-w-0 flex-col gap-1.5 px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3">
+      <div className="flex min-w-0 flex-1 items-start gap-2">
+        <span aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-center text-xs">
+          ✓
+        </span>
+        <span className="flex min-w-0 flex-col">
+          <Link
+            href={e.href}
+            className="break-words text-sm font-medium underline-offset-2 hover:underline"
+          >
+            {titreElementRh(e)}
+          </Link>
+          <span className="truncate text-xs text-[var(--foreground-muted)]">
+            {sousTitreElementRh(e)}
+          </span>
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 pl-6 sm:pl-0">
+        <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-strong)] px-2 py-0.5 text-[0.7rem] font-medium">
+          <span aria-hidden="true">⏸</span>
+          {pastilleElementRh(e)}
+        </span>
+        <Echeance
+          task={{ dueDate: e.dueDate, done: false, isMilestone: false }}
           today={today}
           dueSoonDays={dueSoonDays}
         />
