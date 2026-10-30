@@ -10,6 +10,9 @@
 // - fermeture par `Échap`, par le bouton Fermer et par un clic sur le fond.
 //   Si la saisie a commencé, une confirmation est demandée avant d'abandonner ;
 //   pendant un envoi (`busy`), rien ne ferme ;
+// - `dismissible={false}` : fenêtre bloquante (nouvelle acceptation des
+//   conditions, ADR-0043) — ni bouton Fermer, ni `Échap`, ni clic sur le fond ;
+//   la seule sortie est une action du contenu ou du pied ;
 // - le contenu défile, l'en-tête reste visible ; la page derrière ne défile pas ;
 // - un dialogue imbriqué dans le contenu (`aria-modal`) garde `Échap` et `Tab`
 //   tant qu'il détient le focus ;
@@ -44,12 +47,15 @@ export function modalCloseDecision({
   busy,
   dirty,
   confirming,
+  dismissible = true,
 }: {
   busy: boolean;
   dirty: boolean;
   confirming: boolean;
+  /** `false` : fenêtre bloquante, aucune demande de fermeture n'aboutit. */
+  dismissible?: boolean;
 }): ModalCloseDecision {
-  if (busy) return 'ignore';
+  if (!dismissible || busy) return 'ignore';
   // Une seconde demande pendant la confirmation vaut « continuer la saisie » :
   // elle est traitée par l'appelant, jamais comme un abandon silencieux.
   if (confirming) return 'ignore';
@@ -105,6 +111,11 @@ export interface ModalProps {
   /** Envoi en cours : aucune fermeture possible. */
   busy?: boolean;
   /**
+   * `false` : fenêtre bloquante, sans bouton Fermer ; `Échap` et le clic sur le
+   * fond sont sans effet. Le contenu doit offrir sa propre sortie. Défaut `true`.
+   */
+  dismissible?: boolean;
+  /**
    * Saisie modifiée. Par défaut, la fenêtre le déduit seule du premier
    * événement `input` ou `change` dans son contenu ; passer une valeur
    * explicite remplace cette détection.
@@ -129,6 +140,7 @@ function ModalOuverte({
   description,
   size = 'md',
   busy = false,
+  dismissible = true,
   dirty,
   footer,
   discardTitle = 'Abandonner la saisie ?',
@@ -169,10 +181,15 @@ function ModalOuverte({
   }, [confirmation]);
 
   const demanderFermeture = useCallback(() => {
-    const decision = modalCloseDecision({ busy, dirty: sale, confirming: confirmation });
+    const decision = modalCloseDecision({
+      busy,
+      dirty: sale,
+      confirming: confirmation,
+      dismissible,
+    });
     if (decision === 'close') onClose();
     else if (decision === 'confirm') setConfirmation(true);
-  }, [busy, sale, confirmation, onClose]);
+  }, [busy, sale, confirmation, dismissible, onClose]);
 
   function surTouche(e: React.KeyboardEvent<HTMLDialogElement>): void {
     if (!ref.current) return;
@@ -243,16 +260,18 @@ function ModalOuverte({
               </p>
             ) : null}
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-9 w-9 shrink-0 px-0"
-            aria-label="Fermer"
-            disabled={busy}
-            onClick={demanderFermeture}
-          >
-            <X aria-hidden="true" className="h-5 w-5" />
-          </Button>
+          {dismissible ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 w-9 shrink-0 px-0"
+              aria-label="Fermer"
+              disabled={busy}
+              onClick={demanderFermeture}
+            >
+              <X aria-hidden="true" className="h-5 w-5" />
+            </Button>
+          ) : null}
         </header>
 
         {confirmation ? (

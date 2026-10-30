@@ -24,6 +24,7 @@ import { actionsRapides, appActive, moduleCourant } from './nav-model';
 import { PendingInvitationsBanner } from './pending-invitations-banner';
 import { ShellProvider, useShell } from './shell-context';
 import { SidebarNav } from './sidebar';
+import { TermsGate } from './terms-gate';
 
 const CLE_REPLI = 'lalanda.navigation.repliee';
 
@@ -122,6 +123,10 @@ function Coquille({ children }: { children: React.ReactNode }): React.ReactEleme
             tabIndex={-1}
             className={`mx-auto flex w-full max-w-[120rem] flex-1 flex-col gap-6 px-4 pt-6 ${avecBarre ? 'pb-28' : 'pb-10'} outline-none sm:px-6 lg:px-8 lg:pb-10 lg:pt-8`}
           >
+            {/* Nouvelle acceptation des conditions (ADR-0043) : fenêtre
+                bloquante si l'accord est périmé, bandeau si la vérification
+                échoue, rien tant que la réponse n'est pas arrivée. */}
+            <TermsGate />
             <PendingInvitationsBanner />
             <div className="flex-1">{children}</div>
           </main>

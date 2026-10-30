@@ -13,7 +13,7 @@
 //    de le tenter.
 
 import type { INestApplication } from '@nestjs/common';
-import { LEGAL_VERSION } from '@lalanda/shared/legal';
+import { KNOWN_LEGAL_VERSIONS, LEGAL_VERSION } from '@lalanda/shared/legal';
 import request from 'supertest';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 
@@ -146,5 +146,50 @@ e2eSuite('acceptation des conditions (S22c)', () => {
       .set('Cookie', cookies)
       .expect(200);
     expect(premier.body.acceptedVersion).toBe(LEGAL_VERSION);
+  });
+
+  it('tient pour périmé un accord sur le corpus précédent, puis le rend courant après acceptation (ADR-0043)', async () => {
+    // Cas réel du changement d'éditeur : un compte qui n'a accepté que le corpus
+    // `2026-08-09` doit être resollicité, puis redevenir à jour sans que la
+    // trace de son premier accord ne soit effacée.
+    const ancienne = KNOWN_LEGAL_VERSIONS[KNOWN_LEGAL_VERSIONS.length - 2]!;
+    expect(ancienne).not.toBe(LEGAL_VERSION);
+
+    const db = await dbOf(app);
+    const autreUser = await db.collection('user').findOne({ email: autre.email });
+    const userId = String(autreUser!._id);
+    await db.collection('terms_acceptances').deleteMany({ userId });
+    await db.collection('terms_acceptances').insertOne({
+      userId,
+      termsVersion: ancienne,
+      acceptedAt: new Date('2026-09-01T10:00:00Z'),
+      _schemaVersion: 1,
+      createdAt: new Date('2026-09-01T10:00:00Z'),
+      updatedAt: new Date('2026-09-01T10:00:00Z'),
+    });
+
+    const avant = await request(app.getHttpServer())
+      .get('/legal/terms/acceptance')
+      .set('Cookie', autreCookies)
+      .expect(200);
+    expect(avant.body).toMatchObject({
+      currentVersion: LEGAL_VERSION,
+      acceptedVersion: ancienne,
+      isCurrent: false,
+    });
+
+    const apres = await request(app.getHttpServer())
+      .post('/legal/terms/acceptance')
+      .set('Cookie', autreCookies)
+      .send({ version: LEGAL_VERSION })
+      .expect(201);
+    expect(apres.body).toMatchObject({ acceptedVersion: LEGAL_VERSION, isCurrent: true });
+
+    const historique = await db
+      .collection('terms_acceptances')
+      .find({ userId })
+      .sort({ acceptedAt: 1 })
+      .toArray();
+    expect(historique.map((a) => a['termsVersion'])).toEqual([ancienne, LEGAL_VERSION]);
   });
 });

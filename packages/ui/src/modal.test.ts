@@ -30,6 +30,10 @@ describe('Modal — rendu', () => {
     expect(html).toContain('aria-label="Fermer"');
   });
 
+  it('bloquante : aucun bouton Fermer', () => {
+    expect(rendre({ dismissible: false })).not.toContain('aria-label="Fermer"');
+  });
+
   it('relie la description quand elle existe', () => {
     expect(rendre()).not.toContain('aria-describedby');
     const html = rendre({ description: 'Un projet client ou interne.' });
@@ -65,6 +69,15 @@ describe('Modal — rendu', () => {
 });
 
 describe('modalCloseDecision', () => {
+  it('ignore toute demande quand la fenêtre est bloquante', () => {
+    expect(
+      modalCloseDecision({ busy: false, dirty: false, confirming: false, dismissible: false }),
+    ).toBe('ignore');
+    expect(
+      modalCloseDecision({ busy: false, dirty: true, confirming: false, dismissible: false }),
+    ).toBe('ignore');
+  });
+
   it('ferme quand rien n’a été saisi', () => {
     expect(modalCloseDecision({ busy: false, dirty: false, confirming: false })).toBe('close');
   });
