@@ -2,19 +2,21 @@
 
 // Mon espace — ADR-0045 § 8 (lot H6) : ma fiche (dossier non sensible), mes
 // soldes (moteur), « Demander une absence » en fenêtre modale, mes demandes et
-// leur annulation. Mes documents et mes éléments de liste viennent avec H4 :
-// ils ne s'affichent que si `GET /hr/me` les sert.
+// leur annulation. Mes documents (téléchargement) et mes éléments de liste
+// (cochables par l'assigné) : lot H7, servis par `GET /hr/me` depuis H4.
 
 import { buttonClasses } from '@lalanda/ui';
-import { CalendarPlus, ClipboardCheck, IdCard, Plane, Wallet } from 'lucide-react';
+import { CalendarPlus, ClipboardCheck, FileText, IdCard, Plane, Wallet } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { hrApi, type LeaveRequestView, type LeaveTypeView } from '@/lib/api-hr';
+import { hrAdminApi } from '@/lib/api-hr-admin';
 
-import { BOUTON_PETIT } from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { DemandeAbsence } from './demande-absence';
+import { LIBELLES_CATEGORIE } from './documents-model';
 import {
   etatMoi,
   grouperDemandes,
@@ -29,6 +31,7 @@ import {
   aujourdhui,
   formatJour,
   libellePeriode,
+  messageRh,
   nomAffiche,
   peutDemanderAbsence,
   peutGererRh,
@@ -42,6 +45,7 @@ import {
   Panneau,
   PhraseSection,
   Tuile,
+  enregistrerFichier,
 } from './rh-ui';
 
 export function MonEspace(): React.ReactElement {
@@ -49,6 +53,7 @@ export function MonEspace(): React.ReactElement {
   const [demande, setDemande] = useState(false);
   const [aAnnuler, setAAnnuler] = useState<LeaveRequestView | null>(null);
   const [types, setTypes] = useState<LeaveTypeView[]>([]);
+  const [erreurListe, setErreurListe] = useState<string | null>(null);
   const etat = etatMoi(moi);
   const jour = aujourdhui();
   const demander = peutDemanderAbsence(actions);
@@ -170,19 +175,84 @@ export function MonEspace(): React.ReactElement {
               icone={ClipboardCheck}
               id="rh-moi-listes"
             >
+              {erreurListe ? (
+                <Alerte>
+                  <p>{erreurListe}</p>
+                </Alerte>
+              ) : null}
               <ul className="flex flex-col divide-y divide-[var(--border)] text-sm">
                 {etat.moi.checklistItems.map((i) => (
-                  <li key={`${i.checklistId}-${i.itemId}`} className="flex flex-wrap gap-x-3 py-2">
-                    <span className="min-w-0 flex-1 break-words">
-                      {i.label} — {i.employeeName}
+                  <li key={`${i.checklistId}-${i.itemId}`} className="flex items-start gap-3 py-2">
+                    {/* ADR-0045 — H7 : l'assigné coche son élément (§ 3.3). */}
+                    <input
+                      id={`moi-${i.checklistId}-${i.itemId}`}
+                      type="checkbox"
+                      className="mt-1 h-4 w-4 shrink-0"
+                      checked={i.doneAt !== null}
+                      onChange={(e) => {
+                        setErreurListe(null);
+                        hrAdminApi
+                          .setChecklistItemDone(i.checklistId, i.itemId, e.target.checked)
+                          .then(() => relireMoi())
+                          .catch((err: unknown) =>
+                            setErreurListe(messageRh(err, 'L’élément n’a pas pu être coché.')),
+                          );
+                      }}
+                    />
+                    <label
+                      htmlFor={`moi-${i.checklistId}-${i.itemId}`}
+                      className="flex min-w-0 flex-1 flex-col"
+                    >
+                      <span className="break-words">
+                        {i.label} — {i.employeeName}
+                      </span>
+                      <span className="text-xs text-[var(--foreground-muted)]">
+                        {i.doneAt
+                          ? 'Fait'
+                          : i.dueDate
+                            ? `Pour le ${formatJour(i.dueDate)}`
+                            : 'À faire'}
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </Panneau>
+          ) : null}
+
+          {etat.moi.documents && etat.moi.documents.length > 0 ? (
+            <Panneau titre="Mes documents" icone={FileText} id="rh-moi-documents">
+              <ul className="flex flex-col divide-y divide-[var(--border)] text-sm">
+                {etat.moi.documents.map((d) => (
+                  <li key={d.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="font-medium break-words">
+                        {d.label}
+                        {d.sensitive ? ' · sensible' : ''}
+                      </span>
+                      <span className="text-xs text-[var(--foreground-muted)]">
+                        {LIBELLES_CATEGORIE[d.category as keyof typeof LIBELLES_CATEGORIE] ??
+                          d.category}
+                        {d.expiresOn ? ` · expire le ${formatJour(d.expiresOn)}` : ''}
+                      </span>
                     </span>
-                    <span className="text-xs text-[var(--foreground-muted)]">
-                      {i.doneAt
-                        ? 'Fait'
-                        : i.dueDate
-                          ? `Pour le ${formatJour(i.dueDate)}`
-                          : 'À faire'}
-                    </span>
+                    <button
+                      type="button"
+                      className={BOUTON_PETIT}
+                      onClick={() => {
+                        setErreurListe(null);
+                        hrAdminApi
+                          .downloadDocument({ id: d.id, fileName: d.fileName ?? d.label })
+                          .then((f) => enregistrerFichier(f.blob, f.nom))
+                          .catch((err: unknown) =>
+                            setErreurListe(
+                              messageRh(err, 'Le document n’a pas pu être téléchargé.'),
+                            ),
+                          );
+                      }}
+                    >
+                      Télécharger<span className="sr-only"> {d.label}</span>
+                    </button>
                   </li>
                 ))}
               </ul>

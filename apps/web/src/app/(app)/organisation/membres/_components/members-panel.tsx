@@ -14,15 +14,20 @@
 // la fiche des autorisations du membre (`MemberPermissionsPanel`). Changer le
 // titre efface l'écart : l'écran prévient avant de confirmer (décision n° 1).
 
-import { useState } from 'react';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
 
 import { api, type MemberView, type RoleOption } from '@/lib/api';
+import { hrApi } from '@/lib/api-hr';
 import {
   apiAutorisations,
   type CatalogueAutorisations,
   type MembreAutorisations,
   type MesPermissions,
 } from '@/lib/api-permissions';
+
+import { useShell } from '../../../_components/shell-context';
+import { fichesParCompte } from '../../../rh/_components/collaborateurs-model';
 
 import { MemberPermissionsPanel } from './member-permissions-panel';
 import {
@@ -67,6 +72,8 @@ export function MembersPanel({
   const [ouverte, setOuverte] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // ADR-0045 — H7 (§ 6.6) : lien « Fiche RH » vers le dossier relié, si `hr.read`.
+  const fichesRh = useFichesRh();
 
   /**
    * Toute écriture passe par ici : une seule ligne occupée à la fois, un seul
@@ -150,6 +157,14 @@ export function MembersPanel({
                       <Pastille ton="neutre">{m.roleLabel}</Pastille>
                     )}
                     {badge ? <Pastille ton="accent">{badge}</Pastille> : null}
+                    {fichesRh.get(m.userId) ? (
+                      <Link
+                        href={fichesRh.get(m.userId)!}
+                        className="text-xs font-medium text-[var(--accent)] underline underline-offset-2"
+                      >
+                        Fiche RH<span className="sr-only"> de {nomAffiche(m)}</span>
+                      </Link>
+                    ) : null}
                   </span>
                   {sousTitre(m) ? (
                     <span className="fig text-xs text-[var(--foreground-muted)]">
@@ -388,4 +403,33 @@ function Pastille({
       {children}
     </span>
   );
+}
+
+/**
+ * ADR-0045 — H7 (§ 6.6) : comptes reliés à une fiche collaborateur, lus seulement
+ * avec `hr.read` (droits de la coquille). Une lecture en échec n'affiche aucun lien.
+ */
+function useFichesRh(): Map<string, string> {
+  const { actions } = useShell();
+  const lire = actions !== null && actions.includes('hr.read');
+  const [fiches, setFiches] = useState<Map<string, string>>(() => new Map());
+  useEffect(() => {
+    if (!lire) return;
+    let annule = false;
+    void (async () => {
+      const tous: Parameters<typeof fichesParCompte>[0][number][] = [];
+      let cursor: string | undefined;
+      for (let page = 0; page < 20; page++) {
+        const p = await hrApi.listEmployees({ limit: 100, ...(cursor ? { cursor } : {}) });
+        tous.push(...p.items);
+        if (!p.nextCursor) break;
+        cursor = p.nextCursor;
+      }
+      if (!annule) setFiches(fichesParCompte(tous));
+    })().catch(() => undefined);
+    return () => {
+      annule = true;
+    };
+  }, [lire]);
+  return fiches;
 }

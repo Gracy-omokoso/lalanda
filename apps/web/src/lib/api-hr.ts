@@ -18,6 +18,7 @@ import type {
   EmployeeDetailView as ApiEmployeeDetail,
   EmployeePage as ApiEmployeePage,
   EmployeeView as ApiEmployee,
+  HrMeDocumentsAndChecklists as ApiMeExtras,
   HrMeView as ApiMe,
   HrTeamView as ApiTeam,
   OrgChartView as ApiOrgChart,
@@ -288,6 +289,9 @@ export interface HrMyDocument {
   category: string;
   issuedOn: CalendarDay | null;
   expiresOn: CalendarDay | null;
+  /** ADR-0045 — H7 : nom du fichier et sensibilité, servis par l'API (lot H4). */
+  fileName?: string;
+  sensitive?: boolean;
 }
 
 export interface HrMeView {
@@ -432,8 +436,23 @@ export function employeeFromApi(e: ApiEmployee): HrEmployeeView {
   };
 }
 
-export function meFromApi(m: ApiMe): HrMeView {
+export function meFromApi(m: ApiMe & Partial<ApiMeExtras>): HrMeView {
   return {
+    // ADR-0045 — H7 : mes documents visibles et mes éléments de liste (lot H4).
+    ...(m.documents
+      ? {
+          documents: m.documents.map((d) => ({
+            id: d.id,
+            label: d.label,
+            category: d.category,
+            issuedOn: d.issuedOn,
+            expiresOn: d.expiresOn,
+            fileName: d.fileName,
+            sensitive: d.sensitive,
+          })),
+        }
+      : {}),
+    ...(m.checklistItems ? { checklistItems: m.checklistItems } : {}),
     employee: m.employee ? employeeFromApi(m.employee) : null,
     // ADR-0045 — H3 : soldes (moteur) et demandes servis avec « moi ».
     balances: m.balances,
@@ -500,7 +519,8 @@ export function orgChartFromApi(c: ApiOrgChart): HrOrgChartResponse {
 
 export const hrApi = {
   // Moi, mon équipe (§ 3.1)
-  getMe: async () => meFromApi(await jsonRequest<ApiMe>('/hr/me', { method: 'GET' })),
+  getMe: async () =>
+    meFromApi(await jsonRequest<ApiMe & Partial<ApiMeExtras>>('/hr/me', { method: 'GET' })),
   getTeam: async () => teamFromApi(await jsonRequest<ApiTeam>('/hr/team', { method: 'GET' })),
 
   // Collaborateurs (§ 3.1) — aucune route sensible ici.
