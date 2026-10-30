@@ -10,7 +10,7 @@
 // La suppression n'est proposée que pour un client JAMAIS facturé (§ O7) ;
 // sinon, seule la désactivation le retire des propositions.
 
-import { buttonClasses } from '@lalanda/ui';
+import { Modal, buttonClasses } from '@lalanda/ui';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useState } from 'react';
 
@@ -101,7 +101,7 @@ export function CustomerList(): React.ReactElement {
     }
   }
 
-  if (fiche) {
+  if (fiche?.mode === 'edition') {
     return (
       <CustomerForm
         key={fiche.mode === 'edition' ? fiche.id : FICHE_NOUVELLE}
@@ -117,6 +117,23 @@ export function CustomerList(): React.ReactElement {
 
   return (
     <section aria-labelledby="clients-titre" className="flex flex-col gap-4">
+      <Modal
+        open={fiche?.mode === 'creation'}
+        onClose={() => fermer()}
+        title="Nouveau client"
+        size="lg"
+      >
+        {fiche ? (
+          <CustomerForm
+            key={FICHE_NOUVELLE}
+            fiche={fiche}
+            gerer={gerer}
+            base={pathname}
+            onFermer={fermer}
+            enModal
+          />
+        ) : null}
+      </Modal>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex flex-col gap-1">
           <h2 id="clients-titre" className="font-display text-lg font-bold tracking-tight">

@@ -13,6 +13,8 @@
 // - pour une erreur venant de la DGI, son code et son libellé sont montrés
 //   tels quels.
 
+import { Modal } from '@lalanda/ui';
+import { Plus } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
@@ -670,7 +672,13 @@ export function NormalizedInvoicingPanel({
           </ul>
         )}
 
-        {formulaire.type === 'ajout' ? (
+        <Modal
+          open={formulaire.type === 'ajout'}
+          onClose={() => setFormulaire({ type: 'aucun' })}
+          title="Nouveau point de vente"
+          description="Un point de vente par e-MCF : son nom, son environnement et le jeton fourni par la DGI."
+          size="md"
+        >
           <PointOfSaleCreateForm
             environnementParDefaut={vue.environment}
             productionDisponible={vue.prerequisites.productionAvailable}
@@ -686,17 +694,17 @@ export function NormalizedInvoicingPanel({
               await charger();
             }}
           />
-        ) : (
-          <div>
-            <button
-              type="button"
-              onClick={() => setFormulaire({ type: 'ajout' })}
-              className={BOUTON}
-            >
-              Ajouter un point de vente
-            </button>
-          </div>
-        )}
+        </Modal>
+        <div>
+          <button
+            type="button"
+            onClick={() => setFormulaire({ type: 'ajout' })}
+            className={`${BOUTON} inline-flex items-center gap-2`}
+          >
+            <Plus aria-hidden="true" className="h-4 w-4" />
+            Ajouter un point de vente
+          </button>
+        </div>
       </section>
     </section>
   );

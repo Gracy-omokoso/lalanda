@@ -9,7 +9,7 @@
 //
 // Chiffres recopiés de l'API (moteur) : rien n'est additionné ici.
 
-import { Badge, buttonClasses } from '@lalanda/ui';
+import { Badge, Modal, buttonClasses } from '@lalanda/ui';
 import { AlarmClock, KanbanSquare, Moon, Plus, UserX } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
@@ -166,12 +166,7 @@ function NouvelleOpportunite({ onCree }: { onCree: () => void }): React.ReactEle
   }
 
   return (
-    <form
-      onSubmit={(e) => void creer(e)}
-      className="grid gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-4 sm:grid-cols-2 lg:grid-cols-3"
-      noValidate
-    >
-      <h3 className="text-sm font-semibold sm:col-span-2 lg:col-span-3">Nouvelle opportunité</h3>
+    <form onSubmit={(e) => void creer(e)} className="grid gap-3 sm:grid-cols-2" noValidate>
       <Champ id="op-titre" label="Titre" requis erreur={champs['title']}>
         <input
           id="op-titre"
@@ -244,11 +239,7 @@ function NouvelleOpportunite({ onCree }: { onCree: () => void }): React.ReactEle
       <button
         type="submit"
         disabled={envoi}
-        className={buttonClasses(
-          'primary',
-          'md',
-          'sm:col-span-2 sm:justify-self-start lg:col-span-3',
-        )}
+        className={buttonClasses('primary', 'md', 'sm:col-span-2 sm:justify-self-start')}
       >
         {envoi ? 'Création…' : 'Créer l’opportunité'}
       </button>
@@ -494,11 +485,10 @@ export function CrmBoard(): React.ReactElement {
             <button
               type="button"
               className={buttonClasses('primary', 'sm')}
-              onClick={() => setCreation((c) => !c)}
-              aria-expanded={creation}
+              onClick={() => setCreation(true)}
             >
               <Plus aria-hidden="true" className="h-4 w-4" />
-              {creation ? 'Fermer' : 'Nouvelle opportunité'}
+              Nouvelle opportunité
             </button>
           ) : null
         }
@@ -553,14 +543,19 @@ export function CrmBoard(): React.ReactElement {
           <p>{erreur}</p>
         </Alerte>
       ) : null}
-      {gerer && creation ? (
+      <Modal
+        open={gerer && creation}
+        onClose={() => setCreation(false)}
+        title="Nouvelle opportunité"
+        size="lg"
+      >
         <NouvelleOpportunite
           onCree={() => {
             setCreation(false);
             charger();
           }}
         />
-      ) : null}
+      </Modal>
       {gagnee ? (
         <div className="flex flex-col gap-2 rounded-[var(--radius-lg)] border border-[color-mix(in_srgb,var(--ok)_40%,transparent)] bg-[color-mix(in_srgb,var(--ok)_10%,var(--surface))] p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
           <p>

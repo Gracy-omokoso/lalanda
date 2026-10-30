@@ -4,7 +4,7 @@
 // compte (prospect ou client) ou « sans entreprise », détacher, import et
 // export CSV. Le compte remplace le choix « client / entreprise saisie ».
 
-import { buttonClasses } from '@lalanda/ui';
+import { Modal, buttonClasses } from '@lalanda/ui';
 import { Contact, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
@@ -99,6 +99,14 @@ export function ContactsPanel(): React.ReactElement {
   const [f, setF] = useState<FormulaireContact>(formulaireContact());
   const [champs, setChamps] = useState<Record<string, string>>({});
   const [creation, setCreation] = useState(false);
+  const [erreurCreation, setErreurCreation] = useState<string | null>(null);
+
+  function fermerCreation(): void {
+    setCreation(false);
+    setF(formulaireContact());
+    setChamps({});
+    setErreurCreation(null);
+  }
 
   const charger = useCallback(() => {
     crmApi
@@ -122,14 +130,13 @@ export function ContactsPanel(): React.ReactElement {
       setChamps(p.champs);
       return;
     }
+    setErreurCreation(null);
     try {
       await crmApi.createContact(p.corps);
-      setF(formulaireContact());
-      setChamps({});
-      setCreation(false);
+      fermerCreation();
       charger();
     } catch (err) {
-      setErreur(messageCrm(err, 'Création impossible.'));
+      setErreurCreation(messageCrm(err, 'Création impossible.'));
     }
   }
 
@@ -144,11 +151,10 @@ export function ContactsPanel(): React.ReactElement {
             <button
               type="button"
               className={buttonClasses('primary', 'sm')}
-              aria-expanded={creation}
-              onClick={() => setCreation((c) => !c)}
+              onClick={() => setCreation(true)}
             >
               <Plus aria-hidden="true" className="h-4 w-4" />
-              {creation ? 'Fermer' : 'Nouveau contact'}
+              Nouveau contact
             </button>
           ) : null
         }
@@ -168,13 +174,13 @@ export function ContactsPanel(): React.ReactElement {
         </Alerte>
       ) : null}
 
-      {gerer && creation ? (
+      <Modal open={gerer && creation} onClose={fermerCreation} title="Nouveau contact" size="md">
         <form
           onSubmit={(e) => void creer(e)}
-          className="grid gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-4 sm:grid-cols-2 lg:grid-cols-3"
+          aria-label="Nouveau contact"
+          className="grid gap-3 sm:grid-cols-2"
           noValidate
         >
-          <h3 className="text-sm font-semibold sm:col-span-2 lg:col-span-3">Nouveau contact</h3>
           <Champ id="ct-nom" label="Nom" requis erreur={champs['name']}>
             <input
               id="ct-nom"
@@ -222,18 +228,21 @@ export function ContactsPanel(): React.ReactElement {
               onChange={(accountId) => setF({ ...f, accountId })}
             />
           </Champ>
+          {erreurCreation ? (
+            <div className="sm:col-span-2">
+              <Alerte>
+                <p>{erreurCreation}</p>
+              </Alerte>
+            </div>
+          ) : null}
           <button
             type="submit"
-            className={buttonClasses(
-              'primary',
-              'md',
-              'sm:col-span-2 sm:justify-self-start lg:col-span-3',
-            )}
+            className={buttonClasses('primary', 'md', 'sm:col-span-2 sm:justify-self-start')}
           >
             Ajouter le contact
           </button>
         </form>
-      ) : null}
+      </Modal>
 
       {items === null ? (
         <p className="text-sm text-[var(--foreground-muted)]">Chargement…</p>
