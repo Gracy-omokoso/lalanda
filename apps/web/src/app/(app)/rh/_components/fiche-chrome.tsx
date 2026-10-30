@@ -14,7 +14,7 @@ import { createContext, useCallback, useContext, useEffect, useState } from 'rea
 
 import { hrApi, type HrEmployeeView, type HrSettingsContractType } from '@/lib/api-hr';
 
-import { ONGLETS_FICHE, ongletActif } from './collaborateurs-model';
+import { ongletActif, ongletsVisibles } from './collaborateurs-model';
 import { useReferentielsRh } from './referentiels';
 import { useAccesRh } from './rh-access';
 import {
@@ -51,7 +51,7 @@ export function FicheChrome({
   children: React.ReactNode;
 }): React.ReactElement {
   const pathname = usePathname();
-  const { actions } = useAccesRh();
+  const { actions, moi } = useAccesRh();
   const { contrats } = useReferentielsRh(false);
   const [lecture, setLecture] = useState<Lecture<HrEmployeeView> | null>(null);
   const [version, setVersion] = useState(0);
@@ -107,6 +107,7 @@ export function FicheChrome({
   const fiche = lecture.valeur;
   const statut = libelleStatutCollaborateur(fiche);
   const actif = ongletActif(pathname, base);
+  const estSoi = moi?.ok === true && moi.valeur.employee?.id === fiche.id;
 
   return (
     <Contexte.Provider value={{ fiche, contrats, remplacer }}>
@@ -119,7 +120,7 @@ export function FicheChrome({
           actions={<Badge tone={statut.ton}>{statut.texte}</Badge>}
         >
           <nav aria-label="Sections de la fiche" className="-mb-1 flex gap-1 overflow-x-auto">
-            {ONGLETS_FICHE.map((o) => (
+            {ongletsVisibles(actions, estSoi).map((o) => (
               <Link
                 key={o.id}
                 href={o.segment ? `${base}/${o.segment}` : base}

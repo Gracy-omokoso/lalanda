@@ -7,6 +7,7 @@
 
 import { HR_DEFAULT_CONTRACT_TYPES, HR_LIMITS, type EmployeeStatus } from '@lalanda/shared/hr';
 
+import type { OrgAction } from '@/lib/api';
 import type {
   HrEmployeeInput,
   HrEmployeeListItem,
@@ -209,13 +210,15 @@ export interface OngletFiche {
 }
 
 /**
- * Onglets de la fiche (§ 8). Ne figurent que ceux dont l'écran EXISTE : données
- * sensibles, documents et entrées et sorties sont livrés par le lot H7, qui les
- * ajoutera ici (`ONGLETS_FICHE_PREVUS`).
+ * Onglets de la fiche (§ 8), dans l'ordre d'affichage. Données sensibles,
+ * documents et entrées et sorties sont livrés par le lot H7.
  */
 export const ONGLETS_FICHE: readonly OngletFiche[] = [
   { id: 'dossier', libelle: 'Dossier', segment: '' },
+  { id: 'sensible', libelle: 'Données sensibles', segment: 'sensible' },
   { id: 'absences', libelle: 'Absences et soldes', segment: 'absences' },
+  { id: 'documents', libelle: 'Documents', segment: 'documents' },
+  { id: 'parcours', libelle: 'Entrées et sorties', segment: 'parcours' },
 ];
 
 export const ONGLETS_FICHE_PREVUS = [
@@ -225,6 +228,31 @@ export const ONGLETS_FICHE_PREVUS = [
   'documents',
   'parcours',
 ] as const;
+
+/**
+ * Onglets offerts au lecteur (ADR-0045 § 8, § 3.3) : les données sensibles avec
+ * `hr.sensitive.read` ou pour soi ; les documents avec `hr.read` ou pour soi (le
+ * manager, non) ; les entrées et sorties avec `hr.read`. Masquer est un confort :
+ * l'API refuse de toute façon.
+ */
+export function ongletsVisibles(
+  actions: readonly OrgAction[] | null,
+  estSoi: boolean,
+): readonly OngletFiche[] {
+  const has = (x: OrgAction): boolean => actions !== null && actions.includes(x);
+  return ONGLETS_FICHE.filter((o) => {
+    switch (o.id) {
+      case 'sensible':
+        return estSoi || has('hr.sensitive.read');
+      case 'documents':
+        return estSoi || has('hr.read');
+      case 'parcours':
+        return has('hr.read');
+      default:
+        return true;
+    }
+  });
+}
 
 /** Onglet allumé par le chemin. */
 export function ongletActif(pathname: string, base: string): OngletFiche['id'] {
@@ -254,4 +282,23 @@ export function lignesDossier(
     ['Compte Lalanda', e.userId ? 'Relié à un membre' : 'Sans compte'],
   ];
   return lignes.filter((l): l is [string, string] => typeof l[1] === 'string' && l[1] !== '');
+}
+
+// ── Lien depuis la page des membres (ADR-0045 § 6.6) — lot H7 ──────────────
+
+/**
+ * Fiche RH de chaque compte relié : `userId` → lien vers la fiche. Les fiches
+ * anonymisées (compte délié par l'API) ne figurent pas ; un compte relié à deux
+ * fiches est impossible (unicité tenue par l'API), la première l'emporte.
+ */
+export function fichesParCompte(
+  employes: readonly Pick<HrEmployeeListItem, 'id' | 'userId' | 'status'>[],
+): Map<string, string> {
+  const m = new Map<string, string>();
+  for (const e of employes) {
+    if (e.userId && e.status !== 'anonymized' && !m.has(e.userId)) {
+      m.set(e.userId, `/rh/collaborateurs/${encodeURIComponent(e.id)}`);
+    }
+  }
+  return m;
 }
