@@ -31,7 +31,7 @@ export function Absences(): React.ReactElement {
         titre={vue === 'a-valider' ? 'Absences à valider' : 'Toutes les demandes d’absence'}
         sousTitre={
           vue === 'a-valider'
-            ? 'Les demandes qui attendent votre décision, comme manager ou comme validateur. Vous ne validez jamais vos propres absences.'
+            ? 'Les demandes qui attendent votre décision, comme manager ou comme validateur. Vous ne validez pas vos propres absences, sauf si vous êtes le seul validateur de l’organisation (c’est alors signalé).'
             : 'Les demandes de tout le personnel. Les types confidentiels restent « Absent » sans le droit aux données sensibles.'
         }
         actions={
