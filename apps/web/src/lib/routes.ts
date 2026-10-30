@@ -80,6 +80,8 @@ export const PROTECTED_PREFIXES = [
   '/projets',
   // ADR-0044 § 8 — achats et fournisseurs (RUN). Session ET organisation active.
   '/achats',
+  // ADR-0045 § 8 — ressources humaines (RUN). Session ET organisation active.
+  '/rh',
 ] as const;
 
 /**
