@@ -8,11 +8,12 @@
 // télécharger (le même fichier, sans second rendu) et imprimer
 // (`iframe.contentWindow.print()`, repli : ouvrir le PDF dans un onglet).
 //
-// Fenêtre LOCALE, en attendant le `Modal` partagé de `packages/ui` : un
-// `<dialog>` ouvert par `showModal()` fournit le piège du focus, la touche Échap
-// et l'arrière-plan inerte ; le focus revient au bouton d'origine à la fermeture.
-// Plein écran sur téléphone.
+// Fenêtre : le `Modal` partagé de `@lalanda/ui` (taille `xl`) — dialogue,
+// focus piégé et rendu à la fermeture, Échap, fond cliquable, confirmation si
+// un message est en cours de saisie, aucune fermeture pendant l'envoi, plein
+// écran sur téléphone.
 
+import { Modal } from '@lalanda/ui';
 import { useEffect, useId, useRef, useState } from 'react';
 
 import {
@@ -123,27 +124,16 @@ export function ApercuDocument({
   document: DocumentApercu;
   onFermer: () => void;
 }): React.ReactElement {
-  const ref = useRef<HTMLDialogElement>(null);
   const iframe = useRef<HTMLIFrameElement>(null);
   const id = useId();
   const [pdf, setPdf] = useState<Pdf | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
+  const [occupe, setOccupe] = useState(false);
   const [lecteur] = useState(() =>
     lecteurPdfIntegre(typeof navigator === 'undefined' ? undefined : navigator),
   );
-
-  // Ouverture modale ; retour du focus à l'élément d'origine à la fermeture.
-  useEffect(() => {
-    const d = ref.current;
-    const origine = document.activeElement as HTMLElement | null;
-    if (d && !d.open) d.showModal();
-    return () => {
-      d?.close();
-      origine?.focus?.();
-    };
-  }, []);
 
   useEffect(() => {
     let annule = false;
@@ -188,113 +178,105 @@ export function ApercuDocument({
     }
   }
 
-  const titreId = `${id}-titre`;
   return (
-    <dialog
-      ref={ref}
-      aria-labelledby={titreId}
-      onCancel={(e) => {
-        e.preventDefault();
-        onFermer();
-      }}
-      className="m-auto flex h-[92vh] w-[calc(100%-2rem)] max-w-5xl flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--background)] p-0 text-[var(--foreground)] backdrop:bg-black/50 max-sm:h-full max-sm:max-h-none max-sm:w-full max-sm:max-w-none max-sm:rounded-none max-sm:border-0"
+    <Modal
+      open
+      onClose={onFermer}
+      title={doc.titre}
+      size="xl"
+      busy={occupe}
+      discardTitle="Abandonner le message en cours ?"
     >
-      <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-3 sm:px-5">
-        <h2
-          id={titreId}
-          className="min-w-0 truncate font-display text-base font-bold tracking-tight"
-        >
-          {doc.titre}
-        </h2>
-        <button type="button" className={BOUTON_PETIT} onClick={onFermer}>
-          Fermer
-        </button>
-      </div>
-
-      <div className="flex flex-wrap items-start gap-2 border-b border-[var(--border)] px-4 py-3 sm:px-5">
-        <div className="flex flex-col gap-1">
+      <div className="-mx-4 -my-4 flex min-h-full flex-col sm:-mx-5 sm:-my-5">
+        <div className="flex flex-wrap items-start gap-2 border-b border-[var(--border)] px-4 py-3 sm:px-5">
+          <div className="flex flex-col gap-1">
+            <button
+              type="button"
+              className={BOUTON}
+              disabled={!doc.peutEnvoyer || envoi}
+              aria-describedby={doc.peutEnvoyer ? undefined : `${id}-sans-droit`}
+              aria-expanded={envoi}
+              onClick={() => setEnvoi(true)}
+            >
+              Envoyer par e-mail
+            </button>
+            {doc.peutEnvoyer ? null : (
+              <p
+                id={`${id}-sans-droit`}
+                className="max-w-xs text-xs text-[var(--foreground-muted)]"
+              >
+                {raisonSansDroit(doc.genre)}
+              </p>
+            )}
+          </div>
           <button
             type="button"
             className={BOUTON}
-            disabled={!doc.peutEnvoyer || envoi}
-            aria-describedby={doc.peutEnvoyer ? undefined : `${id}-sans-droit`}
-            aria-expanded={envoi}
-            onClick={() => setEnvoi(true)}
+            disabled={!pdf}
+            onClick={() => pdf && enregistrer(pdf.blob, pdf.filename)}
           >
-            Envoyer par e-mail
+            Télécharger
           </button>
-          {doc.peutEnvoyer ? null : (
-            <p id={`${id}-sans-droit`} className="max-w-xs text-xs text-[var(--foreground-muted)]">
-              {raisonSansDroit(doc.genre)}
-            </p>
-          )}
+          <button type="button" className={BOUTON} disabled={!pdf} onClick={imprimer}>
+            Imprimer
+          </button>
+          {pdf ? (
+            <a
+              href={pdf.url}
+              target="_blank"
+              rel="noopener"
+              className="self-center text-sm underline sm:ml-auto"
+            >
+              Ouvrir le PDF
+            </a>
+          ) : null}
         </div>
-        <button
-          type="button"
-          className={BOUTON}
-          disabled={!pdf}
-          onClick={() => pdf && enregistrer(pdf.blob, pdf.filename)}
-        >
-          Télécharger
-        </button>
-        <button type="button" className={BOUTON} disabled={!pdf} onClick={imprimer}>
-          Imprimer
-        </button>
-        {pdf ? (
-          <a
-            href={pdf.url}
-            target="_blank"
-            rel="noopener"
-            className="self-center text-sm underline sm:ml-auto"
-          >
-            Ouvrir le PDF
-          </a>
-        ) : null}
-      </div>
 
-      {info ? (
-        <p role="status" className="px-4 pt-2 text-xs text-[var(--foreground-muted)] sm:px-5">
-          {info}
-        </p>
-      ) : null}
-
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-        {envoi ? (
-          <FormulaireEmail
-            document={doc}
-            fichier={pdf?.filename ?? null}
-            onFermer={() => setEnvoi(false)}
-          />
+        {info ? (
+          <p role="status" className="px-4 pt-2 text-xs text-[var(--foreground-muted)] sm:px-5">
+            {info}
+          </p>
         ) : null}
-        <div className="flex min-h-[50vh] flex-1 flex-col bg-[var(--surface-muted)]">
-          {erreur ? (
-            <div className="p-4">
-              <Alerte>
-                <p>{erreur}</p>
-              </Alerte>
-            </div>
-          ) : !pdf ? (
-            <p className="m-auto p-6 text-sm text-[var(--foreground-muted)]" aria-live="polite">
-              Préparation du PDF…
-            </p>
-          ) : lecteur ? (
-            <iframe
-              ref={iframe}
-              src={pdf.url}
-              title={`Aperçu PDF — ${doc.titre}`}
-              className="h-full min-h-[50vh] w-full flex-1 border-0 bg-white"
+
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          {envoi ? (
+            <FormulaireEmail
+              document={doc}
+              fichier={pdf?.filename ?? null}
+              onFermer={() => setEnvoi(false)}
+              onOccupe={setOccupe}
             />
-          ) : (
-            <div className="m-auto flex max-w-sm flex-col items-center gap-3 p-6 text-center">
-              <p className="text-sm">Ce navigateur n’affiche pas les PDF dans la page.</p>
-              <button type="button" className={BOUTON} onClick={ouvrirOnglet}>
-                Ouvrir le PDF
-              </button>
-            </div>
-          )}
+          ) : null}
+          <div className="flex min-h-[50vh] flex-1 flex-col bg-[var(--surface-muted)]">
+            {erreur ? (
+              <div className="p-4">
+                <Alerte>
+                  <p>{erreur}</p>
+                </Alerte>
+              </div>
+            ) : !pdf ? (
+              <p className="m-auto p-6 text-sm text-[var(--foreground-muted)]" aria-live="polite">
+                Préparation du PDF…
+              </p>
+            ) : lecteur ? (
+              <iframe
+                ref={iframe}
+                src={pdf.url}
+                title={`Aperçu PDF — ${doc.titre}`}
+                className="h-full min-h-[50vh] w-full flex-1 border-0 bg-white"
+              />
+            ) : (
+              <div className="m-auto flex max-w-sm flex-col items-center gap-3 p-6 text-center">
+                <p className="text-sm">Ce navigateur n’affiche pas les PDF dans la page.</p>
+                <button type="button" className={BOUTON} onClick={ouvrirOnglet}>
+                  Ouvrir le PDF
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </dialog>
+    </Modal>
   );
 }
 
@@ -310,10 +292,13 @@ function FormulaireEmail({
   document: doc,
   fichier,
   onFermer,
+  onOccupe,
 }: {
   document: DocumentApercu;
   fichier: string | null;
   onFermer: () => void;
+  /** Envoi en cours : la fenêtre ne se ferme pas. */
+  onOccupe: (occupe: boolean) => void;
 }): React.ReactElement {
   const id = useId();
   const [etape, setEtape] = useState<Etape>({ nom: 'chargement' });
@@ -343,12 +328,15 @@ function FormulaireEmail({
   async function envoyer(brouillon: DocumentEmailDraft, corps: DocumentEmailInput): Promise<void> {
     setEtape({ nom: 'envoi', brouillon, corps });
     setErreurEnvoi(null);
+    onOccupe(true);
     try {
       const resultat = await sources[doc.genre].envoyer(doc.id, corps);
       setEtape({ nom: 'resultat', brouillon, resultat });
     } catch (err) {
       setErreurEnvoi(messageErreurEnvoi(err));
       setEtape({ nom: 'saisie', brouillon });
+    } finally {
+      onOccupe(false);
     }
   }
 
