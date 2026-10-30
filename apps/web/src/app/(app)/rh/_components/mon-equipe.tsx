@@ -15,7 +15,14 @@ import { CalendrierAbsences } from './calendrier-absences';
 import { porteesProposees } from './calendrier-model';
 import { membresEquipe, type MembreEquipe } from './equipe-model';
 import { useAccesRh } from './rh-access';
-import { aujourdhui, initiales, lienCollaborateur, lire, peutLireRh, type Lecture } from './rh-model';
+import {
+  aujourdhui,
+  initiales,
+  lienCollaborateur,
+  lire,
+  peutLireRh,
+  type Lecture,
+} from './rh-model';
 import { Bandeau, Chargement, EchecLecture, Panneau, PhraseSection } from './rh-ui';
 import { ValidationsListe } from './validations-liste';
 
@@ -99,7 +106,9 @@ export function MonEquipe(): React.ReactElement {
         <p className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border-strong)] p-6 text-center text-sm text-[var(--foreground-muted)]">
           Aucun collaborateur n’a votre fiche pour manager : vous n’encadrez personne pour le
           moment.
-          {moi?.ok && moi.valeur.canApprove ? ' Les absences à valider restent dans « À valider ».' : ''}
+          {moi?.ok && moi.valeur.canApprove
+            ? ' Les absences à valider restent dans « À valider ».'
+            : ''}
         </p>
       ) : null}
 
@@ -129,7 +138,9 @@ export function MonEquipe(): React.ReactElement {
                       .filter((g) => g.liste.length > 0)
                       .map((g) => (
                         <div key={g.titre} className="flex flex-col gap-2">
-                          <h4 className="text-xs font-semibold text-[var(--foreground-muted)]">{g.titre}</h4>
+                          <h4 className="text-xs font-semibold text-[var(--foreground-muted)]">
+                            {g.titre}
+                          </h4>
                           <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                             {g.liste.map((m) => (
                               <li key={m.id}>

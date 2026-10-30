@@ -5,11 +5,7 @@
 // Les vérifications sont de forme (requis, bornes, ordre des dates) ; matricule
 // unique, manager sans cycle, compte membre sont jugés par l'API.
 
-import {
-  HR_DEFAULT_CONTRACT_TYPES,
-  HR_LIMITS,
-  type EmployeeStatus,
-} from '@lalanda/shared/hr';
+import { HR_DEFAULT_CONTRACT_TYPES, HR_LIMITS, type EmployeeStatus } from '@lalanda/shared/hr';
 
 import type {
   HrEmployeeInput,
@@ -60,7 +56,9 @@ export function libelleContrat(
   e: Pick<HrEmployeeListItem, 'contractType' | 'contractTypeLabel'>,
   types: readonly HrSettingsContractType[],
 ): string {
-  return e.contractTypeLabel ?? types.find((t) => t.key === e.contractType)?.label ?? e.contractType;
+  return (
+    e.contractTypeLabel ?? types.find((t) => t.key === e.contractType)?.label ?? e.contractType
+  );
 }
 
 /** Sous-titre d'une carte : poste, service, entrée. */

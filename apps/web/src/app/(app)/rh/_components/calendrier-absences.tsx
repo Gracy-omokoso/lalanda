@@ -29,13 +29,22 @@ import {
 import { Chargement, EchecLecture, PhraseSection } from './rh-ui';
 import { aujourdhui, lire, type Lecture } from './rh-model';
 
-function Case({ c, nom, jour }: { c: CaseAbsence | null; nom: string; jour: string }): React.ReactElement {
+function Case({
+  c,
+  nom,
+  jour,
+}: {
+  c: CaseAbsence | null;
+  nom: string;
+  jour: string;
+}): React.ReactElement {
   if (c === null) return <td className="h-8 min-w-8 border-l border-[var(--border)]" />;
   const attente = c.statut === 'pending';
   const fond = attente
     ? 'border border-dashed border-[var(--module-run)] bg-[color-mix(in_srgb,var(--module-run)_12%,transparent)]'
     : 'bg-[var(--module-run)]';
-  const position = c.demi === 'am' ? 'left-0 w-1/2' : c.demi === 'pm' ? 'right-0 w-1/2' : 'inset-x-0';
+  const position =
+    c.demi === 'am' ? 'left-0 w-1/2' : c.demi === 'pm' ? 'right-0 w-1/2' : 'inset-x-0';
   const texte = texteCase(nom, jour, c);
   return (
     <td className="relative h-8 min-w-8 border-l border-[var(--border)]" title={texte}>
@@ -95,7 +104,10 @@ export function CalendrierAbsences({
         <button type="button" className={BOUTON_PETIT} onClick={() => setAncre(aujourdhui())}>
           Aujourd’hui
         </button>
-        <h3 className="min-w-0 flex-1 text-sm font-semibold first-letter:uppercase" aria-live="polite">
+        <h3
+          className="min-w-0 flex-1 text-sm font-semibold first-letter:uppercase"
+          aria-live="polite"
+        >
           {p.titre}
         </h3>
         <div className="flex gap-1" role="group" aria-label="Affichage">
@@ -134,7 +146,10 @@ export function CalendrierAbsences({
 
       <p className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--foreground-muted)]">
         <span className="inline-flex items-center gap-1.5">
-          <span aria-hidden="true" className="inline-block h-3 w-5 rounded-sm bg-[var(--module-run)]" />
+          <span
+            aria-hidden="true"
+            className="inline-block h-3 w-5 rounded-sm bg-[var(--module-run)]"
+          />
           Absence accordée
         </span>
         <span className="inline-flex items-center gap-1.5">
@@ -145,7 +160,10 @@ export function CalendrierAbsences({
           En attente de validation
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span aria-hidden="true" className="inline-block h-3 w-5 rounded-sm bg-[var(--surface-muted)]" />
+          <span
+            aria-hidden="true"
+            className="inline-block h-3 w-5 rounded-sm bg-[var(--surface-muted)]"
+          />
           Jour férié
         </span>
       </p>
@@ -189,7 +207,10 @@ function Grille({
       {/* Téléphone : une liste par jour. */}
       <ul className="flex flex-col gap-3 sm:hidden">
         {liste.map((j) => (
-          <li key={j.date} className="rounded-[var(--radius-md)] border border-[var(--border)] p-3 text-sm">
+          <li
+            key={j.date}
+            className="rounded-[var(--radius-md)] border border-[var(--border)] p-3 text-sm"
+          >
             <p className="font-medium first-letter:uppercase">{j.titre}</p>
             {j.ferie ? (
               <p className="text-xs text-[var(--foreground-muted)]">Férié : {j.ferie.libelle}</p>
@@ -216,7 +237,10 @@ function Grille({
           <caption className="sr-only">Absences par personne et par jour</caption>
           <thead>
             <tr>
-              <th scope="col" className="sticky left-0 z-10 bg-[var(--surface)] px-2 py-1.5 text-left font-medium">
+              <th
+                scope="col"
+                className="sticky left-0 z-10 bg-[var(--surface)] px-2 py-1.5 text-left font-medium"
+              >
                 Personne
               </th>
               {jours.map((d) => {
@@ -258,7 +282,9 @@ function Grille({
           </tbody>
         </table>
         {lignes.length === 0 ? (
-          <p className="p-3 text-sm text-[var(--foreground-muted)]">Aucune absence sur cette période.</p>
+          <p className="p-3 text-sm text-[var(--foreground-muted)]">
+            Aucune absence sur cette période.
+          </p>
         ) : null}
       </div>
     </>

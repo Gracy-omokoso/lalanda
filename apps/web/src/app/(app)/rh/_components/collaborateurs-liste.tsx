@@ -193,7 +193,9 @@ export function CollaborateursListe(): React.ReactElement {
                     </span>
                     <Badge tone={statut.ton}>{statut.texte}</Badge>
                   </span>
-                  <span className="text-xs text-[var(--foreground-muted)]">{sousTitreCarte(e)}</span>
+                  <span className="text-xs text-[var(--foreground-muted)]">
+                    {sousTitreCarte(e)}
+                  </span>
                   <span className="text-xs">
                     {libelleContrat(e, contrats)}
                     {e.managerName ? ` · Manager : ${e.managerName}` : ''}

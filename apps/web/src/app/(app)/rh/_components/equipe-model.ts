@@ -39,7 +39,10 @@ export function presence(
     .filter((d) => d.start.date > jour)
     .sort((a, b) => (a.start.date < b.start.date ? -1 : 1))[0];
   if (prochaine) {
-    return { texte: `${libelleType(prochaine)} à partir du ${formatJour(prochaine.start.date)}`, absent: false };
+    return {
+      texte: `${libelleType(prochaine)} à partir du ${formatJour(prochaine.start.date)}`,
+      absent: false,
+    };
   }
   return null;
 }

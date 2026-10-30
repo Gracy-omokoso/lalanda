@@ -15,7 +15,13 @@ import { hrApi, type LeaveRequestView, type LeaveTypeView } from '@/lib/api-hr';
 import { BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { DemandeAbsence } from './demande-absence';
-import { etatMoi, grouperDemandes, lignesFiche, lignesSoldes, peutAnnulerDemande } from './moi-model';
+import {
+  etatMoi,
+  grouperDemandes,
+  lignesFiche,
+  lignesSoldes,
+  peutAnnulerDemande,
+} from './moi-model';
 import { useAccesRh } from './rh-access';
 import {
   LIEN_A_VALIDER,
@@ -102,11 +108,13 @@ export function MonEspace(): React.ReactElement {
       </Bandeau>
 
       {etat.etat === 'chargement' ? <Chargement /> : null}
-      {etat.etat === 'pas-encore' ? (
-        <EchecLecture erreur={{ status: 404 }} repli="" />
-      ) : null}
+      {etat.etat === 'pas-encore' ? <EchecLecture erreur={{ status: 404 }} repli="" /> : null}
       {etat.etat === 'erreur' ? (
-        <EchecLecture erreur={etat.erreur} repli="Votre espace est illisible." onReessayer={relireMoi} />
+        <EchecLecture
+          erreur={etat.erreur}
+          repli="Votre espace est illisible."
+          onReessayer={relireMoi}
+        />
       ) : null}
 
       {etat.etat === 'pret' && fiche === null ? (
@@ -139,11 +147,7 @@ export function MonEspace(): React.ReactElement {
             )}
           </Panneau>
 
-          <Demandes
-            demandes={etat.moi.requests}
-            jour={jour}
-            onAnnuler={setAAnnuler}
-          />
+          <Demandes demandes={etat.moi.requests} jour={jour} onAnnuler={setAAnnuler} />
 
           <Panneau titre="Ma fiche" icone={IdCard} id="rh-moi-fiche">
             <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
@@ -155,13 +159,17 @@ export function MonEspace(): React.ReactElement {
               ))}
             </dl>
             <p className="text-xs text-[var(--foreground-muted)]">
-              Une information est fausse ? Signalez-la aux ressources humaines : elles tiennent votre
-              dossier.
+              Une information est fausse ? Signalez-la aux ressources humaines : elles tiennent
+              votre dossier.
             </p>
           </Panneau>
 
           {etat.moi.checklistItems && etat.moi.checklistItems.length > 0 ? (
-            <Panneau titre="Mes tâches d’accueil et de départ" icone={ClipboardCheck} id="rh-moi-listes">
+            <Panneau
+              titre="Mes tâches d’accueil et de départ"
+              icone={ClipboardCheck}
+              id="rh-moi-listes"
+            >
               <ul className="flex flex-col divide-y divide-[var(--border)] text-sm">
                 {etat.moi.checklistItems.map((i) => (
                   <li key={`${i.checklistId}-${i.itemId}`} className="flex flex-wrap gap-x-3 py-2">
@@ -169,7 +177,11 @@ export function MonEspace(): React.ReactElement {
                       {i.label} — {i.employeeName}
                     </span>
                     <span className="text-xs text-[var(--foreground-muted)]">
-                      {i.doneAt ? 'Fait' : i.dueDate ? `Pour le ${formatJour(i.dueDate)}` : 'À faire'}
+                      {i.doneAt
+                        ? 'Fait'
+                        : i.dueDate
+                          ? `Pour le ${formatJour(i.dueDate)}`
+                          : 'À faire'}
                     </span>
                   </li>
                 ))}
@@ -201,8 +213,8 @@ export function MonEspace(): React.ReactElement {
           }}
         >
           <p>
-            Une absence déjà accordée rend ses jours à votre solde. Votre manager et les
-            validateurs sont prévenus.
+            Une absence déjà accordée rend ses jours à votre solde. Votre manager et les validateurs
+            sont prévenus.
           </p>
         </DialogueDecision>
       ) : null}
@@ -227,7 +239,10 @@ function Demandes({
       ) : (
         <>
           {enCours.length > 0 ? (
-            <ul className="flex flex-col divide-y divide-[var(--border)] text-sm" aria-label="Demandes en cours">
+            <ul
+              className="flex flex-col divide-y divide-[var(--border)] text-sm"
+              aria-label="Demandes en cours"
+            >
               {enCours.map((d) => (
                 <LigneDemande
                   key={d.id}

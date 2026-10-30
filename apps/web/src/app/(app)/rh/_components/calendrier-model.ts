@@ -42,7 +42,10 @@ export interface Ferie {
 }
 
 /** Demi-journée occupée par une absence un jour donné (bornes de l'API). */
-export function demiDuJour(e: Pick<HrCalendarEntry, 'start' | 'end'>, jour: string): DemiCase | null {
+export function demiDuJour(
+  e: Pick<HrCalendarEntry, 'start' | 'end'>,
+  jour: string,
+): DemiCase | null {
   if (jour < e.start.date || jour > e.end.date) return null;
   if (e.start.date === e.end.date) return e.start.half === e.end.half ? e.start.half : 'full';
   if (jour === e.start.date && e.start.half === 'pm') return 'pm';
@@ -93,7 +96,13 @@ export interface JourListe {
   date: string;
   titre: string;
   ferie: Ferie | null;
-  absences: { requestId: string; nom: string; libelle: string; demi: DemiCase; statut: 'pending' | 'approved' }[];
+  absences: {
+    requestId: string;
+    nom: string;
+    libelle: string;
+    demi: DemiCase;
+    statut: 'pending' | 'approved';
+  }[];
 }
 
 /** Liste par jour (téléphone) : seuls les jours avec une absence ou un férié. */

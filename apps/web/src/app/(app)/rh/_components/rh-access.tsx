@@ -66,7 +66,9 @@ export function RhChrome({ children }: { children: React.ReactNode }): React.Rea
   if (etat === 'pret' && !peutEntrerRh(actions)) {
     return (
       <div className="rounded-xl border border-dashed border-[var(--border)] p-6 text-center sm:p-8">
-        <p className="text-sm font-medium">Les ressources humaines ne sont pas ouvertes à votre rôle</p>
+        <p className="text-sm font-medium">
+          Les ressources humaines ne sont pas ouvertes à votre rôle
+        </p>
         <p className="mx-auto mt-1 max-w-xl text-sm text-[var(--foreground-muted)]">
           Demander une absence et consulter son espace sont réservés aux membres internes de
           l’organisation. Si vous en avez besoin, demandez à un Propriétaire ou un Administrateur de

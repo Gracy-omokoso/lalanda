@@ -178,7 +178,12 @@ export function DialogueDecision({
       <div className="flex flex-col gap-3 text-sm">
         {children}
         {commentaire !== 'aucun' ? (
-          <Champ id={`${id}-texte`} label={libelle} requis={commentaire === 'obligatoire'} erreur={champ}>
+          <Champ
+            id={`${id}-texte`}
+            label={libelle}
+            requis={commentaire === 'obligatoire'}
+            erreur={champ}
+          >
             <textarea
               id={`${id}-texte`}
               rows={3}

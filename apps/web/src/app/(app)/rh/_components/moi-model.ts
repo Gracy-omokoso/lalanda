@@ -83,9 +83,7 @@ export function grouperDemandes(
   aujourdhui: string,
 ): { enCours: LeaveRequestView[]; passees: LeaveRequestView[] } {
   const enCours = demandes
-    .filter(
-      (d) => d.status === 'pending' || (d.status === 'approved' && d.end.date >= aujourdhui),
-    )
+    .filter((d) => d.status === 'pending' || (d.status === 'approved' && d.end.date >= aujourdhui))
     .sort((a, b) => (a.start.date < b.start.date ? -1 : a.start.date > b.start.date ? 1 : 0));
   const ids = new Set(enCours.map((d) => d.id));
   const passees = demandes

@@ -54,8 +54,7 @@ export const unJour = (f: Pick<FormDemande, 'debut' | 'fin'>): boolean =>
 export type ErreursDemande = Partial<Record<'typeId' | 'debut' | 'fin' | 'motif', string>>;
 
 export type ResultatDemande =
-  | { ok: true; corps: CreateLeaveRequestInput }
-  | { ok: false; erreurs: ErreursDemande };
+  { ok: true; corps: CreateLeaveRequestInput } | { ok: false; erreurs: ErreursDemande };
 
 const JOUR = /^\d{4}-\d{2}-\d{2}$/;
 

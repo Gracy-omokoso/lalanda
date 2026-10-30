@@ -410,7 +410,10 @@ export const hrApi = {
     jsonRequest<{ items: HrDepartmentView[] }>('/hr/departments', { method: 'GET' }),
   createDepartment: (body: HrDepartmentInput) =>
     jsonRequest<HrDepartmentView>('/hr/departments', { method: 'POST', body }),
-  updateDepartment: (departmentId: string, body: HrDepartmentInput & { expectedRevision: number }) =>
+  updateDepartment: (
+    departmentId: string,
+    body: HrDepartmentInput & { expectedRevision: number },
+  ) =>
     jsonRequest<HrDepartmentView>(`/hr/departments/${id(departmentId)}`, { method: 'PUT', body }),
   archiveDepartment: (departmentId: string, expectedRevision: number) =>
     jsonRequest<HrDepartmentView>(`/hr/departments/${id(departmentId)}/archive`, {

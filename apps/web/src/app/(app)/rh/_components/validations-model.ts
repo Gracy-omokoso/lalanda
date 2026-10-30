@@ -13,7 +13,10 @@ import { LIBELLES_ETAPE, etapeEnAttente, peutLireRh } from './rh-model';
 export type VueAbsences = 'a-valider' | 'toutes';
 
 /** Vue demandée par l'adresse ; « toutes » exige `hr.read`, sinon « à valider ». */
-export function vueAbsences(param: string | null, actions: readonly OrgAction[] | null): VueAbsences {
+export function vueAbsences(
+  param: string | null,
+  actions: readonly OrgAction[] | null,
+): VueAbsences {
   return param === 'toutes' && peutLireRh(actions) ? 'toutes' : 'a-valider';
 }
 

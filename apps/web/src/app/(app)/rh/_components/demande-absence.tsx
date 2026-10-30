@@ -142,7 +142,13 @@ function Formulaire({
 
   return (
     <form className="flex flex-col gap-4" onSubmit={(e) => void envoyer(e)} noValidate>
-      <Champ id={`${id}-type`} label="Type d’absence" requis erreur={erreurs.typeId} aide={aideType(type)}>
+      <Champ
+        id={`${id}-type`}
+        label="Type d’absence"
+        requis
+        erreur={erreurs.typeId}
+        aide={aideType(type)}
+      >
         <select
           id={`${id}-type`}
           className={CHAMP}
@@ -171,7 +177,12 @@ function Formulaire({
             {...aria(`${id}-debut`, erreurs.debut)}
           />
         </Champ>
-        <Champ id={`${id}-fin`} label="Dernier jour" erreur={erreurs.fin} aide="Laisser vide pour une seule journée.">
+        <Champ
+          id={`${id}-fin`}
+          label="Dernier jour"
+          erreur={erreurs.fin}
+          aide="Laisser vide pour une seule journée."
+        >
           <input
             id={`${id}-fin`}
             type="date"
@@ -252,7 +263,11 @@ function Formulaire({
         <button type="button" className={BOUTON_PETIT} onClick={onFermer} disabled={envoi}>
           Annuler
         </button>
-        <button type="submit" className={buttonClasses('primary', 'sm')} disabled={envoi || types === null}>
+        <button
+          type="submit"
+          className={buttonClasses('primary', 'sm')}
+          disabled={envoi || types === null}
+        >
           {envoi ? 'Envoi…' : 'Envoyer la demande'}
         </button>
       </div>

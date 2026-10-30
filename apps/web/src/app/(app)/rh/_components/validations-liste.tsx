@@ -53,7 +53,8 @@ export function ValidationsListe({ limite = 50 }: { limite?: number }): React.Re
     );
   }
   const items = lecture.valeur.items;
-  if (items.length === 0) return <PhraseSection>Aucune demande n’attend votre décision.</PhraseSection>;
+  if (items.length === 0)
+    return <PhraseSection>Aucune demande n’attend votre décision.</PhraseSection>;
 
   return (
     <>
@@ -110,7 +111,9 @@ export function ValidationsListe({ limite = 50 }: { limite?: number }): React.Re
       ) : null}
       {decision ? (
         <DialogueDecision
-          titre={decision.sens === 'valider' ? 'Valider cette absence ?' : 'Refuser cette absence ?'}
+          titre={
+            decision.sens === 'valider' ? 'Valider cette absence ?' : 'Refuser cette absence ?'
+          }
           description={`${nomDemandeur(decision.demande)} · ${libelleType(decision.demande)}, ${libellePeriode(decision.demande.start, decision.demande.end)} (${formatJours(decision.demande.days)}).`}
           libelle={decision.sens === 'valider' ? 'Commentaire (facultatif)' : 'Motif du refus'}
           bouton={decision.sens === 'valider' ? 'Valider' : 'Refuser'}
@@ -124,7 +127,10 @@ export function ValidationsListe({ limite = 50 }: { limite?: number }): React.Re
                 ...(texte ? { comment: texte } : {}),
               });
             } else {
-              await hrApi.rejectLeaveRequest(d.id, { comment: texte, expectedRevision: d.revision });
+              await hrApi.rejectLeaveRequest(d.id, {
+                comment: texte,
+                expectedRevision: d.revision,
+              });
             }
             apres();
           }}
@@ -134,7 +140,11 @@ export function ValidationsListe({ limite = 50 }: { limite?: number }): React.Re
           ) : null}
         </DialogueDecision>
       ) : null}
-      <button type="button" className={`${BOUTON_PETIT} self-start`} onClick={() => setVersion((v) => v + 1)}>
+      <button
+        type="button"
+        className={`${BOUTON_PETIT} self-start`}
+        onClick={() => setVersion((v) => v + 1)}
+      >
         Actualiser
       </button>
     </>

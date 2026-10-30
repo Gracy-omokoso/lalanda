@@ -12,11 +12,7 @@ import { RhChrome } from './_components/rh-access';
  * documents, parcours, échéances, rapports, réglages), qui utilisent cette
  * coquille sans l'écrire.
  */
-export default function RhLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}): React.ReactElement {
+export default function RhLayout({ children }: { children: React.ReactNode }): React.ReactElement {
   return (
     <section className="flex flex-col gap-5 sm:gap-6">
       <PageHeader

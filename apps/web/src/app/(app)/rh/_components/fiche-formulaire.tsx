@@ -70,7 +70,13 @@ export function FicheFormulaire({
     label: string,
     opts: { requis?: boolean; type?: string; aide?: string; autoComplete?: string } = {},
   ): React.ReactElement => (
-    <Champ id={`${id}-${champ}`} label={label} requis={opts.requis} erreur={erreurs[champ]} aide={opts.aide}>
+    <Champ
+      id={`${id}-${champ}`}
+      label={label}
+      requis={opts.requis}
+      erreur={erreurs[champ]}
+      aide={opts.aide}
+    >
       <input
         id={`${id}-${champ}`}
         type={opts.type ?? 'text'}
@@ -127,7 +133,12 @@ export function FicheFormulaire({
             ))}
           </select>
         </Champ>
-        <Champ id={`${id}-contractType`} label="Type de contrat" requis erreur={erreurs.contractType}>
+        <Champ
+          id={`${id}-contractType`}
+          label="Type de contrat"
+          requis
+          erreur={erreurs.contractType}
+        >
           <select
             id={`${id}-contractType`}
             className={CHAMP}

@@ -71,7 +71,10 @@ export function FicheChrome({
   const retour = peutLireRh(actions) ? `${RH_BASE}/collaborateurs` : `${RH_BASE}/equipe`;
 
   const lienRetour = (
-    <Link href={retour} className="inline-flex items-center gap-1 self-start text-sm underline underline-offset-2">
+    <Link
+      href={retour}
+      className="inline-flex items-center gap-1 self-start text-sm underline underline-offset-2"
+    >
       <ArrowLeft aria-hidden="true" className="h-4 w-4" />
       {peutLireRh(actions) ? 'Tous les collaborateurs' : 'Mon équipe'}
     </Link>
@@ -86,8 +89,8 @@ export function FicheChrome({
           <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border-strong)] p-6 text-center sm:p-8">
             <p className="text-sm font-medium">Fiche introuvable</p>
             <p className="mx-auto mt-1 max-w-xl text-sm text-[var(--foreground-muted)]">
-              Ce collaborateur n’existe pas, n’est pas dans votre périmètre, ou les fiches ne sont pas
-              encore disponibles sur ce serveur.
+              Ce collaborateur n’existe pas, n’est pas dans votre périmètre, ou les fiches ne sont
+              pas encore disponibles sur ce serveur.
             </p>
           </div>
         ) : (

@@ -5,7 +5,9 @@ import type { Metadata } from 'next';
 
 import { CalendrierRh } from '../_components/calendrier-rh';
 
-export const metadata: Metadata = { title: 'Calendrier des absences — Ressources humaines · Lalanda' };
+export const metadata: Metadata = {
+  title: 'Calendrier des absences — Ressources humaines · Lalanda',
+};
 
 export default function CalendrierRhPage(): React.ReactElement {
   return <CalendrierRh />;
