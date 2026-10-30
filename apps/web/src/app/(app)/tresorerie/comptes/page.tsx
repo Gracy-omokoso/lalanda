@@ -5,6 +5,8 @@
 // à hypothèses explicites, avec alertes et incertitude. Le jour 0 est une
 // observation (soldes) ; tout le reste est une ESTIMATION, et l'écran le dit.
 
+import { Modal, buttonClasses } from '@lalanda/ui';
+import { Plus } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import {
@@ -63,6 +65,18 @@ export default function ComptesPage(): React.ReactElement {
   const [mouvements, setMouvements] = useState<LedgerEntry[]>([]);
   const [compteFiltre, setCompteFiltre] = useState('');
   const [erreur, setErreur] = useState<string | null>(null);
+  const [creation, setCreation] = useState<'compte' | 'mouvement' | null>(null);
+  const [erreurCreation, setErreurCreation] = useState<string | null>(null);
+
+  function ouvrirCreation(quoi: 'compte' | 'mouvement'): void {
+    setErreurCreation(null);
+    setCreation(quoi);
+  }
+
+  function apresCreation(): void {
+    setCreation(null);
+    void charger();
+  }
   const [reglages, setReglages] = useState<TreasurySettingsView | null>(null);
 
   const charger = useCallback(async () => {
@@ -96,6 +110,18 @@ export default function ComptesPage(): React.ReactElement {
       <Section
         titre="Comptes et soldes"
         description={`Soldes au ${page ? libelleDate(page.asOf) : '…'}, calculés à partir du solde d’ouverture et de tous les mouvements enregistrés.`}
+        actions={
+          gerer ? (
+            <button
+              type="button"
+              className={buttonClasses('primary', 'sm')}
+              onClick={() => ouvrirCreation('compte')}
+            >
+              <Plus aria-hidden="true" className="h-4 w-4" />
+              Nouveau compte
+            </button>
+          ) : undefined
+        }
       >
         {page && page.items.length === 0 ? (
           <p className="text-sm text-[var(--foreground-muted)]">
@@ -145,8 +171,36 @@ export default function ComptesPage(): React.ReactElement {
             </span>
           </p>
         ) : null}
-        {gerer ? <NouveauCompte onDone={() => void charger()} onError={setErreur} /> : null}
       </Section>
+
+      <Modal
+        open={gerer && creation === 'compte'}
+        onClose={() => setCreation(null)}
+        title="Nouveau compte"
+        description="Caisse, banque ou mobile money. Devise et date d’ouverture ne se modifient plus ensuite."
+        size="md"
+      >
+        <div className="flex flex-col gap-3">
+          {erreurCreation ? <Bandeau ton="erreur">{erreurCreation}</Bandeau> : null}
+          <NouveauCompte onDone={apresCreation} onError={setErreurCreation} />
+        </div>
+      </Modal>
+      <Modal
+        open={gerer && page !== null && creation === 'mouvement'}
+        onClose={() => setCreation(null)}
+        title="Nouveau mouvement"
+        description="Virement entre vos comptes, ou autre entrée ou sortie (apport, prêt, prélèvement)."
+        size="md"
+      >
+        <div className="flex flex-col gap-3">
+          {erreurCreation ? <Bandeau ton="erreur">{erreurCreation}</Bandeau> : null}
+          <NouveauMouvement
+            comptes={(page?.items ?? []).filter((a) => a.active)}
+            onDone={apresCreation}
+            onError={setErreurCreation}
+          />
+        </div>
+      </Modal>
 
       {prevision ? (
         <PrevisionSection prevision={prevision} devise={devise} setDevise={setDevise} />
@@ -180,11 +234,14 @@ export default function ComptesPage(): React.ReactElement {
         }
       >
         {gerer && page ? (
-          <NouveauMouvement
-            comptes={page.items.filter((a) => a.active)}
-            onDone={() => void charger()}
-            onError={setErreur}
-          />
+          <button
+            type="button"
+            className={`${buttonClasses('primary', 'sm')} self-start`}
+            onClick={() => ouvrirCreation('mouvement')}
+          >
+            <Plus aria-hidden="true" className="h-4 w-4" />
+            Nouveau mouvement
+          </button>
         ) : null}
         {mouvements.length === 0 ? (
           <p className="text-sm text-[var(--foreground-muted)]">Aucun mouvement.</p>
@@ -721,7 +778,8 @@ function NouveauCompte({
   return (
     <form
       onSubmit={(e) => void creer(e)}
-      className="grid gap-3 border-t border-[var(--border)] pt-3 sm:grid-cols-3 lg:grid-cols-6"
+      aria-label="Nouveau compte"
+      className="grid gap-3 sm:grid-cols-2"
     >
       <input
         aria-label="Nom du compte"
@@ -775,13 +833,10 @@ function NouveauCompte({
         required
         onChange={(e) => setF({ ...f, openingDate: e.target.value })}
       />
-      <div className="sm:col-span-3 lg:col-span-6">
+      <div className="sm:col-span-2">
         <button type="submit" className={BOUTON}>
           Créer le compte
         </button>
-        <span className="ml-3 text-xs text-[var(--foreground-muted)]">
-          Devise et date d’ouverture ne se modifient plus ensuite.
-        </span>
       </div>
     </form>
   );
@@ -851,7 +906,8 @@ function NouveauMouvement({
   return (
     <form
       onSubmit={(e) => void enregistrer(e)}
-      className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6"
+      aria-label="Nouveau mouvement"
+      className="grid gap-3 sm:grid-cols-2"
     >
       <select
         aria-label="Type de mouvement"
@@ -937,7 +993,7 @@ function NouveauMouvement({
         </button>
       </div>
       {deuxDevises ? (
-        <p className="text-xs text-[var(--foreground-muted)] sm:col-span-3 lg:col-span-6">
+        <p className="text-xs text-[var(--foreground-muted)] sm:col-span-2">
           Entre deux devises, saisissez les deux montants constatés : Lalanda ne calcule aucun taux
           de change.
         </p>
