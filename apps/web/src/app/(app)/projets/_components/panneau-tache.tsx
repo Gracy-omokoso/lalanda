@@ -15,7 +15,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { workApi } from '@/lib/work-api';
 
-import { BOUTON_DANGER, BOUTON_PETIT, CHAMP, Champ, BloqueeBadge, aria } from './elements';
+import {
+  AbsenceBadges,
+  BOUTON_DANGER,
+  BOUTON_PETIT,
+  CHAMP,
+  Champ,
+  BloqueeBadge,
+  aria,
+} from './elements';
 import { colonnesKanban, placer } from './kanban-model';
 import { useProjet } from './project-context';
 import { PRIORITES, codeWork, formatJour, formatMinutes, messageWork } from './projets-model';
@@ -318,6 +326,12 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
                   </option>
                 ))}
               </select>
+              {/* ADR-0045 — H5 : assigné absent (jours seulement), constat d'échéance. */}
+              {d.assigneeAbsence || d.dueDateAbsence ? (
+                <div className="mt-1 flex flex-wrap items-center gap-1">
+                  <AbsenceBadges t={d} details />
+                </div>
+              ) : null}
             </Champ>
             <Champ id="tache-prio" label="Priorité">
               <select

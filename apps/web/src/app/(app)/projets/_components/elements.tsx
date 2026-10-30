@@ -150,7 +150,7 @@ export function AbsenceBadges({
       ) : null}
       {echeance ? (
         details ? (
-          <p role="note" className="text-xs text-[var(--warning,inherit)]">
+          <p role="note" className="text-xs text-[var(--warning)]">
             <span aria-hidden="true">⚠</span>{' '}
             {constatAbsentEcheance(echeance, t.assignee?.name ?? null)}
           </p>

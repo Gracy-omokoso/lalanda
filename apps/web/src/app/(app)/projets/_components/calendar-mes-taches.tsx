@@ -11,18 +11,29 @@
 // seulement une couleur). Les ouvrir mène à l'opportunité, au compte ou au
 // contact ; les déplacer change `dueAt` par `PUT /crm/activities/:id`, heure de
 // Kinshasa conservée.
+//
+// ADR-0045 — H5 (§ 6.1) : mes absences et celles de ma portée (`GET /hr/calendar?
+// scope=team`) en bandeaux d'une journée, forme et libellé distincts des tâches, sans
+// jamais le type. Sans accès aux RH (ou en cas d'erreur), aucun bandeau.
 
-import type { MyTaskEntry, MyTasksView, WorkMyTaskItem } from '@lalanda/shared/work';
+import {
+  addDays,
+  type MyTaskEntry,
+  type MyTasksView,
+  type WorkMyTaskItem,
+} from '@lalanda/shared/work';
 import { PageHeader, Skeleton, buttonClasses } from '@lalanda/ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
+import { hrApi } from '@/lib/api-hr';
 import { crmAgendaApi } from '@/lib/crm-agenda-api';
 import { workApi } from '@/lib/work-api';
 
 import { useShell } from '../../_components/shell-context';
 
+import { bandeauxAbsence } from './absences-model';
 import { appliquerCorps } from './calendar-model';
 import { CalendrierTaches, type TacheCalendrierUI } from './calendar-vue';
 import { Alerte, BOUTON_PETIT } from './elements';
@@ -115,6 +126,16 @@ export function CalendrierMesTaches(): React.ReactElement {
   const [dueSoon, setDueSoon] = useState(1);
   const [erreur, setErreur] = useState<string | null>(null);
   const [avertissements, setAvertissements] = useState<string[]>([]);
+  // ADR-0045 — H5 : bandeaux d'absence (deux mois en arrière, six en avant).
+  const [bandeaux, setBandeaux] = useState<Map<string, string[]>>(new Map());
+  useEffect(() => {
+    const from = addDays(aujourdhui(), -62);
+    const to = addDays(aujourdhui(), 180);
+    hrApi
+      .getCalendar({ from, to, scope: 'team' })
+      .then((c) => setBandeaux(bandeauxAbsence(c.entries, from, to)))
+      .catch(() => setBandeaux(new Map()));
+  }, []);
 
   const charger = useCallback(() => {
     workApi
@@ -233,6 +254,7 @@ export function CalendrierMesTaches(): React.ReactElement {
           dueSoonDays={dueSoon}
           peutDeplacer={travailler}
           idPrefixe="mes-taches-cal"
+          bandeaux={bandeaux}
           sousTitre={(t) =>
             estElementRh(t.element)
               ? sousTitreElementRh(t.element)

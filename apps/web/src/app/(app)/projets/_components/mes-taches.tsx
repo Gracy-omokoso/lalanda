@@ -24,7 +24,15 @@ import { workApi } from '@/lib/work-api';
 
 import { useShell } from '../../_components/shell-context';
 
-import { Alerte, BOUTON_PETIT, BloqueeBadge, Echeance, PrioriteBadge } from './elements';
+import { constatAbsentEcheance } from './absences-model';
+import {
+  AbsenceBadges,
+  Alerte,
+  BOUTON_PETIT,
+  BloqueeBadge,
+  Echeance,
+  PrioriteBadge,
+} from './elements';
 import {
   GROUPES_MES_TACHES,
   PASTILLE_RELANCE,
@@ -125,6 +133,33 @@ export function MesTaches(): React.ReactElement {
           <p>{erreur}</p>
         </Alerte>
       ) : null}
+      {/* ADR-0045 — H5 (§ 6.2) : tâches que j'ai créées dont l'assigné sera absent à l'échéance. */}
+      {vue && (vue.absenceFindings?.length ?? 0) > 0 ? (
+        <section
+          aria-labelledby="mt-absences"
+          className="flex flex-col gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] p-3"
+        >
+          <h2 id="mt-absences" className="text-sm font-semibold">
+            <span aria-hidden="true">⚠</span> Responsable absent à l’échéance (
+            {vue.absenceFindings!.length})
+          </h2>
+          <ul className="flex flex-col gap-1 text-sm">
+            {vue.absenceFindings!.map((f) => (
+              <li key={f.taskId}>
+                <Link
+                  href={hrefTache(f.projectId, f.taskId)}
+                  className="font-medium underline-offset-2 hover:underline"
+                >
+                  #{f.number} {f.title}
+                </Link>{' '}
+                <span className="text-[var(--foreground-muted)]">
+                  ({f.projectName}) — {constatAbsentEcheance(f.absence, f.assignee.name)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       {vue === null ? (
         erreur ? null : (
           <div aria-busy="true" className="flex flex-col gap-3">
@@ -204,6 +239,7 @@ export function MesTaches(): React.ReactElement {
                           </div>
                           <div className="flex flex-wrap items-center gap-2 pl-6 sm:pl-0">
                             {t.blocked ? <BloqueeBadge /> : null}
+                            <AbsenceBadges t={t} />
                             <PrioriteBadge priority={t.priority} />
                             <Echeance task={t} today={vue.asOf} dueSoonDays={dueSoon} />
                           </div>

@@ -76,6 +76,7 @@ export function CalendrierTaches<T extends TacheCalendrierUI>({
   onDeplacer,
   sousTitre,
   idPrefixe,
+  bandeaux,
 }: {
   taches: readonly T[];
   today: string;
@@ -87,6 +88,11 @@ export function CalendrierTaches<T extends TacheCalendrierUI>({
   /** Ligne secondaire d'une tâche (par exemple le nom du projet). */
   sousTitre?: (t: T) => string | null;
   idPrefixe: string;
+  /**
+   * ADR-0045 — H5 (§ 6.1) : bandeaux d'absence d'une journée, par jour (« Awa —
+   * absent »). Ni type, ni couleur propre : une forme (⊘) et un texte.
+   */
+  bandeaux?: ReadonlyMap<string, readonly string[]>;
 }): React.ReactElement {
   const [vue, setVue] = useState<VueCalendrier>('mois');
   const [liste, setListe] = useState(false);
@@ -314,6 +320,12 @@ export function CalendrierTaches<T extends TacheCalendrierUI>({
                             Aujourd’hui
                           </span>
                         ) : null}
+                        {(bandeaux?.get(jour)?.length ?? 0) > 0 ? (
+                          <Bandeau
+                            textes={bandeaux!.get(jour)!}
+                            className="absolute bottom-0.5 right-1 max-w-[60%]"
+                          />
+                        ) : null}
                         {n > 0 ? (
                           <button
                             type="button"
@@ -387,6 +399,22 @@ export function CalendrierTaches<T extends TacheCalendrierUI>({
 
       {/* Liste par jour (agenda) : toujours sur téléphone, sur demande sur bureau. */}
       <section className={liste ? '' : 'md:hidden'} aria-label={`Échéances, ${p.titre}`}>
+        {/* ADR-0045 — H5 : absences de la période, jour par jour, avant les échéances. */}
+        {bandeaux && [...bandeaux.keys()].some((j) => j >= p.debut && j <= p.fin) ? (
+          <ul aria-label="Absences de la période" className="mb-3 flex flex-col gap-1 text-xs">
+            {[...bandeaux.entries()]
+              .filter(([j]) => j >= p.debut && j <= p.fin)
+              .sort(([a], [b]) => (a < b ? -1 : 1))
+              .map(([j, textes]) => (
+                <li key={j} className="flex flex-wrap items-center gap-1.5">
+                  <span className="font-medium first-letter:uppercase">
+                    {libelleJour(j, false)}
+                  </span>
+                  <Bandeau textes={textes} />
+                </li>
+              ))}
+          </ul>
+        ) : null}
         {jours.length === 0 ? (
           <p className="rounded-[var(--radius-md)] border border-dashed border-[var(--border-strong)] px-4 py-6 text-center text-sm text-[var(--foreground-muted)]">
             Aucune échéance sur cette période.
@@ -449,6 +477,29 @@ export function CalendrierTaches<T extends TacheCalendrierUI>({
         </details>
       ) : null}
     </div>
+  );
+}
+
+/** ADR-0045 — H5 : bandeau d'absence d'une journée (forme ⊘ et texte, jamais le type). */
+function Bandeau({
+  textes,
+  className = '',
+}: {
+  textes: readonly string[];
+  className?: string;
+}): React.ReactElement {
+  const court = textes.length === 1 ? textes[0]! : `${textes.length} absences`;
+  return (
+    <span
+      title={textes.join('\n')}
+      className={`inline-flex min-w-0 items-center gap-1 rounded-[var(--radius-sm)] border border-dashed border-[var(--border-strong)] bg-[var(--surface-muted)] px-1.5 text-[0.65rem] text-[var(--foreground-muted)] ${className}`}
+    >
+      <span aria-hidden="true">⊘</span>
+      <span className="truncate" aria-hidden="true">
+        {court}
+      </span>
+      <span className="sr-only">Absences : {textes.join(' ; ')}</span>
+    </span>
   );
 }
 
