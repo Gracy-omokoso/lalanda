@@ -13,3 +13,6 @@ export * from './suppliers.js';
 export * from './orders.js';
 export * from './settings.js';
 export * from './agenda.js';
+// ADR-0044 — P4
+export * from './receptions.js';
+export * from './invoices.js';

@@ -30,6 +30,7 @@ import {
   PurchaseOrderRevisionBody,
   RejectPurchaseOrderBody,
   UpdatePurchaseOrderBody,
+  type PurchaseOrderDetailView,
   type PurchaseOrderPage,
   type PurchaseOrderView,
 } from '@lalanda/shared/purchases';
@@ -73,6 +74,9 @@ import {
   UserDocumentEmailThrottlerGuard,
 } from '../../security/document-email-throttler.guard.js';
 import { PurchaseOrderDocumentsService } from '../documents/purchase-order-documents.service.js';
+// ADR-0044 — P4 : la fiche porte ses réceptions et factures liées.
+import { SupplierInvoicesService } from '../invoices/supplier-invoices.service.js';
+import { PurchaseReceptionsService } from '../receptions/purchase-receptions.service.js';
 import { PurchaseOrdersService, type PurchaseOrderActor } from './purchase-orders.service.js';
 
 type User = { id: string; email: string; name?: string | null };
@@ -98,6 +102,9 @@ export class PurchaseOrdersController {
     @Inject(PurchaseOrdersService) private readonly orders: PurchaseOrdersService,
     @Inject(PurchaseOrderDocumentsService)
     private readonly documents: PurchaseOrderDocumentsService,
+    // ADR-0044 — P4
+    @Inject(PurchaseReceptionsService) private readonly receptions: PurchaseReceptionsService,
+    @Inject(SupplierInvoicesService) private readonly invoices: SupplierInvoicesService,
   ) {}
 
   @Get('orders')
@@ -133,8 +140,15 @@ export class PurchaseOrdersController {
   async get(
     @CurrentOrgId() orgId: string,
     @Param('orderId') orderId: string,
-  ): Promise<PurchaseOrderView> {
-    return this.orders.get(orgId, orderId);
+  ): Promise<PurchaseOrderDetailView> {
+    const view = await this.orders.get(orgId, orderId);
+    // ADR-0044 — P4 : réceptions et factures fournisseurs liées (§ 3.2).
+    const facts = await this.receptions.orderFacts(orgId, view.id);
+    return {
+      ...view,
+      receptions: facts ? await this.receptions.forOrder(orgId, facts) : [],
+      invoices: await this.invoices.forOrder(orgId, view.id),
+    };
   }
 
   @Post('orders')

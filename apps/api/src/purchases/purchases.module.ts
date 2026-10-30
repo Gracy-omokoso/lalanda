@@ -28,14 +28,24 @@ import { PurchaseSettings, PurchaseSettingsSchema } from './settings/purchase-se
 import { PurchaseSettingsController } from './settings/purchase-settings.controller.js';
 import { PurchaseSettingsService } from './settings/purchase-settings.service.js';
 // ADR-0044 — P2
-import {
-  SUPPLIER_PAYABLES_SOURCE,
-  noSupplierPayables,
-} from './suppliers/supplier-payables.port.js';
+import { SUPPLIER_PAYABLES_SOURCE } from './suppliers/supplier-payables.port.js';
 import { Supplier, SupplierSchema } from './suppliers/supplier.schema.js';
 import { PurchaseSuppliersController } from './suppliers/purchase-suppliers.controller.js';
 import { SuppliersNotifier } from './suppliers/suppliers-notifier.js';
 import { SuppliersService } from './suppliers/suppliers.service.js';
+// ADR-0044 — P4
+import { PurchaseAttachmentsService } from './attachments/purchase-attachments.js';
+import { SupplierInvoice, SupplierInvoiceSchema } from './invoices/supplier-invoice.schema.js';
+import { SupplierInvoicesController } from './invoices/supplier-invoices.controller.js';
+import { SupplierInvoiceSettlements } from './invoices/supplier-invoice-settlements.js';
+import { SupplierInvoicesNotifier } from './invoices/supplier-invoices-notifier.js';
+import { SupplierInvoicesPayablesSource } from './invoices/supplier-invoices-payables.source.js';
+import { SupplierInvoicesService } from './invoices/supplier-invoices.service.js';
+import { PurchaseOrderFactsReader } from './receptions/purchase-order-facts.js';
+import { PurchaseReceptionsController } from './receptions/purchase-receptions.controller.js';
+import { PurchaseReceptionsService } from './receptions/purchase-receptions.service.js';
+import { PurchaseReception, PurchaseReceptionSchema } from './receptions/reception.schema.js';
+import { PURCHASE_RECEPTION_SINK, noPurchaseReceptionSink } from './stock-sink.port.js';
 
 @Module({
   imports: [
@@ -54,6 +64,9 @@ import { SuppliersService } from './suppliers/suppliers.service.js';
       { name: PurchaseOrder.name, schema: PurchaseOrderSchema },
       { name: PurchaseSettings.name, schema: PurchaseSettingsSchema },
       { name: PurchaseCounter.name, schema: PurchaseCounterSchema },
+      // ADR-0044 — P4 : réceptions et factures fournisseurs.
+      { name: PurchaseReception.name, schema: PurchaseReceptionSchema },
+      { name: SupplierInvoice.name, schema: SupplierInvoiceSchema },
     ]),
   ],
   controllers: [
@@ -62,6 +75,9 @@ import { SuppliersService } from './suppliers/suppliers.service.js';
     // ADR-0044 — P3
     PurchaseOrdersController,
     PurchaseSettingsController,
+    // ADR-0044 — P4
+    PurchaseReceptionsController,
+    SupplierInvoicesController,
   ],
   providers: [
     MasterKeyringProvider,
@@ -69,7 +85,6 @@ import { SuppliersService } from './suppliers/suppliers.service.js';
     // nul jusqu'aux factures et paiements (P4, P5), qui le remplaceront.
     SuppliersService,
     SuppliersNotifier,
-    { provide: SUPPLIER_PAYABLES_SOURCE, useValue: noSupplierPayables },
     // ADR-0044 — P3 : cycle demande → bon de commande, réglages, numérotation (DA, BC,
     // et FF/PF pour P4 et P5), PDF et envoi, notifications d'approbation.
     PurchaseSettingsService,
@@ -77,6 +92,19 @@ import { SuppliersService } from './suppliers/suppliers.service.js';
     PurchasesNotifier,
     PurchaseOrdersService,
     PurchaseOrderDocumentsService,
+    // ADR-0044 — P4 : le reste dû se lit désormais sur les factures validées (et les
+    // paiements du lot P5, lus par la connexion) : le fournisseur nul de P2 est remplacé.
+    { provide: SUPPLIER_PAYABLES_SOURCE, useExisting: SupplierInvoicesPayablesSource },
+    // ADR-0044 — P4 : réceptions, factures, rapprochement, pièces jointes. Commandes lues
+    // sur le modèle de P3 ; port de stock nul en R3 (§ 6.6).
+    PurchaseAttachmentsService,
+    SupplierInvoicesService,
+    SupplierInvoicesNotifier,
+    SupplierInvoiceSettlements,
+    SupplierInvoicesPayablesSource,
+    PurchaseReceptionsService,
+    PurchaseOrderFactsReader,
+    { provide: PURCHASE_RECEPTION_SINK, useValue: noPurchaseReceptionSink },
   ],
   exports: [
     SuppliersService,
@@ -84,6 +112,8 @@ import { SuppliersService } from './suppliers/suppliers.service.js';
     PurchaseOrdersService,
     PurchaseSettingsService,
     PurchaseCountersService,
+    // ADR-0044 — P4
+    SupplierInvoicesService,
   ],
 })
 export class PurchasesModule {}

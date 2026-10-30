@@ -631,6 +631,20 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
           .set('Cookie', c)
           .send({ expectedRevision: 1 }),
     },
+    // ADR-0044 — P4 : réceptions et factures fournisseurs.
+    {
+      // ADR-0044 § 5.3 — forcer une facture en écart : Propriétaire et Directeur
+      // financier (ⓢ). Facture inexistante : le 404 prouve que le guard a laissé passer
+      // jusqu'au service, sans prérequis de commande ni de facture dans cette suite.
+      action: 'purchase.approve',
+      libelle: 'POST /purchases/invoices/:id/force-validate',
+      statutsAutorises: [404],
+      envoyer: (c) =>
+        request(serveur())
+          .post('/purchases/invoices/000000000000000000000000/force-validate')
+          .set('Cookie', c)
+          .send({ reason: 'Sonde de matrice', expectedRevision: 1 }),
+    },
   ];
 
   /** Devis minimal à un client de passage (ADR-0035 § 4). */
