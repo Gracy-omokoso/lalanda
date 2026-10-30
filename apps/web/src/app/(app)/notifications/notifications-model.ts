@@ -103,6 +103,44 @@ export const LIBELLES_TYPES: Record<NotificationKind, { label: string; aide: str
     label: 'Coordonnées de paiement modifiées',
     aide: 'Les coordonnées bancaires ou mobile money d’un fournisseur ont changé.',
   },
+  // ADR-0045 — H0 (§ 6.1) : ressources humaines. Aucun libellé ne nomme un type
+  // d'absence confidentiel, un montant ni un numéro.
+  'hr.leave_requested': {
+    label: 'Absence à valider',
+    aide: 'Une demande d’absence attend votre validation.',
+  },
+  'hr.leave_approved': {
+    label: 'Absence validée',
+    aide: 'Une demande d’absence est validée.',
+  },
+  'hr.leave_rejected': {
+    label: 'Absence refusée',
+    aide: 'Une demande d’absence est refusée, avec le motif du validateur.',
+  },
+  'hr.leave_cancelled': {
+    label: 'Absence annulée',
+    aide: 'Une absence déjà validée est annulée.',
+  },
+  'hr.probation_ending': {
+    label: 'Fin de période d’essai proche',
+    aide: 'La période d’essai d’un collaborateur arrive à son terme.',
+  },
+  'hr.contract_ending': {
+    label: 'Fin de contrat proche',
+    aide: 'Le contrat d’un collaborateur arrive à son terme.',
+  },
+  'hr.document_expiring': {
+    label: 'Document RH bientôt expiré',
+    aide: 'Un document ou une pièce d’identité d’un collaborateur arrive à expiration.',
+  },
+  'hr.checklist_item_assigned': {
+    label: 'Tâche d’accueil ou de départ confiée',
+    aide: 'Un élément d’une liste d’accueil ou de départ vous est confié.',
+  },
+  'hr.bank_details_changed': {
+    label: 'Coordonnées bancaires modifiées',
+    aide: 'Les coordonnées bancaires ou mobile money d’un collaborateur ont changé.',
+  },
 };
 
 /** Types dans l'ordre d'affichage des préférences. */

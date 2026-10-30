@@ -11,7 +11,7 @@
 // `AuthGuard` résolvait le mauvais rôle, ou si le guard lisait la métadonnée
 // d'un autre handler.
 //
-// Ce fichier ferme le trou. Huit sessions HTTP réellement authentifiées, une par
+// Ce fichier ferme le trou. Neuf sessions HTTP réellement authentifiées, une par
 // rôle d'organisation attribuable, dans UNE SEULE organisation, contre une route
 // représentative par action. C'est la seule des trois suites qui exerce la chaîne
 // complète : cookie → better-auth → AuthGuard → membership Mongo → PermissionsGuard
@@ -76,8 +76,9 @@ const PLAN_PROJETS_ILLIMITES: Plan | undefined = PLANS.find(
 );
 
 /**
- * Les huit rôles réellement attribuables — `project_manager` exclu (voir en-tête).
- * `sales_rep` (Commercial, ADR-0040 § 4.2) est le dernier.
+ * Les neuf rôles réellement attribuables — `project_manager` exclu (voir en-tête).
+ * `sales_rep` (Commercial, ADR-0040 § 4.2) puis `hr_manager` (Responsable RH,
+ * ADR-0045 § 4.2) sont les derniers.
  *
  * L'ordre importe : `owner` d'abord, parce que c'est lui qui invite tous les
  * autres. Il n'est pas invité, il est propriétaire de son organisation
@@ -93,6 +94,8 @@ const ROLES_TESTES = [
   'viewer',
   // ADR-0040 — C0.
   'sales_rep',
+  // ADR-0045 — H0 : invité par le Propriétaire, seul à pouvoir l'attribuer.
+  'hr_manager',
 ] as const satisfies readonly OrgRole[];
 
 type RoleTeste = (typeof ROLES_TESTES)[number];
@@ -116,6 +119,26 @@ const ACTIONS_SANS_ROUTE: Record<string, string> = {
     'renommage. L’action est déclarée par docs/12 et attend son endpoint.',
   // ADR-0044 — P0 : actions déclarées avant leurs routes. P3 a retiré
   // `purchase.request` et `purchase.approve` (sondes en fin de liste).
+  // ADR-0045 — H0 : actions déclarées avant leurs routes (module `hr`, lots H2 et H3).
+  // Chaque lot retire sa ligne et écrit sa sonde ; la matrice est déjà couverte case
+  // par case par `permissions.test.ts`, et le rôle `hr_manager` est exercé ici sur
+  // toutes les autres sondes.
+  'hr.read':
+    'Aucune route RH en H0 : `GET /hr/employees` (sonde naturelle) arrive avec ' +
+    'les dossiers collaborateurs au lot H2 (ADR-0045 § 3.1).',
+  'hr.manage':
+    'Aucune route RH en H0 : `POST /hr/employees` (sonde naturelle) arrive avec ' +
+    'les dossiers collaborateurs au lot H2 (ADR-0045 § 3.1).',
+  'hr.sensitive.read':
+    'Aucune route RH en H0 : `POST /hr/employees/:id/private/reveal` arrive avec ' +
+    'les données sensibles au lot H2 (ADR-0045 § 2.4) ; interdit absolu plateforme.',
+  'leave.request':
+    'Aucune route RH en H0 : `POST /hr/leave-requests` (sonde naturelle) arrive ' +
+    'avec les absences au lot H3 (ADR-0045 § 3.2).',
+  'leave.approve':
+    'Aucune route RH en H0 : la validation (`POST /hr/leave-requests/:id/approve`) ' +
+    'est relationnelle et arrive au lot H3 ; la séparation des tâches est prouvée ' +
+    'par `leaveApprovalDecision` (permissions.test.ts).',
 };
 
 /** Une sonde HTTP : la route qui matérialise une action, et ses statuts légitimes. */
@@ -174,6 +197,7 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
     advisor: 6,
     viewer: 7,
     sales_rep: 8,
+    hr_manager: 9,
   };
 
   function creerCompte(role: RoleTeste): { email: string; password: string; name: string } {
@@ -726,7 +750,7 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
     }
   });
 
-  it('les huit rôles ont une session authentifiée dans la même organisation', async () => {
+  it('les neuf rôles ont une session authentifiée dans la même organisation', async () => {
     for (const role of ROLES_TESTES) {
       const res = await request(serveur()).get('/me/permissions').set('Cookie', cookiesDe(role));
       expect(res.status, `/me/permissions pour ${role}`).toBe(200);
@@ -978,13 +1002,14 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
 
   it('§ 4.4 — les écarts du réalisé restent ouverts aux rôles qui lisent les projets', async () => {
     // Aucun rôle existant ne perd l'accès : tous les détenteurs d'`analytics.read`
-    // ont `project.read`, le Commercial excepté.
+    // ont `project.read`, le Commercial et le Responsable RH exceptés.
     for (const role of ROLES_TESTES) {
       const res = await request(serveur())
         .get(`/projects/${projetSonde}/variances?year=1`)
         .set('Cookie', cookiesDe(role));
+      // ADR-0045 : le Responsable RH ne lit pas les projets BUILD non plus.
       expect(res.status, `${role} : ${JSON.stringify(res.body)}`).toBe(
-        role === 'sales_rep' ? 403 : 200,
+        role === 'sales_rep' || role === 'hr_manager' ? 403 : 200,
       );
     }
   }, 90_000);
@@ -1075,6 +1100,65 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
       .send({ email: parComptable, role: 'sales_rep' });
     expect(refus.status).toBe(403);
     expect(refus.body).toMatchObject({ code: 'FORBIDDEN', action: 'members.invite' });
+  }, 60_000);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // ADR-0045 — H0 : le Responsable RH (§ 4.2), attribuable par le seul Propriétaire
+  // ───────────────────────────────────────────────────────────────────────────
+
+  it('critère 2 — l’Administrateur ne nomme pas un Responsable RH ; le Propriétaire le peut', async () => {
+    const parAdmin = `rbac-rh-admin-${tag}@lalanda-test.local`;
+    const parProprietaire = `rbac-rh-pro-${tag}@lalanda-test.local`;
+    emails.push(parAdmin, parProprietaire);
+    const refus = await request(serveur())
+      .post(`/organizations/${orgId}/invitations`)
+      .set('Cookie', cookiesDe('admin'))
+      .send({ email: parAdmin, role: 'hr_manager' });
+    expect(refus.status, JSON.stringify(refus.body)).toBe(403);
+    expect(refus.body.code).toBe('ROLE_ESCALATION');
+
+    const promotion = await request(serveur())
+      .patch(`/organizations/${orgId}/members/${await userIdDe('viewer')}/role`)
+      .set('Cookie', cookiesDe('admin'))
+      .send({ role: 'hr_manager' });
+    expect(promotion.status, JSON.stringify(promotion.body)).toBe(403);
+    expect(promotion.body.code).toBe('ROLE_ESCALATION');
+
+    const ok = await request(serveur())
+      .post(`/organizations/${orgId}/invitations`)
+      .set('Cookie', cookiesDe('owner'))
+      .send({ email: parProprietaire, role: 'hr_manager' });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(201);
+    expect(ok.body.invitation.role).toBe('hr_manager');
+  }, 60_000);
+
+  it('critère 1 — le Responsable RH ne voit ni trésorerie, ni achats, ni ventes', async () => {
+    const c = cookiesDe('hr_manager');
+    const s = serveur();
+    const refus: [string, string, Action][] = [
+      ['GET /treasury/expenses', '/treasury/expenses', 'treasury.read'],
+      ['GET /purchases/orders', '/purchases/orders', 'purchase.read'],
+      ['GET /sales/invoices', '/sales/invoices', 'sales.read'],
+    ];
+    for (const [libelle, chemin, action] of refus) {
+      const res = await request(s).get(chemin).set('Cookie', c);
+      expect(res.status, `${libelle} : ${res.status} ${JSON.stringify(res.body)}`).toBe(403);
+      expect(res.body, libelle).toMatchObject({ code: 'FORBIDDEN', action, role: 'hr_manager' });
+    }
+    // Il suit les projets internes et ses tâches, comme tout membre qui travaille.
+    expect((await request(s).get('/work/my-tasks').set('Cookie', c)).status).toBe(200);
+    const moi = await request(s).get('/me/permissions').set('Cookie', c);
+    expect(moi.status).toBe(200);
+    expect(moi.body.actions).toEqual([
+      'analytics.read',
+      'work.read',
+      'work.update',
+      'hr.read',
+      'hr.manage',
+      'hr.sensitive.read',
+      'leave.request',
+      'leave.approve',
+    ]);
   }, 60_000);
 
   /** userId d'un rôle, lu depuis le trombinoscope — l'API ne l'expose pas ailleurs. */

@@ -36,12 +36,32 @@ export const NOTIFICATION_KINDS = [
   'purchases.invoice_due_soon',
   'purchases.invoice_overdue',
   'purchases.supplier_payment_details_changed',
+  // ADR-0045 — H0 (§ 6.1) : ressources humaines. Déclarés ici, émis par H2 (coordonnées
+  // bancaires), H3 (absences) et H4 (échéances, listes) ; refiltrés à la lecture par
+  // `analytics.read` (destinataire choisi par relation ou par droits effectifs à
+  // l'émission). Aucun ne porte un type confidentiel, un montant ni un numéro.
+  'hr.leave_requested',
+  'hr.leave_approved',
+  'hr.leave_rejected',
+  'hr.leave_cancelled',
+  'hr.probation_ending',
+  'hr.contract_ending',
+  'hr.document_expiring',
+  'hr.checklist_item_assigned',
+  'hr.bank_details_changed',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
 /** Modules producteurs connus. */
 // ADR-0041 — A4 : `organization` (gestion des membres). ADR-0044 — P0 : `purchases`.
-export const NOTIFICATION_SOURCE_MODULES = ['work', 'crm', 'organization', 'purchases'] as const;
+// ADR-0045 — H0 : `hr`.
+export const NOTIFICATION_SOURCE_MODULES = [
+  'work',
+  'crm',
+  'organization',
+  'purchases',
+  'hr',
+] as const;
 export type NotificationSourceModule = (typeof NOTIFICATION_SOURCE_MODULES)[number];
 
 /** Natures de l'entité d'origine (ADR-0040 — C4 § 5.4 : `activity`, `opportunity`, `account`). */
@@ -57,6 +77,11 @@ export const NOTIFICATION_ENTITY_TYPES = [
   'purchase_order',
   'supplier_invoice',
   'supplier',
+  // ADR-0045 — H0 (§ 6.1) : demande d'absence, fiche collaborateur, document RH, liste.
+  'leave_request',
+  'employee',
+  'hr_document',
+  'hr_checklist',
 ] as const;
 export type NotificationEntityType = (typeof NOTIFICATION_ENTITY_TYPES)[number];
 

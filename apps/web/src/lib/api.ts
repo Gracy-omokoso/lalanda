@@ -244,8 +244,8 @@ export interface TemplateSummary {
 
 // ─── Rôles d'organisation (S20a — ADR-0012 §1) ─────────────────
 /**
- * Les 9 rôles d'organisation (le neuvième, `sales_rep` « Commercial », d'ADR-0040
- * § 4.2). Miroir de `apps/api/src/authz/permissions.ts`,
+ * Les 10 rôles d'organisation (le neuvième, `sales_rep` « Commercial », d'ADR-0040
+ * § 4.2 ; le dixième, `hr_manager` « Responsable RH », d'ADR-0045 § 4.2). Miroir de `apps/api/src/authz/permissions.ts`,
  * SOURCE DE VÉRITÉ — le web ne peut pas importer de l'API.
  *
  * Volontairement limité à l'union de slugs : les LIBELLÉS et les DESCRIPTIONS ne
@@ -264,6 +264,8 @@ export const ORG_ROLES = [
   'viewer',
   // ADR-0040 — C0 : Commercial (CRM, devis, suivi des clients).
   'sales_rep',
+  // ADR-0045 — H0 : Responsable RH (dossiers du personnel, absences, documents RH).
+  'hr_manager',
 ] as const;
 
 export type OrgRole = (typeof ORG_ROLES)[number];
@@ -1138,7 +1140,7 @@ export interface TermsAcceptanceView {
 
 export type DisplayCurrency = 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR';
 
-/** Les 33 actions granulaires (docs/12, ADR-0021 §8, ADR-0022 § S25c.1, ADR-0023 § S25e.11, ADR-0031 § 4, ADR-0034 § 8, ADR-0035 § 3, ADR-0039 § 7, ADR-0040 § 4.1, ADR-0044 § 4.1). Union fermée, alignée sur l'API. */
+/** Les 38 actions granulaires (docs/12, ADR-0021 §8, ADR-0022 § S25c.1, ADR-0023 § S25e.11, ADR-0031 § 4, ADR-0034 § 8, ADR-0035 § 3, ADR-0039 § 7, ADR-0040 § 4.1, ADR-0044 § 4.1, ADR-0045 § 4.1). Union fermée, alignée sur l'API. */
 export type OrgAction =
   | 'organization.manage'
   | 'billing.manage'
@@ -1198,7 +1200,16 @@ export type OrgAction =
   | 'purchase.request'
   | 'purchase.manage'
   | 'purchase.approve'
-  | 'payables.pay';
+  | 'payables.pay'
+  // ADR-0045 § 4.1 — ressources humaines. Consulter et gérer le registre (Propriétaire,
+  // Administrateur, Directeur financier, Responsable RH) ; données sensibles (sans
+  // l'Administrateur) ; demander une absence (tout rôle interne) ; valider (Propriétaire,
+  // Directeur financier, Responsable RH, séparation des tâches).
+  | 'hr.read'
+  | 'hr.manage'
+  | 'hr.sensitive.read'
+  | 'leave.request'
+  | 'leave.approve';
 
 /**
  * Offres — RÉEXPORTÉES du catalogue partagé, jamais réécrites.

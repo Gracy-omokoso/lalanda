@@ -11,6 +11,10 @@
 // par défaut reste le moins puissant, choisi par rang (`roleParDefaut`) : le
 // Commercial est le dernier de la liste sans être le moindre privilège.
 //
+// ADR-0045 — H0 : le Responsable RH (`hr_manager`) n'est proposé qu'au Propriétaire,
+// seul à pouvoir l'attribuer (`roleOptions` le dit attribuable ou non). Comme le
+// Commercial, il est en fin de liste sans être le moindre privilège.
+//
 // ADR-0041 — A5 : après le titre, « Personnaliser les autorisations » ouvre la
 // même grille que la fiche du membre, préremplie par la ligne du titre. Fermée,
 // elle dit en une phrase ce que le titre donne. L'invitation porte l'écart ;

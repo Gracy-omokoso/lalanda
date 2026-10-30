@@ -33,13 +33,15 @@ Le support ne voit jamais les données financières sans consentement explicite,
 | Conseiller | consultation, commentaires, recommandations |
 | Lecteur | lecture seulement |
 | Commercial (`sales_rep`, ADR-0040, appliqué) | CRM, devis, consultation des clients et du catalogue ; ni trésorerie, ni dépenses, ni émission de facture |
+| Responsable RH (`hr_manager`, ADR-0045, appliqué) | dossiers du personnel, absences et documents RH ; ni trésorerie, ni ventes, ni achats |
 
 ## Actions granulaires
 
-`organization.manage`, `billing.manage`, `members.invite`, `project.create`, `project.read`, `project.update`, `canvas.update`, `inputs.update`, `plan.calculate`, `plan.approve`, `actuals.import`, `period.close`, `analytics.read`, `report.export`, `audit.read`, `fiscal.manage`, `sales.read`, `sales.manage`, `sales.invoice`, `sales.receipt`, `treasury.read`, `treasury.manage`, `crm.read`, `crm.manage`, `work.read`, `work.update`, `work.manage`, `sales.quote`, `purchase.read`, `purchase.request`, `purchase.manage`, `purchase.approve`, `payables.pay`.
+`organization.manage`, `billing.manage`, `members.invite`, `project.create`, `project.read`, `project.update`, `canvas.update`, `inputs.update`, `plan.calculate`, `plan.approve`, `actuals.import`, `period.close`, `analytics.read`, `report.export`, `audit.read`, `fiscal.manage`, `sales.read`, `sales.manage`, `sales.invoice`, `sales.receipt`, `treasury.read`, `treasury.manage`, `crm.read`, `crm.manage`, `work.read`, `work.update`, `work.manage`, `sales.quote`, `purchase.read`, `purchase.request`, `purchase.manage`, `purchase.approve`, `payables.pay`, `hr.read`, `hr.manage`, `hr.sensitive.read`, `leave.request`, `leave.approve`.
 
-Trente-trois actions au total, dans l'ordre ci-dessus (ordre de fusion pour les
-actions ajoutées après la dix-neuvième ; les cinq dernières viennent d'ADR-0044).
+Trente-huit actions au total, dans l'ordre ci-dessus (ordre de fusion pour les
+actions ajoutées après la dix-neuvième ; les vingt-neuvième à trente-troisième viennent
+d'ADR-0044, les cinq dernières d'ADR-0045).
 
 `fiscal.manage` — « Gérer l'identité fiscale et la facture normalisée » — est la
 seizième action, ajoutée par ADR-0021 §8 (18 oct. 2026). Elle couvre la fiche
@@ -295,11 +297,17 @@ sont inchangés.
 - Voir les coordonnées bancaires d'un fournisseur en clair exige `payables.pay` et est journalisé.
 - Tests : matrice 9 × 33 + 6 × 33 = **495** cases.
 
-### Proposé, ADR-0045 — ressources humaines (non appliqué)
+### ADR-0045 — ressources humaines (appliqué, lot H0)
 
-> **Statut : proposé** par [ADR-0045](adr/ADR-0045-ressources-humaines.md) § 4 (30 oct. 2026), R4
-> du RUN, **paie exclue**. Rien de ce qui suit n'est encore dans le code ; le lot H0 l'applique,
-> aux valeurs par défaut des décisions ouvertes n° 1 à 3.
+> **Statut : appliqué** par le lot H0 d'[ADR-0045](adr/ADR-0045-ressources-humaines.md) § 4
+> (30 oct. 2026), R4 du RUN, **paie exclue**, aux valeurs par défaut des décisions ouvertes n° 1
+> à 3. La matrice ci-dessous est celle de `apps/api/src/authz/permissions.ts`, vérifiée par
+> `permissions.test.ts` (608 cases) ; dépendances et neuvième domaine par `overrides.test.ts` ;
+> la séparation des tâches par `leaveApprovalDecision` (fonction pure, table de vérité testée) ;
+> « attribuable par le seul Propriétaire » par `OWNER_ONLY_ROLES` en plus de R7. Les routes
+> `/hr/**` arrivent aux lots H2 et H3 : d'ici là, les cinq actions figurent dans
+> `ACTIONS_SANS_ROUTE` de la sonde `rbac-matrix.e2e.test.ts`, qui exerce déjà le rôle
+> `hr_manager` sur toutes les autres sondes.
 
 - **Cinq actions nouvelles**, trente-quatrième à trente-huitième, en fin de liste : `hr.read`
   (« Consulter les dossiers du personnel »), `hr.manage` (« Gérer les dossiers du personnel »),
@@ -312,7 +320,8 @@ sont inchangés.
   ni la trésorerie, ni les ventes, ni les achats. » Huit actions : `analytics.read`, `hr.read`,
   `hr.manage`, `hr.sensitive.read`, `leave.request`, `leave.approve`, `work.read`, `work.update`.
   Attribuable par le seul Propriétaire (R7 : l'Administrateur n'a ni `hr.sensitive.read` ni
-  `leave.approve`).
+  `leave.approve` ; `OWNER_ONLY_ROLES` ferme aussi le cas d'un acteur qui réunirait les huit
+  actions par ajouts). Le Commercial détient désormais huit actions (avec `leave.request`).
 
 | Action | PRO | ADM | DIR | CPT | ANA | CDP | CON | LEC | COM | RH |
 |---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|

@@ -110,6 +110,8 @@ describe('ADR-0041 § 2 — validateOverrides : un cas par garde-fou', () => {
         'work.read',
         // ADR-0044 § 4.1 : le Lecteur consulte les achats.
         'purchase.read',
+        // ADR-0045 § 4.1 : il demande ses propres absences.
+        'leave.request',
       ],
     });
   });
@@ -427,15 +429,82 @@ describe('ADR-0041 § 4 et § 5 — dépendances, domaines et libellés', () => 
     expect(requiredActionsOf('report.export')).toEqual(['project.read', 'analytics.read']);
   });
 
-  it('huit domaines ; chaque action dans exactement un domaine, avec un libellé', () => {
-    expect(ACTION_DOMAINS).toHaveLength(8);
+  it('neuf domaines ; chaque action dans exactement un domaine, avec un libellé', () => {
+    expect(ACTION_DOMAINS).toHaveLength(9);
     const all = ACTION_DOMAINS.flatMap((d) => d.actions);
     expect(all).toHaveLength(ACTIONS.length);
     expect([...all].sort()).toEqual([...ACTIONS].sort());
     for (const action of ACTIONS) {
       expect(ACTION_LABELS[action].trim().length, action).toBeGreaterThan(0);
     }
-    expect(new Set(ACTION_DOMAINS.map((d) => d.key)).size).toBe(8);
+    expect(new Set(ACTION_DOMAINS.map((d) => d.key)).size).toBe(9);
+  });
+
+  it('ADR-0045 § 4.5 — neuvième domaine « Ressources humaines », cinq actions, libellés', () => {
+    expect(ACTION_DOMAINS[8]).toEqual({
+      key: 'hr',
+      label: 'Ressources humaines',
+      actions: ['hr.read', 'hr.manage', 'hr.sensitive.read', 'leave.request', 'leave.approve'],
+    });
+    expect(ACTION_LABELS['hr.read']).toBe('Consulter les dossiers du personnel');
+    expect(ACTION_LABELS['hr.manage']).toBe('Gérer les dossiers du personnel');
+    expect(ACTION_LABELS['hr.sensitive.read']).toBe('Consulter les données sensibles du personnel');
+    expect(ACTION_LABELS['leave.request']).toBe('Demander une absence');
+    expect(ACTION_LABELS['leave.approve']).toBe('Valider les absences');
+  });
+
+  it('ADR-0045 § 4.5 — dépendances des RH ; aucune paire, rien de non délégable en plus', () => {
+    for (const a of ['hr.manage', 'hr.sensitive.read', 'leave.approve'] as const) {
+      expect(requiredActionsOf(a), a).toEqual(['analytics.read', 'hr.read']);
+    }
+    expect(requiredActionsOf('leave.request')).toEqual(['analytics.read']);
+    expect(requiredActionsOf('hr.read')).toEqual(['analytics.read']);
+    expect(SOD_PAIRS).toHaveLength(3);
+    expect(SOD_PAIRS.flat().some((a) => a.startsWith('hr.') || a.startsWith('leave.'))).toBe(false);
+    expect(NON_DELEGABLE_ACTIONS).toEqual(['billing.manage']);
+  });
+
+  it('ADR-0045 § 4.5 — `hr.sensitive.read` s’ajoute par écart, si l’acteur la détient (R7)', () => {
+    // Un Directeur financier l'ajoute à un Administrateur… pas l'inverse.
+    expect(
+      validateOverrides({
+        actorRole: 'owner',
+        actorCtx: NO_OVERRIDES,
+        targetRole: 'admin',
+        targetCtxBefore: NO_OVERRIDES,
+        grants: ['hr.sensitive.read'],
+        revokes: [],
+        actorIsTarget: false,
+      }),
+    ).toMatchObject({ ok: true, grants: ['hr.sensitive.read'] });
+    expect(
+      validateOverrides({
+        actorRole: 'admin',
+        actorCtx: NO_OVERRIDES,
+        targetRole: 'viewer',
+        targetCtxBefore: NO_OVERRIDES,
+        grants: ['hr.read', 'hr.sensitive.read'],
+        revokes: [],
+        actorIsTarget: false,
+      }),
+    ).toEqual({ ok: false, code: 'PERMISSION_ESCALATION', actions: ['hr.sensitive.read'] });
+    // Sans `hr.read`, la dépendance manque : rien n'est complété en silence.
+    expect(
+      validateOverrides({
+        actorRole: 'owner',
+        actorCtx: NO_OVERRIDES,
+        targetRole: 'viewer',
+        targetCtxBefore: NO_OVERRIDES,
+        grants: ['leave.approve'],
+        revokes: [],
+        actorIsTarget: false,
+      }),
+    ).toEqual({
+      ok: false,
+      code: 'PERMISSION_DEPENDENCY_MISSING',
+      action: 'leave.approve',
+      missing: ['hr.read'],
+    });
   });
 
   it('ADR-0044 § 4.3 — huitième domaine « Achats et fournisseurs », cinq actions, libellés', () => {
@@ -477,7 +546,7 @@ describe('ADR-0041 § 4 et § 5 — dépendances, domaines et libellés', () => 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Propriété à graine fixe (ADR-0041 § 9.5) : 3 000 tirages acteur × cible × écart.
+// Propriété à graine fixe (ADR-0041 § 9.5) : 5 000 tirages acteur × cible × écart.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** mulberry32 — générateur déterministe, pour que tout échec soit reproductible. */
@@ -493,7 +562,7 @@ function prng(seed: number): () => number {
 }
 
 describe('ADR-0041 § 9.5 — propriété : tout écart accepté est sûr', () => {
-  it('3 000 tirages à graine fixe', () => {
+  it('5 000 tirages à graine fixe', () => {
     const rand = prng(41_2026);
     const pick = <T>(xs: readonly T[]): T => xs[Math.floor(rand() * xs.length)] as T;
     const subset = <T>(xs: readonly T[], p: number): T[] => xs.filter(() => rand() < p);
@@ -513,7 +582,9 @@ describe('ADR-0041 § 9.5 — propriété : tout écart accepté est sûr', () =
     // ADR-0044 : 3 000 tirages (et non 2 000) — à 33 actions, les écarts tirés à taux
     // fixe touchent plus d'actions et l'escalade domine ; 2 000 tirages ne donnaient
     // plus que 77 acceptations, sous le seuil de 100 qui garantit une propriété exercée.
-    for (let i = 0; i < 3000; i++) {
+    // ADR-0045 : 5 000 tirages — à 38 actions et 10 rôles, 3 000 tirages ne donnaient plus
+    // que 75 acceptations.
+    for (let i = 0; i < 5000; i++) {
       // Acteur souvent Propriétaire ou Directeur financier : sinon presque tout est escalade.
       const actorRole =
         rand() < 0.5 ? pick(['owner', 'finance_director'] as const) : pick(ORG_ROLES);

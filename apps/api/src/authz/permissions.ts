@@ -7,10 +7,11 @@
 // et l'interface consomment `can()` / `canPlatform()`.
 //
 // Trois ensembles fermés (docs/26 « états représentés par unions fermées ») :
-//   1. ORG_ROLES       — les 9 rôles d'organisation (ADR-0012 §1 ; le neuvième,
-//                        `sales_rep`, d'ADR-0040 § 4.2);
+//   1. ORG_ROLES       — les 10 rôles d'organisation (ADR-0012 §1 ; le neuvième,
+//                        `sales_rep`, d'ADR-0040 § 4.2 ; le dixième, `hr_manager`,
+//                        d'ADR-0045 § 4.2);
 //   2. PLATFORM_ROLES  — les 6 rôles plateforme, préfixés `platform_` (§2);
-//   3. ACTIONS         — les 33 actions granulaires, dans l'ordre de docs/12
+//   3. ACTIONS         — les 38 actions granulaires, dans l'ordre de docs/12
 //                        (la seizième, `fiscal.manage`, vient d'ADR-0021 §8 ;
 //                        la dix-septième et la dix-huitième, `sales.read` et
 //                        `sales.manage`, d'ADR-0022 § S25c.1 ; la dix-neuvième,
@@ -25,7 +26,10 @@
 //                        `sales.quote`, d'ADR-0040 § 4.1 ; les vingt-neuvième à
 //                        trente-troisième, `purchase.read`, `purchase.request`,
 //                        `purchase.manage`, `purchase.approve` et `payables.pay`,
-//                        d'ADR-0044 § 4.1).
+//                        d'ADR-0044 § 4.1 ; les trente-quatrième à
+//                        trente-huitième, `hr.read`, `hr.manage`,
+//                        `hr.sensitive.read`, `leave.request` et `leave.approve`,
+//                        d'ADR-0045 § 4.1).
 //
 // Refus par défaut (docs/17 § Autorisation) : les matrices sont exhaustives, une
 // case absente ne compile pas, et une case `deny` est un refus.
@@ -38,8 +42,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Les 9 rôles d'organisation (ADR-0012 §1). Le neuvième, `sales_rep` (« Commercial »),
- * vient d'ADR-0040 § 4.2 : ajouté EN FIN de liste (ordre de fusion, comme les actions).
+ * Les 10 rôles d'organisation (ADR-0012 §1). Le neuvième, `sales_rep` (« Commercial »),
+ * vient d'ADR-0040 § 4.2 ; le dixième, `hr_manager` (« Responsable RH »), d'ADR-0045
+ * § 4.2 : ajoutés EN FIN de liste (ordre de fusion, comme les actions).
  *
  * Slugs en anglais `snake_case` (docs/26 « noms de code en anglais »). `owner`
  * conserve la valeur de l'ancien modèle : la migration S20a n'a donc aucun
@@ -56,6 +61,9 @@ export const ORG_ROLES = [
   'viewer',
   // ADR-0040 — C0 : CRM, devis et suivi des clients ; ni trésorerie ni facture.
   'sales_rep',
+  // ADR-0045 — H0 : dossiers du personnel, absences et documents RH ; ni trésorerie,
+  // ni ventes, ni achats.
+  'hr_manager',
 ] as const;
 
 export type OrgRole = (typeof ORG_ROLES)[number];
@@ -85,9 +93,12 @@ export const ORG_ROLE_RANK: Readonly<Record<OrgRole, number>> = {
   // ADR-0040 § 4.3 : le Commercial s'insère au rang 5 ; les suivants glissent d'un
   // cran. Le rang n'est pas un droit : aucun accès ne change.
   sales_rep: 5,
-  project_manager: 6,
-  advisor: 7,
-  viewer: 8,
+  // ADR-0045 § 4.2 : le Responsable RH s'insère au rang 6 ; les suivants glissent
+  // d'un cran. Le rang n'est pas un droit : aucun accès ne change.
+  hr_manager: 6,
+  project_manager: 7,
+  advisor: 8,
+  viewer: 9,
 };
 
 /**
@@ -107,7 +118,7 @@ export const PLATFORM_ROLES = [
 export type PlatformRole = (typeof PLATFORM_ROLES)[number];
 
 /**
- * Les 33 actions granulaires (docs/12 § Actions granulaires, ordre du document).
+ * Les 38 actions granulaires (docs/12 § Actions granulaires, ordre du document).
  *
  * `fiscal.manage` (ADR-0021 §8) est ajoutée EN FIN de liste, et non à côté
  * d'`organization.manage` : l'ordre est celui de docs/12, que l'interface et les
@@ -120,7 +131,9 @@ export type PlatformRole = (typeof PLATFORM_ROLES)[number];
  * `work.read`, `work.update` et `work.manage` (ADR-0039 § 7) les vingt-cinquième à
  * vingt-septième, `sales.quote` (ADR-0040 § 4.1) la vingt-huitième, `purchase.read`,
  * `purchase.request`, `purchase.manage`, `purchase.approve` et `payables.pay`
- * (ADR-0044 § 4.1) les vingt-neuvième à trente-troisième.
+ * (ADR-0044 § 4.1) les vingt-neuvième à trente-troisième, `hr.read`, `hr.manage`,
+ * `hr.sensitive.read`, `leave.request` et `leave.approve` (ADR-0045 § 4.1) les
+ * trente-quatrième à trente-huitième.
  */
 export const ACTIONS = [
   'organization.manage',
@@ -164,6 +177,14 @@ export const ACTIONS = [
   'purchase.manage',
   'purchase.approve',
   'payables.pay',
+  // ADR-0045 — H0 : ressources humaines (§ 4.1). Le dossier non sensible, sa gestion,
+  // les données sensibles (salaire, banque, identité, coordonnées personnelles), la
+  // demande d'absence pour soi et la validation des absences (étape RH, suppléance).
+  'hr.read',
+  'hr.manage',
+  'hr.sensitive.read',
+  'leave.request',
+  'leave.approve',
 ] as const;
 
 export type Action = (typeof ACTIONS)[number];
@@ -238,7 +259,7 @@ export type OrgGrant = 'allow' | 'deny' | 'allow_sod' | 'allow_project' | 'condi
 /**
  * MATRICE RÔLE ORGANISATION × ACTION — transcription littérale d'ADR-0012 §3.
  *
- * Le type impose 9 rôles × 33 actions : oublier une case ne compile pas.
+ * Le type impose 10 rôles × 38 actions : oublier une case ne compile pas.
  * `permissions.test.ts` redéclare cette matrice en littéral (elle n'est PAS
  * importée d'ici) : toute modification de production casse le test et force une
  * mise à jour consciente de l'ADR et de docs/12. C'est le garde-fou central.
@@ -303,6 +324,13 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'purchase.manage': 'allow',
       'purchase.approve': 'allow_sod',
       'payables.pay': 'allow',
+      // ADR-0045 — H0 (§ 4.1) : ressources humaines. `leave.approve` est une autorité RH (ⓢ :
+      // on ne valide pas sa propre absence, sauf approbateur unique).
+      'hr.read': 'allow',
+      'hr.manage': 'allow',
+      'hr.sensitive.read': 'allow',
+      'leave.request': 'allow',
+      'leave.approve': 'allow_sod',
     },
     // Administrateur — « membres, projets, paramètres ». Gouvernance technique,
     // pas autorité financière : ni `billing.manage`, ni `plan.approve`, ni
@@ -353,6 +381,13 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'purchase.manage': 'allow',
       'purchase.approve': 'deny',
       'payables.pay': 'deny',
+      // ADR-0045 — H0 (§ 4.1) : tient le registre (fiches, services, dates) sans les données
+      // sensibles ; ne valide pas les absences (décision ouverte n° 3).
+      'hr.read': 'allow',
+      'hr.manage': 'allow',
+      'hr.sensitive.read': 'deny',
+      'leave.request': 'allow',
+      'leave.approve': 'deny',
     },
     // Directeur financier — « plans, validation, réalisé, rapports ». L'autorité
     // financière : approuve et clôture. Cible de la migration des anciens `member`
@@ -392,6 +427,12 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'purchase.manage': 'allow',
       'purchase.approve': 'allow_sod',
       'payables.pay': 'allow',
+      // ADR-0045 — H0 (§ 4.1) : le salaire est un engagement financier ; autorité RH.
+      'hr.read': 'allow',
+      'hr.manage': 'allow',
+      'hr.sensitive.read': 'allow',
+      'leave.request': 'allow',
+      'leave.approve': 'allow_sod',
     },
     // Comptable — « réalisé, mapping, clôture selon permission ». Constate, ne
     // projette pas : ni `inputs.update`, ni `plan.calculate`. Contrepartie de R2.
@@ -434,6 +475,13 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'purchase.manage': 'allow',
       'purchase.approve': 'deny',
       'payables.pay': 'allow',
+      // ADR-0045 — H0 (§ 4.1) : paie exclue, aucun accès au dossier du personnel
+      // (décision ouverte n° 3) ; demande ses propres absences.
+      'hr.read': 'deny',
+      'hr.manage': 'deny',
+      'hr.sensitive.read': 'deny',
+      'leave.request': 'allow',
+      'leave.approve': 'deny',
     },
     // Analyste — « scénarios, analyses, commentaires ». Modélise et calcule,
     // n'approuve ni n'importe le réalisé.
@@ -475,6 +523,12 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'purchase.manage': 'deny',
       'purchase.approve': 'deny',
       'payables.pay': 'deny',
+      // ADR-0045 — H0 (§ 4.1) : minimisation ; demande ses propres absences.
+      'hr.read': 'deny',
+      'hr.manage': 'deny',
+      'hr.sensitive.read': 'deny',
+      'leave.request': 'allow',
+      'leave.approve': 'deny',
     },
     // Chef de projet — « projets autorisés et saisie ». Tout est `allow_project` :
     // le rôle n'a de sens qu'avec des assignations de projet, qui n'existent pas
@@ -517,6 +571,12 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'purchase.manage': 'deny',
       'purchase.approve': 'deny',
       'payables.pay': 'deny',
+      // ADR-0045 — H0 (§ 4.1) : rôle non attribuable, rien sur les RH.
+      'hr.read': 'deny',
+      'hr.manage': 'deny',
+      'hr.sensitive.read': 'deny',
+      'leave.request': 'deny',
+      'leave.approve': 'deny',
     },
     // Conseiller — « consultation, commentaires, recommandations ». Typiquement
     // EXTERNE (mentor, banquier invité) : pas de `report.export`, on lui ouvre la
@@ -560,6 +620,12 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'purchase.manage': 'deny',
       'purchase.approve': 'deny',
       'payables.pay': 'deny',
+      // ADR-0045 — H0 (§ 4.1) : externe, ni dossier du personnel ni demande d'absence.
+      'hr.read': 'deny',
+      'hr.manage': 'deny',
+      'hr.sensitive.read': 'deny',
+      'leave.request': 'deny',
+      'leave.approve': 'deny',
     },
     // Lecteur — lecture seulement. `analytics.read` est conservé : le refuser
     // viderait le rôle de son sens (ADR-0012 §3).
@@ -599,10 +665,17 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'purchase.manage': 'deny',
       'purchase.approve': 'deny',
       'payables.pay': 'deny',
+      // ADR-0045 — H0 (§ 4.1) : demander une absence ne lit que la sienne.
+      'hr.read': 'deny',
+      'hr.manage': 'deny',
+      'hr.sensitive.read': 'deny',
+      'leave.request': 'allow',
+      'leave.approve': 'deny',
     },
-    // Commercial — « CRM, devis et suivi des clients » (ADR-0040 § 4.2, D3). Sept
-    // actions sur trente-trois : il gère le CRM et prépare les devis, consulte clients,
-    // catalogue et factures, travaille sur les tâches qu'on lui confie. Il ne voit ni
+    // Commercial — « CRM, devis et suivi des clients » (ADR-0040 § 4.2, D3). Huit
+    // actions sur trente-huit : il gère le CRM et prépare les devis, consulte clients,
+    // catalogue et factures, travaille sur les tâches qu'on lui confie, demande ses
+    // absences (ADR-0045). Il ne voit ni
     // la trésorerie ni les dépenses (`treasury.*`, et le correctif § 4.4 qui ferme les
     // chemins détournés par `analytics.read`), ne touche ni aux fiches client ni aux
     // prix (`sales.manage`), n'émet ni n'encaisse. BUILD et le plan ne le concernent pas.
@@ -642,6 +715,57 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'purchase.manage': 'deny',
       'purchase.approve': 'deny',
       'payables.pay': 'deny',
+      // ADR-0045 — H0 (§ 4.1) : demande ses propres absences, rien d'autre des RH.
+      'hr.read': 'deny',
+      'hr.manage': 'deny',
+      'hr.sensitive.read': 'deny',
+      'leave.request': 'allow',
+      'leave.approve': 'deny',
+    },
+    // Responsable RH — « dossiers du personnel, absences et documents RH » (ADR-0045 § 4.2,
+    // O6). Huit actions sur trente-huit, socle compris : la fonction RH est DISJOINTE de la
+    // finance — ni trésorerie, ni ventes, ni achats, ni CRM, ni BUILD, ni gouvernance de
+    // l'organisation. `work.read` et `work.update` : suivre les projets internes et saisir
+    // son temps, comme tout membre qui travaille.
+    hr_manager: {
+      'organization.manage': 'deny',
+      'billing.manage': 'deny',
+      'members.invite': 'deny',
+      'project.create': 'deny',
+      'project.read': 'deny',
+      'project.update': 'deny',
+      'canvas.update': 'deny',
+      'inputs.update': 'deny',
+      'plan.calculate': 'deny',
+      'plan.approve': 'deny',
+      'actuals.import': 'deny',
+      'period.close': 'deny',
+      'analytics.read': 'allow',
+      'report.export': 'deny',
+      'audit.read': 'deny',
+      'fiscal.manage': 'deny',
+      'sales.read': 'deny',
+      'sales.manage': 'deny',
+      'sales.invoice': 'deny',
+      'sales.receipt': 'deny',
+      'treasury.read': 'deny',
+      'treasury.manage': 'deny',
+      'crm.read': 'deny',
+      'crm.manage': 'deny',
+      'work.read': 'allow',
+      'work.update': 'allow',
+      'work.manage': 'deny',
+      'sales.quote': 'deny',
+      'purchase.read': 'deny',
+      'purchase.request': 'deny',
+      'purchase.manage': 'deny',
+      'purchase.approve': 'deny',
+      'payables.pay': 'deny',
+      'hr.read': 'allow',
+      'hr.manage': 'allow',
+      'hr.sensitive.read': 'allow',
+      'leave.request': 'allow',
+      'leave.approve': 'allow_sod',
     },
   };
 
@@ -715,6 +839,14 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'purchase.manage': 'delegated',
     'purchase.approve': 'forbidden',
     'payables.pay': 'forbidden',
+    // ADR-0045 — H0 (§ 4.1) : registre du personnel sous accès délégué ; données sensibles
+    // interdites absolument (`PLATFORM_FORBIDDEN_ACTIONS`) ; demander et valider une absence
+    // refusés par la matrice.
+    'hr.read': 'delegated',
+    'hr.manage': 'delegated',
+    'hr.sensitive.read': 'forbidden',
+    'leave.request': 'forbidden',
+    'leave.approve': 'forbidden',
   },
   platform_admin: {
     'organization.manage': 'native',
@@ -750,6 +882,11 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'purchase.manage': 'forbidden',
     'purchase.approve': 'forbidden',
     'payables.pay': 'forbidden',
+    'hr.read': 'forbidden',
+    'hr.manage': 'forbidden',
+    'hr.sensitive.read': 'forbidden',
+    'leave.request': 'forbidden',
+    'leave.approve': 'forbidden',
   },
   // « Le support ne voit jamais les données financières sans consentement
   // explicite, durée limitée et audit » (docs/12) — d'où trois `delegated` et
@@ -791,6 +928,12 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'purchase.manage': 'forbidden',
     'purchase.approve': 'forbidden',
     'payables.pay': 'forbidden',
+    // ADR-0045 — H0 (§ 4.1) : données personnelles du personnel, jamais pour le support.
+    'hr.read': 'forbidden',
+    'hr.manage': 'forbidden',
+    'hr.sensitive.read': 'forbidden',
+    'leave.request': 'forbidden',
+    'leave.approve': 'forbidden',
   },
   platform_billing: {
     'organization.manage': 'forbidden',
@@ -826,6 +969,11 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'purchase.manage': 'forbidden',
     'purchase.approve': 'forbidden',
     'payables.pay': 'forbidden',
+    'hr.read': 'forbidden',
+    'hr.manage': 'forbidden',
+    'hr.sensitive.read': 'forbidden',
+    'leave.request': 'forbidden',
+    'leave.approve': 'forbidden',
   },
   // Vides sur cette matrice : opèrent sur des ressources de portée plateforme
   // (templates, Country Packs) qui n'ont pas d'action granulaire dans docs/12 —
@@ -864,6 +1012,11 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'purchase.manage': 'forbidden',
     'purchase.approve': 'forbidden',
     'payables.pay': 'forbidden',
+    'hr.read': 'forbidden',
+    'hr.manage': 'forbidden',
+    'hr.sensitive.read': 'forbidden',
+    'leave.request': 'forbidden',
+    'leave.approve': 'forbidden',
   },
   platform_country_pack_manager: {
     'organization.manage': 'forbidden',
@@ -899,12 +1052,17 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'purchase.manage': 'forbidden',
     'purchase.approve': 'forbidden',
     'payables.pay': 'forbidden',
+    'hr.read': 'forbidden',
+    'hr.manage': 'forbidden',
+    'hr.sensitive.read': 'forbidden',
+    'leave.request': 'forbidden',
+    'leave.approve': 'forbidden',
   },
 };
 
 /**
- * Les cinq interdits absolus de la plateforme (ADR-0012 §4, amendé par ADR-0021 §8
- * et ADR-0023 § S25e.11).
+ * Les six interdits absolus de la plateforme (ADR-0012 §4, amendé par ADR-0021 §8,
+ * ADR-0023 § S25e.11 et ADR-0045 § 4.1).
  *
  * Aucun rôle plateforme, super-administrateur compris, et aucun accès délégué ne
  * peut approuver un plan, clôturer une période, exporter un rapport client ni
@@ -912,7 +1070,9 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
  * de sa banque; exporter produit un fichier de ses données financières;
  * `fiscal.manage` engage le contribuable devant la DGI — un acteur Lalanda ne
  * saisit jamais son jeton e-MCF et ne bascule jamais son régime de facturation ;
- * `sales.invoice` attribue un numéro de facture et engage de même le contribuable.
+ * `sales.invoice` attribue un numéro de facture et engage de même le contribuable ;
+ * `hr.sensitive.read` (ADR-0045 § 4.1) : un employé de Lalanda ne lit jamais le salaire,
+ * les coordonnées bancaires ni la pièce d'identité du personnel d'un client.
  *
  * Cette constante n'est pas décorative : `canPlatform()` la vérifie AVANT la
  * matrice, et un test s'assure qu'aucune case de la matrice ne la contredit.
@@ -923,6 +1083,8 @@ export const PLATFORM_FORBIDDEN_ACTIONS: readonly Action[] = [
   'report.export',
   'fiscal.manage',
   'sales.invoice',
+  // ADR-0045 — H0 : interdit absolu, même sous accès délégué.
+  'hr.sensitive.read',
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1030,7 +1192,7 @@ export interface PlatformPermissionContext {
 }
 
 /**
- * Autorisation d'un rôle plateforme. Les cinq interdits absolus sont vérifiés
+ * Autorisation d'un rôle plateforme. Les six interdits absolus sont vérifiés
  * en premier : aucune case de matrice ni aucun grant ne peut les lever.
  */
 export function canPlatform(
@@ -1075,6 +1237,15 @@ function potentialActionsOf(role: OrgRole): Set<Action> {
 }
 
 /**
+ * ADR-0045 — H0 (§ 4.2, décision ouverte n° 2, défaut « attribuable par le seul
+ * Propriétaire ») : titres que seul un Propriétaire attribue, en plus de R7. R7 suffit
+ * nativement (l'Administrateur n'a ni `hr.sensitive.read` ni `leave.approve`) ; cette
+ * liste ferme le cas d'un acteur qui réunirait les huit actions par ajouts (ADR-0041).
+ * Comme R1, elle porte sur l'IDENTITÉ du titre `owner`, pas sur une action.
+ */
+export const OWNER_ONLY_ROLES: readonly OrgRole[] = ['hr_manager'];
+
+/**
  * Rôles qu'un acteur peut attribuer (invitation ou changement de rôle) — R7.
  *
  * Règle : un acteur ne peut attribuer qu'un rôle dont l'ensemble d'actions est un
@@ -1099,6 +1270,9 @@ export function grantableRoles(actorRole: OrgRole, actorCtx?: OrgPermissionConte
       : new Set(effectiveActions(actorRole, actorCtx));
   return ORG_ROLES.filter((candidate) => {
     if (!isAssignableRole(candidate)) return false;
+    // ADR-0045 — H0 (§ 4.2, décision ouverte n° 2) : nommer qui lit les salaires est un
+    // acte du Propriétaire, même pour un acteur qui détiendrait les huit actions par écart.
+    if (OWNER_ONLY_ROLES.includes(candidate) && !isOwnerRole(actorRole)) return false;
     for (const action of potentialActionsOf(candidate)) {
       if (!mine.has(action)) return false;
     }
@@ -1169,7 +1343,8 @@ export const APPROVER_ROLES: readonly OrgRole[] = ORG_ROLES.filter(
  * unique » (`AuthzService.countApprovers(organizationId, action)`, ADR-0041 G4
  * généralisée à une action). Toute case non `deny` de ces actions porte la marque ⓢ.
  */
-export const APPROVAL_ACTIONS = ['plan.approve', 'purchase.approve'] as const;
+// ADR-0045 — H0 (§ 4.3) : `leave.approve` rejoint la liste (cases ⓢ).
+export const APPROVAL_ACTIONS = ['plan.approve', 'purchase.approve', 'leave.approve'] as const;
 export type ApprovalAction = (typeof APPROVAL_ACTIONS)[number];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1270,6 +1445,106 @@ export function purchaseApprovalDecision(input: PurchaseApprovalInput): Purchase
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ADR-0045 — H0 : séparation des tâches des absences (§ 4.3)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Étapes d'un circuit de validation d'absence (§ 2.7), figées à la soumission. */
+export type LeaveApprovalStep = 'manager' | 'hr';
+
+/** Entrée de `leaveApprovalDecision` : faits déjà lus par le service, rien d'autre. */
+export interface LeaveApprovalInput {
+  /** Le geste demandé : valider, ou refuser (commentaire exigé par le service). */
+  readonly decision: 'approve' | 'reject';
+  readonly approverUserId: string;
+  /**
+   * Compte relié à la fiche du bénéficiaire (`hr_employees.userId`), `null` pour un
+   * collaborateur sans compte. Le créateur d'une demande saisie pour autrui n'est PAS
+   * le bénéficiaire : il peut la valider.
+   */
+  readonly beneficiaryUserId: string | null;
+  /** Étape en cours de la demande. */
+  readonly step: LeaveApprovalStep;
+  /**
+   * L'approbateur est l'utilisateur relié au `managerEmployeeId` du bénéficiaire
+   * (relation vérifiée par le service sur la fiche, jamais un rôle).
+   */
+  readonly isDesignatedManager: boolean;
+  /** L'approbateur détient `leave.approve` dans ses droits EFFECTIFS (ADR-0041). */
+  readonly holdsLeaveApprove: boolean;
+  /** Validations DÉJÀ portées par la demande (étapes précédentes), sans celle en cours. */
+  readonly priorApproverUserIds: readonly string[];
+  /**
+   * Nombre de détenteurs EFFECTIFS de `leave.approve` dans l'organisation
+   * (`AuthzService.countApprovers(org, 'leave.approve')`). Jamais un compte par rôle.
+   */
+  readonly approverCountInOrg: number;
+  /** Réglage `hr_settings.allowSoleApprover` (défaut `true`). */
+  readonly allowSoleApprover: boolean;
+}
+
+/**
+ * Résultat typé ; le service le traduit en réponse HTTP. Ce module ne lève jamais
+ * d'exception HTTP.
+ *
+ * - `SELF_APPROVAL_FORBIDDEN` (409) — l'approbateur est le bénéficiaire, à n'importe
+ *   quelle étape, hors approbateur unique.
+ * - `LEAVE_NOT_YOUR_STEP` (403) — ni manager désigné (étape `manager`), ni détenteur
+ *   effectif de `leave.approve`.
+ * - `APPROVER_ALREADY_APPROVED` (409) — il a déjà validé une étape de cette demande :
+ *   deux étapes, deux personnes (hors approbateur unique).
+ * - `ok` — le geste est recevable. `soleApprover` marque la décision rendue possible par
+ *   l'échappatoire ; `onBehalfOfManager` marque la suppléance d'un manager par un
+ *   détenteur de `leave.approve` (journalisée par le service).
+ */
+export type LeaveApprovalDecision =
+  | {
+      readonly ok: false;
+      readonly code:
+        'SELF_APPROVAL_FORBIDDEN' | 'LEAVE_NOT_YOUR_STEP' | 'APPROVER_ALREADY_APPROVED';
+    }
+  | { readonly ok: true; readonly soleApprover: boolean; readonly onBehalfOfManager: boolean };
+
+/**
+ * ADR-0045 § 4.3 — séparation des tâches d'une demande d'absence, motif de
+ * `purchaseApprovalDecision`, sans aucun `if (role === …)` : l'autorité vient de la
+ * RELATION (manager désigné) ou des droits EFFECTIFS (`leave.approve`), jamais du titre.
+ *
+ * Ordre des contrôles (le premier refus gagne) :
+ *   1. on ne valide (ni ne refuse) pas sa propre absence, sauf **approbateur unique** :
+ *      `allowSoleApprover`, un seul détenteur effectif de `leave.approve`, et c'est lui ;
+ *   2. étape `manager` : le manager désigné, ou un détenteur de `leave.approve` en
+ *      suppléance ; étape `hr` : un détenteur de `leave.approve` ;
+ *   3. pour valider, il n'a pas déjà validé une étape de la demande, sauf approbateur
+ *      unique (il tient alors l'étape RH qu'il a déjà tenue comme manager, marqué).
+ * Un refus clôt la demande à n'importe quelle étape : le contrôle 3 ne s'y applique pas.
+ */
+export function leaveApprovalDecision(input: LeaveApprovalInput): LeaveApprovalDecision {
+  const isSelf =
+    input.beneficiaryUserId !== null && input.beneficiaryUserId === input.approverUserId;
+  const soleApproverOrg =
+    input.allowSoleApprover && input.holdsLeaveApprove && input.approverCountInOrg <= 1;
+  if (isSelf && !soleApproverOrg) return { ok: false, code: 'SELF_APPROVAL_FORBIDDEN' };
+
+  let onBehalfOfManager = false;
+  if (input.step === 'manager') {
+    if (!input.isDesignatedManager) {
+      if (!input.holdsLeaveApprove) return { ok: false, code: 'LEAVE_NOT_YOUR_STEP' };
+      onBehalfOfManager = true;
+    }
+  } else if (!input.holdsLeaveApprove) {
+    return { ok: false, code: 'LEAVE_NOT_YOUR_STEP' };
+  }
+
+  if (input.decision === 'reject') {
+    return { ok: true, soleApprover: soleApproverOrg && isSelf, onBehalfOfManager };
+  }
+
+  const already = input.priorApproverUserIds.includes(input.approverUserId);
+  if (already && !soleApproverOrg) return { ok: false, code: 'APPROVER_ALREADY_APPROVED' };
+  return { ok: true, soleApprover: soleApproverOrg && (isSelf || already), onBehalfOfManager };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ADR-0041 — A1 : autorisations par membre (titre + écart)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1283,7 +1558,8 @@ export const NON_DELEGABLE_ACTIONS: readonly Action[] = ['billing.manage'];
 
 /**
  * Paires incompatibles par ajout (G4). Trois (ADR-0044 § 4.3 ajoute la paire des
- * achats) ; la paire facturation
+ * achats ; ADR-0045 § 4.5 n'en ajoute aucune : ne pas valider sa propre absence est une
+ * séparation DYNAMIQUE, `leaveApprovalDecision`) ; la paire facturation
  * `sales.invoice` + `fiscal.manage` a été REFUSÉE par la dirigeante le 29 oct. 2026
  * (décision ouverte n° 3) — une seule personne peut émettre et piloter la fiscalité.
  */
@@ -1336,6 +1612,11 @@ export const ACTION_DEPENDENCIES: Readonly<Partial<Record<Action, readonly Actio
   'purchase.manage': ['purchase.read'],
   'purchase.approve': ['purchase.read'],
   'payables.pay': ['purchase.read', 'treasury.read'],
+  // ADR-0045 — H0 (§ 4.5) : tout geste RH d'autorité suppose de lire le dossier ;
+  // `leave.request` n'exige que le socle (on ne demande que pour soi).
+  'hr.manage': ['hr.read'],
+  'hr.sensitive.read': ['hr.read'],
+  'leave.approve': ['hr.read'],
 };
 
 /**
@@ -1356,8 +1637,9 @@ export function requiredActionsOf(action: Action): Action[] {
 }
 
 /**
- * Les huit domaines de l'écran (ADR-0041 § 5), dans l'ordre d'affichage. Le huitième,
- * « Achats et fournisseurs », vient d'ADR-0044 § 4.3.
+ * Les neuf domaines de l'écran (ADR-0041 § 5), dans l'ordre d'affichage. Le huitième,
+ * « Achats et fournisseurs », vient d'ADR-0044 § 4.3 ; le neuvième, « Ressources
+ * humaines », d'ADR-0045 § 4.5.
  */
 export const ACTION_DOMAINS: readonly {
   readonly key: string;
@@ -1418,6 +1700,12 @@ export const ACTION_DOMAINS: readonly {
       'payables.pay',
     ],
   },
+  // ADR-0045 — H0 (§ 4.5).
+  {
+    key: 'hr',
+    label: 'Ressources humaines',
+    actions: ['hr.read', 'hr.manage', 'hr.sensitive.read', 'leave.request', 'leave.approve'],
+  },
 ];
 
 /** Libellés français des actions (ADR-0041 § 5) — « autorisation », jamais « action ». */
@@ -1456,6 +1744,12 @@ export const ACTION_LABELS: Readonly<Record<Action, string>> = {
   'purchase.manage': 'Gérer les fournisseurs, commandes, réceptions et factures fournisseurs',
   'purchase.approve': "Approuver les demandes d'achat",
   'payables.pay': 'Payer les fournisseurs',
+  // ADR-0045 — H0 (§ 4.1).
+  'hr.read': 'Consulter les dossiers du personnel',
+  'hr.manage': 'Gérer les dossiers du personnel',
+  'hr.sensitive.read': 'Consulter les données sensibles du personnel',
+  'leave.request': 'Demander une absence',
+  'leave.approve': 'Valider les absences',
 };
 
 /**
@@ -1650,6 +1944,7 @@ export const ORG_ROLE_LABELS: Readonly<Record<OrgRole, string>> = {
   advisor: 'Conseiller',
   viewer: 'Lecteur',
   sales_rep: 'Commercial',
+  hr_manager: 'Responsable RH',
 };
 
 /** Description courte d'un rôle — affichée sous le sélecteur de rôle. */
@@ -1664,6 +1959,9 @@ export const ORG_ROLE_DESCRIPTIONS: Readonly<Record<OrgRole, string>> = {
   viewer: 'Lecture seule.',
   sales_rep:
     "CRM, devis et suivi des clients. Ne voit ni la trésorerie ni les dépenses ; n'émet pas de facture.",
+  // ADR-0045 § 4.2.
+  hr_manager:
+    'Dossiers du personnel, absences et documents RH. Ne voit ni la trésorerie, ni les ventes, ni les achats.',
 };
 
 export const PLATFORM_ROLE_LABELS: Readonly<Record<PlatformRole, string>> = {

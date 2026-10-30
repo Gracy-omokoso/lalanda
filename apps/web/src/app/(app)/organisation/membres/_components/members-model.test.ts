@@ -140,12 +140,35 @@ describe('rôle par défaut à l’invitation', () => {
     expect(rolesProposables(options).map((o) => o.value)).toEqual(['admin', 'sales_rep', 'viewer']);
   });
 
-  it('le rang miroir couvre les neuf rôles, sans ex æquo', () => {
+  it('le rang miroir couvre les dix rôles, sans ex æquo', () => {
     const roles = Object.keys(RANG_DE_PRIVILEGE) as OrgRole[];
-    expect(roles).toHaveLength(9);
+    expect(roles).toHaveLength(10);
     expect(new Set(roles.map((r) => RANG_DE_PRIVILEGE[r])).size).toBe(roles.length);
     expect(RANG_DE_PRIVILEGE.owner).toBe(0);
     expect(RANG_DE_PRIVILEGE.sales_rep).toBe(5);
+    // ADR-0045 § 4.2.
+    expect(RANG_DE_PRIVILEGE.hr_manager).toBe(6);
+    expect(RANG_DE_PRIVILEGE.viewer).toBe(9);
+  });
+
+  it('le Responsable RH, en fin de liste, n’est pas pris pour le moins puissant (ADR-0045)', () => {
+    const options = [
+      option({ value: 'admin' }),
+      option({ value: 'viewer' }),
+      option({ value: 'sales_rep', label: 'Commercial' }),
+      option({ value: 'hr_manager', label: 'Responsable RH' }),
+    ];
+    expect(roleParDefaut(options)).toBe('viewer');
+    expect(roleParDefaut([option({ value: 'admin' }), option({ value: 'hr_manager' })])).toBe(
+      'hr_manager',
+    );
+    // Non attribuable pour un Administrateur : le serveur le dit, l'écran ne le propose pas.
+    expect(
+      rolesProposables([
+        option({ value: 'viewer' }),
+        option({ value: 'hr_manager', grantable: false }),
+      ]).map((o) => o.value),
+    ).toEqual(['viewer']);
   });
 
   it('n’invente aucun rôle quand l’acteur ne peut rien attribuer', () => {

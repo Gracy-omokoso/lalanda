@@ -343,8 +343,9 @@ e2eSuite('ADR-0041 A2 — écarts lus par la garde et /me/permissions', () => {
       .get('/authz/catalog')
       .set('Cookie', dans('lecteur', orgEquipe));
     expect(res.status).toBe(200);
-    // ADR-0044 § 4.3 : huitième domaine (achats) et troisième paire.
-    expect(res.body.domains).toHaveLength(8);
+    // ADR-0044 § 4.3 : huitième domaine (achats) et troisième paire ; ADR-0045 § 4.5 :
+    // neuvième domaine (RH), aucune paire nouvelle.
+    expect(res.body.domains).toHaveLength(9);
     expect(res.body.nonDelegable).toEqual(['billing.manage']);
     expect(res.body.sodPairs).toHaveLength(3);
     expect(res.body.labels['sales.invoice']).toBe(
@@ -353,5 +354,11 @@ e2eSuite('ADR-0041 A2 — écarts lus par la garde et /me/permissions', () => {
     expect((res.body.roleMatrix as { role: string }[]).map((r) => r.role)).not.toContain(
       'project_manager',
     );
+    // ADR-0045 § 4.2 : le Responsable RH est un titre attribuable (par le Propriétaire).
+    const rh = (res.body.roleMatrix as { role: string; label: string; actions: string[] }[]).find(
+      (r) => r.role === 'hr_manager',
+    );
+    expect(rh?.label).toBe('Responsable RH');
+    expect(rh?.actions).toHaveLength(8);
   }, 30_000);
 });

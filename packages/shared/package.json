@@ -53,6 +53,10 @@
     "./purchases": {
       "types": "./dist/purchases/index.d.ts",
       "import": "./dist/purchases/index.js"
+    },
+    "./hr": {
+      "types": "./dist/hr/index.d.ts",
+      "import": "./dist/hr/index.js"
     }
   },
   "scripts": {
