@@ -120,7 +120,7 @@ function Coquille({ children }: { children: React.ReactNode }): React.ReactEleme
           <main
             id="contenu"
             tabIndex={-1}
-            className={`mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 pt-6 ${avecBarre ? 'pb-28' : 'pb-10'} outline-none sm:px-6 lg:px-8 lg:pb-10 lg:pt-8`}
+            className={`mx-auto flex w-full max-w-[120rem] flex-1 flex-col gap-6 px-4 pt-6 ${avecBarre ? 'pb-28' : 'pb-10'} outline-none sm:px-6 lg:px-8 lg:pb-10 lg:pt-8`}
           >
             <PendingInvitationsBanner />
             <div className="flex-1">{children}</div>
@@ -129,7 +129,7 @@ function Coquille({ children }: { children: React.ReactNode }): React.ReactEleme
           {/* Pied de page légal (S22c) et version du logiciel, visible de tout
               écran (ADR-0026 § 6.2). */}
           <footer
-            className={`mx-auto flex ${avecBarre ? 'mb-24' : ''} w-full max-w-6xl flex-col gap-3 border-t border-[var(--border)] px-4 py-5 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:mb-0 lg:px-8`}
+            className={`mx-auto flex ${avecBarre ? 'mb-24' : ''} w-full max-w-[120rem] flex-col gap-3 border-t border-[var(--border)] px-4 py-5 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:mb-0 lg:px-8`}
           >
             <LegalLinks />
             <AppVersion className="text-xs text-[var(--foreground-muted)]" />
