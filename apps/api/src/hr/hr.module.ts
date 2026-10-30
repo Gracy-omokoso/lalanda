@@ -43,7 +43,29 @@ import { HrLeaveService } from './leave/hr-leave.service.js';
 import { LeaveLedgerEntry, LeaveLedgerEntrySchema } from './leave/leave-ledger.schema.js';
 import { LeaveRequest, LeaveRequestSchema } from './leave/leave-request.schema.js';
 import { LeaveType, LeaveTypeSchema } from './leave/leave-type.schema.js';
-import { HrLifecycleHub } from './lifecycle/hr-lifecycle.js';
+import { HR_DOCUMENTS_LIFECYCLE, HrLifecycleHub } from './lifecycle/hr-lifecycle.js';
+// ADR-0045 — H4
+import {
+  Checklist,
+  ChecklistSchema,
+  ChecklistTemplate,
+  ChecklistTemplateSchema,
+} from './checklists/checklist.schemas.js';
+import { HrChecklistsController } from './checklists/hr-checklists.controller.js';
+import { HrChecklistsNotifier } from './checklists/hr-checklists-notifier.js';
+import { HrChecklistsService } from './checklists/hr-checklists.service.js';
+import { HrDocument, HrDocumentSchema } from './documents/hr-document.schema.js';
+import { HrDocumentsController } from './documents/hr-documents.controller.js';
+import { HrDocumentsLifecycleService } from './documents/hr-documents-lifecycle.js';
+import { HrDocumentsService } from './documents/hr-documents.service.js';
+import { HrDeadlinesController } from './reminders/hr-deadlines.controller.js';
+import { HrDeadlinesService } from './reminders/hr-deadlines.service.js';
+import {
+  HrReminderClaim,
+  HrReminderClaimSchema,
+  HrRemindersJob,
+} from './reminders/hr-reminders.job.js';
+import { HrRetentionJob } from './retention/hr-retention.job.js';
 
 @Module({
   imports: [
@@ -65,6 +87,11 @@ import { HrLifecycleHub } from './lifecycle/hr-lifecycle.js';
       { name: Holiday.name, schema: HolidaySchema },
       { name: LeaveRequest.name, schema: LeaveRequestSchema },
       { name: LeaveLedgerEntry.name, schema: LeaveLedgerEntrySchema },
+      // ADR-0045 — H4 : documents, modèles et listes, réclamations des rappels.
+      { name: HrDocument.name, schema: HrDocumentSchema },
+      { name: ChecklistTemplate.name, schema: ChecklistTemplateSchema },
+      { name: Checklist.name, schema: ChecklistSchema },
+      { name: HrReminderClaim.name, schema: HrReminderClaimSchema },
     ]),
   ],
   controllers: [
@@ -78,6 +105,10 @@ import { HrLifecycleHub } from './lifecycle/hr-lifecycle.js';
     HrHolidaysController,
     HrLeaveController,
     HrCalendarController,
+    // ADR-0045 — H4
+    HrDocumentsController,
+    HrChecklistsController,
+    HrDeadlinesController,
   ],
   providers: [
     MasterKeyringProvider,
@@ -99,6 +130,17 @@ import { HrLifecycleHub } from './lifecycle/hr-lifecycle.js';
     HrLeaveAccrualsJob,
     HrLifecycleHub,
     { provide: HR_EMPLOYEE_LIFECYCLE, useExisting: HrLifecycleHub },
+    // ADR-0045 — H4 : documents (stockage, chiffrement des sensibles), listes, échéances,
+    // rappels, conservation (éteinte) ; effacement des documents sensibles à
+    // l'anonymisation par le point d'extension de H3.
+    HrDocumentsService,
+    HrDocumentsLifecycleService,
+    { provide: HR_DOCUMENTS_LIFECYCLE, useExisting: HrDocumentsLifecycleService },
+    HrChecklistsNotifier,
+    HrChecklistsService,
+    HrDeadlinesService,
+    HrRemindersJob,
+    HrRetentionJob,
   ],
   exports: [
     // ADR-0045 — H2
@@ -110,6 +152,10 @@ import { HrLifecycleHub } from './lifecycle/hr-lifecycle.js';
     HrLeaveService,
     HrLeaveTypesService,
     HrHolidaysService,
+    // ADR-0045 — H4
+    HrDocumentsService,
+    HrChecklistsService,
+    HrDeadlinesService,
   ],
 })
 export class HrModule {}

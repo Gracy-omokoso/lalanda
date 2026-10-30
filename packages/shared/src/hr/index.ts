@@ -14,3 +14,6 @@ export * from './employees.js';
 
 // ADR-0045 — H3 (absences, congés, fériés, calendrier, réglages en écriture, « Mes tâches »)
 export * from './leave.js';
+
+// ADR-0045 — H4 (documents, listes d'entrée et de sortie, échéances)
+export * from './documents.js';

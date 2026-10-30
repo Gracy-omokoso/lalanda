@@ -27,6 +27,7 @@ import {
   type EmployeePage,
   type EmployeeView,
   type EmployeesFromMembersResult,
+  type HrMeDocumentsAndChecklists,
   type HrMeView,
   type HrTeamView,
   type OrgChartView,
@@ -61,6 +62,9 @@ import { employeeNotFound } from '../scope/hr-errors.js';
 import { HrScopeService } from '../scope/hr-scope.service.js';
 import { HrLeaveService } from '../leave/hr-leave.service.js';
 import { HrEmployeesService } from './hr-employees.service.js';
+// ADR-0045 — H4
+import { HrChecklistsService } from '../checklists/hr-checklists.service.js';
+import { HrDocumentsService } from '../documents/hr-documents.service.js';
 
 type User = { id: string };
 
@@ -77,6 +81,9 @@ export class HrEmployeesController {
     @Inject(HrPrivateService) private readonly privates: HrPrivateService,
     // ADR-0045 — H3
     @Inject(HrLeaveService) private readonly leave: HrLeaveService,
+    // ADR-0045 — H4
+    @Inject(HrDocumentsService) private readonly documents: HrDocumentsService,
+    @Inject(HrChecklistsService) private readonly checklists: HrChecklistsService,
   ) {}
 
   @Get('employees')
@@ -219,10 +226,16 @@ export class HrEmployeesController {
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
     @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
-  ): Promise<HrMeView> {
+  ): Promise<HrMeView & HrMeDocumentsAndChecklists> {
     const viewer = await this.scope.viewerOf(orgId, user.id, perms);
     // ADR-0045 — H3 : mes soldes et mes demandes (§ 3.1).
-    return this.leave.completeMe(orgId, viewer, await this.employees.me(viewer));
+    const me = await this.leave.completeMe(orgId, viewer, await this.employees.me(viewer));
+    // ADR-0045 — H4 : mes documents visibles et mes éléments de liste non faits.
+    const [documents, checklistItems] = await Promise.all([
+      this.documents.mine(orgId, viewer),
+      this.checklists.mine(orgId, user.id),
+    ]);
+    return { ...me, documents, checklistItems };
   }
 
   @Get('team')
