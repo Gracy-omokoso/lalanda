@@ -98,17 +98,28 @@ describe('création', () => {
     });
     expect(r.ok).toBe(false);
     if (r.ok) return;
-    expect(Object.keys(r.champs).sort()).toEqual(['contactName', 'email', 'name', 'nif', 'termsDays']);
+    expect(Object.keys(r.champs).sort()).toEqual([
+      'contactName',
+      'email',
+      'name',
+      'nif',
+      'termsDays',
+    ]);
   });
   it('avertissements en phrases', () => {
-    expect(phrasesAvertissements([{ code: 'SUPPLIER_SIMILAR_NAME', supplierId: 'a' }])).toHaveLength(1);
+    expect(
+      phrasesAvertissements([{ code: 'SUPPLIER_SIMILAR_NAME', supplierId: 'a' }]),
+    ).toHaveLength(1);
     expect(phrasesAvertissements([])).toEqual([]);
   });
 });
 
 describe('coordonnées de paiement', () => {
   it('« Afficher » exige `payables.pay`, sinon désactivé avec sa raison', () => {
-    expect(boutonAfficher(['purchase.read', 'payables.pay'])).toEqual({ actif: true, raison: null });
+    expect(boutonAfficher(['purchase.read', 'payables.pay'])).toEqual({
+      actif: true,
+      raison: null,
+    });
     expect(boutonAfficher(['purchase.read', 'purchase.manage'])).toEqual({
       actif: false,
       raison: RAISON_SANS_PAIEMENT,

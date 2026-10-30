@@ -76,8 +76,9 @@ describe('boutons selon les droits et la séparation des tâches', () => {
 
   it('le demandeur approbateur : désactivé, sauf si l’API le met dans SA liste (approbateur unique)', () => {
     const o = commande({ requestedBy: 'u-dir', createdBy: 'u-dir' });
-    expect(actionsCommande(o, ctx(DIRECTEUR, 'u-dir', false)).find((a) => a.id === 'approuver')!
-      .raison).toBe(RAISON_PROPRE_DEMANDE);
+    expect(
+      actionsCommande(o, ctx(DIRECTEUR, 'u-dir', false)).find((a) => a.id === 'approuver')!.raison,
+    ).toBe(RAISON_PROPRE_DEMANDE);
     expect(
       actionsCommande(o, ctx(DIRECTEUR, 'u-dir', true)).find((a) => a.id === 'approuver')!.actif,
     ).toBe(true);

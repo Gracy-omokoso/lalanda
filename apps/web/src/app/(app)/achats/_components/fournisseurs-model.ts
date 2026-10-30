@@ -51,7 +51,9 @@ export function requeteFournisseurs(
  * Reste dû d'une ligne de liste, une devise par ligne. `null` : l'appelant ne
  * lit pas la trésorerie (l'API ne le sert pas) — l'écran le dit, sans zéro.
  */
-export function resteDuLignes(item: Pick<SupplierListItem, 'remainingByCurrency'>): string[] | null {
+export function resteDuLignes(
+  item: Pick<SupplierListItem, 'remainingByCurrency'>,
+): string[] | null {
   if (item.remainingByCurrency === null) return null;
   return (['CDF', 'USD'] as const)
     .filter((c) => item.remainingByCurrency?.[c] !== undefined)
@@ -75,7 +77,9 @@ export function libelleConditions(t: SupplierPaymentTerms): string {
 }
 
 /** Contact principal (préremplit l'envoi du bon de commande), ou `null`. */
-export function contactPrincipal(s: Pick<SupplierView, 'contacts'>): SupplierView['contacts'][number] | null {
+export function contactPrincipal(
+  s: Pick<SupplierView, 'contacts'>,
+): SupplierView['contacts'][number] | null {
   return s.contacts.find((c) => c.isPrimary) ?? s.contacts[0] ?? null;
 }
 
@@ -146,7 +150,8 @@ export function preparerFournisseur(
   if (name === '') champs['name'] = 'Le nom est obligatoire.';
   else if (name.length > 200) champs['name'] = '200 caractères au plus.';
   const nif = f.nif.toUpperCase().replace(/[\s-]+/g, '');
-  if (nif !== '' && !/^[A-Z0-9]{5,20}$/.test(nif)) champs['nif'] = 'NIF : 5 à 20 lettres ou chiffres.';
+  if (nif !== '' && !/^[A-Z0-9]{5,20}$/.test(nif))
+    champs['nif'] = 'NIF : 5 à 20 lettres ou chiffres.';
   if (f.phone.trim() !== '' && !TELEPHONE.test(f.phone.trim()))
     champs['phone'] = 'Numéro de téléphone invalide.';
   if (f.email.trim() !== '' && !ADRESSE.test(f.email.trim()))
@@ -276,7 +281,9 @@ export const TRANCHES_ANCIENNETE = [
   ['disputed', 'En litige'],
 ] as const;
 
-type LigneAnciennete = NonNullable<SupplierOverview['sections']['balance']['data']>['byCurrency'][number];
+type LigneAnciennete = NonNullable<
+  SupplierOverview['sections']['balance']['data']
+>['byCurrency'][number];
 
 /** Tranches d'ancienneté d'une devise, montants formatés (valeurs du moteur). */
 export function trancheAnciennete(row: LigneAnciennete): { libelle: string; montant: string }[] {

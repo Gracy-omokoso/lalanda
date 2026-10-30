@@ -425,9 +425,7 @@ export function FournisseurFiche({ supplierId }: { supplierId: string }): React.
           <Tuile libelle="Téléphone" valeur={s.phone ?? '—'} />
           <Tuile libelle="E-mail" valeur={<span className="break-all">{s.email ?? '—'}</span>} />
         </dl>
-        {s.address ? (
-          <p className="text-sm text-[var(--foreground-muted)]">{s.address}</p>
-        ) : null}
+        {s.address ? <p className="text-sm text-[var(--foreground-muted)]">{s.address}</p> : null}
       </Bandeau>
 
       <Identite s={s} />

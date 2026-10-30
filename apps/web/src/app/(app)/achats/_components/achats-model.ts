@@ -47,7 +47,8 @@ const MESSAGES: Record<string, string> = {
     'Vous avez demandé cet achat : un autre approbateur doit le valider (séparation des tâches).',
   APPROVER_ALREADY_APPROVED:
     'Vous avez déjà approuvé cette demande : la seconde approbation doit venir d’une autre personne.',
-  PURCHASE_ORDER_INVOICED: 'Une facture validée vise cette commande : elle ne peut plus être annulée.',
+  PURCHASE_ORDER_INVOICED:
+    'Une facture validée vise cette commande : elle ne peut plus être annulée.',
   DOCUMENT_NOT_SENDABLE: 'Seule une commande approuvée ou envoyée peut partir au fournisseur.',
   PURCHASE_WORK_PROJECT_UNKNOWN: 'Le projet indiqué est introuvable.',
   DOCUMENT_EMAIL_RATE_LIMITED: 'Trop d’envois en peu de temps : réessayez plus tard.',
@@ -90,8 +91,7 @@ export function messageAchats(err: unknown, repli: string): string {
 /** Identifiant existant porté par un refus (`409 SUPPLIER_NIF_EXISTS`), ou `null`. */
 export function identifiantExistant(err: unknown): string | null {
   const detail = (err as ErreurApi | null)?.detail as
-    | { details?: { existingId?: unknown }; existingId?: unknown }
-    | undefined;
+    { details?: { existingId?: unknown }; existingId?: unknown } | undefined;
   const v = detail?.details?.existingId ?? detail?.existingId;
   return typeof v === 'string' && v !== '' ? v : null;
 }
@@ -175,7 +175,11 @@ export interface Membre {
 }
 
 /** Nom d'un membre ; « vous » pour soi ; « un membre » si la liste n'est pas lisible. */
-export function nomPersonne(membres: readonly Membre[], userId: string, moi: string | null): string {
+export function nomPersonne(
+  membres: readonly Membre[],
+  userId: string,
+  moi: string | null,
+): string {
   if (moi !== null && userId === moi) return 'vous';
   return membres.find((m) => m.userId === userId)?.name ?? 'un membre';
 }

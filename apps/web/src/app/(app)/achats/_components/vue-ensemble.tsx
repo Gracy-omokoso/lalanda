@@ -131,10 +131,7 @@ export function VueEnsemble(): React.ReactElement {
         icone={ClipboardList}
         id="achats-miennes"
         action={
-          <Link
-            href={`${ACHATS_BASE}/commandes`}
-            className="text-sm underline underline-offset-2"
-          >
+          <Link href={`${ACHATS_BASE}/commandes`} className="text-sm underline underline-offset-2">
             Toutes les demandes
           </Link>
         }

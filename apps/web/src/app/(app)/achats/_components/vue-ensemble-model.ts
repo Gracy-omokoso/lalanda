@@ -44,10 +44,7 @@ export function compteDePage(page: PageLue): string {
   return page.nextCursor ? `${n} et plus` : String(n);
 }
 
-function tuileCompte(
-  lu: Lecture<PageLue>,
-  attentionSiNonVide: boolean,
-): EtatTuile {
+function tuileCompte(lu: Lecture<PageLue>, attentionSiNonVide: boolean): EtatTuile {
   if (!lu.ok) return { etat: 'indisponible', phrase: phraseIndisponible(lu.erreur) };
   return {
     etat: 'connu',
@@ -57,10 +54,7 @@ function tuileCompte(
   };
 }
 
-function tuileMontants(
-  lu: Lecture<PayablesView>,
-  champ: 'dueSoon' | 'overdue',
-): EtatTuile {
+function tuileMontants(lu: Lecture<PayablesView>, champ: 'dueSoon' | 'overdue'): EtatTuile {
   if (!lu.ok) return { etat: 'indisponible', phrase: phraseIndisponible(lu.erreur) };
   const lignes = lu.valeur.byCurrency
     .filter((c) => c[champ].count > 0)

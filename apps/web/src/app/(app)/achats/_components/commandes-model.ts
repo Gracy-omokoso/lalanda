@@ -56,7 +56,9 @@ export function requeteCommandes(
 }
 
 /** Numéro affiché : le `BC` l'emporte sur le `DA` ; un brouillon n'en a pas. */
-export function numeroCommande(o: Pick<PurchaseOrderView, 'orderNumber' | 'requestNumber'>): string {
+export function numeroCommande(
+  o: Pick<PurchaseOrderView, 'orderNumber' | 'requestNumber'>,
+): string {
   return o.orderNumber ?? o.requestNumber ?? 'Brouillon sans numéro';
 }
 
@@ -224,7 +226,9 @@ export function formulaireCommande(
 const sansEspaces = (s: string): string => s.replace(/[\s  ]/g, '').replace(',', '.');
 
 /** Quantité saisie (« 2,5 ») → chaîne du contrat (« 2.5 ») : > 0, trois décimales au plus. */
-export function lireQuantite(saisie: string): { ok: true; valeur: string } | { ok: false; erreur: string } {
+export function lireQuantite(
+  saisie: string,
+): { ok: true; valeur: string } | { ok: false; erreur: string } {
   const s = sansEspaces(saisie);
   const m = /^(\d{1,9})(?:\.(\d{1,3}))?$/.exec(s);
   if (m === null) return { ok: false, erreur: 'Quantité invalide : trois décimales au plus.' };
@@ -235,11 +239,16 @@ export function lireQuantite(saisie: string): { ok: true; valeur: string } | { o
 }
 
 /** Montant saisi (« 1 234,50 ») → chaîne du contrat ; zéro permis (prix ≥ 0). */
-export function lirePrix(saisie: string): { ok: true; valeur: string } | { ok: false; erreur: string } {
+export function lirePrix(
+  saisie: string,
+): { ok: true; valeur: string } | { ok: false; erreur: string } {
   const s = sansEspaces(saisie);
   if (s === '') return { ok: false, erreur: 'Saisissez un montant.' };
   if (!/^\d{1,13}(\.\d{1,2})?$/.test(s)) {
-    return { ok: false, erreur: 'Montant invalide : deux décimales au plus, par exemple 1 234,50.' };
+    return {
+      ok: false,
+      erreur: 'Montant invalide : deux décimales au plus, par exemple 1 234,50.',
+    };
   }
   return { ok: true, valeur: s };
 }
@@ -254,9 +263,7 @@ const ouNul = (v: string): string | null => (v.trim() === '' ? null : v.trim());
  */
 export function preparerCommande(
   f: FormulaireCommande,
-):
-  | { ok: true; corps: CreatePurchaseOrderInput }
-  | { ok: false; champs: Record<string, string> } {
+): { ok: true; corps: CreatePurchaseOrderInput } | { ok: false; champs: Record<string, string> } {
   const champs: Record<string, string> = {};
   const title = f.title.trim();
   if (title === '') champs['title'] = 'L’objet de la demande est obligatoire.';

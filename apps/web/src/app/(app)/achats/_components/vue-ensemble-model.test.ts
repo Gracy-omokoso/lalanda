@@ -38,7 +38,8 @@ describe('tuiles', () => {
       echeancier: ko(404),
     });
     expect(t.map((x) => x.id)).toEqual(['a-recevoir', 'factures-ecart', 'a-payer', 'en-retard']);
-    for (const x of t) expect(x.contenu).toEqual({ etat: 'indisponible', phrase: 'Pas encore disponible' });
+    for (const x of t)
+      expect(x.contenu).toEqual({ etat: 'indisponible', phrase: 'Pas encore disponible' });
   });
 
   it('« À approuver » seulement pour qui approuve', () => {

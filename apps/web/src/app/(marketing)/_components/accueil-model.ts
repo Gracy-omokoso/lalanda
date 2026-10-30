@@ -55,6 +55,8 @@ export const APPS_PAR_MODULE: Readonly<Record<ModuleId, readonly string[]>> = {
     'encaissements',
     'clients',
     'catalogue',
+    // ADR-0044 — achats, juste avant Trésorerie (même ordre que la navigation).
+    'achats',
     'tresorerie',
   ],
   grow: ['pilotage', 'brief', 'sante', 'investisseurs', 'parcours'],
