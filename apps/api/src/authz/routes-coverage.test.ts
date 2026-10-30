@@ -79,6 +79,11 @@ import { SupplierPaymentsController } from '../purchases/payments/supplier-payme
 // ADR-0044 — P6
 import { SupplierOverviewController } from '../purchases/overview/supplier-overview.controller.js';
 import { PurchasesSummaryController } from '../purchases/payables/purchases-summary.controller.js';
+// ADR-0045 — H2
+import { HrDepartmentsController } from '../hr/departments/hr-departments.controller.js';
+import { HrEmployeesController } from '../hr/employees/hr-employees.controller.js';
+import { HrPrivateController } from '../hr/private/hr-private.controller.js';
+import { HrSettingsController } from '../hr/settings/hr-settings.controller.js';
 import { QuotesController } from '../sales/quotes/quotes.controller.js';
 import { CrmActivitiesController } from '../crm/crm-activities.controller.js';
 import { CrmContactsController } from '../crm/crm-contacts.controller.js';
@@ -221,6 +226,11 @@ const CONTROLEURS = [
   // ADR-0044 — P6
   SupplierOverviewController,
   PurchasesSummaryController,
+  // ADR-0045 — H2 : dossiers, données sensibles, services, réglages (lecture).
+  HrEmployeesController,
+  HrPrivateController,
+  HrDepartmentsController,
+  HrSettingsController,
 ];
 
 /**
@@ -1067,5 +1077,47 @@ describe('ADR-0044 — P6 : fiche fournisseur 360° et résumé des achats', () 
     expect(routes.map((r) => [r.cle, r.actions])).toEqual([
       ['PurchasesSummaryController.summary', ['purchase.read']],
     ]);
+  });
+});
+
+// ADR-0045 — H2
+describe('ADR-0045 — H2 : dossiers collaborateurs, services, organigramme, données sensibles', () => {
+  it('chaque route déclare la permission de l’ADR (§ 3.1, § 3.3) ; relationnelles en `analytics.read`', () => {
+    const attendu: Record<string, Action[]> = {
+      'HrEmployeesController.list': ['hr.read'],
+      'HrEmployeesController.create': ['hr.manage'],
+      'HrEmployeesController.fromMembers': ['hr.manage'],
+      // Relationnelles : `hr.read`, ou soi, ou manager — portée décidée par le moteur.
+      'HrEmployeesController.get': ['analytics.read'],
+      'HrEmployeesController.update': ['hr.manage'],
+      'HrEmployeesController.exit': ['hr.manage'],
+      'HrEmployeesController.reinstate': ['hr.manage'],
+      'HrEmployeesController.anonymize': ['hr.sensitive.read', 'hr.manage'],
+      'HrEmployeesController.me': ['analytics.read'],
+      'HrEmployeesController.team': ['analytics.read'],
+      'HrEmployeesController.orgChart': ['analytics.read'],
+      // Lecture : `hr.sensitive.read`, ou le collaborateur lui-même (décidé dans le service).
+      'HrPrivateController.summary': ['analytics.read'],
+      'HrPrivateController.reveal': ['analytics.read'],
+      'HrPrivateController.write': ['hr.sensitive.read', 'hr.manage'],
+      'HrDepartmentsController.list': ['hr.read'],
+      'HrDepartmentsController.create': ['hr.manage'],
+      'HrDepartmentsController.update': ['hr.manage'],
+      'HrDepartmentsController.archive': ['hr.manage'],
+      'HrSettingsController.get': ['hr.read'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) =>
+      /^Hr(Employees|Private|Departments|Settings)Controller\./.test(r.cle),
+    );
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+    }
+    for (const cle of Object.keys(SANS_PERMISSION)) expect(cle.startsWith('Hr')).toBe(false);
+  });
+
+  it('`hr.sensitive.read` reste interdit à la plateforme, même sous accès délégué', () => {
+    expect(PLATFORM_FORBIDDEN_ACTIONS).toContain('hr.sensitive.read');
   });
 });
