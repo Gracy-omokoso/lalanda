@@ -10,8 +10,8 @@ import {
 } from './index.js';
 
 describe('notifications — contrats partagés', () => {
-  it('déclare six types work, cinq crm, un organization et sept purchases, préfixés par leur module', () => {
-    expect(NOTIFICATION_KINDS).toHaveLength(19);
+  it('déclare six types work, cinq crm, un organization, sept purchases et neuf hr, préfixés par leur module', () => {
+    expect(NOTIFICATION_KINDS).toHaveLength(28);
     for (const kind of NOTIFICATION_KINDS) {
       const module = kind.split('.')[0]!;
       expect(NOTIFICATION_SOURCE_MODULES as readonly string[]).toContain(module);
@@ -33,6 +33,10 @@ describe('notifications — contrats partagés', () => {
       'purchase_order',
       'supplier_invoice',
       'supplier',
+      'leave_request',
+      'employee',
+      'hr_document',
+      'hr_checklist',
     ]);
     // ADR-0041 — A4.
     expect(NOTIFICATION_KINDS.filter((k) => k.startsWith('organization.'))).toEqual([
@@ -49,6 +53,19 @@ describe('notifications — contrats partagés', () => {
       'purchases.supplier_payment_details_changed',
     ]);
     expect(NOTIFICATION_SOURCE_MODULES).toContain('purchases');
+    // ADR-0045 — H0 (§ 6.1) : neuf types, un module, quatre natures d'entité.
+    expect(NOTIFICATION_KINDS.filter((k) => k.startsWith('hr.'))).toEqual([
+      'hr.leave_requested',
+      'hr.leave_approved',
+      'hr.leave_rejected',
+      'hr.leave_cancelled',
+      'hr.probation_ending',
+      'hr.contract_ending',
+      'hr.document_expiring',
+      'hr.checklist_item_assigned',
+      'hr.bank_details_changed',
+    ]);
+    expect(NOTIFICATION_SOURCE_MODULES).toContain('hr');
   });
 
   it('un lien est un chemin relatif de l’application, jamais une URL absolue', () => {
