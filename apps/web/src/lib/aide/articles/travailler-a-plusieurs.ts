@@ -18,10 +18,9 @@
 //    (`409 MEMBER_PERMISSIONS_DISABLED`), notification `/compte`.
 //
 // TROIS LIMITES CRITIQUES écrites ici telles qu'elles sont AUJOURD'HUI :
-//   1. aucun envoi d'email n'existe dans le dépôt (aucune dépendance SMTP,
-//      aucune variable d'environnement) : l'invitation se transmet par un lien
-//      copié à la main. Un développement est en cours en parallèle — ne pas
-//      décrire l'état futur ;
+//   1. l'invitation part par email (`MailService.sendInvitation`), mais l'écran
+//      ne dit pas si l'envoi a réussi et les emails peuvent arriver en
+//      indésirables (DKIM non réglé) : le lien affiché reste le recours ;
 //   2. le changement d'adresse email ne peut pas aboutir, pour la même raison,
 //      et c'est délibéré (appliquer sans vérification ouvrirait une prise de
 //      compte) ;
@@ -62,9 +61,9 @@ export const TRAVAILLER_A_PLUSIEURS: ArticleAide = {
         {
           type: 'note',
           ton: 'limite',
-          titre: 'L’invitation ne part pas par email : vous transmettez le lien vous-même',
+          titre: 'L’invitation part par email — gardez le lien sous la main',
           texte:
-            'Aucun service d’envoi d’emails n’est branché sur Lalanda à ce jour. Quand vous créez une invitation, **aucun message n’est envoyé**. L’application affiche un **lien d’invitation** que vous devez copier et transmettre vous-même — par WhatsApp, SMS ou votre propre messagerie. Ce n’est pas une panne : c’est l’état actuel du produit.',
+            'Quand vous créez une invitation, Lalanda **envoie un email** à l’adresse saisie. L’email peut arriver dans les **indésirables** : prévenez la personne. L’application affiche aussi le **lien d’invitation** ; si l’email n’arrive pas, copiez ce lien et transmettez-le vous-même — par WhatsApp, SMS ou votre propre messagerie.',
         },
         {
           type: 'etapes',
