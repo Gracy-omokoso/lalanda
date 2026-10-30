@@ -9,6 +9,7 @@
 // active — lue par la coquille, jamais déduite ici. Une organisation créée ici
 // ouvre directement sa mise en route.
 
+import { Modal } from '@lalanda/ui';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
@@ -204,21 +205,19 @@ function CreateOrgModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-30 flex items-center justify-center bg-black/50 p-4"
-      onClick={onClose}
+    <Modal
+      open
+      onClose={onClose}
+      title="Nouvelle organisation"
+      description="Vous en devenez Propriétaire. Une mise en route en quatre étapes vous attend ensuite."
+      size="sm"
+      busy={creating}
     >
       <form
         onSubmit={handleSubmit}
-        onClick={(e) => e.stopPropagation()}
-        className="flex w-full max-w-sm flex-col gap-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6"
+        aria-label="Nouvelle organisation"
+        className="flex flex-col gap-4"
       >
-        <div className="flex flex-col gap-1">
-          <h3 className="text-lg font-semibold">Nouvelle organisation</h3>
-          <p className="text-sm text-[var(--foreground-muted)]">
-            Vous en devenez Propriétaire. Une mise en route en quatre étapes vous attend ensuite.
-          </p>
-        </div>
         <label className="flex flex-col gap-1.5 text-sm">
           <span className="font-medium">Nom</span>
           <input
@@ -254,6 +253,6 @@ function CreateOrgModal({
           </button>
         </div>
       </form>
-    </div>
+    </Modal>
   );
 }

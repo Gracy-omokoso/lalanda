@@ -173,8 +173,14 @@ function ModalOuverte({
   }, [busy, sale, confirmation, onClose]);
 
   function surTouche(e: React.KeyboardEvent<HTMLDialogElement>): void {
-    if (e.key !== 'Tab' || !ref.current) return;
-    const liste = focusables(dialogueImbrique(ref.current) ?? ref.current);
+    if (!ref.current) return;
+    const imbrique = dialogueImbrique(ref.current);
+    // Clavier réservé à la fenêtre : un tiroir ou un menu ouvert derrière elle
+    // (écouteur sur `document`) ne doit ni se fermer sur `Échap`, ni reprendre
+    // `Tab`. Un dialogue imbriqué, lui, garde ses propres écouteurs.
+    if ((e.key === 'Escape' || e.key === 'Tab') && !imbrique) e.stopPropagation();
+    if (e.key !== 'Tab') return;
+    const liste = focusables(imbrique ?? ref.current);
     const actif = document.activeElement as HTMLElement | null;
     const i = actif ? liste.indexOf(actif) : -1;
     const cible = trapFocusIndex(i, liste.length, e.shiftKey);

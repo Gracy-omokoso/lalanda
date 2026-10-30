@@ -17,6 +17,8 @@
 // interrupteur éteint, la grille est en lecture seule et l'invitation part avec
 // le titre seul.
 
+import { Modal, buttonClasses } from '@lalanda/ui';
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
 
 import { api, type InvitationView, type OrgAction, type OrgRole, type RoleOption } from '@/lib/api';
@@ -106,6 +108,7 @@ export function InvitePanel({
   const [busy, setBusy] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [lienCree, setLienCree] = useState<string | null>(null);
+  const [ouvert, setOuvert] = useState(false);
 
   const proposables = rolesProposables(roleOptions);
   const lienBase =
@@ -160,16 +163,52 @@ export function InvitePanel({
         </p>
       </div>
 
+      {peutInviter && proposables.length > 0 ? (
+        <button
+          type="button"
+          className={`${buttonClasses('primary', 'md')} self-start`}
+          onClick={() => {
+            setErreur(null);
+            setLienCree(null);
+            setOuvert(true);
+          }}
+        >
+          <Plus aria-hidden="true" className="h-4 w-4" />
+          Inviter un membre
+        </button>
+      ) : null}
+
       {peutInviter ? (
         proposables.length === 0 ? (
           <p className="rounded-md border border-dashed border-[var(--border)] p-3 text-xs text-[var(--foreground-muted)]">
             Aucun rôle n’est à votre portée : vous ne pouvez attribuer que des rôles dont vous
             détenez déjà tous les droits.
           </p>
-        ) : (
+        ) : null
+      ) : (
+        <p className="rounded-md border border-dashed border-[var(--border)] p-3 text-xs text-[var(--foreground-muted)]">
+          Votre rôle ne permet pas d’inviter de nouveaux membres.
+        </p>
+      )}
+
+      <Modal
+        open={ouvert && peutInviter && proposables.length > 0}
+        onClose={() => {
+          setOuvert(false);
+          setLienCree(null);
+          setErreur(null);
+        }}
+        title="Inviter un membre"
+        description="Le rôle est fixé dès l’invitation et s’applique à l’acceptation. L’invitation expire après 7 jours."
+        size="lg"
+        busy={busy === 'creation'}
+        dirty={email.trim() !== ''}
+      >
+        <div className="flex flex-col gap-4">
           <form
             onSubmit={(e) => void inviter(e)}
-            className="flex flex-col gap-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5"
+            aria-label="Inviter un membre"
+            className="flex flex-col gap-4"
           >
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
               <div className="flex flex-1 flex-col gap-1.5">
@@ -254,32 +293,24 @@ export function InvitePanel({
               </div>
             ) : null}
           </form>
-        )
-      ) : (
-        <p className="rounded-md border border-dashed border-[var(--border)] p-3 text-xs text-[var(--foreground-muted)]">
-          Votre rôle ne permet pas d’inviter de nouveaux membres.
-        </p>
-      )}
+          {erreur ? (
+            <div
+              role="alert"
+              className="rounded-md border border-[var(--danger)]/30 bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger)]"
+            >
+              <strong>Refusé :</strong> {erreur}
+            </div>
+          ) : null}
+          {lienCree ? <LienInvitation lien={lienCree} /> : null}
+        </div>
+      </Modal>
 
-      {erreur ? (
+      {erreur && !ouvert ? (
         <div
           role="alert"
           className="rounded-md border border-[var(--danger)]/30 bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger)]"
         >
           <strong>Refusé :</strong> {erreur}
-        </div>
-      ) : null}
-
-      {lienCree ? (
-        <div className="rounded-md border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-3 text-xs">
-          <p className="mb-1 font-medium">Invitation créée. Partagez ce lien avec l’invité :</p>
-          <code className="block break-all rounded bg-[var(--surface)] p-2 font-mono text-[11px]">
-            {lienCree}
-          </code>
-          <p className="mt-2 text-[var(--foreground-muted)]">
-            L’envoi automatique par email arrive avec S12. L’invité peut aussi accepter depuis la
-            bannière de son tableau de bord.
-          </p>
         </div>
       ) : null}
 
@@ -329,5 +360,21 @@ export function InvitePanel({
         </ul>
       )}
     </section>
+  );
+}
+
+/** Lien d'invitation créé, à partager (recours si l'email n'arrive pas). */
+function LienInvitation({ lien }: { lien: string }): React.ReactElement {
+  return (
+    <div className="rounded-md border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-3 text-xs">
+      <p className="mb-1 font-medium">Invitation créée. Partagez ce lien avec l’invité :</p>
+      <code className="block break-all rounded bg-[var(--surface)] p-2 font-mono text-[11px]">
+        {lien}
+      </code>
+      <p className="mt-2 text-[var(--foreground-muted)]">
+        L’envoi automatique par email arrive avec S12. L’invité peut aussi accepter depuis la
+        bannière de son tableau de bord.
+      </p>
+    </div>
   );
 }
