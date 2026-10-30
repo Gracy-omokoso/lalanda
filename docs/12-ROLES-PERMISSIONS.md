@@ -36,10 +36,10 @@ Le support ne voit jamais les données financières sans consentement explicite,
 
 ## Actions granulaires
 
-`organization.manage`, `billing.manage`, `members.invite`, `project.create`, `project.read`, `project.update`, `canvas.update`, `inputs.update`, `plan.calculate`, `plan.approve`, `actuals.import`, `period.close`, `analytics.read`, `report.export`, `audit.read`, `fiscal.manage`, `sales.read`, `sales.manage`, `sales.invoice`, `sales.receipt`, `treasury.read`, `treasury.manage`, `crm.read`, `crm.manage`, `work.read`, `work.update`, `work.manage`, `sales.quote`.
+`organization.manage`, `billing.manage`, `members.invite`, `project.create`, `project.read`, `project.update`, `canvas.update`, `inputs.update`, `plan.calculate`, `plan.approve`, `actuals.import`, `period.close`, `analytics.read`, `report.export`, `audit.read`, `fiscal.manage`, `sales.read`, `sales.manage`, `sales.invoice`, `sales.receipt`, `treasury.read`, `treasury.manage`, `crm.read`, `crm.manage`, `work.read`, `work.update`, `work.manage`, `sales.quote`, `purchase.read`, `purchase.request`, `purchase.manage`, `purchase.approve`, `payables.pay`.
 
-Vingt-huit actions au total, dans l'ordre ci-dessus (ordre de fusion pour les
-actions ajoutées après la dix-neuvième).
+Trente-trois actions au total, dans l'ordre ci-dessus (ordre de fusion pour les
+actions ajoutées après la dix-neuvième ; les cinq dernières viennent d'ADR-0044).
 
 `fiscal.manage` — « Gérer l'identité fiscale et la facture normalisée » — est la
 seizième action, ajoutée par ADR-0021 §8 (18 oct. 2026). Elle couvre la fiche
@@ -249,15 +249,21 @@ sont inchangés.
   (`member.permissions_changed`, avant et après) et prend effet à la requête suivante.
 - **Changement de titre** : l'écart est effacé (proposition). **Dépendances** : refusées par le
   serveur si incohérentes, complétées par l'écran. **Invitation** : porte déjà l'écart.
-- Les 28 actions sont regroupées en sept domaines avec des libellés en français (ADR-0041 § 5).
+- Les actions sont regroupées en domaines avec des libellés en français (ADR-0041 § 5) : sept,
+  puis huit avec « Achats et fournisseurs » (ADR-0044, lot P0).
 - **Lot A4 appliqué** (routes de gestion, invitation avec écart, audit strict, révision,
   notification) **derrière l'interrupteur `MEMBER_PERMISSIONS_ENABLED`, éteint** : voir docs/16.
 
-### Proposé, ADR-0044 — achats et fournisseurs (non appliqué)
+### ADR-0044 — achats et fournisseurs (appliqué, lot P0)
 
-> **Statut : proposé** par [ADR-0044](adr/ADR-0044-achats-et-fournisseurs.md) § 4 (30 oct. 2026),
-> R3 du RUN. Rien de ce qui suit n'est encore dans le code ; le lot P0 l'applique. Les valeurs
-> ci-dessous sont les valeurs par défaut des décisions ouvertes n° 1 à 4 d'ADR-0044.
+> **Statut : appliqué** par le lot P0 d'[ADR-0044](adr/ADR-0044-achats-et-fournisseurs.md) § 4
+> (30 oct. 2026), R3 du RUN, aux valeurs par défaut des décisions ouvertes n° 1 à 4. La matrice
+> ci-dessous est celle de `apps/api/src/authz/permissions.ts`, vérifiée par `permissions.test.ts`
+> (495 cases) ; dépendances, huitième domaine et paire G4 par `overrides.test.ts` ; la séparation
+> des tâches par `purchaseApprovalDecision` (fonction pure, testée) et le compte des approbateurs
+> par `AuthzService.countApprovers(org, 'purchase.approve')` (détenteurs effectifs). Les routes
+> `/purchases/**` arrivent aux lots P2 à P6 : d'ici là, les cinq actions figurent dans
+> `ACTIONS_SANS_ROUTE` de la sonde `rbac-matrix.e2e.test.ts`, chaque lot y écrivant sa sonde.
 
 - **Cinq actions nouvelles**, vingt-neuvième à trente-troisième, en fin de liste :
   `purchase.read` (« Consulter les achats et les fournisseurs »), `purchase.request` (« Demander un

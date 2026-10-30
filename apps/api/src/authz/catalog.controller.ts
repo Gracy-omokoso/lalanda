@@ -33,7 +33,7 @@ export interface AuthzCatalogView {
    * en lecture seule au lieu de découvrir le refus au premier enregistrement.
    */
   memberPermissionsEnabled: boolean;
-  /** Les sept domaines de l'écran, dans l'ordre d'affichage. */
+  /** Les huit domaines de l'écran, dans l'ordre d'affichage (ADR-0044 : achats). */
   domains: Array<{ key: string; label: string; actions: Action[] }>;
   /** Libellé français de chaque action (« autorisation »). */
   labels: Record<Action, string>;

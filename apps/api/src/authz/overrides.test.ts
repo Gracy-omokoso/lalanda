@@ -102,7 +102,15 @@ describe('ADR-0041 § 2 — validateOverrides : un cas par garde-fou', () => {
       ok: true,
       grants: ['crm.manage'],
       revokes: ['sales.read', 'treasury.read'],
-      effective: ['project.read', 'analytics.read', 'crm.read', 'crm.manage', 'work.read'],
+      effective: [
+        'project.read',
+        'analytics.read',
+        'crm.read',
+        'crm.manage',
+        'work.read',
+        // ADR-0044 § 4.1 : le Lecteur consulte les achats.
+        'purchase.read',
+      ],
     });
   });
 
@@ -218,6 +226,8 @@ describe('ADR-0041 § 2 — validateOverrides : un cas par garde-fou', () => {
       'sales.invoice',
       'sales.receipt',
       'treasury.manage',
+      // ADR-0044 § 4.1 : le Comptable paie les fournisseurs, pas l'Administrateur.
+      'payables.pay',
     ]);
   });
 
@@ -272,8 +282,53 @@ describe('ADR-0041 § 2 — validateOverrides : un cas par garde-fou', () => {
     });
   });
 
+  it('G4 — paire des achats : autoriser la dépense et payer ne se cumulent pas par ajout (ADR-0044)', () => {
+    // Un Lecteur reçoit l'une ou l'autre, pas les deux.
+    expect(
+      validate({ targetRole: 'viewer', grants: ['purchase.approve', 'payables.pay'] }),
+    ).toEqual({ ok: false, code: 'SOD_CONFLICT', pair: ['purchase.approve', 'payables.pay'] });
+    expect(validate({ targetRole: 'viewer', grants: ['purchase.approve'] })).toMatchObject({
+      ok: true,
+    });
+    expect(validate({ targetRole: 'viewer', grants: ['payables.pay'] })).toMatchObject({
+      ok: true,
+    });
+    // Un Administrateur (qui prépare) ne reçoit pas les deux non plus.
+    expect(
+      validate({ targetRole: 'admin', grants: ['purchase.approve', 'payables.pay'] }),
+    ).toMatchObject({ code: 'SOD_CONFLICT', pair: ['purchase.approve', 'payables.pay'] });
+    // Le Directeur financier les cumule nativement : lui retirer autre chose passe.
+    expect(
+      validate({ targetRole: 'finance_director', revokes: ['purchase.manage'] }),
+    ).toMatchObject({ ok: true });
+  });
+
+  it('ADR-0044 — un acheteur : Analyste ou Lecteur avec ajout de `purchase.manage` (O6)', () => {
+    expect(validate({ targetRole: 'analyst', grants: ['purchase.manage'] })).toMatchObject({
+      ok: true,
+    });
+    expect(
+      validate({ targetRole: 'viewer', grants: ['purchase.request', 'purchase.manage'] }),
+    ).toMatchObject({ ok: true });
+    // Sans `purchase.read`, l'ajout est refusé, jamais complété.
+    expect(validate({ targetRole: 'advisor', grants: ['purchase.manage'] })).toMatchObject({
+      code: 'PERMISSION_DEPENDENCY_MISSING',
+      action: 'purchase.manage',
+      missing: ['purchase.read'],
+    });
+    // Payer exige aussi `treasury.read`.
+    expect(
+      validate({ targetRole: 'advisor', grants: ['purchase.read', 'payables.pay'] }),
+    ).toMatchObject({
+      code: 'PERMISSION_DEPENDENCY_MISSING',
+      action: 'payables.pay',
+      missing: ['treasury.read'],
+    });
+  });
+
   it('décision n° 3 refusée : `fiscal.manage` ajouté à un Comptable est accepté', () => {
-    expect(SOD_PAIRS).toHaveLength(2);
+    // Trois paires depuis ADR-0044 § 4.3 ; aucune ne vise la facturation.
+    expect(SOD_PAIRS).toHaveLength(3);
     expect(SOD_PAIRS.some((p) => p.includes('sales.invoice') && p.includes('fiscal.manage'))).toBe(
       false,
     );
@@ -372,15 +427,47 @@ describe('ADR-0041 § 4 et § 5 — dépendances, domaines et libellés', () => 
     expect(requiredActionsOf('report.export')).toEqual(['project.read', 'analytics.read']);
   });
 
-  it('sept domaines ; chaque action dans exactement un domaine, avec un libellé', () => {
-    expect(ACTION_DOMAINS).toHaveLength(7);
+  it('huit domaines ; chaque action dans exactement un domaine, avec un libellé', () => {
+    expect(ACTION_DOMAINS).toHaveLength(8);
     const all = ACTION_DOMAINS.flatMap((d) => d.actions);
     expect(all).toHaveLength(ACTIONS.length);
     expect([...all].sort()).toEqual([...ACTIONS].sort());
     for (const action of ACTIONS) {
       expect(ACTION_LABELS[action].trim().length, action).toBeGreaterThan(0);
     }
-    expect(new Set(ACTION_DOMAINS.map((d) => d.key)).size).toBe(7);
+    expect(new Set(ACTION_DOMAINS.map((d) => d.key)).size).toBe(8);
+  });
+
+  it('ADR-0044 § 4.3 — huitième domaine « Achats et fournisseurs », cinq actions, libellés', () => {
+    expect(ACTION_DOMAINS[7]).toEqual({
+      key: 'purchases',
+      label: 'Achats et fournisseurs',
+      actions: [
+        'purchase.read',
+        'purchase.request',
+        'purchase.manage',
+        'purchase.approve',
+        'payables.pay',
+      ],
+    });
+    expect(ACTION_LABELS['purchase.read']).toBe('Consulter les achats et les fournisseurs');
+    expect(ACTION_LABELS['purchase.request']).toBe('Demander un achat');
+    expect(ACTION_LABELS['purchase.manage']).toBe(
+      'Gérer les fournisseurs, commandes, réceptions et factures fournisseurs',
+    );
+    expect(ACTION_LABELS['purchase.approve']).toBe("Approuver les demandes d'achat");
+    expect(ACTION_LABELS['payables.pay']).toBe('Payer les fournisseurs');
+  });
+
+  it('ADR-0044 § 4.3 — dépendances des achats', () => {
+    for (const a of ['purchase.request', 'purchase.manage', 'purchase.approve'] as const) {
+      expect(requiredActionsOf(a), a).toEqual(['analytics.read', 'purchase.read']);
+    }
+    expect(requiredActionsOf('payables.pay')).toEqual([
+      'analytics.read',
+      'treasury.read',
+      'purchase.read',
+    ]);
   });
 
   it('le vocabulaire visible ne dit ni « action », ni « grant », ni « override »', () => {
@@ -390,7 +477,7 @@ describe('ADR-0041 § 4 et § 5 — dépendances, domaines et libellés', () => 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Propriété à graine fixe (ADR-0041 § 9.5) : 2 000 tirages acteur × cible × écart.
+// Propriété à graine fixe (ADR-0041 § 9.5) : 3 000 tirages acteur × cible × écart.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** mulberry32 — générateur déterministe, pour que tout échec soit reproductible. */
@@ -406,7 +493,7 @@ function prng(seed: number): () => number {
 }
 
 describe('ADR-0041 § 9.5 — propriété : tout écart accepté est sûr', () => {
-  it('2 000 tirages à graine fixe', () => {
+  it('3 000 tirages à graine fixe', () => {
     const rand = prng(41_2026);
     const pick = <T>(xs: readonly T[]): T => xs[Math.floor(rand() * xs.length)] as T;
     const subset = <T>(xs: readonly T[], p: number): T[] => xs.filter(() => rand() < p);
@@ -423,7 +510,10 @@ describe('ADR-0041 § 9.5 — propriété : tout écart accepté est sûr', () =
 
     let accepted = 0;
     const codes = new Set<string>();
-    for (let i = 0; i < 2000; i++) {
+    // ADR-0044 : 3 000 tirages (et non 2 000) — à 33 actions, les écarts tirés à taux
+    // fixe touchent plus d'actions et l'escalade domine ; 2 000 tirages ne donnaient
+    // plus que 77 acceptations, sous le seuil de 100 qui garantit une propriété exercée.
+    for (let i = 0; i < 3000; i++) {
       // Acteur souvent Propriétaire ou Directeur financier : sinon presque tout est escalade.
       const actorRole =
         rand() < 0.5 ? pick(['owner', 'finance_director'] as const) : pick(ORG_ROLES);

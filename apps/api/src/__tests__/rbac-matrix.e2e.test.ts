@@ -114,6 +114,23 @@ const ACTIONS_SANS_ROUTE: Record<string, string> = {
     'Aucune route de modification de projet en S20a : `POST /projects/:id/drivers` ' +
     'relève de `inputs.update`, et il n’existe ni `PATCH /projects/:id` ni ' +
     'renommage. L’action est déclarée par docs/12 et attend son endpoint.',
+  // ADR-0044 — P0 : actions déclarées avant leurs routes (lots P2 à P5). Chaque lot
+  // retire sa ligne d'ici et écrit la sonde avec sa première route.
+  'purchase.read':
+    'ADR-0044 — P0 pose l’action et la matrice ; la première route de lecture ' +
+    '(`GET /purchases/suppliers`) arrive au lot P2, qui écrira la sonde.',
+  'purchase.request':
+    'ADR-0044 — P0 pose l’action ; `POST /purchases/orders` (créer une demande) arrive ' +
+    'au lot P3, qui écrira la sonde.',
+  'purchase.manage':
+    'ADR-0044 — P0 pose l’action ; `POST /purchases/suppliers` (créer une fiche) arrive ' +
+    'au lot P2, qui écrira la sonde.',
+  'purchase.approve':
+    'ADR-0044 — P0 pose l’action et `purchaseApprovalDecision` ; `POST /purchases/orders/:id/approve` ' +
+    'arrive au lot P3, qui écrira la sonde.',
+  'payables.pay':
+    'ADR-0044 — P0 pose l’action ; `POST /purchases/payments` arrive au lot P5 (et ' +
+    '`…/payment-methods/:methodId/reveal` au lot P2), qui écrira la sonde.',
 };
 
 /** Une sonde HTTP : la route qui matérialise une action, et ses statuts légitimes. */
