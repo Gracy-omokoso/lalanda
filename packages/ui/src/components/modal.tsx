@@ -176,6 +176,24 @@ function ModalOuverte({
     };
   }, []);
 
+  // Fermeture forcée par le navigateur : Chrome ignore `preventDefault` sur
+  // `cancel` quand la page n'a pas reçu de geste récent (protection contre les
+  // fenêtres abusives), et le <dialog> se ferme sans que la fenêtre l'ait
+  // décidé. Bloquante, on la rouvre ; sinon on aligne l'état du parent.
+  const etatRef = useRef({ dismissible, onClose });
+  etatRef.current = { dismissible, onClose };
+  useEffect(() => {
+    const d = ref.current;
+    if (!d) return;
+    const surFermeture = (): void => {
+      if (!d.isConnected) return;
+      if (!etatRef.current.dismissible) d.showModal();
+      else etatRef.current.onClose();
+    };
+    d.addEventListener('close', surFermeture);
+    return () => d.removeEventListener('close', surFermeture);
+  }, []);
+
   useEffect(() => {
     if (confirmation) confirmRef.current?.focus();
   }, [confirmation]);
