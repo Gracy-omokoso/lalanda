@@ -8,6 +8,10 @@
 // `actual_periods` et plans inchangés), 15 (détail par membre réservé à
 // `treasury.manage`).
 //
+// ADR-0040 — C7 (critère 15) : opportunité gagnée → projet (création, 409 en
+// double, refus si non gagnée, isolation, droits), suggestion `CREATE_PROJECT`
+// et notification `crm.opportunity_won` au seul responsable, idempotente.
+//
 // BASE DÉDIÉE, supprimée à la fin. NIF inventés.
 
 import 'reflect-metadata';
@@ -15,6 +19,11 @@ import 'reflect-metadata';
 import { createHash, randomBytes } from 'node:crypto';
 import { describe, beforeAll, expect, it, vi } from 'vitest';
 
+import { ObjectId } from 'mongodb';
+
+import { CrmNotifier } from '../crm/crm-notifier.js';
+import { CRM_OPPORTUNITY_EVENTS, type CrmOpportunityEvents } from '../crm/opportunity-events.js';
+import type { NotificationInput } from '../notifications/notifications.port.js';
 import { SALES_INVOICE_NORMALIZER } from '../sales/invoices/normalization.port.js';
 import { kinshasaDayOf } from '../sales/receipts/kinshasa-day.js';
 import { e2eSuite } from './e2e-utils.js';
@@ -678,6 +687,249 @@ e2eSuite('projets du RUN — devis, factures, dépenses, marge (ADR-0039 L4a)', 
       const res = await f.del('owner', `/work/projects/${projectId}`);
       expect(res.status).toBe(409);
       expect(res.body.code).toBe('WORK_PROJECT_NOT_EMPTY');
+    });
+  });
+
+  // ── ADR-0040 — C7 : opportunité gagnée → projet (§ 6.4, critère 15) ─────────
+  describe('opportunité gagnée → projet (ADR-0040 C7, critère 15)', () => {
+    const crmNotes: NotificationInput[] = [];
+    let wonKey = '';
+    let openKey = '';
+    let accountId = '';
+    let gagnee: Record<string, any> = {};
+    let ouverte: Record<string, any> = {};
+    let fromOpp = '';
+
+    const moveTo = async (o: Record<string, any>, stageKey: string) =>
+      ok(
+        await f.post('owner', `/crm/opportunities/${o.id}/move`, {
+          expectedRevision: o.revision,
+          stageKey,
+        }),
+      );
+
+    beforeAll(async () => {
+      // Enregistreur des notifications du CRM, autour du port réel.
+      const notifier = f.app().get(CrmNotifier);
+      const inner = notifier.port;
+      notifier.port = {
+        notify: async (input) => {
+          crmNotes.push(input);
+          await inner.notify(input);
+        },
+      };
+      const settings = ok(await f.get('owner', '/crm/settings'));
+      const stages = settings.stages as { key: string; kind: string }[];
+      wonKey = stages.find((x) => x.kind === 'won')!.key;
+      openKey = stages.find((x) => x.kind === 'open')!.key;
+      const acc = await f
+        .db()
+        .collection('crm_accounts')
+        .findOne({ organizationId: f.orgId(), customerId: customer });
+      accountId = String(acc!['_id']);
+      const corps = (title: string) => ({
+        title,
+        currency: 'USD',
+        accountId,
+        ownerId: f.userId('accountant'),
+        lines: [
+          { label: 'Audit des locaux', quantity: '2', unit: 'jour', unitPrice: '300.00' },
+          { label: 'Rapport final', quantity: '1', unitPrice: '150.00' },
+        ],
+      });
+      gagnee = ok(await f.post('owner', '/crm/opportunities', corps('Audit Gombe')), 201);
+      ouverte = ok(await f.post('owner', '/crm/opportunities', corps('Audit en cours')), 201);
+    }, E2E_HOOK_TIMEOUT_MS);
+
+    it('passer en gagnée ne crée aucun projet ; suggère CREATE_PROJECT ; notifie le seul responsable', async () => {
+      crmNotes.length = 0;
+      const before = await f.db().collection('work_projects').countDocuments();
+      const won = await moveTo(gagnee, wonKey);
+      gagnee = won;
+      expect(won.status).toBe('won');
+      expect(won.suggestions).toEqual([{ code: 'CREATE_PROJECT' }]);
+      expect(await f.db().collection('work_projects').countDocuments()).toBe(before);
+      const notes = crmNotes.filter((n) => n.kind === 'crm.opportunity_won');
+      expect(notes).toHaveLength(1);
+      expect(notes[0]).toMatchObject({
+        recipientUserId: f.userId('accountant'),
+        organizationId: f.orgId(),
+        href: `/crm/opportunites/${gagnee.id}`,
+        actorUserId: f.userId('owner'),
+      });
+      expect(notes[0]!.title).toContain('Créer le projet ?');
+      expect(notes[0]!.dedupeKey).toMatch(new RegExp(`^crm\\.opportunity_won:${gagnee.id}:`));
+      // Idempotent : rejouer le même passage en gagné ne crée pas de doublon.
+      const events = f.app().get<CrmOpportunityEvents>(CRM_OPPORTUNITY_EVENTS);
+      const doc = await f
+        .db()
+        .collection('crm_opportunities')
+        .findOne({ _id: new ObjectId(gagnee.id) });
+      const event = {
+        organizationId: f.orgId(),
+        opportunityId: gagnee.id,
+        ownerId: f.userId('accountant'),
+        actorUserId: f.userId('owner'),
+        source: 'user' as const,
+        quoteId: null,
+        wonAt: doc!['wonAt'] as Date,
+      };
+      await events.onWon(event);
+      await events.onWon(event);
+      expect(
+        await f
+          .db()
+          .collection('notifications')
+          .countDocuments({
+            organizationId: f.orgId(),
+            recipientUserId: f.userId('accountant'),
+            kind: 'crm.opportunity_won',
+            'source.entityId': gagnee.id,
+          }),
+      ).toBe(1);
+      // Le responsable ne reçoit rien pour son propre geste ; un autre ne reçoit rien.
+      expect(crmNotes.filter((n) => n.recipientUserId !== f.userId('accountant'))).toEqual([]);
+    });
+
+    it('droits : sans work.manage (Comptable, Lecteur) ou sans crm.read (Conseiller) → 403', async () => {
+      for (const who of ['accountant', 'viewer', 'advisor', 'analyst'] as const) {
+        const res = await f.post(who, '/work/projects/from-opportunity', {
+          opportunityId: gagnee.id,
+        });
+        expect(res.status, who).toBe(403);
+      }
+      expect((await f.get('advisor', `/work/opportunities/${gagnee.id}/project`)).status).toBe(403);
+    });
+
+    it('opportunité non gagnée : 409 WORK_OPPORTUNITY_NOT_WON ; autre organisation : 404', async () => {
+      const open = await f.post('owner', '/work/projects/from-opportunity', {
+        opportunityId: ouverte.id,
+      });
+      expect(open.status).toBe(409);
+      expect(open.body.code).toBe('WORK_OPPORTUNITY_NOT_WON');
+      const autre = await f.post('ownerB', '/work/projects/from-opportunity', {
+        opportunityId: gagnee.id,
+      });
+      expect(autre.status).toBe(404);
+      expect(autre.body.code).toBe('CRM_OPPORTUNITY_NOT_FOUND');
+      expect((await f.get('ownerB', `/work/opportunities/${gagnee.id}/project`)).body).toEqual({
+        projectId: null,
+      });
+      const montant = await f.post('owner', '/work/projects/from-opportunity', {
+        opportunityId: gagnee.id,
+        amount: '1',
+      });
+      expect(montant.status).toBe(400);
+    });
+
+    it('crée le projet : une tâche par ligne de l’opportunité, sans montant, client du compte', async () => {
+      const p = ok(
+        await f.post('admin', '/work/projects/from-opportunity', { opportunityId: gagnee.id }),
+        201,
+      );
+      fromOpp = p.id;
+      expect(p).toMatchObject({
+        name: 'Audit Gombe',
+        kind: 'client',
+        links: { customerId: customer, opportunityId: gagnee.id, quotes: [] },
+        source: { kind: 'opportunity', opportunityId: gagnee.id },
+      });
+      const tasks = ok(await f.get('viewer', `/work/projects/${fromOpp}/tasks`));
+      expect((tasks.items as Record<string, any>[]).map((t) => [t.number, t.title])).toEqual([
+        [1, 'Audit des locaux'],
+        [2, 'Rapport final'],
+      ]);
+      const stored = JSON.stringify(
+        await f.db().collection('work_tasks').find({ projectId: fromOpp }).toArray(),
+      );
+      expect(stored).toContain('Quantité : 2 jour');
+      for (const amount of ['300.00', '150.00', '750.00']) expect(stored).not.toContain(amount);
+      expect(ok(await f.get('viewer', `/work/opportunities/${gagnee.id}/project`))).toEqual({
+        projectId: fromOpp,
+      });
+    });
+
+    it('une seconde fois : 409 WORK_PROJECT_EXISTS_FOR_OPPORTUNITY ; plus de suggestion', async () => {
+      const again = await f.post('owner', '/work/projects/from-opportunity', {
+        opportunityId: gagnee.id,
+      });
+      expect(again.status).toBe(409);
+      expect(again.body).toMatchObject({
+        code: 'WORK_PROJECT_EXISTS_FOR_OPPORTUNITY',
+        details: { projectId: fromOpp },
+      });
+      // Repasser par une étape ouverte puis gagnée : aucune suggestion, projet existant.
+      const reopened = await moveTo(gagnee, openKey);
+      expect(reopened.suggestions).toEqual([]);
+      const rewon = await moveTo(reopened, wonKey);
+      expect(rewon.suggestions).toEqual([]);
+      const note = crmNotes.filter((n) => n.kind === 'crm.opportunity_won').at(-1)!;
+      expect(note.title).not.toContain('Créer le projet');
+    });
+
+    it('avec un devis accepté : le projet est celui de from-quote, puis from-quote rend 409', async () => {
+      crmNotes.length = 0;
+      const avecDevis = ok(
+        await f.post('owner', '/crm/opportunities', {
+          title: 'Rénovation avec devis',
+          currency: 'USD',
+          accountId,
+          ownerId: f.userId('accountant'),
+        }),
+        201,
+      );
+      const q = await devis(
+        'owner',
+        {
+          currency: 'USD',
+          priceMode: 'ht',
+          customer: { customerId: customer, printContactDetails: false },
+          lines: [ligne('Démolition', '1', '500.00', 'forfait'), ligne('Maçonnerie', '4', '80.00')],
+          title: 'Rénovation devisée',
+          notes: null,
+          opportunityId: avecDevis.id,
+        },
+        'accepted',
+      );
+      // Le devis accepté fait gagner l'opportunité : notification au responsable, sans projet.
+      const won = ok(await f.get('owner', `/crm/opportunities/${avecDevis.id}`));
+      expect(won.status).toBe('won');
+      const notes = crmNotes.filter((n) => n.kind === 'crm.opportunity_won');
+      expect(notes).toHaveLength(1);
+      expect(notes[0]!.dedupeKey).toBe(`crm.opportunity_won:${avecDevis.id}:quote:${q.id}`);
+      // Désigner le devis d'une autre opportunité : 400.
+      const mauvais = await f.post('owner', '/work/projects/from-opportunity', {
+        opportunityId: avecDevis.id,
+        quoteId: accepted.id,
+      });
+      expect(mauvais.status).toBe(400);
+      expect(f.issueCodes(mauvais)).toContain('WORK_QUOTE_NOT_OF_OPPORTUNITY');
+
+      const p = ok(
+        await f.post('owner', '/work/projects/from-opportunity', { opportunityId: avecDevis.id }),
+        201,
+      );
+      expect(p).toMatchObject({
+        name: 'Rénovation devisée',
+        links: { customerId: customer, opportunityId: avecDevis.id },
+        source: { kind: 'quote', quoteId: q.id },
+      });
+      const tasks = ok(await f.get('viewer', `/work/projects/${p.id}/tasks`));
+      expect((tasks.items as Record<string, any>[]).map((t) => t.title)).toEqual([
+        'Démolition',
+        'Maçonnerie',
+      ]);
+      const fromQuote = await f.post('admin', '/work/projects/from-quote', { quoteId: q.id });
+      expect(fromQuote.status).toBe(409);
+      expect(fromQuote.body.code).toBe('WORK_PROJECT_EXISTS_FOR_QUOTE');
+      const again = await f.post('owner', '/work/projects/from-opportunity', {
+        opportunityId: avecDevis.id,
+      });
+      expect(again.status).toBe(409);
+      expect(again.body).toMatchObject({
+        code: 'WORK_PROJECT_EXISTS_FOR_OPPORTUNITY',
+        details: { projectId: p.id },
+      });
     });
   });
 });

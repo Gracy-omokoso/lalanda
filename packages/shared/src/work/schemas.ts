@@ -341,6 +341,23 @@ export const CreateProjectFromQuoteBody = z
   .strict();
 export type CreateProjectFromQuoteBody = z.output<typeof CreateProjectFromQuoteBody>;
 
+/**
+ * `POST /work/projects/from-opportunity` (ADR-0040 § 6.4, lot C7). Avec un devis
+ * accepté de l'opportunité (`quoteId`, ou son unique devis accepté), la création
+ * délègue à `from-quote` et `lineIndexes` désigne les lignes du devis ; sinon,
+ * celles de l'opportunité. Aucun montant n'est recopié.
+ */
+export const CreateProjectFromOpportunityBody = z
+  .object({
+    opportunityId: WorkId,
+    quoteId: WorkId.optional(),
+    name: CreateProjectFromQuoteBody.shape.name,
+    lineIndexes: CreateProjectFromQuoteBody.shape.lineIndexes,
+    milestone: CreateProjectFromQuoteBody.shape.milestone,
+  })
+  .strict();
+export type CreateProjectFromOpportunityBody = z.output<typeof CreateProjectFromOpportunityBody>;
+
 // ── Tâches ──────────────────────────────────────────────────────────────────
 
 const taskFields = {

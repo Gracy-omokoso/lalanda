@@ -44,10 +44,12 @@ import { CrmAccountsController } from './accounts/crm-accounts.controller.js';
 import { CrmAccountsService } from './accounts/crm-accounts.service.js';
 // ADR-0040 — C2
 import { CatalogItem, CatalogItemSchema } from '../sales/catalog-item.schema.js';
-import { CRM_OPPORTUNITY_EVENTS, NO_OPPORTUNITY_EVENTS } from './opportunity-events.js';
+import { CRM_OPPORTUNITY_EVENTS } from './opportunity-events.js';
 // ADR-0040 — C3
 import { CrmReportsController } from './reports/crm-reports.controller.js';
 import { CrmReportsService } from './reports/crm-reports.service.js';
+// ADR-0040 — C7
+import { WorkOpportunityEvents } from '../work/billing/work-opportunity-events.js';
 
 @Module({
   imports: [
@@ -93,8 +95,9 @@ import { CrmReportsService } from './reports/crm-reports.service.js';
     CrmNotifier,
     CrmDueRemindersJob,
     CrmBriefSource,
-    // ADR-0040 — C2 : point d'extension « opportunité gagnée » (sans effet par défaut).
-    { provide: CRM_OPPORTUNITY_EVENTS, useValue: NO_OPPORTUNITY_EVENTS },
+    // ADR-0040 — C2 : point d'extension « opportunité gagnée » ; C7 : notification au
+    // responsable et suggestion « Créer le projet » (lecture seule de `work_projects`).
+    { provide: CRM_OPPORTUNITY_EVENTS, useClass: WorkOpportunityEvents },
     // ADR-0040 — C3 : rapports (moteur `crmReports`).
     CrmReportsService,
   ],

@@ -70,6 +70,7 @@ import type { CrmOpportunityLine } from './crm.schemas.js';
 import {
   CRM_OPPORTUNITY_EVENTS,
   type CrmOpportunityEvents,
+  type OpportunitySuggestion,
   type OpportunityWonEvent,
 } from './opportunity-events.js';
 
@@ -199,6 +200,9 @@ export interface PipelineView {
 
 /** Réponse d'écriture : la vue, plus les avertissements (ADR-0040 § 3.2). */
 export type OpportunityWriteResult = OpportunityView & { warnings: OpportunityWarning[] };
+
+/** Réponse de `move` : la vue et, au passage en gagné, les suggestions (ADR-0040 — C7). */
+export type OpportunityMoveResult = OpportunityView & { suggestions: OpportunitySuggestion[] };
 
 /** Résultat de la règle de gain d'un devis accepté (ADR-0035 § 1). */
 export type QuoteOutcome = 'won' | 'disabled' | 'not_open' | 'none';
@@ -822,12 +826,14 @@ export class OpportunitiesService {
     stageKey: string,
     lost: { lostReasonKey: string | null; lostReasonDetail: string | null },
     actor: CrmActor,
-  ): Promise<OpportunityView> {
+  ): Promise<OpportunityMoveResult> {
     const current = await this.requireOwn(organizationId, opportunityId);
     if (current.revision !== expectedRevision) staleRevision(current.revision);
     const settings = await this.settings.get(organizationId);
     const stage = this.stageOf(settings, stageKey);
-    if (stage.key === current.stageKey) return this.get(organizationId, opportunityId);
+    if (stage.key === current.stageKey) {
+      return { ...(await this.get(organizationId, opportunityId)), suggestions: [] };
+    }
     // ADR-0040 — C2 (§ 2.3) : motif obligatoire pour passer en perdu.
     const lostReasonKey =
       stage.kind === 'lost' ? this.lostReasonFor(settings, lost.lostReasonKey) : null;
@@ -864,8 +870,28 @@ export class OpportunitiesService {
     }
     if (stage.kind === 'won' && current.status !== 'won') {
       await this.notifyWon(organizationId, current, actor.userId, 'user', null, now);
+      // ADR-0040 — C7 § 6.4 : proposer, jamais créer.
+      const view = await this.get(organizationId, opportunityId);
+      return { ...view, suggestions: await this.wonSuggestions(organizationId, opportunityId) };
     }
-    return this.get(organizationId, opportunityId);
+    return { ...(await this.get(organizationId, opportunityId)), suggestions: [] };
+  }
+
+  /** ADR-0040 — C7 : `CREATE_PROJECT` si aucun projet n'existe ; une erreur → aucune suggestion. */
+  private async wonSuggestions(
+    organizationId: string,
+    opportunityId: string,
+  ): Promise<OpportunitySuggestion[]> {
+    try {
+      return (await this.events.projectExists(organizationId, opportunityId))
+        ? []
+        : [{ code: 'CREATE_PROJECT' }];
+    } catch (err) {
+      this.logger.error(
+        `Suggestion « Créer le projet » non calculée (${opportunityId}) : ${String(err)}`,
+      );
+      return [];
+    }
   }
 
   /**

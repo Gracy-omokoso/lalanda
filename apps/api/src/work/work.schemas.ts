@@ -23,6 +23,7 @@ import {
   type WorkLabel,
   type WorkPriority,
   type WorkProjectKind,
+  type WorkProjectSource,
   type WorkProjectStatus,
   type WorkRateCurrency,
 } from '@lalanda/shared/work';
@@ -109,21 +110,62 @@ export class WorkProjectLinks {
 }
 const WorkProjectLinksSchema = SchemaFactory.createForClass(WorkProjectLinks);
 
+/**
+ * Origine d'un projet. `quote` : ADR-0039 § 6.1 ; `opportunity` (ADR-0040 — C7
+ * § 6.4) : opportunité gagnée sans devis. Union élargie, champ additif :
+ * `_schemaVersion` inchangé. Les champs propres à une origine sont absents
+ * de l'autre.
+ */
 @Schema({ _id: false, strict: true })
 export class WorkProjectSourceDoc {
-  @Prop({ type: String, required: true, enum: ['quote'] })
-  kind!: 'quote';
+  @Prop({ type: String, required: true, enum: ['quote', 'opportunity'] })
+  kind!: 'quote' | 'opportunity';
 
-  @Prop({ type: String, required: true })
-  quoteId!: string;
+  @Prop({
+    type: String,
+    required(this: { kind?: string }) {
+      return this.kind === 'quote';
+    },
+  })
+  quoteId?: string;
 
-  @Prop({ type: Number, required: true })
-  quoteVersion!: number;
+  @Prop({
+    type: Number,
+    required(this: { kind?: string }) {
+      return this.kind === 'quote';
+    },
+  })
+  quoteVersion?: number;
+
+  @Prop({
+    type: String,
+    required(this: { kind?: string }) {
+      return this.kind === 'opportunity';
+    },
+  })
+  opportunityId?: string;
 
   @Prop({ type: Date, required: true })
   createdAt!: Date;
 }
 const WorkProjectSourceSchema = SchemaFactory.createForClass(WorkProjectSourceDoc);
+
+/** Vue de l'origine d'un projet (ADR-0039 § 6.1 ; ADR-0040 — C7 § 6.4). */
+export function projectSourceViewOf(
+  source: WorkProjectSourceDoc | null | undefined,
+): WorkProjectSource {
+  if (!source) return null;
+  const createdAt = new Date(source.createdAt).toISOString();
+  if (source.kind === 'opportunity') {
+    return { kind: 'opportunity', opportunityId: source.opportunityId ?? '', createdAt };
+  }
+  return {
+    kind: 'quote',
+    quoteId: source.quoteId ?? '',
+    quoteVersion: source.quoteVersion ?? 1,
+    createdAt,
+  };
+}
 
 @Schema({ collection: 'work_projects', timestamps: true, strict: true, minimize: false })
 export class WorkProject {
@@ -202,6 +244,11 @@ WorkProjectSchema.index({ organizationId: 1, 'links.opportunityId': 1 });
 WorkProjectSchema.index(
   { organizationId: 1, 'source.quoteId': 1 },
   { unique: true, partialFilterExpression: { 'source.kind': 'quote' } },
+);
+// ADR-0040 — C7 § 6.4 : une opportunité ne donne qu'un projet (sans devis).
+WorkProjectSchema.index(
+  { organizationId: 1, 'source.opportunityId': 1 },
+  { unique: true, partialFilterExpression: { 'source.kind': 'opportunity' } },
 );
 
 // ── Tâches ──────────────────────────────────────────────────────────────────

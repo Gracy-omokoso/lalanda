@@ -748,6 +748,10 @@ describe('couverture des routes par le RBAC', () => {
       'QuotesFromOpportunityController.create': ['sales.quote', 'crm.read'],
       // ADR-0040 — C3 : rapports en lecture seule, comme le pipeline.
       'CrmReportsController.reports': ['crm.read'],
+      // ADR-0040 — C7 : opportunité gagnée → projet ; `sales.read` en plus, contrôlé
+      // dans le service, seulement si un devis est désigné (`quoteId`).
+      'WorkBillingController.createFromOpportunity': ['work.manage', 'crm.read'],
+      'WorkBillingController.projectForOpportunity': ['work.read', 'crm.read'],
     };
     for (const [cle, actions] of Object.entries(attendu)) {
       const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle);

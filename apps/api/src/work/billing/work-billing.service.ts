@@ -8,7 +8,11 @@
 //     (le service existant, sans changement), lignes du devis à PRIX FIXÉS
 //     (`lineInputOf(l, true)`, comme la conversion d'ADR-0035). Le brouillon n'est
 //     JAMAIS émis, JAMAIS normalisé, JAMAIS envoyé : aucun appel e-MCF/DGI ici ;
-//   - liens facture ↔ projet (`work_invoice_links`), la facture ignore le projet.
+//   - liens facture ↔ projet (`work_invoice_links`), la facture ignore le projet ;
+//   - ADR-0040 — C7 § 6.4 : opportunité gagnée → projet, en déléguant à la logique
+//     devis → projet quand un devis accepté existe ; sinon une tâche par ligne de
+//     l'opportunité, idempotent par `{ organizationId, source.opportunityId }`
+//     → `409 WORK_PROJECT_EXISTS_FOR_OPPORTUNITY`.
 //
 // Les devis et les factures sont LUS en lecture seule par la connexion
 // (`sales_quotes`, `sales_invoices`), sans toucher au service des devis. Toute
@@ -17,6 +21,7 @@
 import {
   WORK_LIMITS,
   rankBetween,
+  type CreateProjectFromOpportunityBody,
   type CreateProjectFromQuoteBody,
   type PrepareInvoiceBody,
   type WorkInvoiceLinkView,
@@ -38,6 +43,7 @@ import { lineInputOf } from '../../sales/quotes/quotes.service.js';
 import { searchKeyOf } from '../../sales/search.js';
 import {
   conflict,
+  forbidden,
   invalid,
   isWorkId,
   notFound,
@@ -62,10 +68,14 @@ import {
   type WorkInvoiceLinkDocument,
   type WorkInvoiceLinkLean,
 } from './work-invoice-link.schema.js';
+import { opportunityProjectFilter } from './work-opportunity-events.js';
 
 /** Collections d'autres modules, lues en lecture seule. */
 const QUOTES = 'sales_quotes';
 const INVOICES = 'sales_invoices';
+// ADR-0040 — C7 : opportunités et comptes du CRM, lus en lecture seule.
+const OPPORTUNITIES = 'crm_opportunities';
+const ACCOUNTS = 'crm_accounts';
 
 /** Types de facture qu'un projet peut porter : factures de vente, jamais un avoir ni un acompte. */
 const LINKABLE_TYPES: readonly string[] = ['FV', 'EV'];
@@ -124,6 +134,53 @@ export function pickQuoteLines(
       'lineIndexes',
       'INVALID_VALUE',
       `Le devis ${quote.number} n’a pas de ligne d’indice ${bad} (${quote.lines.length} ligne(s)).`,
+    );
+  }
+  return [...lineIndexes].sort((a, b) => a - b).map((i) => all[i]!);
+}
+
+/** Ce qu'on lit d'une opportunité (`crm_opportunities`, ADR-0040 — C7). */
+export interface OpportunityRead {
+  _id: unknown;
+  title: string;
+  status: string;
+  customerId: string | null;
+  accountId?: string | null;
+  lines?: { label: string; quantity: string; unit: string | null }[];
+}
+
+/** Tâche à créer avec un projet : jamais de montant. */
+interface TaskSeed {
+  title: string;
+  description: string;
+  source: Record<string, unknown> | null;
+}
+
+/** « Quantité : 12 m² » — la quantité et l'unité, jamais un prix. */
+function quantityText(quantity: string | number, unit: string | null | undefined): string {
+  return `Quantité : ${quantity}${unit ? ` ${unit}` : ''}`;
+}
+
+/** Nom de projet borné, avec repli. */
+function projectNameOf(name: string | null | undefined, fallback: string): string {
+  const n = (name ?? '').trim().slice(0, WORK_LIMITS.projectNameMax).trim();
+  return n || fallback.slice(0, WORK_LIMITS.projectNameMax);
+}
+
+/** Lignes retenues d'une opportunité : toutes par défaut ; un indice hors limites est refusé. */
+export function pickOpportunityLines(
+  opp: OpportunityRead,
+  lineIndexes: readonly number[] | undefined,
+): { index: number; line: NonNullable<OpportunityRead['lines']>[number] }[] {
+  const lines = opp.lines ?? [];
+  const all = lines.map((line, index) => ({ index, line }));
+  if (lineIndexes === undefined) return all;
+  const bad = lineIndexes.find((i) => i >= lines.length);
+  if (bad !== undefined) {
+    invalid(
+      'lineIndexes',
+      'INVALID_VALUE',
+      `L’opportunité n’a pas de ligne d’indice ${bad} (${lines.length} ligne(s)).`,
     );
   }
   return [...lineIndexes].sort((a, b) => a - b).map((i) => all[i]!);
@@ -214,7 +271,203 @@ export class WorkBillingService {
       });
     }
     const picked = pickQuoteLines(quote, body.lineIndexes);
+    await this.assertProjectRoom(organizationId);
 
+    const quoteId = body.quoteId;
+    const name = projectNameOf(body.name ?? quote.title, `Projet ${quote.number}`);
+    return this.materialize(
+      organizationId,
+      {
+        name,
+        links: {
+          customerId: quote.customer?.customerId ?? null,
+          opportunityId: quote.opportunityId ?? null,
+          quoteIds: [quoteId],
+        },
+        source: { kind: 'quote', quoteId, quoteVersion: quote.version, createdAt: new Date() },
+        seeds: picked.map(({ index, line }) => ({
+          title: line.name || `Ligne ${index + 1}`,
+          description: `${quantityText(line.quantity, line.unit)}\nLigne ${index + 1} du devis ${quote.number} v${quote.version}.`,
+          source: { kind: 'quote_line', quoteId, lineIndex: index },
+        })),
+        milestone: body.milestone,
+        activity: { name, kind: 'client', quoteId, quoteNumber: quote.number },
+        duplicate: async () => {
+          const winner = await this.projectModel
+            .findOne(
+              { organizationId, 'source.kind': 'quote', 'source.quoteId': quoteId },
+              { _id: 1 },
+            )
+            .lean<{ _id: unknown }>()
+            .exec();
+          this.alreadyExists(winner ? String(winner._id) : null);
+        },
+      },
+      actor,
+    );
+  }
+
+  // ── Opportunité gagnée → projet (ADR-0040 — C7 § 6.4) ───────────────────
+
+  /**
+   * Jamais automatique : geste d'un détenteur de `work.manage` + `crm.read`.
+   * Avec un devis accepté de l'opportunité (`quoteId`, ou son unique devis
+   * accepté) : délègue à `createFromQuote` (même idempotence, `links.opportunityId`
+   * posé). Sans devis : une tâche par ligne de l'opportunité, sans montant,
+   * `source.kind = 'opportunity'`, idempotent par l'index unique partiel.
+   * `salesRead` : l'appelant détient `sales.read` (exigé pour désigner un devis).
+   */
+  async createFromOpportunity(
+    organizationId: string,
+    body: CreateProjectFromOpportunityBody,
+    actor: WorkActor,
+    access: { salesRead: boolean },
+  ): Promise<WorkProjectView> {
+    const opp = await this.opportunityOf(organizationId, body.opportunityId);
+    const opportunityId = String(opp._id);
+    const existing = await this.projectModel
+      .findOne(opportunityProjectFilter(organizationId, opportunityId), { _id: 1 })
+      .lean<{ _id: unknown }>()
+      .exec();
+    if (existing) this.alreadyExistsForOpportunity(String(existing._id));
+    if (opp.status !== 'won') {
+      conflict(
+        'WORK_OPPORTUNITY_NOT_WON',
+        'Seule une opportunité gagnée se transforme en projet.',
+        { status: opp.status },
+      );
+    }
+
+    const quoteId = await this.acceptedQuoteOf(organizationId, opportunityId, body, access);
+    if (quoteId !== null) {
+      return this.createFromQuote(
+        organizationId,
+        {
+          quoteId,
+          ...(body.name !== undefined ? { name: body.name } : {}),
+          ...(body.lineIndexes !== undefined ? { lineIndexes: body.lineIndexes } : {}),
+          ...(body.milestone !== undefined ? { milestone: body.milestone } : {}),
+        },
+        actor,
+      );
+    }
+
+    const picked = pickOpportunityLines(opp, body.lineIndexes);
+    await this.assertProjectRoom(organizationId);
+    const customerId = await this.customerOfOpportunity(organizationId, opp);
+    const name = projectNameOf(body.name ?? opp.title, 'Projet de l’opportunité');
+    return this.materialize(
+      organizationId,
+      {
+        name,
+        links: { customerId, opportunityId, quoteIds: [] },
+        source: { kind: 'opportunity', opportunityId, createdAt: new Date() },
+        seeds: picked.map(({ index, line }) => ({
+          title: line.label || `Ligne ${index + 1}`,
+          description: `${quantityText(line.quantity, line.unit)}\nLigne ${index + 1} de l’opportunité.`,
+          source: null,
+        })),
+        milestone: body.milestone,
+        activity: { name, kind: 'client', opportunityId },
+        duplicate: async () => {
+          const winner = await this.projectModel
+            .findOne(opportunityProjectFilter(organizationId, opportunityId), { _id: 1 })
+            .lean<{ _id: unknown }>()
+            .exec();
+          this.alreadyExistsForOpportunity(winner ? String(winner._id) : null);
+        },
+      },
+      actor,
+    );
+  }
+
+  /** Projet issu de cette opportunité (ou d'un de ses devis), ou `null`. */
+  async projectForOpportunity(
+    organizationId: string,
+    opportunityId: string,
+  ): Promise<{ projectId: string | null }> {
+    if (!isWorkId(opportunityId)) return { projectId: null };
+    const doc = await this.projectModel
+      .findOne(opportunityProjectFilter(organizationId, opportunityId.toLowerCase()), { _id: 1 })
+      .lean<{ _id: unknown }>()
+      .exec();
+    return { projectId: doc ? String(doc._id) : null };
+  }
+
+  private async opportunityOf(
+    organizationId: string,
+    opportunityId: string,
+  ): Promise<OpportunityRead> {
+    if (!isWorkId(opportunityId)) notFound('CRM_OPPORTUNITY_NOT_FOUND', 'Opportunité introuvable.');
+    const doc = await this.connection
+      .collection(OPPORTUNITIES)
+      .findOne(
+        { _id: oid(opportunityId), organizationId },
+        { projection: { title: 1, status: 1, customerId: 1, accountId: 1, lines: 1 } },
+      );
+    if (!doc) notFound('CRM_OPPORTUNITY_NOT_FOUND', 'Opportunité introuvable.');
+    return doc as unknown as OpportunityRead;
+  }
+
+  /**
+   * Devis accepté auquel déléguer : `quoteId` (exige `sales.read`, doit appartenir
+   * à l'opportunité), sinon l'unique devis accepté de l'opportunité, sinon `null`.
+   * Plusieurs devis acceptés sans choix : `409 WORK_OPPORTUNITY_QUOTE_REQUIRED`.
+   */
+  private async acceptedQuoteOf(
+    organizationId: string,
+    opportunityId: string,
+    body: CreateProjectFromOpportunityBody,
+    access: { salesRead: boolean },
+  ): Promise<string | null> {
+    if (body.quoteId !== undefined) {
+      if (!access.salesRead) {
+        forbidden('FORBIDDEN', 'Désigner un devis exige le droit de lire les ventes.');
+      }
+      const quote = await this.quoteOf(organizationId, body.quoteId);
+      if (quote.opportunityId !== opportunityId) {
+        invalid(
+          'quoteId',
+          'WORK_QUOTE_NOT_OF_OPPORTUNITY',
+          `Le devis ${quote.number} n’est pas rattaché à cette opportunité.`,
+        );
+      }
+      return body.quoteId;
+    }
+    const accepted = await this.connection
+      .collection(QUOTES)
+      .find(
+        { organizationId, opportunityId, status: 'accepted' },
+        { projection: { _id: 1 }, limit: 2 },
+      )
+      .toArray();
+    if (accepted.length === 1) return String(accepted[0]!._id);
+    if (accepted.length > 1) {
+      conflict(
+        'WORK_OPPORTUNITY_QUOTE_REQUIRED',
+        'Plusieurs devis de cette opportunité sont acceptés : choisissez celui que le projet suit.',
+      );
+    }
+    return null;
+  }
+
+  /** Client du compte de l'opportunité (`null` pour un prospect). */
+  private async customerOfOpportunity(
+    organizationId: string,
+    opp: OpportunityRead,
+  ): Promise<string | null> {
+    if (opp.accountId && isWorkId(opp.accountId)) {
+      const account = await this.connection
+        .collection(ACCOUNTS)
+        .findOne({ _id: oid(opp.accountId), organizationId }, { projection: { customerId: 1 } });
+      if (account) return (account['customerId'] as string | null | undefined) ?? null;
+    }
+    return opp.customerId ?? null;
+  }
+
+  // ── Création commune (devis, opportunité) ───────────────────────────────
+
+  private async assertProjectRoom(organizationId: string): Promise<void> {
     const active = await this.projectModel
       .countDocuments({ organizationId, status: { $ne: 'archived' } })
       .exec();
@@ -225,32 +478,44 @@ export class WorkBillingService {
         { limit: WORK_LIMITS.activeProjectsPerOrganization },
       );
     }
+  }
 
-    const quoteId = body.quoteId;
-    const name = (body.name ?? quote.title?.trim() ?? `Projet ${quote.number}`)
-      .trim()
-      .slice(0, WORK_LIMITS.projectNameMax);
+  /**
+   * Projet client, une tâche par graine (sans montant) et un jalon final
+   * facultatif. Pas de projet à moitié créé : tout est retiré en cas d'échec.
+   * Doublon (index unique) : `duplicate()` lève le 409 qui convient.
+   */
+  private async materialize(
+    organizationId: string,
+    input: {
+      name: string;
+      links: { customerId: string | null; opportunityId: string | null; quoteIds: string[] };
+      source: Record<string, unknown>;
+      seeds: TaskSeed[];
+      milestone: { title: string; dueDate: string } | undefined;
+      activity: Record<string, unknown>;
+      duplicate: () => Promise<void>;
+    },
+    actor: WorkActor,
+  ): Promise<WorkProjectView> {
+    const { name } = input;
     const columns = (await this.settings.get(organizationId)).defaultColumns;
     const todo = columns.find((c) => c.category === 'todo') ?? columns[0]!;
-    const taskCount = picked.length + (body.milestone ? 1 : 0);
+    const taskCount = input.seeds.length + (input.milestone ? 1 : 0);
 
     let created: WorkProjectDocument;
     try {
       created = await this.projectModel.create({
         organizationId,
-        name: name || `Projet ${quote.number}`,
+        name,
         description: null,
         kind: 'client',
         status: 'active',
         ownerUserId: null,
         startDate: null,
         dueDate: null,
-        links: {
-          customerId: quote.customer?.customerId ?? null,
-          opportunityId: quote.opportunityId ?? null,
-          quoteIds: [quoteId],
-        },
-        source: { kind: 'quote', quoteId, quoteVersion: quote.version, createdAt: new Date() },
+        links: input.links,
+        source: input.source,
         columns,
         visibility: 'organization',
         taskSeq: taskCount,
@@ -262,15 +527,12 @@ export class WorkBillingService {
       });
     } catch (err) {
       if (!isDuplicateKey(err)) throw err;
-      const winner = await this.projectModel
-        .findOne({ organizationId, 'source.kind': 'quote', 'source.quoteId': quoteId }, { _id: 1 })
-        .lean<{ _id: unknown }>()
-        .exec();
-      this.alreadyExists(winner ? String(winner._id) : null);
+      await input.duplicate();
+      throw err;
     }
     const projectId = String(created._id);
 
-    // Une tâche par ligne, sans montant : désignation, quantité et unité seulement.
+    // Une tâche par graine, sans montant : désignation, quantité et unité seulement.
     let rank: string | null = null;
     const base = {
       organizationId,
@@ -295,29 +557,28 @@ export class WorkBillingService {
       updatedBy: actor.userId,
       _schemaVersion: 1,
     };
-    const docs: Record<string, unknown>[] = picked.map(({ index, line }, i) => {
+    const docs: Record<string, unknown>[] = input.seeds.map((seed, i) => {
       rank = rankBetween(rank, null);
-      const quantity = `Quantité : ${line.quantity}${line.unit ? ` ${line.unit}` : ''}`;
       return {
         ...base,
         number: i + 1,
-        title: (line.name || `Ligne ${index + 1}`).slice(0, WORK_LIMITS.taskTitleMax),
-        description: `${quantity}\nLigne ${index + 1} du devis ${quote.number} v${quote.version}.`,
+        title: seed.title.slice(0, WORK_LIMITS.taskTitleMax),
+        description: seed.description,
         rank,
         dueDate: null,
         isMilestone: false,
-        source: { kind: 'quote_line', quoteId, lineIndex: index },
+        source: seed.source,
       };
     });
-    if (body.milestone) {
+    if (input.milestone) {
       rank = rankBetween(rank, null);
       docs.push({
         ...base,
         number: docs.length + 1,
-        title: body.milestone.title,
+        title: input.milestone.title,
         description: null,
         rank,
-        dueDate: body.milestone.dueDate,
+        dueDate: input.milestone.dueDate,
         isMilestone: true,
         source: null,
       });
@@ -329,7 +590,7 @@ export class WorkBillingService {
           projectId,
           actorUserId: actor.userId,
           kind: 'project.created',
-          data: { name, kind: 'client', quoteId, quoteNumber: quote.number },
+          data: input.activity,
         },
         // `insertMany` rend les documents dans l'ordre des entrées.
         ...inserted.map((t, i) => ({
@@ -354,6 +615,14 @@ export class WorkBillingService {
     conflict(
       'WORK_PROJECT_EXISTS_FOR_QUOTE',
       'Un projet existe déjà pour ce devis : ouvrez-le.',
+      projectId ? { projectId } : undefined,
+    );
+  }
+
+  private alreadyExistsForOpportunity(projectId: string | null): never {
+    conflict(
+      'WORK_PROJECT_EXISTS_FOR_OPPORTUNITY',
+      'Un projet existe déjà pour cette opportunité : ouvrez-le.',
       projectId ? { projectId } : undefined,
     );
   }

@@ -5,6 +5,7 @@
 // n'est calculé ici ni dans les écrans : la marge vient de l'API (moteur).
 
 import type {
+  CreateProjectFromOpportunityBody,
   CreateProjectFromQuoteBody,
   PrepareInvoiceBody,
   ProjectMarginView,
@@ -33,6 +34,14 @@ export const workBillingApi = {
   /** Projet créé depuis ce devis, ou `null` (`work.read` + `sales.read`). */
   projectForQuote: (quoteId: string) =>
     jsonRequest<{ projectId: string | null }>(`/work/quotes/${id(quoteId)}/project`, {
+      method: 'GET',
+    }),
+  /** ADR-0040 — C7 : opportunité gagnée → projet (`work.manage` + `crm.read`). */
+  createFromOpportunity: (body: CreateProjectFromOpportunityBody) =>
+    jsonRequest<WorkProjectView>('/work/projects/from-opportunity', { method: 'POST', body }),
+  /** ADR-0040 — C7 : projet issu de l'opportunité, ou `null` (`work.read` + `crm.read`). */
+  projectForOpportunity: (opportunityId: string) =>
+    jsonRequest<{ projectId: string | null }>(`/work/opportunities/${id(opportunityId)}/project`, {
       method: 'GET',
     }),
   listInvoices: (projectId: string) =>

@@ -6,7 +6,8 @@
 // (`POST /sales/quotes/from-opportunity`, `sales.quote`), activités (assigné,
 // faite / rouvrir), historique des étapes.
 //
-// « Créer le projet » d'une opportunité gagnée est le lot C7 : pas ici.
+// « Créer le projet » d'une opportunité gagnée : encadré du lot C7
+// (`opportunites/[opportunityId]/_components/creer-projet.tsx`).
 
 import { Badge, buttonClasses } from '@lalanda/ui';
 import { CalendarClock, FileText, History, ListOrdered, Target } from 'lucide-react';
@@ -53,6 +54,8 @@ import {
 } from './lignes-model';
 import { BoiteMotifPerte, type DemandeMotif } from './motif-perte';
 import { MENTION_ESTIME, libelleMotif, nomMembre, suiteDepot } from './pipeline-model';
+// ADR-0040 — C7
+import { CreerProjet } from '../opportunites/[opportunityId]/_components/creer-projet';
 
 function EditeurLignes({
   lignes,
@@ -340,6 +343,9 @@ export function OpportunityDetail({
           </p>
         ) : null}
       </Bandeau>
+
+      {/* ADR-0040 — C7 : opportunité gagnée → « Créer le projet » (jamais automatique). */}
+      <CreerProjet opportunityId={v.id} status={v.status} actions={actions} />
 
       {erreur ? (
         <Alerte>

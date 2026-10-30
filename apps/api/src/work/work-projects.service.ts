@@ -49,6 +49,7 @@ import {
   WorkProject,
   WorkTask,
   WorkTimeEntry,
+  projectSourceViewOf,
   type WorkAttachmentDocument,
   type WorkAttachmentLean,
   type WorkCommentDocument,
@@ -280,14 +281,8 @@ export class WorkProjectsService {
         opportunityTitle: opportunity,
         quotes: (links.quoteIds ?? []).map((q) => ({ quoteId: q, number: quotes.get(q) ?? null })),
       },
-      source: d.source
-        ? {
-            kind: 'quote',
-            quoteId: d.source.quoteId,
-            quoteVersion: d.source.quoteVersion,
-            createdAt: new Date(d.source.createdAt).toISOString(),
-          }
-        : null,
+      // ADR-0040 — C7 : origine devis ou opportunité.
+      source: projectSourceViewOf(d.source),
       columns: d.columns.map((c) => ({ key: c.key, label: c.label, category: c.category })),
       visibility: 'organization',
       archivedAt: iso(d.archivedAt),
