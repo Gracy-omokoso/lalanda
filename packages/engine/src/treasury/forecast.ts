@@ -11,7 +11,13 @@
 //   3. plan BUILD (facultatif) : rythme journalier (mensuel × 12 ÷ 365) des
 //      lignes de produit × taux de réalisation et des lignes de charge × facteur,
 //      une ligne de charge visée par une catégorie récurrente étant diminuée de
-//      l'équivalent mensuel de ces récurrences (jamais sous zéro).
+//      l'équivalent mensuel de ces récurrences (jamais sous zéro) ;
+//   4. échéances fournisseurs (1.1.0, ADR-0044 § 6.3) : reste à payer de chaque
+//      facture validée non en litige, à son échéance (passée ou du jour : J+1),
+//      dans TOUS les scénarios (le plus prudent : la sortie la plus tôt). Les
+//      litiges sont exclus et comptés en incertitude ; les commandes non
+//      facturées sont signalées, jamais prévues. Sans `payables`, les sorties
+//      sont celles de 1.0.0 (la source `payable` vaut zéro).
 //
 // Chaque hypothèse est un paramètre du scénario, rendu avec le résultat.
 
@@ -112,7 +118,21 @@ interface DatedFlow {
   cents: bigint;
 }
 
-const SOURCES: readonly ForecastFlowSource[] = ['receivable', 'recurring', 'plan_in', 'plan_out'];
+const SOURCES: readonly ForecastFlowSource[] = [
+  'receivable',
+  'recurring',
+  'plan_in',
+  'plan_out',
+  'payable',
+];
+
+const emptySlot = (): Record<ForecastFlowSource, bigint> => ({
+  receivable: 0n,
+  recurring: 0n,
+  plan_in: 0n,
+  plan_out: 0n,
+  payable: 0n,
+});
 
 /** Montants journaliers exacts d'un total mensuel : cumul(d) = mensuel × 12 × d ÷ 365. */
 function dailyAmounts(monthlyCents: bigint): bigint[] {
@@ -193,6 +213,62 @@ export function forecastTreasury(input: TreasuryForecastInput): TreasuryForecast
     }
   }
 
+  // ── 3 bis. Échéances fournisseurs (ADR-0044 § 6.3) ────────────────────────
+  const payableFlows: DatedFlow[] = [];
+  const payableSuppliers = new Set<string>();
+  for (const p of input.payables ?? []) {
+    if (p.currency !== input.currency) continue;
+    const cents = trustedCents(p.remaining, 'Reste à payer');
+    if (cents <= 0n) continue;
+    if (p.disputed) {
+      note(
+        'PAYABLES_DISPUTED',
+        'Factures fournisseurs en litige : exclues de la prévision tant que le litige dure.',
+      );
+      continue;
+    }
+    if (p.supplierId) payableSuppliers.add(p.supplierId);
+    const n = dayNumber(p.dueDate);
+    const overdue = n <= asOfN;
+    const dayIndex = overdue ? 1 : n - asOfN;
+    if (dayIndex > FORECAST_DAYS) continue;
+    payableFlows.push({
+      dayIndex,
+      cents,
+      flow: {
+        date: addDays(input.asOf, dayIndex),
+        source: 'payable',
+        direction: 'out',
+        amount: formatCents(cents),
+        label: n < asOfN ? `${p.label} (échéance du ${p.dueDate} dépassée)` : p.label,
+      },
+    });
+  }
+  for (const rule of activeRecurring) {
+    if (rule.supplierId && payableSuppliers.has(rule.supplierId)) {
+      note(
+        'RECURRING_AND_PAYABLES_SAME_SUPPLIER',
+        'Dépense récurrente chez un fournisseur qui a des factures à payer : vérifiez qu’elle n’est pas comptée deux fois.',
+      );
+    }
+  }
+  let notInvoiced = 0n;
+  let notInvoicedCount = 0;
+  for (const o of input.ordersNotInvoiced ?? []) {
+    if (o.currency !== input.currency) continue;
+    const cents = trustedCents(o.amount, 'Reste à facturer');
+    if (cents <= 0n) continue;
+    notInvoiced += cents;
+    notInvoicedCount += 1;
+  }
+  if (notInvoicedCount > 0) {
+    findings.set('ORDERS_NOT_INVOICED', {
+      code: 'ORDERS_NOT_INVOICED',
+      count: notInvoicedCount,
+      detail: `Commandes approuvées non facturées : ${formatCents(notInvoiced)} ${input.currency} HT, non prévus (montant et date inconnus).`,
+    });
+  }
+
   // ── 4. Plan BUILD ──────────────────────────────────────────────────────────
   let planInMonthly = 0n;
   let planOutMonthly = 0n;
@@ -264,6 +340,7 @@ export function forecastTreasury(input: TreasuryForecastInput): TreasuryForecast
         },
       });
     }
+    for (const p of payableFlows) dated.push({ ...p, flow: { ...p.flow } });
     dated.sort((a, b) => a.dayIndex - b.dayIndex || a.flow.label.localeCompare(b.flow.label));
 
     const planIn = dailyAmounts(applyRate(planInMonthly, h.planRevenueRate));
@@ -272,7 +349,7 @@ export function forecastTreasury(input: TreasuryForecastInput): TreasuryForecast
     // Flux nets par jour et par source.
     const perDay: Record<ForecastFlowSource, bigint>[] = Array.from(
       { length: FORECAST_DAYS + 1 },
-      () => ({ receivable: 0n, recurring: 0n, plan_in: 0n, plan_out: 0n }),
+      emptySlot,
     );
     for (const d of dated) {
       const slot = perDay[d.dayIndex];
@@ -288,22 +365,17 @@ export function forecastTreasury(input: TreasuryForecastInput): TreasuryForecast
 
     const balancesByDay: bigint[] = [opening];
     for (let d = 1; d <= FORECAST_DAYS; d += 1) {
-      const slot = perDay[d] ?? { receivable: 0n, recurring: 0n, plan_in: 0n, plan_out: 0n };
+      const slot = perDay[d] ?? emptySlot();
       const previous = balancesByDay[d - 1] ?? opening;
       balancesByDay.push(
-        previous + slot.receivable + slot.plan_in - slot.recurring - slot.plan_out,
+        previous + slot.receivable + slot.plan_in - slot.recurring - slot.plan_out - slot.payable,
       );
     }
 
     const horizons: ForecastHorizonSummary[] = FORECAST_HORIZONS.map((days) => {
       let min = opening;
       let minIndex = 0;
-      const bySource: Record<ForecastFlowSource, bigint> = {
-        receivable: 0n,
-        recurring: 0n,
-        plan_in: 0n,
-        plan_out: 0n,
-      };
+      const bySource = emptySlot();
       for (let d = 0; d <= days; d += 1) {
         const b = balancesByDay[d] ?? opening;
         if (b < min) {
@@ -322,12 +394,13 @@ export function forecastTreasury(input: TreasuryForecastInput): TreasuryForecast
         min: formatCents(min),
         minDate: addDays(input.asOf, minIndex),
         inflows: formatCents(bySource.receivable + bySource.plan_in),
-        outflows: formatCents(bySource.recurring + bySource.plan_out),
+        outflows: formatCents(bySource.recurring + bySource.plan_out + bySource.payable),
         bySource: {
           receivable: formatCents(bySource.receivable),
           recurring: formatCents(bySource.recurring),
           plan_in: formatCents(bySource.plan_in),
           plan_out: formatCents(bySource.plan_out),
+          payable: formatCents(bySource.payable),
         },
       };
     });

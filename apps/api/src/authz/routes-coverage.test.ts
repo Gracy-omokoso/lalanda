@@ -74,6 +74,8 @@ import { PurchaseSettingsController } from '../purchases/settings/purchase-setti
 // ADR-0044 — P4
 import { PurchaseReceptionsController } from '../purchases/receptions/purchase-receptions.controller.js';
 import { SupplierInvoicesController } from '../purchases/invoices/supplier-invoices.controller.js';
+// ADR-0044 — P5
+import { SupplierPaymentsController } from '../purchases/payments/supplier-payments.controller.js';
 import { QuotesController } from '../sales/quotes/quotes.controller.js';
 import { CrmActivitiesController } from '../crm/crm-activities.controller.js';
 import { CrmContactsController } from '../crm/crm-contacts.controller.js';
@@ -211,6 +213,8 @@ const CONTROLEURS = [
   // ADR-0044 — P4 : réceptions et factures fournisseurs.
   PurchaseReceptionsController,
   SupplierInvoicesController,
+  // ADR-0044 — P5 : paiements fournisseurs, échéancier, doublons.
+  SupplierPaymentsController,
 ];
 
 /**
@@ -996,6 +1000,47 @@ describe('ADR-0044 — P4 : réceptions, factures fournisseurs et rapprochement'
     for (const cle of Object.keys(SANS_PERMISSION)) {
       expect(cle.startsWith('PurchaseReceptionsController.')).toBe(false);
       expect(cle.startsWith('SupplierInvoicesController.')).toBe(false);
+    }
+  });
+});
+
+// ADR-0044 — P5
+describe('ADR-0044 — P5 : paiements fournisseurs, échéancier et doublons', () => {
+  it('chaque route des dettes et paiements déclare la permission de l’ADR (§ 3.6)', () => {
+    const attendu: Record<string, Action[]> = {
+      'SupplierPaymentsController.payables': ['purchase.read'],
+      // Paiements et doublons révèlent des dépenses : il faut aussi lire la trésorerie.
+      'SupplierPaymentsController.list': ['purchase.read', 'treasury.read'],
+      'SupplierPaymentsController.get': ['purchase.read', 'treasury.read'],
+      'SupplierPaymentsController.duplicates': ['purchase.read', 'treasury.read'],
+      // Payer est un décaissement ; rattacher une dépense existante, aussi la modifier.
+      'SupplierPaymentsController.create': ['payables.pay'],
+      'SupplierPaymentsController.fromExpense': ['payables.pay', 'treasury.manage'],
+      'SupplierPaymentsController.cancel': ['payables.pay'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) => r.cle.startsWith('SupplierPaymentsController.'));
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+    }
+  });
+
+  it('aucune écriture de paiement n’est accessible par `purchase.approve` seul', () => {
+    const ecritures = TOUTES_LES_ROUTES.filter((r) =>
+      [
+        'SupplierPaymentsController.create',
+        'SupplierPaymentsController.fromExpense',
+        'SupplierPaymentsController.cancel',
+      ].includes(r.cle),
+    );
+    expect(ecritures.length).toBe(3);
+    for (const r of ecritures) {
+      expect(r.actions, r.cle).toContain('payables.pay');
+      expect(r.actions, r.cle).not.toContain('purchase.approve');
+    }
+    for (const cle of Object.keys(SANS_PERMISSION)) {
+      expect(cle.startsWith('SupplierPaymentsController.')).toBe(false);
     }
   });
 });

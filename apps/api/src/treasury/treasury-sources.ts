@@ -17,7 +17,12 @@
 
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectConnection } from '@nestjs/mongoose';
-import type { ReceivableInput, TreasuryCurrency } from '@lalanda/engine';
+import type {
+  OrderNotInvoicedInput,
+  PayableForecastInput,
+  ReceivableInput,
+  TreasuryCurrency,
+} from '@lalanda/engine';
 import type { Connection } from 'mongoose';
 
 import { kinshasaDay } from '../sales/invoices/exchange-rate-reference.service.js';
@@ -133,5 +138,36 @@ export class TreasuryReceivablesReader {
         dueDate: null,
         issuedOn: kinshasaDay(d.issuedAt as Date),
       }));
+  }
+}
+
+// ─── ADR-0044 — P5 (§ 6.3) : échéances fournisseurs ──────────────────────────
+//
+// La prévision lit les dettes fournisseurs par un PORT, motif des encaissements :
+// reste à payer (`payableSettlement`) de chaque facture VALIDÉE, à son échéance,
+// et reste à facturer des commandes approuvées (signalé, jamais prévu). Fournisseur
+// de production : `PurchasesPayablesSource` (achats, lecture seule par la
+// connexion, sans dépendre du module des achats). Le fournisseur nul se déclare
+// non intégré : la prévision le dit (`PAYABLES_NOT_INTEGRATED`).
+
+export interface TreasuryPayablesSource {
+  readonly integrated: boolean;
+  /** Factures validées au reste non nul, toutes devises (le moteur filtre). */
+  openPayables(organizationId: string): Promise<PayableForecastInput[]>;
+  /** Commandes approuvées au reste à facturer non nul, toutes devises. */
+  ordersNotInvoiced(organizationId: string): Promise<OrderNotInvoicedInput[]>;
+}
+
+export const TREASURY_PAYABLES_SOURCE = Symbol('TREASURY_PAYABLES_SOURCE');
+
+/** Montage sans achats : aucune dette, et il le dit. */
+@Injectable()
+export class NoPayablesSource implements TreasuryPayablesSource {
+  readonly integrated = false;
+  openPayables(): Promise<PayableForecastInput[]> {
+    return Promise.resolve([]);
+  }
+  ordersNotInvoiced(): Promise<OrderNotInvoicedInput[]> {
+    return Promise.resolve([]);
   }
 }

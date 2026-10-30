@@ -8,7 +8,15 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Toute évolution d'un calcul de ce module incrémente cette version. */
-export const TREASURY_VERSION = '1.0.0';
+export const TREASURY_VERSION = '1.1.0';
+
+/**
+ * Version du calcul du REPORT des dépenses vers le réalisé (`planExpenseActuals`),
+ * inchangé depuis 1.0.0. L'empreinte d'une cellule reportée la porte : la prévision
+ * peut évoluer (1.1.0, ADR-0044 § 6.3) sans faire passer pour « modifiées » les
+ * cellules déjà reportées, ni bloquer celles d'une période clôturée.
+ */
+export const EXPENSE_ACTUALS_VERSION = '1.0.0';
 
 /** Devises de la trésorerie RUN — les mêmes que la facturation (ADR-0023). */
 export const TREASURY_CURRENCIES = ['CDF', 'USD'] as const;
@@ -227,6 +235,11 @@ export interface RecurringExpenseInput extends RecurrenceRule {
   currency: TreasuryCurrency;
   amount: MoneyString;
   active: boolean;
+  /**
+   * ADR-0044 § 6.3 : fiche fournisseur de la règle, facultative ; sert seulement au
+   * constat `RECURRING_AND_PAYABLES_SAME_SUPPLIER` (rien n'est retranché).
+   */
+  supplierId?: string | null;
 }
 
 // ─── Rapprochement ───────────────────────────────────────────────────────────
@@ -327,6 +340,29 @@ export interface ReceivableInput {
   issuedOn: CalendarDay;
 }
 
+/**
+ * Facture fournisseur VALIDÉE (ADR-0044 § 6.3) : son reste à payer (`payableSettlement`)
+ * sort à son échéance, dans tous les scénarios (le plus prudent) ; une échéance
+ * passée ou du jour est comptée à J+1.
+ */
+export interface PayableForecastInput {
+  id: string;
+  label: string;
+  currency: TreasuryCurrency;
+  remaining: MoneyString;
+  dueDate: CalendarDay;
+  /** En litige : exclue des flux, constat `PAYABLES_DISPUTED`. */
+  disputed: boolean;
+  supplierId: string | null;
+}
+
+/** Commande approuvée non facturée : reste à facturer HT (moteur des achats). */
+export interface OrderNotInvoicedInput {
+  id: string;
+  currency: TreasuryCurrency;
+  amount: MoneyString;
+}
+
 export interface ForecastPlanLine {
   lineId: string;
   label: string;
@@ -350,7 +386,16 @@ export type ForecastFindingCode =
   | 'PLAN_NOT_USED'
   | 'RECEIPTS_NOT_INTEGRATED'
   /** Encaissements (ADR-0031) sans compte de trésorerie : absents des soldes. */
-  | 'RECEIPTS_WITHOUT_ACCOUNT';
+  | 'RECEIPTS_WITHOUT_ACCOUNT'
+  // ADR-0044 § 6.3 (1.1.0) : échéances fournisseurs.
+  /** Les factures fournisseurs ne sont pas reliées à la prévision. */
+  | 'PAYABLES_NOT_INTEGRATED'
+  /** Factures en litige : exclues des flux, comptées en incertitude. */
+  | 'PAYABLES_DISPUTED'
+  /** Commandes approuvées non facturées : signalées, jamais prévues (décision ouverte n° 5). */
+  | 'ORDERS_NOT_INVOICED'
+  /** Dépense récurrente chez un fournisseur qui a des factures à venir : double comptage possible. */
+  | 'RECURRING_AND_PAYABLES_SAME_SUPPLIER';
 
 export interface ForecastFinding {
   code: ForecastFindingCode;
@@ -373,9 +418,13 @@ export interface TreasuryForecastInput {
   minimumBalance: MoneyString | null;
   /** Constats connus de l'appelant seulement (encaissements non intégrés, plan écarté…). */
   externalFindings: readonly ForecastFinding[];
+  /** ADR-0044 § 6.3 (1.1.0) : échéances fournisseurs ; absent ou vide = sorties de 1.0.0. */
+  payables?: readonly PayableForecastInput[];
+  /** ADR-0044 § 6.3 : commandes non facturées, signalées seulement. */
+  ordersNotInvoiced?: readonly OrderNotInvoicedInput[];
 }
 
-export type ForecastFlowSource = 'receivable' | 'recurring' | 'plan_in' | 'plan_out';
+export type ForecastFlowSource = 'receivable' | 'recurring' | 'plan_in' | 'plan_out' | 'payable';
 
 export interface ForecastFlow {
   date: CalendarDay;

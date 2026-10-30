@@ -645,6 +645,20 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
           .set('Cookie', c)
           .send({ reason: 'Sonde de matrice', expectedRevision: 1 }),
     },
+    // ADR-0044 — P5 : paiements fournisseurs.
+    {
+      // ADR-0044 § 4.1 — payer est un décaissement : Propriétaire, Directeur financier,
+      // Comptable. Paiement inexistant : le 404 prouve que le guard a laissé passer
+      // jusqu'au service, sans facture validée ni compte à préparer dans cette suite.
+      action: 'payables.pay',
+      libelle: 'POST /purchases/payments/:id/cancel',
+      statutsAutorises: [404],
+      envoyer: (c) =>
+        request(serveur())
+          .post('/purchases/payments/000000000000000000000000/cancel')
+          .set('Cookie', c)
+          .send({ reason: 'Sonde de matrice', expectedRevision: 1 }),
+    },
   ];
 
   /** Devis minimal à un client de passage (ADR-0035 § 4). */
