@@ -24,6 +24,7 @@ import { IntegrationsModule } from '../integrations/integrations.module.js';
 import { OrganizationsModule } from '../organizations/organizations.module.js';
 import { PdfModule } from '../reports/pdf.module.js';
 import { InvoiceDocumentsController } from './documents/invoice-documents.controller.js';
+import { DocumentEmailService } from './documents/document-email.service.js';
 import { InvoiceDocumentsService } from './documents/invoice-documents.service.js';
 import { InvoiceTemplatePackagesController } from './documents/invoice-template-packages.controller.js';
 import { InvoiceTemplatesController } from './documents/invoice-templates.controller.js';
@@ -139,6 +140,8 @@ import { ReferenceRefreshJob } from './normalization/reference-refresh.job.js';
     InvoiceFreezingService,
     CreditNotesService,
     InvoiceDocumentsService,
+    // ADR-0042 : envoi des documents de vente par e-mail (audit, remise au transport).
+    DocumentEmailService,
     // ADR-0026 § 6.3 : export du journal pour les vérificateurs (lecture seule).
     JournalExportService,
     // ADR-0031 : encaissements et statut de règlement.
@@ -172,6 +175,8 @@ import { ReferenceRefreshJob } from './normalization/reference-refresh.job.js';
     // convertissent en brouillon de facture et s'impriment par le même moteur.
     InvoiceDraftsService,
     InvoiceDocumentsService,
+    // ADR-0042 : les devis s'envoient par le même service.
+    DocumentEmailService,
     // ADR-0033 (amendement du 27 oct. 2026) : le brief lit le reste à encaisser réel.
     SettlementsService,
     // ADR-0040 — C1 : la conversion prospect → client crée la fiche par Ventes.

@@ -105,8 +105,14 @@ export async function envoyerViaZeptoMail(
       accept: 'application/json',
     },
     body: JSON.stringify({
-      from: { address: from.address, name: from.name || 'Lalanda' },
+      from: { address: from.address, name: message.fromName || from.name || 'Lalanda' },
       to: [{ email_address: { address: message.to } }],
+      ...(message.cc?.length
+        ? { cc: message.cc.map((address) => ({ email_address: { address } })) }
+        : {}),
+      ...(message.replyTo
+        ? { reply_to: [{ address: message.replyTo.address, name: message.replyTo.name }] }
+        : {}),
       subject: message.subject,
       htmlbody: message.html,
       // La variante texte est transmise, pas seulement le HTML : ADR-0014 §2
@@ -124,6 +130,16 @@ export async function envoyerViaZeptoMail(
               name: img.filename,
               mime_type: img.contentType,
               content: img.contentBase64,
+            })),
+          }
+        : {}),
+      // Pièces jointes ordinaires (ADR-0042 § 4) : le PDF d'un document de vente.
+      ...(message.attachments?.length
+        ? {
+            attachments: message.attachments.map((a) => ({
+              name: a.filename,
+              mime_type: a.contentType,
+              content: a.contentBase64,
             })),
           }
         : {}),

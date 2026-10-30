@@ -14,8 +14,22 @@ import { APP_VERSION } from '../../health/app-version.js';
 import { kinshasaDay } from '../../crm/crm-model.js';
 import { OrganizationsService } from '../../organizations/organizations.service.js';
 import { PdfRenderingService } from '../../reports/pdf-rendering.service.js';
-import { InvoiceDocumentsService } from '../documents/invoice-documents.service.js';
-import { DocumentNotPrintableError } from '../documents/invoice-document.model.js';
+import { InvoiceDocumentsService, notSendable } from '../documents/invoice-documents.service.js';
+import {
+  documentEmailDefaults,
+  quoteSendability,
+  type DocumentEmailDraft,
+  type DocumentEmailInput,
+  type DocumentEmailResult,
+} from '../documents/document-email.js';
+import {
+  DocumentEmailService,
+  type DocumentEmailSender,
+} from '../documents/document-email.service.js';
+import {
+  DocumentNotPrintableError,
+  type InvoiceDocumentModel,
+} from '../documents/invoice-document.model.js';
 import { templateAt } from '../documents/templates/registry.js';
 import type { FrozenPresentation } from '../documents/templates/template.contract.js';
 import type { InvoiceActor, StoredSeller } from '../invoices/invoice.types.js';
@@ -52,6 +66,7 @@ export class QuoteDocumentsService {
     @Inject(OrganizationsService) private readonly organizations: OrganizationsService,
     @Inject(PdfRenderingService) private readonly renderer: PdfRenderingService,
     @Inject(AuditService) private readonly audit: AuditService,
+    @Inject(DocumentEmailService) private readonly emailer: DocumentEmailService,
   ) {}
 
   private async seller(organizationId: string): Promise<StoredSeller | null> {
@@ -69,11 +84,8 @@ export class QuoteDocumentsService {
     };
   }
 
-  async pdf(
-    organizationId: string,
-    quoteId: string,
-    actor: InvoiceActor,
-  ): Promise<{ pdf: Buffer; fileName: string }> {
+  /** Contenu imprimé du devis (sans rendu). */
+  private async prepare(organizationId: string, quoteId: string) {
     const q = await this.quotes.requireOwn(organizationId, quoteId);
     const [seller, presentation] = await Promise.all([
       this.seller(organizationId),
@@ -85,7 +97,7 @@ export class QuoteDocumentsService {
       if (org?.name) organizationName = org.name;
     }
     const status = quoteStatusOf(q.status, q.validUntil, kinshasaDay(new Date()));
-    let model;
+    let model: InvoiceDocumentModel;
     try {
       model = buildQuoteDocument(q, {
         seller,
@@ -104,13 +116,30 @@ export class QuoteDocumentsService {
       }
       throw err;
     }
+    return { q, presentation, status, model };
+  }
+
+  private async renderModel(
+    organizationId: string,
+    model: InvoiceDocumentModel,
+    presentation: FrozenPresentation | null,
+  ): Promise<Buffer> {
     const r = await this.documents.html(organizationId, model, presentation);
-    const pdf = await this.renderer.render(r.html, {
+    return this.renderer.render(r.html, {
       margin: r.margin,
       fixedDate: model.fixedDate,
       headerTemplate: r.headerTemplate,
       footerTemplate: r.footerTemplate,
     });
+  }
+
+  async pdf(
+    organizationId: string,
+    quoteId: string,
+    actor: InvoiceActor,
+  ): Promise<{ pdf: Buffer; fileName: string }> {
+    const { q, presentation, status, model } = await this.prepare(organizationId, quoteId);
+    const pdf = await this.renderModel(organizationId, model, presentation);
     await this.audit.recordStrict({
       organizationId,
       actorUserId: actor.userId,
@@ -130,4 +159,86 @@ export class QuoteDocumentsService {
     });
     return { pdf, fileName: model.fileName };
   }
+
+  /** Valeurs préremplies de l'envoi (ADR-0042 § 3) ; aucun rendu, aucune écriture. */
+  async emailDraft(
+    organizationId: string,
+    quoteId: string,
+    senderName: string,
+  ): Promise<DocumentEmailDraft> {
+    const q = await this.quotes.requireOwn(organizationId, quoteId);
+    let prepared: Awaited<ReturnType<QuoteDocumentsService['prepare']>>;
+    try {
+      prepared = await this.prepare(organizationId, quoteId);
+    } catch (err) {
+      if (err instanceof ConflictException) {
+        const body = err.getResponse() as { message?: string };
+        return {
+          sendable: false,
+          reason: body.message ?? 'Ce devis ne peut pas être imprimé.',
+          nature: null,
+          to: q.customer.email,
+          cc: [],
+          subject: '',
+          message: '',
+          attachmentName: null,
+        };
+      }
+      throw err;
+    }
+    const { status, model } = prepared;
+    const s = quoteSendability(status);
+    const defaults = documentEmailDefaults({
+      nature: 'quote',
+      reference: model.reference.value,
+      sellerName: model.seller.title,
+      total: model.total,
+      currency: model.currency,
+      senderName,
+      validUntil: frenchDate(q.validUntil),
+    });
+    return {
+      sendable: s.sendable,
+      reason: s.sendable ? null : s.reason,
+      nature: s.sendable ? s.nature : null,
+      to: q.customer.email,
+      cc: [],
+      ...defaults,
+      attachmentName: model.fileName,
+    };
+  }
+
+  /** Envoi par e-mail (ADR-0042) : même rendu que le téléchargement, PDF joint. */
+  async email(
+    organizationId: string,
+    quoteId: string,
+    sender: DocumentEmailSender,
+    input: DocumentEmailInput,
+  ): Promise<DocumentEmailResult> {
+    const { presentation, status, model } = await this.prepare(organizationId, quoteId);
+    const s = quoteSendability(status);
+    if (!s.sendable) notSendable(s.reason, status);
+    const pdf = await this.renderModel(organizationId, model, presentation);
+    return this.emailer.send({
+      organizationId,
+      sender,
+      target: {
+        type: 'sales_quote',
+        id: quoteId,
+        reference: model.reference.value,
+        nature: s.nature,
+        status,
+      },
+      sellerName: model.seller.title,
+      pdf,
+      fileName: model.fileName,
+      input,
+    });
+  }
+}
+
+/** `2026-11-30` → `30/11/2026` ; `null` si illisible. */
+function frenchDate(day: string | null | undefined): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day ?? '');
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : null;
 }

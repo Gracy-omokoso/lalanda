@@ -448,3 +448,76 @@ export function formatDateFr(date: Date): string {
   }).format(date);
   return `${formatted} (UTC)`;
 }
+
+// ── Document de vente envoyé au client (ADR-0042) ────────────────────────────
+//
+// Différent des gabarits transactionnels : le destinataire est un CLIENT de
+// l'organisation, pas un utilisateur de Lalanda. Pas de bouton ni de lien vers
+// l'application ; le document voyage en pièce jointe. Le message est un TEXTE
+// BRUT saisi par l'utilisateur : échappé, sauts de ligne conservés, jamais
+// interprété. La mention fixe (`notice`) est imprimée HORS du texte modifiable :
+// un pro forma ou un devis ne peut pas partir sans « non valable comme facture ».
+
+export interface SalesDocumentMailContent {
+  subject: string;
+  /** Intitulé visible en tête : « Facture FV2610-000123 ». */
+  heading: string;
+  /** Texte saisi par l'utilisateur (paragraphes séparés par une ligne vide). */
+  message: string;
+  /** Mention fixe, ou `null` (facture finale). */
+  notice: string | null;
+  attachmentName: string;
+  organizationName: string;
+  senderName: string;
+}
+
+export function renderSalesDocumentMail(input: SalesDocumentMailContent): RenderedMail {
+  const paragraphs = input.message
+    .replace(/\r\n?/g, '\n')
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter((p) => p !== '');
+  const paraHtml = paragraphs
+    .map(
+      (p) =>
+        `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#1f2430;">${escapeHtml(p).replace(/\n/g, '<br>')}</p>`,
+    )
+    .join('');
+  const notice = input.notice
+    ? `<tr><td style="padding:0 32px 8px;"><p style="margin:0;padding:10px 12px;background-color:#fff7ed;border:1px solid #fed7aa;border-radius:8px;font-size:14px;font-weight:600;color:#9a3412;">${escapeHtml(input.notice)}</p></td></tr>`
+    : '';
+  const footer = `Envoyé par ${input.senderName} (${input.organizationName}) avec ${PRODUCT}. Pour répondre, utilisez « Répondre » : votre message parviendra à ${input.senderName}.`;
+
+  const html = [
+    '<!-- Lalanda — document de vente. Aucune image distante, aucun script. -->',
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f5f6f8;padding:24px 12px;">',
+    '<tr><td align="center">',
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background-color:#ffffff;border:1px solid #e5e7eb;border-radius:12px;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,Helvetica,Arial,sans-serif;">',
+    '<tr><td style="padding:28px 32px 8px;">',
+    `<div style="font-size:13px;color:#6b7280;">${escapeHtml(input.organizationName)}</div>`,
+    `<div style="margin-top:6px;font-size:20px;font-weight:600;color:#111827;">${escapeHtml(input.heading)}</div>`,
+    '</td></tr>',
+    notice,
+    `<tr><td style="padding:16px 32px 0;">${paraHtml}</td></tr>`,
+    '<tr><td style="padding:0 32px 8px;">',
+    `<p style="margin:0;font-size:13px;color:#374151;">Pièce jointe : <strong>${escapeHtml(input.attachmentName)}</strong></p>`,
+    '</td></tr>',
+    `<tr><td style="padding:16px 32px 26px;border-top:1px solid #f0f1f3;"><p style="margin:0;font-size:12px;line-height:1.6;color:#9ca3af;">${escapeHtml(footer)}</p></td></tr>`,
+    '</table>',
+    '</td></tr>',
+    '</table>',
+  ].join('');
+
+  const text = [
+    input.heading,
+    ...(input.notice ? ['', input.notice] : []),
+    '',
+    paragraphs.join('\n\n'),
+    '',
+    `Pièce jointe : ${input.attachmentName}`,
+    '',
+    footer,
+  ].join('\n');
+
+  return { subject: input.subject, html, text };
+}

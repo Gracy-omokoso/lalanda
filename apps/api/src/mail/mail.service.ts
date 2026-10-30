@@ -26,11 +26,13 @@ import {
   renderNormalizationAlert,
   renderNormalizedInvoicingDisabled,
   renderPasswordReset,
+  renderSalesDocumentMail,
+  type SalesDocumentMailContent,
   type MorningBriefMailContent,
   type NormalizationAlertCause,
 } from './mail.templates.js';
 import { MailTransport } from './mail.transport.js';
-import type { MailDeliveryResult } from './mail.types.js';
+import type { MailAttachment, MailDeliveryResult } from './mail.types.js';
 
 /** Vérification d'une adresse — inscription ou changement d'adresse. */
 export interface EmailVerificationMail {
@@ -94,6 +96,18 @@ export interface MorningBriefMail extends MorningBriefMailContent {
 }
 
 /**
+ * Document de vente envoyé à un client (ADR-0042) : facture, avoir, pro forma
+ * ou devis, PDF joint. Seul envoi dont l'objet et le message viennent de
+ * l'utilisateur — le gabarit les échappe et y ajoute la mention fixe.
+ */
+export interface SalesDocumentMail extends SalesDocumentMailContent {
+  to: string;
+  cc: string[];
+  replyTo: { address: string; name: string } | null;
+  attachment: MailAttachment;
+}
+
+/**
  * Contrat d'envoi du produit. Voir l'en-tête de fichier.
  *
  * Aucune méthode ne LÈVE sur échec d'envoi : toutes retournent un
@@ -111,6 +125,7 @@ export abstract class MailService {
   ): Promise<MailDeliveryResult>;
   abstract sendNormalizationAlert(input: NormalizationAlertMail): Promise<MailDeliveryResult>;
   abstract sendMorningBrief(input: MorningBriefMail): Promise<MailDeliveryResult>;
+  abstract sendSalesDocument(input: SalesDocumentMail): Promise<MailDeliveryResult>;
 }
 
 /** Implémentation par défaut : rendu des gabarits puis remise au transport. */
@@ -189,6 +204,19 @@ export class TemplatedMailService extends MailService {
     return this.transport.send({
       to,
       ...renderMorningBrief(content, `${webUrl()}/organisation/brief`),
+    });
+  }
+
+  async sendSalesDocument(input: SalesDocumentMail): Promise<MailDeliveryResult> {
+    const { to, cc, replyTo, attachment, ...content } = input;
+    return this.transport.send({
+      to,
+      ...renderSalesDocumentMail(content),
+      ...(cc.length > 0 ? { cc } : {}),
+      ...(replyTo ? { replyTo } : {}),
+      fromName: `${content.organizationName} via Lalanda`,
+      attachments: [attachment],
+      redactInLogs: true,
     });
   }
 }
