@@ -55,3 +55,35 @@ describe('carte « Mes tâches » de l’Accueil (ADR-0039 § 6.5)', () => {
     });
   });
 });
+
+// ADR-0044 § 6.5 (lot P3) : une approbation d'achat ouvre la demande.
+describe('carte « Mes tâches » — approbation d’achat', () => {
+  it('libellé « Approbation », fournisseur, lien vers la demande', () => {
+    const c = carteMesTaches({
+      overdue: [],
+      today: [
+        {
+          source: 'purchases',
+          id: 'purchases:o1',
+          orderId: 'o1',
+          requestNumber: 'DA2610-000001',
+          title: 'Fournitures',
+          supplierName: 'Socimex SARL',
+          total: '89.35',
+          currency: 'USD',
+          dueDate: '2026-10-30',
+          priority: 'none',
+          rank: '2026-10-30T09:00:00.000Z',
+          done: false,
+          kindLabel: 'Approbation',
+          href: '/achats/commandes/o1',
+        },
+      ],
+    });
+    expect(c.lignes[0]).toMatchObject({
+      titre: 'Approbation : Fournitures',
+      projet: 'Socimex SARL',
+      lien: '/achats/commandes/o1',
+    });
+  });
+});

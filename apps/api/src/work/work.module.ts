@@ -16,7 +16,9 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { CrmAgendaModule } from '../crm/agenda/crm-agenda.module.js';
 import { CrmAgendaSource } from '../crm/agenda/crm-agenda.source.js';
 import { OrganizationsModule } from '../organizations/organizations.module.js';
-import { CRM_AGENDA_SOURCE } from './my-tasks.ports.js';
+import { PurchasesAgendaModule } from '../purchases/agenda/purchases-agenda.module.js';
+import { PurchasesAgendaSource } from '../purchases/agenda/purchases-agenda.source.js';
+import { CRM_AGENDA_SOURCE, PURCHASES_AGENDA_SOURCE } from './my-tasks.ports.js';
 import { WorkBriefSource } from './brief/work-brief.source.js';
 import { WorkActivityService } from './work-activity.service.js';
 import { WorkAttachmentsController } from './work-attachments.controller.js';
@@ -61,6 +63,8 @@ import {
     OrganizationsModule,
     // ADR-0040 — C4 : relances CRM de « Mes tâches », lecture seule.
     CrmAgendaModule,
+    // ADR-0044 — P3 (§ 6.5) : approbations d'achat de « Mes tâches », lecture seule.
+    PurchasesAgendaModule,
     MongooseModule.forFeature([
       { name: WorkSettings.name, schema: WorkSettingsSchema },
       { name: WorkProject.name, schema: WorkProjectSchema },
@@ -96,6 +100,8 @@ import {
     WorkBriefSource,
     // ADR-0040 — C4 § 5.2 : relances CRM dans « Mes tâches » (agrégées à la lecture).
     { provide: CRM_AGENDA_SOURCE, useExisting: CrmAgendaSource },
+    // ADR-0044 — P3 (§ 6.5) : approbations d'achat dans « Mes tâches ».
+    { provide: PURCHASES_AGENDA_SOURCE, useExisting: PurchasesAgendaSource },
   ],
   exports: [
     MongooseModule,

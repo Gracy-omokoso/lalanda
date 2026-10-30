@@ -35,7 +35,8 @@ export interface DocumentEmailRequest {
   organizationId: string;
   sender: DocumentEmailSender;
   target: {
-    type: 'sales_invoice' | 'sales_quote';
+    // ADR-0044 § 3.3 (lot P3) : bon de commande envoyé au fournisseur.
+    type: 'sales_invoice' | 'sales_quote' | 'purchase_order';
     id: string;
     reference: string;
     nature: DocumentEmailNature;

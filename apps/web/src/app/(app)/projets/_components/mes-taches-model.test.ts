@@ -1,18 +1,22 @@
 import type { CrmMyTaskItem } from '@lalanda/shared/crm';
+import type { PurchasesMyTaskItem } from '@lalanda/shared/purchases';
 import type { MyTasksView, WorkMyTaskItem } from '@lalanda/shared/work';
 import { describe, expect, it } from 'vitest';
 
 import { oid, tache } from './fixtures.test-helpers';
 import {
+  PASTILLE_APPROBATION,
   aPlat,
   appliquerRelance,
   appliquerTache,
+  estApprobation,
   estRelance,
   GROUPES_MES_TACHES,
   instantDeplace,
   peutCocherRelance,
   regrouper,
   retirerElement,
+  sousTitreApprobation,
   sousTitreRelance,
   totalMesTaches,
 } from './mes-taches-model';
@@ -140,5 +144,49 @@ describe('Mes tâches mixte — relances du CRM (ADR-0040 — C4)', () => {
     expect(peutCocherRelance(null)).toBe(false);
     expect(peutCocherRelance(['crm.read', 'work.update'])).toBe(false);
     expect(peutCocherRelance(['crm.read', 'crm.manage'])).toBe(true);
+  });
+});
+
+// ADR-0044 § 6.5 (lot P3) : approbations d'achat dans « Mes tâches ».
+describe('approbations d’achat (ADR-0044 § 6.5)', () => {
+  const approbation: PurchasesMyTaskItem = {
+    source: 'purchases',
+    id: 'purchases:o1',
+    orderId: 'o1',
+    requestNumber: 'DA2610-000001',
+    title: 'Fournitures',
+    supplierName: 'Socimex SARL',
+    total: '89.35',
+    currency: 'USD',
+    dueDate: '2026-10-30',
+    priority: 'none',
+    rank: '2026-10-30T09:00:00.000Z',
+    done: false,
+    kindLabel: 'Approbation',
+    href: '/achats/commandes/o1',
+  };
+
+  it('reconnue, ni tâche ni relance ; sous-titre : numéro, fournisseur, total de l’API', () => {
+    expect(estApprobation(approbation)).toBe(true);
+    expect(estRelance(approbation)).toBe(false);
+    expect(estApprobation(item(1, null))).toBe(false);
+    expect(sousTitreApprobation(approbation)).toBe('DA2610-000001 · Socimex SARL · 89.35 USD');
+    expect(PASTILLE_APPROBATION).toBe('Approbation');
+  });
+
+  it('regroupée au jour de soumission avec les autres éléments', () => {
+    const v: MyTasksView = {
+      asOf: '2026-10-30',
+      overdue: [],
+      today: [],
+      next7Days: [],
+      later: [],
+      noDate: [],
+      dueSoonCount: 0,
+      truncated: false,
+    };
+    const r = regrouper(v, [approbation, item(2, '2026-10-29')], 1);
+    expect(r.today.map((e) => e.id)).toEqual(['purchases:o1']);
+    expect(r.overdue).toHaveLength(1);
   });
 });
