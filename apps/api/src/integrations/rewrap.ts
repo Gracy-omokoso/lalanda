@@ -21,6 +21,11 @@ import { Injectable, Inject, Logger } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import type { ClientSession, Connection, Model } from 'mongoose';
 
+import {
+  decryptPaymentDetails,
+  paymentFingerprint,
+  rewrapPaymentDetails,
+} from '../purchases/suppliers/supplier-payment-crypto.js';
 import { Integration, type IntegrationDocument } from './integration.schema.js';
 import { MASTER_KEYRING } from './keyring.provider.js';
 import {
@@ -40,6 +45,9 @@ export interface RewrapReport {
   /** `keyId` restant après passage : doit être vide pour retirer `_PREVIOUS`. */
   remainingKeyIds: string[];
 }
+
+/** ADR-0044 — P2 : fiches fournisseurs (coordonnées de paiement chiffrées). */
+const SUPPLIERS = 'suppliers';
 
 @Injectable()
 export class RewrapService {
@@ -115,6 +123,8 @@ export class RewrapService {
     }
 
     await this.rewrapOrganizationSecrets(keyring, actorUserId, report);
+    // ADR-0044 — P2 (§ 2.1.1) : coordonnées de paiement des fournisseurs.
+    await this.rewrapSupplierPaymentMethods(keyring, actorUserId, report);
 
     this.secrets.invalidateAll();
 
@@ -132,8 +142,96 @@ export class RewrapService {
     for (const doc of await this.orgSecrets.find({}).exec()) {
       if (doc.value.keyId !== keyring.currentKeyId) remaining.add(doc.value.keyId);
     }
+    for (const doc of await this.connection
+      .collection(SUPPLIERS)
+      .find({ 'paymentMethods.0': { $exists: true } }, { projection: { paymentMethods: 1 } })
+      .toArray()) {
+      for (const m of (doc['paymentMethods'] ?? []) as { cipher: EncryptedValue }[]) {
+        if (m.cipher.keyId !== keyring.currentKeyId) remaining.add(m.cipher.keyId);
+      }
+    }
     report.remainingKeyIds = [...remaining];
     return report;
+  }
+
+  /**
+   * ADR-0044 — P2 (§ 2.1.1) : « Rotation : comprise dans `secrets:rewrap` ». Chaque
+   * moyen de paiement d'une fiche `suppliers` est re-chiffré sous la clé courante,
+   * à l'emplacement qu'utilise la lecture (`supplierPaymentLocation`), et son
+   * empreinte, dérivée de la clé courante, est recalculée. Collection lue par la
+   * connexion : ce module n'importe pas celui des achats. Écriture conditionnée par
+   * la révision de la fiche (une saisie concurrente gagne, la rotation repassera) ;
+   * la révision n'augmente pas : une rotation n'est pas une modification métier.
+   */
+  private async rewrapSupplierPaymentMethods(
+    keyring: MasterKeyring,
+    actorUserId: string,
+    report: RewrapReport,
+  ): Promise<void> {
+    const col = this.connection.collection(SUPPLIERS);
+    for (const doc of await col.find({ 'paymentMethods.0': { $exists: true } }).toArray()) {
+      const organizationId = String(doc['organizationId']);
+      const supplierId = String(doc._id);
+      const methods = (doc['paymentMethods'] ?? []) as Array<{
+        id: string;
+        kind: 'bank' | 'mobile_money';
+        fingerprint: string;
+        cipher: EncryptedValue;
+      }>;
+      const changedIds: string[] = [];
+      const next = methods.map((m) => {
+        const outcome = rewrapPaymentDetails({
+          organizationId,
+          supplierId,
+          methodId: m.id,
+          record: m.cipher,
+          keyring,
+        });
+        if (!outcome.changed) {
+          report.skipped += 1;
+          return m;
+        }
+        changedIds.push(m.id);
+        const details = decryptPaymentDetails({
+          organizationId,
+          supplierId,
+          methodId: m.id,
+          kind: m.kind,
+          record: outcome.record,
+          keyring,
+        });
+        return {
+          ...m,
+          cipher: { ...outcome.record, last4: null },
+          fingerprint: paymentFingerprint(organizationId, details, keyring),
+        };
+      });
+      if (changedIds.length === 0) continue;
+      const written = await this.inTransaction(async (session) => {
+        const res = await col.updateOne(
+          { _id: doc._id, revision: doc['revision'] },
+          { $set: { paymentMethods: next } },
+          session ? { session } : {},
+        );
+        if (res.modifiedCount === 0) return false;
+        for (const methodId of changedIds) {
+          await this.audit.record(
+            {
+              actorUserId,
+              actorRole: 'system',
+              action: 'secret.rewrapped',
+              targetType: 'supplier_payment_method',
+              targetId: methodId,
+              // Ni valeur, ni masque, ni organisation (motif des secrets d'organisation).
+              metadata: { keyId: keyring.currentKeyId },
+            },
+            session,
+          );
+        }
+        return true;
+      });
+      if (written) report.rewrapped += changedIds.length;
+    }
   }
 
   /**

@@ -66,6 +66,8 @@ import { TaxGroupsController } from '../sales/tax-groups.controller.js';
 import { TreasuryAccountsController } from '../treasury/treasury-accounts.controller.js';
 import { TreasuryActualsController } from '../treasury/treasury-actuals.controller.js';
 import { TreasuryExpensesController } from '../treasury/treasury-expenses.controller.js';
+// ADR-0044 — P2
+import { PurchaseSuppliersController } from '../purchases/suppliers/purchase-suppliers.controller.js';
 import { QuotesController } from '../sales/quotes/quotes.controller.js';
 import { CrmActivitiesController } from '../crm/crm-activities.controller.js';
 import { CrmContactsController } from '../crm/crm-contacts.controller.js';
@@ -195,6 +197,8 @@ const CONTROLEURS = [
   CatalogController,
   // ADR-0040 — C3 : rapports du CRM.
   CrmReportsController,
+  // ADR-0044 — P2 : fiches fournisseurs.
+  PurchaseSuppliersController,
 ];
 
 /**
@@ -862,5 +866,35 @@ describe('ADR-0041 — A4 : routes de gestion des autorisations par membre', () 
 
   it('la route des autorisations ne figure pas parmi les exceptions sans permission', () => {
     expect(Object.keys(SANS_PERMISSION)).not.toContain('MembersController.setPermissions');
+  });
+});
+
+// ADR-0044 — P2
+describe('ADR-0044 — P2 : fournisseurs et coordonnées de paiement', () => {
+  it('chaque route des fournisseurs déclare la permission de l’ADR (§ 3.1)', () => {
+    const attendu: Record<string, Action[]> = {
+      'PurchaseSuppliersController.list': ['purchase.read'],
+      'PurchaseSuppliersController.get': ['purchase.read'],
+      'PurchaseSuppliersController.create': ['purchase.manage'],
+      'PurchaseSuppliersController.update': ['purchase.manage'],
+      'PurchaseSuppliersController.archive': ['purchase.manage'],
+      'PurchaseSuppliersController.restore': ['purchase.manage'],
+      'PurchaseSuppliersController.remove': ['purchase.manage'],
+      'PurchaseSuppliersController.merge': ['purchase.manage'],
+      'PurchaseSuppliersController.addPaymentMethod': ['purchase.manage'],
+      'PurchaseSuppliersController.updatePaymentMethod': ['purchase.manage'],
+      'PurchaseSuppliersController.removePaymentMethod': ['purchase.manage'],
+      'PurchaseSuppliersController.migrationReport': ['purchase.manage'],
+      // Le clair des coordonnées : celui qui paie, et lui seul (§ 2.1.1).
+      'PurchaseSuppliersController.reveal': ['payables.pay'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) =>
+      r.cle.startsWith('PurchaseSuppliersController.'),
+    );
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+    }
   });
 });

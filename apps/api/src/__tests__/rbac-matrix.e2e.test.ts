@@ -116,21 +116,12 @@ const ACTIONS_SANS_ROUTE: Record<string, string> = {
     'renommage. L’action est déclarée par docs/12 et attend son endpoint.',
   // ADR-0044 — P0 : actions déclarées avant leurs routes (lots P2 à P5). Chaque lot
   // retire sa ligne d'ici et écrit la sonde avec sa première route.
-  'purchase.read':
-    'ADR-0044 — P0 pose l’action et la matrice ; la première route de lecture ' +
-    '(`GET /purchases/suppliers`) arrive au lot P2, qui écrira la sonde.',
   'purchase.request':
     'ADR-0044 — P0 pose l’action ; `POST /purchases/orders` (créer une demande) arrive ' +
     'au lot P3, qui écrira la sonde.',
-  'purchase.manage':
-    'ADR-0044 — P0 pose l’action ; `POST /purchases/suppliers` (créer une fiche) arrive ' +
-    'au lot P2, qui écrira la sonde.',
   'purchase.approve':
     'ADR-0044 — P0 pose l’action et `purchaseApprovalDecision` ; `POST /purchases/orders/:id/approve` ' +
     'arrive au lot P3, qui écrira la sonde.',
-  'payables.pay':
-    'ADR-0044 — P0 pose l’action ; `POST /purchases/payments` arrive au lot P5 (et ' +
-    '`…/payment-methods/:methodId/reveal` au lot P2), qui écrira la sonde.',
 };
 
 /** Une sonde HTTP : la route qui matérialise une action, et ses statuts légitimes. */
@@ -582,6 +573,39 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
           .post('/work/projects')
           .set('Cookie', c)
           .send({ name: `Sonde projet ${role} ${tag}`, kind: 'internal' }),
+    },
+    // ADR-0044 — P2 : fiches fournisseurs et coordonnées de paiement.
+    {
+      // ADR-0044 § 4.1 — détenteurs de `treasury.read`, sauf le Commercial.
+      action: 'purchase.read',
+      libelle: 'GET /purchases/suppliers',
+      statutsAutorises: [200],
+      envoyer: (c) => request(serveur()).get('/purchases/suppliers').set('Cookie', c),
+    },
+    {
+      // ADR-0044 § 4.1 — Propriétaire, Administrateur, Directeur financier, Comptable.
+      // Une fiche nommée par rôle : aucun prérequis, aucune collision.
+      action: 'purchase.manage',
+      libelle: 'POST /purchases/suppliers',
+      statutsAutorises: [201],
+      envoyer: (c, role) =>
+        request(serveur())
+          .post('/purchases/suppliers')
+          .set('Cookie', c)
+          .send({ name: `Sonde fournisseur ${role} ${tag}` }),
+    },
+    {
+      // ADR-0044 § 2.1.1 — `reveal` est la première route de `payables.pay`
+      // (Propriétaire, Directeur financier, Comptable). Fiche inexistante : le 404
+      // prouve que le guard a laissé passer jusqu'au service, sans rien révéler ni
+      // exiger de trousseau de chiffrement dans cette suite.
+      action: 'payables.pay',
+      libelle: 'POST /purchases/suppliers/:id/payment-methods/:methodId/reveal',
+      statutsAutorises: [404],
+      envoyer: (c) =>
+        request(serveur())
+          .post('/purchases/suppliers/000000000000000000000000/payment-methods/x/reveal')
+          .set('Cookie', c),
     },
   ];
 

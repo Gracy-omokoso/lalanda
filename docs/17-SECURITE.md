@@ -175,6 +175,25 @@ Un paquet de modèle téléversé par une organisation est traité comme **conte
 - **Risque résiduel documenté** : la lisibilité (couleur du texte égale au fond) n'est pas
   prouvable statiquement ; l'aperçu est exigé avant activation.
 
+## Implémenté (ADR-0044, lot P2) — coordonnées de paiement des fournisseurs
+
+Les coordonnées bancaires et mobile money des fournisseurs (`suppliers.paymentMethods`) sont un actif sensible nouveau : celui qui les modifie détourne les paiements. Code : `apps/api/src/purchases/suppliers/`. Décision : ADR-0044 § 2.1.1.
+
+### Fait
+
+- **Chiffrées au repos, sans schéma nouveau.** `secrets-crypto.ts` (ADR-0013) est réutilisé tel quel : AES-256-GCM sous le trousseau `MASTER_KEYRING`, sel et `iv` neufs à chaque écriture, emplacement `org:supplier_payment_method` dont la dérivation HKDF et l'AAD portent **organisation, fiche et moyen** : un chiffré recopié vers une autre fiche, une autre organisation ou un autre moyen ne se déchiffre pas (test unitaire et e2e). Sans trousseau, l'écriture est refusée (`503 SECRETS_NOT_CONFIGURED`), jamais stockée en clair.
+- **Masquées partout.** Listes, fiches, réponses d'écriture, journal d'audit et notifications ne portent que `masked` (`Rawbank •••• 4521`, `M-Pesa •••• 78`) et une empreinte. `toJSON` et `toObject` du schéma remplacent chaque chiffré par `[redacted]`. L'e2e vérifie que ni le numéro ni l'IBAN n'apparaissent dans les réponses, dans le document Mongo, dans `audit_events` ni dans les notifications.
+- **Empreinte** : HMAC-SHA256 tronqué à 16 caractères, clé dérivée de la clé maîtresse courante, message préfixé par l'organisation (aucune corrélation entre clients ; un numéro de téléphone, peu entropique, ne se retrouve pas par force brute sans la clé). Deux fiches qui partagent un compte lèvent `SUPPLIER_PAYMENT_DETAILS_SHARED`.
+- **Lecture en clair = `reveal`**, réservée à `payables.pay` (Propriétaire, Directeur financier, Comptable), **30 par heure et par utilisateur**, journalisée **strictement** (`supplier.payment_details_revealed`, écrit avant la réponse : sans trace, rien n'est révélé ; ni clair ni masque au journal).
+- **Changement** (ajout, modification, retrait) : audit strict dans la même transaction (`supplier.payment_details_changed`, avant et après **masqués**), notification `purchases.supplier_payment_details_changed` aux détenteurs **effectifs** de `payables.pay` et `purchase.approve` (sauf l'auteur), bandeau sur la fiche pendant `paymentDetailsAlertDays` (7 jours par défaut). Personne n'est bloqué (décision ouverte n° 9).
+- **Rotation** comprise dans `secrets:rewrap` (`integrations/rewrap.ts`) : chiffré et empreinte recalculés sous la clé courante, `secret.rewrapped` au journal plateforme, `remainingKeyIds` couvre les fiches.
+
+### Limites
+
+- Mêmes limites que le coffre (ADR-0013) : la clé maîtresse vit dans l'environnement du serveur.
+- Pendant une rotation inachevée, les empreintes calculées sous l'ancienne et la nouvelle clé ne se comparent pas : l'avertissement de compte partagé peut manquer jusqu'au `secrets:rewrap`.
+- Aucune confirmation par une seconde personne avant de payer vers des coordonnées modifiées : alerte seulement (décision ouverte n° 9).
+
 ## Menaces prioritaires
 
 - accès inter-organisation;
