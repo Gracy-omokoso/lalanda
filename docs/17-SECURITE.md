@@ -194,6 +194,28 @@ Les coordonnées bancaires et mobile money des fournisseurs (`suppliers.paymentM
 - Pendant une rotation inachevée, les empreintes calculées sous l'ancienne et la nouvelle clé ne se comparent pas : l'avertissement de compte partagé peut manquer jusqu'au `secrets:rewrap`.
 - Aucune confirmation par une seconde personne avant de payer vers des coordonnées modifiées : alerte seulement (décision ouverte n° 9).
 
+## Implémenté (ADR-0045, lot H2) — données sensibles du personnel
+
+Salaire de base déclaré, coordonnées bancaires et mobile money, pièces d'identité, coordonnées personnelles et motif détaillé de sortie (`hr_employee_private`) : un actif sensible nouveau, dont le détournement du salaire est la fraude classique. Code : `apps/api/src/hr/private/`. Décision : ADR-0045 § 2.4.
+
+### Fait
+
+- **Collection à part.** Les fiches (`hr_employees`) ne portent aucune donnée sensible ; listes, fiches, « moi », équipe et organigramme ne lisent jamais `hr_employee_private`, seulement ses formes masquées, et seulement pour un détenteur de `hr.sensitive.read` ou pour le salarié lui-même.
+- **Chiffrées au repos, sans schéma nouveau.** Motif exact des fournisseurs : `secrets-crypto.ts` réutilisé, emplacement `org:hr_employee_private`, dérivation HKDF et AAD portant **organisation, collaborateur et section** (cinq champs : `compensation`, `bankDetails`, `identity`, `personalContact`, `exitNote`) ; un chiffré recopié vers une autre fiche ne se déchiffre pas (`500 HR_PRIVATE_UNREADABLE`, testé). Sans trousseau : `503 SECRETS_NOT_CONFIGURED`. `toJSON`/`toObject` remplacent les chiffrés par `[redacted]`. La nature et l'expiration des pièces d'identité sont recopiées **en clair, sans numéro** (`idExpiries`) pour les rappels.
+- **Masques** : « salaire renseigné depuis le … » (ni montant ni devise), `Rawbank •••• 4521` et empreinte HMAC (celle des fournisseurs, préfixée par l'organisation), type et expiration des pièces, nombre de contacts d'urgence.
+- **Écriture** : `hr.sensitive.read` **et** `hr.manage` ; audit strict `hr.private.changed` dans la même transaction (avant et après masqués) ; un changement bancaire notifie le salarié relié et les détenteurs **effectifs** de `hr.sensitive.read` sauf l'auteur (`hr.bank_details_changed`, sans numéro) et pose un bandeau de sept jours.
+- **Lecture en clair (`reveal`)** : `hr.sensitive.read`, ou le salarié pour ses propres données ; un lecteur qui voit la fiche sans ce droit reçoit `403`, hors portée `404`. Audit **strict** `hr.private.revealed` (sections, jamais de valeur) écrit **avant** tout déchiffrement : journal indisponible ⇒ `503 HR_AUDIT_UNAVAILABLE`, rien n'est révélé. **30 par heure et par utilisateur**, comptés sur le journal lui-même (commun à toutes les instances) : `429 HR_REVEAL_RATE_LIMITED`.
+- **Plateforme** : `hr.sensitive.read` est dans `PLATFORM_FORBIDDEN_ACTIONS` (interdit même sous accès délégué).
+- **Anonymisation** d'un collaborateur sorti : dossier sensible effacé, noms remplacés, lien au compte délié ; audit strict.
+- **Rotation** comprise dans `secrets:rewrap` : chiffrés et empreintes bancaires recalculés, `remainingKeyIds` couvre la collection.
+- **Tests anti-fuite** (`hr-private.e2e.test.ts`) : ni IBAN, ni numéro de compte, ni numéro de passeport, ni salaire, ni date de naissance dans le document Mongo, les listes, la fiche, « moi », l'équipe, l'organigramme, `audit_events` et les notifications.
+
+### Limites
+
+- Mêmes limites que le coffre (ADR-0013) et que les coordonnées des fournisseurs.
+- Le débit de `reveal` compte les traces de l'heure écoulée : deux appels strictement simultanés au seuil peuvent en laisser passer un de plus.
+- Les documents sensibles (pièces scannées, certificats) relèvent du lot H4 ; le brief (H5) ne reçoit que des nombres.
+
 ## Menaces prioritaires
 
 - accès inter-organisation;

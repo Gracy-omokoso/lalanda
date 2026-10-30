@@ -120,18 +120,10 @@ const ACTIONS_SANS_ROUTE: Record<string, string> = {
   // ADR-0044 — P0 : actions déclarées avant leurs routes. P3 a retiré
   // `purchase.request` et `purchase.approve` (sondes en fin de liste).
   // ADR-0045 — H0 : actions déclarées avant leurs routes (module `hr`, lots H2 et H3).
+  // H2 a retiré `hr.read`, `hr.manage` et `hr.sensitive.read` (sondes en fin de liste).
   // Chaque lot retire sa ligne et écrit sa sonde ; la matrice est déjà couverte case
   // par case par `permissions.test.ts`, et le rôle `hr_manager` est exercé ici sur
   // toutes les autres sondes.
-  'hr.read':
-    'Aucune route RH en H0 : `GET /hr/employees` (sonde naturelle) arrive avec ' +
-    'les dossiers collaborateurs au lot H2 (ADR-0045 § 3.1).',
-  'hr.manage':
-    'Aucune route RH en H0 : `POST /hr/employees` (sonde naturelle) arrive avec ' +
-    'les dossiers collaborateurs au lot H2 (ADR-0045 § 3.1).',
-  'hr.sensitive.read':
-    'Aucune route RH en H0 : `POST /hr/employees/:id/private/reveal` arrive avec ' +
-    'les données sensibles au lot H2 (ADR-0045 § 2.4) ; interdit absolu plateforme.',
   'leave.request':
     'Aucune route RH en H0 : `POST /hr/leave-requests` (sonde naturelle) arrive ' +
     'avec les absences au lot H3 (ADR-0045 § 3.2).',
@@ -682,6 +674,45 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
           .post('/purchases/payments/000000000000000000000000/cancel')
           .set('Cookie', c)
           .send({ reason: 'Sonde de matrice', expectedRevision: 1 }),
+    },
+    // ADR-0045 — H2 : dossiers collaborateurs et données sensibles.
+    {
+      // ADR-0045 § 4.1 — Propriétaire, Administrateur, Directeur financier, Responsable RH.
+      action: 'hr.read',
+      libelle: 'GET /hr/employees',
+      statutsAutorises: [200],
+      envoyer: (c) => request(serveur()).get('/hr/employees').set('Cookie', c),
+    },
+    {
+      // ADR-0045 § 4.1 — mêmes rôles. Une fiche nommée par rôle : aucune collision.
+      action: 'hr.manage',
+      libelle: 'POST /hr/employees',
+      statutsAutorises: [201],
+      envoyer: (c, role) =>
+        request(serveur())
+          .post('/hr/employees')
+          .set('Cookie', c)
+          .send({
+            firstName: 'Sonde',
+            lastName: `${role} ${tag}`,
+            jobTitle: 'Sonde de matrice',
+            contractType: 'permanent',
+            startDate: '2026-01-05',
+          }),
+    },
+    {
+      // ADR-0045 § 4.1 — Propriétaire, Directeur financier, Responsable RH ; ni
+      // l'Administrateur ni le Comptable. L'anonymisation déclare `hr.sensitive.read`
+      // EN PREMIER : le 403 nomme cette action pour tout rôle refusé. Fiche inexistante :
+      // le 404 prouve que le guard a laissé passer, sans trousseau dans cette suite.
+      action: 'hr.sensitive.read',
+      libelle: 'POST /hr/employees/:id/anonymize (fiche inconnue)',
+      statutsAutorises: [404],
+      envoyer: (c) =>
+        request(serveur())
+          .post('/hr/employees/000000000000000000000000/anonymize')
+          .set('Cookie', c)
+          .send({ confirm: true, expectedRevision: 1 }),
     },
   ];
 

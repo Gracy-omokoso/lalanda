@@ -26,6 +26,12 @@ import {
   paymentFingerprint,
   rewrapPaymentDetails,
 } from '../purchases/suppliers/supplier-payment-crypto.js';
+// ADR-0045 — H2 : données sensibles du personnel.
+import {
+  decryptHrPrivate,
+  maskBankAccount,
+  rewrapHrPrivate,
+} from '../hr/private/hr-private-crypto.js';
 import { Integration, type IntegrationDocument } from './integration.schema.js';
 import { MASTER_KEYRING } from './keyring.provider.js';
 import {
@@ -48,6 +54,15 @@ export interface RewrapReport {
 
 /** ADR-0044 — P2 : fiches fournisseurs (coordonnées de paiement chiffrées). */
 const SUPPLIERS = 'suppliers';
+/** ADR-0045 — H2 : données sensibles du personnel (cinq champs chiffrés par document). */
+const HR_EMPLOYEE_PRIVATE = 'hr_employee_private';
+const HR_PRIVATE_FIELD_KEYS = [
+  'compensation',
+  'bankDetails',
+  'identity',
+  'personalContact',
+  'exitNote',
+] as const;
 
 @Injectable()
 export class RewrapService {
@@ -125,6 +140,8 @@ export class RewrapService {
     await this.rewrapOrganizationSecrets(keyring, actorUserId, report);
     // ADR-0044 — P2 (§ 2.1.1) : coordonnées de paiement des fournisseurs.
     await this.rewrapSupplierPaymentMethods(keyring, actorUserId, report);
+    // ADR-0045 — H2 (§ 2.4) : données sensibles du personnel.
+    await this.rewrapHrEmployeePrivate(keyring, actorUserId, report);
 
     this.secrets.invalidateAll();
 
@@ -148,6 +165,13 @@ export class RewrapService {
       .toArray()) {
       for (const m of (doc['paymentMethods'] ?? []) as { cipher: EncryptedValue }[]) {
         if (m.cipher.keyId !== keyring.currentKeyId) remaining.add(m.cipher.keyId);
+      }
+    }
+    // ADR-0045 — H2 (§ 2.4) : données sensibles du personnel.
+    for (const doc of await this.connection.collection(HR_EMPLOYEE_PRIVATE).find({}).toArray()) {
+      for (const field of HR_PRIVATE_FIELD_KEYS) {
+        const f = doc[field] as { cipher?: EncryptedValue } | null | undefined;
+        if (f?.cipher && f.cipher.keyId !== keyring.currentKeyId) remaining.add(f.cipher.keyId);
       }
     }
     report.remainingKeyIds = [...remaining];
@@ -231,6 +255,84 @@ export class RewrapService {
         return true;
       });
       if (written) report.rewrapped += changedIds.length;
+    }
+  }
+
+  /**
+   * ADR-0045 — H2 (§ 2.4) : « Rotation comprise dans `secrets:rewrap` ». Chaque champ
+   * chiffré d'un dossier `hr_employee_private` est re-chiffré sous la clé courante, à
+   * l'emplacement qu'utilise la lecture (`hrPrivateLocation`) ; les empreintes des
+   * coordonnées bancaires, dérivées de la clé courante, sont recalculées (le masque
+   * ne change pas). Collection lue par la connexion : ce module n'importe pas celui
+   * des RH. Écriture conditionnée par la révision ; la révision n'augmente pas.
+   */
+  private async rewrapHrEmployeePrivate(
+    keyring: MasterKeyring,
+    actorUserId: string,
+    report: RewrapReport,
+  ): Promise<void> {
+    const col = this.connection.collection(HR_EMPLOYEE_PRIVATE);
+    for (const doc of await col.find({}).toArray()) {
+      const organizationId = String(doc['organizationId']);
+      const employeeId = String(doc['employeeId']);
+      const set: Record<string, unknown> = {};
+      const changed: string[] = [];
+      for (const field of HR_PRIVATE_FIELD_KEYS) {
+        const f = doc[field] as
+          { cipher: EncryptedValue; masked: Record<string, unknown> } | null | undefined;
+        if (!f?.cipher) continue;
+        const outcome = rewrapHrPrivate({
+          organizationId,
+          employeeId,
+          field,
+          record: f.cipher,
+          keyring,
+        });
+        if (!outcome.changed) {
+          report.skipped += 1;
+          continue;
+        }
+        let masked = f.masked;
+        if (field === 'bankDetails') {
+          const clear = decryptHrPrivate({
+            organizationId,
+            employeeId,
+            field,
+            record: outcome.record,
+            keyring,
+          });
+          masked = {
+            accounts: clear.accounts.map((a) => maskBankAccount(organizationId, a, keyring)),
+          };
+        }
+        set[field] = { ...f, cipher: outcome.record, masked };
+        changed.push(field);
+      }
+      if (changed.length === 0) continue;
+      const written = await this.inTransaction(async (session) => {
+        const res = await col.updateOne(
+          { _id: doc._id, revision: doc['revision'] },
+          { $set: set },
+          session ? { session } : {},
+        );
+        if (res.modifiedCount === 0) return false;
+        for (const section of changed) {
+          await this.audit.record(
+            {
+              actorUserId,
+              actorRole: 'system',
+              action: 'secret.rewrapped',
+              targetType: 'hr_employee_private',
+              targetId: employeeId,
+              // Ni valeur, ni masque, ni organisation (motif des fournisseurs).
+              metadata: { section, keyId: keyring.currentKeyId },
+            },
+            session,
+          );
+        }
+        return true;
+      });
+      if (written) report.rewrapped += changed.length;
     }
   }
 

@@ -8,3 +8,6 @@
 // ADR-0045 — H0
 export * from './constants.js';
 export * from './common.js';
+
+// ADR-0045 — H2 (dossiers, services, organigramme, données sensibles)
+export * from './employees.js';

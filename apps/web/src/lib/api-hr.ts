@@ -15,6 +15,12 @@
 // documents. Ces routes appartiennent au lot H7 (`api-hr-admin.ts`).
 
 import type {
+  EmployeeDetailView as ApiEmployeeDetail,
+  EmployeePage as ApiEmployeePage,
+  EmployeeView as ApiEmployee,
+  HrMeView as ApiMe,
+  HrTeamView as ApiTeam,
+  OrgChartView as ApiOrgChart,
   EmployeeExitCategory,
   EmployeeStatus,
   HrCalendarScope,
@@ -385,26 +391,136 @@ export type HrOrgChartResponse =
 
 const id = encodeURIComponent;
 
+// ─── Adaptation aux contrats du lot H2 (`@lalanda/shared/hr`) ───────────────
+// ADR-0045 — H2 : les vues ci-dessus ont été écrites avant les contrats. Les réponses
+// réelles sont ramenées ici à ces formes, sans calcul : le statut dérivé vient du
+// moteur (`derivedStatus`) ; soldes et demandes de « moi » arrivent avec le lot H3.
+
+/** Fiche de l'API → vue des écrans (`upcoming`, `onProbation` lus sur `derivedStatus`). */
+export function employeeFromApi(e: ApiEmployee): HrEmployeeView {
+  return {
+    id: e.id,
+    firstName: e.firstName,
+    lastName: e.lastName,
+    preferredName: e.preferredName,
+    employeeNumber: e.employeeNumber,
+    jobTitle: e.jobTitle,
+    departmentId: e.departmentId,
+    managerEmployeeId: e.managerEmployeeId,
+    contractType: e.contractType,
+    startDate: e.startDate,
+    endDate: e.endDate,
+    status: e.status,
+    upcoming: e.derivedStatus === 'upcoming',
+    onProbation: e.derivedStatus === 'probation',
+    userId: e.userId,
+    workEmail: e.workEmail,
+    workPhone: e.workPhone,
+    workLocation: e.workLocation,
+    probationEndDate: e.probationEndDate,
+    contractEndDate: e.contractEndDate,
+    exitCategory: e.exitCategory,
+    notes: e.notes,
+    revision: e.revision,
+    createdAt: e.createdAt,
+    updatedAt: e.updatedAt,
+  };
+}
+
+export function meFromApi(m: ApiMe): HrMeView {
+  return {
+    employee: m.employee ? employeeFromApi(m.employee) : null,
+    balances: [],
+    requests: [],
+    isManager: m.isManager,
+    canApprove: m.canApprove,
+  };
+}
+
+/** Membre réduit de l'API : nom d'usage en `preferredName`, rien d'autre d'inventé. */
+export function teamFromApi(t: ApiTeam): HrTeamView {
+  return {
+    members: t.items.map((m) => ({
+      direct: m.isDirect,
+      employee: {
+        id: m.id,
+        firstName: m.displayName,
+        lastName: '',
+        preferredName: m.displayName,
+        employeeNumber: null,
+        jobTitle: m.jobTitle,
+        departmentId: m.departmentId,
+        managerEmployeeId: m.managerEmployeeId,
+        contractType: '',
+        startDate: '',
+        endDate: null,
+        status: m.derivedStatus === 'exited' ? 'exited' : 'active',
+        upcoming: m.derivedStatus === 'upcoming',
+        onProbation: m.derivedStatus === 'probation',
+        userId: null,
+        workEmail: m.workEmail,
+        workPhone: m.workPhone,
+        workLocation: null,
+      },
+    })),
+  };
+}
+
+/** Organigramme de l'API : `people` (objet indexé) → liste, nom du service joint. */
+export function orgChartFromApi(c: ApiOrgChart): HrOrgChartResponse {
+  const people: HrOrgChartPerson[] = Object.entries(c.people).map(([personId, p]) => ({
+    id: personId,
+    name: p.displayName,
+    jobTitle: p.jobTitle,
+    departmentId: p.departmentId,
+    departmentName: p.departmentId ? (c.departments[p.departmentId]?.name ?? null) : null,
+    managerEmployeeId: p.managerEmployeeId,
+  }));
+  return c.view === 'departments'
+    ? {
+        view: 'departments',
+        roots: c.roots,
+        unassignedEmployeeIds: c.unassignedEmployeeIds,
+        headcount: c.headcount,
+        people,
+      }
+    : { view: 'reporting', roots: c.roots, headcount: c.headcount, people };
+}
+
 export const hrApi = {
   // Moi, mon équipe (§ 3.1)
-  getMe: () => jsonRequest<HrMeView>('/hr/me', { method: 'GET' }),
-  getTeam: () => jsonRequest<HrTeamView>('/hr/team', { method: 'GET' }),
+  getMe: async () => meFromApi(await jsonRequest<ApiMe>('/hr/me', { method: 'GET' })),
+  getTeam: async () => teamFromApi(await jsonRequest<ApiTeam>('/hr/team', { method: 'GET' })),
 
   // Collaborateurs (§ 3.1) — aucune route sensible ici.
-  listEmployees: (params: ListEmployeesParams = {}) =>
-    jsonRequest<HrEmployeePage>(`/hr/employees${salesQuery(params)}`, { method: 'GET' }),
-  getEmployee: (employeeId: string) =>
-    jsonRequest<HrEmployeeView>(`/hr/employees/${id(employeeId)}`, { method: 'GET' }),
-  createEmployee: (body: HrEmployeeInput) =>
-    jsonRequest<HrEmployeeView>('/hr/employees', { method: 'POST', body }),
-  updateEmployee: (employeeId: string, body: HrEmployeeUpdateInput) =>
-    jsonRequest<HrEmployeeView>(`/hr/employees/${id(employeeId)}`, { method: 'PUT', body }),
-  createEmployeesFromMembers: (userIds: string[]) =>
-    jsonRequest<{ items: HrEmployeeView[] }>('/hr/employees/from-members', {
-      method: 'POST',
-      body: { userIds },
-    }),
-
+  listEmployees: async (params: ListEmployeesParams = {}): Promise<HrEmployeePage> => {
+    const page = await jsonRequest<ApiEmployeePage>(`/hr/employees${salesQuery(params)}`, {
+      method: 'GET',
+    });
+    return { items: page.items.map(employeeFromApi), nextCursor: page.nextCursor };
+  },
+  getEmployee: async (employeeId: string) =>
+    employeeFromApi(
+      (
+        await jsonRequest<ApiEmployeeDetail>(`/hr/employees/${id(employeeId)}`, {
+          method: 'GET',
+        })
+      ).employee,
+    ),
+  createEmployee: async (body: HrEmployeeInput) =>
+    employeeFromApi(await jsonRequest<ApiEmployee>('/hr/employees', { method: 'POST', body })),
+  updateEmployee: async (employeeId: string, body: HrEmployeeUpdateInput) =>
+    employeeFromApi(
+      await jsonRequest<ApiEmployee>(`/hr/employees/${id(employeeId)}`, { method: 'PUT', body }),
+    ),
+  createEmployeesFromMembers: async (userIds: string[]) => ({
+    items: (
+      await jsonRequest<{ items: ApiEmployee[] }>('/hr/employees/from-members', {
+        method: 'POST',
+        body: { userIds },
+      })
+    ).items.map(employeeFromApi),
+  }),
   // Services (§ 3.1)
   listDepartments: () =>
     jsonRequest<{ items: HrDepartmentView[] }>('/hr/departments', { method: 'GET' }),
@@ -422,8 +538,10 @@ export const hrApi = {
     }),
 
   // Organigramme (§ 3.1)
-  getOrgChart: (view: HrOrgChartView) =>
-    jsonRequest<HrOrgChartResponse>(`/hr/org-chart${salesQuery({ view })}`, { method: 'GET' }),
+  getOrgChart: async (view: HrOrgChartView) =>
+    orgChartFromApi(
+      await jsonRequest<ApiOrgChart>(`/hr/org-chart${salesQuery({ view })}`, { method: 'GET' }),
+    ),
 
   // Réglages lus (§ 3.3, lecture `hr.read`)
   getSettings: () => jsonRequest<HrSettingsView>('/hr/settings', { method: 'GET' }),
