@@ -7,10 +7,17 @@
 
 import type { Metadata } from 'next';
 
+import { MyPermissionsPanel } from './_components/my-permissions-panel';
 import { ProfilePanel } from './_components/profile-panel';
 
 export const metadata: Metadata = { title: 'Profil — Mon compte · Lalanda' };
 
 export default function AccountProfilePage(): React.ReactElement {
-  return <ProfilePanel />;
+  return (
+    <div className="flex flex-col gap-10">
+      <ProfilePanel />
+      {/* ADR-0041 décision n° 10 : cible de la notification « Vos autorisations ont changé ». */}
+      <MyPermissionsPanel />
+    </div>
+  );
 }

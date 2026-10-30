@@ -10,21 +10,50 @@
 // dit attribuable (`roleOptions`, R7 : Propriétaire et Administrateur). Le rôle
 // par défaut reste le moins puissant, choisi par rang (`roleParDefaut`) : le
 // Commercial est le dernier de la liste sans être le moindre privilège.
+//
+// ADR-0041 — A5 : après le titre, « Personnaliser les autorisations » ouvre la
+// même grille que la fiche du membre, préremplie par la ligne du titre. Fermée,
+// elle dit en une phrase ce que le titre donne. L'invitation porte l'écart ;
+// interrupteur éteint, la grille est en lecture seule et l'invitation part avec
+// le titre seul.
 
 import { useState } from 'react';
 
-import { api, type InvitationView, type OrgRole, type RoleOption } from '@/lib/api';
+import { api, type InvitationView, type OrgAction, type OrgRole, type RoleOption } from '@/lib/api';
+import {
+  apiAutorisations,
+  type CatalogueAutorisations,
+  type InvitationAutorisations,
+  type MesPermissions,
+} from '@/lib/api-permissions';
 
-import { messageErreur, roleParDefaut, rolesProposables } from './members-model';
+import { GrilleAutorisations } from './member-permissions-panel';
+import { badgePersonnalise, roleParDefaut, rolesProposables } from './members-model';
+import {
+  MESSAGE_PERSONNALISATION_A_VENIR,
+  basculer,
+  construireGrille,
+  ecartAffiche,
+  ligneDuTitre,
+  messageAutorisations,
+  personnalisationDesactivee as estDesactivee,
+  phraseEcart,
+  type ParametresGrille,
+} from './permissions-model';
 import { RoleSelect } from './role-select';
 
 interface InvitePanelProps {
   orgId: string;
-  invitations: readonly InvitationView[];
+  invitations: readonly (InvitationView | InvitationAutorisations)[];
   roleOptions: readonly RoleOption[];
   /** L'acteur détient-il `members.invite` ? Le serveur reste seul juge. */
   peutInviter: boolean;
   onChanged: () => Promise<void>;
+  /** ADR-0041 — `null` si le catalogue n'a pas pu être lu : pas de personnalisation. */
+  catalogue: CatalogueAutorisations | null;
+  moi: MesPermissions | null;
+  personnalisationDesactivee: boolean;
+  onDesactivee: () => void;
 }
 
 export function InvitePanel({
@@ -33,10 +62,47 @@ export function InvitePanel({
   roleOptions,
   peutInviter,
   onChanged,
+  catalogue,
+  moi,
+  personnalisationDesactivee,
+  onDesactivee,
 }: InvitePanelProps): React.ReactElement {
   const defaut = roleParDefaut(roleOptions);
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<OrgRole>(defaut ?? 'viewer');
+  const [personnaliser, setPersonnaliser] = useState(false);
+  const [selection, setSelection] = useState<Set<OrgAction> | null>(null);
+  const [messageGrille, setMessageGrille] = useState<string | null>(null);
+
+  const ligne = catalogue ? ligneDuTitre(catalogue, role) : null;
+  const choisie = selection ?? new Set<OrgAction>(ligne?.base ?? []);
+  const params: ParametresGrille | null =
+    catalogue && ligne
+      ? {
+          catalogue,
+          base: ligne.base,
+          conditionnelles: ligne.conditionnelles,
+          selection: choisie,
+          contexte: 'invitation',
+          ajoutables: moi?.grantableActions ?? [],
+          verrou: personnalisationDesactivee ? MESSAGE_PERSONNALISATION_A_VENIR : null,
+        }
+      : null;
+  const ecart =
+    catalogue && ligne && !personnalisationDesactivee
+      ? ecartAffiche(catalogue, ligne.base, choisie)
+      : { grants: [], revokes: [] };
+  const libelleTitre = roleOptions.find((o) => o.value === role)?.label ?? role;
+
+  function changerTitre(nouveau: OrgRole): void {
+    setRole(nouveau);
+    // La grille repart de la ligne du NOUVEAU titre : un écart choisi sur un
+    // autre titre n'a plus de sens (même règle que la fiche, décision n° 1).
+    if (selection !== null) {
+      setMessageGrille('Titre changé : la grille repart des autorisations du nouveau titre.');
+    }
+    setSelection(null);
+  }
   const [busy, setBusy] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [lienCree, setLienCree] = useState<string | null>(null);
@@ -53,7 +119,7 @@ export function InvitePanel({
     setErreur(null);
     setLienCree(null);
     try {
-      const { token } = await api.createInvitation(orgId, { email: adresse, role });
+      const { token } = await apiAutorisations.inviter(orgId, { email: adresse, role, ...ecart });
       setLienCree(`${lienBase}?token=${token}`);
       setEmail('');
       // Le rôle N'EST PAS réinitialisé : inviter une équipe se fait en rafale,
@@ -61,7 +127,8 @@ export function InvitePanel({
       // fois sur deux. L'adresse, elle, doit changer à chaque fois.
       await onChanged();
     } catch (err) {
-      setErreur(messageErreur(err, 'Impossible de créer l’invitation.'));
+      if (estDesactivee({ erreur: err })) onDesactivee();
+      setErreur(messageAutorisations(err, catalogue, 'Impossible de créer l’invitation.'));
     } finally {
       setBusy(null);
     }
@@ -75,7 +142,7 @@ export function InvitePanel({
       await api.revokeInvitation(orgId, inv.id);
       await onChanged();
     } catch (err) {
-      setErreur(messageErreur(err, 'Impossible de révoquer l’invitation.'));
+      setErreur(messageAutorisations(err, catalogue, 'Impossible de révoquer l’invitation.'));
     } finally {
       setBusy(null);
     }
@@ -102,39 +169,90 @@ export function InvitePanel({
         ) : (
           <form
             onSubmit={(e) => void inviter(e)}
-            className="flex flex-col gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:flex-row sm:items-start"
+            className="flex flex-col gap-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5"
           >
-            <div className="flex flex-1 flex-col gap-1.5">
-              <label htmlFor="invite-email" className="text-sm font-medium">
-                Inviter une adresse email
-              </label>
-              <input
-                id="invite-email"
-                type="email"
-                required
-                placeholder="collegue@exemple.cd"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
-              />
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+              <div className="flex flex-1 flex-col gap-1.5">
+                <label htmlFor="invite-email" className="text-sm font-medium">
+                  Inviter une adresse email
+                </label>
+                <input
+                  id="invite-email"
+                  type="email"
+                  required
+                  placeholder="collegue@exemple.cd"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
+                />
+              </div>
+              <div className="sm:w-64">
+                <RoleSelect
+                  id="invite-role"
+                  label="Rôle"
+                  options={roleOptions}
+                  value={role}
+                  onChange={changerTitre}
+                  disabled={busy !== null}
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={busy !== null || email.trim() === ''}
+                className="rounded-md bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-[var(--accent-foreground)] transition hover:opacity-90 disabled:opacity-50 sm:mt-[1.65rem]"
+              >
+                {busy === 'creation' ? 'Envoi…' : 'Inviter'}
+              </button>
             </div>
-            <div className="sm:w-64">
-              <RoleSelect
-                id="invite-role"
-                label="Rôle"
-                options={roleOptions}
-                value={role}
-                onChange={setRole}
-                disabled={busy !== null}
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={busy !== null || email.trim() === ''}
-              className="rounded-md bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-[var(--accent-foreground)] transition hover:opacity-90 disabled:opacity-50 sm:mt-[1.65rem]"
-            >
-              {busy === 'creation' ? 'Envoi…' : 'Inviter'}
-            </button>
+
+            {catalogue && ligne && params ? (
+              <div className="flex flex-col gap-2 border-t border-[var(--border)] pt-3">
+                <p className="text-sm">{phraseEcart(catalogue, libelleTitre, ligne.base, ecart)}</p>
+                <button
+                  type="button"
+                  aria-expanded={personnaliser}
+                  aria-controls="invite-autorisations"
+                  onClick={() => setPersonnaliser((v) => !v)}
+                  className="self-start rounded-md border border-[var(--border-strong)] px-3 py-1.5 text-xs font-medium transition hover:border-[var(--accent)]"
+                >
+                  {personnaliser ? 'Masquer les autorisations' : 'Personnaliser les autorisations'}
+                </button>
+                {personnaliser ? (
+                  <div id="invite-autorisations" className="flex flex-col gap-2">
+                    {personnalisationDesactivee ? (
+                      <p className="rounded-md border border-dashed border-[var(--border)] p-2 text-xs text-[var(--foreground-muted)]">
+                        {MESSAGE_PERSONNALISATION_A_VENIR}
+                      </p>
+                    ) : null}
+                    <GrilleAutorisations
+                      idPrefixe="invite-autorisations"
+                      grille={construireGrille(params)}
+                      lectureSeule={personnalisationDesactivee}
+                      onBasculer={(action) => {
+                        const r = basculer(params, action);
+                        setSelection(r.selection);
+                        setMessageGrille(r.message);
+                      }}
+                    />
+                    {selection !== null && !personnalisationDesactivee ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelection(null);
+                          setMessageGrille('Autorisations du titre rétablies.');
+                        }}
+                        className="self-start rounded-md border border-[var(--border-strong)] px-3 py-1.5 text-xs transition hover:border-[var(--accent)]"
+                      >
+                        Revenir aux autorisations du titre
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+                <p aria-live="polite" className="text-xs text-[var(--foreground-muted)]">
+                  {messageGrille ?? ''}
+                </p>
+              </div>
+            ) : null}
           </form>
         )
       ) : (
@@ -186,6 +304,11 @@ export function InvitePanel({
                   <span className="rounded-full border border-[var(--border-strong)] px-1.5 py-0.5 text-[0.62rem] font-medium uppercase tracking-[0.06em] text-[var(--foreground-muted)]">
                     {inv.roleLabel}
                   </span>
+                  {'grants' in inv && badgePersonnalise(inv) ? (
+                    <span className="rounded-full border border-[var(--accent)] px-1.5 py-0.5 text-[0.62rem] font-medium uppercase tracking-[0.06em] text-[var(--accent)]">
+                      {badgePersonnalise(inv)}
+                    </span>
+                  ) : null}
                 </span>
                 <span className="fig text-xs text-[var(--foreground-muted)]">
                   Expire le {new Date(inv.expiresAt).toLocaleDateString('fr-FR')}
