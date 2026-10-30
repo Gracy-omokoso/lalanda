@@ -246,12 +246,12 @@ function AlertesBrief({
 }): React.ReactElement {
   const liste = alertes === null ? [] : alertesAccueil(alertes);
   return (
-    <div className="flex flex-col gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-5">
+    <div className="relative flex flex-col gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-5 transition hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-pop)]">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-sm font-semibold">Brief du matin</h3>
         <Link
           href="/organisation/brief"
-          className="text-sm font-medium text-[var(--accent)] underline-offset-2 hover:underline"
+          className="text-sm font-medium text-[var(--accent)] underline-offset-2 hover:underline after:absolute after:inset-0 after:rounded-[inherit] after:content-['']"
         >
           Lire le brief complet
         </Link>
@@ -272,7 +272,7 @@ function AlertesBrief({
             <li key={a.id}>
               <Link
                 href={a.lien}
-                className={`block rounded-[var(--radius-md)] border border-l-4 border-[var(--border)] ${TON[a.severite] ?? ''} px-3 py-2 transition hover:bg-[var(--surface-muted)]`}
+                className={`relative z-10 block rounded-[var(--radius-md)] border border-l-4 border-[var(--border)] ${TON[a.severite] ?? ''} px-3 py-2 transition hover:bg-[var(--surface-muted)]`}
               >
                 <span className="block text-xs font-medium uppercase tracking-wide text-[var(--foreground-muted)]">
                   {SEVERITE[a.severite]}
@@ -296,7 +296,7 @@ function MiseEnRoute(): React.ReactElement | null {
   if (!pret || termine(faits)) return null;
   const { faites, total } = progression(faits);
   return (
-    <div className="flex flex-col gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-5">
+    <div className="relative flex flex-col gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-5 transition hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-pop)]">
       <h3 className="text-sm font-semibold">
         Mise en route · {faites}/{total}
       </h3>
@@ -314,7 +314,7 @@ function MiseEnRoute(): React.ReactElement | null {
       </p>
       <Link
         href={MISE_EN_ROUTE_BASE}
-        className="text-sm font-medium text-[var(--accent)] underline-offset-2 hover:underline"
+        className="text-sm font-medium text-[var(--accent)] underline-offset-2 hover:underline after:absolute after:inset-0 after:rounded-[inherit] after:content-['']"
       >
         Reprendre la mise en route
         <span className="sr-only">

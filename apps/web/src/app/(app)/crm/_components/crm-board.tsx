@@ -92,15 +92,18 @@ function Carte({
         if (e.target !== e.currentTarget) return;
         if (onClavier(o, e.key)) e.preventDefault();
       }}
-      className={`flex min-w-0 flex-col gap-1.5 rounded-[var(--radius-md)] border bg-[var(--surface)] p-3 text-sm shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+      className={`relative flex min-w-0 flex-col gap-1.5 rounded-[var(--radius-md)] border bg-[var(--surface)] p-3 text-sm shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
         saisie_
           ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]'
           : 'border-[var(--border)] hover:border-[var(--module-run)]'
       } ${mobile ? 'cursor-grab active:cursor-grabbing' : ''}`}
     >
+      {/* Lien étiré sur toute la carte ; non déplaçable, pour que le glisser-déposer
+          reste celui de la carte. */}
       <Link
         href={lienOpportunite(o.id)}
-        className="font-medium break-words underline-offset-2 hover:underline"
+        draggable={false}
+        className="font-medium break-words underline-offset-2 hover:underline after:absolute after:inset-0 after:rounded-[inherit] after:content-['']"
       >
         {o.title}
       </Link>
@@ -114,7 +117,7 @@ function Carte({
         {o.stale ? <Badge tone="warning">Inactive depuis {o.daysSinceActivity} j</Badge> : null}
       </span>
       {mobile ? (
-        <label className="mt-1 flex flex-col gap-1 text-xs">
+        <label className="relative z-10 mt-1 flex flex-col gap-1 text-xs">
           <span className="text-[var(--foreground-muted)]">Déplacer vers…</span>
           <select
             className={`${CHAMP} py-1 text-xs`}

@@ -262,11 +262,12 @@ function NouveauProjet({ onAnnule }: { onAnnule: () => void }): React.ReactEleme
 function CarteProjet({ p, today }: { p: WorkProjectSummary; today: string }): React.ReactElement {
   const prog = progression(p);
   return (
-    <li className="flex min-w-0 flex-col gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-4">
+    // Carte entièrement cliquable : le lien du nom est étiré sur toute la carte.
+    <li className="relative flex min-w-0 flex-col gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-4 transition hover:border-[var(--module-run)] hover:shadow-[var(--shadow-pop)]">
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
         <Link
           href={hrefProjet(p.id)}
-          className="min-w-0 break-words font-display text-base font-semibold underline-offset-2 hover:underline"
+          className="min-w-0 break-words font-display text-base font-semibold underline-offset-2 hover:underline after:absolute after:inset-0 after:rounded-[inherit] after:content-['']"
         >
           {p.name}
         </Link>
