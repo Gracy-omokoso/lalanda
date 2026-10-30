@@ -22,7 +22,7 @@ import {
   type LigneSaisie,
 } from './commandes-model';
 
-function ChoixFournisseur({
+export function ChoixFournisseur({
   id,
   valeur,
   onChange,

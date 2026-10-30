@@ -88,3 +88,59 @@ describe('lectures', () => {
     await expect(lire(Promise.resolve(1))).resolves.toEqual({ ok: true, valeur: 1 });
   });
 });
+
+// ADR-0044 — P8 : liens des tuiles et repli sur les listes filtrées des factures.
+describe('tuiles des factures (P8)', () => {
+  it('liens vers les factures en écart et l’échéancier', () => {
+    const t = tuilesVue(['purchase.read'], {
+      enAttente: null,
+      aRecevoir: ok(page(0)),
+      facturesEcart: ok(page(2)),
+      echeancier: ok(echeancier),
+    });
+    expect(t.find((x) => x.id === 'factures-ecart')).toMatchObject({
+      lien: '/achats/factures?filtre=ecart',
+      contenu: { lignes: ['2'], attention: true },
+    });
+    expect(t.find((x) => x.id === 'a-payer')!.lien).toBe('/achats/a-payer');
+    expect(t.find((x) => x.id === 'en-retard')!.lien).toBe('/achats/a-payer');
+  });
+
+  it('échéancier absent (404) : le nombre vient des listes `due=soon|overdue`', () => {
+    const t = tuilesVue(['purchase.read'], {
+      enAttente: null,
+      aRecevoir: ok(page(0)),
+      facturesEcart: ok(page(0)),
+      echeancier: ko(404),
+      bientot: ok(page(0)),
+      enRetard: ok(page(3)),
+    });
+    expect(t.find((x) => x.id === 'a-payer')!.contenu).toEqual({
+      etat: 'connu',
+      lignes: ['Aucune'],
+      detail: null,
+      attention: false,
+    });
+    expect(t.find((x) => x.id === 'en-retard')!.contenu).toEqual({
+      etat: 'connu',
+      lignes: ['3 factures'],
+      detail: 'Montants par devise sur l’échéancier',
+      attention: true,
+    });
+  });
+
+  it('échéancier et listes illisibles : une phrase', () => {
+    const t = tuilesVue(['purchase.read'], {
+      enAttente: null,
+      aRecevoir: ok(page(0)),
+      facturesEcart: ok(page(0)),
+      echeancier: ko(404),
+      bientot: ko(403),
+      enRetard: ko(500),
+    });
+    expect(t.find((x) => x.id === 'a-payer')!.contenu).toEqual({
+      etat: 'indisponible',
+      phrase: 'Pas encore disponible',
+    });
+  });
+});

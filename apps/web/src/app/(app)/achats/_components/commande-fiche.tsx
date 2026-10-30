@@ -44,6 +44,7 @@ import {
   type ActionCommande,
   type IdAction,
 } from './commandes-model';
+import { CommandeSuivi } from './commande-suivi';
 
 /** Gestes qui demandent une saisie ou une confirmation avant l'appel. */
 type Dialogue = 'approuver' | 'refuser' | 'annuler' | 'supprimer' | null;
@@ -449,6 +450,10 @@ export function CommandeFiche({ orderId }: { orderId: string }): React.ReactElem
           ) : null}
         </Panneau>
       </div>
+
+      {o.phase === 'order' && o.status !== 'cancelled' ? (
+        <CommandeSuivi orderId={o.id} revision={o.revision} onChange={charger} />
+      ) : null}
 
       {dialogue ? (
         <DialogueDecision

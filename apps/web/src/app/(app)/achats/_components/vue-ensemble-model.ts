@@ -54,7 +54,26 @@ function tuileCompte(lu: Lecture<PageLue>, attentionSiNonVide: boolean): EtatTui
   };
 }
 
-function tuileMontants(lu: Lecture<PayablesView>, champ: 'dueSoon' | 'overdue'): EtatTuile {
+/**
+ * Montants par devise lus dans l'échéancier du moteur. Tant que l'échéancier n'est
+ * pas livré (404), la liste filtrée des factures (`due=soon|overdue`, lot P4) donne
+ * au moins leur NOMBRE ; à défaut, une phrase (ADR-0044 — P8).
+ */
+function tuileMontants(
+  lu: Lecture<PayablesView>,
+  champ: 'dueSoon' | 'overdue',
+  repli?: Lecture<PageLue>,
+): EtatTuile {
+  if (!lu.ok && repli?.ok) {
+    const n = compteDePage(repli.valeur);
+    const vide = repli.valeur.items.length === 0;
+    return {
+      etat: 'connu',
+      lignes: [vide ? 'Aucune' : `${n} facture${n === '1' ? '' : 's'}`],
+      detail: vide ? null : 'Montants par devise sur l’échéancier',
+      attention: champ === 'overdue' && !vide,
+    };
+  }
   if (!lu.ok) return { etat: 'indisponible', phrase: phraseIndisponible(lu.erreur) };
   const lignes = lu.valeur.byCurrency
     .filter((c) => c[champ].count > 0)
@@ -81,6 +100,9 @@ export interface LecturesVue {
   aRecevoir: Lecture<PageLue>;
   facturesEcart: Lecture<PageLue>;
   echeancier: Lecture<PayablesView>;
+  // ADR-0044 — P8 : listes filtrées des factures, repli de l'échéancier.
+  bientot?: Lecture<PageLue>;
+  enRetard?: Lecture<PageLue>;
 }
 
 /**
@@ -107,20 +129,20 @@ export function tuilesVue(actions: readonly OrgAction[] | null, l: LecturesVue):
     {
       id: 'factures-ecart',
       libelle: 'Factures en écart',
-      lien: null,
+      lien: `${ACHATS_BASE}/factures?filtre=ecart`,
       contenu: tuileCompte(l.facturesEcart, true),
     },
     {
       id: 'a-payer',
       libelle: 'À payer bientôt',
-      lien: null,
-      contenu: tuileMontants(l.echeancier, 'dueSoon'),
+      lien: `${ACHATS_BASE}/a-payer`,
+      contenu: tuileMontants(l.echeancier, 'dueSoon', l.bientot),
     },
     {
       id: 'en-retard',
       libelle: 'Factures en retard',
-      lien: null,
-      contenu: tuileMontants(l.echeancier, 'overdue'),
+      lien: `${ACHATS_BASE}/a-payer`,
+      contenu: tuileMontants(l.echeancier, 'overdue', l.enRetard),
     },
   );
   return tuiles;
