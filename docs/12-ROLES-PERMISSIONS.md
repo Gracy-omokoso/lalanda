@@ -310,8 +310,9 @@ sont inchangés.
 > projets, feuille de temps en lecture, constat de marge, rapports et registre exporté). Les
 > routes `/hr/**` déclarent leurs actions (`routes-coverage.test.ts`, un bloc par lot) et la
 > sonde `rbac-matrix.e2e.test.ts` les exerce. Lot H5 : `GET /hr/reports` exige `hr.read` ;
-> `GET /hr/reports/export.csv` exige `hr.read` **et** `report.export` (le Responsable RH, sans
-> `report.export`, ne l'exporte pas), audit strict `hr.register.exported` ; `GET
+> `GET /hr/reports/export.csv` exige `hr.read` **et** `hr.manage` (révisé le 31 oct. 2026 : le
+> Responsable RH exporte le registre ; `report.export` n'est pas exigé, car il ouvre aussi les
+> exports financiers), audit strict `hr.register.exported` ; `GET
 > /work/timesheets` exige `work.read`, et pour autrui `work.manage` ou la relation de manager
 > (404 hors portée) ; le brief, la cloche et les projets ne rendent jamais un type d'absence
 > confidentiel, un motif, un nom (brief) ni un montant.

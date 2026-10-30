@@ -4,7 +4,7 @@
 // Effectif, entrées et sorties (taux de sortie), absentéisme PAR SERVICE, ancienneté :
 // chiffres du moteur RH. Anti-fuite : ni salaire, ni coordonnées, ni type d'absence
 // nommé, ni motif, dans la réponse ni dans le CSV. Registre : `hr.read` +
-// `report.export`, formules neutralisées, audit strict `hr.register.exported`.
+// `hr.manage`, formules neutralisées, audit strict `hr.register.exported`.
 // Isolation : un service d'une autre organisation rend 404.
 
 import 'reflect-metadata';
@@ -222,8 +222,8 @@ e2eSuite('RH — rapports et registre exporté (ADR-0045 H5)', () => {
     ).toBe(avant + 1);
   });
 
-  it('registre : hr.read ET report.export (Responsable RH sans report.export : 403)', async () => {
-    code(await fx.get('hr_manager', '/hr/reports/export.csv'), 403, 'FORBIDDEN');
+  it('registre : hr.read ET hr.manage (Responsable RH : oui ; Comptable : non)', async () => {
+    expect((await fx.get('hr_manager', '/hr/reports/export.csv')).status).toBe(200);
     code(await fx.get('accountant', '/hr/reports/export.csv'), 403, 'FORBIDDEN');
     expect((await fx.get('admin', '/hr/reports/export.csv')).status).toBe(200);
     const b = await fx.get('ownerB', '/hr/reports/export.csv');

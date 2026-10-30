@@ -1,7 +1,7 @@
 // Rapports RH et registre exporté — ADR-0045 § 3.3, § 7. ADR-0045 — H5.
 //
 //   GET /hr/reports?from=&to=&departmentId=      hr.read
-//   GET /hr/reports/export.csv?departmentId=     hr.read + report.export (audit strict)
+//   GET /hr/reports/export.csv?departmentId=     hr.read + hr.manage (audit strict)
 //
 // Aucune donnée salariale, aucune donnée sensible, aucun type d'absence nommé.
 
@@ -33,7 +33,7 @@ export class HrReportsController {
   }
 
   @Get('export.csv')
-  @RequirePermission('hr.read', 'report.export')
+  @RequirePermission('hr.read', 'hr.manage')
   async exportRegister(
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: { id: string },

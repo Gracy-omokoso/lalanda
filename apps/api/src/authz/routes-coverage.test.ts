@@ -1197,8 +1197,9 @@ describe('ADR-0045 — H5 : rapports, registre exporté, feuille de temps', () =
   it('chaque route déclare la permission de l’ADR (§ 3.3)', () => {
     const attendu: Record<string, Action[]> = {
       'HrReportsController.reports': ['hr.read'],
-      // Un fichier qui sort de l'organisation : `report.export` en plus, audit strict.
-      'HrReportsController.exportRegister': ['hr.read', 'report.export'],
+      // Un fichier qui sort de l'organisation : `hr.manage` en plus, audit strict. Pas
+      // `report.export`, qui ouvre aussi les exports financiers (plan, business plan).
+      'HrReportsController.exportRegister': ['hr.read', 'hr.manage'],
       // Soi au guard ; autrui (`work.manage` ou manager) décidé dans le service.
       'WorkTimesheetsController.weekly': ['work.read'],
     };

@@ -7,7 +7,7 @@
 // services : AUCUNE lecture de `hr_employee_private`, aucun salaire, aucun type
 // d'absence nommé dans la réponse.
 //
-// Registre CSV : `hr.read` + `report.export`, colonnes non sensibles, sans note libre ;
+// Registre CSV : `hr.read` + `hr.manage`, colonnes non sensibles, sans note libre ;
 // séparateur « ; », BOM, formules neutralisées (`toCsv`, motif du CSV du CRM) ; audit
 // STRICT `hr.register.exported` écrit AVANT l'envoi (sans trace, pas de fichier).
 
@@ -287,7 +287,7 @@ export class HrReportsService {
       STATUS_LABELS[employeeStatusOf(engineEmployeeOf(e), today)] ?? e.status,
       e.workLocation ?? null,
     ]);
-    // Sans trace, pas de fichier (docs/12 R4, `report.export`).
+    // Sans trace, pas de fichier (docs/12 R4, audit strict de l'export).
     await this.audit.recordStrict({
       organizationId,
       actorUserId: actor.userId,

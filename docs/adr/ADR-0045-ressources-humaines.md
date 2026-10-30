@@ -406,7 +406,7 @@ par la fonction pure `hrViewerScope` (§ 4.4), comme la cloche d'ADR-0039.
 | `POST /hr/checklists/:id/items/:itemId/done` · `…/undone` | l'assigné, ou `hr.manage` | coche |
 | `GET /hr/deadlines?within=` | `hr.read` | fins d'essai, fins de contrat, documents qui expirent (moteur `hrDeadlines`) |
 | `GET /hr/reports?from=&to=&departmentId=` | `hr.read` | effectif, entrées et sorties, absentéisme, ancienneté (§ 7) ; **aucune donnée salariale** |
-| `GET /hr/reports/export.csv` | `hr.read` + `report.export` | registre non sensible ; audit `hr.register.exported` |
+| `GET /hr/reports/export.csv` | `hr.read` + `hr.manage` (révisé le 31 oct. 2026, au lieu de `report.export`) | registre non sensible ; audit `hr.register.exported` |
 | `GET /hr/settings` · `PUT` | `hr.read` · `hr.manage` (et `leave.approve` pour changer `approvalFlow` ou `allowSoleApprover` : changer qui valide exige d'être soi-même validateur, motif d'ADR-0044 § 3.7) | § 2.2 |
 | `GET /work/timesheets?userId=&week=` | `work.read` (soi) ; `work.manage` ou manager (autrui) | § 6.3 |
 

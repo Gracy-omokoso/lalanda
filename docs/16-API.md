@@ -589,7 +589,7 @@ dans le service (`hrViewerScope`) ; un collaborateur hors portée rend `404`.
 | `GET /hr/leave-balances` · `GET /hr/leave-ledger` · `POST /hr/leave-ledger` | soi, manager, `hr.read` · `hr.manage` | soldes (moteur) ; attributions et ajustements journalisés |
 | `GET`/`POST /hr/employees/:id/documents` · `GET /hr/documents/:id/file` · `DELETE` | `hr.read` / `hr.sensitive.read` / soi · `hr.manage` | PDF inerte ; pièces sensibles chiffrées, téléchargement audité |
 | `GET`/`POST /hr/checklist-templates` · `POST /hr/employees/:id/checklists` · `…/items/:itemId/done` | `hr.read` · `hr.manage` · l'assigné | listes d'accueil et de départ (hors projets RUN) |
-| `GET /hr/deadlines` · `GET /hr/reports` · `GET /hr/reports/export.csv` | `hr.read` (CSV : + `report.export`) | échéances ; effectif, entrées et sorties, absentéisme, ancienneté ; jamais de salaire |
+| `GET /hr/deadlines` · `GET /hr/reports` · `GET /hr/reports/export.csv` | `hr.read` (CSV : + `hr.manage`) | échéances ; effectif, entrées et sorties, absentéisme, ancienneté ; jamais de salaire |
 | `GET /hr/settings` · `PUT` | `hr.read` · `hr.manage` (+ `leave.approve` pour le circuit) | semaine de travail, circuit, types de contrat, rappels, conservation |
 | `GET /work/timesheets` | `work.read` (soi) ; `work.manage` ou manager (autrui) | feuille de temps hebdomadaire **en lecture** des saisies existantes, absences et fériés |
 
@@ -609,7 +609,7 @@ Lot H5 (implémenté) :
   exitRatePercent }, absenteeism { groups (par service), total }, seniority { buckets } }`, tout
   par le moteur RH ; `400` période inversée ou de plus de dix ans ; `404 DEPARTMENT_NOT_FOUND`
   pour un service d'une autre organisation. Aucune donnée salariale ni sensible.
-- `GET /hr/reports/export.csv?departmentId=` (`hr.read` + `report.export`) : registre non
+- `GET /hr/reports/export.csv?departmentId=` (`hr.read` + `hr.manage`) : registre non
   sensible (matricule, noms, poste, service, manager, type de contrat, dates, catégorie de
   sortie, statut, lieu), `;`, BOM, formules neutralisées ; audit **strict**
   `hr.register.exported` avant l'envoi.
