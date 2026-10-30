@@ -125,3 +125,7 @@ export * from './idea-lab/index.js';
 // dépenses rattachées et coût du temps, par devise. Versionné à part
 // (`WORK_MARGIN_VERSION`) ; n'alimente jamais le réalisé ni un plan.
 export * from './work/index.js';
+
+// ADR-0044 — P1 : achats et fournisseurs (totaux, rapprochement, dettes,
+// échéancier). Versionné à part (`PURCHASES_VERSION`).
+export * from './purchases/index.js';
