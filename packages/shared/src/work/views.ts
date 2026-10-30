@@ -348,6 +348,23 @@ export interface ProjectMarginView {
         minutes: number;
         cost: string;
       }[];
+  /**
+   * ADR-0044 § 6.1 (`WORK_MARGIN_VERSION` 1.1.0) — coûts engagés non payés, par
+   * devise, INFORMATIFS : jamais soustraits de `margin`. `committed` : part du
+   * projet dans le reste à payer des factures fournisseurs validées ; `ordered` :
+   * reste à facturer HT des commandes approuvées. `null` si l'appelant ne détient
+   * pas `purchase.read` (rien n'est lu).
+   */
+  purchases?: ProjectMarginPurchasesView[] | null;
+}
+
+/** Coûts engagés d'une devise (ADR-0044 § 6.1), rendus par le moteur. */
+export interface ProjectMarginPurchasesView {
+  currency: WorkRateCurrency;
+  committed: string;
+  ordered: string;
+  invoiceCount: number;
+  orderCount: number;
 }
 
 // ── Historique ──────────────────────────────────────────────────────────────

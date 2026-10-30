@@ -10,7 +10,9 @@ import { MongooseModule } from '@nestjs/mongoose';
 
 import { OrganizationsModule } from '../../organizations/organizations.module.js';
 import { SalesModule } from '../../sales/sales.module.js';
+import { PurchasesMarginSource } from '../../purchases/margin/purchases-margin.source.js';
 import { ProjectMarginService } from '../margin/project-margin.service.js';
+import { WORK_PURCHASES_SOURCE } from '../margin/work-purchases.port.js';
 import { WorkModule } from '../work.module.js';
 import { WorkBillingController } from './work-billing.controller.js';
 import { WorkBillingService } from './work-billing.service.js';
@@ -25,6 +27,11 @@ import { WorkInvoiceLink, WorkInvoiceLinkSchema } from './work-invoice-link.sche
     MongooseModule.forFeature([{ name: WorkInvoiceLink.name, schema: WorkInvoiceLinkSchema }]),
   ],
   controllers: [WorkBillingController],
-  providers: [WorkBillingService, ProjectMarginService],
+  providers: [
+    WorkBillingService,
+    ProjectMarginService,
+    // ADR-0044 — P6 : coûts engagés de la marge (lecture seule par la connexion).
+    { provide: WORK_PURCHASES_SOURCE, useClass: PurchasesMarginSource },
+  ],
 })
 export class WorkBillingModule {}

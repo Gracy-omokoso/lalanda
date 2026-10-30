@@ -33,7 +33,7 @@ import type {
   PurchaseOrderView,
   UpdatePurchaseOrderBody,
 } from '@lalanda/shared/purchases';
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Types, type ClientSession, type Connection, type Model } from 'mongoose';
 
@@ -47,6 +47,7 @@ import { Membership, type MembershipDocument } from '../../organizations/members
 import { conflict, invalidCursor, staleRevision } from '../../sales/sales.errors.js';
 import { isObjectIdHex } from '../../sales/search.js';
 import { PurchaseCountersService } from '../counters/purchase-counters.service.js';
+import { SupplierInvoicesService } from '../invoices/supplier-invoices.service.js';
 import { PurchasesNotifier } from '../purchases-notifier.js';
 import { PurchaseSettingsService } from '../settings/purchase-settings.service.js';
 import type { SupplierLean } from '../suppliers/supplier.schema.js';
@@ -109,6 +110,8 @@ type OrderContent = Pick<
 
 @Injectable()
 export class PurchaseOrdersService {
+  private readonly logger = new Logger('PurchaseOrders');
+
   constructor(
     @InjectModel(PurchaseOrder.name) private readonly orders: Model<PurchaseOrderDocument>,
     @InjectModel(Membership.name) private readonly memberships: Model<MembershipDocument>,
@@ -119,6 +122,10 @@ export class PurchaseOrdersService {
     @Inject(PurchaseSettingsService) private readonly settings: PurchaseSettingsService,
     @Inject(PurchaseCountersService) private readonly counters: PurchaseCountersService,
     @Inject(PurchasesNotifier) private readonly notifier: PurchasesNotifier,
+    // ADR-0044 — P6 : recalcul du rapprochement des brouillons de facture liés. Pas de
+    // cycle : le service des factures ne dépend pas de celui des commandes (il lit les
+    // commandes par `PurchaseOrderFactsReader`).
+    @Inject(SupplierInvoicesService) private readonly invoices: SupplierInvoicesService,
   ) {}
 
   // ── Lecture ──────────────────────────────────────────────────────────────
@@ -326,6 +333,7 @@ export class PurchaseOrdersService {
       return doc;
     });
     if (updated.status === 'submitted') await this.notifyApprovers(updated, actor);
+    await this.refreshInvoiceDrafts(organizationId, orderId, actor.userId);
     return purchaseOrderView(updated);
   }
 
@@ -549,6 +557,8 @@ export class PurchaseOrdersService {
         decision === 'approve' ? 'approved' : 'rejected',
       );
     }
+    // L'approbation complète fige `approvedTotal`, que le rapprochement compare.
+    if (complete) await this.refreshInvoiceDrafts(organizationId, orderId, actor.userId);
     return purchaseOrderView(updated);
   }
 
@@ -761,7 +771,31 @@ export class PurchaseOrdersService {
       );
       return d;
     });
+    // Annulation, clôture, envoi : les brouillons de facture liés sont recalculés.
+    await this.refreshInvoiceDrafts(organizationId, String(o._id), actor.userId);
     return purchaseOrderView(doc);
+  }
+
+  /**
+   * ADR-0044 — P6 : après une écriture de commande (APRÈS sa transaction), recalcule
+   * le rapprochement des brouillons de facture qui la visent
+   * (`SupplierInvoicesService.refreshDrafts`). Sortie dérivée : un échec est
+   * journalisé et ne défait pas l'écriture de la commande, déjà validée.
+   */
+  private async refreshInvoiceDrafts(
+    organizationId: string,
+    orderId: string,
+    actorUserId: string,
+  ): Promise<void> {
+    try {
+      await this.invoices.refreshDrafts(organizationId, [orderId], actorUserId);
+    } catch (err) {
+      this.logger.warn(
+        `Rapprochement des brouillons non recalculé (commande ${orderId}) : ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
   }
 
   /** Champs posés à l'approbation complète : `phase: 'order'`, numéro `BC`. */

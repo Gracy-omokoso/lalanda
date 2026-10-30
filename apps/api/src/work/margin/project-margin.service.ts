@@ -11,6 +11,10 @@
 //
 // Le détail par membre (minutes × taux) n'est rendu qu'au détenteur de
 // `treasury.manage` (contrôle `can()`), pour ne pas révéler un taux horaire.
+//
+// ADR-0044 § 6.1 (P6) : coûts engagés `committed` et `ordered`, INFORMATIFS, lus par
+// le port `WORK_PURCHASES_SOURCE` seulement si l'appelant détient `purchase.read`
+// (sinon rien n'est lu : `purchases: null`) ; jamais soustraits de la marge.
 
 import {
   computeProjectMargin,
@@ -18,12 +22,18 @@ import {
   type WorkMarginInvoiceInput,
 } from '@lalanda/engine';
 import type { ProjectMarginQuery, ProjectMarginView } from '@lalanda/shared/work';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import type { Connection, Model } from 'mongoose';
 
 import { kinshasaDayOf } from '../../sales/receipts/kinshasa-day.js';
 import { actorCan, isWorkId, oid, type WorkActor } from '../work.common.js';
+import {
+  WORK_PURCHASES_SOURCE,
+  noWorkPurchases,
+  type WorkPurchasesRead,
+  type WorkPurchasesSource,
+} from './work-purchases.port.js';
 import { WorkMembersService } from '../work-members.service.js';
 import { WorkProjectsService } from '../work-projects.service.js';
 import {
@@ -86,6 +96,8 @@ function taxGroupsOf(doc: SalesDocRead): WorkMarginInvoiceInput['taxGroups'] {
 
 @Injectable()
 export class ProjectMarginService {
+  private readonly purchases: WorkPurchasesSource;
+
   constructor(
     @InjectModel(WorkInvoiceLink.name) private readonly links: Model<WorkInvoiceLinkDocument>,
     @InjectModel(WorkTimeEntry.name) private readonly time: Model<WorkTimeEntryDocument>,
@@ -93,7 +105,11 @@ export class ProjectMarginService {
     @InjectConnection() private readonly connection: Connection,
     @Inject(WorkProjectsService) private readonly projects: WorkProjectsService,
     @Inject(WorkMembersService) private readonly members: WorkMembersService,
-  ) {}
+    // ADR-0044 — P6 : facultatif, fournisseur nul sans module des achats.
+    @Optional() @Inject(WORK_PURCHASES_SOURCE) purchases: WorkPurchasesSource | null = null,
+  ) {
+    this.purchases = purchases ?? noWorkPurchases;
+  }
 
   async margin(
     organizationId: string,
@@ -156,6 +172,10 @@ export class ProjectMarginService {
         .lean<{ userId: string; workedOn: string; minutes: number }[]>()
         .exec(),
     ]);
+    // ADR-0044 § 6.1 : achats lus seulement avec `purchase.read` (droits effectifs).
+    const purchasesRead: WorkPurchasesRead | null = actorCan(actor, 'purchase.read')
+      ? await this.purchases.purchasesOf(organizationId, projectId)
+      : null;
     const userIds = [...new Set(entries.map((e) => e.userId))];
     const rates =
       userIds.length === 0
@@ -232,6 +252,7 @@ export class ProjectMarginService {
       rates,
       from: query.from ?? null,
       to: query.to ?? null,
+      ...(purchasesRead === null ? {} : { purchases: { projectId, ...purchasesRead } }),
     });
 
     let byMember: ProjectMarginView['byMember'] = null;
@@ -254,6 +275,7 @@ export class ProjectMarginService {
       findings: result.findings,
       minutesWithoutRate: result.minutesWithoutRate,
       byMember,
+      purchases: result.purchases ?? null,
     };
   }
 }

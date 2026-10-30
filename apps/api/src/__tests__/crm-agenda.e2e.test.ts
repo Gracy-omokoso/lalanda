@@ -310,7 +310,7 @@ e2eSuite('CRM — relances dans Mes tâches, cloche et brief (ADR-0040 — C4)',
         alerts: { ruleId: string; message: string; actionPath: string }[];
         recommendations: { ruleId: string }[];
       };
-      expect(b.version).toBe('1.2.0');
+      expect(b.version).toBe('1.3.0');
       const fact = (id: string) => b.facts.find((x) => x.id === id);
       expect(fact('mes_relances.en_retard')).toMatchObject({ status: 'known', value: '2' });
       expect(fact('mes_relances.aujourdhui')).toMatchObject({ status: 'known', value: '0' });

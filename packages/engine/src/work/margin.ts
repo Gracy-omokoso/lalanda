@@ -16,8 +16,17 @@
 // - Aucune conversion : chaque devise a sa ligne (ADR-0031 décision n° 3).
 // - Période facultative : jour d'émission (réglé à l'émission, avoirs, facturé),
 //   jour de l'encaissement, de la dépense, du travail.
+// - 1.1.0 (ADR-0044 § 6.1) : coûts engagés INFORMATIFS, rendus à part et JAMAIS
+//   soustraits : `committed` = part du projet dans le reste à payer des factures
+//   fournisseurs validées (répartie au prorata des imputations par
+//   `splitAllocation`, plus fort reste, comme les dépenses d'un paiement) ;
+//   `ordered` = reste à facturer HT des lignes de commande approuvées qui visent le
+//   projet (`orderRemainingToInvoice`). Un paiement fournisseur entre déjà dans la
+//   marge par sa dépense : rien n'est compté deux fois.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { orderRemainingToInvoice } from '../purchases/orders.js';
+import { splitAllocation } from '../purchases/payables.js';
 import { isCalendarDate } from '../receivables/calendar.js';
 import { revenueBaseOf } from '../receivables/aggregation.js';
 import {
@@ -35,6 +44,8 @@ import {
   type ProjectMarginInput,
   type ProjectMarginMemberCost,
   type ProjectMarginResult,
+  type ProjectPurchasesCurrency,
+  type ProjectPurchasesInput,
   type WorkMarginCurrency,
   type WorkMarginDay,
   type WorkMarginPayment,
@@ -285,5 +296,64 @@ export function computeProjectMargin(input: ProjectMarginInput): ProjectMarginRe
     findings,
     minutesWithoutRate,
     byMember,
+    ...(input.purchases === undefined ? {} : { purchases: projectPurchases(input.purchases) }),
   };
+}
+
+/** Coûts engagés non payés du projet, par devise (ADR-0044 § 6.1) — informatifs. */
+export function projectPurchases(input: ProjectPurchasesInput): ProjectPurchasesCurrency[] {
+  const sums = new Map<
+    WorkMarginCurrency,
+    { committed: Fixed; ordered: Fixed; invoiceCount: number; orderCount: number }
+  >();
+  const sumOf = (currency: WorkMarginCurrency) => {
+    const s = sums.get(currency) ?? { committed: 0n, ordered: 0n, invoiceCount: 0, orderCount: 0 };
+    sums.set(currency, s);
+    return s;
+  };
+
+  for (const payable of input.payables) {
+    const currency = checkCurrency(payable.currency, `Facture fournisseur ${payable.id}`);
+    if (trustedAmount(payable.remaining, `Reste de ${payable.id}`) === 0n) continue;
+    if (!payable.costAllocations.some((a) => a.workProjectId === input.projectId)) continue;
+    const { shares } = splitAllocation(payable.remaining, payable.costAllocations);
+    let mine = 0n;
+    payable.costAllocations.forEach((a, i) => {
+      if (a.workProjectId === input.projectId) {
+        mine += trustedAmount(shares[i] ?? '0', `Part de ${payable.id}`);
+      }
+    });
+    if (mine === 0n) continue;
+    const s = sumOf(currency);
+    s.committed += mine;
+    s.invoiceCount += 1;
+  }
+
+  for (const order of input.orders) {
+    const currency = checkCurrency(order.currency, `Commande ${order.id}`);
+    const rest = orderRemainingToInvoice({ currency, lines: order.lines }, order.invoices);
+    let mine = 0n;
+    for (const line of rest.lines) {
+      if (line.workProjectId !== input.projectId) continue;
+      mine += trustedAmount(line.remainingAmount, `Ligne ${line.orderLineId}`);
+    }
+    if (mine === 0n) continue;
+    const s = sumOf(currency);
+    s.ordered += mine;
+    s.orderCount += 1;
+  }
+
+  return WORK_MARGIN_CURRENCIES.flatMap((currency) => {
+    const s = sums.get(currency);
+    if (!s) return [];
+    return [
+      {
+        currency,
+        committed: formatPositive(s.committed),
+        ordered: formatPositive(s.ordered),
+        invoiceCount: s.invoiceCount,
+        orderCount: s.orderCount,
+      },
+    ];
+  });
 }

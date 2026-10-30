@@ -76,6 +76,12 @@ const EMAIL_FACTS = [
   // ADR-0040 — C4 § 5.5 : ses propres relances clients (même garde, `crm.read`).
   'mes_relances.en_retard',
   'mes_relances.aujourdhui',
+  // ADR-0044 § 6.4 : dettes fournisseurs et approbations (gardes `purchase.read`,
+  // `treasury.read` pour les montants, `purchase.approve`).
+  'fournisseurs.factures_en_retard',
+  'fournisseurs.factures_en_retard.CDF',
+  'fournisseurs.factures_en_retard.USD',
+  'mes_approbations.en_attente',
 ];
 
 export function emailContent(
@@ -98,6 +104,9 @@ export function emailContent(
     dateLabel,
     facts: EMAIL_FACTS.map((id) => brief.facts.find((f) => f.id === id))
       .filter((f): f is BriefFact => f !== undefined)
+      // ADR-0044 § 6.4 : un membre sans le droit ne lit rien des achats, pas même
+      // la mention « masqué » (le module ne le concerne pas).
+      .filter((f) => !(f.status === 'hidden' && f.source.module === 'run.purchases'))
       // Un montant nul dans une devise inutilisée n'apprend rien.
       .filter((f) => !(f.kind === 'amount' && f.value !== null && /^-?0+(\.0+)?$/.test(f.value)))
       .map(factLine),

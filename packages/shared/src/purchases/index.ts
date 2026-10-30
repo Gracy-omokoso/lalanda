@@ -18,3 +18,6 @@ export * from './receptions.js';
 export * from './invoices.js';
 // ADR-0044 — P5
 export * from './payments.js';
+// ADR-0044 — P6
+export * from './overview.js';
+export * from './summary.js';

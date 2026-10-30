@@ -14,6 +14,9 @@
 //   CRM_SOURCE            relances et pipeline       ADR-0040 — C4 § 5.5
 //                         — fournisseur réel dans le module `crm`
 //                         (`crm/brief/crm-brief.source.ts`)
+//   PURCHASES_SOURCE      dettes fournisseurs et     ADR-0044 § 6.4
+//                         approbations d'achat
+//                         — fournisseur réel `purchases/brief/purchases-brief.source.ts`
 //
 // Les fournisseurs « non disponible » ci-dessous restent pour les tests.
 // Le pipeline (ADR-0035) et la santé GROW (ADR-0032) suivront le même motif :
@@ -23,6 +26,7 @@ import type {
   BriefCashInput,
   BriefCrmInput,
   BriefDueDatesInput,
+  BriefPurchasesInput,
   BriefWorkInput,
 } from '@lalanda/engine';
 
@@ -32,6 +36,8 @@ export const OUTSTANDING_SOURCE = Symbol('MORNING_BRIEF_OUTSTANDING_SOURCE');
 export const WORK_SOURCE = Symbol('MORNING_BRIEF_WORK_SOURCE');
 // ADR-0040 — C4
 export const CRM_SOURCE = Symbol('MORNING_BRIEF_CRM_SOURCE');
+// ADR-0044 — P6
+export const PURCHASES_SOURCE = Symbol('MORNING_BRIEF_PURCHASES_SOURCE');
 
 /** Trésorerie disponible de l'organisation. Ne reçoit QUE son identifiant. */
 export interface CashPositionSource {
@@ -92,4 +98,27 @@ export interface CrmSource {
 /** Sans module CRM (tests) : « non disponible ». */
 export const noCrm: CrmSource = {
   crmOf: async () => ({ status: 'unavailable' }),
+};
+
+/**
+ * Achats (ADR-0044 § 6.4) : factures fournisseurs validées au reste non nul et
+ * demandes que l'appelant peut approuver. Appelé seulement si le membre détient
+ * `purchase.read`. `amounts` (`treasury.read`) : le moteur rend les montants par
+ * devise (`amountsVisible`) ; sans lui, il ne rend que des nombres de factures —
+ * le reste à payer ne sert alors qu'à savoir qu'une dette existe et ne sort jamais
+ * du moteur. `approvals` (`purchase.approve`) : le compte des demandes à approuver
+ * est lu ; sinon il ne l'est pas et le fait est masqué.
+ */
+export interface PurchasesSource {
+  purchasesOf(
+    organizationId: string,
+    userId: string,
+    access: { amounts: boolean; approvals: boolean },
+    now: Date,
+  ): Promise<BriefPurchasesInput>;
+}
+
+/** Sans module des achats (tests) : « non disponible ». */
+export const noPurchases: PurchasesSource = {
+  purchasesOf: async () => ({ status: 'unavailable' }),
 };

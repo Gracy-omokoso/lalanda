@@ -12,9 +12,15 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { TaxGroupLetter } from '../invoice-totals/types.js';
+import type { InvoicedLinesInput, PurchaseOrderLineInput } from '../purchases/types.js';
 
-/** Toute évolution d'un calcul de ce module incrémente cette version. */
-export const WORK_MARGIN_VERSION = '1.0.0';
+/**
+ * Toute évolution d'un calcul de ce module incrémente cette version.
+ * 1.1.0 (ADR-0044 § 6.1) : coûts engagés `committed` et `ordered`, INFORMATIFS,
+ * rendus à part (`purchases`) et jamais soustraits de la marge ; sans entrée
+ * `purchases`, la sortie est celle de 1.0.0.
+ */
+export const WORK_MARGIN_VERSION = '1.1.0';
 
 /** Devises de la marge — celles de la facturation et de la trésorerie. */
 export const WORK_MARGIN_CURRENCIES = ['CDF', 'USD'] as const;
@@ -85,6 +91,37 @@ export interface WorkMarginRateInput {
   effectiveFrom: WorkMarginDay;
 }
 
+/**
+ * Facture fournisseur VALIDÉE (type `invoice`) dont une imputation vise le projet :
+ * reste à payer (moteur des achats, `payableSettlement`) et imputations de coût
+ * dans l'ordre de la facture.
+ */
+export interface WorkMarginPayableInput {
+  id: string;
+  currency: WorkMarginCurrency;
+  remaining: WorkMarginAmount;
+  costAllocations: readonly { amount: WorkMarginAmount; workProjectId: string | null }[];
+}
+
+/**
+ * Commande approuvée et non close (`approved`, `sent`, `partially_received`,
+ * `received`) dont une ligne vise le projet, avec les factures VALIDÉES qui la
+ * visent (lignes facturées).
+ */
+export interface WorkMarginOrderInput {
+  id: string;
+  currency: WorkMarginCurrency;
+  lines: readonly PurchaseOrderLineInput[];
+  invoices: readonly InvoicedLinesInput[];
+}
+
+/** Achats du projet (ADR-0044 § 6.1), lus par le port `WORK_PURCHASES_SOURCE`. */
+export interface ProjectPurchasesInput {
+  projectId: string;
+  payables: readonly WorkMarginPayableInput[];
+  orders: readonly WorkMarginOrderInput[];
+}
+
 export interface ProjectMarginInput {
   invoices: readonly WorkMarginInvoiceInput[];
   creditNotes: readonly WorkMarginCreditNoteInput[];
@@ -94,6 +131,11 @@ export interface ProjectMarginInput {
   /** Période facultative, bornes incluses (dates d'encaissement, de dépense, de travail). */
   from: WorkMarginDay | null;
   to: WorkMarginDay | null;
+  /**
+   * Achats du projet (ADR-0044 § 6.1) ; absent : rien n'est rendu (`purchases`
+   * absent du résultat). Hors période : ce sont des engagements à date.
+   */
+  purchases?: ProjectPurchasesInput;
 }
 
 /** Constats codés (ADR-0039 § 5). */
@@ -142,6 +184,22 @@ export interface ProjectMarginMemberCost {
   cost: WorkMarginAmount;
 }
 
+/**
+ * Coûts engagés non payés d'une devise (ADR-0044 § 6.1) — INFORMATIFS, jamais
+ * soustraits de `margin` (décision ouverte n° 10).
+ */
+export interface ProjectPurchasesCurrency {
+  currency: WorkMarginCurrency;
+  /** Part du projet dans le reste à payer des factures validées (plus fort reste). */
+  committed: WorkMarginAmount;
+  /** Reste à facturer HT des lignes de commande approuvées qui visent le projet. */
+  ordered: WorkMarginAmount;
+  /** Factures validées avec un reste à payer imputé au projet. */
+  invoiceCount: number;
+  /** Commandes avec un reste à facturer sur une ligne du projet. */
+  orderCount: number;
+}
+
 export interface ProjectMarginResult {
   version: string;
   from: WorkMarginDay | null;
@@ -152,4 +210,6 @@ export interface ProjectMarginResult {
   /** Minutes sans taux applicable : signalées, jamais valorisées à zéro. */
   minutesWithoutRate: number;
   byMember: ProjectMarginMemberCost[];
+  /** Présent seulement si l'entrée porte `purchases` ; une devise sans engagement n'apparaît pas. */
+  purchases?: ProjectPurchasesCurrency[];
 }

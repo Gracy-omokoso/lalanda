@@ -12,6 +12,7 @@ import type {
   BriefCrmActivityInput,
   BriefFact,
   BriefInvoiceInput,
+  BriefPayableInput,
   BriefWorkTaskInput,
   MorningBriefInput,
 } from './types.js';
@@ -50,6 +51,14 @@ function input(
     dueDates: { status: 'unavailable' },
     work: { status: 'known', tasks: [], truncated: false },
     crm: { status: 'known', activities: [], openOpportunityCount: 0, truncated: false },
+    purchases: {
+      status: 'known',
+      payables: [],
+      dueSoonDays: 7,
+      amountsVisible: true,
+      pendingApprovalCount: 0,
+      truncated: false,
+    },
     ...over,
   };
 }
@@ -460,14 +469,14 @@ describe('projets et tâches — faits et règles R8, R9 (ADR-0039 § 6.5)', () 
     expect(buildMorningBrief(input([], work([], false))).truncated).toBe(false);
   });
 
-  it('version mineure suivante (ADR-0040 — C4)', () => {
-    expect(brief([]).version).toBe('1.2.0');
+  it('version mineure suivante (ADR-0044 § 6.4)', () => {
+    expect(brief([]).version).toBe('1.3.0');
   });
 
-  it('les dix règles ont des rangs uniques', () => {
+  it('les douze règles ont des rangs uniques', () => {
     const ranks = MORNING_BRIEF_RULES.map((r) => r.rank);
     expect(new Set(ranks).size).toBe(ranks.length);
-    expect(ranks.length).toBe(10);
+    expect(ranks.length).toBe(12);
   });
 });
 
@@ -561,5 +570,142 @@ describe('relances du CRM — faits, pipeline et règle R10 (ADR-0040 — C4 § 
 
   it('lecture bornée des relances : le brief le dit', () => {
     expect(buildMorningBrief(input([], crm([], 0, true))).truncated).toBe(true);
+  });
+});
+
+// ── ADR-0044 § 6.4 : achats (faits, R11, R12) ───────────────────────────────
+
+describe('achats — dettes fournisseurs, approbations, règles R11 et R12 (ADR-0044 § 6.4)', () => {
+  // NOW = 21 oct. 2026 à Kinshasa.
+  function achats(
+    payables: BriefPayableInput[],
+    over: { amountsVisible?: boolean; pending?: number | null; truncated?: boolean } = {},
+  ): Partial<MorningBriefInput> {
+    return {
+      purchases: {
+        status: 'known',
+        payables,
+        dueSoonDays: 7,
+        amountsVisible: over.amountsVisible ?? true,
+        pendingApprovalCount: over.pending === undefined ? 0 : over.pending,
+        truncated: over.truncated ?? false,
+      },
+    };
+  }
+  const p = (over: Partial<BriefPayableInput>): BriefPayableInput => ({
+    currency: 'USD',
+    dueDate: '2026-10-20',
+    remaining: '100.00',
+    disputed: false,
+    ...over,
+  });
+
+  it('deux factures échues hier : fait à 2, R11 déclenchée avec les montants par devise', () => {
+    const b = buildMorningBrief(
+      input(
+        [],
+        achats([
+          p({ remaining: '300.00' }),
+          p({ currency: 'CDF', dueDate: '2026-10-01', remaining: '50000.00' }),
+          p({ dueDate: '2026-10-21', remaining: '20.00' }),
+          p({ dueDate: '2026-10-28', remaining: '10.00' }),
+          p({ dueDate: '2026-10-29', remaining: '10.00' }),
+          p({ dueDate: '2026-10-10', disputed: true }),
+        ]),
+      ),
+    );
+    expect(fact(b.facts, 'fournisseurs.factures_en_retard')).toMatchObject({
+      status: 'known',
+      value: '2',
+    });
+    // Aujourd'hui et J+7 inclus ; J+8 hors fenêtre ; le litige à part.
+    expect(fact(b.facts, 'fournisseurs.a_payer_bientot').value).toBe('2');
+    expect(fact(b.facts, 'fournisseurs.factures_en_retard.USD').value).toBe('300.00');
+    expect(fact(b.facts, 'fournisseurs.factures_en_retard.CDF').value).toBe('50000.00');
+    const r11 = b.alerts.find((a) => a.ruleId === 'factures_fournisseurs_en_retard');
+    expect(r11).toMatchObject({
+      rank: 11,
+      severity: 'attention',
+      actionPath: '/achats/a-payer',
+      title: 'Factures fournisseurs en retard',
+    });
+    expect(r11?.message.replace(/\u202f|\u00a0/g, ' ')).toBe(
+      '2 factures fournisseurs ont dépassé leur échéance : 50 000,00 CDF et 300,00 USD restent à payer.',
+    );
+  });
+
+  it('sans treasury.read : les nombres seulement, aucun montant', () => {
+    const b = buildMorningBrief(input([], achats([p({})], { amountsVisible: false })));
+    expect(fact(b.facts, 'fournisseurs.factures_en_retard').value).toBe('1');
+    expect(b.facts.some((f) => f.id.startsWith('fournisseurs.') && f.kind === 'amount')).toBe(
+      false,
+    );
+    const r11 = b.recommendations.find((a) => a.ruleId === 'factures_fournisseurs_en_retard');
+    expect(r11?.message).toBe('1 facture fournisseur a dépassé son échéance.');
+  });
+
+  it('R12 : demandes à approuver par l’appelant', () => {
+    const b = buildMorningBrief(input([], achats([], { pending: 3 })));
+    expect(fact(b.facts, 'mes_approbations.en_attente').value).toBe('3');
+    const r12 = b.recommendations.find((r) => r.ruleId === 'approbations_achat_en_attente');
+    expect(r12).toMatchObject({
+      rank: 12,
+      severity: 'info',
+      actionPath: '/achats/commandes?vue=a-approuver',
+      message: '3 demandes d’achat attendent votre approbation.',
+    });
+    // Information : jamais une alerte.
+    expect(b.alerts.some((a) => a.ruleId === 'approbations_achat_en_attente')).toBe(false);
+  });
+
+  it('sans purchase.approve : fait d’approbation masqué, R12 non évaluée', () => {
+    const b = buildMorningBrief(input([], achats([], { pending: null })));
+    expect(fact(b.facts, 'mes_approbations.en_attente')).toMatchObject({
+      status: 'hidden',
+      value: null,
+    });
+    expect(b.rulesSkipped).toContainEqual({
+      ruleId: 'approbations_achat_en_attente',
+      reason: 'hidden',
+    });
+  });
+
+  it('sans purchase.read : tous les faits masqués, R11 et R12 non évaluées', () => {
+    const b = buildMorningBrief(input([], { purchases: 'hidden' }));
+    for (const id of [
+      'fournisseurs.factures_en_retard',
+      'fournisseurs.a_payer_bientot',
+      'mes_approbations.en_attente',
+    ]) {
+      expect(fact(b.facts, id)).toMatchObject({ status: 'hidden', value: null });
+    }
+    expect(b.facts.some((f) => f.id.startsWith('fournisseurs.') && f.value !== null)).toBe(false);
+    expect(b.rulesSkipped).toContainEqual({
+      ruleId: 'factures_fournisseurs_en_retard',
+      reason: 'hidden',
+    });
+    expect(b.rulesSkipped).toContainEqual({
+      ruleId: 'approbations_achat_en_attente',
+      reason: 'hidden',
+    });
+  });
+
+  it('sans source des achats (entrée absente) : non disponible, jamais zéro', () => {
+    const { purchases: _omis, ...sans } = input([]);
+    const b = buildMorningBrief(sans);
+    expect(fact(b.facts, 'fournisseurs.factures_en_retard')).toMatchObject({
+      status: 'unavailable',
+      value: null,
+    });
+    expect(b.rulesSkipped).toContainEqual({
+      ruleId: 'factures_fournisseurs_en_retard',
+      reason: 'unavailable',
+    });
+  });
+
+  it('lecture bornée des factures : le brief le dit ; version 1.3.0', () => {
+    const b = buildMorningBrief(input([], achats([], { truncated: true })));
+    expect(b.truncated).toBe(true);
+    expect(b.version).toBe('1.3.0');
   });
 });
