@@ -170,7 +170,7 @@ describe('approbations d’achat (ADR-0044 § 6.5)', () => {
     expect(estApprobation(approbation)).toBe(true);
     expect(estRelance(approbation)).toBe(false);
     expect(estApprobation(item(1, null))).toBe(false);
-    expect(sousTitreApprobation(approbation)).toBe('DA2610-000001 · Socimex SARL · 89.35 USD');
+    expect(sousTitreApprobation(approbation)).toBe('DA2610-000001 · Socimex SARL · 89,35\u00a0USD');
     expect(PASTILLE_APPROBATION).toBe('Approbation');
   });
 

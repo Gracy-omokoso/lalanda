@@ -5,11 +5,12 @@
 // inventé. Montants et nombres : ceux de l'API (moteur).
 
 import { Badge, buttonClasses } from '@lalanda/ui';
-import { ClipboardList, ShoppingCart, Truck } from 'lucide-react';
+import { ClipboardList, ShoppingCart } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { purchasesApi, type PurchaseOrderView } from '@/lib/api-purchases';
+import { purchasesPayablesApi } from '@/lib/api-purchases-payables';
 
 import { Alerte } from '../../ventes/_components/form-ui';
 import { formatMontant } from '../../ventes/_components/sales-model';
@@ -78,9 +79,20 @@ export function VueEnsemble(): React.ReactElement {
       lire(purchasesApi.listOrders({ status: 'sent', limit: 50 })),
       lire(purchasesApi.listInvoices({ status: 'draft', matching: 'variance', limit: 50 })),
       lire(purchasesApi.getPayables()),
-    ]).then(([enAttente, aRecevoir, facturesEcart, echeancier]) => {
+      lire(purchasesPayablesApi.listInvoices({ due: 'soon', limit: 50 })),
+      lire(purchasesPayablesApi.listInvoices({ due: 'overdue', limit: 50 })),
+    ]).then(([enAttente, aRecevoir, facturesEcart, echeancier, bientot, enRetard]) => {
       if (!annule) {
-        setTuiles(tuilesVue(actions, { enAttente, aRecevoir, facturesEcart, echeancier }));
+        setTuiles(
+          tuilesVue(actions, {
+            enAttente,
+            aRecevoir,
+            facturesEcart,
+            echeancier,
+            bientot,
+            enRetard,
+          }),
+        );
       }
     });
     purchasesApi
@@ -166,11 +178,6 @@ export function VueEnsemble(): React.ReactElement {
           </ul>
         )}
       </Panneau>
-
-      <p className="flex items-center gap-2 text-xs text-[var(--foreground-muted)]">
-        <Truck aria-hidden="true" className="h-4 w-4" />
-        Réceptions, factures fournisseurs et paiements arrivent avec une prochaine livraison.
-      </p>
     </section>
   );
 }

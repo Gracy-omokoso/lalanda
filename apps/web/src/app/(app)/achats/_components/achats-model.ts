@@ -28,6 +28,12 @@ export const lienCommande = (id: string): string =>
   `${ACHATS_BASE}/commandes/${encodeURIComponent(id)}`;
 export const lienFournisseur = (id: string): string =>
   `${ACHATS_BASE}/fournisseurs/${encodeURIComponent(id)}`;
+// ADR-0044 — P8
+export const lienReception = (id: string): string =>
+  `${ACHATS_BASE}/receptions/${encodeURIComponent(id)}`;
+export const lienFacture = (id: string): string =>
+  `${ACHATS_BASE}/factures/${encodeURIComponent(id)}`;
+export const LIEN_A_PAYER = `${ACHATS_BASE}/a-payer`;
 
 // ── Erreurs ─────────────────────────────────────────────────────────────────
 
@@ -52,6 +58,68 @@ const MESSAGES: Record<string, string> = {
   DOCUMENT_NOT_SENDABLE: 'Seule une commande approuvée ou envoyée peut partir au fournisseur.',
   PURCHASE_WORK_PROJECT_UNKNOWN: 'Le projet indiqué est introuvable.',
   DOCUMENT_EMAIL_RATE_LIMITED: 'Trop d’envois en peu de temps : réessayez plus tard.',
+  // ADR-0044 — P8 : réceptions, factures, paiements (codes des lots P4 et P5).
+  PURCHASE_ORDER_NOT_FOUND: 'Commande introuvable.',
+  PURCHASE_ORDER_LINE_NOT_FOUND: 'Une ligne ne fait pas partie de cette commande.',
+  PURCHASE_ORDER_NOT_RECEIVABLE:
+    'Cette commande ne peut pas recevoir de livraison : elle doit être approuvée ou envoyée, et non annulée ni clôturée.',
+  PURCHASE_ORDER_NOT_INVOICEABLE:
+    'Cette commande ne peut pas être facturée : elle doit être approuvée, et non annulée.',
+  PURCHASE_RECEPTION_NOT_FOUND: 'Réception introuvable.',
+  PURCHASE_RECEPTION_CANCELLED: 'Cette réception est annulée.',
+  PURCHASE_DATE_IN_FUTURE: 'Cette date ne peut pas être dans le futur.',
+  PURCHASE_ATTACHMENT_TYPE:
+    'Pièce refusée : seuls les PDF et les photos PNG, JPEG ou WebP passent.',
+  PURCHASE_ATTACHMENT_NOT_FOUND: 'Aucune pièce jointe.',
+  PURCHASE_STORAGE_FULL: 'L’espace des pièces jointes de l’organisation est plein.',
+  SUPPLIER_INVOICE_NOT_FOUND: 'Facture fournisseur introuvable.',
+  SUPPLIER_INVOICE_NOT_DRAFT: 'Cette facture est déjà validée.',
+  SUPPLIER_INVOICE_CANCELLED: 'Cette facture est annulée.',
+  SUPPLIER_INVOICE_DUPLICATE:
+    'Ce fournisseur a déjà une facture avec cette référence : c’est probablement la même facture saisie deux fois.',
+  SUPPLIER_INVOICE_CURRENCY_MISMATCH: 'La devise de la facture doit être celle de la commande.',
+  SUPPLIER_INVOICE_TOTAL_MISMATCH:
+    'Le total saisi n’est pas égal au sous-total plus les taxes. Vérifiez les montants recopiés de la facture.',
+  SUPPLIER_INVOICE_ALLOCATION_MISMATCH:
+    'La somme des imputations doit être égale au total de la facture.',
+  SUPPLIER_INVOICE_VARIANCE:
+    'Cette facture s’écarte de la commande ou de la réception : corrigez-la, mettez-la en litige, ou faites-la forcer par un approbateur.',
+  SUPPLIER_INVOICE_NOT_IN_VARIANCE:
+    'Cette facture ne présente aucun écart bloquant : validez-la normalement.',
+  SUPPLIER_INVOICE_DISPUTED: 'Cette facture est en litige : réglez le litige avant de la payer.',
+  SUPPLIER_INVOICE_NOT_DISPUTED: 'Cette facture n’est pas en litige.',
+  SUPPLIER_INVOICE_PAID: 'Un paiement est imputé à cette facture : annulez d’abord le paiement.',
+  SUPPLIER_INVOICE_ORDER_SUPPLIER_MISMATCH: 'La commande liée appartient à un autre fournisseur.',
+  SUPPLIER_INVOICE_ORDER_REQUIRED:
+    'Votre organisation exige une commande pour chaque facture fournisseur.',
+  SUPPLIER_INVOICE_LINES_REQUIRED:
+    'Une facture liée à une commande porte ses lignes (pour le rapprochement).',
+  SUPPLIER_INVOICE_SUBTOTAL_REQUIRED: 'Sans ligne, saisissez le sous-total HT de la facture.',
+  SUPPLIER_INVOICE_CATEGORY_REQUIRED:
+    'Indiquez la catégorie de dépense de la facture (imputation) : ni la fiche du fournisseur ni la commande n’en portent.',
+  SUPPLIER_INVOICE_DUE_BEFORE_INVOICE: 'L’échéance ne peut pas précéder la date de la facture.',
+  SUPPLIER_INVOICE_DEDUCTIBLE_VAT_ABOVE_TAXES:
+    'La TVA déductible déclarée ne peut pas dépasser les taxes de la facture.',
+  SUPPLIER_CREDIT_NOTE_TARGET_REQUIRED: 'Un avoir vise une facture du même fournisseur.',
+  SUPPLIER_CREDIT_NOTE_TARGET_MISMATCH:
+    'Un avoir s’impute à une facture non annulée du même fournisseur et de la même devise.',
+  SUPPLIER_PAYMENT_ALLOCATION_MISMATCH:
+    'Le montant payé doit être égal à la somme des montants répartis sur les factures.',
+  SUPPLIER_PAYMENT_EXCEEDS_REMAINING: 'Un montant réparti dépasse le reste à payer de sa facture.',
+  SUPPLIER_PAYMENT_NOT_FOUND: 'Paiement introuvable.',
+  SUPPLIER_PAYMENT_CANCELLED: 'Ce paiement est déjà annulé.',
+  SUPPLIER_PAYMENT_SUPPLIER_MISMATCH: 'Toutes les factures d’un paiement sont du même fournisseur.',
+  SUPPLIER_PAYMENT_CURRENCY_MISMATCH:
+    'Toutes les factures d’un paiement, et le compte qui paie, sont dans la même devise.',
+  SUPPLIER_INVOICE_NOT_PAYABLE: 'Seule une facture validée, non annulée, se paie.',
+  EXPENSE_NOT_FOUND: 'Dépense introuvable.',
+  EXPENSE_CANCELLED: 'Cette dépense est annulée : elle ne peut pas devenir un paiement.',
+  EXPENSE_SUPPLIER_MISMATCH:
+    'Cette dépense est rattachée à un autre fournisseur que celui des factures.',
+  EXPENSE_OWNED_BY_PURCHASES:
+    'Cette dépense est le paiement d’une facture fournisseur : elle se modifie ou s’annule depuis les achats.',
+  WORK_PROJECT_ARCHIVED: 'Ce projet est archivé : restaurez-le avant d’y imputer une facture.',
+  CATEGORY_UNKNOWN: 'Catégorie de dépense inconnue.',
 };
 
 interface ErreurApi {

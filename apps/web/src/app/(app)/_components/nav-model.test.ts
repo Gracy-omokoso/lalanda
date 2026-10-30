@@ -382,6 +382,9 @@ describe('ADR-0044 § 8 — application Achats', () => {
       'Vue d’ensemble',
       'Demandes et commandes',
       'À approuver',
+      'Réceptions',
+      'Factures fournisseurs',
+      'À payer',
       'Fournisseurs',
     ]);
     const prevues: readonly string[] = ACHATS_SOUS_OPTIONS_PREVUES;
@@ -392,14 +395,18 @@ describe('ADR-0044 § 8 — application Achats', () => {
     expect(demandeur.sousOptions.map((s) => s.id)).toEqual([
       'achats-vue',
       'achats-commandes',
+      'achats-receptions',
+      'achats-factures',
+      'achats-a-payer',
       'achats-fournisseurs',
     ]);
   });
 
-  it('les écrans non livrés restent masqués', () => {
+  it('les écrans non livrés restent masqués ; réceptions, factures et à payer sont livrés (P8)', () => {
     const hrefs = NAV_APPS.find((a) => a.id === 'achats')!.sousOptions.map((s) => s.href);
-    for (const absent of ['/achats/receptions', '/achats/factures', '/achats/a-payer']) {
-      expect(hrefs).not.toContain(absent);
+    expect(hrefs).not.toContain('/achats/reglages');
+    for (const livre of ['/achats/receptions', '/achats/factures', '/achats/a-payer']) {
+      expect(hrefs).toContain(livre);
     }
   });
 
@@ -410,6 +417,9 @@ describe('ADR-0044 § 8 — application Achats', () => {
     expect(sousOptionActive('/achats/commandes/abc')).toBe('achats-commandes');
     expect(sousOptionActive('/achats/validations')).toBe('achats-validations');
     expect(sousOptionActive('/achats/fournisseurs/abc')).toBe('achats-fournisseurs');
+    expect(sousOptionActive('/achats/receptions/abc')).toBe('achats-receptions');
+    expect(sousOptionActive('/achats/factures/abc')).toBe('achats-factures');
+    expect(sousOptionActive('/achats/a-payer')).toBe('achats-a-payer');
     expect(appActive('/achats-groupes')).toBeNull();
   });
 });
