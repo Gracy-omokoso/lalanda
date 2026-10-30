@@ -195,8 +195,8 @@ export const NAV_APPS: readonly NavApp[] = [
   // Sous-options prévues : Pipeline, Comptes, Contacts, Activités, Rapports,
   // Réglages. Ne figurent ici que celles dont l'écran EXISTE (règle d'ADR-0016
   // rappelée plus haut : la barre ne promet rien). Comptes et Activités sont
-  // livrés par C5 ; Rapports (`/crm/rapports`, lot C6) s'insérera à son rang
-  // quand son écran sera livré. Voir `CRM_SOUS_OPTIONS_PREVUES`.
+  // livrés par C5, Rapports (`/crm/rapports`) par C6. Voir
+  // `CRM_SOUS_OPTIONS_PREVUES`.
   {
     id: 'crm',
     href: '/crm',
@@ -210,6 +210,7 @@ export const NAV_APPS: readonly NavApp[] = [
       { id: 'crm-comptes', href: '/crm/comptes', label: 'Comptes', action: 'crm.read' },
       { id: 'crm-contacts', href: '/crm/contacts', label: 'Contacts', action: 'crm.read' },
       { id: 'crm-activites', href: '/crm/activites', label: 'Activités', action: 'crm.read' },
+      { id: 'crm-rapports', href: '/crm/rapports', label: 'Rapports', action: 'crm.read' },
       { id: 'crm-reglages', href: '/crm/reglages', label: 'Réglages', action: 'crm.read' },
     ],
   },
