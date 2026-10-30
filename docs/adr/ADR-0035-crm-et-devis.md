@@ -127,7 +127,8 @@ draft ──« Marquer envoyé »──▶ sent ──« Accepté »──▶ ac
 
 - Le contenu n'est modifiable qu'en `draft`. « Marquer envoyé » exige un calcul sans problème
   (taux DGI disponibles) et une validité non échue ; Lalanda n'envoie pas d'e-mail (le PDF
-  est remis par l'utilisateur).
+  est remis par l'utilisateur). **Amendé par [ADR-0042](ADR-0042-envoi-des-documents-par-email.md)** :
+  un devis envoyé ou accepté peut être envoyé au client par e-mail, PDF joint, d'un geste explicite.
 - « Accepté » exige `sent` non expiré. **Règle de gain** : si le devis est rattaché à une
   opportunité ouverte et que le réglage `autoWinOnQuoteAccepted` de l'organisation est actif
   (défaut : oui), l'opportunité passe à l'étape « gagnée » (historique : `source: 'quote'`).

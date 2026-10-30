@@ -731,6 +731,9 @@ manipule que des identifiants.
 - **Envoi d'e-mails depuis Lalanda** (relance, devis, séquence) : la signature DKIM du domaine
   d'envoi n'est pas réglée, les e-mails partent en spam ; tant que ce n'est pas corrigé, Lalanda
   n'envoie rien au nom d'un commercial. Le devis reste un PDF que l'utilisateur remet.
+  **Amendé par [ADR-0042](ADR-0042-envoi-des-documents-par-email.md) (30 oct. 2026)** : l'envoi
+  d'un document de vente (devis, facture, avoir, pro forma) à son client, PDF joint, d'un geste
+  explicite, est ouvert ; relances et séquences restent hors périmètre.
 - **Signature électronique** des devis : non ; l'acceptation reste un geste déclaré (ADR-0035).
 - **Formulaire public de capture de prospects** (page web qui crée un prospect) : non. Proposé
   comme **lot futur C-F** : route publique hors session, anti-abus (débit, piège à robots sans
