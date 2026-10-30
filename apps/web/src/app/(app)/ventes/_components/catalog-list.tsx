@@ -11,7 +11,7 @@
 // à la française (`1 234,50 CDF TTC`, `40,00 USD HT`) ; aucun n'est converti ni
 // recalculé (ADR-0023 E4).
 
-import { buttonClasses } from '@lalanda/ui';
+import { Modal, buttonClasses } from '@lalanda/ui';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -134,7 +134,7 @@ export function CatalogList(): React.ReactElement {
     }
   }
 
-  if (fiche) {
+  if (fiche?.mode === 'edition') {
     return (
       <CatalogItemForm
         key={fiche.mode === 'edition' ? fiche.id : FICHE_NOUVELLE}
@@ -157,6 +157,26 @@ export function CatalogList(): React.ReactElement {
 
   return (
     <section aria-labelledby="catalogue-titre" className="flex flex-col gap-4">
+      <Modal
+        open={fiche?.mode === 'creation'}
+        onClose={() => fermer()}
+        title="Nouvel article"
+        size="lg"
+      >
+        {fiche ? (
+          <CatalogItemForm
+            key={FICHE_NOUVELLE}
+            fiche={fiche}
+            gerer={gerer}
+            base={pathname}
+            groupes={groupes}
+            erreurGroupes={erreurGroupes}
+            onRechargerGroupes={() => setVersionGroupes((v) => v + 1)}
+            onFermer={fermer}
+            enModal
+          />
+        ) : null}
+      </Modal>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex flex-col gap-1">
           <h2 id="catalogue-titre" className="font-display text-lg font-bold tracking-tight">

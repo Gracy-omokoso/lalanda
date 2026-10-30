@@ -78,6 +78,7 @@ export function CatalogItemForm({
   erreurGroupes,
   onRechargerGroupes,
   onFermer,
+  enModal = false,
 }: {
   fiche: Exclude<FicheOuverte, null>;
   gerer: boolean;
@@ -87,6 +88,8 @@ export function CatalogItemForm({
   erreurGroupes: string | null;
   onRechargerGroupes: () => void;
   onFermer: (enregistre?: CatalogItemView) => void;
+  /** Création dans la fenêtre modale : son en-tête porte le titre et la fermeture. */
+  enModal?: boolean;
 }): React.ReactElement {
   const id = fiche.mode === 'edition' ? fiche.id : null;
   const [vue, setVue] = useState<CatalogItemView | null>(null);
@@ -210,18 +213,26 @@ export function CatalogItemForm({
   const titre = fiche.mode === 'creation' ? 'Nouvel article' : vue ? vue.name : 'Article';
 
   return (
-    <section aria-labelledby="fiche-article-titre" className="flex flex-col gap-5">
-      <div className="flex flex-col gap-2">
-        <button
-          type="button"
-          onClick={() => onFermer()}
-          className="self-start text-sm text-[var(--foreground-muted)] underline-offset-4 hover:underline"
-        >
-          ← Retour au catalogue
-        </button>
-        <h2 id="fiche-article-titre" className="font-display text-lg font-bold tracking-tight">
-          {titre}
-        </h2>
+    <section
+      aria-labelledby={enModal ? undefined : 'fiche-article-titre'}
+      aria-label={enModal ? titre : undefined}
+      className="flex flex-col gap-5"
+    >
+      <div className={enModal ? 'flex flex-col gap-2 empty:hidden' : 'flex flex-col gap-2'}>
+        {enModal ? null : (
+          <>
+            <button
+              type="button"
+              onClick={() => onFermer()}
+              className="self-start text-sm text-[var(--foreground-muted)] underline-offset-4 hover:underline"
+            >
+              ← Retour au catalogue
+            </button>
+            <h2 id="fiche-article-titre" className="font-display text-lg font-bold tracking-tight">
+              {titre}
+            </h2>
+          </>
+        )}
         {vue ? (
           <div className="flex flex-wrap items-center gap-2 text-xs">
             {!vue.active ? (
