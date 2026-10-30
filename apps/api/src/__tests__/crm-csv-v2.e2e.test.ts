@@ -17,7 +17,7 @@ import type { Db } from 'mongodb';
 import { ObjectId } from 'mongodb';
 import { randomBytes } from 'node:crypto';
 import request from 'supertest';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 
 import { dbOf, e2eSuite, makeE2EApp, registerAndLogin } from './e2e-utils.js';
 
@@ -49,7 +49,6 @@ e2eSuite('CSV v2 du CRM (ADR-0040 C9)', () => {
   const server = () => app.getHttpServer();
   const asN = (role: Role = 'owner') => [...cookies[role], `active_org_id=${orgN}`];
   const asB = () => [...cookies['ownerB'], `active_org_id=${orgB}`];
-  const get = (c: string[], path: string) => request(server()).get(path).set('Cookie', c);
   const post = (c: string[], path: string, body?: unknown) =>
     request(server())
       .post(path)
@@ -253,7 +252,7 @@ e2eSuite('CSV v2 du CRM (ADR-0040 C9)', () => {
       .buffer(true);
     expect(exp.status).toBe(200);
     const csv = exp.text;
-    expect(csv.startsWith(`﻿${OPP_V2}\r\n`)).toBe(true);
+    expect(csv.startsWith(`\uFEFF${OPP_V2}\r\n`)).toBe(true);
     expect(csv).toContain(
       `Perdue v2;lost;;CDF;;Prospect Unique;;;Prospect Unique;${emails['owner']};price;Trop cher`,
     );
@@ -269,7 +268,7 @@ e2eSuite('CSV v2 du CRM (ADR-0040 C9)', () => {
       .buffer(true);
     expect(
       contacts.text.startsWith(
-        '﻿nom;fonction;email;telephone;entreprise;nif_client;notes;compte\r\n',
+        '\uFEFFnom;fonction;email;telephone;entreprise;nif_client;notes;compte\r\n',
       ),
     ).toBe(true);
     expect(contacts.text).toContain('Awa;;awa@exemple.cd;;Prospect Unique;;;Prospect Unique');
