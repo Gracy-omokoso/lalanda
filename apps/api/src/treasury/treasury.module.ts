@@ -27,8 +27,12 @@ import { TreasuryExpensesService } from './treasury-expenses.service.js';
 import { TreasuryMovementsService } from './treasury-movements.service.js';
 import { TreasuryPlanningService } from './treasury-planning.service.js';
 import { TreasuryRecurringService } from './treasury-recurring.service.js';
+// ADR-0044 — P5 : échéances fournisseurs (lecture seule par la connexion, sans
+// importer le module des achats, qui importe celui-ci).
+import { PurchasesPayablesSource } from '../purchases/treasury/purchases-payables.source.js';
 import {
   SalesReceiptsSource,
+  TREASURY_PAYABLES_SOURCE,
   TREASURY_RECEIPTS_SOURCE,
   TreasuryReceivablesReader,
 } from './treasury-sources.js';
@@ -76,8 +80,12 @@ import {
     TreasuryReceivablesReader,
     TreasuryBridgeLocks,
     { provide: TREASURY_RECEIPTS_SOURCE, useClass: SalesReceiptsSource },
+    // ADR-0044 — P5 (§ 6.3)
+    { provide: TREASURY_PAYABLES_SOURCE, useClass: PurchasesPayablesSource },
   ],
   // ADR-0033 (amendement du 27 oct. 2026) : le brief lit les soldes des comptes.
-  exports: [TreasuryBridgeLocks, TreasuryAccountsService],
+  // ADR-0044 — P5 (§ 6.2) : les paiements fournisseurs écrivent leurs dépenses par
+  // `TreasuryExpensesService`, seul écrivain de `treasury_expenses`.
+  exports: [TreasuryBridgeLocks, TreasuryAccountsService, TreasuryExpensesService],
 })
 export class TreasuryModule {}

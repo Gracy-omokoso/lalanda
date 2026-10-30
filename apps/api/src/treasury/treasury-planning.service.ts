@@ -11,6 +11,7 @@ import { ConflictException, Inject, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import {
   DEFAULT_SCENARIO_HYPOTHESES,
+  EXPENSE_ACTUALS_VERSION,
   EXPENSE_CATEGORIES,
   expenseCategoryNature,
   forecastTreasury,
@@ -51,13 +52,19 @@ import { ProjectsService } from '../projects/projects.service.js';
 import { staleRevision } from '../sales/sales.errors.js';
 import { TreasuryAccountsService } from './treasury-accounts.service.js';
 import { TreasuryRecurringService } from './treasury-recurring.service.js';
-import { TreasuryReceivablesReader } from './treasury-sources.js';
+import {
+  TREASURY_PAYABLES_SOURCE,
+  TreasuryReceivablesReader,
+  type TreasuryPayablesSource,
+} from './treasury-sources.js';
 import { conflict, rejected, todayKinshasa, type TreasuryActor } from './treasury.common.js';
 import type { PutBridgeInput, PutSettingsInput } from './treasury.dto.js';
 import {
   TreasuryExpense,
+  TreasuryRecurringExpense,
   TreasurySettings,
   type EffectiveTreasuryBridge,
+  type TreasuryRecurringExpenseDocument,
   type TreasuryBridgeConfig,
   type TreasuryExpenseDocument,
   type TreasurySettingsDocument,
@@ -142,7 +149,7 @@ const CATEGORY_LABELS = new Map<string, string>(EXPENSE_CATEGORIES.map((c) => [c
 
 function fingerprintOf(lineId: string, amount: string, documents: string[]): string {
   return createHash('sha256')
-    .update(JSON.stringify({ lineId, amount, documents, version: TREASURY_VERSION }))
+    .update(JSON.stringify({ lineId, amount, documents, version: EXPENSE_ACTUALS_VERSION }))
     .digest('hex');
 }
 
@@ -158,6 +165,8 @@ export class TreasuryPlanningService {
   constructor(
     @InjectModel(TreasurySettings.name) private readonly settings: Model<TreasurySettingsDocument>,
     @InjectModel(TreasuryExpense.name) private readonly expenses: Model<TreasuryExpenseDocument>,
+    @InjectModel(TreasuryRecurringExpense.name)
+    private readonly recurringRules: Model<TreasuryRecurringExpenseDocument>,
     @InjectModel(ActualPeriod.name) private readonly periods: Model<ActualPeriodDocument>,
     @Inject(ProjectsService) private readonly projects: ProjectsService,
     @Inject(PlansService) private readonly plans: PlansService,
@@ -166,6 +175,8 @@ export class TreasuryPlanningService {
     @Inject(TreasuryReceivablesReader) private readonly sources: TreasuryReceivablesReader,
     @Inject(AuditService) private readonly audit: AuditService,
     @Inject(RunLinkService) private readonly runLink: RunLinkService,
+    // ADR-0044 — P5 (§ 6.3) : échéances fournisseurs.
+    @Inject(TREASURY_PAYABLES_SOURCE) private readonly payables: TreasuryPayablesSource,
   ) {}
 
   /**
@@ -460,7 +471,7 @@ export class TreasuryPlanningService {
         source: 'run.expenses',
         at: now,
         by: actor.userId,
-        version: TREASURY_VERSION,
+        version: EXPENSE_ACTUALS_VERSION,
         calendarMonth: cell.calendarMonth,
         documents: cell.documents.length,
         fingerprint,
@@ -696,15 +707,33 @@ export class TreasuryPlanningService {
 
   async forecast(organizationId: string, currency: TreasuryCurrency): Promise<TreasuryForecast> {
     const asOf = todayKinshasa();
-    const [ledger, receivables, rules, confirmed, settings] = await Promise.all([
-      this.accounts.ledger(organizationId),
-      this.sources.openReceivables(organizationId),
-      this.recurring.engineRules(organizationId),
-      this.recurring.confirmedOccurrences(organizationId),
-      this.settingsOf(organizationId),
-    ]);
+    const [ledger, receivables, rules, confirmed, settings, payables, ordersNotInvoiced] =
+      await Promise.all([
+        this.accounts.ledger(organizationId),
+        this.sources.openReceivables(organizationId),
+        this.recurring.engineRules(organizationId),
+        this.recurring.confirmedOccurrences(organizationId),
+        this.settingsOf(organizationId),
+        this.payables.openPayables(organizationId),
+        this.payables.ordersNotInvoiced(organizationId),
+      ]);
+    // ADR-0044 — P5 : fiche fournisseur des règles, pour le seul constat de double
+    // comptage possible avec les factures (`RECURRING_AND_PAYABLES_SAME_SUPPLIER`).
+    const ruleSuppliers = await this.recurringSuppliers(organizationId);
+    const rulesWithSupplier = rules.map((r) => ({
+      ...r,
+      supplierId: ruleSuppliers.get(r.id) ?? null,
+    }));
 
     const external: ForecastFinding[] = [];
+    if (!this.payables.integrated) {
+      external.push({
+        code: 'PAYABLES_NOT_INTEGRATED',
+        count: 1,
+        detail:
+          'Les factures fournisseurs ne sont pas reliées : aucune échéance fournisseur n’est prévue.',
+      });
+    }
     if (!this.sources.receiptsIntegrated()) {
       external.push({
         code: 'RECEIPTS_NOT_INTEGRATED',
@@ -757,13 +786,24 @@ export class TreasuryPlanningService {
       accounts: ledger.accounts,
       movements: ledger.movements,
       receivables,
-      recurring: rules,
+      recurring: rulesWithSupplier,
       confirmedOccurrences: confirmed,
       plan,
       scenarios: settings?.scenarios ?? { ...DEFAULT_SCENARIO_HYPOTHESES },
       minimumBalance: settings?.minimumBalances?.[currency] ?? null,
       externalFindings: external,
+      payables,
+      ordersNotInvoiced,
     });
+  }
+
+  /** ADR-0044 — P5 : fiche fournisseur de chaque règle récurrente qui en porte une. */
+  private async recurringSuppliers(organizationId: string): Promise<Map<string, string>> {
+    const docs = await this.recurringRules
+      .find({ organizationId, supplierId: { $type: 'string' } }, { supplierId: 1 })
+      .lean<{ _id: Types.ObjectId; supplierId: string }[]>()
+      .exec();
+    return new Map(docs.map((d) => [String(d._id), d.supplierId]));
   }
 
   /** Lignes du plan pour la prévision, ou `null` avec la raison dans les constats. */
