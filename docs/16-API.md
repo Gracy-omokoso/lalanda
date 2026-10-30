@@ -548,6 +548,23 @@ d'un projet gagne `committed` et `ordered` (informatifs) ; « Mes tâches » gag
 `purchases.invoice_due_soon`, `purchases.invoice_overdue`,
 `purchases.supplier_payment_details_changed`.
 
+### Lot P6 — liens : brief, marge, rappels, fiche 360° — implémenté (ADR-0044 § 3.1.1, § 6.1, § 6.4, § 6.5)
+
+| Méthode et chemin | Permission | Effet |
+|---|---|---|
+| `GET /purchases/suppliers/:id/overview` | `purchase.read` | fiche 360° : `supplier` (coordonnées masquées) et sections `{ status: known \| hidden \| empty, data }` — `orders` (`totalsByCurrency` des commandes engagées, `byStatus`, `recent`), `receptions` (`toReceive` par commande, reste par ligne, moteur `orderReceptionStatus`), `invoices` (`recent`, reste à payer du moteur), `balance` (ancienneté par devise, `payablesAging`, litiges à part) ; `payments` et `directExpenses` (doublons probables signalés) exigent aussi `treasury.read`, sinon `hidden` et rien n'est lu. Autre organisation : `404` |
+| `GET /purchases/summary?from=&to=` | `purchase.read` | moteur `purchasesSummary`, par devise, fournisseur (`supplierName`) et catégorie : `committed` (reste à facturer HT des commandes approuvées non closes, **à date**, hors période), `invoiced`, `credited`, `paid`, `remaining` (factures validées dont la date de facture est dans la période) ; `400 INVALID_REQUEST` pour une période inversée |
+| `GET /work/projects/:id/margin` (étendu) | inchangée | `WORK_MARGIN_VERSION` 1.1.0 ; `purchases: [{ currency, committed, ordered, invoiceCount, orderCount }]` — INFORMATIF, jamais soustrait de `margin` ; `null` sans `purchase.read` (port `WORK_PURCHASES_SOURCE`, rien n'est lu) |
+| `GET /morning-brief` (étendu) | inchangée | `MORNING_BRIEF_VERSION` 1.3.0 ; faits `fournisseurs.factures_en_retard`, `fournisseurs.a_payer_bientot` (montants `.CDF`/`.USD` avec `treasury.read`), `mes_approbations.en_attente` (avec `purchase.approve`) ; R11 `factures_fournisseurs_en_retard` (`attention`, `/achats/a-payer`), R12 `approbations_achat_en_attente` (`info`) ; sans `purchase.read` : faits `hidden`, R11 et R12 non évaluées (port `PURCHASES_SOURCE`) ; l'e-mail quotidien n'affiche aucun fait d'achat masqué |
+
+Tâche planifiée `purchases.due-reminders` (15 min, à partir de 7 h à Kinshasa, 500 factures par
+passage) : `purchases.invoice_due_soon` et `purchases.invoice_overdue` aux détenteurs effectifs de
+`payables.pay`, une fois par facture, type et échéance (réclamation `purchase_due_reminders`, index
+unique ; `dedupeKey`), refiltrées à la lecture par `purchase.read` ; litiges exclus. Une
+modification, une approbation complète, un envoi, une annulation ou une clôture de commande
+recalculent le rapprochement des brouillons de facture liés (`refreshDrafts`). `GET
+/purchases/payables` : livré par P5.
+
 ## Brief du matin — implémenté (ADR-0033)
 
 L'organisation est toujours celle de la session ; aucun corps ni paramètre ne la désigne.
