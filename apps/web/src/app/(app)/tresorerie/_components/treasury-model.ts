@@ -101,6 +101,8 @@ export const FLOW_SOURCE_LABELS: Readonly<Record<ForecastFlowSource, string>> = 
   recurring: 'Dépenses récurrentes',
   plan_in: 'Ventes prévues au plan',
   plan_out: 'Charges prévues au plan',
+  // ADR-0044 § 6.3 — P8.
+  payable: 'Factures fournisseurs à payer',
 };
 
 /** Constats d'incertitude de la prévision (ADR-0034 § 7). */
@@ -114,6 +116,12 @@ export const FORECAST_FINDING_LABELS: Readonly<Record<string, string>> = {
   PLAN_NOT_USED: 'Plan BUILD non utilisé',
   RECEIPTS_NOT_INTEGRATED: 'Encaissements pas encore reliés',
   RECEIPTS_WITHOUT_ACCOUNT: 'Encaissements sans compte : absents des soldes',
+  // ADR-0044 § 6.3 — P8 : échéances fournisseurs.
+  PAYABLES_NOT_INTEGRATED: 'Factures fournisseurs pas encore reliées',
+  PAYABLES_DISPUTED: 'Factures fournisseurs en litige : non prévues',
+  ORDERS_NOT_INVOICED: 'Commandes approuvées non facturées : non prévues',
+  RECURRING_AND_PAYABLES_SAME_SUPPLIER:
+    'Dépense récurrente et factures du même fournisseur : double compte possible',
 };
 
 export const RECONCILIATION_FINDING_LABELS: Readonly<Record<ReconciliationFinding, string>> = {

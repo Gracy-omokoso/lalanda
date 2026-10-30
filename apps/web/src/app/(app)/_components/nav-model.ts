@@ -285,13 +285,13 @@ export const NAV_APPS: readonly NavApp[] = [
   },
   // ADR-0044 § 8 — achats et fournisseurs, JUSTE AVANT Trésorerie (on engage,
   // puis on paie). Lecture `purchase.read`. Ne figurent que les sous-options
-  // dont l'écran EXISTE (lot P7) ; réceptions, factures, à payer et réglages
-  // arrivent avec les lots suivants (`ACHATS_SOUS_OPTIONS_PREVUES`).
+  // dont l'écran EXISTE (lots P7 et P8) ; les réglages arrivent avec un lot
+  // suivant (`ACHATS_SOUS_OPTIONS_PREVUES`).
   {
     id: 'achats',
     href: '/achats',
     label: 'Achats',
-    description: 'Fournisseurs, demandes d’achat approuvées et bons de commande.',
+    description: 'Fournisseurs, commandes approuvées, factures fournisseurs et paiements.',
     module: 'run',
     icon: 'achats',
     action: 'purchase.read',
@@ -308,6 +308,25 @@ export const NAV_APPS: readonly NavApp[] = [
         href: '/achats/validations',
         label: 'À approuver',
         action: 'purchase.approve',
+      },
+      // ADR-0044 — P8 : réceptions, factures fournisseurs, échéancier et paiements.
+      {
+        id: 'achats-receptions',
+        href: '/achats/receptions',
+        label: 'Réceptions',
+        action: 'purchase.read',
+      },
+      {
+        id: 'achats-factures',
+        href: '/achats/factures',
+        label: 'Factures fournisseurs',
+        action: 'purchase.read',
+      },
+      {
+        id: 'achats-a-payer',
+        href: '/achats/a-payer',
+        label: 'À payer',
+        action: 'purchase.read',
       },
       {
         id: 'achats-fournisseurs',
@@ -423,8 +442,8 @@ export const CRM_SOUS_OPTIONS_PREVUES = [
 
 /**
  * Ordre cible des sous-options des Achats (ADR-0044 § 8). Les identifiants
- * absents de `NAV_APPS` sont ceux dont l'écran n'est pas encore livré (lot P8 :
- * réceptions, factures, à payer ; réglages) : masqués plutôt que vides.
+ * absents de `NAV_APPS` sont ceux dont l'écran n'est pas encore livré
+ * (réglages) : masqués plutôt que vides.
  */
 export const ACHATS_SOUS_OPTIONS_PREVUES = [
   'achats-vue',

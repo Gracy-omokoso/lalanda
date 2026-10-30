@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { TreasuryForecast } from '@/lib/treasury-api';
 
 import {
+  FLOW_SOURCE_LABELS,
   FORECAST_FINDING_LABELS,
   RECONCILIATION_FINDING_LABELS,
   SYNC_STATUS_LABELS,
@@ -86,6 +87,10 @@ describe('libellés exhaustifs', () => {
       'PLAN_NOT_USED',
       'RECEIPTS_NOT_INTEGRATED',
       'RECEIPTS_WITHOUT_ACCOUNT',
+      'PAYABLES_NOT_INTEGRATED',
+      'PAYABLES_DISPUTED',
+      'ORDERS_NOT_INVOICED',
+      'RECURRING_AND_PAYABLES_SAME_SUPPLIER',
     ]) {
       expect(FORECAST_FINDING_LABELS[code], code).toBeTruthy();
     }
@@ -170,5 +175,19 @@ describe('graphique de la prévision', () => {
     );
     expect(g.paths.probable).not.toContain('NaN');
     expect(g.thresholdY).not.toBeNull();
+  });
+});
+
+// ADR-0044 § 6.3 — P8 : la source `payable` de la prévision a son libellé.
+describe('sources de la prévision', () => {
+  it('« Factures fournisseurs à payer » pour `payable`', () => {
+    expect(FLOW_SOURCE_LABELS.payable).toBe('Factures fournisseurs à payer');
+    expect(Object.keys(FLOW_SOURCE_LABELS)).toEqual([
+      'receivable',
+      'recurring',
+      'plan_in',
+      'plan_out',
+      'payable',
+    ]);
   });
 });

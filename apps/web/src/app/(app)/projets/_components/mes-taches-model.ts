@@ -27,6 +27,8 @@ import {
 
 import type { OrgAction } from '@/lib/api';
 
+import { formatMontant } from '../../ventes/_components/sales-model';
+
 export type CleGroupe = 'overdue' | 'today' | 'next7Days' | 'later' | 'noDate';
 
 export const GROUPES_MES_TACHES: readonly { cle: CleGroupe; titre: string; vide: string }[] = [
@@ -64,9 +66,12 @@ export function estApprobation(e: MyTaskEntry): e is PurchasesMyTaskItem {
   return e.source === 'purchases';
 }
 
-/** Ligne secondaire d'une approbation : numéro, fournisseur, total rendu par l'API. */
+/**
+ * Ligne secondaire d'une approbation : numéro, fournisseur, total rendu par l'API
+ * (mis en forme « 1 234,50 USD », jamais recalculé).
+ */
 export function sousTitreApprobation(e: PurchasesMyTaskItem): string {
-  return [e.requestNumber, e.supplierName, `${e.total} ${e.currency}`]
+  return [e.requestNumber, e.supplierName, formatMontant(e.total, e.currency)]
     .filter((p): p is string => typeof p === 'string' && p !== '')
     .join(' · ');
 }

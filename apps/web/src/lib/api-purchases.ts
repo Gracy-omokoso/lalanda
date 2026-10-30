@@ -25,6 +25,7 @@ import type {
   SupplierView,
   SupplierWriteResult,
   SupplierInvoiceStatus,
+  PayablesView as SharedPayablesView,
 } from '@lalanda/shared/purchases';
 
 import {
@@ -250,19 +251,11 @@ export interface SupplierInvoicePage {
   nextCursor: string | null;
 }
 
-/** Échéancier d'une devise (§ 3.6) : montants et nombres rendus par le moteur. */
-export interface PayablesCurrencyView {
-  currency: PurchaseCurrency;
-  overdue: { amount: DecimalString; count: number };
-  dueSoon: { amount: DecimalString; count: number };
-  disputed: { amount: DecimalString; count: number };
-}
-
-export interface PayablesView {
-  asOf: string;
-  dueSoonDays: number;
-  byCurrency: PayablesCurrencyView[];
-}
+/**
+ * Échéancier (§ 3.6) : contrat du lot P5 (`GET /purchases/payables`), une devise par
+ * entrée de `schedule`, montants et nombres rendus par le moteur. ADR-0044 — P8.
+ */
+export type PayablesView = SharedPayablesView;
 
 // ─── Client ─────────────────────────────────────────────────────────────────
 
