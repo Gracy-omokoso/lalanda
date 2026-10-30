@@ -260,6 +260,42 @@ describe('AuthzService', () => {
     expect(await service.countApprovers('org')).toBe(2);
     expect(await service.holdersOf('org', 'plan.approve')).toEqual(['o', 'fd']);
   });
+
+  it('ADR-0044 — countApprovers compte aussi les détenteurs effectifs de `purchase.approve`', async () => {
+    process.env['MEMBER_PERMISSIONS_ENABLED'] = 'true';
+    const docs = [
+      { userId: 'o', organizationId: 'org', role: 'owner', canClosePeriods: false },
+      {
+        userId: 'fd',
+        organizationId: 'org',
+        role: 'finance_director',
+        canClosePeriods: false,
+        revokes: ['purchase.approve'],
+      },
+      {
+        userId: 'v',
+        organizationId: 'org',
+        role: 'viewer',
+        canClosePeriods: false,
+        grants: ['purchase.approve'],
+      },
+      { userId: 'c', organizationId: 'org', role: 'accountant', canClosePeriods: true },
+      { userId: 'x', organizationId: 'autre', role: 'owner', canClosePeriods: false },
+    ];
+    const { service } = harnais(docs);
+    // Propriétaire + Lecteur ayant reçu l'autorisation ; le DF l'a perdue, le Comptable
+    // ne l'a jamais (il paie) ; l'autre organisation n'est pas comptée.
+    expect(await service.countApprovers('org', 'purchase.approve')).toBe(2);
+    expect(await service.holdersOf('org', 'purchase.approve')).toEqual(['o', 'v']);
+    // Le compte du plan reste celui de `plan.approve`.
+    expect(await service.countApprovers('org')).toBe(2);
+    expect(await service.countApprovers('org', 'plan.approve')).toBe(2);
+
+    delete process.env['MEMBER_PERMISSIONS_ENABLED'];
+    // Interrupteur éteint : par titre seulement (Propriétaire, Directeur financier).
+    expect(await service.countApprovers('org', 'purchase.approve')).toBe(2);
+    expect(await service.holdersOf('org', 'purchase.approve')).toEqual(['o', 'fd']);
+  });
 });
 
 describe('forbidden — 403 du guard (ADR-0041 § 6)', () => {
@@ -299,6 +335,8 @@ describe('catalogue des autorisations (ADR-0041 § 5, § 6)', () => {
     expect(catalog.sodPairs).toEqual([
       ['inputs.update', 'plan.approve'],
       ['period.close', 'plan.approve'],
+      // ADR-0044 § 4.3.
+      ['purchase.approve', 'payables.pay'],
     ]);
     expect(catalog.nonDelegable).toEqual(['billing.manage']);
     expect(catalog.baseAction).toBe('analytics.read');

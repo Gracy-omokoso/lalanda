@@ -7,12 +7,13 @@
 // ADR-0022 § S25c.1 pour `sales.read` et `sales.manage`, ADR-0023 § S25e.11 pour
 // `sales.invoice`, ADR-0031 § 4 pour `sales.receipt`, ADR-0034 § 8 pour `treasury.read` et
 // `treasury.manage`, ADR-0035 § 3 pour `crm.read` et `crm.manage`, ADR-0039 § 7 pour `work.read`,
-// `work.update` et `work.manage`, ADR-0040 § 4 pour `sales.quote` et le rôle `sales_rep`). C'est délibéré : un test qui
+// `work.update` et `work.manage`, ADR-0040 § 4 pour `sales.quote` et le rôle `sales_rep`,
+// ADR-0044 § 4.1 pour `purchase.*` et `payables.pay`). C'est délibéré : un test qui
 // importerait la matrice de production vérifierait seulement qu'elle est égale à
 // elle-même. Ici, toute modification d'une case de production casse le test, ce
 // qui force une mise à jour CONSCIENTE de l'ADR et de docs/12.
 //
-// 9 rôles × 28 actions + 6 rôles plateforme × 28 actions = 420 cases vérifiées.
+// 9 rôles × 33 actions + 6 rôles plateforme × 33 actions = 495 cases vérifiées.
 
 import { describe, expect, it } from 'vitest';
 
@@ -28,6 +29,8 @@ import {
   PLATFORM_FORBIDDEN_ACTIONS,
   PLATFORM_PERMISSION_MATRIX,
   PLATFORM_ROLES,
+  APPROVAL_ACTIONS,
+  APPROVER_ROLES,
   can,
   canGrantRole,
   canPlatform,
@@ -36,7 +39,9 @@ import {
   isAssignableRole,
   isOwnerRole,
   normalizeOrgRole,
+  purchaseApprovalDecision,
   sodDecision,
+  type PurchaseApprovalInput,
   type Action,
   type OrgPermissionContext,
   type OrgRole,
@@ -108,6 +113,15 @@ const ATTENDU_ORG: Record<Action, string> = {
   // ADR-0040 § 4.1 : préparer les devis. Iso-privilège avec `sales.manage`, plus
   // le Commercial (COM) ; convertir un devis exige en plus `sales.manage`.
   'sales.quote': 'A   A   A   A   .   .   .   .   A',
+  // ADR-0044 § 4.1 : achats et fournisseurs. `purchase.read` suit `treasury.read`
+  // (sans le Commercial) ; demander est ouvert à tout rôle interne qui travaille ;
+  // préparer suit `sales.manage` ; approuver est une autorité de dépense (ⓢ) ;
+  // payer suit `treasury.manage`.
+  'purchase.read': 'A   A   A   A   A   .   .   A   .',
+  'purchase.request': 'A   A   A   A   A   .   .   .   .',
+  'purchase.manage': 'A   A   A   A   .   .   .   .   .',
+  'purchase.approve': 'S   .   S   .   .   .   .   .   .',
+  'payables.pay': 'A   .   A   A   .   .   .   .   .',
 };
 
 const CODE_VERS_GRANT: Record<string, string> = {
@@ -173,6 +187,13 @@ const ATTENDU_PLATEFORME: Record<Action, string> = {
   'work.manage': 'D   .   .   .   .   .',
   // ADR-0040 § 4.1 : comme `sales.manage`, sous accès délégué ; pas un interdit absolu.
   'sales.quote': 'D   .   .   .   .   .',
+  // ADR-0044 § 4.1 : lecture déléguée (SA, support), demande et gestion déléguées (SA
+  // seul) ; approuver et payer refusés à tous, sans être des interdits absolus.
+  'purchase.read': 'D   .   D   .   .   .',
+  'purchase.request': 'D   .   .   .   .   .',
+  'purchase.manage': 'D   .   .   .   .   .',
+  'purchase.approve': '.   .   .   .   .   .',
+  'payables.pay': '.   .   .   .   .   .',
 };
 
 const CODE_VERS_GRANT_PLATEFORME: Record<string, string> = {
@@ -186,9 +207,9 @@ function cellules(ligne: string): string[] {
 }
 
 describe('matrice rôle organisation × action (ADR-0012 §3)', () => {
-  it('déclare exactement les 9 rôles et les 28 actions de docs/12', () => {
+  it('déclare exactement les 9 rôles et les 33 actions de docs/12', () => {
     expect([...ORG_ROLES]).toEqual([...ORDRE_ORG]);
-    expect(ACTIONS).toHaveLength(28);
+    expect(ACTIONS).toHaveLength(33);
     // Ajoutée en fin de liste, comme dans docs/12 (ADR-0021 §8).
     expect(ACTIONS[15]).toBe('fiscal.manage');
     // Dix-septième et dix-huitième, en fin de liste (ADR-0022 § S25c.1).
@@ -211,10 +232,18 @@ describe('matrice rôle organisation × action (ADR-0012 §3)', () => {
     expect(ACTIONS[26]).toBe('work.manage');
     // Vingt-huitième, en fin de liste (ADR-0040 § 4.1).
     expect(ACTIONS[27]).toBe('sales.quote');
+    // Vingt-neuvième à trente-troisième, en fin de liste (ADR-0044 § 4.1).
+    expect(ACTIONS.slice(28)).toEqual([
+      'purchase.read',
+      'purchase.request',
+      'purchase.manage',
+      'purchase.approve',
+      'payables.pay',
+    ]);
     expect(Object.keys(ATTENDU_ORG).sort()).toEqual([...ACTIONS].sort());
   });
 
-  // 9 × 28 = 252 cases.
+  // 9 × 33 = 297 cases.
   for (const action of ACTIONS) {
     const attendus = cellules(ATTENDU_ORG[action]);
     it(`« ${action} » : les 9 cases correspondent à l'ADR`, () => {
@@ -231,12 +260,12 @@ describe('matrice rôle organisation × action (ADR-0012 §3)', () => {
   }
 });
 
-// ADR-0041 — A1 : écart vide ⇒ effectif = ligne du rôle, sur les 252 cases organisation.
+// ADR-0041 — A1 : écart vide ⇒ effectif = ligne du rôle, sur les 297 cases organisation.
 // Ce qui fonde « comportement strictement identique » tant qu'aucun écart n'est stocké.
 describe('ADR-0041 — écart vide : les droits effectifs sont la ligne du rôle', () => {
   const VIDES: readonly OrgPermissionContext[] = [NO_OVERRIDES, {}, { grants: [], revokes: [] }];
   for (const role of ORDRE_ORG) {
-    it(`« ${role} » : 28 cases identiques à la matrice, avec et sans droit de clôture`, () => {
+    it(`« ${role} » : 33 cases identiques à la matrice, avec et sans droit de clôture`, () => {
       for (const canClosePeriods of [false, true]) {
         const attendu = ACTIONS.filter((a) => {
           const g = ORG_PERMISSION_MATRIX[role][a];
@@ -260,7 +289,7 @@ describe('matrice rôle plateforme × action (ADR-0012 §4)', () => {
     for (const role of PLATFORM_ROLES) expect(role.startsWith('platform_')).toBe(true);
   });
 
-  // 6 × 28 = 168 cases.
+  // 6 × 33 = 198 cases.
   for (const action of ACTIONS) {
     const attendus = cellules(ATTENDU_PLATEFORME[action]);
     it(`« ${action} » : les 6 cases plateforme correspondent à l'ADR`, () => {
@@ -507,8 +536,9 @@ describe('R7 — attribution de rôles sans élévation de privilège', () => {
     expect(grantableRoles('viewer').sort()).toEqual(['advisor', 'viewer']);
     for (const cible of grantableRoles('viewer')) {
       for (const action of ACTIONS) {
-        // Les six actions de lecture du Lecteur ; tout le reste est une écriture.
+        // Les sept actions de lecture du Lecteur ; tout le reste est une écriture.
         if (
+          action === 'purchase.read' ||
           action === 'project.read' ||
           action === 'analytics.read' ||
           action === 'sales.read' ||
@@ -603,7 +633,7 @@ describe('compatibilité N-1 des anciens rôles', () => {
 });
 
 describe('cohérence structurelle de la matrice', () => {
-  it('chaque rôle déclare une décision pour CHACUNE des 28 actions', () => {
+  it('chaque rôle déclare une décision pour CHACUNE des 33 actions', () => {
     for (const role of ORG_ROLES) {
       for (const action of ACTIONS) {
         expect(ORG_PERMISSION_MATRIX[role][action], `${role} × ${action}`).toBeDefined();
@@ -627,7 +657,7 @@ describe('cohérence structurelle de la matrice', () => {
     for (const action of ecritures) expect(can('viewer', action, NO_OVERRIDES)).toBe(false);
   });
 
-  it('`owner` détient les 28 actions', () => {
+  it('`owner` détient les 33 actions', () => {
     for (const action of ACTIONS) expect(can('owner', action, NO_OVERRIDES)).toBe(true);
   });
 
@@ -809,7 +839,7 @@ describe('ADR-0040 § 4 — rôle Commercial et action `sales.quote`', () => {
     }
   });
 
-  it('le Commercial détient sept actions sur vingt-huit, et seulement celles-là', () => {
+  it('le Commercial détient sept actions sur trente-trois, et seulement celles-là', () => {
     expect(ACTIONS.filter((a) => can('sales_rep', a, { canClosePeriods: true }))).toEqual([
       'analytics.read',
       'sales.read',
@@ -860,6 +890,216 @@ describe('ADR-0040 § 4 — rôle Commercial et action `sales.quote`', () => {
   it('`member` historique n’est pas un alias du Commercial', () => {
     expect(normalizeOrgRole('member')).toBe('finance_director');
     expect(normalizeOrgRole('sales_rep')).toBe('sales_rep');
+  });
+});
+
+describe('ADR-0044 § 4 — achats et fournisseurs (lot P0)', () => {
+  const ACHATS = [
+    'purchase.read',
+    'purchase.request',
+    'purchase.manage',
+    'purchase.approve',
+    'payables.pay',
+  ] as const;
+  const detenteurs = (action: Action): OrgRole[] =>
+    ORG_ROLES.filter((r) => can(r, action, NO_OVERRIDES));
+
+  it('`purchase.read` suit `treasury.read`, sans le Commercial (D3)', () => {
+    expect(detenteurs('purchase.read')).toEqual(
+      detenteurs('treasury.read').filter((r) => r !== 'sales_rep'),
+    );
+    expect(detenteurs('purchase.read')).toEqual([
+      'owner',
+      'admin',
+      'finance_director',
+      'accountant',
+      'analyst',
+      'viewer',
+    ]);
+  });
+
+  it('demander : tout rôle interne qui travaille ; ni Lecteur, ni Commercial (décision n° 4)', () => {
+    expect(detenteurs('purchase.request')).toEqual([
+      'owner',
+      'admin',
+      'finance_director',
+      'accountant',
+      'analyst',
+    ]);
+  });
+
+  it('préparer suit `sales.manage` ; payer suit `treasury.manage`', () => {
+    expect(detenteurs('purchase.manage')).toEqual(detenteurs('sales.manage'));
+    expect(detenteurs('payables.pay')).toEqual(detenteurs('treasury.manage'));
+  });
+
+  it('approuver : Propriétaire et Directeur financier seulement, case ⓢ', () => {
+    expect(detenteurs('purchase.approve')).toEqual(['owner', 'finance_director']);
+    for (const role of ORG_ROLES) {
+      const cell = ORG_PERMISSION_MATRIX[role]['purchase.approve'];
+      expect(cell === 'deny' || cell === 'allow_sod', role).toBe(true);
+    }
+    // Le Comptable paie sans autoriser ; l'Administrateur prépare sans autoriser ni payer.
+    expect(can('accountant', 'payables.pay', NO_OVERRIDES)).toBe(true);
+    expect(can('accountant', 'purchase.approve', NO_OVERRIDES)).toBe(false);
+    expect(can('admin', 'purchase.manage', NO_OVERRIDES)).toBe(true);
+    expect(can('admin', 'purchase.approve', NO_OVERRIDES)).toBe(false);
+    expect(can('admin', 'payables.pay', NO_OVERRIDES)).toBe(false);
+  });
+
+  it('chaque action d’approbation n’a que des cases ✗ ou ⓢ ; `APPROVER_ROLES` inchangé', () => {
+    expect([...APPROVAL_ACTIONS]).toEqual(['plan.approve', 'purchase.approve']);
+    for (const action of APPROVAL_ACTIONS) {
+      for (const role of ORG_ROLES) {
+        expect(['deny', 'allow_sod']).toContain(ORG_PERMISSION_MATRIX[role][action]);
+      }
+    }
+    expect(APPROVER_ROLES).toEqual(['owner', 'finance_director']);
+  });
+
+  it('plateforme : aucune n’est un interdit absolu ; approuver et payer refusés à tous', () => {
+    for (const action of ACHATS) expect(PLATFORM_FORBIDDEN_ACTIONS).not.toContain(action);
+    for (const role of PLATFORM_ROLES) {
+      for (const action of ['purchase.approve', 'payables.pay'] as const) {
+        expect(canPlatform(role, action, { hasActiveGrant: true }), `${role} × ${action}`).toBe(
+          false,
+        );
+      }
+    }
+    expect(canPlatform('platform_super_admin', 'purchase.manage', { hasActiveGrant: true })).toBe(
+      true,
+    );
+    expect(canPlatform('platform_support', 'purchase.read', { hasActiveGrant: true })).toBe(true);
+    expect(canPlatform('platform_support', 'purchase.read')).toBe(false);
+  });
+
+  it('aucun rôle nouveau, R7 inchangé : l’Administrateur attribue les mêmes rôles', () => {
+    expect(ORG_ROLES).toHaveLength(9);
+    expect(grantableRoles('admin').sort()).toEqual([
+      'admin',
+      'advisor',
+      'analyst',
+      'sales_rep',
+      'viewer',
+    ]);
+    expect(grantableRoles('viewer').sort()).toEqual(['advisor', 'viewer']);
+    expect(canGrantRole('admin', 'accountant')).toBe(false);
+    expect(canGrantRole('admin', 'finance_director')).toBe(false);
+  });
+});
+
+describe('ADR-0044 § 2.3 — `purchaseApprovalDecision` (séparation des tâches des achats)', () => {
+  const base: PurchaseApprovalInput = {
+    decision: 'approve',
+    approverUserId: 'dir',
+    requestedBy: 'ana',
+    createdBy: 'ana',
+    priorApproverUserIds: [],
+    requiredApprovals: 1,
+    approverCountInOrg: 2,
+    allowSoleApprover: true,
+  };
+  const decide = (over: Partial<PurchaseApprovalInput>) =>
+    purchaseApprovalDecision({ ...base, ...over });
+
+  it('approbateur distinct du demandeur : approuvé, palier 1 atteint', () => {
+    expect(decide({})).toEqual({
+      ok: true,
+      soleApprover: false,
+      effectiveRequired: 1,
+      complete: true,
+    });
+  });
+
+  it('critère 2 — le demandeur n’approuve pas sa demande quand d’autres approbateurs existent', () => {
+    expect(decide({ approverUserId: 'ana' })).toEqual({
+      ok: false,
+      code: 'SELF_APPROVAL_FORBIDDEN',
+    });
+    // Ni le créateur quand il diffère du demandeur.
+    expect(decide({ approverUserId: 'pro', createdBy: 'pro' })).toEqual({
+      ok: false,
+      code: 'SELF_APPROVAL_FORBIDDEN',
+    });
+    // Le refus suit la même règle d’éligibilité.
+    expect(decide({ decision: 'reject', approverUserId: 'ana' })).toEqual({
+      ok: false,
+      code: 'SELF_APPROVAL_FORBIDDEN',
+    });
+  });
+
+  it('critère 2 — palier 2 : deux personnes distinctes ; la même n’approuve pas deux fois', () => {
+    const premiere = decide({ requiredApprovals: 2 });
+    expect(premiere).toEqual({
+      ok: true,
+      soleApprover: false,
+      effectiveRequired: 2,
+      complete: false,
+    });
+    expect(decide({ requiredApprovals: 2, priorApproverUserIds: ['dir'] })).toEqual({
+      ok: false,
+      code: 'APPROVER_ALREADY_APPROVED',
+    });
+    expect(
+      decide({ requiredApprovals: 2, approverUserId: 'pro', priorApproverUserIds: ['dir'] }),
+    ).toEqual({ ok: true, soleApprover: false, effectiveRequired: 2, complete: true });
+  });
+
+  it('critère 2 — approbateur unique : il approuve sa demande, marquée, palier réduit à 1', () => {
+    expect(
+      decide({
+        approverUserId: 'pro',
+        requestedBy: 'pro',
+        createdBy: 'pro',
+        approverCountInOrg: 1,
+        requiredApprovals: 2,
+      }),
+    ).toEqual({ ok: true, soleApprover: true, effectiveRequired: 1, complete: true });
+    // Demande d’autrui, palier 1 : rien d’exceptionnel, pas de marque.
+    expect(decide({ approverCountInOrg: 1 })).toEqual({
+      ok: true,
+      soleApprover: false,
+      effectiveRequired: 1,
+      complete: true,
+    });
+    // Demande d’autrui, palier 2 réduit : l’échappatoire sert, le geste est marqué.
+    expect(decide({ approverCountInOrg: 1, requiredApprovals: 2 })).toEqual({
+      ok: true,
+      soleApprover: true,
+      effectiveRequired: 1,
+      complete: true,
+    });
+  });
+
+  it('`allowSoleApprover: false` ferme l’échappatoire, même seul', () => {
+    expect(
+      decide({ approverUserId: 'ana', approverCountInOrg: 1, allowSoleApprover: false }),
+    ).toEqual({ ok: false, code: 'SELF_APPROVAL_FORBIDDEN' });
+    expect(
+      decide({ approverCountInOrg: 1, allowSoleApprover: false, requiredApprovals: 2 }),
+    ).toMatchObject({ ok: true, effectiveRequired: 2, complete: false, soleApprover: false });
+  });
+
+  it('un refus recevable ne complète jamais la demande', () => {
+    expect(
+      decide({ decision: 'reject', requiredApprovals: 2, priorApproverUserIds: ['pro'] }),
+    ).toEqual({ ok: true, soleApprover: false, effectiveRequired: 2, complete: false });
+    expect(
+      decide({ decision: 'reject', approverUserId: 'ana', approverCountInOrg: 1 }),
+    ).toMatchObject({ ok: true, soleApprover: true, complete: false });
+  });
+
+  it('ne lit aucun rôle : seul le nombre de détenteurs effectifs décide de l’échappatoire', () => {
+    // Deux détenteurs effectifs (par exemple un Lecteur ayant reçu l’autorisation) :
+    // le Propriétaire seul de son titre ne s’auto-approuve plus.
+    expect(
+      decide({
+        approverUserId: 'pro',
+        requestedBy: 'pro',
+        createdBy: 'pro',
+        approverCountInOrg: 2,
+      }),
+    ).toEqual({ ok: false, code: 'SELF_APPROVAL_FORBIDDEN' });
   });
 });
 

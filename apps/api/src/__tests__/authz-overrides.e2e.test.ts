@@ -343,9 +343,10 @@ e2eSuite('ADR-0041 A2 — écarts lus par la garde et /me/permissions', () => {
       .get('/authz/catalog')
       .set('Cookie', dans('lecteur', orgEquipe));
     expect(res.status).toBe(200);
-    expect(res.body.domains).toHaveLength(7);
+    // ADR-0044 § 4.3 : huitième domaine (achats) et troisième paire.
+    expect(res.body.domains).toHaveLength(8);
     expect(res.body.nonDelegable).toEqual(['billing.manage']);
-    expect(res.body.sodPairs).toHaveLength(2);
+    expect(res.body.sodPairs).toHaveLength(3);
     expect(res.body.labels['sales.invoice']).toBe(
       'Émettre et normaliser les factures et les avoirs',
     );

@@ -10,7 +10,7 @@
 //   1. ORG_ROLES       — les 9 rôles d'organisation (ADR-0012 §1 ; le neuvième,
 //                        `sales_rep`, d'ADR-0040 § 4.2);
 //   2. PLATFORM_ROLES  — les 6 rôles plateforme, préfixés `platform_` (§2);
-//   3. ACTIONS         — les 28 actions granulaires, dans l'ordre de docs/12
+//   3. ACTIONS         — les 33 actions granulaires, dans l'ordre de docs/12
 //                        (la seizième, `fiscal.manage`, vient d'ADR-0021 §8 ;
 //                        la dix-septième et la dix-huitième, `sales.read` et
 //                        `sales.manage`, d'ADR-0022 § S25c.1 ; la dix-neuvième,
@@ -22,7 +22,10 @@
 //                        fusion, amendement du 27 oct. 2026 ; les vingt-cinquième
 //                        à vingt-septième, `work.read`, `work.update` et
 //                        `work.manage`, d'ADR-0039 § 7 ; la vingt-huitième,
-//                        `sales.quote`, d'ADR-0040 § 4.1).
+//                        `sales.quote`, d'ADR-0040 § 4.1 ; les vingt-neuvième à
+//                        trente-troisième, `purchase.read`, `purchase.request`,
+//                        `purchase.manage`, `purchase.approve` et `payables.pay`,
+//                        d'ADR-0044 § 4.1).
 //
 // Refus par défaut (docs/17 § Autorisation) : les matrices sont exhaustives, une
 // case absente ne compile pas, et une case `deny` est un refus.
@@ -104,7 +107,7 @@ export const PLATFORM_ROLES = [
 export type PlatformRole = (typeof PLATFORM_ROLES)[number];
 
 /**
- * Les 28 actions granulaires (docs/12 § Actions granulaires, ordre du document).
+ * Les 33 actions granulaires (docs/12 § Actions granulaires, ordre du document).
  *
  * `fiscal.manage` (ADR-0021 §8) est ajoutée EN FIN de liste, et non à côté
  * d'`organization.manage` : l'ordre est celui de docs/12, que l'interface et les
@@ -115,7 +118,9 @@ export type PlatformRole = (typeof PLATFORM_ROLES)[number];
  * `treasury.read` et `treasury.manage` (ADR-0034 § 8) les vingt et unième et vingt-deuxième,
  * `crm.read` et `crm.manage` (ADR-0035 § 3) les vingt-troisième et vingt-quatrième,
  * `work.read`, `work.update` et `work.manage` (ADR-0039 § 7) les vingt-cinquième à
- * vingt-septième, `sales.quote` (ADR-0040 § 4.1) la vingt-huitième.
+ * vingt-septième, `sales.quote` (ADR-0040 § 4.1) la vingt-huitième, `purchase.read`,
+ * `purchase.request`, `purchase.manage`, `purchase.approve` et `payables.pay`
+ * (ADR-0044 § 4.1) les vingt-neuvième à trente-troisième.
  */
 export const ACTIONS = [
   'organization.manage',
@@ -151,6 +156,14 @@ export const ACTIONS = [
   // ADR-0040 § 4.1 : préparer les devis, séparé de `sales.manage` (clients, catalogue,
   // brouillons de facture). Convertir un devis exige les deux.
   'sales.quote',
+  // ADR-0044 — P0 : achats et fournisseurs (§ 4.1). Demander, préparer, autoriser et
+  // payer sont quatre actions distinctes : l'autorisation de dépense (`purchase.approve`)
+  // ne se cumule pas avec le paiement par ajout (`SOD_PAIRS`).
+  'purchase.read',
+  'purchase.request',
+  'purchase.manage',
+  'purchase.approve',
+  'payables.pay',
 ] as const;
 
 export type Action = (typeof ACTIONS)[number];
@@ -225,7 +238,7 @@ export type OrgGrant = 'allow' | 'deny' | 'allow_sod' | 'allow_project' | 'condi
 /**
  * MATRICE RÔLE ORGANISATION × ACTION — transcription littérale d'ADR-0012 §3.
  *
- * Le type impose 9 rôles × 28 actions : oublier une case ne compile pas.
+ * Le type impose 9 rôles × 33 actions : oublier une case ne compile pas.
  * `permissions.test.ts` redéclare cette matrice en littéral (elle n'est PAS
  * importée d'ici) : toute modification de production casse le test et force une
  * mise à jour consciente de l'ADR et de docs/12. C'est le garde-fou central.
@@ -283,6 +296,13 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       // ADR-0040 § 4.1 : préparer les devis. Iso-privilège : tous les détenteurs de
       // `sales.manage` la reçoivent ; le Commercial la reçoit seul en plus.
       'sales.quote': 'allow',
+      // ADR-0044 § 4.1 : achats. `purchase.approve` est une autorité de dépense (ⓢ :
+      // le demandeur n'approuve pas sa demande, sauf approbateur unique).
+      'purchase.read': 'allow',
+      'purchase.request': 'allow',
+      'purchase.manage': 'allow',
+      'purchase.approve': 'allow_sod',
+      'payables.pay': 'allow',
     },
     // Administrateur — « membres, projets, paramètres ». Gouvernance technique,
     // pas autorité financière : ni `billing.manage`, ni `plan.approve`, ni
@@ -326,6 +346,13 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'work.update': 'allow',
       'work.manage': 'allow',
       'sales.quote': 'allow',
+      // ADR-0044 § 4.1 : prépare (fiches, commandes, factures) sans approuver ni payer,
+      // comme il prépare une facture sans l'émettre.
+      'purchase.read': 'allow',
+      'purchase.request': 'allow',
+      'purchase.manage': 'allow',
+      'purchase.approve': 'deny',
+      'payables.pay': 'deny',
     },
     // Directeur financier — « plans, validation, réalisé, rapports ». L'autorité
     // financière : approuve et clôture. Cible de la migration des anciens `member`
@@ -359,6 +386,12 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'work.update': 'allow',
       'work.manage': 'allow',
       'sales.quote': 'allow',
+      // ADR-0044 § 4.1 : autorité de dépense, comme le Propriétaire.
+      'purchase.read': 'allow',
+      'purchase.request': 'allow',
+      'purchase.manage': 'allow',
+      'purchase.approve': 'allow_sod',
+      'payables.pay': 'allow',
     },
     // Comptable — « réalisé, mapping, clôture selon permission ». Constate, ne
     // projette pas : ni `inputs.update`, ni `plan.calculate`. Contrepartie de R2.
@@ -395,6 +428,12 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'work.update': 'allow',
       'work.manage': 'deny',
       'sales.quote': 'allow',
+      // ADR-0044 § 4.1 : constate et paie ; n'autorise pas la dépense (motif de `plan.approve`).
+      'purchase.read': 'allow',
+      'purchase.request': 'allow',
+      'purchase.manage': 'allow',
+      'purchase.approve': 'deny',
+      'payables.pay': 'allow',
     },
     // Analyste — « scénarios, analyses, commentaires ». Modélise et calcule,
     // n'approuve ni n'importe le réalisé.
@@ -430,6 +469,12 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'work.update': 'allow',
       'work.manage': 'deny',
       'sales.quote': 'deny',
+      // ADR-0044 § 4.1 : exprime un besoin ; ne prépare, n'approuve ni ne paie.
+      'purchase.read': 'allow',
+      'purchase.request': 'allow',
+      'purchase.manage': 'deny',
+      'purchase.approve': 'deny',
+      'payables.pay': 'deny',
     },
     // Chef de projet — « projets autorisés et saisie ». Tout est `allow_project` :
     // le rôle n'a de sens qu'avec des assignations de projet, qui n'existent pas
@@ -466,6 +511,12 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'work.update': 'deny',
       'work.manage': 'deny',
       'sales.quote': 'deny',
+      // ADR-0044 § 4.1 : rôle non attribuable, rien sur les achats.
+      'purchase.read': 'deny',
+      'purchase.request': 'deny',
+      'purchase.manage': 'deny',
+      'purchase.approve': 'deny',
+      'payables.pay': 'deny',
     },
     // Conseiller — « consultation, commentaires, recommandations ». Typiquement
     // EXTERNE (mentor, banquier invité) : pas de `report.export`, on lui ouvre la
@@ -503,6 +554,12 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'work.update': 'deny',
       'work.manage': 'deny',
       'sales.quote': 'deny',
+      // ADR-0044 § 4.1 : externe ; fournisseurs, prix et dettes ne lui sont pas ouverts.
+      'purchase.read': 'deny',
+      'purchase.request': 'deny',
+      'purchase.manage': 'deny',
+      'purchase.approve': 'deny',
+      'payables.pay': 'deny',
     },
     // Lecteur — lecture seulement. `analytics.read` est conservé : le refuser
     // viderait le rôle de son sens (ADR-0012 §3).
@@ -536,9 +593,15 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'work.update': 'deny',
       'work.manage': 'deny',
       'sales.quote': 'deny',
+      // ADR-0044 § 4.1 : lecture seulement, comme `treasury.read`.
+      'purchase.read': 'allow',
+      'purchase.request': 'deny',
+      'purchase.manage': 'deny',
+      'purchase.approve': 'deny',
+      'payables.pay': 'deny',
     },
     // Commercial — « CRM, devis et suivi des clients » (ADR-0040 § 4.2, D3). Sept
-    // actions sur vingt-huit : il gère le CRM et prépare les devis, consulte clients,
+    // actions sur trente-trois : il gère le CRM et prépare les devis, consulte clients,
     // catalogue et factures, travaille sur les tâches qu'on lui confie. Il ne voit ni
     // la trésorerie ni les dépenses (`treasury.*`, et le correctif § 4.4 qui ferme les
     // chemins détournés par `analytics.read`), ne touche ni aux fiches client ni aux
@@ -573,6 +636,12 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'work.update': 'allow',
       'work.manage': 'deny',
       'sales.quote': 'allow',
+      // ADR-0044 § 4.1, décision ouverte n° 4 : ni prix d'achat ni fournisseurs (D3).
+      'purchase.read': 'deny',
+      'purchase.request': 'deny',
+      'purchase.manage': 'deny',
+      'purchase.approve': 'deny',
+      'payables.pay': 'deny',
     },
   };
 
@@ -638,6 +707,14 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'work.manage': 'delegated',
     // ADR-0040 § 4.1 : comme `sales.manage`, sous accès délégué ; pas un interdit absolu.
     'sales.quote': 'delegated',
+    // ADR-0044 § 4.1 : lecture, demande et gestion sous accès délégué ; approuver une
+    // dépense et payer un fournisseur refusés par la matrice (motif de `sales.receipt`),
+    // sans être des interdits absolus.
+    'purchase.read': 'delegated',
+    'purchase.request': 'delegated',
+    'purchase.manage': 'delegated',
+    'purchase.approve': 'forbidden',
+    'payables.pay': 'forbidden',
   },
   platform_admin: {
     'organization.manage': 'native',
@@ -668,6 +745,11 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'work.update': 'forbidden',
     'work.manage': 'forbidden',
     'sales.quote': 'forbidden',
+    'purchase.read': 'forbidden',
+    'purchase.request': 'forbidden',
+    'purchase.manage': 'forbidden',
+    'purchase.approve': 'forbidden',
+    'payables.pay': 'forbidden',
   },
   // « Le support ne voit jamais les données financières sans consentement
   // explicite, durée limitée et audit » (docs/12) — d'où trois `delegated` et
@@ -703,6 +785,12 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'work.update': 'forbidden',
     'work.manage': 'forbidden',
     'sales.quote': 'forbidden',
+    // ADR-0044 § 4.1 : lecture sous accès délégué seulement.
+    'purchase.read': 'delegated',
+    'purchase.request': 'forbidden',
+    'purchase.manage': 'forbidden',
+    'purchase.approve': 'forbidden',
+    'payables.pay': 'forbidden',
   },
   platform_billing: {
     'organization.manage': 'forbidden',
@@ -733,6 +821,11 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'work.update': 'forbidden',
     'work.manage': 'forbidden',
     'sales.quote': 'forbidden',
+    'purchase.read': 'forbidden',
+    'purchase.request': 'forbidden',
+    'purchase.manage': 'forbidden',
+    'purchase.approve': 'forbidden',
+    'payables.pay': 'forbidden',
   },
   // Vides sur cette matrice : opèrent sur des ressources de portée plateforme
   // (templates, Country Packs) qui n'ont pas d'action granulaire dans docs/12 —
@@ -766,6 +859,11 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'work.update': 'forbidden',
     'work.manage': 'forbidden',
     'sales.quote': 'forbidden',
+    'purchase.read': 'forbidden',
+    'purchase.request': 'forbidden',
+    'purchase.manage': 'forbidden',
+    'purchase.approve': 'forbidden',
+    'payables.pay': 'forbidden',
   },
   platform_country_pack_manager: {
     'organization.manage': 'forbidden',
@@ -796,6 +894,11 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'work.update': 'forbidden',
     'work.manage': 'forbidden',
     'sales.quote': 'forbidden',
+    'purchase.read': 'forbidden',
+    'purchase.request': 'forbidden',
+    'purchase.manage': 'forbidden',
+    'purchase.approve': 'forbidden',
+    'payables.pay': 'forbidden',
   },
 };
 
@@ -1060,6 +1163,112 @@ export const APPROVER_ROLES: readonly OrgRole[] = ORG_ROLES.filter(
   (r) => ORG_PERMISSION_MATRIX[r]['plan.approve'] !== 'deny',
 );
 
+/**
+ * ADR-0044 — P0 : actions d'approbation soumises à la séparation des tâches dynamique,
+ * dont on compte les détenteurs EFFECTIFS pour décider de l'échappatoire « approbateur
+ * unique » (`AuthzService.countApprovers(organizationId, action)`, ADR-0041 G4
+ * généralisée à une action). Toute case non `deny` de ces actions porte la marque ⓢ.
+ */
+export const APPROVAL_ACTIONS = ['plan.approve', 'purchase.approve'] as const;
+export type ApprovalAction = (typeof APPROVAL_ACTIONS)[number];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADR-0044 — P0 : séparation des tâches des achats (§ 2.3, § 4.3)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Entrée de `purchaseApprovalDecision` : faits déjà lus par le service, rien d'autre. */
+export interface PurchaseApprovalInput {
+  /** Le geste demandé : approuver, ou refuser (commentaire exigé par le service). */
+  readonly decision: 'approve' | 'reject';
+  readonly approverUserId: string;
+  /** Membre qui exprime le besoin (`requestedBy`). */
+  readonly requestedBy: string;
+  /** Créateur de la demande (`createdBy`), s'il diffère du demandeur. */
+  readonly createdBy: string;
+  /**
+   * Approbations DÉJÀ portées par la demande (décision `approved`), sans celle en cours.
+   * Seuls les identifiants comptent : la fonction ne lit ni rôle ni date.
+   */
+  readonly priorApproverUserIds: readonly string[];
+  /** `requiredApprovals` figé à la soumission (0, 1 ou 2, moteur des achats). */
+  readonly requiredApprovals: number;
+  /**
+   * Nombre de détenteurs EFFECTIFS de `purchase.approve` dans l'organisation
+   * (`AuthzService.countApprovers(org, 'purchase.approve')`, ajouts compris, retraits
+   * déduits — ADR-0041 G4). Jamais un compte par rôle.
+   */
+  readonly approverCountInOrg: number;
+  /** Réglage `purchase_settings.allowSoleApprover` (défaut `true`). */
+  readonly allowSoleApprover: boolean;
+}
+
+/**
+ * Résultat typé ; le service le traduit en réponse HTTP. Ce module ne lève jamais
+ * d'exception HTTP.
+ *
+ * - `SELF_APPROVAL_FORBIDDEN` (409) — l'approbateur est le demandeur ou le créateur,
+ *   et l'organisation compte d'autres approbateurs (ou l'échappatoire est coupée).
+ * - `APPROVER_ALREADY_APPROVED` (409) — il a déjà approuvé cette demande : deux
+ *   approbations exigent deux personnes distinctes.
+ * - `ok` — le geste est recevable. `soleApprover` marque l'approbation (ou le refus)
+ *   rendue possible par l'échappatoire ; `effectiveRequired` est le palier appliqué
+ *   (réduit à 1 pour un approbateur unique) ; `complete` dit si, ce geste compris,
+ *   la demande est entièrement approuvée (toujours `false` pour un refus).
+ */
+export type PurchaseApprovalDecision =
+  | { readonly ok: false; readonly code: 'SELF_APPROVAL_FORBIDDEN' | 'APPROVER_ALREADY_APPROVED' }
+  | {
+      readonly ok: true;
+      readonly soleApprover: boolean;
+      readonly effectiveRequired: number;
+      readonly complete: boolean;
+    };
+
+/**
+ * ADR-0044 § 2.3 — séparation des tâches d'une demande d'achat, sans aucun
+ * `if (role === …)` : la détention de `purchase.approve` est vérifiée en amont par le
+ * guard (droits effectifs) ; cette fonction ne juge que les PERSONNES.
+ *
+ * Règles :
+ *   1. l'approbateur n'est ni le demandeur ni le créateur, sauf **approbateur unique** :
+ *      `allowSoleApprover` et un seul détenteur effectif de `purchase.approve` ;
+ *   2. pour approuver, il n'a pas déjà approuvé (deux approbations = deux personnes) ;
+ *   3. approbateur unique : un palier à deux approbations se réduit à une (personne ne
+ *      pourrait apporter la seconde), et le geste qui use de l'échappatoire est marqué
+ *      `soleApprover` (auto-approbation, ou palier réduit).
+ *
+ * Un palier à 0 approbation ne passe pas par ici : la soumission vaut approbation.
+ */
+export function purchaseApprovalDecision(input: PurchaseApprovalInput): PurchaseApprovalDecision {
+  const isSelf =
+    input.approverUserId === input.requestedBy || input.approverUserId === input.createdBy;
+  const soleApproverOrg = input.allowSoleApprover && input.approverCountInOrg <= 1;
+  if (isSelf && !soleApproverOrg) return { ok: false, code: 'SELF_APPROVAL_FORBIDDEN' };
+
+  const required = Math.max(0, Math.trunc(input.requiredApprovals));
+  const effectiveRequired = soleApproverOrg ? Math.min(required, 1) : required;
+  const reduced = effectiveRequired < required;
+  const soleApprover = soleApproverOrg && (isSelf || reduced);
+
+  if (input.decision === 'reject') {
+    return {
+      ok: true,
+      soleApprover: soleApproverOrg && isSelf,
+      effectiveRequired,
+      complete: false,
+    };
+  }
+
+  const prior = new Set(input.priorApproverUserIds);
+  if (prior.has(input.approverUserId)) return { ok: false, code: 'APPROVER_ALREADY_APPROVED' };
+  return {
+    ok: true,
+    soleApprover,
+    effectiveRequired,
+    complete: prior.size + 1 >= effectiveRequired,
+  };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ADR-0041 — A1 : autorisations par membre (titre + écart)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1073,7 +1282,8 @@ export const APPROVER_ROLES: readonly OrgRole[] = ORG_ROLES.filter(
 export const NON_DELEGABLE_ACTIONS: readonly Action[] = ['billing.manage'];
 
 /**
- * Paires incompatibles par ajout (G4). Deux seulement : la paire facturation
+ * Paires incompatibles par ajout (G4). Trois (ADR-0044 § 4.3 ajoute la paire des
+ * achats) ; la paire facturation
  * `sales.invoice` + `fiscal.manage` a été REFUSÉE par la dirigeante le 29 oct. 2026
  * (décision ouverte n° 3) — une seule personne peut émettre et piloter la fiscalité.
  */
@@ -1082,6 +1292,11 @@ export const SOD_PAIRS: readonly (readonly [Action, Action])[] = [
   ['inputs.update', 'plan.approve'],
   // R3 : la réouverture d'une période exige les deux.
   ['period.close', 'plan.approve'],
+  // ADR-0044 — P0 (§ 4.3) : celui qui autorise la dépense et celui qui la paie ne se
+  // cumulent pas par ajout (un Comptable ne reçoit pas `purchase.approve`). Propriétaire
+  // et Directeur financier les cumulent nativement ; la séparation dynamique
+  // (`purchaseApprovalDecision`) s'y applique.
+  ['purchase.approve', 'payables.pay'],
 ];
 
 /**
@@ -1115,6 +1330,12 @@ export const ACTION_DEPENDENCIES: Readonly<Partial<Record<Action, readonly Actio
   'crm.manage': ['crm.read'],
   'work.update': ['work.read'],
   'work.manage': ['work.update'],
+  // ADR-0044 — P0 (§ 4.3) : tout geste d'achat suppose de lire les achats ; payer crée
+  // une dépense que le payeur doit pouvoir relire, d'où `treasury.read`.
+  'purchase.request': ['purchase.read'],
+  'purchase.manage': ['purchase.read'],
+  'purchase.approve': ['purchase.read'],
+  'payables.pay': ['purchase.read', 'treasury.read'],
 };
 
 /**
@@ -1134,7 +1355,10 @@ export function requiredActionsOf(action: Action): Action[] {
   return ACTIONS.filter((a) => required.has(a));
 }
 
-/** Les sept domaines de l'écran (ADR-0041 § 5), dans l'ordre d'affichage. */
+/**
+ * Les huit domaines de l'écran (ADR-0041 § 5), dans l'ordre d'affichage. Le huitième,
+ * « Achats et fournisseurs », vient d'ADR-0044 § 4.3.
+ */
 export const ACTION_DOMAINS: readonly {
   readonly key: string;
   readonly label: string;
@@ -1182,6 +1406,18 @@ export const ACTION_DOMAINS: readonly {
     label: 'Projets et tâches',
     actions: ['work.read', 'work.update', 'work.manage'],
   },
+  // ADR-0044 — P0 (§ 4.3).
+  {
+    key: 'purchases',
+    label: 'Achats et fournisseurs',
+    actions: [
+      'purchase.read',
+      'purchase.request',
+      'purchase.manage',
+      'purchase.approve',
+      'payables.pay',
+    ],
+  },
 ];
 
 /** Libellés français des actions (ADR-0041 § 5) — « autorisation », jamais « action ». */
@@ -1214,6 +1450,12 @@ export const ACTION_LABELS: Readonly<Record<Action, string>> = {
   'work.read': 'Consulter les projets et les tâches',
   'work.update': 'Travailler sur les tâches',
   'work.manage': 'Gérer les projets',
+  // ADR-0044 — P0 (§ 4.1).
+  'purchase.read': 'Consulter les achats et les fournisseurs',
+  'purchase.request': 'Demander un achat',
+  'purchase.manage': 'Gérer les fournisseurs, commandes, réceptions et factures fournisseurs',
+  'purchase.approve': "Approuver les demandes d'achat",
+  'payables.pay': 'Payer les fournisseurs',
 };
 
 /**

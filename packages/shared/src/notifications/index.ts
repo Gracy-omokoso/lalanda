@@ -26,12 +26,22 @@ export const NOTIFICATION_KINDS = [
   'crm.opportunity_won',
   // ADR-0041 — A4 : « Vos autorisations ont changé » (titre, ajouts, retraits, clôture).
   'organization.permissions_changed',
+  // ADR-0044 — P0 (§ 6.5) : achats et fournisseurs. Déclarés ici, émis par P2 (coordonnées),
+  // P3 (approbations), P4 (écarts) et P6 (rappels d'échéance) ; refiltrés à la lecture
+  // par `purchase.read`.
+  'purchases.approval_requested',
+  'purchases.request_approved',
+  'purchases.request_rejected',
+  'purchases.invoice_variance',
+  'purchases.invoice_due_soon',
+  'purchases.invoice_overdue',
+  'purchases.supplier_payment_details_changed',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
 /** Modules producteurs connus. */
-// ADR-0041 — A4 : `organization` (gestion des membres).
-export const NOTIFICATION_SOURCE_MODULES = ['work', 'crm', 'organization'] as const;
+// ADR-0041 — A4 : `organization` (gestion des membres). ADR-0044 — P0 : `purchases`.
+export const NOTIFICATION_SOURCE_MODULES = ['work', 'crm', 'organization', 'purchases'] as const;
 export type NotificationSourceModule = (typeof NOTIFICATION_SOURCE_MODULES)[number];
 
 /** Natures de l'entité d'origine (ADR-0040 — C4 § 5.4 : `activity`, `opportunity`, `account`). */
@@ -43,6 +53,10 @@ export const NOTIFICATION_ENTITY_TYPES = [
   'account',
   // ADR-0041 — A4 : appartenance dont les autorisations ont changé.
   'membership',
+  // ADR-0044 — P0 (§ 6.5) : demande ou commande, facture fournisseur, fiche fournisseur.
+  'purchase_order',
+  'supplier_invoice',
+  'supplier',
 ] as const;
 export type NotificationEntityType = (typeof NOTIFICATION_ENTITY_TYPES)[number];
 

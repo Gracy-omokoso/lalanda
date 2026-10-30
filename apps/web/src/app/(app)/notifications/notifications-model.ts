@@ -74,6 +74,35 @@ export const LIBELLES_TYPES: Record<NotificationKind, { label: string; aide: str
     label: 'Autorisations modifiées',
     aide: 'Vos autorisations dans l’organisation ont changé.',
   },
+  // ADR-0044 — P0 (§ 6.5) : achats et fournisseurs.
+  'purchases.approval_requested': {
+    label: 'Demande d’achat à approuver',
+    aide: 'Une demande d’achat attend votre approbation.',
+  },
+  'purchases.request_approved': {
+    label: 'Demande d’achat approuvée',
+    aide: 'Votre demande d’achat est approuvée et devient un bon de commande.',
+  },
+  'purchases.request_rejected': {
+    label: 'Demande d’achat refusée',
+    aide: 'Votre demande d’achat est refusée, avec le motif de l’approbateur.',
+  },
+  'purchases.invoice_variance': {
+    label: 'Facture fournisseur en écart',
+    aide: 'Une facture fournisseur ne correspond pas à la commande ou à la réception.',
+  },
+  'purchases.invoice_due_soon': {
+    label: 'Facture fournisseur à payer bientôt',
+    aide: 'Une facture fournisseur arrive à échéance.',
+  },
+  'purchases.invoice_overdue': {
+    label: 'Facture fournisseur en retard',
+    aide: 'Une facture fournisseur a dépassé son échéance.',
+  },
+  'purchases.supplier_payment_details_changed': {
+    label: 'Coordonnées de paiement modifiées',
+    aide: 'Les coordonnées bancaires ou mobile money d’un fournisseur ont changé.',
+  },
 };
 
 /** Types dans l'ordre d'affichage des préférences. */

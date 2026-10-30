@@ -13,6 +13,7 @@ import {
   isAction,
   normalizeOrgRole,
   type Action,
+  type ApprovalAction,
   type OrgPermissionContext,
   type OrgRole,
   type PlatformRole,
@@ -225,7 +226,8 @@ export class AuthzService {
   }
 
   /**
-   * Nombre de principaux détenant EFFECTIVEMENT `plan.approve` dans une organisation
+   * Nombre de principaux détenant EFFECTIVEMENT `plan.approve` (ou, ADR-0044,
+   * `purchase.approve`) dans une organisation
    * — sert à décider si une auto-approbation relève de l'échappatoire `soleApprover`
    * (R2, ADR-0012 §6) ou d'un refus `SELF_APPROVAL_FORBIDDEN`.
    *
@@ -234,10 +236,15 @@ export class AuthzService {
    * bloquerait à tort l'auto-approbation marquée du Propriétaire, et un Lecteur
    * ayant reçu `plan.approve` ne fermerait pas l'échappatoire.
    */
-  async countApprovers(organizationId: string): Promise<number> {
+  async countApprovers(
+    organizationId: string,
+    // ADR-0044 — P0 (§ 4.3) : la fonction de comptage de G4 généralisée à une action
+    // d'approbation ; `purchase.approve` pour l'approbateur unique des achats.
+    action: ApprovalAction = 'plan.approve',
+  ): Promise<number> {
     // `APPROVER_ROLES` (lignes non `deny`) et `holdersFilter` (cases `allow*`) désignent
-    // les mêmes rôles : `plan.approve` n'a aucune case ⚙. Vérifié par le test unitaire.
-    return this.memberships.countDocuments(holdersFilter(organizationId, 'plan.approve')).exec();
+    // les mêmes rôles : aucune action d'approbation n'a de case ⚙. Vérifié par le test.
+    return this.memberships.countDocuments(holdersFilter(organizationId, action)).exec();
   }
 
   /**

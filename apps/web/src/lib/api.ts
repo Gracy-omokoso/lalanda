@@ -1137,7 +1137,7 @@ export interface TermsAcceptanceView {
 
 export type DisplayCurrency = 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR';
 
-/** Les 28 actions granulaires (docs/12, ADR-0021 §8, ADR-0022 § S25c.1, ADR-0023 § S25e.11, ADR-0031 § 4, ADR-0034 § 8, ADR-0035 § 3, ADR-0039 § 7, ADR-0040 § 4.1). Union fermée, alignée sur l'API. */
+/** Les 33 actions granulaires (docs/12, ADR-0021 §8, ADR-0022 § S25c.1, ADR-0023 § S25e.11, ADR-0031 § 4, ADR-0034 § 8, ADR-0035 § 3, ADR-0039 § 7, ADR-0040 § 4.1, ADR-0044 § 4.1). Union fermée, alignée sur l'API. */
 export type OrgAction =
   | 'organization.manage'
   | 'billing.manage'
@@ -1187,7 +1187,17 @@ export type OrgAction =
   // ADR-0040 § 4.1 — préparer les devis (créer, modifier, envoyer, accepter,
   // refuser, nouvelle version). Détenteurs de `sales.manage`, plus le Commercial ;
   // convertir en brouillon de facture exige en plus `sales.manage`.
-  | 'sales.quote';
+  | 'sales.quote'
+  // ADR-0044 § 4.1 — achats et fournisseurs. Consulter (sauf Chef de projet,
+  // Conseiller et Commercial), demander (rôles internes qui travaillent, sauf
+  // Lecteur), gérer (Propriétaire, Administrateur, Directeur financier, Comptable),
+  // approuver (Propriétaire, Directeur financier, séparation des tâches), payer
+  // (Propriétaire, Directeur financier, Comptable).
+  | 'purchase.read'
+  | 'purchase.request'
+  | 'purchase.manage'
+  | 'purchase.approve'
+  | 'payables.pay';
 
 /**
  * Offres — RÉEXPORTÉES du catalogue partagé, jamais réécrites.

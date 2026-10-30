@@ -49,6 +49,10 @@
     "./crm": {
       "types": "./dist/crm/index.d.ts",
       "import": "./dist/crm/index.js"
+    },
+    "./purchases": {
+      "types": "./dist/purchases/index.d.ts",
+      "import": "./dist/purchases/index.js"
     }
   },
   "scripts": {
