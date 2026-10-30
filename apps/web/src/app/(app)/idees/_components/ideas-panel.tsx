@@ -3,7 +3,8 @@
 // Liste des idées de l'organisation (ADR-0036 § 1) : création rapide, état de la
 // validation (score du moteur ou « indisponible »), expériences, passage au plan.
 
-import { Button, DataNature } from '@lalanda/ui';
+import { Button, DataNature, Modal } from '@lalanda/ui';
+import { Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -24,6 +25,8 @@ export function IdeasPanel(): React.ReactElement {
   const [probleme, setProbleme] = useState('');
   const [enCours, setEnCours] = useState(false);
   const [archivees, setArchivees] = useState(false);
+  const [creation, setCreation] = useState(false);
+  const [erreurCreation, setErreurCreation] = useState<string | null>(null);
 
   const charger = useCallback(async (): Promise<void> => {
     setErreur(null);
@@ -42,16 +45,16 @@ export function IdeasPanel(): React.ReactElement {
     e.preventDefault();
     const r = corpsFiche({ ...ficheVide(), title: titre, problem: probleme });
     if (!r.ok) {
-      setMessage(r.erreur);
+      setErreurCreation(r.erreur);
       return;
     }
     setEnCours(true);
-    setMessage(null);
+    setErreurCreation(null);
     try {
       const idea = await ideaLabApi.create(r.body);
       router.push(`/idees/${idea.id}`);
     } catch (err) {
-      setMessage(messageErreur(err, 'Création impossible.'));
+      setErreurCreation(messageErreur(err, 'Création impossible.'));
       setEnCours(false);
     }
   }
@@ -76,39 +79,70 @@ export function IdeasPanel(): React.ReactElement {
   return (
     <div className="flex flex-col gap-8">
       {peutEcrire && (
-        <Bloc titre="Nouvelle idée">
-          <form onSubmit={(e) => void creer(e)} className="doc-card flex flex-col gap-3 p-4">
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium">Nom de l’idée</span>
-              <input
-                value={titre}
-                onChange={(e) => setTitre(e.target.value)}
-                maxLength={120}
-                required
-                className="rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium">Le problème que vous voulez résoudre</span>
-              <textarea
-                value={probleme}
-                onChange={(e) => setProbleme(e.target.value)}
-                maxLength={1000}
-                rows={2}
-                className="rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2"
-              />
-            </label>
-            <div className="flex flex-wrap items-center gap-3">
-              <Button type="submit" variant="primary" busy={enCours}>
-                Créer l’idée
-              </Button>
-              <span className="text-xs text-[var(--foreground-muted)]">
-                {actives.length + rangees.length} / {vue.limits.ideas} idées
-              </span>
-            </div>
-          </form>
-        </Bloc>
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <span className="text-xs text-[var(--foreground-muted)]">
+            {actives.length + rangees.length} / {vue.limits.ideas} idées
+          </span>
+          <Button
+            variant="primary"
+            onClick={() => {
+              setErreurCreation(null);
+              setCreation(true);
+            }}
+          >
+            <Plus aria-hidden="true" className="h-4 w-4" />
+            Nouvelle idée
+          </Button>
+        </div>
       )}
+      <Modal
+        open={peutEcrire && creation}
+        onClose={() => setCreation(false)}
+        title="Nouvelle idée"
+        description="Commencez par le problème d’un client, pas par la solution."
+        size="md"
+        busy={enCours}
+      >
+        <form
+          onSubmit={(e) => void creer(e)}
+          aria-label="Nouvelle idée"
+          className="flex flex-col gap-3"
+        >
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium">Nom de l’idée</span>
+            <input
+              value={titre}
+              onChange={(e) => setTitre(e.target.value)}
+              maxLength={120}
+              required
+              className="rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium">Le problème que vous voulez résoudre</span>
+            <textarea
+              value={probleme}
+              onChange={(e) => setProbleme(e.target.value)}
+              maxLength={1000}
+              rows={2}
+              className="rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2"
+            />
+          </label>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button type="submit" variant="primary" busy={enCours}>
+              Créer l’idée
+            </Button>
+            <span className="text-xs text-[var(--foreground-muted)]">
+              {actives.length + rangees.length} / {vue.limits.ideas} idées
+            </span>
+          </div>
+          {erreurCreation && (
+            <p role="alert" className="text-sm text-[var(--danger)]">
+              {erreurCreation}
+            </p>
+          )}
+        </form>
+      </Modal>
 
       {message && (
         <p role="status" className="text-sm text-[var(--danger)]">

@@ -5,7 +5,8 @@
 // clairement séparées, pas un vrai wizard multi-étapes — plus rapide pour un
 // utilisateur habitué et lisible pour un nouveau.
 
-import { PageHeader } from '@lalanda/ui';
+import { Modal, PageHeader, buttonClasses } from '@lalanda/ui';
+import { Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -107,6 +108,8 @@ export default function ProjectsPage(): React.ReactElement {
   // (S16b) Limite de projets du plan atteinte (403 PLAN_LIMIT_PROJECTS de l'API).
   const [planLimit, setPlanLimit] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
+  /** Fenêtre « Nouvelle initiative » ouverte. */
+  const [creation, setCreation] = useState(false);
 
   // (S23b) Modal du modèle générique : deux chemins puis le questionnaire de cadrage.
   const [modalCustom, setModalCustom] = useState(false);
@@ -135,6 +138,7 @@ export default function ProjectsPage(): React.ReactElement {
         .get(ideeId)
         .then((idea) => {
           setIdeeSource({ id: idea.id, title: idea.title });
+          setCreation(true);
           setNewName((n) => (n === '' ? idea.title.slice(0, 200) : n));
         })
         .catch(() => undefined);
@@ -327,215 +331,246 @@ export default function ProjectsPage(): React.ReactElement {
         title="Initiatives"
         description="Une initiative est un plan financier prévisionnel, dans un pays et un cadre fiscal donnés. Vos hypothèses alimentent les prévisions calculées par le moteur ; le réalisé s’y compare, mois par mois."
         actions={
-          projects ? (
-            // ADR-0030 § 3 (audit A10) : la limite de l'offre se voit AVANT de
-            // créer, pas seulement au refus. Chiffres servis par l'API.
-            <span className="fig text-xs text-[var(--foreground-muted)]">
-              {projects.length} initiative{projects.length > 1 ? 's' : ''}
-              {subscription && subscription.entitlements.maxProjects !== null
-                ? ` sur ${subscription.entitlements.maxProjects} inclus dans votre offre`
-                : ''}
-            </span>
-          ) : null
+          <>
+            {projects ? (
+              // ADR-0030 § 3 (audit A10) : la limite de l'offre se voit AVANT de
+              // créer, pas seulement au refus. Chiffres servis par l'API.
+              <span className="fig text-xs text-[var(--foreground-muted)]">
+                {projects.length} initiative{projects.length > 1 ? 's' : ''}
+                {subscription && subscription.entitlements.maxProjects !== null
+                  ? ` sur ${subscription.entitlements.maxProjects} inclus dans votre offre`
+                  : ''}
+              </span>
+            ) : null}
+            <button
+              type="button"
+              className={buttonClasses('primary', 'md')}
+              onClick={() => {
+                setError(null);
+                setPlanLimit(null);
+                setCreation(true);
+              }}
+            >
+              <Plus aria-hidden="true" className="h-4 w-4" />
+              Nouvelle initiative
+            </button>
+          </>
         }
       />
 
-      <form
-        onSubmit={handleCreate}
-        className="flex flex-col gap-6 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5"
+      <Modal
+        open={creation}
+        onClose={() => {
+          setCreation(false);
+          setModalCustom(false);
+        }}
+        title="Nouvelle initiative"
+        description="Choisissez d’abord le pays et le cadre fiscal, puis le template sectoriel. Les hypothèses par défaut sont pré-remplies et modifiables ensuite."
+        size="lg"
+        busy={creating}
       >
-        {ideeSource && (
-          <p role="status" className="rounded-md border border-[var(--border)] p-3 text-sm">
-            Nouvelle initiative à partir de l’idée « {ideeSource.title} » : son problème, sa cible,
-            sa solution et son modèle de revenus deviendront des cartes du Canvas. Aucun chiffre
-            n’est repris.
-          </p>
-        )}
-        <div className="flex flex-col gap-1">
-          <h3 className="text-sm font-semibold">Nouvelle initiative</h3>
-          <p className="text-xs text-[var(--foreground-muted)]">
-            Choisis d&apos;abord le pays et le cadre fiscal, puis le template sectoriel. Les
-            hypothèses par défaut sont pré-remplies et modifiables ensuite.
-          </p>
-        </div>
-
-        {/* Section 1 — Contexte fiscal */}
-        <fieldset className="flex flex-col gap-3">
-          <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--foreground-muted)]">
-            1. Contexte fiscal de l’initiative
-          </legend>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <label className="flex min-w-0 flex-col gap-1.5 text-sm">
-              <span className="font-medium">Pays</span>
-              <select
-                value={country}
-                onChange={(e) => setCountry(e.target.value)}
-                className="w-full min-w-0 truncate rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
-              >
-                {COUNTRIES.map((c) => (
-                  <option key={c.code} value={c.code}>
-                    {c.flag} {c.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex min-w-0 flex-col gap-1.5 text-sm">
-              <span className="font-medium">Cadre fiscal</span>
-              <select
-                value={packSlug}
-                onChange={(e) => {
-                  const slug = e.target.value;
-                  setPackSlug(slug);
-                  const p = packs?.find((x) => x.slug === slug);
-                  if (p) setCurrency(p.devise_principale);
-                }}
-                disabled={!packs}
-                className="w-full min-w-0 truncate rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)] disabled:opacity-50"
-              >
-                {packsForCountry.length === 0 ? (
-                  <option>Chargement…</option>
-                ) : (
-                  packsForCountry.map((p) => (
-                    <option key={p.slug} value={p.slug}>
-                      {p.label} · {p.systeme_comptable}
-                    </option>
-                  ))
-                )}
-              </select>
-            </label>
-            <label className="flex min-w-0 flex-col gap-1.5 text-sm">
-              <span className="font-medium">Devise d&apos;affichage</span>
-              <select
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-                className="w-full min-w-0 truncate rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
-              >
-                {currencyOptions.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          {selectedPack?.description ? (
-            <p className="text-xs italic text-[var(--foreground-muted)]">
-              {selectedPack.description}
+        <form
+          onSubmit={handleCreate}
+          aria-label="Nouvelle initiative"
+          className="flex flex-col gap-6"
+        >
+          {ideeSource && (
+            <p role="status" className="rounded-md border border-[var(--border)] p-3 text-sm">
+              Nouvelle initiative à partir de l’idée « {ideeSource.title} » : son problème, sa
+              cible, sa solution et son modèle de revenus deviendront des cartes du Canvas. Aucun
+              chiffre n’est repris.
             </p>
-          ) : null}
-        </fieldset>
+          )}
 
-        {/* Section 2 — Template sectoriel */}
-        <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--foreground-muted)]">
-            2. Template sectoriel
-          </legend>
-          {templates === null ? (
-            <p className="text-xs text-[var(--foreground-muted)]">Chargement des templates…</p>
-          ) : orderedTemplates.length === 0 ? (
-            <p className="text-xs text-[var(--foreground-muted)]">Aucun template disponible.</p>
-          ) : (
-            <div className="grid gap-2 sm:grid-cols-2">
-              {orderedTemplates.map((t) => {
-                const meta = templateMeta(t.slug);
-                const active = templateSlug === t.slug;
-                return (
-                  <label
-                    key={t.slug}
-                    className={`flex cursor-pointer flex-col gap-1 rounded-lg border p-3 text-sm transition ${
-                      active
-                        ? 'border-[var(--accent)] bg-[var(--accent)]/5'
-                        : 'border-[var(--border)] hover:border-[var(--accent)]/40'
-                    }`}
-                  >
-                    <span className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        name="templateSlug"
-                        value={t.slug}
-                        checked={active}
-                        onChange={() => setTemplateSlug(t.slug)}
-                        // (S23b) Le modèle générique ouvre son modal à CHAQUE
-                        // clic, y compris quand il est déjà sélectionné :
-                        // `onChange` ne se déclenche pas sur un radio déjà
-                        // coché, et l'utilisateur qui reclique cherche
-                        // précisément à revoir les deux chemins.
-                        onClick={() => {
-                          if (t.slug === CUSTOM_TEMPLATE_SLUG) setModalCustom(true);
-                        }}
-                        className="accent-[var(--accent)]"
-                      />
-                      <span className="font-medium">{meta.label}</span>
-                      {t.secteur ? (
-                        <span className="ml-auto rounded bg-[var(--surface-muted)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--foreground-muted)]">
-                          {t.secteur}
+          {/* Section 1 — Contexte fiscal */}
+          <fieldset className="flex flex-col gap-3">
+            <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--foreground-muted)]">
+              1. Contexte fiscal de l’initiative
+            </legend>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <label className="flex min-w-0 flex-col gap-1.5 text-sm">
+                <span className="font-medium">Pays</span>
+                <select
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  className="w-full min-w-0 truncate rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
+                >
+                  {COUNTRIES.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.flag} {c.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex min-w-0 flex-col gap-1.5 text-sm">
+                <span className="font-medium">Cadre fiscal</span>
+                <select
+                  value={packSlug}
+                  onChange={(e) => {
+                    const slug = e.target.value;
+                    setPackSlug(slug);
+                    const p = packs?.find((x) => x.slug === slug);
+                    if (p) setCurrency(p.devise_principale);
+                  }}
+                  disabled={!packs}
+                  className="w-full min-w-0 truncate rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)] disabled:opacity-50"
+                >
+                  {packsForCountry.length === 0 ? (
+                    <option>Chargement…</option>
+                  ) : (
+                    packsForCountry.map((p) => (
+                      <option key={p.slug} value={p.slug}>
+                        {p.label} · {p.systeme_comptable}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </label>
+              <label className="flex min-w-0 flex-col gap-1.5 text-sm">
+                <span className="font-medium">Devise d&apos;affichage</span>
+                <select
+                  value={currency}
+                  onChange={(e) => setCurrency(e.target.value)}
+                  className="w-full min-w-0 truncate rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
+                >
+                  {currencyOptions.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            {selectedPack?.description ? (
+              <p className="text-xs italic text-[var(--foreground-muted)]">
+                {selectedPack.description}
+              </p>
+            ) : null}
+          </fieldset>
+
+          {/* Section 2 — Template sectoriel */}
+          <fieldset className="flex flex-col gap-2">
+            <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--foreground-muted)]">
+              2. Template sectoriel
+            </legend>
+            {templates === null ? (
+              <p className="text-xs text-[var(--foreground-muted)]">Chargement des templates…</p>
+            ) : orderedTemplates.length === 0 ? (
+              <p className="text-xs text-[var(--foreground-muted)]">Aucun template disponible.</p>
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {orderedTemplates.map((t) => {
+                  const meta = templateMeta(t.slug);
+                  const active = templateSlug === t.slug;
+                  return (
+                    <label
+                      key={t.slug}
+                      className={`flex cursor-pointer flex-col gap-1 rounded-lg border p-3 text-sm transition ${
+                        active
+                          ? 'border-[var(--accent)] bg-[var(--accent)]/5'
+                          : 'border-[var(--border)] hover:border-[var(--accent)]/40'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="templateSlug"
+                          value={t.slug}
+                          checked={active}
+                          onChange={() => setTemplateSlug(t.slug)}
+                          // (S23b) Le modèle générique ouvre son modal à CHAQUE
+                          // clic, y compris quand il est déjà sélectionné :
+                          // `onChange` ne se déclenche pas sur un radio déjà
+                          // coché, et l'utilisateur qui reclique cherche
+                          // précisément à revoir les deux chemins.
+                          onClick={() => {
+                            if (t.slug === CUSTOM_TEMPLATE_SLUG) setModalCustom(true);
+                          }}
+                          className="accent-[var(--accent)]"
+                        />
+                        <span className="font-medium">{meta.label}</span>
+                        {t.secteur ? (
+                          <span className="ml-auto rounded bg-[var(--surface-muted)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--foreground-muted)]">
+                            {t.secteur}
+                          </span>
+                        ) : null}
+                      </span>
+                      {meta.description ? (
+                        <span className="text-xs text-[var(--foreground-muted)]">
+                          {meta.description}
                         </span>
                       ) : null}
-                    </span>
-                    {meta.description ? (
-                      <span className="text-xs text-[var(--foreground-muted)]">
-                        {meta.description}
-                      </span>
-                    ) : null}
-                  </label>
-                );
-              })}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </fieldset>
+
+          {/* Section 3 — Nom + créer */}
+          <fieldset className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <label className="flex flex-1 flex-col gap-1.5 text-sm">
+              <span className="font-medium">Nom de l’initiative</span>
+              <input
+                ref={nomRef}
+                type="text"
+                required
+                maxLength={200}
+                placeholder="Ex : Restaurant du centre-ville 2026"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                className="w-full min-w-0 truncate rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={creating || !newName.trim() || !templateSlug || !packSlug}
+              className="rounded-md bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-[var(--accent-foreground)] transition hover:opacity-90 disabled:opacity-50"
+            >
+              {creating ? 'Création…' : 'Créer l’initiative'}
+            </button>
+          </fieldset>
+          {planLimit !== null ? (
+            <div
+              role="alert"
+              className="rounded-md border border-[var(--accent)]/30 bg-[var(--surface)] p-3 text-sm"
+            >
+              Votre offre actuelle est limitée à {planLimit} initiative{planLimit > 1 ? 's' : ''}.
+              Passez à l&apos;offre Pro pour créer des initiatives illimitées.{' '}
+              <Link href="/pricing" className="font-medium text-[var(--accent)] underline">
+                Voir les offres
+              </Link>
             </div>
-          )}
-        </fieldset>
+          ) : null}
+          {error ? (
+            <div
+              role="alert"
+              className="rounded-md border border-[var(--danger)]/30 bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger)]"
+            >
+              {error}
+            </div>
+          ) : null}
+        </form>
 
-        {/* Section 3 — Nom + créer */}
-        <fieldset className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <label className="flex flex-1 flex-col gap-1.5 text-sm">
-            <span className="font-medium">Nom de l’initiative</span>
-            <input
-              ref={nomRef}
-              type="text"
-              required
-              maxLength={200}
-              placeholder="Ex : Restaurant du centre-ville 2026"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              className="w-full min-w-0 truncate rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={creating || !newName.trim() || !templateSlug || !packSlug}
-            className="rounded-md bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-[var(--accent-foreground)] transition hover:opacity-90 disabled:opacity-50"
-          >
-            {creating ? 'Création…' : 'Créer l’initiative'}
-          </button>
-        </fieldset>
-      </form>
+        {modalCustom ? (
+          <CustomStartModal
+            nomInitial={newName}
+            onFermer={() => setModalCustom(false)}
+            onDirect={() => {
+              // Chemin direct : rien n'est créé ici. Le formulaire reste maître —
+              // le modèle générique est sélectionné, il ne manque que le nom, et
+              // « Créer le projet » déposera sur l'assistant de saisie.
+              setModalCustom(false);
+              setTemplateSlug(CUSTOM_TEMPLATE_SLUG);
+              requestAnimationFrame(() => nomRef.current?.focus());
+            }}
+            onCadrageTermine={handleCadrageTermine}
+          />
+        ) : null}
+      </Modal>
 
-      {modalCustom ? (
-        <CustomStartModal
-          nomInitial={newName}
-          onFermer={() => setModalCustom(false)}
-          onDirect={() => {
-            // Chemin direct : rien n'est créé ici. Le formulaire reste maître —
-            // le modèle générique est sélectionné, il ne manque que le nom, et
-            // « Créer le projet » déposera sur l'assistant de saisie.
-            setModalCustom(false);
-            setTemplateSlug(CUSTOM_TEMPLATE_SLUG);
-            requestAnimationFrame(() => nomRef.current?.focus());
-          }}
-          onCadrageTermine={handleCadrageTermine}
-        />
-      ) : null}
 
-      {planLimit !== null ? (
-        <div className="rounded-md border border-[var(--accent)]/30 bg-[var(--surface)] p-3 text-sm">
-          Votre offre actuelle est limitée à {planLimit} initiative{planLimit > 1 ? 's' : ''}.
-          Passez à l&apos;offre Pro pour créer des initiatives illimitées.{' '}
-          <Link href="/pricing" className="font-medium text-[var(--accent)] underline">
-            Voir les offres
-          </Link>
-        </div>
-      ) : null}
-
-      {error ? (
+      {error && !creation ? (
         <div className="rounded-md border border-[var(--danger)]/30 bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger)]">
           {error}
         </div>

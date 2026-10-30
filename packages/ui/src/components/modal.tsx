@@ -11,6 +11,8 @@
 //   Si la saisie a commencé, une confirmation est demandée avant d'abandonner ;
 //   pendant un envoi (`busy`), rien ne ferme ;
 // - le contenu défile, l'en-tête reste visible ; la page derrière ne défile pas ;
+// - un dialogue imbriqué dans le contenu (`aria-modal`) garde `Échap` et `Tab`
+//   tant qu'il détient le focus ;
 // - plein écran sur téléphone (< 640 px), centrée et bornée au-delà ;
 // - couleurs par jetons : clair et sombre sans code dédié.
 //
@@ -74,6 +76,16 @@ const FOCUSABLE = [
   '[tabindex]:not([tabindex="-1"])',
   '[contenteditable="true"]',
 ].join(',');
+
+/**
+ * Dialogue imbriqué (un `aria-modal` rendu dans le contenu) qui détient le
+ * focus : il garde la main sur `Échap` et sur la circulation au clavier.
+ */
+function dialogueImbrique(dialog: HTMLDialogElement): HTMLElement | null {
+  const actif = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const imbrique = actif?.closest<HTMLElement>('[aria-modal="true"]') ?? null;
+  return imbrique && imbrique !== dialog && dialog.contains(imbrique) ? imbrique : null;
+}
 
 function focusables(racine: HTMLElement): HTMLElement[] {
   return Array.from(racine.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
@@ -162,7 +174,7 @@ function ModalOuverte({
 
   function surTouche(e: React.KeyboardEvent<HTMLDialogElement>): void {
     if (e.key !== 'Tab' || !ref.current) return;
-    const liste = focusables(ref.current);
+    const liste = focusables(dialogueImbrique(ref.current) ?? ref.current);
     const actif = document.activeElement as HTMLElement | null;
     const i = actif ? liste.indexOf(actif) : -1;
     const cible = trapFocusIndex(i, liste.length, e.shiftKey);
@@ -182,6 +194,7 @@ function ModalOuverte({
       onCancel={(e) => {
         // Échap : la fenêtre décide elle-même (confirmation, envoi en cours).
         e.preventDefault();
+        if (ref.current && dialogueImbrique(ref.current)) return;
         if (confirmation) setConfirmation(false);
         else demanderFermeture();
       }}
