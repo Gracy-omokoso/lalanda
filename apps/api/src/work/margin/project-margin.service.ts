@@ -161,7 +161,8 @@ export class ProjectMarginService {
         .collection(EXPENSES)
         .find(
           { organizationId, workProjectId: projectId, status: 'recorded' },
-          { projection: { spentOn: 1, amount: 1, currency: 1 } },
+          // ADR-0045 — H5 : la catégorie sert au seul constat `personnel` (marge 1.2.0).
+          { projection: { spentOn: 1, amount: 1, currency: 1, category: 1 } },
         )
         .toArray(),
       this.time
@@ -243,6 +244,7 @@ export class ProjectMarginService {
         currency: e['currency'] as 'CDF' | 'USD',
         spentOn: String(e['spentOn']),
         amount: String(e['amount']),
+        category: typeof e['category'] === 'string' ? (e['category'] as string) : null,
       })),
       timeEntries: entries.map((e) => ({
         userId: e.userId,

@@ -16,6 +16,8 @@ import {
 import { AiModule, OPENAI_CHAT_CLIENT } from '../ai/ai.module.js';
 import { CrmBriefSource } from '../crm/brief/crm-brief.source.js';
 import { CrmModule } from '../crm/crm.module.js';
+import { HrBriefModule } from '../hr/brief/hr-brief.module.js';
+import { HrBriefSource } from '../hr/brief/hr-brief.source.js';
 import { OrganizationsModule } from '../organizations/organizations.module.js';
 import { PurchasesBriefModule } from '../purchases/brief/purchases-brief.module.js';
 import { PurchasesBriefSource } from '../purchases/brief/purchases-brief.source.js';
@@ -31,6 +33,7 @@ import {
   CASH_POSITION_SOURCE,
   CRM_SOURCE,
   DUE_DATES_SOURCE,
+  HR_SOURCE,
   OUTSTANDING_SOURCE,
   PURCHASES_SOURCE,
   WORK_SOURCE,
@@ -67,6 +70,8 @@ import { MorningBriefService } from './morning-brief.service.js';
     CrmModule,
     // ADR-0044 § 6.4 : dettes fournisseurs et approbations (`PurchasesBriefSource`).
     PurchasesBriefModule,
+    // ADR-0045 § 6.5 : absences du jour, validations d'absence, échéances (`HrBriefSource`).
+    HrBriefModule,
     MongooseModule.forFeature([
       { name: SalesInvoice.name, schema: SalesInvoiceSchema },
       { name: OrganizationSuspension.name, schema: OrganizationSuspensionSchema },
@@ -91,6 +96,8 @@ import { MorningBriefService } from './morning-brief.service.js';
     { provide: CRM_SOURCE, useExisting: CrmBriefSource },
     // ADR-0044 § 6.4 — factures fournisseurs en retard, approbations d'achat.
     { provide: PURCHASES_SOURCE, useExisting: PurchasesBriefSource },
+    // ADR-0045 § 6.5 — absences du jour, validations d'absence, échéances RH.
+    { provide: HR_SOURCE, useExisting: HrBriefSource },
   ],
   exports: [MorningBriefService],
 })

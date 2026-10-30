@@ -20,8 +20,13 @@ import { PurchasesAgendaModule } from '../purchases/agenda/purchases-agenda.modu
 import { PurchasesAgendaSource } from '../purchases/agenda/purchases-agenda.source.js';
 import { HrAgendaModule } from '../hr/agenda/hr-agenda.module.js';
 import { HrAgendaSource } from '../hr/agenda/hr-agenda.source.js';
+import { HrWorkAbsencesSource } from '../hr/work/hr-work-absences.source.js';
+import { HrWorkModule } from '../hr/work/hr-work.module.js';
 import { CRM_AGENDA_SOURCE, HR_AGENDA_SOURCE, PURCHASES_AGENDA_SOURCE } from './my-tasks.ports.js';
 import { WorkBriefSource } from './brief/work-brief.source.js';
+import { WorkTimesheetsController } from './timesheets/work-timesheets.controller.js';
+import { WorkTimesheetsService } from './timesheets/work-timesheets.service.js';
+import { WORK_ABSENCES_SOURCE } from './work-absences.port.js';
 import { WorkActivityService } from './work-activity.service.js';
 import { WorkAttachmentsController } from './work-attachments.controller.js';
 import { WorkAttachmentsService } from './work-attachments.service.js';
@@ -69,6 +74,8 @@ import {
     PurchasesAgendaModule,
     // ADR-0045 — H3 (§ 6.1) : validations d'absence de « Mes tâches », lecture seule.
     HrAgendaModule,
+    // ADR-0045 — H5 (§ 6.2, § 6.3) : absences des assignés, feuille de temps, lecture seule.
+    HrWorkModule,
     MongooseModule.forFeature([
       { name: WorkSettings.name, schema: WorkSettingsSchema },
       { name: WorkProject.name, schema: WorkProjectSchema },
@@ -88,6 +95,8 @@ import {
     WorkCommentsController,
     WorkAttachmentsController,
     WorkTimeController,
+    // ADR-0045 — H5 (§ 6.3) : feuille de temps hebdomadaire en lecture.
+    WorkTimesheetsController,
   ],
   providers: [
     WorkMembersService,
@@ -108,6 +117,9 @@ import {
     { provide: PURCHASES_AGENDA_SOURCE, useExisting: PurchasesAgendaSource },
     // ADR-0045 — H3 (§ 6.1) : validations d'absence et éléments de liste RH.
     { provide: HR_AGENDA_SOURCE, useExisting: HrAgendaSource },
+    // ADR-0045 — H5 (§ 6.2, § 6.3) : absences approuvées des membres, jamais le type.
+    { provide: WORK_ABSENCES_SOURCE, useExisting: HrWorkAbsencesSource },
+    WorkTimesheetsService,
   ],
   exports: [
     MongooseModule,

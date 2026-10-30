@@ -82,6 +82,10 @@ const EMAIL_FACTS = [
   'fournisseurs.factures_en_retard.CDF',
   'fournisseurs.factures_en_retard.USD',
   'mes_approbations.en_attente',
+  // ADR-0045 § 6.5 : des nombres seulement, mêmes gardes que le brief (portée RH).
+  'rh.absents_aujourdhui',
+  'mes_validations_absence.en_attente',
+  'rh.echeances',
 ];
 
 export function emailContent(
@@ -107,6 +111,8 @@ export function emailContent(
       // ADR-0044 § 6.4 : un membre sans le droit ne lit rien des achats, pas même
       // la mention « masqué » (le module ne le concerne pas).
       .filter((f) => !(f.status === 'hidden' && f.source.module === 'run.purchases'))
+      // ADR-0045 § 6.5 : même règle pour les RH (un membre sans portée n'en lit rien).
+      .filter((f) => !(f.status === 'hidden' && f.source.module === 'run.hr'))
       // Un montant nul dans une devise inutilisée n'apprend rien.
       .filter((f) => !(f.kind === 'amount' && f.value !== null && /^-?0+(\.0+)?$/.test(f.value)))
       .map(factLine),
