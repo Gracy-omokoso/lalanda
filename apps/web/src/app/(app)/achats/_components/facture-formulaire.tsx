@@ -315,6 +315,7 @@ export function FenetreFacture({
                         inputMode="decimal"
                         className={CHAMP}
                         value={l.quantity}
+                        onFocus={(e) => e.currentTarget.select()}
                         onChange={(e) => majLigne(i, { quantity: e.target.value })}
                         {...aria(`${id}-q-${i}`, champs[`ligne-${i}-quantity`])}
                       />

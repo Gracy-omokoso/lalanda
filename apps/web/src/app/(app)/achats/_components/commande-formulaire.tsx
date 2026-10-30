@@ -241,6 +241,7 @@ export function NouvelleDemande({
                   inputMode="decimal"
                   className={CHAMP}
                   value={l.quantity}
+                  onFocus={(e) => e.currentTarget.select()}
                   onChange={(e) => majLigne(i, { quantity: e.target.value })}
                   {...aria(`${id}-${k('quantity')}`, champs[k('quantity')])}
                 />

@@ -155,7 +155,10 @@ export function FactureFiche({ invoiceId }: { invoiceId: string }): React.ReactE
   useEffect(() => charger(), [charger]);
 
   // Paiements qui imputent CETTE facture (`GET /purchases/payments?invoiceId=`, lot P5).
-  const revision = f?.revision;
+  // Clé de rechargement : un paiement ne change pas la révision de la facture,
+  // mais il change sa date de mise à jour — sans elle, la liste restait vide
+  // juste après un paiement.
+  const revision = f ? `${f.revision}:${f.updatedAt}` : undefined;
   const [aAnnuler, setAAnnuler] = useState<SupplierPaymentListItem | null>(null);
   useEffect(() => {
     if (revision === undefined) return;
