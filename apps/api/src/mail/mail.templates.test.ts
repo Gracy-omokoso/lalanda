@@ -301,3 +301,37 @@ describe('alertes de normalisation (ADR-0024, décision ouverte n° 3)', () => {
     expect(mail.html).not.toContain('<img src=x');
   });
 });
+
+describe('renderSalesDocumentMail (ADR-0042)', () => {
+  const base = {
+    subject: 'Pro forma PF2610-000001 — Exemple SARL',
+    heading: 'Pro forma PF2610-000001',
+    message: 'Bonjour,\n\nVoici <b>le document</b>.\nLigne 2\n\nCordialement',
+    notice: 'Pro forma — ce document n’est pas une facture.',
+    attachmentName: 'PF2610-000001.pdf',
+    organizationName: 'Exemple <SARL>',
+    senderName: 'Awa',
+  };
+
+  it('échappe le message saisi, garde ses paragraphes et imprime la mention fixe', async () => {
+    const { renderSalesDocumentMail } = await import('./mail.templates.js');
+    const m = renderSalesDocumentMail(base);
+    expect(m.subject).toBe(base.subject);
+    expect(m.html).not.toContain('<b>le document</b>');
+    expect(m.html).toContain('&lt;b&gt;le document&lt;/b&gt;');
+    expect(m.html).toContain('Ligne 2');
+    expect(m.html).toContain('Exemple &lt;SARL&gt;');
+    expect(m.html).toContain('ce document n’est pas une facture');
+    expect(m.text).toContain('Pro forma — ce document n’est pas une facture.');
+    expect(m.text).toContain('Pièce jointe : PF2610-000001.pdf');
+    // Aucune ressource distante, aucun lien vers l'application.
+    expect(m.html).not.toMatch(/src="https?:/);
+    expect(m.html).not.toContain('<a ');
+  });
+
+  it('sans mention pour une facture finale', async () => {
+    const { renderSalesDocumentMail } = await import('./mail.templates.js');
+    const m = renderSalesDocumentMail({ ...base, notice: null });
+    expect(m.text).not.toContain('pas une facture');
+  });
+});

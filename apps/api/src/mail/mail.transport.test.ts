@@ -431,3 +431,88 @@ describe('chemin ZeptoMail', () => {
     }
   });
 });
+
+// ─── Documents de vente envoyés au client (ADR-0042) ─────────────────────────
+
+const messageDocument = {
+  ...message,
+  to: 'jean.client@exemple.cd',
+  subject: 'Facture FV2610-000001 — Exemple SARL',
+  cc: ['compta@exemple.cd'],
+  replyTo: { address: 'vendeur@exemple.cd', name: 'Awa Vendeuse' },
+  fromName: 'Exemple SARL via Lalanda',
+  attachments: [
+    {
+      filename: 'FV2610-000001.pdf',
+      contentType: 'application/pdf' as const,
+      contentBase64: Buffer.from('%PDF-1.7').toString('base64'),
+    },
+  ],
+  redactInLogs: true,
+};
+
+describe('document de vente (ADR-0042)', () => {
+  beforeEach(() => {
+    sendMail.mockReset();
+    createTransport.mockClear();
+  });
+
+  it('ZeptoMail : copie, réponse, nom affiché et PDF joint, au format de Zoho', async () => {
+    const srv = await serveurLocal(() => ({ status: 201 }));
+    try {
+      await new SmtpMailTransport(new StubCredentials(credsZepto(`${srv.origin}/v1.1/email`))).send(
+        messageDocument,
+      );
+      const charge = JSON.parse(srv.recues[0]!.body) as Record<string, unknown>;
+      expect(charge['from']).toEqual({
+        address: 'no-reply@lalanda.co',
+        name: 'Exemple SARL via Lalanda',
+      });
+      expect(charge['cc']).toEqual([{ email_address: { address: 'compta@exemple.cd' } }]);
+      expect(charge['reply_to']).toEqual([{ address: 'vendeur@exemple.cd', name: 'Awa Vendeuse' }]);
+      expect(charge['attachments']).toEqual([
+        {
+          name: 'FV2610-000001.pdf',
+          mime_type: 'application/pdf',
+          content: Buffer.from('%PDF-1.7').toString('base64'),
+        },
+      ]);
+    } finally {
+      await srv.fermer();
+    }
+  });
+
+  it('SMTP : copie, réponse, nom affiché (adresse inchangée) et PDF en octets', async () => {
+    await new SmtpMailTransport(new StubCredentials(creds())).send(messageDocument);
+    const envoye = sendMail.mock.calls[0]![0] as Record<string, any>;
+    expect(envoye['from']).toBe('"Exemple SARL via Lalanda" <no-reply@exemple.com>');
+    expect(envoye['cc']).toEqual(['compta@exemple.cd']);
+    expect(envoye['replyTo']).toEqual({ address: 'vendeur@exemple.cd', name: 'Awa Vendeuse' });
+    expect(envoye['attachments']).toHaveLength(1);
+    expect((envoye['attachments'][0].content as Buffer).toString('latin1')).toBe('%PDF-1.7');
+  });
+
+  it('journaux : adresse masquée, objet tu', async () => {
+    const { Logger } = await import('@nestjs/common');
+    const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    try {
+      await new SmtpMailTransport(new StubCredentials(null)).send(messageDocument);
+      const ligne = String(warn.mock.calls[0]?.[0] ?? '');
+      expect(ligne).toContain('j***@exemple.cd');
+      expect(ligne).not.toContain('jean.client');
+      expect(ligne).not.toContain('FV2610');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});
+
+describe('maskAddress et withDisplayName', () => {
+  it('masque et compose sans changer l’adresse', async () => {
+    const { maskAddress, withDisplayName } = await import('./mail.transport.js');
+    expect(maskAddress('jean@exemple.cd')).toBe('j***@exemple.cd');
+    expect(maskAddress('sans-arobase')).toBe('***');
+    expect(withDisplayName('Lalanda <no-reply@x.co>', 'A "B"\nC')).toBe('"A B C" <no-reply@x.co>');
+    expect(withDisplayName('no-reply@x.co', 'Org')).toBe('"Org" <no-reply@x.co>');
+  });
+});

@@ -39,6 +39,15 @@ import {
   buildInvoiceDocument,
   type InvoiceDocumentModel,
 } from './invoice-document.model.js';
+import {
+  DOCUMENT_NOT_SENDABLE,
+  documentEmailDefaults,
+  invoiceSendability,
+  type DocumentEmailDraft,
+  type DocumentEmailInput,
+  type DocumentEmailResult,
+} from './document-email.js';
+import { DocumentEmailService, type DocumentEmailSender } from './document-email.service.js';
 import { qrCodeSvg } from './invoice-qr.js';
 import { sampleInvoice } from './sample-invoice.js';
 import {
@@ -101,6 +110,11 @@ function notPrintable(err: DocumentNotPrintableError): never {
   });
 }
 
+/** 409 d'un document qui ne part pas par e-mail (ADR-0042 § 2). */
+export function notSendable(message: string, status: string): never {
+  throw new ConflictException({ code: DOCUMENT_NOT_SENDABLE, message, details: { status } });
+}
+
 @Injectable()
 export class InvoiceDocumentsService {
   constructor(
@@ -113,6 +127,7 @@ export class InvoiceDocumentsService {
     @Inject(OrganizationsService) private readonly organizations: OrganizationsService,
     @Inject(PdfRenderingService) private readonly pdf: PdfRenderingService,
     @Inject(BrandingService) private readonly branding: BrandingService,
+    @Inject(DocumentEmailService) private readonly emailer: DocumentEmailService,
   ) {}
 
   private async load(organizationId: string, invoiceId: string): Promise<InvoiceLean> {
@@ -327,15 +342,105 @@ export class InvoiceDocumentsService {
     };
   }
 
+  /** Original rendu, SANS trace : l'appelant écrit la sienne (téléchargement ou envoi). */
+  private async renderOriginal(organizationId: string, invoiceId: string, loaded?: InvoiceLean) {
+    const doc = loaded ?? (await this.load(organizationId, invoiceId));
+    const presentation = await this.presentationOf(organizationId, doc);
+    const model = await this.model(organizationId, doc, null, presentation);
+    const pdf = await this.render(organizationId, model, presentation);
+    return { doc, presentation, model, pdf };
+  }
+
+  /**
+   * Valeurs préremplies de l'envoi par e-mail (ADR-0042 § 3) et possibilité
+   * d'envoi (§ 2). Ne rend aucun PDF et n'écrit rien.
+   */
+  async emailDraft(
+    organizationId: string,
+    invoiceId: string,
+    senderName: string,
+  ): Promise<DocumentEmailDraft> {
+    const doc = await this.load(organizationId, invoiceId);
+    const presentation = await this.presentationOf(organizationId, doc);
+    let model: InvoiceDocumentModel;
+    try {
+      model = await this.model(organizationId, doc, null, presentation);
+    } catch (err) {
+      if (err instanceof ConflictException) {
+        const body = err.getResponse() as { message?: string };
+        return {
+          sendable: false,
+          reason: body.message ?? 'Ce document ne peut pas être imprimé.',
+          nature: null,
+          to: doc.customer.email,
+          cc: [],
+          subject: '',
+          message: '',
+          attachmentName: null,
+        };
+      }
+      throw err;
+    }
+    const s = invoiceSendability(doc.status, doc.type, model.kind);
+    const nature = s.sendable ? s.nature : model.kind === 'invoice' ? 'invoice' : 'proforma';
+    const defaults = documentEmailDefaults({
+      nature,
+      reference: model.reference.value,
+      sellerName: model.seller.title,
+      total: model.total,
+      currency: model.currency,
+      senderName,
+    });
+    return {
+      sendable: s.sendable,
+      reason: s.sendable ? null : s.reason,
+      nature: s.sendable ? s.nature : null,
+      to: doc.customer.email,
+      cc: [],
+      ...defaults,
+      attachmentName: model.fileName,
+    };
+  }
+
+  /** Envoi par e-mail (ADR-0042) : même rendu que le téléchargement, PDF joint. */
+  async email(
+    organizationId: string,
+    invoiceId: string,
+    sender: DocumentEmailSender,
+    input: DocumentEmailInput,
+  ): Promise<DocumentEmailResult> {
+    const doc = await this.load(organizationId, invoiceId);
+    // Statut lu AVANT le rendu : un document non envoyable ne coûte aucun Chromium.
+    if (doc.status === 'pending_normalization' || doc.status === 'normalization_failed') {
+      const s = invoiceSendability(doc.status, doc.type, 'proforma');
+      if (!s.sendable) notSendable(s.reason, doc.status);
+    }
+    const { model, pdf } = await this.renderOriginal(organizationId, invoiceId, doc);
+    const s = invoiceSendability(doc.status, doc.type, model.kind);
+    if (!s.sendable) notSendable(s.reason, doc.status);
+    return this.emailer.send({
+      organizationId,
+      sender,
+      target: {
+        type: 'sales_invoice',
+        id: invoiceId,
+        reference: model.reference.value,
+        nature: s.nature,
+        status: doc.status,
+      },
+      sellerName: model.seller.title,
+      pdf,
+      fileName: model.fileName,
+      input,
+    });
+  }
+
   async original(
     organizationId: string,
     invoiceId: string,
     actor: InvoiceActor,
   ): Promise<RenderedInvoiceDocument> {
-    const doc = await this.load(organizationId, invoiceId);
-    const presentation = await this.presentationOf(organizationId, doc);
-    const model = await this.model(organizationId, doc, null, presentation);
-    const pdf = await this.render(organizationId, model, presentation);
+    const { doc, presentation, model, pdf } = await this.renderOriginal(organizationId, invoiceId);
     await this.audit.recordStrict({
       organizationId,
       actorUserId: actor.userId,

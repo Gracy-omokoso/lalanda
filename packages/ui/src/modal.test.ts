@@ -38,13 +38,13 @@ describe('Modal — rendu', () => {
   });
 
   it('est plein écran sur téléphone et bornée au-delà, selon la largeur', () => {
-    for (const taille of ['sm', 'md', 'lg'] as const) {
+    for (const taille of ['sm', 'md', 'lg', 'xl'] as const) {
       const html = rendre({ size: taille });
       expect(html).toContain('h-dvh');
       expect(html).toContain('w-full');
       expect(html).toContain(MODAL_WIDTHS[taille]);
     }
-    expect(new Set(Object.values(MODAL_WIDTHS)).size).toBe(3);
+    expect(new Set(Object.values(MODAL_WIDTHS)).size).toBe(4);
   });
 
   it('défile dans son contenu et s’appuie sur les jetons (clair et sombre)', () => {

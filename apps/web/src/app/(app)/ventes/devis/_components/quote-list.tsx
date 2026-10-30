@@ -8,7 +8,8 @@ import { useEffect, useState } from 'react';
 
 import { crmApi, type QuoteStatus, type QuoteSummary } from '@/lib/api-crm';
 
-import { Alerte, BOUTON, CHAMP, Pastille } from '../../_components/form-ui';
+import { BoutonApercu } from '../../_components/apercu-document';
+import { Alerte, BOUTON, BOUTON_PETIT, CHAMP, Pastille } from '../../_components/form-ui';
 import { formatMontant } from '../../_components/sales-model';
 import { useAccesVentes } from '../../_components/sales-access';
 
@@ -115,10 +116,10 @@ export function QuoteList(): React.ReactElement {
       ) : (
         <ul className="flex flex-col divide-y divide-[var(--border)] rounded-xl border border-[var(--border)]">
           {items.map((d) => (
-            <li key={d.id}>
+            <li key={d.id} className="flex flex-col sm:flex-row sm:items-start">
               <Link
                 href={`${DEVIS_BASE}/${encodeURIComponent(d.id)}`}
-                className="flex flex-col gap-1 p-4 sm:flex-row sm:items-start sm:justify-between"
+                className="flex min-w-0 flex-1 flex-col gap-1 p-4 sm:flex-row sm:items-start sm:justify-between"
               >
                 <span className="flex flex-col gap-1">
                   <span className="flex flex-wrap items-center gap-2">
@@ -135,6 +136,18 @@ export function QuoteList(): React.ReactElement {
                   {d.total ? formatMontant(d.total, d.currency) : 'Calcul indisponible'}
                 </span>
               </Link>
+              <div className="px-4 pb-4 sm:py-4 sm:pl-0">
+                <BoutonApercu
+                  className={BOUTON_PETIT}
+                  document={{
+                    genre: 'devis',
+                    id: d.id,
+                    titre: `Devis ${d.number} (v${d.version})`,
+                    nomFichier: `${d.number}-v${d.version}.pdf`,
+                    peutEnvoyer: gerer,
+                  }}
+                />
+              </div>
             </li>
           ))}
         </ul>

@@ -52,3 +52,13 @@ export const INVOICE_NORMALIZE_THROTTLE = { ttl: 3_600_000, limit: 60 } as const
  * plusieurs personnes cliquent en même temps. Voir `normalization-throttler.guard.ts`.
  */
 export const INVOICE_NORMALIZE_ORG_THROTTLE = { ttl: 3_600_000, limit: 60 } as const;
+
+/**
+ * Envoi d'un document de vente par e-mail (ADR-0042 § 6) : 20 par heure et par
+ * UTILISATEUR, seau commun aux factures et aux devis. Borne l'usage du domaine
+ * d'envoi pour du pourriel sans gêner une facturation normale.
+ */
+export const DOCUMENT_EMAIL_USER_THROTTLE = { ttl: 3_600_000, limit: 20 } as const;
+
+/** Même envoi, 100 par heure et par ORGANISATION, tous membres réunis. */
+export const DOCUMENT_EMAIL_ORG_THROTTLE = { ttl: 3_600_000, limit: 100 } as const;

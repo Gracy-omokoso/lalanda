@@ -11,6 +11,8 @@
 //   (ex. POST /ai/corrective-actions, endpoint facturé OpenAI — ADR-0008).
 // - Org/UserNormalizationThrottlerGuard : plafonds de la normalisation DGI, par
 //   organisation et par utilisateur (ADR-0024 § 6), 429 en français.
+// - Org/UserDocumentEmailThrottlerGuard : envoi des documents de vente par
+//   e-mail (ADR-0042 § 6), 429 en français.
 //
 // @Global : expose UserThrottlerGuard et les providers du ThrottlerModule à tous les
 // modules sans réimport (même patron que AuthModule pour AuthGuard).
@@ -20,6 +22,10 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 
 import { ClientIpThrottlerGuard } from './client-ip-throttler.guard.js';
+import {
+  OrgDocumentEmailThrottlerGuard,
+  UserDocumentEmailThrottlerGuard,
+} from './document-email-throttler.guard.js';
 import {
   OrgNormalizationThrottlerGuard,
   UserNormalizationThrottlerGuard,
@@ -35,11 +41,15 @@ import { UserThrottlerGuard } from './user-throttler.guard.js';
     UserThrottlerGuard,
     OrgNormalizationThrottlerGuard,
     UserNormalizationThrottlerGuard,
+    OrgDocumentEmailThrottlerGuard,
+    UserDocumentEmailThrottlerGuard,
   ],
   exports: [
     UserThrottlerGuard,
     OrgNormalizationThrottlerGuard,
     UserNormalizationThrottlerGuard,
+    OrgDocumentEmailThrottlerGuard,
+    UserDocumentEmailThrottlerGuard,
     ThrottlerModule,
   ],
 })

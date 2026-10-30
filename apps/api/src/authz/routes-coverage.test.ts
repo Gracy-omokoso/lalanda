@@ -523,6 +523,9 @@ describe('couverture des routes par le RBAC', () => {
       'NormalizationController.dgiExchanges': ['sales.read'],
       'InvoiceDocumentsController.pdf': ['sales.read'],
       'InvoiceDocumentsController.duplicate': ['sales.manage'],
+      // ADR-0042 — envoi par e-mail : préremplissage et envoi, PDF joint.
+      'InvoiceDocumentsController.emailDraft': ['sales.invoice'],
+      'InvoiceDocumentsController.email': ['sales.invoice'],
       // ADR-0028 : identité visuelle et choix du modèle = administration de
       // l'organisation ; consultation des modèles et aperçu = lecture des ventes.
       'BrandingController.get': ['organization.manage'],
@@ -596,6 +599,9 @@ describe('couverture des routes par le RBAC', () => {
       'QuotesController.refuse': ['sales.quote'],
       'QuotesController.newVersion': ['sales.quote'],
       'QuotesController.convert': ['sales.quote', 'sales.manage'],
+      // ADR-0042 — envoi du devis par e-mail.
+      'QuotesController.emailDraft': ['sales.quote'],
+      'QuotesController.email': ['sales.quote'],
       // ADR-0040 — C0 § 4.4 : un réalisé de plan exige `project.read`.
       'ActualsController.variances': ['project.read', 'analytics.read'],
       'ActualsController.updatedProjection': ['project.read', 'analytics.read'],

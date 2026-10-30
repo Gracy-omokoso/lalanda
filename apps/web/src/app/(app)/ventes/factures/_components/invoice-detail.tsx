@@ -37,6 +37,7 @@ import {
   TYPE_LABELS,
 } from './invoice-model';
 import { NormalizationStatus } from './normalization-status';
+import { BoutonApercu } from '../../_components/apercu-document';
 import { PdfActions } from './pdf-actions';
 
 /** Bandeau « test » : impossible à manquer (demande de la décideuse). */
@@ -305,7 +306,19 @@ function DocumentFige({
         </section>
       ) : null}
 
-      <PdfActions vue={vue} />
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+        <BoutonApercu
+          libelle="Aperçu et envoi"
+          document={{
+            genre: 'facture',
+            id: vue.id,
+            titre: enteteDocument(vue).titre,
+            nomFichier: `${(enteteDocument(vue).reference || vue.proformaRef).replace(/[^A-Za-z0-9._-]/g, '-')}.pdf`,
+            peutEnvoyer: facturer,
+          }}
+        />
+        <PdfActions vue={vue} />
+      </div>
 
       <div className="flex flex-col gap-2 sm:flex-row">
         {actions.includes('avoir') ? (

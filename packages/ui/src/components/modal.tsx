@@ -26,13 +26,15 @@ import { cn } from '../utils.js';
 
 import { Button } from './button.js';
 
-export type ModalSize = 'sm' | 'md' | 'lg';
+/** `xl` : document affiché (aperçu PDF, ADR-0042), hauteur fixe pour l'iframe. */
+export type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
 
 /** Largeur maximale au-delà du téléphone. */
 export const MODAL_WIDTHS: Record<ModalSize, string> = {
   sm: 'sm:max-w-md',
   md: 'sm:max-w-xl',
   lg: 'sm:max-w-3xl',
+  xl: 'sm:max-w-5xl sm:h-[90dvh]',
 };
 
 /** Ce que doit faire une demande de fermeture (Échap, bouton, fond). */

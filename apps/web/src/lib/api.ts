@@ -661,6 +661,35 @@ async function invoicePdfRequest(
   };
 }
 
+/** Envoi d'un document de vente par e-mail (ADR-0042) — préremplissage. */
+export interface DocumentEmailDraft {
+  sendable: boolean;
+  /** Pourquoi le document ne part pas (`sendable: false`), sinon `null`. */
+  reason: string | null;
+  nature: 'invoice' | 'credit_note' | 'proforma' | 'quote' | null;
+  to: string | null;
+  cc: string[];
+  subject: string;
+  message: string;
+  attachmentName: string | null;
+}
+
+/** Corps de `POST …/email` (ADR-0042 § 3). */
+export interface DocumentEmailInput {
+  to: string;
+  cc: string[];
+  subject: string;
+  message: string;
+}
+
+/** Réponse de `POST …/email` : `delivered: false` n'est pas une erreur HTTP. */
+export interface DocumentEmailResult {
+  delivered: boolean;
+  reason: 'MAIL_NOT_CONFIGURED' | 'SMTP_ERROR' | 'ZEPTOMAIL_ERROR' | null;
+  to: string;
+  cc: string[];
+}
+
 /** `GET /sales/journal/export` (ADR-0026 § 6.3) — paramètres. */
 export interface SalesJournalExportQuery {
   from: string;
@@ -3441,6 +3470,16 @@ export const api = {
     invoicePdfRequest(invoiceId, 'pdf', fallbackName),
   downloadInvoiceDuplicate: (invoiceId: string, fallbackName: string) =>
     invoicePdfRequest(invoiceId, 'duplicate', fallbackName),
+  /** ADR-0042 : préremplissage (`sales.invoice`) et envoi par e-mail, PDF joint. */
+  getInvoiceEmailDraft: (invoiceId: string) =>
+    jsonRequest<DocumentEmailDraft>(`/sales/invoices/${encodeURIComponent(invoiceId)}/email`, {
+      method: 'GET',
+    }),
+  sendInvoiceEmail: (invoiceId: string, body: DocumentEmailInput) =>
+    jsonRequest<DocumentEmailResult>(`/sales/invoices/${encodeURIComponent(invoiceId)}/email`, {
+      method: 'POST',
+      body,
+    }),
   // ─── Encaissements et règlement (ADR-0031) ─────────────────────
   // Lecture `sales.read` ; écriture `sales.receipt` ; échéance `sales.manage`.
   listReceipts: (

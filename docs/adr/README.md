@@ -48,3 +48,6 @@ Décideurs :
 - [ADR-0041](ADR-0041-autorisations-par-membre.md) — Autorisations par membre : le rôle devient un
   titre et un modèle de départ, avec ajouts et retraits d'actions par membre (amende ADR-0012 et
   docs/12), après le lot C0 d'ADR-0040. Statut : **proposé, ADR-0041** (29 oct. 2026).
+- [ADR-0042](ADR-0042-envoi-des-documents-par-email.md) — Envoi des documents de vente par
+  e-mail depuis l'aperçu (facture, avoir, pro forma, devis ; PDF joint, audit strict, limite de
+  débit). Amende ADR-0035 et ADR-0040 sur ce seul point. Statut : **proposé** (30 oct. 2026).

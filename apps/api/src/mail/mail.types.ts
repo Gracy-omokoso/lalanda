@@ -22,6 +22,33 @@ export interface MailMessage {
    * transmettre — un `cid:` sans pièce jointe s'affiche comme une image cassée.
    */
   inlineImages?: InlineImage[];
+  /**
+   * Copies visibles (ADR-0042 § 3). Réservé aux documents de vente envoyés à un
+   * client : les e-mails transactionnels n'en ont jamais.
+   */
+  cc?: string[];
+  /** Adresse de réponse (ADR-0042 § 3) : la personne qui envoie, pas `no-reply`. */
+  replyTo?: { address: string; name: string };
+  /**
+   * Nom affiché de l'expéditeur, à la place de celui de `MAIL_FROM`. L'ADRESSE
+   * reste celle de `MAIL_FROM` (domaine vérifié) : seul le nom change.
+   */
+  fromName?: string;
+  /** Pièces jointes (ADR-0042 § 4) : le PDF d'un document de vente. */
+  attachments?: MailAttachment[];
+  /**
+   * Journaux d'exploitation sans données personnelles (ADR-0042 § 7) : le
+   * transport masque le destinataire et tait l'objet. L'audit garde le détail.
+   */
+  redactInLogs?: boolean;
+}
+
+/** Pièce jointe ordinaire (non référencée dans le HTML). */
+export interface MailAttachment {
+  filename: string;
+  contentType: 'application/pdf';
+  /** Contenu encodé en base64, sans préfixe `data:`. */
+  contentBase64: string;
 }
 
 /** Image en ligne d'un email : le contenu voyage dans le message lui-même. */

@@ -6,6 +6,7 @@
 // brouillon de facture (le brouillon de facture reste un geste de facturation).
 // Un devis n'engage pas le contribuable : l'émission de la facture qui en naît
 // reste en `sales.invoice`. Un devis d'une autre organisation répond 404.
+// `GET`/`POST :id/email` (`sales.quote`, ADR-0042) : envoi au client, PDF joint.
 
 import {
   Body,
@@ -29,6 +30,12 @@ import { RequirePermission } from '../../authz/authz.decorators.js';
 import { CurrentOrgRole } from '../../authz/current-org-role.decorator.js';
 import { PermissionsGuard } from '../../authz/permissions.guard.js';
 import type { OrgRole } from '../../authz/permissions.js';
+import {
+  OrgDocumentEmailThrottlerGuard,
+  UserDocumentEmailThrottlerGuard,
+} from '../../security/document-email-throttler.guard.js';
+import type { DocumentEmailDraft, DocumentEmailResult } from '../documents/document-email.js';
+import { documentEmailInputOf, senderOf } from '../documents/invoice-documents.controller.js';
 import { invalidRequest } from '../sales.errors.js';
 import type { InvoiceActor } from '../invoices/invoice.types.js';
 import { QuoteDocumentsService } from './quote-documents.service.js';
@@ -209,5 +216,31 @@ export class QuotesController {
     res.setHeader('content-length', String(doc.pdf.byteLength));
     res.setHeader('cache-control', 'no-store');
     res.end(doc.pdf);
+  }
+
+  @Get(':quoteId/email')
+  @RequirePermission('sales.quote')
+  async emailDraft(
+    @CurrentOrgId() orgId: string,
+    @CurrentUser() user: User,
+    @CurrentOrgRole() role: OrgRole | undefined,
+    @Param('quoteId') quoteId: string,
+  ): Promise<DocumentEmailDraft> {
+    return this.documents.emailDraft(orgId, quoteId, actorOf(user, role).name);
+  }
+
+  @Post(':quoteId/email')
+  @HttpCode(200)
+  @RequirePermission('sales.quote')
+  @UseGuards(UserDocumentEmailThrottlerGuard, OrgDocumentEmailThrottlerGuard)
+  async email(
+    @CurrentOrgId() orgId: string,
+    @CurrentUser() user: User,
+    @CurrentOrgRole() role: OrgRole | undefined,
+    @Param('quoteId') quoteId: string,
+    @Body() body: unknown,
+  ): Promise<DocumentEmailResult> {
+    const input = documentEmailInputOf(body);
+    return this.documents.email(orgId, quoteId, senderOf(user, role), input);
   }
 }

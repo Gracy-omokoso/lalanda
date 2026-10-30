@@ -36,6 +36,45 @@ import {
 } from './mail.types.js';
 import { envoyerViaZeptoMail } from './zeptomail.client.js';
 
+/** `jean@exemple.cd` → `j***@exemple.cd` : assez pour diagnostiquer, pas pour lire. */
+export function maskAddress(address: string): string {
+  const at = address.lastIndexOf('@');
+  if (at <= 0) return '***';
+  return `${address.slice(0, 1)}***${address.slice(at)}`;
+}
+
+/**
+ * `"Lalanda <no-reply@x>"` + `Exemple via Lalanda` → `"Exemple via Lalanda" <no-reply@x>`.
+ * L'adresse ne change jamais ; le nom est débarrassé des guillemets et sauts de ligne.
+ */
+export function withDisplayName(from: string, name: string): string {
+  const m = /<\s*([^>]+?)\s*>/.exec(from);
+  const address = (m?.[1] ?? from).trim();
+  const clean = name
+    .replace(/["\r\n<>]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return clean ? `"${clean}" <${address}>` : from;
+}
+
+/** Pièces jointes nodemailer : images en ligne (`cid`) puis pièces ordinaires ; `undefined` sans aucune. */
+function attachmentsOf(message: MailMessage) {
+  const all = [
+    ...(message.inlineImages ?? []).map((img) => ({
+      cid: img.cid,
+      filename: img.filename,
+      contentType: img.contentType,
+      content: Buffer.from(img.contentBase64, 'base64'),
+    })),
+    ...(message.attachments ?? []).map((a) => ({
+      filename: a.filename,
+      contentType: a.contentType,
+      content: Buffer.from(a.contentBase64, 'base64'),
+    })),
+  ];
+  return all.length > 0 ? all : undefined;
+}
+
 /** Contrat d'acheminement. Substituable en test par un espion sans réseau. */
 @Injectable()
 export abstract class MailTransport {
@@ -75,12 +114,15 @@ export class SmtpMailTransport extends MailTransport {
 
   async send(message: MailMessage): Promise<MailDeliveryResult> {
     const creds = await this.credentials.resolve();
+    // ADR-0042 § 7 : adresse masquée et objet tu pour un document envoyé à un client.
+    const to = message.redactInLogs ? maskAddress(message.to) : message.to;
+    const subject = message.redactInLogs ? '(document de vente)' : `"${message.subject}"`;
 
     if (!creds) {
       // Repli : ni jeton ni corps dans le journal (cf. en-tête de fichier).
       this.logger.warn(
-        `Email NON ENVOYÉ (aucun chemin d'envoi configuré) → destinataire=${message.to} ` +
-          `sujet="${message.subject}". Renseignez ZEPTOMAIL_TOKEN (recommandé) ou ` +
+        `Email NON ENVOYÉ (aucun chemin d'envoi configuré) → destinataire=${to} ` +
+          `sujet=${subject}. Renseignez ZEPTOMAIL_TOKEN (recommandé) ou ` +
           `SMTP_HOST pour activer l'envoi.`,
       );
       return { delivered: false, reason: 'MAIL_NOT_CONFIGURED' };
@@ -97,8 +139,8 @@ export class SmtpMailTransport extends MailTransport {
       // journalise donc la panne, le chemin emprunté, le destinataire et le sujet
       // — jamais le corps, qui porte le lien et son jeton.
       this.logger.error(
-        `Envoi ${creds.kind} en ÉCHEC → destinataire=${message.to} ` +
-          `sujet="${message.subject}" : ` +
+        `Envoi ${creds.kind} en ÉCHEC → destinataire=${to} ` +
+          `sujet=${subject} : ` +
           (err instanceof Error ? err.message : String(err)),
       );
       return {
@@ -121,18 +163,17 @@ export class SmtpMailTransport extends MailTransport {
         return;
       case 'smtp':
         await this.transporterFor(creds).sendMail({
-          from: creds.from,
+          from: message.fromName ? withDisplayName(creds.from, message.fromName) : creds.from,
           to: message.to,
+          ...(message.cc?.length ? { cc: message.cc } : {}),
+          ...(message.replyTo
+            ? { replyTo: { address: message.replyTo.address, name: message.replyTo.name } }
+            : {}),
           subject: message.subject,
           text: message.text,
           html: message.html,
           // nodemailer rattache une pièce jointe à son `cid:` quand `cid` est posé.
-          attachments: message.inlineImages?.map((img) => ({
-            cid: img.cid,
-            filename: img.filename,
-            contentType: img.contentType,
-            content: Buffer.from(img.contentBase64, 'base64'),
-          })),
+          attachments: attachmentsOf(message),
         });
         return;
     }
