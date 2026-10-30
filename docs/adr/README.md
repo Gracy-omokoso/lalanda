@@ -51,6 +51,12 @@ Décideurs :
 - [ADR-0042](ADR-0042-envoi-des-documents-par-email.md) — Envoi des documents de vente par
   e-mail depuis l'aperçu (facture, avoir, pro forma, devis ; PDF joint, audit strict, limite de
   débit). Amende ADR-0035 et ADR-0040 sur ce seul point. Statut : **proposé** (30 oct. 2026).
+- [ADR-0044](ADR-0044-achats-et-fournisseurs.md) — Achats et fournisseurs (R3) : fiches
+  fournisseurs (coordonnées de paiement chiffrées), demandes et bons de commande à approbation par
+  paliers avec séparation des tâches, réceptions sans stock, factures fournisseurs rapprochées à
+  deux ou trois voies, échéancier et paiements qui créent les dépenses de la trésorerie ; cinq
+  actions, aucun rôle nouveau. Lève le refus des achats d'ADR-0018. Statut : **proposé, ADR-0044**
+  (30 oct. 2026).
 
 ## Décisions récentes (légal)
 

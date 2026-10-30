@@ -512,6 +512,42 @@ estimés — … ni réalisé, ni plan »), `period`, `asOf`, `minSample` (10) e
 Tout taux et toute durée sous 10 cas : `{ status: 'unavailable', sample, requiredSample }`.
 `truncated: true` si plus de 20 000 opportunités sont en jeu.
 
+## Achats et fournisseurs — proposé, ADR-0044 (non implémenté)
+
+Contrat **proposé** par [ADR-0044](adr/ADR-0044-achats-et-fournisseurs.md) § 3 (R3 du RUN). Module
+`apps/api/src/purchases/`, web `/achats`. Cinq actions nouvelles (`purchase.read`,
+`purchase.request`, `purchase.manage`, `purchase.approve`, `payables.pay`) ; aucun rôle nouveau.
+
+| Méthode et chemin | Permission | Effet |
+|---|---|---|
+| `GET /purchases/suppliers` · `GET …/:id` · `GET …/:id/overview` | `purchase.read` | fiches (coordonnées de paiement masquées) ; fiche 360° par sections `known \| hidden \| empty` (commandes, réceptions, factures, solde dû et ancienneté par devise ; paiements et dépenses avec `treasury.read`) |
+| `POST /purchases/suppliers` · `PUT …/:id` · `…/archive` · `…/restore` · `…/merge` · `DELETE` | `purchase.manage` | `409 SUPPLIER_NIF_EXISTS`, `SUPPLIER_IN_USE`, `SUPPLIER_HAS_OPEN_PAYABLES` |
+| `POST …/:id/payment-methods` · `PUT`/`DELETE …/:methodId` | `purchase.manage` | chiffrées ; audit strict ; notification aux payeurs |
+| `POST …/:id/payment-methods/:methodId/reveal` | `payables.pay` | clair, audit strict, 30 par heure |
+| `GET /purchases/orders` · `GET …/:id` · `GET …/:id/pdf` | `purchase.read` | demandes et bons de commande ; PDF « n'est pas une facture » |
+| `POST /purchases/orders` · `PUT` · `DELETE` · `…/submit` · `…/duplicate` | `purchase.request` (ses demandes) ou `purchase.manage` | `DA…` à la soumission ; modifier efface les approbations |
+| `POST …/:id/approve` · `…/reject` · `GET /purchases/approvals/pending` | `purchase.approve` | paliers par devise ; `409 SELF_APPROVAL_FORBIDDEN`, `APPROVER_ALREADY_APPROVED` ; approbateur unique marqué ; `BC…` à l'approbation complète |
+| `POST …/:id/mark-sent` · `…/cancel` · `…/close` · `GET`/`POST …/:id/email` | `purchase.manage` | envoi au fournisseur selon ADR-0042 (audit strict, seau commun) ; l'envoi passe la commande à `sent` |
+| `GET /purchases/receptions` · `POST` · `…/:id/cancel` · pièce | `purchase.read` · `purchase.manage` | réceptions totales ou partielles, sans stock |
+| `GET /purchases/invoices` · `GET …/:id` | `purchase.read` | rapprochement `none \| two_way \| three_way`, reste à payer |
+| `POST /purchases/invoices` · `…/from-order` · `PUT` · `…/validate` · `…/dispute` · `…/cancel` · pièce | `purchase.manage` | `409 SUPPLIER_INVOICE_DUPLICATE`, `SUPPLIER_INVOICE_VARIANCE`, `SUPPLIER_INVOICE_TOTAL_MISMATCH` |
+| `POST …/:id/force-validate` | `purchase.approve` | validation malgré l'écart, motif obligatoire |
+| `GET /purchases/payables` · `GET /purchases/summary` | `purchase.read` | échéancier et ancienneté par devise ; engagé, facturé, payé |
+| `GET /purchases/payments` · `GET /purchases/duplicates` | `purchase.read` + `treasury.read` | paiements ; doublons probables avec les dépenses directes |
+| `POST /purchases/payments` · `…/:id/cancel` | `payables.pay` | crée (ou annule) les dépenses `treasury_expenses` correspondantes, ventilées par imputation |
+| `POST /purchases/payments/from-expense` | `payables.pay` + `treasury.manage` | une dépense directe existante devient le paiement (pas de double comptage) |
+| `GET /purchases/settings` · `PUT` | `purchase.read` · `purchase.manage` + `purchase.approve` | paliers, tolérances, échéances |
+
+Effets sur l'existant : `PUT`, `cancel` et pièce d'une dépense créée par un paiement →
+`409 EXPENSE_OWNED_BY_PURCHASES` ; `GET /treasury/suppliers` rend les fiches et les textes libres ;
+la prévision (`GET /treasury/forecast`) gagne la composante « Échéances fournisseurs » ; la marge
+d'un projet gagne `committed` et `ordered` (informatifs) ; « Mes tâches » gagne les éléments
+`source: 'purchases'` (approbations à faire) ; brief : R11 `factures_fournisseurs_en_retard`, R12
+`approbations_achat_en_attente`. Notifications : `purchases.approval_requested`,
+`purchases.request_approved`, `purchases.request_rejected`, `purchases.invoice_variance`,
+`purchases.invoice_due_soon`, `purchases.invoice_overdue`,
+`purchases.supplier_payment_details_changed`.
+
 ## Brief du matin — implémenté (ADR-0033)
 
 L'organisation est toujours celle de la session ; aucun corps ni paramètre ne la désigne.
