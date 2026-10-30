@@ -13,25 +13,46 @@ import {
 } from '@nestjs/common';
 import { Types } from 'mongoose';
 
-import { can, NO_OVERRIDES, type Action, type OrgRole } from '../authz/permissions.js';
+import type { CurrentOrgPermissionsValue } from '../authz/current-org-permissions.decorator.js';
+import {
+  can,
+  NO_OVERRIDES,
+  type Action,
+  type OrgPermissionContext,
+  type OrgRole,
+} from '../authz/permissions.js';
 import { conflict, invalidRequestOf, type SalesIssue } from '../sales/sales.errors.js';
 import { isObjectIdHex } from '../sales/search.js';
 
 export { conflict, staleRevision, invalidCursor } from '../sales/sales.errors.js';
 
-/** Appelant d'une requête du module. `role` absent : accès plateforme délégué. */
+/**
+ * Appelant d'une requête du module. `role` absent : accès plateforme délégué.
+ *
+ * ADR-0041 § 9.4 (A3) : `role` est le TITRE (audit, affichage) ; `context` porte
+ * le droit de clôture, les ajouts et les retraits du membre. Toute décision passe
+ * par le couple (`actorCan`), jamais par le rôle seul.
+ */
 export interface WorkActor {
   userId: string;
   role: OrgRole | undefined;
+  context: OrgPermissionContext;
 }
 
-export function workActorOf(user: { id: string }, role: OrgRole | undefined): WorkActor {
-  return { userId: user.id, role };
+export function workActorOf(
+  user: { id: string },
+  permissions: CurrentOrgPermissionsValue | undefined,
+): WorkActor {
+  return {
+    userId: user.id,
+    role: permissions?.role,
+    context: permissions?.context ?? NO_OVERRIDES,
+  };
 }
 
-/** L'appelant détient-il cette action dans l'organisation active ? */
+/** L'appelant détient-il EFFECTIVEMENT cette action dans l'organisation active ? */
 export function actorCan(actor: WorkActor, action: Action): boolean {
-  return actor.role !== undefined && can(actor.role, action, NO_OVERRIDES);
+  return actor.role !== undefined && can(actor.role, action, actor.context);
 }
 
 export function isWorkId(value: unknown): value is string {

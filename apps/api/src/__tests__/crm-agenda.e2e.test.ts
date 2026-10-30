@@ -357,6 +357,7 @@ e2eSuite('CRM — relances dans Mes tâches, cloche et brief (ADR-0040 — C4)',
       const withRead = await service.myTasks(f.orgId(), {
         userId: accountant,
         role: 'accountant',
+        context: {},
       });
       expect(crmIds(withRead as unknown as Groups)).toContain(a.id);
       const notifs = async () =>
@@ -367,7 +368,11 @@ e2eSuite('CRM — relances dans Mes tâches, cloche et brief (ADR-0040 — C4)',
       expect((await notifs()).some((n) => n.source.entityId === a.id)).toBe(true);
 
       // Cas théorique : le rôle ne détient plus `crm.read`.
-      const without = await service.myTasks(f.orgId(), { userId: accountant, role: 'advisor' });
+      const without = await service.myTasks(f.orgId(), {
+        userId: accountant,
+        role: 'advisor',
+        context: {},
+      });
       expect(crmIds(without as unknown as Groups)).toEqual([]);
       await f
         .db()

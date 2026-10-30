@@ -25,7 +25,8 @@ import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Types, type ClientSession, type Connection, type Model } from 'mongoose';
 
 import { AuditService } from '../../authz/audit.service.js';
-import { can, NO_OVERRIDES, normalizeOrgRole } from '../../authz/permissions.js';
+import { MEMBER_PERMISSIONS_PROJECTION, memberPermissionsOf } from '../../authz/authz.service.js';
+import { can } from '../../authz/permissions.js';
 import { Membership, type MembershipDocument } from '../../organizations/membership.schema.js';
 import { invalidCursor, isDuplicateKey, staleRevision } from '../../sales/sales.errors.js';
 import {
@@ -644,13 +645,13 @@ export class CrmAccountsService {
   async assertOwner(organizationId: string, ownerId: string | null): Promise<void> {
     if (ownerId === null || ownerId === CRM_ACCOUNTS_SYSTEM_ACTOR) return;
     const m = await this.memberships
-      .findOne({ organizationId, userId: ownerId }, { role: 1 })
-      .lean<{ role: string }>()
+      .findOne({ organizationId, userId: ownerId }, MEMBER_PERMISSIONS_PROJECTION)
+      .lean()
       .exec();
     if (!m) ownerNotFound();
-    const role = normalizeOrgRole(m.role);
-    // ADR-0041 A3 : passer aux droits effectifs du membre (ajouts et retraits).
-    if (!role || !can(role, 'crm.manage', NO_OVERRIDES)) ownerNotEligible();
+    // ADR-0041 § 9.4 (A3) : éligibilité sur les droits effectifs (titre + écart).
+    const owner = memberPermissionsOf(m);
+    if (!owner || !can(owner.role, 'crm.manage', owner.context)) ownerNotEligible();
   }
 
   /** Autres comptes non fusionnés de même nom normalisé (avertissement, jamais un refus). */

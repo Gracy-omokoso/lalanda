@@ -42,6 +42,7 @@ import { InvoiceDraftsService } from '../../sales/invoices/invoice-drafts.servic
 import { lineInputOf } from '../../sales/quotes/quotes.service.js';
 import { searchKeyOf } from '../../sales/search.js';
 import {
+  actorCan,
   conflict,
   forbidden,
   invalid,
@@ -315,13 +316,12 @@ export class WorkBillingService {
    * accepté) : délègue à `createFromQuote` (même idempotence, `links.opportunityId`
    * posé). Sans devis : une tâche par ligne de l'opportunité, sans montant,
    * `source.kind = 'opportunity'`, idempotent par l'index unique partiel.
-   * `salesRead` : l'appelant détient `sales.read` (exigé pour désigner un devis).
+   * Désigner un devis (`quoteId`) exige en plus `sales.read` (droits effectifs).
    */
   async createFromOpportunity(
     organizationId: string,
     body: CreateProjectFromOpportunityBody,
     actor: WorkActor,
-    access: { salesRead: boolean },
   ): Promise<WorkProjectView> {
     const opp = await this.opportunityOf(organizationId, body.opportunityId);
     const opportunityId = String(opp._id);
@@ -338,7 +338,7 @@ export class WorkBillingService {
       );
     }
 
-    const quoteId = await this.acceptedQuoteOf(organizationId, opportunityId, body, access);
+    const quoteId = await this.acceptedQuoteOf(organizationId, opportunityId, body, actor);
     if (quoteId !== null) {
       return this.createFromQuote(
         organizationId,
@@ -418,10 +418,11 @@ export class WorkBillingService {
     organizationId: string,
     opportunityId: string,
     body: CreateProjectFromOpportunityBody,
-    access: { salesRead: boolean },
+    actor: WorkActor,
   ): Promise<string | null> {
     if (body.quoteId !== undefined) {
-      if (!access.salesRead) {
+      // Droits EFFECTIFS de l'appelant (ADR-0041), pas le seul rôle.
+      if (!actorCan(actor, 'sales.read')) {
         forbidden('FORBIDDEN', 'Désigner un devis exige le droit de lire les ventes.');
       }
       const quote = await this.quoteOf(organizationId, body.quoteId);

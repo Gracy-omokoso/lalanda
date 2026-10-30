@@ -13,9 +13,13 @@ import { AuthGuard } from '../auth/auth.guard.js';
 import { CurrentOrgId, CurrentUser } from '../auth/current-user.decorator.js';
 import { AuditService } from '../authz/audit.service.js';
 import { RequirePermission } from '../authz/authz.decorators.js';
+import {
+  CurrentOrgPermissions,
+  type CurrentOrgPermissionsValue,
+} from '../authz/current-org-permissions.decorator.js';
 import { CurrentOrgRole } from '../authz/current-org-role.decorator.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
-import { can, NO_OVERRIDES, type OrgRole } from '../authz/permissions.js';
+import { can, type OrgRole } from '../authz/permissions.js';
 import { ProjectsService } from '../projects/projects.service.js';
 import {
   BusinessPlanOverviewService,
@@ -52,13 +56,14 @@ export class BusinessPlanOrgController {
   @RequirePermission('project.read')
   async getSettings(
     @CurrentOrgId() orgId: string,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
   ): Promise<BusinessPlanSettingsView> {
     const disabledBy = await this.service.aiDisabledBy(orgId);
+    // ADR-0041 § 9.4 (A3) : droits effectifs ; repli de moindre privilège (Lecteur).
     return {
       aiEnabled: disabledBy === null,
       disabledBy,
-      canManage: can(role ?? 'viewer', 'organization.manage', NO_OVERRIDES),
+      canManage: perms !== undefined && can(perms.role, 'organization.manage', perms.context),
     };
   }
 
@@ -68,6 +73,7 @@ export class BusinessPlanOrgController {
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: { id: string },
     @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Body() body: unknown,
   ): Promise<BusinessPlanSettingsView> {
     const parsed = SettingsRequestSchema.safeParse(body);
@@ -84,6 +90,6 @@ export class BusinessPlanOrgController {
       targetId: orgId,
       metadata: { aiEnabled: parsed.data.aiEnabled },
     });
-    return this.getSettings(orgId, role);
+    return this.getSettings(orgId, perms);
   }
 }
