@@ -51,6 +51,8 @@ export interface ExpenseView {
   categoryLabel: string;
   label: string;
   supplierName: string | null;
+  /** ADR-0044 — P2 : fiche fournisseur, ou `null` (fournisseur de passage). */
+  supplierId: string | null;
   accountId: string | null;
   deductibleVat: string | null;
   reference: string | null;
@@ -76,6 +78,24 @@ type ExpenseLean = TreasuryExpense & { _id: Types.ObjectId };
 /** Collection du module « work », lue en lecture seule (ADR-0039 § 2.10). */
 const WORK_PROJECTS = 'work_projects';
 
+/**
+ * ADR-0044 — P2 : fiches fournisseurs, lues en lecture seule par la connexion (la
+ * trésorerie n'importe pas le module des achats, motif de `work_projects`).
+ */
+const SUPPLIERS = 'suppliers';
+
+/** Fournisseur d'une dépense ou d'une règle : fiche et copie d'affichage du nom. */
+export interface ResolvedSupplier {
+  supplierId: string | null;
+  supplierName: string | null;
+}
+
+/** Élément de l'autocomplétion des fournisseurs (ADR-0044 § 3.1). */
+export interface TreasurySupplierEntry {
+  name: string;
+  supplierId: string | null;
+}
+
 const CATEGORY_LABELS = new Map<string, string>(EXPENSE_CATEGORIES.map((c) => [c.code, c.label]));
 
 export function expenseView(doc: ExpenseLean): ExpenseView {
@@ -88,6 +108,7 @@ export function expenseView(doc: ExpenseLean): ExpenseView {
     categoryLabel: CATEGORY_LABELS.get(doc.category) ?? doc.category,
     label: doc.label,
     supplierName: doc.supplierName ?? null,
+    supplierId: doc.supplierId ?? null,
     accountId: doc.accountId ?? null,
     deductibleVat: doc.deductibleVat ?? null,
     reference: doc.reference ?? null,
@@ -218,6 +239,103 @@ export class TreasuryExpensesService {
     return names.sort((a, b) => a.localeCompare(b, 'fr')).slice(0, 50);
   }
 
+  /**
+   * ADR-0044 — P2 (§ 3.1) : les fiches fournisseurs actives ET les textes libres
+   * restants (dépenses sans fiche), chaque élément avec `supplierId | null`. Fiches
+   * d'abord, puis textes, chacun trié ; 50 au plus.
+   */
+  async supplierEntries(
+    organizationId: string,
+    q: string | undefined,
+  ): Promise<TreasurySupplierEntry[]> {
+    const term = normalizeForSearch(q ?? '');
+    const cards = await this.connection
+      .collection(SUPPLIERS)
+      .find(
+        {
+          organizationId,
+          active: true,
+          mergedInto: null,
+          ...(term !== '' ? { searchKey: { $regex: escapeRegex(term) } } : {}),
+        },
+        { projection: { name: 1, sortName: 1 } },
+      )
+      .sort({ sortName: 1, _id: 1 })
+      .limit(50)
+      .toArray();
+    const filter: FilterQuery<TreasuryExpenseDocument> = {
+      organizationId,
+      supplierName: { $type: 'string' },
+      $or: [{ supplierId: null }, { supplierId: { $exists: false } }],
+    };
+    if (term !== '') filter.supplierKey = { $regex: escapeRegex(term) };
+    const texts = (await this.expenses.distinct('supplierName', filter).exec()) as string[];
+    const cardKeys = new Set(cards.map((c) => normalizeForSearch(String(c['name']))));
+    return [
+      ...cards.map((c) => ({ name: String(c['name']), supplierId: String(c._id) })),
+      ...texts
+        .filter((t) => !cardKeys.has(normalizeForSearch(t)))
+        .sort((a, b) => a.localeCompare(b, 'fr'))
+        .map((name) => ({ name, supplierId: null })),
+    ].slice(0, 50);
+  }
+
+  /**
+   * ADR-0044 — P2 (§ 2.8, § 2.9) : fiche fournisseur d'une écriture de la trésorerie.
+   *
+   * - `supplierId` posé : fiche de l'organisation (404 sinon), non fusionnée (409),
+   *   active à l'écriture (409), sauf si c'est déjà celle de l'écriture courante ;
+   *   `supplierName` devient la copie du nom de la fiche ;
+   * - `supplierId: null` : fournisseur de passage, texte libre seul ;
+   * - absent : la fiche courante est conservée si le texte n'a pas changé ; sinon le
+   *   texte est rattaché par clé EXACTE à la fiche active qui la porte dans
+   *   `legacyKeys` (aucun rapprochement approché), ou reste libre.
+   */
+  async resolveSupplier(
+    organizationId: string,
+    input: { supplierId?: string | null | undefined; supplierName: string | null },
+    current: ResolvedSupplier | null,
+  ): Promise<ResolvedSupplier> {
+    if (input.supplierId === null) return { supplierId: null, supplierName: input.supplierName };
+    if (typeof input.supplierId === 'string') {
+      const card = Types.ObjectId.isValid(input.supplierId)
+        ? await this.connection
+            .collection(SUPPLIERS)
+            .findOne(
+              { _id: new Types.ObjectId(input.supplierId), organizationId },
+              { projection: { name: 1, active: 1, mergedInto: 1 } },
+            )
+        : null;
+      if (!card)
+        notFound('EXPENSE_SUPPLIER_UNKNOWN', 'Fournisseur introuvable dans cette organisation.');
+      const id = String(card._id);
+      if (card['mergedInto']) {
+        conflict('SUPPLIER_MERGED', 'Ce fournisseur a été fusionné dans une autre fiche.', {
+          mergedInto: String(card['mergedInto']),
+        });
+      }
+      if (card['active'] === false && current?.supplierId !== id) {
+        conflict(
+          'SUPPLIER_ARCHIVED',
+          'Ce fournisseur est archivé : restaurez-le avant de l’utiliser.',
+        );
+      }
+      return { supplierId: id, supplierName: String(card['name']) };
+    }
+    if (current?.supplierId && input.supplierName === current.supplierName) return current;
+    if (input.supplierName === null) return { supplierId: null, supplierName: null };
+    const card = await this.connection.collection(SUPPLIERS).findOne(
+      {
+        organizationId,
+        legacyKeys: normalizeForSearch(input.supplierName),
+        mergedInto: null,
+        active: true,
+      },
+      { sort: { _id: 1 }, projection: { _id: 1 } },
+    );
+    return { supplierId: card ? String(card._id) : null, supplierName: input.supplierName };
+  }
+
   async create(
     organizationId: string,
     input: ExpenseInputDto,
@@ -225,13 +343,22 @@ export class TreasuryExpensesService {
     recurrence: { recurringExpenseId: string; occurrenceDate: string } | null = null,
   ): Promise<ExpenseLean> {
     await this.assertRules(organizationId, input);
-    const { workProjectId, ...fields } = input;
+    const { workProjectId, supplierId: _supplierId, ...fields } = input;
     if (workProjectId) await this.assertWorkProject(organizationId, workProjectId);
+    // ADR-0044 — P2 : l'occurrence d'une règle garde la fiche de sa règle, même archivée.
+    const supplier = await this.resolveSupplier(
+      organizationId,
+      input,
+      recurrence && input.supplierId
+        ? { supplierId: input.supplierId, supplierName: input.supplierName }
+        : null,
+    );
     const doc = await this.expenses.create({
       organizationId,
       ...fields,
+      ...supplier,
       workProjectId: workProjectId ?? null,
-      supplierKey: input.supplierName ? normalizeForSearch(input.supplierName) : null,
+      supplierKey: supplier.supplierName ? normalizeForSearch(supplier.supplierName) : null,
       attachment: null,
       recurringExpenseId: recurrence?.recurringExpenseId ?? null,
       occurrenceDate: recurrence?.occurrenceDate ?? null,
@@ -275,18 +402,24 @@ export class TreasuryExpensesService {
     await this.assertRules(organizationId, input);
     // Absent : rattachement inchangé ; seul un NOUVEAU projet est contrôlé (un
     // projet archivé depuis reste lisible sur la dépense).
-    const { workProjectId, ...fields } = input;
+    const { workProjectId, supplierId: _supplierId, ...fields } = input;
     if (workProjectId && workProjectId !== (current.workProjectId ?? null)) {
       await this.assertWorkProject(organizationId, workProjectId);
     }
+    // ADR-0044 — P2 : fiche fournisseur (posée, retirée, conservée ou rattachée).
+    const supplier = await this.resolveSupplier(organizationId, input, {
+      supplierId: current.supplierId ?? null,
+      supplierName: current.supplierName ?? null,
+    });
     const updated = await this.expenses
       .findOneAndUpdate(
         { _id: current._id, organizationId, revision: expectedRevision, status: 'recorded' },
         {
           $set: {
             ...fields,
+            ...supplier,
             ...(workProjectId !== undefined ? { workProjectId } : {}),
-            supplierKey: input.supplierName ? normalizeForSearch(input.supplierName) : null,
+            supplierKey: supplier.supplierName ? normalizeForSearch(supplier.supplierName) : null,
             updatedBy: actor.userId,
           },
           $inc: { revision: 1 },

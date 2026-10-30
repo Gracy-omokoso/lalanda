@@ -3,7 +3,7 @@
 //   GET  /treasury/categories                          catégories (treasury.read)
 //   GET  /treasury/expenses                            liste paginée
 //   GET  /treasury/expenses/summary                    totaux mois × devise × catégorie (moteur)
-//   GET  /treasury/suppliers?q=                        fournisseurs déjà saisis
+//   GET  /treasury/suppliers?q=                        fiches fournisseurs et textes libres (ADR-0044 — P2)
 //   GET  /treasury/expenses/:id                        détail
 //   POST /treasury/expenses                            enregistrer (treasury.manage)
 //   PUT  /treasury/expenses/:id                        modifier (révision attendue)
@@ -63,6 +63,7 @@ import {
   TreasuryExpensesService,
   type ExpensePage,
   type ExpenseView,
+  type TreasurySupplierEntry,
 } from './treasury-expenses.service.js';
 import {
   TreasuryRecurringService,
@@ -146,12 +147,13 @@ export class TreasuryExpensesController {
   async suppliers(
     @CurrentOrgId() orgId: string,
     @Query('q') q?: string,
-  ): Promise<{ items: string[] }> {
+  ): Promise<{ items: string[]; entries: TreasurySupplierEntry[] }> {
+    const term = typeof q === 'string' ? q.slice(0, 100) : undefined;
     return {
-      items: await this.expenses.suppliers(
-        orgId,
-        typeof q === 'string' ? q.slice(0, 100) : undefined,
-      ),
+      items: await this.expenses.suppliers(orgId, term),
+      // ADR-0044 — P2 (§ 3.1) : fiches ET textes libres, chacun avec `supplierId | null`.
+      // `items` (noms seuls) reste servi tant que l'écran de dépense ne lit pas `entries`.
+      entries: await this.expenses.supplierEntries(orgId, term),
     };
   }
 

@@ -50,6 +50,8 @@ export interface RecurringExpenseView {
   category: ExpenseCategory;
   categoryLabel: string;
   supplierName: string | null;
+  /** ADR-0044 — P2 : fiche fournisseur, ou `null`. */
+  supplierId: string | null;
   accountId: string | null;
   frequency: RecurrenceFrequency;
   startDate: string;
@@ -133,9 +135,12 @@ export class TreasuryRecurringService {
     actor: TreasuryActor,
   ): Promise<RecurringExpenseView> {
     await this.assertAccount(organizationId, input);
+    // ADR-0044 — P2 : fiche fournisseur (même règle que les dépenses).
+    const supplier = await this.expenseService.resolveSupplier(organizationId, input, null);
     const doc = await this.rules.create({
       organizationId,
       ...input,
+      ...supplier,
       revision: 1,
       createdBy: actor.userId,
       updatedBy: actor.userId,
@@ -163,10 +168,15 @@ export class TreasuryRecurringService {
     const current = await this.requireOwn(organizationId, ruleId);
     if (current.revision !== expectedRevision) staleRevision(current.revision);
     await this.assertAccount(organizationId, input);
+    // ADR-0044 — P2 : fiche fournisseur (posée, retirée, conservée ou rattachée).
+    const supplier = await this.expenseService.resolveSupplier(organizationId, input, {
+      supplierId: current.supplierId ?? null,
+      supplierName: current.supplierName ?? null,
+    });
     const updated = await this.rules
       .findOneAndUpdate(
         { _id: current._id, organizationId, revision: expectedRevision },
-        { $set: { ...input, updatedBy: actor.userId }, $inc: { revision: 1 } },
+        { $set: { ...input, ...supplier, updatedBy: actor.userId }, $inc: { revision: 1 } },
         { new: true },
       )
       .lean<RuleLean>()
@@ -258,6 +268,8 @@ export class TreasuryRecurringService {
           category: rule.category,
           label: rule.label,
           supplierName: rule.supplierName ?? null,
+          // ADR-0044 — P2 : l'occurrence porte la fiche de sa règle.
+          supplierId: rule.supplierId ?? null,
           accountId:
             overrides.accountId === undefined ? (rule.accountId ?? null) : overrides.accountId,
           deductibleVat: null,
@@ -324,6 +336,7 @@ export class TreasuryRecurringService {
       category: d.category,
       categoryLabel: CATEGORY_LABELS.get(d.category) ?? d.category,
       supplierName: d.supplierName ?? null,
+      supplierId: d.supplierId ?? null,
       accountId: d.accountId ?? null,
       frequency: d.frequency,
       startDate: d.startDate,
