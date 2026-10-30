@@ -24,11 +24,14 @@ export const NOTIFICATION_KINDS = [
   'crm.activity_overdue',
   'crm.opportunity_assigned',
   'crm.opportunity_won',
+  // ADR-0041 — A4 : « Vos autorisations ont changé » (titre, ajouts, retraits, clôture).
+  'organization.permissions_changed',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
 /** Modules producteurs connus. */
-export const NOTIFICATION_SOURCE_MODULES = ['work', 'crm'] as const;
+// ADR-0041 — A4 : `organization` (gestion des membres).
+export const NOTIFICATION_SOURCE_MODULES = ['work', 'crm', 'organization'] as const;
 export type NotificationSourceModule = (typeof NOTIFICATION_SOURCE_MODULES)[number];
 
 /** Natures de l'entité d'origine (ADR-0040 — C4 § 5.4 : `activity`, `opportunity`, `account`). */
@@ -38,6 +41,8 @@ export const NOTIFICATION_ENTITY_TYPES = [
   'activity',
   'opportunity',
   'account',
+  // ADR-0041 — A4 : appartenance dont les autorisations ont changé.
+  'membership',
 ] as const;
 export type NotificationEntityType = (typeof NOTIFICATION_ENTITY_TYPES)[number];
 

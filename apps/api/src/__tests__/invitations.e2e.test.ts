@@ -10,11 +10,11 @@ import { NestFactory } from '@nestjs/core';
 import { toNodeHandler } from 'better-auth/node';
 import { randomBytes } from 'node:crypto';
 import request from 'supertest';
-import { afterAll, beforeAll, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import 'reflect-metadata';
 
-import { e2eSuite, teardown } from './e2e-utils.js';
+import { dbOf, e2eSuite, teardown } from './e2e-utils.js';
 import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 async function makeApp(): Promise<INestApplication> {
@@ -264,4 +264,187 @@ e2eSuite('invitations (brief §6, docs/12-ROLES-PERMISSIONS.md)', () => {
     expect(attempt.status).toBe(400);
     expect(attempt.body.code).toBe('INVITATION_REVOKED');
   }, 60_000);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ADR-0041 — A4 : l'invitation porte un écart (critère 11)
+  //
+  // Validé À L'ENVOI contre les droits effectifs de l'invitant, puis REVALIDÉ À
+  // L'ACCEPTATION contre ses droits effectifs du moment. Interrupteur
+  // `MEMBER_PERMISSIONS_ENABLED` éteint : une invitation n'accepte pas d'écart.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  describe('ADR-0041 — A4 : invitation avec écart', () => {
+    const INTERRUPTEUR = process.env['MEMBER_PERMISSIONS_ENABLED'];
+    const server = (): ReturnType<INestApplication['getHttpServer']> => app.getHttpServer();
+
+    afterEach(() => {
+      if (INTERRUPTEUR === undefined) delete process.env['MEMBER_PERMISSIONS_ENABLED'];
+      else process.env['MEMBER_PERMISSIONS_ENABLED'] = INTERRUPTEUR;
+    });
+
+    async function userIdOf(email: string): Promise<string> {
+      const db = await dbOf(app);
+      const doc = await db.collection('user').findOne({ email: email.toLowerCase() });
+      if (!doc) throw new Error(`${email} introuvable`);
+      return String(doc._id);
+    }
+
+    /** Propriétaire + Administrateur (invité, accepté) dans l'organisation du premier. */
+    async function equipe(tag: string): Promise<{
+      orgId: string;
+      ownerCookies: string[];
+      adminCookies: string[];
+      adminId: string;
+    }> {
+      const owner = makeUser('a4owner', tag);
+      const admin = makeUser('a4admin', tag);
+      const ownerCookies = await registerAndLogin(owner);
+      const adminCookies = await registerAndLogin(admin);
+      const orgId = await getPrimaryOrgId(ownerCookies);
+      const inv = await request(server())
+        .post(`/organizations/${orgId}/invitations`)
+        .set('Cookie', ownerCookies)
+        .send({ email: admin.email, role: 'admin' });
+      expect(inv.status, JSON.stringify(inv.body)).toBe(201);
+      const acc = await request(server())
+        .post('/invitations/accept')
+        .set('Cookie', adminCookies)
+        .send({ token: inv.body.token });
+      expect(acc.status).toBe(201);
+      return { orgId, ownerCookies, adminCookies, adminId: await userIdOf(admin.email) };
+    }
+
+    it('interrupteur éteint : une invitation avec écart → 409 MEMBER_PERMISSIONS_DISABLED', async () => {
+      delete process.env['MEMBER_PERMISSIONS_ENABLED'];
+      const tag = uniqueTag();
+      const owner = makeUser('a4off', tag);
+      const invitee = makeUser('a4offinv', tag);
+      const cookies = await registerAndLogin(owner);
+      const orgId = await getPrimaryOrgId(cookies);
+      const res = await request(server())
+        .post(`/organizations/${orgId}/invitations`)
+        .set('Cookie', cookies)
+        .send({ email: invitee.email, role: 'viewer', grants: ['crm.manage'] });
+      expect(res.status).toBe(409);
+      expect(res.body.code).toBe('MEMBER_PERMISSIONS_DISABLED');
+    }, 60_000);
+
+    it('critère 11 — « Lecteur + crm.manage » par un Administrateur : appartenance avec cet écart', async () => {
+      process.env['MEMBER_PERMISSIONS_ENABLED'] = 'true';
+      const tag = uniqueTag();
+      const { orgId, adminCookies } = await equipe(tag);
+      const invitee = makeUser('a4lect', tag);
+      const inviteeCookies = await registerAndLogin(invitee);
+
+      // Validé à l'envoi : l'Administrateur n'a pas `sales.invoice`.
+      const escalade = await request(server())
+        .post(`/organizations/${orgId}/invitations`)
+        .set('Cookie', adminCookies)
+        .send({ email: invitee.email, role: 'viewer', grants: ['crm.manage', 'sales.invoice'] });
+      expect(escalade.status).toBe(403);
+      expect(escalade.body.code).toBe('PERMISSION_ESCALATION');
+
+      const inv = await request(server())
+        .post(`/organizations/${orgId}/invitations`)
+        .set('Cookie', adminCookies)
+        .send({ email: invitee.email, role: 'viewer', grants: ['crm.manage'] });
+      expect(inv.status, JSON.stringify(inv.body)).toBe(201);
+      expect(inv.body.invitation).toMatchObject({ grants: ['crm.manage'], revokes: [] });
+
+      // L'invitation listée affiche son écart.
+      const liste = await request(server())
+        .get(`/organizations/${orgId}/invitations`)
+        .set('Cookie', adminCookies);
+      expect(
+        (liste.body.invitations as { id: string; grants: string[] }[]).find(
+          (i) => i.id === inv.body.invitation.id,
+        )?.grants,
+      ).toEqual(['crm.manage']);
+
+      const acc = await request(server())
+        .post('/invitations/accept')
+        .set('Cookie', inviteeCookies)
+        .send({ token: inv.body.token });
+      expect(acc.status, JSON.stringify(acc.body)).toBe(201);
+
+      const db = await dbOf(app);
+      const inviteeId = await userIdOf(invitee.email);
+      const m = await db
+        .collection('memberships')
+        .findOne({ organizationId: orgId, userId: inviteeId });
+      expect(m?.['role']).toBe('viewer');
+      expect(m?.['grants']).toEqual(['crm.manage']);
+      const trace = await db.collection('audit_events').findOne({
+        organizationId: orgId,
+        action: 'member.permissions_changed',
+        targetId: inviteeId,
+      });
+      expect(trace?.['metadata']).toMatchObject({
+        stage: 'acceptance',
+        after: { role: 'viewer', grants: ['crm.manage'] },
+      });
+
+      const moi = await request(server())
+        .get('/me/permissions')
+        .set('Cookie', [...inviteeCookies, `active_org_id=${orgId}`]);
+      expect(moi.body.actions).toContain('crm.manage');
+      expect(moi.body.customized).toBe(true);
+    }, 90_000);
+
+    it("critère 11 — l'Administrateur a perdu `crm.manage` entre-temps : 403, aucune appartenance", async () => {
+      process.env['MEMBER_PERMISSIONS_ENABLED'] = 'true';
+      const tag = uniqueTag();
+      const { orgId, ownerCookies, adminCookies, adminId } = await equipe(tag);
+      const invitee = makeUser('a4lect2', tag);
+      const inviteeCookies = await registerAndLogin(invitee);
+
+      const inv = await request(server())
+        .post(`/organizations/${orgId}/invitations`)
+        .set('Cookie', adminCookies)
+        .send({ email: invitee.email, role: 'viewer', grants: ['crm.manage'] });
+      expect(inv.status, JSON.stringify(inv.body)).toBe(201);
+
+      const retrait = await request(server())
+        .patch(`/organizations/${orgId}/members/${adminId}/permissions`)
+        .set('Cookie', ownerCookies)
+        .send({ grants: [], revokes: ['crm.manage'], expectedRevision: 0 });
+      expect(retrait.status, JSON.stringify(retrait.body)).toBe(200);
+
+      const acc = await request(server())
+        .post('/invitations/accept')
+        .set('Cookie', inviteeCookies)
+        .send({ token: inv.body.token });
+      expect(acc.status).toBe(403);
+      expect(acc.body.code).toBe('INVITATION_INVITER_NO_LONGER_AUTHORIZED');
+
+      const db = await dbOf(app);
+      const m = await db
+        .collection('memberships')
+        .findOne({ organizationId: orgId, userId: await userIdOf(invitee.email) });
+      expect(m).toBeNull();
+    }, 90_000);
+
+    it("une invitation avec écart créée allumé n'est pas acceptée interrupteur éteint", async () => {
+      process.env['MEMBER_PERMISSIONS_ENABLED'] = 'true';
+      const tag = uniqueTag();
+      const owner = makeUser('a4bascule', tag);
+      const invitee = makeUser('a4basculeinv', tag);
+      const cookies = await registerAndLogin(owner);
+      const inviteeCookies = await registerAndLogin(invitee);
+      const orgId = await getPrimaryOrgId(cookies);
+      const inv = await request(server())
+        .post(`/organizations/${orgId}/invitations`)
+        .set('Cookie', cookies)
+        .send({ email: invitee.email, role: 'viewer', revokes: ['treasury.read'] });
+      expect(inv.status, JSON.stringify(inv.body)).toBe(201);
+
+      delete process.env['MEMBER_PERMISSIONS_ENABLED'];
+      const acc = await request(server())
+        .post('/invitations/accept')
+        .set('Cookie', inviteeCookies)
+        .send({ token: inv.body.token });
+      expect(acc.status).toBe(409);
+      expect(acc.body.code).toBe('MEMBER_PERMISSIONS_DISABLED');
+    }, 90_000);
+  });
 });

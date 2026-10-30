@@ -69,6 +69,11 @@ export const LIBELLES_TYPES: Record<NotificationKind, { label: string; aide: str
     label: 'Opportunité gagnée',
     aide: 'Une opportunité dont vous êtes responsable est gagnée.',
   },
+  // ADR-0041 — A4 : décision ouverte n° 10, sans détail.
+  'organization.permissions_changed': {
+    label: 'Autorisations modifiées',
+    aide: 'Vos autorisations dans l’organisation ont changé.',
+  },
 };
 
 /** Types dans l'ordre d'affichage des préférences. */

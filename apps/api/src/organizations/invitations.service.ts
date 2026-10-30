@@ -4,19 +4,37 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import type { Model } from 'mongoose';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import type { ClientSession, Connection, Model } from 'mongoose';
 
+import { AuditService } from '../authz/audit.service.js';
+import {
+  MEMBER_PERMISSIONS_PROJECTION,
+  memberPermissionsEnabled,
+  memberPermissionsOf,
+  type MemberPermissions,
+} from '../authz/authz.service.js';
 import {
   canGrantRole,
   isAssignableRole,
   normalizeOrgRole,
+  validateOverrides,
+  type Action,
   type OrgRole,
 } from '../authz/permissions.js';
 import { Invitation, type InvitationDocument } from './invitation.schema.js';
+import {
+  assertPermissionsWritable,
+  inTransaction,
+  overrideViolationToHttp,
+  permissionsDisabled,
+  stateOf,
+  storedOverridesOf,
+} from './member-permissions.js';
 import {
   MEMBERSHIP_SCHEMA_VERSION,
   Membership,
@@ -40,7 +58,16 @@ export class InvitationsService {
   constructor(
     @InjectModel(Invitation.name) private readonly invModel: Model<InvitationDocument>,
     @InjectModel(Membership.name) private readonly membershipModel: Model<MembershipDocument>,
+    @InjectConnection() private readonly connection: Connection,
+    @Inject(AuditService) private readonly audit: AuditService,
   ) {}
+
+  /** R7 sur le titre : droits effectifs de l'acteur interrupteur allumé, ligne du rôle sinon. */
+  private canGrantTitle(actor: MemberPermissions, role: OrgRole): boolean {
+    return memberPermissionsEnabled()
+      ? canGrantRole(actor.role, role, actor.context)
+      : canGrantRole(actor.role, role);
+  }
 
   /**
    * Rôle de l'appelant dans l'organisation.
@@ -71,8 +98,22 @@ export class InvitationsService {
     invitedBy: string;
     email: string;
     role?: OrgRole;
+    /** ADR-0041 § 6 — écart choisi dès l'invitation. */
+    grants?: Action[];
+    revokes?: Action[];
   }): Promise<InvitationDocument> {
-    const actor = await this.actorRole(input.invitedBy, input.organizationId);
+    await this.actorRole(input.invitedBy, input.organizationId);
+    const requestedGrants = input.grants ?? [];
+    const requestedRevokes = input.revokes ?? [];
+    // Interrupteur éteint : une invitation n'accepte pas d'écart (refus explicite).
+    assertPermissionsWritable(requestedGrants, requestedRevokes);
+    const actorDoc = await this.membershipModel
+      .findOne({ userId: input.invitedBy, organizationId: input.organizationId })
+      .select(MEMBER_PERMISSIONS_PROJECTION)
+      .lean()
+      .exec();
+    const actor = actorDoc ? memberPermissionsOf(actorDoc) : undefined;
+    if (!actor) throw new ForbiddenException({ code: 'UNKNOWN_ROLE' });
 
     // Défaut `viewer` — moindre privilège (ADR-0012 §7).
     const role: OrgRole = input.role ?? 'viewer';
@@ -86,11 +127,30 @@ export class InvitationsService {
         message: `Le rôle « ${role} » n'est pas encore attribuable (assignations de projet absentes).`,
       });
     }
-    if (!canGrantRole(actor, role)) {
+    if (!this.canGrantTitle(actor, role)) {
       throw new ForbiddenException({
         code: 'ROLE_ESCALATION',
-        message: `Un « ${actor} » ne peut pas inviter au rôle « ${role} ».`,
+        message: `Un « ${actor.role} » ne peut pas inviter au rôle « ${role} ».`,
       });
+    }
+
+    // ADR-0041 G1 à G5 et dépendances, contre les droits effectifs de l'invitant.
+    // La case ⚙ du Comptable n'est pas un écart et l'invitation ne la porte pas :
+    // `period.close` y est refusé comme sans objet (accordé après l'acceptation).
+    let grants: Action[] = [];
+    let revokes: Action[] = [];
+    if (memberPermissionsEnabled()) {
+      const verdict = validateOverrides({
+        actorRole: actor.role,
+        actorCtx: actor.context,
+        targetRole: role,
+        grants: requestedGrants,
+        revokes: requestedRevokes,
+        actorIsTarget: false,
+      });
+      if (!verdict.ok) throw overrideViolationToHttp(verdict);
+      grants = [...verdict.grants];
+      revokes = [...verdict.revokes];
     }
 
     const emailNormalized = input.email.trim().toLowerCase();
@@ -103,15 +163,43 @@ export class InvitationsService {
     // l'isolation better-auth. On garde donc la vérification "déjà membre" au moment de l'acceptation.
     // L'unicité pending (org, email) suffit à empêcher les doublons d'invitation.
 
+    const customized = grants.length > 0 || revokes.length > 0;
     try {
-      return await this.invModel.create({
-        organizationId: input.organizationId,
-        email: emailNormalized,
-        invitedBy: input.invitedBy,
-        role,
-        token: generateToken(),
-        expiresAt: new Date(Date.now() + DEFAULT_TTL_MS),
-        _schemaVersion: MEMBERSHIP_SCHEMA_VERSION,
+      return await inTransaction(this.connection, async (session) => {
+        const [inv] = await this.invModel.create(
+          [
+            {
+              organizationId: input.organizationId,
+              email: emailNormalized,
+              invitedBy: input.invitedBy,
+              role,
+              grants,
+              revokes,
+              token: generateToken(),
+              expiresAt: new Date(Date.now() + DEFAULT_TTL_MS),
+              _schemaVersion: MEMBERSHIP_SCHEMA_VERSION,
+            },
+          ],
+          session ? { session } : {},
+        );
+        if (!inv) throw new Error('Invitation non créée.');
+        // G7 — un écart choisi à l'invitation est journalisé STRICTEMENT, dans la
+        // même transaction : sans trace, pas d'invitation personnalisée.
+        if (customized) {
+          await this.recordInvitationOverrides(
+            input.organizationId,
+            input.invitedBy,
+            actor.role,
+            'invitation',
+            String(inv._id),
+            role,
+            grants,
+            revokes,
+            { stage: 'invitation', email: emailNormalized },
+            session,
+          );
+        }
+        return inv;
       });
     } catch (err: unknown) {
       // Duplicate key sur l'index partiel unique → 409 métier.
@@ -215,31 +303,76 @@ export class InvitationsService {
       // reviendrait à laisser un `admin` révoqué continuer de peupler
       // l'organisation — c'est exactement ce que « révocation immédiate »
       // (docs/12 § Tests obligatoires) interdit.
-      const inviter = await this.membershipModel
+      //
+      // ADR-0041 § 6 : revalidé contre les droits EFFECTIFS ACTUELS de l'invitant,
+      // titre ET écart porté par l'invitation (critère 11).
+      const inviterDoc = await this.membershipModel
         .findOne({ userId: inv.invitedBy, organizationId: inv.organizationId })
+        .select(MEMBER_PERMISSIONS_PROJECTION)
         .lean()
         .exec();
-      const inviterRole = inviter ? normalizeOrgRole(inviter.role) : undefined;
+      const inviter = inviterDoc ? memberPermissionsOf(inviterDoc) : undefined;
       const invitedRole = normalizeOrgRole(inv.role);
       if (
-        inviterRole === undefined ||
+        inviter === undefined ||
         invitedRole === undefined ||
-        !canGrantRole(inviterRole, invitedRole)
+        !this.canGrantTitle(inviter, invitedRole)
       ) {
-        throw new ForbiddenException({
-          code: 'INVITATION_INVITER_NO_LONGER_AUTHORIZED',
-          message:
-            "La personne qui a émis cette invitation n'a plus le droit d'attribuer ce rôle. " +
-            'Demandez une nouvelle invitation.',
-        });
+        throw inviterNoLongerAuthorized();
       }
 
-      await this.membershipModel.create({
-        userId,
-        organizationId: inv.organizationId,
-        role: invitedRole,
-        canClosePeriods: false,
-        _schemaVersion: MEMBERSHIP_SCHEMA_VERSION,
+      // L'écart STOCKÉ (même interrupteur éteint) : il a été choisi par l'invitant.
+      const stored = storedOverridesOf(inv);
+      const customized = stored.grants.length > 0 || stored.revokes.length > 0;
+      // Interrupteur éteint : l'écart ne serait pas appliqué — on refuse plutôt que
+      // de créer en silence une appartenance différente de celle qui a été choisie.
+      if (customized && !memberPermissionsEnabled()) throw permissionsDisabled();
+      if (customized) {
+        const verdict = validateOverrides({
+          actorRole: inviter.role,
+          actorCtx: inviter.context,
+          targetRole: invitedRole,
+          grants: stored.grants,
+          revokes: stored.revokes,
+          actorIsTarget: inv.invitedBy === userId,
+        });
+        if (!verdict.ok) throw inviterNoLongerAuthorized(verdict.code);
+      }
+
+      await inTransaction(this.connection, async (session) => {
+        await this.membershipModel.create(
+          [
+            {
+              userId,
+              organizationId: inv.organizationId,
+              role: invitedRole,
+              canClosePeriods: false,
+              grants: stored.grants,
+              revokes: stored.revokes,
+              permissionsRevision: 0,
+              _schemaVersion: MEMBERSHIP_SCHEMA_VERSION,
+            },
+          ],
+          session ? { session } : {},
+        );
+        if (customized) {
+          await this.recordInvitationOverrides(
+            inv.organizationId,
+            inv.invitedBy,
+            inviter.role,
+            'membership',
+            userId,
+            invitedRole,
+            stored.grants,
+            stored.revokes,
+            { stage: 'acceptance', invitationId: String(inv._id) },
+            session,
+          );
+        }
+        if (!inv.acceptedAt) {
+          inv.acceptedAt = new Date();
+          await inv.save(session ? { session } : {});
+        }
       });
     }
 
@@ -250,4 +383,48 @@ export class InvitationsService {
 
     return { invitation: inv, organizationId: inv.organizationId };
   }
+
+  /**
+   * G7 — `member.permissions_changed` d'une invitation personnalisée (émission et
+   * acceptation), STRICT, dans la transaction. `before` : aucune appartenance.
+   */
+  private async recordInvitationOverrides(
+    organizationId: string,
+    actorUserId: string,
+    actorRole: OrgRole,
+    targetType: 'invitation' | 'membership',
+    targetId: string,
+    role: OrgRole,
+    grants: readonly Action[],
+    revokes: readonly Action[],
+    context: Record<string, string>,
+    session: ClientSession | undefined,
+  ): Promise<void> {
+    await this.audit.recordStrict(
+      {
+        organizationId,
+        actorUserId,
+        actorRole,
+        action: 'member.permissions_changed',
+        targetType,
+        targetId,
+        metadata: {
+          before: null,
+          after: stateOf({ role, grants, revokes, canClosePeriods: false }),
+          ...context,
+        },
+      },
+      session ? { session } : {},
+    );
+  }
+}
+
+function inviterNoLongerAuthorized(reason?: string): ForbiddenException {
+  return new ForbiddenException({
+    code: 'INVITATION_INVITER_NO_LONGER_AUTHORIZED',
+    ...(reason !== undefined ? { reason } : {}),
+    message:
+      "La personne qui a émis cette invitation n'a plus le droit d'attribuer ce rôle " +
+      'ou ces autorisations. Demandez une nouvelle invitation.',
+  });
 }

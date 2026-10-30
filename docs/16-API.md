@@ -211,6 +211,38 @@ Un bloc fermé vaut `null` et **n’est jamais chargé** — pas de requête, do
 
 **Codes d’erreur propres à cet espace** : `400 INVALID_REQUEST`, `403 FORBIDDEN`, `403 NO_ORGANIZATION`, `404 ORG_NOT_FOUND`.
 
+## Autorisations par membre — implémenté derrière l'interrupteur (ADR-0041 A4)
+
+`apps/api/src/organizations/` (`members.*`, `invitations.*`, `member-permissions.ts`). Toutes
+les écritures sont gardées par `organization.manage` (invitation : `members.invite`), décidées
+par `validateOverrides` sur les droits **effectifs** de l'acteur, journalisées strictement
+(`member.permissions_changed`, `before` / `after`) **dans la transaction** de l'écriture, et
+incrémentent `permissionsRevision`.
+
+```text
+PATCH /organizations/:orgId/members/:userId/permissions  { grants, revokes, expectedRevision, reason? }
+PATCH /organizations/:orgId/members/:userId/role         { role, grants?, revokes?, expectedRevision?, reason? }
+PATCH /organizations/:orgId/members/:userId/close-right  { value, expectedRevision? }
+POST  /organizations/:orgId/transfer-ownership           efface l'écart des deux personnes
+POST  /organizations/:orgId/invitations                  { email, role?, grants?, revokes? }
+POST  /invitations/accept                                revalide l'écart contre l'invitant du moment
+GET   /organizations/:orgId/members                      + grants, revokes, effective, customized, permissionsRevision
+```
+
+- `…/permissions` remplace l'écart entier ; pour un Comptable, `period.close` écrit
+  `canClosePeriods` (absent des deux listes : inchangé). Le changement de titre efface l'écart
+  (`member.role_changed` porte `droppedOverrides`) et peut en écrire un nouveau dans le même appel.
+- Erreurs : `403 PERMISSION_ESCALATION`, `403 SELF_PERMISSIONS_FORBIDDEN` (aussi sur
+  `close-right`), `400 PERMISSION_NOT_DELEGABLE`, `400 PERMISSION_OVERRIDE_REDUNDANT`,
+  `400 PERMISSION_DEPENDENCY_MISSING`, `409 SOD_CONFLICT`, `409 OWNER_PERMISSIONS_FIXED`,
+  `409 STALE_REVISION`, `404 MEMBER_NOT_FOUND`, `403 INVITATION_INVITER_NO_LONGER_AUTHORIZED`.
+- **Interrupteur `MEMBER_PERMISSIONS_ENABLED` éteint** (défaut) : `…/permissions` répond
+  `409 MEMBER_PERMISSIONS_DISABLED` ; un écart non vide est refusé de même sur `…/role`, à
+  l'invitation et à l'acceptation d'une invitation qui en porte un. Le titre seul fonctionne
+  comme avant.
+- Le membre concerné reçoit la notification in-app `organization.permissions_changed`
+  (« Vos autorisations ont changé », lien `/compte`), interrupteur allumé.
+
 ## Abonnements et paiements — implémenté (S22b)
 
 `apps/api/src/billing/` et `apps/api/src/payments/`. Règles métier : docs/13 § Implémenté (S22b).

@@ -250,6 +250,8 @@ sont inchangés.
 - **Changement de titre** : l'écart est effacé (proposition). **Dépendances** : refusées par le
   serveur si incohérentes, complétées par l'écran. **Invitation** : porte déjà l'écart.
 - Les 28 actions sont regroupées en sept domaines avec des libellés en français (ADR-0041 § 5).
+- **Lot A4 appliqué** (routes de gestion, invitation avec écart, audit strict, révision,
+  notification) **derrière l'interrupteur `MEMBER_PERMISSIONS_ENABLED`, éteint** : voir docs/16.
 
 **Business plan narratif (ADR-0037) — aucune action nouvelle.** Lire relève de
 `project.read` ; rédiger, rattacher le plan figé et demander un brouillon à l'IA, de
