@@ -11,7 +11,7 @@ import 'reflect-metadata';
 
 import { ObjectId } from 'mongodb';
 import { randomBytes } from 'node:crypto';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 
 import { e2eSuite } from './e2e-utils.js';
 import { code, fiche, hrFixture, ok, type HrFixture } from './hr-e2e-fixtures.js';
