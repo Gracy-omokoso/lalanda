@@ -199,7 +199,7 @@ export const NAV_APPS: readonly NavApp[] = [
   // tous les membres) OU `hr.read`. « Mon équipe » est offerte à qui demande
   // des absences : l'écran dit simplement qu'il n'encadre personne si `GET
   // /hr/me` ne le reconnaît pas manager (la portée est calculée par l'API).
-  // Échéances, rapports et réglages arrivent avec H7 (`RH_SOUS_OPTIONS_PREVUES`).
+  // Échéances, rapports et réglages : lot H7.
   {
     id: 'rh',
     href: '/rh',
@@ -236,6 +236,10 @@ export const NAV_APPS: readonly NavApp[] = [
         label: 'Organigramme',
         action: ['leave.request', 'hr.read'],
       },
+      // ADR-0045 — H7 : échéances, rapports et réglages (lecture `hr.read`).
+      { id: 'rh-echeances', href: '/rh/echeances', label: 'Échéances', action: 'hr.read' },
+      { id: 'rh-rapports', href: '/rh/rapports', label: 'Rapports', action: 'hr.read' },
+      { id: 'rh-reglages', href: '/rh/reglages', label: 'Réglages', action: 'hr.read' },
     ],
   },
   // ADR-0040 § 8.1 (amende ADR-0038 § 2) — le CRM est une application RUN à
@@ -506,9 +510,8 @@ export const ACHATS_SOUS_OPTIONS_PREVUES = [
 ] as const;
 
 /**
- * Ordre cible des sous-options des Ressources humaines (ADR-0045 § 8). Les
- * identifiants absents de `NAV_APPS` (échéances, rapports, réglages : lot H7)
- * restent masqués plutôt que vides.
+ * Ordre cible des sous-options des Ressources humaines (ADR-0045 § 8), toutes
+ * livrées depuis le lot H7.
  */
 export const RH_SOUS_OPTIONS_PREVUES = [
   'rh-moi',
