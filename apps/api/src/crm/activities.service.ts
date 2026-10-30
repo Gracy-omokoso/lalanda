@@ -20,7 +20,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Types, type Model } from 'mongoose';
 
 import { AuditService } from '../authz/audit.service.js';
-import { can, NO_OVERRIDES } from '../authz/permissions.js';
+import { can } from '../authz/permissions.js';
 import { Customer, type CustomerDocument } from '../sales/customer.schema.js';
 import { conflict, invalidCursor, invalidRequestOf, staleRevision } from '../sales/sales.errors.js';
 import { WorkMembersService } from '../work/work-members.service.js';
@@ -301,15 +301,15 @@ export class ActivitiesService {
       }
       return null;
     }
-    const role = await this.members.roleOf(organizationId, userId);
-    if (role === undefined) {
+    const member = await this.members.permissionsOf(organizationId, userId);
+    if (member === undefined) {
       throw new NotFoundException({
         code: 'CRM_MEMBER_NOT_FOUND',
         message: 'Membre introuvable dans cette organisation.',
       });
     }
-    // ADR-0041 A3 : passer aux droits effectifs du membre
-    if (!can(role, 'crm.manage', NO_OVERRIDES)) {
+    // ADR-0041 § 9.4 (A3) : éligibilité sur les droits effectifs (titre + écart).
+    if (!can(member.role, 'crm.manage', member.context)) {
       invalidRequestOf([
         {
           path: 'assigneeUserId',

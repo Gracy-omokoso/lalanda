@@ -27,7 +27,7 @@ import {
   type MorningBrief,
 } from '@lalanda/engine';
 
-import { can, NO_OVERRIDES, type OrgRole } from '../authz/permissions.js';
+import { can, type OrgPermissionContext, type OrgRole } from '../authz/permissions.js';
 import { SalesInvoice, type SalesInvoiceDocument } from '../sales/invoices/invoice.schema.js';
 import {
   CASH_POSITION_SOURCE,
@@ -141,20 +141,24 @@ export class MorningBriefService {
    * Brief de l'organisation, vu par ce rôle et pour ce membre : `userId`
    * (session ou destinataire de l'e-mail) ne sert qu'aux faits personnels
    * `mes_taches.*` (ADR-0039 § 6.5) et `mes_relances.*` (ADR-0040 — C4).
+   *
+   * ADR-0041 § 9.4 (A3) : chaque section se décide sur les droits EFFECTIFS du
+   * membre (`role` + `context` : droit de clôture, ajouts, retraits) ; un retrait
+   * masque la section comme si le titre ne la donnait pas.
    */
   async build(
     organizationId: string,
     role: OrgRole,
+    context: OrgPermissionContext,
     userId: string,
     now: Date = new Date(),
   ): Promise<MorningBrief> {
-    const salesVisible = can(role, 'sales.read', NO_OVERRIDES);
-    const workVisible = can(role, 'work.read', NO_OVERRIDES);
+    const salesVisible = can(role, 'sales.read', context);
+    const workVisible = can(role, 'work.read', context);
     // ADR-0040 — C0 § 4.4 : une donnée de trésorerie exige `treasury.read`.
-    const cashVisible = can(role, 'treasury.read', NO_OVERRIDES);
+    const cashVisible = can(role, 'treasury.read', context);
     // ADR-0040 — C4 § 5.5 : relances et pipeline chargés seulement avec `crm.read`.
-    // ADR-0041 A3 : passer aux droits effectifs du membre
-    const crmVisible = can(role, 'crm.read', NO_OVERRIDES);
+    const crmVisible = can(role, 'crm.read', context);
     const [sales, cash, dueDates, work, crm] = await Promise.all([
       salesVisible ? this.loadSales(organizationId, now) : Promise.resolve('hidden' as const),
       cashVisible ? this.cash.cashOf(organizationId, now) : Promise.resolve('hidden' as const),

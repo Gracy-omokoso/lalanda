@@ -149,13 +149,14 @@ describe('sous-options', () => {
     expect(factures?.sousOptions.map((s) => s.label)).toEqual(['Modèle de facture', 'Journal']);
   });
 
-  it('CRM : Pipeline, Comptes, Contacts, Activités, Réglages ; Trésorerie : Dépenses, Comptes, Réalisé vs prévu', () => {
+  it('CRM : Pipeline, Comptes, Contacts, Activités, Rapports, Réglages ; Trésorerie : Dépenses, Comptes, Réalisé vs prévu', () => {
     const run = appsVisibles(PROPRIETAIRE, 'run');
     expect(run.find((a) => a.id === 'crm')?.sousOptions.map((s) => s.label)).toEqual([
       'Pipeline',
       'Comptes',
       'Contacts',
       'Activités',
+      'Rapports',
       'Réglages',
     ]);
     expect(run.find((a) => a.id === 'tresorerie')?.sousOptions.map((s) => s.href)).toEqual([
@@ -186,10 +187,9 @@ describe('sous-options', () => {
     const affichees = crm.sousOptions.map((s) => s.id);
     const ordre = CRM_SOUS_OPTIONS_PREVUES.filter((id) => affichees.includes(id));
     expect(affichees).toEqual(ordre);
-    // Comptes et Activités sont livrés (C5) ; Rapports attend son écran (C6).
-    expect(affichees).toContain('crm-comptes');
-    expect(affichees).toContain('crm-activites');
-    expect(affichees).not.toContain('crm-rapports');
+    // Comptes et Activités sont livrés (C5), Rapports (C6) : toutes les
+    // sous-options prévues sont affichées.
+    expect(affichees).toEqual([...CRM_SOUS_OPTIONS_PREVUES]);
   });
 
   it('les sous-options sont filtrées comme les applications', () => {
@@ -299,6 +299,7 @@ describe('application et sous-option actives', () => {
     expect(sousOptionActive('/crm/comptes')).toBe('crm-comptes');
     expect(sousOptionActive('/crm/comptes/abc')).toBe('crm-comptes');
     expect(sousOptionActive('/crm/activites')).toBe('crm-activites');
+    expect(sousOptionActive('/crm/rapports')).toBe('crm-rapports');
     expect(sousOptionActive('/crm/reglages')).toBe('crm-reglages');
     expect(sousOptionActive('/tresorerie/realise')).toBe('tresorerie-realise');
   });

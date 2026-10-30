@@ -26,6 +26,10 @@ import { AuthGuard } from '../auth/auth.guard.js';
 import { CurrentOrgId, CurrentUser } from '../auth/current-user.decorator.js';
 import { AuditService } from '../authz/audit.service.js';
 import { RequirePermission } from '../authz/authz.decorators.js';
+import {
+  CurrentOrgPermissions,
+  type CurrentOrgPermissionsValue,
+} from '../authz/current-org-permissions.decorator.js';
 import { CurrentOrgRole } from '../authz/current-org-role.decorator.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
 import { can, NO_OVERRIDES, type OrgRole } from '../authz/permissions.js';
@@ -84,9 +88,14 @@ export class IdeaLabController {
   @RequirePermission('project.read')
   async list(
     @CurrentOrgId() orgId: string,
-    @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
   ): Promise<IdeaLabListResponse> {
-    const effective = role ?? 'viewer';
+    // ADR-0041 § 9.4 (A3) : droits effectifs (titre + écart) ; repli de moindre
+    // privilège sur le Lecteur sans écart.
+    const { role: effective, context } = perms ?? {
+      role: 'viewer' as const,
+      context: NO_OVERRIDES,
+    };
     const [view, disabledBy, quota] = await Promise.all([
       this.ideas.list(orgId),
       this.ai.aiDisabledBy(orgId),
@@ -95,8 +104,8 @@ export class IdeaLabController {
     return {
       ...view,
       ai: { enabled: disabledBy === null, disabledBy, quota, mention: MENTION_IDEA_LAB },
-      canEdit: can(effective, 'canvas.update', NO_OVERRIDES),
-      canManageAi: can(effective, 'organization.manage', NO_OVERRIDES),
+      canEdit: can(effective, 'canvas.update', context),
+      canManageAi: can(effective, 'organization.manage', context),
     };
   }
 

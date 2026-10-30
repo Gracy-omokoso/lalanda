@@ -20,7 +20,7 @@ import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
-import { can, NO_OVERRIDES } from '../authz/permissions.js';
+import { can } from '../authz/permissions.js';
 import { SchedulerService } from '../scheduler/scheduler.service.js';
 import { WorkMembersService } from './work-members.service.js';
 import { WorkNotifier } from './work-notifier.js';
@@ -107,7 +107,7 @@ export class WorkDueRemindersJob implements OnModuleInit {
         .lean<WorkTaskLean[]>()
         .exec();
       if (docs.length === 0) continue;
-      const roles = await this.members.roles(
+      const members = await this.members.permissions(
         organizationId,
         docs.map((d) => d.assigneeUserId!),
       );
@@ -130,8 +130,9 @@ export class WorkDueRemindersJob implements OnModuleInit {
           .exec();
         if (claim.modifiedCount !== 1) continue;
         report.claimed += 1;
-        const role = roles.get(task.assigneeUserId!);
-        if (role === undefined || !can(role, 'work.read', NO_OVERRIDES)) {
+        // ADR-0041 § 9.4 (A3) : droits effectifs de l'assigné (titre + écart).
+        const member = members.get(task.assigneeUserId!);
+        if (member === undefined || !can(member.role, 'work.read', member.context)) {
           report.skipped += 1;
           continue;
         }
