@@ -6,7 +6,8 @@
 
 import type { DocumentEmailInput, DocumentEmailResult } from '@/lib/api';
 
-export type GenreDocument = 'facture' | 'devis';
+// ADR-0044 § 3.3 — le bon de commande des achats réutilise le même aperçu.
+export type GenreDocument = 'facture' | 'devis' | 'bon-de-commande';
 
 /** Même borne que l'API (`z.email()` est plus strict ; elle tranche). */
 const ADRESSE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -66,6 +67,7 @@ export function verifierEnvoi(f: FormulaireEnvoi): {
 
 /** Raison affichée quand le droit d'envoyer manque (ADR-0042 § 1). */
 export function raisonSansDroit(genre: GenreDocument): string {
+  if (genre === 'bon-de-commande') return 'Envoi réservé aux rôles qui gèrent les achats.';
   return genre === 'facture'
     ? 'Envoi réservé aux rôles qui émettent les factures (droit « Émettre et normaliser »).'
     : 'Envoi réservé aux rôles qui préparent les devis.';
@@ -119,4 +121,9 @@ export function messageErreurEnvoi(err: unknown): string {
  */
 export function lecteurPdfIntegre(nav: { pdfViewerEnabled?: boolean } | undefined): boolean {
   return nav?.pdfViewerEnabled !== false;
+}
+
+/** Qui recevra le document (phrase sous le formulaire d'envoi). */
+export function destinataireDocument(genre: GenreDocument): string {
+  return genre === 'bon-de-commande' ? 'Le fournisseur' : 'Le client';
 }

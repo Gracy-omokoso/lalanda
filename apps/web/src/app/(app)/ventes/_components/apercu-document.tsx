@@ -23,8 +23,10 @@ import {
   type DocumentEmailResult,
 } from '@/lib/api';
 import { crmApi } from '@/lib/api-crm';
+import { purchasesApi } from '@/lib/api-purchases';
 
 import {
+  destinataireDocument,
   lecteurPdfIntegre,
   messageErreurEnvoi,
   messageResultat,
@@ -64,6 +66,12 @@ const sources = {
     pdf: (id: string, nom: string) => crmApi.downloadQuotePdf(id, nom),
     brouillon: (id: string) => crmApi.getQuoteEmailDraft(id),
     envoyer: (id: string, corps: DocumentEmailInput) => crmApi.sendQuoteEmail(id, corps),
+  },
+  // ADR-0044 § 3.3 — bon de commande (chaîne PDF et envoi d'ADR-0042).
+  'bon-de-commande': {
+    pdf: (id: string, nom: string) => purchasesApi.downloadOrderPdf(id, nom),
+    brouillon: (id: string) => purchasesApi.getOrderEmailDraft(id),
+    envoyer: (id: string, corps: DocumentEmailInput) => purchasesApi.sendOrderEmail(id, corps),
   },
 } as const;
 
@@ -501,8 +509,8 @@ function FormulaireEmail({
           />
         </Champ>
         <p className="text-xs text-[var(--foreground-muted)]">
-          Pièce jointe : {fichier ?? brouillon.attachmentName ?? 'le PDF du document'}. Le client
-          pourra vous répondre directement.
+          Pièce jointe : {fichier ?? brouillon.attachmentName ?? 'le PDF du document'}.{' '}
+          {destinataireDocument(doc.genre)} pourra vous répondre directement.
         </p>
         {erreurEnvoi ? (
           <Alerte>
