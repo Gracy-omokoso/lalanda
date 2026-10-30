@@ -9,3 +9,7 @@
 export * from './constants.js';
 export * from './common.js';
 export * from './suppliers.js';
+// ADR-0044 — P3
+export * from './orders.js';
+export * from './settings.js';
+export * from './agenda.js';

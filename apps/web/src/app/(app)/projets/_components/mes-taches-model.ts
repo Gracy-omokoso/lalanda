@@ -10,8 +10,13 @@
 // relance du CRM (activité assignée, à échéance) : il se coche par la route du
 // CRM, s'ouvre sur l'opportunité, le compte ou le contact (`href`), et porte la
 // pastille « Relance » (forme et libellé, pas seulement une couleur).
+//
+// ADR-0044 § 6.5 (lot P3) : un élément `source: 'purchases'` est une demande d'achat
+// que l'appelant peut approuver. Pas de case à cocher (approuver exige une
+// décision) : il ouvre la demande et porte la pastille « Approbation ».
 
 import type { CrmMyTaskItem } from '@lalanda/shared/crm';
+import type { PurchasesMyTaskItem } from '@lalanda/shared/purchases';
 import {
   groupMyTasks,
   type MyTaskEntry,
@@ -50,6 +55,20 @@ export function estRelance(e: MyTaskEntry): e is CrmMyTaskItem {
 
 export function estTache(e: MyTaskEntry): e is WorkMyTaskItem {
   return e.source === 'work';
+}
+
+/** Pastille des approbations d'achat (ADR-0044 § 8). */
+export const PASTILLE_APPROBATION = 'Approbation';
+
+export function estApprobation(e: MyTaskEntry): e is PurchasesMyTaskItem {
+  return e.source === 'purchases';
+}
+
+/** Ligne secondaire d'une approbation : numéro, fournisseur, total rendu par l'API. */
+export function sousTitreApprobation(e: PurchasesMyTaskItem): string {
+  return [e.requestNumber, e.supplierName, `${e.total} ${e.currency}`]
+    .filter((p): p is string => typeof p === 'string' && p !== '')
+    .join(' · ');
 }
 
 /**
