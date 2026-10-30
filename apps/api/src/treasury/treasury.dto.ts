@@ -123,6 +123,12 @@ const ExpenseFields = {
    * modification (un client qui ignore le champ ne détache rien) ; `null` : détacher.
    */
   workProjectId: objectId.nullable().optional(),
+  /**
+   * ADR-0044 — P2 : fiche fournisseur (§ 2.8). Absent : déduite du texte
+   * `supplierName` par clé exacte (`legacyKeys`), ou conservée si le texte n'a pas
+   * changé ; `null` : fournisseur de passage, sans fiche.
+   */
+  supplierId: objectId.nullable().optional(),
 };
 
 function checkExpense(raw: { amount: string; deductibleVat: string | null }, ctx: Ctx): void {
@@ -190,6 +196,8 @@ export const RecurringExpenseSchema = z
     currency,
     category,
     supplierName: optionalText(120),
+    // ADR-0044 — P2 : fiche fournisseur, mêmes règles que sur une dépense.
+    supplierId: objectId.nullable().optional(),
     accountId: objectId
       .nullable()
       .optional()

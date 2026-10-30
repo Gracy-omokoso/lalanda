@@ -33,6 +33,7 @@ import { OrganizationSpaceModule } from './organization-space/organization-space
 import { OrganizationsModule } from './organizations/organizations.module.js';
 import { ParameterPacksModule } from './parameter-packs/parameter-packs.module.js';
 import { PaymentsModule } from './payments/payments.module.js';
+import { PurchasesModule } from './purchases/purchases.module.js'; // ADR-0044 — P2
 import { PlansModule } from './plans/plans.module.js';
 import { PlatformConfigModule } from './platform-config/platform-config.module.js';
 import { ProjectsModule } from './projects/projects.module.js';
@@ -120,6 +121,7 @@ import { WorkModule } from './work/work.module.js';
     SalesModule,
     // ADR-0034 : dépenses, comptes de trésorerie, prévision et report au réalisé.
     TreasuryModule,
+    PurchasesModule, // ADR-0044 — P2 : achats et fournisseurs (fiches, coordonnées chiffrées).
     // ADR-0035 — CRM minimal, puis devis (qui consomment ventes et CRM).
     CrmModule,
     // ADR-0040 — C1 : conversion prospect → client (compose Ventes et CRM).

@@ -104,6 +104,12 @@ export class TreasuryExpense {
   @Prop({ type: String, default: null })
   supplierKey!: string | null;
 
+  // ADR-0044 — P2 : fiche fournisseur (`suppliers`) de l'organisation, ou `null`
+  // (« fournisseur de passage » en texte libre). Posée, `supplierName` n'est plus
+  // qu'une copie d'affichage du nom de la fiche (§ 2.8).
+  @Prop({ type: String, default: null })
+  supplierId!: string | null;
+
   @Prop({ type: String, default: null })
   accountId!: string | null;
 
@@ -161,6 +167,11 @@ export const TreasuryExpenseSchema = SchemaFactory.createForClass(TreasuryExpens
 TreasuryExpenseSchema.index({ organizationId: 1, spentOn: -1, _id: -1 });
 TreasuryExpenseSchema.index({ organizationId: 1, accountId: 1, spentOn: 1 });
 TreasuryExpenseSchema.index({ organizationId: 1, supplierKey: 1 });
+// ADR-0044 — P2 (§ 2.8) : dépenses d'une fiche fournisseur.
+TreasuryExpenseSchema.index(
+  { organizationId: 1, supplierId: 1, spentOn: 1 },
+  { partialFilterExpression: { supplierId: { $type: 'string' } } },
+);
 // ADR-0039 § 2.10 : dépenses d'un projet du RUN (marge, filtre de liste).
 TreasuryExpenseSchema.index(
   { organizationId: 1, workProjectId: 1 },
@@ -198,6 +209,10 @@ export class TreasuryRecurringExpense {
 
   @Prop({ type: String, default: null })
   supplierName!: string | null;
+
+  // ADR-0044 — P2 : fiche fournisseur, comme sur les dépenses (§ 2.8).
+  @Prop({ type: String, default: null })
+  supplierId!: string | null;
 
   @Prop({ type: String, default: null })
   accountId!: string | null;
