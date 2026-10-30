@@ -51,3 +51,10 @@ Décideurs :
 - [ADR-0042](ADR-0042-envoi-des-documents-par-email.md) — Envoi des documents de vente par
   e-mail depuis l'aperçu (facture, avoir, pro forma, devis ; PDF joint, audit strict, limite de
   débit). Amende ADR-0035 et ADR-0040 sur ce seul point. Statut : **proposé** (30 oct. 2026).
+
+## Décisions récentes (légal)
+
+- [ADR-0043](ADR-0043-editeur-go-freelance-sarlu.md) — L'éditeur devient Go freelance SARLU
+  (SARLU de droit congolais), Televerx LLC partenaire de développement et d'intégration
+  (mentions légales seulement) ; corpus `2026-10-30`, nouvelle acceptation. Statut :
+  **accepté** (30 oct. 2026).

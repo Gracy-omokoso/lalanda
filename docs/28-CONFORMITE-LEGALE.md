@@ -1,7 +1,7 @@
 # 28 — Conformité légale
 
 **Statut : Draft.**
-**Version du corpus contractuel : `2026-08-09`.**
+**Version du corpus contractuel : `2026-10-30`** (précédente : `2026-08-09`).
 
 > **AVERTISSEMENT — LES TEXTES LÉGAUX PUBLIÉS PAR LALANDA SONT DES PROJETS.**
 >
@@ -21,60 +21,115 @@ recense ce qui a été **construit**, ce qui reste **inconnu**, et ce qui doit �
 
 ## 1. Éditeur du service
 
-Lalanda est un produit de **Televerx LLC**.
+**Décision de la dirigeante, 30 oct. 2026 ([ADR-0043](adr/ADR-0043-editeur-go-freelance-sarlu.md)).**
+Lalanda est porté par **Go freelance SARLU**, société à responsabilité limitée
+unipersonnelle de **droit congolais (République démocratique du Congo)**.
+**Televerx LLC** est son **partenaire de développement et d’intégration** ; il
+n’est pas l’éditeur et ne contracte pas avec l’utilisateur.
 
-C’est la **seule information d’identification de l’éditeur qui soit établie à ce
-jour**. Elle est déclarée une fois, dans `packages/shared/src/legal/index.ts`
-(`PUBLISHER_NAME`), et importée partout ailleurs.
+Jusqu’au corpus `2026-08-09`, l’éditeur affiché était Televerx LLC.
 
-### 1.1 Ce qui reste inconnu
+L’identité est déclarée une seule fois, dans `packages/shared/src/legal/index.ts`,
+et importée partout ailleurs :
 
-Aucune des informations ci-dessous n’a été communiquée. Elles sont rendues dans
-les pages sous forme de marqueurs `[À COMPLÉTER : …]` **visibles par le lecteur**,
-et récapitulées dans `PUBLISHER_UNKNOWNS` (`apps/web/src/lib/legal.ts`) :
+| Constante | Valeur |
+|---|---|
+| `PUBLISHER_NAME` | Go freelance SARLU |
+| `PUBLISHER_LEGAL_FORM` | société à responsabilité limitée unipersonnelle (SARLU) |
+| `PUBLISHER_GOVERNING_LAW` | droit congolais (République démocratique du Congo) |
+| `DEVELOPMENT_PARTNER_NAME` | Televerx LLC |
+| `DEVELOPMENT_PARTNER_ROLE` | partenaire de développement et d’intégration de Go freelance SARLU |
 
-- forme juridique complète, État ou pays d’immatriculation ;
-- numéro d’enregistrement de la société ;
+**Où chacun apparaît.** L’éditeur : les cinq pages, le pied de page marketing
+(« Édité par Go freelance SARLU »). Televerx LLC : **uniquement** les mentions
+légales (§ « Développement et intégration »), ni dans les pieds de page, ni dans
+la politique de confidentialité, ni dans les CGU et CGV. Les e-mails et les PDF
+du dépôt ne nomment pas l’éditeur ; rien n’y a changé.
+
+### 1.1 Mentions volontairement non publiées
+
+**Choix de la dirigeante, 30 oct. 2026 : « pas besoin de toutes ces infos ».**
+Les informations suivantes ne sont pas fournies et **ne sont pas publiées** —
+ni en clair, ni sous forme de marqueur « à compléter » :
+
+- numéro RCCM ;
+- identification nationale (Id. Nat.) ;
+- numéro d’impôt (NIF) ;
 - adresse du siège social ;
-- capital social, si la forme juridique en fait état ;
-- nom du représentant légal et du directeur de la publication ;
-- adresse email de contact ;
-- numéro de téléphone, si l’éditeur souhaite en publier un ;
-- identité et adresse de l’hébergeur (cible ADR-0009 : DigitalOcean, non
-  provisionné à ce jour).
+- capital social ;
+- nom du gérant / représentant légal ;
+- nom du directeur de la publication ;
+- numéro de téléphone.
 
-**Règle appliquée : rien n’a été déduit.** Inventer l’adresse ou le numéro
-d’immatriculation d’une société réelle ne produit pas un document incomplet mais
-un document **faux**, publié sous la signature d’une personne morale existante.
-Un marqueur visible est un défaut qu’on corrige ; une mention inventée est une
-affirmation que personne ne pense à vérifier.
+La liste est tenue dans `PUBLISHER_UNPUBLISHED_MENTIONS`
+(`packages/shared/src/legal/index.ts`), **rendue sur aucune page**. Les pages
+publiques n’affichent que ce qui est connu : dénomination, forme juridique et
+droit dont relève la société, les trois adresses e-mail de contact, l’hébergeur,
+et le partenaire. Le directeur de la publication est désigné comme « le
+représentant légal de Go freelance SARLU », sans nom.
 
-### 1.2 Question ouverte structurante — à poser au juriste
+**Point à faire valider par un juriste.** Plusieurs de ces mentions (RCCM,
+Id. Nat., NIF, siège) sont **habituellement attendues** dans des mentions
+légales et sur les documents commerciaux d’une société. Leur absence est un
+choix assumé, pas une conformité établie. Si une mention est fournie, elle
+devient une constante de `packages/shared/src/legal/index.ts` (un seul endroit),
+sort de `PUBLISHER_UNPUBLISHED_MENTIONS`, et est affichée par
+`apps/web/src/app/(marketing)/mentions-legales/page.tsx`.
 
-**La dénomination « LLC » suggère une immatriculation aux États-Unis. C’est une
-indication, pas une conclusion.** L’État d’immatriculation n’est pas établi. Si
-cette indication se confirme, elle emporte des conséquences sur au moins trois
-points, qui sont **liés entre eux et ne peuvent pas être arbitrés séparément** :
+**Règle maintenue : rien n’a été déduit.** Aucune de ces valeurs n’a été
+inventée ou cherchée ailleurs.
 
-1. **Droit applicable au contrat.** Lalanda cible l’Afrique francophone (zone
-   OHADA) et, par la diaspora, des utilisateurs susceptibles d’être établis dans
-   l’Union européenne. Un éditeur américain contractant avec des consommateurs de
-   ces zones ne peut pas librement écarter les règles impératives de leur droit
-   de résidence.
-2. **Juridiction compétente.** Une clause attributive de juridiction au profit
-   d’un tribunal américain est, dans plusieurs droits, **inopposable à un
-   utilisateur consommateur**, qui conserve le bénéfice des tribunaux de son lieu
-   de résidence. La clause peut par ailleurs devoir être accompagnée d’un
-   dispositif de médiation préalable.
-3. **Transferts de données hors de l’Union européenne.** Si des utilisateurs sont
-   établis dans l’UE, l’hébergement et les traitements réalisés depuis les
-   États-Unis relèvent d’un régime de transfert qui exige un instrument juridique
-   (clauses contractuelles types ou équivalent), et probablement la désignation
-   d’un représentant dans l’Union.
+### 1.2 Hébergeur
 
-**Ces trois points sont des questions à poser, pas des positions à retenir.** Ils
-sont marqués comme tels dans les pages concernées (CGU § droit applicable et
-juridiction, politique de confidentialité § transferts).
+L’hébergeur nommé est **DigitalOcean** (serveurs virtuels « Droplets ») : c’est
+la décision acceptée d’[ADR-0009](adr/ADR-0009-infrastructure-digitalocean.md),
+et le dépôt atteste son exploitation (`scripts/deploy-vps.sh`, déploiement sur
+le Droplet ; `docs/24-INFRASTRUCTURE.md`, variables « déjà posées en
+production », MinIO « en service » sur le Droplet).
+
+**Ce que le dépôt n’établit pas** et qui n’est donc pas publié : la dénomination
+sociale exacte de l’entité contractante DigitalOcean, son adresse, et la région
+réelle du Droplet de production (ADR-0009 dit `ams3` « par défaut », sans
+constat). La section « Transferts » de la politique de confidentialité garde
+donc son marqueur sur le pays d’hébergement. À noter : `docs/24` liste encore
+« provisioning des Droplets » au « Reste à faire » — mention périmée, non
+corrigée ici.
+
+### 1.3 Questions ouvertes à poser au juriste (remplace l’analyse « LLC »)
+
+L’ancienne analyse partait d’une indication — « LLC » suggérait une
+immatriculation aux États-Unis — et en tirait trois questions (droit applicable,
+juridiction, transferts). **Elle est caduque** : l’éditeur est une société de
+droit congolais. Aucune règle de droit congolais n’est pour autant posée ici.
+**Ce qui doit être tranché par un juriste :**
+
+1. **Droit applicable au contrat.** La nationalité de l’éditeur ne fixe pas, à
+   elle seule, le droit du contrat. Faut-il choisir le droit congolais ? Comment
+   s’articule-t-il avec les règles impératives protégeant les consommateurs
+   d’autres pays de la zone OHADA et de l’Union européenne (diaspora) ?
+2. **Juridiction compétente** et, le cas échéant, médiation préalable ou
+   médiation de la consommation ; opposabilité d’une clause attributive à un
+   utilisateur consommateur établi hors de RDC.
+3. **Protection des données.** Régime congolais applicable au traitement par
+   un responsable établi en RDC ; formalités éventuelles auprès d’une autorité ;
+   pour les utilisateurs établis dans l’UE, applicabilité du RGPD à un
+   responsable hors UE, désignation d’un représentant dans l’Union.
+4. **Transferts.** Encadrement des transferts vers DigitalOcean (région à
+   constater) et OpenAI, au regard du droit congolais et, le cas échéant, du
+   RGPD.
+5. **Mentions obligatoires** de l’éditeur et des documents commerciaux (§ 1.1) :
+   lesquelles sont exigées, et où.
+6. **Conservation des factures et pièces comptables** : durée applicable à une
+   SARLU congolaise (politique de confidentialité, marqueur conservé).
+7. **Fiscalité des abonnements** et facture normalisée (§ 6).
+8. **Rôle de Televerx LLC** : nature du partenariat (sous-traitant au sens de la
+   protection des données ou non, accès aux données de production), qui
+   conditionne sa mention éventuelle dans la politique de confidentialité —
+   aujourd’hui exclue par décision.
+
+Ces points restent marqués comme questions ouvertes dans les pages concernées
+(CGU § droit applicable, politique de confidentialité § transferts et
+conservation).
 
 ---
 
@@ -158,6 +213,41 @@ acceptations passées y font référence.
   accord enregistré (comptes antérieurs à S22c ou créés par Google). Un écran de
   ré-acceptation à la connexion fermerait les deux cas — non tranché.
 
+### 2.3 bis Nouvelle acceptation : version `2026-10-30` (30 oct. 2026)
+
+La dirigeante a décidé que les utilisateurs existants acceptent à nouveau les
+CGU et les CGV **à leur prochaine connexion**. `LEGAL_VERSION` passe de
+`2026-08-09` à `2026-10-30`, l’ancienne valeur reste dans
+`KNOWN_LEGAL_VERSIONS`. Dates `updatedAt` mises à jour : CGU, CGV, politique de
+confidentialité, mentions légales (la politique de cookies ne change pas).
+
+**Ce qui marche dès cette version :**
+
+- toute acceptation antérieure (`2026-08-09`) est désormais **périmée** :
+  `GET /legal/terms/acceptance` rend `isCurrent: false` pour ces comptes ;
+- une inscription par e-mail enregistre `2026-10-30` ;
+- `POST /legal/terms/acceptance` accepte `2026-10-30` (et, comme avant, refuse
+  une version jamais publiée).
+
+**Ce qui N’EXISTE PAS — la ré-acceptation à la connexion.** Vérifié le
+30 oct. 2026 : aucun écran ni garde ne redemande l’accord.
+
+- Côté web, `api.getTermsAcceptance()` et `api.acceptTerms()`
+  (`apps/web/src/lib/api.ts`) ne sont **appelés nulle part** ; ni la connexion,
+  ni le layout `(app)`, ni le middleware ne lisent `isCurrent`.
+- Côté API, aucune route n’est refusée à un utilisateur dont l’accord est
+  périmé ; la session s’ouvre normalement.
+
+Conséquence : **en l’état, un utilisateur existant ne se voit rien redemander.**
+Les CGU (§ « Modification des conditions ») annoncent pourtant que l’accord
+« vous est redemandé à la prochaine connexion ». Il manque, à construire :
+un écran de ré-acceptation (case non pré-cochée, liens CGU/CGV/confidentialité)
+affiché après connexion tant que `isCurrent` est faux, qui appelle
+`POST /legal/terms/acceptance` avec la version affichée. Cet écran couvrirait
+aussi les comptes Google et les comptes antérieurs à S22c (limite ci-dessus).
+Choix à arbitrer : bloquer l’application jusqu’à l’accord, ou permettre un
+report.
+
 Côté API (`apps/api/src/legal/`), la collection `terms_acceptances` conserve
 `userId`, `termsVersion` et `acceptedAt`. L’enregistrement est **idempotent par
 construction** (`$setOnInsert` sur un upsert indexé unique) : un double clic, un
@@ -232,7 +322,7 @@ encadrant le transfert hors du pays de l’utilisateur. Ces points sont à
 Les cinq documents sont liés depuis :
 
 - le pied de page **marketing** (`apps/web/src/app/(marketing)/layout.tsx`), avec
-  la mention « Édité par Televerx LLC » ;
+  la mention « Édité par Go freelance SARLU » (Televerx LLC n’y figure pas) ;
 - le pied de page **applicatif** (`apps/web/src/app/(app)/layout.tsx`).
 
 Les deux utilisent le même composant `apps/web/src/components/legal-links.tsx`,
@@ -243,7 +333,9 @@ dérivé du registre.
 ## 3. Décisions à faire trancher avant mise en production
 
 Les points ci-dessous sont, dans les pages, des marqueurs `[À COMPLÉTER : …]`
-**visibles par le lecteur**. Un marqueur invisible dans une page publiée est
+**visibles par le lecteur** — à l’exception des mentions d’identification de
+l’éditeur, non publiées par décision (§ 1.1) et qui ne font plus l’objet d’aucun
+marqueur. Un marqueur invisible dans une page publiée est
 exactement la façon dont une mention légale part en production incomplète sans
 que personne ne s’en aperçoive.
 
@@ -251,12 +343,13 @@ que personne ne s’en aperçoive.
 
 | Question | Où |
 |---|---|
-| Droit applicable au contrat (§ 1.2) | CGU |
+| Droit applicable au contrat (§ 1.3) | CGU |
 | Juridiction compétente, médiation préalable, médiation de la consommation | CGU |
 | Plafond de responsabilité retenu | CGU |
 | Bases légales des traitements (contrat, intérêt légitime, obligation légale, consentement) | Confidentialité |
 | Désignation d’un DPO et d’un représentant dans l’UE | Confidentialité |
-| Pays d’hébergement, localisation des traitements, instrument de transfert | Confidentialité |
+| Mentions d’identification non publiées (RCCM, Id. Nat., NIF, siège…) — § 1.1 | Mentions légales (non affichées) |
+| Région du Droplet, localisation des traitements, instrument de transfert | Confidentialité |
 | Procédure de notification d’incident (délai, canal, autorité) | Confidentialité |
 | Droit de rétractation : existence, durée, modalités, exécution immédiate | CGV |
 | Mentions obligatoires du parcours d’achat (droit de la consommation) | CGV |
@@ -282,10 +375,9 @@ que personne ne s’en aperçoive.
 
 | Fait | Où |
 |---|---|
-| Identification complète de Televerx LLC (§ 1.1) | Mentions légales |
-| Adresse email de contact | Les cinq pages |
-| Directeur de la publication | Mentions légales |
-| Hébergeur — cible ADR-0009 (DigitalOcean), infrastructure non provisionnée | Mentions légales |
+| Dénomination exacte et adresse de l’entité DigitalOcean contractante (§ 1.2) | non publiées |
+| Région réelle du Droplet de production (§ 1.2) | Confidentialité |
+| « Limites actuelles » affirme qu’aucun e-mail n’est envoyé, alors que le module `mail/` (ZeptoMail/SMTP) existe — à vérifier et corriger (hors du lot du 30 oct.) | Confidentialité |
 | Entité contractante d’OpenAI et adresse de son établissement | Confidentialité |
 | DPA OpenAI, conservation, instrument de transfert | Confidentialité |
 
@@ -298,12 +390,12 @@ page. **Ne la basculer qu’après une relecture juridique effective**, dans le 
 lot que les corrections qu’elle aura demandées. Liste de contrôle :
 
 1. Tous les marqueurs `[À COMPLÉTER : …]` sont levés — aucun ne subsiste dans les
-   cinq pages.
-2. Les questions du § 1.2 (droit applicable, juridiction, transferts) sont
+   cinq pages — et le choix de ne pas publier les mentions du § 1.1 est validé.
+2. Les questions du § 1.3 (droit applicable, juridiction, transferts) sont
    tranchées par un conseil, et les clauses correspondantes réécrites.
 3. Le DPA OpenAI est conclu, et la section « Assistance IA » de la politique de
    confidentialité reflète son contenu réel.
-4. L’hébergeur est provisionné et nommé.
+4. L’hébergeur est nommé (fait : DigitalOcean) et la région du Droplet constatée.
 5. Les décisions commerciales du § 3.2 sont arbitrées et les CGV réécrites en
    conséquence.
 6. `LEGAL_VERSION` est avancée et l’ancienne valeur ajoutée à
@@ -317,11 +409,42 @@ lot que les corrections qu’elle aura demandées. Liste de contrôle :
 
 | Rôle | Fichier |
 |---|---|
-| Version du corpus, nom de l’éditeur, marqueur | `packages/shared/src/legal/index.ts` |
-| Registre des documents, état de relecture, inconnues éditeur | `apps/web/src/lib/legal.ts` |
+| Version du corpus, identité de l’éditeur et du partenaire, mentions non publiées, marqueur | `packages/shared/src/legal/index.ts` |
+| Registre des documents, état de relecture, contacts | `apps/web/src/lib/legal.ts` |
 | Consentement cookies (logique) | `apps/web/src/lib/cookie-consent.ts` |
 | Bannière de consentement | `apps/web/src/components/cookie-consent.tsx` |
 | Liens légaux des deux pieds de page | `apps/web/src/components/legal-links.tsx` |
 | Gabarit et fragments des pages légales | `apps/web/src/app/(marketing)/_components/legal-page.tsx` |
 | Acceptation à l’inscription | `apps/web/src/app/(auth)/register/page.tsx` |
 | Preuve d’acceptation (API) | `apps/api/src/legal/` |
+
+---
+
+## 6. Point signalé, non résolu — facture normalisée des abonnements
+
+Si **Go freelance SARLU vend les abonnements Lalanda**, c’est une société
+congolaise assujettie, et ses propres factures d’abonnement relèvent a priori de
+la **facture normalisée DGI** (ADR-0019, ADR-0024). Aucune règle n’est tranchée
+ici ; l’écart constaté le 30 oct. 2026 est le suivant :
+
+- **Encaissement** (`apps/api/src/payments/`, docs/13-PRICING § Paiements) :
+  `manual` (mobile money, virement), seul circuit opérationnel, confirmé par un
+  administrateur plateforme ; `stripe` et `paypal` codés mais en attente
+  d’identifiants marchands.
+- **Émetteur** : aucun document de facture n’est produit par Lalanda pour un
+  abonnement. Le circuit manuel ne produit aucune pièce ; Stripe émettrait ses
+  propres factures, au nom du titulaire du compte marchand, qui n’est pas
+  documenté. Les montants sont **hors taxes** (`taxIncluded: false`), la
+  fiscalité de la vente numérique n’est pas arbitrée.
+- **Normalisation** : le module ventes sait émettre et normaliser des factures
+  DGI **pour les organisations clientes** (leurs propres ventes), pas pour la
+  plateforme. `billing/` et `payments/` n’ont aucun lien avec `sales/` ni avec
+  e-DEF.
+
+Questions ouvertes : quelle entité tient les comptes marchands ; TVA applicable
+aux abonnements ; une facture normalisée par encaissement (y compris
+mobile money manuel) ; utilisation du module ventes de Lalanda par
+Go freelance SARLU elle-même (organisation plateforme dotée de ses identifiants
+DGI) ou circuit distinct ; traitement des clients hors RDC. Les CGV promettent
+déjà « une facture est émise à chaque échéance » : la promesse n’est pas tenue
+aujourd’hui.
