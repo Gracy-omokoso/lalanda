@@ -117,6 +117,12 @@ Décision, audit et décisions ouvertes : `docs/adr/ADR-0030-refonte-ui-ux.md`. 
 
 Jetons dans `packages/ui/src/styles/tokens.css` (anciens noms conservés), contrastes vérifiés par test. Composants partagés : `PageHeader` (surtitre de module), `TabsNav` (une ligne défilante sur téléphone), `Stepper`, `Button`, `Badge`, `Alert`, `EmptyState`, `Skeleton`, `DataNature` (hypothèse · prévision · réalisé · suggestion IA : libellé + forme, couleur du module d'origine). Champs de saisie sur `--surface` bordés par `--border-strong` (≥ 3:1). Pages publiques et d'accès : crème de charte conservé (`.surface-marque`).
 
+### Fenêtres modales
+
+Composant `Modal` de `packages/ui` : `<dialog>` ouvert par `showModal()` (`aria-modal`, titre relié par `aria-labelledby`, description par `aria-describedby`), focus au premier champ, `Tab` piégé, focus rendu à l'élément d'origine. Fermeture par `Échap`, par le bouton Fermer et par un clic sur le fond ; si la saisie a commencé, un bandeau demande « Continuer la saisie » ou « Abandonner » ; pendant un envoi, rien ne ferme. Contenu qui défile sous un en-tête fixe, page derrière figée. Plein écran sous 640 px, largeurs `sm`, `md`, `lg` au-delà ; couleurs par jetons (clair et sombre). Un dialogue imbriqué (`aria-modal` dans le contenu) garde `Échap` et `Tab` tant qu'il a le focus.
+
+**Toute création courte (« + », « Nouveau… ») s'ouvre dans cette fenêtre, sur la page courante** : projet, opportunité, prospect, contact, activité, client, article du catalogue, dépense, dépense récurrente, compte et mouvement de trésorerie, idée, initiative, invitation d'un membre, organisation, point de vente. Après la création, la liste se recharge sur place, ou l'on est mené à la fiche créée quand c'était l'usage (projet, idée, initiative, organisation). Client et article gardent leur adresse `?fiche=nouveau` : lien direct et retour arrière ouvrent et ferment la fenêtre. Restent des pages les éditeurs longs : composition d'une facture ou d'un devis, encaissement (panier de factures choisies dans la liste), assistant de saisie d'une initiative, business plan.
+
 ### Accès selon l'offre
 
 Une fonction non incluse reste visible avec un cadenas et un texte lu (« non inclus dans votre offre ») : onglet « Réalisé » d'un projet quand `actualsEnabled` est faux. La limite de projets s'affiche sur `/projects` avant la création.
