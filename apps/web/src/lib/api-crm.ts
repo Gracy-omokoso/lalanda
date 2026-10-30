@@ -9,6 +9,9 @@ import {
   jsonRequest,
   salesQuery,
   type DocumentCurrency,
+  type DocumentEmailDraft,
+  type DocumentEmailInput,
+  type DocumentEmailResult,
   type InvoiceCalculationView,
   type InvoiceCustomerBody,
   type InvoiceCustomerView,
@@ -641,4 +644,12 @@ export const crmApi = {
     }),
   downloadQuotePdf: (quoteId: string, fallbackName: string) =>
     download(`/sales/quotes/${id(quoteId)}/pdf`, fallbackName),
+  /** ADR-0042 : préremplissage (`sales.quote`) et envoi par e-mail, PDF joint. */
+  getQuoteEmailDraft: (quoteId: string) =>
+    jsonRequest<DocumentEmailDraft>(`/sales/quotes/${id(quoteId)}/email`, { method: 'GET' }),
+  sendQuoteEmail: (quoteId: string, body: DocumentEmailInput) =>
+    jsonRequest<DocumentEmailResult>(`/sales/quotes/${id(quoteId)}/email`, {
+      method: 'POST',
+      body,
+    }),
 };

@@ -11,7 +11,8 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { api, type InvoiceSummary, type InvoiceType, type SettlementView } from '@/lib/api';
 
-import { Alerte, BOUTON, CHAMP, Pastille } from '../../_components/form-ui';
+import { BoutonApercu } from '../../_components/apercu-document';
+import { Alerte, BOUTON, BOUTON_PETIT, CHAMP, Pastille } from '../../_components/form-ui';
 import { useAccesVentes } from '../../_components/sales-access';
 import { formatDate } from '../../_components/sales-model';
 import { useSalesList } from '../../_components/use-sales-list';
@@ -37,7 +38,7 @@ import {
 } from './invoice-model';
 
 export function InvoiceList(): React.ReactElement {
-  const { gerer } = useAccesVentes();
+  const { gerer, facturer } = useAccesVentes();
   const [filtres, setFiltres] = useState<FiltresFactures>(FILTRES_INITIAUX);
 
   const charger = useCallback(
@@ -210,10 +211,10 @@ export function InvoiceList(): React.ReactElement {
               const entete = enteteDocument(d);
               const montants = montantsResume(d);
               return (
-                <li key={d.id}>
+                <li key={d.id} className="flex flex-col sm:flex-row sm:items-start">
                   <Link
                     href={`${FACTURES_BASE}/${encodeURIComponent(d.id)}`}
-                    className="flex flex-col gap-2 p-4 transition hover:bg-[var(--surface,transparent)] sm:flex-row sm:items-start sm:justify-between"
+                    className="flex min-w-0 flex-1 flex-col gap-2 p-4 transition hover:bg-[var(--surface,transparent)] sm:flex-row sm:items-start sm:justify-between"
                   >
                     <div className="flex min-w-0 flex-col gap-1">
                       <span className="flex flex-wrap items-center gap-2">
@@ -253,6 +254,18 @@ export function InvoiceList(): React.ReactElement {
                       ) : null}
                     </div>
                   </Link>
+                  <div className="px-4 pb-4 sm:py-4 sm:pl-0">
+                    <BoutonApercu
+                      className={BOUTON_PETIT}
+                      document={{
+                        genre: 'facture',
+                        id: d.id,
+                        titre: entete.titre,
+                        nomFichier: `${(entete.reference || d.proformaRef).replace(/[^A-Za-z0-9._-]/g, '-')}.pdf`,
+                        peutEnvoyer: facturer,
+                      }}
+                    />
+                  </div>
                 </li>
               );
             })}

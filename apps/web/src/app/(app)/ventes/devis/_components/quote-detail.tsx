@@ -13,6 +13,7 @@ import { crmApi, type QuoteView } from '@/lib/api-crm';
 
 import { Alerte, BOUTON_PETIT, Pastille } from '../../_components/form-ui';
 import { formatMontant } from '../../_components/sales-model';
+import { BoutonApercu } from '../../_components/apercu-document';
 import { useAccesVentes } from '../../_components/sales-access';
 import { lienOpportunite } from '../../../crm/_components/crm-model';
 import { FACTURES_BASE } from '../../factures/_components/invoice-model';
@@ -141,6 +142,17 @@ export function QuoteDetail({ quoteId }: { quoteId: string }): React.ReactElemen
       ) : null}
 
       <div className="flex flex-wrap gap-2">
+        <BoutonApercu
+          className={BOUTON_PETIT}
+          libelle="Aperçu et envoi"
+          document={{
+            genre: 'devis',
+            id: vue.id,
+            titre: `Devis ${vue.number} (v${vue.version})`,
+            nomFichier: `${vue.number}-v${vue.version}.pdf`,
+            peutEnvoyer: gerer,
+          }}
+        />
         <button
           type="button"
           className={BOUTON_PETIT}
