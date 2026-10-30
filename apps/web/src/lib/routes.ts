@@ -78,6 +78,8 @@ export const PROTECTED_PREFIXES = [
   // ADR-0039 — projets et tâches du RUN (module `work`). Session ET organisation
   // active ; `/projets` est distinct de `/projects` (initiatives BUILD).
   '/projets',
+  // ADR-0044 § 8 — achats et fournisseurs (RUN). Session ET organisation active.
+  '/achats',
 ] as const;
 
 /**

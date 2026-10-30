@@ -31,6 +31,7 @@ export type NavIconId =
   | 'devis'
   | 'crm'
   | 'projets'
+  | 'achats'
   | 'pilotage'
   | 'sante'
   | 'investisseurs'
@@ -282,6 +283,40 @@ export const NAV_APPS: readonly NavApp[] = [
     action: 'sales.read',
     sousOptions: [],
   },
+  // ADR-0044 § 8 — achats et fournisseurs, JUSTE AVANT Trésorerie (on engage,
+  // puis on paie). Lecture `purchase.read`. Ne figurent que les sous-options
+  // dont l'écran EXISTE (lot P7) ; réceptions, factures, à payer et réglages
+  // arrivent avec les lots suivants (`ACHATS_SOUS_OPTIONS_PREVUES`).
+  {
+    id: 'achats',
+    href: '/achats',
+    label: 'Achats',
+    description: 'Fournisseurs, demandes d’achat approuvées et bons de commande.',
+    module: 'run',
+    icon: 'achats',
+    action: 'purchase.read',
+    sousOptions: [
+      { id: 'achats-vue', href: '/achats', label: 'Vue d’ensemble', action: 'purchase.read' },
+      {
+        id: 'achats-commandes',
+        href: '/achats/commandes',
+        label: 'Demandes et commandes',
+        action: 'purchase.read',
+      },
+      {
+        id: 'achats-validations',
+        href: '/achats/validations',
+        label: 'À approuver',
+        action: 'purchase.approve',
+      },
+      {
+        id: 'achats-fournisseurs',
+        href: '/achats/fournisseurs',
+        label: 'Fournisseurs',
+        action: 'purchase.read',
+      },
+    ],
+  },
   // ADR-0034 — dépenses, comptes, prévision et réalisé vs prévu.
   {
     id: 'tresorerie',
@@ -384,6 +419,22 @@ export const CRM_SOUS_OPTIONS_PREVUES = [
   'crm-activites',
   'crm-rapports',
   'crm-reglages',
+] as const;
+
+/**
+ * Ordre cible des sous-options des Achats (ADR-0044 § 8). Les identifiants
+ * absents de `NAV_APPS` sont ceux dont l'écran n'est pas encore livré (lot P8 :
+ * réceptions, factures, à payer ; réglages) : masqués plutôt que vides.
+ */
+export const ACHATS_SOUS_OPTIONS_PREVUES = [
+  'achats-vue',
+  'achats-commandes',
+  'achats-validations',
+  'achats-receptions',
+  'achats-factures',
+  'achats-a-payer',
+  'achats-fournisseurs',
+  'achats-reglages',
 ] as const;
 
 function autorise(action: OrgAction | null, actions: readonly OrgAction[] | null): boolean {
