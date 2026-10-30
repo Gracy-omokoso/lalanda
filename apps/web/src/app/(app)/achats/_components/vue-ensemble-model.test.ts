@@ -8,23 +8,24 @@ const page = (n: number, suite = false) => ({
   items: Array.from({ length: n }, (_, i) => ({ id: String(i) })),
   nextCursor: suite ? 'c' : null,
 });
+const vide = { amount: '0.00', count: 0 };
+const devise = (
+  currency: 'USD' | 'CDF',
+  overdue: { amount: string; count: number },
+  dueSoon: { amount: string; count: number },
+) => ({ currency, overdue, dueSoon, weeks: [], months: [], open: vide, disputed: vide });
 const echeancier: PayablesView = {
+  version: '1.0.0',
   asOf: '2026-10-30',
   dueSoonDays: 7,
-  byCurrency: [
-    {
-      currency: 'USD',
-      overdue: { amount: '300.00', count: 1 },
-      dueSoon: { amount: '200.00', count: 2 },
-      disputed: { amount: '0.00', count: 0 },
-    },
-    {
-      currency: 'CDF',
-      overdue: { amount: '0.00', count: 0 },
-      dueSoon: { amount: '0.00', count: 0 },
-      disputed: { amount: '0.00', count: 0 },
-    },
+  dueSoonUntil: '2026-11-06',
+  schedule: [
+    devise('USD', { amount: '300.00', count: 1 }, { amount: '200.00', count: 2 }),
+    devise('CDF', vide, vide),
   ],
+  aging: [],
+  invoices: [],
+  duplicates: { status: 'known', count: 0 },
 };
 const ok = <T>(valeur: T) => ({ ok: true as const, valeur });
 const ko = (status: number) => ({ ok: false as const, erreur: { status } });

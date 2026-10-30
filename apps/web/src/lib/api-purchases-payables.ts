@@ -7,15 +7,13 @@
 // échéancier viennent de l'API (moteur `@lalanda/engine`, module `purchases`).
 //
 // Contrats : réceptions et factures reprennent `@lalanda/shared/purchases` (lot P4).
-// Les paiements (P5) et l'échéancier (P5, P6) n'ont pas encore de contrat partagé :
-// les vues ci-dessous recopient l'ADR (§ 2.6, § 3.6) au plus près et seront
-// remplacées par les contrats de ces lots à leur fusion. Tant qu'une route
-// n'existe pas, l'API répond 404 : les écrans le disent, rien n'est inventé.
+// Paiements, échéancier et
+// doublons reprennent ceux du lot P5. Une route absente ou refusée donne une
+// phrase à l'écran, jamais un chiffre inventé.
 
 import type {
   CreatePurchaseReceptionBody,
   CreateSupplierInvoiceBody,
-  PurchaseCurrency,
   PurchaseMatchingStatus,
   PurchaseOrderDetailView,
   PurchaseReceptionPage,
@@ -26,9 +24,14 @@ import type {
   SupplierInvoicePrefill,
   SupplierInvoiceStatus,
   SupplierInvoiceView,
-  SupplierPaymentChannel,
-  SupplierPaymentOrigin,
-  SupplierPaymentStatus,
+  CreateSupplierPaymentBody,
+  PayablesScheduleCurrencyView,
+  PayablesView,
+  PurchaseDuplicatesView,
+  SupplierPaymentAllocationInput,
+  SupplierPaymentFromExpenseBody,
+  SupplierPaymentPage,
+  SupplierPaymentView,
 } from '@lalanda/shared/purchases';
 
 import { API_URL, jsonRequest, salesQuery } from './api';
@@ -41,9 +44,13 @@ export type {
   SupplierInvoicePrefill,
   SupplierInvoiceVarianceView,
   SupplierInvoiceView,
+  PayableInvoiceItem,
+  PayablesView,
+  PossibleDuplicateView,
+  PurchaseDuplicatesView,
+  SupplierPaymentListItem,
+  SupplierPaymentView,
 } from '@lalanda/shared/purchases';
-
-type DecimalString = string;
 
 /** Erreur au format de `jsonRequest` (status, detail), pour les appels binaires. */
 async function erreurHttp(res: Response): Promise<Error & { status: number; detail: unknown }> {
@@ -121,115 +128,16 @@ export type SupplierInvoiceInput = {
 
 export type ReceptionInput = CreatePurchaseReceptionBody;
 
-// ─── Échéancier (§ 3.6) — contrat des lots P5, P6 ───────────────────────────
+// ─── Échéancier, paiements et doublons (§ 2.6, § 3.6) — contrats du lot P5 ──
 
-export interface MontantCompte {
-  amount: DecimalString;
-  count: number;
-}
+/** Échéancier du moteur (`GET /purchases/payables`), une devise par entrée. */
+export type EcheancierView = PayablesView;
+export type EcheancierDeviseView = PayablesScheduleCurrencyView;
 
-/** Une devise de l'échéancier : montants et nombres rendus par le moteur. */
-export interface EcheancierDeviseView {
-  currency: PurchaseCurrency;
-  overdue: MontantCompte;
-  dueSoon: MontantCompte;
-  /** « Plus tard » : semaines glissantes après la fenêtre « bientôt » (moteur). */
-  weeks?: (MontantCompte & { from: string; to: string })[];
-  /** Puis par mois civil `AAAA-MM`. */
-  months?: (MontantCompte & { month: string })[];
-  /** Σ hors litiges, rendu par le moteur. */
-  open?: MontantCompte;
-  disputed: MontantCompte;
-}
-
-export interface EcheancierView {
-  asOf: string;
-  dueSoonDays: number;
-  byCurrency: EcheancierDeviseView[];
-}
-
-// ─── Paiements (§ 2.6, § 3.6) — contrat du lot P5 ───────────────────────────
-
-export interface SupplierPaymentAllocationView {
-  invoiceId: string;
-  amount: DecimalString;
-  /** Copies d'affichage si l'API les rend. */
-  internalNumber?: string | null;
-  supplierReference?: string | null;
-}
-
-export interface SupplierPaymentView {
-  id: string;
-  number: string;
-  supplierId: string;
-  supplierName?: string | null;
-  currency: PurchaseCurrency;
-  paidOn: string;
-  amount: DecimalString;
-  accountId: string | null;
-  method: SupplierPaymentChannel;
-  paymentMethodId?: string | null;
-  reference: string | null;
-  allocations: SupplierPaymentAllocationView[];
-  expenseIds: string[];
-  origin: SupplierPaymentOrigin;
-  status: SupplierPaymentStatus;
-  cancellation?: { at: string; by: string; reason: string } | null;
-  revision?: number;
-  createdAt?: string;
-}
-
-export interface SupplierPaymentPage {
-  items: SupplierPaymentView[];
-  nextCursor: string | null;
-}
-
-export interface PaymentAllocationInput {
-  invoiceId: string;
-  amount: DecimalString;
-}
-
-export interface CreateSupplierPaymentInput {
-  supplierId: string;
-  currency: PurchaseCurrency;
-  paidOn: string;
-  amount: DecimalString;
-  accountId?: string | null;
-  method: SupplierPaymentChannel;
-  reference?: string | null;
-  allocations: PaymentAllocationInput[];
-}
-
-export interface PaymentFromExpenseInput {
-  expenseId: string;
-  allocations: PaymentAllocationInput[];
-  expectedRevision: number;
-}
-
-/**
- * Doublon probable (O3 c, moteur `possibleDuplicateExpenses`) : une dépense directe
- * et un paiement du même fournisseur, même devise, même montant, à trois jours ou
- * moins. Rien n'est annulé seul : l'écran le signale.
- */
-export interface PossibleDuplicateView {
-  code: 'POSSIBLE_DUPLICATE_EXPENSE';
-  paymentId: string;
-  expenseId: string;
-  supplierId: string;
-  currency: PurchaseCurrency;
-  amount: DecimalString;
-  daysApart: number;
-  /** Copies d'affichage si l'API les rend. */
-  supplierName?: string | null;
-  paymentNumber?: string | null;
-  expenseLabel?: string | null;
-  expenseSpentOn?: string | null;
-  paidOn?: string | null;
-}
-
-export interface PossibleDuplicatePage {
-  items: PossibleDuplicateView[];
-}
+/** Corps de `POST /purchases/payments` (la devise est celle des factures imputées). */
+export type CreateSupplierPaymentInput = Omit<CreateSupplierPaymentBody, 'paymentMethodId'>;
+export type PaymentAllocationInput = SupplierPaymentAllocationInput;
+export type PaymentFromExpenseInput = SupplierPaymentFromExpenseBody;
 
 // ─── Client ─────────────────────────────────────────────────────────────────
 
@@ -310,20 +218,31 @@ export const purchasesPayablesApi = {
   getSchedule: (params: { asOf?: string; supplierId?: string } = {}) =>
     jsonRequest<EcheancierView>(`/purchases/payables${salesQuery(params)}`, { method: 'GET' }),
   listPayments: (
-    params: { supplierId?: string; from?: string; to?: string; cursor?: string } = {},
+    params: {
+      supplierId?: string;
+      invoiceId?: string;
+      from?: string;
+      to?: string;
+      cursor?: string;
+      limit?: number;
+    } = {},
   ) =>
     jsonRequest<SupplierPaymentPage>(`/purchases/payments${salesQuery(params)}`, {
       method: 'GET',
     }),
+  getPayment: (paymentId: string) =>
+    jsonRequest<SupplierPaymentView>(`/purchases/payments/${id(paymentId)}`, { method: 'GET' }),
   createPayment: (body: CreateSupplierPaymentInput) =>
     jsonRequest<SupplierPaymentView>('/purchases/payments', { method: 'POST', body }),
   paymentFromExpense: (body: PaymentFromExpenseInput) =>
     jsonRequest<SupplierPaymentView>('/purchases/payments/from-expense', { method: 'POST', body }),
-  cancelPayment: (paymentId: string, body: { reason: string }) =>
+  cancelPayment: (paymentId: string, body: { reason: string; expectedRevision: number }) =>
     jsonRequest<SupplierPaymentView>(`/purchases/payments/${id(paymentId)}/cancel`, {
       method: 'POST',
       body,
     }),
-  listDuplicates: () =>
-    jsonRequest<PossibleDuplicatePage>('/purchases/duplicates', { method: 'GET' }),
+  listDuplicates: (params: { supplierId?: string } = {}) =>
+    jsonRequest<PurchaseDuplicatesView>(`/purchases/duplicates${salesQuery(params)}`, {
+      method: 'GET',
+    }),
 };

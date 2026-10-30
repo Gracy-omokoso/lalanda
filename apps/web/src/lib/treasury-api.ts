@@ -175,7 +175,8 @@ export interface ScenarioHypotheses {
   planChargesRate: number;
 }
 
-export type ForecastFlowSource = 'receivable' | 'recurring' | 'plan_in' | 'plan_out';
+// ADR-0044 — P8 : `payable` = échéances des factures fournisseurs validées (moteur 1.1.0).
+export type ForecastFlowSource = 'receivable' | 'recurring' | 'plan_in' | 'plan_out' | 'payable';
 
 export interface ForecastAlert {
   severity: 'critique' | 'tension';

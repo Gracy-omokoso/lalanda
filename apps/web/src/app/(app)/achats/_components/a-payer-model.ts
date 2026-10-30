@@ -9,7 +9,11 @@
 // Le paiement ne calcule rien : le montant payé est saisi (c'est ce qui est sorti
 // du compte) et l'API vérifie qu'il égale la somme répartie.
 
-import type { PurchaseCurrency, SupplierPaymentChannel } from '@lalanda/shared/purchases';
+import {
+  SUPPLIER_PAYMENT_CHANNEL_LABELS,
+  type PurchaseCurrency,
+  type SupplierPaymentChannel,
+} from '@lalanda/shared/purchases';
 
 import type {
   CreateSupplierPaymentInput,
@@ -128,7 +132,7 @@ export function totauxGroupe(e: EcheancierView | null, id: IdGroupe): string[] |
     }
   };
   if (id === 'plus-tard') return lignesPlusTard(e);
-  return e.byCurrency.flatMap((d) =>
+  return e.schedule.flatMap((d) =>
     champ(d)
       .filter((m) => m.count > 0)
       .map((m) => ligneMontant(m, d.currency)),
@@ -152,13 +156,13 @@ const MOIS = [
 
 /** « Plus tard » : semaines puis mois rendus par le moteur, une ligne chacun. */
 export function lignesPlusTard(e: EcheancierView): string[] {
-  return e.byCurrency.flatMap((d) => [
-    ...(d.weeks ?? [])
+  return e.schedule.flatMap((d) => [
+    ...d.weeks
       .filter((w) => w.count > 0)
       .map(
         (w) => `Du ${formatJour(w.from)} au ${formatJour(w.to)} : ${ligneMontant(w, d.currency)}`,
       ),
-    ...(d.months ?? [])
+    ...d.months
       .filter((m) => m.count > 0)
       .map((m) => {
         const [a, mm] = m.month.split('-');
@@ -170,13 +174,9 @@ export function lignesPlusTard(e: EcheancierView): string[] {
 
 // ── Paiement (§ 2.6) ────────────────────────────────────────────────────────
 
-export const LIBELLES_MOYEN: Record<SupplierPaymentChannel, string> = {
-  bank_transfer: 'Virement bancaire',
-  mobile_money: 'Mobile money',
-  cash: 'Espèces',
-  cheque: 'Chèque',
-  other: 'Autre',
-};
+/** Libellés des moyens de paiement (contrat du lot P5). */
+export const LIBELLES_MOYEN: Readonly<Record<SupplierPaymentChannel, string>> =
+  SUPPLIER_PAYMENT_CHANNEL_LABELS;
 
 export interface ImputationPaiement {
   invoiceId: string;
@@ -308,7 +308,6 @@ export function preparerPaiement(
     ok: true,
     corps: {
       supplierId: f.supplierId,
-      currency: f.currency,
       paidOn: f.paidOn,
       amount: montant.valeur,
       accountId: f.accountId === '' ? null : f.accountId,

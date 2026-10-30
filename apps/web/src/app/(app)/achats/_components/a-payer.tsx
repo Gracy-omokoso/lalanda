@@ -18,7 +18,7 @@ import type { PurchaseCurrency } from '@lalanda/shared/purchases';
 import {
   purchasesPayablesApi,
   type EcheancierView,
-  type PossibleDuplicateView,
+  type PurchaseDuplicatesView,
   type SupplierInvoiceListItem,
   type SupplierPaymentView,
 } from '@/lib/api-purchases-payables';
@@ -56,7 +56,7 @@ interface APayerDonnees {
   echeancier: Lu<EcheancierView>;
   groupes: GroupeEcheancier[] | null;
   erreurListes: string | null;
-  doublons: Lu<{ items: PossibleDuplicateView[] }>;
+  doublons: Lu<PurchaseDuplicatesView>;
 }
 
 function LigneFacture({
@@ -155,7 +155,7 @@ export function APayer(): React.ReactElement {
         />
       );
     }
-    const lignes = d.echeancier.v.byCurrency
+    const lignes = d.echeancier.v.schedule
       .filter((c) => c[champ].count > 0)
       .map((c) => `${formatMontant(c[champ].amount, c.currency)} · ${c[champ].count}`);
     return (
@@ -285,13 +285,13 @@ export function APayer(): React.ReactElement {
               ? 'Les doublons se lisent avec l’accès à la trésorerie.'
               : `${phraseIndisponible(d.doublons.erreur)}.`}
           </PhraseSection>
-        ) : d.doublons.v.items.length === 0 ? (
+        ) : d.doublons.v.duplicates.length === 0 ? (
           <PhraseSection>
             Aucune dépense saisie à la main ne ressemble à un paiement fournisseur.
           </PhraseSection>
         ) : (
           <ul className="flex flex-col gap-2 text-sm">
-            {d.doublons.v.items.map((x) => (
+            {d.doublons.v.duplicates.map((x) => (
               <li key={`${x.paymentId}-${x.expenseId}`} className="flex items-start gap-2">
                 <AlertTriangle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
                 <span>{phraseDoublon(x)}</span>

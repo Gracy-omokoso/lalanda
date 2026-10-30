@@ -75,7 +75,7 @@ function tuileMontants(
     };
   }
   if (!lu.ok) return { etat: 'indisponible', phrase: phraseIndisponible(lu.erreur) };
-  const lignes = lu.valeur.byCurrency
+  const lignes = lu.valeur.schedule
     .filter((c) => c[champ].count > 0)
     .map((c) => {
       const n = c[champ].count;

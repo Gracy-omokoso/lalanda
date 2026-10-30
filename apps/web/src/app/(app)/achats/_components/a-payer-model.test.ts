@@ -46,28 +46,38 @@ const item = (
   ...over,
 });
 
+const vide = { amount: '0.00', count: 0 };
 const echeancier: EcheancierView = {
+  version: '1.0.0',
   asOf: '2026-10-30',
   dueSoonDays: 7,
-  byCurrency: [
+  dueSoonUntil: '2026-11-06',
+  schedule: [
     {
       currency: 'CDF',
-      overdue: { amount: '0.00', count: 0 },
+      overdue: vide,
       dueSoon: { amount: '50000.00', count: 1 },
-      disputed: { amount: '0.00', count: 0 },
+      weeks: [],
+      months: [],
+      open: { amount: '50000.00', count: 1 },
+      disputed: vide,
     },
     {
       currency: 'USD',
       overdue: { amount: '300.00', count: 2 },
-      dueSoon: { amount: '0.00', count: 0 },
+      dueSoon: vide,
       weeks: [
         { from: '2026-11-07', to: '2026-11-13', amount: '200.00', count: 1 },
         { from: '2026-11-14', to: '2026-11-20', amount: '0.00', count: 0 },
       ],
       months: [{ month: '2027-01', amount: '75.00', count: 1 }],
+      open: { amount: '575.00', count: 4 },
       disputed: { amount: '40.00', count: 1 },
     },
   ],
+  aging: [],
+  invoices: [],
+  duplicates: { status: 'known', count: 0 },
 };
 
 describe('échéancier', () => {
@@ -165,7 +175,6 @@ describe('paiement', () => {
       ok: true,
       corps: {
         supplierId: 's1',
-        currency: 'USD',
         paidOn: '2026-10-30',
         amount: '160',
         accountId: 'a1',
@@ -261,7 +270,9 @@ describe('doublons probables', () => {
       daysApart: 2,
       supplierName: 'Socimex',
       paymentNumber: 'PF2610-000003',
+      paidOn: '2026-10-28',
       expenseLabel: 'Ramettes',
+      spentOn: '2026-10-30',
     });
     expect(p).toBe(
       '200,00 USD chez Socimex : le paiement PF2610-000003 et la dépense « Ramettes », à 2 jours d’écart. Vérifiez qu’il ne s’agit pas de la même sortie d’argent ; rien n’est annulé automatiquement.',
@@ -275,6 +286,11 @@ describe('doublons probables', () => {
         currency: 'CDF',
         amount: '10.00',
         daysApart: 0,
+        supplierName: null,
+        paymentNumber: null,
+        paidOn: null,
+        expenseLabel: null,
+        spentOn: null,
       }),
     ).toMatch(
       /ce fournisseur : un paiement fournisseur et une dépense saisie à la main, le même jour/,

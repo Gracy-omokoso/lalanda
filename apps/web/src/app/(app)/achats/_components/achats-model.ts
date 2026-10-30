@@ -106,6 +106,16 @@ const MESSAGES: Record<string, string> = {
   SUPPLIER_PAYMENT_ALLOCATION_MISMATCH:
     'Le montant payé doit être égal à la somme des montants répartis sur les factures.',
   SUPPLIER_PAYMENT_EXCEEDS_REMAINING: 'Un montant réparti dépasse le reste à payer de sa facture.',
+  SUPPLIER_PAYMENT_NOT_FOUND: 'Paiement introuvable.',
+  SUPPLIER_PAYMENT_CANCELLED: 'Ce paiement est déjà annulé.',
+  SUPPLIER_PAYMENT_SUPPLIER_MISMATCH: 'Toutes les factures d’un paiement sont du même fournisseur.',
+  SUPPLIER_PAYMENT_CURRENCY_MISMATCH:
+    'Toutes les factures d’un paiement, et le compte qui paie, sont dans la même devise.',
+  SUPPLIER_INVOICE_NOT_PAYABLE: 'Seule une facture validée, non annulée, se paie.',
+  EXPENSE_NOT_FOUND: 'Dépense introuvable.',
+  EXPENSE_CANCELLED: 'Cette dépense est annulée : elle ne peut pas devenir un paiement.',
+  EXPENSE_SUPPLIER_MISMATCH:
+    'Cette dépense est rattachée à un autre fournisseur que celui des factures.',
   EXPENSE_OWNED_BY_PURCHASES:
     'Cette dépense est le paiement d’une facture fournisseur : elle se modifie ou s’annule depuis les achats.',
   WORK_PROJECT_ARCHIVED: 'Ce projet est archivé : restaurez-le avant d’y imputer une facture.',

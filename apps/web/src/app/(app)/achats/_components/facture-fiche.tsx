@@ -17,7 +17,7 @@ import {
   purchasesPayablesApi,
   type SupplierInvoiceVarianceView,
   type SupplierInvoiceView,
-  type SupplierPaymentView,
+  type SupplierPaymentListItem,
 } from '@/lib/api-purchases-payables';
 
 import { Bandeau, Panneau, PhraseSection, Tuile } from '../../crm/_components/crm-ui';
@@ -35,6 +35,7 @@ import {
   messageAchats,
   nomPersonne,
   peutGererAchats,
+  peutPayerFournisseurs,
   statutDe,
 } from './achats-model';
 import { LIBELLES_MOYEN } from './a-payer-model';
@@ -136,7 +137,7 @@ export function FactureFiche({ invoiceId }: { invoiceId: string }): React.ReactE
   const [erreur, setErreur] = useState<string | null>(null);
   const [erreurGeste, setErreurGeste] = useState<string | null>(null);
   const [refusEcarts, setRefusEcarts] = useState<SupplierInvoiceVarianceView[] | null>(null);
-  const [paiements, setPaiements] = useState<SupplierPaymentView[] | null>(null);
+  const [paiements, setPaiements] = useState<SupplierPaymentListItem[] | null>(null);
   const [erreurPaiements, setErreurPaiements] = useState<string | null>(null);
   const [dialogue, setDialogue] = useState<Dialogue>(null);
   const [occupe, setOccupe] = useState(false);
@@ -153,17 +154,17 @@ export function FactureFiche({ invoiceId }: { invoiceId: string }): React.ReactE
 
   useEffect(() => charger(), [charger]);
 
-  // Paiements du fournisseur qui imputent CETTE facture (lot P5 ; 404 tant qu'absent).
-  const supplierId = f?.supplierId;
+  // Paiements qui imputent CETTE facture (`GET /purchases/payments?invoiceId=`, lot P5).
   const revision = f?.revision;
+  const [aAnnuler, setAAnnuler] = useState<SupplierPaymentListItem | null>(null);
   useEffect(() => {
-    if (supplierId === undefined) return;
+    if (revision === undefined) return;
     let annule = false;
     purchasesPayablesApi
-      .listPayments({ supplierId })
+      .listPayments({ invoiceId, limit: 100 })
       .then((p) => {
         if (!annule) {
-          setPaiements(p.items.filter((x) => x.allocations.some((a) => a.invoiceId === invoiceId)));
+          setPaiements(p.items);
           setErreurPaiements(null);
         }
       })
@@ -179,7 +180,7 @@ export function FactureFiche({ invoiceId }: { invoiceId: string }): React.ReactE
     return () => {
       annule = true;
     };
-  }, [supplierId, invoiceId, revision]);
+  }, [invoiceId, revision]);
 
   async function geste(id: IdActionFacture): Promise<void> {
     if (f === null) return;
@@ -519,6 +520,15 @@ export function FactureFiche({ invoiceId }: { invoiceId: string }): React.ReactE
                       {p.origin === 'linked_expense' ? ' · dépense rattachée' : ''}
                       {p.status === 'cancelled' ? ' · annulé' : ''}
                     </span>
+                    {p.status === 'recorded' && peutPayerFournisseurs(actions) ? (
+                      <button
+                        type="button"
+                        className={`${BOUTON_PETIT} mt-1 w-fit`}
+                        onClick={() => setAAnnuler(p)}
+                      >
+                        Annuler ce paiement
+                      </button>
+                    ) : null}
                   </li>
                 );
               })}
@@ -527,6 +537,25 @@ export function FactureFiche({ invoiceId }: { invoiceId: string }): React.ReactE
         </Panneau>
       </div>
 
+      {aAnnuler ? (
+        <DialogueMotif
+          titre={`Annuler le paiement ${aAnnuler.number}`}
+          description="Les dépenses qu’il a créées dans la trésorerie sont annulées avec lui ; une dépense rattachée redevient une dépense directe."
+          libelle="Motif de l’annulation"
+          bouton="Annuler le paiement"
+          motif="obligatoire"
+          onFermer={() => setAAnnuler(null)}
+          onValider={async (motif) => {
+            const complet = await purchasesPayablesApi.getPayment(aAnnuler.id);
+            await purchasesPayablesApi.cancelPayment(aAnnuler.id, {
+              reason: motif,
+              expectedRevision: complet.revision,
+            });
+            setAAnnuler(null);
+            charger();
+          }}
+        />
+      ) : null}
       {dialogue === 'forcer' ? (
         <DialogueMotif
           titre="Forcer la validation"

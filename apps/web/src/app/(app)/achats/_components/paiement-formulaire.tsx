@@ -160,9 +160,9 @@ export function FenetrePaiement({
       })
       .catch(() => undefined);
     purchasesPayablesApi
-      .listDuplicates()
+      .listDuplicates({ supplierId })
       .then((p) => {
-        if (!annule) setDoublons(p.items.filter((d) => d.supplierId === supplierId));
+        if (!annule) setDoublons(p.duplicates.filter((d) => d.supplierId === supplierId));
       })
       .catch(() => undefined);
     return () => {
