@@ -282,6 +282,13 @@ describe('forbidden — 403 du guard (ADR-0041 § 6)', () => {
 describe('catalogue des autorisations (ADR-0041 § 5, § 6)', () => {
   const catalog = buildAuthzCatalog();
 
+  it('dit si la personnalisation est ouverte (interrupteur, lu à chaque appel)', () => {
+    expect(buildAuthzCatalog({}).memberPermissionsEnabled).toBe(false);
+    expect(buildAuthzCatalog({ MEMBER_PERMISSIONS_ENABLED: 'true' }).memberPermissionsEnabled).toBe(
+      true,
+    );
+  });
+
   it('chaque action figure dans exactement un domaine et a un libellé', () => {
     const vues = catalog.domains.flatMap((d) => d.actions);
     expect([...vues].sort()).toEqual([...ACTIONS].sort());

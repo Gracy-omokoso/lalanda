@@ -9,6 +9,8 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
 
 import { AuthGuard } from '../auth/auth.guard.js';
+
+import { memberPermissionsEnabled } from './authz.service.js';
 import {
   ACTION_DEPENDENCIES,
   ACTION_DOMAINS,
@@ -26,6 +28,11 @@ import {
 } from './permissions.js';
 
 export interface AuthzCatalogView {
+  /**
+   * Interrupteur `MEMBER_PERMISSIONS_ENABLED` : éteint, l'écran affiche la grille
+   * en lecture seule au lieu de découvrir le refus au premier enregistrement.
+   */
+  memberPermissionsEnabled: boolean;
   /** Les sept domaines de l'écran, dans l'ordre d'affichage. */
   domains: Array<{ key: string; label: string; actions: Action[] }>;
   /** Libellé français de chaque action (« autorisation »). */
@@ -51,13 +58,14 @@ export interface AuthzCatalogView {
   }>;
 }
 
-export function buildAuthzCatalog(): AuthzCatalogView {
+export function buildAuthzCatalog(env: NodeJS.ProcessEnv = process.env): AuthzCatalogView {
   const dependencies: Partial<Record<Action, Action[]>> = {};
   for (const action of ACTIONS) {
     const deps = ACTION_DEPENDENCIES[action];
     if (deps !== undefined) dependencies[action] = [...deps];
   }
   return {
+    memberPermissionsEnabled: memberPermissionsEnabled(env),
     domains: ACTION_DOMAINS.map((d) => ({ key: d.key, label: d.label, actions: [...d.actions] })),
     labels: { ...ACTION_LABELS },
     dependencies,

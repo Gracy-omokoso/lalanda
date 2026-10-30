@@ -227,6 +227,8 @@ POST  /organizations/:orgId/transfer-ownership           efface l'écart des deu
 POST  /organizations/:orgId/invitations                  { email, role?, grants?, revokes? }
 POST  /invitations/accept                                revalide l'écart contre l'invitant du moment
 GET   /organizations/:orgId/members                      + grants, revokes, effective, customized, permissionsRevision
+GET   /authz/catalog                                     domaines, libellés, dépendances, paires, non délégables,
+                                                         ligne de chaque rôle, memberPermissionsEnabled (interrupteur)
 ```
 
 - `…/permissions` remplace l'écart entier ; pour un Comptable, `period.close` écrit
