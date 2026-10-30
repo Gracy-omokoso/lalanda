@@ -163,6 +163,39 @@ export interface WorkTaskView {
   doneSubtaskCount: number;
   revision: number;
   updatedAt: string;
+  /**
+   * ADR-0045 — H5 (§ 6.2) : absence APPROUVÉE de l'assigné en cours aujourd'hui
+   * (badge « Absent du … au … »). Jamais le type ni le motif. Absent du contrat
+   * sans module RH.
+   */
+  assigneeAbsence?: WorkAbsenceSpanView | null;
+  /**
+   * ADR-0045 — H5 (§ 6.2) : constat `ASSIGNEE_ABSENT_ON_DUE_DATE` — l'échéance de la
+   * tâche non terminée tombe pendant cette absence de l'assigné. Rien n'est déplacé.
+   */
+  dueDateAbsence?: WorkAbsenceSpanView | null;
+}
+
+/** Période d'absence d'un membre (jours inclus), sans type ni motif (ADR-0045 § 6.2). */
+export interface WorkAbsenceSpanView {
+  from: string;
+  to: string;
+}
+
+/**
+ * Constat de « Mes tâches » du CRÉATEUR d'une tâche (ADR-0045 § 6.2) : l'échéance
+ * tombe pendant une absence de son assigné.
+ */
+export interface WorkAbsenceFindingView {
+  code: 'ASSIGNEE_ABSENT_ON_DUE_DATE';
+  taskId: string;
+  projectId: string;
+  projectName: string;
+  number: number;
+  title: string;
+  dueDate: string;
+  assignee: WorkMemberRef;
+  absence: WorkAbsenceSpanView;
 }
 
 /** Détail d'une tâche (`GET /work/tasks/:taskId`). */
@@ -221,6 +254,11 @@ export interface MyTasksView {
   dueSoonCount: number;
   /** Vrai si une source a dépassé sa borne de lecture (500 par source). */
   truncated: boolean;
+  /**
+   * ADR-0045 — H5 (§ 6.2) : tâches créées par l'appelant, assignées à un autre,
+   * dont l'échéance tombe pendant une absence de l'assigné.
+   */
+  absenceFindings?: WorkAbsenceFindingView[];
 }
 
 // ── Commentaires et pièces jointes ──────────────────────────────────────────
@@ -311,6 +349,8 @@ export const PROJECT_MARGIN_FINDINGS = [
   'NO_INVOICE_LINKED',
   'DRAFT_INVOICES_IGNORED',
   'AMOUNTS_INCLUDE_TAX',
+  // ADR-0045 — H5 (§ 6.3, marge 1.2.0) : salaire rattaché ET temps valorisé, même devise.
+  'PERSONNEL_EXPENSES_AND_TIME_COST',
 ] as const;
 export type ProjectMarginFinding = (typeof PROJECT_MARGIN_FINDINGS)[number];
 
@@ -340,7 +380,13 @@ export interface ProjectMarginView {
   from: string | null;
   to: string | null;
   currencies: ProjectMarginCurrencyView[];
-  findings: { code: ProjectMarginFinding; minutes?: number; count?: number }[];
+  findings: {
+    code: ProjectMarginFinding;
+    minutes?: number;
+    count?: number;
+    /** ADR-0045 — H5 : devise du constat `PERSONNEL_EXPENSES_AND_TIME_COST`. */
+    currency?: WorkRateCurrency;
+  }[];
   minutesWithoutRate: number;
   /** Rendu seulement si l'appelant détient `treasury.manage` ; sinon `null`. */
   byMember:

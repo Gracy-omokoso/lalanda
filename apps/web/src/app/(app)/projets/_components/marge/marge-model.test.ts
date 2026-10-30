@@ -63,6 +63,16 @@ describe('marge-model', () => {
     expect(c[0]!.texte).toContain('30 min');
   });
 
+  it('ADR-0045 — H5 : salaire rattaché et temps valorisé, signalé sans rien retrancher', () => {
+    const c = constats({
+      ...vue,
+      findings: [{ code: 'PERSONNEL_EXPENSES_AND_TIME_COST', currency: 'USD', count: 1 }],
+    });
+    expect(c[0]).toMatchObject({ code: 'PERSONNEL_EXPENSES_AND_TIME_COST', ton: 'attention' });
+    expect(c[0]!.texte).toContain('En USD');
+    expect(c[0]!.texte).toContain('Rien n’a été retranché');
+  });
+
   it('suggestion PREPARE_INVOICE repérée dans une réponse d’écriture', () => {
     expect(suggestionFacture([{ code: 'PREPARE_INVOICE', taskId: 't' }])).toEqual({
       code: 'PREPARE_INVOICE',

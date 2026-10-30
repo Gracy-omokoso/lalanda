@@ -70,6 +70,13 @@ export function constats(view: ProjectMarginView): ConstatAffiche[] {
           ton: 'info',
           texte: 'Encaissements et dépenses sont des montants payés, TVA comprise (TTC).',
         };
+      // ADR-0045 — H5 (§ 6.3, marge 1.2.0) : signalé, jamais retranché.
+      case 'PERSONNEL_EXPENSES_AND_TIME_COST':
+        return {
+          code: f.code,
+          ton: 'attention',
+          texte: `${f.currency ? `En ${f.currency}, ` : ''}des salaires (dépenses « Salaires et charges sociales ») sont rattachés au projet ET du temps y est valorisé : la même personne est peut-être comptée deux fois. Rien n’a été retranché ; retirez l’un des deux si c’est le cas.`,
+        };
       default:
         return { code: String(f.code), ton: 'info', texte: String(f.code) };
     }

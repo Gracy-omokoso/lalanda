@@ -89,6 +89,9 @@ import { HrCalendarController } from '../hr/calendar/hr-calendar.controller.js';
 import { HrHolidaysController } from '../hr/holidays/hr-holidays.controller.js';
 import { HrLeaveTypesController } from '../hr/leave/hr-leave-types.controller.js';
 import { HrLeaveController } from '../hr/leave/hr-leave.controller.js';
+// ADR-0045 — H5
+import { HrReportsController } from '../hr/reports/hr-reports.controller.js';
+import { WorkTimesheetsController } from '../work/timesheets/work-timesheets.controller.js';
 import { QuotesController } from '../sales/quotes/quotes.controller.js';
 import { CrmActivitiesController } from '../crm/crm-activities.controller.js';
 import { CrmContactsController } from '../crm/crm-contacts.controller.js';
@@ -241,6 +244,9 @@ const CONTROLEURS = [
   HrHolidaysController,
   HrLeaveController,
   HrCalendarController,
+  // ADR-0045 — H5 : rapports et registre ; feuille de temps en lecture.
+  HrReportsController,
+  WorkTimesheetsController,
 ];
 
 /**
@@ -1175,5 +1181,31 @@ describe('ADR-0045 — H3 : absences, congés, fériés, calendrier', () => {
     const route = TOUTES_LES_ROUTES.find((r) => r.cle === 'HrSettingsController.updateApproval');
     expect(route!.actions).toEqual(['leave.approve', 'hr.manage']);
     for (const cle of Object.keys(SANS_PERMISSION)) expect(cle.startsWith('Hr')).toBe(false);
+  });
+});
+
+// ADR-0045 — H5
+describe('ADR-0045 — H5 : rapports, registre exporté, feuille de temps', () => {
+  it('chaque route déclare la permission de l’ADR (§ 3.3)', () => {
+    const attendu: Record<string, Action[]> = {
+      'HrReportsController.reports': ['hr.read'],
+      // Un fichier qui sort de l'organisation : `report.export` en plus, audit strict.
+      'HrReportsController.exportRegister': ['hr.read', 'report.export'],
+      // Soi au guard ; autrui (`work.manage` ou manager) décidé dans le service.
+      'WorkTimesheetsController.weekly': ['work.read'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) =>
+      /^(HrReports|WorkTimesheets)Controller\./.test(r.cle),
+    );
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+    }
+  });
+
+  it('aucune route d’écriture sur la feuille de temps (ni saisie, ni validation)', () => {
+    const routes = TOUTES_LES_ROUTES.filter((r) => r.cle.startsWith('WorkTimesheetsController.'));
+    expect(routes.map((r) => r.cle)).toEqual(['WorkTimesheetsController.weekly']);
   });
 });

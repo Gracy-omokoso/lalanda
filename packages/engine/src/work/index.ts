@@ -3,3 +3,13 @@
 
 export * from './types.js';
 export { computeProjectMargin } from './margin.js';
+// ADR-0045 § 6.2 (lot H5) : absences des assignés, badge et constat d'échéance.
+export {
+  ASSIGNEE_ABSENT_ON_DUE_DATE,
+  absenceSpansByUser,
+  taskAbsences,
+  type WorkAbsenceInput,
+  type WorkAbsenceSpan,
+  type WorkAbsenceTaskInput,
+  type WorkTaskAbsence,
+} from './absences.js';

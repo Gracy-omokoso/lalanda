@@ -19,7 +19,14 @@ import { useState } from 'react';
 import { workApi } from '@/lib/work-api';
 
 import { AjoutRapide, BarreFiltres, CaseTerminee, useFiltres } from './barre-taches';
-import { BloqueeBadge, Echeance, Etiquettes, PrioriteBadge, Responsable } from './elements';
+import {
+  AbsenceBadges,
+  BloqueeBadge,
+  Echeance,
+  Etiquettes,
+  PrioriteBadge,
+  Responsable,
+} from './elements';
 import {
   appliquerDeplacement,
   colonnesKanban,
@@ -260,7 +267,11 @@ function Carte({
         ) : null}
       </div>
       <div className="flex items-center justify-between gap-2">
-        <Responsable name={t.assignee?.name ?? null} compact={t.assignee !== null} />
+        <span className="flex min-w-0 flex-wrap items-center gap-1">
+          <Responsable name={t.assignee?.name ?? null} compact={t.assignee !== null} />
+          {/* ADR-0045 — H5 : assigné absent, échéance pendant l'absence. */}
+          <AbsenceBadges t={t} />
+        </span>
         {options.length > 0 ? (
           <>
             <label htmlFor={idMenu} className="sr-only">

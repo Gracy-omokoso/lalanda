@@ -17,6 +17,9 @@
 //   PURCHASES_SOURCE      dettes fournisseurs et     ADR-0044 § 6.4
 //                         approbations d'achat
 //                         — fournisseur réel `purchases/brief/purchases-brief.source.ts`
+//   HR_SOURCE             absences du jour, validations ADR-0045 § 6.5
+//                         d'absence, échéances RH
+//                         — fournisseur réel `hr/brief/hr-brief.source.ts`
 //
 // Les fournisseurs « non disponible » ci-dessous restent pour les tests.
 // Le pipeline (ADR-0035) et la santé GROW (ADR-0032) suivront le même motif :
@@ -26,6 +29,7 @@ import type {
   BriefCashInput,
   BriefCrmInput,
   BriefDueDatesInput,
+  BriefHrInput,
   BriefPurchasesInput,
   BriefWorkInput,
 } from '@lalanda/engine';
@@ -38,6 +42,8 @@ export const WORK_SOURCE = Symbol('MORNING_BRIEF_WORK_SOURCE');
 export const CRM_SOURCE = Symbol('MORNING_BRIEF_CRM_SOURCE');
 // ADR-0044 — P6
 export const PURCHASES_SOURCE = Symbol('MORNING_BRIEF_PURCHASES_SOURCE');
+// ADR-0045 — H5
+export const HR_SOURCE = Symbol('MORNING_BRIEF_HR_SOURCE');
 
 /** Trésorerie disponible de l'organisation. Ne reçoit QUE son identifiant. */
 export interface CashPositionSource {
@@ -121,4 +127,25 @@ export interface PurchasesSource {
 /** Sans module des achats (tests) : « non disponible ». */
 export const noPurchases: PurchasesSource = {
   purchasesOf: async () => ({ status: 'unavailable' }),
+};
+
+/**
+ * Ressources humaines (ADR-0045 § 6.5) : absences du jour dans la portée, demandes
+ * d'absence à valider, échéances RH. Appelé pour tout membre (la relation de manager
+ * suffit) ; `actions` sont les droits EFFECTIFS du membre, la portée est décidée par le
+ * moteur (`hrViewerScope`). Ne rend que des nombres et des dates, jamais de nom, de
+ * type d'absence ni de montant.
+ */
+export interface HrSource {
+  hrOf(
+    organizationId: string,
+    userId: string,
+    actions: readonly string[],
+    now: Date,
+  ): Promise<BriefHrInput>;
+}
+
+/** Sans module RH (tests) : « non disponible ». */
+export const noHr: HrSource = {
+  hrOf: async () => ({ status: 'unavailable' }),
 };

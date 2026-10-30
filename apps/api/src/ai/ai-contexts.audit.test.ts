@@ -124,7 +124,7 @@ describe('contextes servis au modèle (ADR-0040 § 4.4)', () => {
     // Seul modèle : le journal des sessions vocales (minutes consommées).
     expect([...new Set(modeles)]).toEqual(['LalaVocalSession']);
     const interdits =
-      /from '\.\.\/(treasury|actuals|sales|grow|crm|work|projects|plans|morning-brief|organization-space|objectives)\//;
+      /from '\.\.\/(treasury|actuals|sales|grow|crm|work|projects|plans|morning-brief|organization-space|objectives|hr|purchases)\//;
     const fautifs = ia.filter(({ text }) => interdits.test(text)).map(({ file }) => file);
     expect(fautifs).toEqual([]);
   });
@@ -179,5 +179,51 @@ describe('brief du matin envoyé au modèle, sans `treasury.read`', () => {
     const brief = await service.build('org', 'advisor', NO_OVERRIDES, 'u1', new Date(base.now));
     expect(cashOf).not.toHaveBeenCalled();
     expect(brief.facts.find((f) => f.id === 'tresorerie')?.status).toBe('hidden');
+  });
+});
+
+// ADR-0045 — H5 (§ 6.7) : aucune donnée RH nominative n'est servie au modèle.
+describe('brief du matin envoyé au modèle : ressources humaines', () => {
+  const HR_COLLECTIONS =
+    /hr_(employees|employee_private|leave_requests|leave_ledger|documents|checklists|settings)/;
+
+  it('aucun fichier qui parle au modèle ne lit une collection `hr_*`', () => {
+    const toutes = sourcesOf(SRC);
+    for (const f of FICHIERS_QUI_PARLENT_AU_MODELE) {
+      const text = toutes.find((x) => x.file === f)?.text ?? '';
+      expect(HR_COLLECTIONS.test(text), f).toBe(false);
+    }
+  });
+
+  it('le contexte ne porte que des nombres : ni identifiant de fiche, ni type, ni motif', () => {
+    const brief = buildMorningBrief({
+      now: '2026-10-29T08:00:00.000Z',
+      sales: 'hidden',
+      cash: 'hidden',
+      dueDates: { status: 'unavailable' },
+      work: 'hidden',
+      hr: {
+        status: 'known',
+        absences: [
+          {
+            employeeId: 'fiche-6f1a-confidentielle',
+            startDate: '2026-10-29',
+            endDate: '2026-10-30',
+          },
+        ],
+        pendingApprovalCount: 1,
+        deadlineCount: 2,
+        truncated: false,
+      },
+    });
+    const contexte = JSON.stringify(payloadFor(brief));
+    expect(contexte).not.toContain('fiche-6f1a');
+    expect(contexte).not.toMatch(/Maladie|salaire|IBAN/i);
+    const rh = brief.facts.filter((f) => f.source.module === 'run.hr');
+    expect(rh.map((f) => [f.id, f.kind, f.value])).toEqual([
+      ['rh.absents_aujourdhui', 'count', '1'],
+      ['mes_validations_absence.en_attente', 'count', '1'],
+      ['rh.echeances', 'count', '2'],
+    ]);
   });
 });

@@ -6,6 +6,7 @@
 import { Badge, Tag } from '@lalanda/ui';
 import type { WorkLabel, WorkPriority, WorkTaskView } from '@lalanda/shared/work';
 
+import { badgeAbsent, constatAbsentEcheance } from './absences-model';
 import { LIBELLES_ECHEANCE, PRIORITES, etatEcheance, formatJour } from './projets-model';
 
 export {
@@ -117,5 +118,50 @@ export function Responsable({
       </span>
       <span className={compact ? 'sr-only' : 'truncate'}>{name}</span>
     </span>
+  );
+}
+
+/**
+ * ADR-0045 — H5 (§ 6.2) : badge « Absent » de l'assigné et constat « absent à
+ * l'échéance ». Des jours seulement, jamais le type d'absence ; texte et signe, pas
+ * seulement une couleur.
+ */
+export function AbsenceBadges({
+  t,
+  details = false,
+}: {
+  t: Pick<WorkTaskView, 'assigneeAbsence' | 'dueDateAbsence' | 'done' | 'assignee'>;
+  /** Phrase complète du constat (panneau), sinon pastille courte (listes). */
+  details?: boolean;
+}): React.ReactElement | null {
+  const absent = t.assigneeAbsence ?? null;
+  const echeance = t.done ? null : (t.dueDateAbsence ?? null);
+  if (absent === null && echeance === null) return null;
+  return (
+    <>
+      {absent ? (
+        <span title={badgeAbsent(absent).complet}>
+          <Badge tone="neutral">
+            <span aria-hidden="true">⊘</span>{' '}
+            <span className="sr-only">{badgeAbsent(absent).complet}</span>
+            <span aria-hidden="true">{badgeAbsent(absent).court}</span>
+          </Badge>
+        </span>
+      ) : null}
+      {echeance ? (
+        details ? (
+          <p role="note" className="text-xs text-[var(--warning)]">
+            <span aria-hidden="true">⚠</span>{' '}
+            {constatAbsentEcheance(echeance, t.assignee?.name ?? null)}
+          </p>
+        ) : (
+          <span title={constatAbsentEcheance(echeance, t.assignee?.name ?? null)}>
+            <Badge tone="warning">
+              <span aria-hidden="true">⚠</span> Absent à l’échéance
+            </Badge>
+          </span>
+        )
+      ) : null}
+    </>
   );
 }

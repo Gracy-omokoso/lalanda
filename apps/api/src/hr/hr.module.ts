@@ -44,6 +44,9 @@ import { LeaveLedgerEntry, LeaveLedgerEntrySchema } from './leave/leave-ledger.s
 import { LeaveRequest, LeaveRequestSchema } from './leave/leave-request.schema.js';
 import { LeaveType, LeaveTypeSchema } from './leave/leave-type.schema.js';
 import { HrLifecycleHub } from './lifecycle/hr-lifecycle.js';
+// ADR-0045 — H5
+import { HrReportsController } from './reports/hr-reports.controller.js';
+import { HrReportsService } from './reports/hr-reports.service.js';
 
 @Module({
   imports: [
@@ -78,6 +81,8 @@ import { HrLifecycleHub } from './lifecycle/hr-lifecycle.js';
     HrHolidaysController,
     HrLeaveController,
     HrCalendarController,
+    // ADR-0045 — H5
+    HrReportsController,
   ],
   providers: [
     MasterKeyringProvider,
@@ -99,6 +104,8 @@ import { HrLifecycleHub } from './lifecycle/hr-lifecycle.js';
     HrLeaveAccrualsJob,
     HrLifecycleHub,
     { provide: HR_EMPLOYEE_LIFECYCLE, useExisting: HrLifecycleHub },
+    // ADR-0045 — H5 : rapports (moteur) et registre exporté.
+    HrReportsService,
   ],
   exports: [
     // ADR-0045 — H2

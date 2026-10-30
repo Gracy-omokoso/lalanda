@@ -7,7 +7,14 @@
 import { EmptyState, Skeleton } from '@lalanda/ui';
 
 import { AjoutRapide, BarreFiltres, CaseTerminee, useFiltres } from './barre-taches';
-import { BloqueeBadge, Echeance, Etiquettes, PrioriteBadge, Responsable } from './elements';
+import {
+  AbsenceBadges,
+  BloqueeBadge,
+  Echeance,
+  Etiquettes,
+  PrioriteBadge,
+  Responsable,
+} from './elements';
 import { lignesListe } from './kanban-model';
 import { useProjet } from './project-context';
 import { formatMinutes } from './projets-model';
@@ -80,6 +87,8 @@ export function VueListe(): React.ReactElement {
                   </span>
                 ) : null}
                 <Responsable name={t.assignee?.name ?? null} compact />
+                {/* ADR-0045 — H5 : assigné absent, échéance pendant l'absence. */}
+                <AbsenceBadges t={t} />
               </div>
             </li>
           ))}

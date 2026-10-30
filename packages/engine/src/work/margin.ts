@@ -37,6 +37,7 @@ import {
   type Fixed,
 } from '../receivables/money.js';
 import {
+  PERSONNEL_EXPENSE_CATEGORY,
   WORK_MARGIN_CURRENCIES,
   WORK_MARGIN_VERSION,
   type ProjectMarginCurrency,
@@ -61,6 +62,8 @@ interface Bucket {
   invoicedExclTax: Fixed;
   invoiceCount: number;
   expenseCount: number;
+  /** ADR-0045 § 6.3 : dépenses `personnel` de la période (constat seulement). */
+  personnelExpenseCount: number;
   timeMinutes: number;
   touched: boolean;
 }
@@ -73,6 +76,7 @@ const emptyBucket = (): Bucket => ({
   invoicedExclTax: 0n,
   invoiceCount: 0,
   expenseCount: 0,
+  personnelExpenseCount: 0,
   timeMinutes: 0,
   touched: false,
 });
@@ -207,6 +211,7 @@ export function computeProjectMargin(input: ProjectMarginInput): ProjectMarginRe
     b.touched = true;
     b.expenses += trustedAmount(expense.amount, `Dépense ${expense.id}`);
     b.expenseCount += 1;
+    if (expense.category === PERSONNEL_EXPENSE_CATEGORY) b.personnelExpenseCount += 1;
   }
 
   // ── Coût du temps ─────────────────────────────────────────────────────────
@@ -276,6 +281,17 @@ export function computeProjectMargin(input: ProjectMarginInput): ProjectMarginRe
     findings.push({ code: 'DRAFT_INVOICES_IGNORED', count: ignoredInvoices });
   // Encaissements et dépenses sont des montants payés, TVA comprise (décision ouverte n° 8).
   findings.push({ code: 'AMOUNTS_INCLUDE_TAX' });
+  // ADR-0045 § 6.3 (1.2.0) : un salaire rattaché au projet ET du temps valorisé dans la
+  // même devise comptent peut-être deux fois la même personne. Signalé, rien retranché.
+  for (const currency of WORK_MARGIN_CURRENCIES) {
+    const b = buckets.get(currency);
+    if (!b || b.personnelExpenseCount === 0 || b.timeCostMinuteCents === 0n) continue;
+    findings.push({
+      code: 'PERSONNEL_EXPENSES_AND_TIME_COST',
+      currency,
+      count: b.personnelExpenseCount,
+    });
+  }
 
   const byMember: ProjectMarginMemberCost[] = [...members.values()]
     .sort((a, b) =>

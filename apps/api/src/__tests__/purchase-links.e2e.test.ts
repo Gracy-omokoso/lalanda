@@ -149,7 +149,7 @@ e2eSuite('Liens des achats : brief, marge, rappels, fiche 360° (ADR-0044 P6)', 
       expect(brief.get('fournisseurs.factures_en_retard.USD')?.value).toBe('700.00');
       expect(await ruleIds('owner')).toContain('factures_fournisseurs_en_retard');
       const body = f.ok(await f.get('owner', '/morning-brief'));
-      expect(body['brief']['version']).toBe('1.3.0');
+      expect(body['brief']['version']).toBe('1.4.0');
       const r11 = (body['brief']['alerts'] as Record<string, unknown>[]).find(
         (a) => a['ruleId'] === 'factures_fournisseurs_en_retard',
       );
@@ -221,7 +221,7 @@ e2eSuite('Liens des achats : brief, marge, rappels, fiche 360° (ADR-0044 P6)', 
         ],
       });
       const m = f.ok(await f.get('owner', `/work/projects/${projectId}/margin`));
-      expect(m['version']).toBe('1.1.0');
+      expect(m['version']).toBe('1.2.0');
       expect(m['purchases']).toEqual([
         { currency: 'USD', committed: '300.00', ordered: '50.00', invoiceCount: 1, orderCount: 1 },
       ]);

@@ -618,7 +618,7 @@ e2eSuite('projets du RUN — devis, factures, dépenses, marge (ADR-0039 L4a)', 
       const before = await planAndActualsFingerprint();
       const m = ok(await f.get('owner', `/work/projects/${projectId}/margin`));
       expect(m.projectId).toBe(projectId);
-      expect(m.version).toBe('1.1.0');
+      expect(m.version).toBe('1.2.0');
       expect(m.currencies).toEqual([
         {
           currency: 'CDF',

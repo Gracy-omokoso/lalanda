@@ -15,6 +15,8 @@
 //     relances et le pipeline du CRM avec `crm.read` (ADR-0040 — C4 § 5.5), et
 //     pour les achats avec `purchase.read` (ADR-0044 § 6.4) : leurs montants avec
 //     `treasury.read` en plus, les approbations à faire avec `purchase.approve`.
+//     Ressources humaines (ADR-0045 § 6.5) : la portée vient de la relation (manager)
+//     ou des droits effectifs, décidée par le moteur RH ; des nombres seulement.
 
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -29,19 +31,27 @@ import {
   type MorningBrief,
 } from '@lalanda/engine';
 
-import { can, type OrgPermissionContext, type OrgRole } from '../authz/permissions.js';
+import {
+  can,
+  effectiveActions,
+  type OrgPermissionContext,
+  type OrgRole,
+} from '../authz/permissions.js';
 import { SalesInvoice, type SalesInvoiceDocument } from '../sales/invoices/invoice.schema.js';
 import {
   CASH_POSITION_SOURCE,
   CRM_SOURCE,
   DUE_DATES_SOURCE,
+  HR_SOURCE,
   OUTSTANDING_SOURCE,
   PURCHASES_SOURCE,
   WORK_SOURCE,
+  noHr,
   noPurchases,
   type CashPositionSource,
   type CrmSource,
   type DueDatesSource,
+  type HrSource,
   type OutstandingSource,
   type PurchasesSource,
   type WorkSource,
@@ -129,6 +139,7 @@ export interface MorningBriefPreferences {
 @Injectable()
 export class MorningBriefService {
   private readonly purchases: PurchasesSource;
+  private readonly hr: HrSource;
 
   constructor(
     @InjectModel(SalesInvoice.name) private readonly invoices: Model<SalesInvoiceDocument>,
@@ -144,8 +155,11 @@ export class MorningBriefService {
     @Inject(CRM_SOURCE) private readonly crm: CrmSource,
     // ADR-0044 — P6 : facultatif, « non disponible » sans module des achats.
     @Optional() @Inject(PURCHASES_SOURCE) purchases: PurchasesSource | null = null,
+    // ADR-0045 — H5 : facultatif, « non disponible » sans module RH.
+    @Optional() @Inject(HR_SOURCE) hr: HrSource | null = null,
   ) {
     this.purchases = purchases ?? noPurchases;
+    this.hr = hr ?? noHr;
   }
 
   /**
@@ -172,7 +186,10 @@ export class MorningBriefService {
     const crmVisible = can(role, 'crm.read', context);
     // ADR-0044 § 6.4 : achats chargés seulement avec `purchase.read`.
     const purchasesVisible = can(role, 'purchase.read', context);
-    const [sales, cash, dueDates, work, crm, purchases] = await Promise.all([
+    // ADR-0045 § 6.5 : RH pour tout membre qui lit le brief ; la portée est décidée
+    // par le moteur RH sur les droits effectifs (un retrait de `hr.read` la réduit).
+    const hrVisible = can(role, 'analytics.read', context);
+    const [sales, cash, dueDates, work, crm, purchases, hr] = await Promise.all([
       salesVisible ? this.loadSales(organizationId, now) : Promise.resolve('hidden' as const),
       cashVisible ? this.cash.cashOf(organizationId, now) : Promise.resolve('hidden' as const),
       // Les échéances sont des données de ventes : même règle de visibilité.
@@ -195,6 +212,9 @@ export class MorningBriefService {
             now,
           )
         : Promise.resolve('hidden' as const),
+      hrVisible
+        ? this.hr.hrOf(organizationId, userId, effectiveActions(role, context), now)
+        : Promise.resolve('hidden' as const),
     ]);
     return buildMorningBrief({
       now: now.toISOString(),
@@ -204,6 +224,7 @@ export class MorningBriefService {
       work,
       crm,
       purchases,
+      hr,
     });
   }
 

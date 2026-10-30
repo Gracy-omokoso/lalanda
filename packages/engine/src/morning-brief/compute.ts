@@ -30,6 +30,7 @@ import {
   type BriefSource,
   type BriefThreshold,
   type BriefCrmInput,
+  type BriefHrInput,
   type BriefPurchasesInput,
   type BriefWorkInput,
   type MorningBrief,
@@ -228,6 +229,9 @@ export function buildMorningBriefFacts(input: MorningBriefInput): BriefFact[] {
 
   // Dettes fournisseurs et approbations d'achat (ADR-0044 § 6.4).
   facts.push(...purchasesFacts(input.purchases ?? { status: 'unavailable' }, today));
+
+  // ADR-0045 § 6.5 : absences du jour, validations d'absence, échéances RH.
+  facts.push(...hrFacts(input.hr ?? { status: 'unavailable' }, today));
 
   return facts;
 }
@@ -525,6 +529,92 @@ function purchasesFacts(
     }
   }
   return facts;
+}
+
+// ── Ressources humaines (ADR-0045 § 6.5) ────────────────────────────────────
+//
+// DES NOMBRES SEULEMENT : aucun nom, aucun type d'absence (un type confidentiel ne
+// se devine pas d'un compte), aucun montant. Chaque fait a sa propre garde : un
+// champ `null` de l'entrée le rend `hidden`.
+
+const HR_SOURCE_REF = 'ADR-0045 § 6.5';
+
+function hrSource(rule: string, collection = 'hr_leave_requests'): BriefSource {
+  return { module: 'run.hr', collection, rule, reference: HR_SOURCE_REF };
+}
+
+/** Squelette des faits RH : mêmes identifiants, connus, masqués ou non disponibles. */
+const HR_FACT_SKELETON: readonly Omit<BriefFact, 'status' | 'value'>[] = Object.freeze([
+  {
+    id: 'rh.absents_aujourdhui',
+    label: 'Personnes absentes aujourd’hui',
+    kind: 'count',
+    currency: null,
+    source: hrSource(
+      'Collaborateurs de votre portée (votre équipe, ou l’organisation avec l’accès aux dossiers du personnel) dont une absence approuvée couvre aujourd’hui (Kinshasa)',
+    ),
+  },
+  {
+    id: 'mes_validations_absence.en_attente',
+    label: 'Demandes d’absence qui attendent ma validation',
+    kind: 'count',
+    currency: null,
+    source: hrSource(
+      'Demandes en attente que vous pouvez valider à l’étape en cours (jamais la vôtre, sauf validateur unique)',
+    ),
+  },
+  {
+    id: 'rh.echeances',
+    label: 'Échéances RH proches',
+    kind: 'count',
+    currency: null,
+    source: hrSource(
+      'Fins de période d’essai, fins de contrat et documents qui expirent dans les délais de rappel des réglages RH (moteur RH, `hrDeadlines`)',
+      'hr_employees',
+    ),
+  },
+]);
+
+const HR_HIDDEN_RULES: Readonly<Record<string, string>> = Object.freeze({
+  'rh.absents_aujourdhui': 'Réservé aux managers et à l’accès aux dossiers du personnel',
+  'mes_validations_absence.en_attente': 'Réservé aux managers et aux validateurs des absences',
+  'rh.echeances': 'Réservé à l’accès aux dossiers du personnel',
+});
+
+function hrFacts(
+  hr: BriefHrInput,
+  today: { year: number; month: number; day: number },
+): BriefFact[] {
+  if (hr === 'hidden' || hr.status === 'unavailable') {
+    const status = hr === 'hidden' ? ('hidden' as const) : ('unavailable' as const);
+    return HR_FACT_SKELETON.map((f) => ({ ...f, status, value: null }));
+  }
+  const day = dayKey(today);
+  let absent: number | null = null;
+  if (hr.absences !== null) {
+    // Un collaborateur absent le matin seulement compte : il est absent aujourd'hui.
+    const ids = new Set<string>();
+    for (const a of hr.absences) {
+      if (a.startDate <= day && day <= a.endDate) ids.add(a.employeeId);
+    }
+    absent = ids.size;
+  }
+  const values: Record<string, number | null> = {
+    'rh.absents_aujourdhui': absent,
+    'mes_validations_absence.en_attente': hr.pendingApprovalCount,
+    'rh.echeances': hr.deadlineCount,
+  };
+  return HR_FACT_SKELETON.map((f) => {
+    const n = values[f.id] ?? null;
+    return n === null
+      ? {
+          ...f,
+          status: 'hidden' as const,
+          value: null,
+          source: { ...f.source, rule: HR_HIDDEN_RULES[f.id] ?? f.source.rule },
+        }
+      : { ...f, status: 'known' as const, value: String(Math.max(0, Math.trunc(n))) };
+  });
 }
 
 function amountOfSigned(value: string): bigint {
@@ -995,6 +1085,71 @@ export const MORNING_BRIEF_RULES: readonly RuleDefinition[] = Object.freeze([
       };
     },
   },
+  // ── ADR-0045 § 6.5 : ressources humaines ────────────────────────────────
+  {
+    id: 'absences_du_jour',
+    rank: 13,
+    severity: 'info',
+    requires: ['rh.absents_aujourdhui'],
+    threshold: null,
+    evaluate(ctx) {
+      const n = ctx.count('rh.absents_aujourdhui');
+      if (n <= 0) return null;
+      return {
+        title: 'Absences du jour',
+        message:
+          n > 1
+            ? `${n} personnes de votre équipe sont absentes aujourd’hui.`
+            : `${n} personne de votre équipe est absente aujourd’hui.`,
+        recommendation: 'Ouvrir le calendrier des absences et réorganiser la journée si besoin.',
+        actionPath: '/rh/calendrier',
+        factIds: ['rh.absents_aujourdhui'],
+      };
+    },
+  },
+  {
+    id: 'validations_absence_en_attente',
+    rank: 14,
+    severity: 'attention',
+    requires: ['mes_validations_absence.en_attente'],
+    threshold: null,
+    evaluate(ctx) {
+      const n = ctx.count('mes_validations_absence.en_attente');
+      if (n <= 0) return null;
+      return {
+        title: 'Demandes d’absence à valider',
+        message:
+          n > 1
+            ? `${n} demandes d’absence attendent votre validation.`
+            : `${n} demande d’absence attend votre validation.`,
+        recommendation: 'Ouvrir les demandes à valider et décider de chacune.',
+        actionPath: '/rh/absences?vue=a-valider',
+        factIds: ['mes_validations_absence.en_attente'],
+      };
+    },
+  },
+  {
+    id: 'echeances_rh_proches',
+    rank: 15,
+    severity: 'attention',
+    requires: ['rh.echeances'],
+    threshold: null,
+    evaluate(ctx) {
+      const n = ctx.count('rh.echeances');
+      if (n <= 0) return null;
+      return {
+        title: 'Échéances RH proches',
+        message:
+          (n > 1
+            ? `${n} échéances RH dans les prochains jours`
+            : `${n} échéance RH dans les prochains jours`) +
+          ' (fin d’essai, fin de contrat, document).',
+        recommendation: 'Ouvrir les échéances RH et préparer chaque suite.',
+        actionPath: '/rh/echeances',
+        factIds: ['rh.echeances'],
+      };
+    },
+  },
 ] satisfies RuleDefinition[]);
 
 const SEVERITY_ORDER: Record<BriefSeverity, number> = { critique: 0, attention: 1, info: 2 };
@@ -1072,6 +1227,10 @@ export function buildMorningBrief(input: MorningBriefInput): MorningBrief {
       (input.purchases !== undefined &&
         input.purchases !== 'hidden' &&
         input.purchases.status === 'known' &&
-        input.purchases.truncated),
+        input.purchases.truncated) ||
+      (input.hr !== undefined &&
+        input.hr !== 'hidden' &&
+        input.hr.status === 'known' &&
+        input.hr.truncated),
   };
 }

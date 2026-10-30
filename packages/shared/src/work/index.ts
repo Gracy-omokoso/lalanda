@@ -7,3 +7,5 @@ export * from './constants.js';
 export * from './scheduling.js';
 export * from './schemas.js';
 export * from './views.js';
+// ADR-0045 — H5 : feuille de temps hebdomadaire en lecture (§ 6.3).
+export * from './timesheets.js';

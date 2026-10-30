@@ -565,10 +565,11 @@ modification, une approbation complète, un envoi, une annulation ou une clôtur
 recalculent le rapprochement des brouillons de facture liés (`refreshDrafts`). `GET
 /purchases/payables` : livré par P5.
 
-## Ressources humaines — proposé, ADR-0045 (non implémenté)
+## Ressources humaines — implémenté, ADR-0045 (lots H0 à H3 et H5)
 
-Contrat **proposé** par [ADR-0045](adr/ADR-0045-ressources-humaines.md) § 3 (R4 du RUN, **paie
-exclue**). Module `apps/api/src/hr/`, web `/rh`. Cinq actions nouvelles (`hr.read`, `hr.manage`,
+Contrat d'[ADR-0045](adr/ADR-0045-ressources-humaines.md) § 3 (R4 du RUN, **paie exclue**),
+**implémenté** par les lots H0 à H3 et H5 ; documents, listes d'entrée et de sortie, échéances
+(`/hr/employees/:id/documents`, `/hr/documents/**`, `/hr/checklist*`, `/hr/deadlines`) : lot H4. Module `apps/api/src/hr/`, web `/rh`. Cinq actions nouvelles (`hr.read`, `hr.manage`,
 `hr.sensitive.read`, `leave.request`, `leave.approve`) et un rôle nouveau, Responsable RH
 (`hr_manager`). Les routes « soi » et « équipe » portent `analytics.read` au guard et la portée
 dans le service (`hrViewerScope`) ; un collaborateur hors portée rend `404`.
@@ -600,6 +601,31 @@ et le constat `ASSIGNEE_ABSENT_ON_DUE_DATE` ; la marge d'un projet gagne le cons
 `hr.leave_approved`, `hr.leave_rejected`, `hr.leave_cancelled`, `hr.probation_ending`,
 `hr.contract_ending`, `hr.document_expiring`, `hr.checklist_item_assigned`,
 `hr.bank_details_changed`. Tâches : `hr.leave-accruals`, `hr.reminders`, `hr.retention` (éteinte).
+
+Lot H5 (implémenté) :
+
+- `GET /hr/reports?from=&to=&departmentId=` (`hr.read`) : `{ version, headcount { total,
+  byDepartment, byContractType }, movements { entries, exits, exitsByCategory, averageHeadcount,
+  exitRatePercent }, absenteeism { groups (par service), total }, seniority { buckets } }`, tout
+  par le moteur RH ; `400` période inversée ou de plus de dix ans ; `404 DEPARTMENT_NOT_FOUND`
+  pour un service d'une autre organisation. Aucune donnée salariale ni sensible.
+- `GET /hr/reports/export.csv?departmentId=` (`hr.read` + `report.export`) : registre non
+  sensible (matricule, noms, poste, service, manager, type de contrat, dates, catégorie de
+  sortie, statut, lieu), `;`, BOM, formules neutralisées ; audit **strict**
+  `hr.register.exported` avant l'envoi.
+- `GET /work/timesheets?userId=&week=` : `week` = un lundi (défaut : semaine courante) ; rend
+  `{ version, user, week, employeeLinked, days[] (scheduled, holiday, absence en demi-journées,
+  expected, totalMinutes), projects[] (minutesByDay), totalMinutes, findings[] }` ; constats
+  `TIME_ON_LEAVE_DAY` et `NO_TIME_ON_WORKING_DAY` ; `404 WORK_MEMBER_NOT_FOUND` hors portée.
+  Aucune écriture.
+- Tâches (`WorkTaskView`) : `assigneeAbsence` et `dueDateAbsence` (`{ from, to }` ou `null`,
+  jamais le type) ; `GET /work/my-tasks` : `absenceFindings[]` (tâches créées par l'appelant,
+  `ASSIGNEE_ABSENT_ON_DUE_DATE`).
+- Marge (`WORK_MARGIN_VERSION` 1.2.0) : constat `PERSONNEL_EXPENSES_AND_TIME_COST`
+  `{ currency, count }`, montants inchangés.
+- Brief (`MORNING_BRIEF_VERSION` 1.4.0) : faits `rh.absents_aujourdhui`,
+  `mes_validations_absence.en_attente`, `rh.echeances` (nombres seulement, `hidden` sans
+  portée), règles R13 à R15 ; mêmes faits dans l'e-mail quotidien.
 
 ## Brief du matin — implémenté (ADR-0033)
 

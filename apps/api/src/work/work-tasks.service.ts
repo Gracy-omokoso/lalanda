@@ -16,8 +16,10 @@
 //
 // Les notifications partent APRÈS l'écriture, par le port (`WorkNotifier`).
 
+import { taskAbsences, type WorkTaskAbsence } from '@lalanda/engine';
 import {
   WORK_LIMITS,
+  addDays,
   dependencyConflicts,
   detectCycle,
   groupMyTasks,
@@ -37,6 +39,7 @@ import {
   type WorkSuggestion,
   type WorkTaskDetail,
   type WorkTaskView,
+  type WorkAbsenceFindingView,
   type WorkTaskWriteResult,
   type WorkWarning,
 } from '@lalanda/shared/work';
@@ -74,6 +77,7 @@ import {
   type PurchasesAgendaReader,
 } from './my-tasks.ports.js';
 import { WorkActivityService, type ActivityInput } from './work-activity.service.js';
+import { WORK_ABSENCES_SOURCE, type WorkAbsencesSource } from './work-absences.port.js';
 import { dropAttachmentObjects } from './work-attachments.storage.js';
 import { WorkMembersService } from './work-members.service.js';
 import { WorkNotifier } from './work-notifier.js';
@@ -101,7 +105,12 @@ interface ViewContext {
   doneById: Map<string, { done: boolean }>;
   subtasks: Map<string, { total: number; done: number }>;
   refs: Map<string, { userId: string; name: string }>;
+  /** ADR-0045 — H5 : badge et constat d'échéance par tâche ; `null` sans module RH. */
+  absences: Map<string, WorkTaskAbsence> | null;
 }
+
+/** ADR-0045 — H5 : constats d'absence lus au plus dans « Mes tâches » du créateur. */
+const ABSENCE_FINDINGS_MAX = 200;
 
 @Injectable()
 export class WorkTasksService {
@@ -126,11 +135,16 @@ export class WorkTasksService {
     purchasesAgenda: PurchasesAgendaReader | null = null,
     // ADR-0045 — H3 (§ 6.1) : validations d'absence, éléments de liste RH (facultatifs).
     @Optional() @Inject(HR_AGENDA_SOURCE) hrAgenda: HrAgendaReader | null = null,
+    // ADR-0045 — H5 (§ 6.2) : absences approuvées des assignés, lecture seule (facultatif).
+    @Optional() @Inject(WORK_ABSENCES_SOURCE) absences: WorkAbsencesSource | null = null,
   ) {
     this.crmAgenda = crmAgenda ?? noCrmAgenda;
     this.purchasesAgenda = purchasesAgenda ?? noPurchasesAgenda;
     this.hrAgenda = hrAgenda ?? noHrAgenda;
+    this.absenceSource = absences;
   }
+
+  private readonly absenceSource: WorkAbsencesSource | null;
 
   private readonly crmAgenda: CrmAgendaReader;
   private readonly purchasesAgenda: PurchasesAgendaReader;
@@ -205,7 +219,43 @@ export class WorkTasksService {
       doneById: new Map(preds.map((p) => [String(p._id), { done: p.done }])),
       subtasks: new Map(subs.map((s) => [s._id, { total: s.total, done: s.done }])),
       refs,
+      absences: await this.absencesFor(organizationId, docs),
     };
+  }
+
+  /**
+   * ADR-0045 — H5 (§ 6.2) : absences APPROUVÉES des assignés, lues par le port (jamais
+   * le type), puis badge et constat d'échéance décidés par le moteur au jour de
+   * Kinshasa. Lecture seule : rien n'est déplacé ni réassigné.
+   */
+  private async absencesFor(
+    organizationId: string,
+    docs: readonly WorkTaskLean[],
+    now = new Date(),
+  ): Promise<Map<string, WorkTaskAbsence> | null> {
+    if (this.absenceSource === null) return null;
+    const users = [...new Set(docs.map((d) => d.assigneeUserId).filter((u): u is string => !!u))];
+    if (users.length === 0) return new Map();
+    const today = kinshasaDayOf(now);
+    let from = today;
+    let to = today;
+    for (const d of docs) {
+      if (!d.dueDate || !d.assigneeUserId) continue;
+      if (d.dueDate < from) from = d.dueDate;
+      if (d.dueDate > to) to = d.dueDate;
+    }
+    const rows = await this.absenceSource.absencesOf(organizationId, users, from, to);
+    const result = taskAbsences(
+      docs.map((d) => ({
+        id: String(d._id),
+        assigneeUserId: d.assigneeUserId ?? null,
+        dueDate: d.dueDate ?? null,
+        done: d.done,
+      })),
+      rows.map((r) => ({ userId: r.userId, startDate: r.start.date, endDate: r.end.date })),
+      today,
+    );
+    return new Map(result.map((r) => [r.taskId, r]));
   }
 
   private viewOf(d: WorkTaskLean, ctx: ViewContext): WorkTaskView {
@@ -241,6 +291,13 @@ export class WorkTasksService {
       doneSubtaskCount: sub?.done ?? 0,
       revision: d.revision,
       updatedAt: new Date(d.updatedAt).toISOString(),
+      // ADR-0045 — H5 (§ 6.2) : présent seulement avec le module RH.
+      ...(ctx.absences === null
+        ? {}
+        : {
+            assigneeAbsence: ctx.absences.get(id)?.assigneeAbsence ?? null,
+            dueDateAbsence: ctx.absences.get(id)?.dueDateAbsence ?? null,
+          }),
     };
   }
 
@@ -419,7 +476,58 @@ export class WorkTasksService {
       asOf: today,
       ...groups,
       truncated: workTruncated || crm.truncated || purchases.truncated || hr.truncated,
+      // ADR-0045 — H5 (§ 6.2) : constats d'absence des tâches que l'appelant a créées.
+      ...(this.absenceSource === null
+        ? {}
+        : {
+            absenceFindings: await this.absenceFindingsOf(organizationId, actor, archived, today),
+          }),
     };
+  }
+
+  /**
+   * ADR-0045 — H5 (§ 6.2) : tâches non terminées créées par l'appelant, assignées à un
+   * autre membre, à échéance aujourd'hui ou plus tard, dont l'échéance tombe pendant
+   * une absence approuvée de l'assigné (`ASSIGNEE_ABSENT_ON_DUE_DATE`).
+   */
+  private async absenceFindingsOf(
+    organizationId: string,
+    actor: WorkActor,
+    archived: readonly string[],
+    today: string,
+  ): Promise<WorkAbsenceFindingView[]> {
+    const filter: Record<string, unknown> = {
+      organizationId,
+      createdBy: actor.userId,
+      done: false,
+      assigneeUserId: { $nin: [null, actor.userId] },
+      dueDate: { $ne: null, $gte: today, $lte: addDays(today, 366) },
+    };
+    if (archived.length > 0) filter['projectId'] = { $nin: [...archived] };
+    const docs = await this.tasks
+      .find(filter, LIGHT)
+      .sort({ dueDate: 1, _id: 1 })
+      .limit(ABSENCE_FINDINGS_MAX)
+      .lean<WorkTaskLean[]>()
+      .exec();
+    const items = await this.withProjectNames(organizationId, docs);
+    return items.flatMap((t) =>
+      t.dueDateAbsence && t.assignee && t.dueDate
+        ? [
+            {
+              code: 'ASSIGNEE_ABSENT_ON_DUE_DATE' as const,
+              taskId: t.id,
+              projectId: t.projectId,
+              projectName: t.projectName,
+              number: t.number,
+              title: t.title,
+              dueDate: t.dueDate,
+              assignee: t.assignee,
+              absence: t.dueDateAbsence,
+            },
+          ]
+        : [],
+    );
   }
 
   async detail(organizationId: string, taskId: string): Promise<WorkTaskDetail> {
