@@ -121,6 +121,19 @@ Un événement contient acteur, organisation, action, cible, horodatage, adresse
   allocationIndex`), `treasury_recurring_expenses.supplierId`. Migration
   `20261031-0001-suppliers-from-expenses.mjs` (fournisseurs texte regroupés par clé exacte).
 
+- **Proposé, ADR-0045 (non implémenté)** — ressources humaines, paie exclue : `hr_employees`
+  (dossier non sensible ; `userId` facultatif, unique partiel `organizationId + userId` ; matricule
+  unique partiel ; `organizationId + status + sortName`, `+ departmentId`, `+ managerEmployeeId`,
+  partiels sur `contractEndDate` et `probationEndDate`), `hr_employee_private` (un par
+  collaborateur, sections **chiffrées** AES-256-GCM sous le trousseau d'ADR-0013 : salaire de base
+  déclaré, coordonnées bancaires, identité, coordonnées personnelles et contacts d'urgence ; seules
+  des formes masquées sont lisibles sans `reveal`), `hr_departments` (arbre sans cycle),
+  `hr_settings` (un par organisation), `hr_leave_types`, `hr_holidays` (unique `organizationId +
+  date`), `hr_leave_requests` (`organizationId + employeeId + start.date`, `organizationId + status
+  + start.date`), `hr_leave_ledger` (ajout seul ; unique partiel des acquisitions par
+  `employeeId + typeId + period`), `hr_documents` (pièces sensibles chiffrées côté application ;
+  partiel sur `expiresOn`), `hr_checklist_templates`, `hr_checklists`. Aucune migration.
+
 ## Rétention
 
 La politique définit données actives, exports, journaux, IA, pièces et sauvegardes. La suppression d’une organisation suit une période de récupération puis une purge contrôlée, sous réserve des obligations légales.

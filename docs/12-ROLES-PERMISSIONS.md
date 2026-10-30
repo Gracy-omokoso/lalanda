@@ -295,6 +295,50 @@ sont inchangés.
 - Voir les coordonnées bancaires d'un fournisseur en clair exige `payables.pay` et est journalisé.
 - Tests : matrice 9 × 33 + 6 × 33 = **495** cases.
 
+### Proposé, ADR-0045 — ressources humaines (non appliqué)
+
+> **Statut : proposé** par [ADR-0045](adr/ADR-0045-ressources-humaines.md) § 4 (30 oct. 2026), R4
+> du RUN, **paie exclue**. Rien de ce qui suit n'est encore dans le code ; le lot H0 l'applique,
+> aux valeurs par défaut des décisions ouvertes n° 1 à 3.
+
+- **Cinq actions nouvelles**, trente-quatrième à trente-huitième, en fin de liste : `hr.read`
+  (« Consulter les dossiers du personnel »), `hr.manage` (« Gérer les dossiers du personnel »),
+  `hr.sensitive.read` (« Consulter les données sensibles du personnel » : salaire, coordonnées
+  bancaires, identité, coordonnées personnelles, documents sensibles, absences confidentielles ;
+  avec `hr.manage`, les modifier), `leave.request` (« Demander une absence »), `leave.approve`
+  (« Valider les absences », case ⓢ). Trente-huit actions au total.
+- **Rôle nouveau Responsable RH** (`hr_manager`, colonne RH, rang 6 ; Chef de projet, Conseiller et
+  Lecteur passent aux rangs 7, 8 et 9) — « Dossiers du personnel, absences et documents RH. Ne voit
+  ni la trésorerie, ni les ventes, ni les achats. » Huit actions : `analytics.read`, `hr.read`,
+  `hr.manage`, `hr.sensitive.read`, `leave.request`, `leave.approve`, `work.read`, `work.update`.
+  Attribuable par le seul Propriétaire (R7 : l'Administrateur n'a ni `hr.sensitive.read` ni
+  `leave.approve`).
+
+| Action | PRO | ADM | DIR | CPT | ANA | CDP | CON | LEC | COM | RH |
+|---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| `hr.read` | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
+| `hr.manage` | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
+| `hr.sensitive.read` | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
+| `leave.request` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ |
+| `leave.approve` | ✓ⓢ | ✗ | ✓ⓢ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ⓢ |
+
+- **Portée relationnelle** : chacun voit et demande ses propres absences ; un **manager** (désigné
+  dans la fiche collaborateur) voit son équipe et valide l'étape « manager » de ses subordonnés
+  directs **sans action dédiée** ; la portée est rendue par une fonction pure (`hrViewerScope`),
+  jamais par le rôle.
+- **Séparation des tâches** (`leaveApprovalDecision`, fonction pure) : on ne valide jamais sa
+  propre absence ; deux étapes (manager puis RH) exigent deux personnes ; exception **approbateur
+  unique** (un seul détenteur effectif de `leave.approve`), marquée `soleApprover`. `leave.approve`
+  rejoint `APPROVAL_ACTIONS`. Aucune paire `SOD_PAIRS` nouvelle.
+- **ADR-0041** : dépendances `hr.manage`, `hr.sensitive.read`, `leave.approve` → `hr.read` ;
+  neuvième domaine « Ressources humaines ».
+- **Plateforme** : `hr.read` et `hr.manage` sous accès délégué pour le seul super-administrateur ;
+  **`hr.sensitive.read` interdite à tous les rôles plateforme**, même sous accès délégué (sixième
+  interdit absolu) ; `leave.request` et `leave.approve` refusées par la matrice.
+- Lire une donnée sensible en clair (`reveal`) ou télécharger un document sensible est journalisé
+  strictement.
+- Tests : matrice 10 × 38 + 6 × 38 = **608** cases.
+
 **Business plan narratif (ADR-0037) — aucune action nouvelle.** Lire relève de
 `project.read` ; rédiger, rattacher le plan figé et demander un brouillon à l'IA, de
 `canvas.update` (le document prolonge par écrit le modèle économique) ; valider une version,
