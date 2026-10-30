@@ -18,23 +18,30 @@
 // Un 403 sur le premier n'est PAS une erreur à afficher en rouge : c'est la
 // réponse normale pour un Analyste ou un Lecteur qui arrive ici par le menu. La
 // page dit alors ce que son rôle permet, au lieu de crier une panne.
+//
+// ADR-0041 — A5 : la page lit aussi `GET /authz/catalog` (vocabulaire des
+// autorisations) et s'appuie sur `GET /me/permissions` de la coquille (ce que
+// l'acteur peut accorder). Après chaque écriture, elle relit la liste ET les
+// permissions de la coquille (G8). Un `409 MEMBER_PERMISSIONS_DISABLED` fait
+// passer toutes les grilles en lecture seule.
 
 import { useCallback, useEffect, useState } from 'react';
 
+import { api, readActiveOrgCookie, type OrganizationView, type RoleOption } from '@/lib/api';
 import {
-  api,
-  readActiveOrgCookie,
-  type InvitationView,
-  type MemberView,
-  type OrganizationView,
-  type RoleOption,
-} from '@/lib/api';
+  apiAutorisations,
+  type CatalogueAutorisations,
+  type InvitationAutorisations,
+  type MembreAutorisations,
+} from '@/lib/api-permissions';
 
 import { useProfil } from '../../_components/profile-context';
+import { useShell } from '../../_components/shell-context';
 
 import { InvitePanel } from './_components/invite-panel';
 import { MembersPanel } from './_components/members-panel';
 import { libelleRoleActeur, messageErreur } from './_components/members-model';
+import { personnalisationDesactivee } from './_components/permissions-model';
 
 /** Un refus d'autorisation, à distinguer d'une panne. */
 function estRefus(err: unknown): boolean {
@@ -54,9 +61,12 @@ export default function MembersPage(): React.ReactElement {
   const { profil } = useProfil();
   const moiUserId = profil?.id ?? null;
   const [org, setOrg] = useState<OrganizationView | null>(null);
-  const [members, setMembers] = useState<MemberView[] | null>(null);
+  const [members, setMembers] = useState<MembreAutorisations[] | null>(null);
   const [roleOptions, setRoleOptions] = useState<RoleOption[]>([]);
-  const [invitations, setInvitations] = useState<InvitationView[]>([]);
+  const [invitations, setInvitations] = useState<InvitationAutorisations[]>([]);
+  const { permissions: moi, relirePermissions } = useShell();
+  const [catalogue, setCatalogue] = useState<CatalogueAutorisations | null>(null);
+  const [desactivee, setDesactivee] = useState(false);
   const [peutInviter, setPeutInviter] = useState(false);
   const [refuse, setRefuse] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -65,7 +75,7 @@ export default function MembersPage(): React.ReactElement {
   const recharger = useCallback(async (orgId: string): Promise<void> => {
     setErreur(null);
     try {
-      const { members, roleOptions } = await api.listMembers(orgId);
+      const { members, roleOptions } = await apiAutorisations.listMembres(orgId);
       setMembers(members);
       setRoleOptions(roleOptions);
       setRefuse(false);
@@ -88,7 +98,7 @@ export default function MembersPage(): React.ReactElement {
     // recopierait la matrice dans l'interface (ADR-0012 §8) et se tromperait au
     // premier rôle qui gagne ou perd l'action.
     try {
-      const { invitations } = await api.listOrgInvitations(orgId);
+      const { invitations } = await apiAutorisations.listInvitations(orgId);
       setInvitations(invitations);
       setPeutInviter(true);
     } catch (err) {
@@ -122,9 +132,36 @@ export default function MembersPage(): React.ReactElement {
     };
   }, [recharger]);
 
+  // Le catalogue est une donnée statique : lu une fois. Son échec retire les
+  // fiches d'autorisations sans rien casser du reste de la page.
+  useEffect(() => {
+    let annule = false;
+    void apiAutorisations
+      .getCatalogue()
+      .then((c) => {
+        if (annule) return;
+        setCatalogue(c);
+        if (personnalisationDesactivee({ catalogue: c })) setDesactivee(true);
+      })
+      .catch(() => {
+        if (!annule) setCatalogue(null);
+      });
+    return () => {
+      annule = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (personnalisationDesactivee({ moi })) setDesactivee(true);
+  }, [moi]);
+
   const rafraichir = useCallback(async (): Promise<void> => {
+    // G8 : l'écriture a pu changer les droits de l'acteur lui-même (transfert).
+    relirePermissions();
     if (org) await recharger(org.id);
-  }, [org, recharger]);
+  }, [org, recharger, relirePermissions]);
+
+  const signalerDesactivee = useCallback(() => setDesactivee(true), []);
 
   // Le rôle affiché est celui de la liste rechargée après chaque écriture, pas
   // celui de `GET /organizations` figé au montage : un transfert de propriété
@@ -177,6 +214,10 @@ export default function MembersPage(): React.ReactElement {
             roleOptions={roleOptions}
             moiUserId={moiUserId}
             onChanged={rafraichir}
+            catalogue={catalogue}
+            moi={moi}
+            personnalisationDesactivee={desactivee}
+            onDesactivee={signalerDesactivee}
           />
           {/* `key` sur les options : le rôle par défaut du formulaire est calculé
               à l'initialisation, il doit être recalculé si la portée de l'acteur
@@ -188,6 +229,10 @@ export default function MembersPage(): React.ReactElement {
             roleOptions={roleOptions}
             peutInviter={peutInviter}
             onChanged={rafraichir}
+            catalogue={catalogue}
+            moi={moi}
+            personnalisationDesactivee={desactivee}
+            onDesactivee={signalerDesactivee}
           />
         </>
       )}

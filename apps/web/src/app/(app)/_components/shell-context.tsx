@@ -11,11 +11,23 @@
 // Rien ici n'autorise quoi que ce soit (ADR-0012 §8) : un échec de lecture
 // laisse les faits à `null`, ce qui MASQUE les entrées conditionnées et ne
 // VERROUILLE rien — l'API reste seule juge.
+//
+// ADR-0041 G8 : les permissions sont RELUES au retour de focus de l'onglet et
+// après tout `403 FORBIDDEN` du guard — une autorisation ajoutée ou retirée par
+// un administrateur apparaît sans reconnexion. La page des membres les relit
+// aussi après chacune de ses écritures (`relirePermissions`).
 
 import type { ModuleId } from '@lalanda/ui';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import { api, type OrgAction, type SubscriptionStateView } from '@/lib/api';
+import {
+  EVENEMENT_REFUS_API,
+  apiAutorisations,
+  creerLimiteurRelecture,
+  estRefusDePermission,
+  type MesPermissions,
+} from '@/lib/api-permissions';
 
 import { cleModules, ecrireModules, lireModules } from './nav-model';
 
@@ -34,6 +46,10 @@ export interface ShellFacts {
   modulesChoisis: boolean;
   /** Relit permissions et abonnement (après une création d'organisation, par ex.). */
   rafraichir: () => void;
+  /** ADR-0041 — réponse complète de `GET /me/permissions` (titre, écart, ajoutables). */
+  permissions: MesPermissions | null;
+  /** ADR-0041 G8 — relit `GET /me/permissions` seul. */
+  relirePermissions: () => void;
 }
 
 const Contexte = createContext<ShellFacts>({
@@ -45,6 +61,8 @@ const Contexte = createContext<ShellFacts>({
   setModules: () => undefined,
   modulesChoisis: false,
   rafraichir: () => undefined,
+  permissions: null,
+  relirePermissions: () => undefined,
 });
 
 export function useShell(): ShellFacts {
@@ -80,22 +98,36 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
   const [modules, setModulesState] = useState<ModuleId[] | null>(null);
   const [modulesChoisis, setModulesChoisis] = useState(false);
   const [version, setVersion] = useState(0);
+  const [versionPermissions, setVersionPermissions] = useState(0);
+  const [permissions, setPermissions] = useState<MesPermissions | null>(null);
 
   useEffect(() => {
     let annule = false;
-    void api
-      .getMyPermissions()
+    void apiAutorisations
+      .getMesPermissions()
       .then((p) => {
         if (annule) return;
+        setPermissions(p);
         setActions(p.actions);
         setOrganizationId(p.organizationId);
         setChargees(true);
       })
       .catch(() => {
         if (annule) return;
+        // Une RELECTURE en échec (réseau coupé au retour de focus) garde les faits
+        // déjà lus : masquer toute la navigation pour un hoquet n'aiderait personne.
+        if (versionPermissions > 0) return;
+        setPermissions(null);
         setActions(null);
         setChargees(true);
       });
+    return () => {
+      annule = true;
+    };
+  }, [version, versionPermissions]);
+
+  useEffect(() => {
+    let annule = false;
     void api
       .getSubscription()
       .then((s) => {
@@ -128,6 +160,32 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
   );
 
   const rafraichir = useCallback(() => setVersion((v) => v + 1), []);
+  const relirePermissions = useCallback(() => setVersionPermissions((v) => v + 1), []);
+
+  // ADR-0041 G8 — relecture au retour sur l'onglet et après un refus du guard.
+  // Le limiteur évite qu'une rafale de `403` ou un focus suivi d'un
+  // `visibilitychange` ne déclenche plusieurs lectures.
+  useEffect(() => {
+    const peutRelire = creerLimiteurRelecture();
+    const relire = (): void => {
+      if (peutRelire(Date.now())) relirePermissions();
+    };
+    const auFocus = (): void => relire();
+    const auRetour = (): void => {
+      if (document.visibilityState === 'visible') relire();
+    };
+    const auRefus = (e: Event): void => {
+      if (estRefusDePermission((e as CustomEvent<unknown>).detail)) relire();
+    };
+    window.addEventListener('focus', auFocus);
+    document.addEventListener('visibilitychange', auRetour);
+    window.addEventListener(EVENEMENT_REFUS_API, auRefus);
+    return () => {
+      window.removeEventListener('focus', auFocus);
+      document.removeEventListener('visibilitychange', auRetour);
+      window.removeEventListener(EVENEMENT_REFUS_API, auRefus);
+    };
+  }, [relirePermissions]);
 
   const valeur = useMemo<ShellFacts>(
     () => ({
@@ -139,6 +197,8 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
       setModules,
       modulesChoisis,
       rafraichir,
+      permissions,
+      relirePermissions,
     }),
     [
       actions,
@@ -149,6 +209,8 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
       setModules,
       modulesChoisis,
       rafraichir,
+      permissions,
+      relirePermissions,
     ],
   );
 

@@ -214,3 +214,20 @@ export function messageErreur(err: unknown, repli: string): string {
   if (code && MESSAGES[code]) return MESSAGES[code]!;
   return err instanceof Error && err.message !== '' ? err.message : repli;
 }
+
+// ─── ADR-0041 — A5 : badge « personnalisé » ─────────────────────────────────
+
+/**
+ * Badge de la liste des membres : « personnalisé (+2 −1) » quand l'écart n'est
+ * pas vide, `null` sinon. Lu sur `grants` / `revokes` servis par l'API.
+ */
+export function badgePersonnalise(ecart: {
+  grants?: readonly string[];
+  revokes?: readonly string[];
+}): string | null {
+  const a = ecart.grants?.length ?? 0;
+  const r = ecart.revokes?.length ?? 0;
+  if (a === 0 && r === 0) return null;
+  const morceaux = [a > 0 ? `+${a}` : null, r > 0 ? `−${r}` : null].filter(Boolean);
+  return `personnalisé (${morceaux.join(' ')})`;
+}

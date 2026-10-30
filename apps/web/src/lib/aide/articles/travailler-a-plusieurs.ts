@@ -11,6 +11,11 @@
 //    d'adresse obligatoire) + apps/web/.../members/_components/invite-panel.tsx
 //  - restrictions par projet : permissions.ts (`allow_project` se comporte comme
 //    `allow`) — AUCUNE collection d'assignation de projet n'existe.
+//  - autorisations par membre (ADR-0041) : permissions.ts (`validateOverrides`,
+//    `ACTION_DEPENDENCIES`, `SOD_PAIRS`, `NON_DELEGABLE_ACTIONS`, `BASE_ACTION`),
+//    organizations/members.service.ts (`setPermissions`, `changeRole` qui efface
+//    l'écart), interrupteur `MEMBER_PERMISSIONS_ENABLED` ÉTEINT par défaut
+//    (`409 MEMBER_PERMISSIONS_DISABLED`), notification `/compte`.
 //
 // TROIS LIMITES CRITIQUES écrites ici telles qu'elles sont AUJOURD'HUI :
 //   1. aucun envoi d'email n'existe dans le dépôt (aucune dépendance SMTP,
@@ -67,7 +72,7 @@ export const TRAVAILLER_A_PLUSIEURS: ArticleAide = {
             {
               titre: 'Créez l’invitation',
               texte:
-                'Depuis l’espace **Membres**, indiquez l’adresse email de la personne et choisissez son rôle. Le rôle proposé par défaut est **Lecteur**, le moins permissif — c’est volontaire.',
+                'Depuis l’espace **Membres**, indiquez l’adresse email de la personne et choisissez son rôle. Le rôle proposé par défaut est **Lecteur**, le moins permissif — c’est volontaire. Vous pouvez ensuite ajuster ses autorisations avec « Personnaliser les autorisations » (voir [plus bas](/aide/travailler-a-plusieurs#personnaliser)).',
             },
             {
               titre: 'Copiez le lien affiché et envoyez-le',
@@ -176,6 +181,56 @@ export const TRAVAILLER_A_PLUSIEURS: ArticleAide = {
           titre: 'Un rôle « Chef de projet » figure dans le modèle mais n’est pas attribuable',
           texte:
             'Il n’aurait de sens que restreint à certaines initiatives — ce qui n’existe pas encore. Plutôt que de proposer un rôle qui ne restreindrait rien, il est bloqué à l’attribution.',
+        },
+      ],
+    },
+    {
+      id: 'personnaliser',
+      titre: 'Ajuster les autorisations d’une personne',
+      blocs: [
+        {
+          type: 'paragraphe',
+          texte:
+            'Le rôle est un **titre** et un point de départ. Pour une personne précise, vous pouvez **ajouter** une autorisation que son titre n’a pas (un Commercial qui doit consulter la trésorerie) ou en **retirer** une qu’il a (un Comptable qui ne doit pas émettre de facture). Le titre reste affiché ; la liste des membres signale l’écart par un badge « personnalisé (+1 −1) ».',
+        },
+        {
+          type: 'note',
+          ton: 'limite',
+          titre: 'Cette personnalisation n’est peut-être pas encore active sur votre espace',
+          texte:
+            'Elle s’active espace par espace. Tant qu’elle ne l’est pas, la grille des autorisations reste **consultable en lecture seule** et l’application l’indique (« sera bientôt disponible ») : seul le titre s’attribue.',
+        },
+        {
+          type: 'etapes',
+          items: [
+            {
+              titre: 'Ouvrez la fiche',
+              texte:
+                'Dans **Membres**, choisissez « Voir les autorisations » sur la ligne de la personne. Les autorisations sont rangées par domaine (ventes, trésorerie, CRM…), chacune avec son état : **inclus dans le titre**, **ajout**, **retrait** ou **non inclus**.',
+            },
+            {
+              titre: 'Cochez ou décochez',
+              texte:
+                'Certaines autorisations en exigent d’autres : gérer les clients suppose de les consulter. L’application coche ou décoche ces dépendances avec la case et vous le dit.',
+            },
+            {
+              titre: 'Enregistrez',
+              texte:
+                'Un motif facultatif peut accompagner le changement ; il est conservé dans le journal d’audit. Si quelqu’un a modifié la même fiche entre-temps, l’application la recharge et vous demande de vérifier avant de recommencer.',
+            },
+          ],
+        },
+        {
+          type: 'liste',
+          items: [
+            'Vous ne pouvez accorder **que ce que vous détenez vous-même**, et ne pouvez pas modifier la fiche d’une personne qui détient des autorisations que vous n’avez pas.',
+            'Personne ne modifie **ses propres** autorisations. Les vôtres sont visibles dans **Mon compte**.',
+            'Les autorisations d’un **Propriétaire** ne se personnalisent pas, et la gestion de l’abonnement lui reste réservée.',
+            '« Consulter le tableau de bord, le brief et les analyses » est le **socle** : il reste accordé tant qu’une autre autorisation l’est.',
+            'La séparation des tâches s’applique : on ne donne pas « Valider un plan » à qui saisit les hypothèses ou peut clôturer une période.',
+            '**Changer le titre efface les ajouts et retraits** : l’application vous prévient avant de confirmer.',
+            'Le changement prend effet à la requête suivante, sans déconnexion ; la personne voit son menu se mettre à jour en revenant sur l’onglet.',
+          ],
         },
       ],
     },

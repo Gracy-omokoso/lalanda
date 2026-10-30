@@ -9,29 +9,47 @@
 // Accessibilité (docs/04) : rôle et statut sont TOUJOURS portés par du texte. Les
 // pastilles ne sont qu'un renfort visuel — un daltonien lit « Dernier
 // propriétaire », pas une nuance d'ambre.
+//
+// ADR-0041 — A5 : chaque ligne porte un badge « personnalisé (+2 −1) » et ouvre
+// la fiche des autorisations du membre (`MemberPermissionsPanel`). Changer le
+// titre efface l'écart : l'écran prévient avant de confirmer (décision n° 1).
 
 import { useState } from 'react';
 
 import { api, type MemberView, type RoleOption } from '@/lib/api';
+import {
+  apiAutorisations,
+  type CatalogueAutorisations,
+  type MembreAutorisations,
+  type MesPermissions,
+} from '@/lib/api-permissions';
 
+import { MemberPermissionsPanel } from './member-permissions-panel';
 import {
   acteurEstProprietaire,
+  badgePersonnalise,
   afficheDroitCloture,
   ciblesDeTransfert,
-  messageErreur,
   nomAffiche,
   raisonNonModifiable,
   raisonNonRevocable,
   sousTitre,
 } from './members-model';
+import { avertissementChangementTitre, messageAutorisations } from './permissions-model';
 import { RoleSelect } from './role-select';
 
 interface MembersPanelProps {
   orgId: string;
-  members: readonly MemberView[];
+  members: readonly MembreAutorisations[];
   roleOptions: readonly RoleOption[];
   moiUserId: string | null;
   onChanged: () => Promise<void>;
+  /** ADR-0041 — `null` si le catalogue n'a pas pu être lu : pas de fiche. */
+  catalogue: CatalogueAutorisations | null;
+  moi: MesPermissions | null;
+  /** Interrupteur éteint : fiches en lecture seule. */
+  personnalisationDesactivee: boolean;
+  onDesactivee: () => void;
 }
 
 export function MembersPanel({
@@ -40,8 +58,13 @@ export function MembersPanel({
   roleOptions,
   moiUserId,
   onChanged,
+  catalogue,
+  moi,
+  personnalisationDesactivee,
+  onDesactivee,
 }: MembersPanelProps): React.ReactElement {
   const [busy, setBusy] = useState<string | null>(null);
+  const [ouverte, setOuverte] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -64,7 +87,7 @@ export function MembersPanel({
       await onChanged();
       setNotice(succes);
     } catch (err) {
-      setErreur(messageErreur(err, 'L’opération a échoué.'));
+      setErreur(messageAutorisations(err, catalogue, 'L’opération a échoué.'));
     } finally {
       setBusy(null);
     }
@@ -107,6 +130,9 @@ export function MembersPanel({
           const motifRevoc = raisonNonRevocable(m);
           const cestMoi = m.userId === moiUserId;
           const occupe = busy === m.userId;
+          const badge = badgePersonnalise(m);
+          const ficheOuverte = ouverte === m.userId;
+          const idFiche = `fiche-autorisations-${m.userId}`;
 
           return (
             <li
@@ -123,6 +149,7 @@ export function MembersPanel({
                     ) : (
                       <Pastille ton="neutre">{m.roleLabel}</Pastille>
                     )}
+                    {badge ? <Pastille ton="accent">{badge}</Pastille> : null}
                   </span>
                   {sousTitre(m) ? (
                     <span className="fig text-xs text-[var(--foreground-muted)]">
@@ -163,11 +190,23 @@ export function MembersPanel({
                     label={null}
                     ariaLabel={`Rôle de ${nomAffiche(m)}`}
                     disabled={motifRole !== null || occupe}
-                    onChange={(role) =>
-                      void ecrire(m.userId, `Rôle mis à jour pour ${nomAffiche(m)}.`, () =>
-                        api.changeMemberRole(orgId, m.userId, role),
-                      )
-                    }
+                    onChange={(role) => {
+                      // Décision n° 1 : changer le titre efface l'écart — on
+                      // prévient AVANT, un abandon n'écrit rien.
+                      const avertissement = avertissementChangementTitre(m);
+                      if (
+                        avertissement &&
+                        !confirm(`Changer le titre de ${nomAffiche(m)} ?\n\n${avertissement}`)
+                      ) {
+                        return;
+                      }
+                      void ecrire(m.userId, `Titre mis à jour pour ${nomAffiche(m)}.`, () =>
+                        apiAutorisations.changerTitre(orgId, m.userId, {
+                          role,
+                          expectedRevision: m.permissionsRevision,
+                        }),
+                      );
+                    }}
                   />
                   {/* Le motif du refus est affiché À CÔTÉ du contrôle désactivé,
                       jamais à sa place : une commande absente n'explique rien. */}
@@ -203,6 +242,35 @@ export function MembersPanel({
                   </label>
                 ) : null}
               </div>
+
+              {catalogue ? (
+                <div className="flex flex-col gap-2 border-t border-[var(--border)] pt-3">
+                  <button
+                    type="button"
+                    aria-expanded={ficheOuverte}
+                    aria-controls={idFiche}
+                    onClick={() => setOuverte(ficheOuverte ? null : m.userId)}
+                    className="self-start rounded-md border border-[var(--border-strong)] px-3 py-1.5 text-xs font-medium transition hover:border-[var(--accent)]"
+                  >
+                    {ficheOuverte ? 'Masquer les autorisations' : 'Voir les autorisations'}
+                  </button>
+                  {ficheOuverte ? (
+                    <div id={idFiche}>
+                      <MemberPermissionsPanel
+                        orgId={orgId}
+                        membre={m}
+                        catalogue={catalogue}
+                        moi={moi}
+                        moiUserId={moiUserId}
+                        desactivee={personnalisationDesactivee}
+                        onDesactivee={onDesactivee}
+                        onEcrit={onChanged}
+                        nom={nomAffiche(m)}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </li>
           );
         })}
