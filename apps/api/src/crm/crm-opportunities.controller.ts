@@ -39,6 +39,7 @@ import {
 import {
   OpportunitiesService,
   type OpportunityPage,
+  type OpportunityMoveResult,
   type OpportunityView,
   type OpportunityWriteResult,
 } from './opportunities.service.js';
@@ -168,7 +169,7 @@ export class CrmOpportunitiesController {
     @CurrentOrgRole() role: OrgRole | undefined,
     @Param('opportunityId') opportunityId: string,
     @Body() body: unknown,
-  ): Promise<OpportunityView> {
+  ): Promise<OpportunityMoveResult> {
     const parsed = MoveOpportunitySchema.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error);
     return this.opportunities.move(

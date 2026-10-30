@@ -4,6 +4,7 @@ import type { z } from 'zod';
 import { DEFAULT_WORK_COLUMNS } from './constants.js';
 import {
   AddDependencyBody,
+  CreateProjectFromOpportunityBody,
   CreateProjectFromQuoteBody,
   CreateTimeEntryBody,
   CreateWorkCommentBody,
@@ -162,6 +163,19 @@ describe('projets', () => {
     expect(
       codes(CreateProjectFromQuoteBody, { quoteId: ID, milestone: { title: 'Fin', dueDate: 'x' } }),
     ).toEqual(['DATE_INVALID']);
+  });
+
+  it('depuis une opportunité : devis facultatif, mêmes règles de lignes (ADR-0040 C7)', () => {
+    expect(codes(CreateProjectFromOpportunityBody, { opportunityId: ID })).toEqual([]);
+    expect(
+      codes(CreateProjectFromOpportunityBody, { opportunityId: ID, quoteId: ID, lineIndexes: [0] }),
+    ).toEqual([]);
+    expect(
+      codes(CreateProjectFromOpportunityBody, { opportunityId: ID, lineIndexes: [0, 0] }),
+    ).toEqual(['WORK_ID_DUPLICATE']);
+    expect(codes(CreateProjectFromOpportunityBody, { opportunityId: ID, amount: '1' })).toEqual([
+      'unrecognized_keys',
+    ]);
   });
 });
 

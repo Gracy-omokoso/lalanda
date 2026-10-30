@@ -37,7 +37,11 @@ export function PropositionFacture({
   onPrepared,
   onClose,
 }: Props): React.ReactElement {
-  const quoteId = project.source?.quoteId ?? project.links.quotes[0]?.quoteId ?? null;
+  // ADR-0040 — C7 : un projet issu d'une opportunité n'a pas de devis d'origine.
+  const quoteId =
+    (project.source?.kind === 'quote' ? project.source.quoteId : null) ??
+    project.links.quotes[0]?.quoteId ??
+    null;
   const quoteNumber = project.links.quotes.find((q) => q.quoteId === quoteId)?.number ?? null;
   const [lineCount, setLineCount] = useState<number | null>(null);
   const [source, setSource] = useState<'quote_lines' | 'empty'>(quoteId ? 'quote_lines' : 'empty');

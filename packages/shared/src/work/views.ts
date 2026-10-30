@@ -69,12 +69,16 @@ export interface WorkProjectLinksView {
   quotes: { quoteId: string; number: string | null }[];
 }
 
-export type WorkProjectSource = null | {
-  kind: 'quote';
-  quoteId: string;
-  quoteVersion: number;
-  createdAt: string;
-};
+export type WorkProjectSource =
+  | null
+  | {
+      kind: 'quote';
+      quoteId: string;
+      quoteVersion: number;
+      createdAt: string;
+    }
+  // ADR-0040 — C7 § 6.4 : projet créé depuis une opportunité gagnée, sans devis.
+  | { kind: 'opportunity'; opportunityId: string; createdAt: string };
 
 export interface WorkProjectView {
   id: string;

@@ -26,9 +26,22 @@ export interface OpportunityWonEvent {
 
 export interface CrmOpportunityEvents {
   onWon(event: OpportunityWonEvent): Promise<void>;
+  /**
+   * ADR-0040 — C7 § 6.4 : un projet existe-t-il déjà pour l'opportunité (ou un de
+   * ses devis) ? Sinon la réponse de `move` vers `won` suggère `CREATE_PROJECT`.
+   */
+  projectExists(organizationId: string, opportunityId: string): Promise<boolean>;
 }
 
-/** Fournisseur par défaut : aucun effet. */
+/** Fournisseur par défaut : aucun effet ; aucun projet connu. */
 export const NO_OPPORTUNITY_EVENTS: CrmOpportunityEvents = Object.freeze({
   async onWon(): Promise<void> {},
+  async projectExists(): Promise<boolean> {
+    return false;
+  },
 });
+
+/** Suggestion rendue par `POST /crm/opportunities/:id/move` (ADR-0040 § 3.3, § 6.4). */
+export interface OpportunitySuggestion {
+  code: 'CREATE_PROJECT';
+}

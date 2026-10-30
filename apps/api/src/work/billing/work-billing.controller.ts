@@ -2,6 +2,8 @@
 //
 //   POST   /work/projects/from-quote                       work.manage + sales.read
 //   GET    /work/quotes/:quoteId/project                   work.read + sales.read
+//   POST   /work/projects/from-opportunity                 work.manage + crm.read (+ sales.read si quoteId)
+//   GET    /work/opportunities/:opportunityId/project      work.read + crm.read
 //   GET    /work/projects/:projectId/invoices              work.read + sales.read
 //   POST   /work/projects/:projectId/invoices              work.manage + sales.read
 //   DELETE /work/projects/:projectId/invoices/:invoiceId   work.manage
@@ -25,6 +27,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  CreateProjectFromOpportunityBody,
   CreateProjectFromQuoteBody,
   LinkInvoiceBody,
   PrepareInvoiceBody,
@@ -80,6 +83,34 @@ export class WorkBillingController {
     @Param('quoteId', WorkIdPipe) quoteId: string,
   ): Promise<{ projectId: string | null }> {
     return this.billing.projectForQuote(orgId, quoteId);
+  }
+
+  /**
+   * ADR-0040 — C7 § 6.4 : opportunité gagnée → projet. `sales.read` n'est exigé
+   * que pour désigner un devis (`quoteId`) : contrôle dans le service, sur les
+   * droits EFFECTIFS de l'appelant (ADR-0041).
+   */
+  @Post('projects/from-opportunity')
+  @RequirePermission('work.manage', 'crm.read')
+  async createFromOpportunity(
+    @CurrentOrgId() orgId: string,
+    @CurrentUser() user: BillingUser,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
+    @Body() body: unknown,
+  ): Promise<WorkProjectView> {
+    const parsed = CreateProjectFromOpportunityBody.safeParse(body);
+    if (!parsed.success) invalidRequest(parsed.error);
+    return this.billing.createFromOpportunity(orgId, parsed.data, workActorOf(user, perms));
+  }
+
+  /** Projet issu de cette opportunité (ou d'un de ses devis), ou `null`. */
+  @Get('opportunities/:opportunityId/project')
+  @RequirePermission('work.read', 'crm.read')
+  async projectForOpportunity(
+    @CurrentOrgId() orgId: string,
+    @Param('opportunityId', WorkIdPipe) opportunityId: string,
+  ): Promise<{ projectId: string | null }> {
+    return this.billing.projectForOpportunity(orgId, opportunityId);
   }
 
   @Get('projects/:projectId/invoices')
