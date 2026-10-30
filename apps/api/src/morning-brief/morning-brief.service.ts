@@ -12,9 +12,11 @@
 //     après lecture laisserait la donnée transiter jusqu'au prompt de l'IA.
 //     Même règle pour les tâches et projets (ADR-0039 § 6.5) avec `work.read`,
 //     et pour la trésorerie avec `treasury.read` (ADR-0040 § 4.4), et pour les
-//     relances et le pipeline du CRM avec `crm.read` (ADR-0040 — C4 § 5.5).
+//     relances et le pipeline du CRM avec `crm.read` (ADR-0040 — C4 § 5.5), et
+//     pour les achats avec `purchase.read` (ADR-0044 § 6.4) : leurs montants avec
+//     `treasury.read` en plus, les approbations à faire avec `purchase.approve`.
 
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
@@ -34,11 +36,14 @@ import {
   CRM_SOURCE,
   DUE_DATES_SOURCE,
   OUTSTANDING_SOURCE,
+  PURCHASES_SOURCE,
   WORK_SOURCE,
+  noPurchases,
   type CashPositionSource,
   type CrmSource,
   type DueDatesSource,
   type OutstandingSource,
+  type PurchasesSource,
   type WorkSource,
 } from './morning-brief.ports.js';
 import {
@@ -123,6 +128,8 @@ export interface MorningBriefPreferences {
 
 @Injectable()
 export class MorningBriefService {
+  private readonly purchases: PurchasesSource;
+
   constructor(
     @InjectModel(SalesInvoice.name) private readonly invoices: Model<SalesInvoiceDocument>,
     @InjectModel(MorningBriefSettings.name)
@@ -135,7 +142,11 @@ export class MorningBriefService {
     @Inject(WORK_SOURCE) private readonly work: WorkSource,
     // ADR-0040 — C4
     @Inject(CRM_SOURCE) private readonly crm: CrmSource,
-  ) {}
+    // ADR-0044 — P6 : facultatif, « non disponible » sans module des achats.
+    @Optional() @Inject(PURCHASES_SOURCE) purchases: PurchasesSource | null = null,
+  ) {
+    this.purchases = purchases ?? noPurchases;
+  }
 
   /**
    * Brief de l'organisation, vu par ce rôle et pour ce membre : `userId`
@@ -159,7 +170,9 @@ export class MorningBriefService {
     const cashVisible = can(role, 'treasury.read', context);
     // ADR-0040 — C4 § 5.5 : relances et pipeline chargés seulement avec `crm.read`.
     const crmVisible = can(role, 'crm.read', context);
-    const [sales, cash, dueDates, work, crm] = await Promise.all([
+    // ADR-0044 § 6.4 : achats chargés seulement avec `purchase.read`.
+    const purchasesVisible = can(role, 'purchase.read', context);
+    const [sales, cash, dueDates, work, crm, purchases] = await Promise.all([
       salesVisible ? this.loadSales(organizationId, now) : Promise.resolve('hidden' as const),
       cashVisible ? this.cash.cashOf(organizationId, now) : Promise.resolve('hidden' as const),
       // Les échéances sont des données de ventes : même règle de visibilité.
@@ -171,8 +184,27 @@ export class MorningBriefService {
         ? this.work.workOf(organizationId, userId, now)
         : Promise.resolve('hidden' as const),
       crmVisible ? this.crm.crmOf(organizationId, userId, now) : Promise.resolve('hidden' as const),
+      purchasesVisible
+        ? this.purchases.purchasesOf(
+            organizationId,
+            userId,
+            {
+              amounts: cashVisible,
+              approvals: can(role, 'purchase.approve', context),
+            },
+            now,
+          )
+        : Promise.resolve('hidden' as const),
     ]);
-    return buildMorningBrief({ now: now.toISOString(), sales, cash, dueDates, work, crm });
+    return buildMorningBrief({
+      now: now.toISOString(),
+      sales,
+      cash,
+      dueDates,
+      work,
+      crm,
+      purchases,
+    });
   }
 
   /**

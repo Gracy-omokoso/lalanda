@@ -51,6 +51,12 @@ import { TreasuryModule } from '../treasury/treasury.module.js';
 import { SupplierPayment, SupplierPaymentSchema } from './payments/supplier-payment.schema.js';
 import { SupplierPaymentsController } from './payments/supplier-payments.controller.js';
 import { SupplierPaymentsService } from './payments/supplier-payments.service.js';
+// ADR-0044 — P6
+import { SupplierOverviewController } from './overview/supplier-overview.controller.js';
+import { SupplierOverviewService } from './overview/supplier-overview.service.js';
+import { PurchasesSummaryController } from './payables/purchases-summary.controller.js';
+import { PurchasesSummaryService } from './payables/purchases-summary.service.js';
+import { PurchasesRemindersModule } from './reminders/purchases-reminders.module.js';
 
 @Module({
   imports: [
@@ -63,6 +69,8 @@ import { SupplierPaymentsService } from './payments/supplier-payments.service.js
     PdfModule,
     // ADR-0044 — P5 : un paiement crée ses dépenses par `TreasuryExpensesService`.
     TreasuryModule,
+    // ADR-0044 — P6 : rappels d'échéance des factures (tâche `purchases.due-reminders`).
+    PurchasesRemindersModule,
     MongooseModule.forFeature([
       // ADR-0044 — P2 : fiches fournisseurs ; adhésions (destinataires des alertes).
       { name: Supplier.name, schema: SupplierSchema },
@@ -89,6 +97,9 @@ import { SupplierPaymentsService } from './payments/supplier-payments.service.js
     SupplierInvoicesController,
     // ADR-0044 — P5
     SupplierPaymentsController,
+    // ADR-0044 — P6
+    SupplierOverviewController,
+    PurchasesSummaryController,
   ],
   providers: [
     MasterKeyringProvider,
@@ -118,6 +129,10 @@ import { SupplierPaymentsService } from './payments/supplier-payments.service.js
     { provide: PURCHASE_RECEPTION_SINK, useValue: noPurchaseReceptionSink },
     // ADR-0044 — P5 : paiements, ventilation, dépenses possédées, échéancier, doublons.
     SupplierPaymentsService,
+    // ADR-0044 — P6 : fiche fournisseur 360° (lecture seule, calculs du moteur).
+    SupplierOverviewService,
+    // ADR-0044 — P6 : résumé engagé, facturé, payé (moteur `purchasesSummary`).
+    PurchasesSummaryService,
   ],
   exports: [
     SuppliersService,

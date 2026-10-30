@@ -76,6 +76,9 @@ import { PurchaseReceptionsController } from '../purchases/receptions/purchase-r
 import { SupplierInvoicesController } from '../purchases/invoices/supplier-invoices.controller.js';
 // ADR-0044 — P5
 import { SupplierPaymentsController } from '../purchases/payments/supplier-payments.controller.js';
+// ADR-0044 — P6
+import { SupplierOverviewController } from '../purchases/overview/supplier-overview.controller.js';
+import { PurchasesSummaryController } from '../purchases/payables/purchases-summary.controller.js';
 import { QuotesController } from '../sales/quotes/quotes.controller.js';
 import { CrmActivitiesController } from '../crm/crm-activities.controller.js';
 import { CrmContactsController } from '../crm/crm-contacts.controller.js';
@@ -215,6 +218,9 @@ const CONTROLEURS = [
   SupplierInvoicesController,
   // ADR-0044 — P5 : paiements fournisseurs, échéancier, doublons.
   SupplierPaymentsController,
+  // ADR-0044 — P6
+  SupplierOverviewController,
+  PurchasesSummaryController,
 ];
 
 /**
@@ -1042,5 +1048,24 @@ describe('ADR-0044 — P5 : paiements fournisseurs, échéancier et doublons', (
     for (const cle of Object.keys(SANS_PERMISSION)) {
       expect(cle.startsWith('SupplierPaymentsController.')).toBe(false);
     }
+  });
+});
+
+// ADR-0044 — P6
+describe('ADR-0044 — P6 : fiche fournisseur 360° et résumé des achats', () => {
+  it('la fiche 360° exige `purchase.read` ; les sections de trésorerie sont filtrées dedans', () => {
+    const routes = TOUTES_LES_ROUTES.filter((r) => r.cle.startsWith('SupplierOverviewController.'));
+    expect(routes.map((r) => r.cle)).toEqual(['SupplierOverviewController.overview']);
+    expect(routes[0]!.actions).toEqual(['purchase.read']);
+    for (const cle of Object.keys(SANS_PERMISSION)) {
+      expect(cle.startsWith('SupplierOverviewController.')).toBe(false);
+    }
+  });
+
+  it('le résumé des achats exige `purchase.read` (§ 3.6)', () => {
+    const routes = TOUTES_LES_ROUTES.filter((r) => r.cle.startsWith('PurchasesSummaryController.'));
+    expect(routes.map((r) => [r.cle, r.actions])).toEqual([
+      ['PurchasesSummaryController.summary', ['purchase.read']],
+    ]);
   });
 });
