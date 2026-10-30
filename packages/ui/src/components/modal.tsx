@@ -186,7 +186,9 @@ function ModalOuverte({
     const d = ref.current;
     if (!d) return;
     const surFermeture = (): void => {
-      if (!d.isConnected) return;
+      // `close` arrive après coup : si la fenêtre a été rouverte entre-temps
+      // (double montage du mode strict de React), ce n'est pas une fermeture.
+      if (!d.isConnected || d.open) return;
       if (!etatRef.current.dismissible) d.showModal();
       else etatRef.current.onClose();
     };
