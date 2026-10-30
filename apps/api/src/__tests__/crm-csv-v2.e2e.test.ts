@@ -238,6 +238,44 @@ e2eSuite('CSV v2 du CRM (ADR-0040 C9)', () => {
     expect(contact[0]).toMatchObject({ line: 2, message: expect.stringMatching(/ambigu/) });
   });
 
+  it('tout ou rien : dernière ligne en erreur après une ligne qui créerait un prospect → aucun compte, contact ni opportunité', async () => {
+    const avant = {
+      comptes: await count('crm_accounts'),
+      contacts: await count('crm_contacts'),
+      opportunites: await count('crm_opportunities'),
+    };
+    const opp = rejected(
+      await importOpp(
+        `${OPP_V1}\nPremière;;;;;Prospect Tout Ou Rien;;\nDernière;Inconnue;;;;Prospect Tout Ou Rien;;\n`,
+      ),
+    );
+    expect(opp).toEqual([{ line: 3, message: expect.stringMatching(/étape inconnue/) }]);
+    const contacts = rejected(
+      await post(asN(), '/crm/contacts/import', {
+        csv: `nom;email;entreprise;nif_client\nPremier;;Entreprise Tout Ou Rien;\nDernier;;;INCONNU99\n`,
+      }),
+    );
+    expect(contacts.map((e) => e.line)).toEqual([3]);
+    expect(await count('crm_accounts')).toBe(avant.comptes);
+    expect(await count('crm_contacts')).toBe(avant.contacts);
+    expect(await count('crm_opportunities')).toBe(avant.opportunites);
+    expect(
+      await db.collection('crm_accounts').countDocuments({
+        organizationId: orgN,
+        sortName: { $in: ['prospect tout ou rien', 'entreprise tout ou rien'] },
+      }),
+    ).toBe(0);
+
+    // Le même fichier corrigé : un seul prospect pour deux lignes du même nom.
+    ok(
+      await importOpp(
+        `${OPP_V1}\nPremière;;;;;Prospect Tout Ou Rien;;\nDernière;;;;;prospect tout ou rien;;\n`,
+      ),
+    );
+    expect(await count('crm_accounts', { sortName: 'prospect tout ou rien' })).toBe(1);
+    expect(await count('crm_opportunities')).toBe(avant.opportunites + 2);
+  });
+
   it('essai à blanc : rien n’est écrit, pas même le prospect d’un ancien fichier', async () => {
     const avant = await count('crm_accounts');
     const res = ok(await importOpp(`${OPP_V1}\nEssai;;;;;Prospect Essai Blanc;;\n`, true));

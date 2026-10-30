@@ -51,6 +51,7 @@ import {
   toCsv,
   uniqueMatch,
 } from './crm-csv.js';
+import { CrmAccountsService } from './accounts/crm-accounts.service.js';
 import { CrmSettingsService, type CrmActor } from './crm-settings.service.js';
 import type { PipelineStage } from './crm-model.js';
 import { CrmOpportunity, type CrmOpportunityDocument } from './crm.schemas.js';
@@ -158,6 +159,7 @@ export class CrmCsvService {
     @Inject(WorkMembersService) private readonly workMembers: WorkMembersService,
     @InjectModel(CrmOpportunity.name)
     private readonly opportunityDocs: Model<CrmOpportunityDocument>,
+    @Inject(CrmAccountsService) private readonly crmAccounts: CrmAccountsService,
   ) {}
 
   private async nifsOf(
@@ -547,29 +549,116 @@ export class CrmCsvService {
     if (errors.length > 0) importRejected(errors);
     if (dryRun) return { dryRun, rows: valid.length, created: 0 };
 
-    // Import réel : documents construits (références revérifiées par le service
-    // des opportunités) ; une erreur reste une erreur de ligne, rien n'est inséré.
-    const docs: Record<string, unknown>[] = [];
-    for (const { line, stageKey, input } of valid) {
-      try {
-        docs.push(
-          await this.opportunities.build(
-            organizationId,
-            stageKey,
-            input.opportunity,
-            actor,
-            'import',
-            input.lost,
-          ),
-        );
-      } catch (e) {
-        if (!(e instanceof HttpException)) throw e;
-        errors.push({ line, message: httpMessage(e) });
+    // Import réel, en deux temps pour rester TOUT OU RIEN (ADR-0035) :
+    //   1. lignes sans création : documents construits (références revérifiées
+    //      par le service des opportunités) — une erreur rejette, rien n'est écrit ;
+    //   2. prospects nouveaux (ancien rattachement par nom), PUIS leurs lignes,
+    //      construites avec le compte créé. Une erreur à ce stade (concurrence
+    //      seulement : tout a été validé) supprime les prospects créés ici.
+    const existing = await this.existingProspects(organizationId, valid);
+    const later = valid.filter((v) => needsNewProspect(v.input.opportunity, existing));
+    const now = valid.filter((v) => !later.includes(v));
+    const docs = new Map<number, Record<string, unknown>>();
+    const buildAll = async (rows: typeof valid) => {
+      for (const { line, stageKey, input } of rows) {
+        try {
+          docs.set(
+            line,
+            await this.opportunities.build(
+              organizationId,
+              stageKey,
+              input.opportunity,
+              actor,
+              'import',
+              input.lost,
+            ),
+          );
+        } catch (e) {
+          if (!(e instanceof HttpException)) throw e;
+          errors.push({ line, message: httpMessage(e) });
+        }
       }
-    }
+    };
+    await buildAll(now);
     if (errors.length > 0) importRejected(errors);
-    const created = await this.opportunities.insertMany(docs);
+
+    const createdProspects: Types.ObjectId[] = [];
+    let created = 0;
+    try {
+      const prospectIds = new Map<string, string>();
+      for (const { input } of later) {
+        const name = input.opportunity.prospectName!;
+        const key = normalizeForSearch(name);
+        if (prospectIds.has(key)) continue;
+        const account = await this.crmAccounts.resolveLegacy(
+          organizationId,
+          { customerId: null, companyName: name },
+          actor,
+        );
+        if (!account) throw new Error('prospect non créé');
+        createdProspects.push(account._id);
+        prospectIds.set(key, String(account._id));
+      }
+      await buildAll(
+        later.map((v) => ({
+          ...v,
+          input: {
+            ...v.input,
+            opportunity: {
+              ...v.input.opportunity,
+              accountId: prospectIds.get(normalizeForSearch(v.input.opportunity.prospectName!))!,
+            },
+          },
+        })),
+      );
+      if (errors.length > 0) importRejected(errors);
+      const ordered = valid.map((v) => docs.get(v.line)!);
+      created = await this.opportunities.insertMany(ordered);
+    } catch (e) {
+      if (createdProspects.length > 0) {
+        await this.accounts
+          .deleteMany({ organizationId, kind: 'prospect', _id: { $in: createdProspects } })
+          .exec();
+      }
+      throw e;
+    }
     await this.audited(organizationId, actor, 'crm.opportunities_imported', { rows: created });
-    return { dryRun, rows: docs.length, created };
+    return { dryRun, rows: created, created };
   }
+
+  /** Noms normalisés des prospects existants (non fusionnés) cités par l'ancien rattachement. */
+  private async existingProspects(
+    organizationId: string,
+    rows: readonly { input: CreateOpportunity }[],
+  ): Promise<Set<string>> {
+    const names = [
+      ...new Set(
+        rows.flatMap(({ input: { opportunity: o } }) =>
+          o.accountId === undefined && o.customerId === null && o.prospectName
+            ? [normalizeForSearch(o.prospectName)]
+            : [],
+        ),
+      ),
+    ];
+    if (names.length === 0) return new Set();
+    const docs = await this.accounts
+      .find({ organizationId, kind: 'prospect', mergedInto: null, sortName: { $in: names } })
+      .select({ sortName: 1 })
+      .lean<{ sortName: string }[]>()
+      .exec();
+    return new Set(docs.map((d) => d.sortName));
+  }
+}
+
+/** Ligne d'ancien format qui créerait un prospect (nom absent des comptes). */
+function needsNewProspect(
+  o: CreateOpportunity['opportunity'],
+  existing: ReadonlySet<string>,
+): boolean {
+  return (
+    o.accountId === undefined &&
+    o.customerId === null &&
+    o.prospectName !== null &&
+    !existing.has(normalizeForSearch(o.prospectName))
+  );
 }
