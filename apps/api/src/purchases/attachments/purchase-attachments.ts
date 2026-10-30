@@ -29,8 +29,7 @@ import {
   ServiceUnavailableException,
   UnsupportedMediaTypeException,
 } from '@nestjs/common';
-import { InjectConnection } from '@nestjs/mongoose';
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { InjectConnection, Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import type { Request, Response } from 'express';
 import type { Connection } from 'mongoose';
 

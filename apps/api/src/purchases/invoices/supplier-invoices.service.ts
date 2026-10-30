@@ -123,7 +123,6 @@ export interface InvoiceSettings {
   allowSoleApprover: boolean;
 }
 
-
 /** Champs composés d'une facture (création ou mise à jour d'un brouillon). */
 type Composed = Pick<
   SupplierInvoice,
@@ -240,7 +239,9 @@ export class SupplierInvoicesService {
     return {
       items,
       nextCursor:
-        docs.length > query.limit && last ? encodeKeyCursor(last.invoiceDate, String(last._id)) : null,
+        docs.length > query.limit && last
+          ? encodeKeyCursor(last.invoiceDate, String(last._id))
+          : null,
     };
   }
 
@@ -356,7 +357,12 @@ export class SupplierInvoicesService {
     actor: PurchaseActor,
   ): Promise<SupplierInvoiceView> {
     const composed = await this.compose(organizationId, body, null);
-    await this.assertNoDuplicate(organizationId, composed.supplierId, composed.supplierReferenceKey, null);
+    await this.assertNoDuplicate(
+      organizationId,
+      composed.supplierId,
+      composed.supplierReferenceKey,
+      null,
+    );
     // `FF{AA}{MM}-NNNNNN`, compteur annuel au jour de Kinshasa, trous admis (§ 2.5).
     const internalNumber = await this.counters.next(organizationId, 'invoice', new Date());
     let created: SupplierInvoiceDocument;
@@ -1117,8 +1123,7 @@ export class SupplierInvoicesService {
       const lineCategories = new Set(orderLines.map((l) => l?.category).filter(Boolean));
       const projects = new Set(orderLines.map((l) => l?.workProjectId ?? null));
       const category =
-        supplierCategory ??
-        (lineCategories.size === 1 ? ([...lineCategories][0] as string) : null);
+        supplierCategory ?? (lineCategories.size === 1 ? ([...lineCategories][0] as string) : null);
       if (!category) {
         badRequest(
           'SUPPLIER_INVOICE_CATEGORY_REQUIRED',
@@ -1257,9 +1262,7 @@ export class SupplierInvoicesService {
       .lean<SupplierInvoiceLean>()
       .exec();
     if (!updated) {
-      staleRevision(
-        (await this.requireOwn(current.organizationId, String(current._id))).revision,
-      );
+      staleRevision((await this.requireOwn(current.organizationId, String(current._id))).revision);
     }
     return updated;
   }
@@ -1323,7 +1326,8 @@ export class SupplierInvoicesService {
     organizationId: string,
     d: SupplierInvoiceLean,
   ): Promise<SupplierInvoiceView> {
-    const settlement = (await this.settlementsOf(organizationId, [d])).get(String(d._id)) ?? NO_DEBT;
+    const settlement =
+      (await this.settlementsOf(organizationId, [d])).get(String(d._id)) ?? NO_DEBT;
     const names = await this.supplierNames(organizationId, [d.supplierId]);
     return {
       ...this.listItemOf(d, settlement, names),

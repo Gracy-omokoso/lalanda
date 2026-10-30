@@ -22,7 +22,11 @@ export function notFound(code: string, message: string): never {
   throw new NotFoundException({ code, message });
 }
 
-export function badRequest(code: string, message: string, details?: Record<string, unknown>): never {
+export function badRequest(
+  code: string,
+  message: string,
+  details?: Record<string, unknown>,
+): never {
   throw new BadRequestException({ code, message, ...(details ? { details } : {}) });
 }
 

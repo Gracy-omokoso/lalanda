@@ -111,9 +111,7 @@ export const SupplierInvoiceCostAllocationInput = z
     amount: PurchaseAmount,
   })
   .strict();
-export type SupplierInvoiceCostAllocationInput = z.infer<
-  typeof SupplierInvoiceCostAllocationInput
->;
+export type SupplierInvoiceCostAllocationInput = z.infer<typeof SupplierInvoiceCostAllocationInput>;
 
 const invoiceFields = {
   supplierId: PurchaseId,

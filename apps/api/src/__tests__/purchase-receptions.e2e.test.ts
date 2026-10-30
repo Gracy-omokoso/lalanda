@@ -308,9 +308,7 @@ e2eSuite('Réceptions (ADR-0044 P4)', () => {
       f.ok(await f.get('analyst', '/purchases/receptions'));
       expect((await f.get('sales_rep', '/purchases/receptions')).status).toBe(403);
       for (const who of ['analyst', 'viewer', 'sales_rep'] as const) {
-        expect((await f.post(who, '/purchases/receptions', reception('l1', '1'))).status).toBe(
-          403,
-        );
+        expect((await f.post(who, '/purchases/receptions', reception('l1', '1'))).status).toBe(403);
       }
     });
 
@@ -322,7 +320,11 @@ e2eSuite('Réceptions (ADR-0044 P4)', () => {
         404,
         'PURCHASE_ORDER_NOT_FOUND',
       );
-      f.code(await f.get('ownerB', `/purchases/receptions/${id}`), 404, 'PURCHASE_RECEPTION_NOT_FOUND');
+      f.code(
+        await f.get('ownerB', `/purchases/receptions/${id}`),
+        404,
+        'PURCHASE_RECEPTION_NOT_FOUND',
+      );
       f.code(
         await f.post('ownerB', `/purchases/receptions/${id}/cancel`, {
           reason: 'x',
@@ -338,7 +340,11 @@ e2eSuite('Réceptions (ADR-0044 P4)', () => {
       );
       const listB = f.ok(await f.get('ownerB', `/purchases/receptions?orderId=${orderId}`));
       expect(listB['items']).toEqual([]);
-      f.code(await f.get('owner', '/purchases/receptions/zzz'), 404, 'PURCHASE_RECEPTION_NOT_FOUND');
+      f.code(
+        await f.get('owner', '/purchases/receptions/zzz'),
+        404,
+        'PURCHASE_RECEPTION_NOT_FOUND',
+      );
     });
   });
 });

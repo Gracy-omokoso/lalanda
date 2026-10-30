@@ -50,7 +50,8 @@ export class SupplierInvoicesPayablesSource implements SupplierPayablesSource {
     const settlements = await this.settlements.of(organizationId, docs);
     const today = todayInKinshasa();
     const bySupplier = new Map<string, SupplierInvoiceLean[]>();
-    for (const d of docs) bySupplier.set(d.supplierId, [...(bySupplier.get(d.supplierId) ?? []), d]);
+    for (const d of docs)
+      bySupplier.set(d.supplierId, [...(bySupplier.get(d.supplierId) ?? []), d]);
     for (const [supplierId, list] of bySupplier) {
       const aging = payablesAging(
         list.map((d) => ({

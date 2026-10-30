@@ -22,7 +22,10 @@ import {
   PurchaseAttachmentDocSchema,
   type PurchaseAttachmentDoc,
 } from '../attachments/purchase-attachments.js';
-import { PurchaseCancellationSchema, type PurchaseCancellation } from '../receptions/reception.schema.js';
+import {
+  PurchaseCancellationSchema,
+  type PurchaseCancellation,
+} from '../receptions/reception.schema.js';
 
 @Schema({ _id: false, strict: true })
 export class SupplierInvoiceLine {

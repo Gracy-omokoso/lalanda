@@ -120,7 +120,10 @@ export class PurchaseReceptionsService {
   }
 
   /** Réceptions d'une commande (fiche de la commande, § 3.2), annulées comprises. */
-  async forOrder(organizationId: string, order: PurchaseOrderFacts): Promise<PurchaseReceptionView[]> {
+  async forOrder(
+    organizationId: string,
+    order: PurchaseOrderFacts,
+  ): Promise<PurchaseReceptionView[]> {
     const docs = await this.receptions
       .find({ organizationId, orderId: order.id })
       .sort({ receivedOn: 1, _id: 1 })

@@ -71,7 +71,9 @@ function actorOf(user: User, role: OrgRole | undefined): PurchaseActor {
 @Controller('purchases/invoices')
 @UseGuards(AuthGuard, PermissionsGuard)
 export class SupplierInvoicesController {
-  constructor(@Inject(SupplierInvoicesService) private readonly invoices: SupplierInvoicesService) {}
+  constructor(
+    @Inject(SupplierInvoicesService) private readonly invoices: SupplierInvoicesService,
+  ) {}
 
   @Get()
   @RequirePermission('purchase.read')
@@ -223,7 +225,9 @@ export class SupplierInvoicesController {
   @Post(':invoiceId/attachment')
   @HttpCode(201)
   @RequirePermission('purchase.manage')
-  @Throttle({ default: { ttl: 3_600_000, limit: PURCHASE_ATTACHMENT_LIMITS.uploadsPerHourPerUser } })
+  @Throttle({
+    default: { ttl: 3_600_000, limit: PURCHASE_ATTACHMENT_LIMITS.uploadsPerHourPerUser },
+  })
   @UseGuards(UserThrottlerGuard)
   async uploadAttachment(
     @CurrentOrgId() orgId: string,
