@@ -58,6 +58,13 @@ Décideurs :
   actions, aucun rôle nouveau. Lève le refus des achats d'ADR-0018. Statut : **proposé, ADR-0044**
   (30 oct. 2026).
 
+- [ADR-0045](ADR-0045-ressources-humaines.md) — Ressources humaines (R4), **paie exclue** :
+  dossiers collaborateurs distincts des comptes (données sensibles chiffrées, lecture journalisée),
+  services et organigramme, absences et congés paramétrables (aucun droit légal posé) validés par le
+  manager puis éventuellement les RH, documents RH et échéances, listes d'entrée et de sortie, feuille
+  de temps en lecture, rapports, brief R13 à R15 ; cinq actions et un rôle Responsable RH. Statut :
+  **proposé, ADR-0045** (30 oct. 2026).
+
 ## Décisions récentes (légal)
 
 - [ADR-0043](ADR-0043-editeur-go-freelance-sarlu.md) — L'éditeur devient Go freelance SARLU

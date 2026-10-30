@@ -565,6 +565,42 @@ modification, une approbation complète, un envoi, une annulation ou une clôtur
 recalculent le rapprochement des brouillons de facture liés (`refreshDrafts`). `GET
 /purchases/payables` : livré par P5.
 
+## Ressources humaines — proposé, ADR-0045 (non implémenté)
+
+Contrat **proposé** par [ADR-0045](adr/ADR-0045-ressources-humaines.md) § 3 (R4 du RUN, **paie
+exclue**). Module `apps/api/src/hr/`, web `/rh`. Cinq actions nouvelles (`hr.read`, `hr.manage`,
+`hr.sensitive.read`, `leave.request`, `leave.approve`) et un rôle nouveau, Responsable RH
+(`hr_manager`). Les routes « soi » et « équipe » portent `analytics.read` au guard et la portée
+dans le service (`hrViewerScope`) ; un collaborateur hors portée rend `404`.
+
+| Méthode et chemin | Permission | Effet |
+|---|---|---|
+| `GET /hr/employees` · `GET …/:id` | `hr.read` (fiche : aussi manager ou soi) | dossiers, jamais de donnée sensible |
+| `POST /hr/employees` · `PUT …/:id` · `POST /hr/employees/from-members` · `…/exit` · `…/reinstate` | `hr.manage` | `409 EMPLOYEE_USER_ALREADY_LINKED`, `EMPLOYEE_NUMBER_EXISTS`, `MANAGER_CYCLE` ; la sortie annule les absences futures et propose la liste de départ |
+| `POST …/:id/anonymize` | `hr.manage` + `hr.sensitive.read` | collaborateur sorti seulement ; irréversible ; audit strict |
+| `GET …/:id/private` · `PUT …/:id/private/:section` | `hr.sensitive.read` (écriture : + `hr.manage`) | sections chiffrées, formes masquées ; changement bancaire notifié |
+| `POST …/:id/private/reveal` | `hr.sensitive.read`, ou soi | clair, audit strict avant réponse, 30 par heure |
+| `GET /hr/departments` · `POST` · `PUT` · `…/archive` · `GET /hr/org-chart` | `hr.read` · `hr.manage` · `hr.read` ou membre relié | services, organigramme (nom, poste, service, manager) |
+| `GET /hr/me` · `GET /hr/team` · `GET /hr/leave-approvals/pending` · `GET /hr/calendar` | `analytics.read` | ma fiche et mes soldes ; mon équipe ; mes validations ; absences de ma portée (« Absent » pour un type confidentiel) |
+| `GET /hr/leave-types` · `GET /hr/holidays` · `POST`/`PUT` | `analytics.read` · `hr.manage` | types paramétrables, jours fériés saisis par l'organisation |
+| `POST /hr/leave-requests` · `…/:id/cancel` | `leave.request` (soi) ou `hr.manage` (autrui) | jours calculés par le moteur ; `409 LEAVE_OVERLAP`, `LEAVE_BALANCE_INSUFFICIENT`, `EMPLOYEE_NOT_LINKED` |
+| `POST /hr/leave-requests/:id/approve` · `…/reject` | manager désigné, ou `leave.approve` | `409 SELF_APPROVAL_FORBIDDEN`, `APPROVER_ALREADY_APPROVED`, `403 LEAVE_NOT_YOUR_STEP` ; approbateur unique marqué |
+| `GET /hr/leave-balances` · `GET /hr/leave-ledger` · `POST /hr/leave-ledger` | soi, manager, `hr.read` · `hr.manage` | soldes (moteur) ; attributions et ajustements journalisés |
+| `GET`/`POST /hr/employees/:id/documents` · `GET /hr/documents/:id/file` · `DELETE` | `hr.read` / `hr.sensitive.read` / soi · `hr.manage` | PDF inerte ; pièces sensibles chiffrées, téléchargement audité |
+| `GET`/`POST /hr/checklist-templates` · `POST /hr/employees/:id/checklists` · `…/items/:itemId/done` | `hr.read` · `hr.manage` · l'assigné | listes d'accueil et de départ (hors projets RUN) |
+| `GET /hr/deadlines` · `GET /hr/reports` · `GET /hr/reports/export.csv` | `hr.read` (CSV : + `report.export`) | échéances ; effectif, entrées et sorties, absentéisme, ancienneté ; jamais de salaire |
+| `GET /hr/settings` · `PUT` | `hr.read` · `hr.manage` (+ `leave.approve` pour le circuit) | semaine de travail, circuit, types de contrat, rappels, conservation |
+| `GET /work/timesheets` | `work.read` (soi) ; `work.manage` ou manager (autrui) | feuille de temps hebdomadaire **en lecture** des saisies existantes, absences et fériés |
+
+Effets sur l'existant : « Mes tâches » gagne les éléments `source: 'hr'` (validations d'absence,
+éléments de liste) ; le calendrier des tâches affiche les absences ; un assigné absent porte un badge
+et le constat `ASSIGNEE_ABSENT_ON_DUE_DATE` ; la marge d'un projet gagne le constat
+`PERSONNEL_EXPENSES_AND_TIME_COST` (montant inchangé) ; brief : R13 `absences_du_jour`, R14
+`validations_absence_en_attente`, R15 `echeances_rh_proches`. Notifications : `hr.leave_requested`,
+`hr.leave_approved`, `hr.leave_rejected`, `hr.leave_cancelled`, `hr.probation_ending`,
+`hr.contract_ending`, `hr.document_expiring`, `hr.checklist_item_assigned`,
+`hr.bank_details_changed`. Tâches : `hr.leave-accruals`, `hr.reminders`, `hr.retention` (éteinte).
+
 ## Brief du matin — implémenté (ADR-0033)
 
 L'organisation est toujours celle de la session ; aucun corps ni paramètre ne la désigne.
