@@ -119,9 +119,7 @@ const ACTIONS_SANS_ROUTE: Record<string, string> = {
   'purchase.request':
     'ADR-0044 — P0 pose l’action ; `POST /purchases/orders` (créer une demande) arrive ' +
     'au lot P3, qui écrira la sonde.',
-  'purchase.approve':
-    'ADR-0044 — P0 pose l’action et `purchaseApprovalDecision` ; `POST /purchases/orders/:id/approve` ' +
-    'arrive au lot P3, qui écrira la sonde.',
+  // ADR-0044 — P4 : `purchase.approve` a sa première route (`force-validate`), sondée plus bas.
 };
 
 /** Une sonde HTTP : la route qui matérialise une action, et ses statuts légitimes. */
@@ -606,6 +604,20 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
         request(serveur())
           .post('/purchases/suppliers/000000000000000000000000/payment-methods/x/reveal')
           .set('Cookie', c),
+    },
+    // ADR-0044 — P4 : réceptions et factures fournisseurs.
+    {
+      // ADR-0044 § 5.3 — forcer une facture en écart : Propriétaire et Directeur
+      // financier (ⓢ). Facture inexistante : le 404 prouve que le guard a laissé passer
+      // jusqu'au service, sans prérequis de commande ni de facture dans cette suite.
+      action: 'purchase.approve',
+      libelle: 'POST /purchases/invoices/:id/force-validate',
+      statutsAutorises: [404],
+      envoyer: (c) =>
+        request(serveur())
+          .post('/purchases/invoices/000000000000000000000000/force-validate')
+          .set('Cookie', c)
+          .send({ reason: 'Sonde de matrice', expectedRevision: 1 }),
     },
   ];
 

@@ -68,6 +68,9 @@ import { TreasuryActualsController } from '../treasury/treasury-actuals.controll
 import { TreasuryExpensesController } from '../treasury/treasury-expenses.controller.js';
 // ADR-0044 — P2
 import { PurchaseSuppliersController } from '../purchases/suppliers/purchase-suppliers.controller.js';
+// ADR-0044 — P4
+import { PurchaseReceptionsController } from '../purchases/receptions/purchase-receptions.controller.js';
+import { SupplierInvoicesController } from '../purchases/invoices/supplier-invoices.controller.js';
 import { QuotesController } from '../sales/quotes/quotes.controller.js';
 import { CrmActivitiesController } from '../crm/crm-activities.controller.js';
 import { CrmContactsController } from '../crm/crm-contacts.controller.js';
@@ -199,6 +202,9 @@ const CONTROLEURS = [
   CrmReportsController,
   // ADR-0044 — P2 : fiches fournisseurs.
   PurchaseSuppliersController,
+  // ADR-0044 — P4 : réceptions et factures fournisseurs.
+  PurchaseReceptionsController,
+  SupplierInvoicesController,
 ];
 
 /**
@@ -895,6 +901,50 @@ describe('ADR-0044 — P2 : fournisseurs et coordonnées de paiement', () => {
     for (const [cle, actions] of Object.entries(attendu)) {
       const route = routes.find((r) => r.cle === cle);
       expect(route!.actions, cle).toEqual(actions);
+    }
+  });
+});
+
+// ADR-0044 — P4
+describe('ADR-0044 — P4 : réceptions, factures fournisseurs et rapprochement', () => {
+  it('chaque route des réceptions et des factures déclare la permission de l’ADR (§ 3.4, § 3.5)', () => {
+    const attendu: Record<string, Action[]> = {
+      'PurchaseReceptionsController.list': ['purchase.read'],
+      'PurchaseReceptionsController.get': ['purchase.read'],
+      'PurchaseReceptionsController.create': ['purchase.manage'],
+      'PurchaseReceptionsController.cancel': ['purchase.manage'],
+      'PurchaseReceptionsController.uploadAttachment': ['purchase.manage'],
+      'PurchaseReceptionsController.downloadAttachment': ['purchase.read'],
+      'SupplierInvoicesController.list': ['purchase.read'],
+      'SupplierInvoicesController.get': ['purchase.read'],
+      'SupplierInvoicesController.create': ['purchase.manage'],
+      'SupplierInvoicesController.fromOrder': ['purchase.manage'],
+      'SupplierInvoicesController.update': ['purchase.manage'],
+      'SupplierInvoicesController.validate': ['purchase.manage'],
+      // Valider malgré un écart bloquant : une autorité de dépense (§ 5.3).
+      'SupplierInvoicesController.forceValidate': ['purchase.approve'],
+      'SupplierInvoicesController.dispute': ['purchase.manage'],
+      'SupplierInvoicesController.resolveDispute': ['purchase.manage'],
+      'SupplierInvoicesController.cancel': ['purchase.manage'],
+      'SupplierInvoicesController.uploadAttachment': ['purchase.manage'],
+      'SupplierInvoicesController.downloadAttachment': ['purchase.read'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter(
+      (r) =>
+        r.cle.startsWith('PurchaseReceptionsController.') ||
+        r.cle.startsWith('SupplierInvoicesController.'),
+    );
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+    }
+  });
+
+  it('aucune route des réceptions ni des factures n’est une exception sans permission', () => {
+    for (const cle of Object.keys(SANS_PERMISSION)) {
+      expect(cle.startsWith('PurchaseReceptionsController.')).toBe(false);
+      expect(cle.startsWith('SupplierInvoicesController.')).toBe(false);
     }
   });
 });
