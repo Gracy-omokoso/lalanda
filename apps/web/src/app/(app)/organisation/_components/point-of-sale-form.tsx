@@ -154,12 +154,9 @@ export function PointOfSaleCreateForm({
     <form
       onSubmit={(e) => void envoyer(e)}
       noValidate
-      aria-labelledby="pdv-nouveau-titre"
-      className="flex flex-col gap-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5"
+      aria-label="Nouveau point de vente"
+      className="flex flex-col gap-4"
     >
-      <h4 id="pdv-nouveau-titre" className="text-sm font-semibold">
-        Nouveau point de vente
-      </h4>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <label htmlFor="pdv-label" className="text-sm font-medium">

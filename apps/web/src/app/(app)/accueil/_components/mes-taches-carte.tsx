@@ -36,12 +36,13 @@ export function MesTachesCarte({
   }, [organizationId]);
 
   return (
-    <div className="flex flex-col gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-5">
+    // Carte entièrement cliquable (lien étiré) ; les lignes de tâche restent des liens propres.
+    <div className="relative flex flex-col gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-5 transition hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-pop)]">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-sm font-semibold">Mes tâches</h3>
         <Link
           href={MES_TACHES_HREF}
-          className="text-sm font-medium text-[var(--accent)] underline-offset-2 hover:underline"
+          className="text-sm font-medium text-[var(--accent)] underline-offset-2 hover:underline after:absolute after:inset-0 after:rounded-[inherit] after:content-['']"
         >
           Ouvrir Mes tâches
         </Link>
@@ -77,7 +78,7 @@ export function MesTachesCarte({
                 <li key={l.id}>
                   <Link
                     href={l.lien}
-                    className="flex flex-col rounded-[var(--radius-md)] px-2 py-1.5 transition hover:bg-[var(--surface-muted)]"
+                    className="relative z-10 flex flex-col rounded-[var(--radius-md)] px-2 py-1.5 transition hover:bg-[var(--surface-muted)]"
                   >
                     <span className="truncate text-sm font-medium">{l.titre}</span>
                     <span className="truncate text-xs text-[var(--foreground-muted)]">

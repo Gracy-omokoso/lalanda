@@ -6,7 +6,7 @@
 // jalon viennent de l'API (`WorkProjectSummary`) ; rien n'est recalculé ici.
 
 import type { WorkProjectKind, WorkProjectStatus, WorkProjectSummary } from '@lalanda/shared/work';
-import { Badge, EmptyState, PageHeader, Skeleton, buttonClasses } from '@lalanda/ui';
+import { Badge, EmptyState, Modal, PageHeader, Skeleton, buttonClasses } from '@lalanda/ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -97,9 +97,9 @@ function NouveauProjet({ onAnnule }: { onAnnule: () => void }): React.ReactEleme
     <form
       onSubmit={(e) => void creer(e)}
       noValidate
-      className="grid gap-4 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-4 sm:grid-cols-2 sm:p-5"
+      aria-label="Nouveau projet"
+      className="grid gap-4 sm:grid-cols-2"
     >
-      <h2 className="text-base font-semibold sm:col-span-2">Nouveau projet</h2>
       <Champ id="pj-nom" label="Nom du projet" requis erreur={champs['name']}>
         <input
           id="pj-nom"
@@ -262,11 +262,12 @@ function NouveauProjet({ onAnnule }: { onAnnule: () => void }): React.ReactEleme
 function CarteProjet({ p, today }: { p: WorkProjectSummary; today: string }): React.ReactElement {
   const prog = progression(p);
   return (
-    <li className="flex min-w-0 flex-col gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-4">
+    // Carte entièrement cliquable : le lien du nom est étiré sur toute la carte.
+    <li className="relative flex min-w-0 flex-col gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-4 transition hover:border-[var(--module-run)] hover:shadow-[var(--shadow-pop)]">
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
         <Link
           href={hrefProjet(p.id)}
-          className="min-w-0 break-words font-display text-base font-semibold underline-offset-2 hover:underline"
+          className="min-w-0 break-words font-display text-base font-semibold underline-offset-2 hover:underline after:absolute after:inset-0 after:rounded-[inherit] after:content-['']"
         >
           {p.name}
         </Link>
@@ -358,7 +359,7 @@ export function ListeProjets(): React.ReactElement {
             <Link href={MES_TACHES_HREF} className={buttonClasses('secondary', 'md')}>
               Mes tâches
             </Link>
-            {gerer && !creation ? (
+            {gerer ? (
               <button
                 type="button"
                 className={buttonClasses('primary', 'md')}
@@ -370,7 +371,14 @@ export function ListeProjets(): React.ReactElement {
           </>
         }
       />
-      {gerer && creation ? <NouveauProjet onAnnule={() => setCreation(false)} /> : null}
+      <Modal
+        open={gerer && creation}
+        onClose={() => setCreation(false)}
+        title="Nouveau projet"
+        size="lg"
+      >
+        <NouveauProjet onAnnule={() => setCreation(false)} />
+      </Modal>
 
       <form
         role="search"
@@ -461,7 +469,7 @@ export function ListeProjets(): React.ReactElement {
               : 'Un Propriétaire, un Administrateur ou un Dirigeant peut créer le premier projet.'
           }
           action={
-            gerer && !creation ? (
+            gerer ? (
               <button
                 type="button"
                 className={buttonClasses('primary', 'md')}

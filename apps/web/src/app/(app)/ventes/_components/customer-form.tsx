@@ -50,6 +50,7 @@ export function CustomerForm({
   gerer,
   base,
   onFermer,
+  enModal = false,
 }: {
   fiche: Exclude<FicheOuverte, null>;
   /** `sales.manage` confirmé par le serveur. Sans lui, la fiche est en lecture seule. */
@@ -58,6 +59,8 @@ export function CustomerForm({
   base: string;
   /** Retour à la liste ; `enregistre` est la fiche écrite, s'il y en a une. */
   onFermer: (enregistre?: CustomerView) => void;
+  /** Création dans la fenêtre modale : son en-tête porte le titre et la fermeture. */
+  enModal?: boolean;
 }): React.ReactElement {
   const id = fiche.mode === 'edition' ? fiche.id : null;
   const [vue, setVue] = useState<CustomerView | null>(null);
@@ -173,18 +176,26 @@ export function CustomerForm({
   const typeChoisi = CUSTOMER_TYPES.find((t) => t.value === type);
 
   return (
-    <section aria-labelledby="fiche-client-titre" className="flex flex-col gap-5">
-      <div className="flex flex-col gap-2">
-        <button
-          type="button"
-          onClick={() => onFermer()}
-          className="self-start text-sm text-[var(--foreground-muted)] underline-offset-4 hover:underline"
-        >
-          ← Retour à la liste des clients
-        </button>
-        <h2 id="fiche-client-titre" className="font-display text-lg font-bold tracking-tight">
-          {titre}
-        </h2>
+    <section
+      aria-labelledby={enModal ? undefined : 'fiche-client-titre'}
+      aria-label={enModal ? titre : undefined}
+      className="flex flex-col gap-5"
+    >
+      <div className={enModal ? 'flex flex-col gap-2 empty:hidden' : 'flex flex-col gap-2'}>
+        {enModal ? null : (
+          <>
+            <button
+              type="button"
+              onClick={() => onFermer()}
+              className="self-start text-sm text-[var(--foreground-muted)] underline-offset-4 hover:underline"
+            >
+              ← Retour à la liste des clients
+            </button>
+            <h2 id="fiche-client-titre" className="font-display text-lg font-bold tracking-tight">
+              {titre}
+            </h2>
+          </>
+        )}
         {vue ? (
           <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--foreground-muted)]">
             <span>{libelleTypeClient(vue.type)}</span>

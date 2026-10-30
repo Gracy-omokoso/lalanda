@@ -4,6 +4,8 @@
 // totaux du mois par catégorie (moteur), dépenses récurrentes et échéances à
 // confirmer. Fonctionne SANS projet ni plan : RUN est utilisable seul.
 
+import { Modal, buttonClasses } from '@lalanda/ui';
+import { Plus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
@@ -89,6 +91,8 @@ export default function DepensesPage(): React.ReactElement {
   const [info, setInfo] = useState<string | null>(null);
   const [form, setForm] = useState<Formulaire>(VIDE);
   const [enCours, setEnCours] = useState(false);
+  const [creation, setCreation] = useState(false);
+  const [erreurCreation, setErreurCreation] = useState<string | null>(null);
   const [fournisseurs, setFournisseurs] = useState<string[]>([]);
   const [apercu, setApercu] = useState<{ id: string; url: string } | null>(null);
 
@@ -151,18 +155,18 @@ export default function DepensesPage(): React.ReactElement {
 
   async function enregistrer(e: React.FormEvent): Promise<void> {
     e.preventDefault();
-    setErreur(null);
+    setErreurCreation(null);
     setInfo(null);
     const montant = lireMontantSaisi(form.amount);
     if (!montant.ok) {
-      setErreur(montant.erreur);
+      setErreurCreation(montant.erreur);
       return;
     }
     let tva: string | null = null;
     if (form.deductibleVat.trim() !== '') {
       const lu = lireMontantSaisi(form.deductibleVat);
       if (!lu.ok) {
-        setErreur(`TVA déductible : ${lu.erreur}`);
+        setErreurCreation(`TVA déductible : ${lu.erreur}`);
         return;
       }
       tva = lu.valeur;
@@ -187,10 +191,11 @@ export default function DepensesPage(): React.ReactElement {
         accountId: form.accountId,
         spentOn: form.spentOn,
       });
+      setCreation(false);
       setInfo('Dépense enregistrée.');
       await charger();
     } catch (err) {
-      setErreur(messageOf(err));
+      setErreurCreation(messageOf(err));
     } finally {
       setEnCours(false);
     }
@@ -250,6 +255,21 @@ export default function DepensesPage(): React.ReactElement {
 
   return (
     <div className="flex flex-col gap-6">
+      {gerer ? (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            className={buttonClasses('primary', 'md')}
+            onClick={() => {
+              setErreurCreation(null);
+              setCreation(true);
+            }}
+          >
+            <Plus aria-hidden="true" className="h-4 w-4" />
+            Nouvelle dépense
+          </button>
+        </div>
+      ) : null}
       {erreur ? <Bandeau ton="erreur">{erreur}</Bandeau> : null}
       {info ? <Bandeau>{info}</Bandeau> : null}
 
@@ -281,12 +301,18 @@ export default function DepensesPage(): React.ReactElement {
         </Section>
       ) : null}
 
-      {gerer ? (
-        <Section
-          titre="Nouvelle dépense"
-          description="Montant réellement payé. Le compte est facultatif, mais sans lui la dépense n’entre pas dans les soldes."
-        >
+      <Modal
+        open={gerer && creation}
+        onClose={() => setCreation(false)}
+        title="Nouvelle dépense"
+        description="Montant réellement payé. Le compte est facultatif, mais sans lui la dépense n’entre pas dans les soldes."
+        size="lg"
+        busy={enCours}
+      >
+        <div className="flex flex-col gap-3">
+          {erreurCreation ? <Bandeau ton="erreur">{erreurCreation}</Bandeau> : null}
           <form
+            aria-label="Nouvelle dépense"
             onSubmit={(e) => void enregistrer(e)}
             className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
           >
@@ -415,8 +441,8 @@ export default function DepensesPage(): React.ReactElement {
               </button>
             </div>
           </form>
-        </Section>
-      ) : null}
+        </div>
+      </Modal>
 
       <Section
         titre={`Dépenses de ${libelleMois(mois)}`}
@@ -586,12 +612,14 @@ function RecurringSection({
     startDate: aujourdhui(),
     endDate: '',
   });
+  const [creation, setCreation] = useState(false);
+  const [erreurCreation, setErreurCreation] = useState<string | null>(null);
 
   async function creer(e: React.FormEvent): Promise<void> {
     e.preventDefault();
     const montant = lireMontantSaisi(f.amount);
     if (!montant.ok) {
-      onError(montant.erreur);
+      setErreurCreation(montant.erreur);
       return;
     }
     try {
@@ -606,9 +634,10 @@ function RecurringSection({
         endDate: f.endDate || null,
       });
       setF({ ...f, label: '', amount: '' });
+      setCreation(false);
       onChange();
     } catch (err) {
-      onError(messageOf(err));
+      setErreurCreation(messageOf(err));
     }
   }
 
@@ -636,6 +665,21 @@ function RecurringSection({
     <Section
       titre="Dépenses récurrentes"
       description="Loyer, salaires, abonnements : une règle prévoit, elle ne paie rien. Ses échéances alimentent la prévision de trésorerie ; vous confirmez chacune une fois payée."
+      actions={
+        gerer ? (
+          <button
+            type="button"
+            className={buttonClasses('primary', 'sm')}
+            onClick={() => {
+              setErreurCreation(null);
+              setCreation(true);
+            }}
+          >
+            <Plus aria-hidden="true" className="h-4 w-4" />
+            Nouvelle règle
+          </button>
+        ) : undefined
+      }
     >
       {regles.length === 0 ? (
         <p className="text-sm text-[var(--foreground-muted)]">Aucune dépense récurrente.</p>
@@ -667,10 +711,18 @@ function RecurringSection({
           ))}
         </ul>
       )}
-      {gerer ? (
+      <Modal
+        open={gerer && creation}
+        onClose={() => setCreation(false)}
+        title="Nouvelle dépense récurrente"
+        description="Une règle prévoit, elle ne paie rien : chaque échéance sera à confirmer une fois payée."
+        size="md"
+      >
+        {erreurCreation ? <Bandeau ton="erreur">{erreurCreation}</Bandeau> : null}
         <form
           onSubmit={(e) => void creer(e)}
-          className="grid gap-3 border-t border-[var(--border)] pt-3 sm:grid-cols-2 lg:grid-cols-4"
+          aria-label="Nouvelle dépense récurrente"
+          className="mt-3 grid gap-3 sm:grid-cols-2"
         >
           <input
             aria-label="Libellé"
@@ -766,7 +818,7 @@ function RecurringSection({
             </button>
           </div>
         </form>
-      ) : null}
+      </Modal>
     </Section>
   );
 }

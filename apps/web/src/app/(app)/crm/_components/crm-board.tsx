@@ -9,7 +9,7 @@
 //
 // Chiffres recopiés de l'API (moteur) : rien n'est additionné ici.
 
-import { Badge, buttonClasses } from '@lalanda/ui';
+import { Badge, Modal, buttonClasses } from '@lalanda/ui';
 import { AlarmClock, KanbanSquare, Moon, Plus, UserX } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
@@ -92,15 +92,18 @@ function Carte({
         if (e.target !== e.currentTarget) return;
         if (onClavier(o, e.key)) e.preventDefault();
       }}
-      className={`flex min-w-0 flex-col gap-1.5 rounded-[var(--radius-md)] border bg-[var(--surface)] p-3 text-sm shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+      className={`relative flex min-w-0 flex-col gap-1.5 rounded-[var(--radius-md)] border bg-[var(--surface)] p-3 text-sm shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
         saisie_
           ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]'
           : 'border-[var(--border)] hover:border-[var(--module-run)]'
       } ${mobile ? 'cursor-grab active:cursor-grabbing' : ''}`}
     >
+      {/* Lien étiré sur toute la carte ; non déplaçable, pour que le glisser-déposer
+          reste celui de la carte. */}
       <Link
         href={lienOpportunite(o.id)}
-        className="font-medium break-words underline-offset-2 hover:underline"
+        draggable={false}
+        className="font-medium break-words underline-offset-2 hover:underline after:absolute after:inset-0 after:rounded-[inherit] after:content-['']"
       >
         {o.title}
       </Link>
@@ -114,7 +117,7 @@ function Carte({
         {o.stale ? <Badge tone="warning">Inactive depuis {o.daysSinceActivity} j</Badge> : null}
       </span>
       {mobile ? (
-        <label className="mt-1 flex flex-col gap-1 text-xs">
+        <label className="relative z-10 mt-1 flex flex-col gap-1 text-xs">
           <span className="text-[var(--foreground-muted)]">Déplacer vers…</span>
           <select
             className={`${CHAMP} py-1 text-xs`}
@@ -163,12 +166,7 @@ function NouvelleOpportunite({ onCree }: { onCree: () => void }): React.ReactEle
   }
 
   return (
-    <form
-      onSubmit={(e) => void creer(e)}
-      className="grid gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-4 sm:grid-cols-2 lg:grid-cols-3"
-      noValidate
-    >
-      <h3 className="text-sm font-semibold sm:col-span-2 lg:col-span-3">Nouvelle opportunité</h3>
+    <form onSubmit={(e) => void creer(e)} className="grid gap-3 sm:grid-cols-2" noValidate>
       <Champ id="op-titre" label="Titre" requis erreur={champs['title']}>
         <input
           id="op-titre"
@@ -241,11 +239,7 @@ function NouvelleOpportunite({ onCree }: { onCree: () => void }): React.ReactEle
       <button
         type="submit"
         disabled={envoi}
-        className={buttonClasses(
-          'primary',
-          'md',
-          'sm:col-span-2 sm:justify-self-start lg:col-span-3',
-        )}
+        className={buttonClasses('primary', 'md', 'sm:col-span-2 sm:justify-self-start')}
       >
         {envoi ? 'Création…' : 'Créer l’opportunité'}
       </button>
@@ -491,11 +485,10 @@ export function CrmBoard(): React.ReactElement {
             <button
               type="button"
               className={buttonClasses('primary', 'sm')}
-              onClick={() => setCreation((c) => !c)}
-              aria-expanded={creation}
+              onClick={() => setCreation(true)}
             >
               <Plus aria-hidden="true" className="h-4 w-4" />
-              {creation ? 'Fermer' : 'Nouvelle opportunité'}
+              Nouvelle opportunité
             </button>
           ) : null
         }
@@ -550,14 +543,19 @@ export function CrmBoard(): React.ReactElement {
           <p>{erreur}</p>
         </Alerte>
       ) : null}
-      {gerer && creation ? (
+      <Modal
+        open={gerer && creation}
+        onClose={() => setCreation(false)}
+        title="Nouvelle opportunité"
+        size="lg"
+      >
         <NouvelleOpportunite
           onCree={() => {
             setCreation(false);
             charger();
           }}
         />
-      ) : null}
+      </Modal>
       {gagnee ? (
         <div className="flex flex-col gap-2 rounded-[var(--radius-lg)] border border-[color-mix(in_srgb,var(--ok)_40%,transparent)] bg-[color-mix(in_srgb,var(--ok)_10%,var(--surface))] p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
           <p>

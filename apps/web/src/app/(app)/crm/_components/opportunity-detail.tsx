@@ -9,8 +9,8 @@
 // « Créer le projet » d'une opportunité gagnée : encadré du lot C7
 // (`opportunites/[opportunityId]/_components/creer-projet.tsx`).
 
-import { Badge, buttonClasses } from '@lalanda/ui';
-import { CalendarClock, FileText, History, ListOrdered, Target } from 'lucide-react';
+import { Badge, Modal, buttonClasses } from '@lalanda/ui';
+import { CalendarClock, FileText, History, ListOrdered, Plus, Target } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -184,6 +184,9 @@ export function OpportunityDetail({
     assigneeUserId: '',
   });
   const [champsAct, setChampsAct] = useState<Record<string, string>>({});
+  const [ajoutActivite, setAjoutActivite] = useState(false);
+  const [erreurAct, setErreurAct] = useState<string | null>(null);
+  const [envoiAct, setEnvoiAct] = useState(false);
   const [motif, setMotif] = useState<DemandeMotif | null>(null);
   const [sansLignes, setSansLignes] = useState(false);
   const aujourdhui = jourKinshasa(new Date());
@@ -582,8 +585,30 @@ export function OpportunityDetail({
             {activites.length === 0 ? <li>Aucune activité.</li> : null}
           </ul>
           {gerer ? (
+            <button
+              type="button"
+              className={`${BOUTON} gap-2 self-start`}
+              onClick={() => {
+                setChampsAct({});
+                setErreurAct(null);
+                setAjoutActivite(true);
+              }}
+            >
+              <Plus aria-hidden="true" className="h-4 w-4" />
+              Nouvelle activité
+            </button>
+          ) : null}
+          <Modal
+            open={gerer && ajoutActivite}
+            onClose={() => setAjoutActivite(false)}
+            title="Nouvelle activité"
+            description={`Opportunité « ${v.title} »`}
+            size="md"
+            busy={envoiAct}
+          >
             <form
-              className="grid gap-2 rounded-[var(--radius-md)] border border-dashed border-[var(--border)] p-3 sm:grid-cols-2"
+              className="grid gap-3 sm:grid-cols-2"
+              aria-label="Nouvelle activité"
               noValidate
               onSubmit={(e) => {
                 e.preventDefault();
@@ -593,10 +618,17 @@ export function OpportunityDetail({
                   return;
                 }
                 setChampsAct({});
-                void agir(async () => {
-                  await crmApi.createActivity(p.corps);
-                  setF({ ...f, subject: '', notes: '', echeance: '' });
-                });
+                setErreurAct(null);
+                setEnvoiAct(true);
+                crmApi
+                  .createActivity(p.corps)
+                  .then(() => {
+                    setF({ ...f, subject: '', notes: '', echeance: '' });
+                    setAjoutActivite(false);
+                    charger();
+                  })
+                  .catch((err: unknown) => setErreurAct(messageCrm(err, 'Action impossible.')))
+                  .finally(() => setEnvoiAct(false));
               }}
             >
               <Champ id="act-kind" label="Nature">
@@ -645,11 +677,22 @@ export function OpportunityDetail({
                   </Champ>
                 </>
               ) : null}
-              <button type="submit" className={`${BOUTON} sm:col-span-2 sm:justify-self-start`}>
-                Ajouter l’activité
+              {erreurAct ? (
+                <div className="sm:col-span-2">
+                  <Alerte>
+                    <p>{erreurAct}</p>
+                  </Alerte>
+                </div>
+              ) : null}
+              <button
+                type="submit"
+                disabled={envoiAct}
+                className={`${BOUTON} sm:col-span-2 sm:justify-self-start`}
+              >
+                {envoiAct ? 'Ajout…' : 'Ajouter l’activité'}
               </button>
             </form>
-          ) : null}
+          </Modal>
         </Panneau>
 
         <Panneau

@@ -4,7 +4,7 @@
 // prospect / client, archivés ; création d'un PROSPECT (un compte client naît de
 // la fiche client de Ventes). Compteurs rendus par l'API.
 
-import { Badge, buttonClasses } from '@lalanda/ui';
+import { Badge, Modal, buttonClasses } from '@lalanda/ui';
 import { Building2, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
@@ -55,12 +55,7 @@ function NouveauProspect({ onCree }: { onCree: (id: string) => void }): React.Re
   }
 
   return (
-    <form
-      noValidate
-      onSubmit={(e) => void creer(e)}
-      className="grid gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-4 sm:grid-cols-2 lg:grid-cols-3"
-    >
-      <h3 className="text-sm font-semibold sm:col-span-2 lg:col-span-3">Nouveau prospect</h3>
+    <form noValidate onSubmit={(e) => void creer(e)} className="grid gap-3 sm:grid-cols-2">
       <Champ id="cp-nom" label="Nom de l’entreprise" requis erreur={champs['name']}>
         <input
           id="cp-nom"
@@ -123,11 +118,7 @@ function NouveauProspect({ onCree }: { onCree: (id: string) => void }): React.Re
       ) : null}
       <button
         type="submit"
-        className={buttonClasses(
-          'primary',
-          'md',
-          'sm:col-span-2 sm:justify-self-start lg:col-span-3',
-        )}
+        className={buttonClasses('primary', 'md', 'sm:col-span-2 sm:justify-self-start')}
       >
         Créer le prospect
       </button>
@@ -171,11 +162,10 @@ export function ComptesListe(): React.ReactElement {
             <button
               type="button"
               className={buttonClasses('primary', 'sm')}
-              aria-expanded={creation}
-              onClick={() => setCreation((c) => !c)}
+              onClick={() => setCreation(true)}
             >
               <Plus aria-hidden="true" className="h-4 w-4" />
-              {creation ? 'Fermer' : 'Nouveau prospect'}
+              Nouveau prospect
             </button>
           ) : null
         }
@@ -217,14 +207,19 @@ export function ComptesListe(): React.ReactElement {
           <p>{erreur}</p>
         </Alerte>
       ) : null}
-      {gerer && creation ? (
+      <Modal
+        open={gerer && creation}
+        onClose={() => setCreation(false)}
+        title="Nouveau prospect"
+        size="lg"
+      >
         <NouveauProspect
           onCree={() => {
             setCreation(false);
             charger(filtres, null);
           }}
         />
-      ) : null}
+      </Modal>
 
       {items === null ? (
         <p className="text-sm text-[var(--foreground-muted)]" aria-live="polite">
