@@ -12,6 +12,8 @@ import {
   lignesDossier,
   managersProposes,
   ongletActif,
+  ongletsVisibles,
+  fichesParCompte,
   requeteCollaborateurs,
   typesContrat,
   validerCollaborateur,
@@ -131,11 +133,19 @@ describe('formulaire de fiche (dossier non sensible)', () => {
 });
 
 describe('fiche', () => {
-  it('onglets livrés seulement ; les onglets sensibles attendent H7', () => {
-    expect(ONGLETS_FICHE.map((o) => o.id)).toEqual(['dossier', 'absences']);
-    const prevus: readonly string[] = ONGLETS_FICHE_PREVUS;
-    expect(ONGLETS_FICHE.every((o) => prevus.includes(o.id))).toBe(true);
-    expect(ONGLETS_FICHE.map((o) => o.id)).not.toContain('sensible');
+  it('cinq onglets dans l’ordre prévu (H7 livre sensible, documents, parcours)', () => {
+    expect(ONGLETS_FICHE.map((o) => o.id)).toEqual([...ONGLETS_FICHE_PREVUS]);
+  });
+
+  it('onglets visibles selon les actions et la relation', () => {
+    const ids = (x: Parameters<typeof ongletsVisibles>[0], soi: boolean) =>
+      ongletsVisibles(x, soi).map((o) => o.id);
+    expect(ids(['hr.read'], false)).toEqual(['dossier', 'absences', 'documents', 'parcours']);
+    expect(ids(['hr.read', 'hr.sensitive.read'], false)).toEqual([...ONGLETS_FICHE_PREVUS]);
+    // Le manager (sans hr.read) : dossier et absences seulement.
+    expect(ids(['leave.request'], false)).toEqual(['dossier', 'absences']);
+    // Soi-même : ses données sensibles et ses documents, pas le parcours.
+    expect(ids(['leave.request'], true)).toEqual(['dossier', 'sensible', 'absences', 'documents']);
   });
 
   it('onglet allumé par le chemin', () => {
@@ -154,5 +164,16 @@ describe('fiche', () => {
     expect(lignes).toContainEqual(['Fin de contrat', '15 janv. 2027']);
     expect(lignes).toContainEqual(['Compte Lalanda', 'Relié à un membre']);
     expect(lignes.map(([k]) => k).join(' ')).not.toMatch(/salaire|banc|identité|naissance/i);
+  });
+});
+
+describe('page des membres (lot H7)', () => {
+  it('lien vers la fiche des comptes reliés, jamais une fiche anonymisée', () => {
+    const m = fichesParCompte([
+      { id: 'e1', userId: 'u1', status: 'active' },
+      { id: 'e2', userId: null, status: 'active' },
+      { id: 'e3', userId: 'u3', status: 'anonymized' },
+    ]);
+    expect([...m.entries()]).toEqual([['u1', '/rh/collaborateurs/e1']]);
   });
 });

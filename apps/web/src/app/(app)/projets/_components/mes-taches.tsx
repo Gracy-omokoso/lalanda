@@ -113,6 +113,13 @@ export function MesTaches(): React.ReactElement {
             >
               Calendrier
             </Link>
+            {/* ADR-0045 — H7 : la semaine en lecture, croisée avec les absences. */}
+            <Link
+              href={`${PROJETS_BASE}/mes-taches/temps`}
+              className={buttonClasses('secondary', 'md')}
+            >
+              Feuille de temps
+            </Link>
             <Link href={PROJETS_BASE} className={buttonClasses('secondary', 'md')}>
               Tous les projets
             </Link>

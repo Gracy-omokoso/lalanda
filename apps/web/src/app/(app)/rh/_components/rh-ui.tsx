@@ -204,3 +204,19 @@ export function DialogueDecision({
     </Modal>
   );
 }
+
+/**
+ * Enregistre un fichier reçu de l'API (lot H7) : lien local éphémère, révoqué
+ * aussitôt. Rien n'est gardé en cache ni en stockage local.
+ */
+export function enregistrerFichier(blob: Blob, nom: string): void {
+  const url = URL.createObjectURL(blob);
+  const lien = document.createElement('a');
+  lien.href = url;
+  lien.download = nom;
+  lien.rel = 'noopener';
+  document.body.appendChild(lien);
+  lien.click();
+  lien.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}

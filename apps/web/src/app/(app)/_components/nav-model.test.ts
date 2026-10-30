@@ -461,7 +461,7 @@ describe('ADR-0045 § 8 — application Ressources humaines (H6)', () => {
     ]);
   });
 
-  it('sous-options complètes dans l’ordre prévu ; échéances, rapports et réglages masqués (H7)', () => {
+  it('sous-options complètes dans l’ordre prévu, échéances, rapports et réglages compris (H7)', () => {
     const complet = appsVisibles(PROPRIETAIRE, 'run').find((a) => a.id === 'rh')!;
     expect(complet.sousOptions.map((s) => s.label)).toEqual([
       'Mon espace',
@@ -471,14 +471,14 @@ describe('ADR-0045 § 8 — application Ressources humaines (H6)', () => {
       'Collaborateurs',
       'Services',
       'Organigramme',
+      'Échéances',
+      'Rapports',
+      'Réglages',
     ]);
-    const prevues: readonly string[] = RH_SOUS_OPTIONS_PREVUES;
-    const positions = complet.sousOptions.map((s) => prevues.indexOf(s.id));
-    expect(positions.every((p) => p >= 0)).toBe(true);
-    expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+    expect(complet.sousOptions.map((s) => s.id)).toEqual([...RH_SOUS_OPTIONS_PREVUES]);
     const hrefs = rh.sousOptions.map((s) => s.href);
     for (const h7 of ['/rh/echeances', '/rh/rapports', '/rh/reglages']) {
-      expect(hrefs).not.toContain(h7);
+      expect(hrefs).toContain(h7);
     }
   });
 
@@ -490,6 +490,9 @@ describe('ADR-0045 § 8 — application Ressources humaines (H6)', () => {
       'rh-collaborateurs',
       'rh-services',
       'rh-organigramme',
+      'rh-echeances',
+      'rh-rapports',
+      'rh-reglages',
     ]);
   });
 

@@ -33,6 +33,7 @@ import {
   lienPaiement,
   messageDepensePossedee,
 } from './_components/depense-possedee';
+import { rappelPersonnel } from './_components/depense-personnel';
 import {
   FREQUENCY_LABELS,
   formatMontantSigne,
@@ -422,6 +423,15 @@ export default function DepensesPage(): React.ReactElement {
               value={form.workProjectId}
               onChange={(workProjectId) => setForm({ ...form, workProjectId })}
             />
+            {/* ADR-0045 — H7 (§ 6.3) : rappel du double comptage, rien n'est retranché. */}
+            {rappelPersonnel(form.category, form.workProjectId) ? (
+              <p
+                role="note"
+                className="rounded-[var(--radius-md)] border border-[var(--warn)] bg-[color-mix(in_srgb,var(--warn)_10%,transparent)] p-3 text-xs"
+              >
+                {rappelPersonnel(form.category, form.workProjectId)}
+              </p>
+            ) : null}
             <label className="flex flex-col gap-1 text-sm">
               TVA déductible (facultatif)
               <input
