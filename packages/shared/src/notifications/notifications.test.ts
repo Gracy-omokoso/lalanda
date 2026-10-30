@@ -10,8 +10,8 @@ import {
 } from './index.js';
 
 describe('notifications — contrats partagés', () => {
-  it('déclare six types work, cinq types crm et un type organization, préfixés par leur module', () => {
-    expect(NOTIFICATION_KINDS).toHaveLength(12);
+  it('déclare six types work, cinq crm, un organization et sept purchases, préfixés par leur module', () => {
+    expect(NOTIFICATION_KINDS).toHaveLength(19);
     for (const kind of NOTIFICATION_KINDS) {
       const module = kind.split('.')[0]!;
       expect(NOTIFICATION_SOURCE_MODULES as readonly string[]).toContain(module);
@@ -30,11 +30,25 @@ describe('notifications — contrats partagés', () => {
       'opportunity',
       'account',
       'membership',
+      'purchase_order',
+      'supplier_invoice',
+      'supplier',
     ]);
     // ADR-0041 — A4.
     expect(NOTIFICATION_KINDS.filter((k) => k.startsWith('organization.'))).toEqual([
       'organization.permissions_changed',
     ]);
+    // ADR-0044 — P0 (§ 6.5) : sept types, un module, trois natures d'entité.
+    expect(NOTIFICATION_KINDS.filter((k) => k.startsWith('purchases.'))).toEqual([
+      'purchases.approval_requested',
+      'purchases.request_approved',
+      'purchases.request_rejected',
+      'purchases.invoice_variance',
+      'purchases.invoice_due_soon',
+      'purchases.invoice_overdue',
+      'purchases.supplier_payment_details_changed',
+    ]);
+    expect(NOTIFICATION_SOURCE_MODULES).toContain('purchases');
   });
 
   it('un lien est un chemin relatif de l’application, jamais une URL absolue', () => {
