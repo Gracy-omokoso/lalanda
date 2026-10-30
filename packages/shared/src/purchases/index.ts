@@ -16,3 +16,5 @@ export * from './agenda.js';
 // ADR-0044 — P4
 export * from './receptions.js';
 export * from './invoices.js';
+// ADR-0044 — P5
+export * from './payments.js';

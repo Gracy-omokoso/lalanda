@@ -46,6 +46,11 @@ import { PurchaseReceptionsController } from './receptions/purchase-receptions.c
 import { PurchaseReceptionsService } from './receptions/purchase-receptions.service.js';
 import { PurchaseReception, PurchaseReceptionSchema } from './receptions/reception.schema.js';
 import { PURCHASE_RECEPTION_SINK, noPurchaseReceptionSink } from './stock-sink.port.js';
+// ADR-0044 — P5
+import { TreasuryModule } from '../treasury/treasury.module.js';
+import { SupplierPayment, SupplierPaymentSchema } from './payments/supplier-payment.schema.js';
+import { SupplierPaymentsController } from './payments/supplier-payments.controller.js';
+import { SupplierPaymentsService } from './payments/supplier-payments.service.js';
 
 @Module({
   imports: [
@@ -56,6 +61,8 @@ import { PURCHASE_RECEPTION_SINK, noPurchaseReceptionSink } from './stock-sink.p
     FiscalModule,
     BrandingModule,
     PdfModule,
+    // ADR-0044 — P5 : un paiement crée ses dépenses par `TreasuryExpensesService`.
+    TreasuryModule,
     MongooseModule.forFeature([
       // ADR-0044 — P2 : fiches fournisseurs ; adhésions (destinataires des alertes).
       { name: Supplier.name, schema: SupplierSchema },
@@ -67,6 +74,8 @@ import { PURCHASE_RECEPTION_SINK, noPurchaseReceptionSink } from './stock-sink.p
       // ADR-0044 — P4 : réceptions et factures fournisseurs.
       { name: PurchaseReception.name, schema: PurchaseReceptionSchema },
       { name: SupplierInvoice.name, schema: SupplierInvoiceSchema },
+      // ADR-0044 — P5 : paiements fournisseurs.
+      { name: SupplierPayment.name, schema: SupplierPaymentSchema },
     ]),
   ],
   controllers: [
@@ -78,6 +87,8 @@ import { PURCHASE_RECEPTION_SINK, noPurchaseReceptionSink } from './stock-sink.p
     // ADR-0044 — P4
     PurchaseReceptionsController,
     SupplierInvoicesController,
+    // ADR-0044 — P5
+    SupplierPaymentsController,
   ],
   providers: [
     MasterKeyringProvider,
@@ -105,6 +116,8 @@ import { PURCHASE_RECEPTION_SINK, noPurchaseReceptionSink } from './stock-sink.p
     PurchaseReceptionsService,
     PurchaseOrderFactsReader,
     { provide: PURCHASE_RECEPTION_SINK, useValue: noPurchaseReceptionSink },
+    // ADR-0044 — P5 : paiements, ventilation, dépenses possédées, échéancier, doublons.
+    SupplierPaymentsService,
   ],
   exports: [
     SuppliersService,
@@ -114,6 +127,8 @@ import { PURCHASE_RECEPTION_SINK, noPurchaseReceptionSink } from './stock-sink.p
     PurchaseCountersService,
     // ADR-0044 — P4
     SupplierInvoicesService,
+    // ADR-0044 — P5
+    SupplierPaymentsService,
   ],
 })
 export class PurchasesModule {}

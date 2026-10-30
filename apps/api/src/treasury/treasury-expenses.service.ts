@@ -18,7 +18,7 @@ import {
   type ExpenseCategory,
   type TreasuryCurrency,
 } from '@lalanda/engine';
-import { Types, type Connection, type FilterQuery, type Model } from 'mongoose';
+import { Types, type ClientSession, type Connection, type FilterQuery, type Model } from 'mongoose';
 
 import type { ImageAcceptance } from '../account/image-validation.js';
 import { AuditService } from '../authz/audit.service.js';
@@ -40,7 +40,11 @@ import {
   type TreasuryActor,
 } from './treasury.common.js';
 import type { ExpenseInputDto, ListExpensesQuery } from './treasury.dto.js';
-import { TreasuryExpense, type TreasuryExpenseDocument } from './treasury.schemas.js';
+import {
+  TreasuryExpense,
+  type ExpenseOrigin,
+  type TreasuryExpenseDocument,
+} from './treasury.schemas.js';
 
 export interface ExpenseView {
   id: string;
@@ -61,6 +65,11 @@ export interface ExpenseView {
   occurrenceDate: string | null;
   /** Projet du RUN rattaché (ADR-0039 § 2.10), ou `null`. */
   workProjectId: string | null;
+  /**
+   * ADR-0044 — P5 : `null` = dépense directe ; sinon créée ou rattachée par un
+   * paiement fournisseur, en lecture seule pour la trésorerie.
+   */
+  origin: ExpenseOrigin | null;
   status: 'recorded' | 'cancelled';
   cancelReason: string | null;
   revision: number;
@@ -73,7 +82,25 @@ export interface ExpensePage {
   nextCursor: string | null;
 }
 
-type ExpenseLean = TreasuryExpense & { _id: Types.ObjectId };
+export type ExpenseLean = TreasuryExpense & { _id: Types.ObjectId };
+
+/** ADR-0044 — P5 : dépense créée par un paiement fournisseur (montants du moteur). */
+export interface OwnedExpenseInput {
+  organizationId: string;
+  spentOn: string;
+  amount: string;
+  currency: TreasuryCurrency;
+  category: ExpenseCategory;
+  label: string;
+  supplierId: string;
+  supplierName: string;
+  accountId: string | null;
+  deductibleVat: string | null;
+  reference: string | null;
+  workProjectId: string | null;
+  origin: ExpenseOrigin;
+  actor: TreasuryActor;
+}
 
 /** Collection du module « work », lue en lecture seule (ADR-0039 § 2.10). */
 const WORK_PROJECTS = 'work_projects';
@@ -122,6 +149,7 @@ export function expenseView(doc: ExpenseLean): ExpenseView {
     recurringExpenseId: doc.recurringExpenseId ?? null,
     occurrenceDate: doc.occurrenceDate ?? null,
     workProjectId: doc.workProjectId ?? null,
+    origin: doc.origin ?? null,
     status: doc.status,
     cancelReason: doc.cancelReason ?? null,
     revision: doc.revision,
@@ -395,6 +423,7 @@ export class TreasuryExpensesService {
     actor: TreasuryActor,
   ): Promise<ExpenseView> {
     const current = await this.requireOwn(organizationId, expenseId);
+    assertNotOwned(current);
     if (current.status === 'cancelled') {
       conflict('EXPENSE_CANCELLED', 'Cette dépense est annulée : elle ne se modifie plus.');
     }
@@ -413,7 +442,13 @@ export class TreasuryExpensesService {
     });
     const updated = await this.expenses
       .findOneAndUpdate(
-        { _id: current._id, organizationId, revision: expectedRevision, status: 'recorded' },
+        {
+          _id: current._id,
+          organizationId,
+          revision: expectedRevision,
+          status: 'recorded',
+          origin: null,
+        },
         {
           $set: {
             ...fields,
@@ -452,10 +487,11 @@ export class TreasuryExpensesService {
     actor: TreasuryActor,
   ): Promise<ExpenseView> {
     const current = await this.requireOwn(organizationId, expenseId);
+    assertNotOwned(current);
     if (current.status === 'cancelled') return expenseView(current);
     const updated = await this.expenses
       .findOneAndUpdate(
-        { _id: current._id, organizationId, status: 'recorded' },
+        { _id: current._id, organizationId, status: 'recorded', origin: null },
         {
           // Une occurrence annulée sort de l'index unique partiel (statut
           // `recorded`) : elle redevient « à confirmer », le lien reste lisible.
@@ -484,6 +520,311 @@ export class TreasuryExpensesService {
     return expenseView(result);
   }
 
+  // ─── ADR-0044 — P5 : dépenses possédées par les achats (§ 6.2) ─────────────
+  //
+  // La trésorerie reste le SEUL écrivain de `treasury_expenses` : le service des
+  // paiements fournisseurs appelle ces méthodes DANS SA TRANSACTION (`session`),
+  // avec les règles de la trésorerie (compte actif, même devise, postérieure à
+  // l'ouverture, jamais future). Les montants viennent du moteur des achats.
+
+  /** Crée une dépense possédée par un paiement fournisseur (`spentOn` = `paidOn`). */
+  async recordOwnedBySupplierPayment(
+    session: ClientSession,
+    input: OwnedExpenseInput,
+  ): Promise<ExpenseLean> {
+    const { organizationId, actor } = input;
+    noFutureDate(input.spentOn, 'EXPENSE_IN_FUTURE', 'Une dépense');
+    if (input.accountId !== null) {
+      await this.accounts.requireUsable(organizationId, input.accountId, {
+        currency: input.currency,
+        date: input.spentOn,
+      });
+    }
+    const [doc] = await this.expenses.create(
+      [
+        {
+          organizationId,
+          spentOn: input.spentOn,
+          amount: input.amount,
+          currency: input.currency,
+          category: input.category,
+          label: input.label,
+          supplierId: input.supplierId,
+          supplierName: input.supplierName,
+          supplierKey: input.supplierName ? normalizeForSearch(input.supplierName) : null,
+          accountId: input.accountId,
+          deductibleVat: input.deductibleVat,
+          reference: input.reference,
+          attachment: null,
+          recurringExpenseId: null,
+          occurrenceDate: null,
+          workProjectId: input.workProjectId,
+          origin: input.origin,
+          status: 'recorded',
+          cancelReason: null,
+          cancelledAt: null,
+          revision: 1,
+          createdBy: actor.userId,
+          updatedBy: actor.userId,
+          _schemaVersion: 1,
+        },
+      ],
+      { session },
+    );
+    await this.audit.record(
+      {
+        organizationId,
+        actorUserId: actor.userId,
+        actorRole: actor.role,
+        action: 'treasury.expense.recorded',
+        targetType: 'treasury_expense',
+        targetId: String(doc!._id),
+        metadata: {
+          category: input.category,
+          currency: input.currency,
+          recurring: false,
+          workProjectId: input.workProjectId,
+          supplierPaymentId: input.origin.paymentId,
+        },
+      },
+      { session },
+    );
+    return doc!.toObject() as ExpenseLean;
+  }
+
+  /**
+   * `from-expense` (O3 b), dépense GARDÉE : la dépense directe reçoit `origin` et la
+   * fiche fournisseur, rien d'autre. Révision attendue ; une dépense déjà possédée
+   * ou annulée est refusée.
+   */
+  async linkToSupplierPayment(
+    session: ClientSession,
+    organizationId: string,
+    expenseId: string,
+    expectedRevision: number,
+    link: { origin: ExpenseOrigin; supplierId: string; supplierName: string },
+    actor: TreasuryActor,
+  ): Promise<ExpenseLean> {
+    const updated = await this.expenses
+      .findOneAndUpdate(
+        {
+          _id: new Types.ObjectId(expenseId),
+          organizationId,
+          revision: expectedRevision,
+          status: 'recorded',
+          origin: null,
+        },
+        {
+          $set: {
+            origin: link.origin,
+            supplierId: link.supplierId,
+            supplierName: link.supplierName,
+            supplierKey: normalizeForSearch(link.supplierName),
+            updatedBy: actor.userId,
+          },
+          $inc: { revision: 1 },
+        },
+        { new: true, session },
+      )
+      .lean<ExpenseLean>()
+      .exec();
+    if (!updated) await this.directConflict(organizationId, expenseId, expectedRevision);
+    await this.audit.record(
+      {
+        organizationId,
+        actorUserId: actor.userId,
+        actorRole: actor.role,
+        action: 'treasury.expense.linked_to_supplier_payment',
+        targetType: 'treasury_expense',
+        targetId: expenseId,
+        metadata: { supplierPaymentId: link.origin.paymentId, invoiceId: link.origin.invoiceId },
+      },
+      { session },
+    );
+    return updated as ExpenseLean;
+  }
+
+  /**
+   * `from-expense` (O3 b), dépense REMPLACÉE par les parts d'une facture à plusieurs
+   * imputations : la dépense directe est annulée avec le motif « Rattachée au
+   * paiement PF… », dans la transaction qui crée les parts.
+   */
+  async replaceBySupplierPayment(
+    session: ClientSession,
+    organizationId: string,
+    expenseId: string,
+    expectedRevision: number,
+    reason: string,
+    actor: TreasuryActor,
+  ): Promise<ExpenseLean> {
+    const updated = await this.expenses
+      .findOneAndUpdate(
+        {
+          _id: new Types.ObjectId(expenseId),
+          organizationId,
+          revision: expectedRevision,
+          status: 'recorded',
+          origin: null,
+        },
+        {
+          $set: {
+            status: 'cancelled',
+            cancelReason: reason,
+            cancelledAt: new Date(),
+            updatedBy: actor.userId,
+          },
+          $inc: { revision: 1 },
+        },
+        { new: true, session },
+      )
+      .lean<ExpenseLean>()
+      .exec();
+    if (!updated) await this.directConflict(organizationId, expenseId, expectedRevision);
+    await this.audit.record(
+      {
+        organizationId,
+        actorUserId: actor.userId,
+        actorRole: actor.role,
+        action: 'treasury.expense.cancelled',
+        targetType: 'treasury_expense',
+        targetId: expenseId,
+        metadata: { reason: reason.slice(0, 200) },
+      },
+      { session },
+    );
+    return updated as ExpenseLean;
+  }
+
+  /**
+   * Annulation d'un paiement fournisseur (§ 2.6) : ses dépenses CRÉÉES sont annulées
+   * (elles gardent `origin`, donc restent verrouillées) ; une dépense GARDÉE par
+   * `from-expense` redevient directe ; une dépense REMPLACÉE est rétablie.
+   */
+  async releaseFromSupplierPayment(
+    session: ClientSession,
+    organizationId: string,
+    paymentId: string,
+    release: { createdIds: string[]; keptId: string | null; replacedId: string | null },
+    reason: string,
+    actor: TreasuryActor,
+  ): Promise<void> {
+    const at = new Date();
+    if (release.createdIds.length > 0) {
+      await this.expenses
+        .updateMany(
+          {
+            organizationId,
+            _id: { $in: release.createdIds.map((id) => new Types.ObjectId(id)) },
+            'origin.paymentId': paymentId,
+            status: 'recorded',
+          },
+          {
+            $set: {
+              status: 'cancelled',
+              cancelReason: reason,
+              cancelledAt: at,
+              updatedBy: actor.userId,
+            },
+            $inc: { revision: 1 },
+          },
+          { session },
+        )
+        .exec();
+    }
+    if (release.keptId) {
+      await this.expenses
+        .updateOne(
+          {
+            organizationId,
+            _id: new Types.ObjectId(release.keptId),
+            'origin.paymentId': paymentId,
+          },
+          { $set: { origin: null, updatedBy: actor.userId }, $inc: { revision: 1 } },
+          { session },
+        )
+        .exec();
+    }
+    if (release.replacedId) {
+      await this.expenses
+        .updateOne(
+          {
+            organizationId,
+            _id: new Types.ObjectId(release.replacedId),
+            origin: null,
+            status: 'cancelled',
+          },
+          {
+            $set: {
+              status: 'recorded',
+              cancelReason: null,
+              cancelledAt: null,
+              updatedBy: actor.userId,
+            },
+            $inc: { revision: 1 },
+          },
+          { session },
+        )
+        .exec();
+    }
+    await this.audit.record(
+      {
+        organizationId,
+        actorUserId: actor.userId,
+        actorRole: actor.role,
+        action: 'treasury.expense.released_by_supplier_payment',
+        targetType: 'supplier_payment',
+        targetId: paymentId,
+        metadata: {
+          cancelled: release.createdIds.length,
+          unlinked: release.keptId,
+          restored: release.replacedId,
+        },
+      },
+      { session },
+    );
+  }
+
+  /** Dépenses par identifiants, de l'organisation (lecture des paiements). */
+  async findByIds(organizationId: string, ids: readonly string[]): Promise<ExpenseLean[]> {
+    const valid = ids.filter(isMongoId);
+    if (valid.length === 0) return [];
+    return this.expenses
+      .find({ organizationId, _id: { $in: valid.map((id) => new Types.ObjectId(id)) } })
+      .lean<ExpenseLean[]>()
+      .exec();
+  }
+
+  /** Dépenses DIRECTES enregistrées chez des fiches fournisseurs (doublons, O3 c). */
+  async directSupplierExpenses(
+    organizationId: string,
+    supplierIds: readonly string[] | null,
+  ): Promise<ExpenseLean[]> {
+    return this.expenses
+      .find({
+        organizationId,
+        status: 'recorded',
+        origin: null,
+        supplierId: supplierIds === null ? { $type: 'string' } : { $in: [...supplierIds] },
+      })
+      .lean<ExpenseLean[]>()
+      .exec();
+  }
+
+  /** Raison précise d'un refus d'écriture sur une dépense directe. */
+  private async directConflict(
+    organizationId: string,
+    expenseId: string,
+    expectedRevision: number,
+  ): Promise<never> {
+    const doc = await this.requireOwn(organizationId, expenseId);
+    assertNotOwned(doc);
+    if (doc.status === 'cancelled') {
+      conflict('EXPENSE_CANCELLED', 'Cette dépense est annulée : elle ne se rattache plus.');
+    }
+    if (doc.revision !== expectedRevision) staleRevision(doc.revision);
+    return staleRevision(doc.revision);
+  }
+
   // ─── Pièce justificative ──────────────────────────────────────────────────
 
   async attach(
@@ -493,6 +834,7 @@ export class TreasuryExpensesService {
     actor: TreasuryActor,
   ): Promise<ExpenseView> {
     const current = await this.requireOwn(organizationId, expenseId);
+    assertNotOwned(current);
     if (current.status === 'cancelled') {
       conflict('EXPENSE_CANCELLED', 'Cette dépense est annulée : elle ne se modifie plus.');
     }
@@ -544,6 +886,7 @@ export class TreasuryExpensesService {
     actor: TreasuryActor,
   ): Promise<ExpenseView> {
     const current = await this.requireOwn(organizationId, expenseId);
+    assertNotOwned(current);
     if (!current.attachment) return expenseView(current);
     const updated = await this.expenses
       .findOneAndUpdate(
@@ -641,6 +984,20 @@ export class TreasuryExpensesService {
     } catch (err) {
       this.logger.warn(`Pièce ${objectId} non supprimée du stockage : ${(err as Error).message}`);
     }
+  }
+}
+
+/**
+ * ADR-0044 — P5 (§ 2.8) : une dépense créée ou rattachée par un paiement fournisseur
+ * appartient aux achats ; la trésorerie la lit, mais ne la modifie pas.
+ */
+function assertNotOwned(doc: Pick<ExpenseLean, 'origin'>): void {
+  if (doc.origin) {
+    conflict(
+      'EXPENSE_OWNED_BY_PURCHASES',
+      `Cette dépense est le paiement fournisseur ${doc.origin.paymentNumber} : modifiez-la ou annulez-la depuis les achats.`,
+      { paymentId: doc.origin.paymentId, paymentNumber: doc.origin.paymentNumber },
+    );
   }
 }
 

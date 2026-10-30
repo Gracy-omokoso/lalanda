@@ -26,6 +26,9 @@ import {
   type RecurrenceFrequency,
   type TreasuryCurrency,
   type TreasuryForecastInput,
+  type PayableForecastInput,
+  TREASURY_VERSION,
+  EXPENSE_ACTUALS_VERSION,
   type TreasuryMovementInput,
 } from '../index.js';
 
@@ -752,5 +755,140 @@ describe('forecastTreasury', () => {
         receivableDelayDays: 1.5,
       }),
     ).toBe(false);
+  });
+});
+
+// ── Prévision 1.1.0 : échéances fournisseurs (ADR-0044 § 6.3) ─────────────────
+
+describe('forecastTreasury 1.1.0 — échéances fournisseurs', () => {
+  const payable = (o: Partial<PayableForecastInput> = {}): PayableForecastInput => ({
+    id: 'ff1',
+    label: 'Facture FF2610-000001 — Socimex',
+    currency: 'USD',
+    remaining: '300.00',
+    dueDate: '2026-10-20',
+    disputed: false,
+    supplierId: 'sup1',
+    ...o,
+  });
+
+  it('version 1.1.0 ; le report vers le réalisé garde sa version 1.0.0', () => {
+    expect(TREASURY_VERSION).toBe('1.1.0');
+    expect(EXPENSE_ACTUALS_VERSION).toBe('1.0.0');
+  });
+
+  it('sans dettes, ou avec une liste vide : sorties identiques (source `payable` nulle)', () => {
+    const input = baseForecast({
+      receivables: [
+        {
+          id: 'f1',
+          label: 'Facture FV-1',
+          currency: 'USD',
+          outstanding: '500.00',
+          dueDate: '2026-11-01',
+          issuedOn: '2026-10-01',
+        },
+      ],
+    });
+    const without = forecastTreasury(input);
+    const empty = forecastTreasury({ ...input, payables: [], ordersNotInvoiced: [] });
+    expect(empty).toEqual(without);
+    for (const s of without.scenarios) {
+      for (const h of s.horizons) expect(h.bySource.payable).toBe('0.00');
+    }
+  });
+
+  it('échue hier : −300 à J+1 ; dans 10 jours : −200 à J+10 ; dans les trois scénarios', () => {
+    const f = forecastTreasury(
+      baseForecast({
+        payables: [
+          payable(),
+          payable({ id: 'ff2', label: 'FF2', remaining: '200.00', dueDate: '2026-10-31' }),
+        ],
+      }),
+    );
+    for (const s of f.scenarios) {
+      expect(s.series[0]!.balance).toBe('1000.00');
+      expect(s.series[1]!.balance).toBe('700.00');
+      expect(s.series[9]!.balance).toBe('700.00');
+      expect(s.series[10]!.balance).toBe('500.00');
+      expect(s.horizons[0]!.bySource.payable).toBe('300.00');
+      expect(s.horizons[1]!.bySource.payable).toBe('500.00');
+      expect(s.horizons[1]!.outflows).toBe('500.00');
+      expect(s.flows.map((x) => [x.date, x.source, x.amount])).toEqual([
+        ['2026-10-22', 'payable', '300.00'],
+        ['2026-10-31', 'payable', '200.00'],
+      ]);
+      expect(s.flows[0]!.label).toContain('échéance du 2026-10-20 dépassée');
+    }
+  });
+
+  it('due aujourd’hui : J+1 ; au-delà de 180 jours : hors prévision ; autre devise ignorée', () => {
+    const f = forecastTreasury(
+      baseForecast({
+        payables: [
+          payable({ dueDate: '2026-10-21' }),
+          payable({ id: 'loin', dueDate: '2027-12-31' }),
+          payable({ id: 'cdf', currency: 'CDF', remaining: '99999.00' }),
+        ],
+      }),
+    );
+    const s = f.scenarios[0]!;
+    expect(s.flows).toHaveLength(1);
+    expect(s.flows[0]!.date).toBe('2026-10-22');
+    expect(s.series[180]!.balance).toBe('700.00');
+  });
+
+  it('litige exclu et constaté ; commandes non facturées signalées, jamais prévues', () => {
+    const f = forecastTreasury(
+      baseForecast({
+        payables: [payable({ disputed: true })],
+        ordersNotInvoiced: [
+          { id: 'bc1', currency: 'USD', amount: '120.50' },
+          { id: 'bc2', currency: 'USD', amount: '79.50' },
+          { id: 'bc3', currency: 'CDF', amount: '50000.00' },
+        ],
+      }),
+    );
+    for (const s of f.scenarios) expect(s.series[180]!.balance).toBe('1000.00');
+    const codes = Object.fromEntries(f.uncertainty.findings.map((x) => [x.code, x]));
+    expect(codes['PAYABLES_DISPUTED']!.count).toBe(1);
+    expect(codes['ORDERS_NOT_INVOICED']!.count).toBe(2);
+    expect(codes['ORDERS_NOT_INVOICED']!.detail).toContain('200.00 USD');
+  });
+
+  it('récurrence chez un fournisseur qui a des factures : constat, rien de retranché', () => {
+    const f = forecastTreasury(
+      baseForecast({
+        recurring: [
+          {
+            id: 'r1',
+            label: 'Loyer',
+            category: 'loyer',
+            currency: 'USD',
+            amount: '100.00',
+            active: true,
+            frequency: 'monthly',
+            startDate: '2026-11-05',
+            endDate: null,
+            supplierId: 'sup1',
+          },
+        ],
+        payables: [payable()],
+      }),
+    );
+    expect(f.uncertainty.findings.map((x) => x.code)).toContain(
+      'RECURRING_AND_PAYABLES_SAME_SUPPLIER',
+    );
+    expect(f.scenarios[0]!.horizons[1]!.bySource.recurring).toBe('100.00');
+    expect(f.scenarios[0]!.horizons[1]!.bySource.payable).toBe('300.00');
+  });
+
+  it('la plus forte sortie fournisseur peut être la cause probable d’une rupture', () => {
+    const f = forecastTreasury(baseForecast({ payables: [payable({ remaining: '1500.00' })] }));
+    const alert = f.scenarios[0]!.alerts[0]!;
+    expect(alert.severity).toBe('critique');
+    expect(alert.dayIndex).toBe(1);
+    expect(alert.probableCause?.amount).toBe('1500.00');
   });
 });

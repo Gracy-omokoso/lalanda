@@ -77,6 +77,19 @@ export interface ExpenseAttachment {
   uploadedBy: string;
 }
 
+// ADR-0044 — P5 (§ 2.8, § 6.2) : dépense POSSÉDÉE par les achats. Non nulle, la
+// dépense a été créée (ou rattachée) par un paiement fournisseur : la trésorerie ne
+// la modifie, ne l'annule ni ne lui joint de pièce (`409 EXPENSE_OWNED_BY_PURCHASES`).
+export interface ExpenseOrigin {
+  kind: 'supplier_payment';
+  paymentId: string;
+  /** Numéro `PF…` du paiement, copie d'affichage (« Ouvrir le paiement PF… »). */
+  paymentNumber: string;
+  invoiceId: string;
+  /** Rang de l'imputation de coût de la facture (`costAllocations`). */
+  allocationIndex: number;
+}
+
 @Schema({ collection: 'treasury_expenses', timestamps: true, strict: true })
 export class TreasuryExpense {
   @Prop({ type: String, required: true })
@@ -138,6 +151,10 @@ export class TreasuryExpense {
   @Prop({ type: String, default: null })
   workProjectId!: string | null;
 
+  // ADR-0044 — P5 : `null` = dépense directe ; sinon possédée par les achats.
+  @Prop({ type: Object, default: null })
+  origin!: ExpenseOrigin | null;
+
   @Prop({ type: String, required: true, enum: ['recorded', 'cancelled'], default: 'recorded' })
   status!: 'recorded' | 'cancelled';
 
@@ -171,6 +188,15 @@ TreasuryExpenseSchema.index({ organizationId: 1, supplierKey: 1 });
 TreasuryExpenseSchema.index(
   { organizationId: 1, supplierId: 1, spentOn: 1 },
   { partialFilterExpression: { supplierId: { $type: 'string' } } },
+);
+// ADR-0044 — P5 (§ 2.8) : un paiement ne crée jamais deux fois la même dépense.
+TreasuryExpenseSchema.index(
+  { organizationId: 1, 'origin.paymentId': 1, 'origin.invoiceId': 1, 'origin.allocationIndex': 1 },
+  {
+    unique: true,
+    partialFilterExpression: { 'origin.paymentId': { $type: 'string' } },
+    name: 'treasury_expense_supplier_payment_unique',
+  },
 );
 // ADR-0039 § 2.10 : dépenses d'un projet du RUN (marge, filtre de liste).
 TreasuryExpenseSchema.index(
