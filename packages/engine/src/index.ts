@@ -129,3 +129,7 @@ export * from './work/index.js';
 // ADR-0044 — P1 : achats et fournisseurs (totaux, rapprochement, dettes,
 // échéancier). Versionné à part (`PURCHASES_VERSION`).
 export * from './purchases/index.js';
+
+// ADR-0045 — H1 : moteur RH (jours d'absence, soldes, structure, rapports,
+// échéances, feuille de temps). Versionné à part (`HR_VERSION`).
+export * from './hr/index.js';
