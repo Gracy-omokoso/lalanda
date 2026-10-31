@@ -358,7 +358,16 @@ sont inchangés.
   strictement.
 - Tests : matrice 10 × 38 + 6 × 38 = **608** cases.
 
-### ADR-0046 — stocks, équipements et documents (appliqué, lot S0)
+### ADR-0046 — stocks, équipements et documents (appliqué, lot S0 ; implémenté, lots S0 à S9)
+
+> **Implémenté** (31 oct. 2026) : routes `/stock` (S3, S4), `/assets` (S5), `/documents` (S6),
+> écrans (S8, S9). Lot S7 : le brief, « Mes tâches », la cloche et la marge suivent les droits
+> EFFECTIFS — faits des stocks avec `stock.read`, des équipements avec `assets.read`, des
+> documents avec `docs.read` et seulement pour les documents lisibles par le membre ; inventaire
+> « à valider » pour les détenteurs de `stock.manage` qui ne l'ont pas compté ; matériel de la
+> marge seulement avec `stock.read` **et** `purchase.read` ou `treasury.read`
+> (`canSeeStockValues`). Aucun de ces éléments ne porte une valeur, un coût ni un titre de
+> document.
 
 > **Statut : appliqué** par le lot S0 d'[ADR-0046](adr/ADR-0046-stocks-equipements-documents.md)
 > § 8 (31 oct. 2026), R5 du RUN, aux valeurs par défaut des décisions ouvertes n° 1 à 3. La

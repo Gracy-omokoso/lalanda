@@ -140,7 +140,7 @@ Un événement contient acteur, organisation, action, cible, horodatage, adresse
   (en clair, sans numéro) ; jamais une section chiffrée. La marge lit en plus
   `treasury_expenses.category` (constat `personnel`, marge 1.2.0).
 
-- **Proposé, ADR-0046 (non implémenté)** — stocks, équipements et documents :
+- **Implémenté, ADR-0046 (lots S0 à S9)** — stocks, équipements et documents :
   `stock_items` (lien facultatif et unique partiel `organizationId + catalogItemId` vers un article
   du catalogue de type `BIE` ; code unique partiel), `stock_locations` (plusieurs par organisation,
   une par défaut), `stock_movements` (grand livre **en ajout seul**, quantités signées, coût
@@ -156,7 +156,10 @@ Un événement contient acteur, organisation, action, cible, horodatage, adresse
   `documents/<objectId>`, clé enveloppée si sensible). **Aucune migration** ; aucune collection
   existante ne gagne de champ. Lectures seules : `purchase_receptions`, `purchase_orders`,
   `sales_invoices` (statuts `issued` et `normalized`), `catalog_items`, `hr_employees`,
-  `treasury_expenses` (catégorie `investissement`).
+  `treasury_expenses` (catégorie `investissement`). Lot S7 : `stock_notification_states`
+  (épisodes des notifications de seuil et de stock négatif, unique `organizationId + key`) ; le
+  brief, « Mes tâches » et la marge lisent `stock_items`, `stock_levels`, `stock_movements`,
+  `stock_counts`, `stock_pending_lines`, `asset_*` et `library_documents` sans les écrire.
 
 ## Rétention
 
