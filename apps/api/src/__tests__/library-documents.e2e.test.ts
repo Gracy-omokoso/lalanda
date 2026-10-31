@@ -782,13 +782,11 @@ e2eSuite('Bibliothèque de documents (ADR-0046 S6)', () => {
       const d = await current(doc.divers);
       ok(await download('viewer', doc.divers, d['currentVersionId']));
       expect(
-        await db
-          .collection('audit_events')
-          .countDocuments({
-            action: 'documents.downloaded',
-            targetId: doc.divers,
-            actorUserId: userIds['viewer'],
-          }),
+        await db.collection('audit_events').countDocuments({
+          action: 'documents.downloaded',
+          targetId: doc.divers,
+          actorUserId: userIds['viewer'],
+        }),
       ).toBeGreaterThan(0);
       // Le Lecteur ne modifie pas un document sensible.
       expect(
