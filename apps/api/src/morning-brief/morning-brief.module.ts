@@ -4,7 +4,8 @@
 // et réutilise l'IA existante (client OpenAI partagé, quota commun), l'ordonnanceur
 // et l'envoi d'e-mails. Trésorerie, échéances et reste à encaisser viennent des
 // modules RUN (`morning-brief.run-sources.ts`, amendement du 27 oct. 2026) ;
-// tâches et projets du module `work` (ADR-0039 § 6.5).
+// tâches et projets du module `work` (ADR-0039 § 6.5) ; stocks, équipements et
+// bibliothèque de leurs modules (ADR-0046 § 6.6).
 
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -14,8 +15,12 @@ import {
   OrganizationSuspensionSchema,
 } from '../admin/organization-suspension.schema.js';
 import { AiModule, OPENAI_CHAT_CLIENT } from '../ai/ai.module.js';
+import { AssetsBriefModule } from '../assets/brief/assets-brief.module.js';
+import { AssetsBriefSource } from '../assets/brief/assets-brief.source.js';
 import { CrmBriefSource } from '../crm/brief/crm-brief.source.js';
 import { CrmModule } from '../crm/crm.module.js';
+import { DocumentsBriefModule } from '../documents/brief/documents-brief.module.js';
+import { DocumentsBriefSource } from '../documents/brief/documents-brief.source.js';
 import { HrBriefModule } from '../hr/brief/hr-brief.module.js';
 import { HrBriefSource } from '../hr/brief/hr-brief.source.js';
 import { OrganizationsModule } from '../organizations/organizations.module.js';
@@ -23,6 +28,8 @@ import { PurchasesBriefModule } from '../purchases/brief/purchases-brief.module.
 import { PurchasesBriefSource } from '../purchases/brief/purchases-brief.source.js';
 import { SalesInvoice, SalesInvoiceSchema } from '../sales/invoices/invoice.schema.js';
 import { SalesModule } from '../sales/sales.module.js';
+import { StockBriefModule } from '../stock/brief/stock-brief.module.js';
+import { StockBriefSource } from '../stock/brief/stock-brief.source.js';
 import { TreasuryModule } from '../treasury/treasury.module.js';
 import { WorkBriefSource } from '../work/brief/work-brief.source.js';
 import { WorkModule } from '../work/work.module.js';
@@ -30,12 +37,15 @@ import { MorningBriefEmailJob } from './morning-brief-email.job.js';
 import { MORNING_BRIEF_CHAT_CLIENT, MorningBriefAiService } from './morning-brief-ai.service.js';
 import { MorningBriefController } from './morning-brief.controller.js';
 import {
+  ASSETS_SOURCE,
   CASH_POSITION_SOURCE,
   CRM_SOURCE,
+  DOCUMENTS_SOURCE,
   DUE_DATES_SOURCE,
   HR_SOURCE,
   OUTSTANDING_SOURCE,
   PURCHASES_SOURCE,
+  STOCK_SOURCE,
   WORK_SOURCE,
 } from './morning-brief.ports.js';
 import {
@@ -72,6 +82,11 @@ import { MorningBriefService } from './morning-brief.service.js';
     PurchasesBriefModule,
     // ADR-0045 § 6.5 : absences du jour, validations d'absence, échéances (`HrBriefSource`).
     HrBriefModule,
+    // ADR-0046 § 6.6 : ruptures et seuils, échéances des équipements, documents qui
+    // expirent (`StockBriefSource`, `AssetsBriefSource`, `DocumentsBriefSource`).
+    StockBriefModule,
+    AssetsBriefModule,
+    DocumentsBriefModule,
     MongooseModule.forFeature([
       { name: SalesInvoice.name, schema: SalesInvoiceSchema },
       { name: OrganizationSuspension.name, schema: OrganizationSuspensionSchema },
@@ -98,6 +113,10 @@ import { MorningBriefService } from './morning-brief.service.js';
     { provide: PURCHASES_SOURCE, useExisting: PurchasesBriefSource },
     // ADR-0045 § 6.5 — absences du jour, validations d'absence, échéances RH.
     { provide: HR_SOURCE, useExisting: HrBriefSource },
+    // ADR-0046 § 6.6 — ruptures et seuils, maintenances, couvertures, documents.
+    { provide: STOCK_SOURCE, useExisting: StockBriefSource },
+    { provide: ASSETS_SOURCE, useExisting: AssetsBriefSource },
+    { provide: DOCUMENTS_SOURCE, useExisting: DocumentsBriefSource },
   ],
   exports: [MorningBriefService],
 })

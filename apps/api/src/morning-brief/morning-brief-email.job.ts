@@ -86,6 +86,11 @@ const EMAIL_FACTS = [
   'rh.absents_aujourdhui',
   'mes_validations_absence.en_attente',
   'rh.echeances',
+  // ADR-0046 § 6.6 : des nombres seulement, mêmes gardes que le brief.
+  'stock.ruptures',
+  'stock.sous_seuil',
+  'equipements.maintenances_dues',
+  'documents.expirant',
 ];
 
 export function emailContent(
@@ -113,6 +118,14 @@ export function emailContent(
       .filter((f) => !(f.status === 'hidden' && f.source.module === 'run.purchases'))
       // ADR-0045 § 6.5 : même règle pour les RH (un membre sans portée n'en lit rien).
       .filter((f) => !(f.status === 'hidden' && f.source.module === 'run.hr'))
+      // ADR-0046 § 6.6 : idem pour les stocks, les équipements et la bibliothèque.
+      .filter(
+        (f) =>
+          !(
+            f.status === 'hidden' &&
+            ['run.stock', 'run.assets', 'run.documents'].includes(f.source.module)
+          ),
+      )
       // Un montant nul dans une devise inutilisée n'apprend rien.
       .filter((f) => !(f.kind === 'amount' && f.value !== null && /^-?0+(\.0+)?$/.test(f.value)))
       .map(factLine),

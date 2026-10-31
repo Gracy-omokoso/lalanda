@@ -37,6 +37,8 @@ import {
   STOCK_OPEN_ORDERS_SOURCE,
   StockOpenOrdersReader,
 } from './purchases/stock-open-orders.source.js';
+// ADR-0046 — S7
+import { StockAgendaModule } from './agenda/stock-agenda.module.js';
 import {
   StockCount,
   StockCountSchema,
@@ -62,6 +64,8 @@ import {
   imports: [
     // `AuthGuard` résout l'organisation active via `OrganizationsService`.
     OrganizationsModule,
+    // ADR-0046 — S7 : cloche des stocks (`stock.notifications`) et « Mes tâches ».
+    StockAgendaModule,
     MongooseModule.forFeature([
       // ADR-0046 — S3
       { name: StockItem.name, schema: StockItemSchema },

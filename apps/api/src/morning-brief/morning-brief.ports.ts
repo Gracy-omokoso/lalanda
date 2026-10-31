@@ -20,19 +20,32 @@
 //   HR_SOURCE             absences du jour, validations ADR-0045 § 6.5
 //                         d'absence, échéances RH
 //                         — fournisseur réel `hr/brief/hr-brief.source.ts`
+//   STOCK_SOURCE          ruptures, seuils,           ADR-0046 § 6.6
+//                         « À traiter »
+//                         — fournisseur réel `stock/brief/stock-brief.source.ts`
+//   ASSETS_SOURCE         maintenances, couvertures,  ADR-0046 § 6.6
+//                         anciens collaborateurs
+//                         — fournisseur réel `assets/brief/assets-brief.source.ts`
+//   DOCUMENTS_SOURCE      documents qui expirent      ADR-0046 § 6.6
+//                         — fournisseur réel `documents/brief/documents-brief.source.ts`
 //
 // Les fournisseurs « non disponible » ci-dessous restent pour les tests.
 // Le pipeline (ADR-0035) et la santé GROW (ADR-0032) suivront le même motif :
 // un jeton, un fournisseur par défaut « non disponible », un fait de plus.
 
 import type {
+  BriefAssetsInput,
   BriefCashInput,
   BriefCrmInput,
+  BriefDocumentsInput,
   BriefDueDatesInput,
   BriefHrInput,
   BriefPurchasesInput,
+  BriefStockInput,
   BriefWorkInput,
 } from '@lalanda/engine';
+
+import type { OrgRole } from '../authz/permissions.js';
 
 export const CASH_POSITION_SOURCE = Symbol('MORNING_BRIEF_CASH_POSITION_SOURCE');
 export const DUE_DATES_SOURCE = Symbol('MORNING_BRIEF_DUE_DATES_SOURCE');
@@ -44,6 +57,10 @@ export const CRM_SOURCE = Symbol('MORNING_BRIEF_CRM_SOURCE');
 export const PURCHASES_SOURCE = Symbol('MORNING_BRIEF_PURCHASES_SOURCE');
 // ADR-0045 — H5
 export const HR_SOURCE = Symbol('MORNING_BRIEF_HR_SOURCE');
+// ADR-0046 — S7
+export const STOCK_SOURCE = Symbol('MORNING_BRIEF_STOCK_SOURCE');
+export const ASSETS_SOURCE = Symbol('MORNING_BRIEF_ASSETS_SOURCE');
+export const DOCUMENTS_SOURCE = Symbol('MORNING_BRIEF_DOCUMENTS_SOURCE');
 
 /** Trésorerie disponible de l'organisation. Ne reçoit QUE son identifiant. */
 export interface CashPositionSource {
@@ -148,4 +165,53 @@ export interface HrSource {
 /** Sans module RH (tests) : « non disponible ». */
 export const noHr: HrSource = {
   hrOf: async () => ({ status: 'unavailable' }),
+};
+
+/**
+ * Stocks (ADR-0046 § 6.6) : articles (seuils, suivi), niveaux du cache et nombre de
+ * lignes « À traiter » ouvertes de l'organisation. Appelé seulement si le membre
+ * détient `stock.read`. Le moteur du brief compte ruptures et articles sous le seuil ;
+ * aucune valeur ni coût n'est lu.
+ */
+export interface StockSource {
+  stockOf(organizationId: string, now: Date): Promise<BriefStockInput>;
+}
+
+/** Sans module des stocks (tests) : « non disponible ». */
+export const noStock: StockSource = {
+  stockOf: async () => ({ status: 'unavailable' }),
+};
+
+/**
+ * Équipements (ADR-0046 § 6.6) : maintenances dues, couvertures qui expirent,
+ * équipements chez d'anciens collaborateurs (moteur `assetDeadlines`). Appelé seulement
+ * si le membre détient `assets.read`. Des nombres seulement.
+ */
+export interface AssetsSource {
+  assetsOf(organizationId: string, now: Date): Promise<BriefAssetsInput>;
+}
+
+/** Sans module des équipements (tests) : « non disponible ». */
+export const noAssets: AssetsSource = {
+  assetsOf: async () => ({ status: 'unavailable' }),
+};
+
+/**
+ * Bibliothèque (ADR-0046 § 6.6) : documents LISIBLES par le membre (droits des dossiers
+ * jugés sur ses droits EFFECTIFS) qui expirent sous leur délai. Appelé seulement s'il
+ * détient `docs.read`. Un nombre, jamais un titre.
+ */
+export interface DocumentsSource {
+  documentsOf(
+    organizationId: string,
+    userId: string,
+    role: OrgRole,
+    actions: readonly string[],
+    now: Date,
+  ): Promise<BriefDocumentsInput>;
+}
+
+/** Sans module de la bibliothèque (tests) : « non disponible ». */
+export const noDocuments: DocumentsSource = {
+  documentsOf: async () => ({ status: 'unavailable' }),
 };

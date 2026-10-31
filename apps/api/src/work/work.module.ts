@@ -22,7 +22,17 @@ import { HrAgendaModule } from '../hr/agenda/hr-agenda.module.js';
 import { HrAgendaSource } from '../hr/agenda/hr-agenda.source.js';
 import { HrWorkAbsencesSource } from '../hr/work/hr-work-absences.source.js';
 import { HrWorkModule } from '../hr/work/hr-work.module.js';
-import { CRM_AGENDA_SOURCE, HR_AGENDA_SOURCE, PURCHASES_AGENDA_SOURCE } from './my-tasks.ports.js';
+import { AssetsAgendaModule } from '../assets/agenda/assets-agenda.module.js';
+import { AssetsAgendaSource } from '../assets/agenda/assets-agenda.source.js';
+import { StockAgendaModule } from '../stock/agenda/stock-agenda.module.js';
+import { StockAgendaSource } from '../stock/agenda/stock-agenda.source.js';
+import {
+  ASSETS_AGENDA_SOURCE,
+  CRM_AGENDA_SOURCE,
+  HR_AGENDA_SOURCE,
+  PURCHASES_AGENDA_SOURCE,
+  STOCK_AGENDA_SOURCE,
+} from './my-tasks.ports.js';
 import { WorkBriefSource } from './brief/work-brief.source.js';
 import { WorkTimesheetsController } from './timesheets/work-timesheets.controller.js';
 import { WorkTimesheetsService } from './timesheets/work-timesheets.service.js';
@@ -76,6 +86,9 @@ import {
     HrAgendaModule,
     // ADR-0045 — H5 (§ 6.2, § 6.3) : absences des assignés, feuille de temps, lecture seule.
     HrWorkModule,
+    // ADR-0046 — S7 (§ 6.7) : inventaires, « À traiter », maintenances, lecture seule.
+    StockAgendaModule,
+    AssetsAgendaModule,
     MongooseModule.forFeature([
       { name: WorkSettings.name, schema: WorkSettingsSchema },
       { name: WorkProject.name, schema: WorkProjectSchema },
@@ -119,6 +132,9 @@ import {
     { provide: HR_AGENDA_SOURCE, useExisting: HrAgendaSource },
     // ADR-0045 — H5 (§ 6.2, § 6.3) : absences approuvées des membres, jamais le type.
     { provide: WORK_ABSENCES_SOURCE, useExisting: HrWorkAbsencesSource },
+    // ADR-0046 — S7 (§ 6.7) : éléments des stocks et des équipements dans « Mes tâches ».
+    { provide: STOCK_AGENDA_SOURCE, useExisting: StockAgendaSource },
+    { provide: ASSETS_AGENDA_SOURCE, useExisting: AssetsAgendaSource },
     WorkTimesheetsService,
   ],
   exports: [
