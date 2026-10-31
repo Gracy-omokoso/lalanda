@@ -760,5 +760,5 @@ describe('ADR-0041 § 9.5 — propriété : tout écart accepté est sûr', () =
       'SELF_PERMISSIONS_FORBIDDEN',
       'SOD_CONFLICT',
     ]);
-  });
+  }, 60_000); // 10 000 tirages : marge sous charge (CI)
 });

@@ -8,3 +8,6 @@
 // ADR-0046 — S0
 export * from './constants.js';
 export * from './common.js';
+
+// ADR-0046 — S6
+export * from './contracts.js';

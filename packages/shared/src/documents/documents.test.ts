@@ -10,6 +10,10 @@ import {
   DocumentListQuerySchema,
   DocumentSearchBodySchema,
   DocumentTagsSchema,
+  EntityPiecesQuerySchema,
+  UpdateLibraryDocumentBodySchema,
+  UploadLibraryDocumentFieldsSchema,
+  normalizeDocumentSearchKey,
 } from './index.js';
 
 type Issues = { issues: { params?: { code?: string }; message: string }[] };
@@ -118,5 +122,64 @@ describe('bibliothèque — briques de schéma', () => {
         DocumentSearchBodySchema.safeParse({ expiresFrom: '2026-12-31', expiresTo: '2026-01-01' }),
       ),
     ).toEqual(['INVALID_RANGE']);
+  });
+});
+
+// ADR-0046 — S6
+describe('bibliothèque — contrats HTTP du lot S6', () => {
+  it('formulaire d’envoi : tout est texte, étiquettes et liens en JSON, valeurs par défaut', () => {
+    expect(
+      UploadLibraryDocumentFieldsSchema.parse({
+        title: ' Attestation fiscale ',
+        folderId: '',
+        tags: '["DGI","dgi"]',
+        links: JSON.stringify([{ entityType: 'supplier', entityId: ID }]),
+        sensitive: 'true',
+        reminderDays: '45',
+      }),
+    ).toEqual({
+      title: 'Attestation fiscale',
+      folderId: null,
+      nature: 'other',
+      tags: ['dgi'],
+      links: [{ entityType: 'supplier', entityId: ID }],
+      issuedOn: null,
+      expiresOn: null,
+      reminderDays: 45,
+      sensitive: true,
+      note: null,
+    });
+    expect(codes(UploadLibraryDocumentFieldsSchema.safeParse({ title: 'x', tags: '[' }))).toEqual([
+      'INVALID_JSON',
+    ]);
+    expect(UploadLibraryDocumentFieldsSchema.safeParse({ title: 'x', intrus: '1' }).success).toBe(
+      false,
+    );
+    expect(
+      codes(
+        UploadLibraryDocumentFieldsSchema.safeParse({
+          title: 'x',
+          issuedOn: '2026-05-01',
+          expiresOn: '2026-01-01',
+        }),
+      ),
+    ).toEqual(['DATE_BEFORE_ISSUE']);
+  });
+
+  it('la sensibilité ne change pas après le dépôt ; présentation par identifiants seulement', () => {
+    expect(
+      UpdateLibraryDocumentBodySchema.safeParse({ expectedRevision: 1, sensitive: true }).success,
+    ).toBe(false);
+    expect(
+      EntityPiecesQuerySchema.safeParse({ entityType: 'supplier', entityId: ID }).success,
+    ).toBe(true);
+    expect(
+      EntityPiecesQuerySchema.safeParse({ entityType: 'supplier', entityId: ID, title: 'x' })
+        .success,
+    ).toBe(false);
+  });
+
+  it('clé de recherche : sans accents, minuscules', () => {
+    expect(normalizeDocumentSearchKey('  Énergie   ÉLECTRIQUE ')).toBe('energie electrique');
   });
 });

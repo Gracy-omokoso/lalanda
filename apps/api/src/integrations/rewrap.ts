@@ -34,6 +34,8 @@ import {
 } from '../hr/private/hr-private-crypto.js';
 // ADR-0045 — H4 : clés enveloppées des documents RH sensibles.
 import { rewrapHrDocumentKey } from '../hr/documents/hr-document-crypto.js';
+// ADR-0046 — S6 : clés enveloppées des documents sensibles de la bibliothèque.
+import { rewrapLibraryDocumentKey } from '../documents/library-document-crypto.js';
 import { Integration, type IntegrationDocument } from './integration.schema.js';
 import { MASTER_KEYRING } from './keyring.provider.js';
 import {
@@ -68,6 +70,8 @@ const HR_PRIVATE_FIELD_KEYS = [
 
 /** ADR-0045 — H4 : documents RH sensibles (une clé de données enveloppée par document). */
 const HR_DOCUMENTS = 'hr_documents';
+/** ADR-0046 — S6 : versions sensibles de la bibliothèque (une clé enveloppée par version). */
+const LIBRARY_DOCUMENT_VERSIONS = 'library_document_versions';
 
 @Injectable()
 export class RewrapService {
@@ -149,6 +153,8 @@ export class RewrapService {
     await this.rewrapHrEmployeePrivate(keyring, actorUserId, report);
     // ADR-0045 — H4 (§ 2.8) : clés enveloppées des documents RH sensibles.
     await this.rewrapHrDocumentKeys(keyring, actorUserId, report);
+    // ADR-0046 — S6 (§ 4.3) : clés enveloppées des documents sensibles de la bibliothèque.
+    await this.rewrapLibraryDocumentKeys(keyring, actorUserId, report);
 
     this.secrets.invalidateAll();
 
@@ -184,6 +190,14 @@ export class RewrapService {
     // ADR-0045 — H4 (§ 2.8) : clés enveloppées des documents RH sensibles.
     for (const doc of await this.connection
       .collection(HR_DOCUMENTS)
+      .find({ wrappedKey: { $type: 'object' } }, { projection: { wrappedKey: 1 } })
+      .toArray()) {
+      const k = doc['wrappedKey'] as EncryptedValue;
+      if (k.keyId !== keyring.currentKeyId) remaining.add(k.keyId);
+    }
+    // ADR-0046 — S6 (§ 4.3) : clés enveloppées des documents sensibles de la bibliothèque.
+    for (const doc of await this.connection
+      .collection(LIBRARY_DOCUMENT_VERSIONS)
       .find({ wrappedKey: { $type: 'object' } }, { projection: { wrappedKey: 1 } })
       .toArray()) {
       const k = doc['wrappedKey'] as EncryptedValue;
@@ -401,6 +415,65 @@ export class RewrapService {
             targetType: 'hr_document',
             targetId: String(doc._id),
             // Ni clé, ni libellé, ni organisation (motif des fournisseurs).
+            metadata: { keyId: keyring.currentKeyId },
+          },
+          session,
+        );
+        return true;
+      });
+      if (written) report.rewrapped += 1;
+    }
+  }
+
+  /**
+   * ADR-0046 — S6 (§ 4.3) : versions sensibles de la bibliothèque, motif EXACT des
+   * documents RH (H4). Chaque version est chiffrée par sa propre clé de données,
+   * enveloppée à l'emplacement qu'utilise la lecture (`libraryDocumentKeyLocation` :
+   * organisation + document + version) ; seule cette clé est re-chiffrée, l'objet au
+   * stockage reste tel quel. Une version purgée n'a plus de clé (`null`). Écriture
+   * conditionnée par l'ancien `iv` (une purge concurrente gagne).
+   */
+  private async rewrapLibraryDocumentKeys(
+    keyring: MasterKeyring,
+    actorUserId: string,
+    report: RewrapReport,
+  ): Promise<void> {
+    const col = this.connection.collection(LIBRARY_DOCUMENT_VERSIONS);
+    for (const doc of await col
+      .find(
+        { wrappedKey: { $type: 'object' } },
+        { projection: { organizationId: 1, documentId: 1, wrappedKey: 1 } },
+      )
+      .toArray()) {
+      const record = doc['wrappedKey'] as EncryptedValue;
+      const outcome = rewrapLibraryDocumentKey(
+        {
+          organizationId: String(doc['organizationId']),
+          documentId: String(doc['documentId']),
+          versionId: String(doc._id),
+        },
+        record,
+        keyring,
+      );
+      if (!outcome.changed) {
+        report.skipped += 1;
+        continue;
+      }
+      const written = await this.inTransaction(async (session) => {
+        const res = await col.updateOne(
+          { _id: doc._id, 'wrappedKey.iv': record.iv, 'wrappedKey.keyId': record.keyId },
+          { $set: { wrappedKey: outcome.record } },
+          session ? { session } : {},
+        );
+        if (res.modifiedCount === 0) return false;
+        await this.audit.record(
+          {
+            actorUserId,
+            actorRole: 'system',
+            action: 'secret.rewrapped',
+            targetType: 'library_document_version',
+            targetId: String(doc._id),
+            // Ni clé, ni titre, ni organisation (motif des documents RH).
             metadata: { keyId: keyring.currentKeyId },
           },
           session,

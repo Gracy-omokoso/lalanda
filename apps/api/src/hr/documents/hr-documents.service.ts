@@ -55,6 +55,7 @@ import {
   ObjectStorageService,
   ObjectStorageUnavailableError,
 } from '../../storage/object-storage.service.js';
+import { sharedAttachmentsUsage } from '../../storage/attachments-usage.js';
 import { newObjectId } from '../../storage/object-key.js';
 import { sanitizeFileName } from '../../work/work-attachments.service.js';
 import {
@@ -66,7 +67,6 @@ import {
 import type { HrViewer } from '../scope/hr-scope.service.js';
 import { openHrDocument, sealHrDocument } from './hr-document-crypto.js';
 import {
-  HR_DOCUMENTS_COLLECTION,
   HrDocument,
   hrDocumentObjectKey,
   type HrDocumentDocument,
@@ -77,22 +77,6 @@ export interface HrDocumentActor {
   userId: string;
   role: string;
 }
-
-/** Collections dont les pièces comptent dans la borne commune (ADR-0039 § 2.5). */
-const SHARED_STORAGE: readonly { collection: string; match: object; field: string }[] = [
-  { collection: 'work_attachments', match: { deletedAt: null }, field: '$size' },
-  {
-    collection: 'purchase_receptions',
-    match: { 'attachment.size': { $gt: 0 } },
-    field: '$attachment.size',
-  },
-  {
-    collection: 'supplier_invoices',
-    match: { 'attachment.size': { $gt: 0 } },
-    field: '$attachment.size',
-  },
-  { collection: HR_DOCUMENTS_COLLECTION, match: { deletedAt: null }, field: '$storedSize' },
-];
 
 export function hrDocumentNotFound(): never {
   throw new NotFoundException({ code: 'HR_DOCUMENT_NOT_FOUND', message: 'Document introuvable.' });
@@ -545,20 +529,9 @@ export class HrDocumentsService {
     return bucket;
   }
 
+  /** Borne commune (ADR-0039 § 2.5) : liste unique dans `storage/attachments-usage.ts`. */
   private async usage(organizationId: string): Promise<number> {
-    const parts = await Promise.all(
-      SHARED_STORAGE.map(async ({ collection, match, field }) => {
-        const [row] = await this.connection
-          .collection(collection)
-          .aggregate<{ total: number }>([
-            { $match: { organizationId, ...match } },
-            { $group: { _id: null, total: { $sum: field } } },
-          ])
-          .toArray();
-        return row?.total ?? 0;
-      }),
-    );
-    return parts.reduce((a, b) => a + b, 0);
+    return sharedAttachmentsUsage(this.connection, organizationId);
   }
 }
 
