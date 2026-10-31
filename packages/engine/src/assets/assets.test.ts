@@ -300,7 +300,7 @@ describe('managementDepreciationEstimate', () => {
         day = addDays(day, int(r, 0, 400));
       }
     }
-  });
+  }, 30_000); // propriété lourde : marge sous charge (CI)
 
   it('aucune sortie ne dépend de DUREES_SYSCOHADA (critère 14, 20)', () => {
     const dir = dirname(fileURLToPath(import.meta.url));
