@@ -12,6 +12,8 @@
 import type { CrmMyTaskItem } from '@lalanda/shared/crm';
 import type { HrMyTaskItem } from '@lalanda/shared/hr';
 import type { PurchasesMyTaskItem } from '@lalanda/shared/purchases';
+import type { AssetsMyTaskItem } from '@lalanda/shared/assets';
+import type { StockMyTaskItem } from '@lalanda/shared/stock';
 
 export const CRM_AGENDA_SOURCE = Symbol('WORK_CRM_AGENDA_SOURCE');
 
@@ -81,5 +83,70 @@ export interface HrAgendaReader {
 
 /** Sans module RH (tests) : aucun élément. */
 export const noHrAgenda: HrAgendaReader = {
+  agendaOf: async () => ({ items: [], truncated: false }),
+};
+
+// ── ADR-0046 — S7 (§ 6.7) : inventaires, « À traiter », maintenances ──────────
+//
+// Même motif : agrégés à la lecture, en lecture seule, par les fournisseurs réels
+// `stock/agenda/stock-agenda.source.ts` et `assets/agenda/assets-agenda.source.ts`.
+// Appelés seulement avec `stock.read` (resp. `assets.read`) ; les droits EFFECTIFS
+// utiles sont passés, la séparation des tâches est jugée par le fournisseur.
+
+export const STOCK_AGENDA_SOURCE = Symbol('WORK_STOCK_AGENDA_SOURCE');
+
+export interface StockAgendaActor {
+  userId: string;
+  /** `stock.count` effectif : inventaires à compter dont il est compteur. */
+  holdsCount: boolean;
+  /** `stock.manage` effectif : inventaires soumis qu'il peut valider. */
+  holdsManage: boolean;
+  /** `stock.move` effectif : lignes « À traiter » regroupées. */
+  holdsMove: boolean;
+}
+
+export interface StockAgendaPage {
+  items: StockMyTaskItem[];
+  /** Vrai si plus de `limit` éléments répondaient. */
+  truncated: boolean;
+}
+
+export interface StockAgendaReader {
+  agendaOf(
+    organizationId: string,
+    actor: StockAgendaActor,
+    limit: number,
+  ): Promise<StockAgendaPage>;
+}
+
+/** Sans module des stocks (tests) : aucun élément. */
+export const noStockAgenda: StockAgendaReader = {
+  agendaOf: async () => ({ items: [], truncated: false }),
+};
+
+export const ASSETS_AGENDA_SOURCE = Symbol('WORK_ASSETS_AGENDA_SOURCE');
+
+export interface AssetsAgendaActor {
+  userId: string;
+  /** `assets.manage` effectif : toutes les maintenances dues de l'organisation. */
+  holdsManage: boolean;
+}
+
+export interface AssetsAgendaPage {
+  items: AssetsMyTaskItem[];
+  truncated: boolean;
+}
+
+export interface AssetsAgendaReader {
+  agendaOf(
+    organizationId: string,
+    actor: AssetsAgendaActor,
+    limit: number,
+    now: Date,
+  ): Promise<AssetsAgendaPage>;
+}
+
+/** Sans module des équipements (tests) : aucun élément. */
+export const noAssetsAgenda: AssetsAgendaReader = {
   agendaOf: async () => ({ items: [], truncated: false }),
 };

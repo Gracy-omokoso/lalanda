@@ -36,9 +36,36 @@ export interface ConstatAffiche {
   ton: TonConstat;
 }
 
-/** Constats codés de l'API → phrases françaises, dans l'ordre servi. */
+/** Titre du constat du matériel (ADR-0046 § 6.4, décision ouverte n° 12). */
+export const MATERIEL_TITRE = 'Matériel sorti du stock — informatif';
+
+/**
+ * ADR-0046 § 6.4 (marge 1.3.0) : matériel sorti du stock pour le projet, une phrase par
+ * devise de coût. Valeur rendue par le moteur (coût moyen), jamais recalculée ni
+ * soustraite. `materials` absent ou `null` (droits) : aucune phrase.
+ */
+export function constatsMateriel(view: ProjectMarginView): ConstatAffiche[] {
+  return (view.materials ?? []).map((m) => {
+    const bons = `${m.issueCount} ${m.issueCount > 1 ? 'bons de sortie' : 'bon de sortie'}`;
+    const sansCout =
+      m.unvaluedCount > 0
+        ? ` ${m.unvaluedCount} mouvement(s) sans coût connu n’y sont pas valorisés.`
+        : '';
+    return {
+      code: `MATERIALS_FROM_STOCK.${m.currency}`,
+      ton: 'info',
+      texte: `${MATERIEL_TITRE} : ${montantSigne(m.consumedValue, m.currency)} (${bons}, au coût moyen). Son achat entre déjà dans la marge par sa dépense : rien n’est soustrait.${sansCout}`,
+    };
+  });
+}
+
+/** Constats codés de l'API → phrases françaises, dans l'ordre servi, puis le matériel. */
 export function constats(view: ProjectMarginView): ConstatAffiche[] {
-  return view.findings.map((f) => {
+  return [...constatsServis(view), ...constatsMateriel(view)];
+}
+
+function constatsServis(view: ProjectMarginView): ConstatAffiche[] {
+  return view.findings.map((f): ConstatAffiche => {
     switch (f.code) {
       case 'MULTI_CURRENCY':
         return {

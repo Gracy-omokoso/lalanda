@@ -13,6 +13,7 @@
 
 import type { TaxGroupLetter } from '../invoice-totals/types.js';
 import type { InvoicedLinesInput, PurchaseOrderLineInput } from '../purchases/types.js';
+import type { StockItemInput, StockMovementInput } from '../stock/types.js';
 
 /**
  * Toute évolution d'un calcul de ce module incrémente cette version.
@@ -26,7 +27,14 @@ import type { InvoicedLinesInput, PurchaseOrderLineInput } from '../purchases/ty
  * même projet comptent peut-être deux fois la même personne. SIGNALÉ, jamais
  * retranché : aucun montant de la sortie ne change.
  */
-export const WORK_MARGIN_VERSION = '1.2.0';
+/**
+ * 1.3.0 (ADR-0046 § 6.4) : matériel sorti du stock pour le projet (`materials`) —
+ * sorties `issue` nettes des retours, valorisées au coût moyen pondéré (moteur des
+ * stocks, `projectMaterials`), par devise de coût. INFORMATIF, JAMAIS soustrait de
+ * `margin` : l'achat de ce matériel y est déjà, ou y sera, par sa dépense. Sans
+ * entrée `stock`, la sortie est celle de 1.2.0.
+ */
+export const WORK_MARGIN_VERSION = '1.3.0';
 
 /** Catégorie de dépense des salaires et charges sociales (ADR-0034 § 1). */
 export const PERSONNEL_EXPENSE_CATEGORY = 'personnel';
@@ -147,6 +155,33 @@ export interface ProjectMarginInput {
    * absent du résultat). Hors période : ce sont des engagements à date.
    */
   purchases?: ProjectPurchasesInput;
+  /**
+   * Stock (ADR-0046 § 6.4) ; absent : rien n'est rendu (`materials` absent du
+   * résultat). Les mouvements sont TOUS ceux des articles concernés (le coût moyen se
+   * rejoue sur tout l'historique) ; seuls ceux imputés à `projectId` comptent.
+   */
+  stock?: ProjectStockInput;
+}
+
+/** Stock lu pour un projet (ADR-0046 § 6.4), par le port `WORK_STOCK_SOURCE`. */
+export interface ProjectStockInput {
+  projectId: string;
+  items: readonly StockItemInput[];
+  movements: readonly StockMovementInput[];
+}
+
+/**
+ * Matériel sorti du stock pour le projet, d'une devise de coût (ADR-0046 § 6.4) —
+ * INFORMATIF, jamais soustrait de `margin` (décision ouverte n° 12).
+ */
+export interface ProjectMaterialsCurrency {
+  currency: WorkMarginCurrency;
+  /** Sorties nettes des retours, au coût moyen pondéré ; signée si les retours l'emportent. */
+  consumedValue: string;
+  /** Bons de sortie (mouvements `issue` sortants) imputés au projet. */
+  issueCount: number;
+  /** Mouvements sans coût connu (entrée `pending_cost`) : comptés, non valorisés. */
+  unvaluedCount: number;
 }
 
 /** Constats codés (ADR-0039 § 5). */
@@ -230,4 +265,6 @@ export interface ProjectMarginResult {
   byMember: ProjectMarginMemberCost[];
   /** Présent seulement si l'entrée porte `purchases` ; une devise sans engagement n'apparaît pas. */
   purchases?: ProjectPurchasesCurrency[];
+  /** Présent seulement si l'entrée porte `stock` ; une devise sans sortie n'apparaît pas. */
+  materials?: ProjectMaterialsCurrency[];
 }

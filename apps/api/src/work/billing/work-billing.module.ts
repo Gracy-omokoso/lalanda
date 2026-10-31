@@ -13,6 +13,8 @@ import { SalesModule } from '../../sales/sales.module.js';
 import { PurchasesMarginSource } from '../../purchases/margin/purchases-margin.source.js';
 import { ProjectMarginService } from '../margin/project-margin.service.js';
 import { WORK_PURCHASES_SOURCE } from '../margin/work-purchases.port.js';
+import { WORK_STOCK_SOURCE } from '../margin/work-stock.port.js';
+import { StockMarginSource } from '../../stock/margin/stock-margin.source.js';
 import { WorkModule } from '../work.module.js';
 import { WorkBillingController } from './work-billing.controller.js';
 import { WorkBillingService } from './work-billing.service.js';
@@ -32,6 +34,8 @@ import { WorkInvoiceLink, WorkInvoiceLinkSchema } from './work-invoice-link.sche
     ProjectMarginService,
     // ADR-0044 — P6 : coûts engagés de la marge (lecture seule par la connexion).
     { provide: WORK_PURCHASES_SOURCE, useClass: PurchasesMarginSource },
+    // ADR-0046 — S7 : matériel sorti du stock, informatif (lecture seule par la connexion).
+    { provide: WORK_STOCK_SOURCE, useClass: StockMarginSource },
   ],
 })
 export class WorkBillingModule {}

@@ -164,7 +164,7 @@ e2eSuite('RH — liens avec le brief, les projets, le temps et la marge (ADR-004
   describe('brief du matin (§ 6.5, critère 16)', () => {
     it('A (manager) : deux absents dans son équipe → R13 ; une demande à valider → R14', async () => {
       const b = await brief('analyst');
-      expect(b.version).toBe('1.4.0');
+      expect(b.version).toBe('1.5.0');
       expect(fact(b, 'rh.absents_aujourdhui')).toMatchObject({ status: 'known', value: '2' });
       expect(fact(b, 'mes_validations_absence.en_attente')).toMatchObject({
         status: 'known',
@@ -350,7 +350,7 @@ e2eSuite('RH — liens avec le brief, les projets, le temps et la marge (ADR-004
       });
       const autre = ok(await fx.post('owner', '/treasury/expenses', depense('achats')), 201);
       const avant = ok(await fx.get('owner', `/work/projects/${projectId}/margin`));
-      expect(avant['version']).toBe('1.2.0');
+      expect(avant['version']).toBe('1.3.0');
       expect((avant['findings'] as { code: string }[]).map((f) => f.code)).not.toContain(
         'PERSONNEL_EXPENSES_AND_TIME_COST',
       );

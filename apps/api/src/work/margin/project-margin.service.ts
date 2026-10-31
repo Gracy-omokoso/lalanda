@@ -15,6 +15,11 @@
 // ADR-0044 § 6.1 (P6) : coûts engagés `committed` et `ordered`, INFORMATIFS, lus par
 // le port `WORK_PURCHASES_SOURCE` seulement si l'appelant détient `purchase.read`
 // (sinon rien n'est lu : `purchases: null`) ; jamais soustraits de la marge.
+//
+// ADR-0046 § 6.4 (S7) : matériel sorti du stock pour le projet (`materials`), INFORMATIF,
+// lu par le port `WORK_STOCK_SOURCE` seulement si l'appelant détient `stock.read` ET voit
+// les valeurs (`canSeeStockValues` : `purchase.read` ou `treasury.read`) ; sinon rien
+// n'est lu : `materials: null`. Jamais soustrait de la marge.
 
 import {
   computeProjectMargin,
@@ -26,6 +31,7 @@ import { Inject, Injectable, Optional } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import type { Connection, Model } from 'mongoose';
 
+import { canSeeStockValues } from '../../authz/permissions.js';
 import { kinshasaDayOf } from '../../sales/receipts/kinshasa-day.js';
 import { actorCan, isWorkId, oid, type WorkActor } from '../work.common.js';
 import {
@@ -34,6 +40,7 @@ import {
   type WorkPurchasesRead,
   type WorkPurchasesSource,
 } from './work-purchases.port.js';
+import { WORK_STOCK_SOURCE, noWorkStock, type WorkStockSource } from './work-stock.port.js';
 import { WorkMembersService } from '../work-members.service.js';
 import { WorkProjectsService } from '../work-projects.service.js';
 import {
@@ -97,6 +104,7 @@ function taxGroupsOf(doc: SalesDocRead): WorkMarginInvoiceInput['taxGroups'] {
 @Injectable()
 export class ProjectMarginService {
   private readonly purchases: WorkPurchasesSource;
+  private readonly stock: WorkStockSource;
 
   constructor(
     @InjectModel(WorkInvoiceLink.name) private readonly links: Model<WorkInvoiceLinkDocument>,
@@ -107,8 +115,11 @@ export class ProjectMarginService {
     @Inject(WorkMembersService) private readonly members: WorkMembersService,
     // ADR-0044 — P6 : facultatif, fournisseur nul sans module des achats.
     @Optional() @Inject(WORK_PURCHASES_SOURCE) purchases: WorkPurchasesSource | null = null,
+    // ADR-0046 — S7 : facultatif, fournisseur nul sans module des stocks.
+    @Optional() @Inject(WORK_STOCK_SOURCE) stock: WorkStockSource | null = null,
   ) {
     this.purchases = purchases ?? noWorkPurchases;
+    this.stock = stock ?? noWorkStock;
   }
 
   async margin(
@@ -177,6 +188,13 @@ export class ProjectMarginService {
     const purchasesRead: WorkPurchasesRead | null = actorCan(actor, 'purchase.read')
       ? await this.purchases.purchasesOf(organizationId, projectId)
       : null;
+    // ADR-0046 § 6.4 : matériel lu seulement avec `stock.read` ET les valeurs visibles.
+    const stockRead =
+      actorCan(actor, 'stock.read') &&
+      actor.role !== undefined &&
+      canSeeStockValues(actor.role, actor.context)
+        ? await this.stock.stockOf(organizationId, projectId)
+        : null;
     const userIds = [...new Set(entries.map((e) => e.userId))];
     const rates =
       userIds.length === 0
@@ -255,6 +273,7 @@ export class ProjectMarginService {
       from: query.from ?? null,
       to: query.to ?? null,
       ...(purchasesRead === null ? {} : { purchases: { projectId, ...purchasesRead } }),
+      ...(stockRead === null ? {} : { stock: { projectId, ...stockRead } }),
     });
 
     let byMember: ProjectMarginView['byMember'] = null;
@@ -278,6 +297,7 @@ export class ProjectMarginService {
       minutesWithoutRate: result.minutesWithoutRate,
       byMember,
       purchases: result.purchases ?? null,
+      materials: result.materials ?? null,
     };
   }
 }

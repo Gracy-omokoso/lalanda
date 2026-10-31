@@ -17,6 +17,9 @@
 //     `treasury.read` en plus, les approbations à faire avec `purchase.approve`.
 //     Ressources humaines (ADR-0045 § 6.5) : la portée vient de la relation (manager)
 //     ou des droits effectifs, décidée par le moteur RH ; des nombres seulement.
+//     Stocks, équipements, bibliothèque (ADR-0046 § 6.6) : `stock.read`, `assets.read`,
+//     `docs.read` ; des nombres seulement (ni valeur, ni coût, ni titre), et les
+//     documents comptés sont ceux que le membre peut LIRE.
 
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -39,21 +42,30 @@ import {
 } from '../authz/permissions.js';
 import { SalesInvoice, type SalesInvoiceDocument } from '../sales/invoices/invoice.schema.js';
 import {
+  ASSETS_SOURCE,
   CASH_POSITION_SOURCE,
   CRM_SOURCE,
+  DOCUMENTS_SOURCE,
   DUE_DATES_SOURCE,
   HR_SOURCE,
   OUTSTANDING_SOURCE,
   PURCHASES_SOURCE,
+  STOCK_SOURCE,
   WORK_SOURCE,
+  noAssets,
+  noDocuments,
   noHr,
   noPurchases,
+  noStock,
+  type AssetsSource,
   type CashPositionSource,
   type CrmSource,
+  type DocumentsSource,
   type DueDatesSource,
   type HrSource,
   type OutstandingSource,
   type PurchasesSource,
+  type StockSource,
   type WorkSource,
 } from './morning-brief.ports.js';
 import {
@@ -140,6 +152,9 @@ export interface MorningBriefPreferences {
 export class MorningBriefService {
   private readonly purchases: PurchasesSource;
   private readonly hr: HrSource;
+  private readonly stock: StockSource;
+  private readonly assets: AssetsSource;
+  private readonly documents: DocumentsSource;
 
   constructor(
     @InjectModel(SalesInvoice.name) private readonly invoices: Model<SalesInvoiceDocument>,
@@ -157,9 +172,16 @@ export class MorningBriefService {
     @Optional() @Inject(PURCHASES_SOURCE) purchases: PurchasesSource | null = null,
     // ADR-0045 — H5 : facultatif, « non disponible » sans module RH.
     @Optional() @Inject(HR_SOURCE) hr: HrSource | null = null,
+    // ADR-0046 — S7 : facultatifs, « non disponible » sans leur module.
+    @Optional() @Inject(STOCK_SOURCE) stock: StockSource | null = null,
+    @Optional() @Inject(ASSETS_SOURCE) assets: AssetsSource | null = null,
+    @Optional() @Inject(DOCUMENTS_SOURCE) documents: DocumentsSource | null = null,
   ) {
     this.purchases = purchases ?? noPurchases;
     this.hr = hr ?? noHr;
+    this.stock = stock ?? noStock;
+    this.assets = assets ?? noAssets;
+    this.documents = documents ?? noDocuments;
   }
 
   /**
@@ -189,33 +211,53 @@ export class MorningBriefService {
     // ADR-0045 § 6.5 : RH pour tout membre qui lit le brief ; la portée est décidée
     // par le moteur RH sur les droits effectifs (un retrait de `hr.read` la réduit).
     const hrVisible = can(role, 'analytics.read', context);
-    const [sales, cash, dueDates, work, crm, purchases, hr] = await Promise.all([
-      salesVisible ? this.loadSales(organizationId, now) : Promise.resolve('hidden' as const),
-      cashVisible ? this.cash.cashOf(organizationId, now) : Promise.resolve('hidden' as const),
-      // Les échéances sont des données de ventes : même règle de visibilité.
-      salesVisible
-        ? this.dueDates.dueDatesOf(organizationId, now)
-        : Promise.resolve({ status: 'unavailable' as const }),
-      // Tâches et projets : chargés seulement avec `work.read`.
-      workVisible
-        ? this.work.workOf(organizationId, userId, now)
-        : Promise.resolve('hidden' as const),
-      crmVisible ? this.crm.crmOf(organizationId, userId, now) : Promise.resolve('hidden' as const),
-      purchasesVisible
-        ? this.purchases.purchasesOf(
-            organizationId,
-            userId,
-            {
-              amounts: cashVisible,
-              approvals: can(role, 'purchase.approve', context),
-            },
-            now,
-          )
-        : Promise.resolve('hidden' as const),
-      hrVisible
-        ? this.hr.hrOf(organizationId, userId, effectiveActions(role, context), now)
-        : Promise.resolve('hidden' as const),
-    ]);
+    // ADR-0046 § 6.6 : chaque bloc derrière sa propre action de lecture (droits effectifs).
+    const stockVisible = can(role, 'stock.read', context);
+    const assetsVisible = can(role, 'assets.read', context);
+    const documentsVisible = can(role, 'docs.read', context);
+    const [sales, cash, dueDates, work, crm, purchases, hr, stock, assets, documents] =
+      await Promise.all([
+        salesVisible ? this.loadSales(organizationId, now) : Promise.resolve('hidden' as const),
+        cashVisible ? this.cash.cashOf(organizationId, now) : Promise.resolve('hidden' as const),
+        // Les échéances sont des données de ventes : même règle de visibilité.
+        salesVisible
+          ? this.dueDates.dueDatesOf(organizationId, now)
+          : Promise.resolve({ status: 'unavailable' as const }),
+        // Tâches et projets : chargés seulement avec `work.read`.
+        workVisible
+          ? this.work.workOf(organizationId, userId, now)
+          : Promise.resolve('hidden' as const),
+        crmVisible
+          ? this.crm.crmOf(organizationId, userId, now)
+          : Promise.resolve('hidden' as const),
+        purchasesVisible
+          ? this.purchases.purchasesOf(
+              organizationId,
+              userId,
+              {
+                amounts: cashVisible,
+                approvals: can(role, 'purchase.approve', context),
+              },
+              now,
+            )
+          : Promise.resolve('hidden' as const),
+        hrVisible
+          ? this.hr.hrOf(organizationId, userId, effectiveActions(role, context), now)
+          : Promise.resolve('hidden' as const),
+        stockVisible ? this.stock.stockOf(organizationId, now) : Promise.resolve('hidden' as const),
+        assetsVisible
+          ? this.assets.assetsOf(organizationId, now)
+          : Promise.resolve('hidden' as const),
+        documentsVisible
+          ? this.documents.documentsOf(
+              organizationId,
+              userId,
+              role,
+              effectiveActions(role, context),
+              now,
+            )
+          : Promise.resolve('hidden' as const),
+      ]);
     return buildMorningBrief({
       now: now.toISOString(),
       sales,
@@ -225,6 +267,9 @@ export class MorningBriefService {
       crm,
       purchases,
       hr,
+      stock,
+      assets,
+      documents,
     });
   }
 

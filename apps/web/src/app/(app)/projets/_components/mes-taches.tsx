@@ -10,9 +10,11 @@
 // la même liste (pastille « Relance », compte ou opportunité) ; leur case se
 // coche par la route du CRM ; un clic ouvre l'opportunité, le compte ou le contact.
 
+import type { AssetsMyTaskItem } from '@lalanda/shared/assets';
 import type { CrmMyTaskItem } from '@lalanda/shared/crm';
 import type { HrMyTaskItem } from '@lalanda/shared/hr';
 import type { PurchasesMyTaskItem } from '@lalanda/shared/purchases';
+import type { StockMyTaskItem } from '@lalanda/shared/stock';
 import type { MyTasksView, WorkMyTaskItem } from '@lalanda/shared/work';
 import { EmptyState, PageHeader, Skeleton, buttonClasses } from '@lalanda/ui';
 import { ClipboardCheck, Scale } from 'lucide-react';
@@ -39,7 +41,9 @@ import {
   PASTILLE_APPROBATION,
   appliquerTache,
   estApprobation,
+  estElementMagasin,
   estElementRh,
+  sousTitreElementMagasin,
   estRelance,
   peutCocherRelance,
   retirerElement,
@@ -204,7 +208,9 @@ export function MesTaches(): React.ReactElement {
                 ) : (
                   <ul className="flex flex-col divide-y divide-[var(--border)] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)]">
                     {liste.map((t) =>
-                      estElementRh(t) ? (
+                      estElementMagasin(t) ? (
+                        <LigneMagasin key={t.id} e={t} today={vue.asOf} dueSoonDays={dueSoon} />
+                      ) : estElementRh(t) ? (
                         <LigneElementRh key={t.id} e={t} today={vue.asOf} dueSoonDays={dueSoon} />
                       ) : estApprobation(t) ? (
                         <LigneApprobation key={t.id} a={t} today={vue.asOf} dueSoonDays={dueSoon} />
@@ -268,6 +274,49 @@ export function MesTaches(): React.ReactElement {
  * Approbation d'achat (ADR-0044 § 6.5, § 8) : pastille « Approbation », pas de case à
  * cocher — approuver exige une décision, le lien ouvre la demande.
  */
+/** ADR-0046 § 6.7 : inventaire, « À traiter » ou maintenance — un lien et sa pastille. */
+function LigneMagasin({
+  e,
+  today,
+  dueSoonDays,
+}: {
+  e: StockMyTaskItem | AssetsMyTaskItem;
+  today: string;
+  dueSoonDays: number;
+}): React.ReactElement {
+  return (
+    <li className="relative flex min-w-0 flex-col gap-1.5 px-3 py-2.5 hover:bg-[var(--surface-muted)] sm:flex-row sm:items-center sm:gap-3">
+      <div className="flex min-w-0 flex-1 items-start gap-2">
+        <ClipboardCheck
+          aria-hidden="true"
+          className="mt-0.5 h-4 w-4 shrink-0 text-[var(--module-run)]"
+        />
+        <span className="flex min-w-0 flex-col">
+          <Link
+            href={e.href}
+            className="break-words text-sm font-medium underline-offset-2 after:absolute after:inset-0 hover:underline"
+          >
+            {e.title}
+          </Link>
+          <span className="truncate text-xs text-[var(--foreground-muted)]">
+            {sousTitreElementMagasin(e)}
+          </span>
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 pl-6 sm:pl-0">
+        <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-strong)] px-2 py-0.5 text-[0.7rem] font-medium">
+          {e.kindLabel}
+        </span>
+        <Echeance
+          task={{ dueDate: e.dueDate, done: false, isMilestone: false }}
+          today={today}
+          dueSoonDays={dueSoonDays}
+        />
+      </div>
+    </li>
+  );
+}
+
 function LigneApprobation({
   a,
   today,

@@ -627,9 +627,10 @@ Lot H5 (implémenté) :
   `mes_validations_absence.en_attente`, `rh.echeances` (nombres seulement, `hidden` sans
   portée), règles R13 à R15 ; mêmes faits dans l'e-mail quotidien.
 
-## Stocks, équipements et documents — proposé, ADR-0046 (non implémenté)
+## Stocks, équipements et documents — implémenté, ADR-0046 (lots S0 à S9)
 
-Contrat **proposé** par [ADR-0046](adr/ADR-0046-stocks-equipements-documents.md) § 5 (R5 du RUN).
+Contrat posé par [ADR-0046](adr/ADR-0046-stocks-equipements-documents.md) § 5 (R5 du RUN),
+**implémenté** par les lots S0 à S9 (31 oct. 2026), aux valeurs par défaut des décisions ouvertes.
 Modules `apps/api/src/stock/`, `assets/`, `documents/` ; web `/stocks`, `/equipements`,
 `/documents`. Huit actions nouvelles (`stock.read`, `stock.move`, `stock.count`, `stock.manage`,
 `assets.read`, `assets.manage`, `docs.read`, `docs.manage`) et un rôle nouveau, Magasinier
@@ -658,6 +659,24 @@ dans `purchases.module.ts`) ; les factures de vente finales sont **lues** par la
 brief (1.5.0) : R16 `ruptures_et_seuils`, R17 `maintenances_dues`, R18
 `echeances_documents_et_garanties`. Tâches : `stock.purchase-sync`, `stock.sales-sync`,
 `stock.levels-check`, `assets.reminders`, `documents.reminders`, `documents.purge`.
+
+Lot S7 (implémenté) — liens, **aucune route nouvelle** :
+
+- `GET /morning-brief` (1.5.0) : faits `stock.ruptures`, `stock.sous_seuil`, `stock.a_traiter`
+  (`stock.read`), `equipements.maintenances_dues`, `equipements.couvertures_expirant`,
+  `equipements.chez_anciens` (`assets.read`), `documents.expirant` (`docs.read`, documents
+  **lisibles** par le membre) — des nombres seulement, `hidden` sans le droit ; règles R16, R17
+  (`attention`), R18 (`info`) ; mêmes faits dans l'e-mail quotidien ;
+- `GET /work/my-tasks` : éléments `source: 'stock'` (`count_to_count` pour le compteur assigné avec
+  `stock.count`, `count_to_validate` pour le validateur éligible avec `stock.manage` — jamais un
+  compteur, sauf approbateur unique —, `pending_lines` regroupé avec `stock.move`) et
+  `source: 'assets'` (maintenance due dont l'appelant est responsable : `assets.manage` ou
+  équipement affecté), sans case à cocher ;
+- `GET /work/projects/:id/margin` (1.3.0) : `materials` par devise de coût, informatif, jamais
+  soustrait ; `null` sans `stock.read` ou sans `purchase.read`/`treasury.read` ;
+- tâche `stock.notifications` (15 min) : `stock.below_reorder` et `stock.negative` une fois par
+  franchissement, `stock.pending_lines` au plus une par heure, `stock.count_assigned`,
+  `stock.count_submitted` ; `dedupeKey` par destinataire.
 
 ## Brief du matin — implémenté (ADR-0033)
 

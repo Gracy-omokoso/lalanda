@@ -6,6 +6,8 @@ import { describe, expect, it } from 'vitest';
 
 import { oid, tache } from './fixtures.test-helpers';
 import {
+  estElementMagasin,
+  sousTitreElementMagasin,
   PASTILLE_APPROBATION,
   PASTILLE_VALIDATION_ABSENCE,
   aPlat,
@@ -242,5 +244,39 @@ describe('absences à valider (ADR-0045 § 6.1)', () => {
     const r = regrouper(v, [absence, item(2, null)], 1);
     expect(r.next7Days.map((e) => e.id)).toEqual(['hr:leave:r1']);
     expect(r.noDate).toHaveLength(1);
+  });
+});
+
+describe('éléments des stocks et des équipements (ADR-0046 § 6.7, lot S7)', () => {
+  it('reconnus par leur source, sans case à cocher, avec leur nature', () => {
+    const stock = {
+      source: 'stock' as const,
+      kind: 'count_to_validate' as const,
+      id: 'stock:validate:c1',
+      title: 'Inventaire IV2610-000001 — Magasin',
+      dueDate: '2026-10-21',
+      priority: 'none' as const,
+      rank: '2026-10-21T08:00:00.000Z',
+      done: false as const,
+      kindLabel: 'Inventaire à valider',
+      href: '/stocks/inventaires/c1',
+    };
+    expect(estElementMagasin(stock)).toBe(true);
+    expect(sousTitreElementMagasin(stock)).toBe('Inventaire à valider');
+    const maintenance = {
+      source: 'assets' as const,
+      kind: 'maintenance' as const,
+      id: 'assets:maintenance:m1',
+      assetId: 'a1',
+      maintenanceId: 'm1',
+      title: 'EQ-000001 Groupe',
+      dueDate: '2026-10-22',
+      priority: 'none' as const,
+      rank: '2026-10-22:m1',
+      done: false as const,
+      kindLabel: 'Maintenance' as const,
+      href: '/equipements/a1',
+    };
+    expect(sousTitreElementMagasin(maintenance)).toBe('Maintenance prévue le 2026-10-22');
   });
 });

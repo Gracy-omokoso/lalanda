@@ -11,3 +11,5 @@ export * from './common.js';
 // ADR-0046 — S5
 export * from './registry.js';
 export * from './views.js';
+// ADR-0046 — S7
+export * from './agenda.js';

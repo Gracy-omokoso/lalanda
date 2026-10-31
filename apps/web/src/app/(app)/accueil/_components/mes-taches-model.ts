@@ -9,9 +9,11 @@
 // ADR-0040 — C4 : la liste est mixte ; une relance du CRM (`source: 'crm'`) y
 // figure avec son compte (ou son opportunité) et ouvre le CRM.
 
+import type { AssetsMyTaskItem } from '@lalanda/shared/assets';
 import type { CrmMyTaskItem } from '@lalanda/shared/crm';
 import type { HrMyTaskItem } from '@lalanda/shared/hr';
 import type { PurchasesMyTaskItem } from '@lalanda/shared/purchases';
+import type { StockMyTaskItem } from '@lalanda/shared/stock';
 import type { MyTaskEntry, MyTaskItem } from '@lalanda/shared/work';
 
 import type { OrgAction } from '@/lib/api';
@@ -62,7 +64,22 @@ function estElementRh(t: Element): t is HrMyTaskItem {
   return 'source' in t && t.source === 'hr';
 }
 
+// ADR-0046 § 6.7 (lot S7) : inventaire, « À traiter » ou maintenance — un lien.
+function estElementMagasin(t: Element): t is StockMyTaskItem | AssetsMyTaskItem {
+  return 'source' in t && (t.source === 'stock' || t.source === 'assets');
+}
+
 function ligne(t: Element, enRetard: boolean): LigneTache {
+  if (estElementMagasin(t)) {
+    return {
+      id: t.id,
+      titre: `${t.kindLabel} : ${t.title}`,
+      projet: t.source === 'assets' ? 'Équipements' : 'Stocks',
+      echeance: enRetard ? `En retard · ${formatJour(t.dueDate, false)}` : 'Aujourd’hui',
+      enRetard,
+      lien: t.href,
+    };
+  }
   if (estElementRh(t)) {
     const echeance = t.dueDate === null ? 'Sans échéance' : formatJour(t.dueDate, false);
     return t.kind === 'leave_approval'

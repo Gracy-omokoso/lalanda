@@ -11,6 +11,9 @@ import type { CrmMyTaskItem } from '../crm/agenda.js';
 import type { PurchasesMyTaskItem } from '../purchases/agenda.js';
 // ADR-0045 — H3 : validations d'absence et éléments de liste RH dans « Mes tâches » (§ 6.1).
 import type { HrMyTaskItem } from '../hr/leave.js';
+// ADR-0046 — S7 : inventaires, « À traiter » et maintenances dans « Mes tâches » (§ 6.7).
+import type { StockMyTaskItem } from '../stock/agenda.js';
+import type { AssetsMyTaskItem } from '../assets/agenda.js';
 import type {
   WorkActivityKind,
   WorkColumn,
@@ -231,15 +234,23 @@ export interface MyTaskItem extends WorkTaskView {
 /** Tâche du module `work` dans « Mes tâches » (ADR-0040 — C4 § 5.2). */
 export type WorkMyTaskItem = MyTaskItem & { source: 'work' };
 
-export type { CrmMyTaskItem, HrMyTaskItem, PurchasesMyTaskItem };
+export type { AssetsMyTaskItem, CrmMyTaskItem, HrMyTaskItem, PurchasesMyTaskItem, StockMyTaskItem };
 
 /**
  * Élément de « Mes tâches » : une tâche, ou une relance du CRM agrégée à la
  * lecture (ADR-0040 — C4 § 5.2), ou une approbation d'achat (ADR-0044 § 6.5, sans
  * case à cocher), ou un élément RH (ADR-0045 § 6.1 : validation d'absence, élément de
- * liste). `source` dit quel module la possède, donc quelle route la coche.
+ * liste), ou un élément des stocks ou des équipements (ADR-0046 § 6.7 : inventaire à
+ * compter ou à valider, « À traiter », maintenance ; sans case à cocher). `source` dit
+ * quel module la possède, donc quelle route la coche.
  */
-export type MyTaskEntry = WorkMyTaskItem | CrmMyTaskItem | PurchasesMyTaskItem | HrMyTaskItem;
+export type MyTaskEntry =
+  | WorkMyTaskItem
+  | CrmMyTaskItem
+  | PurchasesMyTaskItem
+  | HrMyTaskItem
+  | StockMyTaskItem
+  | AssetsMyTaskItem;
 
 /** `GET /work/my-tasks` — groupes calculés par `groupMyTasks`. */
 export interface MyTasksView {
@@ -405,6 +416,21 @@ export interface ProjectMarginView {
    * pas `purchase.read` (rien n'est lu).
    */
   purchases?: ProjectMarginPurchasesView[] | null;
+  /**
+   * ADR-0046 § 6.4 (`WORK_MARGIN_VERSION` 1.3.0) — matériel sorti du stock pour le
+   * projet, par devise de coût, valorisé au coût moyen : INFORMATIF, jamais soustrait
+   * de `margin`. `null` si l'appelant ne détient pas `stock.read` ET l'accès aux
+   * valeurs (`purchase.read` ou `treasury.read`) : rien n'est lu.
+   */
+  materials?: ProjectMarginMaterialsView[] | null;
+}
+
+/** Matériel sorti du stock d'une devise (ADR-0046 § 6.4), rendu par le moteur. */
+export interface ProjectMarginMaterialsView {
+  currency: WorkRateCurrency;
+  consumedValue: string;
+  issueCount: number;
+  unvaluedCount: number;
 }
 
 /** Coûts engagés d'une devise (ADR-0044 § 6.1), rendus par le moteur. */

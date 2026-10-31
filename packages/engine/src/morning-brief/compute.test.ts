@@ -67,6 +67,15 @@ function input(
       deadlineCount: 0,
       truncated: false,
     },
+    // ADR-0046 § 6.6 : connus et vides par défaut.
+    stock: { status: 'known', items: [], levels: [], pendingCount: 0, truncated: false },
+    assets: {
+      status: 'known',
+      maintenanceDueCount: 0,
+      coverageExpiringCount: 0,
+      heldByFormerEmployeeCount: 0,
+    },
+    documents: { status: 'known', expiringCount: 0 },
     ...over,
   };
 }
@@ -478,13 +487,13 @@ describe('projets et tâches — faits et règles R8, R9 (ADR-0039 § 6.5)', () 
   });
 
   it('version mineure suivante (ADR-0044 § 6.4)', () => {
-    expect(brief([]).version).toBe('1.4.0');
+    expect(brief([]).version).toBe('1.5.0');
   });
 
-  it('les quinze règles ont des rangs uniques', () => {
+  it('les dix-huit règles ont des rangs uniques', () => {
     const ranks = MORNING_BRIEF_RULES.map((r) => r.rank);
     expect(new Set(ranks).size).toBe(ranks.length);
-    expect(ranks.length).toBe(15);
+    expect(ranks.length).toBe(18);
   });
 });
 
@@ -840,9 +849,197 @@ describe('ressources humaines — absences du jour, validations, échéances, R1
     }
   });
 
-  it('lecture bornée : le brief le dit ; version 1.4.0', () => {
+  it('lecture bornée : le brief le dit ; version 1.5.0', () => {
     const b = buildMorningBrief(input([], rh({ truncated: true })));
     expect(b.truncated).toBe(true);
-    expect(b.version).toBe('1.4.0');
+    expect(b.version).toBe('1.5.0');
+  });
+});
+
+describe('stocks, équipements, documents — faits et règles R16 à R18 (ADR-0046 § 6.6)', () => {
+  const item = (id: string, over: Record<string, unknown> = {}) => ({
+    id,
+    unit: 'pièce',
+    costCurrency: 'USD' as const,
+    ...over,
+  });
+  const level = (itemId: string, quantity: string, locationId = 'L1') => ({
+    itemId,
+    locationId,
+    quantity,
+  });
+  const r5 = (over: Partial<MorningBriefInput> = {}): Partial<MorningBriefInput> => ({
+    stock: { status: 'known', items: [], levels: [], pendingCount: 0, truncated: false },
+    assets: {
+      status: 'known',
+      maintenanceDueCount: 0,
+      coverageExpiringCount: 0,
+      heldByFormerEmployeeCount: 0,
+    },
+    documents: { status: 'known', expiringCount: 0 },
+    ...over,
+  });
+
+  it('deux articles sous le seuil : `stock.sous_seuil = 2` et R16 (critère 18)', () => {
+    const reorder = { minQuantity: '10', locationId: null };
+    const b = buildMorningBrief(
+      input(
+        [],
+        r5({
+          stock: {
+            status: 'known',
+            items: [item('a', { reorder }), item('b', { reorder }), item('c', { reorder })],
+            levels: [level('a', '3'), level('b', '9.5'), level('c', '12')],
+            pendingCount: 0,
+            truncated: false,
+          },
+        }),
+      ),
+    );
+    expect(fact(b.facts, 'stock.sous_seuil').value).toBe('2');
+    expect(fact(b.facts, 'stock.ruptures').value).toBe('0');
+    const r16 = b.recommendations.find((r) => r.ruleId === 'ruptures_et_seuils');
+    expect(r16?.message).toBe('2 articles sous le seuil.');
+    expect(r16?.actionPath).toBe('/stocks/reapprovisionnement');
+    expect(r16?.severity).toBe('attention');
+    expect(r16?.rank).toBe(16);
+  });
+
+  it('ruptures : article suivi et actif à quantité ≤ 0 à un emplacement, compté une fois', () => {
+    const b = buildMorningBrief(
+      input(
+        [],
+        r5({
+          stock: {
+            status: 'known',
+            items: [
+              item('a'),
+              item('b'),
+              item('archive', { active: false }),
+              item('libre', { tracked: false }),
+            ],
+            levels: [
+              level('a', '0', 'L1'),
+              level('a', '-2', 'L2'),
+              level('b', '-1'),
+              level('archive', '0'),
+              level('libre', '-4'),
+            ],
+            pendingCount: 3,
+            truncated: false,
+          },
+        }),
+      ),
+    );
+    expect(fact(b.facts, 'stock.ruptures').value).toBe('2');
+    expect(fact(b.facts, 'stock.a_traiter').value).toBe('3');
+    expect(b.recommendations.find((r) => r.ruleId === 'ruptures_et_seuils')?.message).toBe(
+      '2 articles en rupture.',
+    );
+  });
+
+  it('R17 : maintenances dues et équipements chez d’anciens collaborateurs', () => {
+    const b = buildMorningBrief(
+      input(
+        [],
+        r5({
+          assets: {
+            status: 'known',
+            maintenanceDueCount: 1,
+            coverageExpiringCount: 0,
+            heldByFormerEmployeeCount: 2,
+          },
+        }),
+      ),
+    );
+    const r17 = b.recommendations.find((r) => r.ruleId === 'maintenances_dues');
+    expect(r17?.message).toBe(
+      '1 maintenance due et 2 équipements encore affectés à d’anciens collaborateurs.',
+    );
+    expect(r17?.actionPath).toBe('/equipements/echeances');
+    expect(fact(b.facts, 'equipements.chez_anciens').value).toBe('2');
+  });
+
+  it('R18 (info) : couvertures et documents qui expirent', () => {
+    const b = buildMorningBrief(
+      input(
+        [],
+        r5({
+          assets: {
+            status: 'known',
+            maintenanceDueCount: 0,
+            coverageExpiringCount: 1,
+            heldByFormerEmployeeCount: 0,
+          },
+          documents: { status: 'known', expiringCount: 2 },
+        }),
+      ),
+    );
+    const r18 = b.recommendations.find((r) => r.ruleId === 'echeances_documents_et_garanties');
+    expect(r18?.severity).toBe('info');
+    expect(r18?.message).toBe(
+      'Échéance proche ou dépassée : 1 garantie, assurance ou contrat et 2 documents.',
+    );
+    expect(b.alerts.some((a) => a.ruleId === 'echeances_documents_et_garanties')).toBe(false);
+  });
+
+  it('rien à signaler : aucune des trois règles', () => {
+    const ids = ruleIds([], r5());
+    expect(ids).not.toContain('ruptures_et_seuils');
+    expect(ids).not.toContain('maintenances_dues');
+    expect(ids).not.toContain('echeances_documents_et_garanties');
+  });
+
+  it('masqués sans le droit : faits `hidden`, règles sautées ; absents : non disponibles', () => {
+    const b = buildMorningBrief(
+      input([], { stock: 'hidden', assets: 'hidden', documents: 'hidden' }),
+    );
+    for (const id of ['stock.ruptures', 'stock.sous_seuil', 'stock.a_traiter']) {
+      expect(fact(b.facts, id).status).toBe('hidden');
+      expect(fact(b.facts, id).value).toBeNull();
+    }
+    expect(fact(b.facts, 'documents.expirant').status).toBe('hidden');
+    expect(b.rulesSkipped).toContainEqual({ ruleId: 'ruptures_et_seuils', reason: 'hidden' });
+    expect(b.rulesSkipped).toContainEqual({ ruleId: 'maintenances_dues', reason: 'hidden' });
+    expect(b.rulesSkipped).toContainEqual({
+      ruleId: 'echeances_documents_et_garanties',
+      reason: 'hidden',
+    });
+    const absent = buildMorningBrief(
+      input([], { stock: undefined, assets: undefined, documents: undefined }),
+    );
+    expect(fact(absent.facts, 'stock.ruptures').status).toBe('unavailable');
+    expect(absent.rulesSkipped).toContainEqual({
+      ruleId: 'ruptures_et_seuils',
+      reason: 'unavailable',
+    });
+  });
+
+  it('des nombres seulement : ni identifiant d’article ni coût ne sortent du moteur', () => {
+    const b = buildMorningBrief(
+      input(
+        [],
+        r5({
+          stock: {
+            status: 'known',
+            items: [item('article-secret', { reorder: { minQuantity: '5', locationId: null } })],
+            levels: [level('article-secret', '1')],
+            pendingCount: 0,
+            truncated: true,
+          },
+        }),
+      ),
+    );
+    expect(JSON.stringify(b)).not.toContain('article-secret');
+    for (const f of b.facts.filter(
+      (x) => x.source.module.startsWith('run.') && x.id.includes('.'),
+    )) {
+      if (['run.stock', 'run.assets', 'run.documents'].includes(f.source.module)) {
+        expect(f.kind).toBe('count');
+        expect(f.currency).toBeNull();
+      }
+    }
+    expect(b.truncated).toBe(true);
+    expect(b.version).toBe('1.5.0');
   });
 });
