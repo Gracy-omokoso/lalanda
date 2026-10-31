@@ -82,3 +82,19 @@ describe('marge-model', () => {
     expect(suggestionFacture(undefined)).toBeNull();
   });
 });
+
+describe('matériel sorti du stock (ADR-0046 § 6.4, marge 1.3.0)', () => {
+  it('une phrase informative par devise, après les constats servis ; rien sans droits', () => {
+    const avec = constats({
+      ...vue,
+      materials: [{ currency: 'USD', consumedValue: '30.00', issueCount: 1, unvaluedCount: 0 }],
+    });
+    const m = avec[avec.length - 1]!;
+    expect(m.code).toBe('MATERIALS_FROM_STOCK.USD');
+    expect(m.ton).toBe('info');
+    expect(m.texte).toContain('Matériel sorti du stock — informatif');
+    expect(m.texte).toContain('1 bon de sortie');
+    expect(m.texte).toContain('rien n’est soustrait');
+    expect(constats({ ...vue, materials: null })).toHaveLength(constats(vue).length);
+  });
+});

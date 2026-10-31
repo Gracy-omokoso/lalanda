@@ -20,10 +20,17 @@
 // est une décision), soit un élément de liste d'entrée ou de sortie (`checklist_item`,
 // lot H4). Le type d'une absence confidentielle arrive déjà masqué (« Absence ») :
 // l'écran n'en sait pas plus.
+//
+// ADR-0046 § 6.7 (lot S7) : un élément `source: 'stock'` (inventaire à compter ou à
+// valider, lignes « À traiter ») ou `source: 'assets'` (maintenance due) n'a pas de case
+// à cocher : il ouvre l'écran où agir et porte sa pastille (`kindLabel`). Ni coût ni
+// valeur n'y figurent.
 
+import type { AssetsMyTaskItem } from '@lalanda/shared/assets';
 import type { CrmMyTaskItem } from '@lalanda/shared/crm';
 import type { HrMyTaskItem } from '@lalanda/shared/hr';
 import type { PurchasesMyTaskItem } from '@lalanda/shared/purchases';
+import type { StockMyTaskItem } from '@lalanda/shared/stock';
 import {
   groupMyTasks,
   type MyTaskEntry,
@@ -108,6 +115,16 @@ export function pastilleElementRh(e: HrMyTaskItem): string {
 export function sousTitreElementRh(e: HrMyTaskItem): string {
   if (e.kind === 'checklist_item') return e.employeeName;
   return `${libellePeriode(e.start, e.end)} · ${formatJours(e.days)}`;
+}
+
+/** Élément des stocks ou des équipements (ADR-0046 § 6.7) : un lien, sans case à cocher. */
+export function estElementMagasin(e: MyTaskEntry): e is StockMyTaskItem | AssetsMyTaskItem {
+  return e.source === 'stock' || e.source === 'assets';
+}
+
+/** Ligne secondaire : la nature de l'élément (« Inventaire à valider », « Maintenance »). */
+export function sousTitreElementMagasin(e: StockMyTaskItem | AssetsMyTaskItem): string {
+  return e.source === 'assets' ? `Maintenance prévue le ${e.dueDate}` : e.kindLabel;
 }
 
 /**
