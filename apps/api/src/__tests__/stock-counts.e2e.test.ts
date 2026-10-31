@@ -254,6 +254,25 @@ e2eSuite('Stocks — inventaires (ADR-0046 S3)', () => {
     expect(pending['items'][0]['proposal']).toMatchObject({ itemId: unvalued, quantity: '4.000' });
   });
 
+  it('premier inventaire « tous les articles » : un article neuf, jamais stocké, y figure', async () => {
+    // Rangé par défaut à l'emplacement de l'organisation (aucun emplacement propre), sans
+    // stock ni seuil : c'est le cas du stock initial d'un article qu'on vient de créer.
+    const ici = loc || (await f.defaultLocation());
+    const neuf = (await f.item('Rame papier A4', { costCurrency: 'USD' }))['id'];
+    const created = f.ok(await f.post('owner', '/stock/counts', { locationId: ici }), 201);
+    const started = f.ok(
+      await f.post('owner', `/stock/counts/${created['id']}/start`, { expectedRevision: 1 }),
+    );
+    const itemIds = (started['lines'] as Array<{ itemId: string }>).map((l) => l.itemId);
+    expect(itemIds).toContain(neuf);
+    f.ok(
+      await f.post('owner', `/stock/counts/${created['id']}/cancel`, {
+        expectedRevision: started['revision'],
+        reason: 'Essai',
+      }),
+    );
+  });
+
   it('inventaire incomplet : soumission refusée ; annulation par un compteur', async () => {
     const count = await openCount('owner', loc, [itemId]);
     f.code(

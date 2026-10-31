@@ -226,10 +226,16 @@ export class StockCountsService {
     if (current.scope === 'items') {
       itemIds = current.itemIds;
     } else {
-      // Articles suivis présents à l'emplacement, ou seuillés à cet emplacement.
+      // Articles suivis présents à l'emplacement, seuillés à cet emplacement, ou rangés
+      // par défaut à cet emplacement (directement, ou par l'emplacement par défaut de
+      // l'organisation) : sans ce dernier cas, un article neuf, jamais stocké, ne pouvait
+      // pas recevoir son stock initial par le premier inventaire (ADR-0046 § 4).
       const present = await this.levels
         .distinct('itemId', { organizationId, locationId: current.locationId })
         .exec();
+      const orgDefault = (await this.settings.ensure(organizationId)).defaultLocationId;
+      const rangesIci: Array<Record<string, unknown>> = [{ defaultLocationId: current.locationId }];
+      if (orgDefault === current.locationId) rangesIci.push({ defaultLocationId: null });
       const docs = await this.itemModel
         .find({
           organizationId,
@@ -238,6 +244,7 @@ export class StockCountsService {
           $or: [
             { _id: { $in: present.filter(isOid).map((id) => new Types.ObjectId(id)) } },
             { 'reorder.locationId': current.locationId },
+            ...rangesIci,
           ],
         })
         .sort({ sortName: 1, _id: 1 })
