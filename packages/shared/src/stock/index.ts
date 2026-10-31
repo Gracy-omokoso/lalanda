@@ -17,3 +17,5 @@ export * from './counts.js';
 export * from './settings.js';
 // ADR-0046 — S4
 export * from './links.js';
+// ADR-0046 — S7
+export * from './agenda.js';
