@@ -152,6 +152,16 @@ export interface StockCountView {
   valuesHidden: boolean;
   submission: { at: string; by: string } | null;
   validation: { at: string; by: string; comment: string | null; soleApprover: boolean } | null;
+  /**
+   * ADR-0046 — S4 (complément des écrans S8) : l'APPELANT peut-il valider maintenant ?
+   * Inventaire soumis, `stock.manage` effectif et `stockCountDecision` favorable
+   * (exception de l'approbateur unique comprise). Jugé par l'API, jamais par l'écran.
+   */
+  canValidate: boolean;
+  /** Faux sauf si la validation de l'appelant serait celle de l'approbateur unique. */
+  validationAsSoleApprover: boolean;
+  /** `COUNT_SELF_VALIDATION` quand l'appelant a compté et qu'un autre gestionnaire existe. */
+  validationBlockedBy: 'COUNT_SELF_VALIDATION' | null;
   cancellation: { at: string; by: string; reason: string } | null;
   revision: number;
   createdBy: string;

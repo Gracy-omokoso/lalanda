@@ -56,7 +56,13 @@ import { StockSettingsService } from './stock-settings.service.js';
 import { assertMovable } from './stock-vouchers.service.js';
 
 /** Motifs dont la résolution ÉCRIT un mouvement neuf. */
-const WRITES_MOVEMENT = new Set(['unknown_item', 'unknown_unit', 'sale_return_proposed']);
+const WRITES_MOVEMENT = new Set([
+  'unknown_item',
+  'unknown_unit',
+  'sale_return_proposed',
+  // ADR-0046 — S4 : sortie de vente proposée (`salesIssueMode = proposed`).
+  'sale_issue_proposed',
+]);
 
 @Injectable()
 export class StockPendingService {
@@ -235,6 +241,8 @@ export class StockPendingService {
     if (!itemId) badRequest('FIELD_REQUIRED', 'Article obligatoire.', { field: 'itemId' });
     let item = await this.items.requireOwn(organizationId, itemId);
     assertMovable(item);
+    // ADR-0046 — S4 : une ligne d'origine sans unité est exprimée en unité de stock.
+    const lineUnit = p.unit === '' ? item.unit : p.unit;
 
     // Unité : facteur ajouté à l'article, ou quantité saisie en unité de stock.
     let quantity: string;
@@ -256,14 +264,14 @@ export class StockPendingService {
       quantity = body.quantity;
     } else {
       if (body.factor !== undefined)
-        item = await this.addConversion(organizationId, item, p.unit, body.factor, actor);
-      const converted = toStockQuantity(p.quantity, p.unit, engineItem(item));
+        item = await this.addConversion(organizationId, item, lineUnit, body.factor, actor);
+      const converted = toStockQuantity(p.quantity, lineUnit, engineItem(item));
       if (!converted.ok) {
         conflict(
           'STOCK_UNIT_UNKNOWN',
           'Unité inconnue de l’article : saisissez un facteur ou la quantité.',
           {
-            unit: p.unit,
+            unit: lineUnit,
           },
         );
       }
@@ -284,7 +292,7 @@ export class StockPendingService {
         {
           unitPrice: p.unitPrice,
           discountPercent: p.discountPercent,
-          unit: p.unit,
+          unit: lineUnit,
           currency: p.currency,
         },
         engineItem(item),

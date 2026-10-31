@@ -9,11 +9,11 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
-import { stockApi, type StockLevelRowView } from '@/lib/api-stock';
+import { stockApi, type StockLevelRowView, type StockReorderAlertView } from '@/lib/api-stock';
 
 import { BOUTON_PETIT, Champ } from '../../ventes/_components/form-ui';
 
-import { etatNiveau, requeteNiveaux } from './niveaux-model';
+import { alerteDe, etatNiveau, requeteNiveaux } from './niveaux-model';
 import { useAccesStocks } from './stocks-access';
 import { formatQuantite, lienArticle } from './stocks-model';
 import { Bandeau, CarteVide, Chargement, ChoixEmplacement, EchecLecture } from './stocks-ui';
@@ -26,15 +26,15 @@ export function Niveaux(): React.ReactElement {
   const emplacement = params.get('emplacement') ?? '';
   const sousSeuil = params.get('seuil') === '1';
   const [rows, setRows] = useState<StockLevelRowView[] | null>(null);
-  const [suivante, setSuivante] = useState<string | null>(null);
+  const [alertes, setAlertes] = useState<StockReorderAlertView[]>([]);
   const [erreur, setErreur] = useState<unknown>(null);
 
-  const charger = useCallback((loc: string, seuil: boolean, cursor: string | null) => {
+  const charger = useCallback((loc: string, seuil: boolean) => {
     stockApi
-      .listLevels(requeteNiveaux(loc, seuil, cursor))
+      .listLevels(requeteNiveaux(loc, seuil))
       .then((p) => {
-        setRows((avant) => (cursor && avant ? [...avant, ...p.items] : p.items));
-        setSuivante(p.nextCursor);
+        setRows(p.levels);
+        setAlertes(p.belowReorder);
         setErreur(null);
       })
       .catch((err: unknown) => {
@@ -44,7 +44,7 @@ export function Niveaux(): React.ReactElement {
   }, []);
 
   useEffect(() => {
-    if (etat === 'pret') charger(emplacement, sousSeuil, null);
+    if (etat === 'pret') charger(emplacement, sousSeuil);
   }, [etat, emplacement, sousSeuil, charger]);
 
   const filtrer = (loc: string, seuil: boolean): void => {
@@ -97,7 +97,8 @@ export function Niveaux(): React.ReactElement {
       ) : (
         <ul className="flex flex-col divide-y divide-[var(--border)] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)]">
           {rows.map((r) => {
-            const e = etatNiveau(r);
+            const alerte = alerteDe(r, alertes);
+            const e = etatNiveau(r, alerte);
             return (
               <li
                 key={`${r.itemId}-${r.locationId}`}
@@ -115,9 +116,9 @@ export function Niveaux(): React.ReactElement {
                     {r.locationName ?? 'Emplacement'}
                   </span>
                 ) : null}
-                {r.minQuantity !== null ? (
+                {alerte !== null ? (
                   <span className="text-xs text-[var(--foreground-muted)]">
-                    seuil {formatQuantite(r.minQuantity)}
+                    seuil {formatQuantite(alerte.minQuantity)}
                   </span>
                 ) : null}
                 <span
@@ -131,15 +132,6 @@ export function Niveaux(): React.ReactElement {
           })}
         </ul>
       )}
-      {suivante ? (
-        <button
-          type="button"
-          className={`${BOUTON_PETIT} self-center`}
-          onClick={() => charger(emplacement, sousSeuil, suivante)}
-        >
-          Afficher plus
-        </button>
-      ) : null}
     </section>
   );
 }

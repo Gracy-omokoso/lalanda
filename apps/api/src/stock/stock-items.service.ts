@@ -10,7 +10,9 @@ import {
   stockCodeKey,
   type CreateStockItemBody,
   type ListStockItemsQuery,
+  type ListStockLedgerQuery,
   type ListStockMovementsQuery,
+  type StockLedgerPage,
   type StockItemPage,
   type StockItemView,
   type StockMovementPage,
@@ -165,6 +167,90 @@ export class StockItemsService {
     }
     return {
       items: page.map((m) => movementView(m, visible, values.get(String(m._id)) ?? null)),
+      nextCursor:
+        docs.length > query.limit && last
+          ? encodeKeyCursor(last.occurredOn, String(last._id))
+          : null,
+      valuesHidden: !visible,
+    };
+  }
+
+  /**
+   * ADR-0046 — S4 (complément des écrans S8) : grand livre de TOUS les articles,
+   * filtrable (article, emplacement, nature, projet, période) et paginé par curseur
+   * (`occurredOn` décroissant). Valeurs : rejeu du moteur par article présent dans la
+   * page, servies seulement avec `canSeeStockValues`. Un identifiant d'une autre
+   * organisation en filtre : 404.
+   */
+  async ledgerPage(
+    organizationId: string,
+    query: ListStockLedgerQuery,
+    actor: StockActor,
+  ): Promise<StockLedgerPage> {
+    if (query.itemId) await this.requireOwn(organizationId, query.itemId);
+    if (query.locationId) {
+      const own = await this.locations
+        .exists({ _id: new Types.ObjectId(query.locationId), organizationId })
+        .exec();
+      if (own === null) locationNotFound();
+    }
+    const and: Record<string, unknown>[] = [{ organizationId }];
+    if (query.itemId) and.push({ itemId: query.itemId });
+    if (query.locationId) and.push({ locationId: query.locationId });
+    if (query.kind) and.push({ kind: query.kind });
+    if (query.workProjectId) and.push({ workProjectId: query.workProjectId });
+    if (query.from) and.push({ occurredOn: { $gte: query.from } });
+    if (query.to) and.push({ occurredOn: { $lte: query.to } });
+    if (query.cursor !== undefined) {
+      const cursor = decodeKeyCursor(query.cursor);
+      if (cursor === null) invalidCursor();
+      and.push(afterKeyCursor('occurredOn', cursor, -1));
+    }
+    const docs = await this.movementModel
+      .find({ $and: and })
+      .sort({ occurredOn: -1, _id: -1 })
+      .limit(query.limit + 1)
+      .lean<StockMovementLean[]>()
+      .exec();
+    const page = docs.slice(0, query.limit);
+    const last = page[page.length - 1];
+    const itemIds = [...new Set(page.map((m) => m.itemId))];
+    const [items, locations] = await Promise.all([
+      itemIds.length === 0
+        ? Promise.resolve([] as StockItemLean[])
+        : this.items
+            .find({ organizationId, _id: { $in: itemIds.map((i) => new Types.ObjectId(i)) } })
+            .lean<StockItemLean[]>()
+            .exec(),
+      this.locations.find({ organizationId }, { name: 1 }).lean<StockLocationLean[]>().exec(),
+    ]);
+    const byItem = new Map(items.map((i) => [String(i._id), i]));
+    const names = new Map(locations.map((l) => [String(l._id), l.name]));
+    const visible = seesValues(actor);
+    const values = new Map<string, string | null>();
+    if (visible && page.length > 0) {
+      const all = await this.ledger.ofItems(organizationId, itemIds);
+      for (const item of items) {
+        const id = String(item._id);
+        const valuation = weightedAverageValuation(
+          all.filter((m) => m.itemId === id).map(engineMovement),
+          engineItem(item),
+        );
+        for (const st of valuation.steps) values.set(st.movementId, st.entryValue ?? st.exitCost);
+      }
+    }
+    return {
+      items: page.map((m) => {
+        const item = byItem.get(m.itemId);
+        return {
+          ...movementView(m, visible, values.get(String(m._id)) ?? null),
+          itemCode: item?.code ?? null,
+          itemName: item?.name ?? '',
+          unit: item?.unit ?? '',
+          costCurrency: item?.costCurrency ?? 'CDF',
+          locationName: names.get(m.locationId) ?? null,
+        };
+      }),
       nextCursor:
         docs.length > query.limit && last
           ? encodeKeyCursor(last.occurredOn, String(last._id))

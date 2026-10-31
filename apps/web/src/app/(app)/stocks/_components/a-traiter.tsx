@@ -22,6 +22,7 @@ import {
   preparerResolution,
   type FiltreATraiter,
   type SaisieResolution,
+  affichageATraiter,
 } from './a-traiter-model';
 import { DialogueMotif } from './dialogue-motif';
 import { useAccesStocks } from './stocks-access';
@@ -52,6 +53,7 @@ function Resolution({
   const id = useId();
   const { actions } = useAccesStocks();
   const c = champsResolution(ligne.reason);
+  const vue = affichageATraiter(ligne);
   const droit = droitATraiter(ligne.reason, actions);
   const devise = deviseVisible(ligne, actions);
   const [s, setS] = useState<SaisieResolution>(SAISIE_VIDE);
@@ -83,17 +85,17 @@ function Resolution({
         <p className="text-sm">{c.explication}</p>
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
           <dt className="text-[var(--foreground-muted)]">Ligne</dt>
-          <dd className="break-words">{ligne.label ?? ligne.itemName ?? '—'}</dd>
-          {ligne.quantity !== null ? (
+          <dd className="break-words">{vue.libelle}</dd>
+          {vue.quantite !== null ? (
             <>
               <dt className="text-[var(--foreground-muted)]">Quantité</dt>
-              <dd>{formatQuantite(ligne.quantity, ligne.unit)}</dd>
+              <dd>{formatQuantite(vue.quantite, vue.unite)}</dd>
             </>
           ) : null}
-          {ligne.sourceLabel ? (
+          {vue.origine ? (
             <>
               <dt className="text-[var(--foreground-muted)]">Origine</dt>
-              <dd>{ligne.sourceLabel}</dd>
+              <dd>{vue.origine}</dd>
             </>
           ) : null}
         </dl>
@@ -114,7 +116,7 @@ function Resolution({
             {c.facteur ? (
               <Champ
                 id={`${id}-facteur`}
-                label={`1 ${ligne.unit ?? 'unité'} = combien d’unités de stock`}
+                label={`1 ${vue.unite ?? 'unité'} = combien d’unités de stock`}
                 requis
                 erreur={champs['facteur']}
               >
@@ -290,24 +292,27 @@ export function ATraiter(): React.ReactElement {
         )
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {items.map((l) => (
-            <li key={l.id}>
-              <button type="button" className={CARTE} onClick={() => setOuverte(l)}>
-                <span className="flex items-start justify-between gap-2">
-                  <span className="font-semibold break-words">
-                    {l.label ?? l.itemName ?? 'Ligne'}
+          {items.map((l) => {
+            const v = affichageATraiter(l);
+            return (
+              <li key={l.id}>
+                <button type="button" className={CARTE} onClick={() => setOuverte(l)}>
+                  <span className="flex items-start justify-between gap-2">
+                    <span className="font-semibold break-words">{v.libelle}</span>
+                    <Badge tone="warning">{LIBELLES_A_TRAITER[l.reason]}</Badge>
                   </span>
-                  <Badge tone="warning">{LIBELLES_A_TRAITER[l.reason]}</Badge>
-                </span>
-                {l.quantity !== null ? (
-                  <span className="text-sm tabular-nums">{formatQuantite(l.quantity, l.unit)}</span>
-                ) : null}
-                <span className="text-xs text-[var(--foreground-muted)]">
-                  {[l.sourceLabel, formatInstantJour(l.createdAt)].filter(Boolean).join(' · ')}
-                </span>
-              </button>
-            </li>
-          ))}
+                  {v.quantite !== null ? (
+                    <span className="text-sm tabular-nums">
+                      {formatQuantite(v.quantite, v.unite)}
+                    </span>
+                  ) : null}
+                  <span className="text-xs text-[var(--foreground-muted)]">
+                    {[v.origine, formatInstantJour(l.createdAt)].filter(Boolean).join(' · ')}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
       {suivante ? (

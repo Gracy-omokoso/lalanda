@@ -144,6 +144,8 @@ import { StockPendingController } from '../stock/stock-pending.controller.js';
 import { StockReportsController } from '../stock/stock-reports.controller.js';
 import { StockSettingsController } from '../stock/stock-settings.controller.js';
 import { StockVouchersController } from '../stock/stock-vouchers.controller.js';
+// ADR-0046 — S4
+import { StockSyncController } from '../stock/links/stock-sync.controller.js';
 
 /**
  * TOUS les contrôleurs de l'application. Un contrôleur absent de cette liste
@@ -282,6 +284,8 @@ const CONTROLEURS = [
   StockCountsController,
   StockReportsController,
   StockSettingsController,
+  // ADR-0046 — S4 : rattrapages achats et ventes à la demande.
+  StockSyncController,
   // ADR-0046 — S5 : équipements (registre, affectations, maintenance, couvertures, réglages).
   AssetsController,
   AssetMaintenanceController,
@@ -1331,7 +1335,9 @@ describe('ADR-0046 — S3 : stocks (référentiel, grand livre, bons, inventaire
       'StockSettingsController.get': ['stock.read'],
       'StockSettingsController.update': ['stock.manage'],
     };
-    const routes = TOUTES_LES_ROUTES.filter((r) => /^Stock[A-Za-z]+Controller\./.test(r.cle));
+    const routes = TOUTES_LES_ROUTES.filter(
+      (r) => /^Stock[A-Za-z]+Controller\./.test(r.cle) && !(r.cle in ROUTES_S4), // ADR-0046 — S4
+    );
     expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
     for (const [cle, actions] of Object.entries(attendu)) {
       const route = routes.find((r) => r.cle === cle);
@@ -1420,5 +1426,27 @@ describe('ADR-0046 — S6 : bibliothèque de documents', () => {
     for (const cle of Object.keys(SANS_PERMISSION)) {
       expect(/^(DocumentFolders|LibraryDocuments)Controller\./.test(cle)).toBe(false);
     }
+  });
+});
+
+// ADR-0046 — S4
+/** Routes ajoutées par le lot S4 aux stocks (vérifiées ici, exclues du bloc S3). */
+const ROUTES_S4: Record<string, Action[]> = {
+  // Rattrapages achats et ventes à la demande (§ 5.1) ; 6 par heure.
+  'StockSyncController.run': ['stock.manage'],
+  // Complément des écrans S8 : grand livre de tous les articles ; valeurs masquées
+  // sans `purchase.read` ni `treasury.read` (service).
+  'StockLevelsController.ledger': ['stock.read'],
+};
+describe('ADR-0046 — S4 : branchements achats et ventes, grand livre', () => {
+  it('chaque route déclare la permission de l’ADR (§ 5.1)', () => {
+    for (const [cle, actions] of Object.entries(ROUTES_S4)) {
+      const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle);
+      expect(route, cle).toBeDefined();
+      expect(route!.actions, cle).toEqual(actions);
+    }
+    const sync = TOUTES_LES_ROUTES.filter((r) => /^StockSyncController\./.test(r.cle));
+    expect(sync.map((r) => r.cle)).toEqual(['StockSyncController.run']);
+    for (const cle of Object.keys(SANS_PERMISSION)) expect(cle in ROUTES_S4).toBe(false);
   });
 });

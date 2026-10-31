@@ -220,7 +220,6 @@ export function InventaireFiche({ countId }: { countId: string }): React.ReactEl
     (emplacements?.ok ? emplacements.valeur.find((l) => l.id === c.locationId)?.name : null) ??
     'Emplacement';
   const lignes = lignesAffichees(c.lines, saisie ? filtre : 'toutes', recherche);
-  const ecartsParLigne = new Map((c.variances?.lines ?? []).map((v) => [v.lineId, v]));
 
   async function demarrer(): Promise<void> {
     setErreur(null);
@@ -344,7 +343,7 @@ export function InventaireFiche({ countId }: { countId: string }): React.ReactEl
           ) : (
             <ul className="flex flex-col divide-y divide-[var(--border)]">
               {lignes.map((l) => {
-                const v = ecartsParLigne.get(l.id);
+                const v = l; // écart servi sur la ligne (moteur `countVariances`)
                 return (
                   <li
                     key={l.id}

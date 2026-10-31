@@ -7,7 +7,9 @@ import {
   emplacementsDuBon,
   formulaireBon,
   gestesBon,
+  motifBon,
   preparerBon,
+  quantiteLigneBon,
   requeteBons,
   trajetBon,
   typesBon,
@@ -81,7 +83,6 @@ describe('formulaire', () => {
         workProjectId: 'p1',
         recipient: null,
         reason: null,
-        reasonNote: null,
         postedOn: AUJ,
       },
     });
@@ -113,7 +114,7 @@ describe('formulaire', () => {
     }
   });
 
-  it('ajustement : motif obligatoire ; le sens devient le signe', () => {
+  it('ajustement : motif obligatoire ; quantité positive et sens de la ligne (contrat S3)', () => {
     const sans = preparerBon({ ...formulaireBon('adjustment', AUJ, ID2), lignes: [ligne] }, AUJ);
     expect(sans.ok).toBe(false);
     const p = preparerBon(
@@ -124,8 +125,19 @@ describe('formulaire', () => {
       },
       AUJ,
     );
-    expect(p.ok && p.corps.lines.map((l) => l.quantity)).toEqual(['-4', '1.5']);
-    expect(p.ok && p.corps.reason).toBe('breakage');
+    expect(p.ok && p.corps.lines.map((l) => [l.quantity, l.direction])).toEqual([
+      ['4', 'out'],
+      ['1.5', 'in'],
+    ]);
+    expect(p.ok && p.corps.reason).toEqual({ key: 'breakage', note: null });
+  });
+
+  it('lecture d’un bon : quantité signée par le sens, motif par son libellé', () => {
+    expect(quantiteLigneBon({ quantity: '4.000', direction: 'out' })).toBe('-4.000');
+    expect(quantiteLigneBon({ quantity: '4.000', direction: null })).toBe('4.000');
+    const b = bon({ kind: 'adjustment', reason: { key: 'breakage', note: 'Palette tombée' } });
+    expect(motifBon(b, [{ key: 'breakage', label: 'Casse' }])).toBe('Casse (Palette tombée)');
+    expect(motifBon(bon())).toBeNull();
   });
 });
 

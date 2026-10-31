@@ -130,20 +130,23 @@ export function lignesAffichees(
     if (filtre === 'a-compter' && l.countedQuantity !== null) return false;
     if (filtre === 'comptees' && l.countedQuantity === null) return false;
     if (q === '') return true;
-    return l.itemName.toLowerCase().includes(q) || (l.itemCode ?? '').toLowerCase().includes(q);
+    return (
+      (l.itemName ?? '').toLowerCase().includes(q) || (l.itemCode ?? '').toLowerCase().includes(q)
+    );
   });
 }
 
 /**
- * Quantité théorique à montrer : celle que l'API a servie, jamais pour un
- * inventaire à l'aveugle tant qu'il est en comptage (le compteur ne la voit pas).
+ * Quantité théorique à montrer : celle que l'API a servie (`theoretical`), jamais
+ * quand l'API la masque (`theoreticalHidden`) ni pour un inventaire à l'aveugle tant
+ * qu'il est en comptage (le compteur ne la voit pas).
  */
 export function theoriqueAffichee(
-  c: Pick<StockCountView, 'blind' | 'status'>,
-  l: StockCountLineView,
+  c: Pick<StockCountView, 'blind' | 'status' | 'theoreticalHidden'>,
+  l: Pick<StockCountLineView, 'theoretical'>,
 ): string | null {
-  if (c.blind && c.status === 'counting') return null;
-  return l.theoreticalQuantity ?? null;
+  if (c.theoreticalHidden || (c.blind && c.status === 'counting')) return null;
+  return l.theoretical;
 }
 
 // ── Gestes ──────────────────────────────────────────────────────────────────
@@ -200,11 +203,21 @@ export function gestesInventaire(
       break;
     }
     case 'submitted': {
+      // Jugement de l'API (`canValidate`, `stockCountDecision` : séparation des tâches
+      // et approbateur unique) : l'écran ne propose que ce qu'elle accepte.
       let raison: string | null = null;
-      if (!gerer) raison = RAISON_SANS_GESTION;
-      else if (c.canValidate) raison = c.canValidate.allowed ? null : RAISON_COMPTEUR;
-      else if (aCompte(c, moi)) raison = RAISON_COMPTEUR;
-      gestes.push({ id: 'valider', libelle: 'Valider les écarts', actif: raison === null, raison });
+      if (!c.canValidate) {
+        raison =
+          c.validationBlockedBy === 'COUNT_SELF_VALIDATION' || (gerer && aCompte(c, moi))
+            ? RAISON_COMPTEUR
+            : RAISON_SANS_GESTION;
+      }
+      gestes.push({
+        id: 'valider',
+        libelle: 'Valider les écarts',
+        actif: c.canValidate,
+        raison,
+      });
       annuler();
       break;
     }
@@ -216,9 +229,9 @@ export function gestesInventaire(
 
 /** Mention de l'approbateur unique, quand l'API l'annonce. */
 export function mentionApprobateurUnique(
-  c: Pick<StockCountView, 'canValidate' | 'validation'>,
+  c: Pick<StockCountView, 'canValidate' | 'validationAsSoleApprover' | 'validation'>,
 ): string | null {
-  if (c.validation?.soleApprover || c.canValidate?.soleApprover) {
+  if (c.validation?.soleApprover || (c.canValidate && c.validationAsSoleApprover)) {
     return 'Seul gestionnaire des stocks de l’organisation : la validation de son propre comptage est permise et journalisée.';
   }
   return null;

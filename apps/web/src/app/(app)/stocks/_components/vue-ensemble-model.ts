@@ -36,7 +36,7 @@ export interface PageLue {
 }
 
 export interface LecturesVue {
-  /** `GET /stock/levels` (une page). */
+  /** `GET /stock/levels` : toutes les lignes (`levels`), réponse complète. */
   niveaux: Lecture<StockPage<StockLevelRowView>>;
   /** `GET /stock/levels?below=reorder`. */
   sousSeuil: Lecture<PageLue>;
@@ -85,7 +85,9 @@ function tuileValeur(
   actions: readonly OrgAction[] | null,
 ): EtatTuile {
   if (!lu.ok) return { etat: 'indisponible', phrase: phraseIndisponible(lu.erreur) };
-  if (!valeursAffichees(actions, lu.valeur.valuesHidden)) {
+  // `GET /stock/valuation` exige de voir les valeurs (403 sinon) : la réponse n'a pas
+  // de champ masqué, seul le rôle décide.
+  if (!valeursAffichees(actions, false)) {
     return { etat: 'indisponible', phrase: 'Masquée pour votre rôle' };
   }
   const lignes = lu.valeur.byCurrency.map((c) => formatValeur(c.value, c.currency));

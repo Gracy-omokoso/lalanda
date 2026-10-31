@@ -350,6 +350,7 @@ export const LIBELLES_A_TRAITER: Record<StockPendingReason, string> = {
   unknown_unit: 'Unité inconnue',
   pending_cost: 'Coût à saisir',
   sale_return_proposed: 'Retour de vente à confirmer',
+  sale_issue_proposed: 'Sortie de vente à confirmer',
   cost_differs: 'Coût différent de la facture',
 };
 

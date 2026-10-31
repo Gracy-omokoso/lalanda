@@ -45,7 +45,10 @@ import { PurchaseOrderFactsReader } from './receptions/purchase-order-facts.js';
 import { PurchaseReceptionsController } from './receptions/purchase-receptions.controller.js';
 import { PurchaseReceptionsService } from './receptions/purchase-receptions.service.js';
 import { PurchaseReception, PurchaseReceptionSchema } from './receptions/reception.schema.js';
-import { PURCHASE_RECEPTION_SINK, noPurchaseReceptionSink } from './stock-sink.port.js';
+import { PURCHASE_RECEPTION_SINK } from './stock-sink.port.js';
+// ADR-0046 — S4 : le port de stock est branché sur les stocks (§ 6.1).
+import { StockLinksModule } from '../stock/links/stock-links.module.js';
+import { StockReceptionSink } from '../stock/purchases/stock-reception.sink.js';
 // ADR-0044 — P5
 import { TreasuryModule } from '../treasury/treasury.module.js';
 import { SupplierPayment, SupplierPaymentSchema } from './payments/supplier-payment.schema.js';
@@ -71,6 +74,8 @@ import { PurchasesRemindersModule } from './reminders/purchases-reminders.module
     TreasuryModule,
     // ADR-0044 — P6 : rappels d'échéance des factures (tâche `purchases.due-reminders`).
     PurchasesRemindersModule,
+    // ADR-0046 — S4 : fournisseur du port de stock (`StockReceptionSink`).
+    StockLinksModule,
     MongooseModule.forFeature([
       // ADR-0044 — P2 : fiches fournisseurs ; adhésions (destinataires des alertes).
       { name: Supplier.name, schema: SupplierSchema },
@@ -126,7 +131,8 @@ import { PurchasesRemindersModule } from './reminders/purchases-reminders.module
     SupplierInvoicesPayablesSource,
     PurchaseReceptionsService,
     PurchaseOrderFactsReader,
-    { provide: PURCHASE_RECEPTION_SINK, useValue: noPurchaseReceptionSink },
+    // ADR-0046 — S4 : le fournisseur nul de R3 devient celui des stocks.
+    { provide: PURCHASE_RECEPTION_SINK, useExisting: StockReceptionSink },
     // ADR-0044 — P5 : paiements, ventilation, dépenses possédées, échéancier, doublons.
     SupplierPaymentsService,
     // ADR-0044 — P6 : fiche fournisseur 360° (lecture seule, calculs du moteur).

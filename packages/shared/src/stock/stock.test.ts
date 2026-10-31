@@ -33,8 +33,8 @@ describe('stocks — constantes (ADR-0046 § 2)', () => {
     expect([...STOCK_OBSERVED_MOVEMENT_KINDS]).toEqual(['sale_issue', 'purchase_receipt_reversal']);
   });
 
-  it('« À traiter » : cinq motifs, les coûts exigent `stock.manage`', () => {
-    expect(STOCK_PENDING_REASONS).toHaveLength(5);
+  it('« À traiter » : six motifs (S4 : vente proposée), les coûts exigent `stock.manage`', () => {
+    expect(STOCK_PENDING_REASONS).toHaveLength(6);
     expect([...STOCK_PENDING_REASONS_REQUIRING_MANAGE]).toEqual(['pending_cost', 'cost_differs']);
   });
 

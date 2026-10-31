@@ -1,15 +1,11 @@
 // Grand livre des mouvements — ADR-0046 § 2.3 et § 5.1
-// (`GET /stock/items/:id/movements`). Logique pure : filtres → requête, lecture
+// (`GET /stock/movements`, tous les articles, lot S4 ; un article en filtre). Logique pure : filtres → requête, lecture
 // d'un mouvement pour l'affichage. Le grand livre est en AJOUT SEUL : une
 // annulation est un mouvement inverse, jamais un effacement.
 
 import { STOCK_MOVEMENT_KINDS } from '@lalanda/shared/stock';
 
-import type {
-  ListStockMovementsParams,
-  StockMovementKind,
-  StockMovementView,
-} from '@/lib/api-stock';
+import type { ListStockLedgerParams, StockMovementKind, StockMovementView } from '@/lib/api-stock';
 
 import { LIBELLES_MOUVEMENT } from './stocks-model';
 
@@ -34,7 +30,8 @@ const JOUR = /^\d{4}-\d{2}-\d{2}$/;
 export function requeteMouvements(
   f: FiltresMouvements,
   cursor: string | null = null,
-): { ok: true; requete: ListStockMovementsParams } | { ok: false; erreur: string } {
+  itemId = '',
+): { ok: true; requete: ListStockLedgerParams } | { ok: false; erreur: string } {
   if (f.from !== '' && !JOUR.test(f.from)) return { ok: false, erreur: 'Date de début invalide.' };
   if (f.to !== '' && !JOUR.test(f.to)) return { ok: false, erreur: 'Date de fin invalide.' };
   if (f.from !== '' && f.to !== '' && f.from > f.to) {
@@ -44,6 +41,7 @@ export function requeteMouvements(
     ok: true,
     requete: {
       limit: 50,
+      ...(itemId ? { itemId } : {}),
       ...(f.locationId ? { locationId: f.locationId } : {}),
       ...(f.kind ? { kind: f.kind } : {}),
       ...(f.from ? { from: f.from } : {}),
@@ -53,10 +51,9 @@ export function requeteMouvements(
   };
 }
 
-/** Phrase d'origine : pièce lisible servie par l'API, sinon la nature de la source. */
-export function origineMouvement(m: StockMovementView): string | null {
-  if (m.sourceLabel) return m.sourceLabel;
-  switch (m.source?.kind) {
+/** Phrase d'origine : la nature de la source servie par l'API. */
+export function origineMouvement(m: Pick<StockMovementView, 'source'>): string | null {
+  switch (m.source.kind) {
     case 'reception':
       return 'Réception d’achat';
     case 'invoice':
@@ -77,4 +74,9 @@ export function coutAffiche(m: StockMovementView, valeurs: boolean): string | nu
   if (!valeurs) return null;
   if (m.costStatus === 'pending_cost') return 'coût à saisir';
   return m.unitCost;
+}
+
+/** Motif d'un ajustement : la note saisie, sinon la clé du motif. */
+export function motifMouvement(m: Pick<StockMovementView, 'reason'>): string | null {
+  return m.reason ? (m.reason.note ?? m.reason.key) : null;
 }

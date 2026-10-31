@@ -24,7 +24,6 @@ const s = (itemId: string, supplier: string | null, q = '18') => ({
   onOrder: '8',
   suggestedQuantity: q,
   preferredSupplierId: supplier,
-  preferredSupplierName: supplier ? 'Fournisseur' : null,
 });
 
 describe('réapprovisionnement', () => {
@@ -58,7 +57,12 @@ describe('réglages', () => {
     allowNegativeManualMoves: false,
     adjustmentReasons: [{ key: 'breakage', label: 'Casse' }],
     countReminderDays: 0,
+    alertRecipients: 'holders' as const,
+    defaultCostCurrency: 'CDF' as const,
+    dormantDays: null,
+    defaultLocationId: 'l1',
     revision: 5,
+    updatedAt: '2026-10-31T08:00:00.000Z',
   };
 
   it('corps de PUT, révision attendue', () => {

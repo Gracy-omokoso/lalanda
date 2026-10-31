@@ -114,7 +114,8 @@ export class StockCountsService {
     const page = docs.slice(0, query.limit);
     const last = page[page.length - 1];
     const views: StockCountView[] = [];
-    for (const d of page) views.push(await this.view(organizationId, d, actor, false));
+    const approvers = this.approversOnce(organizationId);
+    for (const d of page) views.push(await this.view(organizationId, d, actor, false, approvers));
     return {
       items: views,
       nextCursor:
@@ -123,7 +124,49 @@ export class StockCountsService {
   }
 
   async get(organizationId: string, countId: string, actor: StockActor): Promise<StockCountView> {
-    return this.view(organizationId, await this.requireOwn(organizationId, countId), actor, true);
+    return this.view(
+      organizationId,
+      await this.requireOwn(organizationId, countId),
+      actor,
+      true,
+      this.approversOnce(organizationId),
+    );
+  }
+
+  /** ADR-0046 — S4 : détenteurs effectifs de `stock.manage`, lus une fois par requête. */
+  private approversOnce(organizationId: string): () => Promise<number> {
+    let count: Promise<number> | null = null;
+    return () => (count ??= this.authz.countApprovers(organizationId, 'stock.manage'));
+  }
+
+  /**
+   * ADR-0046 — S4 (complément des écrans S8) : l'appelant peut-il valider ? Même règle
+   * que `validate()` — `stock.manage` effectif, inventaire soumis, `stockCountDecision`
+   * (approbateur unique compris) — pour que l'écran ne propose jamais un geste refusé
+   * ni ne bloque l'approbateur unique.
+   */
+  private async validationOf(
+    d: StockCountLean,
+    actor: StockActor,
+    approvers: () => Promise<number>,
+  ): Promise<
+    Pick<StockCountView, 'canValidate' | 'validationAsSoleApprover' | 'validationBlockedBy'>
+  > {
+    if (d.status !== 'submitted' || !holds(actor, 'stock.manage')) {
+      return { canValidate: false, validationAsSoleApprover: false, validationBlockedBy: null };
+    }
+    const decision = stockCountDecision({
+      validatorUserId: actor.userId,
+      counterUserIds: counterUserIdsOf(d),
+      approverCountInOrg: await approvers(),
+    });
+    return decision.ok
+      ? {
+          canValidate: true,
+          validationAsSoleApprover: decision.soleApprover,
+          validationBlockedBy: null,
+        }
+      : { canValidate: false, validationAsSoleApprover: false, validationBlockedBy: decision.code };
   }
 
   // ── Cycle ────────────────────────────────────────────────────────────────
@@ -224,7 +267,7 @@ export class StockCountsService {
       .lean<StockCountLean>()
       .exec();
     if (!updated) staleRevision(current.revision);
-    return this.view(organizationId, updated, actor, true);
+    return this.view(organizationId, updated, actor, true, this.approversOnce(organizationId));
   }
 
   /**
@@ -280,7 +323,7 @@ export class StockCountsService {
       .lean<StockCountLean>()
       .exec();
     if (!updated) staleRevision(current.revision);
-    return this.view(organizationId, updated, actor, true);
+    return this.view(organizationId, updated, actor, true, this.approversOnce(organizationId));
   }
 
   async submit(
@@ -314,7 +357,7 @@ export class StockCountsService {
       .lean<StockCountLean>()
       .exec();
     if (!updated) staleRevision(current.revision);
-    return this.view(organizationId, updated, actor, true);
+    return this.view(organizationId, updated, actor, true, this.approversOnce(organizationId));
   }
 
   async validate(
@@ -330,17 +373,9 @@ export class StockCountsService {
     if (current.revision !== body.expectedRevision) staleRevision(current.revision);
 
     // Séparation des tâches : les PERSONNES qui ont compté, recomptages compris.
-    const counterUserIds = [
-      ...new Set(
-        current.lines.flatMap((l) => [
-          ...(l.countedBy ? [l.countedBy] : []),
-          ...l.recounts.map((r) => r.countedBy),
-        ]),
-      ),
-    ];
     const decision = stockCountDecision({
       validatorUserId: actor.userId,
-      counterUserIds,
+      counterUserIds: counterUserIdsOf(current),
       approverCountInOrg: await this.authz.countApprovers(organizationId, 'stock.manage'),
     });
     if (!decision.ok) {
@@ -451,14 +486,14 @@ export class StockCountsService {
             number: current.number,
             soleApprover: decision.soleApprover,
             adjustments: result.written.length,
-            counters: counterUserIds.length,
+            counters: counterUserIdsOf(current).length,
           },
         },
         { session },
       );
       return doc;
     });
-    return this.view(organizationId, updated, actor, true);
+    return this.view(organizationId, updated, actor, true, this.approversOnce(organizationId));
   }
 
   async cancel(
@@ -493,7 +528,7 @@ export class StockCountsService {
       .lean<StockCountLean>()
       .exec();
     if (!updated) staleRevision(current.revision);
-    return this.view(organizationId, updated, actor, true);
+    return this.view(organizationId, updated, actor, true, this.approversOnce(organizationId));
   }
 
   // ── Interne ──────────────────────────────────────────────────────────────
@@ -522,6 +557,7 @@ export class StockCountsService {
     d: StockCountLean,
     actor: StockActor,
     detailed: boolean,
+    approvers: () => Promise<number>,
   ): Promise<StockCountView> {
     const visible = seesValues(actor);
     const theoreticalVisible =
@@ -608,12 +644,25 @@ export class StockCountsService {
             reason: d.cancellation.reason,
           }
         : null,
+      ...(await this.validationOf(d, actor, approvers)),
       revision: d.revision,
       createdBy: d.createdBy,
       createdAt: new Date(d.createdAt).toISOString(),
       updatedAt: new Date(d.updatedAt).toISOString(),
     };
   }
+}
+
+/** Personnes qui ont saisi une quantité comptée, recomptages compris (§ 2.7). */
+function counterUserIdsOf(d: StockCountLean): string[] {
+  return [
+    ...new Set(
+      d.lines.flatMap((l) => [
+        ...(l.countedBy ? [l.countedBy] : []),
+        ...l.recounts.map((r) => r.countedBy),
+      ]),
+    ),
+  ];
 }
 
 function countNotFound(): never {

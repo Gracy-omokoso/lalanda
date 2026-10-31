@@ -4,10 +4,14 @@
 //   GET  /stock/levels?locationId=&itemId=&below=reorder   stock.read
 //   POST /stock/levels/rebuild                             stock.manage
 //   PUT  /stock/movements/:id/cost                         stock.manage — audit strict
+//   GET  /stock/movements?itemId=&locationId=&kind=&…       stock.read — grand livre de
+//        tous les articles (ADR-0046 — S4, complément des écrans S8)
 
 import {
+  ListStockLedgerQuery,
   ListStockLevelsQuery,
   UpdateStockMovementCostBody,
+  type StockLedgerPage,
   type StockLevelsRebuildReport,
   type StockLevelsResponse,
   type StockMovementView,
@@ -33,7 +37,7 @@ import { RequirePermission } from '../authz/authz.decorators.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
 import { CurrentStockActor } from './stock-actor.decorator.js';
 import { inTransaction, parseWith, seesValues, type StockActor } from './stock.common.js';
-import { movementView } from './stock-items.service.js';
+import { movementView, StockItemsService } from './stock-items.service.js';
 import { StockMovementsService } from './stock-movements.service.js';
 import { StockReportsService } from './stock-reports.service.js';
 
@@ -42,9 +46,22 @@ import { StockReportsService } from './stock-reports.service.js';
 export class StockLevelsController {
   constructor(
     @Inject(StockReportsService) private readonly reports: StockReportsService,
-    @Inject(StockMovementsService) private readonly ledger: StockMovementsService,
+    @Inject(StockMovementsService) private readonly movements: StockMovementsService,
     @InjectConnection() private readonly connection: Connection,
+    // ADR-0046 — S4 : grand livre de tous les articles.
+    @Inject(StockItemsService) private readonly items: StockItemsService,
   ) {}
+
+  // ADR-0046 — S4 (complément des écrans S8).
+  @Get('movements')
+  @RequirePermission('stock.read')
+  async ledger(
+    @CurrentOrgId() orgId: string,
+    @CurrentStockActor() actor: StockActor,
+    @Query() query: unknown,
+  ): Promise<StockLedgerPage> {
+    return this.items.ledgerPage(orgId, parseWith(ListStockLedgerQuery, query), actor);
+  }
 
   @Get('levels')
   @RequirePermission('stock.read')
@@ -71,9 +88,9 @@ export class StockLevelsController {
     @Body() body: unknown,
   ): Promise<StockMovementView> {
     const input = parseWith(UpdateStockMovementCostBody, body);
-    await this.ledger.findOwn(orgId, movementId);
+    await this.movements.findOwn(orgId, movementId);
     const updated = await inTransaction(this.connection, (session) =>
-      this.ledger.correctCost(orgId, movementId, input, actor, session),
+      this.movements.correctCost(orgId, movementId, input, actor, session),
     );
     return movementView(updated, seesValues(actor), null);
   }

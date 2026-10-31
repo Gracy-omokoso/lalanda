@@ -20,6 +20,8 @@ import { BonFormulaire } from './bon-formulaire';
 import {
   FILTRES_BONS,
   gestesBon,
+  motifBon,
+  quantiteLigneBon,
   requeteBons,
   trajetBon,
   typesBon,
@@ -79,9 +81,7 @@ function FicheBon({
       {bon.recipient || bon.reason ? (
         <p className="text-sm">
           {bon.recipient ? `Remis à ${bon.recipient}. ` : ''}
-          {bon.reason
-            ? `Motif : ${bon.reason}${bon.reasonNote ? ` (${bon.reasonNote})` : ''}.`
-            : ''}
+          {bon.reason ? `Motif : ${motifBon(bon)}.` : ''}
         </p>
       ) : null}
       <ul className="flex flex-col divide-y divide-[var(--border)] rounded-[var(--radius-md)] border border-[var(--border)]">
@@ -93,14 +93,14 @@ function FicheBon({
             <span className="min-w-0 break-words">{l.itemName ?? 'Article'}</span>
             <span className="tabular-nums font-medium">
               {bon.kind === 'adjustment'
-                ? formatQuantiteSignee(l.quantity, l.unit)
+                ? formatQuantiteSignee(quantiteLigneBon(l), l.unit)
                 : formatQuantite(l.quantity, l.unit)}
             </span>
           </li>
         ))}
       </ul>
-      {bon.cancellationReason ? (
-        <p className="text-sm text-[var(--foreground-muted)]">Annulé : {bon.cancellationReason}</p>
+      {bon.cancellation ? (
+        <p className="text-sm text-[var(--foreground-muted)]">Annulé : {bon.cancellation.reason}</p>
       ) : null}
       {bon.createdBy ? (
         <p className="text-xs text-[var(--foreground-muted)]">
