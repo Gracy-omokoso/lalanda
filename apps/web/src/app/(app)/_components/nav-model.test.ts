@@ -18,6 +18,7 @@ import {
   cleModules,
   CRM_SOUS_OPTIONS_PREVUES,
   RH_SOUS_OPTIONS_PREVUES,
+  STOCKS_SOUS_OPTIONS_PREVUES,
   ecrireModules,
   estAccueil,
   estBureau,
@@ -54,6 +55,15 @@ const PROPRIETAIRE: OrgAction[] = [
   'hr.sensitive.read',
   'leave.request',
   'leave.approve',
+  // ADR-0046 — S0
+  'stock.read',
+  'stock.move',
+  'stock.count',
+  'stock.manage',
+  'assets.read',
+  'assets.manage',
+  'docs.read',
+  'docs.manage',
 ];
 const LECTEUR: OrgAction[] = ['project.read', 'sales.read'];
 const SANS_VENTES: OrgAction[] = ['project.read'];
@@ -118,6 +128,7 @@ describe('applications et ordre', () => {
       'catalogue',
       'achats',
       'tresorerie',
+      'stocks',
     ]);
   });
 
@@ -503,5 +514,75 @@ describe('ADR-0045 § 8 — application Ressources humaines (H6)', () => {
     expect(sousOptionActive('/rh/collaborateurs/abc/absences')).toBe('rh-collaborateurs');
     expect(sousOptionActive('/rh/absences')).toBe('rh-a-valider');
     expect(appActive('/rh-externe')).toBeNull();
+  });
+});
+
+describe('ADR-0046 — S8 : Stocks, Équipements, Documents', () => {
+  const MAGASINIER: OrgAction[] = [
+    'analytics.read',
+    'stock.read',
+    'stock.move',
+    'stock.count',
+    'assets.read',
+    'docs.read',
+    'work.read',
+    'work.update',
+    'leave.request',
+  ];
+
+  it('Stocks : après Trésorerie, dernier bloc du RUN, icône `stocks`, `stock.read`', () => {
+    const stocks = NAV_APPS.find((a) => a.id === 'stocks')!;
+    expect(stocks.module).toBe('run');
+    expect(stocks.href).toBe('/stocks');
+    expect(stocks.icon).toBe('stocks');
+    expect(stocks.action).toBe('stock.read');
+    const run = ids(appsVisibles(PROPRIETAIRE, 'run'));
+    expect(run.indexOf('stocks')).toBe(run.indexOf('tresorerie') + 1);
+    expect(ids(appsVisibles(['stock.read'], 'run'))).toEqual(['stocks']);
+    expect(ids(appsVisibles(['purchase.read'], 'run'))).not.toContain('stocks');
+  });
+
+  it('Magasinier : projets, RH et Stocks, jamais Achats ni Trésorerie', () => {
+    expect(ids(appsVisibles(MAGASINIER, 'run'))).toEqual(['projets', 'rh', 'stocks']);
+  });
+
+  it('sous-options des Stocks, toutes livrées, dans l’ordre prévu', () => {
+    const stocks = appsVisibles(MAGASINIER, 'run').find((a) => a.id === 'stocks')!;
+    expect(stocks.sousOptions.map((s) => s.id)).toEqual([...STOCKS_SOUS_OPTIONS_PREVUES]);
+    expect(stocks.sousOptions.map((s) => s.label)).toEqual([
+      'Vue d’ensemble',
+      'Articles',
+      'Niveaux',
+      'Mouvements',
+      'Bons',
+      'À traiter',
+      'Inventaires',
+      'Réapprovisionnement',
+      'Emplacements',
+      'Réglages',
+    ]);
+  });
+
+  it('Équipements et Documents : déclarés, mais masqués jusqu’au lot S9', () => {
+    for (const id of ['equipements', 'documents']) {
+      const app = NAV_APPS.find((a) => a.id === id)!;
+      expect(app.module).toBe('run');
+      expect(app.masquee).toBe(true);
+      expect(ids(appsVisibles(PROPRIETAIRE))).not.toContain(id);
+    }
+    expect(NAV_APPS.find((a) => a.id === 'equipements')!.action).toBe('assets.read');
+    expect(NAV_APPS.find((a) => a.id === 'documents')!.action).toBe('docs.read');
+  });
+
+  it('chemins : module RUN, application et sous-option, frontière de segment', () => {
+    expect(moduleCourant('/stocks')).toBe('run');
+    expect(sousOptionActive('/stocks')).toBe('stocks-vue');
+    expect(sousOptionActive('/stocks/articles/abc')).toBe('stocks-articles');
+    expect(sousOptionActive('/stocks/inventaires/abc')).toBe('stocks-inventaires');
+    expect(sousOptionActive('/stocks/reapprovisionnement')).toBe('stocks-reapprovisionnement');
+    expect(moduleCourant('/equipements/echeances')).toBe('run');
+    expect(appActive('/documents/echeances')).toBe('documents');
+    expect(appActive('/stocks-x')).toBeNull();
+    expect(appActive('/documentation')).toBeNull();
   });
 });
