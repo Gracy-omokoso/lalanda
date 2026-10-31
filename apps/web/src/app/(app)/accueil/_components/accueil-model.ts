@@ -105,9 +105,13 @@ export const MAX_TUILES_RUN = 4;
  * - `achatsEnRetard` : `GET /purchases/payables` (`purchase.read`) ;
  * - `validationsEnAttente` : `GET /purchases/approvals/pending` (`purchase.approve`) ;
  * - `relancesEnRetard` : `GET /crm/activities?status=overdue` (`crm.read`) ;
- * - `opportunitesOuvertes` : `GET /crm/opportunities?status=open` (`crm.read`).
+ * - `opportunitesOuvertes` : `GET /crm/opportunities?status=open` (`crm.read`) ;
+ * - `articlesSousSeuil` : `GET /stock/levels?below=reorder` (`stock.read`, ADR-0046
+ *   § 6.8), nombre seulement, placé après les factures ouvertes et avant les
+ *   chiffres des achats et du CRM.
  */
 export interface FaitsRunModules {
+  articlesSousSeuil?: Compte | null;
   achatsEnRetard?: Compte | null;
   validationsEnAttente?: Compte | null;
   relancesEnRetard?: Compte | null;
@@ -136,6 +140,14 @@ export function chiffresRun(
   }
   return definis([
     ...ventes,
+    // ADR-0046 — S8 : la tuile des stocks cède sa place si la carte est pleine.
+    compte(
+      'stocks-sous-seuil',
+      modules.articlesSousSeuil,
+      'article sous le seuil',
+      'articles sous le seuil',
+      true,
+    ),
     compte(
       'achats-en-retard',
       modules.achatsEnRetard,
