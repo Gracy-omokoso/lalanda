@@ -96,6 +96,11 @@ import { WorkTimesheetsController } from '../work/timesheets/work-timesheets.con
 import { HrChecklistsController } from '../hr/checklists/hr-checklists.controller.js';
 import { HrDocumentsController } from '../hr/documents/hr-documents.controller.js';
 import { HrDeadlinesController } from '../hr/reminders/hr-deadlines.controller.js';
+// ADR-0046 — S6
+import {
+  DocumentFoldersController,
+  LibraryDocumentsController,
+} from '../documents/library-documents.controller.js';
 import { QuotesController } from '../sales/quotes/quotes.controller.js';
 import { CrmActivitiesController } from '../crm/crm-activities.controller.js';
 import { CrmContactsController } from '../crm/crm-contacts.controller.js';
@@ -263,6 +268,9 @@ const CONTROLEURS = [
   AssetsController,
   AssetMaintenanceController,
   AssetSettingsController,
+  // ADR-0046 — S6 : bibliothèque de documents.
+  DocumentFoldersController,
+  LibraryDocumentsController,
 ];
 
 /**
@@ -1299,5 +1307,45 @@ describe('ADR-0046 — S5 : équipements', () => {
       expect(route!.actions, cle).toEqual(actions);
     }
     for (const cle of Object.keys(SANS_PERMISSION)) expect(cle.startsWith('Asset')).toBe(false);
+  });
+});
+
+// ADR-0046 — S6
+describe('ADR-0046 — S6 : bibliothèque de documents', () => {
+  it('chaque route déclare la permission de l’ADR (§ 5.3) ; les droits par dossier et par lien dans le service', () => {
+    const attendu: Record<string, Action[]> = {
+      'DocumentFoldersController.list': ['docs.read'],
+      'DocumentFoldersController.create': ['docs.manage'],
+      'DocumentFoldersController.defaults': ['docs.manage'],
+      'DocumentFoldersController.update': ['docs.manage'],
+      'DocumentFoldersController.archive': ['docs.manage'],
+      // Lecture : `docs.read` au guard, puis dossier ET module de chaque lien (service).
+      'LibraryDocumentsController.list': ['docs.read'],
+      'LibraryDocumentsController.search': ['docs.read'],
+      'LibraryDocumentsController.deadlines': ['docs.read'],
+      'LibraryDocumentsController.entityPieces': ['docs.read'],
+      'LibraryDocumentsController.get': ['docs.read'],
+      'LibraryDocumentsController.download': ['docs.read'],
+      // Écriture : `docs.read` au guard, puis écriture du DOSSIER (`docs.manage` ou
+      // membre de `access.write`) ; sensible ou sans dossier : `docs.manage` (service).
+      'LibraryDocumentsController.upload': ['docs.read'],
+      'LibraryDocumentsController.update': ['docs.read'],
+      'LibraryDocumentsController.archive': ['docs.read'],
+      'LibraryDocumentsController.restore': ['docs.read'],
+      'LibraryDocumentsController.remove': ['docs.read'],
+      'LibraryDocumentsController.addVersion': ['docs.read'],
+      'LibraryDocumentsController.restoreVersion': ['docs.read'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) =>
+      /^(DocumentFolders|LibraryDocuments)Controller\./.test(r.cle),
+    );
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+    }
+    for (const cle of Object.keys(SANS_PERMISSION)) {
+      expect(/^(DocumentFolders|LibraryDocuments)Controller\./.test(cle)).toBe(false);
+    }
   });
 });

@@ -216,6 +216,26 @@ Salaire de base déclaré, coordonnées bancaires et mobile money, pièces d'ide
 - Le débit de `reveal` compte les traces de l'heure écoulée : deux appels strictement simultanés au seuil peuvent en laisser passer un de plus.
 - Les documents sensibles (pièces scannées, certificats) relèvent du lot H4 ; le brief (H5) ne reçoit que des nombres.
 
+## Implémenté (ADR-0046, lot S6) — bibliothèque de documents
+
+Statuts, attestations, licences, polices, contrats (`document_folders`, `library_documents`, `library_document_versions`) : des pièces d'entreprise dont certaines sont sensibles. Code : `apps/api/src/documents/`. Décision : ADR-0046 § 4, § 5.3.
+
+### Fait
+
+- **Droits par dossier, jugés sur les droits effectifs et les personnes** (`folderAccessDecision`, `documentReadDecision`, lot S0) : la lecture exige chaque niveau de la chaîne (un sous-dossier n'élargit jamais, quel que soit `inherit`) ; `inherit` ne gouverne que l'écriture. Un dossier restreint par personnes est invisible, nom compris, d'un gestionnaire (`docs.manage`) qui n'y figure pas. Lire un document exige aussi la lecture du module de chaque entité liée. Invisible ⇒ `404`, et non compté par la recherche (filtrage **avant** pagination). Le Conseiller n'a pas `docs.read`.
+- **Fichiers** : motif d'ADR-0039 § 2.5 (PDF reconnus par `%PDF-`, non analysés, images assainies ; tout autre type `415 DOCUMENT_TYPE`), téléchargement **inerte** (`attachment`, `nosniff`, CSP `sandbox`, `no-store`) ; borne **commune** de 1 Gio (`storage/attachments-usage.ts`, partagée avec les RH).
+- **Chiffrement par enveloppe** des documents sensibles : code commun avec les documents RH (`integrations/envelope-blob-crypto.ts`), format `LLD1`, AAD = organisation + document + version, clé enveloppée à `org:library_documents` ; un objet recopié ne se déchiffre pas (`500 DOCUMENT_UNREADABLE`, testé) ; sans trousseau `503 SECRETS_NOT_CONFIGURED`. Dépôt et gestion d'un sensible : `docs.manage`.
+- **Journal** : tout téléchargement est tracé ; celui d'un sensible est **strict** et écrit avant de servir (`documents.sensitive_downloaded` ; journal indisponible ⇒ `503`). Aucun titre, étiquette ni nom de fichier dans l'audit, les journaux ou les notifications (`documents.expiring` : une nature et une date).
+- **Métadonnées jamais dans l'URL ni dans un en-tête** : envoi `multipart/form-data`, recherche en corps de `POST /documents/search`, requêtes `GET` limitées aux identifiants (un `?title=` est refusé) ; un test e2e observe `req.url` et les en-têtes bruts.
+- **Plateforme** : un acteur plateforme sans appartenance reçoit `404` (testé sur le fichier sensible).
+- **Rotation** comprise dans `secrets:rewrap` : seule la clé enveloppée de chaque version change, l'objet n'est pas réécrit ; `remainingKeyIds` couvre `library_document_versions`.
+- **Suppression** logique, puis `documents.purge` après 30 jours : clés effacées (objet illisible à jamais) et objets supprimés. Aucune durée de conservation (décision ouverte n° 16).
+
+### Limites
+
+- Les pièces des projets et des achats calculent encore leur borne sans compter la bibliothèque (leurs fichiers ne sont pas touchés par R5) : la borne est stricte au dépôt d'un document de bibliothèque ou d'une pièce RH, approximative ailleurs.
+- La recherche lit au plus 5 000 documents avant filtrage par les droits.
+
 ## Menaces prioritaires
 
 - accès inter-organisation;

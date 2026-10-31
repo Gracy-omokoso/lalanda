@@ -140,12 +140,7 @@ const ACTIONS_SANS_ROUTE: Record<string, string> = {
   'stock.manage':
     'Aucune route des stocks en S0 : `POST /stock/items` arrive au lot S3 ; la ' +
     'séparation des tâches est prouvée par `stockCountDecision` (permissions.test.ts).',
-  'docs.read':
-    'Aucune route de la bibliothèque en S0 : `GET /documents/folders` arrive au lot S6 ' +
-    '(ADR-0046 § 5.3) ; les droits par dossier sont prouvés par `folderAccessDecision`.',
-  'docs.manage':
-    'Aucune route de la bibliothèque en S0 : `POST /documents/folders` arrive au lot S6 ' +
-    '(ADR-0046 § 5.3).',
+  // ADR-0046 — S5 et S6 ont retiré `assets.*` et `docs.*` (sondes en fin de liste).
 };
 
 /** Une sonde HTTP : la route qui matérialise une action, et ses statuts légitimes. */
@@ -798,6 +793,27 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
             acquisition: { on: '2026-01-15', cost: '100.00', currency: 'USD' },
           });
       },
+    },
+    // ADR-0046 — S6 : bibliothèque de documents (§ 5.3, § 8.1).
+    {
+      // Tout rôle interne ; ni le Conseiller (externe) ni le Chef de projet. L'arbre est
+      // filtré par les droits de chaque dossier dans le service.
+      action: 'docs.read',
+      libelle: 'GET /documents/folders',
+      statutsAutorises: [200],
+      envoyer: (c) => request(serveur()).get('/documents/folders').set('Cookie', c),
+    },
+    {
+      // Propriétaire, Administrateur, Directeur financier, Comptable, Responsable RH. Un
+      // dossier nommé par rôle : aucune collision.
+      action: 'docs.manage',
+      libelle: 'POST /documents/folders',
+      statutsAutorises: [201],
+      envoyer: (c, role) =>
+        request(serveur())
+          .post('/documents/folders')
+          .set('Cookie', c)
+          .send({ name: `Sonde ${role} ${tag}` }),
     },
   ];
 
