@@ -135,3 +135,5 @@ export * from './purchases/index.js';
 export * from './hr/index.js';
 
 export * from './assets/index.js'; // ADR-0046 — S2
+// ADR-0046 — S1 : moteur des stocks (niveaux, coût moyen pondéré, inventaires, seuils). Versionné à part (`STOCK_VERSION`).
+export * from './stock/index.js';
