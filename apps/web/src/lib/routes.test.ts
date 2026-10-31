@@ -98,6 +98,24 @@ describe('isProtectedPath (S20b)', () => {
     expect(isProtectedPath('/rh-public')).toBe(false);
   });
 
+  it('ADR-0046 : /stocks, /equipements et /documents exigent une session', () => {
+    for (const path of [
+      '/stocks',
+      '/stocks/articles/abc',
+      '/stocks/inventaires/abc',
+      '/stocks/reapprovisionnement',
+      '/equipements',
+      '/equipements/echeances',
+      '/documents',
+      '/documents/echeances',
+    ]) {
+      expect(isProtectedPath(path)).toBe(true);
+    }
+    expect(isProtectedPath('/stocks-publics')).toBe(false);
+    expect(isProtectedPath('/documentation')).toBe(false);
+    expect(isProtectedPath('/equipements-x')).toBe(false);
+  });
+
   it('protège l’espace Croissance, racine comme sous-routes (ADR-0032)', () => {
     for (const path of ['/croissance', '/croissance/sante', '/croissance/parcours']) {
       expect(isProtectedPath(path)).toBe(true);

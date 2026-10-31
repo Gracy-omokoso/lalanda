@@ -33,6 +33,10 @@ export type NavIconId =
   | 'projets'
   | 'achats'
   | 'rh'
+  // ADR-0046 — S8 : stocks, équipements, documents.
+  | 'stocks'
+  | 'equipements'
+  | 'documents'
   | 'pilotage'
   | 'sante'
   | 'investisseurs'
@@ -76,6 +80,13 @@ export interface NavApp {
    * des descendants du pilotage.
    */
   exact?: boolean;
+  /**
+   * ADR-0046 — S8 : application déclarée (routes, coquille, sous-options) mais
+   * dont les écrans ne sont pas encore livrés. Elle n'est proposée NULLE PART
+   * (colonne, bureau) ; le chemin allume quand même le module RUN. Le lot S9
+   * retire ce drapeau en livrant les écrans.
+   */
+  masquee?: boolean;
 }
 
 export interface NavModule {
@@ -420,6 +431,119 @@ export const NAV_APPS: readonly NavApp[] = [
     ],
   },
 
+  // ADR-0046 — S8 : stocks, équipements et documents, DERNIER bloc du RUN
+  // (ordre validé R0 → R5), après Trésorerie : on achète, on paie, puis on tient
+  // le magasin, le matériel et les papiers. Les valeurs du stock ne s'affichent
+  // qu'avec `purchase.read` ou `treasury.read` (règle des écrans, § 5).
+  {
+    id: 'stocks',
+    href: '/stocks',
+    label: 'Stocks',
+    description: 'Articles, emplacements, mouvements, bons, inventaires et réapprovisionnement.',
+    module: 'run',
+    icon: 'stocks',
+    action: 'stock.read',
+    sousOptions: [
+      { id: 'stocks-vue', href: '/stocks', label: 'Vue d’ensemble', action: 'stock.read' },
+      { id: 'stocks-articles', href: '/stocks/articles', label: 'Articles', action: 'stock.read' },
+      { id: 'stocks-niveaux', href: '/stocks/niveaux', label: 'Niveaux', action: 'stock.read' },
+      {
+        id: 'stocks-mouvements',
+        href: '/stocks/mouvements',
+        label: 'Mouvements',
+        action: 'stock.read',
+      },
+      { id: 'stocks-bons', href: '/stocks/bons', label: 'Bons', action: 'stock.read' },
+      {
+        id: 'stocks-a-traiter',
+        href: '/stocks/a-traiter',
+        label: 'À traiter',
+        action: 'stock.read',
+      },
+      {
+        id: 'stocks-inventaires',
+        href: '/stocks/inventaires',
+        label: 'Inventaires',
+        action: 'stock.read',
+      },
+      {
+        id: 'stocks-reapprovisionnement',
+        href: '/stocks/reapprovisionnement',
+        label: 'Réapprovisionnement',
+        action: 'stock.read',
+      },
+      {
+        id: 'stocks-emplacements',
+        href: '/stocks/emplacements',
+        label: 'Emplacements',
+        action: 'stock.read',
+      },
+      { id: 'stocks-reglages', href: '/stocks/reglages', label: 'Réglages', action: 'stock.read' },
+    ],
+  },
+  // Équipements et Documents : routes et coquilles posées par S8, écrans au lot
+  // S9 — masqués d'ici là (`masquee`), la barre ne promet rien.
+  {
+    id: 'equipements',
+    href: '/equipements',
+    label: 'Équipements',
+    description: 'Registre du matériel, affectations, maintenance, garanties et assurances.',
+    module: 'run',
+    icon: 'equipements',
+    action: 'assets.read',
+    masquee: true,
+    sousOptions: [
+      {
+        id: 'equipements-registre',
+        href: '/equipements',
+        label: 'Registre',
+        action: 'assets.read',
+      },
+      {
+        id: 'equipements-echeances',
+        href: '/equipements/echeances',
+        label: 'Échéances',
+        action: 'assets.read',
+      },
+      {
+        id: 'equipements-rapports',
+        href: '/equipements/rapports',
+        label: 'Rapports',
+        action: 'assets.read',
+      },
+      {
+        id: 'equipements-reglages',
+        href: '/equipements/reglages',
+        label: 'Réglages',
+        action: 'assets.read',
+      },
+    ],
+  },
+  {
+    id: 'documents',
+    href: '/documents',
+    label: 'Documents',
+    description: 'La bibliothèque de l’entreprise : dossiers, versions, échéances.',
+    module: 'run',
+    icon: 'documents',
+    action: 'docs.read',
+    masquee: true,
+    sousOptions: [
+      {
+        id: 'documents-bibliotheque',
+        href: '/documents',
+        label: 'Bibliothèque',
+        action: 'docs.read',
+      },
+      {
+        id: 'documents-echeances',
+        href: '/documents/echeances',
+        label: 'Échéances',
+        action: 'docs.read',
+      },
+    ],
+  },
+
   // ─── GROW ────────────────────────────────────────────────────────────────
   // Le tableau de bord de l'organisation EST le pilotage : blocs par rôle,
   // ratios au rouge, écarts, validations (S21a). Rangé dans GROW (ADR-0038 § 6).
@@ -526,6 +650,20 @@ export const RH_SOUS_OPTIONS_PREVUES = [
   'rh-reglages',
 ] as const;
 
+/** Ordre cible des sous-options des Stocks (ADR-0046, lot S8), toutes livrées. */
+export const STOCKS_SOUS_OPTIONS_PREVUES = [
+  'stocks-vue',
+  'stocks-articles',
+  'stocks-niveaux',
+  'stocks-mouvements',
+  'stocks-bons',
+  'stocks-a-traiter',
+  'stocks-inventaires',
+  'stocks-reapprovisionnement',
+  'stocks-emplacements',
+  'stocks-reglages',
+] as const;
+
 function autorise(
   action: OrgAction | readonly OrgAction[] | null,
   actions: readonly OrgAction[] | null,
@@ -549,7 +687,10 @@ export function appsVisibles(
   module: ModuleId | null = null,
 ): NavApp[] {
   return NAV_APPS.filter(
-    (app) => (module === null || app.module === module) && autorise(app.action, actions),
+    (app) =>
+      app.masquee !== true &&
+      (module === null || app.module === module) &&
+      autorise(app.action, actions),
   ).map((app) => ({
     ...app,
     sousOptions: app.sousOptions.filter((s) => autorise(s.action, actions)),

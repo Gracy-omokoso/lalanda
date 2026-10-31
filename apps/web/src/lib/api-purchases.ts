@@ -231,6 +231,8 @@ export interface PurchaseOrderLineInput {
   unitPrice: DecimalString;
   discountPercent?: string | null;
   kind: PurchaseLineKind;
+  /** ADR-0046 — S8 : référence d'article de stock (`stk:<id>`), facultative. */
+  itemRef?: string | null;
 }
 
 export interface CreatePurchaseOrderInput {

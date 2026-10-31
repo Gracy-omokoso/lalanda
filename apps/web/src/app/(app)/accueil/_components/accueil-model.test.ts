@@ -187,3 +187,45 @@ describe('RUN : chiffres CRM et Achats (ADR-0044 — P6)', () => {
     ).toEqual({ n: 3 });
   });
 });
+
+describe('RUN : tuile « Articles sous le seuil » (ADR-0046 § 6.8, lot S8)', () => {
+  const tout = {
+    articlesSousSeuil: { n: 2 },
+    achatsEnRetard: { n: 2 },
+    validationsEnAttente: { n: 1 },
+    relancesEnRetard: { n: 3 },
+    opportunitesOuvertes: { n: 5 },
+  };
+
+  it('après les factures ouvertes, avant les achats et le CRM ; quatre tuiles au plus', () => {
+    const c = chiffresRun([facture(true)], tout);
+    expect(MAX_TUILES_RUN).toBe(4);
+    expect(c.map((x) => [x.id, x.valeur, x.libelle, x.attention])).toEqual([
+      ['a-encaisser', '1', 'facture à encaisser', false],
+      ['en-retard', '1', 'facture en retard', true],
+      ['stocks-sous-seuil', '2', 'articles sous le seuil', true],
+      ['achats-en-retard', '2', 'factures fournisseurs en retard', true],
+    ]);
+  });
+
+  it('sans ventes : en tête ; la dernière tuile cède sa place', () => {
+    expect(chiffresRun(null, tout).map((x) => x.id)).toEqual([
+      'stocks-sous-seuil',
+      'achats-en-retard',
+      'validations-achat',
+      'relances-en-retard',
+    ]);
+  });
+
+  it('sans `stock.read` (non lu) : aucune tuile, jamais un zéro ; zéro lu reste sans relief', () => {
+    expect(chiffresRun(null, { articlesSousSeuil: null }).map((x) => x.id)).toEqual([]);
+    expect(chiffresRun(null, { articlesSousSeuil: { n: 0 } })[0]).toMatchObject({
+      valeur: '0',
+      libelle: 'article sous le seuil',
+      attention: false,
+    });
+    expect(chiffresRun(null, { articlesSousSeuil: { n: 100, auMoins: true } })[0]).toMatchObject({
+      valeur: '100+',
+    });
+  });
+});

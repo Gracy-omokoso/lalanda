@@ -9,10 +9,12 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 
 import { purchasesApi, type SupplierListItem } from '@/lib/api-purchases';
+import { stockApi } from '@/lib/api-stock';
 
 import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from '../../ventes/_components/form-ui';
 
 import { messageAchats } from './achats-model';
+import { lignesPreremplies, type ArticlePrerempli } from './commande-prefill-model';
 import {
   MENTION_TAXES,
   formulaireCommande,
@@ -89,15 +91,52 @@ export function ChoixFournisseur({
 
 export function NouvelleDemande({
   fournisseurInitial,
+  articlesInitiaux = [],
   onCree,
 }: {
   fournisseurInitial: string | null;
+  /**
+   * ADR-0046 — S8 : lignes préremplies depuis les suggestions de
+   * réapprovisionnement (identifiants et quantités seulement) ; désignation et
+   * unité relues sur l'API des stocks, prix à saisir d'après le devis.
+   */
+  articlesInitiaux?: readonly ArticlePrerempli[];
   onCree: (id: string) => void;
 }): React.ReactElement {
   const id = useId();
-  const [f, setF] = useState<FormulaireCommande>(
-    formulaireCommande('USD', fournisseurInitial ?? ''),
-  );
+  const [f, setF] = useState<FormulaireCommande>(() => {
+    const base = formulaireCommande('USD', fournisseurInitial ?? '');
+    return articlesInitiaux.length > 0
+      ? { ...base, lignes: lignesPreremplies(articlesInitiaux, new Map()) }
+      : base;
+  });
+  const cleArticles = articlesInitiaux.map((a) => a.itemId).join(',');
+
+  useEffect(() => {
+    if (cleArticles === '') return;
+    let annule = false;
+    const ids = cleArticles.split(',');
+    void Promise.allSettled(ids.map((i) => stockApi.getItem(i))).then((res) => {
+      if (annule) return;
+      const details = new Map<string, { name: string; unit: string }>();
+      res.forEach((r, i) => {
+        if (r.status === 'fulfilled')
+          details.set(ids[i]!, { name: r.value.name, unit: r.value.unit });
+      });
+      // Seules les lignes encore vides reçoivent leur désignation et leur unité.
+      setF((p) => ({
+        ...p,
+        lignes: p.lignes.map((l) => {
+          const itemId = l.itemRef?.startsWith('stk:') ? l.itemRef.slice(4) : null;
+          const d = itemId ? details.get(itemId) : undefined;
+          return d ? { ...l, label: l.label || d.name, unit: l.unit || d.unit } : l;
+        }),
+      }));
+    });
+    return () => {
+      annule = true;
+    };
+  }, [cleArticles]);
   const [champs, setChamps] = useState<Record<string, string>>({});
   const [erreur, setErreur] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);

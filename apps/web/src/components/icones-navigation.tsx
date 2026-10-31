@@ -158,6 +158,26 @@ const TRACES: Record<
       <path d="M16 3.13a4 4 0 0 1 0 7.75" />
     </>
   ),
+  // ADR-0046 — stocks : Lucide « package » ; équipements : « monitor » ;
+  // documents : « folder-open ».
+  stocks: (
+    <>
+      <path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z" />
+      <path d="M12 22V12" />
+      <path d="m3.3 7 7.703 4.734a2 2 0 0 0 1.994 0L20.7 7" />
+      <path d="m7.5 4.27 9 5.15" />
+    </>
+  ),
+  equipements: (
+    <>
+      <rect width="20" height="14" x="2" y="3" rx="2" />
+      <path d="M8 21h8" />
+      <path d="M12 17v4" />
+    </>
+  ),
+  documents: (
+    <path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2" />
+  ),
   pilotage: (
     <>
       <path d="m12 14 4-4" />

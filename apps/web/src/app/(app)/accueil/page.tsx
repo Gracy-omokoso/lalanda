@@ -9,7 +9,8 @@
 // ADR-0039 § 6.5 : carte « Mes tâches » (`GET /work/my-tasks`) avec `work.read`.
 // ADR-0044 — P6 : la carte RUN ajoute des chiffres des achats et du CRM, chacun
 // lu seulement avec son droit (`purchase.read`, `purchase.approve`, `crm.read`),
-// quatre tuiles au plus.
+// quatre tuiles au plus. ADR-0046 — S8 : tuile « Articles sous le seuil »
+// (`stock.read`), après les factures ouvertes.
 
 import type { PayablesView } from '@lalanda/shared/purchases';
 import { ModuleIcon, type ModuleId } from '@lalanda/ui';
@@ -18,6 +19,7 @@ import { useEffect, useState } from 'react';
 
 import { api, jsonRequest, type SettlementView } from '@/lib/api';
 import { crmApi } from '@/lib/api-crm';
+import { stockApi } from '@/lib/api-stock';
 import { growApi } from '@/lib/grow-api';
 import { ideaLabApi } from '@/lib/idea-lab-api';
 import { morningBriefApi, type BriefRuleOutcomeView } from '@/lib/morning-brief-api';
@@ -106,6 +108,7 @@ export default function AccueilPage(): React.ReactElement {
   const lireCrm = actions?.includes('crm.read') ?? false;
   const lireAchats = actions?.includes('purchase.read') ?? false;
   const approuverAchats = actions?.includes('purchase.approve') ?? false;
+  const lireStocks = actions?.includes('stock.read') ?? false;
 
   useEffect(() => {
     // On attend les permissions : interroger les ventes sans `sales.read`
@@ -129,28 +132,32 @@ export default function AccueilPage(): React.ReactElement {
       ),
       siDroit(lireCrm, () => crmApi.listActivities({ status: 'overdue', limit: PAGE_COMPTE })),
       siDroit(lireCrm, () => crmApi.listOpportunities({ status: 'open', limit: PAGE_COMPTE })),
-    ]).then(([projets, idees, factures, brief, sante, dettes, validations, relances, opps]) => {
-      if (annule) return;
-      const score = lue(sante)?.health.score;
-      setFaits({
-        initiatives: lue(projets)?.projects.length ?? null,
-        ideesActives: lue(idees)?.ideas.filter((i) => !i.archived).length ?? null,
-        factures: lue(factures)?.items ?? null,
-        alertes: lue(brief)?.brief.alerts ?? null,
-        sante: score && score.disponible ? score.valeur : null,
-        run: {
-          achatsEnRetard: achatsEnRetard(lue(dettes)),
-          validationsEnAttente: comptePage(lue(validations)),
-          relancesEnRetard: comptePage(lue(relances)),
-          opportunitesOuvertes: comptePage(lue(opps)),
-        },
-      });
-      setPret(true);
-    });
+      siDroit(lireStocks, () => stockApi.listLevels({ below: 'reorder', limit: PAGE_COMPTE })),
+    ]).then(
+      ([projets, idees, factures, brief, sante, dettes, validations, relances, opps, seuils]) => {
+        if (annule) return;
+        const score = lue(sante)?.health.score;
+        setFaits({
+          initiatives: lue(projets)?.projects.length ?? null,
+          ideesActives: lue(idees)?.ideas.filter((i) => !i.archived).length ?? null,
+          factures: lue(factures)?.items ?? null,
+          alertes: lue(brief)?.brief.alerts ?? null,
+          sante: score && score.disponible ? score.valeur : null,
+          run: {
+            achatsEnRetard: achatsEnRetard(lue(dettes)),
+            validationsEnAttente: comptePage(lue(validations)),
+            relancesEnRetard: comptePage(lue(relances)),
+            opportunitesOuvertes: comptePage(lue(opps)),
+            articlesSousSeuil: comptePage(lue(seuils)),
+          },
+        });
+        setPret(true);
+      },
+    );
     return () => {
       annule = true;
     };
-  }, [chargees, lireVentes, lireCrm, lireAchats, approuverAchats, organizationId]);
+  }, [chargees, lireVentes, lireCrm, lireAchats, approuverAchats, lireStocks, organizationId]);
 
   const chiffres: Record<ModuleId, Chiffre[]> = {
     build: chiffresBuild(faits),
