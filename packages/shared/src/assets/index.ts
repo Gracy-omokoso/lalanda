@@ -8,3 +8,6 @@
 // ADR-0046 — S0
 export * from './constants.js';
 export * from './common.js';
+// ADR-0046 — S5
+export * from './registry.js';
+export * from './views.js';
