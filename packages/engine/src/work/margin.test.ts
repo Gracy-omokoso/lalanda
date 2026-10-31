@@ -492,8 +492,8 @@ describe('computeProjectMargin 1.2.0 — salaire rattaché et temps valorisé (A
     category: 'personnel',
   };
 
-  it('version 1.2.0', () => {
-    expect(WORK_MARGIN_VERSION).toBe('1.2.0');
+  it('version 1.3.0 (le constat 1.2.0 est inchangé)', () => {
+    expect(WORK_MARGIN_VERSION).toBe('1.3.0');
   });
 
   it('dépense `personnel` + temps valorisé, même devise : constat, MONTANT DE LA MARGE INCHANGÉ', () => {
@@ -538,5 +538,82 @@ describe('computeProjectMargin 1.2.0 — salaire rattaché et temps valorisé (A
       base({ invoices: [invoice()], expenses: [sansCategorie], timeEntries, rates }),
     );
     expect(findingCodes(r)).not.toContain('PERSONNEL_EXPENSES_AND_TIME_COST');
+  });
+});
+
+// ── ADR-0046 § 6.4 : matériel sorti du stock, informatif (1.3.0) ─────────────
+
+describe('computeProjectMargin 1.3.0 — matériel sorti du stock (ADR-0046 § 6.4)', () => {
+  const item = { id: 'i1', unit: 'pièce', costCurrency: 'USD' as const };
+  const mv = (
+    id: string,
+    kind: 'opening' | 'issue' | 'issue_return',
+    quantity: string,
+    over: Record<string, unknown> = {},
+  ) => ({
+    id,
+    itemId: 'i1',
+    locationId: 'L',
+    kind,
+    quantity,
+    occurredOn: '2026-10-0' + id,
+    costStatus: kind === 'opening' ? ('valued' as const) : ('not_applicable' as const),
+    ...(kind === 'opening' ? { unitCost: '3.000000' } : {}),
+    ...over,
+  });
+  const expense = {
+    id: 'd1',
+    currency: 'USD' as const,
+    spentOn: '2026-10-05',
+    amount: '100.00',
+    category: null,
+  };
+
+  it('sortie de 30,00 USD vers le projet P : `materials` = 30,00 et la marge INCHANGÉE (critère 18)', () => {
+    const sans = computeProjectMargin(base({ expenses: [expense] }));
+    const avec = computeProjectMargin(
+      base({
+        expenses: [expense],
+        stock: {
+          projectId: 'P',
+          items: [item],
+          movements: [
+            mv('1', 'opening', '20'),
+            mv('2', 'issue', '-10', { workProjectId: 'P' }),
+            // Une sortie pour un autre projet ne compte pas pour P.
+            mv('3', 'issue', '-2', { workProjectId: 'Q' }),
+          ],
+        },
+      }),
+    );
+    expect(avec.materials).toEqual([
+      { currency: 'USD', consumedValue: '30.00', issueCount: 1, unvaluedCount: 0 },
+    ]);
+    expect(avec.currencies).toEqual(sans.currencies);
+    expect(avec.findings).toEqual(sans.findings);
+    expect(sans.materials).toBeUndefined();
+  });
+
+  it('retour au magasin : net des retours ; sans sortie, aucune devise', () => {
+    const r = computeProjectMargin(
+      base({
+        stock: {
+          projectId: 'P',
+          items: [item],
+          movements: [
+            mv('1', 'opening', '20'),
+            mv('2', 'issue', '-10', { workProjectId: 'P' }),
+            mv('3', 'issue_return', '4', { workProjectId: 'P' }),
+          ],
+        },
+      }),
+    );
+    expect(r.materials).toEqual([
+      { currency: 'USD', consumedValue: '18.00', issueCount: 1, unvaluedCount: 0 },
+    ]);
+    const vide = computeProjectMargin(
+      base({ stock: { projectId: 'P', items: [item], movements: [mv('1', 'opening', '20')] } }),
+    );
+    expect(vide.materials).toEqual([]);
   });
 });

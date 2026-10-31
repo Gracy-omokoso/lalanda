@@ -23,10 +23,14 @@
 //   `ordered` = reste à facturer HT des lignes de commande approuvées qui visent le
 //   projet (`orderRemainingToInvoice`). Un paiement fournisseur entre déjà dans la
 //   marge par sa dépense : rien n'est compté deux fois.
+// - 1.3.0 (ADR-0046 § 6.4) : matériel sorti du stock pour le projet (`materials`),
+//   valorisé au coût moyen par le moteur des stocks (`projectMaterials`), par devise
+//   de coût — INFORMATIF, JAMAIS soustrait : son achat est déjà une dépense.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { orderRemainingToInvoice } from '../purchases/orders.js';
 import { splitAllocation } from '../purchases/payables.js';
+import { projectMaterials } from '../stock/reports.js';
 import { isCalendarDate } from '../receivables/calendar.js';
 import { revenueBaseOf } from '../receivables/aggregation.js';
 import {
@@ -42,11 +46,13 @@ import {
   WORK_MARGIN_VERSION,
   type ProjectMarginCurrency,
   type ProjectMarginFinding,
+  type ProjectMaterialsCurrency,
   type ProjectMarginInput,
   type ProjectMarginMemberCost,
   type ProjectMarginResult,
   type ProjectPurchasesCurrency,
   type ProjectPurchasesInput,
+  type ProjectStockInput,
   type WorkMarginCurrency,
   type WorkMarginDay,
   type WorkMarginPayment,
@@ -313,7 +319,28 @@ export function computeProjectMargin(input: ProjectMarginInput): ProjectMarginRe
     minutesWithoutRate,
     byMember,
     ...(input.purchases === undefined ? {} : { purchases: projectPurchases(input.purchases) }),
+    ...(input.stock === undefined ? {} : { materials: projectMaterialsOf(input.stock) }),
   };
+}
+
+/**
+ * Matériel sorti du stock pour le projet, par devise de coût (ADR-0046 § 6.4) —
+ * informatif. Le calcul est celui du moteur des stocks (`projectMaterials`) ; rien
+ * n'entre dans `margin`.
+ */
+export function projectMaterialsOf(input: ProjectStockInput): ProjectMaterialsCurrency[] {
+  return projectMaterials(input.movements, input.items, input.projectId)
+    .projects.filter((p) => p.workProjectId === input.projectId)
+    .map((p) => ({
+      currency: checkCurrency(p.currency, `Matériel du projet ${input.projectId}`),
+      consumedValue: p.consumedValue,
+      issueCount: p.issueCount,
+      unvaluedCount: p.unvaluedCount,
+    }))
+    .sort(
+      (a, b) =>
+        WORK_MARGIN_CURRENCIES.indexOf(a.currency) - WORK_MARGIN_CURRENCIES.indexOf(b.currency),
+    );
 }
 
 /** Coûts engagés non payés du projet, par devise (ADR-0044 § 6.1) — informatifs. */

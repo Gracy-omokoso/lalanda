@@ -17,17 +17,22 @@
 import { formatAmount, parseFixed } from '../invoice-totals/decimal.js';
 import { DUE_SOON_DAYS_BOUNDS, payablesSchedule } from '../purchases/payables.js';
 import { revenueBaseOf } from '../receivables/aggregation.js';
+import { parse as parseStockQty, QTY as STOCK_QTY } from '../stock/decimal.js';
+import { replenishmentSuggestions } from '../stock/replenishment.js';
 import type { RevenueGroupAmount } from '../receivables/types.js';
 import {
   BRIEF_CURRENCIES,
   MORNING_BRIEF_VERSION,
+  type BriefAssetsInput,
   type BriefCurrency,
+  type BriefDocumentsInput,
   type BriefFact,
   type BriefInvoiceInput,
   type BriefRuleOutcome,
   type BriefSeverity,
   type BriefSkippedRule,
   type BriefSource,
+  type BriefStockInput,
   type BriefThreshold,
   type BriefCrmInput,
   type BriefHrInput,
@@ -232,6 +237,11 @@ export function buildMorningBriefFacts(input: MorningBriefInput): BriefFact[] {
 
   // ADR-0045 § 6.5 : absences du jour, validations d'absence, échéances RH.
   facts.push(...hrFacts(input.hr ?? { status: 'unavailable' }, today));
+
+  // ADR-0046 § 6.6 : stocks, équipements, documents — des nombres seulement.
+  facts.push(...stockFacts(input.stock ?? { status: 'unavailable' }));
+  facts.push(...assetsFacts(input.assets ?? { status: 'unavailable' }));
+  facts.push(...documentsFacts(input.documents ?? { status: 'unavailable' }));
 
   return facts;
 }
@@ -615,6 +625,189 @@ function hrFacts(
         }
       : { ...f, status: 'known' as const, value: String(Math.max(0, Math.trunc(n))) };
   });
+}
+
+// ── Stocks, équipements, documents (ADR-0046 § 6.6) ──────────────────────────
+//
+// DES NOMBRES SEULEMENT : ni valeur de stock, ni coût, ni nom d'article, ni titre de
+// document. Chaque bloc a sa propre garde (`stock.read`, `assets.read`, `docs.read`) :
+// `hidden` masque tous ses faits, et l'API n'a alors rien lu.
+
+const R5_SOURCE_REF = 'ADR-0046 § 6.6';
+
+function r5Source(module: string, collection: string, rule: string): BriefSource {
+  return { module, collection, rule, reference: R5_SOURCE_REF };
+}
+
+const STOCK_FACT_SKELETON: readonly Omit<BriefFact, 'status' | 'value'>[] = Object.freeze([
+  {
+    id: 'stock.ruptures',
+    label: 'Articles en rupture',
+    kind: 'count',
+    currency: null,
+    source: r5Source(
+      'run.stock',
+      'stock_levels',
+      'Articles suivis et actifs dont la quantité est nulle ou négative à au moins un emplacement',
+    ),
+  },
+  {
+    id: 'stock.sous_seuil',
+    label: 'Articles sous le seuil de réapprovisionnement',
+    kind: 'count',
+    currency: null,
+    source: r5Source(
+      'run.stock',
+      'stock_levels',
+      'Articles dont le disponible est strictement sous le seuil (moteur des stocks, `replenishmentSuggestions`)',
+    ),
+  },
+  {
+    id: 'stock.a_traiter',
+    label: 'Lignes « À traiter » du magasin',
+    kind: 'count',
+    currency: null,
+    source: r5Source(
+      'run.stock',
+      'stock_pending_lines',
+      'Lignes de réception, de vente ou de coût qui attendent un rattachement ou une décision',
+    ),
+  },
+]);
+
+const ASSETS_FACT_SKELETON: readonly Omit<BriefFact, 'status' | 'value'>[] = Object.freeze([
+  {
+    id: 'equipements.maintenances_dues',
+    label: 'Maintenances dues',
+    kind: 'count',
+    currency: null,
+    source: r5Source(
+      'run.assets',
+      'asset_maintenance',
+      'Interventions prévues en retard ou dues dans le délai des réglages des équipements (moteur `assetDeadlines`)',
+    ),
+  },
+  {
+    id: 'equipements.couvertures_expirant',
+    label: 'Garanties, assurances et contrats qui expirent',
+    kind: 'count',
+    currency: null,
+    source: r5Source(
+      'run.assets',
+      'asset_coverages',
+      'Couvertures expirées ou qui expirent dans leur délai de rappel (moteur `assetDeadlines`)',
+    ),
+  },
+  {
+    id: 'equipements.chez_anciens',
+    label: 'Équipements encore affectés à un ancien collaborateur',
+    kind: 'count',
+    currency: null,
+    source: r5Source(
+      'run.assets',
+      'assets',
+      'Affectation ouverte à un collaborateur sorti (constat `ASSET_HELD_BY_FORMER_EMPLOYEE`)',
+    ),
+  },
+]);
+
+const DOCUMENTS_FACT_SKELETON: readonly Omit<BriefFact, 'status' | 'value'>[] = Object.freeze([
+  {
+    id: 'documents.expirant',
+    label: 'Documents qui expirent',
+    kind: 'count',
+    currency: null,
+    source: r5Source(
+      'run.documents',
+      'library_documents',
+      'Documents que vous pouvez lire, expirés ou qui expirent dans leur délai de rappel',
+    ),
+  },
+]);
+
+const R5_HIDDEN_RULES: Readonly<Record<string, string>> = Object.freeze({
+  'run.stock': 'Réservé aux membres qui consultent les stocks',
+  'run.assets': 'Réservé aux membres qui consultent les équipements',
+  'run.documents': 'Réservé aux membres qui consultent la bibliothèque',
+});
+
+function skeletonFacts(
+  skeleton: readonly Omit<BriefFact, 'status' | 'value'>[],
+  input: 'hidden' | { status: 'unavailable' },
+): BriefFact[] {
+  const status = input === 'hidden' ? ('hidden' as const) : ('unavailable' as const);
+  return skeleton.map((f) => ({
+    ...f,
+    status,
+    value: null,
+    ...(status === 'hidden'
+      ? { source: { ...f.source, rule: R5_HIDDEN_RULES[f.source.module] ?? f.source.rule } }
+      : {}),
+  }));
+}
+
+function knownCounts(
+  skeleton: readonly Omit<BriefFact, 'status' | 'value'>[],
+  values: Readonly<Record<string, number>>,
+): BriefFact[] {
+  return skeleton.map((f) => ({
+    ...f,
+    status: 'known' as const,
+    value: String(Math.max(0, Math.trunc(values[f.id] ?? 0))),
+  }));
+}
+
+/**
+ * Ruptures : articles suivis et actifs dont AU MOINS un niveau du cache est ≤ 0.
+ * Sous le seuil : suggestions du moteur des stocks (un article par seuil, global ou
+ * d'un emplacement), sans déduire les commandes ouvertes (elles réduisent la
+ * suggestion, pas le constat).
+ */
+export function stockBriefCounts(
+  items: Extract<BriefStockInput, { status: 'known' }>['items'],
+  levels: Extract<BriefStockInput, { status: 'known' }>['levels'],
+): { ruptures: number; belowReorder: number } {
+  const followed = new Set(
+    items.filter((i) => i.tracked !== false && i.active !== false).map((i) => i.id),
+  );
+  const out = new Set<string>();
+  for (const l of levels) {
+    if (!followed.has(l.itemId)) continue;
+    const q = parseStockQty(l.quantity, STOCK_QTY, 'any', `Niveau ${l.itemId} / ${l.locationId}`);
+    if (q <= 0n) out.add(l.itemId);
+  }
+  const below = new Set(replenishmentSuggestions(levels, items).suggestions.map((s) => s.itemId));
+  return { ruptures: out.size, belowReorder: below.size };
+}
+
+function stockFacts(stock: BriefStockInput): BriefFact[] {
+  if (stock === 'hidden' || stock.status === 'unavailable') {
+    return skeletonFacts(STOCK_FACT_SKELETON, stock);
+  }
+  const counts = stockBriefCounts(stock.items, stock.levels);
+  return knownCounts(STOCK_FACT_SKELETON, {
+    'stock.ruptures': counts.ruptures,
+    'stock.sous_seuil': counts.belowReorder,
+    'stock.a_traiter': stock.pendingCount,
+  });
+}
+
+function assetsFacts(assets: BriefAssetsInput): BriefFact[] {
+  if (assets === 'hidden' || assets.status === 'unavailable') {
+    return skeletonFacts(ASSETS_FACT_SKELETON, assets);
+  }
+  return knownCounts(ASSETS_FACT_SKELETON, {
+    'equipements.maintenances_dues': assets.maintenanceDueCount,
+    'equipements.couvertures_expirant': assets.coverageExpiringCount,
+    'equipements.chez_anciens': assets.heldByFormerEmployeeCount,
+  });
+}
+
+function documentsFacts(documents: BriefDocumentsInput): BriefFact[] {
+  if (documents === 'hidden' || documents.status === 'unavailable') {
+    return skeletonFacts(DOCUMENTS_FACT_SKELETON, documents);
+  }
+  return knownCounts(DOCUMENTS_FACT_SKELETON, { 'documents.expirant': documents.expiringCount });
 }
 
 function amountOfSigned(value: string): bigint {
@@ -1150,6 +1343,87 @@ export const MORNING_BRIEF_RULES: readonly RuleDefinition[] = Object.freeze([
       };
     },
   },
+  // ── ADR-0046 § 6.6 : stocks, équipements, documents ─────────────────────
+  {
+    id: 'ruptures_et_seuils',
+    rank: 16,
+    severity: 'attention',
+    requires: ['stock.ruptures', 'stock.sous_seuil'],
+    threshold: null,
+    evaluate(ctx) {
+      const out = ctx.count('stock.ruptures');
+      const below = ctx.count('stock.sous_seuil');
+      if (out + below <= 0) return null;
+      const parts: string[] = [];
+      if (out > 0) parts.push(`${out} ${plural(out, 'article en rupture', 'articles en rupture')}`);
+      if (below > 0) {
+        parts.push(`${below} ${plural(below, 'article sous le seuil', 'articles sous le seuil')}`);
+      }
+      return {
+        title: 'Ruptures et seuils de stock',
+        message: `${parts.join(' et ')}.`,
+        recommendation: 'Voir les suggestions de réapprovisionnement.',
+        actionPath: '/stocks/reapprovisionnement',
+        factIds: ['stock.ruptures', 'stock.sous_seuil'],
+      };
+    },
+  },
+  {
+    id: 'maintenances_dues',
+    rank: 17,
+    severity: 'attention',
+    requires: ['equipements.maintenances_dues', 'equipements.chez_anciens'],
+    threshold: null,
+    evaluate(ctx) {
+      const due = ctx.count('equipements.maintenances_dues');
+      const held = ctx.count('equipements.chez_anciens');
+      if (due + held <= 0) return null;
+      const parts: string[] = [];
+      if (due > 0) parts.push(`${due} ${plural(due, 'maintenance due', 'maintenances dues')}`);
+      if (held > 0) {
+        parts.push(
+          `${held} ${plural(
+            held,
+            'équipement encore affecté à un ancien collaborateur',
+            'équipements encore affectés à d’anciens collaborateurs',
+          )}`,
+        );
+      }
+      return {
+        title: 'Équipements à suivre',
+        message: `${parts.join(' et ')}.`,
+        recommendation: 'Ouvrir les échéances des équipements et planifier chaque suite.',
+        actionPath: '/equipements/echeances',
+        factIds: ['equipements.maintenances_dues', 'equipements.chez_anciens'],
+      };
+    },
+  },
+  {
+    id: 'echeances_documents_et_garanties',
+    rank: 18,
+    severity: 'info',
+    requires: ['equipements.couvertures_expirant', 'documents.expirant'],
+    threshold: null,
+    evaluate(ctx) {
+      const covers = ctx.count('equipements.couvertures_expirant');
+      const docs = ctx.count('documents.expirant');
+      if (covers + docs <= 0) return null;
+      const parts: string[] = [];
+      if (covers > 0) {
+        parts.push(
+          `${covers} ${plural(covers, 'garantie, assurance ou contrat', 'garanties, assurances ou contrats')}`,
+        );
+      }
+      if (docs > 0) parts.push(`${docs} ${plural(docs, 'document', 'documents')}`);
+      return {
+        title: 'Échéances de documents et de garanties',
+        message: `Échéance proche ou dépassée : ${parts.join(' et ')}.`,
+        recommendation: 'Ouvrir les échéances et renouveler ce qui doit l’être.',
+        actionPath: '/documents/echeances',
+        factIds: ['equipements.couvertures_expirant', 'documents.expirant'],
+      };
+    },
+  },
 ] satisfies RuleDefinition[]);
 
 const SEVERITY_ORDER: Record<BriefSeverity, number> = { critique: 0, attention: 1, info: 2 };
@@ -1231,6 +1505,10 @@ export function buildMorningBrief(input: MorningBriefInput): MorningBrief {
       (input.hr !== undefined &&
         input.hr !== 'hidden' &&
         input.hr.status === 'known' &&
-        input.hr.truncated),
+        input.hr.truncated) ||
+      (input.stock !== undefined &&
+        input.stock !== 'hidden' &&
+        input.stock.status === 'known' &&
+        input.stock.truncated),
   };
 }

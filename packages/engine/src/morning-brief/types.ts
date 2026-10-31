@@ -10,6 +10,8 @@
 // Montants : chaînes décimales canoniques, jamais de `number` (docs/26).
 // ─────────────────────────────────────────────────────────────────────────────
 
+import type { CachedLevelInput, StockItemInput } from '../stock/types.js';
+
 /**
  * 1.1.0 (ADR-0039 § 6.5) : faits `mes_taches.*`, `taches.en_retard`,
  * `projets_a_risque` et règles R8, R9 (projets et tâches du RUN).
@@ -28,7 +30,15 @@
  * `mes_validations_absence.en_attente`, `rh.echeances` — des NOMBRES seulement,
  * jamais un nom, un type d'absence ni un montant ; règles R13 à R15.
  */
-export const MORNING_BRIEF_VERSION = '1.4.0';
+/**
+ * 1.5.0 (ADR-0046 § 6.6) : faits `stock.ruptures`, `stock.sous_seuil`,
+ * `stock.a_traiter`, `equipements.maintenances_dues`,
+ * `equipements.couvertures_expirant`, `equipements.chez_anciens`,
+ * `documents.expirant` — des NOMBRES seulement, jamais une valeur de stock, un coût
+ * ni un titre de document ; règles R16 à R18. Sans ces trois entrées, la sortie est
+ * celle de 1.4.0.
+ */
+export const MORNING_BRIEF_VERSION = '1.5.0';
 
 export const BRIEF_CURRENCIES = ['CDF', 'USD'] as const;
 export type BriefCurrency = (typeof BRIEF_CURRENCIES)[number];
@@ -209,6 +219,53 @@ export type BriefHrInput =
       truncated: boolean;
     };
 
+/**
+ * Stocks (ADR-0046 § 6.6) : `hidden` sans `stock.read` (rien n'est lu),
+ * `unavailable` sans module des stocks (tests). Le moteur compte lui-même les
+ * ruptures (niveau ≤ 0 d'un article suivi et actif à un emplacement) et les articles
+ * sous le seuil (moteur des stocks, `replenishmentSuggestions`). Aucune valeur : les
+ * articles ne portent ni coût ni prix.
+ */
+export type BriefStockInput =
+  | 'hidden'
+  | { status: 'unavailable' }
+  | {
+      status: 'known';
+      items: readonly StockItemInput[];
+      /** Niveaux du cache (`stock_levels`), quantités en unité de stock. */
+      levels: readonly CachedLevelInput[];
+      /** Lignes « À traiter » ouvertes (§ 2.6). */
+      pendingCount: number;
+      truncated: boolean;
+    };
+
+/**
+ * Équipements (ADR-0046 § 6.6) : `hidden` sans `assets.read`, `unavailable` sans
+ * module. Les trois nombres viennent du moteur des équipements (`assetDeadlines`,
+ * délais des réglages) ; aucun nom, aucun coût.
+ */
+export type BriefAssetsInput =
+  | 'hidden'
+  | { status: 'unavailable' }
+  | {
+      status: 'known';
+      /** Maintenances prévues en retard ou dues sous `maintenanceDueSoonDays`. */
+      maintenanceDueCount: number;
+      /** Garanties, assurances et contrats expirés ou qui expirent sous leur délai. */
+      coverageExpiringCount: number;
+      /** Équipements encore affectés à un collaborateur sorti. */
+      heldByFormerEmployeeCount: number;
+    };
+
+/**
+ * Bibliothèque (ADR-0046 § 6.6) : `hidden` sans `docs.read`, `unavailable` sans
+ * module. Documents LISIBLES par l'appelant (droits des dossiers, documents
+ * sensibles) expirés ou qui expirent sous leur délai de rappel ; un nombre, jamais
+ * un titre.
+ */
+export type BriefDocumentsInput =
+  'hidden' | { status: 'unavailable' } | { status: 'known'; expiringCount: number };
+
 export interface MorningBriefInput {
   /** Instant de référence, ISO 8601. */
   now: string;
@@ -226,6 +283,12 @@ export interface MorningBriefInput {
   purchases?: BriefPurchasesInput;
   /** Absences du jour, validations d'absence, échéances RH ; absent : non disponible (ADR-0045). */
   hr?: BriefHrInput;
+  /** Ruptures, seuils, « À traiter » ; absent : non disponible (ADR-0046 § 6.6). */
+  stock?: BriefStockInput;
+  /** Maintenances, couvertures, anciens collaborateurs ; absent : non disponible. */
+  assets?: BriefAssetsInput;
+  /** Documents qui expirent ; absent : non disponible. */
+  documents?: BriefDocumentsInput;
 }
 
 export type BriefFactStatus = 'known' | 'to_fill' | 'unavailable' | 'hidden';
