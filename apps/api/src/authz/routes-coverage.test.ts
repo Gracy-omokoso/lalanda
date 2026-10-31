@@ -125,6 +125,10 @@ import { CrmOverviewController } from '../crm/overview/crm-overview.controller.j
 import { QuotesFromOpportunityController } from '../sales/quotes/quotes-from-opportunity.controller.js';
 // ADR-0040 — C3
 import { CrmReportsController } from '../crm/reports/crm-reports.controller.js';
+// ADR-0046 — S5
+import { AssetMaintenanceController } from '../assets/maintenance/asset-maintenance.controller.js';
+import { AssetsController } from '../assets/registry/assets.controller.js';
+import { AssetSettingsController } from '../assets/settings/asset-settings.controller.js';
 import { ACTIONS, PLATFORM_FORBIDDEN_ACTIONS, type Action } from './permissions.js';
 
 /**
@@ -255,6 +259,10 @@ const CONTROLEURS = [
   HrDocumentsController,
   HrChecklistsController,
   HrDeadlinesController,
+  // ADR-0046 — S5 : équipements (registre, affectations, maintenance, couvertures, réglages).
+  AssetsController,
+  AssetMaintenanceController,
+  AssetSettingsController,
 ];
 
 /**
@@ -1249,5 +1257,47 @@ describe('ADR-0045 — H4 : documents, listes d’entrée et de sortie, échéan
       expect(route!.actions, cle).toEqual(actions);
     }
     for (const cle of Object.keys(SANS_PERMISSION)) expect(cle.startsWith('Hr')).toBe(false);
+  });
+});
+
+// ADR-0046 — S5
+describe('ADR-0046 — S5 : équipements', () => {
+  it('chaque route déclare la permission de l’ADR (§ 5.2) ; export avec `report.export`', () => {
+    const attendu: Record<string, Action[]> = {
+      'AssetsController.list': ['assets.read'],
+      'AssetsController.get': ['assets.read'],
+      'AssetsController.deadlines': ['assets.read'],
+      'AssetsController.reports': ['assets.read'],
+      'AssetsController.exportRegister': ['assets.read', 'report.export'],
+      'AssetsController.assignments': ['assets.read'],
+      'AssetsController.create': ['assets.manage'],
+      'AssetsController.update': ['assets.manage'],
+      'AssetsController.dispose': ['assets.manage'],
+      'AssetsController.reinstate': ['assets.manage'],
+      'AssetsController.assign': ['assets.manage'],
+      'AssetsController.returnAsset': ['assets.manage'],
+      'AssetMaintenanceController.listMaintenance': ['assets.read'],
+      'AssetMaintenanceController.createMaintenance': ['assets.manage'],
+      'AssetMaintenanceController.updateMaintenance': ['assets.manage'],
+      'AssetMaintenanceController.completeMaintenance': ['assets.manage'],
+      'AssetMaintenanceController.listCoverages': ['assets.read'],
+      'AssetMaintenanceController.createCoverage': ['assets.manage'],
+      'AssetMaintenanceController.updateCoverage': ['assets.manage'],
+      'AssetMaintenanceController.removeCoverage': ['assets.manage'],
+      'AssetSettingsController.listCategories': ['assets.read'],
+      'AssetSettingsController.createCategory': ['assets.manage'],
+      'AssetSettingsController.updateCategory': ['assets.manage'],
+      'AssetSettingsController.getSettings': ['assets.read'],
+      'AssetSettingsController.updateSettings': ['assets.manage'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) =>
+      /^Asset(s|Maintenance|Settings)Controller\./.test(r.cle),
+    );
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+    }
+    for (const cle of Object.keys(SANS_PERMISSION)) expect(cle.startsWith('Asset')).toBe(false);
   });
 });
