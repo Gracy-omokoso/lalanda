@@ -454,7 +454,12 @@ export const NAV_APPS: readonly NavApp[] = [
         action: 'stock.read',
       },
       { id: 'stocks-bons', href: '/stocks/bons', label: 'Bons', action: 'stock.read' },
-      { id: 'stocks-a-traiter', href: '/stocks/a-traiter', label: 'À traiter', action: 'stock.read' },
+      {
+        id: 'stocks-a-traiter',
+        href: '/stocks/a-traiter',
+        label: 'À traiter',
+        action: 'stock.read',
+      },
       {
         id: 'stocks-inventaires',
         href: '/stocks/inventaires',
@@ -488,7 +493,12 @@ export const NAV_APPS: readonly NavApp[] = [
     action: 'assets.read',
     masquee: true,
     sousOptions: [
-      { id: 'equipements-registre', href: '/equipements', label: 'Registre', action: 'assets.read' },
+      {
+        id: 'equipements-registre',
+        href: '/equipements',
+        label: 'Registre',
+        action: 'assets.read',
+      },
       {
         id: 'equipements-echeances',
         href: '/equipements/echeances',

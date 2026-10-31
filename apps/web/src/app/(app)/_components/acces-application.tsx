@@ -32,9 +32,7 @@ export function AccesApplication({
     return (
       <div className="rounded-xl border border-dashed border-[var(--border)] p-6 text-center sm:p-8">
         <p className="text-sm font-medium">{titreRefus}</p>
-        <p className="mx-auto mt-1 max-w-xl text-sm text-[var(--foreground-muted)]">
-          {texteRefus}
-        </p>
+        <p className="mx-auto mt-1 max-w-xl text-sm text-[var(--foreground-muted)]">{texteRefus}</p>
       </div>
     );
   }
