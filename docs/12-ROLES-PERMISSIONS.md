@@ -34,15 +34,16 @@ Le support ne voit jamais les données financières sans consentement explicite,
 | Lecteur | lecture seulement |
 | Commercial (`sales_rep`, ADR-0040, appliqué) | CRM, devis, consultation des clients et du catalogue ; ni trésorerie, ni dépenses, ni émission de facture |
 | Responsable RH (`hr_manager`, ADR-0045, implémenté) | dossiers du personnel, absences et documents RH ; ni trésorerie, ni ventes, ni achats |
-| Magasinier (`storekeeper`, **proposé, ADR-0046**, non appliqué) | sort, transfère et compte le stock ; consulte le matériel et les documents ; ni prix d'achat, ni valeur du stock, ni trésorerie, ni ventes |
+| Magasinier (`storekeeper`, ADR-0046, appliqué au lot S0) | sort, transfère et compte le stock ; consulte le matériel et les documents ; ni prix d'achat, ni valeur du stock, ni trésorerie, ni ventes |
 
 ## Actions granulaires
 
-`organization.manage`, `billing.manage`, `members.invite`, `project.create`, `project.read`, `project.update`, `canvas.update`, `inputs.update`, `plan.calculate`, `plan.approve`, `actuals.import`, `period.close`, `analytics.read`, `report.export`, `audit.read`, `fiscal.manage`, `sales.read`, `sales.manage`, `sales.invoice`, `sales.receipt`, `treasury.read`, `treasury.manage`, `crm.read`, `crm.manage`, `work.read`, `work.update`, `work.manage`, `sales.quote`, `purchase.read`, `purchase.request`, `purchase.manage`, `purchase.approve`, `payables.pay`, `hr.read`, `hr.manage`, `hr.sensitive.read`, `leave.request`, `leave.approve`.
+`organization.manage`, `billing.manage`, `members.invite`, `project.create`, `project.read`, `project.update`, `canvas.update`, `inputs.update`, `plan.calculate`, `plan.approve`, `actuals.import`, `period.close`, `analytics.read`, `report.export`, `audit.read`, `fiscal.manage`, `sales.read`, `sales.manage`, `sales.invoice`, `sales.receipt`, `treasury.read`, `treasury.manage`, `crm.read`, `crm.manage`, `work.read`, `work.update`, `work.manage`, `sales.quote`, `purchase.read`, `purchase.request`, `purchase.manage`, `purchase.approve`, `payables.pay`, `hr.read`, `hr.manage`, `hr.sensitive.read`, `leave.request`, `leave.approve`, `stock.read`, `stock.move`, `stock.count`, `stock.manage`, `assets.read`, `assets.manage`, `docs.read`, `docs.manage`.
 
-Trente-huit actions au total, dans l'ordre ci-dessus (ordre de fusion pour les
+Quarante-six actions au total, dans l'ordre ci-dessus (ordre de fusion pour les
 actions ajoutées après la dix-neuvième ; les vingt-neuvième à trente-troisième viennent
-d'ADR-0044, les cinq dernières d'ADR-0045).
+d'ADR-0044, les trente-quatrième à trente-huitième d'ADR-0045, les huit dernières
+d'ADR-0046).
 
 `fiscal.manage` — « Gérer l'identité fiscale et la facture normalisée » — est la
 seizième action, ajoutée par ADR-0021 §8 (18 oct. 2026). Elle couvre la fiche
@@ -357,11 +358,20 @@ sont inchangés.
   strictement.
 - Tests : matrice 10 × 38 + 6 × 38 = **608** cases.
 
-### Proposé, ADR-0046 — stocks, équipements et documents (non appliqué)
+### ADR-0046 — stocks, équipements et documents (appliqué, lot S0)
 
-> **Statut : proposé** par [ADR-0046](adr/ADR-0046-stocks-equipements-documents.md) § 8 (31 oct.
-> 2026), R5 du RUN. Rien n'est appliqué dans `permissions.ts` avant le lot S0 ; la matrice
-> ci-dessus (608 cases) reste la référence jusque-là.
+> **Statut : appliqué** par le lot S0 d'[ADR-0046](adr/ADR-0046-stocks-equipements-documents.md)
+> § 8 (31 oct. 2026), R5 du RUN, aux valeurs par défaut des décisions ouvertes n° 1 à 3. La
+> matrice ci-dessous est celle de `apps/api/src/authz/permissions.ts`, vérifiée par
+> `permissions.test.ts` (782 cases) ; dépendances et domaines dix à douze par
+> `overrides.test.ts` ; `stockCountDecision`, `folderAccessDecision`, `documentReadDecision` et
+> `canSeeStockValues` (valeurs servies avec `purchase.read` ou `treasury.read`) sont des fonctions
+> pures à tables de vérité testées. Les routes `/stock`, `/assets` et `/documents` arrivent aux lots
+> S3, S5 et S6 : d'ici là, les huit actions figurent dans `ACTIONS_SANS_ROUTE` de la sonde
+> `rbac-matrix.e2e.test.ts`, qui exerce déjà le rôle `storekeeper` sur toutes les autres sondes.
+> Rôles existants : le Lecteur gagne `stock.read`, `assets.read`, `docs.read` ; le Commercial
+> `stock.read`, `docs.read` ; le Responsable RH `assets.read`, `docs.read`, `docs.manage` ;
+> l'Administrateur attribue désormais aussi le Magasinier.
 
 - **Huit actions nouvelles**, trente-neuvième à quarante-sixième, en fin de liste : `stock.read`
   (« Consulter les stocks » ; les **valeurs** exigent en plus `purchase.read` ou `treasury.read`),

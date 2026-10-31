@@ -15,6 +15,10 @@
 // seul à pouvoir l'attribuer (`roleOptions` le dit attribuable ou non). Comme le
 // Commercial, il est en fin de liste sans être le moindre privilège.
 //
+// ADR-0046 — S0 : le Magasinier (`storekeeper`) est attribuable par qui détient ses neuf
+// actions (Propriétaire, Administrateur, Directeur financier) ; en fin de liste lui aussi,
+// sans être le moindre privilège (`roleParDefaut` choisit par rang).
+//
 // ADR-0041 — A5 : après le titre, « Personnaliser les autorisations » ouvre la
 // même grille que la fiche du membre, préremplie par la ligne du titre. Fermée,
 // elle dit en une phrase ce que le titre donne. L'invitation porte l'écart ;

@@ -305,9 +305,9 @@ describe('visibilité des blocs par rôle (S21a)', () => {
   it('ouvre les projets à tous les rôles qui lisent les projets, Conseiller et Lecteur compris', () => {
     for (const role of ORG_ROLES) {
       // ADR-0040 § 4.2 : le Commercial n'a pas `project.read` ; ADR-0045 § 4.2 : le
-      // Responsable RH non plus.
+      // Responsable RH non plus ; ADR-0046 § 8.2 : ni le Magasinier.
       expect(blocVisible('projets', role, sansContexte), role).toBe(
-        role !== 'sales_rep' && role !== 'hr_manager',
+        role !== 'sales_rep' && role !== 'hr_manager' && role !== 'storekeeper',
       );
     }
   });

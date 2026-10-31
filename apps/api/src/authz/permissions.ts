@@ -7,11 +7,12 @@
 // et l'interface consomment `can()` / `canPlatform()`.
 //
 // Trois ensembles fermés (docs/26 « états représentés par unions fermées ») :
-//   1. ORG_ROLES       — les 10 rôles d'organisation (ADR-0012 §1 ; le neuvième,
+//   1. ORG_ROLES       — les 11 rôles d'organisation (ADR-0012 §1 ; le neuvième,
 //                        `sales_rep`, d'ADR-0040 § 4.2 ; le dixième, `hr_manager`,
-//                        d'ADR-0045 § 4.2);
+//                        d'ADR-0045 § 4.2 ; le onzième, `storekeeper`, d'ADR-0046
+//                        § 8.2);
 //   2. PLATFORM_ROLES  — les 6 rôles plateforme, préfixés `platform_` (§2);
-//   3. ACTIONS         — les 38 actions granulaires, dans l'ordre de docs/12
+//   3. ACTIONS         — les 46 actions granulaires, dans l'ordre de docs/12
 //                        (la seizième, `fiscal.manage`, vient d'ADR-0021 §8 ;
 //                        la dix-septième et la dix-huitième, `sales.read` et
 //                        `sales.manage`, d'ADR-0022 § S25c.1 ; la dix-neuvième,
@@ -29,7 +30,8 @@
 //                        d'ADR-0044 § 4.1 ; les trente-quatrième à
 //                        trente-huitième, `hr.read`, `hr.manage`,
 //                        `hr.sensitive.read`, `leave.request` et `leave.approve`,
-//                        d'ADR-0045 § 4.1).
+//                        d'ADR-0045 § 4.1 ; les trente-neuvième à quarante-sixième,
+//                        `stock.*`, `assets.*` et `docs.*`, d'ADR-0046 § 8.1).
 //
 // Refus par défaut (docs/17 § Autorisation) : les matrices sont exhaustives, une
 // case absente ne compile pas, et une case `deny` est un refus.
@@ -42,9 +44,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Les 10 rôles d'organisation (ADR-0012 §1). Le neuvième, `sales_rep` (« Commercial »),
+ * Les 11 rôles d'organisation (ADR-0012 §1). Le neuvième, `sales_rep` (« Commercial »),
  * vient d'ADR-0040 § 4.2 ; le dixième, `hr_manager` (« Responsable RH »), d'ADR-0045
- * § 4.2 : ajoutés EN FIN de liste (ordre de fusion, comme les actions).
+ * § 4.2 ; le onzième, `storekeeper` (« Magasinier »), d'ADR-0046 § 8.2 : ajoutés EN FIN
+ * de liste (ordre de fusion, comme les actions).
  *
  * Slugs en anglais `snake_case` (docs/26 « noms de code en anglais »). `owner`
  * conserve la valeur de l'ancien modèle : la migration S20a n'a donc aucun
@@ -64,6 +67,9 @@ export const ORG_ROLES = [
   // ADR-0045 — H0 : dossiers du personnel, absences et documents RH ; ni trésorerie,
   // ni ventes, ni achats.
   'hr_manager',
+  // ADR-0046 — S0 : réceptionne, range, sort et compte le stock ; ni prix d'achat, ni
+  // valeur du stock, ni trésorerie, ni ventes.
+  'storekeeper',
 ] as const;
 
 export type OrgRole = (typeof ORG_ROLES)[number];
@@ -96,9 +102,12 @@ export const ORG_ROLE_RANK: Readonly<Record<OrgRole, number>> = {
   // ADR-0045 § 4.2 : le Responsable RH s'insère au rang 6 ; les suivants glissent
   // d'un cran. Le rang n'est pas un droit : aucun accès ne change.
   hr_manager: 6,
-  project_manager: 7,
-  advisor: 8,
-  viewer: 9,
+  // ADR-0046 § 8.2 : le Magasinier s'insère au rang 7 ; les suivants glissent d'un
+  // cran. Le rang n'est pas un droit : aucun accès ne change.
+  storekeeper: 7,
+  project_manager: 8,
+  advisor: 9,
+  viewer: 10,
 };
 
 /**
@@ -118,7 +127,7 @@ export const PLATFORM_ROLES = [
 export type PlatformRole = (typeof PLATFORM_ROLES)[number];
 
 /**
- * Les 38 actions granulaires (docs/12 § Actions granulaires, ordre du document).
+ * Les 46 actions granulaires (docs/12 § Actions granulaires, ordre du document).
  *
  * `fiscal.manage` (ADR-0021 §8) est ajoutée EN FIN de liste, et non à côté
  * d'`organization.manage` : l'ordre est celui de docs/12, que l'interface et les
@@ -133,7 +142,9 @@ export type PlatformRole = (typeof PLATFORM_ROLES)[number];
  * `purchase.request`, `purchase.manage`, `purchase.approve` et `payables.pay`
  * (ADR-0044 § 4.1) les vingt-neuvième à trente-troisième, `hr.read`, `hr.manage`,
  * `hr.sensitive.read`, `leave.request` et `leave.approve` (ADR-0045 § 4.1) les
- * trente-quatrième à trente-huitième.
+ * trente-quatrième à trente-huitième, `stock.read`, `stock.move`, `stock.count`,
+ * `stock.manage`, `assets.read`, `assets.manage`, `docs.read` et `docs.manage`
+ * (ADR-0046 § 8.1) les trente-neuvième à quarante-sixième.
  */
 export const ACTIONS = [
   'organization.manage',
@@ -185,6 +196,17 @@ export const ACTIONS = [
   'hr.sensitive.read',
   'leave.request',
   'leave.approve',
+  // ADR-0046 — S0 : stocks, équipements et documents (§ 8.1). Les VALEURS (coûts, valeur
+  // du stock, écarts valorisés, estimation de gestion) exigent en plus `purchase.read` ou
+  // `treasury.read` : règle de service, pas une action (§ 5).
+  'stock.read',
+  'stock.move',
+  'stock.count',
+  'stock.manage',
+  'assets.read',
+  'assets.manage',
+  'docs.read',
+  'docs.manage',
 ] as const;
 
 export type Action = (typeof ACTIONS)[number];
@@ -259,7 +281,7 @@ export type OrgGrant = 'allow' | 'deny' | 'allow_sod' | 'allow_project' | 'condi
 /**
  * MATRICE RÔLE ORGANISATION × ACTION — transcription littérale d'ADR-0012 §3.
  *
- * Le type impose 10 rôles × 38 actions : oublier une case ne compile pas.
+ * Le type impose 11 rôles × 46 actions : oublier une case ne compile pas.
  * `permissions.test.ts` redéclare cette matrice en littéral (elle n'est PAS
  * importée d'ici) : toute modification de production casse le test et force une
  * mise à jour consciente de l'ADR et de docs/12. C'est le garde-fou central.
@@ -331,6 +353,16 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'hr.sensitive.read': 'allow',
       'leave.request': 'allow',
       'leave.approve': 'allow_sod',
+      // ADR-0046 — S0 (§ 8.1) : stocks, équipements, documents. `stock.manage` change des
+      // valeurs et valide les écarts d'inventaire (ⓢ : on ne valide pas son propre comptage).
+      'stock.read': 'allow',
+      'stock.move': 'allow',
+      'stock.count': 'allow',
+      'stock.manage': 'allow_sod',
+      'assets.read': 'allow',
+      'assets.manage': 'allow',
+      'docs.read': 'allow',
+      'docs.manage': 'allow',
     },
     // Administrateur — « membres, projets, paramètres ». Gouvernance technique,
     // pas autorité financière : ni `billing.manage`, ni `plan.approve`, ni
@@ -388,6 +420,16 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'hr.sensitive.read': 'deny',
       'leave.request': 'allow',
       'leave.approve': 'deny',
+      // ADR-0046 — S0 (§ 8.1) : prépare et exécute (mouvements, comptages) ; valide les écarts
+      // en case ⓢ ; registre et bibliothèque.
+      'stock.read': 'allow',
+      'stock.move': 'allow',
+      'stock.count': 'allow',
+      'stock.manage': 'allow_sod',
+      'assets.read': 'allow',
+      'assets.manage': 'allow',
+      'docs.read': 'allow',
+      'docs.manage': 'allow',
     },
     // Directeur financier — « plans, validation, réalisé, rapports ». L'autorité
     // financière : approuve et clôture. Cible de la migration des anciens `member`
@@ -433,6 +475,15 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'hr.sensitive.read': 'allow',
       'leave.request': 'allow',
       'leave.approve': 'allow_sod',
+      // ADR-0046 — S0 (§ 8.1) : autorité sur les valeurs du stock (ⓢ).
+      'stock.read': 'allow',
+      'stock.move': 'allow',
+      'stock.count': 'allow',
+      'stock.manage': 'allow_sod',
+      'assets.read': 'allow',
+      'assets.manage': 'allow',
+      'docs.read': 'allow',
+      'docs.manage': 'allow',
     },
     // Comptable — « réalisé, mapping, clôture selon permission ». Constate, ne
     // projette pas : ni `inputs.update`, ni `plan.calculate`. Contrepartie de R2.
@@ -482,6 +533,16 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'hr.sensitive.read': 'deny',
       'leave.request': 'allow',
       'leave.approve': 'deny',
+      // ADR-0046 — S0 (§ 8.1) : constate et compte, ne sort pas de marchandise (séparation
+      // garde / enregistrement) ; valide les écarts (ⓢ) ; registre et pièces fiscales.
+      'stock.read': 'allow',
+      'stock.move': 'deny',
+      'stock.count': 'allow',
+      'stock.manage': 'allow_sod',
+      'assets.read': 'allow',
+      'assets.manage': 'allow',
+      'docs.read': 'allow',
+      'docs.manage': 'allow',
     },
     // Analyste — « scénarios, analyses, commentaires ». Modélise et calcule,
     // n'approuve ni n'importe le réalisé.
@@ -529,6 +590,15 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'hr.sensitive.read': 'deny',
       'leave.request': 'allow',
       'leave.approve': 'deny',
+      // ADR-0046 — S0 (§ 8.1) : consulte stocks, équipements et documents.
+      'stock.read': 'allow',
+      'stock.move': 'deny',
+      'stock.count': 'deny',
+      'stock.manage': 'deny',
+      'assets.read': 'allow',
+      'assets.manage': 'deny',
+      'docs.read': 'allow',
+      'docs.manage': 'deny',
     },
     // Chef de projet — « projets autorisés et saisie ». Tout est `allow_project` :
     // le rôle n'a de sens qu'avec des assignations de projet, qui n'existent pas
@@ -577,6 +647,15 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'hr.sensitive.read': 'deny',
       'leave.request': 'deny',
       'leave.approve': 'deny',
+      // ADR-0046 — S0 (§ 8.1) : rôle non attribuable, rien.
+      'stock.read': 'deny',
+      'stock.move': 'deny',
+      'stock.count': 'deny',
+      'stock.manage': 'deny',
+      'assets.read': 'deny',
+      'assets.manage': 'deny',
+      'docs.read': 'deny',
+      'docs.manage': 'deny',
     },
     // Conseiller — « consultation, commentaires, recommandations ». Typiquement
     // EXTERNE (mentor, banquier invité) : pas de `report.export`, on lui ouvre la
@@ -626,6 +705,16 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'hr.sensitive.read': 'deny',
       'leave.request': 'deny',
       'leave.approve': 'deny',
+      // ADR-0046 — S0 (§ 8.1) : externe, ni stocks, ni équipements, ni bibliothèque
+      // (décision ouverte n° 17).
+      'stock.read': 'deny',
+      'stock.move': 'deny',
+      'stock.count': 'deny',
+      'stock.manage': 'deny',
+      'assets.read': 'deny',
+      'assets.manage': 'deny',
+      'docs.read': 'deny',
+      'docs.manage': 'deny',
     },
     // Lecteur — lecture seulement. `analytics.read` est conservé : le refuser
     // viderait le rôle de son sens (ADR-0012 §3).
@@ -671,11 +760,20 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'hr.sensitive.read': 'deny',
       'leave.request': 'allow',
       'leave.approve': 'deny',
+      // ADR-0046 — S0 (§ 8.1) : lecture seule.
+      'stock.read': 'allow',
+      'stock.move': 'deny',
+      'stock.count': 'deny',
+      'stock.manage': 'deny',
+      'assets.read': 'allow',
+      'assets.manage': 'deny',
+      'docs.read': 'allow',
+      'docs.manage': 'deny',
     },
-    // Commercial — « CRM, devis et suivi des clients » (ADR-0040 § 4.2, D3). Huit
-    // actions sur trente-huit : il gère le CRM et prépare les devis, consulte clients,
+    // Commercial — « CRM, devis et suivi des clients » (ADR-0040 § 4.2, D3). Dix
+    // actions sur quarante-six : il gère le CRM et prépare les devis, consulte clients,
     // catalogue et factures, travaille sur les tâches qu'on lui confie, demande ses
-    // absences (ADR-0045). Il ne voit ni
+    // absences (ADR-0045), lit les quantités en stock et la bibliothèque (ADR-0046). Il ne voit ni
     // la trésorerie ni les dépenses (`treasury.*`, et le correctif § 4.4 qui ferme les
     // chemins détournés par `analytics.read`), ne touche ni aux fiches client ni aux
     // prix (`sales.manage`), n'émet ni n'encaisse. BUILD et le plan ne le concernent pas.
@@ -721,9 +819,20 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'hr.sensitive.read': 'deny',
       'leave.request': 'allow',
       'leave.approve': 'deny',
+      // ADR-0046 — S0 (§ 8.1) : les quantités pour promettre une livraison (sans valeurs : ni
+      // `purchase.read` ni `treasury.read`) ; la bibliothèque.
+      'stock.read': 'allow',
+      'stock.move': 'deny',
+      'stock.count': 'deny',
+      'stock.manage': 'deny',
+      'assets.read': 'deny',
+      'assets.manage': 'deny',
+      'docs.read': 'allow',
+      'docs.manage': 'deny',
     },
     // Responsable RH — « dossiers du personnel, absences et documents RH » (ADR-0045 § 4.2,
-    // O6). Huit actions sur trente-huit, socle compris : la fonction RH est DISJOINTE de la
+    // O6). Huit actions RH sur quarante-six (onze avec celles d'ADR-0046), socle compris : la
+    // fonction RH est DISJOINTE de la
     // finance — ni trésorerie, ni ventes, ni achats, ni CRM, ni BUILD, ni gouvernance de
     // l'organisation. `work.read` et `work.update` : suivre les projets internes et saisir
     // son temps, comme tout membre qui travaille.
@@ -766,6 +875,70 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'hr.sensitive.read': 'allow',
       'leave.request': 'allow',
       'leave.approve': 'allow_sod',
+      // ADR-0046 — S0 (§ 8.1) : le matériel remis et repris (coûts masqués) ; règlement
+      // intérieur et politiques dans la bibliothèque.
+      'stock.read': 'deny',
+      'stock.move': 'deny',
+      'stock.count': 'deny',
+      'stock.manage': 'deny',
+      'assets.read': 'allow',
+      'assets.manage': 'deny',
+      'docs.read': 'allow',
+      'docs.manage': 'allow',
+    },
+    // Magasinier — « réceptionne, range, sort et compte le stock » (ADR-0046 § 8.2, O6).
+    // Neuf actions sur quarante-six, socle compris : il tient le magasin sans être un acteur
+    // financier — ni prix d'achat, ni valeur du stock (il n'a ni `purchase.read` ni
+    // `treasury.read`), ni validation des écarts (`stock.manage` : celui qui garde le stock ne
+    // valide pas l'écart de son propre stock), ni ventes, ni réception d'achat (décision
+    // ouverte n° 9). `work.read`, `work.update`, `leave.request` : comme tout membre interne.
+    storekeeper: {
+      'organization.manage': 'deny',
+      'billing.manage': 'deny',
+      'members.invite': 'deny',
+      'project.create': 'deny',
+      'project.read': 'deny',
+      'project.update': 'deny',
+      'canvas.update': 'deny',
+      'inputs.update': 'deny',
+      'plan.calculate': 'deny',
+      'plan.approve': 'deny',
+      'actuals.import': 'deny',
+      'period.close': 'deny',
+      'analytics.read': 'allow',
+      'report.export': 'deny',
+      'audit.read': 'deny',
+      'fiscal.manage': 'deny',
+      'sales.read': 'deny',
+      'sales.manage': 'deny',
+      'sales.invoice': 'deny',
+      'sales.receipt': 'deny',
+      'treasury.read': 'deny',
+      'treasury.manage': 'deny',
+      'crm.read': 'deny',
+      'crm.manage': 'deny',
+      'work.read': 'allow',
+      'work.update': 'allow',
+      'work.manage': 'deny',
+      'sales.quote': 'deny',
+      'purchase.read': 'deny',
+      'purchase.request': 'deny',
+      'purchase.manage': 'deny',
+      'purchase.approve': 'deny',
+      'payables.pay': 'deny',
+      'hr.read': 'deny',
+      'hr.manage': 'deny',
+      'hr.sensitive.read': 'deny',
+      'leave.request': 'allow',
+      'leave.approve': 'deny',
+      'stock.read': 'allow',
+      'stock.move': 'allow',
+      'stock.count': 'allow',
+      'stock.manage': 'deny',
+      'assets.read': 'allow',
+      'assets.manage': 'deny',
+      'docs.read': 'allow',
+      'docs.manage': 'deny',
     },
   };
 
@@ -847,6 +1020,16 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'hr.sensitive.read': 'forbidden',
     'leave.request': 'forbidden',
     'leave.approve': 'forbidden',
+    // ADR-0046 — S0 (§ 8.1) : sous accès délégué ; un document sensible n'est jamais servi
+    // à un acteur plateforme (règle de service), sans interdit absolu nouveau.
+    'stock.read': 'delegated',
+    'stock.move': 'delegated',
+    'stock.count': 'delegated',
+    'stock.manage': 'delegated',
+    'assets.read': 'delegated',
+    'assets.manage': 'delegated',
+    'docs.read': 'delegated',
+    'docs.manage': 'delegated',
   },
   platform_admin: {
     'organization.manage': 'native',
@@ -887,6 +1070,14 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'hr.sensitive.read': 'forbidden',
     'leave.request': 'forbidden',
     'leave.approve': 'forbidden',
+    'stock.read': 'forbidden',
+    'stock.move': 'forbidden',
+    'stock.count': 'forbidden',
+    'stock.manage': 'forbidden',
+    'assets.read': 'forbidden',
+    'assets.manage': 'forbidden',
+    'docs.read': 'forbidden',
+    'docs.manage': 'forbidden',
   },
   // « Le support ne voit jamais les données financières sans consentement
   // explicite, durée limitée et audit » (docs/12) — d'où trois `delegated` et
@@ -934,6 +1125,15 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'hr.sensitive.read': 'forbidden',
     'leave.request': 'forbidden',
     'leave.approve': 'forbidden',
+    // ADR-0046 — S0 (§ 8.1) : lecture sous accès délégué ; aucune écriture.
+    'stock.read': 'delegated',
+    'stock.move': 'forbidden',
+    'stock.count': 'forbidden',
+    'stock.manage': 'forbidden',
+    'assets.read': 'delegated',
+    'assets.manage': 'forbidden',
+    'docs.read': 'delegated',
+    'docs.manage': 'forbidden',
   },
   platform_billing: {
     'organization.manage': 'forbidden',
@@ -974,6 +1174,14 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'hr.sensitive.read': 'forbidden',
     'leave.request': 'forbidden',
     'leave.approve': 'forbidden',
+    'stock.read': 'forbidden',
+    'stock.move': 'forbidden',
+    'stock.count': 'forbidden',
+    'stock.manage': 'forbidden',
+    'assets.read': 'forbidden',
+    'assets.manage': 'forbidden',
+    'docs.read': 'forbidden',
+    'docs.manage': 'forbidden',
   },
   // Vides sur cette matrice : opèrent sur des ressources de portée plateforme
   // (templates, Country Packs) qui n'ont pas d'action granulaire dans docs/12 —
@@ -1017,6 +1225,14 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'hr.sensitive.read': 'forbidden',
     'leave.request': 'forbidden',
     'leave.approve': 'forbidden',
+    'stock.read': 'forbidden',
+    'stock.move': 'forbidden',
+    'stock.count': 'forbidden',
+    'stock.manage': 'forbidden',
+    'assets.read': 'forbidden',
+    'assets.manage': 'forbidden',
+    'docs.read': 'forbidden',
+    'docs.manage': 'forbidden',
   },
   platform_country_pack_manager: {
     'organization.manage': 'forbidden',
@@ -1057,6 +1273,14 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'hr.sensitive.read': 'forbidden',
     'leave.request': 'forbidden',
     'leave.approve': 'forbidden',
+    'stock.read': 'forbidden',
+    'stock.move': 'forbidden',
+    'stock.count': 'forbidden',
+    'stock.manage': 'forbidden',
+    'assets.read': 'forbidden',
+    'assets.manage': 'forbidden',
+    'docs.read': 'forbidden',
+    'docs.manage': 'forbidden',
   },
 };
 
@@ -1344,7 +1568,13 @@ export const APPROVER_ROLES: readonly OrgRole[] = ORG_ROLES.filter(
  * généralisée à une action). Toute case non `deny` de ces actions porte la marque ⓢ.
  */
 // ADR-0045 — H0 (§ 4.3) : `leave.approve` rejoint la liste (cases ⓢ).
-export const APPROVAL_ACTIONS = ['plan.approve', 'purchase.approve', 'leave.approve'] as const;
+// ADR-0046 — S0 (§ 8.3) : `stock.manage` aussi (validation d'inventaire, `stockCountDecision`).
+export const APPROVAL_ACTIONS = [
+  'plan.approve',
+  'purchase.approve',
+  'leave.approve',
+  'stock.manage',
+] as const;
 export type ApprovalAction = (typeof APPROVAL_ACTIONS)[number];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1545,6 +1775,196 @@ export function leaveApprovalDecision(input: LeaveApprovalInput): LeaveApprovalD
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ADR-0046 — S0 : stocks, équipements, documents (§ 2.7, § 4.1, § 4.2, § 5)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ADR-0046 § 5 : les VALEURS (coûts d'entrée, coût moyen, valeur du stock, écarts
+ * valorisés, coûts d'acquisition et estimation de gestion des équipements) ne sont
+ * servies qu'à un appelant qui détient, en droits EFFECTIFS, l'une de ces actions en
+ * plus de `stock.read` ou `assets.read`. Sinon les champs valent `null` et la réponse
+ * porte `valuesHidden: true`.
+ */
+export const VALUE_READ_ACTIONS: readonly Action[] = ['purchase.read', 'treasury.read'];
+
+/** Vrai si l'acteur voit les valeurs des stocks et des équipements (§ 5). */
+export function canSeeStockValues(role: OrgRole, ctx: OrgPermissionContext): boolean {
+  return VALUE_READ_ACTIONS.some((a) => can(role, a, ctx));
+}
+
+/** Entrée de `stockCountDecision` : faits déjà lus par le service, rien d'autre. */
+export interface StockCountValidationInput {
+  readonly validatorUserId: string;
+  /**
+   * Utilisateurs qui ont saisi une quantité comptée sur une ligne de l'inventaire,
+   * recomptages (`recounts[]`) compris. Seuls les identifiants comptent.
+   */
+  readonly counterUserIds: readonly string[];
+  /**
+   * Nombre de détenteurs EFFECTIFS de `stock.manage` dans l'organisation
+   * (`AuthzService.countApprovers(org, 'stock.manage')`). Jamais un compte par rôle.
+   */
+  readonly approverCountInOrg: number;
+}
+
+/**
+ * - `COUNT_SELF_VALIDATION` (409) — le validateur a compté au moins une ligne et
+ *   l'organisation compte d'autres détenteurs de `stock.manage`.
+ * - `ok` — `soleApprover` marque la validation de son propre comptage par l'unique
+ *   détenteur (journalisée par le service, `validation.soleApprover`).
+ */
+export type StockCountDecision =
+  | { readonly ok: false; readonly code: 'COUNT_SELF_VALIDATION' }
+  | { readonly ok: true; readonly soleApprover: boolean };
+
+/**
+ * ADR-0046 § 2.7 — séparation des tâches d'un inventaire, motif de
+ * `purchaseApprovalDecision`, sans aucun `if (role === …)` : la détention de
+ * `stock.manage` (droits EFFECTIFS) est vérifiée en amont par le guard ; cette fonction
+ * ne juge que les PERSONNES. Celui qui a compté une ligne ne valide pas l'inventaire,
+ * sauf **approbateur unique** (un seul détenteur effectif de `stock.manage`). Sert aussi
+ * à dire qui est un validateur éligible (« Mes tâches », destinataires de
+ * `stock.count_submitted`).
+ */
+export function stockCountDecision(input: StockCountValidationInput): StockCountDecision {
+  const counted = input.counterUserIds.includes(input.validatorUserId);
+  if (!counted) return { ok: true, soleApprover: false };
+  if (input.approverCountInOrg <= 1) return { ok: true, soleApprover: true };
+  return { ok: false, code: 'COUNT_SELF_VALIDATION' };
+}
+
+/**
+ * Règle de LECTURE d'un dossier de la bibliothèque (§ 4.1) :
+ * - `'all'` : tout détenteur de `docs.read` ;
+ * - `{ action }` : droit PAR NATURE (ex. « Fiscal et administratif » : `treasury.read`),
+ *   en plus de `docs.read` ;
+ * - `{ userIds }` : dossier restreint, visible (nom compris) de ses seuls membres et du
+ *   Propriétaire — `docs.manage` ne l'ouvre pas.
+ */
+export type FolderReadRule =
+  'all' | { readonly action: Action } | { readonly userIds: readonly string[] };
+
+/**
+ * Règle d'ÉCRITURE : `'managers'` (détenteurs de `docs.manage`) ou `{ userIds }`
+ * (ces personnes EN PLUS des gestionnaires).
+ */
+export type FolderWriteRule = 'managers' | { readonly userIds: readonly string[] };
+
+export interface FolderAccessRules {
+  readonly read: FolderReadRule;
+  readonly write: FolderWriteRule;
+  /** Défaut `true` : le dossier hérite des droits de son parent. */
+  readonly inherit: boolean;
+}
+
+/** Entrée de `folderAccessDecision`. */
+export interface FolderAccessInput {
+  /**
+   * Les règles du dossier et de ses ancêtres, **racine d'abord, dossier visé en
+   * dernier** (profondeur ≤ 5, sans cycle : vérifié par le service).
+   */
+  readonly chain: readonly FolderAccessRules[];
+  readonly userId: string;
+  /** Droits EFFECTIFS de l'acteur (`effectiveActions`), ajouts et retraits compris. */
+  readonly actions: readonly Action[];
+  /** L'acteur porte le TITRE `owner` (`isOwnerRole`), comme pour R1. */
+  readonly isOwner: boolean;
+}
+
+export interface FolderAccessDecision {
+  readonly read: boolean;
+  readonly write: boolean;
+}
+
+function folderReadAllowed(rule: FolderReadRule, input: FolderAccessInput): boolean {
+  if (rule === 'all') return true;
+  if ('action' in rule) return input.actions.includes(rule.action);
+  return input.isOwner || rule.userIds.includes(input.userId);
+}
+
+function folderWriteAllowed(rule: FolderWriteRule, input: FolderAccessInput): boolean {
+  if (input.actions.includes('docs.manage')) return true;
+  return rule !== 'managers' && rule.userIds.includes(input.userId);
+}
+
+/**
+ * ADR-0046 § 4.1 — droits d'un dossier jugés sur les droits EFFECTIFS et les PERSONNES,
+ * jamais sur le rôle.
+ *
+ * - Lire exige `docs.read` et la règle de lecture de CHAQUE niveau de la chaîne : un
+ *   sous-dossier n'élargit jamais la visibilité de son parent, quel que soit `inherit`.
+ * - Écrire exige de lire, puis la règle d'écriture du dossier ; avec `inherit` (défaut),
+ *   aussi celle du parent, récursivement (un sous-dossier n'ajoute que des
+ *   restrictions) ; sans `inherit`, la règle d'écriture propre au dossier seule.
+ * - Chaîne vide (document sans dossier) : rien n'est accordé par le dossier — la lecture
+ *   passe alors par les liens (`documentLinksReadable`).
+ */
+export function folderAccessDecision(input: FolderAccessInput): FolderAccessDecision {
+  if (input.chain.length === 0 || !input.actions.includes('docs.read')) {
+    return { read: false, write: false };
+  }
+  const read = input.chain.every((level) => folderReadAllowed(level.read, input));
+  if (!read) return { read: false, write: false };
+  let write = true;
+  for (let i = input.chain.length - 1; i >= 0; i--) {
+    const level = input.chain[i]!;
+    if (!folderWriteAllowed(level.write, input)) {
+      write = false;
+      break;
+    }
+    if (!level.inherit) break;
+  }
+  return { read: true, write };
+}
+
+/**
+ * Natures d'entité qu'un document de bibliothèque peut lier (§ 4.2), miroir de
+ * `DOCUMENT_LINK_ENTITY_TYPES` (`@lalanda/shared/documents`, alignement testé). Jamais
+ * `employee` : les pièces RH restent dans `hr_documents`.
+ */
+export type DocumentLinkEntityType =
+  | 'customer'
+  | 'supplier'
+  | 'work_project'
+  | 'crm_account'
+  | 'asset'
+  | 'stock_item'
+  | 'purchase_order';
+
+/** Permission de lecture du module propriétaire de chaque entité liée (§ 4.2). */
+export const DOCUMENT_LINK_READ_ACTION: Readonly<Record<DocumentLinkEntityType, Action>> = {
+  customer: 'sales.read',
+  supplier: 'purchase.read',
+  work_project: 'work.read',
+  crm_account: 'crm.read',
+  asset: 'assets.read',
+  stock_item: 'stock.read',
+  purchase_order: 'purchase.read',
+};
+
+/** Entrée de `documentReadDecision`. */
+export interface DocumentReadInput {
+  /** Décision du dossier (`folderAccessDecision`), `null` pour un document sans dossier. */
+  readonly folder: FolderAccessDecision | null;
+  readonly linkEntityTypes: readonly DocumentLinkEntityType[];
+  /** Droits EFFECTIFS de l'acteur. */
+  readonly actions: readonly Action[];
+}
+
+/**
+ * ADR-0046 § 4.2 — lire un document = accès au dossier (s'il en a un) **et**, pour
+ * chaque lien, la permission de lecture du module de l'entité : l'intersection, la plus
+ * restrictive. Un document sans dossier n'est lu que par ses liens (au moins un), et
+ * toujours sous `docs.read`. Un document illisible rend 404 (service).
+ */
+export function documentReadDecision(input: DocumentReadInput): boolean {
+  if (!input.actions.includes('docs.read')) return false;
+  if (input.folder !== null && !input.folder.read) return false;
+  if (input.folder === null && input.linkEntityTypes.length === 0) return false;
+  return input.linkEntityTypes.every((t) => input.actions.includes(DOCUMENT_LINK_READ_ACTION[t]));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ADR-0041 — A1 : autorisations par membre (titre + écart)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1559,7 +1979,10 @@ export const NON_DELEGABLE_ACTIONS: readonly Action[] = ['billing.manage'];
 /**
  * Paires incompatibles par ajout (G4). Trois (ADR-0044 § 4.3 ajoute la paire des
  * achats ; ADR-0045 § 4.5 n'en ajoute aucune : ne pas valider sa propre absence est une
- * séparation DYNAMIQUE, `leaveApprovalDecision`) ; la paire facturation
+ * séparation DYNAMIQUE, `leaveApprovalDecision` ; ADR-0046 § 8.3 non plus : une paire
+ * `stock.count` + `stock.manage` empêcherait le Comptable, le Directeur financier et le
+ * Propriétaire de compter, alors que la règle utile — ne pas valider son propre
+ * comptage — est dynamique, `stockCountDecision`) ; la paire facturation
  * `sales.invoice` + `fiscal.manage` a été REFUSÉE par la dirigeante le 29 oct. 2026
  * (décision ouverte n° 3) — une seule personne peut émettre et piloter la fiscalité.
  */
@@ -1617,6 +2040,13 @@ export const ACTION_DEPENDENCIES: Readonly<Partial<Record<Action, readonly Actio
   'hr.manage': ['hr.read'],
   'hr.sensitive.read': ['hr.read'],
   'leave.approve': ['hr.read'],
+  // ADR-0046 — S0 (§ 8.3) : tout geste sur le stock, le registre ou la bibliothèque
+  // suppose de les lire.
+  'stock.move': ['stock.read'],
+  'stock.count': ['stock.read'],
+  'stock.manage': ['stock.read'],
+  'assets.manage': ['assets.read'],
+  'docs.manage': ['docs.read'],
 };
 
 /**
@@ -1637,9 +2067,10 @@ export function requiredActionsOf(action: Action): Action[] {
 }
 
 /**
- * Les neuf domaines de l'écran (ADR-0041 § 5), dans l'ordre d'affichage. Le huitième,
+ * Les douze domaines de l'écran (ADR-0041 § 5), dans l'ordre d'affichage. Le huitième,
  * « Achats et fournisseurs », vient d'ADR-0044 § 4.3 ; le neuvième, « Ressources
- * humaines », d'ADR-0045 § 4.5.
+ * humaines », d'ADR-0045 § 4.5 ; les dixième à douzième, « Stocks », « Équipements » et
+ * « Documents », d'ADR-0046 § 8.3.
  */
 export const ACTION_DOMAINS: readonly {
   readonly key: string;
@@ -1706,6 +2137,14 @@ export const ACTION_DOMAINS: readonly {
     label: 'Ressources humaines',
     actions: ['hr.read', 'hr.manage', 'hr.sensitive.read', 'leave.request', 'leave.approve'],
   },
+  // ADR-0046 — S0 (§ 8.3).
+  {
+    key: 'stock',
+    label: 'Stocks',
+    actions: ['stock.read', 'stock.move', 'stock.count', 'stock.manage'],
+  },
+  { key: 'assets', label: 'Équipements', actions: ['assets.read', 'assets.manage'] },
+  { key: 'documents', label: 'Documents', actions: ['docs.read', 'docs.manage'] },
 ];
 
 /** Libellés français des actions (ADR-0041 § 5) — « autorisation », jamais « action ». */
@@ -1750,6 +2189,15 @@ export const ACTION_LABELS: Readonly<Record<Action, string>> = {
   'hr.sensitive.read': 'Consulter les données sensibles du personnel',
   'leave.request': 'Demander une absence',
   'leave.approve': 'Valider les absences',
+  // ADR-0046 — S0 (§ 8.1).
+  'stock.read': 'Consulter les stocks',
+  'stock.move': 'Mouvementer le stock',
+  'stock.count': 'Compter un inventaire',
+  'stock.manage': 'Gérer les stocks et valider les écarts',
+  'assets.read': 'Consulter les équipements',
+  'assets.manage': 'Gérer les équipements',
+  'docs.read': 'Consulter la bibliothèque de documents',
+  'docs.manage': 'Gérer la bibliothèque de documents',
 };
 
 /**
@@ -1945,6 +2393,7 @@ export const ORG_ROLE_LABELS: Readonly<Record<OrgRole, string>> = {
   viewer: 'Lecteur',
   sales_rep: 'Commercial',
   hr_manager: 'Responsable RH',
+  storekeeper: 'Magasinier',
 };
 
 /** Description courte d'un rôle — affichée sous le sélecteur de rôle. */
@@ -1962,6 +2411,9 @@ export const ORG_ROLE_DESCRIPTIONS: Readonly<Record<OrgRole, string>> = {
   // ADR-0045 § 4.2.
   hr_manager:
     'Dossiers du personnel, absences et documents RH. Ne voit ni la trésorerie, ni les ventes, ni les achats.',
+  // ADR-0046 § 8.2.
+  storekeeper:
+    'Réceptionne, range, sort et compte le stock ; consulte le matériel et les documents. Ne voit ni les prix d’achat, ni la valeur du stock, ni la trésorerie, ni les ventes.',
 };
 
 export const PLATFORM_ROLE_LABELS: Readonly<Record<PlatformRole, string>> = {

@@ -112,6 +112,10 @@ describe('ADR-0041 § 2 — validateOverrides : un cas par garde-fou', () => {
         'purchase.read',
         // ADR-0045 § 4.1 : il demande ses propres absences.
         'leave.request',
+        // ADR-0046 § 8.1 : il consulte stocks, équipements et bibliothèque.
+        'stock.read',
+        'assets.read',
+        'docs.read',
       ],
     });
   });
@@ -429,15 +433,85 @@ describe('ADR-0041 § 4 et § 5 — dépendances, domaines et libellés', () => 
     expect(requiredActionsOf('report.export')).toEqual(['project.read', 'analytics.read']);
   });
 
-  it('neuf domaines ; chaque action dans exactement un domaine, avec un libellé', () => {
-    expect(ACTION_DOMAINS).toHaveLength(9);
+  it('douze domaines ; chaque action dans exactement un domaine, avec un libellé', () => {
+    expect(ACTION_DOMAINS).toHaveLength(12);
     const all = ACTION_DOMAINS.flatMap((d) => d.actions);
     expect(all).toHaveLength(ACTIONS.length);
     expect([...all].sort()).toEqual([...ACTIONS].sort());
     for (const action of ACTIONS) {
       expect(ACTION_LABELS[action].trim().length, action).toBeGreaterThan(0);
     }
-    expect(new Set(ACTION_DOMAINS.map((d) => d.key)).size).toBe(9);
+    expect(new Set(ACTION_DOMAINS.map((d) => d.key)).size).toBe(12);
+  });
+
+  it('ADR-0046 § 8.3 — dixième à douzième domaines « Stocks », « Équipements », « Documents »', () => {
+    expect(ACTION_DOMAINS.slice(9)).toEqual([
+      {
+        key: 'stock',
+        label: 'Stocks',
+        actions: ['stock.read', 'stock.move', 'stock.count', 'stock.manage'],
+      },
+      { key: 'assets', label: 'Équipements', actions: ['assets.read', 'assets.manage'] },
+      { key: 'documents', label: 'Documents', actions: ['docs.read', 'docs.manage'] },
+    ]);
+    expect(ACTION_LABELS['stock.read']).toBe('Consulter les stocks');
+    expect(ACTION_LABELS['stock.move']).toBe('Mouvementer le stock');
+    expect(ACTION_LABELS['stock.count']).toBe('Compter un inventaire');
+    expect(ACTION_LABELS['stock.manage']).toBe('Gérer les stocks et valider les écarts');
+    expect(ACTION_LABELS['assets.read']).toBe('Consulter les équipements');
+    expect(ACTION_LABELS['assets.manage']).toBe('Gérer les équipements');
+    expect(ACTION_LABELS['docs.read']).toBe('Consulter la bibliothèque de documents');
+    expect(ACTION_LABELS['docs.manage']).toBe('Gérer la bibliothèque de documents');
+  });
+
+  it('ADR-0046 § 8.3 — dépendances ; aucune paire nouvelle, rien de non délégable en plus', () => {
+    for (const a of ['stock.move', 'stock.count', 'stock.manage'] as const) {
+      expect(requiredActionsOf(a), a).toEqual(['analytics.read', 'stock.read']);
+    }
+    expect(requiredActionsOf('assets.manage')).toEqual(['analytics.read', 'assets.read']);
+    expect(requiredActionsOf('docs.manage')).toEqual(['analytics.read', 'docs.read']);
+    for (const a of ['stock.read', 'assets.read', 'docs.read'] as const) {
+      expect(requiredActionsOf(a), a).toEqual(['analytics.read']);
+    }
+    expect(SOD_PAIRS).toHaveLength(3);
+    expect(
+      SOD_PAIRS.flat().some(
+        (a) => a.startsWith('stock.') || a.startsWith('assets.') || a.startsWith('docs.'),
+      ),
+    ).toBe(false);
+    expect(NON_DELEGABLE_ACTIONS).toEqual(['billing.manage']);
+  });
+
+  it('ADR-0046 § 8.3 — `stock.manage` s’ajoute par écart sans `stock.read` : dépendance manquante', () => {
+    expect(
+      validateOverrides({
+        actorRole: 'owner',
+        actorCtx: NO_OVERRIDES,
+        targetRole: 'hr_manager',
+        targetCtxBefore: NO_OVERRIDES,
+        grants: ['stock.manage'],
+        revokes: [],
+        actorIsTarget: false,
+      }),
+    ).toEqual({
+      ok: false,
+      code: 'PERMISSION_DEPENDENCY_MISSING',
+      action: 'stock.manage',
+      missing: ['stock.read'],
+    });
+    // Un Administrateur, qui détient `stock.manage` (ⓢ), peut l'ajouter à un Magasinier (aucune
+    // paire statique) : la séparation dynamique `stockCountDecision` s'applique alors.
+    expect(
+      validateOverrides({
+        actorRole: 'admin',
+        actorCtx: NO_OVERRIDES,
+        targetRole: 'storekeeper',
+        targetCtxBefore: NO_OVERRIDES,
+        grants: ['stock.manage'],
+        revokes: [],
+        actorIsTarget: false,
+      }),
+    ).toMatchObject({ ok: true, grants: ['stock.manage'] });
   });
 
   it('ADR-0045 § 4.5 — neuvième domaine « Ressources humaines », cinq actions, libellés', () => {
@@ -546,7 +620,7 @@ describe('ADR-0041 § 4 et § 5 — dépendances, domaines et libellés', () => 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Propriété à graine fixe (ADR-0041 § 9.5) : 5 000 tirages acteur × cible × écart.
+// Propriété à graine fixe (ADR-0041 § 9.5) : 10 000 tirages acteur × cible × écart.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** mulberry32 — générateur déterministe, pour que tout échec soit reproductible. */
@@ -562,7 +636,7 @@ function prng(seed: number): () => number {
 }
 
 describe('ADR-0041 § 9.5 — propriété : tout écart accepté est sûr', () => {
-  it('5 000 tirages à graine fixe', () => {
+  it('10 000 tirages à graine fixe', () => {
     const rand = prng(41_2026);
     const pick = <T>(xs: readonly T[]): T => xs[Math.floor(rand() * xs.length)] as T;
     const subset = <T>(xs: readonly T[], p: number): T[] => xs.filter(() => rand() < p);
@@ -583,8 +657,9 @@ describe('ADR-0041 § 9.5 — propriété : tout écart accepté est sûr', () =
     // fixe touchent plus d'actions et l'escalade domine ; 2 000 tirages ne donnaient
     // plus que 77 acceptations, sous le seuil de 100 qui garantit une propriété exercée.
     // ADR-0045 : 5 000 tirages — à 38 actions et 10 rôles, 3 000 tirages ne donnaient plus
-    // que 75 acceptations.
-    for (let i = 0; i < 5000; i++) {
+    // que 75 acceptations. ADR-0046 : 10 000 tirages — à 46 actions et 11 rôles, 5 000
+    // tirages ne donnaient plus que 60 acceptations.
+    for (let i = 0; i < 10000; i++) {
       // Acteur souvent Propriétaire ou Directeur financier : sinon presque tout est escalade.
       const actorRole =
         rand() < 0.5 ? pick(['owner', 'finance_director'] as const) : pick(ORG_ROLES);
