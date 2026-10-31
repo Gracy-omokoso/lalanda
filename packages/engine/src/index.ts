@@ -133,3 +133,6 @@ export * from './purchases/index.js';
 // ADR-0045 — H1 : moteur RH (jours d'absence, soldes, structure, rapports,
 // échéances, feuille de temps). Versionné à part (`HR_VERSION`).
 export * from './hr/index.js';
+
+// ADR-0046 — S1 : moteur des stocks (niveaux, coût moyen pondéré, inventaires, seuils). Versionné à part (`STOCK_VERSION`).
+export * from './stock/index.js';
