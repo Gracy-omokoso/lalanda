@@ -27,7 +27,10 @@ describe('accueil public — rien que du livré', () => {
 
   it('cite toutes les applications de chaque module (aucune oubliée)', () => {
     for (const m of MODULES_PUBLICS) {
-      const attendues = NAV_APPS.filter((a) => a.module === m.id).map((a) => a.id);
+      // ADR-0046 — S8 : une application masquée (écrans non livrés) n'est pas citée.
+      const attendues = NAV_APPS.filter((a) => a.module === m.id && a.masquee !== true).map(
+        (a) => a.id,
+      );
       expect([...APPS_PAR_MODULE[m.id]].sort()).toEqual([...attendues].sort());
     }
   });

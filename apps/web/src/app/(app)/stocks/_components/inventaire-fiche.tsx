@@ -235,7 +235,7 @@ export function InventaireFiche({ countId }: { countId: string }): React.ReactEl
   }
 
   return (
-    <section className="flex min-w-0 flex-col gap-5 pb-24 sm:pb-0">
+    <section className="flex min-w-0 flex-col gap-5">
       {retour}
       <Bandeau
         icone={ClipboardCheck}
@@ -324,6 +324,11 @@ export function InventaireFiche({ countId }: { countId: string }): React.ReactEl
               </div>
             ) : null}
           </div>
+          {saisie ? (
+            <p className="text-sm font-medium" aria-live="polite">
+              {p.phrase}
+            </p>
+          ) : null}
           {lignes.length === 0 ? (
             <PhraseSection>
               {saisie && filtre === 'a-compter'
@@ -403,14 +408,6 @@ export function InventaireFiche({ countId }: { countId: string }): React.ReactEl
           {formatInstantJour(c.validation.at)}
           {c.validation.comment ? ` : ${c.validation.comment}` : ''}.
         </p>
-      ) : null}
-
-      {saisie && p.total > 0 ? (
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-[var(--border)] bg-[var(--surface)] px-4 py-3 shadow-[var(--shadow-pop)] sm:hidden">
-          <p className="text-center text-sm font-medium" aria-live="polite">
-            {p.phrase}
-          </p>
-        </div>
       ) : null}
 
       {dialogue === 'soumettre' ? (
