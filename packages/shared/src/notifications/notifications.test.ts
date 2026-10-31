@@ -10,8 +10,8 @@ import {
 } from './index.js';
 
 describe('notifications — contrats partagés', () => {
-  it('déclare six types work, cinq crm, un organization, sept purchases et neuf hr, préfixés par leur module', () => {
-    expect(NOTIFICATION_KINDS).toHaveLength(28);
+  it('déclare six types work, cinq crm, un organization, sept purchases, neuf hr, cinq stock, deux assets et un documents, préfixés par leur module', () => {
+    expect(NOTIFICATION_KINDS).toHaveLength(36);
     for (const kind of NOTIFICATION_KINDS) {
       const module = kind.split('.')[0]!;
       expect(NOTIFICATION_SOURCE_MODULES as readonly string[]).toContain(module);
@@ -37,6 +37,10 @@ describe('notifications — contrats partagés', () => {
       'employee',
       'hr_document',
       'hr_checklist',
+      'stock_item',
+      'stock_count',
+      'asset',
+      'library_document',
     ]);
     // ADR-0041 — A4.
     expect(NOTIFICATION_KINDS.filter((k) => k.startsWith('organization.'))).toEqual([
@@ -66,6 +70,22 @@ describe('notifications — contrats partagés', () => {
       'hr.bank_details_changed',
     ]);
     expect(NOTIFICATION_SOURCE_MODULES).toContain('hr');
+    // ADR-0046 — S0 (§ 6.7) : huit types, trois modules, quatre natures d'entité.
+    expect(NOTIFICATION_KINDS.filter((k) => k.startsWith('stock.'))).toEqual([
+      'stock.below_reorder',
+      'stock.negative',
+      'stock.pending_lines',
+      'stock.count_assigned',
+      'stock.count_submitted',
+    ]);
+    expect(NOTIFICATION_KINDS.filter((k) => k.startsWith('assets.'))).toEqual([
+      'assets.maintenance_due',
+      'assets.coverage_expiring',
+    ]);
+    expect(NOTIFICATION_KINDS.filter((k) => k.startsWith('documents.'))).toEqual([
+      'documents.expiring',
+    ]);
+    expect(NOTIFICATION_SOURCE_MODULES.slice(-3)).toEqual(['stock', 'assets', 'documents']);
   });
 
   it('un lien est un chemin relatif de l’application, jamais une URL absolue', () => {

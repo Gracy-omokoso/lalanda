@@ -49,18 +49,34 @@ export const NOTIFICATION_KINDS = [
   'hr.document_expiring',
   'hr.checklist_item_assigned',
   'hr.bank_details_changed',
+  // ADR-0046 — S0 (§ 6.7) : stocks, équipements, documents. Déclarés ici, émis par S3
+  // (seuils, négatif, « À traiter », inventaires), S5 (rappels des équipements) et S6
+  // (échéances des documents) ; refiltrés à la lecture par `stock.read`, `assets.read` et
+  // `docs.read` (destinataires choisis par droits EFFECTIFS à l'émission). Aucun ne porte
+  // un coût, une valeur ni le titre d'un document.
+  'stock.below_reorder',
+  'stock.negative',
+  'stock.pending_lines',
+  'stock.count_assigned',
+  'stock.count_submitted',
+  'assets.maintenance_due',
+  'assets.coverage_expiring',
+  'documents.expiring',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
 /** Modules producteurs connus. */
 // ADR-0041 — A4 : `organization` (gestion des membres). ADR-0044 — P0 : `purchases`.
-// ADR-0045 — H0 : `hr`.
+// ADR-0045 — H0 : `hr`. ADR-0046 — S0 : `stock`, `assets`, `documents`.
 export const NOTIFICATION_SOURCE_MODULES = [
   'work',
   'crm',
   'organization',
   'purchases',
   'hr',
+  'stock',
+  'assets',
+  'documents',
 ] as const;
 export type NotificationSourceModule = (typeof NOTIFICATION_SOURCE_MODULES)[number];
 
@@ -82,6 +98,11 @@ export const NOTIFICATION_ENTITY_TYPES = [
   'employee',
   'hr_document',
   'hr_checklist',
+  // ADR-0046 — S0 (§ 6.7) : article stocké, inventaire, équipement, document de bibliothèque.
+  'stock_item',
+  'stock_count',
+  'asset',
+  'library_document',
 ] as const;
 export type NotificationEntityType = (typeof NOTIFICATION_ENTITY_TYPES)[number];
 

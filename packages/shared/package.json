@@ -57,6 +57,18 @@
     "./hr": {
       "types": "./dist/hr/index.d.ts",
       "import": "./dist/hr/index.js"
+    },
+    "./stock": {
+      "types": "./dist/stock/index.d.ts",
+      "import": "./dist/stock/index.js"
+    },
+    "./assets": {
+      "types": "./dist/assets/index.d.ts",
+      "import": "./dist/assets/index.js"
+    },
+    "./documents": {
+      "types": "./dist/documents/index.d.ts",
+      "import": "./dist/documents/index.js"
     }
   },
   "scripts": {
