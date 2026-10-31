@@ -11,7 +11,7 @@
 // `AuthGuard` résolvait le mauvais rôle, ou si le guard lisait la métadonnée
 // d'un autre handler.
 //
-// Ce fichier ferme le trou. Neuf sessions HTTP réellement authentifiées, une par
+// Ce fichier ferme le trou. Dix sessions HTTP réellement authentifiées, une par
 // rôle d'organisation attribuable, dans UNE SEULE organisation, contre une route
 // représentative par action. C'est la seule des trois suites qui exerce la chaîne
 // complète : cookie → better-auth → AuthGuard → membership Mongo → PermissionsGuard
@@ -76,9 +76,9 @@ const PLAN_PROJETS_ILLIMITES: Plan | undefined = PLANS.find(
 );
 
 /**
- * Les neuf rôles réellement attribuables — `project_manager` exclu (voir en-tête).
- * `sales_rep` (Commercial, ADR-0040 § 4.2) puis `hr_manager` (Responsable RH,
- * ADR-0045 § 4.2) sont les derniers.
+ * Les dix rôles réellement attribuables — `project_manager` exclu (voir en-tête).
+ * `sales_rep` (Commercial, ADR-0040 § 4.2), `hr_manager` (Responsable RH, ADR-0045
+ * § 4.2) puis `storekeeper` (Magasinier, ADR-0046 § 8.2) sont les derniers.
  *
  * L'ordre importe : `owner` d'abord, parce que c'est lui qui invite tous les
  * autres. Il n'est pas invité, il est propriétaire de son organisation
@@ -96,6 +96,8 @@ const ROLES_TESTES = [
   'sales_rep',
   // ADR-0045 — H0 : invité par le Propriétaire, seul à pouvoir l'attribuer.
   'hr_manager',
+  // ADR-0046 — S0 : invité par le Propriétaire (l'Administrateur le peut aussi, R7).
+  'storekeeper',
 ] as const satisfies readonly OrgRole[];
 
 type RoleTeste = (typeof ROLES_TESTES)[number];
@@ -122,6 +124,34 @@ const ACTIONS_SANS_ROUTE: Record<string, string> = {
   // ADR-0045 — H0 : actions déclarées avant leurs routes (module `hr`, lots H2 et H3).
   // H2 a retiré `hr.read`, `hr.manage` et `hr.sensitive.read` ; H3 a retiré
   // `leave.request` et `leave.approve` (sondes en fin de liste).
+  // ADR-0046 — S0 : actions déclarées avant leurs routes (modules `stock`, `assets`,
+  // `documents`, lots S3, S5 et S6). Chaque lot retire sa ligne et écrit sa sonde ; la
+  // matrice est déjà couverte case par case par `permissions.test.ts`, et le rôle
+  // `storekeeper` est exercé ici sur toutes les autres sondes.
+  'stock.read':
+    'Aucune route des stocks en S0 : `GET /stock/items` (sonde naturelle) arrive avec ' +
+    'le référentiel au lot S3 (ADR-0046 § 5.1).',
+  'stock.move':
+    'Aucune route des stocks en S0 : `POST /stock/vouchers` (sonde naturelle) arrive ' +
+    'avec les bons au lot S3 (ADR-0046 § 5.1).',
+  'stock.count':
+    'Aucune route des stocks en S0 : `PUT /stock/counts/:id/lines/:lineId` arrive avec ' +
+    'les inventaires au lot S3 (ADR-0046 § 5.1).',
+  'stock.manage':
+    'Aucune route des stocks en S0 : `POST /stock/items` arrive au lot S3 ; la ' +
+    'séparation des tâches est prouvée par `stockCountDecision` (permissions.test.ts).',
+  'assets.read':
+    'Aucune route des équipements en S0 : `GET /assets` (sonde naturelle) arrive avec ' +
+    'le registre au lot S5 (ADR-0046 § 5.2).',
+  'assets.manage':
+    'Aucune route des équipements en S0 : `POST /assets` (sonde naturelle) arrive avec ' +
+    'le registre au lot S5 (ADR-0046 § 5.2).',
+  'docs.read':
+    'Aucune route de la bibliothèque en S0 : `GET /documents/folders` arrive au lot S6 ' +
+    '(ADR-0046 § 5.3) ; les droits par dossier sont prouvés par `folderAccessDecision`.',
+  'docs.manage':
+    'Aucune route de la bibliothèque en S0 : `POST /documents/folders` arrive au lot S6 ' +
+    '(ADR-0046 § 5.3).',
 };
 
 /** Une sonde HTTP : la route qui matérialise une action, et ses statuts légitimes. */
@@ -181,6 +211,7 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
     viewer: 7,
     sales_rep: 8,
     hr_manager: 9,
+    storekeeper: 10,
   };
 
   function creerCompte(role: RoleTeste): { email: string; password: string; name: string } {
@@ -807,7 +838,7 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
     }
   });
 
-  it('les neuf rôles ont une session authentifiée dans la même organisation', async () => {
+  it('les dix rôles ont une session authentifiée dans la même organisation', async () => {
     for (const role of ROLES_TESTES) {
       const res = await request(serveur()).get('/me/permissions').set('Cookie', cookiesDe(role));
       expect(res.status, `/me/permissions pour ${role}`).toBe(200);
@@ -1064,9 +1095,10 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
       const res = await request(serveur())
         .get(`/projects/${projetSonde}/variances?year=1`)
         .set('Cookie', cookiesDe(role));
-      // ADR-0045 : le Responsable RH ne lit pas les projets BUILD non plus.
+      // ADR-0045 : le Responsable RH ne lit pas les projets BUILD non plus ; ADR-0046 : ni
+      // le Magasinier.
       expect(res.status, `${role} : ${JSON.stringify(res.body)}`).toBe(
-        role === 'sales_rep' || role === 'hr_manager' ? 403 : 200,
+        role === 'sales_rep' || role === 'hr_manager' || role === 'storekeeper' ? 403 : 200,
       );
     }
   }, 90_000);
@@ -1215,6 +1247,63 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
       'hr.sensitive.read',
       'leave.request',
       'leave.approve',
+      // ADR-0046 § 8.1 : le matériel (sans coûts) et la bibliothèque.
+      'assets.read',
+      'docs.read',
+      'docs.manage',
+    ]);
+  }, 60_000);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // ADR-0046 — S0 : le Magasinier (§ 8.2)
+  // ───────────────────────────────────────────────────────────────────────────
+
+  it('R7 — l’Administrateur nomme un Magasinier ; le Comptable ne peut pas inviter', async () => {
+    const parAdmin = `rbac-mag-admin-${tag}@lalanda-test.local`;
+    const parComptable = `rbac-mag-cpt-${tag}@lalanda-test.local`;
+    emails.push(parAdmin, parComptable);
+    const ok = await request(serveur())
+      .post(`/organizations/${orgId}/invitations`)
+      .set('Cookie', cookiesDe('admin'))
+      .send({ email: parAdmin, role: 'storekeeper' });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(201);
+    expect(ok.body.invitation.role).toBe('storekeeper');
+
+    const refus = await request(serveur())
+      .post(`/organizations/${orgId}/invitations`)
+      .set('Cookie', cookiesDe('accountant'))
+      .send({ email: parComptable, role: 'storekeeper' });
+    expect(refus.status, JSON.stringify(refus.body)).toBe(403);
+    expect(refus.body).toMatchObject({ code: 'FORBIDDEN', action: 'members.invite' });
+  }, 60_000);
+
+  it('critère 1 — le Magasinier ne voit ni achats, ni trésorerie, ni ventes', async () => {
+    const c = cookiesDe('storekeeper');
+    const s = serveur();
+    const refus: [string, string, Action][] = [
+      ['GET /purchases/orders', '/purchases/orders', 'purchase.read'],
+      ['GET /treasury/expenses', '/treasury/expenses', 'treasury.read'],
+      ['GET /sales/invoices', '/sales/invoices', 'sales.read'],
+    ];
+    for (const [libelle, chemin, action] of refus) {
+      const res = await request(s).get(chemin).set('Cookie', c);
+      expect(res.status, `${libelle} : ${res.status} ${JSON.stringify(res.body)}`).toBe(403);
+      expect(res.body, libelle).toMatchObject({ code: 'FORBIDDEN', action, role: 'storekeeper' });
+    }
+    // Il suit ses tâches, comme tout membre qui travaille.
+    expect((await request(s).get('/work/my-tasks').set('Cookie', c)).status).toBe(200);
+    const moi = await request(s).get('/me/permissions').set('Cookie', c);
+    expect(moi.status).toBe(200);
+    expect(moi.body.actions).toEqual([
+      'analytics.read',
+      'work.read',
+      'work.update',
+      'leave.request',
+      'stock.read',
+      'stock.move',
+      'stock.count',
+      'assets.read',
+      'docs.read',
     ]);
   }, 60_000);
 

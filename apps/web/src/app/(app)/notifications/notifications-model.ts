@@ -141,6 +141,40 @@ export const LIBELLES_TYPES: Record<NotificationKind, { label: string; aide: str
     label: 'Coordonnées bancaires modifiées',
     aide: 'Les coordonnées bancaires ou mobile money d’un collaborateur ont changé.',
   },
+  // ADR-0046 — S0 (§ 6.7) : stocks, équipements, documents. Aucun libellé ne porte un
+  // coût, une valeur ni le titre d'un document.
+  'stock.below_reorder': {
+    label: 'Article sous le seuil',
+    aide: 'Le stock d’un article est passé sous son seuil d’alerte.',
+  },
+  'stock.negative': {
+    label: 'Stock négatif',
+    aide: 'Une vente ou une annulation a rendu le stock d’un article négatif.',
+  },
+  'stock.pending_lines': {
+    label: 'Entrées ou sorties à traiter',
+    aide: 'De nouvelles lignes attendent un rattachement, une unité ou un coût.',
+  },
+  'stock.count_assigned': {
+    label: 'Inventaire à compter',
+    aide: 'Un inventaire vous est confié.',
+  },
+  'stock.count_submitted': {
+    label: 'Inventaire à valider',
+    aide: 'Un inventaire compté attend la validation de ses écarts.',
+  },
+  'assets.maintenance_due': {
+    label: 'Maintenance à prévoir',
+    aide: 'Une intervention de maintenance d’un équipement est due ou en retard.',
+  },
+  'assets.coverage_expiring': {
+    label: 'Garantie ou assurance bientôt expirée',
+    aide: 'Une garantie, une assurance ou un contrat d’un équipement arrive à échéance.',
+  },
+  'documents.expiring': {
+    label: 'Document bientôt expiré',
+    aide: 'Un document de la bibliothèque arrive à sa date d’expiration.',
+  },
 };
 
 /** Types dans l'ordre d'affichage des préférences. */

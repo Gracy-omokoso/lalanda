@@ -244,8 +244,9 @@ export interface TemplateSummary {
 
 // ─── Rôles d'organisation (S20a — ADR-0012 §1) ─────────────────
 /**
- * Les 10 rôles d'organisation (le neuvième, `sales_rep` « Commercial », d'ADR-0040
- * § 4.2 ; le dixième, `hr_manager` « Responsable RH », d'ADR-0045 § 4.2). Miroir de `apps/api/src/authz/permissions.ts`,
+ * Les 11 rôles d'organisation (le neuvième, `sales_rep` « Commercial », d'ADR-0040
+ * § 4.2 ; le dixième, `hr_manager` « Responsable RH », d'ADR-0045 § 4.2 ; le onzième,
+ * `storekeeper` « Magasinier », d'ADR-0046 § 8.2). Miroir de `apps/api/src/authz/permissions.ts`,
  * SOURCE DE VÉRITÉ — le web ne peut pas importer de l'API.
  *
  * Volontairement limité à l'union de slugs : les LIBELLÉS et les DESCRIPTIONS ne
@@ -266,6 +267,8 @@ export const ORG_ROLES = [
   'sales_rep',
   // ADR-0045 — H0 : Responsable RH (dossiers du personnel, absences, documents RH).
   'hr_manager',
+  // ADR-0046 — S0 : Magasinier (réceptionne, range, sort et compte le stock).
+  'storekeeper',
 ] as const;
 
 export type OrgRole = (typeof ORG_ROLES)[number];
@@ -1140,7 +1143,7 @@ export interface TermsAcceptanceView {
 
 export type DisplayCurrency = 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR';
 
-/** Les 38 actions granulaires (docs/12, ADR-0021 §8, ADR-0022 § S25c.1, ADR-0023 § S25e.11, ADR-0031 § 4, ADR-0034 § 8, ADR-0035 § 3, ADR-0039 § 7, ADR-0040 § 4.1, ADR-0044 § 4.1, ADR-0045 § 4.1). Union fermée, alignée sur l'API. */
+/** Les 46 actions granulaires (docs/12, ADR-0021 §8, ADR-0022 § S25c.1, ADR-0023 § S25e.11, ADR-0031 § 4, ADR-0034 § 8, ADR-0035 § 3, ADR-0039 § 7, ADR-0040 § 4.1, ADR-0044 § 4.1, ADR-0045 § 4.1, ADR-0046 § 8.1). Union fermée, alignée sur l'API. */
 export type OrgAction =
   | 'organization.manage'
   | 'billing.manage'
@@ -1209,7 +1212,18 @@ export type OrgAction =
   | 'hr.manage'
   | 'hr.sensitive.read'
   | 'leave.request'
-  | 'leave.approve';
+  | 'leave.approve'
+  // ADR-0046 § 8.1 — stocks, équipements, documents. Les valeurs (coûts, valeur du stock,
+  // estimation de gestion) exigent en plus `purchase.read` ou `treasury.read` : l'API les
+  // sert à `null` avec `valuesHidden: true` sinon.
+  | 'stock.read'
+  | 'stock.move'
+  | 'stock.count'
+  | 'stock.manage'
+  | 'assets.read'
+  | 'assets.manage'
+  | 'docs.read'
+  | 'docs.manage';
 
 /**
  * Offres — RÉEXPORTÉES du catalogue partagé, jamais réécrites.

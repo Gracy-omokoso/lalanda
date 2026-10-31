@@ -345,7 +345,8 @@ e2eSuite('ADR-0041 A2 — écarts lus par la garde et /me/permissions', () => {
     expect(res.status).toBe(200);
     // ADR-0044 § 4.3 : huitième domaine (achats) et troisième paire ; ADR-0045 § 4.5 :
     // neuvième domaine (RH), aucune paire nouvelle.
-    expect(res.body.domains).toHaveLength(9);
+    // ADR-0046 § 8.3 : dixième à douzième domaines (stocks, équipements, documents).
+    expect(res.body.domains).toHaveLength(12);
     expect(res.body.nonDelegable).toEqual(['billing.manage']);
     expect(res.body.sodPairs).toHaveLength(3);
     expect(res.body.labels['sales.invoice']).toBe(
@@ -359,6 +360,13 @@ e2eSuite('ADR-0041 A2 — écarts lus par la garde et /me/permissions', () => {
       (r) => r.role === 'hr_manager',
     );
     expect(rh?.label).toBe('Responsable RH');
-    expect(rh?.actions).toHaveLength(8);
+    // ADR-0046 § 8.1 : plus `assets.read`, `docs.read` et `docs.manage`.
+    expect(rh?.actions).toHaveLength(11);
+    // ADR-0046 § 8.2 : le Magasinier, neuf actions.
+    const mag = (res.body.roleMatrix as { role: string; label: string; actions: string[] }[]).find(
+      (r) => r.role === 'storekeeper',
+    );
+    expect(mag?.label).toBe('Magasinier');
+    expect(mag?.actions).toHaveLength(9);
   }, 30_000);
 });
