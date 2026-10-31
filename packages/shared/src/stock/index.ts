@@ -15,3 +15,5 @@ export * from './vouchers.js';
 export * from './pending.js';
 export * from './counts.js';
 export * from './settings.js';
+// ADR-0046 — S4
+export * from './links.js';

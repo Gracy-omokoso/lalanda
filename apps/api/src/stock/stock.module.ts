@@ -32,6 +32,11 @@ import { StockSettingsController } from './stock-settings.controller.js';
 import { StockSettingsService } from './stock-settings.service.js';
 import { StockVouchersController } from './stock-vouchers.controller.js';
 import { StockVouchersService } from './stock-vouchers.service.js';
+// ADR-0046 — S4
+import {
+  STOCK_OPEN_ORDERS_SOURCE,
+  StockOpenOrdersReader,
+} from './purchases/stock-open-orders.source.js';
 import {
   StockCount,
   StockCountSchema,
@@ -93,6 +98,8 @@ import {
     StockCountsService,
     StockReportsService,
     StockLevelsCheckJob,
+    // ADR-0046 — S4 : quantités commandées non reçues, lues des achats (lecture seule).
+    { provide: STOCK_OPEN_ORDERS_SOURCE, useClass: StockOpenOrdersReader },
   ],
   exports: [
     // ADR-0046 — S3 : points d'extension des lots S4 et S7.

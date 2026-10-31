@@ -143,6 +143,9 @@ export const STOCK_PENDING_REASONS = [
   'pending_cost',
   'sale_return_proposed',
   'cost_differs',
+  // ADR-0046 — S4 : `salesIssueMode = proposed` (§ 2.8, § 6.2) — la ligne d'une facture
+  // finale devient « À traiter » au lieu d'une sortie ; confirmée, elle écrit `sale_issue`.
+  'sale_issue_proposed',
 ] as const;
 export type StockPendingReason = (typeof STOCK_PENDING_REASONS)[number];
 
