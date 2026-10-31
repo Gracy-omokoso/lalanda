@@ -140,12 +140,6 @@ const ACTIONS_SANS_ROUTE: Record<string, string> = {
   'stock.manage':
     'Aucune route des stocks en S0 : `POST /stock/items` arrive au lot S3 ; la ' +
     'séparation des tâches est prouvée par `stockCountDecision` (permissions.test.ts).',
-  'assets.read':
-    'Aucune route des équipements en S0 : `GET /assets` (sonde naturelle) arrive avec ' +
-    'le registre au lot S5 (ADR-0046 § 5.2).',
-  'assets.manage':
-    'Aucune route des équipements en S0 : `POST /assets` (sonde naturelle) arrive avec ' +
-    'le registre au lot S5 (ADR-0046 § 5.2).',
   'docs.read':
     'Aucune route de la bibliothèque en S0 : `GET /documents/folders` arrive au lot S6 ' +
     '(ADR-0046 § 5.3) ; les droits par dossier sont prouvés par `folderAccessDecision`.',
@@ -769,6 +763,40 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
           .put('/hr/settings/approval')
           .set('Cookie', c)
           .send({ expectedRevision: revision, allowSoleApprover: true });
+      },
+    },
+    // ADR-0046 — S5 : registre des équipements (S5 a retiré `assets.read` et
+    // `assets.manage` d'ACTIONS_SANS_ROUTE).
+    {
+      // ADR-0046 § 8.1 — tout rôle interne qui gère ou contrôle, le Responsable RH et le
+      // Magasinier ; ni le Commercial, ni le Conseiller.
+      action: 'assets.read',
+      libelle: 'GET /assets',
+      statutsAutorises: [200],
+      envoyer: (c) => request(serveur()).get('/assets').set('Cookie', c),
+    },
+    {
+      // ADR-0046 § 8.1 — Propriétaire, Administrateur, Directeur financier, Comptable ;
+      // ni le Responsable RH ni le Magasinier (décision ouverte n° 3). La catégorie est
+      // relue avec les mêmes cookies (tout détenteur de `assets.manage` lit le registre) ;
+      // un refusé envoie un identifiant forgé et reçoit 403 avant toute lecture.
+      action: 'assets.manage',
+      libelle: 'POST /assets',
+      statutsAutorises: [201],
+      envoyer: async (c, role) => {
+        const cats = await request(serveur()).get('/assets/categories').set('Cookie', c);
+        const categoryId =
+          cats.status === 200
+            ? (cats.body.items as { id: string }[])[0]!.id
+            : '000000000000000000000000';
+        return request(serveur())
+          .post('/assets')
+          .set('Cookie', c)
+          .send({
+            name: `Sonde ${role} ${tag}`,
+            categoryId,
+            acquisition: { on: '2026-01-15', cost: '100.00', currency: 'USD' },
+          });
       },
     },
   ];
