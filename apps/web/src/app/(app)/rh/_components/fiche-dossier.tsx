@@ -7,6 +7,8 @@ import { Modal, buttonClasses } from '@lalanda/ui';
 import { FileText, NotebookPen } from 'lucide-react';
 import { useState } from 'react';
 
+import { EntityAssetsPanel } from '@/components/entity-assets-panel';
+
 import { lignesDossier } from './collaborateurs-model';
 import { FicheFormulaire } from './fiche-formulaire';
 import { useFiche } from './fiche-chrome';
@@ -53,6 +55,11 @@ export function FicheDossier(): React.ReactElement {
           <p className="text-sm whitespace-pre-line break-words">{fiche.notes}</p>
         </Panneau>
       ) : null}
+      {/* ADR-0046 — S9 : matériel affecté (§ 6.5), sans modifier les RH. */}
+      <EntityAssetsPanel
+        filtre={{ employeeId: fiche.id }}
+        vide="Aucun équipement affecté à ce collaborateur."
+      />
       <Modal
         open={gerer && edition}
         onClose={() => setEdition(false)}

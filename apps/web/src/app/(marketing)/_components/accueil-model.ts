@@ -60,9 +60,11 @@ export const APPS_PAR_MODULE: Readonly<Record<ModuleId, readonly string[]>> = {
     // ADR-0044 — achats, juste avant Trésorerie (même ordre que la navigation).
     'achats',
     'tresorerie',
-    // ADR-0046 — S8 : stocks, après Trésorerie. Équipements et Documents ne sont
-    // pas cités tant que leurs écrans sont masqués (`masquee`, lot S9).
+    // ADR-0046 — S8 : stocks, après Trésorerie ; S9 : équipements et documents,
+    // désormais livrés (même ordre que la navigation).
     'stocks',
+    'equipements',
+    'documents',
   ],
   grow: ['pilotage', 'brief', 'sante', 'investisseurs', 'parcours'],
 };

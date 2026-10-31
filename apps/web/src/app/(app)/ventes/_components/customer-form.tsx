@@ -14,6 +14,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
+import { EntityDocumentsPanel } from '@/components/entity-documents-panel';
 import { api, type CustomerView } from '@/lib/api';
 
 import { Alerte, aria, BOUTON, Champ, CHAMP, Pastille } from './form-ui';
@@ -437,6 +438,14 @@ export function CustomerForm({
           </button>
         </div>
       </form>
+      {/* ADR-0046 — S9 : documents liés à un client existant (présentation O5). */}
+      {id !== null && !enModal ? (
+        <EntityDocumentsPanel
+          entityType="customer"
+          entityId={id}
+          libelle={vue?.name ?? 'ce client'}
+        />
+      ) : null}
     </section>
   );
 }
