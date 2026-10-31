@@ -25,6 +25,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
+import { EntityDocumentsPanel } from '@/components/entity-documents-panel';
 import { api, type CustomerType, type CustomerView } from '@/lib/api';
 import { crmApi, type CrmAccountListItem } from '@/lib/api-crm';
 
@@ -923,6 +924,14 @@ export function CompteFiche({ accountId }: { accountId: string }): React.ReactEl
             </ul>
           )}
         </Panneau>
+
+        {/* ADR-0046 — S9 : documents liés (présentation O5). */}
+        <EntityDocumentsPanel
+          entityType="crm_account"
+          entityId={a.id}
+          libelle={a.name}
+          className="lg:col-span-2"
+        />
 
         <Fil key={version} accountId={a.id} />
       </div>
