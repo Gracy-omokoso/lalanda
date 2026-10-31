@@ -26,6 +26,7 @@ import {
   tonStatut,
 } from './achats-model';
 import { NouvelleDemande } from './commande-formulaire';
+import { lireArticlesPreremplis } from './commande-prefill-model';
 import {
   FILTRES_COMMANDES,
   natureCommande,
@@ -43,6 +44,8 @@ export function CommandesListe(): React.ReactElement {
   const demander = peutDemanderAchat(actions);
   const creation = params.get('nouvelle') === '1';
   const fournisseur = params.get('fournisseur');
+  // ADR-0046 — S8 : lignes préremplies depuis le réapprovisionnement des stocks.
+  const articles = lireArticlesPreremplis(params.get('articles'));
   const [filtre, setFiltre] = useState<FiltreCommandes>('toutes');
   const [items, setItems] = useState<PurchaseOrderView[] | null>(null);
   const [suivante, setSuivante] = useState<string | null>(null);
@@ -115,6 +118,7 @@ export function CommandesListe(): React.ReactElement {
       >
         <NouvelleDemande
           fournisseurInitial={fournisseur}
+          articlesInitiaux={articles}
           onCree={(id) => router.push(lienCommande(id))}
         />
       </Modal>

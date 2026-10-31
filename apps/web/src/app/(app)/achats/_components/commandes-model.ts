@@ -181,6 +181,8 @@ export interface LigneSaisie {
   quantity: string;
   unit: string;
   unitPrice: string;
+  /** ADR-0046 — S8 : référence d'article de stock (`stk:<id>`) d'une ligne préremplie. */
+  itemRef?: string | null;
 }
 
 export interface TaxeSaisie {
@@ -290,6 +292,7 @@ export function preparerCommande(
         quantity: q.valeur,
         unitPrice: p.valeur,
         unit: ouNul(l.unit),
+        ...(l.itemRef ? { itemRef: l.itemRef } : {}),
       });
     }
   });
