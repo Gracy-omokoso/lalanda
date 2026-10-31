@@ -17,6 +17,8 @@ const base: LecturesVue = {
   sousSeuil: ok({ items: [1, 2], nextCursor: null }),
   aTraiter: ok({ items: [], nextCursor: null }),
   valorisation: ok({
+    version: '1.0.0',
+    items: [],
     until: null,
     locationId: null,
     byCurrency: [
@@ -45,9 +47,8 @@ describe('tuiles de la vue d’ensemble', () => {
     expect(t.map((x) => x.id)).toEqual(['ruptures', 'sous-seuil', 'a-traiter']);
   });
 
-  it('valeur servie mais masquée par l’API : une phrase, pas de chiffre', () => {
-    const v = ok({ until: null, locationId: null, byCurrency: [], valuesHidden: true });
-    expect(tuilesVue(PROPRIETAIRE, { ...base, valorisation: v })[3]!.contenu).toEqual({
+  it('valeur lue pour un rôle qui ne voit pas les valeurs : une phrase, pas de chiffre', () => {
+    expect(tuilesVue(MAGASINIER, base)[3]!.contenu).toEqual({
       etat: 'indisponible',
       phrase: 'Masquée pour votre rôle',
     });

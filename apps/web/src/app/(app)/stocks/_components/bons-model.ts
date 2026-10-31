@@ -186,9 +186,13 @@ export function preparerBon(
     if (l.note.length > STOCK_LIMITS.lineNote)
       champs[`ligne-${i}-note`] = '500 caractères au plus.';
     if (l.itemId !== '' && q.ok) {
-      // Ajustement : le SENS devient le signe de la quantité (aucun calcul).
-      const quantity = f.kind === 'adjustment' && l.sens === 'out' ? `-${q.valeur}` : q.valeur;
-      lignes.push({ itemId: l.itemId, quantity, note: ouNul(l.note) });
+      // Ajustement : quantité positive et SENS de la ligne (`in`, `out`), comme l'API.
+      lignes.push({
+        itemId: l.itemId,
+        quantity: q.valeur,
+        ...(f.kind === 'adjustment' ? { direction: l.sens } : {}),
+        note: ouNul(l.note),
+      });
     }
   });
 
@@ -202,8 +206,7 @@ export function preparerBon(
       lines: lignes,
       workProjectId: f.kind === 'issue' ? ouNul(f.workProjectId) : null,
       recipient: f.kind === 'issue' ? ouNul(f.recipient) : null,
-      reason: f.kind === 'adjustment' ? f.reason : null,
-      reasonNote: f.kind === 'adjustment' ? ouNul(f.reasonNote) : null,
+      reason: f.kind === 'adjustment' ? { key: f.reason, note: ouNul(f.reasonNote) } : null,
       postedOn: f.postedOn,
     },
   };
@@ -231,10 +234,25 @@ export function gestesBon(b: StockVoucherView, actions: Actions): GesteBon[] {
 
 /** Trajet lisible d'un bon : « Magasin → Chantier », « depuis Magasin ». */
 export function trajetBon(b: StockVoucherView, nom: (id: string) => string): string {
-  const depart = b.fromLocationId ? (b.fromLocationName ?? nom(b.fromLocationId)) : null;
-  const arrivee = b.toLocationId ? (b.toLocationName ?? nom(b.toLocationId)) : null;
+  const depart = b.fromLocationId ? nom(b.fromLocationId) : null;
+  const arrivee = b.toLocationId ? nom(b.toLocationId) : null;
   if (depart && arrivee) return `${depart} → ${arrivee}`;
   if (arrivee) return `vers ${arrivee}`;
   if (depart) return `depuis ${depart}`;
   return '';
+}
+
+/** Quantité signée d'une ligne d'ajustement, lue sur son SENS (aucun calcul). */
+export function quantiteLigneBon(l: { quantity: string; direction: 'in' | 'out' | null }): string {
+  return l.direction === 'out' ? `-${l.quantity}` : l.quantity;
+}
+
+/** Motif d'un bon : libellé du motif des réglages (sinon sa clé), et sa note. */
+export function motifBon(
+  b: Pick<StockVoucherView, 'reason'>,
+  motifs: readonly { key: string; label: string }[] = [],
+): string | null {
+  if (!b.reason) return null;
+  const libelle = motifs.find((m) => m.key === b.reason!.key)?.label ?? b.reason.key;
+  return b.reason.note ? `${libelle} (${b.reason.note})` : libelle;
 }

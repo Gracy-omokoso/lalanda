@@ -1,6 +1,7 @@
 'use client';
 
-// Mouvements — grand livre filtrable d'un article (ADR-0046 § 2.3, § 5.1).
+// Mouvements — grand livre filtrable de tous les articles, ou d'un seul
+// (ADR-0046 § 2.3, § 5.1 ; `GET /stock/movements`, lot S4).
 // Ajout seul : une annulation apparaît comme un mouvement inverse. Coûts
 // d'entrée seulement pour un rôle qui voit les valeurs.
 
@@ -10,7 +11,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
-import { stockApi, type StockItemView, type StockMovementView } from '@/lib/api-stock';
+import { stockApi, type StockItemView, type StockLedgerEntryView } from '@/lib/api-stock';
 
 import { Alerte, BOUTON_PETIT, CHAMP, Champ } from '../../ventes/_components/form-ui';
 
@@ -18,6 +19,7 @@ import {
   FILTRES_VIDES,
   OPTIONS_NATURE,
   coutAffiche,
+  motifMouvement,
   origineMouvement,
   requeteMouvements,
   type FiltresMouvements,
@@ -50,7 +52,7 @@ export function Mouvements(): React.ReactElement {
   const articleId = params.get('article') ?? '';
   const [article, setArticle] = useState<StockItemView | null>(null);
   const [filtres, setFiltres] = useState<FiltresMouvements>(FILTRES_VIDES);
-  const [items, setItems] = useState<StockMovementView[] | null>(null);
+  const [items, setItems] = useState<StockLedgerEntryView[] | null>(null);
   const [masquees, setMasquees] = useState(true);
   const [suivante, setSuivante] = useState<string | null>(null);
   const [erreur, setErreur] = useState<unknown>(null);
@@ -76,14 +78,14 @@ export function Mouvements(): React.ReactElement {
   }, [articleId]);
 
   const charger = useCallback((itemId: string, f: FiltresMouvements, cursor: string | null) => {
-    const r = requeteMouvements(f, cursor);
+    const r = requeteMouvements(f, cursor, itemId);
     if (!r.ok) {
       setErreurFiltre(r.erreur);
       return;
     }
     setErreurFiltre(null);
     stockApi
-      .listItemMovements(itemId, r.requete)
+      .listMovements(r.requete)
       .then((p) => {
         setItems((avant) => (cursor && avant ? [...avant, ...p.items] : p.items));
         setMasquees(p.valuesHidden === true);
@@ -97,10 +99,6 @@ export function Mouvements(): React.ReactElement {
   }, []);
 
   useEffect(() => {
-    if (articleId === '') {
-      setItems(null);
-      return;
-    }
     charger(articleId, filtres, null);
   }, [articleId, filtres, charger]);
 
@@ -183,9 +181,7 @@ export function Mouvements(): React.ReactElement {
       ) : null}
       {erreur ? <EchecLecture erreur={erreur} repli="Impossible de lire les mouvements." /> : null}
 
-      {articleId === '' ? (
-        <CarteVide>Choisissez un article pour lire son grand livre.</CarteVide>
-      ) : items === null ? (
+      {items === null ? (
         <Chargement texte="Chargement des mouvements…" />
       ) : items.length === 0 ? (
         erreur ? null : (
@@ -215,6 +211,12 @@ export function Mouvements(): React.ReactElement {
                   </span>
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="font-medium break-words">
+                      {articleId === '' ? (
+                        <Link href={lienArticle(m.itemId)} className="underline underline-offset-2">
+                          {m.itemName}
+                        </Link>
+                      ) : null}
+                      {articleId === '' ? ' · ' : ''}
                       {LIBELLES_MOUVEMENT[m.kind]}
                       {m.reversalOf ? ' (contre-passation)' : ''}
                     </span>
@@ -222,7 +224,7 @@ export function Mouvements(): React.ReactElement {
                       {[
                         origine,
                         m.locationName ?? nomEmplacement(m.locationId),
-                        m.reason,
+                        motifMouvement(m),
                         m.createdBy ? `par ${nomPersonne(membres, m.createdBy, moi)}` : null,
                       ]
                         .filter(Boolean)
@@ -233,13 +235,13 @@ export function Mouvements(): React.ReactElement {
                     <span className="text-xs tabular-nums text-[var(--foreground-muted)]">
                       {cout === 'coût à saisir'
                         ? cout
-                        : `à ${formatCoutUnitaire(cout, article?.costCurrency ?? '')}`}
+                        : `à ${formatCoutUnitaire(cout, m.costCurrency)}`}
                     </span>
                   ) : null}
                   <span
                     className={`tabular-nums whitespace-nowrap font-semibold ${estNegatif(m.quantity) ? 'text-[var(--danger)]' : 'text-[var(--ok)]'}`}
                   >
-                    {formatQuantiteSignee(m.quantity, article?.unit ?? null)}
+                    {formatQuantiteSignee(m.quantity, m.unit)}
                   </span>
                   {m.costStatus === 'pending_cost' && valeurs ? (
                     <Badge tone="warning">Sans coût</Badge>
@@ -250,7 +252,7 @@ export function Mouvements(): React.ReactElement {
           </ul>
         </>
       )}
-      {suivante && articleId ? (
+      {suivante ? (
         <button
           type="button"
           className={`${BOUTON_PETIT} self-center`}

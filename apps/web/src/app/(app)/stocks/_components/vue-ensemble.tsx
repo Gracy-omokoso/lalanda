@@ -9,7 +9,7 @@ import { AlertTriangle, Boxes } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
-import { stockApi, type StockLevelRowView } from '@/lib/api-stock';
+import { stockApi, type StockReorderAlertView } from '@/lib/api-stock';
 
 import { useAccesStocks } from './stocks-access';
 import {
@@ -63,15 +63,19 @@ export function VueEnsemble(): React.ReactElement {
   const { actions, etat } = useAccesStocks();
   const valeurs = peutVoirValeurs(actions);
   const [tuiles, setTuiles] = useState<TuileVue[] | null>(null);
-  const [sousSeuil, setSousSeuil] = useState<Lecture<StockLevelRowView[]> | null>(null);
+  const [sousSeuil, setSousSeuil] = useState<Lecture<StockReorderAlertView[]> | null>(null);
 
   useEffect(() => {
     if (etat !== 'pret') return;
     let annule = false;
-    const seuil = lire(stockApi.listLevels({ below: 'reorder', limit: 100 }));
+    // Une seule lecture de `GET /stock/levels` : toutes les lignes (ruptures) et les
+    // alertes du moteur (`belowReorder`, une par article sous son seuil).
+    const niveauxLus = lire(stockApi.listLevels());
     void Promise.all([
-      lire(stockApi.listLevels({ limit: 100 })),
-      seuil,
+      niveauxLus.then((l) =>
+        l.ok ? { ok: true as const, valeur: { items: l.valeur.levels, nextCursor: null } } : l,
+      ),
+      niveauxLus,
       lire(stockApi.listPending({ status: 'open', limit: 100 })),
       valeurs ? lire(stockApi.getValuation()) : Promise.resolve(null),
     ]).then(([niveaux, bas, aTraiter, valorisation]) => {
@@ -155,14 +159,12 @@ export function VueEnsemble(): React.ReactElement {
                   {r.itemName}
                 </Link>
                 <span className="text-xs text-[var(--foreground-muted)]">
-                  {r.locationName ?? 'Emplacement'}
+                  {r.locationName ?? 'Tous emplacements'}
                 </span>
                 <span className="text-sm tabular-nums whitespace-nowrap">
-                  {formatQuantite(r.quantity, r.unit)}
+                  {formatQuantite(r.available, r.unit)}
                 </span>
-                {r.minQuantity !== null ? (
-                  <Badge tone="warning">seuil {formatQuantite(r.minQuantity)}</Badge>
-                ) : null}
+                <Badge tone="warning">seuil {formatQuantite(r.minQuantity)}</Badge>
               </li>
             ))}
           </ul>

@@ -16,6 +16,7 @@ import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { ArticleFormulaire } from './article-formulaire';
 import { gestesArticle, phraseSeuil } from './articles-model';
+import { origineMouvement } from './mouvements-model';
 import { useAccesStocks } from './stocks-access';
 import {
   LIBELLES_MOUVEMENT,
@@ -289,10 +290,10 @@ export function ArticleFiche({ itemId }: { itemId: string }): React.ReactElement
                 </span>
                 <span className="min-w-0 flex-1 break-words">
                   {LIBELLES_MOUVEMENT[m.kind]}
-                  {m.sourceLabel ? ` · ${m.sourceLabel}` : ''}
+                  {origineMouvement(m) ? ` · ${origineMouvement(m)}` : ''}
                 </span>
                 <span className="text-xs text-[var(--foreground-muted)]">
-                  {m.locationName ?? nomEmplacement(m.locationId) ?? ''}
+                  {nomEmplacement(m.locationId) ?? ''}
                 </span>
                 <span className="tabular-nums whitespace-nowrap font-medium">
                   {formatQuantiteSignee(m.quantity, a.unit)}

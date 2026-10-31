@@ -26,7 +26,9 @@ export function groupesParFournisseur(
     const cle = s.preferredSupplierId ?? '';
     const g = groupes.get(cle) ?? {
       supplierId: s.preferredSupplierId,
-      supplierName: s.preferredSupplierName,
+      // Le nom du fournisseur n'est pas servi par l'API des stocks (un Magasinier ne
+      // lit pas les fiches fournisseurs) : l'écran affiche un libellé générique.
+      supplierName: null,
       suggestions: [],
     };
     g.suggestions.push(s);

@@ -2,10 +2,13 @@
 
 import { describe, expect, it } from 'vitest';
 
+import type { StockPendingLineView } from '@/lib/api-stock';
+
 import {
   RAISON_COUT,
   SAISIE_VIDE,
   champsResolution,
+  affichageATraiter,
   deviseVisible,
   droitATraiter,
   preparerResolution,
@@ -65,20 +68,67 @@ describe('résolution', () => {
   });
 
   it('la devise d’une ligne n’apparaît qu’à qui voit les valeurs', () => {
-    const l = {
-      id: 'p',
-      reason: 'pending_cost' as const,
-      status: 'open' as const,
-      label: 'x',
-      itemRef: null,
-      itemId: null,
-      quantity: '1',
-      unit: 'u',
-      currency: 'CDF' as const,
-      createdAt: '',
-      revision: 1,
-    };
-    expect(deviseVisible(l, PROPRIETAIRE)).toBe('CDF');
-    expect(deviseVisible(l, MAGASINIER)).toBeNull();
+    expect(deviseVisible(LIGNE, PROPRIETAIRE)).toBe('CDF');
+    expect(deviseVisible(LIGNE, MAGASINIER)).toBeNull();
+  });
+
+  it('la carte se lit dans la proposition servie par l’API (ADR-0046 S4)', () => {
+    expect(affichageATraiter(LIGNE)).toEqual({
+      libelle: 'Gobelets',
+      quantite: '2',
+      unite: 'carton',
+      origine: 'Réception d’achat',
+    });
+    expect(
+      affichageATraiter({ proposal: { ...LIGNE.proposal, label: null, itemRef: 'GOB', unit: '' } }),
+    ).toMatchObject({ libelle: 'GOB', unite: null });
+  });
+
+  it('sortie de vente proposée : rien à saisir, on confirme ou on classe', () => {
+    const c = champsResolution('sale_issue_proposed');
+    expect([c.article, c.facteur, c.quantite, c.cout, c.emplacement]).toEqual([
+      false,
+      false,
+      false,
+      false,
+      false,
+    ]);
+    expect(droitATraiter('sale_issue_proposed', MAGASINIER).actif).toBe(true);
+    expect(preparerResolution({ reason: 'sale_issue_proposed', revision: 2 }, SAISIE_VIDE)).toEqual(
+      { ok: true, corps: { expectedRevision: 2 } },
+    );
   });
 });
+
+const LIGNE: StockPendingLineView = {
+  id: 'p',
+  reason: 'pending_cost',
+  status: 'open',
+  sourceKey: 'pending_cost:m1',
+  proposal: {
+    movementKind: 'purchase_receipt',
+    movementSourceKey: 'reception:r1:l1:in',
+    source: { kind: 'reception', receptionId: 'r1', orderLineId: 'l1' },
+    itemId: null,
+    itemRef: null,
+    label: 'Gobelets',
+    quantity: '2',
+    unit: 'carton',
+    occurredOn: '2026-10-31',
+    locationId: null,
+    unitPrice: null,
+    discountPercent: null,
+    currency: 'CDF',
+    workProjectId: null,
+    orderId: 'o1',
+    movementId: 'm1',
+    maxQuantity: null,
+    invoicedUnitCost: null,
+  },
+  movementId: null,
+  closure: null,
+  valuesHidden: false,
+  revision: 1,
+  createdAt: '',
+  updatedAt: '',
+};

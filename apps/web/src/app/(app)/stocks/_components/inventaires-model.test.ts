@@ -81,10 +81,14 @@ describe('saisie du comptage', () => {
   });
 
   it('à l’aveugle : la théorie n’est jamais montrée pendant le comptage', () => {
-    const l = ligneInventaire({ theoreticalQuantity: '20.000' });
+    const l = ligneInventaire({ theoretical: '20.000' });
     expect(theoriqueAffichee(inventaire(), l)).toBeNull();
     expect(theoriqueAffichee(inventaire({ blind: false }), l)).toBe('20.000');
     expect(theoriqueAffichee(inventaire({ status: 'submitted' }), l)).toBe('20.000');
+    // Masquée par l'API (`theoreticalHidden`) : jamais montrée.
+    expect(
+      theoriqueAffichee(inventaire({ status: 'submitted', theoreticalHidden: true }), l),
+    ).toBeNull();
   });
 
   it('progression et filtre « à compter », recherche par nom ou code', () => {
@@ -118,32 +122,43 @@ describe('gestes et séparation des tâches', () => {
     );
   });
 
-  it('celui qui a compté ne valide pas : bouton désactivé avec sa raison', () => {
-    const c = inventaire({ status: 'submitted', lines: [compte('moi'), compte('autre')] });
-    expect(gestesInventaire(c, COMPTABLE, 'moi')[0]).toEqual({
+  it('celui qui a compté ne valide pas : le refus vient de l’API (`canValidate`)', () => {
+    const lignes = [compte('moi'), compte('autre')];
+    const refuse = inventaire({
+      status: 'submitted',
+      lines: lignes,
+      canValidate: false,
+      validationBlockedBy: 'COUNT_SELF_VALIDATION',
+    });
+    expect(gestesInventaire(refuse, COMPTABLE, 'moi')[0]).toEqual({
       id: 'valider',
       libelle: 'Valider les écarts',
       actif: false,
       raison: RAISON_COMPTEUR,
     });
-    expect(gestesInventaire(c, COMPTABLE, 'tiers')[0]!.actif).toBe(true);
+    const permis = inventaire({ status: 'submitted', lines: lignes, canValidate: true });
+    expect(gestesInventaire(permis, COMPTABLE, 'tiers')[0]!.actif).toBe(true);
   });
 
   it('le Magasinier ne valide jamais (stock.manage)', () => {
-    const c = inventaire({ status: 'submitted', lines: [compte('autre')] });
+    const c = inventaire({ status: 'submitted', lines: [compte('autre')], canValidate: false });
     expect(gestesInventaire(c, MAGASINIER, 'moi')[0]).toMatchObject({
       actif: false,
       raison: RAISON_SANS_GESTION,
     });
   });
 
-  it('approbateur unique : le jugement servi par l’API l’emporte', () => {
+  it('approbateur unique : il valide son propre comptage, l’écran ne le bloque pas', () => {
     const c = inventaire({
       status: 'submitted',
       lines: [compte('moi')],
-      canValidate: { allowed: true, soleApprover: true },
+      canValidate: true,
+      validationAsSoleApprover: true,
     });
-    expect(gestesInventaire(c, PROPRIETAIRE, 'moi')[0]!.actif).toBe(true);
+    expect(gestesInventaire(c, PROPRIETAIRE, 'moi')[0]).toMatchObject({
+      actif: true,
+      raison: null,
+    });
     expect(mentionApprobateurUnique(c)).toMatch(/Seul gestionnaire/);
     expect(mentionApprobateurUnique(inventaire())).toBeNull();
   });

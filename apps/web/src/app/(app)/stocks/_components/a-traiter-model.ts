@@ -33,6 +33,7 @@ export const FILTRES_A_TRAITER: readonly { valeur: FiltreATraiter; label: string
   { valeur: 'unknown_unit', label: 'Unités inconnues' },
   { valeur: 'pending_cost', label: 'Coûts à saisir' },
   { valeur: 'sale_return_proposed', label: 'Retours de vente' },
+  { valeur: 'sale_issue_proposed', label: 'Ventes à confirmer' },
   { valeur: 'cost_differs', label: 'Coûts différents' },
 ];
 
@@ -104,6 +105,13 @@ export function champsResolution(reason: StockPendingReason): ChampsResolution {
           'Un avoir vise cet article. Confirmez la quantité physiquement revenue et où elle est rangée ; une remise ou une correction de prix n’a pas de retour.',
         classer: 'Pas de retour physique',
       };
+    case 'sale_issue_proposed':
+      return {
+        ...rien,
+        explication:
+          'Une facture émise vise cet article et les sorties de vente sont « proposées » dans les réglages. Confirmez la sortie, ou classez si rien n’est sorti du magasin.',
+        classer: 'Pas de sortie',
+      };
     case 'cost_differs':
       return {
         ...rien,
@@ -172,5 +180,29 @@ export function preparerResolution(
  * coût qu'aux rôles qui voient les valeurs ; le Magasinier voit qu'elles existent.
  */
 export function deviseVisible(ligne: StockPendingLineView, actions: Actions): string | null {
-  return peutVoirValeurs(actions) ? (ligne.currency ?? null) : null;
+  return peutVoirValeurs(actions) ? (ligne.proposal.currency ?? null) : null;
+}
+
+const ORIGINES: Record<string, string> = {
+  reception: 'Réception d’achat',
+  invoice: 'Facture de vente',
+  voucher: 'Bon',
+  count: 'Inventaire',
+  pending: 'Ligne à traiter',
+};
+
+/** Ce que la carte d'une ligne affiche, lu dans la PROPOSITION servie par l'API. */
+export function affichageATraiter(ligne: Pick<StockPendingLineView, 'proposal'>): {
+  libelle: string;
+  quantite: string | null;
+  unite: string | null;
+  origine: string | null;
+} {
+  const p = ligne.proposal;
+  return {
+    libelle: p.label ?? p.itemRef ?? 'Ligne',
+    quantite: p.quantity === '' ? null : p.quantity,
+    unite: p.unit === '' ? null : p.unit,
+    origine: ORIGINES[p.source.kind] ?? null,
+  };
 }

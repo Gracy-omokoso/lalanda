@@ -8,14 +8,15 @@ import {
   gestesEmplacement,
   preparerEmplacement,
 } from './emplacements-model';
-import { MAGASINIER, PROPRIETAIRE, emplacement, niveau } from './fixtures.test-utils';
+import { ID1, ID2, MAGASINIER, PROPRIETAIRE, emplacement, niveau } from './fixtures.test-utils';
 import {
   FILTRES_VIDES,
   coutAffiche,
+  motifMouvement,
   origineMouvement,
   requeteMouvements,
 } from './mouvements-model';
-import { etatNiveau, requeteNiveaux } from './niveaux-model';
+import { alerteDe, etatNiveau, requeteNiveaux } from './niveaux-model';
 
 describe('emplacements', () => {
   it('nom obligatoire ; adresse vide → null', () => {
@@ -42,24 +43,37 @@ describe('emplacements', () => {
 });
 
 describe('niveaux', () => {
-  it('requête : emplacement, sous le seuil, curseur', () => {
-    expect(requeteNiveaux('', false)).toEqual({ limit: 100 });
-    expect(requeteNiveaux('L', true, 'c')).toEqual({
-      limit: 100,
-      locationId: 'L',
-      below: 'reorder',
-      cursor: 'c',
-    });
+  it('requête : emplacement, sous le seuil (réponse complète, sans pagination)', () => {
+    expect(requeteNiveaux('', false)).toEqual({});
+    expect(requeteNiveaux('L', true)).toEqual({ locationId: 'L', below: 'reorder' });
   });
 
   it('état d’une ligne : négatif, rupture, sous le seuil (moteur), rien', () => {
-    expect(etatNiveau(niveau({ quantity: '-1' })).libelle).toBe('Négatif');
-    expect(etatNiveau(niveau({ quantity: '0' })).libelle).toBe('Rupture');
-    expect(etatNiveau(niveau({ quantity: '4', belowReorder: true }))).toEqual({
+    const alerte = {
+      itemId: ID1,
+      itemCode: null,
+      itemName: 'Ciment 50 kg',
+      unit: 'sac',
+      locationId: null,
+      locationName: null,
+      available: '4',
+      minQuantity: '10',
+      targetQuantity: null,
+      onOrder: '0',
+      suggestedQuantity: '6',
+      preferredSupplierId: null,
+    };
+    expect(etatNiveau(niveau({ quantity: '-1' }), null).libelle).toBe('Négatif');
+    expect(etatNiveau(niveau({ quantity: '0' }), null).libelle).toBe('Rupture');
+    expect(etatNiveau(niveau({ quantity: '4' }), alerte)).toEqual({
       libelle: 'Sous le seuil',
       ton: 'warning',
     });
-    expect(etatNiveau(niveau({ quantity: '40', belowReorder: false })).libelle).toBeNull();
+    expect(etatNiveau(niveau({ quantity: '40' }), null).libelle).toBeNull();
+    // Seuil global : vaut pour chaque emplacement ; seuil d'un emplacement : pour lui seul.
+    expect(alerteDe(niveau(), [alerte])).toBe(alerte);
+    expect(alerteDe(niveau(), [{ ...alerte, locationId: 'autre' }])).toBeNull();
+    expect(alerteDe(niveau({ itemId: ID2 }), [alerte])).toBeNull();
   });
 });
 
@@ -96,13 +110,16 @@ describe('grand livre', () => {
     occurredOn: '2026-10-30',
     unitCost: '1.000000',
     costStatus: 'valued' as const,
-    source: { kind: 'reception' as const },
+    value: '72.00',
+    source: { kind: 'reception' as const, receptionId: 'r', orderLineId: 'o' },
+    sourceKey: 'reception:r:o:in',
     workProjectId: null,
     transferId: null,
     reason: null,
     reversalOf: null,
-    createdBy: null,
-    createdAt: '2026-10-30T08:00:00Z',
+    recordedAt: '2026-10-30T08:00:00Z',
+    createdBy: 'u1',
+    revision: 1,
   };
 
   it('coût d’entrée seulement si les valeurs sont visibles', () => {
@@ -113,9 +130,18 @@ describe('grand livre', () => {
     );
   });
 
-  it('origine : pièce servie par l’API, sinon la nature de la source', () => {
+  it('origine : la nature de la source servie par l’API', () => {
     expect(origineMouvement(m)).toBe('Réception d’achat');
-    expect(origineMouvement({ ...m, sourceLabel: 'BS2610-000004' })).toBe('BS2610-000004');
-    expect(origineMouvement({ ...m, source: null })).toBeNull();
+    expect(origineMouvement({ source: { kind: 'invoice', invoiceId: 'f', lineIndex: 0 } })).toBe(
+      'Facture de vente',
+    );
+  });
+
+  it('motif d’un ajustement : la note, sinon la clé', () => {
+    expect(motifMouvement(m)).toBeNull();
+    expect(motifMouvement({ reason: { key: 'breakage', note: null } })).toBe('breakage');
+    expect(motifMouvement({ reason: { key: 'other', note: 'Casse au déchargement' } })).toBe(
+      'Casse au déchargement',
+    );
   });
 });
