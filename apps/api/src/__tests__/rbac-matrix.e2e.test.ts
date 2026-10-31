@@ -127,20 +127,8 @@ const ACTIONS_SANS_ROUTE: Record<string, string> = {
   // ADR-0046 — S0 : actions déclarées avant leurs routes (modules `stock`, `assets`,
   // `documents`, lots S3, S5 et S6). Chaque lot retire sa ligne et écrit sa sonde ; la
   // matrice est déjà couverte case par case par `permissions.test.ts`, et le rôle
-  // `storekeeper` est exercé ici sur toutes les autres sondes.
-  'stock.read':
-    'Aucune route des stocks en S0 : `GET /stock/items` (sonde naturelle) arrive avec ' +
-    'le référentiel au lot S3 (ADR-0046 § 5.1).',
-  'stock.move':
-    'Aucune route des stocks en S0 : `POST /stock/vouchers` (sonde naturelle) arrive ' +
-    'avec les bons au lot S3 (ADR-0046 § 5.1).',
-  'stock.count':
-    'Aucune route des stocks en S0 : `PUT /stock/counts/:id/lines/:lineId` arrive avec ' +
-    'les inventaires au lot S3 (ADR-0046 § 5.1).',
-  'stock.manage':
-    'Aucune route des stocks en S0 : `POST /stock/items` arrive au lot S3 ; la ' +
-    'séparation des tâches est prouvée par `stockCountDecision` (permissions.test.ts).',
-  // ADR-0046 — S5 et S6 ont retiré `assets.*` et `docs.*` (sondes en fin de liste).
+  // `storekeeper` est exercé ici sur toutes les autres sondes. S3 a retiré les quatre
+  // actions `stock.*`, S5 `assets.*` et S6 `docs.*` (sondes en fin de liste).
 };
 
 /** Une sonde HTTP : la route qui matérialise une action, et ses statuts légitimes. */
@@ -759,6 +747,50 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
           .set('Cookie', c)
           .send({ expectedRevision: revision, allowSoleApprover: true });
       },
+    },
+    // ADR-0046 — S3 : stocks (référentiel, bons, inventaires).
+    {
+      // ADR-0046 § 8.1 — tout rôle interne sauf Chef de projet, Conseiller, Responsable RH.
+      action: 'stock.read',
+      libelle: 'GET /stock/items',
+      statutsAutorises: [200],
+      envoyer: (c) => request(serveur()).get('/stock/items').set('Cookie', c),
+    },
+    {
+      // ADR-0046 § 8.1 — Propriétaire, Administrateur, Directeur financier, Magasinier.
+      // Bon inexistant : le 404 prouve que le guard a laissé passer jusqu'au service.
+      action: 'stock.move',
+      libelle: 'POST /stock/vouchers/:id/post',
+      statutsAutorises: [404],
+      envoyer: (c) =>
+        request(serveur())
+          .post('/stock/vouchers/000000000000000000000000/post')
+          .set('Cookie', c)
+          .send({ expectedRevision: 1 }),
+    },
+    {
+      // ADR-0046 § 8.1 — ceux qui sortent la marchandise et le Comptable. Inventaire
+      // inexistant : 404.
+      action: 'stock.count',
+      libelle: 'PUT /stock/counts/:id/lines/:lineId',
+      statutsAutorises: [404],
+      envoyer: (c) =>
+        request(serveur())
+          .put('/stock/counts/000000000000000000000000/lines/sonde')
+          .set('Cookie', c)
+          .send({ countedQuantity: '1' }),
+    },
+    {
+      // ADR-0046 § 8.1 — Propriétaire, Administrateur, Directeur financier, Comptable ;
+      // pas le Magasinier. Un article nommé par rôle, sans code : aucune collision.
+      action: 'stock.manage',
+      libelle: 'POST /stock/items',
+      statutsAutorises: [201],
+      envoyer: (c, role) =>
+        request(serveur())
+          .post('/stock/items')
+          .set('Cookie', c)
+          .send({ name: `Sonde article ${role} ${tag}`, unit: 'pièce' }),
     },
     // ADR-0046 — S5 : registre des équipements (S5 a retiré `assets.read` et
     // `assets.manage` d'ACTIONS_SANS_ROUTE).
