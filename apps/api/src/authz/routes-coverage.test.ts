@@ -126,6 +126,15 @@ import { QuotesFromOpportunityController } from '../sales/quotes/quotes-from-opp
 // ADR-0040 — C3
 import { CrmReportsController } from '../crm/reports/crm-reports.controller.js';
 import { ACTIONS, PLATFORM_FORBIDDEN_ACTIONS, type Action } from './permissions.js';
+// ADR-0046 — S3
+import { StockCountsController } from '../stock/stock-counts.controller.js';
+import { StockItemsController } from '../stock/stock-items.controller.js';
+import { StockLevelsController } from '../stock/stock-levels.controller.js';
+import { StockLocationsController } from '../stock/stock-locations.controller.js';
+import { StockPendingController } from '../stock/stock-pending.controller.js';
+import { StockReportsController } from '../stock/stock-reports.controller.js';
+import { StockSettingsController } from '../stock/stock-settings.controller.js';
+import { StockVouchersController } from '../stock/stock-vouchers.controller.js';
 
 /**
  * TOUS les contrôleurs de l'application. Un contrôleur absent de cette liste
@@ -255,6 +264,15 @@ const CONTROLEURS = [
   HrDocumentsController,
   HrChecklistsController,
   HrDeadlinesController,
+  // ADR-0046 — S3 : référentiel, grand livre, bons, « À traiter », inventaires.
+  StockItemsController,
+  StockLocationsController,
+  StockLevelsController,
+  StockVouchersController,
+  StockPendingController,
+  StockCountsController,
+  StockReportsController,
+  StockSettingsController,
 ];
 
 /**
@@ -1249,5 +1267,60 @@ describe('ADR-0045 — H4 : documents, listes d’entrée et de sortie, échéan
       expect(route!.actions, cle).toEqual(actions);
     }
     for (const cle of Object.keys(SANS_PERMISSION)) expect(cle.startsWith('Hr')).toBe(false);
+  });
+});
+
+// ADR-0046 — S3
+describe('ADR-0046 — S3 : stocks (référentiel, grand livre, bons, inventaires)', () => {
+  it('chaque route déclare la permission de l’ADR (§ 5.1)', () => {
+    const attendu: Record<string, Action[]> = {
+      'StockItemsController.list': ['stock.read'],
+      'StockItemsController.get': ['stock.read'],
+      'StockItemsController.movements': ['stock.read'],
+      'StockItemsController.create': ['stock.manage'],
+      'StockItemsController.update': ['stock.manage'],
+      'StockItemsController.archive': ['stock.manage'],
+      'StockItemsController.restore': ['stock.manage'],
+      'StockLocationsController.list': ['stock.read'],
+      'StockLocationsController.create': ['stock.manage'],
+      'StockLocationsController.update': ['stock.manage'],
+      'StockLocationsController.archive': ['stock.manage'],
+      'StockLevelsController.levels': ['stock.read'],
+      'StockLevelsController.rebuild': ['stock.manage'],
+      'StockLevelsController.cost': ['stock.manage'],
+      // Ajustement : `stock.manage` en plus, décidé dans le service (droits effectifs).
+      'StockVouchersController.list': ['stock.read'],
+      'StockVouchersController.get': ['stock.read'],
+      'StockVouchersController.create': ['stock.move'],
+      'StockVouchersController.update': ['stock.move'],
+      'StockVouchersController.post': ['stock.move'],
+      'StockVouchersController.cancel': ['stock.move'],
+      // `stock.move` (motifs de coût : `stock.manage`), décidé dans le service : le
+      // Comptable, qui n'a pas `stock.move`, saisit les coûts en attente.
+      'StockPendingController.list': ['stock.read'],
+      'StockPendingController.resolve': ['stock.read'],
+      'StockPendingController.dismiss': ['stock.read'],
+      'StockCountsController.list': ['stock.read'],
+      'StockCountsController.get': ['stock.read'],
+      'StockCountsController.create': ['stock.manage'],
+      'StockCountsController.start': ['stock.manage'],
+      'StockCountsController.countLine': ['stock.count'],
+      'StockCountsController.submit': ['stock.count'],
+      'StockCountsController.cancel': ['stock.count'],
+      'StockCountsController.validate': ['stock.manage'],
+      // Valeurs : `purchase.read` ou `treasury.read` en plus, décidé dans le service.
+      'StockReportsController.valuation': ['stock.read'],
+      'StockReportsController.replenishment': ['stock.read'],
+      'StockReportsController.report': ['stock.read'],
+      'StockSettingsController.get': ['stock.read'],
+      'StockSettingsController.update': ['stock.manage'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) => /^Stock[A-Za-z]+Controller\./.test(r.cle));
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+    }
+    for (const cle of Object.keys(SANS_PERMISSION)) expect(cle.startsWith('Stock')).toBe(false);
   });
 });
