@@ -1,14 +1,18 @@
-// `/equipements` — route posée par le lot S8 (ADR-0046) ; le registre arrive
-// avec le lot S9, qui remplace ce fichier.
+// `/equipements` — registre des équipements (ADR-0046 § 3.1, § 5.2) ; lecture
+// `assets.read`, création `assets.manage` (`?nouveau=1` ouvre la fenêtre), export
+// `report.export`.
 
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 
-import { EcranAVenir } from '../_components/acces-application';
+import { Registre } from './_components/registre';
 
 export const metadata: Metadata = { title: 'Équipements — Lalanda' };
 
 export default function EquipementsPage(): React.ReactElement {
   return (
-    <EcranAVenir texte="Le registre des équipements arrive avec une prochaine livraison. Rien n’est affiché d’ici là plutôt que des données inventées." />
+    <Suspense fallback={null}>
+      <Registre />
+    </Suspense>
   );
 }
