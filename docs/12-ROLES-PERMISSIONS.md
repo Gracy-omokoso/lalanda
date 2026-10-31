@@ -34,6 +34,7 @@ Le support ne voit jamais les données financières sans consentement explicite,
 | Lecteur | lecture seulement |
 | Commercial (`sales_rep`, ADR-0040, appliqué) | CRM, devis, consultation des clients et du catalogue ; ni trésorerie, ni dépenses, ni émission de facture |
 | Responsable RH (`hr_manager`, ADR-0045, implémenté) | dossiers du personnel, absences et documents RH ; ni trésorerie, ni ventes, ni achats |
+| Magasinier (`storekeeper`, **proposé, ADR-0046**, non appliqué) | sort, transfère et compte le stock ; consulte le matériel et les documents ; ni prix d'achat, ni valeur du stock, ni trésorerie, ni ventes |
 
 ## Actions granulaires
 
@@ -355,6 +356,50 @@ sont inchangés.
 - Lire une donnée sensible en clair (`reveal`) ou télécharger un document sensible est journalisé
   strictement.
 - Tests : matrice 10 × 38 + 6 × 38 = **608** cases.
+
+### Proposé, ADR-0046 — stocks, équipements et documents (non appliqué)
+
+> **Statut : proposé** par [ADR-0046](adr/ADR-0046-stocks-equipements-documents.md) § 8 (31 oct.
+> 2026), R5 du RUN. Rien n'est appliqué dans `permissions.ts` avant le lot S0 ; la matrice
+> ci-dessus (608 cases) reste la référence jusque-là.
+
+- **Huit actions nouvelles**, trente-neuvième à quarante-sixième, en fin de liste : `stock.read`
+  (« Consulter les stocks » ; les **valeurs** exigent en plus `purchase.read` ou `treasury.read`),
+  `stock.move` (« Mouvementer le stock »), `stock.count` (« Compter un inventaire »),
+  `stock.manage` (« Gérer les stocks et valider les écarts », case ⓢ), `assets.read`
+  (« Consulter les équipements »), `assets.manage` (« Gérer les équipements »), `docs.read`
+  (« Consulter la bibliothèque de documents »), `docs.manage` (« Gérer la bibliothèque de
+  documents »). Quarante-six actions au total.
+- **Rôle nouveau Magasinier** (`storekeeper`, colonne MAG, rang 7 ; Chef de projet, Conseiller et
+  Lecteur passent aux rangs 8, 9 et 10). Neuf actions : `analytics.read`, `stock.read`,
+  `stock.move`, `stock.count`, `assets.read`, `docs.read`, `work.read`, `work.update`,
+  `leave.request`. Attribuable par le Propriétaire, l'Administrateur et le Directeur financier (R7).
+
+| Action | PRO | ADM | DIR | CPT | ANA | CDP | CON | LEC | COM | RH | MAG |
+|---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| `stock.read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✗ | ✓ |
+| `stock.move` | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
+| `stock.count` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
+| `stock.manage` | ✓ⓢ | ✓ⓢ | ✓ⓢ | ✓ⓢ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `assets.read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✗ | ✓ | ✓ |
+| `assets.manage` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `docs.read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ |
+| `docs.manage` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ |
+
+- **Séparation des tâches** (`stockCountDecision`, fonction pure) : celui qui a compté une ligne
+  d'un inventaire ne le valide pas ; exception approbateur unique (un seul détenteur effectif de
+  `stock.manage`), marquée `soleApprover`. `stock.manage` rejoint `APPROVAL_ACTIONS` ; aucune paire
+  `SOD_PAIRS` nouvelle. Le Magasinier ne détient pas `stock.manage`.
+- **Droits par dossier** (`folderAccessDecision`, fonction pure) : lecture `all`, par action
+  (« nature ») ou par personnes ; un dossier restreint n'est pas ouvert par `docs.manage` ; lire un
+  document lié à une entité exige aussi la lecture de son module.
+- **ADR-0041** : dépendances `stock.move`, `stock.count`, `stock.manage` → `stock.read`,
+  `assets.manage` → `assets.read`, `docs.manage` → `docs.read` ; domaines dix à douze
+  « Stocks », « Équipements », « Documents ».
+- **Plateforme** : lectures sous accès délégué (super-administrateur, support) ; écritures sous
+  accès délégué pour le seul super-administrateur ; un document sensible n'est jamais servi à un
+  acteur plateforme.
+- Tests : matrice 11 × 46 + 6 × 46 = **782** cases.
 
 **Business plan narratif (ADR-0037) — aucune action nouvelle.** Lire relève de
 `project.read` ; rédiger, rattacher le plan figé et demander un brouillon à l'IA, de

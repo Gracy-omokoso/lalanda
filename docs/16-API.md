@@ -627,6 +627,38 @@ Lot H5 (implémenté) :
   `mes_validations_absence.en_attente`, `rh.echeances` (nombres seulement, `hidden` sans
   portée), règles R13 à R15 ; mêmes faits dans l'e-mail quotidien.
 
+## Stocks, équipements et documents — proposé, ADR-0046 (non implémenté)
+
+Contrat **proposé** par [ADR-0046](adr/ADR-0046-stocks-equipements-documents.md) § 5 (R5 du RUN).
+Modules `apps/api/src/stock/`, `assets/`, `documents/` ; web `/stocks`, `/equipements`,
+`/documents`. Huit actions nouvelles (`stock.read`, `stock.move`, `stock.count`, `stock.manage`,
+`assets.read`, `assets.manage`, `docs.read`, `docs.manage`) et un rôle nouveau, Magasinier
+(`storekeeper`). Coûts et valeurs servis seulement avec `purchase.read` ou `treasury.read` en plus
+(sinon `null` et `valuesHidden: true`).
+
+| Méthode et chemin | Permission | Effet |
+|---|---|---|
+| `GET /stock/items` · `GET …/:id` · `…/:id/movements` · `POST` · `PUT` · `…/archive` | `stock.read` · `stock.manage` | articles stockés (lien facultatif vers un article `BIE` du catalogue), quantités, coût moyen |
+| `GET /stock/locations` · `POST` · `PUT` · `GET /stock/levels` · `POST /stock/levels/rebuild` | `stock.read` · `stock.manage` | emplacements ; stock en temps réel ; recalcul du cache depuis le grand livre |
+| `GET /stock/vouchers` · `POST` · `…/post` · `…/cancel` | `stock.read` · `stock.move` (ajustement : `stock.manage`) | bons de sortie, transfert, retour, ajustement ; `409 STOCK_INSUFFICIENT` |
+| `GET /stock/pending` · `…/:id/resolve` · `…/dismiss` · `PUT /stock/movements/:id/cost` | `stock.read` · `stock.move` · `stock.manage` | lignes « À traiter » (article ou unité inconnus, coût en autre devise, retours d'avoir proposés) |
+| `GET /stock/counts` · `POST` · `PUT …/lines/:lineId` · `…/submit` · `…/validate` | `stock.read` · `stock.count` · `stock.manage` | inventaires à l'aveugle ; `409 COUNT_SELF_VALIDATION` ; approbateur unique marqué |
+| `GET /stock/valuation` · `GET /stock/replenishment` · `GET /stock/reports` · `POST /stock/sync` · `GET`/`PUT /stock/settings` | `stock.read` (+ valeurs) · `stock.manage` | valorisation au coût moyen pondéré par devise ; suggestions (aucune écriture) ; rattrapages |
+| `GET /assets` · `GET …/:id` · `POST` · `PUT` · `…/dispose` · `…/assign` · `…/return` | `assets.read` · `assets.manage` | registre, affectations (collaborateur, membre, projet, emplacement) |
+| `…/:id/maintenance` · `…/:id/coverages` · `GET /assets/deadlines` · `GET /assets/reports` · `GET /assets/export.csv` | `assets.read` · `assets.manage` (CSV : + `report.export`) | maintenance, garanties et assurances ; estimation de gestion étiquetée |
+| `GET /documents/folders` · `POST` · `PUT` · `GET /documents` · `GET …/:id` | `docs.read` + droits du dossier et des liens · `docs.manage` | identifiants seulement en requête |
+| `POST /documents/search` | `docs.read` | recherche par **corps**, jamais en `?q=` |
+| `POST /documents` · `…/:id/versions` · `GET …/versions/:vid/file` | écriture du dossier · lecture | `multipart/form-data`, aucune métadonnée dans l'URL ni les en-têtes ; sensibles chiffrés par enveloppe, téléchargement audité |
+| `GET /documents/entity-pieces` · `GET /documents/deadlines` | lecture de l'entité · `docs.read` | présentation des pièces par entité (aucune migration) ; échéances |
+
+Effets sur l'existant : le port `PURCHASE_RECEPTION_SINK` reçoit le fournisseur des stocks (une ligne
+dans `purchases.module.ts`) ; les factures de vente finales sont **lues** par la tâche
+`stock.sales-sync`, jamais écrites ; la marge d'un projet gagne `materials` (informatif,
+`WORK_MARGIN_VERSION` 1.3.0) ; « Mes tâches » gagne les éléments `source: 'stock' | 'assets'` ;
+brief (1.5.0) : R16 `ruptures_et_seuils`, R17 `maintenances_dues`, R18
+`echeances_documents_et_garanties`. Tâches : `stock.purchase-sync`, `stock.sales-sync`,
+`stock.levels-check`, `assets.reminders`, `documents.reminders`, `documents.purge`.
+
 ## Brief du matin — implémenté (ADR-0033)
 
 L'organisation est toujours celle de la session ; aucun corps ni paramètre ne la désigne.

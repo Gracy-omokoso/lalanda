@@ -65,6 +65,16 @@ Décideurs :
   de temps en lecture, rapports, brief R13 à R15 ; cinq actions et un rôle Responsable RH. Statut :
   **proposé, ADR-0045** (30 oct. 2026).
 
+- [ADR-0046](ADR-0046-stocks-equipements-documents.md) — Stocks, équipements et documents (R5,
+  dernier bloc du RUN) : articles stockés propres, liés facultativement au catalogue ; emplacements
+  multiples ; grand livre de mouvements en ajout seul ; entrées par le port `stock-sink` des
+  réceptions, sorties par **lecture** des factures finales (aucune écriture dans les ventes ni le
+  circuit DGI) ; valorisation au coût moyen pondéré de gestion par devise, sans conversion ;
+  inventaires à l'aveugle avec séparation des tâches ; registre des équipements, affectations,
+  maintenance, garanties, estimation d'amortissement **de gestion** ; bibliothèque de documents
+  avec droits par dossier, versions, échéances, chiffrement des pièces sensibles ; huit actions et
+  un rôle Magasinier. Statut : **proposé, ADR-0046** (31 oct. 2026).
+
 ## Décisions récentes (légal)
 
 - [ADR-0043](ADR-0043-editeur-go-freelance-sarlu.md) — L'éditeur devient Go freelance SARLU

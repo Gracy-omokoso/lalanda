@@ -140,6 +140,24 @@ Un événement contient acteur, organisation, action, cible, horodatage, adresse
   (en clair, sans numéro) ; jamais une section chiffrée. La marge lit en plus
   `treasury_expenses.category` (constat `personnel`, marge 1.2.0).
 
+- **Proposé, ADR-0046 (non implémenté)** — stocks, équipements et documents :
+  `stock_items` (lien facultatif et unique partiel `organizationId + catalogItemId` vers un article
+  du catalogue de type `BIE` ; code unique partiel), `stock_locations` (plusieurs par organisation,
+  une par défaut), `stock_movements` (grand livre **en ajout seul**, quantités signées, coût
+  d'entrée, unique partiel `organizationId + sourceKey` pour l'idempotence des entrées de réception
+  et des sorties de vente ; `organizationId + itemId + occurredOn + _id` pour le rejeu de la
+  valorisation), `stock_vouchers` (bons `BS`, `BT`, `BJ`), `stock_levels` (cache des quantités,
+  recalculable, jamais source de vérité ; aucune valeur stockée), `stock_pending_lines`
+  (« À traiter »), `stock_counts` (inventaires `IV`), `stock_settings`, `stock_sync_checkpoints`,
+  `stock_counters` ; `assets` (numéro `EQ-…`, liens facultatifs d'acquisition), `asset_categories`,
+  `asset_assignments` (ajout seul, une ouverte par équipement), `asset_maintenance`,
+  `asset_coverages`, `asset_settings`, `asset_counters` ; `document_folders` (droits par dossier),
+  `library_documents` (liens vers des entités, échéance), `library_document_versions` (objet
+  `documents/<objectId>`, clé enveloppée si sensible). **Aucune migration** ; aucune collection
+  existante ne gagne de champ. Lectures seules : `purchase_receptions`, `purchase_orders`,
+  `sales_invoices` (statuts `issued` et `normalized`), `catalog_items`, `hr_employees`,
+  `treasury_expenses` (catégorie `investissement`).
+
 ## Rétention
 
 La politique définit données actives, exports, journaux, IA, pièces et sauvegardes. La suppression d’une organisation suit une période de récupération puis une purge contrôlée, sous réserve des obligations légales.
