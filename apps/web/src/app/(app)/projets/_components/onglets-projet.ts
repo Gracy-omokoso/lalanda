@@ -31,6 +31,8 @@ export const ONGLETS_PROJET: readonly OngletProjet[] = [
   { segment: 'chronologie', label: 'Chronologie', action: null, livre: true },
   // Lot L4a — marge encaissée (la carte signale elle-même un `sales.read` manquant).
   { segment: 'marge', label: 'Marge', action: 'treasury.read', livre: true },
+  // ADR-0046 — S9 : documents liés et équipements affectés au projet.
+  { segment: 'documents', label: 'Documents', action: 'docs.read', livre: true },
   { segment: 'reglages', label: 'Réglages', action: 'work.manage', livre: true },
 ];
 

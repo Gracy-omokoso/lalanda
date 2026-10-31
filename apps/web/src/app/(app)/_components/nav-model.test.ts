@@ -129,6 +129,8 @@ describe('applications et ordre', () => {
       'achats',
       'tresorerie',
       'stocks',
+      'equipements',
+      'documents',
     ]);
   });
 
@@ -542,8 +544,14 @@ describe('ADR-0046 — S8 : Stocks, Équipements, Documents', () => {
     expect(ids(appsVisibles(['purchase.read'], 'run'))).not.toContain('stocks');
   });
 
-  it('Magasinier : projets, RH et Stocks, jamais Achats ni Trésorerie', () => {
-    expect(ids(appsVisibles(MAGASINIER, 'run'))).toEqual(['projets', 'rh', 'stocks']);
+  it('Magasinier : projets, RH, Stocks, Équipements et Documents, jamais Achats ni Trésorerie', () => {
+    expect(ids(appsVisibles(MAGASINIER, 'run'))).toEqual([
+      'projets',
+      'rh',
+      'stocks',
+      'equipements',
+      'documents',
+    ]);
   });
 
   it('sous-options des Stocks, toutes livrées, dans l’ordre prévu', () => {
@@ -563,15 +571,23 @@ describe('ADR-0046 — S8 : Stocks, Équipements, Documents', () => {
     ]);
   });
 
-  it('Équipements et Documents : déclarés, mais masqués jusqu’au lot S9', () => {
+  it('Équipements et Documents : visibles depuis le lot S9, selon les droits', () => {
     for (const id of ['equipements', 'documents']) {
       const app = NAV_APPS.find((a) => a.id === id)!;
       expect(app.module).toBe('run');
-      expect(app.masquee).toBe(true);
-      expect(ids(appsVisibles(PROPRIETAIRE))).not.toContain(id);
+      expect(app.masquee).toBeUndefined();
+      expect(ids(appsVisibles(PROPRIETAIRE))).toContain(id);
     }
     expect(NAV_APPS.find((a) => a.id === 'equipements')!.action).toBe('assets.read');
     expect(NAV_APPS.find((a) => a.id === 'documents')!.action).toBe('docs.read');
+    expect(ids(appsVisibles(['stock.read']))).not.toContain('equipements');
+  });
+
+  it('Équipements et Documents : sous-options et chemins des fiches', () => {
+    expect(sousOptionActive('/equipements/abc')).toBe('equipements-registre');
+    expect(sousOptionActive('/equipements/echeances')).toBe('equipements-echeances');
+    expect(sousOptionActive('/documents/echeances')).toBe('documents-echeances');
+    expect(appActive('/documents/abc')).toBe('documents');
   });
 
   it('chemins : module RUN, application et sous-option, frontière de segment', () => {

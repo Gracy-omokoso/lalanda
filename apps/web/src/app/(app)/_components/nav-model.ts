@@ -481,8 +481,8 @@ export const NAV_APPS: readonly NavApp[] = [
       { id: 'stocks-reglages', href: '/stocks/reglages', label: 'Réglages', action: 'stock.read' },
     ],
   },
-  // Équipements et Documents : routes et coquilles posées par S8, écrans au lot
-  // S9 — masqués d'ici là (`masquee`), la barre ne promet rien.
+  // Équipements et Documents : routes et coquilles posées par S8, écrans livrés
+  // par le lot S9 (ADR-0046).
   {
     id: 'equipements',
     href: '/equipements',
@@ -491,7 +491,6 @@ export const NAV_APPS: readonly NavApp[] = [
     module: 'run',
     icon: 'equipements',
     action: 'assets.read',
-    masquee: true,
     sousOptions: [
       {
         id: 'equipements-registre',
@@ -527,7 +526,6 @@ export const NAV_APPS: readonly NavApp[] = [
     module: 'run',
     icon: 'documents',
     action: 'docs.read',
-    masquee: true,
     sousOptions: [
       {
         id: 'documents-bibliotheque',

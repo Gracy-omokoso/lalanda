@@ -24,6 +24,8 @@ import {
 import Link from 'next/link';
 import { useCallback, useEffect, useId, useState } from 'react';
 
+import { EntityAssetsPanel } from '@/components/entity-assets-panel';
+import { EntityDocumentsPanel } from '@/components/entity-documents-panel';
 import {
   purchasesApi,
   type SupplierOverview,
@@ -429,6 +431,16 @@ export function FournisseurFiche({ supplierId }: { supplierId: string }): React.
       </Bandeau>
 
       <Identite s={s} />
+
+      {/* ADR-0046 — S9 : documents et équipements acquis (§ 6.8). */}
+      <div className="grid min-w-0 gap-5 lg:grid-cols-2">
+        <EntityDocumentsPanel entityType="supplier" entityId={s.id} libelle={s.name} />
+        <EntityAssetsPanel
+          filtre={{ supplierId: s.id }}
+          titre="Équipements acquis"
+          vide="Aucun équipement acquis chez ce fournisseur."
+        />
+      </div>
 
       {o ? (
         <SectionsFiche sections={o.sections} />

@@ -1,14 +1,18 @@
-// `/documents` — route posée par le lot S8 (ADR-0046) ; la bibliothèque arrive
-// avec le lot S9, qui remplace ce fichier.
+// `/documents` — bibliothèque (ADR-0046 § 4, § 5.3) : arbre des dossiers, liste,
+// recherche en corps, dépôt multipart. Seul l'identifiant du dossier ouvert figure
+// dans l'adresse (`?dossier=`).
 
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 
-import { EcranAVenir } from '../_components/acces-application';
+import { Bibliotheque } from './_components/bibliotheque';
 
 export const metadata: Metadata = { title: 'Documents — Lalanda' };
 
 export default function DocumentsPage(): React.ReactElement {
   return (
-    <EcranAVenir texte="La bibliothèque de documents arrive avec une prochaine livraison. Rien n’est affiché d’ici là plutôt que des données inventées." />
+    <Suspense fallback={null}>
+      <Bibliotheque />
+    </Suspense>
   );
 }
