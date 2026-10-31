@@ -36,6 +36,7 @@ import { PaymentsModule } from './payments/payments.module.js';
 import { PurchasesModule } from './purchases/purchases.module.js'; // ADR-0044 — P2
 import { HrModule } from './hr/hr.module.js'; // ADR-0045 — H2
 import { StockModule } from './stock/stock.module.js'; // ADR-0046 — S3
+import { AssetsModule } from './assets/assets.module.js'; // ADR-0046 — S5
 import { PlansModule } from './plans/plans.module.js';
 import { PlatformConfigModule } from './platform-config/platform-config.module.js';
 import { ProjectsModule } from './projects/projects.module.js';
@@ -126,6 +127,7 @@ import { WorkModule } from './work/work.module.js';
     PurchasesModule, // ADR-0044 — P2 : achats et fournisseurs (fiches, coordonnées chiffrées).
     HrModule, // ADR-0045 — H2 : ressources humaines (dossiers, services, données sensibles).
     StockModule, // ADR-0046 — S3 : stocks (référentiel, grand livre, bons, inventaires).
+    AssetsModule, // ADR-0046 — S5 : équipements (registre, affectations, maintenance, couvertures).
     // ADR-0035 — CRM minimal, puis devis (qui consomment ventes et CRM).
     CrmModule,
     // ADR-0040 — C1 : conversion prospect → client (compose Ventes et CRM).

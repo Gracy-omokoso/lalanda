@@ -128,13 +128,7 @@ const ACTIONS_SANS_ROUTE: Record<string, string> = {
   // `documents`, lots S3, S5 et S6). Chaque lot retire sa ligne et écrit sa sonde ; la
   // matrice est déjà couverte case par case par `permissions.test.ts`, et le rôle
   // `storekeeper` est exercé ici sur toutes les autres sondes. S3 a retiré les quatre
-  // actions `stock.*` (sondes en fin de liste).
-  'assets.read':
-    'Aucune route des équipements en S0 : `GET /assets` (sonde naturelle) arrive avec ' +
-    'le registre au lot S5 (ADR-0046 § 5.2).',
-  'assets.manage':
-    'Aucune route des équipements en S0 : `POST /assets` (sonde naturelle) arrive avec ' +
-    'le registre au lot S5 (ADR-0046 § 5.2).',
+  // actions `stock.*`, S5 `assets.read` et `assets.manage` (sondes en fin de liste).
   'docs.read':
     'Aucune route de la bibliothèque en S0 : `GET /documents/folders` arrive au lot S6 ' +
     '(ADR-0046 § 5.3) ; les droits par dossier sont prouvés par `folderAccessDecision`.',
@@ -803,6 +797,40 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
           .post('/stock/items')
           .set('Cookie', c)
           .send({ name: `Sonde article ${role} ${tag}`, unit: 'pièce' }),
+    },
+    // ADR-0046 — S5 : registre des équipements (S5 a retiré `assets.read` et
+    // `assets.manage` d'ACTIONS_SANS_ROUTE).
+    {
+      // ADR-0046 § 8.1 — tout rôle interne qui gère ou contrôle, le Responsable RH et le
+      // Magasinier ; ni le Commercial, ni le Conseiller.
+      action: 'assets.read',
+      libelle: 'GET /assets',
+      statutsAutorises: [200],
+      envoyer: (c) => request(serveur()).get('/assets').set('Cookie', c),
+    },
+    {
+      // ADR-0046 § 8.1 — Propriétaire, Administrateur, Directeur financier, Comptable ;
+      // ni le Responsable RH ni le Magasinier (décision ouverte n° 3). La catégorie est
+      // relue avec les mêmes cookies (tout détenteur de `assets.manage` lit le registre) ;
+      // un refusé envoie un identifiant forgé et reçoit 403 avant toute lecture.
+      action: 'assets.manage',
+      libelle: 'POST /assets',
+      statutsAutorises: [201],
+      envoyer: async (c, role) => {
+        const cats = await request(serveur()).get('/assets/categories').set('Cookie', c);
+        const categoryId =
+          cats.status === 200
+            ? (cats.body.items as { id: string }[])[0]!.id
+            : '000000000000000000000000';
+        return request(serveur())
+          .post('/assets')
+          .set('Cookie', c)
+          .send({
+            name: `Sonde ${role} ${tag}`,
+            categoryId,
+            acquisition: { on: '2026-01-15', cost: '100.00', currency: 'USD' },
+          });
+      },
     },
   ];
 
