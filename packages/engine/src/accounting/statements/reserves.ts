@@ -1,13 +1,7 @@
 // Réserves : ce qu'une balance ou un projet d'état dit de lui-même
 // (ADR-0049 § 6.10). Une réserve n'est jamais masquée ; l'ordre est fixe.
 
-import {
-  byString,
-  checkDay,
-  excludedCounts,
-  formatCents,
-  postedLines,
-} from '../ledger/money.js';
+import { byString, checkDay, excludedCounts, formatCents, postedLines } from '../ledger/money.js';
 import { ACCOUNTING_REPORTING_VERSION, type ReportingEntry } from '../ledger/types.js';
 
 /**
@@ -41,7 +35,8 @@ export interface Reserve {
 }
 
 const MESSAGES: Record<ReserveCode, string> = {
-  PACK_NOT_REVIEWED: "Plan comptable non relu par un expert-comptable : comptes et rubriques à confirmer.",
+  PACK_NOT_REVIEWED:
+    'Plan comptable non relu par un expert-comptable : comptes et rubriques à confirmer.',
   RULES_NOT_VALIDATED:
     "Règles de correspondance non validées, ou sans relecture déclarée par l'expert-comptable de l'organisation.",
   SUSPENSE_BALANCE: "Compte d'attente non soldé : des opérations restent à classer.",
@@ -53,8 +48,10 @@ const MESSAGES: Record<ReserveCode, string> = {
   STOCK_NOT_POSTED: 'Stocks non comptabilisés : registre de gestion seulement.',
   PAYMENTS_AT_ISSUE_UNCLASSIFIED:
     "Fonds reçus à l'émission de factures sans compte de trésorerie précisé : la trésorerie ne les voit pas.",
-  TRIAL_BALANCE_UNBALANCED: 'Balance déséquilibrée : total des débits différent du total des crédits.',
-  STATEMENT_TEMPLATE_TO_CONFIRM: "Modèle d'état non relu : rubriques à confirmer par l'expert-comptable.",
+  TRIAL_BALANCE_UNBALANCED:
+    'Balance déséquilibrée : total des débits différent du total des crédits.',
+  STATEMENT_TEMPLATE_TO_CONFIRM:
+    "Modèle d'état non relu : rubriques à confirmer par l'expert-comptable.",
   UNMAPPED_ACCOUNTS: "Comptes soldés non repris dans une rubrique du modèle d'état.",
   ACCOUNT_IN_SEVERAL_RUBRICS: "Comptes repris dans plusieurs rubriques du modèle d'état.",
 };
@@ -116,7 +113,9 @@ export function computeReserves(input: ReservesInput): Reserves {
     input.mode === 'simulation' ||
     (input.chartPackStatus !== 'approved' && input.chartPackStatus !== 'active')
   ) {
-    list.push(reserveOf('PACK_NOT_REVIEWED', { chartPackStatus: input.chartPackStatus, mode: input.mode }));
+    list.push(
+      reserveOf('PACK_NOT_REVIEWED', { chartPackStatus: input.chartPackStatus, mode: input.mode }),
+    );
   }
   if (
     input.ruleSet === null ||
@@ -186,8 +185,12 @@ export function computeReserves(input: ReservesInput): Reserves {
   if (!input.opening.validated || !input.opening.balanced) {
     list.push(reserveOf('OPENING_INCOMPLETE', { ...input.opening }));
   }
-  const open = input.periods.filter((p) => p.status === 'open').map((p) => p.month).sort(byString);
-  if (open.length > 0 || draft > 0) list.push(reserveOf('PERIODS_OPEN', { months: open, draftEntries: draft }));
+  const open = input.periods
+    .filter((p) => p.status === 'open')
+    .map((p) => p.month)
+    .sort(byString);
+  if (open.length > 0 || draft > 0)
+    list.push(reserveOf('PERIODS_OPEN', { months: open, draftEntries: draft }));
   if (input.depreciationPosting === 'off') list.push(reserveOf('DEPRECIATION_NOT_POSTED'));
   if (input.stockPosting === 'off') list.push(reserveOf('STOCK_NOT_POSTED'));
   if (payAtIssueLines > 0 && payAtIssue !== 0n) {

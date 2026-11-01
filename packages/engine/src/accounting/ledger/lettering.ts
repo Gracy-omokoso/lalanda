@@ -9,13 +9,7 @@
 // - `resolveLettering` : état courant à partir des événements en ajout seul
 //   (`letter` / `unletter`) ; un événement incohérent est rejeté et signalé.
 
-import {
-  byString,
-  formatCents,
-  lineRefOf,
-  parseLine,
-  type ParsedLine,
-} from './money.js';
+import { byString, formatCents, lineRefOf, parseLine, type ParsedLine } from './money.js';
 import {
   ACCOUNTING_REPORTING_VERSION,
   type LineRef,
@@ -42,7 +36,8 @@ function indexLines(
 ): Map<LineRef, { entry: ReportingEntry; index: number }> {
   const map = new Map<LineRef, { entry: ReportingEntry; index: number }>();
   for (const entry of entries) {
-    for (let i = 0; i < entry.lines.length; i += 1) map.set(lineRefOf(entry.id, i), { entry, index: i });
+    for (let i = 0; i < entry.lines.length; i += 1)
+      map.set(lineRefOf(entry.id, i), { entry, index: i });
   }
   return map;
 }
@@ -116,7 +111,8 @@ export function checkLettering(input: LetteringCheckInput): LetteringCheck {
       (p.line.auxiliaryAccountNumber ?? null) === (first.line.auxiliaryAccountNumber ?? null),
   );
   if (!sameAccount) return fail('LETTERING_MIXED_ACCOUNTS');
-  if (!parsed.every((p) => p.currency === first.currency)) return fail('LETTERING_MIXED_CURRENCIES');
+  if (!parsed.every((p) => p.currency === first.currency))
+    return fail('LETTERING_MIXED_CURRENCIES');
 
   const docTotal = parsed.reduce((s, p) => s + p.doc, 0n);
   if (docTotal !== 0n) return fail('LETTERING_NOT_BALANCED', refs, formatCents(docTotal));
@@ -172,9 +168,12 @@ export function suggestLettering(
       const p = parseLine(entry, i);
       const docRef = p.line.documentRef ?? null;
       if (docRef === null || docRef === '' || lettered.has(p.ref) || p.line.letteringCode) continue;
-      const key = [p.line.accountNumber, p.line.auxiliaryAccountNumber ?? '', p.currency, docRef].join(
-        '\u0000',
-      );
+      const key = [
+        p.line.accountNumber,
+        p.line.auxiliaryAccountNumber ?? '',
+        p.currency,
+        docRef,
+      ].join('\u0000');
       const g = groups.get(key) ?? [];
       g.push(p);
       groups.set(key, g);
@@ -247,7 +246,8 @@ export function resolveLettering(events: readonly LetteringEvent[]): LetteringSt
       return;
     }
     const a = active.get(e.code);
-    if (a === undefined) return void rejected.push({ position, code: e.code, reason: 'CODE_NOT_ACTIVE' });
+    if (a === undefined)
+      return void rejected.push({ position, code: e.code, reason: 'CODE_NOT_ACTIVE' });
     for (const r of a.lineRefs) byLine.delete(r);
     active.delete(e.code);
   });
@@ -260,4 +260,3 @@ export function resolveLettering(events: readonly LetteringEvent[]): LetteringSt
     rejected,
   };
 }
-

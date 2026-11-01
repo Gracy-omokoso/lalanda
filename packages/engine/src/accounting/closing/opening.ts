@@ -101,7 +101,12 @@ export interface OpeningEntries {
   warnings: OpeningWarning[];
 }
 
-const CARRIED: ReadonlySet<ReportingAccountNature> = new Set(['asset', 'liability', 'equity', 'mixed']);
+const CARRIED: ReadonlySet<ReportingAccountNature> = new Set([
+  'asset',
+  'liability',
+  'equity',
+  'mixed',
+]);
 
 interface Bucket {
   account: string;
@@ -290,7 +295,11 @@ export function computeOpeningEntries(input: OpeningEntriesInput): OpeningEntrie
     },
     notCarried: [...notCarried.entries(), ...management.entries()]
       .sort(([a], [b]) => byString(a, b))
-      .map(([accountNumber, g]) => ({ accountNumber, nature: g.nature, balance: formatCents(g.balance) })),
+      .map(([accountNumber, g]) => ({
+        accountNumber,
+        nature: g.nature,
+        balance: formatCents(g.balance),
+      })),
     warnings,
   };
 }

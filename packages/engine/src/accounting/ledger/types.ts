@@ -109,13 +109,7 @@ export type ReportingConfirmation = 'sourced' | 'to_confirm';
 
 /** Nature d'un compte du pack (§ 2.1). */
 export type ReportingAccountNature =
-  | 'asset'
-  | 'liability'
-  | 'equity'
-  | 'expense'
-  | 'income'
-  | 'off_balance'
-  | 'mixed';
+  'asset' | 'liability' | 'equity' | 'expense' | 'income' | 'off_balance' | 'mixed';
 
 /** Vue du plan comptable (pack K1 + comptes de l'organisation) utile à la restitution. */
 export interface ReportingChart {

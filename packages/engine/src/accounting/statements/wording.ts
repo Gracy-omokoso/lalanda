@@ -41,11 +41,7 @@ const FORBIDDEN_PATTERNS: readonly { word: string; pattern: RegExp }[] = [
   { word: 'liasse', pattern: /\bliasses?\b/ },
 ];
 
-const fold = (text: string): string =>
-  text
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase();
+const fold = (text: string): string => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 
 /** Mots interdits trouvés dans un texte (vide si aucun). */
 export function findForbiddenWords(text: string): string[] {

@@ -46,7 +46,13 @@ const entry = (
   number: null,
   date,
   status: 'posted',
-  source: { kind: 'sales_invoice', id: `src-${id}`, number: `N-${id}`, date, partyName: 'Client A' },
+  source: {
+    kind: 'sales_invoice',
+    id: `src-${id}`,
+    number: `N-${id}`,
+    date,
+    partyName: 'Client A',
+  },
   sourceKey: `k:${id}`,
   lines,
   ...o,
@@ -59,9 +65,23 @@ const chart: ReportingChart = {
     { number: 7, label: 'Produits', confirmation: 'to_confirm' },
   ],
   accounts: [
-    { number: '411', label: 'Clients', classNumber: 4, nature: 'asset', confirmation: 'to_confirm', collective: true, auxiliaryKind: 'customer' },
+    {
+      number: '411',
+      label: 'Clients',
+      classNumber: 4,
+      nature: 'asset',
+      confirmation: 'to_confirm',
+      collective: true,
+      auxiliaryKind: 'customer',
+    },
     { number: '521', label: 'Banques', classNumber: 5, nature: 'asset', confirmation: 'sourced' },
-    { number: '706', label: 'Services', classNumber: 7, nature: 'income', confirmation: 'to_confirm' },
+    {
+      number: '706',
+      label: 'Services',
+      classNumber: 7,
+      nature: 'income',
+      confirmation: 'to_confirm',
+    },
   ],
 };
 
@@ -73,7 +93,10 @@ const sale = entry('e1', '2026-03-05', [
 const receipt = entry(
   'e2',
   '2026-03-20',
-  [D('5211', '1160.00'), C('411', '1160.00', { auxiliaryAccountNumber: '411C1', documentRef: 'inv1' })],
+  [
+    D('5211', '1160.00'),
+    C('411', '1160.00', { auxiliaryAccountNumber: '411C1', documentRef: 'inv1' }),
+  ],
   { journalCode: 'T01' },
 );
 const before = entry('e0', '2026-02-10', [D('5211', '50.00'), C('ATTENTE', '50.00')], {
@@ -83,7 +106,9 @@ const before = entry('e0', '2026-02-10', [D('5211', '50.00'), C('ATTENTE', '50.0
 const awaiting = entry('e3', '2026-03-21', [D('601', '10.00'), C('5211', '10.00')], {
   status: 'awaiting_rate',
 });
-const draft = entry('e4', '2026-03-22', [D('601', '10.00'), C('5211', '10.00')], { status: 'draft' });
+const draft = entry('e4', '2026-03-22', [D('601', '10.00'), C('5211', '10.00')], {
+  status: 'draft',
+});
 const after = entry('e5', '2026-04-01', [D('601', '10.00'), C('5211', '10.00')]);
 const all = [before, sale, receipt, awaiting, draft, after];
 const period = { bookCurrency: 'CDF' as const, from: '2026-03-01', to: '2026-03-31', chart };
@@ -148,17 +173,26 @@ describe('computeTrialBalance', () => {
   });
 
   it('journal d’à-nouveaux compté en ouverture même daté dans la période', () => {
-    const an = entry('an', '2026-03-01', [D('5211', '5.00'), C('ATTENTE', '5.00')], { journalCode: 'AN' });
+    const an = entry('an', '2026-03-01', [D('5211', '5.00'), C('ATTENTE', '5.00')], {
+      journalCode: 'AN',
+    });
     const t = computeTrialBalance({ ...period, entries: [an], openingJournalCodes: ['AN'] });
     expect(t.totals.openingDebit).toBe('5.00');
     expect(t.totals.periodDebit).toBe('0.00');
   });
 
   it('refuse les entrées illisibles', () => {
-    expect(() => computeTrialBalance({ ...period, from: '2026-02-30', entries: [] })).toThrow(RangeError);
-    expect(() => computeTrialBalance({ ...period, from: '2026-04-01', entries: [] })).toThrow('inversée');
+    expect(() => computeTrialBalance({ ...period, from: '2026-02-30', entries: [] })).toThrow(
+      RangeError,
+    );
+    expect(() => computeTrialBalance({ ...period, from: '2026-04-01', entries: [] })).toThrow(
+      'inversée',
+    );
     expect(() =>
-      computeTrialBalance({ ...period, entries: [entry('x', '2026-03-01', [{ ...D('1', '1'), credit: '1' }])] }),
+      computeTrialBalance({
+        ...period,
+        entries: [entry('x', '2026-03-01', [{ ...D('1', '1'), credit: '1' }])],
+      }),
     ).toThrow('soit un débit');
     expect(() =>
       computeTrialBalance({ ...period, entries: [entry('x', '2026-03-01', [D('1', '1.001')])] }),
@@ -208,11 +242,24 @@ describe('computeLedger', () => {
   });
 
   it('ordre des lignes : date, journal, numéro, identifiant', () => {
-    const a = entry('b', '2026-03-02', [D('5', '1.00'), C('7', '1.00')], { journalCode: 'OD', number: 2 });
-    const b = entry('a', '2026-03-02', [D('5', '1.00'), C('7', '1.00')], { journalCode: 'OD', number: 1 });
-    const c = entry('c', '2026-03-01', [D('5', '1.00'), C('7', '1.00')], { journalCode: 'VE', number: 9 });
+    const a = entry('b', '2026-03-02', [D('5', '1.00'), C('7', '1.00')], {
+      journalCode: 'OD',
+      number: 2,
+    });
+    const b = entry('a', '2026-03-02', [D('5', '1.00'), C('7', '1.00')], {
+      journalCode: 'OD',
+      number: 1,
+    });
+    const c = entry('c', '2026-03-01', [D('5', '1.00'), C('7', '1.00')], {
+      journalCode: 'VE',
+      number: 9,
+    });
     const l = computeLedger({ ...period, entries: [a, b, c] });
-    expect(l.accounts.find((x) => x.accountNumber === '5')?.lines.map((x) => x.entryId)).toEqual(['c', 'a', 'b']);
+    expect(l.accounts.find((x) => x.accountNumber === '5')?.lines.map((x) => x.entryId)).toEqual([
+      'c',
+      'a',
+      'b',
+    ]);
   });
 });
 
@@ -227,7 +274,9 @@ describe('computeAuxiliaryBalances', () => {
     expect(aux.groups).toHaveLength(1);
     const g = aux.groups[0];
     expect(g?.auxiliaryKind).toBe('customer');
-    expect(g?.rows.map((r) => [r.auxiliaryAccountNumber, r.closingBalance, r.unletteredLineCount])).toEqual([
+    expect(
+      g?.rows.map((r) => [r.auxiliaryAccountNumber, r.closingBalance, r.unletteredLineCount]),
+    ).toEqual([
       ['411C1', '0.00', 2],
       ['411C2', '100.00', 1],
     ]);
@@ -244,7 +293,9 @@ describe('computeAuxiliaryBalances', () => {
       C('401', '1.00', { auxiliaryAccountNumber: 'T1' }),
     ]);
     const aux = computeAuxiliaryBalances({ ...period, entries: [e] });
-    expect(aux.conflicts).toEqual([{ auxiliaryAccountNumber: 'T1', collectiveAccountNumbers: ['401', '411'] }]);
+    expect(aux.conflicts).toEqual([
+      { auxiliaryAccountNumber: 'T1', collectiveAccountNumbers: ['401', '411'] },
+    ]);
   });
 });
 
@@ -278,7 +329,15 @@ describe('lettrage', () => {
   });
 
   it('refus typés', () => {
-    const base = { entries: [...all, entry('z', '2026-03-03', [D('411', '5.00', { auxiliaryAccountNumber: '411C1', currency: 'USD' }), C('706', '5.00')])] };
+    const base = {
+      entries: [
+        ...all,
+        entry('z', '2026-03-03', [
+          D('411', '5.00', { auxiliaryAccountNumber: '411C1', currency: 'USD' }),
+          C('706', '5.00'),
+        ]),
+      ],
+    };
     const code = (lineRefs: string[], extra: object = {}) => {
       const r = checkLettering({ ...base, lineRefs, ...extra });
       return r.ok ? 'OK' : r.code;
@@ -290,24 +349,66 @@ describe('lettrage', () => {
     expect(code(['e1#0', 'e1#1'])).toBe('LETTERING_LINE_WITHOUT_AUXILIARY');
     expect(code(['e1#1', 'e1#2'], { requireAuxiliary: false })).toBe('LETTERING_MIXED_ACCOUNTS');
     expect(code(['e1#0', 'z#0'])).toBe('LETTERING_MIXED_CURRENCIES');
-    expect(code(['e1#0', 'e2#1'], { alreadyLettered: ['e2#1'] })).toBe('LETTERING_ALREADY_LETTERED');
-    expect(code(['e1#0', 'e2#1'], { alreadyLettered: new Set(['e1#0']) })).toBe('LETTERING_ALREADY_LETTERED');
-    const partial = entry('p', '2026-03-10', [D('5211', '100.00'), C('411', '100.00', { auxiliaryAccountNumber: '411C1' })]);
+    expect(code(['e1#0', 'e2#1'], { alreadyLettered: ['e2#1'] })).toBe(
+      'LETTERING_ALREADY_LETTERED',
+    );
+    expect(code(['e1#0', 'e2#1'], { alreadyLettered: new Set(['e1#0']) })).toBe(
+      'LETTERING_ALREADY_LETTERED',
+    );
+    const partial = entry('p', '2026-03-10', [
+      D('5211', '100.00'),
+      C('411', '100.00', { auxiliaryAccountNumber: '411C1' }),
+    ]);
     const r = checkLettering({ entries: [sale, partial], lineRefs: ['e1#0', 'p#1'] });
-    expect(r).toEqual({ ok: false, code: 'LETTERING_NOT_BALANCED', lineRefs: ['e1#0', 'p#1'], documentTotal: '1060.00' });
+    expect(r).toEqual({
+      ok: false,
+      code: 'LETTERING_NOT_BALANCED',
+      lineRefs: ['e1#0', 'p#1'],
+      documentTotal: '1060.00',
+    });
   });
 
   it('suggestLettering : par pièce citée seulement, complet ou partiel', () => {
-    const partial = entry('p', '2026-03-10', [D('5211', '100.00'), C('411', '100.00', { auxiliaryAccountNumber: 'X', documentRef: 'inv9' })]);
-    const inv9 = entry('i9', '2026-03-09', [D('411', '300.00', { auxiliaryAccountNumber: 'X', documentRef: 'inv9' }), C('706', '300.00')]);
-    const noRef = entry('n', '2026-03-10', [D('5211', '300.00'), C('411', '300.00', { auxiliaryAccountNumber: 'X' })]);
+    const partial = entry('p', '2026-03-10', [
+      D('5211', '100.00'),
+      C('411', '100.00', { auxiliaryAccountNumber: 'X', documentRef: 'inv9' }),
+    ]);
+    const inv9 = entry('i9', '2026-03-09', [
+      D('411', '300.00', { auxiliaryAccountNumber: 'X', documentRef: 'inv9' }),
+      C('706', '300.00'),
+    ]);
+    const noRef = entry('n', '2026-03-10', [
+      D('5211', '300.00'),
+      C('411', '300.00', { auxiliaryAccountNumber: 'X' }),
+    ]);
     const s = suggestLettering([...all, partial, inv9, noRef]);
     expect(s.suggestions).toEqual([
-      { accountNumber: '411', auxiliaryAccountNumber: '411C1', currency: 'CDF', documentRef: 'inv1', lineRefs: ['e1#0', 'e2#1'], status: 'full', remaining: '0.00', bookDifference: '0.00' },
-      { accountNumber: '411', auxiliaryAccountNumber: 'X', currency: 'CDF', documentRef: 'inv9', lineRefs: ['i9#0', 'p#1'], status: 'partial', remaining: '200.00', bookDifference: '200.00' },
+      {
+        accountNumber: '411',
+        auxiliaryAccountNumber: '411C1',
+        currency: 'CDF',
+        documentRef: 'inv1',
+        lineRefs: ['e1#0', 'e2#1'],
+        status: 'full',
+        remaining: '0.00',
+        bookDifference: '0.00',
+      },
+      {
+        accountNumber: '411',
+        auxiliaryAccountNumber: 'X',
+        currency: 'CDF',
+        documentRef: 'inv9',
+        lineRefs: ['i9#0', 'p#1'],
+        status: 'partial',
+        remaining: '200.00',
+        bookDifference: '200.00',
+      },
     ]);
     expect(suggestLettering(all, ['e1#0']).suggestions).toEqual([]);
-    const lettered = entry('L', '2026-03-01', [D('411', '1.00', { auxiliaryAccountNumber: 'Y', documentRef: 'd', letteringCode: 'AA' }), C('411', '1.00', { auxiliaryAccountNumber: 'Y', documentRef: 'd' })]);
+    const lettered = entry('L', '2026-03-01', [
+      D('411', '1.00', { auxiliaryAccountNumber: 'Y', documentRef: 'd', letteringCode: 'AA' }),
+      C('411', '1.00', { auxiliaryAccountNumber: 'Y', documentRef: 'd' }),
+    ]);
     expect(suggestLettering([lettered]).suggestions).toEqual([]);
   });
 

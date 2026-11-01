@@ -115,7 +115,8 @@ export function parseLine(entry: ReportingEntry, index: number): ParsedLine {
   if (debit + credit <= 0n) throw new RangeError(`${where} : montant strictement positif attendu`);
   const currency = checkCurrency(line.currency, `${where}, devise`);
   const amount = centsOf(line.amount, `${where}, montant en devise`);
-  if (amount <= 0n) throw new RangeError(`${where} : montant en devise strictement positif attendu`);
+  if (amount <= 0n)
+    throw new RangeError(`${where} : montant en devise strictement positif attendu`);
   return {
     ref: lineRefOf(entry.id, index),
     entry,

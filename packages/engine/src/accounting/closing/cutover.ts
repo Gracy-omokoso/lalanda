@@ -13,13 +13,7 @@
 // la bascule exactement (jamais la veille, jamais une moyenne) ; sans taux, la
 // ligne attend (`awaiting_rate`).
 
-import {
-  byString,
-  centsOf,
-  checkCurrency,
-  checkDay,
-  formatCents,
-} from '../ledger/money.js';
+import { byString, centsOf, checkCurrency, checkDay, formatCents } from '../ledger/money.js';
 import {
   ACCOUNTING_REPORTING_VERSION,
   type ReportingCurrency,
