@@ -3,7 +3,10 @@
 // (n° 14) : l'écran propose ce que l'ADR retient par défaut, sans rien présumer de
 // l'outil de l'expert.
 
-import { ACCOUNTING_SIMULATION_EXPORT_MARK } from '@lalanda/shared/accounting';
+import {
+  ACCOUNTING_EXPORT_FORMATS_BY_KIND,
+  ACCOUNTING_SIMULATION_EXPORT_MARK,
+} from '@lalanda/shared/accounting';
 
 import type {
   AccountingExportFormat,
@@ -11,22 +14,21 @@ import type {
   AccountingExportView,
 } from '@/lib/api-accounting';
 
+/** Contenus proposés ; les formats sont ceux que l'API admet (`ACCOUNTING_EXPORT_FORMATS_BY_KIND`). */
 export const TYPES_EXPORT: readonly {
   kind: AccountingExportKind;
   libelle: string;
   formats: readonly AccountingExportFormat[];
-}[] = [
-  { kind: 'entries', libelle: 'Écritures, une ligne par ligne d’écriture', formats: ['csv'] },
-  { kind: 'trial-balance', libelle: 'Balance générale', formats: ['csv', 'xlsx'] },
-  {
-    kind: 'auxiliary-balance',
-    libelle: 'Balances clients et fournisseurs',
-    formats: ['csv', 'xlsx'],
-  },
-  { kind: 'ledger', libelle: 'Grand livre', formats: ['csv', 'xlsx'] },
-  { kind: 'statements', libelle: 'Projets d’états', formats: ['pdf', 'xlsx'] },
-  { kind: 'reserves', libelle: 'État des réserves', formats: ['csv'] },
-];
+}[] = (
+  [
+    { kind: 'entries', libelle: 'Écritures, une ligne par ligne d’écriture' },
+    { kind: 'trial-balance', libelle: 'Balance générale' },
+    { kind: 'auxiliary-balance', libelle: 'Balances clients et fournisseurs' },
+    { kind: 'ledger', libelle: 'Grand livre' },
+    { kind: 'statements', libelle: 'Projets d’états' },
+    { kind: 'reserves', libelle: 'État des réserves' },
+  ] as const
+).map((t) => ({ ...t, formats: ACCOUNTING_EXPORT_FORMATS_BY_KIND[t.kind] }));
 
 export const LIBELLES_FORMAT: Record<AccountingExportFormat, string> = {
   csv: 'CSV (point-virgule, UTF-8)',

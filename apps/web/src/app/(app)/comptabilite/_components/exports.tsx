@@ -176,7 +176,12 @@ export function Exports(): React.ReactElement {
                 <span className="font-mono text-xs" title={e.sha256}>
                   Empreinte {empreinteCourte(e.sha256)}
                 </span>
-                {autorise ? (
+                {autorise && !e.fileAvailable ? (
+                  <span className="text-xs text-[var(--foreground-muted)]">
+                    Fichier expiré (empreinte conservée)
+                  </span>
+                ) : null}
+                {autorise && e.fileAvailable ? (
                   <a
                     href={accountingApi.exportFileUrl(e.id)}
                     className="underline underline-offset-2"

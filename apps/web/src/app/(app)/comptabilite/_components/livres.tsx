@@ -13,7 +13,11 @@ import { Badge } from '@lalanda/ui';
 import { BookOpen, Scale, Users } from 'lucide-react';
 import { useState } from 'react';
 
-import { accountingApi, type AccountingTrialBalanceView } from '@/lib/api-accounting';
+import {
+  accountingApi,
+  type AccountingAuxiliaryBalanceView,
+  type AccountingTrialBalanceView,
+} from '@/lib/api-accounting';
 
 import { CHAMP } from '../../ventes/_components/form-ui';
 
@@ -102,13 +106,71 @@ function TableBalance({ b }: { b: AccountingTrialBalanceView }): React.ReactElem
         </table>
       </div>
       <p className="flex flex-wrap items-center gap-2 text-sm">
-        Total des débits : <strong>{formatValeur(b.totals.debit, b.bookCurrency)}</strong> · Total
-        des crédits : <strong>{formatValeur(b.totals.credit, b.bookCurrency)}</strong>
-        <Badge tone={b.totals.balanced ? 'success' : 'danger'}>
-          {b.totals.balanced ? 'Équilibrée' : 'Déséquilibrée'}
+        Mouvements au débit : <strong>{formatValeur(b.totals.periodDebit, b.bookCurrency)}</strong>{' '}
+        · au crédit : <strong>{formatValeur(b.totals.periodCredit, b.bookCurrency)}</strong>
+        <Badge tone={b.balanced ? 'success' : 'danger'}>
+          {b.balanced ? 'Équilibrée' : 'Déséquilibrée'}
         </Badge>
       </p>
     </>
+  );
+}
+
+function TableAuxiliaire({ b }: { b: AccountingAuxiliaryBalanceView }): React.ReactElement {
+  const lignes = b.groups.flatMap((g) => g.rows);
+  if (lignes.length === 0) return <CarteVide>Aucun compte mouvementé sur cette période.</CarteVide>;
+  return (
+    <div className="flex flex-col gap-4">
+      {b.groups.map((g) => (
+        <div key={g.collectiveAccountNumber} className="flex flex-col gap-2">
+          <h4 className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+            Compte collectif <span className="font-mono">{g.collectiveAccountNumber}</span>
+            <span className="ml-auto font-normal text-[var(--foreground-muted)]">
+              Solde {formatSolde(g.closingBalance)}
+            </span>
+          </h4>
+          {g.withoutAuxiliaryBalance !== '0.00' ? (
+            <p className="text-sm text-[var(--warn)]">
+              Montant porté sans compte de tiers : {formatSolde(g.withoutAuxiliaryBalance)}. Il est
+              signalé, jamais réparti.
+            </p>
+          ) : null}
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[44rem] text-sm">
+              <thead className="text-left text-xs text-[var(--foreground-muted)]">
+                <tr>
+                  <th className="py-1.5 pr-3 font-medium">Tiers</th>
+                  <th className="py-1.5 pr-3 text-right font-medium">Solde d’ouverture</th>
+                  <th className="py-1.5 pr-3 text-right font-medium">Débit</th>
+                  <th className="py-1.5 pr-3 text-right font-medium">Crédit</th>
+                  <th className="py-1.5 pr-3 text-right font-medium">Solde</th>
+                  <th className="py-1.5 text-right font-medium">Non lettrées</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border)] tabular-nums">
+                {g.rows.map((r) => (
+                  <tr key={r.auxiliaryAccountNumber}>
+                    <td className="py-1.5 pr-3">
+                      <span className="font-mono">{r.auxiliaryAccountNumber}</span> {r.label ?? ''}
+                      {r.byCurrency.some((c) => c.currency !== b.bookCurrency) ? (
+                        <span className="block text-xs text-[var(--foreground-muted)]">
+                          {r.byCurrency.map((c) => formatValeur(c.balance, c.currency)).join(' · ')}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="py-1.5 pr-3 text-right">{formatSolde(r.openingBalance)}</td>
+                    <td className="py-1.5 pr-3 text-right">{formatMontant(r.periodDebit)}</td>
+                    <td className="py-1.5 pr-3 text-right">{formatMontant(r.periodCredit)}</td>
+                    <td className="py-1.5 pr-3 text-right">{formatSolde(r.closingBalance)}</td>
+                    <td className="py-1.5 text-right">{r.unletteredLineCount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -290,7 +352,7 @@ export function Tiers(): React.ReactElement {
         ) : !l.ok ? (
           <EchecLecture erreur={l.erreur} repli="La balance auxiliaire est illisible." />
         ) : (
-          <TableBalance b={l.valeur} />
+          <TableAuxiliaire b={l.valeur} />
         )}
       </Panneau>
       <Panneau titre={<Terme terme="lettrage">Lettrage</Terme>} id="compta-lettrage">

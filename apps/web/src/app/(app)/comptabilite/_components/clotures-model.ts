@@ -37,6 +37,9 @@ const PHRASES_RAISON: Record<string, string> = {
   SUSPENSE_NOT_ACCEPTED:
     'Le compte d’attente n’est pas soldé, et son solde n’a pas été accepté avec un motif.',
   PERIOD_HAS_DRAFTS: 'Des brouillons occupent encore ce mois.',
+  DRAFT_ENTRIES: 'Des écritures en brouillon restent dans l’exercice.',
+  NEXT_PERIOD_CLOSED:
+    'Le premier mois de l’exercice suivant est clos : il ne peut pas recevoir les à-nouveaux.',
 };
 
 /**

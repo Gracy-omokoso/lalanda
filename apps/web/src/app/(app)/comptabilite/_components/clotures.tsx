@@ -23,7 +23,12 @@ export function Clotures(): React.ReactElement {
   const [version, setVersion] = useState(0);
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState<{ message: string; raisons: string[] } | null>(null);
-  const [reouverture, setReouverture] = useState<{ annee: number; mois: number } | null>(null);
+  /** `mois: null` : réouverture de l'exercice entier. */
+  const [reouverture, setReouverture] = useState<{ annee: number; mois: number | null } | null>(
+    null,
+  );
+  const [clotureExercice, setClotureExercice] = useState<number | null>(null);
+  const [motifAttente, setMotifAttente] = useState('');
   const [motif, setMotif] = useState('');
   const l = useLecture(
     () => accountingApi.listFiscalYears().then((r) => r.items),
@@ -145,9 +150,38 @@ export function Clotures(): React.ReactElement {
                 );
               })}
             </ul>
-            <p className="text-sm text-[var(--foreground-muted)]">
-              Clôture de l’exercice et génération des à-nouveaux : bientôt disponibles.
-            </p>
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              {ex.status === 'open' && actionsPeriode('open', actions, role).cloturer ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={envoi}
+                  onClick={() => {
+                    setMotifAttente('');
+                    setClotureExercice(ex.year);
+                  }}
+                >
+                  Clôturer l’exercice et préparer les à-nouveaux
+                </Button>
+              ) : null}
+              {ex.status === 'closed' && actionsPeriode('closed', actions, role).rouvrir ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={envoi}
+                  onClick={() => {
+                    setMotif('');
+                    setReouverture({ annee: ex.year, mois: null });
+                  }}
+                >
+                  Rouvrir l’exercice
+                </Button>
+              ) : null}
+              <span className="text-[var(--foreground-muted)]">
+                Les à-nouveaux sont calculés par Lalanda comme projet, à valider par votre
+                expert-comptable.
+              </span>
+            </div>
           </Panneau>
         ))
       )}
@@ -155,7 +189,11 @@ export function Clotures(): React.ReactElement {
         <Modal
           open
           onClose={() => setReouverture(null)}
-          title={`Rouvrir ${libelleMois(reouverture.annee, reouverture.mois)}`}
+          title={
+            reouverture.mois === null
+              ? `Rouvrir l’exercice ${reouverture.annee}`
+              : `Rouvrir ${libelleMois(reouverture.annee, reouverture.mois)}`
+          }
           description="La réouverture est inscrite au journal, avec votre motif. Elle ne s’efface pas."
           busy={envoi}
           dirty={motif.trim() !== ''}
@@ -170,14 +208,20 @@ export function Clotures(): React.ReactElement {
                 onClick={() =>
                   void agir(
                     () =>
-                      accountingApi.reopenPeriod(reouverture.annee, reouverture.mois, motif.trim()),
+                      reouverture.mois === null
+                        ? accountingApi.reopenFiscalYear(reouverture.annee, motif.trim())
+                        : accountingApi.reopenPeriod(
+                            reouverture.annee,
+                            reouverture.mois,
+                            motif.trim(),
+                          ),
                     'La réouverture a échoué.',
                   ).then((ok) => {
                     if (ok) setReouverture(null);
                   })
                 }
               >
-                Rouvrir le mois
+                Rouvrir
               </Button>
             </>
           }
@@ -191,6 +235,53 @@ export function Clotures(): React.ReactElement {
               maxLength={500}
               value={motif}
               onChange={(e) => setMotif(e.target.value)}
+            />
+          </label>
+        </Modal>
+      ) : null}
+      {clotureExercice !== null ? (
+        <Modal
+          open
+          onClose={() => setClotureExercice(null)}
+          title={`Clôturer l’exercice ${clotureExercice}`}
+          description="Tous les mois doivent être clos. Lalanda prépare les à-nouveaux de l’exercice suivant ; ils restent un projet à valider par votre expert-comptable."
+          busy={envoi}
+          dirty={motifAttente.trim() !== ''}
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setClotureExercice(null)} disabled={envoi}>
+                Annuler
+              </Button>
+              <Button
+                variant="primary"
+                disabled={envoi}
+                onClick={() =>
+                  void agir(
+                    () =>
+                      accountingApi.closeFiscalYear(
+                        clotureExercice,
+                        motifAttente.trim() === '' ? undefined : motifAttente.trim(),
+                      ),
+                    'La clôture de l’exercice a échoué.',
+                  ).then((ok) => {
+                    if (ok) setClotureExercice(null);
+                  })
+                }
+              >
+                Clôturer l’exercice
+              </Button>
+            </>
+          }
+        >
+          <label htmlFor="compta-motif-attente" className="flex flex-col gap-1 text-sm font-medium">
+            Si le compte d’attente n’est pas soldé : motif pour accepter son solde (facultatif)
+            <textarea
+              id="compta-motif-attente"
+              className={CHAMP}
+              rows={3}
+              maxLength={500}
+              value={motifAttente}
+              onChange={(e) => setMotifAttente(e.target.value)}
             />
           </label>
         </Modal>

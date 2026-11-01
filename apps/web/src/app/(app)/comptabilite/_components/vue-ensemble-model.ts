@@ -50,7 +50,7 @@ function tuileAttente(balance: Lecture<AccountingTrialBalanceView>): EtatTuile {
       attention: false,
     };
   }
-  const montant = r.details?.['amount'];
+  const montant = r.details['balance'];
   return {
     etat: 'connu',
     valeur:

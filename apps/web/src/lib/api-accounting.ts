@@ -5,10 +5,8 @@
 // tient du moteur (`@lalanda/engine`, module `accounting`), en chaînes décimales.
 //
 // Contrats : les unions fermées, les textes des bandeaux et les codes viennent de
-// `@lalanda/shared/accounting` (lot K0). Les VUES de réponse ne sont pas encore publiées
-// par les lots K4 à K7 : elles sont décrites ici d'après l'ADR (§ 2, § 6.10, § 6.11,
-// § 10, § 11), au plus juste et en lecture seule, et seront remplacées par les types
-// partagés quand ces lots les ajouteront à `@lalanda/shared/accounting`. Tant qu'une
+// `@lalanda/shared/accounting` (lot K0). Les VUES de réponse sont publiées
+// par les lots K4 à K7 dans `@lalanda/shared/accounting` et réexportées ici. Tant qu'une
 // route n'existe pas, l'API répond 404 : les écrans affichent « bientôt disponible »,
 // jamais une donnée inventée.
 //
@@ -17,12 +15,16 @@
 
 import type {
   AccountingActivationMissingCode,
-  AccountingAuxiliaryKind,
-  AccountingBookCurrency,
-  AccountingConfirmation,
-  AccountingReconciliationCause,
+  AccountingAuxiliaryBalanceView,
+  AccountingExportView,
+  AccountingFiscalYearCloseView,
+  AccountingLedgerView,
+  AccountingPeriodCriteria,
+  AccountingReconciliationView,
   AccountingStatementKind,
-  AccountingStatementStatus,
+  AccountingStatementView,
+  AccountingTrialBalanceView,
+  CreateAccountingExportInput,
 } from '@lalanda/shared/accounting';
 
 import type {
@@ -63,14 +65,7 @@ export type {
   AccountingStatementKind,
 } from '@lalanda/shared/accounting';
 
-// ── Vues (provisoires, d'après l'ADR, pour K5 à K7 ; K4 publie les siennes) ──
-
-/** Réserve qu'un état dit de lui-même (§ 6.10) : code stable, phrase prête à afficher. */
-export interface AccountingReserveView {
-  code: string;
-  message: string;
-  details?: Record<string, unknown>;
-}
+// ── Vues publiées par l'API (`@lalanda/shared/accounting`) ──────────────────
 
 // ADR-0049 — K4 : vues et corps du référentiel et des réglages, PUBLIÉS par l'API dans
 // `@lalanda/shared/accounting` (referential.ts) — mêmes formes que les réponses.
@@ -113,130 +108,30 @@ export type {
   AccountingTreasuryLinkView,
 } from '@lalanda/shared/accounting';
 
-/** Critères en corps du grand livre et des balances (§ 11). */
-export interface AccountingPeriodCriteria {
-  from: string;
-  to: string;
-  accountNumber?: string;
-  auxiliaryKind?: AccountingAuxiliaryKind;
-}
+// ADR-0049 — K6 : restitution, projets d'états, clôtures, rapprochement et exports, PUBLIÉS
+// par l'API dans `@lalanda/shared/accounting` (reporting.ts) — mêmes formes que les réponses.
+export type {
+  AccountingAuxiliaryBalanceView,
+  AccountingAuxiliaryGroupView,
+  AccountingAuxiliaryRowView,
+  AccountingExportFormat,
+  AccountingExportKind,
+  AccountingExportView,
+  AccountingFiscalYearCloseView,
+  AccountingLedgerAccountView,
+  AccountingLedgerLineView,
+  AccountingLedgerView,
+  AccountingPeriodCriteria,
+  AccountingReconciliationMetricView,
+  AccountingReconciliationView,
+  AccountingReserveView,
+  AccountingStatementView,
+  AccountingTrialBalanceRowView,
+  AccountingTrialBalanceView,
+} from '@lalanda/shared/accounting';
 
-export interface AccountingLedgerLineView {
-  ref: string;
-  entryId: string;
-  journalCode: string;
-  number: number | null;
-  date: string;
-  label: string;
-  debit: string;
-  credit: string;
-  balance: string;
-  currency: AccountingBookCurrency;
-  amount: string;
-  letteringCode: string | null;
-  sourceNumber: string | null;
-}
-
-export interface AccountingLedgerAccountView {
-  accountNumber: string;
-  label: string | null;
-  confirmation: AccountingConfirmation;
-  openingBalance: string;
-  totalDebit: string;
-  totalCredit: string;
-  closingBalance: string;
-  lines: AccountingLedgerLineView[];
-}
-
-export interface AccountingLedgerView {
-  bookCurrency: AccountingBookCurrency;
-  from: string;
-  to: string;
-  accounts: AccountingLedgerAccountView[];
-  reserves: AccountingReserveView[];
-}
-
-export interface AccountingTrialBalanceRowView {
-  accountNumber: string;
-  label: string | null;
-  confirmation: AccountingConfirmation;
-  openingDebit: string;
-  openingCredit: string;
-  periodDebit: string;
-  periodCredit: string;
-  closingDebit: string;
-  closingCredit: string;
-}
-
-export interface AccountingTrialBalanceView {
-  bookCurrency: AccountingBookCurrency;
-  from: string;
-  to: string;
-  rows: AccountingTrialBalanceRowView[];
-  totals: { debit: string; credit: string; balanced: boolean };
-  reserves: AccountingReserveView[];
-}
-
-export interface AccountingAuxiliaryBalanceView extends AccountingTrialBalanceView {
-  kind: AccountingAuxiliaryKind;
-}
-
-/** Projet d'état (§ 10) : `status: "draft_unverified"`, `disclaimer`, réserves, toujours. */
-export interface AccountingStatementView {
-  status: AccountingStatementStatus;
-  disclaimer: string;
-  reserves: AccountingReserveView[];
-  kind: AccountingStatementKind;
-  label: string;
-  bookCurrency: AccountingBookCurrency;
-  from: string;
-  to: string;
-  sections: {
-    code: string;
-    label: string;
-    toConfirm: boolean;
-    total: string;
-    rubrics: { code: string; label: string; toConfirm: boolean; amount: string }[];
-  }[];
-  result: string | null;
-}
-
-/** Rapprochement du mois avec le réalisé (§ 7) : écarts typés, jamais corrigés. */
-export interface AccountingReconciliationView {
-  month: string;
-  metrics: {
-    key: string;
-    label: string;
-    actuals: string | null;
-    accounting: string | null;
-    gap: string | null;
-    causes: AccountingReconciliationCause[];
-  }[];
-}
-
-export type AccountingExportKind =
-  'entries' | 'trial-balance' | 'auxiliary-balance' | 'ledger' | 'statements' | 'reserves';
-export type AccountingExportFormat = 'csv' | 'xlsx' | 'pdf';
-
-export interface AccountingExportInput {
-  kind: AccountingExportKind;
-  format: AccountingExportFormat;
-  from: string;
-  to: string;
-}
-
-export interface AccountingExportView {
-  id: string;
-  kind: AccountingExportKind;
-  format: AccountingExportFormat;
-  from: string;
-  to: string;
-  simulation: boolean;
-  sha256: string;
-  createdAt: string;
-  createdBy: string | null;
-  expiresAt: string | null;
-}
+/** Corps de `POST /accounting/exports`. */
+export type AccountingExportInput = CreateAccountingExportInput;
 
 // ─── Client ─────────────────────────────────────────────────────────────────
 
@@ -345,7 +240,7 @@ export const accountingApi = {
     jsonRequest<AccountingLedgerView>('/accounting/ledger', { method: 'POST', body }),
   trialBalance: (body: AccountingPeriodCriteria) =>
     jsonRequest<AccountingTrialBalanceView>('/accounting/trial-balance', { method: 'POST', body }),
-  auxiliaryBalance: (body: AccountingPeriodCriteria & { auxiliaryKind: AccountingAuxiliaryKind }) =>
+  auxiliaryBalance: (body: AccountingPeriodCriteria) =>
     jsonRequest<AccountingAuxiliaryBalanceView>('/accounting/auxiliary-balance', {
       method: 'POST',
       body,
@@ -361,7 +256,7 @@ export const accountingApi = {
       GET,
     ),
 
-  // Clôtures (K4 pour la structure, K6 pour les clôtures)
+  // Clôtures (K4 pour la structure, K6 pour les clôtures et les à-nouveaux)
   listFiscalYears: () =>
     jsonRequest<{ items: AccountingFiscalYearView[] }>('/accounting/fiscal-years', GET),
   closePeriod: (year: number, month: number) =>
@@ -371,6 +266,21 @@ export const accountingApi = {
     }),
   reopenPeriod: (year: number, month: number, reason: string) =>
     jsonRequest<AccountingFiscalYearView>(`/accounting/periods/${seg(year)}/${seg(month)}/reopen`, {
+      method: 'POST',
+      body: { reason },
+    }),
+  /** Clôture d'exercice : à-nouveaux générés par le moteur ; solde d'attente accepté avec motif. */
+  closeFiscalYear: (year: number, suspenseAcceptanceReason?: string) =>
+    jsonRequest<AccountingFiscalYearCloseView>(`/accounting/fiscal-years/${seg(year)}/close`, {
+      method: 'POST',
+      body:
+        suspenseAcceptanceReason === undefined
+          ? {}
+          : { suspenseAcceptance: { reason: suspenseAcceptanceReason } },
+    }),
+  /** Propriétaire seul (403 `REOPEN_OWNER_ONLY`) ; les à-nouveaux sont contre-passés. */
+  reopenFiscalYear: (year: number, reason: string) =>
+    jsonRequest<AccountingFiscalYearView>(`/accounting/fiscal-years/${seg(year)}/reopen`, {
       method: 'POST',
       body: { reason },
     }),

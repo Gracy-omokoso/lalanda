@@ -20,12 +20,28 @@ import { dernieresClotures, phraseMode, reservesDe, tuilesVue } from './vue-ense
 
 const BIENTOT = { ok: false as const, erreur: { status: 404, detail: {} } };
 
+const TOTAUX = {
+  openingDebit: '0.00',
+  openingCredit: '0.00',
+  periodDebit: '0.00',
+  periodCredit: '0.00',
+  closingDebit: '0.00',
+  closingCredit: '0.00',
+};
+
 const BALANCE = (reserves: AccountingTrialBalanceView['reserves']): AccountingTrialBalanceView => ({
+  mode: 'active',
+  simulation: false,
+  banner: 'Projet — à valider par un expert-comptable',
   bookCurrency: 'CDF',
   from: '2026-10-01',
   to: '2026-10-31',
   rows: [],
-  totals: { debit: '0.00', credit: '0.00', balanced: true },
+  classes: [],
+  totals: TOTAUX,
+  balanced: true,
+  unbalancedEntries: [],
+  excluded: { draft: 0, awaitingRate: 0, afterPeriod: 0 },
   reserves,
 });
 
@@ -40,8 +56,8 @@ describe('vue d’ensemble (§ 13)', () => {
 
   it('réserves en premier ; le solde d’attente est celui de la réserve du moteur', () => {
     const b = BALANCE([
-      { code: 'PACK_NOT_REVIEWED', message: 'Plan non relu.' },
-      { code: 'SUSPENSE_BALANCE', message: 'Attente.', details: { amount: '1500.00' } },
+      { code: 'PACK_NOT_REVIEWED', message: 'Plan non relu.', details: {} },
+      { code: 'SUSPENSE_BALANCE', message: 'Attente.', details: { balance: '1500.00' } },
     ]);
     const t = tuilesVue({
       balance: { ok: true, valeur: b },
@@ -203,12 +219,28 @@ describe('écritures (§ 2.6, § 13)', () => {
   });
 });
 
+const RUBRIQUE = (code: string, label: string, toConfirm: boolean, amount: string) => ({
+  code,
+  label,
+  confirmation: toConfirm ? ('to_confirm' as const) : ('sourced' as const),
+  toConfirm,
+  note: null,
+  amount,
+  accounts: [],
+});
+
 const ETAT: AccountingStatementView = {
+  mode: 'active',
+  simulation: false,
+  banner: 'Projet — à valider par un expert-comptable',
   status: 'draft_unverified',
   disclaimer: ACCOUNTING_DISCLAIMER,
-  reserves: [{ code: 'PACK_NOT_REVIEWED', message: 'Plan non relu.' }],
+  reserves: [{ code: 'PACK_NOT_REVIEWED', message: 'Plan non relu.', details: {} }],
   kind: 'income-statement',
   label: 'Compte de résultat',
+  fiscalYear: 2026,
+  available: true,
+  unavailableReason: null,
   bookCurrency: 'CDF',
   from: '2026-01-01',
   to: '2026-12-31',
@@ -216,22 +248,23 @@ const ETAT: AccountingStatementView = {
     {
       code: 'P',
       label: 'Produits',
+      confirmation: 'to_confirm',
       toConfirm: true,
       total: '10.00',
-      rubrics: [
-        { code: 'P1', label: 'Ventes', toConfirm: false, amount: '10.00' },
-        { code: 'P2', label: 'Autres', toConfirm: false, amount: '0.00' },
-      ],
+      rubrics: [RUBRIQUE('P1', 'Ventes', false, '10.00'), RUBRIQUE('P2', 'Autres', false, '0.00')],
     },
     {
       code: 'C',
       label: 'Charges',
+      confirmation: 'sourced',
       toConfirm: false,
       total: '0.00',
-      rubrics: [{ code: 'C1', label: 'Achats', toConfirm: true, amount: '0.00' }],
+      rubrics: [RUBRIQUE('C1', 'Achats', true, '0.00')],
     },
   ],
+  matchedNetBalance: '-10.00',
   result: '10.00',
+  unmappedAccounts: [],
 };
 
 describe('projets d’états (§ 10)', () => {
@@ -280,7 +313,7 @@ describe('clôtures (§ 4)', () => {
 
 describe('exports (§ 9)', () => {
   it('formats proposés par contenu', () => {
-    expect(formatsDe('entries')).toEqual(['csv']);
+    expect(formatsDe('entries')).toEqual(['csv', 'xlsx']);
     expect(formatsDe('statements')).toEqual(['pdf', 'xlsx']);
     for (const t of TYPES_EXPORT) expect(t.formats.length).toBeGreaterThan(0);
   });
