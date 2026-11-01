@@ -9,6 +9,7 @@
 
 import 'reflect-metadata';
 
+import { HR_VERSION } from '@lalanda/engine';
 import { ObjectId } from 'mongodb';
 import { randomBytes } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
@@ -137,7 +138,7 @@ e2eSuite('RH — rapports et registre exporté (ADR-0045 H5)', () => {
   it('effectif, mouvements, absentéisme par service et ancienneté, par le moteur', async () => {
     const res = await fx.get('hr_manager', Q);
     const r = ok(res);
-    expect(r['version']).toBe('1.0.0');
+    expect(r['version']).toBe(HR_VERSION);
     // Au 31 mars : Ancien, Recent, Formule ; Sorti sort ce jour-là (inclus).
     expect(r['headcount']['total']).toBe(4);
     expect(r['headcount']['byDepartment']).toEqual(
