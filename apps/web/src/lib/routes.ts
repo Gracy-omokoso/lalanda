@@ -87,6 +87,8 @@ export const PROTECTED_PREFIXES = [
   '/stocks',
   '/equipements',
   '/documents',
+  // ADR-0049 — K8 : comptabilité (RUN). Session ET organisation active.
+  '/comptabilite',
 ] as const;
 
 /**

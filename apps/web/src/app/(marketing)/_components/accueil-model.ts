@@ -65,6 +65,9 @@ export const APPS_PAR_MODULE: Readonly<Record<ModuleId, readonly string[]>> = {
     'stocks',
     'equipements',
     'documents',
+    // ADR-0049 — K8 : comptabilité (projets à valider par un expert-comptable),
+    // dernier bloc du RUN (même ordre que la navigation).
+    'comptabilite',
   ],
   grow: ['pilotage', 'brief', 'sante', 'investisseurs', 'parcours'],
 };

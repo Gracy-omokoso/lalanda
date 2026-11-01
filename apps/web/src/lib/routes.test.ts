@@ -259,3 +259,22 @@ describe('formulaire public de prospects (ADR-0048)', () => {
     }
   });
 });
+
+describe('ADR-0049 — K8 : comptabilité', () => {
+  it('protège l’application Comptabilité, racine comme sous-routes', () => {
+    for (const path of [
+      '/comptabilite',
+      '/comptabilite/ecritures',
+      '/comptabilite/grand-livre',
+      '/comptabilite/balance',
+      '/comptabilite/tiers',
+      '/comptabilite/etats',
+      '/comptabilite/clotures',
+      '/comptabilite/exports',
+      '/comptabilite/reglages',
+    ]) {
+      expect(isProtectedPath(path)).toBe(true);
+    }
+    expect(isProtectedPath('/comptabilites')).toBe(false);
+  });
+});
