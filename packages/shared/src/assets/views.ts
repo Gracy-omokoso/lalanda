@@ -51,7 +51,7 @@ export interface AssetEstimateView {
   /** « Estimation de gestion — n'est pas un amortissement comptable ou fiscal ». */
   notice: string;
   estimable: boolean;
-  /** Motif quand `estimable` est faux (`NO_DURATION`, `RESIDUAL_ABOVE_COST`). */
+  /** Motif quand `estimable` est faux (`NO_DURATION`, `RESIDUAL_ABOVE_COST`, `UNKNOWN_COST`). */
   reason: string | null;
   onDate: string;
   currency: AssetCurrency | null;
@@ -78,7 +78,10 @@ export interface AssetView {
   status: AssetStatus;
   acquisition: {
     on: string;
-    /** `null` si les valeurs sont masquées. */
+    /**
+     * `null` si les valeurs sont masquées (`valuesHidden`), ou si le coût est
+     * INCONNU (non saisi) quand elles sont visibles — jamais « 0 ».
+     */
     cost: string | null;
     currency: AssetCurrency;
     supplierId: string | null;
@@ -113,6 +116,9 @@ export interface AssetDetailView extends AssetView {
   managementEstimate: AssetEstimateView | null;
   /** Coût total de possession par devise (moteur) ; `null` si valeurs masquées. */
   totalCostOfOwnership: {
+    /** `false` si le coût d'acquisition est inconnu : aucun total publié. */
+    estimable: boolean;
+    reason: 'UNKNOWN_COST' | null;
     byCurrency: {
       currency: AssetCurrency;
       acquisition: string;
@@ -223,10 +229,16 @@ export interface AssetReportsView {
     count: number;
     byStatus: { status: AssetStatus; count: number }[];
     acquisitionCosts: AssetCurrencyTotalView[] | null;
+    /** Équipements au coût inconnu, exclus des sommes ; `null` si valeurs masquées. */
+    unknownCostCount: number | null;
   }[];
   assigned: { employee: number; project: number; location: number; member: number; none: number };
+  /** Coûts CONNUS seulement. */
   acquisitionCosts: AssetCurrencyTotalView[] | null;
   activeAcquisitionCosts: AssetCurrencyTotalView[] | null;
+  /** Équipements au coût inconnu (cédés compris / non cédés) ; `null` si valeurs masquées. */
+  unknownCostCount: number | null;
+  activeUnknownCostCount: number | null;
   managementEstimate: {
     label: 'management_estimate';
     notice: string;

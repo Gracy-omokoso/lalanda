@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { OrgAction } from '@/lib/api';
 
-import { etatCreerProjet, lienProjet, suiteRefus } from './creer-projet-model';
+import { etatCreerProjet, lienProjet, suiteCreation, suiteRefus } from './creer-projet-model';
 
 const DIRECTION: OrgAction[] = ['crm.read', 'crm.manage', 'work.read', 'work.manage'];
 const COMMERCIAL: OrgAction[] = ['crm.read', 'crm.manage', 'work.read', 'work.update'];
@@ -71,5 +71,21 @@ describe('suiteRefus', () => {
 
   it('lien du projet encodé', () => {
     expect(lienProjet('a/b')).toBe('/projets/a%2Fb');
+  });
+});
+
+describe('suiteCreation', () => {
+  it('sans avertissement : on va au projet', () => {
+    expect(suiteCreation({ id: ID, warnings: [] })).toEqual({ aller: `/projets/${ID}` });
+    expect(suiteCreation({ id: ID })).toEqual({ aller: `/projets/${ID}` });
+  });
+
+  it('devis non repris faute de sales.read : l’avertissement est affiché, pas avalé', () => {
+    const message =
+      'Un devis accepté existe, mais vous ne consultez pas les ventes : le projet reprend les lignes de l’opportunité, pas celles du devis.';
+    expect(suiteCreation({ id: ID, warnings: [{ code: 'QUOTE_LINES_HIDDEN', message }] })).toEqual({
+      projectId: ID,
+      avertissements: [message],
+    });
   });
 });

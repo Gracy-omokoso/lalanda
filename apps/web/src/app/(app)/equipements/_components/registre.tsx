@@ -236,9 +236,11 @@ export function Registre(): React.ReactElement {
                     ))}
                   </span>
                 ) : null}
-                {valeurs && a.acquisition.cost !== null ? (
+                {valeurs ? (
                   <span className="mt-auto text-xs tabular-nums text-[var(--foreground-muted)]">
-                    Acquis {formatMontant(a.acquisition.cost, a.acquisition.currency)} le{' '}
+                    {a.acquisition.cost === null
+                      ? 'Coût inconnu, acquis le '
+                      : `Acquis ${formatMontant(a.acquisition.cost, a.acquisition.currency)} le `}
                     {formatJour(a.acquisition.on)}
                   </span>
                 ) : null}

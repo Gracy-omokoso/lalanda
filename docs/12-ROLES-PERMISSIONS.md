@@ -232,6 +232,9 @@ sont inchangés.
   `…/objectives/attainment` exigent `project.read` + `analytics.read`. Les contextes servis à
   l'IA sont figés par `apps/api/src/ai/ai-contexts.audit.test.ts`. Effet de bord : le
   Conseiller perd la trésorerie dans le brief et GROW (ADR-0040, décision ouverte n° 2).
+  Depuis le 1er nov. 2026 (amendement d'ADR-0032, à confirmer), GROW masque aussi les
+  indicateurs du réalisé (consommation, marges, croissance du CA réalisé, autonomie) sans
+  `project.read` effectif : raison `REALISE_MASQUE`.
 - Tests : matrice 9 × 28 + 6 × 28 = **420** cases.
 
 ### Proposé, ADR-0041 — autorisations par membre (non appliqué)

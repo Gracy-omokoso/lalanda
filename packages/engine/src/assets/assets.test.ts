@@ -73,7 +73,7 @@ function schedule(asset: AssetInput): ManagementScheduleAvailable {
 
 describe('version', () => {
   it('le module a sa propre version, sans toucher ENGINE_VERSION', () => {
-    expect(ASSETS_VERSION).toBe('1.0.0');
+    expect(ASSETS_VERSION).toBe('1.1.0');
     expect(ENGINE_VERSION).toBe('0.2.0');
     expect(MANAGEMENT_ESTIMATE_LABEL).toBe('management_estimate');
     expect(MANAGEMENT_ESTIMATE_NOTICE).toContain('Estimation de gestion');
@@ -126,6 +126,28 @@ describe('managementDepreciationEstimate', () => {
       consumedPercent: '100.00',
     });
     expect(estimate(residual, '2040-01-01').estimatedValue).toBe('150.00');
+  });
+
+  it('coût d’acquisition inconnu (absent ou null) : « non estimable », jamais 0', () => {
+    const none = { version: ASSETS_VERSION, label: 'management_estimate', estimable: false };
+    for (const cost of [null, undefined]) {
+      const a = laptop({ acquisition: { on: '2026-01-15', cost, currency: 'USD' } });
+      expect(managementDepreciationEstimate(a, '2026-12-31')).toEqual({
+        ...none,
+        reason: 'UNKNOWN_COST',
+      });
+      expect(managementDepreciationSchedule(a)).toEqual({ ...none, reason: 'UNKNOWN_COST' });
+    }
+    // Sans paramètres d'estimation, la raison reste l'absence de durée.
+    expect(
+      managementDepreciationEstimate(
+        laptop({
+          acquisition: { on: '2026-01-15', cost: null, currency: 'USD' },
+          managementDepreciation: null,
+        }),
+        '2026-12-31',
+      ),
+    ).toEqual({ ...none, reason: 'NO_DURATION' });
   });
 
   it('sans durée saisie : « non estimable », jamais 0', () => {
@@ -562,6 +584,39 @@ describe('assetRegisterSummary', () => {
       { currency: 'USD', count: 2, total: '1299.99' },
     ]);
     expect(r.managementEstimate).toBeNull();
+    expect(r.unknownCostCount).toBe(0);
+    expect(r.activeUnknownCostCount).toBe(0);
+  });
+
+  it('coût inconnu : exclu des sommes, compté à part, non estimable à une date', () => {
+    const inconnu = (id: string, status: AssetInput['status'] = 'in_service'): AssetInput =>
+      laptop({
+        id,
+        status,
+        acquisition: { on: '2026-01-01', cost: null, currency: 'USD' },
+        ...(status === 'disposed' ? { disposal: { on: '2026-02-01' } } : {}),
+      });
+    const r = assetRegisterSummary(
+      [laptop({ id: 'a' }), inconnu('u1'), inconnu('u2', 'disposed')],
+      '2026-12-31',
+    );
+    expect(r.acquisitionCosts).toEqual([{ currency: 'USD', count: 1, total: '1200.00' }]);
+    expect(r.activeAcquisitionCosts).toEqual([{ currency: 'USD', count: 1, total: '1200.00' }]);
+    expect(r.unknownCostCount).toBe(2);
+    expect(r.activeUnknownCostCount).toBe(1);
+    expect(r.byCategory).toEqual([
+      expect.objectContaining({
+        categoryId: 'it',
+        count: 3,
+        acquisitionCosts: [{ currency: 'USD', count: 1, total: '1200.00' }],
+        unknownCostCount: 2,
+      }),
+    ]);
+    // u1 (non cédé) est non estimable ; u2, cédé avant la date, est hors estimation.
+    expect(r.managementEstimate).toMatchObject({
+      estimatedValues: [{ currency: 'USD', count: 1, total: '800.00' }],
+      notEstimable: 1,
+    });
   });
 
   it('estimation de gestion à une date, étiquetée, hors cédés', () => {
@@ -661,6 +716,8 @@ describe('assetTotalCostOfOwnership', () => {
       version: ASSETS_VERSION,
       assetId: 'a1',
       until: null,
+      estimable: true,
+      reason: null,
       byCurrency: [
         {
           currency: 'CDF',
@@ -708,6 +765,25 @@ describe('assetTotalCostOfOwnership', () => {
         },
       ]),
     ).toThrow(/devise/);
+  });
+
+  it('coût d’acquisition inconnu : non estimable, aucun total amputé', () => {
+    const a = laptop({ acquisition: { on: '2026-01-15', cost: null, currency: 'USD' } });
+    const r = assetTotalCostOfOwnership(a, maintenance, coverages);
+    expect(r).toMatchObject({
+      estimable: false,
+      reason: 'UNKNOWN_COST',
+      byCurrency: [],
+      maintenanceCount: 3,
+      unpricedMaintenanceCount: 1,
+      coverageCount: 1,
+    });
+    // Arrêté avant l'acquisition : le coût inconnu n'entre pas dans la période.
+    expect(assetTotalCostOfOwnership(a, maintenance, [], '2026-01-10')).toMatchObject({
+      estimable: true,
+      reason: null,
+      byCurrency: [],
+    });
   });
 });
 

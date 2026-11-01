@@ -14,10 +14,13 @@
 //    /pricing est en cours de refonte par ailleurs. Des CGV qui annonceraient un
 //    prix ou un délai de remboursement décidés en écrivant la page créeraient un
 //    engagement contractuel que personne n'a pris.
-// 2. L'ÉTAT RÉEL EST DIT. Il n'existe AUCUNE intégration de paiement
-//    (docs/13 § « Hors périmètre S16b ») : aucun abonnement payant ne peut être
-//    souscrit aujourd'hui. Publier des CGV muettes sur ce point laisserait croire
-//    à un parcours d'achat qui n'existe pas.
+// 2. L'ÉTAT RÉEL EST DIT. Revue du 1er nov. 2026 : le paiement MANUEL (mobile
+//    money ou virement, confirmé par un administrateur plateforme,
+//    `apps/api/src/payments/manual.provider.ts`) fonctionne, sans renouvellement
+//    automatique ; aucune facture d'abonnement n'est émise. L'ancienne phrase
+//    « aucun moyen de paiement n'est en service » était fausse. Savoir si les
+//    stipulations ci-dessous s'appliquent dès maintenant est une décision de la
+//    dirigeante (marqueur À COMPLÉTER), pas de l'équipe produit.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Metadata } from 'next';
@@ -57,16 +60,25 @@ const SECTIONS: readonly LegalSection[] = [
   },
   {
     id: 'etat-du-service',
-    title: 'État actuel : aucun abonnement payant n’est encore commercialisé',
+    title: 'État actuel du paiement',
     body: (
       <>
         <p>
           <strong>
-            Aucun moyen de paiement n&apos;est en service à ce jour et aucune souscription payante
-            ne peut être conclue.
+            Le seul moyen de paiement en service à ce jour est le paiement manuel, par mobile money
+            ou par virement.
           </strong>{' '}
-          Le service est utilisable dans son offre gratuite, avec les limites annoncées sur la page
-          des tarifs.
+          Vous recevez des instructions de dépôt&nbsp;; l&apos;abonnement est activé lorsqu&apos;un
+          administrateur de Lalanda a constaté la réception du paiement. Un paiement manuel ne se
+          renouvelle pas automatiquement&nbsp;: il est à refaire à chaque échéance. Aucune facture
+          d&apos;abonnement n&apos;est encore émise par le service. Le service reste utilisable dans
+          son offre gratuite, avec les limites annoncées sur la page des tarifs.
+        </p>
+        <p>
+          <ToComplete>
+            date d’ouverture de la commercialisation et applicabilité des stipulations ci-dessous
+            aux abonnements payés manuellement — décision de la dirigeante
+          </ToComplete>
         </p>
         <p>
           Les stipulations qui suivent décrivent le cadre prévu pour les abonnements. Elles ne
@@ -369,9 +381,9 @@ export default function CgvPage(): React.ReactElement {
       lead={
         <p>
           Ce document décrit les conditions d&apos;achat d&apos;un abonnement Lalanda&nbsp;:
-          souscription, essai, paiement, résiliation et remboursement. Il est publié avant
-          l&apos;ouverture de la commercialisation, et le dit&nbsp;: aucun abonnement payant ne peut
-          être souscrit aujourd&apos;hui.
+          souscription, essai, paiement, résiliation et remboursement. Il dit l&apos;état réel du
+          paiement&nbsp;: aujourd&apos;hui, seul le paiement manuel (mobile money ou virement) est
+          en service.
         </p>
       }
       sections={SECTIONS}

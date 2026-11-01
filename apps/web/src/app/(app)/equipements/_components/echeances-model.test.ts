@@ -7,6 +7,7 @@ import type { AssetDeadlineView } from '@/lib/api-assets';
 import {
   grouperEcheances,
   lignesDevises,
+  phraseCoutsInconnus,
   phraseDelai,
   preparerReglages,
   tonEcheance,
@@ -48,6 +49,11 @@ describe('rapports', () => {
       ]),
     ).toEqual(['1 200,00 USD (1 équipement)', '50 000,00 CDF (2 équipements)']);
     expect(lignesDevises(null)).toEqual([]);
+  });
+
+  it('coûts inconnus : comptés à part, jamais comme zéro', () => {
+    expect(phraseCoutsInconnus(1)).toBe('1 équipement au coût inconnu');
+    expect(phraseCoutsInconnus(3)).toBe('3 équipements au coût inconnu');
   });
 });
 

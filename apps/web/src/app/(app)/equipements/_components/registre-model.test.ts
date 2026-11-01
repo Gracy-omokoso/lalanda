@@ -79,6 +79,29 @@ describe('formulaire d’équipement', () => {
     });
   });
 
+  it('coût vide : inconnu (null), jamais « 0 » ; coût masqué : aucun coût envoyé', () => {
+    const base = { ...vide, name: 'Écran', categoryId: 'c1' };
+    const visible = preparerEquipement(
+      { ...base, cost: '  ' },
+      { creation: true, coutMasque: false },
+    );
+    expect(visible.ok && visible.corps.acquisition.cost).toBeNull();
+    // Rôle qui ne voit pas les valeurs (assets.manage sans purchase.read ni treasury.read).
+    const masque = preparerEquipement({ ...base, cost: '' }, { creation: true, coutMasque: true });
+    expect(masque.ok).toBe(true);
+    if (masque.ok) {
+      expect(masque.corps.acquisition).not.toHaveProperty('cost');
+      expect(JSON.stringify(masque.corps)).not.toContain('"0"');
+    }
+  });
+
+  it('modification visible : vider le coût le déclare inconnu', () => {
+    const a = equipement();
+    const f = formulaireEquipement(a, '2026-10-31');
+    const p = preparerModification({ ...f, cost: '' }, a, false);
+    expect(p.ok && p.corps.acquisition?.cost).toBeNull();
+  });
+
   it('modification : révision attendue, coût masqué jamais renvoyé', () => {
     const a = equipement({ valuesHidden: true });
     const f = formulaireEquipement(a, '2026-10-31');

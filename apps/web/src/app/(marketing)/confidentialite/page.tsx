@@ -16,6 +16,9 @@
 //
 // Le traitement le plus sensible est la TRANSMISSION À OPENAI (module `ai/`).
 // Il a sa propre section, détaillée jusqu'au contenu exact de ce qui part.
+// Revue du 1er nov. 2026 : paiement manuel (`apps/api/src/payments/manual.provider.ts`),
+// Lala et ElevenLabs (`apps/api/src/ai/`), brief, business plan, Idea Lab, modules
+// de gestion et RH ajoutés ; « aucun paiement encaissé » retiré (faux).
 // Sources : `apps/api/src/ai/ai-actions.service.ts` (buildUserPrompt),
 // `apps/api/src/ai/openai-client.ts`, `apps/api/src/account/`,
 // `apps/api/src/organizations/`, `docs/17-SECURITE.md`.
@@ -109,6 +112,21 @@ const SECTIONS: readonly LegalSection[] = [
               'Vous',
             ],
             [
+              'Données de gestion de l’organisation',
+              'Selon les modules utilisés : clients, prospects et leurs contacts, devis et factures, fournisseurs et achats, comptes de trésorerie, stocks, équipements, projets et tâches, documents déposés. Ce sont des données d’entreprise, qui peuvent désigner des personnes (contacts, interlocuteurs).',
+              'Vous et les autres membres',
+            ],
+            [
+              'Collaborateurs (module RH)',
+              'Fiches du personnel saisies par l’organisation : identité, poste, coordonnées professionnelles, absences, documents RH.',
+              'Les membres habilités de l’organisation',
+            ],
+            [
+              'Paiement manuel d’un abonnement',
+              'Référence de la demande, offre, période, montant, moyen choisi (mobile money ou virement) et décision de l’administrateur qui confirme ou rejette. Aucune coordonnée du payeur (numéro de téléphone, numéro de compte) n’est enregistrée.',
+              'Vous, puis un administrateur de Lalanda',
+            ],
+            [
               'Acceptation des conditions',
               'Date et version du corpus contractuel accepté. Sert à prouver le consentement et à savoir quand le redemander.',
               'Vous, à l’inscription',
@@ -126,8 +144,11 @@ const SECTIONS: readonly LegalSection[] = [
           ]}
         />
         <p>
-          Nous ne demandons aucune donnée sensible (santé, opinions, appartenance syndicale…) et le
-          service n&apos;a pas de champ prévu pour en recevoir.
+          Nous ne demandons aucune donnée sensible (santé, opinions, appartenance syndicale…), à une
+          exception près&nbsp;: le module RH permet d&apos;enregistrer une absence de type
+          «&nbsp;maladie&nbsp;», ce qui révèle une information liée à la santé d&apos;un
+          collaborateur. Le service n&apos;a pas d&apos;autre champ prévu pour recevoir une donnée
+          sensible.
         </p>
       </>
     ),
@@ -143,6 +164,7 @@ const SECTIONS: readonly LegalSection[] = [
             'Sécuriser les accès : authentification, détection d’un accès anormal, limitation du nombre de requêtes.',
             'Répondre à vos demandes de support.',
             'Prouver l’acceptation des conditions et savoir quand la redemander.',
+            'Gérer le paiement des abonnements : paiement manuel par mobile money ou virement, confirmé par un administrateur de Lalanda après constat du dépôt.',
             'Facturer les abonnements, lorsque la facturation sera en service.',
             'Respecter nos obligations légales et comptables.',
           ]}
@@ -160,17 +182,16 @@ const SECTIONS: readonly LegalSection[] = [
   },
   {
     id: 'ia-openai',
-    title: 'Assistance IA : ce qui est transmis à OpenAI',
+    title: 'Assistance IA : ce qui est transmis à OpenAI et à ElevenLabs',
     body: (
       <>
         <p>
-          Lalanda propose une fonction d&apos;<strong>actions correctives</strong>&nbsp;: à partir
-          des ratios de votre plan qui sortent des seuils attendus, elle suggère des pistes de
-          correction. Pour produire ces suggestions,{' '}
-          <strong>
-            des données de votre projet sont transmises à un prestataire tiers, OpenAI
-          </strong>
-          , qui les traite sur son infrastructure via son interface de programmation.{' '}
+          Plusieurs fonctions d&apos;assistance de Lalanda font appel à un prestataire tiers,{' '}
+          <strong>OpenAI</strong>, qui traite sur son infrastructure, via son interface de
+          programmation, les données que chaque fonction lui transmet. La première est la fonction
+          d&apos;<strong>actions correctives</strong>&nbsp;: à partir des ratios de votre plan qui
+          sortent des seuils attendus, elle suggère des pistes de correction. Les autres sont
+          décrites plus bas.{' '}
           <ToComplete>
             entité juridique contractante d’OpenAI et adresse de son établissement — à relever dans
             le contrat au moment de le conclure, pas à déduire
@@ -182,7 +203,7 @@ const SECTIONS: readonly LegalSection[] = [
           configurée. Nous le disons donc précisément.
         </p>
 
-        <p className="font-semibold">Ce qui est envoyé</p>
+        <p className="font-semibold">Actions correctives : ce qui est envoyé</p>
         <LegalList
           items={[
             'L’identifiant du modèle sectoriel de votre projet (par exemple « commerce de détail »).',
@@ -191,7 +212,7 @@ const SECTIONS: readonly LegalSection[] = [
           ]}
         />
 
-        <p className="font-semibold">Ce qui n&apos;est pas envoyé</p>
+        <p className="font-semibold">Actions correctives : ce qui n&apos;est pas envoyé</p>
         <LegalList
           items={[
             'Ni votre nom, ni votre adresse email, ni aucun identifiant de compte.',
@@ -205,12 +226,35 @@ const SECTIONS: readonly LegalSection[] = [
           activité, même sans votre nom&nbsp;: nous ne les présentons pas comme anonymes.
         </p>
 
+        <p className="font-semibold">Les autres fonctions qui transmettent des données à OpenAI</p>
+        <LegalList
+          items={[
+            'Lala, interprétation et échange sur les résultats : le modèle sectoriel, la devise, le nom de la feuille de résultats et ses lignes (libellé, valeur calculée, format, seuil éventuel), ainsi que les messages que vous écrivez à Lala. Ces lignes peuvent être des états financiers de votre plan.',
+            'Explication du brief du matin : la période, les faits du brief que votre rôle peut voir (ventes, trésorerie, réalisé…), avec leurs valeurs, les alertes et les recommandations du moteur. Aucun nom d’organisation, de client ou d’utilisateur, aucun numéro de facture.',
+            'Brouillon d’une section du business plan : la section et ses questions, vos réponses et le texte actuel de la section, des cartes du Canvas, des hypothèses et des résultats de synthèse du plan. Le texte que vous avez saisi part tel quel.',
+            'Assistance de l’Idea Lab : les champs de la fiche d’idée que vous avez saisis, sans le nom de l’organisation ni des membres, ni les notes d’entretien.',
+          ]}
+        />
+        <p>
+          Ces fonctions transmettent donc, pour certaines, des chiffres de votre plan financier, de
+          votre réalisé ou de votre trésorerie, et du texte libre saisi par vous. Écrire un nom ou
+          une information personnelle dans ce texte le transmet aussi.
+        </p>
+
+        <p className="font-semibold">Appel vocal avec Lala : ElevenLabs</p>
+        <p>
+          Lorsque vous lancez un appel vocal avec Lala, votre navigateur ouvre une session avec un
+          autre prestataire, <strong>ElevenLabs</strong>&nbsp;: votre voix et la conversation sont
+          traitées par ce prestataire. Notre serveur ne lui transmet, pour ouvrir la session, ni
+          votre nom, ni votre organisation, ni les données de votre projet.
+        </p>
+
         <p className="font-semibold">Comment vous y opposer</p>
         <LegalList
           items={[
-            'La fonction ne s’exécute jamais d’elle-même. Aucune donnée ne part tant que vous ne demandez pas explicitement des actions correctives : ne pas utiliser cette fonction suffit à ce qu’aucun transfert n’ait lieu.',
-            'Refuser cette fonction ne dégrade rien d’autre. Les calculs, les états financiers, les ratios et les exports sont produits par le moteur financier de Lalanda, sans aucune intervention d’un modèle d’IA.',
-            'Si vous souhaitez que la fonction soit désactivée pour l’ensemble de votre organisation, écrivez-nous : nous la coupons sur demande.',
+            'Ces fonctions ne s’exécutent jamais d’elles-mêmes. Aucune donnée ne part tant que vous ne déclenchez pas l’une d’elles (demander des actions correctives, une interprétation, une explication, un brouillon, lancer un appel vocal) : ne pas les utiliser suffit à ce qu’aucun transfert n’ait lieu.',
+            'Refuser ces fonctions ne dégrade rien d’autre. Les calculs, les états financiers, les ratios et les exports sont produits par le moteur financier de Lalanda, sans aucune intervention d’un modèle d’IA.',
+            'Si vous souhaitez que ces fonctions soient désactivées pour l’ensemble de votre organisation, écrivez-nous : nous les coupons sur demande.',
           ]}
         />
         <p>
@@ -220,7 +264,7 @@ const SECTIONS: readonly LegalSection[] = [
           </ToComplete>
         </p>
 
-        <p className="font-semibold">Ce que devient la donnée chez OpenAI</p>
+        <p className="font-semibold">Ce que devient la donnée chez les prestataires d&apos;IA</p>
         <p>
           Les suggestions renvoyées ne sont jamais reprises comme chiffres officiels&nbsp;: elles
           sont affichées comme du texte, et le moteur financier reste seul à calculer. Nous
@@ -229,9 +273,9 @@ const SECTIONS: readonly LegalSection[] = [
         </p>
         <p>
           <ToComplete>
-            accord de traitement (DPA) à conclure avec OpenAI, durée de conservation appliquée de
-            leur côté, et instrument encadrant le transfert hors du pays de l’utilisateur — à
-            formaliser avant mise en service commerciale
+            accord de traitement (DPA) à conclure avec OpenAI et ElevenLabs, durée de conservation
+            appliquée de leur côté, et instrument encadrant le transfert hors du pays de
+            l’utilisateur — à formaliser avant mise en service commerciale
           </ToComplete>
         </p>
       </>
@@ -253,12 +297,17 @@ const SECTIONS: readonly LegalSection[] = [
           rows={[
             [
               'OpenAI',
-              'Génération des suggestions d’actions correctives, à partir des ratios en anomalie (voir la section précédente).',
+              'Fonctions d’assistance IA : actions correctives, Lala, explication du brief du matin, brouillons du business plan, Idea Lab (voir la section précédente).',
+              'En service dès qu’une clé d’accès est configurée',
+            ],
+            [
+              'ElevenLabs',
+              'Appel vocal avec Lala : traitement de la voix et de la conversation (voir la section précédente).',
               'En service dès qu’une clé d’accès est configurée',
             ],
             [
               'DigitalOcean',
-              'Hébergement des serveurs, de la base de données et du stockage des fichiers exportés.',
+              'Hébergement des serveurs, de la base de données et du stockage des fichiers (exports et documents déposés).',
               'En service',
             ],
             [
@@ -268,11 +317,17 @@ const SECTIONS: readonly LegalSection[] = [
             ],
             [
               <ToComplete key="p">prestataire de paiement</ToComplete>,
-              'Encaissement des abonnements et émission des factures.',
-              'Aucune intégration de paiement — voir les CGV',
+              'Paiement en ligne des abonnements (carte, PayPal) et émission des factures.',
+              'Non désigné dans cette politique — le paiement manuel, lui, ne passe par aucun prestataire de Lalanda',
             ],
           ]}
         />
+        <p>
+          Le paiement manuel d&apos;un abonnement (mobile money ou virement) n&apos;implique aucun
+          prestataire de paiement côté Lalanda&nbsp;: vous effectuez le dépôt auprès de votre
+          opérateur ou de votre banque, puis un administrateur de Lalanda constate la réception et
+          confirme la demande.
+        </p>
         <p>
           La dernière ligne décrit un rôle prévu, sans prestataire choisi. Nous la faisons figurer
           pour que cette page ne devienne pas fausse le jour où il le sera&nbsp;: sa mise en service
@@ -292,9 +347,9 @@ const SECTIONS: readonly LegalSection[] = [
     body: (
       <>
         <p>
-          Certaines données quittent votre pays. C&apos;est déjà le cas pour la fonction
-          d&apos;actions correctives, traitée par OpenAI, et pour l&apos;hébergement, assuré par
-          DigitalOcean.
+          Certaines données quittent votre pays. C&apos;est déjà le cas pour les fonctions
+          d&apos;assistance IA, traitées par OpenAI, pour l&apos;appel vocal, traité par ElevenLabs,
+          et pour l&apos;hébergement, assuré par DigitalOcean.
         </p>
         <p>
           <ToComplete>
@@ -389,7 +444,7 @@ const SECTIONS: readonly LegalSection[] = [
             'Accéder aux données que nous détenons sur vous.',
             'Les corriger si elles sont inexactes — la plupart sont modifiables directement dans votre espace compte.',
             'Les supprimer : la suppression du compte est disponible en libre-service et prend effet immédiatement.',
-            'Vous opposer à la transmission de données de projet à OpenAI, en n’utilisant pas la fonction d’actions correctives ou en nous demandant de la désactiver.',
+            'Vous opposer à la transmission de données à OpenAI ou à ElevenLabs, en n’utilisant pas les fonctions d’assistance IA ou en nous demandant de les désactiver.',
             'Récupérer vos données de projet, que les exports du service produisent au format PDF et Excel.',
             'Retirer votre consentement aux cookies non essentiels, à tout moment, depuis la politique de cookies.',
             'Introduire une réclamation auprès d’une autorité de protection des données.',
@@ -417,7 +472,11 @@ const SECTIONS: readonly LegalSection[] = [
           des conséquences visibles pour vous&nbsp;:
         </p>
         <LegalList
-          items={['Aucun paiement n’est encaissé : il n’existe pas d’intégration de paiement.']}
+          items={[
+            'Le paiement en service est le paiement manuel, par mobile money ou virement : l’abonnement est activé lorsqu’un administrateur de Lalanda a constaté le dépôt, et il ne se renouvelle pas automatiquement.',
+            'Le paiement en ligne (carte, PayPal) n’est ouvert que lorsqu’un prestataire est configuré ; son ouverture donnera lieu à une mise à jour de cette politique.',
+            'Aucune facture d’abonnement n’est encore émise par le service.',
+          ]}
         />
         <p>
           Ces manques seront comblés. Ils sont mentionnés ici parce qu&apos;une politique de
@@ -462,7 +521,7 @@ export default function ConfidentialitePage(): React.ReactElement {
           Cette page décrit ce que Lalanda fait de vos données&nbsp;: ce que nous collectons, à quoi
           cela sert, qui y accède et ce que vous pouvez exiger. Elle décrit le service tel
           qu&apos;il fonctionne réellement aujourd&apos;hui — y compris la transmission de certaines
-          données de projet à OpenAI pour la fonction d&apos;actions correctives, et y compris ce
+          données à OpenAI et à ElevenLabs pour les fonctions d&apos;assistance IA, et y compris ce
           qui n&apos;existe pas encore.
         </p>
       }

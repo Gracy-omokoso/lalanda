@@ -13,6 +13,8 @@
 //
 // ADR-0040 — C0 § 4.4 : sans `treasury.read`, aucun fait de trésorerie (solde
 // déclaré, soldes des comptes, autonomie) n'est lu ni rendu, sur les cinq lectures.
+// Sans `project.read`, aucun chiffre du réalisé (consommation, marges, croissance du
+// CA réalisé, autonomie) n'est rendu (amendement d'ADR-0032 du 1er nov. 2026).
 
 import {
   Body,
@@ -79,7 +81,10 @@ export interface GrowJourneyResponse {
  * (ADR-0041 § 9.4, A3 : titre + écart). Membre inconnu : rien de sensible.
  */
 function accessOf(perms: CurrentOrgPermissionsValue | undefined): GrowReadAccess {
-  return { treasury: perms !== undefined && can(perms.role, 'treasury.read', perms.context) };
+  return {
+    treasury: perms !== undefined && can(perms.role, 'treasury.read', perms.context),
+    project: perms !== undefined && can(perms.role, 'project.read', perms.context),
+  };
 }
 
 function actorOf(user: { id: string }, role: OrgRole | undefined): GrowActor {

@@ -25,7 +25,9 @@ import {
   type CreateProjectFromQuoteBody,
   type PrepareInvoiceBody,
   type WorkInvoiceLinkView,
+  type WorkProjectFromOpportunityView,
   type WorkProjectView,
+  type WorkProjectWarning,
   type WorkTaskView,
 } from '@lalanda/shared/work';
 import { Inject, Injectable } from '@nestjs/common';
@@ -317,12 +319,14 @@ export class WorkBillingService {
    * posé). Sans devis : une tâche par ligne de l'opportunité, sans montant,
    * `source.kind = 'opportunity'`, idempotent par l'index unique partiel.
    * Désigner un devis (`quoteId`) exige en plus `sales.read` (droits effectifs).
+   * Sans `sales.read`, le devis accepté n'est jamais lu : le projet reprend les
+   * lignes de l'opportunité et la réponse porte l'avertissement `QUOTE_LINES_HIDDEN`.
    */
   async createFromOpportunity(
     organizationId: string,
     body: CreateProjectFromOpportunityBody,
     actor: WorkActor,
-  ): Promise<WorkProjectView> {
+  ): Promise<WorkProjectFromOpportunityView> {
     const opp = await this.opportunityOf(organizationId, body.opportunityId);
     const opportunityId = String(opp._id);
     const existing = await this.projectModel
@@ -338,9 +342,14 @@ export class WorkBillingService {
       );
     }
 
-    const quoteId = await this.acceptedQuoteOf(organizationId, opportunityId, body, actor);
+    const { quoteId, quoteHidden } = await this.acceptedQuoteOf(
+      organizationId,
+      opportunityId,
+      body,
+      actor,
+    );
     if (quoteId !== null) {
-      return this.createFromQuote(
+      const project = await this.createFromQuote(
         organizationId,
         {
           quoteId,
@@ -350,13 +359,23 @@ export class WorkBillingService {
         },
         actor,
       );
+      return { ...project, warnings: [] };
     }
+    const warnings: WorkProjectWarning[] = quoteHidden
+      ? [
+          {
+            code: 'QUOTE_LINES_HIDDEN',
+            message:
+              'Un devis accepté existe, mais vous ne consultez pas les ventes : le projet reprend les lignes de l’opportunité, pas celles du devis.',
+          },
+        ]
+      : [];
 
     const picked = pickOpportunityLines(opp, body.lineIndexes);
     await this.assertProjectRoom(organizationId);
     const customerId = await this.customerOfOpportunity(organizationId, opp);
     const name = projectNameOf(body.name ?? opp.title, 'Projet de l’opportunité');
-    return this.materialize(
+    const project = await this.materialize(
       organizationId,
       {
         name,
@@ -379,6 +398,7 @@ export class WorkBillingService {
       },
       actor,
     );
+    return { ...project, warnings };
   }
 
   /** Projet issu de cette opportunité (ou d'un de ses devis), ou `null`. */
@@ -413,13 +433,16 @@ export class WorkBillingService {
    * Devis accepté auquel déléguer : `quoteId` (exige `sales.read`, doit appartenir
    * à l'opportunité), sinon l'unique devis accepté de l'opportunité, sinon `null`.
    * Plusieurs devis acceptés sans choix : `409 WORK_OPPORTUNITY_QUOTE_REQUIRED`.
+   *
+   * Sans `sales.read` EFFECTIF (ADR-0041), aucun devis n'est retenu ni lu : on ne
+   * regarde que l'existence d'un devis accepté, pour l'avertissement (`quoteHidden`).
    */
   private async acceptedQuoteOf(
     organizationId: string,
     opportunityId: string,
     body: CreateProjectFromOpportunityBody,
     actor: WorkActor,
-  ): Promise<string | null> {
+  ): Promise<{ quoteId: string | null; quoteHidden: boolean }> {
     if (body.quoteId !== undefined) {
       // Droits EFFECTIFS de l'appelant (ADR-0041), pas le seul rôle.
       if (!actorCan(actor, 'sales.read')) {
@@ -433,7 +456,13 @@ export class WorkBillingService {
           `Le devis ${quote.number} n’est pas rattaché à cette opportunité.`,
         );
       }
-      return body.quoteId;
+      return { quoteId: body.quoteId, quoteHidden: false };
+    }
+    if (!actorCan(actor, 'sales.read')) {
+      const one = await this.connection
+        .collection(QUOTES)
+        .countDocuments({ organizationId, opportunityId, status: 'accepted' }, { limit: 1 });
+      return { quoteId: null, quoteHidden: one > 0 };
     }
     const accepted = await this.connection
       .collection(QUOTES)
@@ -442,14 +471,14 @@ export class WorkBillingService {
         { projection: { _id: 1 }, limit: 2 },
       )
       .toArray();
-    if (accepted.length === 1) return String(accepted[0]!._id);
+    if (accepted.length === 1) return { quoteId: String(accepted[0]!._id), quoteHidden: false };
     if (accepted.length > 1) {
       conflict(
         'WORK_OPPORTUNITY_QUOTE_REQUIRED',
         'Plusieurs devis de cette opportunité sont acceptés : choisissez celui que le projet suit.',
       );
     }
-    return null;
+    return { quoteId: null, quoteHidden: false };
   }
 
   /** Client du compte de l'opportunité (`null` pour un prospect). */

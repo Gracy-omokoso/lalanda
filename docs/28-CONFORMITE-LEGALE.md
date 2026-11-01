@@ -360,6 +360,33 @@ affirmé sur ses garanties contractuelles, sa localisation ou ses durées de
 conservation : ces points relèvent du marqueur « Transferts » et des questions
 du § 1.3.
 
+### 2.5 ter Revue factuelle des pages légales (1er nov. 2026)
+
+Relecture des cinq pages contre le code ; seules les affirmations **fausses** ont
+été corrigées, aucun marqueur « À COMPLÉTER » n’a été retiré, `LEGAL_VERSION`
+n’a pas changé.
+
+- **Paiement** : « aucun paiement n’est encaissé » (confidentialité) et « aucun
+  moyen de paiement n’est en service » (CGV) étaient faux. Le paiement **manuel**
+  (mobile money ou virement, confirmé par un administrateur plateforme,
+  `apps/api/src/payments/manual.provider.ts`) fonctionne, sans renouvellement
+  automatique et sans coordonnées du payeur enregistrées ; aucune facture
+  d’abonnement n’est émise. Les CGV disent cet état et portent un nouveau
+  marqueur : applicabilité des stipulations aux abonnements payés manuellement.
+  **Ce point change le fond du contrat : une nouvelle acceptation est à décider
+  par la dirigeante.**
+- **IA** : la politique ne citait que les actions correctives. Elle décrit
+  désormais aussi Lala (interprétation, échange), l’explication du brief du
+  matin, les brouillons du business plan et l’Idea Lab (OpenAI), et l’appel
+  vocal (**ElevenLabs**, nouveau sous-traitant). La phrase « ni les états
+  financiers, ni vos données de réalisé » ne vaut plus que pour les actions
+  correctives.
+- **Données** : catégories ajoutées (données de gestion, collaborateurs RH,
+  paiement manuel) ; l’absence de type « maladie » du module RH contredisait
+  « aucun champ prévu » pour une donnée de santé.
+- **Cookies** : `active_org_id` dure un an (et non « la session ») ; autres clés
+  de stockage local et de session listées.
+
 ### 2.6 Pieds de page
 
 Les cinq documents sont liés depuis :

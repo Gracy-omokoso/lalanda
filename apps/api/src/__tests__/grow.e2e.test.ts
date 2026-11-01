@@ -11,6 +11,10 @@
 //    point de checklist automatique.
 // 6. GROW lit : aucune donnée de BUILD ni de RUN n'est modifiée par ses routes.
 // 7. Isolation : une autre organisation ne voit rien.
+// 8. Réalisé (ADR-0040 § 4.4, amendement d'ADR-0032 du 1er nov. 2026) : sans
+//    `project.read` EFFECTIF, consommation, marges, croissance du CA réalisé et
+//    autonomie sont `REALISE_MASQUE` — Commercial, Conseiller privé du droit ;
+//    le Propriétaire et le Conseiller par défaut les voient.
 
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
@@ -31,6 +35,7 @@ e2eSuite('GROW — santé, indicateurs investisseurs, parcours (ADR-0032)', () =
   const owner = user('owner');
   const advisor = user('advisor');
   const viewer = user('viewer');
+  const salesRep = user('salesrep');
   const outsider = user('outsider');
 
   const cookies: Record<string, string[]> = {};
@@ -74,6 +79,7 @@ e2eSuite('GROW — santé, indicateurs investisseurs, parcours (ADR-0032)', () =
     cookies['owner'] = await registerAndLogin(app, owner);
     cookies['advisor'] = await registerAndLogin(app, advisor);
     cookies['viewer'] = await registerAndLogin(app, viewer);
+    cookies['salesrep'] = await registerAndLogin(app, salesRep);
     cookies['outsider'] = await registerAndLogin(app, outsider);
     orgId = await orgOf('owner');
     outsiderOrgId = await orgOf('outsider');
@@ -92,7 +98,7 @@ e2eSuite('GROW — santé, indicateurs investisseurs, parcours (ADR-0032)', () =
         .collection('sales_invoices')
         .deleteMany({ organizationId: { $in: [orgId, outsiderOrgId] } });
     }
-    await teardown(app, [owner.email, advisor.email, viewer.email, outsider.email]);
+    await teardown(app, [owner.email, advisor.email, viewer.email, salesRep.email, outsider.email]);
   }, 60_000);
 
   // ─── 1. Forfait ──────────────────────────────────────────────────────────────
@@ -326,6 +332,90 @@ e2eSuite('GROW — santé, indicateurs investisseurs, parcours (ADR-0032)', () =
       .delete('/grow/declared-cash')
       .set('Cookie', cookies['viewer']!);
     expect(del.status).toBe(403);
+  }, 120_000);
+
+  // ─── 4 bis. Réalisé masqué sans `project.read` (ADR-0040 § 4.4) ─────────────
+  it('réalisé : masqué sans `project.read` effectif (Commercial, Conseiller privé du droit), visible pour le Propriétaire', async () => {
+    const REALISE = ['burn_rate', 'marge_brute', 'marge_nette', 'croissance_ca_realise'] as const;
+    await invite(salesRep.email, 'sales_rep', 'salesrep');
+
+    // Propriétaire : chiffres du réalisé publiés.
+    const own = await get('/grow/indicators', 'owner');
+    expect(own.status).toBe(200);
+    expect(own.body.indicateurs.burn_rate).toMatchObject({ disponible: true, valeur: 200 });
+    expect(own.body.indicateurs.marge_brute).toMatchObject({ disponible: true, valeur: 0.6 });
+    expect(own.body.indicateurs.runway.disponible).toBe(true);
+
+    const masque = async (who: string): Promise<void> => {
+      const ind = await get('/grow/indicators', who);
+      const health = await get('/grow/health', who);
+      const journey = await get('/grow/journey', who);
+      for (const res of [ind, health, journey]) {
+        expect(res.status, `${who} ${JSON.stringify(res.body)}`).toBe(200);
+      }
+      for (const code of REALISE) {
+        expect(ind.body.indicateurs[code], `${who} ${code}`).toEqual({
+          code,
+          libelle: expect.any(String),
+          disponible: false,
+          raison: 'REALISE_MASQUE',
+          message: expect.any(String),
+          sources: [],
+          hypotheses: [],
+        });
+        // Statut masqué explicite : jamais un zéro.
+        expect(ind.body.indicateurs[code]).not.toHaveProperty('valeur');
+      }
+      expect(ind.body.indicateurs.runway.disponible, who).toBe(false);
+      const corps = JSON.stringify([ind.body, health.body, journey.body]);
+      expect(corps, who).not.toContain('build.actuals');
+      const finance = (
+        health.body.health.axes as { axe: string; metriques: { raison: string | null }[] }[]
+      ).find((a) => a.axe === 'finance');
+      expect(
+        finance?.metriques.map((m) => m.raison),
+        who,
+      ).toEqual(['REALISE_MASQUE']);
+      // Les ventes, elles, ne relèvent pas du réalisé : la concentration reste calculée.
+      expect(ind.body.indicateurs.concentration_clients.disponible, who).toBe(true);
+    };
+
+    // Commercial : ni `project.read` ni `treasury.read`.
+    await masque('salesrep');
+    const com = await get('/grow/indicators', 'salesrep');
+    expect(com.body.indicateurs.runway.raison).toBe('TRESORERIE_MASQUEE');
+
+    // Conseiller : `project.read` par défaut → le réalisé lui est montré…
+    const adv = await get('/grow/indicators', 'advisor');
+    expect(adv.body.indicateurs.burn_rate).toMatchObject({ disponible: true, valeur: 200 });
+    // … et masqué dès que le droit lui est retiré (droits EFFECTIFS, ADR-0041).
+    const members = await get(`/organizations/${orgId}/members`, 'owner');
+    expect(members.status).toBe(200);
+    const m = (
+      members.body.members as { userId: string; email: string; permissionsRevision: number }[]
+    ).find((x) => x.email === advisor.email)!;
+    // Interrupteur d'ADR-0041 allumé le temps de cette vérification seulement.
+    const interrupteur = process.env['MEMBER_PERMISSIONS_ENABLED'];
+    process.env['MEMBER_PERMISSIONS_ENABLED'] = 'true';
+    try {
+      const retrait = await request(server())
+        .patch(`/organizations/${orgId}/members/${m.userId}/permissions`)
+        .set('Cookie', cookies['owner']!)
+        .send({ grants: [], revokes: ['project.read'], expectedRevision: m.permissionsRevision });
+      expect(retrait.status, JSON.stringify(retrait.body)).toBe(200);
+      await masque('advisor');
+      // Sans `treasury.read` non plus : la raison de trésorerie prime sur l'autonomie.
+      expect((await get('/grow/indicators', 'advisor')).body.indicateurs.runway.raison).toBe(
+        'TRESORERIE_MASQUEE',
+      );
+    } finally {
+      if (interrupteur === undefined) delete process.env['MEMBER_PERMISSIONS_ENABLED'];
+      else process.env['MEMBER_PERMISSIONS_ENABLED'] = interrupteur;
+    }
+
+    // Le Propriétaire n'est pas touché par le retrait d'un autre membre.
+    const own2 = await get('/grow/indicators', 'owner');
+    expect(own2.body.indicateurs.marge_nette.disponible).toBe(true);
   }, 120_000);
 
   // ─── 5. Validation de la fiche ───────────────────────────────────────────────

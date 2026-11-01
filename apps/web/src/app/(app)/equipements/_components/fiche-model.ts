@@ -79,7 +79,13 @@ export type PhraseEstimation =
 const MOTIFS: Record<string, string> = {
   NO_DURATION: 'aucune durée n’est saisie pour cet équipement',
   RESIDUAL_ABOVE_COST: 'la valeur résiduelle saisie dépasse le coût d’acquisition',
+  UNKNOWN_COST: 'le coût d’acquisition est inconnu',
 };
+
+/** Coût d'acquisition affiché : « Inconnu » quand il n'est pas saisi, jamais « 0 ». */
+export function texteCoutAcquisition(cost: string | null, formater: (v: string) => string): string {
+  return cost === null ? 'Inconnu' : formater(cost);
+}
 
 /** Motif lisible d'une estimation impossible ; un code inconnu reste lisible. */
 export function motifNonEstimable(reason: string | null): string {

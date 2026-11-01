@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ETIQUETTE_ESTIMATION,
   gestesEquipement,
+  motifNonEstimable,
   phraseEstimation,
   preparerAffectation,
   preparerCession,
@@ -14,6 +15,7 @@ import {
   preparerMaintenance,
   typesBeneficiaire,
   formulaireCouverture,
+  texteCoutAcquisition,
 } from './fiche-model';
 import { GESTIONNAIRE, LECTEUR_RH, equipement } from './fixtures.test-utils';
 
@@ -81,6 +83,14 @@ describe('amortissement indicatif', () => {
   it('valeurs masquées ou affichage éteint', () => {
     expect(phraseEstimation(equipement(), false).etat).toBe('masquee');
     expect(phraseEstimation(equipement(), true).etat).toBe('eteinte');
+  });
+});
+
+describe('coût d’acquisition inconnu', () => {
+  it('affiché « Inconnu », jamais « 0 » ; motif lisible du non-estimable', () => {
+    expect(texteCoutAcquisition(null, (v) => `${v} USD`)).toBe('Inconnu');
+    expect(texteCoutAcquisition('0.00', (v) => `${v} USD`)).toBe('0.00 USD');
+    expect(motifNonEstimable('UNKNOWN_COST')).toBe('le coût d’acquisition est inconnu');
   });
 });
 

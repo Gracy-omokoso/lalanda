@@ -11,6 +11,11 @@
 // droit, ni les soldes des comptes ni le solde déclaré ne sont LUS (masquer après
 // lecture laisserait la donnée transiter), et l'autonomie (`runway`) est rendue
 // indisponible pour la raison `TRESORERIE_MASQUEE` avant le score et le parcours.
+//
+// Même règle pour le réalisé (ADR-0040 § 4.4, amendement d'ADR-0032 du 1er nov. 2026) :
+// sans `project.read`, la consommation (burn), les marges, la croissance du CA
+// réalisé — et l'autonomie, qui divise par la consommation — sont rendues
+// indisponibles pour la raison `REALISE_MASQUE`, avant le score et le parcours.
 
 import {
   computeHealthScore,
@@ -49,10 +54,51 @@ const SALES_HISTORY_DAYS = 800;
 /** Raison rendue pour un fait de trésorerie masqué faute de `treasury.read`. */
 export const GROW_TREASURY_HIDDEN_REASON = 'TRESORERIE_MASQUEE' as const;
 
+/** Raison rendue pour un indicateur issu du réalisé masqué faute de `project.read`. */
+export const GROW_ACTUALS_HIDDEN_REASON = 'REALISE_MASQUE' as const;
+
+/** Indicateurs calculés sur le réalisé des initiatives (ADR-0032 § 3). */
+export const GROW_ACTUALS_INDICATORS = [
+  'burn_rate',
+  'marge_brute',
+  'marge_nette',
+  'croissance_ca_realise',
+] as const;
+
 /** Ce que l'appelant peut lire (ADR-0040 § 4.4) ; par défaut, tout. */
 export interface GrowReadAccess {
   /** `treasury.read` : soldes des comptes et solde déclaré. */
   treasury: boolean;
+  /** `project.read` : réalisé des initiatives (consommation, marges, croissance). */
+  project: boolean;
+}
+
+const ACTUALS_HIDDEN_MESSAGE =
+  'Cet indicateur se calcule sur le réalisé des initiatives, réservé aux rôles qui les consultent.';
+
+/**
+ * Indicateurs sans aucun chiffre du réalisé : consommation, marges et croissance du
+ * CA réalisé deviennent indisponibles, sans valeur, sans source ni hypothèse. Le
+ * runway, quotient du solde par la consommation, la trahirait : il est masqué aussi
+ * (sauf s'il l'est déjà pour la trésorerie, dont la raison est conservée).
+ */
+export function withoutActuals(result: GrowIndicatorsResult): GrowIndicatorsResult {
+  const hide = (code: GrowIndicatorUnavailable['code']): GrowIndicatorUnavailable => ({
+    code,
+    libelle: result.indicateurs[code].libelle,
+    disponible: false,
+    raison: GROW_ACTUALS_HIDDEN_REASON,
+    message: ACTUALS_HIDDEN_MESSAGE,
+    sources: [],
+    hypotheses: [],
+  });
+  const indicateurs = { ...result.indicateurs };
+  for (const code of GROW_ACTUALS_INDICATORS) indicateurs[code] = hide(code);
+  const runway = result.indicateurs.runway;
+  if (runway.disponible || runway.raison !== GROW_TREASURY_HIDDEN_REASON) {
+    indicateurs.runway = hide('runway');
+  }
+  return { ...result, indicateurs };
 }
 
 /**
@@ -106,7 +152,7 @@ export class GrowReaderService {
   async snapshot(
     orgId: string,
     now: Date = new Date(),
-    access: GrowReadAccess = { treasury: true },
+    access: GrowReadAccess = { treasury: true, project: true },
   ): Promise<GrowSnapshot> {
     const asOf = kinshasaDateOf(now.toISOString())!;
     const since = new Date(now.getTime() - SALES_HISTORY_DAYS * 24 * 60 * 60 * 1000);
@@ -184,7 +230,8 @@ export class GrowReaderService {
             },
       recurringCatalogItemIds: profile.recurringCatalogItemIds,
     });
-    const indicators = access.treasury ? computed : withoutTreasury(computed);
+    const withTreasuryRule = access.treasury ? computed : withoutTreasury(computed);
+    const indicators = access.project ? withTreasuryRule : withoutActuals(withTreasuryRule);
     const journey = suggestJourneyStage({
       indicators,
       projects: projects.length,

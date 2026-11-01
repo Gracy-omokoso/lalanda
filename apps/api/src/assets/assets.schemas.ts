@@ -21,7 +21,8 @@ import type { HydratedDocument, Types } from 'mongoose';
 
 export interface AssetAcquisitionDoc {
   on: string;
-  cost: string;
+  /** `null` (ou absent sur un document ancien) = coût inconnu, jamais « 0 ». */
+  cost: string | null;
   currency: AssetCurrency;
   supplierId: string | null;
   supplierInvoiceId: string | null;

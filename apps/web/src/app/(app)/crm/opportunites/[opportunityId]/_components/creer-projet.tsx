@@ -14,7 +14,13 @@ import { useEffect, useState } from 'react';
 import type { OrgAction } from '@/lib/api';
 import { workBillingApi, workErrorCode, workErrorDetails } from '@/lib/work-billing-api';
 
-import { etatCreerProjet, lienProjet, peutLireProjet, suiteRefus } from './creer-projet-model';
+import {
+  etatCreerProjet,
+  lienProjet,
+  peutLireProjet,
+  suiteCreation,
+  suiteRefus,
+} from './creer-projet-model';
 
 export function CreerProjet({
   opportunityId,
@@ -30,6 +36,7 @@ export function CreerProjet({
   const [projectId, setProjectId] = useState<string | null | undefined>(undefined);
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
+  const [avertissements, setAvertissements] = useState<string[]>([]);
 
   useEffect(() => {
     if (!lire) return;
@@ -49,13 +56,20 @@ export function CreerProjet({
 
   const etat = etatCreerProjet({ status, actions, projectId });
   if (etat.genre === 'cache' || etat.genre === 'chargement') return null;
+  // Créé avec un avertissement : on reste ici pour le montrer, avec le lien du projet.
+  const cree = avertissements.length > 0 && typeof projectId === 'string' ? projectId : null;
 
   async function creer(): Promise<void> {
     setEnvoi(true);
     setErreur(null);
     try {
       const p = await workBillingApi.createFromOpportunity({ opportunityId });
-      router.push(lienProjet(p.id));
+      const suite = suiteCreation(p);
+      if ('aller' in suite) router.push(suite.aller);
+      else {
+        setAvertissements(suite.avertissements);
+        setProjectId(suite.projectId);
+      }
     } catch (err) {
       const suite = suiteRefus(workErrorCode(err), workErrorDetails(err));
       if ('projectId' in suite) setProjectId(suite.projectId);
@@ -70,7 +84,23 @@ export function CreerProjet({
       aria-label="Projet de l’opportunité"
       className="flex flex-col gap-2 rounded-[var(--radius-lg)] border border-[color-mix(in_srgb,var(--ok)_40%,transparent)] bg-[color-mix(in_srgb,var(--ok)_10%,var(--surface))] p-4 text-sm sm:flex-row sm:items-center sm:justify-between"
     >
-      {etat.genre === 'ouvrir' ? (
+      {cree !== null ? (
+        <>
+          <div role="status" className="flex flex-col gap-1">
+            <p>
+              <strong>Projet créé.</strong>
+            </p>
+            {avertissements.map((a) => (
+              <p key={a}>
+                <strong>Attention :</strong> {a}
+              </p>
+            ))}
+          </div>
+          <Link href={lienProjet(cree)} className={buttonClasses('secondary', 'sm')}>
+            Ouvrir le projet
+          </Link>
+        </>
+      ) : etat.genre === 'ouvrir' ? (
         <>
           <p>Un projet suit l’exécution de cette opportunité gagnée.</p>
           <Link href={lienProjet(etat.projectId)} className={buttonClasses('secondary', 'sm')}>

@@ -13,7 +13,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Toute évolution d'un calcul de ce module incrémente cette version. */
-export const ASSETS_VERSION = '1.0.0';
+export const ASSETS_VERSION = '1.1.0';
 
 /** Devises des équipements (ADR-0046 § 1). */
 export const ASSET_CURRENCIES = ['CDF', 'USD'] as const;
@@ -62,7 +62,12 @@ export type AssetDisposalKind = (typeof ASSET_DISPOSAL_KINDS)[number];
 
 export interface AssetAcquisitionInput {
   on: AssetDay;
-  cost: AssetAmount;
+  /**
+   * Coût d'acquisition ; absent ou `null` = INCONNU (jamais lu comme zéro) : non
+   * estimable pour l'estimation de gestion et le coût total de possession, exclu
+   * des sommes du registre (et compté à part).
+   */
+  cost?: AssetAmount | null;
   currency: AssetCurrency;
 }
 
@@ -104,7 +109,9 @@ export type NotEstimableReason =
   /** Aucune durée saisie (paramètres absents ou `years` nul). */
   | 'NO_DURATION'
   /** Valeur résiduelle supérieure au coût d'acquisition. */
-  | 'RESIDUAL_ABOVE_COST';
+  | 'RESIDUAL_ABOVE_COST'
+  /** Coût d'acquisition inconnu (non saisi). */
+  | 'UNKNOWN_COST';
 
 export interface ManagementEstimateUnavailable {
   version: string;
@@ -277,11 +284,17 @@ export interface AssetRegisterSummary {
     count: number;
     byStatus: { status: AssetStatus; count: number }[];
     acquisitionCosts: AssetCurrencyTotal[];
+    /** Équipements de la catégorie au coût inconnu, exclus des sommes. */
+    unknownCostCount: number;
   }[];
-  /** Tous les équipements, cédés compris. */
+  /** Tous les équipements, cédés compris (coûts connus seulement). */
   acquisitionCosts: AssetCurrencyTotal[];
-  /** Hors équipements cédés. */
+  /** Hors équipements cédés (coûts connus seulement). */
   activeAcquisitionCosts: AssetCurrencyTotal[];
+  /** Équipements au coût inconnu, cédés compris, exclus des sommes. */
+  unknownCostCount: number;
+  /** Équipements non cédés au coût inconnu. */
+  activeUnknownCostCount: number;
   /** Présent seulement si une date est fournie ; hors équipements cédés à cette date. */
   managementEstimate: {
     label: typeof MANAGEMENT_ESTIMATE_LABEL;
@@ -295,7 +308,14 @@ export interface TotalCostOfOwnership {
   version: string;
   assetId: string;
   until: AssetDay | null;
-  /** Par devise, jamais convertie. */
+  /**
+   * `false` quand le coût d'acquisition, compris dans la période, est inconnu :
+   * aucun total n'est publié (`byCurrency` vide), jamais un total amputé.
+   */
+  estimable: boolean;
+  /** `UNKNOWN_COST` quand `estimable` est faux, sinon `null`. */
+  reason: 'UNKNOWN_COST' | null;
+  /** Par devise, jamais convertie ; vide si non estimable. */
   byCurrency: {
     currency: AssetCurrency;
     acquisition: AssetAmount;

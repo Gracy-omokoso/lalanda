@@ -34,6 +34,7 @@ import {
   ProjectMarginQuery,
   type ProjectMarginView,
   type WorkInvoiceLinkView,
+  type WorkProjectFromOpportunityView,
   type WorkProjectView,
 } from '@lalanda/shared/work';
 
@@ -88,7 +89,8 @@ export class WorkBillingController {
   /**
    * ADR-0040 — C7 § 6.4 : opportunité gagnée → projet. `sales.read` n'est exigé
    * que pour désigner un devis (`quoteId`) : contrôle dans le service, sur les
-   * droits EFFECTIFS de l'appelant (ADR-0041).
+   * droits EFFECTIFS de l'appelant (ADR-0041). Sans `sales.read`, le devis accepté
+   * n'est pas repris : lignes de l'opportunité, avertissement `QUOTE_LINES_HIDDEN`.
    */
   @Post('projects/from-opportunity')
   @RequirePermission('work.manage', 'crm.read')
@@ -97,7 +99,7 @@ export class WorkBillingController {
     @CurrentUser() user: BillingUser,
     @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Body() body: unknown,
-  ): Promise<WorkProjectView> {
+  ): Promise<WorkProjectFromOpportunityView> {
     const parsed = CreateProjectFromOpportunityBody.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error);
     return this.billing.createFromOpportunity(orgId, parsed.data, workActorOf(user, perms));

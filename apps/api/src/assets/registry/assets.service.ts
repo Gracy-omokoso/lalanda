@@ -300,6 +300,8 @@ export class AssetsService {
         covers.map(engineCoverageOf),
       );
       tco = {
+        estimable: r.estimable,
+        reason: r.reason,
         byCurrency: r.byCurrency.map((c) => ({ ...c })),
         maintenanceCount: r.maintenanceCount,
         unpricedMaintenanceCount: r.unpricedMaintenanceCount,
@@ -356,7 +358,7 @@ export class AssetsService {
     reader: AssetReader,
   ): Promise<AssetDetailView> {
     await this.settings.requireActiveCategory(organizationId, body.categoryId, actor.userId);
-    const acquisition = await this.acquisitionOf(organizationId, body.acquisition);
+    const acquisition = await this.acquisitionOf(organizationId, body.acquisition, null);
     if (body.stockItemId) await this.links.assertStockItem(organizationId, body.stockItemId);
     if (body.locationId) await this.links.assertLocation(organizationId, body.locationId);
     let id = '';
@@ -436,7 +438,11 @@ export class AssetsService {
       if (body[k] !== undefined) set[k] = body[k];
     }
     if (body.acquisition !== undefined) {
-      set['acquisition'] = await this.acquisitionOf(organizationId, body.acquisition);
+      set['acquisition'] = await this.acquisitionOf(
+        organizationId,
+        body.acquisition,
+        current.acquisition.cost ?? null,
+      );
     }
     if (body.stockItemId !== undefined) {
       if (body.stockItemId) await this.links.assertStockItem(organizationId, body.stockItemId);
@@ -898,10 +904,13 @@ export class AssetsService {
         count: c.count,
         byStatus: c.byStatus,
         acquisitionCosts: v ? c.acquisitionCosts : null,
+        unknownCostCount: v ? c.unknownCostCount : null,
       })),
       assigned,
       acquisitionCosts: v ? summary.acquisitionCosts : null,
       activeAcquisitionCosts: v ? summary.activeAcquisitionCosts : null,
+      unknownCostCount: v ? summary.unknownCostCount : null,
+      activeUnknownCostCount: v ? summary.activeUnknownCostCount : null,
       managementEstimate:
         v && summary.managementEstimate
           ? { ...summary.managementEstimate, notice: MANAGEMENT_ESTIMATE_NOTICE }
@@ -941,7 +950,7 @@ export class AssetsService {
         a ? (a.name ?? null) : null,
         d.currentAssignment?.from ?? null,
         d.acquisition.on,
-        reader.visible ? d.acquisition.cost : null,
+        reader.visible ? (d.acquisition.cost ?? null) : null,
         reader.visible ? d.acquisition.currency : null,
         d.disposal?.on ?? null,
       ];
@@ -999,7 +1008,7 @@ export class AssetsService {
       status: d.status,
       acquisition: {
         on: d.acquisition.on,
-        cost: v ? d.acquisition.cost : null,
+        cost: v ? (d.acquisition.cost ?? null) : null,
         currency: d.acquisition.currency,
         supplierId: d.acquisition.supplierId ?? null,
         supplierInvoiceId: d.acquisition.supplierInvoiceId ?? null,
@@ -1069,10 +1078,15 @@ export class AssetsService {
     else await this.links.assertMember(organizationId, a.userId);
   }
 
-  /** Acquisition : liens facultatifs VÉRIFIÉS dans l'organisation ; rien n'est créé. */
+  /**
+   * Acquisition : liens facultatifs VÉRIFIÉS dans l'organisation ; rien n'est créé.
+   * Coût absent : celui déjà enregistré (`previousCost`, `null` à la création) ;
+   * `null` explicite : inconnu. Jamais « 0 » par défaut.
+   */
   private async acquisitionOf(
     organizationId: string,
     body: AssetAcquisitionBody,
+    previousCost: string | null,
   ): Promise<AssetAcquisitionDoc> {
     const { supplierId, supplierInvoiceId } = await this.links.supplierLinks(
       organizationId,
@@ -1083,7 +1097,7 @@ export class AssetsService {
     if (expenseId !== null) await this.links.assertExpense(organizationId, expenseId);
     return {
       on: body.on,
-      cost: body.cost,
+      cost: body.cost === undefined ? previousCost : body.cost,
       currency: body.currency,
       supplierId,
       supplierInvoiceId,

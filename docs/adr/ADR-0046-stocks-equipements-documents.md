@@ -1049,6 +1049,26 @@ Chacune a une **valeur par défaut**, appliquée si rien n'est tranché.
 22. **Offres** (docs/13) : stocks, équipements et documents ouverts à toutes les offres, comme les autres
     applications RUN. *Défaut : toutes les offres, à arbitrer avec le reste du tableau.*
 
+## Amendement du 1er nov. 2026 — coût d'acquisition inconnu
+
+Un membre peut détenir `assets.manage` sans `purchase.read` ni `treasury.read` (autorisations par
+membre, ADR-0041) : il crée des équipements sans voir les valeurs. Le web envoyait alors un coût
+« 0 », que le moteur additionnait et amortissait comme un vrai zéro.
+
+- **Contrat** (`AssetAcquisitionBody.cost`) : **facultatif**. Absent ou `null` = coût **inconnu**,
+  jamais « 0 ». En modification, un coût absent conserve le coût enregistré ; `null` le déclare
+  inconnu. Un « 0 » saisi reste un zéro.
+- **Moteur** (`ASSETS_VERSION` 1.0.0 → **1.1.0**) : coût inconnu → estimation de gestion
+  `estimable: false`, raison **`UNKNOWN_COST`** ; coût total de possession `estimable: false`,
+  `reason: 'UNKNOWN_COST'`, **aucun total** (jamais un total amputé de l'acquisition) ; registre :
+  coûts inconnus **exclus des sommes** et comptés à part (`unknownCostCount`,
+  `activeUnknownCostCount`, et par catégorie).
+- **Web** : le champ « Coût » n'est plus obligatoire (vide = inconnu) ; un rôle qui ne voit pas
+  les valeurs n'envoie aucun coût ; la fiche affiche « Inconnu », le registre « Coût inconnu »,
+  les rapports le nombre d'équipements au coût inconnu.
+- **Compatibilité** : les équipements existants gardent leur coût ; un document sans le champ se
+  lit « inconnu ». Aucune migration.
+
 ## Liens
 
 - [ADR-0011](ADR-0011-contrats-integration-s18.md) ; [ADR-0012](ADR-0012-modele-rbac-complet.md)
