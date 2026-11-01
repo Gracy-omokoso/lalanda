@@ -16,6 +16,7 @@ import {
   ACHATS_SOUS_OPTIONS_PREVUES,
   appsVisibles,
   cleModules,
+  COMPTABILITE_SOUS_OPTIONS_PREVUES,
   CRM_SOUS_OPTIONS_PREVUES,
   RH_SOUS_OPTIONS_PREVUES,
   STOCKS_SOUS_OPTIONS_PREVUES,
@@ -600,5 +601,60 @@ describe('ADR-0046 — S8 : Stocks, Équipements, Documents', () => {
     expect(appActive('/documents/echeances')).toBe('documents');
     expect(appActive('/stocks-x')).toBeNull();
     expect(appActive('/documentation')).toBeNull();
+  });
+});
+
+describe('ADR-0049 — K8 : Comptabilité', () => {
+  // Rôle Expert-comptable externe (EXP, § 8.2) : trois actions, socle compris.
+  const EXPERT: OrgAction[] = ['analytics.read', 'accounting.read', 'accounting.export'];
+  const MAGASINIER: OrgAction[] = ['analytics.read', 'stock.read', 'stock.move', 'work.read'];
+
+  it('application RUN, dernier bloc, icône `comptabilite`, visible avec `accounting.read`', () => {
+    const compta = NAV_APPS.find((a) => a.id === 'comptabilite')!;
+    expect(compta.module).toBe('run');
+    expect(compta.href).toBe('/comptabilite');
+    expect(compta.icon).toBe('comptabilite');
+    expect(compta.action).toBe('accounting.read');
+    expect(compta.masquee).toBeUndefined();
+    const run = ids(appsVisibles([...PROPRIETAIRE, 'accounting.read'], 'run'));
+    expect(run[run.length - 1]).toBe('comptabilite');
+    expect(run.indexOf('comptabilite')).toBe(run.indexOf('documents') + 1);
+  });
+
+  it('selon les droits EFFECTIFS : sans `accounting.read`, pas d’entrée', () => {
+    expect(ids(appsVisibles(PROPRIETAIRE, 'run'))).not.toContain('comptabilite');
+    expect(ids(appsVisibles(MAGASINIER, 'run'))).not.toContain('comptabilite');
+    expect(ids(appsVisibles(null))).not.toContain('comptabilite');
+    expect(ids(appsVisibles(['accounting.read'], 'run'))).toEqual(['comptabilite']);
+  });
+
+  it('l’expert-comptable externe ne voit dans le RUN que la comptabilité', () => {
+    expect(ids(appsVisibles(EXPERT, 'run'))).toEqual(['comptabilite']);
+  });
+
+  it('sous-options toutes livrées, dans l’ordre prévu par l’écran (§ 13)', () => {
+    const compta = appsVisibles(EXPERT, 'run').find((a) => a.id === 'comptabilite')!;
+    expect(compta.sousOptions.map((s) => s.id)).toEqual([...COMPTABILITE_SOUS_OPTIONS_PREVUES]);
+    expect(compta.sousOptions.map((s) => s.label)).toEqual([
+      'Vue d’ensemble',
+      'Écritures',
+      'Grand livre',
+      'Balance',
+      'Clients et fournisseurs',
+      'États',
+      'Clôtures',
+      'Exports',
+      'Réglages',
+    ]);
+    for (const s of compta.sousOptions) expect(s.action).toBe('accounting.read');
+  });
+
+  it('chemins : module RUN, sous-option allumée, frontière de segment', () => {
+    expect(moduleCourant('/comptabilite')).toBe('run');
+    expect(sousOptionActive('/comptabilite')).toBe('comptabilite-vue');
+    expect(sousOptionActive('/comptabilite/grand-livre')).toBe('comptabilite-grand-livre');
+    expect(sousOptionActive('/comptabilite/reglages')).toBe('comptabilite-reglages');
+    expect(appActive('/comptabilite/etats')).toBe('comptabilite');
+    expect(appActive('/comptabilites')).toBeNull();
   });
 });

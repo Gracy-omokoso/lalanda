@@ -37,6 +37,8 @@ export type NavIconId =
   | 'stocks'
   | 'equipements'
   | 'documents'
+  // ADR-0049 — K8 : comptabilité.
+  | 'comptabilite'
   | 'pilotage'
   | 'sante'
   | 'investisseurs'
@@ -542,6 +544,77 @@ export const NAV_APPS: readonly NavApp[] = [
     ],
   },
 
+  // ADR-0049 — K8 : comptabilité, après les stocks, équipements et documents :
+  // elle LIT les pièces de toutes les applications du RUN. Visible avec
+  // `accounting.read` effectif (Propriétaire, Administrateur, Directeur financier,
+  // Comptable, Analyste, Lecteur, Expert-comptable externe), jamais d'après le rôle.
+  {
+    id: 'comptabilite',
+    href: '/comptabilite',
+    label: 'Comptabilité',
+    description:
+      'Écritures tirées de vos pièces, balance et projets d’états pour votre expert-comptable.',
+    module: 'run',
+    icon: 'comptabilite',
+    action: 'accounting.read',
+    sousOptions: [
+      {
+        id: 'comptabilite-vue',
+        href: '/comptabilite',
+        label: 'Vue d’ensemble',
+        action: 'accounting.read',
+      },
+      {
+        id: 'comptabilite-ecritures',
+        href: '/comptabilite/ecritures',
+        label: 'Écritures',
+        action: 'accounting.read',
+      },
+      {
+        id: 'comptabilite-grand-livre',
+        href: '/comptabilite/grand-livre',
+        label: 'Grand livre',
+        action: 'accounting.read',
+      },
+      {
+        id: 'comptabilite-balance',
+        href: '/comptabilite/balance',
+        label: 'Balance',
+        action: 'accounting.read',
+      },
+      {
+        id: 'comptabilite-tiers',
+        href: '/comptabilite/tiers',
+        label: 'Clients et fournisseurs',
+        action: 'accounting.read',
+      },
+      {
+        id: 'comptabilite-etats',
+        href: '/comptabilite/etats',
+        label: 'États',
+        action: 'accounting.read',
+      },
+      {
+        id: 'comptabilite-clotures',
+        href: '/comptabilite/clotures',
+        label: 'Clôtures',
+        action: 'accounting.read',
+      },
+      {
+        id: 'comptabilite-exports',
+        href: '/comptabilite/exports',
+        label: 'Exports',
+        action: 'accounting.read',
+      },
+      {
+        id: 'comptabilite-reglages',
+        href: '/comptabilite/reglages',
+        label: 'Réglages',
+        action: 'accounting.read',
+      },
+    ],
+  },
+
   // ─── GROW ────────────────────────────────────────────────────────────────
   // Le tableau de bord de l'organisation EST le pilotage : blocs par rôle,
   // ratios au rouge, écarts, validations (S21a). Rangé dans GROW (ADR-0038 § 6).
@@ -660,6 +733,19 @@ export const STOCKS_SOUS_OPTIONS_PREVUES = [
   'stocks-reapprovisionnement',
   'stocks-emplacements',
   'stocks-reglages',
+] as const;
+
+/** Ordre cible des sous-options de la Comptabilité (ADR-0049 § 13, lot K8), toutes livrées. */
+export const COMPTABILITE_SOUS_OPTIONS_PREVUES = [
+  'comptabilite-vue',
+  'comptabilite-ecritures',
+  'comptabilite-grand-livre',
+  'comptabilite-balance',
+  'comptabilite-tiers',
+  'comptabilite-etats',
+  'comptabilite-clotures',
+  'comptabilite-exports',
+  'comptabilite-reglages',
 ] as const;
 
 function autorise(
