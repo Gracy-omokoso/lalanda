@@ -465,6 +465,13 @@ lot que les corrections qu’elle aura demandées. Liste de contrôle :
 
 ## 6. Point signalé, non résolu — facture normalisée des abonnements
 
+> **Suite : [ADR-0047](adr/ADR-0047-factures-des-abonnements-lalanda.md)** (1ᵉʳ nov. 2026,
+> proposé, en attente de la dirigeante) détaille l'écart, les options (module ventes utilisé
+> par Go freelance SARLU elle-même, module dédié, reçu non fiscal avec CGV corrigées, saisie
+> manuelle, outil externe), les éléments à fournir (NIF, régime TVA, groupe de taxation, devise,
+> jeton e-MCF de production) et les questions au comptable, au juriste et à la DGI. Rien n'est
+> codé avant sa réponse ; ce paragraphe reste ouvert.
+
 Si **Go freelance SARLU vend les abonnements Lalanda**, c’est une société
 congolaise assujettie, et ses propres factures d’abonnement relèvent a priori de
 la **facture normalisée DGI** (ADR-0019, ADR-0024). Aucune règle n’est tranchée

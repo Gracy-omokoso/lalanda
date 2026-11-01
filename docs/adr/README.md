@@ -81,3 +81,9 @@ Décideurs :
   (SARLU de droit congolais), Televerx LLC partenaire de développement et d'intégration
   (mentions légales seulement) ; corpus `2026-10-30`, nouvelle acceptation. Statut :
   **accepté** (30 oct. 2026).
+- [ADR-0047](ADR-0047-factures-des-abonnements-lalanda.md) — Factures des abonnements Lalanda :
+  aucune pièce n'est remise aujourd'hui alors que les CGV promettent une facture ; options
+  (A) Go freelance SARLU se facture avec son propre module ventes, (B) module dédié, (C) reçu non
+  fiscal et CGV corrigées, (D) factures saisies à la main, (E) facturation hors Lalanda ;
+  recommandation C puis A ; quatorze décisions ouvertes, sans valeur par défaut. Statut :
+  **proposé, en attente de la dirigeante** (1ᵉʳ nov. 2026).
