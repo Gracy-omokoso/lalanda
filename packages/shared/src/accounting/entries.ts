@@ -161,7 +161,9 @@ export const AccountingEntrySearchBody = z
       .min(1)
       .max(80)
       .optional(),
-    sourceKind: z.enum(ACCOUNTING_SOURCE_KINDS, accountingFr('Nature de pièce inconnue.')).optional(),
+    sourceKind: z
+      .enum(ACCOUNTING_SOURCE_KINDS, accountingFr('Nature de pièce inconnue.'))
+      .optional(),
     sourceId: z
       .string(accountingFr('Identifiant de pièce attendu.'))
       .regex(/^[0-9a-f]{24}$/i, { message: 'Identifiant de pièce invalide.' })

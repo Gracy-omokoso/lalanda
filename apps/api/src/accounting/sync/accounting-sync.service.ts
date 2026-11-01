@@ -78,7 +78,10 @@ import {
   pendingReasonOf,
   type PendingSource,
 } from '../pending/accounting-pending.service.js';
-import { AccountingPeriod, type AccountingPeriodLean } from '../periods/accounting-period.schema.js';
+import {
+  AccountingPeriod,
+  type AccountingPeriodLean,
+} from '../periods/accounting-period.schema.js';
 import {
   AccountingExchangeRate,
   type AccountingExchangeRateLean,
@@ -158,7 +161,12 @@ export interface SourceOutcome {
   result: PostingResult | null;
 }
 
-type Scope = { all: true } | { since: Partial<Record<AccountingSyncSource, Date | null>>; ids: Partial<Record<SourceKind, string[]>> };
+type Scope =
+  | { all: true }
+  | {
+      since: Partial<Record<AccountingSyncSource, Date | null>>;
+      ids: Partial<Record<SourceKind, string[]>>;
+    };
 
 type Pin = SettlementAllocationView['invoiceBookRate'];
 
@@ -244,7 +252,10 @@ export class AccountingSyncService {
    * Ce que la génération exige. `null` en mode `off` (rien n'est lu). Monnaie de tenue et
    * bascule n'ont AUCUN défaut : sans elles, `409 ACCOUNTING_SETTINGS_INCOMPLETE`.
    */
-  async state(organizationId: string, settings?: AccountingSettingsLean): Promise<PostingState | null> {
+  async state(
+    organizationId: string,
+    settings?: AccountingSettingsLean,
+  ): Promise<PostingState | null> {
     const s = settings ?? (await this.settings.ensure(organizationId));
     if (s.mode === 'off') return null;
     const missing = [
@@ -296,7 +307,15 @@ export class AccountingSyncService {
         const rate = engineRate(r.rate);
         return rate === null
           ? []
-          : [{ date: r.date, from: r.from, to: r.to, rate, ref: `${r.sourceText} (saisi le ${r.date})` }];
+          : [
+              {
+                date: r.date,
+                from: r.from,
+                to: r.to,
+                rate,
+                ref: `${r.sourceText} (saisi le ${r.date})`,
+              },
+            ];
       }),
       links: Object.fromEntries(links.map((l) => [l.treasuryAccountId, l.accountNumber])),
       vatRegistered: await this.sources.vatRegistered(organizationId),
@@ -341,12 +360,17 @@ export class AccountingSyncService {
     const out: Record<string, AuxiliaryAccount> = {};
     for (const d of existing) {
       const party = d.auxiliary!.partyId;
-      out[party] ??= { collectiveNumber: d.collectiveNumber ?? collective, auxiliaryNumber: d.number };
+      out[party] ??= {
+        collectiveNumber: d.collectiveNumber ?? collective,
+        auxiliaryNumber: d.number,
+      };
     }
     const missing = ids.filter((id) => out[id] === undefined);
     if (missing.length === 0) return out;
     if (!persist) {
-      const taken = await this.accounts.countDocuments({ organizationId: org, collectiveNumber: collective }).exec();
+      const taken = await this.accounts
+        .countDocuments({ organizationId: org, collectiveNumber: collective })
+        .exec();
       missing.forEach((id, i) => {
         out[id] = {
           collectiveNumber: collective,
@@ -404,12 +428,16 @@ export class AccountingSyncService {
     const byId = new Map<string, SourceDoc>();
     const sinceDate = scope.since[since];
     if (sinceDate !== undefined) {
-      const s: SourceScope = { since: sinceDate === null ? null : new Date(sinceDate.getTime() - CHECKPOINT_OVERLAP_MS) };
-      for (const d of await this.sources.read(collection, org, s, extra)) byId.set(d._id.toHexString(), d);
+      const s: SourceScope = {
+        since: sinceDate === null ? null : new Date(sinceDate.getTime() - CHECKPOINT_OVERLAP_MS),
+      };
+      for (const d of await this.sources.read(collection, org, s, extra))
+        byId.set(d._id.toHexString(), d);
     }
     const ids = scope.ids[kind] ?? [];
     if (ids.length > 0) {
-      for (const d of await this.sources.read(collection, org, { ids }, extra)) byId.set(d._id.toHexString(), d);
+      for (const d of await this.sources.read(collection, org, { ids }, extra))
+        byId.set(d._id.toHexString(), d);
     }
     return [...byId.values()].sort((a, b) => (a._id.toHexString() < b._id.toHexString() ? -1 : 1));
   }
@@ -455,14 +483,52 @@ export class AccountingSyncService {
   ): Promise<SourceOutcome[]> {
     const org = state.organizationId;
     const finalInvoices = { series: 'real', status: { $in: ['issued', 'normalized'] } };
-    const invoices = await this.readScoped('sales_invoices', org, scope, 'sales_invoices', 'sales_invoice', finalInvoices);
-    const receipts = await this.readScoped('sales_receipts', org, scope, 'sales_receipts', 'sales_receipt');
-    const expenses = await this.readScoped('treasury_expenses', org, scope, 'treasury_expenses', 'treasury_expense');
-    const supplierInvoices = await this.readScoped('supplier_invoices', org, scope, 'supplier_invoices', 'supplier_invoice', {
-      status: { $in: ['validated', 'cancelled'] },
-    });
-    const payments = await this.readScoped('supplier_payments', org, scope, 'supplier_payments', 'supplier_payment');
-    const movements = await this.readScoped('treasury_movements', org, scope, 'treasury_movements', 'treasury_movement');
+    const invoices = await this.readScoped(
+      'sales_invoices',
+      org,
+      scope,
+      'sales_invoices',
+      'sales_invoice',
+      finalInvoices,
+    );
+    const receipts = await this.readScoped(
+      'sales_receipts',
+      org,
+      scope,
+      'sales_receipts',
+      'sales_receipt',
+    );
+    const expenses = await this.readScoped(
+      'treasury_expenses',
+      org,
+      scope,
+      'treasury_expenses',
+      'treasury_expense',
+    );
+    const supplierInvoices = await this.readScoped(
+      'supplier_invoices',
+      org,
+      scope,
+      'supplier_invoices',
+      'supplier_invoice',
+      {
+        status: { $in: ['validated', 'cancelled'] },
+      },
+    );
+    const payments = await this.readScoped(
+      'supplier_payments',
+      org,
+      scope,
+      'supplier_payments',
+      'supplier_payment',
+    );
+    const movements = await this.readScoped(
+      'treasury_movements',
+      org,
+      scope,
+      'treasury_movements',
+      'treasury_movement',
+    );
 
     // Factures citées par les encaissements : client et taux de la pièce.
     const invoiceInfo = new Map<string, { customerId: string; customerName: string | null }>();
@@ -475,7 +541,11 @@ export class AccountingSyncService {
     };
     invoices.forEach(infoOf);
     const citedInvoices = [
-      ...new Set(receipts.flatMap((r) => ((r['allocations'] as { invoiceId: string }[]) ?? []).map((a) => a.invoiceId))),
+      ...new Set(
+        receipts.flatMap((r) =>
+          ((r['allocations'] as { invoiceId: string }[]) ?? []).map((a) => a.invoiceId),
+        ),
+      ),
     ];
     const missingInvoices = citedInvoices.filter((id) => !invoiceInfo.has(id));
     if (missingInvoices.length > 0) {
@@ -487,7 +557,11 @@ export class AccountingSyncService {
       supplierInvoices.map((d) => [d._id.toHexString(), (d['internalNumber'] as string) ?? null]),
     );
     const citedSupplier = [
-      ...new Set(payments.flatMap((p) => ((p['allocations'] as { invoiceId: string }[]) ?? []).map((a) => a.invoiceId))),
+      ...new Set(
+        payments.flatMap((p) =>
+          ((p['allocations'] as { invoiceId: string }[]) ?? []).map((a) => a.invoiceId),
+        ),
+      ),
     ].filter((id) => !supplierNumbers.has(id));
     if (citedSupplier.length > 0) {
       for (const d of await this.sources.read('supplier_invoices', org, { ids: citedSupplier })) {
@@ -502,7 +576,8 @@ export class AccountingSyncService {
 
     // Tiers → comptes auxiliaires.
     const customerParties = new Map<string, string | null>();
-    for (const info of invoiceInfo.values()) customerParties.set(info.customerId, info.customerName);
+    for (const info of invoiceInfo.values())
+      customerParties.set(info.customerId, info.customerName);
     const supplierParties = new Map<string, string | null>(
       supplierIds.map((id) => [id, supplierNames.get(id) ?? null]),
     );
@@ -513,8 +588,20 @@ export class AccountingSyncService {
       cutoverDate: state.cutoverDate,
       enteredRates: state.rates,
       chartPack: state.chartPack,
-      customerAccounts: await this.auxiliaries(state, 'customer', customerParties, persistAuxiliaries, actorUserId),
-      supplierAccounts: await this.auxiliaries(state, 'supplier', supplierParties, persistAuxiliaries, actorUserId),
+      customerAccounts: await this.auxiliaries(
+        state,
+        'customer',
+        customerParties,
+        persistAuxiliaries,
+        actorUserId,
+      ),
+      supplierAccounts: await this.auxiliaries(
+        state,
+        'supplier',
+        supplierParties,
+        persistAuxiliaries,
+        actorUserId,
+      ),
       treasuryAccounts: state.links,
       vatRegistered: state.vatRegistered,
       stockPosting: state.stockPosting,
@@ -529,7 +616,7 @@ export class AccountingSyncService {
       result: PostingResult | null,
     ): void => {
       outcomes.push({
-        source: { kind, id: d._id.toHexString(), number, date: date ?? '', },
+        source: { kind, id: d._id.toHexString(), number, date: date ?? '' },
         result,
       });
     };
@@ -539,7 +626,13 @@ export class AccountingSyncService {
       const v = salesInvoiceView(d);
       const r = v === null ? null : entriesForSalesInvoice(v, ctx);
       if (r) invoiceResults.push(r);
-      push('sales_invoice', d, v?.number ?? (d['number'] as string | null) ?? null, v?.date ?? null, r);
+      push(
+        'sales_invoice',
+        d,
+        v?.number ?? (d['number'] as string | null) ?? null,
+        v?.date ?? null,
+        r,
+      );
     }
     const supplierResults: PostingResult[] = [];
     for (const d of supplierInvoices) {
@@ -561,20 +654,49 @@ export class AccountingSyncService {
 
     for (const d of receipts) {
       const v = receiptView(d, invoiceInfo, pinOf('sales_invoice'));
-      push('sales_receipt', d, v?.number ?? null, v?.receivedOn ?? (d['receivedOn'] as string) ?? null, v === null ? null : entriesForReceipt(v, ctx));
+      push(
+        'sales_receipt',
+        d,
+        v?.number ?? null,
+        v?.receivedOn ?? (d['receivedOn'] as string) ?? null,
+        v === null ? null : entriesForReceipt(v, ctx),
+      );
     }
     for (const d of expenses) {
       const v = expenseView(d);
-      push('treasury_expense', d, v?.reference ?? null, v?.spentOn ?? null, v === null ? null : entriesForExpense(v, ctx));
+      push(
+        'treasury_expense',
+        d,
+        v?.reference ?? null,
+        v?.spentOn ?? null,
+        v === null ? null : entriesForExpense(v, ctx),
+      );
     }
     for (const d of payments) {
-      const v = supplierPaymentView(d, supplierNames.get(String(d['supplierId'])) ?? null, supplierNumbers, pinOf('supplier_invoice'));
-      push('supplier_payment', d, v?.number ?? null, v?.paidOn ?? null, v === null ? null : entriesForSupplierPayment(v, ctx));
+      const v = supplierPaymentView(
+        d,
+        supplierNames.get(String(d['supplierId'])) ?? null,
+        supplierNumbers,
+        pinOf('supplier_invoice'),
+      );
+      push(
+        'supplier_payment',
+        d,
+        v?.number ?? null,
+        v?.paidOn ?? null,
+        v === null ? null : entriesForSupplierPayment(v, ctx),
+      );
     }
     const currencies = new Map(state.treasuryAccounts.map((t) => [t.id, t.currency]));
     for (const d of movements) {
       const v = treasuryMovementView(d, currencies);
-      push('treasury_movement', d, v?.reference ?? null, v?.date ?? null, v === null ? null : entriesForTreasuryMovement(v, ctx));
+      push(
+        'treasury_movement',
+        d,
+        v?.reference ?? null,
+        v?.date ?? null,
+        v === null ? null : entriesForTreasuryMovement(v, ctx),
+      );
     }
     // Mouvements de stock : `stockPosting` reste `off` tant que l'expert n'a pas validé la
     // méthode (§ 6.7, `409 STOCK_POSTING_NOT_VALIDATED`) ; ils ne sont donc pas lus.
@@ -584,7 +706,10 @@ export class AccountingSyncService {
   // ── Simulation ───────────────────────────────────────────────────────────
 
   /** Tout, calculé à la volée ; rien n'est enregistré. */
-  async simulate(organizationId: string, state: PostingState): Promise<{
+  async simulate(
+    organizationId: string,
+    state: PostingState,
+  ): Promise<{
     outcomes: SourceOutcome[];
     entries: (NewEntryDoc & { _id: string })[];
   }> {
@@ -596,7 +721,10 @@ export class AccountingSyncService {
         const journal =
           journalCodeOf(journals, e.journal) ??
           (e.journal.kind === 'treasury'
-            ? { code: `T:${e.journal.treasuryAccountId ?? ''}`.slice(0, 10), kind: 'treasury' as const }
+            ? {
+                code: `T:${e.journal.treasuryAccountId ?? ''}`.slice(0, 10),
+                kind: 'treasury' as const,
+              }
             : { code: e.journal.kind.toUpperCase().slice(0, 2), kind: e.journal.kind });
         entries.push({ ...newEntryDoc(organizationId, e, journal, 'system'), _id: e.sourceKey });
       }
@@ -609,7 +737,11 @@ export class AccountingSyncService {
   /** `POST /accounting/sync` et la tâche `accounting.sync` (toutes les 5 minutes). */
   async sync(organizationId: string, actor: AccountingActor): Promise<AccountingSyncResult> {
     const settings = await this.settings.ensure(organizationId);
-    const empty = (mode: AccountingMode): AccountingSyncResult => ({ mode, ...zeroCounts(), sourcesRead: 0 });
+    const empty = (mode: AccountingMode): AccountingSyncResult => ({
+      mode,
+      ...zeroCounts(),
+      sourcesRead: 0,
+    });
     if (settings.mode === 'off') return empty('off');
     const state = (await this.state(organizationId, settings))!;
     if (settings.mode === 'simulation') {
@@ -633,7 +765,8 @@ export class AccountingSyncService {
       .lean<AccountingSyncCheckpointLean[]>()
       .exec();
     const since: Partial<Record<AccountingSyncSource, Date | null>> = {};
-    for (const s of ACCOUNTING_SYNC_SOURCES) since[s] = cps.find((c) => c.source === s)?.lastUpdatedAt ?? null;
+    for (const s of ACCOUNTING_SYNC_SOURCES)
+      since[s] = cps.find((c) => c.source === s)?.lastUpdatedAt ?? null;
     const ids = await this.revisitIds(organizationId);
     const outcomes = await this.generate(state, { since, ids }, true, actor.userId);
     const counts = await this.apply(organizationId, outcomes, actor.userId, runAt);
@@ -743,7 +876,9 @@ export class AccountingSyncService {
       }
       const w = wanted.get(e.sourceKey);
       if (w === undefined) {
-        await this.store.entries.deleteOne({ _id: e._id, organizationId, status: 'awaiting_rate' }).exec();
+        await this.store.entries
+          .deleteOne({ _id: e._id, organizationId, status: 'awaiting_rate' })
+          .exec();
         continue;
       }
       keep.push(e);
@@ -758,7 +893,12 @@ export class AccountingSyncService {
         {
           existingId: String(e._id),
           expectedRevision: e.revision,
-          patch: { lines: w.lines.map((l) => ({ ...l })), suspense: w.suspense, generation: w.generation, label: w.label },
+          patch: {
+            lines: w.lines.map((l) => ({ ...l })),
+            suspense: w.suspense,
+            generation: w.generation,
+            label: w.label,
+          },
         },
         period.fiscalYear,
         actorUserId,
@@ -799,7 +939,12 @@ export class AccountingSyncService {
           actorUserId,
           { reversalOf: String(original._id) },
         );
-        const posted = await this.store.post(organizationId, { doc }, period.fiscalYear, actorUserId);
+        const posted = await this.store.post(
+          organizationId,
+          { doc },
+          period.fiscalYear,
+          actorUserId,
+        );
         if (!posted) continue;
         await this.store.markReversed(organizationId, String(original._id), String(posted._id));
         await this.lettering.unletterEntry(organizationId, original, 'system');
@@ -883,7 +1028,8 @@ export class AccountingSyncService {
       .lean<AccountingEntryLean[]>()
       .exec();
     const ids: Partial<Record<SourceKind, string[]>> = {};
-    for (const t of targets) if (t.source) (ids[t.source.kind as SourceKind] ??= []).push(t.source.id);
+    for (const t of targets)
+      if (t.source) (ids[t.source.kind as SourceKind] ??= []).push(t.source.id);
     const view: AccountingRegenerationView = {
       year,
       month,
@@ -927,12 +1073,23 @@ export class AccountingSyncService {
         actor.userId,
         { reversalOf: String(t._id), regeneration: { batchId, role: 'reversal' } },
       );
-      const posted = await this.store.post(organizationId, { doc }, period.fiscalYear, actor.userId);
+      const posted = await this.store.post(
+        organizationId,
+        { doc },
+        period.fiscalYear,
+        actor.userId,
+      );
       if (!posted) continue;
       await this.store.entries
         .updateOne(
           { _id: t._id, organizationId, reversedBy: null },
-          { $set: { keyed: false, reversedBy: String(posted._id), regeneration: { batchId, role: 'reversed' } } },
+          {
+            $set: {
+              keyed: false,
+              reversedBy: String(posted._id),
+              regeneration: { batchId, role: 'reversed' },
+            },
+          },
         )
         .exec();
       await this.lettering.unletterEntry(organizationId, t, actor.userId);
@@ -967,7 +1124,10 @@ export class AccountingSyncService {
 
   async treasuryLinks(organizationId: string): Promise<AccountingTreasuryLinkView[]> {
     const accounts = await this.sources.read('treasury_accounts', organizationId);
-    const links = await this.links.find({ organizationId }).lean<AccountingTreasuryLinkLean[]>().exec();
+    const links = await this.links
+      .find({ organizationId })
+      .lean<AccountingTreasuryLinkLean[]>()
+      .exec();
     const journals = await this.store.journalsOf(organizationId);
     return accounts
       .filter((a) => a['currency'] === 'CDF' || a['currency'] === 'USD')
@@ -992,25 +1152,34 @@ export class AccountingSyncService {
     body: PutAccountingTreasuryLinkBody,
     actor: AccountingActor,
   ): Promise<AccountingTreasuryLinkView> {
-    const [account] = await this.sources.read('treasury_accounts', organizationId, { ids: [treasuryAccountId] });
+    const [account] = await this.sources.read('treasury_accounts', organizationId, {
+      ids: [treasuryAccountId],
+    });
     if (!account) notFound('TREASURY_ACCOUNT_NOT_FOUND', 'Compte de trésorerie introuvable.');
     const current = await this.links
       .findOne({ organizationId, treasuryAccountId })
       .lean<AccountingTreasuryLinkLean>()
       .exec();
-    if ((current?.revision ?? null) !== body.expectedRevision) staleRevision(current?.revision ?? 0);
+    if ((current?.revision ?? null) !== body.expectedRevision)
+      staleRevision(current?.revision ?? 0);
     if (body.accountNumber === null) {
       if (current) await this.links.deleteOne({ _id: current._id, organizationId }).exec();
     } else {
       const plan = await this.accountsService.activeNumbers(organizationId);
       if (!plan.has(body.accountNumber)) {
-        conflict('ACCOUNT_NOT_IN_PLAN', 'Ce compte n’est pas un compte actif du plan de l’organisation.');
+        conflict(
+          'ACCOUNT_NOT_IN_PLAN',
+          'Ce compte n’est pas un compte actif du plan de l’organisation.',
+        );
       }
       if (current) {
         const updated = await this.links
           .updateOne(
             { _id: current._id, organizationId, revision: current.revision },
-            { $set: { accountNumber: body.accountNumber, updatedBy: actor.userId }, $inc: { revision: 1 } },
+            {
+              $set: { accountNumber: body.accountNumber, updatedBy: actor.userId },
+              $inc: { revision: 1 },
+            },
           )
           .exec();
         if (updated.modifiedCount === 0) staleRevision(current.revision);

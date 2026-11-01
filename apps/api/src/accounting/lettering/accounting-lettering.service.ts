@@ -11,11 +11,7 @@
 // Événements en ajout seul ; le code actif est recopié sur les lignes pour la lecture
 // (hors empreinte de l'écriture).
 
-import {
-  checkLettering,
-  suggestLettering,
-  type ReportingEntry,
-} from '@lalanda/engine';
+import { checkLettering, suggestLettering, type ReportingEntry } from '@lalanda/engine';
 import type { AccountingLetteringView } from '@lalanda/shared/accounting';
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -25,14 +21,18 @@ import { AuditService } from '../../authz/audit.service.js';
 import { conflict, notFound, type AccountingActor } from '../accounting.common.js';
 import type { AccountingEntryLean } from '../entries/accounting-entry.schema.js';
 import { AccountingEntryStore, reportingOf } from '../entries/accounting-entry-store.service.js';
-import { AccountingLettering, type AccountingLetteringLean } from './accounting-lettering.schema.js';
+import {
+  AccountingLettering,
+  type AccountingLetteringLean,
+} from './accounting-lettering.schema.js';
 
 const MESSAGES: Record<string, string> = {
   LETTERING_TOO_FEW_LINES: 'Deux lignes au moins.',
   LETTERING_UNKNOWN_LINE: 'Ligne introuvable.',
   LETTERING_DUPLICATE_LINE: 'Une ligne est citée deux fois.',
   LETTERING_LINE_NOT_POSTED: 'Seules les lignes d’écritures validées se lettrent.',
-  LETTERING_LINE_WITHOUT_AUXILIARY: 'Seules les lignes d’un compte client ou fournisseur se lettrent.',
+  LETTERING_LINE_WITHOUT_AUXILIARY:
+    'Seules les lignes d’un compte client ou fournisseur se lettrent.',
   LETTERING_MIXED_ACCOUNTS: 'Les lignes doivent viser le même compte auxiliaire.',
   LETTERING_MIXED_CURRENCIES: 'Les lignes doivent être dans la même devise.',
   LETTERING_NOT_BALANCED: 'La somme des lignes n’est pas nulle dans la devise de la pièce.',
@@ -53,7 +53,10 @@ export class AccountingLetteringService {
     @Inject(AuditService) private readonly audit: AuditService,
   ) {}
 
-  private async entriesOf(organizationId: string, ids: readonly string[]): Promise<AccountingEntryLean[]> {
+  private async entriesOf(
+    organizationId: string,
+    ids: readonly string[],
+  ): Promise<AccountingEntryLean[]> {
     const valid = [...new Set(ids)].filter((id) => /^[0-9a-f]{24}$/i.test(id));
     return this.store.entries
       .find({ organizationId, _id: { $in: valid } })
@@ -64,7 +67,12 @@ export class AccountingLetteringService {
   private async write(
     organizationId: string,
     code: string,
-    head: { accountNumber: string; auxiliary: string | null; currency: string; bookDifference: string | null },
+    head: {
+      accountNumber: string;
+      auxiliary: string | null;
+      currency: string;
+      bookDifference: string | null;
+    },
     lineRefs: readonly string[],
     automatic: boolean,
     by: string,
@@ -87,7 +95,10 @@ export class AccountingLetteringService {
     for (const ref of lineRefs) {
       const { id, index } = splitRef(ref);
       await this.store.entries
-        .updateOne({ _id: id, organizationId }, { $set: { [`lines.${index}.letteringCode`]: code } })
+        .updateOne(
+          { _id: id, organizationId },
+          { $set: { [`lines.${index}.letteringCode`]: code } },
+        )
         .exec();
     }
   }
@@ -136,12 +147,22 @@ export class AccountingLetteringService {
   }
 
   /** Délettre tout code qui touche une ligne de l'écriture (contre-passation). */
-  async unletterEntry(organizationId: string, entry: AccountingEntryLean, by: string): Promise<void> {
-    const codes = [...new Set(entry.lines.map((l) => l.letteringCode).filter((c): c is string => !!c))];
+  async unletterEntry(
+    organizationId: string,
+    entry: AccountingEntryLean,
+    by: string,
+  ): Promise<void> {
+    const codes = [
+      ...new Set(entry.lines.map((l) => l.letteringCode).filter((c): c is string => !!c)),
+    ];
     for (const code of codes) await this.unletterCode(organizationId, code, by);
   }
 
-  private async unletterCode(organizationId: string, code: string, by: string): Promise<AccountingLetteringLean> {
+  private async unletterCode(
+    organizationId: string,
+    code: string,
+    by: string,
+  ): Promise<AccountingLetteringLean> {
     const letter = await this.events
       .findOne({ organizationId, code, action: 'letter' })
       .lean<AccountingLetteringLean>()
@@ -194,8 +215,11 @@ export class AccountingLetteringService {
       alreadyLettered: lettered,
     });
     if (!check.ok) {
-      if (check.code === 'LETTERING_UNKNOWN_LINE') notFound('LETTERING_UNKNOWN_LINE', MESSAGES[check.code]!);
-      conflict(check.code, MESSAGES[check.code] ?? 'Lettrage refusé.', { lineRefs: check.lineRefs });
+      if (check.code === 'LETTERING_UNKNOWN_LINE')
+        notFound('LETTERING_UNKNOWN_LINE', MESSAGES[check.code]!);
+      conflict(check.code, MESSAGES[check.code] ?? 'Lettrage refusé.', {
+        lineRefs: check.lineRefs,
+      });
     }
     const code = await this.store.nextLetteringCode(organizationId);
     await this.write(

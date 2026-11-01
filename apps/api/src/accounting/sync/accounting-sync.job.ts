@@ -33,10 +33,16 @@ export class AccountingSyncJob implements OnModuleInit {
     let failed = 0;
     for (const organizationId of orgs) {
       try {
-        await this.sync.sync(organizationId, { userId: 'system', role: 'system', perms: undefined });
+        await this.sync.sync(organizationId, {
+          userId: 'system',
+          role: 'system',
+          perms: undefined,
+        });
       } catch (err) {
         failed += 1;
-        this.logger.error(`Synchronisation comptable en échec (${organizationId}) : ${String(err)}`);
+        this.logger.error(
+          `Synchronisation comptable en échec (${organizationId}) : ${String(err)}`,
+        );
       }
     }
     return { organizations: orgs.length, failed };

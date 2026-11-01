@@ -15,7 +15,13 @@ import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
 import { AuditService } from '../../authz/audit.service.js';
-import { conflict, isDuplicateKey, notFound, toIso, type AccountingActor } from '../accounting.common.js';
+import {
+  conflict,
+  isDuplicateKey,
+  notFound,
+  toIso,
+  type AccountingActor,
+} from '../accounting.common.js';
 import { AccountingPending, type AccountingPendingLean } from './accounting-pending.schema.js';
 
 export interface PendingSource {
@@ -122,7 +128,12 @@ export class AccountingPendingService {
             reason: { $in: stale },
           },
           {
-            $set: { status: 'resolved', resolvedAt: now, resolvedBy: 'system', resolution: 'Motif disparu à la synchronisation.' },
+            $set: {
+              status: 'resolved',
+              resolvedAt: now,
+              resolvedBy: 'system',
+              resolution: 'Motif disparu à la synchronisation.',
+            },
             $inc: { revision: 1 },
           },
         )
@@ -140,7 +151,10 @@ export class AccountingPendingService {
     return docs.map((d) => d.source);
   }
 
-  async list(organizationId: string, limit = 200): Promise<{ items: AccountingPendingView[]; nextCursor: null }> {
+  async list(
+    organizationId: string,
+    limit = 200,
+  ): Promise<{ items: AccountingPendingView[]; nextCursor: null }> {
     const docs = await this.pending
       .find({ organizationId, status: 'open' })
       .sort({ 'source.date': -1, _id: -1 })
@@ -161,15 +175,25 @@ export class AccountingPendingService {
     note: string,
     actor: AccountingActor,
   ): Promise<AccountingPendingView> {
-    if (!/^[0-9a-f]{24}$/i.test(id)) notFound('PENDING_NOT_FOUND', 'Pièce à comptabiliser introuvable.');
-    const current = await this.pending.findOne({ _id: id, organizationId }).lean<AccountingPendingLean>().exec();
+    if (!/^[0-9a-f]{24}$/i.test(id))
+      notFound('PENDING_NOT_FOUND', 'Pièce à comptabiliser introuvable.');
+    const current = await this.pending
+      .findOne({ _id: id, organizationId })
+      .lean<AccountingPendingLean>()
+      .exec();
     if (!current) notFound('PENDING_NOT_FOUND', 'Pièce à comptabiliser introuvable.');
-    if (current.status !== 'open') conflict('PENDING_ALREADY_RESOLVED', 'Cette pièce a déjà été revue.');
+    if (current.status !== 'open')
+      conflict('PENDING_ALREADY_RESOLVED', 'Cette pièce a déjà été revue.');
     const updated = await this.pending
       .findOneAndUpdate(
         { _id: id, organizationId, status: 'open' },
         {
-          $set: { status: 'resolved', resolvedAt: new Date(), resolvedBy: actor.userId, resolution: note },
+          $set: {
+            status: 'resolved',
+            resolvedAt: new Date(),
+            resolvedBy: actor.userId,
+            resolution: note,
+          },
           $inc: { revision: 1 },
         },
         { new: true },

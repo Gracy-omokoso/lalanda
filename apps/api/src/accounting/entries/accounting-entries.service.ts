@@ -271,7 +271,8 @@ export class AccountingEntriesService {
   ): Promise<{ mode: AccountingSettingsLean['mode']; entries: ReportingEntry[] }> {
     const settings = await this.settings.ensure(organizationId);
     const inRange = (date: string): boolean =>
-      (range.from === undefined || date >= range.from) && (range.to === undefined || date <= range.to);
+      (range.from === undefined || date >= range.from) &&
+      (range.to === undefined || date <= range.to);
     if (settings.mode === 'simulation') {
       const state = (await this.sync.state(organizationId, settings))!;
       const { entries } = await this.sync.simulate(organizationId, state);
@@ -311,15 +312,16 @@ export class AccountingEntriesService {
     for (const o of outcomes) {
       const reasons = o.result === null ? ['UNSUPPORTED_SOURCE'] : o.result.pending;
       for (const reason of [...new Set(reasons)]) {
-        const r = (
-          [
-            'NO_TREASURY_ACCOUNT',
-            'RATE_MISSING',
-            'PERIOD_CLOSED',
-            'SOURCE_CHANGED_IN_CLOSED_PERIOD',
-            'UNSUPPORTED_SOURCE',
-          ] as const
-        ).find((x) => x === reason) ?? 'UNSUPPORTED_SOURCE';
+        const r =
+          (
+            [
+              'NO_TREASURY_ACCOUNT',
+              'RATE_MISSING',
+              'PERIOD_CLOSED',
+              'SOURCE_CHANGED_IN_CLOSED_PERIOD',
+              'UNSUPPORTED_SOURCE',
+            ] as const
+          ).find((x) => x === reason) ?? 'UNSUPPORTED_SOURCE';
         items.push({
           id: `${o.source.kind}:${o.source.id}:${r}`,
           reason: r,
@@ -339,7 +341,9 @@ export class AccountingEntriesService {
         });
       }
     }
-    items.sort((a, b) => (a.source.date < b.source.date ? 1 : a.source.date > b.source.date ? -1 : 0));
+    items.sort((a, b) =>
+      a.source.date < b.source.date ? 1 : a.source.date > b.source.date ? -1 : 0,
+    );
     return { items, nextCursor: null, simulation: true };
   }
 
@@ -375,10 +379,14 @@ export class AccountingEntriesService {
     const currency = settings.bookCurrency!;
     const stored: StoredEntryLine[] = lines.map((l, i) => {
       if (l.accountNumber !== ACCOUNTING_SUSPENSE_ACCOUNT && !plan.has(l.accountNumber)) {
-        conflict('ACCOUNT_NOT_IN_PLAN', `Ligne ${i + 1} : ce compte n’est pas un compte actif du plan.`, {
-          line: i,
-          accountNumber: l.accountNumber,
-        });
+        conflict(
+          'ACCOUNT_NOT_IN_PLAN',
+          `Ligne ${i + 1} : ce compte n’est pas un compte actif du plan.`,
+          {
+            line: i,
+            accountNumber: l.accountNumber,
+          },
+        );
       }
       const auxNumber = l.auxiliaryAccountNumber ?? null;
       if (auxNumber !== null) {
@@ -624,7 +632,11 @@ export class AccountingEntriesService {
         existingId: id,
         expectedRevision: current.revision,
         patch: {
-          manual: { ...current.manual, validatorId: actor.userId, soleApprover: decision.soleApprover },
+          manual: {
+            ...current.manual,
+            validatorId: actor.userId,
+            soleApprover: decision.soleApprover,
+          },
         },
       },
       period.fiscalYear,
@@ -657,7 +669,10 @@ export class AccountingEntriesService {
     await this.activeSettings(organizationId);
     const current = await this.find(organizationId, id);
     if (current.status !== 'posted') {
-      conflict('ENTRY_NOT_POSTED', 'Seule une écriture validée se contre-passe ; un brouillon se supprime.');
+      conflict(
+        'ENTRY_NOT_POSTED',
+        'Seule une écriture validée se contre-passe ; un brouillon se supprime.',
+      );
     }
     if (current.reversalOf !== null) {
       conflict('ENTRY_IS_REVERSAL', 'Une contre-passation ne se contre-passe pas.');

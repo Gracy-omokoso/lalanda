@@ -36,7 +36,9 @@ e2eSuite('comptabilité — trésorerie et devises (ADR-0049, K5)', () => {
   let cashUsd = '';
 
   const lines = async (sourceId: ObjectId | string): Promise<Line[][]> =>
-    (await entriesOf(w.db, w.org, { 'source.id': String(sourceId) })).map((e) => e['lines'] as Line[]);
+    (await entriesOf(w.db, w.org, { 'source.id': String(sourceId) })).map(
+      (e) => e['lines'] as Line[],
+    );
   const setVat = async (vatRegistered: boolean): Promise<void> => {
     await w.db
       .collection('organization_fiscal_profiles')
@@ -45,14 +47,28 @@ e2eSuite('comptabilité — trésorerie et devises (ADR-0049, K5)', () => {
 
   beforeAll(async () => {
     w = await accountingWorld('tresorerie', ['finance_director']);
-    await prepareOrganization(w, { mode: 'active', author: 'owner', validator: 'finance_director' });
+    await prepareOrganization(w, {
+      mode: 'active',
+      author: 'owner',
+      validator: 'finance_director',
+    });
     const b = treasuryAccountDoc(w.org, { name: 'Banque CDF', kind: 'bank', currency: 'CDF' });
     const c = treasuryAccountDoc(w.org, { name: 'Caisse USD', kind: 'cash', currency: 'USD' });
     await w.db.collection('treasury_accounts').insertMany([b, c]);
     bank = b._id.toHexString();
     cashUsd = c._id.toHexString();
-    ok(await w.put('owner', `/accounting/treasury-links/${bank}`, { accountNumber: '521', expectedRevision: null }));
-    ok(await w.put('owner', `/accounting/treasury-links/${cashUsd}`, { accountNumber: '571', expectedRevision: null }));
+    ok(
+      await w.put('owner', `/accounting/treasury-links/${bank}`, {
+        accountNumber: '521',
+        expectedRevision: null,
+      }),
+    );
+    ok(
+      await w.put('owner', `/accounting/treasury-links/${cashUsd}`, {
+        accountNumber: '571',
+        expectedRevision: null,
+      }),
+    );
   }, E2E_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
@@ -61,7 +77,12 @@ e2eSuite('comptabilité — trésorerie et devises (ADR-0049, K5)', () => {
 
   it('critère 8 — TVA déclarée : jamais récupérée sans règle validée ni hors assujettissement', async () => {
     await setVat(true);
-    const a = expenseDoc(w.org, { spentOn: '2026-10-03', amount: '58000.00', deductibleVat: '8000.00', accountId: bank });
+    const a = expenseDoc(w.org, {
+      spentOn: '2026-10-03',
+      amount: '58000.00',
+      deductibleVat: '8000.00',
+      accountId: bank,
+    });
     await w.db.collection('treasury_expenses').insertOne(a);
     ok(await w.post('owner', '/accounting/sync'));
     const [la] = await lines(a._id);
@@ -75,7 +96,10 @@ e2eSuite('comptabilité — trésorerie et devises (ADR-0049, K5)', () => {
     const saved = ok(
       await w.put('owner', `/accounting/rule-sets/${draft['version']}`, {
         expectedRevision: draft['revision'],
-        rules: [...TEST_RULES, { key: 'expense.vat_declared', debit: ['4452'], credit: [], requiresReview: false }],
+        rules: [
+          ...TEST_RULES,
+          { key: 'expense.vat_declared', debit: ['4452'], credit: [], requiresReview: false },
+        ],
       }),
     );
     ok(
@@ -86,14 +110,24 @@ e2eSuite('comptabilité — trésorerie et devises (ADR-0049, K5)', () => {
     );
 
     await setVat(false);
-    const b = expenseDoc(w.org, { spentOn: '2026-10-04', amount: '58000.00', deductibleVat: '8000.00', accountId: bank });
+    const b = expenseDoc(w.org, {
+      spentOn: '2026-10-04',
+      amount: '58000.00',
+      deductibleVat: '8000.00',
+      accountId: bank,
+    });
     await w.db.collection('treasury_expenses').insertOne(b);
     ok(await w.post('owner', '/accounting/sync'));
     const [lb] = await lines(b._id);
     expect(lb!.map((l) => l['operationKey'])).toEqual(['expense.loyer', 'expense.payment']);
 
     await setVat(true);
-    const c = expenseDoc(w.org, { spentOn: '2026-10-05', amount: '58000.00', deductibleVat: '8000.00', accountId: bank });
+    const c = expenseDoc(w.org, {
+      spentOn: '2026-10-05',
+      amount: '58000.00',
+      deductibleVat: '8000.00',
+      accountId: bank,
+    });
     await w.db.collection('treasury_expenses').insertOne(c);
     ok(await w.post('owner', '/accounting/sync'));
     const [lc] = await lines(c._id);
@@ -122,7 +156,12 @@ e2eSuite('comptabilité — trésorerie et devises (ADR-0049, K5)', () => {
       groups: [{ group: 'B', itemType: 'SER', ht: '100.00', vat: '0.00' }],
     });
     // Dépense USD sans taux saisi.
-    const exp = expenseDoc(org, { spentOn: '2026-10-07', amount: '50.00', currency: 'USD', accountId: cashUsd });
+    const exp = expenseDoc(org, {
+      spentOn: '2026-10-07',
+      amount: '50.00',
+      currency: 'USD',
+      accountId: cashUsd,
+    });
     // Virement 280 000 CDF → 100 USD.
     const mvt = {
       _id: new ObjectId(),
@@ -148,7 +187,13 @@ e2eSuite('comptabilité — trésorerie et devises (ADR-0049, K5)', () => {
       amount: '100.00',
       currency: 'USD',
       accountId: cashUsd,
-      allocations: [{ invoiceId: inv._id.toHexString(), invoiceNumber: inv['number'] as string, amount: '100.00' }],
+      allocations: [
+        {
+          invoiceId: inv._id.toHexString(),
+          invoiceNumber: inv['number'] as string,
+          amount: '100.00',
+        },
+      ],
     });
     ok(
       await w.put('owner', '/accounting/exchange-rates/2026-10-09/USD/CDF', {
@@ -181,7 +226,10 @@ e2eSuite('comptabilité — trésorerie et devises (ADR-0049, K5)', () => {
     const pending = ok(await w.get('owner', '/accounting/pending'));
     expect(pending['items']).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ reason: 'RATE_MISSING', source: expect.objectContaining({ id: exp._id.toHexString() }) }),
+        expect.objectContaining({
+          reason: 'RATE_MISSING',
+          source: expect.objectContaining({ id: exp._id.toHexString() }),
+        }),
       ]),
     );
 
@@ -191,7 +239,9 @@ e2eSuite('comptabilité — trésorerie et devises (ADR-0049, K5)', () => {
       `treasury_movement:${mvt._id.toHexString()}:in`,
     ]);
     for (const leg of legs) {
-      const debit = (leg['lines'] as Line[]).filter((l) => l['side'] === 'debit').map((l) => l['bookAmount']);
+      const debit = (leg['lines'] as Line[])
+        .filter((l) => l['side'] === 'debit')
+        .map((l) => l['bookAmount']);
       expect(debit).toEqual(['280000.00']);
     }
     const usdLine = (legs[1]!['lines'] as Line[]).find((l) => l['currency'] === 'USD');
@@ -199,8 +249,14 @@ e2eSuite('comptabilité — trésorerie et devises (ADR-0049, K5)', () => {
 
     const [er] = await entriesOf(w.db, org, { 'source.id': rec._id.toHexString() });
     const rl = er!['lines'] as Line[];
-    expect(rl.find((l) => l['operationKey'] === 'receipt.VIREMENT')).toMatchObject({ bookAmount: '290000.00', rateSource: 'entered' });
-    expect(rl.find((l) => l['operationKey'] === 'receipt.receivable')).toMatchObject({ bookAmount: '280000.00', rateSource: 'document' });
+    expect(rl.find((l) => l['operationKey'] === 'receipt.VIREMENT')).toMatchObject({
+      bookAmount: '290000.00',
+      rateSource: 'entered',
+    });
+    expect(rl.find((l) => l['operationKey'] === 'receipt.receivable')).toMatchObject({
+      bookAmount: '280000.00',
+      rateSource: 'document',
+    });
     expect(rl.find((l) => l['exchangeDifference'] === true)).toMatchObject({
       accountNumber: 'ATTENTE',
       side: 'credit',
@@ -223,8 +279,15 @@ e2eSuite('comptabilité — trésorerie et devises (ADR-0049, K5)', () => {
     const [ee2] = await entriesOf(w.db, org, { 'source.id': exp._id.toHexString() });
     expect(ee2).toMatchObject({ _id: ee!['_id'], status: 'posted', fiscalYear: 2026 });
     expect(typeof ee2!['number']).toBe('number');
-    expect((ee2!['lines'] as Line[])[0]).toMatchObject({ bookAmount: '142500.00', rateSource: 'entered', rate: '2850' });
-    const open = ok(await w.get('owner', '/accounting/pending'))['items'] as { reason: string; source: { id: string } }[];
+    expect((ee2!['lines'] as Line[])[0]).toMatchObject({
+      bookAmount: '142500.00',
+      rateSource: 'entered',
+      rate: '2850',
+    });
+    const open = ok(await w.get('owner', '/accounting/pending'))['items'] as {
+      reason: string;
+      source: { id: string };
+    }[];
     expect(open.some((p) => p.source.id === exp._id.toHexString())).toBe(false);
   });
 
@@ -237,7 +300,10 @@ e2eSuite('comptabilité — trésorerie et devises (ADR-0049, K5)', () => {
 
     await w.db
       .collection('treasury_expenses')
-      .updateOne({ _id: d1._id }, { $set: { status: 'cancelled', revision: 2, updatedAt: new Date() } });
+      .updateOne(
+        { _id: d1._id },
+        { $set: { status: 'cancelled', revision: 2, updatedAt: new Date() } },
+      );
     ok(await w.post('owner', '/accounting/sync'));
     const [o1, r1] = await entriesOf(w.db, org, { 'source.id': d1._id.toHexString() });
     expect(r1).toMatchObject({
@@ -248,10 +314,15 @@ e2eSuite('comptabilité — trésorerie et devises (ADR-0049, K5)', () => {
     });
 
     // Octobre clos (le lot K6 le fera par l'API) : la contre-passation va au 1ᵉʳ novembre.
-    await w.db.collection('accounting_periods').updateOne({ organizationId: org, year: 2026, month: 10 }, { $set: { status: 'closed' } });
+    await w.db
+      .collection('accounting_periods')
+      .updateOne({ organizationId: org, year: 2026, month: 10 }, { $set: { status: 'closed' } });
     await w.db
       .collection('treasury_expenses')
-      .updateOne({ _id: d2._id }, { $set: { status: 'cancelled', revision: 2, updatedAt: new Date() } });
+      .updateOne(
+        { _id: d2._id },
+        { $set: { status: 'cancelled', revision: 2, updatedAt: new Date() } },
+      );
     ok(await w.post('owner', '/accounting/sync'));
     const [o2, r2] = await entriesOf(w.db, org, { 'source.id': d2._id.toHexString() });
     expect(r2).toMatchObject({
@@ -260,9 +331,15 @@ e2eSuite('comptabilité — trésorerie et devises (ADR-0049, K5)', () => {
       reversalReason: 'SOURCE_CHANGED_IN_CLOSED_PERIOD',
       status: 'posted',
     });
-    const pending = ok(await w.get('owner', '/accounting/pending'))['items'] as Record<string, any>[];
+    const pending = ok(await w.get('owner', '/accounting/pending'))['items'] as Record<
+      string,
+      any
+    >[];
     const changed = pending.find((p) => p['reason'] === 'SOURCE_CHANGED_IN_CLOSED_PERIOD');
-    expect(changed).toMatchObject({ entryId: String(r2!['_id']), source: { id: d2._id.toHexString() } });
+    expect(changed).toMatchObject({
+      entryId: String(r2!['_id']),
+      source: { id: d2._id.toHexString() },
+    });
 
     // Une pièce neuve datée d'un mois clos n'est pas passée : « À comptabiliser ».
     const d3 = expenseDoc(org, { spentOn: '2026-10-22', amount: '300.00', accountId: bank });
@@ -270,11 +347,22 @@ e2eSuite('comptabilité — trésorerie et devises (ADR-0049, K5)', () => {
     ok(await w.post('owner', '/accounting/sync'));
     expect(await entriesOf(w.db, org, { 'source.id': d3._id.toHexString() })).toEqual([]);
     const after = ok(await w.get('owner', '/accounting/pending'))['items'] as Record<string, any>[];
-    expect(after.find((p) => p['source'].id === d3._id.toHexString())).toMatchObject({ reason: 'PERIOD_CLOSED' });
+    expect(after.find((p) => p['source'].id === d3._id.toHexString())).toMatchObject({
+      reason: 'PERIOD_CLOSED',
+    });
 
     // Revue humaine motivée.
-    const resolved = ok(await w.post('finance_director', `/accounting/pending/${changed!['id']}/resolve`, { note: 'Vu avec l’expert' }));
-    expect(resolved).toMatchObject({ status: 'resolved', resolvedBy: w.userIds['finance_director'] });
-    await w.db.collection('accounting_periods').updateOne({ organizationId: org, year: 2026, month: 10 }, { $set: { status: 'open' } });
+    const resolved = ok(
+      await w.post('finance_director', `/accounting/pending/${changed!['id']}/resolve`, {
+        note: 'Vu avec l’expert',
+      }),
+    );
+    expect(resolved).toMatchObject({
+      status: 'resolved',
+      resolvedBy: w.userIds['finance_director'],
+    });
+    await w.db
+      .collection('accounting_periods')
+      .updateOne({ organizationId: org, year: 2026, month: 10 }, { $set: { status: 'open' } });
   });
 });

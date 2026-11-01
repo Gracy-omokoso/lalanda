@@ -72,7 +72,9 @@ export function lienPiece(
 /** Origine de l'écriture, en clair : règle et sa version, ou saisie manuelle. */
 export function origineEcriture(e: Pick<AccountingEntryView, 'generation' | 'manual'>): string {
   if (e.generation) {
-    return `Générée par Lalanda depuis la pièce, règles version ${e.generation.ruleSetVersion}.`;
+    return e.generation.ruleSetVersion === null
+      ? 'Générée par Lalanda depuis la pièce, sans règle validée : lignes au compte d’attente.'
+      : `Générée par Lalanda depuis la pièce, règles version ${e.generation.ruleSetVersion}.`;
   }
   if (e.manual) return `Opération diverse saisie à la main. Motif : ${e.manual.reason}`;
   return 'Origine non précisée.';

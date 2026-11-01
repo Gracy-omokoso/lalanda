@@ -34,7 +34,10 @@ import {
   AccountingJournal,
   type AccountingJournalLean,
 } from '../journals/accounting-journal.schema.js';
-import { AccountingPeriod, type AccountingPeriodLean } from '../periods/accounting-period.schema.js';
+import {
+  AccountingPeriod,
+  type AccountingPeriodLean,
+} from '../periods/accounting-period.schema.js';
 import {
   AccountingCounter,
   AccountingEntry,
@@ -156,7 +159,9 @@ export function proposedOf(d: AccountingEntryLean): ProposedEntry {
 
 /** Écriture enregistrée, ou calculée en simulation (`_id` = clé de source). */
 export type EntryLike = NewEntryDoc &
-  Partial<Pick<AccountingEntryLean, 'fiscalYear' | 'number' | 'reversedBy' | 'hash' | 'postedAt'>> & {
+  Partial<
+    Pick<AccountingEntryLean, 'fiscalYear' | 'number' | 'reversedBy' | 'hash' | 'postedAt'>
+  > & {
     _id: unknown;
   };
 
@@ -227,7 +232,11 @@ export class AccountingEntryStore {
   // ── Journaux ─────────────────────────────────────────────────────────────
 
   async journalsOf(organizationId: string): Promise<AccountingJournalLean[]> {
-    return this.journals.find({ organizationId }).sort({ code: 1 }).lean<AccountingJournalLean[]>().exec();
+    return this.journals
+      .find({ organizationId })
+      .sort({ code: 1 })
+      .lean<AccountingJournalLean[]>()
+      .exec();
   }
 
   /**
@@ -443,9 +452,16 @@ export class AccountingEntryStore {
   }
 
   /** Lien de contre-passation sur l'origine (hors empreinte). */
-  async markReversed(organizationId: string, originalId: string, reversalId: string): Promise<void> {
+  async markReversed(
+    organizationId: string,
+    originalId: string,
+    reversalId: string,
+  ): Promise<void> {
     await this.entries
-      .updateOne({ _id: originalId, organizationId, reversedBy: null }, { $set: { reversedBy: reversalId } })
+      .updateOne(
+        { _id: originalId, organizationId, reversedBy: null },
+        { $set: { reversedBy: reversalId } },
+      )
       .exec();
   }
 
@@ -453,7 +469,9 @@ export class AccountingEntryStore {
    * Chaîne intacte de bout en bout : rangs 1, 2, 3… sans trou, chaque `prevHash` égal au
    * `hash` précédent, chaque `hash` recalculé à l'identique, tête cohérente.
    */
-  async verifyChain(organizationId: string): Promise<{ ok: boolean; count: number; brokenAt: number | null }> {
+  async verifyChain(
+    organizationId: string,
+  ): Promise<{ ok: boolean; count: number; brokenAt: number | null }> {
     const docs = await this.entries
       .find({ organizationId, seq: { $type: 'number' } })
       .sort({ seq: 1 })
@@ -468,8 +486,12 @@ export class AccountingEntryStore {
       prev = d.hash!;
       expected += 1;
     }
-    const head = await this.heads.findOne({ organizationId }).lean<AccountingJournalHeadLean>().exec();
-    const headOk = (head?.seq ?? 0) === docs.length && (head?.lastHash ?? ACCOUNTING_GENESIS_HASH) === prev;
+    const head = await this.heads
+      .findOne({ organizationId })
+      .lean<AccountingJournalHeadLean>()
+      .exec();
+    const headOk =
+      (head?.seq ?? 0) === docs.length && (head?.lastHash ?? ACCOUNTING_GENESIS_HASH) === prev;
     return { ok: headOk, count: docs.length, brokenAt: headOk ? null : expected };
   }
 
@@ -508,7 +530,9 @@ export function journalCodeOf(
   ref: { kind: JournalKind; treasuryAccountId: string | null },
 ): { code: string; kind: AccountingJournalKind } | null {
   if (ref.kind === 'treasury') {
-    const j = journals.find((x) => x.kind === 'treasury' && x.treasuryAccountId === ref.treasuryAccountId);
+    const j = journals.find(
+      (x) => x.kind === 'treasury' && x.treasuryAccountId === ref.treasuryAccountId,
+    );
     return j ? { code: j.code, kind: 'treasury' } : null;
   }
   const candidates = journals.filter((x) => x.kind === ref.kind && x.treasuryAccountId === null);
@@ -549,7 +573,10 @@ export function lineView(
 }
 
 /** Vue d'API d'une écriture enregistrée. */
-export function entryView(d: AccountingEntryLean, labels: ReadonlyMap<string, string>): AccountingEntryView {
+export function entryView(
+  d: AccountingEntryLean,
+  labels: ReadonlyMap<string, string>,
+): AccountingEntryView {
   const id = String(d._id);
   return {
     id,

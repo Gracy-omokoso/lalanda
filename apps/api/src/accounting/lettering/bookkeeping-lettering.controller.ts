@@ -3,10 +3,7 @@
 //   POST /accounting/lettering                  accounting.post
 //   POST /accounting/lettering/:code/unletter   accounting.post
 
-import {
-  AccountingLetteringBody,
-  type AccountingLetteringView,
-} from '@lalanda/shared/accounting';
+import { AccountingLetteringBody, type AccountingLetteringView } from '@lalanda/shared/accounting';
 import { Body, Controller, HttpCode, Inject, Param, Post, UseGuards } from '@nestjs/common';
 
 import { AuthGuard } from '../../auth/auth.guard.js';

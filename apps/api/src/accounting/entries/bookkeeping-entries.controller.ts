@@ -44,7 +44,9 @@ import { AccountingEntriesService } from './accounting-entries.service.js';
 @Controller('accounting/entries')
 @UseGuards(AuthGuard, PermissionsGuard)
 export class BookkeepingEntriesController {
-  constructor(@Inject(AccountingEntriesService) private readonly entries: AccountingEntriesService) {}
+  constructor(
+    @Inject(AccountingEntriesService) private readonly entries: AccountingEntriesService,
+  ) {}
 
   @Get()
   @RequirePermission('accounting.read')

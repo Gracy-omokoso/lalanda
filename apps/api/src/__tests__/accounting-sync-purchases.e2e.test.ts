@@ -70,11 +70,20 @@ e2eSuite('comptabilité — synchronisation des achats (ADR-0049, K5)', () => {
 
   beforeAll(async () => {
     w = await accountingWorld('achats', ['finance_director']);
-    await prepareOrganization(w, { mode: 'active', author: 'owner', validator: 'finance_director' });
+    await prepareOrganization(w, {
+      mode: 'active',
+      author: 'owner',
+      validator: 'finance_director',
+    });
     const b = treasuryAccountDoc(w.org, { name: 'Banque', kind: 'bank', currency: 'CDF' });
     await w.db.collection('treasury_accounts').insertOne(b);
     bank = b._id.toHexString();
-    ok(await w.put('owner', `/accounting/treasury-links/${bank}`, { accountNumber: '521', expectedRevision: null }));
+    ok(
+      await w.put('owner', `/accounting/treasury-links/${bank}`, {
+        accountNumber: '521',
+        expectedRevision: null,
+      }),
+    );
     await w.db.collection('suppliers').insertOne({
       _id: supplierId,
       organizationId: w.org,
@@ -153,15 +162,29 @@ e2eSuite('comptabilité — synchronisation des achats (ADR-0049, K5)', () => {
     expect(await entriesOf(w.db, org, { 'source.id': draft._id.toHexString() })).toEqual([]);
 
     const [e1] = await entriesOf(w.db, org, { 'source.id': si1._id.toHexString() });
-    expect(e1).toMatchObject({ journalCode: 'AC', status: 'posted', sourceKey: `supplier_invoice:${si1._id.toHexString()}:validate` });
-    expect((e1!['lines'] as Line[]).map((l) => [l['accountNumber'], l['auxiliaryAccountNumber'], l['side'], l['bookAmount']])).toEqual([
+    expect(e1).toMatchObject({
+      journalCode: 'AC',
+      status: 'posted',
+      sourceKey: `supplier_invoice:${si1._id.toHexString()}:validate`,
+    });
+    expect(
+      (e1!['lines'] as Line[]).map((l) => [
+        l['accountNumber'],
+        l['auxiliaryAccountNumber'],
+        l['side'],
+        l['bookAmount'],
+      ]),
+    ).toEqual([
       ['601', null, 'debit', '1000.00'],
       ['401', '40100001', 'credit', '1000.00'],
     ]);
 
     const pay = await entriesOf(w.db, org, { 'source.id': paymentId.toHexString() });
     expect(pay).toHaveLength(1);
-    expect(pay[0]).toMatchObject({ journalCode: 'T01', sourceKey: `supplier_payment:${paymentId.toHexString()}:record` });
+    expect(pay[0]).toMatchObject({
+      journalCode: 'T01',
+      sourceKey: `supplier_payment:${paymentId.toHexString()}:record`,
+    });
     const pl = pay[0]!['lines'] as Line[];
     expect(pl.map((l) => [l['accountNumber'], l['side'], l['bookAmount']])).toEqual([
       ['521', 'credit', '1500.00'],
@@ -173,7 +196,9 @@ e2eSuite('comptabilité — synchronisation des achats (ADR-0049, K5)', () => {
 
     // Charge comptée une fois : 1 500,00 au débit de 601, pas 3 000,00.
     const all = await entriesOf(w.db, org);
-    const charges = all.flatMap((e) => (e['lines'] as Line[]).filter((l) => l['accountNumber'] === '601'));
+    const charges = all.flatMap((e) =>
+      (e['lines'] as Line[]).filter((l) => l['accountNumber'] === '601'),
+    );
     expect(charges.map((l) => l['bookAmount'])).toEqual(['1000.00', '500.00']);
 
     expect(ok(await w.post('owner', '/accounting/sync'))).toMatchObject({ created: 0, posted: 0 });
@@ -194,7 +219,10 @@ e2eSuite('comptabilité — synchronisation des achats (ADR-0049, K5)', () => {
     ok(await w.post('owner', '/accounting/sync'));
     await w.db
       .collection('supplier_invoices')
-      .updateOne({ _id: si._id }, { $set: { status: 'cancelled', updatedAt: new Date(), revision: 3 } });
+      .updateOne(
+        { _id: si._id },
+        { $set: { status: 'cancelled', updatedAt: new Date(), revision: 3 } },
+      );
     ok(await w.post('owner', '/accounting/sync'));
     const [orig, rev] = await entriesOf(w.db, org, { 'source.id': si._id.toHexString() });
     expect(rev).toMatchObject({

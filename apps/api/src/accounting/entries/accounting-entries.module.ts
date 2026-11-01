@@ -22,7 +22,10 @@ import {
 } from '../lettering/accounting-lettering.schema.js';
 import { AccountingLetteringService } from '../lettering/accounting-lettering.service.js';
 import { BookkeepingLetteringController } from '../lettering/bookkeeping-lettering.controller.js';
-import { AccountingPending, AccountingPendingSchema } from '../pending/accounting-pending.schema.js';
+import {
+  AccountingPending,
+  AccountingPendingSchema,
+} from '../pending/accounting-pending.schema.js';
 import { AccountingPendingService } from '../pending/accounting-pending.service.js';
 import { BookkeepingPendingController } from '../pending/bookkeeping-pending.controller.js';
 import { AccountingSourcesService } from '../sources/accounting-sources.service.js';
