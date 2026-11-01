@@ -30,6 +30,7 @@ import {
 } from './journals/accounting-journal.schema.js';
 import { AccountingJournalsController } from './journals/accounting-journals.controller.js';
 import { AccountingJournalsService } from './journals/accounting-journals.service.js';
+import { AccountingEntriesModule } from './entries/accounting-entries.module.js'; // ADR-0049 — K5
 import { AccountingFiscalYearsController } from './periods/accounting-fiscal-years.controller.js';
 import {
   AccountingFiscalYear,
@@ -58,6 +59,7 @@ import { AccountingSettingsService } from './settings/accounting-settings.servic
   imports: [
     // `AuthGuard` résout l'organisation active via `OrganizationsService`.
     OrganizationsModule,
+    AccountingEntriesModule, // ADR-0049 — K5 : écritures et synchronisation.
     MongooseModule.forFeature([
       // ADR-0049 — K4
       { name: AccountingChartPack.name, schema: AccountingChartPackSchema },
