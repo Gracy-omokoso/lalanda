@@ -109,6 +109,22 @@ export interface WorkProjectView {
   updatedAt: string;
 }
 
+/**
+ * ADR-0040 — C7 § 6.4 : avertissement rendu par « Créer le projet » depuis une
+ * opportunité. `QUOTE_LINES_HIDDEN` : un devis accepté existe, mais l'appelant ne
+ * détient pas `sales.read` (droits effectifs) ; le projet reprend les lignes de
+ * l'opportunité, pas celles du devis.
+ */
+export interface WorkProjectWarning {
+  code: 'QUOTE_LINES_HIDDEN';
+  message: string;
+}
+
+/** Réponse de `POST /work/projects/from-opportunity`. */
+export interface WorkProjectFromOpportunityView extends WorkProjectView {
+  warnings: WorkProjectWarning[];
+}
+
 /** Ligne de la liste des projets, avec ses compteurs (§ 4). */
 export interface WorkProjectSummary {
   id: string;

@@ -11,6 +11,7 @@ import type {
   ProjectMarginView,
   WorkInvoiceLinkView,
   WorkPage,
+  WorkProjectFromOpportunityView,
   WorkProjectSummary,
   WorkProjectView,
   WorkTaskView,
@@ -38,7 +39,10 @@ export const workBillingApi = {
     }),
   /** ADR-0040 — C7 : opportunité gagnée → projet (`work.manage` + `crm.read`). */
   createFromOpportunity: (body: CreateProjectFromOpportunityBody) =>
-    jsonRequest<WorkProjectView>('/work/projects/from-opportunity', { method: 'POST', body }),
+    jsonRequest<WorkProjectFromOpportunityView>('/work/projects/from-opportunity', {
+      method: 'POST',
+      body,
+    }),
   /** ADR-0040 — C7 : projet issu de l'opportunité, ou `null` (`work.read` + `crm.read`). */
   projectForOpportunity: (opportunityId: string) =>
     jsonRequest<{ projectId: string | null }>(`/work/opportunities/${id(opportunityId)}/project`, {

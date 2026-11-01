@@ -9,6 +9,11 @@
 //     et qu'il le voit (`work.read`), sinon la phrase « Un responsable des projets
 //     peut créer le projet ».
 // Les droits viennent de la coquille (`GET /me/permissions`), jamais du nom du rôle.
+//   - après création : sans avertissement, on va au projet ; avec un avertissement
+//     (`QUOTE_LINES_HIDDEN` : devis accepté non repris faute de `sales.read`),
+//     l'encadré l'affiche et propose d'ouvrir le projet, au lieu d'y aller en silence.
+
+import type { WorkProjectFromOpportunityView } from '@lalanda/shared/work';
 
 import type { OrgAction } from '@/lib/api';
 
@@ -77,4 +82,19 @@ export function suiteRefus(
     default:
       return { message: 'Le projet n’a pas pu être créé.' };
   }
+}
+
+/**
+ * Suite d'une création réussie : aller au projet, ou rester sur l'encadré pour
+ * montrer les avertissements de l'API (jamais avalés).
+ */
+export function suiteCreation(
+  projet: Pick<WorkProjectFromOpportunityView, 'id'> & {
+    warnings?: WorkProjectFromOpportunityView['warnings'];
+  },
+): { aller: string } | { projectId: string; avertissements: string[] } {
+  const avertissements = (projet.warnings ?? []).map((w) => w.message);
+  return avertissements.length === 0
+    ? { aller: lienProjet(projet.id) }
+    : { projectId: projet.id, avertissements };
 }

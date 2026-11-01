@@ -634,6 +634,13 @@ appelle `POST /sales/quotes/from-opportunity` (§ 3.3).
     la logique **existante** `createFromQuote` (une tâche par ligne du devis, sans montant ;
     `source.kind = 'quote'`) et pose `links.opportunityId` — même idempotence (index unique sur
     `source.quoteId`) ;
+  - **correctif du 1er nov. 2026** : l'unique devis accepté n'est repris que si l'appelant
+    détient `sales.read` **effectif** (ADR-0041). Sans ce droit, le devis n'est pas lu : le projet
+    suit la branche « sans devis » (lignes de l'opportunité) et la réponse porte
+    `warnings: [{ code: 'QUOTE_LINES_HIDDEN', message }]`, que l'encadré affiche avant d'ouvrir
+    le projet. Plusieurs devis acceptés ne déclenchent pas `409 WORK_OPPORTUNITY_QUOTE_REQUIRED`
+    pour un tel appelant : ils ne lui sont pas lisibles. La réponse porte toujours `warnings`
+    (vide par défaut) ;
   - **sans devis** : projet `kind: 'client'` si le compte est client (sinon `links.customerId:
     null`), une tâche par **ligne de l'opportunité** (libellé, quantité et unité, **aucun
     montant**), `source = { kind: 'opportunity', opportunityId }` ; index **unique partiel**

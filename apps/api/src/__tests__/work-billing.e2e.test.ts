@@ -833,6 +833,7 @@ e2eSuite('projets du RUN — devis, factures, dépenses, marge (ADR-0039 L4a)', 
         kind: 'client',
         links: { customerId: customer, opportunityId: gagnee.id, quotes: [] },
         source: { kind: 'opportunity', opportunityId: gagnee.id },
+        warnings: [],
       });
       const tasks = ok(await f.get('viewer', `/work/projects/${fromOpp}/tasks`));
       expect((tasks.items as Record<string, any>[]).map((t) => [t.number, t.title])).toEqual([
@@ -930,6 +931,76 @@ e2eSuite('projets du RUN — devis, factures, dépenses, marge (ADR-0039 L4a)', 
         code: 'WORK_PROJECT_EXISTS_FOR_OPPORTUNITY',
         details: { projectId: p.id },
       });
+    });
+
+    it('devis accepté unique, appelant sans sales.read effectif : lignes de l’opportunité et avertissement', async () => {
+      const opp = ok(
+        await f.post('owner', '/crm/opportunities', {
+          title: 'Peinture avec devis',
+          currency: 'USD',
+          accountId,
+          ownerId: f.userId('accountant'),
+          lines: [{ label: 'Peinture des bureaux', quantity: '3', unit: 'jour' }],
+        }),
+        201,
+      );
+      await devis(
+        'owner',
+        {
+          currency: 'USD',
+          priceMode: 'ht',
+          customer: { customerId: customer, printContactDetails: false },
+          lines: [ligne('Ligne secrète du devis', '1', '999.00', 'forfait')],
+          title: 'Peinture devisée',
+          notes: null,
+          opportunityId: opp.id,
+        },
+        'accepted',
+      );
+      expect(ok(await f.get('owner', `/crm/opportunities/${opp.id}`)).status).toBe('won');
+
+      // L'Administrateur, privé de `sales.read` (et de ce qui en dépend) : ADR-0041.
+      const ecart = async (revokes: string[]): Promise<void> => {
+        const membres = ok(await f.get('owner', `/organizations/${f.orgId()}/members`));
+        const rev = (membres.members as { userId: string; permissionsRevision: number }[]).find(
+          (m) => m.userId === f.userId('admin'),
+        )!.permissionsRevision;
+        ok(
+          await f.patch(
+            'owner',
+            `/organizations/${f.orgId()}/members/${f.userId('admin')}/permissions`,
+            {
+              grants: [],
+              revokes,
+              expectedRevision: rev,
+            },
+          ),
+        );
+      };
+      const interrupteur = process.env['MEMBER_PERMISSIONS_ENABLED'];
+      process.env['MEMBER_PERMISSIONS_ENABLED'] = 'true';
+      try {
+        await ecart(['sales.read', 'sales.manage', 'sales.quote']);
+        const p = ok(
+          await f.post('admin', '/work/projects/from-opportunity', { opportunityId: opp.id }),
+          201,
+        );
+        expect(p).toMatchObject({
+          links: { opportunityId: opp.id, quotes: [] },
+          source: { kind: 'opportunity', opportunityId: opp.id },
+          warnings: [{ code: 'QUOTE_LINES_HIDDEN', message: expect.stringContaining('devis') }],
+        });
+        const tasks = ok(await f.get('viewer', `/work/projects/${p.id}/tasks`));
+        expect((tasks.items as Record<string, any>[]).map((t) => t.title)).toEqual([
+          'Peinture des bureaux',
+        ]);
+        expect(JSON.stringify(p)).not.toContain('Ligne secrète');
+        expect(JSON.stringify(tasks.body ?? tasks)).not.toContain('Ligne secrète');
+      } finally {
+        await ecart([]);
+        if (interrupteur === undefined) delete process.env['MEMBER_PERMISSIONS_ENABLED'];
+        else process.env['MEMBER_PERMISSIONS_ENABLED'] = interrupteur;
+      }
     });
   });
 });
