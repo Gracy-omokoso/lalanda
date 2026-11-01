@@ -138,10 +138,8 @@ const ACTIONS_SANS_ROUTE: Record<string, string> = {
   // par case par `permissions.test.ts`, et le rôle `external_accountant` est exercé ici
   // sur toutes les autres sondes (refus de `sales.read`, `treasury.read`, `purchase.read`).
   // K4 a retiré `accounting.read`, `accounting.manage`, `accounting.post` (taux saisis) et
-  // `accounting.close` (création d'exercice) : sondes en fin de liste.
-  'accounting.export':
-    'Aucune route en K0 : les exports pour l’expert-comptable arrivent au lot K6 ' +
-    '(`POST /accounting/exports`, ADR-0049 § 9 et § 11).',
+  // `accounting.close` (création d'exercice) ; K6 a retiré `accounting.export` (exports pour
+  // l'expert-comptable) : sondes en fin de liste.
 };
 
 /** Une sonde HTTP : la route qui matérialise une action, et ses statuts légitimes. */
@@ -902,6 +900,19 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
       statutsAutorises: [400],
       envoyer: (c) =>
         request(serveur()).post('/accounting/fiscal-years').set('Cookie', c).send({ year: 1999 }),
+    },
+    // ADR-0049 — K6 : exports pour l'expert-comptable (§ 9, § 11).
+    {
+      // PRO, DIR, CPT et l'Expert-comptable. Contenu inconnu : 400 après le guard, aucun
+      // export préparé ni journalisé.
+      action: 'accounting.export',
+      libelle: 'POST /accounting/exports',
+      statutsAutorises: [400],
+      envoyer: (c) =>
+        request(serveur())
+          .post('/accounting/exports')
+          .set('Cookie', c)
+          .send({ kind: 'sonde', format: 'csv', from: '2026-10-01', to: '2026-10-31' }),
     },
   ];
 

@@ -18,6 +18,7 @@ import {
   LIBELLES_MODE,
   bornesDuMois,
   formatInstantJour,
+  formatValeur,
   moisDe,
   peutParametrer,
 } from './comptabilite-model';
@@ -192,6 +193,12 @@ export function VueEnsemble(): React.ReactElement {
             <Chargement />
           ) : !rapprochement.ok ? (
             <EchecLecture erreur={rapprochement.erreur} repli="Le rapprochement est illisible." />
+          ) : !rapprochement.valeur.available ? (
+            <CarteVide>
+              {rapprochement.valeur.unavailableReason === 'NO_LINKED_PROJECT'
+                ? 'Aucune initiative n’est reliée au réalisé : rien à rapprocher.'
+                : 'Rapprochement non disponible pour ce mois.'}
+            </CarteVide>
           ) : rapprochement.valeur.metrics.length === 0 ? (
             <CarteVide>Rien à rapprocher pour ce mois.</CarteVide>
           ) : (
@@ -200,14 +207,18 @@ export function VueEnsemble(): React.ReactElement {
                 <li key={m.key} className="flex flex-col gap-1 py-2">
                   <span className="font-medium">{m.label}</span>
                   <span className="text-[var(--foreground-muted)]">
-                    Réalisé : {m.actuals ?? '—'} · Comptabilité : {m.accounting ?? '—'} · Écart :{' '}
-                    {m.gap ?? '—'}
+                    Réalisé : {m.actual === null ? '—' : formatValeur(m.actual, m.currency)} ·
+                    Comptabilité : {formatValeur(m.accounting, m.currency)} · Écart :{' '}
+                    {m.difference === null ? '—' : formatValeur(m.difference, m.currency)}
                   </span>
                   {m.causes.length > 0 ? (
                     <span className="flex flex-wrap gap-1">
                       {m.causes.map((c) => (
-                        <Badge key={c} tone={c === 'UNEXPLAINED' ? 'danger' : 'neutral'}>
-                          {LIBELLES_CAUSE[c]}
+                        <Badge
+                          key={c.cause}
+                          tone={c.cause === 'UNEXPLAINED' ? 'danger' : 'neutral'}
+                        >
+                          {LIBELLES_CAUSE[c.cause]} {formatValeur(c.amount, m.currency)}
                         </Badge>
                       ))}
                     </span>

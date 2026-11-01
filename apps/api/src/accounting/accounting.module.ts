@@ -31,6 +31,7 @@ import {
 import { AccountingJournalsController } from './journals/accounting-journals.controller.js';
 import { AccountingJournalsService } from './journals/accounting-journals.service.js';
 import { AccountingEntriesModule } from './entries/accounting-entries.module.js'; // ADR-0049 — K5
+import { AccountingReportingModule } from './reports/accounting-reporting.module.js'; // ADR-0049 — K6
 import { CutoverOpeningModule } from './opening/cutover-opening.module.js'; // ADR-0049 — K7
 import { AccountingFiscalYearsController } from './periods/accounting-fiscal-years.controller.js';
 import {
@@ -61,6 +62,7 @@ import { AccountingSettingsService } from './settings/accounting-settings.servic
     // `AuthGuard` résout l'organisation active via `OrganizationsService`.
     OrganizationsModule,
     AccountingEntriesModule, // ADR-0049 — K5 : écritures et synchronisation.
+    AccountingReportingModule, // ADR-0049 — K6 : restitution, clôtures, exports.
     CutoverOpeningModule, // ADR-0049 — K7 : reprise de l'existant.
     MongooseModule.forFeature([
       // ADR-0049 — K4
