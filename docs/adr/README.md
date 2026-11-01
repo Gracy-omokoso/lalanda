@@ -89,6 +89,15 @@ Décideurs :
   journaux, grand livre, balance, lettrage, clôtures ; états **toujours « projet — à valider par un
   expert-comptable »**, exports pour lui ; mode simulation ; aucune écriture dans le réalisé ; cinq
   actions et un rôle Expert-comptable externe. Statut : **proposé, ADR-0049** (1ᵉʳ nov. 2026).
+- [ADR-0050](ADR-0050-contrats-commandes-acomptes-abonnements.md) — Contrats clients, commandes
+  clients, acomptes et abonnements (brief § 5.2) : commandes `CC…` avec reste à facturer ; contrats
+  `CT…` versionnés avant signature, avenants datés, terme, reconduction et préavis **saisis comme
+  clauses** (dates calculées, validité jamais affirmée) ; copie signée téléversée (signature
+  électronique hors v1) ; acompte = brouillon `FT`/`ET` existant, rappelé en ligne C, **aucune
+  imputation automatique** ; échéancier et abonnements en **brouillons** préparés par une tâche,
+  jamais émis sans geste humain ; alertes dans « Mes tâches » ; aucune ligne des factures, du circuit
+  DGI, du réalisé ni de la comptabilité ne change ; deux actions `sales.contract` et
+  `sales.contract.approve` (ⓢ). Statut : **proposé, ADR-0050** (1ᵉʳ nov. 2026).
 
 ## Décisions récentes (légal)
 
