@@ -106,7 +106,8 @@ export interface AttendanceOptions {
 
 // ─── Internes ────────────────────────────────────────────────────────────────
 
-const ISO_WITH_ZONE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/;
+const ISO_WITH_ZONE =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/;
 
 function instantOf(value: unknown, what: string): number {
   const ms = typeof value === 'string' && ISO_WITH_ZONE.test(value) ? Date.parse(value) : NaN;
@@ -215,7 +216,12 @@ export function attendanceDay(
       (x) => x.s.date === date || (x.s.date === yesterday && kinshasaDayOf(x.endMs - 1) === date),
     );
     if (!covered) {
-      findings.push({ code: 'ATTENDANCE_WITHOUT_SHIFT', eventId: null, shiftId: null, minutes: null });
+      findings.push({
+        code: 'ATTENDANCE_WITHOUT_SHIFT',
+        eventId: null,
+        shiftId: null,
+        minutes: null,
+      });
     }
   }
   for (const x of today) {
@@ -231,7 +237,12 @@ export function attendanceDay(
     );
     if (arrivals.length === 0) {
       if (!outsInside && nowMs !== null && x.endMs <= nowMs) {
-        findings.push({ code: 'SHIFT_WITHOUT_ATTENDANCE', eventId: null, shiftId: x.s.id, minutes: null });
+        findings.push({
+          code: 'SHIFT_WITHOUT_ATTENDANCE',
+          eventId: null,
+          shiftId: x.s.id,
+          minutes: null,
+        });
       }
       continue;
     }

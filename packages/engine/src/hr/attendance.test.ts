@@ -28,7 +28,11 @@ const TUE = '2026-11-03';
 const OFF: AttendanceOptions = { planningEnabled: false, lateToleranceMinutes: null };
 
 let seq = 0;
-const ev = (kind: 'in' | 'out', at: string, over: Partial<AttendanceEventInput> = {}): AttendanceEventInput => ({
+const ev = (
+  kind: 'in' | 'out',
+  at: string,
+  over: Partial<AttendanceEventInput> = {},
+): AttendanceEventInput => ({
   id: `e${String(seq++).padStart(3, '0')}`,
   kind,
   at,
@@ -84,7 +88,9 @@ describe('attendanceDay', () => {
     const r = attendanceDay([a, b, c], [], [], [], MON, OFF);
     expect(r.pairs.map((p) => [p.inId, p.outId, p.minutes])).toEqual([[b.id, c.id, 235]]);
     expect(r.unpairedEventIds).toEqual([a.id]);
-    expect(r.findings).toEqual([{ code: 'ATTENDANCE_UNPAIRED', eventId: a.id, shiftId: null, minutes: null }]);
+    expect(r.findings).toEqual([
+      { code: 'ATTENDANCE_UNPAIRED', eventId: a.id, shiftId: null, minutes: null },
+    ]);
     expect(r.firstIn).toBe(a.at);
   });
 
@@ -128,7 +134,9 @@ describe('attendanceDay', () => {
   });
 
   it('ATTENDANCE_ON_LEAVE_DAY, demi-journée comprise ; férié rendu pour information', () => {
-    const leave: LeavePeriod[] = [{ start: { date: MON, half: 'pm' }, end: { date: MON, half: 'full' } }];
+    const leave: LeavePeriod[] = [
+      { start: { date: MON, half: 'pm' }, end: { date: MON, half: 'full' } },
+    ];
     const r = attendanceDay(
       [ev('in', k(MON, '08:00')), ev('out', k(MON, '12:00'))],
       [],
@@ -139,7 +147,9 @@ describe('attendanceDay', () => {
     );
     expect(r.leave).toBe('pm');
     expect(r.holiday).toBe('full');
-    expect(r.findings).toEqual([{ code: 'ATTENDANCE_ON_LEAVE_DAY', eventId: null, shiftId: null, minutes: null }]);
+    expect(r.findings).toEqual([
+      { code: 'ATTENDANCE_ON_LEAVE_DAY', eventId: null, shiftId: null, minutes: null },
+    ]);
     expect(attendanceDay([], [], leave, [], MON, OFF).findings).toEqual([]);
   });
 
@@ -147,13 +157,19 @@ describe('attendanceDay', () => {
     const events = [ev('in', k(MON, '08:00')), ev('out', k(MON, '12:00'))];
     expect(attendanceDay(events, [], [], [], MON, OFF).findings).toEqual([]);
     const on = { ...OFF, planningEnabled: true };
-    expect(attendanceDay(events, [], [], [], MON, on).findings.map((f) => f.code)).toEqual(['ATTENDANCE_WITHOUT_SHIFT']);
-    expect(attendanceDay(events, [shift({ id: 's', status: 'draft' })], [], [], MON, on).findings.map((f) => f.code)).toEqual([
+    expect(attendanceDay(events, [], [], [], MON, on).findings.map((f) => f.code)).toEqual([
       'ATTENDANCE_WITHOUT_SHIFT',
     ]);
+    expect(
+      attendanceDay(events, [shift({ id: 's', status: 'draft' })], [], [], MON, on).findings.map(
+        (f) => f.code,
+      ),
+    ).toEqual(['ATTENDANCE_WITHOUT_SHIFT']);
     expect(attendanceDay(events, [shift({ id: 's' })], [], [], MON, on).findings).toEqual([]);
     // Nuit commencée la veille : la sortie du matin n'est pas « sans créneau ».
-    const night = [shift({ id: 'n', date: '2026-11-01', start: '22:00', end: '06:00', crossesMidnight: true })];
+    const night = [
+      shift({ id: 'n', date: '2026-11-01', start: '22:00', end: '06:00', crossesMidnight: true }),
+    ];
     const morning = [ev('in', k(MON, '05:00')), ev('out', k(MON, '06:00'))];
     expect(attendanceDay(morning, night, [], [], MON, on).findings).toEqual([]);
   });
@@ -161,38 +177,61 @@ describe('attendanceDay', () => {
   it('SHIFT_WITHOUT_ATTENDANCE : créneau publié terminé sans pointage, jamais sans « now »', () => {
     const s = [shift({ id: 's' })];
     expect(attendanceDay([], s, [], [], MON, OFF).findings).toEqual([]);
-    expect(attendanceDay([], s, [], [], MON, { ...OFF, now: k(MON, '16:59') }).findings).toEqual([]);
+    expect(attendanceDay([], s, [], [], MON, { ...OFF, now: k(MON, '16:59') }).findings).toEqual(
+      [],
+    );
     expect(attendanceDay([], s, [], [], MON, { ...OFF, now: k(MON, '17:00') }).findings).toEqual([
       { code: 'SHIFT_WITHOUT_ATTENDANCE', eventId: null, shiftId: 's', minutes: null },
     ]);
     // Arrivé avant le début : présent.
     const early = [ev('in', k(MON, '07:50')), ev('out', k(MON, '17:05'))];
-    expect(attendanceDay(early, s, [], [], MON, { ...OFF, now: k(TUE, '00:00') }).findings).toEqual([]);
+    expect(attendanceDay(early, s, [], [], MON, { ...OFF, now: k(TUE, '00:00') }).findings).toEqual(
+      [],
+    );
   });
 
   it('ATTENDANCE_LATE_START : éteint par défaut ; tolérance saisie', () => {
     const s = [shift({ id: 's' })];
     const late = [ev('in', k(MON, '08:20')), ev('out', k(MON, '17:00'))];
     expect(attendanceDay(late, s, [], [], MON, OFF).findings).toEqual([]);
-    expect(attendanceDay(late, s, [], [], MON, { ...OFF, lateToleranceMinutes: 20 }).findings).toEqual([]);
-    expect(attendanceDay(late, s, [], [], MON, { ...OFF, lateToleranceMinutes: 15 }).findings).toEqual([
-      { code: 'ATTENDANCE_LATE_START', eventId: null, shiftId: 's', minutes: 20 },
-    ]);
-    expect(attendanceDay(late, s, [], [], MON, { ...OFF, lateToleranceMinutes: 0 }).findings[0]?.minutes).toBe(20);
+    expect(
+      attendanceDay(late, s, [], [], MON, { ...OFF, lateToleranceMinutes: 20 }).findings,
+    ).toEqual([]);
+    expect(
+      attendanceDay(late, s, [], [], MON, { ...OFF, lateToleranceMinutes: 15 }).findings,
+    ).toEqual([{ code: 'ATTENDANCE_LATE_START', eventId: null, shiftId: 's', minutes: 20 }]);
+    expect(
+      attendanceDay(late, s, [], [], MON, { ...OFF, lateToleranceMinutes: 0 }).findings[0]?.minutes,
+    ).toBe(20);
   });
 
   it('entrées invalides', () => {
-    expect(() => attendanceDay([ev('in', '2026-11-02 08:00')], [], [], [], MON, OFF)).toThrow(RangeError);
-    expect(() => attendanceDay([ev('in', '2026-11-02T08:00:00')], [], [], [], MON, OFF)).toThrow(RangeError);
-    expect(() => attendanceDay([ev('pause' as never, k(MON, '08:00'))], [], [], [], MON, OFF)).toThrow(RangeError);
+    expect(() => attendanceDay([ev('in', '2026-11-02 08:00')], [], [], [], MON, OFF)).toThrow(
+      RangeError,
+    );
+    expect(() => attendanceDay([ev('in', '2026-11-02T08:00:00')], [], [], [], MON, OFF)).toThrow(
+      RangeError,
+    );
+    expect(() =>
+      attendanceDay([ev('pause' as never, k(MON, '08:00'))], [], [], [], MON, OFF),
+    ).toThrow(RangeError);
     const a = ev('in', k(MON, '08:00'));
     expect(() => attendanceDay([a, { ...a }], [], [], [], MON, OFF)).toThrow(RangeError);
-    expect(() => attendanceDay([], [], [], [], MON, { ...OFF, lateToleranceMinutes: -1 })).toThrow(RangeError);
+    expect(() => attendanceDay([], [], [], [], MON, { ...OFF, lateToleranceMinutes: -1 })).toThrow(
+      RangeError,
+    );
     expect(() => attendanceDay([], [], [], [], '2026-02-30', OFF)).toThrow(RangeError);
   });
 
   it('aucun champ de localisation, d’adresse ni d’appareil dans le résultat', () => {
-    const r = attendanceDay([ev('in', k(MON, '08:00')), ev('out', k(MON, '09:00'))], [], [], [], MON, OFF);
+    const r = attendanceDay(
+      [ev('in', k(MON, '08:00')), ev('out', k(MON, '09:00'))],
+      [],
+      [],
+      [],
+      MON,
+      OFF,
+    );
     expect(JSON.stringify(r)).not.toMatch(/ip|lat|lon|geo|device|position/i);
   });
 });
@@ -209,37 +248,43 @@ describe('attendanceDays', () => {
     expect(r.days.map((d) => d.minutes)).toEqual([240, 240, 0]);
     expect(r.minutes).toBe(480);
     expect(() => attendanceDays(events, [], [], [], TUE, MON, OFF)).toThrow(RangeError);
-    expect(() => attendanceDays(events, [], [], [], '2026-01-01', '2027-01-02', OFF)).toThrow(RangeError);
+    expect(() => attendanceDays(events, [], [], [], '2026-01-01', '2027-01-02', OFF)).toThrow(
+      RangeError,
+    );
   });
 
-  it('propriété : chaque pointage valide est apparié une fois ou isolé une fois ; minutes ≥ 0 ; ordre sans effet', { timeout: 120_000 }, () => {
-    const r = rng(1102);
-    const base = Date.parse('2026-11-01T23:00:00Z'); // 2026-11-02 00:00 à Kinshasa
-    for (let run = 0; run < 400; run += 1) {
-      const events: AttendanceEventInput[] = Array.from({ length: int(r, 0, 20) }, (_, i) => ({
-        id: `x${String(i).padStart(2, '0')}`,
-        kind: r() < 0.5 ? 'in' : 'out',
-        at: new Date(base + int(r, 0, 4 * 24 * 60) * 60_000 + int(r, 0, 59) * 1000).toISOString(),
-        voidedBy: r() < 0.1 ? 'c' : null,
-      }));
-      const res = attendanceDays(events, [], [], [], MON, '2026-11-05', OFF);
-      const seen = new Map<string, number>();
-      for (const d of res.days) {
-        for (const p of d.pairs) {
-          expect(p.minutes >= 0 && p.minutes <= 24 * 60).toBe(true);
-          seen.set(p.inId, (seen.get(p.inId) ?? 0) + 1);
-          seen.set(p.outId, (seen.get(p.outId) ?? 0) + 1);
+  it(
+    'propriété : chaque pointage valide est apparié une fois ou isolé une fois ; minutes ≥ 0 ; ordre sans effet',
+    { timeout: 120_000 },
+    () => {
+      const r = rng(1102);
+      const base = Date.parse('2026-11-01T23:00:00Z'); // 2026-11-02 00:00 à Kinshasa
+      for (let run = 0; run < 400; run += 1) {
+        const events: AttendanceEventInput[] = Array.from({ length: int(r, 0, 20) }, (_, i) => ({
+          id: `x${String(i).padStart(2, '0')}`,
+          kind: r() < 0.5 ? 'in' : 'out',
+          at: new Date(base + int(r, 0, 4 * 24 * 60) * 60_000 + int(r, 0, 59) * 1000).toISOString(),
+          voidedBy: r() < 0.1 ? 'c' : null,
+        }));
+        const res = attendanceDays(events, [], [], [], MON, '2026-11-05', OFF);
+        const seen = new Map<string, number>();
+        for (const d of res.days) {
+          for (const p of d.pairs) {
+            expect(p.minutes >= 0 && p.minutes <= 24 * 60).toBe(true);
+            seen.set(p.inId, (seen.get(p.inId) ?? 0) + 1);
+            seen.set(p.outId, (seen.get(p.outId) ?? 0) + 1);
+          }
+          for (const id of d.unpairedEventIds) seen.set(id, (seen.get(id) ?? 0) + 1);
+          expect(d.minutes).toBe(d.pairs.reduce((s, p) => s + p.minutes, 0));
         }
-        for (const id of d.unpairedEventIds) seen.set(id, (seen.get(id) ?? 0) + 1);
-        expect(d.minutes).toBe(d.pairs.reduce((s, p) => s + p.minutes, 0));
+        for (const e of events) {
+          const inWindow = e.at >= '2026-11-01T23:00:00' && e.at < '2026-11-05T23:00:00';
+          if (e.voidedBy !== null) expect(seen.has(e.id)).toBe(false);
+          else if (inWindow) expect(seen.get(e.id)).toBe(1);
+        }
+        const shuffled = [...events].reverse();
+        expect(attendanceDays(shuffled, [], [], [], MON, '2026-11-05', OFF)).toEqual(res);
       }
-      for (const e of events) {
-        const inWindow = e.at >= '2026-11-01T23:00:00' && e.at < '2026-11-05T23:00:00';
-        if (e.voidedBy !== null) expect(seen.has(e.id)).toBe(false);
-        else if (inWindow) expect(seen.get(e.id)).toBe(1);
-      }
-      const shuffled = [...events].reverse();
-      expect(attendanceDays(shuffled, [], [], [], MON, '2026-11-05', OFF)).toEqual(res);
-    }
-  });
+    },
+  );
 });

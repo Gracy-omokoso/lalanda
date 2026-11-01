@@ -56,32 +56,38 @@ const advance = (over: Partial<AdvanceInput> = {}): AdvanceInput => ({
 
 describe('checkAdvanceRequest', () => {
   it('défauts : avance de frais ouverte, avance sur salaire éteinte', () => {
-    expect(checkAdvanceRequest({ kind: 'expenses', currency: 'USD', amount: '100' }, DEFAULTS)).toEqual(
-      { version: HR_VERSION, ok: true, code: null },
-    );
-    expect(checkAdvanceRequest({ kind: 'salary', currency: 'USD', amount: '100' }, DEFAULTS).code).toBe(
-      'ADVANCE_KIND_DISABLED',
-    );
+    expect(
+      checkAdvanceRequest({ kind: 'expenses', currency: 'USD', amount: '100' }, DEFAULTS),
+    ).toEqual({ version: HR_VERSION, ok: true, code: null });
+    expect(
+      checkAdvanceRequest({ kind: 'salary', currency: 'USD', amount: '100' }, DEFAULTS).code,
+    ).toBe('ADVANCE_KIND_DISABLED');
   });
 
   it('critère 9 : aucun plafond inventé ; plafond saisi de 200,00 USD', () => {
     for (const amount of ['0.01', '200.00', '1000000', '999999999999999.99']) {
-      expect(checkAdvanceRequest({ kind: 'expenses', currency: 'USD', amount }, DEFAULTS).ok).toBe(true);
+      expect(checkAdvanceRequest({ kind: 'expenses', currency: 'USD', amount }, DEFAULTS).ok).toBe(
+        true,
+      );
     }
     const capped: AdvanceSettings = { ...DEFAULTS, maxAmount: { CDF: null, USD: '200.00' } };
-    expect(checkAdvanceRequest({ kind: 'expenses', currency: 'USD', amount: '200.00' }, capped).ok).toBe(true);
-    expect(checkAdvanceRequest({ kind: 'expenses', currency: 'USD', amount: '250.00' }, capped).code).toBe(
-      'ADVANCE_ABOVE_ORGANIZATION_LIMIT',
-    );
+    expect(
+      checkAdvanceRequest({ kind: 'expenses', currency: 'USD', amount: '200.00' }, capped).ok,
+    ).toBe(true);
+    expect(
+      checkAdvanceRequest({ kind: 'expenses', currency: 'USD', amount: '250.00' }, capped).code,
+    ).toBe('ADVANCE_ABOVE_ORGANIZATION_LIMIT');
     // Le plafond USD ne s'applique pas au CDF (aucune conversion).
-    expect(checkAdvanceRequest({ kind: 'expenses', currency: 'CDF', amount: '250000' }, capped).ok).toBe(true);
+    expect(
+      checkAdvanceRequest({ kind: 'expenses', currency: 'CDF', amount: '250000' }, capped).ok,
+    ).toBe(true);
   });
 
   it('montant invalide', () => {
     for (const amount of ['0', '-5', '1.001', 'x']) {
-      expect(checkAdvanceRequest({ kind: 'expenses', currency: 'USD', amount }, DEFAULTS).code).toBe(
-        'ADVANCE_AMOUNT_INVALID',
-      );
+      expect(
+        checkAdvanceRequest({ kind: 'expenses', currency: 'USD', amount }, DEFAULTS).code,
+      ).toBe('ADVANCE_AMOUNT_INVALID');
     }
   });
 });
@@ -90,7 +96,10 @@ describe('advanceApprovalSteps', () => {
   const settings = { approvalFlow: 'manager_then_finance' as const };
   const employee = { managerEmployeeId: 'A', managerUserId: 'uA' };
   it('avance de frais : comme une note ; avance sur salaire : finance seule, sans le manager', () => {
-    expect(advanceApprovalSteps('expenses', settings, employee, 'uB').steps).toEqual(['manager', 'finance']);
+    expect(advanceApprovalSteps('expenses', settings, employee, 'uB').steps).toEqual([
+      'manager',
+      'finance',
+    ]);
     expect(advanceApprovalSteps('salary', settings, employee, 'uB')).toEqual({
       version: HR_VERSION,
       steps: ['finance'],
@@ -110,7 +119,11 @@ describe('advanceOutstanding', () => {
 
   it('critère 7 : versé 100, note 80, retour 20 → soldée', () => {
     const v = advance();
-    expect(advanceOutstanding(v)).toMatchObject({ disbursed: '100.00', outstanding: '100.00', state: 'open' });
+    expect(advanceOutstanding(v)).toMatchObject({
+      disbursed: '100.00',
+      outstanding: '100.00',
+      state: 'open',
+    });
     const afterNote = advance({
       settlements: [{ id: 's1', kind: 'expense_report', amount: '80.00', on: '2026-11-05' }],
     });
@@ -148,7 +161,11 @@ describe('advanceOutstanding', () => {
         { id: 's2', kind: 'top_up', amount: '30.00', on: '2026-11-05' },
       ],
     });
-    expect(advanceOutstanding(v)).toMatchObject({ outstanding: '0.00', toppedUp: '30.00', state: 'settled' });
+    expect(advanceOutstanding(v)).toMatchObject({
+      outstanding: '0.00',
+      toppedUp: '30.00',
+      state: 'settled',
+    });
   });
 
   it('données incohérentes : excès rendu à part, reste dû jamais négatif', () => {
@@ -173,7 +190,9 @@ describe('advanceOutstanding', () => {
     ).toThrow(RangeError);
     expect(() =>
       advanceOutstanding(
-        advance({ settlements: [{ id: 's', kind: 'payroll' as never, amount: '1', on: '2026-11-05' }] }),
+        advance({
+          settlements: [{ id: 's', kind: 'payroll' as never, amount: '1', on: '2026-11-05' }],
+        }),
       ),
     ).toThrow(RangeError);
   });
@@ -181,7 +200,9 @@ describe('advanceOutstanding', () => {
 
 describe('checkAdvanceSettlement', () => {
   it('au-delà du reste dû : refusé', () => {
-    const v = advance({ settlements: [{ id: 's1', kind: 'expense_report', amount: '80.00', on: '2026-11-05' }] });
+    const v = advance({
+      settlements: [{ id: 's1', kind: 'expense_report', amount: '80.00', on: '2026-11-05' }],
+    });
     expect(checkAdvanceSettlement(v, { kind: 'cash_return', amount: '20.01' }, DEFAULTS)).toEqual({
       version: HR_VERSION,
       ok: false,
@@ -189,7 +210,9 @@ describe('checkAdvanceSettlement', () => {
       outstandingBefore: '20.00',
       outstandingAfter: '20.00',
     });
-    expect(checkAdvanceSettlement(v, { kind: 'cash_return', amount: '20.00' }, DEFAULTS)).toMatchObject({
+    expect(
+      checkAdvanceSettlement(v, { kind: 'cash_return', amount: '20.00' }, DEFAULTS),
+    ).toMatchObject({
       ok: true,
       outstandingAfter: '0.00',
     });
@@ -197,19 +220,22 @@ describe('checkAdvanceSettlement', () => {
 
   it('avant versement, montant invalide', () => {
     expect(
-      checkAdvanceSettlement(advance({ disbursement: null }), { kind: 'cash_return', amount: '1' }, DEFAULTS)
-        .code,
+      checkAdvanceSettlement(
+        advance({ disbursement: null }),
+        { kind: 'cash_return', amount: '1' },
+        DEFAULTS,
+      ).code,
     ).toBe('ADVANCE_NOT_DISBURSED');
-    expect(checkAdvanceSettlement(advance(), { kind: 'cash_return', amount: '0' }, DEFAULTS).code).toBe(
-      'ADVANCE_SETTLEMENT_AMOUNT_INVALID',
-    );
+    expect(
+      checkAdvanceSettlement(advance(), { kind: 'cash_return', amount: '0' }, DEFAULTS).code,
+    ).toBe('ADVANCE_SETTLEMENT_AMOUNT_INVALID');
   });
 
   it('critère 8 : déclaration sur la paie éteinte par défaut, permise une fois activée', () => {
     const salary = advance({ kind: 'salary' });
-    expect(checkAdvanceSettlement(salary, { kind: 'declared_payroll', amount: '100' }, DEFAULTS).code).toBe(
-      'ADVANCE_DECLARED_PAYROLL_DISABLED',
-    );
+    expect(
+      checkAdvanceSettlement(salary, { kind: 'declared_payroll', amount: '100' }, DEFAULTS).code,
+    ).toBe('ADVANCE_DECLARED_PAYROLL_DISABLED');
     expect(
       checkAdvanceSettlement(
         salary,
@@ -235,9 +261,13 @@ describe('checkAdvanceSettlement', () => {
       amount: '0.01',
       on: '2026-11-05',
     }));
-    expect(checkAdvanceSettlement(advance({ settlements }), { kind: 'cash_return', amount: '0.01' }, DEFAULTS).code).toBe(
-      'ADVANCE_SETTLEMENT_LIMIT_REACHED',
-    );
+    expect(
+      checkAdvanceSettlement(
+        advance({ settlements }),
+        { kind: 'cash_return', amount: '0.01' },
+        DEFAULTS,
+      ).code,
+    ).toBe('ADVANCE_SETTLEMENT_LIMIT_REACHED');
   });
 });
 
@@ -288,7 +318,9 @@ describe('advanceSettlementPlan', () => {
 
   it('refus : avance sur salaire, autre devise, non versée, déjà soldée', () => {
     const lines = [{ amount: '10' }];
-    expect(advanceSettlementPlan(advance({ kind: 'salary' }), { currency: 'USD', lines })).toMatchObject({
+    expect(
+      advanceSettlementPlan(advance({ kind: 'salary' }), { currency: 'USD', lines }),
+    ).toMatchObject({
       ok: false,
       code: 'ADVANCE_SETTLEMENT_KIND_MISMATCH',
     });
@@ -296,7 +328,9 @@ describe('advanceSettlementPlan', () => {
       ok: false,
       code: 'EXPENSE_REPORT_CURRENCY_MISMATCH',
     });
-    expect(advanceSettlementPlan(advance({ disbursement: null }), { currency: 'USD', lines })).toMatchObject({
+    expect(
+      advanceSettlementPlan(advance({ disbursement: null }), { currency: 'USD', lines }),
+    ).toMatchObject({
       ok: false,
       code: 'ADVANCE_NOT_DISBURSED',
     });
@@ -307,88 +341,121 @@ describe('advanceSettlementPlan', () => {
       ok: false,
       code: 'ADVANCE_ALREADY_SETTLED',
     });
-    expect(() => advanceSettlementPlan(advance(), { currency: 'USD', lines: [] })).toThrow(RangeError);
+    expect(() => advanceSettlementPlan(advance(), { currency: 'USD', lines: [] })).toThrow(
+      RangeError,
+    );
   });
 
-  it('propriété : répartition exacte au centime, déterministe, jamais négative', { timeout: 120_000 }, () => {
-    const r = rng(2611);
-    for (let run = 0; run < 3_000; run += 1) {
-      const adv = int(r, 1, r() < 0.2 ? 100 : 5_000_000);
-      const already = r() < 0.3 ? int(r, 0, adv - 1) : 0;
-      const a = advance({
-        amount: amountOf(adv),
-        settlements: already > 0 ? [{ id: 's0', kind: 'cash_return', amount: amountOf(already), on: '2026-11-02' }] : [],
-      });
-      const lines = Array.from({ length: int(r, 1, 50) }, () => ({ amount: amountOf(int(r, 1, 2_000_000)) }));
-      const p = advanceSettlementPlan(a, { currency: 'USD', lines });
-      if (!p.ok) throw new Error(p.code);
-      const total = lines.reduce((s, l) => s + toCents(l.amount), 0n);
-      const before = BigInt(adv - already);
-      const covered = before < total ? before : total;
-      expect(toCents(p.reportTotal)).toBe(total);
-      expect(toCents(p.fromAdvance)).toBe(covered);
-      expect(toCents(p.fromAdvance) + toCents(p.topUp)).toBe(total);
-      expect(toCents(p.outstandingAfter)).toBe(before - covered);
-      expect(p.lines.reduce((s, l) => s + toCents(l.fromAdvance), 0n)).toBe(covered);
-      expect(p.lines.reduce((s, l) => s + toCents(l.topUp), 0n)).toBe(total - covered);
-      for (const [i, l] of p.lines.entries()) {
-        expect(toCents(l.fromAdvance) >= 0n && toCents(l.topUp) >= 0n).toBe(true);
-        expect(toCents(l.fromAdvance) + toCents(l.topUp)).toBe(toCents(lines[i]?.amount ?? '0'));
-        // Prorata à un centime près.
-        const exact = (covered * toCents(l.amount) * 1000n) / total;
-        const diff = toCents(l.fromAdvance) * 1000n - exact;
-        expect(diff > -1000n && diff < 1000n).toBe(true);
+  it(
+    'propriété : répartition exacte au centime, déterministe, jamais négative',
+    { timeout: 120_000 },
+    () => {
+      const r = rng(2611);
+      for (let run = 0; run < 3_000; run += 1) {
+        const adv = int(r, 1, r() < 0.2 ? 100 : 5_000_000);
+        const already = r() < 0.3 ? int(r, 0, adv - 1) : 0;
+        const a = advance({
+          amount: amountOf(adv),
+          settlements:
+            already > 0
+              ? [{ id: 's0', kind: 'cash_return', amount: amountOf(already), on: '2026-11-02' }]
+              : [],
+        });
+        const lines = Array.from({ length: int(r, 1, 50) }, () => ({
+          amount: amountOf(int(r, 1, 2_000_000)),
+        }));
+        const p = advanceSettlementPlan(a, { currency: 'USD', lines });
+        if (!p.ok) throw new Error(p.code);
+        const total = lines.reduce((s, l) => s + toCents(l.amount), 0n);
+        const before = BigInt(adv - already);
+        const covered = before < total ? before : total;
+        expect(toCents(p.reportTotal)).toBe(total);
+        expect(toCents(p.fromAdvance)).toBe(covered);
+        expect(toCents(p.fromAdvance) + toCents(p.topUp)).toBe(total);
+        expect(toCents(p.outstandingAfter)).toBe(before - covered);
+        expect(p.lines.reduce((s, l) => s + toCents(l.fromAdvance), 0n)).toBe(covered);
+        expect(p.lines.reduce((s, l) => s + toCents(l.topUp), 0n)).toBe(total - covered);
+        for (const [i, l] of p.lines.entries()) {
+          expect(toCents(l.fromAdvance) >= 0n && toCents(l.topUp) >= 0n).toBe(true);
+          expect(toCents(l.fromAdvance) + toCents(l.topUp)).toBe(toCents(lines[i]?.amount ?? '0'));
+          // Prorata à un centime près.
+          const exact = (covered * toCents(l.amount) * 1000n) / total;
+          const diff = toCents(l.fromAdvance) * 1000n - exact;
+          expect(diff > -1000n && diff < 1000n).toBe(true);
+        }
+        expect(advanceSettlementPlan(a, { currency: 'USD', lines })).toEqual(p);
+        // Appliquer le plan : le reste dû suit exactement.
+        const applied = advance({
+          ...a,
+          settlements: [
+            ...a.settlements,
+            ...p.settlements.map((s, k) => ({
+              id: `p${k}`,
+              kind: s.kind,
+              amount: s.amount,
+              on: '2026-11-03',
+            })),
+          ],
+        });
+        expect(advanceOutstanding(applied).outstanding).toBe(p.outstandingAfter);
       }
-      expect(advanceSettlementPlan(a, { currency: 'USD', lines })).toEqual(p);
-      // Appliquer le plan : le reste dû suit exactement.
-      const applied = advance({
-        ...a,
-        settlements: [
-          ...a.settlements,
-          ...p.settlements.map((s, k) => ({ id: `p${k}`, kind: s.kind, amount: s.amount, on: '2026-11-03' })),
-        ],
-      });
-      expect(advanceOutstanding(applied).outstanding).toBe(p.outstandingAfter);
-    }
-  });
+    },
+  );
 });
 
 describe('propriété : le solde d’une avance n’est jamais incohérent', () => {
-  it('suite aléatoire de régularisations acceptées par checkAdvanceSettlement', { timeout: 120_000 }, () => {
-    const r = rng(42);
-    const kinds: AdvanceSettlementKind[] = ['expense_report', 'cash_return', 'declared_payroll', 'top_up', 'write_off'];
-    for (let run = 0; run < 1_500; run += 1) {
-      const kind = pick(r, ['expenses', 'salary'] as const);
-      const amount = int(r, 1, 1_000_000);
-      let a = advance({ kind, amount: amountOf(amount), disbursement: r() < 0.1 ? null : { paidOn: '2026-11-01' } });
-      const settings = { allowDeclaredPayrollSettlement: r() < 0.5 };
-      for (let step = 0; step < int(r, 0, 30); step += 1) {
-        const s = { kind: pick(r, kinds), amount: amountOf(int(r, 1, Math.max(1, Math.floor(amount / 3)))) };
-        const check = checkAdvanceSettlement(a, s, settings);
-        const before = advanceOutstanding(a);
-        expect(check.outstandingBefore).toBe(before.outstanding);
-        if (!check.ok) {
-          expect(check.outstandingAfter).toBe(check.outstandingBefore);
-          continue;
+  it(
+    'suite aléatoire de régularisations acceptées par checkAdvanceSettlement',
+    { timeout: 120_000 },
+    () => {
+      const r = rng(42);
+      const kinds: AdvanceSettlementKind[] = [
+        'expense_report',
+        'cash_return',
+        'declared_payroll',
+        'top_up',
+        'write_off',
+      ];
+      for (let run = 0; run < 1_500; run += 1) {
+        const kind = pick(r, ['expenses', 'salary'] as const);
+        const amount = int(r, 1, 1_000_000);
+        let a = advance({
+          kind,
+          amount: amountOf(amount),
+          disbursement: r() < 0.1 ? null : { paidOn: '2026-11-01' },
+        });
+        const settings = { allowDeclaredPayrollSettlement: r() < 0.5 };
+        for (let step = 0; step < int(r, 0, 30); step += 1) {
+          const s = {
+            kind: pick(r, kinds),
+            amount: amountOf(int(r, 1, Math.max(1, Math.floor(amount / 3)))),
+          };
+          const check = checkAdvanceSettlement(a, s, settings);
+          const before = advanceOutstanding(a);
+          expect(check.outstandingBefore).toBe(before.outstanding);
+          if (!check.ok) {
+            expect(check.outstandingAfter).toBe(check.outstandingBefore);
+            continue;
+          }
+          a = { ...a, settlements: [...a.settlements, { id: `s${step}`, ...s, on: '2026-11-02' }] };
+          const after = advanceOutstanding(a);
+          expect(after.outstanding).toBe(check.outstandingAfter);
         }
-        a = { ...a, settlements: [...a.settlements, { id: `s${step}`, ...s, on: '2026-11-02' }] };
-        const after = advanceOutstanding(a);
-        expect(after.outstanding).toBe(check.outstandingAfter);
+        const o = advanceOutstanding(a);
+        const disbursed = toCents(o.disbursed);
+        const out = toCents(o.outstanding);
+        // 0 ≤ reste ≤ versé ; versé = reste + réglé ; jamais d'excès par le chemin contrôlé.
+        expect(out >= 0n && out <= disbursed).toBe(true);
+        expect(toCents(o.overSettled)).toBe(0n);
+        expect(out + toCents(o.settled)).toBe(disbursed);
+        expect(o.bySettlementKind.reduce((s, k) => s + toCents(k.amount), 0n)).toBe(
+          toCents(o.settled) + toCents(o.toppedUp),
+        );
+        expect(o.state === 'settled').toBe(a.disbursement !== null && out === 0n);
+        if (kind === 'salary') expect(o.toppedUp).toBe('0.00');
       }
-      const o = advanceOutstanding(a);
-      const disbursed = toCents(o.disbursed);
-      const out = toCents(o.outstanding);
-      // 0 ≤ reste ≤ versé ; versé = reste + réglé ; jamais d'excès par le chemin contrôlé.
-      expect(out >= 0n && out <= disbursed).toBe(true);
-      expect(toCents(o.overSettled)).toBe(0n);
-      expect(out + toCents(o.settled)).toBe(disbursed);
-      expect(o.bySettlementKind.reduce((s, k) => s + toCents(k.amount), 0n)).toBe(
-        toCents(o.settled) + toCents(o.toppedUp),
-      );
-      expect(o.state === 'settled').toBe(a.disbursement !== null && out === 0n);
-      if (kind === 'salary') expect(o.toppedUp).toBe('0.00');
-    }
-  });
+    },
+  );
 
   it('données quelconques : reste + réglé − excès = versé', { timeout: 120_000 }, () => {
     const r = rng(7);
@@ -398,7 +465,13 @@ describe('propriété : le solde d’une avance n’est jamais incohérent', () 
         disbursement: r() < 0.2 ? null : { paidOn: '2026-11-01' },
         settlements: Array.from({ length: int(r, 0, 10) }, (_, i) => ({
           id: `s${i}`,
-          kind: pick(r, ['expense_report', 'cash_return', 'declared_payroll', 'top_up', 'write_off'] as const),
+          kind: pick(r, [
+            'expense_report',
+            'cash_return',
+            'declared_payroll',
+            'top_up',
+            'write_off',
+          ] as const),
           amount: amountOf(int(r, 1, 50_000)),
           on: '2026-11-02',
         })),
@@ -407,7 +480,9 @@ describe('propriété : le solde d’une avance n’est jamais incohérent', () 
       expect(toCents(o.outstanding) >= 0n).toBe(true);
       expect(toCents(o.overSettled) >= 0n).toBe(true);
       expect(toCents(o.outstanding) === 0n || toCents(o.overSettled) === 0n).toBe(true);
-      expect(toCents(o.outstanding) + toCents(o.settled) - toCents(o.overSettled)).toBe(toCents(o.disbursed));
+      expect(toCents(o.outstanding) + toCents(o.settled) - toCents(o.overSettled)).toBe(
+        toCents(o.disbursed),
+      );
     }
   });
 });
@@ -417,16 +492,31 @@ describe('advanceFindings', () => {
     const a = advance({ expectedSettlement: '2026-11' });
     expect(advanceFindings(a, '2026-11-30')).toEqual([]);
     expect(advanceFindings(a, '2026-12-01')).toEqual([
-      { code: 'ADVANCE_OVERDUE', dueOn: '2026-11-30', payrollMonth: null, amount: '100.00', settlementId: null },
+      {
+        code: 'ADVANCE_OVERDUE',
+        dueOn: '2026-11-30',
+        payrollMonth: null,
+        amount: '100.00',
+        settlementId: null,
+      },
     ]);
-    expect(advanceFindings(advance({ expectedSettlement: '2027-02' }), '2027-03-01')[0]?.dueOn).toBe('2027-02-28');
-    expect(advanceFindings(advance({ expectedSettlement: '2026-11-10' }), '2026-11-11')).toHaveLength(1);
+    expect(
+      advanceFindings(advance({ expectedSettlement: '2027-02' }), '2027-03-01')[0]?.dueOn,
+    ).toBe('2027-02-28');
+    expect(
+      advanceFindings(advance({ expectedSettlement: '2026-11-10' }), '2026-11-11'),
+    ).toHaveLength(1);
     const settled = advance({
       expectedSettlement: '2026-11-10',
       settlements: [{ id: 's', kind: 'cash_return', amount: '100', on: '2026-11-09' }],
     });
     expect(advanceFindings(settled, '2026-12-01')).toEqual([]);
-    expect(advanceFindings(advance({ expectedSettlement: '2026-11-10', disbursement: null }), '2026-12-01')).toEqual([]);
+    expect(
+      advanceFindings(
+        advance({ expectedSettlement: '2026-11-10', disbursement: null }),
+        '2026-12-01',
+      ),
+    ).toEqual([]);
     expect(advanceFindings(advance(), '2030-01-01')).toEqual([]);
   });
 
@@ -439,12 +529,26 @@ describe('advanceFindings', () => {
       ],
     });
     expect(advanceFindings(a, '2027-01-05')).toEqual([
-      { code: 'ADVANCE_SETTLED_ON_PAYROLL', dueOn: null, payrollMonth: '2026-11', amount: '60.00', settlementId: 's1' },
-      { code: 'ADVANCE_SETTLED_ON_PAYROLL', dueOn: null, payrollMonth: '2026-12', amount: '40.00', settlementId: 's2' },
+      {
+        code: 'ADVANCE_SETTLED_ON_PAYROLL',
+        dueOn: null,
+        payrollMonth: '2026-11',
+        amount: '60.00',
+        settlementId: 's1',
+      },
+      {
+        code: 'ADVANCE_SETTLED_ON_PAYROLL',
+        dueOn: null,
+        payrollMonth: '2026-12',
+        amount: '40.00',
+        settlementId: 's2',
+      },
     ]);
   });
 
   it('échéance illisible', () => {
-    expect(() => advanceFindings(advance({ expectedSettlement: '2026-13' }), '2026-12-01')).toThrow(RangeError);
+    expect(() => advanceFindings(advance({ expectedSettlement: '2026-13' }), '2026-12-01')).toThrow(
+      RangeError,
+    );
   });
 });

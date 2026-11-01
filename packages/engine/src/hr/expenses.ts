@@ -251,10 +251,7 @@ export function checkExpenseReport(
  * illisible lève une `RangeError`. Σ `byCategory` = Σ `byProject` = `total`.
  */
 export function expenseReportTotals(
-  lines: readonly Pick<
-    ExpenseLineInput,
-    'category' | 'amount' | 'workProjectId' | 'rebillable'
-  >[],
+  lines: readonly Pick<ExpenseLineInput, 'category' | 'amount' | 'workProjectId' | 'rebillable'>[],
 ): ExpenseReportTotals {
   if (lines.length > EXPENSE_REPORT_LINES_BOUNDS.max) {
     throw new RangeError(`Note de frais : ${EXPENSE_REPORT_LINES_BOUNDS.max} lignes au plus`);
@@ -391,7 +388,9 @@ export function expenseSummary(
     }
   }
   const categoryRank = (key: string | null): number =>
-    key === null ? Number.MAX_SAFE_INTEGER : (EXPENSE_CATEGORY_CODES as readonly string[]).indexOf(key);
+    key === null
+      ? Number.MAX_SAFE_INTEGER
+      : (EXPENSE_CATEGORY_CODES as readonly string[]).indexOf(key);
   return {
     version: HR_VERSION,
     from,

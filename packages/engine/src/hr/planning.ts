@@ -24,6 +24,7 @@ import {
   checkId,
   checkIntegerIn,
   dayNumber,
+  dayOfNumber,
   halvesOfDay,
   slotsOf,
   weekdayOf,
@@ -66,7 +67,8 @@ export interface EmployeeLeaveInput extends LeavePeriod {
   employeeId: string;
 }
 
-export type ShiftFindingCode = 'SHIFT_OVERLAP' | 'SHIFT_DURING_LEAVE' | 'SHIFT_ABOVE_INDICATIVE_LIMIT';
+export type ShiftFindingCode =
+  'SHIFT_OVERLAP' | 'SHIFT_DURING_LEAVE' | 'SHIFT_ABOVE_INDICATIVE_LIMIT';
 
 export interface ShiftFinding {
   code: ShiftFindingCode;
@@ -129,7 +131,7 @@ const HHMM = /^([01]\d|2[0-3]):([0-5]\d)$/;
 export function minutesOfTime(value: unknown, what: string): number {
   const m = typeof value === 'string' ? HHMM.exec(value) : null;
   if (m === null) throw new RangeError(`${what} : heure « HH:MM » attendue`);
-  return Number(m[1]) * 60 + Number(m[2]);
+  return Number.parseInt(m[1] ?? '', 10) * 60 + Number.parseInt(m[2] ?? '', 10);
 }
 
 /** Instant UTC (ms) d'une heure locale de Kinshasa un jour civil donné. */
@@ -139,7 +141,7 @@ export function kinshasaInstant(day: HrDay, minutesOfDay: number): number {
 
 /** Jour civil de Kinshasa d'un instant UTC (ms). */
 export function kinshasaDayOf(instantMs: number): HrDay {
-  return new Date(instantMs + KINSHASA_UTC_OFFSET_MS).toISOString().slice(0, 10);
+  return dayOfNumber(Math.floor((instantMs + KINSHASA_UTC_OFFSET_MS) / DAY_MS));
 }
 
 /** Instants `[début, fin)` d'un créneau (ms UTC) et sa durée en minutes. */
@@ -163,7 +165,10 @@ export function shiftInterval(
   return { startMs, endMs: startMs + minutes * MINUTE_MS, minutes };
 }
 
-function checkShift(shift: ShiftInput, what: string): { startMs: number; endMs: number; minutes: number } {
+function checkShift(
+  shift: ShiftInput,
+  what: string,
+): { startMs: number; endMs: number; minutes: number } {
   checkId(shift.id, what);
   checkId(shift.employeeId, `${what} (collaborateur)`);
   if (shift.status !== 'draft' && shift.status !== 'published' && shift.status !== 'cancelled') {
@@ -178,7 +183,9 @@ function mondayOf(day: HrDay): HrDay {
 }
 
 /** Jours couverts (demi-journée au moins) par une absence, par collaborateur. */
-function leaveDaysByEmployee(absences: readonly EmployeeLeaveInput[]): Map<string, [number, number][]> {
+function leaveDaysByEmployee(
+  absences: readonly EmployeeLeaveInput[],
+): Map<string, [number, number][]> {
   const out = new Map<string, [number, number][]>();
   for (const [i, a] of absences.entries()) {
     const what = `Absence n° ${i + 1}`;
@@ -228,7 +235,8 @@ export function shiftConflicts(
   options: { indicativeMaxMinutesPerWeek: number | null } = { indicativeMaxMinutesPerWeek: null },
 ): ShiftConflictsResult {
   const limit = options.indicativeMaxMinutesPerWeek;
-  if (limit !== null) checkIntegerIn(limit, 1, 7 * SHIFT_MAX_MINUTES, 'Seuil indicatif hebdomadaire');
+  if (limit !== null)
+    checkIntegerIn(limit, 1, 7 * SHIFT_MAX_MINUTES, 'Seuil indicatif hebdomadaire');
   const leaves = leaveDaysByEmployee(absences);
   const active = shifts
     .map((s, i) => ({ s, ...checkShift(s, `Créneau n° ${i + 1}`) }))
@@ -360,7 +368,8 @@ export function staffingGaps(
   checkDay(to, 'Fin');
   if (to < from) throw new RangeError('Planning : la fin précède le début');
   const span = dayNumber(to) - dayNumber(from) + 1;
-  if (span > PLANNING_MAX_DAYS) throw new RangeError(`Planning : ${PLANNING_MAX_DAYS} jours au plus`);
+  if (span > PLANNING_MAX_DAYS)
+    throw new RangeError(`Planning : ${PLANNING_MAX_DAYS} jours au plus`);
   const leaves = leaveDaysByEmployee(absences);
   const published = shifts
     .map((s, i) => ({ s, ...checkShift(s, `Créneau n° ${i + 1}`) }))

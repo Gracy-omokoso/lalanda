@@ -19,7 +19,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { formatCents } from '../treasury/money.js';
-import { byString, checkDay, checkId } from './days.js';
+import { byString, checkDay, checkId, clampedDay } from './days.js';
 import {
   expenseApprovalSteps,
   isHrCurrency,
@@ -97,7 +97,8 @@ export interface AdvanceSettings {
 export interface AdvanceRequestCheck {
   version: string;
   ok: boolean;
-  code: null | 'ADVANCE_KIND_DISABLED' | 'ADVANCE_AMOUNT_INVALID' | 'ADVANCE_ABOVE_ORGANIZATION_LIMIT';
+  code:
+    null | 'ADVANCE_KIND_DISABLED' | 'ADVANCE_AMOUNT_INVALID' | 'ADVANCE_ABOVE_ORGANIZATION_LIMIT';
 }
 
 export interface AdvanceOutstandingResult {
@@ -420,11 +421,10 @@ const MONTH = /^(\d{4})-(\d{2})$/;
 function dueDayOf(expected: string): HrDay {
   const m = MONTH.exec(expected);
   if (m !== null) {
-    const year = Number(m[1]);
-    const month = Number(m[2]);
+    const year = Number.parseInt(m[1] ?? '', 10);
+    const month = Number.parseInt(m[2] ?? '', 10);
     if (month < 1 || month > 12) throw new RangeError('Échéance annoncée : mois invalide');
-    const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
-    return checkDay(`${m[1]}-${m[2]}-${String(last).padStart(2, '0')}`, 'Échéance annoncée');
+    return checkDay(clampedDay(year, month, 31), 'Échéance annoncée');
   }
   return checkDay(expected, 'Échéance annoncée');
 }

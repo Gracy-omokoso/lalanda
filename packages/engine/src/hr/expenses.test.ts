@@ -33,7 +33,9 @@ const toCents = (s: string): bigint => {
 const amountOf = (cents: number): string =>
   `${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, '0')}`;
 
-const ALLOWED = EXPENSE_CATEGORY_CODES.filter((c) => !EXPENSE_LINE_FORBIDDEN_CATEGORIES.includes(c));
+const ALLOWED = EXPENSE_CATEGORY_CODES.filter(
+  (c) => !EXPENSE_LINE_FORBIDDEN_CATEGORIES.includes(c),
+);
 
 const line = (over: Partial<ExpenseLineInput> = {}): ExpenseLineInput => ({
   spentOn: '2026-11-02',
@@ -62,17 +64,24 @@ describe('checkExpenseReport', () => {
     ]);
     const many = Array.from({ length: 51 }, () => line());
     expect(
-      checkExpenseReport({ currency: 'CDF', lines: many }, today, { receiptRequired: false }).issues,
+      checkExpenseReport({ currency: 'CDF', lines: many }, today, { receiptRequired: false })
+        .issues,
     ).toEqual([{ lineIndex: null, code: 'EXPENSE_REPORT_TOO_MANY_LINES' }]);
     const fifty = Array.from({ length: 50 }, () => line());
-    expect(checkExpenseReport({ currency: 'CDF', lines: fifty }, today, { receiptRequired: false }).ok).toBe(true);
+    expect(
+      checkExpenseReport({ currency: 'CDF', lines: fifty }, today, { receiptRequired: false }).ok,
+    ).toBe(true);
   });
 
   it('date future, date illisible, aujourd’hui permis', () => {
     const r = checkExpenseReport(
       {
         currency: 'USD',
-        lines: [line({ spentOn: '2026-11-06' }), line({ spentOn: '2026-02-30' }), line({ spentOn: today })],
+        lines: [
+          line({ spentOn: '2026-11-06' }),
+          line({ spentOn: '2026-02-30' }),
+          line({ spentOn: today }),
+        ],
       },
       today,
       { receiptRequired: false },
@@ -168,11 +177,15 @@ describe('checkExpenseReport', () => {
       line({ hasReceipt: false, missingReceiptReason: 'Taxi sans reçu' }),
       line({ hasReceipt: true }),
     ];
-    expect(checkExpenseReport({ currency: 'USD', lines }, today, { receiptRequired: true }).issues).toEqual([
+    expect(
+      checkExpenseReport({ currency: 'USD', lines }, today, { receiptRequired: true }).issues,
+    ).toEqual([
       { lineIndex: 0, code: 'EXPENSE_RECEIPT_REASON_REQUIRED' },
       { lineIndex: 1, code: 'EXPENSE_RECEIPT_REASON_REQUIRED' },
     ]);
-    expect(checkExpenseReport({ currency: 'USD', lines }, today, { receiptRequired: false }).ok).toBe(true);
+    expect(
+      checkExpenseReport({ currency: 'USD', lines }, today, { receiptRequired: false }).ok,
+    ).toBe(true);
   });
 });
 
@@ -222,42 +235,50 @@ describe('expenseReportTotals', () => {
       RangeError,
     );
     expect(() =>
-      expenseReportTotals(Array.from({ length: 51 }, () => ({ category: 'transport', amount: '1' }))),
+      expenseReportTotals(
+        Array.from({ length: 51 }, () => ({ category: 'transport', amount: '1' })),
+      ),
     ).toThrow(RangeError);
   });
 
-  it('propriété : total = Σ lignes = Σ catégories = Σ projets ; ordre des lignes sans effet', { timeout: 120_000 }, () => {
-    const r = rng(20261101);
-    for (let run = 0; run < 2_000; run += 1) {
-      const n = int(r, 1, 50);
-      const lines = Array.from({ length: n }, () => ({
-        category: pick(r, ALLOWED),
-        amount: amountOf(int(r, 1, r() < 0.1 ? 10_000_000_000 : 50_000)),
-        workProjectId: r() < 0.4 ? pick(r, ['P1', 'P2', 'P3']) : null,
-        rebillable: r() < 0.3,
-      }));
-      const t = expenseReportTotals(lines);
-      const expected = lines.reduce((s, l) => s + toCents(l.amount), 0n);
-      expect(toCents(t.total)).toBe(expected);
-      expect(t.byCategory.reduce((s, g) => s + toCents(g.total), 0n)).toBe(expected);
-      expect(t.byProject.reduce((s, g) => s + toCents(g.total), 0n)).toBe(expected);
-      expect(t.byCategory.reduce((s, g) => s + g.lines, 0)).toBe(n);
-      expect(t.byProject.reduce((s, g) => s + g.lines, 0)).toBe(n);
-      expect(toCents(t.rebillable)).toBe(
-        lines
-          .filter((l) => l.rebillable && l.workProjectId !== null)
-          .reduce((s, l) => s + toCents(l.amount), 0n),
-      );
-      const shuffled = [...lines].sort(() => (r() < 0.5 ? -1 : 1));
-      expect(expenseReportTotals(shuffled)).toEqual(t);
-    }
-  });
+  it(
+    'propriété : total = Σ lignes = Σ catégories = Σ projets ; ordre des lignes sans effet',
+    { timeout: 120_000 },
+    () => {
+      const r = rng(20261101);
+      for (let run = 0; run < 2_000; run += 1) {
+        const n = int(r, 1, 50);
+        const lines = Array.from({ length: n }, () => ({
+          category: pick(r, ALLOWED),
+          amount: amountOf(int(r, 1, r() < 0.1 ? 10_000_000_000 : 50_000)),
+          workProjectId: r() < 0.4 ? pick(r, ['P1', 'P2', 'P3']) : null,
+          rebillable: r() < 0.3,
+        }));
+        const t = expenseReportTotals(lines);
+        const expected = lines.reduce((s, l) => s + toCents(l.amount), 0n);
+        expect(toCents(t.total)).toBe(expected);
+        expect(t.byCategory.reduce((s, g) => s + toCents(g.total), 0n)).toBe(expected);
+        expect(t.byProject.reduce((s, g) => s + toCents(g.total), 0n)).toBe(expected);
+        expect(t.byCategory.reduce((s, g) => s + g.lines, 0)).toBe(n);
+        expect(t.byProject.reduce((s, g) => s + g.lines, 0)).toBe(n);
+        expect(toCents(t.rebillable)).toBe(
+          lines
+            .filter((l) => l.rebillable && l.workProjectId !== null)
+            .reduce((s, l) => s + toCents(l.amount), 0n),
+        );
+        const shuffled = [...lines].sort(() => (r() < 0.5 ? -1 : 1));
+        expect(expenseReportTotals(shuffled)).toEqual(t);
+      }
+    },
+  );
 });
 
 describe('expenseApprovalSteps', () => {
   const flow = { approvalFlow: 'manager_then_finance' as const };
   it('manager puis finance', () => {
-    expect(expenseApprovalSteps(flow, { managerEmployeeId: 'A', managerUserId: 'uA' }, 'uB')).toEqual({
+    expect(
+      expenseApprovalSteps(flow, { managerEmployeeId: 'A', managerUserId: 'uA' }, 'uB'),
+    ).toEqual({
       version: HR_VERSION,
       steps: ['manager', 'finance'],
       managerReplacedBy: null,
@@ -265,7 +286,12 @@ describe('expenseApprovalSteps', () => {
   });
   it('finance seule : circuit, sans manager, manager sans compte, manager bénéficiaire', () => {
     const cases = [
-      [{ approvalFlow: 'finance_only' as const }, { managerEmployeeId: 'A', managerUserId: 'uA' }, 'uB', 'FINANCE_ONLY_FLOW'],
+      [
+        { approvalFlow: 'finance_only' as const },
+        { managerEmployeeId: 'A', managerUserId: 'uA' },
+        'uB',
+        'FINANCE_ONLY_FLOW',
+      ],
       [flow, { managerEmployeeId: null, managerUserId: null }, 'uB', 'NO_MANAGER'],
       [flow, { managerEmployeeId: 'A', managerUserId: null }, 'uB', 'MANAGER_WITHOUT_ACCOUNT'],
       [flow, { managerEmployeeId: 'A', managerUserId: 'uA' }, 'uA', 'MANAGER_IS_BENEFICIARY'],
@@ -311,7 +337,9 @@ describe('expenseSummary', () => {
       currency: 'USD',
       status: 'approved',
       departmentId: null,
-      lines: [{ spentOn: '2026-10-20', category: 'transport', amount: '10.00', workProjectId: 'P' }],
+      lines: [
+        { spentOn: '2026-10-20', category: 'transport', amount: '10.00', workProjectId: 'P' },
+      ],
     },
     {
       id: 'r3',
@@ -361,56 +389,69 @@ describe('expenseSummary', () => {
   });
 
   it('entrées invalides', () => {
-    expect(() => expenseSummary(reports, '2026-10-31', '2026-10-01', 'category')).toThrow(RangeError);
+    expect(() => expenseSummary(reports, '2026-10-31', '2026-10-01', 'category')).toThrow(
+      RangeError,
+    );
     expect(() => expenseSummary(reports, '2026-10-01', '2026-10-31', 'employee' as never)).toThrow(
       RangeError,
     );
   });
 
-  it('propriété : Σ groupes = Σ totaux par devise, quel que soit le regroupement', { timeout: 120_000 }, () => {
-    const r = rng(51);
-    const statuses = [
-      'draft',
-      'submitted',
-      'approved',
-      'rejected',
-      'reimbursed',
-      'settled_by_advance',
-      'partially_settled',
-      'cancelled',
-    ] as const;
-    for (let run = 0; run < 300; run += 1) {
-      const rs: ExpenseSummaryReportInput[] = Array.from({ length: int(r, 0, 20) }, (_, k) => ({
-        id: `r${k}`,
-        currency: pick(r, ['CDF', 'USD'] as const),
-        status: pick(r, statuses),
-        departmentId: r() < 0.3 ? null : pick(r, ['D1', 'D2']),
-        lines: Array.from({ length: int(r, 1, 6) }, () => ({
-          spentOn: `2026-${String(int(r, 9, 11)).padStart(2, '0')}-${String(int(r, 1, 28)).padStart(2, '0')}`,
-          category: pick(r, ALLOWED),
-          amount: amountOf(int(r, 1, 100_000)),
-          workProjectId: r() < 0.5 ? null : pick(r, ['P1', 'P2']),
-        })),
-      }));
-      const expected = new Map<string, bigint>();
-      for (const rep of rs) {
-        if (!['approved', 'reimbursed', 'settled_by_advance', 'partially_settled'].includes(rep.status)) continue;
-        for (const l of rep.lines) {
-          if (l.spentOn < '2026-10-01' || l.spentOn > '2026-10-31') continue;
-          expected.set(rep.currency, (expected.get(rep.currency) ?? 0n) + toCents(l.amount));
+  it(
+    'propriété : Σ groupes = Σ totaux par devise, quel que soit le regroupement',
+    { timeout: 120_000 },
+    () => {
+      const r = rng(51);
+      const statuses = [
+        'draft',
+        'submitted',
+        'approved',
+        'rejected',
+        'reimbursed',
+        'settled_by_advance',
+        'partially_settled',
+        'cancelled',
+      ] as const;
+      for (let run = 0; run < 300; run += 1) {
+        const rs: ExpenseSummaryReportInput[] = Array.from({ length: int(r, 0, 20) }, (_, k) => ({
+          id: `r${k}`,
+          currency: pick(r, ['CDF', 'USD'] as const),
+          status: pick(r, statuses),
+          departmentId: r() < 0.3 ? null : pick(r, ['D1', 'D2']),
+          lines: Array.from({ length: int(r, 1, 6) }, () => ({
+            spentOn: `2026-${String(int(r, 9, 11)).padStart(2, '0')}-${String(int(r, 1, 28)).padStart(2, '0')}`,
+            category: pick(r, ALLOWED),
+            amount: amountOf(int(r, 1, 100_000)),
+            workProjectId: r() < 0.5 ? null : pick(r, ['P1', 'P2']),
+          })),
+        }));
+        const expected = new Map<string, bigint>();
+        for (const rep of rs) {
+          if (
+            !['approved', 'reimbursed', 'settled_by_advance', 'partially_settled'].includes(
+              rep.status,
+            )
+          )
+            continue;
+          for (const l of rep.lines) {
+            if (l.spentOn < '2026-10-01' || l.spentOn > '2026-10-31') continue;
+            expected.set(rep.currency, (expected.get(rep.currency) ?? 0n) + toCents(l.amount));
+          }
+        }
+        for (const g of ['category', 'department', 'project'] as const) {
+          const s = expenseSummary(rs, '2026-10-01', '2026-10-31', g);
+          for (const t of s.totals) {
+            expect(toCents(t.total)).toBe(expected.get(t.currency));
+            expect(
+              s.groups
+                .filter((x) => x.currency === t.currency)
+                .reduce((a, x) => a + toCents(x.total), 0n),
+            ).toBe(expected.get(t.currency));
+            expect(toCents(t.awaitingReimbursement) <= toCents(t.total)).toBe(true);
+          }
+          expect(s.totals.map((t) => t.currency).sort()).toEqual([...expected.keys()].sort());
         }
       }
-      for (const g of ['category', 'department', 'project'] as const) {
-        const s = expenseSummary(rs, '2026-10-01', '2026-10-31', g);
-        for (const t of s.totals) {
-          expect(toCents(t.total)).toBe(expected.get(t.currency));
-          expect(
-            s.groups.filter((x) => x.currency === t.currency).reduce((a, x) => a + toCents(x.total), 0n),
-          ).toBe(expected.get(t.currency));
-          expect(toCents(t.awaitingReimbursement) <= toCents(t.total)).toBe(true);
-        }
-        expect(s.totals.map((t) => t.currency).sort()).toEqual([...expected.keys()].sort());
-      }
-    }
-  });
+    },
+  );
 });

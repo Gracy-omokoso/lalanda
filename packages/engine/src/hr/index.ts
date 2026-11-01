@@ -37,3 +37,9 @@ export {
   seniorityYears,
 } from './reports.js';
 export { weeklyTimesheet } from './timesheet.js';
+// ADR-0051 — H9
+export * from './expenses.js';
+export * from './advances.js';
+export * from './attendance.js';
+export * from './planning.js';
+export * from './performance.js';
