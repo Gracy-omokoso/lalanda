@@ -118,7 +118,7 @@ describe('versions', () => {
     expect(STOCK_VERSION).toBe('1.0.0');
     expect(ENGINE_VERSION).toBe('0.2.0');
     expect(PURCHASES_VERSION).toBe('1.0.0');
-    expect(HR_VERSION).toBe('1.0.0');
+    expect(HR_VERSION).toBe('1.1.0');
   });
 });
 

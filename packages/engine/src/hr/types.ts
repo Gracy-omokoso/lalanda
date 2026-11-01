@@ -12,7 +12,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Toute évolution d'un calcul de ce module incrémente cette version. */
-export const HR_VERSION = '1.0.0';
+export const HR_VERSION = '1.1.0';
 
 /** Date civile `AAAA-MM-JJ` (jour de Kinshasa). */
 export type HrDay = string;

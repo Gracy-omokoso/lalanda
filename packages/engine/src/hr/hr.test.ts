@@ -90,7 +90,7 @@ const SUN = '2026-01-11';
 
 describe('version', () => {
   it('le module a sa propre version, sans toucher ENGINE_VERSION', () => {
-    expect(HR_VERSION).toBe('1.0.0');
+    expect(HR_VERSION).toBe('1.1.0');
     expect(ENGINE_VERSION).toBe('0.2.0');
   });
 });
