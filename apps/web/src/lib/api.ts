@@ -1146,7 +1146,7 @@ export interface TermsAcceptanceView {
 
 export type DisplayCurrency = 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR';
 
-/** Les 51 actions granulaires (docs/12, ADR-0021 §8, ADR-0022 § S25c.1, ADR-0023 § S25e.11, ADR-0031 § 4, ADR-0034 § 8, ADR-0035 § 3, ADR-0039 § 7, ADR-0040 § 4.1, ADR-0044 § 4.1, ADR-0045 § 4.1, ADR-0046 § 8.1, ADR-0049 § 8.1). Union fermée, alignée sur l'API. */
+/** Les 53 actions granulaires (docs/12, ADR-0021 §8, ADR-0022 § S25c.1, ADR-0023 § S25e.11, ADR-0031 § 4, ADR-0034 § 8, ADR-0035 § 3, ADR-0039 § 7, ADR-0040 § 4.1, ADR-0044 § 4.1, ADR-0045 § 4.1, ADR-0046 § 8.1, ADR-0049 § 8.1, ADR-0050 § 8.1). Union fermée, alignée sur l'API. */
 export type OrgAction =
   | 'organization.manage'
   | 'billing.manage'
@@ -1233,7 +1233,12 @@ export type OrgAction =
   | 'accounting.post'
   | 'accounting.close'
   | 'accounting.export'
-  | 'accounting.manage';
+  | 'accounting.manage'
+  // ADR-0050 § 8.1 — contrats et commandes clients. Préparer (contrats, avenants, commandes,
+  // copies signées) ; approuver, constater une reconduction, résilier (ⓢ, interdit absolu
+  // de plateforme). Les factures d'un engagement restent sous `sales.manage` et `sales.invoice`.
+  | 'sales.contract'
+  | 'sales.contract.approve';
 
 /**
  * Offres — RÉEXPORTÉES du catalogue partagé, jamais réécrites.

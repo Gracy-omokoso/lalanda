@@ -32,19 +32,20 @@ Le support ne voit jamais les données financières sans consentement explicite,
 | Chef de projet | projets autorisés et saisie |
 | Conseiller | consultation, commentaires, recommandations |
 | Lecteur | lecture seulement |
-| Commercial (`sales_rep`, ADR-0040, appliqué) | CRM, devis, consultation des clients et du catalogue ; ni trésorerie, ni dépenses, ni émission de facture |
+| Commercial (`sales_rep`, ADR-0040, appliqué) | CRM, devis, préparation des contrats et commandes clients (ADR-0050), consultation des clients et du catalogue ; ni trésorerie, ni dépenses, ni émission de facture |
 | Responsable RH (`hr_manager`, ADR-0045, implémenté) | dossiers du personnel, absences et documents RH ; ni trésorerie, ni ventes, ni achats |
 | Magasinier (`storekeeper`, ADR-0046, appliqué au lot S0) | sort, transfère et compte le stock ; consulte le matériel et les documents ; ni prix d'achat, ni valeur du stock, ni trésorerie, ni ventes |
 | Expert-comptable externe (`external_accountant`, ADR-0049, appliqué au lot K0) | consulte et exporte la comptabilité ; n'écrit rien ; attribuable par le seul Propriétaire |
 
 ## Actions granulaires
 
-`organization.manage`, `billing.manage`, `members.invite`, `project.create`, `project.read`, `project.update`, `canvas.update`, `inputs.update`, `plan.calculate`, `plan.approve`, `actuals.import`, `period.close`, `analytics.read`, `report.export`, `audit.read`, `fiscal.manage`, `sales.read`, `sales.manage`, `sales.invoice`, `sales.receipt`, `treasury.read`, `treasury.manage`, `crm.read`, `crm.manage`, `work.read`, `work.update`, `work.manage`, `sales.quote`, `purchase.read`, `purchase.request`, `purchase.manage`, `purchase.approve`, `payables.pay`, `hr.read`, `hr.manage`, `hr.sensitive.read`, `leave.request`, `leave.approve`, `stock.read`, `stock.move`, `stock.count`, `stock.manage`, `assets.read`, `assets.manage`, `docs.read`, `docs.manage`, `accounting.read`, `accounting.post`, `accounting.close`, `accounting.export`, `accounting.manage`.
+`organization.manage`, `billing.manage`, `members.invite`, `project.create`, `project.read`, `project.update`, `canvas.update`, `inputs.update`, `plan.calculate`, `plan.approve`, `actuals.import`, `period.close`, `analytics.read`, `report.export`, `audit.read`, `fiscal.manage`, `sales.read`, `sales.manage`, `sales.invoice`, `sales.receipt`, `treasury.read`, `treasury.manage`, `crm.read`, `crm.manage`, `work.read`, `work.update`, `work.manage`, `sales.quote`, `purchase.read`, `purchase.request`, `purchase.manage`, `purchase.approve`, `payables.pay`, `hr.read`, `hr.manage`, `hr.sensitive.read`, `leave.request`, `leave.approve`, `stock.read`, `stock.move`, `stock.count`, `stock.manage`, `assets.read`, `assets.manage`, `docs.read`, `docs.manage`, `accounting.read`, `accounting.post`, `accounting.close`, `accounting.export`, `accounting.manage`, `sales.contract`, `sales.contract.approve`.
 
-Cinquante et une actions au total, dans l'ordre ci-dessus (ordre de fusion pour les
+Cinquante-trois actions au total, dans l'ordre ci-dessus (ordre de fusion pour les
 actions ajoutées après la dix-neuvième ; les vingt-neuvième à trente-troisième viennent
 d'ADR-0044, les trente-quatrième à trente-huitième d'ADR-0045, les trente-neuvième à
-quarante-sixième d'ADR-0046, les cinq dernières d'ADR-0049).
+quarante-sixième d'ADR-0046, les quarante-septième à cinquante et unième d'ADR-0049, les deux
+dernières d'ADR-0050).
 
 `fiscal.manage` — « Gérer l'identité fiscale et la facture normalisée » — est la
 seizième action, ajoutée par ADR-0021 §8 (18 oct. 2026). Elle couvre la fiche
@@ -489,7 +490,50 @@ promotion vers un projet, assistance IA) de `canvas.update`, régler son IA de
   « Comptabilité ».
 - **Plateforme** : `accounting.read` sous accès délégué ; `accounting.post`, `accounting.close`,
   `accounting.export`, `accounting.manage` rejoignent `PLATFORM_FORBIDDEN_ACTIONS`.
-- Tests : matrice 12 × 51 + 6 × 51 = **918** cases.
+- Tests : matrice 12 × 51 + 6 × 51 = **918** cases (954 depuis ADR-0050).
+
+### ADR-0050 — contrats et commandes clients (appliqué, lot V0)
+
+> **Statut : appliqué** par le lot V0
+> d'[ADR-0050](adr/ADR-0050-contrats-commandes-acomptes-abonnements.md) § 8 (1ᵉʳ nov. 2026), aux
+> valeurs par défaut des décisions ouvertes n° 1 à 5 (l'ADR reste au statut proposé). La matrice
+> ci-dessous est celle de `apps/api/src/authz/permissions.ts`, vérifiée par `permissions.test.ts`
+> (954 cases) ; dépendances et domaine par `overrides.test.ts`. Fonction pure à table de vérité
+> testée : `contractApprovalDecision` (`409 SELF_APPROVAL_FORBIDDEN` ; approbateur unique marqué
+> `soleApprover`). Contrats partagés : `@lalanda/shared/sales-contracts`. Les routes
+> `/sales/orders` et `/sales/contracts` arrivent aux lots V2 et V3 : d'ici là, les deux actions
+> figurent dans `ACTIONS_SANS_ROUTE` de la sonde `rbac-matrix.e2e.test.ts`, qui vérifie
+> `/me/permissions` pour chaque rôle. Aucune migration : une instance N-1 ignore les deux actions
+> (refus par défaut).
+
+- **Deux actions nouvelles**, cinquante-deuxième et cinquante-troisième, en fin de liste (ordre
+  de fusion ; ADR-0051, rédigé en parallèle, prendra les rangs suivants) : `sales.contract`
+  (« Préparer contrats et commandes » : contrats, versions, avenants, déclaration de signature et
+  copies, commandes clients, création depuis un devis) et `sales.contract.approve` (« Approuver les
+  contrats » : approuver ou rejeter un contrat ou un avenant, case ⓢ ; constater une reconduction ;
+  résilier ; réglages). Préparer une facture depuis un engagement reste sous `sales.manage`,
+  l'émettre sous `sales.invoice`.
+- **Aucun rôle nouveau.** `sales.contract` suit `sales.quote` (iso-privilège : le Commercial
+  prépare le contrat de l'affaire qu'il a gagnée) ; `sales.contract.approve` : Propriétaire et
+  Directeur financier, ni l'Administrateur ni le Comptable (décision ouverte n° 2 ; un ajout par
+  membre reste possible). R7 inchangé.
+
+| Action | PRO | ADM | DIR | CPT | ANA | CDP | CON | LEC | COM | RH | MAG | EXP |
+|---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| `sales.contract` | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ |
+| `sales.contract.approve` | ✓ⓢ | ✗ | ✓ⓢ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+
+- **Séparation des tâches** dynamique : celui qui a soumis ou créé un contrat ou un avenant (ou
+  préparé une reconduction) ne l'approuve pas, sauf approbateur unique (un seul détenteur
+  effectif, réglage `allowSoleApprover`), marqué. `sales.contract.approve` rejoint
+  `APPROVAL_ACTIONS` ; aucune paire `SOD_PAIRS` nouvelle (elle empêcherait l'entrepreneur seul de
+  contracter).
+- **ADR-0041** : dépendances des deux actions vers `sales.read` ; elles rejoignent le domaine
+  « Ventes et facturation », après `sales.quote` ; aucun domaine nouveau.
+- **Plateforme** : `sales.contract` sous accès délégué (super-administrateur seul, comme
+  `sales.quote`) ; `sales.contract.approve` rejoint `PLATFORM_FORBIDDEN_ACTIONS` (onzième interdit
+  absolu) : la plateforme n'engage jamais un client envers ses propres clients.
+- Tests : matrice 12 × 53 + 6 × 53 = **954** cases.
 
 ## Règles critiques
 

@@ -10,18 +10,20 @@
 // `work.update` et `work.manage`, ADR-0040 § 4 pour `sales.quote` et le rôle `sales_rep`,
 // ADR-0044 § 4.1 pour `purchase.*` et `payables.pay`, ADR-0045 § 4 pour `hr.*`, `leave.*` et
 // le rôle `hr_manager`, ADR-0046 § 8 pour `stock.*`, `assets.*`, `docs.*` et le rôle
-// `storekeeper`, ADR-0049 § 8 pour `accounting.*` et le rôle `external_accountant`).
+// `storekeeper`, ADR-0049 § 8 pour `accounting.*` et le rôle `external_accountant`,
+// ADR-0050 § 8 pour `sales.contract` et `sales.contract.approve`).
 // C'est délibéré : un test qui
 // importerait la matrice de production vérifierait seulement qu'elle est égale à
 // elle-même. Ici, toute modification d'une case de production casse le test, ce
 // qui force une mise à jour CONSCIENTE de l'ADR et de docs/12.
 //
-// 12 rôles × 51 actions + 6 rôles plateforme × 51 actions = 918 cases vérifiées.
+// 12 rôles × 53 actions + 6 rôles plateforme × 53 actions = 954 cases vérifiées.
 
 import { describe, expect, it } from 'vitest';
 
 import { ACCOUNTING_ACTIVATION_MISSING_CODES } from '@lalanda/shared/accounting';
 import { DOCUMENT_LINK_ENTITY_TYPES } from '@lalanda/shared/documents';
+import { SALES_CONTRACT_ERROR_CODES } from '@lalanda/shared/sales-contracts';
 
 import {
   ACTIONS,
@@ -60,6 +62,8 @@ import {
   accountingActivationDecision,
   accountingReopenDecision,
   canActivateAccounting,
+  contractApprovalDecision,
+  type ContractApprovalInput,
   manualEntryDecision,
   ruleSetDecision,
   type AccountingActivationInput,
@@ -189,6 +193,11 @@ const ATTENDU_ORG: Record<Action, string> = {
   'accounting.close': 'A   .   A   A   .   .   .   .   .   .   .   .',
   'accounting.export': 'A   .   A   A   .   .   .   .   .   .   .   A',
   'accounting.manage': 'S   .   S   S   .   .   .   .   .   .   .   .',
+  // ADR-0050 § 8.1 : préparer contrats, avenants et commandes — iso-privilège avec
+  // `sales.quote` (le Commercial prépare le contrat de l'affaire qu'il a gagnée) ;
+  // approuver, constater une reconduction, résilier : Propriétaire et Directeur financier (ⓢ).
+  'sales.contract': 'A   A   A   A   .   .   .   .   A   .   .   .',
+  'sales.contract.approve': 'S   .   S   .   .   .   .   .   .   .   .   .',
 };
 
 const CODE_VERS_GRANT: Record<string, string> = {
@@ -287,6 +296,10 @@ const ATTENDU_PLATEFORME: Record<Action, string> = {
   'accounting.close': '.   .   .   .   .   .',
   'accounting.export': '.   .   .   .   .   .',
   'accounting.manage': '.   .   .   .   .   .',
+  // ADR-0050 § 8.1 : préparer sous accès délégué (SA seul), comme `sales.quote` ; approuver,
+  // onzième interdit absolu.
+  'sales.contract': 'D   .   .   .   .   .',
+  'sales.contract.approve': '.   .   .   .   .   .',
 };
 
 const CODE_VERS_GRANT_PLATEFORME: Record<string, string> = {
@@ -300,9 +313,9 @@ function cellules(ligne: string): string[] {
 }
 
 describe('matrice rôle organisation × action (ADR-0012 §3)', () => {
-  it('déclare exactement les 12 rôles et les 51 actions de docs/12', () => {
+  it('déclare exactement les 12 rôles et les 53 actions de docs/12', () => {
     expect([...ORG_ROLES]).toEqual([...ORDRE_ORG]);
-    expect(ACTIONS).toHaveLength(51);
+    expect(ACTIONS).toHaveLength(53);
     // Ajoutée en fin de liste, comme dans docs/12 (ADR-0021 §8).
     expect(ACTIONS[15]).toBe('fiscal.manage');
     // Dix-septième et dix-huitième, en fin de liste (ADR-0022 § S25c.1).
@@ -352,14 +365,17 @@ describe('matrice rôle organisation × action (ADR-0012 §3)', () => {
       'docs.read',
       'docs.manage',
     ]);
-    // Quarante-septième à cinquante et unième, en fin de liste (ADR-0049 § 8.1).
-    expect(ACTIONS.slice(46)).toEqual([
+    // Quarante-septième à cinquante et unième (ADR-0049 § 8.1).
+    expect(ACTIONS.slice(46, 51)).toEqual([
       'accounting.read',
       'accounting.post',
       'accounting.close',
       'accounting.export',
       'accounting.manage',
     ]);
+    // Cinquante-deuxième et cinquante-troisième, en fin de liste (ADR-0050 § 8.1, ordre de
+    // fusion).
+    expect(ACTIONS.slice(51)).toEqual(['sales.contract', 'sales.contract.approve']);
     expect(Object.keys(ATTENDU_ORG).sort()).toEqual([...ACTIONS].sort());
   });
 
@@ -426,7 +442,7 @@ describe('matrice rôle plateforme × action (ADR-0012 §4)', () => {
   }
 });
 
-describe('interdits absolus de la plateforme (ADR-0012 §4, ADR-0021 §8, ADR-0023 § S25e.11, ADR-0045 § 4.1, ADR-0049 § 8.1)', () => {
+describe('interdits absolus de la plateforme (ADR-0012 §4, ADR-0021 §8, ADR-0023 § S25e.11, ADR-0045 § 4.1, ADR-0049 § 8.1, ADR-0050 § 8.1)', () => {
   const interdits: Action[] = [
     'plan.approve',
     'period.close',
@@ -439,10 +455,12 @@ describe('interdits absolus de la plateforme (ADR-0012 §4, ADR-0021 §8, ADR-00
     'accounting.close',
     'accounting.export',
     'accounting.manage',
+    // ADR-0050 § 8.1 : approuver, constater une reconduction, résilier un contrat client.
+    'sales.contract.approve',
   ];
 
-  it('sont exactement ceux annoncés, au nombre de dix', () => {
-    expect(PLATFORM_FORBIDDEN_ACTIONS).toHaveLength(10);
+  it('sont exactement ceux annoncés, au nombre de onze', () => {
+    expect(PLATFORM_FORBIDDEN_ACTIONS).toHaveLength(11);
     expect([...PLATFORM_FORBIDDEN_ACTIONS].sort()).toEqual([...interdits].sort());
   });
 
@@ -768,7 +786,7 @@ describe('compatibilité N-1 des anciens rôles', () => {
 });
 
 describe('cohérence structurelle de la matrice', () => {
-  it('chaque rôle déclare une décision pour CHACUNE des 51 actions', () => {
+  it('chaque rôle déclare une décision pour CHACUNE des 53 actions', () => {
     for (const role of ORG_ROLES) {
       for (const action of ACTIONS) {
         expect(ORG_PERMISSION_MATRIX[role][action], `${role} × ${action}`).toBeDefined();
@@ -792,7 +810,7 @@ describe('cohérence structurelle de la matrice', () => {
     for (const action of ecritures) expect(can('viewer', action, NO_OVERRIDES)).toBe(false);
   });
 
-  it('`owner` détient les 51 actions', () => {
+  it('`owner` détient les 53 actions', () => {
     for (const action of ACTIONS) expect(can('owner', action, NO_OVERRIDES)).toBe(true);
   });
 
@@ -1002,6 +1020,8 @@ describe('ADR-0040 § 4 — rôle Commercial et action `sales.quote`', () => {
       // ADR-0046 § 8.1 : les quantités (sans valeurs) et la bibliothèque.
       'stock.read',
       'docs.read',
+      // ADR-0050 § 8.1 : il prépare le contrat de l'affaire qu'il a gagnée, sans l'approuver.
+      'sales.contract',
     ]);
   });
 
@@ -1113,6 +1133,8 @@ describe('ADR-0044 § 4 — achats et fournisseurs (lot P0)', () => {
       // ADR-0049 § 8.3 : opérations diverses et jeux de règles.
       'accounting.post',
       'accounting.manage',
+      // ADR-0050 § 8.3 : contrats, avenants et constats de reconduction.
+      'sales.contract.approve',
     ]);
     for (const action of APPROVAL_ACTIONS) {
       for (const role of ORG_ROLES) {
@@ -2347,5 +2369,217 @@ describe('ADR-0049 § 4 — `accountingReopenDecision` (réouverture, Propriéta
         code: 'REOPEN_REASON_REQUIRED',
       });
     }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADR-0050 — V0 : contrats clients, commandes clients, avenants
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('ADR-0050 § 8 — contrats et commandes clients (lot V0)', () => {
+  const CONTRATS = ['sales.contract', 'sales.contract.approve'] as const;
+
+  it('critère 1 — préparer : iso-privilège avec `sales.quote` (Propriétaire, Administrateur, Directeur financier, Comptable, Commercial)', () => {
+    const preparent = ORG_ROLES.filter((r) => can(r, 'sales.contract', NO_OVERRIDES));
+    expect(preparent).toEqual(['owner', 'admin', 'finance_director', 'accountant', 'sales_rep']);
+    expect(preparent).toEqual(ORG_ROLES.filter((r) => can(r, 'sales.quote', NO_OVERRIDES)));
+  });
+
+  it('critère 1 — approuver : Propriétaire et Directeur financier seulement, cases ⓢ (décision ouverte n° 2)', () => {
+    expect(ORG_ROLES.filter((r) => can(r, 'sales.contract.approve', NO_OVERRIDES))).toEqual([
+      'owner',
+      'finance_director',
+    ]);
+    for (const role of ORG_ROLES) {
+      expect(['deny', 'allow_sod']).toContain(
+        ORG_PERMISSION_MATRIX[role]['sales.contract.approve'],
+      );
+    }
+    expect(APPROVAL_ACTIONS).toContain('sales.contract.approve');
+    expect(APPROVAL_ACTIONS).not.toContain('sales.contract');
+    // `APPROVER_ROLES` compte les approbateurs de plan : inchangé.
+    expect(APPROVER_ROLES).toEqual(['owner', 'finance_director']);
+  });
+
+  it('critère 1 — le Commercial, le Comptable et l’Administrateur préparent sans approuver ; ni facture ni acompte pour le Commercial', () => {
+    for (const role of ['sales_rep', 'accountant', 'admin'] as const) {
+      expect(can(role, 'sales.contract', NO_OVERRIDES), role).toBe(true);
+      expect(can(role, 'sales.contract.approve', NO_OVERRIDES), role).toBe(false);
+    }
+    // `prepare-deposit` exige `sales.manage` (§ 3) : le Commercial ne l'a pas, le Comptable si.
+    expect(can('sales_rep', 'sales.manage', NO_OVERRIDES)).toBe(false);
+    expect(can('accountant', 'sales.manage', NO_OVERRIDES)).toBe(true);
+  });
+
+  it('critère 1 — Lecteur et Analyste lisent sans écrire ; Conseiller, RH, Magasinier, Expert-comptable ne lisent pas les ventes', () => {
+    for (const role of ['viewer', 'analyst'] as const) {
+      expect(can(role, 'sales.read', NO_OVERRIDES), role).toBe(true);
+      for (const action of CONTRATS) expect(can(role, action, NO_OVERRIDES), role).toBe(false);
+    }
+    for (const role of [
+      'advisor',
+      'hr_manager',
+      'storekeeper',
+      'external_accountant',
+      'project_manager',
+    ] as const) {
+      expect(can(role, 'sales.read', { canClosePeriods: true }), role).toBe(false);
+      for (const action of CONTRATS) {
+        expect(can(role, action, { canClosePeriods: true }), `${role} × ${action}`).toBe(false);
+      }
+    }
+  });
+
+  it('dépendances vers `sales.read`, satisfaites par chaque ligne de la matrice', () => {
+    for (const action of CONTRATS) {
+      expect(ACTION_DEPENDENCIES[action], action).toEqual(['sales.read']);
+      for (const role of ORG_ROLES) {
+        if (can(role, action, NO_OVERRIDES)) {
+          expect(can(role, 'sales.read', NO_OVERRIDES), `${role} × ${action}`).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('critère 1 — plateforme : préparer délégué au seul super-administrateur ; approuver, interdit absolu', () => {
+    expect(canPlatform('platform_super_admin', 'sales.contract', { hasActiveGrant: true })).toBe(
+      true,
+    );
+    expect(canPlatform('platform_super_admin', 'sales.contract')).toBe(false);
+    expect(canPlatform('platform_support', 'sales.contract', { hasActiveGrant: true })).toBe(false);
+    expect(PLATFORM_FORBIDDEN_ACTIONS).not.toContain('sales.contract');
+    expect(PLATFORM_FORBIDDEN_ACTIONS).toContain('sales.contract.approve');
+    for (const role of PLATFORM_ROLES) {
+      expect(canPlatform(role, 'sales.contract.approve', { hasActiveGrant: true }), role).toBe(
+        false,
+      );
+    }
+  });
+
+  it('§ 8.2 — aucun rôle nouveau ; R7 inchangé', () => {
+    expect(ORG_ROLES).toHaveLength(12);
+    expect(grantableRoles('admin').sort()).toEqual([
+      'admin',
+      'advisor',
+      'analyst',
+      'sales_rep',
+      'storekeeper',
+      'viewer',
+    ]);
+    expect(grantableRoles('viewer').sort()).toEqual(['advisor', 'viewer']);
+    // L'Administrateur, qui prépare, attribue toujours le Commercial (qui prépare aussi) ;
+    // le Comptable, qui prépare aussi, reste hors de sa portée (clôture conditionnelle).
+    expect(canGrantRole('admin', 'sales_rep')).toBe(true);
+    expect(canGrantRole('admin', 'accountant')).toBe(false);
+    expect(canGrantRole('sales_rep', 'admin')).toBe(false);
+  });
+});
+
+describe('ADR-0050 § 8.3 — `contractApprovalDecision` (séparation dynamique)', () => {
+  const base: ContractApprovalInput = {
+    approverUserId: 'dir',
+    submittedBy: 'com',
+    createdBy: 'com',
+    holdersCount: 2,
+    allowSoleApprover: true,
+  };
+
+  it('critère 2 — un autre détenteur approuve, sans marque', () => {
+    expect(contractApprovalDecision(base)).toEqual({ ok: true, soleApprover: false });
+  });
+
+  it('critère 2 — celui qui a soumis n’approuve pas quand un autre détenteur existe', () => {
+    expect(
+      contractApprovalDecision({
+        ...base,
+        approverUserId: 'pro',
+        submittedBy: 'pro',
+        createdBy: 'com',
+      }),
+    ).toEqual({ ok: false, code: 'SELF_APPROVAL_FORBIDDEN' });
+  });
+
+  it('le créateur non plus, même si un autre a soumis', () => {
+    expect(
+      contractApprovalDecision({
+        ...base,
+        approverUserId: 'pro',
+        submittedBy: 'com',
+        createdBy: 'pro',
+      }),
+    ).toEqual({ ok: false, code: 'SELF_APPROVAL_FORBIDDEN' });
+  });
+
+  it('critère 2 — seul détenteur avec `allowSoleApprover` : approuve, marqué `soleApprover`', () => {
+    expect(
+      contractApprovalDecision({
+        ...base,
+        approverUserId: 'pro',
+        submittedBy: 'pro',
+        createdBy: 'pro',
+        holdersCount: 1,
+      }),
+    ).toEqual({ ok: true, soleApprover: true });
+  });
+
+  it('critère 2 — réglage à `false` : 409, même seul', () => {
+    expect(
+      contractApprovalDecision({
+        ...base,
+        approverUserId: 'pro',
+        submittedBy: 'pro',
+        createdBy: 'pro',
+        holdersCount: 1,
+        allowSoleApprover: false,
+      }),
+    ).toEqual({ ok: false, code: 'SELF_APPROVAL_FORBIDDEN' });
+  });
+
+  it('seul détenteur qui n’a ni créé ni soumis : approbation ordinaire, sans marque', () => {
+    expect(contractApprovalDecision({ ...base, holdersCount: 1 })).toEqual({
+      ok: true,
+      soleApprover: false,
+    });
+  });
+
+  it('reconduction proposée par le moteur (personne ne l’a préparée) : tout détenteur la constate', () => {
+    expect(
+      contractApprovalDecision({
+        ...base,
+        approverUserId: 'pro',
+        submittedBy: null,
+        createdBy: null,
+      }),
+    ).toEqual({ ok: true, soleApprover: false });
+  });
+
+  it('table de vérité : seule la personne et le nombre de détenteurs comptent', () => {
+    for (const isSubmitter of [false, true]) {
+      for (const isCreator of [false, true]) {
+        for (const holdersCount of [0, 1, 2, 5]) {
+          for (const allowSoleApprover of [false, true]) {
+            const input: ContractApprovalInput = {
+              approverUserId: 'x',
+              submittedBy: isSubmitter ? 'x' : 'a',
+              createdBy: isCreator ? 'x' : 'b',
+              holdersCount,
+              allowSoleApprover,
+            };
+            const self = isSubmitter || isCreator;
+            const sole = allowSoleApprover && holdersCount <= 1;
+            const attendu = !self
+              ? { ok: true, soleApprover: false }
+              : sole
+                ? { ok: true, soleApprover: true }
+                : { ok: false, code: 'SELF_APPROVAL_FORBIDDEN' };
+            expect(contractApprovalDecision(input), JSON.stringify(input)).toEqual(attendu);
+          }
+        }
+      }
+    }
+  });
+
+  it('le code est celui du contrat partagé (`@lalanda/shared/sales-contracts`)', () => {
+    expect(SALES_CONTRACT_ERROR_CODES).toContain('SELF_APPROVAL_FORBIDDEN');
   });
 });
