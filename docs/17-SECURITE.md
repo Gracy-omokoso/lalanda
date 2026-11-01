@@ -236,6 +236,44 @@ Statuts, attestations, licences, polices, contrats (`document_folders`, `library
 - Les pièces des projets et des achats calculent encore leur borne sans compter la bibliothèque (leurs fichiers ne sont pas touchés par R5) : la borne est stricte au dépôt d'un document de bibliothèque ou d'une pièce RH, approximative ailleurs.
 - La recherche lit au plus 5 000 documents avant filtrage par les droits.
 
+## Implémenté (ADR-0048) — formulaire public de prospects : surface publique nouvelle
+
+Deux routes de l'API **sans session** (`GET /public/lead-forms/:token`,
+`POST /public/lead-forms/:token/submissions`) et une page web publique (`/f/<jeton>`). Code :
+`apps/api/src/crm/lead-forms/`, `apps/web/src/app/f/`. Décision :
+[ADR-0048](adr/ADR-0048-formulaire-public-de-prospects.md).
+
+### Fait
+
+- **Désactivé par défaut**, par organisation ; activé par un détenteur de `crm.manage` seulement
+  avec une politique de confidentialité `https://` et un responsable éligible.
+- **Jeton** : 24 octets aléatoires (192 bits), index unique, **remplaçable** ; jeton inconnu,
+  formulaire désactivé ou remplacé rendent le **même** `404`. La configuration publique ne rend que
+  ce qui s'affiche : ni nom d'organisation, ni identifiant interne, ni responsable (testé).
+- **Anti-abus sans CAPTCHA tiers** : champ piège (réponse identique à un succès, rien créé) ;
+  ticket HMAC (clé dérivée d'`AUTH_SECRET`, étiquette propre) imposant 3 s minimum et 2 h maximum ;
+  débit **5 envois par 10 minutes par IP** et **60 par heure par formulaire**, comptés avant toute
+  lecture de la base ; corps `.strict()`, champs bornés, JSON seulement (aucune pièce jointe).
+- **Aucune IP en clair** : la clé du seau de débit, la preuve de consentement et l'audit portent
+  une **empreinte** HMAC (étiquette `lalanda/lead-form-ip`) ; la ligne d'accès automatique de
+  pino-http (qui contient l'adresse distante) est **coupée** pour `/public/lead-forms/*` ; les refus
+  sont journalisés avec l'empreinte et l'identifiant du formulaire seulement. Testé : ni la base ni
+  `audit_events` ne contiennent l'adresse, ni les clés du stockage de débit.
+- **Isolation** : la soumission écrit dans l'organisation du jeton seulement ; le dédoublonnage
+  par e-mail ne lit que cette organisation ; un visiteur ne réécrit **jamais** une fiche existante.
+- **Web** : page hors de l'application, `noindex`, appels API `credentials: 'omit'` ; CSP et
+  `frame-ancestors 'none'` **inchangés** (l'extrait à copier est un lien, pas un cadre) ; le logo
+  passe par l'URL signée existante (ADR-0028).
+
+### Limites
+
+- Débit en mémoire du processus (une instance d'API), comme les autres gardes.
+- L'empreinte d'IP est stable tant qu'`AUTH_SECRET` ne change pas (décision ouverte n° 5).
+- Deux soumissions simultanées au même e-mail inconnu peuvent créer deux contacts (fusion manuelle
+  dans le CRM).
+- Les robots qui exécutent JavaScript et attendent 3 s passent le délai minimal ; la limite de
+  débit borne alors leur volume.
+
 ## Menaces prioritaires
 
 - accès inter-organisation;

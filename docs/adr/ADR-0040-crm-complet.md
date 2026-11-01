@@ -740,6 +740,7 @@ manipule que des identifiants.
   CAPTCHA tiers), consentement et finalité affichés, prospect créé en `origin: 'formulaire'`
   assigné à un responsable par défaut — à cadrer par un ADR (données personnelles, docs/17,
   docs/28).
+  **Réalisé par [ADR-0048](ADR-0048-formulaire-public-de-prospects.md) (1er nov. 2026).**
 - Visibilité restreinte du pipeline par responsable ou par équipe ; objectifs (quotas) de vente ;
   commissions.
 - Conversion de devises dans les rapports ; toute écriture dans le réalisé ou un plan.
