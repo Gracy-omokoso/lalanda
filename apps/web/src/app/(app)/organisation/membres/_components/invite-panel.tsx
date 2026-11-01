@@ -19,6 +19,10 @@
 // actions (Propriétaire, Administrateur, Directeur financier) ; en fin de liste lui aussi,
 // sans être le moindre privilège (`roleParDefaut` choisit par rang).
 //
+// ADR-0049 — K0 : l'Expert-comptable externe (`external_accountant`) n'est proposé qu'au
+// Propriétaire, seul à pouvoir l'attribuer (`roleOptions`) ; il lit et exporte la
+// comptabilité, rien d'autre. En fin de liste, sans être le moindre privilège.
+//
 // ADR-0041 — A5 : après le titre, « Personnaliser les autorisations » ouvre la
 // même grille que la fiche du membre, préremplie par la ligne du titre. Fermée,
 // elle dit en une phrase ce que le titre donne. L'invitation porte l'écart ;

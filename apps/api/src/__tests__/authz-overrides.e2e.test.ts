@@ -346,7 +346,8 @@ e2eSuite('ADR-0041 A2 — écarts lus par la garde et /me/permissions', () => {
     // ADR-0044 § 4.3 : huitième domaine (achats) et troisième paire ; ADR-0045 § 4.5 :
     // neuvième domaine (RH), aucune paire nouvelle.
     // ADR-0046 § 8.3 : dixième à douzième domaines (stocks, équipements, documents).
-    expect(res.body.domains).toHaveLength(12);
+    // ADR-0049 § 8.3 : treizième domaine (comptabilité), aucune paire nouvelle.
+    expect(res.body.domains).toHaveLength(13);
     expect(res.body.nonDelegable).toEqual(['billing.manage']);
     expect(res.body.sodPairs).toHaveLength(3);
     expect(res.body.labels['sales.invoice']).toBe(
@@ -368,5 +369,12 @@ e2eSuite('ADR-0041 A2 — écarts lus par la garde et /me/permissions', () => {
     );
     expect(mag?.label).toBe('Magasinier');
     expect(mag?.actions).toHaveLength(9);
+    // ADR-0049 § 8.2 : l'Expert-comptable (externe), trois actions.
+    const exp = (res.body.roleMatrix as { role: string; label: string; actions: string[] }[]).find(
+      (r) => r.role === 'external_accountant',
+    );
+    expect(exp?.label).toBe('Expert-comptable (externe)');
+    expect(exp?.actions).toEqual(['analytics.read', 'accounting.read', 'accounting.export']);
+    expect(res.body.labels['accounting.export']).toBe('Exporter la comptabilité');
   }, 30_000);
 });

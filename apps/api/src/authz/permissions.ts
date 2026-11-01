@@ -7,12 +7,13 @@
 // et l'interface consomment `can()` / `canPlatform()`.
 //
 // Trois ensembles fermés (docs/26 « états représentés par unions fermées ») :
-//   1. ORG_ROLES       — les 11 rôles d'organisation (ADR-0012 §1 ; le neuvième,
+//   1. ORG_ROLES       — les 12 rôles d'organisation (ADR-0012 §1 ; le neuvième,
 //                        `sales_rep`, d'ADR-0040 § 4.2 ; le dixième, `hr_manager`,
 //                        d'ADR-0045 § 4.2 ; le onzième, `storekeeper`, d'ADR-0046
+//                        § 8.2 ; le douzième, `external_accountant`, d'ADR-0049
 //                        § 8.2);
 //   2. PLATFORM_ROLES  — les 6 rôles plateforme, préfixés `platform_` (§2);
-//   3. ACTIONS         — les 46 actions granulaires, dans l'ordre de docs/12
+//   3. ACTIONS         — les 51 actions granulaires, dans l'ordre de docs/12
 //                        (la seizième, `fiscal.manage`, vient d'ADR-0021 §8 ;
 //                        la dix-septième et la dix-huitième, `sales.read` et
 //                        `sales.manage`, d'ADR-0022 § S25c.1 ; la dix-neuvième,
@@ -31,7 +32,9 @@
 //                        trente-huitième, `hr.read`, `hr.manage`,
 //                        `hr.sensitive.read`, `leave.request` et `leave.approve`,
 //                        d'ADR-0045 § 4.1 ; les trente-neuvième à quarante-sixième,
-//                        `stock.*`, `assets.*` et `docs.*`, d'ADR-0046 § 8.1).
+//                        `stock.*`, `assets.*` et `docs.*`, d'ADR-0046 § 8.1 ; les
+//                        quarante-septième à cinquante et unième, `accounting.*`,
+//                        d'ADR-0049 § 8.1).
 //
 // Refus par défaut (docs/17 § Autorisation) : les matrices sont exhaustives, une
 // case absente ne compile pas, et une case `deny` est un refus.
@@ -44,9 +47,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Les 11 rôles d'organisation (ADR-0012 §1). Le neuvième, `sales_rep` (« Commercial »),
+ * Les 12 rôles d'organisation (ADR-0012 §1). Le neuvième, `sales_rep` (« Commercial »),
  * vient d'ADR-0040 § 4.2 ; le dixième, `hr_manager` (« Responsable RH »), d'ADR-0045
- * § 4.2 ; le onzième, `storekeeper` (« Magasinier »), d'ADR-0046 § 8.2 : ajoutés EN FIN
+ * § 4.2 ; le onzième, `storekeeper` (« Magasinier »), d'ADR-0046 § 8.2 ; le douzième,
+ * `external_accountant` (« Expert-comptable (externe) »), d'ADR-0049 § 8.2 : ajoutés EN FIN
  * de liste (ordre de fusion, comme les actions).
  *
  * Slugs en anglais `snake_case` (docs/26 « noms de code en anglais »). `owner`
@@ -70,6 +74,8 @@ export const ORG_ROLES = [
   // ADR-0046 — S0 : réceptionne, range, sort et compte le stock ; ni prix d'achat, ni
   // valeur du stock, ni trésorerie, ni ventes.
   'storekeeper',
+  // ADR-0049 — K0 : EXTERNE ; consulte et exporte la comptabilité, n'écrit rien.
+  'external_accountant',
 ] as const;
 
 export type OrgRole = (typeof ORG_ROLES)[number];
@@ -105,9 +111,12 @@ export const ORG_ROLE_RANK: Readonly<Record<OrgRole, number>> = {
   // ADR-0046 § 8.2 : le Magasinier s'insère au rang 7 ; les suivants glissent d'un
   // cran. Le rang n'est pas un droit : aucun accès ne change.
   storekeeper: 7,
-  project_manager: 8,
-  advisor: 9,
-  viewer: 10,
+  // ADR-0049 § 8.2 : l'Expert-comptable (externe) s'insère au rang 8 ; les suivants glissent
+  // d'un cran. Le rang n'est pas un droit : aucun accès ne change.
+  external_accountant: 8,
+  project_manager: 9,
+  advisor: 10,
+  viewer: 11,
 };
 
 /**
@@ -127,7 +136,7 @@ export const PLATFORM_ROLES = [
 export type PlatformRole = (typeof PLATFORM_ROLES)[number];
 
 /**
- * Les 46 actions granulaires (docs/12 § Actions granulaires, ordre du document).
+ * Les 51 actions granulaires (docs/12 § Actions granulaires, ordre du document).
  *
  * `fiscal.manage` (ADR-0021 §8) est ajoutée EN FIN de liste, et non à côté
  * d'`organization.manage` : l'ordre est celui de docs/12, que l'interface et les
@@ -144,7 +153,9 @@ export type PlatformRole = (typeof PLATFORM_ROLES)[number];
  * `hr.sensitive.read`, `leave.request` et `leave.approve` (ADR-0045 § 4.1) les
  * trente-quatrième à trente-huitième, `stock.read`, `stock.move`, `stock.count`,
  * `stock.manage`, `assets.read`, `assets.manage`, `docs.read` et `docs.manage`
- * (ADR-0046 § 8.1) les trente-neuvième à quarante-sixième.
+ * (ADR-0046 § 8.1) les trente-neuvième à quarante-sixième, `accounting.read`,
+ * `accounting.post`, `accounting.close`, `accounting.export` et `accounting.manage`
+ * (ADR-0049 § 8.1) les quarante-septième à cinquante et unième.
  */
 export const ACTIONS = [
   'organization.manage',
@@ -207,6 +218,15 @@ export const ACTIONS = [
   'assets.manage',
   'docs.read',
   'docs.manage',
+  // ADR-0049 — K0 : comptabilité (§ 8.1). Les états sont toujours des PROJETS ; la pièce
+  // complète exige en plus la lecture de son module ; la réouverture d'une période ou d'un
+  // exercice est réservée au Propriétaire (`accountingReopenDecision`) ; l'activation exige
+  // en plus `fiscal.manage` (cumul de route, `ACCOUNTING_ACTIVATION_ACTIONS`).
+  'accounting.read',
+  'accounting.post',
+  'accounting.close',
+  'accounting.export',
+  'accounting.manage',
 ] as const;
 
 export type Action = (typeof ACTIONS)[number];
@@ -281,7 +301,7 @@ export type OrgGrant = 'allow' | 'deny' | 'allow_sod' | 'allow_project' | 'condi
 /**
  * MATRICE RÔLE ORGANISATION × ACTION — transcription littérale d'ADR-0012 §3.
  *
- * Le type impose 11 rôles × 46 actions : oublier une case ne compile pas.
+ * Le type impose 12 rôles × 51 actions : oublier une case ne compile pas.
  * `permissions.test.ts` redéclare cette matrice en littéral (elle n'est PAS
  * importée d'ici) : toute modification de production casse le test et force une
  * mise à jour consciente de l'ADR et de docs/12. C'est le garde-fou central.
@@ -363,6 +383,14 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'assets.manage': 'allow',
       'docs.read': 'allow',
       'docs.manage': 'allow',
+      // ADR-0049 — K0 (§ 8.1) : comptabilité. Écrire dans les livres (opérations diverses) et
+      // paramétrer les règles de correspondance sont soumis à la séparation dynamique (ⓢ :
+      // `manualEntryDecision`, `ruleSetDecision`) ; la réouverture reste au seul Propriétaire.
+      'accounting.read': 'allow',
+      'accounting.post': 'allow_sod',
+      'accounting.close': 'allow',
+      'accounting.export': 'allow',
+      'accounting.manage': 'allow_sod',
     },
     // Administrateur — « membres, projets, paramètres ». Gouvernance technique,
     // pas autorité financière : ni `billing.manage`, ni `plan.approve`, ni
@@ -430,6 +458,13 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'assets.manage': 'allow',
       'docs.read': 'allow',
       'docs.manage': 'allow',
+      // ADR-0049 — K0 (§ 8.1) : lit les livres ; gère l'organisation, pas la comptabilité (motif
+      // de `fiscal.manage` et de `sales.invoice`).
+      'accounting.read': 'allow',
+      'accounting.post': 'deny',
+      'accounting.close': 'deny',
+      'accounting.export': 'deny',
+      'accounting.manage': 'deny',
     },
     // Directeur financier — « plans, validation, réalisé, rapports ». L'autorité
     // financière : approuve et clôture. Cible de la migration des anciens `member`
@@ -484,6 +519,12 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'assets.manage': 'allow',
       'docs.read': 'allow',
       'docs.manage': 'allow',
+      // ADR-0049 — K0 (§ 8.1) : tient les livres, comme le Propriétaire (ⓢ).
+      'accounting.read': 'allow',
+      'accounting.post': 'allow_sod',
+      'accounting.close': 'allow',
+      'accounting.export': 'allow',
+      'accounting.manage': 'allow_sod',
     },
     // Comptable — « réalisé, mapping, clôture selon permission ». Constate, ne
     // projette pas : ni `inputs.update`, ni `plan.calculate`. Contrepartie de R2.
@@ -543,6 +584,13 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'assets.manage': 'allow',
       'docs.read': 'allow',
       'docs.manage': 'allow',
+      // ADR-0049 — K0 (§ 8.1) : tient les livres (ⓢ) ; clôt sans condition ⚙, la réouverture
+      // étant réservée au Propriétaire (décision ouverte n° 11).
+      'accounting.read': 'allow',
+      'accounting.post': 'allow_sod',
+      'accounting.close': 'allow',
+      'accounting.export': 'allow',
+      'accounting.manage': 'allow_sod',
     },
     // Analyste — « scénarios, analyses, commentaires ». Modélise et calcule,
     // n'approuve ni n'importe le réalisé.
@@ -599,6 +647,12 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'assets.manage': 'deny',
       'docs.read': 'allow',
       'docs.manage': 'deny',
+      // ADR-0049 — K0 (§ 8.1) : lecture des livres, comme la trésorerie et les achats.
+      'accounting.read': 'allow',
+      'accounting.post': 'deny',
+      'accounting.close': 'deny',
+      'accounting.export': 'deny',
+      'accounting.manage': 'deny',
     },
     // Chef de projet — « projets autorisés et saisie ». Tout est `allow_project` :
     // le rôle n'a de sens qu'avec des assignations de projet, qui n'existent pas
@@ -656,6 +710,12 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'assets.manage': 'deny',
       'docs.read': 'deny',
       'docs.manage': 'deny',
+      // ADR-0049 — K0 (§ 8.1) : rôle non attribuable, rien.
+      'accounting.read': 'deny',
+      'accounting.post': 'deny',
+      'accounting.close': 'deny',
+      'accounting.export': 'deny',
+      'accounting.manage': 'deny',
     },
     // Conseiller — « consultation, commentaires, recommandations ». Typiquement
     // EXTERNE (mentor, banquier invité) : pas de `report.export`, on lui ouvre la
@@ -715,6 +775,12 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'assets.manage': 'deny',
       'docs.read': 'deny',
       'docs.manage': 'deny',
+      // ADR-0049 — K0 (§ 8.1) : externe (banquier, mentor) : il n'a pas les livres (O7).
+      'accounting.read': 'deny',
+      'accounting.post': 'deny',
+      'accounting.close': 'deny',
+      'accounting.export': 'deny',
+      'accounting.manage': 'deny',
     },
     // Lecteur — lecture seulement. `analytics.read` est conservé : le refuser
     // viderait le rôle de son sens (ADR-0012 §3).
@@ -769,6 +835,12 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'assets.manage': 'deny',
       'docs.read': 'allow',
       'docs.manage': 'deny',
+      // ADR-0049 — K0 (§ 8.1) : lecture seule.
+      'accounting.read': 'allow',
+      'accounting.post': 'deny',
+      'accounting.close': 'deny',
+      'accounting.export': 'deny',
+      'accounting.manage': 'deny',
     },
     // Commercial — « CRM, devis et suivi des clients » (ADR-0040 § 4.2, D3). Dix
     // actions sur quarante-six : il gère le CRM et prépare les devis, consulte clients,
@@ -829,6 +901,12 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'assets.manage': 'deny',
       'docs.read': 'allow',
       'docs.manage': 'deny',
+      // ADR-0049 — K0 (§ 8.1) : sans la trésorerie, sans la comptabilité.
+      'accounting.read': 'deny',
+      'accounting.post': 'deny',
+      'accounting.close': 'deny',
+      'accounting.export': 'deny',
+      'accounting.manage': 'deny',
     },
     // Responsable RH — « dossiers du personnel, absences et documents RH » (ADR-0045 § 4.2,
     // O6). Huit actions RH sur quarante-six (onze avec celles d'ADR-0046), socle compris : la
@@ -885,6 +963,12 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'assets.manage': 'deny',
       'docs.read': 'allow',
       'docs.manage': 'allow',
+      // ADR-0049 — K0 (§ 8.1) : sans la trésorerie, sans la comptabilité.
+      'accounting.read': 'deny',
+      'accounting.post': 'deny',
+      'accounting.close': 'deny',
+      'accounting.export': 'deny',
+      'accounting.manage': 'deny',
     },
     // Magasinier — « réceptionne, range, sort et compte le stock » (ADR-0046 § 8.2, O6).
     // Neuf actions sur quarante-six, socle compris : il tient le magasin sans être un acteur
@@ -939,6 +1023,72 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'assets.manage': 'deny',
       'docs.read': 'allow',
       'docs.manage': 'deny',
+      // ADR-0049 — K0 (§ 8.1) : sans la trésorerie, sans la comptabilité.
+      'accounting.read': 'deny',
+      'accounting.post': 'deny',
+      'accounting.close': 'deny',
+      'accounting.export': 'deny',
+      'accounting.manage': 'deny',
+    },
+    // Expert-comptable (externe) — « consulte et exporte la comptabilité de l'organisation pour
+    // la réviser » (ADR-0049 § 8.2, O7). Trois actions sur cinquante et une, socle compris :
+    // comme le Conseiller, il est EXTERNE et n'écrit rien — ni écriture, ni vente, ni paiement,
+    // ni clôture, ni paramétrage. Il n'a ni `sales.read`, ni `purchase.read`, ni
+    // `treasury.read` : il voit la COPIE D'AFFICHAGE de la pièce portée par l'écriture, pas le
+    // module (décision ouverte n° 3). Ni projets BUILD, ni tâches, ni absences : il n'est pas
+    // membre du personnel. Attribuable par le seul Propriétaire (`OWNER_ONLY_ROLES`).
+    external_accountant: {
+      'organization.manage': 'deny',
+      'billing.manage': 'deny',
+      'members.invite': 'deny',
+      'project.create': 'deny',
+      'project.read': 'deny',
+      'project.update': 'deny',
+      'canvas.update': 'deny',
+      'inputs.update': 'deny',
+      'plan.calculate': 'deny',
+      'plan.approve': 'deny',
+      'actuals.import': 'deny',
+      'period.close': 'deny',
+      'analytics.read': 'allow',
+      'report.export': 'deny',
+      'audit.read': 'deny',
+      'fiscal.manage': 'deny',
+      'sales.read': 'deny',
+      'sales.manage': 'deny',
+      'sales.invoice': 'deny',
+      'sales.receipt': 'deny',
+      'treasury.read': 'deny',
+      'treasury.manage': 'deny',
+      'crm.read': 'deny',
+      'crm.manage': 'deny',
+      'work.read': 'deny',
+      'work.update': 'deny',
+      'work.manage': 'deny',
+      'sales.quote': 'deny',
+      'purchase.read': 'deny',
+      'purchase.request': 'deny',
+      'purchase.manage': 'deny',
+      'purchase.approve': 'deny',
+      'payables.pay': 'deny',
+      'hr.read': 'deny',
+      'hr.manage': 'deny',
+      'hr.sensitive.read': 'deny',
+      'leave.request': 'deny',
+      'leave.approve': 'deny',
+      'stock.read': 'deny',
+      'stock.move': 'deny',
+      'stock.count': 'deny',
+      'stock.manage': 'deny',
+      'assets.read': 'deny',
+      'assets.manage': 'deny',
+      'docs.read': 'deny',
+      'docs.manage': 'deny',
+      'accounting.read': 'allow',
+      'accounting.post': 'deny',
+      'accounting.close': 'deny',
+      'accounting.export': 'allow',
+      'accounting.manage': 'deny',
     },
   };
 
@@ -1030,6 +1180,13 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'assets.manage': 'delegated',
     'docs.read': 'delegated',
     'docs.manage': 'delegated',
+    // ADR-0049 — K0 (§ 8.1) : lecture des livres sous accès délégué ; écrire, clôturer,
+    // exporter et paramétrer sont des interdits absolus (`PLATFORM_FORBIDDEN_ACTIONS`).
+    'accounting.read': 'delegated',
+    'accounting.post': 'forbidden',
+    'accounting.close': 'forbidden',
+    'accounting.export': 'forbidden',
+    'accounting.manage': 'forbidden',
   },
   platform_admin: {
     'organization.manage': 'native',
@@ -1078,6 +1235,11 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'assets.manage': 'forbidden',
     'docs.read': 'forbidden',
     'docs.manage': 'forbidden',
+    'accounting.read': 'forbidden',
+    'accounting.post': 'forbidden',
+    'accounting.close': 'forbidden',
+    'accounting.export': 'forbidden',
+    'accounting.manage': 'forbidden',
   },
   // « Le support ne voit jamais les données financières sans consentement
   // explicite, durée limitée et audit » (docs/12) — d'où trois `delegated` et
@@ -1134,6 +1296,12 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'assets.manage': 'forbidden',
     'docs.read': 'delegated',
     'docs.manage': 'forbidden',
+    // ADR-0049 — K0 (§ 8.1) : lecture sous accès délégué ; aucune écriture.
+    'accounting.read': 'delegated',
+    'accounting.post': 'forbidden',
+    'accounting.close': 'forbidden',
+    'accounting.export': 'forbidden',
+    'accounting.manage': 'forbidden',
   },
   platform_billing: {
     'organization.manage': 'forbidden',
@@ -1182,6 +1350,11 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'assets.manage': 'forbidden',
     'docs.read': 'forbidden',
     'docs.manage': 'forbidden',
+    'accounting.read': 'forbidden',
+    'accounting.post': 'forbidden',
+    'accounting.close': 'forbidden',
+    'accounting.export': 'forbidden',
+    'accounting.manage': 'forbidden',
   },
   // Vides sur cette matrice : opèrent sur des ressources de portée plateforme
   // (templates, Country Packs) qui n'ont pas d'action granulaire dans docs/12 —
@@ -1233,6 +1406,11 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'assets.manage': 'forbidden',
     'docs.read': 'forbidden',
     'docs.manage': 'forbidden',
+    'accounting.read': 'forbidden',
+    'accounting.post': 'forbidden',
+    'accounting.close': 'forbidden',
+    'accounting.export': 'forbidden',
+    'accounting.manage': 'forbidden',
   },
   platform_country_pack_manager: {
     'organization.manage': 'forbidden',
@@ -1281,12 +1459,17 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'assets.manage': 'forbidden',
     'docs.read': 'forbidden',
     'docs.manage': 'forbidden',
+    'accounting.read': 'forbidden',
+    'accounting.post': 'forbidden',
+    'accounting.close': 'forbidden',
+    'accounting.export': 'forbidden',
+    'accounting.manage': 'forbidden',
   },
 };
 
 /**
- * Les six interdits absolus de la plateforme (ADR-0012 §4, amendé par ADR-0021 §8,
- * ADR-0023 § S25e.11 et ADR-0045 § 4.1).
+ * Les dix interdits absolus de la plateforme (ADR-0012 §4, amendé par ADR-0021 §8,
+ * ADR-0023 § S25e.11, ADR-0045 § 4.1 et ADR-0049 § 8.1).
  *
  * Aucun rôle plateforme, super-administrateur compris, et aucun accès délégué ne
  * peut approuver un plan, clôturer une période, exporter un rapport client ni
@@ -1296,7 +1479,10 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
  * saisit jamais son jeton e-MCF et ne bascule jamais son régime de facturation ;
  * `sales.invoice` attribue un numéro de facture et engage de même le contribuable ;
  * `hr.sensitive.read` (ADR-0045 § 4.1) : un employé de Lalanda ne lit jamais le salaire,
- * les coordonnées bancaires ni la pièce d'identité du personnel d'un client.
+ * les coordonnées bancaires ni la pièce d'identité du personnel d'un client ;
+ * `accounting.post`, `accounting.close`, `accounting.export` et `accounting.manage`
+ * (ADR-0049 § 8.1) : la plateforme n'écrit, ne clôt, n'exporte ni ne paramètre jamais les
+ * livres d'un client (motif de `period.close` et `report.export`).
  *
  * Cette constante n'est pas décorative : `canPlatform()` la vérifie AVANT la
  * matrice, et un test s'assure qu'aucune case de la matrice ne la contredit.
@@ -1309,6 +1495,12 @@ export const PLATFORM_FORBIDDEN_ACTIONS: readonly Action[] = [
   'sales.invoice',
   // ADR-0045 — H0 : interdit absolu, même sous accès délégué.
   'hr.sensitive.read',
+  // ADR-0049 — K0 (§ 8.1) : les livres d'un client ne s'écrivent, ne se clôturent, ne
+  // s'exportent ni ne se paramètrent jamais depuis la plateforme.
+  'accounting.post',
+  'accounting.close',
+  'accounting.export',
+  'accounting.manage',
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1467,7 +1659,12 @@ function potentialActionsOf(role: OrgRole): Set<Action> {
  * liste ferme le cas d'un acteur qui réunirait les huit actions par ajouts (ADR-0041).
  * Comme R1, elle porte sur l'IDENTITÉ du titre `owner`, pas sur une action.
  */
-export const OWNER_ONLY_ROLES: readonly OrgRole[] = ['hr_manager'];
+//
+// ADR-0049 — K0 (§ 8.2, R7, décision ouverte n° 2) : l'Expert-comptable (externe) aussi. Il
+// lit les salaires payés et tous les tiers ; ouvrir les livres à un tiers externe est un acte
+// du Propriétaire. R7 seul ne suffirait pas : la ligne EXP est un sous-ensemble de celle du
+// Directeur financier et du Comptable (s'ils pouvaient inviter par ajout).
+export const OWNER_ONLY_ROLES: readonly OrgRole[] = ['hr_manager', 'external_accountant'];
 
 /**
  * Rôles qu'un acteur peut attribuer (invitation ou changement de rôle) — R7.
@@ -1569,11 +1766,16 @@ export const APPROVER_ROLES: readonly OrgRole[] = ORG_ROLES.filter(
  */
 // ADR-0045 — H0 (§ 4.3) : `leave.approve` rejoint la liste (cases ⓢ).
 // ADR-0046 — S0 (§ 8.3) : `stock.manage` aussi (validation d'inventaire, `stockCountDecision`).
+// ADR-0049 — K0 (§ 8.3) : `accounting.post` (validation d'une opération diverse,
+// `manualEntryDecision`) et `accounting.manage` (validation d'un jeu de règles,
+// `ruleSetDecision`).
 export const APPROVAL_ACTIONS = [
   'plan.approve',
   'purchase.approve',
   'leave.approve',
   'stock.manage',
+  'accounting.post',
+  'accounting.manage',
 ] as const;
 export type ApprovalAction = (typeof APPROVAL_ACTIONS)[number];
 
@@ -1965,6 +2167,207 @@ export function documentReadDecision(input: DocumentReadInput): boolean {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ADR-0049 — K0 : comptabilité (§ 2.4, § 3.1, § 4, § 6.9, § 8)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ADR-0049 § 3.1 : activer (ou désactiver) la comptabilité exige ces deux actions
+ * ENSEMBLE, en droits EFFECTIFS — activer engage l'organisation comme activer la facture
+ * normalisée (ADR-0021 § 8). C'est un cumul exigé par la route (guard, `403`), pas une
+ * dépendance : un Comptable (sans `fiscal.manage`) paramètre la comptabilité sans
+ * pouvoir l'activer.
+ */
+export const ACCOUNTING_ACTIVATION_ACTIONS: readonly Action[] = [
+  'accounting.manage',
+  'fiscal.manage',
+];
+
+/** Vrai si l'acteur peut activer ou désactiver la comptabilité (§ 3.1). */
+export function canActivateAccounting(role: OrgRole, ctx: OrgPermissionContext): boolean {
+  return canAll(role, ACCOUNTING_ACTIVATION_ACTIONS, ctx);
+}
+
+/**
+ * Conditions manquantes d'une activation (`409 ACCOUNTING_ACTIVATION_PRECONDITION`,
+ * `details.missing[]`), dans l'ordre de l'assistant (§ 13). Miroir de
+ * `ACCOUNTING_ACTIVATION_MISSING_CODES` (`@lalanda/shared/accounting`, alignement testé).
+ */
+export type AccountingActivationMissing =
+  | 'CHART_PACK_NOT_APPROVED'
+  | 'BOOK_CURRENCY_REQUIRED'
+  | 'CUTOVER_DATE_REQUIRED'
+  | 'RULE_SET_NOT_VALIDATED'
+  | 'EXPERT_REVIEW_NOT_DECLARED'
+  | 'FISCAL_YEAR_NOT_OPEN';
+
+/** Statut d'un pack de plan comptable (docs/09 § Modèle de version, ADR-0049 § 2.1). */
+export type AccountingChartPackStatus = 'draft' | 'review' | 'approved' | 'active' | 'retired';
+
+/** Entrée d'`accountingActivationDecision` : faits déjà lus par le service, rien d'autre. */
+export interface AccountingActivationInput {
+  /** Statut du pack choisi (`accounting_settings.chartPack`), `null` si aucun. */
+  readonly chartPackStatus: AccountingChartPackStatus | null;
+  /** Monnaie de tenue choisie, `null` si aucune : AUCUNE valeur par défaut (§ 2.2). */
+  readonly bookCurrency: 'CDF' | 'USD' | null;
+  /** Date de bascule (jour de Kinshasa), `null` si aucune. */
+  readonly cutoverDate: string | null;
+  /**
+   * Jeu de règles `validated` en vigueur, `null` si aucun. `expertReviewDeclared` : la
+   * case « relu par notre expert-comptable » (nom, date) a été cochée à la validation —
+   * déclaration de l'organisation, que Lalanda ne vérifie pas (décision ouverte n° 6).
+   */
+  readonly validatedRuleSet: { readonly expertReviewDeclared: boolean } | null;
+  /** Un premier exercice existe au statut `open`. */
+  readonly hasOpenFiscalYear: boolean;
+}
+
+export type AccountingActivationDecision =
+  | { readonly ok: true }
+  | {
+      readonly ok: false;
+      readonly code: 'ACCOUNTING_ACTIVATION_PRECONDITION';
+      readonly missing: readonly AccountingActivationMissing[];
+    };
+
+/**
+ * ADR-0049 § 3.1 — passer en mode `active` exige, TOUS vérifiés par le serveur : un pack
+ * `approved` ou `active` (un pack `draft` ou `review` ne permet que la simulation,
+ * décision ouverte n° 5) ; la monnaie de tenue ; la date de bascule ; un jeu de règles
+ * `validated` avec déclaration de relecture ; un exercice ouvert. Toutes les conditions
+ * manquantes sont rendues ensemble (l'assistant les liste). La détention des deux actions
+ * (`ACCOUNTING_ACTIVATION_ACTIONS`) est vérifiée en amont par le guard.
+ */
+export function accountingActivationDecision(
+  input: AccountingActivationInput,
+): AccountingActivationDecision {
+  const missing: AccountingActivationMissing[] = [];
+  if (input.chartPackStatus !== 'approved' && input.chartPackStatus !== 'active') {
+    missing.push('CHART_PACK_NOT_APPROVED');
+  }
+  if (input.bookCurrency === null) missing.push('BOOK_CURRENCY_REQUIRED');
+  if (input.cutoverDate === null || input.cutoverDate.trim() === '') {
+    missing.push('CUTOVER_DATE_REQUIRED');
+  }
+  if (input.validatedRuleSet === null) missing.push('RULE_SET_NOT_VALIDATED');
+  else if (!input.validatedRuleSet.expertReviewDeclared) missing.push('EXPERT_REVIEW_NOT_DECLARED');
+  if (!input.hasOpenFiscalYear) missing.push('FISCAL_YEAR_NOT_OPEN');
+  return missing.length === 0
+    ? { ok: true }
+    : { ok: false, code: 'ACCOUNTING_ACTIVATION_PRECONDITION', missing };
+}
+
+/** Entrée de `manualEntryDecision` : faits déjà lus par le service, rien d'autre. */
+export interface ManualEntryValidationInput {
+  /** Statut de l'opération diverse : seule une `draft` se valide. */
+  readonly status: 'draft' | 'awaiting_rate' | 'posted';
+  readonly validatorUserId: string;
+  /** Auteur de l'opération diverse (`manual.authorId`). */
+  readonly authorUserId: string;
+  /**
+   * Nombre de détenteurs EFFECTIFS de `accounting.post` dans l'organisation
+   * (`AuthzService.countApprovers(org, 'accounting.post')`). Jamais un compte par rôle.
+   */
+  readonly approverCountInOrg: number;
+}
+
+export type ManualEntryDecision =
+  | { readonly ok: false; readonly code: 'ENTRY_NOT_DRAFT' | 'SELF_APPROVAL_FORBIDDEN' }
+  | { readonly ok: true; readonly soleApprover: boolean };
+
+/**
+ * ADR-0049 § 6.9 — séparation des tâches d'une opération diverse, motif de
+ * `stockCountDecision`, sans aucun `if (role === …)` : la détention de `accounting.post`
+ * (droits EFFECTIFS) est vérifiée en amont par le guard ; cette fonction ne juge que les
+ * PERSONNES. L'auteur ne valide pas sa propre écriture, sauf **approbateur unique** (un
+ * seul détenteur effectif de `accounting.post`) : la validation est alors marquée
+ * `soleApprover` (`manual.soleApprover`, audit). Une écriture déjà validée ne se valide
+ * plus (`409 ENTRY_NOT_DRAFT`) : on la contre-passe.
+ */
+export function manualEntryDecision(input: ManualEntryValidationInput): ManualEntryDecision {
+  if (input.status !== 'draft') return { ok: false, code: 'ENTRY_NOT_DRAFT' };
+  if (input.validatorUserId !== input.authorUserId) return { ok: true, soleApprover: false };
+  if (input.approverCountInOrg <= 1) return { ok: true, soleApprover: true };
+  return { ok: false, code: 'SELF_APPROVAL_FORBIDDEN' };
+}
+
+/** Entrée de `ruleSetDecision` : faits déjà lus par le service, rien d'autre. */
+export interface RuleSetValidationInput {
+  /** Statut de la version : seule une `draft` se valide ; une `validated` est immuable. */
+  readonly status: 'draft' | 'validated' | 'superseded';
+  readonly validatorUserId: string;
+  /** Dernier auteur de la version brouillon (`updatedBy`, à défaut `createdBy`). */
+  readonly lastAuthorUserId: string;
+  /**
+   * Nombre de détenteurs EFFECTIFS de `accounting.manage` dans l'organisation
+   * (`AuthzService.countApprovers(org, 'accounting.manage')`). Jamais un compte par rôle.
+   */
+  readonly approverCountInOrg: number;
+  /**
+   * La case « relu par notre expert-comptable » est cochée avec un nom et une date
+   * (décision ouverte n° 6, défaut : exigée). Déclarative : Lalanda ne la vérifie pas.
+   */
+  readonly expertReviewDeclared: boolean;
+}
+
+export type RuleSetDecision =
+  | {
+      readonly ok: false;
+      readonly code:
+        'RULE_SET_IMMUTABLE' | 'SELF_APPROVAL_FORBIDDEN' | 'EXPERT_REVIEW_DECLARATION_REQUIRED';
+    }
+  | { readonly ok: true; readonly soleApprover: boolean };
+
+/**
+ * ADR-0049 § 2.4 — validation d'un jeu de règles de correspondance, même séparation que
+ * `manualEntryDecision` sur `accounting.manage` : le dernier auteur ne valide pas, sauf
+ * approbateur unique (marqué `validation.soleApprover`). Ordre des contrôles (le premier
+ * refus gagne) : version non brouillon (`RULE_SET_IMMUTABLE`), personne
+ * (`SELF_APPROVAL_FORBIDDEN`), déclaration de relecture
+ * (`EXPERT_REVIEW_DECLARATION_REQUIRED`).
+ */
+export function ruleSetDecision(input: RuleSetValidationInput): RuleSetDecision {
+  if (input.status !== 'draft') return { ok: false, code: 'RULE_SET_IMMUTABLE' };
+  const isSelf = input.validatorUserId === input.lastAuthorUserId;
+  if (isSelf && input.approverCountInOrg > 1) {
+    return { ok: false, code: 'SELF_APPROVAL_FORBIDDEN' };
+  }
+  if (!input.expertReviewDeclared) {
+    return { ok: false, code: 'EXPERT_REVIEW_DECLARATION_REQUIRED' };
+  }
+  return { ok: true, soleApprover: isSelf };
+}
+
+/** Entrée d'`accountingReopenDecision`. */
+export interface AccountingReopenInput {
+  /**
+   * TITRE de l'acteur (valeur du membership). La règle porte sur l'IDENTITÉ du titre
+   * `owner`, comme R1 : aucun ajout (ADR-0041) ne la confère.
+   */
+  readonly actorRole: unknown;
+  /** Motif saisi ; obligatoire, espaces de bord ignorés. */
+  readonly reason: string | null | undefined;
+}
+
+export type AccountingReopenDecision =
+  | { readonly ok: false; readonly code: 'REOPEN_OWNER_ONLY' | 'REOPEN_REASON_REQUIRED' }
+  | { readonly ok: true; readonly reason: string };
+
+/**
+ * ADR-0049 § 4 (décision ouverte n° 11) — rouvrir un mois ou un exercice comptable est
+ * réservé au **Propriétaire seul**, avec un motif, journalisé en ajout seul et audité :
+ * même règle que le réalisé de docs/08 (`REOPEN_OWNER_ONLY`). Ni le Directeur financier
+ * ni le Comptable, qui clôturent (`accounting.close`), ne rouvrent. Le titre est jugé
+ * avant le motif : un non-propriétaire apprend qu'il ne peut pas, pas qu'il a oublié le
+ * motif. Le motif rendu est nettoyé des espaces de bord.
+ */
+export function accountingReopenDecision(input: AccountingReopenInput): AccountingReopenDecision {
+  if (!isOwnerRole(input.actorRole)) return { ok: false, code: 'REOPEN_OWNER_ONLY' };
+  const reason = typeof input.reason === 'string' ? input.reason.trim() : '';
+  if (reason === '') return { ok: false, code: 'REOPEN_REASON_REQUIRED' };
+  return { ok: true, reason };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ADR-0041 — A1 : autorisations par membre (titre + écart)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -2047,6 +2450,12 @@ export const ACTION_DEPENDENCIES: Readonly<Partial<Record<Action, readonly Actio
   'stock.manage': ['stock.read'],
   'assets.manage': ['assets.read'],
   'docs.manage': ['docs.read'],
+  // ADR-0049 — K0 (§ 8.3) : tout geste sur les livres suppose de les lire. L'activation
+  // exige en plus `fiscal.manage` : cumul de route, pas une dépendance.
+  'accounting.post': ['accounting.read'],
+  'accounting.close': ['accounting.read'],
+  'accounting.export': ['accounting.read'],
+  'accounting.manage': ['accounting.read'],
 };
 
 /**
@@ -2067,10 +2476,10 @@ export function requiredActionsOf(action: Action): Action[] {
 }
 
 /**
- * Les douze domaines de l'écran (ADR-0041 § 5), dans l'ordre d'affichage. Le huitième,
+ * Les treize domaines de l'écran (ADR-0041 § 5), dans l'ordre d'affichage. Le huitième,
  * « Achats et fournisseurs », vient d'ADR-0044 § 4.3 ; le neuvième, « Ressources
  * humaines », d'ADR-0045 § 4.5 ; les dixième à douzième, « Stocks », « Équipements » et
- * « Documents », d'ADR-0046 § 8.3.
+ * « Documents », d'ADR-0046 § 8.3 ; le treizième, « Comptabilité », d'ADR-0049 § 8.3.
  */
 export const ACTION_DOMAINS: readonly {
   readonly key: string;
@@ -2145,6 +2554,18 @@ export const ACTION_DOMAINS: readonly {
   },
   { key: 'assets', label: 'Équipements', actions: ['assets.read', 'assets.manage'] },
   { key: 'documents', label: 'Documents', actions: ['docs.read', 'docs.manage'] },
+  // ADR-0049 — K0 (§ 8.3).
+  {
+    key: 'accounting',
+    label: 'Comptabilité',
+    actions: [
+      'accounting.read',
+      'accounting.post',
+      'accounting.close',
+      'accounting.export',
+      'accounting.manage',
+    ],
+  },
 ];
 
 /** Libellés français des actions (ADR-0041 § 5) — « autorisation », jamais « action ». */
@@ -2198,6 +2619,12 @@ export const ACTION_LABELS: Readonly<Record<Action, string>> = {
   'assets.manage': 'Gérer les équipements',
   'docs.read': 'Consulter la bibliothèque de documents',
   'docs.manage': 'Gérer la bibliothèque de documents',
+  // ADR-0049 — K0 (§ 8.1).
+  'accounting.read': 'Consulter la comptabilité',
+  'accounting.post': 'Saisir et valider des écritures',
+  'accounting.close': 'Clôturer les périodes comptables',
+  'accounting.export': 'Exporter la comptabilité',
+  'accounting.manage': 'Paramétrer la comptabilité',
 };
 
 /**
@@ -2394,6 +2821,7 @@ export const ORG_ROLE_LABELS: Readonly<Record<OrgRole, string>> = {
   sales_rep: 'Commercial',
   hr_manager: 'Responsable RH',
   storekeeper: 'Magasinier',
+  external_accountant: 'Expert-comptable (externe)',
 };
 
 /** Description courte d'un rôle — affichée sous le sélecteur de rôle. */
@@ -2414,6 +2842,9 @@ export const ORG_ROLE_DESCRIPTIONS: Readonly<Record<OrgRole, string>> = {
   // ADR-0046 § 8.2.
   storekeeper:
     'Réceptionne, range, sort et compte le stock ; consulte le matériel et les documents. Ne voit ni les prix d’achat, ni la valeur du stock, ni la trésorerie, ni les ventes.',
+  // ADR-0049 § 8.2.
+  external_accountant:
+    "Consulte et exporte la comptabilité de l'organisation pour la réviser. N'écrit rien : ni écriture, ni vente, ni paiement. Externe à l'organisation.",
 };
 
 export const PLATFORM_ROLE_LABELS: Readonly<Record<PlatformRole, string>> = {

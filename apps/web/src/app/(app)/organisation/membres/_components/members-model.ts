@@ -156,9 +156,11 @@ export const RANG_DE_PRIVILEGE: Readonly<Record<OrgRole, number>> = {
   hr_manager: 6,
   // ADR-0046 § 8.2 : le Magasinier au rang 7 ; les suivants glissent d'un cran.
   storekeeper: 7,
-  project_manager: 8,
-  advisor: 9,
-  viewer: 10,
+  // ADR-0049 § 8.2 : l'Expert-comptable (externe) au rang 8 ; les suivants glissent d'un cran.
+  external_accountant: 8,
+  project_manager: 9,
+  advisor: 10,
+  viewer: 11,
 };
 
 /**

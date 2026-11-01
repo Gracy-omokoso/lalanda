@@ -116,6 +116,8 @@ describe('ADR-0041 § 2 — validateOverrides : un cas par garde-fou', () => {
         'stock.read',
         'assets.read',
         'docs.read',
+        // ADR-0049 § 8.1 : il consulte la comptabilité.
+        'accounting.read',
       ],
     });
   });
@@ -234,6 +236,11 @@ describe('ADR-0041 § 2 — validateOverrides : un cas par garde-fou', () => {
       'treasury.manage',
       // ADR-0044 § 4.1 : le Comptable paie les fournisseurs, pas l'Administrateur.
       'payables.pay',
+      // ADR-0049 § 8.1 : le Comptable tient les livres ; l'Administrateur les lit seulement.
+      'accounting.post',
+      'accounting.close',
+      'accounting.export',
+      'accounting.manage',
     ]);
   });
 
@@ -433,19 +440,19 @@ describe('ADR-0041 § 4 et § 5 — dépendances, domaines et libellés', () => 
     expect(requiredActionsOf('report.export')).toEqual(['project.read', 'analytics.read']);
   });
 
-  it('douze domaines ; chaque action dans exactement un domaine, avec un libellé', () => {
-    expect(ACTION_DOMAINS).toHaveLength(12);
+  it('treize domaines ; chaque action dans exactement un domaine, avec un libellé', () => {
+    expect(ACTION_DOMAINS).toHaveLength(13);
     const all = ACTION_DOMAINS.flatMap((d) => d.actions);
     expect(all).toHaveLength(ACTIONS.length);
     expect([...all].sort()).toEqual([...ACTIONS].sort());
     for (const action of ACTIONS) {
       expect(ACTION_LABELS[action].trim().length, action).toBeGreaterThan(0);
     }
-    expect(new Set(ACTION_DOMAINS.map((d) => d.key)).size).toBe(12);
+    expect(new Set(ACTION_DOMAINS.map((d) => d.key)).size).toBe(13);
   });
 
   it('ADR-0046 § 8.3 — dixième à douzième domaines « Stocks », « Équipements », « Documents »', () => {
-    expect(ACTION_DOMAINS.slice(9)).toEqual([
+    expect(ACTION_DOMAINS.slice(9, 12)).toEqual([
       {
         key: 'stock',
         label: 'Stocks',
@@ -480,6 +487,71 @@ describe('ADR-0041 § 4 et § 5 — dépendances, domaines et libellés', () => 
       ),
     ).toBe(false);
     expect(NON_DELEGABLE_ACTIONS).toEqual(['billing.manage']);
+  });
+
+  it('ADR-0049 § 8.3 — treizième domaine « Comptabilité », libellés et dépendances ; aucune paire nouvelle', () => {
+    expect(ACTION_DOMAINS[12]).toEqual({
+      key: 'accounting',
+      label: 'Comptabilité',
+      actions: [
+        'accounting.read',
+        'accounting.post',
+        'accounting.close',
+        'accounting.export',
+        'accounting.manage',
+      ],
+    });
+    expect(ACTION_LABELS['accounting.read']).toBe('Consulter la comptabilité');
+    expect(ACTION_LABELS['accounting.post']).toBe('Saisir et valider des écritures');
+    expect(ACTION_LABELS['accounting.close']).toBe('Clôturer les périodes comptables');
+    expect(ACTION_LABELS['accounting.export']).toBe('Exporter la comptabilité');
+    expect(ACTION_LABELS['accounting.manage']).toBe('Paramétrer la comptabilité');
+    expect(requiredActionsOf('accounting.read')).toEqual(['analytics.read']);
+    for (const a of [
+      'accounting.post',
+      'accounting.close',
+      'accounting.export',
+      'accounting.manage',
+    ] as const) {
+      expect(requiredActionsOf(a), a).toEqual(['analytics.read', 'accounting.read']);
+    }
+    // La règle utile (ne pas valider sa propre écriture) est dynamique : une paire
+    // statique empêcherait l'entrepreneur seul de tenir ses livres.
+    expect(SOD_PAIRS).toHaveLength(3);
+    expect(SOD_PAIRS.flat().some((a) => a.startsWith('accounting.'))).toBe(false);
+    expect(NON_DELEGABLE_ACTIONS).toEqual(['billing.manage']);
+  });
+
+  it('ADR-0049 § 8.3 — `accounting.export` s’ajoute par écart sans `accounting.read` : dépendance manquante', () => {
+    expect(
+      validateOverrides({
+        actorRole: 'owner',
+        actorCtx: NO_OVERRIDES,
+        targetRole: 'sales_rep',
+        targetCtxBefore: NO_OVERRIDES,
+        grants: ['accounting.export'],
+        revokes: [],
+        actorIsTarget: false,
+      }),
+    ).toEqual({
+      ok: false,
+      code: 'PERMISSION_DEPENDENCY_MISSING',
+      action: 'accounting.export',
+      missing: ['accounting.read'],
+    });
+    // L'Expert-comptable (externe) ne reçoit `sales.read` par ajout que du Propriétaire ou
+    // d'un acteur qui le détient (décision ouverte n° 3, écarts éteints par défaut).
+    expect(
+      validateOverrides({
+        actorRole: 'owner',
+        actorCtx: NO_OVERRIDES,
+        targetRole: 'external_accountant',
+        targetCtxBefore: NO_OVERRIDES,
+        grants: ['sales.read', 'purchase.read'],
+        revokes: [],
+        actorIsTarget: false,
+      }),
+    ).toMatchObject({ ok: true, grants: ['sales.read', 'purchase.read'] });
   });
 
   it('ADR-0046 § 8.3 — `stock.manage` s’ajoute par écart sans `stock.read` : dépendance manquante', () => {
@@ -636,7 +708,7 @@ function prng(seed: number): () => number {
 }
 
 describe('ADR-0041 § 9.5 — propriété : tout écart accepté est sûr', () => {
-  it('10 000 tirages à graine fixe', () => {
+  it('15 000 tirages à graine fixe', () => {
     const rand = prng(41_2026);
     const pick = <T>(xs: readonly T[]): T => xs[Math.floor(rand() * xs.length)] as T;
     const subset = <T>(xs: readonly T[], p: number): T[] => xs.filter(() => rand() < p);
@@ -658,8 +730,9 @@ describe('ADR-0041 § 9.5 — propriété : tout écart accepté est sûr', () =
     // plus que 77 acceptations, sous le seuil de 100 qui garantit une propriété exercée.
     // ADR-0045 : 5 000 tirages — à 38 actions et 10 rôles, 3 000 tirages ne donnaient plus
     // que 75 acceptations. ADR-0046 : 10 000 tirages — à 46 actions et 11 rôles, 5 000
-    // tirages ne donnaient plus que 60 acceptations.
-    for (let i = 0; i < 10000; i++) {
+    // tirages ne donnaient plus que 60 acceptations. ADR-0049 : 15 000 tirages — à 51 actions
+    // et 12 rôles, 10 000 tirages ne donnaient plus que 95 acceptations.
+    for (let i = 0; i < 15000; i++) {
       // Acteur souvent Propriétaire ou Directeur financier : sinon presque tout est escalade.
       const actorRole =
         rand() < 0.5 ? pick(['owner', 'finance_director'] as const) : pick(ORG_ROLES);
@@ -760,5 +833,5 @@ describe('ADR-0041 § 9.5 — propriété : tout écart accepté est sûr', () =
       'SELF_PERMISSIONS_FORBIDDEN',
       'SOD_CONFLICT',
     ]);
-  }, 60_000); // 10 000 tirages : marge sous charge (CI)
+  }, 90_000); // 15 000 tirages : marge sous charge (CI)
 });
