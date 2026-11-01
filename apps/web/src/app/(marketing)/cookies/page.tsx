@@ -100,7 +100,7 @@ const SECTIONS: readonly LegalSection[] = [
             [
               <code key="n">active_org_id</code>,
               'Mémorise l’organisation sur laquelle vous travaillez lorsque vous appartenez à plusieurs.',
-              'Durée de la session',
+              '1 an',
             ],
             [
               <code key="n">{CONSENT_COOKIE_NAME}</code>,
@@ -110,9 +110,13 @@ const SECTIONS: readonly LegalSection[] = [
           ]}
         />
         <p>
-          Un élément supplémentaire est stocké sur votre appareil sans être un cookie&nbsp;: la clé{' '}
-          <code>theme</code> en stockage local, qui retient si vous préférez l&apos;affichage clair
-          ou sombre. Elle n&apos;est jamais transmise à nos serveurs et n&apos;identifie personne.
+          D&apos;autres éléments sont stockés sur votre appareil sans être des cookies, en stockage
+          local&nbsp;: la clé <code>theme</code>, qui retient si vous préférez l&apos;affichage
+          clair ou sombre, ainsi que des préférences d&apos;affichage de l&apos;application (barre
+          de navigation repliée, modules affichés pour une organisation). Lors d&apos;une
+          réauthentification, une action en cours est gardée le temps de la session du navigateur
+          pour être reprise ensuite. Ces éléments ne sont jamais transmis à nos serveurs et
+          n&apos;identifient personne.
         </p>
         <p>
           Cookies non essentiels&nbsp;: <strong>aucun à ce jour.</strong> La catégorie «&nbsp;mesure
