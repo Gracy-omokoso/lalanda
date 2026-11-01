@@ -178,6 +178,25 @@ Un événement contient acteur, organisation, action, cible, horodatage, adresse
   `treasury_accounts`, `supplier_invoices`, `supplier_payments`, `stock_movements` (option éteinte).
   **N'écrit jamais** `actual_periods` ni un plan.
 
+- **Proposé, ADR-0050 (non implémenté ; socle RBAC et contrats partagés appliqués au lot V0)** —
+  commandes clients, contrats, avenants, acomptes et abonnements que les organisations vendent à
+  **leurs** clients : `sales_orders` (`CC{AA}{MM}-NNNNNN`, hors série fiscale ; une seule commande
+  vivante par devis, unique partiel `organizationId + source.quoteId` sur les commandes non
+  annulées), `sales_order_counters`, `sales_contracts` (`CT{AA}{MM}-NNNNNN` ; versions avant
+  signature dans `previousVersions` ; clauses **saisies** : terme, reconduction, préavis ;
+  échéancier `none | schedule | recurring` ; `approvals`, `signature`, `renewals` en ajout seul,
+  `termination` ; `contentSha256` à la signature), `sales_contract_counters`,
+  `sales_contract_amendments` (avenant numéroté `CT…-A{n}`, date d'effet, même cycle que le
+  contrat), `sales_contract_files` (PDF seul, 10 Mio, téléchargement inerte, ajout seul),
+  `sales_document_links` (lien facture ↔ commande, contrat ou échéance ; unique
+  `organizationId + invoiceId`, partiels `organizationId + contractId + occurrenceDate` et
+  `organizationId + contractId + itemRef`), `sales_contract_settings` (un par organisation, défaut
+  implicite). Toutes portent `organizationId`, `revision`, `_schemaVersion: 1`. **Aucune
+  migration** ; **aucun champ** ajouté à `sales_invoices` (les factures naissent par
+  `InvoiceDraftsService.create`, liste fermée des écrivains inchangée). Lectures seules :
+  `sales_quotes`, `customers`, `sales_invoices`, `sales_invoice_settlements`, `work_projects`.
+  `sales_document_links` n'est lu ni par la comptabilité ni par le pont vers le réalisé.
+
 ## Rétention
 
 La politique définit données actives, exports, journaux, IA, pièces et sauvegardes. La suppression d’une organisation suit une période de récupération puis une purge contrôlée, sous réserve des obligations légales.

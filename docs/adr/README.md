@@ -97,7 +97,8 @@ Décideurs :
   imputation automatique** ; échéancier et abonnements en **brouillons** préparés par une tâche,
   jamais émis sans geste humain ; alertes dans « Mes tâches » ; aucune ligne des factures, du circuit
   DGI, du réalisé ni de la comptabilité ne change ; deux actions `sales.contract` et
-  `sales.contract.approve` (ⓢ). Statut : **proposé, ADR-0050** (1ᵉʳ nov. 2026).
+  `sales.contract.approve` (ⓢ). Statut : **proposé, ADR-0050** (1ᵉʳ nov. 2026) ; socle RBAC et
+  contrats partagés **appliqués au lot V0**.
 - [ADR-0051](ADR-0051-rh-frais-avances-presences-evaluations.md) — RH, second volet (paie exclue) :
   notes de frais avec justificatifs, validation en deux étapes et remboursement en dépenses
   **possédées par les RH** ; avances de frais et sur salaire versées en mouvements de trésorerie et

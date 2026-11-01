@@ -721,6 +721,27 @@ idempotente) ; aucune écriture dans les ventes, la trésorerie, les achats, le 
 | `GET /accounting/reconciliation/actuals` | `accounting.read` + `project.read` | écarts typés avec le réalisé, jamais corrigés |
 | `POST /accounting/exports` · `GET …/:id/file` | `accounting.export` | CSV (format à arrêter avec l'expert), balance, grand livre, projets d'états ; empreinte, audit strict |
 
+## Commandes clients, contrats, acomptes et abonnements — proposé, ADR-0050 (non implémenté)
+
+Contrat **proposé** par [ADR-0050](adr/ADR-0050-contrats-commandes-acomptes-abonnements.md) § 3.
+Module `apps/api/src/sales/contracts/`, préfixe `/sales`, `AuthGuard`, organisation de la session,
+`404` hors organisation ; corps `.strict()` (`@lalanda/shared/sales-contracts`, lot V0), montants en
+chaînes, listes paginées par curseur. Deux actions nouvelles, **appliquées au lot V0** :
+`sales.contract` (préparer) et `sales.contract.approve` (approuver, case ⓢ, interdit absolu de
+plateforme). Aucune route n'existe encore : elles arrivent aux lots V2 à V5.
+
+| Méthode et chemin | Permission | Effet |
+|---|---|---|
+| `GET /sales/orders` · `/:id` · `GET /sales/contracts` · `/:id` · `…/amendments` · `…/files/:fileId` · `…/schedule` · `GET /sales/contract-settings` | `sales.read` | lecture ; pièce servie en `attachment` ; échéances préparées, à préparer, à venir, bloquées |
+| `POST`/`PUT`/`DELETE /sales/orders` · `…/confirm` · `…/close` · `…/cancel` · `POST /sales/quotes/:id/to-order` | `sales.contract` | commande client ; `409 ORDER_EXISTS_FOR_QUOTE` ; devis inchangé |
+| `POST`/`PUT`/`DELETE /sales/contracts` · `…/submit` · `…/new-version` · `…/cancel` · `…/signature` · `POST …/files` · `POST /sales/quotes/:id/to-contract` · avenants (`…/amendments`, `…/submit`, `…/signature`) | `sales.contract` | `409 CONTRACT_NOT_DRAFT` ; `422 SIGNED_COPY_REQUIRED` ; signature **déclarée** |
+| `POST /sales/contracts/:id/approve` · `…/reject` · avenants `…/approve` · `…/reject` · `…/renewals` · `…/terminate` · `PUT /sales/contract-settings` | `sales.contract.approve` | séparation dynamique (`contractApprovalDecision`, `409 SELF_APPROVAL_FORBIDDEN`, approbateur unique marqué) ; reconduction **constatée** ; résiliation jamais refusée (`noticeCheck` affiché) |
+| `POST /sales/orders/:id/prepare-invoice` · `…/prepare-deposit` · `POST /sales/contracts/:id/prepare-deposit` · `…/occurrences/:key/prepare` · `…/deposits/:invoiceId/resolved` | `sales.read` + `sales.manage` | brouillon `FV`/`EV` ou `FT`/`ET` par `InvoiceDraftsService.create`, **jamais émis** ; groupe de taxation de l'acompte exigé, jamais prérempli |
+
+Tâche `sales.subscriptions.prepare` (quotidienne, idempotente, acteur `system:subscriptions`) :
+prépare des brouillons, n'émet ni ne normalise rien. Émettre reste `sales.invoice` (routes
+existantes).
+
 ## Brief du matin — implémenté (ADR-0033)
 
 L'organisation est toujours celle de la session ; aucun corps ni paramètre ne la désigne.
