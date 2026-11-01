@@ -161,6 +161,23 @@ Un événement contient acteur, organisation, action, cible, horodatage, adresse
   brief, « Mes tâches » et la marge lisent `stock_items`, `stock_levels`, `stock_movements`,
   `stock_counts`, `stock_pending_lines`, `asset_*` et `library_documents` sans les écrire.
 
+- **Proposé, ADR-0049 (non implémenté)** — comptabilité SYSCOHADA, états toujours « projet » :
+  `accounting_chart_packs` (plateforme ; pack de plan comptable versionné `draft → review → approved →
+  active → retired`, sources, chaque compte `sourced` ou `to_confirm`), `accounting_settings` (un par
+  organisation : mode `off | simulation | active`, monnaie de tenue sans défaut, date de bascule),
+  `accounting_accounts` (unique `organizationId + number` ; auxiliaires clients et fournisseurs),
+  `accounting_rule_sets` (règles de correspondance versionnées, immuables une fois validées),
+  `accounting_journals` (unique `organizationId + code`), `accounting_entries` (**ajout seul** ; unique
+  partiel `organizationId + sourceKey` pour l'idempotence ; numéros sans trou par journal et exercice ;
+  chaînage `prevHash`/`hash`), `accounting_journal_heads`, `accounting_counters`,
+  `accounting_fiscal_years`, `accounting_periods`, `accounting_exchange_rates` (taux saisis, unique
+  `organizationId + date + from + to`), `accounting_lettering` (ajout seul), `accounting_pending`,
+  `accounting_sync_checkpoints`, `accounting_exports` (empreinte SHA-256). **Aucune migration** ; aucune
+  collection existante ne gagne de champ. Lectures seules : `sales_invoices` (série réelle, `issued` et
+  `normalized`), `sales_receipts`, `treasury_expenses` (`origin` nulle), `treasury_movements`,
+  `treasury_accounts`, `supplier_invoices`, `supplier_payments`, `stock_movements` (option éteinte).
+  **N'écrit jamais** `actual_periods` ni un plan.
+
 ## Rétention
 
 La politique définit données actives, exports, journaux, IA, pièces et sauvegardes. La suppression d’une organisation suit une période de récupération puis une purge contrôlée, sous réserve des obligations légales.

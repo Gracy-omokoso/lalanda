@@ -75,6 +75,15 @@ Décideurs :
   avec droits par dossier, versions, échéances, chiffrement des pièces sensibles ; huit actions et
   un rôle Magasinier. Statut : **proposé, ADR-0046** (31 oct. 2026).
 
+- [ADR-0049](ADR-0049-comptabilite-syscohada.md) — Comptabilité SYSCOHADA : pack de plan comptable
+  sourcé, daté et versionné (`draft` tant qu'un expert-comptable ne l'a pas relu ; chaque compte
+  candidat « à confirmer ») ; écritures générées par lecture des pièces du RUN, reliées à leur pièce,
+  idempotentes, en ajout seul (contre-passations) ; compte d'attente pour tout ce qu'aucune règle
+  validée ne classe ; monnaie de tenue choisie, taux de la pièce, observé ou saisi, jamais implicite ;
+  journaux, grand livre, balance, lettrage, clôtures ; états **toujours « projet — à valider par un
+  expert-comptable »**, exports pour lui ; mode simulation ; aucune écriture dans le réalisé ; cinq
+  actions et un rôle Expert-comptable externe. Statut : **proposé, ADR-0049** (1ᵉʳ nov. 2026).
+
 ## Décisions récentes (légal)
 
 - [ADR-0043](ADR-0043-editeur-go-freelance-sarlu.md) — L'éditeur devient Go freelance SARLU

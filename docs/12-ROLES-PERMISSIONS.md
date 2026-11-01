@@ -35,6 +35,7 @@ Le support ne voit jamais les données financières sans consentement explicite,
 | Commercial (`sales_rep`, ADR-0040, appliqué) | CRM, devis, consultation des clients et du catalogue ; ni trésorerie, ni dépenses, ni émission de facture |
 | Responsable RH (`hr_manager`, ADR-0045, implémenté) | dossiers du personnel, absences et documents RH ; ni trésorerie, ni ventes, ni achats |
 | Magasinier (`storekeeper`, ADR-0046, appliqué au lot S0) | sort, transfère et compte le stock ; consulte le matériel et les documents ; ni prix d'achat, ni valeur du stock, ni trésorerie, ni ventes |
+| Expert-comptable externe (`external_accountant`, **proposé, ADR-0049**, non appliqué) | consulte et exporte la comptabilité ; n'écrit rien ; attribuable par le seul Propriétaire |
 
 ## Actions granulaires
 
@@ -431,6 +432,39 @@ L'Idea Lab ([ADR-0036](adr/ADR-0036-idea-lab-et-validation.md) § 6) **n'ajoute 
 action** : lire une idée relève de `project.read`, la modifier (fiche, notes, expériences,
 promotion vers un projet, assistance IA) de `canvas.update`, régler son IA de
 `organization.manage`. Les actions et la matrice sont inchangées par l'Idea Lab.
+
+### Proposé, ADR-0049 — comptabilité SYSCOHADA (non appliqué)
+
+> **Statut : proposé** par [ADR-0049](adr/ADR-0049-comptabilite-syscohada.md) § 8 (1ᵉʳ nov. 2026).
+> Rien de ce qui suit n'est dans le code ; le lot K0 l'appliquera.
+
+- **Cinq actions nouvelles**, quarante-septième à cinquante et unième, en fin de liste :
+  `accounting.read` (« Consulter la comptabilité »), `accounting.post` (« Saisir et valider des
+  écritures », case ⓢ), `accounting.close` (« Clôturer les périodes comptables » ; la réouverture
+  reste au Propriétaire), `accounting.export` (« Exporter la comptabilité », audit strict),
+  `accounting.manage` (« Paramétrer la comptabilité », case ⓢ ; l'activation exige en plus
+  `fiscal.manage`).
+- **Rôle nouveau Expert-comptable externe** (`external_accountant`, colonne EXP, rang 8 ; Chef de
+  projet, Conseiller et Lecteur passent à 9, 10 et 11) : `analytics.read`, `accounting.read`,
+  `accounting.export`. Dans `OWNER_ONLY_ROLES` : attribuable par le seul Propriétaire.
+
+| Action | PRO | ADM | DIR | CPT | ANA | CDP | CON | LEC | COM | RH | MAG | EXP |
+|---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| `accounting.read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✓ |
+| `accounting.post` | ✓ⓢ | ✗ | ✓ⓢ | ✓ⓢ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `accounting.close` | ✓ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `accounting.export` | ✓ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
+| `accounting.manage` | ✓ⓢ | ✗ | ✓ⓢ | ✓ⓢ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+
+- **Séparation des tâches** dynamique : l'auteur d'une opération diverse ne la valide pas
+  (`manualEntryDecision`), le dernier auteur d'un jeu de règles de correspondance ne le valide pas
+  (`ruleSetDecision`) ; exception approbateur unique, marquée. `accounting.post` et
+  `accounting.manage` rejoignent `APPROVAL_ACTIONS` ; aucune paire `SOD_PAIRS` nouvelle.
+- **ADR-0041** : dépendances des quatre actions vers `accounting.read` ; treizième domaine
+  « Comptabilité ».
+- **Plateforme** : `accounting.read` sous accès délégué ; `accounting.post`, `accounting.close`,
+  `accounting.export`, `accounting.manage` rejoignent `PLATFORM_FORBIDDEN_ACTIONS`.
+- Tests : matrice 12 × 51 + 6 × 51 = **918** cases.
 
 ## Règles critiques
 
