@@ -97,7 +97,16 @@ export interface ParsedLine {
   doc: bigint;
 }
 
-/** Lit une ligne : un seul côté, strictement positif ; montant en devise > 0. */
+/**
+ * Lit une ligne : un seul côté non `null` ; devise connue. Montants :
+ * - cas général : montant de tenue > 0 et montant en devise > 0 ;
+ * - ligne CONVERTIE (devise ≠ `entry.bookCurrency`, monnaie de tenue fournie)
+ *   arrondie à `0.00` en tenue : admise si son montant en devise est > 0 ; elle
+ *   compte pour 0 dans les balances de tenue, pour son montant par devise ;
+ * - ligne d'écart de change (`exchangeDifference`) : montant en devise nul
+ *   admis, montant de tenue > 0 exigé.
+ * Raccord K2/K3 (ADR-0049 § 5, note du 1er novembre 2026).
+ */
 export function parseLine(entry: ReportingEntry, index: number): ParsedLine {
   const line = entry.lines[index];
   const where = `Écriture ${entry.id}, ligne ${index + 1}`;
@@ -112,10 +121,18 @@ export function parseLine(entry: ReportingEntry, index: number): ParsedLine {
   }
   const debit = hasDebit ? centsOf(line.debit, `${where}, débit`) : 0n;
   const credit = hasCredit ? centsOf(line.credit, `${where}, crédit`) : 0n;
-  if (debit + credit <= 0n) throw new RangeError(`${where} : montant strictement positif attendu`);
   const currency = checkCurrency(line.currency, `${where}, devise`);
   const amount = centsOf(line.amount, `${where}, montant en devise`);
-  if (amount <= 0n)
+  const exchange = line.exchangeDifference === true;
+  if (debit + credit <= 0n) {
+    const bookCurrency = entry.bookCurrency ?? null;
+    const converted =
+      !exchange &&
+      bookCurrency !== null &&
+      checkCurrency(bookCurrency, `Écriture ${entry.id}, monnaie de tenue`) !== currency;
+    if (!converted) throw new RangeError(`${where} : montant strictement positif attendu`);
+  }
+  if (amount <= 0n && !exchange)
     throw new RangeError(`${where} : montant en devise strictement positif attendu`);
   return {
     ref: lineRefOf(entry.id, index),

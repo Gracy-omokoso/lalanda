@@ -779,6 +779,19 @@ Module **pur** (aucune base, aucun réseau, aucune horloge), `bigint` en centime
 
 Rien dans ce module ne choisit un compte : il applique les règles reçues en entrée.
 
+**Note du 1er novembre 2026 — raccord K2/K3.** Les lots K2 et K3, écrits en parallèle, ne se
+raccordaient pas : `toReportingEntry(écriture K2, persistance)` (`accounting/bridge.ts`) traduit une
+écriture du moteur d'écritures en vue de restitution (côté inactif `'0.00'` → `null`, `matchRef` →
+`documentRef`, `operationKey`, `suspenseReason`, `exchangeDifference` et `bookCurrency` recopiés ;
+identifiant, journal, exercice, numéro, statut et date de validation fournis par la persistance). K3
+admet en outre, explicitement et seulement : une ligne **convertie** (devise ≠ monnaie de tenue de
+l'écriture) arrondie à `0.00` en monnaie de tenue si son montant en devise est strictement positif — elle
+compte pour 0 dans la balance, pour son montant par devise ; une ligne d'**écart de change** de montant en
+devise nul, son montant de tenue restant strictement positif. Une ligne porte toujours un seul côté non
+nul ; toutes les autres validations demeurent. `generation.ruleSetVersion` et `generation.chartPack`
+peuvent être `null` (aucun jeu validé, aucun pack). Un test de propriété à graine fixe enchaîne
+`entriesFor…` → `toReportingEntry` → balance, grand livre, état, export.
+
 ### 13. Interface — application RUN « Comptabilité », route `/comptabilite`
 
 Colonne d'applications (ADR-0038), visible avec `accounting.read` ; sous-options :
