@@ -1,0 +1,255 @@
+# Pack de plan comptable — SYSCOHADA révisé, République démocratique du Congo, version 1.
+#
+# ADR-0049 § 2.1 et § 2.1.1 (lot K1). Statut : DRAFT.
+#
+# RÈGLE ABSOLUE : ce fichier ne contient AUCUN numéro, AUCUN intitulé et AUCUNE règle
+# vérifiés sur le texte officiel. Les neuf classes et les dix comptes candidats sont
+# repris mot pour mot de l'ADR-0049 § 2.1.1 ; chacun reste `to_confirm`, « à confirmer
+# par l'expert-comptable ». Les comptes que l'ADR dit « à fournir par l'expert » ne
+# figurent pas dans `accounts` : ils sont listés dans `expectedAccounts`.
+#
+# Les libellés des comptes sont les « besoins » décrits par l'ADR (colonne « Besoin »),
+# pas les intitulés officiels du Plan comptable général OHADA, qui restent à vérifier.
+#
+# Le document de relecture pour l'expert-comptable reprend ce fichier en tableau :
+# docs/comptabilite/relecture-pack-syscohada-v1.md (un test vérifie la concordance).
+
+schemaVersion: 1
+slug: syscohada-revise-2017-cd
+version: 1
+framework: syscohada-revise-2017
+countries: [CD]
+status: draft
+label: 'SYSCOHADA révisé — RDC — version 1 (projet non relu)'
+
+sources:
+  - id: audcif-2017
+    issuer: 'OHADA — Conseil des ministres'
+    title: >-
+      Acte uniforme relatif au droit comptable et à l'information financière (AUDCIF) et
+      Système comptable OHADA annexé (Plan comptable général OHADA, guide d'application)
+    reference: null
+    adoptedOn: '2017-01-26'
+    publishedOn: null
+    effectiveFrom: null
+    url: null
+    verifiedOn: null
+    verifiedBy: null
+    note: >-
+      Texte officiel non disponible dans le dépôt. Référence de publication au Journal
+      officiel de l'OHADA, dates d'entrée en vigueur et texte intégral à joindre par
+      l'expert-comptable ou l'équipe produit (ADR-0049 § 2.1.1). Aucun numéro de compte
+      n'a été vérifié sur ce texte.
+
+classes:
+  - number: '1'
+    label: 'Comptes de ressources durables'
+    sourceId: audcif-2017
+    confirmation: to_confirm
+    note: "Libellé usuel repris de l'ADR-0049 § 2.1.1, à vérifier mot pour mot sur le texte ; à confirmer par l'expert-comptable."
+  - number: '2'
+    label: "Comptes d'actif immobilisé"
+    sourceId: audcif-2017
+    confirmation: to_confirm
+    note: "Libellé usuel repris de l'ADR-0049 § 2.1.1, à vérifier mot pour mot sur le texte ; à confirmer par l'expert-comptable."
+  - number: '3'
+    label: 'Comptes de stocks'
+    sourceId: audcif-2017
+    confirmation: to_confirm
+    note: "Libellé usuel repris de l'ADR-0049 § 2.1.1, à vérifier mot pour mot sur le texte ; à confirmer par l'expert-comptable."
+  - number: '4'
+    label: 'Comptes de tiers'
+    sourceId: audcif-2017
+    confirmation: to_confirm
+    note: "Libellé usuel repris de l'ADR-0049 § 2.1.1, à vérifier mot pour mot sur le texte ; à confirmer par l'expert-comptable."
+  - number: '5'
+    label: 'Comptes de trésorerie'
+    sourceId: audcif-2017
+    confirmation: to_confirm
+    note: "Libellé usuel repris de l'ADR-0049 § 2.1.1, à vérifier mot pour mot sur le texte ; à confirmer par l'expert-comptable."
+  - number: '6'
+    label: 'Comptes de charges des activités ordinaires'
+    sourceId: audcif-2017
+    confirmation: to_confirm
+    note: "Libellé usuel repris de l'ADR-0049 § 2.1.1, à vérifier mot pour mot sur le texte ; à confirmer par l'expert-comptable."
+  - number: '7'
+    label: 'Comptes de produits des activités ordinaires'
+    sourceId: audcif-2017
+    confirmation: to_confirm
+    note: "Libellé usuel repris de l'ADR-0049 § 2.1.1, à vérifier mot pour mot sur le texte ; à confirmer par l'expert-comptable."
+  - number: '8'
+    label: 'Comptes des autres charges et des autres produits'
+    sourceId: audcif-2017
+    confirmation: to_confirm
+    note: "Libellé usuel repris de l'ADR-0049 § 2.1.1, à vérifier mot pour mot sur le texte ; à confirmer par l'expert-comptable."
+  - number: '9'
+    label: 'Comptes des engagements hors bilan et de comptabilité analytique de gestion'
+    sourceId: audcif-2017
+    confirmation: to_confirm
+    note: "Libellé usuel repris de l'ADR-0049 § 2.1.1, à vérifier mot pour mot sur le texte ; à confirmer par l'expert-comptable."
+
+# Comptes candidats de l'ADR-0049 § 2.1.1. `nature` et `parent` restent nuls : l'ADR ne
+# les fixe pas, ils sont à fournir par l'expert-comptable (exigés pour `approved`).
+# `collective` et `auxiliaryKind` traduisent la seule mention « (collectif) » de l'ADR.
+accounts:
+  - number: '411'
+    label: 'Clients'
+    classNumber: '4'
+    parent: null
+    nature: null
+    collective: true
+    auxiliaryKind: customer
+    sourceId: audcif-2017
+    confirmation: to_confirm
+    note: "Candidat de l'ADR-0049 § 2.1.1 pour « Clients (collectif) » ; numéro et intitulé non vérifiés sur le texte officiel ; à confirmer par l'expert-comptable."
+  - number: '401'
+    label: 'Fournisseurs'
+    classNumber: '4'
+    parent: null
+    nature: null
+    collective: true
+    auxiliaryKind: supplier
+    sourceId: audcif-2017
+    confirmation: to_confirm
+    note: "Candidat de l'ADR-0049 § 2.1.1 pour « Fournisseurs (collectif) » ; numéro et intitulé non vérifiés sur le texte officiel ; à confirmer par l'expert-comptable."
+  - number: '4431'
+    label: 'TVA facturée sur ventes (collectée)'
+    classNumber: '4'
+    parent: null
+    nature: null
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: to_confirm
+    note: "Candidat de l'ADR-0049 § 2.1.1 ; ventilation par groupe de taxation DGI : question E2.1 ; à confirmer par l'expert-comptable."
+  - number: '4452'
+    label: 'TVA récupérable sur achats'
+    classNumber: '4'
+    parent: null
+    nature: null
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: to_confirm
+    note: "Candidat de l'ADR-0049 § 2.1.1 ; subdivisions par nature : à confirmer par l'expert-comptable."
+  - number: '521'
+    label: 'Banques'
+    classNumber: '5'
+    parent: null
+    nature: null
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: to_confirm
+    note: "Candidat de l'ADR-0049 § 2.1.1 ; numéro et intitulé non vérifiés sur le texte officiel ; à confirmer par l'expert-comptable."
+  - number: '571'
+    label: 'Caisse'
+    classNumber: '5'
+    parent: null
+    nature: null
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: to_confirm
+    note: "Candidat de l'ADR-0049 § 2.1.1 ; numéro et intitulé non vérifiés sur le texte officiel ; à confirmer par l'expert-comptable."
+  - number: '585'
+    label: 'Virements internes de fonds'
+    classNumber: '5'
+    parent: null
+    nature: null
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: to_confirm
+    note: "Candidat de l'ADR-0049 § 2.1.1 et § 6.6 (clé transfer.internal) ; à confirmer par l'expert-comptable."
+  - number: '601'
+    label: 'Achats de marchandises'
+    classNumber: '6'
+    parent: null
+    nature: null
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: to_confirm
+    note: "Candidat de l'ADR-0049 § 2.1.1 ; numéro et intitulé non vérifiés sur le texte officiel ; à confirmer par l'expert-comptable."
+  - number: '701'
+    label: 'Ventes de marchandises'
+    classNumber: '7'
+    parent: null
+    nature: null
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: to_confirm
+    note: "Candidat de l'ADR-0049 § 2.1.1 ; compte de produit des biens (BIE) : question E1.3 ; à confirmer par l'expert-comptable."
+  - number: '706'
+    label: 'Services vendus'
+    classNumber: '7'
+    parent: null
+    nature: null
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: to_confirm
+    note: "Candidat de l'ADR-0049 § 2.1.1 ; compte de produit des services (SER) : question E1.3 ; à confirmer par l'expert-comptable."
+
+# Comptes que l'ADR-0049 § 2.1.1 dit « à fournir par l'expert ». Aucun numéro n'est
+# proposé ici ; `classHint` recopie seulement l'indication de classe donnée par l'ADR.
+expectedAccounts:
+  - id: mobile_money
+    need: 'Monnaie électronique (mobile money)'
+    classHint: '5'
+    hint: 'sous-compte de la classe 5 dédié à la monnaie électronique'
+    questions: [E1.1]
+  - id: suspense
+    need: "Comptes d'attente"
+    classHint: '47'
+    hint: 'compte de la classe 47'
+    questions: [E1.1]
+  - id: expense_categories
+    need: 'Autres achats, services extérieurs, impôts et taxes, charges de personnel, frais financiers'
+    classHint: '60-67'
+    hint: 'comptes des classes 60 à 67, un par catégorie de dépense (ADR-0049 § 6.3)'
+    questions: [E1.2]
+  - id: income_tax
+    need: 'Impôt sur le résultat'
+    classHint: '89'
+    hint: 'compte de la classe 89'
+    questions: [E1.1]
+  - id: fixed_assets
+    need: 'Immobilisations corporelles (dépenses « investissement »)'
+    classHint: '2'
+    hint: 'comptes de la classe 2, selon la nature'
+    questions: [E1.2]
+  - id: borrowings
+    need: 'Emprunts (dépenses « remboursement d’emprunt »)'
+    classHint: '16'
+    hint: 'compte de la classe 16'
+    questions: [E1.2]
+  - id: result_and_retained_earnings
+    need: "Résultat de l'exercice, report à nouveau (à-nouveaux)"
+    classHint: '1'
+    hint: 'comptes de la classe 1'
+    questions: [E1.1, E7]
+  - id: exchange_differences
+    need: 'Pertes et gains de change'
+    classHint: null
+    hint: 'décision ouverte n° 12'
+    questions: [E3.3]
+
+# Modèles d'états : rubriques et plages de comptes à fournir par l'expert (question E8).
+statementTemplates:
+  balanceSheet: null
+  incomeStatement: null
+  cashFlow: null
+
+# Règles de correspondance proposées : aucune tant que l'expert n'a pas répondu à E1 à E3.
+# Toute clé d'opération sans règle validée va au compte d'attente (ADR-0049 § 6.0).
+proposedRules: []
+
+review: null
+
+warnings:
+  - 'Projet — plan comptable non relu par un expert-comptable ; utilisable en mode simulation seulement (ADR-0049 § 3.1).'
+  - 'Aucun numéro ni intitulé de ce pack n’a été vérifié sur le texte officiel de l’AUDCIF du 26 janvier 2017 ; chaque élément est à confirmer par l’expert-comptable.'
+  - 'Les libellés des comptes décrivent le besoin de Lalanda (ADR-0049 § 2.1.1), pas l’intitulé officiel du Plan comptable général OHADA.'
