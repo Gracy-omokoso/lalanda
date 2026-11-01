@@ -1632,3 +1632,44 @@ describe('ADR-0049 — K5 : écritures et synchronisation de la comptabilité', 
     }
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADR-0049 — K7 : reprise de l'existant, à-nouveaux de reprise (§ 3.2, § 11)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Contrôleur nommé `CutoverOpening…` : les blocs K4 et K5 ci-dessus énumèrent à l'égalité
+// stricte les routes `Accounting…Controller` et `Bookkeeping…Controller`.
+
+import { CutoverOpeningController } from '../accounting/opening/cutover-opening.controller.js';
+
+(CONTROLEURS as unknown[]).push(CutoverOpeningController);
+TOUTES_LES_ROUTES.push(...routesDe(CutoverOpeningController as new (...args: never[]) => unknown));
+
+describe('ADR-0049 — K7 : reprise de l’existant', () => {
+  it('chaque route déclare la permission de l’ADR (§ 11)', () => {
+    const attendu: Record<string, Action[]> = {
+      'CutoverOpeningController.proposal': ['accounting.read'],
+      'CutoverOpeningController.status': ['accounting.read'],
+      'CutoverOpeningController.create': ['accounting.post'],
+      // Case ⓢ : `manualEntryDecision` dans le service.
+      'CutoverOpeningController.validate': ['accounting.post'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) => /^CutoverOpening\w*Controller\./.test(r.cle));
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+      expect(route!.rolesPlateforme, cle).toBeUndefined();
+      expect(SANS_PERMISSION[cle], cle).toBeUndefined();
+    }
+  });
+
+  it('la saisie et la validation de la reprise sont interdites à la plateforme (§ 8.1)', () => {
+    for (const cle of ['CutoverOpeningController.create', 'CutoverOpeningController.validate']) {
+      const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle)!;
+      for (const action of route.actions ?? []) {
+        expect(PLATFORM_FORBIDDEN_ACTIONS as readonly string[], cle).toContain(action);
+      }
+    }
+  });
+});
