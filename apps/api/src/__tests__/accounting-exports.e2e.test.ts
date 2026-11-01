@@ -18,7 +18,7 @@ import { createHash } from 'node:crypto';
 
 import { findForbiddenWords } from '@lalanda/engine';
 import ExcelJS from 'exceljs';
-import request from 'supertest';
+import type request from 'supertest';
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 
 import { PdfRenderingService } from '../reports/pdf-rendering.service.js';
@@ -51,7 +51,10 @@ function download(w: AccountingWorld, who: string, id: string): request.Test {
 }
 
 function csvLines(buf: Buffer): string[] {
-  return buf.toString('utf8').replace(/^﻿/, '').split('\r\n');
+  return buf
+    .toString('utf8')
+    .replace(/^\uFEFF/, '')
+    .split('\r\n');
 }
 
 e2eSuite('comptabilité — restitution et exports (ADR-0049, K6)', () => {

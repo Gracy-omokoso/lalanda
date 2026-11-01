@@ -144,15 +144,13 @@ e2eSuite('comptabilité — réalisé intact (ADR-0049, K6, critère 15)', () =>
         groups: [{ group: 'B', itemType: 'SER', ht: '10000.00', vat: '1600.00' }],
       }),
     );
-    await w.db
-      .collection('treasury_expenses')
-      .insertOne(
-        expenseDoc(w.org, {
-          spentOn: '2026-10-10',
-          amount: '1000.00',
-          accountId: bank._id.toHexString(),
-        }),
-      );
+    await w.db.collection('treasury_expenses').insertOne(
+      expenseDoc(w.org, {
+        spentOn: '2026-10-10',
+        amount: '1000.00',
+        accountId: bank._id.toHexString(),
+      }),
+    );
   }, E2E_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
