@@ -57,10 +57,13 @@ const unavailable = (reason: NotEstimableReason): ManagementEstimateUnavailable 
 function planOf(asset: AssetInput): Plan | NotEstimableReason {
   const what = `Équipement ${asset.id}`;
   const currency = checkCurrency(asset.acquisition.currency, `${what} (devise)`);
-  const cost = centsOf(asset.acquisition.cost, `${what} (coût d’acquisition)`);
+  const rawCost = asset.acquisition.cost ?? null;
+  const cost = rawCost === null ? null : centsOf(rawCost, `${what} (coût d’acquisition)`);
   const disposalOn = checkNullableDay(asset.disposal?.on, `${what} (date de cession)`);
   const params = asset.managementDepreciation ?? null;
   if (params === null || params.years === null || params.years === undefined) return 'NO_DURATION';
+  // Coût inconnu : non estimable, jamais calculé sur zéro.
+  if (cost === null) return 'UNKNOWN_COST';
   const { min, max } = DEPRECIATION_YEARS_BOUNDS;
   const years = checkIntegerIn(params.years, min, max, `${what} (durée en années)`);
   const residual = centsOf(params.residualValue, `${what} (valeur résiduelle)`);
@@ -95,7 +98,8 @@ function monthsElapsedAt(plan: Plan, day: AssetDay): number {
 /**
  * Valeur nette estimée d'un équipement à `onDate` — estimation de gestion,
  * étiquetée `management_estimate`. Rend `estimable: false` (jamais 0) sans
- * durée saisie ou si la valeur résiduelle dépasse le coût.
+ * durée saisie, au coût d'acquisition inconnu, ou si la valeur résiduelle dépasse
+ * le coût.
  */
 export function managementDepreciationEstimate(
   asset: AssetInput,

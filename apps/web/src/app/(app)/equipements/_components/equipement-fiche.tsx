@@ -40,7 +40,13 @@ import {
   DialogueReintegration,
   DialogueRetour,
 } from './fiche-dialogues';
-import { gestesEquipement, phraseEstimation, type IdGeste } from './fiche-model';
+import {
+  gestesEquipement,
+  motifNonEstimable,
+  phraseEstimation,
+  texteCoutAcquisition,
+  type IdGeste,
+} from './fiche-model';
 import { PanneauCouvertures, PanneauMaintenance } from './fiche-suivi';
 
 export function EquipementFiche({ assetId }: { assetId: string }): React.ReactElement {
@@ -164,7 +170,9 @@ export function EquipementFiche({ assetId }: { assetId: string }): React.ReactEl
           {valeurs ? (
             <Tuile
               libelle="Coût d’acquisition"
-              valeur={formatMontant(a.acquisition.cost, a.acquisition.currency)}
+              valeur={texteCoutAcquisition(a.acquisition.cost, (v) =>
+                formatMontant(v, a.acquisition.currency),
+              )}
             />
           ) : null}
           {a.tag ? (
@@ -224,7 +232,12 @@ export function EquipementFiche({ assetId }: { assetId: string }): React.ReactEl
 
         {a.totalCostOfOwnership ? (
           <Panneau titre="Coût total de possession" icone={Wallet} id="eq-tco">
-            {a.totalCostOfOwnership.byCurrency.length === 0 ? (
+            {!a.totalCostOfOwnership.estimable ? (
+              <PhraseSection>
+                Non estimable : {motifNonEstimable(a.totalCostOfOwnership.reason)}. Saisissez-le
+                pour obtenir le coût total.
+              </PhraseSection>
+            ) : a.totalCostOfOwnership.byCurrency.length === 0 ? (
               <PhraseSection>Aucun coût enregistré.</PhraseSection>
             ) : (
               <ul className="flex flex-col gap-3 text-sm">

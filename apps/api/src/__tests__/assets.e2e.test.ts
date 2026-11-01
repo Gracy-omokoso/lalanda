@@ -363,6 +363,116 @@ e2eSuite('Équipements — registre, affectations, maintenance, couvertures (ADR
     });
   });
 
+  describe('coût d’acquisition inconnu (ADR-0041 : gérer sans voir les valeurs)', () => {
+    it('créé sans coût par un membre qui ne voit pas les valeurs : inconnu, jamais « 0 »', async () => {
+      const server = fx.app.getHttpServer();
+      const permissions = async (grants: string[]): Promise<void> => {
+        const membres = ok(
+          await request(server)
+            .get(`/organizations/${fx.orgN}/members`)
+            .set('Cookie', fx.as('owner')),
+        );
+        const rev = (membres['members'] as { userId: string; permissionsRevision: number }[]).find(
+          (m) => m.userId === storekeeperId,
+        )!.permissionsRevision;
+        const res = await request(server)
+          .patch(`/organizations/${fx.orgN}/members/${storekeeperId}/permissions`)
+          .set('Cookie', fx.as('owner'))
+          .send({ grants, revokes: [], expectedRevision: rev });
+        expect(res.status, JSON.stringify(res.body)).toBe(200);
+      };
+      const interrupteur = process.env['MEMBER_PERMISSIONS_ENABLED'];
+      process.env['MEMBER_PERMISSIONS_ENABLED'] = 'true';
+      try {
+        // Magasinier + `assets.manage`, sans `purchase.read` ni `treasury.read`.
+        await permissions(['assets.manage']);
+        const cree = ok(
+          await sk.post('/assets', {
+            name: `Écran sans coût ${tag}`,
+            categoryId,
+            acquisition: { on: '2026-02-01', currency: 'USD' },
+          }),
+          201,
+        );
+        expect(cree['valuesHidden']).toBe(true);
+        const id = cree['id'] as string;
+        const stocke = await db.collection('assets').findOne({ _id: new ObjectId(id) });
+        expect(stocke!['acquisition']['cost']).toBeNull();
+
+        // Le Propriétaire voit les valeurs : coût inconnu, coût total non estimable.
+        const vu = ok(await fx.get('owner', `/assets/${id}?on=2026-12-31`));
+        expect(vu['valuesHidden']).toBe(false);
+        expect(vu['acquisition']['cost']).toBeNull();
+        expect(vu['totalCostOfOwnership']).toMatchObject({
+          estimable: false,
+          reason: 'UNKNOWN_COST',
+          byCurrency: [],
+        });
+        const avecDuree = ok(
+          await fx.put('owner', `/assets/${id}`, {
+            expectedRevision: vu['revision'],
+            managementDepreciation: { years: 3, residualValue: '0', startOn: '2026-02-01' },
+          }),
+        );
+        const estime = ok(await fx.get('owner', `/assets/${id}?on=2026-12-31`));
+        expect(estime['managementEstimate']).toMatchObject({
+          estimable: false,
+          reason: 'UNKNOWN_COST',
+          estimatedValue: null,
+        });
+        const rapports = ok(await fx.get('owner', '/assets/reports?on=2026-12-31'));
+        expect(rapports['unknownCostCount']).toBeGreaterThanOrEqual(1);
+        expect(rapports['activeUnknownCostCount']).toBeGreaterThanOrEqual(1);
+        expect(JSON.stringify(rapports['activeAcquisitionCosts'])).not.toContain('"count":0');
+
+        // Le Propriétaire complète le coût ; le Magasinier modifie l'acquisition sans
+        // coût (il ne le voit pas) : le coût enregistré est conservé, pas effacé.
+        ok(
+          await fx.put('owner', `/assets/${id}`, {
+            expectedRevision: avecDuree['revision'],
+            acquisition: { on: '2026-02-01', cost: '450.00', currency: 'USD' },
+          }),
+        );
+        const rev = ok(await sk.get(`/assets/${id}`))['revision'];
+        ok(
+          await request(server)
+            .put(`/assets/${id}`)
+            .set('Cookie', storekeeper)
+            .send({
+              expectedRevision: rev,
+              acquisition: { on: '2026-02-03', currency: 'USD', note: 'date corrigée' },
+            }),
+        );
+        const complete = ok(await fx.get('owner', `/assets/${id}?on=2026-12-31`));
+        expect(complete['acquisition']).toMatchObject({ on: '2026-02-03', cost: '450.00' });
+        expect(complete['totalCostOfOwnership']).toMatchObject({ estimable: true, reason: null });
+        expect(complete['managementEstimate']['estimable']).toBe(true);
+      } finally {
+        await permissions([]);
+        if (interrupteur === undefined) delete process.env['MEMBER_PERMISSIONS_ENABLED'];
+        else process.env['MEMBER_PERMISSIONS_ENABLED'] = interrupteur;
+      }
+    });
+
+    it('compatibilité : un équipement existant garde son coût ; un document sans le champ se lit « inconnu »', async () => {
+      const a = await newAsset(`Portable ancien ${tag}`);
+      const lu = ok(await fx.get('owner', `/assets/${a['id']}`));
+      expect(lu['acquisition']['cost']).toBe('1200.00');
+      expect(lu['totalCostOfOwnership']).toMatchObject({ estimable: true });
+      await db
+        .collection('assets')
+        .updateOne({ _id: new ObjectId(a['id']) }, { $unset: { 'acquisition.cost': '' } });
+      const sansChamp = ok(await fx.get('owner', `/assets/${a['id']}`));
+      expect(sansChamp['acquisition']['cost']).toBeNull();
+      expect(sansChamp['totalCostOfOwnership']).toMatchObject({
+        estimable: false,
+        reason: 'UNKNOWN_COST',
+      });
+      expect((await fx.get('owner', '/assets/reports')).status).toBe(200);
+      expect((await fx.get('owner', '/assets/export.csv')).status).toBe(200);
+    });
+  });
+
   describe('affectations (critère 13)', () => {
     it('réaffecter clôt l’ouverte ; chevauchement et doublon refusés ; retour', async () => {
       const a = await newAsset(`Portable affecté ${tag}`);

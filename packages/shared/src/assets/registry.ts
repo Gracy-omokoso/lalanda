@@ -55,11 +55,19 @@ const EditableStatus = z.enum(ASSET_EDITABLE_STATUSES, assetFr('Statut non modif
 
 // ── Équipements (§ 3.1) ─────────────────────────────────────────────────────
 
-/** Acquisition : date, coût et devise ; liens FACULTATIFS, qui ne créent rien. */
+/**
+ * Acquisition : date, coût et devise ; liens FACULTATIFS, qui ne créent rien.
+ *
+ * `cost` est FACULTATIF : absent ou `null` = coût INCONNU (jamais « 0 »). Un membre
+ * qui crée un équipement sans voir les valeurs (ADR-0041 : `assets.manage` sans
+ * `purchase.read` ni `treasury.read`) n'en saisit pas ; le moteur rend alors
+ * l'estimation et le coût total de possession « non estimables ». En modification,
+ * un coût absent conserve le coût enregistré ; `null` le déclare inconnu.
+ */
 export const AssetAcquisitionBody = z
   .object({
     on: AssetCalendarDay,
-    cost: AssetAmount,
+    cost: AssetAmount.nullable().optional(),
     currency: AssetCurrencySchema,
     supplierId: AssetId.nullable().optional(),
     supplierInvoiceId: AssetId.nullable().optional(),

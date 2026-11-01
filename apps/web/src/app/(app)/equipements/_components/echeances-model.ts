@@ -64,6 +64,11 @@ export function lignesDevises(
   );
 }
 
+/** Équipements au coût inconnu, exclus des totaux (jamais comptés comme zéro). */
+export function phraseCoutsInconnus(n: number): string {
+  return n > 1 ? `${n} équipements au coût inconnu` : '1 équipement au coût inconnu';
+}
+
 export function affectesLignes(r: AssetReportsView): [string, number][] {
   return [
     ['Collaborateurs', r.assigned.employee],

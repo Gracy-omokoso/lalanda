@@ -193,11 +193,16 @@ export function EquipementFormulaire({
         {coutMasque ? (
           <p className="text-xs text-[var(--foreground-muted)] sm:col-span-2 sm:self-end">
             Le coût n’est saisi et affiché que par les rôles qui voient les prix d’achat ou la
-            trésorerie.
+            trésorerie. Un équipement créé ici a un coût inconnu, à compléter par eux.
           </p>
         ) : (
           <>
-            <Champ id={`${id}-cout`} label="Coût" requis erreur={champs['cost']}>
+            <Champ
+              id={`${id}-cout`}
+              label="Coût"
+              aide="Laissez vide si le coût est inconnu : il ne sera pas compté comme zéro."
+              erreur={champs['cost']}
+            >
               <ChampNombre
                 id={`${id}-cout`}
                 value={f.cost}

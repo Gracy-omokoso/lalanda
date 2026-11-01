@@ -113,9 +113,9 @@ export type Preparation<T> = { ok: true; corps: T } | { ok: false; champs: Recor
 const vide = (s: string): string | null => (s.trim() === '' ? null : s.trim());
 
 /**
- * Corps de création. Le coût est obligatoire quand il est saisi par un rôle qui
- * voit les valeurs ; `coutMasque` : le rôle ne voit pas les coûts, l'ancien coût
- * est conservé (modification) ou zéro est envoyé (création).
+ * Corps de création. Le coût est FACULTATIF : champ vide = coût inconnu (`null`),
+ * jamais « 0 ». `coutMasque` : le rôle ne voit pas les coûts, aucun coût n'est
+ * envoyé — inconnu à la création, conservé par l'API en modification.
  */
 export function preparerEquipement(
   f: FormulaireEquipement,
@@ -125,11 +125,15 @@ export function preparerEquipement(
   if (f.name.trim() === '') champs['name'] = 'Le nom est obligatoire.';
   if (f.categoryId === '') champs['categoryId'] = 'Choisissez une catégorie.';
   if (!estJour(f.acquisitionOn)) champs['acquisitionOn'] = 'Date d’acquisition obligatoire.';
-  let cost = '0';
+  // `undefined` : rien n'est envoyé (coût masqué) ; `null` : inconnu, déclaré.
+  let cost: string | null | undefined;
   if (!options.coutMasque) {
-    const c = lireMontantSaisi(f.cost);
-    if (c.ok) cost = c.valeur;
-    else champs['cost'] = c.erreur;
+    if (f.cost.trim() === '') cost = null;
+    else {
+      const c = lireMontantSaisi(f.cost);
+      if (c.ok) cost = c.valeur;
+      else champs['cost'] = c.erreur;
+    }
   }
 
   let managementDepreciation: CreateAssetBody['managementDepreciation'] = null;
@@ -158,7 +162,7 @@ export function preparerEquipement(
     serialNumber: vide(f.serialNumber),
     acquisition: {
       on: f.acquisitionOn,
-      cost,
+      ...(cost !== undefined ? { cost } : {}),
       currency: f.currency,
       supplierId: f.supplierId === '' ? null : f.supplierId,
     },

@@ -33,6 +33,33 @@ describe('équipements — contrats HTTP (ADR-0046 — S5)', () => {
     ).toContain('DECIMAL_MUST_BE_STRING');
   });
 
+  it('fiche : coût facultatif — absent ou null = inconnu, jamais « 0 »', () => {
+    const acquisition = { on: '2026-01-15', currency: 'USD' };
+    const absent = CreateAssetBody.parse({ name: 'Écran', categoryId: ID, acquisition });
+    expect(absent.acquisition.cost).toBeUndefined();
+    const inconnu = CreateAssetBody.parse({
+      name: 'Écran',
+      categoryId: ID,
+      acquisition: { ...acquisition, cost: null },
+    });
+    expect(inconnu.acquisition.cost).toBeNull();
+    // Un vrai zéro saisi reste un zéro ; une chaîne vide n'est pas un montant.
+    expect(
+      CreateAssetBody.parse({
+        name: 'Don',
+        categoryId: ID,
+        acquisition: { ...acquisition, cost: '0' },
+      }).acquisition.cost,
+    ).toBe('0.00');
+    expect(
+      CreateAssetBody.safeParse({
+        name: 'Écran',
+        categoryId: ID,
+        acquisition: { ...acquisition, cost: '' },
+      }).success,
+    ).toBe(false);
+  });
+
   it('cession déclarée : un prix exige sa devise', () => {
     expect(
       codes(

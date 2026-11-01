@@ -70,7 +70,8 @@ export function engineAssetOf(a: AssetLean): AssetInput {
     status: a.status,
     acquisition: {
       on: a.acquisition.on,
-      cost: a.acquisition.cost,
+      // Document ancien sans le champ, ou coût inconnu : `null`, jamais « 0 ».
+      cost: a.acquisition.cost ?? null,
       currency: a.acquisition.currency,
     },
     managementDepreciation: a.managementDepreciation

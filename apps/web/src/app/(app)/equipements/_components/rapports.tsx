@@ -11,7 +11,7 @@ import { assetsApi, type AssetReportsView } from '@/lib/api-assets';
 
 import { useShell } from '../../_components/shell-context';
 
-import { affectesLignes, lignesDevises } from './echeances-model';
+import { affectesLignes, lignesDevises, phraseCoutsInconnus } from './echeances-model';
 import {
   LIBELLES_STATUT,
   formatJour,
@@ -71,7 +71,10 @@ export function Rapports(): React.ReactElement {
                   </span>
                   {valeurs && c.acquisitionCosts ? (
                     <span className="text-xs text-[var(--foreground-muted)]">
-                      {lignesDevises(c.acquisitionCosts).join(' · ')}
+                      {[
+                        ...lignesDevises(c.acquisitionCosts),
+                        ...(c.unknownCostCount ? [phraseCoutsInconnus(c.unknownCostCount)] : []),
+                      ].join(' · ')}
                     </span>
                   ) : null}
                 </li>
@@ -106,6 +109,11 @@ export function Rapports(): React.ReactElement {
                   ))}
                 </ul>
               )}
+              {r.activeUnknownCostCount ? (
+                <p className="text-xs text-[var(--foreground-muted)]">
+                  {phraseCoutsInconnus(r.activeUnknownCostCount)}, non compté(s) dans ces totaux.
+                </p>
+              ) : null}
             </Panneau>
             <Panneau titre="Amortissement indicatif du parc" id="eq-rap-estimation">
               <p className="rounded-[var(--radius-sm)] border border-dashed border-[var(--border-strong)] px-2 py-1 text-xs font-medium">

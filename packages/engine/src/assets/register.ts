@@ -60,9 +60,11 @@ export function assetRegisterSummary(
   const byStatus = new Map<AssetStatus, number>();
   const categories = new Map<
     string | null,
-    { count: number; byStatus: Map<AssetStatus, number>; costs: CurrencySums }
+    { count: number; byStatus: Map<AssetStatus, number>; costs: CurrencySums; unknown: number }
   >();
   const all = new CurrencySums();
+  let unknownCost = 0;
+  let activeUnknownCost = 0;
   const activeCosts = new CurrencySums();
   const estimated = new CurrencySums();
   let notEstimable = 0;
@@ -72,20 +74,29 @@ export function assetRegisterSummary(
       throw new RangeError(`${what} : statut inconnu ${JSON.stringify(a.status)}`);
     }
     const currency = checkCurrency(a.acquisition.currency, `${what} (devise)`);
-    const cost = centsOf(a.acquisition.cost, `${what} (coût d’acquisition)`);
+    const rawCost = a.acquisition.cost ?? null;
+    const cost = rawCost === null ? null : centsOf(rawCost, `${what} (coût d’acquisition)`);
     byStatus.set(a.status, (byStatus.get(a.status) ?? 0) + 1);
     const key = a.categoryId ?? null;
     const cat = categories.get(key) ?? {
       count: 0,
       byStatus: new Map<AssetStatus, number>(),
       costs: new CurrencySums(),
+      unknown: 0,
     };
     cat.count += 1;
     cat.byStatus.set(a.status, (cat.byStatus.get(a.status) ?? 0) + 1);
-    cat.costs.add(currency, cost);
     categories.set(key, cat);
-    all.add(currency, cost);
-    if (a.status !== 'disposed') activeCosts.add(currency, cost);
+    // Coût inconnu : compté à part, jamais additionné comme un zéro.
+    if (cost === null) {
+      cat.unknown += 1;
+      unknownCost += 1;
+      if (a.status !== 'disposed') activeUnknownCost += 1;
+    } else {
+      cat.costs.add(currency, cost);
+      all.add(currency, cost);
+      if (a.status !== 'disposed') activeCosts.add(currency, cost);
+    }
     if (onDate !== null) {
       const disposedOn = checkNullableDay(a.disposal?.on, `${what} (date de cession)`);
       const disposed = a.status === 'disposed' && (disposedOn === null || disposedOn <= onDate);
@@ -110,10 +121,13 @@ export function assetRegisterSummary(
         count: c.count,
         byStatus: statusCounts(c.byStatus),
         acquisitionCosts: c.costs.list(),
+        unknownCostCount: c.unknown,
       };
     }),
     acquisitionCosts: all.list(),
     activeAcquisitionCosts: activeCosts.list(),
+    unknownCostCount: unknownCost,
+    activeUnknownCostCount: activeUnknownCost,
     managementEstimate:
       onDate === null
         ? null
@@ -130,7 +144,8 @@ export function assetRegisterSummary(
  * Coût total de possession d'un équipement, par devise : acquisition +
  * interventions FAITES (coût saisi, `doneOn` ≤ `until` si fourni) + couvertures
  * (coût saisi, `startOn` ≤ `until`). Les éléments d'un autre équipement sont
- * ignorés ; aucune conversion entre devises.
+ * ignorés ; aucune conversion entre devises. Coût d'acquisition inconnu dans la
+ * période : `estimable: false`, `reason: 'UNKNOWN_COST'`, aucun total.
  */
 export function assetTotalCostOfOwnership(
   asset: AssetInput,
@@ -152,9 +167,14 @@ export function assetTotalCostOfOwnership(
     return r;
   };
   const acquiredOn = checkDay(asset.acquisition.on, `${what} (date d’acquisition)`);
-  if (until === null || acquiredOn <= until) {
-    row(checkCurrency(asset.acquisition.currency, `${what} (devise)`)).acquisition += centsOf(
-      asset.acquisition.cost,
+  const acquisitionCurrency = checkCurrency(asset.acquisition.currency, `${what} (devise)`);
+  const acquisitionCost = asset.acquisition.cost ?? null;
+  const acquisitionInPeriod = until === null || acquiredOn <= until;
+  // Coût d'acquisition inconnu dans la période : le total n'est pas estimable.
+  const estimable = !(acquisitionInPeriod && acquisitionCost === null);
+  if (acquisitionInPeriod && acquisitionCost !== null) {
+    row(acquisitionCurrency).acquisition += centsOf(
+      acquisitionCost,
       `${what} (coût d’acquisition)`,
     );
   }
@@ -186,9 +206,11 @@ export function assetTotalCostOfOwnership(
     version: ASSETS_VERSION,
     assetId: asset.id,
     until,
+    estimable,
+    reason: estimable ? null : 'UNKNOWN_COST',
     byCurrency: ASSET_CURRENCIES.flatMap((currency) => {
       const r = rows.get(currency);
-      if (r === undefined) return [];
+      if (r === undefined || !estimable) return [];
       return [
         {
           currency,
