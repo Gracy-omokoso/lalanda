@@ -518,6 +518,12 @@ export class AccountingEntriesService {
   ): Promise<AccountingEntryView> {
     const settings = await this.activeSettings(organizationId);
     const current = await this.find(organizationId, id);
+    if (current.journalKind === 'opening') {
+      conflict(
+        'OPENING_ENTRY_USE_OPENING_ROUTE',
+        'La reprise se modifie et se valide depuis l’écran Reprise (contrôle des montants repris).',
+      );
+    }
     if (current.status !== 'draft' || current.manual === null) {
       conflict('ENTRY_NOT_DRAFT', 'Une écriture validée ne se modifie jamais : contre-passez-la.');
     }
@@ -591,6 +597,12 @@ export class AccountingEntriesService {
   ): Promise<AccountingEntryView> {
     const settings = await this.activeSettings(organizationId);
     const current = await this.find(organizationId, id);
+    if (current.journalKind === 'opening') {
+      conflict(
+        'OPENING_ENTRY_USE_OPENING_ROUTE',
+        'La reprise se modifie et se valide depuis l’écran Reprise (contrôle des montants repris).',
+      );
+    }
     if (current.manual === null) {
       conflict('ENTRY_NOT_DRAFT', 'Seule une opération diverse en brouillon se valide.');
     }

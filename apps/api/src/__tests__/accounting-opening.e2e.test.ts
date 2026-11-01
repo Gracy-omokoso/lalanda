@@ -410,6 +410,19 @@ e2eSuite('comptabilité — reprise de l’existant (ADR-0049, K7)', () => {
     const status = ok(await w.get('accountant', '/accounting/opening'));
     const id = status['entry']['id'] as string;
     const revision = status['entry']['revision'] as number;
+    // Les routes génériques des opérations diverses ne touchent pas la reprise.
+    code(
+      await w.put('accountant', `/accounting/entries/${id}`, { expectedRevision: revision }),
+      409,
+      'OPENING_ENTRY_USE_OPENING_ROUTE',
+    );
+    code(
+      await w.post('finance_director', `/accounting/entries/${id}/validate`, {
+        expectedRevision: revision,
+      }),
+      409,
+      'OPENING_ENTRY_USE_OPENING_ROUTE',
+    );
     code(
       await w.post('accountant', `/accounting/opening/${id}/validate`, {
         expectedRevision: revision,
