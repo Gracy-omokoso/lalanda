@@ -17,7 +17,7 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
 
-import { isAuthPath, isMarketingPath, isProtectedPath } from '@/lib/routes';
+import { isAuthPath, isMarketingPath, isProtectedPath, isPublicFormPath } from '@/lib/routes';
 
 // Noms de cookies possibles émis par better-auth selon la version et l'option `secureCookies`.
 const SESSION_COOKIE_NAMES = ['better-auth.session_token', '__Secure-better-auth.session_token'];
@@ -28,6 +28,10 @@ function hasSession(req: NextRequest): boolean {
 
 export function middleware(req: NextRequest): NextResponse {
   const { pathname } = req.nextUrl;
+  // ADR-0048 : formulaire public de prospects — joignable sans session, et sans
+  // renvoi d'un membre connecté vers l'application.
+  if (isPublicFormPath(pathname)) return NextResponse.next();
+
   const authed = hasSession(req);
 
   // Marketing : accessible à tous ; les authentifiés partent vers l'app.
