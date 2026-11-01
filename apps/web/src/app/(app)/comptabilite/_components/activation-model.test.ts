@@ -16,7 +16,8 @@ import {
 
 const REGLAGES: AccountingSettingsView = {
   mode: 'off',
-  chartPack: { slug: 'pack-test', version: 1, status: 'draft' },
+  banner: null,
+  chartPack: { slug: 'pack-test', version: 1, label: 'Pack test', status: 'draft', warnings: [] },
   bookCurrency: null,
   cutoverDate: null,
   fiscalYearStartMonth: 1,
@@ -25,6 +26,10 @@ const REGLAGES: AccountingSettingsView = {
   ruleSetVersion: null,
   activatedAt: null,
   activatedBy: null,
+  activation: { possible: false, missing: [] },
+  locks: { bookCurrency: false, cutoverDate: false, fiscalYearStartMonth: false },
+  revision: 1,
+  updatedAt: '2026-11-01T00:00:00.000Z',
 };
 
 const PROPRIETAIRE: OrgAction[] = ['accounting.read', 'accounting.manage', 'fiscal.manage'];
@@ -61,7 +66,13 @@ describe('choix du mode (§ 3.1)', () => {
   it('pack approuvé : `active` offert au Propriétaire, grisé pour qui n’a pas `fiscal.manage`', () => {
     const r: AccountingSettingsView = {
       ...REGLAGES,
-      chartPack: { slug: 'pack-test', version: 2, status: 'approved' },
+      chartPack: {
+        slug: 'pack-test',
+        version: 2,
+        label: 'Pack test',
+        status: 'approved',
+        warnings: [],
+      },
     };
     expect(option(r, PROPRIETAIRE, 'active').desactive).toBe(false);
     const comptable = option(r, COMPTABLE, 'active');
@@ -117,7 +128,6 @@ const JEU = (
       debit: [],
       credit: ['y'],
       requiresReview: false,
-      confirmation: 'sourced',
     },
   ],
   validation:
@@ -126,9 +136,14 @@ const JEU = (
           by: 'u',
           at: '2026-10-01',
           soleApprover: false,
-          expertReview: { declared: relu, name: relu ? 'Expert' : null, date: null },
+          expertReview: { declared: relu, name: relu ? 'Expert' : null, date: null, note: null },
         }
       : null,
+  revision: 1,
+  createdBy: 'u',
+  updatedBy: 'u',
+  createdAt: '2026-10-01T00:00:00.000Z',
+  updatedAt: '2026-10-01T00:00:00.000Z',
 });
 
 describe('étapes de l’assistant (§ 13)', () => {

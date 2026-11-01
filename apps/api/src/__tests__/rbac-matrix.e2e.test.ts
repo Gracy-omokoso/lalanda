@@ -137,21 +137,11 @@ const ACTIONS_SANS_ROUTE: Record<string, string> = {
   // K6). Chaque lot retire sa ligne et écrit sa sonde ; la matrice est déjà couverte case
   // par case par `permissions.test.ts`, et le rôle `external_accountant` est exercé ici
   // sur toutes les autres sondes (refus de `sales.read`, `treasury.read`, `purchase.read`).
-  'accounting.read':
-    'Aucune route `/accounting` en K0 : `GET /accounting/settings`, les écritures, le ' +
-    'grand livre et les projets d’états arrivent aux lots K4 à K6 (ADR-0049 § 11).',
-  'accounting.post':
-    'Aucune route en K0 : les opérations diverses, le lettrage et les taux saisis ' +
-    'arrivent au lot K5 (`POST /accounting/entries`, ADR-0049 § 11).',
-  'accounting.close':
-    'Aucune route en K0 : la clôture des mois et des exercices arrive au lot K6 ' +
-    '(`POST /accounting/periods/:year/:month/close`, ADR-0049 § 11).',
+  // K4 a retiré `accounting.read`, `accounting.manage`, `accounting.post` (taux saisis) et
+  // `accounting.close` (création d'exercice) : sondes en fin de liste.
   'accounting.export':
     'Aucune route en K0 : les exports pour l’expert-comptable arrivent au lot K6 ' +
     '(`POST /accounting/exports`, ADR-0049 § 9 et § 11).',
-  'accounting.manage':
-    'Aucune route en K0 : réglages, plan de l’organisation, règles et journaux arrivent ' +
-    'au lot K4 (`PUT /accounting/settings`, ADR-0049 § 11).',
 };
 
 /** Une sonde HTTP : la route qui matérialise une action, et ses statuts légitimes. */
@@ -872,6 +862,46 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
           .post('/documents/folders')
           .set('Cookie', c)
           .send({ name: `Sonde ${role} ${tag}` }),
+    },
+    // ADR-0049 — K4 : référentiel et réglages de la comptabilité (§ 8.1, § 11).
+    {
+      // PRO, ADM, DIR, CPT, ANA, LEC et l'Expert-comptable ; ni COM, ni RH, ni MAG, ni CON.
+      action: 'accounting.read',
+      libelle: 'GET /accounting/settings',
+      statutsAutorises: [200],
+      envoyer: (c) => request(serveur()).get('/accounting/settings').set('Cookie', c),
+    },
+    {
+      // PRO, DIR, CPT. Révision forgée : le guard laisse passer, le service répond
+      // 409 STALE_REVISION sans rien écrire.
+      action: 'accounting.manage',
+      libelle: 'PUT /accounting/settings',
+      statutsAutorises: [409],
+      envoyer: (c) =>
+        request(serveur())
+          .put('/accounting/settings')
+          .set('Cookie', c)
+          .send({ expectedRevision: 999_999 }),
+    },
+    {
+      // PRO, DIR, CPT. Taux d'une devise vers elle-même : 400 RATE_SAME_CURRENCY après le
+      // guard, rien n'est saisi.
+      action: 'accounting.post',
+      libelle: 'PUT /accounting/exchange-rates/:date/:from/:to',
+      statutsAutorises: [400],
+      envoyer: (c) =>
+        request(serveur())
+          .put('/accounting/exchange-rates/2026-01-15/USD/USD')
+          .set('Cookie', c)
+          .send({ rate: '1', sourceText: 'Sonde', expectedRevision: null }),
+    },
+    {
+      // PRO, DIR, CPT. Année hors bornes : 400 après le guard, aucun exercice créé.
+      action: 'accounting.close',
+      libelle: 'POST /accounting/fiscal-years',
+      statutsAutorises: [400],
+      envoyer: (c) =>
+        request(serveur()).post('/accounting/fiscal-years').set('Cookie', c).send({ year: 1999 }),
     },
   ];
 

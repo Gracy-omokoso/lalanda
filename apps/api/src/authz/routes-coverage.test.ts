@@ -1477,3 +1477,91 @@ describe('ADR-0046 — S4 : branchements achats et ventes, grand livre', () => {
     for (const cle of Object.keys(SANS_PERMISSION)) expect(cle in ROUTES_S4).toBe(false);
   });
 });
+
+// ADR-0049 — K4
+// Bloc du lot K4 (zone de conflit : un bloc par lot, à la fin). Les contrôleurs sont
+// ajoutés ICI à `CONTROLEURS` et à `TOUTES_LES_ROUTES` (les `import` sont hissés) : les
+// tests d'exhaustivité et de couverture ci-dessus, exécutés après le chargement du
+// module, les voient comme les autres.
+import { AccountingAccountsController } from '../accounting/chart/accounting-accounts.controller.js';
+import {
+  AccountingChartPacksController,
+  AccountingChartPacksPlatformController,
+} from '../accounting/chart/accounting-chart-packs.controller.js';
+import { AccountingJournalsController } from '../accounting/journals/accounting-journals.controller.js';
+import { AccountingFiscalYearsController } from '../accounting/periods/accounting-fiscal-years.controller.js';
+import { AccountingRatesController } from '../accounting/rates/accounting-rates.controller.js';
+import { AccountingRuleSetsController } from '../accounting/rules/accounting-rule-sets.controller.js';
+import { AccountingSettingsController } from '../accounting/settings/accounting-settings.controller.js';
+
+const CONTROLEURS_K4 = [
+  AccountingSettingsController,
+  AccountingChartPacksController,
+  AccountingChartPacksPlatformController,
+  AccountingAccountsController,
+  AccountingRuleSetsController,
+  AccountingJournalsController,
+  AccountingRatesController,
+  AccountingFiscalYearsController,
+];
+(CONTROLEURS as unknown[]).push(...CONTROLEURS_K4);
+TOUTES_LES_ROUTES.push(
+  ...CONTROLEURS_K4.flatMap((c) => routesDe(c as new (...args: never[]) => unknown)),
+);
+
+describe('ADR-0049 — K4 : référentiel et réglages de la comptabilité', () => {
+  it('chaque route déclare la permission de l’ADR (§ 11)', () => {
+    const attendu: Record<string, Action[]> = {
+      'AccountingSettingsController.get': ['accounting.read'],
+      'AccountingSettingsController.update': ['accounting.manage'],
+      // § 3.1 : cumul exigé par la route (activer engage l'organisation).
+      'AccountingSettingsController.activate': ['accounting.manage', 'fiscal.manage'],
+      'AccountingSettingsController.deactivate': ['accounting.manage', 'fiscal.manage'],
+      'AccountingChartPacksController.list': ['accounting.read'],
+      'AccountingChartPacksController.get': ['accounting.read'],
+      'AccountingAccountsController.list': ['accounting.read'],
+      'AccountingAccountsController.create': ['accounting.manage'],
+      'AccountingAccountsController.update': ['accounting.manage'],
+      'AccountingAccountsController.archive': ['accounting.manage'],
+      'AccountingRuleSetsController.list': ['accounting.read'],
+      'AccountingRuleSetsController.get': ['accounting.read'],
+      'AccountingRuleSetsController.create': ['accounting.manage'],
+      'AccountingRuleSetsController.update': ['accounting.manage'],
+      // Case ⓢ : `ruleSetDecision` dans le service.
+      'AccountingRuleSetsController.validate': ['accounting.manage'],
+      'AccountingJournalsController.list': ['accounting.read'],
+      'AccountingJournalsController.create': ['accounting.manage'],
+      'AccountingJournalsController.update': ['accounting.manage'],
+      'AccountingRatesController.list': ['accounting.read'],
+      'AccountingRatesController.put': ['accounting.post'],
+      'AccountingFiscalYearsController.list': ['accounting.read'],
+      'AccountingFiscalYearsController.create': ['accounting.close'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter(
+      (r) => /^Accounting\w+Controller\./.test(r.cle) && !r.cle.includes('Platform'),
+    );
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+      expect(route!.rolesPlateforme, cle).toBeUndefined();
+    }
+    for (const cle of Object.keys(SANS_PERMISSION))
+      expect(cle.startsWith('Accounting')).toBe(false);
+  });
+
+  it('le chargement et le cycle des packs sont réservés au gestionnaire comptable et fiscal de la plateforme (§ 2.1)', () => {
+    const routes = TOUTES_LES_ROUTES.filter((r) =>
+      r.cle.startsWith('AccountingChartPacksPlatformController.'),
+    );
+    expect(routes.map((r) => r.cle).sort()).toEqual([
+      'AccountingChartPacksPlatformController.load',
+      'AccountingChartPacksPlatformController.transition',
+    ]);
+    for (const route of routes) {
+      expect(route.rolesPlateforme, route.cle).toEqual(['platform_country_pack_manager']);
+      // Aucune action d'organisation : la plateforme n'écrit jamais les livres d'un client.
+      expect(route.actions, route.cle).toBeUndefined();
+    }
+  });
+});

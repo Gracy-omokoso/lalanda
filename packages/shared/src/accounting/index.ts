@@ -8,3 +8,6 @@
 // ADR-0049 — K0
 export * from './constants.js';
 export * from './common.js';
+
+// ADR-0049 — K4
+export * from './referential.js';

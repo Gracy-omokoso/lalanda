@@ -83,13 +83,19 @@ function FenetreEtape({
       if (etape === 'pack') {
         const [slug, version] = pack.split('@');
         if (!slug || !version) throw new Error('Choisissez un plan comptable.');
-        await accountingApi.updateSettings({ chartPack: { slug, version } });
+        const { revision } = await accountingApi.getSettings();
+        await accountingApi.updateSettings({
+          expectedRevision: revision,
+          chartPack: { slug, version: Number(version) },
+        });
       } else if (etape === 'monnaie') {
         if (devise === '') throw new Error('Choisissez la monnaie de tenue.');
-        await accountingApi.updateSettings({ bookCurrency: devise });
+        const { revision } = await accountingApi.getSettings();
+        await accountingApi.updateSettings({ expectedRevision: revision, bookCurrency: devise });
       } else if (etape === 'bascule') {
         if (bascule === '') throw new Error('Choisissez la date de bascule.');
-        await accountingApi.updateSettings({ cutoverDate: bascule });
+        const { revision } = await accountingApi.getSettings();
+        await accountingApi.updateSettings({ expectedRevision: revision, cutoverDate: bascule });
       }
       onSaved();
     } catch (err) {
@@ -263,11 +269,13 @@ export function Activation(): React.ReactElement {
     setErreur(null);
     setManquantes(null);
     try {
-      if (mode === 'active') await accountingApi.activate();
+      if (mode === 'active') await accountingApi.activate(r.revision);
       else if (r.mode === 'active') {
-        await accountingApi.deactivate();
-        if (mode === 'simulation') await accountingApi.updateSettings({ mode });
-      } else await accountingApi.updateSettings({ mode });
+        const off = await accountingApi.deactivate(r.revision);
+        if (mode === 'simulation') {
+          await accountingApi.updateSettings({ expectedRevision: off.revision, mode });
+        }
+      } else await accountingApi.updateSettings({ expectedRevision: r.revision, mode });
       recharger();
     } catch (err) {
       const conditions = conditionsDuRefus(err);

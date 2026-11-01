@@ -19,23 +19,29 @@ import type {
   AccountingActivationMissingCode,
   AccountingAuxiliaryKind,
   AccountingBookCurrency,
-  AccountingChartPackStatus,
   AccountingConfirmation,
-  AccountingDepreciationPostingMode,
   AccountingEntryStatus,
-  AccountingFiscalYearStatus,
-  AccountingJournalKind,
-  AccountingMode,
   AccountingPendingReason,
-  AccountingPeriodStatus,
   AccountingRateSource,
   AccountingReconciliationCause,
-  AccountingRuleSetStatus,
   AccountingSourceKind,
   AccountingStatementKind,
   AccountingStatementStatus,
-  AccountingStockPostingMode,
 } from '@lalanda/shared/accounting';
+
+import type {
+  AccountingAccountView,
+  AccountingChartPackDetail,
+  AccountingChartPackSummary,
+  AccountingExchangeRateView,
+  AccountingFiscalYearView,
+  AccountingJournalView,
+  AccountingRuleInput,
+  AccountingRuleSetView,
+  AccountingSettingsView,
+  UpdateAccountingSettingsBody,
+} from '@lalanda/shared/accounting';
+import type { z } from 'zod';
 
 import { API_URL, jsonRequest } from './api';
 
@@ -50,7 +56,7 @@ export type {
   AccountingStatementKind,
 } from '@lalanda/shared/accounting';
 
-// ── Vues (provisoires, d'après l'ADR ; à remplacer par les contrats de K4 à K7) ──
+// ── Vues (provisoires, d'après l'ADR, pour K5 à K7 ; K4 publie les siennes) ──
 
 /** Réserve qu'un état dit de lui-même (§ 6.10) : code stable, phrase prête à afficher. */
 export interface AccountingReserveView {
@@ -59,112 +65,30 @@ export interface AccountingReserveView {
   details?: Record<string, unknown>;
 }
 
-/** `GET /accounting/settings` (§ 2.2). */
-export interface AccountingSettingsView {
-  mode: AccountingMode;
-  chartPack: { slug: string; version: number | string; status: AccountingChartPackStatus } | null;
-  bookCurrency: AccountingBookCurrency | null;
-  cutoverDate: string | null;
-  fiscalYearStartMonth: number;
-  stockPosting: AccountingStockPostingMode;
-  depreciationPosting: AccountingDepreciationPostingMode;
-  ruleSetVersion: number | null;
-  activatedAt: string | null;
-  activatedBy: string | null;
-  revision?: number;
-}
+// ADR-0049 — K4 : vues et corps du référentiel et des réglages, PUBLIÉS par l'API dans
+// `@lalanda/shared/accounting` (referential.ts) — mêmes formes que les réponses.
+export type {
+  AccountingAccountView,
+  AccountingChartPackDetail,
+  AccountingChartPackSummary,
+  AccountingExchangeRateView,
+  AccountingFiscalYearView,
+  AccountingJournalView,
+  AccountingPeriodView,
+  AccountingRuleInput,
+  AccountingRuleSetView,
+  AccountingSettingsView,
+} from '@lalanda/shared/accounting';
 
-/** Corps de `PUT /accounting/settings` : champs modifiés seulement. */
-export interface AccountingSettingsInput {
-  mode?: Exclude<AccountingMode, 'active'>;
-  chartPack?: { slug: string; version: number | string };
-  bookCurrency?: AccountingBookCurrency;
-  cutoverDate?: string;
-  fiscalYearStartMonth?: number;
-  expectedRevision?: number;
-}
+/** Règle de correspondance (§ 2.4) ; numéros de compte venus du plan, jamais du code. */
+export type AccountingRuleView = AccountingRuleInput;
+
+/** Corps de `PUT /accounting/settings` : `expectedRevision` + champs modifiés seulement. */
+export type AccountingSettingsInput = z.input<typeof UpdateAccountingSettingsBody>;
 
 /** Erreur `409 ACCOUNTING_ACTIVATION_PRECONDITION` : `details.missing[]`. */
 export interface AccountingActivationRefusal {
   missing: AccountingActivationMissingCode[];
-}
-
-/** Pack de plan comptable publié (`GET /accounting/chart-packs`, § 2.1). */
-export interface AccountingChartPackSummary {
-  slug: string;
-  version: number | string;
-  framework: string;
-  countries: string[];
-  status: AccountingChartPackStatus;
-  warnings: string[];
-}
-
-export interface AccountingChartPackDetail extends AccountingChartPackSummary {
-  sources: {
-    id: string;
-    issuer: string;
-    title: string;
-    reference: string;
-    publishedOn: string | null;
-    url: string | null;
-  }[];
-  classes: { number: string | number; label: string; confirmation: AccountingConfirmation }[];
-  accounts: {
-    number: string;
-    label: string;
-    classNumber: string | number;
-    confirmation: AccountingConfirmation;
-  }[];
-}
-
-/** Compte du plan de l'organisation (§ 2.3). */
-export interface AccountingAccountView {
-  number: string;
-  label: string;
-  packLabel: string | null;
-  origin: 'pack' | 'organization';
-  confirmation: AccountingConfirmation | null;
-  auxiliary: { kind: AccountingAuxiliaryKind; partyName: string | null } | null;
-  collectiveNumber: string | null;
-  active: boolean;
-}
-
-/** Règle de correspondance (§ 2.4) ; numéros de compte venus du plan, jamais du code. */
-export interface AccountingRuleView {
-  key: string;
-  label?: string | null;
-  debit: string[];
-  credit: string[];
-  requiresReview: boolean;
-  confirmation?: AccountingConfirmation | null;
-}
-
-export interface AccountingRuleSetView {
-  version: number;
-  status: AccountingRuleSetStatus;
-  basedOn: { packSlug: string; packVersion: number | string } | null;
-  rules: AccountingRuleView[];
-  validation: {
-    by: string | null;
-    at: string | null;
-    soleApprover: boolean;
-    expertReview: { declared: boolean; name: string | null; date: string | null } | null;
-  } | null;
-}
-
-export interface AccountingJournalView {
-  code: string;
-  label: string;
-  kind: AccountingJournalKind;
-  active: boolean;
-}
-
-export interface AccountingExchangeRateView {
-  date: string;
-  from: AccountingBookCurrency;
-  to: AccountingBookCurrency;
-  rate: string;
-  sourceText: string | null;
 }
 
 /** Ligne d'écriture (§ 2.6). Débit OU crédit en monnaie de tenue ; montant en devise de la pièce. */
@@ -319,15 +243,6 @@ export interface AccountingStatementView {
   result: string | null;
 }
 
-export interface AccountingFiscalYearView {
-  year: number;
-  start: string;
-  end: string;
-  status: AccountingFiscalYearStatus;
-  closedAt: string | null;
-  periods: { month: number; status: AccountingPeriodStatus; closedAt: string | null }[];
-}
-
 /** Rapprochement du mois avec le réalisé (§ 7) : écarts typés, jamais corrigés. */
 export interface AccountingReconciliationView {
   month: string;
@@ -375,10 +290,17 @@ export const accountingApi = {
   getSettings: () => jsonRequest<AccountingSettingsView>('/accounting/settings', GET),
   updateSettings: (body: AccountingSettingsInput) =>
     jsonRequest<AccountingSettingsView>('/accounting/settings', { method: 'PUT', body }),
-  activate: () =>
-    jsonRequest<AccountingSettingsView>('/accounting/activate', { method: 'POST', body: {} }),
-  deactivate: () =>
-    jsonRequest<AccountingSettingsView>('/accounting/deactivate', { method: 'POST', body: {} }),
+  /** `accounting.manage` + `fiscal.manage` ; révision des réglages exigée (409 `STALE_REVISION`). */
+  activate: (expectedRevision: number) =>
+    jsonRequest<AccountingSettingsView>('/accounting/activate', {
+      method: 'POST',
+      body: { expectedRevision },
+    }),
+  deactivate: (expectedRevision: number) =>
+    jsonRequest<AccountingSettingsView>('/accounting/deactivate', {
+      method: 'POST',
+      body: { expectedRevision },
+    }),
 
   // Packs, plan, règles, journaux, taux (K4)
   listChartPacks: () =>
