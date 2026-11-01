@@ -17,3 +17,5 @@ export * from './entries.js';
 
 // ADR-0049 — K6
 export * from './reporting.js';
+// ADR-0049 — K7
+export * from './opening.js';

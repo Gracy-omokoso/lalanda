@@ -43,6 +43,7 @@ import {
 import type { AccountingChartPackLean } from '../chart/chart-pack.schema.js';
 import { AccountingEntriesService } from '../entries/accounting-entries.service.js';
 import { AccountingEntryStore } from '../entries/accounting-entry-store.service.js';
+import { CutoverOpeningService } from '../opening/cutover-opening.service.js';
 import {
   AccountingFiscalYear,
   AccountingPeriod,
@@ -118,6 +119,8 @@ export class AccountingReportingService {
     @InjectModel(AccountingFiscalYear.name)
     private readonly fiscalYears: Model<AccountingFiscalYearLean>,
     @InjectModel(AccountingRuleSet.name) private readonly ruleSets: Model<AccountingRuleSetLean>,
+    @Inject(forwardRef(() => CutoverOpeningService))
+    private readonly cutover: CutoverOpeningService,
   ) {}
 
   /**
@@ -224,7 +227,8 @@ export class AccountingReportingService {
       to,
       suspenseAccountNumbers: [ACCOUNTING_SUSPENSE_ACCOUNT],
       pendingSources: [...byReason.entries()].map(([reason, count]) => ({ reason, count })),
-      opening: this.openingState(ctx),
+      // Reprise de l'existant (§ 3.2) : état lu du lot K7, jamais déduit ici.
+      opening: await this.cutover.reserveInput(ctx.organizationId),
       periods,
       stockPosting: ctx.settings.stockPosting,
       depreciationPosting: 'off',
@@ -233,21 +237,6 @@ export class AccountingReportingService {
       (r) =>
         r.code !== 'PERIODS_OPEN' || periods.some((p) => p.status === 'open') || hasDraft(inRange),
     );
-  }
-
-  /**
-   * Reprise de l'existant (§ 3.2, lot K7) : validée et équilibrée dès qu'une écriture
-   * d'à-nouveau, validée, est datée du jour de bascule. Chaque écriture validée est
-   * équilibrée (invariant du § 2.6) ; la simulation n'a jamais de reprise.
-   */
-  private openingState(ctx: ReportingContext): { validated: boolean; balanced: boolean } {
-    if (ctx.mode !== 'active') return { validated: false, balanced: false };
-    const opening = new Set(ctx.openingJournalCodes);
-    const found = ctx.entries.some(
-      (e) =>
-        e.status === 'posted' && opening.has(e.journalCode) && e.date === ctx.settings.cutoverDate,
-    );
-    return { validated: found, balanced: found };
   }
 
   envelope(

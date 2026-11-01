@@ -34,6 +34,7 @@ import {
   UserAccountingExportThrottlerGuard,
 } from '../exports/export-throttler.guard.js';
 import { LedgerExportsController } from '../exports/ledger-exports.controller.js';
+import { CutoverOpeningModule } from '../opening/cutover-opening.module.js';
 import { AccountingReconciliationService } from '../reconciliation/accounting-reconciliation.service.js';
 import { LedgerReconciliationController } from '../reconciliation/ledger-reconciliation.controller.js';
 import { AccountingStatementsService } from '../statements/accounting-statements.service.js';
@@ -47,6 +48,7 @@ import { LedgerReportsController } from './ledger-reports.controller.js';
     PdfModule,
     forwardRef(() => AccountingModule),
     AccountingEntriesModule,
+    forwardRef(() => CutoverOpeningModule),
     MongooseModule.forFeature([
       { name: AccountingClosing.name, schema: AccountingClosingSchema },
       { name: AccountingExport.name, schema: AccountingExportSchema },

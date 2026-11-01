@@ -49,6 +49,9 @@ import type {
   AccountingRuleSetView,
   AccountingSettingsView,
   UpdateAccountingSettingsBody,
+  AccountingOpeningProposalView,
+  AccountingOpeningStatusView,
+  CreateAccountingOpeningBody,
 } from '@lalanda/shared/accounting';
 import type { z } from 'zod';
 
@@ -128,6 +131,16 @@ export type {
   AccountingStatementView,
   AccountingTrialBalanceRowView,
   AccountingTrialBalanceView,
+} from '@lalanda/shared/accounting';
+
+// ADR-0049 — K7 : reprise de l'existant (à-nouveaux de reprise), PUBLIÉE par l'API dans
+// `@lalanda/shared/accounting` (opening.ts) — mêmes formes que les réponses.
+export type {
+  AccountingOpeningLaterAccountView,
+  AccountingOpeningLineKind,
+  AccountingOpeningProposalLineView,
+  AccountingOpeningProposalView,
+  AccountingOpeningStatusView,
 } from '@lalanda/shared/accounting';
 
 /** Corps de `POST /accounting/exports`. */
@@ -234,6 +247,20 @@ export const accountingApi = {
       `/accounting/treasury-links/${seg(treasuryAccountId)}`,
       { method: 'PUT', body },
     ),
+
+  // Reprise de l'existant (K7) : proposition (rien n'est enregistré), saisie en brouillon
+  // (mode actif), validation par une autre personne autorisée (409 `SELF_APPROVAL_FORBIDDEN`,
+  // `OPENING_PROPOSAL_CHANGED` si un montant repris ne correspond plus aux pièces).
+  getOpeningProposal: () =>
+    jsonRequest<AccountingOpeningProposalView>('/accounting/opening/proposal', GET),
+  getOpening: () => jsonRequest<AccountingOpeningStatusView>('/accounting/opening', GET),
+  createOpening: (body: z.input<typeof CreateAccountingOpeningBody>) =>
+    jsonRequest<AccountingOpeningStatusView>('/accounting/opening', { method: 'POST', body }),
+  validateOpening: (entryId: string, expectedRevision: number) =>
+    jsonRequest<AccountingOpeningStatusView>(`/accounting/opening/${seg(entryId)}/validate`, {
+      method: 'POST',
+      body: { expectedRevision },
+    }),
 
   // Restitution (K6)
   ledger: (body: AccountingPeriodCriteria) =>
