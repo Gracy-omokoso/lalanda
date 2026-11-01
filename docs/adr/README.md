@@ -89,6 +89,14 @@ Décideurs :
   journaux, grand livre, balance, lettrage, clôtures ; états **toujours « projet — à valider par un
   expert-comptable »**, exports pour lui ; mode simulation ; aucune écriture dans le réalisé ; cinq
   actions et un rôle Expert-comptable externe. Statut : **proposé, ADR-0049** (1ᵉʳ nov. 2026).
+- [ADR-0051](ADR-0051-rh-frais-avances-presences-evaluations.md) — RH, second volet (paie exclue) :
+  notes de frais avec justificatifs, validation en deux étapes et remboursement en dépenses
+  **possédées par les RH** ; avances de frais et sur salaire versées en mouvements de trésorerie et
+  régularisées **sans calcul de paie** ; pointage simple, plannings, objectifs individuels et
+  évaluations chiffrées, **éteints par défaut** ; aucune règle sociale, fiscale ni de droit du
+  travail posée (questions au juriste et à l'expert-comptable) ; aucune note posée par l'IA ; quatre
+  actions, aucun rôle nouveau ; amendement demandé d'ADR-0049 § 6.3. Statut : **proposé,
+  ADR-0051** (1ᵉʳ nov. 2026).
 
 ## Décisions récentes (légal)
 
