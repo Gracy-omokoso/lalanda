@@ -119,6 +119,19 @@ import {
  */
 export const ACCOUNTING_SUSPENSE_ACCOUNT = ACCOUNTING_SIMULATION_SUSPENSE_ACCOUNT;
 
+/**
+ * Taux saisi (dix décimales au plus, K4) → forme lue par le moteur (huit au plus, K2) :
+ * zéros de queue retirés, sans arrondi. Un taux plus précis que le moteur ne le lit est
+ * écarté (l'écriture reste en attente de taux) plutôt qu'arrondi en silence.
+ */
+export function engineRate(stored: string): string | null {
+  const m = /^(\d+)(?:\.(\d+))?$/.exec(stored);
+  if (m === null) return null;
+  const fraction = (m[2] ?? '').replace(/0+$/, '');
+  if (fraction.length > 8 || m[1]!.length > 12) return null;
+  return fraction === '' ? m[1]! : `${m[1]}.${fraction}`;
+}
+
 /** Chevauchement de relecture d'un point de lecture (l'idempotence rend la relecture inerte). */
 const CHECKPOINT_OVERLAP_MS = 5 * 60_000;
 
@@ -279,13 +292,12 @@ export class AccountingSyncService {
       cutoverDate: s.cutoverDate,
       ruleSet,
       chartPack: s.chartPack,
-      rates: rates.map((r) => ({
-        date: r.date,
-        from: r.from,
-        to: r.to,
-        rate: r.rate,
-        ref: `${r.sourceText} (saisi le ${r.date})`,
-      })),
+      rates: rates.flatMap((r) => {
+        const rate = engineRate(r.rate);
+        return rate === null
+          ? []
+          : [{ date: r.date, from: r.from, to: r.to, rate, ref: `${r.sourceText} (saisi le ${r.date})` }];
+      }),
       links: Object.fromEntries(links.map((l) => [l.treasuryAccountId, l.accountNumber])),
       vatRegistered: await this.sources.vatRegistered(organizationId),
       stockPosting: s.stockPosting,
