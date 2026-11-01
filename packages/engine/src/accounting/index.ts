@@ -12,3 +12,10 @@ export * from './entries/index.js';
 
 // ADR-0049 — K1 : pack de plan comptable (lecture, validation, empreinte).
 export * from './chart/index.js';
+
+// ADR-0049 — K3 : grand livre, balances, lettrage, états, clôtures, rapprochement, exports.
+export * from './ledger/index.js';
+export * from './statements/index.js';
+export * from './closing/index.js';
+export * from './reconciliation/index.js';
+export * from './export/index.js';
