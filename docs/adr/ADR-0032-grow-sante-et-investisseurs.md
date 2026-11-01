@@ -358,6 +358,35 @@ moteur `treasury`) sont sur `main` :
 Navigation GROW : Pilotage, Brief du matin (ADR-0033), Santé, Indicateurs investisseurs,
 Parcours.
 
+## Amendement du 1er nov. 2026 — le réalisé exige `project.read`
+
+**Appliqué par défaut en l'absence de la dirigeante, à confirmer au débrief.**
+
+ADR-0040 § 4.4 pose la règle générale : le réalisé, la marge et la trésorerie ne se montrent
+pas sans le droit correspondant. Le lot C0 a masqué la trésorerie (`TRESORERIE_MASQUEE`) ;
+GROW montrait encore, sous le seul `analytics.read`, les indicateurs calculés sur le réalisé
+des initiatives.
+
+- Sans `project.read` **effectif** (rôle, ajouts et retraits d'ADR-0041), `burn_rate`,
+  `marge_brute`, `marge_nette` et `croissance_ca_realise` sont rendus indisponibles pour la
+  raison **`REALISE_MASQUE`** : ni valeur, ni source, ni hypothèse — un statut masqué
+  explicite, jamais un zéro.
+- Le **runway** divise le solde par la consommation : il la trahirait, il est donc masqué
+  aussi (`REALISE_MASQUE`) ; s'il l'est déjà faute de `treasury.read`, la raison
+  `TRESORERIE_MASQUEE` est conservée.
+- Le masquage a lieu **avant** le score et le parcours (même ordre que la trésorerie) : l'axe
+  « finance » du score et le point « marge nette positive » de la checklist SCALE ne
+  s'appuient pas sur un chiffre que le membre ne peut pas voir.
+- Les indicateurs de **ventes** (MRR, ARR, croissance des ventes, concentration, clients
+  revenants) ne sont pas touchés : ils relèvent de RUN et de `analytics.read`.
+- Rôles concernés par défaut : le **Commercial**, le **Responsable RH** et le **Magasinier**
+  (`project.read` refusé). Le **Conseiller** détient `project.read` dans la matrice : il
+  continue de voir le réalisé, sauf retrait individuel du droit.
+
+Code : `apps/api/src/grow/grow-reader.service.ts` (`withoutActuals`), droits lus dans
+`grow.controller.ts` ; e2e `grow.e2e.test.ts` (Commercial, Conseiller par défaut puis privé
+du droit, Propriétaire).
+
 ## Liens
 
 - [ADR-0001](ADR-0001-autorite-brief-vs-docs.md) ; [ADR-0012](ADR-0012-modele-rbac-complet.md) ;
