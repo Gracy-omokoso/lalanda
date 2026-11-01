@@ -164,7 +164,19 @@ export interface AccountingChartPackHistoryEvent {
 
 /** Détail d'un pack : contenu du YAML tel que lu, statut de la plateforme. */
 export interface AccountingChartPackDetail extends AccountingChartPackSummary {
-  sources: Record<string, unknown>[];
+  sources: {
+    id: string;
+    issuer: string;
+    title: string;
+    reference: string | null;
+    adoptedOn: string | null;
+    publishedOn: string | null;
+    effectiveFrom: string | null;
+    url: string | null;
+    verifiedOn: string | null;
+    verifiedBy: string | null;
+    note?: string;
+  }[];
   classes: {
     number: string;
     label: string;
@@ -415,6 +427,8 @@ export interface AccountingPeriodView {
   start: string;
   end: string;
   status: AccountingPeriodStatus;
+  /** Clôture du mois (lot K6) ; `null` tant qu'il est ouvert. */
+  closedAt: string | null;
 }
 
 export interface AccountingFiscalYearView {
@@ -422,6 +436,8 @@ export interface AccountingFiscalYearView {
   start: string;
   end: string;
   status: AccountingFiscalYearStatus;
+  /** Clôture de l'exercice (lot K6) ; `null` tant qu'il n'est pas clos. */
+  closedAt: string | null;
   periods: AccountingPeriodView[];
   revision: number;
 }

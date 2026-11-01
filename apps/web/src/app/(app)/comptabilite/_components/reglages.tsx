@@ -69,10 +69,11 @@ function Plan({ l }: { l: Lecture<AccountingAccountView[]> | null }): React.Reac
                     Libellé du plan : {c.packLabel}
                   </span>
                 ) : null}
-                {c.auxiliary?.partyName ? (
+                {c.auxiliaryKind ? (
                   <span className="block text-xs text-[var(--foreground-muted)]">
-                    {c.auxiliary.kind === 'customer' ? 'Client' : 'Fournisseur'} :{' '}
-                    {c.auxiliary.partyName}
+                    {c.auxiliaryKind === 'customer'
+                      ? 'Comptes des clients'
+                      : 'Comptes des fournisseurs'}
                   </span>
                 ) : null}
               </td>
@@ -140,17 +141,12 @@ function Regles({ l }: { l: Lecture<AccountingRuleSetView[]> | null }): React.Re
                   {jeu.rules.map((r) => (
                     <tr key={r.key}>
                       <td className="py-1.5 pr-3">
-                        {r.label ?? r.key}
-                        {r.label ? (
-                          <span className="block font-mono text-xs text-[var(--foreground-muted)]">
-                            {r.key}
-                          </span>
-                        ) : null}
+                        <span className="font-mono">{r.key}</span>
                       </td>
                       <td className="py-1.5 pr-3 font-mono">{r.debit.join(', ') || '—'}</td>
                       <td className="py-1.5 pr-3 font-mono">{r.credit.join(', ') || '—'}</td>
                       <td className="py-1.5">
-                        {r.requiresReview || r.confirmation === 'to_confirm' ? (
+                        {r.requiresReview ? (
                           <AConfirmer texte={ACCOUNTING_TO_CONFIRM_LABEL} />
                         ) : null}
                       </td>

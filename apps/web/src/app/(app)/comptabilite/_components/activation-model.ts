@@ -123,7 +123,7 @@ export function reglesEnVigueur(
 
 /** Nombre de règles encore « à confirmer » ou à revoir dans un jeu. */
 export function reglesAConfirmer(jeu: AccountingRuleSetView): number {
-  return jeu.rules.filter((r) => r.requiresReview || r.confirmation === 'to_confirm').length;
+  return jeu.rules.filter((r) => r.requiresReview).length;
 }
 
 /**

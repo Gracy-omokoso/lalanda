@@ -15,7 +15,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
 import { AuditService } from '../../authz/audit.service.js';
-import { conflict, isDuplicateKey, type AccountingActor } from '../accounting.common.js';
+import { conflict, isDuplicateKey, toIso, type AccountingActor } from '../accounting.common.js';
 import { AccountingSettingsService } from '../settings/accounting-settings.service.js';
 import {
   AccountingFiscalYear,
@@ -146,9 +146,17 @@ function viewOf(
     start: fy.start,
     end: fy.end,
     status: fy.status,
+    closedAt: toIso(fy.closedAt),
     periods: periods
       .filter((p) => p.fiscalYear === fy.year)
-      .map((p) => ({ year: p.year, month: p.month, start: p.start, end: p.end, status: p.status })),
+      .map((p) => ({
+        year: p.year,
+        month: p.month,
+        start: p.start,
+        end: p.end,
+        status: p.status,
+        closedAt: toIso(p.closedAt),
+      })),
     revision: fy.revision,
   };
 }
