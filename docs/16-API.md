@@ -678,6 +678,26 @@ Lot S7 (implémenté) — liens, **aucune route nouvelle** :
   franchissement, `stock.pending_lines` au plus une par heure, `stock.count_assigned`,
   `stock.count_submitted` ; `dedupeKey` par destinataire.
 
+## Comptabilité SYSCOHADA — proposé, ADR-0049 (non implémenté)
+
+Contrat **proposé** par [ADR-0049](adr/ADR-0049-comptabilite-syscohada.md) § 11. Module
+`apps/api/src/accounting/`, web `/comptabilite`. Cinq actions nouvelles (`accounting.read`,
+`accounting.post`, `accounting.close`, `accounting.export`, `accounting.manage`) et un rôle externe
+Expert-comptable. Écritures **générées par lecture** des pièces du RUN (tâche `accounting.sync`,
+idempotente) ; aucune écriture dans les ventes, la trésorerie, les achats, le stock ni le réalisé.
+
+| Méthode et chemin | Permission | Effet |
+|---|---|---|
+| `GET`/`PUT /accounting/settings` · `POST /accounting/activate` · `…/deactivate` | `accounting.read` · `accounting.manage` (+ `fiscal.manage` pour activer) | modes `off`, `simulation`, `active` ; `409 ACCOUNTING_ACTIVATION_PRECONDITION` (pack non relu, monnaie de tenue, bascule, règles) |
+| `GET /accounting/chart-packs` · `/accounts` · `/rule-sets` · `/journals` (+ écritures de paramétrage) | `accounting.read` · `accounting.manage` | plan, règles de correspondance (validation ⓢ, déclaration de relecture exigée), journaux |
+| `POST /accounting/entries/search` · `GET …/:id` · `POST /accounting/entries` · `…/:id/validate` · `…/:id/reverse` | `accounting.read` · `accounting.post` | opérations diverses à séparation des tâches ; contre-passation, jamais de suppression d'une écriture validée |
+| `GET /accounting/pending` · `POST /accounting/sync` · `…/periods/:y/:m/regenerate` | `accounting.read` · `accounting.post` · `accounting.manage` | « À comptabiliser », synchronisation, régénération d'un mois ouvert |
+| `POST /accounting/ledger` · `/trial-balance` · `/auxiliary-balance` · `/lettering` | `accounting.read` · `accounting.post` | grand livre, balances, lettrage |
+| `GET /accounting/statements/:kind` | `accounting.read` | `status: "draft_unverified"`, bandeau et réserves, toujours |
+| `POST /accounting/periods/:y/:m/close` · `/fiscal-years/:y/close` · `…/reopen` | `accounting.close` · Propriétaire | clôtures ; réouverture motivée par le seul Propriétaire |
+| `GET /accounting/reconciliation/actuals` | `accounting.read` + `project.read` | écarts typés avec le réalisé, jamais corrigés |
+| `POST /accounting/exports` · `GET …/:id/file` | `accounting.export` | CSV (format à arrêter avec l'expert), balance, grand livre, projets d'états ; empreinte, audit strict |
+
 ## Brief du matin — implémenté (ADR-0033)
 
 L'organisation est toujours celle de la session ; aucun corps ni paramètre ne la désigne.
