@@ -69,6 +69,10 @@
     "./documents": {
       "types": "./dist/documents/index.d.ts",
       "import": "./dist/documents/index.js"
+    },
+    "./accounting": {
+      "types": "./dist/accounting/index.d.ts",
+      "import": "./dist/accounting/index.js"
     }
   },
   "scripts": {
