@@ -17,3 +17,6 @@ export * from './reports.js';
 
 // ADR-0040 — C5
 export * from './overview.js';
+
+// ADR-0048 — formulaire public de prospects
+export * from './lead-forms.js';

@@ -109,6 +109,9 @@ import { WorkOpportunityEvents } from '../work/billing/work-opportunity-events.j
     // ADR-0040 — C4 : brief du matin (`CRM_SOURCE`) ; notifier pour C2 et C7.
     CrmBriefSource,
     CrmNotifier,
+    // ADR-0048 : formulaire public de prospects (contact et activité « à traiter »).
+    ContactsService,
+    ActivitiesService,
   ],
 })
 export class CrmModule {}

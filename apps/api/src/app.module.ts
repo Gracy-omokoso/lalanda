@@ -14,6 +14,7 @@ import { BusinessPlanModule } from './business-plan/business-plan.module.js';
 import { CrmModule } from './crm/crm.module.js';
 // ADR-0040 — C1
 import { CrmAccountConversionModule } from './crm/accounts/conversion/crm-account-conversion.module.js';
+import { CrmLeadFormsModule } from './crm/lead-forms/crm-lead-forms.module.js';
 import { CrmOverviewModule } from './crm/overview/crm-overview.module.js'; // ADR-0040 — C8
 import { CanvasModule } from './canvas/canvas.module.js';
 import { DatabaseModule } from './database/database.module.js';
@@ -56,6 +57,11 @@ import { WorkModule } from './work/work.module.js';
     LoggerModule.forRoot({
       pinoHttp: {
         level: process.env['LOG_LEVEL'] ?? 'info',
+        // ADR-0048 § 7 : aucune ligne d'accès automatique (qui porte l'adresse
+        // distante) pour les routes publiques du formulaire de prospects.
+        autoLogging: {
+          ignore: (req) => (req.url ?? '').startsWith('/public/lead-forms/'),
+        },
         redact: {
           paths: ['req.headers.authorization', 'req.headers.cookie'],
           censor: '[REDACTED]',
@@ -135,6 +141,7 @@ import { WorkModule } from './work/work.module.js';
     // ADR-0040 — C1 : conversion prospect → client (compose Ventes et CRM).
     CrmAccountConversionModule,
     CrmOverviewModule, // ADR-0040 — C8 : fiche 360° et fil chronologique.
+    CrmLeadFormsModule, // ADR-0048 : formulaire public de prospects.
     QuotesModule,
     // ADR-0039 — boîte de notifications (@Global), avant ses producteurs (work, brief).
     NotificationsModule,
