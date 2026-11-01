@@ -140,3 +140,4 @@ export * from './stock/index.js';
 
 // ADR-0049 — K2 : comptabilité SYSCOHADA (projet à valider), versionnée à part (`ACCOUNTING_VERSION`).
 export * from './accounting/index.js';
+export * from './contracts/index.js'; // ADR-0050 — V1 : contrats, commandes, acomptes, abonnements (`CONTRACTS_VERSION`).
