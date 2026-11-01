@@ -261,10 +261,11 @@ export type AccountingStatementStatus = typeof ACCOUNTING_STATEMENT_STATUS;
 
 /**
  * Bandeau des projets d'états (§ 10) : écran, chaque page PDF, chaque feuille `.xlsx`,
- * réponse d'API (`disclaimer`). Texte de l'ADR, mot pour mot.
+ * réponse d'API (`disclaimer`). Même texte que `STATEMENT_DISCLAIMER` du moteur : l'ADR
+ * écrivait « ni certifié », mot interdit par son propre critère 14 (amendement du 1er nov. 2026).
  */
 export const ACCOUNTING_DISCLAIMER =
-  'Projet — à valider par un expert-comptable. Établi automatiquement par Lalanda à partir des opérations enregistrées ; ni certifié, ni déposé.';
+  'Projet — à valider par un expert-comptable. Établi automatiquement par Lalanda à partir des opérations enregistrées ; non vérifié, non déposé.';
 
 /** Bandeaux des modes (§ 3.1) et en-tête des exports (§ 9). */
 export const ACCOUNTING_MODE_BANNERS: Readonly<Record<Exclude<AccountingMode, 'off'>, string>> =
@@ -279,8 +280,7 @@ export const ACCOUNTING_SIMULATION_EXPORT_MARK = 'SIMULATION';
 
 /**
  * Mots qu'aucun libellé de l'interface, d'un gabarit ou d'un export ne porte (critère 14) :
- * Lalanda n'affirme jamais une conformité. Le bandeau officiel les cite à la NÉGATIVE
- * (« ni certifié ») : `findForbiddenAccountingWords` l'ignore.
+ * Lalanda n'affirme jamais une conformité.
  *
  * § 10 cite aussi « déclaration » (déclaration fiscale) : il n'est pas dans cette liste
  * mécanique parce que l'écran doit dire « déclaration de relecture » (§ 2.4, décision

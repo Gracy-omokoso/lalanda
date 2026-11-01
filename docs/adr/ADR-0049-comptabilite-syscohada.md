@@ -717,7 +717,7 @@ Justifications :
 - **Bilan, compte de résultat, tableau des flux de trésorerie**, au **format du modèle d'états du pack**
   (rubriques → plages de comptes) ; tant qu'une rubrique est `to_confirm`, elle s'affiche avec ce statut.
 - **Toujours** : bandeau « Projet — à valider par un expert-comptable. Établi automatiquement par Lalanda
-  à partir des opérations enregistrées ; ni certifié, ni déposé. » sur l'écran, chaque page PDF, chaque
+  à partir des opérations enregistrées ; non vérifié, non déposé. » (amendé le 1er nov. 2026 : « ni certifié » contenait un mot interdit par le critère 14) sur l'écran, chaque page PDF, chaque
   feuille `.xlsx` et dans la réponse d'API (`status: "draft_unverified"`, `disclaimer`) ; réserves du
   § 6.10 imprimées.
 - **Jamais** : dépôt, transmission à une administration ou à une banque, signature, libellé
