@@ -108,7 +108,7 @@ export function exportRows(input: ExportRowsInput): ExportRows {
     credit += l.credit;
     entryIds.add(l.entry.id);
     const gen = l.entry.generation ?? null;
-    if (gen !== null) ruleSets.add(gen.ruleSetVersion);
+    if (gen !== null && gen.ruleSetVersion !== null) ruleSets.add(gen.ruleSetVersion);
     const letter = input.lettering?.[l.ref] ?? null;
     const aux = l.line.auxiliaryAccountNumber ?? null;
     const amount = l.doc < 0n ? -l.doc : l.doc;
@@ -133,7 +133,7 @@ export function exportRows(input: ExportRowsInput): ExportRows {
       Montantdevise: formatCents(amount),
       Idevise: l.currency,
       CleSource: l.entry.sourceKey ?? '',
-      VersionRegles: gen === null ? '' : String(gen.ruleSetVersion),
+      VersionRegles: gen === null || gen.ruleSetVersion === null ? '' : String(gen.ruleSetVersion),
       VersionMoteur: gen?.engineVersion ?? '',
       EmpreinteEcriture: l.entry.hash ?? '',
     };

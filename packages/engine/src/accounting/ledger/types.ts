@@ -50,14 +50,28 @@ export interface ReportingLine {
   accountNumber: string;
   auxiliaryAccountNumber: string | null;
   label: string;
-  /** Débit en MONNAIE DE TENUE, strictement positif ; `null` (ou absent) si la ligne est au crédit. */
+  /**
+   * Débit en MONNAIE DE TENUE ; `null` (ou absent) si la ligne est au crédit.
+   * Strictement positif, sauf pour une ligne CONVERTIE (devise ≠ `bookCurrency`
+   * de l'écriture) que l'arrondi ramène à `0.00` : le côté reste alors porté
+   * par le seul champ non `null` (raccord K2/K3, ADR-0049 § 5).
+   */
   debit: ReportingAmount | null;
-  /** Crédit en MONNAIE DE TENUE, strictement positif ; `null` (ou absent) si la ligne est au débit. */
+  /** Crédit en MONNAIE DE TENUE ; `null` (ou absent) si la ligne est au débit. Même règle que `debit`. */
   credit: ReportingAmount | null;
   /** Devise de la pièce. */
   currency: ReportingCurrency;
-  /** Montant en devise de la pièce, strictement positif, du même côté que la ligne. */
+  /**
+   * Montant en devise de la pièce, du même côté que la ligne : strictement
+   * positif, sauf pour une ligne d'écart de change (`exchangeDifference`), où il
+   * vaut `0.00` (seul le montant de tenue compte).
+   */
   amount: ReportingAmount;
+  /**
+   * Ligne d'écart de change (§ 5) : montant en devise nul admis, montant de
+   * tenue strictement positif exigé. Absent = `false`.
+   */
+  exchangeDifference?: boolean;
   rate?: string | null;
   rateSource?: string | null;
   rateRef?: string | null;
@@ -87,15 +101,21 @@ export interface ReportingEntry {
   number: number | null;
   date: ReportingDay;
   status: ReportingEntryStatus;
+  /**
+   * Monnaie de tenue de l'écriture (§ 5). Requise pour admettre une ligne
+   * convertie à `0.00` en tenue ; absente, une telle ligne est refusée.
+   */
+  bookCurrency?: ReportingCurrency | null;
   label?: string | null;
   source: ReportingSource | null;
   sourceKey: string | null;
   lines: readonly ReportingLine[];
   reversalOf?: string | null;
   reversedBy?: string | null;
+  /** `ruleSetVersion` et `chartPack` sont `null` quand aucun jeu validé ou aucun pack n'était en vigueur (tout en attente). */
   generation?: {
-    ruleSetVersion: number;
-    chartPack: { slug: string; version: number | string };
+    ruleSetVersion: number | null;
+    chartPack: { slug: string; version: number | string } | null;
     engineVersion: string;
   } | null;
   manual?: { authorId: string; validatorId: string | null; reason: string } | null;

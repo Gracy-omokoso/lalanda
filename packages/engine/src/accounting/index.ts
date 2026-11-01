@@ -19,3 +19,6 @@ export * from './statements/index.js';
 export * from './closing/index.js';
 export * from './reconciliation/index.js';
 export * from './export/index.js';
+
+// ADR-0049 — raccord K2/K3 : écriture K2 enregistrée → vue de restitution K3.
+export * from './bridge.js';
