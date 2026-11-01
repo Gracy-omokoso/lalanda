@@ -587,12 +587,10 @@ e2eSuite('Formulaire public de prospects (ADR-0048)', () => {
         );
       try {
         ok(await publicPost(form['token'], submission(form, { name: 'Paul Tshibanda' })), 201);
-        const act = await db
-          .collection('crm_activities')
-          .findOne({
-            organizationId: orgN,
-            subject: 'Demande reçue par le formulaire : Paul Tshibanda',
-          });
+        const act = await db.collection('crm_activities').findOne({
+          organizationId: orgN,
+          subject: 'Demande reçue par le formulaire : Paul Tshibanda',
+        });
         expect(act).toMatchObject({ assigneeUserId: null, dueAt: null, done: false });
       } finally {
         await db
