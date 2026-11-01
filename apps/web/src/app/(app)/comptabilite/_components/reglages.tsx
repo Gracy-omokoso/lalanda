@@ -1,0 +1,256 @@
+'use client';
+
+// Réglages de la comptabilité (ADR-0049 § 13) : assistant d'activation, plan de
+// l'organisation, règles de correspondance (chaque règle « à confirmer » signalée),
+// journaux, taux saisis. Lecture `accounting.read` ; les modifications passent par
+// `accounting.manage` (et `fiscal.manage` pour l'activation), vérifiées par l'API.
+//
+// Les comptes, règles, journaux et taux viennent TOUS de l'API : aucun numéro de compte
+// n'est écrit dans ce fichier.
+
+import { ACCOUNTING_TO_CONFIRM_LABEL } from '@lalanda/shared/accounting';
+import { Badge } from '@lalanda/ui';
+import { BookOpenCheck, Coins, Library, Scale, Settings2 } from 'lucide-react';
+
+import {
+  accountingApi,
+  type AccountingAccountView,
+  type AccountingExchangeRateView,
+  type AccountingJournalView,
+  type AccountingRuleSetView,
+} from '@/lib/api-accounting';
+
+import { Activation } from './activation';
+import { reglesAConfirmer } from './activation-model';
+import { useAccesCompta } from './comptabilite-access';
+import { type Lecture } from './comptabilite-model';
+import {
+  AConfirmer,
+  Bandeau,
+  CarteVide,
+  Chargement,
+  EchecLecture,
+  Panneau,
+  Terme,
+} from './comptabilite-ui';
+import { LIBELLES_JOURNAL, LIBELLES_STATUT_REGLES } from './libelles';
+import { useLecture } from './use-lecture';
+
+function Plan({ l }: { l: Lecture<AccountingAccountView[]> | null }): React.ReactElement {
+  if (l === null) return <Chargement />;
+  if (!l.ok)
+    return <EchecLecture erreur={l.erreur} repli="Le plan de l’organisation est illisible." />;
+  if (l.valeur.length === 0) {
+    return (
+      <CarteVide>
+        Le plan de l’organisation est vide : choisissez d’abord un plan comptable.
+      </CarteVide>
+    );
+  }
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[32rem] text-sm">
+        <thead className="text-left text-xs text-[var(--foreground-muted)]">
+          <tr>
+            <th className="py-2 pr-3 font-medium">Compte</th>
+            <th className="py-2 pr-3 font-medium">Libellé</th>
+            <th className="py-2 pr-3 font-medium">Origine</th>
+            <th className="py-2 font-medium">Statut</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-[var(--border)]">
+          {l.valeur.map((c) => (
+            <tr key={c.number} className={c.active ? '' : 'opacity-60'}>
+              <td className="py-2 pr-3 font-mono tabular-nums">{c.number}</td>
+              <td className="py-2 pr-3">
+                {c.label}
+                {c.packLabel && c.packLabel !== c.label ? (
+                  <span className="block text-xs text-[var(--foreground-muted)]">
+                    Libellé du plan : {c.packLabel}
+                  </span>
+                ) : null}
+                {c.auxiliary?.partyName ? (
+                  <span className="block text-xs text-[var(--foreground-muted)]">
+                    {c.auxiliary.kind === 'customer' ? 'Client' : 'Fournisseur'} :{' '}
+                    {c.auxiliary.partyName}
+                  </span>
+                ) : null}
+              </td>
+              <td className="py-2 pr-3">
+                {c.origin === 'pack' ? 'Plan comptable' : 'Organisation'}
+              </td>
+              <td className="py-2">
+                {c.confirmation === 'to_confirm' ? (
+                  <AConfirmer texte={ACCOUNTING_TO_CONFIRM_LABEL} />
+                ) : c.active ? null : (
+                  <Badge tone="neutral">Archivé</Badge>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function Regles({ l }: { l: Lecture<AccountingRuleSetView[]> | null }): React.ReactElement {
+  if (l === null) return <Chargement />;
+  if (!l.ok) return <EchecLecture erreur={l.erreur} repli="Les règles sont illisibles." />;
+  if (l.valeur.length === 0) {
+    return <CarteVide>Aucune version des règles pour le moment.</CarteVide>;
+  }
+  return (
+    <ul className="flex flex-col gap-4">
+      {l.valeur.map((jeu) => {
+        const n = reglesAConfirmer(jeu);
+        const relu = jeu.validation?.expertReview;
+        return (
+          <li
+            key={jeu.version}
+            className="flex flex-col gap-2 rounded-[var(--radius-md)] border border-[var(--border)] p-4"
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-semibold">Version {jeu.version}</span>
+              <Badge tone={jeu.status === 'validated' ? 'success' : 'neutral'}>
+                {LIBELLES_STATUT_REGLES[jeu.status]}
+              </Badge>
+              {n > 0 ? <AConfirmer texte={`${n} règle${n > 1 ? 's' : ''} à confirmer`} /> : null}
+            </div>
+            {relu?.declared ? (
+              <p className="text-sm text-[var(--foreground-muted)]">
+                Déclaration de relecture : {relu.name ?? 'nom non précisé'}
+                {relu.date ? `, le ${relu.date}` : ''}. Lalanda enregistre cette déclaration de
+                relecture sans la vérifier.
+              </p>
+            ) : jeu.status === 'validated' ? (
+              <p className="text-sm">Aucune déclaration de relecture.</p>
+            ) : null}
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[32rem] text-sm">
+                <thead className="text-left text-xs text-[var(--foreground-muted)]">
+                  <tr>
+                    <th className="py-1.5 pr-3 font-medium">Opération</th>
+                    <th className="py-1.5 pr-3 font-medium">Débit</th>
+                    <th className="py-1.5 pr-3 font-medium">Crédit</th>
+                    <th className="py-1.5 font-medium">Statut</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border)]">
+                  {jeu.rules.map((r) => (
+                    <tr key={r.key}>
+                      <td className="py-1.5 pr-3">
+                        {r.label ?? r.key}
+                        {r.label ? (
+                          <span className="block font-mono text-xs text-[var(--foreground-muted)]">
+                            {r.key}
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="py-1.5 pr-3 font-mono">{r.debit.join(', ') || '—'}</td>
+                      <td className="py-1.5 pr-3 font-mono">{r.credit.join(', ') || '—'}</td>
+                      <td className="py-1.5">
+                        {r.requiresReview || r.confirmation === 'to_confirm' ? (
+                          <AConfirmer texte={ACCOUNTING_TO_CONFIRM_LABEL} />
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function Journaux({ l }: { l: Lecture<AccountingJournalView[]> | null }): React.ReactElement {
+  if (l === null) return <Chargement />;
+  if (!l.ok) return <EchecLecture erreur={l.erreur} repli="Les journaux sont illisibles." />;
+  if (l.valeur.length === 0) {
+    return <CarteVide>Les journaux sont créés à l’activation.</CarteVide>;
+  }
+  return (
+    <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      {l.valeur.map((j) => (
+        <li
+          key={j.code}
+          className="flex items-center gap-3 rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
+        >
+          <span className="font-mono font-semibold">{j.code}</span>
+          <span className="min-w-0 flex-1">{j.label}</span>
+          <Badge tone="neutral">{LIBELLES_JOURNAL[j.kind]}</Badge>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Taux({ l }: { l: Lecture<AccountingExchangeRateView[]> | null }): React.ReactElement {
+  if (l === null) return <Chargement />;
+  if (!l.ok) return <EchecLecture erreur={l.erreur} repli="Les taux sont illisibles." />;
+  if (l.valeur.length === 0) {
+    return (
+      <CarteVide>
+        Aucun taux saisi. Lalanda n’importe jamais de taux d’office : une pièce dans une autre
+        devise attend un taux saisi.
+      </CarteVide>
+    );
+  }
+  return (
+    <ul className="flex flex-col divide-y divide-[var(--border)] text-sm">
+      {l.valeur.map((t) => (
+        <li key={`${t.date}-${t.from}-${t.to}`} className="flex flex-wrap gap-x-4 gap-y-1 py-2">
+          <span className="tabular-nums">{t.date}</span>
+          <span className="font-medium tabular-nums">
+            1 {t.from} = {t.rate.replace('.', ',')} {t.to}
+          </span>
+          {t.sourceText ? (
+            <span className="text-[var(--foreground-muted)]">{t.sourceText}</span>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function Reglages(): React.ReactElement {
+  const { reglages } = useAccesCompta();
+  const plan = useLecture(() => accountingApi.listAccounts().then((r) => r.items), reglages);
+  const regles = useLecture(() => accountingApi.listRuleSets().then((r) => r.items), reglages);
+  const journaux = useLecture(() => accountingApi.listJournals().then((r) => r.items), reglages);
+  const taux = useLecture(() => accountingApi.listExchangeRates().then((r) => r.items), reglages);
+
+  return (
+    <section className="flex min-w-0 flex-col gap-5">
+      <Bandeau
+        icone={Settings2}
+        titre="Réglages"
+        sousTitre="Activer la comptabilité, choisir le plan, la monnaie de tenue, la bascule et les règles."
+      />
+      <Activation />
+      <Panneau titre="Plan de l’organisation" icone={Library} id="compta-plan">
+        <Plan l={plan} />
+      </Panneau>
+      <Panneau
+        titre={<Terme terme="regle">Règles de correspondance</Terme>}
+        icone={Scale}
+        id="compta-regles"
+      >
+        <Regles l={regles} />
+      </Panneau>
+      <Panneau
+        titre={<Terme terme="journal">Journaux</Terme>}
+        icone={BookOpenCheck}
+        id="compta-journaux"
+      >
+        <Journaux l={journaux} />
+      </Panneau>
+      <Panneau titre="Taux de change saisis" icone={Coins} id="compta-taux">
+        <Taux l={taux} />
+      </Panneau>
+    </section>
+  );
+}
