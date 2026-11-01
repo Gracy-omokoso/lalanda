@@ -244,9 +244,10 @@ export interface TemplateSummary {
 
 // ─── Rôles d'organisation (S20a — ADR-0012 §1) ─────────────────
 /**
- * Les 11 rôles d'organisation (le neuvième, `sales_rep` « Commercial », d'ADR-0040
+ * Les 12 rôles d'organisation (le neuvième, `sales_rep` « Commercial », d'ADR-0040
  * § 4.2 ; le dixième, `hr_manager` « Responsable RH », d'ADR-0045 § 4.2 ; le onzième,
- * `storekeeper` « Magasinier », d'ADR-0046 § 8.2). Miroir de `apps/api/src/authz/permissions.ts`,
+ * `storekeeper` « Magasinier », d'ADR-0046 § 8.2 ; le douzième, `external_accountant`
+ * « Expert-comptable (externe) », d'ADR-0049 § 8.2). Miroir de `apps/api/src/authz/permissions.ts`,
  * SOURCE DE VÉRITÉ — le web ne peut pas importer de l'API.
  *
  * Volontairement limité à l'union de slugs : les LIBELLÉS et les DESCRIPTIONS ne
@@ -269,6 +270,8 @@ export const ORG_ROLES = [
   'hr_manager',
   // ADR-0046 — S0 : Magasinier (réceptionne, range, sort et compte le stock).
   'storekeeper',
+  // ADR-0049 — K0 : Expert-comptable externe (consulte et exporte la comptabilité).
+  'external_accountant',
 ] as const;
 
 export type OrgRole = (typeof ORG_ROLES)[number];
@@ -1143,7 +1146,7 @@ export interface TermsAcceptanceView {
 
 export type DisplayCurrency = 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR';
 
-/** Les 46 actions granulaires (docs/12, ADR-0021 §8, ADR-0022 § S25c.1, ADR-0023 § S25e.11, ADR-0031 § 4, ADR-0034 § 8, ADR-0035 § 3, ADR-0039 § 7, ADR-0040 § 4.1, ADR-0044 § 4.1, ADR-0045 § 4.1, ADR-0046 § 8.1). Union fermée, alignée sur l'API. */
+/** Les 51 actions granulaires (docs/12, ADR-0021 §8, ADR-0022 § S25c.1, ADR-0023 § S25e.11, ADR-0031 § 4, ADR-0034 § 8, ADR-0035 § 3, ADR-0039 § 7, ADR-0040 § 4.1, ADR-0044 § 4.1, ADR-0045 § 4.1, ADR-0046 § 8.1, ADR-0049 § 8.1). Union fermée, alignée sur l'API. */
 export type OrgAction =
   | 'organization.manage'
   | 'billing.manage'
@@ -1223,7 +1226,14 @@ export type OrgAction =
   | 'assets.read'
   | 'assets.manage'
   | 'docs.read'
-  | 'docs.manage';
+  | 'docs.manage'
+  // ADR-0049 § 8.1 — comptabilité. Les états sont toujours des projets ; la réouverture
+  // d'une période est réservée au Propriétaire ; l'activation exige en plus `fiscal.manage`.
+  | 'accounting.read'
+  | 'accounting.post'
+  | 'accounting.close'
+  | 'accounting.export'
+  | 'accounting.manage';
 
 /**
  * Offres — RÉEXPORTÉES du catalogue partagé, jamais réécrites.

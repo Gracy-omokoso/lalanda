@@ -35,16 +35,16 @@ Le support ne voit jamais les données financières sans consentement explicite,
 | Commercial (`sales_rep`, ADR-0040, appliqué) | CRM, devis, consultation des clients et du catalogue ; ni trésorerie, ni dépenses, ni émission de facture |
 | Responsable RH (`hr_manager`, ADR-0045, implémenté) | dossiers du personnel, absences et documents RH ; ni trésorerie, ni ventes, ni achats |
 | Magasinier (`storekeeper`, ADR-0046, appliqué au lot S0) | sort, transfère et compte le stock ; consulte le matériel et les documents ; ni prix d'achat, ni valeur du stock, ni trésorerie, ni ventes |
-| Expert-comptable externe (`external_accountant`, **proposé, ADR-0049**, non appliqué) | consulte et exporte la comptabilité ; n'écrit rien ; attribuable par le seul Propriétaire |
+| Expert-comptable externe (`external_accountant`, ADR-0049, appliqué au lot K0) | consulte et exporte la comptabilité ; n'écrit rien ; attribuable par le seul Propriétaire |
 
 ## Actions granulaires
 
-`organization.manage`, `billing.manage`, `members.invite`, `project.create`, `project.read`, `project.update`, `canvas.update`, `inputs.update`, `plan.calculate`, `plan.approve`, `actuals.import`, `period.close`, `analytics.read`, `report.export`, `audit.read`, `fiscal.manage`, `sales.read`, `sales.manage`, `sales.invoice`, `sales.receipt`, `treasury.read`, `treasury.manage`, `crm.read`, `crm.manage`, `work.read`, `work.update`, `work.manage`, `sales.quote`, `purchase.read`, `purchase.request`, `purchase.manage`, `purchase.approve`, `payables.pay`, `hr.read`, `hr.manage`, `hr.sensitive.read`, `leave.request`, `leave.approve`, `stock.read`, `stock.move`, `stock.count`, `stock.manage`, `assets.read`, `assets.manage`, `docs.read`, `docs.manage`.
+`organization.manage`, `billing.manage`, `members.invite`, `project.create`, `project.read`, `project.update`, `canvas.update`, `inputs.update`, `plan.calculate`, `plan.approve`, `actuals.import`, `period.close`, `analytics.read`, `report.export`, `audit.read`, `fiscal.manage`, `sales.read`, `sales.manage`, `sales.invoice`, `sales.receipt`, `treasury.read`, `treasury.manage`, `crm.read`, `crm.manage`, `work.read`, `work.update`, `work.manage`, `sales.quote`, `purchase.read`, `purchase.request`, `purchase.manage`, `purchase.approve`, `payables.pay`, `hr.read`, `hr.manage`, `hr.sensitive.read`, `leave.request`, `leave.approve`, `stock.read`, `stock.move`, `stock.count`, `stock.manage`, `assets.read`, `assets.manage`, `docs.read`, `docs.manage`, `accounting.read`, `accounting.post`, `accounting.close`, `accounting.export`, `accounting.manage`.
 
-Quarante-six actions au total, dans l'ordre ci-dessus (ordre de fusion pour les
+Cinquante et une actions au total, dans l'ordre ci-dessus (ordre de fusion pour les
 actions ajoutées après la dix-neuvième ; les vingt-neuvième à trente-troisième viennent
-d'ADR-0044, les trente-quatrième à trente-huitième d'ADR-0045, les huit dernières
-d'ADR-0046).
+d'ADR-0044, les trente-quatrième à trente-huitième d'ADR-0045, les trente-neuvième à
+quarante-sixième d'ADR-0046, les cinq dernières d'ADR-0049).
 
 `fiscal.manage` — « Gérer l'identité fiscale et la facture normalisée » — est la
 seizième action, ajoutée par ADR-0021 §8 (18 oct. 2026). Elle couvre la fiche
@@ -433,10 +433,24 @@ action** : lire une idée relève de `project.read`, la modifier (fiche, notes, 
 promotion vers un projet, assistance IA) de `canvas.update`, régler son IA de
 `organization.manage`. Les actions et la matrice sont inchangées par l'Idea Lab.
 
-### Proposé, ADR-0049 — comptabilité SYSCOHADA (non appliqué)
+### ADR-0049 — comptabilité SYSCOHADA (appliqué, lot K0)
 
-> **Statut : proposé** par [ADR-0049](adr/ADR-0049-comptabilite-syscohada.md) § 8 (1ᵉʳ nov. 2026).
-> Rien de ce qui suit n'est dans le code ; le lot K0 l'appliquera.
+> **Statut : appliqué** par le lot K0 d'[ADR-0049](adr/ADR-0049-comptabilite-syscohada.md) § 8
+> (1ᵉʳ nov. 2026), R6 du RUN, aux valeurs par défaut des décisions ouvertes n° 1, 2, 3, 5, 6 et 11
+> (l'ADR reste au statut proposé). La matrice ci-dessous est celle de
+> `apps/api/src/authz/permissions.ts`, vérifiée par `permissions.test.ts` (918 cases) ; dépendances
+> et treizième domaine par `overrides.test.ts`. Fonctions pures à tables de vérité testées :
+> `accountingActivationDecision` (conditions manquantes, `409 ACCOUNTING_ACTIVATION_PRECONDITION`),
+> `canActivateAccounting` (cumul `accounting.manage` + `fiscal.manage`, `ACCOUNTING_ACTIVATION_ACTIONS`),
+> `manualEntryDecision`, `ruleSetDecision` (séparation dynamique, approbateur unique marqué ;
+> déclaration de relecture exigée), `accountingReopenDecision` (Propriétaire seul, motif
+> obligatoire). Contrats partagés : `@lalanda/shared/accounting`. Les routes `/accounting`
+> arrivent aux lots K4 à K6 : d'ici là, les cinq actions figurent dans `ACTIONS_SANS_ROUTE` de la
+> sonde `rbac-matrix.e2e.test.ts`, qui exerce déjà le rôle `external_accountant` sur toutes les
+> autres sondes. Rôles existants : Propriétaire, Directeur financier et Comptable reçoivent les
+> cinq actions ; l'Administrateur, l'Analyste et le Lecteur `accounting.read`. R7 inchangé pour
+> l'Administrateur. Avant d'attribuer `external_accountant`, toutes les instances de l'API doivent
+> être à jour (une instance N-1 lit ce slug comme un rôle inconnu et refuse) ; aucune migration.
 
 - **Cinq actions nouvelles**, quarante-septième à cinquante et unième, en fin de liste :
   `accounting.read` (« Consulter la comptabilité »), `accounting.post` (« Saisir et valider des

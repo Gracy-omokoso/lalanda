@@ -10,15 +10,17 @@
 // `work.update` et `work.manage`, ADR-0040 § 4 pour `sales.quote` et le rôle `sales_rep`,
 // ADR-0044 § 4.1 pour `purchase.*` et `payables.pay`, ADR-0045 § 4 pour `hr.*`, `leave.*` et
 // le rôle `hr_manager`, ADR-0046 § 8 pour `stock.*`, `assets.*`, `docs.*` et le rôle
-// `storekeeper`). C'est délibéré : un test qui
+// `storekeeper`, ADR-0049 § 8 pour `accounting.*` et le rôle `external_accountant`).
+// C'est délibéré : un test qui
 // importerait la matrice de production vérifierait seulement qu'elle est égale à
 // elle-même. Ici, toute modification d'une case de production casse le test, ce
 // qui force une mise à jour CONSCIENTE de l'ADR et de docs/12.
 //
-// 11 rôles × 46 actions + 6 rôles plateforme × 46 actions = 782 cases vérifiées.
+// 12 rôles × 51 actions + 6 rôles plateforme × 51 actions = 918 cases vérifiées.
 
 import { describe, expect, it } from 'vitest';
 
+import { ACCOUNTING_ACTIVATION_MISSING_CODES } from '@lalanda/shared/accounting';
 import { DOCUMENT_LINK_ENTITY_TYPES } from '@lalanda/shared/documents';
 
 import {
@@ -53,6 +55,17 @@ import {
   folderAccessDecision,
   stockCountDecision,
   VALUE_READ_ACTIONS,
+  ACCOUNTING_ACTIVATION_ACTIONS,
+  ACTION_DEPENDENCIES,
+  accountingActivationDecision,
+  accountingReopenDecision,
+  canActivateAccounting,
+  manualEntryDecision,
+  ruleSetDecision,
+  type AccountingActivationInput,
+  type AccountingActivationMissing,
+  type ManualEntryValidationInput,
+  type RuleSetValidationInput,
   type DocumentLinkEntityType,
   type FolderAccessRules,
   type StockCountValidationInput,
@@ -88,82 +101,94 @@ const ORDRE_ORG: readonly OrgRole[] = [
   'hr_manager',
   // ADR-0046 § 8.2 : onzième, en fin de liste.
   'storekeeper',
+  // ADR-0049 § 8.2 : douzième, en fin de liste.
+  'external_accountant',
 ];
 
-//                                        PRO ADM DIR CPT ANA CDP CON LEC COM RH  MAG
+//                                        PRO ADM DIR CPT ANA CDP CON LEC COM RH  MAG EXP
 const ATTENDU_ORG: Record<Action, string> = {
-  'organization.manage': 'A   A   .   .   .   .   .   .   .   .   .',
-  'billing.manage': 'A   .   .   .   .   .   .   .   .   .   .',
-  'members.invite': 'A   A   .   .   .   .   .   .   .   .   .',
-  'project.create': 'A   A   A   .   .   .   .   .   .   .   .',
-  'project.read': 'A   A   A   A   A   P   A   A   .   .   .',
-  'project.update': 'A   A   A   .   .   P   .   .   .   .   .',
-  'canvas.update': 'A   A   A   .   A   P   .   .   .   .   .',
-  'inputs.update': 'A   A   A   .   A   P   .   .   .   .   .',
-  'plan.calculate': 'A   A   A   .   A   P   .   .   .   .   .',
-  'plan.approve': 'S   .   S   .   .   .   .   .   .   .   .',
-  'actuals.import': 'A   A   A   A   .   .   .   .   .   .   .',
-  'period.close': 'A   .   A   C   .   .   .   .   .   .   .',
-  'analytics.read': 'A   A   A   A   A   P   A   A   A   A   A',
-  'report.export': 'A   A   A   A   A   P   .   .   .   .   .',
-  'audit.read': 'A   A   A   .   .   .   .   .   .   .   .',
+  'organization.manage': 'A   A   .   .   .   .   .   .   .   .   .   .',
+  'billing.manage': 'A   .   .   .   .   .   .   .   .   .   .   .',
+  'members.invite': 'A   A   .   .   .   .   .   .   .   .   .   .',
+  'project.create': 'A   A   A   .   .   .   .   .   .   .   .   .',
+  'project.read': 'A   A   A   A   A   P   A   A   .   .   .   .',
+  'project.update': 'A   A   A   .   .   P   .   .   .   .   .   .',
+  'canvas.update': 'A   A   A   .   A   P   .   .   .   .   .   .',
+  'inputs.update': 'A   A   A   .   A   P   .   .   .   .   .   .',
+  'plan.calculate': 'A   A   A   .   A   P   .   .   .   .   .   .',
+  'plan.approve': 'S   .   S   .   .   .   .   .   .   .   .   .',
+  'actuals.import': 'A   A   A   A   .   .   .   .   .   .   .   .',
+  'period.close': 'A   .   A   C   .   .   .   .   .   .   .   .',
+  'analytics.read': 'A   A   A   A   A   P   A   A   A   A   A   A',
+  'report.export': 'A   A   A   A   A   P   .   .   .   .   .   .',
+  'audit.read': 'A   A   A   .   .   .   .   .   .   .   .   .',
   // ADR-0021 §8 : autorité financière seulement (Propriétaire, Directeur financier).
-  'fiscal.manage': 'A   .   A   .   .   .   .   .   .   .   .',
+  'fiscal.manage': 'A   .   A   .   .   .   .   .   .   .   .   .',
   // ADR-0022 § S25c.1 : données maîtres de vente. Analyste et Lecteur consultent ;
   // le Conseiller, externe, ne voit pas le fichier clients ; le Chef de projet n'a rien.
-  'sales.read': 'A   A   A   A   A   .   .   A   A   .   .',
-  'sales.manage': 'A   A   A   A   .   .   .   .   .   .   .',
+  'sales.read': 'A   A   A   A   A   .   .   A   A   .   .   .',
+  'sales.manage': 'A   A   A   A   .   .   .   .   .   .   .   .',
   // ADR-0023 § S25e.11 : émettre et normaliser engagent le contribuable. Propriétaire,
   // Directeur financier et Comptable ; l'Administrateur prépare mais n'émet pas.
-  'sales.invoice': 'A   .   A   A   .   .   .   .   .   .   .',
+  'sales.invoice': 'A   .   A   A   .   .   .   .   .   .   .   .',
   // ADR-0031 § 4 : enregistrer l'argent reçu, même population que `sales.invoice`.
-  'sales.receipt': 'A   .   A   A   .   .   .   .   .   .   .',
+  'sales.receipt': 'A   .   A   A   .   .   .   .   .   .   .   .',
   // ADR-0034 § 8 : trésorerie. Le Conseiller (externe) ne voit pas le détail des
   // dépenses ; l'Administrateur consulte mais n'enregistre pas de décaissement.
-  'treasury.read': 'A   A   A   A   A   .   .   A   .   .   .',
-  'treasury.manage': 'A   .   A   A   .   .   .   .   .   .   .',
+  'treasury.read': 'A   A   A   A   A   .   .   A   .   .   .   .',
+  'treasury.manage': 'A   .   A   A   .   .   .   .   .   .   .   .',
   // ADR-0035 § 3 : le CRM suit la répartition de `sales.read` / `sales.manage`.
-  'crm.read': 'A   A   A   A   A   .   .   A   A   .   .',
-  'crm.manage': 'A   A   A   A   .   .   .   .   A   .   .',
+  'crm.read': 'A   A   A   A   A   .   .   A   A   .   .   .',
+  'crm.manage': 'A   A   A   A   .   .   .   .   A   .   .   .',
   // ADR-0039 § 7 : projets et tâches du RUN. Le Lecteur lit ; Comptable et Analyste
   // travaillent sans gouverner ; le Conseiller (externe) et le Chef de projet n'ont rien.
-  'work.read': 'A   A   A   A   A   .   .   A   A   A   A',
-  'work.update': 'A   A   A   A   A   .   .   .   A   A   A',
-  'work.manage': 'A   A   A   .   .   .   .   .   .   .   .',
+  'work.read': 'A   A   A   A   A   .   .   A   A   A   A   .',
+  'work.update': 'A   A   A   A   A   .   .   .   A   A   A   .',
+  'work.manage': 'A   A   A   .   .   .   .   .   .   .   .   .',
   // ADR-0040 § 4.1 : préparer les devis. Iso-privilège avec `sales.manage`, plus
   // le Commercial (COM) ; convertir un devis exige en plus `sales.manage`.
-  'sales.quote': 'A   A   A   A   .   .   .   .   A   .   .',
+  'sales.quote': 'A   A   A   A   .   .   .   .   A   .   .   .',
   // ADR-0044 § 4.1 : achats et fournisseurs. `purchase.read` suit `treasury.read`
   // (sans le Commercial) ; demander est ouvert à tout rôle interne qui travaille ;
   // préparer suit `sales.manage` ; approuver est une autorité de dépense (ⓢ) ;
   // payer suit `treasury.manage`.
-  'purchase.read': 'A   A   A   A   A   .   .   A   .   .   .',
-  'purchase.request': 'A   A   A   A   A   .   .   .   .   .   .',
-  'purchase.manage': 'A   A   A   A   .   .   .   .   .   .   .',
-  'purchase.approve': 'S   .   S   .   .   .   .   .   .   .   .',
-  'payables.pay': 'A   .   A   A   .   .   .   .   .   .   .',
+  'purchase.read': 'A   A   A   A   A   .   .   A   .   .   .   .',
+  'purchase.request': 'A   A   A   A   A   .   .   .   .   .   .   .',
+  'purchase.manage': 'A   A   A   A   .   .   .   .   .   .   .   .',
+  'purchase.approve': 'S   .   S   .   .   .   .   .   .   .   .   .',
+  'payables.pay': 'A   .   A   A   .   .   .   .   .   .   .   .',
   // ADR-0045 § 4.1 : ressources humaines. Le registre (lecture, gestion) : Propriétaire,
   // Administrateur, Directeur financier, Responsable RH ; les données sensibles : le moins
   // de personnes possible (ni Administrateur, ni Comptable) ; demander une absence : tout
   // rôle interne ; valider : autorité RH (ⓢ). Le manager n'a besoin d'aucune action.
-  'hr.read': 'A   A   A   .   .   .   .   .   .   A   .',
-  'hr.manage': 'A   A   A   .   .   .   .   .   .   A   .',
-  'hr.sensitive.read': 'A   .   A   .   .   .   .   .   .   A   .',
-  'leave.request': 'A   A   A   A   A   .   .   A   A   A   A',
-  'leave.approve': 'S   .   S   .   .   .   .   .   .   S   .',
+  'hr.read': 'A   A   A   .   .   .   .   .   .   A   .   .',
+  'hr.manage': 'A   A   A   .   .   .   .   .   .   A   .   .',
+  'hr.sensitive.read': 'A   .   A   .   .   .   .   .   .   A   .   .',
+  'leave.request': 'A   A   A   A   A   .   .   A   A   A   A   .',
+  'leave.approve': 'S   .   S   .   .   .   .   .   .   S   .   .',
   // ADR-0046 § 8.1 : stocks, équipements, documents. Les quantités ne révèlent ni prix ni
   // dette (le Commercial les lit pour promettre une livraison) ; mouvementer est un geste
   // opérationnel (pas le Comptable : séparation garde / enregistrement) ; compter : ceux
   // qui sortent la marchandise et le Comptable ; `stock.manage` change des valeurs (ⓢ, pas
   // le Magasinier) ; la bibliothèque à tout rôle interne, le Conseiller externe exclu.
-  'stock.read': 'A   A   A   A   A   .   .   A   A   .   A',
-  'stock.move': 'A   A   A   .   .   .   .   .   .   .   A',
-  'stock.count': 'A   A   A   A   .   .   .   .   .   .   A',
-  'stock.manage': 'S   S   S   S   .   .   .   .   .   .   .',
-  'assets.read': 'A   A   A   A   A   .   .   A   .   A   A',
-  'assets.manage': 'A   A   A   A   .   .   .   .   .   .   .',
-  'docs.read': 'A   A   A   A   A   .   .   A   A   A   A',
-  'docs.manage': 'A   A   A   A   .   .   .   .   .   A   .',
+  'stock.read': 'A   A   A   A   A   .   .   A   A   .   A   .',
+  'stock.move': 'A   A   A   .   .   .   .   .   .   .   A   .',
+  'stock.count': 'A   A   A   A   .   .   .   .   .   .   A   .',
+  'stock.manage': 'S   S   S   S   .   .   .   .   .   .   .   .',
+  'assets.read': 'A   A   A   A   A   .   .   A   .   A   A   .',
+  'assets.manage': 'A   A   A   A   .   .   .   .   .   .   .   .',
+  'docs.read': 'A   A   A   A   A   .   .   A   A   A   A   .',
+  'docs.manage': 'A   A   A   A   .   .   .   .   .   A   .   .',
+  // ADR-0049 § 8.1 : comptabilité. La lecture agrège ce que ces rôles lisent déjà
+  // (`sales.read`, `treasury.read`, `purchase.read`) ; ni Commercial, ni Responsable RH, ni
+  // Magasinier (sans trésorerie), ni Conseiller (externe, sans les livres). Écrire et
+  // paramétrer : Propriétaire, Directeur financier, Comptable (ⓢ) ; clôturer : les mêmes,
+  // sans ⚙ (la réouverture est au Propriétaire) ; exporter : les mêmes et l'Expert-comptable.
+  'accounting.read': 'A   A   A   A   A   .   .   A   .   .   .   A',
+  'accounting.post': 'S   .   S   S   .   .   .   .   .   .   .   .',
+  'accounting.close': 'A   .   A   A   .   .   .   .   .   .   .   .',
+  'accounting.export': 'A   .   A   A   .   .   .   .   .   .   .   A',
+  'accounting.manage': 'S   .   S   S   .   .   .   .   .   .   .   .',
 };
 
 const CODE_VERS_GRANT: Record<string, string> = {
@@ -255,6 +280,13 @@ const ATTENDU_PLATEFORME: Record<Action, string> = {
   'assets.manage': 'D   .   .   .   .   .',
   'docs.read': 'D   .   D   .   .   .',
   'docs.manage': 'D   .   .   .   .   .',
+  // ADR-0049 § 8.1 : lecture des livres sous accès délégué (SA, support) ; écrire,
+  // clôturer, exporter et paramétrer : septième à dixième interdits absolus.
+  'accounting.read': 'D   .   D   .   .   .',
+  'accounting.post': '.   .   .   .   .   .',
+  'accounting.close': '.   .   .   .   .   .',
+  'accounting.export': '.   .   .   .   .   .',
+  'accounting.manage': '.   .   .   .   .   .',
 };
 
 const CODE_VERS_GRANT_PLATEFORME: Record<string, string> = {
@@ -268,9 +300,9 @@ function cellules(ligne: string): string[] {
 }
 
 describe('matrice rôle organisation × action (ADR-0012 §3)', () => {
-  it('déclare exactement les 11 rôles et les 46 actions de docs/12', () => {
+  it('déclare exactement les 12 rôles et les 51 actions de docs/12', () => {
     expect([...ORG_ROLES]).toEqual([...ORDRE_ORG]);
-    expect(ACTIONS).toHaveLength(46);
+    expect(ACTIONS).toHaveLength(51);
     // Ajoutée en fin de liste, comme dans docs/12 (ADR-0021 §8).
     expect(ACTIONS[15]).toBe('fiscal.manage');
     // Dix-septième et dix-huitième, en fin de liste (ADR-0022 § S25c.1).
@@ -309,8 +341,8 @@ describe('matrice rôle organisation × action (ADR-0012 §3)', () => {
       'leave.request',
       'leave.approve',
     ]);
-    // Trente-neuvième à quarante-sixième, en fin de liste (ADR-0046 § 8.1).
-    expect(ACTIONS.slice(38)).toEqual([
+    // Trente-neuvième à quarante-sixième (ADR-0046 § 8.1).
+    expect(ACTIONS.slice(38, 46)).toEqual([
       'stock.read',
       'stock.move',
       'stock.count',
@@ -319,6 +351,14 @@ describe('matrice rôle organisation × action (ADR-0012 §3)', () => {
       'assets.manage',
       'docs.read',
       'docs.manage',
+    ]);
+    // Quarante-septième à cinquante et unième, en fin de liste (ADR-0049 § 8.1).
+    expect(ACTIONS.slice(46)).toEqual([
+      'accounting.read',
+      'accounting.post',
+      'accounting.close',
+      'accounting.export',
+      'accounting.manage',
     ]);
     expect(Object.keys(ATTENDU_ORG).sort()).toEqual([...ACTIONS].sort());
   });
@@ -386,7 +426,7 @@ describe('matrice rôle plateforme × action (ADR-0012 §4)', () => {
   }
 });
 
-describe('interdits absolus de la plateforme (ADR-0012 §4, ADR-0021 §8, ADR-0023 § S25e.11, ADR-0045 § 4.1)', () => {
+describe('interdits absolus de la plateforme (ADR-0012 §4, ADR-0021 §8, ADR-0023 § S25e.11, ADR-0045 § 4.1, ADR-0049 § 8.1)', () => {
   const interdits: Action[] = [
     'plan.approve',
     'period.close',
@@ -394,10 +434,15 @@ describe('interdits absolus de la plateforme (ADR-0012 §4, ADR-0021 §8, ADR-00
     'fiscal.manage',
     'sales.invoice',
     'hr.sensitive.read',
+    // ADR-0049 § 8.1 : écrire, clôturer, exporter et paramétrer les livres d'un client.
+    'accounting.post',
+    'accounting.close',
+    'accounting.export',
+    'accounting.manage',
   ];
 
-  it('sont exactement ceux annoncés, au nombre de six', () => {
-    expect(PLATFORM_FORBIDDEN_ACTIONS).toHaveLength(6);
+  it('sont exactement ceux annoncés, au nombre de dix', () => {
+    expect(PLATFORM_FORBIDDEN_ACTIONS).toHaveLength(10);
     expect([...PLATFORM_FORBIDDEN_ACTIONS].sort()).toEqual([...interdits].sort());
   });
 
@@ -632,7 +677,9 @@ describe('R7 — attribution de rôles sans élévation de privilège', () => {
           // ADR-0046 § 8.1 : lectures des stocks, du registre et de la bibliothèque.
           action === 'stock.read' ||
           action === 'assets.read' ||
-          action === 'docs.read'
+          action === 'docs.read' ||
+          // ADR-0049 § 8.1 : lecture des livres.
+          action === 'accounting.read'
         ) {
           continue;
         }
@@ -677,7 +724,7 @@ describe('rang de privilège (correction du tri de l’organisation primaire)', 
     expect(ORG_ROLE_RANK.owner).toBe(0);
   });
 
-  it('couvre les 10 rôles avec des rangs distincts', () => {
+  it('couvre les 12 rôles avec des rangs distincts', () => {
     const rangs = ORG_ROLES.map((r) => ORG_ROLE_RANK[r]);
     expect(new Set(rangs).size).toBe(ORG_ROLES.length);
   });
@@ -705,7 +752,7 @@ describe('compatibilité N-1 des anciens rôles', () => {
     expect(normalizeOrgRole('owner')).toBe('owner');
   });
 
-  it('les 10 slugs se normalisent en eux-mêmes', () => {
+  it('les 12 slugs se normalisent en eux-mêmes', () => {
     for (const role of ORG_ROLES) expect(normalizeOrgRole(role)).toBe(role);
   });
 
@@ -721,7 +768,7 @@ describe('compatibilité N-1 des anciens rôles', () => {
 });
 
 describe('cohérence structurelle de la matrice', () => {
-  it('chaque rôle déclare une décision pour CHACUNE des 46 actions', () => {
+  it('chaque rôle déclare une décision pour CHACUNE des 51 actions', () => {
     for (const role of ORG_ROLES) {
       for (const action of ACTIONS) {
         expect(ORG_PERMISSION_MATRIX[role][action], `${role} × ${action}`).toBeDefined();
@@ -745,7 +792,7 @@ describe('cohérence structurelle de la matrice', () => {
     for (const action of ecritures) expect(can('viewer', action, NO_OVERRIDES)).toBe(false);
   });
 
-  it('`owner` détient les 46 actions', () => {
+  it('`owner` détient les 51 actions', () => {
     for (const action of ACTIONS) expect(can('owner', action, NO_OVERRIDES)).toBe(true);
   });
 
@@ -977,10 +1024,11 @@ describe('ADR-0040 § 4 — rôle Commercial et action `sales.quote`', () => {
     expect(ORG_ROLE_RANK.analyst).toBe(4);
     expect(ORG_ROLE_RANK.sales_rep).toBe(5);
     // ADR-0045 § 4.2 : le Responsable RH s'insère au rang 6 ; ADR-0046 § 8.2 : le
-    // Magasinier au rang 7 ; les suivants glissent.
-    expect(ORG_ROLE_RANK.project_manager).toBe(8);
-    expect(ORG_ROLE_RANK.advisor).toBe(9);
-    expect(ORG_ROLE_RANK.viewer).toBe(10);
+    // Magasinier au rang 7 ; ADR-0049 § 8.2 : l'Expert-comptable au rang 8 ; les suivants
+    // glissent.
+    expect(ORG_ROLE_RANK.project_manager).toBe(9);
+    expect(ORG_ROLE_RANK.advisor).toBe(10);
+    expect(ORG_ROLE_RANK.viewer).toBe(11);
     expect(ORG_ROLE_LABELS.sales_rep).toBe('Commercial');
     expect(ORG_ROLE_DESCRIPTIONS.sales_rep.length).toBeGreaterThan(20);
   });
@@ -1062,6 +1110,9 @@ describe('ADR-0044 § 4 — achats et fournisseurs (lot P0)', () => {
       'purchase.approve',
       'leave.approve',
       'stock.manage',
+      // ADR-0049 § 8.3 : opérations diverses et jeux de règles.
+      'accounting.post',
+      'accounting.manage',
     ]);
     for (const action of APPROVAL_ACTIONS) {
       for (const role of ORG_ROLES) {
@@ -1089,8 +1140,12 @@ describe('ADR-0044 § 4 — achats et fournisseurs (lot P0)', () => {
 
   it('aucun rôle nouveau, R7 inchangé : l’Administrateur attribue les mêmes rôles', () => {
     // ADR-0044 n'ajoute aucun rôle ; le dixième, `hr_manager`, vient d'ADR-0045.
-    // ADR-0046 ajoute le onzième, `storekeeper`.
-    expect(ORG_ROLES.filter((r) => r !== 'hr_manager' && r !== 'storekeeper')).toHaveLength(9);
+    // ADR-0046 ajoute le onzième, `storekeeper` ; ADR-0049 le douzième, `external_accountant`.
+    expect(
+      ORG_ROLES.filter(
+        (r) => r !== 'hr_manager' && r !== 'storekeeper' && r !== 'external_accountant',
+      ),
+    ).toHaveLength(9);
     expect(grantableRoles('admin').sort()).toEqual([
       'admin',
       'advisor',
@@ -1307,8 +1362,9 @@ describe('ADR-0045 § 4 — ressources humaines et rôle Responsable RH (lot H0)
   it('rang 6, après le Commercial ; libellé et description du § 4.2', () => {
     expect(ORG_ROLE_RANK.sales_rep).toBe(5);
     expect(ORG_ROLE_RANK.hr_manager).toBe(6);
-    // ADR-0046 § 8.2 : le Magasinier s'insère au rang 7.
-    expect(ORG_ROLE_RANK.project_manager).toBe(8);
+    // ADR-0046 § 8.2 : le Magasinier s'insère au rang 7 ; ADR-0049 § 8.2 : l'Expert-comptable
+    // au rang 8.
+    expect(ORG_ROLE_RANK.project_manager).toBe(9);
     expect(ORG_ROLE_LABELS.hr_manager).toBe('Responsable RH');
     expect(ORG_ROLE_DESCRIPTIONS.hr_manager).toBe(
       'Dossiers du personnel, absences et documents RH. Ne voit ni la trésorerie, ni les ventes, ni les achats.',
@@ -1319,7 +1375,8 @@ describe('ADR-0045 § 4 — ressources humaines et rôle Responsable RH (lot H0)
 
   it('R7 — attribuable par le seul Propriétaire (critère 2, décision ouverte n° 2)', () => {
     expect(isAssignableRole('hr_manager')).toBe(true);
-    expect(OWNER_ONLY_ROLES).toEqual(['hr_manager']);
+    // ADR-0049 § 8.2 : l'Expert-comptable (externe) aussi.
+    expect(OWNER_ONLY_ROLES).toEqual(['hr_manager', 'external_accountant']);
     for (const role of ORG_ROLES) {
       expect(canGrantRole(role, 'hr_manager'), `${role} → hr_manager`).toBe(role === 'owner');
     }
@@ -1543,7 +1600,7 @@ describe('ADR-0046 § 8 — stocks, équipements, documents et rôle Magasinier 
     expect(can('hr_manager', 'stock.read', NO_OVERRIDES)).toBe(false);
     // Le Conseiller (externe) et le Chef de projet n'ont rien (décision ouverte n° 17).
     for (const role of ['advisor', 'project_manager'] as const) {
-      for (const action of ACTIONS.slice(38)) {
+      for (const action of ACTIONS.slice(38, 46)) {
         expect(can(role, action, NO_OVERRIDES), `${role} × ${action}`).toBe(false);
       }
     }
@@ -1588,9 +1645,10 @@ describe('ADR-0046 § 8 — stocks, équipements, documents et rôle Magasinier 
   it('rang 7, après le Responsable RH ; libellé et description du § 8.2', () => {
     expect(ORG_ROLE_RANK.hr_manager).toBe(6);
     expect(ORG_ROLE_RANK.storekeeper).toBe(7);
-    expect(ORG_ROLE_RANK.project_manager).toBe(8);
-    expect(ORG_ROLE_RANK.advisor).toBe(9);
-    expect(ORG_ROLE_RANK.viewer).toBe(10);
+    // ADR-0049 § 8.2 : l'Expert-comptable s'insère au rang 8.
+    expect(ORG_ROLE_RANK.project_manager).toBe(9);
+    expect(ORG_ROLE_RANK.advisor).toBe(10);
+    expect(ORG_ROLE_RANK.viewer).toBe(11);
     expect(ORG_ROLE_LABELS.storekeeper).toBe('Magasinier');
     expect(ORG_ROLE_DESCRIPTIONS.storekeeper).toBe(
       'Réceptionne, range, sort et compte le stock ; consulte le matériel et les documents. Ne voit ni les prix d’achat, ni la valeur du stock, ni la trésorerie, ni les ventes.',
@@ -1637,7 +1695,7 @@ describe('ADR-0046 § 8 — stocks, équipements, documents et rôle Magasinier 
   });
 
   it('plateforme : lectures déléguées (SA, support), gestes au seul SA ; aucun interdit absolu nouveau', () => {
-    for (const action of ACTIONS.slice(38)) {
+    for (const action of ACTIONS.slice(38, 46)) {
       expect(canPlatform('platform_super_admin', action, { hasActiveGrant: true }), action).toBe(
         true,
       );
@@ -1880,6 +1938,414 @@ describe('R1 — identité du rôle propriétaire (repris de S20b)', () => {
   it('n’accepte pas un rôle qui CONTIENT « owner » sans en être un', () => {
     for (const role of ['co_owner', 'owner_delegate', 'not-owner']) {
       expect(isOwnerRole(role), role).toBe(false);
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADR-0049 — K0 : comptabilité et rôle Expert-comptable (externe)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const COMPTABILITE: readonly Action[] = [
+  'accounting.read',
+  'accounting.post',
+  'accounting.close',
+  'accounting.export',
+  'accounting.manage',
+];
+
+describe('ADR-0049 § 8 — comptabilité et rôle Expert-comptable (lot K0)', () => {
+  const detenteurs = (action: Action): OrgRole[] =>
+    ORG_ROLES.filter((r) => can(r, action, NO_OVERRIDES));
+
+  it('détenteurs de chaque action, ligne du § 8.1', () => {
+    expect(detenteurs('accounting.read')).toEqual([
+      'owner',
+      'admin',
+      'finance_director',
+      'accountant',
+      'analyst',
+      'viewer',
+      'external_accountant',
+    ]);
+    for (const action of ['accounting.post', 'accounting.close', 'accounting.manage'] as const) {
+      expect(detenteurs(action), action).toEqual(['owner', 'finance_director', 'accountant']);
+    }
+    expect(detenteurs('accounting.export')).toEqual([
+      'owner',
+      'finance_director',
+      'accountant',
+      'external_accountant',
+    ]);
+  });
+
+  it('la lecture n’ouvre rien de plus : chaque lecteur interne lit déjà trésorerie et achats', () => {
+    for (const role of detenteurs('accounting.read')) {
+      if (role === 'external_accountant') continue;
+      for (const lu of ['sales.read', 'treasury.read', 'purchase.read'] as const) {
+        expect(can(role, lu, NO_OVERRIDES), `${role} × ${lu}`).toBe(true);
+      }
+    }
+  });
+
+  it('critère 1 — Commercial, Responsable RH, Magasinier, Conseiller, Chef de projet : rien', () => {
+    for (const role of [
+      'sales_rep',
+      'hr_manager',
+      'storekeeper',
+      'advisor',
+      'project_manager',
+    ] as const) {
+      for (const action of COMPTABILITE) {
+        expect(can(role, action, { canClosePeriods: true }), `${role} × ${action}`).toBe(false);
+      }
+    }
+  });
+
+  it('critère 1 — l’Administrateur lit, n’écrit, ne clôt, n’exporte ni ne paramètre', () => {
+    expect(can('admin', 'accounting.read', NO_OVERRIDES)).toBe(true);
+    for (const action of COMPTABILITE.slice(1)) {
+      expect(can('admin', action, NO_OVERRIDES), action).toBe(false);
+    }
+  });
+
+  it('écrire et paramétrer : cases ⓢ, dans `APPROVAL_ACTIONS` ; clôturer sans ⚙ ; aucune paire nouvelle', () => {
+    for (const role of ORG_ROLES) {
+      expect(['deny', 'allow_sod']).toContain(ORG_PERMISSION_MATRIX[role]['accounting.post']);
+      expect(['deny', 'allow_sod']).toContain(ORG_PERMISSION_MATRIX[role]['accounting.manage']);
+      expect(['deny', 'allow']).toContain(ORG_PERMISSION_MATRIX[role]['accounting.close']);
+    }
+    expect(APPROVAL_ACTIONS).toContain('accounting.post');
+    expect(APPROVAL_ACTIONS).toContain('accounting.manage');
+    expect(APPROVAL_ACTIONS).not.toContain('accounting.close');
+    expect(APPROVER_ROLES).toEqual(['owner', 'finance_director']);
+  });
+
+  it('l’Expert-comptable détient trois actions sur cinquante et une, et seulement celles-là', () => {
+    expect(ACTIONS.filter((a) => can('external_accountant', a, { canClosePeriods: true }))).toEqual(
+      ['analytics.read', 'accounting.read', 'accounting.export'],
+    );
+    // Critère 1 : ni ventes, ni trésorerie, ni achats ; il voit la copie d'affichage de la
+    // pièce portée par l'écriture (décision ouverte n° 3).
+    for (const action of [
+      'sales.read',
+      'treasury.read',
+      'purchase.read',
+      'accounting.post',
+      'accounting.close',
+      'accounting.manage',
+      'report.export',
+      'project.read',
+      'work.read',
+      'leave.request',
+      'docs.read',
+    ] as const) {
+      expect(can('external_accountant', action, NO_OVERRIDES), action).toBe(false);
+    }
+  });
+
+  it('comme le Conseiller, externe : il n’a ni projets, ni tâches, ni absences', () => {
+    for (const action of ACTIONS) {
+      if (action === 'analytics.read' || action.startsWith('accounting.')) continue;
+      expect(ORG_PERMISSION_MATRIX.external_accountant[action], action).toBe('deny');
+      // Ce que le Conseiller n'a pas, l'Expert-comptable ne l'a pas non plus.
+      if (ORG_PERMISSION_MATRIX.advisor[action] === 'deny') {
+        expect(can('external_accountant', action, NO_OVERRIDES), action).toBe(false);
+      }
+    }
+  });
+
+  it('rang 8, après le Magasinier ; libellé et description du § 8.2', () => {
+    expect(ORG_ROLE_RANK.storekeeper).toBe(7);
+    expect(ORG_ROLE_RANK.external_accountant).toBe(8);
+    expect(ORG_ROLE_RANK.project_manager).toBe(9);
+    expect(ORG_ROLE_RANK.advisor).toBe(10);
+    expect(ORG_ROLE_RANK.viewer).toBe(11);
+    expect(ORG_ROLE_LABELS.external_accountant).toBe('Expert-comptable (externe)');
+    expect(ORG_ROLE_DESCRIPTIONS.external_accountant).toBe(
+      "Consulte et exporte la comptabilité de l'organisation pour la réviser. N'écrit rien : ni écriture, ni vente, ni paiement. Externe à l'organisation.",
+    );
+    expect(normalizeOrgRole('external_accountant')).toBe('external_accountant');
+    expect(isOwnerRole('external_accountant')).toBe(false);
+  });
+
+  it('critère 1, R7 — attribuable par le seul Propriétaire', () => {
+    expect(isAssignableRole('external_accountant')).toBe(true);
+    expect(OWNER_ONLY_ROLES).toContain('external_accountant');
+    for (const role of ORG_ROLES) {
+      expect(canGrantRole(role, 'external_accountant'), `${role} → EXP`).toBe(role === 'owner');
+    }
+    // R7 seul laisserait le Directeur financier et le Comptable l'attribuer (inclusion) :
+    // c'est `OWNER_ONLY_ROLES` qui ferme, même avec `members.invite` ajouté.
+    expect(canGrantRole('finance_director', 'external_accountant')).toBe(false);
+    expect(canGrantRole('accountant', 'external_accountant', { grants: ['members.invite'] })).toBe(
+      false,
+    );
+    const toutAjoute: OrgPermissionContext = {
+      grants: ACTIONS.filter(
+        (a) => ORG_PERMISSION_MATRIX.admin[a] === 'deny' && a !== 'billing.manage',
+      ),
+    };
+    expect(grantableRoles('admin', toutAjoute)).not.toContain('external_accountant');
+    // L'Expert-comptable n'attribue aucun rôle qui écrive.
+    expect(grantableRoles('external_accountant')).toEqual([]);
+    expect(grantableRoles('owner')).toContain('external_accountant');
+  });
+
+  it('R7 inchangé pour l’Administrateur : il attribue les mêmes rôles qu’avant', () => {
+    expect(grantableRoles('admin').sort()).toEqual([
+      'admin',
+      'advisor',
+      'analyst',
+      'sales_rep',
+      'storekeeper',
+      'viewer',
+    ]);
+  });
+
+  it('dépendances : chaque geste exige la lecture ; chaque ligne de la matrice les satisfait', () => {
+    for (const action of COMPTABILITE.slice(1)) {
+      expect(ACTION_DEPENDENCIES[action], action).toEqual(['accounting.read']);
+    }
+    expect(ACTION_DEPENDENCIES['accounting.read']).toBeUndefined();
+    for (const role of ORG_ROLES) {
+      for (const action of COMPTABILITE.slice(1)) {
+        if (can(role, action, NO_OVERRIDES)) {
+          expect(can(role, 'accounting.read', NO_OVERRIDES), `${role} × ${action}`).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('critère 1 — plateforme : lecture déléguée (SA, support) ; quatre interdits absolus', () => {
+    for (const role of ['platform_super_admin', 'platform_support'] as const) {
+      expect(canPlatform(role, 'accounting.read', { hasActiveGrant: true }), role).toBe(true);
+      expect(canPlatform(role, 'accounting.read'), role).toBe(false);
+    }
+    expect(canPlatform('platform_admin', 'accounting.read', { hasActiveGrant: true })).toBe(false);
+    for (const action of COMPTABILITE.slice(1)) {
+      expect(PLATFORM_FORBIDDEN_ACTIONS).toContain(action);
+      for (const role of PLATFORM_ROLES) {
+        expect(canPlatform(role, action, { hasActiveGrant: true }), `${role} × ${action}`).toBe(
+          false,
+        );
+      }
+    }
+    expect(PLATFORM_FORBIDDEN_ACTIONS).not.toContain('accounting.read');
+  });
+});
+
+describe('ADR-0049 § 3.1 — activation (`accountingActivationDecision`)', () => {
+  const pret: AccountingActivationInput = {
+    chartPackStatus: 'approved',
+    bookCurrency: 'CDF',
+    cutoverDate: '2026-11-01',
+    validatedRuleSet: { expertReviewDeclared: true },
+    hasOpenFiscalYear: true,
+  };
+  const decide = (over: Partial<AccountingActivationInput>) =>
+    accountingActivationDecision({ ...pret, ...over });
+
+  it('toutes les conditions réunies : activable, pack `approved` ou `active`', () => {
+    expect(decide({})).toEqual({ ok: true });
+    expect(decide({ chartPackStatus: 'active' })).toEqual({ ok: true });
+  });
+
+  it('critère 2 — sans pack approuvé : `CHART_PACK_NOT_APPROVED` (décision ouverte n° 5)', () => {
+    for (const status of ['draft', 'review', 'retired', null] as const) {
+      expect(decide({ chartPackStatus: status }), String(status)).toEqual({
+        ok: false,
+        code: 'ACCOUNTING_ACTIVATION_PRECONDITION',
+        missing: ['CHART_PACK_NOT_APPROVED'],
+      });
+    }
+  });
+
+  it('toutes les conditions manquantes rendues ensemble, dans l’ordre de l’assistant', () => {
+    expect(
+      decide({
+        chartPackStatus: 'draft',
+        bookCurrency: null,
+        cutoverDate: '  ',
+        validatedRuleSet: null,
+        hasOpenFiscalYear: false,
+      }),
+    ).toEqual({
+      ok: false,
+      code: 'ACCOUNTING_ACTIVATION_PRECONDITION',
+      missing: [
+        'CHART_PACK_NOT_APPROVED',
+        'BOOK_CURRENCY_REQUIRED',
+        'CUTOVER_DATE_REQUIRED',
+        'RULE_SET_NOT_VALIDATED',
+        'FISCAL_YEAR_NOT_OPEN',
+      ],
+    });
+  });
+
+  it('aucune monnaie de tenue par défaut ; règles validées sans déclaration de relecture refusées', () => {
+    expect(decide({ bookCurrency: null })).toMatchObject({ missing: ['BOOK_CURRENCY_REQUIRED'] });
+    expect(decide({ validatedRuleSet: { expertReviewDeclared: false } })).toMatchObject({
+      missing: ['EXPERT_REVIEW_NOT_DECLARED'],
+    });
+  });
+
+  it('les codes sont ceux du contrat partagé (`@lalanda/shared/accounting`)', () => {
+    const codes: readonly AccountingActivationMissing[] = ACCOUNTING_ACTIVATION_MISSING_CODES;
+    const tout = decide({
+      chartPackStatus: null,
+      bookCurrency: null,
+      cutoverDate: null,
+      validatedRuleSet: { expertReviewDeclared: false },
+      hasOpenFiscalYear: false,
+    });
+    const sansRegles = decide({ validatedRuleSet: null });
+    const rendus = new Set([
+      ...(tout.ok ? [] : tout.missing),
+      ...(sansRegles.ok ? [] : sansRegles.missing),
+    ]);
+    expect([...rendus].sort()).toEqual([...codes].sort());
+  });
+
+  it('critère 2 — l’activation exige `accounting.manage` ET `fiscal.manage` : pas le Comptable', () => {
+    expect([...ACCOUNTING_ACTIVATION_ACTIONS]).toEqual(['accounting.manage', 'fiscal.manage']);
+    expect(ORG_ROLES.filter((r) => canActivateAccounting(r, NO_OVERRIDES))).toEqual([
+      'owner',
+      'finance_director',
+    ]);
+    expect(canActivateAccounting('accountant', NO_OVERRIDES)).toBe(false);
+    // Droits EFFECTIFS : un retrait de `fiscal.manage` ferme l'activation au Directeur.
+    expect(canActivateAccounting('finance_director', { revokes: ['fiscal.manage'] })).toBe(false);
+    // Le cumul n'est pas une dépendance : `accounting.manage` n'exige pas `fiscal.manage`.
+    expect(ACTION_DEPENDENCIES['accounting.manage']).not.toContain('fiscal.manage');
+  });
+});
+
+describe('ADR-0049 § 6.9 — `manualEntryDecision` (opération diverse)', () => {
+  const base: ManualEntryValidationInput = {
+    status: 'draft',
+    validatorUserId: 'V',
+    authorUserId: 'A',
+    approverCountInOrg: 2,
+  };
+  const decide = (over: Partial<ManualEntryValidationInput>) =>
+    manualEntryDecision({ ...base, ...over });
+
+  it('critère 11 — un autre détenteur valide', () => {
+    expect(decide({})).toEqual({ ok: true, soleApprover: false });
+  });
+
+  it('critère 11 — l’auteur ne valide pas sa propre écriture : 409 SELF_APPROVAL_FORBIDDEN', () => {
+    expect(decide({ validatorUserId: 'A' })).toEqual({
+      ok: false,
+      code: 'SELF_APPROVAL_FORBIDDEN',
+    });
+    expect(decide({ validatorUserId: 'A', approverCountInOrg: 7 })).toMatchObject({ ok: false });
+  });
+
+  it('critère 11 — approbateur unique : il valide, marqué `soleApprover`', () => {
+    expect(decide({ validatorUserId: 'A', approverCountInOrg: 1 })).toEqual({
+      ok: true,
+      soleApprover: true,
+    });
+    expect(decide({ approverCountInOrg: 1 })).toEqual({ ok: true, soleApprover: false });
+  });
+
+  it('critère 10 — une écriture non brouillon ne se valide plus : 409 ENTRY_NOT_DRAFT', () => {
+    for (const status of ['posted', 'awaiting_rate'] as const) {
+      expect(decide({ status }), status).toEqual({ ok: false, code: 'ENTRY_NOT_DRAFT' });
+      expect(decide({ status, approverCountInOrg: 1, validatorUserId: 'A' })).toEqual({
+        ok: false,
+        code: 'ENTRY_NOT_DRAFT',
+      });
+    }
+  });
+});
+
+describe('ADR-0049 § 2.4 — `ruleSetDecision` (validation d’un jeu de règles)', () => {
+  const base: RuleSetValidationInput = {
+    status: 'draft',
+    validatorUserId: 'V',
+    lastAuthorUserId: 'A',
+    approverCountInOrg: 2,
+    expertReviewDeclared: true,
+  };
+  const decide = (over: Partial<RuleSetValidationInput>) => ruleSetDecision({ ...base, ...over });
+
+  it('un autre détenteur valide, déclaration cochée', () => {
+    expect(decide({})).toEqual({ ok: true, soleApprover: false });
+  });
+
+  it('critère 11 — le dernier auteur ne valide pas, sauf approbateur unique (marqué)', () => {
+    expect(decide({ validatorUserId: 'A' })).toEqual({
+      ok: false,
+      code: 'SELF_APPROVAL_FORBIDDEN',
+    });
+    expect(decide({ validatorUserId: 'A', approverCountInOrg: 1 })).toEqual({
+      ok: true,
+      soleApprover: true,
+    });
+  });
+
+  it('décision ouverte n° 6 — la déclaration de relecture est exigée', () => {
+    expect(decide({ expertReviewDeclared: false })).toEqual({
+      ok: false,
+      code: 'EXPERT_REVIEW_DECLARATION_REQUIRED',
+    });
+    expect(
+      decide({ expertReviewDeclared: false, validatorUserId: 'A', approverCountInOrg: 1 }),
+    ).toEqual({ ok: false, code: 'EXPERT_REVIEW_DECLARATION_REQUIRED' });
+  });
+
+  it('une version validée ou remplacée est immuable ; ce refus passe en premier', () => {
+    for (const status of ['validated', 'superseded'] as const) {
+      expect(decide({ status, validatorUserId: 'A', expertReviewDeclared: false })).toEqual({
+        ok: false,
+        code: 'RULE_SET_IMMUTABLE',
+      });
+    }
+  });
+});
+
+describe('ADR-0049 § 4 — `accountingReopenDecision` (réouverture, Propriétaire seul)', () => {
+  it('le Propriétaire rouvre avec un motif, nettoyé des espaces de bord', () => {
+    expect(accountingReopenDecision({ actorRole: 'owner', reason: '  erreur de date ' })).toEqual({
+      ok: true,
+      reason: 'erreur de date',
+    });
+    // Valeur venue de la base : casse et espaces tolérés, comme R1.
+    expect(accountingReopenDecision({ actorRole: ' Owner ', reason: 'x' })).toMatchObject({
+      ok: true,
+    });
+  });
+
+  it('critère 12 — aucun autre titre ne rouvre, pas même ceux qui clôturent', () => {
+    for (const role of ORG_ROLES.filter((r) => r !== 'owner')) {
+      expect(accountingReopenDecision({ actorRole: role, reason: 'motif' }), role).toEqual({
+        ok: false,
+        code: 'REOPEN_OWNER_ONLY',
+      });
+    }
+    for (const role of PLATFORM_ROLES) {
+      expect(accountingReopenDecision({ actorRole: role, reason: 'motif' })).toMatchObject({
+        code: 'REOPEN_OWNER_ONLY',
+      });
+    }
+    // `accounting.close` ne suffit pas : Directeur financier et Comptable clôturent.
+    expect(can('finance_director', 'accounting.close', NO_OVERRIDES)).toBe(true);
+    expect(can('accountant', 'accounting.close', NO_OVERRIDES)).toBe(true);
+  });
+
+  it('le titre est jugé avant le motif ; motif absent ou blanc : REOPEN_REASON_REQUIRED', () => {
+    expect(accountingReopenDecision({ actorRole: 'admin', reason: '' })).toEqual({
+      ok: false,
+      code: 'REOPEN_OWNER_ONLY',
+    });
+    for (const reason of ['', '   ', null, undefined]) {
+      expect(accountingReopenDecision({ actorRole: 'owner', reason }), String(reason)).toEqual({
+        ok: false,
+        code: 'REOPEN_REASON_REQUIRED',
+      });
     }
   });
 });

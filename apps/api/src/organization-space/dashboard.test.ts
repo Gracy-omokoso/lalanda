@@ -305,9 +305,13 @@ describe('visibilité des blocs par rôle (S21a)', () => {
   it('ouvre les projets à tous les rôles qui lisent les projets, Conseiller et Lecteur compris', () => {
     for (const role of ORG_ROLES) {
       // ADR-0040 § 4.2 : le Commercial n'a pas `project.read` ; ADR-0045 § 4.2 : le
-      // Responsable RH non plus ; ADR-0046 § 8.2 : ni le Magasinier.
+      // Responsable RH non plus ; ADR-0046 § 8.2 : ni le Magasinier ; ADR-0049 § 8.2 : ni
+      // l'Expert-comptable (externe).
       expect(blocVisible('projets', role, sansContexte), role).toBe(
-        role !== 'sales_rep' && role !== 'hr_manager' && role !== 'storekeeper',
+        role !== 'sales_rep' &&
+          role !== 'hr_manager' &&
+          role !== 'storekeeper' &&
+          role !== 'external_accountant',
       );
     }
   });
@@ -360,9 +364,11 @@ describe('visibilité des blocs par rôle (S21a)', () => {
 });
 
 describe('lecture seule (S21a)', () => {
-  it('ne considère en lecture seule que le Conseiller et le Lecteur', () => {
+  it('ne considère en lecture seule que le Conseiller, le Lecteur et l’Expert-comptable', () => {
     const lecteurs = ORG_ROLES.filter((r) => estLectureSeule(r, {}));
-    expect(lecteurs).toEqual(['advisor', 'viewer']);
+    // ADR-0049 § 8.2 : l'Expert-comptable (externe) lit et exporte, n'écrit rien —
+    // exporter ne modifie rien, motif de `report.export`.
+    expect(lecteurs).toEqual(['advisor', 'viewer', 'external_accountant']);
   });
 
   it('le Comptable n’est jamais en lecture seule, droit de clôture ou non', () => {

@@ -76,9 +76,10 @@ const PLAN_PROJETS_ILLIMITES: Plan | undefined = PLANS.find(
 );
 
 /**
- * Les dix rôles réellement attribuables — `project_manager` exclu (voir en-tête).
+ * Les onze rôles réellement attribuables — `project_manager` exclu (voir en-tête).
  * `sales_rep` (Commercial, ADR-0040 § 4.2), `hr_manager` (Responsable RH, ADR-0045
- * § 4.2) puis `storekeeper` (Magasinier, ADR-0046 § 8.2) sont les derniers.
+ * § 4.2), `storekeeper` (Magasinier, ADR-0046 § 8.2) puis `external_accountant`
+ * (Expert-comptable externe, ADR-0049 § 8.2) sont les derniers.
  *
  * L'ordre importe : `owner` d'abord, parce que c'est lui qui invite tous les
  * autres. Il n'est pas invité, il est propriétaire de son organisation
@@ -98,6 +99,8 @@ const ROLES_TESTES = [
   'hr_manager',
   // ADR-0046 — S0 : invité par le Propriétaire (l'Administrateur le peut aussi, R7).
   'storekeeper',
+  // ADR-0049 — K0 : invité par le Propriétaire, seul à pouvoir l'attribuer.
+  'external_accountant',
 ] as const satisfies readonly OrgRole[];
 
 type RoleTeste = (typeof ROLES_TESTES)[number];
@@ -129,6 +132,26 @@ const ACTIONS_SANS_ROUTE: Record<string, string> = {
   // matrice est déjà couverte case par case par `permissions.test.ts`, et le rôle
   // `storekeeper` est exercé ici sur toutes les autres sondes. S3 a retiré les quatre
   // actions `stock.*`, S5 `assets.*` et S6 `docs.*` (sondes en fin de liste).
+  //
+  // ADR-0049 — K0 : actions déclarées avant leurs routes (module `accounting`, lots K4 à
+  // K6). Chaque lot retire sa ligne et écrit sa sonde ; la matrice est déjà couverte case
+  // par case par `permissions.test.ts`, et le rôle `external_accountant` est exercé ici
+  // sur toutes les autres sondes (refus de `sales.read`, `treasury.read`, `purchase.read`).
+  'accounting.read':
+    'Aucune route `/accounting` en K0 : `GET /accounting/settings`, les écritures, le ' +
+    'grand livre et les projets d’états arrivent aux lots K4 à K6 (ADR-0049 § 11).',
+  'accounting.post':
+    'Aucune route en K0 : les opérations diverses, le lettrage et les taux saisis ' +
+    'arrivent au lot K5 (`POST /accounting/entries`, ADR-0049 § 11).',
+  'accounting.close':
+    'Aucune route en K0 : la clôture des mois et des exercices arrive au lot K6 ' +
+    '(`POST /accounting/periods/:year/:month/close`, ADR-0049 § 11).',
+  'accounting.export':
+    'Aucune route en K0 : les exports pour l’expert-comptable arrivent au lot K6 ' +
+    '(`POST /accounting/exports`, ADR-0049 § 9 et § 11).',
+  'accounting.manage':
+    'Aucune route en K0 : réglages, plan de l’organisation, règles et journaux arrivent ' +
+    'au lot K4 (`PUT /accounting/settings`, ADR-0049 § 11).',
 };
 
 /** Une sonde HTTP : la route qui matérialise une action, et ses statuts légitimes. */
@@ -189,6 +212,9 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
     sales_rep: 8,
     hr_manager: 9,
     storekeeper: 10,
+    // ADR-0049 — K0 : le mois 11 est pris par le test ⚙ du Comptable ; l'Expert-comptable
+    // n'a pas `period.close`, sa sonde ne ferme rien.
+    external_accountant: 12,
   };
 
   function creerCompte(role: RoleTeste): { email: string; password: string; name: string } {
@@ -914,7 +940,7 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
     }
   });
 
-  it('les dix rôles ont une session authentifiée dans la même organisation', async () => {
+  it('les onze rôles ont une session authentifiée dans la même organisation', async () => {
     for (const role of ROLES_TESTES) {
       const res = await request(serveur()).get('/me/permissions').set('Cookie', cookiesDe(role));
       expect(res.status, `/me/permissions pour ${role}`).toBe(200);
@@ -1172,9 +1198,14 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
         .get(`/projects/${projetSonde}/variances?year=1`)
         .set('Cookie', cookiesDe(role));
       // ADR-0045 : le Responsable RH ne lit pas les projets BUILD non plus ; ADR-0046 : ni
-      // le Magasinier.
+      // le Magasinier ; ADR-0049 : ni l'Expert-comptable (externe).
       expect(res.status, `${role} : ${JSON.stringify(res.body)}`).toBe(
-        role === 'sales_rep' || role === 'hr_manager' || role === 'storekeeper' ? 403 : 200,
+        role === 'sales_rep' ||
+          role === 'hr_manager' ||
+          role === 'storekeeper' ||
+          role === 'external_accountant'
+          ? 403
+          : 200,
       );
     }
   }, 90_000);
@@ -1381,6 +1412,59 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
       'assets.read',
       'docs.read',
     ]);
+  }, 60_000);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // ADR-0049 — K0 : l'Expert-comptable externe (§ 8.2), attribuable par le seul Propriétaire
+  // ───────────────────────────────────────────────────────────────────────────
+
+  it('critère 1 — ni l’Administrateur ni le Directeur financier ne nomment un Expert-comptable ; le Propriétaire le peut', async () => {
+    const parAdmin = `rbac-exp-admin-${tag}@lalanda-test.local`;
+    const parProprietaire = `rbac-exp-pro-${tag}@lalanda-test.local`;
+    emails.push(parAdmin, parProprietaire);
+    const refus = await request(serveur())
+      .post(`/organizations/${orgId}/invitations`)
+      .set('Cookie', cookiesDe('admin'))
+      .send({ email: parAdmin, role: 'external_accountant' });
+    expect(refus.status, JSON.stringify(refus.body)).toBe(403);
+    expect(refus.body.code).toBe('ROLE_ESCALATION');
+
+    const promotion = await request(serveur())
+      .patch(`/organizations/${orgId}/members/${await userIdDe('viewer')}/role`)
+      .set('Cookie', cookiesDe('admin'))
+      .send({ role: 'external_accountant' });
+    expect(promotion.status, JSON.stringify(promotion.body)).toBe(403);
+    expect(promotion.body.code).toBe('ROLE_ESCALATION');
+
+    const ok = await request(serveur())
+      .post(`/organizations/${orgId}/invitations`)
+      .set('Cookie', cookiesDe('owner'))
+      .send({ email: parProprietaire, role: 'external_accountant' });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(201);
+    expect(ok.body.invitation.role).toBe('external_accountant');
+  }, 60_000);
+
+  it('critère 1 — l’Expert-comptable ne voit ni ventes, ni trésorerie, ni achats, ni projets', async () => {
+    const c = cookiesDe('external_accountant');
+    const s = serveur();
+    const refus: [string, string, Action][] = [
+      ['GET /sales/invoices', '/sales/invoices', 'sales.read'],
+      ['GET /treasury/expenses', '/treasury/expenses', 'treasury.read'],
+      ['GET /purchases/orders', '/purchases/orders', 'purchase.read'],
+      ['GET /work/my-tasks', '/work/my-tasks', 'work.read'],
+    ];
+    for (const [libelle, chemin, action] of refus) {
+      const res = await request(s).get(chemin).set('Cookie', c);
+      expect(res.status, `${libelle} : ${res.status} ${JSON.stringify(res.body)}`).toBe(403);
+      expect(res.body, libelle).toMatchObject({
+        code: 'FORBIDDEN',
+        action,
+        role: 'external_accountant',
+      });
+    }
+    const moi = await request(s).get('/me/permissions').set('Cookie', c);
+    expect(moi.status).toBe(200);
+    expect(moi.body.actions).toEqual(['analytics.read', 'accounting.read', 'accounting.export']);
   }, 60_000);
 
   /** userId d'un rôle, lu depuis le trombinoscope — l'API ne l'expose pas ailleurs. */

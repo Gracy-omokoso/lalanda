@@ -140,9 +140,9 @@ describe('rôle par défaut à l’invitation', () => {
     expect(rolesProposables(options).map((o) => o.value)).toEqual(['admin', 'sales_rep', 'viewer']);
   });
 
-  it('le rang miroir couvre les onze rôles, sans ex æquo', () => {
+  it('le rang miroir couvre les douze rôles, sans ex æquo', () => {
     const roles = Object.keys(RANG_DE_PRIVILEGE) as OrgRole[];
-    expect(roles).toHaveLength(11);
+    expect(roles).toHaveLength(12);
     expect(new Set(roles.map((r) => RANG_DE_PRIVILEGE[r])).size).toBe(roles.length);
     expect(RANG_DE_PRIVILEGE.owner).toBe(0);
     expect(RANG_DE_PRIVILEGE.sales_rep).toBe(5);
@@ -150,7 +150,28 @@ describe('rôle par défaut à l’invitation', () => {
     expect(RANG_DE_PRIVILEGE.hr_manager).toBe(6);
     // ADR-0046 § 8.2.
     expect(RANG_DE_PRIVILEGE.storekeeper).toBe(7);
-    expect(RANG_DE_PRIVILEGE.viewer).toBe(10);
+    // ADR-0049 § 8.2.
+    expect(RANG_DE_PRIVILEGE.external_accountant).toBe(8);
+    expect(RANG_DE_PRIVILEGE.viewer).toBe(11);
+  });
+
+  it('l’Expert-comptable, en fin de liste, n’est pas pris pour le moins puissant (ADR-0049)', () => {
+    const options = [
+      option({ value: 'admin' }),
+      option({ value: 'viewer' }),
+      option({ value: 'external_accountant', label: 'Expert-comptable (externe)' }),
+    ];
+    expect(roleParDefaut(options)).toBe('viewer');
+    expect(
+      roleParDefaut([option({ value: 'admin' }), option({ value: 'external_accountant' })]),
+    ).toBe('external_accountant');
+    // Non attribuable hors Propriétaire : le serveur le dit, l'écran ne le propose pas.
+    expect(
+      rolesProposables([
+        option({ value: 'viewer' }),
+        option({ value: 'external_accountant', grantable: false }),
+      ]).map((o) => o.value),
+    ).toEqual(['viewer']);
   });
 
   it('le Magasinier, en fin de liste, n’est pas pris pour le moins puissant (ADR-0046)', () => {
