@@ -73,6 +73,10 @@
     "./accounting": {
       "types": "./dist/accounting/index.d.ts",
       "import": "./dist/accounting/index.js"
+    },
+    "./sales-contracts": {
+      "types": "./dist/sales-contracts/index.d.ts",
+      "import": "./dist/sales-contracts/index.js"
     }
   },
   "scripts": {

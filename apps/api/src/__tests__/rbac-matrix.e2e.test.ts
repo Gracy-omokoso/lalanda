@@ -140,6 +140,16 @@ const ACTIONS_SANS_ROUTE: Record<string, string> = {
   // K4 a retiré `accounting.read`, `accounting.manage`, `accounting.post` (taux saisis) et
   // `accounting.close` (création d'exercice) ; K6 a retiré `accounting.export` (exports pour
   // l'expert-comptable) : sondes en fin de liste.
+  //
+  // ADR-0050 — V0 : actions déclarées avant leurs routes (module `sales/contracts`, lots V2
+  // et V3). Chaque lot retire sa ligne et écrit sa sonde ; la matrice est déjà couverte case
+  // par case par `permissions.test.ts`, et `/me/permissions` est vérifié ci-dessous.
+  'sales.contract':
+    'Aucune route en V0 : `POST /sales/orders` et `POST /sales/quotes/:id/to-order` arrivent ' +
+    'au lot V2, `POST /sales/contracts` et ses avenants au lot V3 (ADR-0050 § 3).',
+  'sales.contract.approve':
+    'Aucune route en V0 : `POST /sales/contracts/:id/approve`, `…/renewals`, `…/terminate` ' +
+    'et `PUT /sales/contract-settings` arrivent au lot V3 (ADR-0050 § 3).',
 };
 
 /** Une sonde HTTP : la route qui matérialise une action, et ses statuts légitimes. */
@@ -1506,6 +1516,25 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
     const moi = await request(s).get('/me/permissions').set('Cookie', c);
     expect(moi.status).toBe(200);
     expect(moi.body.actions).toEqual(['analytics.read', 'accounting.read', 'accounting.export']);
+  }, 60_000);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // ADR-0050 — V0 : contrats et commandes clients (§ 8.1), sans route avant V2 et V3
+  // ───────────────────────────────────────────────────────────────────────────
+
+  it('critère 1 — `/me/permissions` : préparent Propriétaire, Administrateur, Directeur financier, Comptable, Commercial ; approuvent Propriétaire et Directeur financier', async () => {
+    const s = serveur();
+    for (const role of ROLES_TESTES) {
+      const moi = await request(s).get('/me/permissions').set('Cookie', cookiesDe(role));
+      expect(moi.status, role).toBe(200);
+      const actions = moi.body.actions as string[];
+      expect(actions.includes('sales.contract'), `${role} × sales.contract`).toBe(
+        ['owner', 'admin', 'finance_director', 'accountant', 'sales_rep'].includes(role),
+      );
+      expect(actions.includes('sales.contract.approve'), `${role} × sales.contract.approve`).toBe(
+        ['owner', 'finance_director'].includes(role),
+      );
+    }
   }, 60_000);
 
   /** userId d'un rôle, lu depuis le trombinoscope — l'API ne l'expose pas ailleurs. */

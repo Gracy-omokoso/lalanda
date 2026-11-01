@@ -13,7 +13,7 @@
 //                        § 8.2 ; le douzième, `external_accountant`, d'ADR-0049
 //                        § 8.2);
 //   2. PLATFORM_ROLES  — les 6 rôles plateforme, préfixés `platform_` (§2);
-//   3. ACTIONS         — les 51 actions granulaires, dans l'ordre de docs/12
+//   3. ACTIONS         — les 53 actions granulaires, dans l'ordre de docs/12
 //                        (la seizième, `fiscal.manage`, vient d'ADR-0021 §8 ;
 //                        la dix-septième et la dix-huitième, `sales.read` et
 //                        `sales.manage`, d'ADR-0022 § S25c.1 ; la dix-neuvième,
@@ -34,7 +34,9 @@
 //                        d'ADR-0045 § 4.1 ; les trente-neuvième à quarante-sixième,
 //                        `stock.*`, `assets.*` et `docs.*`, d'ADR-0046 § 8.1 ; les
 //                        quarante-septième à cinquante et unième, `accounting.*`,
-//                        d'ADR-0049 § 8.1).
+//                        d'ADR-0049 § 8.1 ; les cinquante-deuxième et
+//                        cinquante-troisième, `sales.contract` et
+//                        `sales.contract.approve`, d'ADR-0050 § 8.1).
 //
 // Refus par défaut (docs/17 § Autorisation) : les matrices sont exhaustives, une
 // case absente ne compile pas, et une case `deny` est un refus.
@@ -136,7 +138,7 @@ export const PLATFORM_ROLES = [
 export type PlatformRole = (typeof PLATFORM_ROLES)[number];
 
 /**
- * Les 51 actions granulaires (docs/12 § Actions granulaires, ordre du document).
+ * Les 53 actions granulaires (docs/12 § Actions granulaires, ordre du document).
  *
  * `fiscal.manage` (ADR-0021 §8) est ajoutée EN FIN de liste, et non à côté
  * d'`organization.manage` : l'ordre est celui de docs/12, que l'interface et les
@@ -155,7 +157,8 @@ export type PlatformRole = (typeof PLATFORM_ROLES)[number];
  * `stock.manage`, `assets.read`, `assets.manage`, `docs.read` et `docs.manage`
  * (ADR-0046 § 8.1) les trente-neuvième à quarante-sixième, `accounting.read`,
  * `accounting.post`, `accounting.close`, `accounting.export` et `accounting.manage`
- * (ADR-0049 § 8.1) les quarante-septième à cinquante et unième.
+ * (ADR-0049 § 8.1) les quarante-septième à cinquante et unième, `sales.contract` et
+ * `sales.contract.approve` (ADR-0050 § 8.1) les cinquante-deuxième et cinquante-troisième.
  */
 export const ACTIONS = [
   'organization.manage',
@@ -227,6 +230,12 @@ export const ACTIONS = [
   'accounting.close',
   'accounting.export',
   'accounting.manage',
+  // ADR-0050 — V0 : contrats clients, commandes clients, avenants (§ 8.1). Préparer une
+  // facture depuis un engagement reste sous `sales.manage`, l'émettre sous `sales.invoice`.
+  // Approuver (ⓢ, `contractApprovalDecision`), constater une reconduction et résilier
+  // engagent l'organisation : `sales.contract.approve`, interdit absolu de plateforme.
+  'sales.contract',
+  'sales.contract.approve',
 ] as const;
 
 export type Action = (typeof ACTIONS)[number];
@@ -301,7 +310,7 @@ export type OrgGrant = 'allow' | 'deny' | 'allow_sod' | 'allow_project' | 'condi
 /**
  * MATRICE RÔLE ORGANISATION × ACTION — transcription littérale d'ADR-0012 §3.
  *
- * Le type impose 12 rôles × 51 actions : oublier une case ne compile pas.
+ * Le type impose 12 rôles × 53 actions : oublier une case ne compile pas.
  * `permissions.test.ts` redéclare cette matrice en littéral (elle n'est PAS
  * importée d'ici) : toute modification de production casse le test et force une
  * mise à jour consciente de l'ADR et de docs/12. C'est le garde-fou central.
@@ -391,6 +400,10 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'accounting.close': 'allow',
       'accounting.export': 'allow',
       'accounting.manage': 'allow_sod',
+      // ADR-0050 — V0 (§ 8.1) : prépare et approuve contrats et avenants (ⓢ :
+      // `contractApprovalDecision`) ; constate une reconduction, résilie, règle.
+      'sales.contract': 'allow',
+      'sales.contract.approve': 'allow_sod',
     },
     // Administrateur — « membres, projets, paramètres ». Gouvernance technique,
     // pas autorité financière : ni `billing.manage`, ni `plan.approve`, ni
@@ -465,6 +478,10 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'accounting.close': 'deny',
       'accounting.export': 'deny',
       'accounting.manage': 'deny',
+      // ADR-0050 — V0 (§ 8.1) : prépare contrats et commandes comme il gère clients et
+      // catalogue ; n'approuve pas (motif de `sales.invoice` et `accounting.post`).
+      'sales.contract': 'allow',
+      'sales.contract.approve': 'deny',
     },
     // Directeur financier — « plans, validation, réalisé, rapports ». L'autorité
     // financière : approuve et clôture. Cible de la migration des anciens `member`
@@ -525,6 +542,9 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'accounting.close': 'allow',
       'accounting.export': 'allow',
       'accounting.manage': 'allow_sod',
+      // ADR-0050 — V0 (§ 8.1) : prépare et approuve (ⓢ), comme le Propriétaire.
+      'sales.contract': 'allow',
+      'sales.contract.approve': 'allow_sod',
     },
     // Comptable — « réalisé, mapping, clôture selon permission ». Constate, ne
     // projette pas : ni `inputs.update`, ni `plan.calculate`. Contrepartie de R2.
@@ -591,6 +611,10 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'accounting.close': 'allow',
       'accounting.export': 'allow',
       'accounting.manage': 'allow_sod',
+      // ADR-0050 — V0 (§ 8.1) : prépare ; n'approuve pas (il ne gouverne pas les
+      // engagements commerciaux, décision ouverte n° 2).
+      'sales.contract': 'allow',
+      'sales.contract.approve': 'deny',
     },
     // Analyste — « scénarios, analyses, commentaires ». Modélise et calcule,
     // n'approuve ni n'importe le réalisé.
@@ -653,6 +677,9 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'accounting.close': 'deny',
       'accounting.export': 'deny',
       'accounting.manage': 'deny',
+      // ADR-0050 — V0 (§ 8.1) : lit les ventes, n'engage pas l'organisation.
+      'sales.contract': 'deny',
+      'sales.contract.approve': 'deny',
     },
     // Chef de projet — « projets autorisés et saisie ». Tout est `allow_project` :
     // le rôle n'a de sens qu'avec des assignations de projet, qui n'existent pas
@@ -716,6 +743,9 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'accounting.close': 'deny',
       'accounting.export': 'deny',
       'accounting.manage': 'deny',
+      // ADR-0050 — V0 (§ 8.1) : rôle non attribuable, rien.
+      'sales.contract': 'deny',
+      'sales.contract.approve': 'deny',
     },
     // Conseiller — « consultation, commentaires, recommandations ». Typiquement
     // EXTERNE (mentor, banquier invité) : pas de `report.export`, on lui ouvre la
@@ -781,6 +811,9 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'accounting.close': 'deny',
       'accounting.export': 'deny',
       'accounting.manage': 'deny',
+      // ADR-0050 — V0 (§ 8.1) : externe, sans les ventes.
+      'sales.contract': 'deny',
+      'sales.contract.approve': 'deny',
     },
     // Lecteur — lecture seulement. `analytics.read` est conservé : le refuser
     // viderait le rôle de son sens (ADR-0012 §3).
@@ -841,6 +874,9 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'accounting.close': 'deny',
       'accounting.export': 'deny',
       'accounting.manage': 'deny',
+      // ADR-0050 — V0 (§ 8.1) : lecture seule.
+      'sales.contract': 'deny',
+      'sales.contract.approve': 'deny',
     },
     // Commercial — « CRM, devis et suivi des clients » (ADR-0040 § 4.2, D3). Dix
     // actions sur quarante-six : il gère le CRM et prépare les devis, consulte clients,
@@ -907,6 +943,10 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'accounting.close': 'deny',
       'accounting.export': 'deny',
       'accounting.manage': 'deny',
+      // ADR-0050 — V0 (§ 8.1) : prépare le contrat de l'affaire qu'il a gagnée, comme le
+      // devis (iso-privilège avec `sales.quote`) ; n'approuve pas (décision ouverte n° 3).
+      'sales.contract': 'allow',
+      'sales.contract.approve': 'deny',
     },
     // Responsable RH — « dossiers du personnel, absences et documents RH » (ADR-0045 § 4.2,
     // O6). Huit actions RH sur quarante-six (onze avec celles d'ADR-0046), socle compris : la
@@ -969,6 +1009,9 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'accounting.close': 'deny',
       'accounting.export': 'deny',
       'accounting.manage': 'deny',
+      // ADR-0050 — V0 (§ 8.1) : sans les ventes.
+      'sales.contract': 'deny',
+      'sales.contract.approve': 'deny',
     },
     // Magasinier — « réceptionne, range, sort et compte le stock » (ADR-0046 § 8.2, O6).
     // Neuf actions sur quarante-six, socle compris : il tient le magasin sans être un acteur
@@ -1029,9 +1072,12 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'accounting.close': 'deny',
       'accounting.export': 'deny',
       'accounting.manage': 'deny',
+      // ADR-0050 — V0 (§ 8.1) : sans les ventes.
+      'sales.contract': 'deny',
+      'sales.contract.approve': 'deny',
     },
     // Expert-comptable (externe) — « consulte et exporte la comptabilité de l'organisation pour
-    // la réviser » (ADR-0049 § 8.2, O7). Trois actions sur cinquante et une, socle compris :
+    // la réviser » (ADR-0049 § 8.2, O7). Trois actions sur cinquante-trois, socle compris :
     // comme le Conseiller, il est EXTERNE et n'écrit rien — ni écriture, ni vente, ni paiement,
     // ni clôture, ni paramétrage. Il n'a ni `sales.read`, ni `purchase.read`, ni
     // `treasury.read` : il voit la COPIE D'AFFICHAGE de la pièce portée par l'écriture, pas le
@@ -1089,6 +1135,9 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'accounting.close': 'deny',
       'accounting.export': 'allow',
       'accounting.manage': 'deny',
+      // ADR-0050 — V0 (§ 8.1) : externe, n'engage pas l'organisation envers un client.
+      'sales.contract': 'deny',
+      'sales.contract.approve': 'deny',
     },
   };
 
@@ -1187,6 +1236,11 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'accounting.close': 'forbidden',
     'accounting.export': 'forbidden',
     'accounting.manage': 'forbidden',
+    // ADR-0050 — V0 (§ 8.1) : préparer sous accès délégué, comme `sales.manage` ;
+    // approuver, constater, résilier : interdit absolu (`PLATFORM_FORBIDDEN_ACTIONS`) —
+    // la plateforme n'engage jamais un client envers ses propres clients.
+    'sales.contract': 'delegated',
+    'sales.contract.approve': 'forbidden',
   },
   platform_admin: {
     'organization.manage': 'native',
@@ -1240,6 +1294,9 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'accounting.close': 'forbidden',
     'accounting.export': 'forbidden',
     'accounting.manage': 'forbidden',
+    // ADR-0050 — V0 (§ 8.1) : comme `sales.quote` ; approuver est un interdit absolu.
+    'sales.contract': 'forbidden',
+    'sales.contract.approve': 'forbidden',
   },
   // « Le support ne voit jamais les données financières sans consentement
   // explicite, durée limitée et audit » (docs/12) — d'où trois `delegated` et
@@ -1302,6 +1359,9 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'accounting.close': 'forbidden',
     'accounting.export': 'forbidden',
     'accounting.manage': 'forbidden',
+    // ADR-0050 — V0 (§ 8.1) : comme `sales.quote` ; approuver est un interdit absolu.
+    'sales.contract': 'forbidden',
+    'sales.contract.approve': 'forbidden',
   },
   platform_billing: {
     'organization.manage': 'forbidden',
@@ -1355,6 +1415,9 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'accounting.close': 'forbidden',
     'accounting.export': 'forbidden',
     'accounting.manage': 'forbidden',
+    // ADR-0050 — V0 (§ 8.1) : comme `sales.quote` ; approuver est un interdit absolu.
+    'sales.contract': 'forbidden',
+    'sales.contract.approve': 'forbidden',
   },
   // Vides sur cette matrice : opèrent sur des ressources de portée plateforme
   // (templates, Country Packs) qui n'ont pas d'action granulaire dans docs/12 —
@@ -1411,6 +1474,9 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'accounting.close': 'forbidden',
     'accounting.export': 'forbidden',
     'accounting.manage': 'forbidden',
+    // ADR-0050 — V0 (§ 8.1) : comme `sales.quote` ; approuver est un interdit absolu.
+    'sales.contract': 'forbidden',
+    'sales.contract.approve': 'forbidden',
   },
   platform_country_pack_manager: {
     'organization.manage': 'forbidden',
@@ -1464,12 +1530,15 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     'accounting.close': 'forbidden',
     'accounting.export': 'forbidden',
     'accounting.manage': 'forbidden',
+    // ADR-0050 — V0 (§ 8.1) : comme `sales.quote` ; approuver est un interdit absolu.
+    'sales.contract': 'forbidden',
+    'sales.contract.approve': 'forbidden',
   },
 };
 
 /**
- * Les dix interdits absolus de la plateforme (ADR-0012 §4, amendé par ADR-0021 §8,
- * ADR-0023 § S25e.11, ADR-0045 § 4.1 et ADR-0049 § 8.1).
+ * Les onze interdits absolus de la plateforme (ADR-0012 §4, amendé par ADR-0021 §8,
+ * ADR-0023 § S25e.11, ADR-0045 § 4.1, ADR-0049 § 8.1 et ADR-0050 § 8.1).
  *
  * Aucun rôle plateforme, super-administrateur compris, et aucun accès délégué ne
  * peut approuver un plan, clôturer une période, exporter un rapport client ni
@@ -1482,7 +1551,9 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
  * les coordonnées bancaires ni la pièce d'identité du personnel d'un client ;
  * `accounting.post`, `accounting.close`, `accounting.export` et `accounting.manage`
  * (ADR-0049 § 8.1) : la plateforme n'écrit, ne clôt, n'exporte ni ne paramètre jamais les
- * livres d'un client (motif de `period.close` et `report.export`).
+ * livres d'un client (motif de `period.close` et `report.export`) ;
+ * `sales.contract.approve` (ADR-0050 § 8.1) : approuver un contrat, en constater la
+ * reconduction ou le résilier engage le client envers ses propres clients.
  *
  * Cette constante n'est pas décorative : `canPlatform()` la vérifie AVANT la
  * matrice, et un test s'assure qu'aucune case de la matrice ne la contredit.
@@ -1501,6 +1572,9 @@ export const PLATFORM_FORBIDDEN_ACTIONS: readonly Action[] = [
   'accounting.close',
   'accounting.export',
   'accounting.manage',
+  // ADR-0050 — V0 (§ 8.1) : la plateforme n'engage jamais un client envers ses propres
+  // clients (approuver, constater une reconduction, résilier).
+  'sales.contract.approve',
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1769,6 +1843,8 @@ export const APPROVER_ROLES: readonly OrgRole[] = ORG_ROLES.filter(
 // ADR-0049 — K0 (§ 8.3) : `accounting.post` (validation d'une opération diverse,
 // `manualEntryDecision`) et `accounting.manage` (validation d'un jeu de règles,
 // `ruleSetDecision`).
+// ADR-0050 — V0 (§ 8.3) : `sales.contract.approve` (approbation d'un contrat ou d'un
+// avenant, constat d'une reconduction, `contractApprovalDecision`).
 export const APPROVAL_ACTIONS = [
   'plan.approve',
   'purchase.approve',
@@ -1776,6 +1852,7 @@ export const APPROVAL_ACTIONS = [
   'stock.manage',
   'accounting.post',
   'accounting.manage',
+  'sales.contract.approve',
 ] as const;
 export type ApprovalAction = (typeof APPROVAL_ACTIONS)[number];
 
@@ -2368,6 +2445,59 @@ export function accountingReopenDecision(input: AccountingReopenInput): Accounti
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ADR-0050 — V0 : contrats clients, avenants et reconductions (§ 8.3)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Entrée de `contractApprovalDecision` : faits déjà lus par le service, rien d'autre. */
+export interface ContractApprovalInput {
+  readonly approverUserId: string;
+  /**
+   * Membre qui a soumis le contrat ou l'avenant, ou préparé la reconduction à constater ;
+   * `null` quand personne ne l'a préparé (terme suivant proposé par le moteur).
+   */
+  readonly submittedBy: string | null;
+  /** Créateur du contrat ou de l'avenant ; `null` pour une reconduction proposée. */
+  readonly createdBy: string | null;
+  /**
+   * Nombre de détenteurs EFFECTIFS de `sales.contract.approve` dans l'organisation
+   * (`AuthzService.countApprovers(org, 'sales.contract.approve')`, ajouts compris,
+   * retraits déduits — ADR-0041 G4). Jamais un compte par rôle.
+   */
+  readonly holdersCount: number;
+  /** Réglage `sales_contract_settings.allowSoleApprover` (défaut `true`, § 2.1). */
+  readonly allowSoleApprover: boolean;
+}
+
+/**
+ * Résultat typé ; le service le traduit en réponse HTTP (`409 SELF_APPROVAL_FORBIDDEN`).
+ * `soleApprover` marque le geste rendu possible par l'échappatoire (copié dans
+ * `approvals[].soleApprover`, audit).
+ */
+export type ContractApprovalDecision =
+  | { readonly ok: false; readonly code: 'SELF_APPROVAL_FORBIDDEN' }
+  | { readonly ok: true; readonly soleApprover: boolean };
+
+/**
+ * ADR-0050 § 8.3 — séparation dynamique de l'approbation d'un contrat, d'un avenant, ou du
+ * constat d'une reconduction préparée par un autre, sans aucun `if (role === …)` : la
+ * détention de `sales.contract.approve` est vérifiée en amont par le guard (droits
+ * effectifs) ; cette fonction ne juge que les PERSONNES.
+ *
+ * Celui qui a soumis ou créé ne l'approuve pas (ni ne le rejette), sauf **approbateur
+ * unique** : `allowSoleApprover` et un seul détenteur effectif ; le geste est alors marqué
+ * `soleApprover: true`. Aucune paire `SOD_PAIRS` : elle empêcherait l'entrepreneur seul de
+ * contracter (motif ADR-0049 § 8.3).
+ */
+export function contractApprovalDecision(input: ContractApprovalInput): ContractApprovalDecision {
+  const isSelf =
+    (input.submittedBy !== null && input.submittedBy === input.approverUserId) ||
+    (input.createdBy !== null && input.createdBy === input.approverUserId);
+  if (!isSelf) return { ok: true, soleApprover: false };
+  if (input.allowSoleApprover && input.holdersCount <= 1) return { ok: true, soleApprover: true };
+  return { ok: false, code: 'SELF_APPROVAL_FORBIDDEN' };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ADR-0041 — A1 : autorisations par membre (titre + écart)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -2456,6 +2586,11 @@ export const ACTION_DEPENDENCIES: Readonly<Partial<Record<Action, readonly Actio
   'accounting.close': ['accounting.read'],
   'accounting.export': ['accounting.read'],
   'accounting.manage': ['accounting.read'],
+  // ADR-0050 — V0 (§ 8.3) : préparer ou approuver un engagement suppose de lire les ventes.
+  // Préparer une facture depuis un engagement exige en plus `sales.manage` : cumul de
+  // route, pas une dépendance.
+  'sales.contract': ['sales.read'],
+  'sales.contract.approve': ['sales.read'],
 };
 
 /**
@@ -2516,6 +2651,9 @@ export const ACTION_DOMAINS: readonly {
       'sales.read',
       'sales.manage',
       'sales.quote',
+      // ADR-0050 — V0 (§ 8.3) : après `sales.quote`, aucun domaine nouveau.
+      'sales.contract',
+      'sales.contract.approve',
       'sales.invoice',
       'sales.receipt',
       'fiscal.manage',
@@ -2625,6 +2763,9 @@ export const ACTION_LABELS: Readonly<Record<Action, string>> = {
   'accounting.close': 'Clôturer les périodes comptables',
   'accounting.export': 'Exporter la comptabilité',
   'accounting.manage': 'Paramétrer la comptabilité',
+  // ADR-0050 — V0 (§ 8.1).
+  'sales.contract': 'Préparer contrats et commandes',
+  'sales.contract.approve': 'Approuver les contrats',
 };
 
 /**

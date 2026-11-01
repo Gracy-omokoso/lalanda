@@ -489,6 +489,82 @@ describe('ADR-0041 § 4 et § 5 — dépendances, domaines et libellés', () => 
     expect(NON_DELEGABLE_ACTIONS).toEqual(['billing.manage']);
   });
 
+  it('ADR-0050 § 8.3 — domaine « Ventes et facturation » élargi après `sales.quote` ; libellés, dépendances, aucune paire nouvelle', () => {
+    expect(ACTION_DOMAINS).toHaveLength(13);
+    expect(ACTION_DOMAINS.find((d) => d.key === 'sales')).toEqual({
+      key: 'sales',
+      label: 'Ventes et facturation',
+      actions: [
+        'sales.read',
+        'sales.manage',
+        'sales.quote',
+        'sales.contract',
+        'sales.contract.approve',
+        'sales.invoice',
+        'sales.receipt',
+        'fiscal.manage',
+      ],
+    });
+    expect(ACTION_LABELS['sales.contract']).toBe('Préparer contrats et commandes');
+    expect(ACTION_LABELS['sales.contract.approve']).toBe('Approuver les contrats');
+    for (const a of ['sales.contract', 'sales.contract.approve'] as const) {
+      expect(requiredActionsOf(a), a).toEqual(['analytics.read', 'sales.read']);
+    }
+    // La règle utile (ne pas approuver ce qu'on a préparé) est dynamique
+    // (`contractApprovalDecision`) : une paire statique empêcherait l'entrepreneur seul de
+    // contracter.
+    expect(SOD_PAIRS).toHaveLength(3);
+    expect(SOD_PAIRS.flat().some((a) => a.startsWith('sales.contract'))).toBe(false);
+    expect(NON_DELEGABLE_ACTIONS).toEqual(['billing.manage']);
+  });
+
+  it('ADR-0050 § 8.3 — `sales.contract.approve` s’ajoute à un Comptable par écart ; sans `sales.read`, dépendance manquante', () => {
+    // Décision ouverte n° 2 : un ajout par membre reste possible.
+    expect(
+      validateOverrides({
+        actorRole: 'owner',
+        actorCtx: NO_OVERRIDES,
+        targetRole: 'accountant',
+        targetCtxBefore: NO_OVERRIDES,
+        grants: ['sales.contract.approve'],
+        revokes: [],
+        actorIsTarget: false,
+      }),
+    ).toMatchObject({ ok: true, grants: ['sales.contract.approve'] });
+    expect(
+      validateOverrides({
+        actorRole: 'owner',
+        actorCtx: NO_OVERRIDES,
+        targetRole: 'hr_manager',
+        targetCtxBefore: NO_OVERRIDES,
+        grants: ['sales.contract'],
+        revokes: [],
+        actorIsTarget: false,
+      }),
+    ).toEqual({
+      ok: false,
+      code: 'PERMISSION_DEPENDENCY_MISSING',
+      action: 'sales.contract',
+      missing: ['sales.read'],
+    });
+    // Le Commercial ne reçoit pas l'approbation d'un acteur qui ne la détient pas (G1).
+    expect(
+      validateOverrides({
+        actorRole: 'admin',
+        actorCtx: NO_OVERRIDES,
+        targetRole: 'sales_rep',
+        targetCtxBefore: NO_OVERRIDES,
+        grants: ['sales.contract.approve'],
+        revokes: [],
+        actorIsTarget: false,
+      }),
+    ).toEqual({
+      ok: false,
+      code: 'PERMISSION_ESCALATION',
+      actions: ['sales.contract.approve'],
+    });
+  });
+
   it('ADR-0049 § 8.3 — treizième domaine « Comptabilité », libellés et dépendances ; aucune paire nouvelle', () => {
     expect(ACTION_DOMAINS[12]).toEqual({
       key: 'accounting',

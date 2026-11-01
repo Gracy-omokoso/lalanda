@@ -135,6 +135,32 @@ droit congolais. Aucune règle de droit congolais n’est pour autant posée ici
    dossiers et des pièces après la sortie (réglage `retention` vide par défaut :
    aucune purge automatique, anonymisation manuelle seulement).
 
+10. **Contrats et commandes des organisations clientes (ADR-0050, proposé).**
+    Lalanda tient les métadonnées, les dates et les copies signées des contrats
+    que les organisations clientes concluent avec **leurs** clients ; les clauses
+    sont **saisies** par l'utilisateur, Lalanda calcule des dates sans en juger la
+    validité. Questions JU1 à JU7 d'ADR-0050 :
+    - **JU1 — Reconduction tacite** : validité entre professionnels et envers un
+      consommateur ; information préalable du client (délai, forme) ; durée ou
+      nombre maximal de reconductions.
+    - **JU2 — Préavis** : préavis minimal légal selon la nature du contrat ;
+      décompte (jours calendaires, date de réception).
+    - **JU3 — Mentions obligatoires** d'un contrat commercial et d'une commande ;
+      langue ; mentions propres aux contrats conclus avec un consommateur.
+    - **JU4 — Preuve** : valeur probante d'une copie PDF d'un contrat signé à la
+      main ; reconnaissance d'une signature électronique (simple ou qualifiée) —
+      préalable à toute intégration de signature (décision ouverte n° 6).
+    - **JU5 — Conservation** des contrats, avenants et commandes (rejoint le
+      point 6).
+    - **JU6 — Données personnelles des signataires** (nom, fonction) : base légale
+      et durée (rejoint le point 9).
+    - **JU7 — Modification du prix** d'un contrat en cours ou reconduit : avenant
+      exigé, ou clause d'indexation admise.
+
+    Tant qu'il n'a pas été répondu, aucun écran ne dit « conforme », « valable
+    juridiquement » ni « reconduit automatiquement » (critère 18 d'ADR-0050) ; une
+    reconduction tacite est **constatée** par un humain, jamais appliquée seule.
+
 **Registre de traitement — « gestion du personnel » (ADR-0045, lot H2).**
 Finalité : tenue du registre du personnel de l’organisation cliente, organigramme,
 absences, échéances (paie exclue). Catégories : identité et poste ; salaire de
@@ -453,6 +479,7 @@ que personne ne s’en aperçoive.
 | Traitement des taxes (TVA ou équivalent) selon le pays de l’acheteur | CGV |
 | Frais de recouvrement selon le droit applicable | CGV |
 | Gestion du personnel des clients : qualification, information des salariés, conservation (§ 1.3, point 9) | Confidentialité, ADR-0045 |
+| Contrats des organisations clientes : reconduction tacite, préavis, mentions, preuve, conservation, signataires, prix (§ 1.3, point 10 ; JU1 à JU7) | ADR-0050 |
 
 ### 3.2 Décisions commerciales (non arbitrées — rien n’a été inventé)
 
