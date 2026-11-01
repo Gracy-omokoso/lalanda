@@ -1565,3 +1565,70 @@ describe('ADR-0049 — K4 : référentiel et réglages de la comptabilité', () 
     }
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADR-0049 — K5 : écritures, « À comptabiliser », lettrage, synchronisation (§ 11)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Contrôleurs nommés `Bookkeeping…` : le bloc K4 ci-dessus énumère à l'égalité stricte
+// les routes `Accounting…Controller`.
+
+import { BookkeepingEntriesController } from '../accounting/entries/bookkeeping-entries.controller.js';
+import { BookkeepingLetteringController } from '../accounting/lettering/bookkeeping-lettering.controller.js';
+import { BookkeepingPendingController } from '../accounting/pending/bookkeeping-pending.controller.js';
+import { BookkeepingSyncController } from '../accounting/sync/bookkeeping-sync.controller.js';
+
+const CONTROLEURS_K5 = [
+  BookkeepingEntriesController,
+  BookkeepingPendingController,
+  BookkeepingLetteringController,
+  BookkeepingSyncController,
+];
+(CONTROLEURS as unknown[]).push(...CONTROLEURS_K5);
+TOUTES_LES_ROUTES.push(
+  ...CONTROLEURS_K5.flatMap((c) => routesDe(c as new (...args: never[]) => unknown)),
+);
+
+describe('ADR-0049 — K5 : écritures et synchronisation de la comptabilité', () => {
+  it('chaque route déclare la permission de l’ADR (§ 11)', () => {
+    const attendu: Record<string, Action[]> = {
+      'BookkeepingEntriesController.list': ['accounting.read'],
+      'BookkeepingEntriesController.search': ['accounting.read'],
+      'BookkeepingEntriesController.get': ['accounting.read'],
+      'BookkeepingEntriesController.create': ['accounting.post'],
+      'BookkeepingEntriesController.update': ['accounting.post'],
+      // Case ⓢ : `manualEntryDecision` dans le service.
+      'BookkeepingEntriesController.validate': ['accounting.post'],
+      'BookkeepingEntriesController.reverse': ['accounting.post'],
+      'BookkeepingEntriesController.remove': ['accounting.post'],
+      'BookkeepingPendingController.list': ['accounting.read'],
+      'BookkeepingPendingController.resolve': ['accounting.post'],
+      'BookkeepingLetteringController.letter': ['accounting.post'],
+      'BookkeepingLetteringController.unletter': ['accounting.post'],
+      'BookkeepingSyncController.run': ['accounting.manage'],
+      'BookkeepingSyncController.regenerate': ['accounting.manage'],
+      'BookkeepingSyncController.links': ['accounting.read'],
+      'BookkeepingSyncController.putLink': ['accounting.manage'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) => /^Bookkeeping\w+Controller\./.test(r.cle));
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+      expect(route!.rolesPlateforme, cle).toBeUndefined();
+      expect(SANS_PERMISSION[cle], cle).toBeUndefined();
+    }
+  });
+
+  it('aucune écriture comptable n’est ouverte à la plateforme (§ 8.1)', () => {
+    const ecritures = TOUTES_LES_ROUTES.filter(
+      (r) => /^Bookkeeping\w+Controller\./.test(r.cle) && !r.actions?.includes('accounting.read'),
+    );
+    expect(ecritures.length).toBeGreaterThan(0);
+    for (const route of ecritures) {
+      for (const action of route.actions ?? []) {
+        expect(PLATFORM_FORBIDDEN_ACTIONS as readonly string[], route.cle).toContain(action);
+      }
+    }
+  });
+});

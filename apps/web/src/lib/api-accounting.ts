@@ -20,16 +20,23 @@ import type {
   AccountingAuxiliaryKind,
   AccountingBookCurrency,
   AccountingConfirmation,
-  AccountingEntryStatus,
-  AccountingPendingReason,
-  AccountingRateSource,
   AccountingReconciliationCause,
-  AccountingSourceKind,
   AccountingStatementKind,
   AccountingStatementStatus,
 } from '@lalanda/shared/accounting';
 
 import type {
+  AccountingEntrySearch,
+  AccountingEntryView,
+  AccountingLetteringView,
+  AccountingPage,
+  AccountingPendingView,
+  AccountingRegenerationView,
+  AccountingSyncResult,
+  AccountingTreasuryLinkView,
+  CreateManualEntryBody,
+  PutAccountingTreasuryLinkBody,
+  UpdateManualEntryBody,
   AccountingAccountView,
   AccountingChartPackDetail,
   AccountingChartPackSummary,
@@ -91,69 +98,20 @@ export interface AccountingActivationRefusal {
   missing: AccountingActivationMissingCode[];
 }
 
-/** Ligne d'écriture (§ 2.6). Débit OU crédit en monnaie de tenue ; montant en devise de la pièce. */
-export interface AccountingEntryLineView {
-  accountNumber: string;
-  accountLabel?: string | null;
-  auxiliaryAccountNumber: string | null;
-  label: string;
-  debit: string | null;
-  credit: string | null;
-  currency: AccountingBookCurrency;
-  amount: string;
-  rate: string | null;
-  rateSource: AccountingRateSource | null;
-  letteringCode: string | null;
-}
-
-export interface AccountingEntryView {
-  id: string;
-  journalCode: string;
-  fiscalYear: number | null;
-  number: number | null;
-  date: string;
-  status: AccountingEntryStatus;
-  label: string | null;
-  source: {
-    kind: AccountingSourceKind;
-    id: string;
-    number: string | null;
-    date: string;
-    partyName: string | null;
-  } | null;
-  lines: AccountingEntryLineView[];
-  reversalOf: string | null;
-  reversedBy: string | null;
-  generation: { ruleSetVersion: number; engineVersion: string } | null;
-  manual: { authorId: string; validatorId: string | null; reason: string } | null;
-  suspense: boolean;
-}
-
-/** Corps de `POST /accounting/entries/search` (filtres en corps, § 11). */
-export interface AccountingEntrySearch {
-  journalCode?: string;
-  from?: string;
-  to?: string;
-  accountNumber?: string;
-  sourceNumber?: string;
-  status?: AccountingEntryStatus;
-  cursor?: string;
-  limit?: number;
-}
-
-export interface AccountingPage<T> {
-  items: T[];
-  nextCursor: string | null;
-  reserves?: AccountingReserveView[];
-}
-
-/** « À comptabiliser » (§ 2.7). */
-export interface AccountingPendingView {
-  id: string;
-  reason: AccountingPendingReason;
-  source: { kind: AccountingSourceKind; id: string; number: string | null; date: string };
-  createdAt: string;
-}
+// ADR-0049 — K5 : écritures, « À comptabiliser », synchronisation, lettrage, PUBLIÉS par
+// l'API dans `@lalanda/shared/accounting` (entries.ts) — mêmes formes que les réponses.
+export type {
+  AccountingEntryLineView,
+  AccountingEntrySearch,
+  AccountingEntrySourceView,
+  AccountingEntryView,
+  AccountingLetteringView,
+  AccountingPage,
+  AccountingPendingView,
+  AccountingRegenerationView,
+  AccountingSyncResult,
+  AccountingTreasuryLinkView,
+} from '@lalanda/shared/accounting';
 
 /** Critères en corps du grand livre et des balances (§ 11). */
 export interface AccountingPeriodCriteria {
@@ -327,6 +285,60 @@ export const accountingApi = {
   getEntry: (entryId: string) =>
     jsonRequest<AccountingEntryView>(`/accounting/entries/${seg(entryId)}`, GET),
   listPending: () => jsonRequest<AccountingPage<AccountingPendingView>>('/accounting/pending', GET),
+  /** Opération diverse en brouillon (`accounting.post`, mode actif). */
+  createEntry: (body: z.input<typeof CreateManualEntryBody>) =>
+    jsonRequest<AccountingEntryView>('/accounting/entries', { method: 'POST', body }),
+  updateEntry: (entryId: string, body: z.input<typeof UpdateManualEntryBody>) =>
+    jsonRequest<AccountingEntryView>(`/accounting/entries/${seg(entryId)}`, {
+      method: 'PUT',
+      body,
+    }),
+  /** Séparation des tâches : l'auteur ne valide pas (409 `SELF_APPROVAL_FORBIDDEN`). */
+  validateEntry: (entryId: string, expectedRevision: number) =>
+    jsonRequest<AccountingEntryView>(`/accounting/entries/${seg(entryId)}/validate`, {
+      method: 'POST',
+      body: { expectedRevision },
+    }),
+  reverseEntry: (entryId: string, body: { reason: string; date?: string }) =>
+    jsonRequest<AccountingEntryView>(`/accounting/entries/${seg(entryId)}/reverse`, {
+      method: 'POST',
+      body,
+    }),
+  deleteEntry: (entryId: string) =>
+    jsonRequest<void>(`/accounting/entries/${seg(entryId)}`, { method: 'DELETE' }),
+  resolvePending: (pendingId: string, note: string) =>
+    jsonRequest<AccountingPendingView>(`/accounting/pending/${seg(pendingId)}/resolve`, {
+      method: 'POST',
+      body: { note },
+    }),
+  /** Synchronisation immédiate, idempotente (`accounting.manage`). */
+  sync: () => jsonRequest<AccountingSyncResult>('/accounting/sync', { method: 'POST', body: {} }),
+  /** Aperçu, puis `confirm` : régénération contrôlée d'un mois ouvert. */
+  regenerate: (year: number, month: number, confirm: boolean) =>
+    jsonRequest<AccountingRegenerationView>(
+      `/accounting/periods/${seg(year)}/${seg(month)}/regenerate${confirm ? '?confirm=true' : ''}`,
+      { method: 'POST', body: {} },
+    ),
+  letter: (lineRefs: string[]) =>
+    jsonRequest<AccountingLetteringView>('/accounting/lettering', {
+      method: 'POST',
+      body: { lineRefs },
+    }),
+  unletter: (code: string) =>
+    jsonRequest<{ code: string; lineRefs: string[] }>(
+      `/accounting/lettering/${seg(code)}/unletter`,
+      {
+        method: 'POST',
+        body: {},
+      },
+    ),
+  listTreasuryLinks: () =>
+    jsonRequest<{ items: AccountingTreasuryLinkView[] }>('/accounting/treasury-links', GET),
+  putTreasuryLink: (treasuryAccountId: string, body: PutAccountingTreasuryLinkBody) =>
+    jsonRequest<AccountingTreasuryLinkView>(
+      `/accounting/treasury-links/${seg(treasuryAccountId)}`,
+      { method: 'PUT', body },
+    ),
 
   // Restitution (K6)
   ledger: (body: AccountingPeriodCriteria) =>

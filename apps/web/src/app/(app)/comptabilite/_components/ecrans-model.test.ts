@@ -117,24 +117,34 @@ describe('vue d’ensemble (§ 13)', () => {
 const ECRITURE: AccountingEntryView = {
   id: 'e1',
   journalCode: 'VE',
+  journalKind: 'sales',
   fiscalYear: 2026,
   number: 12,
   date: '2026-10-03',
   status: 'posted',
+  bookCurrency: 'CDF',
   label: null,
   source: {
     kind: 'sales_invoice',
     id: 'abc',
+    event: 'issue',
     number: 'FV-12',
     date: '2026-10-03',
     partyName: 'Client',
   },
+  sourceKey: 'sales_invoice:abc:issue',
   lines: [],
   reversalOf: null,
   reversedBy: null,
-  generation: { ruleSetVersion: 3, engineVersion: '1.0.0' },
+  reversalReason: null,
+  generation: { ruleSetVersion: 3, chartPack: null, engineVersion: '1.0.0' },
   manual: null,
   suspense: false,
+  seq: 12,
+  hash: null,
+  postedAt: null,
+  simulation: false,
+  revision: 2,
 };
 
 describe('écritures (§ 2.6, § 13)', () => {
@@ -175,9 +185,21 @@ describe('écritures (§ 2.6, § 13)', () => {
     expect(
       origineEcriture({
         generation: null,
-        manual: { authorId: 'a', validatorId: null, reason: 'Reclassement' },
+        manual: {
+          authorId: 'a',
+          validatorId: null,
+          soleApprover: false,
+          attachmentKey: null,
+          reason: 'Reclassement',
+        },
       }),
     ).toMatch(/Reclassement/);
+    expect(
+      origineEcriture({
+        ...ECRITURE,
+        generation: { ...ECRITURE.generation!, ruleSetVersion: null },
+      }),
+    ).toMatch(/compte d’attente/);
   });
 });
 
