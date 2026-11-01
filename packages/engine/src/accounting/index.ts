@@ -9,3 +9,6 @@
 export * from './types.js';
 export * from './rules/index.js';
 export * from './entries/index.js';
+
+// ADR-0049 — K1 : pack de plan comptable (lecture, validation, empreinte).
+export * from './chart/index.js';
