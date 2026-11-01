@@ -159,6 +159,14 @@ Côté plateforme, comme `sales.*` : `crm.read` sous accès délégué pour le
 super-administrateur et le support, `crm.manage` sous accès délégué pour le seul
 super-administrateur. Aucune n'est un interdit absolu.
 
+**Formulaire public de prospects** ([ADR-0048](adr/ADR-0048-formulaire-public-de-prospects.md),
+1er nov. 2026) : aucune action ni aucun rôle nouveau. Lire ses réglages (lien compris) relève de
+`crm.read` ; le créer, le régler, l'activer et remplacer son lien, de `crm.manage`. Le responsable
+des demandes doit détenir **effectivement** `crm.manage` (ADR-0041), vérifié à l'enregistrement
+et à chaque soumission. Les deux routes publiques (`/public/lead-forms/*`) n'ont **aucune**
+permission : le jeton fait autorité, elles sont justifiées une à une dans `SANS_PERMISSION`
+(`routes-coverage.test.ts`).
+
 `work.read` — « Consulter les projets et les tâches » —, `work.update` — « Travailler sur
 les tâches » (créer, modifier, déplacer, commenter, joindre, saisir son temps) — et
 `work.manage` — « Gérer les projets » (créer, archiver, supprimer, colonnes, étiquettes,

@@ -75,6 +75,12 @@ Décideurs :
   avec droits par dossier, versions, échéances, chiffrement des pièces sensibles ; huit actions et
   un rôle Magasinier. Statut : **proposé, ADR-0046** (31 oct. 2026).
 
+- [ADR-0048](ADR-0048-formulaire-public-de-prospects.md) — Formulaire public de prospects
+  (web-to-lead, lot C-F d'ADR-0040) : un formulaire par organisation, **désactivé par défaut**,
+  jeton non devinable et révocable, champs dans une liste fermée, consentement explicite avec la
+  politique de l'organisation, prospect + contact + relance « à traiter » (opportunité seulement
+  sur réglage), anti-abus sans CAPTCHA tiers, aucune IP en clair. Statut : **proposé, ADR-0048**
+  (1er nov. 2026).
 - [ADR-0049](ADR-0049-comptabilite-syscohada.md) — Comptabilité SYSCOHADA : pack de plan comptable
   sourcé, daté et versionné (`draft` tant qu'un expert-comptable ne l'a pas relu ; chaque compte
   candidat « à confirmer ») ; écritures générées par lecture des pièces du RUN, reliées à leur pièce,

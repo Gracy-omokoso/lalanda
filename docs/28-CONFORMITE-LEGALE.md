@@ -387,6 +387,33 @@ n’a pas changé.
 - **Cookies** : `active_org_id` dure un an (et non « la session ») ; autres clés
   de stockage local et de session listées.
 
+### 2.7 Prospects entrants : formulaire public (1er nov. 2026, ADR-0048)
+
+Une organisation peut publier un formulaire de contact hébergé par Lalanda (`/f/<jeton>`,
+[ADR-0048](adr/ADR-0048-formulaire-public-de-prospects.md)). C'est un **traitement de
+l'organisation** — elle en est responsable — que Lalanda **héberge et exécute pour son compte**.
+
+- **Données** : nom, entreprise, e-mail, téléphone, message, source (liste fermée, choisie par
+  l'organisation) ; empreinte salée de l'adresse IP (jamais l'adresse en clair).
+- **Finalité** : recontacter la personne au sujet de sa demande (prospect, contact et relance
+  dans le CRM de l'organisation).
+- **Base** : consentement explicite — case non cochée par défaut, texte rédigé par
+  l'organisation, lien **obligatoire** vers **sa** politique de confidentialité (l'activation est
+  refusée sans lui). Le texte affiché est conservé avec la date (`crm_lead_submissions`) : preuve
+  du consentement.
+- **Mention** : « Formulaire hébergé par Lalanda pour le compte de l'organisation destinataire. »
+- **Minimisation** : aucune pièce jointe, aucun CAPTCHA tiers (aucun transfert à Google,
+  hCaptcha ou Cloudflare), aucun e-mail envoyé au visiteur, rien d'exposé de l'organisation
+  au-delà du formulaire lui-même.
+- **Désactivé par défaut**.
+
+**Ouvert, marqué comme tel** : durée de conservation des preuves de consentement (défaut : tant
+que l'organisation existe — à fixer avec le juriste, § 3.1) ; mention de ce rôle de sous-traitant
+dans les CGV et la politique de confidentialité de Lalanda (à rédiger avec le lot des pages
+légales, non modifiées ici) ; exercice des droits d'une personne inscrite par le formulaire (elle
+s'adresse à l'organisation ; la suppression du contact dans le CRM ne supprime pas encore la
+preuve).
+
 ### 2.6 Pieds de page
 
 Les cinq documents sont liés depuis :

@@ -146,6 +146,9 @@ import { StockSettingsController } from '../stock/stock-settings.controller.js';
 import { StockVouchersController } from '../stock/stock-vouchers.controller.js';
 // ADR-0046 — S4
 import { StockSyncController } from '../stock/links/stock-sync.controller.js';
+// ADR-0048 — formulaire public de prospects
+import { CrmLeadFormsController } from '../crm/lead-forms/crm-lead-forms.controller.js';
+import { PublicLeadFormsController } from '../crm/lead-forms/public-lead-forms.controller.js';
 
 /**
  * TOUS les contrôleurs de l'application. Un contrôleur absent de cette liste
@@ -293,6 +296,9 @@ const CONTROLEURS = [
   // ADR-0046 — S6 : bibliothèque de documents.
   DocumentFoldersController,
   LibraryDocumentsController,
+  // ADR-0048 : formulaire public de prospects (réglages et routes publiques).
+  CrmLeadFormsController,
+  PublicLeadFormsController,
 ];
 
 /**
@@ -413,6 +419,21 @@ const SANS_PERMISSION: Record<string, string> = {
     'Vocabulaire statique des autorisations (domaines, libellés, dépendances, paires, ' +
     'actions non délégables, ligne de chaque rôle) tiré de permissions.ts. Ne dit rien ' +
     'd’aucun membre ni d’aucune organisation : la matrice est publique (docs/12).',
+
+  // ── ADR-0048 — formulaire public de prospects ───────────────────────────
+  // Consultées par un VISITEUR ANONYME du site de l'organisation : aucune
+  // session ne peut exister. Le jeton (192 bits, aléatoire, remplaçable) fait
+  // autorité et n'ouvre que SON formulaire ; inconnu, désactivé ou remplacé :
+  // même 404. Rien n'est lu en dehors du titre, des libellés, du consentement
+  // et du logo choisi ; rien n'est écrit en dehors de l'organisation du jeton.
+  'PublicLeadFormsController.config':
+    'Configuration AFFICHÉE d’un formulaire public actif (titre, libellés, consentement, ' +
+    'logo signé si choisi) et ticket de remplissage signé. Jeton non devinable ; aucun ' +
+    'nom d’organisation, identifiant interne ni responsable n’est rendu (ADR-0048 § 5.2).',
+  'PublicLeadFormsController.submit':
+    'Soumission d’un visiteur anonyme : jeton actif, champ piège, délai minimal par ticket ' +
+    'signé, débit par empreinte d’IP et par formulaire, champs bornés, sans pièce jointe ; ' +
+    'écrit seulement dans l’organisation du jeton (ADR-0048 § 3, § 6).',
 };
 
 interface RouteInspectee {
@@ -856,6 +877,12 @@ describe('couverture des routes par le RBAC', () => {
       // dans le service, seulement si un devis est désigné (`quoteId`).
       'WorkBillingController.createFromOpportunity': ['work.manage', 'crm.read'],
       'WorkBillingController.projectForOpportunity': ['work.read', 'crm.read'],
+      // ADR-0048 : lire les réglages du formulaire public sous `crm.read`, les
+      // créer, régler, activer et remplacer le lien sous `crm.manage`.
+      'CrmLeadFormsController.get': ['crm.read'],
+      'CrmLeadFormsController.create': ['crm.manage'],
+      'CrmLeadFormsController.update': ['crm.manage'],
+      'CrmLeadFormsController.rotateToken': ['crm.manage'],
     };
     for (const [cle, actions] of Object.entries(attendu)) {
       const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle);

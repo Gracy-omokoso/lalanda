@@ -7,7 +7,13 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { isAuthPath, isMarketingPath, isProtectedPath } from './routes';
+import {
+  PUBLIC_FORM_PREFIXES,
+  isAuthPath,
+  isMarketingPath,
+  isProtectedPath,
+  isPublicFormPath,
+} from './routes';
 
 describe('isProtectedPath (S20b)', () => {
   it('protège les trois pages de l’espace compte', () => {
@@ -226,6 +232,30 @@ describe('le centre d’aide est ouvert à tous, connecté ou non (S22d)', () =>
     // cette feuille » et atterrirait sur sa liste de projets.
     for (const chemin of chemins) {
       expect(isMarketingPath(chemin), chemin).toBe(false);
+    }
+  });
+});
+
+describe('formulaire public de prospects (ADR-0048)', () => {
+  it('`/f/<jeton>` est joignable sans session', () => {
+    expect(isPublicFormPath('/f/AbCdEfGhIjKlMnOpQrStUvWxYz012345')).toBe(true);
+    expect(isProtectedPath('/f/AbCdEfGhIjKlMnOpQrStUvWxYz012345')).toBe(false);
+  });
+
+  it('n’est ni marketing ni une page d’authentification (un membre connecté y reste)', () => {
+    expect(isMarketingPath('/f/AbCdEfGhIjKlMnOpQrStUvWxYz012345')).toBe(false);
+    expect(isAuthPath('/f/AbCdEfGhIjKlMnOpQrStUvWxYz012345')).toBe(false);
+  });
+
+  it('compare des segments : `/f` seul, `/formation` ou `/fiches` ne sont pas concernés', () => {
+    expect(isPublicFormPath('/f')).toBe(false);
+    expect(isPublicFormPath('/formation/x')).toBe(false);
+    expect(isPublicFormPath('/fiches/x')).toBe(false);
+  });
+
+  it('aucun préfixe public ne recouvre un espace protégé', () => {
+    for (const prefix of PUBLIC_FORM_PREFIXES) {
+      expect(isProtectedPath(`${prefix}/x`)).toBe(false);
     }
   });
 });

@@ -62,3 +62,12 @@ export const DOCUMENT_EMAIL_USER_THROTTLE = { ttl: 3_600_000, limit: 20 } as con
 
 /** Même envoi, 100 par heure et par ORGANISATION, tous membres réunis. */
 export const DOCUMENT_EMAIL_ORG_THROTTLE = { ttl: 3_600_000, limit: 100 } as const;
+
+/**
+ * Formulaire public de prospects (ADR-0048 § 6) : 5 envois par 10 minutes et
+ * par IP CLIENTE (empreinte, tous formulaires réunis)…
+ */
+export const LEAD_FORM_IP_THROTTLE = { ttl: 600_000, limit: 5 } as const;
+
+/** … et 60 envois par heure et par FORMULAIRE (jeton). */
+export const LEAD_FORM_FORM_THROTTLE = { ttl: 3_600_000, limit: 60 } as const;

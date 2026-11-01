@@ -512,6 +512,29 @@ estimés — … ni réalisé, ni plan »), `period`, `asOf`, `minSample` (10) e
 Tout taux et toute durée sous 10 cas : `{ status: 'unavailable', sample, requiredSample }`.
 `truncated: true` si plus de 20 000 opportunités sont en jeu.
 
+### Formulaire public de prospects — implémenté (ADR-0048)
+
+[ADR-0048](adr/ADR-0048-formulaire-public-de-prospects.md). Un formulaire par organisation,
+**désactivé à la création**. Contrats : `@lalanda/shared/crm` (`lead-forms.ts`).
+
+| Méthode et chemin | Permission | Effet |
+|---|---|---|
+| `GET /crm/lead-form` | `crm.read` | `{ form: CrmLeadFormView \| null }` : lien (`token`, `publicPath` = `/f/<jeton>`), réglages, `stats { submissions, lastSubmissionAt }` |
+| `POST /crm/lead-form` `{ title?, consentText?, privacyPolicyUrl?, assigneeUserId? }` | `crm.manage` | crée le formulaire désactivé, six champs par défaut ; `409 LEAD_FORM_EXISTS` |
+| `PUT /crm/lead-form` | `crm.manage` | réglages complets + `enabled`, `expectedRevision` (`409 STALE_REVISION`) ; `400 INVALID_REQUEST` avec `LEAD_FORM_POLICY_REQUIRED`, `LEAD_FORM_ASSIGNEE_REQUIRED`, `CRM_ASSIGNEE_NOT_ELIGIBLE`, `LEAD_FORM_NAME_REQUIRED`, `LEAD_FORM_CONTACT_REQUIRED`, `LEAD_FORM_FIELD_NOT_ENABLED`, `URL_INVALID` ; membre d'une autre organisation : `404 CRM_MEMBER_NOT_FOUND` |
+| `POST /crm/lead-form/rotate-token` `{ expectedRevision }` | `crm.manage` | nouveau jeton ; l'ancien répond 404 aussitôt |
+| `GET /public/lead-forms/:token` | **aucune** (public, sans cookie) | `PublicLeadFormView` : titre, introduction, champs affichés (`key`, `label`, `required`, `maxLength`), consentement (`text`, `policyUrl`), message de remerciement, `branding { logoUrl (signée 24 h), color } \| null`, `ticket` signé ; `cache-control: no-store` |
+| `POST /public/lead-forms/:token/submissions` | **aucune** (public, sans cookie) | `{ ticket, consent, name?, company?, email?, phone?, message?, source?, website? }` (`.strict()`, JSON seulement) → `201 { status: 'received', message }` ; champ piège rempli : même `201`, rien créé ; `400 LEAD_FORM_TOO_FAST` (< 3 s), `400 LEAD_FORM_TICKET_INVALID` (forgé, autre formulaire, > 2 h) ; `400 INVALID_REQUEST` (`FIELD_REQUIRED`, `EMAIL_INVALID`, `PHONE_INVALID`, `LEAD_FORM_FIELD_NOT_ENABLED`, `LEAD_FORM_CONSENT_REQUIRED`) ; `429 LEAD_FORM_RATE_LIMITED` (5 par 10 min et par IP, 60 par heure et par formulaire) |
+
+Jeton inconnu, formulaire désactivé ou jeton remplacé : **`404 LEAD_FORM_NOT_FOUND`**, même corps.
+Une soumission acceptée crée, dans l'organisation du jeton : un compte prospect
+(`origin: 'formulaire'`) et un contact — ou réutilise le contact de même e-mail sans le modifier —,
+une activité `follow_up` « Demande reçue par le formulaire : … » échue à la réception et assignée
+au responsable (notification `crm.activity_assigned`), une opportunité ouverte sans montant
+**seulement** si `createOpportunity`, et une preuve `crm_lead_submissions` (texte de consentement
+affiché, empreinte d'IP). Audit : `crm.lead_form.created`, `.updated`, `.token_rotated`,
+`.submission_accepted`.
+
 ## Achats et fournisseurs — proposé, ADR-0044 (non implémenté)
 
 Contrat **proposé** par [ADR-0044](adr/ADR-0044-achats-et-fournisseurs.md) § 3 (R3 du RUN). Module

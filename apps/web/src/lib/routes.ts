@@ -103,6 +103,21 @@ export function isProtectedPath(pathname: string): boolean {
   );
 }
 
+/**
+ * ADR-0048 — pages PUBLIQUES sans session : le formulaire de prospects d'une
+ * organisation (`/f/<jeton>`), ouvert par un visiteur anonyme de son site.
+ *
+ * Ni protégées (un visiteur n'a pas de compte), ni marketing (un membre connecté
+ * qui ouvre le lien pour le vérifier doit voir le formulaire, pas `/accueil`).
+ * Le jeton fait autorité côté API ; ce classement n'est que l'aiguillage.
+ */
+export const PUBLIC_FORM_PREFIXES = ['/f'] as const;
+
+/** Ce chemin est-il une page publique de formulaire (ADR-0048) ? */
+export function isPublicFormPath(pathname: string): boolean {
+  return PUBLIC_FORM_PREFIXES.some((prefix) => pathname.startsWith(`${prefix}/`));
+}
+
 /** Ce chemin est-il une page d'authentification ? */
 export function isAuthPath(pathname: string): boolean {
   return pathname === '/login' || pathname === '/register';
