@@ -14,3 +14,6 @@ export * from './referential.js';
 
 // ADR-0049 — K5
 export * from './entries.js';
+
+// ADR-0049 — K6
+export * from './reporting.js';

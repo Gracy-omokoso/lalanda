@@ -1632,3 +1632,69 @@ describe('ADR-0049 — K5 : écritures et synchronisation de la comptabilité', 
     }
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADR-0049 — K6 : restitution, clôtures, rapprochement, exports (§ 11)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Contrôleurs nommés `Ledger…` : les blocs K4 et K5 ci-dessus énumèrent à l'égalité
+// stricte les routes `Accounting…Controller` et `Bookkeeping…Controller`.
+
+import { LedgerClosingController } from '../accounting/closing/ledger-closing.controller.js';
+import { LedgerExportsController } from '../accounting/exports/ledger-exports.controller.js';
+import { LedgerReconciliationController } from '../accounting/reconciliation/ledger-reconciliation.controller.js';
+import { LedgerReportsController } from '../accounting/reports/ledger-reports.controller.js';
+import { LedgerStatementsController } from '../accounting/statements/ledger-statements.controller.js';
+
+const CONTROLEURS_K6 = [
+  LedgerReportsController,
+  LedgerStatementsController,
+  LedgerClosingController,
+  LedgerReconciliationController,
+  LedgerExportsController,
+];
+(CONTROLEURS as unknown[]).push(...CONTROLEURS_K6);
+TOUTES_LES_ROUTES.push(
+  ...CONTROLEURS_K6.flatMap((c) => routesDe(c as new (...args: never[]) => unknown)),
+);
+
+describe('ADR-0049 — K6 : restitution, clôtures et exports de la comptabilité', () => {
+  it('chaque route déclare la permission de l’ADR (§ 11)', () => {
+    const attendu: Record<string, Action[]> = {
+      'LedgerReportsController.ledger': ['accounting.read'],
+      'LedgerReportsController.trialBalance': ['accounting.read'],
+      'LedgerReportsController.auxiliaryBalance': ['accounting.read'],
+      'LedgerStatementsController.get': ['accounting.read'],
+      'LedgerClosingController.closePeriod': ['accounting.close'],
+      // Titre de Propriétaire en plus (`accountingReopenDecision`, dans le service).
+      'LedgerClosingController.reopenPeriod': ['accounting.close'],
+      'LedgerClosingController.closeFiscalYear': ['accounting.close'],
+      'LedgerClosingController.reopenFiscalYear': ['accounting.close'],
+      // § 11 : le rapprochement lit aussi le réalisé d'un projet.
+      'LedgerReconciliationController.actuals': ['accounting.read', 'project.read'],
+      'LedgerExportsController.create': ['accounting.export'],
+      'LedgerExportsController.list': ['accounting.read'],
+      'LedgerExportsController.file': ['accounting.export'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) => /^Ledger\w+Controller\./.test(r.cle));
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+      expect(route!.rolesPlateforme, cle).toBeUndefined();
+      expect(SANS_PERMISSION[cle], cle).toBeUndefined();
+    }
+  });
+
+  it('la plateforme lit, mais ne clôt ni n’exporte jamais les livres d’un client (§ 8.1)', () => {
+    const ecritures = TOUTES_LES_ROUTES.filter(
+      (r) => /^Ledger\w+Controller\./.test(r.cle) && !r.actions?.includes('accounting.read'),
+    );
+    expect(ecritures.length).toBeGreaterThan(0);
+    for (const route of ecritures) {
+      for (const action of route.actions ?? []) {
+        expect(PLATFORM_FORBIDDEN_ACTIONS as readonly string[], route.cle).toContain(action);
+      }
+    }
+  });
+});
