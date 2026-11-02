@@ -11,8 +11,10 @@ import {
 
 describe('notifications — contrats partagés', () => {
   it('déclare six types work, cinq crm, un organization, sept purchases, vingt-quatre hr, cinq stock, deux assets, un documents et six sales, préfixés par leur module', () => {
-    expect(NOTIFICATION_KINDS).toHaveLength(57);
+    // ADR-0053 — P6 : `platform.announcement` s'ajoute, hors module d'organisation.
+    expect(NOTIFICATION_KINDS).toHaveLength(58);
     for (const kind of NOTIFICATION_KINDS) {
+      if (kind === 'platform.announcement') continue;
       const module = kind.split('.')[0]!;
       expect(NOTIFICATION_SOURCE_MODULES as readonly string[]).toContain(module);
     }

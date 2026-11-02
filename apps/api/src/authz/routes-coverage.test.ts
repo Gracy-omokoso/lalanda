@@ -1966,6 +1966,8 @@ describe('ADR-0053 — P0 : la garde sans organisation ne vaut que pour la conso
     'AccountingChartPacksPlatformController',
     // ADR-0053 — P3
     'PlatformBillingController',
+    // ADR-0053 — P6
+    'PlatformAnnouncementsController',
   ];
   /** Routes de console sans rôle ni action plateforme, avec leur raison (déjà justifiées). */
   const CONSOLE_SANS_EXIGENCE = ['PlatformAccessController.platformAccess'];
@@ -2521,5 +2523,94 @@ describe('ADR-0053 — P3 : `/admin/billing/**`', () => {
       const methode = (PaymentsController.prototype as unknown as Record<string, object>)[nom]!;
       expect(Reflect.getMetadata(GUARDS_METADATA, methode) ?? [], cle).toEqual([]);
     }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADR-0053 — P6 : annonces de la plateforme (§ 6.6, § 7)
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { MeAnnouncementsController } from '../admin/announcements/me-announcements.controller.js';
+import { PlatformAnnouncementsController } from '../admin/announcements/platform-announcements.controller.js';
+
+const CONTROLEURS_P6 = [PlatformAnnouncementsController, MeAnnouncementsController];
+(CONTROLEURS as unknown[]).push(...CONTROLEURS_P6);
+TOUTES_LES_ROUTES.push(
+  ...CONTROLEURS_P6.flatMap((c) => routesDe(c as new (...args: never[]) => unknown)),
+);
+
+/** Routes du DESTINATAIRE : `AuthGuard`, aucune action (§ 7). */
+const ROUTES_DESTINATAIRE_P6: Record<string, string> = {
+  'MeAnnouncementsController.list':
+    'ADR-0053 P6 : ses PROPRES annonces (accusés de la session), quelle que soit ' +
+    "l'organisation active ; aucune action RBAC (§ 7), la personne vient de la session.",
+  'MeAnnouncementsController.read':
+    'ADR-0053 P6 : marque lue une annonce dont la session est destinataire (404 sinon).',
+  'MeAnnouncementsController.dismiss':
+    'ADR-0053 P6 : ferme une annonce dont la session est destinataire (404 sinon).',
+};
+Object.assign(SANS_PERMISSION, ROUTES_DESTINATAIRE_P6);
+
+describe('ADR-0053 — P6 : `/admin/announcements/**` et `/me/announcements`', () => {
+  const proto = PlatformAnnouncementsController.prototype as unknown as Record<string, object>;
+
+  it('chaque route de console déclare l’action plateforme du § 7, jamais une action d’organisation', () => {
+    const attendu: Record<string, PlatformAction> = {
+      'PlatformAnnouncementsController.list': 'platform.announcements.draft',
+      'PlatformAnnouncementsController.create': 'platform.announcements.draft',
+      'PlatformAnnouncementsController.update': 'platform.announcements.draft',
+      'PlatformAnnouncementsController.preview': 'platform.announcements.draft',
+      'PlatformAnnouncementsController.submit': 'platform.announcements.draft',
+      'PlatformAnnouncementsController.cancel': 'platform.announcements.draft',
+      'PlatformAnnouncementsController.approve': 'platform.announcements.approve',
+      'PlatformAnnouncementsController.send': 'platform.announcements.approve',
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) =>
+      r.cle.startsWith('PlatformAnnouncementsController.'),
+    );
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, action] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle)!;
+      expect(route.actions ?? [], cle).toEqual([]);
+      expect(route.rolesPlateforme, cle).toEqual(platformActionHolders(action));
+      const declarees = (Reflect.getMetadata(
+        REQUIRED_PLATFORM_ACTIONS_KEY,
+        proto[cle.split('.')[1]!]!,
+      ) ?? []) as string[];
+      expect(declarees, cle).toEqual([action]);
+    }
+  });
+
+  it('aucun rôle d’organisation ne prépare ni n’approuve une annonce', () => {
+    for (const action of [
+      'platform.announcements.draft',
+      'platform.announcements.approve',
+    ] as const) {
+      for (const role of platformActionHolders(action)) {
+        expect(role.startsWith('platform_'), `${action} × ${role}`).toBe(true);
+      }
+    }
+  });
+
+  it('toute écriture exige la ré-authentification, sauf l’aperçu qui ne fait que compter', () => {
+    const avecReauth = ['create', 'update', 'submit', 'approve', 'send', 'cancel'];
+    for (const nom of Object.getOwnPropertyNames(proto)) {
+      if (nom === 'constructor' || Reflect.getMetadata('path', proto[nom]!) === undefined) continue;
+      expect(Reflect.getMetadata(P2_REAUTH_KEY, proto[nom]!) === true, nom).toBe(
+        avecReauth.includes(nom),
+      );
+    }
+  });
+
+  it('les routes du destinataire ne portent ni action, ni rôle plateforme, ni garde de console', () => {
+    for (const cle of Object.keys(ROUTES_DESTINATAIRE_P6)) {
+      const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle);
+      expect(route, cle).toBeDefined();
+      expect(route!.actions ?? [], cle).toEqual([]);
+      expect(route!.rolesPlateforme ?? [], cle).toEqual([]);
+    }
+    const gardes = (Reflect.getMetadata(GUARDS_METADATA, MeAnnouncementsController) ??
+      []) as unknown[];
+    expect(gardes).toEqual([AuthGuard]);
   });
 });

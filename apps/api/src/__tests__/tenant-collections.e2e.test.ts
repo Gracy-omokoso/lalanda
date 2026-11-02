@@ -44,6 +44,9 @@ const SANS_ORGANISATION: Readonly<Record<string, string>> = {
   platform_reauth: 'réauthentification des opérateurs de la plateforme',
   // ADR-0053 — P3 : l'organisation visée est nommée `targetOrganizationId` (§ 4).
   platform_plan_grants: 'octrois manuels d’offre par la plateforme (organisation cible nommée)',
+  // ADR-0053 — P6 : annonces par catégorie et accusés par personne, hors de toute société.
+  platform_announcements: 'annonces de la plateforme (catégorie déclarative, aucune société)',
+  platform_announcement_receipts: 'accusés de réception d’une annonce, par personne',
   // La société elle-même : c'est l'`_id` qui sert de clé, pas un `organizationId`.
   organizations: "l'organisation elle-même (son _id est la clé)",
   // Ordonnanceur : verrous de tâches qui parcourent toutes les organisations.
