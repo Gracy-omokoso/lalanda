@@ -1,7 +1,14 @@
 # 28 — Conformité légale
 
 **Statut : Draft.**
-**Version du corpus contractuel : `2026-10-30`** (précédente : `2026-08-09`).
+**Version du corpus contractuel : `2026-11-03`** (précédentes : `2026-10-30`, `2026-08-09`).
+
+> **3 nov. 2026 — décisions de la dirigeante ([ADR-0054](adr/ADR-0054-decisions-du-3-novembre.md)).**
+> « Ne perdons pas le temps, fais ce qui s'applique en RDC Congo et nous allons améliorer au fur et
+> à mesure avec les experts. » Chaque point ouvert ci-dessous porte désormais son état : **tranché le
+> 3 nov. 2026 (ADR-0054), à revoir** — décision prise, source citée ou « choix produit prudent » — ou
+> **maintenu ouvert**, quand il exige un avis du conseil ou une donnée que l'équipe n'a pas. Rien de
+> ce qui est tranché n'est une relecture juridique : `LEGAL_REVIEWED_BY_COUNSEL` reste `false`.
 
 > **AVERTISSEMENT — LES TEXTES LÉGAUX PUBLIÉS PAR LALANDA SONT DES PROJETS.**
 >
@@ -13,7 +20,8 @@
 > bandeau qui le dit au lecteur, piloté par `LEGAL_REVIEWED_BY_COUNSEL` dans
 > `apps/web/src/lib/legal.ts`.
 
-Ce document ne cherche pas à trancher les questions juridiques ouvertes. Il
+Ce document ne tranche pas lui-même les questions juridiques ouvertes (les décisions de la dirigeante
+sont dans les ADR, dont ADR-0054). Il
 recense ce qui a été **construit**, ce qui reste **inconnu**, et ce qui doit être
 **arbitré par un conseil** avant toute mise en service commerciale.
 
@@ -102,31 +110,31 @@ juridiction, transferts). **Elle est caduque** : l’éditeur est une société 
 droit congolais. Aucune règle de droit congolais n’est pour autant posée ici.
 **Ce qui doit être tranché par un juriste :**
 
-1. **Droit applicable au contrat.** La nationalité de l’éditeur ne fixe pas, à
+1. **Maintenu ouvert le 3 nov. 2026 ([ADR-0054](adr/ADR-0054-decisions-du-3-novembre.md)) : avis du conseil ou donnée manquante.** **Droit applicable au contrat.** La nationalité de l’éditeur ne fixe pas, à
    elle seule, le droit du contrat. Faut-il choisir le droit congolais ? Comment
    s’articule-t-il avec les règles impératives protégeant les consommateurs
    d’autres pays de la zone OHADA et de l’Union européenne (diaspora) ?
-2. **Juridiction compétente** et, le cas échéant, médiation préalable ou
+2. **Maintenu ouvert le 3 nov. 2026 ([ADR-0054](adr/ADR-0054-decisions-du-3-novembre.md)) : avis du conseil ou donnée manquante.** **Juridiction compétente** et, le cas échéant, médiation préalable ou
    médiation de la consommation ; opposabilité d’une clause attributive à un
    utilisateur consommateur établi hors de RDC.
-3. **Protection des données.** Régime congolais applicable au traitement par
+3. **Maintenu ouvert le 3 nov. 2026 ([ADR-0054](adr/ADR-0054-decisions-du-3-novembre.md)) : avis du conseil ou donnée manquante.** La politique de confidentialité décrit désormais le rôle de Lalanda « pour le compte de l'organisation » sans qualification juridique (ADR-0054 D8). **Protection des données.** Régime congolais applicable au traitement par
    un responsable établi en RDC ; formalités éventuelles auprès d’une autorité ;
    pour les utilisateurs établis dans l’UE, applicabilité du RGPD à un
    responsable hors UE, désignation d’un représentant dans l’Union.
-4. **Transferts.** Encadrement des transferts vers DigitalOcean (région à
+4. **Maintenu ouvert le 3 nov. 2026 ([ADR-0054](adr/ADR-0054-decisions-du-3-novembre.md)) : avis du conseil ou donnée manquante.** **Transferts.** Encadrement des transferts vers DigitalOcean (région à
    constater) et OpenAI, au regard du droit congolais et, le cas échéant, du
    RGPD.
-5. **Mentions obligatoires** de l’éditeur et des documents commerciaux (§ 1.1) :
+5. **Maintenu ouvert le 3 nov. 2026 ([ADR-0054](adr/ADR-0054-decisions-du-3-novembre.md)) : avis du conseil ou donnée manquante.** **Mentions obligatoires** de l’éditeur et des documents commerciaux (§ 1.1) :
    lesquelles sont exigées, et où.
-6. **Conservation des factures et pièces comptables** : durée applicable à une
+6. **Maintenu ouvert le 3 nov. 2026 ([ADR-0054](adr/ADR-0054-decisions-du-3-novembre.md)) : avis du conseil ou donnée manquante.** **Conservation des factures et pièces comptables** : durée applicable à une
    SARLU congolaise (politique de confidentialité, marqueur conservé).
-7. **Fiscalité des abonnements** et facture normalisée (§ 6).
-8. **Rôle de Televerx LLC** : nature du partenariat (sous-traitant au sens de la
+7. **Maintenu ouvert le 3 nov. 2026 ([ADR-0054](adr/ADR-0054-decisions-du-3-novembre.md)) : avis du conseil ou donnée manquante.** Renvoyé au lot ADR-0047. **Fiscalité des abonnements** et facture normalisée (§ 6).
+8. **Maintenu ouvert le 3 nov. 2026 ([ADR-0054](adr/ADR-0054-decisions-du-3-novembre.md)) : avis du conseil ou donnée manquante.** **Rôle de Televerx LLC** : nature du partenariat (sous-traitant au sens de la
    protection des données ou non, accès aux données de production), qui
    conditionne sa mention éventuelle dans la politique de confidentialité —
    aujourd’hui exclue par décision.
 
-9. **Gestion du personnel des clients (ADR-0045, R4).** Lalanda tient, pour le
+9. **Tranché le 3 nov. 2026 ([ADR-0054](adr/ADR-0054-decisions-du-3-novembre.md)), à revoir.** Rôle décrit « pour le compte de l'organisation » ; pointages conservés 5 ans puis purgés ; autres durées réglées par l'organisation (défaut : aucune purge) ; texte d'information affiché à l'écran de pointage. **Gestion du personnel des clients (ADR-0045, R4).** Lalanda tient, pour le
    compte de l’organisation cliente, des dossiers de salariés (registre non
    sensible ; salaire de base déclaré, coordonnées bancaires, pièces d’identité,
    coordonnées personnelles chiffrés). À qualifier : rôle de Go freelance SARLU
@@ -135,7 +143,7 @@ droit congolais. Aucune règle de droit congolais n’est pour autant posée ici
    dossiers et des pièces après la sortie (réglage `retention` vide par défaut :
    aucune purge automatique, anonymisation manuelle seulement).
 
-10. **Contrats et commandes des organisations clientes (ADR-0050, proposé).**
+10. **Tranché le 3 nov. 2026 ([ADR-0054](adr/ADR-0054-decisions-du-3-novembre.md)), à revoir.** JU1 : reconduction tacite permise si le contrat la prévoit, constatée par un humain ; JU2 : préavis de la clause saisie ; JU3 à JU7 : défauts gardés (détail dans ADR-0054 § 2.4). **Contrats et commandes des organisations clientes (ADR-0050).**
     Lalanda tient les métadonnées, les dates et les copies signées des contrats
     que les organisations clientes concluent avec **leurs** clients ; les clauses
     sont **saisies** par l'utilisateur, Lalanda calcule des dates sans en juger la
@@ -168,9 +176,22 @@ base déclaré, coordonnées bancaires, pièces d’identité, coordonnées pers
 (chiffrés, `hr_employee_private`). Destinataires : détenteurs de `hr.read` pour le
 registre ; de `hr.sensitive.read` (Propriétaire, Directeur financier, Responsable
 RH) pour les données sensibles ; le salarié pour les siennes ; jamais l’IA, les
-exports, les notifications ni la plateforme. Durée : **à fixer avec le juriste**.
+exports, les notifications ni la plateforme. Durée : réglée par l’organisation
+(`hr_settings.retention`, défaut : aucune purge) — tranché le 3 nov. 2026
+(ADR-0054), à revoir.
 
-11. **Console de la plateforme (ADR-0053, proposé).** Questions JA1 à JA7 de l'ADR, non
+**Registre de traitement — « présences » (ADR-0051, lot H12 ; ADR-0054).**
+Finalité : registre de présence tenu par l’organisation cliente, **désactivé par
+défaut**. Catégories : sens du pointage, heure du serveur, origine, note, demandes de
+correction et motif ; aucune position, photo, empreinte ni identifiant d’appareil.
+Destinataires : le collaborateur, son manager, les RH de l’organisation ; jamais la
+plateforme. Information : texte affiché à l’écran de pointage
+(`attendanceEmployeeNotice`). Durée : **5 ans par défaut**, réglable (1 à 600 mois,
+`null` = aucune purge) ; purge quotidienne `hr.attendance.retention`, idempotente,
+journalisée `hr.attendance.purged` — tranché le 3 nov. 2026 (ADR-0054), choix
+produit prudent, à revoir.
+
+11. **Tranché le 3 nov. 2026 ([ADR-0054](adr/ADR-0054-decisions-du-3-novembre.md)), à revoir.** Défauts gardés et décrits dans les CGV et la politique de confidentialité ; une annonce envoyée peut être retirée (ADR-0054 D10). **Console de la plateforme (ADR-0053).** Questions JA1 à JA7 de l'ADR, non
     tranchées : base légale et information pour l'accès des opérateurs de Go freelance SARLU aux
     métadonnées des comptes et organisations (JA1) ; information et contestation d'un blocage ou
     d'une suspension (JA2) ; lecture ou export garantis pendant une suspension (JA3) ; message de
@@ -192,12 +213,12 @@ détenteurs de `performance.read` (Propriétaire, Responsable RH) ; jamais le
 Directeur financier, l’Administrateur, l’IA, le brief, les exports, les
 notifications (l’étape seulement) ni la plateforme. La « prise de connaissance »
 n’est pas un accord (J6). Anonymisation : contenu effacé. Durée de conservation
-après la sortie : **à fixer avec le juriste** (J4 ; réglage
-`retention.reviewsYearsAfterExit`, vide, aucune purge).
+après la sortie : réglée par l’organisation (`retention.reviewsYearsAfterExit`, vide
+par défaut, aucune purge) — tranché le 3 nov. 2026 (ADR-0054), à revoir (J4).
 
-Ces points restent marqués comme questions ouvertes dans les pages concernées
-(CGU § droit applicable, politique de confidentialité § transferts et
-conservation).
+Les points maintenus ouverts restent marqués dans les pages concernées (CGU § droit
+applicable, politique de confidentialité § transferts et conservation, CGV § TVA,
+facturation et rétractation).
 
 ---
 
@@ -344,6 +365,23 @@ l’inscription, à l’instant où l’organisation personnelle vient d’être
 c’est en outre un fait **personnel** — un utilisateur accepte des conditions, pas
 une organisation.
 
+### 2.3 ter Nouvelle acceptation : version `2026-11-03` (3 nov. 2026, ADR-0054)
+
+`LEGAL_VERSION` passe de `2026-10-30` à `2026-11-03` ; l’ancienne valeur reste dans
+`KNOWN_LEGAL_VERSIONS`. Dates `updatedAt` : CGV et politique de confidentialité. L’écran de
+nouvelle acceptation (§ 2.3 bis) redemande l’accord à la prochaine connexion. Contenu :
+
+- **CGV** : applicables dès cette version, paiement manuel compris ; moyens réels (manuel ;
+  Stripe et PayPal seulement s’ils sont proposés) ; prix en USD hors taxes ; essai sans moyen de
+  paiement et sans bascule ; grâce de 7 jours ; aucun remboursement d’une période commencée ;
+  préavis de 30 jours avant hausse ; aucuns frais de recouvrement ; octrois ; administration de
+  la plateforme, blocage, suspension, messages de service retirables ; outils de gestion
+  (contrats clients, formulaire de prospects, RH). La promesse « une facture est émise à chaque
+  échéance », non tenue, est retirée.
+- **Confidentialité** : présences, évaluations, notes de frais, formulaire de prospects,
+  administration de la plateforme ; finalités et durées correspondantes ; rôle de Lalanda pour
+  les données saisies par l’organisation.
+
 ### 2.4 Consentement aux cookies
 
 Logique pure : `apps/web/src/lib/cookie-consent.ts`. Interface :
@@ -425,7 +463,8 @@ n’a pas changé.
   d’abonnement n’est émise. Les CGV disent cet état et portent un nouveau
   marqueur : applicabilité des stipulations aux abonnements payés manuellement.
   **Ce point change le fond du contrat : une nouvelle acceptation est à décider
-  par la dirigeante.**
+  par la dirigeante.** Décidé le 3 nov. 2026 : version `2026-11-03` (§ 2.3 ter,
+  ADR-0054).
 - **IA** : la politique ne citait que les actions correctives. Elle décrit
   désormais aussi Lala (interprétation, échange), l’explication du brief du
   matin, les brouillons du business plan et l’Idea Lab (OpenAI), et l’appel
@@ -458,10 +497,9 @@ l'organisation** — elle en est responsable — que Lalanda **héberge et exéc
   au-delà du formulaire lui-même.
 - **Désactivé par défaut**.
 
-**Ouvert, marqué comme tel** : durée de conservation des preuves de consentement (défaut : tant
-que l'organisation existe — à fixer avec le juriste, § 3.1) ; mention de ce rôle de sous-traitant
-dans les CGV et la politique de confidentialité de Lalanda (à rédiger avec le lot des pages
-légales, non modifiées ici) ; exercice des droits d'une personne inscrite par le formulaire (elle
+**Tranché le 3 nov. 2026 ([ADR-0054](adr/ADR-0054-decisions-du-3-novembre.md)), à revoir.** Conservation des preuves de consentement : tant que l'organisation existe
+(défaut gardé, dit dans la politique de confidentialité) ; rôle de Lalanda décrit dans les CGV et la
+politique de confidentialité (version `2026-11-03`). **Reste ouvert** : exercice des droits d'une personne inscrite par le formulaire (elle
 s'adresse à l'organisation ; la suppression du contact dans le CRM ne supprime pas encore la
 preuve).
 
@@ -478,7 +516,7 @@ dérivé du registre.
 
 ---
 
-## 3. Décisions à faire trancher avant mise en production
+## 3. Décisions à faire trancher avant mise en production — état au 3 nov. 2026
 
 Les points ci-dessous sont, dans les pages, des marqueurs `[À COMPLÉTER : …]`
 **visibles par le lecteur** — à l’exception des mentions d’identification de
@@ -489,40 +527,48 @@ que personne ne s’en aperçoive.
 
 ### 3.1 Questions juridiques (conseil requis)
 
-| Question | Où |
-|---|---|
-| Droit applicable au contrat (§ 1.3) | CGU |
-| Juridiction compétente, médiation préalable, médiation de la consommation | CGU |
-| Plafond de responsabilité retenu | CGU |
-| Bases légales des traitements (contrat, intérêt légitime, obligation légale, consentement) | Confidentialité |
-| Désignation d’un DPO et d’un représentant dans l’UE | Confidentialité |
-| Mentions d’identification non publiées (RCCM, Id. Nat., NIF, siège…) — § 1.1 | Mentions légales (non affichées) |
-| Région du Droplet, localisation des traitements, instrument de transfert | Confidentialité |
-| Procédure de notification d’incident (délai, canal, autorité) | Confidentialité |
-| Droit de rétractation : existence, durée, modalités, exécution immédiate | CGV |
-| Mentions obligatoires du parcours d’achat (droit de la consommation) | CGV |
-| Traitement des taxes (TVA ou équivalent) selon le pays de l’acheteur | CGV |
-| Frais de recouvrement selon le droit applicable | CGV |
-| Gestion du personnel des clients : qualification, information des salariés, conservation (§ 1.3, point 9) | Confidentialité, ADR-0045 |
-| Contrats des organisations clientes : reconduction tacite, préavis, mentions, preuve, conservation, signataires, prix (§ 1.3, point 10 ; JU1 à JU7) | ADR-0050 |
-| Console de la plateforme : accès des opérateurs, blocage et suspension, messages de masse, conservation, statistiques, demandes des autorités (§ 1.3, point 11 ; JA1 à JA7) | ADR-0053 |
+État au 3 nov. 2026 ([ADR-0054](adr/ADR-0054-decisions-du-3-novembre.md)) : **T** = tranché le
+3 nov. 2026 (ADR-0054), à revoir ; **O** = maintenu ouvert (avis du conseil ou donnée manquante).
 
-### 3.2 Décisions commerciales (non arbitrées — rien n’a été inventé)
+| Question | Où | État |
+|---|---|---|
+| Droit applicable au contrat (§ 1.3) | CGU | O |
+| Juridiction compétente, médiation préalable, médiation de la consommation | CGU | O |
+| Plafond de responsabilité retenu | CGU | O |
+| Bases légales des traitements (contrat, intérêt légitime, obligation légale, consentement) | Confidentialité | O |
+| Désignation d’un DPO et d’un représentant dans l’UE | Confidentialité | O |
+| Mentions d’identification non publiées (RCCM, Id. Nat., NIF, siège…) — § 1.1 | Mentions légales (non affichées) | O — la dirigeante ne veut pas les publier |
+| Région du Droplet, localisation des traitements, instrument de transfert | Confidentialité | O |
+| Procédure de notification d’incident (délai, canal, autorité) | Confidentialité | O |
+| Droit de rétractation : existence, durée, modalités, exécution immédiate | CGV | O — aucune règle affirmée ; l’essai gratuit sans moyen de paiement est rappelé |
+| Mentions obligatoires du parcours d’achat (droit de la consommation) | CGV | T — récapitulatif, obligation de payer à la validation, conclusion à la confirmation du paiement |
+| Traitement des taxes (TVA ou équivalent) selon le pays de l’acheteur | CGV | O — prix hors taxes ; TVA à l’expert-comptable (ADR-0047) |
+| Frais de recouvrement selon le droit applicable | CGV | T — aucuns frais |
+| Gestion du personnel des clients : qualification, information des salariés, conservation (§ 1.3, point 9) | Confidentialité, ADR-0045, ADR-0051 | T — pointages 5 ans puis purge ; information à l’écran ; autres durées réglées par l’organisation |
+| Contrats des organisations clientes : reconduction tacite, préavis, mentions, preuve, conservation, signataires, prix (§ 1.3, point 10 ; JU1 à JU7) | ADR-0050 | T |
+| Console de la plateforme : accès des opérateurs, blocage et suspension, messages de masse, conservation, statistiques, demandes des autorités (§ 1.3, point 11 ; JA1 à JA7) | ADR-0053 | T |
 
-| Décision | Où |
-|---|---|
-| Devise(s) de facturation et règle de conversion | CGV |
-| Prix affichés HT ou TTC | CGV |
-| Carte bancaire exigée ou non à l’entrée en essai (`docs/13-PRICING.md` la laisse ouverte) | CGV |
-| Bascule en fin d’essai : reconduction automatique ou arrêt sans prélèvement | CGV |
-| Durée de la période de grâce après l’essai | CGV |
-| Moyens de paiement acceptés (dont mobile money) et prestataire retenu | CGV |
-| Information préalable à la reconduction (délai, canal) | CGV |
-| Politique de remboursement : cas ouverts, délai, modalités | CGV |
-| Délais de relance, de suspension et de conservation après suspension | CGV |
-| Préavis avant hausse de prix | CGV |
+### 3.2 Décisions commerciales
+
+Toutes **tranchées le 3 nov. 2026 (ADR-0054), à revoir** — choix produit prudents alignés sur le
+code, écrits dans les CGV `2026-11-03` :
+
+| Décision | Où | Choix |
+|---|---|---|
+| Devise(s) de facturation et règle de conversion | CGV | USD ; montant et devise : ceux du récapitulatif et des instructions de paiement |
+| Prix affichés HT ou TTC | CGV | Hors taxes (TVA : § 3.1, maintenu ouvert) |
+| Carte bancaire exigée ou non à l’entrée en essai | CGV | Non : aucun moyen de paiement demandé |
+| Bascule en fin d’essai | CGV | Aucune : retour à l’offre gratuite, rien prélevé |
+| Durée de la période de grâce | CGV | 7 jours après impayé (`GRACE_DAYS`) |
+| Moyens de paiement acceptés et prestataire retenu | CGV | Manuel (mobile money, virement) ; Stripe et PayPal s’ils sont proposés |
+| Information préalable à la reconduction | CGV | Période couverte affichée dans l’espace de l’organisation ; aucun e-mail de rappel |
+| Politique de remboursement | CGV | Aucune période commencée remboursée ; double paiement, erreur ou paiement rejeté remboursés sur demande ; crédit de prorata reporté |
+| Délais de relance, de suspension et de conservation après suspension | CGV | Impayé → grâce 7 jours → limites de l’offre gratuite ; données conservées et exportables |
+| Préavis avant hausse de prix | CGV | 30 jours |
 
 ### 3.3 Faits à relever (pas à déduire)
+
+Tous **maintenus ouverts** le 3 nov. 2026 : ce sont des faits à constater, pas des décisions.
 
 | Fait | Où |
 |---|---|
@@ -602,6 +648,7 @@ Questions ouvertes : quelle entité tient les comptes marchands ; TVA applicable
 aux abonnements ; une facture normalisée par encaissement (y compris
 mobile money manuel) ; utilisation du module ventes de Lalanda par
 Go freelance SARLU elle-même (organisation plateforme dotée de ses identifiants
-DGI) ou circuit distinct ; traitement des clients hors RDC. Les CGV promettent
-déjà « une facture est émise à chaque échéance » : la promesse n’est pas tenue
-aujourd’hui.
+DGI) ou circuit distinct ; traitement des clients hors RDC. ~~Les CGV promettent
+« une facture est émise à chaque échéance »~~ : depuis la version `2026-11-03`
+(ADR-0054), les CGV disent qu’aucune facture d’abonnement n’est encore émise et
+gardent un marqueur ; le reste de ce paragraphe est maintenu ouvert (lot ADR-0047).

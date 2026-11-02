@@ -1,6 +1,9 @@
 # ADR-0052 — Mise en route d'une société : une organisation = une entreprise distincte, configurée complètement à sa création, avec statut de complétude, verrous sourcés avant facture et comptabilité, aucune copie implicite et isolation vérifiée de bout en bout
 
 Statut : Proposed
+
+> **3 nov. 2026 — décisions ouvertes tranchées par [ADR-0054](ADR-0054-decisions-du-3-novembre.md)** (valeurs par défaut gardées sauf mention contraire, à revoir avec le juriste et l'expert-comptable).
+
 Date : 2026-11-02
 Décideurs : Gracy Omokoso (dirigeante) — **besoin exprimé**, en ses mots : « normalement nouvelle
 organisation c'est nouvelle entreprise il faut mettre en place un nouvel onboarding de configuration de

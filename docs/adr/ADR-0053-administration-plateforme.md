@@ -1,6 +1,9 @@
 # ADR-0053 — Administration de la plateforme : une console Lalanda séparée de l'espace des organisations, rôles et actions plateforme, blocages motivés et effectifs, abonnements et paiements manuels, fonctionnalités par offre, journaux, annonces par catégorie, statistiques et finances du site
 
 Statut : Proposed
+
+> **3 nov. 2026 — décisions ouvertes tranchées par [ADR-0054](ADR-0054-decisions-du-3-novembre.md)** (valeurs par défaut gardées sauf mention contraire, à revoir avec le juriste et l'expert-comptable).
+
 Date : 2026-11-02
 Décideurs : Gracy Omokoso (dirigeante) — **besoin exprimé** : « éclater l'espace administrateur de
 l'espace membre (organisation) : les infos se mélangent ». Voir chaque compte, les abonnements, les
