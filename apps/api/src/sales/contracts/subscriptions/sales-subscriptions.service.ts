@@ -336,6 +336,7 @@ export class SalesSubscriptionsService {
         : occurrenceComment({
             kind: 'schedule_item',
             number: c.number,
+            itemRef: p.occurrence.itemRef ?? '',
             date: p.occurrence.date,
             label: this.labelOf(p),
           });
@@ -526,7 +527,12 @@ export class SalesSubscriptionsService {
   ): Promise<{ invoiceId: string; warnings: SalesOccurrenceWarning[] } | null> {
     const contractId = String(plan.contract._id);
     const { draft, lines, commentTruncated } = this.draftOf(plan, p, type);
-    const invoice = await this.drafts.create(organizationId, draft, actor);
+    // Reprise après panne : un brouillon portant la clé de l'échéance, sans lien, est
+    // RATTACHÉ au lieu d'en créer un second (jamais deux brouillons par échéance).
+    const recovered = await this.orphanDraftOf(organizationId, plan, draft, lines.length);
+    const invoice = recovered
+      ? { id: recovered }
+      : await this.drafts.create(organizationId, draft, actor);
     const stored = (await this.links.invoicesOf(organizationId, [invoice.id])).get(invoice.id);
     try {
       if (!stored) throw new Error(`Brouillon ${invoice.id} introuvable après sa création`);
@@ -546,11 +552,22 @@ export class SalesSubscriptionsService {
         linkedBy: actor.userId,
       });
     } catch (err) {
-      await this.drafts.remove(organizationId, invoice.id, actor).catch(() => undefined);
+      // Un brouillon rattaché n'est jamais retiré : il préexistait à cette passe.
+      if (!recovered) {
+        await this.drafts.remove(organizationId, invoice.id, actor).catch(() => undefined);
+      }
       if (isDuplicateKey(err)) return null;
       throw err;
     }
     const warnings: SalesOccurrenceWarning[] = [];
+    if (recovered) {
+      warnings.push({
+        code: 'DRAFT_RECOVERED',
+        message:
+          'Un brouillon de cette échéance existait sans lien (préparation interrompue) : il a été rattaché, aucun autre n’a été créé.',
+        details: { invoiceId: recovered },
+      });
+    }
     if (commentTruncated) {
       warnings.push({
         code: 'COMMENT_TRUNCATED',
@@ -582,9 +599,46 @@ export class SalesSubscriptionsService {
         invoiceId: invoice.id,
         type,
         automatic: actor.userId === SUBSCRIPTIONS_ACTOR.userId,
+        recovered: recovered !== null,
       },
     );
     return { invoiceId: invoice.id, warnings };
+  }
+
+  /**
+   * Brouillon ORPHELIN de l'échéance : brouillon de l'organisation, au client, à la devise
+   * et au mode de prix du contrat, portant la clé déterministe de l'échéance (commentaire
+   * C : numéro du contrat et période, ou référence et date de l'échéance), au même nombre
+   * de lignes, et sans aucun lien. C'est la trace d'une préparation interrompue entre la
+   * création du brouillon et la pose du lien. Lecture seule de `sales_invoices`.
+   */
+  private async orphanDraftOf(
+    organizationId: string,
+    plan: ContractPlan,
+    draft: InvoiceDraftInput,
+    lineCount: number,
+  ): Promise<string | null> {
+    const candidates = await this.connection
+      .collection(READ_ONLY_COLLECTIONS.invoices)
+      .find(
+        {
+          organizationId,
+          status: 'draft',
+          type: draft.type,
+          currency: plan.contract.currency,
+          priceMode: plan.contract.priceMode,
+          'customer.customerId': plan.contract.customerId,
+          'comments.C': draft.comments.C,
+        },
+        { projection: { _id: 1, lines: 1 }, sort: { createdAt: 1, _id: 1 }, limit: 20 },
+      )
+      .toArray();
+    for (const c of candidates) {
+      if (((c['lines'] as unknown[] | undefined) ?? []).length !== lineCount) continue;
+      const id = String(c._id);
+      if ((await this.links.linkOfInvoice(organizationId, id)) === null) return id;
+    }
+    return null;
   }
 
   /** Date d'une clé d'échéance (`AAAA-MM-JJ`, ou échéance `item:<ref>` d'un échéancier). */

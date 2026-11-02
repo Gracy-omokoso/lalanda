@@ -93,7 +93,13 @@ export function occurrenceComment(
         periodEnd: string | null;
         date: string;
       }
-    | { kind: 'schedule_item'; number: string; date: string; label: string | null },
+    | {
+        kind: 'schedule_item';
+        number: string;
+        itemRef: string;
+        date: string;
+        label: string | null;
+      },
   max: number = COMMENT_C_MAX,
 ): { text: string; truncated: boolean } {
   let full: string;
@@ -103,7 +109,7 @@ export function occurrenceComment(
         ? `Abonnement ${input.number} — période du ${frenchDay(input.periodStart)} au ${frenchDay(input.periodEnd)}`
         : `Abonnement ${input.number} — échéance du ${frenchDay(input.date)}`;
   } else {
-    full = `Contrat ${input.number} — échéance du ${frenchDay(input.date)}${
+    full = `Contrat ${input.number} — échéance ${input.itemRef} du ${frenchDay(input.date)}${
       input.label ? ` — ${input.label}` : ''
     }`;
   }

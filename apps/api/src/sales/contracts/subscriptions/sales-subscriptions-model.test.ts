@@ -67,14 +67,16 @@ describe('échéancier — règles pures (ADR-0050, V5)', () => {
       occurrenceComment({
         kind: 'schedule_item',
         number: 'CT2701-000001',
+        itemRef: 'E2',
         date: '2027-03-15',
         label: 'Livraison',
       }).text,
-    ).toBe('Contrat CT2701-000001 — échéance du 15/03/2027 — Livraison');
+    ).toBe('Contrat CT2701-000001 — échéance E2 du 15/03/2027 — Livraison');
     const long = occurrenceComment(
       {
         kind: 'schedule_item',
         number: 'CT2701-000001',
+        itemRef: 'E2',
         date: '2027-03-15',
         label: 'x'.repeat(300),
       },

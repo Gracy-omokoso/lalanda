@@ -411,6 +411,55 @@ e2eSuite('échéancier et abonnements (ADR-0050, V5)', () => {
       );
     });
 
+    it('panne entre le brouillon et le lien : la passe suivante rattache le brouillon, n’en crée pas un second', async () => {
+      const debut = addDays(today, -8);
+      const c = await contratSigne({ startDate: debut, billing: mensuel(debut) });
+      await job().run(new Date());
+      const avant = await brouillonsDe(c.id);
+      expect(avant.invoices).toHaveLength(1);
+      const brouillon = String(avant.invoices[0]!['_id']);
+      // Panne simulée : le brouillon (et sa clé, commentaire C) existe, le lien non.
+      await links().deleteMany({ contractId: c.id });
+      const avecCle = () =>
+        invoices().countDocuments({
+          organizationId: f.orgId(),
+          'comments.C': avant.invoices[0]!['comments'].C,
+        });
+      expect(await avecCle()).toBe(1);
+
+      const r = await job().run(new Date());
+      expect(r.failed).toBe(0);
+      expect(await avecCle()).toBe(1);
+      const apres = await brouillonsDe(c.id);
+      expect(apres.links).toHaveLength(1);
+      expect(apres.links[0]).toMatchObject({
+        invoiceId: brouillon,
+        kind: 'subscription_occurrence',
+        occurrenceDate: debut,
+        linkedBy: SYSTEME,
+      });
+      expect((await schedule('viewer', c.id)).entries[0]).toMatchObject({
+        key: debut,
+        state: 'prepared',
+        invoice: { invoiceId: brouillon },
+      });
+      const reprise = await f
+        .db()
+        .collection('audit_events')
+        .findOne({ targetId: c.id, 'metadata.recovered': true });
+      expect(reprise?.['metadata']).toMatchObject({ invoiceId: brouillon, automatic: true });
+
+      // Même reprise par « Préparer maintenant » : rattaché, signalé, rien de créé.
+      await links().deleteMany({ contractId: c.id });
+      const prep = ok(await post('owner', `/sales/contracts/${c.id}/occurrences/${debut}/prepare`));
+      expect(prep.invoiceId).toBe(brouillon);
+      expect(prep.warnings.map((w: any) => w.code)).toContain('DRAFT_RECOVERED');
+      expect(await avecCle()).toBe(1);
+      // Rejouée ensuite : toujours un seul brouillon.
+      await job().run(new Date());
+      expect(await avecCle()).toBe(1);
+    });
+
     it('`autoPrepare` faux : la tâche ne prépare rien, la préparation manuelle reste possible', async () => {
       const debut = addDays(today, -5);
       const c = await contratSigne({ startDate: debut, billing: mensuel(debut, false) });
@@ -448,6 +497,7 @@ e2eSuite('échéancier et abonnements (ADR-0050, V5)', () => {
       expect(ls).toHaveLength(1);
       expect(ls[0]).toMatchObject({ kind: 'schedule_item', itemRef: 'E1', occurrenceDate: debut });
       expect(docs[0]!['lines'][0]).toMatchObject({ name: 'Mise en service', unitPrice: '800.00' });
+      expect(docs[0]!['comments'].C).toContain('— échéance E1 du');
       expect(docs[0]!['comments'].C).toContain('— Démarrage');
       const s = await schedule('viewer', c.id);
       expect(s.entries.map((e: any) => [e.key, e.state, e.label])).toEqual([

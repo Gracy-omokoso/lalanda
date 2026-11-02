@@ -783,7 +783,10 @@ OCCURRENCE_NOT_FOUND`, `409 OCCURRENCE_ALREADY_PREPARED`, `409 OCCURRENCE_BLOCKE
 CONTRACT_NOT_SIGNED`). La tâche passe une fois par jour sur les contrats `signed` et `terminated`,
 fenêtre `[aujourd'hui − 90 j, aujourd'hui + subscriptionLeadDays]`, brouillons `FV` aux lignes en
 vigueur à la date de l'échéance (aucun prorata), commentaire C « Abonnement CT… — période du … au … »
-ou « Contrat CT… — échéance du … » ; audit `sales_contract.occurrence_prepared`.
+ou « Contrat CT… — échéance E1 du … » ; audit `sales_contract.occurrence_prepared`. Ce commentaire
+est la clé déterministe de l'échéance : un brouillon qui la porte sans lien (préparation interrompue
+entre le brouillon et le lien) est rattaché à la passe suivante, jamais doublé (avertissement
+`DRAFT_RECOVERED`).
 
 ## Brief du matin — implémenté (ADR-0033)
 
