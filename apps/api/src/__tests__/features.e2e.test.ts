@@ -35,6 +35,8 @@ import type { PlatformRole } from '../authz/permissions.js';
 import { BillingService } from '../billing/billing.service.js';
 import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 import { dbOf, e2eSuite, makeE2EApp, registerAndLogin, teardown } from './e2e-utils.js';
+// ADR-0053 — P8 : tout opérateur s'enrôle ; ré-authentification = mot de passe + code.
+import { corpsReauth, enrolerDeuxFacteurs } from './platform-2fa-e2e.js';
 
 const DAY_MS = 86_400_000;
 
@@ -79,7 +81,7 @@ e2eSuite('ADR-0053 — P4 : fonctionnalités par offre', () => {
     const res = await request(serveur())
       .post('/admin/reauth')
       .set('Cookie', cookies[cle]!)
-      .send({ password: compte(cle).password });
+      .send(await corpsReauth(app, db, cookies[cle]!, compte(cle).password));
     expect(res.status, JSON.stringify(res.body)).toBe(201);
   };
   const derogation = (over: Record<string, unknown> = {}) => ({
@@ -169,6 +171,8 @@ e2eSuite('ADR-0053 — P4 : fonctionnalités par offre', () => {
       ids[cle] = await idDeSession(cookies[cle]);
       if (cle !== 'saMembre') await db.collection('memberships').deleteMany({ userId: ids[cle] });
       await poserRole(ids[cle]!, role);
+      viderLimiteur();
+      await enrolerDeuxFacteurs(app, cookies[cle]!, compte(cle).password);
     }
     await db.collection('memberships').insertOne({
       userId: ids['saMembre'],
