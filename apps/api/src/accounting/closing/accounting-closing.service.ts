@@ -39,6 +39,7 @@ import type { Model } from 'mongoose';
 import { AuditService } from '../../authz/audit.service.js';
 import { accountingReopenDecision } from '../../authz/permissions.js';
 import { conflict, notFound, type AccountingActor } from '../accounting.common.js';
+import { suspenseAccountOf, suspenseAccountsOf } from '../chart/suspense-account.js';
 import type { AccountingEntryLean, StoredEntryLine } from '../entries/accounting-entry.schema.js';
 import {
   AccountingEntryStore,
@@ -55,7 +56,7 @@ import { AccountingPeriodsService } from '../periods/accounting-periods.service.
 import { AccountingReportingService } from '../reports/accounting-reporting.service.js';
 import { AccountingSettingsService } from '../settings/accounting-settings.service.js';
 import type { AccountingSettingsLean } from '../settings/accounting-settings.schema.js';
-import { ACCOUNTING_SUSPENSE_ACCOUNT, newEntryDoc } from '../sync/accounting-sync.service.js';
+import { newEntryDoc } from '../sync/accounting-sync.service.js';
 import { AccountingClosing, type AccountingClosingLean } from './accounting-closing.schema.js';
 
 /** Clé d'opération des lignes d'à-nouveaux (aucune règle : report du moteur). */
@@ -351,7 +352,7 @@ export class AccountingClosingService {
         journalCode: journal.code,
         chart: ctx.chart,
         resultAccountNumber: null,
-        suspenseAccountNumber: ACCOUNTING_SUSPENSE_ACCOUNT,
+        suspenseAccountNumber: suspenseAccountOf(ctx.pack),
       });
 
       let entryId: string | null = null;
@@ -379,7 +380,7 @@ export class AccountingClosingService {
           },
           manual: null,
           regeneration: null,
-          suspense: lines.some((l) => l.accountNumber === ACCOUNTING_SUSPENSE_ACCOUNT),
+          suspense: lines.some((l) => suspenseAccountsOf(ctx.pack).includes(l.accountNumber)),
           createdBy: actor.userId,
           updatedBy: actor.userId,
         };

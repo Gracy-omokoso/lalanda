@@ -199,6 +199,8 @@ export interface AccountingChartPackDetail extends AccountingChartPackSummary {
   expectedAccounts: Record<string, unknown>[];
   statementTemplates: Record<string, unknown>;
   proposedRules: Record<string, unknown>[];
+  /** Compte d'attente désigné par le pack (§ 6.0) ; `null` : compte technique `ATTENTE`. */
+  suspenseAccount: string | null;
   review: Record<string, unknown> | null;
   history: AccountingChartPackHistoryEvent[];
 }
