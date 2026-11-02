@@ -29,12 +29,17 @@
 // finit par être « corrigée ».
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { Controller, Get, Inject, UseGuards } from '@nestjs/common';
+import { Controller, Get, Inject, Req, UseGuards } from '@nestjs/common';
+// ADR-0053 — P8
+import type { PlatformTwoFactorStatus } from '@lalanda/shared/platform';
+import type { AuthenticatedRequest } from '../auth/auth.guard.js';
+import { sessionFingerprint } from '../integrations/reauth.service.js';
+import { PlatformTwoFactorService } from '../platform-two-factor/platform-two-factor.service.js';
 
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { AuthzService } from '../authz/authz.service.js';
 // ADR-0053 — P0
-import { PlatformConsoleRoute } from '../authz/authz.decorators.js';
+import { AllowPlatformTwoFactorPending, PlatformConsoleRoute } from '../authz/authz.decorators.js';
 import { platformActionsOf, type PlatformAction } from '../authz/platform-actions.js';
 import { PlatformAuthGuard } from '../authz/platform-auth.guard.js';
 import {
@@ -68,6 +73,11 @@ export interface PlatformAccessView {
    * onglets de la console (lot P1) ; les champs ci-dessus restent servis une version.
    */
   actions: PlatformAction[];
+  /**
+   * ADR-0053 — P8 : état de la double authentification. La coquille de console envoie un
+   * opérateur non enrôlé vers l'enrôlement, une session non vérifiée vers la saisie du code.
+   */
+  twoFactor: PlatformTwoFactorStatus;
 }
 
 @Controller('me')
@@ -75,11 +85,20 @@ export interface PlatformAccessView {
 // plateforme de la session, jamais une organisation.
 @UseGuards(PlatformAuthGuard)
 @PlatformConsoleRoute()
+// ADR-0053 — P8 : lue par tout le monde, enrôlé ou non — c'est elle qui dit quoi faire.
+@AllowPlatformTwoFactorPending('enrollment')
 export class PlatformAccessController {
-  constructor(@Inject(AuthzService) private readonly authz: AuthzService) {}
+  constructor(
+    @Inject(AuthzService) private readonly authz: AuthzService,
+    // ADR-0053 — P8
+    @Inject(PlatformTwoFactorService) private readonly twoFactor: PlatformTwoFactorService,
+  ) {}
 
   @Get('platform-access')
-  async platformAccess(@CurrentUser() user: { id: string }): Promise<PlatformAccessView> {
+  async platformAccess(
+    @CurrentUser() user: { id: string },
+    @Req() req: AuthenticatedRequest,
+  ): Promise<PlatformAccessView> {
     const roles = await this.authz.platformRolesOf(user.id);
     return {
       roles: roles.map((role) => ({ role, label: PLATFORM_ROLE_LABELS[role] })),
@@ -91,6 +110,7 @@ export class PlatformAccessController {
       canManageIntegrations: roles.includes('platform_super_admin'),
       forbiddenActions: [...PLATFORM_FORBIDDEN_ACTIONS],
       actions: platformActionsOf(roles),
+      twoFactor: await this.twoFactor.status(user.id, sessionFingerprint(req.headers.cookie)),
     };
   }
 }

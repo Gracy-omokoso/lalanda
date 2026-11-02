@@ -9,3 +9,5 @@ export * from './constants.js';
 export * from './schemas.js';
 // ADR-0053 — P5
 export * from './audit.js';
+// ADR-0053 — P8
+export * from './two-factor.js';

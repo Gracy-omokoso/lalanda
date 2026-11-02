@@ -1981,6 +1981,8 @@ describe('ADR-0053 — P0 : la garde sans organisation ne vaut que pour la conso
     // ADR-0053 — P7
     'AdminStatsController',
     'AdminFinanceController',
+    // ADR-0053 — P8
+    'PlatformTwoFactorController',
   ];
   /** Routes de console sans rôle ni action plateforme, avec leur raison (déjà justifiées). */
   const CONSOLE_SANS_EXIGENCE = ['PlatformAccessController.platformAccess'];
@@ -2741,5 +2743,92 @@ describe('ADR-0053 — P7 : `/admin/stats` et `/admin/finance`', () => {
     );
     expect(platformActionHolders('platform.finance.read')).not.toContain('platform_admin');
     expect(platformActionHolders('platform.finance.export')).not.toContain('platform_support');
+  });
+});
+
+// ── ADR-0053 — P8 : double authentification de la console ────────────────────
+import { PlatformTwoFactorController } from '../admin/two-factor/platform-two-factor.controller.js';
+// Modules déjà importés plus haut : relus ici sans dupliquer leurs `import`.
+const { ReauthController: ReauthControllerP8 } =
+  await import('../integrations/integrations.controller.js');
+const { PlatformAccessController: PlatformAccessControllerP8 } =
+  await import('../admin/platform-access.controller.js');
+const { PLATFORM_TWO_FACTOR_EXEMPT_KEY } = await import('./authz.decorators.js');
+const { REQUIRES_RECENT_REAUTH_KEY } = await import('../integrations/reauth.guard.js');
+
+const CONTROLEURS_P8 = [PlatformTwoFactorController];
+(CONTROLEURS as unknown[]).push(...CONTROLEURS_P8);
+TOUTES_LES_ROUTES.push(
+  ...CONTROLEURS_P8.flatMap((c) => routesDe(c as new (...args: never[]) => unknown)),
+);
+
+describe('ADR-0053 — P8 : double authentification de la console', () => {
+  const exemption = (classe: object, nom: string): unknown =>
+    Reflect.getMetadata(
+      PLATFORM_TWO_FACTOR_EXEMPT_KEY,
+      (classe as { prototype: Record<string, object> }).prototype[nom]!,
+    ) ?? Reflect.getMetadata(PLATFORM_TWO_FACTOR_EXEMPT_KEY, classe);
+
+  it('chaque route déclare une action plateforme, jamais une action d’organisation', () => {
+    const attendu: Record<string, PlatformAction> = {
+      'PlatformTwoFactorController.status': 'platform.console.read',
+      'PlatformTwoFactorController.startEnrollment': 'platform.console.read',
+      'PlatformTwoFactorController.confirmEnrollment': 'platform.console.read',
+      'PlatformTwoFactorController.reset': 'platform.roles.manage',
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) =>
+      r.cle.startsWith('PlatformTwoFactorController.'),
+    );
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, action] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle)!;
+      expect(route.actions ?? [], cle).toEqual([]);
+      expect(route.rolesPlateforme, cle).toEqual(platformActionHolders(action));
+      expect(SANS_PERMISSION[cle], cle).toBeUndefined();
+    }
+  });
+
+  it('seules l’enrôlement, l’état et `/me/platform-access` sont ouverts à un non-enrôlé', () => {
+    const proto = PlatformTwoFactorController.prototype as unknown as Record<string, object>;
+    for (const nom of ['status', 'startEnrollment', 'confirmEnrollment']) {
+      expect(Reflect.getMetadata(PLATFORM_TWO_FACTOR_EXEMPT_KEY, proto[nom]!), nom).toBe(
+        'enrollment',
+      );
+    }
+    expect(Reflect.getMetadata(PLATFORM_TWO_FACTOR_EXEMPT_KEY, proto['reset']!)).toBeUndefined();
+    expect(Reflect.getMetadata(PLATFORM_TWO_FACTOR_EXEMPT_KEY, PlatformTwoFactorController)).toBe(
+      undefined,
+    );
+    expect(exemption(PlatformAccessControllerP8, 'platformAccess')).toBe('enrollment');
+    // La ré-authentification vérifie la session : ouverte à une session NON vérifiée, mais
+    // jamais à un opérateur non enrôlé.
+    expect(exemption(ReauthControllerP8, 'confirm')).toBe('verification');
+  });
+
+  it('aucune autre route de la console ne porte d’exemption', () => {
+    const autorisees = new Set([
+      'PlatformTwoFactorController.status',
+      'PlatformTwoFactorController.startEnrollment',
+      'PlatformTwoFactorController.confirmEnrollment',
+      'PlatformAccessController.platformAccess',
+      'ReauthController.status',
+      'ReauthController.confirm',
+    ]);
+    for (const route of TOUTES_LES_ROUTES) {
+      const [nomClasse, nom] = route.cle.split('.') as [string, string];
+      const classe = (CONTROLEURS as Array<{ name: string; prototype: object }>).find(
+        (c) => c.name === nomClasse,
+      );
+      if (!classe) continue;
+      if (exemption(classe, nom) !== undefined) {
+        expect(autorisees.has(route.cle), route.cle).toBe(true);
+      }
+    }
+  });
+
+  it('la réinitialisation exige une ré-authentification récente', () => {
+    const proto = PlatformTwoFactorController.prototype as unknown as Record<string, object>;
+    expect(Reflect.getMetadata(REQUIRES_RECENT_REAUTH_KEY, proto['reset']!)).toBe(true);
+    expect(platformActionHolders('platform.roles.manage')).toEqual(['platform_super_admin']);
   });
 });

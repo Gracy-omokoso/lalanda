@@ -83,3 +83,21 @@ export const CONSOLE_IDLE_EXEMPT_KEY = 'lalanda:console_idle_exempt';
 export function AllowIdleConsoleSession(): CustomDecorator<string> {
   return SetMetadata(CONSOLE_IDLE_EXEMPT_KEY, true);
 }
+
+// ── ADR-0053 — P8 : double authentification de la console ────────────────────
+
+export const PLATFORM_TWO_FACTOR_EXEMPT_KEY = 'lalanda:platform_two_factor_exempt';
+
+/**
+ * Exemption du contrôle de double authentification de `PlatformAuthGuard` :
+ *   - `'enrollment'` : route ouverte à un opérateur NON enrôlé (lecture de son état,
+ *     enrôlement lui-même, `/me/platform-access`) — sans elle, aucun chemin d'enrôlement ;
+ *   - `'verification'` : route ouverte à un opérateur enrôlé dont la session n'est pas
+ *     encore vérifiée — la SEULE est `/admin/reauth`, qui la vérifie.
+ * Toute autre route de console exige un opérateur enrôlé ET une session vérifiée.
+ */
+export function AllowPlatformTwoFactorPending(
+  level: 'enrollment' | 'verification',
+): CustomDecorator<string> {
+  return SetMetadata(PLATFORM_TWO_FACTOR_EXEMPT_KEY, level);
+}
