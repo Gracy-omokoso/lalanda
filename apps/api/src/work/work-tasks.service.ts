@@ -48,6 +48,11 @@ import { PURCHASES_AGENDA_MAX, type PurchasesMyTaskItem } from '@lalanda/shared/
 import { HR_LIMITS, type HrMyTaskItem } from '@lalanda/shared/hr';
 import { STOCK_LIMITS, type StockMyTaskItem } from '@lalanda/shared/stock';
 import type { AssetsMyTaskItem } from '@lalanda/shared/assets';
+// ADR-0050 — V6
+import {
+  SALES_CONTRACTS_AGENDA_MAX,
+  type SalesContractMyTaskItem,
+} from '@lalanda/shared/sales-contracts';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
@@ -72,16 +77,19 @@ import {
   CRM_AGENDA_SOURCE,
   HR_AGENDA_SOURCE,
   PURCHASES_AGENDA_SOURCE,
+  SALES_CONTRACTS_AGENDA_SOURCE,
   STOCK_AGENDA_SOURCE,
   noAssetsAgenda,
   noCrmAgenda,
   noHrAgenda,
   noPurchasesAgenda,
+  noSalesContractsAgenda,
   noStockAgenda,
   type AssetsAgendaReader,
   type CrmAgendaReader,
   type HrAgendaReader,
   type PurchasesAgendaReader,
+  type SalesContractsAgendaReader,
   type StockAgendaReader,
 } from './my-tasks.ports.js';
 import { WorkActivityService, type ActivityInput } from './work-activity.service.js';
@@ -148,12 +156,17 @@ export class WorkTasksService {
     // ADR-0046 — S7 (§ 6.7) : inventaires, « À traiter », maintenances (facultatifs).
     @Optional() @Inject(STOCK_AGENDA_SOURCE) stockAgenda: StockAgendaReader | null = null,
     @Optional() @Inject(ASSETS_AGENDA_SOURCE) assetsAgenda: AssetsAgendaReader | null = null,
+    // ADR-0050 — V6 (§ 6) : alertes des contrats et abonnements (facultatives).
+    @Optional()
+    @Inject(SALES_CONTRACTS_AGENDA_SOURCE)
+    salesContractsAgenda: SalesContractsAgendaReader | null = null,
   ) {
     this.crmAgenda = crmAgenda ?? noCrmAgenda;
     this.purchasesAgenda = purchasesAgenda ?? noPurchasesAgenda;
     this.hrAgenda = hrAgenda ?? noHrAgenda;
     this.stockAgenda = stockAgenda ?? noStockAgenda;
     this.assetsAgenda = assetsAgenda ?? noAssetsAgenda;
+    this.salesContractsAgenda = salesContractsAgenda ?? noSalesContractsAgenda;
     this.absenceSource = absences;
   }
 
@@ -164,6 +177,7 @@ export class WorkTasksService {
   private readonly hrAgenda: HrAgendaReader;
   private readonly stockAgenda: StockAgendaReader;
   private readonly assetsAgenda: AssetsAgendaReader;
+  private readonly salesContractsAgenda: SalesContractsAgendaReader;
 
   // ── Accès ────────────────────────────────────────────────────────────────
 
@@ -456,7 +470,9 @@ export class WorkTasksService {
     // ADR-0046 — S7 : chaque source derrière sa lecture ; les droits utiles sont passés.
     const stockVisible = actorCan(actor, 'stock.read');
     const assetsVisible = actorCan(actor, 'assets.read');
-    const [docs, crm, purchases, hr, stock, assets] = await Promise.all([
+    // ADR-0050 — V6 : derrière `sales.read` ; l'audience de chaque élément suit les droits passés.
+    const salesContractsVisible = actorCan(actor, 'sales.read');
+    const [docs, crm, purchases, hr, stock, assets, salesContracts] = await Promise.all([
       this.tasks
         .find(filter, LIGHT)
         .sort({ dueDate: 1, _id: 1 })
@@ -500,6 +516,19 @@ export class WorkTasksService {
             now,
           )
         : Promise.resolve({ items: [] as AssetsMyTaskItem[], truncated: false }),
+      salesContractsVisible
+        ? this.salesContractsAgenda.agendaOf(
+            organizationId,
+            {
+              userId: actor.userId,
+              holdsApprove: actorCan(actor, 'sales.contract.approve'),
+              holdsInvoice: actorCan(actor, 'sales.invoice'),
+              holdsManage: actorCan(actor, 'sales.manage'),
+            },
+            SALES_CONTRACTS_AGENDA_MAX,
+            now,
+          )
+        : Promise.resolve({ items: [] as SalesContractMyTaskItem[], truncated: false }),
     ]);
     const workTruncated = docs.length > MY_TASKS_MAX_PER_SOURCE;
     const work = await this.withProjectNames(
@@ -513,6 +542,7 @@ export class WorkTasksService {
       ...hr.items,
       ...stock.items,
       ...assets.items,
+      ...salesContracts.items,
     ];
     const today = kinshasaDayOf(now);
     const { dueSoonDays } = await this.settings.get(organizationId);
@@ -526,7 +556,8 @@ export class WorkTasksService {
         purchases.truncated ||
         hr.truncated ||
         stock.truncated ||
-        assets.truncated,
+        assets.truncated ||
+        salesContracts.truncated,
       // ADR-0045 — H5 (§ 6.2) : constats d'absence des tâches que l'appelant a créées.
       ...(this.absenceSource === null
         ? {}

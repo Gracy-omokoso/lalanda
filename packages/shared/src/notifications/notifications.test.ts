@@ -10,8 +10,8 @@ import {
 } from './index.js';
 
 describe('notifications — contrats partagés', () => {
-  it('déclare six types work, cinq crm, un organization, sept purchases, vingt-quatre hr, cinq stock, deux assets et un documents, préfixés par leur module', () => {
-    expect(NOTIFICATION_KINDS).toHaveLength(51);
+  it('déclare six types work, cinq crm, un organization, sept purchases, vingt-quatre hr, cinq stock, deux assets, un documents et six sales, préfixés par leur module', () => {
+    expect(NOTIFICATION_KINDS).toHaveLength(57);
     for (const kind of NOTIFICATION_KINDS) {
       const module = kind.split('.')[0]!;
       expect(NOTIFICATION_SOURCE_MODULES as readonly string[]).toContain(module);
@@ -47,6 +47,7 @@ describe('notifications — contrats partagés', () => {
       'review',
       'goal',
       'attendance_correction',
+      'sales_contract',
     ]);
     // ADR-0041 — A4.
     expect(NOTIFICATION_KINDS.filter((k) => k.startsWith('organization.'))).toEqual([
@@ -107,7 +108,21 @@ describe('notifications — contrats partagés', () => {
     expect(NOTIFICATION_KINDS.filter((k) => k.startsWith('documents.'))).toEqual([
       'documents.expiring',
     ]);
-    expect(NOTIFICATION_SOURCE_MODULES.slice(-3)).toEqual(['stock', 'assets', 'documents']);
+    expect(NOTIFICATION_SOURCE_MODULES.slice(-4)).toEqual([
+      'stock',
+      'assets',
+      'documents',
+      'sales',
+    ]);
+    // ADR-0050 — V6 (§ 6) : six types, un module, une nature d'entité.
+    expect(NOTIFICATION_KINDS.filter((k) => k.startsWith('sales.'))).toEqual([
+      'sales.contract_submitted',
+      'sales.contract_approved',
+      'sales.contract_rejected',
+      'sales.contract_notice_due',
+      'sales.contract_term_ending',
+      'sales.subscription_drafts_ready',
+    ]);
   });
 
   it('un lien est un chemin relatif de l’application, jamais une URL absolue', () => {

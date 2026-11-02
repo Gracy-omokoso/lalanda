@@ -9,3 +9,5 @@
 // ADR-0050 — V0
 export * from './constants.js';
 export * from './common.js';
+// ADR-0050 — V6
+export * from './agenda.js';

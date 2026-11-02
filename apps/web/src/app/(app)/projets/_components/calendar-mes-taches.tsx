@@ -44,8 +44,10 @@ import {
   appliquerRelance,
   appliquerTache,
   estApprobation,
+  estElementContrat,
   estElementMagasin,
   estElementRh,
+  sousTitreElementContrat,
   sousTitreElementMagasin,
   estRelance,
   estTache,
@@ -78,6 +80,22 @@ function versCalendrier(e: MyTaskEntry): ElementCalendrier {
       number: 0,
       title: titreElementRh(e),
       etiquette: pastilleElementRh(e),
+      startDate: null,
+      dueDate: e.dueDate,
+      isMilestone: false,
+      done: false,
+      rank: e.rank,
+      revision: 0,
+      element: e,
+    };
+  }
+  // ADR-0050 § 6 : contrat, échéance ou acompte — au jour dit, sans se déplacer.
+  if (estElementContrat(e)) {
+    return {
+      id: e.id,
+      number: 0,
+      title: e.title,
+      etiquette: e.kindLabel,
       startDate: null,
       dueDate: e.dueDate,
       isMilestone: false,
@@ -274,22 +292,25 @@ export function CalendrierMesTaches(): React.ReactElement {
           idPrefixe="mes-taches-cal"
           bandeaux={bandeaux}
           sousTitre={(t) =>
-            estElementMagasin(t.element)
-              ? sousTitreElementMagasin(t.element)
-              : estElementRh(t.element)
-                ? sousTitreElementRh(t.element)
-                : estApprobation(t.element)
-                  ? sousTitreApprobation(t.element)
-                  : estRelance(t.element)
-                    ? sousTitreRelance(t.element)
-                    : t.element.projectName
+            estElementContrat(t.element)
+              ? sousTitreElementContrat(t.element)
+              : estElementMagasin(t.element)
+                ? sousTitreElementMagasin(t.element)
+                : estElementRh(t.element)
+                  ? sousTitreElementRh(t.element)
+                  : estApprobation(t.element)
+                    ? sousTitreApprobation(t.element)
+                    : estRelance(t.element)
+                      ? sousTitreRelance(t.element)
+                      : t.element.projectName
           }
           onOuvrir={(t) =>
             router.push(
               estRelance(t.element) ||
                 estApprobation(t.element) ||
                 estElementRh(t.element) ||
-                estElementMagasin(t.element)
+                estElementMagasin(t.element) ||
+                estElementContrat(t.element)
                 ? t.element.href
                 : hrefTache(t.element.projectId, t.element.id, 'calendrier'),
             )

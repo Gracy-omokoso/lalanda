@@ -13,6 +13,7 @@ import type { AssetsMyTaskItem } from '@lalanda/shared/assets';
 import type { CrmMyTaskItem } from '@lalanda/shared/crm';
 import type { HrMyTaskItem } from '@lalanda/shared/hr';
 import type { PurchasesMyTaskItem } from '@lalanda/shared/purchases';
+import type { SalesContractMyTaskItem } from '@lalanda/shared/sales-contracts';
 import type { StockMyTaskItem } from '@lalanda/shared/stock';
 import type { MyTaskEntry, MyTaskItem } from '@lalanda/shared/work';
 
@@ -69,7 +70,23 @@ function estElementMagasin(t: Element): t is StockMyTaskItem | AssetsMyTaskItem 
   return 'source' in t && (t.source === 'stock' || t.source === 'assets');
 }
 
+// ADR-0050 § 6 (lot V6) : contrat, échéance ou acompte — un lien, sans montant.
+function estElementContrat(t: Element): t is SalesContractMyTaskItem {
+  return 'source' in t && t.source === 'sales_contracts';
+}
+
 function ligne(t: Element, enRetard: boolean): LigneTache {
+  if (estElementContrat(t)) {
+    const echeance = t.dueDate === null ? 'Sans échéance' : formatJour(t.dueDate, false);
+    return {
+      id: t.id,
+      titre: `${t.kindLabel} : ${t.title}`,
+      projet: 'Ventes',
+      echeance: enRetard ? `En retard · ${echeance}` : 'Aujourd’hui',
+      enRetard,
+      lien: t.href,
+    };
+  }
   if (estElementMagasin(t)) {
     return {
       id: t.id,

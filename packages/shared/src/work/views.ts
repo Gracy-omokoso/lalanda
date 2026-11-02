@@ -14,6 +14,8 @@ import type { HrMyTaskItem } from '../hr/leave.js';
 // ADR-0046 — S7 : inventaires, « À traiter » et maintenances dans « Mes tâches » (§ 6.7).
 import type { StockMyTaskItem } from '../stock/agenda.js';
 import type { AssetsMyTaskItem } from '../assets/agenda.js';
+// ADR-0050 — V6 : alertes des contrats, commandes et abonnements dans « Mes tâches » (§ 6).
+import type { SalesContractMyTaskItem } from '../sales-contracts/agenda.js';
 import type {
   WorkActivityKind,
   WorkColumn,
@@ -266,7 +268,8 @@ export type MyTaskEntry =
   | PurchasesMyTaskItem
   | HrMyTaskItem
   | StockMyTaskItem
-  | AssetsMyTaskItem;
+  | AssetsMyTaskItem
+  | SalesContractMyTaskItem; // ADR-0050 — V6
 
 /** `GET /work/my-tasks` — groupes calculés par `groupMyTasks`. */
 export interface MyTasksView {

@@ -13,7 +13,7 @@
 // suivants.
 
 import { SALES_SUBSCRIPTIONS_JOB_NAME } from '@lalanda/shared/sales-contracts';
-import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional, type OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
@@ -24,6 +24,8 @@ import {
   type SalesContractDocument,
   type SalesContractLean,
 } from '../contracts/sales-contract.schema.js';
+// ADR-0050 — V6 : `sales.subscription_drafts_ready` (cloche des détenteurs de `sales.invoice`).
+import { SalesContractsNotifier } from '../agenda/contracts-notifier.js';
 import {
   SalesSubscriptionsService,
   type SubscriptionsRunReport,
@@ -40,6 +42,10 @@ export class SalesSubscriptionsJob implements OnModuleInit {
     @Inject(SchedulerService) private readonly scheduler: SchedulerService,
     @Inject(SalesSubscriptionsService) private readonly subscriptions: SalesSubscriptionsService,
     @InjectModel(SalesContract.name) private readonly contracts: Model<SalesContractDocument>,
+    // ADR-0050 — V6 : facultatif (tests sans le module des alertes).
+    @Optional()
+    @Inject(SalesContractsNotifier)
+    private readonly notifier: SalesContractsNotifier | null = null,
   ) {}
 
   // ADR-0050 — V5 : enregistrement de la tâche quotidienne.
@@ -66,8 +72,11 @@ export class SalesSubscriptionsJob implements OnModuleInit {
       .sort({ organizationId: 1, _id: 1 })
       .lean<SalesContractLean[]>()
       .exec();
+    // ADR-0050 — V6 : brouillons préparés par organisation (premier contrat concerné).
+    const preparedByOrg = new Map<string, { prepared: number; contractId: string }>();
     for (const contract of contracts) {
       report.contracts += 1;
+      const before = report.prepared;
       try {
         await this.subscriptions.prepareDue(contract.organizationId, contract, now, report);
       } catch (err) {
@@ -76,6 +85,18 @@ export class SalesSubscriptionsJob implements OnModuleInit {
           `Préparation des échéances en échec (${contract.organizationId}, ${contract.number}) : ${String(err)}`,
         );
       }
+      // ADR-0050 — V6
+      if (report.prepared > before) {
+        const p = preparedByOrg.get(contract.organizationId);
+        preparedByOrg.set(contract.organizationId, {
+          prepared: (p?.prepared ?? 0) + report.prepared - before,
+          contractId: p?.contractId ?? String(contract._id),
+        });
+      }
+    }
+    // ADR-0050 — V6 : une notification par organisation et par jour (clé de dédoublonnage).
+    for (const [organizationId, p] of preparedByOrg) {
+      await this.notifier?.draftsReady({ organizationId, today: report.today, ...p });
     }
     if (report.prepared > 0 || report.failed > 0) {
       this.logger.log(
