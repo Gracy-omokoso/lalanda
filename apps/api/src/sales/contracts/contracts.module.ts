@@ -31,6 +31,28 @@ import {
 } from './orders/sales-order.schema.js';
 import { SalesOrdersController } from './orders/sales-orders.controller.js';
 import { SalesOrdersService } from './orders/sales-orders.service.js';
+// ADR-0050 — V3
+import { SalesContractAmendmentsController } from './amendments/sales-contract-amendments.controller.js';
+import {
+  SalesContractAmendment,
+  SalesContractAmendmentSchema,
+} from './amendments/sales-contract-amendment.schema.js';
+import { SalesContractAmendmentsService } from './amendments/sales-contract-amendments.service.js';
+import { QuoteToContractController } from './contracts/quote-to-contract.controller.js';
+import {
+  SalesContract,
+  SalesContractCounter,
+  SalesContractCounterSchema,
+  SalesContractSchema,
+} from './contracts/sales-contract.schema.js';
+import { SalesContractsController } from './contracts/sales-contracts.controller.js';
+import { SalesContractsService } from './contracts/sales-contracts.service.js';
+import { SalesContractSettingsController } from './settings/sales-contract-settings.controller.js';
+import {
+  SalesContractSettings,
+  SalesContractSettingsSchema,
+} from './settings/sales-contract-settings.schema.js';
+import { SalesContractSettingsService } from './settings/sales-contract-settings.service.js';
 
 @Module({
   imports: [
@@ -43,24 +65,42 @@ import { SalesOrdersService } from './orders/sales-orders.service.js';
       { name: SalesOrderCounter.name, schema: SalesOrderCounterSchema },
       { name: SalesDocumentLink.name, schema: SalesDocumentLinkSchema },
       { name: SalesContractFile.name, schema: SalesContractFileSchema },
+      // ADR-0050 — V3
+      { name: SalesContract.name, schema: SalesContractSchema },
+      { name: SalesContractCounter.name, schema: SalesContractCounterSchema },
+      { name: SalesContractAmendment.name, schema: SalesContractAmendmentSchema },
+      { name: SalesContractSettings.name, schema: SalesContractSettingsSchema },
     ]),
   ],
   controllers: [
     // ADR-0050 — V2
     SalesOrdersController,
     QuoteToOrderController,
+    // ADR-0050 — V3
+    SalesContractsController,
+    SalesContractAmendmentsController,
+    QuoteToContractController,
+    SalesContractSettingsController,
   ],
   providers: [
     // ADR-0050 — V2
     SalesDocumentLinksService,
     SalesContractFilesService,
     SalesOrdersService,
+    // ADR-0050 — V3
+    SalesContractSettingsService,
+    SalesContractsService,
+    SalesContractAmendmentsService,
   ],
   exports: [
     // ADR-0050 — V2 : liens et pièces partagés par V3 à V6.
     SalesDocumentLinksService,
     SalesContractFilesService,
     SalesOrdersService,
+    // ADR-0050 — V3 : contrats, avenants et réglages, lus par V4 à V6.
+    SalesContractSettingsService,
+    SalesContractsService,
+    SalesContractAmendmentsService,
   ],
 })
 export class ContractsModule {}
