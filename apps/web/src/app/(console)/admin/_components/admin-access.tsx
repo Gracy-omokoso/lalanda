@@ -57,7 +57,10 @@ export type ChargementAcces =
   | { etat: 'pret'; acces: PlatformAccessView };
 
 /** Lit `GET /me/platform-access` une fois — seul appel de la coquille avec les préférences. */
-export function useChargementAcces(): ChargementAcces {
+export function useChargementAcces(
+  // ADR-0053 — P8 : relu après l'enrôlement ou la vérification de la session.
+  cle = 0,
+): ChargementAcces {
   const [etat, setEtat] = useState<ChargementAcces>({ etat: 'chargement' });
 
   useEffect(() => {
@@ -78,7 +81,7 @@ export function useChargementAcces(): ChargementAcces {
     return () => {
       annule = true;
     };
-  }, []);
+  }, [cle]);
 
   return etat;
 }
