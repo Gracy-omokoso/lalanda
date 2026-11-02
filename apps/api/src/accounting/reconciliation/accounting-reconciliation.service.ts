@@ -20,10 +20,10 @@ import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { InjectConnection } from '@nestjs/mongoose';
 import { Types, type Connection } from 'mongoose';
 
+import { suspenseAccountsOf } from '../chart/suspense-account.js';
 import { AccountingEntriesService } from '../entries/accounting-entries.service.js';
 import { AccountingSettingsService } from '../settings/accounting-settings.service.js';
 import { conflict } from '../accounting.common.js';
-import { ACCOUNTING_SUSPENSE_ACCOUNT } from '../sync/accounting-sync.service.js';
 
 interface BridgeDoc {
   projectId?: string | null;
@@ -183,7 +183,7 @@ export class AccountingReconciliationService {
       month,
       projectCurrency: currency,
       entries,
-      suspenseAccountNumbers: [ACCOUNTING_SUSPENSE_ACCOUNT],
+      suspenseAccountNumbers: suspenseAccountsOf(await this.settings.chartPackOf(settings)),
       revenue,
       expenses,
     });

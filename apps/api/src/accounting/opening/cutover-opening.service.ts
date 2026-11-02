@@ -319,7 +319,7 @@ export class CutoverOpeningService {
       cutoverDate: cutover,
       bookCurrency: state.bookCurrency,
       journalCode,
-      suspenseAccountNumber: ACCOUNTING_SUSPENSE_ACCOUNT,
+      suspenseAccountNumber: state.suspenseAccount,
       treasury: {
         balances: balances.accounts,
         accountNumbers: state.links,
@@ -618,7 +618,7 @@ export class CutoverOpeningService {
       .exec();
     const label = body.label ?? 'À-nouveaux de reprise';
     const counterpart: DraftLine[] = body.lines.map((l, i) => {
-      if (l.accountNumber !== ACCOUNTING_SUSPENSE_ACCOUNT && !plan.has(l.accountNumber)) {
+      if (l.accountNumber !== c.state.suspenseAccount && !plan.has(l.accountNumber)) {
         conflict(
           'ACCOUNT_NOT_IN_PLAN',
           `Ligne ${i + 1} : ce compte n’est pas un compte actif du plan.`,
@@ -704,7 +704,7 @@ export class CutoverOpeningService {
         bookCurrency,
         enteredRates: c.state.rates,
         ruleSet: c.state.ruleSet,
-        suspenseAccount: ACCOUNTING_SUSPENSE_ACCOUNT,
+        suspenseAccount: c.state.suspenseAccount,
       });
       if (out.status === 'awaiting_rate') {
         missingRates.push(currency);
@@ -725,7 +725,7 @@ export class CutoverOpeningService {
     const final = CutoverOpeningService.readyEntry(lines, cutover, bookCurrency, label);
     const check = checkEntry(final, {
       chartAccounts: [...plan],
-      suspenseAccount: ACCOUNTING_SUSPENSE_ACCOUNT,
+      suspenseAccount: c.state.suspenseAccount,
     });
     if (!check.ok) {
       const unbalanced = check.issues.some(
@@ -768,7 +768,11 @@ export class CutoverOpeningService {
         reason: body.reason,
       },
       regeneration: null,
-      suspense: lines.some((l) => l.accountNumber === ACCOUNTING_SUSPENSE_ACCOUNT),
+      suspense: lines.some(
+        (l) =>
+          l.accountNumber === ACCOUNTING_SUSPENSE_ACCOUNT ||
+          l.accountNumber === c.state.suspenseAccount,
+      ),
       createdBy: actor.userId,
       updatedBy: actor.userId,
     };
@@ -868,7 +872,7 @@ export class CutoverOpeningService {
     stored.suspense = stored.lines.some((l) => l.suspenseReason !== null);
     const check = checkEntry(stored, {
       chartAccounts: [...(await this.accountsService.activeNumbers(organizationId))],
-      suspenseAccount: ACCOUNTING_SUSPENSE_ACCOUNT,
+      suspenseAccount: c.state.suspenseAccount,
     });
     if (!check.ok) {
       conflict('ENTRY_UNBALANCED', 'La reprise n’est plus valide : saisissez-la à nouveau.', {

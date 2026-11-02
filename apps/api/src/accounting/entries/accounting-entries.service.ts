@@ -36,6 +36,7 @@ import {
   type AccountingAccountLean,
 } from '../chart/accounting-account.schema.js';
 import { AccountingAccountsService } from '../chart/accounting-accounts.service.js';
+import { suspenseAccountOf } from '../chart/suspense-account.js';
 import { AccountingLetteringService } from '../lettering/accounting-lettering.service.js';
 import { AccountingPendingService } from '../pending/accounting-pending.service.js';
 import { AccountingSettingsService } from '../settings/accounting-settings.service.js';
@@ -360,6 +361,18 @@ export class AccountingEntriesService {
     return s;
   }
 
+  /** Une ligne vise-t-elle un compte d'attente (technique ou désigné par le pack) ? */
+  private async touchesSuspense(
+    settings: AccountingSettingsLean,
+    lines: readonly { accountNumber: string }[],
+  ): Promise<boolean> {
+    const accounts = new Set([
+      ACCOUNTING_SUSPENSE_ACCOUNT,
+      suspenseAccountOf(await this.settings.chartPackOf(settings)),
+    ]);
+    return lines.some((l) => accounts.has(l.accountNumber));
+  }
+
   /** Lignes saisies → lignes d'écriture, comptes vérifiés dans le plan, équilibre au moteur. */
   private async manualLines(
     organizationId: string,
@@ -377,8 +390,10 @@ export class AccountingEntriesService {
       .lean<AccountingAccountLean[]>()
       .exec();
     const currency = settings.bookCurrency!;
+    // Compte d'attente en vigueur : celui du pack relu (v2), sinon le compte technique.
+    const suspenseAccount = suspenseAccountOf(await this.settings.chartPackOf(settings));
     const stored: StoredEntryLine[] = lines.map((l, i) => {
-      if (l.accountNumber !== ACCOUNTING_SUSPENSE_ACCOUNT && !plan.has(l.accountNumber)) {
+      if (l.accountNumber !== suspenseAccount && !plan.has(l.accountNumber)) {
         conflict(
           'ACCOUNT_NOT_IN_PLAN',
           `Ligne ${i + 1} : ce compte n’est pas un compte actif du plan.`,
@@ -493,7 +508,7 @@ export class AccountingEntriesService {
         reason: body.reason,
       },
       regeneration: null,
-      suspense: lines.some((l) => l.accountNumber === ACCOUNTING_SUSPENSE_ACCOUNT),
+      suspense: await this.touchesSuspense(settings, lines),
       createdBy: actor.userId,
       updatedBy: actor.userId,
     };
@@ -552,7 +567,7 @@ export class AccountingEntriesService {
           ...(l.side === 'debit' ? { debit: l.amount } : { credit: l.amount }),
         }));
       set.lines = await this.manualLines(organizationId, settings, date, label, raw);
-      set.suspense = set.lines.some((l) => l.accountNumber === ACCOUNTING_SUSPENSE_ACCOUNT);
+      set.suspense = await this.touchesSuspense(settings, set.lines);
     }
     const updated = await this.store.entries
       .findOneAndUpdate(

@@ -41,6 +41,7 @@ import {
   type AccountingAccountLean,
 } from '../chart/accounting-account.schema.js';
 import type { AccountingChartPackLean } from '../chart/chart-pack.schema.js';
+import { suspenseAccountsOf } from '../chart/suspense-account.js';
 import { AccountingEntriesService } from '../entries/accounting-entries.service.js';
 import { AccountingEntryStore } from '../entries/accounting-entry-store.service.js';
 import { CutoverOpeningService } from '../opening/cutover-opening.service.js';
@@ -225,7 +226,7 @@ export class AccountingReportingService {
       // Le compte d'attente et l'attente de taux se lisent sur tout ce qui précède `to`.
       entries: ctx.entries,
       to,
-      suspenseAccountNumbers: [ACCOUNTING_SUSPENSE_ACCOUNT],
+      suspenseAccountNumbers: suspenseAccountsOf(ctx.pack),
       pendingSources: [...byReason.entries()].map(([reason, count]) => ({ reason, count })),
       // Reprise de l'existant (§ 3.2) : état lu du lot K7, jamais déduit ici.
       opening: await this.cutover.reserveInput(ctx.organizationId),
