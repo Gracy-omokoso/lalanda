@@ -26,12 +26,6 @@ import { morningBriefApi, type BriefRuleOutcomeView } from '@/lib/morning-brief-
 
 import { moduleParId, ordreAccueil } from '../_components/nav-model';
 import { useShell } from '../_components/shell-context';
-import {
-  MISE_EN_ROUTE_BASE,
-  progression,
-  termine,
-} from '../organisation/_components/onboarding-model';
-import { useMiseEnRoute } from '../organisation/_components/use-mise-en-route';
 
 import {
   achatsEnRetard,
@@ -45,6 +39,8 @@ import {
   type FaitsRunModules,
 } from './_components/accueil-model';
 import { MesTachesCarte } from './_components/mes-taches-carte';
+// ADR-0052 — O4 : carte « Votre société » (remplace « Mise en route · n/4 »).
+import { VotreSocieteCarte } from './_components/votre-societe';
 import { carteVisible } from './_components/mes-taches-model';
 
 interface Faits {
@@ -193,7 +189,8 @@ export default function AccueilPage(): React.ReactElement {
           {/* ADR-0039 § 6.5 : carte « Mes tâches », seulement avec `work.read`. */}
           {carteVisible(actions) ? <MesTachesCarte organizationId={organizationId} /> : null}
           <AlertesBrief alertes={faits.alertes} pret={pret} />
-          <MiseEnRoute />
+          {/* ADR-0052 — O4 */}
+          <VotreSocieteCarte />
         </div>
       </section>
     </div>
@@ -331,42 +328,6 @@ function AlertesBrief({
           ))}
         </ul>
       )}
-    </div>
-  );
-}
-
-/** Rappel de la mise en route tant qu'une étape ouverte au rôle reste à faire. */
-function MiseEnRoute(): React.ReactElement | null {
-  const { faits, pret } = useMiseEnRoute();
-  if (!pret || termine(faits)) return null;
-  const { faites, total } = progression(faits);
-  return (
-    <div className="relative flex flex-col gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-5 transition hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-pop)]">
-      <h3 className="text-sm font-semibold">
-        Mise en route · {faites}/{total}
-      </h3>
-      <div
-        aria-hidden="true"
-        className="h-1.5 overflow-hidden rounded-full bg-[var(--surface-muted)]"
-      >
-        <div
-          className="h-full rounded-full bg-[var(--accent)]"
-          style={{ width: `${total ? Math.round((faites / total) * 100) : 0}%` }}
-        />
-      </div>
-      <p className="text-sm text-[var(--foreground-muted)]">
-        Identité visuelle, profil fiscal, points de vente : ce qu’il faut pour facturer en règle.
-      </p>
-      <Link
-        href={MISE_EN_ROUTE_BASE}
-        className="text-sm font-medium text-[var(--accent)] underline-offset-2 hover:underline after:absolute after:inset-0 after:rounded-[inherit] after:content-['']"
-      >
-        Reprendre la mise en route
-        <span className="sr-only">
-          {' '}
-          ({faites} étapes faites sur {total})
-        </span>
-      </Link>
     </div>
   );
 }
