@@ -43,6 +43,18 @@ export interface WorkAbsencesSource {
     from: string,
     to: string,
   ): Promise<WorkTimesheetContext>;
+  /**
+   * ADR-0051 — H14 (§ 7.8) : minutes de présence pointées par jour du membre (moteur
+   * `attendanceDay`), ou `null` si le pointage est éteint ou sans fiche reliée. L'appelant
+   * (la feuille de temps) ne le demande que pour le membre lui-même, son manager ou un
+   * lecteur RH (§ 4). Facultatif : absent, pas de colonne « présence ».
+   */
+  attendanceOf?(
+    organizationId: string,
+    userId: string,
+    from: string,
+    to: string,
+  ): Promise<{ date: string; minutes: number }[] | null>;
 }
 
 /** Semaine de travail par défaut sans module RH : lundi à vendredi (décision ouverte n° 5). */

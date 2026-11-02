@@ -5,6 +5,7 @@ import {
   etatJour,
   formatMinutes,
   formatPrevu,
+  aPresence,
   messageConstat,
   peutChoisirMembre,
   semaineVoisine,
@@ -40,6 +41,23 @@ describe('feuille de temps', () => {
     expect(messageConstat(c)).toMatch(/2 h saisies le 4 nov\. 2026/);
     expect(tonConstat(c)).toBe('attention');
     expect(tonConstat({ code: 'NO_TIME_ON_WORKING_DAY' })).toBe('info');
+  });
+
+  it('ADR-0051 — H14 : présence pointée, information seulement', () => {
+    const c = { code: 'PROJECT_TIME_ABOVE_ATTENDANCE' as const, date: '2026-11-04', minutes: 60 };
+    expect(messageConstat(c)).toMatch(/dépasse de 1 h la présence pointée/);
+    expect(tonConstat(c)).toBe('info');
+    const jour = {
+      date: '2026-11-02',
+      weekday: 'mon' as const,
+      scheduled: '1',
+      holiday: null,
+      absence: null,
+      expected: '1',
+      totalMinutes: 0,
+    };
+    expect(aPresence({ days: [jour] })).toBe(false);
+    expect(aPresence({ days: [{ ...jour, attendanceMinutes: 0 }] })).toBe(true);
   });
 
   it('autrui : work.manage', () => {

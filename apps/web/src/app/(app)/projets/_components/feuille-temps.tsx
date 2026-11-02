@@ -20,6 +20,7 @@ import { useShell } from '../../_components/shell-context';
 import { Alerte, BOUTON_PETIT } from './elements';
 import { MES_TACHES_HREF, messageWork, peutLire } from './projets-model';
 import {
+  aPresence,
   enteteJour,
   etatJour,
   formatMinutes,
@@ -211,6 +212,20 @@ export function FeuilleTemps(): React.ReactElement {
                       ))}
                       <td className={`${TD} font-bold`}>{formatMinutes(vue.totalMinutes)}</td>
                     </tr>
+                    {/* ADR-0051 — H14 (§ 7.8) : présence pointée, information seulement. */}
+                    {aPresence(vue) ? (
+                      <tr>
+                        <th scope="row" className={`${TD} text-left`}>
+                          Présence pointée
+                        </th>
+                        {vue.days.map((j) => (
+                          <td key={j.date} className={TD}>
+                            {formatMinutes(j.attendanceMinutes ?? 0)}
+                          </td>
+                        ))}
+                        <td className={TD} />
+                      </tr>
+                    ) : null}
                   </tfoot>
                 </table>
               </div>

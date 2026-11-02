@@ -224,6 +224,50 @@ describe('brief du matin envoyé au modèle : ressources humaines', () => {
       ['rh.absents_aujourdhui', 'count', '1'],
       ['mes_validations_absence.en_attente', 'count', '1'],
       ['rh.echeances', 'count', '2'],
+      // ADR-0051 — H14 : sans leurs entrées, les faits des frais sont non disponibles.
+      ['mes_validations_frais.en_attente', 'count', null],
+      ['rh.remboursements_a_payer', 'count', null],
+    ]);
+  });
+});
+
+// ADR-0051 — H14 (§ 7.6, § 8, critère 18) : du second volet RH, le modèle ne reçoit que
+// deux NOMBRES du brief ; aucun fichier qui lui parle ne lit les neuf collections nouvelles.
+describe('brief du matin envoyé au modèle : frais, avances, présences, évaluations', () => {
+  const HR_SECOND_VOLET =
+    /hr_(expense_reports|advances|attendance_events|attendance_corrections|shifts|staffing_needs|goals|review_cycles|reviews)/;
+
+  it('aucun fichier qui parle au modèle ne lit une collection du second volet', () => {
+    const toutes = sourcesOf(SRC);
+    for (const f of FICHIERS_QUI_PARLENT_AU_MODELE) {
+      const text = toutes.find((x) => x.file === f)?.text ?? '';
+      expect(HR_SECOND_VOLET.test(text), f).toBe(false);
+    }
+  });
+
+  it('le contexte ne porte que deux nombres : ni montant, ni nom, ni « sur salaire »', () => {
+    const brief = buildMorningBrief({
+      now: '2026-11-02T08:00:00.000Z',
+      sales: 'hidden',
+      cash: 'hidden',
+      dueDates: { status: 'unavailable' },
+      work: 'hidden',
+      hr: {
+        status: 'known',
+        absences: null,
+        pendingApprovalCount: null,
+        deadlineCount: null,
+        pendingExpenseApprovalCount: 3,
+        reimbursementsToPayCount: 2,
+        truncated: false,
+      },
+    });
+    const contexte = JSON.stringify(payloadFor(brief));
+    expect(contexte).not.toMatch(/salaire|NF\d{4}|AV\d{4}/);
+    const frais = brief.facts.filter((f) => f.source.reference === 'ADR-0051 § 7.6');
+    expect(frais.map((f) => [f.id, f.kind, f.value, f.currency])).toEqual([
+      ['mes_validations_frais.en_attente', 'count', '3', null],
+      ['rh.remboursements_a_payer', 'count', '2', null],
     ]);
   });
 });

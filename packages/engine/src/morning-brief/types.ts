@@ -38,7 +38,14 @@ import type { CachedLevelInput, StockItemInput } from '../stock/types.js';
  * ni un titre de document ; règles R16 à R18. Sans ces trois entrées, la sortie est
  * celle de 1.4.0.
  */
-export const MORNING_BRIEF_VERSION = '1.5.0';
+/**
+ * 1.6.0 (ADR-0051 § 7.6) : faits `mes_validations_frais.en_attente` (notes de frais et
+ * avances que l'appelant peut valider) et `rh.remboursements_a_payer` (notes à
+ * rembourser et avances à verser, pour `payables.pay`) — des NOMBRES seulement, jamais
+ * un nom, un montant ni la nature d'une avance ; règles R19 et R20. Sans ces deux
+ * entrées, leurs faits sont « non disponibles » et les règles R1 à R18 inchangées.
+ */
+export const MORNING_BRIEF_VERSION = '1.6.0';
 
 export const BRIEF_CURRENCIES = ['CDF', 'USD'] as const;
 export type BriefCurrency = (typeof BRIEF_CURRENCIES)[number];
@@ -216,6 +223,18 @@ export type BriefHrInput =
       pendingApprovalCount: number | null;
       /** Échéances RH sous les délais de rappel (moteur RH `hrDeadlines`). */
       deadlineCount: number | null;
+      /**
+       * ADR-0051 § 7.6 : notes de frais et avances que l'appelant peut valider à l'étape
+       * en cours (séparation des tâches appliquée) ; `null` : fait masqué ; absent : non
+       * disponible.
+       */
+      pendingExpenseApprovalCount?: number | null;
+      /**
+       * ADR-0051 § 7.6 : notes approuvées à rembourser et avances validées à verser que
+       * l'appelant peut payer (`payables.pay`) ; `null` : fait masqué ; absent : non
+       * disponible.
+       */
+      reimbursementsToPayCount?: number | null;
       truncated: boolean;
     };
 

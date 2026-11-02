@@ -19,11 +19,11 @@ export default async function ProjetMargePage({
   params: Promise<{ id: string }>;
 }): Promise<React.ReactElement> {
   const { id } = await params;
-  // ADR-0051 — H16 : frais refacturables (« bientôt disponible » tant que H14 manque).
+  // ADR-0051 — H16 : frais refacturables, branchés sur la route du lot H14.
   return (
     <div className="flex flex-col gap-5">
       <CarteMarge projectId={id} />
-      <FraisRefacturables />
+      <FraisRefacturables projectId={id} />
     </div>
   );
 }

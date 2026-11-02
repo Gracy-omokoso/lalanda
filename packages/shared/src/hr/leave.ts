@@ -50,6 +50,8 @@ import {
   type LeaveRequestStatus,
   type LeaveUnit,
 } from './constants.js';
+// ADR-0051 — H14
+import type { HrLinkTaskItem } from './links.js';
 
 const L = HR_LIMITS;
 
@@ -597,7 +599,11 @@ export interface HrChecklistTaskItem {
   href: string;
 }
 
-export type HrMyTaskItem = HrLeaveApprovalTaskItem | HrChecklistTaskItem;
+export type HrMyTaskItem =
+  | HrLeaveApprovalTaskItem
+  | HrChecklistTaskItem
+  // ADR-0051 — H14 : frais, avances, corrections de pointage.
+  | HrLinkTaskItem;
 
 export function hrLeaveAgendaId(requestId: string): string {
   return `${HR_AGENDA_ID_PREFIX}leave:${requestId}`;

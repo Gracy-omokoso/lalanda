@@ -26,6 +26,9 @@
 // - 1.3.0 (ADR-0046 § 6.4) : matériel sorti du stock pour le projet (`materials`),
 //   valorisé au coût moyen par le moteur des stocks (`projectMaterials`), par devise
 //   de coût — INFORMATIF, JAMAIS soustrait : son achat est déjà une dépense.
+// - 1.4.0 (ADR-0051 § 7.3) : frais du personnel approuvés non remboursés
+//   (`pendingExpenseClaims`), INFORMATIFS, JAMAIS soustraits ; chaque ligne en attente
+//   est diminuée des dépenses déjà créées pour elle (pas de double comptage).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { orderRemainingToInvoice } from '../purchases/orders.js';
@@ -50,6 +53,9 @@ import {
   type ProjectMarginInput,
   type ProjectMarginMemberCost,
   type ProjectMarginResult,
+  type ProjectHrExpensesInput,
+  type ProjectPendingExpenseClaimsCurrency,
+  type WorkMarginExpenseInput,
   type ProjectPurchasesCurrency,
   type ProjectPurchasesInput,
   type ProjectStockInput,
@@ -320,7 +326,53 @@ export function computeProjectMargin(input: ProjectMarginInput): ProjectMarginRe
     byMember,
     ...(input.purchases === undefined ? {} : { purchases: projectPurchases(input.purchases) }),
     ...(input.stock === undefined ? {} : { materials: projectMaterialsOf(input.stock) }),
+    ...(input.hrExpenses === undefined
+      ? {}
+      : { pendingExpenseClaims: pendingExpenseClaimsOf(input.hrExpenses, input.expenses) }),
   };
+}
+
+/**
+ * Frais du personnel approuvés non encore remboursés, par devise (ADR-0051 § 7.3) —
+ * INFORMATIFS. Reste d'une ligne = montant de la ligne − dépenses de la même devise
+ * déjà créées pour elle (soldées par une avance, complément remboursé), jamais négatif :
+ * un montant n'est jamais à la fois dans `margin` et ici.
+ */
+export function pendingExpenseClaimsOf(
+  input: ProjectHrExpensesInput,
+  expenses: readonly WorkMarginExpenseInput[],
+): ProjectPendingExpenseClaimsCurrency[] {
+  const recorded = new Map<string, Fixed>();
+  for (const e of expenses) {
+    const line = e.expenseReportLine ?? null;
+    if (line === null) continue;
+    const key = `${checkCurrency(e.currency, `Dépense ${e.id}`)}|${line}`;
+    recorded.set(key, (recorded.get(key) ?? 0n) + trustedAmount(e.amount, `Dépense ${e.id}`));
+  }
+  const seen = new Set<string>();
+  const totals = new Map<WorkMarginCurrency, { amount: Fixed; lineCount: number }>();
+  for (const claim of input.claims) {
+    const what = `Ligne de frais ${claim.line}`;
+    if (typeof claim.line !== 'string' || claim.line === '') {
+      throw new RangeError(`${what} : identifiant de ligne attendu`);
+    }
+    if (seen.has(claim.line)) throw new RangeError(`${what} : en double`);
+    seen.add(claim.line);
+    const currency = checkCurrency(claim.currency, what);
+    const amount = trustedAmount(claim.amount, what);
+    const rest = amount - (recorded.get(`${currency}|${claim.line}`) ?? 0n);
+    if (rest <= 0n) continue;
+    const t = totals.get(currency) ?? { amount: 0n, lineCount: 0 };
+    t.amount += rest;
+    t.lineCount += 1;
+    totals.set(currency, t);
+  }
+  return WORK_MARGIN_CURRENCIES.flatMap((currency) => {
+    const t = totals.get(currency);
+    return t === undefined
+      ? []
+      : [{ currency, amount: formatPositive(t.amount), lineCount: t.lineCount }];
+  });
 }
 
 /**

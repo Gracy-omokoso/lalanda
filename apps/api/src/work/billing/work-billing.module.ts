@@ -15,6 +15,9 @@ import { ProjectMarginService } from '../margin/project-margin.service.js';
 import { WORK_PURCHASES_SOURCE } from '../margin/work-purchases.port.js';
 import { WORK_STOCK_SOURCE } from '../margin/work-stock.port.js';
 import { StockMarginSource } from '../../stock/margin/stock-margin.source.js';
+// ADR-0051 — H14
+import { HrWorkExpensesSource } from '../../hr/work/hr-work-expenses.source.js';
+import { WORK_HR_EXPENSES_SOURCE } from '../margin/work-hr-expenses.port.js';
 import { WorkModule } from '../work.module.js';
 import { WorkBillingController } from './work-billing.controller.js';
 import { WorkBillingService } from './work-billing.service.js';
@@ -36,6 +39,8 @@ import { WorkInvoiceLink, WorkInvoiceLinkSchema } from './work-invoice-link.sche
     { provide: WORK_PURCHASES_SOURCE, useClass: PurchasesMarginSource },
     // ADR-0046 — S7 : matériel sorti du stock, informatif (lecture seule par la connexion).
     { provide: WORK_STOCK_SOURCE, useClass: StockMarginSource },
+    // ADR-0051 — H14 : frais du personnel du projet (lecture seule par la connexion).
+    { provide: WORK_HR_EXPENSES_SOURCE, useClass: HrWorkExpensesSource },
   ],
 })
 export class WorkBillingModule {}

@@ -556,7 +556,18 @@ export interface TimesheetEntryInput {
   minutes: number;
 }
 
-export type TimesheetFindingCode = 'TIME_ON_LEAVE_DAY' | 'NO_TIME_ON_WORKING_DAY';
+export type TimesheetFindingCode =
+  | 'TIME_ON_LEAVE_DAY'
+  | 'NO_TIME_ON_WORKING_DAY'
+  // ADR-0051 — H14 (§ 7.8) : temps projet du jour supérieur à la présence pointée.
+  | 'PROJECT_TIME_ABOVE_ATTENDANCE';
+
+/** ADR-0051 — H14 (§ 7.8) : minutes de présence d'un jour (moteur `attendanceDay`). */
+export interface TimesheetAttendanceInput {
+  date: HrDay;
+  /** Entier ≥ 0. */
+  minutes: number;
+}
 
 export interface TimesheetDay {
   date: HrDay;
@@ -569,6 +580,11 @@ export interface TimesheetDay {
   /** Fraction travaillée restante (fériés et absences déduits). */
   expected: HrDays;
   totalMinutes: number;
+  /**
+   * ADR-0051 — H14 (§ 7.8) : minutes de présence pointées ce jour ; présent seulement
+   * si l'appelant passe `attendance` (sinon la sortie est celle d'ADR-0045).
+   */
+  attendanceMinutes?: number;
 }
 
 export interface WeeklyTimesheetResult {

@@ -492,6 +492,10 @@ export class WorkTasksService {
               userId: actor.userId,
               holdsLeaveApprove: actorCan(actor, 'leave.approve'),
               seesConfidential: actorCan(actor, 'hr.sensitive.read'),
+              // ADR-0051 — H14 (§ 7.5) : frais, avances, corrections de pointage.
+              holdsExpensesApprove: actorCan(actor, 'expenses.approve'),
+              holdsPayablesPay: actorCan(actor, 'payables.pay'),
+              holdsHrManage: actorCan(actor, 'hr.manage'),
             },
             HR_LIMITS.agendaItemsMax,
           )

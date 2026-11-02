@@ -18,6 +18,8 @@ import { LeaveType, LeaveTypeSchema } from '../leave/leave-type.schema.js';
 import { HrAgendaSource } from './hr-agenda.source.js';
 import { HR_CHECKLIST_AGENDA } from './hr-checklist-agenda.port.js';
 import { HrLeaveApprovalsReader } from './hr-leave-approvals.reader.js';
+// ADR-0051 — H14 : frais, avances et corrections de pointage (lecture seule).
+import { HrExpenseAgendaReader } from './hr-expense-agenda.reader.js';
 
 @Module({
   imports: [
@@ -35,7 +37,9 @@ import { HrLeaveApprovalsReader } from './hr-leave-approvals.reader.js';
     // ADR-0045 — H4 : éléments de liste d'entrée et de sortie de l'appelant.
     HrChecklistAgendaSource,
     { provide: HR_CHECKLIST_AGENDA, useExisting: HrChecklistAgendaSource },
+    // ADR-0051 — H14
+    HrExpenseAgendaReader,
   ],
-  exports: [HrLeaveApprovalsReader, HrAgendaSource],
+  exports: [HrLeaveApprovalsReader, HrAgendaSource, HrExpenseAgendaReader],
 })
 export class HrAgendaModule {}
