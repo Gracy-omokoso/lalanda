@@ -6,6 +6,10 @@
 **Empreinte SHA-256 du pack relu :** `d68b17cffe85df1fbef1f9a8e24a43089b9fa20b3dc33902881f19b941378ca8`
 **Cadre :** [ADR-0049](../adr/ADR-0049-comptabilite-syscohada.md) § 2.1, § 2.1.1, § Plan de validation, § Questions pour l'expert-comptable
 
+> **3 nov. 2026** : le pack v2, adopté par décision de la dirigeante, est en usage ; ses choix et ce que
+> l'expert devra revoir sont dans [relecture-pack-syscohada-v2.md](relecture-pack-syscohada-v2.md). Le
+> pack v1 reste `draft`, inchangé.
+
 ## À l'attention de l'expert-comptable
 
 Lalanda prépare une comptabilité générée à partir des pièces de ses utilisateurs (factures, encaissements,
