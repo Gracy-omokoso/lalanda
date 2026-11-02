@@ -216,6 +216,30 @@ Salaire de base déclaré, coordonnées bancaires et mobile money, pièces d'ide
 - Le débit de `reveal` compte les traces de l'heure écoulée : deux appels strictement simultanés au seuil peuvent en laisser passer un de plus.
 - Les documents sensibles (pièces scannées, certificats) relèvent du lot H4 ; le brief (H5) ne reçoit que des nombres.
 
+## Implémenté (ADR-0051, lot H15) — objectifs individuels et évaluations
+
+Entretiens d'évaluation (`hr_reviews`) : auto-évaluation, appréciation et notes de l'évaluateur, commentaire du collaborateur, note RH — **parmi les données les plus sensibles du dossier**. Objectifs individuels (`hr_goals`) et campagnes (`hr_review_cycles`). Code : `apps/api/src/hr/performance/`. Décision : ADR-0051 § 2.5 à § 2.7, § 3.5, § 4.
+
+### Fait
+
+- **Éteint par défaut** (`hr_settings.performance.enabled = false`) : toute route rend `409 HR_FEATURE_DISABLED` tant que l'organisation ne l'active pas (`PUT /hr/settings/performance`, `hr.manage`). Manager direct seul (`managerChainDepth = 1`), aucune purge (`retention.reviewsYearsAfterExit = null`).
+- **Action dédiée `performance.read`** (Propriétaire, Responsable RH), distincte de `hr.sensitive.read` : le Directeur financier et l'Administrateur ne lisent ni objectifs ni évaluations (`404`, testé) ; `hr.read` seul non plus. Interdit absolu de la plateforme (`PLATFORM_FORBIDDEN_ACTIONS`). Autres lecteurs **par relation** : le collaborateur, l'évaluateur, la chaîne de managers jusqu'à `managerChainDepth`.
+- **Chiffrées au repos, sans schéma nouveau.** Quatre sections (`selfAssessment`, `managerAssessment`, `employeeComment`, `hrNote`) chiffrées par `secrets-crypto.ts`, emplacement `org:hr_reviews`, dérivation HKDF et AAD portant **organisation, évaluation et section** ; un chiffré recopié ne se déchiffre pas (testé). Les notes choisies (`ratings`, `overall`) sont **dans** l'appréciation chiffrée. `toJSON`/`toObject` remplacent les chiffrés par `[redacted]`. Sans trousseau : `503 SECRETS_NOT_CONFIGURED`.
+- **Listes : statuts seulement** (`GET /hr/reviews`). Le contenu ne sort que par `POST /hr/reviews/:id/reveal` : section par section selon le lecteur et l'étape (l'évalué lit l'appréciation après le partage ; `hrNote` : `performance.read` seul — `403 REVIEW_SECTION_NOT_YOURS`) ; audit **strict** `hr.review.revealed` (sections, jamais de valeur) écrit **avant** le déchiffrement (journal indisponible ⇒ `503 HR_AUDIT_UNAVAILABLE`) ; **30 par heure et par utilisateur** (`429 HR_REVEAL_RATE_LIMITED`).
+- **Écriture** d'une section par son seul auteur, à son étape, avec audit strict `hr.review.changed` (section, jamais la valeur) dans la même transaction ; `expectedRevision` partout.
+- **Aucune note calculée** : une note est choisie par l'évaluateur dans l'échelle saisie par l'organisation (`checkRating`), `overall` facultatif et choisi ; le moteur ne compte que des statuts (`reviewProgress`). Aucune IA, aucun effet automatique.
+- **Clôture** : garde `hr.manage` + `performance.read`, puis `reviewCloseDecision` (ni l'évalué ni l'évaluateur, sauf détenteur unique marqué) ; une évaluation partagée non signée est close avec la mention « non signée » (`closedUnsigned`), jamais un consentement présumé. La prise de connaissance ne change que le statut et la signature (testé).
+- **Notifications** (`hr.review_step`, `hr.goal_proposed`, `hr.goal_agreed`) : l'étape, jamais un extrait, une note ni un objectif.
+- **Anonymisation** d'un collaborateur (`HrEmployeesService.anonymize`) : ses quatre sections et l'instantané de ses objectifs sont effacés dans la même transaction ; le squelette (campagne, statut, évaluateur) reste.
+- **Rotation** comprise dans `secrets:rewrap` (`rewrapHrReviews`) : chaque section re-chiffrée sous la clé courante, écriture conditionnée par l'ancien `iv`, révision inchangée, une trace `secret.rewrapped` par section ; `remainingKeyIds` couvre `hr_reviews`. Testé : après k1 → k2, tout se relit avec la seule k2.
+- **Tests anti-fuite** (`hr-performance.e2e.test.ts`) : aucune appréciation, auto-évaluation, commentaire ni note RH dans le document Mongo, les listes, `audit_events` et les notifications.
+
+### Limites
+
+- Mêmes limites que les données sensibles du personnel (débit de `reveal` compté sur l'heure écoulée).
+- Les objectifs (`hr_goals`) ne sont **pas** chiffrés : ils sont protégés par la portée (soi, chaîne, `performance.read`), pas par le chiffrement ; ADR-0051 ne chiffre que les évaluations.
+- Un acteur plateforme sans appartenance reçoit `404` (son organisation active est la sienne) ; il n'existe pas d'accès délégué aux routes d'organisation qui permettrait d'observer le `403` du critère 2.
+
 ## Implémenté (ADR-0046, lot S6) — bibliothèque de documents
 
 Statuts, attestations, licences, polices, contrats (`document_folders`, `library_documents`, `library_document_versions`) : des pièces d'entreprise dont certaines sont sensibles. Code : `apps/api/src/documents/`. Décision : ADR-0046 § 4, § 5.3.

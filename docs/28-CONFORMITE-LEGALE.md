@@ -170,6 +170,21 @@ registre ; de `hr.sensitive.read` (Propriétaire, Directeur financier, Responsab
 RH) pour les données sensibles ; le salarié pour les siennes ; jamais l’IA, les
 exports, les notifications ni la plateforme. Durée : **à fixer avec le juriste**.
 
+**Registre de traitement — « évaluation » (ADR-0051, lot H15).**
+Finalité : objectifs individuels et entretiens d’évaluation tenus par
+l’organisation cliente, **désactivés par défaut** (décision ouverte n° 11).
+Catégories : objectifs (titre, mesure, avancement **déclaré**) ; auto-évaluation,
+appréciation et notes **choisies** par l’évaluateur, commentaire du collaborateur,
+note RH (chiffrés, `hr_reviews`). Aucune note n’est calculée ni produite par l’IA ;
+aucun effet automatique sur la rémunération, le contrat ou une sortie. Destinataires :
+le collaborateur, son évaluateur, son manager direct (`managerChainDepth = 1`), les
+détenteurs de `performance.read` (Propriétaire, Responsable RH) ; jamais le
+Directeur financier, l’Administrateur, l’IA, le brief, les exports, les
+notifications (l’étape seulement) ni la plateforme. La « prise de connaissance »
+n’est pas un accord (J6). Anonymisation : contenu effacé. Durée de conservation
+après la sortie : **à fixer avec le juriste** (J4 ; réglage
+`retention.reviewsYearsAfterExit`, vide, aucune purge).
+
 Ces points restent marqués comme questions ouvertes dans les pages concernées
 (CGU § droit applicable, politique de confidentialité § transferts et
 conservation).

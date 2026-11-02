@@ -69,6 +69,8 @@ import {
   HrRemindersJob,
 } from './reminders/hr-reminders.job.js';
 import { HrRetentionJob } from './retention/hr-retention.job.js';
+// ADR-0051 — H15 : objectifs individuels et évaluations (module autonome).
+import { HrPerformanceModule } from './performance/hr-performance.module.js';
 
 @Module({
   imports: [
@@ -76,6 +78,8 @@ import { HrRetentionJob } from './retention/hr-retention.job.js';
     OrganizationsModule,
     // ADR-0045 — H3 : lecteur des demandes à valider, partagé avec « Mes tâches ».
     HrAgendaModule,
+    // ADR-0051 — H15
+    HrPerformanceModule,
     MongooseModule.forFeature([
       // ADR-0045 — H2 : réglages, services, fiches, données sensibles ; adhésions
       // (lien membre, destinataires de l'alerte bancaire) ; journal (débit de `reveal`).
