@@ -170,6 +170,16 @@ registre ; de `hr.sensitive.read` (Propriétaire, Directeur financier, Responsab
 RH) pour les données sensibles ; le salarié pour les siennes ; jamais l’IA, les
 exports, les notifications ni la plateforme. Durée : **à fixer avec le juriste**.
 
+11. **Console de la plateforme (ADR-0053, proposé).** Questions JA1 à JA7 de l'ADR, non
+    tranchées : base légale et information pour l'accès des opérateurs de Go freelance SARLU aux
+    métadonnées des comptes et organisations (JA1) ; information et contestation d'un blocage ou
+    d'une suspension (JA2) ; lecture ou export garantis pendant une suspension (JA3) ; message de
+    service et prospection, consentement et désinscription (JA4) ; conservation du journal
+    plateforme, des motifs et des notes internes, des accusés de lecture (JA5) ; seuil de diffusion
+    des statistiques (JA6) ; demandes des autorités (JA7). Valeurs par défaut techniques et
+    prudentes appliquées dans l'attente : aucun e-mail de masse, aucune purge du journal, message
+    générique au compte bloqué, aucune case de moins de 5 organisations.
+
 Ces points restent marqués comme questions ouvertes dans les pages concernées
 (CGU § droit applicable, politique de confidentialité § transferts et
 conservation).
@@ -480,6 +490,7 @@ que personne ne s’en aperçoive.
 | Frais de recouvrement selon le droit applicable | CGV |
 | Gestion du personnel des clients : qualification, information des salariés, conservation (§ 1.3, point 9) | Confidentialité, ADR-0045 |
 | Contrats des organisations clientes : reconduction tacite, préavis, mentions, preuve, conservation, signataires, prix (§ 1.3, point 10 ; JU1 à JU7) | ADR-0050 |
+| Console de la plateforme : accès des opérateurs, blocage et suspension, messages de masse, conservation, statistiques, demandes des autorités (§ 1.3, point 11 ; JA1 à JA7) | ADR-0053 |
 
 ### 3.2 Décisions commerciales (non arbitrées — rien n’a été inventé)
 
