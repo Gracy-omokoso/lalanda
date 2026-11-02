@@ -48,7 +48,6 @@ import {
 } from '../authz/platform-role-assignment.schema.js';
 import {
   platformActionHolders,
-  platformGrantDecision,
   platformRoleGrantDecision,
   platformSelfDealingDecision,
   type PlatformAction,
@@ -295,91 +294,8 @@ export class AdminService {
     };
   }
 
-  /**
-   * Change le plan d'une organisation — route HISTORIQUE, servie une version
-   * (ADR-0053 § 7) avant les octrois du lot P3.
-   *
-   * Depuis ADR-0053 (P2) : motif obligatoire (catégorie, message client, note interne),
-   * ré-authentification (contrôleur), contrôle de conflit d'intérêts (§ 2.6), seconde
-   * personne au sens de `platformGrantDecision` (§ 5.3) et miroir « Équipe Lalanda »
-   * dans le journal du client (F4). Le retour à `free` n'est pas un octroi : il ne
-   * passe pas par la seconde personne.
-   */
-  async setPlan(
-    orgId: string,
-    input: {
-      plan: Plan;
-      reasonCategory: PlatformReasonCategory;
-      clientMessage: string;
-      internalNote: string;
-    },
-    actor: AdminActor,
-  ): Promise<AdminOrganizationSummary> {
-    const { plan } = input;
-    if (!PLANS.includes(plan)) {
-      throw new BadRequestException({ code: 'UNKNOWN_PLAN', message: `Plan inconnu : ${plan}.` });
-    }
-    const org = await this.orgOrThrow(orgId);
-    const { soleOperator } = await this.assertNoSelfDealing(
-      'billing.grant',
-      'platform.billing.grant',
-      orgId,
-      actor,
-    );
-    let soleApprover = false;
-    if (plan !== 'free') {
-      const now = new Date();
-      const decision = platformGrantDecision({
-        plan,
-        startsAt: now,
-        endsAt: null,
-        requestedBy: actor.userId,
-        approverUserId: null,
-        holdersCount: await this.effectiveHoldersCount('platform.billing.grant'),
-      });
-      if (!decision.ok || decision.status === 'pending_approval') {
-        throw new ConflictException({
-          code: 'SECOND_PERSON_REQUIRED',
-          message:
-            'Un octroi sans échéance exige une seconde personne : passez par les octrois ' +
-            'manuels de la console (ADR-0053 § 6.2).',
-        });
-      }
-      soleApprover = decision.soleApprover;
-    }
-
-    const previous = await this.billing.getPlan(orgId);
-    await this.billing.setPlan(orgId, plan);
-    const ref = newPlatformEventRef();
-    await this.audit.record({
-      actorUserId: actor.userId,
-      actorRole: actor.platformRole,
-      action: 'organization.plan_changed',
-      targetType: 'organization',
-      targetId: orgId,
-      metadata: {
-        from: previous,
-        to: plan,
-        reasonCategory: input.reasonCategory,
-        internalNote: input.internalNote,
-        clientMessage: input.clientMessage,
-        ref,
-        soleOperator,
-        soleApprover,
-      },
-    });
-    await this.mirrors.mirror({
-      organizationId: orgId,
-      action: 'platform.organization.plan_changed',
-      targetType: 'organization',
-      targetId: orgId,
-      platformEventRef: ref,
-      clientMessage: input.clientMessage,
-      soleOperator: soleOperator || soleApprover,
-      facts: { from: previous, to: plan },
-    });
-    return this.summarizeOrganization(org);
-  }
+  // ADR-0053 — P3 : l'ancien `setPlan` (changement direct, remis `active` sans trace) a
+  // disparu ; la route historique passe par les octrois (`billing/platform-billing.service.ts`).
 
   /**
    * Suspend une organisation (ADR-0053 § 6.1) : catégorie, message client, note
@@ -819,7 +735,8 @@ export class AdminService {
    * `409 PLATFORM_SELF_DEALING` si l'opérateur est MEMBRE de l'organisation cible et
    * qu'un autre détenteur effectif de l'action existe ; seul détenteur : permis, marqué.
    */
-  private async assertNoSelfDealing(
+  // ADR-0053 — P3 : public, réutilisé par la console des abonnements.
+  async assertNoSelfDealing(
     gesture: PlatformSelfDealingGesture,
     action: PlatformAction,
     orgId: string,
@@ -848,7 +765,8 @@ export class AdminService {
    * Détenteurs EFFECTIFS d'une action plateforme : personnes distinctes dont un rôle
    * détenteur n'est ni révoqué ni expiré, et dont le compte n'est pas bloqué.
    */
-  private async effectiveHoldersCount(action: PlatformAction): Promise<number> {
+  // ADR-0053 — P3 : public, réutilisé par les octrois manuels.
+  async effectiveHoldersCount(action: PlatformAction): Promise<number> {
     const now = new Date();
     const userIds: string[] = await this.platformRoles
       .distinct('userId', {

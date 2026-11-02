@@ -1959,6 +1959,8 @@ describe('ADR-0053 — P0 : la garde sans organisation ne vaut que pour la conso
     'IntegrationsController',
     'ReauthController',
     'AccountingChartPacksPlatformController',
+    // ADR-0053 — P3
+    'PlatformBillingController',
     // ADR-0053 — P4
     'AdminFeaturesController',
   ];
@@ -1966,15 +1968,11 @@ describe('ADR-0053 — P0 : la garde sans organisation ne vaut que pour la conso
   const CONSOLE_SANS_EXIGENCE = ['PlatformAccessController.platformAccess'];
   /**
    * Routes plateforme ENCORE sous `AuthGuard`, servies une version (compatibilité N-1,
-   * ADR-0053 § 2.2, § 7) : le lot P3 les duplique sous `/admin/billing/**` derrière la
-   * garde de console, puis les retire (`410`). Liste figée : aucune entrée nouvelle.
+   * ADR-0053 § 2.2, § 7). VIDÉE par le lot P3 : `/payments/manual/*` et
+   * `/payments/maintenance/sweep` sont dupliquées sous `/admin/billing/**` et répondent
+   * désormais `410`. Liste figée : aucune entrée nouvelle.
    */
-  const PLATEFORME_SOUS_AUTHGUARD_N1 = [
-    'PaymentsController.pendingManual',
-    'PaymentsController.confirmManual',
-    'PaymentsController.rejectManual',
-    'PaymentsController.sweep',
-  ];
+  const PLATEFORME_SOUS_AUTHGUARD_N1: string[] = [];
 
   interface RouteGardee {
     cle: string;
@@ -2431,5 +2429,94 @@ describe('ADR-0052 — O2/O3 : déclarations de la mise en route', () => {
     // Critère 7 : aucune route de report pour la fiche fiscale.
     expect(routes.some((r) => /fiscal$/i.test(r.cle))).toBe(false);
     expect(SANS_PERMISSION['OrganizationSetupController.read']).toBeDefined();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADR-0053 — P3 : abonnements et paiements manuels de la console (§ 6.2, § 7)
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { PlatformBillingController } from '../admin/billing/platform-billing.controller.js';
+
+const CONTROLEURS_P3 = [PlatformBillingController];
+(CONTROLEURS as unknown[]).push(...CONTROLEURS_P3);
+TOUTES_LES_ROUTES.push(
+  ...CONTROLEURS_P3.flatMap((c) => routesDe(c as new (...args: never[]) => unknown)),
+);
+
+/** Anciennes routes plateforme : `410 ROUTE_GONE` à tous, sans session ni action. */
+const ROUTES_RETIREES_P3: Record<string, string> = {
+  'PaymentsController.pendingManual':
+    'ADR-0053 P3 : retirée (410), remplacée par GET /admin/billing/manual-payments',
+  'PaymentsController.confirmManual':
+    'ADR-0053 P3 : retirée (410), remplacée par POST /admin/billing/manual-payments/:reference/confirm',
+  'PaymentsController.rejectManual':
+    'ADR-0053 P3 : retirée (410), remplacée par POST /admin/billing/manual-payments/:reference/reject',
+  'PaymentsController.sweep':
+    'ADR-0053 P3 : retirée (410), remplacée par POST /admin/billing/sweep',
+};
+Object.assign(SANS_PERMISSION, ROUTES_RETIREES_P3);
+
+describe('ADR-0053 — P3 : `/admin/billing/**`', () => {
+  const routesP3 = () =>
+    TOUTES_LES_ROUTES.filter((r) => r.cle.startsWith('PlatformBillingController.'));
+
+  it('chaque route déclare l’action plateforme du § 7, jamais une action d’organisation', () => {
+    const attendu: Record<string, PlatformAction> = {
+      'PlatformBillingController.subscriptions': 'platform.billing.read',
+      'PlatformBillingController.manualPayments': 'platform.billing.read',
+      'PlatformBillingController.grants': 'platform.billing.read',
+      'PlatformBillingController.confirm': 'platform.billing.confirm',
+      'PlatformBillingController.reject': 'platform.billing.confirm',
+      'PlatformBillingController.sweep': 'platform.billing.confirm',
+      'PlatformBillingController.createGrant': 'platform.billing.grant',
+      'PlatformBillingController.approveGrant': 'platform.billing.grant',
+      'PlatformBillingController.revokeGrant': 'platform.billing.grant',
+    };
+    expect(
+      routesP3()
+        .map((r) => r.cle)
+        .sort(),
+    ).toEqual(Object.keys(attendu).sort());
+    const proto = PlatformBillingController.prototype as unknown as Record<string, object>;
+    for (const [cle, action] of Object.entries(attendu)) {
+      const route = routesP3().find((r) => r.cle === cle)!;
+      expect(route.actions ?? [], cle).toEqual([]);
+      expect(route.rolesPlateforme, cle).toEqual(platformActionHolders(action));
+      const declarees = (Reflect.getMetadata(
+        REQUIRED_PLATFORM_ACTIONS_KEY,
+        proto[cle.split('.')[1]!]!,
+      ) ?? []) as string[];
+      expect(declarees, cle).toEqual([action]);
+      expect(SANS_PERMISSION[cle], cle).toBeUndefined();
+    }
+  });
+
+  it('`platform_admin` ne confirme plus un dépôt manuel ; la finance, si (§ 5.2)', () => {
+    expect(platformActionHolders('platform.billing.confirm')).not.toContain('platform_admin');
+    expect(platformActionHolders('platform.billing.confirm')).toContain('platform_billing');
+  });
+
+  it('toute écriture motivée exige la ré-authentification (§ 2.4) ; le balayage, non (§ 7)', () => {
+    const proto = PlatformBillingController.prototype as unknown as Record<string, object>;
+    const avecReauth = ['confirm', 'reject', 'createGrant', 'approveGrant', 'revokeGrant'];
+    for (const nom of Object.getOwnPropertyNames(proto)) {
+      if (nom === 'constructor' || Reflect.getMetadata('path', proto[nom]!) === undefined) continue;
+      expect(Reflect.getMetadata(P2_REAUTH_KEY, proto[nom]!) === true, nom).toBe(
+        avecReauth.includes(nom),
+      );
+    }
+  });
+
+  it('les anciennes routes `/payments/manual/*` et le balayage sont retirés : aucune garde, aucune exigence', () => {
+    for (const cle of Object.keys(ROUTES_RETIREES_P3)) {
+      const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle);
+      expect(route, cle).toBeDefined();
+      expect(route!.actions ?? [], cle).toEqual([]);
+      expect(route!.rolesPlateforme ?? [], cle).toEqual([]);
+      const nom = cle.split('.')[1]!;
+      const methode = (PaymentsController.prototype as unknown as Record<string, object>)[nom]!;
+      expect(Reflect.getMetadata(GUARDS_METADATA, methode) ?? [], cle).toEqual([]);
+    }
   });
 });

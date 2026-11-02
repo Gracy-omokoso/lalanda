@@ -136,6 +136,7 @@ e2eSuite('ADR-0053 — P4 : fonctionnalités par offre', () => {
     billing = app.get(BillingService);
     await db.collection('platform_roles').deleteMany({});
     await db.collection('platform_feature_overrides').deleteMany({});
+    await db.collection('platform_plan_grants').deleteMany({});
 
     const poserRole = (userId: string, role: PlatformRole) =>
       db.collection('platform_roles').insertOne({
@@ -250,6 +251,43 @@ e2eSuite('ADR-0053 — P4 : fonctionnalités par offre', () => {
 
     await billing.setPlan(org, 'pro');
     expect((await ecrireOpportunite()).body?.code).not.toBe('FEATURE_NOT_IN_PLAN');
+  });
+
+  it('cohérence avec P3 — un octroi actif (`plan.granted`) fait l’offre effective de la garde ; retiré, elle repart', async () => {
+    await billing.setPlan(org, 'free');
+    features.replaceGridForTesting(fermer(DEFAULT_FEATURE_GRID, ['crm'], ['free']));
+    expect((await ecrireOpportunite()).body?.code).toBe('FEATURE_NOT_IN_PLAN');
+
+    await reauth('sa');
+    const octroi = await request(serveur())
+      .post('/admin/billing/grants')
+      .set('Cookie', cookies['sa']!)
+      .send({
+        targetOrganizationId: org,
+        plan: 'pro',
+        reasonCategory: 'request',
+        clientMessage: 'Offre Pro accordée pour un mois.',
+        internalNote: 'Octroi court pour la suite P4.',
+        endsAt: new Date(Date.now() + 30 * DAY_MS).toISOString(),
+      });
+    expect(octroi.status, JSON.stringify(octroi.body)).toBe(201);
+    expect(octroi.body.status).toBe('active');
+
+    // Offre effective = `pro` : l'écriture passe, `GET /me/features` le dit.
+    expect((await ecrireOpportunite()).body?.code).not.toBe('FEATURE_NOT_IN_PLAN');
+    const moi = await request(serveur()).get('/me/features').set('Cookie', client());
+    expect(moi.body.plan).toBe('pro');
+    expect(
+      (moi.body.features as Array<{ key: string; status: string }>).find((f) => f.key === 'crm')
+        ?.status,
+    ).toBe('included');
+
+    const retrait = await request(serveur())
+      .delete(`/admin/billing/grants/${String(octroi.body.id)}`)
+      .set('Cookie', cookies['sa']!)
+      .send({ internalNote: 'Fin de l’octroi de test.', clientMessage: 'Fin de l’offre Pro.' });
+    expect(retrait.status, JSON.stringify(retrait.body)).toBe(200);
+    expect((await ecrireOpportunite()).body?.code).toBe('FEATURE_NOT_IN_PLAN');
   });
 
   it('console : lecture ouverte au support, écriture refusée au support et sans ré-authentification', async () => {

@@ -181,6 +181,15 @@ e2eSuite('abonnements de bout en bout (S22b)', () => {
     return res.body.organizations[0].id as string;
   }
 
+  /** ADR-0053 P3 : toute décision de la console exige une ré-authentification récente. */
+  async function reauthAdmin(): Promise<void> {
+    const res = await request(app.getHttpServer())
+      .post('/admin/reauth')
+      .set('Cookie', adminCookies)
+      .send({ password: admin.password });
+    expect(res.status, JSON.stringify(res.body)).toBe(201);
+  }
+
   function subscriptionOf(cookies: string[]) {
     return request(app.getHttpServer())
       .get('/organizations/current/subscription')
@@ -594,9 +603,9 @@ e2eSuite('abonnements de bout en bout (S22b)', () => {
     expect(JSON.stringify(checkout.body.instructions)).toContain(reference);
 
     // Alice ne peut PAS confirmer son propre paiement : la confirmation exige un
-    // rôle plateforme, pas `billing.manage`.
+    // rôle plateforme, pas `billing.manage` (ADR-0053 P3 : depuis la console).
     const selfConfirm = await request(server)
-      .post(`/payments/manual/${reference}/confirm`)
+      .post(`/admin/billing/manual-payments/${reference}/confirm`)
       .set('Cookie', aliceCookies)
       .send({});
     expect(selfConfirm.status).toBe(403);
@@ -606,15 +615,16 @@ e2eSuite('abonnements de bout en bout (S22b)', () => {
 
     // L'administrateur plateforme voit la demande et la confirme.
     const pending = await request(server)
-      .get('/payments/manual/pending')
+      .get('/admin/billing/manual-payments?status=pending')
       .set('Cookie', adminCookies);
     expect(pending.status).toBe(200);
     expect(
       pending.body.requests.some((r: { reference: string }) => r.reference === reference),
     ).toBe(true);
 
+    await reauthAdmin();
     const confirm = await request(server)
-      .post(`/payments/manual/${reference}/confirm`)
+      .post(`/admin/billing/manual-payments/${reference}/confirm`)
       .set('Cookie', adminCookies)
       .send({ note: 'Dépôt M-Pesa constaté (suite e2e).' });
     expect(confirm.status).toBe(200);
@@ -640,7 +650,7 @@ e2eSuite('abonnements de bout en bout (S22b)', () => {
     // Une seconde confirmation de la MÊME référence ne double pas le mois.
     const periodEnd = state.body.currentPeriodEnd;
     const again = await request(server)
-      .post(`/payments/manual/${reference}/confirm`)
+      .post(`/admin/billing/manual-payments/${reference}/confirm`)
       .set('Cookie', adminCookies)
       .send({ note: 'Rejeu accidentel.' });
     expect(again.status).toBe(400);
@@ -671,17 +681,18 @@ e2eSuite('abonnements de bout en bout (S22b)', () => {
     expect(checkout.status).toBe(200);
     const reference: string = checkout.body.reference;
 
+    await reauthAdmin();
     const noNote = await request(server)
-      .post(`/payments/manual/${reference}/reject`)
+      .post(`/admin/billing/manual-payments/${reference}/reject`)
       .set('Cookie', adminCookies)
       .send({});
     expect(noNote.status).toBe(400);
-    expect(noNote.body.code).toBe('REJECTION_NOTE_REQUIRED');
+    expect(noNote.body.code).toBe('REASON_REQUIRED');
 
     const rejected = await request(server)
-      .post(`/payments/manual/${reference}/reject`)
+      .post(`/admin/billing/manual-payments/${reference}/reject`)
       .set('Cookie', adminCookies)
-      .send({ note: 'Aucun virement reçu sous 7 jours.' });
+      .send({ reason: 'Aucun virement reçu sous 7 jours.' });
     expect(rejected.status).toBe(200);
   }, 60_000);
 
@@ -776,16 +787,32 @@ e2eSuite('abonnements de bout en bout (S22b)', () => {
 
   it("le balayage d'exploitation exige un rôle plateforme", async () => {
     const denied = await request(app.getHttpServer())
-      .post('/payments/maintenance/sweep')
+      .post('/admin/billing/sweep')
       .set('Cookie', aliceCookies)
       .send({});
     expect(denied.status).toBe(403);
 
     const allowed = await request(app.getHttpServer())
-      .post('/payments/maintenance/sweep')
+      .post('/admin/billing/sweep')
       .set('Cookie', adminCookies)
       .send({});
     expect(allowed.status).toBe(200);
     expect(typeof allowed.body.scanned).toBe('number');
+  }, 30_000);
+
+  it('ADR-0053 P3 — les anciennes routes `/payments/manual/*` et le balayage répondent 410', async () => {
+    const s = app.getHttpServer();
+    for (const [verbe, chemin] of [
+      ['get', '/payments/manual/pending'],
+      ['post', '/payments/manual/LLD-X/confirm'],
+      ['post', '/payments/manual/LLD-X/reject'],
+      ['post', '/payments/maintenance/sweep'],
+    ] as const) {
+      for (const cookies of [adminCookies, aliceCookies, []]) {
+        const res = await request(s)[verbe](chemin).set('Cookie', cookies).send({});
+        expect(res.status, `${verbe} ${chemin}`).toBe(410);
+        expect(res.body.code).toBe('ROUTE_GONE');
+      }
+    }
   }, 30_000);
 });

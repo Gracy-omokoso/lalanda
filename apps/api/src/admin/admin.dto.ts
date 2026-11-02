@@ -80,6 +80,8 @@ const REASON_FIELDS = new Set([
   'reason',
   'liftReason',
   'liftedClientMessage',
+  // ADR-0053 — P3 : note de confirmation d'un dépôt manuel.
+  'note',
 ]);
 
 /**

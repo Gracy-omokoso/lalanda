@@ -24,6 +24,7 @@
 import {
   BadRequestException,
   Body,
+  ConflictException,
   Controller,
   Delete,
   Get,
@@ -45,6 +46,11 @@ import { PlatformAuthGuard } from '../authz/platform-auth.guard.js';
 import { PlatformAuditService } from '../integrations/platform-audit.service.js';
 // ADR-0053 — P2
 import { RequireRecentReauth } from '../integrations/reauth.guard.js';
+// ADR-0053 — P3
+import {
+  PlatformBillingService,
+  type AdminPlanGrantView,
+} from './billing/platform-billing.service.js';
 import {
   AdminService,
   type AdminActor,
@@ -91,6 +97,8 @@ export class AdminController {
     @Inject(AdminService) private readonly admin: AdminService,
     @Inject(PlatformAuditService) private readonly audit: PlatformAuditService,
     @Inject(AuthzService) private readonly authz: AuthzService,
+    // ADR-0053 — P3
+    @Inject(PlatformBillingService) private readonly billing: PlatformBillingService,
   ) {}
 
   /**
@@ -155,8 +163,13 @@ export class AdminController {
   }
 
   /**
-   * Changement de plan — route HISTORIQUE (ADR-0053 § 7), remplacée par les octrois du
-   * lot P3. Motif obligatoire, ré-authentification, conflit d'intérêts, miroir client.
+   * Changement de plan — route HISTORIQUE (ADR-0053 § 7), servie une version encore.
+   *
+   * ADR-0053 — P3 : le palliatif de P2 (`409 SECOND_PERSON_REQUIRED`) est levé. La route
+   * passe désormais par les OCTROIS (`platform_plan_grants`) : une offre payante devient
+   * un octroi sans échéance — actif, ou en attente d'une seconde personne (§ 5.3) ;
+   * `free` retire l'octroi en cours (ou annule la demande en attente). Plus jamais `setPlan`, qui remettait `active` sans
+   * trace (F4). La console utilise `/admin/billing/grants`.
    */
   @Patch('organizations/:organizationId/plan')
   @RequirePlatformAction('platform.billing.grant')
@@ -165,12 +178,34 @@ export class AdminController {
     @Req() req: AuthenticatedRequest,
     @Param('organizationId') organizationId: string,
     @Body() body: unknown,
-  ): Promise<AdminOrganizationSummary> {
+  ): Promise<AdminOrganizationSummary & { grant: AdminPlanGrantView }> {
     const parsed = SetPlanSchema.safeParse(body);
     if (!parsed.success) {
       throw invalidBody(parsed.error, 'Offre, catégorie, message client et note interne requis.');
     }
-    return this.admin.setPlan(organizationId, parsed.data, await this.actorOf(req));
+    const actor = await this.actorOf(req);
+    const { plan, reasonCategory, clientMessage, internalNote } = parsed.data;
+    let grant: AdminPlanGrantView;
+    if (plan === 'free') {
+      const current = await this.billing.openGrantOf(organizationId);
+      if (!current) {
+        throw new ConflictException({
+          code: 'NO_ACTIVE_GRANT',
+          message: 'Aucun octroi en cours : l’offre souscrite par le client s’applique déjà.',
+        });
+      }
+      grant = await this.billing.revokeGrant(
+        String(current._id),
+        { internalNote, clientMessage },
+        actor,
+      );
+    } else {
+      grant = await this.billing.createGrant(
+        { targetOrganizationId: organizationId, plan, reasonCategory, clientMessage, internalNote },
+        actor,
+      );
+    }
+    return { ...(await this.admin.getOrganization(organizationId)), grant };
   }
 
   @Post('organizations/:organizationId/suspend')

@@ -22,6 +22,12 @@ import {
 import { PlatformAccessController } from './platform-access.controller.js';
 // ADR-0053 — P2
 import { PlatformMirrorService } from './mirror.js';
+// ADR-0053 — P3
+import { Subscription, SubscriptionSchema } from '../billing/subscription.schema.js';
+import { PaymentsModule } from '../payments/payments.module.js';
+import { PlanGrant, PlanGrantSchema } from './billing/plan-grant.schema.js';
+import { PlatformBillingController } from './billing/platform-billing.controller.js';
+import { PlatformBillingService } from './billing/platform-billing.service.js';
 // ADR-0053 — P4 : fonctionnalités par offre (@Global, sert `FeatureGuard` partout).
 import { FeaturesModule } from './features/features.module.js';
 
@@ -31,17 +37,22 @@ import { FeaturesModule } from './features/features.module.js';
     OrganizationsModule,
     BillingModule,
     IntegrationsModule,
+    // ADR-0053 — P3 : file des paiements manuels (`PaymentsService`).
+    PaymentsModule,
     FeaturesModule, // ADR-0053 — P4
     MongooseModule.forFeature([
       { name: OrganizationSuspension.name, schema: OrganizationSuspensionSchema },
       { name: AiUsageEvent.name, schema: AiUsageEventSchema },
+      // ADR-0053 — P3
+      { name: PlanGrant.name, schema: PlanGrantSchema },
+      { name: Subscription.name, schema: SubscriptionSchema },
     ]),
   ],
   // `PlatformAccessController` sert `/me/platform-access` et NON `/admin/*` :
   // voir l'en-tête du fichier pour la raison — un utilisateur sans rôle doit
   // pouvoir apprendre qu'il n'en a pas.
-  controllers: [AdminController, PlatformAccessController],
-  providers: [AdminService, AiUsageService, PlatformMirrorService],
+  controllers: [AdminController, PlatformAccessController, PlatformBillingController],
+  providers: [AdminService, AiUsageService, PlatformMirrorService, PlatformBillingService],
   // `AiUsageService` est exporté pour `AiModule`, qui compte ses propres appels.
   exports: [AiUsageService],
 })

@@ -53,11 +53,13 @@ import { addDays, computeProration, nextPeriodEnd, type ProrationResult } from '
 import {
   daysUntil,
   dueEvents,
-  effectivePlan,
   hasUsedTrial,
   isPendingPlanDue,
   statusNotice,
   type SubscriptionSnapshot,
+  // ADR-0053 — P3
+  activeGrantPlan,
+  effectivePlanAt,
 } from './subscription-lifecycle.js';
 import {
   applyEvent,
@@ -469,6 +471,81 @@ export class BillingService {
     return { scanned: candidates.length, changed };
   }
 
+  // ── ADR-0053 — P3 : octrois manuels ───────────────────────────────────────
+
+  /**
+   * Pose l'octroi ACTIF d'une organisation sur son abonnement (`plan.granted`).
+   *
+   * Aucune transition d'état, aucun paiement simulé : le plan souscrit et le statut
+   * restent ce qu'ils sont, l'octroi se superpose (`effectivePlanAt`). Un document
+   * absent est créé dans l'état conventionnel (`free` / `canceled`). Aucune trace
+   * d'audit ici : le journal plateforme et le miroir « Équipe Lalanda » sont écrits par
+   * la console, qui seule connaît le motif et la référence de l'événement.
+   */
+  async applyPlanGrant(input: {
+    organizationId: string;
+    grantId: string;
+    plan: Plan;
+    startsAt: Date;
+    endsAt: Date | null;
+    now?: Date;
+  }): Promise<SubscriptionState> {
+    const now = input.now ?? new Date();
+    const doc =
+      (await this.model.findOne({ organizationId: input.organizationId }).exec()) ??
+      new this.model({
+        organizationId: input.organizationId,
+        plan: 'free',
+        status: 'canceled',
+        _schemaVersion: SUBSCRIPTION_SCHEMA_VERSION,
+      });
+    await this.settle(doc, now);
+    doc.grantId = input.grantId;
+    doc.grantPlan = input.plan;
+    doc.grantStartsAt = input.startsAt;
+    doc.grantEndsAt = input.endsAt;
+    this.pushGrantHistory(doc, 'plan.granted', now);
+    await doc.save();
+    return this.toState(doc, now);
+  }
+
+  /** Retire l'octroi `grantId` s'il est celui que porte l'abonnement (`plan.grant_revoked`). */
+  async clearPlanGrant(input: {
+    organizationId: string;
+    grantId: string;
+    now?: Date;
+  }): Promise<SubscriptionState> {
+    const now = input.now ?? new Date();
+    const doc = await this.model.findOne({ organizationId: input.organizationId }).exec();
+    if (!doc) return this.freeState(input.organizationId);
+    if (doc.grantId === input.grantId) {
+      doc.grantId = null;
+      doc.grantPlan = null;
+      doc.grantStartsAt = null;
+      doc.grantEndsAt = null;
+      this.pushGrantHistory(doc, 'plan.grant_revoked', now);
+      await doc.save();
+    }
+    return this.toState(doc, now);
+  }
+
+  private pushGrantHistory(
+    doc: SubscriptionDocument,
+    event: 'plan.granted' | 'plan.grant_revoked',
+    now: Date,
+  ): void {
+    doc.statusHistory.push({
+      from: doc.status,
+      to: doc.status,
+      event,
+      at: now,
+      source: 'platform',
+    });
+    if (doc.statusHistory.length > STATUS_HISTORY_MAX) {
+      doc.statusHistory.splice(0, doc.statusHistory.length - STATUS_HISTORY_MAX);
+    }
+  }
+
   // ── Interne ────────────────────────────────────────────────────────────────
 
   /**
@@ -623,7 +700,9 @@ export class BillingService {
   /** Document → vue. Aucune écriture. */
   private toState(doc: SubscriptionDocument, now: Date): SubscriptionState {
     const snapshot: SubscriptionSnapshot = doc;
-    const effective = effectivePlan(snapshot);
+    // ADR-0053 — P3 : un octroi en vigueur l'emporte (superposé, sans paiement).
+    const granted = activeGrantPlan(doc, now);
+    const effective = effectivePlanAt(doc, now);
 
     return {
       organizationId: doc.organizationId,
@@ -635,7 +714,7 @@ export class BillingService {
       // à tous les abonnements, y compris ceux souscrits avant elle. Voir
       // `entitlements.ts` § ANTÉRIORITÉ.
       entitlements: resolveEntitlements(effective),
-      paidAccess: grantsPaidAccess(doc.status),
+      paidAccess: grantsPaidAccess(doc.status) || (granted !== null && granted !== 'free'),
       trialEndsAt: doc.trialEndsAt ?? null,
       trialDaysLeft: doc.status === 'trialing' ? daysUntil(doc.trialEndsAt, now) : null,
       trialUsed: hasUsedTrial(snapshot),
@@ -647,7 +726,10 @@ export class BillingService {
       pendingPlanEffectiveAt: doc.pendingPlanEffectiveAt ?? null,
       provider: doc.provider ?? null,
       lastFailureCode: doc.lastFailureCode ?? null,
-      notice: statusNotice(snapshot, now),
+      notice:
+        granted !== null
+          ? grantNotice(granted, doc.grantEndsAt ?? null)
+          : statusNotice(snapshot, now),
     };
   }
 
@@ -675,6 +757,26 @@ export class BillingService {
       notice: null,
     };
   }
+}
+
+// ADR-0053 — P3
+const PLAN_LABELS: Readonly<Record<Plan, string>> = {
+  free: 'Gratuit',
+  pro: 'Pro',
+  cabinet: 'Cabinet',
+  business: 'Business',
+  expert: 'Expert',
+};
+
+/** Message d'un octroi en vigueur : factuel, sans montant ni mention d'un opérateur. */
+function grantNotice(plan: Plan, endsAt: Date | null): { level: 'info'; message: string } {
+  const label = PLAN_LABELS[plan] ?? plan;
+  return {
+    level: 'info',
+    message: endsAt
+      ? `Offre ${label} accordée par l'équipe Lalanda jusqu'au ${endsAt.toISOString().slice(0, 10)}.`
+      : `Offre ${label} accordée par l'équipe Lalanda.`,
+  };
 }
 
 /** Réexporté pour que `payments/` n'ait pas à connaître `subscription-state.js`. */

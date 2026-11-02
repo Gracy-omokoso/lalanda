@@ -21,6 +21,9 @@ import { Inject, Injectable, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
+// ADR-0053 — P3
+import { PLATFORM_MIRROR_ACTOR_ID, PLATFORM_MIRROR_ACTOR_ROLE } from '@lalanda/shared/platform';
+
 import { AuditService } from '../authz/audit.service.js';
 import { BillingService, BillingRuleError } from '../billing/billing.service.js';
 import type { Plan } from '../billing/entitlements.js';
@@ -252,10 +255,9 @@ export class PaymentsService {
   async confirmManualPayment(input: {
     reference: string;
     adminUserId: string;
-    adminRole: string;
     note?: string;
     now?: Date;
-  }): Promise<{ organizationId: string; plan: Plan }> {
+  }): Promise<ManualDecisionOutcome> {
     const now = input.now ?? new Date();
     const request = await this.manualRequests.findOne({ reference: input.reference }).exec();
     if (!request) {
@@ -290,9 +292,13 @@ export class PaymentsService {
     await this.billing.applyPaymentEvent({
       organizationId: request.organizationId,
       event: 'payment.succeeded',
-      source: `admin:manual:${input.adminUserId}`,
-      actorUserId: input.adminUserId,
-      actorRole: input.adminRole,
+      // ADR-0053 — P3 (fuite F3) : ces trois champs finissent dans le journal DU CLIENT.
+      // Ni l'identifiant de l'opérateur, ni un rôle plateforme (autrefois codé en dur) :
+      // le pseudonyme « Équipe Lalanda ». L'acteur réel et ses rôles réellement détenus
+      // vont au journal plateforme, écrit par la console (`PlatformBillingService`).
+      source: 'admin:manual',
+      actorUserId: PLATFORM_MIRROR_ACTOR_ID,
+      actorRole: PLATFORM_MIRROR_ACTOR_ROLE,
       plan: request.plan,
       interval: request.interval,
       provider: 'manual',
@@ -307,7 +313,7 @@ export class PaymentsService {
 
     await this.markEvent(claimed, 'processed', null);
 
-    return { organizationId: request.organizationId, plan: request.plan };
+    return outcomeOf(request);
   }
 
   /** Refus d'un dépôt (montant insuffisant, dépôt jamais reçu). */
@@ -316,7 +322,7 @@ export class PaymentsService {
     adminUserId: string;
     note: string;
     now?: Date;
-  }): Promise<void> {
+  }): Promise<ManualDecisionOutcome> {
     const request = await this.manualRequests.findOne({ reference: input.reference }).exec();
     if (!request) {
       throw new BillingRuleError('MANUAL_REQUEST_NOT_FOUND', 'Référence de paiement inconnue.');
@@ -332,6 +338,28 @@ export class PaymentsService {
     request.decidedAt = input.now ?? new Date();
     request.decisionNote = input.note;
     await request.save();
+    return outcomeOf(request);
+  }
+
+  // ── ADR-0053 — P3 : lectures de la console ────────────────────────────────
+
+  /** Demande par référence (contrôle de conflit d'intérêts AVANT la décision). */
+  async findManualRequest(reference: string): Promise<ManualPaymentRequestDocument | null> {
+    return this.manualRequests.findOne({ reference }).exec();
+  }
+
+  /** Demandes récentes, tous statuts, plus récentes d'abord (file de la console). */
+  async listManualRequests(
+    filter: { status?: ManualPaymentRequestDocument['status'] } = {},
+    limit = 100,
+  ): Promise<ManualPaymentRequestDocument[]> {
+    const query: Record<string, unknown> = {};
+    if (filter.status) query['status'] = filter.status;
+    return this.manualRequests
+      .find(query)
+      .sort({ createdAt: -1 })
+      .limit(Math.min(Math.max(limit, 1), 500))
+      .exec();
   }
 
   // ── Rappels ────────────────────────────────────────────────────────────────
@@ -517,6 +545,28 @@ export class PaymentsService {
       parsed.providerSubscriptionId,
     );
   }
+}
+
+// ADR-0053 — P3
+/** Faits d'une décision sur un dépôt manuel, pour le journal plateforme et le miroir. */
+export interface ManualDecisionOutcome {
+  organizationId: string;
+  plan: Plan;
+  interval: string;
+  amountDueCents: number;
+  currency: string;
+  method: string;
+}
+
+function outcomeOf(request: ManualPaymentRequestDocument): ManualDecisionOutcome {
+  return {
+    organizationId: request.organizationId,
+    plan: request.plan,
+    interval: request.interval,
+    amountDueCents: request.amountDueCents,
+    currency: request.currency,
+    method: request.method,
+  };
 }
 
 /**

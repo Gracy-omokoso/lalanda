@@ -241,16 +241,24 @@ function ChangementPlan({
     setEtat(null);
     try {
       if (motif.reasonCategory === '') return;
-      onMaj(
-        await api.setOrganizationPlan(org.id, {
-          plan,
-          reasonCategory: motif.reasonCategory,
-          clientMessage: motif.clientMessage.trim(),
-          internalNote: motif.internalNote.trim(),
-        }),
-      );
+      // ADR-0053 — P3 : le changement passe par un octroi, actif ou en attente.
+      const { grant, ...maj } = await api.setOrganizationPlan(org.id, {
+        plan,
+        reasonCategory: motif.reasonCategory,
+        clientMessage: motif.clientMessage.trim(),
+        internalNote: motif.internalNote.trim(),
+      });
+      onMaj(maj);
       setMotif(MOTIF_VIDE);
-      setEtat({ ton: 'succes', texte: 'Plan modifié. Le changement figure au journal.' });
+      setEtat({
+        ton: 'succes',
+        texte:
+          grant.status === 'pending_approval'
+            ? 'Octroi préparé : il attend l’approbation d’une seconde personne (module Abonnements).'
+            : grant.status === 'revoked'
+              ? 'Octroi retiré : l’offre souscrite par le client s’applique de nouveau.'
+              : 'Offre accordée. Le geste figure au journal.',
+      });
     } catch (err) {
       setEtat({ ton: 'echec', texte: messageErreur(err, 'Le plan n’a pas pu être modifié.') });
     } finally {
@@ -264,9 +272,9 @@ function ChangementPlan({
         Plan
       </h3>
       <p className="max-w-2xl text-xs text-[var(--foreground-muted)]">
-        Le changement est immédiat et sans facturation : il n’y a pas de paiement branché. Un
-        rétrogradage ne supprime rien — les initiatives au-delà de la limite du nouveau plan restent
-        lisibles, seule la création est bloquée.
+        Le changement passe par un octroi sans paiement, sans échéance : il attend une seconde
+        personne (module Abonnements). « Gratuit » retire l’octroi en cours. Un rétrogradage ne
+        supprime rien — seule la création au-delà des limites est bloquée.
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <select
