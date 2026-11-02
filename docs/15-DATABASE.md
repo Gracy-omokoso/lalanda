@@ -63,6 +63,14 @@ ajoutés à `subscriptions` : `grantId`, `grantPlan`, `grantStartsAt`, `grantEnd
 l'octroi actif, superposée au plan souscrit sans toucher au statut) ; `statusHistory.event`
 accepte `plan.granted` et `plan.grant_revoked`.
 
+**Implémenté, ADR-0053 lot P6.** `platform_announcements` : `{ title, body (texte brut), channel:
+'in_app', audience (AudienceFilter), status: draft | pending_approval | approved | sent | canceled,
+previewCount, previewedAt, audienceCountAtApproval, createdBy, submittedBy, approvedBy, soleApprover,
+sentBy, sentAt, recipientCount, expiresAt, canceledBy, canceledAt, _schemaVersion }`.
+`platform_announcement_receipts` : `{ announcementId, userId, deliveredAt, expiresAt, readAt,
+dismissedAt, _schemaVersion }`, index unique `{ announcementId, userId }` (aucun doublon), posés à
+l'envoi pour chaque destinataire. Aucune des deux ne porte d'`organizationId`.
+
 ## Valeur financière
 
 ```ts
