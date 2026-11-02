@@ -202,6 +202,12 @@ Un événement contient acteur, organisation, action, cible, horodatage, adresse
   partiel `organizationId + liveQuoteId` sur `$type: 'string'`) ; chaque ligne de commande porte un
   `lineRef` stable (`L1`, `L2`…). Les pièces comptent dans le quota commun de 1 Gio par organisation
   (pièces des projets et des achats).
+  **Lot V3 implémenté** : `sales_contracts` (contenu versionné, `previousVersions`, `approvals`,
+  `signature`, `renewals` en ajout seul — `{ termIndex, from, to, mode, recordedBy, recordedAt,
+  amendmentId }` —, `termination` avec `noticeCheck`, `contentSha256` posé à la signature ; les
+  lignes de chaque échéance d'un `schedule` sont composées et stockées avec leurs montants),
+  `sales_contract_counters`, `sales_contract_amendments` (unique `organizationId + contractId +
+  index`, `changes` partiels composés), `sales_contract_settings` (unique `organizationId`).
 
 ## Rétention
 
