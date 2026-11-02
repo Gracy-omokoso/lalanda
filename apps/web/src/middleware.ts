@@ -7,6 +7,8 @@
 //    (page d'arrivée, ADR-0038 § 5).
 //  - Protégées (`/accueil`, `/initiatives/*`, `/members`, `/invitations/*`, `/compte/*`) : si non
 //    authentifié, redirect vers `/login?next=…`.
+//  - Console Lalanda (`/admin/*`, ADR-0053 — P1) : protégée comme ci-dessus, et
+//    servie sans cache ni indexation (`CONSOLE_RESPONSE_HEADERS`).
 //
 // Le classement lui-même vit dans `lib/routes.ts` — logique pure, testée
 // séparément : c'est le genre de liste qu'on oublie de compléter en ajoutant un
@@ -17,7 +19,14 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
 
-import { isAuthPath, isMarketingPath, isProtectedPath, isPublicFormPath } from '@/lib/routes';
+import {
+  CONSOLE_RESPONSE_HEADERS,
+  isAuthPath,
+  isConsolePath,
+  isMarketingPath,
+  isProtectedPath,
+  isPublicFormPath,
+} from '@/lib/routes';
 
 // Noms de cookies possibles émis par better-auth selon la version et l'option `secureCookies`.
 const SESSION_COOKIE_NAMES = ['better-auth.session_token', '__Secure-better-auth.session_token'];
@@ -63,6 +72,15 @@ export function middleware(req: NextRequest): NextResponse {
     url.pathname = '/accueil';
     url.search = '';
     return NextResponse.redirect(url);
+  }
+
+  // ADR-0053 — P1 : console servie sans cache ni indexation.
+  if (isConsolePath(pathname)) {
+    const res = NextResponse.next();
+    for (const [nom, valeur] of Object.entries(CONSOLE_RESPONSE_HEADERS)) {
+      res.headers.set(nom, valeur);
+    }
+    return res;
   }
 
   return NextResponse.next();

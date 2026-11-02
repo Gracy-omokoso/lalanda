@@ -18,12 +18,15 @@ import { api, type PlatformOverview } from '@/lib/api';
 
 import { useAccesPlateforme } from './admin-access';
 import { Bandeau, Compteur } from './admin-chrome';
-import { LIBELLES_PLAN, messageErreur } from './admin-model';
+import { LIBELLES_PLAN, messageErreur, statutErreur } from './admin-model';
 
 export function OverviewPanel(): React.ReactElement {
   const acces = useAccesPlateforme();
   const [vue, setVue] = useState<PlatformOverview | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
+  // ADR-0053 — P1 : tous les rôles ouvrent la console, mais `GET /admin/overview`
+  // garde son plancher d'avant P2. Un refus n'est pas une panne : il est dit sobrement.
+  const [refuse, setRefuse] = useState(false);
   const [chargement, setChargement] = useState(true);
 
   useEffect(() => {
@@ -34,7 +37,9 @@ export function OverviewPanel(): React.ReactElement {
         if (!annule) setVue(v);
       })
       .catch((err: unknown) => {
-        if (!annule) setErreur(messageErreur(err, 'Impossible de charger le tableau de bord.'));
+        if (annule) return;
+        if (statutErreur(err) === 403) setRefuse(true);
+        else setErreur(messageErreur(err, 'Impossible de charger le tableau de bord.'));
       })
       .finally(() => {
         if (!annule) setChargement(false);
@@ -46,6 +51,14 @@ export function OverviewPanel(): React.ReactElement {
 
   if (chargement) {
     return <p className="text-sm text-[var(--foreground-muted)]">Chargement…</p>;
+  }
+  if (refuse) {
+    return (
+      <Bandeau ton="neutre">
+        Les volumes de la plateforme ne sont pas ouverts à vos rôles. Vos modules figurent
+        ci-dessus.
+      </Bandeau>
+    );
   }
   if (erreur) {
     return <Bandeau ton="echec">{erreur}</Bandeau>;

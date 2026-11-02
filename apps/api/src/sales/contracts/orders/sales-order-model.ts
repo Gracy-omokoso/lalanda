@@ -5,6 +5,8 @@
 import type { OrderInvoicingResult } from '@lalanda/engine';
 import type { SalesOrderStatus } from '@lalanda/shared/sales-contracts';
 
+import { commentWithDepositRecall } from '../deposits/sales-deposit-model.js';
+
 export const SALES_ORDER_STATUS_LABELS: Record<SalesOrderStatus, string> = {
   draft: 'Brouillon',
   confirmed: 'Confirmée',
@@ -65,15 +67,18 @@ export function compareQuantities(a: string, b: string): -1 | 0 | 1 {
   return x < y ? -1 : x > y ? 1 : 0;
 }
 
-/** Ligne C d'une facture préparée depuis une commande (§ 4.3), tronquée à `max`. */
+/**
+ * Ligne C d'une facture préparée depuis une commande (§ 4.3), tronquée à `max`. Pour une
+ * facture finale, `depositCodes` porte les codes des factures d'acompte émises de la
+ * commande, RAPPELÉS en tête (§ 5.2, ADR-0050 — V4) : rien n'est imputé.
+ */
 export function orderInvoiceComment(
   order: { number: string; customerReference: string | null },
   max: number,
+  depositCodes: readonly string[] = [],
 ): { text: string; truncated: boolean } {
-  const full = `Commande ${order.number}${
+  const base = `Commande ${order.number}${
     order.customerReference ? ` — réf. client ${order.customerReference}` : ''
   }`;
-  return full.length > max
-    ? { text: full.slice(0, max), truncated: true }
-    : { text: full, truncated: false };
+  return commentWithDepositRecall(base, depositCodes, max);
 }

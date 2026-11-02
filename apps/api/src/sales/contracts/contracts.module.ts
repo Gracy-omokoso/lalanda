@@ -53,6 +53,14 @@ import {
   SalesContractSettingsSchema,
 } from './settings/sales-contract-settings.schema.js';
 import { SalesContractSettingsService } from './settings/sales-contract-settings.service.js';
+// ADR-0050 — V4
+import { SalesContractDepositsController } from './deposits/sales-contract-deposits.controller.js';
+import { SalesOrderDepositsController } from './deposits/sales-order-deposits.controller.js';
+import {
+  SalesDepositResolution,
+  SalesDepositResolutionSchema,
+} from './deposits/sales-deposit-resolution.schema.js';
+import { SalesDepositsService } from './deposits/sales-deposits.service.js';
 // ADR-0050 — V5
 import { SalesSubscriptionsController } from './subscriptions/sales-subscriptions.controller.js';
 import { SalesSubscriptionsJob } from './subscriptions/sales-subscriptions.job.js';
@@ -74,6 +82,8 @@ import { SalesSubscriptionsService } from './subscriptions/sales-subscriptions.s
       { name: SalesContractCounter.name, schema: SalesContractCounterSchema },
       { name: SalesContractAmendment.name, schema: SalesContractAmendmentSchema },
       { name: SalesContractSettings.name, schema: SalesContractSettingsSchema },
+      // ADR-0050 — V4
+      { name: SalesDepositResolution.name, schema: SalesDepositResolutionSchema },
     ]),
   ],
   controllers: [
@@ -85,6 +95,9 @@ import { SalesSubscriptionsService } from './subscriptions/sales-subscriptions.s
     SalesContractAmendmentsController,
     QuoteToContractController,
     SalesContractSettingsController,
+    // ADR-0050 — V4
+    SalesOrderDepositsController,
+    SalesContractDepositsController,
     // ADR-0050 — V5
     SalesSubscriptionsController,
   ],
@@ -97,6 +110,8 @@ import { SalesSubscriptionsService } from './subscriptions/sales-subscriptions.s
     SalesContractSettingsService,
     SalesContractsService,
     SalesContractAmendmentsService,
+    // ADR-0050 — V4
+    SalesDepositsService,
     // ADR-0050 — V5 : échéancier, préparation manuelle et tâche `sales.subscriptions.prepare`.
     SalesSubscriptionsService,
     SalesSubscriptionsJob,
