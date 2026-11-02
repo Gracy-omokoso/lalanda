@@ -253,43 +253,6 @@ e2eSuite('ADR-0053 — P4 : fonctionnalités par offre', () => {
     expect((await ecrireOpportunite()).body?.code).not.toBe('FEATURE_NOT_IN_PLAN');
   });
 
-  it('cohérence avec P3 — un octroi actif (`plan.granted`) fait l’offre effective de la garde ; retiré, elle repart', async () => {
-    await billing.setPlan(org, 'free');
-    features.replaceGridForTesting(fermer(DEFAULT_FEATURE_GRID, ['crm'], ['free']));
-    expect((await ecrireOpportunite()).body?.code).toBe('FEATURE_NOT_IN_PLAN');
-
-    await reauth('sa');
-    const octroi = await request(serveur())
-      .post('/admin/billing/grants')
-      .set('Cookie', cookies['sa']!)
-      .send({
-        targetOrganizationId: org,
-        plan: 'pro',
-        reasonCategory: 'request',
-        clientMessage: 'Offre Pro accordée pour un mois.',
-        internalNote: 'Octroi court pour la suite P4.',
-        endsAt: new Date(Date.now() + 30 * DAY_MS).toISOString(),
-      });
-    expect(octroi.status, JSON.stringify(octroi.body)).toBe(201);
-    expect(octroi.body.status).toBe('active');
-
-    // Offre effective = `pro` : l'écriture passe, `GET /me/features` le dit.
-    expect((await ecrireOpportunite()).body?.code).not.toBe('FEATURE_NOT_IN_PLAN');
-    const moi = await request(serveur()).get('/me/features').set('Cookie', client());
-    expect(moi.body.plan).toBe('pro');
-    expect(
-      (moi.body.features as Array<{ key: string; status: string }>).find((f) => f.key === 'crm')
-        ?.status,
-    ).toBe('included');
-
-    const retrait = await request(serveur())
-      .delete(`/admin/billing/grants/${String(octroi.body.id)}`)
-      .set('Cookie', cookies['sa']!)
-      .send({ internalNote: 'Fin de l’octroi de test.', clientMessage: 'Fin de l’offre Pro.' });
-    expect(retrait.status, JSON.stringify(retrait.body)).toBe(200);
-    expect((await ecrireOpportunite()).body?.code).toBe('FEATURE_NOT_IN_PLAN');
-  });
-
   it('console : lecture ouverte au support, écriture refusée au support et sans ré-authentification', async () => {
     const vue = await request(serveur()).get('/admin/features').set('Cookie', cookies['sup']!);
     expect(vue.status, JSON.stringify(vue.body)).toBe(200);
@@ -411,5 +374,42 @@ e2eSuite('ADR-0053 — P4 : fonctionnalités par offre', () => {
       .set('Cookie', cookies['sa']!);
     const evt = (plateforme.body.events as Array<Record<string, unknown>>)[0]!;
     expect(evt).toMatchObject({ actorUserId: ids['sa'], actorRole: 'platform_super_admin' });
+  });
+
+  it('cohérence avec P3 — un octroi actif (`plan.granted`) fait l’offre effective de la garde ; retiré, elle repart', async () => {
+    await billing.setPlan(org, 'free');
+    features.replaceGridForTesting(fermer(DEFAULT_FEATURE_GRID, ['crm'], ['free']));
+    expect((await ecrireOpportunite()).body?.code).toBe('FEATURE_NOT_IN_PLAN');
+
+    await reauth('sa');
+    const octroi = await request(serveur())
+      .post('/admin/billing/grants')
+      .set('Cookie', cookies['sa']!)
+      .send({
+        targetOrganizationId: org,
+        plan: 'pro',
+        reasonCategory: 'request',
+        clientMessage: 'Offre Pro accordée pour un mois.',
+        internalNote: 'Octroi court pour la suite P4.',
+        endsAt: new Date(Date.now() + 30 * DAY_MS).toISOString(),
+      });
+    expect(octroi.status, JSON.stringify(octroi.body)).toBe(201);
+    expect(octroi.body.status).toBe('active');
+
+    // Offre effective = `pro` : l'écriture passe, `GET /me/features` le dit.
+    expect((await ecrireOpportunite()).body?.code).not.toBe('FEATURE_NOT_IN_PLAN');
+    const moi = await request(serveur()).get('/me/features').set('Cookie', client());
+    expect(moi.body.plan).toBe('pro');
+    expect(
+      (moi.body.features as Array<{ key: string; status: string }>).find((f) => f.key === 'crm')
+        ?.status,
+    ).toBe('included');
+
+    const retrait = await request(serveur())
+      .delete(`/admin/billing/grants/${String(octroi.body.id)}`)
+      .set('Cookie', cookies['sa']!)
+      .send({ internalNote: 'Fin de l’octroi de test.', clientMessage: 'Fin de l’offre Pro.' });
+    expect(retrait.status, JSON.stringify(retrait.body)).toBe(200);
+    expect((await ecrireOpportunite()).body?.code).toBe('FEATURE_NOT_IN_PLAN');
   });
 });
