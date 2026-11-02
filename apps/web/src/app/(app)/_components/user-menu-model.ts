@@ -13,10 +13,11 @@
 // jamais un droit en trop.
 //
 // Corollaire à ne pas relâcher : AUCUN `if (role === …)` ici. Le seul fait
-// consommé est ce que sert le serveur : un drapeau booléen (`canReadAdmin`, issu de
-// `GET /me/platform-access`) et les actions de `GET /me/permissions`.
+// consommé est ce que sert le serveur : l'accès à la console (action plateforme
+// `platform.console.read`, issue de `GET /me/platform-access`, ADR-0053 — P1) et les
+// actions de `GET /me/permissions`.
 
-import type { OrgAction } from '@/lib/api';
+import type { OrgAction, PlatformAccessView } from '@/lib/api';
 
 /** Un lien du menu. `id` est stable et sert de clé de rendu comme de clé de test. */
 export interface UserMenuLink {
@@ -50,8 +51,11 @@ export type UserMenuItem = UserMenuLink | UserMenuAction;
  * supplémentaire au titre de la visibilité (ADR-0016 §1, ADR-0038 § 6).
  */
 export interface UserMenuFacts {
-  /** `GET /me/platform-access`. Défaut `false` : voir `entreesMenu`. */
-  canReadAdmin: boolean;
+  /**
+   * La personne ouvre-t-elle la console Lalanda (`accesConsole`, depuis
+   * `GET /me/platform-access`) ? Défaut `false` : voir `entreesMenu`.
+   */
+  accesConsole: boolean;
   /**
    * `GET /me/permissions` (actions de l'organisation active), `null` tant
    * qu'elles ne sont pas connues ou si l'appel a échoué.
@@ -67,7 +71,9 @@ export interface UserMenuFacts {
  * de l'ORGANISATION :
  *  1. ce qui appartient à la personne (Mon compte) ;
  *  2. les réglages de l'organisation, qui ne sont plus un module ;
- *  3. la plateforme (Administration, opérateurs seulement) ;
+ *  3. la plateforme : « Console Lalanda », dans son propre groupe, opérateurs
+ *     seulement (ADR-0053 § 2.1, décision ouverte n° 17) — elle ouvre la console
+ *     dans sa coquille, hors de l'espace organisation ;
  *  4. la déconnexion, seule : une action destructive de session ne doit pas
  *     border un lien qu'on visait.
  *
@@ -132,12 +138,15 @@ const ITEMS: readonly UserMenuItem[] = [
     hint: 'Plan, essai et changement d’offre',
     group: 2,
   },
+  // ADR-0053 — P1 : « Console Lalanda » remplace « Administration », qui se
+  // confondait avec le rôle d'organisation « Administrateur » ; le libellé faux
+  // « packs » disparaît (F10).
   {
     kind: 'link',
     id: 'admin',
     href: '/admin',
-    label: 'Administration',
-    hint: 'Plateforme : organisations, packs, journaux',
+    label: 'Console Lalanda',
+    hint: 'Espace des opérateurs de la plateforme',
     group: 3,
   },
   { kind: 'action', id: 'signout', label: 'Déconnexion', group: 4 },
@@ -150,19 +159,29 @@ const ITEMS: readonly UserMenuItem[] = [
  * celles des onglets de `/organisation` (`organization-model.ts`), pour que le
  * menu et l'espace ne se contredisent pas.
  */
-const CONDITIONS: Readonly<Record<string, { drapeau: 'canReadAdmin' } | { action: OrgAction }>> = {
+const CONDITIONS: Readonly<Record<string, { drapeau: 'accesConsole' } | { action: OrgAction }>> = {
   identite: { action: 'organization.manage' },
   fiscalite: { action: 'fiscal.manage' },
   membres: { action: 'organization.manage' },
   parametres: { action: 'organization.manage' },
-  admin: { drapeau: 'canReadAdmin' },
+  admin: { drapeau: 'accesConsole' },
 };
+
+/**
+ * ADR-0053 — P1 : la console s'ouvre sur l'action plateforme `platform.console.read`
+ * (détenue par les six rôles plateforme, § 5.2), jamais sur un nom de rôle ni sur
+ * l'ancien drapeau `canReadAdmin`, servi une version seulement. Une réponse absente
+ * ou en échec vaut `false`.
+ */
+export function accesConsole(acces: Pick<PlatformAccessView, 'actions'> | null): boolean {
+  return Array.isArray(acces?.actions) && acces.actions.includes('platform.console.read');
+}
 
 /**
  * Entrées réellement proposées.
  *
  * Une entrée conditionnée dont le fait n'est pas encore connu ne s'affiche PAS
- * « en attendant » : `canReadAdmin` vaut `false` tant que
+ * « en attendant » : `accesConsole` vaut `false` tant que
  * `GET /me/platform-access` n'a pas répondu, et des actions `null` masquent
  * toutes les entrées qui en exigent une. Le défaut est de ne rien proposer
  * plutôt que de proposer une page qui répondra 403 (ADR-0016 §5).
@@ -181,8 +200,9 @@ export function entreesMenu(faits: UserMenuFacts): UserMenuItem[] {
  * `true` si un séparateur doit précéder `item`.
  *
  * Le séparateur se déduit du changement de groupe et non d'un index codé en
- * dur : quand « Administration » disparaît, le groupe 2 garde deux entrées et le
- * dessin reste juste — aucun séparateur orphelin, aucun groupe vide.
+ * dur : quand « Console Lalanda » disparaît, le groupe 2 garde deux entrées et le
+ * dessin reste juste — aucun séparateur orphelin, aucun groupe vide. (« Console
+ * Lalanda » disparaît pour tout non-opérateur.)
  */
 export function separateurAvant(items: readonly UserMenuItem[], index: number): boolean {
   if (index <= 0) return false;

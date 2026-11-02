@@ -1566,6 +1566,9 @@ export interface AuditEventView {
 // fichier : le contrat d'API est en écriture seule (ADR-0013 §4). Le seul
 // fragment qui circule est `last4`, les quatre DERNIERS caractères.
 
+// ADR-0053 — P1
+import type { PlatformAction } from '@lalanda/shared/platform';
+
 /** Les 6 rôles plateforme. Miroir d'`apps/api/src/authz/permissions.ts`. */
 export const PLATFORM_ROLES = [
   'platform_super_admin',
@@ -1591,6 +1594,10 @@ export interface PlatformAccessView {
   canManageIntegrations: boolean;
   /** Les trois interdits absolus (ADR-0012 §4), pour être AFFICHÉS tels quels. */
   forbiddenActions: string[];
+  // ADR-0053 — P1 : actions plateforme détenues, dans l'ordre du catalogue
+  // (`PLATFORM_ACTIONS`). Seule vérité des modules de la console ; les drapeaux
+  // ci-dessus restent servis une version (P0) et ne décident plus de la navigation.
+  actions: PlatformAction[];
 }
 
 export interface PlatformOverview {

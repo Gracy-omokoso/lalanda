@@ -8,10 +8,16 @@
 
 import type { Metadata } from 'next';
 
+import { EnTeteModule } from '../_components/en-tete-module';
 import { IntegrationsPanel } from '../_components/integrations-panel';
 
-export const metadata: Metadata = { title: 'Intégrations — Administration · Lalanda' };
+export const metadata: Metadata = { title: 'Intégrations — Console Lalanda' };
 
 export default function AdminIntegrationsPage(): React.ReactElement {
-  return <IntegrationsPanel />;
+  return (
+    <section className="flex flex-col gap-6">
+      <EnTeteModule moduleId="integrations" />
+      <IntegrationsPanel />
+    </section>
+  );
 }

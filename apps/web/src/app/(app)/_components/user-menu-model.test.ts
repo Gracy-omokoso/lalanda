@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 import type { OrgAction } from '@/lib/api';
 
 import {
+  accesConsole,
   entreeActive,
   entreesMenu,
   libelleDeclencheur,
@@ -20,9 +21,9 @@ import {
 
 const PROPRIETAIRE: OrgAction[] = ['organization.manage', 'fiscal.manage', 'billing.manage'];
 const DIRECTEUR_FINANCIER: OrgAction[] = ['fiscal.manage', 'sales.read'];
-const OPERATEUR = { canReadAdmin: true, actions: PROPRIETAIRE };
-const MEMBRE = { canReadAdmin: false, actions: PROPRIETAIRE };
-const INCONNU = { canReadAdmin: false, actions: null };
+const OPERATEUR = { accesConsole: true, actions: PROPRIETAIRE };
+const MEMBRE = { accesConsole: false, actions: PROPRIETAIRE };
+const INCONNU = { accesConsole: false, actions: null };
 
 const labels = (items: UserMenuItem[]): string[] => items.map((e) => e.label);
 
@@ -36,7 +37,7 @@ describe('contenu et ordre du menu (ADR-0038 § 6)', () => {
       'Membres',
       'Paramètres',
       'Abonnement',
-      'Administration',
+      'Console Lalanda',
       'Déconnexion',
     ]);
   });
@@ -71,8 +72,8 @@ describe('contenu et ordre du menu (ADR-0038 § 6)', () => {
 });
 
 describe('conditionnement par les faits serveur (ADR-0016 §5)', () => {
-  it('masque « Administration » sans canReadAdmin', () => {
-    expect(labels(entreesMenu(MEMBRE))).not.toContain('Administration');
+  it('masque « Console Lalanda » sans accès à la console', () => {
+    expect(labels(entreesMenu(MEMBRE))).not.toContain('Console Lalanda');
   });
 
   it('permissions inconnues : seules les entrées sans condition', () => {
@@ -83,11 +84,11 @@ describe('conditionnement par les faits serveur (ADR-0016 §5)', () => {
       'Déconnexion',
     ]);
     // Rétrocompatible : sans `actions`, même comportement.
-    expect(labels(entreesMenu({ canReadAdmin: false }))).toEqual(labels(entreesMenu(INCONNU)));
+    expect(labels(entreesMenu({ accesConsole: false }))).toEqual(labels(entreesMenu(INCONNU)));
   });
 
   it('filtre par action serveur, pas par nom de rôle', () => {
-    const df = labels(entreesMenu({ canReadAdmin: false, actions: DIRECTEUR_FINANCIER }));
+    const df = labels(entreesMenu({ accesConsole: false, actions: DIRECTEUR_FINANCIER }));
     expect(df).toContain('Fiscalité');
     expect(df).not.toContain('Identité visuelle');
     expect(df).not.toContain('Membres');
@@ -96,6 +97,38 @@ describe('conditionnement par les faits serveur (ADR-0016 §5)', () => {
 
   it('ne masque JAMAIS « Mon compte » : c’est l’espace de secours sans organisation', () => {
     expect(entreesMenu(INCONNU).some((e) => e.id === 'compte')).toBe(true);
+  });
+});
+
+describe('entrée « Console Lalanda » (ADR-0053 — P1)', () => {
+  it('ouvre l’entrée sur l’action de console seule, jamais sur l’ancien drapeau', () => {
+    expect(accesConsole({ actions: ['platform.console.read'] })).toBe(true);
+    expect(accesConsole({ actions: ['platform.orgs.read'] })).toBe(false);
+    expect(accesConsole({ actions: [] })).toBe(false);
+    expect(accesConsole({ canReadAdmin: true, actions: [] } as never)).toBe(false);
+    expect(accesConsole({} as never)).toBe(false);
+    expect(accesConsole(null)).toBe(false);
+  });
+
+  it('range la console dans son propre groupe, vers /admin, sans le libellé « Administration »', () => {
+    const items = entreesMenu(OPERATEUR);
+    const console = items.find((e) => e.id === 'admin');
+    expect(console).toMatchObject({ kind: 'link', href: '/admin', label: 'Console Lalanda' });
+    const groupes = new Set(items.filter((e) => e.id !== 'admin').map((e) => e.group));
+    expect(groupes.has(console!.group)).toBe(false);
+    for (const e of items) {
+      expect(e.label).not.toBe('Administration');
+      if (e.kind === 'link') expect(e.hint.toLowerCase()).not.toContain('packs');
+    }
+  });
+
+  it('ne montre aucun lien vers la console à un non-opérateur', () => {
+    for (const faits of [MEMBRE, INCONNU]) {
+      const hrefs = entreesMenu(faits).map((e) => (e.kind === 'link' ? e.href : null));
+      expect(hrefs.some((h) => h !== null && (h === '/admin' || h.startsWith('/admin/')))).toBe(
+        false,
+      );
+    }
   });
 });
 

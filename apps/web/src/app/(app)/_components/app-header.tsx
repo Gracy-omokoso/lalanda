@@ -24,6 +24,7 @@ import { ACCUEIL_HREF, estAccueil, moduleCourant, NAV_MODULES } from './nav-mode
 import { NotificationsBell } from './notifications-bell';
 import { OrgSwitcher } from './org-switcher';
 import { UserMenu } from './user-menu';
+import { accesConsole } from './user-menu-model';
 
 /** Couleur du module sur le fond pétrole de la barre (jetons `--nav-*`, ≥ 3:1). */
 const COULEUR_NAV = {
@@ -43,9 +44,10 @@ export function AppHeader({
   const courant = moduleCourant(pathname);
   const accueil = estAccueil(pathname);
 
-  // Drapeau qui conditionne l'entrée « Administration » DU MENU (ADR-0016 §1).
-  // Il vient du serveur (`GET /me/platform-access`) ; un échec ne montre PAS
-  // l'entrée — ne rien proposer plutôt qu'une page qui répondrait 403.
+  // Fait qui conditionne l'entrée « Console Lalanda » DU MENU (ADR-0016 §1,
+  // ADR-0053 — P1). Il vient du serveur (`GET /me/platform-access`, action
+  // `platform.console.read`) ; un échec ne montre PAS l'entrée — ne rien proposer
+  // plutôt qu'une page qui répondrait 403.
   const [operateur, setOperateur] = useState(false);
   useEffect(() => {
     if (!session?.user) return;
@@ -53,7 +55,7 @@ export function AppHeader({
     void api
       .getPlatformAccess()
       .then((acces) => {
-        if (!annule) setOperateur(acces.canReadAdmin);
+        if (!annule) setOperateur(accesConsole(acces));
       })
       .catch(() => undefined);
     return () => {
@@ -169,7 +171,7 @@ export function AppHeader({
         {isPending ? (
           <span aria-hidden="true" className="h-8 w-8 rounded-full bg-[var(--nav-active-bg)]" />
         ) : session?.user ? (
-          <UserMenu email={session.user.email} canReadAdmin={operateur} />
+          <UserMenu email={session.user.email} accesConsole={operateur} />
         ) : null}
       </div>
     </header>

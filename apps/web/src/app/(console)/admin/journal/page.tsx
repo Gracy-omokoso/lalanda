@@ -6,10 +6,16 @@
 
 import type { Metadata } from 'next';
 
+import { EnTeteModule } from '../_components/en-tete-module';
 import { PlatformAuditPanel } from '../_components/platform-audit-panel';
 
-export const metadata: Metadata = { title: 'Journal — Administration · Lalanda' };
+export const metadata: Metadata = { title: 'Journal — Console Lalanda' };
 
 export default function AdminAuditPage(): React.ReactElement {
-  return <PlatformAuditPanel />;
+  return (
+    <section className="flex flex-col gap-6">
+      <EnTeteModule moduleId="journal" />
+      <PlatformAuditPanel />
+    </section>
+  );
 }
