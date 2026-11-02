@@ -17,7 +17,11 @@
 //      dans TOUS les scénarios (le plus prudent : la sortie la plus tôt). Les
 //      litiges sont exclus et comptés en incertitude ; les commandes non
 //      facturées sont signalées, jamais prévues. Sans `payables`, les sorties
-//      sont celles de 1.0.0 (la source `payable` vaut zéro).
+//      sont celles de 1.0.0 (la source `payable` vaut zéro) ;
+//   5. remboursements au personnel (1.2.0, ADR-0051 § 7.2) : notes de frais
+//      approuvées non remboursées et avances approuvées non versées, à J+1, dans
+//      tous les scénarios, dans leur devise. Sans `hrPayables`, les sorties sont
+//      celles de 1.1.0 (la source `hr_payable` vaut zéro).
 //
 // Chaque hypothèse est un paramètre du scénario, rendu avec le résultat.
 
@@ -124,6 +128,7 @@ const SOURCES: readonly ForecastFlowSource[] = [
   'plan_in',
   'plan_out',
   'payable',
+  'hr_payable',
 ];
 
 const emptySlot = (): Record<ForecastFlowSource, bigint> => ({
@@ -132,6 +137,7 @@ const emptySlot = (): Record<ForecastFlowSource, bigint> => ({
   plan_in: 0n,
   plan_out: 0n,
   payable: 0n,
+  hr_payable: 0n,
 });
 
 /** Montants journaliers exacts d'un total mensuel : cumul(d) = mensuel × 12 × d ÷ 365. */
@@ -269,6 +275,25 @@ export function forecastTreasury(input: TreasuryForecastInput): TreasuryForecast
     });
   }
 
+  // ── 3 ter. Remboursements au personnel (ADR-0051 § 7.2) ──────────────────
+  const hrPayableFlows: DatedFlow[] = [];
+  for (const p of input.hrPayables ?? []) {
+    if (p.currency !== input.currency) continue;
+    const cents = trustedCents(p.amount, 'Remboursement au personnel');
+    if (cents <= 0n) continue;
+    hrPayableFlows.push({
+      dayIndex: 1,
+      cents,
+      flow: {
+        date: addDays(input.asOf, 1),
+        source: 'hr_payable',
+        direction: 'out',
+        amount: formatCents(cents),
+        label: p.label,
+      },
+    });
+  }
+
   // ── 4. Plan BUILD ──────────────────────────────────────────────────────────
   let planInMonthly = 0n;
   let planOutMonthly = 0n;
@@ -341,6 +366,7 @@ export function forecastTreasury(input: TreasuryForecastInput): TreasuryForecast
       });
     }
     for (const p of payableFlows) dated.push({ ...p, flow: { ...p.flow } });
+    for (const p of hrPayableFlows) dated.push({ ...p, flow: { ...p.flow } });
     dated.sort((a, b) => a.dayIndex - b.dayIndex || a.flow.label.localeCompare(b.flow.label));
 
     const planIn = dailyAmounts(applyRate(planInMonthly, h.planRevenueRate));
@@ -368,7 +394,13 @@ export function forecastTreasury(input: TreasuryForecastInput): TreasuryForecast
       const slot = perDay[d] ?? emptySlot();
       const previous = balancesByDay[d - 1] ?? opening;
       balancesByDay.push(
-        previous + slot.receivable + slot.plan_in - slot.recurring - slot.plan_out - slot.payable,
+        previous +
+          slot.receivable +
+          slot.plan_in -
+          slot.recurring -
+          slot.plan_out -
+          slot.payable -
+          slot.hr_payable,
       );
     }
 
@@ -394,13 +426,16 @@ export function forecastTreasury(input: TreasuryForecastInput): TreasuryForecast
         min: formatCents(min),
         minDate: addDays(input.asOf, minIndex),
         inflows: formatCents(bySource.receivable + bySource.plan_in),
-        outflows: formatCents(bySource.recurring + bySource.plan_out + bySource.payable),
+        outflows: formatCents(
+          bySource.recurring + bySource.plan_out + bySource.payable + bySource.hr_payable,
+        ),
         bySource: {
           receivable: formatCents(bySource.receivable),
           recurring: formatCents(bySource.recurring),
           plan_in: formatCents(bySource.plan_in),
           plan_out: formatCents(bySource.plan_out),
           payable: formatCents(bySource.payable),
+          hr_payable: formatCents(bySource.hr_payable),
         },
       };
     });

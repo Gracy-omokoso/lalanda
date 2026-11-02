@@ -30,6 +30,7 @@ import {
   TreasuryAccount,
   TreasuryExpense,
   TreasuryMovement,
+  type MovementOrigin,
   type TreasuryAccountDocument,
   type TreasuryExpenseDocument,
   type TreasuryMovementDocument,
@@ -72,6 +73,8 @@ export interface LedgerEntry {
   amount: string;
   currency: TreasuryCurrency;
   label: string;
+  /** ADR-0051 — H11 : présent seulement sur un mouvement possédé par les RH (avance). */
+  origin?: MovementOrigin;
 }
 
 export interface Ledger {
@@ -145,6 +148,7 @@ export class TreasuryAccountsService {
           amount: m.amountOut,
           currency: currencyOf.get(m.fromAccountId) ?? 'USD',
           label: m.label,
+          ...(m.origin ? { origin: m.origin } : {}),
         });
       }
       if (m.toAccountId !== null && m.amountIn !== null) {
@@ -157,6 +161,7 @@ export class TreasuryAccountsService {
           amount: m.amountIn,
           currency: currencyOf.get(m.toAccountId) ?? 'USD',
           label: m.label,
+          ...(m.origin ? { origin: m.origin } : {}),
         });
       }
     }
