@@ -69,6 +69,18 @@ import {
   HrRemindersJob,
 } from './reminders/hr-reminders.job.js';
 import { HrRetentionJob } from './retention/hr-retention.job.js';
+// ADR-0051 — H10
+import { TreasuryModule } from '../treasury/treasury.module.js';
+import { EmployeeAdvance, EmployeeAdvanceSchema } from './advances/advance.schema.js';
+import { HrAdvanceRemindersService } from './advances/hr-advance-reminders.service.js';
+import { HrAdvancesController } from './advances/hr-advances.controller.js';
+import { HrAdvancesService } from './advances/hr-advances.service.js';
+import { ExpenseReport, ExpenseReportSchema } from './expenses/expense-report.schema.js';
+import { HrCounter, HrCounterSchema } from './expenses/hr-counter.schema.js';
+import { HrExpenseReportsController } from './expenses/hr-expense-reports.controller.js';
+import { HrExpenseReportsService } from './expenses/hr-expense-reports.service.js';
+import { HrExpensesNotifier } from './expenses/hr-expenses-notifier.js';
+import { HrExpensesSettingsService } from './expenses/hr-expenses-settings.service.js';
 // ADR-0051 — H12 : présences et plannings.
 import {
   AttendanceCorrection,
@@ -98,6 +110,8 @@ import { HrPerformanceModule } from './performance/hr-performance.module.js';
     OrganizationsModule,
     // ADR-0045 — H3 : lecteur des demandes à valider, partagé avec « Mes tâches ».
     HrAgendaModule,
+    // ADR-0051 — H10 : dépenses et mouvements possédés par les RH (`recordOwnedBy…`).
+    TreasuryModule,
     // ADR-0051 — H15
     HrPerformanceModule,
     MongooseModule.forFeature([
@@ -124,6 +138,10 @@ import { HrPerformanceModule } from './performance/hr-performance.module.js';
       { name: AttendanceCorrection.name, schema: AttendanceCorrectionSchema },
       { name: Shift.name, schema: ShiftSchema },
       { name: StaffingNeed.name, schema: StaffingNeedSchema },
+      // ADR-0051 — H10 : notes de frais, avances, compteurs `NF…` et `AV…`.
+      { name: ExpenseReport.name, schema: ExpenseReportSchema },
+      { name: EmployeeAdvance.name, schema: EmployeeAdvanceSchema },
+      { name: HrCounter.name, schema: HrCounterSchema },
     ]),
   ],
   controllers: [
@@ -146,6 +164,9 @@ import { HrPerformanceModule } from './performance/hr-performance.module.js';
     // ADR-0051 — H12
     HrAttendanceController,
     HrShiftsController,
+    // ADR-0051 — H10
+    HrExpenseReportsController,
+    HrAdvancesController,
   ],
   providers: [
     MasterKeyringProvider,
@@ -187,6 +208,12 @@ import { HrPerformanceModule } from './performance/hr-performance.module.js';
     HrPresenceNotifier,
     HrAttendanceService,
     HrPlanningService,
+    // ADR-0051 — H10 : réglages des frais et avances, notes, avances, rappels d'avance.
+    HrExpensesSettingsService,
+    HrExpensesNotifier,
+    HrExpenseReportsService,
+    HrAdvancesService,
+    HrAdvanceRemindersService,
   ],
   exports: [
     // ADR-0045 — H2
@@ -202,6 +229,10 @@ import { HrPerformanceModule } from './performance/hr-performance.module.js';
     HrDocumentsService,
     HrChecklistsService,
     HrDeadlinesService,
+    // ADR-0051 — H10
+    HrExpensesSettingsService,
+    HrExpenseReportsService,
+    HrAdvancesService,
   ],
 })
 export class HrModule {}

@@ -30,8 +30,10 @@ import { TreasuryRecurringService } from './treasury-recurring.service.js';
 // ADR-0044 — P5 : échéances fournisseurs (lecture seule par la connexion, sans
 // importer le module des achats, qui importe celui-ci).
 import { PurchasesPayablesSource } from '../purchases/treasury/purchases-payables.source.js';
+// ADR-0051 — H10 : remboursements au personnel (lecture seule par la connexion, sans
+// importer le module RH, qui importe celui-ci).
+import { HrPayablesSource } from '../hr/expenses/hr-payables.source.js';
 import {
-  NoHrPayablesSource,
   SalesReceiptsSource,
   TREASURY_HR_PAYABLES_SOURCE,
   TREASURY_PAYABLES_SOURCE,
@@ -84,8 +86,8 @@ import {
     { provide: TREASURY_RECEIPTS_SOURCE, useClass: SalesReceiptsSource },
     // ADR-0044 — P5 (§ 6.3)
     { provide: TREASURY_PAYABLES_SOURCE, useClass: PurchasesPayablesSource },
-    // ADR-0051 — H11 (§ 7.2) : fournisseur nul tant que les RH (H10) ne le relient pas.
-    { provide: TREASURY_HR_PAYABLES_SOURCE, useClass: NoHrPayablesSource },
+    // ADR-0051 — H10 (§ 7.2) : notes approuvées non remboursées, avances non versées.
+    { provide: TREASURY_HR_PAYABLES_SOURCE, useClass: HrPayablesSource },
   ],
   // ADR-0033 (amendement du 27 oct. 2026) : le brief lit les soldes des comptes.
   // ADR-0044 — P5 (§ 6.2) : les paiements fournisseurs écrivent leurs dépenses par
