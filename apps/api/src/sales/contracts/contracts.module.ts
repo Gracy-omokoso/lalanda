@@ -53,6 +53,14 @@ import {
   SalesContractSettingsSchema,
 } from './settings/sales-contract-settings.schema.js';
 import { SalesContractSettingsService } from './settings/sales-contract-settings.service.js';
+// ADR-0050 — V4
+import { SalesContractDepositsController } from './deposits/sales-contract-deposits.controller.js';
+import { SalesOrderDepositsController } from './deposits/sales-order-deposits.controller.js';
+import {
+  SalesDepositResolution,
+  SalesDepositResolutionSchema,
+} from './deposits/sales-deposit-resolution.schema.js';
+import { SalesDepositsService } from './deposits/sales-deposits.service.js';
 
 @Module({
   imports: [
@@ -70,6 +78,8 @@ import { SalesContractSettingsService } from './settings/sales-contract-settings
       { name: SalesContractCounter.name, schema: SalesContractCounterSchema },
       { name: SalesContractAmendment.name, schema: SalesContractAmendmentSchema },
       { name: SalesContractSettings.name, schema: SalesContractSettingsSchema },
+      // ADR-0050 — V4
+      { name: SalesDepositResolution.name, schema: SalesDepositResolutionSchema },
     ]),
   ],
   controllers: [
@@ -81,6 +91,9 @@ import { SalesContractSettingsService } from './settings/sales-contract-settings
     SalesContractAmendmentsController,
     QuoteToContractController,
     SalesContractSettingsController,
+    // ADR-0050 — V4
+    SalesOrderDepositsController,
+    SalesContractDepositsController,
   ],
   providers: [
     // ADR-0050 — V2
@@ -91,6 +104,8 @@ import { SalesContractSettingsService } from './settings/sales-contract-settings
     SalesContractSettingsService,
     SalesContractsService,
     SalesContractAmendmentsService,
+    // ADR-0050 — V4
+    SalesDepositsService,
   ],
   exports: [
     // ADR-0050 — V2 : liens et pièces partagés par V3 à V6.
