@@ -107,6 +107,26 @@ Décideurs :
   travail posée (questions au juriste et à l'expert-comptable) ; aucune note posée par l'IA ; quatre
   actions, aucun rôle nouveau ; amendement demandé d'ADR-0049 § 6.3. Statut : **proposé,
   ADR-0051** (1ᵉʳ nov. 2026).
+- [ADR-0052](ADR-0052-mise-en-route-societe.md) — Mise en route d'une société : **une organisation =
+  une entreprise distincte**, créée vide (rien n'est copié, reprise explicite reportée) ; parcours en
+  neuf étapes reprenables (société, identité fiscale, devises, identité visuelle, facture normalisée,
+  trésorerie, comptabilité et exercice, équipe, modules et offre) ; statut de complétude
+  `GET /organizations/current/setup` lisible par tout membre, sans valeur ; seuls verrous ceux du
+  serveur (fiche fiscale avant facture, R1 d'ADR-0021, ADR-0049 § 3.1) ; choix des modules côté
+  serveur (tranche ADR-0030 D3) ; audit d'isolation **sans fuite de données**, six couplages relevés ;
+  e2e d'isolation BUILD/RUN/GROW pour un même utilisateur ; aucune action RBAC nouvelle ; aucune règle
+  fiscale ni juridique posée. Statut : **proposé, ADR-0052** (2 nov. 2026).
+- [ADR-0053](ADR-0053-administration-plateforme.md) — Administration de la plateforme : la console
+  Lalanda quitte la coquille des organisations (groupe de routes propre, `/admin` conservé,
+  sous-domaine en décision ouverte) ; `PlatformAuthGuard` sans organisation (un opérateur n'a plus à
+  être membre d'un client) ; 21 actions plateforme et matrice 6 × 21, aucun rôle nouveau ; blocage et
+  suspension motivés **et effectifs** ; chaque geste au journal plateforme avec le rôle réel, miroir
+  pseudonyme « Équipe Lalanda » chez le client ; minimisation (recherche obligatoire, liste blanche de
+  métadonnées), conflit d'intérêts refusé ; abonnements et paiements manuels, fonctionnalités par offre
+  (catalogue en code, grille ouverte), journaux, annonces in-app à deux personnes, statistiques
+  agrégées, encaissements constatés (ADR-0047) ; état des lieux : aucune fuite entre organisations,
+  une fuite plateforme → organisation (identifiant d'opérateur au journal client). Statut : **proposé,
+  ADR-0053** (2 nov. 2026).
 
 ## Décisions récentes (légal)
 

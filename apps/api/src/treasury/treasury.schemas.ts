@@ -90,6 +90,25 @@ export interface ExpenseOrigin {
   allocationIndex: number;
 }
 
+// ADR-0051 — H11 (§ 7.1) : dépense POSSÉDÉE par les RH. Le remboursement d'une note
+// de frais crée une dépense par ligne ; une ligne soldée par une avance crée une
+// dépense SANS compte (`accountId: null`, `settledByAdvanceId`) : l'argent est déjà
+// sorti au versement. La trésorerie ne la modifie, ne l'annule ni ne lui joint de
+// pièce (`409 EXPENSE_OWNED_BY_HR`).
+export interface HrExpenseOrigin {
+  kind: 'expense_report';
+  reportId: string;
+  /** Numéro `NF…` de la note, copie d'affichage (« Ouvrir la note de frais NF… »). */
+  reportNumber: string;
+  /** Rang de la ligne dans la note. */
+  lineIndex: number;
+  /** Avance qui solde la ligne (dépense sans compte), ou `null` (remboursement). */
+  settledByAdvanceId: string | null;
+}
+
+/** Propriétaire d'une dépense non directe : les achats ou les RH. */
+export type TreasuryExpenseOrigin = ExpenseOrigin | HrExpenseOrigin;
+
 @Schema({ collection: 'treasury_expenses', timestamps: true, strict: true })
 export class TreasuryExpense {
   @Prop({ type: String, required: true })
@@ -151,9 +170,10 @@ export class TreasuryExpense {
   @Prop({ type: String, default: null })
   workProjectId!: string | null;
 
-  // ADR-0044 — P5 : `null` = dépense directe ; sinon possédée par les achats.
+  // ADR-0044 — P5 : `null` = dépense directe ; sinon possédée par les achats
+  // (`supplier_payment`) ou, ADR-0051 — H11, par les RH (`expense_report`).
   @Prop({ type: Object, default: null })
-  origin!: ExpenseOrigin | null;
+  origin!: TreasuryExpenseOrigin | null;
 
   @Prop({ type: String, required: true, enum: ['recorded', 'cancelled'], default: 'recorded' })
   status!: 'recorded' | 'cancelled';
@@ -196,6 +216,23 @@ TreasuryExpenseSchema.index(
     unique: true,
     partialFilterExpression: { 'origin.paymentId': { $type: 'string' } },
     name: 'treasury_expense_supplier_payment_unique',
+  },
+);
+// ADR-0051 — H11 (§ 7.1) : un remboursement ne crée jamais deux fois la même dépense
+// (une ligne peut donner deux dépenses : la part soldée par l'avance, sans compte,
+// et le complément remboursé). Une dépense annulée sort de l'index : un nouveau
+// remboursement après annulation reste possible.
+TreasuryExpenseSchema.index(
+  {
+    organizationId: 1,
+    'origin.reportId': 1,
+    'origin.lineIndex': 1,
+    'origin.settledByAdvanceId': 1,
+  },
+  {
+    unique: true,
+    partialFilterExpression: { 'origin.kind': 'expense_report', status: 'recorded' },
+    name: 'treasury_expense_hr_report_unique',
   },
 );
 // ADR-0039 § 2.10 : dépenses d'un projet du RUN (marge, filtre de liste).
@@ -279,6 +316,19 @@ TreasuryRecurringExpenseSchema.index({ organizationId: 1, active: -1, label: 1 }
 
 export type TreasuryMovementKind = 'transfer' | 'other_in' | 'other_out';
 
+// ADR-0051 — H11 (§ 7.1) : mouvement POSSÉDÉ par les RH. Une avance n'est pas une
+// charge : son versement est un `other_out`, le retour du reliquat en espèces un
+// `other_in` (`settlementId` = la régularisation `cash_return`). La trésorerie ne
+// l'annule pas (`409 MOVEMENT_OWNED_BY_HR`) ; il n'entre jamais au réalisé.
+export interface MovementOrigin {
+  kind: 'employee_advance';
+  advanceId: string;
+  /** Numéro `AV…` de l'avance, copie d'affichage. */
+  advanceNumber: string;
+  /** Régularisation `cash_return` (entrée) ; `null` pour le versement (sortie). */
+  settlementId: string | null;
+}
+
 @Schema({ collection: 'treasury_movements', timestamps: true, strict: true })
 export class TreasuryMovement {
   @Prop({ type: String, required: true })
@@ -312,6 +362,10 @@ export class TreasuryMovement {
   @Prop({ type: String, default: null })
   reference!: string | null;
 
+  // ADR-0051 — H11 : `null` = mouvement saisi en trésorerie ; sinon possédé par les RH.
+  @Prop({ type: Object, default: null })
+  origin!: MovementOrigin | null;
+
   @Prop({ type: String, required: true, enum: ['recorded', 'cancelled'], default: 'recorded' })
   status!: 'recorded' | 'cancelled';
 
@@ -333,6 +387,16 @@ export class TreasuryMovement {
 export type TreasuryMovementDocument = HydratedDocument<TreasuryMovement>;
 export const TreasuryMovementSchema = SchemaFactory.createForClass(TreasuryMovement);
 TreasuryMovementSchema.index({ organizationId: 1, date: -1, _id: -1 });
+// ADR-0051 — H11 (§ 7.1) : une avance n'est versée qu'une fois, une régularisation
+// `cash_return` n'entre qu'une fois ; un mouvement annulé sort de l'index.
+TreasuryMovementSchema.index(
+  { organizationId: 1, 'origin.advanceId': 1, kind: 1, 'origin.settlementId': 1 },
+  {
+    unique: true,
+    partialFilterExpression: { 'origin.kind': 'employee_advance', status: 'recorded' },
+    name: 'treasury_movement_hr_advance_unique',
+  },
+);
 
 // ─── Réglages : minimum de trésorerie, hypothèses, pont vers le réalisé ─────
 

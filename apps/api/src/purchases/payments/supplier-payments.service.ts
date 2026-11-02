@@ -253,6 +253,14 @@ export class SupplierPaymentsService {
     actor: PurchaseActor,
   ): Promise<SupplierPaymentView> {
     const expense = await this.expenses.requireOwn(organizationId, input.expenseId);
+    // ADR-0051 — H11 : un remboursement de frais appartient aux RH, jamais aux achats.
+    if (expense.origin?.kind === 'expense_report') {
+      conflict(
+        'EXPENSE_OWNED_BY_HR',
+        `Cette dépense est le remboursement de la note de frais ${expense.origin.reportNumber}.`,
+        { reportId: expense.origin.reportId },
+      );
+    }
     if (expense.origin) {
       conflict(
         'EXPENSE_OWNED_BY_PURCHASES',
@@ -908,10 +916,15 @@ export class SupplierPaymentsService {
       expenses: p.expenseIds
         .map((id) => byId.get(id))
         .filter((e): e is ExpenseLean => e !== undefined)
-        .map((e) => ({
+        .map((e) => {
+          // ADR-0051 — H11 : seules les dépenses d'un paiement portent une facture.
+          const origin = e.origin?.kind === 'supplier_payment' ? e.origin : null;
+          return { e, origin };
+        })
+        .map(({ e, origin }) => ({
           id: String(e._id),
-          invoiceId: e.origin?.invoiceId ?? null,
-          allocationIndex: e.origin?.allocationIndex ?? null,
+          invoiceId: origin?.invoiceId ?? null,
+          allocationIndex: origin?.allocationIndex ?? null,
           amount: e.amount,
           category: e.category,
           workProjectId: e.workProjectId ?? null,
