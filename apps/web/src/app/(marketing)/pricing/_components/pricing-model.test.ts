@@ -300,7 +300,7 @@ describe('foire aux questions', () => {
     expect(all).toContain('supprim');
     // Prorata d'un changement d'offre.
     expect(all).toContain('échéance');
-    // Fiscalité non arbitrée : la taire sur une page de prix serait malhonnête.
+    // Prix HT + TVA 16 % (ADR-0047) : la taire sur une page de prix serait malhonnête.
     expect(all).toContain('hors taxes');
     // Pourquoi Expert n'a pas de prix : sans cette réponse, l'absence de montant
     // se lit comme un oubli.

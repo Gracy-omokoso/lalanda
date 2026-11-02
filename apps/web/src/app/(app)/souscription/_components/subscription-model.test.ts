@@ -56,6 +56,9 @@ function chiffrage(patch: Partial<PlanQuoteView> = {}): PlanQuoteView {
     carriedCreditCents: 0,
     currency: 'USD',
     taxIncluded: false,
+    taxCents: 144,
+    totalDueCents: 1044,
+    tax: { group: 'B', ratePercent: '16', label: 'TVA 16 %' },
     effectiveAt: null,
     ...patch,
   };
