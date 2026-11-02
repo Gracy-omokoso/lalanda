@@ -53,8 +53,10 @@ import { staleRevision } from '../sales/sales.errors.js';
 import { TreasuryAccountsService } from './treasury-accounts.service.js';
 import { TreasuryRecurringService } from './treasury-recurring.service.js';
 import {
+  TREASURY_HR_PAYABLES_SOURCE,
   TREASURY_PAYABLES_SOURCE,
   TreasuryReceivablesReader,
+  type TreasuryHrPayablesSource,
   type TreasuryPayablesSource,
 } from './treasury-sources.js';
 import { conflict, rejected, todayKinshasa, type TreasuryActor } from './treasury.common.js';
@@ -177,6 +179,8 @@ export class TreasuryPlanningService {
     @Inject(RunLinkService) private readonly runLink: RunLinkService,
     // ADR-0044 — P5 (§ 6.3) : échéances fournisseurs.
     @Inject(TREASURY_PAYABLES_SOURCE) private readonly payables: TreasuryPayablesSource,
+    // ADR-0051 — H11 (§ 7.2) : notes de frais et avances à rembourser ou verser.
+    @Inject(TREASURY_HR_PAYABLES_SOURCE) private readonly hrPayables: TreasuryHrPayablesSource,
   ) {}
 
   /**
@@ -707,7 +711,7 @@ export class TreasuryPlanningService {
 
   async forecast(organizationId: string, currency: TreasuryCurrency): Promise<TreasuryForecast> {
     const asOf = todayKinshasa();
-    const [ledger, receivables, rules, confirmed, settings, payables, ordersNotInvoiced] =
+    const [ledger, receivables, rules, confirmed, settings, payables, ordersNotInvoiced, hr] =
       await Promise.all([
         this.accounts.ledger(organizationId),
         this.sources.openReceivables(organizationId),
@@ -716,6 +720,7 @@ export class TreasuryPlanningService {
         this.settingsOf(organizationId),
         this.payables.openPayables(organizationId),
         this.payables.ordersNotInvoiced(organizationId),
+        this.hrPayables.openHrPayables(organizationId),
       ]);
     // ADR-0044 — P5 : fiche fournisseur des règles, pour le seul constat de double
     // comptage possible avec les factures (`RECURRING_AND_PAYABLES_SAME_SUPPLIER`).
@@ -734,6 +739,14 @@ export class TreasuryPlanningService {
           'Les factures fournisseurs ne sont pas reliées : aucune échéance fournisseur n’est prévue.',
       });
     }
+    if (!this.hrPayables.integrated) {
+      external.push({
+        code: 'HR_PAYABLES_NOT_INTEGRATED',
+        count: 1,
+        detail:
+          'Les notes de frais et avances au personnel ne sont pas reliées : aucun remboursement au personnel n’est prévu.',
+      });
+    }
     if (!this.sources.receiptsIntegrated()) {
       external.push({
         code: 'RECEIPTS_NOT_INTEGRATED',
@@ -749,6 +762,9 @@ export class TreasuryPlanningService {
         currency,
         accountId: null,
         spentOn: { $gte: treasuryAddDays(asOf, -90) },
+        // ADR-0051 — H11 (§ 7.2) : une dépense soldée par une avance n'a pas de
+        // compte par construction (l'argent est sorti au versement) : exclue.
+        'origin.settledByAdvanceId': { $not: { $type: 'string' } },
       })
       .exec();
     if (withoutAccount > 0) {
@@ -794,6 +810,7 @@ export class TreasuryPlanningService {
       externalFindings: external,
       payables,
       ordersNotInvoiced,
+      hrPayables: hr,
     });
   }
 

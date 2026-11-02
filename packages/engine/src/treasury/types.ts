@@ -8,12 +8,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Toute évolution d'un calcul de ce module incrémente cette version. */
-export const TREASURY_VERSION = '1.1.0';
+export const TREASURY_VERSION = '1.2.0';
 
 /**
  * Version du calcul du REPORT des dépenses vers le réalisé (`planExpenseActuals`),
  * inchangé depuis 1.0.0. L'empreinte d'une cellule reportée la porte : la prévision
- * peut évoluer (1.1.0, ADR-0044 § 6.3) sans faire passer pour « modifiées » les
+ * peut évoluer (1.1.0, ADR-0044 § 6.3 ; 1.2.0, ADR-0051 § 7.2) sans faire passer pour « modifiées » les
  * cellules déjà reportées, ni bloquer celles d'une période clôturée.
  */
 export const EXPENSE_ACTUALS_VERSION = '1.0.0';
@@ -356,6 +356,21 @@ export interface PayableForecastInput {
   supplierId: string | null;
 }
 
+/**
+ * Remboursement au personnel à venir (ADR-0051 § 7.2, 1.2.0) : note de frais
+ * APPROUVÉE non remboursée, ou avance APPROUVÉE non versée. Sortie estimée à J+1
+ * (motif des récurrences en retard), dans tous les scénarios (le plus prudent),
+ * dans sa devise. Le libellé est fourni neutre par la source (jamais le nom d'un
+ * bénéficiaire d'avance sur salaire, jamais « sur salaire »).
+ */
+export interface HrPayableForecastInput {
+  id: string;
+  kind: 'expense_report' | 'advance';
+  label: string;
+  currency: TreasuryCurrency;
+  amount: MoneyString;
+}
+
 /** Commande approuvée non facturée : reste à facturer HT (moteur des achats). */
 export interface OrderNotInvoicedInput {
   id: string;
@@ -395,7 +410,10 @@ export type ForecastFindingCode =
   /** Commandes approuvées non facturées : signalées, jamais prévues (décision ouverte n° 5). */
   | 'ORDERS_NOT_INVOICED'
   /** Dépense récurrente chez un fournisseur qui a des factures à venir : double comptage possible. */
-  | 'RECURRING_AND_PAYABLES_SAME_SUPPLIER';
+  | 'RECURRING_AND_PAYABLES_SAME_SUPPLIER'
+  // ADR-0051 § 7.2 (1.2.0) : remboursements au personnel.
+  /** Les notes de frais et avances (RH) ne sont pas reliées à la prévision. */
+  | 'HR_PAYABLES_NOT_INTEGRATED';
 
 export interface ForecastFinding {
   code: ForecastFindingCode;
@@ -422,9 +440,18 @@ export interface TreasuryForecastInput {
   payables?: readonly PayableForecastInput[];
   /** ADR-0044 § 6.3 : commandes non facturées, signalées seulement. */
   ordersNotInvoiced?: readonly OrderNotInvoicedInput[];
+  /** ADR-0051 § 7.2 (1.2.0) : remboursements au personnel ; absent ou vide = sorties de 1.1.0. */
+  hrPayables?: readonly HrPayableForecastInput[];
 }
 
-export type ForecastFlowSource = 'receivable' | 'recurring' | 'plan_in' | 'plan_out' | 'payable';
+export type ForecastFlowSource =
+  | 'receivable'
+  | 'recurring'
+  | 'plan_in'
+  | 'plan_out'
+  | 'payable'
+  /** ADR-0051 § 7.2 (1.2.0) : « Remboursements au personnel » (estimation). */
+  | 'hr_payable';
 
 export interface ForecastFlow {
   date: CalendarDay;

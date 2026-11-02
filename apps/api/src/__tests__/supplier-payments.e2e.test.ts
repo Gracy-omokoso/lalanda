@@ -12,6 +12,7 @@
 
 import 'reflect-metadata';
 
+import { TREASURY_VERSION } from '@lalanda/engine';
 import { ObjectId } from 'mongodb';
 import request from 'supertest';
 import { describe, expect, it, vi } from 'vitest';
@@ -674,7 +675,7 @@ e2eSuite('Paiements fournisseurs et trésorerie (ADR-0044 P5)', () => {
         lines: [{ id: 'a', quantity: '2', unitPrice: '25.00' }],
       });
       const res = f.ok(await f.get('viewer', '/treasury/forecast?currency=USD'));
-      expect(res['version']).toBe('1.1.0');
+      expect(res['version']).toBe(TREASURY_VERSION);
       for (const s of res['scenarios'] as {
         flows: { date: string; source: string; amount: string; label: string }[];
       }[]) {
