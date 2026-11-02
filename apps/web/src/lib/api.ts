@@ -289,6 +289,17 @@ export interface OrganizationView {
   canClosePeriods: boolean;
 }
 
+// ADR-0052 — O1 : types d'organisation admis par `POST /organizations`.
+export type OrganizationType = 'solo' | 'agence' | 'incubateur' | 'banque' | 'ecole';
+
+// ADR-0052 — O1 : avancement de la mise en route de chaque organisation de l'appelant.
+export interface OrganizationSetupProgressView {
+  organizationId: string;
+  done: number;
+  deferred: number;
+  total: number;
+}
+
 // ─── Invitations (S5d, rôles S20a) ─────────────────────────────
 export interface InvitationView {
   id: string;
@@ -2955,10 +2966,19 @@ export const api = {
     }),
   getTermsAcceptance: () =>
     jsonRequest<TermsAcceptanceView>(`/legal/terms/acceptance`, { method: 'GET' }),
+  // ADR-0052 — O1 : `activeOrganizationId` = l'organisation que l'API sert (F2).
   listOrganizations: () =>
-    jsonRequest<{ organizations: OrganizationView[] }>(`/organizations`, { method: 'GET' }),
-  createOrganization: (input: { name: string }) =>
+    jsonRequest<{ organizations: OrganizationView[]; activeOrganizationId: string }>(
+      `/organizations`,
+      { method: 'GET' },
+    ),
+  createOrganization: (input: { name: string; pays?: string; type?: OrganizationType }) =>
     jsonRequest<OrganizationView>(`/organizations`, { method: 'POST', body: input }),
+  listOrganizationsSetupProgress: () =>
+    jsonRequest<{ organizations: OrganizationSetupProgressView[] }>(
+      `/organizations/setup-progress`,
+      { method: 'GET' },
+    ),
   listTemplates: () =>
     jsonRequest<{ slugs: string[]; templates: TemplateSummary[] }>(`/evaluate/templates`, {
       method: 'GET',
@@ -3014,11 +3034,13 @@ export const api = {
       { method: 'DELETE' },
     ),
   listMyPendingInvitations: () =>
-    jsonRequest<{ invitations: (InvitationView & { token: string })[] }>(`/invitations/pending`, {
+    jsonRequest<{
+      invitations: (InvitationView & { token: string; organizationName: string })[];
+    }>(`/invitations/pending`, {
       method: 'GET',
     }),
   acceptInvitation: (token: string) =>
-    jsonRequest<{ organizationId: string }>(`/invitations/accept`, {
+    jsonRequest<{ organizationId: string; organizationName: string }>(`/invitations/accept`, {
       method: 'POST',
       body: { token },
     }),

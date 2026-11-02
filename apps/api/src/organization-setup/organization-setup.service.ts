@@ -45,6 +45,11 @@ import {
   type OrganizationSetupFacts,
 } from './organization-setup.model.js';
 import { OrganizationSetup, type OrganizationSetupLean } from './organization-setup.schema.js';
+// ADR-0052 — O1 : avancement par organisation pour le sélecteur.
+import {
+  setupProgress,
+  type OrganizationSetupProgress,
+} from './organization-setup-progress.model.js';
 
 /** Auteur d'une déclaration (journal d'audit). */
 export interface SetupActor {
@@ -85,6 +90,15 @@ export class OrganizationSetupService {
         .exec();
     }
     return buildOrganizationSetupView(organizationId, facts, actions);
+  }
+
+  /**
+   * ADR-0052 — O1 : avancement de chaque organisation citée. L'appelant DOIT n'y passer
+   * que des organisations dont l'utilisateur est membre (le contrôleur les tire de ses
+   * appartenances). Lecture seule : aucun nettoyage de report ici, contrairement à `view`.
+   */
+  async progressOf(organizationIds: readonly string[]): Promise<OrganizationSetupProgress[]> {
+    return Promise.all(organizationIds.map(async (id) => setupProgress(id, await this.facts(id))));
   }
 
   // ── Déclarations (ADR-0052 § 4) ────────────────────────────────────────────

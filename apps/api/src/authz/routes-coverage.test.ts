@@ -46,6 +46,8 @@ import { ObjectivesController } from '../objectives/objectives.controller.js';
 import { OrganizationSpaceController } from '../organization-space/organization-space.controller.js';
 // ADR-0052 — O0
 import { OrganizationSetupController } from '../organization-setup/organization-setup.controller.js';
+// ADR-0052 — O1
+import { OrganizationSetupProgressController } from '../organization-setup/organization-setup-progress.controller.js';
 import { InvitationsController } from '../organizations/invitations.controller.js';
 import { MembersController } from '../organizations/members.controller.js';
 import { OrganizationsController } from '../organizations/organizations.controller.js';
@@ -318,6 +320,8 @@ const CONTROLEURS = [
   PublicLeadFormsController,
   // ADR-0052 — O0 : statut de complétude de la mise en route.
   OrganizationSetupController,
+  // ADR-0052 — O1 : avancement par organisation (sélecteur).
+  OrganizationSetupProgressController,
 ];
 
 /**
@@ -460,6 +464,11 @@ const SANS_PERMISSION: Record<string, string> = {
     'option O5 : aucune action nouvelle). AuthGuard vérifie l’appartenance ; la réponse ' +
     'ne porte que des booléens et des codes, jamais une valeur (NIF, solde, nom) ; ' +
     '`canAct` suit les droits effectifs de l’appelant.',
+  // ── ADR-0052 — O1 : avancement de la mise en route dans le sélecteur ──────
+  'OrganizationSetupProgressController.list':
+    'Avancement de la mise en route de chaque organisation de l’appelant, comme ' +
+    '`GET /organizations` : la liste vient de SES appartenances, jamais d’un paramètre ; ' +
+    'la réponse ne porte que des compteurs, lisibles par tout membre (ADR-0052 § 7).',
 };
 
 interface RouteInspectee {
