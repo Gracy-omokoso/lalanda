@@ -44,6 +44,8 @@ import { LegalController } from '../legal/legal.controller.js';
 import { MorningBriefController } from '../morning-brief/morning-brief.controller.js';
 import { ObjectivesController } from '../objectives/objectives.controller.js';
 import { OrganizationSpaceController } from '../organization-space/organization-space.controller.js';
+// ADR-0052 — O0
+import { OrganizationSetupController } from '../organization-setup/organization-setup.controller.js';
 import { InvitationsController } from '../organizations/invitations.controller.js';
 import { MembersController } from '../organizations/members.controller.js';
 import { OrganizationsController } from '../organizations/organizations.controller.js';
@@ -314,6 +316,8 @@ const CONTROLEURS = [
   // ADR-0048 : formulaire public de prospects (réglages et routes publiques).
   CrmLeadFormsController,
   PublicLeadFormsController,
+  // ADR-0052 — O0 : statut de complétude de la mise en route.
+  OrganizationSetupController,
 ];
 
 /**
@@ -449,6 +453,13 @@ const SANS_PERMISSION: Record<string, string> = {
     'Soumission d’un visiteur anonyme : jeton actif, champ piège, délai minimal par ticket ' +
     'signé, débit par empreinte d’IP et par formulaire, champs bornés, sans pièce jointe ; ' +
     'écrit seulement dans l’organisation du jeton (ADR-0048 § 3, § 6).',
+
+  // ── ADR-0052 — O0 : statut de complétude ────────────────────────────────
+  'OrganizationSetupController.read':
+    'Statut de complétude de l’organisation ACTIVE, ouvert à tout membre (ADR-0052 § 7, ' +
+    'option O5 : aucune action nouvelle). AuthGuard vérifie l’appartenance ; la réponse ' +
+    'ne porte que des booléens et des codes, jamais une valeur (NIF, solde, nom) ; ' +
+    '`canAct` suit les droits effectifs de l’appelant.',
 };
 
 interface RouteInspectee {

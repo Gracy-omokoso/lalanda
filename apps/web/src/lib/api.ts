@@ -2869,6 +2869,15 @@ export interface ActualsSyncReport {
   counts: { written: number; unchanged: number; removed: number; blocked: number; skipped: number };
 }
 
+// ADR-0052 — O0 : contrat du statut de complétude (`@lalanda/shared/organization-setup`).
+import type { OrganizationSetupView } from '@lalanda/shared/organization-setup';
+export type {
+  OrganizationSetupCapability,
+  OrganizationSetupStep,
+  OrganizationSetupStepId,
+  OrganizationSetupView,
+} from '@lalanda/shared/organization-setup';
+
 export const api = {
   /**
    * Enregistre l'accord de l'utilisateur connecté.
@@ -3094,6 +3103,11 @@ export const api = {
     }),
   getOrganizationBilling: () =>
     jsonRequest<OrganizationBillingView>(`/organizations/current/billing`, { method: 'GET' }),
+  // ADR-0052 — O0 : statut de complétude de la mise en route, lisible par TOUT membre.
+  // Booléens et codes seulement (jamais de NIF, de solde ni de nom) ; `canAct` dit si
+  // l'appelant peut agir sur l'étape. Les lots O2 à O5 le lisent, aucun ne le recalcule.
+  getOrganizationSetup: () =>
+    jsonRequest<OrganizationSetupView>(`/organizations/current/setup`, { method: 'GET' }),
   // ─── Abonnements et paiements (S22b) ───────────────────────
   /**
    * État d'abonnement de l'organisation active. Lisible par tout rôle disposant
