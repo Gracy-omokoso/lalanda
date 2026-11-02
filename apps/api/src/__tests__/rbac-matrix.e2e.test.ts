@@ -1975,4 +1975,34 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
       expect(Array.isArray(mes.body.announcements), role).toBe(true);
     }
   }, 120_000);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // ADR-0053 — P7 : statistiques et finances du site. Aucun rôle d'organisation ne
+  // les ouvre — `analytics.read` ni `billing.manage` compris. Le refus nomme l'action
+  // PLATEFORME.
+  // ───────────────────────────────────────────────────────────────────────────
+
+  it('ADR-0053 P7 — aucun rôle d’organisation n’ouvre `/admin/stats` ni `/admin/finance`', async () => {
+    const s = serveur();
+    const sondes: Array<[string, PlatformAction]> = [
+      ['/admin/stats', 'platform.stats.read'],
+      ['/admin/finance', 'platform.finance.read'],
+      ['/admin/finance/export.csv', 'platform.finance.export'],
+    ];
+    const { ThrottlerStorage } = await import('@nestjs/throttler');
+    const store = app.get(ThrottlerStorage) as unknown as {
+      storage: Map<string, unknown>;
+      timeoutIds: Map<string, NodeJS.Timeout[]>;
+    };
+    for (const role of ROLES_TESTES) {
+      for (const t of store.timeoutIds.values()) t.forEach(clearTimeout);
+      store.timeoutIds.clear();
+      store.storage.clear();
+      for (const [chemin, action] of sondes) {
+        const res = await request(s).get(chemin).set('Cookie', cookiesDe(role));
+        expect(res.status, `${role} × ${chemin}`).toBe(403);
+        expect(res.body, `${role} × ${chemin}`).toMatchObject({ code: 'FORBIDDEN', action });
+      }
+    }
+  }, 120_000);
 });

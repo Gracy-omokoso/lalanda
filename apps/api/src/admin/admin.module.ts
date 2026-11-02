@@ -34,6 +34,8 @@ import { FeaturesModule } from './features/features.module.js';
 import { AdminAuditModule } from './audit/admin-audit.module.js';
 // ADR-0053 — P6
 import { PlatformAnnouncementsModule } from './announcements/announcements.module.js';
+// ADR-0053 — P7 : statistiques et finances du site (`/admin/stats`, `/admin/finance`).
+import { PlatformInsightsModule } from './stats/platform-insights.module.js';
 
 @Module({
   imports: [
@@ -55,6 +57,8 @@ import { PlatformAnnouncementsModule } from './announcements/announcements.modul
     AdminAuditModule,
     // ADR-0053 — P6 : annonces (`/admin/announcements/**`, `/me/announcements`).
     PlatformAnnouncementsModule,
+    // ADR-0053 — P7
+    PlatformInsightsModule,
   ],
   // `PlatformAccessController` sert `/me/platform-access` et NON `/admin/*` :
   // voir l'en-tête du fichier pour la raison — un utilisateur sans rôle doit

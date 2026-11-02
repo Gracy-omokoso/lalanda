@@ -497,8 +497,8 @@ La console est **séparée** de l’espace organisation : groupe de routes `apps
 | `/admin/integrations` | Intégrations | `platform.integrations.manage` | disponible |
 | `/admin/journal` | Journal | `platform.audit.read` | disponible |
 | `/admin/annonces` | Annonces | `platform.announcements.draft` | bientôt (P6) |
-| `/admin/statistiques` | Statistiques | `platform.stats.read` | bientôt (P7) |
-| `/admin/finances` | Finances du site | `platform.finance.read` | bientôt (P7) |
+| `/admin/statistiques` | Statistiques (seuil « < 5 ») | `platform.stats.read` | disponible (P7) |
+| `/admin/finances` | Finances du site (par devise, export CSV journalisé) | `platform.finance.read` | disponible (P7) |
 | `/admin/packs` | Country Packs | `platform.packs.manage` | bientôt |
 | `/admin/modeles` | Modèles sectoriels | `platform.templates.manage` | bientôt |
 

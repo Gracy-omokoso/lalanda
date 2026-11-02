@@ -1978,6 +1978,9 @@ describe('ADR-0053 — P0 : la garde sans organisation ne vaut que pour la conso
     'AdminAuditController',
     // ADR-0053 — P6
     'PlatformAnnouncementsController',
+    // ADR-0053 — P7
+    'AdminStatsController',
+    'AdminFinanceController',
   ];
   /** Routes de console sans rôle ni action plateforme, avec leur raison (déjà justifiées). */
   const CONSOLE_SANS_EXIGENCE = ['PlatformAccessController.platformAccess'];
@@ -2687,5 +2690,56 @@ describe('ADR-0053 — P6 : `/admin/announcements/**` et `/me/announcements`', (
     const gardes = (Reflect.getMetadata(GUARDS_METADATA, MeAnnouncementsController) ??
       []) as unknown[];
     expect(gardes).toEqual([AuthGuard]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADR-0053 — P7 : statistiques et finances du site (§ 6.7, § 6.8, § 7)
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { AdminFinanceController } from '../admin/finance/admin-finance.controller.js';
+import { AdminStatsController } from '../admin/stats/admin-stats.controller.js';
+
+const CONTROLEURS_P7 = [AdminStatsController, AdminFinanceController];
+(CONTROLEURS as unknown[]).push(...CONTROLEURS_P7);
+TOUTES_LES_ROUTES.push(
+  ...CONTROLEURS_P7.flatMap((c) => routesDe(c as new (...args: never[]) => unknown)),
+);
+
+describe('ADR-0053 — P7 : `/admin/stats` et `/admin/finance`', () => {
+  const attendu: Record<string, PlatformAction> = {
+    'AdminStatsController.stats': 'platform.stats.read',
+    'AdminFinanceController.report': 'platform.finance.read',
+    'AdminFinanceController.export': 'platform.finance.export',
+  };
+
+  it('chaque route déclare l’action plateforme du § 7, jamais une action d’organisation', () => {
+    const routes = TOUTES_LES_ROUTES.filter(
+      (r) =>
+        r.cle.startsWith('AdminStatsController.') || r.cle.startsWith('AdminFinanceController.'),
+    );
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, action] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle)!;
+      expect(route.actions ?? [], cle).toEqual([]);
+      expect(route.rolesPlateforme, cle).toEqual(platformActionHolders(action));
+      const [nomClasse, nom] = cle.split('.') as [string, string];
+      const classe =
+        nomClasse === 'AdminStatsController' ? AdminStatsController : AdminFinanceController;
+      const declarees = (Reflect.getMetadata(
+        REQUIRED_PLATFORM_ACTIONS_KEY,
+        (classe.prototype as unknown as Record<string, object>)[nom]!,
+      ) ?? []) as string[];
+      expect(declarees, cle).toEqual([action]);
+      expect(SANS_PERMISSION[cle], cle).toBeUndefined();
+    }
+  });
+
+  it('matrice § 5.2 : l’administrateur plateforme lit les statistiques, pas les finances', () => {
+    expect(platformActionHolders('platform.stats.read')).toEqual(
+      expect.arrayContaining(['platform_super_admin', 'platform_admin', 'platform_billing']),
+    );
+    expect(platformActionHolders('platform.finance.read')).not.toContain('platform_admin');
+    expect(platformActionHolders('platform.finance.export')).not.toContain('platform_support');
   });
 });

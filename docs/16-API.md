@@ -389,6 +389,29 @@ fonctionnalités. Dérogation : `400 UNKNOWN_FEATURE`, `400 OVERRIDE_EXPIRY_INVA
 Le journal du client reçoit `platform.feature.override_granted` / `_revoked` sous « Équipe Lalanda »,
 avec la fonctionnalité, l'échéance et la raison générique (catégorie), jamais l'opérateur ni la note.
 
+**Statistiques et finances du site (ADR-0053 § 6.7, § 6.8 — lot P7).**
+
+```
+GET    /admin/stats                              agrégats de la plateforme — platform.stats.read
+GET    /admin/finance?from=AAAA-MM&to=AAAA-MM    finances du site (défaut : 12 derniers mois, 60 au plus) — platform.finance.read
+GET    /admin/finance/export.csv?from=&to=       même rapport en CSV (`;`, UTF-8 BOM) — platform.finance.export, journalisé
+```
+
+Garde de console (`PlatformAuthGuard` puis `PermissionsGuard`), lecture seule, sans ré-authentification.
+**Statistiques** : comptes d'organisations (total, actives sur 30 jours — un membre connecté —, nouvelles,
+par offre effective, pays, état d'abonnement, type), de comptes, d'essais (démarrés, convertis, en
+cours), adoption des modules (organisations ayant au moins un document : `distinct('organizationId')`
+seulement) et volumes IA/PDF. Toute case `< 5` part `{ value: null, masked: true }` ; dans une
+répartition, une case masquée seule entraîne le masquage de la plus petite autre. Calcul pur :
+`apps/api/src/admin/stats/stats.ts`. **Finances** : rapport du moteur `platform-revenue`
+(`PLATFORM_REVENUE_VERSION`) — encaissements constatés (dépôts manuels **confirmés**, montant figé
+de la demande) par mois, offre et moyen, **par devise, sans conversion** ; rappels Stripe/PayPal
+**comptés sans montant** (non conservé) ; revenu récurrent déclaré (abonnements `active` déjà payés,
+tarif publié, annuels ÷ 12, arrondi une fois) ; file manuelle (en attente, expirées, refusées) ;
+abonnements `past_due` et `grace`. Les octrois sans paiement n'entrent jamais dans les encaissements.
+Aucune donnée d'un client (nom, identifiant, référence). `400 INVALID_PERIOD`. L'export écrit
+`platform.finance.exported` au journal plateforme (acteur réel, rôles relus).
+
 **`:organizationId` et non `:orgId`.** Le nom du paramètre est porteur : `PermissionsGuard` traite un `:orgId` de route comme « l’organisation dont il faut résoudre le rôle de l’appelant », et un opérateur de plateforme n’est membre d’aucune organisation cliente. Nommée `:orgId`, la route de changement de plan répondrait `404 ORG_NOT_FOUND` à un super-administrateur parfaitement légitime.
 
 **Trois actions restent refusées à tous les rôles plateforme** — `plan.approve`, `period.close`, `report.export` (ADR-0012 §4). Aucune route d’administration ne les déclare, et `routes-coverage.test.ts` échoue si l’une venait à le faire : une route qui les porterait serait morte (le contrôle la refuserait de toute façon) mais **trompeuse**, car elle promettrait dans `/admin` un pouvoir que la plateforme n’a pas. `GET /me/platform-access` renvoie ces trois actions dans `forbiddenActions[]` pour qu’elles soient **affichées** et non seulement absentes.
