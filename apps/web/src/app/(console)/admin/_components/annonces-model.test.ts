@@ -14,6 +14,7 @@ import {
   ROLES_ORG,
   SAISIE_AUDIENCE_VIDE,
   saisieDepuisAudience,
+  gesteDeFin,
   statutAnnonce,
 } from './annonces-model';
 
@@ -96,10 +97,22 @@ describe('brouillon, envoi et erreurs', () => {
   it('statuts et codes métier traduits', () => {
     expect(statutAnnonce('pending_approval').ton).toBe('attention');
     expect(statutAnnonce('sent').libelle).toBe('Envoyée');
+    expect(statutAnnonce('withdrawn').libelle).toBe('Retirée');
     const err = Object.assign(new Error('x'), {
       status: 409,
       detail: { code: 'SELF_APPROVAL_FORBIDDEN' },
     });
     expect(messageErreurAnnonces(err, 'repli')).toContain('autre personne');
+  });
+});
+
+describe('ADR-0054 — retrait d’une annonce envoyée', () => {
+  it('avant l’envoi on annule ; envoyée on retire ; annulée ou retirée, plus aucun geste', () => {
+    for (const s of ['draft', 'pending_approval', 'approved'] as const) {
+      expect(gesteDeFin(s), s).toBe('annuler');
+    }
+    expect(gesteDeFin('sent')).toBe('retirer');
+    expect(gesteDeFin('canceled')).toBeNull();
+    expect(gesteDeFin('withdrawn')).toBeNull();
   });
 });
