@@ -2203,3 +2203,44 @@ describe('ADR-0051 — H15 : objectifs et évaluations', () => {
     expect(PLATFORM_FORBIDDEN_ACTIONS).toContain('performance.read');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADR-0050 — V4 : acomptes des commandes et des contrats (§ 3, § 5.1, § 5.2)
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { SalesContractDepositsController } from '../sales/contracts/deposits/sales-contract-deposits.controller.js';
+import { SalesOrderDepositsController } from '../sales/contracts/deposits/sales-order-deposits.controller.js';
+
+const CONTROLEURS_V4 = [SalesOrderDepositsController, SalesContractDepositsController];
+(CONTROLEURS as unknown[]).push(...CONTROLEURS_V4);
+TOUTES_LES_ROUTES.push(
+  ...CONTROLEURS_V4.flatMap((c) => routesDe(c as new (...args: never[]) => unknown)),
+);
+
+const MOTIF_V4 = /^(SalesOrderDepositsController|SalesContractDepositsController)\./;
+
+describe('ADR-0050 — V4 : acomptes', () => {
+  it('chaque route déclare la permission de l’ADR (§ 3, § 5.2)', () => {
+    const attendu: Record<string, Action[]> = {};
+    for (const c of ['SalesOrderDepositsController', 'SalesContractDepositsController']) {
+      attendu[`${c}.list`] = ['sales.read'];
+      // Brouillon `FT`/`ET` seulement ; geste « traité » déclaratif sous `sales.manage`.
+      attendu[`${c}.prepare`] = ['sales.read', 'sales.manage'];
+      attendu[`${c}.resolve`] = ['sales.read', 'sales.manage'];
+    }
+    const routes = TOUTES_LES_ROUTES.filter((r) => MOTIF_V4.test(r.cle));
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+      expect(route!.rolesPlateforme, cle).toBeUndefined();
+      expect(SANS_PERMISSION[cle], cle).toBeUndefined();
+    }
+  });
+
+  it('aucune route des acomptes n’émet ni ne normalise : `sales.invoice` n’y apparaît pas', () => {
+    for (const route of TOUTES_LES_ROUTES.filter((r) => MOTIF_V4.test(r.cle))) {
+      expect(route.actions ?? [], route.cle).not.toContain('sales.invoice');
+    }
+  });
+});
