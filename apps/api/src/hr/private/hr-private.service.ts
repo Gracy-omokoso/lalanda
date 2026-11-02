@@ -247,6 +247,7 @@ export class HrPrivateService {
     const since = new Date(Date.now() - HOUR_MS);
     const recent = await this.auditEvents
       .countDocuments({
+        organizationId,
         actorUserId: actor.userId,
         action: 'hr.private.revealed',
         createdAt: { $gte: since },

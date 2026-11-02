@@ -152,9 +152,7 @@ const ACTIONS_SANS_ROUTE: Record<string, string> = {
   // `permissions.test.ts`, et `/me/permissions` est vérifié ci-dessous.
   // H10 a retiré `expenses.claim` et `expenses.approve` (sondes `POST /hr/expense-reports`
   // et `PUT /hr/settings/advances` en fin de liste).
-  'attendance.clock':
-    'Aucune route en H8 : `POST /hr/attendance/clock` et les demandes de correction ' +
-    'arrivent au lot H12 (ADR-0051 § 6.2).',
+  // H12 a retiré `attendance.clock` (sonde `POST /hr/attendance/clock` en fin de liste).
   'performance.read':
     'Aucune route en H8 : objectifs, campagnes et `POST /hr/reviews/:id/reveal` arrivent ' +
     'au lot H15 (ADR-0051 § 6.3).',
@@ -956,6 +954,17 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
           .put('/sales/contract-settings')
           .set('Cookie', c)
           .send({ expectedRevision: null }),
+    },
+    // ADR-0051 — H12 : présences (§ 5.1, § 6.2).
+    {
+      // Tout rôle interne sauf Chef de projet, Conseiller et Expert-comptable externe. Le
+      // pointage est éteint par défaut : 409 HR_FEATURE_DISABLED prouve que le guard a
+      // laissé passer jusqu'au service, sans aucun pointage écrit.
+      action: 'attendance.clock',
+      libelle: 'POST /hr/attendance/clock (pointage éteint)',
+      statutsAutorises: [409],
+      envoyer: (c) =>
+        request(serveur()).post('/hr/attendance/clock').set('Cookie', c).send({ kind: 'in' }),
     },
     // ADR-0051 — H10 : notes de frais et avances (§ 5.1, § 6.1).
     {

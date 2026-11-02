@@ -79,6 +79,7 @@ import {
 import { newObjectId } from '../../storage/object-key.js';
 import { TreasuryExpensesService } from '../../treasury/treasury-expenses.service.js';
 import type { HrActor } from '../departments/hr-departments.service.js';
+import { HrCounter, type HrCounterDocument } from './hr-counter.schema.js';
 import type { EmployeeLean } from '../employees/employee.schema.js';
 import { displayNameOf } from '../leave/display-name.js';
 import { employeeNotFound, hrToday, inHrTransaction } from '../scope/hr-errors.js';
@@ -206,6 +207,7 @@ export class HrExpenseReportsService {
   constructor(
     @InjectModel(ExpenseReport.name) private readonly reports: Model<ExpenseReportDocument>,
     @InjectModel(EmployeeAdvance.name) private readonly advances: Model<EmployeeAdvanceDocument>,
+    @InjectModel(HrCounter.name) private readonly counters: Model<HrCounterDocument>,
     @InjectConnection() private readonly connection: Connection,
     @Inject(AuditService) private readonly audit: AuditService,
     @Inject(AuthzService) private readonly authz: AuthzService,
@@ -903,7 +905,7 @@ export class HrExpenseReportsService {
     );
     const now = new Date();
     await inHrTransaction(this.connection, async (session) => {
-      const number = await nextHrNumber(this.connection, organizationId, 'NF', now, session);
+      const number = await nextHrNumber(this.counters, organizationId, 'NF', now, session);
       const res = await this.reports
         .updateOne(
           { _id: r._id, organizationId, revision: r.revision, status: 'draft' },

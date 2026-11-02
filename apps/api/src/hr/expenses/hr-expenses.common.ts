@@ -10,7 +10,7 @@
 //   AAD = organisation + note + objet), quand le trousseau est configuré.
 
 import { ForbiddenException, HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
-import type { ClientSession, Connection } from 'mongoose';
+import type { ClientSession, Model } from 'mongoose';
 
 import {
   openEnvelopeBlob,
@@ -34,14 +34,13 @@ import { employeeNotFound } from '../scope/hr-errors.js';
 import type { HrViewer } from '../scope/hr-scope.service.js';
 import { fiscalYearOf, periodInYear } from '../../sales/invoices/invoice-numbering.js';
 import type { EmployeeLean } from '../employees/employee.schema.js';
+import type { HrCounter, HrCounterDocument } from './hr-counter.schema.js';
 
 // ── Numérotation ────────────────────────────────────────────────────────────
 
-const COUNTERS = 'hr_counters';
-
 /** Numéro suivant `NF…` ou `AV…`, au jour de Kinshasa, dans la transaction. */
 export async function nextHrNumber(
-  connection: Connection,
+  counters: Model<HrCounterDocument>,
   organizationId: string,
   prefix: 'NF' | 'AV',
   now: Date,
@@ -49,35 +48,26 @@ export async function nextHrNumber(
 ): Promise<string> {
   const year = fiscalYearOf(now);
   const bump = () =>
-    connection
-      .collection(COUNTERS)
+    counters
       .findOneAndUpdate(
         { organizationId, kind: prefix, year },
         { $inc: { last: 1 }, $setOnInsert: { _schemaVersion: 1 } },
-        { upsert: true, returnDocument: 'after', session },
-      );
-  let counter;
+        { upsert: true, new: true, session },
+      )
+      .lean<HrCounter>()
+      .exec();
+  let counter: HrCounter | null;
   try {
     counter = await bump();
   } catch (err) {
+    // Première création concurrente du compteur : la seconde bute sur l'index unique.
     if (!isDuplicateKey(err)) throw err;
     counter = await bump();
   }
-  const last = Number((counter as { last?: number } | null)?.last ?? 0);
   const period = periodInYear(year, now);
   const yy = String(period.year % 100).padStart(2, '0');
   const mm = String(period.month).padStart(2, '0');
-  return `${prefix}${yy}${mm}-${String(last).padStart(6, '0')}`;
-}
-
-/** Index unique du compteur (créé au démarrage du module, idempotent). */
-export async function ensureHrCountersIndex(connection: Connection): Promise<void> {
-  await connection
-    .collection(COUNTERS)
-    .createIndex(
-      { organizationId: 1, kind: 1, year: 1 },
-      { unique: true, name: 'hr_counter_unique' },
-    );
+  return `${prefix}${yy}${mm}-${String(counter!.last).padStart(6, '0')}`;
 }
 
 // ── Circuit ─────────────────────────────────────────────────────────────────

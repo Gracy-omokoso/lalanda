@@ -48,6 +48,7 @@ import { conflict, invalidCursor, staleRevision } from '../../sales/sales.errors
 import { decodeCursor, encodeCursor } from '../../sales/search.js';
 import { TreasuryMovementsService } from '../../treasury/treasury-movements.service.js';
 import type { HrActor } from '../departments/hr-departments.service.js';
+import { HrCounter, type HrCounterDocument } from '../expenses/hr-counter.schema.js';
 import type { EmployeeLean } from '../employees/employee.schema.js';
 import { displayNameOf } from '../leave/display-name.js';
 import {
@@ -103,6 +104,7 @@ const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 export class HrAdvancesService {
   constructor(
     @InjectModel(EmployeeAdvance.name) private readonly advances: Model<EmployeeAdvanceDocument>,
+    @InjectModel(HrCounter.name) private readonly counters: Model<HrCounterDocument>,
     @InjectConnection() private readonly connection: Connection,
     @Inject(AuditService) private readonly audit: AuditService,
     @Inject(AuthzService) private readonly authz: AuthzService,
@@ -464,7 +466,7 @@ export class HrAdvancesService {
     );
     const now = new Date();
     await inHrTransaction(this.connection, async (session) => {
-      const number = await nextHrNumber(this.connection, organizationId, 'AV', now, session);
+      const number = await nextHrNumber(this.counters, organizationId, 'AV', now, session);
       const res = await this.advances
         .updateOne(
           { _id: a._id, organizationId, revision: a.revision, status: 'draft' },

@@ -76,10 +76,31 @@ import { HrAdvanceRemindersService } from './advances/hr-advance-reminders.servi
 import { HrAdvancesController } from './advances/hr-advances.controller.js';
 import { HrAdvancesService } from './advances/hr-advances.service.js';
 import { ExpenseReport, ExpenseReportSchema } from './expenses/expense-report.schema.js';
+import { HrCounter, HrCounterSchema } from './expenses/hr-counter.schema.js';
 import { HrExpenseReportsController } from './expenses/hr-expense-reports.controller.js';
 import { HrExpenseReportsService } from './expenses/hr-expense-reports.service.js';
 import { HrExpensesNotifier } from './expenses/hr-expenses-notifier.js';
 import { HrExpensesSettingsService } from './expenses/hr-expenses-settings.service.js';
+// ADR-0051 — H12 : présences et plannings.
+import {
+  AttendanceCorrection,
+  AttendanceCorrectionSchema,
+  AttendanceEvent,
+  AttendanceEventSchema,
+} from './attendance/attendance.schemas.js';
+import { HrAttendanceController } from './attendance/hr-attendance.controller.js';
+import { HrAttendanceService } from './attendance/hr-attendance.service.js';
+import { HrPresenceNotifier } from './attendance/hr-presence-notifier.js';
+import { HrPresenceSettingsService } from './attendance/hr-presence-settings.js';
+import { HrPlanningService } from './planning/hr-planning.service.js';
+import { HrPresenceReader } from './planning/hr-presence-reader.js';
+import { HrShiftsController } from './planning/hr-shifts.controller.js';
+import {
+  Shift,
+  ShiftSchema,
+  StaffingNeed,
+  StaffingNeedSchema,
+} from './planning/planning.schemas.js';
 
 @Module({
   imports: [
@@ -108,9 +129,15 @@ import { HrExpensesSettingsService } from './expenses/hr-expenses-settings.servi
       { name: ChecklistTemplate.name, schema: ChecklistTemplateSchema },
       { name: Checklist.name, schema: ChecklistSchema },
       { name: HrReminderClaim.name, schema: HrReminderClaimSchema },
-      // ADR-0051 — H10 : notes de frais, avances.
+      // ADR-0051 — H12 : pointages, corrections, créneaux, besoins minimaux.
+      { name: AttendanceEvent.name, schema: AttendanceEventSchema },
+      { name: AttendanceCorrection.name, schema: AttendanceCorrectionSchema },
+      { name: Shift.name, schema: ShiftSchema },
+      { name: StaffingNeed.name, schema: StaffingNeedSchema },
+      // ADR-0051 — H10 : notes de frais, avances, compteurs `NF…` et `AV…`.
       { name: ExpenseReport.name, schema: ExpenseReportSchema },
       { name: EmployeeAdvance.name, schema: EmployeeAdvanceSchema },
+      { name: HrCounter.name, schema: HrCounterSchema },
     ]),
   ],
   controllers: [
@@ -130,6 +157,9 @@ import { HrExpensesSettingsService } from './expenses/hr-expenses-settings.servi
     HrDocumentsController,
     HrChecklistsController,
     HrDeadlinesController,
+    // ADR-0051 — H12
+    HrAttendanceController,
+    HrShiftsController,
     // ADR-0051 — H10
     HrExpenseReportsController,
     HrAdvancesController,
@@ -167,6 +197,13 @@ import { HrExpensesSettingsService } from './expenses/hr-expenses-settings.servi
     HrDeadlinesService,
     HrRemindersJob,
     HrRetentionJob,
+    // ADR-0051 — H12 : réglages des présences et plannings, lectures pour le moteur,
+    // notifications, pointages et corrections, créneaux et besoins.
+    HrPresenceSettingsService,
+    HrPresenceReader,
+    HrPresenceNotifier,
+    HrAttendanceService,
+    HrPlanningService,
     // ADR-0051 — H10 : réglages des frais et avances, notes, avances, rappels d'avance.
     HrExpensesSettingsService,
     HrExpensesNotifier,
