@@ -9,7 +9,11 @@ import type { Connection } from 'mongoose';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import type { AuthenticatedRequest } from '../auth/auth.guard.js';
-import { PlatformConsoleRoute, RequirePermission } from './authz.decorators.js';
+import {
+  AllowPlatformTwoFactorPending,
+  PlatformConsoleRoute,
+  RequirePermission,
+} from './authz.decorators.js';
 import { PlatformAuthGuard, type SessionReader } from './platform-auth.guard.js';
 
 class Routes {
@@ -21,6 +25,15 @@ class Routes {
   @PlatformConsoleRoute()
   @RequirePermission('organization.manage')
   mixed(): void {}
+
+  // ADR-0053 — P8
+  @PlatformConsoleRoute()
+  @AllowPlatformTwoFactorPending('enrollment')
+  enrolement(): void {}
+
+  @PlatformConsoleRoute()
+  @AllowPlatformTwoFactorPending('verification')
+  reauth(): void {}
 }
 
 @PlatformConsoleRoute()
@@ -44,9 +57,30 @@ function contexte(
   return { ctx, req: request };
 }
 
-function guard(user: { disabledAt?: Date | null } | null = {}): PlatformAuthGuard {
+// ADR-0053 — P8 : la fausse base répond par collection (compte, rôles, double
+// authentification, sessions vérifiées) ; par défaut, aucun rôle plateforme.
+interface Etat2fa {
+  operateur?: boolean;
+  enrole?: boolean;
+  sessionVerifiee?: boolean;
+}
+function guard(
+  user: { disabledAt?: Date | null } | null = {},
+  etat: Etat2fa = {},
+): PlatformAuthGuard {
+  const lignes: Record<string, unknown> = {
+    user,
+    platform_roles: etat.operateur ? { _id: 'r' } : null,
+    platform_two_factor: etat.enrole ? { userId: USER_ID, status: 'active' } : null,
+    platform_two_factor_sessions: etat.sessionVerifiee ? { userId: USER_ID } : null,
+  };
   const connection = {
-    db: { collection: () => ({ findOne: async () => user }) },
+    db: {
+      collection: (nom: string) => ({
+        findOne: async () => lignes[nom] ?? null,
+        updateOne: async () => ({ modifiedCount: 1 }),
+      }),
+    },
   } as unknown as Connection;
   return new PlatformAuthGuard(new Reflector(), connection);
 }
@@ -129,5 +163,60 @@ describe('PlatformAuthGuard (ADR-0053 § 2.2)', () => {
     const { ctx } = contexte(Routes.prototype.console, Routes);
     const sansBase = new PlatformAuthGuard(new Reflector(), {} as Connection);
     await expect(sansBase.canActivate(ctx)).rejects.toMatchObject({ status: 503 });
+  });
+});
+
+// ── ADR-0053 — P8 : double authentification exigée de tout opérateur ─────────────
+describe('PlatformAuthGuard — double authentification (ADR-0053 P8)', () => {
+  const connecte = { user: { id: USER_ID, email: 'op@lalanda.test', name: 'Op' } };
+  const cookie = { headers: { cookie: 'better-auth.session_token=jeton.signature' } };
+
+  it('compte sans rôle plateforme : pas jugé ici (PermissionsGuard refusera)', async () => {
+    session(connecte);
+    const { ctx } = contexte(Routes.prototype.console, Routes, cookie);
+    await expect(guard({}, {}).canActivate(ctx)).resolves.toBe(true);
+  });
+
+  it('opérateur non enrôlé → 403 PLATFORM_2FA_REQUIRED', async () => {
+    session(connecte);
+    const { ctx } = contexte(Routes.prototype.console, Routes, cookie);
+    await expect(guard({}, { operateur: true }).canActivate(ctx)).rejects.toMatchObject({
+      response: { code: 'PLATFORM_2FA_REQUIRED' },
+      status: 403,
+    });
+  });
+
+  it('opérateur non enrôlé : les routes d’enrôlement restent ouvertes (aucun verrouillage)', async () => {
+    session(connecte);
+    const { ctx } = contexte(Routes.prototype.enrolement, Routes, cookie);
+    await expect(guard({}, { operateur: true }).canActivate(ctx)).resolves.toBe(true);
+  });
+
+  it('opérateur non enrôlé : la ré-authentification ne lui est pas ouverte', async () => {
+    session(connecte);
+    const { ctx } = contexte(Routes.prototype.reauth, Routes, cookie);
+    await expect(guard({}, { operateur: true }).canActivate(ctx)).rejects.toMatchObject({
+      response: { code: 'PLATFORM_2FA_REQUIRED' },
+    });
+  });
+
+  it('enrôlé, session non vérifiée → 401 PLATFORM_2FA_VERIFICATION_REQUIRED, sauf ré-auth', async () => {
+    session(connecte);
+    const etat = { operateur: true, enrole: true };
+    const { ctx } = contexte(Routes.prototype.console, Routes, cookie);
+    await expect(guard({}, etat).canActivate(ctx)).rejects.toMatchObject({
+      response: { code: 'PLATFORM_2FA_VERIFICATION_REQUIRED' },
+      status: 401,
+    });
+    const reauth = contexte(Routes.prototype.reauth, Routes, cookie);
+    await expect(guard({}, etat).canActivate(reauth.ctx)).resolves.toBe(true);
+  });
+
+  it('enrôlé et session vérifiée → passe', async () => {
+    session(connecte);
+    const { ctx } = contexte(Routes.prototype.console, Routes, cookie);
+    await expect(
+      guard({}, { operateur: true, enrole: true, sessionVerifiee: true }).canActivate(ctx),
+    ).resolves.toBe(true);
   });
 });

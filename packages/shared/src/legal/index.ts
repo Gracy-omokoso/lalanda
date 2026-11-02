@@ -31,7 +31,7 @@
  * antérieures deviennent alors périmées et l'accord est redemandé. Une
  * correction de typographie ne la fait PAS avancer.
  */
-export const LEGAL_VERSION = '2026-10-30';
+export const LEGAL_VERSION = '2026-11-03';
 
 /**
  * Versions du corpus ayant réellement existé, la plus ancienne d'abord.
@@ -48,6 +48,10 @@ export const KNOWN_LEGAL_VERSIONS: readonly string[] = [
   // Premier corpus publié (S22c), éditeur : Televerx LLC.
   '2026-08-09',
   // Changement d'éditeur : Go freelance SARLU, droit congolais (ADR-0043).
+  '2026-10-30',
+  // Décisions du 3 nov. 2026 (ADR-0054) : CGV applicables (paiement manuel, essai,
+  // impayés, octrois, administration de la plateforme), confidentialité (pointage,
+  // évaluations, frais, prospects, journal et statistiques de la plateforme).
   LEGAL_VERSION,
 ] as const;
 

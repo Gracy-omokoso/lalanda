@@ -1617,6 +1617,24 @@ export interface PlatformAccessView {
   // (`PLATFORM_ACTIONS`). Seule vérité des modules de la console ; les drapeaux
   // ci-dessus restent servis une version (P0) et ne décident plus de la navigation.
   actions: PlatformAction[];
+  // ADR-0053 — P8 : état de la double authentification de la console.
+  twoFactor: PlatformTwoFactorStatus;
+}
+
+// ── ADR-0053 — P8 : double authentification de la console ────────────────────
+import type { PlatformTwoFactorStatus } from '@lalanda/shared/platform';
+
+/** `POST /admin/two-factor/enrollment` : QR code (image `data:`), URI et clé manuelle. */
+export interface PlatformTwoFactorEnrollmentStart {
+  otpauthUri: string;
+  qrCodeDataUrl: string;
+  manualKey: string;
+}
+
+/** Second facteur : un code TOTP OU un code de secours. */
+export interface PlatformSecondFactor {
+  code?: string;
+  backupCode?: string;
 }
 
 export interface PlatformOverview {
@@ -3753,10 +3771,11 @@ export const api = {
 
   /** Fenêtre de ré-authentification (ADR-0013 §5) — dix minutes, liée à la session. */
   getReauthStatus: () => jsonRequest<ReauthStatus>(`/admin/reauth`, { method: 'GET' }),
-  confirmReauth: (password: string) =>
+  // ADR-0053 — P8 : mot de passe + code TOTP, ou un code de secours.
+  confirmReauth: (password: string, secondFactor: PlatformSecondFactor = {}) =>
     jsonRequest<{ active: true; expiresAt: string }>(`/admin/reauth`, {
       method: 'POST',
-      body: { password },
+      body: { password, ...secondFactor },
     }),
 
   // ─── Fiscalité et facture normalisée (S25b — ADR-0021 §10) ───
@@ -4272,5 +4291,26 @@ export const api = {
     downloadPdfFrom(
       `/admin/billing/subscription-invoices/${encodeURIComponent(id)}/pdf?kind=${kind}`,
       'facture.pdf',
+    ),
+  // ── ADR-0053 — P8 : double authentification de la console ─────────────────
+  getPlatformTwoFactor: () =>
+    jsonRequest<PlatformTwoFactorStatus>(`/admin/two-factor`, { method: 'GET' }),
+  startPlatformTwoFactorEnrollment: () =>
+    jsonRequest<PlatformTwoFactorEnrollmentStart>(`/admin/two-factor/enrollment`, {
+      method: 'POST',
+    }),
+  /** Rend les 10 codes de secours — UNE seule fois. */
+  confirmPlatformTwoFactorEnrollment: (input: { password?: string; code: string }) =>
+    jsonRequest<{ backupCodes: string[]; status: PlatformTwoFactorStatus }>(
+      `/admin/two-factor/enrollment/confirm`,
+      { method: 'POST', body: input },
+    ),
+  resetPlatformTwoFactor: (
+    userId: string,
+    input: { reasonCategory: AdminReasonCategory; internalNote: string },
+  ) =>
+    jsonRequest<{ reset: true; revokedSessions: number }>(
+      `/admin/users/${encodeURIComponent(userId)}/two-factor/reset`,
+      { method: 'POST', body: input },
     ),
 };

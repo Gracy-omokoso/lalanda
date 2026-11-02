@@ -17,6 +17,8 @@ import request from 'supertest';
 import { expect } from 'vitest';
 
 import { dbOf, makeE2EApp, registerAndLogin } from './e2e-utils.js';
+// ADR-0053 — P8
+import { enrolerDeuxFacteurs } from './platform-2fa-e2e.js';
 
 export const PACK = { slug: 'syscohada-revise-2017-cd', version: 1 } as const;
 
@@ -149,7 +151,7 @@ export async function accountingWorld(
 
 /** Charge le pack v1 (gestionnaire plateforme de test) une fois par base. */
 export async function loadPack(w: AccountingWorld): Promise<void> {
-  if (await w.db.collection('accounting_chart_packs').findOne({ slug: PACK.slug })) return;
+  if (await w.db.collection('accounting_chart_packs').findOne({ ...PACK })) return;
   const pm = `pm-${w.tag}`;
   const cookies = await registerAndLogin(w.app, {
     email: `k5-pack-${w.tag}@lalanda-test.local`,
@@ -168,6 +170,8 @@ export async function loadPack(w: AccountingWorld): Promise<void> {
     createdAt: new Date(),
     updatedAt: new Date(),
   });
+  // ADR-0053 — P8 : le gestionnaire plateforme s'enrôle avant la console.
+  await enrolerDeuxFacteurs(w.app, cookies, 'Passw0rd!compta-k5');
   ok(
     await request(w.app.getHttpServer())
       .post('/accounting/platform/chart-packs')

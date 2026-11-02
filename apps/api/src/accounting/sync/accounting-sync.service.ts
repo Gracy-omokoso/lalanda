@@ -64,6 +64,7 @@ import {
   type AccountingAccountLean,
 } from '../chart/accounting-account.schema.js';
 import { AccountingAccountsService } from '../chart/accounting-accounts.service.js';
+import { suspenseAccountOf } from '../chart/suspense-account.js';
 import type { AccountingEntryLean } from '../entries/accounting-entry.schema.js';
 import {
   AccountingEntryStore,
@@ -116,9 +117,9 @@ import {
 } from './accounting-sync.schema.js';
 
 /**
- * Compte d'attente (§ 6.0). Le pack ne désigne pas encore « le » compte de la classe 47
- * (numéro à fournir par l'expert, ADR-0049 § 2.1.1) : le compte technique `ATTENTE` est
- * employé, signalé comme tel, dans les deux modes, jusqu'à ce que le pack le désigne.
+ * Compte d'attente TECHNIQUE (§ 6.0), signalé comme tel : employé tant que le pack choisi
+ * n'est pas relu ou ne désigne pas son compte d'attente. Un pack relu qui le désigne
+ * (pack v2, amendement du 3 nov. 2026) le remplace : `suspenseAccountOf(pack)`.
  */
 export const ACCOUNTING_SUSPENSE_ACCOUNT = ACCOUNTING_SIMULATION_SUSPENSE_ACCOUNT;
 
@@ -146,6 +147,8 @@ export interface PostingState {
   cutoverDate: string;
   ruleSet: MappingRuleSet | null;
   chartPack: { slug: string; version: number } | null;
+  /** Compte d'attente des écritures nouvelles (`suspenseAccountOf`). */
+  suspenseAccount: string;
   rates: EnteredRate[];
   links: Record<string, string>;
   vatRegistered: boolean;
@@ -303,6 +306,7 @@ export class AccountingSyncService {
       cutoverDate: s.cutoverDate,
       ruleSet,
       chartPack: s.chartPack,
+      suspenseAccount: suspenseAccountOf(pack),
       rates: rates.flatMap((r) => {
         const rate = engineRate(r.rate);
         return rate === null
@@ -583,7 +587,7 @@ export class AccountingSyncService {
     );
     const ctx: PostingContext = {
       ruleSet: state.ruleSet,
-      suspenseAccount: ACCOUNTING_SUSPENSE_ACCOUNT,
+      suspenseAccount: state.suspenseAccount,
       bookCurrency: state.bookCurrency,
       cutoverDate: state.cutoverDate,
       enteredRates: state.rates,

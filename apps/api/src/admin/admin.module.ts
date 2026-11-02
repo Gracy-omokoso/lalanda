@@ -36,6 +36,8 @@ import { AdminAuditModule } from './audit/admin-audit.module.js';
 import { PlatformAnnouncementsModule } from './announcements/announcements.module.js';
 // ADR-0053 — P7 : statistiques et finances du site (`/admin/stats`, `/admin/finance`).
 import { PlatformInsightsModule } from './stats/platform-insights.module.js';
+// ADR-0053 — P8
+import { PlatformTwoFactorController } from './two-factor/platform-two-factor.controller.js';
 
 @Module({
   imports: [
@@ -63,7 +65,13 @@ import { PlatformInsightsModule } from './stats/platform-insights.module.js';
   // `PlatformAccessController` sert `/me/platform-access` et NON `/admin/*` :
   // voir l'en-tête du fichier pour la raison — un utilisateur sans rôle doit
   // pouvoir apprendre qu'il n'en a pas.
-  controllers: [AdminController, PlatformAccessController, PlatformBillingController],
+  controllers: [
+    AdminController,
+    PlatformAccessController,
+    PlatformBillingController,
+    // ADR-0053 — P8
+    PlatformTwoFactorController,
+  ],
   providers: [AdminService, AiUsageService, PlatformMirrorService, PlatformBillingService],
   // `AiUsageService` est exporté pour `AiModule`, qui compte ses propres appels.
   // ADR-0047 : `AdminService` et `PlatformMirrorService` servent la console des factures d'abonnement.

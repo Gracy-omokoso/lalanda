@@ -18,8 +18,10 @@
  * Toute évolution d'un calcul du module comptable incrémente cette version.
  * 1.1.0 (ADR-0051 H13) : dépenses possédées par les RH comptabilisées ; motif
  * d'attente `SETTLED_BY_EMPLOYEE_ADVANCE` ; clés `hr.advance.*` sans règle.
+ * 1.2.0 (ADR-0049, amendement du 3 nov. 2026) : une règle validée visant une clé
+ * `hr.advance.*` s'applique ; sans elle, le motif H13 demeure.
  */
-export const ACCOUNTING_VERSION = '1.1.0';
+export const ACCOUNTING_VERSION = '1.2.0';
 
 /** Devises des pièces et monnaies de tenue admises (ADR-0049 § 2.2). */
 export const ACCOUNTING_CURRENCIES = ['CDF', 'USD'] as const;

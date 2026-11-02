@@ -25,7 +25,7 @@
 // porte : seule la session qui a saisi le mot de passe obtient la fenêtre.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { ObjectId } from 'mongodb';
 import { createHash } from 'node:crypto';
@@ -33,6 +33,11 @@ import type { Connection, Model } from 'mongoose';
 
 import { getAuth } from '../auth/auth.js';
 import { PlatformReauth, type PlatformReauthDocument } from './reauth.schema.js';
+// ADR-0053 — P8
+import {
+  PlatformTwoFactorService,
+  type SecondFactorInput,
+} from '../platform-two-factor/platform-two-factor.service.js';
 
 /** Durée de la fenêtre d'écriture ouverte par une ré-authentification (ADR-0013 §5). */
 export const REAUTH_WINDOW_MS = 10 * 60_000;
@@ -81,6 +86,8 @@ export class ReauthService {
   constructor(
     @InjectModel(PlatformReauth.name) private readonly model: Model<PlatformReauthDocument>,
     @InjectConnection() private readonly connection: Connection,
+    // ADR-0053 — P8 : second facteur de la ré-authentification de console.
+    @Inject(PlatformTwoFactorService) private readonly twoFactor: PlatformTwoFactorService,
   ) {}
 
   /**
@@ -129,6 +136,9 @@ export class ReauthService {
     userId: string;
     headers: Headers;
     cookieHeader: string | undefined;
+    /** ADR-0053 — P8 : exigé par la ré-authentification de la CONSOLE. */
+    secondFactor?: SecondFactorInput;
+    requireSecondFactor?: boolean;
   }): Promise<{ expiresAt: Date }> {
     const fingerprint = sessionFingerprint(input.cookieHeader);
     if (!fingerprint) {
@@ -159,14 +169,99 @@ export class ReauthService {
       });
     }
 
+    const secondFactor = await this.secondFactorOf(input, fingerprint);
     await this.model
       .findOneAndUpdate(
         { userId: input.userId, sessionFingerprint: fingerprint },
-        { $set: { confirmedAt: now, expiresAt }, $setOnInsert: { _schemaVersion: 1 } },
+        {
+          $set: { confirmedAt: now, expiresAt, secondFactor },
+          $setOnInsert: { _schemaVersion: 1 },
+        },
         { upsert: true, new: true },
       )
       .exec();
     return { expiresAt };
+  }
+
+  // ── ADR-0053 — P8 : second facteur ──────────────────────────────────────────
+
+  /**
+   * Juge le second facteur APRÈS la preuve de présence (mot de passe ou connexion Google
+   * récente) : jamais un code compté contre un mot de passe faux.
+   *
+   * - console (`requireSecondFactor`) : code TOTP ou de secours obligatoire ; la session
+   *   est marquée vérifiée (elle ouvre la console 12 heures) ;
+   * - espace organisation (`/me/reauth`) : aucun code exigé ; un code fourni par un
+   *   opérateur enrôlé est jugé et vaut alors aussi pour la console.
+   */
+  private async secondFactorOf(
+    input: { userId: string; secondFactor?: SecondFactorInput; requireSecondFactor?: boolean },
+    fingerprint: string,
+  ): Promise<boolean> {
+    const supplied =
+      (input.secondFactor?.code ?? '') !== '' || (input.secondFactor?.backupCode ?? '') !== '';
+    if (!input.requireSecondFactor && !supplied) return false;
+    if (!input.requireSecondFactor && !(await this.twoFactor.isEnrolled(input.userId))) {
+      return false;
+    }
+    await this.twoFactor.verifySecondFactor(input.userId, input.secondFactor ?? {});
+    await this.twoFactor.markSessionVerified(input.userId, fingerprint);
+    return true;
+  }
+
+  /**
+   * Preuve de présence SANS ouvrir de fenêtre (enrôlement de la double authentification) :
+   * mot de passe pour un compte qui en a un, connexion Google de moins de 10 minutes sinon.
+   */
+  async provePresence(input: {
+    userId: string;
+    headers: Headers;
+    cookieHeader: string | undefined;
+    password?: string | undefined;
+  }): Promise<void> {
+    if (!sessionFingerprint(input.cookieHeader)) {
+      throw new UnauthorizedException({ code: 'NOT_AUTHENTICATED' });
+    }
+    if ((await this.methodOf(input.userId)) === 'password') {
+      if (!(await this.passwordIsValid(input.headers, input.password ?? ''))) {
+        throw new UnauthorizedException({
+          code: 'INVALID_PASSWORD',
+          message: 'Mot de passe incorrect.',
+        });
+      }
+      return;
+    }
+    const session = (await getAuth().api.getSession({ headers: input.headers })) as {
+      user?: { id?: unknown };
+      session?: { createdAt?: unknown };
+    } | null;
+    const createdAt = toDate(session?.session?.createdAt);
+    const fresh =
+      session?.user &&
+      String(session.user.id) === input.userId &&
+      createdAt !== null &&
+      Date.now() - createdAt.getTime() < REAUTH_WINDOW_MS;
+    if (!fresh) {
+      throw new UnauthorizedException({
+        code: 'REAUTH_GOOGLE_REQUIRED',
+        message: 'Reconnectez-vous avec Google, puis recommencez.',
+        windowMs: REAUTH_WINDOW_MS,
+      });
+    }
+  }
+
+  private async passwordIsValid(headers: Headers, password: string): Promise<boolean> {
+    if (password === '') return false;
+    try {
+      const res = (await getAuth().api.verifyPassword({
+        body: { password },
+        headers,
+      })) as { status?: boolean } | null;
+      return res?.status === true;
+    } catch {
+      // better-auth lève sur mot de passe invalide — traité comme un refus.
+      return false;
+    }
   }
 
   /**
@@ -182,23 +277,16 @@ export class ReauthService {
     headers: Headers;
     cookieHeader: string | undefined;
     password: string;
+    /** ADR-0053 — P8 : exigé par la ré-authentification de la CONSOLE. */
+    secondFactor?: SecondFactorInput;
+    requireSecondFactor?: boolean;
   }): Promise<{ expiresAt: Date }> {
     const fingerprint = sessionFingerprint(input.cookieHeader);
     if (!fingerprint) {
       throw new UnauthorizedException({ code: 'NOT_AUTHENTICATED' });
     }
 
-    let ok = false;
-    try {
-      const res = (await getAuth().api.verifyPassword({
-        body: { password: input.password },
-        headers: input.headers,
-      })) as { status?: boolean } | null;
-      ok = res?.status === true;
-    } catch {
-      // better-auth lève sur mot de passe invalide — traité comme un refus.
-      ok = false;
-    }
+    const ok = await this.passwordIsValid(input.headers, input.password);
     if (!ok) {
       throw new UnauthorizedException({
         code: 'INVALID_PASSWORD',
@@ -206,33 +294,53 @@ export class ReauthService {
       });
     }
 
+    const secondFactor = await this.secondFactorOf(input, fingerprint);
     const now = new Date();
     const expiresAt = new Date(now.getTime() + REAUTH_WINDOW_MS);
     await this.model
       .findOneAndUpdate(
         { userId: input.userId, sessionFingerprint: fingerprint },
-        { $set: { confirmedAt: now, expiresAt }, $setOnInsert: { _schemaVersion: 1 } },
+        {
+          $set: { confirmedAt: now, expiresAt, secondFactor },
+          $setOnInsert: { _schemaVersion: 1 },
+        },
         { upsert: true, new: true },
       )
       .exec();
     return { expiresAt };
   }
 
-  /** Fenêtre ouverte pour cette session ? Sinon `401 REAUTH_REQUIRED`. */
-  async assertRecent(userId: string, cookieHeader: string | undefined): Promise<void> {
+  /**
+   * Fenêtre ouverte pour cette session ? Sinon `401 REAUTH_REQUIRED`.
+   *
+   * ADR-0053 — P8 : `secondFactor: true` (écritures de la console) n'accepte qu'une
+   * fenêtre ouverte avec le code TOTP ou un code de secours.
+   */
+  async assertRecent(
+    userId: string,
+    cookieHeader: string | undefined,
+    opts: { secondFactor?: boolean } = {},
+  ): Promise<void> {
     const fingerprint = sessionFingerprint(cookieHeader);
     const row = fingerprint
       ? await this.model
-          .findOne({ userId, sessionFingerprint: fingerprint, expiresAt: { $gt: new Date() } })
+          .findOne({
+            userId,
+            sessionFingerprint: fingerprint,
+            expiresAt: { $gt: new Date() },
+            ...(opts.secondFactor ? { secondFactor: true } : {}),
+          })
           .lean()
           .exec()
       : null;
     if (!row) {
       throw new UnauthorizedException({
         code: 'REAUTH_REQUIRED',
-        message:
-          'Ré-authentification requise : saisissez votre mot de passe pour ouvrir une ' +
-          'fenêtre de 10 minutes.',
+        message: opts.secondFactor
+          ? 'Ré-authentification requise : saisissez votre mot de passe et le code de votre ' +
+            'application d’authentification pour ouvrir une fenêtre de 10 minutes.'
+          : 'Ré-authentification requise : saisissez votre mot de passe pour ouvrir une ' +
+            'fenêtre de 10 minutes.',
         windowMs: REAUTH_WINDOW_MS,
       });
     }
@@ -242,11 +350,18 @@ export class ReauthService {
   async statusOf(
     userId: string,
     cookieHeader: string | undefined,
+    // ADR-0053 — P8 : la console ne compte que les fenêtres ouvertes avec le code.
+    opts: { secondFactor?: boolean } = {},
   ): Promise<{ active: boolean; expiresAt: string | null }> {
     const fingerprint = sessionFingerprint(cookieHeader);
     if (!fingerprint) return { active: false, expiresAt: null };
     const row = await this.model
-      .findOne({ userId, sessionFingerprint: fingerprint, expiresAt: { $gt: new Date() } })
+      .findOne({
+        userId,
+        sessionFingerprint: fingerprint,
+        expiresAt: { $gt: new Date() },
+        ...(opts.secondFactor ? { secondFactor: true } : {}),
+      })
       .lean()
       .exec();
     return row

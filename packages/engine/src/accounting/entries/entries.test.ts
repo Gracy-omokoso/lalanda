@@ -915,16 +915,13 @@ describe('ADR-0051 H13 — dépenses possédées par les RH (§ 7.4, amendement 
     expect(e.suspense).toBe(true);
   });
 
-  it('clés `hr.advance.*` : au catalogue, toujours en attente, même avec une règle ou sans jeu validé', () => {
+  it('clés `hr.advance.*` : au catalogue ; règle validée appliquée (1.2.0), sinon attente au motif H13', () => {
     for (const key of ['hr.advance.settled', 'hr.advance.disbursed', 'hr.advance.returned']) {
       expect(isOperationKey(key)).toBe(true);
     }
     expect(isOperationKey('hr.advance.salary')).toBe(false);
     const withRule = ruleSet([...SALES_RULES, rule('hr.advance.settled', [], ['4250'])]);
-    expect(resolveRule(withRule, 'hr.advance.settled')).toEqual({
-      status: 'suspense',
-      reason: 'SETTLED_BY_EMPLOYEE_ADVANCE',
-    });
+    expect(resolveRule(withRule, 'hr.advance.settled')).toMatchObject({ status: 'rule' });
     expect(resolveRule(null, 'hr.advance.settled')).toEqual({
       status: 'suspense',
       reason: 'SETTLED_BY_EMPLOYEE_ADVANCE',
@@ -933,10 +930,20 @@ describe('ADR-0051 H13 — dépenses possédées par les RH (§ 7.4, amendement 
       status: 'suspense',
       reason: 'NATURE_UNKNOWN',
     });
+    const toReview = ruleSet([
+      ...SALES_RULES,
+      { ...rule('hr.advance.settled', [], ['4250']), requiresReview: true },
+    ]);
+    expect(resolveRule(toReview, 'hr.advance.settled')).toEqual({
+      status: 'suspense',
+      reason: 'SETTLED_BY_EMPLOYEE_ADVANCE',
+    });
     const e = only(
       entriesForExpense(report({ accountId: null }, 'av1'), context({ ruleSet: withRule })).entries,
     );
-    expect(e.lines.find((l) => l.side === 'credit')?.accountNumber).toBe(SUSPENSE);
+    const credit = e.lines.find((l) => l.side === 'credit');
+    expect(credit?.accountNumber).toBe('4250');
+    expect(credit?.suspenseReason).toBeNull();
   });
 
   it('note de frais sans compte ni avance : attente `NO_TREASURY_ACCOUNT` et « À comptabiliser »', () => {

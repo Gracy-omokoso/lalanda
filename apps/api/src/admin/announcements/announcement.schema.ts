@@ -25,6 +25,8 @@ export const ANNOUNCEMENT_STATUSES = [
   'approved',
   'sent',
   'canceled',
+  // ADR-0054 (3 nov. 2026) : une annonce envoyée peut être retirée, avec motif.
+  'withdrawn',
 ] as const;
 export type AnnouncementStatus = (typeof ANNOUNCEMENT_STATUSES)[number];
 
@@ -103,6 +105,17 @@ export class PlatformAnnouncement {
 
   @Prop({ type: Date, default: null })
   canceledAt!: Date | null;
+
+  /** Retrait d'une annonce ENVOYÉE (ADR-0054) : elle disparaît de la bannière et de la cloche. */
+  @Prop({ type: String, default: null })
+  withdrawnBy!: string | null;
+
+  @Prop({ type: Date, default: null })
+  withdrawnAt!: Date | null;
+
+  /** Motif interne, obligatoire ; jamais montré au destinataire. */
+  @Prop({ type: String, default: null })
+  withdrawReason!: string | null;
 
   @Prop({ type: Number, required: true, default: ANNOUNCEMENT_SCHEMA_VERSION })
   _schemaVersion!: number;

@@ -51,6 +51,9 @@ const SANS_ORGANISATION: Readonly<Record<string, string>> = {
   platform_announcement_receipts: 'accusés de réception d’une annonce, par personne',
   platform_security_counters:
     'compteurs agrégés d’événements de sécurité de la plateforme (aucune organisation, aucun identifiant)',
+  // ADR-0053 — P8 : double authentification des opérateurs, par personne et par session.
+  platform_two_factor: 'double authentification d’un opérateur (secret chiffré, codes hachés)',
+  platform_two_factor_sessions: 'sessions de console vérifiées par un code, par opérateur',
   // ADR-0047 : désignation de l'organisation vendeuse des abonnements (réglage plateforme).
   platform_subscription_invoice_settings:
     'organisation vendeuse des abonnements Lalanda (réglage de plateforme, une ligne)',

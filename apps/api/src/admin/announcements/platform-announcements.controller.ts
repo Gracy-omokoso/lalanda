@@ -8,6 +8,8 @@
 //
 // Ré-authentification (§ 2.4, « toute écriture de la console ») : toutes les écritures,
 // sauf l'aperçu, qui ne fait que COMPTER. Approbation et envoi : `platform.announcements.approve`.
+// Retrait d'une annonce envoyée (ADR-0054) : tout opérateur des annonces, motif et
+// ré-authentification.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import {
@@ -44,7 +46,7 @@ import {
   type AdminAnnouncementView,
 } from './platform-announcements.service.js';
 
-/** Annuler : motif interne obligatoire (§ 2.4, un motif par écriture). */
+/** Annuler ou retirer : motif interne obligatoire (§ 2.4, un motif par écriture). */
 const CancelAnnouncementInputSchema = z
   .object({
     reason: z
@@ -166,5 +168,22 @@ export class PlatformAnnouncementsController {
       throw invalidBody(parsed.error, 'Motif d’annulation requis (dix caractères au moins).');
     }
     return this.announcements.cancel(id, parsed.data.reason, await this.actorOf(req));
+  }
+
+  /** ADR-0054 : retirer une annonce ENVOYÉE (motif interne, ré-authentification). */
+  @Post(':id/withdraw')
+  @RequirePlatformAction('platform.announcements.draft')
+  @RequireRecentReauth()
+  @HttpCode(200)
+  async withdraw(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ): Promise<AdminAnnouncementView> {
+    const parsed = CancelAnnouncementInputSchema.safeParse(body ?? {});
+    if (!parsed.success) {
+      throw invalidBody(parsed.error, 'Motif du retrait requis (dix caractères au moins).');
+    }
+    return this.announcements.withdraw(id, parsed.data.reason, await this.actorOf(req));
   }
 }

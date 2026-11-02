@@ -14,6 +14,8 @@ import request from 'supertest';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 
 import { dbOf, e2eSuite, makeE2EApp, registerAndLogin } from './e2e-utils.js';
+// ADR-0053 — P8 : les gestionnaires plateforme s'enrôlent avant la console.
+import { enrolerDeuxFacteurs } from './platform-2fa-e2e.js';
 import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 const ROLES = [
@@ -114,6 +116,7 @@ e2eSuite('comptabilité — référentiel et réglages (ADR-0049, K4)', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       });
+      await enrolerDeuxFacteurs(app, cookies[who]!, 'Passw0rd!compta-k4');
     }
     // Pack chargé par un autre essai sur la même base : on repart du chargement.
     await db.collection('accounting_chart_packs').deleteMany({ slug: PACK.slug });

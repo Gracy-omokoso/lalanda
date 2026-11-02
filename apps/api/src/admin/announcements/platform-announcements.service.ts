@@ -12,6 +12,12 @@
 // et la cloche le lisent par `/me/announcements`. Ce service n'injecte AUCUN service
 // d'e-mail : aucun envoi de masse externe n'est possible depuis ici.
 //
+// Retrait (ADR-0054, décision du 3 nov. 2026) : une annonce ENVOYÉE peut être retirée
+// par un opérateur, avec motif et ré-authentification. La transition `sent → withdrawn`
+// est atomique ; les accusés sont échus à l'instant du retrait (rien n'est effacé) et
+// la lecture du destinataire ne joint que les annonces `sent` : l'annonce disparaît de
+// la bannière et de la cloche, même pour qui l'avait déjà lue.
+//
 // Journal : chaque étape écrit un événement au journal PLATEFORME (acteur réel, rôles
 // relus). Une annonce ne touche aucune organisation en particulier : pas de miroir.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -94,6 +100,8 @@ export interface AdminAnnouncementView {
   recipientCount: number | null;
   expiresAt: string | null;
   canceledAt: string | null;
+  withdrawnBy: string | null;
+  withdrawnAt: string | null;
   createdAt: string;
 }
 
@@ -198,8 +206,8 @@ export class PlatformAnnouncementsService {
   /** Aperçu : le NOMBRE de destinataires, jamais leurs adresses. */
   async preview(id: string, actor: AdminActor): Promise<AdminAnnouncementView> {
     const doc = await this.load(id);
-    if (doc.status === 'sent' || doc.status === 'canceled') {
-      throw wrongStatus(doc.status, 'Annonce déjà envoyée ou annulée.');
+    if (doc.status === 'sent' || doc.status === 'canceled' || doc.status === 'withdrawn') {
+      throw wrongStatus(doc.status, 'Annonce déjà envoyée, annulée ou retirée.');
     }
     const count = (await this.resolveAudience(doc.audience)).length;
     doc.previewCount = count;
@@ -351,8 +359,11 @@ export class PlatformAnnouncementsService {
 
   async cancel(id: string, reason: string, actor: AdminActor): Promise<AdminAnnouncementView> {
     const doc = await this.load(id);
-    if (doc.status === 'sent' || doc.status === 'canceled') {
-      throw wrongStatus(doc.status, 'Une annonce envoyée ou annulée ne s’annule plus.');
+    if (doc.status === 'sent' || doc.status === 'canceled' || doc.status === 'withdrawn') {
+      throw wrongStatus(
+        doc.status,
+        'Une annonce envoyée, annulée ou retirée ne s’annule plus (une annonce envoyée se retire).',
+      );
     }
     const from = doc.status;
     doc.status = 'canceled';
@@ -364,6 +375,52 @@ export class PlatformAnnouncementsService {
       internalNote: reason,
     });
     return toAdminView(doc);
+  }
+
+  /**
+   * Retire une annonce ENVOYÉE (ADR-0054). Motif interne obligatoire ; idempotent au sens
+   * où un second retrait répond `409 ANNOUNCEMENT_WRONG_STATUS` sans rien réécrire.
+   */
+  async withdraw(
+    id: string,
+    reason: string,
+    actor: AdminActor,
+    now: Date = new Date(),
+  ): Promise<AdminAnnouncementView> {
+    const doc = await this.load(id);
+    if (doc.status !== 'sent') {
+      throw wrongStatus(
+        doc.status,
+        'Seule une annonce envoyée se retire ; avant l’envoi, annulez-la.',
+      );
+    }
+    const claimed = await this.announcements
+      .findOneAndUpdate(
+        { _id: doc._id, status: 'sent' },
+        {
+          $set: {
+            status: 'withdrawn',
+            withdrawnBy: actor.userId,
+            withdrawnAt: now,
+            withdrawReason: reason,
+          },
+        },
+        { new: true },
+      )
+      .exec();
+    if (!claimed) throw wrongStatus('withdrawn', 'Annonce déjà retirée.');
+    const expired = await this.receipts
+      .updateMany(
+        { announcementId: String(claimed._id), expiresAt: { $gt: now } },
+        { $set: { expiresAt: now } },
+      )
+      .exec();
+    await this.record(actor, 'platform.announcement.withdrawn', claimed, {
+      internalNote: reason,
+      recipientCount: claimed.recipientCount ?? null,
+      receiptsClosed: expired.modifiedCount,
+    });
+    return toAdminView(claimed);
   }
 
   // ── Destinataire ───────────────────────────────────────────────────────────
@@ -659,6 +716,8 @@ function toAdminView(d: PlatformAnnouncementDocument): AdminAnnouncementView {
     recipientCount: d.recipientCount ?? null,
     expiresAt: iso(d.expiresAt),
     canceledAt: iso(d.canceledAt),
+    withdrawnBy: d.withdrawnBy ?? null,
+    withdrawnAt: iso(d.withdrawnAt),
     createdAt: d.createdAt.toISOString(),
   };
 }

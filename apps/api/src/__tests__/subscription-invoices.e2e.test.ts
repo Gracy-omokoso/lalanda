@@ -35,6 +35,8 @@ import { PdfRenderingService } from '../reports/pdf-rendering.service.js';
 import { SubscriptionInvoicingService } from '../subscription-invoices/subscription-invoicing.service.js';
 import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 import { dbOf, e2eSuite, makeE2EApp, registerAndLogin, teardown } from './e2e-utils.js';
+// ADR-0053 — P8 : tout opérateur s'enrôle ; ré-authentification = mot de passe + code.
+import { corpsReauth, enrolerDeuxFacteurs } from './platform-2fa-e2e.js';
 
 const WEBHOOK_SECRET = 'whsec_e2e_adr0047_secret_de_test';
 process.env['LALANDA_STRIPE_RESTRICTED_KEY'] = 'rk_test_e2e_adr0047';
@@ -113,7 +115,7 @@ e2eSuite('ADR-0047 — factures des abonnements Lalanda', () => {
     const res = await request(serveur())
       .post('/admin/reauth')
       .set('Cookie', cookies[cle]!)
-      .send({ password: compte(cle).password });
+      .send(await corpsReauth(app, db, cookies[cle]!, compte(cle).password));
     expect(res.status, JSON.stringify(res.body)).toBe(201);
   };
   const client = () => [...cookies['client']!, `active_org_id=${orgClient}`];
@@ -202,6 +204,8 @@ e2eSuite('ADR-0047 — factures des abonnements Lalanda', () => {
       ids[cle] = await idDeSession(cookies[cle]);
       await db.collection('memberships').deleteMany({ userId: ids[cle] });
       await poserRole(ids[cle]!, role);
+      viderLimiteur();
+      await enrolerDeuxFacteurs(app, cookies[cle]!, compte(cle).password);
     }
   }, E2E_HOOK_TIMEOUT_MS);
 

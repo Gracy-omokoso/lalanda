@@ -3,6 +3,7 @@
 // `validateChartPack` ne lève pas : il rend la liste des défauts, pour que l'API (K4)
 // puisse les afficher. `parseChartPack` (parse.ts) refuse tout pack qui en a un.
 
+import { isOperationKey } from '../rules/operation-keys.js';
 import { RULE_TOKENS, TO_CONFIRM_MENTION, type ChartPack, type Confirmation } from './schema.js';
 
 export type ChartPackIssueCode =
@@ -22,7 +23,9 @@ export type ChartPackIssueCode =
   | 'AUXILIARY_NOT_COLLECTIVE'
   | 'UNKNOWN_ACCOUNT_IN_RULE'
   | 'RULE_WITHOUT_LINES'
+  | 'UNKNOWN_OPERATION_KEY_IN_RULE'
   | 'UNKNOWN_ACCOUNT_IN_TEMPLATE'
+  | 'UNKNOWN_SUSPENSE_ACCOUNT'
   | 'APPROVED_WITH_TO_CONFIRM'
   | 'APPROVED_WITHOUT_REVIEW'
   | 'APPROVED_WITH_EXPECTED_ACCOUNTS'
@@ -151,6 +154,13 @@ export function validateChartPack(pack: ChartPack): ChartPackIssue[] {
   pack.proposedRules.forEach((r, i) => {
     const path = `proposedRules.${i}`;
     checkConfirmable(r, path);
+    if (!isOperationKey(r.key)) {
+      add(
+        'UNKNOWN_OPERATION_KEY_IN_RULE',
+        `${path}.key`,
+        `clé d'opération inconnue du moteur : « ${r.key} »`,
+      );
+    }
     if (r.debit.length === 0 || r.credit.length === 0) {
       add('RULE_WITHOUT_LINES', path, 'une règle vise au moins un compte au débit et au crédit');
     }
@@ -185,6 +195,16 @@ export function validateChartPack(pack: ChartPack): ChartPackIssue[] {
         }
       });
     });
+  }
+
+  // ─── Compte d'attente désigné (§ 6.0) ──────────────────────
+  const suspense = pack.suspenseAccount ?? null;
+  if (suspense !== null && !accountNumbers.has(suspense)) {
+    add(
+      'UNKNOWN_SUSPENSE_ACCOUNT',
+      'suspenseAccount',
+      `le compte d'attente désigné est absent du pack : « ${suspense} »`,
+    );
   }
 
   // ─── Pack complet : approved, active, retired ──────────────

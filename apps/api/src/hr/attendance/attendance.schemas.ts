@@ -1,7 +1,7 @@
 // Pointages et demandes de correction (ADR-0051 § 2.3). ADR-0051 — H12.
 //
 // `hr_attendance_events` : AJOUT SEUL. Un pointage n'est jamais modifié ni effacé (hors
-// purge réglée, aucune aujourd'hui) ; une correction approuvée l'annule en posant
+// purge de conservation, `HrAttendanceRetentionJob`, ADR-0054 : 5 ans par défaut) ; une correction approuvée l'annule en posant
 // `voidedBy` et écrit les pointages proposés (`source: 'correction'`). AUCUNE adresse
 // IP, position, photo, empreinte ni identifiant d'appareil (O4) : le schéma est strict.
 //

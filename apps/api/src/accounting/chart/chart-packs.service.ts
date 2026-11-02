@@ -337,6 +337,7 @@ function detailOf(d: AccountingChartPackLean): AccountingChartPackDetail {
     expectedAccounts: c.expectedAccounts.map((e) => ({ ...e })),
     statementTemplates: { ...c.statementTemplates },
     proposedRules: c.proposedRules.map((r) => ({ ...r, mention: mention(r.confirmation) })),
+    suspenseAccount: c.suspenseAccount ?? null,
     review: c.review === null ? null : { ...c.review },
     history: d.history.map((h) => ({
       action: h.action,

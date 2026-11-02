@@ -2005,6 +2005,44 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
       }
     }
   }, 120_000);
+  // ───────────────────────────────────────────────────────────────────────────
+  // ADR-0053 — P8 : double authentification de la console. Aucun rôle d'organisation
+  // ne s'enrôle ni ne réinitialise ; la double authentification ne leur est pas imposée.
+  // ───────────────────────────────────────────────────────────────────────────
+
+  it('ADR-0053 P8 — aucun rôle d’organisation n’ouvre l’enrôlement ni la réinitialisation ; non imposée', async () => {
+    const s = serveur();
+    const factice = '0123456789abcdef01234567';
+    const sondes: Array<[string, string, PlatformAction]> = [
+      ['get', '/admin/two-factor', 'platform.console.read'],
+      ['post', '/admin/two-factor/enrollment', 'platform.console.read'],
+      ['post', '/admin/two-factor/enrollment/confirm', 'platform.console.read'],
+      ['post', `/admin/users/${factice}/two-factor/reset`, 'platform.roles.manage'],
+    ];
+    const { ThrottlerStorage } = await import('@nestjs/throttler');
+    const store = app.get(ThrottlerStorage) as unknown as {
+      storage: Map<string, unknown>;
+      timeoutIds: Map<string, NodeJS.Timeout[]>;
+    };
+    for (const role of ROLES_TESTES) {
+      for (const t of store.timeoutIds.values()) t.forEach(clearTimeout);
+      store.timeoutIds.clear();
+      store.storage.clear();
+      for (const [verbe, chemin, action] of sondes) {
+        const req = request(s) as unknown as Record<string, (p: string) => request.Test>;
+        const res = await req[verbe]!(chemin)
+          .set('Cookie', cookiesDe(role))
+          .send({ code: '123456', reasonCategory: 'request', internalNote: 'sonde rbac p8' });
+        expect(res.status, `${role} × ${verbe} ${chemin}`).toBe(403);
+        expect(res.body, `${role} × ${verbe} ${chemin}`).toMatchObject({
+          code: 'FORBIDDEN',
+          action,
+        });
+      }
+      const acces = await request(s).get('/me/platform-access').set('Cookie', cookiesDe(role));
+      expect(acces.body.twoFactor, role).toMatchObject({ required: false, enrolled: false });
+    }
+  }, 120_000);
 
   // ───────────────────────────────────────────────────────────────────────────
   // ADR-0047 : factures des abonnements. Dans l'organisation, seul `billing.manage`

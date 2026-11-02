@@ -104,7 +104,7 @@ export const OPERATION_KEY_FAMILIES: readonly {
     section: '6.7',
   },
   { pattern: /^exchange\.difference$/, example: 'exchange.difference', section: '5' },
-  // ADR-0051 — H13 (§ 7.4) : avances au personnel, clés SANS règle (question C2).
+  // ADR-0051 — H13 (§ 7.4) : avances au personnel ; règle admise depuis le 3 nov. 2026.
   {
     pattern: new RegExp(`^hr\\.advance\\.(${alt(['disbursed', 'returned', 'settled'])})$`),
     example: 'hr.advance.settled',
@@ -125,15 +125,19 @@ export function isOperationKey(value: unknown): value is string {
 export const ALWAYS_SUSPENSE_KEYS = ['other_in.counterpart', 'other_out.counterpart'] as const;
 
 /**
- * ADR-0051 — H13 (§ 7.4) : clés des avances au personnel, TOUJOURS au compte
- * d'attente avec leur motif, qu'un jeu de règles soit validé ou non : aucune règle
- * n'est admise tant que l'expert n'a pas répondu (question C2), et le motif dit à
- * l'expert ce qu'il reclasse.
+ * ADR-0051 — H13 (§ 7.4) : motif d'attente des clés des avances au personnel, quand
+ * aucune règle validée applicable ne les vise. Le motif dit à l'expert ce qu'il
+ * reclasse.
  * - `hr.advance.settled` : contrepartie d'une dépense de note de frais soldée par une
  *   avance (dépense sans compte, l'argent est sorti au versement) ;
  * - `hr.advance.disbursed`, `hr.advance.returned` : versement et retour en espèces,
  *   réservées ; le mouvement `other_out` / `other_in` va aujourd'hui en attente par
  *   `other_*.counterpart` (ADR-0049 § 6.6).
+ *
+ * Amendement du 3 nov. 2026 (ADR-0049, pack v2, `ACCOUNTING_VERSION` 1.2.0) : le
+ * blocage « jamais appliquée » de H13 est levé ; une règle validée par l'organisation
+ * (proposée par le pack v2 : compte du personnel, avances et acomptes) s'applique comme
+ * toute autre.
  */
 export const HR_ADVANCE_SUSPENSE: Readonly<Record<string, SuspenseReason>> = Object.freeze({
   'hr.advance.settled': 'SETTLED_BY_EMPLOYEE_ADVANCE',

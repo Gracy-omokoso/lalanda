@@ -33,6 +33,45 @@ l'expert-comptable** (§ Questions pour l'expert-comptable) et reste inactif tan
 > `purchases/`, `stock/`, `assets/`, `hr/` ni du circuit DGI ne change. **N'écrit jamais** dans
 > `actual_periods` ni dans un plan (règle centrale de docs/08, § 7).
 
+## Amendement du 3 novembre 2026 — pack v2 adopté par décision de la dirigeante
+
+**Décision** (Gracy Omokoso, dirigeante, 3 nov. 2026) : « ne perdons pas le temps, fais ce qui s'applique
+en RDC Congo et nous allons améliorer au fur et à mesure avec les experts. Aucun client n'a encore
+commencé à utiliser Lalanda. » Elle tranche les questions en attente sur les règles du plan comptable,
+les comptes de capitaux propres et le traitement des acomptes et des avances. Référentiel : SYSCOHADA
+révisé (AUDCIF du 26 janvier 2017 et son Plan comptable général OHADA).
+
+Ce qui change :
+
+1. **Pack v2** `syscohada-revise-2017-cd@2`, au statut `approved` : 9 classes, 60 comptes retenus parce
+   que l'équipe est sûre de leur numéro et de leur intitulé, chacun `sourced` (source `audcif-2017`) avec
+   la note « décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable » ; `review`
+   renseigne la décision, **pas** une relecture d'expert. Modèles du bilan et du compte de résultat
+   (système normal) ; tableau des flux toujours non fourni (E8). Le v1 reste `draft`, inchangé.
+   Comptes écartés par doute et points à revoir : `docs/comptabilite/relecture-pack-syscohada-v2.md`.
+2. **Compte d'attente désigné** : champ `suspenseAccount` du pack (471 au v2), contrôlé par
+   `validateChartPack` (`UNKNOWN_SUSPENSE_ACCOUNT`). Quand le pack choisi est `approved` ou `active` et le
+   désigne, il remplace le compte technique `ATTENTE` pour les écritures nouvelles (§ 6.0) ; les réserves,
+   le rapprochement et l'indicateur d'attente lisent les deux.
+3. **Jeu de règles par défaut v1** : 245 règles proposées par le pack, une par clé connue (hors `stock.*`,
+   E4) ; 75 « à revoir » (`requiresReview`), jamais appliquées, vont au compte d'attente avec leur motif.
+   Acomptes clients et encaissements non imputés → 4191 ; avances fournisseurs → 4091 ; avances au
+   personnel → 421. Une clé de règle proposée doit appartenir au catalogue du moteur
+   (`UNKNOWN_OPERATION_KEY_IN_RULE`) ; les capitales sont admises (groupes, moyens de règlement).
+4. **Amende ADR-0051 § 7.4 (H13)** : une règle validée visant une clé `hr.advance.*` s'applique ; sans
+   elle, le motif propre (`SETTLED_BY_EMPLOYEE_ADVANCE`, `NATURE_UNKNOWN`) demeure.
+   `ACCOUNTING_VERSION` 1.2.0.
+5. **Décision ouverte n° 5 levée pour le v2** : l'approbation plateforme exige deux personnes ; la
+   migration idempotente `apps/api/migrations/20261103-0001-pack-syscohada-v2-approuve.mjs` enregistre
+   le pack `approved` avec la trace « décision de la dirigeante 2026-11-03 » (historique du pack, journal
+   d'audit de la plateforme, `_migrations`). L'organisation choisit le pack, valide son jeu de règles et
+   passe en mode `active` par le circuit existant (§ 3.1), inchangé.
+
+Ce qui ne change pas : les états restent des projets (`status: "draft_unverified"`, bandeau « Projet — à
+valider par un expert-comptable »), aucune sortie ne porte de mot interdit (critère 14), Lalanda ne dépose
+ni ne transmet rien. Décisions ouvertes n° 9 (paiements à l'émission), 12 (écarts de change), 13 (autres
+mouvements), 17 et 18 (stocks, amortissements) gardent leur défaut.
+
 ## Contexte
 
 Depuis R1 à R5, Lalanda enregistre ce qu'une PME **vend** (factures normalisées DGI, avoirs),

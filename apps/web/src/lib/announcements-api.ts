@@ -23,7 +23,13 @@ export interface MyAnnouncementView {
 }
 
 export type AdminAnnouncementStatus =
-  'draft' | 'pending_approval' | 'approved' | 'sent' | 'canceled';
+  | 'draft'
+  | 'pending_approval'
+  | 'approved'
+  | 'sent'
+  | 'canceled'
+  /** ADR-0054 : envoyée puis retirée par un opérateur. */
+  | 'withdrawn';
 
 export interface AdminAnnouncementView {
   id: string;
@@ -46,6 +52,8 @@ export interface AdminAnnouncementView {
   recipientCount: number | null;
   expiresAt: string | null;
   canceledAt: string | null;
+  withdrawnBy: string | null;
+  withdrawnAt: string | null;
   createdAt: string;
 }
 
@@ -107,6 +115,12 @@ export const announcementsApi = {
     }),
   cancel: (announcementId: string, reason: string) =>
     jsonRequest<AdminAnnouncementView>(`/admin/announcements/${id(announcementId)}/cancel`, {
+      method: 'POST',
+      body: { reason },
+    }),
+  /** ADR-0054 : retirer une annonce envoyée (motif, ré-authentification). */
+  withdraw: (announcementId: string, reason: string) =>
+    jsonRequest<AdminAnnouncementView>(`/admin/announcements/${id(announcementId)}/withdraw`, {
       method: 'POST',
       body: { reason },
     }),

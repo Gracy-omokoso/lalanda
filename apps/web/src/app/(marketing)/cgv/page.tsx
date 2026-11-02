@@ -17,10 +17,16 @@
 // 2. L'ÉTAT RÉEL EST DIT. Revue du 1er nov. 2026 : le paiement MANUEL (mobile
 //    money ou virement, confirmé par un administrateur plateforme,
 //    `apps/api/src/payments/manual.provider.ts`) fonctionne, sans renouvellement
-//    automatique ; aucune facture d'abonnement n'est émise. L'ancienne phrase
-//    « aucun moyen de paiement n'est en service » était fausse. Savoir si les
-//    stipulations ci-dessous s'appliquent dès maintenant est une décision de la
-//    dirigeante (marqueur À COMPLÉTER), pas de l'équipe produit.
+//    automatique ; aucune facture d'abonnement n'est émise.
+// 3. DÉCISIONS DU 3 NOV. 2026 (ADR-0054, version `2026-11-03`). La dirigeante a
+//    tranché : les conditions s'appliquent dès cette version, paiement manuel
+//    compris. Les choix retenus sont des CHOIX PRODUIT PRUDENTS, alignés sur ce
+//    que fait le code (essai sans carte, grâce de 7 jours, aucun remboursement
+//    d'une période commencée, crédit de prorata reporté), et non des règles de
+//    droit congolais établies : ils sont à revoir avec le juriste. Restent
+//    marqués : la fiscalité (TVA), l'émission des factures d'abonnement
+//    (ADR-0047) et le droit de rétractation — ils exigent une donnée ou un avis
+//    que l'équipe produit n'a pas.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Metadata } from 'next';
@@ -55,36 +61,38 @@ const SECTIONS: readonly LegalSection[] = [
           facturation, durée, résiliation d&apos;un abonnement — les présentes conditions
           l&apos;emportent.
         </p>
+        <p>
+          Elles s&apos;appliquent <strong>à compter de leur version du 3 novembre 2026</strong>, à
+          tout abonnement souscrit ou renouvelé, quel que soit le moyen de paiement, y compris le
+          paiement manuel. Chaque utilisateur est invité à les accepter à sa prochaine connexion.
+        </p>
       </>
     ),
   },
   {
     id: 'etat-du-service',
-    title: 'État actuel du paiement',
+    title: 'Moyens de paiement en service',
     body: (
       <>
+        <LegalList
+          items={[
+            <>
+              <strong>Paiement manuel, par mobile money ou par virement</strong> — en service. Vous
+              recevez des instructions de dépôt ; l’abonnement est activé lorsqu’un administrateur
+              de Lalanda a constaté la réception du paiement. Un paiement manuel ne se renouvelle
+              pas automatiquement : il est à refaire à chaque échéance. Aucune coordonnée du payeur
+              (numéro de téléphone, numéro de compte) n’est enregistrée.
+            </>,
+            <>
+              <strong>Carte bancaire (Stripe) et PayPal</strong> — proposés à l’écran de paiement
+              seulement lorsque le prestataire est configuré. Tant qu’ils n’y figurent pas, ils ne
+              sont pas disponibles.
+            </>,
+          ]}
+        />
         <p>
-          <strong>
-            Le seul moyen de paiement en service à ce jour est le paiement manuel, par mobile money
-            ou par virement.
-          </strong>{' '}
-          Vous recevez des instructions de dépôt&nbsp;; l&apos;abonnement est activé lorsqu&apos;un
-          administrateur de Lalanda a constaté la réception du paiement. Un paiement manuel ne se
-          renouvelle pas automatiquement&nbsp;: il est à refaire à chaque échéance. Aucune facture
-          d&apos;abonnement n&apos;est encore émise par le service. Le service reste utilisable dans
-          son offre gratuite, avec les limites annoncées sur la page des tarifs.
-        </p>
-        <p>
-          <ToComplete>
-            date d’ouverture de la commercialisation et applicabilité des stipulations ci-dessous
-            aux abonnements payés manuellement — décision de la dirigeante
-          </ToComplete>
-        </p>
-        <p>
-          Les stipulations qui suivent décrivent le cadre prévu pour les abonnements. Elles ne
-          deviendront applicables qu&apos;à l&apos;ouverture effective de la commercialisation, qui
-          fera l&apos;objet d&apos;une mise à jour datée de ce document. Nous les publions dès
-          maintenant pour que personne ne découvre les conditions d&apos;achat au moment de payer.
+          Le service reste utilisable dans son offre gratuite, avec les limites annoncées sur la
+          page des tarifs.
         </p>
       </>
     ),
@@ -103,16 +111,15 @@ const SECTIONS: readonly LegalSection[] = [
           différents finiraient nécessairement par se contredire.
         </p>
         <p>
-          <ToComplete>
-            devise ou devises de facturation, et règle de conversion le cas échéant — la grille
-            tarifaire n’est pas arbitrée commercialement
-          </ToComplete>
+          Les prix sont exprimés en <strong>dollars américains (USD)</strong> et{' '}
+          <strong>hors taxes</strong>. Le montant à payer et la devise du paiement sont ceux
+          indiqués par le récapitulatif et les instructions de paiement.
         </p>
         <p>
           <ToComplete>
-            traitement des taxes applicables (TVA ou équivalent) : prix affichés hors taxes ou
-            toutes taxes comprises, et règles selon le pays de l’acheteur — question fiscale, à
-            trancher avec un conseil
+            traitement de la TVA : assujettissement de {PUBLISHER_NAME}, groupe de taxation et taux
+            applicables aux abonnements, règle pour un acheteur établi hors de RDC — avis de
+            l’expert-comptable attendu (ADR-0047)
           </ToComplete>
         </p>
       </>
@@ -125,20 +132,15 @@ const SECTIONS: readonly LegalSection[] = [
       <>
         <p>
           L&apos;abonnement est souscrit au niveau d&apos;une organisation, par un membre qui en a
-          le pouvoir. Il couvre l&apos;ensemble des membres de cette organisation dans la limite des
-          places prévues par l&apos;offre.
+          le pouvoir (le Propriétaire). Il couvre l&apos;ensemble des membres de cette organisation
+          dans la limite des places prévues par l&apos;offre.
         </p>
         <p>
-          Avant de valider, vous verrez le récapitulatif de ce que vous commandez&nbsp;: offre,
-          périodicité, montant à payer et date de la première échéance. La commande n&apos;est
-          conclue qu&apos;après cette validation explicite et la confirmation du paiement.
-        </p>
-        <p>
-          <ToComplete>
-            mentions obligatoires du parcours d’achat selon le droit de la consommation applicable
-            (récapitulatif avant paiement, mention explicite d’une obligation de payer, confirmation
-            écrite de la commande)
-          </ToComplete>
+          Avant de valider, vous voyez le récapitulatif de ce que vous commandez&nbsp;: offre,
+          périodicité, montant à payer et période couverte. Valider ce récapitulatif vaut commande
+          avec obligation de payer le montant affiché. La commande est conclue à la confirmation du
+          paiement&nbsp;; l&apos;état de l&apos;abonnement est alors visible dans l&apos;espace de
+          facturation de l&apos;organisation.
         </p>
       </>
     ),
@@ -151,24 +153,14 @@ const SECTIONS: readonly LegalSection[] = [
         <p>
           Une période d&apos;essai gratuite de <strong>14 jours</strong> est prévue au niveau de
           l&apos;organisation, à raison d&apos;une seule par organisation. Elle donne accès aux
-          fonctions de l&apos;offre essayée, dans des limites d&apos;usage raisonnables.
+          fonctions de l&apos;offre Pro. <strong>Aucun moyen de paiement n&apos;est demandé</strong>{' '}
+          pour la commencer.
         </p>
         <p>
-          À son terme, aucune donnée n&apos;est supprimée. L&apos;accès passe en consultation
-          limitée pendant une période de grâce, et vos données restent exportables.
-        </p>
-        <p>
-          <ToComplete>
-            durée de la période de grâce après l’essai, et décision commerciale sur l’exigence d’une
-            carte bancaire à l’entrée en essai (docs/13-PRICING.md la laisse ouverte)
-          </ToComplete>
-        </p>
-        <p>
-          <ToComplete>
-            règle exacte de bascule à la fin de l’essai : reconduction automatique en abonnement
-            payant, ou arrêt sans prélèvement sauf souscription explicite. Ce choix a des
-            conséquences directes en droit de la consommation
-          </ToComplete>
+          À son terme, <strong>rien n&apos;est prélevé et rien n&apos;est souscrit</strong> sans
+          votre décision&nbsp;: l&apos;organisation repasse à l&apos;offre gratuite. Aucune donnée
+          n&apos;est supprimée&nbsp;; les limites de l&apos;offre gratuite s&apos;appliquent aux
+          créations suivantes.
         </p>
       </>
     ),
@@ -180,25 +172,19 @@ const SECTIONS: readonly LegalSection[] = [
       <>
         <p>
           L&apos;abonnement est payable d&apos;avance, par période mensuelle ou annuelle selon
-          l&apos;option choisie. Il se reconduit automatiquement à chaque échéance pour une durée
-          identique, tant qu&apos;il n&apos;a pas été résilié.
+          l&apos;option choisie.
         </p>
+        <LegalList
+          items={[
+            'Paiement manuel : pas de reconduction automatique. À l’échéance, un nouveau paiement est nécessaire ; à défaut, la procédure d’impayé ci-dessous s’applique.',
+            'Carte bancaire ou PayPal, lorsqu’ils sont proposés : l’abonnement se reconduit à chaque échéance pour une durée identique, tant qu’il n’a pas été résilié.',
+          ]}
+        />
         <p>
           Vous pouvez résilier à tout moment depuis votre espace. La résiliation prend effet à la
           fin de la période en cours&nbsp;: l&apos;accès est conservé jusque-là et aucun nouveau
-          prélèvement n&apos;intervient ensuite.
-        </p>
-        <p>
-          <ToComplete>
-            moyens de paiement acceptés, y compris les moyens locaux (mobile money) le cas échéant,
-            et prestataire de paiement retenu
-          </ToComplete>
-        </p>
-        <p>
-          <ToComplete>
-            information préalable à la reconduction (délai et canal), lorsque le droit applicable
-            l’impose
-          </ToComplete>
+          prélèvement n&apos;intervient ensuite. La période couverte par chaque paiement est
+          indiquée dans l&apos;espace de souscription et de facturation de l&apos;organisation.
         </p>
       </>
     ),
@@ -209,14 +195,23 @@ const SECTIONS: readonly LegalSection[] = [
     body: (
       <>
         <p>
-          Une facture est émise à chaque échéance et reste consultable depuis l&apos;espace de
-          l&apos;organisation. Elle reprend l&apos;offre, la période couverte, le montant et les
-          taxes applicables.
+          <strong>À ce jour, Lalanda n&apos;émet pas encore de facture d&apos;abonnement.</strong>{' '}
+          Chaque paiement confirmé reste consultable dans l&apos;espace de l&apos;organisation.
         </p>
         <p>
-          Les informations de facturation que vous fournissez (raison sociale, adresse, identifiant
-          fiscal) doivent être exactes. Une facture émise sur des informations erronées est
-          rectifiée sur demande.
+          <ToComplete>
+            émission des factures d’abonnement (facture normalisée DGI ou autre pièce), moment de
+            leur émission et informations demandées à l’abonné — chantier en cours (ADR-0047),
+            données fiscales de l’éditeur requises
+          </ToComplete>
+        </p>
+        <p>
+          Les informations de facturation que vous fournissez doivent être exactes. Pour toute
+          question, écrivez à{' '}
+          <a href={`mailto:${CONTACT_FACTURATION}`} className="underline underline-offset-2">
+            {CONTACT_FACTURATION}
+          </a>
+          .
         </p>
       </>
     ),
@@ -229,7 +224,8 @@ const SECTIONS: readonly LegalSection[] = [
         <p>
           Une montée en gamme prend effet immédiatement, avec ajustement du montant au prorata de la
           période restante. Une baisse de gamme prend effet à l&apos;échéance suivante, afin que la
-          période déjà payée reste servie.
+          période déjà payée reste servie. Un crédit de prorata n&apos;est pas remboursé&nbsp;: il
+          est reporté sur les échéances suivantes.
         </p>
         <p>
           Si votre usage dépasse les limites de la nouvelle offre, nous vous le signalons avant
@@ -241,25 +237,35 @@ const SECTIONS: readonly LegalSection[] = [
     ),
   },
   {
+    id: 'octroi',
+    title: 'Offre accordée par Lalanda',
+    body: (
+      <>
+        <p>
+          {PUBLISHER_NAME} peut accorder une offre sans paiement à une organisation (partenariat,
+          geste commercial, test). L&apos;octroi porte un motif et, le cas échéant, une échéance. Il
+          est visible par l&apos;organisation dans son journal, sous le nom «&nbsp;Équipe
+          Lalanda&nbsp;». À son échéance ou à son retrait, l&apos;organisation retrouve l&apos;offre
+          qu&apos;elle paie, ou l&apos;offre gratuite.
+        </p>
+      </>
+    ),
+  },
+  {
     id: 'retractation',
     title: 'Droit de rétractation',
     body: (
       <>
         <p>
-          Lorsque vous souscrivez en qualité de consommateur, un droit de rétractation peut
-          s&apos;appliquer à la commande d&apos;un service numérique.
+          La période d&apos;essai gratuite, sans moyen de paiement, permet d&apos;évaluer le service
+          avant tout paiement.
         </p>
         <p>
           <ToComplete>
-            existence, durée et modalités du droit de rétractation selon le droit applicable, et
-            traitement du cas où l’exécution commence immédiatement à la demande de l’acheteur. La
-            rédaction de cette clause dépend du droit applicable au contrat, qui n’est pas arbitré —
-            voir les CGU § droit applicable
+            existence, durée et modalités d’un droit de rétractation pour un acheteur consommateur,
+            selon le droit applicable (en RDC et, le cas échéant, dans le pays de l’acheteur) — avis
+            du juriste attendu ; aucune règle n’est affirmée ici
           </ToComplete>
-        </p>
-        <p>
-          Indépendamment de tout droit de rétractation, la période d&apos;essai gratuite permet
-          d&apos;évaluer le service avant tout paiement.
         </p>
       </>
     ),
@@ -270,10 +276,13 @@ const SECTIONS: readonly LegalSection[] = [
     body: (
       <>
         <p>
-          <ToComplete>
-            politique de remboursement : cas ouverts, délai de traitement et modalités. Décision
-            commerciale non arbitrée — aucune règle n’est inventée ici
-          </ToComplete>
+          Une période d&apos;abonnement commencée n&apos;est pas remboursée&nbsp;; la résiliation
+          prend effet à sa fin. Un paiement reçu en double ou par erreur, ou un paiement manuel
+          rejeté après réception des fonds, est remboursé sur demande à{' '}
+          <a href={`mailto:${CONTACT_FACTURATION}`} className="underline underline-offset-2">
+            {CONTACT_FACTURATION}
+          </a>
+          , par le même moyen que le paiement lorsque c&apos;est possible.
         </p>
         <p>
           En cas d&apos;indisponibilité prolongée du service qui nous est imputable,
@@ -287,21 +296,63 @@ const SECTIONS: readonly LegalSection[] = [
     title: 'Impayés et suspension',
     body: (
       <>
-        <p>En cas d&apos;échec de paiement à une échéance :</p>
+        <p>Lorsqu&apos;une échéance n&apos;est pas payée :</p>
         <LegalList
           items={[
-            'nous vous en informons et une nouvelle tentative est effectuée;',
-            'l’abonnement passe en état d’impayé, sans interruption immédiate de l’accès;',
-            'passé un délai de régularisation, l’accès est réduit à la consultation puis suspendu;',
-            'vos données ne sont pas supprimées du fait d’un impayé, et restent exportables pendant la période de conservation applicable.',
+            'l’abonnement passe en état d’impayé, sans interruption immédiate de l’accès ; un message vous en informe dans l’application ;',
+            'une période de grâce de 7 jours s’ouvre ensuite, accès toujours intact, compte à rebours affiché ;',
+            'à son terme, l’accès est ramené aux limites de l’offre gratuite, jusqu’au paiement ;',
+            'vos données ne sont pas supprimées du fait d’un impayé et restent exportables ;',
+            'aucuns frais de recouvrement ni pénalités ne sont facturés.',
           ]}
         />
+      </>
+    ),
+  },
+  {
+    id: 'administration',
+    title: 'Administration de la plateforme',
+    body: (
+      <>
         <p>
-          <ToComplete>
-            délais exacts de relance, de suspension et de conservation des données après suspension,
-            ainsi que d’éventuels frais de recouvrement selon le droit applicable
-          </ToComplete>
+          Des opérateurs de {PUBLISHER_NAME} administrent la plateforme depuis une console séparée.
+          Ils voient les métadonnées des comptes et des organisations (nom, adresse email, offre,
+          état de l&apos;abonnement, usage), jamais le contenu de vos projets ou de vos données de
+          gestion. Chacun de leurs gestes est motivé, inscrit au journal de la plateforme et, quand
+          il vous concerne, visible dans le journal de votre organisation sous le nom «&nbsp;Équipe
+          Lalanda&nbsp;».
         </p>
+        <p>
+          En cas de fraude, d&apos;atteinte à la sécurité ou de manquement grave aux CGU, un compte
+          peut être bloqué ou une organisation suspendue, avec un motif. Une suspension laisse, en
+          principe, vos données accessibles en lecture.
+        </p>
+        <p>
+          Lalanda peut vous adresser des <strong>messages de service</strong> dans
+          l&apos;application (bannière et cloche)&nbsp;: incident, changement des conditions,
+          sécurité. Aucun email de masse ni aucune prospection ne vous est envoyé par ce moyen. Un
+          message envoyé par erreur peut être retiré.
+        </p>
+      </>
+    ),
+  },
+  {
+    id: 'outils-gestion',
+    title: 'Outils de gestion : votre responsabilité',
+    body: (
+      <>
+        <p>
+          Certains modules vous aident à gérer vos propres relations commerciales et votre
+          personnel. Lalanda les fournit comme outils&nbsp;; votre organisation reste responsable de
+          ses contrats, de ses documents et des données qu&apos;elle y saisit.
+        </p>
+        <LegalList
+          items={[
+            'Contrats et commandes de vos clients : Lalanda tient les métadonnées, les dates et les copies signées que vous téléversez. Il calcule les dates à partir des clauses que vous saisissez (durée, préavis, reconduction) sans juger leur validité. Une reconduction tacite n’est jamais appliquée seule : Lalanda vous alerte avant l’échéance et c’est un membre de votre organisation qui la constate.',
+            'Formulaire public de prospects : si votre organisation en publie un, Lalanda l’héberge et l’exécute pour son compte. Votre organisation rédige le texte de consentement, fournit le lien vers sa propre politique de confidentialité et répond aux demandes des personnes qui s’y inscrivent.',
+            'Ressources humaines (dossiers, présences, notes de frais, évaluations) : votre organisation informe son personnel et règle les durées de conservation. Le pointage, désactivé par défaut, conserve les pointages 5 ans sauf autre durée réglée par l’organisation.',
+          ]}
+        />
       </>
     ),
   },
@@ -336,11 +387,9 @@ const SECTIONS: readonly LegalSection[] = [
       <>
         <p>
           Les prix peuvent évoluer. Une hausse ne s&apos;applique jamais à une période déjà
-          payée&nbsp;: elle prend effet à l&apos;échéance suivante, après information préalable, et
-          vous pouvez résilier avant qu&apos;elle ne s&apos;applique.
-        </p>
-        <p>
-          <ToComplete>délai de préavis retenu avant application d’une hausse de prix</ToComplete>
+          payée&nbsp;: elle est annoncée <strong>au moins 30 jours</strong> à l&apos;avance, prend
+          effet à l&apos;échéance suivante, et vous pouvez résilier avant qu&apos;elle ne
+          s&apos;applique.
         </p>
         <p>
           Le retrait d&apos;une fonction significative d&apos;une offre payante est annoncé aux
@@ -381,9 +430,11 @@ export default function CgvPage(): React.ReactElement {
       lead={
         <p>
           Ce document décrit les conditions d&apos;achat d&apos;un abonnement Lalanda&nbsp;:
-          souscription, essai, paiement, résiliation et remboursement. Il dit l&apos;état réel du
-          paiement&nbsp;: aujourd&apos;hui, seul le paiement manuel (mobile money ou virement) est
-          en service.
+          souscription, essai, paiement, résiliation et remboursement, ainsi que ce que Lalanda fait
+          en tant qu&apos;administrateur de la plateforme. Il dit l&apos;état réel du
+          paiement&nbsp;: aujourd&apos;hui, le paiement manuel (mobile money ou virement) est en
+          service&nbsp;; la carte et PayPal ne le sont que s&apos;ils sont proposés à l&apos;écran
+          de paiement.
         </p>
       }
       sections={SECTIONS}

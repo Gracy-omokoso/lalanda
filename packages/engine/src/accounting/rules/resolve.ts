@@ -26,18 +26,23 @@ export function isAccountNumber(value: unknown): value is string {
  * `requiresReview` n'est jamais appliquée : elle est encore « à confirmer ».
  */
 export function resolveRule(ruleSet: MappingRuleSet | null, key: string): RuleResolution {
-  // Avances au personnel : motif propre à la pièce, avant tout jeu de règles (H13).
+  // Avances au personnel (H13) : sans règle validée applicable, le motif propre à la
+  // pièce remplace le motif générique. Depuis 1.2.0, une règle validée s'applique
+  // (décision de la dirigeante du 3 nov. 2026, ADR-0049 amendement).
   const hrAdvance = Object.hasOwn(HR_ADVANCE_SUSPENSE, key) ? HR_ADVANCE_SUSPENSE[key] : undefined;
-  if (hrAdvance !== undefined) return { status: 'suspense', reason: hrAdvance };
+  const suspense = (reason: SuspenseReason): RuleResolution => ({
+    status: 'suspense',
+    reason: hrAdvance ?? reason,
+  });
   if (ruleSet === null || ruleSet.status !== 'validated') {
-    return { status: 'suspense', reason: 'NO_VALIDATED_RULE_SET' };
+    return suspense('NO_VALIDATED_RULE_SET');
   }
   if ((ALWAYS_SUSPENSE_KEYS as readonly string[]).includes(key)) {
     return { status: 'suspense', reason: 'NATURE_UNKNOWN' };
   }
   const rule = ruleSet.rules.find((r) => r.key === key);
-  if (rule === undefined) return { status: 'suspense', reason: 'NO_RULE' };
-  if (rule.requiresReview) return { status: 'suspense', reason: 'RULE_REQUIRES_REVIEW' };
+  if (rule === undefined) return suspense('NO_RULE');
+  if (rule.requiresReview) return suspense('RULE_REQUIRES_REVIEW');
   return { status: 'rule', rule, ruleSetVersion: ruleSet.version };
 }
 

@@ -41,6 +41,9 @@ import { rewrapReviewSection } from '../hr/performance/hr-review-crypto.js';
 // ADR-0051 — H10 : clés enveloppées des justificatifs, motifs des avances sur salaire.
 import { rewrapReceiptKey } from '../hr/expenses/hr-expenses.common.js';
 import { rewrapAdvanceReason } from '../hr/advances/advance-reason-crypto.js';
+// ADR-0053 — P8 : secrets TOTP des opérateurs de la console.
+import { rewrapTotpSecret } from '../platform-two-factor/two-factor-crypto.js';
+import { TWO_FACTOR_COLLECTION } from '../platform-two-factor/two-factor.schema.js';
 import { Integration, type IntegrationDocument } from './integration.schema.js';
 import { MASTER_KEYRING } from './keyring.provider.js';
 import {
@@ -177,6 +180,8 @@ export class RewrapService {
     // ADR-0051 — H10 (§ 2.1, § 4) : justificatifs des notes de frais, motifs d'avance.
     await this.rewrapExpenseReceiptKeys(keyring, actorUserId, report);
     await this.rewrapAdvanceReasons(keyring, actorUserId, report);
+    // ADR-0053 — P8 : secrets TOTP de la double authentification de la console.
+    await this.rewrapPlatformTwoFactor(keyring, actorUserId, report);
 
     this.secrets.invalidateAll();
 
@@ -252,8 +257,61 @@ export class RewrapService {
       const k = doc['reasonSealed'] as EncryptedValue;
       if (k.keyId !== keyring.currentKeyId) remaining.add(k.keyId);
     }
+    // ADR-0053 — P8 : secrets TOTP de la double authentification de la console.
+    for (const doc of await this.connection
+      .collection(TWO_FACTOR_COLLECTION)
+      .find({ secret: { $type: 'object' } }, { projection: { secret: 1 } })
+      .toArray()) {
+      const k = doc['secret'] as EncryptedValue;
+      if (k.keyId !== keyring.currentKeyId) remaining.add(k.keyId);
+    }
     report.remainingKeyIds = [...remaining];
     return report;
+  }
+
+  /**
+   * ADR-0053 — P8 : secret TOTP de chaque opérateur (`platform_two_factor.secret`),
+   * re-chiffré à l'emplacement qu'utilise la lecture (`twoFactorSecretLocation`).
+   * Écriture conditionnée par l'ancien `iv` : un ré-enrôlement simultané n'est pas écrasé.
+   */
+  private async rewrapPlatformTwoFactor(
+    keyring: MasterKeyring,
+    actorUserId: string,
+    report: RewrapReport,
+  ): Promise<void> {
+    const col = this.connection.collection(TWO_FACTOR_COLLECTION);
+    for (const doc of await col
+      .find({ secret: { $type: 'object' } }, { projection: { userId: 1, secret: 1 } })
+      .toArray()) {
+      const record = doc['secret'] as EncryptedValue;
+      const outcome = rewrapTotpSecret({ userId: String(doc['userId']), record, keyring });
+      if (!outcome.changed) {
+        report.skipped += 1;
+        continue;
+      }
+      const written = await this.inTransaction(async (session) => {
+        const res = await col.updateOne(
+          { _id: doc._id, 'secret.iv': record.iv, 'secret.keyId': record.keyId },
+          { $set: { secret: outcome.record } },
+          session ? { session } : {},
+        );
+        if (res.modifiedCount === 0) return false;
+        await this.audit.record(
+          {
+            actorUserId,
+            actorRole: 'system',
+            action: 'secret.rewrapped',
+            targetType: 'platform_two_factor',
+            targetId: String(doc['userId']),
+            // Ni secret, ni code.
+            metadata: { section: 'totpSecret', keyId: keyring.currentKeyId },
+          },
+          session,
+        );
+        return true;
+      });
+      if (written) report.rewrapped += 1;
+    }
   }
 
   /**

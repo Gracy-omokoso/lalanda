@@ -32,6 +32,8 @@ import { Throttle } from '@nestjs/throttler';
 
 import {
   AllowIdleConsoleSession,
+  // ADR-0053 — P8
+  AllowPlatformTwoFactorPending,
   PlatformConsoleRoute,
   RequirePlatformAction,
   RequirePlatformRole,
@@ -142,7 +144,8 @@ export class IntegrationsController {
   }
 
   private async assertReauth(req: AuthenticatedRequest): Promise<void> {
-    await this.reauth.assertRecent(req.user!.id, req.headers.cookie);
+    // ADR-0053 — P8 : fenêtre ouverte avec le second facteur.
+    await this.reauth.assertRecent(req.user!.id, req.headers.cookie, { secondFactor: true });
   }
 }
 
@@ -158,6 +161,8 @@ export class IntegrationsController {
 // tout opérateur doit donc pouvoir l'ouvrir, et elle seule rouvre une console inactive.
 @RequirePlatformAction('platform.console.read')
 @AllowIdleConsoleSession()
+// ADR-0053 — P8 : c'est elle qui vérifie la session (mot de passe + code).
+@AllowPlatformTwoFactorPending('verification')
 export class ReauthController {
   constructor(@Inject(ReauthService) private readonly reauth: ReauthService) {}
 
@@ -166,7 +171,7 @@ export class ReauthController {
   async status(
     @Req() req: AuthenticatedRequest,
   ): Promise<{ active: boolean; expiresAt: string | null }> {
-    return this.reauth.statusOf(req.user!.id, req.headers.cookie);
+    return this.reauth.statusOf(req.user!.id, req.headers.cookie, { secondFactor: true });
   }
 
   @Post()
@@ -185,6 +190,9 @@ export class ReauthController {
       headers: new Headers(req.headers as Record<string, string>),
       cookieHeader: req.headers.cookie,
       password: parsed.data.password,
+      // ADR-0053 — P8 : mot de passe + code TOTP, ou un code de secours.
+      secondFactor: { code: parsed.data.code, backupCode: parsed.data.backupCode },
+      requireSecondFactor: true,
     });
     return { active: true, expiresAt: expiresAt.toISOString() };
   }

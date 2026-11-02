@@ -128,6 +128,8 @@ Décideurs :
   une fuite plateforme → organisation (identifiant d'opérateur au journal client). Statut : **proposé,
   ADR-0053** (2 nov. 2026).
   Socle RBAC plateforme, garde sans organisation et contrats partagés **appliqués au lot P0**.
+  Décision n° 2 **retenue le 3 nov. 2026** : double authentification TOTP obligatoire pour tout
+  opérateur, **appliquée au lot P8** (§ 2.4 bis).
 
 ## Décisions récentes (légal)
 
@@ -143,3 +145,10 @@ Décideurs :
   revoir avec l'expert-comptable) : C puis A, facture ordinaire émise par l'organisation vendeuse à
   l'encaissement confirmé, prix HT + TVA 16 % (groupe B), sans normalisation DGI avant
   l'homologation, avoir à deux personnes.
+- [ADR-0054](ADR-0054-decisions-du-3-novembre.md) — Décisions de la dirigeante du 3 nov. 2026 :
+  inventaire des questions ouvertes des ADR-0047 à ADR-0053 et décision prise pour chacune (source ou
+  « choix produit prudent », à revoir avec le juriste et l'expert-comptable). Reconduction tacite
+  permise si le contrat la prévoit, constatée par un humain ; avoir déduit du reste à facturer ;
+  pointages conservés 5 ans puis purgés chaque jour ; avances sur salaire éteintes ; retrait d'une
+  annonce envoyée ; CGV et confidentialité réécrites, corpus `2026-11-03`. Statut : **accepté**
+  (3 nov. 2026).

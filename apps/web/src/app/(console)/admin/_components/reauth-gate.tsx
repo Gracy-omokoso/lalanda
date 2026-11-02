@@ -26,6 +26,8 @@ import { api } from '@/lib/api';
 
 import { Bandeau } from './admin-chrome';
 import { formaterRestant, messageErreur, reauthRestantMs, reauthUtilisable } from './admin-model';
+// ADR-0053 — P8 : mot de passe + code de l'application, ou un code de secours.
+import { messageDeuxFacteurs, secondFacteurDe } from './deux-facteurs-model';
 
 export interface Reauth {
   /** La fenêtre est-elle ouverte et assez large pour lancer une écriture ? */
@@ -80,21 +82,25 @@ export function ReauthGate({
   description?: string;
 }): React.ReactElement {
   const [motDePasse, setMotDePasse] = useState('');
+  const [code, setCode] = useState('');
   const [erreur, setErreur] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
+  const facteur = secondFacteurDe(code);
 
   async function confirmer(e: React.FormEvent): Promise<void> {
     e.preventDefault();
+    if (!facteur) return;
     setEnvoi(true);
     setErreur(null);
     try {
-      await api.confirmReauth(motDePasse);
+      await api.confirmReauth(motDePasse, facteur);
       // Vidé immédiatement : le champ ne doit pas rester rempli derrière un
       // panneau replié, ni repartir dans un rendu ultérieur.
       setMotDePasse('');
+      setCode('');
       reauth.rafraichir();
     } catch (err) {
-      setErreur(messageErreur(err, 'Mot de passe refusé.'));
+      setErreur(messageDeuxFacteurs(err, messageErreur(err, 'Mot de passe refusé.')));
     } finally {
       setEnvoi(false);
     }
@@ -118,7 +124,7 @@ export function ReauthGate({
       onSubmit={(e) => void confirmer(e)}
     >
       <h2 className="font-display text-lg font-bold tracking-tight">
-        Confirmez votre mot de passe
+        Confirmez votre mot de passe et votre code
       </h2>
       <p className="max-w-2xl text-sm text-[var(--foreground-muted)]">
         {description ??
@@ -136,10 +142,23 @@ export function ReauthGate({
           className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm"
         />
       </label>
+      {/* ADR-0053 — P8 : code de l'application d'authentification, ou un code de secours. */}
+      <label className="flex max-w-sm flex-col gap-1 text-sm">
+        <span className="font-mono text-[0.66rem] uppercase tracking-[0.1em] text-[var(--foreground-muted)]">
+          Code de l’application ou code de secours
+        </span>
+        <input
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          autoComplete="one-time-code"
+          maxLength={16}
+          className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 font-mono text-sm tracking-widest"
+        />
+      </label>
       <div>
         <button
           type="submit"
-          disabled={envoi || motDePasse === ''}
+          disabled={envoi || motDePasse === '' || !facteur}
           className="rounded-md border border-[var(--accent)] px-3 py-2 text-sm font-medium text-[var(--accent)] transition hover:bg-[var(--accent)]/10 disabled:opacity-40"
         >
           {envoi ? 'Vérification…' : 'Ouvrir la fenêtre de dix minutes'}

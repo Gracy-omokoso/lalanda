@@ -69,6 +69,8 @@ import {
   HrRemindersJob,
 } from './reminders/hr-reminders.job.js';
 import { HrRetentionJob } from './retention/hr-retention.job.js';
+// ADR-0054 — purge des pointages au-delà de la durée réglée
+import { HrAttendanceRetentionJob } from './attendance/hr-attendance-retention.job.js';
 // ADR-0051 — H10
 import { TreasuryModule } from '../treasury/treasury.module.js';
 import { EmployeeAdvance, EmployeeAdvanceSchema } from './advances/advance.schema.js';
@@ -208,6 +210,8 @@ import { HrPerformanceModule } from './performance/hr-performance.module.js';
     HrPresenceNotifier,
     HrAttendanceService,
     HrPlanningService,
+    // ADR-0054 : purge quotidienne des pointages (5 ans par défaut, réglable).
+    HrAttendanceRetentionJob,
     // ADR-0051 — H10 : réglages des frais et avances, notes, avances, rappels d'avance.
     HrExpensesSettingsService,
     HrExpensesNotifier,

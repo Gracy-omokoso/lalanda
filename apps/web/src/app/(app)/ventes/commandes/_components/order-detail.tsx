@@ -270,7 +270,14 @@ export function OrderDetail({ orderId }: { orderId: string }): React.ReactElemen
                     <td className="text-right font-mono">
                       {l.amount ? formatMontant(l.amount, vue.currency) : '—'}
                     </td>
-                    <td className="text-right font-mono">{r ? formatQuantite(r.invoiced) : '—'}</td>
+                    <td className="text-right font-mono">
+                      {r ? formatQuantite(r.invoiced) : '—'}
+                      {r && r.credited && r.credited !== '0' ? (
+                        <span className="block text-xs text-[var(--foreground-muted)]">
+                          avoirs : −{formatQuantite(r.credited)}
+                        </span>
+                      ) : null}
+                    </td>
                     <td className="text-right font-mono">{r ? formatQuantite(r.inDraft) : '—'}</td>
                     <td className="text-right font-mono">
                       {r ? formatQuantite(r.remainingToInvoice) : '—'}

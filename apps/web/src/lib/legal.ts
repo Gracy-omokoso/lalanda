@@ -89,8 +89,8 @@ export const LEGAL_DOCUMENTS: readonly LegalDocument[] = [
     title: 'Conditions générales de vente',
     shortTitle: 'CGV',
     summary:
-      'Conditions de vente des abonnements Lalanda : offres et prix, essai de 14 jours, paiement, facturation, reconduction, rétractation, remboursement et impayés.',
-    updatedAt: '2026-10-30',
+      'Conditions de vente des abonnements Lalanda : offres et prix, essai de 14 jours, paiement, facturation, reconduction, rétractation, remboursement, impayés et administration de la plateforme.',
+    updatedAt: '2026-11-03',
   },
   {
     slug: 'confidentialite',
@@ -99,7 +99,7 @@ export const LEGAL_DOCUMENTS: readonly LegalDocument[] = [
     shortTitle: 'Confidentialité',
     summary:
       'Données collectées par Lalanda, finalités, durées de conservation, sous-traitants (hébergement, IA, paiement, email), transferts et droits des personnes.',
-    updatedAt: '2026-10-30',
+    updatedAt: '2026-11-03',
   },
   {
     slug: 'cookies',
