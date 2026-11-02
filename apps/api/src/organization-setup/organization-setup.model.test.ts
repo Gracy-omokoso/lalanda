@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { ORG_PERMISSION_MATRIX, effectiveActions, type OrgRole } from '../authz/permissions.js';
 import {
   buildOrganizationSetupView,
+  doneSteps,
   type OrganizationSetupFacts,
 } from './organization-setup.model.js';
 
@@ -113,13 +114,51 @@ describe('buildOrganizationSetupView (ADR-0052 § 3)', () => {
     expect(etat(adminPlus, 'normalisation').canAct).toBe(true);
   });
 
-  it('les modules restent ouverts à tout membre, même sans aucun droit', () => {
+  it('décision n° 3 (défaut) : les modules s’enregistrent avec `organization.manage`', () => {
     const roles: OrgRole[] = ['viewer', 'external_accountant'];
     for (const role of roles) {
       const v = buildOrganizationSetupView('o', VIDE, effectiveActions(role, {}));
-      expect(etat(v, 'modules').canAct, role).toBe(true);
-      expect(etat(v, 'fiscal').canAct, role).toBe(false);
+      expect(etat(v, 'modules').canAct, role).toBe(false);
     }
-    expect(etat(buildOrganizationSetupView('o', VIDE, []), 'modules').canAct).toBe(true);
+    expect(
+      etat(buildOrganizationSetupView('o', VIDE, ['organization.manage']), 'modules').canAct,
+    ).toBe(true);
+  });
+
+  // ADR-0052 — O2/O3 : déclarations de § 4.
+  it('« pas maintenant » : `deferred` tant que la donnée manque, `done` dès qu’elle existe', () => {
+    const reportee = buildOrganizationSetupView('o', { ...VIDE, deferred: ['tresorerie'] }, []);
+    expect(etat(reportee, 'tresorerie')).toMatchObject({
+      state: 'deferred',
+      missing: ['treasury_account'],
+    });
+    const faite = buildOrganizationSetupView(
+      'o',
+      { ...VIDE, deferred: ['tresorerie'], treasuryAccount: true },
+      [],
+    );
+    expect(etat(faite, 'tresorerie').state).toBe('done');
+    expect(doneSteps({ ...VIDE, treasuryAccount: true }, ['tresorerie', 'equipe'])).toEqual([
+      'tresorerie',
+    ]);
+  });
+
+  it('modules : `null` sans choix ; la liste choisie sinon ; pays confirmé = étape 1 faite', () => {
+    expect(buildOrganizationSetupView('o', VIDE, []).modules).toBeNull();
+    const v = buildOrganizationSetupView(
+      'o',
+      { ...VIDE, modulesChosen: true, modules: ['run'], countryConfirmed: true },
+      [],
+    );
+    expect(v.modules).toEqual(['run']);
+    expect(etat(v, 'modules').state).toBe('done');
+    expect(etat(v, 'societe').state).toBe('done');
+    const tous = buildOrganizationSetupView(
+      'o',
+      { ...VIDE, modulesChosen: true, modules: null },
+      [],
+    );
+    expect(tous.modules).toBeNull();
+    expect(etat(tous, 'modules').state).toBe('done');
   });
 });
