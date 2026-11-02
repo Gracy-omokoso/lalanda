@@ -217,6 +217,12 @@ Un événement contient acteur, organisation, action, cible, horodatage, adresse
   lignes de chaque échéance d'un `schedule` sont composées et stockées avec leurs montants),
   `sales_contract_counters`, `sales_contract_amendments` (unique `organizationId + contractId +
   index`, `changes` partiels composés), `sales_contract_settings` (unique `organizationId`).
+  **Lot V4 implémenté** : `sales_deposit_resolutions` (geste déclaratif « traité » d'une facture
+  d'acompte émise, ajout seul ; unique `organizationId + invoiceId` ; `orderId` ou `contractId`,
+  `reason`, `resolvedBy`, `resolvedAt`) ; lue par le seul module des engagements, jamais par la
+  comptabilité, le réalisé ni la trésorerie. Les acomptes eux-mêmes restent des `sales_invoices`
+  `FT`/`ET` ordinaires, reliés par `sales_document_links` (`order_deposit`, `contract_deposit`,
+  `requestedAmount`).
 
 ## Rétention
 

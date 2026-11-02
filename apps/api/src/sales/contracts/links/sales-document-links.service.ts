@@ -36,6 +36,8 @@ export interface LinkedInvoiceRead {
   lines: StoredLine[];
   documentAmounts: StoredDocumentAmounts;
   normalization?: { codeDefDgi?: string | null } | null;
+  /** `real`, `test` ou `proforma` (ADR-0050 — V4 : rappel des acomptes en série réelle). */
+  series?: string | null;
 }
 
 export interface LiveLink {
@@ -117,6 +119,7 @@ export class SalesDocumentLinksService {
             lines: 1,
             documentAmounts: 1,
             'normalization.codeDefDgi': 1,
+            series: 1,
           },
         },
       )
