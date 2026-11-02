@@ -1755,6 +1755,7 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
     expect(membre, `aucun membre au rôle ${role}`).toBeDefined();
     return membre!.userId;
   }
+
   // ───────────────────────────────────────────────────────────────────────────
   // ADR-0053 — P2 : routes de comptes et d'organisations de la console. Aucun rôle
   // d'organisation ne les ouvre ; le refus nomme l'action PLATEFORME, avant toute
@@ -1797,4 +1798,63 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
       }
     }
   }, 120_000);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // ADR-0052 — O2/O3 : déclarations de la mise en route (§ 4), action de l'étape (§ 7)
+  // ───────────────────────────────────────────────────────────────────────────
+
+  it('ADR-0052 O2/O3 — chaque déclaration suit les droits effectifs de son étape', async () => {
+    const s = serveur();
+    // Sondes sans effet durable : retirer un report absent est idempotent ; un corps de
+    // modules invalide répond 400 à qui a le droit, 403 aux autres (le guard passe avant).
+    const sondes: {
+      methode: 'delete' | 'put';
+      chemin: string;
+      corps?: object;
+      action: string;
+      ok: number;
+    }[] = [
+      { methode: 'delete', chemin: 'deferred/normalisation', action: 'fiscal.manage', ok: 200 },
+      { methode: 'delete', chemin: 'deferred/tresorerie', action: 'treasury.manage', ok: 200 },
+      { methode: 'delete', chemin: 'deferred/comptabilite', action: 'accounting.manage', ok: 200 },
+      { methode: 'delete', chemin: 'deferred/equipe', action: 'members.invite', ok: 200 },
+      {
+        methode: 'put',
+        chemin: 'modules',
+        corps: { modules: [] },
+        action: 'organization.manage',
+        ok: 400,
+      },
+    ];
+    // Quota global de requêtes par IP : remis à zéro par rôle, comme le bloc P2.
+    const { ThrottlerStorage } = await import('@nestjs/throttler');
+    const store = app.get(ThrottlerStorage) as unknown as {
+      storage: Map<string, unknown>;
+      timeoutIds: Map<string, NodeJS.Timeout[]>;
+    };
+    for (const role of ROLES_TESTES) {
+      for (const t of store.timeoutIds.values()) t.forEach(clearTimeout);
+      store.timeoutIds.clear();
+      store.storage.clear();
+      const moi = await request(s).get('/me/permissions').set('Cookie', cookiesDe(role));
+      const actions = moi.body.actions as string[];
+      for (const sonde of sondes) {
+        const agent = request(s);
+        const chemin = `/organizations/current/setup/${sonde.chemin}`;
+        const req = (sonde.methode === 'put' ? agent.put(chemin) : agent.delete(chemin)).set(
+          'Cookie',
+          cookiesDe(role),
+        );
+        const res = await (sonde.corps ? req.send(sonde.corps) : req);
+        expect(res.status, `${role} × ${sonde.chemin} : ${JSON.stringify(res.body)}`).toBe(
+          actions.includes(sonde.action) ? sonde.ok : 403,
+        );
+      }
+      // La fiche fiscale ne se reporte jamais (critère 7).
+      const fiscal = await request(s)
+        .put('/organizations/current/setup/deferred/fiscal')
+        .set('Cookie', cookiesDe(role));
+      expect(fiscal.status, role).toBe(404);
+    }
+  }, 60_000);
 });

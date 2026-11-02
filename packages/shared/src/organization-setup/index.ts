@@ -8,3 +8,5 @@
 // ADR-0052 — O0
 export * from './constants.js';
 export * from './schemas.js';
+// ADR-0052 — O2/O3
+export * from './declarations.js';
