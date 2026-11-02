@@ -8,12 +8,59 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  CONSOLE_PREFIXES,
+  CONSOLE_RESPONSE_HEADERS,
+  PROTECTED_PREFIXES,
   PUBLIC_FORM_PREFIXES,
+  isConsolePath,
   isAuthPath,
   isMarketingPath,
   isProtectedPath,
   isPublicFormPath,
 } from './routes';
+
+describe('console Lalanda (ADR-0053 — P1)', () => {
+  const PAGES = [
+    '/admin',
+    '/admin/organisations',
+    '/admin/utilisateurs',
+    '/admin/integrations',
+    '/admin/journal',
+    '/admin/abonnements',
+    '/admin/finances',
+  ];
+
+  it('classe la console à part de l’espace organisation', () => {
+    for (const path of PAGES) expect(isConsolePath(path)).toBe(true);
+    expect(CONSOLE_PREFIXES).toEqual(['/admin']);
+    // Une seule liste par espace : la console n'est pas un préfixe d'organisation.
+    expect(PROTECTED_PREFIXES as readonly string[]).not.toContain('/admin');
+  });
+
+  it('compare des frontières de segment', () => {
+    expect(isConsolePath('/administration')).toBe(false);
+    expect(isConsolePath('/administration-publique')).toBe(false);
+    expect(isConsolePath('/accueil')).toBe(false);
+    expect(isConsolePath('/organisation/journal')).toBe(false);
+  });
+
+  it('reste une page protégée : sans session, on passe par la connexion', () => {
+    for (const path of PAGES) expect(isProtectedPath(path)).toBe(true);
+  });
+
+  it('n’est ni marketing, ni authentification, ni formulaire public', () => {
+    for (const path of PAGES) {
+      expect(isMarketingPath(path)).toBe(false);
+      expect(isAuthPath(path)).toBe(false);
+      expect(isPublicFormPath(path)).toBe(false);
+    }
+  });
+
+  it('est servie sans cache ni indexation', () => {
+    expect(CONSOLE_RESPONSE_HEADERS['Cache-Control']).toBe('no-store');
+    expect(CONSOLE_RESPONSE_HEADERS['X-Robots-Tag']).toContain('noindex');
+  });
+});
 
 describe('isProtectedPath (S20b)', () => {
   it('protège les trois pages de l’espace compte', () => {

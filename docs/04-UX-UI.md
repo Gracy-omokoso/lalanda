@@ -94,7 +94,7 @@ Page d'arrivée après connexion. Trois cartes BUILD · RUN · GROW (nom, verbe,
 
 ### Menu de l'avatar
 
-Mon compte · Mise en route · Identité visuelle · Fiscalité · Membres · Paramètres · Abonnement · Administration · Déconnexion, filtrés par `GET /me/permissions` (déjà lu par la coquille) et `canReadAdmin`.
+Mon compte · Mise en route · Identité visuelle · Fiscalité · Membres · Paramètres · Abonnement · Console Lalanda · Déconnexion, filtrés par `GET /me/permissions` (déjà lu par la coquille) et l’action plateforme `platform.console.read` (ADR-0053 — P1, ci-dessous).
 
 ### « Initiative »
 
@@ -157,7 +157,7 @@ Déclenché par l’**avatar**, disponible à toutes les largeurs. Sept entrées
 | Mon compte | `/compte` (onglets Profil · Sécurité · Préférences) | aucune |
 | Organisation | `/organisation` | aucune — tout membre |
 | Abonnement | `/souscription` | aucune — tout membre |
-| Administration | `/admin` | `canReadAdmin` (`GET /me/platform-access`) |
+| Console Lalanda (ADR-0053 — P1) | `/admin` | action `platform.console.read` (`GET /me/platform-access`) |
 | Déconnexion | — (action) | session |
 
 **« Tableau de bord » mène à `/projects`, et aucune page de synthèse n’existe.** La page d’accueil transverse décrite plus haut dans ce document (« projets récents, alertes, tâches ») n’est pas construite : le menu ne la promet pas.
@@ -426,7 +426,7 @@ Composants : `normalize-dialog.tsx` (fenêtre), `normalization-status.tsx` (éta
 
 ## Implémenté (S21b) — Espace admin plateforme
 
-`/admin` livre l’exploitation de la plateforme en cinq onglets. Écrans : `apps/web/src/app/(app)/admin/`. API : `apps/api/src/admin/` et `apps/api/src/integrations/` (voir docs/16 § Espace admin plateforme).
+`/admin` livre l’exploitation de la plateforme en cinq onglets. Écrans : `apps/web/src/app/(console)/admin/` depuis ADR-0053 — P1 (section suivante, qui remplace la navigation et l’entrée décrites ici). API : `apps/api/src/admin/` et `apps/api/src/integrations/` (voir docs/16 § Espace admin plateforme).
 
 ### Pages
 
@@ -479,6 +479,34 @@ Conséquence assumée : on ne peut pas corriger un caractère d’une clé, on l
 - **Aucune donnée cliente n’y est lisible.** Le tableau de bord sert des compteurs, jamais un classement de clients ni un montant. La page Organisations affiche des volumes (membres, projets), jamais leur contenu. Il n’existe pas d’écran pour consulter le journal d’audit d’une organisation cliente depuis `/admin`.
 - **Trois actes restent refusés à tous**, super-administrateur compris : valider un plan, clôturer une période, exporter un rapport. Ils sont **affichés** sur le tableau de bord, pas seulement absents : une absence s’interprète comme un oubli, une interdiction écrite ne s’interprète pas.
 - **La recherche de comptes est un geste dirigé.** Il n’y a pas de « tout parcourir » : un annuaire feuilletable de toutes les adresses de tous les clients serait une base de données personnelles offerte à quiconque obtient un rôle support.
+
+## Implémenté (ADR-0053 — P1) — Coquille de la console Lalanda
+
+La console est **séparée** de l’espace organisation : groupe de routes `apps/web/src/app/(console)/admin/`, même domaine, URL `/admin` conservée (décision ouverte n° 1). Les écrans de S21b y sont repris sans changement de fond.
+
+- **Coquille propre** (`console-shell.tsx`) : barre du haut (marque, pastille « Console », **« Retour à l’espace organisation »** vers `/accueil`, thème, adresse, déconnexion), **bandeau permanent** « Console Lalanda — vous agissez pour la plateforme » avec les rôles détenus, colonne des modules (bande défilante sous 1024 px), contenu pleine largeur. **Ni sélecteur d’organisation, ni barre BUILD · RUN · GROW, ni cloche, ni `TermsGate`.** La coquille n’appelle que `GET /me/platform-access` et `GET /account/preferences` (`CONSOLE_SHELL_CALLS`) ; un test de source refuse tout import de la coquille d’organisation et tout appel d’organisation sous `(console)`.
+- **Modules par actions** (`console-model.ts`, testé) : chaque module est ouvert par une action plateforme (ADR-0053 § 5.1) servie par `GET /me/platform-access` (`actions`), jamais par un nom de rôle ni par les anciens drapeaux. Sans `platform.console.read`, écran de refus et **aucun appel `/admin/**`** ; module non ouvert : refus nommé, la page n’est pas montée.
+
+| Route | Module | Action | État |
+|---|---|---|---|
+| `/admin` | Tableau de bord (cartes cliquables des modules, volumes, interdits) | `platform.console.read` | disponible |
+| `/admin/organisations` | Organisations | `platform.orgs.read` | disponible |
+| `/admin/utilisateurs` | Comptes | `platform.users.read` | disponible |
+| `/admin/abonnements` | Abonnements et paiements | `platform.billing.read` | bientôt (P3) |
+| `/admin/fonctionnalites` | Fonctionnalités par offre | `platform.features.read` | bientôt (P4) |
+| `/admin/integrations` | Intégrations | `platform.integrations.manage` | disponible |
+| `/admin/journal` | Journal | `platform.audit.read` | disponible |
+| `/admin/annonces` | Annonces | `platform.announcements.draft` | bientôt (P6) |
+| `/admin/statistiques` | Statistiques | `platform.stats.read` | bientôt (P7) |
+| `/admin/finances` | Finances du site | `platform.finance.read` | bientôt (P7) |
+| `/admin/packs` | Country Packs | `platform.packs.manage` | bientôt |
+| `/admin/modeles` | Modèles sectoriels | `platform.templates.manage` | bientôt |
+
+Un module « bientôt » affiche « Bientôt disponible » et n’appelle rien.
+
+- **Entrée « Console Lalanda »** du menu du compte (remplace « Administration » ; le libellé faux « packs » disparaît, F10) : groupe propre, visible des seuls détenteurs de `platform.console.read` ; échec de l’appel → pas d’entrée.
+- **Middleware** : `lib/routes.ts` classe la console à part (`CONSOLE_PREFIXES`, `isConsolePath`), toujours protégée par la session seule ; ses pages sont servies avec `Cache-Control: no-store` et `X-Robots-Tag: noindex, nofollow`.
+- **Écart transitoire** : les boutons d’écriture des écrans repris restent conditionnés par `canManagePlatform` / `canManageIntegrations` jusqu’aux lots P2 et P3, qui posent les actions sur ces routes.
 
 ## Implémenté (S22a) — Connexion Google, mot de passe oublié, confirmation d’adresse
 
