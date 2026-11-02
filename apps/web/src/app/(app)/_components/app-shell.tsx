@@ -19,6 +19,8 @@ import { AppVersion } from '@/components/app-version';
 import { IconeNav } from '@/components/icones-navigation';
 import { LegalLinks } from '@/components/legal-links';
 
+// ADR-0053 — P6
+import { AnnoncesBanniere } from './annonces-banniere';
 import { AppHeader } from './app-header';
 import { actionsRapides, appActive, moduleCourant } from './nav-model';
 import { PendingInvitationsBanner } from './pending-invitations-banner';
@@ -128,6 +130,8 @@ function Coquille({ children }: { children: React.ReactNode }): React.ReactEleme
                 échoue, rien tant que la réponse n'est pas arrivée. */}
             <TermsGate />
             <PendingInvitationsBanner />
+            {/* ADR-0053 — P6 : annonce de la plateforme, quelle que soit l'organisation. */}
+            <AnnoncesBanniere />
             <div className="flex-1">{children}</div>
           </main>
 
