@@ -20,6 +20,7 @@ import {
   ETATS_ABONNEMENT,
   finDepuisSaisie,
   finParDefaut,
+  gesteDeFin,
   LIBELLES_ETATS_ABONNEMENT,
   LIBELLES_ROLES_ORG,
   messageErreurAnnonces,
@@ -34,7 +35,7 @@ import {
 import { ReauthGate, useReauth } from './reauth-gate';
 
 const REAUTH_ANNONCES =
-  'Préparer, soumettre, approuver, envoyer ou annuler une annonce exige une ré-authentification, valable dix minutes. Une annonce est approuvée par une autre personne que son auteur, et chaque étape est inscrite au journal plateforme.';
+  'Préparer, soumettre, approuver, envoyer, annuler ou retirer une annonce exige une ré-authentification, valable dix minutes. Une annonce est approuvée par une autre personne que son auteur, et chaque étape est inscrite au journal plateforme.';
 
 const ETIQUETTE =
   'font-mono text-[0.66rem] uppercase tracking-[0.1em] text-[var(--foreground-muted)]';
@@ -370,7 +371,8 @@ function Detail({
     }
   }
 
-  const annulable = a.status !== 'sent' && a.status !== 'canceled';
+  const fin = gesteDeFin(a.status);
+  const enCours = fin === 'annuler';
 
   return (
     <div className="flex flex-col gap-4 border-t border-[var(--border)] px-4 py-4 text-sm">
@@ -392,18 +394,24 @@ function Detail({
             ? `${formaterDateHeure(a.sentAt)} — ${a.recipientCount ?? 0} destinataire(s)`
             : '—'}
         </dd>
+        {a.withdrawnAt ? (
+          <>
+            <dt className={ETIQUETTE}>Retirée</dt>
+            <dd>{formaterDateHeure(a.withdrawnAt)}</dd>
+          </>
+        ) : null}
         <dt className={ETIQUETTE}>Fin de diffusion</dt>
         <dd>{a.expiresAt ? formaterDate(a.expiresAt) : '30 jours après l’envoi'}</dd>
       </dl>
 
-      {!fenetreOuverte && a.status !== 'sent' && a.status !== 'canceled' ? (
+      {!fenetreOuverte && fin !== null ? (
         <Bandeau ton="neutre">
           Confirmez votre mot de passe en haut de page pour faire avancer cette annonce.
         </Bandeau>
       ) : null}
 
       <div className="flex flex-wrap gap-2">
-        {a.status !== 'sent' && a.status !== 'canceled' ? (
+        {enCours ? (
           <button
             type="button"
             disabled={envoi}
@@ -473,10 +481,14 @@ function Detail({
         </div>
       ) : null}
 
-      {annulable ? (
+      {fin !== null ? (
         <div className="flex flex-wrap items-end gap-3">
           <label className="flex flex-col gap-1">
-            <span className={ETIQUETTE}>Motif d’annulation (dix caractères au moins)</span>
+            <span className={ETIQUETTE}>
+              {fin === 'retirer'
+                ? 'Motif du retrait (dix caractères au moins, interne)'
+                : 'Motif d’annulation (dix caractères au moins)'}
+            </span>
             <input
               value={motif}
               onChange={(e) => setMotif(e.target.value)}
@@ -488,10 +500,18 @@ function Detail({
             disabled={envoi || !fenetreOuverte || motif.trim().length < 10}
             className={BOUTON}
             onClick={() =>
-              void agir(() => announcementsApi.cancel(a.id, motif.trim()), 'Annonce annulée.')
+              void agir(
+                () =>
+                  fin === 'retirer'
+                    ? announcementsApi.withdraw(a.id, motif.trim())
+                    : announcementsApi.cancel(a.id, motif.trim()),
+                fin === 'retirer'
+                  ? 'Annonce retirée : elle n’apparaît plus chez les destinataires.'
+                  : 'Annonce annulée.',
+              )
             }
           >
-            Annuler l’annonce
+            {fin === 'retirer' ? 'Retirer l’annonce envoyée' : 'Annuler l’annonce'}
           </button>
         </div>
       ) : null}

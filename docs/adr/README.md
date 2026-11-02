@@ -141,3 +141,10 @@ Décideurs :
   fiscal et CGV corrigées, (D) factures saisies à la main, (E) facturation hors Lalanda ;
   recommandation C puis A ; quatorze décisions ouvertes, sans valeur par défaut. Statut :
   **proposé, en attente de la dirigeante** (1ᵉʳ nov. 2026).
+- [ADR-0054](ADR-0054-decisions-du-3-novembre.md) — Décisions de la dirigeante du 3 nov. 2026 :
+  inventaire des questions ouvertes des ADR-0047 à ADR-0053 et décision prise pour chacune (source ou
+  « choix produit prudent », à revoir avec le juriste et l'expert-comptable). Reconduction tacite
+  permise si le contrat la prévoit, constatée par un humain ; avoir déduit du reste à facturer ;
+  pointages conservés 5 ans puis purgés chaque jour ; avances sur salaire éteintes ; retrait d'une
+  annonce envoyée ; CGV et confidentialité réécrites, corpus `2026-11-03`. Statut : **accepté**
+  (3 nov. 2026).

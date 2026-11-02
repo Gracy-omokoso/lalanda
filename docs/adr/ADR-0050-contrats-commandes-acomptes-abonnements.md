@@ -1,6 +1,9 @@
 # ADR-0050 — Contrats clients, commandes clients, acomptes et abonnements : versions, avenants, échéances, reconduction, factures d'acompte, brouillons récurrents et alertes dans « Mes tâches »
 
 Statut : Proposed
+
+> **3 nov. 2026 — décisions ouvertes tranchées par [ADR-0054](ADR-0054-decisions-du-3-novembre.md)** (valeurs par défaut gardées sauf mention contraire, à revoir avec le juriste et l'expert-comptable).
+
 Date : 2026-11-01
 Décideurs : Gracy Omokoso (dirigeante) — **besoin exprimé** : compléter le RUN avec le § 5.2 du brief
 stratégique (produits et services, tarifs, versions de devis, validations, commandes clients, contrats,

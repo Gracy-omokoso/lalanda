@@ -16,6 +16,7 @@ import { ObjectId } from 'mongodb';
 import { randomBytes } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { HrAttendanceRetentionJob } from '../hr/attendance/hr-attendance-retention.job.js';
 import { e2eSuite } from './e2e-utils.js';
 import { code, hrFixture, ok, type HrFixture } from './hr-e2e-fixtures.js';
 
@@ -72,12 +73,12 @@ e2eSuite('RH — présences et pointage (ADR-0051 H12)', () => {
   }, 60_000);
 
   describe('éteint par défaut (critères 11, 17)', () => {
-    it('réglages par défaut : pointage et plannings éteints, aucun seuil, aucune purge', async () => {
+    it('réglages par défaut : pointage et plannings éteints, aucun seuil, pointages gardés 5 ans (ADR-0054)', async () => {
       const s = ok(await fx.get('viewer', '/hr/attendance/settings'));
       expect(s).toMatchObject({
         attendance: { enabled: false, selfClock: true, lateToleranceMinutes: null },
         planning: { enabled: false, indicativeMaxMinutesPerWeek: null },
-        retention: { attendanceMonths: null },
+        retention: { attendanceMonths: 60 },
       });
     });
 
@@ -483,6 +484,123 @@ e2eSuite('RH — présences et pointage (ADR-0051 H12)', () => {
       expect(ok(await fx.get('ownerB', '/hr/attendance/settings'))['planning']['enabled']).toBe(
         false,
       );
+    });
+  });
+
+  describe('conservation des pointages (ADR-0054)', () => {
+    /** Pointage posé directement (ancienneté impossible à saisir par l'API). */
+    const pointage = (organizationId: string, employeeId: string, at: string) => ({
+      organizationId,
+      employeeId,
+      kind: 'in',
+      at: new Date(at),
+      source: 'hr',
+      note: 'Ancien',
+      voidedBy: null,
+      correctionId: null,
+      createdBy: 'e2e',
+      _schemaVersion: 1,
+      createdAt: new Date(at),
+    });
+    const correction = (organizationId: string, employeeId: string, date: string) => ({
+      organizationId,
+      employeeId,
+      date,
+      proposed: [],
+      voidEventIds: [],
+      reason: 'Ancienne',
+      status: 'rejected',
+      requestedBy: 'e2e',
+      decidedBy: 'e2e',
+      decidedAt: new Date(`${date}T12:00:00Z`),
+      comment: null,
+      soleApprover: false,
+      createdAt: new Date(`${date}T12:00:00Z`),
+      updatedAt: new Date(`${date}T12:00:00Z`),
+    });
+    const NOW = new Date('2026-11-03T08:00:00Z');
+
+    it('purge quotidienne : au-delà de 5 ans par défaut, journalisée, idempotente ; récent gardé', async () => {
+      const events = db.collection('hr_attendance_events');
+      const corrections = db.collection('hr_attendance_corrections');
+      const ancien = await events.insertMany([
+        pointage(fx.orgN, emp.A, '2021-11-01T07:00:00Z'),
+        pointage(fx.orgN, emp.A, '2019-03-04T07:00:00Z'),
+      ]);
+      // Limite : le 3 nov. 2021 à 00:00 Kinshasa (2 nov. 23:00Z) — gardé.
+      const limite = await events.insertOne(pointage(fx.orgN, emp.A, '2021-11-02T23:00:00Z'));
+      await corrections.insertMany([
+        correction(fx.orgN, emp.A, '2021-11-02'),
+        correction(fx.orgN, emp.A, '2021-11-03'),
+      ]);
+      const avant = await events.countDocuments({ organizationId: fx.orgN });
+
+      const job = fx.app.get(HrAttendanceRetentionJob);
+      const r1 = await job.run(NOW);
+      expect(r1).toMatchObject({ purgedOrganizations: 1, events: 2, corrections: 1 });
+      for (const id of Object.values(ancien.insertedIds)) {
+        expect(await events.findOne({ _id: id })).toBeNull();
+      }
+      expect(await events.findOne({ _id: limite.insertedId })).not.toBeNull();
+      expect(await events.countDocuments({ organizationId: fx.orgN })).toBe(avant - 2);
+      const restantes = await corrections
+        .find({ organizationId: fx.orgN, reason: 'Ancienne' })
+        .toArray();
+      expect(restantes.map((c) => c['date'])).toEqual(['2021-11-03']);
+      const journal = await db
+        .collection('audit_events')
+        .find({ organizationId: fx.orgN, action: 'hr.attendance.purged' })
+        .toArray();
+      expect(journal).toHaveLength(1);
+      expect(journal[0]).toMatchObject({
+        actorUserId: 'system',
+        metadata: { events: 2, corrections: 1, cutoffDay: '2021-11-03', retentionMonths: 60 },
+      });
+      // Les pointages de la suite (octobre 2026) sont intacts.
+      expect(
+        await events.countDocuments({
+          organizationId: fx.orgN,
+          at: { $gte: new Date('2026-01-01T00:00:00Z') },
+        }),
+      ).toBeGreaterThan(0);
+
+      // Idempotente : une seconde passe ne trouve rien et n'écrit rien.
+      const r2 = await job.run(NOW);
+      expect(r2.purgedOrganizations).toBe(0);
+      expect(
+        await db
+          .collection('audit_events')
+          .countDocuments({ organizationId: fx.orgN, action: 'hr.attendance.purged' }),
+      ).toBe(1);
+    });
+
+    it('durée réglée par l’organisation ; `null` = aucune purge ; jamais hors de l’organisation', async () => {
+      const events = db.collection('hr_attendance_events');
+      // B règle 12 mois ; N désactive la purge.
+      ok(
+        await fx.put('ownerB', '/hr/attendance/settings', {
+          expectedRevision: await settingsRev('ownerB'),
+          retention: { attendanceMonths: 12 },
+        }),
+      );
+      ok(
+        await fx.put('hr_manager', '/hr/attendance/settings', {
+          expectedRevision: await settingsRev('hr_manager'),
+          retention: { attendanceMonths: null },
+        }),
+      );
+      const b = await events.insertOne(pointage(fx.orgB, 'emp-b', '2025-06-01T07:00:00Z'));
+      const bRecent = await events.insertOne(pointage(fx.orgB, 'emp-b', '2026-02-01T07:00:00Z'));
+      const n = await events.insertOne(pointage(fx.orgN, emp.A, '2010-01-04T07:00:00Z'));
+      const r = await fx.app.get(HrAttendanceRetentionJob).run(NOW);
+      expect(r.events).toBe(1);
+      expect(await events.findOne({ _id: b.insertedId })).toBeNull();
+      expect(await events.findOne({ _id: bRecent.insertedId })).not.toBeNull();
+      expect(await events.findOne({ _id: n.insertedId })).not.toBeNull();
+      const journal = await db
+        .collection('audit_events')
+        .findOne({ organizationId: fx.orgB, action: 'hr.attendance.purged' });
+      expect(journal?.['metadata']).toMatchObject({ events: 1, retentionMonths: 12 });
     });
   });
 });

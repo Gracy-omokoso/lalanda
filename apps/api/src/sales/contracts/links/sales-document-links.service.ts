@@ -38,6 +38,8 @@ export interface LinkedInvoiceRead {
   normalization?: { codeDefDgi?: string | null } | null;
   /** `real`, `test` ou `proforma` (ADR-0050 — V4 : rappel des acomptes en série réelle). */
   series?: string | null;
+  /** Quantités créditées par des avoirs gelés, par ligne (ADR-0023 § S25e.5 ; ADR-0054). */
+  credited?: { lineIndex: number; quantity: string }[] | null;
 }
 
 export interface LiveLink {
@@ -57,8 +59,14 @@ export function invoiceStateOf(status: InvoiceStatus): 'draft' | 'issued' {
   return FINAL_STATUSES.includes(status) ? 'issued' : 'draft';
 }
 
-/** Lien vivant → entrée du moteur (`orderInvoicing`). */
+/**
+ * Lien vivant → entrée du moteur (`orderInvoicing`). ADR-0054 (3 nov. 2026) : la quantité
+ * créditée par les avoirs gelés de la facture accompagne chaque ligne ; le moteur la
+ * déduit du facturé.
+ */
 export function linkedInvoiceInput({ link, invoice }: LiveLink): LinkedInvoiceInput {
+  const credited = new Map<number, string>();
+  for (const c of invoice.credited ?? []) credited.set(c.lineIndex, c.quantity);
   return {
     invoiceId: link.invoiceId,
     state: invoiceStateOf(invoice.status),
@@ -67,6 +75,7 @@ export function linkedInvoiceInput({ link, invoice }: LiveLink): LinkedInvoiceIn
       catalogItemId: l.catalogItemId ?? null,
       unitPrice: l.unitPrice,
       quantity: l.quantity,
+      ...(credited.has(l.index) ? { credited: credited.get(l.index)! } : {}),
     })),
     lineMap: link.lineMap.map((m) => ({
       invoiceLineIndex: m.invoiceLineIndex,
@@ -120,6 +129,7 @@ export class SalesDocumentLinksService {
             documentAmounts: 1,
             'normalization.codeDefDgi': 1,
             series: 1,
+            credited: 1,
           },
         },
       )

@@ -25,6 +25,7 @@ import {
   LIBELLES_STATUT_CORRECTION,
   MENTION_POINTAGE,
   accesPresences,
+  informationPointage,
   libelleConstat,
   pointageSuggere,
   separationCorrection,
@@ -83,6 +84,7 @@ export function Presences(): React.ReactElement {
         <FonctionEteinte fonction="attendance" actions={actions} />
       ) : (
         <PresencesActives
+          information={informationPointage(reglages.valeur)}
           pointer={acces.pointer}
           equipe={acces.equipe}
           employeeId={moi.employeeId}
@@ -94,11 +96,13 @@ export function Presences(): React.ReactElement {
 }
 
 function PresencesActives({
+  information,
   pointer,
   equipe,
   employeeId,
   moi,
 }: {
+  information: string;
   pointer: boolean;
   equipe: boolean;
   employeeId: string | null;
@@ -208,6 +212,7 @@ function PresencesActives({
             </button>
           </div>
           <p className="text-xs text-[var(--foreground-muted)]">{MENTION_POINTAGE}</p>
+          <p className="max-w-3xl text-xs text-[var(--foreground-muted)]">{information}</p>
           {notice ? <p className="text-sm">{notice}</p> : null}
           <ErreurAction erreur={erreur} />
         </Panneau>

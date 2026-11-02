@@ -8,6 +8,8 @@
 // voit pas ; la vue du destinataire ne révèle pas la catégorie ; fermer est idempotent et
 // sans doublon ; l'aperçu précède la soumission ; annulation motivée ; approbateur unique
 // marqué ; une date de fin passée est refusée ; chaque étape au journal plateforme.
+// ADR-0054 : une annonce envoyée se retire (motif, ré-authentification) et disparaît
+// aussitôt de la bannière et de la cloche de ses destinataires.
 
 import { ThrottlerStorage } from '@nestjs/throttler';
 import type { INestApplication } from '@nestjs/common';
@@ -190,6 +192,7 @@ e2eSuite('ADR-0053 — P6 : annonces par catégorie, circuit à deux personnes',
       ['post', `/admin/announcements/${factice}/approve`],
       ['post', `/admin/announcements/${factice}/send`],
       ['post', `/admin/announcements/${factice}/cancel`],
+      ['post', `/admin/announcements/${factice}/withdraw`],
     ] as const) {
       const res = await request(serveur())[verbe](chemin).set('Cookie', cookies['sa']!).send({});
       expect(res.status, `${verbe} ${chemin}`).toBe(401);
@@ -450,5 +453,52 @@ e2eSuite('ADR-0053 — P6 : annonces par catégorie, circuit à deux personnes',
       .get('/audit-events?limit=500')
       .set('Cookie', [...cookies['a']!, `active_org_id=${orgs['a']}`]);
     expect(JSON.stringify(client.body)).not.toContain('announcement');
+  });
+
+  // ── Retrait d'une annonce envoyée (ADR-0054) ────────────────────────────────
+
+  it('ADR-0054 — une annonce envoyée ne s’annule pas : elle se retire, avec motif', async () => {
+    const annuler = await poster('pa', `/admin/announcements/${annonce}/cancel`, {
+      reason: 'Texte erroné, à retirer.',
+    });
+    expect(annuler.status).toBe(409);
+    const sansMotif = await poster('pa', `/admin/announcements/${annonce}/withdraw`, {});
+    expect(sansMotif.status).toBe(400);
+    const client = await request(serveur())
+      .post(`/admin/announcements/${annonce}/withdraw`)
+      .set('Cookie', cookies['a']!)
+      .send({ reason: 'Je ne suis pas opérateur.' });
+    expect(client.status).toBe(403);
+    expect((await mesAnnonces('a')).body.announcements).toHaveLength(1);
+  });
+
+  it('ADR-0054 — retirée, elle disparaît chez le destinataire ; un second retrait → 409', async () => {
+    const res = await poster('pa', `/admin/announcements/${annonce}/withdraw`, {
+      reason: 'Information erronée, retirée par le support.',
+    });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body).toMatchObject({ status: 'withdrawn', withdrawnBy: ids['pa'] });
+    expect(res.body.withdrawnAt).not.toBeNull();
+    expect((await mesAnnonces('a')).body.announcements).toEqual([]);
+    expect((await poster('a', `/me/announcements/${annonce}/read`)).status).toBe(404);
+    // Rien n'est effacé : l'accusé reste, échu.
+    expect(
+      await db
+        .collection('platform_announcement_receipts')
+        .countDocuments({ announcementId: annonce }),
+    ).toBeGreaterThan(0);
+    const encore = await poster('pa', `/admin/announcements/${annonce}/withdraw`, {
+      reason: 'Information erronée, retirée par le support.',
+    });
+    expect(encore.status).toBe(409);
+    expect(encore.body.code).toBe('ANNOUNCEMENT_WRONG_STATUS');
+    const journal = await request(serveur())
+      .get('/admin/audit-events?limit=500')
+      .set('Cookie', cookies['sa']!);
+    const retrait = (journal.body.events as Array<Record<string, any>>).find(
+      (e) => e['targetId'] === annonce && e['action'] === 'platform.announcement.withdrawn',
+    );
+    expect(retrait).toBeDefined();
+    expect(retrait!['actorUserId']).toBe(ids['pa']);
   });
 });

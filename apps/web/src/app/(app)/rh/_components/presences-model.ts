@@ -5,7 +5,7 @@
 // (`attendanceDay`) par l'API : l'écran les met en forme, sans calcul d'heures
 // supplémentaires ni de durée légale. Les constats sont des faits, jamais des sanctions.
 
-import { ATTENDANCE_CLOCK_NOTICE } from '@lalanda/shared/hr';
+import { ATTENDANCE_CLOCK_NOTICE, attendanceEmployeeNotice } from '@lalanda/shared/hr';
 
 import type { OrgAction } from '@/lib/api';
 import type {
@@ -20,6 +20,14 @@ type Actions = readonly OrgAction[] | null;
 const a = (x: Actions, action: OrgAction): boolean => x !== null && x.includes(action);
 
 export const MENTION_POINTAGE = ATTENDANCE_CLOCK_NOTICE;
+
+/**
+ * Information des salariés à l'écran de pointage (ADR-0054, 3 nov. 2026) : ce qui est
+ * enregistré, par qui c'est lu, la durée de conservation RÉGLÉE par l'organisation.
+ */
+export function informationPointage(s: Pick<HrPresenceSettingsView, 'retention'> | null): string {
+  return attendanceEmployeeNotice(s ? s.retention.attendanceMonths : 60);
+}
 
 export const LIBELLES_CONSTAT_PRESENCE: Record<string, string> = {
   ATTENDANCE_UNPAIRED: 'Pointage sans arrivée ou sans départ correspondant',

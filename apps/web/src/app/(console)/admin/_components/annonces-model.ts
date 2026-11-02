@@ -22,7 +22,15 @@ const STATUTS: Record<AdminAnnouncementStatus, { libelle: string; ton: TonStatut
   approved: { libelle: 'Approuvée, à envoyer', ton: 'attention' },
   sent: { libelle: 'Envoyée', ton: 'succes' },
   canceled: { libelle: 'Annulée', ton: 'neutre' },
+  withdrawn: { libelle: 'Retirée', ton: 'neutre' },
 };
+
+/** ADR-0054 : seule une annonce ENVOYÉE se retire ; avant l'envoi, elle s'annule. */
+export function gesteDeFin(statut: AdminAnnouncementStatus): 'annuler' | 'retirer' | null {
+  if (statut === 'sent') return 'retirer';
+  if (statut === 'canceled' || statut === 'withdrawn') return null;
+  return 'annuler';
+}
 
 export function statutAnnonce(statut: AdminAnnouncementStatus): {
   libelle: string;

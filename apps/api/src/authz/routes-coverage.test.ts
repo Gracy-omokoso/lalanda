@@ -2642,6 +2642,8 @@ describe('ADR-0053 — P6 : `/admin/announcements/**` et `/me/announcements`', (
       'PlatformAnnouncementsController.cancel': 'platform.announcements.draft',
       'PlatformAnnouncementsController.approve': 'platform.announcements.approve',
       'PlatformAnnouncementsController.send': 'platform.announcements.approve',
+      // ADR-0054 — retrait d'une annonce envoyée (motif, ré-authentification).
+      'PlatformAnnouncementsController.withdraw': 'platform.announcements.draft',
     };
     const routes = TOUTES_LES_ROUTES.filter((r) =>
       r.cle.startsWith('PlatformAnnouncementsController.'),
@@ -2671,7 +2673,7 @@ describe('ADR-0053 — P6 : `/admin/announcements/**` et `/me/announcements`', (
   });
 
   it('toute écriture exige la ré-authentification, sauf l’aperçu qui ne fait que compter', () => {
-    const avecReauth = ['create', 'update', 'submit', 'approve', 'send', 'cancel'];
+    const avecReauth = ['create', 'update', 'submit', 'approve', 'send', 'cancel', 'withdraw'];
     for (const nom of Object.getOwnPropertyNames(proto)) {
       if (nom === 'constructor' || Reflect.getMetadata('path', proto[nom]!) === undefined) continue;
       expect(Reflect.getMetadata(P2_REAUTH_KEY, proto[nom]!) === true, nom).toBe(

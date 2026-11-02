@@ -65,8 +65,38 @@ export const HR_ATTENDANCE_SETTINGS_DEFAULTS = Object.freeze({
   lateToleranceMinutes: null as number | null,
 });
 
-/** Durée de conservation des pointages : non fixée, aucune purge (J4). */
-export const HR_ATTENDANCE_RETENTION_DEFAULT: number | null = null;
+/**
+ * Conservation des pointages par défaut, en mois : 60 (cinq ans). Décision de la
+ * dirigeante du 3 nov. 2026 (ADR-0054) — CHOIX PRODUIT PRUDENT, pas une durée légale
+ * établie ; à revoir avec le juriste et l'expert-comptable. Réglable par l'organisation
+ * (`hr_settings.retention.attendanceMonths`, de 1 à 600 mois) ; `null` posé par
+ * l'organisation = aucune purge. La tâche `hr.attendance.retention` efface chaque jour
+ * les pointages et corrections plus anciens.
+ */
+export const HR_ATTENDANCE_RETENTION_DEFAULT: number | null = 60;
+
+/**
+ * Information des salariés, affichée à l'écran de pointage (ADR-0054). Texte produit,
+ * rédigé sans affirmer de règle légale ; l'organisation reste responsable de
+ * l'information de son personnel.
+ */
+export function attendanceEmployeeNotice(retentionMonths: number | null): string {
+  const duree =
+    retentionMonths === null
+      ? 'aussi longtemps que votre organisation le décide (aucune durée réglée)'
+      : retentionMonths % 12 === 0
+        ? `${retentionMonths / 12} an${retentionMonths === 12 ? '' : 's'}`
+        : `${retentionMonths} mois`;
+  return (
+    'Votre organisation tient un registre de présence : chaque pointage enregistre votre nom, ' +
+    'le sens (arrivée ou départ) et l’heure, rien d’autre — ni position, ni photo, ni appareil. ' +
+    'Il sert au suivi des présences par votre organisation, qui en est responsable ; il est ' +
+    'lu par vous, votre manager et les personnes chargées des RH dans votre organisation. ' +
+    `Les pointages sont conservés ${duree}, puis effacés automatiquement. ` +
+    'Pour toute question, ou pour faire corriger un pointage, adressez-vous à votre ' +
+    'manager ou aux RH.'
+  );
+}
 
 // ── Codes ───────────────────────────────────────────────────────────────────
 

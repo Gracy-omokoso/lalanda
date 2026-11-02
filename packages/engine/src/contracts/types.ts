@@ -17,7 +17,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Toute évolution d'un calcul de ce module incrémente cette version. */
-export const CONTRACTS_VERSION = '1.0.0';
+export const CONTRACTS_VERSION = '1.1.0';
 
 /** Devises d'une commande ou d'un contrat — celles des documents de vente. */
 export const CONTRACT_CURRENCIES = ['CDF', 'USD'] as const;
@@ -333,6 +333,12 @@ export interface LinkedInvoiceLine {
   catalogItemId: string | null;
   unitPrice: ContractAmount;
   quantity: ContractQuantity;
+  /**
+   * Quantité déjà créditée par des avoirs GELÉS rattachés à cette ligne (`credited` de la
+   * facture d'origine, ADR-0023 § S25e.5). Décision du 3 nov. 2026 (ADR-0054) : un avoir
+   * réduit le facturé de la commande. Absente ou `0` : rien n'est déduit.
+   */
+  credited?: ContractQuantity;
 }
 
 export interface LinkedInvoiceInput {
@@ -365,8 +371,10 @@ export interface OrderInvoicingIssue {
 export interface OrderInvoicingLine {
   lineRef: string;
   ordered: ContractQuantity;
-  /** Quantité des factures émises. */
+  /** Quantité des factures émises, NETTE des avoirs gelés (ADR-0054). */
   invoiced: ContractQuantity;
+  /** Quantité créditée par des avoirs gelés sur les factures émises de la commande. */
+  credited: ContractQuantity;
   /** Quantité des brouillons en cours. */
   inDraft: ContractQuantity;
   /** Commandé − émis, jamais négatif. */

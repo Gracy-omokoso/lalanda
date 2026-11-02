@@ -1,6 +1,9 @@
 # ADR-0048 — Formulaire public de prospects (web-to-lead) : un formulaire par organisation, désactivé par défaut, consentement explicite, anti-abus sans CAPTCHA tiers
 
 Statut : Proposed
+
+> **3 nov. 2026 — décisions ouvertes tranchées par [ADR-0054](ADR-0054-decisions-du-3-novembre.md)** (valeurs par défaut gardées sauf mention contraire, à revoir avec le juriste et l'expert-comptable).
+
 Date : 2026-11-01
 Décideurs : Gracy Omokoso (dirigeante) — consigne du 1er nov. 2026 : « continue tous les
 chantiers » ; CTO Lalanda (contrat technique). Le cadrage est **proposé** : chaque choix qui

@@ -19,6 +19,11 @@
 // Revue du 1er nov. 2026 : paiement manuel (`apps/api/src/payments/manual.provider.ts`),
 // Lala et ElevenLabs (`apps/api/src/ai/`), brief, business plan, Idea Lab, modules
 // de gestion et RH ajoutés ; « aucun paiement encaissé » retiré (faux).
+// Mise à jour du 3 nov. 2026 (ADR-0054, version `2026-11-03`) : pointage (5 ans par
+// défaut, purge quotidienne), évaluations, notes de frais, formulaire public de
+// prospects, journal et statistiques de la plateforme, annonces ; rôle de Lalanda pour
+// les données que l'organisation saisit sur des tiers (choix produit, à revoir avec le
+// juriste).
 // Sources : `apps/api/src/ai/ai-actions.service.ts` (buildUserPrompt),
 // `apps/api/src/ai/openai-client.ts`, `apps/api/src/account/`,
 // `apps/api/src/organizations/`, `docs/17-SECURITE.md`.
@@ -122,6 +127,31 @@ const SECTIONS: readonly LegalSection[] = [
               'Les membres habilités de l’organisation',
             ],
             [
+              'Présences (pointage), si votre organisation l’active',
+              'Pour chaque collaborateur : sens du pointage (arrivée ou départ), heure du serveur, origine (le collaborateur, son manager ou les RH), note de saisie, demandes de correction et leur motif. Aucune position, photo, empreinte ni identifiant d’appareil.',
+              'Le collaborateur, son manager ou les RH',
+            ],
+            [
+              'Objectifs et évaluations, si votre organisation les active',
+              'Objectifs et avancement déclaré, auto-évaluation, appréciations et notes choisies par l’évaluateur, commentaire du collaborateur, note RH — chiffrés. Aucune note n’est calculée par Lalanda ni par l’IA.',
+              'Le collaborateur, son évaluateur, les RH',
+            ],
+            [
+              'Notes de frais et avances',
+              'Lignes de dépense, montants, justificatifs déposés, circuit de validation, moyen de remboursement choisi (espèces, mobile money, virement) sans numéro de compte.',
+              'Le collaborateur, puis les validateurs',
+            ],
+            [
+              'Formulaire public de prospects, si votre organisation en publie un',
+              'Nom, entreprise, adresse email, téléphone, message et source déclarés par le visiteur ; texte du consentement affiché et date ; empreinte salée de l’adresse IP (jamais l’adresse en clair).',
+              'Le visiteur du formulaire',
+            ],
+            [
+              'Administration de la plateforme',
+              'Métadonnées des comptes et organisations consultées par les opérateurs de Lalanda (nom, adresse email, offre, état de l’abonnement, usage) ; journal de leurs gestes avec motif et note interne ; accusés de lecture des messages de service ; statistiques agrégées par organisations.',
+              'Automatique et opérateurs de Lalanda',
+            ],
+            [
               'Paiement manuel d’un abonnement',
               'Référence de la demande, offre, période, montant, moyen choisi (mobile money ou virement) et décision de l’administrateur qui confirme ou rejette. Aucune coordonnée du payeur (numéro de téléphone, numéro de compte) n’est enregistrée.',
               'Vous, puis un administrateur de Lalanda',
@@ -143,6 +173,13 @@ const SECTIONS: readonly LegalSection[] = [
             ],
           ]}
         />
+        <p>
+          <strong>Données que votre organisation saisit sur d&apos;autres personnes</strong>{' '}
+          (collaborateurs, clients, prospects, contacts)&nbsp;: votre organisation décide de leur
+          usage et en est responsable&nbsp;; Lalanda les héberge et les traite pour son compte, sans
+          les réutiliser pour lui-même. Les personnes concernées exercent leurs droits auprès de
+          l&apos;organisation.
+        </p>
         <p>
           Nous ne demandons aucune donnée sensible (santé, opinions, appartenance syndicale…), à une
           exception près&nbsp;: le module RH permet d&apos;enregistrer une absence de type
@@ -166,6 +203,8 @@ const SECTIONS: readonly LegalSection[] = [
             'Prouver l’acceptation des conditions et savoir quand la redemander.',
             'Gérer le paiement des abonnements : paiement manuel par mobile money ou virement, confirmé par un administrateur de Lalanda après constat du dépôt.',
             'Facturer les abonnements, lorsque la facturation sera en service.',
+            'Administrer la plateforme : traiter les demandes de support et de paiement, bloquer un compte ou suspendre une organisation en cas de fraude ou d’atteinte à la sécurité, avec un motif ; tenir le journal de ces gestes ; établir des statistiques agrégées (aucune case de moins de 5 organisations) ; adresser des messages de service dans l’application, jamais de prospection par email.',
+            'Pour le compte de votre organisation : tenir ses dossiers RH, présences, notes de frais et évaluations, et recevoir les demandes de son formulaire public de prospects.',
             'Respecter nos obligations légales et comptables.',
           ]}
         />
@@ -380,6 +419,22 @@ const SECTIONS: readonly LegalSection[] = [
             ['Jeton de changement d’adresse email', '24 heures'],
             ['Choix en matière de cookies', 'Environ 6 mois'],
             [
+              'Pointages (présences)',
+              '5 ans par défaut, ou la durée réglée par votre organisation ; effacés automatiquement chaque jour au-delà.',
+            ],
+            [
+              'Évaluations, justificatifs de frais, dossiers des anciens salariés',
+              'La durée réglée par votre organisation ; tant qu’aucune n’est réglée, aucun effacement automatique.',
+            ],
+            [
+              'Demandes reçues par le formulaire de prospects et preuve du consentement',
+              'Tant que l’organisation existe, sauf suppression par elle.',
+            ],
+            [
+              'Journal de la plateforme (gestes des opérateurs, motifs, notes internes) et accusés de lecture des messages de service',
+              'Sans limite de durée à ce jour (ajout seul) ; une durée sera fixée avec un juriste.',
+            ],
+            [
               'Preuve d’acceptation des conditions',
               <ToComplete key="p">
                 durée de conservation de la preuve d’acceptation après suppression du compte — à
@@ -474,7 +529,7 @@ const SECTIONS: readonly LegalSection[] = [
         <LegalList
           items={[
             'Le paiement en service est le paiement manuel, par mobile money ou virement : l’abonnement est activé lorsqu’un administrateur de Lalanda a constaté le dépôt, et il ne se renouvelle pas automatiquement.',
-            'Le paiement en ligne (carte, PayPal) n’est ouvert que lorsqu’un prestataire est configuré ; son ouverture donnera lieu à une mise à jour de cette politique.',
+            'Le paiement en ligne (carte bancaire par Stripe, PayPal) n’est ouvert que lorsqu’un prestataire est configuré et proposé à l’écran de paiement ; son ouverture donnera lieu à une mise à jour de cette politique.',
             'Aucune facture d’abonnement n’est encore émise par le service.',
           ]}
         />
