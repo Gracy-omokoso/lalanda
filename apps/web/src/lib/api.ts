@@ -1711,7 +1711,24 @@ export interface PlatformAuditEventView {
   /** Valeurs simples, ou objets et listes depuis ADR-0041 (avant / après). */
   metadata: Record<string, unknown>;
   createdAt: string;
+  // ADR-0053 — P5 : clés de métadonnées retirées par la liste blanche (montant, IP…).
+  redactedKeys?: number;
 }
+
+// ADR-0053 — P5 : filtres du journal plateforme et événements de sécurité agrégés.
+export interface PlatformAuditFilters {
+  action?: string;
+  actorUserId?: string;
+  targetType?: string;
+  targetId?: string;
+  /** `AAAA-MM-JJ`, inclus. */
+  from?: string;
+  /** `AAAA-MM-JJ`, inclus. */
+  to?: string;
+}
+
+import type { PlatformSecuritySummaryView } from '@lalanda/shared/platform';
+export type { PlatformSecuritySummaryView };
 
 /**
  * État d'un secret — **jamais sa valeur**.
@@ -3405,17 +3422,68 @@ export const api = {
     }),
 
   /** Journal de PORTÉE PLATEFORME uniquement — aucun événement d'organisation cliente. */
+  // ADR-0053 — P5 : filtres combinés, page bornée, curseur `before`.
   listPlatformAuditEvents: (
-    filtre: { action?: string; actorUserId?: string; limit?: number } = {},
+    filtre: PlatformAuditFilters & { limit?: number; before?: string } = {},
   ) => {
     const params = new URLSearchParams();
-    if (filtre.action) params.set('action', filtre.action);
-    if (filtre.actorUserId) params.set('actorUserId', filtre.actorUserId);
+    for (const [cle, valeur] of Object.entries(filtre)) {
+      if (cle !== 'limit' && typeof valeur === 'string' && valeur.trim() !== '') {
+        params.set(cle, valeur.trim());
+      }
+    }
     params.set('limit', String(filtre.limit ?? 100));
-    return jsonRequest<{ events: PlatformAuditEventView[] }>(
+    return jsonRequest<{ events: PlatformAuditEventView[]; nextCursor?: string | null }>(
       `/admin/audit-events?${params.toString()}`,
       { method: 'GET' },
     );
+  },
+
+  // ADR-0053 — P5 : export CSV (motif obligatoire, journalisé, limité en débit) et
+  // événements de sécurité agrégés (comptes par jour, sans identifiant).
+  async exportPlatformAuditCsv(
+    filtre: PlatformAuditFilters,
+    reason: string,
+  ): Promise<{ blob: Blob; filename: string }> {
+    const params = new URLSearchParams();
+    for (const [cle, valeur] of Object.entries(filtre)) {
+      if (typeof valeur === 'string' && valeur.trim() !== '') params.set(cle, valeur.trim());
+    }
+    params.set('reason', reason);
+    const res = await fetch(`${API_URL}/admin/audit-events/export.csv?${params.toString()}`, {
+      method: 'GET',
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      let detail: unknown = text;
+      try {
+        detail = JSON.parse(text);
+      } catch {
+        /* garde le texte brut */
+      }
+      const err = new Error(
+        typeof detail === 'object' && detail !== null && 'message' in detail
+          ? String((detail as { message: unknown }).message)
+          : `HTTP ${res.status}`,
+      ) as Error & { status: number; detail: unknown };
+      err.status = res.status;
+      err.detail = detail;
+      throw err;
+    }
+    const cd = res.headers.get('content-disposition') ?? '';
+    const match = cd.match(/filename="([^"]+)"/);
+    return { blob: await res.blob(), filename: match?.[1] ?? 'journal-plateforme.csv' };
+  },
+
+  getPlatformSecurityEvents: (periode: { from?: string; to?: string } = {}) => {
+    const params = new URLSearchParams();
+    if (periode.from) params.set('from', periode.from);
+    if (periode.to) params.set('to', periode.to);
+    const qs = params.toString();
+    return jsonRequest<PlatformSecuritySummaryView>(`/admin/security-events${qs ? `?${qs}` : ''}`, {
+      method: 'GET',
+    });
   },
 
   // ─── ADR-0053 — P3 : abonnements et paiements manuels (`/admin/billing/**`) ───
