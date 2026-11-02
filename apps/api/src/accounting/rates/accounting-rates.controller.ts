@@ -23,8 +23,10 @@ import {
   type AccountingActor,
 } from '../accounting.common.js';
 import { AccountingRatesService } from './accounting-rates.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 @Controller('accounting/exchange-rates')
+@RequireFeature('accounting') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class AccountingRatesController {
   constructor(@Inject(AccountingRatesService) private readonly rates: AccountingRatesService) {}

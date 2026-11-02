@@ -19,8 +19,10 @@ import {
 } from '../accounting.common.js';
 import { AccountingSettingsService } from '../settings/accounting-settings.service.js';
 import { AccountingLetteringService } from './accounting-lettering.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 @Controller('accounting/lettering')
+@RequireFeature('accounting') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class BookkeepingLetteringController {
   constructor(

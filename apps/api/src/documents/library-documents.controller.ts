@@ -84,6 +84,7 @@ import {
   classifyLibraryDocument,
   type DocumentUploadedFile,
 } from './library-documents.service.js';
+import { RequireFeature } from '../billing/feature.guard.js';
 
 type User = { id: string };
 type Perms = CurrentOrgPermissionsValue | undefined;
@@ -119,6 +120,7 @@ function sendVersion(res: Response, v: LibraryDocumentVersionLean, body: Buffer)
 }
 
 @Controller('documents/folders')
+@RequireFeature('documents') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class DocumentFoldersController {
   constructor(@Inject(DocumentFoldersService) private readonly folders: DocumentFoldersService) {}
@@ -186,6 +188,7 @@ export class DocumentFoldersController {
 }
 
 @Controller('documents')
+@RequireFeature('documents') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class LibraryDocumentsController {
   constructor(

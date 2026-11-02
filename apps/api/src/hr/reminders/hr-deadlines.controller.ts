@@ -21,8 +21,10 @@ import { PermissionsGuard } from '../../authz/permissions.guard.js';
 import { effectiveActions } from '../../authz/permissions.js';
 import { invalidRequest } from '../../sales/sales.errors.js';
 import { HrDeadlinesService } from './hr-deadlines.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 @Controller('hr')
+@RequireFeature('hr') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class HrDeadlinesController {
   constructor(@Inject(HrDeadlinesService) private readonly deadlines: HrDeadlinesService) {}

@@ -23,8 +23,10 @@ import { PermissionsGuard } from '../../authz/permissions.guard.js';
 import type { OrgRole } from '../../authz/permissions.js';
 import { invalidRequest } from '../../sales/sales.errors.js';
 import { HrSettingsService } from './hr-settings.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 @Controller('hr/settings')
+@RequireFeature('hr') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class HrSettingsController {
   constructor(@Inject(HrSettingsService) private readonly settings: HrSettingsService) {}

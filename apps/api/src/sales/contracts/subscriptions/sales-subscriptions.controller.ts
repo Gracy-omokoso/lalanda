@@ -44,6 +44,7 @@ import {
   type PreparedOccurrence,
   type SalesContractScheduleView,
 } from './sales-subscriptions.service.js';
+import { RequireFeature } from '../../../billing/feature.guard.js';
 
 const ScheduleQuerySchema = z
   .object({ from: SalesContractCalendarDay.optional(), to: SalesContractCalendarDay.optional() })
@@ -59,6 +60,7 @@ const PrepareOccurrenceSchema = z
   .strict();
 
 @Controller('sales/contracts')
+@RequireFeature('sales_contracts') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class SalesSubscriptionsController {
   constructor(

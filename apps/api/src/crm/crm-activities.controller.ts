@@ -35,10 +35,12 @@ import {
   ListActivitiesQuerySchema,
   PutActivitySchema,
 } from './crm.dto.js';
+import { RequireFeature } from '../billing/feature.guard.js';
 
 type User = { id: string };
 
 @Controller('crm/activities')
+@RequireFeature('crm') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class CrmActivitiesController {
   constructor(@Inject(ActivitiesService) private readonly activities: ActivitiesService) {}

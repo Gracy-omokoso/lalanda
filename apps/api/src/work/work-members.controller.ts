@@ -16,8 +16,10 @@ import { CurrentOrgId } from '../auth/current-user.decorator.js';
 import { RequirePermission } from '../authz/authz.decorators.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
 import { WorkMembersService, type WorkMemberView } from './work-members.service.js';
+import { RequireFeature } from '../billing/feature.guard.js';
 
 @Controller('work/members')
+@RequireFeature('run_work') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class WorkMembersController {
   constructor(@Inject(WorkMembersService) private readonly members: WorkMembersService) {}

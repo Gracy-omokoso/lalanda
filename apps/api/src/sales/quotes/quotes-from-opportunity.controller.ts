@@ -17,6 +17,7 @@ import { isCalendarDay } from '../../crm/crm-model.js';
 import { invalidRequest } from '../sales.errors.js';
 import { isObjectIdHex } from '../search.js';
 import { QuotesService, type QuoteView } from './quotes.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 type User = { id: string; email: string; name?: string | null };
 
@@ -33,6 +34,7 @@ export const QuoteFromOpportunitySchema = z
   }));
 
 @Controller('sales/quotes')
+@RequireFeature('quotes') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class QuotesFromOpportunityController {
   constructor(@Inject(QuotesService) private readonly quotes: QuotesService) {}

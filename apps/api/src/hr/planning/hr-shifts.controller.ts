@@ -64,6 +64,7 @@ import {
   type ShiftWriteView,
   type StaffingNeedView,
 } from './hr-planning.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 type User = { id: string };
 type Perms = CurrentOrgPermissionsValue | undefined;
@@ -76,6 +77,7 @@ function actorOf(user: User, perms: Perms): HrActor {
 }
 
 @Controller('hr')
+@RequireFeature('hr') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class HrShiftsController {
   constructor(

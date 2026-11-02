@@ -21,8 +21,10 @@ import { PermissionsGuard } from '../authz/permissions.guard.js';
 import { CurrentStockActor } from './stock-actor.decorator.js';
 import { parseWith, type StockActor } from './stock.common.js';
 import { StockReportsService } from './stock-reports.service.js';
+import { RequireFeature } from '../billing/feature.guard.js';
 
 @Controller('stock')
+@RequireFeature('stock') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class StockReportsController {
   constructor(@Inject(StockReportsService) private readonly reports: StockReportsService) {}

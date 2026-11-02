@@ -54,8 +54,10 @@ import {
   type BillingUser,
   type PreparedInvoiceView,
 } from './work-billing.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 @Controller('work')
+@RequireFeature('run_work') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class WorkBillingController {
   constructor(

@@ -40,10 +40,12 @@ import type { OrgRole } from '../../authz/permissions.js';
 import { invalidRequest } from '../../sales/sales.errors.js';
 import { crmActorOf } from '../crm-actor.js';
 import { CrmAccountsService, type MergeResult } from './crm-accounts.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 type User = { id: string };
 
 @Controller('crm/accounts')
+@RequireFeature('crm') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class CrmAccountsController {
   constructor(@Inject(CrmAccountsService) private readonly accounts: CrmAccountsService) {}

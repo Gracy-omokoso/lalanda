@@ -52,12 +52,14 @@ import {
   PutSettingsSchema,
   TransferSchema,
 } from './treasury.dto.js';
+import { RequireFeature } from '../billing/feature.guard.js';
 
 function actorOf(user: { id: string }, role: OrgRole | undefined): TreasuryActor {
   return { userId: user.id, role: role ?? 'unknown' };
 }
 
 @Controller('treasury')
+@RequireFeature('treasury') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class TreasuryAccountsController {
   constructor(

@@ -20,8 +20,10 @@ import {
   UpdatePerformanceSettingsBody,
   type HrPerformanceSettingsView,
 } from './hr-performance-settings.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 @Controller('hr/settings/performance')
+@RequireFeature('hr') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class HrPerformanceSettingsController {
   constructor(

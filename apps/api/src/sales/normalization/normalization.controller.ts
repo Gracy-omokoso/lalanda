@@ -30,6 +30,7 @@ import { invalidRequest } from '../sales.errors.js';
 import type { DgiExchangePage, InvoiceView } from '../invoices/invoice.contract.js';
 import type { InvoiceActor } from '../invoices/invoice.types.js';
 import { NormalizationRoutesService } from './normalization-routes.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 type User = { id: string; email: string; name?: string | null };
 
@@ -44,6 +45,7 @@ export const DeclareNotNormalizedSchema = z
   .strict();
 
 @Controller('sales')
+@RequireFeature('normalized_invoicing') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class NormalizationController {
   constructor(

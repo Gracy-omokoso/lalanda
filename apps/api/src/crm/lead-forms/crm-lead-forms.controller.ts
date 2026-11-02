@@ -21,8 +21,10 @@ import type { OrgRole } from '../../authz/permissions.js';
 import { invalidRequest } from '../../sales/sales.errors.js';
 import { crmActorOf } from '../crm-actor.js';
 import { CrmLeadFormsService } from './crm-lead-forms.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 @Controller('crm/lead-form')
+@RequireFeature('crm') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class CrmLeadFormsController {
   constructor(@Inject(CrmLeadFormsService) private readonly forms: CrmLeadFormsService) {}

@@ -19,8 +19,10 @@ import {
   CrmAccountConversionService,
   type ConversionResult,
 } from './crm-account-conversion.service.js';
+import { RequireFeature } from '../../../billing/feature.guard.js';
 
 @Controller('crm/accounts')
+@RequireFeature('crm') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class CrmAccountConversionController {
   constructor(

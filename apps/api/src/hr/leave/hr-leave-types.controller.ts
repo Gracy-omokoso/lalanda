@@ -39,6 +39,7 @@ import { can } from '../../authz/permissions.js';
 import { invalidRequest } from '../../sales/sales.errors.js';
 import type { HrActor } from '../departments/hr-departments.service.js';
 import { HrLeaveTypesService } from './hr-leave-types.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 type User = { id: string };
 type Perms = CurrentOrgPermissionsValue | undefined;
@@ -48,6 +49,7 @@ function actorOf(user: User, perms: Perms): HrActor {
 }
 
 @Controller('hr/leave-types')
+@RequireFeature('hr') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class HrLeaveTypesController {
   constructor(@Inject(HrLeaveTypesService) private readonly types: HrLeaveTypesService) {}

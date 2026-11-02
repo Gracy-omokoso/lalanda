@@ -19,8 +19,10 @@ import { RequirePermission } from '../../authz/authz.decorators.js';
 import { PermissionsGuard } from '../../authz/permissions.guard.js';
 import { parseParam, parseWith } from '../accounting.common.js';
 import { AccountingStatementsService } from './accounting-statements.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 @Controller('accounting/statements')
+@RequireFeature('accounting') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class LedgerStatementsController {
   constructor(

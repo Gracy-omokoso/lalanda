@@ -36,8 +36,10 @@ import { PermissionsGuard } from '../authz/permissions.guard.js';
 import { CurrentStockActor } from './stock-actor.decorator.js';
 import { parseWith, type StockActor } from './stock.common.js';
 import { StockVouchersService } from './stock-vouchers.service.js';
+import { RequireFeature } from '../billing/feature.guard.js';
 
 @Controller('stock/vouchers')
+@RequireFeature('stock') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class StockVouchersController {
   constructor(@Inject(StockVouchersService) private readonly vouchers: StockVouchersService) {}

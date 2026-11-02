@@ -19,8 +19,10 @@ import { PermissionsGuard } from '../../authz/permissions.guard.js';
 import { invalidRequest } from '../../sales/sales.errors.js';
 import { workActorOf } from '../work.common.js';
 import { WorkTimesheetsService } from './work-timesheets.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 @Controller('work/timesheets')
+@RequireFeature('run_work') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class WorkTimesheetsController {
   constructor(@Inject(WorkTimesheetsService) private readonly timesheets: WorkTimesheetsService) {}

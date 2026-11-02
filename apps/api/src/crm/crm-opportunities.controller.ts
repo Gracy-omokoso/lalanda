@@ -43,10 +43,12 @@ import {
   type OpportunityView,
   type OpportunityWriteResult,
 } from './opportunities.service.js';
+import { RequireFeature } from '../billing/feature.guard.js';
 
 type User = { id: string };
 
 @Controller('crm/opportunities')
+@RequireFeature('crm') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class CrmOpportunitiesController {
   constructor(

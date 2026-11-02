@@ -50,6 +50,7 @@ import { PACKAGE_LIMITS } from './templates/custom/package-files.js';
 import type { ValidationReport } from './templates/custom/validate-package.js';
 import { FONTS, isBodyFont, type FontId } from './templates/invoice-fonts.js';
 import { CUSTOM_TEMPLATE_KEY, type TemplateFontChoice } from './templates/template.contract.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 export interface TemplatePackageView {
   packageId: string;
@@ -133,6 +134,7 @@ const ACCEPTED_TYPES = new Set([
 ]);
 
 @Controller('sales')
+@RequireFeature('invoice_templates') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class InvoiceTemplatePackagesController {
   constructor(
