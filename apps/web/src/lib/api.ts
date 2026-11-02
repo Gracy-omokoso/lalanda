@@ -1621,8 +1621,13 @@ export interface AdminOrganizationSummary {
   projectCount: number;
   suspended: boolean;
   suspendedReason: string | null;
+  /** ADR-0053 — P2 : effet de la suspension active (`null` sans suspension). */
+  suspensionMode?: 'read_only' | 'full' | null;
   createdAt: string;
 }
+
+/** ADR-0053 — P2 : motif d'un geste de la console (catégorie, message client, note interne). */
+export type AdminReasonCategory = 'unpaid' | 'abuse' | 'fraud' | 'legal' | 'request' | 'other';
 
 export interface AdminUserSummary {
   id: string;
@@ -3261,47 +3266,80 @@ export const api = {
       `/admin/organizations${q ? `?q=${encodeURIComponent(q)}` : ''}`,
       { method: 'GET' },
     ),
-  setOrganizationPlan: (organizationId: string, plan: Plan) =>
+  // ADR-0053 — P2 : chaque écriture porte un motif et exige une ré-authentification
+  // de dix minutes (`401 REAUTH_REQUIRED` sinon) ; conflit d'intérêts : `409 PLATFORM_SELF_DEALING`.
+  setOrganizationPlan: (
+    organizationId: string,
+    input: {
+      plan: Plan;
+      reasonCategory: AdminReasonCategory;
+      clientMessage: string;
+      internalNote: string;
+    },
+  ) =>
     jsonRequest<AdminOrganizationSummary>(
       `/admin/organizations/${encodeURIComponent(organizationId)}/plan`,
-      { method: 'PATCH', body: { plan } },
+      { method: 'PATCH', body: input },
     ),
-  /** Motif obligatoire (10 caractères minimum) — il part dans l'audit. */
-  suspendOrganization: (organizationId: string, reason: string) =>
+  suspendOrganization: (
+    organizationId: string,
+    input: {
+      reasonCategory: AdminReasonCategory;
+      clientMessage: string;
+      internalNote: string;
+      mode: 'read_only' | 'full';
+    },
+  ) =>
     jsonRequest<AdminOrganizationSummary>(
       `/admin/organizations/${encodeURIComponent(organizationId)}/suspend`,
-      { method: 'POST', body: { reason } },
+      { method: 'POST', body: input },
     ),
-  liftOrganizationSuspension: (organizationId: string) =>
+  liftOrganizationSuspension: (
+    organizationId: string,
+    input: { liftReason: string; liftedClientMessage: string },
+  ) =>
     jsonRequest<AdminOrganizationSummary>(
-      `/admin/organizations/${encodeURIComponent(organizationId)}/suspend`,
-      { method: 'DELETE' },
+      `/admin/organizations/${encodeURIComponent(organizationId)}/restore`,
+      { method: 'POST', body: input },
     ),
 
-  listAdminUsers: (q?: string) =>
-    jsonRequest<{ users: AdminUserSummary[] }>(
-      `/admin/users${q ? `?q=${encodeURIComponent(q)}` : ''}`,
-      { method: 'GET' },
-    ),
-  /** 400 { code: 'SELF_DEMOTION_FORBIDDEN' } si l'on se retire son propre super-admin. */
+  /** Recherche OBLIGATOIRE : trois caractères au moins, sinon `400 SEARCH_REQUIRED`. */
+  listAdminUsers: (q: string) =>
+    jsonRequest<{ users: AdminUserSummary[] }>(`/admin/users?q=${encodeURIComponent(q)}`, {
+      method: 'GET',
+    }),
+  /**
+   * Motif obligatoire ; `platform_support` exige une échéance (90 jours au plus).
+   * `409 SELF_GRANT_FORBIDDEN`, `409 EMAIL_NOT_VERIFIED`.
+   */
   grantPlatformRole: (
     userId: string,
     role: PlatformRole,
-    input: { reason?: string; expiresAt?: string } = {},
+    input: { reason: string; expiresAt?: string },
   ) =>
     jsonRequest<AdminUserSummary>(`/admin/users/${encodeURIComponent(userId)}/platform-roles`, {
       method: 'POST',
       body: { role, ...input },
     }),
+  /** 400 { code: 'SELF_DEMOTION_FORBIDDEN' } si l'on se retire son propre super-admin. */
   revokePlatformRole: (userId: string, role: PlatformRole) =>
     jsonRequest<AdminUserSummary>(
       `/admin/users/${encodeURIComponent(userId)}/platform-roles/${encodeURIComponent(role)}`,
       { method: 'DELETE' },
     ),
-  setUserDisabled: (userId: string, disabled: boolean) =>
-    jsonRequest<AdminUserSummary>(`/admin/users/${encodeURIComponent(userId)}/disabled`, {
-      method: 'PATCH',
-      body: { disabled },
+  /** Bloquer : la connexion est ensuite refusée (`403 ACCOUNT_BLOCKED`). */
+  blockUser: (
+    userId: string,
+    input: { reasonCategory: AdminReasonCategory; internalNote: string },
+  ) =>
+    jsonRequest<AdminUserSummary>(`/admin/users/${encodeURIComponent(userId)}/block`, {
+      method: 'POST',
+      body: input,
+    }),
+  unblockUser: (userId: string, input: { internalNote: string }) =>
+    jsonRequest<AdminUserSummary>(`/admin/users/${encodeURIComponent(userId)}/unblock`, {
+      method: 'POST',
+      body: input,
     }),
 
   /** Journal de PORTÉE PLATEFORME uniquement — aucun événement d'organisation cliente. */

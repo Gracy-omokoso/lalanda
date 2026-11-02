@@ -16,7 +16,7 @@
 // on désactive le contrôle ET on affiche la raison à côté : un bouton grisé sans
 // explication se lit comme un bug.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { api, PLATFORM_ROLES, type AdminUserSummary, type PlatformRole } from '@/lib/api';
 import { useSession } from '@/lib/auth-client';
@@ -31,6 +31,19 @@ import {
   raisonNonDesactivable,
   raisonNonRevocable,
 } from './admin-model';
+// ADR-0053 — P2
+import { ChampsMotif } from './champs-motif';
+import {
+  echeanceSupportParDefaut,
+  MOTIF_VIDE,
+  motifComplet,
+  rechercheSuffisante,
+  type MotifSaisi,
+} from './motif-model';
+import { ReauthGate, useReauth, type Reauth } from './reauth-gate';
+
+const REAUTH_COMPTES =
+  'Bloquer, débloquer un compte ou attribuer un rôle plateforme exige une ré-authentification, valable dix minutes. Chaque geste est motivé et inscrit au journal plateforme.';
 
 export function UsersPanel(): React.ReactElement {
   const acces = useAccesPlateforme();
@@ -40,12 +53,20 @@ export function UsersPanel(): React.ReactElement {
   const [recherche, setRecherche] = useState('');
   const [users, setUsers] = useState<AdminUserSummary[] | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
-  const [chargement, setChargement] = useState(true);
+  const [chargement, setChargement] = useState(false);
+  const reauth = useReauth();
 
+  // ADR-0053 — P2 : la recherche est OBLIGATOIRE côté serveur (`400 SEARCH_REQUIRED`) ;
+  // rien n'est chargé avant trois caractères.
   const charger = useCallback(async (q: string): Promise<void> => {
+    if (!rechercheSuffisante(q)) {
+      setUsers(null);
+      setErreur('Saisissez au moins trois caractères : la recherche est obligatoire.');
+      return;
+    }
     setChargement(true);
     try {
-      const { users: liste } = await api.listAdminUsers(q.trim() || undefined);
+      const { users: liste } = await api.listAdminUsers(q.trim());
       setUsers(liste);
       setErreur(null);
     } catch (err) {
@@ -54,10 +75,6 @@ export function UsersPanel(): React.ReactElement {
       setChargement(false);
     }
   }, []);
-
-  useEffect(() => {
-    void charger('');
-  }, [charger]);
 
   const remplacer = useCallback((maj: AdminUserSummary): void => {
     setUsers((liste) => (liste ? liste.map((u) => (u.id === maj.id ? maj : u)) : liste));
@@ -98,9 +115,9 @@ export function UsersPanel(): React.ReactElement {
         <p className="text-sm text-[var(--foreground-muted)]">Chargement…</p>
       ) : !users || users.length === 0 ? (
         <Vide>
-          {recherche.trim()
+          {users
             ? 'Aucun compte ne correspond à cette recherche.'
-            : 'Aucun compte à afficher.'}
+            : 'Cherchez un compte par son adresse ou son nom (trois caractères au moins).'}
         </Vide>
       ) : (
         <ul className="flex flex-col gap-2">
@@ -110,6 +127,7 @@ export function UsersPanel(): React.ReactElement {
               user={user}
               moiUserId={moiUserId}
               peutEcrire={acces.canManagePlatform}
+              reauth={reauth}
               onMaj={remplacer}
             />
           ))}
@@ -123,14 +141,18 @@ function LigneCompte({
   user,
   moiUserId,
   peutEcrire,
+  reauth,
   onMaj,
 }: {
   user: AdminUserSummary;
   moiUserId: string | null;
   peutEcrire: boolean;
+  reauth: Reauth;
   onMaj: (maj: AdminUserSummary) => void;
 }): React.ReactElement {
   const [role, setRole] = useState<PlatformRole>('platform_support');
+  const [motifRole, setMotifRole] = useState('');
+  const [motif, setMotif] = useState<MotifSaisi>(MOTIF_VIDE);
   const [etat, setEtat] = useState<{ ton: 'succes' | 'echec'; texte: string } | null>(null);
   const [envoi, setEnvoi] = useState(false);
 
@@ -142,6 +164,8 @@ function LigneCompte({
     setEtat(null);
     try {
       onMaj(await action());
+      setMotif(MOTIF_VIDE);
+      setMotifRole('');
       setEtat({ ton: 'succes', texte: succes });
     } catch (err) {
       setEtat({ ton: 'echec', texte: messageErreur(err, 'L’action a échoué.') });
@@ -164,7 +188,7 @@ function LigneCompte({
           </span>
         </div>
         {desactive ? (
-          <Pastille ton="echec">Désactivé le {formaterDate(user.disabledAt)}</Pastille>
+          <Pastille ton="echec">Bloqué le {formaterDate(user.disabledAt)}</Pastille>
         ) : (
           <Pastille ton="succes">Actif</Pastille>
         )}
@@ -221,57 +245,102 @@ function LigneCompte({
         : null}
 
       {peutEcrire ? (
-        <div className="flex flex-col gap-3 border-t border-[var(--border)] pt-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value as PlatformRole)}
-              aria-label={`Rôle plateforme à attribuer à ${user.email}`}
-              disabled={attribuables.length === 0}
-              className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
-            >
-              {attribuables.map((r) => (
-                <option key={r} value={r}>
-                  {libelleRole(r)}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              disabled={envoi || attribuables.length === 0 || !attribuables.includes(role)}
-              onClick={() =>
-                void executer(
-                  () => api.grantPlatformRole(user.id, role),
-                  'Rôle attribué. L’attribution figure au journal.',
-                )
-              }
-              className="rounded-md border border-[var(--border)] px-3 py-2 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-40"
-            >
-              Attribuer
-            </button>
+        <div className="border-t border-[var(--border)] pt-3">
+          <ReauthGate reauth={reauth} description={REAUTH_COMPTES}>
+            <div className="flex flex-wrap items-end gap-2">
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value as PlatformRole)}
+                aria-label={`Rôle plateforme à attribuer à ${user.email}`}
+                disabled={attribuables.length === 0}
+                className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
+              >
+                {attribuables.map((r) => (
+                  <option key={r} value={r}>
+                    {libelleRole(r)}
+                  </option>
+                ))}
+              </select>
+              <input
+                value={motifRole}
+                onChange={(e) => setMotifRole(e.target.value)}
+                placeholder="Motif de l’attribution (10 caractères minimum)"
+                aria-label="Motif de l’attribution"
+                className="w-80 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
+              />
+              <button
+                type="button"
+                disabled={
+                  envoi ||
+                  attribuables.length === 0 ||
+                  !attribuables.includes(role) ||
+                  motifRole.trim().length < 10
+                }
+                onClick={() =>
+                  void executer(
+                    () =>
+                      api.grantPlatformRole(user.id, role, {
+                        reason: motifRole.trim(),
+                        // Le Support est attribué pour 90 jours au plus (ADR-0053, décision n° 18).
+                        ...(role === 'platform_support'
+                          ? { expiresAt: echeanceSupportParDefaut(new Date()) }
+                          : {}),
+                      }),
+                    'Rôle attribué. L’attribution figure au journal.',
+                  )
+                }
+                className="rounded-md border border-[var(--border)] px-3 py-2 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-40"
+              >
+                Attribuer
+              </button>
+            </div>
 
-            <button
-              type="button"
-              disabled={envoi || blocageDesactivation !== null}
-              onClick={() =>
-                void executer(
-                  () => api.setUserDisabled(user.id, !desactive),
-                  desactive ? 'Compte réactivé.' : 'Compte désactivé et sessions révoquées.',
-                )
-              }
-              className="rounded-md border border-[var(--danger)]/40 px-3 py-2 text-sm font-medium text-[var(--danger)] transition hover:bg-[var(--danger-bg)] disabled:opacity-40"
-            >
-              {desactive ? 'Réactiver le compte' : 'Désactiver le compte'}
-            </button>
-          </div>
+            <div className="flex flex-col gap-2">
+              <ChampsMotif
+                motif={motif}
+                onChange={setMotif}
+                avecCategorie={!desactive}
+                avecMessageClient={false}
+              />
+              <div>
+                <button
+                  type="button"
+                  disabled={
+                    envoi ||
+                    blocageDesactivation !== null ||
+                    !motifComplet(motif, { avecCategorie: !desactive, avecMessageClient: false })
+                  }
+                  onClick={() =>
+                    void executer(
+                      () =>
+                        desactive
+                          ? api.unblockUser(user.id, { internalNote: motif.internalNote.trim() })
+                          : motif.reasonCategory === ''
+                            ? Promise.reject(new Error('Catégorie de motif obligatoire.'))
+                            : api.blockUser(user.id, {
+                                reasonCategory: motif.reasonCategory,
+                                internalNote: motif.internalNote.trim(),
+                              }),
+                      desactive
+                        ? 'Compte débloqué : il peut de nouveau se connecter.'
+                        : 'Compte bloqué : sessions révoquées, connexion refusée.',
+                    )
+                  }
+                  className="rounded-md border border-[var(--danger)]/40 px-3 py-2 text-sm font-medium text-[var(--danger)] transition hover:bg-[var(--danger-bg)] disabled:opacity-40"
+                >
+                  {desactive ? 'Débloquer le compte' : 'Bloquer le compte'}
+                </button>
+              </div>
+            </div>
 
-          {blocageDesactivation ? (
-            <p className="text-xs text-[var(--foreground-muted)]">{blocageDesactivation}</p>
-          ) : desactive ? null : (
-            <p className="max-w-2xl text-xs text-[var(--foreground-muted)]">
-              {AVERTISSEMENT_DESACTIVATION}
-            </p>
-          )}
+            {blocageDesactivation ? (
+              <p className="text-xs text-[var(--foreground-muted)]">{blocageDesactivation}</p>
+            ) : desactive ? null : (
+              <p className="max-w-2xl text-xs text-[var(--foreground-muted)]">
+                {AVERTISSEMENT_DESACTIVATION}
+              </p>
+            )}
+          </ReauthGate>
         </div>
       ) : null}
 

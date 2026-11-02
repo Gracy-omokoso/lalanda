@@ -22,13 +22,15 @@ import { api, type AdminOrganizationSummary, type Plan } from '@/lib/api';
 
 import { useAccesPlateforme } from './admin-access';
 import { Bandeau, Pastille, Vide } from './admin-chrome';
-import {
-  formaterDate,
-  LIBELLES_PLAN,
-  messageErreur,
-  MOTIF_SUSPENSION_MIN,
-  motifSuspensionValide,
-} from './admin-model';
+import { formaterDate, LIBELLES_PLAN, messageErreur } from './admin-model';
+// ADR-0053 — P2
+import { ChampsMotif } from './champs-motif';
+import { MOTIF_VIDE, motifComplet, noteInterneValide, type MotifSaisi } from './motif-model';
+import { ReauthGate, useReauth } from './reauth-gate';
+
+/** Texte de la fenêtre de ré-authentification des gestes sur une organisation. */
+const REAUTH_ORGANISATION =
+  'Changer l’offre, suspendre ou rétablir une organisation exige une ré-authentification, valable dix minutes. Chaque geste est motivé, inscrit au journal plateforme et paraît au journal du client sous « Équipe Lalanda ».';
 
 const PLANS = Object.keys(LIBELLES_PLAN) as Plan[];
 
@@ -172,10 +174,7 @@ function LigneOrganisation({
           ) : null}
 
           {peutEcrire ? (
-            <>
-              <ChangementPlan org={org} onMaj={onMaj} />
-              <Suspension org={org} onMaj={onMaj} />
-            </>
+            <GestionOrganisation org={org} onMaj={onMaj} />
           ) : (
             <Bandeau ton="neutre">
               Votre rôle plateforme ouvre la consultation, pas la gestion. Le changement de plan et
@@ -207,6 +206,23 @@ function Fiche({
   );
 }
 
+/** Monté seulement à l'ouverture d'une ligne gérable : une lecture de fenêtre par ligne ouverte. */
+function GestionOrganisation({
+  org,
+  onMaj,
+}: {
+  org: AdminOrganizationSummary;
+  onMaj: (maj: AdminOrganizationSummary) => void;
+}): React.ReactElement {
+  const reauth = useReauth();
+  return (
+    <ReauthGate reauth={reauth} description={REAUTH_ORGANISATION}>
+      <ChangementPlan org={org} onMaj={onMaj} />
+      <Suspension org={org} onMaj={onMaj} />
+    </ReauthGate>
+  );
+}
+
 function ChangementPlan({
   org,
   onMaj,
@@ -214,6 +230,7 @@ function ChangementPlan({
   org: AdminOrganizationSummary;
   onMaj: (maj: AdminOrganizationSummary) => void;
 }): React.ReactElement {
+  const [motif, setMotif] = useState<MotifSaisi>(MOTIF_VIDE);
   const [plan, setPlan] = useState<Plan>(org.plan);
   const [etat, setEtat] = useState<{ ton: 'succes' | 'echec'; texte: string } | null>(null);
   const [envoi, setEnvoi] = useState(false);
@@ -223,7 +240,16 @@ function ChangementPlan({
     setEnvoi(true);
     setEtat(null);
     try {
-      onMaj(await api.setOrganizationPlan(org.id, plan));
+      if (motif.reasonCategory === '') return;
+      onMaj(
+        await api.setOrganizationPlan(org.id, {
+          plan,
+          reasonCategory: motif.reasonCategory,
+          clientMessage: motif.clientMessage.trim(),
+          internalNote: motif.internalNote.trim(),
+        }),
+      );
+      setMotif(MOTIF_VIDE);
       setEtat({ ton: 'succes', texte: 'Plan modifié. Le changement figure au journal.' });
     } catch (err) {
       setEtat({ ton: 'echec', texte: messageErreur(err, 'Le plan n’a pas pu être modifié.') });
@@ -255,9 +281,16 @@ function ChangementPlan({
             </option>
           ))}
         </select>
+      </div>
+      <ChampsMotif motif={motif} onChange={setMotif} avecCategorie avecMessageClient />
+      <div>
         <button
           type="submit"
-          disabled={envoi || plan === org.plan}
+          disabled={
+            envoi ||
+            plan === org.plan ||
+            !motifComplet(motif, { avecCategorie: true, avecMessageClient: true })
+          }
           className="rounded-md border border-[var(--border)] px-3 py-2 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-40"
         >
           {envoi ? 'Enregistrement…' : 'Changer le plan'}
@@ -275,9 +308,14 @@ function Suspension({
   org: AdminOrganizationSummary;
   onMaj: (maj: AdminOrganizationSummary) => void;
 }): React.ReactElement {
-  const [motif, setMotif] = useState('');
+  const [motif, setMotif] = useState<MotifSaisi>(MOTIF_VIDE);
+  const [mode, setMode] = useState<'read_only' | 'full'>('read_only');
   const [etat, setEtat] = useState<{ ton: 'succes' | 'echec'; texte: string } | null>(null);
   const [envoi, setEnvoi] = useState(false);
+
+  const pret = org.suspended
+    ? motif.clientMessage.trim() !== '' && noteInterneValide(motif.internalNote)
+    : motifComplet(motif, { avecCategorie: true, avecMessageClient: true });
 
   async function agir(e: React.FormEvent): Promise<void> {
     e.preventDefault();
@@ -285,13 +323,26 @@ function Suspension({
     setEtat(null);
     try {
       if (org.suspended) {
-        onMaj(await api.liftOrganizationSuspension(org.id));
-        setEtat({ ton: 'succes', texte: 'Suspension levée.' });
+        onMaj(
+          await api.liftOrganizationSuspension(org.id, {
+            liftReason: motif.internalNote.trim(),
+            liftedClientMessage: motif.clientMessage.trim(),
+          }),
+        );
+        setEtat({ ton: 'succes', texte: 'Organisation rétablie.' });
       } else {
-        onMaj(await api.suspendOrganization(org.id, motif.trim()));
-        setMotif('');
+        if (motif.reasonCategory === '') return;
+        onMaj(
+          await api.suspendOrganization(org.id, {
+            reasonCategory: motif.reasonCategory,
+            clientMessage: motif.clientMessage.trim(),
+            internalNote: motif.internalNote.trim(),
+            mode,
+          }),
+        );
         setEtat({ ton: 'succes', texte: 'Organisation suspendue. Le motif figure au journal.' });
       }
+      setMotif(MOTIF_VIDE);
     } catch (err) {
       setEtat({ ton: 'echec', texte: messageErreur(err, 'L’action a échoué.') });
     } finally {
@@ -305,29 +356,42 @@ function Suspension({
         Suspension
       </h3>
       <p className="max-w-2xl text-xs text-[var(--foreground-muted)]">
-        Une suspension ferme l’accès à l’organisation pour tous ses membres. Elle ne supprime aucune
-        donnée et se lève sans perte. Le motif est obligatoire et part au journal : c’est lui qu’on
-        relira dans six mois pour comprendre la décision.
+        En lecture seule (par défaut), les membres consultent et exportent leurs données mais ne
+        modifient plus rien ; une suspension totale ferme toute l’organisation. Leurs autres
+        organisations ne sont pas touchées. Rien n’est supprimé ; le rétablissement est sans perte.
       </p>
       {org.suspended ? null : (
         <label className="flex flex-col gap-1 text-sm">
-          <span className="sr-only">Motif de suspension de {org.name}</span>
-          <textarea
-            value={motif}
-            onChange={(e) => setMotif(e.target.value)}
-            rows={2}
-            placeholder={`Motif (${MOTIF_SUSPENSION_MIN} caractères minimum)`}
-            className="w-full max-w-xl rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
-          />
+          <span className="font-mono text-[0.66rem] uppercase tracking-[0.1em] text-[var(--foreground-muted)]">
+            Effet
+          </span>
+          <select
+            value={mode}
+            onChange={(e) => setMode(e.target.value as 'read_only' | 'full')}
+            className="w-56 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
+          >
+            <option value="read_only">Lecture seule</option>
+            <option value="full">Suspension totale</option>
+          </select>
         </label>
       )}
+      <ChampsMotif
+        motif={motif}
+        onChange={setMotif}
+        avecCategorie={!org.suspended}
+        avecMessageClient
+      />
       <div>
         <button
           type="submit"
-          disabled={envoi || (!org.suspended && !motifSuspensionValide(motif))}
+          disabled={envoi || !pret}
           className="rounded-md border border-[var(--danger)]/40 px-3 py-2 text-sm font-medium text-[var(--danger)] transition hover:bg-[var(--danger-bg)] disabled:opacity-40"
         >
-          {envoi ? 'En cours…' : org.suspended ? 'Lever la suspension' : 'Suspendre l’organisation'}
+          {envoi
+            ? 'En cours…'
+            : org.suspended
+              ? 'Rétablir l’organisation'
+              : 'Suspendre l’organisation'}
         </button>
       </div>
       {etat ? <Bandeau ton={etat.ton}>{etat.texte}</Bandeau> : null}

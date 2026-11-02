@@ -11,6 +11,7 @@
 
 import {
   ForbiddenException,
+  HttpException,
   Inject,
   Injectable,
   NotFoundException,
@@ -19,6 +20,9 @@ import {
   type ExecutionContext,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+// ADR-0053 — P2
+import { InjectConnection } from '@nestjs/mongoose';
+import type { Connection } from 'mongoose';
 
 import type { AuthenticatedRequest } from '../auth/auth.guard.js';
 import { AuthzService, forbidden } from './authz.service.js';
@@ -43,6 +47,8 @@ export class PermissionsGuard implements CanActivate {
   constructor(
     @Inject(Reflector) private readonly reflector: Reflector,
     @Inject(AuthzService) private readonly authz: AuthzService,
+    // ADR-0053 — P2 : lecture de la suspension administrative de l'organisation visée.
+    @InjectConnection() private readonly connection: Connection,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -124,12 +130,48 @@ export class PermissionsGuard implements CanActivate {
       throw new ForbiddenException(forbidden(denied, resolved.role, customized));
     }
 
+    // ADR-0053 — P2 : suspension administrative de l'organisation VISÉE (jamais d'une
+    // autre organisation du même membre). Jugée après le droit : un refus de rôle reste
+    // un 403 qui nomme l'action.
+    await this.assertNotSuspended(orgId, req.method);
+
     // Mémorisés pour les contrôleurs (journalisation d'audit, vues filtrées) —
     // évite une seconde lecture de la membership.
     req.orgRole = resolved.role;
     req.orgRoleContext = resolved.context;
     req.targetOrgId = orgId;
     return true;
+  }
+
+  // ── ADR-0053 — P2 : suspension administrative effective (§ 6.1, O4) ──────────
+  /**
+   * `read_only` (défaut, et toute suspension antérieure sans mode) : lecture ouverte
+   * (`GET`, `HEAD`, `OPTIONS`), toute autre méthode → `423 ORGANIZATION_SUSPENDED`.
+   * `full` : toute route d'organisation → 423. Aucune suspension active : rien.
+   */
+  private async assertNotSuspended(orgId: string, method: string | undefined): Promise<void> {
+    const db = this.connection.db;
+    if (!db) return;
+    const suspension = await db
+      .collection<{ organizationId: string; liftedAt: Date | null; mode?: string }>(
+        'organization_suspensions',
+      )
+      .findOne({ organizationId: orgId, liftedAt: null }, { projection: { mode: 1 } });
+    if (!suspension) return;
+    const reading = ['GET', 'HEAD', 'OPTIONS'].includes((method ?? 'GET').toUpperCase());
+    if (suspension.mode !== 'full' && reading) return;
+    throw new HttpException(
+      {
+        code: 'ORGANIZATION_SUSPENDED',
+        mode: suspension.mode === 'full' ? 'full' : 'read_only',
+        message:
+          suspension.mode === 'full'
+            ? 'Cette organisation est suspendue par l’équipe Lalanda.'
+            : 'Cette organisation est suspendue par l’équipe Lalanda : elle reste lisible, ' +
+              'aucune modification n’est possible.',
+      },
+      423,
+    );
   }
 
   /**
