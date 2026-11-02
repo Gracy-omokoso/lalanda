@@ -118,6 +118,9 @@ describe('ADR-0041 § 2 — validateOverrides : un cas par garde-fou', () => {
         'docs.read',
         // ADR-0049 § 8.1 : il consulte la comptabilité.
         'accounting.read',
+        // ADR-0051 § 5.1 : il déclare ses frais et pointe pour lui-même.
+        'expenses.claim',
+        'attendance.clock',
       ],
     });
   });
@@ -341,7 +344,8 @@ describe('ADR-0041 § 2 — validateOverrides : un cas par garde-fou', () => {
 
   it('décision n° 3 refusée : `fiscal.manage` ajouté à un Comptable est accepté', () => {
     // Trois paires depuis ADR-0044 § 4.3 ; aucune ne vise la facturation.
-    expect(SOD_PAIRS).toHaveLength(3);
+    // ADR-0051 § 5.2 ajoute la quatrième, `expenses.approve` + `payables.pay`.
+    expect(SOD_PAIRS).toHaveLength(4);
     expect(SOD_PAIRS.some((p) => p.includes('sales.invoice') && p.includes('fiscal.manage'))).toBe(
       false,
     );
@@ -480,13 +484,142 @@ describe('ADR-0041 § 4 et § 5 — dépendances, domaines et libellés', () => 
     for (const a of ['stock.read', 'assets.read', 'docs.read'] as const) {
       expect(requiredActionsOf(a), a).toEqual(['analytics.read']);
     }
-    expect(SOD_PAIRS).toHaveLength(3);
+    // ADR-0051 § 5.2 ajoute la quatrième, `expenses.approve` + `payables.pay`.
+    expect(SOD_PAIRS).toHaveLength(4);
     expect(
       SOD_PAIRS.flat().some(
         (a) => a.startsWith('stock.') || a.startsWith('assets.') || a.startsWith('docs.'),
       ),
     ).toBe(false);
     expect(NON_DELEGABLE_ACTIONS).toEqual(['billing.manage']);
+  });
+
+  it('ADR-0051 § 5.2 — domaine « Ressources humaines » élargi ; libellés et dépendances', () => {
+    expect(ACTION_DOMAINS).toHaveLength(13);
+    expect(ACTION_DOMAINS.find((d) => d.key === 'hr')?.actions.slice(5)).toEqual([
+      'expenses.claim',
+      'expenses.approve',
+      'attendance.clock',
+      'performance.read',
+    ]);
+    expect(ACTION_LABELS['expenses.claim']).toBe('Déclarer ses frais et demander une avance');
+    expect(ACTION_LABELS['expenses.approve']).toBe('Valider les notes de frais et les avances');
+    expect(ACTION_LABELS['attendance.clock']).toBe('Pointer sa présence');
+    expect(ACTION_LABELS['performance.read']).toBe(
+      'Consulter les objectifs et les évaluations du personnel',
+    );
+    // Déclarer et pointer : le socle seul (pour soi).
+    expect(requiredActionsOf('expenses.claim')).toEqual(['analytics.read']);
+    expect(requiredActionsOf('attendance.clock')).toEqual(['analytics.read']);
+    // Valider : relire la trésorerie engagée et le dossier du bénéficiaire.
+    expect(requiredActionsOf('expenses.approve')).toEqual([
+      'analytics.read',
+      'treasury.read',
+      'hr.read',
+    ]);
+    expect(requiredActionsOf('performance.read')).toEqual(['analytics.read', 'hr.read']);
+    // `payables.pay` : dépendances inchangées (décision ouverte n° 2).
+    expect(ACTION_DEPENDENCIES['payables.pay']).toEqual(['purchase.read', 'treasury.read']);
+    expect(NON_DELEGABLE_ACTIONS).toEqual(['billing.manage']);
+  });
+
+  it('ADR-0051 § 5.2 — paire `expenses.approve` + `payables.pay` : un Comptable ne reçoit pas la validation des frais', () => {
+    expect(SOD_PAIRS).toContainEqual(['expenses.approve', 'payables.pay']);
+    expect(
+      validateOverrides({
+        actorRole: 'owner',
+        actorCtx: NO_OVERRIDES,
+        targetRole: 'accountant',
+        targetCtxBefore: NO_OVERRIDES,
+        grants: ['hr.read', 'expenses.approve'],
+        revokes: [],
+        actorIsTarget: false,
+      }),
+    ).toEqual({ ok: false, code: 'SOD_CONFLICT', pair: ['expenses.approve', 'payables.pay'] });
+    // Le Responsable RH la reçoit (décision ouverte n° 2) s'il lit la trésorerie.
+    expect(
+      validateOverrides({
+        actorRole: 'owner',
+        actorCtx: NO_OVERRIDES,
+        targetRole: 'hr_manager',
+        targetCtxBefore: NO_OVERRIDES,
+        grants: ['expenses.approve'],
+        revokes: [],
+        actorIsTarget: false,
+      }),
+    ).toEqual({
+      ok: false,
+      code: 'PERMISSION_DEPENDENCY_MISSING',
+      action: 'expenses.approve',
+      missing: ['treasury.read'],
+    });
+    expect(
+      validateOverrides({
+        actorRole: 'owner',
+        actorCtx: NO_OVERRIDES,
+        targetRole: 'hr_manager',
+        targetCtxBefore: NO_OVERRIDES,
+        grants: ['treasury.read', 'expenses.approve'],
+        revokes: [],
+        actorIsTarget: false,
+      }),
+    ).toMatchObject({ ok: true, grants: ['treasury.read', 'expenses.approve'] });
+    // Le Directeur financier cumule nativement : lui retirer autre chose passe.
+    expect(
+      validateOverrides({
+        actorRole: 'owner',
+        actorCtx: NO_OVERRIDES,
+        targetRole: 'finance_director',
+        targetCtxBefore: NO_OVERRIDES,
+        grants: [],
+        revokes: ['attendance.clock'],
+        actorIsTarget: false,
+      }),
+    ).toMatchObject({ ok: true });
+  });
+
+  it('ADR-0051 § 5.1 — `performance.read` ne s’ajoute que par un acteur qui la détient (R7)', () => {
+    // Le Directeur financier ne la détient pas : il ne peut l'ajouter à personne.
+    expect(
+      validateOverrides({
+        actorRole: 'finance_director',
+        actorCtx: NO_OVERRIDES,
+        targetRole: 'analyst',
+        targetCtxBefore: NO_OVERRIDES,
+        grants: ['hr.read', 'performance.read'],
+        revokes: [],
+        actorIsTarget: false,
+      }),
+    ).toEqual({ ok: false, code: 'PERMISSION_ESCALATION', actions: ['performance.read'] });
+    // Sans `hr.read`, la dépendance manque.
+    expect(
+      validateOverrides({
+        actorRole: 'owner',
+        actorCtx: NO_OVERRIDES,
+        targetRole: 'viewer',
+        targetCtxBefore: NO_OVERRIDES,
+        grants: ['performance.read'],
+        revokes: [],
+        actorIsTarget: false,
+      }),
+    ).toEqual({
+      ok: false,
+      code: 'PERMISSION_DEPENDENCY_MISSING',
+      action: 'performance.read',
+      missing: ['hr.read'],
+    });
+    // Le Propriétaire l'ajoute à un Administrateur (décision ouverte n° 12, par membre).
+    expect(
+      validateOverrides({
+        actorRole: 'owner',
+        actorCtx: NO_OVERRIDES,
+        targetRole: 'admin',
+        targetCtxBefore: NO_OVERRIDES,
+        grants: ['performance.read'],
+        revokes: [],
+        actorIsTarget: false,
+      }),
+    ).toMatchObject({ ok: true, grants: ['performance.read'] });
   });
 
   it('ADR-0050 § 8.3 — domaine « Ventes et facturation » élargi après `sales.quote` ; libellés, dépendances, aucune paire nouvelle', () => {
@@ -513,7 +646,8 @@ describe('ADR-0041 § 4 et § 5 — dépendances, domaines et libellés', () => 
     // La règle utile (ne pas approuver ce qu'on a préparé) est dynamique
     // (`contractApprovalDecision`) : une paire statique empêcherait l'entrepreneur seul de
     // contracter.
-    expect(SOD_PAIRS).toHaveLength(3);
+    // ADR-0051 § 5.2 ajoute la quatrième, `expenses.approve` + `payables.pay`.
+    expect(SOD_PAIRS).toHaveLength(4);
     expect(SOD_PAIRS.flat().some((a) => a.startsWith('sales.contract'))).toBe(false);
     expect(NON_DELEGABLE_ACTIONS).toEqual(['billing.manage']);
   });
@@ -593,7 +727,8 @@ describe('ADR-0041 § 4 et § 5 — dépendances, domaines et libellés', () => 
     }
     // La règle utile (ne pas valider sa propre écriture) est dynamique : une paire
     // statique empêcherait l'entrepreneur seul de tenir ses livres.
-    expect(SOD_PAIRS).toHaveLength(3);
+    // ADR-0051 § 5.2 ajoute la quatrième, `expenses.approve` + `payables.pay`.
+    expect(SOD_PAIRS).toHaveLength(4);
     expect(SOD_PAIRS.flat().some((a) => a.startsWith('accounting.'))).toBe(false);
     expect(NON_DELEGABLE_ACTIONS).toEqual(['billing.manage']);
   });
@@ -666,7 +801,18 @@ describe('ADR-0041 § 4 et § 5 — dépendances, domaines et libellés', () => 
     expect(ACTION_DOMAINS[8]).toEqual({
       key: 'hr',
       label: 'Ressources humaines',
-      actions: ['hr.read', 'hr.manage', 'hr.sensitive.read', 'leave.request', 'leave.approve'],
+      actions: [
+        'hr.read',
+        'hr.manage',
+        'hr.sensitive.read',
+        'leave.request',
+        'leave.approve',
+        // ADR-0051 § 5.2 : second volet, même domaine.
+        'expenses.claim',
+        'expenses.approve',
+        'attendance.clock',
+        'performance.read',
+      ],
     });
     expect(ACTION_LABELS['hr.read']).toBe('Consulter les dossiers du personnel');
     expect(ACTION_LABELS['hr.manage']).toBe('Gérer les dossiers du personnel');
@@ -681,7 +827,8 @@ describe('ADR-0041 § 4 et § 5 — dépendances, domaines et libellés', () => 
     }
     expect(requiredActionsOf('leave.request')).toEqual(['analytics.read']);
     expect(requiredActionsOf('hr.read')).toEqual(['analytics.read']);
-    expect(SOD_PAIRS).toHaveLength(3);
+    // ADR-0051 § 5.2 ajoute la quatrième, `expenses.approve` + `payables.pay`.
+    expect(SOD_PAIRS).toHaveLength(4);
     expect(SOD_PAIRS.flat().some((a) => a.startsWith('hr.') || a.startsWith('leave.'))).toBe(false);
     expect(NON_DELEGABLE_ACTIONS).toEqual(['billing.manage']);
   });
@@ -747,7 +894,8 @@ describe('ADR-0041 § 4 et § 5 — dépendances, domaines et libellés', () => 
       'Gérer les fournisseurs, commandes, réceptions et factures fournisseurs',
     );
     expect(ACTION_LABELS['purchase.approve']).toBe("Approuver les demandes d'achat");
-    expect(ACTION_LABELS['payables.pay']).toBe('Payer les fournisseurs');
+    // ADR-0051 § 5.1 : libellé élargi au remboursement du personnel.
+    expect(ACTION_LABELS['payables.pay']).toBe('Payer les fournisseurs et rembourser le personnel');
   });
 
   it('ADR-0044 § 4.3 — dépendances des achats', () => {

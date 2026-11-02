@@ -10,8 +10,8 @@ import {
 } from './index.js';
 
 describe('notifications — contrats partagés', () => {
-  it('déclare six types work, cinq crm, un organization, sept purchases, neuf hr, cinq stock, deux assets et un documents, préfixés par leur module', () => {
-    expect(NOTIFICATION_KINDS).toHaveLength(36);
+  it('déclare six types work, cinq crm, un organization, sept purchases, vingt-quatre hr, cinq stock, deux assets et un documents, préfixés par leur module', () => {
+    expect(NOTIFICATION_KINDS).toHaveLength(51);
     for (const kind of NOTIFICATION_KINDS) {
       const module = kind.split('.')[0]!;
       expect(NOTIFICATION_SOURCE_MODULES as readonly string[]).toContain(module);
@@ -41,6 +41,12 @@ describe('notifications — contrats partagés', () => {
       'stock_count',
       'asset',
       'library_document',
+      'expense_report',
+      'advance',
+      'shift',
+      'review',
+      'goal',
+      'attendance_correction',
     ]);
     // ADR-0041 — A4.
     expect(NOTIFICATION_KINDS.filter((k) => k.startsWith('organization.'))).toEqual([
@@ -68,6 +74,22 @@ describe('notifications — contrats partagés', () => {
       'hr.document_expiring',
       'hr.checklist_item_assigned',
       'hr.bank_details_changed',
+      // ADR-0051 — H8 (§ 7.5) : quinze types, six natures d'entité, aucun module nouveau.
+      'hr.expense_submitted',
+      'hr.expense_approved',
+      'hr.expense_rejected',
+      'hr.expense_reimbursed',
+      'hr.advance_submitted',
+      'hr.advance_decided',
+      'hr.advance_disbursed',
+      'hr.advance_overdue',
+      'hr.attendance_correction_requested',
+      'hr.attendance_correction_decided',
+      'hr.shifts_published',
+      'hr.shift_changed',
+      'hr.review_step',
+      'hr.goal_proposed',
+      'hr.goal_agreed',
     ]);
     expect(NOTIFICATION_SOURCE_MODULES).toContain('hr');
     // ADR-0046 — S0 (§ 6.7) : huit types, trois modules, quatre natures d'entité.

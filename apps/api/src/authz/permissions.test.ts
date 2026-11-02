@@ -11,18 +11,25 @@
 // ADR-0044 § 4.1 pour `purchase.*` et `payables.pay`, ADR-0045 § 4 pour `hr.*`, `leave.*` et
 // le rôle `hr_manager`, ADR-0046 § 8 pour `stock.*`, `assets.*`, `docs.*` et le rôle
 // `storekeeper`, ADR-0049 § 8 pour `accounting.*` et le rôle `external_accountant`,
-// ADR-0050 § 8 pour `sales.contract` et `sales.contract.approve`).
+// ADR-0050 § 8 pour `sales.contract` et `sales.contract.approve`, ADR-0051 § 5 pour
+// `expenses.*`, `attendance.clock` et `performance.read`).
 // C'est délibéré : un test qui
 // importerait la matrice de production vérifierait seulement qu'elle est égale à
 // elle-même. Ici, toute modification d'une case de production casse le test, ce
 // qui force une mise à jour CONSCIENTE de l'ADR et de docs/12.
 //
-// 12 rôles × 53 actions + 6 rôles plateforme × 53 actions = 954 cases vérifiées.
+// 12 rôles × 57 actions + 6 rôles plateforme × 57 actions = 1026 cases vérifiées.
 
 import { describe, expect, it } from 'vitest';
 
 import { ACCOUNTING_ACTIVATION_MISSING_CODES } from '@lalanda/shared/accounting';
 import { DOCUMENT_LINK_ENTITY_TYPES } from '@lalanda/shared/documents';
+import {
+  HR_ADVANCES_ERROR_CODES,
+  HR_ATTENDANCE_ERROR_CODES,
+  HR_EXPENSES_ERROR_CODES,
+  HR_PERFORMANCE_ERROR_CODES,
+} from '@lalanda/shared/hr';
 import { SALES_CONTRACT_ERROR_CODES } from '@lalanda/shared/sales-contracts';
 
 import {
@@ -64,6 +71,15 @@ import {
   canActivateAccounting,
   contractApprovalDecision,
   type ContractApprovalInput,
+  SOD_PAIRS,
+  attendanceCorrectionDecision,
+  expenseApprovalDecision,
+  reimbursementDecision,
+  reviewCloseDecision,
+  type AttendanceCorrectionInput,
+  type ExpenseApprovalInput,
+  type ReimbursementInput,
+  type ReviewCloseInput,
   manualEntryDecision,
   ruleSetDecision,
   type AccountingActivationInput,
@@ -198,6 +214,14 @@ const ATTENDU_ORG: Record<Action, string> = {
   // approuver, constater une reconduction, résilier : Propriétaire et Directeur financier (ⓢ).
   'sales.contract': 'A   A   A   A   .   .   .   .   A   .   .   .',
   'sales.contract.approve': 'S   .   S   .   .   .   .   .   .   .   .   .',
+  // ADR-0051 § 5.1 : déclarer ses frais et pointer suivent `leave.request` (tout rôle
+  // interne qui travaille) ; valider frais et avances suit `purchase.approve` (autorité de
+  // dépense, ⓢ) ; lire objectifs et évaluations : Propriétaire et Responsable RH seuls —
+  // ni Directeur financier, ni Administrateur (décision ouverte n° 12).
+  'expenses.claim': 'A   A   A   A   A   .   .   A   A   A   A   .',
+  'expenses.approve': 'S   .   S   .   .   .   .   .   .   .   .   .',
+  'attendance.clock': 'A   A   A   A   A   .   .   A   A   A   A   .',
+  'performance.read': 'A   .   .   .   .   .   .   .   .   A   .   .',
 };
 
 const CODE_VERS_GRANT: Record<string, string> = {
@@ -300,6 +324,11 @@ const ATTENDU_PLATEFORME: Record<Action, string> = {
   // onzième interdit absolu.
   'sales.contract': 'D   .   .   .   .   .',
   'sales.contract.approve': '.   .   .   .   .   .',
+  // ADR-0051 § 5.1 : refusées à tous ; `performance.read`, douzième interdit absolu.
+  'expenses.claim': '.   .   .   .   .   .',
+  'expenses.approve': '.   .   .   .   .   .',
+  'attendance.clock': '.   .   .   .   .   .',
+  'performance.read': '.   .   .   .   .   .',
 };
 
 const CODE_VERS_GRANT_PLATEFORME: Record<string, string> = {
@@ -313,9 +342,9 @@ function cellules(ligne: string): string[] {
 }
 
 describe('matrice rôle organisation × action (ADR-0012 §3)', () => {
-  it('déclare exactement les 12 rôles et les 53 actions de docs/12', () => {
+  it('déclare exactement les 12 rôles et les 57 actions de docs/12', () => {
     expect([...ORG_ROLES]).toEqual([...ORDRE_ORG]);
-    expect(ACTIONS).toHaveLength(53);
+    expect(ACTIONS).toHaveLength(57);
     // Ajoutée en fin de liste, comme dans docs/12 (ADR-0021 §8).
     expect(ACTIONS[15]).toBe('fiscal.manage');
     // Dix-septième et dix-huitième, en fin de liste (ADR-0022 § S25c.1).
@@ -375,7 +404,15 @@ describe('matrice rôle organisation × action (ADR-0012 §3)', () => {
     ]);
     // Cinquante-deuxième et cinquante-troisième, en fin de liste (ADR-0050 § 8.1, ordre de
     // fusion).
-    expect(ACTIONS.slice(51)).toEqual(['sales.contract', 'sales.contract.approve']);
+    expect(ACTIONS.slice(51, 53)).toEqual(['sales.contract', 'sales.contract.approve']);
+    // Cinquante-quatrième à cinquante-septième, en fin de liste (ADR-0051 § 5.1, recalées
+    // après ADR-0050).
+    expect(ACTIONS.slice(53)).toEqual([
+      'expenses.claim',
+      'expenses.approve',
+      'attendance.clock',
+      'performance.read',
+    ]);
     expect(Object.keys(ATTENDU_ORG).sort()).toEqual([...ACTIONS].sort());
   });
 
@@ -442,7 +479,7 @@ describe('matrice rôle plateforme × action (ADR-0012 §4)', () => {
   }
 });
 
-describe('interdits absolus de la plateforme (ADR-0012 §4, ADR-0021 §8, ADR-0023 § S25e.11, ADR-0045 § 4.1, ADR-0049 § 8.1, ADR-0050 § 8.1)', () => {
+describe('interdits absolus de la plateforme (ADR-0012 §4, ADR-0021 §8, ADR-0023 § S25e.11, ADR-0045 § 4.1, ADR-0049 § 8.1, ADR-0050 § 8.1, ADR-0051 § 5.1)', () => {
   const interdits: Action[] = [
     'plan.approve',
     'period.close',
@@ -457,10 +494,12 @@ describe('interdits absolus de la plateforme (ADR-0012 §4, ADR-0021 §8, ADR-00
     'accounting.manage',
     // ADR-0050 § 8.1 : approuver, constater une reconduction, résilier un contrat client.
     'sales.contract.approve',
+    // ADR-0051 § 5.1 : objectifs et évaluations du personnel d'un client.
+    'performance.read',
   ];
 
-  it('sont exactement ceux annoncés, au nombre de onze', () => {
-    expect(PLATFORM_FORBIDDEN_ACTIONS).toHaveLength(11);
+  it('sont exactement ceux annoncés, au nombre de douze', () => {
+    expect(PLATFORM_FORBIDDEN_ACTIONS).toHaveLength(12);
     expect([...PLATFORM_FORBIDDEN_ACTIONS].sort()).toEqual([...interdits].sort());
   });
 
@@ -697,7 +736,11 @@ describe('R7 — attribution de rôles sans élévation de privilège', () => {
           action === 'assets.read' ||
           action === 'docs.read' ||
           // ADR-0049 § 8.1 : lecture des livres.
-          action === 'accounting.read'
+          action === 'accounting.read' ||
+          // ADR-0051 § 5.1 : comme `leave.request`, déclarer ses frais et pointer n'écrivent
+          // que pour le membre lui-même, jamais une donnée de l'organisation.
+          action === 'expenses.claim' ||
+          action === 'attendance.clock'
         ) {
           continue;
         }
@@ -786,7 +829,7 @@ describe('compatibilité N-1 des anciens rôles', () => {
 });
 
 describe('cohérence structurelle de la matrice', () => {
-  it('chaque rôle déclare une décision pour CHACUNE des 53 actions', () => {
+  it('chaque rôle déclare une décision pour CHACUNE des 57 actions', () => {
     for (const role of ORG_ROLES) {
       for (const action of ACTIONS) {
         expect(ORG_PERMISSION_MATRIX[role][action], `${role} × ${action}`).toBeDefined();
@@ -810,7 +853,7 @@ describe('cohérence structurelle de la matrice', () => {
     for (const action of ecritures) expect(can('viewer', action, NO_OVERRIDES)).toBe(false);
   });
 
-  it('`owner` détient les 53 actions', () => {
+  it('`owner` détient les 57 actions', () => {
     for (const action of ACTIONS) expect(can('owner', action, NO_OVERRIDES)).toBe(true);
   });
 
@@ -1022,6 +1065,9 @@ describe('ADR-0040 § 4 — rôle Commercial et action `sales.quote`', () => {
       'docs.read',
       // ADR-0050 § 8.1 : il prépare le contrat de l'affaire qu'il a gagnée, sans l'approuver.
       'sales.contract',
+      // ADR-0051 § 5.1 : ses frais de terrain et son pointage, comme `leave.request`.
+      'expenses.claim',
+      'attendance.clock',
     ]);
   });
 
@@ -1135,6 +1181,8 @@ describe('ADR-0044 § 4 — achats et fournisseurs (lot P0)', () => {
       'accounting.manage',
       // ADR-0050 § 8.3 : contrats, avenants et constats de reconduction.
       'sales.contract.approve',
+      // ADR-0051 § 5.2 : notes de frais et avances (étape `finance`).
+      'expenses.approve',
     ]);
     for (const action of APPROVAL_ACTIONS) {
       for (const role of ORG_ROLES) {
@@ -1364,6 +1412,11 @@ describe('ADR-0045 § 4 — ressources humaines et rôle Responsable RH (lot H0)
       'assets.read',
       'docs.read',
       'docs.manage',
+      // ADR-0051 § 5.1 : ses frais, son pointage ; objectifs et évaluations de tous. Il ne
+      // valide pas une dépense (`expenses.approve`, décision ouverte n° 2).
+      'expenses.claim',
+      'attendance.clock',
+      'performance.read',
     ]);
     // Disjoint de la finance et de la gouvernance (O6).
     for (const action of [
@@ -1647,6 +1700,9 @@ describe('ADR-0046 § 8 — stocks, équipements, documents et rôle Magasinier 
       'stock.count',
       'assets.read',
       'docs.read',
+      // ADR-0051 § 5.1 : ses frais et son pointage, comme `leave.request`.
+      'expenses.claim',
+      'attendance.clock',
     ]);
     // Ni valeurs, ni validation d'écart, ni achats, ni trésorerie, ni ventes (O6).
     for (const action of [
@@ -2581,5 +2637,547 @@ describe('ADR-0050 § 8.3 — `contractApprovalDecision` (séparation dynamique)
 
   it('le code est celui du contrat partagé (`@lalanda/shared/sales-contracts`)', () => {
     expect(SALES_CONTRACT_ERROR_CODES).toContain('SELF_APPROVAL_FORBIDDEN');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADR-0051 — H8 : RH, second volet (frais, avances, présences, évaluations)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('ADR-0051 § 5 — frais, avances, présences, évaluations (lot H8)', () => {
+  const NOUVELLES = [
+    'expenses.claim',
+    'expenses.approve',
+    'attendance.clock',
+    'performance.read',
+  ] as const;
+
+  it('critère 1 — déclarer et pointer : iso-privilège avec `leave.request` (tout rôle interne qui travaille)', () => {
+    const declarent = ORG_ROLES.filter((r) => can(r, 'expenses.claim', NO_OVERRIDES));
+    expect(declarent).toEqual(ORG_ROLES.filter((r) => can(r, 'leave.request', NO_OVERRIDES)));
+    expect(ORG_ROLES.filter((r) => can(r, 'attendance.clock', NO_OVERRIDES))).toEqual(declarent);
+    // Externes et rôle non attribuable : rien (`403` sur `POST /hr/expense-reports`).
+    for (const role of ['advisor', 'external_accountant', 'project_manager'] as const) {
+      for (const action of NOUVELLES) {
+        expect(can(role, action, { canClosePeriods: true }), `${role} × ${action}`).toBe(false);
+      }
+    }
+  });
+
+  it('critère 1 — valider : Propriétaire et Directeur financier, cases ⓢ ; ni Comptable, ni Responsable RH', () => {
+    expect(ORG_ROLES.filter((r) => can(r, 'expenses.approve', NO_OVERRIDES))).toEqual([
+      'owner',
+      'finance_director',
+    ]);
+    expect(ORG_ROLES.filter((r) => can(r, 'expenses.approve', NO_OVERRIDES))).toEqual(
+      ORG_ROLES.filter((r) => can(r, 'purchase.approve', NO_OVERRIDES)),
+    );
+    for (const role of ORG_ROLES) {
+      expect(['deny', 'allow_sod']).toContain(ORG_PERMISSION_MATRIX[role]['expenses.approve']);
+    }
+    expect(APPROVAL_ACTIONS).toContain('expenses.approve');
+    // Le Comptable rembourse (`payables.pay`) sans valider ; le Responsable RH lit la liste
+    // (`hr.read`) sans valider ni rembourser.
+    expect(can('accountant', 'expenses.approve', NO_OVERRIDES)).toBe(false);
+    expect(can('accountant', 'payables.pay', NO_OVERRIDES)).toBe(true);
+    expect(can('hr_manager', 'hr.read', NO_OVERRIDES)).toBe(true);
+    expect(can('hr_manager', 'expenses.approve', NO_OVERRIDES)).toBe(false);
+    expect(can('hr_manager', 'payables.pay', NO_OVERRIDES)).toBe(false);
+  });
+
+  it('critère 1 — confidentialité : `performance.read` au Propriétaire et au Responsable RH seuls ; ni Directeur financier ni Administrateur', () => {
+    expect(ORG_ROLES.filter((r) => can(r, 'performance.read', NO_OVERRIDES))).toEqual([
+      'owner',
+      'hr_manager',
+    ]);
+    // Le Directeur financier lit les salaires, pas les entretiens (O6).
+    expect(can('finance_director', 'hr.sensitive.read', NO_OVERRIDES)).toBe(true);
+    expect(can('finance_director', 'performance.read', NO_OVERRIDES)).toBe(false);
+    expect(can('admin', 'performance.read', { canClosePeriods: true })).toBe(false);
+    // `hr.read` ou `hr.sensitive.read` seuls n'ouvrent pas les évaluations.
+    for (const role of ORG_ROLES) {
+      if (can(role, 'performance.read', NO_OVERRIDES)) {
+        expect(can(role, 'hr.manage', NO_OVERRIDES), role).toBe(true);
+      }
+    }
+  });
+
+  it('dépendances (§ 5.2), satisfaites par chaque ligne de la matrice', () => {
+    expect(ACTION_DEPENDENCIES['expenses.claim']).toBeUndefined();
+    expect(ACTION_DEPENDENCIES['attendance.clock']).toBeUndefined();
+    expect(ACTION_DEPENDENCIES['expenses.approve']).toEqual(['hr.read', 'treasury.read']);
+    expect(ACTION_DEPENDENCIES['performance.read']).toEqual(['hr.read']);
+    for (const action of NOUVELLES) {
+      for (const role of ORG_ROLES) {
+        if (!can(role, action, NO_OVERRIDES)) continue;
+        for (const dep of ACTION_DEPENDENCIES[action] ?? []) {
+          expect(can(role, dep, NO_OVERRIDES), `${role} × ${action} → ${dep}`).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('§ 5.2 — paire `expenses.approve` + `payables.pay` ; Propriétaire et Directeur financier la cumulent nativement', () => {
+    expect(SOD_PAIRS).toContainEqual(['expenses.approve', 'payables.pay']);
+    expect(
+      ORG_ROLES.filter(
+        (r) => can(r, 'expenses.approve', NO_OVERRIDES) && can(r, 'payables.pay', NO_OVERRIDES),
+      ),
+    ).toEqual(['owner', 'finance_director']);
+    // `payables.pay` : population et dépendances inchangées (décision ouverte n° 2).
+    expect(ORG_ROLES.filter((r) => can(r, 'payables.pay', NO_OVERRIDES))).toEqual([
+      'owner',
+      'finance_director',
+      'accountant',
+    ]);
+    expect(ACTION_DEPENDENCIES['payables.pay']).toEqual(['purchase.read', 'treasury.read']);
+  });
+
+  it('critère 2 — plateforme : les quatre refusées à tous, même sous accès délégué ; `performance.read` interdit absolu', () => {
+    expect(PLATFORM_FORBIDDEN_ACTIONS).toContain('performance.read');
+    for (const action of ['expenses.claim', 'expenses.approve', 'attendance.clock'] as const) {
+      expect(PLATFORM_FORBIDDEN_ACTIONS).not.toContain(action);
+    }
+    for (const role of PLATFORM_ROLES) {
+      for (const action of NOUVELLES) {
+        expect(PLATFORM_PERMISSION_MATRIX[role][action], `${role} × ${action}`).toBe('forbidden');
+        expect(canPlatform(role, action, { hasActiveGrant: true }), `${role} × ${action}`).toBe(
+          false,
+        );
+      }
+    }
+  });
+
+  it('§ 5.2 — aucun rôle nouveau ; R7 : l’Administrateur attribue les mêmes rôles', () => {
+    expect(ORG_ROLES).toHaveLength(12);
+    expect(grantableRoles('admin').sort()).toEqual([
+      'admin',
+      'advisor',
+      'analyst',
+      'sales_rep',
+      'storekeeper',
+      'viewer',
+    ]);
+    expect(grantableRoles('viewer').sort()).toEqual(['advisor', 'viewer']);
+    // Le Responsable RH reste attribuable par le seul Propriétaire.
+    expect(canGrantRole('admin', 'hr_manager')).toBe(false);
+    expect(canGrantRole('finance_director', 'hr_manager')).toBe(false);
+    expect(canGrantRole('owner', 'hr_manager')).toBe(true);
+  });
+});
+
+describe('ADR-0051 § 3.1, § 3.2 — `expenseApprovalDecision`', () => {
+  const base: ExpenseApprovalInput = {
+    decision: 'approve',
+    approverUserId: 'dir',
+    beneficiaryUserId: 'b',
+    createdBy: 'b',
+    step: 'finance',
+    salaryAdvance: false,
+    isDesignatedManager: false,
+    holdsExpensesApprove: true,
+    holdsHrSensitiveRead: true,
+    priorApproverUserIds: ['a'],
+    approverCountInOrg: 2,
+    allowSoleApprover: true,
+  };
+
+  it('critère 3 — le bénéficiaire ne valide pas sa note', () => {
+    expect(expenseApprovalDecision({ ...base, approverUserId: 'b' })).toEqual({
+      ok: false,
+      code: 'SELF_APPROVAL_FORBIDDEN',
+    });
+    expect(expenseApprovalDecision({ ...base, approverUserId: 'b', decision: 'reject' })).toEqual({
+      ok: false,
+      code: 'SELF_APPROVAL_FORBIDDEN',
+    });
+  });
+
+  it('critère 3 — l’auteur d’une saisie pour autrui (chauffeur sans compte) ne la valide pas', () => {
+    expect(
+      expenseApprovalDecision({
+        ...base,
+        approverUserId: 'rh',
+        beneficiaryUserId: null,
+        createdBy: 'rh',
+      }),
+    ).toEqual({ ok: false, code: 'CREATOR_APPROVAL_FORBIDDEN' });
+  });
+
+  it('critère 3 — le manager tient l’étape manager, puis ne tient pas l’étape finance', () => {
+    expect(
+      expenseApprovalDecision({
+        ...base,
+        approverUserId: 'a',
+        step: 'manager',
+        isDesignatedManager: true,
+        holdsExpensesApprove: false,
+        holdsHrSensitiveRead: false,
+        priorApproverUserIds: [],
+      }),
+    ).toEqual({ ok: true, soleApprover: false, onBehalfOfManager: false });
+    expect(expenseApprovalDecision({ ...base, approverUserId: 'a' })).toEqual({
+      ok: false,
+      code: 'APPROVER_ALREADY_APPROVED',
+    });
+    // La Directrice financière valide l'étape finance.
+    expect(expenseApprovalDecision(base)).toEqual({
+      ok: true,
+      soleApprover: false,
+      onBehalfOfManager: false,
+    });
+  });
+
+  it('étape manager : suppléance par un détenteur d’`expenses.approve`, marquée ; un collègue sans droit : 403', () => {
+    expect(expenseApprovalDecision({ ...base, step: 'manager', priorApproverUserIds: [] })).toEqual(
+      { ok: true, soleApprover: false, onBehalfOfManager: true },
+    );
+    expect(
+      expenseApprovalDecision({
+        ...base,
+        approverUserId: 'c',
+        step: 'manager',
+        holdsExpensesApprove: false,
+        priorApproverUserIds: [],
+      }),
+    ).toEqual({ ok: false, code: 'EXPENSE_NOT_YOUR_STEP' });
+    // Le manager désigné n'a aucune autorité à l'étape finance.
+    expect(
+      expenseApprovalDecision({
+        ...base,
+        approverUserId: 'a',
+        isDesignatedManager: true,
+        holdsExpensesApprove: false,
+        priorApproverUserIds: [],
+      }),
+    ).toEqual({ ok: false, code: 'EXPENSE_NOT_YOUR_STEP' });
+  });
+
+  it('critère 8 — avance sur salaire : ni le manager, ni un validateur sans `hr.sensitive.read`', () => {
+    expect(
+      expenseApprovalDecision({
+        ...base,
+        approverUserId: 'a',
+        salaryAdvance: true,
+        step: 'finance',
+        isDesignatedManager: true,
+        holdsExpensesApprove: false,
+        holdsHrSensitiveRead: false,
+        priorApproverUserIds: [],
+      }),
+    ).toEqual({ ok: false, code: 'ADVANCE_SALARY_NOT_YOUR_STEP' });
+    expect(
+      expenseApprovalDecision({
+        ...base,
+        salaryAdvance: true,
+        holdsHrSensitiveRead: false,
+        priorApproverUserIds: [],
+      }),
+    ).toEqual({ ok: false, code: 'ADVANCE_SALARY_NOT_YOUR_STEP' });
+    expect(
+      expenseApprovalDecision({ ...base, salaryAdvance: true, priorApproverUserIds: [] }),
+    ).toEqual({ ok: true, soleApprover: false, onBehalfOfManager: false });
+  });
+
+  it('critère 4 — approbatrice unique, sans manager : elle valide sa propre note, marquée', () => {
+    expect(
+      expenseApprovalDecision({
+        ...base,
+        approverUserId: 'pro',
+        beneficiaryUserId: 'pro',
+        createdBy: 'pro',
+        priorApproverUserIds: [],
+        approverCountInOrg: 1,
+      }),
+    ).toEqual({ ok: true, soleApprover: true, onBehalfOfManager: false });
+    // Réglage coupé : 409 même seule.
+    expect(
+      expenseApprovalDecision({
+        ...base,
+        approverUserId: 'pro',
+        beneficiaryUserId: 'pro',
+        createdBy: 'pro',
+        priorApproverUserIds: [],
+        approverCountInOrg: 1,
+        allowSoleApprover: false,
+      }),
+    ).toEqual({ ok: false, code: 'SELF_APPROVAL_FORBIDDEN' });
+  });
+
+  it('un refus clôt la note à toute étape, sans contrôle des étapes déjà tenues', () => {
+    expect(expenseApprovalDecision({ ...base, approverUserId: 'a', decision: 'reject' })).toEqual({
+      ok: true,
+      soleApprover: false,
+      onBehalfOfManager: false,
+    });
+  });
+
+  it('table de vérité : seules les personnes, les droits effectifs et le nombre de détenteurs comptent', () => {
+    for (const isSelf of [false, true]) {
+      for (const isCreator of [false, true]) {
+        for (const already of [false, true]) {
+          for (const holders of [1, 2]) {
+            for (const allowSoleApprover of [false, true]) {
+              for (const decision of ['approve', 'reject'] as const) {
+                const input: ExpenseApprovalInput = {
+                  ...base,
+                  decision,
+                  approverUserId: 'x',
+                  beneficiaryUserId: isSelf ? 'x' : 'b',
+                  createdBy: isCreator ? 'x' : 'b',
+                  priorApproverUserIds: already ? ['x'] : ['a'],
+                  approverCountInOrg: holders,
+                  allowSoleApprover,
+                };
+                const sole = allowSoleApprover && holders <= 1;
+                const personal = isSelf || isCreator;
+                const attendu =
+                  isSelf && !sole
+                    ? { ok: false, code: 'SELF_APPROVAL_FORBIDDEN' }
+                    : isCreator && !sole
+                      ? { ok: false, code: 'CREATOR_APPROVAL_FORBIDDEN' }
+                      : decision === 'reject'
+                        ? { ok: true, soleApprover: sole && personal, onBehalfOfManager: false }
+                        : already && !sole
+                          ? { ok: false, code: 'APPROVER_ALREADY_APPROVED' }
+                          : {
+                              ok: true,
+                              soleApprover: sole && (personal || already),
+                              onBehalfOfManager: false,
+                            };
+                expect(expenseApprovalDecision(input), JSON.stringify(input)).toEqual(attendu);
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it('les codes sont ceux des contrats partagés (`@lalanda/shared/hr`)', () => {
+    for (const code of [
+      'SELF_APPROVAL_FORBIDDEN',
+      'CREATOR_APPROVAL_FORBIDDEN',
+      'APPROVER_ALREADY_APPROVED',
+      'EXPENSE_NOT_YOUR_STEP',
+      'SELF_PAYMENT_FORBIDDEN',
+      'APPROVER_CANNOT_PAY',
+    ]) {
+      expect(HR_EXPENSES_ERROR_CODES as readonly string[]).toContain(code);
+    }
+    expect(HR_ADVANCES_ERROR_CODES).toContain('ADVANCE_SALARY_NOT_YOUR_STEP');
+  });
+});
+
+describe('ADR-0051 § 3.1 point 5 — `reimbursementDecision`', () => {
+  const base: ReimbursementInput = {
+    payerUserId: 'cpt',
+    beneficiaryUserId: 'b',
+    financeApproverUserId: 'dir',
+    payerCountInOrg: 3,
+    allowSoleApprover: true,
+  };
+
+  it('critère 3 — le Comptable rembourse ; la Directrice qui a validé ne rembourse pas si un autre payeur existe', () => {
+    expect(reimbursementDecision(base)).toEqual({ ok: true, soleApprover: false });
+    expect(reimbursementDecision({ ...base, payerUserId: 'dir' })).toEqual({
+      ok: false,
+      code: 'APPROVER_CANNOT_PAY',
+    });
+  });
+
+  it('le bénéficiaire ne se rembourse pas', () => {
+    expect(reimbursementDecision({ ...base, payerUserId: 'b' })).toEqual({
+      ok: false,
+      code: 'SELF_PAYMENT_FORBIDDEN',
+    });
+  });
+
+  it('critère 4 — payeuse unique : elle rembourse sa note qu’elle a validée, marquée', () => {
+    expect(
+      reimbursementDecision({
+        payerUserId: 'pro',
+        beneficiaryUserId: 'pro',
+        financeApproverUserId: 'pro',
+        payerCountInOrg: 1,
+        allowSoleApprover: true,
+      }),
+    ).toEqual({ ok: true, soleApprover: true });
+    expect(
+      reimbursementDecision({
+        payerUserId: 'pro',
+        beneficiaryUserId: 'pro',
+        financeApproverUserId: 'pro',
+        payerCountInOrg: 1,
+        allowSoleApprover: false,
+      }),
+    ).toEqual({ ok: false, code: 'SELF_PAYMENT_FORBIDDEN' });
+  });
+
+  it('collaborateur sans compte, approbateur inconnu : tout payeur, sans marque', () => {
+    expect(
+      reimbursementDecision({ ...base, beneficiaryUserId: null, financeApproverUserId: null }),
+    ).toEqual({ ok: true, soleApprover: false });
+  });
+
+  it('table de vérité', () => {
+    for (const isSelf of [false, true]) {
+      for (const isApprover of [false, true]) {
+        for (const count of [1, 2]) {
+          for (const allowSoleApprover of [false, true]) {
+            const input: ReimbursementInput = {
+              payerUserId: 'x',
+              beneficiaryUserId: isSelf ? 'x' : 'b',
+              financeApproverUserId: isApprover ? 'x' : 'a',
+              payerCountInOrg: count,
+              allowSoleApprover,
+            };
+            const sole = allowSoleApprover && count <= 1;
+            const attendu =
+              isSelf && !sole
+                ? { ok: false, code: 'SELF_PAYMENT_FORBIDDEN' }
+                : isApprover && !sole
+                  ? { ok: false, code: 'APPROVER_CANNOT_PAY' }
+                  : { ok: true, soleApprover: sole && (isSelf || isApprover) };
+            expect(reimbursementDecision(input), JSON.stringify(input)).toEqual(attendu);
+          }
+        }
+      }
+    }
+  });
+});
+
+describe('ADR-0051 § 3.4 — `attendanceCorrectionDecision`', () => {
+  const base: AttendanceCorrectionInput = {
+    decision: 'approve',
+    deciderUserId: 'a',
+    beneficiaryUserId: 'b',
+    requestedBy: 'b',
+    isDesignatedManager: true,
+    hasOtherDesignatedManager: false,
+    holdsHrManage: false,
+    hrManagerCountInOrg: 2,
+    allowSoleApprover: true,
+  };
+
+  it('critère 11 — la correction demandée par B est refusée à B, acceptée par A (manager)', () => {
+    expect(attendanceCorrectionDecision(base)).toEqual({ ok: true, soleApprover: false });
+    expect(
+      attendanceCorrectionDecision({
+        ...base,
+        deciderUserId: 'b',
+        isDesignatedManager: false,
+        hasOtherDesignatedManager: true,
+        holdsHrManage: true,
+      }),
+    ).toEqual({ ok: false, code: 'SELF_APPROVAL_FORBIDDEN' });
+  });
+
+  it('ni manager ni `hr.manage` : 403', () => {
+    expect(
+      attendanceCorrectionDecision({ ...base, deciderUserId: 'c', isDesignatedManager: false }),
+    ).toEqual({ ok: false, code: 'ATTENDANCE_CORRECTION_NOT_YOURS' });
+  });
+
+  it('l’auteur d’une correction saisie pour autrui ne la décide pas', () => {
+    expect(attendanceCorrectionDecision({ ...base, requestedBy: 'a' })).toEqual({
+      ok: false,
+      code: 'CREATOR_APPROVAL_FORBIDDEN',
+    });
+  });
+
+  it('approbateur unique : seul détenteur de `hr.manage`, sans autre manager, marqué', () => {
+    const seul: AttendanceCorrectionInput = {
+      ...base,
+      deciderUserId: 'rh',
+      beneficiaryUserId: 'rh',
+      requestedBy: 'rh',
+      isDesignatedManager: false,
+      holdsHrManage: true,
+      hrManagerCountInOrg: 1,
+    };
+    expect(attendanceCorrectionDecision(seul)).toEqual({ ok: true, soleApprover: true });
+    // Un manager existe : il décide, pas d'échappatoire.
+    expect(attendanceCorrectionDecision({ ...seul, hasOtherDesignatedManager: true })).toEqual({
+      ok: false,
+      code: 'SELF_APPROVAL_FORBIDDEN',
+    });
+  });
+
+  it('les codes sont ceux des contrats partagés', () => {
+    for (const code of [
+      'ATTENDANCE_CORRECTION_NOT_YOURS',
+      'SELF_APPROVAL_FORBIDDEN',
+      'CREATOR_APPROVAL_FORBIDDEN',
+    ]) {
+      expect(HR_ATTENDANCE_ERROR_CODES as readonly string[]).toContain(code);
+    }
+  });
+});
+
+describe('ADR-0051 § 3.5 — `reviewCloseDecision`', () => {
+  const base: ReviewCloseInput = {
+    closerUserId: 'rh',
+    employeeUserId: 'b',
+    reviewerUserId: 'a',
+    closerCountInOrg: 2,
+    allowSoleApprover: true,
+  };
+
+  it('critère 14 — l’évaluateur ne clôt pas ; la RH le peut', () => {
+    expect(reviewCloseDecision(base)).toEqual({ ok: true, soleApprover: false });
+    expect(reviewCloseDecision({ ...base, closerUserId: 'a' })).toEqual({
+      ok: false,
+      code: 'REVIEW_CLOSE_FORBIDDEN',
+    });
+  });
+
+  it('l’évalué ne clôt pas sa propre évaluation', () => {
+    expect(reviewCloseDecision({ ...base, closerUserId: 'b' })).toEqual({
+      ok: false,
+      code: 'REVIEW_CLOSE_FORBIDDEN',
+    });
+  });
+
+  it('détenteur unique : marqué ; réglage coupé : 409', () => {
+    expect(reviewCloseDecision({ ...base, closerUserId: 'a', closerCountInOrg: 1 })).toEqual({
+      ok: true,
+      soleApprover: true,
+    });
+    expect(
+      reviewCloseDecision({
+        ...base,
+        closerUserId: 'a',
+        closerCountInOrg: 1,
+        allowSoleApprover: false,
+      }),
+    ).toEqual({ ok: false, code: 'REVIEW_CLOSE_FORBIDDEN' });
+  });
+
+  it('table de vérité', () => {
+    for (const isEmployee of [false, true]) {
+      for (const isReviewer of [false, true]) {
+        for (const count of [1, 2]) {
+          for (const allowSoleApprover of [false, true]) {
+            const input: ReviewCloseInput = {
+              closerUserId: 'x',
+              employeeUserId: isEmployee ? 'x' : 'b',
+              reviewerUserId: isReviewer ? 'x' : 'a',
+              closerCountInOrg: count,
+              allowSoleApprover,
+            };
+            const personal = isEmployee || isReviewer;
+            const sole = allowSoleApprover && count <= 1;
+            const attendu = !personal
+              ? { ok: true, soleApprover: false }
+              : sole
+                ? { ok: true, soleApprover: true }
+                : { ok: false, code: 'REVIEW_CLOSE_FORBIDDEN' };
+            expect(reviewCloseDecision(input), JSON.stringify(input)).toEqual(attendu);
+          }
+        }
+      }
+    }
+    expect(HR_PERFORMANCE_ERROR_CODES).toContain('REVIEW_CLOSE_FORBIDDEN');
   });
 });

@@ -141,6 +141,68 @@ export const LIBELLES_TYPES: Record<NotificationKind, { label: string; aide: str
     label: 'Coordonnées bancaires modifiées',
     aide: 'Les coordonnées bancaires ou mobile money d’un collaborateur ont changé.',
   },
+  // ADR-0051 — H8 (§ 7.5) : second volet RH. Aucun libellé ne porte un montant, un motif,
+  // une note ni la mention « sur salaire ».
+  'hr.expense_submitted': {
+    label: 'Note de frais à valider',
+    aide: 'Une note de frais attend votre validation.',
+  },
+  'hr.expense_approved': {
+    label: 'Note de frais validée',
+    aide: 'Une note de frais est validée ; elle attend son remboursement.',
+  },
+  'hr.expense_rejected': {
+    label: 'Note de frais refusée',
+    aide: 'Une note de frais est refusée, avec le commentaire du validateur.',
+  },
+  'hr.expense_reimbursed': {
+    label: 'Note de frais remboursée',
+    aide: 'Une note de frais est remboursée.',
+  },
+  'hr.advance_submitted': {
+    label: 'Avance à valider',
+    aide: 'Une demande d’avance attend votre validation.',
+  },
+  'hr.advance_decided': {
+    label: 'Avance validée ou refusée',
+    aide: 'Une demande d’avance a reçu une décision.',
+  },
+  'hr.advance_disbursed': {
+    label: 'Avance versée',
+    aide: 'Une avance est versée, ou attend son versement.',
+  },
+  'hr.advance_overdue': {
+    label: 'Avance à régulariser',
+    aide: 'Une avance versée n’est pas régularisée à la date annoncée.',
+  },
+  'hr.attendance_correction_requested': {
+    label: 'Correction de pointage à décider',
+    aide: 'Une demande de correction de pointage attend votre décision.',
+  },
+  'hr.attendance_correction_decided': {
+    label: 'Correction de pointage décidée',
+    aide: 'Votre demande de correction de pointage a reçu une décision.',
+  },
+  'hr.shifts_published': {
+    label: 'Planning publié',
+    aide: 'De nouveaux créneaux de planning vous concernent.',
+  },
+  'hr.shift_changed': {
+    label: 'Créneau modifié',
+    aide: 'Un créneau publié qui vous concerne a changé.',
+  },
+  'hr.review_step': {
+    label: 'Évaluation : étape à faire',
+    aide: 'Une évaluation attend votre action (rédaction, prise de connaissance).',
+  },
+  'hr.goal_proposed': {
+    label: 'Objectif proposé',
+    aide: 'Un objectif individuel attend votre accord.',
+  },
+  'hr.goal_agreed': {
+    label: 'Objectif convenu',
+    aide: 'Un objectif individuel est convenu.',
+  },
   // ADR-0046 — S0 (§ 6.7) : stocks, équipements, documents. Aucun libellé ne porte un
   // coût, une valeur ni le titre d'un document.
   'stock.below_reorder': {

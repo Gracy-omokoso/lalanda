@@ -49,6 +49,26 @@ export const NOTIFICATION_KINDS = [
   'hr.document_expiring',
   'hr.checklist_item_assigned',
   'hr.bank_details_changed',
+  // ADR-0051 — H8 (§ 7.5) : second volet RH. Déclarés ici, émis par H10 (frais, avances),
+  // H12 (corrections de pointage, plannings) et H15 (objectifs, évaluations) ; destinataires
+  // choisis par relation ou par droits EFFECTIFS (`holdersOf`) à l'émission. AUCUN ne porte
+  // un montant d'avance sur salaire, un motif, une note ni un extrait d'évaluation ; une
+  // avance sur salaire n'est jamais nommée ainsi pour un tiers.
+  'hr.expense_submitted',
+  'hr.expense_approved',
+  'hr.expense_rejected',
+  'hr.expense_reimbursed',
+  'hr.advance_submitted',
+  'hr.advance_decided',
+  'hr.advance_disbursed',
+  'hr.advance_overdue',
+  'hr.attendance_correction_requested',
+  'hr.attendance_correction_decided',
+  'hr.shifts_published',
+  'hr.shift_changed',
+  'hr.review_step',
+  'hr.goal_proposed',
+  'hr.goal_agreed',
   // ADR-0046 — S0 (§ 6.7) : stocks, équipements, documents. Déclarés ici, émis par S3
   // (seuils, négatif, « À traiter », inventaires), S5 (rappels des équipements) et S6
   // (échéances des documents) ; refiltrés à la lecture par `stock.read`, `assets.read` et
@@ -103,6 +123,14 @@ export const NOTIFICATION_ENTITY_TYPES = [
   'stock_count',
   'asset',
   'library_document',
+  // ADR-0051 — H8 (§ 7.5) : note de frais, avance, créneau, évaluation, objectif, correction
+  // de pointage.
+  'expense_report',
+  'advance',
+  'shift',
+  'review',
+  'goal',
+  'attendance_correction',
 ] as const;
 export type NotificationEntityType = (typeof NOTIFICATION_ENTITY_TYPES)[number];
 
