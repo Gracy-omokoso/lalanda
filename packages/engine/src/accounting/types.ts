@@ -14,8 +14,12 @@
 // d'attente désigné par la configuration (§ 6.0).
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Toute évolution d'un calcul du module comptable incrémente cette version. */
-export const ACCOUNTING_VERSION = '1.0.0';
+/**
+ * Toute évolution d'un calcul du module comptable incrémente cette version.
+ * 1.1.0 (ADR-0051 H13) : dépenses possédées par les RH comptabilisées ; motif
+ * d'attente `SETTLED_BY_EMPLOYEE_ADVANCE` ; clés `hr.advance.*` sans règle.
+ */
+export const ACCOUNTING_VERSION = '1.1.0';
 
 /** Devises des pièces et monnaies de tenue admises (ADR-0049 § 2.2). */
 export const ACCOUNTING_CURRENCIES = ['CDF', 'USD'] as const;
@@ -83,6 +87,12 @@ export const SUSPENSE_REASONS = [
   'EXCHANGE_DIFFERENCE',
   /** Nature d'un autre mouvement de trésorerie inconnue de la pièce (§ 6.6). */
   'NATURE_UNKNOWN',
+  /**
+   * Dépense de note de frais soldée par une avance au personnel : l'argent est sorti
+   * au versement de l'avance ; la contrepartie attend la réponse de l'expert
+   * (ADR-0051 § 7.4, question C2).
+   */
+  'SETTLED_BY_EMPLOYEE_ADVANCE',
 ] as const;
 export type SuspenseReason = (typeof SUSPENSE_REASONS)[number];
 
@@ -360,8 +370,25 @@ export interface ExpenseView {
   accountId: string | null;
   deductibleVat: AccountingAmount | null;
   reference: string | null;
-  /** Non nulle quand un paiement fournisseur l'a créée : alors ignorée (§ 6.3). */
-  origin: { kind: string; id: string } | null;
+  /**
+   * Propriétaire de la dépense (§ 6.3 amendé par ADR-0051 § 7.4), ou `null` (directe).
+   * - `supplier_payment` : ignorée, le paiement fournisseur la comptabilise déjà ;
+   * - `expense_report` : comptabilisée comme une dépense ; `settledByAdvanceId` non nul
+   *   (dépense sans compte) → contrepartie au compte d'attente ;
+   * - toute autre nature : « À comptabiliser », jamais devinée.
+   */
+  origin: ExpenseOriginView | null;
+}
+
+/** Natures de propriétaire d'une dépense connues du moteur. */
+export const EXPENSE_ORIGIN_KINDS = ['supplier_payment', 'expense_report'] as const;
+
+/** Propriétaire d'une dépense : paiement fournisseur ou note de frais (`id` de la pièce). */
+export interface ExpenseOriginView {
+  kind: string;
+  id: string;
+  /** Avance au personnel qui solde la dépense (`expense_report` seulement), sinon `null`. */
+  settledByAdvanceId: string | null;
 }
 
 /** Facture ou avoir fournisseur (§ 6.4). */

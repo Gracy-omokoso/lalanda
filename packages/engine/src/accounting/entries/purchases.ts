@@ -41,11 +41,32 @@ function declaredVat(
   return { vat, notes: [] };
 }
 
-/** Écriture d'une dépense directe (révision courante) ; annulée → aucune. */
+/**
+ * Écriture d'une dépense (révision courante) ; annulée → aucune.
+ *
+ * Propriétaire (§ 6.3, amendé par ADR-0051 § 7.4, lot H13) :
+ * - directe (`origin` nulle) ou note de frais (`expense_report`) : comptabilisée ;
+ * - paiement fournisseur : ignorée, ce paiement la comptabilise déjà (pas de double
+ *   comptage) ;
+ * - autre nature : « À comptabiliser » (`UNSUPPORTED_SOURCE`), jamais devinée.
+ *
+ * Une dépense de note de frais SOLDÉE PAR UNE AVANCE n'a pas de compte : l'argent est
+ * sorti au versement de l'avance. Sa contrepartie est la clé `hr.advance.settled`,
+ * toujours au compte d'attente (`SETTLED_BY_EMPLOYEE_ADVANCE`), à reclasser par
+ * l'expert (question C2) ; ce n'est pas une pièce « à comptabiliser ».
+ */
 export function entriesForExpense(view: ExpenseView, ctx: PostingContext): PostingResult {
   const source = { kind: 'treasury_expense' as const, id: view.id };
+  const origin = view.origin;
   // Créée par un paiement fournisseur : déjà comptée par ce paiement (§ 6.3).
-  if (view.origin !== null) return result(source, { skipped: 'CREATED_BY_SUPPLIER_PAYMENT' });
+  if (origin?.kind === 'supplier_payment') {
+    return result(source, { skipped: 'CREATED_BY_SUPPLIER_PAYMENT' });
+  }
+  if (origin !== null && origin.kind !== 'expense_report') {
+    return result(source, { pending: ['UNSUPPORTED_SOURCE'] });
+  }
+  const settledByAdvance =
+    origin !== null && origin.settledByAdvanceId !== null && view.accountId === null;
   if (view.spentOn < ctx.cutoverDate) return result(source, { skipped: 'BEFORE_CUTOVER' });
   if (view.status === 'cancelled') return result(source, { cancelled: true });
 
@@ -72,13 +93,15 @@ export function entriesForExpense(view: ExpenseView, ctx: PostingContext): Posti
     );
   }
   lines.push(
-    draftLine(ctx, {
-      ...common,
-      key: 'expense.payment',
-      side: 'credit',
-      cents: amount,
-      tokens: { treasuryAccount },
-    }),
+    settledByAdvance
+      ? draftLine(ctx, { ...common, key: 'hr.advance.settled', side: 'credit', cents: amount })
+      : draftLine(ctx, {
+          ...common,
+          key: 'expense.payment',
+          side: 'credit',
+          cents: amount,
+          tokens: { treasuryAccount },
+        }),
   );
 
   const entry = applyRate(
@@ -107,7 +130,7 @@ export function entriesForExpense(view: ExpenseView, ctx: PostingContext): Posti
   );
   return result(source, {
     entries: [entry],
-    pending: treasuryAccount === null ? ['NO_TREASURY_ACCOUNT'] : [],
+    pending: treasuryAccount === null && !settledByAdvance ? ['NO_TREASURY_ACCOUNT'] : [],
     notes: vat.notes,
   });
 }

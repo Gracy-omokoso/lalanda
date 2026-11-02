@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import type { ReportingEntry, ReportingLine } from '../ledger/index.js';
 import { computeReserves } from '../statements/index.js';
 import { EXPORT_COLUMNS, exportRows, type ExportRowsInput } from './index.js';
+import { ACCOUNTING_VERSION } from '../types.js';
 
 const L = (
   account: string,
@@ -41,7 +42,11 @@ const entries: ReportingEntry[] = [
       L('411', 'D', '2800.00', { auxiliaryAccountNumber: 'C2', currency: 'USD', amount: '1.00' }),
       L('706', 'C', '2800.00', { currency: 'USD', amount: '1.00' }),
     ],
-    generation: { ruleSetVersion: 3, chartPack: { slug: 'p', version: 1 }, engineVersion: '1.0.0' },
+    generation: {
+      ruleSetVersion: 3,
+      chartPack: { slug: 'p', version: 1 },
+      engineVersion: ACCOUNTING_VERSION,
+    },
     postedOn: '2026-03-05',
     hash: 'abc',
   },
@@ -64,7 +69,11 @@ const entries: ReportingEntry[] = [
       L('411', 'D', '116.00', { auxiliaryAccountNumber: 'C1', letteringCode: 'AA' }),
       L('706', 'C', '116.00'),
     ],
-    generation: { ruleSetVersion: 2, chartPack: { slug: 'p', version: 1 }, engineVersion: '1.0.0' },
+    generation: {
+      ruleSetVersion: 2,
+      chartPack: { slug: 'p', version: 1 },
+      engineVersion: ACCOUNTING_VERSION,
+    },
     postedOn: '2026-03-02',
     hash: 'def',
   },
@@ -158,7 +167,7 @@ describe('exportRows', () => {
       Idevise: 'CDF',
       CleSource: 'sales_invoice:inv1:issue',
       VersionRegles: '2',
-      VersionMoteur: '1.0.0',
+      VersionMoteur: ACCOUNTING_VERSION,
       EmpreinteEcriture: 'def',
     });
     expect(x.rows[2]).toMatchObject({
