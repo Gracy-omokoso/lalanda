@@ -186,6 +186,31 @@ export const PlanGrantInputSchema = z
     }
   });
 
+// ── ADR-0053 — P3 : corps de la console des abonnements (§ 6.2) ─────────────────
+
+const optionalClientMessage = z.string().trim().max(L.clientMessageMaxLength).optional();
+
+/**
+ * Confirmation depuis la console : note interne obligatoire (référence de l'opération
+ * reçue) ; message au client facultatif, repris par le miroir « Équipe Lalanda ».
+ */
+export const ConsoleConfirmManualPaymentInputSchema = ConfirmManualPaymentInputSchema.extend({
+  clientMessage: optionalClientMessage,
+}).strict();
+
+/** Refus depuis la console : motif interne obligatoire, message au client facultatif. */
+export const ConsoleRejectManualPaymentInputSchema = RejectManualPaymentInputSchema.extend({
+  clientMessage: optionalClientMessage,
+}).strict();
+
+/** Retrait d'un octroi (ou annulation d'une demande en attente) : motif et message client. */
+export const RevokePlanGrantInputSchema = z.object({ internalNote, clientMessage }).strict();
+
+/** Approbation d'un octroi par une seconde personne : note interne facultative. */
+export const ApprovePlanGrantInputSchema = z
+  .object({ internalNote: z.string().trim().max(L.internalNoteMaxLength).optional() })
+  .strict();
+
 // ── Fonctionnalités par offre (§ 6.3) ──────────────────────────────────────────
 
 /**

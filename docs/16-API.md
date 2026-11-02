@@ -258,11 +258,35 @@ POST /organizations/current/subscription/cancel résiliation — billing.manage
 POST /payments/checkout                         ouvre un encaissement — billing.manage
 GET  /payments/methods                          moyens réellement disponibles — PUBLIC
 POST /payments/webhooks/:provider               rappel fournisseur — SIGNATURE
-GET  /payments/manual/pending                   dépôts à confirmer — rôle plateforme
-POST /payments/manual/:reference/confirm        confirme un dépôt reçu — rôle plateforme
-POST /payments/manual/:reference/reject         refuse, motif obligatoire — rôle plateforme
-POST /payments/maintenance/sweep                balayage des échéances — rôle plateforme
+GET  /payments/manual/pending                   410 ROUTE_GONE (ADR-0053 P3)
+POST /payments/manual/:reference/confirm        410 ROUTE_GONE (ADR-0053 P3)
+POST /payments/manual/:reference/reject         410 ROUTE_GONE (ADR-0053 P3)
+POST /payments/maintenance/sweep                410 ROUTE_GONE (ADR-0053 P3)
 ```
+
+**Console Lalanda, abonnements et paiements manuels (ADR-0053 § 6.2, lot P3 — appliqué).**
+Garde de console (`PlatformAuthGuard` puis `PermissionsGuard`, action plateforme par route) ;
+écritures motivées sous ré-authentification de dix minutes (`401 REAUTH_REQUIRED`) ; conflit
+d'intérêts `409 PLATFORM_SELF_DEALING`. Aucun encaissement, aucun prestataire, aucune pièce émise.
+
+```text
+GET    /admin/billing/subscriptions?status=               platform.billing.read   (métadonnées)
+GET    /admin/billing/manual-payments?status=             platform.billing.read
+POST   /admin/billing/manual-payments/:reference/confirm  platform.billing.confirm (ré-auth, { note, clientMessage? })
+POST   /admin/billing/manual-payments/:reference/reject   platform.billing.confirm (ré-auth, { reason, clientMessage? })
+POST   /admin/billing/sweep                               platform.billing.confirm (journalisé)
+GET    /admin/billing/grants                              platform.billing.read
+POST   /admin/billing/grants                              platform.billing.grant  (ré-auth)
+POST   /admin/billing/grants/:id/approve                  platform.billing.grant  (ré-auth, seconde personne)
+DELETE /admin/billing/grants/:id                          platform.billing.grant  (ré-auth, { internalNote, clientMessage })
+```
+
+Un octroi (offre Expert, sans échéance ou de plus de 90 jours) reste `pending_approval` jusqu'à
+l'approbation d'une seconde personne détentrice (`409 SELF_APPROVAL_FORBIDDEN` pour son auteur ;
+seul détenteur : actif, marqué `soleApprover`). Un octroi ouvert à la fois par organisation
+(`409 GRANT_ALREADY_OPEN`) ; `free` n'est pas un octroi (`400 GRANT_PLAN_INVALID`).
+`PATCH /admin/organizations/:id/plan` (historique) passe désormais par un octroi sans échéance et
+renvoie `grant` ; `free` retire l'octroi ouvert (`409 NO_ACTIVE_GRANT` s'il n'y en a pas).
 
 **`plan` répond le plan EFFECTIF, pas le plan souscrit.** C'est un changement de
 sémantique par rapport à S16b, pas de forme : une organisation Business suspendue

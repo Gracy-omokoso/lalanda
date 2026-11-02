@@ -1639,6 +1639,67 @@ export interface AdminUserSummary {
   createdAt: string | null;
 }
 
+// ── ADR-0053 — P3 : abonnements, paiements manuels et octrois de la console ──
+// Métadonnées seulement : aucun contenu d'organisation, aucune pièce (ADR-0047).
+
+export type AdminSubscriptionStatus =
+  'trialing' | 'active' | 'past_due' | 'grace' | 'suspended' | 'canceled';
+
+export interface AdminSubscriptionView {
+  organizationId: string;
+  organizationName: string | null;
+  plan: Plan;
+  effectivePlan: Plan;
+  status: AdminSubscriptionStatus;
+  billingInterval: string;
+  trialEndsAt: string | null;
+  currentPeriodEnd: string | null;
+  graceEndsAt: string | null;
+  provider: string | null;
+  grant: { plan: Plan; endsAt: string | null } | null;
+  updatedAt: string | null;
+}
+
+export type AdminManualPaymentStatus = 'pending' | 'confirmed' | 'rejected' | 'expired';
+
+export interface AdminManualPaymentView {
+  reference: string;
+  organizationId: string;
+  organizationName: string | null;
+  plan: string;
+  interval: string;
+  amountDueCents: number;
+  currency: string;
+  method: string;
+  status: AdminManualPaymentStatus;
+  createdAt: string;
+  expiresAt: string;
+  decidedAt: string | null;
+}
+
+export type AdminPlanGrantPhase =
+  'pending_approval' | 'scheduled' | 'active' | 'expired' | 'revoked';
+
+export interface AdminPlanGrantView {
+  id: string;
+  targetOrganizationId: string;
+  organizationName: string | null;
+  plan: Plan;
+  reasonCategory: string;
+  clientMessage: string;
+  internalNote: string;
+  startsAt: string;
+  endsAt: string | null;
+  status: 'pending_approval' | 'active' | 'revoked';
+  phase: AdminPlanGrantPhase;
+  grantedBy: string;
+  approvedBy: string | null;
+  soleApprover: boolean;
+  soleOperator: boolean;
+  revokedAt: string | null;
+  createdAt: string;
+}
+
 /** Événement du journal d’audit PLATEFORME (S21b) — jamais de valeur de secret. */
 export interface PlatformAuditEventView {
   id: string;
@@ -3277,7 +3338,8 @@ export const api = {
       internalNote: string;
     },
   ) =>
-    jsonRequest<AdminOrganizationSummary>(
+    // ADR-0053 — P3 : passe par un octroi (actif, ou en attente d'une seconde personne).
+    jsonRequest<AdminOrganizationSummary & { grant: AdminPlanGrantView }>(
       `/admin/organizations/${encodeURIComponent(organizationId)}/plan`,
       { method: 'PATCH', body: input },
     ),
@@ -3355,6 +3417,57 @@ export const api = {
       { method: 'GET' },
     );
   },
+
+  // ─── ADR-0053 — P3 : abonnements et paiements manuels (`/admin/billing/**`) ───
+  // Écritures : ré-authentification de dix minutes (`401 REAUTH_REQUIRED`), conflit
+  // d'intérêts (`409 PLATFORM_SELF_DEALING`). Aucun encaissement, aucune pièce émise.
+
+  listAdminSubscriptions: (status?: AdminSubscriptionStatus) =>
+    jsonRequest<{ subscriptions: AdminSubscriptionView[] }>(
+      `/admin/billing/subscriptions${status ? `?status=${encodeURIComponent(status)}` : ''}`,
+      { method: 'GET' },
+    ),
+  listAdminManualPayments: (status?: AdminManualPaymentStatus) =>
+    jsonRequest<{ requests: AdminManualPaymentView[] }>(
+      `/admin/billing/manual-payments${status ? `?status=${encodeURIComponent(status)}` : ''}`,
+      { method: 'GET' },
+    ),
+  /** Note obligatoire (référence de l'opération reçue) ; message client facultatif. */
+  confirmAdminManualPayment: (reference: string, input: { note: string; clientMessage?: string }) =>
+    jsonRequest<{ confirmed: true; organizationId: string; plan: Plan }>(
+      `/admin/billing/manual-payments/${encodeURIComponent(reference)}/confirm`,
+      { method: 'POST', body: input },
+    ),
+  rejectAdminManualPayment: (
+    reference: string,
+    input: { reason: string; clientMessage?: string },
+  ) =>
+    jsonRequest<{ rejected: true; organizationId: string }>(
+      `/admin/billing/manual-payments/${encodeURIComponent(reference)}/reject`,
+      { method: 'POST', body: input },
+    ),
+  listAdminPlanGrants: () =>
+    jsonRequest<{ grants: AdminPlanGrantView[] }>(`/admin/billing/grants`, { method: 'GET' }),
+  /** Expert, ou plus de 90 jours : en attente d'une seconde personne (§ 5.3). */
+  createAdminPlanGrant: (input: {
+    targetOrganizationId: string;
+    plan: Plan;
+    reasonCategory: AdminReasonCategory;
+    clientMessage: string;
+    internalNote: string;
+    endsAt?: string;
+  }) => jsonRequest<AdminPlanGrantView>(`/admin/billing/grants`, { method: 'POST', body: input }),
+  /** `409 SELF_APPROVAL_FORBIDDEN` si l'auteur tente d'approuver son propre octroi. */
+  approveAdminPlanGrant: (id: string, input: { internalNote?: string } = {}) =>
+    jsonRequest<AdminPlanGrantView>(`/admin/billing/grants/${encodeURIComponent(id)}/approve`, {
+      method: 'POST',
+      body: input,
+    }),
+  revokeAdminPlanGrant: (id: string, input: { internalNote: string; clientMessage: string }) =>
+    jsonRequest<AdminPlanGrantView>(`/admin/billing/grants/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      body: input,
+    }),
 
   // ─── Intégrations chiffrées (S21b — ADR-0013) ──────────────
   // Écriture seule : aucune de ces méthodes ne peut rendre une valeur en clair,
