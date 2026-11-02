@@ -145,9 +145,7 @@ const ACTIONS_SANS_ROUTE: Record<string, string> = {
   // et V3). Chaque lot retire sa ligne et écrit sa sonde ; la matrice est déjà couverte case
   // par case par `permissions.test.ts`, et `/me/permissions` est vérifié ci-dessous.
   // V2 a retiré `sales.contract` (sonde `POST /sales/orders` en fin de liste).
-  'sales.contract.approve':
-    'Aucune route en V0 : `POST /sales/contracts/:id/approve`, `…/renewals`, `…/terminate` ' +
-    'et `PUT /sales/contract-settings` arrivent au lot V3 (ADR-0050 § 3).',
+  // V3 a retiré `sales.contract.approve` (sonde `PUT /sales/contract-settings` en fin de liste).
   //
   // ADR-0051 — H8 : actions déclarées avant leurs routes (lots H10, H12 et H15). Chaque lot
   // retire sa ligne et écrit sa sonde ; la matrice est couverte case par case par
@@ -950,6 +948,18 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
           .post('/sales/orders')
           .set('Cookie', c)
           .send({ orderedOn: '2026-11-01', currency: 'CDF', priceMode: 'ht', lines: [] }),
+    },
+    // ADR-0050 — V3 : réglages des contrats (§ 3, § 8.1).
+    {
+      // PRO, DIR. Corps incomplet : 400 INVALID_REQUEST après le guard, aucun réglage écrit.
+      action: 'sales.contract.approve',
+      libelle: 'PUT /sales/contract-settings',
+      statutsAutorises: [400],
+      envoyer: (c) =>
+        request(serveur())
+          .put('/sales/contract-settings')
+          .set('Cookie', c)
+          .send({ expectedRevision: null }),
     },
   ];
 
