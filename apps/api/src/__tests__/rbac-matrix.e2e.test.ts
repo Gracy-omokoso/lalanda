@@ -150,12 +150,8 @@ const ACTIONS_SANS_ROUTE: Record<string, string> = {
   // ADR-0051 — H8 : actions déclarées avant leurs routes (lots H10, H12 et H15). Chaque lot
   // retire sa ligne et écrit sa sonde ; la matrice est couverte case par case par
   // `permissions.test.ts`, et `/me/permissions` est vérifié ci-dessous.
-  'expenses.claim':
-    'Aucune route en H8 : `POST /hr/expense-reports` et `POST /hr/advances` arrivent au ' +
-    'lot H10 (ADR-0051 § 6.1).',
-  'expenses.approve':
-    'Aucune route en H8 : validation des notes et avances (`…/approve`, `…/reject`) et ' +
-    'régularisations arrivent au lot H10 (ADR-0051 § 6.1).',
+  // H10 a retiré `expenses.claim` et `expenses.approve` (sondes `POST /hr/expense-reports`
+  // et `PUT /hr/settings/advances` en fin de liste).
   'attendance.clock':
     'Aucune route en H8 : `POST /hr/attendance/clock` et les demandes de correction ' +
     'arrivent au lot H12 (ADR-0051 § 6.2).',
@@ -958,6 +954,45 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
       envoyer: (c) =>
         request(serveur())
           .put('/sales/contract-settings')
+          .set('Cookie', c)
+          .send({ expectedRevision: null }),
+    },
+    // ADR-0051 — H10 : notes de frais et avances (§ 5.1, § 6.1).
+    {
+      // Tout rôle interne sauf Chef de projet ; ni Conseiller ni Expert-comptable externe.
+      // Aucun compte de cette suite n'est relié à une fiche : 409 EMPLOYEE_NOT_LINKED
+      // prouve que le guard a laissé passer jusqu'au service, aucune note créée.
+      action: 'expenses.claim',
+      libelle: 'POST /hr/expense-reports (sans fiche reliée)',
+      statutsAutorises: [409],
+      envoyer: (c) =>
+        request(serveur())
+          .post('/hr/expense-reports')
+          .set('Cookie', c)
+          .send({
+            title: 'Sonde de matrice',
+            currency: 'USD',
+            lines: [
+              {
+                spentOn: '2026-01-05',
+                category: 'transport',
+                label: 'Taxi',
+                amount: '1.00',
+                missingReceiptReason: 'Sonde',
+              },
+            ],
+          }),
+    },
+    {
+      // PRO, DIR (ⓢ). La route déclare `expenses.approve` EN PREMIER (puis `hr.manage`) :
+      // le 403 la nomme pour tout rôle refusé. Corps incomplet : 400 INVALID_REQUEST après
+      // le guard, aucun réglage écrit.
+      action: 'expenses.approve',
+      libelle: 'PUT /hr/settings/advances',
+      statutsAutorises: [400],
+      envoyer: (c) =>
+        request(serveur())
+          .put('/hr/settings/advances')
           .set('Cookie', c)
           .send({ expectedRevision: null }),
     },
