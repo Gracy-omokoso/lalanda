@@ -19,7 +19,10 @@
 // révision attendue (`409 STALE_REVISION`).
 
 import { orderInvoicing, type OrderInvoicingResult } from '@lalanda/engine';
-import { SALES_ORDER_NUMBER_PREFIX } from '@lalanda/shared/sales-contracts';
+import {
+  SALES_DEPOSIT_FINAL_INVOICE_WARNING,
+  SALES_ORDER_NUMBER_PREFIX,
+} from '@lalanda/shared/sales-contracts';
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Types, type Connection, type Model } from 'mongoose';
@@ -52,6 +55,7 @@ import {
   type EngagementDocument,
   type EngagementLine,
 } from '../common/engagement-document.js';
+import { depositRecallCodes } from '../deposits/sales-deposit-model.js';
 import {
   SalesContractFilesService,
   salesContractFileView,
@@ -641,8 +645,11 @@ export class SalesOrdersService {
     }
   }
 
-  /** Écriture conditionnée par statut ET révision ; perte → 409 explicite. */
-  private async transition(
+  /**
+   * Écriture conditionnée par statut ET révision ; perte → 409 explicite. Publique
+   * pour le lot V4 (acomptes : réservation par la révision, motif de `prepareInvoice`).
+   */
+  async transition(
     organizationId: string,
     current: SalesOrderLean,
     expectedRevision: number,
@@ -666,7 +673,7 @@ export class SalesOrdersService {
     return updated;
   }
 
-  private async load(
+  async load(
     organizationId: string,
     orderId: string,
     expectedRevision: number,
@@ -908,7 +915,16 @@ export class SalesOrdersService {
     });
 
     const warnings: SalesOrderWarning[] = [];
-    const comment = orderInvoiceComment(current, COMMENT_C_MAX);
+    // ADR-0050 — V4 : rappel des acomptes émis en ligne C (§ 5.2), sans imputation.
+    const depositCodes = depositRecallCodes(live);
+    const comment = orderInvoiceComment(current, COMMENT_C_MAX, depositCodes);
+    if (depositCodes.length > 0) {
+      warnings.push({
+        code: 'DEPOSIT_NOT_RESOLVED',
+        message: SALES_DEPOSIT_FINAL_INVOICE_WARNING,
+        details: { depositCodes },
+      });
+    }
     if (comment.truncated) {
       warnings.push({
         code: 'COMMENT_TRUNCATED',

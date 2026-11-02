@@ -7,10 +7,16 @@
 
 import type { Metadata } from 'next';
 
+import { EnTeteModule } from '../_components/en-tete-module';
 import { UsersPanel } from '../_components/users-panel';
 
-export const metadata: Metadata = { title: 'Utilisateurs — Administration · Lalanda' };
+export const metadata: Metadata = { title: 'Comptes — Console Lalanda' };
 
 export default function AdminUsersPage(): React.ReactElement {
-  return <UsersPanel />;
+  return (
+    <section className="flex flex-col gap-6">
+      <EnTeteModule moduleId="comptes" />
+      <UsersPanel />
+    </section>
+  );
 }
