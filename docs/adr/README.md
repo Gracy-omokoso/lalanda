@@ -128,6 +128,8 @@ Décideurs :
   une fuite plateforme → organisation (identifiant d'opérateur au journal client). Statut : **proposé,
   ADR-0053** (2 nov. 2026).
   Socle RBAC plateforme, garde sans organisation et contrats partagés **appliqués au lot P0**.
+  Décision n° 2 **retenue le 3 nov. 2026** : double authentification TOTP obligatoire pour tout
+  opérateur, **appliquée au lot P8** (§ 2.4 bis).
 
 ## Décisions récentes (légal)
 

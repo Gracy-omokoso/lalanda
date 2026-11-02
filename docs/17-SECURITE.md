@@ -312,7 +312,8 @@ Deux routes de l'API **sans session** (`GET /public/lead-forms/:token`,
   console (`403 ACCOUNT_BLOCKED`). **Limite maintenue** : l'espace organisation (`AuthGuard`) et
   l'ouverture de session ne lisent pas encore `disabledAt` (lot P2, F5).
 - **Restent ouverts** (lots P2, P8) : ré-authentification de toute écriture de la console, session
-  de console de 12 heures, double authentification (décision ouverte n° 2).
+  de console de 12 heures, double authentification (décision ouverte n° 2). *Levés depuis : P2
+  ci-dessous ; P8 en fin de section.*
 
 ## ADR-0053 — console Lalanda : lot P2 (appliqué)
 
@@ -428,3 +429,22 @@ Les événements de sécurité sont centralisés et alertés. Aucun token, secre
 ## Mise en production
 
 Revue de menace, scan des dépendances, tests d’autorisation, secrets vérifiés, sauvegarde restaurée, procédure d’incident et responsables d’astreinte définis.
+
+## ADR-0053 — console Lalanda : lot P8, double authentification (appliqué)
+
+Décision n° 2 retenue par la dirigeante le 3 nov. 2026 ; détail : ADR-0053 § 2.4 bis.
+
+- **TOTP obligatoire pour tout opérateur** (`otpauth` 9.5.2, RFC 6238). Non enrôlé :
+  `403 PLATFORM_2FA_REQUIRED` sur toute la console, enrôlement seul ouvert (QR code, code + mot de
+  passe). Session non vérifiée : `401 PLATFORM_2FA_VERIFICATION_REQUIRED`, `/admin/reauth` seul ouvert.
+- **Ré-authentification de la console** : mot de passe + code, ou code de secours ; la fenêtre de
+  `/me/reauth` (mot de passe seul) ne vaut plus pour une écriture de console.
+- **Stockage** : secret chiffré sous `SECRETS_MASTER_KEY`, compris dans `secrets:rewrap` ;
+  10 codes de secours hachés (SHA-256 salé), à usage unique ; anti-rejeu du pas TOTP.
+- **Limitation** : 5 échecs consécutifs → verrouillage 15 minutes (`429 TWO_FACTOR_LOCKED`), plus le
+  quota par utilisateur des routes d'enrôlement et de ré-authentification.
+- **Journal plateforme** : enrôlement, échec, verrouillage, code de secours utilisé, réinitialisation.
+- **Réinitialisation** par un autre super-administrateur, motif obligatoire, jamais sur soi-même.
+- **Limite** : les comptes d'organisation n'ont pas de double authentification (non imposée, non
+  proposée en v1) ; la ligne « MFA et OTP SMS » du § Restant vaut pour eux.
+

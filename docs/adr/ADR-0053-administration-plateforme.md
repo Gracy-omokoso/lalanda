@@ -251,6 +251,41 @@ ouvre la console et n'y voit que ses modules (corrige F7).
 - **Si la double authentification est retenue** (lot P8) : TOTP par le greffon `twoFactor` de
   better-auth, enrôlement dans `/compte/securite`, codes de secours ; `PlatformAuthGuard` refuse
   `403 PLATFORM_2FA_REQUIRED` à un opérateur non enrôlé, sauf pour l'enrôlement lui-même.
+  **Retenue le 3 nov. 2026 (décision n° 2) ; mise en œuvre précisée au § 2.4 bis.**
+
+#### 2.4 bis Double authentification de la console (lot P8, décision n° 2 retenue le 3 nov. 2026)
+
+- **Mécanisme** : TOTP (RFC 6238 : 6 chiffres, 30 s, SHA-1, un pas de dérive), lisible par toute
+  application d'authentification usuelle. Calcul par la bibliothèque `otpauth` (9.5.2, une seule
+  dépendance, `@noble/hashes`). **Le greffon `twoFactor` de better-auth n'est pas retenu** : il
+  chiffre le secret avec `AUTH_SECRET` (hors du coffre d'ADR-0013 et de `secrets:rewrap`), garde les
+  codes de secours déchiffrables au lieu de hachés, permet à l'utilisateur de retirer sa double
+  authentification contre son seul mot de passe, et intercepte la connexion de tous les comptes.
+- **Obligation** : tout opérateur (au moins un rôle plateforme actif). `PlatformAuthGuard` répond
+  `403 PLATFORM_2FA_REQUIRED` à un opérateur non enrôlé et `401 PLATFORM_2FA_VERIFICATION_REQUIRED`
+  à une session non vérifiée ; restent ouverts `GET /me/platform-access`, `GET /admin/two-factor`,
+  l'enrôlement (`POST /admin/two-factor/enrollment`, `…/enrollment/confirm`) et, pour une session
+  non vérifiée seulement, `/admin/reauth`. L'enrôlement se fait **dans la console** (et non dans
+  `/compte/securite`, inaccessible à un opérateur sans organisation depuis P0) : QR code, code à six
+  chiffres + mot de passe, puis **10 codes de secours** à usage unique, montrés une fois, stockés
+  hachés (SHA-256 salé, 60 bits par code). Une session vérifiée l'est 12 heures (session de console).
+- **Ré-authentification de la console** : mot de passe + code TOTP, ou un code de secours. Seule une
+  fenêtre ouverte ainsi (`platform_reauth.secondFactor`) vaut pour une écriture de la console ou
+  rouvre une console inactive ; `/me/reauth` (espace organisation) reste au mot de passe seul.
+- **Sécurité** : secret chiffré sous `SECRETS_MASTER_KEY` (emplacement lié à l'opérateur), rotation
+  dans `secrets:rewrap` ; anti-rejeu du pas TOTP ; verrouillage de 15 minutes après 5 échecs
+  consécutifs (`429 TWO_FACTOR_LOCKED`) ; journal plateforme `platform.two_factor.enrolled`,
+  `.failed`, `.locked`, `.backup_code_used`, `.reset` (jamais un secret ni un code).
+- **Réinitialisation** : `POST /admin/users/:userId/two-factor/reset`, `platform.roles.manage`
+  (super-administrateur), ré-authentification avec code, motif (catégorie + note interne) ; jamais
+  sur soi-même (`409 SELF_RESET_FORBIDDEN`) — deux personnes, l'opérateur et un autre
+  super-administrateur. Effets : enrôlement supprimé, sessions révoquées ; la cible se ré-enrôle à
+  sa prochaine entrée. Une opératrice **seule** super-administratrice qui perd téléphone **et**
+  codes n'a pas de recours dans le produit : procédure d'exploitation hors ligne (à écrire, docs/24).
+- **Comptes d'organisation** : non concernés ; aucune double authentification ne leur est proposée en
+  v1 (la connexion n'est pas modifiée).
+- **Mise en ligne** : les opérateurs existants sont envoyés vers l'enrôlement à leur prochaine entrée
+  dans la console ; aucun verrouillage sans chemin d'enrôlement (`admin-2fa.e2e.test.ts`).
 
 #### 2.5 Journal de chaque geste plateforme
 
@@ -722,7 +757,7 @@ reçoivent que des **ajouts** d'une ligne ou d'un bloc, sous un commentaire `// 
 | **P5 — Journaux et sécurité** | filtres, export CSV journalisé, événements de sécurité agrégés | `apps/api/src/integrations/platform-audit.service.ts` (ajouts de méthodes), `apps/api/src/admin/audit/**` (nouveau) ; écrans console | 12 | P0, P2 |
 | **P6 — Annonces** | collections, catégories, circuit à deux personnes, livraison in-app, bannière et cloche | `apps/api/src/admin/announcements/**` (nouveau), `apps/api/src/admin/announcements/me-announcements.controller.ts` (nouveau, routes `/me/announcements`) ; `packages/shared/src/notifications/index.ts` (**une ligne**) ; `apps/web/src/app/(app)/_components/app-shell.tsx` (**un bloc** bannière), `notifications-bell.tsx` (**un bloc**) ; écrans console | 19 | P0, P1 |
 | **P7 — Statistiques et finances** | `packages/engine/src/platform-revenue/**`, `/admin/stats`, `/admin/finance`, exports, libellés interdits | `packages/engine/src/platform-revenue/**` (nouveau), `packages/engine/src/index.ts` (**une ligne**) ; `apps/api/src/admin/{stats,finance}/**` ; écrans console | 20, 21 | P0 ; P3 (octrois, pour les exclure des encaissements) |
-| **P8 — Double authentification** (si décision n° 2 retenue) | greffon `twoFactor`, enrôlement, codes de secours, refus `PLATFORM_2FA_REQUIRED` | `apps/api/src/auth/auth.ts` (**un bloc**), `authz/platform-auth.guard.ts` (après P0), `apps/web/src/app/(app)/compte/securite/**` | (à écrire avec la décision) | P0, P2 |
+| **P8 — Double authentification** (décision n° 2 retenue le 3 nov. 2026 ; § 2.4 bis) | greffon `twoFactor`, enrôlement, codes de secours, refus `PLATFORM_2FA_REQUIRED` | `apps/api/src/auth/auth.ts` (**un bloc**), `authz/platform-auth.guard.ts` (après P0), `apps/web/src/app/(app)/compte/securite/**` | (à écrire avec la décision) | P0, P2 |
 
 ### Zones de conflit entre lots
 
@@ -762,7 +797,8 @@ Chacune a une **valeur par défaut**, la plus prudente, appliquée si rien n'est
 
 1. **Sous-domaine de la console.** *Défaut : même domaine, URL `/admin`, coquille séparée (O1-b) ; le
    sous-domaine sera un lot d'infrastructure ultérieur.*
-2. **Double authentification des opérateurs.** *Défaut : pas de 2FA tant qu'elle n'est pas décidée ;
+2. **Double authentification des opérateurs.** **Tranchée le 3 nov. 2026 : retenue** (TOTP
+   obligatoire pour tout rôle plateforme, lot P8, § 2.4 bis). *Défaut d'origine : pas de 2FA tant qu'elle n'est pas décidée ;
    ré-authentification de dix minutes avant toute écriture de la console et session de console de
    12 heures. Recommandation : TOTP obligatoire pour tout rôle plateforme (lot P8) avant toute
    ouverture de la console à une autre personne que la dirigeante.*
