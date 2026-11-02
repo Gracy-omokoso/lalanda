@@ -50,6 +50,11 @@ import { PLANS, PLAN_CATALOG, type Plan } from '@lalanda/shared/pricing';
 import { ACTIONS, ORG_PERMISSION_MATRIX, type Action, type OrgRole } from '../authz/permissions.js';
 // ADR-0053 — P0
 import { PLATFORM_ACTIONS, type PlatformAction } from '../authz/platform-actions.js';
+// ADR-0052 — O0
+import {
+  ORGANIZATION_SETUP_STEPS,
+  type OrganizationSetupStepId,
+} from '@lalanda/shared/organization-setup';
 import { e2eSuite, makeE2EApp, registerAndLogin, teardown } from './e2e-utils.js';
 import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
@@ -152,12 +157,8 @@ const ACTIONS_SANS_ROUTE: Record<string, string> = {
   // ADR-0051 — H8 : actions déclarées avant leurs routes (lots H10, H12 et H15). Chaque lot
   // retire sa ligne et écrit sa sonde ; la matrice est couverte case par case par
   // `permissions.test.ts`, et `/me/permissions` est vérifié ci-dessous.
-  'expenses.claim':
-    'Aucune route en H8 : `POST /hr/expense-reports` et `POST /hr/advances` arrivent au ' +
-    'lot H10 (ADR-0051 § 6.1).',
-  'expenses.approve':
-    'Aucune route en H8 : validation des notes et avances (`…/approve`, `…/reject`) et ' +
-    'régularisations arrivent au lot H10 (ADR-0051 § 6.1).',
+  // H10 a retiré `expenses.claim` et `expenses.approve` (sondes `POST /hr/expense-reports`
+  // et `PUT /hr/settings/advances` en fin de liste).
   // H12 a retiré `attendance.clock` (sonde `POST /hr/attendance/clock` en fin de liste).
   // H15 a retiré `performance.read` (sonde `GET /hr/review-cycles` en fin de liste).
 };
@@ -970,6 +971,45 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
       envoyer: (c) =>
         request(serveur()).post('/hr/attendance/clock').set('Cookie', c).send({ kind: 'in' }),
     },
+    // ADR-0051 — H10 : notes de frais et avances (§ 5.1, § 6.1).
+    {
+      // Tout rôle interne sauf Chef de projet ; ni Conseiller ni Expert-comptable externe.
+      // Aucun compte de cette suite n'est relié à une fiche : 409 EMPLOYEE_NOT_LINKED
+      // prouve que le guard a laissé passer jusqu'au service, aucune note créée.
+      action: 'expenses.claim',
+      libelle: 'POST /hr/expense-reports (sans fiche reliée)',
+      statutsAutorises: [409],
+      envoyer: (c) =>
+        request(serveur())
+          .post('/hr/expense-reports')
+          .set('Cookie', c)
+          .send({
+            title: 'Sonde de matrice',
+            currency: 'USD',
+            lines: [
+              {
+                spentOn: '2026-01-05',
+                category: 'transport',
+                label: 'Taxi',
+                amount: '1.00',
+                missingReceiptReason: 'Sonde',
+              },
+            ],
+          }),
+    },
+    {
+      // PRO, DIR (ⓢ). La route déclare `expenses.approve` EN PREMIER (puis `hr.manage`) :
+      // le 403 la nomme pour tout rôle refusé. Corps incomplet : 400 INVALID_REQUEST après
+      // le guard, aucun réglage écrit.
+      action: 'expenses.approve',
+      libelle: 'PUT /hr/settings/advances',
+      statutsAutorises: [400],
+      envoyer: (c) =>
+        request(serveur())
+          .put('/hr/settings/advances')
+          .set('Cookie', c)
+          .send({ expectedRevision: null }),
+    },
     // ADR-0051 — H15 : objectifs et évaluations (§ 5.1, § 6.3).
     {
       // Propriétaire et Responsable RH seulement (ni Administrateur ni Directeur financier,
@@ -1680,6 +1720,29 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
     }
   }, 60_000);
 
+  // ───────────────────────────────────────────────────────────────────────────
+  // ADR-0052 — O0 : statut de complétude, ouvert à tout membre (§ 7), sans action nouvelle
+  // ───────────────────────────────────────────────────────────────────────────
+
+  it('ADR-0052 critères 1 et 8 — `/organizations/current/setup` : 200 pour chaque rôle, `canAct` = droits effectifs', async () => {
+    const s = serveur();
+    for (const role of ROLES_TESTES) {
+      const res = await request(s)
+        .get('/organizations/current/setup')
+        .set('Cookie', cookiesDe(role));
+      expect(res.status, `${role} : ${JSON.stringify(res.body)}`).toBe(200);
+      expect(res.body.organizationId, role).toBe(orgId);
+      const moi = await request(s).get('/me/permissions').set('Cookie', cookiesDe(role));
+      const actions = moi.body.actions as string[];
+      for (const etape of res.body.steps as { id: OrganizationSetupStepId; canAct: boolean }[]) {
+        const action = ORGANIZATION_SETUP_STEPS[etape.id].action;
+        expect(etape.canAct, `${role} × ${etape.id}`).toBe(
+          action === null ? true : actions.includes(action),
+        );
+      }
+    }
+  }, 60_000);
+
   /** userId d'un rôle, lu depuis le trombinoscope — l'API ne l'expose pas ailleurs. */
   async function userIdDe(role: RoleTeste): Promise<string> {
     const res = await request(serveur())
@@ -1692,4 +1755,46 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
     expect(membre, `aucun membre au rôle ${role}`).toBeDefined();
     return membre!.userId;
   }
+  // ───────────────────────────────────────────────────────────────────────────
+  // ADR-0053 — P2 : routes de comptes et d'organisations de la console. Aucun rôle
+  // d'organisation ne les ouvre ; le refus nomme l'action PLATEFORME, avant toute
+  // ré-authentification, recherche ou motif (le 403 ne renseigne sur rien d'autre).
+  // ───────────────────────────────────────────────────────────────────────────
+
+  it('ADR-0053 P2 — aucun rôle d’organisation n’ouvre les comptes, organisations ni blocages', async () => {
+    const s = serveur();
+    const factice = '0123456789abcdef01234567';
+    const sondes: Array<[string, string, PlatformAction]> = [
+      ['get', '/admin/organizations', 'platform.orgs.read'],
+      ['get', `/admin/organizations/${orgId}?reason=support`, 'platform.orgs.read'],
+      ['post', `/admin/organizations/${orgId}/suspend`, 'platform.orgs.suspend'],
+      ['post', `/admin/organizations/${orgId}/restore`, 'platform.orgs.suspend'],
+      ['get', '/admin/users?q=abc', 'platform.users.read'],
+      ['get', `/admin/users/${factice}?reason=support`, 'platform.users.read'],
+      ['post', `/admin/users/${factice}/block`, 'platform.users.block'],
+      ['post', `/admin/users/${factice}/unblock`, 'platform.users.block'],
+      ['post', `/admin/users/${factice}/platform-roles`, 'platform.roles.manage'],
+      ['get', '/admin/audit-events', 'platform.audit.read'],
+    ];
+    // Quota global de 100 requêtes par minute et par IP : remis à zéro par rôle.
+    const { ThrottlerStorage } = await import('@nestjs/throttler');
+    const store = app.get(ThrottlerStorage) as unknown as {
+      storage: Map<string, unknown>;
+      timeoutIds: Map<string, NodeJS.Timeout[]>;
+    };
+    for (const role of ROLES_TESTES) {
+      for (const t of store.timeoutIds.values()) t.forEach(clearTimeout);
+      store.timeoutIds.clear();
+      store.storage.clear();
+      for (const [verbe, chemin, action] of sondes) {
+        const req = request(s) as unknown as Record<string, (p: string) => request.Test>;
+        const res = await req[verbe]!(chemin).set('Cookie', cookiesDe(role)).send({});
+        expect(res.status, `${role} × ${verbe} ${chemin}`).toBe(403);
+        expect(res.body, `${role} × ${verbe} ${chemin}`).toMatchObject({
+          code: 'FORBIDDEN',
+          action,
+        });
+      }
+    }
+  }, 120_000);
 });

@@ -20,6 +20,8 @@ import {
   OrganizationSuspensionSchema,
 } from './organization-suspension.schema.js';
 import { PlatformAccessController } from './platform-access.controller.js';
+// ADR-0053 — P2
+import { PlatformMirrorService } from './mirror.js';
 
 @Module({
   imports: [
@@ -36,7 +38,7 @@ import { PlatformAccessController } from './platform-access.controller.js';
   // voir l'en-tête du fichier pour la raison — un utilisateur sans rôle doit
   // pouvoir apprendre qu'il n'en a pas.
   controllers: [AdminController, PlatformAccessController],
-  providers: [AdminService, AiUsageService],
+  providers: [AdminService, AiUsageService, PlatformMirrorService],
   // `AiUsageService` est exporté pour `AiModule`, qui compte ses propres appels.
   exports: [AiUsageService],
 })

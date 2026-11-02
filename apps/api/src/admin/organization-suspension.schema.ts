@@ -15,11 +15,12 @@
 //
 // ── Ce que la suspension fait, et ce qu'elle NE FAIT PAS ─────────────────────
 //
-// Elle enregistre la décision, révoque immédiatement les sessions des membres et
-// l'affiche dans `/admin`. Elle NE BLOQUE PAS une reconnexion : le refus d'accès
-// se déciderait dans `AuthGuard` (`apps/api/src/auth/`), hors du périmètre de ce
-// lot. La limite est documentée dans docs/17 § Implémenté (S21b) et dans la PR :
-// une suspension aujourd'hui déconnecte, elle ne verrouille pas.
+// ADR-0053 — P2 : la suspension est EFFECTIVE. `PermissionsGuard` lit la suspension
+// active de l'organisation visée par chaque route d'organisation : en `read_only`
+// (défaut, décision ouverte n° 4) toute écriture répond `423 ORGANIZATION_SUSPENDED`
+// et la lecture reste ouverte ; en `full`, toute route d'organisation répond 423. Les
+// sessions des membres ne sont plus révoquées : un membre garde l'accès à ses AUTRES
+// organisations, que la suspension ne touche pas (§ 6.1).
 
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import type { HydratedDocument } from 'mongoose';
@@ -29,9 +30,36 @@ export class OrganizationSuspension {
   @Prop({ type: String, required: true })
   organizationId!: string;
 
-  /** Motif obligatoire — une suspension sans raison écrite ne se relit pas. */
+  /**
+   * Motif obligatoire — une suspension sans raison écrite ne se relit pas. Depuis
+   * ADR-0053 (P2), recopie de `internalNote` pour les lecteurs historiques.
+   */
   @Prop({ type: String, required: true })
   reason!: string;
+
+  // ── ADR-0053 — P2 (§ 4) ─────────────────────────────────────────────────────
+
+  /** `unpaid`, `abuse`, `fraud`, `legal`, `request`, `other` ; `null` avant P2. */
+  @Prop({ type: String, default: null })
+  reasonCategory!: string | null;
+
+  /** Texte destiné au client (miroir de son journal). */
+  @Prop({ type: String, default: null })
+  clientMessage!: string | null;
+
+  /** Note interne — JAMAIS servie au client. */
+  @Prop({ type: String, default: null })
+  internalNote!: string | null;
+
+  /** `read_only` (défaut) ou `full`. Absent sur une suspension antérieure : `read_only`. */
+  @Prop({ type: String, default: 'read_only' })
+  mode!: string;
+
+  @Prop({ type: String, default: null })
+  liftReason!: string | null;
+
+  @Prop({ type: String, default: null })
+  liftedClientMessage!: string | null;
 
   @Prop({ type: String, required: true })
   suspendedBy!: string;

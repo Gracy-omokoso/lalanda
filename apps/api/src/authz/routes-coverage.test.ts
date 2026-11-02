@@ -44,6 +44,8 @@ import { LegalController } from '../legal/legal.controller.js';
 import { MorningBriefController } from '../morning-brief/morning-brief.controller.js';
 import { ObjectivesController } from '../objectives/objectives.controller.js';
 import { OrganizationSpaceController } from '../organization-space/organization-space.controller.js';
+// ADR-0052 — O0
+import { OrganizationSetupController } from '../organization-setup/organization-setup.controller.js';
 import { InvitationsController } from '../organizations/invitations.controller.js';
 import { MembersController } from '../organizations/members.controller.js';
 import { OrganizationsController } from '../organizations/organizations.controller.js';
@@ -314,6 +316,8 @@ const CONTROLEURS = [
   // ADR-0048 : formulaire public de prospects (réglages et routes publiques).
   CrmLeadFormsController,
   PublicLeadFormsController,
+  // ADR-0052 — O0 : statut de complétude de la mise en route.
+  OrganizationSetupController,
 ];
 
 /**
@@ -449,6 +453,13 @@ const SANS_PERMISSION: Record<string, string> = {
     'Soumission d’un visiteur anonyme : jeton actif, champ piège, délai minimal par ticket ' +
     'signé, débit par empreinte d’IP et par formulaire, champs bornés, sans pièce jointe ; ' +
     'écrit seulement dans l’organisation du jeton (ADR-0048 § 3, § 6).',
+
+  // ── ADR-0052 — O0 : statut de complétude ────────────────────────────────
+  'OrganizationSetupController.read':
+    'Statut de complétude de l’organisation ACTIVE, ouvert à tout membre (ADR-0052 § 7, ' +
+    'option O5 : aucune action nouvelle). AuthGuard vérifie l’appartenance ; la réponse ' +
+    'ne porte que des booléens et des codes, jamais une valeur (NIF, solde, nom) ; ' +
+    '`canAct` suit les droits effectifs de l’appelant.',
 };
 
 interface RouteInspectee {
@@ -2194,6 +2205,76 @@ describe('ADR-0051 — H15 : objectifs et évaluations', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ADR-0053 — P2 : comptes et organisations — une action par route, ré-authentification
+// sur chaque écriture, inactivité de 12 heures exemptée pour la seule ré-authentification
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** `CONSOLE_IDLE_EXEMPT_KEY` d'`authz.decorators.ts` (un seul import par module, lint). */
+const P2_IDLE_EXEMPT_KEY = 'lalanda:console_idle_exempt';
+import { REQUIRES_RECENT_REAUTH_KEY as P2_REAUTH_KEY } from '../integrations/reauth.guard.js';
+
+describe('ADR-0053 — P2 : routes `/admin` de comptes et d’organisations', () => {
+  /** Route → [action plateforme, ré-authentification exigée]. */
+  const ATTENDU: Record<string, [PlatformAction, boolean]> = {
+    'AdminController.overview': ['platform.console.read', false],
+    'AdminController.listOrganizations': ['platform.orgs.read', false],
+    'AdminController.getOrganization': ['platform.orgs.read', false],
+    'AdminController.setPlan': ['platform.billing.grant', true],
+    'AdminController.suspend': ['platform.orgs.suspend', true],
+    'AdminController.restore': ['platform.orgs.suspend', true],
+    'AdminController.lift': ['platform.orgs.suspend', true],
+    'AdminController.listUsers': ['platform.users.read', false],
+    'AdminController.getUser': ['platform.users.read', false],
+    'AdminController.block': ['platform.users.block', true],
+    'AdminController.unblock': ['platform.users.block', true],
+    'AdminController.setDisabled': ['platform.users.block', true],
+    'AdminController.grantRole': ['platform.roles.manage', true],
+    'AdminController.revokeRole': ['platform.roles.manage', true],
+    'AdminController.auditEvents': ['platform.audit.read', false],
+  };
+
+  const proto = AdminController.prototype as unknown as Record<string, object>;
+  const handlers = Object.getOwnPropertyNames(proto).filter(
+    (nom) => nom !== 'constructor' && Reflect.getMetadata('path', proto[nom]!) !== undefined,
+  );
+
+  it('la table est exhaustive : chaque route de `AdminController` y figure', () => {
+    expect(handlers.map((n) => `AdminController.${n}`).sort()).toEqual(Object.keys(ATTENDU).sort());
+  });
+
+  it('chaque route déclare SON action plateforme (plus aucune liste de rôles recopiée)', () => {
+    for (const [cle, [action]] of Object.entries(ATTENDU)) {
+      const methode = proto[cle.split('.')[1]!]!;
+      expect(Reflect.getMetadata(REQUIRED_PLATFORM_ACTIONS_KEY, methode), cle).toEqual([action]);
+      expect(Reflect.getMetadata(REQUIRED_PLATFORM_ROLES_KEY, methode), cle).toEqual(
+        platformActionHolders(action),
+      );
+    }
+  });
+
+  it('toute écriture exige la ré-authentification ; aucune lecture ne l’exige', () => {
+    for (const [cle, [, reauth]] of Object.entries(ATTENDU)) {
+      const methode = proto[cle.split('.')[1]!]!;
+      const verbe = Reflect.getMetadata('method', methode) as number;
+      // RequestMethod.GET === 0
+      expect(verbe !== 0, `${cle} : écriture ⇔ ré-authentification`).toBe(reauth);
+      expect(Reflect.getMetadata(P2_REAUTH_KEY, methode) === true, cle).toBe(reauth);
+    }
+  });
+
+  it('la ré-authentification est ouverte à tout opérateur et seule exemptée de l’inactivité', () => {
+    expect(Reflect.getMetadata(REQUIRED_PLATFORM_ACTIONS_KEY, ReauthController)).toEqual([
+      'platform.console.read',
+    ]);
+    expect(Reflect.getMetadata(P2_IDLE_EXEMPT_KEY, ReauthController)).toBe(true);
+    const exemptes = CONTROLEURS.filter(
+      (c) => Reflect.getMetadata(P2_IDLE_EXEMPT_KEY, c) === true,
+    ).map((c) => c.name);
+    expect(exemptes).toEqual(['ReauthController']);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ADR-0050 — V4 : acomptes des commandes et des contrats (§ 3, § 5.1, § 5.2)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -2230,6 +2311,84 @@ describe('ADR-0050 — V4 : acomptes', () => {
   it('aucune route des acomptes n’émet ni ne normalise : `sales.invoice` n’y apparaît pas', () => {
     for (const route of TOUTES_LES_ROUTES.filter((r) => MOTIF_V4.test(r.cle))) {
       expect(route.actions ?? [], route.cle).not.toContain('sales.invoice');
+    }
+  });
+});
+
+// ADR-0051 — H10 : notes de frais et avances (§ 6.1)
+import { HrAdvancesController } from '../hr/advances/hr-advances.controller.js';
+import { HrExpenseReportsController } from '../hr/expenses/hr-expense-reports.controller.js';
+
+const CONTROLEURS_H10 = [HrExpenseReportsController, HrAdvancesController];
+(CONTROLEURS as unknown[]).push(...CONTROLEURS_H10);
+TOUTES_LES_ROUTES.push(
+  ...CONTROLEURS_H10.flatMap((c) => routesDe(c as new (...args: never[]) => unknown)),
+);
+
+const MOTIF_H10 = /^(HrExpenseReportsController|HrAdvancesController)\./;
+
+describe('ADR-0051 — H10 : notes de frais et avances', () => {
+  it('chaque route déclare la permission de l’ADR (§ 6.1) ; relationnelles en `analytics.read`', () => {
+    const attendu: Record<string, Action[]> = {
+      // Relationnelles : siennes, équipe, validateurs, payeurs, `hr.read` (sans justificatif).
+      'HrExpenseReportsController.list': ['analytics.read'],
+      'HrExpenseReportsController.get': ['analytics.read'],
+      'HrExpenseReportsController.create': ['expenses.claim'],
+      'HrExpenseReportsController.update': ['expenses.claim'],
+      'HrExpenseReportsController.remove': ['expenses.claim'],
+      'HrExpenseReportsController.uploadReceipt': ['expenses.claim'],
+      'HrExpenseReportsController.downloadReceipt': ['analytics.read'],
+      'HrExpenseReportsController.submit': ['expenses.claim'],
+      'HrExpenseReportsController.duplicate': ['expenses.claim'],
+      // Déclarant, ou `expenses.approve` avec motif (décidé dans le service).
+      'HrExpenseReportsController.cancel': ['analytics.read'],
+      // Manager de l'étape (relation) ou `expenses.approve` : `expenseApprovalDecision`.
+      'HrExpenseReportsController.approve': ['analytics.read'],
+      'HrExpenseReportsController.reject': ['analytics.read'],
+      // Décaisser : paire `expenses.approve` + `payables.pay` (`reimbursementDecision`).
+      'HrExpenseReportsController.reimburse': ['payables.pay', 'treasury.read'],
+      'HrExpenseReportsController.cancelReimbursement': ['payables.pay', 'treasury.read'],
+      // `expenses.approve` ou `hr.read`, vérifié dans le service.
+      'HrExpenseReportsController.summary': ['analytics.read'],
+      'HrExpenseReportsController.toPay': ['payables.pay'],
+      'HrExpenseReportsController.getSettings': ['analytics.read'],
+      // Le circuit exige en plus `expenses.approve` (vérifié dans le contrôleur).
+      'HrExpenseReportsController.putSettings': ['hr.manage'],
+      'HrAdvancesController.list': ['analytics.read'],
+      'HrAdvancesController.get': ['analytics.read'],
+      'HrAdvancesController.create': ['expenses.claim'],
+      'HrAdvancesController.update': ['expenses.claim'],
+      'HrAdvancesController.submit': ['expenses.claim'],
+      'HrAdvancesController.cancel': ['analytics.read'],
+      'HrAdvancesController.approve': ['analytics.read'],
+      'HrAdvancesController.reject': ['analytics.read'],
+      'HrAdvancesController.disburse': ['payables.pay', 'treasury.read'],
+      'HrAdvancesController.cancelDisbursement': ['payables.pay', 'treasury.read'],
+      // Selon la nature (§ 3.3) : vérifié dans le service.
+      'HrAdvancesController.settle': ['analytics.read'],
+      // Bénéficiaire, ou `expenses.approve` + `hr.sensitive.read` ; audit strict.
+      'HrAdvancesController.revealReason': ['analytics.read'],
+      // Changer qui valide exige d'être soi-même validateur (§ 2.7).
+      'HrAdvancesController.putSettings': ['expenses.approve', 'hr.manage'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) => MOTIF_H10.test(r.cle));
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+      expect(route!.rolesPlateforme, cle).toBeUndefined();
+      expect(SANS_PERMISSION[cle], cle).toBeUndefined();
+    }
+  });
+
+  it('valider ne décaisse pas : aucune route de validation ne porte `payables.pay`', () => {
+    for (const cle of [
+      'HrExpenseReportsController.approve',
+      'HrAdvancesController.approve',
+      'HrAdvancesController.putSettings',
+    ]) {
+      const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle);
+      expect(route!.actions ?? [], cle).not.toContain('payables.pay');
     }
   });
 });

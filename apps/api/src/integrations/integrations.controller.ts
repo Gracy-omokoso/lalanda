@@ -30,7 +30,12 @@ import {
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 
-import { PlatformConsoleRoute, RequirePlatformRole } from '../authz/authz.decorators.js';
+import {
+  AllowIdleConsoleSession,
+  PlatformConsoleRoute,
+  RequirePlatformAction,
+  RequirePlatformRole,
+} from '../authz/authz.decorators.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
 import type { AuthenticatedRequest } from '../auth/auth.guard.js';
 // ADR-0053 — P0
@@ -149,7 +154,10 @@ export class IntegrationsController {
 // ADR-0053 — P0 : console sans organisation.
 @UseGuards(PlatformAuthGuard, PermissionsGuard)
 @PlatformConsoleRoute()
-@RequirePlatformRole('platform_super_admin')
+// ADR-0053 — P2 : toute écriture de la console exige une ré-authentification (§ 2.4) ;
+// tout opérateur doit donc pouvoir l'ouvrir, et elle seule rouvre une console inactive.
+@RequirePlatformAction('platform.console.read')
+@AllowIdleConsoleSession()
 export class ReauthController {
   constructor(@Inject(ReauthService) private readonly reauth: ReauthService) {}
 

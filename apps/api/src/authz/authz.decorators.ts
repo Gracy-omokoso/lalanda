@@ -70,3 +70,16 @@ export function RequirePlatformAction(action: PlatformAction): MethodDecorator &
 export function PlatformConsoleRoute(): CustomDecorator<string> {
   return SetMetadata(PLATFORM_CONSOLE_ROUTE_KEY, true);
 }
+
+// ── ADR-0053 — P2 : session de console de 12 heures d'inactivité ───────────────
+
+export const CONSOLE_IDLE_EXEMPT_KEY = 'lalanda:console_idle_exempt';
+
+/**
+ * Exempte une route de console du contrôle d'inactivité de 12 heures (§ 2.4) : la SEULE
+ * à en porter est la ré-authentification (`/admin/reauth`), qui rouvre la console après
+ * une inactivité — sans elle, une session de console expirée ne se rouvrirait jamais.
+ */
+export function AllowIdleConsoleSession(): CustomDecorator<string> {
+  return SetMetadata(CONSOLE_IDLE_EXEMPT_KEY, true);
+}

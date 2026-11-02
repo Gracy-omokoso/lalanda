@@ -40,6 +40,7 @@ import { StockModule } from './stock/stock.module.js'; // ADR-0046 — S3
 import { AssetsModule } from './assets/assets.module.js'; // ADR-0046 — S5
 import { DocumentsModule } from './documents/documents.module.js'; // ADR-0046 — S6
 import { AccountingModule } from './accounting/accounting.module.js'; // ADR-0049 — K4
+import { OrganizationSetupModule } from './organization-setup/organization-setup.module.js'; // ADR-0052 — O0
 import { PlansModule } from './plans/plans.module.js';
 import { PlatformConfigModule } from './platform-config/platform-config.module.js';
 import { ProjectsModule } from './projects/projects.module.js';
@@ -138,6 +139,7 @@ import { WorkModule } from './work/work.module.js';
     AssetsModule, // ADR-0046 — S5 : équipements (registre, affectations, maintenance, couvertures).
     DocumentsModule, // ADR-0046 — S6 : bibliothèque de documents (dossiers, versions, chiffrement).
     AccountingModule, // ADR-0049 — K4 : comptabilité (réglages, packs, plan, règles, journaux, taux).
+    OrganizationSetupModule, // ADR-0052 — O0 : statut de complétude de la mise en route (lecture).
     // ADR-0035 — CRM minimal, puis devis (qui consomment ventes et CRM).
     CrmModule,
     // ADR-0040 — C1 : conversion prospect → client (compose Ventes et CRM).

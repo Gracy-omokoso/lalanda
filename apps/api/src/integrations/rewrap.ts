@@ -38,6 +38,9 @@ import { rewrapHrDocumentKey } from '../hr/documents/hr-document-crypto.js';
 import { rewrapLibraryDocumentKey } from '../documents/library-document-crypto.js';
 // ADR-0051 — H15 : sections chiffrées des évaluations.
 import { rewrapReviewSection } from '../hr/performance/hr-review-crypto.js';
+// ADR-0051 — H10 : clés enveloppées des justificatifs, motifs des avances sur salaire.
+import { rewrapReceiptKey } from '../hr/expenses/hr-expenses.common.js';
+import { rewrapAdvanceReason } from '../hr/advances/advance-reason-crypto.js';
 import { Integration, type IntegrationDocument } from './integration.schema.js';
 import { MASTER_KEYRING } from './keyring.provider.js';
 import {
@@ -82,6 +85,10 @@ const HR_REVIEW_SECTION_KEYS = [
   'employeeComment',
   'hrNote',
 ] as const;
+/** ADR-0051 — H10 : notes de frais (une clé enveloppée par justificatif de ligne). */
+const HR_EXPENSE_REPORTS = 'hr_expense_reports';
+/** ADR-0051 — H10 : avances (motif chiffré d'une avance sur salaire). */
+const HR_ADVANCES = 'hr_advances';
 
 @Injectable()
 export class RewrapService {
@@ -167,6 +174,9 @@ export class RewrapService {
     await this.rewrapLibraryDocumentKeys(keyring, actorUserId, report);
     // ADR-0051 — H15 (§ 2.6) : sections chiffrées des évaluations.
     await this.rewrapHrReviews(keyring, actorUserId, report);
+    // ADR-0051 — H10 (§ 2.1, § 4) : justificatifs des notes de frais, motifs d'avance.
+    await this.rewrapExpenseReceiptKeys(keyring, actorUserId, report);
+    await this.rewrapAdvanceReasons(keyring, actorUserId, report);
 
     this.secrets.invalidateAll();
 
@@ -224,6 +234,23 @@ export class RewrapService {
         const f = doc[section] as { cipher?: EncryptedValue } | null | undefined;
         if (f?.cipher && f.cipher.keyId !== keyring.currentKeyId) remaining.add(f.cipher.keyId);
       }
+    }
+    // ADR-0051 — H10 : justificatifs des notes de frais, motifs d'avance sur salaire.
+    for (const doc of await this.connection
+      .collection(HR_EXPENSE_REPORTS)
+      .find({ 'lines.receipt.wrappedKey': { $type: 'object' } }, { projection: { lines: 1 } })
+      .toArray()) {
+      for (const line of (doc['lines'] ?? []) as { receipt?: { wrappedKey?: EncryptedValue } }[]) {
+        const k = line.receipt?.wrappedKey;
+        if (k && k.keyId !== keyring.currentKeyId) remaining.add(k.keyId);
+      }
+    }
+    for (const doc of await this.connection
+      .collection(HR_ADVANCES)
+      .find({ reasonSealed: { $type: 'object' } }, { projection: { reasonSealed: 1 } })
+      .toArray()) {
+      const k = doc['reasonSealed'] as EncryptedValue;
+      if (k.keyId !== keyring.currentKeyId) remaining.add(k.keyId);
     }
     report.remainingKeyIds = [...remaining];
     return report;
@@ -299,6 +326,131 @@ export class RewrapService {
         return true;
       });
       if (written) report.rewrapped += changed.length;
+    }
+  }
+
+  /**
+   * ADR-0051 — H10 (§ 2.1) : justificatifs des notes de frais, motif EXACT des documents
+   * RH (H4). Chaque justificatif est chiffré par sa propre clé de données, enveloppée à
+   * l'emplacement qu'utilise la lecture (`expenseReceiptKeyLocation` : organisation +
+   * note + objet) ; seule cette clé est re-chiffrée, l'objet au stockage reste tel quel.
+   * Ligne par ligne ; écriture conditionnée par l'ancien `iv` de CHAQUE clé re-chiffrée
+   * (un remplacement concurrent du justificatif gagne, la rotation repassera) ; la
+   * révision n'augmente pas. Une clé indéchiffrable fait échouer la rotation bruyamment.
+   */
+  private async rewrapExpenseReceiptKeys(
+    keyring: MasterKeyring,
+    actorUserId: string,
+    report: RewrapReport,
+  ): Promise<void> {
+    const col = this.connection.collection(HR_EXPENSE_REPORTS);
+    for (const doc of await col
+      .find(
+        { 'lines.receipt.wrappedKey': { $type: 'object' } },
+        { projection: { organizationId: 1, lines: 1 } },
+      )
+      .toArray()) {
+      const organizationId = String(doc['organizationId']);
+      const reportId = String(doc._id);
+      const lines = (doc['lines'] ?? []) as {
+        id: string;
+        receipt?: { objectId: string; wrappedKey?: EncryptedValue | null } | null;
+      }[];
+      const set: Record<string, unknown> = {};
+      const guard: Record<string, unknown> = { _id: doc._id };
+      const changed: string[] = [];
+      lines.forEach((line, i) => {
+        const record = line.receipt?.wrappedKey;
+        if (!record || !line.receipt) return;
+        const outcome = rewrapReceiptKey(
+          { organizationId, reportId, objectId: line.receipt.objectId },
+          record,
+          keyring,
+        );
+        if (!outcome.changed) {
+          report.skipped += 1;
+          return;
+        }
+        set[`lines.${i}.receipt.wrappedKey`] = outcome.record;
+        guard[`lines.${i}.receipt.objectId`] = line.receipt.objectId;
+        guard[`lines.${i}.receipt.wrappedKey.iv`] = record.iv;
+        changed.push(line.id);
+      });
+      if (changed.length === 0) continue;
+      const written = await this.inTransaction(async (session) => {
+        const res = await col.updateOne(guard, { $set: set }, session ? { session } : {});
+        if (res.modifiedCount === 0) return false;
+        for (const lineId of changed) {
+          await this.audit.record(
+            {
+              actorUserId,
+              actorRole: 'system',
+              action: 'secret.rewrapped',
+              targetType: 'hr_expense_receipt',
+              targetId: reportId,
+              // Ni clé, ni montant, ni organisation (motif des documents RH).
+              metadata: { lineId, keyId: keyring.currentKeyId },
+            },
+            session,
+          );
+        }
+        return true;
+      });
+      if (written) report.rewrapped += changed.length;
+    }
+  }
+
+  /**
+   * ADR-0051 — H10 (§ 4) : motif chiffré d'une avance SUR SALAIRE (`reasonSealed`),
+   * re-chiffré à l'emplacement qu'utilise la lecture (`advanceReasonLocation` :
+   * organisation + avance). Écriture conditionnée par l'ancien `iv` ; la révision
+   * n'augmente pas.
+   */
+  private async rewrapAdvanceReasons(
+    keyring: MasterKeyring,
+    actorUserId: string,
+    report: RewrapReport,
+  ): Promise<void> {
+    const col = this.connection.collection(HR_ADVANCES);
+    for (const doc of await col
+      .find(
+        { reasonSealed: { $type: 'object' } },
+        { projection: { organizationId: 1, reasonSealed: 1 } },
+      )
+      .toArray()) {
+      const record = doc['reasonSealed'] as EncryptedValue;
+      const outcome = rewrapAdvanceReason({
+        organizationId: String(doc['organizationId']),
+        advanceId: String(doc._id),
+        record,
+        keyring,
+      });
+      if (!outcome.changed) {
+        report.skipped += 1;
+        continue;
+      }
+      const written = await this.inTransaction(async (session) => {
+        const res = await col.updateOne(
+          { _id: doc._id, 'reasonSealed.iv': record.iv, 'reasonSealed.keyId': record.keyId },
+          { $set: { reasonSealed: outcome.record } },
+          session ? { session } : {},
+        );
+        if (res.modifiedCount === 0) return false;
+        await this.audit.record(
+          {
+            actorUserId,
+            actorRole: 'system',
+            action: 'secret.rewrapped',
+            targetType: 'hr_advance',
+            targetId: String(doc._id),
+            // Ni motif, ni montant, ni organisation.
+            metadata: { section: 'advanceReason', keyId: keyring.currentKeyId },
+          },
+          session,
+        );
+        return true;
+      });
+      if (written) report.rewrapped += 1;
     }
   }
 

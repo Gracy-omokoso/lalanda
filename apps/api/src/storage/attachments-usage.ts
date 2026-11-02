@@ -10,6 +10,8 @@ export const SHARED_ATTACHMENT_STORAGE: readonly {
   collection: string;
   match: Record<string, unknown>;
   field: string;
+  /** Tableau à déplier avant la somme (pièces portées par des lignes). */
+  unwind?: string;
 }[] = [
   { collection: 'work_attachments', match: { deletedAt: null }, field: '$size' },
   {
@@ -26,6 +28,13 @@ export const SHARED_ATTACHMENT_STORAGE: readonly {
   // ADR-0046 — S6 : versions de la bibliothèque tant que leur objet existe (un document
   // supprimé compte jusqu'à la purge de ses objets, `documents.purge`).
   { collection: 'library_document_versions', match: { purgedAt: null }, field: '$storedSize' },
+  // ADR-0051 — H10 : justificatifs des lignes de frais (taille stockée, chiffrée ou non).
+  {
+    collection: 'hr_expense_reports',
+    match: { 'lines.receipt.storedSize': { $gt: 0 } },
+    field: '$lines.receipt.storedSize',
+    unwind: '$lines',
+  },
 ];
 
 /** Octets occupés par l'organisation, toutes pièces confondues. */
@@ -34,11 +43,12 @@ export async function sharedAttachmentsUsage(
   organizationId: string,
 ): Promise<number> {
   const parts = await Promise.all(
-    SHARED_ATTACHMENT_STORAGE.map(async ({ collection, match, field }) => {
+    SHARED_ATTACHMENT_STORAGE.map(async ({ collection, match, field, unwind }) => {
       const [row] = await connection
         .collection(collection)
         .aggregate<{ total: number }>([
           { $match: { organizationId, ...match } },
+          ...(unwind ? [{ $unwind: unwind }] : []),
           { $group: { _id: null, total: { $sum: field } } },
         ])
         .toArray();
