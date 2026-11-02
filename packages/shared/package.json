@@ -77,6 +77,10 @@
     "./sales-contracts": {
       "types": "./dist/sales-contracts/index.d.ts",
       "import": "./dist/sales-contracts/index.js"
+    },
+    "./platform": {
+      "types": "./dist/platform/index.d.ts",
+      "import": "./dist/platform/index.js"
     }
   },
   "scripts": {
