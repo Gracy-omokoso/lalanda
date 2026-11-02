@@ -31,7 +31,9 @@ import { TreasuryRecurringService } from './treasury-recurring.service.js';
 // importer le module des achats, qui importe celui-ci).
 import { PurchasesPayablesSource } from '../purchases/treasury/purchases-payables.source.js';
 import {
+  NoHrPayablesSource,
   SalesReceiptsSource,
+  TREASURY_HR_PAYABLES_SOURCE,
   TREASURY_PAYABLES_SOURCE,
   TREASURY_RECEIPTS_SOURCE,
   TreasuryReceivablesReader,
@@ -82,10 +84,19 @@ import {
     { provide: TREASURY_RECEIPTS_SOURCE, useClass: SalesReceiptsSource },
     // ADR-0044 — P5 (§ 6.3)
     { provide: TREASURY_PAYABLES_SOURCE, useClass: PurchasesPayablesSource },
+    // ADR-0051 — H11 (§ 7.2) : fournisseur nul tant que les RH (H10) ne le relient pas.
+    { provide: TREASURY_HR_PAYABLES_SOURCE, useClass: NoHrPayablesSource },
   ],
   // ADR-0033 (amendement du 27 oct. 2026) : le brief lit les soldes des comptes.
   // ADR-0044 — P5 (§ 6.2) : les paiements fournisseurs écrivent leurs dépenses par
   // `TreasuryExpensesService`, seul écrivain de `treasury_expenses`.
-  exports: [TreasuryBridgeLocks, TreasuryAccountsService, TreasuryExpensesService],
+  // ADR-0051 — H11 (§ 7.1) : les RH écrivent leurs dépenses et leurs mouvements
+  // d'avance par `recordOwnedByExpenseReport` et `recordOwnedByAdvance`.
+  exports: [
+    TreasuryBridgeLocks,
+    TreasuryAccountsService,
+    TreasuryExpensesService,
+    TreasuryMovementsService,
+  ],
 })
 export class TreasuryModule {}
