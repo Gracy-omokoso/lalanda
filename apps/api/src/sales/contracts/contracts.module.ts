@@ -65,12 +65,16 @@ import { SalesDepositsService } from './deposits/sales-deposits.service.js';
 import { SalesSubscriptionsController } from './subscriptions/sales-subscriptions.controller.js';
 import { SalesSubscriptionsJob } from './subscriptions/sales-subscriptions.job.js';
 import { SalesSubscriptionsService } from './subscriptions/sales-subscriptions.service.js';
+// ADR-0050 — V6
+import { SalesContractsAgendaModule } from './agenda/contracts-agenda.module.js';
 
 @Module({
   imports: [
     // `AuthGuard` résout l'organisation active via `OrganizationsService`.
     OrganizationsModule,
     forwardRef(() => SalesModule),
+    // ADR-0050 — V6 : « Mes tâches » (port global), cloche, tâche des alertes.
+    forwardRef(() => SalesContractsAgendaModule),
     MongooseModule.forFeature([
       // ADR-0050 — V2
       { name: SalesOrder.name, schema: SalesOrderSchema },

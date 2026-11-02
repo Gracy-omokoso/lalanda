@@ -14,6 +14,8 @@ import type { HrMyTaskItem } from '@lalanda/shared/hr';
 import type { PurchasesMyTaskItem } from '@lalanda/shared/purchases';
 import type { AssetsMyTaskItem } from '@lalanda/shared/assets';
 import type { StockMyTaskItem } from '@lalanda/shared/stock';
+// ADR-0050 — V6
+import type { SalesContractMyTaskItem } from '@lalanda/shared/sales-contracts';
 
 export const CRM_AGENDA_SOURCE = Symbol('WORK_CRM_AGENDA_SOURCE');
 
@@ -148,5 +150,46 @@ export interface AssetsAgendaReader {
 
 /** Sans module des équipements (tests) : aucun élément. */
 export const noAssetsAgenda: AssetsAgendaReader = {
+  agendaOf: async () => ({ items: [], truncated: false }),
+};
+
+// ── ADR-0050 — V6 (§ 6) : contrats, avenants, échéances et acomptes ──────────
+//
+// Même motif : agrégés à la lecture, en lecture seule, par le fournisseur réel
+// `sales/contracts/agenda/contracts-agenda.source.ts`. Appelé seulement avec `sales.read`
+// effectif ; les droits EFFECTIFS utiles sont passés, l'audience de chaque élément
+// (approbateurs, responsable, émetteurs) est jugée par le fournisseur. Le fournisseur
+// réel est déclaré par un module `@Global` du module des contrats : `WorkModule` ne
+// l'importe pas (le module des ventes importe déjà, par le CRM, `WorkModule`).
+
+export const SALES_CONTRACTS_AGENDA_SOURCE = Symbol('WORK_SALES_CONTRACTS_AGENDA_SOURCE');
+
+export interface SalesContractsAgendaActor {
+  userId: string;
+  /** `sales.contract.approve` effectif : contrats et avenants à approuver, reconductions. */
+  holdsApprove: boolean;
+  /** `sales.invoice` effectif : brouillons d'échéance à émettre. */
+  holdsInvoice: boolean;
+  /** `sales.manage` effectif : acomptes à marquer « traités ». */
+  holdsManage: boolean;
+}
+
+export interface SalesContractsAgendaPage {
+  items: SalesContractMyTaskItem[];
+  /** Vrai si plus de `limit` éléments répondaient. */
+  truncated: boolean;
+}
+
+export interface SalesContractsAgendaReader {
+  agendaOf(
+    organizationId: string,
+    actor: SalesContractsAgendaActor,
+    limit: number,
+    now: Date,
+  ): Promise<SalesContractsAgendaPage>;
+}
+
+/** Sans module des contrats (tests) : aucun élément. */
+export const noSalesContractsAgenda: SalesContractsAgendaReader = {
   agendaOf: async () => ({ items: [], truncated: false }),
 };

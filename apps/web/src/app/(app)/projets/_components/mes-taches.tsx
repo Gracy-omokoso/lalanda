@@ -14,10 +14,11 @@ import type { AssetsMyTaskItem } from '@lalanda/shared/assets';
 import type { CrmMyTaskItem } from '@lalanda/shared/crm';
 import type { HrMyTaskItem } from '@lalanda/shared/hr';
 import type { PurchasesMyTaskItem } from '@lalanda/shared/purchases';
+import type { SalesContractMyTaskItem } from '@lalanda/shared/sales-contracts';
 import type { StockMyTaskItem } from '@lalanda/shared/stock';
 import type { MyTasksView, WorkMyTaskItem } from '@lalanda/shared/work';
 import { EmptyState, PageHeader, Skeleton, buttonClasses } from '@lalanda/ui';
-import { ClipboardCheck, Scale } from 'lucide-react';
+import { ClipboardCheck, FileSignature, Scale } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -41,8 +42,10 @@ import {
   PASTILLE_APPROBATION,
   appliquerTache,
   estApprobation,
+  estElementContrat,
   estElementMagasin,
   estElementRh,
+  sousTitreElementContrat,
   sousTitreElementMagasin,
   estRelance,
   peutCocherRelance,
@@ -208,7 +211,9 @@ export function MesTaches(): React.ReactElement {
                 ) : (
                   <ul className="flex flex-col divide-y divide-[var(--border)] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)]">
                     {liste.map((t) =>
-                      estElementMagasin(t) ? (
+                      estElementContrat(t) ? (
+                        <LigneContrat key={t.id} e={t} today={vue.asOf} dueSoonDays={dueSoon} />
+                      ) : estElementMagasin(t) ? (
                         <LigneMagasin key={t.id} e={t} today={vue.asOf} dueSoonDays={dueSoon} />
                       ) : estElementRh(t) ? (
                         <LigneElementRh key={t.id} e={t} today={vue.asOf} dueSoonDays={dueSoon} />
@@ -300,6 +305,52 @@ function LigneMagasin({
           </Link>
           <span className="truncate text-xs text-[var(--foreground-muted)]">
             {sousTitreElementMagasin(e)}
+          </span>
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 pl-6 sm:pl-0">
+        <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-strong)] px-2 py-0.5 text-[0.7rem] font-medium">
+          {e.kindLabel}
+        </span>
+        <Echeance
+          task={{ dueDate: e.dueDate, done: false, isMilestone: false }}
+          today={today}
+          dueSoonDays={dueSoonDays}
+        />
+      </div>
+    </li>
+  );
+}
+
+/**
+ * ADR-0050 § 6 : contrat, avenant, échéance ou acompte — un lien et sa pastille, sans case
+ * à cocher (« cocher » renvoie à l'écran propriétaire).
+ */
+function LigneContrat({
+  e,
+  today,
+  dueSoonDays,
+}: {
+  e: SalesContractMyTaskItem;
+  today: string;
+  dueSoonDays: number;
+}): React.ReactElement {
+  return (
+    <li className="relative flex min-w-0 flex-col gap-1.5 px-3 py-2.5 hover:bg-[var(--surface-muted)] sm:flex-row sm:items-center sm:gap-3">
+      <div className="flex min-w-0 flex-1 items-start gap-2">
+        <FileSignature
+          aria-hidden="true"
+          className="mt-0.5 h-4 w-4 shrink-0 text-[var(--module-run)]"
+        />
+        <span className="flex min-w-0 flex-col">
+          <Link
+            href={e.href}
+            className="break-words text-sm font-medium underline-offset-2 after:absolute after:inset-0 hover:underline"
+          >
+            {e.title}
+          </Link>
+          <span className="truncate text-xs text-[var(--foreground-muted)]">
+            {sousTitreElementContrat(e)}
           </span>
         </span>
       </div>

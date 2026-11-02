@@ -25,11 +25,17 @@
 // valider, lignes « À traiter ») ou `source: 'assets'` (maintenance due) n'a pas de case
 // à cocher : il ouvre l'écran où agir et porte sa pastille (`kindLabel`). Ni coût ni
 // valeur n'y figurent.
+//
+// ADR-0050 § 6 (lot V6) : un élément `source: 'sales_contracts'` (contrat ou avenant à
+// approuver, préavis, fin de terme, reconduction à constater, copie signée manquante,
+// brouillons d'échéance à émettre, échéance bloquée, acompte à traiter) n'a pas de case à
+// cocher : il ouvre l'écran propriétaire et porte sa pastille (`kindLabel`). Aucun montant.
 
 import type { AssetsMyTaskItem } from '@lalanda/shared/assets';
 import type { CrmMyTaskItem } from '@lalanda/shared/crm';
 import type { HrMyTaskItem } from '@lalanda/shared/hr';
 import type { PurchasesMyTaskItem } from '@lalanda/shared/purchases';
+import type { SalesContractMyTaskItem } from '@lalanda/shared/sales-contracts';
 import type { StockMyTaskItem } from '@lalanda/shared/stock';
 import {
   groupMyTasks,
@@ -125,6 +131,16 @@ export function estElementMagasin(e: MyTaskEntry): e is StockMyTaskItem | Assets
 /** Ligne secondaire : la nature de l'élément (« Inventaire à valider », « Maintenance »). */
 export function sousTitreElementMagasin(e: StockMyTaskItem | AssetsMyTaskItem): string {
   return e.source === 'assets' ? `Maintenance prévue le ${e.dueDate}` : e.kindLabel;
+}
+
+/** Élément des contrats, commandes et abonnements (ADR-0050 § 6) : un lien, sans case. */
+export function estElementContrat(e: MyTaskEntry): e is SalesContractMyTaskItem {
+  return e.source === 'sales_contracts';
+}
+
+/** Ligne secondaire : client et objet, motifs d'une échéance bloquée, ou la pastille. */
+export function sousTitreElementContrat(e: SalesContractMyTaskItem): string {
+  return e.detail ?? e.kindLabel;
 }
 
 /**

@@ -82,6 +82,16 @@ export const NOTIFICATION_KINDS = [
   'assets.maintenance_due',
   'assets.coverage_expiring',
   'documents.expiring',
+  // ADR-0050 — V6 (§ 6) : contrats clients et abonnements. Destinataires par droits
+  // EFFECTIFS (`holdersOf`) ou responsable du contrat, jamais par rôle ; refiltrés à la
+  // lecture par `sales.contract.approve`, `sales.read` ou `sales.invoice`. Aucun ne porte un
+  // montant ni ne juge une clause : seulement un numéro et une date.
+  'sales.contract_submitted',
+  'sales.contract_approved',
+  'sales.contract_rejected',
+  'sales.contract_notice_due',
+  'sales.contract_term_ending',
+  'sales.subscription_drafts_ready',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -97,6 +107,8 @@ export const NOTIFICATION_SOURCE_MODULES = [
   'stock',
   'assets',
   'documents',
+  // ADR-0050 — V6 : contrats clients et abonnements.
+  'sales',
 ] as const;
 export type NotificationSourceModule = (typeof NOTIFICATION_SOURCE_MODULES)[number];
 
@@ -131,6 +143,8 @@ export const NOTIFICATION_ENTITY_TYPES = [
   'review',
   'goal',
   'attendance_correction',
+  // ADR-0050 — V6 : contrat client (ses avenants et ses échéances y renvoient).
+  'sales_contract',
 ] as const;
 export type NotificationEntityType = (typeof NOTIFICATION_ENTITY_TYPES)[number];
 
