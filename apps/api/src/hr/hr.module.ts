@@ -69,6 +69,17 @@ import {
   HrRemindersJob,
 } from './reminders/hr-reminders.job.js';
 import { HrRetentionJob } from './retention/hr-retention.job.js';
+// ADR-0051 — H10
+import { TreasuryModule } from '../treasury/treasury.module.js';
+import { EmployeeAdvance, EmployeeAdvanceSchema } from './advances/advance.schema.js';
+import { HrAdvanceRemindersService } from './advances/hr-advance-reminders.service.js';
+import { HrAdvancesController } from './advances/hr-advances.controller.js';
+import { HrAdvancesService } from './advances/hr-advances.service.js';
+import { ExpenseReport, ExpenseReportSchema } from './expenses/expense-report.schema.js';
+import { HrExpenseReportsController } from './expenses/hr-expense-reports.controller.js';
+import { HrExpenseReportsService } from './expenses/hr-expense-reports.service.js';
+import { HrExpensesNotifier } from './expenses/hr-expenses-notifier.js';
+import { HrExpensesSettingsService } from './expenses/hr-expenses-settings.service.js';
 
 @Module({
   imports: [
@@ -76,6 +87,8 @@ import { HrRetentionJob } from './retention/hr-retention.job.js';
     OrganizationsModule,
     // ADR-0045 — H3 : lecteur des demandes à valider, partagé avec « Mes tâches ».
     HrAgendaModule,
+    // ADR-0051 — H10 : dépenses et mouvements possédés par les RH (`recordOwnedBy…`).
+    TreasuryModule,
     MongooseModule.forFeature([
       // ADR-0045 — H2 : réglages, services, fiches, données sensibles ; adhésions
       // (lien membre, destinataires de l'alerte bancaire) ; journal (débit de `reveal`).
@@ -95,6 +108,9 @@ import { HrRetentionJob } from './retention/hr-retention.job.js';
       { name: ChecklistTemplate.name, schema: ChecklistTemplateSchema },
       { name: Checklist.name, schema: ChecklistSchema },
       { name: HrReminderClaim.name, schema: HrReminderClaimSchema },
+      // ADR-0051 — H10 : notes de frais, avances.
+      { name: ExpenseReport.name, schema: ExpenseReportSchema },
+      { name: EmployeeAdvance.name, schema: EmployeeAdvanceSchema },
     ]),
   ],
   controllers: [
@@ -114,6 +130,9 @@ import { HrRetentionJob } from './retention/hr-retention.job.js';
     HrDocumentsController,
     HrChecklistsController,
     HrDeadlinesController,
+    // ADR-0051 — H10
+    HrExpenseReportsController,
+    HrAdvancesController,
   ],
   providers: [
     MasterKeyringProvider,
@@ -148,6 +167,12 @@ import { HrRetentionJob } from './retention/hr-retention.job.js';
     HrDeadlinesService,
     HrRemindersJob,
     HrRetentionJob,
+    // ADR-0051 — H10 : réglages des frais et avances, notes, avances, rappels d'avance.
+    HrExpensesSettingsService,
+    HrExpensesNotifier,
+    HrExpenseReportsService,
+    HrAdvancesService,
+    HrAdvanceRemindersService,
   ],
   exports: [
     // ADR-0045 — H2
@@ -163,6 +188,10 @@ import { HrRetentionJob } from './retention/hr-retention.job.js';
     HrDocumentsService,
     HrChecklistsService,
     HrDeadlinesService,
+    // ADR-0051 — H10
+    HrExpensesSettingsService,
+    HrExpenseReportsService,
+    HrAdvancesService,
   ],
 })
 export class HrModule {}
