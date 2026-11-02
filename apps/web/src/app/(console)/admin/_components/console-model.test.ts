@@ -118,9 +118,11 @@ describe('catalogue des modules', () => {
       '/admin/fonctionnalites',
       '/admin/integrations',
       '/admin/journal',
+      // ADR-0053 — P6
+      '/admin/annonces',
     ]);
     const bientot = CONSOLE_MODULES.filter((m) => m.etat === 'bientot').map((m) => m.id);
-    expect(bientot).toEqual(['annonces', 'statistiques', 'finances', 'packs', 'modeles']);
+    expect(bientot).toEqual(['statistiques', 'finances', 'packs', 'modeles']);
   });
 
   it('n’emploie aucun mot réservé aux pièces fiscales (ADR-0053 § 6.8)', () => {

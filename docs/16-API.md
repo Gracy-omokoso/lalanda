@@ -319,6 +319,31 @@ paiements.
 `404 MANUAL_REQUEST_NOT_FOUND`, `400 MANUAL_REQUEST_CLOSED`,
 `400 MANUAL_REQUEST_EXPIRED`, `400 REJECTION_NOTE_REQUIRED`,
 `503 PAYMENT_PROVIDER_UNAVAILABLE`.
+
+**Console Lalanda, annonces (ADR-0053 § 6.6, lot P6 — appliqué).** Canal **in-app seulement**
+(aucun e-mail). Garde de console, action plateforme par route ; écritures sous ré-authentification
+(sauf l'aperçu, qui compte). Circuit : `draft → pending_approval → approved → sent`, `canceled`
+possible jusqu'à l'envoi.
+
+```text
+GET    /admin/announcements                  platform.announcements.draft
+POST   /admin/announcements                  platform.announcements.draft   (ré-auth, { title, body, audience, expiresAt? })
+PUT    /admin/announcements/:id              platform.announcements.draft   (ré-auth, brouillon, auteur seul)
+POST   /admin/announcements/:id/preview      platform.announcements.draft   (nombre de destinataires)
+POST   /admin/announcements/:id/submit       platform.announcements.draft   (ré-auth, 409 PREVIEW_REQUIRED)
+POST   /admin/announcements/:id/approve      platform.announcements.approve (ré-auth, 409 SELF_APPROVAL_FORBIDDEN)
+POST   /admin/announcements/:id/send         platform.announcements.approve (ré-auth, { confirmedAudienceCount })
+POST   /admin/announcements/:id/cancel       platform.announcements.draft   (ré-auth, { reason })
+GET    /me/announcements                     AuthGuard (destinataire) : texte et dates seulement
+POST   /me/announcements/:id/read            AuthGuard (destinataire), idempotent, 404 hors cible
+POST   /me/announcements/:id/dismiss         AuthGuard (destinataire), idempotent, 404 hors cible
+```
+
+Codes : `409 AUDIENCE_COUNT_MISMATCH` (nombre retapé faux), `409 REAPPROVAL_REQUIRED` (écart de
+plus de 10 % au recompte : retour à l'approbation), `409 ANNOUNCEMENT_ALL_ACTIVE` (une seule
+annonce « tous » en cours), `400 AUDIENCE_INVALID`, `400`/`409 ANNOUNCEMENT_EXPIRED`. L'auteur ou le
+soumetteur n'approuve pas, sauf détenteur unique (`soleApprover: true`, journalisé).
+
 ## Espace admin plateforme — implémenté (S21b)
 
 `apps/api/src/admin/` et `apps/api/src/integrations/`. Écrans correspondants : docs/04 § Implémenté (S21b). Modèle de rôles : ADR-0012 §4. Stockage des secrets : ADR-0013.

@@ -1930,4 +1930,49 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
       }
     }
   }, 120_000);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // ADR-0053 — P6 : annonces de la console. Aucun rôle d'organisation — Propriétaire
+  // compris — ne prépare, n'approuve ni n'envoie une annonce ; le refus nomme l'action
+  // PLATEFORME. `/me/announcements` reste ouvert à chacun pour SES annonces.
+  // ───────────────────────────────────────────────────────────────────────────
+
+  it('ADR-0053 P6 — aucun rôle d’organisation ne crée ni n’envoie d’annonce', async () => {
+    const s = serveur();
+    const factice = '0123456789abcdef01234567';
+    const sondes: Array<[string, string, PlatformAction]> = [
+      ['get', '/admin/announcements', 'platform.announcements.draft'],
+      ['post', '/admin/announcements', 'platform.announcements.draft'],
+      ['put', `/admin/announcements/${factice}`, 'platform.announcements.draft'],
+      ['post', `/admin/announcements/${factice}/preview`, 'platform.announcements.draft'],
+      ['post', `/admin/announcements/${factice}/submit`, 'platform.announcements.draft'],
+      ['post', `/admin/announcements/${factice}/cancel`, 'platform.announcements.draft'],
+      ['post', `/admin/announcements/${factice}/approve`, 'platform.announcements.approve'],
+      ['post', `/admin/announcements/${factice}/send`, 'platform.announcements.approve'],
+    ];
+    const { ThrottlerStorage } = await import('@nestjs/throttler');
+    const store = app.get(ThrottlerStorage) as unknown as {
+      storage: Map<string, unknown>;
+      timeoutIds: Map<string, NodeJS.Timeout[]>;
+    };
+    for (const role of ROLES_TESTES) {
+      for (const t of store.timeoutIds.values()) t.forEach(clearTimeout);
+      store.timeoutIds.clear();
+      store.storage.clear();
+      for (const [verbe, chemin, action] of sondes) {
+        const req = request(s) as unknown as Record<string, (p: string) => request.Test>;
+        const res = await req[verbe]!(chemin)
+          .set('Cookie', cookiesDe(role))
+          .send({ title: 'x', body: 'y', audience: {} });
+        expect(res.status, `${role} × ${verbe} ${chemin}`).toBe(403);
+        expect(res.body, `${role} × ${verbe} ${chemin}`).toMatchObject({
+          code: 'FORBIDDEN',
+          action,
+        });
+      }
+      const mes = await request(s).get('/me/announcements').set('Cookie', cookiesDe(role));
+      expect(mes.status, role).toBe(200);
+      expect(Array.isArray(mes.body.announcements), role).toBe(true);
+    }
+  }, 120_000);
 });

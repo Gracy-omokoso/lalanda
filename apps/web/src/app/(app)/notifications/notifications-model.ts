@@ -262,10 +262,20 @@ export const LIBELLES_TYPES: Record<NotificationKind, { label: string; aide: str
     label: 'Brouillons d’échéance prêts',
     aide: 'Des brouillons de factures d’échéance ont été préparés : à vérifier et émettre.',
   },
+  // ADR-0053 — P6 : message de service de Lalanda ; ne se coupe pas (absent des préférences).
+  'platform.announcement': {
+    label: 'Annonce de Lalanda',
+    aide: 'Un message de l’équipe Lalanda à ses utilisateurs.',
+  },
 };
 
-/** Types dans l'ordre d'affichage des préférences. */
-export const TYPES_AFFICHES: readonly NotificationKind[] = NOTIFICATION_KINDS;
+/**
+ * Types dans l'ordre d'affichage des préférences. ADR-0053 — P6 : les annonces de la
+ * plateforme ne se coupent pas (message de service, décision ouverte n° 9).
+ */
+export const TYPES_AFFICHES: readonly NotificationKind[] = NOTIFICATION_KINDS.filter(
+  (k) => k !== 'platform.announcement',
+);
 
 /** Pastille du compteur : rien à zéro, « 99+ » au-delà de 99. */
 export function pastilleCompteur(nonLues: number): string | null {

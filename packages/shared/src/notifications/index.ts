@@ -92,6 +92,7 @@ export const NOTIFICATION_KINDS = [
   'sales.contract_notice_due',
   'sales.contract_term_ending',
   'sales.subscription_drafts_ready',
+  'platform.announcement', // ADR-0053 — P6 : annonce de la plateforme (`/me/announcements`, hors boîte d'organisation).
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
