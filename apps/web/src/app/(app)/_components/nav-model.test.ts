@@ -56,6 +56,11 @@ const PROPRIETAIRE: OrgAction[] = [
   'hr.sensitive.read',
   'leave.request',
   'leave.approve',
+  // ADR-0051 — H8
+  'expenses.claim',
+  'expenses.approve',
+  'attendance.clock',
+  'performance.read',
   // ADR-0046 — S0
   'stock.read',
   'stock.move',
@@ -482,6 +487,12 @@ describe('ADR-0045 § 8 — application Ressources humaines (H6)', () => {
       'Mon équipe',
       'À valider',
       'Calendrier',
+      'Mes frais',
+      'Frais et avances',
+      'Présences',
+      'Planning',
+      'Objectifs',
+      'Évaluations',
       'Collaborateurs',
       'Services',
       'Organigramme',
@@ -501,6 +512,10 @@ describe('ADR-0045 § 8 — application Ressources humaines (H6)', () => {
     expect(approbateur.sousOptions.map((s) => s.id)).toContain('rh-a-valider');
     const rhLecture = appsVisibles(['hr.read'], 'run')[0]!;
     expect(rhLecture.sousOptions.map((s) => s.id)).toEqual([
+      // ADR-0051 — H16 : liste des frais (sans justificatif), présences et planning.
+      'rh-frais',
+      'rh-presences',
+      'rh-planning',
       'rh-collaborateurs',
       'rh-services',
       'rh-organigramme',
@@ -656,5 +671,37 @@ describe('ADR-0049 — K8 : Comptabilité', () => {
     expect(sousOptionActive('/comptabilite/reglages')).toBe('comptabilite-reglages');
     expect(appActive('/comptabilite/etats')).toBe('comptabilite');
     expect(appActive('/comptabilites')).toBeNull();
+  });
+});
+
+describe('ADR-0051 § 10 — second volet des ressources humaines (H16)', () => {
+  const rh = NAV_APPS.find((a) => a.id === 'rh')!;
+  const ids = (x: OrgAction[]): string[] =>
+    appsVisibles(x, 'run')
+      .find((a) => a.id === 'rh')!
+      .sousOptions.map((s) => s.id);
+
+  it('« Mes frais » avec `expenses.claim` ; « Frais et avances » aux validateurs, payeurs et RH', () => {
+    expect(ids(['leave.request', 'expenses.claim'])).toContain('rh-mes-frais');
+    expect(ids(['leave.request', 'expenses.claim'])).not.toContain('rh-frais');
+    expect(ids(['leave.request', 'payables.pay'])).toContain('rh-frais');
+    expect(ids(['hr.read'])).toContain('rh-frais');
+  });
+
+  it('présences, planning, objectifs, évaluations : membre interne ou lecture RH', () => {
+    const membre = ids(['leave.request', 'attendance.clock']);
+    for (const id of ['rh-presences', 'rh-planning', 'rh-objectifs', 'rh-evaluations']) {
+      expect(membre).toContain(id);
+    }
+    const lecteurPerf = ids(['leave.request', 'performance.read']);
+    expect(lecteurPerf).toEqual(expect.arrayContaining(['rh-objectifs', 'rh-evaluations']));
+    expect(lecteurPerf).not.toContain('rh-presences');
+  });
+
+  it('les chemins s’allument sur leur sous-option', () => {
+    expect(sousOptionActive('/rh/moi/frais')).toBe('rh-mes-frais');
+    expect(sousOptionActive('/rh/frais')).toBe('rh-frais');
+    expect(sousOptionActive('/rh/evaluations')).toBe('rh-evaluations');
+    expect(rh.sousOptions.map((s) => s.href)).toContain('/rh/planning');
   });
 });

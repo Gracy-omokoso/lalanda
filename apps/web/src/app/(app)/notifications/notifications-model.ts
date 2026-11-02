@@ -237,6 +237,31 @@ export const LIBELLES_TYPES: Record<NotificationKind, { label: string; aide: str
     label: 'Document bientôt expiré',
     aide: 'Un document de la bibliothèque arrive à sa date d’expiration.',
   },
+  // ADR-0050 — V6 (§ 6) : contrats clients et abonnements.
+  'sales.contract_submitted': {
+    label: 'Contrat à approuver',
+    aide: 'Un contrat ou un avenant est soumis à votre approbation.',
+  },
+  'sales.contract_approved': {
+    label: 'Contrat approuvé',
+    aide: 'Un contrat ou un avenant que vous suivez a été approuvé.',
+  },
+  'sales.contract_rejected': {
+    label: 'Contrat rejeté',
+    aide: 'Un contrat ou un avenant que vous suivez a été rejeté.',
+  },
+  'sales.contract_notice_due': {
+    label: 'Date limite de préavis proche',
+    aide: 'La date limite de préavis d’un contrat dont vous êtes responsable approche.',
+  },
+  'sales.contract_term_ending': {
+    label: 'Fin de terme proche',
+    aide: 'Le terme d’un contrat dont vous êtes responsable arrive à sa fin.',
+  },
+  'sales.subscription_drafts_ready': {
+    label: 'Brouillons d’échéance prêts',
+    aide: 'Des brouillons de factures d’échéance ont été préparés : à vérifier et émettre.',
+  },
 };
 
 /** Types dans l'ordre d'affichage des préférences. */

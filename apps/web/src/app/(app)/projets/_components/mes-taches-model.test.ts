@@ -6,7 +6,9 @@ import { describe, expect, it } from 'vitest';
 
 import { oid, tache } from './fixtures.test-helpers';
 import {
+  estElementContrat,
   estElementMagasin,
+  sousTitreElementContrat,
   sousTitreElementMagasin,
   PASTILLE_APPROBATION,
   PASTILLE_VALIDATION_ABSENCE,
@@ -278,5 +280,48 @@ describe('éléments des stocks et des équipements (ADR-0046 § 6.7, lot S7)', 
       href: '/equipements/a1',
     };
     expect(sousTitreElementMagasin(maintenance)).toBe('Maintenance prévue le 2026-10-22');
+  });
+});
+
+describe('alertes des contrats (ADR-0050 § 6, lot V6)', () => {
+  const contrat = {
+    source: 'sales_contracts' as const,
+    kind: 'notice_deadline' as const,
+    id: 'sct:notice_deadline:c1:0',
+    title: 'Date limite de préavis le 15/12/2027 — contrat CT2701-000001',
+    detail: 'Kin Services — Maintenance annuelle',
+    contractId: 'c1',
+    amendmentId: null,
+    orderId: null,
+    dueDate: '2027-12-15',
+    priority: 'none' as const,
+    rank: 'sct:notice_deadline:c1:0',
+    done: false as const,
+    kindLabel: 'Préavis',
+    count: 1,
+    href: '/ventes/contrats/c1',
+  };
+
+  it('reconnues par leur source, un lien sans case à cocher ; ligne secondaire = détail ou pastille', () => {
+    expect(estElementContrat(contrat)).toBe(true);
+    expect(estElementMagasin(contrat)).toBe(false);
+    expect(sousTitreElementContrat(contrat)).toBe('Kin Services — Maintenance annuelle');
+    expect(sousTitreElementContrat({ ...contrat, detail: null })).toBe('Préavis');
+  });
+
+  it('regroupées au même jour que les autres sources ; sans date → « Sans échéance »', () => {
+    const v: MyTasksView = {
+      asOf: '2027-12-10',
+      overdue: [],
+      today: [],
+      next7Days: [],
+      later: [],
+      noDate: [],
+      dueSoonCount: 0,
+      truncated: false,
+    };
+    const r = regrouper(v, [contrat, { ...contrat, id: 'sct:x', dueDate: null }], 1);
+    expect(r.next7Days.map((e) => e.id)).toEqual(['sct:notice_deadline:c1:0']);
+    expect(r.noDate.map((e) => e.id)).toEqual(['sct:x']);
   });
 });
