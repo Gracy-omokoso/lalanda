@@ -34,6 +34,8 @@ import { CatalogItemsService } from './catalog-items.service.js';
 import { Customer, CustomerSchema } from './customer.schema.js';
 import { CustomersController } from './customers.controller.js';
 import { CustomersService } from './customers.service.js';
+// ADR-0050 — V2 : commandes clients, liens, pièces (contrats, acomptes, abonnements ensuite).
+import { ContractsModule } from './contracts/contracts.module.js';
 import {
   SalesInvoiceSettlement,
   SalesInvoiceSettlementSchema,
@@ -97,6 +99,7 @@ import { ReferenceRefreshJob } from './normalization/reference-refresh.job.js';
     BrandingModule,
     // ADR-0040 — C1 : synchronisation fiche client → compte CRM (`CrmAccountsSync`).
     CrmModule,
+    ContractsModule, // ADR-0050 — V2
     MongooseModule.forFeature([
       { name: Customer.name, schema: CustomerSchema },
       { name: CatalogItem.name, schema: CatalogItemSchema },
