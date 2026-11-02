@@ -357,6 +357,18 @@ Deux routes de l'API **sans session** (`GET /public/lead-forms/:token`,
 - Tests : `admin-billing.e2e.test.ts`, `subscriptions.e2e.test.ts` (nouveaux chemins), blocs P3
   de `routes-coverage.test.ts` et `rbac-matrix.e2e.test.ts`.
 
+## ADR-0053 — console Lalanda : lot P7 (appliqué)
+
+- **Statistiques agrégées seulement** (`/admin/stats`) : aucun nom, identifiant ni montant d'une
+  organisation dans la réponse ; seuil de diffusion de 5 sur toute case, avec masquage secondaire
+  dans les répartitions (une case masquée ne se déduit pas du total). L'adoption des modules ne lit
+  que la clé de locataire (`distinct('organizationId')`), aucun champ de contenu.
+- **Finances du site** (`/admin/finance`) : super-administrateur et finance seuls ; calcul dans le
+  moteur (`platform-revenue`), « encaissements constatés » et « revenu récurrent déclaré », jamais
+  « chiffre d'affaires » (ADR-0047 non tranché). Export CSV journalisé (`platform.finance.exported`).
+- Tests : `admin-stats.e2e.test.ts`, `platform-revenue.test.ts`, `stats.test.ts`, blocs P7 de
+  `routes-coverage.test.ts` et `rbac-matrix.e2e.test.ts`.
+
 ## Menaces prioritaires
 
 - accès inter-organisation;

@@ -126,15 +126,15 @@ export const CONSOLE_MODULES: readonly ModuleConsole[] = [
     label: 'Statistiques',
     description: 'Agrégats de la plateforme, sans aucune case de moins de cinq organisations.',
     action: 'platform.stats.read',
-    etat: 'bientot',
+    etat: 'disponible', // ADR-0053 — P7
   },
   {
     id: 'finances',
     segment: 'finances',
     label: 'Finances du site',
-    description: 'Encaissements constatés et revenu récurrent déclaré, en USD.',
+    description: 'Encaissements constatés et revenu récurrent déclaré, par devise.',
     action: 'platform.finance.read',
-    etat: 'bientot',
+    etat: 'disponible', // ADR-0053 — P7
   },
   {
     id: 'packs',
