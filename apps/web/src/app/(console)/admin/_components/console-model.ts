@@ -50,7 +50,7 @@ export interface ModuleConsole {
  *
  * Les segments des écrans repris de S21b (`organisations`, `utilisateurs`,
  * `integrations`, `journal`) sont conservés : liens, docs et tests restent justes.
- * Lots à venir : fonctionnalités (P4), annonces (P6),
+ * Lots à venir : fonctionnalités (P4),
  * statistiques et finances (P7) ; Country Packs et modèles sectoriels n'ont pas
  * encore de lot d'écran (leurs routes d'API existent).
  */
@@ -118,7 +118,8 @@ export const CONSOLE_MODULES: readonly ModuleConsole[] = [
     label: 'Annonces',
     description: 'Messages in-app par catégorie de destinataires, approuvés à deux.',
     action: 'platform.announcements.draft',
-    etat: 'bientot',
+    // ADR-0053 — P6
+    etat: 'disponible',
   },
   {
     id: 'statistiques',

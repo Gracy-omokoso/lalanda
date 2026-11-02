@@ -35,6 +35,8 @@ import {
   pastilleCompteur,
   toutMarquerLu,
 } from '../notifications/notifications-model';
+// ADR-0053 — P6
+import { SectionAnnoncesCloche, useAnnoncesCloche } from './annonces-cloche';
 import { useShell } from './shell-context';
 
 type EtatPanneau = 'ferme' | 'chargement' | 'pret' | 'erreur';
@@ -144,7 +146,9 @@ export function NotificationsBell(): React.ReactElement {
     }
   }
 
-  const pastille = pastilleCompteur(nonLues);
+  // ADR-0053 — P6 : les annonces non lues s'ajoutent au compteur de la cloche.
+  const annonces = useAnnoncesCloche();
+  const pastille = pastilleCompteur(nonLues + annonces.nonLues);
   const maintenant = new Date();
 
   return (
@@ -155,7 +159,7 @@ export function NotificationsBell(): React.ReactElement {
         onClick={basculer}
         aria-haspopup="dialog"
         aria-expanded={ouvert}
-        aria-label={nomAccessibleCloche(nonLues)}
+        aria-label={nomAccessibleCloche(nonLues + annonces.nonLues)}
         title="Notifications"
         className="relative inline-flex h-9 w-9 items-center justify-center rounded-full text-[var(--nav-muted)] transition hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-fg)]"
       >
@@ -206,6 +210,8 @@ export function NotificationsBell(): React.ReactElement {
             aria-live="polite"
             aria-busy={etat === 'chargement'}
           >
+            {/* ADR-0053 — P6 : annonces de la plateforme, avant celles de l'organisation. */}
+            <SectionAnnoncesCloche annonces={annonces.annonces} onLire={annonces.lire} />
             {etat === 'chargement' ? (
               <p className="px-3 py-6 text-center text-sm text-[var(--foreground-muted)]">
                 Chargement…

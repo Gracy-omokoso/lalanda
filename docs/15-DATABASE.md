@@ -68,6 +68,14 @@ value (toujours `true` en v1 : une dérogation ouvre, elle ne ferme pas), reason
 endsAt (90 jours au plus), grantedBy, revokedAt, revokedBy, _schemaVersion }`, index
 `{ targetOrganizationId, feature, revokedAt, endsAt }`. Rien n'est supprimé : une levée pose `revokedAt`.
 
+**Implémenté, ADR-0053 lot P6.** `platform_announcements` : `{ title, body (texte brut), channel:
+'in_app', audience (AudienceFilter), status: draft | pending_approval | approved | sent | canceled,
+previewCount, previewedAt, audienceCountAtApproval, createdBy, submittedBy, approvedBy, soleApprover,
+sentBy, sentAt, recipientCount, expiresAt, canceledBy, canceledAt, _schemaVersion }`.
+`platform_announcement_receipts` : `{ announcementId, userId, deliveredAt, expiresAt, readAt,
+dismissedAt, _schemaVersion }`, index unique `{ announcementId, userId }` (aucun doublon), posés à
+l'envoi pour chaque destinataire. Aucune des deux ne porte d'`organizationId`.
+
 ## Valeur financière
 
 ```ts

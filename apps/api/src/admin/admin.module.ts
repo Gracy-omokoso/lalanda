@@ -32,6 +32,8 @@ import { PlatformBillingService } from './billing/platform-billing.service.js';
 import { FeaturesModule } from './features/features.module.js';
 // ADR-0053 — P5
 import { AdminAuditModule } from './audit/admin-audit.module.js';
+// ADR-0053 — P6
+import { PlatformAnnouncementsModule } from './announcements/announcements.module.js';
 // ADR-0053 — P7 : statistiques et finances du site (`/admin/stats`, `/admin/finance`).
 import { PlatformInsightsModule } from './stats/platform-insights.module.js';
 
@@ -53,6 +55,8 @@ import { PlatformInsightsModule } from './stats/platform-insights.module.js';
     ]),
     // ADR-0053 — P5 : journal plateforme filtré, export CSV, événements de sécurité.
     AdminAuditModule,
+    // ADR-0053 — P6 : annonces (`/admin/announcements/**`, `/me/announcements`).
+    PlatformAnnouncementsModule,
     // ADR-0053 — P7
     PlatformInsightsModule,
   ],
