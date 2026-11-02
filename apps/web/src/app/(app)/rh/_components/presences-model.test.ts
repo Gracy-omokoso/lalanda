@@ -11,6 +11,7 @@ import {
 import {
   MENTION_POINTAGE,
   accesPresences,
+  informationPointage,
   libelleConstat,
   pointageSuggere,
   separationCorrection,
@@ -47,6 +48,17 @@ describe('ADR-0051 H16 — présences', () => {
 
   it('le bouton dit ce qui est enregistré', () => {
     expect(MENTION_POINTAGE).toMatch(/heure du serveur, rien d’autre/);
+  });
+
+  it('ADR-0054 : l’information des salariés suit la durée réglée par l’organisation', () => {
+    expect(informationPointage({ retention: { attendanceMonths: 60 } })).toMatch(
+      /conservés 5 ans, puis effacés automatiquement/,
+    );
+    expect(informationPointage({ retention: { attendanceMonths: 24 } })).toMatch(/2 ans/);
+    expect(informationPointage({ retention: { attendanceMonths: null } })).toMatch(
+      /aucune durée réglée/,
+    );
+    expect(informationPointage(null)).toMatch(/5 ans/);
   });
 
   it('pointage suggéré : départ après une arrivée ouverte ; les annulés ne comptent pas', () => {

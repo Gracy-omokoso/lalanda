@@ -10,7 +10,9 @@
 // - Aucune règle de droit du travail : la tolérance de retard et le seuil hebdomadaire
 //   sont des valeurs SAISIES, vides par défaut (constats éteints) ; aucune durée
 //   légale, aucun repos, aucune majoration (J3).
-// - Conservation des pointages : non fixée, AUCUNE purge (J4).
+// - Conservation des pointages : 60 mois par défaut (ADR-0054, choix produit prudent du
+//   3 nov. 2026), réglable ; `null` posé par l'organisation = aucune purge. La purge est
+//   faite par `HrAttendanceRetentionJob`.
 //
 // L'écriture partage la révision du document `hr_settings` (`expectedRevision`, `0` tant
 // que rien n'est enregistré) : un autre écrivain des réglages RH invalide la révision.
