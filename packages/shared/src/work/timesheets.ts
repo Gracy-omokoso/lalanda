@@ -32,7 +32,12 @@ export const WeeklyTimesheetQuery = z
   .strict();
 export type WeeklyTimesheetQuery = z.output<typeof WeeklyTimesheetQuery>;
 
-export const TIMESHEET_FINDING_CODES = ['TIME_ON_LEAVE_DAY', 'NO_TIME_ON_WORKING_DAY'] as const;
+export const TIMESHEET_FINDING_CODES = [
+  'TIME_ON_LEAVE_DAY',
+  'NO_TIME_ON_WORKING_DAY',
+  // ADR-0051 — H14 (§ 7.8) : temps projet du jour supérieur à la présence pointée.
+  'PROJECT_TIME_ABOVE_ATTENDANCE',
+] as const;
 export type TimesheetFindingCode = (typeof TIMESHEET_FINDING_CODES)[number];
 
 export interface WeeklyTimesheetDayView {
@@ -45,6 +50,13 @@ export interface WeeklyTimesheetDayView {
   absence: 'am' | 'pm' | 'full' | null;
   expected: string;
   totalMinutes: number;
+  /**
+   * ADR-0051 — H14 (§ 7.8) : minutes de présence pointées ce jour (moteur
+   * `attendanceDay`) ; `null` si le pointage est éteint, sans fiche reliée, ou si
+   * l'appelant n'est ni le membre, ni son manager, ni un lecteur RH (§ 4). Information
+   * seulement : aucune saisie de temps n'en découle.
+   */
+  attendanceMinutes?: number | null;
 }
 
 export interface WeeklyTimesheetView {

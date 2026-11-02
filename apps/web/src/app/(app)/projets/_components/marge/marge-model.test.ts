@@ -98,3 +98,19 @@ describe('matériel sorti du stock (ADR-0046 § 6.4, marge 1.3.0)', () => {
     expect(constats({ ...vue, materials: null })).toHaveLength(constats(vue).length);
   });
 });
+
+describe('frais du personnel en attente (ADR-0051 § 7.3, marge 1.4.0)', () => {
+  it('une phrase informative par devise, jamais soustraite ; rien sans module RH', () => {
+    const avec = constats({
+      ...vue,
+      pendingExpenseClaims: [{ currency: 'USD', amount: '15.00', lineCount: 1 }],
+    });
+    const p = avec[avec.length - 1]!;
+    expect(p.code).toBe('PENDING_EXPENSE_CLAIMS.USD');
+    expect(p.ton).toBe('info');
+    expect(p.texte).toContain('Frais approuvés non remboursés — informatif');
+    expect(p.texte).toContain('1 ligne');
+    expect(p.texte).toContain('rien n’est soustrait');
+    expect(constats({ ...vue, pendingExpenseClaims: null })).toHaveLength(constats(vue).length);
+  });
+});

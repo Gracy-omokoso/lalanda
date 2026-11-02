@@ -77,7 +77,18 @@ export function messageConstat(c: WeeklyTimesheetView['findings'][number]): stri
       return `${formatMinutes(c.minutes)} saisies le ${formatJour(c.date)}, jour d’absence accordée : vérifiez la saisie ou l’absence.`;
     case 'NO_TIME_ON_WORKING_DAY':
       return `Aucun temps saisi le ${formatJour(c.date)}, jour travaillé (information).`;
+    // ADR-0051 — H14 (§ 7.8) : information seulement, aucune saisie n'en découle.
+    case 'PROJECT_TIME_ABOVE_ATTENDANCE':
+      return `Le ${formatJour(c.date)}, le temps saisi sur les projets dépasse de ${formatMinutes(c.minutes)} la présence pointée (information).`;
   }
+}
+
+/**
+ * ADR-0051 — H14 (§ 7.8) : la colonne « présence » existe si l'API l'a rendue (pointage
+ * activé, et l'appelant est le membre, son manager ou un lecteur RH).
+ */
+export function aPresence(v: Pick<WeeklyTimesheetView, 'days'>): boolean {
+  return v.days.some((j) => typeof j.attendanceMinutes === 'number');
 }
 
 export function tonConstat(

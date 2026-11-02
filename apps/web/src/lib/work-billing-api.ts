@@ -17,6 +17,8 @@ import type {
   WorkTaskView,
 } from '@lalanda/shared/work';
 
+import type { WorkRebillableExpensesView } from '@lalanda/shared/hr';
+
 import { jsonRequest } from './api';
 
 /** Réponse de `POST /work/tasks/:taskId/prepare-invoice`. */
@@ -78,6 +80,14 @@ export const workBillingApi = {
       { method: 'GET' },
     );
   },
+  /**
+   * ADR-0051 — H14 : frais refacturables remboursés du projet, sans nom
+   * (`work.read` + `sales.read` + `treasury.read`).
+   */
+  rebillableExpenses: (projectId: string) =>
+    jsonRequest<WorkRebillableExpensesView>(`/work/projects/${id(projectId)}/rebillable-expenses`, {
+      method: 'GET',
+    }),
   /** Projets non archivés proposés au rattachement d'une dépense (`work.read`). */
   activeProjects: () =>
     jsonRequest<WorkPage<WorkProjectSummary>>('/work/projects?limit=100', {

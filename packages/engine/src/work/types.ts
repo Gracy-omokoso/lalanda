@@ -34,7 +34,16 @@ import type { StockItemInput, StockMovementInput } from '../stock/types.js';
  * `margin` : l'achat de ce matériel y est déjà, ou y sera, par sa dépense. Sans
  * entrée `stock`, la sortie est celle de 1.2.0.
  */
-export const WORK_MARGIN_VERSION = '1.3.0';
+/**
+ * 1.4.0 (ADR-0051 § 7.3) : frais du personnel APPROUVÉS non encore remboursés, imputés
+ * au projet (`pendingExpenseClaims`), par devise — INFORMATIFS, JAMAIS soustraits de
+ * `margin`. Une ligne remboursée entre dans `margin` par sa dépense de remboursement
+ * (`treasury_expenses`, possédée par les RH), sans code nouveau ; le moteur retranche
+ * de chaque ligne en attente les dépenses déjà créées pour elle (`expenseReportLine`),
+ * pour qu'aucun montant ne soit compté deux fois. Sans entrée `hrExpenses`, la sortie
+ * est celle de 1.3.0.
+ */
+export const WORK_MARGIN_VERSION = '1.4.0';
 
 /** Catégorie de dépense des salaires et charges sociales (ADR-0034 § 1). */
 export const PERSONNEL_EXPENSE_CATEGORY = 'personnel';
@@ -91,6 +100,37 @@ export interface WorkMarginExpenseInput {
   amount: WorkMarginAmount;
   /** Catégorie de la dépense (ADR-0034) ; sert au seul constat de 1.2.0, jamais au calcul. */
   category?: string | null;
+  /**
+   * ADR-0051 § 7.3 (1.4.0) : ligne de note de frais d'origine (`<reportId>:<lineIndex>`)
+   * d'une dépense possédée par les RH ; `null` ou absent pour toute autre dépense. Sert
+   * au seul calcul de `pendingExpenseClaims`, jamais à `margin`.
+   */
+  expenseReportLine?: string | null;
+}
+
+/**
+ * Ligne de note de frais APPROUVÉE, imputée au projet, pas (ou pas entièrement)
+ * remboursée (ADR-0051 § 7.3). `amount` : montant de la ligne (payé par le
+ * collaborateur) ; le moteur en retranche les dépenses déjà créées pour elle.
+ */
+export interface WorkMarginExpenseClaimInput {
+  /** `<reportId>:<lineIndex>`, unique. */
+  line: string;
+  currency: WorkMarginCurrency;
+  amount: WorkMarginAmount;
+}
+
+/** Frais du personnel lus pour un projet (ADR-0051 § 7.3), par le port `WORK_HR_EXPENSES_SOURCE`. */
+export interface ProjectHrExpensesInput {
+  claims: readonly WorkMarginExpenseClaimInput[];
+}
+
+/** Frais approuvés non remboursés d'une devise — INFORMATIFS, jamais soustraits de `margin`. */
+export interface ProjectPendingExpenseClaimsCurrency {
+  currency: WorkMarginCurrency;
+  amount: WorkMarginAmount;
+  /** Lignes dont un reste est en attente de remboursement. */
+  lineCount: number;
 }
 
 /** Saisie de temps non supprimée. */
@@ -161,6 +201,12 @@ export interface ProjectMarginInput {
    * rejoue sur tout l'historique) ; seuls ceux imputés à `projectId` comptent.
    */
   stock?: ProjectStockInput;
+  /**
+   * Frais du personnel (ADR-0051 § 7.3) ; absent : rien n'est rendu
+   * (`pendingExpenseClaims` absent du résultat). Hors période : un reste à rembourser
+   * est un engagement à date.
+   */
+  hrExpenses?: ProjectHrExpensesInput;
 }
 
 /** Stock lu pour un projet (ADR-0046 § 6.4), par le port `WORK_STOCK_SOURCE`. */
@@ -267,4 +313,6 @@ export interface ProjectMarginResult {
   purchases?: ProjectPurchasesCurrency[];
   /** Présent seulement si l'entrée porte `stock` ; une devise sans sortie n'apparaît pas. */
   materials?: ProjectMaterialsCurrency[];
+  /** Présent seulement si l'entrée porte `hrExpenses` ; une devise sans reste n'apparaît pas. */
+  pendingExpenseClaims?: ProjectPendingExpenseClaimsCurrency[];
 }

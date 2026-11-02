@@ -492,8 +492,8 @@ describe('computeProjectMargin 1.2.0 — salaire rattaché et temps valorisé (A
     category: 'personnel',
   };
 
-  it('version 1.3.0 (le constat 1.2.0 est inchangé)', () => {
-    expect(WORK_MARGIN_VERSION).toBe('1.3.0');
+  it('version 1.4.0 (le constat 1.2.0 est inchangé)', () => {
+    expect(WORK_MARGIN_VERSION).toBe('1.4.0');
   });
 
   it('dépense `personnel` + temps valorisé, même devise : constat, MONTANT DE LA MARGE INCHANGÉ', () => {
@@ -615,5 +615,80 @@ describe('computeProjectMargin 1.3.0 — matériel sorti du stock (ADR-0046 § 6
       base({ stock: { projectId: 'P', items: [item], movements: [mv('1', 'opening', '20')] } }),
     );
     expect(vide.materials).toEqual([]);
+  });
+});
+
+// ── ADR-0051 § 7.3 : frais du personnel approuvés non remboursés (1.4.0) ─────
+
+describe('computeProjectMargin 1.4.0 — frais du personnel (ADR-0051 § 7.3, critère 6)', () => {
+  const claim = (line: string, amount: string, currency: 'CDF' | 'USD' = 'USD') => ({
+    line,
+    currency,
+    amount,
+  });
+
+  it('avant remboursement : la ligne est informative, MONTANT DE LA MARGE INCHANGÉ', () => {
+    const sans = computeProjectMargin(base({ invoices: [invoice()] }));
+    const avec = computeProjectMargin(
+      base({ invoices: [invoice()], hrExpenses: { claims: [claim('r1:0', '15.00')] } }),
+    );
+    expect(avec.pendingExpenseClaims).toEqual([{ currency: 'USD', amount: '15.00', lineCount: 1 }]);
+    expect(avec.currencies).toEqual(sans.currencies);
+    expect(avec.findings).toEqual(sans.findings);
+    expect(sans.pendingExpenseClaims).toBeUndefined();
+  });
+
+  it('après remboursement : la dépense entre dans la marge, plus rien en attente', () => {
+    const expense = {
+      id: 'e1',
+      currency: 'USD' as const,
+      spentOn: '2026-11-03',
+      amount: '15.00',
+      category: 'transport',
+      expenseReportLine: 'r1:0',
+    };
+    const r = computeProjectMargin(
+      base({
+        invoices: [invoice()],
+        expenses: [expense],
+        // Lecture concurrente : la ligne est encore lue « approuvée » — rien n'est compté deux fois.
+        hrExpenses: { claims: [claim('r1:0', '15.00')] },
+      }),
+    );
+    expect(r.currencies[0]!.expenses).toBe('15.00');
+    expect(r.pendingExpenseClaims).toEqual([]);
+  });
+
+  it('ligne soldée en partie par une avance : seul le complément reste en attente', () => {
+    const r = computeProjectMargin(
+      base({
+        expenses: [
+          {
+            id: 'e1',
+            currency: 'USD',
+            spentOn: '2026-11-03',
+            amount: '100.00',
+            expenseReportLine: 'r2:0',
+          },
+        ],
+        hrExpenses: { claims: [claim('r2:0', '130.00'), claim('r3:1', '2500.00', 'CDF')] },
+      }),
+    );
+    expect(r.currencies.find((c) => c.currency === 'USD')!.expenses).toBe('100.00');
+    expect(r.pendingExpenseClaims).toEqual([
+      { currency: 'CDF', amount: '2500.00', lineCount: 1 },
+      { currency: 'USD', amount: '30.00', lineCount: 1 },
+    ]);
+  });
+
+  it('refuse une ligne en double ou un montant illisible', () => {
+    expect(() =>
+      computeProjectMargin(
+        base({ hrExpenses: { claims: [claim('r1:0', '1.00'), claim('r1:0', '2.00')] } }),
+      ),
+    ).toThrow(RangeError);
+    expect(() =>
+      computeProjectMargin(base({ hrExpenses: { claims: [claim('r1:0', '1,00')] } })),
+    ).toThrow(RangeError);
   });
 });

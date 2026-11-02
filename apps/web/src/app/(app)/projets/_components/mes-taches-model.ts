@@ -21,6 +21,11 @@
 // lot H4). Le type d'une absence confidentielle arrive déjà masqué (« Absence ») :
 // l'écran n'en sait pas plus.
 //
+// ADR-0051 § 7.5 (lot H14) : quatre natures `source: 'hr'` de plus — frais à valider, à
+// rembourser (ou avance à verser), avance à régulariser, correction de pointage. Sans case
+// à cocher, sans montant : titre « Note de frais NF… » ou « Avance AV… », pastille
+// `kindLabel`, ligne secondaire : le collaborateur.
+//
 // ADR-0046 § 6.7 (lot S7) : un élément `source: 'stock'` (inventaire à compter ou à
 // valider, lignes « À traiter ») ou `source: 'assets'` (maintenance due) n'a pas de case
 // à cocher : il ouvre l'écran où agir et porte sa pastille (`kindLabel`). Ni coût ni
@@ -119,7 +124,8 @@ export function pastilleElementRh(e: HrMyTaskItem): string {
  * (matin) · 3,5 jours »), jamais recalculées ; ou le collaborateur d'un élément de liste.
  */
 export function sousTitreElementRh(e: HrMyTaskItem): string {
-  if (e.kind === 'checklist_item') return e.employeeName;
+  // ADR-0051 — H14 : un élément de liste, de frais, d'avance ou de pointage : le collaborateur.
+  if (e.kind !== 'leave_approval') return e.employeeName;
   return `${libellePeriode(e.start, e.end)} · ${formatJours(e.days)}`;
 }
 

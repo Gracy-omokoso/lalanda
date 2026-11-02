@@ -59,9 +59,28 @@ export function constatsMateriel(view: ProjectMarginView): ConstatAffiche[] {
   });
 }
 
-/** Constats codés de l'API → phrases françaises, dans l'ordre servi, puis le matériel. */
+/** Titre des frais du personnel en attente (ADR-0051 § 7.3). */
+export const FRAIS_EN_ATTENTE_TITRE = 'Frais approuvés non remboursés — informatif';
+
+/**
+ * ADR-0051 — H14 (marge 1.4.0) : frais du personnel approuvés non encore remboursés,
+ * imputés au projet, une phrase par devise. Montant rendu par le moteur, jamais recalculé
+ * ni soustrait. `pendingExpenseClaims` absent ou `null` : aucune phrase.
+ */
+export function constatsFraisEnAttente(view: ProjectMarginView): ConstatAffiche[] {
+  return (view.pendingExpenseClaims ?? []).map((p) => ({
+    code: `PENDING_EXPENSE_CLAIMS.${p.currency}`,
+    ton: 'info',
+    texte: `${FRAIS_EN_ATTENTE_TITRE} : ${montantSigne(p.amount, p.currency)} (${p.lineCount} ${p.lineCount > 1 ? 'lignes' : 'ligne'}). Ils entreront dans la marge par leur dépense de remboursement : rien n’est soustrait d’ici là.`,
+  }));
+}
+
+/**
+ * Constats codés de l'API → phrases françaises, dans l'ordre servi, puis le matériel et
+ * (ADR-0051 — H14) les frais du personnel en attente de remboursement.
+ */
 export function constats(view: ProjectMarginView): ConstatAffiche[] {
-  return [...constatsServis(view), ...constatsMateriel(view)];
+  return [...constatsServis(view), ...constatsMateriel(view), ...constatsFraisEnAttente(view)];
 }
 
 function constatsServis(view: ProjectMarginView): ConstatAffiche[] {

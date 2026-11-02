@@ -9,6 +9,8 @@
 //   DELETE /work/projects/:projectId/invoices/:invoiceId   work.manage
 //   POST   /work/tasks/:taskId/prepare-invoice             work.read + sales.manage
 //   GET    /work/projects/:projectId/margin                work.read + sales.read + treasury.read
+//   GET    /work/projects/:projectId/rebillable-expenses   work.read + sales.read + treasury.read
+//          (ADR-0051 — H14, § 7.3 : frais refacturables remboursés, sans nom, sans facture)
 //
 // Les actions listées sont TOUTES requises (sémantique conjonctive). Le brouillon
 // préparé n'est jamais émis ni normalisé : « Émettre » reste un geste de
@@ -37,6 +39,8 @@ import {
   type WorkProjectFromOpportunityView,
   type WorkProjectView,
 } from '@lalanda/shared/work';
+
+import type { WorkRebillableExpensesView } from '@lalanda/shared/hr';
 
 import { AuthGuard } from '../../auth/auth.guard.js';
 import { CurrentOrgId, CurrentUser } from '../../auth/current-user.decorator.js';
@@ -165,6 +169,20 @@ export class WorkBillingController {
     const parsed = PrepareInvoiceBody.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error);
     return this.billing.prepareInvoice(orgId, taskId, parsed.data, workActorOf(user, perms), user);
+  }
+
+  /**
+   * ADR-0051 — H14 (§ 7.3) : lignes de frais « refacturables » imputées au projet et
+   * remboursées (ou soldées par une avance). Libellé sans nom ; aucune facture créée :
+   * refacturer reste un geste de l'utilisateur sous `sales.manage` et `sales.invoice`.
+   */
+  @Get('projects/:projectId/rebillable-expenses')
+  @RequirePermission('work.read', 'sales.read', 'treasury.read')
+  async rebillableExpenses(
+    @CurrentOrgId() orgId: string,
+    @Param('projectId', WorkIdPipe) projectId: string,
+  ): Promise<WorkRebillableExpensesView> {
+    return this.margins.rebillable(orgId, projectId);
   }
 
   @Get('projects/:projectId/margin')

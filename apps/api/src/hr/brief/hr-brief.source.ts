@@ -10,6 +10,14 @@
 //   - échéances RH (moteur `hrDeadlines`) : `hr.read` ; sinon `null`.
 // Rien d'autre ne sort d'ici : ni nom, ni type d'absence, ni motif, ni montant. Le
 // moteur du brief décide qui est absent « aujourd'hui » au jour de Kinshasa.
+//
+// ADR-0051 — H14 (§ 7.6) : deux nombres de plus, lus par le lecteur partagé avec « Mes
+// tâches » (`HrExpenseAgendaReader`, séparation des tâches appliquée) :
+//   - notes et avances que l'appelant peut valider : manager ou `expenses.approve` ;
+//     sinon `null` ;
+//   - notes à rembourser et avances à verser qu'il peut payer : `payables.pay` ; sinon
+//     `null`.
+// Jamais un nom, un montant ni la nature d'une avance.
 
 import {
   hrDeadlines,
@@ -18,12 +26,15 @@ import {
   type BriefHrInput,
 } from '@lalanda/engine';
 import { addDays, kinshasaDayOf } from '@lalanda/shared/work';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { InjectConnection } from '@nestjs/mongoose';
 import type { Connection } from 'mongoose';
 
 import type { HrSource } from '../../morning-brief/morning-brief.ports.js';
 import { HrLeaveApprovalsReader } from '../agenda/hr-leave-approvals.reader.js';
+// ADR-0051 — H14
+import type { Action } from '../../authz/permissions.js';
+import { HrExpenseAgendaReader } from '../agenda/hr-expense-agenda.reader.js';
 import type { EmployeeLean } from '../employees/employee.schema.js';
 import { engineEmployeeOf } from '../scope/hr-scope.service.js';
 import { hrSettingsViewOf } from '../settings/hr-settings.service.js';
@@ -36,6 +47,10 @@ export class HrBriefSource implements HrSource {
   constructor(
     @InjectConnection() private readonly connection: Connection,
     @Inject(HrLeaveApprovalsReader) private readonly approvals: HrLeaveApprovalsReader,
+    // ADR-0051 — H14 : frais et avances (facultatif : sans lui, faits non disponibles).
+    @Optional()
+    @Inject(HrExpenseAgendaReader)
+    private readonly expenseLinks: HrExpenseAgendaReader | null = null,
   ) {}
 
   async hrOf(
@@ -99,12 +114,55 @@ export class HrBriefSource implements HrSource {
         ? this.deadlineCount(organizationId, employees, today, settings.reminders)
         : Promise.resolve(null),
     ]);
+    // ADR-0051 — H14 : frais à valider, remboursements à payer (des nombres).
+    const expenseFacts = await this.expenseCounts(
+      organizationId,
+      userId,
+      actions,
+      scope.isManager,
+      today,
+    );
     return {
       status: 'known',
       absences: absences === null ? null : absences.items,
       pendingApprovalCount: pending,
       deadlineCount: deadlines,
-      truncated: absences?.truncated ?? false,
+      ...expenseFacts,
+      truncated: (absences?.truncated ?? false) || expenseFacts.truncated,
+    };
+  }
+
+  /**
+   * ADR-0051 — H14 (§ 7.6) : chaque nombre derrière sa garde ; `null` masque le fait.
+   * Rien n'est lu si l'appelant ne peut ni valider ni payer.
+   */
+  private async expenseCounts(
+    organizationId: string,
+    userId: string,
+    actions: readonly string[],
+    isManager: boolean,
+    today: string,
+  ): Promise<{
+    pendingExpenseApprovalCount?: number | null;
+    reimbursementsToPayCount?: number | null;
+    truncated: boolean;
+  }> {
+    if (this.expenseLinks === null) return { truncated: false };
+    const held = new Set(actions as readonly Action[]);
+    const approves = isManager || held.has('expenses.approve');
+    const pays = held.has('payables.pay');
+    if (!approves && !pays) {
+      return {
+        pendingExpenseApprovalCount: null,
+        reimbursementsToPayCount: null,
+        truncated: false,
+      };
+    }
+    const links = await this.expenseLinks.linksOf(organizationId, { userId, actions: held }, today);
+    return {
+      pendingExpenseApprovalCount: approves ? links.approvals.length : null,
+      reimbursementsToPayCount: pays ? links.toPay.length : null,
+      truncated: links.truncated,
     };
   }
 

@@ -237,6 +237,8 @@ export function buildMorningBriefFacts(input: MorningBriefInput): BriefFact[] {
 
   // ADR-0045 § 6.5 : absences du jour, validations d'absence, échéances RH.
   facts.push(...hrFacts(input.hr ?? { status: 'unavailable' }, today));
+  // ADR-0051 § 7.6 : frais et avances à valider, remboursements à payer — des nombres.
+  facts.push(...hrExpenseFacts(input.hr ?? { status: 'unavailable' }));
 
   // ADR-0046 § 6.6 : stocks, équipements, documents — des nombres seulement.
   facts.push(...stockFacts(input.stock ?? { status: 'unavailable' }));
@@ -622,6 +624,69 @@ function hrFacts(
           status: 'hidden' as const,
           value: null,
           source: { ...f.source, rule: HR_HIDDEN_RULES[f.id] ?? f.source.rule },
+        }
+      : { ...f, status: 'known' as const, value: String(Math.max(0, Math.trunc(n))) };
+  });
+}
+
+// ── Frais et avances du personnel (ADR-0051 § 7.6) ───────────────────────────
+//
+// DES NOMBRES SEULEMENT : ni nom, ni montant, ni nature d'une avance (une avance sur
+// salaire n'a aucun fait propre). Chaque champ a sa propre garde : `null` le masque,
+// absent le rend « non disponible ».
+
+const HR_EXPENSES_SOURCE_REF = 'ADR-0051 § 7.6';
+
+const HR_EXPENSE_FACT_SKELETON: readonly Omit<BriefFact, 'status' | 'value'>[] = Object.freeze([
+  {
+    id: 'mes_validations_frais.en_attente',
+    label: 'Notes de frais et avances qui attendent ma validation',
+    kind: 'count',
+    currency: null,
+    source: {
+      module: 'run.hr',
+      collection: 'hr_expense_reports',
+      rule: 'Notes de frais et avances soumises que vous pouvez valider à l’étape en cours (jamais les vôtres, ni celles que vous avez saisies, sauf validateur unique)',
+      reference: HR_EXPENSES_SOURCE_REF,
+    },
+  },
+  {
+    id: 'rh.remboursements_a_payer',
+    label: 'Remboursements au personnel à payer',
+    kind: 'count',
+    currency: null,
+    source: {
+      module: 'run.hr',
+      collection: 'hr_expense_reports',
+      rule: 'Notes de frais approuvées non remboursées et avances validées non versées que vous pouvez payer',
+      reference: HR_EXPENSES_SOURCE_REF,
+    },
+  },
+]);
+
+const HR_EXPENSE_HIDDEN_RULES: Readonly<Record<string, string>> = Object.freeze({
+  'mes_validations_frais.en_attente': 'Réservé aux managers et aux validateurs des frais',
+  'rh.remboursements_a_payer': 'Réservé aux personnes qui paient le personnel',
+});
+
+function hrExpenseFacts(hr: BriefHrInput): BriefFact[] {
+  if (hr === 'hidden' || hr.status === 'unavailable') {
+    const status = hr === 'hidden' ? ('hidden' as const) : ('unavailable' as const);
+    return HR_EXPENSE_FACT_SKELETON.map((f) => ({ ...f, status, value: null }));
+  }
+  const values: Record<string, number | null | undefined> = {
+    'mes_validations_frais.en_attente': hr.pendingExpenseApprovalCount,
+    'rh.remboursements_a_payer': hr.reimbursementsToPayCount,
+  };
+  return HR_EXPENSE_FACT_SKELETON.map((f) => {
+    const n = values[f.id];
+    if (n === undefined) return { ...f, status: 'unavailable' as const, value: null };
+    return n === null
+      ? {
+          ...f,
+          status: 'hidden' as const,
+          value: null,
+          source: { ...f.source, rule: HR_EXPENSE_HIDDEN_RULES[f.id] ?? f.source.rule },
         }
       : { ...f, status: 'known' as const, value: String(Math.max(0, Math.trunc(n))) };
   });
@@ -1421,6 +1486,49 @@ export const MORNING_BRIEF_RULES: readonly RuleDefinition[] = Object.freeze([
         recommendation: 'Ouvrir les échéances et renouveler ce qui doit l’être.',
         actionPath: '/documents/echeances',
         factIds: ['equipements.couvertures_expirant', 'documents.expirant'],
+      };
+    },
+  },
+  // ── ADR-0051 § 7.6 : frais et avances du personnel ──────────────────────
+  {
+    id: 'validations_frais_en_attente',
+    rank: 19,
+    severity: 'attention',
+    requires: ['mes_validations_frais.en_attente'],
+    threshold: null,
+    evaluate(ctx) {
+      const n = ctx.count('mes_validations_frais.en_attente');
+      if (n <= 0) return null;
+      return {
+        title: 'Frais et avances à valider',
+        message:
+          n > 1
+            ? `${n} notes de frais ou avances attendent votre validation.`
+            : `${n} note de frais ou avance attend votre validation.`,
+        recommendation: 'Ouvrir les frais à valider et décider de chacun.',
+        actionPath: '/rh/frais?vue=a-valider',
+        factIds: ['mes_validations_frais.en_attente'],
+      };
+    },
+  },
+  {
+    id: 'remboursements_personnel_a_payer',
+    rank: 20,
+    severity: 'attention',
+    requires: ['rh.remboursements_a_payer'],
+    threshold: null,
+    evaluate(ctx) {
+      const n = ctx.count('rh.remboursements_a_payer');
+      if (n <= 0) return null;
+      return {
+        title: 'Remboursements au personnel à payer',
+        message:
+          n > 1
+            ? `${n} notes de frais ou avances validées attendent leur paiement.`
+            : `${n} note de frais ou avance validée attend son paiement.`,
+        recommendation: 'Ouvrir les frais à payer et enregistrer chaque paiement.',
+        actionPath: '/rh/frais?vue=a-payer',
+        factIds: ['rh.remboursements_a_payer'],
       };
     },
   },

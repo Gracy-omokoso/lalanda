@@ -26,3 +26,6 @@ export * from './advances.js';
 export * from './attendance.js';
 export * from './planning.js';
 export * from './performance.js';
+
+// ADR-0051 — H14 (liens : « Mes tâches », frais refacturables)
+export * from './links.js';

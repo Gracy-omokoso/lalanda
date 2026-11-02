@@ -618,7 +618,9 @@ e2eSuite('projets du RUN — devis, factures, dépenses, marge (ADR-0039 L4a)', 
       const before = await planAndActualsFingerprint();
       const m = ok(await f.get('owner', `/work/projects/${projectId}/margin`));
       expect(m.projectId).toBe(projectId);
-      expect(m.version).toBe('1.3.0');
+      // ADR-0051 — H14 : marge 1.4.0 (frais du personnel informatifs, aucun ici).
+      expect(m.version).toBe('1.4.0');
+      expect(m.pendingExpenseClaims).toEqual([]);
       expect(m.currencies).toEqual([
         {
           currency: 'CDF',
@@ -980,7 +982,7 @@ e2eSuite('projets du RUN — devis, factures, dépenses, marge (ADR-0039 L4a)', 
       const interrupteur = process.env['MEMBER_PERMISSIONS_ENABLED'];
       process.env['MEMBER_PERMISSIONS_ENABLED'] = 'true';
       try {
-        await ecart(['sales.read', 'sales.manage', 'sales.quote']);
+        await ecart(['sales.read', 'sales.manage', 'sales.quote', 'sales.contract']);
         const p = ok(
           await f.post('admin', '/work/projects/from-opportunity', { opportunityId: opp.id }),
           201,

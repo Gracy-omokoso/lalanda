@@ -65,6 +65,9 @@ function input(
       absences: [],
       pendingApprovalCount: 0,
       deadlineCount: 0,
+      // ADR-0051 § 7.6 : connus et nuls par défaut.
+      pendingExpenseApprovalCount: 0,
+      reimbursementsToPayCount: 0,
       truncated: false,
     },
     // ADR-0046 § 6.6 : connus et vides par défaut.
@@ -487,13 +490,13 @@ describe('projets et tâches — faits et règles R8, R9 (ADR-0039 § 6.5)', () 
   });
 
   it('version mineure suivante (ADR-0044 § 6.4)', () => {
-    expect(brief([]).version).toBe('1.5.0');
+    expect(brief([]).version).toBe('1.6.0');
   });
 
-  it('les dix-huit règles ont des rangs uniques', () => {
+  it('les vingt règles ont des rangs uniques', () => {
     const ranks = MORNING_BRIEF_RULES.map((r) => r.rank);
     expect(new Set(ranks).size).toBe(ranks.length);
-    expect(ranks.length).toBe(18);
+    expect(ranks.length).toBe(20);
   });
 });
 
@@ -742,6 +745,8 @@ describe('ressources humaines — absences du jour, validations, échéances, R1
         absences: over.absences === undefined ? [] : over.absences,
         pendingApprovalCount: over.pending === undefined ? 0 : over.pending,
         deadlineCount: over.deadlines === undefined ? 0 : over.deadlines,
+        pendingExpenseApprovalCount: 0,
+        reimbursementsToPayCount: 0,
         truncated: over.truncated ?? false,
       },
     };
@@ -849,10 +854,84 @@ describe('ressources humaines — absences du jour, validations, échéances, R1
     }
   });
 
-  it('lecture bornée : le brief le dit ; version 1.5.0', () => {
+  it('lecture bornée : le brief le dit ; version 1.6.0', () => {
     const b = buildMorningBrief(input([], rh({ truncated: true })));
     expect(b.truncated).toBe(true);
-    expect(b.version).toBe('1.5.0');
+    expect(b.version).toBe('1.6.0');
+  });
+});
+
+describe('frais et avances du personnel — R19 et R20 (ADR-0051 § 7.6)', () => {
+  const hr = (
+    pendingExpenseApprovalCount: number | null | undefined,
+    reimbursementsToPayCount: number | null | undefined,
+  ): Partial<MorningBriefInput> => ({
+    hr: {
+      status: 'known',
+      absences: [],
+      pendingApprovalCount: 0,
+      deadlineCount: 0,
+      ...(pendingExpenseApprovalCount === undefined ? {} : { pendingExpenseApprovalCount }),
+      ...(reimbursementsToPayCount === undefined ? {} : { reimbursementsToPayCount }),
+      truncated: false,
+    },
+  });
+
+  it('critère 15 : R19 chez le validateur, R20 chez le payeur, en alerte', () => {
+    const b = buildMorningBrief(input([], hr(2, 1)));
+    expect(fact(b.facts, 'mes_validations_frais.en_attente')).toMatchObject({
+      status: 'known',
+      value: '2',
+      kind: 'count',
+      currency: null,
+    });
+    expect(b.alerts.find((x) => x.ruleId === 'validations_frais_en_attente')).toMatchObject({
+      rank: 19,
+      severity: 'attention',
+      actionPath: '/rh/frais?vue=a-valider',
+      message: '2 notes de frais ou avances attendent votre validation.',
+    });
+    expect(b.alerts.find((x) => x.ruleId === 'remboursements_personnel_a_payer')).toMatchObject({
+      rank: 20,
+      severity: 'attention',
+      actionPath: '/rh/frais?vue=a-payer',
+      message: '1 note de frais ou avance validée attend son paiement.',
+    });
+    // Rien à zéro.
+    expect(
+      buildMorningBrief(input([], hr(0, 0))).recommendations.filter((r) => r.rank >= 19),
+    ).toEqual([]);
+  });
+
+  it('chaque fait a sa garde : masqué (`null`), non disponible (absent), jamais zéro', () => {
+    const b = buildMorningBrief(input([], hr(null, undefined)));
+    expect(fact(b.facts, 'mes_validations_frais.en_attente')).toMatchObject({
+      status: 'hidden',
+      value: null,
+    });
+    expect(fact(b.facts, 'rh.remboursements_a_payer')).toMatchObject({
+      status: 'unavailable',
+      value: null,
+    });
+    expect(b.rulesSkipped).toContainEqual({
+      ruleId: 'validations_frais_en_attente',
+      reason: 'hidden',
+    });
+    expect(b.rulesSkipped).toContainEqual({
+      ruleId: 'remboursements_personnel_a_payer',
+      reason: 'unavailable',
+    });
+    const masque = buildMorningBrief(input([], { hr: 'hidden' }));
+    expect(fact(masque.facts, 'rh.remboursements_a_payer').status).toBe('hidden');
+  });
+
+  it('des nombres seulement : aucun montant, aucune nature d’avance', () => {
+    const b = buildMorningBrief(input([], hr(3, 4)));
+    const text = JSON.stringify(b.facts.filter((f) => f.source.reference === 'ADR-0051 § 7.6'));
+    expect(text).not.toMatch(/salaire|\$|USD|CDF/);
+    for (const id of ['mes_validations_frais.en_attente', 'rh.remboursements_a_payer']) {
+      expect(fact(b.facts, id).kind).toBe('count');
+    }
   });
 });
 
@@ -1040,6 +1119,6 @@ describe('stocks, équipements, documents — faits et règles R16 à R18 (ADR-0
       }
     }
     expect(b.truncated).toBe(true);
-    expect(b.version).toBe('1.5.0');
+    expect(b.version).toBe('1.6.0');
   });
 });

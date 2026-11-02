@@ -249,6 +249,34 @@ describe('absences à valider (ADR-0045 § 6.1)', () => {
   });
 });
 
+// ADR-0051 § 7.5 (lot H14) : frais, avances et corrections de pointage dans « Mes tâches ».
+describe('frais, avances, corrections de pointage (ADR-0051 § 7.5)', () => {
+  const avance: HrMyTaskItem = {
+    source: 'hr',
+    kind: 'expense_approval',
+    id: 'hr:expense_approval:a1',
+    entityType: 'advance',
+    entityId: 'a1',
+    number: 'AV2611-000002',
+    label: 'Avance AV2611-000002',
+    employeeName: 'Bea Kanku',
+    dueDate: '2026-11-02',
+    priority: 'none',
+    rank: '2026-11-02T08:00:00.000Z',
+    done: false,
+    kindLabel: 'Frais à valider',
+    href: '/rh/frais?vue=a-valider',
+  };
+
+  it('libellé de l’API, pastille de nature, collaborateur en ligne secondaire, aucun montant', () => {
+    expect(estElementRh(avance)).toBe(true);
+    expect(titreElementRh(avance)).toBe('Avance AV2611-000002');
+    expect(pastilleElementRh(avance)).toBe('Frais à valider');
+    expect(sousTitreElementRh(avance)).toBe('Bea Kanku');
+    expect(JSON.stringify(avance)).not.toMatch(/salaire/);
+  });
+});
+
 describe('éléments des stocks et des équipements (ADR-0046 § 6.7, lot S7)', () => {
   it('reconnus par leur source, sans case à cocher, avec leur nature', () => {
     const stock = {

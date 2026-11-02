@@ -9,6 +9,11 @@
 // Accès : soi (`work.read`, au guard) ; autrui avec `work.manage` (droits effectifs) ou
 // en étant son manager (relation, décidée par le moteur RH). Hors portée, ou membre
 // d'une autre organisation : 404 (on ne confirme pas l'existence).
+//
+// ADR-0051 — H14 (§ 7.8) : colonne « présence » (minutes pointées, moteur
+// `attendanceDay`) et constat `PROJECT_TIME_ABOVE_ATTENDANCE`, information seulement.
+// Rendue au membre lui-même, à son manager et aux lecteurs RH (`hr.read`) seulement
+// (§ 4 : les pointages ne se lisent pas au titre de `work.manage`).
 
 import { weeklyTimesheet } from '@lalanda/engine';
 import {
@@ -83,13 +88,20 @@ export class WorkTimesheetsService {
       )
       .lean<{ projectId: string; workedOn: string; minutes: number }[]>()
       .exec();
+    // ADR-0051 — H14 : la présence, seulement pour soi, le manager ou un lecteur RH.
+    const seesAttendance =
+      userId === actor.userId || context.viewerIsManager || actorCan(actor, 'hr.read');
+    const attendance =
+      seesAttendance && context.employeeLinked && this.absences.attendanceOf
+        ? await this.absences.attendanceOf(organizationId, userId, week, sunday)
+        : null;
     const result = weeklyTimesheet(
       entries.map((e) => ({ projectId: e.projectId, workedOn: e.workedOn, minutes: e.minutes })),
       context.absences,
       context.holidays,
       context.workPattern,
       week,
-      { today },
+      { today, attendance },
     );
     const [refs, names] = await Promise.all([
       this.members.refs([userId]),
