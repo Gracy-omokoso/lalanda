@@ -236,6 +236,42 @@ export const NAV_APPS: readonly NavApp[] = [
         label: 'Calendrier',
         action: 'leave.request',
       },
+      // ADR-0051 — H16 : second volet (frais, avances, présences, plannings, objectifs,
+      // évaluations). Pointage, plannings, objectifs et évaluations sont éteints par
+      // défaut : l'écran l'explique. `attendance.clock` désigne le membre interne qui
+      // travaille (mêmes rôles que `leave.request`, ADR-0051 § 5.1) ; l'écran des
+      // évaluations ne montre que ce qui concerne la personne, sauf `performance.read`.
+      { id: 'rh-mes-frais', href: '/rh/moi/frais', label: 'Mes frais', action: 'expenses.claim' },
+      {
+        id: 'rh-frais',
+        href: '/rh/frais',
+        label: 'Frais et avances',
+        action: ['expenses.approve', 'payables.pay', 'hr.read'],
+      },
+      {
+        id: 'rh-presences',
+        href: '/rh/presences',
+        label: 'Présences',
+        action: ['attendance.clock', 'hr.read'],
+      },
+      {
+        id: 'rh-planning',
+        href: '/rh/planning',
+        label: 'Planning',
+        action: ['attendance.clock', 'hr.read'],
+      },
+      {
+        id: 'rh-objectifs',
+        href: '/rh/objectifs',
+        label: 'Objectifs',
+        action: ['performance.read', 'attendance.clock'],
+      },
+      {
+        id: 'rh-evaluations',
+        href: '/rh/evaluations',
+        label: 'Évaluations',
+        action: ['performance.read', 'attendance.clock'],
+      },
       {
         id: 'rh-collaborateurs',
         href: '/rh/collaborateurs',
@@ -717,6 +753,13 @@ export const RH_SOUS_OPTIONS_PREVUES = [
   'rh-equipe',
   'rh-a-valider',
   'rh-calendrier',
+  // ADR-0051 — H16
+  'rh-mes-frais',
+  'rh-frais',
+  'rh-presences',
+  'rh-planning',
+  'rh-objectifs',
+  'rh-evaluations',
   'rh-collaborateurs',
   'rh-services',
   'rh-organigramme',

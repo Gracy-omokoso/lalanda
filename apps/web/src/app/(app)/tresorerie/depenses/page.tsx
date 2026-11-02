@@ -28,8 +28,12 @@ import { Bandeau, Section, useAccesTresorerie } from '../_components/treasury-ac
 import { WorkProjectSelect } from '../_components/work-project-select';
 
 import {
+  MARQUE_NOTE_DE_FRAIS,
   MENTION_POSSEDEE,
+  MENTION_POSSEDEE_RH,
+  MENTION_SOLDEE_PAR_AVANCE,
   gestesTresorerie,
+  lienNoteFrais,
   lienPaiement,
   messageDepensePossedee,
 } from './_components/depense-possedee';
@@ -524,6 +528,8 @@ export default function DepensesPage(): React.ReactElement {
                 {depenses.map((d) => {
                   const gestes = gestesTresorerie(d, gerer);
                   const paiement = lienPaiement(d);
+                  // ADR-0051 — H16 : marque « Note de frais » (dépense possédée par les RH).
+                  const noteFrais = lienNoteFrais(d);
                   return (
                     <tr
                       key={d.id}
@@ -540,6 +546,20 @@ export default function DepensesPage(): React.ReactElement {
                         {d.recurringExpenseId ? (
                           <span className="block text-xs text-[var(--foreground-muted)]">
                             Échéance récurrente
+                          </span>
+                        ) : null}
+                        {noteFrais ? (
+                          <span className="block text-xs text-[var(--foreground-muted)]">
+                            <span className="mr-1 inline-flex items-center rounded-full border border-[var(--border)] px-2 py-0.5 text-[0.7rem] font-medium">
+                              {MARQUE_NOTE_DE_FRAIS}
+                            </span>
+                            {MENTION_POSSEDEE_RH}{' '}
+                            {d.origin?.kind === 'expense_report' && d.origin.settledByAdvanceId
+                              ? `${MENTION_SOLDEE_PAR_AVANCE} `
+                              : null}
+                            <Link href={noteFrais.href} className="underline underline-offset-2">
+                              {noteFrais.libelle}
+                            </Link>
                           </span>
                         ) : null}
                         {paiement ? (

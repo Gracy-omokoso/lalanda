@@ -151,6 +151,20 @@ describe('isProtectedPath (S20b)', () => {
     expect(isProtectedPath('/rh-public')).toBe(false);
   });
 
+  // ADR-0051 — H16 : second volet des RH, sous `/rh` (préfixe déjà protégé).
+  it('ADR-0051 : frais, présences, planning, objectifs et évaluations exigent une session', () => {
+    for (const path of [
+      '/rh/moi/frais',
+      '/rh/frais',
+      '/rh/presences',
+      '/rh/planning',
+      '/rh/objectifs',
+      '/rh/evaluations',
+    ]) {
+      expect(isProtectedPath(path)).toBe(true);
+    }
+  });
+
   it('ADR-0046 : /stocks, /equipements et /documents exigent une session', () => {
     for (const path of [
       '/stocks',

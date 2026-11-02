@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   MENTION_POSSEDEE,
+  MENTION_POSSEDEE_RH,
+  estPossedeeParRh,
+  lienNoteFrais,
   estPossedeeParAchats,
   gestesTresorerie,
   lienPaiement,
@@ -48,5 +51,34 @@ describe('dépense possédée par les achats (ADR-0044 § 2.8)', () => {
     expect(messageDepensePossedee('EXPENSE_OWNED_BY_PURCHASES')).toBe(MENTION_POSSEDEE);
     expect(messageDepensePossedee('AUTRE')).toBeNull();
     expect(messageDepensePossedee(null)).toBeNull();
+  });
+});
+
+describe('ADR-0051 H16 — dépense possédée par les RH', () => {
+  const rh = {
+    kind: 'expense_report' as const,
+    reportId: 'r1',
+    reportNumber: 'NF2611-000001',
+    lineIndex: 0,
+    settledByAdvanceId: null,
+  };
+
+  it('marque « Note de frais », lien vers les RH, jamais confondue avec les achats', () => {
+    expect(estPossedeeParRh({ origin: rh })).toBe(true);
+    expect(estPossedeeParAchats({ origin: rh })).toBe(false);
+    expect(lienPaiement({ origin: rh })).toBeNull();
+    expect(lienNoteFrais({ origin: rh })).toEqual({
+      href: '/rh/frais?vue=toutes',
+      libelle: 'Ouvrir la note de frais NF2611-000001',
+    });
+    expect(lienNoteFrais({ origin: null })).toBeNull();
+  });
+
+  it('lecture seule en trésorerie ; refus `EXPENSE_OWNED_BY_HR` expliqué', () => {
+    expect(gestesTresorerie({ origin: rh, status: 'recorded' }, true)).toEqual({
+      annuler: false,
+      joindre: false,
+    });
+    expect(messageDepensePossedee('EXPENSE_OWNED_BY_HR')).toBe(MENTION_POSSEDEE_RH);
   });
 });
