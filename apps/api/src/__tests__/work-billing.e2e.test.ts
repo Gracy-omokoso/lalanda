@@ -982,7 +982,7 @@ e2eSuite('projets du RUN — devis, factures, dépenses, marge (ADR-0039 L4a)', 
       const interrupteur = process.env['MEMBER_PERMISSIONS_ENABLED'];
       process.env['MEMBER_PERMISSIONS_ENABLED'] = 'true';
       try {
-        await ecart(['sales.read', 'sales.manage', 'sales.quote']);
+        await ecart(['sales.read', 'sales.manage', 'sales.quote', 'sales.contract']);
         const p = ok(
           await f.post('admin', '/work/projects/from-opportunity', { opportunityId: opp.id }),
           201,
