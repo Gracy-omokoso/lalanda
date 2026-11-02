@@ -771,6 +771,33 @@ Tâche `sales.subscriptions.prepare` (quotidienne, idempotente, acteur `system:s
 prépare des brouillons, n'émet ni ne normalise rien. Émettre reste `sales.invoice` (routes
 existantes).
 
+## Présences et plannings — implémenté, ADR-0051 (lot H12)
+
+Contrat d'[ADR-0051](adr/ADR-0051-rh-frais-avances-presences-evaluations.md) § 6.2. Module
+`apps/api/src/hr/{attendance,planning}/`, `AuthGuard` + `PermissionsGuard`, corps `.strict()`
+(`@lalanda/shared/hr`, lot H8). Routes **relationnelles** : `analytics.read` au guard, portée décidée
+dans le service (`hrViewerScope` : soi, équipe, `hr.read`), hors portée `404`. **Éteints par défaut** :
+toute route rend `409 HR_FEATURE_DISABLED` tant que `attendance.enabled` (pointage) ou
+`planning.enabled` (plannings) n'est pas activé. Aucune durée légale, aucun repos, aucune majoration :
+seuils **saisis**, vides par défaut, qui lèvent des constats, jamais des refus.
+
+| Méthode et chemin | Permission | Effet |
+|---|---|---|
+| `GET /hr/attendance/settings` · `PUT` | `analytics.read` · `hr.manage` | réglages `attendance.*`, `planning.*`, `retention.attendanceMonths` (révision du document `hr_settings`) |
+| `POST /hr/attendance/clock` `{ kind }` | `attendance.clock` | heure du **serveur**, rien d'autre ; `409 EMPLOYEE_NOT_LINKED` ; `429 ATTENDANCE_RATE_LIMITED` (20 par jour) |
+| `POST /hr/attendance/events` `{ employeeId, kind, at, note }` | manager (équipe) ou `hr.manage` | saisie pour autrui ; `422 ATTENDANCE_IN_FUTURE` ; `403 ATTENDANCE_ENTRY_NOT_YOURS` pour soi |
+| `GET /hr/attendance/days?employeeId=&from=&to=` | soi, manager, `hr.read` | journées du moteur (`attendanceDays`) : paires, minutes, constats ; pointages de la période ; 62 jours au plus |
+| `GET`/`POST /hr/attendance/corrections` · `…/:id/approve` · `…/reject` | `attendance.clock` (pour soi) ou manager / `hr.manage` · `attendanceCorrectionDecision` | `409 SELF_APPROVAL_FORBIDDEN`, `409 CREATOR_APPROVAL_FORBIDDEN`, `403 ATTENDANCE_CORRECTION_NOT_YOURS` ; approuvée : pointages `correction` écrits et `voidedBy` posé dans la même transaction |
+| `GET /hr/shifts?from=&to=&scope=` | soi, équipe, service, organisation (calendrier d'équipe) | publiés ; brouillons et constats (`shiftConflicts`) pour les planificateurs |
+| `POST`/`PUT /hr/shifts` · `…/:id/cancel` · `POST /hr/shifts/publish` · `…/copy-week` | manager (équipe) ou `hr.manage` | `409 SHIFT_OVERLAP` (moteur) ; `SHIFT_DURING_LEAVE`, `SHIFT_ABOVE_INDICATIVE_LIMIT` en constats ; copie = brouillons, chevauchements sautés |
+| `POST /hr/shifts/:id/unavailability` `{ comment }` | le collaborateur planifié | indisponibilité signalée, planificateur notifié |
+| `GET /hr/staffing-needs` · `POST` · `PUT` · `DELETE` | `hr.read` · `hr.manage` | besoins minimaux (service ou lieu) |
+| `GET /hr/planning/gaps?from=&to=` | manager (besoins des services de son équipe) ou `hr.read` | `staffingGaps` : `UNDERSTAFFED_SLOT`, nombres seulement |
+
+Notifications : `hr.attendance_correction_requested` · `…_decided`, `hr.shifts_published`,
+`hr.shift_changed` (sans heure, motif ni note). Collections : `hr_attendance_events` (ajout seul,
+aucune IP, position ni appareil), `hr_attendance_corrections`, `hr_shifts`, `hr_staffing_needs`.
+
 ## Brief du matin — implémenté (ADR-0033)
 
 L'organisation est toujours celle de la session ; aucun corps ni paramètre ne la désigne.

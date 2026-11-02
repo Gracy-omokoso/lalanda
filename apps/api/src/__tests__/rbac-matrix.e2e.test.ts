@@ -156,9 +156,7 @@ const ACTIONS_SANS_ROUTE: Record<string, string> = {
   'expenses.approve':
     'Aucune route en H8 : validation des notes et avances (`…/approve`, `…/reject`) et ' +
     'régularisations arrivent au lot H10 (ADR-0051 § 6.1).',
-  'attendance.clock':
-    'Aucune route en H8 : `POST /hr/attendance/clock` et les demandes de correction ' +
-    'arrivent au lot H12 (ADR-0051 § 6.2).',
+  // H12 a retiré `attendance.clock` (sonde `POST /hr/attendance/clock` en fin de liste).
   // H15 a retiré `performance.read` (sonde `GET /hr/review-cycles` en fin de liste).
 };
 
@@ -958,6 +956,17 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
           .put('/sales/contract-settings')
           .set('Cookie', c)
           .send({ expectedRevision: null }),
+    },
+    // ADR-0051 — H12 : présences (§ 5.1, § 6.2).
+    {
+      // Tout rôle interne sauf Chef de projet, Conseiller et Expert-comptable externe. Le
+      // pointage est éteint par défaut : 409 HR_FEATURE_DISABLED prouve que le guard a
+      // laissé passer jusqu'au service, sans aucun pointage écrit.
+      action: 'attendance.clock',
+      libelle: 'POST /hr/attendance/clock (pointage éteint)',
+      statutsAutorises: [409],
+      envoyer: (c) =>
+        request(serveur()).post('/hr/attendance/clock').set('Cookie', c).send({ kind: 'in' }),
     },
     // ADR-0051 — H15 : objectifs et évaluations (§ 5.1, § 6.3).
     {

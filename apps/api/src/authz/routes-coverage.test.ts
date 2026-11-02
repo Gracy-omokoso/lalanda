@@ -1865,6 +1865,57 @@ describe('ADR-0050 — V3 : contrats et avenants', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ADR-0051 — H12 : présences et plannings (§ 6.2)
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { HrAttendanceController } from '../hr/attendance/hr-attendance.controller.js';
+import { HrShiftsController } from '../hr/planning/hr-shifts.controller.js';
+
+const CONTROLEURS_H12 = [HrAttendanceController, HrShiftsController];
+(CONTROLEURS as unknown[]).push(...CONTROLEURS_H12);
+TOUTES_LES_ROUTES.push(
+  ...CONTROLEURS_H12.flatMap((c) => routesDe(c as new (...args: never[]) => unknown)),
+);
+
+describe('ADR-0051 — H12 : présences et plannings', () => {
+  it('chaque route déclare la permission de l’ADR (§ 6.2) ; relationnelles : analytics.read', () => {
+    const attendu: Record<string, Action[]> = {
+      'HrAttendanceController.getSettings': ['analytics.read'],
+      'HrAttendanceController.putSettings': ['hr.manage'],
+      'HrAttendanceController.clock': ['attendance.clock'],
+      'HrAttendanceController.record': ['analytics.read'],
+      'HrAttendanceController.days': ['analytics.read'],
+      'HrAttendanceController.listCorrections': ['analytics.read'],
+      'HrAttendanceController.requestCorrection': ['analytics.read'],
+      'HrAttendanceController.approve': ['analytics.read'],
+      'HrAttendanceController.reject': ['analytics.read'],
+      'HrShiftsController.list': ['analytics.read'],
+      'HrShiftsController.create': ['analytics.read'],
+      'HrShiftsController.publish': ['analytics.read'],
+      'HrShiftsController.copyWeek': ['analytics.read'],
+      'HrShiftsController.update': ['analytics.read'],
+      'HrShiftsController.cancel': ['analytics.read'],
+      'HrShiftsController.unavailability': ['analytics.read'],
+      'HrShiftsController.listNeeds': ['hr.read'],
+      'HrShiftsController.createNeed': ['hr.manage'],
+      'HrShiftsController.updateNeed': ['hr.manage'],
+      'HrShiftsController.deleteNeed': ['hr.manage'],
+      'HrShiftsController.gaps': ['analytics.read'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) =>
+      /^(HrAttendanceController|HrShiftsController)\./.test(r.cle),
+    );
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+      expect(route!.rolesPlateforme, cle).toBeUndefined();
+      expect(SANS_PERMISSION[cle], cle).toBeUndefined();
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ADR-0051 — H15 : objectifs individuels et évaluations (§ 6.3)
 // ─────────────────────────────────────────────────────────────────────────────
 

@@ -69,6 +69,26 @@ import {
   HrRemindersJob,
 } from './reminders/hr-reminders.job.js';
 import { HrRetentionJob } from './retention/hr-retention.job.js';
+// ADR-0051 — H12 : présences et plannings.
+import {
+  AttendanceCorrection,
+  AttendanceCorrectionSchema,
+  AttendanceEvent,
+  AttendanceEventSchema,
+} from './attendance/attendance.schemas.js';
+import { HrAttendanceController } from './attendance/hr-attendance.controller.js';
+import { HrAttendanceService } from './attendance/hr-attendance.service.js';
+import { HrPresenceNotifier } from './attendance/hr-presence-notifier.js';
+import { HrPresenceSettingsService } from './attendance/hr-presence-settings.js';
+import { HrPlanningService } from './planning/hr-planning.service.js';
+import { HrPresenceReader } from './planning/hr-presence-reader.js';
+import { HrShiftsController } from './planning/hr-shifts.controller.js';
+import {
+  Shift,
+  ShiftSchema,
+  StaffingNeed,
+  StaffingNeedSchema,
+} from './planning/planning.schemas.js';
 // ADR-0051 — H15 : objectifs individuels et évaluations (module autonome).
 import { HrPerformanceModule } from './performance/hr-performance.module.js';
 
@@ -99,6 +119,11 @@ import { HrPerformanceModule } from './performance/hr-performance.module.js';
       { name: ChecklistTemplate.name, schema: ChecklistTemplateSchema },
       { name: Checklist.name, schema: ChecklistSchema },
       { name: HrReminderClaim.name, schema: HrReminderClaimSchema },
+      // ADR-0051 — H12 : pointages, corrections, créneaux, besoins minimaux.
+      { name: AttendanceEvent.name, schema: AttendanceEventSchema },
+      { name: AttendanceCorrection.name, schema: AttendanceCorrectionSchema },
+      { name: Shift.name, schema: ShiftSchema },
+      { name: StaffingNeed.name, schema: StaffingNeedSchema },
     ]),
   ],
   controllers: [
@@ -118,6 +143,9 @@ import { HrPerformanceModule } from './performance/hr-performance.module.js';
     HrDocumentsController,
     HrChecklistsController,
     HrDeadlinesController,
+    // ADR-0051 — H12
+    HrAttendanceController,
+    HrShiftsController,
   ],
   providers: [
     MasterKeyringProvider,
@@ -152,6 +180,13 @@ import { HrPerformanceModule } from './performance/hr-performance.module.js';
     HrDeadlinesService,
     HrRemindersJob,
     HrRetentionJob,
+    // ADR-0051 — H12 : réglages des présences et plannings, lectures pour le moteur,
+    // notifications, pointages et corrections, créneaux et besoins.
+    HrPresenceSettingsService,
+    HrPresenceReader,
+    HrPresenceNotifier,
+    HrAttendanceService,
+    HrPlanningService,
   ],
   exports: [
     // ADR-0045 — H2
