@@ -115,18 +115,12 @@ describe('catalogue des modules', () => {
       '/admin/organisations',
       '/admin/utilisateurs',
       '/admin/abonnements',
+      '/admin/fonctionnalites',
       '/admin/integrations',
       '/admin/journal',
     ]);
     const bientot = CONSOLE_MODULES.filter((m) => m.etat === 'bientot').map((m) => m.id);
-    expect(bientot).toEqual([
-      'fonctionnalites',
-      'annonces',
-      'statistiques',
-      'finances',
-      'packs',
-      'modeles',
-    ]);
+    expect(bientot).toEqual(['annonces', 'statistiques', 'finances', 'packs', 'modeles']);
   });
 
   it('n’emploie aucun mot réservé aux pièces fiscales (ADR-0053 § 6.8)', () => {

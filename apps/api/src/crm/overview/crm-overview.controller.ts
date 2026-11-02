@@ -26,6 +26,7 @@ import { PermissionsGuard } from '../../authz/permissions.guard.js';
 import { overviewAccessOf, timelineSourcesOf, type OverviewAccess } from './crm-overview.model.js';
 import { CrmOverviewService } from './crm-overview.service.js';
 import type { CrmOverview, TimelinePage } from './crm-overview.types.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 const NO_ACCESS: OverviewAccess = { sales: false, work: false };
 
@@ -35,6 +36,7 @@ function accessOf(perms: CurrentOrgPermissionsValue | undefined): OverviewAccess
 }
 
 @Controller('crm/accounts')
+@RequireFeature('crm') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class CrmOverviewController {
   constructor(@Inject(CrmOverviewService) private readonly overviews: CrmOverviewService) {}

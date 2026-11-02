@@ -47,10 +47,12 @@ import {
   type GoalView,
 } from './hr-goals.service.js';
 import { HrPerformanceAccess, parse, type PerformanceViewer } from './hr-performance-access.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 type User = { id: string };
 
 @Controller('hr/goals')
+@RequireFeature('hr') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class HrGoalsController {
   constructor(

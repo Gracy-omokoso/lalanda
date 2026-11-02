@@ -36,12 +36,14 @@ import { PermissionsGuard } from '../../authz/permissions.guard.js';
 import type { OrgRole } from '../../authz/permissions.js';
 import { invalidRequest } from '../../sales/sales.errors.js';
 import { HrDepartmentsService, type HrActor } from './hr-departments.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 function actorOf(user: { id: string }, role: OrgRole | undefined): HrActor {
   return { userId: user.id, role: role ?? 'unknown' };
 }
 
 @Controller('hr/departments')
+@RequireFeature('hr') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class HrDepartmentsController {
   constructor(@Inject(HrDepartmentsService) private readonly departments: HrDepartmentsService) {}

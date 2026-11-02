@@ -94,7 +94,7 @@ export const CONSOLE_MODULES: readonly ModuleConsole[] = [
     label: 'Fonctionnalités par offre',
     description: 'Ce que chaque offre permet, et les dérogations par organisation.',
     action: 'platform.features.read',
-    etat: 'bientot',
+    etat: 'disponible', // ADR-0053 — P4
   },
   {
     id: 'integrations',

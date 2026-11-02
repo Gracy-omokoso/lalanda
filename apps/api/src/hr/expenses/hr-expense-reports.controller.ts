@@ -85,6 +85,7 @@ import { HrScopeService } from '../scope/hr-scope.service.js';
 import { forbiddenAction, unprocessable } from './hr-expenses.common.js';
 import { HrExpensesSettingsService } from './hr-expenses-settings.service.js';
 import { HrExpenseReportsService, classifyReceipt } from './hr-expense-reports.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 type User = { id: string };
 type Perms = CurrentOrgPermissionsValue | undefined;
@@ -107,6 +108,7 @@ export function refuseExpenseBody(error: ZodError, message: string): never {
 }
 
 @Controller('hr')
+@RequireFeature('hr') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class HrExpenseReportsController {
   constructor(

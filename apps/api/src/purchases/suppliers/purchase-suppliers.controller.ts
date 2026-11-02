@@ -65,6 +65,7 @@ import {
   type SupplierActor,
   type SupplierMergeResult,
 } from './suppliers.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 type User = { id: string };
 
@@ -76,6 +77,7 @@ function actorOf(user: User, role: OrgRole | undefined): SupplierActor {
 }
 
 @Controller('purchases/suppliers')
+@RequireFeature('purchases') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class PurchaseSuppliersController {
   constructor(@Inject(SuppliersService) private readonly suppliers: SuppliersService) {}

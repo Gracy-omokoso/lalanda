@@ -42,8 +42,10 @@ import {
   type SessionVocaleResponse,
 } from './lala-vocal.dto.js';
 import { LalaVocalService } from './lala-vocal.service.js';
+import { RequireFeature } from '../billing/feature.guard.js';
 
 @Controller('ai/lala/vocal')
+@RequireFeature('lala_vocal') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class LalaVocalController {
   constructor(private readonly service: LalaVocalService) {}

@@ -32,6 +32,7 @@ import { PermissionsGuard } from '../../authz/permissions.guard.js';
 import { PlatformAuthGuard } from '../../authz/platform-auth.guard.js';
 import { parseParam, parseWith } from '../accounting.common.js';
 import { ChartPacksService, type PlatformPackActor } from './chart-packs.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 function refOf(slug: string, version: string) {
   return parseParam(AccountingChartPackRefSchema, {
@@ -41,6 +42,7 @@ function refOf(slug: string, version: string) {
 }
 
 @Controller('accounting/chart-packs')
+@RequireFeature('accounting') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class AccountingChartPacksController {
   constructor(@Inject(ChartPacksService) private readonly packs: ChartPacksService) {}

@@ -17,6 +17,13 @@
 import type { ModuleId } from '@lalanda/ui';
 
 import type { OrgAction } from '@/lib/api';
+// ADR-0053 — P4
+import {
+  featureUnavailableLabel,
+  PLAN_CATALOG,
+  type FeatureKey,
+  type MyFeaturesView,
+} from '@lalanda/shared/pricing';
 
 export type NavIconId =
   | 'idees'
@@ -1012,4 +1019,51 @@ export function actionsRapides(actions: readonly OrgAction[] | null): ActionRapi
     principale: false,
   });
   return liste;
+}
+
+// ─── ADR-0053 — P4 : fonctionnalités par offre ──────────────────────────────
+
+/**
+ * Fonctionnalité du catalogue (`@lalanda/shared/pricing`) dont dépend chaque
+ * application. Les applications absentes (pilotage, clients, catalogue…) ne
+ * relèvent d'aucune fonctionnalité gardée.
+ */
+export const FONCTIONNALITE_PAR_APP: Readonly<Record<string, FeatureKey>> = {
+  idees: 'idea_lab',
+  validation: 'idea_lab',
+  'business-plan': 'business_plan',
+  projets: 'run_work',
+  rh: 'hr',
+  crm: 'crm',
+  factures: 'normalized_invoicing',
+  devis: 'quotes',
+  encaissements: 'normalized_invoicing',
+  achats: 'purchases',
+  tresorerie: 'treasury',
+  stocks: 'stock',
+  equipements: 'assets',
+  documents: 'documents',
+  comptabilite: 'accounting',
+  brief: 'morning_brief',
+  sante: 'grow',
+  investisseurs: 'grow',
+  parcours: 'grow',
+};
+
+/**
+ * Explication à AFFICHER sous une application dont la fonctionnalité n'est pas
+ * comprise dans l'offre (« Disponible avec l'offre Pro »), ou `null`. L'entrée
+ * reste visible : l'offre dit ce qui est permis, l'API l'impose (`FeatureGuard`) ;
+ * l'interface explique plutôt que de cacher. Fonctionnalités inconnues (appel en
+ * échec, rôle sans `analytics.read`) : `null`, rien n'est affirmé.
+ */
+export function explicationOffre(
+  appId: string,
+  mesFonctionnalites: MyFeaturesView | null,
+): string | null {
+  const cle = FONCTIONNALITE_PAR_APP[appId];
+  if (cle === undefined || mesFonctionnalites === null) return null;
+  const f = mesFonctionnalites.features.find((x) => x.key === cle);
+  if (!f || f.status !== 'not_in_plan') return null;
+  return featureUnavailableLabel(f.minimalPlan === null ? null : PLAN_CATALOG[f.minimalPlan].name);
 }

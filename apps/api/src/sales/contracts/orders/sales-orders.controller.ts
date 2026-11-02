@@ -69,11 +69,13 @@ import {
   type SalesOrderPage,
   type SalesOrderView,
 } from './sales-orders.service.js';
+import { RequireFeature } from '../../../billing/feature.guard.js';
 
 /** Téléversements par utilisateur et par heure (motif des pièces des achats). */
 const UPLOADS_PER_HOUR = 30;
 
 @Controller('sales/orders')
+@RequireFeature('sales_contracts') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class SalesOrdersController {
   constructor(@Inject(SalesOrdersService) private readonly orders: SalesOrdersService) {}

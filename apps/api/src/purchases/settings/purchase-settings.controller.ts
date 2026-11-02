@@ -16,8 +16,10 @@ import { PermissionsGuard } from '../../authz/permissions.guard.js';
 import type { OrgRole } from '../../authz/permissions.js';
 import { invalidRequest } from '../../sales/sales.errors.js';
 import { PurchaseSettingsService } from './purchase-settings.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 @Controller('purchases/settings')
+@RequireFeature('purchases') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class PurchaseSettingsController {
   constructor(

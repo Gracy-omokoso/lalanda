@@ -23,8 +23,10 @@ import {
 import { AccountingEntriesService } from '../entries/accounting-entries.service.js';
 import { AccountingSettingsService } from '../settings/accounting-settings.service.js';
 import { AccountingPendingService } from './accounting-pending.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 @Controller('accounting/pending')
+@RequireFeature('accounting') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class BookkeepingPendingController {
   constructor(

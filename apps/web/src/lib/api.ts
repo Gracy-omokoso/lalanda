@@ -289,6 +289,17 @@ export interface OrganizationView {
   canClosePeriods: boolean;
 }
 
+// ADR-0052 — O1 : types d'organisation admis par `POST /organizations`.
+export type OrganizationType = 'solo' | 'agence' | 'incubateur' | 'banque' | 'ecole';
+
+// ADR-0052 — O1 : avancement de la mise en route de chaque organisation de l'appelant.
+export interface OrganizationSetupProgressView {
+  organizationId: string;
+  done: number;
+  deferred: number;
+  total: number;
+}
+
 // ─── Invitations (S5d, rôles S20a) ─────────────────────────────
 export interface InvitationView {
   id: string;
@@ -1715,6 +1726,37 @@ export interface PlatformAuditEventView {
   redactedKeys?: number;
 }
 
+// ADR-0053 — P4 : fonctionnalités par offre. `GET /me/features` INFORME l'interface
+// (« Disponible avec l'offre … ») ; l'API impose (`403 FEATURE_NOT_IN_PLAN`).
+import type { FeatureKey, FeatureModule, MyFeaturesView } from '@lalanda/shared/pricing';
+export type { FeatureKey, MyFeaturesView, MyFeatureView } from '@lalanda/shared/pricing';
+
+/** Dérogation active vue par la console : jamais la note interne. */
+export interface AdminFeatureOverrideView {
+  id: string;
+  targetOrganizationId: string;
+  organizationName: string | null;
+  feature: FeatureKey;
+  reasonCategory: string;
+  endsAt: string;
+  createdAt: string | null;
+}
+
+/** Grille offre × fonctionnalité en LECTURE SEULE, et dérogations actives. */
+export interface AdminFeaturesView {
+  plans: Plan[];
+  features: Array<{
+    key: FeatureKey;
+    label: string;
+    module: FeatureModule;
+    apiPrefixes: string[];
+    plans: Record<Plan, boolean>;
+    minimalPlan: Plan | null;
+  }>;
+  closedCells: number;
+  overrides: AdminFeatureOverrideView[];
+}
+
 // ADR-0053 — P5 : filtres du journal plateforme et événements de sécurité agrégés.
 export interface PlatformAuditFilters {
   action?: string;
@@ -2972,10 +3014,19 @@ export const api = {
     }),
   getTermsAcceptance: () =>
     jsonRequest<TermsAcceptanceView>(`/legal/terms/acceptance`, { method: 'GET' }),
+  // ADR-0052 — O1 : `activeOrganizationId` = l'organisation que l'API sert (F2).
   listOrganizations: () =>
-    jsonRequest<{ organizations: OrganizationView[] }>(`/organizations`, { method: 'GET' }),
-  createOrganization: (input: { name: string }) =>
+    jsonRequest<{ organizations: OrganizationView[]; activeOrganizationId: string }>(
+      `/organizations`,
+      { method: 'GET' },
+    ),
+  createOrganization: (input: { name: string; pays?: string; type?: OrganizationType }) =>
     jsonRequest<OrganizationView>(`/organizations`, { method: 'POST', body: input }),
+  listOrganizationsSetupProgress: () =>
+    jsonRequest<{ organizations: OrganizationSetupProgressView[] }>(
+      `/organizations/setup-progress`,
+      { method: 'GET' },
+    ),
   listTemplates: () =>
     jsonRequest<{ slugs: string[]; templates: TemplateSummary[] }>(`/evaluate/templates`, {
       method: 'GET',
@@ -3031,11 +3082,13 @@ export const api = {
       { method: 'DELETE' },
     ),
   listMyPendingInvitations: () =>
-    jsonRequest<{ invitations: (InvitationView & { token: string })[] }>(`/invitations/pending`, {
+    jsonRequest<{
+      invitations: (InvitationView & { token: string; organizationName: string })[];
+    }>(`/invitations/pending`, {
       method: 'GET',
     }),
   acceptInvitation: (token: string) =>
-    jsonRequest<{ organizationId: string }>(`/invitations/accept`, {
+    jsonRequest<{ organizationId: string; organizationName: string }>(`/invitations/accept`, {
       method: 'POST',
       body: { token },
     }),
@@ -3536,6 +3589,26 @@ export const api = {
       method: 'DELETE',
       body: input,
     }),
+  // ADR-0053 — P4 : fonctionnalités par offre. Écritures motivées, échéance de 90 jours
+  // au plus, ré-authentification (`401 REAUTH_REQUIRED`), `409 PLATFORM_SELF_DEALING`.
+  getMyFeatures: () => jsonRequest<MyFeaturesView>(`/me/features`, { method: 'GET' }),
+  getAdminFeatures: () => jsonRequest<AdminFeaturesView>(`/admin/features`, { method: 'GET' }),
+  grantFeatureOverride: (input: {
+    targetOrganizationId: string;
+    feature: FeatureKey;
+    reasonCategory: AdminReasonCategory;
+    internalNote: string;
+    endsAt: string;
+  }) =>
+    jsonRequest<AdminFeatureOverrideView>(`/admin/features/overrides`, {
+      method: 'POST',
+      body: { ...input, value: true },
+    }),
+  revokeFeatureOverride: (overrideId: string, input: { internalNote: string }) =>
+    jsonRequest<AdminFeatureOverrideView>(
+      `/admin/features/overrides/${encodeURIComponent(overrideId)}`,
+      { method: 'DELETE', body: input },
+    ),
 
   // ─── Intégrations chiffrées (S21b — ADR-0013) ──────────────
   // Écriture seule : aucune de ces méthodes ne peut rendre une valeur en clair,

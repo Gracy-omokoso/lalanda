@@ -16,8 +16,10 @@ import { crmActorOf } from './crm-actor.js';
 import { CrmSettingsService, type CrmSettingsView } from './crm-settings.service.js';
 import { PipelineQuerySchema, PutCrmSettingsSchema } from './crm.dto.js';
 import { OpportunitiesService, type PipelineView } from './opportunities.service.js';
+import { RequireFeature } from '../billing/feature.guard.js';
 
 @Controller('crm')
+@RequireFeature('crm') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class CrmSettingsController {
   constructor(

@@ -31,8 +31,10 @@ import {
   type SyncReport,
 } from './treasury-planning.service.js';
 import { PutBridgeSchema, ReconciliationQuerySchema, SyncSchema } from './treasury.dto.js';
+import { RequireFeature } from '../billing/feature.guard.js';
 
 @Controller('treasury')
+@RequireFeature('treasury') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class TreasuryActualsController {
   constructor(

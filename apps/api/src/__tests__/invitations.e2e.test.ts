@@ -447,4 +447,138 @@ e2eSuite('invitations (brief §6, docs/12-ROLES-PERMISSIONS.md)', () => {
       expect(acc.body.code).toBe('MEMBER_PERMISSIONS_DISABLED');
     }, 90_000);
   });
+
+  // ── ADR-0052 — O1 et O5 : bascule, sélecteur, création ────────────────────
+  describe('ADR-0052 — O1/O5 : organisation invitante, sélecteur et création', () => {
+    const srv = () => app.getHttpServer();
+    const avec = (cookies: string[], orgId: string): string[] => [
+      ...cookies,
+      `active_org_id=${orgId}`,
+    ];
+
+    it('critère 12 — une personne déjà propriétaire de A rejoint B : rien ne bouge dans A, le nom de B est rendu', async () => {
+      const tag = uniqueTag();
+      const ownerB = makeUser('o5ownerb', tag);
+      const alice = makeUser('o5alice', tag);
+      const ownerBCookies = await registerAndLogin(ownerB);
+      const orgB = await getPrimaryOrgId(ownerBCookies);
+      const aliceCookies = await registerAndLogin(alice);
+      const orgA = await getPrimaryOrgId(aliceCookies);
+      expect(orgA).not.toBe(orgB);
+
+      const inv = await request(srv())
+        .post(`/organizations/${orgB}/invitations`)
+        .set('Cookie', ownerBCookies)
+        .send({ email: alice.email, role: 'viewer' });
+      expect(inv.status).toBe(201);
+
+      const pending = await request(srv()).get('/invitations/pending').set('Cookie', aliceCookies);
+      const mine = (pending.body.invitations as { token: string; organizationName: string }[]).find(
+        (i) => i.token === inv.body.token,
+      );
+      expect(mine?.organizationName).toBe(`o5ownerb's Workspace`);
+
+      const db = await dbOf(app);
+      const avantA = {
+        memberships: await db.collection('memberships').countDocuments({ organizationId: orgA }),
+        audit: await db.collection('audit_events').countDocuments({ organizationId: orgA }),
+      };
+
+      const acc = await request(srv())
+        .post('/invitations/accept')
+        .set('Cookie', aliceCookies)
+        .send({ token: inv.body.token });
+      expect(acc.status).toBe(201);
+      expect(acc.body).toEqual({ organizationId: orgB, organizationName: `o5ownerb's Workspace` });
+
+      // Aucune écriture dans A.
+      expect(await db.collection('memberships').countDocuments({ organizationId: orgA })).toBe(
+        avantA.memberships,
+      );
+      expect(await db.collection('audit_events').countDocuments({ organizationId: orgA })).toBe(
+        avantA.audit,
+      );
+
+      // Cookie sur B : l'API sert B et le dit ; le sélecteur liste A et B.
+      const surB = await request(srv())
+        .get('/organizations')
+        .set('Cookie', avec(aliceCookies, orgB));
+      expect(surB.status).toBe(200);
+      expect(surB.body.activeOrganizationId).toBe(orgB);
+      const ids = (surB.body.organizations as { id: string }[]).map((o) => o.id);
+      expect(ids).toEqual(expect.arrayContaining([orgA, orgB]));
+      // Repasser sur A : A est servie.
+      const surA = await request(srv())
+        .get('/organizations')
+        .set('Cookie', avec(aliceCookies, orgA));
+      expect(surA.body.activeOrganizationId).toBe(orgA);
+    }, 90_000);
+
+    it('critère 13 — sans cookie, l’organisation affichée est celle que l’API sert (lecteur de l’ancienne B, propriétaire de la récente A)', async () => {
+      const tag = uniqueTag();
+      const ownerB = makeUser('o1ownerb', tag);
+      const lea = makeUser('o1lea', tag);
+      const ownerBCookies = await registerAndLogin(ownerB);
+      const orgB = await getPrimaryOrgId(ownerBCookies);
+      const inv = await request(srv())
+        .post(`/organizations/${orgB}/invitations`)
+        .set('Cookie', ownerBCookies)
+        .send({ email: lea.email, role: 'viewer' });
+      const leaCookies = await registerAndLogin(lea);
+      const perso = await getPrimaryOrgId(leaCookies);
+      await request(srv())
+        .post('/invitations/accept')
+        .set('Cookie', leaCookies)
+        .send({ token: inv.body.token })
+        .expect(201);
+      // Retire l'organisation personnelle de l'ordre : Léa n'est plus que lectrice de B
+      // (la plus ancienne appartenance), puis crée A, dont elle est propriétaire.
+      const db = await dbOf(app);
+      await db.collection('memberships').deleteOne({ organizationId: perso });
+      const creee = await request(srv())
+        .post('/organizations')
+        .set('Cookie', leaCookies)
+        .send({ name: `O1 A ${tag}`, pays: 'CG', type: 'agence' });
+      expect(creee.status).toBe(201);
+      const orgA = creee.body.id as string;
+
+      const liste = await request(srv()).get('/organizations').set('Cookie', leaCookies);
+      expect(liste.status).toBe(200);
+      // La première appartenance par ancienneté est B ; l'API sert A (propriétaire).
+      expect(liste.body.organizations[0].id).toBe(orgB);
+      expect(liste.body.activeOrganizationId).toBe(orgA);
+    }, 90_000);
+
+    it('critères 9 et 10 — la création enregistre pays et type, la nouvelle organisation part de zéro (0 étape sur 9)', async () => {
+      const tag = uniqueTag();
+      const owner = makeUser('o1create', tag);
+      const cookies = await registerAndLogin(owner);
+      const res = await request(srv())
+        .post('/organizations')
+        .set('Cookie', cookies)
+        .send({ name: `Kin Agro ${tag}`, pays: 'CG', type: 'agence' });
+      expect(res.status).toBe(201);
+      expect(res.body).toMatchObject({ pays: 'CG', type: 'agence', role: 'owner' });
+      const orgId = res.body.id as string;
+
+      const progres = await request(srv())
+        .get('/organizations/setup-progress')
+        .set('Cookie', cookies);
+      expect(progres.status).toBe(200);
+      const ligne = (
+        progres.body.organizations as { organizationId: string; done: number; total: number }[]
+      ).find((p) => p.organizationId === orgId);
+      expect(ligne).toEqual({ organizationId: orgId, done: 0, deferred: 0, total: 9 });
+      // Seulement des compteurs, et seulement les organisations de l'appelant.
+      expect(progres.body.organizations).toHaveLength(2);
+      for (const p of progres.body.organizations as Record<string, unknown>[]) {
+        expect(Object.keys(p).sort()).toEqual(['deferred', 'done', 'organizationId', 'total']);
+      }
+    }, 60_000);
+
+    it('setup-progress : 401 sans session', async () => {
+      const res = await request(srv()).get('/organizations/setup-progress');
+      expect(res.status).toBe(401);
+    });
+  });
 });

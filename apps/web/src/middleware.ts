@@ -19,6 +19,12 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
 
+// ADR-0052 — O5 : jeton d'invitation suivi à travers la connexion ou l'inscription.
+import {
+  COOKIE_INVITATION,
+  DUREE_COOKIE_INVITATION_S,
+  jetonInvitationValide,
+} from '@/lib/invitation-en-attente';
 import {
   CONSOLE_RESPONSE_HEADERS,
   isAuthPath,
@@ -63,7 +69,20 @@ export function middleware(req: NextRequest): NextResponse {
     // distinguable de ce que l'attaquant a joint.
     url.search = '';
     url.searchParams.set('next', pathname);
-    return NextResponse.redirect(url);
+    const res = NextResponse.redirect(url);
+    // ADR-0052 — O5 : le jeton d'invitation ne passe PAS par `next` (S22e) ; il est gardé
+    // dans un cookie dédié, au format vérifié, que la bannière des invitations reprend
+    // une fois la session ouverte (atterrissage dans l'organisation invitante).
+    const jeton = req.nextUrl.searchParams.get('token');
+    if (pathname === '/invitations/accept' && jetonInvitationValide(jeton)) {
+      res.cookies.set(COOKIE_INVITATION, jeton, {
+        path: '/',
+        maxAge: DUREE_COOKIE_INVITATION_S,
+        sameSite: 'lax',
+        secure: req.nextUrl.protocol === 'https:',
+      });
+    }
+    return res;
   }
 
   // Pages d'auth : déjà authentifié → app.

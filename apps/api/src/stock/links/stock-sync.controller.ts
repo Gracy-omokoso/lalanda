@@ -13,8 +13,10 @@ import { RequirePermission } from '../../authz/authz.decorators.js';
 import { PermissionsGuard } from '../../authz/permissions.guard.js';
 import { UserThrottlerGuard } from '../../security/user-throttler.guard.js';
 import { StockSyncService } from './stock-sync.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 @Controller('stock')
+@RequireFeature('stock') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class StockSyncController {
   constructor(@Inject(StockSyncService) private readonly sync: StockSyncService) {}

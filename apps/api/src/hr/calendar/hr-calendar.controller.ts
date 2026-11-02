@@ -20,8 +20,10 @@ import { PermissionsGuard } from '../../authz/permissions.guard.js';
 import { invalidRequest } from '../../sales/sales.errors.js';
 import { HrLeaveService } from '../leave/hr-leave.service.js';
 import { HrScopeService } from '../scope/hr-scope.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 @Controller('hr/calendar')
+@RequireFeature('hr') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class HrCalendarController {
   constructor(

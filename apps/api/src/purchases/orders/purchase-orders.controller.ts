@@ -78,6 +78,7 @@ import { PurchaseOrderDocumentsService } from '../documents/purchase-order-docum
 import { SupplierInvoicesService } from '../invoices/supplier-invoices.service.js';
 import { PurchaseReceptionsService } from '../receptions/purchase-receptions.service.js';
 import { PurchaseOrdersService, type PurchaseOrderActor } from './purchase-orders.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 type User = { id: string; email: string; name?: string | null };
 
@@ -96,6 +97,7 @@ function revisionOf(body: unknown): number {
 }
 
 @Controller('purchases')
+@RequireFeature('purchases') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class PurchaseOrdersController {
   constructor(

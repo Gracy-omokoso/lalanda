@@ -20,6 +20,8 @@ import {
 import { OrganizationsModule } from '../organizations/organizations.module.js';
 import { TreasuryAccount, TreasuryAccountSchema } from '../treasury/treasury.schemas.js';
 import { OrganizationSetupController } from './organization-setup.controller.js';
+// ADR-0052 — O1 : avancement par organisation (sélecteur).
+import { OrganizationSetupProgressController } from './organization-setup-progress.controller.js';
 // ADR-0052 — O2 : déclarations de § 4, écrivain unique.
 import { OrganizationSetup, OrganizationSetupSchema } from './organization-setup.schema.js';
 import { OrganizationSetupService } from './organization-setup.service.js';
@@ -40,7 +42,7 @@ import { OrganizationSetupService } from './organization-setup.service.js';
       { name: OrganizationSetup.name, schema: OrganizationSetupSchema },
     ]),
   ],
-  controllers: [OrganizationSetupController],
+  controllers: [OrganizationSetupController, OrganizationSetupProgressController],
   providers: [OrganizationSetupService],
 })
 export class OrganizationSetupModule {}
