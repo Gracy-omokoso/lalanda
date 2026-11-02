@@ -29,7 +29,11 @@ import {
   type MesPermissions,
 } from '@/lib/api-permissions';
 
-import { cleModules, ecrireModules, lireModules } from './nav-model';
+// ADR-0052 — O3 : le choix des modules vient du serveur (`organization_setup`).
+import { organizationSetupApi } from '@/lib/api-organization-setup';
+
+import { planModules } from './modules-organisation-model';
+import { MODULE_IDS, cleModules } from './nav-model';
 
 export interface ShellFacts {
   /** `null` tant que `GET /me/permissions` n'a pas répondu, ou en cas d'échec. */
@@ -39,11 +43,14 @@ export interface ShellFacts {
   organizationId: string | null;
   /** `null` tant que l'abonnement n'est pas lu, ou s'il ne peut pas l'être. */
   subscription: SubscriptionStateView | null;
-  /** Choix de la mise en route ; `null` = tous les modules. */
+  /** Choix de l'organisation (ADR-0052 — O3) ; `null` = tous les modules. */
   modules: ModuleId[] | null;
-  setModules: (modules: readonly ModuleId[]) => void;
-  /** Le choix a-t-il été fait (même « tous ») ? Sert à l'étape 4 de la mise en route. */
+  /** Enregistre le choix pour l'organisation (`organization.manage`) ; rejette en cas d'échec. */
+  setModules: (modules: readonly ModuleId[]) => Promise<void>;
+  /** Le choix de l'organisation a-t-il été fait (même « tous ») ? */
   modulesChoisis: boolean;
+  /** L'appelant peut-il enregistrer le choix de l'organisation ? (`canAct` de l'étape). */
+  peutChoisirModules: boolean;
   /** Relit permissions et abonnement (après une création d'organisation, par ex.). */
   rafraichir: () => void;
   /** ADR-0041 — réponse complète de `GET /me/permissions` (titre, écart, ajoutables). */
@@ -58,8 +65,9 @@ const Contexte = createContext<ShellFacts>({
   organizationId: null,
   subscription: null,
   modules: null,
-  setModules: () => undefined,
+  setModules: () => Promise.resolve(),
   modulesChoisis: false,
+  peutChoisirModules: false,
   rafraichir: () => undefined,
   permissions: null,
   relirePermissions: () => undefined,
@@ -78,17 +86,14 @@ function lireStockage(cle: string): string | null {
   }
 }
 
-function ecrireStockage(cle: string, valeur: string | null): void {
+/** ADR-0052 — O3 : l'ancienne valeur locale n'est plus jamais écrite, seulement effacée. */
+function effacerStockage(cle: string): void {
   try {
-    if (valeur === null) window.localStorage.removeItem(cle);
-    else window.localStorage.setItem(cle, valeur);
+    window.localStorage.removeItem(cle);
   } catch {
-    /* confort par appareil : un échec n'empêche rien */
+    /* stockage bloqué : rien à effacer */
   }
 }
-
-/** Marqueur « choix fait, tous les modules » : distingue « pas encore choisi » de « tout ». */
-const TOUS = '"*"';
 
 export function ShellProvider({ children }: { children: React.ReactNode }): React.ReactElement {
   const [actions, setActions] = useState<OrgAction[] | null>(null);
@@ -97,6 +102,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
   const [subscription, setSubscription] = useState<SubscriptionStateView | null>(null);
   const [modules, setModulesState] = useState<ModuleId[] | null>(null);
   const [modulesChoisis, setModulesChoisis] = useState(false);
+  const [peutChoisirModules, setPeutChoisirModules] = useState(false);
   const [version, setVersion] = useState(0);
   const [versionPermissions, setVersionPermissions] = useState(0);
   const [permissions, setPermissions] = useState<MesPermissions | null>(null);
@@ -141,23 +147,61 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
     };
   }, [version]);
 
+  // ADR-0052 — O3 : choix des modules de l'organisation, lu sur le serveur ; l'ancienne
+  // valeur du navigateur est reprise une fois (par un gérant) puis effacée (critère 11).
   useEffect(() => {
     if (organizationId === null) return;
-    const brut = lireStockage(cleModules(organizationId));
-    setModulesChoisis(brut !== null);
-    setModulesState(brut === TOUS ? null : lireModules(brut));
-  }, [organizationId]);
+    let annule = false;
+    const cle = cleModules(organizationId);
+    const appliquer = (m: ModuleId[] | null, choisi: boolean): void => {
+      if (annule) return;
+      setModulesState(m);
+      setModulesChoisis(choisi);
+    };
+    void api
+      .getOrganizationSetup()
+      .then(async (vue) => {
+        const etape = vue.steps.find((s) => s.id === 'modules');
+        const choisiServeur = etape?.state === 'done';
+        if (!annule) setPeutChoisirModules(etape?.canAct ?? false);
+        const plan = planModules({
+          choisiServeur,
+          brutLocal: lireStockage(cle),
+          peutEnregistrer: etape?.canAct ?? false,
+        });
+        if (plan.type === 'serveur') {
+          if (plan.effacerLocal) effacerStockage(cle);
+          appliquer(vue.modules, true);
+        } else if (plan.type === 'migrer') {
+          try {
+            const relue = await organizationSetupApi.putModules(plan.modules);
+            effacerStockage(cle);
+            appliquer(relue.modules, true);
+          } catch {
+            // Reprise refusée ou réseau coupé : la valeur locale reste, rien n'est perdu.
+            appliquer(plan.modules, false);
+          }
+        } else if (plan.type === 'local') {
+          appliquer(plan.modules, false);
+        } else {
+          appliquer(null, false);
+        }
+      })
+      .catch(() => {
+        // Statut illisible : aucun module mis en avant, rien n'est verrouillé.
+        appliquer(null, false);
+      });
+    return () => {
+      annule = true;
+    };
+  }, [organizationId, version]);
 
-  const setModules = useCallback(
-    (choix: readonly ModuleId[]) => {
-      if (organizationId === null) return;
-      const valeur = ecrireModules(choix);
-      ecrireStockage(cleModules(organizationId), valeur ?? TOUS);
-      setModulesState(valeur === null ? null : lireModules(valeur));
-      setModulesChoisis(true);
-    },
-    [organizationId],
-  );
+  const setModules = useCallback(async (choix: readonly ModuleId[]): Promise<void> => {
+    const tous = MODULE_IDS.every((m) => choix.includes(m));
+    const relue = await organizationSetupApi.putModules(tous ? null : [...choix]);
+    setModulesState(relue.modules);
+    setModulesChoisis(true);
+  }, []);
 
   const rafraichir = useCallback(() => setVersion((v) => v + 1), []);
   const relirePermissions = useCallback(() => setVersionPermissions((v) => v + 1), []);
@@ -196,6 +240,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
       modules,
       setModules,
       modulesChoisis,
+      peutChoisirModules,
       rafraichir,
       permissions,
       relirePermissions,
@@ -208,6 +253,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }): Reac
       modules,
       setModules,
       modulesChoisis,
+      peutChoisirModules,
       rafraichir,
       permissions,
       relirePermissions,

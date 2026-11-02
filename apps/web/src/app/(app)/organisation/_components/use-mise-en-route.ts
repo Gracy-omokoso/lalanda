@@ -1,61 +1,48 @@
 'use client';
 
-// Lit les faits de la mise en route sur le serveur (ADR-0030 § 8).
+// Lit l'avancement de la mise en route sur le serveur (ADR-0052 § 3). ADR-0052 — O2.
 //
-// Trois lectures existantes, rien de nouveau côté API. Une étape fermée au rôle
-// n'est pas lue (son refus se déduit des actions) ; un 403/404 inattendu est
-// traduit en refus ; toute autre erreur laisse le fait INCONNU — jamais « fait ».
+// UN appel, `GET /organizations/current/setup`, ouvert à tout membre : plus de lectures
+// multiples vouées au 403. En échec, la vue reste `null` — jamais une étape « faite » par
+// défaut. Les déclarations (`organizationSetupApi`) renvoient la vue relue : `remplacer`
+// l'installe sans second aller-retour.
 
+import type { OrganizationSetupView } from '@lalanda/shared/organization-setup';
 import { useCallback, useEffect, useState } from 'react';
 
 import { api } from '@/lib/api';
 
 import { useShell } from '../../_components/shell-context';
 
-import {
-  FAITS_INCONNUS,
-  fiscalFait,
-  identiteFaite,
-  pointsDeVenteFaits,
-  refusDepuisActions,
-  type FaitEtape,
-  type FaitsMiseEnRoute,
-} from './onboarding-model';
-import { estRefus } from './organization-model';
-
-async function lire<T>(appel: () => Promise<T>, fait: (v: T) => boolean): Promise<FaitEtape> {
-  try {
-    return fait(await appel());
-  } catch (err) {
-    return estRefus(err) ? 'refus' : null;
-  }
-}
-
 export function useMiseEnRoute(): {
-  faits: FaitsMiseEnRoute;
+  vue: OrganizationSetupView | null;
   pret: boolean;
+  echec: boolean;
   relire: () => Promise<void>;
+  remplacer: (vue: OrganizationSetupView) => void;
 } {
-  const { actions, modulesChoisis } = useShell();
-  const [faits, setFaits] = useState<FaitsMiseEnRoute>(FAITS_INCONNUS);
+  const { organizationId } = useShell();
+  const [vue, setVue] = useState<OrganizationSetupView | null>(null);
   const [pret, setPret] = useState(false);
+  const [echec, setEchec] = useState(false);
 
   const relire = useCallback(async (): Promise<void> => {
-    // Permissions inconnues : on attend plutôt que de lancer des appels au hasard.
-    if (actions === null) return;
-    const refus = refusDepuisActions(actions);
-    const [identite, fiscal, pointsDeVente] = await Promise.all([
-      refus.identite ?? lire(api.getBrand, identiteFaite),
-      refus.fiscal ?? lire(api.getFiscalProfile, fiscalFait),
-      refus['points-de-vente'] ?? lire(api.getNormalizedInvoicing, pointsDeVenteFaits),
-    ]);
-    setFaits({ identite, fiscal, 'points-de-vente': pointsDeVente, modules: modulesChoisis });
-    setPret(true);
-  }, [actions, modulesChoisis]);
+    try {
+      setVue(await api.getOrganizationSetup());
+      setEchec(false);
+    } catch {
+      setEchec(true);
+    } finally {
+      setPret(true);
+    }
+  }, []);
 
   useEffect(() => {
+    // Relu à chaque changement d'organisation active : jamais l'avancement d'une autre.
+    setVue(null);
+    setPret(false);
     void relire();
-  }, [relire]);
+  }, [relire, organizationId]);
 
-  return { faits, pret, relire };
+  return { vue, pret, echec, relire, remplacer: setVue };
 }
