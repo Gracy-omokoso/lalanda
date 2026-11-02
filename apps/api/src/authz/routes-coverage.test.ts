@@ -1739,3 +1739,54 @@ describe('ADR-0049 — K6 : restitution, clôtures et exports de la comptabilit�
     }
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADR-0050 — V2 : commandes clients, liens et pièces (§ 3)
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { QuoteToOrderController } from '../sales/contracts/orders/quote-to-order.controller.js';
+import { SalesOrdersController } from '../sales/contracts/orders/sales-orders.controller.js';
+
+const CONTROLEURS_V2 = [SalesOrdersController, QuoteToOrderController];
+(CONTROLEURS as unknown[]).push(...CONTROLEURS_V2);
+TOUTES_LES_ROUTES.push(
+  ...CONTROLEURS_V2.flatMap((c) => routesDe(c as new (...args: never[]) => unknown)),
+);
+
+describe('ADR-0050 — V2 : commandes clients', () => {
+  it('chaque route déclare la permission de l’ADR (§ 3)', () => {
+    const attendu: Record<string, Action[]> = {
+      'SalesOrdersController.list': ['sales.read'],
+      'SalesOrdersController.get': ['sales.read'],
+      'SalesOrdersController.file': ['sales.read'],
+      'SalesOrdersController.create': ['sales.contract'],
+      'SalesOrdersController.put': ['sales.contract'],
+      'SalesOrdersController.remove': ['sales.contract'],
+      'SalesOrdersController.confirm': ['sales.contract'],
+      'SalesOrdersController.close': ['sales.contract'],
+      'SalesOrdersController.cancel': ['sales.contract'],
+      'SalesOrdersController.addFile': ['sales.contract'],
+      // Brouillon seulement : l'émission reste sous `sales.invoice` (routes existantes).
+      'SalesOrdersController.prepareInvoice': ['sales.read', 'sales.manage'],
+      'QuoteToOrderController.toOrder': ['sales.contract'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) =>
+      /^(SalesOrdersController|QuoteToOrderController)\./.test(r.cle),
+    );
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+      expect(route!.rolesPlateforme, cle).toBeUndefined();
+      expect(SANS_PERMISSION[cle], cle).toBeUndefined();
+    }
+  });
+
+  it('aucune route du module n’émet ni ne normalise : `sales.invoice` n’y apparaît pas', () => {
+    const routes = TOUTES_LES_ROUTES.filter((r) =>
+      /^(SalesOrdersController|QuoteToOrderController)\./.test(r.cle),
+    );
+    for (const route of routes)
+      expect(route.actions ?? [], route.cle).not.toContain('sales.invoice');
+  });
+});
