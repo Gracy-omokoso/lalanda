@@ -6,9 +6,9 @@
 // masquées, écriture réservée à `hr.manage` + `hr.sensitive.read`, lecture en clair
 // (`reveal`) par le Responsable RH ou par le salarié lui-même, journalisée AVANT la
 // réponse (audit en échec ⇒ 503, rien de révélé), 30 lectures par heure au plus
-// (429), chiffré recopié vers une autre fiche indéchiffrable, alerte et bandeau de
-// changement bancaire, refus de l'Administrateur, du manager, du Comptable, d'une
-// autre organisation et de la plateforme.
+// (429) et par organisation (ADR-0052 F1), chiffré recopié vers une autre fiche
+// indéchiffrable, alerte et bandeau de changement bancaire, refus de l'Administrateur,
+// du manager, du Comptable, d'une autre organisation et de la plateforme.
 //
 // Coordonnées et pièces inventées.
 
@@ -17,6 +17,7 @@ import 'reflect-metadata';
 import type { Db } from 'mongodb';
 import { ObjectId } from 'mongodb';
 import { randomBytes } from 'node:crypto';
+import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AuditService } from '../authz/audit.service.js';
@@ -387,6 +388,54 @@ e2eSuite('RH — données sensibles (ADR-0045 H2)', () => {
       ).toBe(30);
       // Le débit est propre à chaque utilisateur.
       ok(await fx.post('hr_manager', privatePath(id.B, '/reveal'), { sections: ['identity'] }));
+    });
+
+    it('le plafond est compté par organisation : épuisé dans N, intact dans B (ADR-0052 F1)', async () => {
+      // Le Directeur financier a consommé ses 30 lectures dans N au cas précédent.
+      fx.clearThrottle();
+      code(
+        await fx.post('finance_director', privatePath(id.B, '/reveal'), {
+          sections: ['identity'],
+        }),
+        429,
+        'HR_REVEAL_RATE_LIMITED',
+      );
+      // Il devient aussi Directeur financier de B, et y révèle une fiche de B.
+      const inv = ok(
+        await request(fx.app.getHttpServer())
+          .post(`/organizations/${fx.orgB}/invitations`)
+          .set('Cookie', fx.as('ownerB'))
+          .send({
+            email: `rh-sensible-finance_director-${tag}@lalanda-test.local`,
+            role: 'finance_director',
+          }),
+        201,
+      );
+      const sansOrg = fx.as('finance_director').filter((c) => !c.startsWith('active_org_id='));
+      ok(
+        await request(fx.app.getHttpServer())
+          .post('/invitations/accept')
+          .set('Cookie', sansOrg)
+          .send({ token: inv['token'] }),
+        201,
+      );
+      const eB = ok(await fx.post('ownerB', '/hr/employees', fiche(`Caissier B ${tag}`)), 201);
+      fx.clearThrottle();
+      ok(
+        await request(fx.app.getHttpServer())
+          .post(privatePath(eB['id'] as string, '/reveal'))
+          .set('Cookie', [...sansOrg, `active_org_id=${fx.orgB}`])
+          .send({ sections: ['identity'] }),
+      );
+      // Et N reste plafonnée.
+      fx.clearThrottle();
+      code(
+        await fx.post('finance_director', privatePath(id.B, '/reveal'), {
+          sections: ['identity'],
+        }),
+        429,
+        'HR_REVEAL_RATE_LIMITED',
+      );
     });
   });
 
