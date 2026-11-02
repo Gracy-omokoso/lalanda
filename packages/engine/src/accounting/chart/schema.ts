@@ -123,7 +123,9 @@ const AccountRefSchema = z.union([AccountNumberSchema, z.enum(RULE_TOKENS)]);
 
 const ProposedRuleSchema = z
   .object({
-    key: z.string().regex(/^[a-z_]+(\.[a-z0-9_<>|]+)+$/, "clé d'opération invalide"),
+    // Lettres capitales admises : groupes de taxation (`…vat.B`) et moyens de règlement
+    // (`receipt.VIREMENT`) du catalogue des clés (rules/operation-keys.ts).
+    key: z.string().regex(/^[a-z_]+(\.[A-Za-z0-9_<>|]+)+$/, "clé d'opération invalide"),
     debit: z.array(AccountRefSchema),
     credit: z.array(AccountRefSchema),
     requiresReview: z.boolean(),
@@ -164,6 +166,12 @@ export const ChartPackSchema = z
       })
       .strict(),
     proposedRules: z.array(ProposedRuleSchema),
+    /**
+     * Compte d'attente désigné par le pack (§ 6.0), qui remplace le compte technique
+     * `ATTENTE` quand le pack est relu (`approved` ou `active`). Absent ou nul : aucun
+     * compte désigné (pack v1). Amendement du 3 nov. 2026 (pack v2).
+     */
+    suspenseAccount: AccountNumberSchema.nullable().optional(),
     review: ReviewSchema.nullable(),
     warnings: z.array(z.string().min(1)),
   })

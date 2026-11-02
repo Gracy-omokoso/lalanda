@@ -1,0 +1,2592 @@
+# Pack de plan comptable — SYSCOHADA révisé, République démocratique du Congo, version 2.
+#
+# ADR-0049, amendement du 3 novembre 2026. Statut : APPROVED, par DÉCISION DE LA DIRIGEANTE
+# (Gracy Omokoso) : « fais ce qui s'applique en RDC Congo et nous allons améliorer au fur et à
+# mesure avec les experts. Aucun client n'a encore commencé à utiliser Lalanda. »
+#
+# Ce que cela veut dire, en clair :
+# - les numéros et intitulés ci-dessous sont repris du Plan comptable général OHADA annexé à
+#   l'AUDCIF du 26 janvier 2017 (SYSCOHADA révisé), tels que l'équipe les connaît ; seuls ceux
+#   dont elle est sûre figurent ici. Les comptes écartés par doute sont listés dans
+#   docs/comptabilite/relecture-pack-syscohada-v2.md ;
+# - `confirmation: sourced` et `review` traduisent la décision de la dirigeante, PAS une relecture
+#   par un expert-comptable : chaque élément porte la note « décision de la dirigeante du
+#   3 nov. 2026, à revoir avec l'expert-comptable » ;
+# - les états restent des projets (`draft_unverified`, bandeau « Projet — à valider par un
+#   expert-comptable ») : ce pack ne change rien à cette règle ;
+# - une règle `requiresReview: true` n'est jamais appliquée : sa clé va au compte d'attente 471
+#   (`suspenseAccount`), avec son motif ; l'organisation peut la remplacer dans son jeu de règles.
+#
+# Le pack v1 reste `draft`, inchangé. Généré une fois puis relu ; le YAML seul fait foi.
+
+schemaVersion: 1
+slug: syscohada-revise-2017-cd
+version: 2
+framework: syscohada-revise-2017
+countries: [CD]
+status: approved
+label: 'SYSCOHADA révisé — RDC — version 2 (décision de la dirigeante, à revoir avec l’expert-comptable)'
+
+sources:
+  - id: audcif-2017
+    issuer: 'OHADA — Conseil des ministres'
+    title: >-
+      Acte uniforme relatif au droit comptable et à l'information financière (AUDCIF) et
+      Système comptable OHADA annexé (Plan comptable général OHADA, guide d'application)
+    reference: null
+    adoptedOn: '2017-01-26'
+    publishedOn: null
+    effectiveFrom: null
+    url: null
+    verifiedOn: '2026-11-03'
+    verifiedBy: 'Gracy Omokoso, dirigeante — décision de gestion, sans relecture par un expert-comptable'
+    note: >-
+      Numéros et intitulés retenus d'après le Plan comptable général OHADA (SYSCOHADA révisé),
+      par décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable. Référence
+      de publication au Journal officiel de l'OHADA, dates d'entrée en vigueur et texte intégral
+      restent à joindre.
+
+classes:
+  - number: '1'
+    label: 'Comptes de ressources durables'
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '2'
+    label: "Comptes d'actif immobilisé"
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '3'
+    label: 'Comptes de stocks'
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '4'
+    label: 'Comptes de tiers'
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '5'
+    label: 'Comptes de trésorerie'
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '6'
+    label: 'Comptes de charges des activités ordinaires'
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '7'
+    label: 'Comptes de produits des activités ordinaires'
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '8'
+    label: 'Comptes des autres charges et des autres produits'
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '9'
+    label: 'Comptes des engagements hors bilan et de comptabilité analytique de gestion'
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Intitulé de la classe 9 à vérifier mot pour mot sur le texte (aucun compte de cette classe n'est employé) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+
+# Compte d'attente désigné (§ 6.0) : remplace le compte technique `ATTENTE` quand le pack est
+# relu (approved ou active).
+suspenseAccount: '471'
+
+accounts:
+  - number: '10'
+    label: 'Capital'
+    classNumber: '1'
+    parent: null
+    nature: equity
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '101'
+    label: 'Capital social'
+    classNumber: '1'
+    parent: '10'
+    nature: equity
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '109'
+    label: 'Apporteurs, capital souscrit, non appelé'
+    classNumber: '1'
+    parent: '10'
+    nature: equity
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Compte soustractif des capitaux propres (solde débiteur) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '11'
+    label: 'Réserves'
+    classNumber: '1'
+    parent: null
+    nature: equity
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '111'
+    label: 'Réserve légale'
+    classNumber: '1'
+    parent: '11'
+    nature: equity
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '112'
+    label: 'Réserves statutaires ou contractuelles'
+    classNumber: '1'
+    parent: '11'
+    nature: equity
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '118'
+    label: 'Autres réserves'
+    classNumber: '1'
+    parent: '11'
+    nature: equity
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '12'
+    label: 'Report à nouveau'
+    classNumber: '1'
+    parent: null
+    nature: equity
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '121'
+    label: 'Report à nouveau créditeur'
+    classNumber: '1'
+    parent: '12'
+    nature: equity
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '129'
+    label: 'Report à nouveau débiteur'
+    classNumber: '1'
+    parent: '12'
+    nature: equity
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '13'
+    label: "Résultat net de l'exercice"
+    classNumber: '1'
+    parent: null
+    nature: equity
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '131'
+    label: 'Résultat net : bénéfice'
+    classNumber: '1'
+    parent: '13'
+    nature: equity
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '139'
+    label: 'Résultat net : perte'
+    classNumber: '1'
+    parent: '13'
+    nature: equity
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '40'
+    label: 'Fournisseurs et comptes rattachés'
+    classNumber: '4'
+    parent: null
+    nature: liability
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '401'
+    label: 'Fournisseurs, dettes en compte'
+    classNumber: '4'
+    parent: '40'
+    nature: liability
+    collective: true
+    auxiliaryKind: supplier
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Compte collectif des fournisseurs ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '409'
+    label: 'Fournisseurs débiteurs'
+    classNumber: '4'
+    parent: '40'
+    nature: asset
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '4091'
+    label: 'Fournisseurs, avances et acomptes versés'
+    classNumber: '4'
+    parent: '409'
+    nature: asset
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Avances versées aux fournisseurs (paiement non imputé à une facture) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '41'
+    label: 'Clients et comptes rattachés'
+    classNumber: '4'
+    parent: null
+    nature: asset
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '411'
+    label: 'Clients'
+    classNumber: '4'
+    parent: '41'
+    nature: asset
+    collective: true
+    auxiliaryKind: customer
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Compte collectif des clients ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '419'
+    label: 'Clients créditeurs'
+    classNumber: '4'
+    parent: '41'
+    nature: liability
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '4191'
+    label: 'Clients, avances et acomptes reçus'
+    classNumber: '4'
+    parent: '419'
+    nature: liability
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Acomptes facturés (FT, ET) et encaissements non imputés à une facture ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '42'
+    label: 'Personnel'
+    classNumber: '4'
+    parent: null
+    nature: mixed
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '421'
+    label: 'Personnel, avances et acomptes'
+    classNumber: '4'
+    parent: '42'
+    nature: asset
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Avances au personnel (clés hr.advance.*) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '422'
+    label: 'Personnel, rémunérations dues'
+    classNumber: '4'
+    parent: '42'
+    nature: liability
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '44'
+    label: 'État et collectivités publiques'
+    classNumber: '4'
+    parent: null
+    nature: mixed
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '443'
+    label: 'État, TVA facturée'
+    classNumber: '4'
+    parent: '44'
+    nature: liability
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '4431'
+    label: 'TVA facturée sur ventes'
+    classNumber: '4'
+    parent: '443'
+    nature: liability
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "TVA de tous les groupes de taxation ; le plan prévoit aussi 4432 pour les prestations de services, non retenu (la clé ne distingue pas biens et services) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '444'
+    label: 'État, TVA due ou crédit de TVA'
+    classNumber: '4'
+    parent: '44'
+    nature: mixed
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '4441'
+    label: 'État, TVA due'
+    classNumber: '4'
+    parent: '444'
+    nature: liability
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Liquidation de la TVA par opération diverse ; aucune règle automatique ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '445'
+    label: 'État, TVA récupérable'
+    classNumber: '4'
+    parent: '44'
+    nature: asset
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '4452'
+    label: 'TVA récupérable sur achats'
+    classNumber: '4'
+    parent: '445'
+    nature: asset
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "TVA déclarée des dépenses et factures fournisseurs (organisation assujettie seulement) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '4454'
+    label: 'TVA récupérable sur services extérieurs et autres charges'
+    classNumber: '4'
+    parent: '445'
+    nature: asset
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Disponible pour un reclassement ; la clé de TVA déclarée ne distingue pas achats et services ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '47'
+    label: 'Débiteurs et créditeurs divers'
+    classNumber: '4'
+    parent: null
+    nature: mixed
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '471'
+    label: 'Débiteurs et créditeurs divers'
+    classNumber: '4'
+    parent: '47'
+    nature: mixed
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Désigné compte d'attente du pack (suspenseAccount) : opérations à classer, avec leur motif ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '52'
+    label: 'Banques'
+    classNumber: '5'
+    parent: null
+    nature: asset
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '521'
+    label: 'Banques locales'
+    classNumber: '5'
+    parent: '52'
+    nature: asset
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Comptes bancaires ; un sous-compte par banque se crée dans le plan de l’organisation ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '57'
+    label: 'Caisse'
+    classNumber: '5'
+    parent: null
+    nature: asset
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '571'
+    label: 'Caisse siège social'
+    classNumber: '5'
+    parent: '57'
+    nature: asset
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '58'
+    label: "Régies d'avances, accréditifs et virements internes"
+    classNumber: '5'
+    parent: null
+    nature: mixed
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '585'
+    label: 'Virements de fonds'
+    classNumber: '5'
+    parent: '58'
+    nature: mixed
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Virements internes entre comptes de trésorerie (soldé après les deux jambes) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '60'
+    label: 'Achats et variations de stocks'
+    classNumber: '6'
+    parent: null
+    nature: expense
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '601'
+    label: 'Achats de marchandises'
+    classNumber: '6'
+    parent: '60'
+    nature: expense
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '604'
+    label: 'Achats stockés de matières et fournitures consommables'
+    classNumber: '6'
+    parent: '60'
+    nature: expense
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '605'
+    label: 'Autres achats'
+    classNumber: '6'
+    parent: '60'
+    nature: expense
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '61'
+    label: 'Transports'
+    classNumber: '6'
+    parent: null
+    nature: expense
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '618'
+    label: 'Autres frais de transport'
+    classNumber: '6'
+    parent: '61'
+    nature: expense
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '622'
+    label: 'Locations et charges locatives'
+    classNumber: '6'
+    parent: null
+    nature: expense
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Compte principal 62 non repris (intitulé à vérifier) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '627'
+    label: 'Publicité, publications, relations publiques'
+    classNumber: '6'
+    parent: null
+    nature: expense
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Compte principal 62 non repris (intitulé à vérifier) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '628'
+    label: 'Frais de télécommunications'
+    classNumber: '6'
+    parent: null
+    nature: expense
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Compte principal 62 non repris (intitulé à vérifier) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '631'
+    label: 'Frais bancaires'
+    classNumber: '6'
+    parent: null
+    nature: expense
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Compte principal 63 non repris (intitulé à vérifier) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '632'
+    label: "Rémunérations d'intermédiaires et de conseils"
+    classNumber: '6'
+    parent: null
+    nature: expense
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Compte principal 63 non repris (intitulé à vérifier) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '638'
+    label: 'Autres charges externes'
+    classNumber: '6'
+    parent: null
+    nature: expense
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Compte principal 63 non repris (intitulé à vérifier) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '66'
+    label: 'Charges de personnel'
+    classNumber: '6'
+    parent: null
+    nature: expense
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '661'
+    label: 'Rémunérations directes versées au personnel national'
+    classNumber: '6'
+    parent: '66'
+    nature: expense
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Montant payé seulement ; aucune paie dans Lalanda (ADR-0045) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '70'
+    label: 'Ventes'
+    classNumber: '7'
+    parent: null
+    nature: income
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '701'
+    label: 'Ventes de marchandises'
+    classNumber: '7'
+    parent: '70'
+    nature: income
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Produit des biens (BIE) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '706'
+    label: 'Services vendus'
+    classNumber: '7'
+    parent: '70'
+    nature: income
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Produit des services (SER) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '707'
+    label: 'Produits accessoires'
+    classNumber: '7'
+    parent: '70'
+    nature: income
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Aucune règle automatique ; disponible pour un reclassement ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '89'
+    label: 'Impôts sur le résultat'
+    classNumber: '8'
+    parent: null
+    nature: expense
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - number: '891'
+    label: "Impôts sur les bénéfices de l'exercice"
+    classNumber: '8'
+    parent: '89'
+    nature: expense
+    collective: false
+    auxiliaryKind: null
+    sourceId: audcif-2017
+    confirmation: sourced
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+
+# Aucun compte attendu : ce que le pack ne couvre pas va au compte d'attente 471, avec son motif.
+expectedAccounts: []
+
+# Modèles d'états, système normal : rubriques du bilan et du compte de résultat, avec les
+# comptes rattachés. Les projets d'états restent `draft_unverified` (bandeau « Projet — à
+# valider par un expert-comptable »). Le tableau des flux reste non disponible (question E8).
+statementTemplates:
+  balanceSheet:
+    - code: actif_immobilise
+      label: 'Actif immobilisé'
+      accountPrefixes: ['2']
+      confirmation: sourced
+      sourceId: audcif-2017
+      note: "Rubrique du système normal ; comptes de la classe 2 créés par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+    - code: stocks_et_encours
+      label: 'Stocks et encours'
+      accountPrefixes: ['3']
+      confirmation: sourced
+      sourceId: audcif-2017
+      note: "Rubrique du système normal ; comptes de la classe 3 créés par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+    - code: fournisseurs_avances_versees
+      label: 'Fournisseurs, avances versées'
+      accountPrefixes: ['409']
+      confirmation: sourced
+      sourceId: audcif-2017
+      note: "Rubrique du système normal ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+    - code: clients
+      label: 'Clients'
+      accountPrefixes: ['411']
+      confirmation: sourced
+      sourceId: audcif-2017
+      note: "Rubrique du système normal ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+    - code: autres_creances
+      label: 'Autres créances'
+      accountPrefixes: ['421', '445']
+      confirmation: sourced
+      sourceId: audcif-2017
+      note: "Rubrique du système normal ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+    - code: tresorerie_actif
+      label: 'Trésorerie-Actif'
+      accountPrefixes: ['52', '57', '58']
+      confirmation: sourced
+      sourceId: audcif-2017
+      note: "Rubrique du système normal ; virements de fonds soldés après les deux jambes ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+    - code: capital
+      label: 'Capital'
+      accountPrefixes: ['101']
+      confirmation: sourced
+      sourceId: audcif-2017
+      note: "Rubrique du système normal ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+    - code: apporteurs_capital_non_appele
+      label: 'Apporteurs, capital non appelé (−)'
+      accountPrefixes: ['109']
+      confirmation: sourced
+      sourceId: audcif-2017
+      note: "Rubrique du système normal ; montant soustrait des capitaux propres ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+    - code: reserves
+      label: 'Réserves'
+      accountPrefixes: ['11']
+      confirmation: sourced
+      sourceId: audcif-2017
+      note: "Rubrique du système normal ; réserves indisponibles et libres réunies (répartition à faire par l'expert) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+    - code: report_a_nouveau
+      label: 'Report à nouveau (+ ou −)'
+      accountPrefixes: ['12']
+      confirmation: sourced
+      sourceId: audcif-2017
+      note: "Rubrique du système normal ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+    - code: resultat_net
+      label: "Résultat net de l'exercice (bénéfice + ou perte −)"
+      accountPrefixes: ['13']
+      confirmation: sourced
+      sourceId: audcif-2017
+      note: "Rubrique du système normal ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+    - code: clients_avances_recues
+      label: 'Clients, avances reçues'
+      accountPrefixes: ['419']
+      confirmation: sourced
+      sourceId: audcif-2017
+      note: "Rubrique du système normal ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+    - code: fournisseurs_exploitation
+      label: "Fournisseurs d'exploitation"
+      accountPrefixes: ['401']
+      confirmation: sourced
+      sourceId: audcif-2017
+      note: "Rubrique du système normal ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+    - code: dettes_fiscales_et_sociales
+      label: 'Dettes fiscales et sociales'
+      accountPrefixes: ['422', '443', '444']
+      confirmation: sourced
+      sourceId: audcif-2017
+      note: "Rubrique du système normal ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+    - code: autres_dettes
+      label: 'Autres dettes'
+      accountPrefixes: ['47']
+      confirmation: sourced
+      sourceId: audcif-2017
+      note: "Rubrique du système normal ; compte d'attente 471 compris : son solde se lit avec ses motifs ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  incomeStatement:
+    - code: ventes_de_marchandises
+      label: 'Ventes de marchandises'
+      accountPrefixes: ['701']
+      confirmation: sourced
+      sourceId: audcif-2017
+      note: "Rubrique du système normal ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+    - code: achats_de_marchandises
+      label: 'Achats de marchandises'
+      accountPrefixes: ['601']
+      confirmation: sourced
+      sourceId: audcif-2017
+      note: "Rubrique du système normal ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+    - code: travaux_services_vendus
+      label: 'Travaux, services vendus'
+      accountPrefixes: ['706']
+      confirmation: sourced
+      sourceId: audcif-2017
+      note: "Rubrique du système normal ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+    - code: produits_accessoires
+      label: 'Produits accessoires'
+      accountPrefixes: ['707']
+      confirmation: sourced
+      sourceId: audcif-2017
+      note: "Rubrique du système normal ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+    - code: autres_achats
+      label: 'Autres achats'
+      accountPrefixes: ['604', '605']
+      confirmation: sourced
+      sourceId: audcif-2017
+      note: "Rubrique du système normal ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+    - code: transports
+      label: 'Transports'
+      accountPrefixes: ['61']
+      confirmation: sourced
+      sourceId: audcif-2017
+      note: "Rubrique du système normal ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+    - code: services_exterieurs
+      label: 'Services extérieurs'
+      accountPrefixes: ['62', '63']
+      confirmation: sourced
+      sourceId: audcif-2017
+      note: "Rubrique du système normal ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+    - code: charges_de_personnel
+      label: 'Charges de personnel'
+      accountPrefixes: ['66']
+      confirmation: sourced
+      sourceId: audcif-2017
+      note: "Rubrique du système normal ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+    - code: impots_sur_le_resultat
+      label: 'Impôts sur le résultat'
+      accountPrefixes: ['89']
+      confirmation: sourced
+      sourceId: audcif-2017
+      note: "Rubrique du système normal ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  cashFlow: null
+
+# Jeu de règles de correspondance par défaut v1 (même décision). Une organisation le reçoit en
+# brouillon (`POST /accounting/rule-sets`), le relit et le valide par le circuit existant.
+# Même compte au débit et au crédit : le côté vient de la pièce (facture, avoir, encaissement).
+proposedRules:
+  - key: 'sale.invoice.receivable'
+    debit: ['{customer}']
+    credit: ['{customer}']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Facture : compte client auxiliaire ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.revenue.BIE.A'
+    debit: ['701']
+    credit: ['701']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.revenue.BIE.B'
+    debit: ['701']
+    credit: ['701']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.revenue.BIE.C'
+    debit: ['701']
+    credit: ['701']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.revenue.BIE.D'
+    debit: ['701']
+    credit: ['701']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.revenue.BIE.E'
+    debit: ['701']
+    credit: ['701']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.revenue.BIE.F'
+    debit: ['701']
+    credit: ['701']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.revenue.BIE.G'
+    debit: ['701']
+    credit: ['701']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.revenue.BIE.K'
+    debit: ['701']
+    credit: ['701']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.revenue.BIE.M'
+    debit: ['701']
+    credit: ['701']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.revenue.BIE.O'
+    debit: ['701']
+    credit: ['701']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.revenue.BIE.P'
+    debit: ['701']
+    credit: ['701']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.revenue.SER.A'
+    debit: ['706']
+    credit: ['706']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.revenue.SER.B'
+    debit: ['706']
+    credit: ['706']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.revenue.SER.C'
+    debit: ['706']
+    credit: ['706']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.revenue.SER.D'
+    debit: ['706']
+    credit: ['706']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.revenue.SER.E'
+    debit: ['706']
+    credit: ['706']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.revenue.SER.F'
+    debit: ['706']
+    credit: ['706']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.revenue.SER.G'
+    debit: ['706']
+    credit: ['706']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.revenue.SER.K'
+    debit: ['706']
+    credit: ['706']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.revenue.SER.M'
+    debit: ['706']
+    credit: ['706']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.revenue.SER.O'
+    debit: ['706']
+    credit: ['706']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.revenue.SER.P'
+    debit: ['706']
+    credit: ['706']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.vat.A'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.vat.B'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.vat.C'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.vat.D'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.vat.E'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.vat.F'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.vat.G'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.vat.H'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.vat.I'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.vat.J'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.vat.K'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.vat.L'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.vat.M'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.vat.N'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.vat.O'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.vat.P'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.nonrevenue.A'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.nonrevenue.B'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.nonrevenue.C'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.nonrevenue.D'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.nonrevenue.E'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.nonrevenue.F'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.nonrevenue.G'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.nonrevenue.H'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : consignation d'emballage : compte de tiers à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.nonrevenue.I'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : garantie et caution : compte de tiers à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.nonrevenue.J'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : débours : refacturation à l'identique, compte à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.nonrevenue.K'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.nonrevenue.L'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : prélèvements sur ventes : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.nonrevenue.M'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.nonrevenue.N'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : TVA spécifique : compte de TVA à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.nonrevenue.O'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.invoice.nonrevenue.P'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.receivable'
+    debit: ['{customer}']
+    credit: ['{customer}']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Facture d'acompte : compte client auxiliaire ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.revenue.BIE.A'
+    debit: ['4191']
+    credit: ['4191']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Acompte reçu sur commande : dette envers le client, jamais un produit ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.revenue.BIE.B'
+    debit: ['4191']
+    credit: ['4191']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Acompte reçu sur commande : dette envers le client, jamais un produit ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.revenue.BIE.C'
+    debit: ['4191']
+    credit: ['4191']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Acompte reçu sur commande : dette envers le client, jamais un produit ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.revenue.BIE.D'
+    debit: ['4191']
+    credit: ['4191']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Acompte reçu sur commande : dette envers le client, jamais un produit ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.revenue.BIE.E'
+    debit: ['4191']
+    credit: ['4191']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Acompte reçu sur commande : dette envers le client, jamais un produit ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.revenue.BIE.F'
+    debit: ['4191']
+    credit: ['4191']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Acompte reçu sur commande : dette envers le client, jamais un produit ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.revenue.BIE.G'
+    debit: ['4191']
+    credit: ['4191']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Acompte reçu sur commande : dette envers le client, jamais un produit ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.revenue.BIE.K'
+    debit: ['4191']
+    credit: ['4191']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Acompte reçu sur commande : dette envers le client, jamais un produit ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.revenue.BIE.M'
+    debit: ['4191']
+    credit: ['4191']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Acompte reçu sur commande : dette envers le client, jamais un produit ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.revenue.BIE.O'
+    debit: ['4191']
+    credit: ['4191']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Acompte reçu sur commande : dette envers le client, jamais un produit ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.revenue.BIE.P'
+    debit: ['4191']
+    credit: ['4191']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Acompte reçu sur commande : dette envers le client, jamais un produit ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.revenue.SER.A'
+    debit: ['4191']
+    credit: ['4191']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Acompte reçu sur commande : dette envers le client, jamais un produit ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.revenue.SER.B'
+    debit: ['4191']
+    credit: ['4191']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Acompte reçu sur commande : dette envers le client, jamais un produit ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.revenue.SER.C'
+    debit: ['4191']
+    credit: ['4191']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Acompte reçu sur commande : dette envers le client, jamais un produit ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.revenue.SER.D'
+    debit: ['4191']
+    credit: ['4191']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Acompte reçu sur commande : dette envers le client, jamais un produit ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.revenue.SER.E'
+    debit: ['4191']
+    credit: ['4191']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Acompte reçu sur commande : dette envers le client, jamais un produit ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.revenue.SER.F'
+    debit: ['4191']
+    credit: ['4191']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Acompte reçu sur commande : dette envers le client, jamais un produit ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.revenue.SER.G'
+    debit: ['4191']
+    credit: ['4191']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Acompte reçu sur commande : dette envers le client, jamais un produit ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.revenue.SER.K'
+    debit: ['4191']
+    credit: ['4191']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Acompte reçu sur commande : dette envers le client, jamais un produit ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.revenue.SER.M'
+    debit: ['4191']
+    credit: ['4191']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Acompte reçu sur commande : dette envers le client, jamais un produit ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.revenue.SER.O'
+    debit: ['4191']
+    credit: ['4191']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Acompte reçu sur commande : dette envers le client, jamais un produit ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.revenue.SER.P'
+    debit: ['4191']
+    credit: ['4191']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Acompte reçu sur commande : dette envers le client, jamais un produit ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.vat.A'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.vat.B'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.vat.C'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.vat.D'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.vat.E'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.vat.F'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.vat.G'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.vat.H'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.vat.I'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.vat.J'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.vat.K'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.vat.L'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.vat.M'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.vat.N'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.vat.O'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.vat.P'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.nonrevenue.A'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.nonrevenue.B'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.nonrevenue.C'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.nonrevenue.D'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.nonrevenue.E'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.nonrevenue.F'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.nonrevenue.G'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.nonrevenue.H'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : consignation d'emballage : compte de tiers à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.nonrevenue.I'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : garantie et caution : compte de tiers à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.nonrevenue.J'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : débours : refacturation à l'identique, compte à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.nonrevenue.K'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.nonrevenue.L'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : prélèvements sur ventes : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.nonrevenue.M'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.nonrevenue.N'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : TVA spécifique : compte de TVA à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.nonrevenue.O'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.deposit.nonrevenue.P'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.receivable'
+    debit: ['{customer}']
+    credit: ['{customer}']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Avoir : compte client auxiliaire ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.revenue.BIE.A'
+    debit: ['701']
+    credit: ['701']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Avoir : diminution du produit (question E1) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.revenue.BIE.B'
+    debit: ['701']
+    credit: ['701']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Avoir : diminution du produit (question E1) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.revenue.BIE.C'
+    debit: ['701']
+    credit: ['701']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Avoir : diminution du produit (question E1) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.revenue.BIE.D'
+    debit: ['701']
+    credit: ['701']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Avoir : diminution du produit (question E1) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.revenue.BIE.E'
+    debit: ['701']
+    credit: ['701']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Avoir : diminution du produit (question E1) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.revenue.BIE.F'
+    debit: ['701']
+    credit: ['701']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Avoir : diminution du produit (question E1) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.revenue.BIE.G'
+    debit: ['701']
+    credit: ['701']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Avoir : diminution du produit (question E1) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.revenue.BIE.K'
+    debit: ['701']
+    credit: ['701']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Avoir : diminution du produit (question E1) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.revenue.BIE.M'
+    debit: ['701']
+    credit: ['701']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Avoir : diminution du produit (question E1) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.revenue.BIE.O'
+    debit: ['701']
+    credit: ['701']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Avoir : diminution du produit (question E1) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.revenue.BIE.P'
+    debit: ['701']
+    credit: ['701']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Avoir : diminution du produit (question E1) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.revenue.SER.A'
+    debit: ['706']
+    credit: ['706']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Avoir : diminution du produit (question E1) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.revenue.SER.B'
+    debit: ['706']
+    credit: ['706']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Avoir : diminution du produit (question E1) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.revenue.SER.C'
+    debit: ['706']
+    credit: ['706']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Avoir : diminution du produit (question E1) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.revenue.SER.D'
+    debit: ['706']
+    credit: ['706']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Avoir : diminution du produit (question E1) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.revenue.SER.E'
+    debit: ['706']
+    credit: ['706']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Avoir : diminution du produit (question E1) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.revenue.SER.F'
+    debit: ['706']
+    credit: ['706']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Avoir : diminution du produit (question E1) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.revenue.SER.G'
+    debit: ['706']
+    credit: ['706']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Avoir : diminution du produit (question E1) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.revenue.SER.K'
+    debit: ['706']
+    credit: ['706']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Avoir : diminution du produit (question E1) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.revenue.SER.M'
+    debit: ['706']
+    credit: ['706']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Avoir : diminution du produit (question E1) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.revenue.SER.O'
+    debit: ['706']
+    credit: ['706']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Avoir : diminution du produit (question E1) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.revenue.SER.P'
+    debit: ['706']
+    credit: ['706']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Avoir : diminution du produit (question E1) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.vat.A'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.vat.B'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.vat.C'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.vat.D'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.vat.E'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.vat.F'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.vat.G'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.vat.H'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.vat.I'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.vat.J'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.vat.K'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.vat.L'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.vat.M'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.vat.N'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.vat.O'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.vat.P'
+    debit: ['4431']
+    credit: ['4431']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.nonrevenue.A'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.nonrevenue.B'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.nonrevenue.C'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.nonrevenue.D'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.nonrevenue.E'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.nonrevenue.F'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.nonrevenue.G'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.nonrevenue.H'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : consignation d'emballage : compte de tiers à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.nonrevenue.I'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : garantie et caution : compte de tiers à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.nonrevenue.J'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : débours : refacturation à l'identique, compte à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.nonrevenue.K'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.nonrevenue.L'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : prélèvements sur ventes : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.nonrevenue.M'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.nonrevenue.N'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : TVA spécifique : compte de TVA à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.nonrevenue.O'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.credit_note.nonrevenue.P'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : taxe spécifique du groupe : compte de l'État à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.payment_at_issue.ESPECES'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : fonds déclarés reçus à l'émission, invisibles de la trésorerie : compte de trésorerie à préciser (décision ouverte n° 9) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.payment_at_issue.VIREMENT'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : fonds déclarés reçus à l'émission, invisibles de la trésorerie : compte de trésorerie à préciser (décision ouverte n° 9) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.payment_at_issue.CARTEBANCAIRE'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : fonds déclarés reçus à l'émission, invisibles de la trésorerie : compte de trésorerie à préciser (décision ouverte n° 9) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.payment_at_issue.MOBILEMONEY'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : fonds déclarés reçus à l'émission, invisibles de la trésorerie : compte de trésorerie à préciser (décision ouverte n° 9) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.payment_at_issue.CHEQUES'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : fonds déclarés reçus à l'émission, invisibles de la trésorerie : compte de trésorerie à préciser (décision ouverte n° 9) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.payment_at_issue.AUTRE'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : fonds déclarés reçus à l'émission, invisibles de la trésorerie : compte de trésorerie à préciser (décision ouverte n° 9) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'sale.payment_at_issue.receivable'
+    debit: ['{customer}']
+    credit: ['{customer}']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'receipt.ESPECES'
+    debit: ['{treasuryAccount}']
+    credit: ['{treasuryAccount}']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Compte de trésorerie rattaché par l’organisation ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'receipt.VIREMENT'
+    debit: ['{treasuryAccount}']
+    credit: ['{treasuryAccount}']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Compte de trésorerie rattaché par l’organisation ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'receipt.CARTEBANCAIRE'
+    debit: ['{treasuryAccount}']
+    credit: ['{treasuryAccount}']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Compte de trésorerie rattaché par l’organisation ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'receipt.MOBILEMONEY'
+    debit: ['{treasuryAccount}']
+    credit: ['{treasuryAccount}']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Compte de trésorerie rattaché par l’organisation ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'receipt.CHEQUES'
+    debit: ['{treasuryAccount}']
+    credit: ['{treasuryAccount}']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Compte de trésorerie rattaché par l’organisation ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'receipt.AUTRE'
+    debit: ['{treasuryAccount}']
+    credit: ['{treasuryAccount}']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Compte de trésorerie rattaché par l’organisation ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'receipt.receivable'
+    debit: ['{customer}']
+    credit: ['{customer}']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'receipt.unallocated'
+    debit: ['4191']
+    credit: ['4191']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Encaissement non imputé à une facture : avance reçue du client ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'expense.achats'
+    debit: ['601']
+    credit: ['601']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'expense.personnel'
+    debit: ['661']
+    credit: ['661']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Montant payé, sans brut ni cotisations ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'expense.loyer'
+    debit: ['622']
+    credit: ['622']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'expense.transport'
+    debit: ['618']
+    credit: ['618']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'expense.marketing'
+    debit: ['627']
+    credit: ['627']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'expense.outils_logiciels'
+    debit: ['638']
+    credit: ['638']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Abonnements et logiciels ; l'expert dira si un compte de redevances convient mieux ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'expense.energie_telecom'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : catégorie mêlant énergie et eau (achats non stockés) et télécommunications : à ventiler ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'expense.services_exterieurs'
+    debit: ['632']
+    credit: ['632']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Honoraires ; un service extérieur d'une autre nature se reclasse ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'expense.impots_taxes'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : nature de l'impôt (direct, indirect, droits) non connue de la pièce ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'expense.impot_benefices'
+    debit: ['891']
+    credit: ['891']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'expense.frais_financiers'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : catégorie mêlant frais bancaires et intérêts : à ventiler ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'expense.charges_diverses'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : nature de la charge non connue de la pièce ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'expense.investissement'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : immobilisation : compte de la classe 2 selon sa nature, à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'expense.remboursement_emprunt'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : remboursement d'emprunt : compte de la classe 16 selon le prêteur, à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'expense.payment'
+    debit: ['{treasuryAccount}']
+    credit: ['{treasuryAccount}']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'expense.vat_declared'
+    debit: ['4452']
+    credit: ['4452']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Appliquée seulement si l'organisation est assujettie (décision ouverte n° 7) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.invoice.achats'
+    debit: ['601']
+    credit: ['601']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.invoice.personnel'
+    debit: ['661']
+    credit: ['661']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Montant payé, sans brut ni cotisations ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.invoice.loyer'
+    debit: ['622']
+    credit: ['622']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.invoice.transport'
+    debit: ['618']
+    credit: ['618']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.invoice.marketing'
+    debit: ['627']
+    credit: ['627']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.invoice.outils_logiciels'
+    debit: ['638']
+    credit: ['638']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Abonnements et logiciels ; l'expert dira si un compte de redevances convient mieux ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.invoice.energie_telecom'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : catégorie mêlant énergie et eau (achats non stockés) et télécommunications : à ventiler ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.invoice.services_exterieurs'
+    debit: ['632']
+    credit: ['632']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Honoraires ; un service extérieur d'une autre nature se reclasse ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.invoice.impots_taxes'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : nature de l'impôt (direct, indirect, droits) non connue de la pièce ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.invoice.impot_benefices'
+    debit: ['891']
+    credit: ['891']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.invoice.frais_financiers'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : catégorie mêlant frais bancaires et intérêts : à ventiler ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.invoice.charges_diverses'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : nature de la charge non connue de la pièce ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.invoice.investissement'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : immobilisation : compte de la classe 2 selon sa nature, à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.invoice.remboursement_emprunt'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : remboursement d'emprunt : compte de la classe 16 selon le prêteur, à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.invoice.payable'
+    debit: ['{supplier}']
+    credit: ['{supplier}']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.invoice.vat_declared'
+    debit: ['4452']
+    credit: ['4452']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Appliquée seulement si l'organisation est assujettie (décision ouverte n° 7) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.credit_note.achats'
+    debit: ['601']
+    credit: ['601']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.credit_note.personnel'
+    debit: ['661']
+    credit: ['661']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Montant payé, sans brut ni cotisations ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.credit_note.loyer'
+    debit: ['622']
+    credit: ['622']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.credit_note.transport'
+    debit: ['618']
+    credit: ['618']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.credit_note.marketing'
+    debit: ['627']
+    credit: ['627']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.credit_note.outils_logiciels'
+    debit: ['638']
+    credit: ['638']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Abonnements et logiciels ; l'expert dira si un compte de redevances convient mieux ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.credit_note.energie_telecom'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : catégorie mêlant énergie et eau (achats non stockés) et télécommunications : à ventiler ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.credit_note.services_exterieurs'
+    debit: ['632']
+    credit: ['632']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Honoraires ; un service extérieur d'une autre nature se reclasse ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.credit_note.impots_taxes'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : nature de l'impôt (direct, indirect, droits) non connue de la pièce ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.credit_note.impot_benefices'
+    debit: ['891']
+    credit: ['891']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.credit_note.frais_financiers'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : catégorie mêlant frais bancaires et intérêts : à ventiler ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.credit_note.charges_diverses'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : nature de la charge non connue de la pièce ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.credit_note.investissement'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : immobilisation : compte de la classe 2 selon sa nature, à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.credit_note.remboursement_emprunt'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : remboursement d'emprunt : compte de la classe 16 selon le prêteur, à choisir par l'expert ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.credit_note.payable'
+    debit: ['{supplier}']
+    credit: ['{supplier}']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.credit_note.vat_declared'
+    debit: ['4452']
+    credit: ['4452']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Appliquée seulement si l'organisation est assujettie (décision ouverte n° 7) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.payment.bank_transfer'
+    debit: ['{treasuryAccount}']
+    credit: ['{treasuryAccount}']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.payment.mobile_money'
+    debit: ['{treasuryAccount}']
+    credit: ['{treasuryAccount}']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.payment.cash'
+    debit: ['{treasuryAccount}']
+    credit: ['{treasuryAccount}']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.payment.cheque'
+    debit: ['{treasuryAccount}']
+    credit: ['{treasuryAccount}']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.payment.other'
+    debit: ['{treasuryAccount}']
+    credit: ['{treasuryAccount}']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.payment.payable'
+    debit: ['{supplier}']
+    credit: ['{supplier}']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'purchase.payment.unallocated'
+    debit: ['4091']
+    credit: ['4091']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Paiement non imputé à une facture : avance versée au fournisseur ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'transfer.treasury'
+    debit: ['{treasuryAccount}']
+    credit: ['{treasuryAccount}']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'transfer.internal'
+    debit: ['585']
+    credit: ['585']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'other_in.treasury'
+    debit: ['{treasuryAccount}']
+    credit: ['{treasuryAccount}']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'other_in.counterpart'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : apport, prêt, prélèvement : nature non connue de la pièce (décision ouverte n° 13), reclassement par opération diverse ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'other_out.treasury'
+    debit: ['{treasuryAccount}']
+    credit: ['{treasuryAccount}']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'other_out.counterpart'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : apport, prêt, prélèvement : nature non connue de la pièce (décision ouverte n° 13), reclassement par opération diverse ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'exchange.difference'
+    debit: ['471']
+    credit: ['471']
+    requiresReview: true
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "À revoir — compte d'attente 471, motif : le SYSCOHADA révisé distingue les écarts de change commerciaux et financiers ; comptes à confirmer par l'expert (voir le document de relecture) ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'hr.advance.settled'
+    debit: ['421']
+    credit: ['421']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Note de frais soldée par une avance : diminution de l'avance au personnel ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'hr.advance.disbursed'
+    debit: ['421']
+    credit: ['421']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Clé réservée : versement d’une avance au personnel ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+  - key: 'hr.advance.returned'
+    debit: ['421']
+    credit: ['421']
+    requiresReview: false
+    confirmation: sourced
+    sourceId: audcif-2017
+    note: "Clé réservée : retour d’une avance au personnel ; décision de la dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable."
+
+review:
+  reviewerName: 'Gracy Omokoso'
+  reviewerCapacity: >-
+    Dirigeante de l'éditeur (Go Freelance SARLU) — décision de gestion du 3 novembre 2026 ;
+    ce n'est pas une relecture par un expert-comptable
+  reviewedOn: '2026-11-03'
+  scope: >-
+    Adoption du plan comptable, des comptes de capitaux propres, du traitement des acomptes et
+    des avances et du jeu de règles par défaut, pour permettre le mode actif ; relecture par
+    l'expert-comptable à venir, points listés dans le document de relecture v2
+  reportDocumentKey: 'docs/comptabilite/relecture-pack-syscohada-v2.md'
+
+warnings:
+  - 'Projet — plan comptable adopté par décision de la dirigeante du 3 nov. 2026, sans relecture par un expert-comptable ; à revoir avec lui.'
+  - 'Les projets d’états restent à valider par un expert-comptable : rien n’est déposé ni transmis.'
+  - 'Ce qui n’a pas de correspondance sûre va au compte d’attente 471, avec son motif, et se reclasse par opération diverse.'

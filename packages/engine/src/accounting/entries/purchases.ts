@@ -51,9 +51,9 @@ function declaredVat(
  * - autre nature : « À comptabiliser » (`UNSUPPORTED_SOURCE`), jamais devinée.
  *
  * Une dépense de note de frais SOLDÉE PAR UNE AVANCE n'a pas de compte : l'argent est
- * sorti au versement de l'avance. Sa contrepartie est la clé `hr.advance.settled`,
- * toujours au compte d'attente (`SETTLED_BY_EMPLOYEE_ADVANCE`), à reclasser par
- * l'expert (question C2) ; ce n'est pas une pièce « à comptabiliser ».
+ * sorti au versement de l'avance. Sa contrepartie est la clé `hr.advance.settled` :
+ * compte de la règle validée s'il y en a une (1.2.0), sinon compte d'attente
+ * (`SETTLED_BY_EMPLOYEE_ADVANCE`) ; ce n'est pas une pièce « à comptabiliser ».
  */
 export function entriesForExpense(view: ExpenseView, ctx: PostingContext): PostingResult {
   const source = { kind: 'treasury_expense' as const, id: view.id };
