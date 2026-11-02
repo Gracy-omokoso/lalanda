@@ -18,6 +18,7 @@ import 'reflect-metadata';
 import { addDays, kinshasaDayOf } from '@lalanda/shared/work';
 import { randomBytes } from 'node:crypto';
 import request from 'supertest';
+import { MORNING_BRIEF_VERSION, WORK_MARGIN_VERSION } from '@lalanda/engine';
 import { describe, expect, it, vi } from 'vitest';
 
 import { emailContent } from '../morning-brief/morning-brief-email.job.js';
@@ -210,7 +211,7 @@ e2eSuite('Stocks, équipements, documents — brief, Mes tâches, cloche, marge 
 
     it('Magasinier : deux articles sous le seuil → R16 ; maintenance → R17 ; échéances → R18', async () => {
       const b = await brief('storekeeper');
-      expect(b.version).toBe('1.5.0');
+      expect(b.version).toBe(MORNING_BRIEF_VERSION);
       expect(fact(b, 'stock.sous_seuil').value).toBe('2');
       expect(fact(b, 'stock.ruptures').value).toBe('0');
       expect(fact(b, 'stock.a_traiter').value).toBe('1');
@@ -483,7 +484,7 @@ e2eSuite('Stocks, équipements, documents — brief, Mes tâches, cloche, marge 
   describe('marge du projet — matériel informatif (§ 6.4, critère 18)', () => {
     it('sortie de 30,00 USD vers le projet : `materials` = 30,00, marge INCHANGÉE', async () => {
       const avant = f.ok(await f.get('owner', `/work/projects/${projectId}/margin`));
-      expect(avant['version']).toBe('1.3.0');
+      expect(avant['version']).toBe(WORK_MARGIN_VERSION);
       expect(avant['materials']).toEqual([]);
       f.ok(
         (

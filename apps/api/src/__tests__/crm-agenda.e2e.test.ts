@@ -20,6 +20,7 @@
 import 'reflect-metadata';
 
 import { addDays, kinshasaDayOf } from '@lalanda/shared/work';
+import { MORNING_BRIEF_VERSION } from '@lalanda/engine';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { CrmNotifier } from '../crm/crm-notifier.js';
@@ -310,7 +311,7 @@ e2eSuite('CRM — relances dans Mes tâches, cloche et brief (ADR-0040 — C4)',
         alerts: { ruleId: string; message: string; actionPath: string }[];
         recommendations: { ruleId: string }[];
       };
-      expect(b.version).toBe('1.5.0');
+      expect(b.version).toBe(MORNING_BRIEF_VERSION);
       const fact = (id: string) => b.facts.find((x) => x.id === id);
       expect(fact('mes_relances.en_retard')).toMatchObject({ status: 'known', value: '2' });
       expect(fact('mes_relances.aujourdhui')).toMatchObject({ status: 'known', value: '0' });
