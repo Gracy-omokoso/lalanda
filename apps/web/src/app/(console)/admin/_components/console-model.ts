@@ -50,7 +50,7 @@ export interface ModuleConsole {
  *
  * Les segments des écrans repris de S21b (`organisations`, `utilisateurs`,
  * `integrations`, `journal`) sont conservés : liens, docs et tests restent justes.
- * Lots à venir : abonnements (P3), fonctionnalités (P4), annonces (P6),
+ * Lots à venir : fonctionnalités (P4), annonces (P6),
  * statistiques et finances (P7) ; Country Packs et modèles sectoriels n'ont pas
  * encore de lot d'écran (leurs routes d'API existent).
  */
@@ -85,7 +85,8 @@ export const CONSOLE_MODULES: readonly ModuleConsole[] = [
     label: 'Abonnements et paiements',
     description: 'Abonnements, file des paiements manuels et octrois sans paiement.',
     action: 'platform.billing.read',
-    etat: 'bientot',
+    // ADR-0053 — P3
+    etat: 'disponible',
   },
   {
     id: 'fonctionnalites',

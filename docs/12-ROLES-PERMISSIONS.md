@@ -617,8 +617,9 @@ promotion vers un projet, assistance IA) de `canvas.update`, régler son IA de
   compte non bloqué (`403 ACCOUNT_BLOCKED`), aucune organisation résolue ; il refuse toute route qui
   n'est pas marquée `@PlatformConsoleRoute()` ou qui déclare une action d'organisation
   (`403 PLATFORM_ROUTE_REQUIRED`). Posé sur `/admin/**`, `/me/platform-access` et
-  `/accounting/platform/chart-packs` ; `/payments/manual/*` reste sous `AuthGuard` une version
-  (liste figée, lot P3).
+  `/accounting/platform/chart-packs` ; `/payments/manual/*` restait sous `AuthGuard` une version
+  (liste figée) : **lot P3 appliqué**, ces routes répondent `410` et vivent sous
+  `/admin/billing/**`. `platform_admin` a perdu la confirmation des paiements manuels.
 - **`@RequirePlatformAction(action)`** : jugé par `PermissionsGuard` contre la matrice ; pose aussi
   la liste des rôles détenteurs (dérivée), si bien qu'une route déclarée par action se lit comme une
   route déclarée par rôles pendant la transition. Première route : `GET /admin/overview`

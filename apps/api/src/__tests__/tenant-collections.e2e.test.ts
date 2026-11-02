@@ -42,6 +42,8 @@ const SANS_ORGANISATION: Readonly<Record<string, string>> = {
   // Plateforme : rôles et réauthentification des opérateurs Lalanda, hors de toute société.
   platform_roles: 'rôles des opérateurs de la plateforme',
   platform_reauth: 'réauthentification des opérateurs de la plateforme',
+  // ADR-0053 — P3 : l'organisation visée est nommée `targetOrganizationId` (§ 4).
+  platform_plan_grants: 'octrois manuels d’offre par la plateforme (organisation cible nommée)',
   // La société elle-même : c'est l'`_id` qui sert de clé, pas un `organizationId`.
   organizations: "l'organisation elle-même (son _id est la clé)",
   // Ordonnanceur : verrous de tâches qui parcourent toutes les organisations.

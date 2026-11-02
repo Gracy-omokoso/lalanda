@@ -339,6 +339,24 @@ Deux routes de l'API **sans session** (`GET /public/lead-forms/:token`,
 - Tests : `admin-accounts.e2e.test.ts`, blocs P2 de `routes-coverage.test.ts` et
   `rbac-matrix.e2e.test.ts`.
 
+## ADR-0053 — console Lalanda : lot P3 (appliqué)
+
+- **Fuite F3 fermée** : confirmer un dépôt manuel n'écrit plus l'identifiant de l'opérateur ni un
+  rôle codé en dur dans le journal du client. La transition d'abonnement porte le pseudonyme
+  `platform:lalanda` et la source `admin:manual` (sans identifiant) ; le journal plateforme reçoit
+  l'acteur réel et ses rôles RELUS. Le refus est désormais journalisé, des deux côtés.
+- **Routes plateforme sous la garde de console** : `/payments/manual/*` et
+  `/payments/maintenance/sweep` répondent `410 ROUTE_GONE` à tous ; leurs remplaçantes vivent sous
+  `/admin/billing/**`. La liste N-1 de `routes-coverage.test.ts` est vide.
+- **Matrice appliquée** : `platform_admin` ne confirme plus un dépôt (finance et
+  super-administrateur seuls) ; conflit d'intérêts sur confirmation, refus, octroi, approbation et
+  retrait.
+- **Octrois** à deux personnes (offre Expert, sans échéance, plus de 90 jours) : le palliatif
+  `SECOND_PERSON_REQUIRED` de P2 est levé. Un octroi ne simule aucun paiement (`plan.granted`,
+  jamais `payment.succeeded`).
+- Tests : `admin-billing.e2e.test.ts`, `subscriptions.e2e.test.ts` (nouveaux chemins), blocs P3
+  de `routes-coverage.test.ts` et `rbac-matrix.e2e.test.ts`.
+
 ## Menaces prioritaires
 
 - accès inter-organisation;

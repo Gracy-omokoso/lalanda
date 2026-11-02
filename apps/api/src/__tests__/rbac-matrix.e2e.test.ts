@@ -1857,4 +1857,45 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
       expect(fiscal.status, role).toBe(404);
     }
   }, 60_000);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // ADR-0053 — P3 : abonnements et paiements manuels de la console. Aucun rôle
+  // d'organisation ne les ouvre — `billing.manage` du Propriétaire compris : il
+  // s'accorderait sinon ses propres abonnements. Le refus nomme l'action PLATEFORME.
+  // ───────────────────────────────────────────────────────────────────────────
+
+  it('ADR-0053 P3 — aucun rôle d’organisation n’ouvre `/admin/billing/**`', async () => {
+    const s = serveur();
+    const factice = '0123456789abcdef01234567';
+    const sondes: Array<[string, string, PlatformAction]> = [
+      ['get', '/admin/billing/subscriptions', 'platform.billing.read'],
+      ['get', '/admin/billing/manual-payments', 'platform.billing.read'],
+      ['get', '/admin/billing/grants', 'platform.billing.read'],
+      ['post', '/admin/billing/manual-payments/LLD-X/confirm', 'platform.billing.confirm'],
+      ['post', '/admin/billing/manual-payments/LLD-X/reject', 'platform.billing.confirm'],
+      ['post', '/admin/billing/sweep', 'platform.billing.confirm'],
+      ['post', '/admin/billing/grants', 'platform.billing.grant'],
+      ['post', `/admin/billing/grants/${factice}/approve`, 'platform.billing.grant'],
+      ['delete', `/admin/billing/grants/${factice}`, 'platform.billing.grant'],
+    ];
+    const { ThrottlerStorage } = await import('@nestjs/throttler');
+    const store = app.get(ThrottlerStorage) as unknown as {
+      storage: Map<string, unknown>;
+      timeoutIds: Map<string, NodeJS.Timeout[]>;
+    };
+    for (const role of ROLES_TESTES) {
+      for (const t of store.timeoutIds.values()) t.forEach(clearTimeout);
+      store.timeoutIds.clear();
+      store.storage.clear();
+      for (const [verbe, chemin, action] of sondes) {
+        const req = request(s) as unknown as Record<string, (p: string) => request.Test>;
+        const res = await req[verbe]!(chemin).set('Cookie', cookiesDe(role)).send({});
+        expect(res.status, `${role} × ${verbe} ${chemin}`).toBe(403);
+        expect(res.body, `${role} × ${verbe} ${chemin}`).toMatchObject({
+          code: 'FORBIDDEN',
+          action,
+        });
+      }
+    }
+  }, 120_000);
 });

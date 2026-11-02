@@ -175,3 +175,43 @@ export function statusNotice(
       return null;
   }
 }
+
+// ── ADR-0053 — P3 : octrois manuels (`platform_plan_grants`) ─────────────────────
+//
+// Un octroi est une offre ACCORDÉE sans paiement, par un opérateur, pour une durée
+// facultative. Il ne passe PAS par la machine d'état : il ne simule aucun paiement
+// (jamais de `payment.succeeded` sans argent reçu, F4) et ne touche ni au plan souscrit
+// ni au statut. Il SE SUPERPOSE à l'abonnement le temps de sa validité, puis s'efface
+// seul à son échéance — lu à la lecture, comme l'essai (aucun ordonnanceur, ADR-0009).
+
+/** Événements d'octroi inscrits dans `statusHistory` (statut inchangé, `from === to`). */
+export const SUBSCRIPTION_GRANT_EVENTS = ['plan.granted', 'plan.grant_revoked'] as const;
+export type SubscriptionGrantEvent = (typeof SUBSCRIPTION_GRANT_EVENTS)[number];
+
+/** Octroi porté par l'abonnement (copie du document `platform_plan_grants` actif). */
+export interface SubscriptionGrantSnapshot {
+  grantId?: string | null;
+  grantPlan?: Plan | null;
+  grantStartsAt?: Date | null;
+  grantEndsAt?: Date | null;
+}
+
+/** Offre accordée et en vigueur à `now`, ou `null` (aucun octroi, pas commencé, échu). */
+export function activeGrantPlan(sub: SubscriptionGrantSnapshot, now: Date): Plan | null {
+  if (!sub.grantPlan) return null;
+  if (sub.grantStartsAt && sub.grantStartsAt.getTime() > now.getTime()) return null;
+  if (sub.grantEndsAt && sub.grantEndsAt.getTime() <= now.getTime()) return null;
+  return sub.grantPlan;
+}
+
+/**
+ * Plan applicable à `now`, octroi compris : un octroi en vigueur l'emporte sur l'état
+ * de l'abonnement (il est accordé SANS paiement, un impayé ne le suspend donc pas) ; à
+ * son échéance, `effectivePlan()` reprend la main sans aucune écriture.
+ */
+export function effectivePlanAt(
+  sub: SubscriptionSnapshot & SubscriptionGrantSnapshot,
+  now: Date,
+): Plan {
+  return activeGrantPlan(sub, now) ?? effectivePlan(sub);
+}
