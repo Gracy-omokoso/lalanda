@@ -2093,3 +2093,41 @@ describe('ADR-0053 — P0 : la garde sans organisation ne vaut que pour la conso
     }
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADR-0050 — V5 : échéancier et abonnements (§ 3, § 5.3)
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { SalesSubscriptionsController } from '../sales/contracts/subscriptions/sales-subscriptions.controller.js';
+
+const CONTROLEURS_V5 = [SalesSubscriptionsController];
+(CONTROLEURS as unknown[]).push(...CONTROLEURS_V5);
+TOUTES_LES_ROUTES.push(
+  ...CONTROLEURS_V5.flatMap((c) => routesDe(c as new (...args: never[]) => unknown)),
+);
+
+describe('ADR-0050 — V5 : échéancier et abonnements', () => {
+  it('chaque route déclare la permission de l’ADR (§ 3)', () => {
+    const attendu: Record<string, Action[]> = {
+      'SalesSubscriptionsController.schedule': ['sales.read'],
+      // Brouillon seulement : l'émission reste sous `sales.invoice` (routes existantes).
+      'SalesSubscriptionsController.prepare': ['sales.read', 'sales.manage'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) => /^SalesSubscriptionsController\./.test(r.cle));
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+      expect(route!.rolesPlateforme, cle).toBeUndefined();
+      expect(SANS_PERMISSION[cle], cle).toBeUndefined();
+    }
+  });
+
+  it('aucune route de l’échéancier n’émet ni ne normalise : `sales.invoice` n’y apparaît pas', () => {
+    for (const route of TOUTES_LES_ROUTES.filter((r) =>
+      /^SalesSubscriptionsController\./.test(r.cle),
+    )) {
+      expect(route.actions ?? [], route.cle).not.toContain('sales.invoice');
+    }
+  });
+});
