@@ -71,6 +71,14 @@ export interface HrAgendaActor {
   holdsLeaveApprove: boolean;
   /** `hr.sensitive.read` effectif : voit le type des absences confidentielles. */
   seesConfidential: boolean;
+  // ADR-0051 — H14 (§ 7.5) : notes de frais, avances, corrections de pointage. Absents :
+  // faux (aucun élément de ces natures, sauf ses propres avances à régulariser).
+  /** `expenses.approve` effectif : étape finance, suppléance du manager. */
+  holdsExpensesApprove?: boolean;
+  /** `payables.pay` effectif : notes à rembourser, avances à verser. */
+  holdsPayablesPay?: boolean;
+  /** `hr.manage` effectif : corrections de pointage à décider. */
+  holdsHrManage?: boolean;
 }
 
 export interface HrAgendaPage {

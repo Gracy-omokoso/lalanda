@@ -875,6 +875,8 @@ describe('couverture des routes par le RBAC', () => {
       'WorkBillingController.unlinkInvoice': ['work.manage'],
       'WorkBillingController.prepareInvoice': ['work.read', 'sales.manage'],
       'WorkBillingController.margin': ['work.read', 'sales.read', 'treasury.read'],
+      // ADR-0051 — H14 (§ 7.3) : frais refacturables, mêmes droits que la marge.
+      'WorkBillingController.rebillableExpenses': ['work.read', 'sales.read', 'treasury.read'],
       // ADR-0040 — C1 : comptes lus sous `crm.read`, gérés sous `crm.manage` ;
       // convertir un prospect crée une fiche client (NIF, type DGI) : `sales.manage` en plus.
       'CrmAccountsController.list': ['crm.read'],

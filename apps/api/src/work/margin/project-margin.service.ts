@@ -20,12 +20,20 @@
 // lu par le port `WORK_STOCK_SOURCE` seulement si l'appelant détient `stock.read` ET voit
 // les valeurs (`canSeeStockValues` : `purchase.read` ou `treasury.read`) ; sinon rien
 // n'est lu : `materials: null`. Jamais soustrait de la marge.
+//
+// ADR-0051 § 7.3 (H14) : frais du personnel APPROUVÉS non remboursés imputés au projet
+// (`pendingExpenseClaims`), INFORMATIFS, lus par le port `WORK_HR_EXPENSES_SOURCE` ; une
+// ligne remboursée entre dans la marge par sa dépense possédée par les RH (sans code
+// nouveau) ; l'origine de cette dépense (`origin.reportId`, `origin.lineIndex`) est passée
+// au moteur, qui ne compte jamais deux fois la même ligne. La route exige déjà
+// `treasury.read`.
 
 import {
   computeProjectMargin,
   type WorkMarginCreditNoteInput,
   type WorkMarginInvoiceInput,
 } from '@lalanda/engine';
+import type { WorkRebillableExpensesView } from '@lalanda/shared/hr';
 import type { ProjectMarginQuery, ProjectMarginView } from '@lalanda/shared/work';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
@@ -41,6 +49,12 @@ import {
   type WorkPurchasesSource,
 } from './work-purchases.port.js';
 import { WORK_STOCK_SOURCE, noWorkStock, type WorkStockSource } from './work-stock.port.js';
+// ADR-0051 — H14
+import {
+  WORK_HR_EXPENSES_SOURCE,
+  noWorkHrExpenses,
+  type WorkHrExpensesSource,
+} from './work-hr-expenses.port.js';
 import { WorkMembersService } from '../work-members.service.js';
 import { WorkProjectsService } from '../work-projects.service.js';
 import {
@@ -101,10 +115,22 @@ function taxGroupsOf(doc: SalesDocRead): WorkMarginInvoiceInput['taxGroups'] {
   }));
 }
 
+/** ADR-0051 — H14 : `<reportId>:<lineIndex>` d'une dépense possédée par les RH, sinon `null`. */
+export function expenseReportLineOf(origin: unknown): string | null {
+  if (origin === null || typeof origin !== 'object') return null;
+  const o = origin as { kind?: unknown; reportId?: unknown; lineIndex?: unknown };
+  return o.kind === 'expense_report' &&
+    typeof o.reportId === 'string' &&
+    typeof o.lineIndex === 'number'
+    ? `${o.reportId}:${o.lineIndex}`
+    : null;
+}
+
 @Injectable()
 export class ProjectMarginService {
   private readonly purchases: WorkPurchasesSource;
   private readonly stock: WorkStockSource;
+  private readonly hrExpenses: WorkHrExpensesSource;
 
   constructor(
     @InjectModel(WorkInvoiceLink.name) private readonly links: Model<WorkInvoiceLinkDocument>,
@@ -117,9 +143,19 @@ export class ProjectMarginService {
     @Optional() @Inject(WORK_PURCHASES_SOURCE) purchases: WorkPurchasesSource | null = null,
     // ADR-0046 — S7 : facultatif, fournisseur nul sans module des stocks.
     @Optional() @Inject(WORK_STOCK_SOURCE) stock: WorkStockSource | null = null,
+    // ADR-0051 — H14 : facultatif, fournisseur nul sans module RH.
+    @Optional() @Inject(WORK_HR_EXPENSES_SOURCE) hrExpenses: WorkHrExpensesSource | null = null,
   ) {
     this.purchases = purchases ?? noWorkPurchases;
     this.stock = stock ?? noWorkStock;
+    this.hrExpenses = hrExpenses ?? noWorkHrExpenses;
+  }
+
+  /** ADR-0051 — H14 (§ 7.3) : lignes refacturables remboursées du projet (sans nom). */
+  async rebillable(organizationId: string, projectId: string): Promise<WorkRebillableExpensesView> {
+    await this.projects.requireOwn(organizationId, projectId);
+    const read = await this.hrExpenses.rebillableOf(organizationId, projectId);
+    return { projectId, items: read.items, truncated: read.truncated };
   }
 
   async margin(
@@ -173,7 +209,18 @@ export class ProjectMarginService {
         .find(
           { organizationId, workProjectId: projectId, status: 'recorded' },
           // ADR-0045 — H5 : la catégorie sert au seul constat `personnel` (marge 1.2.0).
-          { projection: { spentOn: 1, amount: 1, currency: 1, category: 1 } },
+          // ADR-0051 — H14 : l'origine RH identifie la ligne de frais remboursée.
+          {
+            projection: {
+              spentOn: 1,
+              amount: 1,
+              currency: 1,
+              category: 1,
+              'origin.kind': 1,
+              'origin.reportId': 1,
+              'origin.lineIndex': 1,
+            },
+          },
         )
         .toArray(),
       this.time
@@ -195,6 +242,8 @@ export class ProjectMarginService {
       canSeeStockValues(actor.role, actor.context)
         ? await this.stock.stockOf(organizationId, projectId)
         : null;
+    // ADR-0051 — H14 : frais approuvés non remboursés (informatifs).
+    const hrClaims = await this.hrExpenses.claimsOf(organizationId, projectId);
     const userIds = [...new Set(entries.map((e) => e.userId))];
     const rates =
       userIds.length === 0
@@ -263,6 +312,7 @@ export class ProjectMarginService {
         spentOn: String(e['spentOn']),
         amount: String(e['amount']),
         category: typeof e['category'] === 'string' ? (e['category'] as string) : null,
+        expenseReportLine: expenseReportLineOf(e['origin']),
       })),
       timeEntries: entries.map((e) => ({
         userId: e.userId,
@@ -274,6 +324,7 @@ export class ProjectMarginService {
       to: query.to ?? null,
       ...(purchasesRead === null ? {} : { purchases: { projectId, ...purchasesRead } }),
       ...(stockRead === null ? {} : { stock: { projectId, ...stockRead } }),
+      ...(hrClaims === null ? {} : { hrExpenses: { claims: hrClaims } }),
     });
 
     let byMember: ProjectMarginView['byMember'] = null;
@@ -298,6 +349,7 @@ export class ProjectMarginService {
       byMember,
       purchases: result.purchases ?? null,
       materials: result.materials ?? null,
+      pendingExpenseClaims: result.pendingExpenseClaims ?? null,
     };
   }
 }

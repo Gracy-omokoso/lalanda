@@ -8,6 +8,9 @@
 //     ayants droit ;
 //   - `checklist_item` : élément de liste d'entrée ou de sortie assigné à l'appelant,
 //     lu par le port `HR_CHECKLIST_AGENDA` (nul jusqu'au lot H4).
+// ADR-0051 — H14 (§ 7.5) : quatre natures de plus, lues par `HrExpenseAgendaReader` sur
+// les droits EFFECTIFS passés : `expense_approval`, `expense_to_pay`, `advance_to_settle`,
+// `attendance_correction` — sans montant, jamais « sur salaire ».
 
 import {
   HR_LEAVE_APPROVALS_HREF,
@@ -15,12 +18,18 @@ import {
   hrLeaveAgendaId,
   type HrMyTaskItem,
 } from '@lalanda/shared/hr';
+import { kinshasaDayOf } from '@lalanda/shared/work';
 import { Inject, Injectable, Optional } from '@nestjs/common';
+
+import type { Action } from '../../authz/permissions.js';
 
 import type { HrAgendaActor, HrAgendaPage, HrAgendaReader } from '../../work/my-tasks.ports.js';
 import { displayNameOf } from '../leave/display-name.js';
 import { MASKED_AGENDA_LABEL, seesLeaveType } from '../leave/leave-model.js';
 import { HrLeaveApprovalsReader } from './hr-leave-approvals.reader.js';
+// ADR-0051 — H14
+import { HrExpenseAgendaReader } from './hr-expense-agenda.reader.js';
+import { hrLinkItemsOf } from './hr-links-agenda.js';
 import {
   HR_CHECKLIST_AGENDA,
   noHrChecklistAgenda,
@@ -34,6 +43,8 @@ export class HrAgendaSource implements HrAgendaReader {
   constructor(
     @Inject(HrLeaveApprovalsReader) private readonly approvals: HrLeaveApprovalsReader,
     @Optional() @Inject(HR_CHECKLIST_AGENDA) checklists: HrChecklistAgendaReader | null,
+    // ADR-0051 — H14 : frais, avances, corrections de pointage.
+    @Optional() @Inject(HrExpenseAgendaReader) private readonly links: HrExpenseAgendaReader | null,
   ) {
     this.checklists = checklists ?? noHrChecklistAgenda;
   }
@@ -77,9 +88,37 @@ export class HrAgendaSource implements HrAgendaReader {
     });
     const room = Math.max(0, limit - out.length);
     out.push(...items.items.slice(0, room));
+    // ADR-0051 — H14 : ce qui attend l'appelant dans les frais, avances et présences.
+    const links = await this.linksOf(organizationId, actor);
+    const linkRoom = Math.max(0, limit - out.length);
+    out.push(...links.items.slice(0, linkRoom));
     return {
       items: out,
-      truncated: pending.requests.length > limit || items.truncated || items.items.length > room,
+      truncated:
+        pending.requests.length > limit ||
+        items.truncated ||
+        items.items.length > room ||
+        links.truncated ||
+        links.items.length > linkRoom,
     };
+  }
+
+  /** ADR-0051 — H14 : droits EFFECTIFS passés par « Mes tâches », jamais un rôle. */
+  private async linksOf(
+    organizationId: string,
+    actor: HrAgendaActor,
+  ): Promise<{ items: HrMyTaskItem[]; truncated: boolean }> {
+    if (this.links === null) return { items: [], truncated: false };
+    const actions = new Set<Action>();
+    if (actor.holdsExpensesApprove) actions.add('expenses.approve');
+    if (actor.holdsPayablesPay) actions.add('payables.pay');
+    if (actor.holdsHrManage) actions.add('hr.manage');
+    if (actor.seesConfidential) actions.add('hr.sensitive.read');
+    const result = await this.links.linksOf(
+      organizationId,
+      { userId: actor.userId, actions },
+      kinshasaDayOf(new Date()),
+    );
+    return { items: hrLinkItemsOf(result, actor.userId), truncated: result.truncated };
   }
 }

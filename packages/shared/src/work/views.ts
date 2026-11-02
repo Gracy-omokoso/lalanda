@@ -442,6 +442,20 @@ export interface ProjectMarginView {
    * valeurs (`purchase.read` ou `treasury.read`) : rien n'est lu.
    */
   materials?: ProjectMarginMaterialsView[] | null;
+  /**
+   * ADR-0051 § 7.3 (`WORK_MARGIN_VERSION` 1.4.0) — frais du personnel APPROUVÉS non encore
+   * remboursés, imputés au projet, par devise : INFORMATIFS, jamais soustraits de
+   * `margin` (ils y entreront par leur dépense de remboursement, sans double comptage).
+   * `null` sans module RH (rien n'est lu).
+   */
+  pendingExpenseClaims?: ProjectMarginPendingExpenseClaimsView[] | null;
+}
+
+/** Frais approuvés non remboursés d'une devise (ADR-0051 § 7.3), rendus par le moteur. */
+export interface ProjectMarginPendingExpenseClaimsView {
+  currency: WorkRateCurrency;
+  amount: string;
+  lineCount: number;
 }
 
 /** Matériel sorti du stock d'une devise (ADR-0046 § 6.4), rendu par le moteur. */

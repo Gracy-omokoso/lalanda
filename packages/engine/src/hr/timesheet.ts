@@ -8,6 +8,10 @@
 //   - `NO_TIME_ON_WORKING_DAY` : jour encore travaillé (fériés et absences
 //     déduits) sans saisie — information ; limité aux jours ≤ `today` s'il est
 //     fourni.
+// ADR-0051 — H14 (§ 7.8) : avec `attendance` (minutes pointées par jour, moteur
+// `attendanceDay`), chaque jour gagne sa colonne « présence » et le constat
+// `PROJECT_TIME_ABOVE_ATTENDANCE` (temps projet > présence du jour) — information
+// seulement : aucune saisie de temps n'en découle, la marge n'est pas touchée.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import {
@@ -33,6 +37,7 @@ import {
   type HolidayInput,
   type HrDay,
   type LeavePeriod,
+  type TimesheetAttendanceInput,
   type TimesheetDay,
   type TimesheetEntryInput,
   type WeeklyTimesheetResult,
@@ -45,7 +50,11 @@ export function weeklyTimesheet(
   holidays: readonly HolidayInput[],
   workPattern: WorkPattern,
   week: HrDay,
-  options: { today?: HrDay | null } = {},
+  options: {
+    today?: HrDay | null;
+    /** ADR-0051 — H14 : présence pointée par jour ; absent ou `null` : pas de colonne. */
+    attendance?: readonly TimesheetAttendanceInput[] | null;
+  } = {},
 ): WeeklyTimesheetResult {
   const pattern = checkWorkPattern(workPattern);
   checkDay(week, 'Semaine');
@@ -57,6 +66,21 @@ export function weeklyTimesheet(
   const firstN = dayNumber(week);
   const dates = Array.from({ length: 7 }, (_, i) => addDays(week, i));
   const index = holidayIndex(holidays);
+  // ADR-0051 — H14 : minutes de présence de chaque jour de la semaine.
+  const presence: number[] | null =
+    options.attendance === undefined || options.attendance === null ? null : [0, 0, 0, 0, 0, 0, 0];
+  if (presence !== null) {
+    for (const [i, a] of (options.attendance ?? []).entries()) {
+      const what = `Présence n° ${i + 1}`;
+      const day = checkDay(a.date, `${what} (jour)`);
+      if (typeof a.minutes !== 'number' || !Number.isInteger(a.minutes) || a.minutes < 0) {
+        throw new RangeError(`${what} : minutes entières positives ou nulles attendues`);
+      }
+      const d = dayNumber(day) - firstN;
+      if (d < 0 || d > 6) continue;
+      presence[d] = (presence[d] ?? 0) + a.minutes;
+    }
+  }
 
   const absent: Halves[] = [0, 0, 0, 0, 0, 0, 0];
   for (const [i, a] of absences.entries()) {
@@ -105,12 +129,22 @@ export function weeklyTimesheet(
       absence: halvesLabel(away),
       expected: formatDays(expected),
       totalMinutes,
+      ...(presence === null ? {} : { attendanceMinutes: presence[d] ?? 0 }),
     });
     if (away === BOTH && totalMinutes > 0) {
       findings.push({ code: 'TIME_ON_LEAVE_DAY', date, minutes: totalMinutes });
     }
     if (expected > 0n && totalMinutes === 0 && (today === null || date <= today)) {
       findings.push({ code: 'NO_TIME_ON_WORKING_DAY', date, minutes: 0 });
+    }
+    // ADR-0051 — H14 : `minutes` = temps projet au-delà de la présence pointée.
+    const attended = presence === null ? null : (presence[d] ?? 0);
+    if (attended !== null && totalMinutes > attended) {
+      findings.push({
+        code: 'PROJECT_TIME_ABOVE_ATTENDANCE',
+        date,
+        minutes: totalMinutes - attended,
+      });
     }
   }
   return {
