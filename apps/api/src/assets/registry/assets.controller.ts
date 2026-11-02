@@ -61,6 +61,7 @@ import { sendCsv } from '../../crm/crm-actor.js';
 import { invalidRequest } from '../../sales/sales.errors.js';
 import type { AssetActor } from '../settings/asset-settings.service.js';
 import { AssetsService, type AssetReader } from './assets.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 export function assetReaderOf(perms: CurrentOrgPermissionsValue | undefined): AssetReader {
   return { visible: perms ? canSeeStockValues(perms.role, perms.context) : false };
@@ -71,6 +72,7 @@ export function assetActorOf(user: { id: string }, role: OrgRole | undefined): A
 }
 
 @Controller('assets')
+@RequireFeature('assets') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class AssetsController {
   constructor(@Inject(AssetsService) private readonly assets: AssetsService) {}

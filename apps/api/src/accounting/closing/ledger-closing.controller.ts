@@ -29,8 +29,10 @@ import {
   type AccountingActor,
 } from '../accounting.common.js';
 import { AccountingClosingService } from './accounting-closing.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 @Controller('accounting')
+@RequireFeature('accounting') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class LedgerClosingController {
   constructor(

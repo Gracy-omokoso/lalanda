@@ -81,6 +81,7 @@ import {
   type SalesContractView,
   type SalesContractWithWarnings,
 } from './sales-contracts.service.js';
+import { RequireFeature } from '../../../billing/feature.guard.js';
 
 /** Téléversements par utilisateur et par heure (motif des pièces des achats). */
 const UPLOADS_PER_HOUR = 30;
@@ -88,6 +89,7 @@ const UPLOADS_PER_HOUR = 30;
 const ViewQuerySchema = z.object({ on: SalesContractCalendarDay.optional() }).strict();
 
 @Controller('sales/contracts')
+@RequireFeature('sales_contracts') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class SalesContractsController {
   constructor(@Inject(SalesContractsService) private readonly contracts: SalesContractsService) {}

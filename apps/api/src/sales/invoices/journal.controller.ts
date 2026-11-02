@@ -22,10 +22,12 @@ import { InvoiceJournalService } from './invoice-journal.service.js';
 import type { JournalPage } from './invoice.contract.js';
 import { JournalExportQuerySchema, ListJournalQuerySchema } from './invoices.dto.js';
 import { JournalExportService } from './journal-export.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 type User = { id: string; email: string; name?: string | null };
 
 @Controller('sales/journal')
+@RequireFeature('normalized_invoicing') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class JournalController {
   constructor(

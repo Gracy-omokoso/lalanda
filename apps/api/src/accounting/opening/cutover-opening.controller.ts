@@ -22,8 +22,10 @@ import { RequirePermission } from '../../authz/authz.decorators.js';
 import { PermissionsGuard } from '../../authz/permissions.guard.js';
 import { CurrentAccountingActor, parseWith, type AccountingActor } from '../accounting.common.js';
 import { CutoverOpeningService } from './cutover-opening.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 @Controller('accounting/opening')
+@RequireFeature('accounting') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class CutoverOpeningController {
   constructor(@Inject(CutoverOpeningService) private readonly opening: CutoverOpeningService) {}

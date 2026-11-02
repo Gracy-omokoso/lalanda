@@ -43,7 +43,6 @@ import { PlatformConsoleRoute, RequirePlatformAction } from '../authz/authz.deco
 import { PermissionsGuard } from '../authz/permissions.guard.js';
 // ADR-0053 — P0
 import { PlatformAuthGuard } from '../authz/platform-auth.guard.js';
-import { PlatformAuditService } from '../integrations/platform-audit.service.js';
 // ADR-0053 — P2
 import { RequireRecentReauth } from '../integrations/reauth.guard.js';
 // ADR-0053 — P3
@@ -73,17 +72,6 @@ import {
   invalidBody,
 } from './admin.dto.js';
 
-export interface PlatformAuditEventView {
-  id: string;
-  action: string;
-  actorUserId: string;
-  actorRole: string;
-  targetType: string;
-  targetId: string;
-  metadata: Record<string, string | number | boolean | null>;
-  createdAt: string;
-}
-
 @Controller('admin')
 // ADR-0053 — P0 : console sans organisation (F2). `PlatformAuthGuard` ne résout aucune
 // organisation ; l'autorisation reste celle de `PermissionsGuard`, rôles PLATEFORME seuls.
@@ -95,7 +83,6 @@ export interface PlatformAuditEventView {
 export class AdminController {
   constructor(
     @Inject(AdminService) private readonly admin: AdminService,
-    @Inject(PlatformAuditService) private readonly audit: PlatformAuditService,
     @Inject(AuthzService) private readonly authz: AuthzService,
     // ADR-0053 — P3
     @Inject(PlatformBillingService) private readonly billing: PlatformBillingService,
@@ -369,37 +356,8 @@ export class AdminController {
       : this.admin.unblockUser(userId, { internalNote: parsed.data.internalNote }, actor);
   }
 
-  // ── Journal d'audit plateforme ─────────────────────────────────────────────
-
-  /**
-   * Journal des actions de PORTÉE PLATEFORME uniquement.
-   *
-   * Ne donne accès à aucun événement d'organisation cliente : `PlatformAuditService.list`
-   * filtre sur la sentinelle `organizationId: 'platform'`. Un opérateur qui veut
-   * le journal d'une organisation passe par le chemin délégué, avec consentement
-   * (ADR-0012 §4, `audit.read` en `delegated` pour le support).
-   */
-  @Get('audit-events')
-  @RequirePlatformAction('platform.audit.read')
-  async auditEvents(
-    @Query('action') action?: string,
-    @Query('actorUserId') actorUserId?: string,
-    @Query('limit') limit?: string,
-  ): Promise<{ events: PlatformAuditEventView[] }> {
-    const docs = await this.audit.list({ action, actorUserId }, toInt(limit) ?? 100);
-    return {
-      events: docs.map((d) => ({
-        id: String(d._id),
-        action: d.action,
-        actorUserId: d.actorUserId,
-        actorRole: d.actorRole,
-        targetType: d.targetType,
-        targetId: d.targetId,
-        metadata: d.metadata ?? {},
-        createdAt: (d as unknown as { createdAt: Date }).createdAt.toISOString(),
-      })),
-    };
-  }
+  // ADR-0053 — P5 : le journal plateforme (`GET /admin/audit-events`, filtres, export,
+  // événements de sécurité) vit dans `audit/admin-audit.controller.ts`.
 }
 
 function toInt(raw: string | undefined): number | undefined {

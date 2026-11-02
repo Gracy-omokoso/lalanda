@@ -370,6 +370,25 @@ GET    /admin/reauth                             état de la fenêtre de 10 min 
 POST   /admin/reauth                             ouverture de la fenêtre — super_admin
 ```
 
+**Fonctionnalités par offre (ADR-0053 § 6.3 — lot P4).**
+
+```
+GET    /me/features                           ce que l'offre de l'organisation active permet — analytics.read
+GET    /admin/features                        grille offre × fonctionnalité (lecture seule), dérogations actives — platform.features.read
+POST   /admin/features/overrides              dérogation motivée, échéance ≤ 90 jours — platform.features.override (ré-auth)
+DELETE /admin/features/overrides/:overrideId  levée motivée (`internalNote`) — platform.features.override (ré-auth)
+```
+
+`@RequireFeature(clé)` pose `FeatureGuard` après `PermissionsGuard` sur les contrôleurs des
+fonctionnalités du catalogue `FEATURES` (`@lalanda/shared/pricing`). Seuls les **gestes** (méthodes
+autres que `GET`, `HEAD`, `OPTIONS`) sont gardés : lire et exporter l'existant reste permis (docs/13).
+Refus : `403 { code: 'FEATURE_NOT_IN_PLAN', feature, minimalPlan }`. La grille du catalogue est
+**entièrement ouverte** : aucune route ne répond ce code tant que docs/13 n'a pas réparti les
+fonctionnalités. Dérogation : `400 UNKNOWN_FEATURE`, `400 OVERRIDE_EXPIRY_INVALID`,
+`400 OVERRIDE_VALUE_UNSUPPORTED` (une dérogation ouvre, elle ne ferme pas), `409 PLATFORM_SELF_DEALING`.
+Le journal du client reçoit `platform.feature.override_granted` / `_revoked` sous « Équipe Lalanda »,
+avec la fonctionnalité, l'échéance et la raison générique (catégorie), jamais l'opérateur ni la note.
+
 **`:organizationId` et non `:orgId`.** Le nom du paramètre est porteur : `PermissionsGuard` traite un `:orgId` de route comme « l’organisation dont il faut résoudre le rôle de l’appelant », et un opérateur de plateforme n’est membre d’aucune organisation cliente. Nommée `:orgId`, la route de changement de plan répondrait `404 ORG_NOT_FOUND` à un super-administrateur parfaitement légitime.
 
 **Trois actions restent refusées à tous les rôles plateforme** — `plan.approve`, `period.close`, `report.export` (ADR-0012 §4). Aucune route d’administration ne les déclare, et `routes-coverage.test.ts` échoue si l’une venait à le faire : une route qui les porterait serait morte (le contrôle la refuserait de toute façon) mais **trompeuse**, car elle promettrait dans `/admin` un pouvoir que la plateforme n’a pas. `GET /me/platform-access` renvoie ces trois actions dans `forbiddenActions[]` pour qu’elles soient **affichées** et non seulement absentes.

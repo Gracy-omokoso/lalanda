@@ -65,6 +65,7 @@ import { HrEmployeesService } from './hr-employees.service.js';
 // ADR-0045 — H4
 import { HrChecklistsService } from '../checklists/hr-checklists.service.js';
 import { HrDocumentsService } from '../documents/hr-documents.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 type User = { id: string };
 
@@ -73,6 +74,7 @@ function actorOf(user: User, role: OrgRole | undefined): HrActor {
 }
 
 @Controller('hr')
+@RequireFeature('hr') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class HrEmployeesController {
   constructor(

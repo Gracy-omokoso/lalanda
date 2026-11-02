@@ -28,6 +28,10 @@ import { PaymentsModule } from '../payments/payments.module.js';
 import { PlanGrant, PlanGrantSchema } from './billing/plan-grant.schema.js';
 import { PlatformBillingController } from './billing/platform-billing.controller.js';
 import { PlatformBillingService } from './billing/platform-billing.service.js';
+// ADR-0053 — P4 : fonctionnalités par offre (@Global, sert `FeatureGuard` partout).
+import { FeaturesModule } from './features/features.module.js';
+// ADR-0053 — P5
+import { AdminAuditModule } from './audit/admin-audit.module.js';
 // ADR-0053 — P6
 import { PlatformAnnouncementsModule } from './announcements/announcements.module.js';
 
@@ -39,6 +43,7 @@ import { PlatformAnnouncementsModule } from './announcements/announcements.modul
     IntegrationsModule,
     // ADR-0053 — P3 : file des paiements manuels (`PaymentsService`).
     PaymentsModule,
+    FeaturesModule, // ADR-0053 — P4
     MongooseModule.forFeature([
       { name: OrganizationSuspension.name, schema: OrganizationSuspensionSchema },
       { name: AiUsageEvent.name, schema: AiUsageEventSchema },
@@ -46,6 +51,8 @@ import { PlatformAnnouncementsModule } from './announcements/announcements.modul
       { name: PlanGrant.name, schema: PlanGrantSchema },
       { name: Subscription.name, schema: SubscriptionSchema },
     ]),
+    // ADR-0053 — P5 : journal plateforme filtré, export CSV, événements de sécurité.
+    AdminAuditModule,
     // ADR-0053 — P6 : annonces (`/admin/announcements/**`, `/me/announcements`).
     PlatformAnnouncementsModule,
   ],

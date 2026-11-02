@@ -44,6 +44,8 @@ const SANS_ORGANISATION: Readonly<Record<string, string>> = {
   platform_reauth: 'réauthentification des opérateurs de la plateforme',
   // ADR-0053 — P3 : l'organisation visée est nommée `targetOrganizationId` (§ 4).
   platform_plan_grants: 'octrois manuels d’offre par la plateforme (organisation cible nommée)',
+  // ADR-0053 — P4 : l'organisation visée est `targetOrganizationId`, jamais une clé de locataire.
+  platform_feature_overrides: 'dérogations de fonctionnalité accordées par la plateforme',
   // ADR-0053 — P6 : annonces par catégorie et accusés par personne, hors de toute société.
   platform_announcements: 'annonces de la plateforme (catégorie déclarative, aucune société)',
   platform_announcement_receipts: 'accusés de réception d’une annonce, par personne',

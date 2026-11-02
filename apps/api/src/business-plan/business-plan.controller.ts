@@ -74,6 +74,7 @@ import {
 } from './business-plan.sections.js';
 import type { BusinessPlanVersionDocument } from './business-plan.schemas.js';
 import { BusinessPlanService, parseVersion, type PlanChoice } from './business-plan.service.js';
+import { RequireFeature } from '../billing/feature.guard.js';
 
 export const PlanRequestSchema = z
   .object({ planVersion: z.number().int().min(1).nullable() })
@@ -166,6 +167,7 @@ function fileSlug(name: string): string {
 }
 
 @Controller('projects')
+@RequireFeature('business_plan') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class BusinessPlanController {
   constructor(

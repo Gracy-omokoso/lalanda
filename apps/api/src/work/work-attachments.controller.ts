@@ -45,6 +45,7 @@ import {
   classifyAttachment,
   contentDisposition,
 } from './work-attachments.service.js';
+import { RequireFeature } from '../billing/feature.guard.js';
 
 type User = { id: string };
 
@@ -60,6 +61,7 @@ function storageFailure(cause: unknown): HttpException {
 }
 
 @Controller('work')
+@RequireFeature('run_work') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class WorkAttachmentsController {
   constructor(

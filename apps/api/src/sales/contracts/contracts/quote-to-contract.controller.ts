@@ -24,8 +24,10 @@ import {
   SalesContractsService,
   type SalesContractWithWarnings,
 } from './sales-contracts.service.js';
+import { RequireFeature } from '../../../billing/feature.guard.js';
 
 @Controller('sales/quotes')
+@RequireFeature('sales_contracts') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class QuoteToContractController {
   constructor(@Inject(SalesContractsService) private readonly contracts: SalesContractsService) {}

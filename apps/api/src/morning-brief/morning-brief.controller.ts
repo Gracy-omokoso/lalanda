@@ -43,6 +43,7 @@ import { UserThrottlerGuard } from '../security/user-throttler.guard.js';
 import { BRIEF_INTENTS, MENTION_BRIEF } from './morning-brief-ai.js';
 import { MorningBriefAiService, type BriefAnswerView } from './morning-brief-ai.service.js';
 import { MorningBriefService, type MorningBriefPreferences } from './morning-brief.service.js';
+import { RequireFeature } from '../billing/feature.guard.js';
 
 export const ExplanationRequestSchema = z.object({ intent: z.enum(BRIEF_INTENTS) }).strict();
 export const PreferencesRequestSchema = z.object({ emailDaily: z.boolean() }).strict();
@@ -73,6 +74,7 @@ function parse<T>(schema: z.ZodType<T>, body: unknown): T {
 const VIEWER_FALLBACK: CurrentOrgPermissionsValue = { role: 'viewer', context: NO_OVERRIDES };
 
 @Controller('morning-brief')
+@RequireFeature('morning_brief') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class MorningBriefController {
   constructor(

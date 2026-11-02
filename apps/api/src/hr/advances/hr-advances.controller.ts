@@ -65,6 +65,7 @@ import type { HrActor } from '../departments/hr-departments.service.js';
 import { HrExpensesSettingsService } from '../expenses/hr-expenses-settings.service.js';
 import { HrScopeService } from '../scope/hr-scope.service.js';
 import { HrAdvancesService } from './hr-advances.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 type User = { id: string };
 type Perms = CurrentOrgPermissionsValue | undefined;
@@ -74,6 +75,7 @@ function actorOf(user: User, perms: Perms): HrActor {
 }
 
 @Controller('hr')
+@RequireFeature('hr') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class HrAdvancesController {
   constructor(

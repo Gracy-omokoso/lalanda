@@ -18,8 +18,10 @@ import type { OrgRole } from '../../authz/permissions.js';
 import { sendCsv } from '../../crm/crm-actor.js';
 import { invalidRequest } from '../../sales/sales.errors.js';
 import { HrReportsService } from './hr-reports.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 @Controller('hr/reports')
+@RequireFeature('hr') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class HrReportsController {
   constructor(@Inject(HrReportsService) private readonly reportsService: HrReportsService) {}

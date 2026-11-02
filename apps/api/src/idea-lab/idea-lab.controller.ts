@@ -54,6 +54,7 @@ import {
   type IdeaView,
   type PromotionView,
 } from './idea-lab.service.js';
+import { RequireFeature } from '../billing/feature.guard.js';
 
 export const AssistSchema = z.object({ intent: z.enum(IDEA_ASSIST_INTENTS) }).strict();
 
@@ -75,6 +76,7 @@ function actorOf(user: { id: string }, role: OrgRole | undefined): IdeaActor {
 }
 
 @Controller('idea-lab')
+@RequireFeature('idea_lab') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class IdeaLabController {
   constructor(

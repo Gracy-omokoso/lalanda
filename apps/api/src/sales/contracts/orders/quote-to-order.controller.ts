@@ -21,8 +21,10 @@ import {
 } from '../common/contracts.common.js';
 import { QuoteToOrderSchema } from './sales-orders.dto.js';
 import { SalesOrdersService, type SalesOrderFromQuoteResult } from './sales-orders.service.js';
+import { RequireFeature } from '../../../billing/feature.guard.js';
 
 @Controller('sales/quotes')
+@RequireFeature('sales_contracts') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class QuoteToOrderController {
   constructor(@Inject(SalesOrdersService) private readonly orders: SalesOrdersService) {}

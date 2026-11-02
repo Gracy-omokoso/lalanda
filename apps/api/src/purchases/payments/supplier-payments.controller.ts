@@ -49,6 +49,7 @@ import { can, type OrgRole } from '../../authz/permissions.js';
 import { invalidRequest } from '../../sales/sales.errors.js';
 import { parseBody, type PurchaseActor } from '../invoices/purchase-p4.common.js';
 import { SupplierPaymentsService } from './supplier-payments.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 type User = { id: string };
 
@@ -57,6 +58,7 @@ function actorOf(user: User, role: OrgRole | undefined): PurchaseActor {
 }
 
 @Controller('purchases')
+@RequireFeature('purchases') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class SupplierPaymentsController {
   constructor(

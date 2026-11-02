@@ -54,6 +54,7 @@ import {
   PutDeclaredCashSchema,
   PutGrowProfileSchema,
 } from './grow.dto.js';
+import { RequireFeature } from '../billing/feature.guard.js';
 
 /** Code du refus de forfait (ADR-0032 § 6). */
 export const GROW_PLAN_ERROR_CODE = 'PLAN_FEATURE_UNAVAILABLE' as const;
@@ -92,6 +93,7 @@ function actorOf(user: { id: string }, role: OrgRole | undefined): GrowActor {
 }
 
 @Controller('grow')
+@RequireFeature('grow') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class GrowController {
   constructor(

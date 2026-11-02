@@ -61,6 +61,7 @@ import {
   type ReviewCycleView,
   type ReviewRevealView,
 } from './hr-reviews.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 type User = { id: string };
 
@@ -75,6 +76,7 @@ function sectionOf(raw: string): ReviewSection {
 }
 
 @Controller('hr')
+@RequireFeature('hr') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class HrReviewsController {
   constructor(
