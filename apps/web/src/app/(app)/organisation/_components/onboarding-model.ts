@@ -35,7 +35,10 @@ export const ETAPES: readonly Etape[] = [
   {
     id: 'fiscal',
     label: 'Profil fiscal',
-    pourquoi: 'Raison sociale, NIF, RCCM et siège : les mentions obligatoires de chaque facture.',
+    // ADR-0052 F3 : « obligatoire » seulement pour ce que le serveur exige ; le RCCM est
+    // facultatif (ADR-0021 § 2).
+    pourquoi:
+      'Raison sociale, NIF et siège : les informations qui figurent sur vos factures. Le RCCM est facultatif.',
     action: 'fiscal.manage',
     quiPeut: 'un Propriétaire ou un Directeur financier',
   },
