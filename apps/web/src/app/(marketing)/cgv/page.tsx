@@ -17,16 +17,17 @@
 // 2. L'ÉTAT RÉEL EST DIT. Revue du 1er nov. 2026 : le paiement MANUEL (mobile
 //    money ou virement, confirmé par un administrateur plateforme,
 //    `apps/api/src/payments/manual.provider.ts`) fonctionne, sans renouvellement
-//    automatique ; aucune facture d'abonnement n'est émise.
+//    automatique ; aucune facture d'abonnement n'était émise (émise depuis
+//    ADR-0047, voir point 3).
 // 3. DÉCISIONS DU 3 NOV. 2026 (ADR-0054, version `2026-11-03`). La dirigeante a
 //    tranché : les conditions s'appliquent dès cette version, paiement manuel
 //    compris. Les choix retenus sont des CHOIX PRODUIT PRUDENTS, alignés sur ce
 //    que fait le code (essai sans carte, grâce de 7 jours, aucun remboursement
 //    d'une période commencée, crédit de prorata reporté), et non des règles de
 //    droit congolais établies : ils sont à revoir avec le juriste. Restent
-//    marqués : la fiscalité (TVA), l'émission des factures d'abonnement
-//    (ADR-0047) et le droit de rétractation — ils exigent une donnée ou un avis
-//    que l'équipe produit n'a pas.
+//    marqué : le droit de rétractation. La TVA (16 %, prix HT + TVA) et la
+//    facture à chaque paiement confirmé suivent ADR-0047, accepté le 3 nov. 2026
+//    (décision de la dirigeante, à revoir avec l'expert-comptable).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Metadata } from 'next';
@@ -116,11 +117,9 @@ const SECTIONS: readonly LegalSection[] = [
           indiqués par le récapitulatif et les instructions de paiement.
         </p>
         <p>
-          <ToComplete>
-            traitement de la TVA : assujettissement de {PUBLISHER_NAME}, groupe de taxation et taux
-            applicables aux abonnements, règle pour un acheteur établi hors de RDC — avis de
-            l’expert-comptable attendu (ADR-0047)
-          </ToComplete>
+          La TVA de la République démocratique du Congo (taux normal de 16&nbsp;%) s&apos;ajoute aux
+          prix hors taxes. Le récapitulatif de paiement indique le montant hors taxes, la TVA et le
+          total à verser.
         </p>
       </>
     ),
@@ -195,15 +194,16 @@ const SECTIONS: readonly LegalSection[] = [
     body: (
       <>
         <p>
-          <strong>À ce jour, Lalanda n&apos;émet pas encore de facture d&apos;abonnement.</strong>{' '}
-          Chaque paiement confirmé reste consultable dans l&apos;espace de l&apos;organisation.
+          Une facture est émise à chaque paiement confirmé et reste consultable depuis la page
+          Abonnement de l&apos;organisation. Elle reprend l&apos;offre, la période couverte, le
+          montant hors taxes, la TVA et le total. Elle est établie au nom de la raison sociale
+          indiquée lors de la souscription (et, s&apos;ils sont fournis, du NIF et de
+          l&apos;adresse), à défaut de la fiche fiscale de l&apos;organisation.
         </p>
         <p>
-          <ToComplete>
-            émission des factures d’abonnement (facture normalisée DGI ou autre pièce), moment de
-            leur émission et informations demandées à l’abonné — chantier en cours (ADR-0047),
-            données fiscales de l’éditeur requises
-          </ToComplete>
+          Cette facture n&apos;est pas encore normalisée auprès de la DGI&nbsp;: elle le sera
+          lorsque l&apos;homologation du service de facturation de {PUBLISHER_NAME} aura été
+          obtenue.
         </p>
         <p>
           Les informations de facturation que vous fournissez doivent être exactes. Pour toute

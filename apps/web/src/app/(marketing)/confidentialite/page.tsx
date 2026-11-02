@@ -23,7 +23,8 @@
 // défaut, purge quotidienne), évaluations, notes de frais, formulaire public de
 // prospects, journal et statistiques de la plateforme, annonces ; rôle de Lalanda pour
 // les données que l'organisation saisit sur des tiers (choix produit, à revoir avec le
-// juriste).
+// juriste) ; factures d'abonnement (ADR-0047) : identité de facturation de l'abonné
+// transmise à l'éditeur.
 // Sources : `apps/api/src/ai/ai-actions.service.ts` (buildUserPrompt),
 // `apps/api/src/ai/openai-client.ts`, `apps/api/src/account/`,
 // `apps/api/src/organizations/`, `docs/17-SECURITE.md`.
@@ -368,6 +369,12 @@ const SECTIONS: readonly LegalSection[] = [
           confirme la demande.
         </p>
         <p>
+          Pour établir la facture de chaque abonnement payé, la raison sociale, le NIF et
+          l&apos;adresse de facturation de l&apos;organisation abonnée sont transmis à{' '}
+          {PUBLISHER_NAME}, qui émet ces factures. Aucune autre donnée de l&apos;organisation ne lui
+          est communiquée à cette fin.
+        </p>
+        <p>
           La dernière ligne décrit un rôle prévu, sans prestataire choisi. Nous la faisons figurer
           pour que cette page ne devienne pas fausse le jour où il le sera&nbsp;: sa mise en service
           donnera lieu à une mise à jour de cette politique.
@@ -530,7 +537,6 @@ const SECTIONS: readonly LegalSection[] = [
           items={[
             'Le paiement en service est le paiement manuel, par mobile money ou virement : l’abonnement est activé lorsqu’un administrateur de Lalanda a constaté le dépôt, et il ne se renouvelle pas automatiquement.',
             'Le paiement en ligne (carte bancaire par Stripe, PayPal) n’est ouvert que lorsqu’un prestataire est configuré et proposé à l’écran de paiement ; son ouverture donnera lieu à une mise à jour de cette politique.',
-            'Aucune facture d’abonnement n’est encore émise par le service.',
           ]}
         />
         <p>
