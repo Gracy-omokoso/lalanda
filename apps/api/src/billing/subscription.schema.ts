@@ -9,6 +9,11 @@ import {
   type SubscriptionEvent,
   type SubscriptionStatus,
 } from './subscription-state.js';
+// ADR-0053 — P3
+import {
+  SUBSCRIPTION_GRANT_EVENTS,
+  type SubscriptionGrantEvent,
+} from './subscription-lifecycle.js';
 
 /** Version de schéma courante (ADR-0004 §8). S16b = 1, S22b = 2. */
 export const SUBSCRIPTION_SCHEMA_VERSION = 2;
@@ -37,8 +42,13 @@ export class SubscriptionTransition {
   @Prop({ type: String, required: true, enum: SUBSCRIPTION_STATUSES as unknown as string[] })
   to!: SubscriptionStatus;
 
-  @Prop({ type: String, required: true, enum: SUBSCRIPTION_EVENTS as unknown as string[] })
-  event!: SubscriptionEvent;
+  // ADR-0053 — P3 : les octrois s'inscrivent aussi à l'historique (statut inchangé).
+  @Prop({
+    type: String,
+    required: true,
+    enum: [...SUBSCRIPTION_EVENTS, ...SUBSCRIPTION_GRANT_EVENTS] as unknown as string[],
+  })
+  event!: SubscriptionEvent | SubscriptionGrantEvent;
 
   @Prop({ type: Date, required: true })
   at!: Date;
@@ -184,6 +194,23 @@ export class Subscription {
   // Le décideur a tranché : aucune antériorité, la grille courante s'applique à
   // tous les abonnements. Stocker une version qu'aucune lecture ne consulte
   // laisserait croire à un mécanisme d'antériorité actif. Voir `entitlements.ts`.
+
+  // ── ADR-0053 — P3 : octroi manuel en cours (copie de `platform_plan_grants`) ──
+  //
+  // Superposé à l'abonnement (voir `effectivePlanAt`) : ni le plan souscrit ni le statut
+  // ne changent. Effacé au retrait ; laissé en place à l'échéance, où il cesse de valoir.
+
+  @Prop({ type: String, default: null })
+  grantId!: string | null;
+
+  @Prop({ type: String, enum: [...PLANS, null] as unknown as string[], default: null })
+  grantPlan!: Plan | null;
+
+  @Prop({ type: Date, default: null })
+  grantStartsAt!: Date | null;
+
+  @Prop({ type: Date, default: null })
+  grantEndsAt!: Date | null;
 
   @Prop({ type: Number, required: true, default: SUBSCRIPTION_SCHEMA_VERSION })
   _schemaVersion!: number;

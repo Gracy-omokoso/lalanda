@@ -603,7 +603,7 @@ e2eSuite('ADR-0053 — P2 : blocage, suspension, minimisation, ré-authentificat
     expect(retrait.status).toBe(200);
   });
 
-  it('changement d’offre historique : motif obligatoire, puis miroir côté client', async () => {
+  it('changement d’offre historique : motif obligatoire, puis octroi et miroir côté client (P3)', async () => {
     viderLimiteur();
     const sans = await request(serveur())
       .patch(`/admin/organizations/${orgT}/plan`)
@@ -611,34 +611,48 @@ e2eSuite('ADR-0053 — P2 : blocage, suspension, minimisation, ré-authentificat
       .send({ plan: 'free' });
     expect(sans.status).toBe(400);
     expect(sans.body.code).toBe('REASON_REQUIRED');
-    // `free` n'est pas un octroi : pas de seconde personne.
-    const ok = await request(serveur())
+    const motif = {
+      reasonCategory: 'request',
+      clientMessage: 'Offre Pro accordée.',
+      internalNote: 'Geste commercial validé.',
+    };
+    // `free` sans octroi en cours : rien à retirer.
+    const rien = await request(serveur())
       .patch(`/admin/organizations/${orgT}/plan`)
       .set('Cookie', cookies['sa']!)
-      .send({
-        plan: 'free',
-        reasonCategory: 'request',
-        clientMessage: 'Retour à l’offre gratuite.',
-        internalNote: 'Demande écrite du client.',
-      });
-    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
-    // Octroi sans échéance avec deux détenteurs : seconde personne exigée.
+      .send({ plan: 'free', ...motif });
+    expect(rien.status).toBe(409);
+    expect(rien.body.code).toBe('NO_ACTIVE_GRANT');
+    // ADR-0053 P3 : le palliatif `SECOND_PERSON_REQUIRED` est levé. Sans échéance, avec
+    // d'autres détenteurs : l'octroi attend une seconde personne.
     const pro = await request(serveur())
       .patch(`/admin/organizations/${orgT}/plan`)
       .set('Cookie', cookies['sa']!)
-      .send({
-        plan: 'pro',
-        reasonCategory: 'request',
-        clientMessage: 'Offre Pro accordée.',
-        internalNote: 'Geste commercial validé.',
-      });
-    expect(pro.status).toBe(409);
-    expect(pro.body.code).toBe('SECOND_PERSON_REQUIRED');
+      .send({ plan: 'pro', ...motif });
+    expect(pro.status, JSON.stringify(pro.body)).toBe(200);
+    expect(pro.body.grant).toMatchObject({ plan: 'pro', status: 'pending_approval' });
+    const approuve = await request(serveur())
+      .post(`/admin/billing/grants/${pro.body.grant.id}/approve`)
+      .set('Cookie', cookies['pa']!)
+      .send({});
+    expect(approuve.status, JSON.stringify(approuve.body)).toBe(200);
+    expect(approuve.body.status).toBe('active');
+    // `free` retire l'octroi en cours.
+    const retour = await request(serveur())
+      .patch(`/admin/organizations/${orgT}/plan`)
+      .set('Cookie', cookies['sa']!)
+      .send({ plan: 'free', ...motif, clientMessage: 'Retour à votre offre.' });
+    expect(retour.status, JSON.stringify(retour.body)).toBe(200);
+    expect(retour.body.grant.status).toBe('revoked');
     const journal = await journalOrg(cookies['client']!, orgT);
-    const miroir = (journal.body.events as { action: string; actorUserId: string }[]).find(
-      (e) => e.action === 'platform.organization.plan_changed',
+    const actions = (journal.body.events as { action: string; actorUserId: string }[]).filter((e) =>
+      e.action.startsWith('platform.billing.plan_grant'),
     );
-    expect(miroir?.actorUserId).toBe(PLATFORM_MIRROR_ACTOR_ID);
+    expect(actions.map((e) => e.action).sort()).toEqual([
+      'platform.billing.plan_grant_revoked',
+      'platform.billing.plan_granted',
+    ]);
+    for (const e of actions) expect(e.actorUserId).toBe(PLATFORM_MIRROR_ACTOR_ID);
   });
 
   // ── Session de console de 12 heures (§ 2.4) ─────────────────────────────────

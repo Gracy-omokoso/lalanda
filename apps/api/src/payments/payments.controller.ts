@@ -6,8 +6,8 @@
 //
 //   /payments/webhooks/*   PUBLIC — authentifié par SIGNATURE, pas par session.
 //   /payments/methods      PUBLIC — dit quels moyens de paiement existent.
-//   /payments/manual/*     RÔLE PLATEFORME — un humain confirme de l'argent reçu.
-//   /payments/maintenance  RÔLE PLATEFORME — balayage d'exploitation.
+//   /payments/manual/*     RETIRÉES (410) — remplacées par `/admin/billing/**` (ADR-0053 P3).
+//   /payments/maintenance  RETIRÉE (410) — idem.
 //
 // Un guard de classe forcerait à en désactiver un par exception sur les
 // webhooks, et une exception est exactement ce qu'on finit par appliquer au
@@ -26,6 +26,7 @@
 import {
   BadRequestException,
   Body,
+  GoneException,
   Controller,
   Get,
   HttpCode,
@@ -41,9 +42,9 @@ import {
 import type { Request } from 'express';
 
 import { AuthGuard, type AuthenticatedRequest } from '../auth/auth.guard.js';
-import { RequirePermission, RequirePlatformRole } from '../authz/authz.decorators.js';
+import { RequirePermission } from '../authz/authz.decorators.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
-import { BillingRuleError, BillingService } from '../billing/billing.service.js';
+import { BillingRuleError } from '../billing/billing.service.js';
 import { PLANS, type Plan } from '../billing/entitlements.js';
 import { isBillingInterval } from '../billing/pricing-catalog.js';
 import {
@@ -54,10 +55,6 @@ import {
   type PaymentProviderId,
 } from './payment-provider.js';
 import { PaymentsService, type MethodAvailability } from './payments.service.js';
-
-interface ManualDecisionBody {
-  note?: unknown;
-}
 
 interface CheckoutBody {
   plan?: unknown;
@@ -90,10 +87,7 @@ interface WebhookAck {
 
 @Controller('payments')
 export class PaymentsController {
-  constructor(
-    @Inject(PaymentsService) private readonly payments: PaymentsService,
-    @Inject(BillingService) private readonly billing: BillingService,
-  ) {}
+  constructor(@Inject(PaymentsService) private readonly payments: PaymentsService) {}
 
   /**
    * Moyens de paiement disponibles. PUBLIC : la page tarifs l'appelle sans
@@ -221,108 +215,43 @@ export class PaymentsController {
     }
   }
 
-  // ── Administration plateforme ──────────────────────────────────────────────
+  // ── Administration plateforme : routes RETIRÉES (ADR-0053 — P3) ────────────
+  //
+  // La file des paiements manuels et le balayage vivent désormais sous
+  // `/admin/billing/**`, derrière la garde de console (`PlatformAuthGuard`), avec motif,
+  // ré-authentification, rôle RÉEL au journal plateforme et miroir « Équipe Lalanda »
+  // côté client (`admin/billing/platform-billing.controller.ts`). Les anciens chemins
+  // répondent `410 ROUTE_GONE` à TOUS, sans session : ils n'agissent plus et ne disent
+  // rien d'autre que l'adresse de remplacement (compatibilité N-1 close, § 7).
 
-  /** Demandes de paiement manuel en attente de confirmation. */
   @Get('manual/pending')
-  @UseGuards(AuthGuard, PermissionsGuard)
-  @RequirePlatformRole('platform_billing', 'platform_admin', 'platform_super_admin')
-  async pendingManual(): Promise<{
-    requests: {
-      reference: string;
-      organizationId: string;
-      plan: string;
-      interval: string;
-      amountDueCents: number;
-      method: string;
-      createdAt: string;
-      expiresAt: string;
-    }[];
-  }> {
-    const rows = await this.payments.listPendingManualRequests();
-    return {
-      requests: rows.map((r) => ({
-        reference: r.reference,
-        organizationId: r.organizationId,
-        plan: r.plan,
-        interval: r.interval,
-        amountDueCents: r.amountDueCents,
-        method: r.method,
-        createdAt: r.createdAt.toISOString(),
-        expiresAt: r.expiresAt.toISOString(),
-      })),
-    };
+  pendingManual(): never {
+    throw gone('/admin/billing/manual-payments');
   }
 
-  /**
-   * Confirme un dépôt reçu. Rôle PLATEFORME exigé, jamais un rôle
-   * d'organisation : `billing.manage` appartient au propriétaire de
-   * l'organisation, qui s'accorderait alors ses propres abonnements.
-   */
   @Post('manual/:reference/confirm')
-  @UseGuards(AuthGuard, PermissionsGuard)
-  @RequirePlatformRole('platform_billing', 'platform_admin', 'platform_super_admin')
-  @HttpCode(200)
-  async confirmManual(
-    @Param('reference') reference: string,
-    @Body() body: ManualDecisionBody,
-    @Req() req: AuthenticatedRequest,
-  ): Promise<{ confirmed: true; organizationId: string; plan: string }> {
-    try {
-      const result = await this.payments.confirmManualPayment({
-        reference,
-        adminUserId: req.user?.id ?? 'unknown',
-        adminRole: 'platform_billing',
-        note: typeof body?.note === 'string' ? body.note.slice(0, 500) : undefined,
-      });
-      return { confirmed: true, organizationId: result.organizationId, plan: result.plan };
-    } catch (error) {
-      throw toHttp(error);
-    }
+  confirmManual(): never {
+    throw gone('/admin/billing/manual-payments/:reference/confirm');
   }
 
   @Post('manual/:reference/reject')
-  @UseGuards(AuthGuard, PermissionsGuard)
-  @RequirePlatformRole('platform_billing', 'platform_admin', 'platform_super_admin')
-  @HttpCode(200)
-  async rejectManual(
-    @Param('reference') reference: string,
-    @Body() body: ManualDecisionBody,
-    @Req() req: AuthenticatedRequest,
-  ): Promise<{ rejected: true }> {
-    const note = typeof body?.note === 'string' ? body.note.trim() : '';
-    if (note.length === 0) {
-      // Un refus sans motif est un refus qu'on ne saura pas expliquer au client
-      // qui a réellement envoyé l'argent.
-      throw new BadRequestException({ code: 'REJECTION_NOTE_REQUIRED' });
-    }
-    try {
-      await this.payments.rejectManualPayment({
-        reference,
-        adminUserId: req.user?.id ?? 'unknown',
-        note: note.slice(0, 500),
-      });
-      return { rejected: true };
-    } catch (error) {
-      throw toHttp(error);
-    }
+  rejectManual(): never {
+    throw gone('/admin/billing/manual-payments/:reference/reject');
   }
 
-  /**
-   * Balayage des essais et grâces échus.
-   *
-   * COMMODITÉ, jamais source de vérité : `BillingService.getState()` applique
-   * déjà les transitions échues à la lecture (aucun ordonnanceur — ADR-0009).
-   * Cette route sert à ce que les tableaux d'exploitation ne montrent pas des
-   * essais expirés encore marqués « en cours ».
-   */
   @Post('maintenance/sweep')
-  @UseGuards(AuthGuard, PermissionsGuard)
-  @RequirePlatformRole('platform_billing', 'platform_admin', 'platform_super_admin')
-  @HttpCode(200)
-  async sweep(): Promise<{ scanned: number; changed: number }> {
-    return this.billing.sweep();
+  sweep(): never {
+    throw gone('/admin/billing/sweep');
   }
+}
+
+/** `410` d'une route plateforme retirée, avec sa remplaçante. */
+function gone(replacement: string): GoneException {
+  return new GoneException({
+    code: 'ROUTE_GONE',
+    message: 'Route retirée : la console Lalanda la remplace.',
+    replacement,
+  });
 }
 
 /** Traduit les refus métier en réponses HTTP stables. */
