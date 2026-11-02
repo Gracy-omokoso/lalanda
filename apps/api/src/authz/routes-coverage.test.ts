@@ -2131,3 +2131,64 @@ describe('ADR-0050 — V5 : échéancier et abonnements', () => {
     }
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADR-0051 — H15 : objectifs individuels et évaluations (§ 6.3)
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { HrGoalsController } from '../hr/performance/hr-goals.controller.js';
+import { HrPerformanceSettingsController } from '../hr/performance/hr-performance-settings.controller.js';
+import { HrReviewsController } from '../hr/performance/hr-reviews.controller.js';
+
+const CONTROLEURS_H15 = [HrGoalsController, HrReviewsController, HrPerformanceSettingsController];
+(CONTROLEURS as unknown[]).push(...CONTROLEURS_H15);
+TOUTES_LES_ROUTES.push(
+  ...CONTROLEURS_H15.flatMap((c) => routesDe(c as new (...args: never[]) => unknown)),
+);
+
+describe('ADR-0051 — H15 : objectifs et évaluations', () => {
+  const MOTIF = /^(HrGoals|HrReviews|HrPerformanceSettings)Controller\./;
+
+  it('chaque route déclare la permission de l’ADR (§ 6.3) ; relationnelles en `analytics.read`', () => {
+    const attendu: Record<string, Action[]> = {
+      // Relationnelles : soi, chaîne de managers, `performance.read` (décidé dans le service).
+      'HrGoalsController.list': ['analytics.read'],
+      'HrGoalsController.create': ['analytics.read'],
+      'HrGoalsController.update': ['analytics.read'],
+      'HrGoalsController.agree': ['analytics.read'],
+      'HrGoalsController.close': ['analytics.read'],
+      'HrGoalsController.progress': ['analytics.read'],
+      // Campagnes : `performance.read` + `hr.manage`, `performance.read` nommée au refus.
+      'HrReviewsController.listCycles': ['performance.read', 'hr.manage'],
+      'HrReviewsController.createCycle': ['performance.read', 'hr.manage'],
+      'HrReviewsController.updateCycle': ['performance.read', 'hr.manage'],
+      'HrReviewsController.openCycle': ['performance.read', 'hr.manage'],
+      'HrReviewsController.closeCycle': ['performance.read', 'hr.manage'],
+      // Statuts seulement ; contenu par `reveal` (lecteurs du § 4, audit strict).
+      'HrReviewsController.list': ['analytics.read'],
+      'HrReviewsController.writeSection': ['analytics.read'],
+      'HrReviewsController.reveal': ['analytics.read'],
+      'HrReviewsController.submitSelf': ['analytics.read'],
+      'HrReviewsController.submitManager': ['analytics.read'],
+      'HrReviewsController.share': ['analytics.read'],
+      'HrReviewsController.acknowledge': ['analytics.read'],
+      // Étape RH : garde de route, puis `reviewCloseDecision` dans le service.
+      'HrReviewsController.close': ['hr.manage', 'performance.read'],
+      'HrReviewsController.reassign': ['hr.manage', 'performance.read'],
+      'HrPerformanceSettingsController.get': ['analytics.read'],
+      'HrPerformanceSettingsController.update': ['hr.manage'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) => MOTIF.test(r.cle));
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+      expect(route!.rolesPlateforme, cle).toBeUndefined();
+      expect(SANS_PERMISSION[cle], cle).toBeUndefined();
+    }
+  });
+
+  it('`performance.read` reste interdit à la plateforme, même sous accès délégué', () => {
+    expect(PLATFORM_FORBIDDEN_ACTIONS).toContain('performance.read');
+  });
+});

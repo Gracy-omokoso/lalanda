@@ -159,9 +159,7 @@ const ACTIONS_SANS_ROUTE: Record<string, string> = {
     'Aucune route en H8 : validation des notes et avances (`…/approve`, `…/reject`) et ' +
     'régularisations arrivent au lot H10 (ADR-0051 § 6.1).',
   // H12 a retiré `attendance.clock` (sonde `POST /hr/attendance/clock` en fin de liste).
-  'performance.read':
-    'Aucune route en H8 : objectifs, campagnes et `POST /hr/reviews/:id/reveal` arrivent ' +
-    'au lot H15 (ADR-0051 § 6.3).',
+  // H15 a retiré `performance.read` (sonde `GET /hr/review-cycles` en fin de liste).
 };
 
 /** Une sonde HTTP : la route qui matérialise une action, et ses statuts légitimes. */
@@ -971,6 +969,17 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
       statutsAutorises: [409],
       envoyer: (c) =>
         request(serveur()).post('/hr/attendance/clock').set('Cookie', c).send({ kind: 'in' }),
+    },
+    // ADR-0051 — H15 : objectifs et évaluations (§ 5.1, § 6.3).
+    {
+      // Propriétaire et Responsable RH seulement (ni Administrateur ni Directeur financier,
+      // qui détiennent `hr.manage`) ; la route déclare `performance.read` EN PREMIER : le
+      // 403 la nomme. Évaluations éteintes par défaut : 409 HR_FEATURE_DISABLED prouve que
+      // le guard a laissé passer jusqu'au service, sans rien activer dans cette suite.
+      action: 'performance.read',
+      libelle: 'GET /hr/review-cycles (évaluations éteintes)',
+      statutsAutorises: [409],
+      envoyer: (c) => request(serveur()).get('/hr/review-cycles').set('Cookie', c),
     },
   ];
 

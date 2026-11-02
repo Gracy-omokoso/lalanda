@@ -36,6 +36,8 @@ import {
 import { rewrapHrDocumentKey } from '../hr/documents/hr-document-crypto.js';
 // ADR-0046 — S6 : clés enveloppées des documents sensibles de la bibliothèque.
 import { rewrapLibraryDocumentKey } from '../documents/library-document-crypto.js';
+// ADR-0051 — H15 : sections chiffrées des évaluations.
+import { rewrapReviewSection } from '../hr/performance/hr-review-crypto.js';
 import { Integration, type IntegrationDocument } from './integration.schema.js';
 import { MASTER_KEYRING } from './keyring.provider.js';
 import {
@@ -72,6 +74,14 @@ const HR_PRIVATE_FIELD_KEYS = [
 const HR_DOCUMENTS = 'hr_documents';
 /** ADR-0046 — S6 : versions sensibles de la bibliothèque (une clé enveloppée par version). */
 const LIBRARY_DOCUMENT_VERSIONS = 'library_document_versions';
+/** ADR-0051 — H15 : évaluations (quatre sections chiffrées par document). */
+const HR_REVIEWS = 'hr_reviews';
+const HR_REVIEW_SECTION_KEYS = [
+  'selfAssessment',
+  'managerAssessment',
+  'employeeComment',
+  'hrNote',
+] as const;
 
 @Injectable()
 export class RewrapService {
@@ -155,6 +165,8 @@ export class RewrapService {
     await this.rewrapHrDocumentKeys(keyring, actorUserId, report);
     // ADR-0046 — S6 (§ 4.3) : clés enveloppées des documents sensibles de la bibliothèque.
     await this.rewrapLibraryDocumentKeys(keyring, actorUserId, report);
+    // ADR-0051 — H15 (§ 2.6) : sections chiffrées des évaluations.
+    await this.rewrapHrReviews(keyring, actorUserId, report);
 
     this.secrets.invalidateAll();
 
@@ -203,8 +215,91 @@ export class RewrapService {
       const k = doc['wrappedKey'] as EncryptedValue;
       if (k.keyId !== keyring.currentKeyId) remaining.add(k.keyId);
     }
+    // ADR-0051 — H15 (§ 2.6) : sections chiffrées des évaluations.
+    for (const doc of await this.connection
+      .collection(HR_REVIEWS)
+      .find({}, { projection: Object.fromEntries(HR_REVIEW_SECTION_KEYS.map((k) => [k, 1])) })
+      .toArray()) {
+      for (const section of HR_REVIEW_SECTION_KEYS) {
+        const f = doc[section] as { cipher?: EncryptedValue } | null | undefined;
+        if (f?.cipher && f.cipher.keyId !== keyring.currentKeyId) remaining.add(f.cipher.keyId);
+      }
+    }
     report.remainingKeyIds = [...remaining];
     return report;
+  }
+
+  /**
+   * ADR-0051 — H15 (§ 2.6) : « contenu chiffré au repos, motif d'ADR-0045 § 2.4 ». Chaque
+   * section chiffrée d'une évaluation `hr_reviews` est re-chiffrée sous la clé courante, à
+   * l'emplacement qu'utilise la lecture (`hrReviewLocation` : organisation + évaluation +
+   * section). Collection lue par la connexion : ce module n'importe pas celui des RH. Une
+   * section effacée (anonymisation) vaut `null` : rien à faire. Écriture conditionnée par
+   * l'ancien `iv` de CHAQUE section re-chiffrée (une écriture concurrente gagne, la
+   * rotation repassera) ; la révision n'augmente pas : une rotation n'est pas une
+   * modification métier. Une section indéchiffrable fait échouer la rotation bruyamment.
+   */
+  private async rewrapHrReviews(
+    keyring: MasterKeyring,
+    actorUserId: string,
+    report: RewrapReport,
+  ): Promise<void> {
+    const col = this.connection.collection(HR_REVIEWS);
+    for (const doc of await col
+      .find(
+        { $or: HR_REVIEW_SECTION_KEYS.map((k) => ({ [k]: { $type: 'object' } })) },
+        {
+          projection: {
+            organizationId: 1,
+            ...Object.fromEntries(HR_REVIEW_SECTION_KEYS.map((k) => [k, 1])),
+          },
+        },
+      )
+      .toArray()) {
+      const organizationId = String(doc['organizationId']);
+      const reviewId = String(doc._id);
+      const set: Record<string, unknown> = {};
+      const guard: Record<string, unknown> = { _id: doc._id };
+      const changed: string[] = [];
+      for (const section of HR_REVIEW_SECTION_KEYS) {
+        const f = doc[section] as { cipher: EncryptedValue } | null | undefined;
+        if (!f?.cipher) continue;
+        const outcome = rewrapReviewSection(
+          { organizationId, reviewId, section },
+          f.cipher,
+          keyring,
+        );
+        if (!outcome.changed) {
+          report.skipped += 1;
+          continue;
+        }
+        set[`${section}.cipher`] = outcome.record;
+        guard[`${section}.cipher.iv`] = f.cipher.iv;
+        guard[`${section}.cipher.keyId`] = f.cipher.keyId;
+        changed.push(section);
+      }
+      if (changed.length === 0) continue;
+      const written = await this.inTransaction(async (session) => {
+        const res = await col.updateOne(guard, { $set: set }, session ? { session } : {});
+        if (res.modifiedCount === 0) return false;
+        for (const section of changed) {
+          await this.audit.record(
+            {
+              actorUserId,
+              actorRole: 'system',
+              action: 'secret.rewrapped',
+              targetType: 'hr_review',
+              targetId: reviewId,
+              // Ni valeur, ni note, ni organisation (motif des documents RH).
+              metadata: { section, keyId: keyring.currentKeyId },
+            },
+            session,
+          );
+        }
+        return true;
+      });
+      if (written) report.rewrapped += changed.length;
+    }
   }
 
   /**

@@ -685,6 +685,26 @@ export class HrEmployeesService {
         .exec();
       if (res.matchedCount !== 1) staleRevision(current.revision + 1);
       await this.privates.erase(organizationId, employeeId, session);
+      // ADR-0051 — H15 (§ 4) : les évaluations de la personne anonymisée perdent leur
+      // contenu chiffré (quatre sections) et l'instantané de ses objectifs, dans la même
+      // transaction ; le squelette (campagne, statut, évaluateur, dates) reste pour les
+      // décomptes. Collection lue par la connexion : ce service n'importe pas le module.
+      await this.connection.collection('hr_reviews').updateMany(
+        { organizationId, employeeId },
+        {
+          $set: {
+            selfAssessment: null,
+            managerAssessment: null,
+            employeeComment: null,
+            hrNote: null,
+            goalSnapshot: null,
+            erasedAt: new Date(),
+            updatedBy: actor.userId,
+          },
+          $inc: { revision: 1 },
+        },
+        { session },
+      );
       await this.lifecycle.onAnonymize({
         organizationId,
         employeeId,
