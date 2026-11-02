@@ -31,9 +31,12 @@
 
 import { Controller, Get, Inject, UseGuards } from '@nestjs/common';
 
-import { AuthGuard } from '../auth/auth.guard.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { AuthzService } from '../authz/authz.service.js';
+// ADR-0053 — P0
+import { PlatformConsoleRoute } from '../authz/authz.decorators.js';
+import { platformActionsOf, type PlatformAction } from '../authz/platform-actions.js';
+import { PlatformAuthGuard } from '../authz/platform-auth.guard.js';
 import {
   PLATFORM_FORBIDDEN_ACTIONS,
   PLATFORM_ROLE_LABELS,
@@ -60,10 +63,18 @@ export interface PlatformAccessView {
   canManageIntegrations: boolean;
   /** Les trois interdits absolus, pour affichage — jamais pour décision. */
   forbiddenActions: Action[];
+  /**
+   * ADR-0053 — P0 : actions plateforme détenues (ordre du catalogue). Vérité nouvelle des
+   * onglets de la console (lot P1) ; les champs ci-dessus restent servis une version.
+   */
+  actions: PlatformAction[];
 }
 
 @Controller('me')
-@UseGuards(AuthGuard)
+// ADR-0053 — P0 : lisible sans organisation (critère 1) ; la route ne lit que les rôles
+// plateforme de la session, jamais une organisation.
+@UseGuards(PlatformAuthGuard)
+@PlatformConsoleRoute()
 export class PlatformAccessController {
   constructor(@Inject(AuthzService) private readonly authz: AuthzService) {}
 
@@ -79,6 +90,7 @@ export class PlatformAccessController {
       ),
       canManageIntegrations: roles.includes('platform_super_admin'),
       forbiddenActions: [...PLATFORM_FORBIDDEN_ACTIONS],
+      actions: platformActionsOf(roles),
     };
   }
 }

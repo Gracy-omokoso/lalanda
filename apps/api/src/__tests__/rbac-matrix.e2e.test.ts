@@ -48,6 +48,8 @@ import 'reflect-metadata';
 import { PLANS, PLAN_CATALOG, type Plan } from '@lalanda/shared/pricing';
 
 import { ACTIONS, ORG_PERMISSION_MATRIX, type Action, type OrgRole } from '../authz/permissions.js';
+// ADR-0053 — P0
+import { PLATFORM_ACTIONS, type PlatformAction } from '../authz/platform-actions.js';
 import { e2eSuite, makeE2EApp, registerAndLogin, teardown } from './e2e-utils.js';
 import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
@@ -1602,6 +1604,61 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
       expect(actions.includes('performance.read'), `${role} × performance.read`).toBe(
         ['owner', 'hr_manager'].includes(role),
       );
+    }
+  }, 60_000);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // ADR-0053 — P0 : console Lalanda (actions plateforme). Les sondes par rôle plateforme
+  // et l'isolation exhaustive vivent dans `admin-platform-isolation.e2e.test.ts`.
+  // ───────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Action plateforme → route qui la sonde, ou lot qui la posera. Une action sans l'un ni
+   * l'autre fait rougir le test : la sonde suit la route.
+   */
+  const SONDES_PLATEFORME: Record<PlatformAction, string> = {
+    'platform.console.read': 'GET /admin/overview',
+    'platform.orgs.read': 'lot P2 (routes `/admin/organizations` converties en actions)',
+    'platform.orgs.suspend': 'lot P2',
+    'platform.users.read': 'lot P2',
+    'platform.users.block': 'lot P2',
+    'platform.roles.manage': 'lot P2',
+    'platform.billing.read': 'lot P3 (`/admin/billing/**`)',
+    'platform.billing.confirm': 'lot P3',
+    'platform.billing.grant': 'lot P3',
+    'platform.features.read': 'lot P4',
+    'platform.features.override': 'lot P4',
+    'platform.integrations.manage': 'lot P2 ou P5 (`/admin/integrations`, rôle inchangé)',
+    'platform.audit.read': 'lot P5',
+    'platform.audit.export': 'lot P5',
+    'platform.announcements.draft': 'lot P6',
+    'platform.announcements.approve': 'lot P6',
+    'platform.stats.read': 'lot P7',
+    'platform.finance.read': 'lot P7',
+    'platform.finance.export': 'lot P7',
+    'platform.packs.manage': 'lot P2 (`/accounting/platform/chart-packs`, rôle inchangé)',
+    'platform.templates.manage': 'aucune route de modèles sectoriels à ce jour',
+  };
+
+  it('ADR-0053 — chaque action plateforme a une sonde ou le lot qui la posera', () => {
+    expect(Object.keys(SONDES_PLATEFORME).sort()).toEqual([...PLATFORM_ACTIONS].sort());
+    expect(SONDES_PLATEFORME['platform.console.read']).toBe('GET /admin/overview');
+  });
+
+  it('ADR-0053 critère 2 — aucun rôle d’organisation n’ouvre la console ni ne détient d’action plateforme', async () => {
+    const s = serveur();
+    for (const role of ROLES_TESTES) {
+      const tableau = await request(s).get('/admin/overview').set('Cookie', cookiesDe(role));
+      expect(tableau.status, `${role} : ${JSON.stringify(tableau.body)}`).toBe(403);
+      expect(tableau.body).toMatchObject({ code: 'FORBIDDEN', action: 'platform.console.read' });
+      const acces = await request(s).get('/me/platform-access').set('Cookie', cookiesDe(role));
+      expect(acces.status, role).toBe(200);
+      expect(acces.body.actions, role).toEqual([]);
+      // Et `/me/permissions` ne mélange jamais les deux vocabulaires.
+      const moi = await request(s).get('/me/permissions').set('Cookie', cookiesDe(role));
+      for (const action of moi.body.actions as string[]) {
+        expect(action.startsWith('platform.'), `${role} × ${action}`).toBe(false);
+      }
     }
   }, 60_000);
 
