@@ -62,7 +62,7 @@ export function PaymentMethods(): React.ReactElement {
   if (etat.phase === 'chargement') {
     return (
       <p className="text-center text-sm text-[var(--foreground-muted)]">
-        Facturation en USD, hors taxes.
+        Prix en USD, hors taxes ; TVA 16 % en sus.
       </p>
     );
   }
@@ -70,8 +70,8 @@ export function PaymentMethods(): React.ReactElement {
   if (etat.phase === 'indisponible' || etat.disponibles.length === 0) {
     return (
       <p className="text-center text-sm text-[var(--foreground-muted)]">
-        Facturation en USD, hors taxes. Les moyens de paiement disponibles vous sont confirmés à la
-        souscription.
+        Prix en USD, hors taxes ; TVA 16 % en sus. Les moyens de paiement disponibles vous sont
+        confirmés à la souscription.
       </p>
     );
   }
@@ -81,7 +81,7 @@ export function PaymentMethods(): React.ReactElement {
 
   return (
     <div className="text-center text-sm text-[var(--foreground-muted)]">
-      <p>Facturation en USD, hors taxes.</p>
+      <p>Prix en USD, hors taxes ; TVA 16 % en sus.</p>
       <ul className="mt-3 flex flex-wrap justify-center gap-2">
         {etat.disponibles.map((method) => (
           <li

@@ -8,8 +8,9 @@
 // (métadonnées seulement). Toute décision passe par la fenêtre de ré-authentification et
 // porte un motif ; ce que voit le client paraît sous « Équipe Lalanda ».
 //
-// Ce module n'encaisse rien et n'émet aucune pièce : le paiement manuel existant reste le
-// seul circuit, et la remise d'un reçu attend ADR-0047.
+// Ce module n'encaisse rien. Depuis ADR-0047 (3 nov. 2026), chaque paiement confirmé
+// produit une facture émise par l'organisation vendeuse : volet « Factures des
+// abonnements » (`factures-abonnements-panel.tsx`).
 
 import { useCallback, useEffect, useState } from 'react';
 
@@ -44,6 +45,7 @@ import { useAccesPlateforme } from './admin-access';
 import { Bandeau, Pastille, Vide } from './admin-chrome';
 import { exigeReauth, formaterDate, formaterDateHeure, LIBELLES_PLAN } from './admin-model';
 import { ChampsMotif } from './champs-motif';
+import { FacturesAbonnements } from './factures-abonnements-panel';
 import { MOTIF_VIDE, motifComplet, noteInterneValide, type MotifSaisi } from './motif-model';
 import { ReauthGate, useReauth } from './reauth-gate';
 
@@ -82,6 +84,12 @@ export function AbonnementsPanel(): React.ReactElement {
         onReauth={reauth.redemander}
       />
       <TableauAbonnements />
+      {/* ADR-0047 : factures des abonnements (vendeur, paiements sans facture, avoirs). */}
+      <FacturesAbonnements
+        peutEmettre={peutDecider}
+        peutDesigner={peutOctroyer}
+        onReauth={reauth.redemander}
+      />
     </div>
   );
 }

@@ -17,7 +17,8 @@
 // service sur l'encaissement, silencieux et difficile à diagnostiquer.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { Inject, Injectable, Optional } from '@nestjs/common';
+import { subscriptionAmounts } from '@lalanda/engine';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
@@ -69,6 +70,29 @@ export interface MethodAvailability {
   reason?: string;
 }
 
+/**
+ * ADR-0047 : faits d'un paiement RÉUSSI, remis aux abonnés de l'événement (la
+ * facture des abonnements). Métadonnées seulement : aucune coordonnée du payeur.
+ */
+export interface PaymentSucceededFact {
+  provider: PaymentProviderId;
+  /** Identifiant d'événement : `manual:<référence>` ou celui du fournisseur. */
+  eventId: string;
+  organizationId: string;
+  plan: Plan | null;
+  interval: BillingInterval | null;
+  /** Somme encaissée TTC en centimes ; `null` si le fournisseur ne la déclare pas. */
+  amountCents: number | null;
+  currency: string | null;
+  /** `mobile_money`, `bank_transfer`, `card`, `paypal`. */
+  method: string;
+  /** Référence `LLD-…` d'un dépôt manuel ; `null` pour un rappel. */
+  reference: string | null;
+  paidAt: Date;
+}
+
+export type PaymentSucceededListener = (fact: PaymentSucceededFact) => Promise<void>;
+
 /** Code d'erreur Mongo pour violation d'index unique. */
 const DUPLICATE_KEY = 11000;
 
@@ -82,6 +106,10 @@ function isDuplicateKeyError(error: unknown): boolean {
 
 @Injectable()
 export class PaymentsService {
+  private readonly logger = new Logger('PaymentsService');
+  /** ADR-0047 : abonnés aux paiements réussis (la facture), inscrits au démarrage. */
+  private readonly succeededListeners: PaymentSucceededListener[] = [];
+
   constructor(
     @Inject(PAYMENT_PROVIDER_REGISTRY) private readonly providers: ProviderRegistry,
     @Inject(BillingService) private readonly billing: BillingService,
@@ -90,6 +118,54 @@ export class PaymentsService {
     private readonly manualRequests: Model<ManualPaymentRequestDocument>,
     @Optional() @Inject(AuditService) private readonly audit?: AuditService,
   ) {}
+
+  // ── ADR-0047 : paiements réussis → facture ─────────────────────────────────
+
+  /**
+   * Inscrit un abonné aux paiements réussis. Le module de facturation des
+   * abonnements s'y inscrit au démarrage : `payments/` ne dépend ainsi d'aucun
+   * module de ventes, et un échec de facturation ne remonte jamais ici.
+   */
+  onPaymentSucceeded(listener: PaymentSucceededListener): void {
+    this.succeededListeners.push(listener);
+  }
+
+  /**
+   * Prévient les abonnés APRÈS que le paiement a produit son effet. Une erreur
+   * d'abonné est journalisée et avalée : la facture suit le paiement, elle ne le
+   * conditionne jamais (ADR-0047 § 2, risque « couplage »).
+   */
+  private async notifySucceeded(fact: PaymentSucceededFact): Promise<void> {
+    for (const listener of this.succeededListeners) {
+      try {
+        await listener(fact);
+      } catch (error) {
+        this.logger.error(
+          `Abonné aux paiements réussis en échec (${fact.provider}:${fact.eventId}) : ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
+  }
+
+  /** Événements de paiement réussis et traités, plus récents d'abord (console ADR-0047). */
+  async listSucceededEvents(limit = 200): Promise<PaymentEventDocument[]> {
+    return this.events
+      .find({
+        mappedEvent: 'payment.succeeded',
+        status: 'processed',
+        organizationId: { $ne: null },
+      })
+      .sort({ createdAt: -1 })
+      .limit(Math.min(Math.max(limit, 1), 500))
+      .exec();
+  }
+
+  /** Un événement de paiement par sa clé, ou `null`. */
+  async findEvent(provider: string, eventId: string): Promise<PaymentEventDocument | null> {
+    return this.events.findOne({ provider, eventId }).exec();
+  }
 
   // ── Disponibilité ──────────────────────────────────────────────────────────
 
@@ -145,7 +221,9 @@ export class PaymentsService {
     successUrl: string;
     cancelUrl: string;
     now?: Date;
-  }): Promise<CheckoutResult & { amountDueCents: number }> {
+  }): Promise<
+    CheckoutResult & { amountDueCents: number; taxCents: number; totalDueCents: number }
+  > {
     const now = input.now ?? new Date();
 
     if (!isSellable(input.plan, input.interval)) {
@@ -179,6 +257,9 @@ export class PaymentsService {
     }
 
     const amountDueCents = quote.amountDueCents || (priceCents(input.plan, input.interval) ?? 0);
+    // ADR-0047 (décision n° 4) : le prix est HORS TAXES ; l'abonné verse HT + TVA 16 %,
+    // calculés par le moteur des factures. C'est ce montant que reçoit le fournisseur.
+    const amounts = subscriptionAmounts({ cents: amountDueCents, mode: 'ht' });
     const reference = buildReference(input.organizationId, now);
 
     const result = await provider.createCheckout({
@@ -186,7 +267,7 @@ export class PaymentsService {
       plan: input.plan,
       interval: input.interval,
       method: input.method,
-      amountDueCents,
+      amountDueCents: amounts.totalCents,
       currency: 'USD',
       customerEmail: input.userEmail,
       reference,
@@ -201,7 +282,10 @@ export class PaymentsService {
         requestedBy: input.userId,
         plan: input.plan,
         interval: input.interval,
-        amountDueCents,
+        // ADR-0047 : montant à VERSER (TTC), et son détail.
+        amountDueCents: amounts.totalCents,
+        amountExclTaxCents: amounts.exclTaxCents,
+        taxCents: amounts.taxCents,
         currency: 'USD',
         method: input.method === 'bank_transfer' ? 'bank_transfer' : 'mobile_money',
         status: 'pending',
@@ -223,11 +307,19 @@ export class PaymentsService {
         plan: input.plan,
         interval: input.interval,
         amountDueCents,
+        taxCents: amounts.taxCents,
+        totalDueCents: amounts.totalCents,
         reference,
       },
     });
 
-    return { ...result, amountDueCents };
+    // `amountDueCents` reste HT (contrat inchangé) ; `totalDueCents` est à verser.
+    return {
+      ...result,
+      amountDueCents,
+      taxCents: amounts.taxCents,
+      totalDueCents: amounts.totalCents,
+    };
   }
 
   /** Demandes de paiement manuel en attente — file de travail de l'administration. */
@@ -311,7 +403,25 @@ export class PaymentsService {
     request.decisionNote = input.note ?? null;
     await request.save();
 
+    // ADR-0047 : faits du paiement conservés avec l'événement (rattrapage console).
+    claimed.amountCents = request.amountDueCents;
+    claimed.currency = request.currency;
+    claimed.plan = request.plan;
+    claimed.interval = request.interval;
     await this.markEvent(claimed, 'processed', null);
+
+    await this.notifySucceeded({
+      provider: 'manual',
+      eventId: claimed.eventId,
+      organizationId: request.organizationId,
+      plan: request.plan,
+      interval: request.interval,
+      amountCents: request.amountDueCents,
+      currency: request.currency,
+      method: request.method,
+      reference: request.reference,
+      paidAt: now,
+    });
 
     return outcomeOf(request);
   }
@@ -441,6 +551,12 @@ export class PaymentsService {
       throw error;
     }
 
+    if (parsed.event === 'payment.succeeded') {
+      claimed.amountCents = parsed.amountPaidCents ?? null;
+      claimed.currency = parsed.amountCurrency ?? null;
+      claimed.plan = parsed.plan;
+      claimed.interval = parsed.interval;
+    }
     await this.markEvent(claimed, 'processed', null);
 
     await this.audit?.record({
@@ -456,6 +572,22 @@ export class PaymentsService {
         rawType: parsed.rawType,
       },
     });
+
+    // ADR-0047 : la facture suit le paiement, après lui, sans pouvoir l'annuler.
+    if (parsed.event === 'payment.succeeded') {
+      await this.notifySucceeded({
+        provider: providerId,
+        eventId: parsed.eventId,
+        organizationId,
+        plan: parsed.plan,
+        interval: parsed.interval,
+        amountCents: parsed.amountPaidCents ?? null,
+        currency: parsed.amountCurrency ?? null,
+        method: providerId === 'stripe' ? 'card' : 'paypal',
+        reference: null,
+        paidAt: parsed.occurredAt,
+      });
+    }
 
     return { status: 'processed', eventId: parsed.eventId };
   }

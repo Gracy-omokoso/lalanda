@@ -357,14 +357,21 @@ export function SubscriptionFunnel(): React.ReactElement {
         ) : (
           <>
             <p className="fig mt-2 text-3xl font-semibold tracking-tight">
-              {formatCents(quote.amountDueCents, quote.currency)}
+              {formatCents(quote.totalDueCents, quote.currency)}
             </p>
-            <p className="mt-1 text-sm text-[var(--foreground-muted)]">
-              {chemin?.raison}{' '}
-              {/* La fiscalité de la vente numérique n'est pas arbitrée
-                  (docs/13) : l'omettre laisserait croire à un prix TTC. */}
-              Montant hors taxes.
-            </p>
+            {/* ADR-0047 (décision du 3 nov. 2026) : prix HT de la grille, TVA 16 % en sus,
+                calculée par l'API ; le montant à verser est TTC. */}
+            <dl className="fig mt-2 grid max-w-sm grid-cols-2 gap-x-4 gap-y-1 text-sm text-[var(--foreground-muted)]">
+              <dt>Montant hors taxes</dt>
+              <dd className="text-right">{formatCents(quote.amountDueCents, quote.currency)}</dd>
+              <dt>{quote.tax.label}</dt>
+              <dd className="text-right">{formatCents(quote.taxCents, quote.currency)}</dd>
+              <dt className="font-medium text-[var(--foreground)]">Total à verser</dt>
+              <dd className="text-right font-medium text-[var(--foreground)]">
+                {formatCents(quote.totalDueCents, quote.currency)}
+              </dd>
+            </dl>
+            <p className="mt-1 text-sm text-[var(--foreground-muted)]">{chemin?.raison}</p>
             {quote.creditCents > 0 ? (
               <p className="mt-2 text-sm text-[var(--foreground-muted)]">
                 Crédit appliqué : {formatCents(quote.creditCents, quote.currency)}
@@ -458,8 +465,9 @@ export function SubscriptionFunnel(): React.ReactElement {
             </dl>
           ) : null}
           <p className="mt-4 text-sm text-[var(--foreground-muted)]">
-            Montant à verser : {formatCents(instructions.amountDueCents)}. Votre abonnement est
-            activé après vérification du versement.
+            Montant à verser : {formatCents(instructions.totalDueCents)} (dont{' '}
+            {formatCents(instructions.taxCents)} de TVA 16 %). Votre abonnement est activé après
+            vérification du versement ; la facture est émise à ce moment-là.
           </p>
         </section>
       ) : null}

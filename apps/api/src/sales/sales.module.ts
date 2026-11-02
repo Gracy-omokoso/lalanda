@@ -184,6 +184,8 @@ import { ReferenceRefreshJob } from './normalization/reference-refresh.job.js';
     SettlementsService,
     // ADR-0040 — C1 : la conversion prospect → client crée la fiche par Ventes.
     CustomersService,
+    // ADR-0047 : les factures des abonnements Lalanda s'émettent par le même circuit.
+    InvoiceFreezingService,
   ],
 })
 export class SalesModule {}

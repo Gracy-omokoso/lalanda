@@ -65,6 +65,24 @@ export class PaymentEvent {
   @Prop({ type: String, default: null })
   detail!: string | null;
 
+  // ── ADR-0047 : faits d'un paiement réussi, pour sa facture ─────────────────
+  // Renseignés quand le paiement est connu (montant du dépôt confirmé, montant
+  // payé déclaré par le fournisseur). Absents des rappels antérieurs : leur
+  // facture se rattrape depuis la console, jamais en inventant un montant.
+
+  /** Somme encaissée, en centimes, toutes taxes comprises. */
+  @Prop({ type: Number, default: null })
+  amountCents!: number | null;
+
+  @Prop({ type: String, default: null })
+  currency!: string | null;
+
+  @Prop({ type: String, default: null })
+  plan!: string | null;
+
+  @Prop({ type: String, default: null })
+  interval!: string | null;
+
   @Prop({ type: Number, required: true, default: 1 })
   _schemaVersion!: number;
 

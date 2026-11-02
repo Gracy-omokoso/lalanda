@@ -174,6 +174,9 @@ export class PaymentsController {
     mode: string;
     reference: string;
     amountDueCents: number;
+    // ADR-0047 : TVA 16 % et montant à verser (TTC).
+    taxCents: number;
+    totalDueCents: number;
     redirectUrl?: string;
     instructions?: unknown;
   }> {
@@ -201,6 +204,8 @@ export class PaymentsController {
         mode: result.mode,
         reference: result.reference,
         amountDueCents: result.amountDueCents,
+        taxCents: result.taxCents,
+        totalDueCents: result.totalDueCents,
         ...(result.redirectUrl ? { redirectUrl: result.redirectUrl } : {}),
         ...(result.instructions ? { instructions: result.instructions } : {}),
       };

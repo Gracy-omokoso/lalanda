@@ -141,8 +141,10 @@ Décideurs :
   aucune pièce n'est remise aujourd'hui alors que les CGV promettent une facture ; options
   (A) Go freelance SARLU se facture avec son propre module ventes, (B) module dédié, (C) reçu non
   fiscal et CGV corrigées, (D) factures saisies à la main, (E) facturation hors Lalanda ;
-  recommandation C puis A ; quatorze décisions ouvertes, sans valeur par défaut. Statut :
-  **proposé, en attente de la dirigeante** (1ᵉʳ nov. 2026).
+  recommandation C puis A. Statut : **accepté** (décision de la dirigeante du 3 nov. 2026, à
+  revoir avec l'expert-comptable) : C puis A, facture ordinaire émise par l'organisation vendeuse à
+  l'encaissement confirmé, prix HT + TVA 16 % (groupe B), sans normalisation DGI avant
+  l'homologation, avoir à deux personnes.
 - [ADR-0054](ADR-0054-decisions-du-3-novembre.md) — Décisions de la dirigeante du 3 nov. 2026 :
   inventaire des questions ouvertes des ADR-0047 à ADR-0053 et décision prise pour chacune (source ou
   « choix produit prudent », à revoir avec le juriste et l'expert-comptable). Reconduction tacite

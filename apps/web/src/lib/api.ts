@@ -1519,6 +1519,10 @@ export interface PlanQuoteView {
   carriedCreditCents: number;
   currency: string;
   taxIncluded: false;
+  /** ADR-0047 : TVA 16 % ajoutée au montant HT, et montant à verser (TTC). */
+  taxCents: number;
+  totalDueCents: number;
+  tax: { group: string; ratePercent: string; label: string };
   effectiveAt: string | null;
 }
 
@@ -1534,7 +1538,11 @@ export interface CheckoutResultView {
   provider: string;
   mode: string;
   reference: string;
+  /** Montant HORS TAXES (prix de la grille ou prorata). */
   amountDueCents: number;
+  /** ADR-0047 : TVA 16 % et montant à verser, toutes taxes comprises. */
+  taxCents: number;
+  totalDueCents: number;
   /** Présent pour un fournisseur à redirection (Stripe, PayPal). */
   redirectUrl?: string;
   /** Présent pour le fournisseur manuel. */
@@ -3016,6 +3024,107 @@ export type {
   OrganizationSetupView,
 } from '@lalanda/shared/organization-setup';
 
+// ─── ADR-0047 : factures des abonnements Lalanda ───────────────────────────
+
+/** Facture (ou avoir) d'abonnement, telle que l'abonné la voit dans `/souscription`. */
+export interface SubscriptionInvoiceView {
+  id: string;
+  kind: 'invoice' | 'credit_note';
+  number: string;
+  issuedAt: string | null;
+  plan: string | null;
+  interval: string | null;
+  periodStart: string | null;
+  periodEnd: string | null;
+  currency: string;
+  exclTaxCents: number | null;
+  taxCents: number | null;
+  totalCents: number | null;
+  normalized: boolean;
+}
+
+export interface SubscriptionBillingProfileView {
+  profile: {
+    legalName: string;
+    nif: string | null;
+    address: string | null;
+    revision: number;
+  } | null;
+  effective: {
+    legalName: string;
+    nif: string | null;
+    address: string | null;
+    source: 'billing_profile' | 'fiscal_profile' | 'organization';
+  };
+}
+
+export interface AdminSubscriptionInvoiceView {
+  id: string;
+  organizationId: string;
+  organizationName: string | null;
+  provider: string;
+  eventId: string;
+  reference: string | null;
+  plan: string | null;
+  interval: string | null;
+  amountCents: number | null;
+  currency: string | null;
+  method: string;
+  paidAt: string;
+  status: 'pending' | 'issued' | 'failed';
+  origin: 'automatic' | 'console';
+  invoiceNumber: string | null;
+  issuedAt: string | null;
+  lastError: { code: string; message: string } | null;
+  emissionReason: string | null;
+  creditNote: {
+    status: 'requested' | 'issued' | 'failed';
+    reason: string;
+    requestedBy: string;
+    approvedBy: string | null;
+    soleApprover: boolean;
+    number: string | null;
+    lastError: { code: string; message: string } | null;
+  } | null;
+}
+
+export interface AdminUninvoicedPaymentView {
+  provider: 'manual' | 'stripe' | 'paypal';
+  eventId: string;
+  organizationId: string;
+  organizationName: string | null;
+  reference: string | null;
+  plan: string | null;
+  interval: string | null;
+  amountCents: number | null;
+  currency: string | null;
+  paidAt: string;
+  attempt: { status: string; lastError: { code: string; message: string } | null } | null;
+}
+
+export interface AdminSubscriptionSellerView {
+  sellerOrganizationId: string | null;
+  organizationName: string | null;
+  designatedAt: string | null;
+  reason: string | null;
+  readiness: { ready: boolean; blockers: { code: string; message: string }[] };
+}
+
+/** Télécharge un PDF servi par l'API (session par cookie). */
+async function downloadPdfFrom(
+  path: string,
+  fallbackName: string,
+): Promise<{ blob: Blob; filename: string }> {
+  const res = await fetch(`${API_URL}${path}`, { method: 'GET', credentials: 'include' });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`HTTP ${res.status} — ${text.slice(0, 200)}`);
+  }
+  const cd = res.headers.get('content-disposition') ?? '';
+  const match = cd.match(/filename="([^"]+)"/);
+  return { blob: await res.blob(), filename: match?.[1] ?? fallbackName };
+}
+
 export const api = {
   /**
    * Enregistre l'accord de l'utilisateur connecté.
@@ -4117,6 +4226,72 @@ export const api = {
     return { blob: await res.blob(), filename };
   },
 
+  // ─── ADR-0047 : factures des abonnements ───────────────────────────────────
+  listSubscriptionInvoices: () =>
+    jsonRequest<{ invoices: SubscriptionInvoiceView[] }>(
+      `/organizations/current/subscription/invoices`,
+      { method: 'GET' },
+    ),
+  downloadSubscriptionInvoice: (id: string) =>
+    downloadPdfFrom(
+      `/organizations/current/subscription/invoices/${encodeURIComponent(id)}/pdf`,
+      'facture.pdf',
+    ),
+  getSubscriptionBillingProfile: () =>
+    jsonRequest<SubscriptionBillingProfileView>(
+      `/organizations/current/subscription/billing-profile`,
+      { method: 'GET' },
+    ),
+  saveSubscriptionBillingProfile: (input: {
+    legalName: string;
+    nif: string | null;
+    address: string | null;
+  }) =>
+    jsonRequest<SubscriptionBillingProfileView>(
+      `/organizations/current/subscription/billing-profile`,
+      { method: 'PUT', body: input },
+    ),
+  listAdminSubscriptionInvoices: (status?: AdminSubscriptionInvoiceView['status']) =>
+    jsonRequest<{ invoices: AdminSubscriptionInvoiceView[] }>(
+      `/admin/billing/subscription-invoices${status ? `?status=${encodeURIComponent(status)}` : ''}`,
+      { method: 'GET' },
+    ),
+  listAdminUninvoicedPayments: () =>
+    jsonRequest<{ payments: AdminUninvoicedPaymentView[] }>(
+      `/admin/billing/subscription-invoices/uninvoiced`,
+      { method: 'GET' },
+    ),
+  /** Motif obligatoire ; ré-authentification ; une seule facture par paiement. */
+  emitAdminSubscriptionInvoice: (input: { provider: string; eventId: string; reason: string }) =>
+    jsonRequest<{ alreadyIssued: boolean; invoice: AdminSubscriptionInvoiceView }>(
+      `/admin/billing/subscription-invoices/emit`,
+      { method: 'POST', body: input },
+    ),
+  getAdminSubscriptionSeller: () =>
+    jsonRequest<AdminSubscriptionSellerView>(`/admin/billing/subscription-invoices/seller`, {
+      method: 'GET',
+    }),
+  designateAdminSubscriptionSeller: (input: { organizationId: string; reason: string }) =>
+    jsonRequest<AdminSubscriptionSellerView>(`/admin/billing/subscription-invoices/seller`, {
+      method: 'PUT',
+      body: input,
+    }),
+  requestAdminSubscriptionCreditNote: (id: string, input: { reason: string }) =>
+    jsonRequest<AdminSubscriptionInvoiceView>(
+      `/admin/billing/subscription-invoices/${encodeURIComponent(id)}/credit-note`,
+      { method: 'POST', body: input },
+    ),
+  /** `409 SELF_APPROVAL_FORBIDDEN` : la personne qui a demandé l'avoir ne l'approuve pas. */
+  approveAdminSubscriptionCreditNote: (id: string) =>
+    jsonRequest<AdminSubscriptionInvoiceView>(
+      `/admin/billing/subscription-invoices/${encodeURIComponent(id)}/credit-note/approve`,
+      { method: 'POST' },
+    ),
+  downloadAdminSubscriptionInvoice: (id: string, kind: 'invoice' | 'credit_note') =>
+    downloadPdfFrom(
+      `/admin/billing/subscription-invoices/${encodeURIComponent(id)}/pdf?kind=${kind}`,
+      'facture.pdf',
+    ),
   // ── ADR-0053 — P8 : double authentification de la console ─────────────────
   getPlatformTwoFactor: () =>
     jsonRequest<PlatformTwoFactorStatus>(`/admin/two-factor`, { method: 'GET' }),

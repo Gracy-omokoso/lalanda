@@ -1,14 +1,15 @@
 # ADR-0047 — Factures des abonnements Lalanda : qui émet, avec quel outil, et quand
 
-Statut : Proposed — **en attente de la dirigeante**
-Date : 2026-11-01
+Statut : **Accepted** — décision de la dirigeante du 3 nov. 2026, **à revoir avec
+l'expert-comptable** (voir l'amendement en fin de document)
+Date : 2026-11-01 ; amendé le 2026-11-03
 Décideurs : Gracy Omokoso (dirigeante) ; expert-comptable et juriste de Go freelance SARLU pour
 les points fiscaux et juridiques (§ 6).
 
-> **Rien n'est codé tant que la dirigeante n'a pas répondu.** Cet ADR ne pose **aucune valeur par
-> défaut** : chaque décision ouverte (§ 9) reste ouverte, et aucun lot (§ 8) ne démarre avant sa
-> réponse. Il ne pose aucune règle fiscale ou juridique congolaise : ce qui n'est pas sourcé dans le
-> dépôt est écrit comme une question.
+> **Tranché le 3 nov. 2026** : « fais ce qui s'applique en RDC Congo, nous améliorerons au fur et à
+> mesure avec les experts ; aucun client n'utilise encore Lalanda ». Les décisions retenues et ce qui
+> est livré sont dans l'**amendement du 3 nov. 2026** (fin du document). Les §§ 1 à 10 restent le
+> raisonnement d'origine ; les questions du § 6 restent à poser au conseil.
 
 ## 1. Contexte
 
@@ -306,3 +307,82 @@ l'environnement de test DGI avant toute ouverture de la production.
 - [ADR-0043](ADR-0043-editeur-go-freelance-sarlu.md) — éditeur et mentions non publiées
 - Code : `apps/api/src/billing/`, `apps/api/src/payments/`, `packages/shared/src/pricing/`,
   `apps/web/src/app/(marketing)/cgv/page.tsx`
+
+---
+
+## Amendement du 3 nov. 2026 — décision de la dirigeante, à revoir avec l'expert-comptable
+
+> « Fais ce qui s'applique en RDC Congo, nous améliorerons au fur et à mesure avec les experts ;
+> aucun client n'utilise encore Lalanda. » — Gracy Omokoso, 3 nov. 2026.
+
+Cette décision tranche les quatorze décisions ouvertes du § 9 **à titre provisoire**. Chacune est à
+confirmer par l'expert-comptable (questions F1 à F8), le juriste (J1 à J4) et la DGI (DGI1) : une
+réponse contraire se traduira par un nouvel amendement, pas par une correction silencieuse.
+
+### A1. Décisions appliquées
+
+| N° (§ 9) | Décision | Où |
+|---|---|---|
+| 1 | **Option C puis A.** C : l'inexactitude publique est corrigée là où elle ne touche pas le corpus légal (page tarifs : TVA 16 % annoncée, facture à chaque paiement confirmé). Les CGV et la politique de confidentialité, qui disent aujourd'hui « aucune facture d'abonnement n'est encore émise », sont **confiées au lot des décisions juridiques** (seul à toucher aux pages légales et à `LEGAL_VERSION`) : texte proposé en A4. A : chaque abonnement payé produit une facture **émise par l'organisation vendeuse, dans Lalanda même, par le circuit des factures de vente existant** (brouillon puis émission, ADR-0023 ; numérotation ADR-0027 ; PDF ADR-0025). | `apps/api/src/subscription-invoices/` |
+| 5 | **Organisation vendeuse** : une organisation EXISTANTE, désignée depuis la console (`PUT /admin/billing/subscription-invoices/seller`, `platform.billing.grant`, motif, ré-authentification, journal plateforme). **Aucune organisation n'est créée par le code**, aucune migration ne devine laquelle. La console affiche ce qui empêchera l'émission (fiche fiscale absente, vendeur non assujetti, facture normalisée activée). | collection `platform_subscription_invoice_settings` |
+| 7 (F4) | **Moment de la pièce : l'encaissement confirmé** — dépôt manuel confirmé dans la console (P3), ou rappel Stripe ou PayPal `payment.succeeded`. Pas de facture à l'échéance impayée. | `PaymentsService.onPaymentSucceeded` |
+| 4 (F5) | **Devise : celle payée** (USD aujourd'hui). La facture est ordinaire : **aucune conversion** n'a lieu à l'émission (ADR-0023 § S25e.4, « une organisation ordinaire émet tel quel »). La conversion en CDF au taux DGI s'appliquera, selon la même règle, quand la normalisation sera ouverte (lot N7). | — |
+| 2, 3 (F1, F2) | **TVA : RDC, taux normal 16 %, groupe B « Taxable 16 % »** (`DEFAULT_TAX_GROUPS`), article de type service. docs/13 déclarant les prix **hors taxes**, la règle est **prix HT + TVA 16 %** : le tunnel affiche HT, TVA et total ; l'abonné verse le TTC ; la demande de dépôt garde HT, TVA et TTC. Calcul par le moteur (`subscriptionAmounts`, même fonction et même politique d'arrondi que les factures). | `packages/shared/src/pricing` (`SUBSCRIPTION_TAX`), `packages/engine/src/subscription-invoices` |
+| — | **Montant facturé = somme encaissée.** La facture part du montant reçu, en mode TTC ; le moteur en dégage la base HT et la TVA. Comme ce montant a été calculé HT + 16 % par le même moteur, la base retrouvée est exactement le prix de la grille (aller-retour prouvé par test unitaire). Un rappel fournisseur sans montant déclaré ne produit **aucune** facture : jamais de montant deviné (`AMOUNT_UNKNOWN`, à émettre depuis la console). | — |
+| — (ADR-0024 § 11) | **Sans normalisation DGI** tant que l'homologation n'est pas obtenue : émission par la route ordinaire (`issue`). La pièce porte la mention déjà prévue pour ce cas, « Facture » (non normalisée, ADR-0023 § S25e.2), jamais « Facture normalisée ». Une organisation vendeuse en facture normalisée est refusée par le circuit (`NORMALIZATION_REQUIRED`) et signalée dans la console. | — |
+| 8 (F3) | **Données de l'abonné** : raison sociale obligatoire, NIF et adresse facultatifs, saisis dans `/souscription` ; à défaut, repris de la **fiche fiscale** de l'organisation abonnée (dénomination, NIF, siège), sinon du nom de l'organisation. Avec NIF : client de type PM ; sans NIF : type PP (la DGI exige le NIF pour PM, ADR-0022). Seuls ces trois champs passent chez le vendeur (pont à sens unique, borné). Abonné hors RDC : même traitement, en attendant F3. | collections `subscription_billing_profiles`, `subscription_invoice_customers` |
+| 10 (F6) | **Avoir sur remboursement** décidé dans la console : motif obligatoire, **deux personnes** (celle qui demande n'approuve pas ; exception du seul détenteur de `platform.billing.confirm`, marquée, comme ADR-0053 § 5.3). Avoir d'annulation `RAN` de toute la facture, série des avoirs. Le remboursement lui-même (l'argent) se fait hors Lalanda. Le crédit de prorata (`carriedCreditCents`) reste traité comme aujourd'hui (aucune pièce) : F6 reste ouverte. | `POST …/:id/credit-note`, `…/approve` |
+| 13 | **Consultation** : l'abonné voit et télécharge ses factures et avoirs dans `/souscription` (`billing.manage`) ; la plateforme les voit dans la console, sous Abonnements (`platform.billing.read`) ; les membres de l'organisation vendeuse les voient dans Ventes › Factures. | — |
+| 6 (J1) | **Identité sur la facture** : celle de la **fiche fiscale de l'organisation vendeuse**, telle quelle (dénomination, NIF, siège, téléphone, e-mail ; RCCM seulement s'il y figure). Aucun identifiant n'est écrit dans le code ni publié ailleurs : `PUBLISHER_UNPUBLISHED_MENTIONS` (ADR-0043) reste inchangé. | — |
+| 12 (F7) | **Paiements passés sans facture** : rien n'est régularisé automatiquement. La console liste les paiements réussis sans facture émise (`GET …/uninvoiced`), avec la tentative précédente, et propose « émettre la facture », paiement par paiement, avec motif (`POST …/emit`, `platform.billing.confirm`, ré-authentification). | — |
+| 9 (J4) | Stripe et PayPal : la facture Lalanda est émise sur leur rappel réussi. Désactiver leurs propres reçus relève de la configuration des comptes marchands, quand ils existeront. | — |
+| 11 | Les CGV changent hors de ce lot (voir A4). | — |
+| 14 | Les questions du § 6 restent à transmettre au conseil. | — |
+
+### A2. Garanties et preuves
+
+- **Un paiement, une facture.** Index unique `paymentKey` (`<fournisseur>:<événement>`) de
+  `subscription_invoices`, bail de traitement, brouillon retenu et repris. Prouvé par
+  `subscription-invoices.e2e.test.ts` : confirmation rejouée (refusée), pont rejoué deux fois en
+  parallèle, « émettre » recliqué (`alreadyIssued`), rappel Stripe signé réémis — toujours une
+  facture.
+- **La facture ne conditionne jamais l'abonnement** : un échec (vendeur non désigné, taux DGI
+  absents, fiche fiscale incomplète…) laisse une ligne `failed` avec son motif, visible dans la
+  console ; l'abonnement est déjà prolongé.
+- **Isolation** : une autre organisation obtient `404` sur une facture qui n'est pas la sienne ; le
+  journal du vendeur ne reçoit aucun identifiant d'utilisateur de l'abonné (acteur système) ; le
+  téléchargement est journalisé chez l'abonné.
+- **Routes** : `routes-coverage` et `rbac-matrix` (blocs ADR-0047) ; aucun rôle d'organisation
+  n'ouvre la console.
+
+### A3. À configurer en production par la dirigeante
+
+1. **Désigner l'organisation vendeuse** dans la console (Abonnements › Factures des abonnements) :
+   l'organisation « Go Freelance » existante, ou une autre. Rappel : un même NIF n'active la facture
+   normalisée que dans une seule organisation par environnement (ADR-0021 R1).
+2. **Compléter sa fiche fiscale** (Organisation › Fiscalité) avec l'identité réelle de Go freelance
+   SARLU — c'est elle qui s'imprime — et **assujettie à la TVA** (sinon le groupe B est refusé).
+3. **Désactiver la facture normalisée** de cette organisation si elle est activée (point de vente
+   de test de l'homologation) : tant qu'elle l'est, l'émission ordinaire est refusée.
+4. Vérifier qu'un **relevé des taux DGI** existe pour son environnement (rafraîchir les listes du
+   point de vente) : sans taux, la facture reste « non émise » (`TAX_RATES_UNAVAILABLE`).
+5. Puis, depuis la liste « Paiements sans facture », émettre les factures des paiements passés si
+   elle le souhaite.
+
+### A4. Texte proposé pour les pages légales (lot des décisions juridiques)
+
+- CGV § Facturation : « Une facture est émise à chaque paiement confirmé et reste consultable depuis
+  la page Abonnement de l'organisation. Elle reprend l'offre, la période couverte, le montant hors
+  taxes, la TVA et le total. Les prix affichés sont hors taxes ; la TVA de la RDC (16 %) s'y ajoute.
+  Elle n'est pas encore normalisée auprès de la DGI. » — et retirer « Aucune facture d'abonnement
+  n'est encore émise par le service ».
+- Politique de confidentialité : retirer « Aucune facture d'abonnement n'est encore émise par le
+  service » ; dire que raison sociale, NIF et adresse de facturation de l'organisation abonnée sont
+  transmis à Go freelance SARLU pour établir ses factures (J3).
+- Nouvelle `LEGAL_VERSION` et nouvelle acceptation : à décider avec ce lot.
+
+### A5. Reste ouvert
+
+Normalisation des factures d'abonnement (lot N7, après homologation) ; F3, F5 (paiement en CDF),
+F6 (crédit de prorata), F8, J1 à J4, DGI1 ; rattrapage automatique des factures en échec par
+l'ordonnanceur (aujourd'hui : bouton de la console) ; envoi des factures par e-mail (ADR-0042).

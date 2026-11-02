@@ -53,6 +53,7 @@ import { StorageModule } from './storage/storage.module.js';
 import { TreasuryModule } from './treasury/treasury.module.js';
 import { WorkBillingModule } from './work/billing/work-billing.module.js';
 import { WorkModule } from './work/work.module.js';
+import { SubscriptionInvoicesModule } from './subscription-invoices/subscription-invoices.module.js';
 
 @Module({
   imports: [
@@ -161,6 +162,8 @@ import { WorkModule } from './work/work.module.js';
     WorkModule,
     // ADR-0039 — lot L4a : devis → projet, jalon → brouillon, liens facture, marge.
     WorkBillingModule,
+    // ADR-0047 : factures des abonnements Lalanda (organisation vendeuse, circuit des ventes).
+    SubscriptionInvoicesModule,
   ],
   controllers: [HealthController, EvaluateController],
 })

@@ -2043,4 +2043,66 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
       expect(acces.body.twoFactor, role).toMatchObject({ required: false, enrolled: false });
     }
   }, 120_000);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // ADR-0047 : factures des abonnements. Dans l'organisation, seul `billing.manage`
+  // ouvre la liste, le PDF et la fiche de facturation ; aucun rôle d'organisation —
+  // Propriétaire compris — n'ouvre la console des factures d'abonnement.
+  // ───────────────────────────────────────────────────────────────────────────
+
+  it('ADR-0047 — factures d’abonnement : `billing.manage` dans l’organisation, jamais la console', async () => {
+    const s = serveur();
+    const { ThrottlerStorage } = await import('@nestjs/throttler');
+    const store = app.get(ThrottlerStorage) as unknown as {
+      storage: Map<string, unknown>;
+      timeoutIds: Map<string, NodeJS.Timeout[]>;
+    };
+    const factice = '0123456789abcdef01234567';
+    const console47: Array<[string, string, PlatformAction]> = [
+      ['get', '/admin/billing/subscription-invoices', 'platform.billing.read'],
+      ['get', '/admin/billing/subscription-invoices/uninvoiced', 'platform.billing.read'],
+      ['get', '/admin/billing/subscription-invoices/seller', 'platform.billing.read'],
+      ['put', '/admin/billing/subscription-invoices/seller', 'platform.billing.grant'],
+      ['post', '/admin/billing/subscription-invoices/emit', 'platform.billing.confirm'],
+      [
+        'post',
+        `/admin/billing/subscription-invoices/${factice}/credit-note`,
+        'platform.billing.confirm',
+      ],
+      [
+        'post',
+        `/admin/billing/subscription-invoices/${factice}/credit-note/approve`,
+        'platform.billing.confirm',
+      ],
+    ];
+    for (const role of ROLES_TESTES) {
+      for (const t of store.timeoutIds.values()) t.forEach(clearTimeout);
+      store.timeoutIds.clear();
+      store.storage.clear();
+      const permis = ORG_PERMISSION_MATRIX[role]['billing.manage'] !== 'deny';
+      const liste = await request(s)
+        .get('/organizations/current/subscription/invoices')
+        .set('Cookie', cookiesDe(role));
+      const fiche = await request(s)
+        .get('/organizations/current/subscription/billing-profile')
+        .set('Cookie', cookiesDe(role));
+      for (const res of [liste, fiche]) {
+        if (permis) {
+          expect(res.status, `${role} × factures d’abonnement`).toBe(200);
+        } else {
+          expect(res.status, `${role} × factures d’abonnement`).toBe(403);
+          expect(res.body).toMatchObject({ code: 'FORBIDDEN', action: 'billing.manage' });
+        }
+      }
+      for (const [verbe, chemin, action] of console47) {
+        const req = request(s) as unknown as Record<string, (p: string) => request.Test>;
+        const res = await req[verbe]!(chemin).set('Cookie', cookiesDe(role)).send({});
+        expect(res.status, `${role} × ${verbe} ${chemin}`).toBe(403);
+        expect(res.body, `${role} × ${verbe} ${chemin}`).toMatchObject({
+          code: 'FORBIDDEN',
+          action,
+        });
+      }
+    }
+  }, 120_000);
 });

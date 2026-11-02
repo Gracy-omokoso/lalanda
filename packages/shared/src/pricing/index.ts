@@ -362,3 +362,25 @@ export function monthWindowReset(now: Date): Date {
 
 // ADR-0053 — P4 : catalogue des fonctionnalités par offre (grille entièrement ouverte).
 export * from './features.js';
+
+// ── ADR-0047 : taxe des abonnements Lalanda ──────────────────────────────────
+
+/**
+ * TVA des abonnements vendus par Go freelance SARLU (ADR-0047, décision de la
+ * dirigeante du 3 nov. 2026, à revoir avec l'expert-comptable).
+ *
+ * Les prix de la grille restent HORS TAXES (docs/13) ; la TVA RDC au taux normal
+ * s'y ajoute. Le groupe est celui que le dépôt connaît déjà pour ce taux : `B`,
+ * « Taxable 16 % » (`DEFAULT_TAX_GROUPS` du moteur, documentation DGI v1.2), sur
+ * un article de type service (`SER`). Le taux est une chaîne décimale : le moteur
+ * calcule, ce module ne fait que déclarer.
+ */
+export const SUBSCRIPTION_TAX = Object.freeze({
+  taxGroup: 'B',
+  ratePercent: '16',
+  itemType: 'SER',
+  label: 'TVA 16 %',
+  decidedOn: '2026-11-03',
+  source: 'ADR-0047, décision n° 4 (dirigeante, 3 nov. 2026)',
+} as const);
+export type SubscriptionTax = typeof SUBSCRIPTION_TAX;

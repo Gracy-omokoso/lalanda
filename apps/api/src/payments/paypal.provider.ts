@@ -41,6 +41,8 @@
 // moyen de paiement n'apparaît pas dans l'interface.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { decimalToCents } from '@lalanda/engine';
+
 import type { Plan } from '../billing/entitlements.js';
 import { PLANS } from '../billing/entitlements.js';
 import { isBillingInterval, type BillingInterval } from '../billing/pricing-catalog.js';
@@ -382,5 +384,25 @@ export function mapPayPalEvent(payload: unknown): NormalizedWebhookEvent {
     currentPeriodStart: asDate(pick(resource, 'billing_info', 'last_payment', 'time')),
     currentPeriodEnd: asDate(pick(resource, 'billing_info', 'next_billing_time')),
     failureCode: asString(pick(resource, 'status_change_note')),
+    // ADR-0047 : somme payée, seulement sur un paiement réussi qui la déclare.
+    ...(EVENT_MAP[rawType] === 'payment.succeeded' ? paypalPaidAmount(resource) : {}),
   };
+}
+
+/**
+ * ADR-0047 : montant d'une vente PayPal (`amount.total` + `amount.currency`, ou
+ * `amount.value` + `amount.currency_code`), converti en centimes SANS flottant.
+ */
+function paypalPaidAmount(
+  resource: unknown,
+): { amountPaidCents: number; amountCurrency: string } | Record<string, never> {
+  const value =
+    asString(pick(resource, 'amount', 'total')) ?? asString(pick(resource, 'amount', 'value'));
+  const currency =
+    asString(pick(resource, 'amount', 'currency')) ??
+    asString(pick(resource, 'amount', 'currency_code'));
+  if (!value || !currency) return {};
+  const cents = decimalToCents(value);
+  if (cents === null || cents <= 0) return {};
+  return { amountPaidCents: cents, amountCurrency: currency.toUpperCase() };
 }

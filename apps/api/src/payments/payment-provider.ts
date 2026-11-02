@@ -162,6 +162,14 @@ export interface NormalizedWebhookEvent {
   currentPeriodEnd: Date | null;
   /** Code d'échec normalisé (jamais un message brut non assaini). */
   failureCode: string | null;
+  /**
+   * ADR-0047 : somme effectivement payée, en centimes, si le fournisseur la
+   * déclare (`amount_paid` Stripe, `amount` PayPal). Absente sinon : la facture
+   * ne s'émet alors qu'à la console, jamais sur un montant deviné.
+   */
+  amountPaidCents?: number | null;
+  /** Devise de `amountPaidCents`, en majuscules (`USD`). */
+  amountCurrency?: string | null;
 }
 
 /**

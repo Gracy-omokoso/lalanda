@@ -33,6 +33,10 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
+// ADR-0047
+import { subscriptionAmounts } from '@lalanda/engine';
+import { SUBSCRIPTION_TAX } from '@lalanda/shared/pricing';
+
 import { AuthGuard, type AuthenticatedRequest } from '../auth/auth.guard.js';
 import { CurrentOrgId } from '../auth/current-user.decorator.js';
 import { RequirePermission } from '../authz/authz.decorators.js';
@@ -198,6 +202,10 @@ export class BillingController {
     carriedCreditCents: number;
     currency: string;
     taxIncluded: false;
+    // ADR-0047 (décision n° 4) : TVA 16 % ajoutée au montant HT, calculée par le moteur.
+    taxCents: number;
+    totalDueCents: number;
+    tax: { group: string; ratePercent: string; label: string };
     effectiveAt: string | null;
   }> {
     const plan = asPlan(planParam);
@@ -212,6 +220,7 @@ export class BillingController {
         targetPlan: plan,
         targetInterval: interval,
       });
+      const amounts = subscriptionAmounts({ cents: amountDueCents, mode: 'ht' });
       return {
         plan,
         interval,
@@ -221,9 +230,16 @@ export class BillingController {
         creditCents: proration.creditCents,
         carriedCreditCents: proration.carriedCreditCents,
         currency: BILLING_CURRENCY,
-        // Hors taxes — la fiscalité de la vente numérique n'est pas arbitrée
-        // (docs/13 § Validation commerciale requise). Le dire est obligatoire.
+        // `amountDueCents` reste HORS TAXES (docs/13) ; ADR-0047 (décision n° 4,
+        // 3 nov. 2026) : la TVA 16 % s'y ajoute, et l'abonné verse `totalDueCents`.
         taxIncluded: false,
+        taxCents: amounts.taxCents,
+        totalDueCents: amounts.totalCents,
+        tax: {
+          group: SUBSCRIPTION_TAX.taxGroup,
+          ratePercent: SUBSCRIPTION_TAX.ratePercent,
+          label: SUBSCRIPTION_TAX.label,
+        },
         effectiveAt:
           proration.effect === 'period_end'
             ? (state.currentPeriodEnd?.toISOString() ?? null)

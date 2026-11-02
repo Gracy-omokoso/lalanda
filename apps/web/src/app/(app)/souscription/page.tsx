@@ -13,6 +13,7 @@
 import type { Metadata } from 'next';
 
 import { SubscriptionFunnel } from './_components/subscription-funnel';
+import { SubscriptionInvoices } from './_components/subscription-invoices';
 
 export const metadata: Metadata = { title: 'Abonnement — Lalanda' };
 
@@ -27,6 +28,8 @@ export default function SubscriptionPage(): React.ReactElement {
         </p>
       </header>
       <SubscriptionFunnel />
+      {/* ADR-0047 : factures de l'abonnement et fiche de facturation. */}
+      <SubscriptionInvoices />
     </section>
   );
 }

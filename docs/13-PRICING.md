@@ -339,8 +339,10 @@ plateforme **facturable** ; il ne décide d'aucun prix.
   un POST.
 - `GET .../subscription/quote` chiffre sans encaisser — le client voit le montant
   avant d'être envoyé chez un fournisseur.
-- Montants **hors taxes**, et la réponse le déclare (`taxIncluded: false`) : la
-  fiscalité de la vente numérique n'est pas arbitrée (voir plus bas).
+- Montants **hors taxes**, et la réponse le déclare (`taxIncluded: false`). Depuis
+  ADR-0047 (décision du 3 nov. 2026, à revoir avec l'expert-comptable), la TVA RDC
+  de 16 % (groupe B) s'y ajoute : le chiffrage rend aussi `taxCents` et
+  `totalDueCents`, et l'abonné verse le montant TTC, calculé par le moteur.
 
 ### Paiements
 
@@ -534,9 +536,12 @@ l'opérateur, ou chez nous. Tant qu'aucune politique de taux daté n'est arbitr�
 le circuit manuel expose l'écart de change à l'administrateur qui confirme le
 dépôt, ce qui est un travail invisible et une source d'erreur.
 
-De même, la fiscalité de la vente de service numérique n'est pas tranchée : tous
-les montants produits par l'API sont explicitement hors taxes, et l'interface le
-dit. **Ce point doit être arbitré avant le premier encaissement réel**, pas après.
+~~De même, la fiscalité de la vente de service numérique n'est pas tranchée.~~
+**Arbitré provisoirement le 3 nov. 2026 (ADR-0047)** : prix de la grille hors
+taxes, TVA RDC 16 % (groupe B) en sus ; une facture ordinaire est émise par
+l'organisation vendeuse (Go freelance SARLU) à chaque paiement confirmé, dans la
+devise payée, sans normalisation DGI tant que l'homologation n'est pas obtenue. À
+revoir avec l'expert-comptable.
 
 ### Ce qui était demandé au décideur
 
@@ -546,8 +551,9 @@ dit. **Ce point doit être arbitré avant le premier encaissement réel**, pas a
    **Fait** — Cabinet 39, annuel Business 790.
 3. ~~Antériorité des comptes déjà inscrits.~~ **Fait** — aucune antériorité.
 4. **Valider ou corriger la période de grâce de 7 jours.** Toujours ouvert.
-5. **Arbitrer devise de règlement et fiscalité (§ 5).** Toujours ouvert, et
-   toujours bloquant avant le premier encaissement réel.
+5. **Arbitrer devise de règlement et fiscalité (§ 5).** Fiscalité arbitrée
+   provisoirement (ADR-0047, 3 nov. 2026 : HT + TVA 16 %) ; le taux d'un paiement
+   mobile money en CDF reste ouvert (F5).
 
 ## Répartition des fonctionnalités par offre — À ARBITRER
 

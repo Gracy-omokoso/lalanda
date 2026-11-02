@@ -417,9 +417,10 @@ export const FAQ: readonly FaqEntry[] = [
   {
     question: 'Les prix sont-ils hors taxes ?',
     answer:
-      'Les montants affichés sont hors taxes. Le traitement fiscal applicable à une vente de ' +
-      'service numérique dépend de votre pays et de votre statut ; il n’est pas encore arbitré ' +
-      'et sera précisé sur la facture avant tout prélèvement.',
+      'Oui. Les montants affichés sont hors taxes ; la TVA de la RDC au taux de 16 % s’y ' +
+      'ajoute, et le montant à verser, taxe comprise, est affiché avant tout paiement. Une ' +
+      'facture est émise à chaque paiement confirmé et reste consultable depuis la page ' +
+      'Abonnement de votre organisation.',
   },
   {
     question: 'Puis-je résilier à tout moment ?',
