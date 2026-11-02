@@ -72,9 +72,12 @@ export function useReauth(): Reauth {
 export function ReauthGate({
   reauth,
   children,
+  description,
 }: {
   reauth: Reauth;
   children: React.ReactNode;
+  /** ADR-0053 — P2 : texte propre au geste protégé (défaut : intégrations). */
+  description?: string;
 }): React.ReactElement {
   const [motDePasse, setMotDePasse] = useState('');
   const [erreur, setErreur] = useState<string | null>(null);
@@ -118,9 +121,8 @@ export function ReauthGate({
         Confirmez votre mot de passe
       </h2>
       <p className="max-w-2xl text-sm text-[var(--foreground-muted)]">
-        Modifier un secret d’intégration exige une ré-authentification, valable dix minutes. Une
-        session volée ne suffit donc pas à remplacer une clé de paiement ou d’envoi d’e-mails. La
-        consultation de l’état des intégrations, elle, reste ouverte sans cette confirmation.
+        {description ??
+          'Modifier un secret d’intégration exige une ré-authentification, valable dix minutes. Une session volée ne suffit donc pas à remplacer une clé de paiement ou d’envoi d’e-mails. La consultation de l’état des intégrations, elle, reste ouverte sans cette confirmation.'}
       </p>
       <label className="flex max-w-sm flex-col gap-1 text-sm">
         <span className="font-mono text-[0.66rem] uppercase tracking-[0.1em] text-[var(--foreground-muted)]">

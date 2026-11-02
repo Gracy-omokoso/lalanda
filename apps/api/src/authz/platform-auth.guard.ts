@@ -35,7 +35,14 @@ import type { Connection } from 'mongoose';
 
 import type { AuthenticatedRequest } from '../auth/auth.guard.js';
 import { getAuth } from '../auth/auth.js';
-import { PLATFORM_CONSOLE_ROUTE_KEY, REQUIRED_PERMISSIONS_KEY } from './authz.decorators.js';
+import {
+  CONSOLE_IDLE_EXEMPT_KEY,
+  PLATFORM_CONSOLE_ROUTE_KEY,
+  REQUIRED_PERMISSIONS_KEY,
+} from './authz.decorators.js';
+// ADR-0053 — P2
+import { PLATFORM_LIMITS } from '@lalanda/shared/platform';
+import { sessionFingerprint } from '../integrations/reauth.service.js';
 
 /** Message générique d'un compte bloqué : ne dit ni qui, ni pourquoi (§ 6.1). */
 export const ACCOUNT_BLOCKED_MESSAGE = 'Votre compte est bloqué. Contactez le support.';
@@ -87,6 +94,12 @@ export class PlatformAuthGuard implements CanActivate {
       throw new ForbiddenException({ code: 'ACCOUNT_BLOCKED', message: ACCOUNT_BLOCKED_MESSAGE });
     }
 
+    // ADR-0053 — P2 : session de console de 12 heures d'inactivité (§ 2.4).
+    const idleExempt =
+      this.reflector.getAllAndOverride<boolean | undefined>(CONSOLE_IDLE_EXEMPT_KEY, targets) ===
+      true;
+    await this.touchConsoleSession(userId, req.headers.cookie, idleExempt);
+
     req.user = { id: userId, email: session.user.email, name: session.user.name ?? null };
     // Délibérément AUCUNE organisation : ni `orgId`, ni `targetOrgId`.
     delete req.orgId;
@@ -105,4 +118,60 @@ export class PlatformAuthGuard implements CanActivate {
       .findOne({ _id }, { projection: { disabledAt: 1 } });
     return user?.disabledAt != null;
   }
+
+  // ── ADR-0053 — P2 : session de console de 12 heures d'inactivité (§ 2.4) ──────
+  //
+  // La session better-auth dure plusieurs jours et sert aussi l'espace organisation ;
+  // la console, elle, se referme après 12 heures sans y être revenu. L'activité est
+  // suivie PAR SESSION (empreinte SHA-256 du cookie, jamais le jeton) dans
+  // `platform_console_activity`. Au-delà de 12 heures : `401 CONSOLE_SESSION_EXPIRED`,
+  // sauf si une ré-authentification de CETTE session a eu lieu depuis la dernière
+  // activité (`platform_reauth.confirmedAt`) — c'est ainsi que la console se rouvre,
+  // par `POST /admin/reauth` (exempté) ou `POST /me/reauth`. Une première visite, ou une
+  // requête sans cookie de session (tests unitaires), n'est jamais refusée par ce
+  // contrôle ; l'espace organisation n'est jamais touché.
+  private async touchConsoleSession(
+    userId: string,
+    cookieHeader: string | undefined,
+    idleExempt: boolean,
+  ): Promise<void> {
+    const fingerprint = sessionFingerprint(cookieHeader);
+    const db = this.connection.db;
+    if (!fingerprint || !db) return;
+    const now = Date.now();
+    const activity = db.collection<{
+      userId: string;
+      sessionFingerprint: string;
+      lastSeenAt: Date;
+    }>(CONSOLE_ACTIVITY_COLLECTION);
+    const row = await activity.findOne({ userId, sessionFingerprint: fingerprint });
+    const last = row ? new Date(row.lastSeenAt).getTime() : null;
+    if (last !== null && now - last > CONSOLE_IDLE_MS && !idleExempt) {
+      const reauth = await db.collection('platform_reauth').findOne({
+        userId,
+        sessionFingerprint: fingerprint,
+        confirmedAt: { $gt: new Date(last) },
+      });
+      if (!reauth) {
+        throw new UnauthorizedException({
+          code: 'CONSOLE_SESSION_EXPIRED',
+          message:
+            'Session de console expirée après 12 heures d’inactivité : ré-authentifiez-vous.',
+        });
+      }
+    }
+    // Une écriture par minute au plus : l'inactivité se mesure en heures.
+    if (idleExempt && last !== null && now - last > CONSOLE_IDLE_MS) return;
+    if (last === null || now - last > 60_000) {
+      await activity.updateOne(
+        { userId, sessionFingerprint: fingerprint },
+        { $set: { lastSeenAt: new Date(now) } },
+        { upsert: true },
+      );
+    }
+  }
 }
+
+/** Collection de l'activité de console, par session (ADR-0053 — P2). */
+export const CONSOLE_ACTIVITY_COLLECTION = 'platform_console_activity';
+const CONSOLE_IDLE_MS = PLATFORM_LIMITS.consoleSessionIdleHours * 3_600_000;

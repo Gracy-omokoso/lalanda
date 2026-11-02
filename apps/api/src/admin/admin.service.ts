@@ -21,9 +21,23 @@
 //    `members.service.ts` et `platform-role-assignment.schema.ts`).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import type { Connection, Model } from 'mongoose';
+
+// ADR-0053 — P2
+import {
+  PLATFORM_LIMITS,
+  type PlatformReasonCategory,
+  type PlatformSuspensionMode,
+  type PlatformViewReason,
+} from '@lalanda/shared/platform';
 
 import { BillingService } from '../billing/billing.service.js';
 import { PLANS, type Plan } from '../billing/entitlements.js';
@@ -32,6 +46,14 @@ import {
   PlatformRoleAssignment,
   type PlatformRoleAssignmentDocument,
 } from '../authz/platform-role-assignment.schema.js';
+import {
+  platformActionHolders,
+  platformGrantDecision,
+  platformRoleGrantDecision,
+  platformSelfDealingDecision,
+  type PlatformAction,
+  type PlatformSelfDealingGesture,
+} from '../authz/platform-actions.js';
 import { PlatformAuditService } from '../integrations/platform-audit.service.js';
 import { Membership, type MembershipDocument } from '../organizations/membership.schema.js';
 import { Organization, type OrganizationDocument } from '../organizations/organization.schema.js';
@@ -40,6 +62,7 @@ import {
   OrganizationSuspension,
   type OrganizationSuspensionDocument,
 } from './organization-suspension.schema.js';
+import { newPlatformEventRef, PlatformMirrorService } from './mirror.js';
 
 export interface PlatformOverview {
   organizations: { total: number; suspended: number };
@@ -63,7 +86,30 @@ export interface AdminOrganizationSummary {
   projectCount: number;
   suspended: boolean;
   suspendedReason: string | null;
+  /** ADR-0053 — P2 : effet de la suspension active, `null` sans suspension. */
+  suspensionMode: PlatformSuspensionMode | null;
   createdAt: string;
+}
+
+/**
+ * Fiche détaillée d'une organisation (ADR-0053 § 2.6) : métadonnées seulement, plus
+ * l'adresse du Propriétaire (contact). Aucun montant, aucun contenu.
+ */
+export interface AdminOrganizationDetail extends AdminOrganizationSummary {
+  ownerEmail: string | null;
+  suspension: {
+    reasonCategory: string | null;
+    clientMessage: string | null;
+    internalNote: string | null;
+    mode: PlatformSuspensionMode;
+    suspendedAt: string;
+  } | null;
+}
+
+/** Fiche détaillée d'un compte : ses appartenances (nom d'organisation, rôle). */
+export interface AdminUserDetail extends AdminUserSummary {
+  organizations: Array<{ id: string; name: string; role: string }>;
+  blockedReasonCategory: string | null;
 }
 
 export interface AdminUserSummary {
@@ -94,6 +140,8 @@ export class AdminService {
     @Inject(BillingService) private readonly billing: BillingService,
     @Inject(AiUsageService) private readonly aiUsage: AiUsageService,
     @Inject(PlatformAuditService) private readonly audit: PlatformAuditService,
+    // ADR-0053 — P2
+    @Inject(PlatformMirrorService) private readonly mirrors: PlatformMirrorService,
   ) {}
 
   // ── Tableau de bord ────────────────────────────────────────────────────────
@@ -154,14 +202,23 @@ export class AdminService {
 
   // ── Organisations ──────────────────────────────────────────────────────────
 
+  /**
+   * ADR-0053 § 2.6 : sans recherche, la PREMIÈRE page seulement ; au-delà (`limit` au-delà
+   * de la page par défaut), la recherche est obligatoire (`400 SEARCH_REQUIRED`).
+   */
   async listOrganizations(query: {
     q?: string;
     limit?: number;
   }): Promise<AdminOrganizationSummary[]> {
-    const limit = Math.min(Math.max(query.limit ?? 50, 1), 200);
+    const q = query.q?.trim() ?? '';
+    if (q.length > 0 && q.length < PLATFORM_LIMITS.searchMinLength) {
+      throw searchRequired();
+    }
+    if (q.length === 0 && (query.limit ?? FIRST_PAGE) > FIRST_PAGE) throw searchRequired();
+    const limit = Math.min(Math.max(query.limit ?? FIRST_PAGE, 1), 200);
     const filter: Record<string, unknown> = {};
-    if (query.q) {
-      const rx = new RegExp(escapeRegExp(query.q), 'i');
+    if (q) {
+      const rx = new RegExp(escapeRegExp(q), 'i');
       filter['$or'] = [{ name: rx }, { slug: rx }];
     }
     const docs = await this.orgs.find(filter).sort({ createdAt: -1 }).limit(limit).exec();
@@ -169,12 +226,45 @@ export class AdminService {
   }
 
   async getOrganization(orgId: string): Promise<AdminOrganizationSummary> {
-    const doc = await this.orgs
-      .findById(orgId)
-      .exec()
-      .catch(() => null);
-    if (!doc) throw new NotFoundException({ code: 'ORG_NOT_FOUND' });
-    return this.summarizeOrganization(doc);
+    return this.summarizeOrganization(await this.orgOrThrow(orgId));
+  }
+
+  /**
+   * Fiche détaillée — lecture JOURNALISÉE avec son motif (`platform.organization.viewed`,
+   * § 2.6, critère 7).
+   */
+  async viewOrganization(
+    orgId: string,
+    reason: PlatformViewReason,
+    actor: AdminActor,
+  ): Promise<AdminOrganizationDetail> {
+    const org = await this.orgOrThrow(orgId);
+    const [summary, suspension, ownerEmail] = await Promise.all([
+      this.summarizeOrganization(org),
+      this.suspensions.findOne({ organizationId: orgId, liftedAt: null }).lean().exec(),
+      this.emailOf(org.ownerId),
+    ]);
+    await this.audit.record({
+      actorUserId: actor.userId,
+      actorRole: actor.platformRole,
+      action: 'platform.organization.viewed',
+      targetType: 'organization',
+      targetId: orgId,
+      metadata: { reason },
+    });
+    return {
+      ...summary,
+      ownerEmail,
+      suspension: suspension
+        ? {
+            reasonCategory: suspension.reasonCategory ?? null,
+            clientMessage: suspension.clientMessage ?? null,
+            internalNote: suspension.internalNote ?? suspension.reason ?? null,
+            mode: suspensionModeOf(suspension.mode),
+            suspendedAt: new Date(suspension.suspendedAt).toISOString(),
+          }
+        : null,
+    };
   }
 
   private async summarizeOrganization(
@@ -200,112 +290,238 @@ export class AdminService {
       projectCount,
       suspended: Boolean(suspension),
       suspendedReason: suspension?.reason ?? null,
+      suspensionMode: suspension ? suspensionModeOf(suspension.mode) : null,
       createdAt: new Date((doc as unknown as { createdAt: Date }).createdAt).toISOString(),
     };
   }
 
   /**
-   * Change le plan d'une organisation.
+   * Change le plan d'une organisation — route HISTORIQUE, servie une version
+   * (ADR-0053 § 7) avant les octrois du lot P3.
    *
-   * `BillingService.setPlan` existe depuis S16b et était resté INTERNE, faute de
-   * chemin d'appel légitime : « aucun endpoint public de changement de plan tant
-   * que le paiement n'est pas intégré ». `/admin` est ce chemin — un opérateur
-   * plateforme, tracé, sous `billing.manage`. Ce n'est pas un contournement du
-   * paiement : c'est l'octroi manuel qui existait déjà en base, rendu visible.
+   * Depuis ADR-0053 (P2) : motif obligatoire (catégorie, message client, note interne),
+   * ré-authentification (contrôleur), contrôle de conflit d'intérêts (§ 2.6), seconde
+   * personne au sens de `platformGrantDecision` (§ 5.3) et miroir « Équipe Lalanda »
+   * dans le journal du client (F4). Le retour à `free` n'est pas un octroi : il ne
+   * passe pas par la seconde personne.
    */
-  async setPlan(orgId: string, plan: Plan, actor: AdminActor): Promise<AdminOrganizationSummary> {
+  async setPlan(
+    orgId: string,
+    input: {
+      plan: Plan;
+      reasonCategory: PlatformReasonCategory;
+      clientMessage: string;
+      internalNote: string;
+    },
+    actor: AdminActor,
+  ): Promise<AdminOrganizationSummary> {
+    const { plan } = input;
     if (!PLANS.includes(plan)) {
       throw new BadRequestException({ code: 'UNKNOWN_PLAN', message: `Plan inconnu : ${plan}.` });
     }
-    const org = await this.orgs
-      .findById(orgId)
-      .exec()
-      .catch(() => null);
-    if (!org) throw new NotFoundException({ code: 'ORG_NOT_FOUND' });
+    const org = await this.orgOrThrow(orgId);
+    const { soleOperator } = await this.assertNoSelfDealing(
+      'billing.grant',
+      'platform.billing.grant',
+      orgId,
+      actor,
+    );
+    let soleApprover = false;
+    if (plan !== 'free') {
+      const now = new Date();
+      const decision = platformGrantDecision({
+        plan,
+        startsAt: now,
+        endsAt: null,
+        requestedBy: actor.userId,
+        approverUserId: null,
+        holdersCount: await this.effectiveHoldersCount('platform.billing.grant'),
+      });
+      if (!decision.ok || decision.status === 'pending_approval') {
+        throw new ConflictException({
+          code: 'SECOND_PERSON_REQUIRED',
+          message:
+            'Un octroi sans échéance exige une seconde personne : passez par les octrois ' +
+            'manuels de la console (ADR-0053 § 6.2).',
+        });
+      }
+      soleApprover = decision.soleApprover;
+    }
 
     const previous = await this.billing.getPlan(orgId);
     await this.billing.setPlan(orgId, plan);
+    const ref = newPlatformEventRef();
     await this.audit.record({
       actorUserId: actor.userId,
       actorRole: actor.platformRole,
       action: 'organization.plan_changed',
       targetType: 'organization',
       targetId: orgId,
-      metadata: { from: previous, to: plan },
+      metadata: {
+        from: previous,
+        to: plan,
+        reasonCategory: input.reasonCategory,
+        internalNote: input.internalNote,
+        clientMessage: input.clientMessage,
+        ref,
+        soleOperator,
+        soleApprover,
+      },
+    });
+    await this.mirrors.mirror({
+      organizationId: orgId,
+      action: 'platform.organization.plan_changed',
+      targetType: 'organization',
+      targetId: orgId,
+      platformEventRef: ref,
+      clientMessage: input.clientMessage,
+      soleOperator: soleOperator || soleApprover,
+      facts: { from: previous, to: plan },
     });
     return this.summarizeOrganization(org);
   }
 
   /**
-   * Suspend une organisation : décision enregistrée, motif obligatoire, sessions
-   * des membres révoquées, trace d'audit.
-   *
-   * Voir `organization-suspension.schema.ts` pour ce que la suspension NE fait
-   * pas : elle déconnecte, elle ne verrouille pas la reconnexion.
+   * Suspend une organisation (ADR-0053 § 6.1) : catégorie, message client, note
+   * interne, mode. L'effet est appliqué par `PermissionsGuard` sur toute route
+   * d'organisation qui la vise ; les sessions des membres NE sont PLUS révoquées (un
+   * membre garde ses autres organisations).
    */
   async suspendOrganization(
     orgId: string,
-    reason: string,
+    input: {
+      reasonCategory: PlatformReasonCategory;
+      clientMessage: string;
+      internalNote: string;
+      mode: PlatformSuspensionMode;
+    },
     actor: AdminActor,
   ): Promise<AdminOrganizationSummary> {
-    const org = await this.orgs
-      .findById(orgId)
-      .exec()
-      .catch(() => null);
-    if (!org) throw new NotFoundException({ code: 'ORG_NOT_FOUND' });
-
+    const org = await this.orgOrThrow(orgId);
+    const { soleOperator } = await this.assertNoSelfDealing(
+      'orgs.suspend',
+      'platform.orgs.suspend',
+      orgId,
+      actor,
+    );
     const existing = await this.suspensions
       .findOne({ organizationId: orgId, liftedAt: null })
+      .lean()
       .exec();
-    if (!existing) {
-      await this.suspensions.create({
-        organizationId: orgId,
-        reason,
-        suspendedBy: actor.userId,
-        suspendedAt: new Date(),
-        liftedAt: null,
-        liftedBy: null,
-        _schemaVersion: 1,
+    if (existing) {
+      throw new ConflictException({
+        code: 'ORGANIZATION_ALREADY_SUSPENDED',
+        message: 'Cette organisation est déjà suspendue.',
       });
     }
+    await this.suspensions.create({
+      organizationId: orgId,
+      reason: input.internalNote,
+      reasonCategory: input.reasonCategory,
+      clientMessage: input.clientMessage,
+      internalNote: input.internalNote,
+      mode: input.mode,
+      suspendedBy: actor.userId,
+      suspendedAt: new Date(),
+      liftedAt: null,
+      liftedBy: null,
+      _schemaVersion: 2,
+    });
 
-    const revoked = await this.revokeSessionsOfOrganization(orgId);
+    const ref = newPlatformEventRef();
     await this.audit.record({
       actorUserId: actor.userId,
       actorRole: actor.platformRole,
       action: 'organization.suspended',
       targetType: 'organization',
       targetId: orgId,
-      metadata: { reason, revokedSessions: revoked },
+      metadata: {
+        reasonCategory: input.reasonCategory,
+        internalNote: input.internalNote,
+        clientMessage: input.clientMessage,
+        mode: input.mode,
+        ref,
+        soleOperator,
+      },
+    });
+    await this.mirrors.mirror({
+      organizationId: orgId,
+      action: 'platform.organization.suspended',
+      targetType: 'organization',
+      targetId: orgId,
+      platformEventRef: ref,
+      clientMessage: input.clientMessage,
+      soleOperator,
+      facts: { mode: input.mode },
     });
     return this.summarizeOrganization(org);
   }
 
-  async liftSuspension(orgId: string, actor: AdminActor): Promise<AdminOrganizationSummary> {
-    const org = await this.orgs
-      .findById(orgId)
-      .exec()
-      .catch(() => null);
-    if (!org) throw new NotFoundException({ code: 'ORG_NOT_FOUND' });
-    await this.suspensions
+  /** Rétablit une organisation : motif et message client obligatoires (§ 6.1). */
+  async liftSuspension(
+    orgId: string,
+    input: { liftReason: string; liftedClientMessage: string },
+    actor: AdminActor,
+  ): Promise<AdminOrganizationSummary> {
+    const org = await this.orgOrThrow(orgId);
+    const { soleOperator } = await this.assertNoSelfDealing(
+      'orgs.restore',
+      'platform.orgs.suspend',
+      orgId,
+      actor,
+    );
+    const res = await this.suspensions
       .updateOne(
         { organizationId: orgId, liftedAt: null },
-        { $set: { liftedAt: new Date(), liftedBy: actor.userId } },
+        {
+          $set: {
+            liftedAt: new Date(),
+            liftedBy: actor.userId,
+            liftReason: input.liftReason,
+            liftedClientMessage: input.liftedClientMessage,
+          },
+        },
       )
       .exec();
+    if (res.modifiedCount === 0) {
+      throw new ConflictException({
+        code: 'ORGANIZATION_NOT_SUSPENDED',
+        message: 'Cette organisation n’est pas suspendue.',
+      });
+    }
+    const ref = newPlatformEventRef();
     await this.audit.record({
       actorUserId: actor.userId,
       actorRole: actor.platformRole,
       action: 'organization.suspension_lifted',
       targetType: 'organization',
       targetId: orgId,
-      metadata: {},
+      metadata: {
+        liftReason: input.liftReason,
+        clientMessage: input.liftedClientMessage,
+        ref,
+        soleOperator,
+      },
+    });
+    await this.mirrors.mirror({
+      organizationId: orgId,
+      action: 'platform.organization.restored',
+      targetType: 'organization',
+      targetId: orgId,
+      platformEventRef: ref,
+      clientMessage: input.liftedClientMessage,
+      soleOperator,
     });
     return this.summarizeOrganization(org);
   }
 
   // ── Utilisateurs ───────────────────────────────────────────────────────────
 
+  /**
+   * Recherche de comptes. La RECHERCHE OBLIGATOIRE (`q` de trois caractères au moins,
+   * ADR-0053 § 2.6, F8) est jugée par le contrôleur ; ce service sert aussi la relecture
+   * interne d'un compte par son adresse exacte (`userOrThrow`).
+   */
   async searchUsers(query: { q?: string; limit?: number }): Promise<AdminUserSummary[]> {
     const db = this.connection.db;
     if (!db) return [];
@@ -321,8 +537,11 @@ export class AdminService {
       .sort({ createdAt: -1 })
       .limit(limit)
       .toArray();
+    return this.summarizeUsers(rows);
+  }
 
-    const ids = rows.map((r) => String(r._id));
+  private async summarizeUsers(rows: Array<Record<string, unknown>>): Promise<AdminUserSummary[]> {
+    const ids = rows.map((r) => String(r['_id']));
     const [roleRows, memberships] = await Promise.all([
       this.platformRoles
         .find({ userId: { $in: ids }, revokedAt: null })
@@ -351,7 +570,7 @@ export class AdminService {
     }
 
     return rows.map((r) => {
-      const id = String(r._id);
+      const id = String(r['_id']);
       return {
         id,
         email: String(r['email'] ?? ''),
@@ -364,25 +583,73 @@ export class AdminService {
     });
   }
 
+  /** Fiche détaillée d'un compte — lecture journalisée (`platform.user.viewed`). */
+  async viewUser(
+    userId: string,
+    reason: PlatformViewReason,
+    actor: AdminActor,
+  ): Promise<AdminUserDetail> {
+    const row = await this.userRowOrThrow(userId);
+    const [summary] = await this.summarizeUsers([row]);
+    const memberships = await this.memberships
+      .find({ userId })
+      .select({ organizationId: 1, role: 1 })
+      .lean()
+      .exec();
+    const orgDocs = await this.orgs
+      .find({ _id: { $in: memberships.map((m) => m.organizationId) } })
+      .select({ name: 1 })
+      .lean()
+      .exec()
+      .catch(() => []);
+    const names = new Map(orgDocs.map((o) => [String(o._id), String(o.name)]));
+    await this.audit.record({
+      actorUserId: actor.userId,
+      actorRole: actor.platformRole,
+      action: 'platform.user.viewed',
+      targetType: 'user',
+      targetId: userId,
+      metadata: { reason },
+    });
+    return {
+      ...summary!,
+      organizations: memberships.map((m) => ({
+        id: m.organizationId,
+        name: names.get(m.organizationId) ?? '',
+        role: String(m.role),
+      })),
+      blockedReasonCategory: (row['disabledReasonCategory'] as string | null | undefined) ?? null,
+    };
+  }
+
   /**
-   * Attribue un rôle plateforme.
-   *
-   * Aucune vérification d'escalade n'est faite : la route est réservée au
-   * `platform_super_admin`, qui détient déjà le rôle le plus élevé. La règle R7
-   * (« on n'attribue que ce qu'on détient », ADR-0012 §6) porte sur les rôles
-   * d'ORGANISATION et n'a pas d'équivalent plateforme dans l'ADR. Le jour où un
-   * `platform_admin` pourra attribuer des rôles, il faudra en écrire une.
+   * Attribue un rôle plateforme (§ 5.3) : jamais à soi-même (`409 SELF_GRANT_FORBIDDEN`),
+   * jamais à une adresse non vérifiée (`409 EMAIL_NOT_VERIFIED`, § 2.4) ; motif et
+   * échéance du Support jugés par le schéma partagé.
    */
   async grantPlatformRole(
     userId: string,
     role: string,
-    input: { reason?: string; expiresAt?: string },
+    input: { reason: string; expiresAt?: string },
     actor: AdminActor,
   ): Promise<AdminUserSummary> {
     if (!isPlatformRole(role)) {
       throw new BadRequestException({ code: 'UNKNOWN_ROLE', message: `Rôle inconnu : ${role}.` });
     }
-    await this.assertUserExists(userId);
+    const self = platformRoleGrantDecision({ actorUserId: actor.userId, targetUserId: userId });
+    if (!self.ok) {
+      throw new ConflictException({
+        code: self.code,
+        message: 'Un opérateur ne s’attribue pas lui-même un rôle plateforme.',
+      });
+    }
+    const row = await this.userRowOrThrow(userId);
+    if (row['emailVerified'] !== true) {
+      throw new ConflictException({
+        code: 'EMAIL_NOT_VERIFIED',
+        message: 'L’attributaire doit d’abord vérifier son adresse e-mail.',
+      });
+    }
 
     const expiresAt = input.expiresAt ? new Date(input.expiresAt) : null;
     if (expiresAt && Number.isNaN(expiresAt.getTime())) {
@@ -397,7 +664,7 @@ export class AdminService {
         {
           $set: {
             grantedBy: actor.userId,
-            reason: input.reason ?? null,
+            reason: input.reason,
             expiresAt,
             revokedAt: null,
           },
@@ -415,7 +682,7 @@ export class AdminService {
       targetId: userId,
       metadata: {
         role,
-        reason: input.reason ?? null,
+        reason: input.reason,
         expiresAt: expiresAt ? expiresAt.toISOString() : null,
       },
     });
@@ -457,71 +724,201 @@ export class AdminService {
   }
 
   /**
-   * Désactive un compte : marque `disabledAt` et révoque toutes ses sessions.
-   *
-   * LIMITE CONNUE, à ne pas confondre avec « fait » : rien n'empêche l'utilisateur
-   * de se reconnecter. Le refus au moment de la connexion se déciderait dans
-   * `AuthGuard` (`apps/api/src/auth/`), hors du périmètre de ce lot. Ce qui est
-   * livré aujourd'hui déconnecte immédiatement et laisse une trace; le verrou
-   * complet tient en une lecture de `disabledAt` dans le guard, et il est
-   * documenté comme restant dans docs/17 § Implémenté (S21b).
+   * Bloque un compte (ADR-0053 § 6.1) : catégorie et note interne obligatoires, sessions
+   * révoquées, et — c'est la correction de F5 — connexion REFUSÉE ensuite :
+   * `AuthGuard`, `PlatformAuthGuard` et le crochet better-auth de création de session
+   * lisent `disabledAt` (`403 ACCOUNT_BLOCKED`). Miroir « Équipe Lalanda » dans le
+   * journal de chacune de ses organisations.
    */
-  async setUserDisabled(
+  async blockUser(
     userId: string,
-    disabled: boolean,
+    input: { reasonCategory: PlatformReasonCategory; internalNote: string },
     actor: AdminActor,
   ): Promise<AdminUserSummary> {
-    if (userId === actor.userId && disabled) {
+    if (userId === actor.userId) {
       throw new BadRequestException({
         code: 'SELF_DISABLE_FORBIDDEN',
-        message: 'Un administrateur ne peut pas désactiver son propre compte.',
+        message: 'Un opérateur ne peut pas bloquer son propre compte.',
       });
     }
-    const db = await this.assertUserExists(userId);
-    const { ObjectId } = await import('mongodb');
-    await db
-      .collection('user')
-      .updateOne(
-        { _id: new ObjectId(userId) },
-        { $set: { disabledAt: disabled ? new Date() : null } },
-      );
-
-    const revoked = disabled ? await this.revokeSessionsOfUser(userId) : 0;
+    const row = await this.userRowOrThrow(userId);
+    if (row['disabledAt'] != null) {
+      throw new ConflictException({
+        code: 'ACCOUNT_ALREADY_BLOCKED',
+        message: 'Ce compte est déjà bloqué.',
+      });
+    }
+    const db = this.connection.db!;
+    await db.collection('user').updateOne(
+      { _id: row['_id'] as never },
+      {
+        $set: {
+          disabledAt: new Date(),
+          disabledReasonCategory: input.reasonCategory,
+          disabledInternalNote: input.internalNote,
+          disabledBy: actor.userId,
+        },
+      },
+    );
+    const revoked = await this.revokeSessionsOfUser(userId);
+    const ref = newPlatformEventRef();
     await this.audit.record({
       actorUserId: actor.userId,
       actorRole: actor.platformRole,
-      action: disabled ? 'user.disabled' : 'user.enabled',
+      action: 'user.disabled',
       targetType: 'user',
       targetId: userId,
-      metadata: { revokedSessions: revoked },
+      metadata: {
+        reasonCategory: input.reasonCategory,
+        internalNote: input.internalNote,
+        revokedSessions: revoked,
+        ref,
+      },
     });
+    await this.mirrorToMemberships(userId, 'platform.member.blocked', ref);
     return this.userOrThrow(userId);
+  }
+
+  /** Débloque un compte : note interne obligatoire, comme pour bloquer (§ 5.3). */
+  async unblockUser(
+    userId: string,
+    input: { internalNote: string },
+    actor: AdminActor,
+  ): Promise<AdminUserSummary> {
+    const row = await this.userRowOrThrow(userId);
+    if (row['disabledAt'] == null) {
+      throw new ConflictException({
+        code: 'ACCOUNT_NOT_BLOCKED',
+        message: 'Ce compte n’est pas bloqué.',
+      });
+    }
+    const db = this.connection.db!;
+    await db.collection('user').updateOne(
+      { _id: row['_id'] as never },
+      {
+        $set: { disabledAt: null },
+        $unset: { disabledReasonCategory: '', disabledInternalNote: '', disabledBy: '' },
+      },
+    );
+    const ref = newPlatformEventRef();
+    await this.audit.record({
+      actorUserId: actor.userId,
+      actorRole: actor.platformRole,
+      action: 'user.enabled',
+      targetType: 'user',
+      targetId: userId,
+      metadata: { internalNote: input.internalNote, ref },
+    });
+    await this.mirrorToMemberships(userId, 'platform.member.unblocked', ref);
+    return this.userOrThrow(userId);
+  }
+
+  // ── Séparation des tâches (ADR-0053 § 2.6) ─────────────────────────────────
+
+  /**
+   * `409 PLATFORM_SELF_DEALING` si l'opérateur est MEMBRE de l'organisation cible et
+   * qu'un autre détenteur effectif de l'action existe ; seul détenteur : permis, marqué.
+   */
+  private async assertNoSelfDealing(
+    gesture: PlatformSelfDealingGesture,
+    action: PlatformAction,
+    orgId: string,
+    actor: AdminActor,
+  ): Promise<{ soleOperator: boolean }> {
+    const isMember =
+      (await this.memberships
+        .countDocuments({ userId: actor.userId, organizationId: orgId })
+        .exec()) > 0;
+    const decision = platformSelfDealingDecision({
+      gesture,
+      actorIsMemberOfTarget: isMember,
+      holdersCount: isMember ? await this.effectiveHoldersCount(action) : 0,
+    });
+    if (!decision.ok) {
+      throw new ConflictException({
+        code: decision.code,
+        message:
+          'Vous êtes membre de cette organisation : un autre opérateur doit accomplir ce geste.',
+      });
+    }
+    return { soleOperator: decision.soleOperator };
+  }
+
+  /**
+   * Détenteurs EFFECTIFS d'une action plateforme : personnes distinctes dont un rôle
+   * détenteur n'est ni révoqué ni expiré, et dont le compte n'est pas bloqué.
+   */
+  private async effectiveHoldersCount(action: PlatformAction): Promise<number> {
+    const now = new Date();
+    const userIds: string[] = await this.platformRoles
+      .distinct('userId', {
+        role: { $in: platformActionHolders(action) },
+        revokedAt: null,
+        $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
+      })
+      .exec();
+    const db = this.connection.db;
+    if (!db || userIds.length === 0) return userIds.length;
+    const { ObjectId } = await import('mongodb');
+    const oids = userIds.filter((id) => ObjectId.isValid(id)).map((id) => new ObjectId(id));
+    const blocked = await db
+      .collection('user')
+      .countDocuments({ _id: { $in: oids }, disabledAt: { $ne: null } });
+    return userIds.length - blocked;
+  }
+
+  private async mirrorToMemberships(userId: string, action: string, ref: string): Promise<void> {
+    const memberships = await this.memberships
+      .find({ userId })
+      .select({ organizationId: 1 })
+      .lean()
+      .exec();
+    for (const m of memberships) {
+      await this.mirrors.mirror({
+        organizationId: m.organizationId,
+        action,
+        targetType: 'user',
+        targetId: userId,
+        platformEventRef: ref,
+      });
+    }
   }
 
   // ── Utilitaires ────────────────────────────────────────────────────────────
 
-  private async assertUserExists(userId: string): Promise<NonNullable<Connection['db']>> {
+  private async orgOrThrow(orgId: string): Promise<OrganizationDocument> {
+    const doc = await this.orgs
+      .findById(orgId)
+      .exec()
+      .catch(() => null);
+    if (!doc) throw new NotFoundException({ code: 'ORG_NOT_FOUND' });
+    return doc;
+  }
+
+  private async emailOf(userId: string): Promise<string | null> {
+    const db = this.connection.db;
+    if (!db) return null;
+    const { ObjectId } = await import('mongodb');
+    if (!ObjectId.isValid(userId)) return null;
+    const row = await db
+      .collection('user')
+      .findOne({ _id: new ObjectId(userId) }, { projection: { email: 1 } });
+    return row ? String(row['email'] ?? '') || null : null;
+  }
+
+  private async userRowOrThrow(userId: string): Promise<Record<string, unknown>> {
     const db = this.connection.db;
     if (!db) throw new NotFoundException({ code: 'USER_NOT_FOUND' });
     const { ObjectId } = await import('mongodb');
-    let oid: InstanceType<typeof ObjectId>;
-    try {
-      oid = new ObjectId(userId);
-    } catch {
-      throw new NotFoundException({ code: 'USER_NOT_FOUND' });
-    }
-    const exists = await db.collection('user').findOne({ _id: oid }, { projection: { _id: 1 } });
-    if (!exists) throw new NotFoundException({ code: 'USER_NOT_FOUND' });
-    return db;
+    if (!ObjectId.isValid(userId)) throw new NotFoundException({ code: 'USER_NOT_FOUND' });
+    const row = await db.collection('user').findOne({ _id: new ObjectId(userId) });
+    if (!row) throw new NotFoundException({ code: 'USER_NOT_FOUND' });
+    return row as Record<string, unknown>;
   }
 
   private async userOrThrow(userId: string): Promise<AdminUserSummary> {
-    const db = this.connection.db;
-    if (!db) throw new NotFoundException({ code: 'USER_NOT_FOUND' });
-    const { ObjectId } = await import('mongodb');
-    const row = await db.collection('user').findOne({ _id: new ObjectId(userId) });
-    if (!row) throw new NotFoundException({ code: 'USER_NOT_FOUND' });
-    const [found] = await this.searchUsers({ q: String(row['email']), limit: 1 });
+    const row = await this.userRowOrThrow(userId);
+    const [found] = await this.summarizeUsers([row]);
     if (found) return found;
     throw new NotFoundException({ code: 'USER_NOT_FOUND' });
   }
@@ -534,17 +931,21 @@ export class AdminService {
     const res = await db.collection('session').deleteMany({ userId: new ObjectId(userId) });
     return res.deletedCount ?? 0;
   }
+}
 
-  private async revokeSessionsOfOrganization(orgId: string): Promise<number> {
-    const members = await this.memberships
-      .find({ organizationId: orgId })
-      .select({ userId: 1 })
-      .lean()
-      .exec();
-    let total = 0;
-    for (const m of members) total += await this.revokeSessionsOfUser(m.userId);
-    return total;
-  }
+/** Première page des organisations, lisible sans recherche (§ 2.6). */
+const FIRST_PAGE = 50;
+
+function searchRequired(): BadRequestException {
+  return new BadRequestException({
+    code: 'SEARCH_REQUIRED',
+    message: `Recherche : ${PLATFORM_LIMITS.searchMinLength} caractères au moins.`,
+  });
+}
+
+/** Mode d'une suspension ; une suspension antérieure à P2 (sans mode) vaut `read_only`. */
+function suspensionModeOf(mode: unknown): PlatformSuspensionMode {
+  return mode === 'full' ? 'full' : 'read_only';
 }
 
 /** Échappe une saisie utilisateur avant construction d'une `RegExp`. */
