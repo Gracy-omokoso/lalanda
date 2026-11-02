@@ -178,10 +178,18 @@ export class InvitationsController {
   @Get('invitations/pending')
   async listMine(
     @CurrentUser() user: { email: string },
-  ): Promise<{ invitations: (InvitationView & { token: string })[] }> {
+  ): Promise<{ invitations: (InvitationView & { token: string; organizationName: string })[] }> {
     const docs = await this.invitations.listPendingForEmail(user.email);
+    // ADR-0052 — O5 : le nom de l'organisation qui invite, pour que la bannière dise
+    // QUI invite et vers quel espace on bascule. L'invitée légitime le lit déjà dans
+    // le courriel d'invitation : rien de plus n'est révélé.
+    const names = await this.organizationNames(docs.map((d) => d.organizationId));
     return {
-      invitations: docs.map((d) => ({ ...toView(d), token: d.token })),
+      invitations: docs.map((d) => ({
+        ...toView(d),
+        token: d.token,
+        organizationName: names.get(d.organizationId) ?? '',
+      })),
     };
   }
 
@@ -189,7 +197,7 @@ export class InvitationsController {
   async accept(
     @CurrentUser() user: { id: string; email: string },
     @Body() body: unknown,
-  ): Promise<{ organizationId: string }> {
+  ): Promise<{ organizationId: string; organizationName: string }> {
     const parsed = AcceptInvitationSchema.safeParse(body);
     if (!parsed.success) {
       throw new BadRequestException({ code: 'INVALID_REQUEST', issues: parsed.error.issues });
@@ -199,6 +207,22 @@ export class InvitationsController {
       user.email,
       parsed.data.token,
     );
-    return { organizationId };
+    // ADR-0052 — O5 : « Vous êtes maintenant dans l'espace de X » — l'appelant en est
+    // désormais membre.
+    const names = await this.organizationNames([organizationId]);
+    return { organizationId, organizationName: names.get(organizationId) ?? '' };
+  }
+
+  /** Noms des organisations citées (ADR-0052 — O5), sans modifier le service. */
+  private async organizationNames(ids: readonly string[]): Promise<Map<string, string>> {
+    const names = new Map<string, string>();
+    for (const id of new Set(ids)) {
+      try {
+        names.set(id, (await this.organizations.findOrgById(id)).name);
+      } catch {
+        // Organisation disparue : le nom reste vide, l'interface dit « l'organisation ».
+      }
+    }
+    return names;
   }
 }

@@ -2,7 +2,11 @@
 
 // Sélecteur d'organisation : liste des orgs du user, marque l'active, permet d'en créer une nouvelle.
 // L'org active est stockée dans le cookie `active_org_id`, lu par l'AuthGuard côté API.
-// Un switch = set cookie + router.refresh() pour recharger les données côté serveur.
+//
+// ADR-0052 — O1 : un changement d'organisation pose le cookie puis RECHARGE la page vers
+// l'accueil (`basculerOrganisation`) : aucun état en mémoire de l'ancienne organisation ne
+// survit. L'organisation affichée est celle que l'API sert (`activeOrganizationId`, F2) ;
+// chaque ligne dit le rôle et l'avancement de la mise en route.
 //
 // ADR-0030 § 2 : il vit en tête de la barre latérale (panneau pétrole) et dans
 // le tiroir mobile, et affiche sous le nom l'OFFRE EFFECTIVE de l'organisation
@@ -10,33 +14,67 @@
 // ouvre directement sa mise en route.
 
 import { Modal } from '@lalanda/ui';
-import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 import { IconeNav } from '@/components/icones-navigation';
-import { api, readActiveOrgCookie, setActiveOrgCookie, type OrganizationView } from '@/lib/api';
+import {
+  api,
+  readActiveOrgCookie,
+  setActiveOrgCookie,
+  type OrganizationSetupProgressView,
+  type OrganizationView,
+} from '@/lib/api';
+import { basculerOrganisation } from '@/lib/bascule-organisation';
 
 import { PLAN_LABELS, STATUS_LABELS } from '../souscription/_components/subscription-model';
+import {
+  DESTINATION_APRES_CREATION,
+  FORMULAIRE_CREATION_VIDE,
+  PAYS_CREATION,
+  PHRASE_NOUVELLE_ORGANISATION,
+  TYPES_ORGANISATION,
+  avertissementPays,
+  cookieARectifier,
+  detailOrganisation,
+  organisationAffichee,
+  validerCreation,
+  type FormulaireCreation,
+} from './org-switcher-model';
 import { useShell } from './shell-context';
 
 export function OrgSwitcher({ replie = false }: { replie?: boolean }): React.ReactElement {
-  const router = useRouter();
-  const { subscription, rafraichir } = useShell();
+  const { subscription } = useShell();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [orgs, setOrgs] = useState<OrganizationView[] | null>(null);
   const [activeId, setActiveId] = useState<string | undefined>();
+  const [avancement, setAvancement] = useState<Map<string, OrganizationSetupProgressView>>(
+    () => new Map(),
+  );
   const [open, setOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     void refresh();
-    const enregistree = readActiveOrgCookie();
-    // Reposer le cookie le migre vers le domaine partagé avec l'API (`setActiveOrgCookie`) :
-    // un cookie posé avant ce correctif restait sur l'hôte de la page, invisible pour l'API.
-    if (enregistree) setActiveOrgCookie(enregistree);
-    setActiveId(enregistree);
   }, []);
+
+  // L'avancement de chaque organisation est lu à l'ouverture du menu (une lecture par
+  // ouverture : il change quand on avance dans la mise en route).
+  useEffect(() => {
+    if (!open) return;
+    let actif = true;
+    api
+      .listOrganizationsSetupProgress()
+      .then(({ organizations }) => {
+        if (actif) setAvancement(new Map(organizations.map((p) => [p.organizationId, p])));
+      })
+      .catch(() => {
+        /* silencieux : le menu reste utilisable sans l'avancement */
+      });
+    return () => {
+      actif = false;
+    };
+  }, [open]);
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent): void {
@@ -58,30 +96,29 @@ export function OrgSwitcher({ replie = false }: { replie?: boolean }): React.Rea
 
   async function refresh(): Promise<void> {
     try {
-      const { organizations } = await api.listOrganizations();
+      const { organizations, activeOrganizationId } = await api.listOrganizations();
       setOrgs(organizations);
-      // Si aucun cookie et au moins 1 org, on prend la première comme active affichée.
-      // Le cookie est posé aussi : sans lui, l'API servirait l'organisation primaire
-      // pendant que le sélecteur en afficherait peut-être une autre.
-      if (!readActiveOrgCookie() && organizations[0]) {
-        setActiveOrgCookie(organizations[0].id);
-        setActiveId(organizations[0].id);
+      // F2 : l'organisation affichée est celle que l'API sert. Le cookie est reposé quand il
+      // manque ou en désigne une autre — ce qui le migre aussi vers le domaine partagé avec
+      // l'API (`setActiveOrgCookie`) : l'étiquette et les données disent toujours la même chose.
+      const servie = organisationAffichee(organizations, activeOrganizationId);
+      if (servie && cookieARectifier(readActiveOrgCookie(), servie.id)) {
+        setActiveOrgCookie(servie.id);
       }
+      setActiveId(servie?.id);
     } catch {
       /* silencieux — l'app fonctionne quand même via la primary org côté API */
     }
   }
 
-  function switchTo(orgId: string): void {
-    setActiveOrgCookie(orgId);
-    setActiveId(orgId);
+  function switchTo(org: OrganizationView): void {
     setOpen(false);
-    rafraichir();
-    router.push('/accueil');
-    router.refresh();
+    if (org.id === activeId) return;
+    // Cookie posé, reprises de session effacées, page RECHARGÉE sur l'accueil.
+    basculerOrganisation(org, '/accueil');
   }
 
-  const active = orgs?.find((o) => o.id === activeId) ?? orgs?.[0];
+  const active = orgs ? organisationAffichee(orgs, activeId) : undefined;
   // Offre effective (essai, suspension compris) : c'est ce à quoi l'organisation
   // a droit aujourd'hui, pas ce qu'elle a souscrit (docs/13).
   const offre = subscription
@@ -132,7 +169,7 @@ export function OrgSwitcher({ replie = false }: { replie?: boolean }): React.Rea
                 <button
                   type="button"
                   role="menuitem"
-                  onClick={() => switchTo(o.id)}
+                  onClick={() => switchTo(o)}
                   className={`flex w-full items-start justify-between gap-2 px-3 py-2 text-left text-sm transition hover:bg-[var(--surface-muted)] ${
                     o.id === (active?.id ?? '') ? 'bg-[var(--surface-muted)]' : ''
                   }`}
@@ -140,7 +177,7 @@ export function OrgSwitcher({ replie = false }: { replie?: boolean }): React.Rea
                   <div className="flex flex-col gap-0.5">
                     <span className="font-medium">{o.name}</span>
                     <span className="text-xs text-[var(--foreground-muted)]">
-                      {o.role} · {o.type}
+                      {detailOrganisation(o, avancement.get(o.id))}
                     </span>
                   </div>
                   {o.id === (active?.id ?? '') ? (
@@ -170,15 +207,10 @@ export function OrgSwitcher({ replie = false }: { replie?: boolean }): React.Rea
       {modalOpen ? (
         <CreateOrgModal
           onClose={() => setModalOpen(false)}
-          onCreated={async (org) => {
-            setModalOpen(false);
-            setActiveOrgCookie(org.id);
-            await refresh();
-            setActiveId(org.id);
-            rafraichir();
-            // ADR-0030 § 8 : une organisation neuve commence par sa mise en route.
-            router.push('/organisation/mise-en-route');
-            router.refresh();
+          onCreated={(org) => {
+            // ADR-0052 § 5 : la nouvelle organisation devient active et commence par sa
+            // mise en route, étape « Société » ; rechargement complet comme toute bascule.
+            basculerOrganisation(org, DESTINATION_APRES_CREATION);
           }}
         />
       ) : null}
@@ -193,30 +225,38 @@ function CreateOrgModal({
   onClose: () => void;
   onCreated: (org: OrganizationView) => void;
 }): React.ReactElement {
-  const [name, setName] = useState('');
+  const [form, setForm] = useState<FormulaireCreation>(FORMULAIRE_CREATION_VIDE);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const avertissement = avertissementPays(form.pays);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
-    if (!name.trim()) return;
+    const v = validerCreation(form);
+    if (!v.ok) {
+      setError(v.erreur);
+      return;
+    }
     setCreating(true);
     setError(null);
     try {
-      const org = await api.createOrganization({ name: name.trim() });
+      const org = await api.createOrganization(v.corps);
       onCreated(org);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Impossible de créer');
+      setError(err instanceof Error ? err.message : 'Impossible de créer l’organisation.');
       setCreating(false);
     }
   }
+
+  const champ =
+    'rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]';
 
   return (
     <Modal
       open
       onClose={onClose}
       title="Nouvelle organisation"
-      description="Vous en devenez Propriétaire. Une mise en route en quatre étapes vous attend ensuite."
+      description={PHRASE_NOUVELLE_ORGANISATION}
       size="sm"
       busy={creating}
     >
@@ -233,13 +273,56 @@ function CreateOrgModal({
             maxLength={100}
             autoFocus
             placeholder="Ex : Ma PME SARL"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
+            value={form.nom}
+            onChange={(e) => setForm({ ...form, nom: e.target.value })}
+            className={champ}
           />
         </label>
+        <label className="flex flex-col gap-1.5 text-sm">
+          <span className="font-medium">Pays</span>
+          <select
+            value={form.pays}
+            onChange={(e) => setForm({ ...form, pays: e.target.value })}
+            aria-describedby={avertissement ? 'org-creation-pays-aide' : undefined}
+            className={champ}
+          >
+            {PAYS_CREATION.map((p) => (
+              <option key={p.code} value={p.code}>
+                {p.libelle}
+              </option>
+            ))}
+          </select>
+          {avertissement ? (
+            <span id="org-creation-pays-aide" className="text-xs text-[var(--warn)]">
+              {avertissement}
+            </span>
+          ) : null}
+        </label>
+        <label className="flex flex-col gap-1.5 text-sm">
+          <span className="font-medium">Type d’organisation</span>
+          <select
+            value={form.type}
+            onChange={(e) =>
+              setForm({ ...form, type: e.target.value as FormulaireCreation['type'] })
+            }
+            className={champ}
+          >
+            {TYPES_ORGANISATION.map((t) => (
+              <option key={t.code} value={t.code}>
+                {t.libelle}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="text-xs text-[var(--foreground-muted)]">
+          Vous en devenez Propriétaire. Sa mise en route vous attend ensuite ; rien n’est copié
+          depuis votre organisation actuelle.
+        </p>
         {error ? (
-          <div className="rounded-md border border-[var(--danger)]/30 bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger)]">
+          <div
+            role="alert"
+            className="rounded-md border border-[var(--danger)]/30 bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger)]"
+          >
             {error}
           </div>
         ) : null}
@@ -253,7 +336,7 @@ function CreateOrgModal({
           </button>
           <button
             type="submit"
-            disabled={creating || !name.trim()}
+            disabled={creating || !form.nom.trim()}
             className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--accent-foreground)] transition hover:opacity-90 disabled:opacity-50"
           >
             {creating ? 'Création…' : 'Créer'}

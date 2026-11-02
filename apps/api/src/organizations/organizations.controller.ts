@@ -10,7 +10,7 @@ import {
 import { z } from 'zod';
 
 import { AuthGuard } from '../auth/auth.guard.js';
-import { CurrentUser } from '../auth/current-user.decorator.js';
+import { CurrentOrgId, CurrentUser } from '../auth/current-user.decorator.js';
 import { ORG_ROLE_LABELS, type OrgRole } from '../authz/permissions.js';
 import { OrganizationsService } from './organizations.service.js';
 
@@ -38,9 +38,15 @@ export class OrganizationsController {
   constructor(@Inject(OrganizationsService) private readonly orgs: OrganizationsService) {}
 
   @Get()
-  async list(@CurrentUser() user: { id: string }): Promise<{ organizations: OrganizationView[] }> {
+  async list(
+    @CurrentUser() user: { id: string },
+    // ADR-0052 — O1 (F2) : l'organisation que l'API SERT (cookie vérifié, sinon primaire).
+    @CurrentOrgId() activeOrgId: string,
+  ): Promise<{ organizations: OrganizationView[]; activeOrganizationId: string }> {
     const rows = await this.orgs.listForUser(user.id);
     return {
+      // ADR-0052 — O1 : le sélecteur affiche CETTE organisation, pas la première appartenance.
+      activeOrganizationId: activeOrgId,
       organizations: rows.map(({ org, role, canClosePeriods }) => ({
         id: String(org._id),
         name: org.name,
