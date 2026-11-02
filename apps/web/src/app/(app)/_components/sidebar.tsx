@@ -15,11 +15,14 @@ import { useEffect, useState } from 'react';
 
 import { BrandLogo } from '@/components/brand-logo';
 import { IconeNav } from '@/components/icones-navigation';
+// ADR-0053 — P4
+import { api, type MyFeaturesView } from '@/lib/api';
 
 import {
   ACCUEIL_HREF,
   appActive,
   appsVisibles,
+  explicationOffre,
   moduleParId,
   NAV_MODULES,
   sousOptionActive,
@@ -121,6 +124,7 @@ function ListeApplications({
   const { actions } = useShell();
   const m = moduleParId(module);
   const apps = appsVisibles(actions, module);
+  const fonctionnalites = useMesFonctionnalites(actions);
   const active = appActive(pathname, apps);
   const sousActive = sousOptionActive(pathname, apps);
 
@@ -161,6 +165,7 @@ function ListeApplications({
                 sousActive={sousActive}
                 replie={replie}
                 onNavigate={onNavigate}
+                explication={explicationOffre(app.id, fonctionnalites)}
               />
             </li>
           ))}
@@ -170,18 +175,45 @@ function ListeApplications({
   );
 }
 
+/**
+ * ADR-0053 — P4 : `GET /me/features` de l'organisation active, relu quand ses droits
+ * changent. `null` tant qu'il n'est pas connu ou en cas d'échec : rien n'est affirmé.
+ */
+function useMesFonctionnalites(actions: readonly unknown[] | null): MyFeaturesView | null {
+  const [vue, setVue] = useState<MyFeaturesView | null>(null);
+  useEffect(() => {
+    if (actions === null) return;
+    let annule = false;
+    api
+      .getMyFeatures()
+      .then((v) => {
+        if (!annule) setVue(v);
+      })
+      .catch(() => {
+        if (!annule) setVue(null);
+      });
+    return () => {
+      annule = true;
+    };
+  }, [actions]);
+  return vue;
+}
+
 function Application({
   app,
   actif,
   sousActive,
   replie,
   onNavigate,
+  explication = null,
 }: {
   app: NavApp;
   actif: boolean;
   sousActive: string | null;
   replie: boolean;
   onNavigate: (() => void) | undefined;
+  /** ADR-0053 — P4 : « Disponible avec l'offre … », affiché plutôt que caché. */
+  explication?: string | null;
 }): React.ReactElement {
   const aSousOptions = app.sousOptions.length > 0 && !replie;
   const [ouvert, setOuvert] = useState(actif);
@@ -208,7 +240,7 @@ function Application({
           // Replié, l'icône est seule à l'écran : le nom passe par `aria-label`,
           // et `title` le montre au survol. Jamais une icône muette.
           aria-label={replie ? app.label : undefined}
-          title={replie ? app.label : undefined}
+          title={replie ? (explication ? `${app.label} — ${explication}` : app.label) : undefined}
           className={`${base} ${etat} ${replie ? 'h-10 w-10 flex-none justify-center' : 'gap-3 py-2 pl-2 pr-2'}`}
         >
           {actif ? (
@@ -218,7 +250,16 @@ function Application({
             />
           ) : null}
           <IconeNav id={app.icon} className="h-[1.05rem] w-[1.05rem] shrink-0" />
-          {replie ? null : <span className="truncate">{app.label}</span>}
+          {replie ? null : explication ? (
+            <span className="flex min-w-0 flex-col">
+              <span className="truncate">{app.label}</span>
+              <span className="truncate text-[0.68rem] font-normal text-[var(--nav-muted)]">
+                {explication}
+              </span>
+            </span>
+          ) : (
+            <span className="truncate">{app.label}</span>
+          )}
         </Link>
         {aSousOptions ? (
           <button

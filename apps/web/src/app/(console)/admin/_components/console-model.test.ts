@@ -114,13 +114,13 @@ describe('catalogue des modules', () => {
       '/admin',
       '/admin/organisations',
       '/admin/utilisateurs',
+      '/admin/fonctionnalites',
       '/admin/integrations',
       '/admin/journal',
     ]);
     const bientot = CONSOLE_MODULES.filter((m) => m.etat === 'bientot').map((m) => m.id);
     expect(bientot).toEqual([
       'abonnements',
-      'fonctionnalites',
       'annonces',
       'statistiques',
       'finances',

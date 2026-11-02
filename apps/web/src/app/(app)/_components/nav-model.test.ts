@@ -29,6 +29,9 @@ import {
   NAV_MODULES,
   ordreAccueil,
   sousOptionActive,
+  // ADR-0053 — P4
+  explicationOffre,
+  FONCTIONNALITE_PAR_APP,
 } from './nav-model';
 
 const PROPRIETAIRE: OrgAction[] = [
@@ -703,5 +706,44 @@ describe('ADR-0051 § 10 — second volet des ressources humaines (H16)', () => 
     expect(sousOptionActive('/rh/frais')).toBe('rh-frais');
     expect(sousOptionActive('/rh/evaluations')).toBe('rh-evaluations');
     expect(rh.sousOptions.map((s) => s.href)).toContain('/rh/planning');
+  });
+});
+
+// ─── ADR-0053 — P4 : explication des fonctionnalités hors offre ─────────────
+
+describe('explicationOffre (ADR-0053 — P4)', () => {
+  const vue = (status: 'included' | 'override' | 'not_in_plan', minimalPlan: 'pro' | null) => ({
+    plan: 'free' as const,
+    features: [
+      {
+        key: 'crm' as const,
+        label: 'CRM',
+        module: 'run' as const,
+        status,
+        minimalPlan,
+        overrideEndsAt: null,
+        overrideReason: null,
+      },
+    ],
+  });
+
+  it('n’affirme rien sans réponse de l’API, ni pour une application hors catalogue', () => {
+    expect(explicationOffre('crm', null)).toBeNull();
+    expect(explicationOffre('pilotage', vue('not_in_plan', 'pro'))).toBeNull();
+  });
+
+  it('se tait quand l’offre ou une dérogation permet la fonctionnalité', () => {
+    expect(explicationOffre('crm', vue('included', 'pro'))).toBeNull();
+    expect(explicationOffre('crm', vue('override', 'pro'))).toBeNull();
+  });
+
+  it('explique une fonctionnalité absente par l’offre minimale', () => {
+    expect(explicationOffre('crm', vue('not_in_plan', 'pro'))).toBe('Disponible avec l’offre Pro');
+    expect(explicationOffre('crm', vue('not_in_plan', null))).toBe('Non comprise dans votre offre');
+  });
+
+  it('chaque application liée existe dans la navigation', () => {
+    const ids = new Set(NAV_APPS.map((a) => a.id));
+    for (const id of Object.keys(FONCTIONNALITE_PAR_APP)) expect(ids.has(id), id).toBe(true);
   });
 });
