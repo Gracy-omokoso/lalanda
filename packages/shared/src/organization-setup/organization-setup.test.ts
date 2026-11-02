@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import { ACCOUNTING_ACTIVATION_MISSING_CODES } from '../accounting/constants.js';
 import {
+  ORGANIZATION_SETUP_DEFERRABLE_STEPS,
   ORGANIZATION_SETUP_STEPS,
+  PutOrganizationSetupModulesSchema,
+  isDeferrableStep,
+  normalizeSetupModules,
   ORGANIZATION_SETUP_STEP_IDS,
   OrganizationSetupViewSchema,
   type OrganizationSetupView,
@@ -19,6 +23,7 @@ function vue(): OrganizationSetupView {
       missing: [ORGANIZATION_SETUP_STEPS[id].missingCode],
       canAct: true,
     })),
+    modules: null,
     capabilities: {
       invoice: { ready: false, missing: ['fiscal_profile'] },
       normalize: { ready: false, enabled: false, missing: ['fiscal_profile', 'country_cd'] },
@@ -84,5 +89,35 @@ describe('organization-setup (ADR-0052 — O0)', () => {
     expect(OrganizationSetupViewSchema.safeParse({ ...v, steps: v.steps.slice(1) }).success).toBe(
       false,
     );
+  });
+
+  // ADR-0052 — O2/O3 : déclarations mémorisées (§ 4).
+  it('« pas maintenant » : les quatre étapes de § 4, jamais la fiche fiscale (critère 7)', () => {
+    expect(ORGANIZATION_SETUP_DEFERRABLE_STEPS).toEqual([
+      'normalisation',
+      'tresorerie',
+      'comptabilite',
+      'equipe',
+    ]);
+    expect(isDeferrableStep('fiscal')).toBe(false);
+    expect(isDeferrableStep('societe')).toBe(false);
+    expect(isDeferrableStep('equipe')).toBe(true);
+  });
+
+  it('modules : au moins un, sans doublon ; `null` = tous ; ordre canonique', () => {
+    const ok = (b: unknown) => PutOrganizationSetupModulesSchema.safeParse(b).success;
+    expect(ok({ modules: ['run'] })).toBe(true);
+    expect(ok({ modules: null })).toBe(true);
+    expect(ok({ modules: [] })).toBe(false);
+    expect(ok({ modules: ['run', 'run'] })).toBe(false);
+    expect(ok({ modules: ['ventes'] })).toBe(false);
+    expect(ok({ modules: ['run'], extra: 1 })).toBe(false);
+    expect(normalizeSetupModules(['grow', 'build'])).toEqual(['build', 'grow']);
+    expect(normalizeSetupModules(['grow', 'run', 'build'])).toBeNull();
+    expect(normalizeSetupModules(null)).toBeNull();
+  });
+
+  it('les modules sont désormais enregistrés par `organization.manage` (décision n° 3)', () => {
+    expect(ORGANIZATION_SETUP_STEPS.modules.action).toBe('organization.manage');
   });
 });

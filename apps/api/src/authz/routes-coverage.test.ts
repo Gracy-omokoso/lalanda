@@ -2392,3 +2392,36 @@ describe('ADR-0051 — H10 : notes de frais et avances', () => {
     }
   });
 });
+
+// ADR-0052 — O2/O3 : déclarations de la mise en route (§ 4 et § 7).
+describe('ADR-0052 — O2/O3 : déclarations de la mise en route', () => {
+  it('chaque déclaration exige l’action de son étape (§ 7) ; la lecture reste ouverte à tout membre', () => {
+    const attendu: Record<string, Action[]> = {
+      'OrganizationSetupController.confirmCountry': ['organization.manage'],
+      'OrganizationSetupController.putModules': ['organization.manage'],
+      'OrganizationSetupController.deferNormalisation': ['fiscal.manage'],
+      'OrganizationSetupController.undeferNormalisation': ['fiscal.manage'],
+      'OrganizationSetupController.deferTresorerie': ['treasury.manage'],
+      'OrganizationSetupController.undeferTresorerie': ['treasury.manage'],
+      'OrganizationSetupController.deferComptabilite': ['accounting.manage'],
+      'OrganizationSetupController.undeferComptabilite': ['accounting.manage'],
+      'OrganizationSetupController.deferEquipe': ['members.invite'],
+      'OrganizationSetupController.undeferEquipe': ['members.invite'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) =>
+      r.cle.startsWith('OrganizationSetupController.'),
+    );
+    expect(routes.map((r) => r.cle).sort()).toEqual(
+      [...Object.keys(attendu), 'OrganizationSetupController.read'].sort(),
+    );
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+      expect(route!.rolesPlateforme, cle).toBeUndefined();
+      expect(SANS_PERMISSION[cle], cle).toBeUndefined();
+    }
+    // Critère 7 : aucune route de report pour la fiche fiscale.
+    expect(routes.some((r) => /fiscal$/i.test(r.cle))).toBe(false);
+    expect(SANS_PERMISSION['OrganizationSetupController.read']).toBeDefined();
+  });
+});

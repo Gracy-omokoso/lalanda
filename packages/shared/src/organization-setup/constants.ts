@@ -22,8 +22,8 @@ export type OrganizationSetupStepId = (typeof ORGANIZATION_SETUP_STEP_IDS)[numbe
 
 /**
  * `done` : la donnée existe (lue sur le serveur) ; `todo` : elle manque ; `deferred` :
- * « pas maintenant » déclaré (§ 4). O0 ne mémorise aucune déclaration : `deferred` n'est
- * jamais produit avant le lot qui crée `organization_setup`.
+ * « pas maintenant » déclaré (§ 4, collection `organization_setup`, lot O2) ; une étape
+ * faite n'est jamais `deferred`.
  */
 export const ORGANIZATION_SETUP_STEP_STATES = ['done', 'todo', 'deferred'] as const;
 export type OrganizationSetupStepState = (typeof ORGANIZATION_SETUP_STEP_STATES)[number];
@@ -144,5 +144,12 @@ export const ORGANIZATION_SETUP_STEPS: Readonly<
     action: 'members.invite',
     missingCode: 'invitation',
   },
-  modules: { level: 'optional', requiredFor: [], action: null, missingCode: 'modules_choice' },
+  // ADR-0052 — O3 : décision ouverte n° 3, valeur par défaut — le choix de l'organisation
+  // est enregistré par un détenteur d'`organization.manage` ; tout membre le lit.
+  modules: {
+    level: 'optional',
+    requiredFor: [],
+    action: 'organization.manage',
+    missingCode: 'modules_choice',
+  },
 });

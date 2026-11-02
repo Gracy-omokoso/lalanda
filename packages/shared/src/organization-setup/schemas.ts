@@ -17,6 +17,8 @@ import {
   ORGANIZATION_SETUP_STEP_MISSING_CODES,
   ORGANIZATION_SETUP_STEP_STATES,
 } from './constants.js';
+// ADR-0052 — O3
+import { ORGANIZATION_SETUP_MODULE_IDS } from './declarations.js';
 
 export const OrganizationSetupStepSchema = z
   .object({
@@ -36,6 +38,11 @@ export const OrganizationSetupViewSchema = z
   .object({
     organizationId: z.string().min(1),
     steps: z.array(OrganizationSetupStepSchema).length(ORGANIZATION_SETUP_STEP_IDS.length),
+    /**
+     * ADR-0052 — O3 : modules choisis pour l'organisation (codes, jamais une valeur) ;
+     * `null` = tous, ou aucun choix encore (l'étape `modules` dit lequel).
+     */
+    modules: z.array(z.enum(ORGANIZATION_SETUP_MODULE_IDS)).nullable(),
     capabilities: z
       .object({
         invoice: z

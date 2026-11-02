@@ -205,9 +205,10 @@ e2eSuite('mise en route — statut de complétude (ADR-0052 — O0)', () => {
     }
   });
 
-  it('critère 8 — `canAct` suit les droits : le Lecteur ne peut rien, sauf ranger ses modules', async () => {
+  it('critère 8 — `canAct` suit les droits : le Lecteur ne peut rien (modules : décision n° 3)', async () => {
     const v = await statut(as('bruno', 'A'));
-    for (const s of v.steps) expect(s.canAct, s.id).toBe(s.id === 'modules');
+    // ADR-0052 — O3 : le choix des modules de l'organisation exige `organization.manage`.
+    for (const s of v.steps) expect(s.canAct, s.id).toBe(false);
     const proprio = await statut(as('alice', 'A'));
     expect(proprio.steps.every((s) => s.canAct)).toBe(true);
   });
@@ -436,5 +437,130 @@ e2eSuite('mise en route — statut de complétude (ADR-0052 — O0)', () => {
     // cookie hors appartenance et sert son organisation principale.
     const intrus = await statut(as('bruno', 'B'));
     expect(intrus.organizationId).not.toBe(org.B);
+  });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // ADR-0052 — O2/O3 : déclarations mémorisées (§ 4), collection `organization_setup`
+  // ───────────────────────────────────────────────────────────────────────────
+  const del = (c: string[], path: string) => request(server()).delete(path).set('Cookie', c);
+  const auditDe = (action: string, o: 'A' | 'B') =>
+    db.collection('audit_events').countDocuments({ organizationId: org[o], action });
+
+  it('O2 critère 7 — « pas maintenant » exige l’action de l’étape, jamais pour la fiche fiscale', async () => {
+    const bruno = as('bruno', 'A');
+    expect((await put(bruno, '/organizations/current/setup/deferred/tresorerie', {})).status).toBe(
+      403,
+    );
+    expect((await put(bruno, '/organizations/current/setup/country-confirmation', {})).status).toBe(
+      403,
+    );
+    const alice = as('alice', 'A');
+    for (const id of ['fiscal', 'societe', 'devises', 'modules']) {
+      const res = await put(alice, `/organizations/current/setup/deferred/${id}`, {});
+      expect(res.status, id).toBe(404);
+    }
+  });
+
+  it('O2 critère 6 — reporter, reprendre, puis retirer le report quand l’étape est faite', async () => {
+    const c = as('alice', 'A');
+    expect(etape(await statut(c), 'tresorerie').state).toBe('todo');
+    const reportee = OrganizationSetupViewSchema.parse(
+      ok(await put(c, '/organizations/current/setup/deferred/tresorerie', {})),
+    );
+    expect(etape(reportee, 'tresorerie')).toMatchObject({
+      state: 'deferred',
+      missing: ['treasury_account'],
+    });
+    expect(await auditDe('organization_setup.deferred', 'A')).toBe(1);
+
+    const reprise = OrganizationSetupViewSchema.parse(
+      ok(await del(c, '/organizations/current/setup/deferred/tresorerie')),
+    );
+    expect(etape(reprise, 'tresorerie').state).toBe('todo');
+    expect(await auditDe('organization_setup.deferred', 'A')).toBe(2);
+
+    ok(await put(c, '/organizations/current/setup/deferred/tresorerie', {}));
+    ok(
+      await post(c, '/treasury/accounts', {
+        name: 'Banque',
+        kind: 'bank',
+        currency: 'USD',
+        openingBalance: '0.00',
+        openingDate: '2026-01-01',
+      }),
+      201,
+    );
+    expect(etape(await statut(c), 'tresorerie').state).toBe('done');
+    const doc = await db.collection('organization_setup').findOne({ organizationId: org.A });
+    expect((doc?.['deferred'] as Record<string, unknown>)['tresorerie']).toBeUndefined();
+
+    // Étape déjà faite : rien à reporter.
+    const equipe = await put(c, '/organizations/current/setup/deferred/equipe', {});
+    expect(equipe.status).toBe(409);
+    expect(equipe.body.code).toBe('SETUP_STEP_ALREADY_DONE');
+  });
+
+  it('O2 — confirmer le pays fait l’étape 1, avec une trace', async () => {
+    const c = as('alice', 'A');
+    expect(etape(await statut(c), 'societe').state).toBe('todo');
+    const v = OrganizationSetupViewSchema.parse(
+      ok(await put(c, '/organizations/current/setup/country-confirmation', {})),
+    );
+    expect(etape(v, 'societe')).toMatchObject({ state: 'done', missing: [] });
+    expect(await auditDe('organization_setup.country_confirmed', 'A')).toBe(1);
+  });
+
+  it('O3 critère 11 — modules enregistrés côté serveur par `organization.manage`, lus par tous', async () => {
+    const bruno = as('bruno', 'A');
+    const alice = as('alice', 'A');
+    expect(
+      (await put(bruno, '/organizations/current/setup/modules', { modules: ['run'] })).status,
+    ).toBe(403);
+    for (const corps of [
+      { modules: [] },
+      { modules: ['ventes'] },
+      { modules: ['run', 'run'] },
+      {},
+    ]) {
+      expect((await put(alice, '/organizations/current/setup/modules', corps)).status).toBe(400);
+    }
+    const v = OrganizationSetupViewSchema.parse(
+      ok(await put(alice, '/organizations/current/setup/modules', { modules: ['grow', 'run'] })),
+    );
+    expect(v.modules).toEqual(['run', 'grow']);
+    expect(etape(v, 'modules').state).toBe('done');
+    // Un autre membre, sur un autre « navigateur », lit le même choix.
+    expect((await statut(bruno)).modules).toEqual(['run', 'grow']);
+    const tous = OrganizationSetupViewSchema.parse(
+      ok(await put(alice, '/organizations/current/setup/modules', { modules: null })),
+    );
+    expect(tous.modules).toBeNull();
+    expect(etape(tous, 'modules').state).toBe('done');
+    expect(await auditDe('organization_setup.modules_changed', 'A')).toBe(2);
+  });
+
+  it('O2 isolation — les déclarations de A ne touchent jamais B, et inversement', async () => {
+    const b = await statut(as('alice', 'B'));
+    expect(b.modules).toBeNull();
+    for (const s of b.steps) expect(s.state, s.id).toBe('todo');
+    expect(
+      await db.collection('organization_setup').countDocuments({ organizationId: org.B }),
+    ).toBe(0);
+
+    const avantA = await db.collection('organization_setup').findOne({ organizationId: org.A });
+    ok(await put(as('alice', 'B'), '/organizations/current/setup/deferred/equipe', {}));
+    ok(await put(as('alice', 'B'), '/organizations/current/setup/modules', { modules: ['build'] }));
+    const apresA = await db.collection('organization_setup').findOne({ organizationId: org.A });
+    expect(apresA).toEqual(avantA);
+
+    const a = await statut(as('alice', 'A'));
+    expect(a.modules).toBeNull();
+    expect(etape(a, 'equipe').state).toBe('done');
+    const b2 = await statut(as('alice', 'B'));
+    expect(b2.modules).toEqual(['build']);
+    expect(etape(b2, 'equipe').state).toBe('deferred');
+    expect(etape(b2, 'societe').state).toBe('todo');
+    expect(await auditDe('organization_setup.deferred', 'B')).toBe(1);
+    expect(await auditDe('organization_setup.modules_changed', 'B')).toBe(1);
   });
 });

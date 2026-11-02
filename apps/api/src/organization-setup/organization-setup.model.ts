@@ -8,6 +8,8 @@
 import type { AccountingActivationMissingCode } from '@lalanda/shared/accounting';
 import {
   ORGANIZATION_SETUP_STEPS,
+  type OrganizationSetupDeferrableStep,
+  type OrganizationSetupModuleId,
   ORGANIZATION_SETUP_STEP_IDS,
   type NormalizeMissingCode,
   type OrganizationSetupStepId,
@@ -18,7 +20,7 @@ import type { Action } from '../authz/permissions.js';
 
 /** Ce que le serveur sait de l'organisation, sans aucune valeur. */
 export interface OrganizationSetupFacts {
-  /** Déclaration « pays confirmé » (§ 4) — aucune n'est mémorisée avant le lot qui crée `organization_setup`. */
+  /** Déclaration « pays confirmé » (§ 4, `organization_setup`). */
   countryConfirmed: boolean;
   fiscalProfile: boolean;
   /** Un document `organization_settings` existe (devise enregistrée). */
@@ -37,6 +39,18 @@ export interface OrganizationSetupFacts {
   teamStarted: boolean;
   /** Choix de modules enregistré côté serveur (lot O3). */
   modulesChosen: boolean;
+  /** ADR-0052 — O3 : modules choisis ; `null` = tous (ou aucun choix). */
+  modules?: readonly OrganizationSetupModuleId[] | null;
+  /** ADR-0052 — O2 : « pas maintenant » déclarés (§ 4) ; ignorés pour une étape faite. */
+  deferred?: readonly OrganizationSetupDeferrableStep[];
+}
+
+/** Étapes faites parmi `ids` : sert au service à retirer un « pas maintenant » devenu inutile. */
+export function doneSteps(
+  facts: OrganizationSetupFacts,
+  ids: readonly OrganizationSetupStepId[] = ORGANIZATION_SETUP_STEP_IDS,
+): OrganizationSetupStepId[] {
+  return ids.filter((id) => stepDone(id, facts));
 }
 
 function stepDone(id: OrganizationSetupStepId, f: OrganizationSetupFacts): boolean {
@@ -72,12 +86,18 @@ export function buildOrganizationSetupView(
   actions: readonly Action[],
 ): OrganizationSetupView {
   const held = new Set<string>(actions);
+  const deferred = new Set<string>(facts.deferred ?? []);
   const steps = ORGANIZATION_SETUP_STEP_IDS.map((id) => {
     const def = ORGANIZATION_SETUP_STEPS[id];
     const done = stepDone(id, facts);
     return {
       id,
-      state: done ? ('done' as const) : ('todo' as const),
+      // `done` prime : un « pas maintenant » est retiré dès que l'étape est faite (critère 6).
+      state: done
+        ? ('done' as const)
+        : deferred.has(id)
+          ? ('deferred' as const)
+          : ('todo' as const),
       level: def.level,
       requiredFor: [...def.requiredFor],
       missing: done ? [] : [def.missingCode],
@@ -89,6 +109,7 @@ export function buildOrganizationSetupView(
   return {
     organizationId,
     steps,
+    modules: facts.modulesChosen && facts.modules ? [...facts.modules] : null,
     capabilities: {
       invoice: facts.fiscalProfile
         ? { ready: true, missing: [] }
