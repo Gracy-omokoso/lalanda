@@ -558,13 +558,50 @@ export interface UpdatedProjectionView {
 export const ACTIVE_ORG_COOKIE = 'active_org_id';
 
 /**
+ * Domaine du cookie `active_org_id` : le parent commun de la page et de l'API.
+ *
+ * En production la page (`lalanda.co`) et l'API (`api.lalanda.co`) sont sur deux
+ * hôtes : un cookie sans `Domain` reste attaché à `lalanda.co` et n'est jamais
+ * envoyé à l'API, qui retombe alors sur l'organisation primaire — le changement
+ * d'organisation n'avait aucun effet sur les données. En local (`localhost:3000` et
+ * `localhost:3001`), les cookies ignorent le port : pas de `Domain`.
+ * `undefined` = cookie limité à l'hôte (même hôte, localhost, IP, ou aucun parent commun).
+ */
+export function activeOrgCookieDomain(pageHost: string, apiUrl: string): string | undefined {
+  let apiHost: string;
+  try {
+    apiHost = new URL(apiUrl).hostname.toLowerCase();
+  } catch {
+    return undefined;
+  }
+  const page = pageHost.toLowerCase();
+  if (page === apiHost) return undefined;
+  if (page === 'localhost' || /^[\d.]+$/.test(page) || page.includes(':')) return undefined;
+  const a = page.split('.').reverse();
+  const b = apiHost.split('.').reverse();
+  const commun: string[] = [];
+  for (let i = 0; i < Math.min(a.length, b.length) && a[i] === b[i]; i += 1) commun.push(a[i]!);
+  // Au moins deux étiquettes (`lalanda.co`) : jamais un domaine de premier niveau seul.
+  if (commun.length < 2) return undefined;
+  return commun.reverse().join('.');
+}
+
+/**
  * Positionne le cookie `active_org_id` côté client (non-HttpOnly pour l'UI).
  * Le guard côté API le lit à la requête suivante et scope les données à cette org.
  * SameSite=Lax : le cookie n'est pas envoyé sur requêtes cross-site (protection CSRF de base).
+ * Posé sur le domaine parent commun avec l'API (voir `activeOrgCookieDomain`) ; l'ancienne
+ * version limitée à l'hôte est effacée pour qu'un seul cookie subsiste.
  */
 export function setActiveOrgCookie(orgId: string): void {
   if (typeof document === 'undefined') return;
   const oneYear = 60 * 60 * 24 * 365;
+  const domain = activeOrgCookieDomain(window.location.hostname, API_URL);
+  if (domain) {
+    document.cookie = `${ACTIVE_ORG_COOKIE}=; Max-Age=0; Path=/; SameSite=Lax`;
+    document.cookie = `${ACTIVE_ORG_COOKIE}=${encodeURIComponent(orgId)}; Max-Age=${oneYear}; Path=/; Domain=${domain}; SameSite=Lax; Secure`;
+    return;
+  }
   document.cookie = `${ACTIVE_ORG_COOKIE}=${encodeURIComponent(orgId)}; Max-Age=${oneYear}; Path=/; SameSite=Lax`;
 }
 
