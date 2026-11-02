@@ -50,6 +50,11 @@ import { PLANS, PLAN_CATALOG, type Plan } from '@lalanda/shared/pricing';
 import { ACTIONS, ORG_PERMISSION_MATRIX, type Action, type OrgRole } from '../authz/permissions.js';
 // ADR-0053 — P0
 import { PLATFORM_ACTIONS, type PlatformAction } from '../authz/platform-actions.js';
+// ADR-0052 — O0
+import {
+  ORGANIZATION_SETUP_STEPS,
+  type OrganizationSetupStepId,
+} from '@lalanda/shared/organization-setup';
 import { e2eSuite, makeE2EApp, registerAndLogin, teardown } from './e2e-utils.js';
 import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
@@ -1676,6 +1681,29 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
       const moi = await request(s).get('/me/permissions').set('Cookie', cookiesDe(role));
       for (const action of moi.body.actions as string[]) {
         expect(action.startsWith('platform.'), `${role} × ${action}`).toBe(false);
+      }
+    }
+  }, 60_000);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // ADR-0052 — O0 : statut de complétude, ouvert à tout membre (§ 7), sans action nouvelle
+  // ───────────────────────────────────────────────────────────────────────────
+
+  it('ADR-0052 critères 1 et 8 — `/organizations/current/setup` : 200 pour chaque rôle, `canAct` = droits effectifs', async () => {
+    const s = serveur();
+    for (const role of ROLES_TESTES) {
+      const res = await request(s)
+        .get('/organizations/current/setup')
+        .set('Cookie', cookiesDe(role));
+      expect(res.status, `${role} : ${JSON.stringify(res.body)}`).toBe(200);
+      expect(res.body.organizationId, role).toBe(orgId);
+      const moi = await request(s).get('/me/permissions').set('Cookie', cookiesDe(role));
+      const actions = moi.body.actions as string[];
+      for (const etape of res.body.steps as { id: OrganizationSetupStepId; canAct: boolean }[]) {
+        const action = ORGANIZATION_SETUP_STEPS[etape.id].action;
+        expect(etape.canAct, `${role} × ${etape.id}`).toBe(
+          action === null ? true : actions.includes(action),
+        );
       }
     }
   }, 60_000);
