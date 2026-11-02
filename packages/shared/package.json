@@ -81,6 +81,10 @@
     "./platform": {
       "types": "./dist/platform/index.d.ts",
       "import": "./dist/platform/index.js"
+    },
+    "./organization-setup": {
+      "types": "./dist/organization-setup/index.d.ts",
+      "import": "./dist/organization-setup/index.js"
     }
   },
   "scripts": {
