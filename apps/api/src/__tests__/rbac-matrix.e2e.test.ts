@@ -144,9 +144,7 @@ const ACTIONS_SANS_ROUTE: Record<string, string> = {
   // ADR-0050 — V0 : actions déclarées avant leurs routes (module `sales/contracts`, lots V2
   // et V3). Chaque lot retire sa ligne et écrit sa sonde ; la matrice est déjà couverte case
   // par case par `permissions.test.ts`, et `/me/permissions` est vérifié ci-dessous.
-  'sales.contract':
-    'Aucune route en V0 : `POST /sales/orders` et `POST /sales/quotes/:id/to-order` arrivent ' +
-    'au lot V2, `POST /sales/contracts` et ses avenants au lot V3 (ADR-0050 § 3).',
+  // V2 a retiré `sales.contract` (sonde `POST /sales/orders` en fin de liste).
   'sales.contract.approve':
     'Aucune route en V0 : `POST /sales/contracts/:id/approve`, `…/renewals`, `…/terminate` ' +
     'et `PUT /sales/contract-settings` arrivent au lot V3 (ADR-0050 § 3).',
@@ -923,6 +921,19 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
           .post('/accounting/exports')
           .set('Cookie', c)
           .send({ kind: 'sonde', format: 'csv', from: '2026-10-01', to: '2026-10-31' }),
+    },
+    // ADR-0050 — V2 : commandes clients (§ 3, § 8.1).
+    {
+      // PRO, ADM, DIR, CPT, COM. Corps sans client : 400 CUSTOMER_REQUIRED après le guard,
+      // aucune commande créée.
+      action: 'sales.contract',
+      libelle: 'POST /sales/orders',
+      statutsAutorises: [400],
+      envoyer: (c) =>
+        request(serveur())
+          .post('/sales/orders')
+          .set('Cookie', c)
+          .send({ orderedOn: '2026-11-01', currency: 'CDF', priceMode: 'ht', lines: [] }),
     },
   ];
 
