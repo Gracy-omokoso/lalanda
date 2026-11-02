@@ -1692,4 +1692,46 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
     expect(membre, `aucun membre au rôle ${role}`).toBeDefined();
     return membre!.userId;
   }
+  // ───────────────────────────────────────────────────────────────────────────
+  // ADR-0053 — P2 : routes de comptes et d'organisations de la console. Aucun rôle
+  // d'organisation ne les ouvre ; le refus nomme l'action PLATEFORME, avant toute
+  // ré-authentification, recherche ou motif (le 403 ne renseigne sur rien d'autre).
+  // ───────────────────────────────────────────────────────────────────────────
+
+  it('ADR-0053 P2 — aucun rôle d’organisation n’ouvre les comptes, organisations ni blocages', async () => {
+    const s = serveur();
+    const factice = '0123456789abcdef01234567';
+    const sondes: Array<[string, string, PlatformAction]> = [
+      ['get', '/admin/organizations', 'platform.orgs.read'],
+      ['get', `/admin/organizations/${orgId}?reason=support`, 'platform.orgs.read'],
+      ['post', `/admin/organizations/${orgId}/suspend`, 'platform.orgs.suspend'],
+      ['post', `/admin/organizations/${orgId}/restore`, 'platform.orgs.suspend'],
+      ['get', '/admin/users?q=abc', 'platform.users.read'],
+      ['get', `/admin/users/${factice}?reason=support`, 'platform.users.read'],
+      ['post', `/admin/users/${factice}/block`, 'platform.users.block'],
+      ['post', `/admin/users/${factice}/unblock`, 'platform.users.block'],
+      ['post', `/admin/users/${factice}/platform-roles`, 'platform.roles.manage'],
+      ['get', '/admin/audit-events', 'platform.audit.read'],
+    ];
+    // Quota global de 100 requêtes par minute et par IP : remis à zéro par rôle.
+    const { ThrottlerStorage } = await import('@nestjs/throttler');
+    const store = app.get(ThrottlerStorage) as unknown as {
+      storage: Map<string, unknown>;
+      timeoutIds: Map<string, NodeJS.Timeout[]>;
+    };
+    for (const role of ROLES_TESTES) {
+      for (const t of store.timeoutIds.values()) t.forEach(clearTimeout);
+      store.timeoutIds.clear();
+      store.storage.clear();
+      for (const [verbe, chemin, action] of sondes) {
+        const req = request(s) as unknown as Record<string, (p: string) => request.Test>;
+        const res = await req[verbe]!(chemin).set('Cookie', cookiesDe(role)).send({});
+        expect(res.status, `${role} × ${verbe} ${chemin}`).toBe(403);
+        expect(res.body, `${role} × ${verbe} ${chemin}`).toMatchObject({
+          code: 'FORBIDDEN',
+          action,
+        });
+      }
+    }
+  }, 120_000);
 });

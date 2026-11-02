@@ -88,7 +88,7 @@ Coffre et espace d’administration livrés au sprint S21b (`apps/api/src/integr
 
 - **`SECRETS_MASTER_KEY` vit dans l’environnement du serveur.** Le chiffrement protège la base — sauvegardes, instantanés, accès en lecture au stockage — il ne protège pas d’un accès au processus ou à ses variables d’environnement. Un HSM ou un service de gestion de clés dédié reste à faire.
 - **La rotation de la clé maîtresse est outillée** (re-chiffrement, `secret.rewrapped` au journal) **mais n’est pas automatisée** ni planifiée.
-- **La désactivation d’un compte révoque ses sessions sans verrouiller la reconnexion.** Le verrou au moment de la connexion reste à livrer ; l’interface l’annonce plutôt que de laisser croire l’accès barré.
+- ~~**La désactivation d’un compte révoque ses sessions sans verrouiller la reconnexion.**~~ Levée par ADR-0053, lot P2 (voir plus bas).
 - **`OPENAI_API_KEY` et `S3_SECRET_KEY` restent lues en secours.** C’est un chemin de migration borné (ADR-0013 §8), à retirer au sprint de sortie — pas un mode de fonctionnement.
 
 ## Implémenté (S22a) — envoi d’emails, connexion Google, mot de passe oublié
@@ -313,6 +313,31 @@ Deux routes de l'API **sans session** (`GET /public/lead-forms/:token`,
   l'ouverture de session ne lisent pas encore `disabledAt` (lot P2, F5).
 - **Restent ouverts** (lots P2, P8) : ré-authentification de toute écriture de la console, session
   de console de 12 heures, double authentification (décision ouverte n° 2).
+
+## ADR-0053 — console Lalanda : lot P2 (appliqué)
+
+- **Blocage effectif (F5)** : `AuthGuard`, `PlatformAuthGuard` et le crochet better-auth
+  `session.create.before` lisent `user.disabledAt` ; un compte bloqué n'utilise plus aucune
+  session et n'en ouvre plus (`403 ACCOUNT_BLOCKED`, message générique). Seul un `disabledAt` non
+  nul refuse. Bloquer et débloquer exigent une note interne (catégorie pour bloquer).
+- **Suspension effective** : `PermissionsGuard` lit la suspension active de l'organisation VISÉE ;
+  `read_only` (défaut) : écritures `423 ORGANIZATION_SUSPENDED`, lectures ouvertes ; `full` : toute
+  route d'organisation `423`. Les sessions des membres ne sont plus révoquées : leurs autres
+  organisations restent intactes.
+- **Ré-authentification** de dix minutes sur toute écriture de la console (`@RequireRecentReauth`),
+  ouverte à tout opérateur par `POST /admin/reauth`. **Session de console de 12 heures**
+  d'inactivité par session (`platform_console_activity`, empreinte du cookie) :
+  `401 CONSOLE_SESSION_EXPIRED`, rouverte par une ré-authentification.
+- **Minimisation (F8)** : `GET /admin/users` exige `q` de trois caractères (`400 SEARCH_REQUIRED`) ;
+  fiches détaillées sous motif, lecture journalisée (`platform.organization.viewed`,
+  `platform.user.viewed`).
+- **Conflit d'intérêts (F9)** : suspension, levée et changement d'offre refusés à un opérateur
+  membre de l'organisation cible (`409 PLATFORM_SELF_DEALING`), sauf seul détenteur, marqué.
+- **Miroir (F3/F4, volet P2)** : suspension, levée, changement d'offre, blocage d'un membre
+  paraissent au journal du client sous `platform:lalanda` (« Équipe Lalanda »), sans identifiant,
+  rôle ni note interne de l'opérateur.
+- Tests : `admin-accounts.e2e.test.ts`, blocs P2 de `routes-coverage.test.ts` et
+  `rbac-matrix.e2e.test.ts`.
 
 ## Menaces prioritaires
 

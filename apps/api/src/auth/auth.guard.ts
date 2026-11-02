@@ -15,6 +15,10 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import type { Request } from 'express';
+// ADR-0053 — P2
+import { InjectConnection } from '@nestjs/mongoose';
+import { ObjectId } from 'mongodb';
+import type { Connection } from 'mongoose';
 
 import type { OrgPermissionContext, OrgRole } from '../authz/permissions.js';
 import { OrganizationsService } from '../organizations/organizations.service.js';
@@ -43,7 +47,11 @@ export interface AuthenticatedRequest extends Request {
 @Injectable()
 export class AuthGuard implements CanActivate {
   // @Inject explicite — évite de dépendre de `emitDecoratorMetadata` (non émis par vitest).
-  constructor(@Inject(OrganizationsService) private readonly orgs: OrganizationsService) {}
+  constructor(
+    @Inject(OrganizationsService) private readonly orgs: OrganizationsService,
+    // ADR-0053 — P2 : lecture de `user.disabledAt` (blocage effectif, F5).
+    @InjectConnection() private readonly connection: Connection,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<AuthenticatedRequest>();
@@ -54,6 +62,13 @@ export class AuthGuard implements CanActivate {
     });
     if (!session?.user) {
       throw new UnauthorizedException({ code: 'NOT_AUTHENTICATED' });
+    }
+
+    // ── ADR-0053 — P2 : un compte BLOQUÉ n'utilise plus aucune session (F5) ──────
+    // Seul un `disabledAt` posé refuse : un compte sans le champ, ou à `null`, passe.
+    // Message générique (§ 6.1) : ni qui a bloqué, ni pourquoi.
+    if (await isAccountBlocked(this.connection, String(session.user.id))) {
+      throw new ForbiddenException({ code: 'ACCOUNT_BLOCKED', message: ACCOUNT_BLOCKED_MESSAGE });
     }
 
     req.user = {
@@ -91,4 +106,24 @@ function extractCookie(header: string | undefined, name: string): string | undef
     if (k === name) return decodeURIComponent(rest.join('=') ?? '') || undefined;
   }
   return undefined;
+}
+
+// ── ADR-0053 — P2 : blocage effectif ─────────────────────────────────────────
+
+/** Message générique d'un compte bloqué : ne dit ni qui, ni pourquoi (§ 6.1). */
+export const ACCOUNT_BLOCKED_MESSAGE = 'Votre compte est bloqué. Contactez le support.';
+
+/**
+ * `user.disabledAt` est-il posé ? Champ hors schéma better-auth, lu par le driver natif.
+ * Base injoignable : on laisse la lecture de session (déjà faite) trancher, comme avant ;
+ * c'est le seul cas où le blocage n'est pas relu.
+ */
+export async function isAccountBlocked(connection: Connection, userId: string): Promise<boolean> {
+  const db = connection.db;
+  if (!db) return false;
+  const _id = ObjectId.isValid(userId) ? new ObjectId(userId) : userId;
+  const user = await db
+    .collection<{ _id: ObjectId | string; disabledAt?: Date | null }>('user')
+    .findOne({ _id }, { projection: { disabledAt: 1 } });
+  return user?.disabledAt != null;
 }
