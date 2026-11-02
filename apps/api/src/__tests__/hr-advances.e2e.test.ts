@@ -17,14 +17,28 @@ import { ObjectId } from 'mongodb';
 import { randomBytes } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { getConnectionToken, getModelToken } from '@nestjs/mongoose';
+import type { Connection, Model } from 'mongoose';
+
 import { HrAdvanceRemindersService } from '../hr/advances/hr-advance-reminders.service.js';
+import { HrAdvancesService } from '../hr/advances/hr-advances.service.js';
+import { Integration, type IntegrationDocument } from '../integrations/integration.schema.js';
+import {
+  OrganizationSecret,
+  type OrganizationSecretDocument,
+} from '../integrations/organization-secret.schema.js';
+import { PlatformAuditService } from '../integrations/platform-audit.service.js';
+import { RewrapService } from '../integrations/rewrap.js';
+import { MasterKeyring } from '../integrations/secrets-crypto.js';
+import { SecretsService } from '../integrations/secrets.service.js';
 import { HrExpensesNotifier } from '../hr/expenses/hr-expenses-notifier.js';
 import type { NotificationInput } from '../notifications/notifications.port.js';
 import { e2eSuite } from './e2e-utils.js';
 import { code, hrFixture, ok, type HrAccount, type HrFixture } from './hr-e2e-fixtures.js';
 
 const tag = randomBytes(4).toString('hex');
-process.env['SECRETS_MASTER_KEY'] = randomBytes(32).toString('base64');
+const CLE_K1 = randomBytes(32);
+process.env['SECRETS_MASTER_KEY'] = CLE_K1.toString('base64');
 process.env['SECRETS_MASTER_KEY_ID'] = 'k1';
 
 vi.setConfig({ testTimeout: 120_000 });
@@ -533,6 +547,47 @@ e2eSuite('RH — avances au personnel (ADR-0051 H10)', () => {
       expect(
         await db.collection('treasury_movements').countDocuments({ organizationId: fx.orgN }),
       ).toBe(movementsBefore);
+    });
+  });
+
+  describe('rotation secrets:rewrap', () => {
+    it('k1 → k2 : le motif d’une avance sur salaire se relit après le rewrap et la retraite de k1', async () => {
+      const row = await db
+        .collection('hr_advances')
+        .findOne({ organizationId: fx.orgN, reasonSealed: { $type: 'object' } });
+      expect(row!['reasonSealed']['keyId']).toBe('k1');
+      const id = String(row!._id);
+      const k1 = { keyId: 'k1', key: CLE_K1 };
+      const k2 = { keyId: 'k2', key: randomBytes(32) };
+      const rewrap = new RewrapService(
+        fx.app.get<Model<IntegrationDocument>>(getModelToken(Integration.name)),
+        fx.app.get<Model<OrganizationSecretDocument>>(getModelToken(OrganizationSecret.name)),
+        fx.app.get<Connection>(getConnectionToken()),
+        MasterKeyring.of([k2, k1], 'k2'),
+        fx.app.get(PlatformAuditService),
+        fx.app.get(SecretsService),
+      );
+      const premier = await rewrap.run('operateur-1');
+      expect(premier.remainingKeyIds).toEqual([]);
+      expect(
+        (await db.collection('hr_advances').findOne({ _id: row!._id }))!['reasonSealed']['keyId'],
+      ).toBe('k2');
+      expect((await rewrap.run('operateur-1')).rewrapped).toBe(0);
+      const service = fx.app.get(HrAdvancesService) as unknown as { keyring: MasterKeyring };
+      const ancien = service.keyring;
+      service.keyring = MasterKeyring.of([k2], 'k2');
+      try {
+        const lu = ok(await fx.post('finance_director', `/hr/advances/${id}/reveal-reason`));
+        expect(lu['reason']).toBe('Frais médicaux de mon enfant');
+      } finally {
+        service.keyring = ancien;
+      }
+      const traces = await db
+        .collection('audit_events')
+        .find({ action: 'secret.rewrapped', targetType: 'hr_advance', targetId: id })
+        .toArray();
+      expect(traces).toHaveLength(1);
+      expect(JSON.stringify(traces)).not.toContain('médicaux');
     });
   });
 

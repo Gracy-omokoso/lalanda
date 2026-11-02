@@ -8,6 +8,7 @@
 import {
   decryptSecret,
   encryptSecret,
+  rewrapSecret,
   type EncryptedValue,
   type MasterKeyring,
   type SecretLocation,
@@ -50,4 +51,19 @@ export function openAdvanceReason(input: {
     record: input.record,
     keyring: input.keyring,
   }).expose();
+}
+
+/** Rotation (ADR-0013 § 3) : `changed: false` si le chiffré est déjà à la clé courante. */
+export function rewrapAdvanceReason(input: {
+  organizationId: string;
+  advanceId: string;
+  record: EncryptedValue;
+  keyring: MasterKeyring;
+}): { changed: boolean; record: EncryptedValue } {
+  const out = rewrapSecret({
+    location: advanceReasonLocation(input.organizationId, input.advanceId),
+    record: input.record,
+    keyring: input.keyring,
+  });
+  return out.changed ? { changed: true, record: { ...out.record, last4: null } } : out;
 }

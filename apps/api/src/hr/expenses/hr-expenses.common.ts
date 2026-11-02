@@ -14,6 +14,7 @@ import type { ClientSession, Model } from 'mongoose';
 
 import {
   openEnvelopeBlob,
+  rewrapEnvelopeKey,
   sealEnvelopeBlob,
   type EnvelopeIdentity,
 } from '../../integrations/envelope-blob-crypto.js';
@@ -310,4 +311,17 @@ export function openReceipt(
   keyring: MasterKeyring,
 ): Buffer {
   return openEnvelopeBlob(receiptEnvelope(id), blob, wrappedKey, keyring);
+}
+
+/**
+ * Rotation (ADR-0013 § 3, `secrets:rewrap`) : seule la clé de données enveloppée dépend
+ * du trousseau ; l'objet au stockage reste valide tel quel. `changed: false` si la clé
+ * est déjà à la clé courante.
+ */
+export function rewrapReceiptKey(
+  id: ReceiptIdentity,
+  wrappedKey: EncryptedValue,
+  keyring: MasterKeyring,
+): { changed: boolean; record: EncryptedValue } {
+  return rewrapEnvelopeKey(expenseReceiptKeyLocation(id), wrappedKey, keyring);
 }

@@ -17,14 +17,28 @@ import { randomBytes } from 'node:crypto';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { getConnectionToken, getModelToken } from '@nestjs/mongoose';
+import type { Connection, Model } from 'mongoose';
+
+import { HrExpenseReportsService } from '../hr/expenses/hr-expense-reports.service.js';
 import { HrExpensesNotifier } from '../hr/expenses/hr-expenses-notifier.js';
+import { Integration, type IntegrationDocument } from '../integrations/integration.schema.js';
+import {
+  OrganizationSecret,
+  type OrganizationSecretDocument,
+} from '../integrations/organization-secret.schema.js';
+import { PlatformAuditService } from '../integrations/platform-audit.service.js';
+import { RewrapService } from '../integrations/rewrap.js';
+import { MasterKeyring } from '../integrations/secrets-crypto.js';
+import { SecretsService } from '../integrations/secrets.service.js';
 import type { NotificationInput } from '../notifications/notifications.port.js';
 import { ObjectStorageService } from '../storage/object-storage.service.js';
 import { e2eSuite } from './e2e-utils.js';
 import { code, fiche, hrFixture, ok, type HrAccount, type HrFixture } from './hr-e2e-fixtures.js';
 
 const tag = randomBytes(4).toString('hex');
-process.env['SECRETS_MASTER_KEY'] = randomBytes(32).toString('base64');
+const CLE_K1 = randomBytes(32);
+process.env['SECRETS_MASTER_KEY'] = CLE_K1.toString('base64');
 process.env['SECRETS_MASTER_KEY_ID'] = 'k1';
 
 vi.setConfig({ testTimeout: 120_000 });
@@ -595,6 +609,74 @@ e2eSuite('RH — notes de frais (ADR-0051 H10)', () => {
       const approved = audits.find((x) => x['action'] === 'hr.expense_report.approved');
       expect(approved!['metadata']['soleApprover']).toBe(true);
       expect(await balance('ownerB', banqueB)).toBe('92.50');
+    });
+  });
+
+  describe('rotation secrets:rewrap', () => {
+    it('k1 → k2 : un justificatif écrit sous k1 se relit après le rewrap et la retraite de k1', async () => {
+      const n = ok(
+        await fx.post('viewer', '/hr/expense-reports', {
+          title: 'Rotation',
+          currency: 'USD',
+          lines: [lignes()[1]],
+        }),
+        201,
+      );
+      ok(await uploadReceipt('viewer', n['id'], n['lines'][0]['id']), 201);
+      const cle = async () =>
+        (await db.collection('hr_expense_reports').findOne({ _id: new ObjectId(n['id']) }))![
+          'lines'
+        ][0]['receipt'];
+      const avant = await cle();
+      expect(avant['wrappedKey']['keyId']).toBe('k1');
+      const objetAvant = objects.get(`rh-test/hr-expense-receipts/${avant['objectId']}`)!.body;
+
+      const k1 = { keyId: 'k1', key: CLE_K1 };
+      const k2 = { keyId: 'k2', key: randomBytes(32) };
+      const rewrap = new RewrapService(
+        fx.app.get<Model<IntegrationDocument>>(getModelToken(Integration.name)),
+        fx.app.get<Model<OrganizationSecretDocument>>(getModelToken(OrganizationSecret.name)),
+        fx.app.get<Connection>(getConnectionToken()),
+        MasterKeyring.of([k2, k1], 'k2'),
+        fx.app.get(PlatformAuditService),
+        fx.app.get(SecretsService),
+      );
+      const premier = await rewrap.run('operateur-1');
+      expect(premier.remainingKeyIds).toEqual([]);
+      expect(premier.rewrapped).toBeGreaterThanOrEqual(1);
+      expect((await cle())['wrappedKey']['keyId']).toBe('k2');
+      // L'objet chiffré n'est ni relu ni réécrit : seule la clé enveloppée change.
+      expect(
+        objects.get(`rh-test/hr-expense-receipts/${avant['objectId']}`)!.body.equals(objetAvant),
+      ).toBe(true);
+      const second = await rewrap.run('operateur-1');
+      expect(second.rewrapped).toBe(0);
+      expect(second.remainingKeyIds).toEqual([]);
+
+      // `_PREVIOUS` retirée : l'application ne connaît plus que k2.
+      const service = fx.app.get(HrExpenseReportsService) as unknown as { keyring: MasterKeyring };
+      const ancien = service.keyring;
+      service.keyring = MasterKeyring.of([k2], 'k2');
+      try {
+        const file = await fx
+          .get('viewer', `/hr/expense-reports/${n['id']}/lines/${n['lines'][0]['id']}/receipt`)
+          .buffer(true)
+          .parse((res, cb) => {
+            const chunks: Buffer[] = [];
+            res.on('data', (d: Buffer) => chunks.push(d));
+            res.on('end', () => cb(null, Buffer.concat(chunks)));
+          });
+        expect(file.status).toBe(200);
+        expect((file.body as Buffer).equals(PDF)).toBe(true);
+      } finally {
+        service.keyring = ancien;
+      }
+      const traces = await db
+        .collection('audit_events')
+        .find({ action: 'secret.rewrapped', targetType: 'hr_expense_receipt', targetId: n['id'] })
+        .toArray();
+      expect(traces).toHaveLength(1);
+      expect(traces[0]!['metadata']).toEqual({ lineId: n['lines'][0]['id'], keyId: 'k2' });
     });
   });
 
