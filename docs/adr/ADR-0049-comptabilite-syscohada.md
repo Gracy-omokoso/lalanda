@@ -523,6 +523,15 @@ par motif, et l'outil de **reclassement** (opération diverse préremplie).
 - **Lu** : `treasury_expenses` `recorded`, **`origin` nulle seulement** ; une dépense créée par un paiement
   fournisseur (`origin.kind = 'supplier_payment'`) est **ignorée** : le paiement fournisseur la comptabilise
   déjà (§ 6.5) — sans cette règle, la charge serait comptée deux fois.
+  > **Amendé par [ADR-0051](ADR-0051-rh-frais-avances-presences-evaluations.md) § 7.4 (lot H13).** Le
+  > filtre vise `origin.kind = 'supplier_payment'` **seulement**. Une dépense possédée par les RH
+  > (`origin.kind = 'expense_report'`, remboursement d'une note de frais) est comptabilisée comme une
+  > dépense directe : débit `expense.<catégorie>`, crédit `{treasuryAccount}`, même `sourceKey`. Soldée
+  > par une avance (`accountId: null`, `settledByAdvanceId`), sa contrepartie est la clé
+  > `hr.advance.settled`, **toujours** au compte d'attente avec le motif `SETTLED_BY_EMPLOYEE_ADVANCE`
+  > (question C2), sans être « À comptabiliser ». Les clés `hr.advance.disbursed` et
+  > `hr.advance.returned` sont réservées, sans règle admise. Toute autre nature de propriétaire est
+  > « À comptabiliser » (`UNSUPPORTED_SOURCE`). `ACCOUNTING_VERSION` 1.1.0.
 - `sourceKey` : `treasury_expense:<id>:r<revision>` ; annulation : contre-passation.
 - Débit `expense.<catégorie>` (quatorze catégories ; `investissement` vers la classe 2,
   `remboursement_emprunt` vers la classe 16, `impot_benefices` vers la classe 89 — **tous à confirmer**),

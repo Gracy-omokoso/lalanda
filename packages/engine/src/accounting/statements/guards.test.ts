@@ -36,6 +36,7 @@ import {
   type StatementTemplateView,
 } from './index.js';
 import { reserveOf } from './reserves.js';
+import { ACCOUNTING_VERSION } from '../types.js';
 
 const ACCOUNTING_DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
 const K3_DIRS = ['ledger', 'statements', 'closing', 'reconciliation', 'export'];
@@ -69,7 +70,11 @@ const L = (
   amount,
   ...o,
 });
-const gen = { ruleSetVersion: 1, chartPack: { slug: 'p', version: 1 }, engineVersion: '1.0.0' };
+const gen = {
+  ruleSetVersion: 1,
+  chartPack: { slug: 'p', version: 1 },
+  engineVersion: ACCOUNTING_VERSION,
+};
 const entries: ReportingEntry[] = [
   {
     id: 'a',

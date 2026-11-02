@@ -12,7 +12,7 @@ import {
   type RuleResolution,
   type SuspenseReason,
 } from '../types.js';
-import { ALWAYS_SUSPENSE_KEYS, isOperationKey } from './operation-keys.js';
+import { ALWAYS_SUSPENSE_KEYS, HR_ADVANCE_SUSPENSE, isOperationKey } from './operation-keys.js';
 
 /** Numéro de compte : chiffres seulement (un compte propre prolonge un compte du pack, § 2.3). */
 const ACCOUNT_NUMBER = /^\d{1,20}$/;
@@ -26,6 +26,9 @@ export function isAccountNumber(value: unknown): value is string {
  * `requiresReview` n'est jamais appliquée : elle est encore « à confirmer ».
  */
 export function resolveRule(ruleSet: MappingRuleSet | null, key: string): RuleResolution {
+  // Avances au personnel : motif propre à la pièce, avant tout jeu de règles (H13).
+  const hrAdvance = Object.hasOwn(HR_ADVANCE_SUSPENSE, key) ? HR_ADVANCE_SUSPENSE[key] : undefined;
+  if (hrAdvance !== undefined) return { status: 'suspense', reason: hrAdvance };
   if (ruleSet === null || ruleSet.status !== 'validated') {
     return { status: 'suspense', reason: 'NO_VALIDATED_RULE_SET' };
   }

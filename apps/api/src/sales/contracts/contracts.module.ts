@@ -61,6 +61,10 @@ import {
   SalesDepositResolutionSchema,
 } from './deposits/sales-deposit-resolution.schema.js';
 import { SalesDepositsService } from './deposits/sales-deposits.service.js';
+// ADR-0050 — V5
+import { SalesSubscriptionsController } from './subscriptions/sales-subscriptions.controller.js';
+import { SalesSubscriptionsJob } from './subscriptions/sales-subscriptions.job.js';
+import { SalesSubscriptionsService } from './subscriptions/sales-subscriptions.service.js';
 
 @Module({
   imports: [
@@ -94,6 +98,8 @@ import { SalesDepositsService } from './deposits/sales-deposits.service.js';
     // ADR-0050 — V4
     SalesOrderDepositsController,
     SalesContractDepositsController,
+    // ADR-0050 — V5
+    SalesSubscriptionsController,
   ],
   providers: [
     // ADR-0050 — V2
@@ -106,6 +112,9 @@ import { SalesDepositsService } from './deposits/sales-deposits.service.js';
     SalesContractAmendmentsService,
     // ADR-0050 — V4
     SalesDepositsService,
+    // ADR-0050 — V5 : échéancier, préparation manuelle et tâche `sales.subscriptions.prepare`.
+    SalesSubscriptionsService,
+    SalesSubscriptionsJob,
   ],
   exports: [
     // ADR-0050 — V2 : liens et pièces partagés par V3 à V6.
@@ -116,6 +125,8 @@ import { SalesDepositsService } from './deposits/sales-deposits.service.js';
     SalesContractSettingsService,
     SalesContractsService,
     SalesContractAmendmentsService,
+    // ADR-0050 — V5 : échéancier, lu par V6 (alertes).
+    SalesSubscriptionsService,
   ],
 })
 export class ContractsModule {}

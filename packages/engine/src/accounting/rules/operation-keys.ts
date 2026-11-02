@@ -8,6 +8,7 @@ import { RECEIPT_METHODS } from '../../receivables/types.js';
 import { STOCK_MOVEMENT_KINDS } from '../../stock/types.js';
 import { EXPENSE_CATEGORY_CODES } from '../../treasury/types.js';
 import { TAX_GROUP_LETTERS } from '../../invoice-totals/types.js';
+import type { SuspenseReason } from '../types.js';
 
 /**
  * Groupes de taxation qui ne vont JAMAIS d'office à un compte de produit
@@ -103,6 +104,12 @@ export const OPERATION_KEY_FAMILIES: readonly {
     section: '6.7',
   },
   { pattern: /^exchange\.difference$/, example: 'exchange.difference', section: '5' },
+  // ADR-0051 — H13 (§ 7.4) : avances au personnel, clés SANS règle (question C2).
+  {
+    pattern: new RegExp(`^hr\\.advance\\.(${alt(['disbursed', 'returned', 'settled'])})$`),
+    example: 'hr.advance.settled',
+    section: '6.3',
+  },
 ]);
 
 /** Vrai si le moteur sait produire une ligne pour cette clé. */
@@ -116,3 +123,20 @@ export function isOperationKey(value: unknown): value is string {
  * pièce (§ 6.6, décision ouverte n° 13).
  */
 export const ALWAYS_SUSPENSE_KEYS = ['other_in.counterpart', 'other_out.counterpart'] as const;
+
+/**
+ * ADR-0051 — H13 (§ 7.4) : clés des avances au personnel, TOUJOURS au compte
+ * d'attente avec leur motif, qu'un jeu de règles soit validé ou non : aucune règle
+ * n'est admise tant que l'expert n'a pas répondu (question C2), et le motif dit à
+ * l'expert ce qu'il reclasse.
+ * - `hr.advance.settled` : contrepartie d'une dépense de note de frais soldée par une
+ *   avance (dépense sans compte, l'argent est sorti au versement) ;
+ * - `hr.advance.disbursed`, `hr.advance.returned` : versement et retour en espèces,
+ *   réservées ; le mouvement `other_out` / `other_in` va aujourd'hui en attente par
+ *   `other_*.counterpart` (ADR-0049 § 6.6).
+ */
+export const HR_ADVANCE_SUSPENSE: Readonly<Record<string, SuspenseReason>> = Object.freeze({
+  'hr.advance.settled': 'SETTLED_BY_EMPLOYEE_ADVANCE',
+  'hr.advance.disbursed': 'NATURE_UNKNOWN',
+  'hr.advance.returned': 'NATURE_UNKNOWN',
+});
