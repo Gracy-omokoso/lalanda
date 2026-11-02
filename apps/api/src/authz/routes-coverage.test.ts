@@ -1792,6 +1792,79 @@ describe('ADR-0050 — V2 : commandes clients', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ADR-0050 — V3 : contrats, avenants, signature, reconduction, réglages (§ 3)
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { SalesContractAmendmentsController } from '../sales/contracts/amendments/sales-contract-amendments.controller.js';
+import { QuoteToContractController } from '../sales/contracts/contracts/quote-to-contract.controller.js';
+import { SalesContractsController } from '../sales/contracts/contracts/sales-contracts.controller.js';
+import { SalesContractSettingsController } from '../sales/contracts/settings/sales-contract-settings.controller.js';
+
+const CONTROLEURS_V3 = [
+  SalesContractsController,
+  SalesContractAmendmentsController,
+  QuoteToContractController,
+  SalesContractSettingsController,
+];
+(CONTROLEURS as unknown[]).push(...CONTROLEURS_V3);
+TOUTES_LES_ROUTES.push(
+  ...CONTROLEURS_V3.flatMap((c) => routesDe(c as new (...args: never[]) => unknown)),
+);
+
+const MOTIF_V3 =
+  /^(SalesContractsController|SalesContractAmendmentsController|QuoteToContractController|SalesContractSettingsController)\./;
+
+describe('ADR-0050 — V3 : contrats et avenants', () => {
+  it('chaque route déclare la permission de l’ADR (§ 3)', () => {
+    const attendu: Record<string, Action[]> = {
+      'SalesContractsController.list': ['sales.read'],
+      'SalesContractsController.get': ['sales.read'],
+      'SalesContractsController.file': ['sales.read'],
+      'SalesContractsController.create': ['sales.contract'],
+      'SalesContractsController.put': ['sales.contract'],
+      'SalesContractsController.remove': ['sales.contract'],
+      'SalesContractsController.submit': ['sales.contract'],
+      'SalesContractsController.newVersion': ['sales.contract'],
+      'SalesContractsController.cancel': ['sales.contract'],
+      'SalesContractsController.signature': ['sales.contract'],
+      'SalesContractsController.addFile': ['sales.contract'],
+      // Engagent l'organisation : case ⓢ, séparation par `contractApprovalDecision`.
+      'SalesContractsController.approve': ['sales.contract.approve'],
+      'SalesContractsController.reject': ['sales.contract.approve'],
+      'SalesContractsController.recordRenewal': ['sales.contract.approve'],
+      'SalesContractsController.terminate': ['sales.contract.approve'],
+      'SalesContractAmendmentsController.list': ['sales.read'],
+      'SalesContractAmendmentsController.get': ['sales.read'],
+      'SalesContractAmendmentsController.create': ['sales.contract'],
+      'SalesContractAmendmentsController.put': ['sales.contract'],
+      'SalesContractAmendmentsController.submit': ['sales.contract'],
+      'SalesContractAmendmentsController.cancel': ['sales.contract'],
+      'SalesContractAmendmentsController.signature': ['sales.contract'],
+      'SalesContractAmendmentsController.approve': ['sales.contract.approve'],
+      'SalesContractAmendmentsController.reject': ['sales.contract.approve'],
+      'QuoteToContractController.toContract': ['sales.contract'],
+      'SalesContractSettingsController.get': ['sales.read'],
+      'SalesContractSettingsController.put': ['sales.contract.approve'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) => MOTIF_V3.test(r.cle));
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+      expect(route!.rolesPlateforme, cle).toBeUndefined();
+      expect(SANS_PERMISSION[cle], cle).toBeUndefined();
+    }
+  });
+
+  it('aucune route des contrats ne prépare ni n’émet de facture : ni `sales.manage` ni `sales.invoice`', () => {
+    for (const route of TOUTES_LES_ROUTES.filter((r) => MOTIF_V3.test(r.cle))) {
+      expect(route.actions ?? [], route.cle).not.toContain('sales.invoice');
+      expect(route.actions ?? [], route.cle).not.toContain('sales.manage');
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ADR-0051 — H15 : objectifs individuels et évaluations (§ 6.3)
 // ─────────────────────────────────────────────────────────────────────────────
 

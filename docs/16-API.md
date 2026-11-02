@@ -750,6 +750,23 @@ warnings }`, avertissement `QUOTE_ALREADY_CONVERTED`) · `POST /sales/orders/:id
 porte le reste à facturer (`invoicing`, moteur), les factures liées, les pièces, les actions
 (`closeSuggested`) et l'avertissement `UNMATCHED_LINE`.
 
+**Lot V3 — implémenté** (contrats, versions, avenants, signature, reconduction, résiliation,
+réglages) : `GET /sales/contracts` (filtres `status`, `billingKind` — `recurring` pour les
+abonnements —, `customerId`, `quoteId`, `q`, curseur) · `GET /sales/contracts/:id?on=AAAA-MM-JJ`
+(conditions en vigueur et dates du moteur à cette date ; défaut aujourd'hui) · `POST`/`PUT`/`DELETE`
+(brouillon v1 jamais soumis, sinon `409 CONTRACT_ALREADY_SUBMITTED`) · `…/submit` · `…/new-version` ·
+`…/cancel` (avant signature, motif) · `…/signature` (`422 SIGNED_COPY_REQUIRED`) · `POST …/files?kind=
+draft_copy|signed_copy&amendmentId=` · `GET …/files/:fileId` · `…/approve` · `…/reject` ·
+`…/renewals` (`409 RENEWAL_NOT_PROPOSED` hors de la fenêtre « fin de terme − `termEndAlertDays` ») ·
+`…/terminate` (`{ contract, warnings }`, `NOTICE_BELOW_CLAUSE` en avertissement) ·
+`POST /sales/quotes/:id/to-contract` (`201 { contract, warnings }`) · avenants
+`GET`/`POST …/amendments`, `GET`/`PUT …/amendments/:aid`, `…/submit`, `…/cancel`, `…/signature`,
+`…/approve`, `…/reject` (`422 AMENDMENT_BEFORE_CONTRACT_START`, `409
+AMENDMENT_BEFORE_PREPARED_OCCURRENCE`, `409 AMENDMENT_RENEWAL_NOT_EXPLICIT`) ·
+`GET`/`PUT /sales/contract-settings` (`expectedRevision: null` pour la première écriture). Un avenant
+`renewal` signé enregistre le terme suivant (`explicit_amendment`). Aucune facture n'est créée par ce
+lot.
+
 Tâche `sales.subscriptions.prepare` (quotidienne, idempotente, acteur `system:subscriptions`) :
 prépare des brouillons, n'émet ni ne normalise rien. Émettre reste `sales.invoice` (routes
 existantes).
