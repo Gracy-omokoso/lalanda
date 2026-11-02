@@ -767,6 +767,19 @@ AMENDMENT_BEFORE_PREPARED_OCCURRENCE`, `409 AMENDMENT_RENEWAL_NOT_EXPLICIT`) ·
 `renewal` signé enregistre le terme suivant (`explicit_amendment`). Aucune facture n'est créée par ce
 lot.
 
+**Lot V4 — implémenté** (acomptes) : `GET /sales/{orders|contracts}/:id/deposits` (`sales.read` :
+acomptes, encaissé lu des règlements, par devise, factures finales liées, `DEPOSIT_NOT_RESOLVED`,
+avertissement constant) · `POST /sales/{orders|contracts}/:id/prepare-deposit` (`sales.read` +
+`sales.manage` ; `{ expectedRevision, type: FT|ET, requestedAmount, taxGroup, label? }`, groupe
+EXIGÉ — `400 TAX_GROUP_REQUIRED` —, commande `confirmed` ou contrat `signed` sinon `409
+ORDER_NOT_CONFIRMED` / `CONTRACT_NOT_SIGNED` ; brouillon à une ligne libre, quantité 1, prix = montant
+demandé ; réponse `{ invoiceId, warnings, deposits }`, `DEPOSIT_AMOUNT_MISMATCH` signalé jamais
+corrigé) · `POST /sales/{orders|contracts}/:id/deposits/:invoiceId/resolved` (`sales.read` +
+`sales.manage` ; `{ expectedRevision, reason }` ; `409 DEPOSIT_NOT_ISSUED`, `409
+DEPOSIT_ALREADY_RESOLVED`, `404 SALES_DEPOSIT_NOT_FOUND`). `prepare-invoice` d'une commande rappelle
+en ligne C les codes des acomptes émis (« Acompte FT… — Commande CC… ») et ajoute l'avertissement
+`DEPOSIT_NOT_RESOLVED` ; aucune imputation, aucune ligne négative, aucun paiement prérempli.
+
 Tâche `sales.subscriptions.prepare` (quotidienne, idempotente, acteur `system:subscriptions`) :
 prépare des brouillons, n'émet ni ne normalise rien. Émettre reste `sales.invoice` (routes
 existantes).
