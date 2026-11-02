@@ -38,14 +38,14 @@ describe('version du corpus légal', () => {
     expect(isKnownLegalVersion('n’importe quoi')).toBe(false);
   });
 
-  it('est la version du changement d’éditeur (Go freelance SARLU, ADR-0043)', () => {
-    expect(LEGAL_VERSION).toBe('2026-10-30');
+  it('est la version des décisions du 3 nov. 2026 (ADR-0054)', () => {
+    expect(LEGAL_VERSION).toBe('2026-11-03');
   });
 
   it('garde la version précédente connue, la courante en dernier', () => {
     // Les acceptations du premier corpus y font référence : la retirer les
     // rendrait inexplicables. La courante est la plus récente.
-    expect(KNOWN_LEGAL_VERSIONS).toEqual(['2026-08-09', '2026-10-30']);
+    expect(KNOWN_LEGAL_VERSIONS).toEqual(['2026-08-09', '2026-10-30', '2026-11-03']);
     expect(KNOWN_LEGAL_VERSIONS.at(-1)).toBe(LEGAL_VERSION);
   });
 
@@ -76,6 +76,11 @@ describe('fraîcheur d’une acceptation', () => {
     // Go freelance SARLU.
     expect(isKnownLegalVersion('2026-08-09')).toBe(true);
     expect(isTermsAcceptanceCurrent('2026-08-09')).toBe(false);
+  });
+
+  it('ADR-0054 : une acceptation du corpus du 30 oct. 2026 est périmée', () => {
+    expect(isKnownLegalVersion('2026-10-30')).toBe(true);
+    expect(isTermsAcceptanceCurrent('2026-10-30')).toBe(false);
   });
 });
 
