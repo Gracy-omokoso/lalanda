@@ -30,9 +30,11 @@ import {
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 
-import { RequirePlatformRole } from '../authz/authz.decorators.js';
+import { PlatformConsoleRoute, RequirePlatformRole } from '../authz/authz.decorators.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
-import { AuthGuard, type AuthenticatedRequest } from '../auth/auth.guard.js';
+import type { AuthenticatedRequest } from '../auth/auth.guard.js';
+// ADR-0053 — P0
+import { PlatformAuthGuard } from '../authz/platform-auth.guard.js';
 import { INTEGRATION_WRITE_THROTTLE } from '../security/throttling.js';
 import { UserThrottlerGuard } from '../security/user-throttler.guard.js';
 import {
@@ -49,7 +51,9 @@ import { isIntegrationProvider, type IntegrationProvider } from './providers.js'
 import { ReauthService } from './reauth.service.js';
 
 @Controller('admin/integrations')
-@UseGuards(AuthGuard, PermissionsGuard)
+// ADR-0053 — P0 : console sans organisation.
+@UseGuards(PlatformAuthGuard, PermissionsGuard)
+@PlatformConsoleRoute()
 // Le rôle est déclaré AU NIVEAU DU CONTRÔLEUR : une route ajoutée demain hérite
 // de la contrainte sans que personne n'ait à y penser. `getAllAndOverride` du
 // guard remonte au contrôleur quand la méthode ne déclare rien.
@@ -142,7 +146,9 @@ export class IntegrationsController {
  * pour l'ensemble de `/admin`, pas pour un fournisseur.
  */
 @Controller('admin/reauth')
-@UseGuards(AuthGuard, PermissionsGuard)
+// ADR-0053 — P0 : console sans organisation.
+@UseGuards(PlatformAuthGuard, PermissionsGuard)
+@PlatformConsoleRoute()
 @RequirePlatformRole('platform_super_admin')
 export class ReauthController {
   constructor(@Inject(ReauthService) private readonly reauth: ReauthService) {}

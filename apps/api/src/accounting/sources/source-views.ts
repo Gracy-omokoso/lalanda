@@ -46,7 +46,9 @@ export function salesInvoiceView(d: SourceDoc): SalesInvoiceView | null {
     calculation: Totals;
     payments: { method: string; amount: string }[];
   } | null;
-  const docAmounts = d['documentAmounts'] as { calculation?: { ok: boolean; totals: Totals | null } };
+  const docAmounts = d['documentAmounts'] as {
+    calculation?: { ok: boolean; totals: Totals | null };
+  };
   const useNormalized = status === 'normalized' && normalized !== null && normalized !== undefined;
   const totals: Totals | null = useNormalized
     ? normalized.calculation
@@ -120,7 +122,9 @@ export function receiptView(
   pinOf: (invoiceId: string) => Pin,
 ): ReceiptView | null {
   const currency = currencyOf(d['currency']);
-  const allocations = (d['allocations'] as { invoiceId: string; invoiceNumber: string | null; amount: string }[]) ?? [];
+  const allocations =
+    (d['allocations'] as { invoiceId: string; invoiceNumber: string | null; amount: string }[]) ??
+    [];
   const first = allocations[0] === undefined ? undefined : invoices.get(allocations[0].invoiceId);
   const receivedOn = str(d['receivedOn']);
   const status = str(d['status']);
@@ -147,14 +151,37 @@ export function receiptView(
   };
 }
 
-/** Dépense (§ 6.3) ; `origin` non nulle quand un paiement fournisseur l'a créée. */
+/**
+ * Propriétaire d'une dépense (§ 6.3 ; ADR-0051 § 7.4, lot H13) : paiement fournisseur
+ * (`paymentId`) ou note de frais (`reportId`, `settledByAdvanceId`). Une nature
+ * inconnue est recopiée telle quelle : le moteur la met « À comptabiliser ».
+ * `undefined` : propriétaire illisible → pièce illisible.
+ */
+function expenseOriginOf(v: unknown): ExpenseView['origin'] | undefined {
+  if (v === null || v === undefined) return null;
+  const o = v as Record<string, unknown>;
+  const kind = str(o['kind']);
+  if (kind === null) return undefined;
+  if (kind === 'supplier_payment') {
+    const id = str(o['paymentId']);
+    return id === null ? undefined : { kind, id, settledByAdvanceId: null };
+  }
+  if (kind === 'expense_report') {
+    const id = str(o['reportId']);
+    return id === null ? undefined : { kind, id, settledByAdvanceId: str(o['settledByAdvanceId']) };
+  }
+  return { kind, id: '', settledByAdvanceId: null };
+}
+
+/** Dépense (§ 6.3) ; `origin` non nulle quand un paiement fournisseur ou une note de frais l'a créée. */
 export function expenseView(d: SourceDoc): ExpenseView | null {
   const currency = currencyOf(d['currency']);
   const spentOn = str(d['spentOn']);
   const status = str(d['status']);
   if (currency === null || spentOn === null) return null;
   if (status !== 'recorded' && status !== 'cancelled') return null;
-  const origin = d['origin'] as { kind: string; paymentId: string } | null;
+  const origin = expenseOriginOf(d['origin']);
+  if (origin === undefined) return null;
   return {
     id: idOf(d),
     status,
@@ -168,7 +195,7 @@ export function expenseView(d: SourceDoc): ExpenseView | null {
     accountId: str(d['accountId']),
     deductibleVat: str(d['deductibleVat']),
     reference: str(d['reference']),
-    origin: origin ? { kind: origin.kind, id: origin.paymentId } : null,
+    origin,
   };
 }
 

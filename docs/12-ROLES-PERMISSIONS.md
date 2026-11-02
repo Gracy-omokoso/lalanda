@@ -594,6 +594,49 @@ promotion vers un projet, assistance IA) de `canvas.update`, régler son IA de
   `hr.sensitive.read`).
 - Tests : matrice 12 × 57 + 6 × 57 = **1 026** cases.
 
+### ADR-0053 — console Lalanda : actions plateforme (appliqué, lot P0)
+
+> **Statut : appliqué** par le lot P0 d'[ADR-0053](adr/ADR-0053-administration-plateforme.md) § 5
+> (2 nov. 2026), aux valeurs par défaut des décisions ouvertes n° 3, 7, 8, 10 et 18 (l'ADR reste au
+> statut proposé). Catalogue `PLATFORM_ACTIONS` (`@lalanda/shared/platform`), matrice
+> `PLATFORM_ACTION_MATRIX` (`apps/api/src/authz/platform-actions.ts`), vérifiée par
+> `platform-actions.test.ts` (**126** cases, transcription indépendante). Les 57 actions
+> d'organisation, `PLATFORM_PERMISSION_MATRIX` (accès délégué futur) et leurs 1 026 cases sont
+> **inchangés** ; `permissions.ts` n'est pas touché.
+
+- **Deux vocabulaires disjoints.** Une action plateforme (`platform.*`) porte sur une ressource de
+  Lalanda, jamais sur le contenu d'une organisation ; aucun rôle d'organisation n'en détient, aucune
+  route ne mêle les deux (`routes-coverage.test.ts`). Aucun rôle nouveau.
+- **Matrice** (SA super-administrateur, PA administrateur plateforme, SUP support, FAC finance et
+  facturation, TPL éditeur de modèles, CPK gestionnaire comptable et fiscal) : celle d'ADR-0053
+  § 5.2, recopiée sans écart. Chaque rôle détient `platform.console.read`. Écarts avec S21b,
+  **appliqués au fil des lots** : `platform_admin` perd la confirmation des paiements manuels (P3),
+  `platform_support` perd le journal plateforme (P2/P5), `platform_billing` gagne la console
+  (**appliqué dès P0** sur `GET /admin/overview`). `platform.packs.manage` reste au seul CPK.
+- **Garde sans organisation** : `PlatformAuthGuard` (`authz/platform-auth.guard.ts`) — session,
+  compte non bloqué (`403 ACCOUNT_BLOCKED`), aucune organisation résolue ; il refuse toute route qui
+  n'est pas marquée `@PlatformConsoleRoute()` ou qui déclare une action d'organisation
+  (`403 PLATFORM_ROUTE_REQUIRED`). Posé sur `/admin/**`, `/me/platform-access` et
+  `/accounting/platform/chart-packs` ; `/payments/manual/*` reste sous `AuthGuard` une version
+  (liste figée, lot P3).
+- **`@RequirePlatformAction(action)`** : jugé par `PermissionsGuard` contre la matrice ; pose aussi
+  la liste des rôles détenteurs (dérivée), si bien qu'une route déclarée par action se lit comme une
+  route déclarée par rôles pendant la transition. Première route : `GET /admin/overview`
+  (`platform.console.read`) ; les autres routes de la console gardent leur `@RequirePlatformRole`
+  jusqu'aux lots P2 à P7.
+- **Séparation des tâches**, fonctions pures à tables de vérité : `platformSelfDealingDecision`
+  (`409 PLATFORM_SELF_DEALING`, opérateur seul détenteur marqué `soleOperator`),
+  `broadcastApprovalDecision` (`409 SELF_APPROVAL_FORBIDDEN`, `soleApprover`),
+  `platformGrantDecision` (offre Expert, octroi sans échéance ou de plus de 90 jours : seconde
+  personne, `pending_approval`), `platformRoleGrantDecision` (`409 SELF_GRANT_FORBIDDEN`),
+  `announcementSendDecision` (`409 AUDIENCE_COUNT_MISMATCH`, écart de plus de 10 % : nouvelle
+  approbation). Le motif obligatoire et l'échéance du Support (90 jours au plus) sont dans
+  `grantPlatformRoleInputSchema`.
+- Tests : `platform-actions.test.ts`, `platform-auth.guard.test.ts`, bloc ADR-0053 de
+  `routes-coverage.test.ts` (table entière : aucune route d'organisation sous la garde de console),
+  `admin-platform-isolation.e2e.test.ts` (critères 1 à 3, les deux sens, routes découvertes sur
+  l'application montée), bloc ADR-0053 de `rbac-matrix.e2e.test.ts`.
+
 ## Règles critiques
 
 - Un propriétaire ne peut pas retirer le dernier propriétaire sans transfert.

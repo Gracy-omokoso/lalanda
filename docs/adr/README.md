@@ -127,6 +127,7 @@ Décideurs :
   agrégées, encaissements constatés (ADR-0047) ; état des lieux : aucune fuite entre organisations,
   une fuite plateforme → organisation (identifiant d'opérateur au journal client). Statut : **proposé,
   ADR-0053** (2 nov. 2026).
+  Socle RBAC plateforme, garde sans organisation et contrats partagés **appliqués au lot P0**.
 
 ## Décisions récentes (légal)
 

@@ -101,6 +101,8 @@ import {
   StaffingNeed,
   StaffingNeedSchema,
 } from './planning/planning.schemas.js';
+// ADR-0051 — H15 : objectifs individuels et évaluations (module autonome).
+import { HrPerformanceModule } from './performance/hr-performance.module.js';
 
 @Module({
   imports: [
@@ -110,6 +112,8 @@ import {
     HrAgendaModule,
     // ADR-0051 — H10 : dépenses et mouvements possédés par les RH (`recordOwnedBy…`).
     TreasuryModule,
+    // ADR-0051 — H15
+    HrPerformanceModule,
     MongooseModule.forFeature([
       // ADR-0045 — H2 : réglages, services, fiches, données sensibles ; adhésions
       // (lien membre, destinataires de l'alerte bancaire) ; journal (débit de `reveal`).
