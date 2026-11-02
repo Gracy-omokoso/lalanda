@@ -66,6 +66,7 @@ import { PlatformInsightsModule } from './stats/platform-insights.module.js';
   controllers: [AdminController, PlatformAccessController, PlatformBillingController],
   providers: [AdminService, AiUsageService, PlatformMirrorService, PlatformBillingService],
   // `AiUsageService` est exporté pour `AiModule`, qui compte ses propres appels.
-  exports: [AiUsageService],
+  // ADR-0047 : `AdminService` et `PlatformMirrorService` servent la console des factures d'abonnement.
+  exports: [AiUsageService, AdminService, PlatformMirrorService],
 })
 export class AdminModule {}

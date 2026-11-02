@@ -51,6 +51,9 @@ const SANS_ORGANISATION: Readonly<Record<string, string>> = {
   platform_announcement_receipts: 'accusés de réception d’une annonce, par personne',
   platform_security_counters:
     'compteurs agrégés d’événements de sécurité de la plateforme (aucune organisation, aucun identifiant)',
+  // ADR-0047 : désignation de l'organisation vendeuse des abonnements (réglage plateforme).
+  platform_subscription_invoice_settings:
+    'organisation vendeuse des abonnements Lalanda (réglage de plateforme, une ligne)',
   // La société elle-même : c'est l'`_id` qui sert de clé, pas un `organizationId`.
   organizations: "l'organisation elle-même (son _id est la clé)",
   // Ordonnanceur : verrous de tâches qui parcourent toutes les organisations.

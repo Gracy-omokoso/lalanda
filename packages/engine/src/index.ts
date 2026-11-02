@@ -142,3 +142,4 @@ export * from './stock/index.js';
 export * from './accounting/index.js';
 export * from './contracts/index.js'; // ADR-0050 — V1 : contrats, commandes, acomptes, abonnements (`CONTRACTS_VERSION`).
 export * from './platform-revenue/index.js'; // ADR-0053 — P7 : finances du site (`PLATFORM_REVENUE_VERSION`).
+export * from './subscription-invoices/index.js'; // ADR-0047 : montants HT, TVA 16 % et TTC des abonnements (`SUBSCRIPTION_AMOUNTS_VERSION`).

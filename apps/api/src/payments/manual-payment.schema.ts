@@ -45,9 +45,21 @@ export class ManualPaymentRequest {
   @Prop({ type: String, required: true, enum: BILLING_INTERVALS as unknown as string[] })
   interval!: BillingInterval;
 
-  /** Montant attendu, en centimes. Figé à la demande : le tarif peut changer. */
+  /**
+   * Montant attendu, en centimes. Figé à la demande : le tarif peut changer.
+   * Depuis ADR-0047 (3 nov. 2026), c'est le montant TOUTES TAXES COMPRISES à
+   * verser (HT + TVA 16 %) ; les deux champs ci-dessous en donnent le détail.
+   */
   @Prop({ type: Number, required: true })
   amountDueCents!: number;
+
+  /** ADR-0047 : base hors taxes. `null` pour une demande ouverte avant la décision. */
+  @Prop({ type: Number, default: null })
+  amountExclTaxCents!: number | null;
+
+  /** ADR-0047 : TVA 16 % comprise dans `amountDueCents`. `null` avant la décision. */
+  @Prop({ type: Number, default: null })
+  taxCents!: number | null;
 
   @Prop({ type: String, required: true, default: 'USD' })
   currency!: string;

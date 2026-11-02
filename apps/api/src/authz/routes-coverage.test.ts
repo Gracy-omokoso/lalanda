@@ -1981,6 +1981,8 @@ describe('ADR-0053 — P0 : la garde sans organisation ne vaut que pour la conso
     // ADR-0053 — P7
     'AdminStatsController',
     'AdminFinanceController',
+    // ADR-0047 : factures des abonnements, sous Abonnements.
+    'PlatformSubscriptionInvoicesController',
   ];
   /** Routes de console sans rôle ni action plateforme, avec leur raison (déjà justifiées). */
   const CONSOLE_SANS_EXIGENCE = ['PlatformAccessController.platformAccess'];
@@ -2741,5 +2743,74 @@ describe('ADR-0053 — P7 : `/admin/stats` et `/admin/finance`', () => {
     );
     expect(platformActionHolders('platform.finance.read')).not.toContain('platform_admin');
     expect(platformActionHolders('platform.finance.export')).not.toContain('platform_support');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADR-0047 : factures des abonnements Lalanda (espace de l'abonné et console)
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { PlatformSubscriptionInvoicesController } from '../subscription-invoices/platform-subscription-invoices.controller.js';
+import { SubscriptionInvoicesController } from '../subscription-invoices/subscription-invoices.controller.js';
+
+const CONTROLEURS_ADR47 = [SubscriptionInvoicesController, PlatformSubscriptionInvoicesController];
+(CONTROLEURS as unknown[]).push(...CONTROLEURS_ADR47);
+TOUTES_LES_ROUTES.push(
+  ...CONTROLEURS_ADR47.flatMap((c) => routesDe(c as new (...args: never[]) => unknown)),
+);
+
+describe('ADR-0047 : factures des abonnements', () => {
+  it('l’espace de l’abonné exige `billing.manage`, sans exception ni rôle plateforme', () => {
+    const routes = TOUTES_LES_ROUTES.filter((r) =>
+      r.cle.startsWith('SubscriptionInvoicesController.'),
+    );
+    expect(routes.map((r) => r.cle).sort()).toEqual(
+      [
+        'SubscriptionInvoicesController.list',
+        'SubscriptionInvoicesController.pdf',
+        'SubscriptionInvoicesController.profile',
+        'SubscriptionInvoicesController.saveProfile',
+      ].sort(),
+    );
+    for (const r of routes) {
+      expect(r.actions, r.cle).toEqual(['billing.manage']);
+      expect(r.rolesPlateforme ?? [], r.cle).toEqual([]);
+      expect(SANS_PERMISSION[r.cle], r.cle).toBeUndefined();
+    }
+  });
+
+  it('la console déclare l’action plateforme attendue ; toute écriture exige la ré-authentification', () => {
+    const attendu: Record<string, [PlatformAction, boolean]> = {
+      'PlatformSubscriptionInvoicesController.list': ['platform.billing.read', false],
+      'PlatformSubscriptionInvoicesController.uninvoiced': ['platform.billing.read', false],
+      'PlatformSubscriptionInvoicesController.seller': ['platform.billing.read', false],
+      'PlatformSubscriptionInvoicesController.pdf': ['platform.billing.read', false],
+      'PlatformSubscriptionInvoicesController.emit': ['platform.billing.confirm', true],
+      'PlatformSubscriptionInvoicesController.requestCreditNote': [
+        'platform.billing.confirm',
+        true,
+      ],
+      'PlatformSubscriptionInvoicesController.approveCreditNote': [
+        'platform.billing.confirm',
+        true,
+      ],
+      'PlatformSubscriptionInvoicesController.designate': ['platform.billing.grant', true],
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) =>
+      r.cle.startsWith('PlatformSubscriptionInvoicesController.'),
+    );
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    const proto = PlatformSubscriptionInvoicesController.prototype as unknown as Record<
+      string,
+      object
+    >;
+    for (const [cle, [action, reauth]] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle)!;
+      expect(route.actions ?? [], cle).toEqual([]);
+      expect(route.rolesPlateforme, cle).toEqual(platformActionHolders(action));
+      const methode = proto[cle.split('.')[1]!]!;
+      expect(Reflect.getMetadata(REQUIRED_PLATFORM_ACTIONS_KEY, methode), cle).toEqual([action]);
+      expect(Reflect.getMetadata(P2_REAUTH_KEY, methode) === true, cle).toBe(reauth);
+    }
   });
 });

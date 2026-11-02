@@ -268,7 +268,20 @@ export function mapStripeEvent(payload: unknown): NormalizedWebhookEvent {
     failureCode:
       asString(pick(object, 'last_payment_error', 'code')) ??
       asString(pick(object, 'last_finalization_error', 'code')),
+    // ADR-0047 : somme payée (facture Stripe : `amount_paid` ; session : `amount_total`),
+    // seulement sur un paiement réussi. Absente des autres événements.
+    ...(event === 'payment.succeeded' ? stripePaidAmount(object) : {}),
   };
+}
+
+/** ADR-0047 : montant payé en centimes et devise, quand Stripe les déclare. */
+function stripePaidAmount(
+  object: unknown,
+): { amountPaidCents: number; amountCurrency: string } | Record<string, never> {
+  const raw = pick(object, 'amount_paid') ?? pick(object, 'amount_total');
+  const currency = asString(pick(object, 'currency'));
+  if (typeof raw !== 'number' || !Number.isSafeInteger(raw) || raw <= 0 || !currency) return {};
+  return { amountPaidCents: raw, amountCurrency: currency.toUpperCase() };
 }
 
 function mapEvent(rawType: string, object: unknown): SubscriptionEvent | null {
