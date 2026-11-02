@@ -771,6 +771,20 @@ Tâche `sales.subscriptions.prepare` (quotidienne, idempotente, acteur `system:s
 prépare des brouillons, n'émet ni ne normalise rien. Émettre reste `sales.invoice` (routes
 existantes).
 
+**Lot V5 — implémenté** (échéancier et abonnements) : `GET /sales/contracts/:id/schedule?from=&to=`
+(`sales.read` ; défaut aujourd'hui ± 365 jours, 1 098 jours au plus ; entrées `{ key, kind, date,
+itemRef, label, periodStart, periodEnd, periodExceedsBounds, state, invoice, reasons, autoPrepare }`,
+`state` ∈ `prepared · to_prepare · upcoming · blocked`, motifs `CUSTOMER_ARCHIVED · CALCULATION_ERROR ·
+RENEWAL_NOT_RECORDED · CONTRACT_TERMINATED · AMENDMENT_PENDING` ; au-delà du dernier jour facturable,
+seules les échéances dues sont montrées, bloquées) · `POST /sales/contracts/:id/occurrences/:key/prepare`
+(`sales.read` + `sales.manage` ; `key` = date `AAAA-MM-JJ` d'un abonnement ou `item:<itemRef>` ; corps
+`{ type?: 'FV' | 'EV' }`, `FV` par défaut ; `200 { invoiceId, warnings, occurrence }` ; `404
+OCCURRENCE_NOT_FOUND`, `409 OCCURRENCE_ALREADY_PREPARED`, `409 OCCURRENCE_BLOCKED`, `409
+CONTRACT_NOT_SIGNED`). La tâche passe une fois par jour sur les contrats `signed` et `terminated`,
+fenêtre `[aujourd'hui − 90 j, aujourd'hui + subscriptionLeadDays]`, brouillons `FV` aux lignes en
+vigueur à la date de l'échéance (aucun prorata), commentaire C « Abonnement CT… — période du … au … »
+ou « Contrat CT… — échéance du … » ; audit `sales_contract.occurrence_prepared`.
+
 ## Brief du matin — implémenté (ADR-0033)
 
 L'organisation est toujours celle de la session ; aucun corps ni paramètre ne la désigne.
