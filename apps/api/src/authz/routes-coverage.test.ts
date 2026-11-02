@@ -116,7 +116,12 @@ import { WorkSettingsController } from '../work/work-settings.controller.js';
 import { WorkTasksController } from '../work/work-tasks.controller.js';
 import { WorkTimeController } from '../work/work-time.controller.js';
 import { AuditController } from './audit.controller.js';
-import { REQUIRED_PERMISSIONS_KEY, REQUIRED_PLATFORM_ROLES_KEY } from './authz.decorators.js';
+import {
+  PLATFORM_CONSOLE_ROUTE_KEY,
+  REQUIRED_PERMISSIONS_KEY,
+  REQUIRED_PLATFORM_ACTIONS_KEY,
+  REQUIRED_PLATFORM_ROLES_KEY,
+} from './authz.decorators.js';
 import { MeController } from './me.controller.js';
 import { CatalogController } from './catalog.controller.js';
 // ADR-0039 — L2
@@ -149,6 +154,16 @@ import { StockSyncController } from '../stock/links/stock-sync.controller.js';
 // ADR-0048 — formulaire public de prospects
 import { CrmLeadFormsController } from '../crm/lead-forms/crm-lead-forms.controller.js';
 import { PublicLeadFormsController } from '../crm/lead-forms/public-lead-forms.controller.js';
+// ADR-0053 — P0
+import { GUARDS_METADATA } from '@nestjs/common/constants.js';
+import { AuthGuard } from '../auth/auth.guard.js';
+import { PermissionsGuard } from './permissions.guard.js';
+import { PlatformAuthGuard } from './platform-auth.guard.js';
+import {
+  isPlatformAction,
+  platformActionHolders,
+  type PlatformAction,
+} from './platform-actions.js';
 
 /**
  * TOUS les contrôleurs de l'application. Un contrôleur absent de cette liste
@@ -1911,6 +1926,170 @@ describe('ADR-0051 — H12 : présences et plannings', () => {
       expect(route!.actions, cle).toEqual(actions);
       expect(route!.rolesPlateforme, cle).toBeUndefined();
       expect(SANS_PERMISSION[cle], cle).toBeUndefined();
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADR-0053 — P0 : console Lalanda, garde sans organisation et actions plateforme
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('ADR-0053 — P0 : la garde sans organisation ne vaut que pour la console', () => {
+  /** Contrôleurs autorisés à porter `PlatformAuthGuard` : la console, et elle seule. */
+  const CONTROLEURS_CONSOLE = [
+    'AdminController',
+    'PlatformAccessController',
+    'IntegrationsController',
+    'ReauthController',
+    'AccountingChartPacksPlatformController',
+  ];
+  /** Routes de console sans rôle ni action plateforme, avec leur raison (déjà justifiées). */
+  const CONSOLE_SANS_EXIGENCE = ['PlatformAccessController.platformAccess'];
+  /**
+   * Routes plateforme ENCORE sous `AuthGuard`, servies une version (compatibilité N-1,
+   * ADR-0053 § 2.2, § 7) : le lot P3 les duplique sous `/admin/billing/**` derrière la
+   * garde de console, puis les retire (`410`). Liste figée : aucune entrée nouvelle.
+   */
+  const PLATEFORME_SOUS_AUTHGUARD_N1 = [
+    'PaymentsController.pendingManual',
+    'PaymentsController.confirmManual',
+    'PaymentsController.rejectManual',
+    'PaymentsController.sweep',
+  ];
+
+  interface RouteGardee {
+    cle: string;
+    controleur: string;
+    cheminControleur: string;
+    gardes: unknown[];
+    console: boolean;
+    actions: Action[] | undefined;
+    rolesPlateforme: string[] | undefined;
+    actionsPlateforme: string[] | undefined;
+  }
+
+  function lire<T>(cle: string, methode: object, classe: object): T | undefined {
+    return (Reflect.getMetadata(cle, methode) ?? Reflect.getMetadata(cle, classe)) as T | undefined;
+  }
+
+  const ROUTES: RouteGardee[] = CONTROLEURS.flatMap((controleur) => {
+    const proto = controleur.prototype as Record<string, unknown>;
+    const gardesClasse = (Reflect.getMetadata(GUARDS_METADATA, controleur) ?? []) as unknown[];
+    return Object.getOwnPropertyNames(proto)
+      .filter((nom) => nom !== 'constructor' && typeof proto[nom] === 'function')
+      .filter((nom) => Reflect.getMetadata('path', proto[nom] as object) !== undefined)
+      .map((nom) => {
+        const methode = proto[nom] as object;
+        return {
+          cle: `${controleur.name}.${nom}`,
+          controleur: controleur.name,
+          cheminControleur: String(Reflect.getMetadata('path', controleur) ?? ''),
+          gardes: [
+            ...gardesClasse,
+            ...((Reflect.getMetadata(GUARDS_METADATA, methode) ?? []) as unknown[]),
+          ],
+          console: lire<boolean>(PLATFORM_CONSOLE_ROUTE_KEY, methode, controleur) === true,
+          actions: lire<Action[]>(REQUIRED_PERMISSIONS_KEY, methode, controleur),
+          rolesPlateforme: lire<string[]>(REQUIRED_PLATFORM_ROLES_KEY, methode, controleur),
+          actionsPlateforme: lire<string[]>(REQUIRED_PLATFORM_ACTIONS_KEY, methode, controleur),
+        };
+      });
+  });
+  const avecGardePlateforme = ROUTES.filter((r) => r.gardes.includes(PlatformAuthGuard));
+  const plateforme = (r: RouteGardee): boolean =>
+    Boolean(r.rolesPlateforme?.length || r.actionsPlateforme?.length);
+
+  it("l'introspection voit les gardes (le test ne se valide pas à vide)", () => {
+    expect(ROUTES.length).toBe(TOUTES_LES_ROUTES.length);
+    expect(ROUTES.filter((r) => r.gardes.includes(AuthGuard)).length).toBeGreaterThan(100);
+    expect(avecGardePlateforme.length).toBeGreaterThan(10);
+  });
+
+  it('seuls les contrôleurs de la console portent `PlatformAuthGuard`', () => {
+    const hors = avecGardePlateforme.filter((r) => !CONTROLEURS_CONSOLE.includes(r.controleur));
+    expect(hors.map((r) => r.cle)).toEqual([]);
+    expect([...new Set(avecGardePlateforme.map((r) => r.controleur))].sort()).toEqual(
+      [...CONTROLEURS_CONSOLE].sort(),
+    );
+  });
+
+  it('toute route sous `PlatformAuthGuard` est marquée console, sans `AuthGuard`, suivie de `PermissionsGuard`', () => {
+    for (const r of avecGardePlateforme) {
+      expect(r.console, `${r.cle} : marqueur @PlatformConsoleRoute absent`).toBe(true);
+      expect(r.gardes.includes(AuthGuard), `${r.cle} : deux gardes d'authentification`).toBe(false);
+      if (plateforme(r)) {
+        expect(
+          r.gardes.indexOf(PermissionsGuard),
+          `${r.cle} : PermissionsGuard doit suivre PlatformAuthGuard`,
+        ).toBeGreaterThan(r.gardes.indexOf(PlatformAuthGuard));
+      }
+    }
+  });
+
+  it('toute route marquée console porte `PlatformAuthGuard` (un marqueur seul ne vaut rien)', () => {
+    const orphelines = ROUTES.filter((r) => r.console && !r.gardes.includes(PlatformAuthGuard));
+    expect(orphelines.map((r) => r.cle)).toEqual([]);
+  });
+
+  it("aucune route d'organisation ne devient accessible sans organisation — table entière", () => {
+    // Une route qui déclare une action d'organisation passe TOUJOURS par `AuthGuard`, qui
+    // résout une organisation (ou refuse `403 NO_ORGANIZATION`) : jamais par la garde de
+    // console, jamais marquée console.
+    const avecAction = ROUTES.filter((r) => r.actions?.length);
+    expect(avecAction.length).toBeGreaterThan(100);
+    for (const r of avecAction) {
+      expect(r.gardes.includes(PlatformAuthGuard), `${r.cle} : garde sans organisation`).toBe(
+        false,
+      );
+      expect(r.console, `${r.cle} : route d'organisation marquée console`).toBe(false);
+      expect(r.gardes.includes(AuthGuard), `${r.cle} : AuthGuard absent`).toBe(true);
+    }
+  });
+
+  it("une route plateforme n'accepte aucune action d'organisation ; une route d'organisation, aucune exigence plateforme", () => {
+    for (const r of ROUTES) {
+      if (plateforme(r)) {
+        expect(
+          r.actions ?? [],
+          `${r.cle} : action d'organisation sur une route plateforme`,
+        ).toEqual([]);
+        expect(
+          r.gardes.includes(PlatformAuthGuard) || PLATEFORME_SOUS_AUTHGUARD_N1.includes(r.cle),
+          `${r.cle} : route plateforme sous AuthGuard`,
+        ).toBe(true);
+      }
+      if (r.actions?.length) expect(plateforme(r), r.cle).toBe(false);
+    }
+  });
+
+  it('toute route de console exige un rôle ou une action plateforme, sauf la lecture de ses propres droits', () => {
+    const sansExigence = avecGardePlateforme.filter((r) => !plateforme(r)).map((r) => r.cle);
+    expect(sansExigence).toEqual(CONSOLE_SANS_EXIGENCE);
+    for (const cle of CONSOLE_SANS_EXIGENCE) expect(SANS_PERMISSION[cle], cle).toBeDefined();
+  });
+
+  it('la liste N-1 est exacte : chaque entrée existe et reste plateforme sous `AuthGuard`', () => {
+    for (const cle of PLATEFORME_SOUS_AUTHGUARD_N1) {
+      const r = ROUTES.find((x) => x.cle === cle);
+      expect(r, cle).toBeDefined();
+      expect(plateforme(r!) && r!.gardes.includes(AuthGuard), cle).toBe(true);
+    }
+  });
+
+  it('chaque `/admin/**` est sous la garde de console', () => {
+    const admin = ROUTES.filter((r) => /^admin(\/|$)/.test(r.cheminControleur));
+    expect(admin.length).toBeGreaterThan(10);
+    for (const r of admin) expect(r.gardes.includes(PlatformAuthGuard), r.cle).toBe(true);
+  });
+
+  it('une action plateforme déclarée appartient au catalogue et pose ses détenteurs', () => {
+    const declarees = ROUTES.filter((r) => r.actionsPlateforme?.length);
+    expect(declarees.map((r) => r.cle)).toContain('AdminController.overview');
+    for (const r of declarees) {
+      for (const a of r.actionsPlateforme!) {
+        expect(isPlatformAction(a), `${r.cle} : ${a}`).toBe(true);
+        expect(r.rolesPlateforme, r.cle).toEqual(platformActionHolders(a as PlatformAction));
+      }
     }
   });
 });

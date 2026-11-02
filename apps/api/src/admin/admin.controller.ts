@@ -35,10 +35,16 @@ import {
   UseGuards,
 } from '@nestjs/common';
 
-import { AuthGuard, type AuthenticatedRequest } from '../auth/auth.guard.js';
+import type { AuthenticatedRequest } from '../auth/auth.guard.js';
 import { AuthzService } from '../authz/authz.service.js';
-import { RequirePlatformRole } from '../authz/authz.decorators.js';
+import {
+  PlatformConsoleRoute,
+  RequirePlatformAction,
+  RequirePlatformRole,
+} from '../authz/authz.decorators.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
+// ADR-0053 — P0
+import { PlatformAuthGuard } from '../authz/platform-auth.guard.js';
 import { PlatformAuditService } from '../integrations/platform-audit.service.js';
 import {
   AdminService,
@@ -66,7 +72,10 @@ export interface PlatformAuditEventView {
 }
 
 @Controller('admin')
-@UseGuards(AuthGuard, PermissionsGuard)
+// ADR-0053 — P0 : console sans organisation (F2). `PlatformAuthGuard` ne résout aucune
+// organisation ; l'autorisation reste celle de `PermissionsGuard`, rôles PLATEFORME seuls.
+@UseGuards(PlatformAuthGuard, PermissionsGuard)
+@PlatformConsoleRoute()
 // Plancher du contrôleur : sans AUCUN rôle plateforme, tout `/admin` est fermé.
 // Chaque route resserre ensuite pour ses écritures.
 @RequirePlatformRole('platform_super_admin', 'platform_admin', 'platform_support')
@@ -94,7 +103,10 @@ export class AdminController {
 
   // ── Tableau de bord ────────────────────────────────────────────────────────
 
+  // ADR-0053 — P0 : tableau de bord ouvert aux six rôles plateforme (`platform.console.read`,
+  // corrige F7) ; il ne sert que des compteurs agrégés de la plateforme.
   @Get('overview')
+  @RequirePlatformAction('platform.console.read')
   async overview(): Promise<PlatformOverview> {
     return this.admin.overview();
   }
