@@ -49,6 +49,8 @@ const SANS_ORGANISATION: Readonly<Record<string, string>> = {
   // ADR-0053 — P6 : annonces par catégorie et accusés par personne, hors de toute société.
   platform_announcements: 'annonces de la plateforme (catégorie déclarative, aucune société)',
   platform_announcement_receipts: 'accusés de réception d’une annonce, par personne',
+  platform_security_counters:
+    'compteurs agrégés d’événements de sécurité de la plateforme (aucune organisation, aucun identifiant)',
   // La société elle-même : c'est l'`_id` qui sert de clé, pas un `organizationId`.
   organizations: "l'organisation elle-même (son _id est la clé)",
   // Ordonnanceur : verrous de tâches qui parcourent toutes les organisations.
