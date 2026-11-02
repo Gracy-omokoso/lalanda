@@ -13,8 +13,10 @@ import { RequirePermission } from '../../authz/authz.decorators.js';
 import { PermissionsGuard } from '../../authz/permissions.guard.js';
 import { invalidRequest } from '../../sales/sales.errors.js';
 import { PurchasesSummaryService } from './purchases-summary.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 @Controller('purchases')
+@RequireFeature('purchases') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class PurchasesSummaryController {
   constructor(

@@ -19,8 +19,10 @@ import {
 import { PermissionsGuard } from '../../authz/permissions.guard.js';
 import { can } from '../../authz/permissions.js';
 import { SupplierOverviewService } from './supplier-overview.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 @Controller('purchases/suppliers')
+@RequireFeature('purchases') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class SupplierOverviewController {
   constructor(

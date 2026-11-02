@@ -35,6 +35,7 @@ import {
   type AccountingActor,
 } from '../accounting.common.js';
 import { AccountingRuleSetsService } from './accounting-rule-sets.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 function versionOf(raw: string): number {
   if (!/^[1-9]\d{0,5}$/.test(raw)) badRequest('INVALID_VERSION', 'Version de règles invalide.');
@@ -42,6 +43,7 @@ function versionOf(raw: string): number {
 }
 
 @Controller('accounting/rule-sets')
+@RequireFeature('accounting') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class AccountingRuleSetsController {
   constructor(

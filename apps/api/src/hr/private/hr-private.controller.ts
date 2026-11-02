@@ -46,10 +46,12 @@ import { HrEmployeesService } from '../employees/hr-employees.service.js';
 import { employeeNotFound, sensitiveForbidden } from '../scope/hr-errors.js';
 import { HrScopeService } from '../scope/hr-scope.service.js';
 import { HrPrivateService } from './hr-private.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 type User = { id: string };
 
 @Controller('hr/employees/:employeeId/private')
+@RequireFeature('hr') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class HrPrivateController {
   constructor(

@@ -28,6 +28,8 @@ import { PaymentsModule } from '../payments/payments.module.js';
 import { PlanGrant, PlanGrantSchema } from './billing/plan-grant.schema.js';
 import { PlatformBillingController } from './billing/platform-billing.controller.js';
 import { PlatformBillingService } from './billing/platform-billing.service.js';
+// ADR-0053 — P4 : fonctionnalités par offre (@Global, sert `FeatureGuard` partout).
+import { FeaturesModule } from './features/features.module.js';
 
 @Module({
   imports: [
@@ -37,6 +39,7 @@ import { PlatformBillingService } from './billing/platform-billing.service.js';
     IntegrationsModule,
     // ADR-0053 — P3 : file des paiements manuels (`PaymentsService`).
     PaymentsModule,
+    FeaturesModule, // ADR-0053 — P4
     MongooseModule.forFeature([
       { name: OrganizationSuspension.name, schema: OrganizationSuspensionSchema },
       { name: AiUsageEvent.name, schema: AiUsageEventSchema },

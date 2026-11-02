@@ -58,10 +58,12 @@ import { invalidRequest } from '../sales/sales.errors.js';
 import { WorkIdPipe, workActorOf } from './work.common.js';
 import { WorkActivityService } from './work-activity.service.js';
 import { WorkTasksService } from './work-tasks.service.js';
+import { RequireFeature } from '../billing/feature.guard.js';
 
 type User = { id: string };
 
 @Controller('work')
+@RequireFeature('run_work') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class WorkTasksController {
   constructor(

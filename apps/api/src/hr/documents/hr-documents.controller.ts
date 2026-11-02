@@ -66,6 +66,7 @@ import {
   type HrUploadedFile,
 } from './hr-documents.service.js';
 import type { HrDocumentLean } from './hr-document.schema.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 type User = { id: string };
 
@@ -89,6 +90,7 @@ function sendDocument(res: Response, doc: HrDocumentLean, body: Buffer): void {
 }
 
 @Controller('hr')
+@RequireFeature('hr') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class HrDocumentsController {
   constructor(

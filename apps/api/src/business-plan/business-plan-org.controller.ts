@@ -26,6 +26,7 @@ import {
   type BusinessPlanOverviewItem,
 } from './business-plan-overview.service.js';
 import { BusinessPlanService } from './business-plan.service.js';
+import { RequireFeature } from '../billing/feature.guard.js';
 
 export const SettingsRequestSchema = z.object({ aiEnabled: z.boolean() }).strict();
 
@@ -36,6 +37,7 @@ export interface BusinessPlanSettingsView {
 }
 
 @Controller('business-plan')
+@RequireFeature('business_plan') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class BusinessPlanOrgController {
   constructor(

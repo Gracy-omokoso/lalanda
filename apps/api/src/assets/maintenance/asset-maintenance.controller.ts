@@ -45,8 +45,10 @@ import type { OrgRole } from '../../authz/permissions.js';
 import { invalidRequest } from '../../sales/sales.errors.js';
 import { assetActorOf, assetReaderOf } from '../registry/assets.controller.js';
 import { AssetMaintenanceService } from './asset-maintenance.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 @Controller('assets/:assetId')
+@RequireFeature('assets') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class AssetMaintenanceController {
   constructor(@Inject(AssetMaintenanceService) private readonly service: AssetMaintenanceService) {}

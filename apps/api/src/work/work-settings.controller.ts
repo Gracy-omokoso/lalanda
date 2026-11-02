@@ -17,8 +17,10 @@ import { PermissionsGuard } from '../authz/permissions.guard.js';
 import { invalidRequest } from '../sales/sales.errors.js';
 import { workActorOf } from './work.common.js';
 import { WorkSettingsService } from './work-settings.service.js';
+import { RequireFeature } from '../billing/feature.guard.js';
 
 @Controller('work/settings')
+@RequireFeature('run_work') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class WorkSettingsController {
   constructor(@Inject(WorkSettingsService) private readonly settings: WorkSettingsService) {}

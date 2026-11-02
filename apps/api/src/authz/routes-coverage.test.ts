@@ -19,6 +19,9 @@ import { EmailVerificationController } from '../account/email-verification.contr
 import { ActualsController } from '../actuals/actuals.controller.js';
 import { AdminController } from '../admin/admin.controller.js';
 import { PlatformAccessController } from '../admin/platform-access.controller.js';
+// ADR-0053 — P4
+import { AdminFeaturesController } from '../admin/features/admin-features.controller.js';
+import { MeFeaturesController } from '../admin/features/me-features.controller.js';
 import {
   IntegrationsController,
   ReauthController,
@@ -322,6 +325,9 @@ const CONTROLEURS = [
   OrganizationSetupController,
   // ADR-0052 — O1 : avancement par organisation (sélecteur).
   OrganizationSetupProgressController,
+  // ADR-0053 — P4 : fonctionnalités par offre (console et `GET /me/features`).
+  AdminFeaturesController,
+  MeFeaturesController,
 ];
 
 /**
@@ -1966,6 +1972,8 @@ describe('ADR-0053 — P0 : la garde sans organisation ne vaut que pour la conso
     'AccountingChartPacksPlatformController',
     // ADR-0053 — P3
     'PlatformBillingController',
+    // ADR-0053 — P4
+    'AdminFeaturesController',
   ];
   /** Routes de console sans rôle ni action plateforme, avec leur raison (déjà justifiées). */
   const CONSOLE_SANS_EXIGENCE = ['PlatformAccessController.platformAccess'];

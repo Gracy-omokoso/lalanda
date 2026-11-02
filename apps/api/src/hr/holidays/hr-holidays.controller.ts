@@ -31,8 +31,10 @@ import { PermissionsGuard } from '../../authz/permissions.guard.js';
 import type { OrgRole } from '../../authz/permissions.js';
 import { invalidRequest } from '../../sales/sales.errors.js';
 import { HrHolidaysService } from './hr-holidays.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 @Controller('hr/holidays')
+@RequireFeature('hr') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class HrHolidaysController {
   constructor(@Inject(HrHolidaysService) private readonly holidays: HrHolidaysService) {}

@@ -36,6 +36,7 @@ import {
 } from './receipts.dto.js';
 import { ReceiptsService, type ReceiptView, type ReceiptsSummary } from './receipts.service.js';
 import { SettlementsService, type SettlementView } from './settlements.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 type User = { id: string; email: string; name?: string | null };
 
@@ -45,6 +46,7 @@ function actorOf(user: User, role: OrgRole | undefined): InvoiceActor {
 }
 
 @Controller('sales')
+@RequireFeature('normalized_invoicing') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class ReceiptsController {
   constructor(

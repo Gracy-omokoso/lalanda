@@ -21,8 +21,10 @@ import {
   SalesContractSettingsService,
   type SalesContractSettingsView,
 } from './sales-contract-settings.service.js';
+import { RequireFeature } from '../../../billing/feature.guard.js';
 
 @Controller('sales/contract-settings')
+@RequireFeature('sales_contracts') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class SalesContractSettingsController {
   constructor(

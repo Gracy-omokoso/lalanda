@@ -49,6 +49,7 @@ import type { OrgRole } from '../../authz/permissions.js';
 import { invalidRequest } from '../../sales/sales.errors.js';
 import { HrScopeService } from '../scope/hr-scope.service.js';
 import { HrChecklistsService, type HrChecklistActor } from './hr-checklists.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 type User = { id: string };
 
@@ -57,6 +58,7 @@ function actorOf(user: User, role: OrgRole | undefined): HrChecklistActor {
 }
 
 @Controller('hr')
+@RequireFeature('hr') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class HrChecklistsController {
   constructor(

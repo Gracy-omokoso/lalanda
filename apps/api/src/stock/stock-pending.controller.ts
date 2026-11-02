@@ -33,8 +33,10 @@ import { PermissionsGuard } from '../authz/permissions.guard.js';
 import { CurrentStockActor } from './stock-actor.decorator.js';
 import { parseWith, type StockActor } from './stock.common.js';
 import { StockPendingService } from './stock-pending.service.js';
+import { RequireFeature } from '../billing/feature.guard.js';
 
 @Controller('stock/pending')
+@RequireFeature('stock') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class StockPendingController {
   constructor(@Inject(StockPendingService) private readonly pending: StockPendingService) {}

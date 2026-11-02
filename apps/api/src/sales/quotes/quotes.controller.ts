@@ -52,6 +52,7 @@ import {
   QuoteRevisionSchema,
   RefuseQuoteSchema,
 } from './quotes.dto.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 type User = { id: string; email: string; name?: string | null };
 
@@ -67,6 +68,7 @@ function revisionOf(body: unknown): number {
 }
 
 @Controller('sales/quotes')
+@RequireFeature('quotes') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class QuotesController {
   constructor(

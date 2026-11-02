@@ -50,6 +50,7 @@ import {
 } from '../attachments/purchase-attachments.js';
 import { parseBody, type PurchaseActor } from '../invoices/purchase-p4.common.js';
 import { PurchaseReceptionsService } from './purchase-receptions.service.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 type User = { id: string };
 
@@ -58,6 +59,7 @@ function actorOf(user: User, role: OrgRole | undefined): PurchaseActor {
 }
 
 @Controller('purchases/receptions')
+@RequireFeature('purchases') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class PurchaseReceptionsController {
   constructor(

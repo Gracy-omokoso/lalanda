@@ -50,6 +50,7 @@ import {
   type TemplateOptions,
   type TemplateOptionsInput,
 } from './templates/template.contract.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 export interface InvoiceTemplatesView {
   templates: InvoiceTemplateCatalogEntry[];
@@ -82,6 +83,7 @@ function invalid(error: Parameters<typeof issuesOf>[0]): never {
 }
 
 @Controller('sales')
+@RequireFeature('invoice_templates') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class InvoiceTemplatesController {
   constructor(

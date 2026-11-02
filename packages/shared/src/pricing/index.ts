@@ -359,3 +359,6 @@ export function monthWindowStart(now: Date): Date {
 export function monthWindowReset(now: Date): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0));
 }
+
+// ADR-0053 — P4 : catalogue des fonctionnalités par offre (grille entièrement ouverte).
+export * from './features.js';

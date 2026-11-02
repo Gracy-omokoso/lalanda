@@ -54,6 +54,7 @@ import {
   NormalizeInvoiceSchema,
   PutInvoiceSchema,
 } from './invoices.dto.js';
+import { RequireFeature } from '../../billing/feature.guard.js';
 
 type User = { id: string; email: string; name?: string | null };
 
@@ -63,6 +64,7 @@ function actorOf(user: User, role: OrgRole | undefined): InvoiceActor {
 }
 
 @Controller('sales')
+@RequireFeature('normalized_invoicing') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class InvoicesController {
   constructor(

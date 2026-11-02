@@ -44,10 +44,12 @@ import { PermissionsGuard } from '../authz/permissions.guard.js';
 import { invalidRequest } from '../sales/sales.errors.js';
 import { WorkIdPipe, workActorOf } from './work.common.js';
 import { WorkTimeService } from './work-time.service.js';
+import { RequireFeature } from '../billing/feature.guard.js';
 
 type User = { id: string };
 
 @Controller('work')
+@RequireFeature('run_work') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class WorkTimeController {
   constructor(@Inject(WorkTimeService) private readonly time: WorkTimeService) {}

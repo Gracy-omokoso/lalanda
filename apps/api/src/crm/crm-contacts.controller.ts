@@ -36,10 +36,12 @@ import {
   ListContactsQuerySchema,
   PutContactSchema,
 } from './crm.dto.js';
+import { RequireFeature } from '../billing/feature.guard.js';
 
 type User = { id: string };
 
 @Controller('crm/contacts')
+@RequireFeature('crm') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class CrmContactsController {
   constructor(

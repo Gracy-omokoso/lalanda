@@ -27,8 +27,10 @@ import {
   type PreparedSalesDeposit,
   type SalesDepositsView,
 } from './sales-deposits.service.js';
+import { RequireFeature } from '../../../billing/feature.guard.js';
 
 @Controller('sales/contracts')
+@RequireFeature('sales_contracts') // ADR-0053 — P4
 @UseGuards(AuthGuard, PermissionsGuard)
 export class SalesContractDepositsController {
   constructor(@Inject(SalesDepositsService) private readonly deposits: SalesDepositsService) {}
