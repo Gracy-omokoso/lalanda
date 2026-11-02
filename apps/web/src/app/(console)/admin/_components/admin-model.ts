@@ -496,6 +496,14 @@ const LIBELLES_ACTIONS: Record<string, string> = {
   'platform_role.revoked': 'Rôle plateforme retiré',
   'user.disabled': 'Compte désactivé',
   'user.enabled': 'Compte réactivé',
+  // ADR-0053 — P3
+  'billing.manual_payment.confirmed': 'Paiement manuel confirmé',
+  'billing.manual_payment.rejected': 'Paiement manuel refusé',
+  'billing.plan_grant.requested': 'Octroi préparé (seconde personne attendue)',
+  'billing.plan_granted': 'Offre accordée sans paiement',
+  'billing.plan_grant.revoked': 'Octroi retiré',
+  'billing.plan_grant.canceled': 'Demande d’octroi annulée',
+  'billing.sweep': 'Balayage des abonnements',
 };
 
 export function libelleAction(action: string): string {
