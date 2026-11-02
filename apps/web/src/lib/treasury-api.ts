@@ -64,7 +64,8 @@ export interface ExpenseView {
   // ADR-0044 — P8 : fiche fournisseur (P2) et dépense possédée par les achats (P5).
   // Facultatifs tant que l'API ne les sert pas.
   supplierId?: string | null;
-  origin?: ExpenseOrigin | null;
+  // ADR-0051 — H16 : ou possédée par les RH (remboursement d'une note de frais).
+  origin?: ExpenseOrigin | HrExpenseOrigin | null;
   status: 'recorded' | 'cancelled';
   cancelReason: string | null;
   revision: number;
@@ -83,6 +84,16 @@ export interface ExpenseOrigin {
   allocationIndex: number;
   /** Copie d'affichage du numéro `PF…`, si l'API la rend. */
   paymentNumber?: string | null;
+}
+
+// ADR-0051 — H16 (§ 7.1) : dépense créée par le remboursement d'une note de frais ;
+// elle appartient aux RH (`409 EXPENSE_OWNED_BY_HR`). Sans compte si soldée par une avance.
+export interface HrExpenseOrigin {
+  kind: 'expense_report';
+  reportId: string;
+  reportNumber: string;
+  lineIndex: number;
+  settledByAdvanceId: string | null;
 }
 
 export interface ExpensePage {

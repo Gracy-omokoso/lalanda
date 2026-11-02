@@ -9,6 +9,7 @@
 import type { Metadata } from 'next';
 
 import { CarteMarge } from '../../_components/marge/carte-marge';
+import { FraisRefacturables } from '../_components/frais-refacturables';
 
 export const metadata: Metadata = { title: 'Projet — Marge — Lalanda' };
 
@@ -18,5 +19,11 @@ export default async function ProjetMargePage({
   params: Promise<{ id: string }>;
 }): Promise<React.ReactElement> {
   const { id } = await params;
-  return <CarteMarge projectId={id} />;
+  // ADR-0051 — H16 : frais refacturables (« bientôt disponible » tant que H14 manque).
+  return (
+    <div className="flex flex-col gap-5">
+      <CarteMarge projectId={id} />
+      <FraisRefacturables />
+    </div>
+  );
 }
