@@ -18,6 +18,9 @@ import { useAccesVentes } from '../../_components/sales-access';
 import { lienOpportunite } from '../../../crm/_components/crm-model';
 import { FACTURES_BASE } from '../../factures/_components/invoice-model';
 
+// ADR-0050 — V7 : devis accepté → commande ou contrat.
+import { QuoteEngagementBox } from '../[quoteId]/_components/quote-engagement-box';
+
 import { QuoteEditor } from './quote-editor';
 import { QuoteProjectBox } from './quote-project-box';
 import {
@@ -287,6 +290,9 @@ export function QuoteDetail({ quoteId }: { quoteId: string }): React.ReactElemen
 
       {/* ADR-0039 § 6.1 : devis accepté → projet client (proposé, jamais imposé). */}
       <QuoteProjectBox quoteId={vue.id} status={vue.status} actions={actions} />
+
+      {/* ADR-0050 — V7 : « Créer la commande », « Créer le contrat » (sales.contract). */}
+      <QuoteEngagementBox quote={vue} actions={actions} />
 
       {a.edit ? (
         <QuoteEditor key={vue.revision} vueInitiale={vue} onEnregistre={setVue} />

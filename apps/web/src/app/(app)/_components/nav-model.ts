@@ -352,7 +352,11 @@ export const NAV_APPS: readonly NavApp[] = [
     module: 'run',
     icon: 'devis',
     action: 'sales.read',
-    sousOptions: [],
+    // ADR-0050 — V7 : commandes clients et contrats, issus d'un devis accepté.
+    sousOptions: [
+      { id: 'commandes', href: '/ventes/commandes', label: 'Commandes', action: 'sales.read' },
+      { id: 'contrats', href: '/ventes/contrats', label: 'Contrats', action: 'sales.read' },
+    ],
   },
   // ADR-0031 : argent reçu, statut de règlement et pont vers le réalisé.
   {
