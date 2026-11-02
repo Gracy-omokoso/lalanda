@@ -23,7 +23,7 @@ import {
   hrRequiredText,
 } from './common.js';
 import { HR_CURRENCIES, type HrCurrency } from './constants.js';
-import { HrPaymentMethodSchema, hrPageLimit } from './expenses.js';
+import { HrPaymentMethodSchema, hrPageLimit, type HrExpensesSettingsView } from './expenses.js';
 
 // ── Unions fermées ──────────────────────────────────────────────────────────
 
@@ -277,3 +277,123 @@ export const AdvanceMaxAmountSchema = z
   )
   .strict();
 export type AdvanceMaxAmountInput = z.output<typeof AdvanceMaxAmountSchema>;
+
+// ── ADR-0051 — H10 : vues, réglages ─────────────────────────────────────────
+
+export interface AdvanceSettlementView {
+  id: string;
+  kind: AdvanceSettlementKind;
+  amount: string;
+  on: string;
+  reference: string | null;
+  note: string | null;
+  by: string;
+  at: string;
+  expenseReportId: string | null;
+  movementId: string | null;
+  /** Complément annulé avec le remboursement de sa note (la ligne reste, marquée). */
+  cancelledAt: string | null;
+}
+
+export interface AdvanceView {
+  id: string;
+  number: string | null;
+  employeeId: string;
+  employeeName: string;
+  /**
+   * `null` pour un lecteur qui ne doit pas savoir qu'il s'agit d'une avance sur salaire
+   * (payeur sans `hr.sensitive.read`) : la liste dit alors « Avance ».
+   */
+  kind: AdvanceKind | null;
+  label: string;
+  amount: string;
+  currency: HrCurrency;
+  /** Motif en clair d'une avance de frais ; d'une avance sur salaire : jamais (route `reveal-reason`). */
+  reason: string | null;
+  hasReason: boolean;
+  purpose: string | null;
+  workProjectId: string | null;
+  expectedSettlement: string | null;
+  status: AdvanceStatus;
+  steps: ('manager' | 'finance')[];
+  currentStep: 'manager' | 'finance' | null;
+  approvals: {
+    step: 'manager' | 'finance';
+    userId: string;
+    decision: 'approved' | 'rejected';
+    at: string;
+    comment: string | null;
+    soleApprover: boolean;
+    onBehalfOfManager: boolean;
+  }[];
+  disbursement: {
+    paidOn: string;
+    accountId: string;
+    method: 'cash' | 'mobile_money' | 'bank_transfer' | 'other';
+    reference: string | null;
+    paidBy: string;
+    movementId: string;
+    soleApprover: boolean;
+  } | null;
+  /** Régularisations (vues des seuls ayants droit au détail). */
+  settlements: AdvanceSettlementView[];
+  /** Calculés par le moteur (`advanceOutstanding`). */
+  disbursed: string;
+  settled: string;
+  outstanding: string;
+  /** Constats du moteur (`advanceFindings`) : `ADVANCE_OVERDUE`, `ADVANCE_SETTLED_ON_PAYROLL`. */
+  findings: { code: HrAdvancesFindingCode; dueOn: string | null; payrollMonth: string | null }[];
+  submittedAt: string | null;
+  createdBy: string;
+  createdAt: string;
+  cancelReason: string | null;
+  revision: number;
+}
+
+export interface AdvancePage {
+  items: AdvanceView[];
+  nextCursor: string | null;
+}
+
+/** `POST /hr/advances/:id/submit`, `…/approve`. */
+export const SubmitAdvanceBody = z.object({ expectedRevision: HrExpectedRevision }).strict();
+export type SubmitAdvanceBody = z.output<typeof SubmitAdvanceBody>;
+
+/** Réglages `hr_settings.advances` lus (défauts compris). */
+export interface HrAdvancesSettingsView {
+  enabled: { expenses: boolean; salary: boolean };
+  maxAmount: Record<HrCurrency, string | null>;
+  allowDeclaredPayrollSettlement: boolean;
+}
+
+/**
+ * `PUT /hr/settings/advances` — `hr.manage` ET `expenses.approve` (§ 2.7). Aucun plafond
+ * n'est posé par Lalanda : un plafond saisi est une décision de l'organisation (J1).
+ */
+export const UpdateHrAdvancesSettingsBody = z
+  .object({
+    expectedRevision: z.number(hrFr('Révision attendue : un entier.')).int().min(0),
+    enabled: z
+      .object({
+        expenses: z.boolean(hrFr('Booléen attendu.')),
+        salary: z.boolean(hrFr('Booléen attendu.')),
+      })
+      .strict()
+      .optional(),
+    maxAmount: AdvanceMaxAmountSchema.optional(),
+    allowDeclaredPayrollSettlement: z.boolean(hrFr('Booléen attendu.')).optional(),
+  })
+  .strict();
+export type UpdateHrAdvancesSettingsBody = z.output<typeof UpdateHrAdvancesSettingsBody>;
+
+/** Réponse de `GET /hr/settings/expenses` : les deux blocs du lot H10 et la révision commune. */
+export interface HrExpensesAdvancesSettingsView {
+  expenses: HrExpensesSettingsView;
+  advances: HrAdvancesSettingsView;
+  revision: number;
+}
+
+/** `POST /hr/advances/:id/reveal-reason` — rend le motif, audit strict écrit avant. */
+export interface AdvanceReasonView {
+  reason: string | null;
+}

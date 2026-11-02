@@ -19,6 +19,15 @@ export class HrSettings {
 
   @Prop({ type: Number, required: true, default: 1 })
   _schemaVersion!: number;
+
+  // ADR-0051 — H10 : notes de frais et avances (§ 2.7). Lus et VÉRIFIÉS par
+  // `hr/expenses/hr-expenses-settings.service.ts` (défauts prudents à la lecture : avance
+  // sur salaire et régularisation déclarée éteintes, aucun plafond, aucun seuil).
+  @Prop({ type: Object })
+  expenses?: Record<string, unknown>;
+
+  @Prop({ type: Object })
+  advances?: Record<string, unknown>;
 }
 
 export type HrSettingsDocument = HydratedDocument<HrSettings>;

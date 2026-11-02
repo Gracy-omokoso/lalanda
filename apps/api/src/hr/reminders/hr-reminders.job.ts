@@ -22,6 +22,8 @@ import { InjectConnection, InjectModel, Prop, Schema, SchemaFactory } from '@nes
 import type { Connection, HydratedDocument, Model } from 'mongoose';
 
 import { holdersFilter } from '../../authz/authz.service.js';
+// ADR-0051 — H10 : rappels d'avance non régularisée à l'échéance annoncée.
+import { HrAdvanceRemindersService } from '../advances/hr-advance-reminders.service.js';
 import { SchedulerService } from '../../scheduler/scheduler.service.js';
 import {
   HrChecklistsNotifier,
@@ -86,6 +88,8 @@ export class HrRemindersJob implements OnModuleInit {
     @Inject(HrDeadlinesService) private readonly deadlines: HrDeadlinesService,
     @Inject(HrChecklistsNotifier) private readonly notifier: HrChecklistsNotifier,
     @Inject(SchedulerService) private readonly scheduler: SchedulerService,
+    // ADR-0051 — H10
+    @Inject(HrAdvanceRemindersService) private readonly advanceReminders: HrAdvanceRemindersService,
   ) {}
 
   onModuleInit(): void {
@@ -104,6 +108,10 @@ export class HrRemindersJob implements OnModuleInit {
     for (const organizationId of orgs.sort()) {
       try {
         await this.runOrg(organizationId, today, now, report);
+        // ADR-0051 — H10 : avances versées non régularisées après l'échéance annoncée.
+        const advances = await this.advanceReminders.run(organizationId, today, now);
+        report.claimed += advances.claimed;
+        report.notified += advances.notified;
         report.organizations += 1;
       } catch (err) {
         this.logger.warn(

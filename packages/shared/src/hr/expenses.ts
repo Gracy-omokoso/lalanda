@@ -238,6 +238,9 @@ export const HrPaymentMethodSchema = z.enum(
  */
 export const ExpenseLineSchema = z
   .object({
+    // ADR-0051 — H10 : identifiant d'une ligne existante (brouillon modifié) ; il garde
+    // son justificatif. Absent : ligne nouvelle, sans justificatif.
+    id: HrId.optional(),
     spentOn: HrCalendarDay,
     category: z.string(hrFr('Catégorie attendue.')).superRefine((v, ctx) => {
       if ((EXPENSE_LINE_FORBIDDEN_CATEGORIES as readonly string[]).includes(v)) {
@@ -397,3 +400,136 @@ export const ExpenseSummaryQuery = z
     if (q.to < q.from) hrIssue(ctx, 'PERIOD_END_BEFORE_START', 'La fin précède le début.', ['to']);
   });
 export type ExpenseSummaryQuery = z.output<typeof ExpenseSummaryQuery>;
+
+// ── ADR-0051 — H10 : vues, réglages, réponses ───────────────────────────────
+//
+// Formes de réponse de l'API (`apps/api/src/hr/expenses/**`). Les montants viennent du
+// moteur (`expenseReportTotals`, `advanceSettlementPlan`), jamais additionnés à l'écran.
+
+/** Justificatif tel qu'il est servi : jamais la clé ni la clé de chiffrement. */
+export interface ExpenseReceiptView {
+  contentType: ExpenseReceiptContentType;
+  size: number;
+  uploadedAt: string;
+  uploadedBy: string;
+}
+
+export interface ExpenseLineView {
+  id: string;
+  spentOn: string;
+  category: ExpenseLineCategory;
+  label: string;
+  amount: string;
+  merchant: string | null;
+  deductibleVat: string | null;
+  workProjectId: string | null;
+  rebillable: boolean;
+  /** `null` : aucun justificatif, ou lecteur `hr.read` seul (jamais de justificatif). */
+  receipt: ExpenseReceiptView | null;
+  /** Vrai si un justificatif est joint, même quand le lecteur ne peut pas le voir. */
+  hasReceipt: boolean;
+  missingReceiptReason: string | null;
+  /** Part soldée par l'avance liée et complément dû (moteur), après approbation. */
+  fromAdvance: string | null;
+  topUp: string | null;
+}
+
+export interface ExpenseApprovalView {
+  step: ExpenseApprovalStepKey;
+  userId: string;
+  userName: string | null;
+  decision: ExpenseApprovalDecisionValue;
+  at: string;
+  comment: string | null;
+  soleApprover: boolean;
+  onBehalfOfManager: boolean;
+}
+
+export interface ExpenseReimbursementView {
+  paidOn: string;
+  accountId: string | null;
+  method: HrPaymentMethod;
+  reference: string | null;
+  paidBy: string;
+  soleApprover: boolean;
+  expenseIds: string[];
+}
+
+export interface ExpenseReportView {
+  id: string;
+  number: string | null;
+  employeeId: string;
+  employeeName: string;
+  title: string;
+  currency: 'CDF' | 'USD';
+  lines: ExpenseLineView[];
+  /** Calculés par le moteur. */
+  total: string;
+  byCategory: { category: ExpenseLineCategory; total: string; lines: number }[];
+  advanceId: string | null;
+  advanceNumber: string | null;
+  status: ExpenseReportStatus;
+  steps: ExpenseApprovalStepKey[];
+  currentStep: ExpenseApprovalStepKey | null;
+  approvals: ExpenseApprovalView[];
+  /** Part couverte par l'avance et complément, après l'approbation finale d'une note liée. */
+  settlement: { fromAdvance: string; topUp: string } | null;
+  reimbursement: ExpenseReimbursementView | null;
+  /** Ce qui reste à rembourser au collaborateur (`approved` : total ; `partially_settled` : complément). */
+  toReimburse: string | null;
+  submittedAt: string | null;
+  createdBy: string;
+  createdAt: string;
+  cancelReason: string | null;
+  revision: number;
+}
+
+export interface ExpenseReportPage {
+  items: ExpenseReportView[];
+  nextCursor: string | null;
+}
+
+/** Réglages `hr_settings.expenses` lus (défauts compris). */
+export interface HrExpensesSettingsView {
+  enabled: boolean;
+  approvalFlow: ExpenseApprovalFlow;
+  receiptRequired: boolean;
+  /** Durée de conservation des justificatifs : non fixée (`null`), aucune purge. */
+  receiptsRetentionYears: number | null;
+}
+
+/**
+ * `PUT /hr/settings/expenses` — `hr.manage` ; changer `approvalFlow` exige en plus
+ * `expenses.approve` (changer qui valide exige d'être soi-même validateur, § 2.7).
+ */
+export const UpdateHrExpensesSettingsBody = z
+  .object({
+    expectedRevision: z.number(hrFr('Révision attendue : un entier.')).int().min(0),
+    enabled: z.boolean(hrFr('Booléen attendu.')).optional(),
+    approvalFlow: z
+      .enum(EXPENSE_APPROVAL_FLOWS, hrFr('Circuit : manager_then_finance ou finance_only.'))
+      .optional(),
+    receiptRequired: z.boolean(hrFr('Booléen attendu.')).optional(),
+  })
+  .strict();
+export type UpdateHrExpensesSettingsBody = z.output<typeof UpdateHrExpensesSettingsBody>;
+
+/** `POST /hr/expense-reports/:id/duplicate` — copie d'une note refusée ou annulée, en brouillon. */
+export const DuplicateExpenseReportBody = z.object({}).strict();
+
+/** Élément de `GET /hr/expenses/to-pay` : ce qui attend un payeur (§ 7.2). */
+export interface HrToPayItem {
+  kind: 'expense_report' | 'advance';
+  id: string;
+  number: string | null;
+  /** Neutre : « Note de frais NF… », « Avance AV… » — jamais « sur salaire ». */
+  label: string;
+  employeeName: string;
+  currency: 'CDF' | 'USD';
+  amount: string;
+  approvedAt: string | null;
+}
+
+export interface HrToPayView {
+  items: HrToPayItem[];
+}

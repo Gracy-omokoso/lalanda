@@ -17,7 +17,8 @@
 //     liée → dépenses SANS compte (solde inchangé, charge +80) ; retour en espèces
 //     `other_in` ; complément (`top_up`) : charge entière une seule fois.
 //  3. Prévision 1.2.0 : dépenses soldées par une avance exclues du constat
-//     `EXPENSES_WITHOUT_ACCOUNT` ; `HR_PAYABLES_NOT_INTEGRATED` (fournisseur nul).
+//     `EXPENSES_WITHOUT_ACCOUNT` ; fournisseur des RH relié (lot H10) : plus de
+//     `HR_PAYABLES_NOT_INTEGRATED`.
 //  4. Compatibilité achats : une dépense RH ne devient pas un paiement fournisseur.
 //  5. Isolation : compte, projet, avance et dépense d'une autre organisation.
 
@@ -634,7 +635,8 @@ e2eSuite('trésorerie — pièces possédées par les RH (ADR-0051, H11)', () =>
       };
       const before = await findings();
       expect(before.map((f) => f.code)).not.toContain('EXPENSES_WITHOUT_ACCOUNT');
-      expect(before.map((f) => f.code)).toContain('HR_PAYABLES_NOT_INTEGRATED');
+      // ADR-0051 — H10 : le fournisseur des RH est relié ; rien à rembourser ici.
+      expect(before.map((f) => f.code)).not.toContain('HR_PAYABLES_NOT_INTEGRATED');
 
       const direct = await post(asA(), '/treasury/expenses', {
         spentOn: day(2),
