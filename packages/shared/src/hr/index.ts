@@ -19,3 +19,10 @@ export * from './leave.js';
 export * from './reports.js';
 // ADR-0045 — H4 (documents, listes d'entrée et de sortie, échéances)
 export * from './documents.js';
+
+// ADR-0051 — H8 (second volet : frais, avances, présences, plannings, objectifs et évaluations)
+export * from './expenses.js';
+export * from './advances.js';
+export * from './attendance.js';
+export * from './planning.js';
+export * from './performance.js';
