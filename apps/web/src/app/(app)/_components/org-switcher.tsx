@@ -61,7 +61,10 @@ export function OrgSwitcher({ replie = false }: { replie?: boolean }): React.Rea
       const { organizations } = await api.listOrganizations();
       setOrgs(organizations);
       // Si aucun cookie et au moins 1 org, on prend la première comme active affichée.
+      // Le cookie est posé aussi : sans lui, l'API servirait l'organisation primaire
+      // pendant que le sélecteur en afficherait peut-être une autre.
       if (!readActiveOrgCookie() && organizations[0]) {
+        setActiveOrgCookie(organizations[0].id);
         setActiveId(organizations[0].id);
       }
     } catch {
