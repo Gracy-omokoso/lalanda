@@ -196,6 +196,12 @@ Un événement contient acteur, organisation, action, cible, horodatage, adresse
   `InvoiceDraftsService.create`, liste fermée des écrivains inchangée). Lectures seules :
   `sales_quotes`, `customers`, `sales_invoices`, `sales_invoice_settlements`, `work_projects`.
   `sales_document_links` n'est lu ni par la comptabilité ni par le pont vers le réalisé.
+  **Lot V2 implémenté** : `sales_orders`, `sales_order_counters`, `sales_document_links`,
+  `sales_contract_files`. L'unicité « une commande vivante par devis » porte sur le champ
+  `liveQuoteId` (identifiant du devis tant que la commande n'est pas annulée, `null` sinon ; unique
+  partiel `organizationId + liveQuoteId` sur `$type: 'string'`) ; chaque ligne de commande porte un
+  `lineRef` stable (`L1`, `L2`…). Les pièces comptent dans le quota commun de 1 Gio par organisation
+  (pièces des projets et des achats).
 
 ## Rétention
 

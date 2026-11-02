@@ -738,6 +738,18 @@ plateforme). Aucune route n'existe encore : elles arrivent aux lots V2 à V5.
 | `POST /sales/contracts/:id/approve` · `…/reject` · avenants `…/approve` · `…/reject` · `…/renewals` · `…/terminate` · `PUT /sales/contract-settings` | `sales.contract.approve` | séparation dynamique (`contractApprovalDecision`, `409 SELF_APPROVAL_FORBIDDEN`, approbateur unique marqué) ; reconduction **constatée** ; résiliation jamais refusée (`noticeCheck` affiché) |
 | `POST /sales/orders/:id/prepare-invoice` · `…/prepare-deposit` · `POST /sales/contracts/:id/prepare-deposit` · `…/occurrences/:key/prepare` · `…/deposits/:invoiceId/resolved` | `sales.read` + `sales.manage` | brouillon `FV`/`EV` ou `FT`/`ET` par `InvoiceDraftsService.create`, **jamais émis** ; groupe de taxation de l'acompte exigé, jamais prérempli |
 
+**Lot V2 — implémenté** (commandes clients, liens, pièces) : `GET /sales/orders` (filtres `status`,
+`customerId`, `quoteId`, `q`, curseur) · `GET`/`PUT`/`DELETE /sales/orders/:id` · `POST /sales/orders`
+· `…/confirm` · `…/close` · `…/cancel` (motif) · `POST /sales/quotes/:id/to-order` (`201 { order,
+warnings }`, avertissement `QUOTE_ALREADY_CONVERTED`) · `POST /sales/orders/:id/prepare-invoice`
+`{ expectedRevision, type?: 'FV' | 'EV', lines?: [{ lineRef, quantity }] }` (défaut : tout le reste
+à préparer calculé par `orderInvoicing` ; `409 ORDER_QUANTITY_EXCEEDS_REMAINING`,
+`ORDER_NOTHING_TO_INVOICE` ; réponse `{ invoiceId, warnings, order }`, brouillon **jamais émis**) ·
+`POST /sales/orders/:id/files` (corps binaire, `X-File-Name`, `sales.contract`, `422 FILE_NOT_PDF`,
+`422 FILE_TOO_LARGE`) · `GET /sales/orders/:id/files/:fileId` (`sales.read`, `attachment`). La fiche
+porte le reste à facturer (`invoicing`, moteur), les factures liées, les pièces, les actions
+(`closeSuggested`) et l'avertissement `UNMATCHED_LINE`.
+
 Tâche `sales.subscriptions.prepare` (quotidienne, idempotente, acteur `system:subscriptions`) :
 prépare des brouillons, n'émet ni ne normalise rien. Émettre reste `sales.invoice` (routes
 existantes).
