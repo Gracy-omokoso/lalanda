@@ -31,7 +31,11 @@ export function OrgSwitcher({ replie = false }: { replie?: boolean }): React.Rea
 
   useEffect(() => {
     void refresh();
-    setActiveId(readActiveOrgCookie());
+    const enregistree = readActiveOrgCookie();
+    // Reposer le cookie le migre vers le domaine partagé avec l'API (`setActiveOrgCookie`) :
+    // un cookie posé avant ce correctif restait sur l'hôte de la page, invisible pour l'API.
+    if (enregistree) setActiveOrgCookie(enregistree);
+    setActiveId(enregistree);
   }, []);
 
   useEffect(() => {
