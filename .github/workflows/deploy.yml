@@ -137,4 +137,22 @@ jobs:
             # après incident) relirait l'ancienne valeur et redescendrait de
             # version sans rien dire.
             sed -i "s/^LALANDA_TAG=.*/LALANDA_TAG=${LALANDA_TAG}/" .env.production
+            # Chaque version laisse ~1 Go d'images : sans nettoyage, le disque s'est
+            # rempli (incident du 2 nov. 2026 : 75 images, 68 Go, MongoDB arrêté
+            # faute de place). On retire AVANT le pull les images inutilisées de plus
+            # de 3 jours (la version précédente reste disponible pour un retour
+            # arrière) et le cache de construction. Jamais les volumes : ils portent
+            # les données (MongoDB, MinIO).
+            docker image prune -af --filter "until=72h" || true
+            docker builder prune -af || true
+            # Garde-fou : moins de 5 Go libres, on refuse de déployer plutôt que de
+            # saturer le disque en plein pull.
+            libre_ko="$(df -Pk / | awk 'NR==2 {print $4}')"
+            if [ "${libre_ko:-0}" -lt 5242880 ]; then
+              echo "disque presque plein ($(df -h / | awk 'NR==2 {print $4}') libres) : déploiement refusé" >&2
+              df -h / >&2
+              exit 1
+            fi
             ./scripts/deploy-vps.sh
+            # Après le déploiement : l'image remplacée devient inutilisée ; elle sera
+            # retirée au déploiement suivant passé le délai de 3 jours.
