@@ -55,6 +55,11 @@ plateforme, sans `organizationId` de locataire (une cible se nomme `targetOrgani
 `user.disabledAt` (existant) est **lu** dès P0 par `PlatformAuthGuard`. `audit_events` inchangé : le
 miroir pseudonyme s'écrit avec `actorUserId: 'platform:lalanda'`.
 
+**Créée au lot P4 (ADR-0053 § 6.3) : `platform_feature_overrides`** — `{ targetOrganizationId, feature,
+value (toujours `true` en v1 : une dérogation ouvre, elle ne ferme pas), reasonCategory, internalNote,
+endsAt (90 jours au plus), grantedBy, revokedAt, revokedBy, _schemaVersion }`, index
+`{ targetOrganizationId, feature, revokedAt, endsAt }`. Rien n'est supprimé : une levée pose `revokedAt`.
+
 ## Valeur financière
 
 ```ts

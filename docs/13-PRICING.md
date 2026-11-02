@@ -557,6 +557,13 @@ offre. Aucune nouvelle fonctionnalité ne reçoit donc de garde d'offre d'ici l�
 chacune est inscrite ici avec son état actuel pour que l'arbitrage se fasse en une
 fois, sur une liste complète.
 
+**Depuis ADR-0053 (lot P4)**, la liste de référence est le catalogue `FEATURES`
+(`packages/shared/src/pricing/features.ts`) : une clé par fonctionnalité, ses routes
+API et sa valeur par offre — **ouverte partout**. `FeatureGuard` applique la grille
+aux gestes (jamais à la lecture ni à l'export de l'existant) ; fermer une case est
+l'arbitrage ci-dessous, fait en code, revu et testé. La console accorde des
+dérogations par organisation, motivées, de 90 jours au plus.
+
 | Fonctionnalité | Accès aujourd'hui | Ce qui la borne déjà | À trancher |
 |---|---|---|---|
 | Projets, plans, scénarios (BUILD) | toutes les offres | `maxProjects` | — |

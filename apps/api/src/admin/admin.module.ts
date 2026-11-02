@@ -22,6 +22,8 @@ import {
 import { PlatformAccessController } from './platform-access.controller.js';
 // ADR-0053 — P2
 import { PlatformMirrorService } from './mirror.js';
+// ADR-0053 — P4 : fonctionnalités par offre (@Global, sert `FeatureGuard` partout).
+import { FeaturesModule } from './features/features.module.js';
 
 @Module({
   imports: [
@@ -29,6 +31,7 @@ import { PlatformMirrorService } from './mirror.js';
     OrganizationsModule,
     BillingModule,
     IntegrationsModule,
+    FeaturesModule, // ADR-0053 — P4
     MongooseModule.forFeature([
       { name: OrganizationSuspension.name, schema: OrganizationSuspensionSchema },
       { name: AiUsageEvent.name, schema: AiUsageEventSchema },
