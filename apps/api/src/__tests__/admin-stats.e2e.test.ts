@@ -22,6 +22,8 @@ import { findForbiddenPlatformFinanceWords } from '@lalanda/shared/platform';
 import type { PlatformRole } from '../authz/permissions.js';
 import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 import { dbOf, e2eSuite, makeE2EApp, registerAndLogin, teardown } from './e2e-utils.js';
+// ADR-0053 — P8 : tout opérateur s'enrôle avant d'ouvrir la console.
+import { enrolerDeuxFacteurs } from './platform-2fa-e2e.js';
 
 e2eSuite('ADR-0053 — P7 : statistiques et finances du site', () => {
   let app: INestApplication;
@@ -106,6 +108,8 @@ e2eSuite('ADR-0053 — P7 : statistiques et finances du site', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       });
+      viderLimiteur();
+      await enrolerDeuxFacteurs(app, cookies[cle]!, compte(cle).password);
     }
 
     // Donnée métier du client : elle ne doit paraître dans AUCUNE réponse de la console.

@@ -22,6 +22,8 @@ import type { PlatformRole } from '../authz/permissions.js';
 import { MailService } from '../mail/mail.service.js';
 import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 import { dbOf, e2eSuite, makeE2EApp, registerAndLogin, teardown } from './e2e-utils.js';
+// ADR-0053 — P8 : tout opérateur s'enrôle ; ré-authentification = mot de passe + code.
+import { corpsReauth, enrolerDeuxFacteurs } from './platform-2fa-e2e.js';
 
 e2eSuite('ADR-0053 — P6 : annonces par catégorie, circuit à deux personnes', () => {
   let app: INestApplication;
@@ -71,7 +73,7 @@ e2eSuite('ADR-0053 — P6 : annonces par catégorie, circuit à deux personnes',
     const res = await request(serveur())
       .post('/admin/reauth')
       .set('Cookie', cookies[cle]!)
-      .send({ password: compte(cle).password });
+      .send(await corpsReauth(app, db, cookies[cle]!, compte(cle).password));
     expect(res.status, JSON.stringify(res.body)).toBe(201);
   };
   const poster = (cle: string, chemin: string, corps: object = {}) =>
@@ -145,6 +147,8 @@ e2eSuite('ADR-0053 — P6 : annonces par catégorie, circuit à deux personnes',
       ids[cle] = await idDeSession(cookies[cle]);
       await db.collection('memberships').deleteMany({ userId: ids[cle] });
       await poserRole(ids[cle]!, role);
+      viderLimiteur();
+      await enrolerDeuxFacteurs(app, cookies[cle]!, compte(cle).password);
     }
 
     // Aucun e-mail ne doit partir : chaque méthode de MailService est espionnée.

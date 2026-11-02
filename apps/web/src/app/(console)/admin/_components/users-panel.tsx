@@ -41,6 +41,8 @@ import {
   type MotifSaisi,
 } from './motif-model';
 import { ReauthGate, useReauth, type Reauth } from './reauth-gate';
+// ADR-0053 — P8
+import { ReinitialisationDeuxFacteurs } from './reinitialisation-deux-facteurs';
 
 const REAUTH_COMPTES =
   'Bloquer, débloquer un compte ou attribuer un rôle plateforme exige une ré-authentification, valable dix minutes. Chaque geste est motivé et inscrit au journal plateforme.';
@@ -127,6 +129,7 @@ export function UsersPanel(): React.ReactElement {
               user={user}
               moiUserId={moiUserId}
               peutEcrire={acces.canManagePlatform}
+              peutReinitialiser2fa={acces.actions.includes('platform.roles.manage')}
               reauth={reauth}
               onMaj={remplacer}
             />
@@ -141,12 +144,15 @@ function LigneCompte({
   user,
   moiUserId,
   peutEcrire,
+  peutReinitialiser2fa,
   reauth,
   onMaj,
 }: {
   user: AdminUserSummary;
   moiUserId: string | null;
   peutEcrire: boolean;
+  /** ADR-0053 — P8 : `platform.roles.manage` (super-administrateur). */
+  peutReinitialiser2fa: boolean;
   reauth: Reauth;
   onMaj: (maj: AdminUserSummary) => void;
 }): React.ReactElement {
@@ -340,6 +346,10 @@ function LigneCompte({
                 {AVERTISSEMENT_DESACTIVATION}
               </p>
             )}
+            {/* ADR-0053 — P8 : super-administrateur seul, opérateur tiers seulement. */}
+            {peutReinitialiser2fa && user.platformRoles.length > 0 && user.id !== moiUserId ? (
+              <ReinitialisationDeuxFacteurs userId={user.id} email={user.email} />
+            ) : null}
           </ReauthGate>
         </div>
       ) : null}

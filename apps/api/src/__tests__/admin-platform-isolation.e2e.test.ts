@@ -40,6 +40,8 @@ import {
 import { platformActionsOf } from '../authz/platform-actions.js';
 import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 import { dbOf, e2eSuite, makeE2EApp, registerAndLogin, teardown } from './e2e-utils.js';
+// ADR-0053 — P8 : tout opérateur s'enrôle avant d'ouvrir la console.
+import { enrolerDeuxFacteurs } from './platform-2fa-e2e.js';
 
 interface RouteDecouverte {
   cle: string;
@@ -201,6 +203,8 @@ e2eSuite('ADR-0053 — P0 : console sans organisation, isolation dans les deux s
       userIds[cle] = await idDeSession(cookies[cle]);
       await db.collection('memberships').deleteMany({ userId: userIds[cle] });
       await poserRole(userIds[cle], role);
+      viderLimiteur();
+      await enrolerDeuxFacteurs(app, cookies[cle], compte(cle).password);
     }
 
     // Compte sans organisation ni rôle ; opérateur bloqué ; opérateur membre de A.
@@ -233,6 +237,8 @@ e2eSuite('ADR-0053 — P0 : console sans organisation, isolation dans les deux s
       updatedAt: new Date(),
     });
     await poserRole(userIds['opMembreA'], 'platform_super_admin');
+    viderLimiteur();
+    await enrolerDeuxFacteurs(app, cookies['opMembreA'], compte('opMembreA').password);
   }, E2E_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {

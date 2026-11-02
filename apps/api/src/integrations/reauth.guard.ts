@@ -31,7 +31,11 @@ import {
   UseGuards,
 } from '@nestjs/common';
 
+import { Reflector } from '@nestjs/core';
+
 import type { AuthenticatedRequest } from '../auth/auth.guard.js';
+// ADR-0053 — P8
+import { PLATFORM_CONSOLE_ROUTE_KEY } from '../authz/authz.decorators.js';
 import { ReauthService } from './reauth.service.js';
 
 /** Marqueur lisible par introspection — les tests vérifient quelles routes l'exigent. */
@@ -39,14 +43,27 @@ export const REQUIRES_RECENT_REAUTH_KEY = 'lalanda:requiresRecentReauth';
 
 @Injectable()
 export class RecentReauthGuard implements CanActivate {
-  constructor(@Inject(ReauthService) private readonly reauth: ReauthService) {}
+  constructor(
+    @Inject(ReauthService) private readonly reauth: ReauthService,
+    // ADR-0053 — P8
+    @Inject(Reflector) private readonly reflector: Reflector = new Reflector(),
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<AuthenticatedRequest>();
     // `AuthGuard` doit précéder ce garde. S'il manque, on refuse : un garde de
     // sécurité mal câblé ne laisse jamais passer.
     if (!req.user) throw new UnauthorizedException({ code: 'NOT_AUTHENTICATED' });
-    await this.reauth.assertRecent(req.user.id, req.headers.cookie);
+    // ADR-0053 — P8 : une écriture de la CONSOLE n'accepte qu'une fenêtre ouverte avec le
+    // second facteur ; l'espace organisation garde la fenêtre par mot de passe seul.
+    // Un contexte sans route (appel direct, banc d'essai) garde la règle d'avant P8.
+    const console =
+      typeof context.getHandler === 'function' &&
+      this.reflector.getAllAndOverride<boolean | undefined>(PLATFORM_CONSOLE_ROUTE_KEY, [
+        context.getHandler(),
+        context.getClass(),
+      ]) === true;
+    await this.reauth.assertRecent(req.user.id, req.headers.cookie, { secondFactor: console });
     return true;
   }
 }

@@ -26,6 +26,14 @@ export class PlatformReauth {
   @Prop({ type: Date, required: true })
   expiresAt!: Date;
 
+  /**
+   * ADR-0053 — P8 : fenêtre ouverte AVEC le second facteur (mot de passe + code TOTP ou
+   * code de secours). Seule une telle fenêtre vaut pour une écriture de la console ; celle
+   * de `/me/reauth` (mot de passe seul, espace organisation) n'y suffit pas.
+   */
+  @Prop({ type: Boolean, default: false })
+  secondFactor!: boolean;
+
   @Prop({ type: Number, required: true, default: 1 })
   _schemaVersion!: number;
 }

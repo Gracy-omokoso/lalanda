@@ -38,8 +38,12 @@ import { getAuth } from '../auth/auth.js';
 import {
   CONSOLE_IDLE_EXEMPT_KEY,
   PLATFORM_CONSOLE_ROUTE_KEY,
+  // ADR-0053 — P8
+  PLATFORM_TWO_FACTOR_EXEMPT_KEY,
   REQUIRED_PERMISSIONS_KEY,
 } from './authz.decorators.js';
+// ADR-0053 — P8
+import { twoFactorGateOf } from '../platform-two-factor/two-factor.store.js';
 // ADR-0053 — P2
 import { PLATFORM_LIMITS } from '@lalanda/shared/platform';
 import { sessionFingerprint } from '../integrations/reauth.service.js';
@@ -94,6 +98,9 @@ export class PlatformAuthGuard implements CanActivate {
       throw new ForbiddenException({ code: 'ACCOUNT_BLOCKED', message: ACCOUNT_BLOCKED_MESSAGE });
     }
 
+    // ADR-0053 — P8 : double authentification exigée de tout opérateur (décision n° 2).
+    await this.assertTwoFactor(userId, req.headers.cookie, targets);
+
     // ADR-0053 — P2 : session de console de 12 heures d'inactivité (§ 2.4).
     const idleExempt =
       this.reflector.getAllAndOverride<boolean | undefined>(CONSOLE_IDLE_EXEMPT_KEY, targets) ===
@@ -117,6 +124,42 @@ export class PlatformAuthGuard implements CanActivate {
       .collection<{ _id: ObjectId | string; disabledAt?: Date | null }>('user')
       .findOne({ _id }, { projection: { disabledAt: 1 } });
     return user?.disabledAt != null;
+  }
+
+  // ── ADR-0053 — P8 : double authentification des opérateurs ───────────────────
+  //
+  // Tout détenteur d'un rôle plateforme actif doit (1) être enrôlé — sinon
+  // `403 PLATFORM_2FA_REQUIRED`, et seules les routes d'enrôlement lui restent ouvertes :
+  // aucun opérateur n'est enfermé dehors — et (2) avoir vérifié CETTE session par un code
+  // depuis moins de 12 heures — sinon `401 PLATFORM_2FA_VERIFICATION_REQUIRED`, et seule
+  // `/admin/reauth` (mot de passe + code) lui reste ouverte. Un compte sans rôle plateforme
+  // n'est pas jugé ici : `PermissionsGuard` le refuse de toute façon (403).
+  private async assertTwoFactor(
+    userId: string,
+    cookieHeader: string | undefined,
+    targets: Parameters<Reflector['getAllAndOverride']>[1],
+  ): Promise<void> {
+    const exempt = this.reflector.getAllAndOverride<'enrollment' | 'verification' | undefined>(
+      PLATFORM_TWO_FACTOR_EXEMPT_KEY,
+      targets,
+    );
+    if (exempt === 'enrollment') return;
+    const db = this.connection.db;
+    if (!db) throw new ServiceUnavailableException({ code: 'DATABASE_UNAVAILABLE' });
+    const gate = await twoFactorGateOf(db, userId, sessionFingerprint(cookieHeader));
+    if (gate === 'enrollment_required') {
+      throw new ForbiddenException({
+        code: 'PLATFORM_2FA_REQUIRED',
+        message:
+          'La console Lalanda exige la double authentification : activez-la depuis la console.',
+      });
+    }
+    if (gate === 'verification_required' && exempt !== 'verification') {
+      throw new UnauthorizedException({
+        code: 'PLATFORM_2FA_VERIFICATION_REQUIRED',
+        message: 'Confirmez votre mot de passe et le code de votre application d’authentification.',
+      });
+    }
   }
 
   // ── ADR-0053 — P2 : session de console de 12 heures d'inactivité (§ 2.4) ──────
@@ -151,6 +194,8 @@ export class PlatformAuthGuard implements CanActivate {
         userId,
         sessionFingerprint: fingerprint,
         confirmedAt: { $gt: new Date(last) },
+        // ADR-0053 — P8 : seule une ré-authentification avec le code rouvre la console.
+        secondFactor: true,
       });
       if (!reauth) {
         throw new UnauthorizedException({

@@ -26,6 +26,8 @@ import { PLATFORM_MIRROR_ACTOR_ID } from '@lalanda/shared/platform';
 import type { PlatformRole } from '../authz/permissions.js';
 import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 import { dbOf, e2eSuite, makeE2EApp, registerAndLogin, teardown } from './e2e-utils.js';
+// ADR-0053 — P8 : tout opérateur s'enrôle ; ré-authentification = mot de passe + code.
+import { corpsReauth, enrolerDeuxFacteurs } from './platform-2fa-e2e.js';
 
 e2eSuite('ADR-0053 — P2 : blocage, suspension, minimisation, ré-authentification', () => {
   let app: INestApplication;
@@ -73,7 +75,7 @@ e2eSuite('ADR-0053 — P2 : blocage, suspension, minimisation, ré-authentificat
     const res = await request(serveur())
       .post('/admin/reauth')
       .set('Cookie', cookies[cle]!)
-      .send({ password: compte(cle).password });
+      .send(await corpsReauth(app, db, cookies[cle]!, compte(cle).password));
     expect(res.status, JSON.stringify(res.body)).toBe(201);
   };
   const premiereOrg = async (c: string[]): Promise<string> => {
@@ -108,6 +110,8 @@ e2eSuite('ADR-0053 — P2 : blocage, suspension, minimisation, ré-authentificat
       ids[cle] = await idDeSession(cookies[cle]);
       if (cle !== 'saMembre') await db.collection('memberships').deleteMany({ userId: ids[cle] });
       await poserRole(ids[cle]!, role);
+      viderLimiteur();
+      await enrolerDeuxFacteurs(app, cookies[cle]!, compte(cle).password);
     }
 
     // Client : Propriétaire de S (son organisation personnelle) et de T (créée en base).

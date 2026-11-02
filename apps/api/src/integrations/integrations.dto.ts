@@ -68,4 +68,11 @@ export function findWhitelistViolations(
 }
 
 /** Corps de `POST /admin/reauth` (ADR-0013 §5). */
-export const ReauthSchema = z.object({ password: z.string().min(1).max(256) }).strict();
+export const ReauthSchema = z
+  .object({
+    password: z.string().min(1).max(256),
+    // ADR-0053 — P8 : code TOTP ou code de secours (la console exige l'un des deux).
+    code: z.string().max(32).optional(),
+    backupCode: z.string().max(32).optional(),
+  })
+  .strict();

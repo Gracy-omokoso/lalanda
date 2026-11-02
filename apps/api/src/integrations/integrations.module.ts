@@ -26,6 +26,14 @@ import { ReauthService } from './reauth.service.js';
 import { RewrapService } from './rewrap.js';
 import { SecretsService } from './secrets.service.js';
 import { SessionReauthController } from './session-reauth.controller.js';
+// ADR-0053 — P8 : double authentification de la console.
+import { PlatformTwoFactorService } from '../platform-two-factor/platform-two-factor.service.js';
+import {
+  PlatformTwoFactor,
+  PlatformTwoFactorSchema,
+  PlatformTwoFactorSession,
+  PlatformTwoFactorSessionSchema,
+} from '../platform-two-factor/two-factor.schema.js';
 
 @Module({
   imports: [
@@ -38,6 +46,9 @@ import { SessionReauthController } from './session-reauth.controller.js';
       // et la rotation (`RewrapService`) reçoivent ce modèle : `SecretsService` n'y a
       // aucun accès, par construction.
       { name: OrganizationSecret.name, schema: OrganizationSecretSchema },
+      // ADR-0053 — P8
+      { name: PlatformTwoFactor.name, schema: PlatformTwoFactorSchema },
+      { name: PlatformTwoFactorSession.name, schema: PlatformTwoFactorSessionSchema },
     ]),
   ],
   controllers: [IntegrationsController, ReauthController, SessionReauthController],
@@ -54,6 +65,8 @@ import { SessionReauthController } from './session-reauth.controller.js';
     // la classe concrète : il ne dépend ni de la clé maîtresse ni de ce modèle.
     { provide: ORGANIZATION_SECRETS, useExisting: OrganizationSecretsService },
     { provide: CONNECTION_TESTER, useClass: HttpConnectionTester },
+    // ADR-0053 — P8
+    PlatformTwoFactorService,
   ],
   // `ReauthService` est exporté depuis ADR-0021 §11 : les écritures sensibles du
   // module fiscal exigent la même fenêtre de ré-authentification liée à la session
@@ -65,6 +78,8 @@ import { SessionReauthController } from './session-reauth.controller.js';
     ReauthService,
     RecentReauthGuard,
     ORGANIZATION_SECRETS,
+    // ADR-0053 — P8
+    PlatformTwoFactorService,
   ],
 })
 export class IntegrationsModule implements OnApplicationBootstrap {

@@ -23,6 +23,9 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { useSession } from '@/lib/auth-client';
 
 import { AccesPlateformeProvider, useChargementAcces } from './admin-access';
+// ADR-0053 — P8
+import { EnrolementDeuxFacteurs, VerificationDeuxFacteurs } from './deux-facteurs';
+import { etatDeuxFacteurs } from './deux-facteurs-model';
 import { Bandeau, Vide } from './admin-chrome';
 import {
   CONSOLE_BASE,
@@ -38,7 +41,9 @@ import {
 
 export function ConsoleShell({ children }: { children: React.ReactNode }): React.ReactElement {
   const pathname = usePathname();
-  const chargement = useChargementAcces();
+  // ADR-0053 — P8 : relecture de l'accès après enrôlement ou vérification.
+  const [relecture, setRelecture] = useState(0);
+  const chargement = useChargementAcces(relecture);
 
   let rolesTexte: string | null = null;
   let modules: ModuleConsole[] = [];
@@ -56,7 +61,16 @@ export function ConsoleShell({ children }: { children: React.ReactNode }): React
     const etat = etatPage(pathname, actions);
     rolesTexte = libelleRoles(acces.roles);
     modules = modulesVisibles(actions);
-    if (etat === 'refus-console') {
+    // ADR-0053 — P8 : double authentification exigée avant toute page de console. Un
+    // opérateur non enrôlé est envoyé vers l'enrôlement, jamais vers un refus sans issue.
+    const deuxFacteurs = etatDeuxFacteurs(acces);
+    if (etat !== 'refus-console' && deuxFacteurs === 'enrolement') {
+      modules = [];
+      contenu = <EnrolementDeuxFacteurs onTermine={() => setRelecture((n) => n + 1)} />;
+    } else if (etat !== 'refus-console' && deuxFacteurs === 'verification') {
+      modules = [];
+      contenu = <VerificationDeuxFacteurs onTermine={() => setRelecture((n) => n + 1)} />;
+    } else if (etat === 'refus-console') {
       // Refus, et non panne : la page n'est pas montée, aucun appel `/admin/**`
       // ne part (ADR-0053, critère 22).
       contenu = <RefusConsole operateur={acces.isPlatformOperator} roles={rolesTexte} />;

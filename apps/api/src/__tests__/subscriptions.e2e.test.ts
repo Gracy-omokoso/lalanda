@@ -36,6 +36,8 @@ import { BILLING_INTERVALS, PLAN_ENTITLEMENTS, PLANS, priceCents } from '@laland
 import { addDays } from '../billing/proration.js';
 import { hmacSha256Hex } from '../payments/webhook-signature.js';
 import { dbOf, e2eSuite, makeE2EApp, teardown } from './e2e-utils.js';
+// ADR-0053 — P8 : l'opératrice s'enrôle ; ré-authentification = mot de passe + code.
+import { corpsReauth, enrolerDeuxFacteurs } from './platform-2fa-e2e.js';
 import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 /**
@@ -160,6 +162,7 @@ e2eSuite('abonnements de bout en bout (S22b)', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
     });
+    await enrolerDeuxFacteurs(app, adminCookies, admin.password);
   }, E2E_HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
@@ -186,7 +189,7 @@ e2eSuite('abonnements de bout en bout (S22b)', () => {
     const res = await request(app.getHttpServer())
       .post('/admin/reauth')
       .set('Cookie', adminCookies)
-      .send({ password: admin.password });
+      .send(await corpsReauth(app, await dbOf(app), adminCookies, admin.password));
     expect(res.status, JSON.stringify(res.body)).toBe(201);
   }
 
