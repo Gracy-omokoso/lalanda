@@ -485,7 +485,10 @@ describe('ADR-0049 K2 — dépenses et achats (§ 6.3 à 6.5, critères 7 et 8)'
     ]);
     for (const id of ['ex-a', 'ex-b']) {
       const r = entriesForExpense(
-        expense({ id, origin: { kind: 'supplier_payment', id: 'pf1' } }),
+        expense({
+          id,
+          origin: { kind: 'supplier_payment', id: 'pf1', settledByAdvanceId: null },
+        }),
         ctx,
       );
       expect(r.entries).toEqual([]);
@@ -863,6 +866,115 @@ describe('ADR-0049 K2 — devises (§ 5, critère 9)', () => {
     );
     expect(e.lines.map((l) => l.bookAmount)).toEqual(['1.00', '0.34', '0.33', '0.33']);
     expect(checkEntry(e).ok).toBe(true);
+  });
+});
+
+describe('ADR-0051 H13 — dépenses possédées par les RH (§ 7.4, amendement ADR-0049 § 6.3)', () => {
+  const report = (
+    over: Partial<ExpenseView> = {},
+    settledByAdvanceId: string | null = null,
+  ): ExpenseView =>
+    expense({
+      id: 'exr1',
+      category: 'transport',
+      amount: '15.00',
+      label: 'Frais NF2611-000001 — Taxi aéroport',
+      supplierName: 'Taxi Gombe',
+      origin: { kind: 'expense_report', id: 'nf1', settledByAdvanceId },
+      ...over,
+    });
+  const withTransport = (): ReturnType<typeof context> =>
+    context({ ruleSet: ruleSet([...SALES_RULES, rule('expense.transport', ['6241'])]) });
+
+  it('remboursement d’une note de frais : comptabilisé comme une dépense, charge par catégorie', () => {
+    const r = entriesForExpense(report(), withTransport());
+    expect(r.skipped).toBeNull();
+    expect(r.pending).toEqual([]);
+    const e = only(r.entries);
+    ok(e);
+    expect(e.sourceKey).toBe('treasury_expense:exr1:r1');
+    expect(e.journal).toEqual({ kind: 'treasury', treasuryAccountId: 'bank' });
+    expect(e.lines.map((l) => [l.operationKey, l.side, l.accountNumber, l.amount])).toEqual([
+      ['expense.transport', 'debit', '6241', '15.00'],
+      ['expense.payment', 'credit', '5211', '15.00'],
+    ]);
+  });
+
+  it('soldée par une avance (sans compte) : contrepartie au compte d’attente, motif `SETTLED_BY_EMPLOYEE_ADVANCE`', () => {
+    const r = entriesForExpense(report({ accountId: null }, 'av1'), withTransport());
+    expect(r.pending).toEqual([]);
+    const e = only(r.entries);
+    ok(e);
+    expect(e.journal).toEqual({ kind: 'misc', treasuryAccountId: null });
+    expect(
+      e.lines.map((l) => [l.operationKey, l.side, l.accountNumber, l.suspenseReason, l.amount]),
+    ).toEqual([
+      ['expense.transport', 'debit', '6241', null, '15.00'],
+      ['hr.advance.settled', 'credit', SUSPENSE, 'SETTLED_BY_EMPLOYEE_ADVANCE', '15.00'],
+    ]);
+    expect(e.suspense).toBe(true);
+  });
+
+  it('clés `hr.advance.*` : au catalogue, toujours en attente, même avec une règle ou sans jeu validé', () => {
+    for (const key of ['hr.advance.settled', 'hr.advance.disbursed', 'hr.advance.returned']) {
+      expect(isOperationKey(key)).toBe(true);
+    }
+    expect(isOperationKey('hr.advance.salary')).toBe(false);
+    const withRule = ruleSet([...SALES_RULES, rule('hr.advance.settled', [], ['4250'])]);
+    expect(resolveRule(withRule, 'hr.advance.settled')).toEqual({
+      status: 'suspense',
+      reason: 'SETTLED_BY_EMPLOYEE_ADVANCE',
+    });
+    expect(resolveRule(null, 'hr.advance.settled')).toEqual({
+      status: 'suspense',
+      reason: 'SETTLED_BY_EMPLOYEE_ADVANCE',
+    });
+    expect(resolveRule(withRule, 'hr.advance.disbursed')).toEqual({
+      status: 'suspense',
+      reason: 'NATURE_UNKNOWN',
+    });
+    const e = only(
+      entriesForExpense(report({ accountId: null }, 'av1'), context({ ruleSet: withRule })).entries,
+    );
+    expect(e.lines.find((l) => l.side === 'credit')?.accountNumber).toBe(SUSPENSE);
+  });
+
+  it('note de frais sans compte ni avance : attente `NO_TREASURY_ACCOUNT` et « À comptabiliser »', () => {
+    const r = entriesForExpense(report({ accountId: null }), withTransport());
+    expect(r.pending).toEqual(['NO_TREASURY_ACCOUNT']);
+    expect(only(r.entries).lines[1]).toMatchObject({
+      operationKey: 'expense.payment',
+      suspenseReason: 'NO_TREASURY_ACCOUNT',
+    });
+  });
+
+  it('paiement fournisseur toujours ignoré ; propriétaire inconnu → « À comptabiliser », jamais deviné', () => {
+    const supplier = entriesForExpense(
+      report({ origin: { kind: 'supplier_payment', id: 'pf1', settledByAdvanceId: null } }),
+      withTransport(),
+    );
+    expect(supplier).toMatchObject({ skipped: 'CREATED_BY_SUPPLIER_PAYMENT', entries: [] });
+    const unknown = entriesForExpense(
+      report({ origin: { kind: 'stock_receipt', id: 'x', settledByAdvanceId: null } }),
+      withTransport(),
+    );
+    expect(unknown).toMatchObject({ skipped: null, entries: [], pending: ['UNSUPPORTED_SOURCE'] });
+  });
+
+  it('annulée → contre-passation attendue ; avant bascule → ignorée, comme une dépense directe', () => {
+    expect(entriesForExpense(report({ status: 'cancelled' }), withTransport())).toMatchObject({
+      cancelled: true,
+      entries: [],
+    });
+    expect(entriesForExpense(report({ spentOn: '2026-09-01' }), withTransport()).skipped).toBe(
+      'BEFORE_CUTOVER',
+    );
+  });
+
+  it('version du moteur portée par le résultat et l’écriture', () => {
+    const r = entriesForExpense(report(), withTransport());
+    expect(r.version).toBe(ACCOUNTING_VERSION);
+    expect(only(r.entries).generation.engineVersion).toBe(ACCOUNTING_VERSION);
   });
 });
 

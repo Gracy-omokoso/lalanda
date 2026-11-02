@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { ReportingEntry, ReportingLine } from '../ledger/index.js';
 import { reconcileWithActuals, type ReconcileWithActualsInput } from './index.js';
+import { ACCOUNTING_VERSION } from '../types.js';
 
 const L = (
   account: string,
@@ -20,7 +21,11 @@ const L = (
   amount,
   ...o,
 });
-const gen = { ruleSetVersion: 1, chartPack: { slug: 'p', version: 1 }, engineVersion: '1.0.0' };
+const gen = {
+  ruleSetVersion: 1,
+  chartPack: { slug: 'p', version: 1 },
+  engineVersion: ACCOUNTING_VERSION,
+};
 const E = (
   id: string,
   date: string,
