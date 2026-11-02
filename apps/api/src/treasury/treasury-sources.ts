@@ -18,6 +18,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectConnection } from '@nestjs/mongoose';
 import type {
+  HrPayableForecastInput,
   OrderNotInvoicedInput,
   PayableForecastInput,
   ReceivableInput,
@@ -168,6 +169,32 @@ export class NoPayablesSource implements TreasuryPayablesSource {
     return Promise.resolve([]);
   }
   ordersNotInvoiced(): Promise<OrderNotInvoicedInput[]> {
+    return Promise.resolve([]);
+  }
+}
+
+// ─── ADR-0051 — H11 (§ 7.2) : remboursements au personnel ────────────────────
+//
+// La prévision lit par un PORT, motif des échéances fournisseurs, les notes de
+// frais APPROUVÉES non remboursées et les avances APPROUVÉES non versées (montant,
+// devise, libellé neutre : jamais le nom d'un bénéficiaire d'avance sur salaire,
+// jamais « sur salaire »). Le moteur les place à J+1. Le fournisseur de production
+// appartient aux RH (lot H10) ; le fournisseur nul se déclare non intégré : la
+// prévision le dit (`HR_PAYABLES_NOT_INTEGRATED`).
+
+export interface TreasuryHrPayablesSource {
+  readonly integrated: boolean;
+  /** Notes approuvées non remboursées et avances approuvées non versées, toutes devises. */
+  openHrPayables(organizationId: string): Promise<HrPayableForecastInput[]>;
+}
+
+export const TREASURY_HR_PAYABLES_SOURCE = Symbol('TREASURY_HR_PAYABLES_SOURCE');
+
+/** Montage sans notes de frais ni avances : rien à rembourser, et il le dit. */
+@Injectable()
+export class NoHrPayablesSource implements TreasuryHrPayablesSource {
+  readonly integrated = false;
+  openHrPayables(): Promise<HrPayableForecastInput[]> {
     return Promise.resolve([]);
   }
 }
