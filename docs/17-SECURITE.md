@@ -274,6 +274,22 @@ Deux routes de l'API **sans session** (`GET /public/lead-forms/:token`,
 - Les robots qui exécutent JavaScript et attendent 3 s passent le délai minimal ; la limite de
   débit borne alors leur volume.
 
+## ADR-0053 — console Lalanda : socle P0 (appliqué)
+
+- **Console sans organisation** : `PlatformAuthGuard` remplace `AuthGuard` sur `/admin/**`,
+  `/me/platform-access` et `/accounting/platform/**`. Il ne résout aucune organisation et refuse
+  toute route non marquée `@PlatformConsoleRoute()` ou déclarant une action d'organisation : une
+  route d'organisation ne devient jamais accessible sans organisation. Prouvé sur la table entière
+  (`routes-coverage.test.ts`) et de bout en bout dans les deux sens
+  (`admin-platform-isolation.e2e.test.ts` : 12 rôles d'organisation × toute la console → `403` ;
+  6 rôles plateforme sans appartenance × toute route d'organisation → `403 NO_ORGANIZATION` ou
+  `404 ORG_NOT_FOUND`).
+- **Blocage, volet console seulement** : un compte dont `disabledAt` est posé n'ouvre plus la
+  console (`403 ACCOUNT_BLOCKED`). **Limite maintenue** : l'espace organisation (`AuthGuard`) et
+  l'ouverture de session ne lisent pas encore `disabledAt` (lot P2, F5).
+- **Restent ouverts** (lots P2, P8) : ré-authentification de toute écriture de la console, session
+  de console de 12 heures, double authentification (décision ouverte n° 2).
+
 ## Menaces prioritaires
 
 - accès inter-organisation;

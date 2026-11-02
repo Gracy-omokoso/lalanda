@@ -14,6 +14,8 @@ import { AuthzService } from './authz.service.js';
 import { CatalogController } from './catalog.controller.js';
 import { MeController } from './me.controller.js';
 import { PermissionsGuard } from './permissions.guard.js';
+// ADR-0053 — P0
+import { PlatformAuthGuard } from './platform-auth.guard.js';
 import {
   PlatformRoleAssignment,
   PlatformRoleAssignmentSchema,
@@ -30,7 +32,7 @@ import {
     ]),
   ],
   controllers: [AuditController, MeController, CatalogController],
-  providers: [AuthzService, AuditService, PermissionsGuard],
-  exports: [AuthzService, AuditService, PermissionsGuard, MongooseModule],
+  providers: [AuthzService, AuditService, PermissionsGuard, PlatformAuthGuard],
+  exports: [AuthzService, AuditService, PermissionsGuard, PlatformAuthGuard, MongooseModule],
 })
 export class AuthzModule {}

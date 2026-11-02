@@ -858,6 +858,24 @@ Organisation de la session ; une idée d'une autre organisation répond `404`. A
 
 Codes : `400 INVALID_REQUEST` (corps `.strict()` ; taille de marché sans source ; note sans preuve ; expérience terminée sans conclusion), `400 EXPERIMENT_NOT_FOUND` (preuve citant une expérience inconnue), `404 IDEA_NOT_FOUND` · `CRITERION_NOT_FOUND` · `PROJECT_NOT_FOUND`, `403 IDEA_LIMIT_REACHED` (50 idées) · `EXPERIMENT_LIMIT_REACHED` (30), `409 IDEA_CONFLICT` (écriture concurrente), `403 PLAN_LIMIT_AI_MESSAGES` avant tout appel au modèle. L'assistance rend `source: "llm" | "fallback"` et `reason` ; un nombre absent de la fiche fait servir le texte déterministe. La promotion n'ajoute que des cartes de texte au Canvas (`added`, `present`, `ignored`, `empty`) ; un nouveau projet se crée par `POST /projects`.
 
+## Console Lalanda — proposé, ADR-0053 (socle P0 appliqué)
+
+Contrat **proposé** par [ADR-0053](adr/ADR-0053-administration-plateforme.md) § 7. **Appliqué au
+lot P0** : `PlatformAuthGuard` (session, compte non bloqué, **aucune organisation**) sur `/admin/**`,
+`GET /me/platform-access` et `/accounting/platform/chart-packs/**` ; un opérateur sans appartenance
+n'y reçoit plus `403 NO_ORGANIZATION`. `GET /me/platform-access` ajoute `actions` (actions
+plateforme détenues, ordre du catalogue) aux champs S21b, servis inchangés une version.
+`GET /admin/overview` exige `platform.console.read` (les six rôles plateforme). Les autres routes
+de § 7 arrivent aux lots P2 à P7 ; contrats d'entrée partagés : `@lalanda/shared/platform`
+(recherche, motifs, suspension, blocage, attribution de rôle, octroi, dérogation, catégories de
+destinataires, annonce).
+
+Codes nouveaux : `403 ACCOUNT_BLOCKED` (message générique), `403 PLATFORM_ROUTE_REQUIRED` (erreur
+de câblage : route non marquée console derrière la garde de console). Les autres codes de § 7
+(`SEARCH_REQUIRED`, `REASON_REQUIRED`, `PLATFORM_SELF_DEALING`, `SELF_GRANT_FORBIDDEN`,
+`AUDIENCE_COUNT_MISMATCH`…) sont déclarés dans `PLATFORM_ERROR_CODES` et servis par les lots qui
+posent leurs routes.
+
 ## Webhooks
 
 Paiements et intégrations utilisent signatures, tolérance temporelle, anti-rejeu, journal et traitement idempotent.

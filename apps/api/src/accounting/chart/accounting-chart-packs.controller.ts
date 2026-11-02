@@ -21,9 +21,15 @@ import { Body, Controller, Get, HttpCode, Inject, Param, Post, UseGuards } from 
 import { AuthGuard } from '../../auth/auth.guard.js';
 import { CurrentUser } from '../../auth/current-user.decorator.js';
 import type { AuthenticatedRequest } from '../../auth/auth.guard.js';
-import { RequirePermission, RequirePlatformRole } from '../../authz/authz.decorators.js';
+import {
+  PlatformConsoleRoute,
+  RequirePermission,
+  RequirePlatformRole,
+} from '../../authz/authz.decorators.js';
 import { AuthzService } from '../../authz/authz.service.js';
 import { PermissionsGuard } from '../../authz/permissions.guard.js';
+// ADR-0053 — P0
+import { PlatformAuthGuard } from '../../authz/platform-auth.guard.js';
 import { parseParam, parseWith } from '../accounting.common.js';
 import { ChartPacksService, type PlatformPackActor } from './chart-packs.service.js';
 
@@ -56,7 +62,10 @@ export class AccountingChartPacksController {
 }
 
 @Controller('accounting/platform/chart-packs')
-@UseGuards(AuthGuard, PermissionsGuard)
+// ADR-0053 — P0 : route plateforme, sans organisation (le gestionnaire comptable et fiscal
+// n'est membre d'aucun client).
+@UseGuards(PlatformAuthGuard, PermissionsGuard)
+@PlatformConsoleRoute()
 @RequirePlatformRole('platform_country_pack_manager')
 export class AccountingChartPacksPlatformController {
   constructor(

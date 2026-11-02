@@ -46,6 +46,15 @@ résultats saisis, traces de promotion ; aucun score stocké, le moteur le recal
 
 `Report`, `ExportJob`, `Attachment`, `Comment`, `AuditEvent`, `Notification`, `AiInteraction`.
 
+**Proposé, ADR-0053 (console Lalanda, aucune collection créée au lot P0).** Collections de portée
+plateforme, sans `organizationId` de locataire (une cible se nomme `targetOrganizationId`) :
+`platform_plan_grants`, `platform_feature_overrides`, `platform_announcements`,
+`platform_announcement_receipts` (index unique `{ announcementId, userId }`) ; champs ajoutés à
+`organization_suspensions` (`reasonCategory`, `clientMessage`, `internalNote`, `mode`, `liftReason`,
+`liftedClientMessage`) et à `user` (`disabledReasonCategory`, `disabledInternalNote`, `disabledBy`).
+`user.disabledAt` (existant) est **lu** dès P0 par `PlatformAuthGuard`. `audit_events` inchangé : le
+miroir pseudonyme s'écrit avec `actorUserId: 'platform:lalanda'`.
+
 ## Valeur financière
 
 ```ts

@@ -22,7 +22,13 @@ import { Reflector } from '@nestjs/core';
 
 import type { AuthenticatedRequest } from '../auth/auth.guard.js';
 import { AuthzService, forbidden } from './authz.service.js';
-import { REQUIRED_PERMISSIONS_KEY, REQUIRED_PLATFORM_ROLES_KEY } from './authz.decorators.js';
+import {
+  REQUIRED_PERMISSIONS_KEY,
+  REQUIRED_PLATFORM_ACTIONS_KEY,
+  REQUIRED_PLATFORM_ROLES_KEY,
+} from './authz.decorators.js';
+// ADR-0053 — P0
+import { canAnyPlatformAction, type PlatformAction } from './platform-actions.js';
 import {
   canAll,
   canAnyPlatform,
@@ -52,7 +58,15 @@ export class PermissionsGuard implements CanActivate {
       [handler, controller],
     );
 
-    if (!platformRoles?.length && !actions?.length) return true;
+    // ADR-0053 — P0 : action plateforme (`@RequirePlatformAction`), jugée contre
+    // `PLATFORM_ACTION_MATRIX`. Conjonctive avec les rôles exigés, et seulement avec des
+    // rôles PLATEFORME : aucune appartenance à une organisation ne la satisfait.
+    const platformActions = this.reflector.getAllAndOverride<PlatformAction[] | undefined>(
+      REQUIRED_PLATFORM_ACTIONS_KEY,
+      [handler, controller],
+    );
+
+    if (!platformRoles?.length && !platformActions?.length && !actions?.length) return true;
 
     const req = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const userId = req.user?.id;
@@ -61,12 +75,20 @@ export class PermissionsGuard implements CanActivate {
       throw new UnauthorizedException({ code: 'NOT_AUTHENTICATED' });
     }
 
-    if (platformRoles?.length) {
+    if (platformRoles?.length || platformActions?.length) {
       const held = await this.authz.platformRolesOf(userId);
-      const granted = platformRoles.some((r) => held.includes(r));
+      // ADR-0053 — P0 : chaque action plateforme déclarée doit être détenue. Jugée en
+      // premier pour que le 403 nomme l'action, pas la liste des rôles qui en dérive.
+      const deniedPlatformAction = platformActions?.find((a) => !canAnyPlatformAction(held, a));
+      if (deniedPlatformAction) {
+        throw new ForbiddenException(
+          forbidden(deniedPlatformAction, held.length > 0 ? held.join(',') : null),
+        );
+      }
+      const granted = !platformRoles?.length || platformRoles.some((r) => held.includes(r));
       if (!granted) {
         throw new ForbiddenException(
-          forbidden(platformRoles.join('|'), held.length > 0 ? held.join(',') : null),
+          forbidden(platformRoles!.join('|'), held.length > 0 ? held.join(',') : null),
         );
       }
       // Un rôle plateforme suffit : on n'exige pas en plus une appartenance à l'org.
