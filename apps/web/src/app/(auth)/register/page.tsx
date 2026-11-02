@@ -30,9 +30,11 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { signUp } from '@/lib/auth-client';
+// ADR-0052 — O5 : inscription venue d'une invitation.
+import { TEXTE_INSCRIPTION_INVITEE, lireJetonInvitation } from '@/lib/invitation-en-attente';
 import { LEGAL_VERSION } from '@/lib/legal';
 
 import { GoogleButton } from '../_components/google-button';
@@ -48,6 +50,12 @@ export default function RegisterPage(): React.ReactElement {
   const [loading, setLoading] = useState(false);
   /** Compte créé, adresse à confirmer : l'inscription n'a pas ouvert de session. */
   const [verificationSent, setVerificationSent] = useState(false);
+  /** ADR-0052 — O5 : une invitation est suivie (cookie posé par le middleware). */
+  const [invitee, setInvitee] = useState(false);
+
+  useEffect(() => {
+    setInvitee(lireJetonInvitation(document.cookie) !== null);
+  }, []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
@@ -113,7 +121,9 @@ export default function RegisterPage(): React.ReactElement {
       <div className="flex flex-col gap-1">
         <h2 className="text-2xl font-semibold tracking-tight">Créer un compte</h2>
         <p className="text-sm text-[var(--foreground-muted)]">
-          Une organisation personnelle est créée automatiquement.
+          {invitee
+            ? TEXTE_INSCRIPTION_INVITEE
+            : 'Une organisation personnelle est créée automatiquement.'}
         </p>
       </div>
 
