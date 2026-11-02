@@ -28,6 +28,8 @@ import { PaymentsModule } from '../payments/payments.module.js';
 import { PlanGrant, PlanGrantSchema } from './billing/plan-grant.schema.js';
 import { PlatformBillingController } from './billing/platform-billing.controller.js';
 import { PlatformBillingService } from './billing/platform-billing.service.js';
+// ADR-0053 — P5
+import { AdminAuditModule } from './audit/admin-audit.module.js';
 
 @Module({
   imports: [
@@ -44,6 +46,8 @@ import { PlatformBillingService } from './billing/platform-billing.service.js';
       { name: PlanGrant.name, schema: PlanGrantSchema },
       { name: Subscription.name, schema: SubscriptionSchema },
     ]),
+    // ADR-0053 — P5 : journal plateforme filtré, export CSV, événements de sécurité.
+    AdminAuditModule,
   ],
   // `PlatformAccessController` sert `/me/platform-access` et NON `/admin/*` :
   // voir l'en-tête du fichier pour la raison — un utilisateur sans rôle doit

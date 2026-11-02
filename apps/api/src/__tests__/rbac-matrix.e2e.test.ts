@@ -1898,4 +1898,36 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
       }
     }
   }, 120_000);
+  // ───────────────────────────────────────────────────────────────────────────
+  // ADR-0053 — P5 : journal plateforme, export et événements de sécurité. Aucun rôle
+  // d'organisation ne les ouvre — Propriétaire compris, qui garde son seul journal
+  // d'organisation (`/audit-events`). Le refus nomme l'action PLATEFORME, avant toute
+  // validation de filtre, de motif ou de limite de débit.
+  // ───────────────────────────────────────────────────────────────────────────
+
+  it('ADR-0053 P5 — aucun rôle d’organisation n’ouvre le journal plateforme ni la sécurité', async () => {
+    const s = serveur();
+    const sondes: Array<[string, PlatformAction]> = [
+      ['/admin/audit-events?action=user.disabled', 'platform.audit.read'],
+      ['/admin/audit-events/export.csv?reason=security', 'platform.audit.export'],
+      ['/admin/audit-events/export.csv', 'platform.audit.export'],
+      ['/admin/security-events', 'platform.audit.read'],
+    ];
+    const { ThrottlerStorage } = await import('@nestjs/throttler');
+    const store = app.get(ThrottlerStorage) as unknown as {
+      storage: Map<string, unknown>;
+      timeoutIds: Map<string, NodeJS.Timeout[]>;
+    };
+    for (const role of ROLES_TESTES) {
+      for (const t of store.timeoutIds.values()) t.forEach(clearTimeout);
+      store.timeoutIds.clear();
+      store.storage.clear();
+      for (const [chemin, action] of sondes) {
+        const res = await request(s).get(chemin).set('Cookie', cookiesDe(role));
+        expect(res.status, `${role} × GET ${chemin}`).toBe(403);
+        expect(res.body, `${role} × GET ${chemin}`).toMatchObject({ code: 'FORBIDDEN', action });
+        expect(String(res.headers['content-type'] ?? ''), chemin).not.toContain('text/csv');
+      }
+    }
+  }, 120_000);
 });
