@@ -1974,6 +1974,8 @@ describe('ADR-0053 — P0 : la garde sans organisation ne vaut que pour la conso
     'PlatformBillingController',
     // ADR-0053 — P4
     'AdminFeaturesController',
+    // ADR-0053 — P5
+    'AdminAuditController',
     // ADR-0053 — P7
     'AdminStatsController',
     'AdminFinanceController',
@@ -2250,7 +2252,7 @@ describe('ADR-0053 — P2 : routes `/admin` de comptes et d’organisations', ()
     'AdminController.setDisabled': ['platform.users.block', true],
     'AdminController.grantRole': ['platform.roles.manage', true],
     'AdminController.revokeRole': ['platform.roles.manage', true],
-    'AdminController.auditEvents': ['platform.audit.read', false],
+    // ADR-0053 — P5 : `auditEvents` est passée à `AdminAuditController` (bloc P5).
   };
 
   const proto = AdminController.prototype as unknown as Record<string, object>;
@@ -2532,6 +2534,71 @@ describe('ADR-0053 — P3 : `/admin/billing/**`', () => {
       const methode = (PaymentsController.prototype as unknown as Record<string, object>)[nom]!;
       expect(Reflect.getMetadata(GUARDS_METADATA, methode) ?? [], cle).toEqual([]);
     }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADR-0053 — P5 : journal plateforme, export et événements de sécurité (§ 6.5, § 7)
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { AdminAuditController } from '../admin/audit/admin-audit.controller.js';
+import { PlatformAuditExportThrottlerGuard } from '../admin/audit/audit-export-throttler.guard.js';
+
+const CONTROLEURS_P5 = [AdminAuditController];
+(CONTROLEURS as unknown[]).push(...CONTROLEURS_P5);
+TOUTES_LES_ROUTES.push(
+  ...CONTROLEURS_P5.flatMap((c) => routesDe(c as new (...args: never[]) => unknown)),
+);
+
+describe('ADR-0053 — P5 : `/admin/audit-events`, export, `/admin/security-events`', () => {
+  const proto = AdminAuditController.prototype as unknown as Record<string, object>;
+  const routesP5 = () => TOUTES_LES_ROUTES.filter((r) => r.cle.startsWith('AdminAuditController.'));
+
+  it('chaque route déclare l’action plateforme du § 7, jamais une action d’organisation', () => {
+    const attendu: Record<string, PlatformAction> = {
+      'AdminAuditController.auditEvents': 'platform.audit.read',
+      'AdminAuditController.exportCsv': 'platform.audit.export',
+      'AdminAuditController.securityEvents': 'platform.audit.read',
+    };
+    expect(
+      routesP5()
+        .map((r) => r.cle)
+        .sort(),
+    ).toEqual(Object.keys(attendu).sort());
+    for (const [cle, action] of Object.entries(attendu)) {
+      const route = routesP5().find((r) => r.cle === cle)!;
+      expect(route.actions ?? [], cle).toEqual([]);
+      expect(route.rolesPlateforme, cle).toEqual(platformActionHolders(action));
+      expect(
+        Reflect.getMetadata(REQUIRED_PLATFORM_ACTIONS_KEY, proto[cle.split('.')[1]!]!),
+        cle,
+      ).toEqual([action]);
+      expect(SANS_PERMISSION[cle], cle).toBeUndefined();
+    }
+  });
+
+  it('garde de console sans organisation, et aucune route d’écriture', () => {
+    const gardes = (Reflect.getMetadata(GUARDS_METADATA, AdminAuditController) ?? []) as unknown[];
+    expect(gardes).toEqual([PlatformAuthGuard, PermissionsGuard]);
+    expect(Reflect.getMetadata(PLATFORM_CONSOLE_ROUTE_KEY, AdminAuditController)).toBe(true);
+    for (const r of routesP5()) {
+      const nom = r.cle.split('.')[1]!;
+      // RequestMethod.GET === 0 : le journal est en ajout seul, la console le lit.
+      expect(Reflect.getMetadata('method', proto[nom]!), r.cle).toBe(0);
+    }
+  });
+
+  it('l’export est limité en débit ; seul le super-administrateur exporte (§ 5.2)', () => {
+    expect(Reflect.getMetadata(GUARDS_METADATA, proto['exportCsv']!)).toEqual([
+      PlatformAuditExportThrottlerGuard,
+    ]);
+    expect(platformActionHolders('platform.audit.export')).toEqual(['platform_super_admin']);
+    expect(platformActionHolders('platform.audit.read')).not.toContain('platform_support');
+  });
+
+  it('`AdminController` ne sert plus le journal (une seule route par chemin)', () => {
+    const admin = AdminController.prototype as unknown as Record<string, unknown>;
+    expect(admin['auditEvents']).toBeUndefined();
   });
 });
 
