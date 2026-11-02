@@ -13,6 +13,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
+import { PLATFORM_MIRROR_ACTOR_ID, PLATFORM_MIRROR_ACTOR_LABEL } from '@lalanda/shared/platform';
+
 import { api, type AuditEventView } from '@/lib/api';
 
 import { estRefus, formatDateHeure, messageErreur } from './organization-model';
@@ -145,10 +147,18 @@ export function AuditPanel(): React.ReactElement {
                     {/* L'identité réelle n'est jamais réécrite (ADR-0012 §5) :
                         on affiche le rôle détenu AU MOMENT de l'action, qui a pu
                         changer depuis. */}
-                    <span className="fig text-xs">{e.actorUserId.slice(-8)}</span>
-                    <span className="block text-xs text-[var(--foreground-muted)]">
-                      {e.actorRole}
-                    </span>
+                    {/* ADR-0053 — P2 : un geste de la plateforme paraît sous « Équipe
+                        Lalanda », jamais sous un identifiant ni un rôle d'opérateur. */}
+                    {e.actorUserId === PLATFORM_MIRROR_ACTOR_ID ? (
+                      <span className="text-xs">{PLATFORM_MIRROR_ACTOR_LABEL}</span>
+                    ) : (
+                      <>
+                        <span className="fig text-xs">{e.actorUserId.slice(-8)}</span>
+                        <span className="block text-xs text-[var(--foreground-muted)]">
+                          {e.actorRole}
+                        </span>
+                      </>
+                    )}
                   </td>
                   <td className="px-2 py-2 font-mono text-xs">{e.action}</td>
                   <td className="px-2 py-2">

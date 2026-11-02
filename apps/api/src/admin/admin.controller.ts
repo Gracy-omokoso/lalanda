@@ -12,12 +12,13 @@
 // l'une de ces trois actions — la propriété doit survivre à la prochaine route
 // ajoutée par quelqu'un qui n'aura pas lu ce commentaire.
 //
-// ── Répartition des rôles ─────────────────────────────────────────────────────
+// ── Répartition des droits (ADR-0053 — P2) ────────────────────────────────────
 //
-// La lecture est ouverte à `platform_admin` et `platform_support` (consultation
-// pour le diagnostic). L'écriture sur les organisations exige `platform_admin`,
-// l'écriture sur les rôles plateforme exige `platform_super_admin` — attribuer
-// un rôle, c'est distribuer du pouvoir sur la plateforme.
+// Chaque route déclare son ACTION plateforme (`@RequirePlatformAction`), jugée contre
+// la matrice d'ADR-0053 § 5.2 : plus aucune liste de rôles recopiée ici. Toute
+// ÉCRITURE de la console exige en outre une ré-authentification de moins de dix
+// minutes (`@RequireRecentReauth`, § 2.4) et un motif écrit ; la lecture d'une fiche
+// détaillée exige un motif de consultation et est journalisée (§ 2.6).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import {
@@ -37,27 +38,33 @@ import {
 
 import type { AuthenticatedRequest } from '../auth/auth.guard.js';
 import { AuthzService } from '../authz/authz.service.js';
-import {
-  PlatformConsoleRoute,
-  RequirePlatformAction,
-  RequirePlatformRole,
-} from '../authz/authz.decorators.js';
+import { PlatformConsoleRoute, RequirePlatformAction } from '../authz/authz.decorators.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
 // ADR-0053 — P0
 import { PlatformAuthGuard } from '../authz/platform-auth.guard.js';
 import { PlatformAuditService } from '../integrations/platform-audit.service.js';
+// ADR-0053 — P2
+import { RequireRecentReauth } from '../integrations/reauth.guard.js';
 import {
   AdminService,
   type AdminActor,
+  type AdminOrganizationDetail,
   type AdminOrganizationSummary,
+  type AdminUserDetail,
   type AdminUserSummary,
   type PlatformOverview,
 } from './admin.service.js';
 import {
+  BlockUserInputSchema,
   DisableUserSchema,
-  GrantPlatformRoleSchema,
+  PlatformSearchQuerySchema,
+  PlatformViewReasonQuerySchema,
+  RestoreOrganizationInputSchema,
   SetPlanSchema,
-  SuspendOrganizationSchema,
+  SuspendOrganizationInputSchema,
+  UnblockUserInputSchema,
+  grantPlatformRoleInputSchema,
+  invalidBody,
 } from './admin.dto.js';
 
 export interface PlatformAuditEventView {
@@ -76,9 +83,9 @@ export interface PlatformAuditEventView {
 // organisation ; l'autorisation reste celle de `PermissionsGuard`, rôles PLATEFORME seuls.
 @UseGuards(PlatformAuthGuard, PermissionsGuard)
 @PlatformConsoleRoute()
-// Plancher du contrôleur : sans AUCUN rôle plateforme, tout `/admin` est fermé.
-// Chaque route resserre ensuite pour ses écritures.
-@RequirePlatformRole('platform_super_admin', 'platform_admin', 'platform_support')
+// ADR-0053 — P2 : plancher du contrôleur = ouvrir la console ; chaque route le remplace par
+// son action. Sans AUCUN rôle plateforme, tout `/admin` est fermé.
+@RequirePlatformAction('platform.console.read')
 export class AdminController {
   constructor(
     @Inject(AdminService) private readonly admin: AdminService,
@@ -113,7 +120,9 @@ export class AdminController {
 
   // ── Organisations ──────────────────────────────────────────────────────────
 
+  /** Première page sans recherche ; au-delà, `q` de trois caractères (§ 2.6). */
   @Get('organizations')
+  @RequirePlatformAction('platform.orgs.read')
   async listOrganizations(
     @Query('q') q?: string,
     @Query('limit') limit?: string,
@@ -123,16 +132,8 @@ export class AdminController {
     };
   }
 
-  @Get('organizations/:organizationId')
-  async getOrganization(
-    @Param('organizationId') organizationId: string,
-  ): Promise<AdminOrganizationSummary> {
-    return this.admin.getOrganization(organizationId);
-  }
-
   /**
-   * Changement de plan. `platform_admin` suffit : c'est un acte de gestion
-   * plateforme, pas un accès aux données du client.
+   * Fiche détaillée : motif de consultation obligatoire (`?reason=`), lecture journalisée.
    *
    * NOTE — le paramètre s'appelle `organizationId` et NON `orgId`. C'est
    * délibéré : `PermissionsGuard` traite un `:orgId` de route comme
@@ -141,63 +142,158 @@ export class AdminController {
    * `orgId`, la route renverrait 404 ORG_NOT_FOUND à un super-administrateur
    * parfaitement légitime.
    */
+  @Get('organizations/:organizationId')
+  @RequirePlatformAction('platform.orgs.read')
+  async getOrganization(
+    @Req() req: AuthenticatedRequest,
+    @Param('organizationId') organizationId: string,
+    @Query('reason') reason?: string,
+  ): Promise<AdminOrganizationDetail> {
+    const parsed = PlatformViewReasonQuerySchema.safeParse({ reason });
+    if (!parsed.success) throw reasonRequired();
+    return this.admin.viewOrganization(organizationId, parsed.data.reason, await this.actorOf(req));
+  }
+
+  /**
+   * Changement de plan — route HISTORIQUE (ADR-0053 § 7), remplacée par les octrois du
+   * lot P3. Motif obligatoire, ré-authentification, conflit d'intérêts, miroir client.
+   */
   @Patch('organizations/:organizationId/plan')
-  @RequirePlatformRole('platform_super_admin', 'platform_admin')
+  @RequirePlatformAction('platform.billing.grant')
+  @RequireRecentReauth()
   async setPlan(
     @Req() req: AuthenticatedRequest,
     @Param('organizationId') organizationId: string,
     @Body() body: unknown,
   ): Promise<AdminOrganizationSummary> {
     const parsed = SetPlanSchema.safeParse(body);
-    if (!parsed.success) throw invalid('Plan requis (free, pro ou business).');
-    return this.admin.setPlan(organizationId, parsed.data.plan, await this.actorOf(req));
+    if (!parsed.success) {
+      throw invalidBody(parsed.error, 'Offre, catégorie, message client et note interne requis.');
+    }
+    return this.admin.setPlan(organizationId, parsed.data, await this.actorOf(req));
   }
 
   @Post('organizations/:organizationId/suspend')
-  @RequirePlatformRole('platform_super_admin', 'platform_admin')
+  @RequirePlatformAction('platform.orgs.suspend')
+  @RequireRecentReauth()
   async suspend(
     @Req() req: AuthenticatedRequest,
     @Param('organizationId') organizationId: string,
     @Body() body: unknown,
   ): Promise<AdminOrganizationSummary> {
-    const parsed = SuspendOrganizationSchema.safeParse(body);
-    if (!parsed.success) throw invalid('Motif de suspension requis (10 caractères minimum).');
-    return this.admin.suspendOrganization(
-      organizationId,
-      parsed.data.reason,
-      await this.actorOf(req),
-    );
+    const parsed = SuspendOrganizationInputSchema.safeParse(body);
+    if (!parsed.success) {
+      throw invalidBody(parsed.error, 'Catégorie, message client et note interne requis.');
+    }
+    return this.admin.suspendOrganization(organizationId, parsed.data, await this.actorOf(req));
   }
 
+  @Post('organizations/:organizationId/restore')
+  @RequirePlatformAction('platform.orgs.suspend')
+  @RequireRecentReauth()
+  async restore(
+    @Req() req: AuthenticatedRequest,
+    @Param('organizationId') organizationId: string,
+    @Body() body: unknown,
+  ): Promise<AdminOrganizationSummary> {
+    return this.liftWithReason(req, organizationId, body);
+  }
+
+  /** Route HISTORIQUE de levée (§ 7) : même corps motivé que `restore`. */
   @Delete('organizations/:organizationId/suspend')
-  @RequirePlatformRole('platform_super_admin', 'platform_admin')
+  @RequirePlatformAction('platform.orgs.suspend')
+  @RequireRecentReauth()
   async lift(
     @Req() req: AuthenticatedRequest,
     @Param('organizationId') organizationId: string,
+    @Body() body: unknown,
   ): Promise<AdminOrganizationSummary> {
-    return this.admin.liftSuspension(organizationId, await this.actorOf(req));
+    return this.liftWithReason(req, organizationId, body);
+  }
+
+  private async liftWithReason(
+    req: AuthenticatedRequest,
+    organizationId: string,
+    body: unknown,
+  ): Promise<AdminOrganizationSummary> {
+    const parsed = RestoreOrganizationInputSchema.safeParse(body ?? {});
+    if (!parsed.success) {
+      throw invalidBody(parsed.error, 'Motif de levée et message client requis.');
+    }
+    return this.admin.liftSuspension(organizationId, parsed.data, await this.actorOf(req));
   }
 
   // ── Utilisateurs ───────────────────────────────────────────────────────────
 
+  /**
+   * Recherche OBLIGATOIRE (F8) : sans `q` de trois caractères, `400 SEARCH_REQUIRED` —
+   * plus aucun annuaire d'adresses servi sans recherche.
+   */
   @Get('users')
+  @RequirePlatformAction('platform.users.read')
   async listUsers(
     @Query('q') q?: string,
     @Query('limit') limit?: string,
   ): Promise<{ users: AdminUserSummary[] }> {
-    return { users: await this.admin.searchUsers({ q, limit: toInt(limit) }) };
+    const parsed = PlatformSearchQuerySchema.safeParse({ q });
+    if (!parsed.success) {
+      throw new BadRequestException({
+        code: 'SEARCH_REQUIRED',
+        message: 'Recherche obligatoire : trois caractères au moins.',
+      });
+    }
+    return { users: await this.admin.searchUsers({ q: parsed.data.q, limit: toInt(limit) }) };
+  }
+
+  @Get('users/:userId')
+  @RequirePlatformAction('platform.users.read')
+  async getUser(
+    @Req() req: AuthenticatedRequest,
+    @Param('userId') userId: string,
+    @Query('reason') reason?: string,
+  ): Promise<AdminUserDetail> {
+    const parsed = PlatformViewReasonQuerySchema.safeParse({ reason });
+    if (!parsed.success) throw reasonRequired();
+    return this.admin.viewUser(userId, parsed.data.reason, await this.actorOf(req));
+  }
+
+  @Post('users/:userId/block')
+  @RequirePlatformAction('platform.users.block')
+  @RequireRecentReauth()
+  async block(
+    @Req() req: AuthenticatedRequest,
+    @Param('userId') userId: string,
+    @Body() body: unknown,
+  ): Promise<AdminUserSummary> {
+    const parsed = BlockUserInputSchema.safeParse(body);
+    if (!parsed.success) throw invalidBody(parsed.error, 'Catégorie et note interne requises.');
+    return this.admin.blockUser(userId, parsed.data, await this.actorOf(req));
+  }
+
+  @Post('users/:userId/unblock')
+  @RequirePlatformAction('platform.users.block')
+  @RequireRecentReauth()
+  async unblock(
+    @Req() req: AuthenticatedRequest,
+    @Param('userId') userId: string,
+    @Body() body: unknown,
+  ): Promise<AdminUserSummary> {
+    const parsed = UnblockUserInputSchema.safeParse(body);
+    if (!parsed.success) throw invalidBody(parsed.error, 'Note interne requise.');
+    return this.admin.unblockUser(userId, parsed.data, await this.actorOf(req));
   }
 
   /** Attribution d'un rôle plateforme — super-administrateur uniquement. */
   @Post('users/:userId/platform-roles')
-  @RequirePlatformRole('platform_super_admin')
+  @RequirePlatformAction('platform.roles.manage')
+  @RequireRecentReauth()
   async grantRole(
     @Req() req: AuthenticatedRequest,
     @Param('userId') userId: string,
     @Body() body: unknown,
   ): Promise<AdminUserSummary> {
-    const parsed = GrantPlatformRoleSchema.safeParse(body);
-    if (!parsed.success) throw invalid('Rôle plateforme requis.');
+    const parsed = grantPlatformRoleInputSchema(new Date()).safeParse(body);
+    if (!parsed.success) throw invalidBody(parsed.error, 'Rôle plateforme et motif requis.');
     return this.admin.grantPlatformRole(
       userId,
       parsed.data.role,
@@ -207,7 +303,8 @@ export class AdminController {
   }
 
   @Delete('users/:userId/platform-roles/:role')
-  @RequirePlatformRole('platform_super_admin')
+  @RequirePlatformAction('platform.roles.manage')
+  @RequireRecentReauth()
   async revokeRole(
     @Req() req: AuthenticatedRequest,
     @Param('userId') userId: string,
@@ -216,16 +313,25 @@ export class AdminController {
     return this.admin.revokePlatformRole(userId, role, await this.actorOf(req));
   }
 
+  /** Route HISTORIQUE (§ 7), remplacée par `block` / `unblock` : même motif exigé. */
   @Patch('users/:userId/disabled')
-  @RequirePlatformRole('platform_super_admin', 'platform_admin')
+  @RequirePlatformAction('platform.users.block')
+  @RequireRecentReauth()
   async setDisabled(
     @Req() req: AuthenticatedRequest,
     @Param('userId') userId: string,
     @Body() body: unknown,
   ): Promise<AdminUserSummary> {
     const parsed = DisableUserSchema.safeParse(body);
-    if (!parsed.success) throw invalid('`disabled` booléen requis.');
-    return this.admin.setUserDisabled(userId, parsed.data.disabled, await this.actorOf(req));
+    if (!parsed.success) throw invalidBody(parsed.error, '`disabled` et note interne requis.');
+    const actor = await this.actorOf(req);
+    return parsed.data.disabled
+      ? this.admin.blockUser(
+          userId,
+          { reasonCategory: parsed.data.reasonCategory!, internalNote: parsed.data.internalNote },
+          actor,
+        )
+      : this.admin.unblockUser(userId, { internalNote: parsed.data.internalNote }, actor);
   }
 
   // ── Journal d'audit plateforme ─────────────────────────────────────────────
@@ -239,6 +345,7 @@ export class AdminController {
    * (ADR-0012 §4, `audit.read` en `delegated` pour le support).
    */
   @Get('audit-events')
+  @RequirePlatformAction('platform.audit.read')
   async auditEvents(
     @Query('action') action?: string,
     @Query('actorUserId') actorUserId?: string,
@@ -265,6 +372,10 @@ function toInt(raw: string | undefined): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-function invalid(message: string): BadRequestException {
-  return new BadRequestException({ code: 'VALIDATION_ERROR', message });
+function reasonRequired(): BadRequestException {
+  return new BadRequestException({
+    code: 'REASON_REQUIRED',
+    message:
+      'Motif de consultation obligatoire (assistance, facturation, sécurité, abus, demande légale).',
+  });
 }

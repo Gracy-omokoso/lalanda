@@ -6,7 +6,7 @@ import { isKnownLegalVersion } from '@lalanda/shared/legal';
 import { betterAuth } from 'better-auth';
 import { mongodbAdapter } from 'better-auth/adapters/mongodb';
 import { APIError } from 'better-auth/api';
-import { MongoClient, type Db } from 'mongodb';
+import { MongoClient, ObjectId, type Db } from 'mongodb';
 
 import { passwordResetUrl, signupVerificationUrl } from '../mail/mail.links.js';
 import type { MailService } from '../mail/mail.service.js';
@@ -344,12 +344,39 @@ export async function buildAuth(opts: BuildAuthOptions): Promise<ReturnType<type
           },
         },
       },
+      // ── ADR-0053 — P2 : un compte BLOQUÉ n'ouvre plus de session (F5) ─────────
+      // Toute création de session (mot de passe, Google, lien de vérification) passe
+      // ici : `disabledAt` posé → refus `403 ACCOUNT_BLOCKED`, message générique.
+      // Seul un `disabledAt` non nul refuse : un compte sans le champ se connecte.
+      session: {
+        create: {
+          before: async (session: { userId?: unknown }) => {
+            if (await isUserBlocked(db, session.userId)) {
+              throw new APIError('FORBIDDEN', {
+                code: 'ACCOUNT_BLOCKED',
+                message: 'Votre compte est bloqué. Contactez le support.',
+              });
+            }
+          },
+        },
+      },
     },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any);
 
   cachedAuth = instance;
   return instance;
+}
+
+/** ADR-0053 — P2 : `user.disabledAt` posé pour cet identifiant better-auth ? */
+async function isUserBlocked(db: Db, userId: unknown): Promise<boolean> {
+  if (userId === undefined || userId === null) return false;
+  const raw = String(userId);
+  const _id = ObjectId.isValid(raw) ? new ObjectId(raw) : raw;
+  const user = await db
+    .collection<{ _id: ObjectId | string; disabledAt?: Date | null }>('user')
+    .findOne({ _id }, { projection: { disabledAt: 1 } });
+  return user?.disabledAt != null;
 }
 
 /**

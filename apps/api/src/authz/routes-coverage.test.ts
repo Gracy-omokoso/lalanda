@@ -44,6 +44,8 @@ import { LegalController } from '../legal/legal.controller.js';
 import { MorningBriefController } from '../morning-brief/morning-brief.controller.js';
 import { ObjectivesController } from '../objectives/objectives.controller.js';
 import { OrganizationSpaceController } from '../organization-space/organization-space.controller.js';
+// ADR-0052 — O0
+import { OrganizationSetupController } from '../organization-setup/organization-setup.controller.js';
 import { InvitationsController } from '../organizations/invitations.controller.js';
 import { MembersController } from '../organizations/members.controller.js';
 import { OrganizationsController } from '../organizations/organizations.controller.js';
@@ -314,6 +316,8 @@ const CONTROLEURS = [
   // ADR-0048 : formulaire public de prospects (réglages et routes publiques).
   CrmLeadFormsController,
   PublicLeadFormsController,
+  // ADR-0052 — O0 : statut de complétude de la mise en route.
+  OrganizationSetupController,
 ];
 
 /**
@@ -449,6 +453,13 @@ const SANS_PERMISSION: Record<string, string> = {
     'Soumission d’un visiteur anonyme : jeton actif, champ piège, délai minimal par ticket ' +
     'signé, débit par empreinte d’IP et par formulaire, champs bornés, sans pièce jointe ; ' +
     'écrit seulement dans l’organisation du jeton (ADR-0048 § 3, § 6).',
+
+  // ── ADR-0052 — O0 : statut de complétude ────────────────────────────────
+  'OrganizationSetupController.read':
+    'Statut de complétude de l’organisation ACTIVE, ouvert à tout membre (ADR-0052 § 7, ' +
+    'option O5 : aucune action nouvelle). AuthGuard vérifie l’appartenance ; la réponse ' +
+    'ne porte que des booléens et des codes, jamais une valeur (NIF, solde, nom) ; ' +
+    '`canAct` suit les droits effectifs de l’appelant.',
 };
 
 interface RouteInspectee {
@@ -2190,6 +2201,76 @@ describe('ADR-0051 — H15 : objectifs et évaluations', () => {
 
   it('`performance.read` reste interdit à la plateforme, même sous accès délégué', () => {
     expect(PLATFORM_FORBIDDEN_ACTIONS).toContain('performance.read');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADR-0053 — P2 : comptes et organisations — une action par route, ré-authentification
+// sur chaque écriture, inactivité de 12 heures exemptée pour la seule ré-authentification
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** `CONSOLE_IDLE_EXEMPT_KEY` d'`authz.decorators.ts` (un seul import par module, lint). */
+const P2_IDLE_EXEMPT_KEY = 'lalanda:console_idle_exempt';
+import { REQUIRES_RECENT_REAUTH_KEY as P2_REAUTH_KEY } from '../integrations/reauth.guard.js';
+
+describe('ADR-0053 — P2 : routes `/admin` de comptes et d’organisations', () => {
+  /** Route → [action plateforme, ré-authentification exigée]. */
+  const ATTENDU: Record<string, [PlatformAction, boolean]> = {
+    'AdminController.overview': ['platform.console.read', false],
+    'AdminController.listOrganizations': ['platform.orgs.read', false],
+    'AdminController.getOrganization': ['platform.orgs.read', false],
+    'AdminController.setPlan': ['platform.billing.grant', true],
+    'AdminController.suspend': ['platform.orgs.suspend', true],
+    'AdminController.restore': ['platform.orgs.suspend', true],
+    'AdminController.lift': ['platform.orgs.suspend', true],
+    'AdminController.listUsers': ['platform.users.read', false],
+    'AdminController.getUser': ['platform.users.read', false],
+    'AdminController.block': ['platform.users.block', true],
+    'AdminController.unblock': ['platform.users.block', true],
+    'AdminController.setDisabled': ['platform.users.block', true],
+    'AdminController.grantRole': ['platform.roles.manage', true],
+    'AdminController.revokeRole': ['platform.roles.manage', true],
+    'AdminController.auditEvents': ['platform.audit.read', false],
+  };
+
+  const proto = AdminController.prototype as unknown as Record<string, object>;
+  const handlers = Object.getOwnPropertyNames(proto).filter(
+    (nom) => nom !== 'constructor' && Reflect.getMetadata('path', proto[nom]!) !== undefined,
+  );
+
+  it('la table est exhaustive : chaque route de `AdminController` y figure', () => {
+    expect(handlers.map((n) => `AdminController.${n}`).sort()).toEqual(Object.keys(ATTENDU).sort());
+  });
+
+  it('chaque route déclare SON action plateforme (plus aucune liste de rôles recopiée)', () => {
+    for (const [cle, [action]] of Object.entries(ATTENDU)) {
+      const methode = proto[cle.split('.')[1]!]!;
+      expect(Reflect.getMetadata(REQUIRED_PLATFORM_ACTIONS_KEY, methode), cle).toEqual([action]);
+      expect(Reflect.getMetadata(REQUIRED_PLATFORM_ROLES_KEY, methode), cle).toEqual(
+        platformActionHolders(action),
+      );
+    }
+  });
+
+  it('toute écriture exige la ré-authentification ; aucune lecture ne l’exige', () => {
+    for (const [cle, [, reauth]] of Object.entries(ATTENDU)) {
+      const methode = proto[cle.split('.')[1]!]!;
+      const verbe = Reflect.getMetadata('method', methode) as number;
+      // RequestMethod.GET === 0
+      expect(verbe !== 0, `${cle} : écriture ⇔ ré-authentification`).toBe(reauth);
+      expect(Reflect.getMetadata(P2_REAUTH_KEY, methode) === true, cle).toBe(reauth);
+    }
+  });
+
+  it('la ré-authentification est ouverte à tout opérateur et seule exemptée de l’inactivité', () => {
+    expect(Reflect.getMetadata(REQUIRED_PLATFORM_ACTIONS_KEY, ReauthController)).toEqual([
+      'platform.console.read',
+    ]);
+    expect(Reflect.getMetadata(P2_IDLE_EXEMPT_KEY, ReauthController)).toBe(true);
+    const exemptes = CONTROLEURS.filter(
+      (c) => Reflect.getMetadata(P2_IDLE_EXEMPT_KEY, c) === true,
+    ).map((c) => c.name);
+    expect(exemptes).toEqual(['ReauthController']);
   });
 });
 

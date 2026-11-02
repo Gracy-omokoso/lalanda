@@ -466,14 +466,11 @@ export function raisonNonRevocable(
 }
 
 /**
- * Une désactivation déconnecte mais NE VERROUILLE PAS la reconnexion.
- *
- * Limite connue et documentée (`admin.service.ts`, docs/17 § S21b). L'interface
- * doit le dire : un opérateur qui croit avoir barré l'accès alors qu'il n'a que
- * déconnecté prend une décision de sécurité sur une prémisse fausse.
+ * Effet d'un blocage (ADR-0053 — P2) : sessions révoquées ET connexion refusée
+ * (`403 ACCOUNT_BLOCKED`), jusqu'au déblocage motivé.
  */
 export const AVERTISSEMENT_DESACTIVATION =
-  'La désactivation révoque immédiatement toutes les sessions du compte, mais n’empêche pas encore la reconnexion. Le verrou au moment de la connexion reste à livrer.';
+  'Le blocage révoque immédiatement toutes les sessions du compte et refuse toute nouvelle connexion, jusqu’au déblocage. La personne voit un message générique ; ses organisations voient « Équipe Lalanda » dans leur journal.';
 
 // ── Journal d'audit ──────────────────────────────────────────────────────────
 
