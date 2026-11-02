@@ -2303,3 +2303,81 @@ describe('ADR-0050 — V4 : acomptes', () => {
     }
   });
 });
+
+// ADR-0051 — H10 : notes de frais et avances (§ 6.1)
+import { HrAdvancesController } from '../hr/advances/hr-advances.controller.js';
+import { HrExpenseReportsController } from '../hr/expenses/hr-expense-reports.controller.js';
+
+const CONTROLEURS_H10 = [HrExpenseReportsController, HrAdvancesController];
+(CONTROLEURS as unknown[]).push(...CONTROLEURS_H10);
+TOUTES_LES_ROUTES.push(
+  ...CONTROLEURS_H10.flatMap((c) => routesDe(c as new (...args: never[]) => unknown)),
+);
+
+const MOTIF_H10 = /^(HrExpenseReportsController|HrAdvancesController)\./;
+
+describe('ADR-0051 — H10 : notes de frais et avances', () => {
+  it('chaque route déclare la permission de l’ADR (§ 6.1) ; relationnelles en `analytics.read`', () => {
+    const attendu: Record<string, Action[]> = {
+      // Relationnelles : siennes, équipe, validateurs, payeurs, `hr.read` (sans justificatif).
+      'HrExpenseReportsController.list': ['analytics.read'],
+      'HrExpenseReportsController.get': ['analytics.read'],
+      'HrExpenseReportsController.create': ['expenses.claim'],
+      'HrExpenseReportsController.update': ['expenses.claim'],
+      'HrExpenseReportsController.remove': ['expenses.claim'],
+      'HrExpenseReportsController.uploadReceipt': ['expenses.claim'],
+      'HrExpenseReportsController.downloadReceipt': ['analytics.read'],
+      'HrExpenseReportsController.submit': ['expenses.claim'],
+      'HrExpenseReportsController.duplicate': ['expenses.claim'],
+      // Déclarant, ou `expenses.approve` avec motif (décidé dans le service).
+      'HrExpenseReportsController.cancel': ['analytics.read'],
+      // Manager de l'étape (relation) ou `expenses.approve` : `expenseApprovalDecision`.
+      'HrExpenseReportsController.approve': ['analytics.read'],
+      'HrExpenseReportsController.reject': ['analytics.read'],
+      // Décaisser : paire `expenses.approve` + `payables.pay` (`reimbursementDecision`).
+      'HrExpenseReportsController.reimburse': ['payables.pay', 'treasury.read'],
+      'HrExpenseReportsController.cancelReimbursement': ['payables.pay', 'treasury.read'],
+      // `expenses.approve` ou `hr.read`, vérifié dans le service.
+      'HrExpenseReportsController.summary': ['analytics.read'],
+      'HrExpenseReportsController.toPay': ['payables.pay'],
+      'HrExpenseReportsController.getSettings': ['analytics.read'],
+      // Le circuit exige en plus `expenses.approve` (vérifié dans le contrôleur).
+      'HrExpenseReportsController.putSettings': ['hr.manage'],
+      'HrAdvancesController.list': ['analytics.read'],
+      'HrAdvancesController.get': ['analytics.read'],
+      'HrAdvancesController.create': ['expenses.claim'],
+      'HrAdvancesController.update': ['expenses.claim'],
+      'HrAdvancesController.submit': ['expenses.claim'],
+      'HrAdvancesController.cancel': ['analytics.read'],
+      'HrAdvancesController.approve': ['analytics.read'],
+      'HrAdvancesController.reject': ['analytics.read'],
+      'HrAdvancesController.disburse': ['payables.pay', 'treasury.read'],
+      'HrAdvancesController.cancelDisbursement': ['payables.pay', 'treasury.read'],
+      // Selon la nature (§ 3.3) : vérifié dans le service.
+      'HrAdvancesController.settle': ['analytics.read'],
+      // Bénéficiaire, ou `expenses.approve` + `hr.sensitive.read` ; audit strict.
+      'HrAdvancesController.revealReason': ['analytics.read'],
+      // Changer qui valide exige d'être soi-même validateur (§ 2.7).
+      'HrAdvancesController.putSettings': ['expenses.approve', 'hr.manage'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) => MOTIF_H10.test(r.cle));
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+      expect(route!.rolesPlateforme, cle).toBeUndefined();
+      expect(SANS_PERMISSION[cle], cle).toBeUndefined();
+    }
+  });
+
+  it('valider ne décaisse pas : aucune route de validation ne porte `payables.pay`', () => {
+    for (const cle of [
+      'HrExpenseReportsController.approve',
+      'HrAdvancesController.approve',
+      'HrAdvancesController.putSettings',
+    ]) {
+      const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle);
+      expect(route!.actions ?? [], cle).not.toContain('payables.pay');
+    }
+  });
+});

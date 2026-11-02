@@ -784,6 +784,37 @@ Tâche `sales.subscriptions.prepare` (quotidienne, idempotente, acteur `system:s
 prépare des brouillons, n'émet ni ne normalise rien. Émettre reste `sales.invoice` (routes
 existantes).
 
+## Notes de frais et avances — implémenté, ADR-0051 (lot H10)
+
+Contrat d'[ADR-0051](adr/ADR-0051-rh-frais-avances-presences-evaluations.md) § 6.1. Module
+`apps/api/src/hr/{expenses,advances}/`, `AuthGuard` + `PermissionsGuard`, corps `.strict()`
+(`@lalanda/shared/hr`). Routes **relationnelles** : `analytics.read` au guard, portée décidée dans le
+service (bénéficiaire, auteur, équipe, `expenses.approve`, `payables.pay`, `hr.read` sans justificatif),
+hors portée `404`. Calculs au **moteur** (`checkExpenseReport`, `expenseReportTotals`,
+`expenseApprovalSteps`, `advanceSettlementPlan`, `advanceOutstanding`, `advanceFindings`,
+`expenseSummary`). Aucun plafond, barème ni seuil posé par Lalanda ; avance sur salaire et
+régularisation déclarée sur la paie **éteintes** par défaut ; aucune retenue calculée.
+
+| Méthode et chemin | Permission | Effet |
+|---|---|---|
+| `GET /hr/expense-reports?employeeId=&status=&view=&from=&to=&cursor=` · `GET …/:id` | `analytics.read` + portée | notes, totaux du moteur ; `view=a-valider` (ce que l'appelant peut valider), `a-payer` (`payables.pay`) |
+| `POST /hr/expense-reports` · `PUT …/:id` · `DELETE …/:id` | `expenses.claim` | brouillon ; pour autrui : `hr.manage` et collaborateur **sans compte** (`409 EMPLOYEE_HAS_ACCOUNT`) ; `422 EXPENSE_LINE_CATEGORY_NOT_ALLOWED`, `422 EXPENSE_IN_FUTURE`, `422 EXPENSE_WORK_PROJECT_UNKNOWN`, `422 EXPENSE_REPORT_CURRENCY_MISMATCH` |
+| `POST …/:id/lines/:lineId/receipt` · `GET …/receipt` | `expenses.claim` (brouillon, 30 par heure) · lecteurs sauf `hr.read` seul | justificatif `hr-expense-receipts/<objectId>`, chiffré par enveloppe quand le trousseau est configuré ; `415 EXPENSE_RECEIPT_TYPE` ; servi inerte, journalisé |
+| `POST …/:id/submit` · `…/duplicate` · `…/cancel` | `expenses.claim` · `analytics.read` (déclarant, ou `expenses.approve` avec motif) | numéro `NF{AA}{MM}-NNNNNN`, étapes figées ; `422 EXPENSE_RECEIPT_REASON_REQUIRED` |
+| `POST …/:id/approve` · `…/reject` | `analytics.read` + `expenseApprovalDecision` | `409 SELF_APPROVAL_FORBIDDEN`, `409 CREATOR_APPROVAL_FORBIDDEN`, `409 APPROVER_ALREADY_APPROVED`, `403 EXPENSE_NOT_YOUR_STEP` ; note liée à une avance : dépenses **sans compte** à l'approbation finale |
+| `POST …/:id/reimburse` · `…/reimbursement/cancel` | `payables.pay` + `treasury.read` + `reimbursementDecision` | une dépense possédée par ligne (`recordOwnedByExpenseReport`), dans la transaction ; complément `top_up` d'une note liée ; `409 APPROVER_CANNOT_PAY`, `409 SELF_PAYMENT_FORBIDDEN` |
+| `GET /hr/advances` · `GET …/:id` · `POST` · `PUT …/:id` · `…/submit` · `…/cancel` | comme les notes | numéro `AV…` ; `409 ADVANCE_KIND_DISABLED`, `422 ADVANCE_ABOVE_ORGANIZATION_LIMIT` ; avance sur salaire : `404` pour le manager et `hr.read` seul, nature et motif masqués au payeur |
+| `POST /hr/advances/:id/approve` · `…/reject` | `analytics.read` + `expenseApprovalDecision` | avance sur salaire : étape `finance` seule, `403 ADVANCE_SALARY_NOT_YOUR_STEP` |
+| `POST …/:id/disburse` · `…/disbursement/cancel` | `payables.pay` + `treasury.read` | `other_out` possédé (`recordOwnedByAdvance`), libellé neutre ; aucune dépense |
+| `POST …/:id/settlements` `{ kind, amount, on, accountId?, reference, note }` | `cash_return` : `payables.pay` ; `declared_payroll` : `expenses.approve` + `hr.sensitive.read` ; `write_off` : `expenses.approve` | ajout seul ; `409 ADVANCE_SETTLEMENT_EXCEEDS_OUTSTANDING`, `409 ADVANCE_DECLARED_PAYROLL_DISABLED` ; retour d'espèces = `other_in` |
+| `POST …/:id/reveal-reason` | bénéficiaire, ou `expenses.approve` + `hr.sensitive.read` | motif chiffré d'une avance sur salaire ; audit **strict** écrit avant |
+| `GET /hr/expenses/summary?from=&to=&groupBy=` · `GET /hr/expenses/to-pay` | `expenses.approve` ou `hr.read` · `payables.pay` | totaux par devise (jamais par personne) · notes à rembourser, avances à verser |
+| `GET /hr/settings/expenses` · `PUT /hr/settings/expenses` · `PUT /hr/settings/advances` | `analytics.read` · `hr.manage` (+ `expenses.approve` pour le circuit) · `expenses.approve` + `hr.manage` | réglages `expenses.*`, `advances.*` (révision du document `hr_settings`) |
+
+Trésorerie : le port `TREASURY_HR_PAYABLES_SOURCE` est relié (`HrPayablesSource`) : la prévision
+porte les « Remboursements au personnel ». Rappel `hr.advance_overdue` par la tâche `hr.reminders`
+(une fois par avance et par échéance annoncée). Collections : `hr_expense_reports`, `hr_advances`,
+compteurs `hr_counters`.
 **Lot V5 — implémenté** (échéancier et abonnements) : `GET /sales/contracts/:id/schedule?from=&to=`
 (`sales.read` ; défaut aujourd'hui ± 365 jours, 1 098 jours au plus ; entrées `{ key, kind, date,
 itemRef, label, periodStart, periodEnd, periodExceedsBounds, state, invoice, reasons, autoPrepare }`,
