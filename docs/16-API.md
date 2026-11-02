@@ -859,6 +859,20 @@ Notifications : `hr.attendance_correction_requested` · `…_decided`, `hr.shift
 `hr.shift_changed` (sans heure, motif ni note). Collections : `hr_attendance_events` (ajout seul,
 aucune IP, position ni appareil), `hr_attendance_corrections`, `hr_shifts`, `hr_staffing_needs`.
 
+## Liens du second volet RH — implémenté, ADR-0051 (lot H14)
+
+Contrat d'[ADR-0051](adr/ADR-0051-rh-frais-avances-presences-evaluations.md) § 7.3, § 7.5, § 7.6,
+§ 7.8. **Aucune route RH nouvelle** : les routes existantes gagnent des éléments, des faits et des
+colonnes, toujours dans l'organisation de la session.
+
+| Méthode et chemin | Permission | Effet |
+|---|---|---|
+| `GET /work/my-tasks` | `work.read` (RH : `analytics.read`) | `HR_AGENDA_SOURCE` gagne `expense_approval` (note ou avance que l'appelant peut valider, `expenseApprovalDecision`), `expense_to_pay` (`payables.pay` + `reimbursementDecision` : note à rembourser, avance à verser), `advance_to_settle` (avance versée non soldée après l'échéance annoncée : le bénéficiaire, et `expenses.approve` — avec `hr.sensitive.read` pour une avance sur salaire), `attendance_correction` (pointage activé, `attendanceCorrectionDecision`) ; libellé « Note de frais NF… » ou « Avance AV… », **aucun montant**, jamais « sur salaire », sans case à cocher |
+| `GET /morning-brief` | `analytics.read` | `MORNING_BRIEF_VERSION` 1.6.0 : faits `mes_validations_frais.en_attente` (manager ou `expenses.approve`, sinon masqué) et `rh.remboursements_a_payer` (`payables.pay`, sinon masqué), des nombres ; règles R19 `validations_frais_en_attente` → `/rh/frais?vue=a-valider` et R20 `remboursements_personnel_a_payer` → `/rh/frais?vue=a-payer` (rangs 19 et 20, `attention`) |
+| `GET /work/projects/:projectId/margin` | `work.read` + `sales.read` + `treasury.read` | `WORK_MARGIN_VERSION` 1.4.0 : `pendingExpenseClaims` (par devise : frais **approuvés non remboursés** imputés au projet, port `WORK_HR_EXPENSES_SOURCE`), informatifs, jamais soustraits ; le moteur retranche de chaque ligne les dépenses déjà créées pour elle (`origin.reportId`, `origin.lineIndex`) : aucun double comptage avec la dépense de remboursement, qui entre dans `margin` sans code nouveau |
+| `GET /work/projects/:projectId/rebillable-expenses` | `work.read` + `sales.read` + `treasury.read` | lignes `rebillable` imputées au projet, remboursées ou soldées par une avance : `{ key, reportId, reportNumber, lineIndex, spentOn, category, label « Frais NF… — {libellé} », currency, amount, merchant }`, **sans nom** ; aucune facture créée ; projet d'une autre organisation : `404` |
+| `GET /work/timesheets?userId=&week=` | `work.read` (+ `work.manage` ou manager pour autrui) | jours : `attendanceMinutes` (minutes pointées, moteur `attendanceDays`) et constat `PROJECT_TIME_ABOVE_ATTENDANCE`, **information seulement** ; rendus si le pointage est activé et que l'appelant est le membre, son manager ou `hr.read` (jamais au seul titre de `work.manage`) |
+
 ## Brief du matin — implémenté (ADR-0033)
 
 L'organisation est toujours celle de la session ; aucun corps ni paramètre ne la désigne.
