@@ -1146,7 +1146,7 @@ export interface TermsAcceptanceView {
 
 export type DisplayCurrency = 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR';
 
-/** Les 53 actions granulaires (docs/12, ADR-0021 §8, ADR-0022 § S25c.1, ADR-0023 § S25e.11, ADR-0031 § 4, ADR-0034 § 8, ADR-0035 § 3, ADR-0039 § 7, ADR-0040 § 4.1, ADR-0044 § 4.1, ADR-0045 § 4.1, ADR-0046 § 8.1, ADR-0049 § 8.1, ADR-0050 § 8.1). Union fermée, alignée sur l'API. */
+/** Les 57 actions granulaires (docs/12, ADR-0021 §8, ADR-0022 § S25c.1, ADR-0023 § S25e.11, ADR-0031 § 4, ADR-0034 § 8, ADR-0035 § 3, ADR-0039 § 7, ADR-0040 § 4.1, ADR-0044 § 4.1, ADR-0045 § 4.1, ADR-0046 § 8.1, ADR-0049 § 8.1, ADR-0050 § 8.1, ADR-0051 § 5.1). Union fermée, alignée sur l'API. */
 export type OrgAction =
   | 'organization.manage'
   | 'billing.manage'
@@ -1238,7 +1238,14 @@ export type OrgAction =
   // copies signées) ; approuver, constater une reconduction, résilier (ⓢ, interdit absolu
   // de plateforme). Les factures d'un engagement restent sous `sales.manage` et `sales.invoice`.
   | 'sales.contract'
-  | 'sales.contract.approve';
+  | 'sales.contract.approve'
+  // ADR-0051 § 5.1 — RH, second volet. Déclarer ses frais et pointer (pour soi) ; valider
+  // frais et avances (ⓢ) ; lire objectifs et évaluations (interdit absolu de plateforme).
+  // Rembourser et verser restent sous `payables.pay`.
+  | 'expenses.claim'
+  | 'expenses.approve'
+  | 'attendance.clock'
+  | 'performance.read';
 
 /**
  * Offres — RÉEXPORTÉES du catalogue partagé, jamais réécrites.

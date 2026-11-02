@@ -33,19 +33,19 @@ Le support ne voit jamais les données financières sans consentement explicite,
 | Conseiller | consultation, commentaires, recommandations |
 | Lecteur | lecture seulement |
 | Commercial (`sales_rep`, ADR-0040, appliqué) | CRM, devis, préparation des contrats et commandes clients (ADR-0050), consultation des clients et du catalogue ; ni trésorerie, ni dépenses, ni émission de facture |
-| Responsable RH (`hr_manager`, ADR-0045, implémenté) | dossiers du personnel, absences et documents RH ; ni trésorerie, ni ventes, ni achats |
+| Responsable RH (`hr_manager`, ADR-0045, implémenté) | dossiers du personnel, absences et documents RH ; objectifs et évaluations (ADR-0051) ; ni trésorerie, ni ventes, ni achats, ni validation des frais |
 | Magasinier (`storekeeper`, ADR-0046, appliqué au lot S0) | sort, transfère et compte le stock ; consulte le matériel et les documents ; ni prix d'achat, ni valeur du stock, ni trésorerie, ni ventes |
 | Expert-comptable externe (`external_accountant`, ADR-0049, appliqué au lot K0) | consulte et exporte la comptabilité ; n'écrit rien ; attribuable par le seul Propriétaire |
 
 ## Actions granulaires
 
-`organization.manage`, `billing.manage`, `members.invite`, `project.create`, `project.read`, `project.update`, `canvas.update`, `inputs.update`, `plan.calculate`, `plan.approve`, `actuals.import`, `period.close`, `analytics.read`, `report.export`, `audit.read`, `fiscal.manage`, `sales.read`, `sales.manage`, `sales.invoice`, `sales.receipt`, `treasury.read`, `treasury.manage`, `crm.read`, `crm.manage`, `work.read`, `work.update`, `work.manage`, `sales.quote`, `purchase.read`, `purchase.request`, `purchase.manage`, `purchase.approve`, `payables.pay`, `hr.read`, `hr.manage`, `hr.sensitive.read`, `leave.request`, `leave.approve`, `stock.read`, `stock.move`, `stock.count`, `stock.manage`, `assets.read`, `assets.manage`, `docs.read`, `docs.manage`, `accounting.read`, `accounting.post`, `accounting.close`, `accounting.export`, `accounting.manage`, `sales.contract`, `sales.contract.approve`.
+`organization.manage`, `billing.manage`, `members.invite`, `project.create`, `project.read`, `project.update`, `canvas.update`, `inputs.update`, `plan.calculate`, `plan.approve`, `actuals.import`, `period.close`, `analytics.read`, `report.export`, `audit.read`, `fiscal.manage`, `sales.read`, `sales.manage`, `sales.invoice`, `sales.receipt`, `treasury.read`, `treasury.manage`, `crm.read`, `crm.manage`, `work.read`, `work.update`, `work.manage`, `sales.quote`, `purchase.read`, `purchase.request`, `purchase.manage`, `purchase.approve`, `payables.pay`, `hr.read`, `hr.manage`, `hr.sensitive.read`, `leave.request`, `leave.approve`, `stock.read`, `stock.move`, `stock.count`, `stock.manage`, `assets.read`, `assets.manage`, `docs.read`, `docs.manage`, `accounting.read`, `accounting.post`, `accounting.close`, `accounting.export`, `accounting.manage`, `sales.contract`, `sales.contract.approve`, `expenses.claim`, `expenses.approve`, `attendance.clock`, `performance.read`.
 
-Cinquante-trois actions au total, dans l'ordre ci-dessus (ordre de fusion pour les
+Cinquante-sept actions au total, dans l'ordre ci-dessus (ordre de fusion pour les
 actions ajoutées après la dix-neuvième ; les vingt-neuvième à trente-troisième viennent
 d'ADR-0044, les trente-quatrième à trente-huitième d'ADR-0045, les trente-neuvième à
-quarante-sixième d'ADR-0046, les quarante-septième à cinquante et unième d'ADR-0049, les deux
-dernières d'ADR-0050).
+quarante-sixième d'ADR-0046, les quarante-septième à cinquante et unième d'ADR-0049, les
+cinquante-deuxième et cinquante-troisième d'ADR-0050, les quatre dernières d'ADR-0051).
 
 `fiscal.manage` — « Gérer l'identité fiscale et la facture normalisée » — est la
 seizième action, ajoutée par ADR-0021 §8 (18 oct. 2026). Elle couvre la fiche
@@ -260,7 +260,8 @@ sont inchangés.
   ne modifie ses propres autorisations ; `billing.manage` n'est pas délégable et les
   autorisations d'un Propriétaire ne se personnalisent pas (transfert, suppression, R1 restent
   attachés au titre) ; paires incompatibles par ajout : `inputs.update` + `plan.approve` (R2),
-  `period.close` + `plan.approve` (R3) ; le
+  `period.close` + `plan.approve` (R3), `purchase.approve` + `payables.pay` (ADR-0044),
+  `expenses.approve` + `payables.pay` (ADR-0051) ; le
   compte des approbateurs de R2 porte sur les détenteurs effectifs ; portées `allow_project`
   conservées ; rôles plateforme et accès délégué inchangés ; chaque changement est journalisé
   (`member.permissions_changed`, avant et après) et prend effet à la requête suivante.
@@ -286,7 +287,8 @@ sont inchangés.
   `purchase.read` (« Consulter les achats et les fournisseurs »), `purchase.request` (« Demander un
   achat »), `purchase.manage` (« Gérer les fournisseurs, commandes, réceptions et factures
   fournisseurs »), `purchase.approve` (« Approuver les demandes d'achat », case ⓢ), `payables.pay`
-  (« Payer les fournisseurs »). Trente-trois actions au total.
+  (« Payer les fournisseurs », libellé élargi par ADR-0051 en « Payer les fournisseurs et
+  rembourser le personnel »). Trente-trois actions au total.
 
 | Action | PRO | ADM | DIR | CPT | ANA | CDP | CON | LEC | COM |
 |---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
@@ -533,7 +535,64 @@ promotion vers un projet, assistance IA) de `canvas.update`, régler son IA de
 - **Plateforme** : `sales.contract` sous accès délégué (super-administrateur seul, comme
   `sales.quote`) ; `sales.contract.approve` rejoint `PLATFORM_FORBIDDEN_ACTIONS` (onzième interdit
   absolu) : la plateforme n'engage jamais un client envers ses propres clients.
-- Tests : matrice 12 × 53 + 6 × 53 = **954** cases.
+- Tests : matrice 12 × 53 + 6 × 53 = **954** cases (1 026 depuis ADR-0051).
+
+### ADR-0051 — RH, second volet : frais, avances, présences, évaluations (appliqué, lot H8)
+
+> **Statut : appliqué** par le lot H8
+> d'[ADR-0051](adr/ADR-0051-rh-frais-avances-presences-evaluations.md) § 5 (1ᵉʳ nov. 2026), aux
+> valeurs par défaut des décisions ouvertes n° 1, 2, 4 et 12 (l'ADR reste au statut proposé). La
+> matrice ci-dessous est celle de `apps/api/src/authz/permissions.ts`, vérifiée par
+> `permissions.test.ts` (1 026 cases) ; dépendances, domaine et paire par `overrides.test.ts`.
+> Fonctions pures à tables de vérité testées : `expenseApprovalDecision` (bénéficiaire :
+> `409 SELF_APPROVAL_FORBIDDEN` ; auteur d'une saisie pour autrui : `409 CREATOR_APPROVAL_FORBIDDEN` ;
+> deux étapes, deux personnes : `409 APPROVER_ALREADY_APPROVED` ; avance sur salaire réservée à
+> `expenses.approve` + `hr.sensitive.read` : `403 ADVANCE_SALARY_NOT_YOUR_STEP`),
+> `reimbursementDecision` (`409 SELF_PAYMENT_FORBIDDEN`, `409 APPROVER_CANNOT_PAY`),
+> `attendanceCorrectionDecision`, `reviewCloseDecision` (`409 REVIEW_CLOSE_FORBIDDEN`) ; chacune
+> avec l'exception de l'approbateur unique, marquée `soleApprover`. Contrats partagés :
+> `@lalanda/shared/hr` (fichiers `expenses`, `advances`, `attendance`, `planning`,
+> `performance`) ; quinze types de notification `hr.*` et six natures d'entité. Les routes
+> arrivent aux lots H10, H12 et H15 : d'ici là, les quatre actions figurent dans
+> `ACTIONS_SANS_ROUTE` de la sonde `rbac-matrix.e2e.test.ts`, qui vérifie `/me/permissions` pour
+> chaque rôle. Aucune migration : une instance N-1 ignore les quatre actions (refus par défaut).
+
+- **Quatre actions nouvelles**, cinquante-quatrième à cinquante-septième, en fin de liste (recalées
+  après ADR-0050) : `expenses.claim` (« Déclarer ses frais et demander une avance »),
+  `expenses.approve` (« Valider les notes de frais et les avances », case ⓢ), `attendance.clock`
+  (« Pointer sa présence »), `performance.read` (« Consulter les objectifs et les évaluations du
+  personnel »). Rembourser une note et verser une avance réutilisent `payables.pay`, dont le
+  libellé devient « Payer les fournisseurs et rembourser le personnel » ; ses dépendances sont
+  inchangées.
+- **Aucun rôle nouveau.** Déclarer et pointer suivent `leave.request` (tout rôle interne qui
+  travaille ; ni Conseiller ni Expert-comptable externe, externes ; rien au Chef de projet).
+  Valider suit `purchase.approve` : Propriétaire et Directeur financier ; ni le Comptable (il
+  paie), ni le Responsable RH (il voit les notes en liste par `hr.read`). Lire objectifs et
+  évaluations : Propriétaire et Responsable RH seulement — **ni le Directeur financier, ni
+  l'Administrateur** ; le manager lit son équipe par la relation, sans action. R7 inchangé.
+
+| Action | PRO | ADM | DIR | CPT | ANA | CDP | CON | LEC | COM | RH | MAG | EXP |
+|---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| `expenses.claim` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✗ |
+| `expenses.approve` | ✓ⓢ | ✗ | ✓ⓢ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `attendance.clock` | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✗ |
+| `performance.read` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ |
+
+- **Séparation des tâches** : celui qui demande ne valide pas, à aucune étape ; l'auteur d'une
+  note saisie pour autrui ne la valide pas ; deux étapes, deux personnes ; le payeur n'est ni le
+  bénéficiaire ni l'approbateur de l'étape finance quand un autre payeur existe ; le cloteur d'une
+  évaluation n'est ni l'évalué ni l'évaluateur. `expenses.approve` rejoint `APPROVAL_ACTIONS` ;
+  paire `SOD_PAIRS` **`expenses.approve` + `payables.pay`** (un Comptable ne reçoit pas la
+  validation par ajout ; Propriétaire et Directeur financier les cumulent nativement).
+  **Aucune décision sensible n'est automatisée** : ces fonctions disent seulement si le geste
+  d'une personne est recevable.
+- **ADR-0041** : `expenses.approve` → `hr.read` et `treasury.read` ; `performance.read` →
+  `hr.read` ; `expenses.claim` et `attendance.clock` → socle seul. Les quatre actions rejoignent
+  le domaine « Ressources humaines » ; aucun domaine nouveau.
+- **Plateforme** : les quatre actions refusées à tous les rôles plateforme par la matrice ;
+  `performance.read` rejoint `PLATFORM_FORBIDDEN_ACTIONS` (douzième interdit absolu, motif de
+  `hr.sensitive.read`).
+- Tests : matrice 12 × 57 + 6 × 57 = **1 026** cases.
 
 ## Règles critiques
 

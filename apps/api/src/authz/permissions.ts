@@ -13,7 +13,7 @@
 //                        § 8.2 ; le douzième, `external_accountant`, d'ADR-0049
 //                        § 8.2);
 //   2. PLATFORM_ROLES  — les 6 rôles plateforme, préfixés `platform_` (§2);
-//   3. ACTIONS         — les 53 actions granulaires, dans l'ordre de docs/12
+//   3. ACTIONS         — les 57 actions granulaires, dans l'ordre de docs/12
 //                        (la seizième, `fiscal.manage`, vient d'ADR-0021 §8 ;
 //                        la dix-septième et la dix-huitième, `sales.read` et
 //                        `sales.manage`, d'ADR-0022 § S25c.1 ; la dix-neuvième,
@@ -36,7 +36,10 @@
 //                        quarante-septième à cinquante et unième, `accounting.*`,
 //                        d'ADR-0049 § 8.1 ; les cinquante-deuxième et
 //                        cinquante-troisième, `sales.contract` et
-//                        `sales.contract.approve`, d'ADR-0050 § 8.1).
+//                        `sales.contract.approve`, d'ADR-0050 § 8.1 ; les
+//                        cinquante-quatrième à cinquante-septième,
+//                        `expenses.claim`, `expenses.approve`, `attendance.clock`
+//                        et `performance.read`, d'ADR-0051 § 5.1).
 //
 // Refus par défaut (docs/17 § Autorisation) : les matrices sont exhaustives, une
 // case absente ne compile pas, et une case `deny` est un refus.
@@ -138,7 +141,7 @@ export const PLATFORM_ROLES = [
 export type PlatformRole = (typeof PLATFORM_ROLES)[number];
 
 /**
- * Les 53 actions granulaires (docs/12 § Actions granulaires, ordre du document).
+ * Les 57 actions granulaires (docs/12 § Actions granulaires, ordre du document).
  *
  * `fiscal.manage` (ADR-0021 §8) est ajoutée EN FIN de liste, et non à côté
  * d'`organization.manage` : l'ordre est celui de docs/12, que l'interface et les
@@ -158,7 +161,10 @@ export type PlatformRole = (typeof PLATFORM_ROLES)[number];
  * (ADR-0046 § 8.1) les trente-neuvième à quarante-sixième, `accounting.read`,
  * `accounting.post`, `accounting.close`, `accounting.export` et `accounting.manage`
  * (ADR-0049 § 8.1) les quarante-septième à cinquante et unième, `sales.contract` et
- * `sales.contract.approve` (ADR-0050 § 8.1) les cinquante-deuxième et cinquante-troisième.
+ * `sales.contract.approve` (ADR-0050 § 8.1) les cinquante-deuxième et cinquante-troisième,
+ * `expenses.claim`, `expenses.approve`, `attendance.clock` et `performance.read`
+ * (ADR-0051 § 5.1) les cinquante-quatrième à cinquante-septième (recalées après ADR-0050,
+ * ordre de fusion).
  */
 export const ACTIONS = [
   'organization.manage',
@@ -236,6 +242,14 @@ export const ACTIONS = [
   // engagent l'organisation : `sales.contract.approve`, interdit absolu de plateforme.
   'sales.contract',
   'sales.contract.approve',
+  // ADR-0051 — H8 : RH, second volet (§ 5.1). Déclarer ses frais et demander une avance,
+  // valider frais et avances (ⓢ, `expenseApprovalDecision`), pointer sa présence, lire les
+  // objectifs et évaluations de tous (interdit absolu de plateforme). Décaisser un
+  // remboursement ou une avance réutilise `payables.pay` (`reimbursementDecision`).
+  'expenses.claim',
+  'expenses.approve',
+  'attendance.clock',
+  'performance.read',
 ] as const;
 
 export type Action = (typeof ACTIONS)[number];
@@ -310,7 +324,7 @@ export type OrgGrant = 'allow' | 'deny' | 'allow_sod' | 'allow_project' | 'condi
 /**
  * MATRICE RÔLE ORGANISATION × ACTION — transcription littérale d'ADR-0012 §3.
  *
- * Le type impose 12 rôles × 53 actions : oublier une case ne compile pas.
+ * Le type impose 12 rôles × 57 actions : oublier une case ne compile pas.
  * `permissions.test.ts` redéclare cette matrice en littéral (elle n'est PAS
  * importée d'ici) : toute modification de production casse le test et force une
  * mise à jour consciente de l'ADR et de docs/12. C'est le garde-fou central.
@@ -404,6 +418,12 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       // `contractApprovalDecision`) ; constate une reconduction, résilie, règle.
       'sales.contract': 'allow',
       'sales.contract.approve': 'allow_sod',
+      // ADR-0051 — H8 (§ 5.1) : déclare ses frais et pointe comme tout membre interne ; valide
+      // frais et avances (ⓢ : `expenseApprovalDecision`) ; lit objectifs et évaluations.
+      'expenses.claim': 'allow',
+      'expenses.approve': 'allow_sod',
+      'attendance.clock': 'allow',
+      'performance.read': 'allow',
     },
     // Administrateur — « membres, projets, paramètres ». Gouvernance technique,
     // pas autorité financière : ni `billing.manage`, ni `plan.approve`, ni
@@ -482,6 +502,13 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       // catalogue ; n'approuve pas (motif de `sales.invoice` et `accounting.post`).
       'sales.contract': 'allow',
       'sales.contract.approve': 'deny',
+      // ADR-0051 — H8 (§ 5.1) : déclare et pointe pour soi ; ne valide pas une dépense (il
+      // n'a ni `purchase.approve` ni autorité financière) ; ne lit pas les évaluations
+      // (décision ouverte n° 12).
+      'expenses.claim': 'allow',
+      'expenses.approve': 'deny',
+      'attendance.clock': 'allow',
+      'performance.read': 'deny',
     },
     // Directeur financier — « plans, validation, réalisé, rapports ». L'autorité
     // financière : approuve et clôture. Cible de la migration des anciens `member`
@@ -545,6 +572,12 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       // ADR-0050 — V0 (§ 8.1) : prépare et approuve (ⓢ), comme le Propriétaire.
       'sales.contract': 'allow',
       'sales.contract.approve': 'allow_sod',
+      // ADR-0051 — H8 (§ 5.1) : autorité de dépense sur les frais et avances (ⓢ), comme
+      // `purchase.approve` ; il lit les salaires, PAS les évaluations (décision ouverte n° 12).
+      'expenses.claim': 'allow',
+      'expenses.approve': 'allow_sod',
+      'attendance.clock': 'allow',
+      'performance.read': 'deny',
     },
     // Comptable — « réalisé, mapping, clôture selon permission ». Constate, ne
     // projette pas : ni `inputs.update`, ni `plan.calculate`. Contrepartie de R2.
@@ -615,6 +648,12 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       // engagements commerciaux, décision ouverte n° 2).
       'sales.contract': 'allow',
       'sales.contract.approve': 'deny',
+      // ADR-0051 — H8 (§ 5.1) : déclare et pointe ; constate et paie (`payables.pay`), n'autorise
+      // pas la dépense (motif d'ADR-0044 § 4.1).
+      'expenses.claim': 'allow',
+      'expenses.approve': 'deny',
+      'attendance.clock': 'allow',
+      'performance.read': 'deny',
     },
     // Analyste — « scénarios, analyses, commentaires ». Modélise et calcule,
     // n'approuve ni n'importe le réalisé.
@@ -680,6 +719,11 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       // ADR-0050 — V0 (§ 8.1) : lit les ventes, n'engage pas l'organisation.
       'sales.contract': 'deny',
       'sales.contract.approve': 'deny',
+      // ADR-0051 — H8 (§ 5.1) : déclare et pointe pour soi, rien d'autre.
+      'expenses.claim': 'allow',
+      'expenses.approve': 'deny',
+      'attendance.clock': 'allow',
+      'performance.read': 'deny',
     },
     // Chef de projet — « projets autorisés et saisie ». Tout est `allow_project` :
     // le rôle n'a de sens qu'avec des assignations de projet, qui n'existent pas
@@ -746,6 +790,11 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       // ADR-0050 — V0 (§ 8.1) : rôle non attribuable, rien.
       'sales.contract': 'deny',
       'sales.contract.approve': 'deny',
+      // ADR-0051 — H8 (§ 5.1) : rôle non attribuable, rien.
+      'expenses.claim': 'deny',
+      'expenses.approve': 'deny',
+      'attendance.clock': 'deny',
+      'performance.read': 'deny',
     },
     // Conseiller — « consultation, commentaires, recommandations ». Typiquement
     // EXTERNE (mentor, banquier invité) : pas de `report.export`, on lui ouvre la
@@ -814,6 +863,11 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       // ADR-0050 — V0 (§ 8.1) : externe, sans les ventes.
       'sales.contract': 'deny',
       'sales.contract.approve': 'deny',
+      // ADR-0051 — H8 (§ 5.1) : externe, ni frais ni pointage.
+      'expenses.claim': 'deny',
+      'expenses.approve': 'deny',
+      'attendance.clock': 'deny',
+      'performance.read': 'deny',
     },
     // Lecteur — lecture seulement. `analytics.read` est conservé : le refuser
     // viderait le rôle de son sens (ADR-0012 §3).
@@ -877,6 +931,12 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       // ADR-0050 — V0 (§ 8.1) : lecture seule.
       'sales.contract': 'deny',
       'sales.contract.approve': 'deny',
+      // ADR-0051 — H8 (§ 5.1) : déclarer ses frais ou pointer ne lit aucune donnée de
+      // l'organisation (motif de `leave.request`).
+      'expenses.claim': 'allow',
+      'expenses.approve': 'deny',
+      'attendance.clock': 'allow',
+      'performance.read': 'deny',
     },
     // Commercial — « CRM, devis et suivi des clients » (ADR-0040 § 4.2, D3). Dix
     // actions sur quarante-six : il gère le CRM et prépare les devis, consulte clients,
@@ -947,6 +1007,11 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       // devis (iso-privilège avec `sales.quote`) ; n'approuve pas (décision ouverte n° 3).
       'sales.contract': 'allow',
       'sales.contract.approve': 'deny',
+      // ADR-0051 — H8 (§ 5.1) : déclare ses frais de terrain et pointe, comme `leave.request`.
+      'expenses.claim': 'allow',
+      'expenses.approve': 'deny',
+      'attendance.clock': 'allow',
+      'performance.read': 'deny',
     },
     // Responsable RH — « dossiers du personnel, absences et documents RH » (ADR-0045 § 4.2,
     // O6). Huit actions RH sur quarante-six (onze avec celles d'ADR-0046), socle compris : la
@@ -1012,6 +1077,13 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       // ADR-0050 — V0 (§ 8.1) : sans les ventes.
       'sales.contract': 'deny',
       'sales.contract.approve': 'deny',
+      // ADR-0051 — H8 (§ 5.1) : déclare et pointe ; voit les notes EN LISTE par `hr.read` sans
+      // les valider (il ne voit ni la trésorerie ni les achats, décision ouverte n° 2) ; lit
+      // objectifs et évaluations (`performance.read`).
+      'expenses.claim': 'allow',
+      'expenses.approve': 'deny',
+      'attendance.clock': 'allow',
+      'performance.read': 'allow',
     },
     // Magasinier — « réceptionne, range, sort et compte le stock » (ADR-0046 § 8.2, O6).
     // Neuf actions sur quarante-six, socle compris : il tient le magasin sans être un acteur
@@ -1075,6 +1147,11 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       // ADR-0050 — V0 (§ 8.1) : sans les ventes.
       'sales.contract': 'deny',
       'sales.contract.approve': 'deny',
+      // ADR-0051 — H8 (§ 5.1) : déclare et pointe pour soi, comme `leave.request`.
+      'expenses.claim': 'allow',
+      'expenses.approve': 'deny',
+      'attendance.clock': 'allow',
+      'performance.read': 'deny',
     },
     // Expert-comptable (externe) — « consulte et exporte la comptabilité de l'organisation pour
     // la réviser » (ADR-0049 § 8.2, O7). Trois actions sur cinquante-trois, socle compris :
@@ -1138,6 +1215,11 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       // ADR-0050 — V0 (§ 8.1) : externe, n'engage pas l'organisation envers un client.
       'sales.contract': 'deny',
       'sales.contract.approve': 'deny',
+      // ADR-0051 — H8 (§ 5.1) : externe, ni frais ni pointage.
+      'expenses.claim': 'deny',
+      'expenses.approve': 'deny',
+      'attendance.clock': 'deny',
+      'performance.read': 'deny',
     },
   };
 
@@ -1241,6 +1323,12 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     // la plateforme n'engage jamais un client envers ses propres clients.
     'sales.contract': 'delegated',
     'sales.contract.approve': 'forbidden',
+    // ADR-0051 — H8 (§ 5.1) : refusées par la matrice ; `performance.read` est en plus un
+    // interdit absolu (`PLATFORM_FORBIDDEN_ACTIONS`, motif de `hr.sensitive.read`).
+    'expenses.claim': 'forbidden',
+    'expenses.approve': 'forbidden',
+    'attendance.clock': 'forbidden',
+    'performance.read': 'forbidden',
   },
   platform_admin: {
     'organization.manage': 'native',
@@ -1297,6 +1385,11 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     // ADR-0050 — V0 (§ 8.1) : comme `sales.quote` ; approuver est un interdit absolu.
     'sales.contract': 'forbidden',
     'sales.contract.approve': 'forbidden',
+    // ADR-0051 — H8 (§ 5.1) : refusées.
+    'expenses.claim': 'forbidden',
+    'expenses.approve': 'forbidden',
+    'attendance.clock': 'forbidden',
+    'performance.read': 'forbidden',
   },
   // « Le support ne voit jamais les données financières sans consentement
   // explicite, durée limitée et audit » (docs/12) — d'où trois `delegated` et
@@ -1362,6 +1455,11 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     // ADR-0050 — V0 (§ 8.1) : comme `sales.quote` ; approuver est un interdit absolu.
     'sales.contract': 'forbidden',
     'sales.contract.approve': 'forbidden',
+    // ADR-0051 — H8 (§ 5.1) : refusées.
+    'expenses.claim': 'forbidden',
+    'expenses.approve': 'forbidden',
+    'attendance.clock': 'forbidden',
+    'performance.read': 'forbidden',
   },
   platform_billing: {
     'organization.manage': 'forbidden',
@@ -1418,6 +1516,11 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     // ADR-0050 — V0 (§ 8.1) : comme `sales.quote` ; approuver est un interdit absolu.
     'sales.contract': 'forbidden',
     'sales.contract.approve': 'forbidden',
+    // ADR-0051 — H8 (§ 5.1) : refusées.
+    'expenses.claim': 'forbidden',
+    'expenses.approve': 'forbidden',
+    'attendance.clock': 'forbidden',
+    'performance.read': 'forbidden',
   },
   // Vides sur cette matrice : opèrent sur des ressources de portée plateforme
   // (templates, Country Packs) qui n'ont pas d'action granulaire dans docs/12 —
@@ -1477,6 +1580,11 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     // ADR-0050 — V0 (§ 8.1) : comme `sales.quote` ; approuver est un interdit absolu.
     'sales.contract': 'forbidden',
     'sales.contract.approve': 'forbidden',
+    // ADR-0051 — H8 (§ 5.1) : refusées.
+    'expenses.claim': 'forbidden',
+    'expenses.approve': 'forbidden',
+    'attendance.clock': 'forbidden',
+    'performance.read': 'forbidden',
   },
   platform_country_pack_manager: {
     'organization.manage': 'forbidden',
@@ -1533,12 +1641,17 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
     // ADR-0050 — V0 (§ 8.1) : comme `sales.quote` ; approuver est un interdit absolu.
     'sales.contract': 'forbidden',
     'sales.contract.approve': 'forbidden',
+    // ADR-0051 — H8 (§ 5.1) : refusées.
+    'expenses.claim': 'forbidden',
+    'expenses.approve': 'forbidden',
+    'attendance.clock': 'forbidden',
+    'performance.read': 'forbidden',
   },
 };
 
 /**
- * Les onze interdits absolus de la plateforme (ADR-0012 §4, amendé par ADR-0021 §8,
- * ADR-0023 § S25e.11, ADR-0045 § 4.1, ADR-0049 § 8.1 et ADR-0050 § 8.1).
+ * Les douze interdits absolus de la plateforme (ADR-0012 §4, amendé par ADR-0021 §8,
+ * ADR-0023 § S25e.11, ADR-0045 § 4.1, ADR-0049 § 8.1, ADR-0050 § 8.1 et ADR-0051 § 5.1).
  *
  * Aucun rôle plateforme, super-administrateur compris, et aucun accès délégué ne
  * peut approuver un plan, clôturer une période, exporter un rapport client ni
@@ -1553,7 +1666,9 @@ export const PLATFORM_PERMISSION_MATRIX: Readonly<
  * (ADR-0049 § 8.1) : la plateforme n'écrit, ne clôt, n'exporte ni ne paramètre jamais les
  * livres d'un client (motif de `period.close` et `report.export`) ;
  * `sales.contract.approve` (ADR-0050 § 8.1) : approuver un contrat, en constater la
- * reconduction ou le résilier engage le client envers ses propres clients.
+ * reconduction ou le résilier engage le client envers ses propres clients ;
+ * `performance.read` (ADR-0051 § 5.1) : un employé de Lalanda ne lit jamais les objectifs
+ * ni les évaluations du personnel d'un client (motif de `hr.sensitive.read`).
  *
  * Cette constante n'est pas décorative : `canPlatform()` la vérifie AVANT la
  * matrice, et un test s'assure qu'aucune case de la matrice ne la contredit.
@@ -1575,6 +1690,8 @@ export const PLATFORM_FORBIDDEN_ACTIONS: readonly Action[] = [
   // ADR-0050 — V0 (§ 8.1) : la plateforme n'engage jamais un client envers ses propres
   // clients (approuver, constater une reconduction, résilier).
   'sales.contract.approve',
+  // ADR-0051 — H8 (§ 5.1) : objectifs et évaluations du personnel, même sous accès délégué.
+  'performance.read',
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1845,6 +1962,8 @@ export const APPROVER_ROLES: readonly OrgRole[] = ORG_ROLES.filter(
 // `ruleSetDecision`).
 // ADR-0050 — V0 (§ 8.3) : `sales.contract.approve` (approbation d'un contrat ou d'un
 // avenant, constat d'une reconduction, `contractApprovalDecision`).
+// ADR-0051 — H8 (§ 5.2) : `expenses.approve` (étape `finance` d'une note de frais ou d'une
+// avance, suppléance du manager, `expenseApprovalDecision`).
 export const APPROVAL_ACTIONS = [
   'plan.approve',
   'purchase.approve',
@@ -1853,6 +1972,7 @@ export const APPROVAL_ACTIONS = [
   'accounting.post',
   'accounting.manage',
   'sales.contract.approve',
+  'expenses.approve',
 ] as const;
 export type ApprovalAction = (typeof APPROVAL_ACTIONS)[number];
 
@@ -2498,6 +2618,287 @@ export function contractApprovalDecision(input: ContractApprovalInput): Contract
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ADR-0051 — H8 : frais, avances, présences, évaluations (§ 3, § 5)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Quatre fonctions pures, motif de `leaveApprovalDecision` et `purchaseApprovalDecision` :
+// celui qui demande ne valide pas, à aucune étape ; deux étapes, deux personnes ;
+// l'exception de l'approbateur unique (un seul détenteur EFFECTIF, `countApprovers`)
+// s'applique seulement si le réglage le permet et est MARQUÉE `soleApprover`. Elles
+// jugent des PERSONNES, jamais un rôle ; la détention des actions de route est vérifiée en
+// amont par le guard. Aucune ne décide à la place d'une personne : elles disent seulement
+// si le geste demandé par un humain est recevable.
+
+/** Étapes d'une note de frais ou d'une avance (§ 2.1, § 3.1), figées à la soumission. */
+export type ExpenseApprovalStep = 'manager' | 'finance';
+
+/** Entrée de `expenseApprovalDecision` : faits déjà lus par le service, rien d'autre. */
+export interface ExpenseApprovalInput {
+  /** Le geste demandé : valider, ou refuser (commentaire exigé par le service). */
+  readonly decision: 'approve' | 'reject';
+  readonly approverUserId: string;
+  /**
+   * Compte relié à la fiche du bénéficiaire (`hr_employees.userId`), `null` pour un
+   * collaborateur sans compte (chauffeur).
+   */
+  readonly beneficiaryUserId: string | null;
+  /**
+   * Auteur de la note ou de l'avance (`createdBy`). Différent du bénéficiaire pour une
+   * saisie pour autrui : à la différence d'une absence, une note engage de l'argent, son
+   * auteur ne la valide pas (§ 3.1 point 4).
+   */
+  readonly createdBy: string;
+  /** Étape en cours. */
+  readonly step: ExpenseApprovalStep;
+  /** Avance SUR SALAIRE (§ 3.2 point 2) : étape `finance` seule, donnée sensible. */
+  readonly salaryAdvance: boolean;
+  /**
+   * L'approbateur est l'utilisateur relié au `managerEmployeeId` du bénéficiaire
+   * (relation vérifiée par le service sur la fiche, jamais un rôle).
+   */
+  readonly isDesignatedManager: boolean;
+  /** L'approbateur détient `expenses.approve` dans ses droits EFFECTIFS (ADR-0041). */
+  readonly holdsExpensesApprove: boolean;
+  /** L'approbateur détient `hr.sensitive.read` (exigé pour une avance sur salaire). */
+  readonly holdsHrSensitiveRead: boolean;
+  /** Validations DÉJÀ portées (étapes précédentes), sans celle en cours. */
+  readonly priorApproverUserIds: readonly string[];
+  /**
+   * Nombre de détenteurs EFFECTIFS d'`expenses.approve` dans l'organisation
+   * (`AuthzService.countApprovers(org, 'expenses.approve')`). Jamais un compte par rôle.
+   */
+  readonly approverCountInOrg: number;
+  /** Réglage `hr_settings.allowSoleApprover` (défaut `true`, ADR-0045). */
+  readonly allowSoleApprover: boolean;
+}
+
+/**
+ * Résultat typé ; le service le traduit en réponse HTTP. Ce module ne lève jamais
+ * d'exception HTTP.
+ *
+ * - `SELF_APPROVAL_FORBIDDEN` (409) — l'approbateur est le bénéficiaire.
+ * - `CREATOR_APPROVAL_FORBIDDEN` (409) — il a saisi la note ou l'avance pour autrui.
+ * - `ADVANCE_SALARY_NOT_YOUR_STEP` (403) — avance sur salaire sans `expenses.approve`
+ *   ET `hr.sensitive.read` (le manager n'y a aucune place, décision ouverte n° 4).
+ * - `EXPENSE_NOT_YOUR_STEP` (403) — ni manager désigné (étape `manager`), ni détenteur
+ *   effectif d'`expenses.approve`.
+ * - `APPROVER_ALREADY_APPROVED` (409) — il a déjà tenu une étape : deux étapes, deux
+ *   personnes (hors approbateur unique).
+ * - `ok` — recevable. `soleApprover` marque le geste rendu possible par l'échappatoire ;
+ *   `onBehalfOfManager` la suppléance d'un manager par un détenteur d'`expenses.approve`.
+ */
+export type ExpenseApprovalDecision =
+  | {
+      readonly ok: false;
+      readonly code:
+        | 'SELF_APPROVAL_FORBIDDEN'
+        | 'CREATOR_APPROVAL_FORBIDDEN'
+        | 'ADVANCE_SALARY_NOT_YOUR_STEP'
+        | 'EXPENSE_NOT_YOUR_STEP'
+        | 'APPROVER_ALREADY_APPROVED';
+    }
+  | { readonly ok: true; readonly soleApprover: boolean; readonly onBehalfOfManager: boolean };
+
+/**
+ * ADR-0051 § 3.1 et § 3.2 — validation d'une note de frais ou d'une avance.
+ *
+ * Ordre des contrôles (le premier refus gagne) :
+ *   1. avance sur salaire : seul un détenteur d'`expenses.approve` et de
+ *      `hr.sensitive.read` agit, à l'étape `finance` (le manager désigné n'a aucun droit) ;
+ *   2. le bénéficiaire ne valide ni ne refuse, puis l'auteur d'une saisie pour autrui non
+ *      plus, sauf **approbateur unique** (`allowSoleApprover`, un seul détenteur effectif
+ *      d'`expenses.approve`, et c'est lui) ;
+ *   3. étape `manager` : le manager désigné, ou un détenteur d'`expenses.approve` en
+ *      suppléance ; étape `finance` : un détenteur d'`expenses.approve` ;
+ *   4. pour valider, il n'a pas déjà tenu une étape, sauf approbateur unique (marqué).
+ * Un refus clôt la note à n'importe quelle étape : le contrôle 4 ne s'y applique pas.
+ */
+export function expenseApprovalDecision(input: ExpenseApprovalInput): ExpenseApprovalDecision {
+  if (input.salaryAdvance && !(input.holdsExpensesApprove && input.holdsHrSensitiveRead)) {
+    return { ok: false, code: 'ADVANCE_SALARY_NOT_YOUR_STEP' };
+  }
+  const isSelf =
+    input.beneficiaryUserId !== null && input.beneficiaryUserId === input.approverUserId;
+  const isCreator = !isSelf && input.createdBy === input.approverUserId;
+  const soleApproverOrg =
+    input.allowSoleApprover && input.holdsExpensesApprove && input.approverCountInOrg <= 1;
+  if (isSelf && !soleApproverOrg) return { ok: false, code: 'SELF_APPROVAL_FORBIDDEN' };
+  if (isCreator && !soleApproverOrg) return { ok: false, code: 'CREATOR_APPROVAL_FORBIDDEN' };
+
+  let onBehalfOfManager = false;
+  if (input.step === 'manager' && !input.salaryAdvance) {
+    if (!input.isDesignatedManager) {
+      if (!input.holdsExpensesApprove) return { ok: false, code: 'EXPENSE_NOT_YOUR_STEP' };
+      onBehalfOfManager = true;
+    }
+  } else if (!input.holdsExpensesApprove) {
+    return { ok: false, code: 'EXPENSE_NOT_YOUR_STEP' };
+  }
+
+  const personal = isSelf || isCreator;
+  if (input.decision === 'reject') {
+    return { ok: true, soleApprover: soleApproverOrg && personal, onBehalfOfManager };
+  }
+
+  const already = input.priorApproverUserIds.includes(input.approverUserId);
+  if (already && !soleApproverOrg) return { ok: false, code: 'APPROVER_ALREADY_APPROVED' };
+  return {
+    ok: true,
+    soleApprover: soleApproverOrg && (personal || already),
+    onBehalfOfManager,
+  };
+}
+
+/** Entrée de `reimbursementDecision` : faits déjà lus par le service, rien d'autre. */
+export interface ReimbursementInput {
+  readonly payerUserId: string;
+  /** Compte relié à la fiche du bénéficiaire, `null` pour un collaborateur sans compte. */
+  readonly beneficiaryUserId: string | null;
+  /**
+   * Celui qui a tenu l'étape `finance` de la note ou de l'avance (approbation finale),
+   * `null` s'il n'y en a pas (retour d'espèces sur une avance dont l'approbateur est
+   * inconnu, par exemple).
+   */
+  readonly financeApproverUserId: string | null;
+  /**
+   * Nombre de détenteurs EFFECTIFS de `payables.pay` dans l'organisation
+   * (`AuthzService.countApprovers(org, 'payables.pay')`). Jamais un compte par rôle.
+   */
+  readonly payerCountInOrg: number;
+  /** Réglage `hr_settings.allowSoleApprover` (défaut `true`). */
+  readonly allowSoleApprover: boolean;
+}
+
+/**
+ * - `SELF_PAYMENT_FORBIDDEN` (409) — le payeur est le bénéficiaire.
+ * - `APPROVER_CANNOT_PAY` (409) — il a tenu l'étape `finance` et un autre détenteur
+ *   effectif de `payables.pay` existe.
+ * - `ok` — recevable ; `soleApprover` marque le geste rendu possible par l'échappatoire.
+ */
+export type ReimbursementDecision =
+  | { readonly ok: false; readonly code: 'SELF_PAYMENT_FORBIDDEN' | 'APPROVER_CANNOT_PAY' }
+  | { readonly ok: true; readonly soleApprover: boolean };
+
+/**
+ * ADR-0051 § 3.1 point 5, § 3.2 point 3, § 3.3 — rembourser une note, verser une avance,
+ * enregistrer un retour d'espèces ou un complément : motif de la paire `purchase.approve`
+ * + `payables.pay`. Le payeur n'est pas le bénéficiaire, ni l'approbateur de l'étape
+ * `finance` quand un autre payeur existe, sauf **payeur unique** (`allowSoleApprover` et
+ * un seul détenteur effectif de `payables.pay`), marqué.
+ */
+export function reimbursementDecision(input: ReimbursementInput): ReimbursementDecision {
+  const solePayer = input.allowSoleApprover && input.payerCountInOrg <= 1;
+  const isSelf = input.beneficiaryUserId !== null && input.beneficiaryUserId === input.payerUserId;
+  if (isSelf && !solePayer) return { ok: false, code: 'SELF_PAYMENT_FORBIDDEN' };
+  const isApprover =
+    input.financeApproverUserId !== null && input.financeApproverUserId === input.payerUserId;
+  if (isApprover && !solePayer) return { ok: false, code: 'APPROVER_CANNOT_PAY' };
+  return { ok: true, soleApprover: solePayer && (isSelf || isApprover) };
+}
+
+/** Entrée de `attendanceCorrectionDecision` : faits déjà lus par le service. */
+export interface AttendanceCorrectionInput {
+  /** Le geste demandé : approuver, ou refuser la correction. */
+  readonly decision: 'approve' | 'reject';
+  readonly deciderUserId: string;
+  /** Compte relié à la fiche du collaborateur pointé, `null` sans compte. */
+  readonly beneficiaryUserId: string | null;
+  /** Auteur de la demande de correction (le collaborateur, son manager ou les RH). */
+  readonly requestedBy: string;
+  /** Le décideur est l'utilisateur relié au manager désigné du collaborateur. */
+  readonly isDesignatedManager: boolean;
+  /**
+   * Le collaborateur a un manager désigné relié à un compte autre que le décideur : ce
+   * manager peut décider, l'échappatoire ne s'applique donc pas.
+   */
+  readonly hasOtherDesignatedManager: boolean;
+  /** Le décideur détient `hr.manage` dans ses droits EFFECTIFS. */
+  readonly holdsHrManage: boolean;
+  /** Nombre de détenteurs EFFECTIFS de `hr.manage` (`countApprovers`). */
+  readonly hrManagerCountInOrg: number;
+  /** Réglage `hr_settings.allowSoleApprover` (défaut `true`). */
+  readonly allowSoleApprover: boolean;
+}
+
+/**
+ * - `ATTENDANCE_CORRECTION_NOT_YOURS` (403) — ni manager désigné ni détenteur de
+ *   `hr.manage`.
+ * - `SELF_APPROVAL_FORBIDDEN` (409) — le décideur est le collaborateur pointé.
+ * - `CREATOR_APPROVAL_FORBIDDEN` (409) — il a saisi la correction pour autrui.
+ * - `ok` — recevable ; `soleApprover` marque l'échappatoire.
+ */
+export type AttendanceCorrectionDecision =
+  | {
+      readonly ok: false;
+      readonly code:
+        | 'ATTENDANCE_CORRECTION_NOT_YOURS'
+        | 'SELF_APPROVAL_FORBIDDEN'
+        | 'CREATOR_APPROVAL_FORBIDDEN';
+    }
+  | { readonly ok: true; readonly soleApprover: boolean };
+
+/**
+ * ADR-0051 § 3.4 — décider une correction de pointage. Le collaborateur demande ; le
+ * manager (relation) ou un détenteur de `hr.manage` décide ; jamais le bénéficiaire ni
+ * l'auteur d'une correction saisie pour autrui, sauf **approbateur unique** : un seul
+ * détenteur effectif de `hr.manage`, c'est lui, et aucun autre manager ne peut décider.
+ */
+export function attendanceCorrectionDecision(
+  input: AttendanceCorrectionInput,
+): AttendanceCorrectionDecision {
+  if (!input.isDesignatedManager && !input.holdsHrManage) {
+    return { ok: false, code: 'ATTENDANCE_CORRECTION_NOT_YOURS' };
+  }
+  const isSelf =
+    input.beneficiaryUserId !== null && input.beneficiaryUserId === input.deciderUserId;
+  const isCreator = !isSelf && input.requestedBy === input.deciderUserId;
+  const soleApproverOrg =
+    input.allowSoleApprover &&
+    input.holdsHrManage &&
+    input.hrManagerCountInOrg <= 1 &&
+    !input.hasOtherDesignatedManager;
+  if (isSelf && !soleApproverOrg) return { ok: false, code: 'SELF_APPROVAL_FORBIDDEN' };
+  if (isCreator && !soleApproverOrg) return { ok: false, code: 'CREATOR_APPROVAL_FORBIDDEN' };
+  return { ok: true, soleApprover: soleApproverOrg && (isSelf || isCreator) };
+}
+
+/** Entrée de `reviewCloseDecision` : faits déjà lus par le service. */
+export interface ReviewCloseInput {
+  readonly closerUserId: string;
+  /** Compte relié à la fiche de l'évalué, `null` sans compte. */
+  readonly employeeUserId: string | null;
+  /** Évaluateur figé à l'ouverture (`reviewerUserId`). */
+  readonly reviewerUserId: string;
+  /**
+   * Nombre de membres qui détiennent EFFECTIVEMENT `hr.manage` ET `performance.read`
+   * (ceux qui peuvent clore). Jamais un compte par rôle.
+   */
+  readonly closerCountInOrg: number;
+  /** Réglage `hr_settings.allowSoleApprover` (défaut `true`). */
+  readonly allowSoleApprover: boolean;
+}
+
+export type ReviewCloseDecision =
+  | { readonly ok: false; readonly code: 'REVIEW_CLOSE_FORBIDDEN' }
+  | { readonly ok: true; readonly soleApprover: boolean };
+
+/**
+ * ADR-0051 § 3.5 — clore une évaluation (étape RH). La détention de `hr.manage` et de
+ * `performance.read` est vérifiée par le guard ; le cloteur n'est ni l'évalué ni
+ * l'évaluateur (`409 REVIEW_CLOSE_FORBIDDEN`), sauf **détenteur unique** marqué. Clore
+ * ne vaut jamais accord du collaborateur ; la fonction ne lit aucun contenu.
+ */
+export function reviewCloseDecision(input: ReviewCloseInput): ReviewCloseDecision {
+  const isEmployee = input.employeeUserId !== null && input.employeeUserId === input.closerUserId;
+  const isReviewer = input.reviewerUserId === input.closerUserId;
+  if (!isEmployee && !isReviewer) return { ok: true, soleApprover: false };
+  if (input.allowSoleApprover && input.closerCountInOrg <= 1) {
+    return { ok: true, soleApprover: true };
+  }
+  return { ok: false, code: 'REVIEW_CLOSE_FORBIDDEN' };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ADR-0041 — A1 : autorisations par membre (titre + écart)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -2510,7 +2911,7 @@ export function contractApprovalDecision(input: ContractApprovalInput): Contract
 export const NON_DELEGABLE_ACTIONS: readonly Action[] = ['billing.manage'];
 
 /**
- * Paires incompatibles par ajout (G4). Trois (ADR-0044 § 4.3 ajoute la paire des
+ * Paires incompatibles par ajout (G4). Quatre (ADR-0044 § 4.3 ajoute la paire des
  * achats ; ADR-0045 § 4.5 n'en ajoute aucune : ne pas valider sa propre absence est une
  * séparation DYNAMIQUE, `leaveApprovalDecision` ; ADR-0046 § 8.3 non plus : une paire
  * `stock.count` + `stock.manage` empêcherait le Comptable, le Directeur financier et le
@@ -2518,6 +2919,7 @@ export const NON_DELEGABLE_ACTIONS: readonly Action[] = ['billing.manage'];
  * comptage — est dynamique, `stockCountDecision`) ; la paire facturation
  * `sales.invoice` + `fiscal.manage` a été REFUSÉE par la dirigeante le 29 oct. 2026
  * (décision ouverte n° 3) — une seule personne peut émettre et piloter la fiscalité.
+ * ADR-0051 § 5.2 ajoute la paire des frais du personnel, motif exact de celle des achats.
  */
 export const SOD_PAIRS: readonly (readonly [Action, Action])[] = [
   // R2 statique (ADR-0012 § 6) : saisir et valider.
@@ -2529,6 +2931,11 @@ export const SOD_PAIRS: readonly (readonly [Action, Action])[] = [
   // et Directeur financier les cumulent nativement ; la séparation dynamique
   // (`purchaseApprovalDecision`) s'y applique.
   ['purchase.approve', 'payables.pay'],
+  // ADR-0051 — H8 (§ 5.2) : valider une note de frais ou une avance et la décaisser ne se
+  // cumulent pas par ajout (un Comptable ne reçoit pas `expenses.approve`). Propriétaire
+  // et Directeur financier les cumulent nativement ; la séparation dynamique
+  // (`reimbursementDecision`) s'y applique.
+  ['expenses.approve', 'payables.pay'],
 ];
 
 /**
@@ -2591,6 +2998,11 @@ export const ACTION_DEPENDENCIES: Readonly<Partial<Record<Action, readonly Actio
   // route, pas une dépendance.
   'sales.contract': ['sales.read'],
   'sales.contract.approve': ['sales.read'],
+  // ADR-0051 — H8 (§ 5.2) : déclarer ses frais et pointer n'exigent que le socle (pour
+  // soi) ; l'approbateur relit la trésorerie qu'il engage et le dossier du bénéficiaire ;
+  // lire les évaluations suppose de lire le dossier.
+  'expenses.approve': ['hr.read', 'treasury.read'],
+  'performance.read': ['hr.read'],
 };
 
 /**
@@ -2682,7 +3094,18 @@ export const ACTION_DOMAINS: readonly {
   {
     key: 'hr',
     label: 'Ressources humaines',
-    actions: ['hr.read', 'hr.manage', 'hr.sensitive.read', 'leave.request', 'leave.approve'],
+    actions: [
+      'hr.read',
+      'hr.manage',
+      'hr.sensitive.read',
+      'leave.request',
+      'leave.approve',
+      // ADR-0051 — H8 (§ 5.2) : second volet, aucun domaine nouveau.
+      'expenses.claim',
+      'expenses.approve',
+      'attendance.clock',
+      'performance.read',
+    ],
   },
   // ADR-0046 — S0 (§ 8.3).
   {
@@ -2741,7 +3164,8 @@ export const ACTION_LABELS: Readonly<Record<Action, string>> = {
   'purchase.request': 'Demander un achat',
   'purchase.manage': 'Gérer les fournisseurs, commandes, réceptions et factures fournisseurs',
   'purchase.approve': "Approuver les demandes d'achat",
-  'payables.pay': 'Payer les fournisseurs',
+  // ADR-0051 § 5.1 : libellé élargi, l'action décaisse aussi les remboursements et avances.
+  'payables.pay': 'Payer les fournisseurs et rembourser le personnel',
   // ADR-0045 — H0 (§ 4.1).
   'hr.read': 'Consulter les dossiers du personnel',
   'hr.manage': 'Gérer les dossiers du personnel',
@@ -2766,6 +3190,11 @@ export const ACTION_LABELS: Readonly<Record<Action, string>> = {
   // ADR-0050 — V0 (§ 8.1).
   'sales.contract': 'Préparer contrats et commandes',
   'sales.contract.approve': 'Approuver les contrats',
+  // ADR-0051 — H8 (§ 5.1).
+  'expenses.claim': 'Déclarer ses frais et demander une avance',
+  'expenses.approve': 'Valider les notes de frais et les avances',
+  'attendance.clock': 'Pointer sa présence',
+  'performance.read': 'Consulter les objectifs et les évaluations du personnel',
 };
 
 /**

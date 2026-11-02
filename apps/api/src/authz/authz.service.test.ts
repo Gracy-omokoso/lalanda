@@ -337,6 +337,8 @@ describe('catalogue des autorisations (ADR-0041 § 5, § 6)', () => {
       ['period.close', 'plan.approve'],
       // ADR-0044 § 4.3.
       ['purchase.approve', 'payables.pay'],
+      // ADR-0051 § 5.2.
+      ['expenses.approve', 'payables.pay'],
     ]);
     expect(catalog.nonDelegable).toEqual(['billing.manage']);
     expect(catalog.baseAction).toBe('analytics.read');

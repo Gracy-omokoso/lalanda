@@ -150,6 +150,22 @@ const ACTIONS_SANS_ROUTE: Record<string, string> = {
   'sales.contract.approve':
     'Aucune route en V0 : `POST /sales/contracts/:id/approve`, `…/renewals`, `…/terminate` ' +
     'et `PUT /sales/contract-settings` arrivent au lot V3 (ADR-0050 § 3).',
+  //
+  // ADR-0051 — H8 : actions déclarées avant leurs routes (lots H10, H12 et H15). Chaque lot
+  // retire sa ligne et écrit sa sonde ; la matrice est couverte case par case par
+  // `permissions.test.ts`, et `/me/permissions` est vérifié ci-dessous.
+  'expenses.claim':
+    'Aucune route en H8 : `POST /hr/expense-reports` et `POST /hr/advances` arrivent au ' +
+    'lot H10 (ADR-0051 § 6.1).',
+  'expenses.approve':
+    'Aucune route en H8 : validation des notes et avances (`…/approve`, `…/reject`) et ' +
+    'régularisations arrivent au lot H10 (ADR-0051 § 6.1).',
+  'attendance.clock':
+    'Aucune route en H8 : `POST /hr/attendance/clock` et les demandes de correction ' +
+    'arrivent au lot H12 (ADR-0051 § 6.2).',
+  'performance.read':
+    'Aucune route en H8 : objectifs, campagnes et `POST /hr/reviews/:id/reveal` arrivent ' +
+    'au lot H15 (ADR-0051 § 6.3).',
 };
 
 /** Une sonde HTTP : la route qui matérialise une action, et ses statuts légitimes. */
@@ -1409,6 +1425,10 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
       'assets.read',
       'docs.read',
       'docs.manage',
+      // ADR-0051 § 5.1 : ses frais et son pointage ; objectifs et évaluations de tous.
+      'expenses.claim',
+      'attendance.clock',
+      'performance.read',
     ]);
   }, 60_000);
 
@@ -1462,6 +1482,9 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
       'stock.count',
       'assets.read',
       'docs.read',
+      // ADR-0051 § 5.1 : ses frais et son pointage, comme `leave.request`.
+      'expenses.claim',
+      'attendance.clock',
     ]);
   }, 60_000);
 
@@ -1533,6 +1556,30 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
       );
       expect(actions.includes('sales.contract.approve'), `${role} × sales.contract.approve`).toBe(
         ['owner', 'finance_director'].includes(role),
+      );
+    }
+  }, 60_000);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // ADR-0051 — H8 : RH, second volet (§ 5.1), sans route avant H10, H12 et H15
+  // ───────────────────────────────────────────────────────────────────────────
+
+  it('ADR-0051 critère 1 — `/me/permissions` : déclarer et pointer comme `leave.request` ; valider : Propriétaire et Directeur financier ; évaluations : Propriétaire et Responsable RH', async () => {
+    const s = serveur();
+    for (const role of ROLES_TESTES) {
+      const moi = await request(s).get('/me/permissions').set('Cookie', cookiesDe(role));
+      expect(moi.status, role).toBe(200);
+      const actions = moi.body.actions as string[];
+      for (const action of ['expenses.claim', 'attendance.clock']) {
+        expect(actions.includes(action), `${role} × ${action}`).toBe(
+          actions.includes('leave.request'),
+        );
+      }
+      expect(actions.includes('expenses.approve'), `${role} × expenses.approve`).toBe(
+        ['owner', 'finance_director'].includes(role),
+      );
+      expect(actions.includes('performance.read'), `${role} × performance.read`).toBe(
+        ['owner', 'hr_manager'].includes(role),
       );
     }
   }, 60_000);

@@ -347,9 +347,11 @@ e2eSuite('ADR-0041 A2 — écarts lus par la garde et /me/permissions', () => {
     // neuvième domaine (RH), aucune paire nouvelle.
     // ADR-0046 § 8.3 : dixième à douzième domaines (stocks, équipements, documents).
     // ADR-0049 § 8.3 : treizième domaine (comptabilité), aucune paire nouvelle.
+    // ADR-0051 § 5.2 : quatrième paire `expenses.approve` + `payables.pay`, aucun domaine.
     expect(res.body.domains).toHaveLength(13);
     expect(res.body.nonDelegable).toEqual(['billing.manage']);
-    expect(res.body.sodPairs).toHaveLength(3);
+    expect(res.body.sodPairs).toHaveLength(4);
+    expect(res.body.sodPairs).toContainEqual(['expenses.approve', 'payables.pay']);
     expect(res.body.labels['sales.invoice']).toBe(
       'Émettre et normaliser les factures et les avoirs',
     );
@@ -361,14 +363,16 @@ e2eSuite('ADR-0041 A2 — écarts lus par la garde et /me/permissions', () => {
       (r) => r.role === 'hr_manager',
     );
     expect(rh?.label).toBe('Responsable RH');
-    // ADR-0046 § 8.1 : plus `assets.read`, `docs.read` et `docs.manage`.
-    expect(rh?.actions).toHaveLength(11);
-    // ADR-0046 § 8.2 : le Magasinier, neuf actions.
+    // ADR-0046 § 8.1 : plus `assets.read`, `docs.read` et `docs.manage` ; ADR-0051 § 5.1 :
+    // plus `expenses.claim`, `attendance.clock` et `performance.read`.
+    expect(rh?.actions).toHaveLength(14);
+    // ADR-0046 § 8.2 : le Magasinier, neuf actions ; onze avec ADR-0051 § 5.1 (ses frais, son
+    // pointage).
     const mag = (res.body.roleMatrix as { role: string; label: string; actions: string[] }[]).find(
       (r) => r.role === 'storekeeper',
     );
     expect(mag?.label).toBe('Magasinier');
-    expect(mag?.actions).toHaveLength(9);
+    expect(mag?.actions).toHaveLength(11);
     // ADR-0049 § 8.2 : l'Expert-comptable (externe), trois actions.
     const exp = (res.body.roleMatrix as { role: string; label: string; actions: string[] }[]).find(
       (r) => r.role === 'external_accountant',
@@ -376,5 +380,8 @@ e2eSuite('ADR-0041 A2 — écarts lus par la garde et /me/permissions', () => {
     expect(exp?.label).toBe('Expert-comptable (externe)');
     expect(exp?.actions).toEqual(['analytics.read', 'accounting.read', 'accounting.export']);
     expect(res.body.labels['accounting.export']).toBe('Exporter la comptabilité');
+    expect(res.body.labels['payables.pay']).toBe(
+      'Payer les fournisseurs et rembourser le personnel',
+    );
   }, 30_000);
 });
