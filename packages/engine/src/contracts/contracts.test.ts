@@ -46,7 +46,7 @@ const terms = (
 
 describe('export public', () => {
   it('le module est exporté par le moteur, version à part', () => {
-    expect(engine.CONTRACTS_VERSION).toBe('1.0.0');
+    expect(engine.CONTRACTS_VERSION).toBe('1.1.0');
     expect(engine.termsAt).toBe(termsAt);
     expect(engine.ENGINE_VERSION).toBe('0.2.0');
   });
@@ -622,6 +622,50 @@ describe('orderInvoicing — reste à facturer (critère 4)', () => {
     expect(all.status).toBe('invoiced');
     expect(all.closeSuggested).toBe(true);
     expect(all.issues).toEqual([]);
+  });
+
+  it('ADR-0054 : un avoir gelé réduit le facturé et rouvre le reste à facturer', () => {
+    const credited = (q: string, c: string): LinkedInvoiceInput => {
+      const base = inv('f1', 'issued', q);
+      return { ...base, lines: [{ ...base.lines[0]!, credited: c }] };
+    };
+    const partial = orderInvoicing(lines, [credited('10', '3')]);
+    expect(partial.status).toBe('partially_invoiced');
+    expect(partial.lines[0]).toMatchObject({
+      invoiced: '7',
+      credited: '3',
+      remainingToInvoice: '3',
+      remainingToPrepare: '3',
+    });
+
+    // Avoir total : plus rien de facturé sur la ligne.
+    const total = orderInvoicing(lines, [credited('10', '10')]);
+    expect(total.status).toBe('not_invoiced');
+    expect(total.lines[0]).toMatchObject({
+      invoiced: '0',
+      credited: '10',
+      remainingToInvoice: '10',
+    });
+
+    // Crédit supérieur à la ligne (donnée incohérente) : borné à la quantité de la ligne.
+    expect(orderInvoicing(lines, [credited('4', '9')]).lines[0]).toMatchObject({
+      invoiced: '0',
+      credited: '4',
+    });
+
+    // Un brouillon ne porte pas d'avoir gelé : rien n'est déduit.
+    const draftBase = inv('f2', 'draft', '5');
+    const draft = orderInvoicing(lines, [
+      { ...draftBase, lines: [{ ...draftBase.lines[0]!, credited: '5' }] },
+    ]);
+    expect(draft.lines[0]).toMatchObject({ inDraft: '5', credited: '0' });
+
+    // Sans avoir : facturé inchangé, crédité nul.
+    expect(orderInvoicing(lines, [credited('6', '0')]).lines[0]).toMatchObject({
+      invoiced: '6',
+      credited: '0',
+    });
+    expect(() => orderInvoicing(lines, [credited('6', '-1')])).toThrow(RangeError);
   });
 
   it('article ou prix changé dans le brouillon : UNMATCHED_LINE, reste inchangé', () => {

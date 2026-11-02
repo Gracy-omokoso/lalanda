@@ -175,6 +175,37 @@ e2eSuite('commandes clients et liens (ADR-0050, V2)', () => {
     );
   }
 
+  /**
+   * Avoir `FA` gelé sur la première ligne d'une facture émise (circuit EXISTANT des
+   * avoirs, ADR-0023 § S25e.5) — ADR-0054 : il réduit le facturé de la commande.
+   */
+  async function avoir(originId: string, quantity: string): Promise<Record<string, any>> {
+    const o = ok(await f.get('owner', `/sales/invoices/${originId}`));
+    const body = {
+      type: 'FA',
+      currency: o.currency,
+      priceMode: o.priceMode,
+      customer: { customerId: o.customer.customerId, printContactDetails: false },
+      pointOfSaleId: null,
+      lines: [{ source: 'origin', originLineIndex: 0, quantity }],
+      payments: [],
+      comments: { A: null, C: null },
+      creditNote: { nature: 'RAM', originInvoiceId: originId },
+      showUsdCounterValue: false,
+    };
+    const d = ok(await f.post('owner', '/sales/invoices', body), 201);
+    const p = ok(
+      await f.put('owner', `/sales/invoices/${d.id}`, {
+        ...body,
+        payments: [{ method: 'CREDIT', amount: d.documentAmounts.calculation.totals.total }],
+        expectedRevision: d.revision,
+      }),
+    );
+    return ok(
+      await f.post('owner', `/sales/invoices/${d.id}/issue`, { expectedRevision: p.revision }),
+    );
+  }
+
   beforeAll(async () => {
     ok(await f.put('owner', '/organizations/current/fiscal-profile', fiche('A1111111X')));
     ok(await f.put('ownerB', '/organizations/current/fiscal-profile', fiche('B2222222X')));
@@ -588,6 +619,40 @@ e2eSuite('commandes clients et liens (ADR-0050, V2)', () => {
         409,
         'ORDER_NOT_CONFIRMED',
       );
+    });
+
+    it('ADR-0054 : un avoir gelé sur une facture de la commande réduit le facturé ; la commande se refacture', async () => {
+      const c = await commandeConfirmee({ lines: [ligne('Licence annuelle', '10', '120.00')] });
+      const p1 = ok(
+        await f.post('owner', `/sales/orders/${c.id}/prepare-invoice`, {
+          expectedRevision: c.revision,
+        }),
+      );
+      const facture = await emettre(p1.invoiceId);
+      const v1 = ok(await f.get('owner', `/sales/orders/${c.id}`));
+      expect(v1.invoicing).toMatchObject({ status: 'invoiced', closeSuggested: true });
+      expect(v1.invoicing.lines[0]).toMatchObject({ invoiced: '10', credited: '0' });
+
+      const a = await avoir(facture.id ?? p1.invoiceId, '3');
+      expect(a).toMatchObject({ type: 'FA', status: 'issued' });
+      const v2 = ok(await f.get('owner', `/sales/orders/${c.id}`));
+      expect(v2.invoicing).toMatchObject({ status: 'partially_invoiced', closeSuggested: false });
+      expect(v2.invoicing.lines[0]).toMatchObject({
+        invoiced: '7',
+        credited: '3',
+        remainingToInvoice: '3',
+        remainingToPrepare: '3',
+      });
+      // L'avoir n'est pas lui-même une facture de la commande : aucun lien posé.
+      expect(v2.invoices.map((i: { invoiceId: string }) => i.invoiceId)).toEqual([p1.invoiceId]);
+
+      const p2 = ok(
+        await f.post('owner', `/sales/orders/${c.id}/prepare-invoice`, {
+          expectedRevision: v2.revision,
+        }),
+      );
+      const second = ok(await f.get('owner', `/sales/invoices/${p2.invoiceId}`));
+      expect(second.lines.map((l: Record<string, string>) => l.quantity)).toEqual(['3']);
     });
 
     it('une ligne de brouillon modifiée (autre prix) → UNMATCHED_LINE, reste inchangé ; brouillon supprimé → échéance libérée', async () => {

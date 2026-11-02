@@ -135,7 +135,10 @@ export interface SalesOrderSummary {
 export interface OrderInvoicingLine {
   lineRef: string;
   ordered: DecimalString;
+  /** Émis, net des avoirs gelés (ADR-0054). */
   invoiced: DecimalString;
+  /** Crédité par des avoirs gelés (ADR-0054). */
+  credited: DecimalString;
   inDraft: DecimalString;
   remainingToInvoice: DecimalString;
   remainingToPrepare: DecimalString;

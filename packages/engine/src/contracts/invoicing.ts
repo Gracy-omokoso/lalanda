@@ -5,6 +5,9 @@
 //   n'est recalculé ici (les montants viennent de `compose`). Une ligne de
 //   facture dont l'article ou le prix unitaire ne correspond plus à la ligne de
 //   commande est signalée `UNMATCHED_LINE`, jamais devinée ni comptée.
+// - Avoirs (ADR-0054, décision du 3 nov. 2026) : la quantité créditée par des
+//   avoirs GELÉS sur une ligne de facture émise est déduite du facturé ; le reste
+//   à facturer remonte d'autant. Un avoir en brouillon ne compte pas.
 // - Acomptes : sommes PAR DEVISE, sans conversion ; aucune imputation sur la
 //   facture finale (décision ouverte n° 11) ; l'écart au montant demandé est
 //   signalé, jamais corrigé.
@@ -39,7 +42,7 @@ const positive = (value: unknown, what: string): bigint => {
 };
 
 /**
- * Reste à facturer par `lineRef` (§ 2.2) : commandé − émis (jamais négatif),
+ * Reste à facturer par `lineRef` (§ 2.2) : commandé − (émis − avoirs gelés), jamais négatif,
  * et commandé − émis − brouillons (ce que propose une nouvelle préparation).
  * La quantité comptée est celle de la LIGNE DE FACTURE (figée si émise).
  */
@@ -61,6 +64,7 @@ export function orderInvoicing(
   }
 
   const issued = new Map<string, bigint>();
+  const credited = new Map<string, bigint>();
   const drafts = new Map<string, bigint>();
   const issues: OrderInvoicingIssue[] = [];
   const seenInvoices = new Set<string>();
@@ -107,7 +111,17 @@ export function orderInvoicing(
         issue('UNMATCHED_LINE');
         continue;
       }
-      target.set(entry.lineRef, (target.get(entry.lineRef) ?? 0n) + quantity);
+      let counted = quantity;
+      if (invoice.state === 'issued' && invoiceLine.credited !== undefined) {
+        const c = milliOf(invoiceLine.credited, `${what} : quantité créditée`);
+        if (c < 0n) throw new RangeError(`${what} : quantité créditée négative`);
+        const deducted = c > quantity ? quantity : c;
+        counted = quantity - deducted;
+        if (deducted > 0n) {
+          credited.set(entry.lineRef, (credited.get(entry.lineRef) ?? 0n) + deducted);
+        }
+      }
+      target.set(entry.lineRef, (target.get(entry.lineRef) ?? 0n) + counted);
     }
   }
 
@@ -133,6 +147,7 @@ export function orderInvoicing(
       lineRef: line.lineRef,
       ordered: formatQuantity(ordered),
       invoiced: formatQuantity(done),
+      credited: formatQuantity(credited.get(line.lineRef) ?? 0n),
       inDraft: formatQuantity(draft),
       remainingToInvoice: formatQuantity(remaining),
       remainingToPrepare: formatQuantity(toPrepare),
