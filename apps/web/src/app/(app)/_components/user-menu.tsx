@@ -3,7 +3,7 @@
 // Menu du compte (S20b, refondu par ADR-0016 E1/E3).
 //
 // C'est le point d'entrée UNIQUE vers tout ce qui n'est pas un projet :
-// Tableau de bord · Mon compte · Organisation · Abonnement · Administration ·
+// Tableau de bord · Mon compte · Organisation · Abonnement · Console Lalanda ·
 // Déconnexion. Avant, trois de ces destinations vivaient dans la barre avec
 // `hidden sm:inline` — donc INATTEIGNABLES sous 640 px, sans autre chemin. Le
 // menu, lui, existe à toutes les largeurs.
@@ -27,7 +27,7 @@
 // document : on perdrait sa place à chaque ouverture accidentelle.
 //
 // La collecte des éléments navigables interroge le DOM (`[role="menuitem"]`),
-// elle reste donc juste quand « Administration » disparaît — À CONDITION que
+// elle reste donc juste quand « Console Lalanda » disparaît — À CONDITION que
 // seules les vraies entrées portent ce rôle. L'en-tête d'identité et les
 // séparateurs n'en portent pas et ne sont pas focusables : sinon la circulation
 // clavier aurait des trous où il n'y a rien à activer.
@@ -42,7 +42,7 @@ import { entreeActive, entreesMenu, libelleDeclencheur, separateurAvant } from '
 
 export function UserMenu({
   email,
-  canReadAdmin,
+  accesConsole,
 }: {
   email: string;
   /**
@@ -51,7 +51,7 @@ export function UserMenu({
    * d'un rôle qu'il aurait recopié (ADR-0012 §8) : masquer est un confort, le
    * contrôle est `PermissionsGuard` côté API.
    */
-  canReadAdmin: boolean;
+  accesConsole: boolean;
 }): React.ReactElement {
   const router = useRouter();
   const pathname = usePathname();
@@ -65,7 +65,7 @@ export function UserMenu({
   // Les actions de l'organisation sont déjà lues par la coquille
   // (`GET /me/permissions`) : aucun appel de plus (ADR-0038 § 6).
   const { actions } = useShell();
-  const items = entreesMenu({ canReadAdmin, actions });
+  const items = entreesMenu({ accesConsole, actions });
   const actif = entreeActive(pathname, items);
 
   const close = useCallback((focusTrigger: boolean): void => {

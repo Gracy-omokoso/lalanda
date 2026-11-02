@@ -6,10 +6,16 @@
 
 import type { Metadata } from 'next';
 
+import { EnTeteModule } from '../_components/en-tete-module';
 import { OrganizationsPanel } from '../_components/organizations-panel';
 
-export const metadata: Metadata = { title: 'Organisations — Administration · Lalanda' };
+export const metadata: Metadata = { title: 'Organisations — Console Lalanda' };
 
 export default function AdminOrganizationsPage(): React.ReactElement {
-  return <OrganizationsPanel />;
+  return (
+    <section className="flex flex-col gap-6">
+      <EnTeteModule moduleId="organisations" />
+      <OrganizationsPanel />
+    </section>
+  );
 }

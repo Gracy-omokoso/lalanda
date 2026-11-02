@@ -67,7 +67,7 @@ Appliquer le changement d’adresse sans vérification lèverait le blocage en u
 
 ## Implémenté (S21b) — secrets d’intégration chiffrés, espace admin
 
-Coffre et espace d’administration livrés au sprint S21b (`apps/api/src/integrations/`, `apps/api/src/admin/`, `apps/web/src/app/(app)/admin/`). Décision : ADR-0013. Contrat : docs/16 § Espace admin plateforme. Écrans : docs/04 § Implémenté (S21b).
+Coffre et espace d’administration livrés au sprint S21b (`apps/api/src/integrations/`, `apps/api/src/admin/`, `apps/web/src/app/(app)/admin/`, déplacé dans `apps/web/src/app/(console)/admin/` par ADR-0053 — P1). Décision : ADR-0013. Contrat : docs/16 § Espace admin plateforme. Écrans : docs/04 § Implémenté (S21b).
 
 ### Fait
 

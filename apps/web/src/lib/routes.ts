@@ -50,13 +50,9 @@ export const PROTECTED_PREFIXES = [
   // paiement. Un tunnel logé sous un onglet obligerait chacun de ces chemins à
   // traverser un écran qui n'a rien à voir avec la décision en cours.
   '/souscription',
-  // S21b — espace admin plateforme. Le middleware n'y vérifie QUE la session :
-  // il ne connaît pas les rôles plateforme, et prétendre le contraire donnerait
-  // un faux sentiment de protection. Le rôle est vérifié par `PermissionsGuard`
-  // à chaque appel d'API, et l'espace se referme sur un écran de refus explicite
-  // (voir `admin/layout.tsx`). C'est délibérément une redirection de CONFORT,
-  // pas un contrôle d'accès.
-  '/admin',
+  // S21b — la console Lalanda (`/admin`) n'est plus listée ici : elle a sa propre
+  // liste, `CONSOLE_PREFIXES` (ADR-0053 — P1), et reste protégée par
+  // `isProtectedPath`.
   // S25c (ADR-0022) — clients et catalogue. Exige une session ET une
   // organisation active, comme `/organisation` ; seule la première est vue ici.
   '/ventes',
@@ -100,10 +96,44 @@ export const PROTECTED_PREFIXES = [
  * le nom commence par le même mot.
  */
 export function isProtectedPath(pathname: string): boolean {
-  return PROTECTED_PREFIXES.some(
+  return (
+    isConsolePath(pathname) ||
+    PROTECTED_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+  );
+}
+
+/**
+ * ADR-0053 — P1 : la console Lalanda, espace des opérateurs de la plateforme,
+ * séparé de l'espace organisation (groupe de routes `(console)`, même domaine,
+ * URL `/admin` conservée — décision ouverte n° 1).
+ *
+ * Le middleware n'y vérifie QUE la session : il ne connaît pas les rôles
+ * plateforme, et prétendre le contraire donnerait un faux sentiment de
+ * protection. Les actions plateforme sont vérifiées par l'API à chaque appel
+ * `/admin/**`, et la coquille de console se referme sur un écran de refus
+ * explicite. C'est une redirection de CONFORT, pas un contrôle d'accès.
+ *
+ * La console n'exige AUCUNE organisation active (ADR-0053 § 2.2) : un opérateur
+ * sans appartenance doit pouvoir l'ouvrir.
+ */
+export const CONSOLE_PREFIXES = ['/admin'] as const;
+
+/** Ce chemin appartient-il à la console Lalanda ? Frontière de segment. */
+export function isConsolePath(pathname: string): boolean {
+  return CONSOLE_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
 }
+
+/**
+ * En-têtes posés par le middleware sur toute page de la console : jamais mise en
+ * cache (un écran d'opérateur ne doit survivre ni dans un cache partagé ni dans
+ * l'historique d'un poste prêté), jamais indexée.
+ */
+export const CONSOLE_RESPONSE_HEADERS: Readonly<Record<string, string>> = {
+  'Cache-Control': 'no-store',
+  'X-Robots-Tag': 'noindex, nofollow',
+};
 
 /**
  * ADR-0048 — pages PUBLIQUES sans session : le formulaire de prospects d'une
