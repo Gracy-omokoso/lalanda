@@ -26,6 +26,7 @@ import {
   type RecurrenceFrequency,
   type TreasuryCurrency,
   type TreasuryForecastInput,
+  type HrPayableForecastInput,
   type PayableForecastInput,
   TREASURY_VERSION,
   EXPENSE_ACTUALS_VERSION,
@@ -772,8 +773,7 @@ describe('forecastTreasury 1.1.0 — échéances fournisseurs', () => {
     ...o,
   });
 
-  it('version 1.1.0 ; le report vers le réalisé garde sa version 1.0.0', () => {
-    expect(TREASURY_VERSION).toBe('1.1.0');
+  it('le report vers le réalisé garde sa version 1.0.0', () => {
     expect(EXPENSE_ACTUALS_VERSION).toBe('1.0.0');
   });
 
@@ -890,5 +890,96 @@ describe('forecastTreasury 1.1.0 — échéances fournisseurs', () => {
     expect(alert.severity).toBe('critique');
     expect(alert.dayIndex).toBe(1);
     expect(alert.probableCause?.amount).toBe('1500.00');
+  });
+});
+
+// ── Prévision 1.2.0 : remboursements au personnel (ADR-0051 § 7.2) ─────────────
+
+describe('forecastTreasury 1.2.0 — remboursements au personnel', () => {
+  const hr = (o: Partial<HrPayableForecastInput> = {}): HrPayableForecastInput => ({
+    id: 'nf1',
+    kind: 'expense_report',
+    label: 'Note de frais NF2610-000001',
+    currency: 'USD',
+    amount: '22.50',
+    ...o,
+  });
+
+  it('version 1.2.0 ; le report vers le réalisé garde sa version 1.0.0', () => {
+    expect(TREASURY_VERSION).toBe('1.2.0');
+    expect(EXPENSE_ACTUALS_VERSION).toBe('1.0.0');
+  });
+
+  it('sans remboursements, ou avec une liste vide : sorties identiques (source `hr_payable` nulle)', () => {
+    const input = baseForecast({
+      receivables: [
+        {
+          id: 'f1',
+          label: 'Facture FV-1',
+          currency: 'USD',
+          outstanding: '500.00',
+          dueDate: '2026-11-01',
+          issuedOn: '2026-10-01',
+        },
+      ],
+    });
+    const without = forecastTreasury(input);
+    const empty = forecastTreasury({ ...input, hrPayables: [] });
+    expect(empty).toEqual(without);
+    for (const s of without.scenarios) {
+      for (const h of s.horizons) expect(h.bySource.hr_payable).toBe('0.00');
+    }
+  });
+
+  it('note approuvée et avance approuvée : sorties à J+1, dans les trois scénarios ; autre devise ignorée', () => {
+    const f = forecastTreasury(
+      baseForecast({
+        hrPayables: [
+          hr(),
+          hr({
+            id: 'av1',
+            kind: 'advance',
+            label: 'Avance au personnel AV2610-000001',
+            amount: '100.00',
+          }),
+          hr({ id: 'cdf', currency: 'CDF', amount: '99999.00' }),
+          hr({ id: 'zero', amount: '0.00' }),
+        ],
+      }),
+    );
+    for (const s of f.scenarios) {
+      expect(s.series[0]!.balance).toBe('1000.00');
+      expect(s.series[1]!.balance).toBe('877.50');
+      expect(s.series[180]!.balance).toBe('877.50');
+      expect(s.horizons[0]!.bySource.hr_payable).toBe('122.50');
+      expect(s.horizons[0]!.outflows).toBe('122.50');
+      expect(s.flows.map((x) => [x.date, x.source, x.amount, x.label])).toEqual([
+        ['2026-10-22', 'hr_payable', '100.00', 'Avance au personnel AV2610-000001'],
+        ['2026-10-22', 'hr_payable', '22.50', 'Note de frais NF2610-000001'],
+      ]);
+    }
+  });
+
+  it('cumulée avec les échéances fournisseurs, sans se confondre avec elles', () => {
+    const f = forecastTreasury(
+      baseForecast({
+        payables: [
+          {
+            id: 'ff1',
+            label: 'FF1',
+            currency: 'USD',
+            remaining: '300.00',
+            dueDate: '2026-10-20',
+            disputed: false,
+            supplierId: null,
+          },
+        ],
+        hrPayables: [hr()],
+      }),
+    );
+    const h = f.scenarios[1]!.horizons[0]!;
+    expect(h.bySource.payable).toBe('300.00');
+    expect(h.bySource.hr_payable).toBe('22.50');
+    expect(h.outflows).toBe('322.50');
   });
 });

@@ -15,6 +15,7 @@ import {
   aggregateExpenses,
   EXPENSE_CATEGORIES,
   type ExpenseAggregation,
+  treasuryCentsOf,
   type ExpenseCategory,
   type TreasuryCurrency,
 } from '@lalanda/engine';
@@ -37,13 +38,18 @@ import {
   isMongoId,
   noFutureDate,
   notFound,
+  rejected,
   type TreasuryActor,
 } from './treasury.common.js';
 import type { ExpenseInputDto, ListExpensesQuery } from './treasury.dto.js';
 import {
   TreasuryExpense,
+  TreasuryMovement,
   type ExpenseOrigin,
+  type HrExpenseOrigin,
   type TreasuryExpenseDocument,
+  type TreasuryExpenseOrigin,
+  type TreasuryMovementDocument,
 } from './treasury.schemas.js';
 
 export interface ExpenseView {
@@ -67,9 +73,11 @@ export interface ExpenseView {
   workProjectId: string | null;
   /**
    * ADR-0044 — P5 : `null` = dépense directe ; sinon créée ou rattachée par un
-   * paiement fournisseur, en lecture seule pour la trésorerie.
+   * paiement fournisseur (`supplier_payment`) ou, ADR-0051 — H11, par le
+   * remboursement d'une note de frais (`expense_report`), en lecture seule pour
+   * la trésorerie.
    */
-  origin: ExpenseOrigin | null;
+  origin: TreasuryExpenseOrigin | null;
   status: 'recorded' | 'cancelled';
   cancelReason: string | null;
   revision: number;
@@ -102,6 +110,42 @@ export interface OwnedExpenseInput {
   actor: TreasuryActor;
 }
 
+/** ADR-0051 — H11 (§ 7.1) : une ligne de note de frais à porter en dépense. */
+export interface HrExpenseReportLineInput {
+  lineIndex: number;
+  /** Date de la ligne : date de la charge (décision ouverte n° 13). */
+  spentOn: string;
+  /** Montant de la ligne (ou de sa part, quand une avance la solde en partie). */
+  amount: string;
+  category: ExpenseCategory;
+  /** Libellé de la ligne ; la dépense porte « Frais NF… — {libellé} », sans nom. */
+  label: string;
+  /** Marchand en texte libre (jamais une fiche fournisseur). */
+  merchant: string | null;
+  workProjectId: string | null;
+  deductibleVat: string | null;
+}
+
+/**
+ * ADR-0051 — H11 (§ 7.1) : remboursement d'une note de frais, ou part soldée par
+ * une avance. `settledByAdvanceId` posé ⇒ `accountId: null` (l'argent est sorti au
+ * versement de l'avance) ; sinon `accountId` est le compte payeur, ou `null` comme
+ * pour une dépense directe sans compte.
+ */
+export interface HrExpenseReportInput {
+  organizationId: string;
+  reportId: string;
+  reportNumber: string;
+  currency: TreasuryCurrency;
+  /** Date du remboursement (décaissement) : contrôle du compte payeur. */
+  paidOn: string;
+  accountId: string | null;
+  settledByAdvanceId: string | null;
+  reference: string | null;
+  lines: readonly HrExpenseReportLineInput[];
+  actor: TreasuryActor;
+}
+
 /** Collection du module « work », lue en lecture seule (ADR-0039 § 2.10). */
 const WORK_PROJECTS = 'work_projects';
 
@@ -124,6 +168,7 @@ export interface TreasurySupplierEntry {
 }
 
 const CATEGORY_LABELS = new Map<string, string>(EXPENSE_CATEGORIES.map((c) => [c.code, c.label]));
+const EXPENSE_CATEGORY_CODES = new Set<string>(EXPENSE_CATEGORIES.map((c) => c.code));
 
 export function expenseView(doc: ExpenseLean): ExpenseView {
   return {
@@ -179,6 +224,9 @@ export class TreasuryExpensesService {
     @Inject(ObjectStorageService) private readonly storage: ObjectStorageService,
     @Inject(AuditService) private readonly audit: AuditService,
     @InjectConnection() private readonly connection: Connection,
+    // ADR-0051 — H11 : une dépense soldée par une avance exige son versement (lecture).
+    @InjectModel(TreasuryMovement.name)
+    private readonly movements: Model<TreasuryMovementDocument>,
   ) {}
 
   async list(organizationId: string, query: ListExpensesQuery): Promise<ExpensePage> {
@@ -825,6 +873,220 @@ export class TreasuryExpensesService {
     return staleRevision(doc.revision);
   }
 
+  // ─── ADR-0051 — H11 : dépenses possédées par les RH (§ 7.1) ────────────────
+  //
+  // Motif exact des dépenses possédées par les achats : la trésorerie reste le SEUL
+  // écrivain de `treasury_expenses` ; le service RH appelle ces méthodes DANS SA
+  // TRANSACTION (`session`), avec les règles de la trésorerie (compte actif, même
+  // devise, ouvert à la date du remboursement, jamais futur).
+
+  /**
+   * Remboursement d'une note de frais (ou part soldée par une avance) : une dépense
+   * par ligne, datée de la ligne, au montant de la ligne, libellé « Frais NF… —
+   * {libellé} » sans nom. Une ligne antérieure à l'ouverture du compte payeur reste
+   * permise : c'est le décaissement (`paidOn`) qui doit être postérieur.
+   */
+  async recordOwnedByExpenseReport(
+    session: ClientSession,
+    input: HrExpenseReportInput,
+  ): Promise<ExpenseLean[]> {
+    const { organizationId, actor } = input;
+    if (input.lines.length === 0) {
+      rejected('EXPENSE_REPORT_EMPTY', 'Une note de frais remboursée porte au moins une ligne.');
+    }
+    noFutureDate(input.paidOn, 'EXPENSE_IN_FUTURE', 'Un remboursement');
+    const indexes = new Set<number>();
+    for (const line of input.lines) {
+      noFutureDate(line.spentOn, 'EXPENSE_IN_FUTURE', 'Une dépense');
+      if (!Number.isInteger(line.lineIndex) || line.lineIndex < 0 || indexes.has(line.lineIndex)) {
+        rejected('EXPENSE_REPORT_LINE_INVALID', 'Rang de ligne absent ou en double.');
+      }
+      indexes.add(line.lineIndex);
+      if (!EXPENSE_CATEGORY_CODES.has(line.category)) {
+        rejected('EXPENSE_REPORT_LINE_INVALID', `Catégorie inconnue : ${line.category}.`);
+      }
+      const cents = treasuryCentsOf(line.amount);
+      if (cents === null || cents <= 0n) {
+        rejected('EXPENSE_REPORT_LINE_INVALID', 'Le montant d’une ligne est strictement positif.');
+      }
+    }
+    if (input.settledByAdvanceId !== null) {
+      if (input.accountId !== null) {
+        rejected(
+          'EXPENSE_SETTLED_BY_ADVANCE_WITH_ACCOUNT',
+          'Une dépense soldée par une avance n’a pas de compte : l’argent est sorti au versement.',
+        );
+      }
+      await this.assertAdvanceDisbursed(session, organizationId, input.settledByAdvanceId);
+    } else if (input.accountId !== null) {
+      await this.accounts.requireUsable(organizationId, input.accountId, {
+        currency: input.currency,
+        date: input.paidOn,
+      });
+    }
+    for (const projectId of new Set(input.lines.map((l) => l.workProjectId))) {
+      if (projectId !== null) await this.assertWorkProjectOf(organizationId, projectId);
+    }
+
+    const docs = await this.expenses.create(
+      input.lines.map((line) => {
+        const origin: HrExpenseOrigin = {
+          kind: 'expense_report',
+          reportId: input.reportId,
+          reportNumber: input.reportNumber,
+          lineIndex: line.lineIndex,
+          settledByAdvanceId: input.settledByAdvanceId,
+        };
+        return {
+          organizationId,
+          spentOn: line.spentOn,
+          amount: line.amount,
+          currency: input.currency,
+          category: line.category,
+          label: `Frais ${input.reportNumber} — ${line.label}`,
+          supplierId: null,
+          supplierName: line.merchant,
+          supplierKey: line.merchant ? normalizeForSearch(line.merchant) : null,
+          accountId: input.accountId,
+          deductibleVat: line.deductibleVat,
+          reference: input.reference,
+          attachment: null,
+          recurringExpenseId: null,
+          occurrenceDate: null,
+          workProjectId: line.workProjectId,
+          origin,
+          status: 'recorded',
+          cancelReason: null,
+          cancelledAt: null,
+          revision: 1,
+          createdBy: actor.userId,
+          updatedBy: actor.userId,
+          _schemaVersion: 1,
+        };
+      }),
+      { session, ordered: true },
+    );
+    for (const doc of docs) {
+      await this.audit.record(
+        {
+          organizationId,
+          actorUserId: actor.userId,
+          actorRole: actor.role,
+          action: 'treasury.expense.recorded',
+          targetType: 'treasury_expense',
+          targetId: String(doc._id),
+          metadata: {
+            category: doc.category,
+            currency: doc.currency,
+            recurring: false,
+            workProjectId: doc.workProjectId ?? null,
+            expenseReportId: input.reportId,
+            settledByAdvance: input.settledByAdvanceId !== null,
+          },
+        },
+        { session },
+      );
+    }
+    return docs.map((d) => d.toObject() as ExpenseLean);
+  }
+
+  /**
+   * Annulation d'un remboursement (ou de la part soldée par une avance) : les
+   * dépenses ENREGISTRÉES de la note sont annulées avec le motif ; elles gardent
+   * `origin`, donc restent verrouillées. `settledByAdvanceId` : `undefined` = toutes,
+   * `null` = les seules dépenses remboursées, un identifiant = les seules parts
+   * soldées par cette avance. Rend le nombre de dépenses annulées.
+   */
+  async cancelOwnedByExpenseReport(
+    session: ClientSession,
+    organizationId: string,
+    reportId: string,
+    scope: { settledByAdvanceId?: string | null },
+    reason: string,
+    actor: TreasuryActor,
+  ): Promise<number> {
+    const filter: FilterQuery<TreasuryExpenseDocument> = {
+      organizationId,
+      'origin.kind': 'expense_report',
+      'origin.reportId': reportId,
+      status: 'recorded',
+    };
+    if (scope.settledByAdvanceId !== undefined) {
+      filter['origin.settledByAdvanceId'] = scope.settledByAdvanceId;
+    }
+    const res = await this.expenses
+      .updateMany(
+        filter,
+        {
+          $set: {
+            status: 'cancelled',
+            cancelReason: reason,
+            cancelledAt: new Date(),
+            updatedBy: actor.userId,
+          },
+          $inc: { revision: 1 },
+        },
+        { session },
+      )
+      .exec();
+    await this.audit.record(
+      {
+        organizationId,
+        actorUserId: actor.userId,
+        actorRole: actor.role,
+        action: 'treasury.expense.released_by_expense_report',
+        targetType: 'hr_expense_report',
+        targetId: reportId,
+        metadata: { cancelled: res.modifiedCount, reason: reason.slice(0, 200) },
+      },
+      { session },
+    );
+    return res.modifiedCount;
+  }
+
+  /** Une dépense soldée par une avance exige le versement ENREGISTRÉ de cette avance. */
+  private async assertAdvanceDisbursed(
+    session: ClientSession,
+    organizationId: string,
+    advanceId: string,
+  ): Promise<void> {
+    const disbursed = await this.movements
+      .exists({
+        organizationId,
+        kind: 'other_out',
+        'origin.kind': 'employee_advance',
+        'origin.advanceId': advanceId,
+        status: 'recorded',
+      })
+      .session(session)
+      .exec();
+    if (!disbursed) {
+      conflict(
+        'ADVANCE_NOT_DISBURSED',
+        'Cette avance n’a pas été versée : aucune dépense ne peut être soldée par elle.',
+      );
+    }
+  }
+
+  /**
+   * Projet du RUN de l'organisation (isolation), archivé ou non : la ligne a été
+   * imputée à la soumission de la note ; un archivage depuis ne bloque pas le
+   * remboursement.
+   */
+  private async assertWorkProjectOf(organizationId: string, workProjectId: string): Promise<void> {
+    const project = Types.ObjectId.isValid(workProjectId)
+      ? await this.connection
+          .collection(WORK_PROJECTS)
+          .findOne(
+            { _id: new Types.ObjectId(workProjectId), organizationId },
+            { projection: { _id: 1 } },
+          )
+      : null;
+    if (!project) {
+      notFound('EXPENSE_WORK_PROJECT_UNKNOWN', 'Projet introuvable dans cette organisation.');
+    }
+  }
+
   // ─── Pièce justificative ──────────────────────────────────────────────────
 
   async attach(
@@ -989,16 +1251,23 @@ export class TreasuryExpensesService {
 
 /**
  * ADR-0044 — P5 (§ 2.8) : une dépense créée ou rattachée par un paiement fournisseur
- * appartient aux achats ; la trésorerie la lit, mais ne la modifie pas.
+ * appartient aux achats ; ADR-0051 — H11 (§ 7.1) : une dépense de remboursement de
+ * frais appartient aux RH. La trésorerie la lit, mais ne la modifie pas.
  */
-function assertNotOwned(doc: Pick<ExpenseLean, 'origin'>): void {
-  if (doc.origin) {
+export function assertNotOwned(doc: Pick<ExpenseLean, 'origin'>): void {
+  if (!doc.origin) return;
+  if (doc.origin.kind === 'expense_report') {
     conflict(
-      'EXPENSE_OWNED_BY_PURCHASES',
-      `Cette dépense est le paiement fournisseur ${doc.origin.paymentNumber} : modifiez-la ou annulez-la depuis les achats.`,
-      { paymentId: doc.origin.paymentId, paymentNumber: doc.origin.paymentNumber },
+      'EXPENSE_OWNED_BY_HR',
+      `Cette dépense est le remboursement de la note de frais ${doc.origin.reportNumber} : modifiez-la ou annulez-la depuis les ressources humaines.`,
+      { reportId: doc.origin.reportId, reportNumber: doc.origin.reportNumber },
     );
   }
+  conflict(
+    'EXPENSE_OWNED_BY_PURCHASES',
+    `Cette dépense est le paiement fournisseur ${doc.origin.paymentNumber} : modifiez-la ou annulez-la depuis les achats.`,
+    { paymentId: doc.origin.paymentId, paymentNumber: doc.origin.paymentNumber },
+  );
 }
 
 function expenseNotFound(): never {
