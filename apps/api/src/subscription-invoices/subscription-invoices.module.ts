@@ -16,7 +16,6 @@ import {
 } from '../payments/manual-payment.schema.js';
 import { PaymentsModule } from '../payments/payments.module.js';
 import { Customer, CustomerSchema } from '../sales/customer.schema.js';
-import { SalesInvoice, SalesInvoiceSchema } from '../sales/invoices/invoice.schema.js';
 import { SalesModule } from '../sales/sales.module.js';
 import { PlatformSubscriptionInvoicesController } from './platform-subscription-invoices.controller.js';
 import {
@@ -47,7 +46,6 @@ import { SubscriptionInvoicingService } from './subscription-invoicing.service.j
       { name: SubscriptionBillingProfile.name, schema: SubscriptionBillingProfileSchema },
       { name: SubscriptionInvoiceCustomer.name, schema: SubscriptionInvoiceCustomerSchema },
       { name: Customer.name, schema: CustomerSchema },
-      { name: SalesInvoice.name, schema: SalesInvoiceSchema },
       { name: Subscription.name, schema: SubscriptionSchema },
       { name: ManualPaymentRequest.name, schema: ManualPaymentRequestSchema },
     ]),

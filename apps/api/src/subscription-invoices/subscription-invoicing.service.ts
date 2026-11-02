@@ -65,7 +65,6 @@ import { CustomersService } from '../sales/customers.service.js';
 import { InvoiceDocumentsService } from '../sales/documents/invoice-documents.service.js';
 import { InvoiceDraftsService } from '../sales/invoices/invoice-drafts.service.js';
 import { InvoiceFreezingService } from '../sales/invoices/invoice-freezing.service.js';
-import { SalesInvoice, type SalesInvoiceDocument } from '../sales/invoices/invoice.schema.js';
 import type { InvoiceActor, InvoiceLean } from '../sales/invoices/invoice.types.js';
 import type { CustomerInput } from '../sales/sales.dto.js';
 import {
@@ -105,6 +104,8 @@ export const SUBSCRIPTION_INVOICING_ACTOR: InvoiceActor = Object.freeze({
 
 /** Durée du bail d'un traitement : au-delà, une reprise est permise. */
 const LEASE_MS = 2 * 60 * 1000;
+/** État « facture émise » d'une ligne de `subscription_invoices` (pas d'un document de vente). */
+const LINK_ISSUED = 'issued' as const;
 const LIST_MAX = 200;
 
 class InvoicingFailure extends Error {
@@ -258,7 +259,6 @@ export class SubscriptionInvoicingService implements OnModuleInit {
     @InjectModel(SubscriptionInvoiceCustomer.name)
     private readonly customerLinks: Model<SubscriptionInvoiceCustomerDocument>,
     @InjectModel(Customer.name) private readonly customers: Model<CustomerDocument>,
-    @InjectModel(SalesInvoice.name) private readonly invoices: Model<SalesInvoiceDocument>,
     @InjectModel(Organization.name) private readonly orgs: Model<OrganizationDocument>,
     @InjectModel(Subscription.name) private readonly subscriptions: Model<SubscriptionDocument>,
     @InjectModel(ManualPaymentRequest.name)
@@ -370,7 +370,7 @@ export class SubscriptionInvoicingService implements OnModuleInit {
           { _id: leased._id },
           {
             $set: {
-              status: 'issued',
+              status: LINK_ISSUED,
               invoiceId: issued.invoiceId,
               invoiceNumber: issued.number,
               issuedAt: issued.issuedAt,
@@ -445,10 +445,7 @@ export class SubscriptionInvoicingService implements OnModuleInit {
 
     // Reprise : un brouillon existe déjà pour ce paiement.
     if (link.draftId) {
-      const existing = await this.invoices
-        .findOne({ _id: new Types.ObjectId(link.draftId), organizationId: seller })
-        .lean<InvoiceLean>()
-        .exec();
+      const existing = await this.readInvoice(seller, link.draftId);
       if (existing && existing.status === 'issued' && existing.number) {
         return { invoiceId: link.draftId, number: existing.number, issuedAt: existing.issuedAt };
       }
@@ -761,13 +758,20 @@ export class SubscriptionInvoicingService implements OnModuleInit {
 
   async listForSubscriber(organizationId: string): Promise<SubscriberInvoiceView[]> {
     const links = await this.links
-      .find({ organizationId, status: 'issued' })
+      .find({ organizationId, status: LINK_ISSUED })
       .sort({ paidAt: -1 })
       .limit(LIST_MAX)
       .lean<SubscriptionInvoice[]>()
       .exec();
-    const ids = links.flatMap((l) => [l.invoiceId, l.creditNote?.invoiceId ?? null]);
-    const docs = await this.invoiceDocs(ids.filter((i): i is string => i !== null));
+    const docs = new Map<string, InvoiceLean>();
+    for (const l of links) {
+      if (!l.sellerOrganizationId) continue;
+      for (const id of [l.invoiceId, l.creditNote?.invoiceId ?? null]) {
+        if (!id) continue;
+        const doc = await this.readInvoice(l.sellerOrganizationId, id);
+        if (doc) docs.set(id, doc);
+      }
+    }
     const out: SubscriberInvoiceView[] = [];
     for (const l of links) {
       const base = {
@@ -801,13 +805,14 @@ export class SubscriptionInvoicingService implements OnModuleInit {
     return out;
   }
 
-  private async invoiceDocs(ids: string[]): Promise<Map<string, InvoiceLean>> {
-    if (ids.length === 0) return new Map();
-    const docs = await this.invoices
-      .find({ _id: { $in: ids.map((i) => new Types.ObjectId(i)) } })
-      .lean<InvoiceLean[]>()
-      .exec();
-    return new Map(docs.map((d) => [String(d._id), d]));
+  /** Document de vente du vendeur, lu par le circuit des ventes ; `null` s'il n'existe plus. */
+  private async readInvoice(seller: string, invoiceId: string): Promise<InvoiceLean | null> {
+    try {
+      return await this.drafts.requireOwn(seller, invoiceId);
+    } catch (error) {
+      if (error instanceof NotFoundException) return null;
+      throw error;
+    }
   }
 
   private amountsOf(
@@ -841,7 +846,7 @@ export class SubscriptionInvoicingService implements OnModuleInit {
     const linkId = isCredit ? documentId.slice(0, -'-avoir'.length) : documentId;
     if (!Types.ObjectId.isValid(linkId)) this.notFound();
     const link = await this.links
-      .findOne({ _id: new Types.ObjectId(linkId), organizationId, status: 'issued' })
+      .findOne({ _id: new Types.ObjectId(linkId), organizationId, status: LINK_ISSUED })
       .exec();
     if (!link || !link.sellerOrganizationId) this.notFound();
     const invoiceId = isCredit
@@ -1282,7 +1287,7 @@ export class SubscriptionInvoicingService implements OnModuleInit {
       throw new ConflictException({ code: 'CREDIT_NOTE_NOT_REQUESTED' });
     }
 
-    let status: 'issued' | 'failed' = 'failed';
+    let outcome: 'issued' | 'failed' = 'failed';
     try {
       const issued = await this.issueCreditNote(claimed);
       await this.links
@@ -1298,7 +1303,7 @@ export class SubscriptionInvoicingService implements OnModuleInit {
           },
         )
         .exec();
-      status = 'issued';
+      outcome = 'issued';
     } catch (error) {
       await this.links
         .updateOne(
@@ -1320,7 +1325,7 @@ export class SubscriptionInvoicingService implements OnModuleInit {
       actorUserId: actor.userId,
       actorRole: actor.platformRole,
       action:
-        status === 'issued'
+        outcome === 'issued'
           ? 'billing.subscription_credit_note.issued'
           : 'billing.subscription_credit_note.failed',
       targetType: 'organization',
@@ -1335,7 +1340,7 @@ export class SubscriptionInvoicingService implements OnModuleInit {
         soleOperator,
       },
     });
-    if (status === 'issued') {
+    if (outcome === 'issued') {
       await this.audit.record({
         organizationId: link.organizationId,
         actorUserId: 'system',
@@ -1360,10 +1365,7 @@ export class SubscriptionInvoicingService implements OnModuleInit {
     }
     const cn = link.creditNote!;
     if (cn.draftId) {
-      const existing = await this.invoices
-        .findOne({ _id: new Types.ObjectId(cn.draftId), organizationId: seller })
-        .lean<InvoiceLean>()
-        .exec();
+      const existing = await this.readInvoice(seller, cn.draftId);
       if (existing?.status === 'issued' && existing.number) {
         return { invoiceId: cn.draftId, number: existing.number };
       }
