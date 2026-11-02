@@ -30,6 +30,8 @@ import { PlatformBillingController } from './billing/platform-billing.controller
 import { PlatformBillingService } from './billing/platform-billing.service.js';
 // ADR-0053 — P4 : fonctionnalités par offre (@Global, sert `FeatureGuard` partout).
 import { FeaturesModule } from './features/features.module.js';
+// ADR-0053 — P5
+import { AdminAuditModule } from './audit/admin-audit.module.js';
 
 @Module({
   imports: [
@@ -47,6 +49,8 @@ import { FeaturesModule } from './features/features.module.js';
       { name: PlanGrant.name, schema: PlanGrantSchema },
       { name: Subscription.name, schema: SubscriptionSchema },
     ]),
+    // ADR-0053 — P5 : journal plateforme filtré, export CSV, événements de sécurité.
+    AdminAuditModule,
   ],
   // `PlatformAccessController` sert `/me/platform-access` et NON `/admin/*` :
   // voir l'en-tête du fichier pour la raison — un utilisateur sans rôle doit
