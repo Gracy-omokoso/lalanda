@@ -5,18 +5,17 @@ import './globals.css';
 import { CookieBanner } from '@/components/cookie-consent';
 import { THEME_BOOT_SCRIPT } from '@/lib/theme-boot';
 
-// Poppins — brief §4. Chargée via next/font/local avec woff2 auto-hébergés
-// dans public/fonts/ pour éviter la dépendance réseau à fonts.gstatic.com au build.
-// Voir docs/decisions.md 2026-07-30.
-const poppins = localFont({
+// IBM Plex Sans — police de texte (ADR-0055, remplace Poppins). woff2
+// auto-hébergés dans public/fonts/ (sous-ensemble latin de @fontsource/ibm-plex-sans
+// 5.3.0, licence OFL 1.1) pour ne pas dépendre de fonts.gstatic.com au build.
+const plexSans = localFont({
   src: [
-    { path: '../../public/fonts/poppins-400.woff2', weight: '400', style: 'normal' },
-    { path: '../../public/fonts/poppins-500.woff2', weight: '500', style: 'normal' },
-    { path: '../../public/fonts/poppins-600.woff2', weight: '600', style: 'normal' },
-    { path: '../../public/fonts/poppins-700.woff2', weight: '700', style: 'normal' },
+    { path: '../../public/fonts/plexsans-400.woff2', weight: '400', style: 'normal' },
+    { path: '../../public/fonts/plexsans-500.woff2', weight: '500', style: 'normal' },
+    { path: '../../public/fonts/plexsans-600.woff2', weight: '600', style: 'normal' },
   ],
   display: 'swap',
-  variable: '--font-poppins',
+  variable: '--font-plex-sans',
   fallback: [
     'ui-sans-serif',
     'system-ui',
@@ -64,7 +63,7 @@ export default function RootLayout({
   return (
     <html
       lang="fr"
-      className={`${poppins.variable} ${archivo.variable} ${plexMono.variable}`}
+      className={`${plexSans.variable} ${archivo.variable} ${plexMono.variable}`}
       suppressHydrationWarning
     >
       <head>
