@@ -350,7 +350,7 @@ export function DonutChart({
   const stroke = 16;
   const radius = 50 - stroke / 2;
   return (
-    <div className={cn('flex items-center gap-4', className)}>
+    <div className={cn('flex flex-wrap items-center gap-4', className)}>
       <div aria-hidden="true" className="relative shrink-0" style={{ width: size, height: size }}>
         <svg viewBox="0 0 100 100" className="chart-fade h-full w-full -rotate-90">
           <circle
@@ -385,7 +385,7 @@ export function DonutChart({
           <span className="text-[11px] text-[var(--foreground-muted)]">{totalLabel}</span>
         </span>
       </div>
-      <ul aria-hidden="true" className="flex min-w-0 flex-1 flex-col gap-1.5 text-xs">
+      <ul aria-hidden="true" className="flex min-w-[8.5rem] flex-1 flex-col gap-1.5 text-xs">
         {shown.map((s) => (
           <li key={s.id} className="flex items-center gap-1.5 whitespace-nowrap">
             <span

@@ -3019,6 +3019,9 @@ export interface ActualsSyncReport {
 
 // ADR-0052 — O0 : contrat du statut de complétude (`@lalanda/shared/organization-setup`).
 import type { OrganizationSetupView } from '@lalanda/shared/organization-setup';
+// ADR-0056 — tableau de bord des factures.
+import type { InvoiceStats } from '@lalanda/shared/sales-invoices';
+export type { InvoiceStats } from '@lalanda/shared/sales-invoices';
 export type {
   OrganizationSetupCapability,
   OrganizationSetupStep,
@@ -3936,6 +3939,8 @@ export const api = {
   // normalisation `sales.invoice`. Aucun montant n'est calculé ici.
   listInvoices: (query: ListInvoicesQuery = {}) =>
     jsonRequest<InvoicePage>(`/sales/invoices${salesQuery(query)}`, { method: 'GET' }),
+  /** ADR-0056 : cartes, graphiques et compteurs de l'écran Factures, calculés par le serveur. */
+  getInvoiceStats: () => jsonRequest<InvoiceStats>(`/sales/invoices/stats`, { method: 'GET' }),
   getInvoice: (invoiceId: string) =>
     jsonRequest<InvoiceView>(`/sales/invoices/${encodeURIComponent(invoiceId)}`, {
       method: 'GET',

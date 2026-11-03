@@ -1,6 +1,5 @@
-import { PageHeader } from '@lalanda/ui';
-
 import { SalesChrome } from './_components/sales-access';
+import { SalesHeader } from './_components/sales-header';
 
 /**
  * Espace Ventes (module RUN) : factures, pro forma et avoirs (S25e — ADR-0023),
@@ -14,6 +13,8 @@ import { SalesChrome } from './_components/sales-access';
  * ADR-0030 : sur téléphone, la description de l'espace n'est pas affichée (elle
  * reste lue par les lecteurs d'écran) — le premier client ou la première facture
  * se voit sans défiler.
+ *
+ * ADR-0056 : l'écran Factures porte son propre en-tête compact (`SalesHeader`).
  */
 export default function SalesLayout({
   children,
@@ -22,12 +23,7 @@ export default function SalesLayout({
 }): React.ReactElement {
   return (
     <section className="flex flex-col gap-5 sm:gap-6">
-      <PageHeader
-        module="run"
-        moduleLabel="Exploiter"
-        title="Ventes"
-        description="Vos factures, pro forma et avoirs, vos clients et votre catalogue d’articles, prêts pour la facture normalisée de la DGI. Ce que vous pouvez modifier dépend de votre rôle."
-      />
+      <SalesHeader />
       <SalesChrome>{children}</SalesChrome>
     </section>
   );
