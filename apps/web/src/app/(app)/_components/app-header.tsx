@@ -64,7 +64,7 @@ export function AppHeader({
   }, [session?.user]);
 
   const onglet = (actif: boolean): string =>
-    `relative inline-flex h-10 items-center justify-center gap-2 rounded-[var(--radius-md)] px-2.5 text-sm transition-colors sm:px-3 ${
+    `relative inline-flex h-10 items-center justify-center gap-2 rounded-[var(--radius-md)] px-2.5 text-sm transition-colors duration-[var(--motion-fast)] ease-[var(--ease-standard)] sm:px-3 ${
       actif
         ? 'bg-[var(--nav-active-bg)] font-semibold text-[var(--nav-active-fg)]'
         : 'text-[var(--nav-muted)] hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-fg)]'

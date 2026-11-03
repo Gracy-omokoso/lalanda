@@ -5,8 +5,10 @@ import { cn } from '../utils.js';
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
+// Transition de couleur au survol : `--motion-fast` (ADR-0055), annulée par la
+// règle globale `prefers-reduced-motion` de `apps/web/src/app/globals.css`.
 const BASE =
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius-md)] font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 aria-busy:cursor-progress';
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius-md)] font-medium transition-colors duration-[var(--motion-fast)] ease-[var(--ease-standard)] disabled:pointer-events-none disabled:opacity-50 aria-busy:cursor-progress';
 
 const VARIANTES: Record<ButtonVariant, string> = {
   primary:
@@ -19,9 +21,10 @@ const VARIANTES: Record<ButtonVariant, string> = {
     'border border-[color-mix(in_srgb,var(--danger)_45%,transparent)] text-[var(--danger)] hover:bg-[var(--danger-bg)]',
 };
 
+// Hauteurs de contrôle (ADR-0055) : `--control-h-sm` 32 px, `--control-h` 36 px.
 const TAILLES: Record<ButtonSize, string> = {
-  sm: 'h-8 px-3 text-xs',
-  md: 'h-10 px-4 text-sm',
+  sm: 'h-[var(--control-h-sm)] px-3 text-xs',
+  md: 'h-[var(--control-h)] px-4 text-sm',
   // Cible tactile confortable (≥ 44 px) : boutons d'action principale sur téléphone.
   lg: 'h-12 px-5 text-base',
 };

@@ -94,7 +94,7 @@ function ListeModules({
             <Link
               href={m.href}
               onClick={onNavigate}
-              className="flex items-center gap-3 rounded-[var(--radius-sm)] px-2 py-2.5 text-[var(--nav-muted)] transition-colors hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-fg)]"
+              className="flex items-center gap-3 rounded-[var(--radius-sm)] px-2 py-2.5 text-[var(--nav-muted)] transition-colors duration-[var(--motion-fast)] ease-[var(--ease-standard)] hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-fg)]"
             >
               <ModuleIcon module={m.id} className={`h-5 w-5 ${COULEUR_NAV[m.id]}`} />
               <span className="flex flex-col">
@@ -139,7 +139,7 @@ function ListeApplications({
         aria-current={pathname === m.href ? 'page' : undefined}
         aria-label={replie ? `${m.label} — ${m.verb}` : undefined}
         title={replie ? `${m.label} — ${m.verb}` : undefined}
-        className={`mb-2 flex items-center rounded-[var(--radius-sm)] font-mono text-[0.72rem] uppercase tracking-[0.14em] transition-colors hover:bg-[var(--nav-active-bg)] ${replie ? 'mx-auto h-10 w-10 justify-center' : 'gap-2.5 px-2 py-2'}`}
+        className={`mb-2 flex items-center rounded-[var(--radius-sm)] font-mono text-[0.72rem] uppercase tracking-[0.14em] transition-colors duration-[var(--motion-fast)] ease-[var(--ease-standard)] hover:bg-[var(--nav-active-bg)] ${replie ? 'mx-auto h-10 w-10 justify-center' : 'gap-2.5 px-2 py-2'}`}
       >
         <ModuleIcon module={module} className={`h-4 w-4 ${COULEUR_NAV[module]}`} />
         {replie ? null : (
@@ -224,7 +224,7 @@ function Application({
 
   const courante = actif && sousActive === null;
   const base =
-    'group relative flex min-w-0 flex-1 items-center rounded-[var(--radius-sm)] text-sm transition-colors';
+    'group relative flex min-w-0 flex-1 items-center rounded-[var(--radius-sm)] text-sm transition-colors duration-[var(--motion-fast)] ease-[var(--ease-standard)]';
   const etat = actif
     ? 'bg-[var(--nav-active-bg)] font-semibold text-[var(--nav-active-fg)]'
     : 'text-[var(--nav-muted)] hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-fg)]';
@@ -290,7 +290,7 @@ function Application({
                   href={s.href}
                   onClick={onNavigate}
                   aria-current={allumee ? 'page' : undefined}
-                  className={`block truncate rounded-[var(--radius-sm)] px-2 py-1.5 text-[0.8rem] transition-colors ${allumee ? 'font-semibold text-[var(--nav-active-fg)]' : 'text-[var(--nav-muted)] hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-fg)]'}`}
+                  className={`block truncate rounded-[var(--radius-sm)] px-2 py-1.5 text-[0.8rem] transition-colors duration-[var(--motion-fast)] ease-[var(--ease-standard)] ${allumee ? 'font-semibold text-[var(--nav-active-fg)]' : 'text-[var(--nav-muted)] hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-fg)]'}`}
                 >
                   {s.label}
                 </Link>

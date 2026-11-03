@@ -270,7 +270,7 @@ function ModalOuverte({
           <div className="min-w-0 flex-1">
             <h2
               id={`${id}-titre`}
-              className="font-display text-lg font-bold tracking-tight text-[var(--foreground)]"
+              className="font-display text-[length:var(--font-size-h2)] font-bold tracking-tight text-[var(--foreground)]"
             >
               {title}
             </h2>

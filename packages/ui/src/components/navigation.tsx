@@ -56,7 +56,7 @@ export function PageHeader({
     >
       <div className="flex min-w-0 flex-col gap-1.5">
         {module ? <ModuleMark module={module} suffix={moduleLabel} /> : null}
-        <Titre className="font-display text-2xl font-bold tracking-tight sm:text-[1.75rem] sm:leading-9">
+        <Titre className="font-display text-[length:var(--font-size-h1)] leading-8 font-bold tracking-tight">
           {title}
         </Titre>
         {description ? (
@@ -113,7 +113,7 @@ export function TabsNav({
               href: item.href,
               'aria-current': item.current ? 'page' : undefined,
               className: cn(
-                '-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm transition-colors',
+                '-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm transition-colors duration-[var(--motion-fast)] ease-[var(--ease-standard)]',
                 item.current
                   ? 'border-[var(--accent)] font-semibold text-[var(--foreground)]'
                   : 'border-transparent font-medium text-[var(--foreground-muted)] hover:border-[var(--border-strong)] hover:text-[var(--foreground)]',
