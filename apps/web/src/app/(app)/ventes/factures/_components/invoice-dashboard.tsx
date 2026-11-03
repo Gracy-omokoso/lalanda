@@ -4,7 +4,14 @@
 // réponse de `GET /sales/invoices/stats`. Aucun calcul ici : mise en forme
 // (`invoice-dashboard-model.ts`) et composants SVG maison de `@lalanda/ui`.
 
-import { BarList, DonutChart, LineChart, Sparkline, type LineSeries } from '@lalanda/ui';
+import {
+  BarList,
+  ChartLegend,
+  DonutChart,
+  LineChart,
+  Sparkline,
+  type LineSeries,
+} from '@lalanda/ui';
 
 import type { InvoiceStats } from '@/lib/api';
 
@@ -116,7 +123,7 @@ export function InvoiceDashboard({
           <div className={`${CARTE} flex flex-col gap-2 px-4 py-3.5`}>
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
               <h2 className="text-[13px] font-semibold">Facturé et encaissé, 12 derniers mois</h2>
-              <ChartLegendInline series={series} />
+              <ChartLegend series={series} />
             </div>
             <LineChart
               title={`Facturé et encaissé par mois, de ${moisLong(stats.from)} à ${moisLong(stats.to)}, en ${stats.currency}`}
@@ -162,30 +169,6 @@ export function InvoiceDashboard({
         {exclusions ? ` ${exclusions[0]!.toUpperCase()}${exclusions.slice(1)}` : ''}
       </p>
     </section>
-  );
-}
-
-/** Légende écrite des courbes, en ligne avec le titre (comme la maquette). */
-function ChartLegendInline({ series }: { series: readonly LineSeries[] }): React.ReactElement {
-  return (
-    <span aria-hidden="true" className="flex gap-3.5 text-xs text-[var(--foreground-muted)]">
-      {series.map((s) => (
-        <span key={s.id} className="inline-flex items-center gap-1.5">
-          {s.variant === 'dashed' ? (
-            <span
-              className="inline-block w-3 border-t-2 border-dashed"
-              style={{ borderColor: `var(--chart-${s.color})` }}
-            />
-          ) : (
-            <span
-              className="inline-block h-[3px] w-3 rounded-full"
-              style={{ background: `var(--chart-${s.color})` }}
-            />
-          )}
-          {s.label}
-        </span>
-      ))}
-    </span>
   );
 }
 

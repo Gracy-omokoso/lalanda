@@ -95,6 +95,8 @@ describe('documents de vente — lecture des sources', () => {
       'sales/invoices/invoice-drafts.service.ts',
       'sales/invoices/invoice-freezing.service.ts',
       'sales/invoices/invoice-numbering.service.ts',
+      // ADR-0056 : LECTEUR seulement (tableau de bord des factures) — vérifié ci-dessous.
+      'sales/invoices/invoice-stats.service.ts',
       // ADR-0024 (F2) : seul écrivain de la normalisation (`normalization`, statuts
       // `normalized` et `normalization_failed`).
       'sales/normalization/normalization-recorder.ts',
@@ -107,6 +109,7 @@ describe('documents de vente — lecture des sources', () => {
       'crm/overview/crm-overview.service.ts',
       'sales/receipts/settlements.service.ts',
       'sales/receipts/treasury-feed.service.ts',
+      'sales/invoices/invoice-stats.service.ts',
     ]) {
       const code = await readFile(resolve(SRC, lecteur), 'utf8');
       expect(code, lecteur).not.toMatch(

@@ -199,7 +199,8 @@ function addMonths(month: CalendarMonth, delta: number): CalendarMonth {
 function lastDayOf(month: CalendarMonth): CalendarDate {
   const y = Number(month.slice(0, 4));
   const m = Number(month.slice(5, 7));
-  const d = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+  const d = m === 2 ? (leap ? 29 : 28) : [4, 6, 9, 11].includes(m) ? 30 : 31;
   return `${month}-${String(d).padStart(2, '0')}`;
 }
 

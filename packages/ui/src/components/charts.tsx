@@ -86,11 +86,17 @@ export interface LineSeries {
 
 function LegendSwatch({ s }: { s: LineSeries }): React.ReactElement {
   return s.variant === 'dashed' ? (
-    <span
-      aria-hidden="true"
-      className="inline-block w-3 border-t-2 border-dashed"
-      style={{ borderColor: chartColor(s.color) }}
-    />
+    <svg aria-hidden="true" width={14} height={4} viewBox="0 0 14 4" className="shrink-0">
+      <line
+        x1={0}
+        x2={14}
+        y1={2}
+        y2={2}
+        stroke={chartColor(s.color)}
+        strokeWidth={2}
+        strokeDasharray="4 2"
+      />
+    </svg>
   ) : (
     <span
       aria-hidden="true"
@@ -100,7 +106,10 @@ function LegendSwatch({ s }: { s: LineSeries }): React.ReactElement {
   );
 }
 
-/** Légende écrite des séries (la couleur n'est jamais seule). */
+/**
+ * Légende écrite des séries (la couleur n'est jamais seule). Masquée des lecteurs
+ * d'écran : le tableau du graphique nomme déjà chaque série.
+ */
 export function ChartLegend({
   series,
   className,
@@ -110,6 +119,7 @@ export function ChartLegend({
 }): React.ReactElement {
   return (
     <ul
+      aria-hidden="true"
       className={cn(
         'flex flex-wrap items-center gap-x-3.5 gap-y-1 text-xs text-[var(--foreground-muted)]',
         className,
@@ -288,29 +298,33 @@ export function LineChart({
           </span>
         ))}
       </div>
-      <table className="sr-only">
-        <caption>{title}</caption>
-        <thead>
-          <tr>
-            <th scope="col">Période</th>
-            {series.map((s) => (
-              <th key={s.id} scope="col">
-                {s.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {full.map((l, i) => (
-            <tr key={`${l}-${i}`}>
-              <th scope="row">{l}</th>
+      {/* `sr-only` sur un conteneur : un tableau ignore la largeur de 1 px et
+          déborderait de la page sur téléphone. */}
+      <div className="sr-only">
+        <table>
+          <caption>{title}</caption>
+          <thead>
+            <tr>
+              <th scope="col">Période</th>
               {series.map((s) => (
-                <td key={s.id}>{formatValue(s.values[i] ?? 0)}</td>
+                <th key={s.id} scope="col">
+                  {s.label}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {full.map((l, i) => (
+              <tr key={`${l}-${i}`}>
+                <th scope="row">{l}</th>
+                {series.map((s) => (
+                  <td key={s.id}>{formatValue(s.values[i] ?? 0)}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -350,7 +364,7 @@ export function DonutChart({
   const stroke = 16;
   const radius = 50 - stroke / 2;
   return (
-    <div className={cn('flex flex-wrap items-center gap-4', className)}>
+    <div className={cn('flex flex-wrap items-center gap-3', className)}>
       <div aria-hidden="true" className="relative shrink-0" style={{ width: size, height: size }}>
         <svg viewBox="0 0 100 100" className="chart-fade h-full w-full -rotate-90">
           <circle
@@ -385,7 +399,7 @@ export function DonutChart({
           <span className="text-[11px] text-[var(--foreground-muted)]">{totalLabel}</span>
         </span>
       </div>
-      <ul aria-hidden="true" className="flex min-w-[8.5rem] flex-1 flex-col gap-1.5 text-xs">
+      <ul aria-hidden="true" className="flex min-w-[7rem] flex-1 flex-col gap-1.5 text-xs">
         {shown.map((s) => (
           <li key={s.id} className="flex items-center gap-1.5 whitespace-nowrap">
             <span
@@ -399,17 +413,21 @@ export function DonutChart({
           </li>
         ))}
       </ul>
-      <table className="sr-only">
-        <caption>{`${title} : ${total} ${totalLabel}`}</caption>
-        <tbody>
-          {slices.map((s) => (
-            <tr key={s.id}>
-              <th scope="row">{s.label}</th>
-              <td>{s.value}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {/* `sr-only` sur un conteneur : un tableau ignore la largeur de 1 px et
+          déborderait de la page sur téléphone. */}
+      <div className="sr-only">
+        <table>
+          <caption>{`${title} : ${total} ${totalLabel}`}</caption>
+          <tbody>
+            {slices.map((s) => (
+              <tr key={s.id}>
+                <th scope="row">{s.label}</th>
+                <td>{s.value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
