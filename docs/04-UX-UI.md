@@ -82,7 +82,7 @@ Décision : `docs/adr/ADR-0038-navigation-par-modules-et-initiatives.md`. Elle *
 
 ### Trois niveaux
 
-1. **Barre du haut** (`(app)/_components/app-header.tsx`) : marque et sélecteur d'organisation (≥ 1024 px), onglets **Accueil · BUILD · RUN · GROW** avec leur icône (`ModuleIcon` de `packages/ui` : blocs empilés, engrenage, pousse sur une courbe montante), Aide, thème (≥ 640 px ; sinon dans Mon compte › Préférences), avatar. Sous 1024 px, les onglets se réduisent à leur icône (nom accessible conservé) et le bouton du tiroir apparaît.
+1. **Barre du haut** (`(app)/_components/app-header.tsx`) : marque et sélecteur d'organisation (≥ 1024 px, hors module ; dans un module, en tête de la colonne de gauche depuis ADR-0056), fil d'Ariane (ADR-0056), onglets **Accueil · BUILD · RUN · GROW** avec leur icône (`ModuleIcon` de `packages/ui` : blocs empilés, engrenage, pousse sur une courbe montante), Aide, thème (≥ 640 px ; sinon dans Mon compte › Préférences), avatar. Sous 1024 px, les onglets se réduisent à leur icône (nom accessible conservé) et le bouton du tiroir apparaît.
 2. **Bureau du module** (`/build`, `/run`, `/grow`, composant `module-desk.tsx`) : tuiles des applications du module (icône, libellé, description), deux colonnes sur téléphone.
 3. **Page d'application** : la colonne de gauche (`sidebar.tsx`) ne liste que les applications du module courant ; « Factures » (Modèle de facture, Journal), « CRM » (Pipeline, Contacts, Réglages) et « Trésorerie » (Dépenses, Comptes, Réalisé vs prévu) se déroulent. Sur téléphone, la colonne est le tiroir. Hors module (accueil, compte, réglages), pas de colonne.
 
@@ -127,6 +127,15 @@ Décision : `docs/adr/ADR-0055-themes-et-design-professionnel.md`. Captures : `d
 - **Police** : IBM Plex Sans (texte), Archivo (titres), IBM Plex Mono (chiffres). **Échelle** : texte 14 px, tableaux 13 px, titres 24/18/15 px, appliquée au texte sans classe de `#contenu` et aux titres de `PageHeader` et `Modal`.
 - **Densité** : rayons 4/6/8 px ; `--control-h` 36 px et `--control-h-sm` 32 px (lus par `Button`), `--row-h` 40 px (tableaux, vague 3).
 - **Mouvement** : `--motion-fast` 120 ms, `--motion-base` 180 ms, `--motion-slow` 240 ms, `--ease-standard`. Seuls `Button`, les onglets `TabsNav` et les liens de navigation ont une transition de couleur au survol. Jamais de chiffres qui comptent, d'apparition au défilement, de rebond ni de transition de page lourde. Sous `prefers-reduced-motion: reduce`, toutes les transitions et animations sont ramenées à zéro.
+
+### Écran Factures, coquille et graphiques de la maquette (ADR-0056)
+
+Décision : `docs/adr/ADR-0056-ecran-factures-et-tableau-de-bord.md`. Captures (réel, maquette côte à côte, téléphone, état vide) : `docs/refonte-ui/v3/`.
+
+- **Coquille** : dans un module, colonne de gauche **pleine hauteur** de 240 px (marque, sélecteur d'organisation, applications rangées par **rubrique** — RUN : Opérations, Ventes, Gestion —, entrées de 32 px, entrée active à fond, gras et filet d'accent) ; **en-tête de 56 px sur la surface** : fil d'Ariane « RUN / Ventes / Factures » (`filAriane`, testé), onglets de modules compacts, aide, thème, cloche, avatar de 32 px. Hors module, marque et organisation restent dans l'en-tête. Tiroir et barre basse du téléphone inchangés.
+- **Graphiques maison** (`packages/ui` : `Sparkline`, `LineChart`, `DonutChart`, `BarList`, `ChartLegend`, `StatusPill`) : SVG sans bibliothèque, couleurs `--chart-*` seulement, légende écrite, tableau masqué visuellement avec toutes les valeurs, infobulle au survol en CSS. Une seule animation par élément (révélation, fondu, allongement, 240 ms, `charts.css`), coupée sous `prefers-reduced-motion`.
+- **Écran Factures** : en-tête compact (titre, Journal, Nouveau document) ; quatre cartes avec mini-courbe (facturé et encaissé sur 12 mois, reste à encaisser, retard) ; courbe facturé/encaissé, anneau par statut, meilleurs clients ; onglets de statut **avec compteurs**, recherche et type sur une barre ; **tableau dense** (`--row-h`, colonnes Numéro, Client, Type, Émise le, Montant TTC, Statut, Aperçu), ligne entière cliquable, étiquette de statut et de règlement (« En retard · 5 j »). Sur téléphone : cartes deux par deux sans mini-courbe, liste compacte à la place du tableau, aucun défilement horizontal à 375 px.
+- Tous les chiffres viennent de `GET /sales/invoices/stats` (docs/16) : l'écran n'additionne rien. Chargement : blocs à la place des cartes ; échec : phrase et « Réessayer », la liste reste utilisable ; organisation sans facture émise : cartes à zéro et une phrase à la place des graphiques.
 
 ### Fenêtres modales
 

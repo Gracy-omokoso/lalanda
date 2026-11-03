@@ -158,3 +158,8 @@ Décideurs :
   rayons 4/6/8 px, principes de mouvement (120/180/240 ms, rien qui compte, rebondit ou apparaît au
   défilement ; réduction des animations respectée), jetons de graphique pour des SVG maison (vague 4),
   liens légaux vers le menu Aide (vague 2). Statut : **accepté** (3 nov. 2026).
+- [ADR-0056](ADR-0056-ecran-factures-et-tableau-de-bord.md) — Écran Factures de la maquette en tranche
+  verticale : colonne pleine hauteur rangée par rubrique et en-tête compact à fil d'Ariane, graphiques
+  SVG maison (`packages/ui`), `GET /sales/invoices/stats` calculé par le moteur (TTC, devise de
+  référence, taux figé sur la facture, retard = échéance dépassée et non soldée), tableau dense.
+  Statut : **proposé** (3 nov. 2026).

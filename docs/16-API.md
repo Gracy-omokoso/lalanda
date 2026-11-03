@@ -465,6 +465,14 @@ Codes : `422 RECEIPT_INVALID` (`details.issues` du moteur : `RECEIPT_ALLOCATIONS
 
 Intégration avec la trésorerie (26 oct. 2026, amendements d'ADR-0031 et ADR-0034) : `accountId` d'un encaissement est un compte de trésorerie de l'organisation (`404 TREASURY_ACCOUNT_NOT_FOUND`), actif (`400 ACCOUNT_INACTIVE`), de la même devise (`400 RECEIPT_ACCOUNT_CURRENCY_MISMATCH`) et ouvert à la date de réception (`400 RECEIPT_BEFORE_ACCOUNT_OPENING`). `projectId` et `exerciseStart` du pont sont le rattachement commun aux deux ponts : `409 RUN_LINK_IN_USE` (`details.otherBridge`) s'ils changent sous le report des dépenses actif ; `409 LINE_FED_BY_OTHER_BRIDGE` si la ligne est visée par ce report. La synchronisation rend `OTHER_SOURCE_PRESENT` sur une case déjà alimentée par les dépenses. `LINE_FED_BY_RUN` porte `details.sources[ligne]` (`run.sales` ou `run.expenses`).
 
+## Ventes — tableau de bord des factures — implémenté (ADR-0056)
+
+`GET /sales/invoices/stats` (`months` facultatif, 1 à 24, défaut 12 ; tout autre paramètre `400 INVALID_REQUEST`) — `sales.read`, organisation active, fonctionnalité `normalized_invoicing`. Contrat zod partagé : `@lalanda/shared/sales-invoices` (`InvoiceStatsSchema`). Calcul : moteur `computeInvoiceStats` (`receivables`, version `1.0.0`) ; rien n'est stocké.
+
+Réponse : `currency` et `currencySource` (`accounting_book` : monnaie de tenue de la comptabilité ; `default_cdf`), `asOf`, `from`, `to` ; `months[]` (`billed`, `collected` signés, `outstanding`, `overdue` en fin de mois) ; `totals` (`billed`, `collected`, `collectedRatePercent`, `invoiceCount`, `creditNoteCount`) ; `outstanding` et `overdue` au jour (`amount`, `count`) ; `categories[]` (`paid`, `to_collect`, `overdue`, `draft`, `pending_normalization`, `normalization_failed`, `credit_note`, `other_final`) ; `statusCounts` (mêmes définitions que les filtres de `GET /sales/invoices`) ; `topCustomers[]` (5) ; `excluded` (`deposits`, `testSeries`, `notConvertible[]` par devise avec total) ; `truncated` (au-delà de 20 000 documents) ; `version`.
+
+Règles (ADR-0056 § 3) : montants TTC dans la devise de référence, **au taux figé sur la facture** (total CDF normalisé, conversion du document ou contre-valeur USD) ; sans taux, exclus et comptés. Facturé = FV/EV finaux hors essai moins avoirs FA/EA finaux ; acomptes exclus et comptés. Encaissé = part réglée à l'émission + lettrages − remboursements à l'émission des avoirs. Retard = facture finale, échéance dépassée, non soldée (`computeSettlement`).
+
 ## Ventes — normalisation DGI — implémenté (S25f, ADR-0024 chantier F2)
 
 Contrat : ADR-0024 § 9. `POST …/normalize` envoie, compare et confirme d'un seul tenant ; un refus de la DGI n'est pas une erreur HTTP (200 avec l'état). La route est idempotente : une requête renvoyée (double clic, navigateur) trouve la prise en main et rend l'état courant sans rien envoyer.
