@@ -125,13 +125,13 @@ export function GestesRegles({
         {droits.creer ? (
           <Button
             size="sm"
-            variant="primary"
+            variant={jeux.some((j) => j.status === 'validated') ? 'secondary' : 'primary'}
             disabled={envoi}
             onClick={() =>
               void agir(() => accountingApi.createRuleSet(), 'La création des règles a échoué.')
             }
           >
-            Créer les règles depuis le plan comptable
+            {droits.libelleCreer}
           </Button>
         ) : null}
         {droits.modifier && brouillon && reprise && proposees ? (

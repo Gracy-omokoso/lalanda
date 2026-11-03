@@ -146,9 +146,12 @@ describe('droits sur les règles (accounting.manage)', () => {
       creer: true,
       modifier: false,
       raison: null,
+      libelleCreer: 'Créer les règles depuis le plan comptable',
     });
-    expect(actionsRegles(REGLAGES, [JEU(1, 'validated')], GERANT).creer).toBe(true);
-    expect(actionsRegles(REGLAGES, [JEU(2, 'draft')], GERANT)).toEqual({
+    const apres = actionsRegles(REGLAGES, [JEU(1, 'validated')], GERANT);
+    expect(apres.creer).toBe(true);
+    expect(apres.libelleCreer).toMatch(/nouvelle version.*copie de la version validée/);
+    expect(actionsRegles(REGLAGES, [JEU(2, 'draft')], GERANT)).toMatchObject({
       creer: false,
       modifier: true,
       raison: null,
@@ -168,7 +171,7 @@ describe('droits sur les règles (accounting.manage)', () => {
   });
 
   it('lectures en cours : rien n’est offert', () => {
-    expect(actionsRegles(REGLAGES, null, GERANT)).toEqual({
+    expect(actionsRegles(REGLAGES, null, GERANT)).toMatchObject({
       creer: false,
       modifier: false,
       raison: null,

@@ -89,8 +89,13 @@ export function repriseDuBrouillon(
 // ── Droits ──────────────────────────────────────────────────────────────────
 
 export interface ActionsRegles {
-  /** « Créer les règles depuis le plan comptable » est offert. */
+  /** Créer un brouillon est offert. */
   creer: boolean;
+  /**
+   * Bouton de création : depuis le plan (aucune version validée) ou nouvelle version,
+   * copie de la version validée (ce que fait le serveur).
+   */
+  libelleCreer: string;
   /** Le brouillon se modifie et se valide. */
   modifier: boolean;
   /** Pourquoi rien n'est offert ; `null` si c'est offert ou sans objet. */
@@ -102,13 +107,19 @@ export function actionsRegles(
   jeux: readonly AccountingRuleSetView[] | null,
   actions: readonly OrgAction[] | null,
 ): ActionsRegles {
-  if (jeux === null || reglages === null) return { creer: false, modifier: false, raison: null };
+  const libelleCreer = jeux?.some((j) => j.status === 'validated')
+    ? 'Préparer une nouvelle version (copie de la version validée)'
+    : 'Créer les règles depuis le plan comptable';
+  if (jeux === null || reglages === null) {
+    return { creer: false, modifier: false, raison: null, libelleCreer };
+  }
   const brouillon = brouillonDe(jeux);
   if (!peutParametrer(actions)) {
     return {
       creer: false,
       modifier: false,
       raison: 'Votre rôle ne permet pas de créer, modifier ou valider les règles.',
+      libelleCreer,
     };
   }
   if (brouillon === null && reglages.chartPack === null) {
@@ -116,9 +127,10 @@ export function actionsRegles(
       creer: false,
       modifier: false,
       raison: 'Choisissez d’abord un plan comptable : les règles en viennent.',
+      libelleCreer,
     };
   }
-  return { creer: brouillon === null, modifier: brouillon !== null, raison: null };
+  return { creer: brouillon === null, modifier: brouillon !== null, raison: null, libelleCreer };
 }
 
 // ── Modification d'une règle du brouillon ───────────────────────────────────
