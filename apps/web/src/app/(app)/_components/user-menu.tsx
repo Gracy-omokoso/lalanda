@@ -171,16 +171,14 @@ export function UserMenu({
         // Le nom accessible porte l'IDENTITÉ : l'avatar est `aria-hidden`, donc
         // c'est la seule chose qu'un lecteur d'écran entend de ce bouton.
         aria-label={libelleDeclencheur({ nom, email })}
-        className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] p-1 pr-2 text-[var(--foreground)] transition hover:bg-[var(--surface-muted)]"
+        // En-tête compact (ADR-0056) : l'avatar seul, 32 px, comme la maquette.
+        className="ml-1 inline-flex rounded-full text-[var(--foreground)] transition-shadow duration-[var(--motion-fast)] hover:shadow-[0_0_0_3px_var(--accent-soft)]"
       >
         <Avatar
           initiales={profil?.initials ?? null}
           photoUrl={profil?.avatarUrl ?? null}
           taille="sm"
         />
-        <span aria-hidden="true" className="text-xs opacity-50">
-          ▾
-        </span>
       </button>
 
       {open ? (
@@ -299,7 +297,9 @@ function Avatar({
 }): React.ReactElement {
   const [photoCassee, setPhotoCassee] = useState(false);
   const dimensions =
-    taille === 'sm' ? 'h-7 w-7 text-[0.6rem] border' : 'h-10 w-10 text-xs border-2';
+    taille === 'sm'
+      ? 'h-8 w-8 text-xs font-semibold bg-[var(--accent-soft)]'
+      : 'h-10 w-10 text-xs border-2 font-black bg-[var(--surface)]';
 
   // Une nouvelle URL mérite une nouvelle chance : sans cette remise à zéro, une
   // photo remplacée après un échec resterait masquée jusqu'au rechargement.
@@ -312,7 +312,7 @@ function Avatar({
       // L'identité est déjà dans le nom accessible du bouton (déclencheur) et
       // dans le texte voisin (panneau) : la répéter serait du bruit.
       aria-hidden="true"
-      className={`font-display relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border-[var(--accent)] bg-[var(--surface)] font-black text-[var(--accent)] ${dimensions}`}
+      className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border-[var(--accent)] text-[var(--accent)] ${taille === 'md' ? 'font-display' : ''} ${dimensions}`}
     >
       {initiales ?? ''}
       {photoUrl !== null && !photoCassee ? (

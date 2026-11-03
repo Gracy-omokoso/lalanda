@@ -161,7 +161,7 @@ export function NotificationsBell(): React.ReactElement {
         aria-expanded={ouvert}
         aria-label={nomAccessibleCloche(nonLues + annonces.nonLues)}
         title="Notifications"
-        className="relative inline-flex h-9 w-9 items-center justify-center rounded-full text-[var(--nav-muted)] transition hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-fg)]"
+        className="relative inline-flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] text-[var(--foreground-muted)] transition-colors duration-[var(--motion-fast)] hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]"
       >
         <svg
           aria-hidden="true"
@@ -171,7 +171,7 @@ export function NotificationsBell(): React.ReactElement {
           strokeWidth="1.8"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className="h-5 w-5"
+          className="h-4 w-4"
         >
           <path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
           <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
@@ -179,7 +179,7 @@ export function NotificationsBell(): React.ReactElement {
         {pastille ? (
           <span
             aria-hidden="true"
-            className="absolute -right-0.5 -top-0.5 inline-flex h-[1.1rem] min-w-[1.1rem] items-center justify-center rounded-full bg-[var(--nav-accent)] px-1 text-[0.65rem] font-bold leading-none text-[var(--nav-bg)]"
+            className="absolute -right-0.5 -top-0.5 inline-flex h-[1.1rem] min-w-[1.1rem] items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[0.65rem] font-bold leading-none text-[var(--accent-foreground)]"
           >
             {pastille}
           </span>

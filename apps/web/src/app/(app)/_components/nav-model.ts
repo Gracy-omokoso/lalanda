@@ -929,6 +929,75 @@ export function ordreAccueil(modules: readonly ModuleId[] | null): ModuleId[] {
   ];
 }
 
+// ─── Rubriques et fil d'Ariane (ADR-0056) ───────────────────────────────────
+
+/**
+ * Rubrique d'une application dans la colonne de gauche : un intitulé discret
+ * au-dessus d'un groupe d'applications CONTIGUËS, comme la maquette validée le
+ * 3 nov. 2026. Un rangement, jamais un accès ; une application sans rubrique
+ * s'affiche sans intitulé. Sert aussi de second maillon au fil d'Ariane
+ * (« RUN › Ventes › Factures »).
+ */
+export const RUBRIQUES: Readonly<Record<string, string>> = {
+  projets: 'Opérations',
+  rh: 'Opérations',
+  crm: 'Ventes',
+  factures: 'Ventes',
+  devis: 'Ventes',
+  encaissements: 'Ventes',
+  clients: 'Ventes',
+  catalogue: 'Ventes',
+  achats: 'Gestion',
+  tresorerie: 'Gestion',
+  stocks: 'Gestion',
+  equipements: 'Gestion',
+  documents: 'Gestion',
+  comptabilite: 'Gestion',
+};
+
+export interface GroupeApplications {
+  rubrique: string | null;
+  apps: NavApp[];
+}
+
+/** Applications regroupées par rubrique, dans leur ordre (groupes contigus). */
+export function groupesApplications(apps: readonly NavApp[]): GroupeApplications[] {
+  const groupes: GroupeApplications[] = [];
+  for (const app of apps) {
+    const rubrique = RUBRIQUES[app.id] ?? null;
+    const dernier = groupes[groupes.length - 1];
+    if (dernier && dernier.rubrique === rubrique) dernier.apps.push(app);
+    else groupes.push({ rubrique, apps: [app] });
+  }
+  return groupes;
+}
+
+export interface MaillonAriane {
+  label: string;
+  /** `null` : maillon non cliquable (rubrique, page courante). */
+  href: string | null;
+}
+
+/**
+ * Fil d'Ariane de l'en-tête : module › rubrique › application › sous-option.
+ * Le dernier maillon est la page (non cliquable). Hors module : vide.
+ */
+export function filAriane(pathname: string): MaillonAriane[] {
+  const courant = moduleCourant(pathname);
+  if (courant === null) return [];
+  const m = moduleParId(courant);
+  const trouve = correspondance(pathname);
+  if (trouve === null || trouve.app.module !== courant) return [{ label: m.label, href: null }];
+  const fil: MaillonAriane[] = [{ label: m.label, href: m.href }];
+  const rubrique = RUBRIQUES[trouve.app.id];
+  if (rubrique) fil.push({ label: rubrique, href: null });
+  const sous =
+    trouve.sousOption && trouve.sousOption.href !== trouve.app.href ? trouve.sousOption : null;
+  fil.push({ label: trouve.app.label, href: sous ? trouve.app.href : null });
+  if (sous) fil.push({ label: sous.label, href: null });
+  return fil;
+}
+
 // ─── Choix des modules (mise en route, étape 4) ─────────────────────────────
 
 /**

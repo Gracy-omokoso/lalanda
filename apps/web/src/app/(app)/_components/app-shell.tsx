@@ -1,10 +1,13 @@
 'use client';
 
-// Coquille de l'application (ADR-0038 § 2 ; ADR-0030 § 5 et § 6).
+// Coquille de l'application (ADR-0038 § 2 ; ADR-0030 § 5 et § 6 ; ADR-0056).
 //
-//   Barre du haut, pleine largeur : Accueil · BUILD · RUN · GROW (niveau 1).
-//   ≥ 1024 px : dans un module, colonne de ses seules applications (repliable
-//               en rail) + zone de contenu ; hors module, contenu pleine largeur.
+//   ≥ 1024 px, dans un module : colonne pleine hauteur (marque, organisation,
+//               applications du module rangées par rubrique, repliable en rail)
+//               et, à sa droite, l'en-tête compact (fil d'Ariane, modules,
+//               aide, thème, compte) au-dessus du contenu.
+//   Hors module : en-tête pleine largeur (marque et organisation en tête),
+//               contenu pleine largeur.
 //   < 1024 px : la colonne devient un tiroir, et — si le rôle lit les ventes —
 //               barre d'actions basse centrée sur RUN.
 //
@@ -80,12 +83,8 @@ function Coquille({ children }: { children: React.ReactNode }): React.ReactEleme
     boutonTiroir.current?.focus();
   }, []);
 
-  const grille = replie
-    ? 'lg:grid-cols-[var(--sidebar-rail)_minmax(0,1fr)]'
-    : 'lg:grid-cols-[var(--sidebar-width)_minmax(0,1fr)]';
-
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen">
       <a
         href="#contenu"
         className="sr-only z-50 rounded-[var(--radius-md)] bg-[var(--surface)] px-4 py-2 text-sm font-medium focus:not-sr-only focus:fixed focus:left-3 focus:top-3"
@@ -93,57 +92,59 @@ function Coquille({ children }: { children: React.ReactNode }): React.ReactEleme
         Aller au contenu
       </a>
 
-      <AppHeader onOuvrirNavigation={ouvrirTiroir} />
-
-      <div className={`flex-1 ${moduleActif !== null ? `lg:grid ${grille}` : ''}`}>
-        {moduleActif !== null ? (
-          <aside className="nav-panel sticky top-14 hidden h-[calc(100vh-3.5rem)] flex-col border-r border-[var(--nav-border)] bg-[var(--nav-bg)] text-[var(--nav-fg)] lg:flex">
-            <div className="min-h-0 flex-1">
-              <SidebarNav module={moduleActif} replie={replie} />
-            </div>
-            <div
-              className={`border-t border-[var(--nav-border)] p-2 ${replie ? 'flex justify-center' : ''}`}
+      {/* ≥ 1024 px, dans un module : colonne pleine hauteur, marque et
+          organisation en tête (maquette validée, ADR-0056). */}
+      {moduleActif !== null ? (
+        <aside
+          className={`nav-panel sticky top-0 hidden h-screen shrink-0 flex-col border-r border-[var(--nav-border)] bg-[var(--nav-bg)] text-[var(--nav-fg)] lg:flex ${replie ? 'w-[var(--sidebar-rail)]' : 'w-[var(--sidebar-width)]'}`}
+        >
+          <div className="min-h-0 flex-1">
+            <SidebarNav module={moduleActif} replie={replie} />
+          </div>
+          <div
+            className={`border-t border-[var(--nav-border)] p-2 ${replie ? 'flex justify-center' : ''}`}
+          >
+            <button
+              type="button"
+              onClick={basculerRepli}
+              aria-expanded={!replie}
+              aria-label={replie ? 'Déplier la navigation' : 'Replier la navigation'}
+              title={replie ? 'Déplier la navigation' : 'Replier la navigation'}
+              className="flex h-8 items-center gap-2 rounded-[var(--radius-md)] px-2.5 text-xs text-[var(--nav-muted)] transition-colors duration-[var(--motion-fast)] hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-fg)]"
             >
-              <button
-                type="button"
-                onClick={basculerRepli}
-                aria-expanded={!replie}
-                aria-label={replie ? 'Déplier la navigation' : 'Replier la navigation'}
-                title={replie ? 'Déplier la navigation' : 'Replier la navigation'}
-                className="flex h-9 items-center gap-2 rounded-[var(--radius-sm)] px-2 text-xs text-[var(--nav-muted)] transition hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-fg)]"
-              >
-                <IconeNav id="replier" className="h-4 w-4" />
-                {replie ? null : <span>Replier</span>}
-              </button>
-            </div>
-          </aside>
-        ) : null}
+              <IconeNav id="replier" className="h-4 w-4" />
+              {replie ? null : <span>Replier</span>}
+            </button>
+          </div>
+        </aside>
+      ) : null}
 
-        <div className="flex min-w-0 flex-col">
-          <main
-            id="contenu"
-            tabIndex={-1}
-            className={`mx-auto flex w-full max-w-[120rem] flex-1 flex-col gap-6 px-4 pt-6 ${avecBarre ? 'pb-28' : 'pb-10'} outline-none sm:px-6 lg:px-8 lg:pb-10 lg:pt-8`}
-          >
-            {/* Nouvelle acceptation des conditions (ADR-0043) : fenêtre
-                bloquante si l'accord est périmé, bandeau si la vérification
-                échoue, rien tant que la réponse n'est pas arrivée. */}
-            <TermsGate />
-            <PendingInvitationsBanner />
-            {/* ADR-0053 — P6 : annonce de la plateforme, quelle que soit l'organisation. */}
-            <AnnoncesBanniere />
-            <div className="flex-1">{children}</div>
-          </main>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <AppHeader onOuvrirNavigation={ouvrirTiroir} avecColonne={moduleActif !== null} />
 
-          {/* Pied de page légal (S22c) et version du logiciel, visible de tout
-              écran (ADR-0026 § 6.2). */}
-          <footer
-            className={`mx-auto flex ${avecBarre ? 'mb-24' : ''} w-full max-w-[120rem] flex-col gap-3 border-t border-[var(--border)] px-4 py-5 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:mb-0 lg:px-8`}
-          >
-            <LegalLinks />
-            <AppVersion className="text-xs text-[var(--foreground-muted)]" />
-          </footer>
-        </div>
+        <main
+          id="contenu"
+          tabIndex={-1}
+          className={`mx-auto flex w-full max-w-[120rem] flex-1 flex-col gap-6 px-4 pt-5 ${avecBarre ? 'pb-28' : 'pb-10'} outline-none sm:px-6 lg:px-8 lg:pb-10 lg:pt-5`}
+        >
+          {/* Nouvelle acceptation des conditions (ADR-0043) : fenêtre
+              bloquante si l'accord est périmé, bandeau si la vérification
+              échoue, rien tant que la réponse n'est pas arrivée. */}
+          <TermsGate />
+          <PendingInvitationsBanner />
+          {/* ADR-0053 — P6 : annonce de la plateforme, quelle que soit l'organisation. */}
+          <AnnoncesBanniere />
+          <div className="flex-1">{children}</div>
+        </main>
+
+        {/* Pied de page légal (S22c) et version du logiciel, visible de tout
+            écran (ADR-0026 § 6.2). */}
+        <footer
+          className={`mx-auto flex ${avecBarre ? 'mb-24' : ''} w-full max-w-[120rem] flex-col gap-3 border-t border-[var(--border)] px-4 py-5 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:mb-0 lg:px-8`}
+        >
+          <LegalLinks />
+          <AppVersion className="text-xs text-[var(--foreground-muted)]" />
+        </footer>
       </div>
 
       {tiroir ? <Tiroir module={moduleActif} onFermer={fermerTiroir} /> : null}

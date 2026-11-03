@@ -30,7 +30,14 @@ function readForcedDark(): boolean {
   return document.documentElement.dataset['uiTheme'] === 'ebene';
 }
 
-export function ThemeToggle({ persist = false }: { persist?: boolean }): React.ReactElement {
+export function ThemeToggle({
+  persist = false,
+  discret = false,
+}: {
+  persist?: boolean;
+  /** Sans cadre ni fond (en-tête compact, ADR-0056). */
+  discret?: boolean;
+}): React.ReactElement {
   // Éviter l'hydration mismatch : on démarre en "light" côté serveur,
   // puis on lit l'état réel après le mount.
   const [theme, setTheme] = useState<ResolvedTheme>('light');
@@ -86,7 +93,7 @@ export function ThemeToggle({ persist = false }: { persist?: boolean }): React.R
             ? 'Mode clair'
             : 'Mode sombre'
       }
-      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground-muted)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-60"
+      className={`inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--foreground-muted)] transition-colors duration-[var(--motion-fast)] hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-60 ${discret ? '' : 'border border-[var(--border)] bg-[var(--surface)]'}`}
     >
       {/* Icônes au trait plutôt qu'emoji : un emoji est dessiné par la police du
           système — il change d'aspect d'une plateforme à l'autre, arrive en

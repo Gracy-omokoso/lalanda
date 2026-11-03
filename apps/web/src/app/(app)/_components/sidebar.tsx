@@ -23,6 +23,7 @@ import {
   appActive,
   appsVisibles,
   explicationOffre,
+  groupesApplications,
   moduleParId,
   NAV_MODULES,
   sousOptionActive,
@@ -40,37 +41,36 @@ const COULEUR_NAV: Record<ModuleId, string> = {
 export function SidebarNav({
   module,
   replie = false,
-  tiroir = false,
   onNavigate,
 }: {
   /** Module courant ; `null` hors module (le tiroir liste alors les modules). */
   module: ModuleId | null;
   /** Rail d'icônes (bureau, replié). Les noms restent accessibles. */
   replie?: boolean;
-  /** Rendu dans le tiroir du téléphone : marque et sélecteur d'organisation en tête. */
+  /** Rendu dans le tiroir du téléphone (le bouton de fermeture est posé par le tiroir). */
   tiroir?: boolean;
   /** Appelé au clic sur une entrée (le tiroir mobile se ferme). */
   onNavigate?: () => void;
 }): React.ReactElement {
   return (
     <div className="flex h-full flex-col">
-      {tiroir ? (
-        <>
-          <div className="px-5 pb-4 pt-5">
-            <Link
-              href={ACCUEIL_HREF}
-              aria-label="Lalanda — accueil"
-              onClick={onNavigate}
-              className="inline-flex shrink-0 items-center transition hover:opacity-80"
-            >
-              <BrandLogo hauteur={28} fond="nav" />
-            </Link>
-          </div>
-          <div className="px-3">
-            <OrgSwitcher />
-          </div>
-        </>
-      ) : null}
+      {/* Marque et organisation en tête de colonne, comme la maquette validée
+          (ADR-0056) : sur le bureau comme dans le tiroir du téléphone. */}
+      <div
+        className={`flex h-14 shrink-0 items-center border-b border-[var(--nav-border)] ${replie ? 'justify-center px-2' : 'px-[18px]'}`}
+      >
+        <Link
+          href={ACCUEIL_HREF}
+          aria-label="Lalanda — accueil"
+          onClick={onNavigate}
+          className="inline-flex shrink-0 items-center transition-opacity duration-[var(--motion-fast)] hover:opacity-80"
+        >
+          <BrandLogo hauteur={replie ? 15 : 26} fond="nav" />
+        </Link>
+      </div>
+      <div className={replie ? 'flex justify-center p-3' : 'p-3'}>
+        <OrgSwitcher replie={replie} />
+      </div>
       {module === null ? (
         <ListeModules onNavigate={onNavigate} />
       ) : (
@@ -87,7 +87,7 @@ function ListeModules({
   onNavigate: (() => void) | undefined;
 }): React.ReactElement {
   return (
-    <nav aria-label="Modules" className="mt-5 flex-1 overflow-y-auto px-3 pb-4">
+    <nav aria-label="Modules" className="mt-1 flex-1 overflow-y-auto px-3 pb-4">
       <ul className="flex flex-col gap-1">
         {NAV_MODULES.map((m) => (
           <li key={m.id}>
@@ -127,11 +127,12 @@ function ListeApplications({
   const fonctionnalites = useMesFonctionnalites(actions);
   const active = appActive(pathname, apps);
   const sousActive = sousOptionActive(pathname, apps);
+  const groupes = groupesApplications(apps);
 
   return (
     <nav
       aria-label={`Applications ${m.label}`}
-      className="mt-4 flex-1 overflow-y-auto overscroll-contain px-3 pb-4"
+      className="flex-1 overflow-y-auto overscroll-contain px-3 pb-4 pt-1"
     >
       <Link
         href={m.href}
@@ -139,37 +140,56 @@ function ListeApplications({
         aria-current={pathname === m.href ? 'page' : undefined}
         aria-label={replie ? `${m.label} — ${m.verb}` : undefined}
         title={replie ? `${m.label} — ${m.verb}` : undefined}
-        className={`mb-2 flex items-center rounded-[var(--radius-sm)] font-mono text-[0.72rem] uppercase tracking-[0.14em] transition-colors duration-[var(--motion-fast)] ease-[var(--ease-standard)] hover:bg-[var(--nav-active-bg)] ${replie ? 'mx-auto h-10 w-10 justify-center' : 'gap-2.5 px-2 py-2'}`}
+        className={`mb-2 flex items-center rounded-[var(--radius-md)] text-[11px] transition-colors duration-[var(--motion-fast)] ease-[var(--ease-standard)] hover:bg-[var(--nav-active-bg)] ${replie ? 'mx-auto h-8 w-8 justify-center' : 'h-8 gap-2 px-2.5'}`}
       >
         <ModuleIcon module={module} className={`h-4 w-4 ${COULEUR_NAV[module]}`} />
         {replie ? null : (
           <>
-            <span className="font-semibold text-[var(--nav-fg)]">{m.label}</span>
-            <span className="normal-case tracking-normal text-[var(--nav-muted)]">{m.verb}</span>
+            <span className="font-semibold tracking-[0.6px] text-[var(--nav-fg)]">{m.label}</span>
+            <span className="text-[var(--nav-muted)]">{m.verb}</span>
           </>
         )}
       </Link>
       {apps.length === 0 ? (
         replie ? null : (
-          <p className="px-2 text-xs leading-5 text-[var(--nav-muted)]">
+          <p className="px-2.5 text-xs leading-5 text-[var(--nav-muted)]">
             Aucune application de ce module n’est ouverte à votre rôle.
           </p>
         )
       ) : (
-        <ul className={replie ? 'flex flex-col items-center gap-1' : 'flex flex-col gap-0.5'}>
-          {apps.map((app) => (
-            <li key={app.id}>
-              <Application
-                app={app}
-                actif={active === app.id}
-                sousActive={sousActive}
-                replie={replie}
-                onNavigate={onNavigate}
-                explication={explicationOffre(app.id, fonctionnalites)}
-              />
-            </li>
+        <div className={replie ? 'flex flex-col items-center gap-3' : 'flex flex-col gap-3.5'}>
+          {groupes.map((g, gi) => (
+            <div key={g.rubrique ?? `groupe-${gi}`} className="flex flex-col gap-px">
+              {g.rubrique && !replie ? (
+                <p className="flex items-center gap-2 px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-[0.6px] text-[var(--nav-muted)]">
+                  <span
+                    aria-hidden="true"
+                    className="h-[7px] w-[7px] rounded-full"
+                    style={{ background: `var(--nav-${module})` }}
+                  />
+                  {g.rubrique}
+                </p>
+              ) : null}
+              <ul
+                aria-label={g.rubrique ?? undefined}
+                className={replie ? 'flex flex-col items-center gap-1' : 'flex flex-col gap-px'}
+              >
+                {g.apps.map((app) => (
+                  <li key={app.id}>
+                    <Application
+                      app={app}
+                      actif={active === app.id}
+                      sousActive={sousActive}
+                      replie={replie}
+                      onNavigate={onNavigate}
+                      explication={explicationOffre(app.id, fonctionnalites)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </nav>
   );
@@ -223,11 +243,13 @@ function Application({
   }, [actif]);
 
   const courante = actif && sousActive === null;
+  // Maquette validée (ADR-0056) : 32 px, 13 px ; active = fond, gras et filet
+  // d'accent à gauche ; inactive en encre de barre adoucie (lisible, pas grise).
   const base =
-    'group relative flex min-w-0 flex-1 items-center rounded-[var(--radius-sm)] text-sm transition-colors duration-[var(--motion-fast)] ease-[var(--ease-standard)]';
+    'group relative flex min-w-0 flex-1 items-center rounded-[var(--radius-md)] text-[13px] transition-colors duration-[var(--motion-fast)] ease-[var(--ease-standard)]';
   const etat = actif
-    ? 'bg-[var(--nav-active-bg)] font-semibold text-[var(--nav-active-fg)]'
-    : 'text-[var(--nav-muted)] hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-fg)]';
+    ? 'bg-[var(--nav-active-bg)] font-semibold text-[var(--nav-active-fg)] shadow-[inset_2px_0_0_var(--nav-accent)]'
+    : 'text-[color-mix(in_srgb,var(--nav-fg)_86%,var(--nav-bg))] hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-fg)]';
   const idListe = `sous-options-${app.id}`;
 
   return (
@@ -241,15 +263,9 @@ function Application({
           // et `title` le montre au survol. Jamais une icône muette.
           aria-label={replie ? app.label : undefined}
           title={replie ? (explication ? `${app.label} — ${explication}` : app.label) : undefined}
-          className={`${base} ${etat} ${replie ? 'h-10 w-10 flex-none justify-center' : 'gap-3 py-2 pl-2 pr-2'}`}
+          className={`${base} ${etat} ${replie ? 'h-9 w-9 flex-none justify-center' : explication ? 'min-h-8 gap-2.5 px-2.5 py-1' : 'h-8 gap-2.5 px-2.5'}`}
         >
-          {actif ? (
-            <span
-              aria-hidden="true"
-              className="absolute bottom-1.5 left-0 top-1.5 w-[3px] rounded-full bg-[var(--nav-accent)]"
-            />
-          ) : null}
-          <IconeNav id={app.icon} className="h-[1.05rem] w-[1.05rem] shrink-0" />
+          <IconeNav id={app.icon} className="h-4 w-4 shrink-0" />
           {replie ? null : explication ? (
             <span className="flex min-w-0 flex-col">
               <span className="truncate">{app.label}</span>
@@ -268,11 +284,11 @@ function Application({
             aria-expanded={ouvert}
             aria-controls={idListe}
             aria-label={`${ouvert ? 'Replier' : 'Déplier'} ${app.label}`}
-            className="inline-flex h-9 w-8 shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-[var(--nav-muted)] transition hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-fg)]"
+            className="inline-flex h-8 w-7 shrink-0 items-center justify-center rounded-[var(--radius-md)] text-[var(--nav-muted)] transition-colors duration-[var(--motion-fast)] hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-fg)]"
           >
             <IconeNav
               id="chevron"
-              className={`h-4 w-4 transition-transform motion-reduce:transition-none ${ouvert ? 'rotate-180' : ''}`}
+              className={`h-3.5 w-3.5 transition-transform duration-[var(--motion-base)] ease-[var(--ease-standard)] motion-reduce:transition-none ${ouvert ? 'rotate-180' : ''}`}
             />
           </button>
         ) : null}
@@ -280,7 +296,7 @@ function Application({
       {aSousOptions && ouvert ? (
         <ul
           id={idListe}
-          className="mb-1 ml-[1.15rem] mt-0.5 border-l border-[var(--nav-border)] pl-3"
+          className="mb-1 ml-[1.15rem] mt-px border-l border-[var(--nav-border)] pl-2.5"
         >
           {app.sousOptions.map((s) => {
             const allumee = sousActive === s.id;
@@ -290,7 +306,7 @@ function Application({
                   href={s.href}
                   onClick={onNavigate}
                   aria-current={allumee ? 'page' : undefined}
-                  className={`block truncate rounded-[var(--radius-sm)] px-2 py-1.5 text-[0.8rem] transition-colors duration-[var(--motion-fast)] ease-[var(--ease-standard)] ${allumee ? 'font-semibold text-[var(--nav-active-fg)]' : 'text-[var(--nav-muted)] hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-fg)]'}`}
+                  className={`flex h-7 items-center truncate rounded-[var(--radius-md)] px-2 text-[12.5px] transition-colors duration-[var(--motion-fast)] ease-[var(--ease-standard)] ${allumee ? 'font-semibold text-[var(--nav-active-fg)]' : 'text-[var(--nav-muted)] hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-fg)]'}`}
                 >
                   {s.label}
                 </Link>

@@ -42,7 +42,38 @@ import {
 } from './org-switcher-model';
 import { useShell } from './shell-context';
 
-export function OrgSwitcher({ replie = false }: { replie?: boolean }): React.ReactElement {
+/**
+ * `nav` : dans la barre de navigation (jetons `--nav-*`) ; `surface` : dans
+ * l'en-tête clair, hors module sur grand écran (ADR-0056).
+ */
+export type VarianteSelecteur = 'nav' | 'surface';
+
+const CLASSES_VARIANTE: Record<
+  VarianteSelecteur,
+  { bouton: string; replie: string; discret: string }
+> = {
+  nav: {
+    bouton:
+      'border-[var(--nav-border)] bg-[color-mix(in_srgb,var(--nav-fg)_6%,var(--nav-bg))] text-[var(--nav-fg)] hover:bg-[var(--nav-active-bg)]',
+    replie: 'border-[var(--nav-border)] text-[var(--nav-fg)] hover:bg-[var(--nav-active-bg)]',
+    discret: 'text-[var(--nav-muted)]',
+  },
+  surface: {
+    bouton:
+      'border-[var(--border)] bg-[var(--surface-muted)] text-[var(--foreground)] hover:bg-[var(--accent-soft)]',
+    replie: 'border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--accent-soft)]',
+    discret: 'text-[var(--foreground-muted)]',
+  },
+};
+
+export function OrgSwitcher({
+  replie = false,
+  variante = 'nav',
+}: {
+  replie?: boolean;
+  variante?: VarianteSelecteur;
+}): React.ReactElement {
+  const classes = CLASSES_VARIANTE[variante];
   const { subscription } = useShell();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [orgs, setOrgs] = useState<OrganizationView[] | null>(null);
@@ -137,8 +168,8 @@ export function OrgSwitcher({ replie = false }: { replie?: boolean }): React.Rea
         aria-label={`Organisation active : ${active?.name ?? 'chargement'}${offre ? ` — ${offre}` : ''}. Changer d’organisation`}
         className={
           replie
-            ? 'flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] border border-[var(--nav-border)] font-display text-sm font-bold text-[var(--nav-fg)] transition hover:bg-[var(--nav-active-bg)]'
-            : 'flex w-full items-center gap-3 rounded-[var(--radius-md)] border border-[var(--nav-border)] px-3 py-2 text-left text-[var(--nav-fg)] transition hover:bg-[var(--nav-active-bg)]'
+            ? `flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] border font-display text-sm font-bold transition-colors duration-[var(--motion-fast)] ${classes.replie}`
+            : `flex w-full items-center gap-2 rounded-[var(--radius-md)] border px-2.5 py-2 text-left transition-colors duration-[var(--motion-fast)] ${classes.bouton}`
         }
         aria-haspopup="menu"
         aria-expanded={open}
@@ -147,13 +178,13 @@ export function OrgSwitcher({ replie = false }: { replie?: boolean }): React.Rea
           <span aria-hidden="true">{(active?.name ?? '·').slice(0, 1).toUpperCase()}</span>
         ) : (
           <>
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-sm font-semibold">
+            <span className="flex min-w-0 flex-1 flex-col leading-tight">
+              <span className="truncate text-[13px] font-semibold">
                 {active?.name ?? 'Organisation…'}
               </span>
-              <span className="truncate text-xs text-[var(--nav-muted)]">{offre ?? '\u00a0'}</span>
+              <span className={`truncate text-xs ${classes.discret}`}>{offre ?? '\u00a0'}</span>
             </span>
-            <IconeNav id="selecteur" className="h-4 w-4 shrink-0 text-[var(--nav-muted)]" />
+            <IconeNav id="selecteur" className={`h-3.5 w-3.5 shrink-0 ${classes.discret}`} />
           </>
         )}
       </button>

@@ -32,6 +32,10 @@ import {
   // ADR-0053 — P4
   explicationOffre,
   FONCTIONNALITE_PAR_APP,
+  // ADR-0056
+  filAriane,
+  groupesApplications,
+  RUBRIQUES,
 } from './nav-model';
 
 const PROPRIETAIRE: OrgAction[] = [
@@ -745,5 +749,54 @@ describe('explicationOffre (ADR-0053 — P4)', () => {
   it('chaque application liée existe dans la navigation', () => {
     const ids = new Set(NAV_APPS.map((a) => a.id));
     for (const id of Object.keys(FONCTIONNALITE_PAR_APP)) expect(ids.has(id), id).toBe(true);
+  });
+});
+
+describe('rubriques et fil d’Ariane (ADR-0056)', () => {
+  it('chaque rubrique forme un groupe contigu dans la colonne RUN', () => {
+    const groupes = groupesApplications(NAV_APPS.filter((a) => a.module === 'run'));
+    const noms = groupes.map((g) => g.rubrique);
+    expect(new Set(noms).size).toBe(noms.length);
+    expect(noms).toEqual(['Opérations', 'Ventes', 'Gestion']);
+  });
+
+  it('toute rubrique désigne une application existante du module RUN', () => {
+    for (const id of Object.keys(RUBRIQUES)) {
+      expect(NAV_APPS.find((a) => a.id === id)?.module, id).toBe('run');
+    }
+  });
+
+  it('sans rubrique (BUILD, GROW) : un seul groupe sans intitulé', () => {
+    const groupes = groupesApplications(NAV_APPS.filter((a) => a.module === 'grow'));
+    expect(groupes).toHaveLength(1);
+    expect(groupes[0]!.rubrique).toBeNull();
+  });
+
+  it('RUN › Ventes › Factures, puis la sous-option', () => {
+    expect(filAriane('/ventes/factures')).toEqual([
+      { label: 'RUN', href: '/run' },
+      { label: 'Ventes', href: null },
+      { label: 'Factures', href: null },
+    ]);
+    expect(filAriane('/ventes/factures/journal').map((m) => m.label)).toEqual([
+      'RUN',
+      'Ventes',
+      'Factures',
+      'Journal',
+    ]);
+    expect(filAriane('/ventes/factures/journal')[2]).toEqual({
+      label: 'Factures',
+      href: '/ventes/factures',
+    });
+  });
+
+  it('bureau du module : un seul maillon ; hors module : aucun', () => {
+    expect(filAriane('/run')).toEqual([{ label: 'RUN', href: null }]);
+    expect(filAriane('/accueil')).toEqual([]);
+    expect(filAriane('/compte')).toEqual([]);
+  });
+
+  it('sous-option au même chemin que son application : pas de doublon', () => {
+    expect(filAriane('/crm').map((m) => m.label)).toEqual(['RUN', 'Ventes', 'CRM']);
   });
 });

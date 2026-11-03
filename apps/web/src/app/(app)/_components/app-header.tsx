@@ -1,12 +1,14 @@
 'use client';
 
-// Barre du haut — niveau 1 de la navigation (ADR-0038 § 2) :
+// En-tête compact (ADR-0038 § 2, ADR-0056) :
 //
-//   [marque] [organisation ▾]  [Accueil] [BUILD] [RUN] [GROW]      Aide · thème · avatar
+//   [≡] [fil d'Ariane : RUN / Ventes / Factures]   [Accueil BUILD RUN GROW] · aide · thème · cloche · avatar
 //
-// Sous 1024 px : bouton du tiroir, onglets réduits à leur icône (nom accessible
-// et info-bulle conservés), Aide, avatar ; la marque et le sélecteur
-// d'organisation passent dans le tiroir. La barre tient dans 360 px.
+// Sur fond de surface, 56 px, comme la maquette validée le 3 nov. 2026. Dans un
+// module sur grand écran, la marque et le sélecteur d'organisation vivent en tête
+// de la colonne de gauche ; hors module (accueil, compte, réglages), ils restent
+// ici. Sous 1024 px : bouton du tiroir, onglets réduits à leur icône (nom
+// accessible et info-bulle conservés) ; la barre tient dans 360 px.
 
 import { ModuleIcon } from '@lalanda/ui';
 import Link from 'next/link';
@@ -20,29 +22,33 @@ import { api } from '@/lib/api';
 import { LIENS_AIDE } from '@/lib/aide/liens';
 import { useSession } from '@/lib/auth-client';
 
-import { ACCUEIL_HREF, estAccueil, moduleCourant, NAV_MODULES } from './nav-model';
+import { ACCUEIL_HREF, estAccueil, filAriane, moduleCourant, NAV_MODULES } from './nav-model';
 import { NotificationsBell } from './notifications-bell';
 import { OrgSwitcher } from './org-switcher';
 import { UserMenu } from './user-menu';
 import { accesConsole } from './user-menu-model';
 
-/** Couleur du module sur le fond pétrole de la barre (jetons `--nav-*`, ≥ 3:1). */
-const COULEUR_NAV = {
-  build: 'text-[var(--nav-build)]',
-  run: 'text-[var(--nav-run)]',
-  grow: 'text-[var(--nav-grow)]',
+/** Couleur du module sur la surface (jetons `--module-*`, ≥ 3:1). */
+const COULEUR_MODULE = {
+  build: 'text-[var(--module-build)]',
+  run: 'text-[var(--module-run)]',
+  grow: 'text-[var(--module-grow)]',
 } as const;
 
 export function AppHeader({
   onOuvrirNavigation,
+  avecColonne = false,
 }: {
   /** Ouvre le tiroir de navigation (sous 1024 px). Absent : pas de bouton. */
   onOuvrirNavigation?: () => void;
+  /** Colonne de gauche visible sur grand écran : la marque y est déjà. */
+  avecColonne?: boolean;
 } = {}): React.ReactElement {
   const { data: session, isPending } = useSession();
   const pathname = usePathname();
   const courant = moduleCourant(pathname);
   const accueil = estAccueil(pathname);
+  const fil = filAriane(pathname);
 
   // Fait qui conditionne l'entrée « Console Lalanda » DU MENU (ADR-0016 §1,
   // ADR-0053 — P1). Il vient du serveur (`GET /me/platform-access`, action
@@ -64,41 +70,84 @@ export function AppHeader({
   }, [session?.user]);
 
   const onglet = (actif: boolean): string =>
-    `relative inline-flex h-10 items-center justify-center gap-2 rounded-[var(--radius-md)] px-2.5 text-sm transition-colors duration-[var(--motion-fast)] ease-[var(--ease-standard)] sm:px-3 ${
+    `inline-flex h-8 items-center justify-center gap-1.5 rounded-[var(--radius-md)] px-2 text-[13px] transition-colors duration-[var(--motion-fast)] ease-[var(--ease-standard)] ${
       actif
-        ? 'bg-[var(--nav-active-bg)] font-semibold text-[var(--nav-active-fg)]'
-        : 'text-[var(--nav-muted)] hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-fg)]'
+        ? 'bg-[var(--accent-soft)] font-semibold text-[var(--accent)]'
+        : 'text-[var(--foreground-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]'
     }`;
 
   return (
-    <header className="nav-panel sticky top-0 z-30 flex h-14 items-center gap-1 border-b border-[var(--nav-border)] bg-[var(--nav-bg)] px-2 text-[var(--nav-fg)] sm:gap-2 sm:px-4 lg:px-5">
+    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-1 border-b border-[var(--border)] bg-[var(--surface)] px-2 text-[var(--foreground)] sm:gap-2 sm:px-4 lg:px-8">
       {onOuvrirNavigation ? (
         <button
           type="button"
           onClick={onOuvrirNavigation}
           aria-label="Ouvrir la navigation"
           aria-haspopup="dialog"
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-md)] text-[var(--nav-fg)] transition hover:bg-[var(--nav-active-bg)] lg:hidden"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-md)] text-[var(--foreground)] transition-colors duration-[var(--motion-fast)] hover:bg-[var(--surface-muted)] lg:hidden"
         >
           <IconeNav id="menu" className="h-5 w-5" />
         </button>
       ) : null}
 
-      {/* Grand écran : marque et sélecteur d'organisation. `aria-label`
-          explicite : le nom du lien ne dépend pas de la largeur (ADR-0016). */}
-      <Link
-        href={ACCUEIL_HREF}
-        aria-label="Lalanda — accueil"
-        className="mr-2 hidden shrink-0 items-center transition hover:opacity-80 lg:inline-flex"
-      >
-        <BrandLogo hauteur={26} fond="nav" />
-      </Link>
-      <div className="mr-3 hidden w-56 shrink-0 lg:block">
-        <OrgSwitcher />
-      </div>
+      {/* Hors module, grand écran : marque et sélecteur d'organisation.
+          `aria-label` explicite : le nom du lien ne dépend pas de la largeur. */}
+      {avecColonne ? null : (
+        <>
+          <Link
+            href={ACCUEIL_HREF}
+            aria-label="Lalanda — accueil"
+            className="mr-2 hidden shrink-0 items-center transition-opacity hover:opacity-80 lg:inline-flex"
+          >
+            <BrandLogo hauteur={26} />
+          </Link>
+          <div className="mr-3 hidden w-56 shrink-0 lg:block">
+            <OrgSwitcher variante="surface" />
+          </div>
+        </>
+      )}
+
+      {fil.length > 0 ? (
+        <nav aria-label="Fil d’Ariane" className="hidden min-w-0 sm:block">
+          <ol className="flex min-w-0 items-center gap-2 text-[13px] text-[var(--foreground-muted)]">
+            {courant ? (
+              <li aria-hidden="true" className="flex">
+                <ModuleIcon module={courant} className={`h-4 w-4 ${COULEUR_MODULE[courant]}`} />
+              </li>
+            ) : null}
+            {fil.map((maillon, i) => {
+              const dernier = i === fil.length - 1;
+              return (
+                <li key={`${maillon.label}-${i}`} className="flex min-w-0 items-center gap-2">
+                  {i > 0 ? <span aria-hidden="true">/</span> : null}
+                  {dernier ? (
+                    <span
+                      aria-current="page"
+                      className="truncate font-medium text-[var(--foreground)]"
+                    >
+                      {maillon.label}
+                    </span>
+                  ) : maillon.href ? (
+                    <Link
+                      href={maillon.href}
+                      className="truncate transition-colors duration-[var(--motion-fast)] hover:text-[var(--foreground)]"
+                    >
+                      {maillon.label}
+                    </Link>
+                  ) : (
+                    <span className="truncate">{maillon.label}</span>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        </nav>
+      ) : null}
+
+      <div className="flex-1" />
 
       <nav aria-label="Modules" className="min-w-0">
-        <ul className="flex items-center gap-0.5 sm:gap-1">
+        <ul className="flex items-center gap-0.5">
           <li>
             <Link
               href={ACCUEIL_HREF}
@@ -107,8 +156,8 @@ export function AppHeader({
               title="Accueil"
               className={onglet(accueil)}
             >
-              <IconeNav id="accueil" className="h-[1.1rem] w-[1.1rem]" />
-              <span className="hidden md:inline">Accueil</span>
+              <IconeNav id="accueil" className="h-4 w-4" />
+              <span className="hidden xl:inline">Accueil</span>
             </Link>
           </li>
           {NAV_MODULES.map((m) => {
@@ -124,19 +173,10 @@ export function AppHeader({
                   title={`${m.label} — ${m.verb}`}
                   className={onglet(actif)}
                 >
-                  <ModuleIcon
-                    module={m.id}
-                    className={`h-[1.1rem] w-[1.1rem] ${COULEUR_NAV[m.id]}`}
-                  />
-                  <span className="hidden font-mono text-[0.8rem] tracking-[0.1em] sm:inline">
+                  <ModuleIcon module={m.id} className={`h-4 w-4 ${COULEUR_MODULE[m.id]}`} />
+                  <span className="hidden text-[12px] font-semibold tracking-[0.6px] md:inline">
                     {m.label}
                   </span>
-                  {actif ? (
-                    <span
-                      aria-hidden="true"
-                      className="absolute inset-x-2 -bottom-[9px] h-[3px] rounded-full bg-[var(--nav-accent)]"
-                    />
-                  ) : null}
                 </Link>
               </li>
             );
@@ -144,32 +184,41 @@ export function AppHeader({
         </ul>
       </nav>
 
-      <div className="flex-1" />
+      <span aria-hidden="true" className="mx-1 hidden h-5 w-px bg-[var(--border)] sm:block" />
 
       {/* RÈGLE (ADR-0016 §6) : aucun élément de cette barre n'est masqué s'il
           n'a pas d'autre chemin d'accès. Le thème, masqué sous 640 px, reste
           réglable dans Mon compte › Préférences. */}
-      <div className="flex shrink-0 items-center gap-1.5 text-sm sm:gap-3">
+      <div className="flex shrink-0 items-center gap-1.5">
         <Link
           href={LIENS_AIDE.centre}
           aria-label="Aide"
           title="Aide"
-          className="text-[var(--nav-muted)] transition hover:text-[var(--nav-fg)]"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] text-[var(--foreground-muted)] transition-colors duration-[var(--motion-fast)] hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]"
         >
-          <span
+          <svg
             aria-hidden="true"
-            className="font-display inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--nav-border)] text-xs font-bold xl:hidden"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-4 w-4"
           >
-            ?
-          </span>
-          <span className="hidden xl:inline">Aide</span>
+            <circle cx="12" cy="12" r="9" />
+            <path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.7M12 17h.01" />
+          </svg>
         </Link>
         <span className="hidden sm:inline-flex">
-          <ThemeToggle persist />
+          <ThemeToggle persist discret />
         </span>
         {session?.user ? <NotificationsBell /> : null}
         {isPending ? (
-          <span aria-hidden="true" className="h-8 w-8 rounded-full bg-[var(--nav-active-bg)]" />
+          <span
+            aria-hidden="true"
+            className="ml-1 h-8 w-8 rounded-full bg-[var(--surface-muted)]"
+          />
         ) : session?.user ? (
           <UserMenu email={session.user.email} accesConsole={operateur} />
         ) : null}
