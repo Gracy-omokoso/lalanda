@@ -1,6 +1,8 @@
 @import 'tailwindcss';
 /* Jetons du design system — voir « Design tokens » plus bas. */
 @import '@lalanda/ui/tokens.css';
+/* Mouvement des graphiques maison (ADR-0056). */
+@import '@lalanda/ui/charts.css';
 
 @theme {
   --font-sans:

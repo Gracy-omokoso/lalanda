@@ -11,6 +11,7 @@
       "import": "./dist/index.js"
     },
     "./tokens.css": "./src/styles/tokens.css",
+    "./charts.css": "./src/styles/charts.css",
     "./utils": {
       "types": "./dist/utils.d.ts",
       "import": "./dist/utils.js"

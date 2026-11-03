@@ -1,0 +1,56 @@
+/* Mouvement des graphiques maison (ADR-0055 § 4 et § 5, ADR-0056).
+ *
+ * Trois effets seulement, une seule fois, au premier rendu : le tracé se révèle de
+ * gauche à droite, un repère apparaît en fondu, une barre s'allonge depuis sa
+ * gauche. Tous en `--motion-slow` (240 ms) au plus, sans rebond ni dépassement.
+ * Jamais de chiffre qui compte, d'apparition au défilement ni de boucle.
+ * Sous `prefers-reduced-motion: reduce`, rien ne bouge (en plus de la règle
+ * globale de `apps/web/src/app/globals.css`). */
+
+@keyframes lalanda-chart-reveal {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes lalanda-chart-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes lalanda-chart-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.chart-reveal {
+  animation: lalanda-chart-reveal var(--motion-slow) var(--ease-standard) both;
+}
+
+.chart-fade {
+  animation: lalanda-chart-fade var(--motion-slow) var(--ease-standard) both;
+}
+
+.chart-grow {
+  transform-origin: left center;
+  animation: lalanda-chart-grow var(--motion-slow) var(--ease-standard) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chart-reveal,
+  .chart-fade,
+  .chart-grow {
+    animation: none;
+  }
+}

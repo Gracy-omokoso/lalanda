@@ -9,3 +9,7 @@ export * from './components/navigation.js';
 export * from './components/module-icon.js';
 export * from './components/tag.js';
 export * from './components/modal.js';
+// ADR-0056 : graphiques maison et étiquette de statut.
+export * from './charts-geometry.js';
+export * from './components/charts.js';
+export * from './components/status-pill.js';
