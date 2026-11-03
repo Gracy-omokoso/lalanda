@@ -66,7 +66,7 @@ export function AppHeader({
   const onglet = (actif: boolean): string =>
     `relative inline-flex h-10 items-center justify-center gap-2 rounded-[var(--radius-md)] px-2.5 text-sm transition-colors sm:px-3 ${
       actif
-        ? 'bg-[var(--nav-active-bg)] font-semibold text-white'
+        ? 'bg-[var(--nav-active-bg)] font-semibold text-[var(--nav-active-fg)]'
         : 'text-[var(--nav-muted)] hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-fg)]'
     }`;
 
@@ -91,7 +91,7 @@ export function AppHeader({
         aria-label="Lalanda — accueil"
         className="mr-2 hidden shrink-0 items-center transition hover:opacity-80 lg:inline-flex"
       >
-        <BrandLogo hauteur={26} fond="encre" />
+        <BrandLogo hauteur={26} fond="nav" />
       </Link>
       <div className="mr-3 hidden w-56 shrink-0 lg:block">
         <OrgSwitcher />

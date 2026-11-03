@@ -28,6 +28,14 @@ export const THEMES = ['light', 'dark', 'system'] as const;
 export type Theme = (typeof THEMES)[number];
 
 /**
+ * Thème d'interface choisi par la personne (ADR-0055), distinct du mode
+ * clair/sombre ci-dessus. Même liste que `UI_THEMES` de `@lalanda/ui` : l'API
+ * ne dépend pas du paquet d'interface, le test e2e vérifie les valeurs.
+ */
+export const UI_THEMES = ['lalanda', 'lagune', 'ebene'] as const;
+export type UiTheme = (typeof UI_THEMES)[number];
+
+/**
  * Fuseau IANA valide. On ne maintient pas une liste en dur (elle se périme) :
  * on demande à l'ICU embarqué dans Node de résoudre le fuseau. Un identifiant
  * inconnu fait lever `Intl.DateTimeFormat`, ce qui est exactement le test voulu.
@@ -69,10 +77,17 @@ export const PutProfileSchema = z
   .strict();
 export type PutProfileInput = z.infer<typeof PutProfileSchema>;
 
-/** PUT /account/preferences — thème, devise par défaut, notifications. */
+/**
+ * PUT /account/preferences — thème, devise par défaut, notifications.
+ *
+ * `uiTheme` est FACULTATIF : absent, le thème d'interface enregistré est
+ * conservé. Un client antérieur à ADR-0055 (ou la console, qui n'écrit que le
+ * mode) ne remet donc pas le thème à Lalanda en enregistrant autre chose.
+ */
 export const PutPreferencesSchema = z
   .object({
     theme: z.enum(THEMES),
+    uiTheme: z.enum(UI_THEMES).optional(),
     displayCurrency: z.enum(DISPLAY_CURRENCIES),
     notifications: z
       .object({

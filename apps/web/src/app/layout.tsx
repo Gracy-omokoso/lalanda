@@ -3,6 +3,7 @@ import localFont from 'next/font/local';
 import './globals.css';
 
 import { CookieBanner } from '@/components/cookie-consent';
+import { THEME_BOOT_SCRIPT } from '@/lib/theme-boot';
 
 // Poppins — brief §4. Chargée via next/font/local avec woff2 auto-hébergés
 // dans public/fonts/ pour éviter la dépendance réseau à fonts.gstatic.com au build.
@@ -54,18 +55,8 @@ export const metadata: Metadata = {
     'SaaS de plans financiers bancables (SYSCOHADA, RDC-first). Générez en <30 min votre dossier prêt banque.',
 };
 
-// Preload d'un mini-script inline qui applique le thème avant le premier paint
-// pour éviter le flash light→dark (FOUC).
-const setInitialThemeScript = `
-(function() {
-  try {
-    var pref = localStorage.getItem('theme');
-    var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    var theme = pref || (systemDark ? 'dark' : 'light');
-    document.documentElement.dataset.theme = theme;
-  } catch (e) {}
-})();
-`;
+// Script inline qui pose `data-ui-theme` et `data-theme` avant le premier paint,
+// pour éviter le flash d'un thème à l'autre (FOUC). Voir `@/lib/theme-boot`.
 
 export default function RootLayout({
   children,
@@ -77,7 +68,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <script dangerouslySetInnerHTML={{ __html: setInitialThemeScript }} />
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>
       <body>
         {children}

@@ -68,6 +68,7 @@ import {
   SUPPORTED_LOCALES,
   DISPLAY_CURRENCIES,
   THEMES,
+  UI_THEMES,
 } from './account.dto.js';
 import { AccountSessionsService, type SessionView } from './account-sessions.service.js';
 import {
@@ -327,6 +328,7 @@ export class AccountController {
       options: {
         locales: readonly string[];
         themes: readonly string[];
+        uiThemes: readonly string[];
         currencies: readonly string[];
       };
     }
@@ -334,7 +336,12 @@ export class AccountController {
     const prefs = await this.account.getPreferences(user.id);
     return {
       ...prefs,
-      options: { locales: SUPPORTED_LOCALES, themes: THEMES, currencies: DISPLAY_CURRENCIES },
+      options: {
+        locales: SUPPORTED_LOCALES,
+        themes: THEMES,
+        uiThemes: UI_THEMES,
+        currencies: DISPLAY_CURRENCIES,
+      },
     };
   }
 

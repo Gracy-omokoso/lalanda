@@ -51,8 +51,11 @@ const RATIO_LOCKUP = 1024 / 273;
  * bascule avec lui. `encre` : le fond est un panneau `.bg-ink` — `--ink` vaut
  * `#005263` dans les DEUX thèmes, donc la version fond sombre y est la bonne en
  * permanence; y brancher la bascule poserait le lockup encre sur de l'encre.
+ * `nav` : le fond est la barre de navigation (`--nav-bg`), sombre partout sauf
+ * dans le thème Lagune clair où elle est blanche (ADR-0055). Même mécanique que
+ * `theme`, avec ses propres classes (`app/globals.css`, section « Marque »).
  */
-export type FondMarque = 'theme' | 'encre';
+export type FondMarque = 'theme' | 'encre' | 'nav';
 
 export function BrandLogo({
   hauteur,
@@ -99,6 +102,11 @@ export function BrandLogo({
     );
   }
 
+  const [classeClair, classeSombre] =
+    fond === 'nav'
+      ? ['marque-nav-clair', 'marque-nav-sombre']
+      : ['marque-fond-clair', 'marque-fond-sombre'];
+
   return (
     <>
       {/* eslint-disable-next-line @next/next/no-img-element -- voir l'en-tête */}
@@ -106,14 +114,14 @@ export function BrandLogo({
         {...commun}
         alt=""
         src="/marque/logo-lalanda-fond-clair.png"
-        className={`marque-fond-clair shrink-0 ${className}`}
+        className={`${classeClair} shrink-0 ${className}`}
       />
       {/* eslint-disable-next-line @next/next/no-img-element -- voir l'en-tête */}
       <img
         {...commun}
         alt=""
         src="/marque/logo-lalanda-fond-sombre.png"
-        className={`marque-fond-sombre shrink-0 ${className}`}
+        className={`${classeSombre} shrink-0 ${className}`}
       />
     </>
   );

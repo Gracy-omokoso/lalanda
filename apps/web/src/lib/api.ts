@@ -1141,11 +1141,13 @@ export interface AccountPreferencesView {
   locale: string;
   timezone: string;
   theme: 'light' | 'dark' | 'system';
+  /** Thème d'interface (ADR-0055). Absent d'une réponse antérieure : Lalanda. */
+  uiTheme?: 'lalanda' | 'lagune' | 'ebene';
   displayCurrency: 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR';
   notifications: NotificationPreferences;
   updatedAt: string | null;
   /** Valeurs acceptées, servies par l'API — l'UI ne les code pas en dur. */
-  options: { locales: string[]; themes: string[]; currencies: string[] };
+  options: { locales: string[]; themes: string[]; uiThemes?: string[]; currencies: string[] };
 }
 
 /** Session active. Le token n'est JAMAIS exposé : seul un id opaque circule. */
@@ -3452,6 +3454,8 @@ export const api = {
     jsonRequest<AccountPreferencesView>(`/account/preferences`, { method: 'GET' }),
   putAccountPreferences: (input: {
     theme: 'light' | 'dark' | 'system';
+    /** Facultatif : absent, le thème d'interface enregistré est conservé. */
+    uiTheme?: 'lalanda' | 'lagune' | 'ebene';
     displayCurrency: 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR';
     notifications: NotificationPreferences;
   }) => jsonRequest<AccountPreferencesView>(`/account/preferences`, { method: 'PUT', body: input }),

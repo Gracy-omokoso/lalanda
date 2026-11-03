@@ -127,6 +127,14 @@ describe('preferencesAreDirty (S20b)', () => {
     ).toBe(false);
   });
 
+  it('détecte un changement de thème d’interface (ADR-0055), absent valant Lalanda', () => {
+    expect(preferencesAreDirty({ ...saved, uiTheme: 'ebene' }, saved)).toBe(true);
+    expect(preferencesAreDirty({ ...saved, uiTheme: 'lalanda' }, saved)).toBe(false);
+    expect(
+      preferencesAreDirty({ ...saved, uiTheme: 'lagune' }, { ...saved, uiTheme: 'lagune' }),
+    ).toBe(false);
+  });
+
   it('détecte un changement de thème et de devise', () => {
     expect(preferencesAreDirty({ ...saved, theme: 'dark' }, saved)).toBe(true);
     expect(preferencesAreDirty({ ...saved, displayCurrency: 'CDF' }, saved)).toBe(true);

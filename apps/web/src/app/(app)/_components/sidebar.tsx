@@ -63,7 +63,7 @@ export function SidebarNav({
               onClick={onNavigate}
               className="inline-flex shrink-0 items-center transition hover:opacity-80"
             >
-              <BrandLogo hauteur={28} fond="encre" />
+              <BrandLogo hauteur={28} fond="nav" />
             </Link>
           </div>
           <div className="px-3">
@@ -226,7 +226,7 @@ function Application({
   const base =
     'group relative flex min-w-0 flex-1 items-center rounded-[var(--radius-sm)] text-sm transition-colors';
   const etat = actif
-    ? 'bg-[var(--nav-active-bg)] font-semibold text-white'
+    ? 'bg-[var(--nav-active-bg)] font-semibold text-[var(--nav-active-fg)]'
     : 'text-[var(--nav-muted)] hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-fg)]';
   const idListe = `sous-options-${app.id}`;
 
@@ -290,7 +290,7 @@ function Application({
                   href={s.href}
                   onClick={onNavigate}
                   aria-current={allumee ? 'page' : undefined}
-                  className={`block truncate rounded-[var(--radius-sm)] px-2 py-1.5 text-[0.8rem] transition-colors ${allumee ? 'font-semibold text-white' : 'text-[var(--nav-muted)] hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-fg)]'}`}
+                  className={`block truncate rounded-[var(--radius-sm)] px-2 py-1.5 text-[0.8rem] transition-colors ${allumee ? 'font-semibold text-[var(--nav-active-fg)]' : 'text-[var(--nav-muted)] hover:bg-[var(--nav-active-bg)] hover:text-[var(--nav-fg)]'}`}
                 >
                   {s.label}
                 </Link>

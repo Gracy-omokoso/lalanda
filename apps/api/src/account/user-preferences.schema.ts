@@ -55,6 +55,14 @@ export class UserPreferences {
   theme!: 'light' | 'dark' | 'system';
 
   /**
+   * Thème d'interface (ADR-0055) : Lalanda (défaut), Lagune ou Ébène. Ébène est
+   * toujours sombre et ignore `theme` à l'affichage, sans l'effacer : revenir à
+   * Lalanda ou Lagune retrouve le mode choisi.
+   */
+  @Prop({ type: String, required: true, enum: ['lalanda', 'lagune', 'ebene'], default: 'lalanda' })
+  uiTheme!: 'lalanda' | 'lagune' | 'ebene';
+
+  /**
    * Devise d'affichage proposée par défaut à la création d'un projet.
    * Même énumération que `projects.dto.ts` — c'est une valeur par défaut d'UI,
    * elle ne change aucun calcul du moteur financier.

@@ -21,6 +21,16 @@ export const THEME_DESCRIPTIONS: Record<string, string> = {
   dark: 'Fond encre, texte crème.',
 };
 
+/**
+ * Thèmes d'interface (ADR-0055), dans l'ordre d'affichage. Les pastilles
+ * d'aperçu lisent les jetons de `@lalanda/ui` : barre, fond, surface, accent.
+ */
+export const UI_THEME_LABELS: Record<string, { label: string; description: string }> = {
+  lalanda: { label: 'Lalanda', description: 'Le thème d’origine, barre latérale pétrole.' },
+  lagune: { label: 'Lagune', description: 'Clair et aéré, barre latérale blanche.' },
+  ebene: { label: 'Ébène', description: 'Sombre en permanence.' },
+};
+
 // La mécanique du thème (résolution, application, stockage local) vit dans
 // `@/lib/theme` : elle est partagée avec le bascule du header et la
 // synchronisation au chargement, hors de l'espace compte.
@@ -178,6 +188,8 @@ export function profileIsDirty(
  */
 export interface PreferencesForm<N extends object = Record<string, boolean>> {
   theme: string;
+  /** Thème d'interface (ADR-0055). */
+  uiTheme?: string;
   displayCurrency: string;
   notifications: N;
 }
@@ -196,6 +208,7 @@ export function preferencesAreDirty<N extends object>(
   saved: PreferencesForm<N>,
 ): boolean {
   if (form.theme !== saved.theme) return true;
+  if ((form.uiTheme ?? 'lalanda') !== (saved.uiTheme ?? 'lalanda')) return true;
   if (form.displayCurrency !== saved.displayCurrency) return true;
   const a = form.notifications as Record<string, boolean | undefined>;
   const b = saved.notifications as Record<string, boolean | undefined>;

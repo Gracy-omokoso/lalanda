@@ -1,6 +1,7 @@
 'use client';
 
-// Synchronisation du thème enregistré sur le compte (S20b).
+// Synchronisation du thème enregistré sur le compte (S20b) : mode clair/sombre
+// et thème d'interface (ADR-0055).
 //
 // POURQUOI CE COMPOSANT EXISTE.
 // Le script inline de `app/layout.tsx` applique, avant le premier paint, le
@@ -22,7 +23,7 @@
 import { useEffect } from 'react';
 
 import { api } from '@/lib/api';
-import { applyThemePreference } from '@/lib/theme';
+import { applyAppearance } from '@/lib/theme';
 
 export function ThemeSync(): null {
   useEffect(() => {
@@ -33,7 +34,7 @@ export function ThemeSync(): null {
         // risque n°2) : cet appel fonctionne aussi pour un compte qui n'en a
         // plus aucune, là où les routes métier répondraient 403.
         const prefs = await api.getAccountPreferences();
-        if (!cancelled) applyThemePreference(prefs.theme);
+        if (!cancelled) applyAppearance(prefs);
       } catch {
         /* thème local conservé */
       }

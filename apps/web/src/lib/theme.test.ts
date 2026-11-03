@@ -3,7 +3,17 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { THEME_STORAGE_KEY, resolveTheme, themeStorageValue } from './theme';
+import {
+  DEFAULT_UI_THEME,
+  THEME_STORAGE_KEY,
+  UI_THEMES,
+  UI_THEME_STORAGE_KEY,
+  displayedTheme,
+  isUiTheme,
+  resolveTheme,
+  themeStorageValue,
+  uiThemeForcesDark,
+} from './theme';
 
 describe('resolveTheme (S20b)', () => {
   it('applique tel quel un thème explicite, quel que soit le système', () => {
@@ -34,5 +44,35 @@ describe('themeStorageValue (S20b)', () => {
     // Constante partagée avec `theme-toggle.tsx` et le script inline de
     // layout.tsx : la désynchroniser casserait silencieusement l'anti-FOUC.
     expect(THEME_STORAGE_KEY).toBe('theme');
+  });
+});
+
+describe('thème d’interface (ADR-0055)', () => {
+  it('trois thèmes, Lalanda par défaut', () => {
+    expect(UI_THEMES).toEqual(['lalanda', 'lagune', 'ebene']);
+    expect(DEFAULT_UI_THEME).toBe('lalanda');
+  });
+
+  it('reconnaît les seuls thèmes servis', () => {
+    expect(isUiTheme('lagune')).toBe(true);
+    expect(isUiTheme('ebene')).toBe(true);
+    expect(isUiTheme('solarized')).toBe(false);
+    expect(isUiTheme(null)).toBe(false);
+  });
+
+  it('Ébène est toujours sombre, quel que soit le mode choisi', () => {
+    expect(uiThemeForcesDark('ebene')).toBe(true);
+    expect(displayedTheme('ebene', 'light')).toBe('dark');
+    expect(displayedTheme('ebene', 'dark')).toBe('dark');
+  });
+
+  it('Lalanda et Lagune suivent le mode choisi', () => {
+    expect(displayedTheme('lalanda', 'light')).toBe('light');
+    expect(displayedTheme('lagune', 'light')).toBe('light');
+    expect(displayedTheme('lagune', 'dark')).toBe('dark');
+  });
+
+  it('utilise la clé attendue par le script de démarrage', () => {
+    expect(UI_THEME_STORAGE_KEY).toBe('ui-theme');
   });
 });

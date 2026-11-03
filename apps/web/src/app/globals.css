@@ -136,6 +136,13 @@ input[type='number'] {
 :root:not([data-theme='dark']) .marque-fond-sombre {
   display: none;
 }
+/* Barre de navigation (ADR-0055) : sombre partout, sauf Lagune clair (blanche). */
+[data-ui-theme='lagune'][data-theme='light'] .marque-nav-sombre {
+  display: none;
+}
+:root:not([data-ui-theme='lagune'][data-theme='light']) .marque-nav-clair {
+  display: none;
+}
 
 /* ─── Panneaux encre ─────────────────────────────────────────── */
 

@@ -9,6 +9,10 @@
 // page /compte/preferences affiche la même chose. Le bascule reste purement
 // local sur les pages publiques et d'authentification, où il n'y a pas de compte
 // à écrire — d'où un opt-in explicite plutôt qu'un appel réseau systématique.
+//
+// ADR-0055 : sous le thème Ébène, toujours sombre, le bouton est désactivé et
+// dit pourquoi (le choix se fait dans Mon compte › Préférences). Il suit les
+// attributs de <html> : un thème changé ailleurs dans la page s'y reflète.
 
 import { useEffect, useState } from 'react';
 
@@ -21,15 +25,33 @@ function readTheme(): ResolvedTheme {
   return attr === 'dark' ? 'dark' : 'light';
 }
 
+function readForcedDark(): boolean {
+  if (typeof document === 'undefined') return false;
+  return document.documentElement.dataset['uiTheme'] === 'ebene';
+}
+
 export function ThemeToggle({ persist = false }: { persist?: boolean }): React.ReactElement {
   // Éviter l'hydration mismatch : on démarre en "light" côté serveur,
   // puis on lit l'état réel après le mount.
   const [theme, setTheme] = useState<ResolvedTheme>('light');
   const [mounted, setMounted] = useState(false);
+  const [forcedDark, setForcedDark] = useState(false);
 
   useEffect(() => {
-    setTheme(readTheme());
+    const sync = (): void => {
+      setTheme(readTheme());
+      setForcedDark(readForcedDark());
+    };
+    sync();
     setMounted(true);
+    // Préférences ou synchronisation du compte peuvent changer le thème après
+    // le montage : on suit les attributs plutôt que de garder une copie périmée.
+    const observer = new MutationObserver(sync);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme', 'data-ui-theme'],
+    });
+    return () => observer.disconnect();
   }, []);
 
   function toggle(): void {
@@ -49,9 +71,22 @@ export function ThemeToggle({ persist = false }: { persist?: boolean }): React.R
     <button
       type="button"
       onClick={toggle}
-      aria-label={theme === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre'}
-      title={theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
-      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground-muted)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]"
+      disabled={forcedDark}
+      aria-label={
+        forcedDark
+          ? 'Mode clair indisponible : le thème Ébène est toujours sombre'
+          : theme === 'dark'
+            ? 'Passer en mode clair'
+            : 'Passer en mode sombre'
+      }
+      title={
+        forcedDark
+          ? 'Ébène est toujours sombre — changez de thème dans Mon compte › Préférences'
+          : theme === 'dark'
+            ? 'Mode clair'
+            : 'Mode sombre'
+      }
+      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground-muted)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-60"
     >
       {/* Icônes au trait plutôt qu'emoji : un emoji est dessiné par la police du
           système — il change d'aspect d'une plateforme à l'autre, arrive en

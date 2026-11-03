@@ -1,6 +1,8 @@
 'use client';
 
 // Préférences (S20b) — thème, devise d'affichage par défaut, notifications.
+// ADR-0055 : le thème d'interface (Lalanda, Lagune, Ébène) s'ajoute au mode
+// clair/sombre ; Ébène, toujours sombre, désactive ce dernier en disant pourquoi.
 //
 // États couverts (docs/04 § États obligatoires) : chargement, erreur récupérable
 // (avec réessai), succès. Pas d'état vide : l'API sert toujours des valeurs, les
@@ -14,20 +16,34 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
+import { NAV_TOKENS, THEME_TOKENS, type Combinaison } from '@lalanda/ui';
+
 import { api, type AccountPreferencesView, type NotificationPreferences } from '@/lib/api';
-import { applyThemePreference, type ThemePreference } from '@/lib/theme';
+import {
+  applyAppearance,
+  applyThemePreference,
+  applyUiTheme,
+  isUiTheme,
+  DEFAULT_UI_THEME,
+  UI_THEMES,
+  uiThemeForcesDark,
+  type ThemePreference,
+  type UiTheme,
+} from '@/lib/theme';
 
 import {
   CURRENCY_LABELS,
   NOTIFICATION_LABELS,
   THEME_DESCRIPTIONS,
   THEME_LABELS,
+  UI_THEME_LABELS,
   accountErrorMessage,
   preferencesAreDirty,
 } from './account-model';
 
 interface FormState {
   theme: ThemePreference;
+  uiTheme: UiTheme;
   displayCurrency: string;
   notifications: NotificationPreferences;
 }
@@ -35,9 +51,39 @@ interface FormState {
 function formOf(prefs: AccountPreferencesView): FormState {
   return {
     theme: prefs.theme,
+    uiTheme: isUiTheme(prefs.uiTheme) ? prefs.uiTheme : DEFAULT_UI_THEME,
     displayCurrency: prefs.displayCurrency,
     notifications: { ...prefs.notifications },
   };
+}
+
+/** Combinaison montrée en aperçu : la variante claire, sauf Ébène (toujours sombre). */
+const APERCU: Record<UiTheme, Combinaison> = {
+  lalanda: 'lalanda-light',
+  lagune: 'lagune-light',
+  ebene: 'ebene',
+};
+
+/** Pastilles d'aperçu : barre de navigation, fond, surface, accent. */
+function ThemeSwatches({ uiTheme }: { uiTheme: UiTheme }): React.ReactElement {
+  const c = APERCU[uiTheme];
+  const couleurs = [
+    NAV_TOKENS[c]['nav-bg'],
+    THEME_TOKENS[c].background,
+    THEME_TOKENS[c].surface,
+    THEME_TOKENS[c].accent,
+  ];
+  return (
+    <span aria-hidden="true" className="flex gap-1">
+      {couleurs.map((couleur, i) => (
+        <span
+          key={i}
+          className="h-5 w-5 rounded-full border border-[var(--border-strong)]"
+          style={{ background: couleur }}
+        />
+      ))}
+    </span>
+  );
 }
 
 export function PreferencesPanel(): React.ReactElement {
@@ -58,7 +104,7 @@ export function PreferencesPanel(): React.ReactElement {
       setForm(formOf(prefs));
       // Le thème enregistré fait autorité au chargement de l'écran : c'est ce qui
       // rend la préférence réellement « persistée serveur » d'un appareil à l'autre.
-      applyThemePreference(prefs.theme);
+      applyAppearance(prefs);
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Impossible de charger vos préférences');
     } finally {
@@ -75,6 +121,11 @@ export function PreferencesPanel(): React.ReactElement {
     applyThemePreference(theme);
   }
 
+  function chooseUiTheme(uiTheme: UiTheme): void {
+    setForm((f) => (f ? { ...f, uiTheme } : f));
+    applyUiTheme(uiTheme);
+  }
+
   async function submit(e: React.FormEvent): Promise<void> {
     e.preventDefault();
     if (!form) return;
@@ -84,6 +135,7 @@ export function PreferencesPanel(): React.ReactElement {
     try {
       const updated = await api.putAccountPreferences({
         theme: form.theme,
+        uiTheme: form.uiTheme,
         displayCurrency: form.displayCurrency as AccountPreferencesView['displayCurrency'],
         notifications: form.notifications,
       });
@@ -92,14 +144,14 @@ export function PreferencesPanel(): React.ReactElement {
       const merged: AccountPreferencesView = { ...saved, ...updated };
       setSaved(merged);
       setForm(formOf(merged));
-      applyThemePreference(merged.theme);
+      applyAppearance(merged);
       setNotice('Préférences enregistrées.');
     } catch (err) {
       const detail = (err as { detail?: { code?: string; message?: string } }).detail;
       setError(accountErrorMessage(detail, 'Impossible d’enregistrer vos préférences'));
       // Le thème revient à la dernière valeur RÉELLEMENT enregistrée : l'écran ne
       // doit pas rester dans une apparence que le serveur ne connaît pas.
-      if (saved) applyThemePreference(saved.theme);
+      if (saved) applyAppearance(saved);
     } finally {
       setSaving(false);
     }
@@ -137,6 +189,8 @@ export function PreferencesPanel(): React.ReactElement {
   const dirty = preferencesAreDirty(form, formOf(saved));
   const themes =
     saved.options.themes.length > 0 ? saved.options.themes : ['system', 'light', 'dark'];
+  const uiThemes = (saved.options.uiThemes ?? UI_THEMES).filter(isUiTheme);
+  const modeForce = uiThemeForcesDark(form.uiTheme);
 
   return (
     <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-6">
@@ -162,13 +216,68 @@ export function PreferencesPanel(): React.ReactElement {
         <p id="theme-help" className="text-sm text-[var(--foreground-muted)]">
           Le thème est enregistré sur votre compte : vous le retrouvez sur tous vos appareils.
         </p>
+
+        <p id="ui-theme-label" className="text-sm font-medium">
+          Thème
+        </p>
+        <div
+          role="radiogroup"
+          aria-labelledby="ui-theme-label"
+          aria-describedby="theme-help"
+          className="grid gap-2 sm:grid-cols-3"
+        >
+          {uiThemes.map((value) => {
+            const checked = form.uiTheme === value;
+            const meta = UI_THEME_LABELS[value];
+            return (
+              <label
+                key={value}
+                className={[
+                  'flex cursor-pointer flex-col gap-2 rounded-lg border p-3 text-sm transition',
+                  checked
+                    ? 'border-[var(--accent)] bg-[var(--surface-muted)]'
+                    : 'border-[var(--border)] hover:bg-[var(--surface-muted)]',
+                ].join(' ')}
+              >
+                <span className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="uiTheme"
+                      value={value}
+                      checked={checked}
+                      onChange={() => chooseUiTheme(value)}
+                      className="accent-[var(--accent)]"
+                    />
+                    <span className="font-medium">{meta?.label ?? value}</span>
+                  </span>
+                  <ThemeSwatches uiTheme={value} />
+                </span>
+                <span className="text-xs text-[var(--foreground-muted)]">
+                  {meta?.description ?? ''}
+                </span>
+              </label>
+            );
+          })}
+        </div>
+
+        <p id="mode-label" className="mt-2 text-sm font-medium">
+          Clair ou sombre
+        </p>
+        {modeForce ? (
+          <p id="mode-force" className="-mt-1 text-xs text-[var(--foreground-muted)]">
+            Ébène est toujours sombre : ce réglage ne s’applique pas. Il est conservé et reprend
+            effet si vous choisissez Lalanda ou Lagune.
+          </p>
+        ) : null}
         {/* Groupe de radios : le clavier y navigue avec les flèches, et le choix
             actif est porté par le libellé et l'état coché, jamais par la seule
             bordure colorée (docs/04 § Accessibilité). */}
         <div
           role="radiogroup"
-          aria-label="Thème de l’interface"
-          aria-describedby="theme-help"
+          aria-labelledby="mode-label"
+          aria-describedby={modeForce ? 'mode-force' : 'theme-help'}
+          aria-disabled={modeForce || undefined}
           className="grid gap-2 sm:grid-cols-3"
         >
           {themes.map((value) => {
@@ -177,10 +286,11 @@ export function PreferencesPanel(): React.ReactElement {
               <label
                 key={value}
                 className={[
-                  'flex cursor-pointer flex-col gap-1 rounded-lg border p-3 text-sm transition',
+                  'flex flex-col gap-1 rounded-lg border p-3 text-sm transition',
+                  modeForce ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
                   checked
                     ? 'border-[var(--accent)] bg-[var(--surface-muted)]'
-                    : 'border-[var(--border)] hover:bg-[var(--surface-muted)]',
+                    : `border-[var(--border)] ${modeForce ? '' : 'hover:bg-[var(--surface-muted)]'}`,
                 ].join(' ')}
               >
                 <span className="flex items-center gap-2">
@@ -189,6 +299,7 @@ export function PreferencesPanel(): React.ReactElement {
                     name="theme"
                     value={value}
                     checked={checked}
+                    disabled={modeForce}
                     onChange={() => chooseTheme(value as ThemePreference)}
                     className="accent-[var(--accent)]"
                   />

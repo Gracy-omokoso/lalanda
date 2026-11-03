@@ -25,6 +25,7 @@ export const DEFAULT_PREFERENCES: PreferencesView = {
   locale: 'fr',
   timezone: 'Africa/Kinshasa',
   theme: 'system',
+  uiTheme: 'lalanda',
   displayCurrency: 'USD',
   notifications: {
     securite: true,
@@ -39,6 +40,8 @@ export interface PreferencesView {
   locale: 'fr';
   timezone: string;
   theme: 'light' | 'dark' | 'system';
+  /** Thème d'interface (ADR-0055). */
+  uiTheme: 'lalanda' | 'lagune' | 'ebene';
   displayCurrency: 'USD' | 'CDF' | 'XOF' | 'XAF' | 'EUR';
   notifications: NotificationPreferences;
   /** `null` tant qu'aucune préférence n'a été enregistrée. */
@@ -119,6 +122,8 @@ export class AccountService {
   async savePreferences(userId: string, input: PutPreferencesInput): Promise<PreferencesView> {
     return this.upsert(userId, {
       theme: input.theme,
+      // Absent : le thème d'interface enregistré est conservé (voir le DTO).
+      ...(input.uiTheme ? { uiTheme: input.uiTheme } : {}),
       displayCurrency: input.displayCurrency,
       notifications: input.notifications,
     });
@@ -287,6 +292,8 @@ function toPreferencesView(doc: UserPreferencesDocument | null): PreferencesView
     locale: doc.locale,
     timezone: doc.timezone,
     theme: doc.theme,
+    // Document écrit avant ADR-0055 : le défaut, comme pour un compte neuf.
+    uiTheme: doc.uiTheme ?? DEFAULT_PREFERENCES.uiTheme,
     displayCurrency: doc.displayCurrency,
     notifications: {
       securite: doc.notifications.securite,

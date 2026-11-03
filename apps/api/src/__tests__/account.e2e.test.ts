@@ -291,6 +291,51 @@ e2eSuite('espace compte (S20b — docs/04, docs/12, docs/17)', () => {
     expect(prefsB.body.displayCurrency).toBe('USD');
   }, 30_000);
 
+  it('préférences : thème d’interface (ADR-0055) — Lalanda par défaut, conservé si absent', async () => {
+    const server = app.getHttpServer();
+    const cookiesC = await login(userB);
+
+    const avant = await request(server).get('/account/preferences').set('Cookie', cookiesC);
+    expect(avant.status).toBe(200);
+    expect(avant.body.uiTheme).toBe('lalanda');
+    expect(avant.body.options.uiThemes).toEqual(['lalanda', 'lagune', 'ebene']);
+
+    const base = {
+      theme: 'light',
+      displayCurrency: 'USD',
+      notifications: { securite: true, produit: true, projet: true, resumeHebdomadaire: false },
+    };
+    const put = await request(server)
+      .put('/account/preferences')
+      .set('Cookie', cookiesC)
+      .send({ ...base, uiTheme: 'ebene' });
+    expect(put.status).toBe(200);
+    expect(put.body.uiTheme).toBe('ebene');
+    // Ébène impose le sombre à l'AFFICHAGE, mais le mode choisi est gardé tel quel.
+    expect(put.body.theme).toBe('light');
+
+    // Sans `uiTheme` (bouton clair/sombre, ancien client) : le thème reste Ébène.
+    const sansTheme = await request(server)
+      .put('/account/preferences')
+      .set('Cookie', cookiesC)
+      .send({ ...base, theme: 'dark' });
+    expect(sansTheme.status).toBe(200);
+
+    const apres = await request(server).get('/account/preferences').set('Cookie', cookiesC);
+    expect(apres.body.uiTheme).toBe('ebene');
+    expect(apres.body.theme).toBe('dark');
+
+    const invalide = await request(server)
+      .put('/account/preferences')
+      .set('Cookie', cookiesC)
+      .send({ ...base, uiTheme: 'solarized' });
+    expect(invalide.status).toBe(400);
+
+    // L'autre compte n'est pas touché.
+    const prefsA = await request(server).get('/account/preferences').set('Cookie', cookiesA);
+    expect(prefsA.body.uiTheme).toBe('lalanda');
+  }, 60_000);
+
   it('préférences : zod refuse une valeur hors énumération', async () => {
     const server = app.getHttpServer();
     const valid = {
