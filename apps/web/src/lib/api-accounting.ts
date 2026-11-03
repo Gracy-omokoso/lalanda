@@ -49,6 +49,8 @@ import type {
   AccountingRuleSetView,
   AccountingSettingsView,
   UpdateAccountingSettingsBody,
+  UpdateAccountingRuleSetBody,
+  ValidateAccountingRuleSetBody,
   AccountingOpeningProposalView,
   AccountingOpeningStatusView,
   CreateAccountingOpeningBody,
@@ -180,6 +182,27 @@ export const accountingApi = {
   listRuleSets: () => jsonRequest<{ items: AccountingRuleSetView[] }>('/accounting/rule-sets', GET),
   getRuleSet: (version: number) =>
     jsonRequest<AccountingRuleSetView>(`/accounting/rule-sets/${seg(version)}`, GET),
+  /**
+   * Brouillon né des règles proposées du pack choisi, ou copie de la version validée
+   * (`accounting.manage`) ; 409 `RULE_SET_DRAFT_EXISTS` si un brouillon existe déjà.
+   */
+  createRuleSet: () =>
+    jsonRequest<AccountingRuleSetView>('/accounting/rule-sets', { method: 'POST', body: {} }),
+  /** Remplace les règles d'un brouillon ; il se rattache au pack en vigueur. */
+  updateRuleSet: (version: number, body: z.input<typeof UpdateAccountingRuleSetBody>) =>
+    jsonRequest<AccountingRuleSetView>(`/accounting/rule-sets/${seg(version)}`, {
+      method: 'PUT',
+      body,
+    }),
+  /**
+   * Validation (séparation des tâches, 409 `SELF_APPROVAL_FORBIDDEN`).
+   * La déclaration de relecture (nom, date) est exigée ; Lalanda ne la vérifie pas.
+   */
+  validateRuleSet: (version: number, body: z.input<typeof ValidateAccountingRuleSetBody>) =>
+    jsonRequest<AccountingRuleSetView>(`/accounting/rule-sets/${seg(version)}/validate`, {
+      method: 'POST',
+      body,
+    }),
   listJournals: () => jsonRequest<{ items: AccountingJournalView[] }>('/accounting/journals', GET),
   listExchangeRates: () =>
     jsonRequest<{ items: AccountingExchangeRateView[] }>('/accounting/exchange-rates', GET),
@@ -286,6 +309,12 @@ export const accountingApi = {
   // Clôtures (K4 pour la structure, K6 pour les clôtures et les à-nouveaux)
   listFiscalYears: () =>
     jsonRequest<{ items: AccountingFiscalYearView[] }>('/accounting/fiscal-years', GET),
+  /** Ouvre un exercice et ses douze mois (`accounting.close`) ; 409 `FISCAL_YEAR_EXISTS`. */
+  createFiscalYear: (year: number) =>
+    jsonRequest<AccountingFiscalYearView>('/accounting/fiscal-years', {
+      method: 'POST',
+      body: { year },
+    }),
   closePeriod: (year: number, month: number) =>
     jsonRequest<AccountingFiscalYearView>(`/accounting/periods/${seg(year)}/${seg(month)}/close`, {
       method: 'POST',

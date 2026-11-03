@@ -3,6 +3,8 @@
 // - Une version naît BROUILLON : copie de la version validée en vigueur, sinon des règles
 //   PROPOSÉES du pack — chacune encore « à confirmer » (`requiresReview: true` dès que le
 //   pack la dit `to_confirm`). Le pack v1 n'en propose aucune : le brouillon naît VIDE.
+// - Changer de pack avant la validation : le brouillon se reprend par `PUT` (règles
+//   proposées du nouveau pack) et se rattache au pack en vigueur (`basedOn`).
 // - L'organisation change les comptes, jamais la liste des clés (`checkRuleSet`, K2 :
 //   `400 UNKNOWN_OPERATION_KEY`) ; un numéro hors du plan actif est refusé.
 // - Validation : `ruleSetDecision` (K0) — le dernier auteur ne valide pas, sauf
@@ -143,10 +145,16 @@ export class AccountingRuleSetsService {
       requiresReview: r.requiresReview,
     }));
     await this.assertRules(organizationId, version, rules, 'save');
+    // Le brouillon est contrôlé contre le plan EN VIGUEUR : il se rattache au pack choisi
+    // aujourd'hui (passage d'un pack à un autre avant la validation).
+    const settings = await this.settings.ensure(organizationId, actor.userId);
+    const basedOn = settings.chartPack
+      ? { packSlug: settings.chartPack.slug, packVersion: settings.chartPack.version }
+      : current.basedOn;
     const updated = await this.ruleSets
       .findOneAndUpdate(
         { organizationId, version, status: 'draft', revision: body.expectedRevision },
-        { $set: { rules, updatedBy: actor.userId }, $inc: { revision: 1 } },
+        { $set: { rules, basedOn, updatedBy: actor.userId }, $inc: { revision: 1 } },
         { new: true },
       )
       .lean<AccountingRuleSetLean>()

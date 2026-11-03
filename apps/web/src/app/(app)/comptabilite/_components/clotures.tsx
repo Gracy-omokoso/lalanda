@@ -16,10 +16,12 @@ import { useAccesCompta } from './comptabilite-access';
 import { formatInstantJour, libelleMois, messageCompta } from './comptabilite-model';
 import { Bandeau, CarteVide, Chargement, EchecLecture, Panneau } from './comptabilite-ui';
 import { LIBELLES_EXERCICE, LIBELLES_PERIODE } from './libelles';
+import { OuvrirExercice } from './regles';
+import { exerciceAProposer, jourDe } from './regles-model';
 import { useLecture } from './use-lecture';
 
 export function Clotures(): React.ReactElement {
-  const { actions, role, mode } = useAccesCompta();
+  const { actions, role, mode, reglages } = useAccesCompta();
   const [version, setVersion] = useState(0);
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState<{ message: string; raisons: string[] } | null>(null);
@@ -74,6 +76,14 @@ export function Clotures(): React.ReactElement {
           ) : null}
         </div>
       ) : null}
+      {l?.ok && reglages?.ok
+        ? (() => {
+            const annee = exerciceAProposer(reglages.valeur, l.valeur, jourDe(new Date()));
+            return annee === null ? null : (
+              <OuvrirExercice annee={annee} onOuvert={() => setVersion((v) => v + 1)} />
+            );
+          })()
+        : null}
       {l === null ? (
         <Chargement />
       ) : !l.ok ? (

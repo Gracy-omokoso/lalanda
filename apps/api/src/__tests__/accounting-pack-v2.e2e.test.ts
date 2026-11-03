@@ -16,7 +16,9 @@ import {
   accountingWorld,
   code,
   entriesOf,
+  loadPack,
   ok,
+  PACK as PACK_V1,
   salesInvoiceDoc,
   type AccountingWorld,
 } from './accounting-e2e-fixtures.js';
@@ -35,7 +37,7 @@ e2eSuite('comptabilité — pack v2 approuvé par décision et règles par défa
   let PACK_REF: Migration['PACK_REF'];
 
   beforeAll(async () => {
-    w = await accountingWorld('pack-v2', ['finance_director']);
+    w = await accountingWorld('pack-v2', ['finance_director'], ['switcher']);
     m = (await import(
       new URL('../../migrations/20261103-0001-pack-syscohada-v2-approuve.mjs', import.meta.url).href
     )) as Migration;
@@ -66,6 +68,48 @@ e2eSuite('comptabilité — pack v2 approuvé par décision et règles par défa
     const detail = ok(await w.get('owner', `/accounting/chart-packs/${PACK_REF.slug}/2`));
     expect(detail['suspenseAccount']).toBe('471');
     expect(detail['fingerprint']).toBe(first.fingerprint);
+  });
+
+  it('passer du pack v1 (brouillon) au v2 : le brouillon de règles se reprend et se rattache au v2', async () => {
+    await loadPack(w);
+    const s0 = ok(await w.get('switcher', '/accounting/settings'));
+    const s1 = ok(
+      await w.put('switcher', '/accounting/settings', {
+        expectedRevision: s0['revision'],
+        mode: 'simulation',
+        chartPack: PACK_V1,
+      }),
+    );
+    // Le v1 ne propose aucune règle : le brouillon naît vide, rattaché au v1.
+    const empty = ok(await w.post('switcher', '/accounting/rule-sets', {}), 201);
+    expect(empty['rules']).toEqual([]);
+    expect(empty['basedOn']).toEqual({ packSlug: PACK_V1.slug, packVersion: 1 });
+
+    // Hors mode actif, le pack approuvé se choisit à la place du brouillon.
+    ok(
+      await w.put('switcher', '/accounting/settings', {
+        expectedRevision: s1['revision'],
+        chartPack: PACK_REF,
+      }),
+    );
+    code(await w.post('switcher', '/accounting/rule-sets', {}), 409, 'RULE_SET_DRAFT_EXISTS');
+
+    // L'écran reprend les règles proposées du v2 dans le brouillon existant.
+    const detail = ok(await w.get('switcher', `/accounting/chart-packs/${PACK_REF.slug}/2`));
+    const proposed = (detail['proposedRules'] as Record<string, any>[]).map((r) => ({
+      key: r['key'],
+      debit: r['debit'],
+      credit: r['credit'],
+      requiresReview: r['requiresReview'] === true || r['confirmation'] === 'to_confirm',
+    }));
+    const refreshed = ok(
+      await w.put('switcher', `/accounting/rule-sets/${empty['version']}`, {
+        expectedRevision: empty['revision'],
+        rules: proposed,
+      }),
+    );
+    expect(refreshed['basedOn']).toEqual({ packSlug: PACK_REF.slug, packVersion: 2 });
+    expect((refreshed['rules'] as unknown[]).length).toBe(proposed.length);
   });
 
   it('une organisation passe en mode actif par le circuit existant avec le pack v2', async () => {

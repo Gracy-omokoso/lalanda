@@ -1,6 +1,6 @@
 'use client';
 
-// Assistant d'activation (ADR-0049 § 3.1, § 13) : quatre étapes, puis le choix du mode.
+// Assistant d'activation (ADR-0049 § 3.1, § 13) : cinq étapes, puis le choix du mode.
 // `active` reste grisé, avec sa raison, tant que le pack n'est pas approuvé ; la
 // simulation est possible avec le pack brouillon. Le serveur reste juge : un refus
 // `409 ACCOUNTING_ACTIVATION_PRECONDITION` affiche la liste des conditions manquantes.
@@ -18,6 +18,7 @@ import { useEffect, useState } from 'react';
 import {
   accountingApi,
   type AccountingChartPackSummary,
+  type AccountingFiscalYearView,
   type AccountingRuleSetView,
   type AccountingSettingsView,
 } from '@/lib/api-accounting';
@@ -42,6 +43,8 @@ import {
   type Lecture,
 } from './comptabilite-model';
 import { AConfirmer, Chargement, EchecLecture, Panneau, Terme } from './comptabilite-ui';
+import { GestesRegles, OuvrirExercice, usePackChoisi } from './regles';
+import { exerciceAProposer, jourDe } from './regles-model';
 
 type EtapeOuverte = EtapeActivation['id'] | null;
 
@@ -112,11 +115,12 @@ function FenetreEtape({
     monnaie: 'Choisir la monnaie de tenue',
     bascule: 'Choisir la date de bascule',
     regles: 'Règles de correspondance',
+    exercice: 'Premier exercice',
   };
 
   return (
     <Modal
-      open={etape !== null && etape !== 'regles'}
+      open={etape !== null && etape !== 'regles' && etape !== 'exercice'}
       onClose={onClose}
       title={etape ? titres[etape] : ''}
       busy={envoi}
@@ -231,6 +235,8 @@ function FenetreEtape({
 export function Activation(): React.ReactElement {
   const { actions, reglages, recharger } = useAccesCompta();
   const [jeux, setJeux] = useState<Lecture<AccountingRuleSetView[]> | null>(null);
+  const [exercices, setExercices] = useState<Lecture<AccountingFiscalYearView[]> | null>(null);
+  const pack = usePackChoisi(reglages?.ok ? reglages.valeur : null);
   const [ouverte, setOuverte] = useState<EtapeOuverte>(null);
   const [envoi, setEnvoi] = useState<AccountingMode | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -240,6 +246,9 @@ export function Activation(): React.ReactElement {
     let annule = false;
     void lire(accountingApi.listRuleSets().then((r) => r.items)).then((l) => {
       if (!annule) setJeux(l);
+    });
+    void lire(accountingApi.listFiscalYears().then((r) => r.items)).then((l) => {
+      if (!annule) setExercices(l);
     });
     return () => {
       annule = true;
@@ -260,7 +269,14 @@ export function Activation(): React.ReactElement {
   }
 
   const r = reglages.valeur;
-  const etapes = etapesActivation(r, jeux?.ok ? jeux.valeur : null);
+  const etapes = etapesActivation(
+    r,
+    jeux?.ok ? jeux.valeur : null,
+    exercices?.ok ? exercices.valeur : null,
+  );
+  const anneeAOuvrir = exercices?.ok
+    ? exerciceAProposer(r, exercices.valeur, jourDe(new Date()))
+    : null;
   const options = optionsMode(r, actions);
   const modifiable = peutParametrer(actions);
 
@@ -315,13 +331,17 @@ export function Activation(): React.ReactElement {
               {e.id === 'pack' && r.chartPack && !packActivable(r.chartPack.status) ? (
                 <p className="text-sm">
                   <AConfirmer texte={ACCOUNTING_TO_CONFIRM_LABEL} /> Les comptes de ce plan sont des
-                  candidats : ils ne servent qu’à la simulation.
+                  candidats : ils ne servent qu’à la simulation. Pour la tenue active, choisissez un
+                  plan au statut « {LIBELLES_STATUT_PACK.approved} » : hors tenue active, le plan se
+                  change, et un brouillon de règles se reprend depuis le nouveau plan.
                 </p>
               ) : null}
               {e.id === 'regles' ? (
-                <a href="#compta-regles" className="text-sm underline underline-offset-2">
-                  Voir les règles
-                </a>
+                <GestesRegles jeux={jeux?.ok ? jeux.valeur : null} pack={pack} lienVersRegles />
+              ) : e.id === 'exercice' ? (
+                anneeAOuvrir !== null ? (
+                  <OuvrirExercice annee={anneeAOuvrir} onOuvert={recharger} />
+                ) : null
               ) : modifiable ? (
                 <div>
                   <Button variant="secondary" size="sm" onClick={() => setOuverte(e.id)}>

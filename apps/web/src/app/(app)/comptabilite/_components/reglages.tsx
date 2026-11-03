@@ -1,7 +1,9 @@
 'use client';
 
 // Réglages de la comptabilité (ADR-0049 § 13) : assistant d'activation, plan de
-// l'organisation, règles de correspondance (chaque règle « à confirmer » signalée),
+// l'organisation, règles de correspondance (création depuis le plan, modification d'un
+// brouillon, validation avec déclaration de relecture ; chaque règle « à revoir » signalée
+// avec son motif),
 // journaux, taux saisis. Lecture `accounting.read` ; les modifications passent par
 // `accounting.manage` (et `fiscal.manage` pour l'activation), vérifiées par l'API.
 //
@@ -15,13 +17,13 @@ import { BookOpenCheck, Coins, Library, Scale, Settings2 } from 'lucide-react';
 import {
   accountingApi,
   type AccountingAccountView,
+  type AccountingChartPackDetail,
   type AccountingExchangeRateView,
   type AccountingJournalView,
   type AccountingRuleSetView,
 } from '@/lib/api-accounting';
 
 import { Activation } from './activation';
-import { reglesAConfirmer } from './activation-model';
 import { useAccesCompta } from './comptabilite-access';
 import { type Lecture } from './comptabilite-model';
 import {
@@ -33,7 +35,8 @@ import {
   Panneau,
   Terme,
 } from './comptabilite-ui';
-import { LIBELLES_JOURNAL, LIBELLES_STATUT_REGLES } from './libelles';
+import { LIBELLES_JOURNAL } from './libelles';
+import { GestesRegles, TableauRegles, usePackChoisi } from './regles';
 import { useLecture } from './use-lecture';
 
 function Plan({ l }: { l: Lecture<AccountingAccountView[]> | null }): React.ReactElement {
@@ -95,70 +98,23 @@ function Plan({ l }: { l: Lecture<AccountingAccountView[]> | null }): React.Reac
   );
 }
 
-function Regles({ l }: { l: Lecture<AccountingRuleSetView[]> | null }): React.ReactElement {
+function Regles({
+  l,
+  pack,
+}: {
+  l: Lecture<AccountingRuleSetView[]> | null;
+  pack: Lecture<AccountingChartPackDetail> | null;
+}): React.ReactElement {
   if (l === null) return <Chargement />;
   if (!l.ok) return <EchecLecture erreur={l.erreur} repli="Les règles sont illisibles." />;
-  if (l.valeur.length === 0) {
-    return <CarteVide>Aucune version des règles pour le moment.</CarteVide>;
-  }
   return (
-    <ul className="flex flex-col gap-4">
-      {l.valeur.map((jeu) => {
-        const n = reglesAConfirmer(jeu);
-        const relu = jeu.validation?.expertReview;
-        return (
-          <li
-            key={jeu.version}
-            className="flex flex-col gap-2 rounded-[var(--radius-md)] border border-[var(--border)] p-4"
-          >
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-semibold">Version {jeu.version}</span>
-              <Badge tone={jeu.status === 'validated' ? 'success' : 'neutral'}>
-                {LIBELLES_STATUT_REGLES[jeu.status]}
-              </Badge>
-              {n > 0 ? <AConfirmer texte={`${n} règle${n > 1 ? 's' : ''} à confirmer`} /> : null}
-            </div>
-            {relu?.declared ? (
-              <p className="text-sm text-[var(--foreground-muted)]">
-                Déclaration de relecture : {relu.name ?? 'nom non précisé'}
-                {relu.date ? `, le ${relu.date}` : ''}. Lalanda enregistre cette déclaration de
-                relecture sans la vérifier.
-              </p>
-            ) : jeu.status === 'validated' ? (
-              <p className="text-sm">Aucune déclaration de relecture.</p>
-            ) : null}
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[32rem] text-sm">
-                <thead className="text-left text-xs text-[var(--foreground-muted)]">
-                  <tr>
-                    <th className="py-1.5 pr-3 font-medium">Opération</th>
-                    <th className="py-1.5 pr-3 font-medium">Débit</th>
-                    <th className="py-1.5 pr-3 font-medium">Crédit</th>
-                    <th className="py-1.5 font-medium">Statut</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--border)]">
-                  {jeu.rules.map((r) => (
-                    <tr key={r.key}>
-                      <td className="py-1.5 pr-3">
-                        <span className="font-mono">{r.key}</span>
-                      </td>
-                      <td className="py-1.5 pr-3 font-mono">{r.debit.join(', ') || '—'}</td>
-                      <td className="py-1.5 pr-3 font-mono">{r.credit.join(', ') || '—'}</td>
-                      <td className="py-1.5">
-                        {r.requiresReview ? (
-                          <AConfirmer texte={ACCOUNTING_TO_CONFIRM_LABEL} />
-                        ) : null}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </li>
-        );
-      })}
-    </ul>
+    <div className="flex flex-col gap-4">
+      {l.valeur.length === 0 ? (
+        <CarteVide>Aucune version des règles pour le moment.</CarteVide>
+      ) : null}
+      <GestesRegles jeux={l.valeur} pack={pack} />
+      <TableauRegles jeux={l} pack={pack} />
+    </div>
   );
 }
 
@@ -214,6 +170,7 @@ function Taux({ l }: { l: Lecture<AccountingExchangeRateView[]> | null }): React
 
 export function Reglages(): React.ReactElement {
   const { reglages } = useAccesCompta();
+  const pack = usePackChoisi(reglages?.ok ? reglages.valeur : null);
   const plan = useLecture(() => accountingApi.listAccounts().then((r) => r.items), reglages);
   const regles = useLecture(() => accountingApi.listRuleSets().then((r) => r.items), reglages);
   const journaux = useLecture(() => accountingApi.listJournals().then((r) => r.items), reglages);
@@ -235,7 +192,7 @@ export function Reglages(): React.ReactElement {
         icone={Scale}
         id="compta-regles"
       >
-        <Regles l={regles} />
+        <Regles l={regles} pack={pack} />
       </Panneau>
       <Panneau
         titre={<Terme terme="journal">Journaux</Terme>}

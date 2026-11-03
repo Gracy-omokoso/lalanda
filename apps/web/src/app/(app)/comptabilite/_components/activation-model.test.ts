@@ -147,13 +147,45 @@ const JEU = (
 });
 
 describe('étapes de l’assistant (§ 13)', () => {
-  it('quatre étapes : pack, monnaie, bascule, règles', () => {
+  it('cinq étapes : pack, monnaie, bascule, règles, premier exercice', () => {
     expect(etapesActivation(REGLAGES, null).map((e) => [e.numero, e.id])).toEqual([
       [1, 'pack'],
       [2, 'monnaie'],
       [3, 'bascule'],
       [4, 'regles'],
+      [5, 'exercice'],
     ]);
+  });
+
+  it('premier exercice : fait seulement avec un exercice ouvert', () => {
+    const ex = (status: 'open' | 'closed') => ({
+      year: 2026,
+      start: '2026-01-01',
+      end: '2026-12-31',
+      status,
+      closedAt: null,
+      periods: [],
+      revision: 1,
+    });
+    expect(etapesActivation(REGLAGES, null, null)[4]!.etat).toBe('a-faire');
+    expect(etapesActivation(REGLAGES, null, [ex('closed')])[4]!.etat).toBe('a-faire');
+    const e = etapesActivation(REGLAGES, null, [ex('open')])[4]!;
+    expect(e.etat).toBe('fait');
+    expect(e.resume).toMatch(/Exercice 2026 ouvert/);
+  });
+
+  it('règles : un brouillon est annoncé, à valider avec la déclaration de relecture', () => {
+    expect(etapesActivation(REGLAGES, [])[3]!.resume).toMatch(/créez les règles/);
+    expect(etapesActivation(REGLAGES, [JEU(4, 'draft', false)])[3]!.resume).toMatch(
+      /Version 4 en brouillon \(2 règles\)/,
+    );
+  });
+
+  it('libellé exact : un plan « approuvé » sans prétendre à la relecture d’un expert', () => {
+    expect(LIBELLES_CONDITION.CHART_PACK_NOT_APPROVED).not.toMatch(/expert/);
+    expect(LIBELLES_CONDITION.CHART_PACK_NOT_APPROVED).toMatch(/approuvé/);
+    const r = { ...REGLAGES, chartPack: null };
+    expect(option(r, PROPRIETAIRE, 'active').raison).not.toMatch(/expert/);
   });
 
   it('pack brouillon : « en attente de l’expert-comptable » ; monnaie sans défaut', () => {

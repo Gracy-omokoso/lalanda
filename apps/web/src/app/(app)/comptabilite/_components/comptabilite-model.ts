@@ -90,7 +90,7 @@ export const EXPLICATIONS_MODE: Record<AccountingMode, string> = {
 export const LIBELLES_STATUT_PACK: Record<AccountingChartPackStatus, string> = {
   draft: 'Brouillon, non relu',
   review: 'En relecture chez l’expert-comptable',
-  approved: 'Relu et approuvé',
+  approved: 'Approuvé',
   active: 'En service',
   retired: 'Retiré',
 };
@@ -130,6 +130,15 @@ const MESSAGES: Record<string, string> = {
     'Cet état n’est pas disponible tant que votre expert-comptable n’a pas précisé sa méthode.',
   LETTERING_NOT_BALANCED: 'Les lignes choisies ne se compensent pas : le lettrage est refusé.',
   LETTERING_MIXED_ACCOUNTS: 'Le lettrage porte sur les lignes d’un seul et même compte.',
+  RULE_SET_DRAFT_EXISTS:
+    'Un brouillon de règles existe déjà : il est affiché, modifiez-le ou validez-le.',
+  RULE_ACCOUNT_NOT_IN_CHART:
+    'Un compte saisi n’est pas dans le plan de l’organisation : choisissez un compte du plan.',
+  UNKNOWN_OPERATION_KEY:
+    'Une opération est inconnue de Lalanda : la liste des opérations ne change pas.',
+  RULE_SET_INVALID: 'Ces règles sont illisibles : vérifiez les comptes saisis.',
+  FISCAL_YEAR_EXISTS: 'Cet exercice existe déjà.',
+  FISCAL_YEAR_OVERLAP: 'Ces mois appartiennent déjà à un autre exercice.',
   STALE_REVISION:
     'Ces réglages ont été modifiés entre-temps. Rechargez la page avant de recommencer.',
 };

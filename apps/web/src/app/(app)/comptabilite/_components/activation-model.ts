@@ -1,7 +1,8 @@
 // Assistant d'activation de la comptabilité (ADR-0049 § 3.1, § 13 « Réglages »), lot K8.
 // Logique pure.
 //
-// Quatre étapes : pack et avertissements, monnaie de tenue, bascule et reprise, règles.
+// Cinq étapes : pack et avertissements, monnaie de tenue, bascule et reprise, règles,
+// premier exercice.
 // Trois modes : `off`, `simulation`, `active`. Le mode `active` reste GRISÉ, avec sa
 // raison, tant que le pack n'est pas approuvé ; le serveur vérifie de toute façon
 // chaque condition (`409 ACCOUNTING_ACTIVATION_PRECONDITION`, `details.missing[]`) —
@@ -16,7 +17,11 @@ import {
 } from '@lalanda/shared/accounting';
 
 import type { OrgAction } from '@/lib/api';
-import type { AccountingRuleSetView, AccountingSettingsView } from '@/lib/api-accounting';
+import type {
+  AccountingFiscalYearView,
+  AccountingRuleSetView,
+  AccountingSettingsView,
+} from '@/lib/api-accounting';
 
 import {
   EXPLICATIONS_MODE,
@@ -30,13 +35,14 @@ import {
 
 /** Phrase de chaque condition manquante, dans l'ordre de l'assistant. */
 export const LIBELLES_CONDITION: Record<AccountingActivationMissingCode, string> = {
-  CHART_PACK_NOT_APPROVED: 'Le plan comptable doit être relu et approuvé par un expert-comptable.',
+  CHART_PACK_NOT_APPROVED:
+    'Choisissez un plan comptable approuvé : un plan au statut brouillon ne sert qu’à la simulation.',
   BOOK_CURRENCY_REQUIRED: 'Choisissez la monnaie de tenue (CDF ou USD).',
   CUTOVER_DATE_REQUIRED: 'Choisissez la date de bascule.',
   RULE_SET_NOT_VALIDATED: 'Validez une version des règles de correspondance.',
   EXPERT_REVIEW_NOT_DECLARED:
     'Faites la déclaration de relecture : nom de votre expert-comptable et date de sa relecture.',
-  FISCAL_YEAR_NOT_OPEN: 'Ouvrez un premier exercice.',
+  FISCAL_YEAR_NOT_OPEN: 'Ouvrez un premier exercice (étape 5).',
 };
 
 /** Conditions lues dans un refus `409 ACCOUNTING_ACTIVATION_PRECONDITION`, ordonnées. */
@@ -81,8 +87,8 @@ export function optionsMode(
       if (!packActivable(statutPack)) {
         raison =
           statutPack === null
-            ? 'Aucun plan comptable choisi. La tenue active exige un plan relu et approuvé par un expert-comptable.'
-            : `Le plan comptable n’est pas encore approuvé (statut : ${LIBELLES_STATUT_PACK[statutPack].toLowerCase()}). La tenue active reste fermée jusqu’à la relecture d’un expert-comptable ; la simulation, elle, est possible.`;
+            ? 'Aucun plan comptable choisi. La tenue active exige un plan approuvé.'
+            : `Le plan comptable choisi n’est pas encore approuvé (statut : ${LIBELLES_STATUT_PACK[statutPack].toLowerCase()}). La tenue active reste fermée tant qu’un plan approuvé n’est pas choisi ; la simulation, elle, est possible.`;
       } else if (!peutActiver(actions)) {
         raison =
           'Activer engage l’organisation : il faut aussi le droit de gérer la fiscalité (Propriétaire ou Directeur financier).';
@@ -104,8 +110,8 @@ export function optionsMode(
 export type EtatEtape = 'fait' | 'a-faire' | 'attente-expert';
 
 export interface EtapeActivation {
-  id: 'pack' | 'monnaie' | 'bascule' | 'regles';
-  numero: 1 | 2 | 3 | 4;
+  id: 'pack' | 'monnaie' | 'bascule' | 'regles' | 'exercice';
+  numero: 1 | 2 | 3 | 4 | 5;
   titre: string;
   etat: EtatEtape;
   resume: string;
@@ -127,13 +133,16 @@ export function reglesAConfirmer(jeu: AccountingRuleSetView): number {
 }
 
 /**
- * État des quatre étapes. Rien n'est déduit qui ne vienne de l'API : un jeu de règles
- * illisible (`null`) laisse l'étape « à faire ».
+ * État des cinq étapes. Rien n'est déduit qui ne vienne de l'API : un jeu de règles ou
+ * une liste d'exercices illisible (`null`) laisse l'étape « à faire ».
  */
 export function etapesActivation(
   reglages: AccountingSettingsView,
   jeux: readonly AccountingRuleSetView[] | null,
+  exercices: readonly AccountingFiscalYearView[] | null = null,
 ): EtapeActivation[] {
+  const ouvert = exercices?.find((e) => e.status === 'open') ?? null;
+  const brouillon = jeux?.find((j) => j.status === 'draft') ?? null;
   const pack = reglages.chartPack;
   const valide = reglesEnVigueur(jeux);
   const relu = valide?.validation?.expertReview?.declared === true;
@@ -146,7 +155,7 @@ export function etapesActivation(
       resume:
         pack === null
           ? 'Aucun plan comptable choisi.'
-          : `Plan ${pack.slug}, version ${pack.version} — ${LIBELLES_STATUT_PACK[pack.status]}.`,
+          : `${pack.label} (${pack.slug}, version ${pack.version}) — ${LIBELLES_STATUT_PACK[pack.status]}.`,
     },
     {
       id: 'monnaie',
@@ -175,10 +184,22 @@ export function etapesActivation(
       etat: valide !== null && relu ? 'fait' : 'a-faire',
       resume:
         valide === null
-          ? 'Aucune version validée.'
+          ? brouillon === null
+            ? 'Aucune version : créez les règles depuis le plan comptable.'
+            : `Version ${brouillon.version} en brouillon (${brouillon.rules.length} règles), à valider avec la déclaration de relecture.`
           : relu
             ? `Version ${valide.version} validée, déclaration de relecture faite.`
             : `Version ${valide.version} validée, sans déclaration de relecture.`,
+    },
+    {
+      id: 'exercice',
+      numero: 5,
+      titre: 'Premier exercice',
+      etat: ouvert !== null ? 'fait' : 'a-faire',
+      resume:
+        ouvert !== null
+          ? `Exercice ${ouvert.year} ouvert, du ${ouvert.start} au ${ouvert.end}.`
+          : 'Aucun exercice ouvert : les écritures ont besoin de leurs mois.',
     },
   ];
 }
