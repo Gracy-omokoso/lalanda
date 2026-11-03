@@ -85,6 +85,10 @@
     "./organization-setup": {
       "types": "./dist/organization-setup/index.d.ts",
       "import": "./dist/organization-setup/index.js"
+    },
+    "./sales-invoices": {
+      "types": "./dist/sales-invoices/index.d.ts",
+      "import": "./dist/sales-invoices/index.js"
     }
   },
   "scripts": {

@@ -57,6 +57,7 @@ import {
 } from './invoices/invoice-counter.schema.js';
 import { InvoiceDraftsService } from './invoices/invoice-drafts.service.js';
 import { InvoiceFreezingService } from './invoices/invoice-freezing.service.js';
+import { InvoiceStatsService } from './invoices/invoice-stats.service.js';
 import {
   SalesInvoiceJournalEntry,
   SalesInvoiceJournalEntrySchema,
@@ -141,6 +142,7 @@ import { ReferenceRefreshJob } from './normalization/reference-refresh.job.js';
     ExchangeRateReferenceService,
     InvoiceDraftsService,
     InvoiceFreezingService,
+    InvoiceStatsService,
     CreditNotesService,
     InvoiceDocumentsService,
     // ADR-0042 : envoi des documents de vente par e-mail (audit, remise au transport).

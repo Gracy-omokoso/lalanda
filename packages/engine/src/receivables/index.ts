@@ -21,3 +21,5 @@ export {
 } from './aggregation.js';
 // ADR-0040 — C8 : solde dû d'un client par devise (fiche 360°).
 export * from './outstanding.js';
+// ADR-0056 : tableau de bord des factures (cartes, graphiques, compteurs).
+export * from './invoice-stats.js';

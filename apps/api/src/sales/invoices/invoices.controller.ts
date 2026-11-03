@@ -38,6 +38,7 @@ import { CreditNotesService } from './credit-notes.service.js';
 import { ExchangeRateReferenceService } from './exchange-rate-reference.service.js';
 import { InvoiceDraftsService } from './invoice-drafts.service.js';
 import { InvoiceFreezingService } from './invoice-freezing.service.js';
+import { InvoiceStatsService } from './invoice-stats.service.js';
 import type {
   ExchangeRateReference,
   InvoicePage,
@@ -55,6 +56,7 @@ import {
   PutInvoiceSchema,
 } from './invoices.dto.js';
 import { RequireFeature } from '../../billing/feature.guard.js';
+import { InvoiceStatsQuerySchema, type InvoiceStats } from '@lalanda/shared/sales-invoices';
 
 type User = { id: string; email: string; name?: string | null };
 
@@ -72,6 +74,7 @@ export class InvoicesController {
     @Inject(InvoiceFreezingService) private readonly freezing: InvoiceFreezingService,
     @Inject(CreditNotesService) private readonly creditNotes: CreditNotesService,
     @Inject(ExchangeRateReferenceService) private readonly exchange: ExchangeRateReferenceService,
+    @Inject(InvoiceStatsService) private readonly statsService: InvoiceStatsService,
   ) {}
 
   @Get('invoices')
@@ -80,6 +83,18 @@ export class InvoicesController {
     const parsed = ListInvoicesQuerySchema.safeParse(query);
     if (!parsed.success) invalidRequest(parsed.error, 'Paramètres de liste invalides.');
     return this.drafts.list(orgId, parsed.data);
+  }
+
+  /**
+   * ADR-0056 : tableau de bord de l'écran Factures (cartes, graphiques, compteurs
+   * des filtres). Déclarée AVANT `invoices/:invoiceId`, qui la capturerait sinon.
+   */
+  @Get('invoices/stats')
+  @RequirePermission('sales.read')
+  async stats(@CurrentOrgId() orgId: string, @Query() query: unknown): Promise<InvoiceStats> {
+    const parsed = InvoiceStatsQuerySchema.safeParse(query);
+    if (!parsed.success) invalidRequest(parsed.error, 'Paramètres invalides.');
+    return this.statsService.stats(orgId, parsed.data.months);
   }
 
   @Post('invoices')

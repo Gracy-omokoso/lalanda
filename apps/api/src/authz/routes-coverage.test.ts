@@ -666,6 +666,7 @@ describe('couverture des routes par le RBAC', () => {
       'CatalogItemsController.remove': ['sales.manage'],
       'TaxGroupsController.list': ['sales.read'],
       'InvoicesController.list': ['sales.read'],
+      'InvoicesController.stats': ['sales.read'],
       'InvoicesController.get': ['sales.read'],
       'InvoicesController.create': ['sales.manage'],
       'InvoicesController.put': ['sales.manage'],
