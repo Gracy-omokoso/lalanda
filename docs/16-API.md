@@ -130,8 +130,8 @@ Contraintes :
 ```text
 GET    /account/profile                 identité + langue + fuseau + demande d'email en attente
 PUT    /account/profile                 nom affiché, langue, fuseau
-GET    /account/preferences             thème, devise par défaut, notifications, valeurs acceptées
-PUT    /account/preferences             écriture des mêmes (remplacement total)
+GET    /account/preferences             thème, thème d’interface (ADR-0055), devise par défaut, notifications, valeurs acceptées
+PUT    /account/preferences             écriture des mêmes (remplacement total ; `uiTheme` facultatif, conservé si absent)
 GET    /account/sessions                sessions actives, la courante marquée
 DELETE /account/sessions/{id}           révocation d'une session
 POST   /account/sessions/revoke-others  révocation de toutes les autres

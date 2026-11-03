@@ -152,3 +152,9 @@ Décideurs :
   pointages conservés 5 ans puis purgés chaque jour ; avances sur salaire éteintes ; retrait d'une
   annonce envoyée ; CGV et confidentialité réécrites, corpus `2026-11-03`. Statut : **accepté**
   (3 nov. 2026).
+- [ADR-0055](ADR-0055-themes-et-design-professionnel.md) — Thèmes au choix et design « plus
+  professionnel », vague 1 sur 5 (fondations) : trois thèmes choisis par personne (Lalanda par défaut,
+  Lagune clair et aéré, Ébène toujours sombre), IBM Plex Sans au lieu de Poppins, densité 14/13 px,
+  rayons 4/6/8 px, principes de mouvement (120/180/240 ms, rien qui compte, rebondit ou apparaît au
+  défilement ; réduction des animations respectée), jetons de graphique pour des SVG maison (vague 4),
+  liens légaux vers le menu Aide (vague 2). Statut : **accepté** (3 nov. 2026).

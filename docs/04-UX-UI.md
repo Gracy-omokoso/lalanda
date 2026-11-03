@@ -117,6 +117,17 @@ Décision, audit et décisions ouvertes : `docs/adr/ADR-0030-refonte-ui-ux.md`. 
 
 Jetons dans `packages/ui/src/styles/tokens.css` (anciens noms conservés), contrastes vérifiés par test. Composants partagés : `PageHeader` (surtitre de module), `TabsNav` (une ligne défilante sur téléphone), `Stepper`, `Button`, `Badge`, `Alert`, `EmptyState`, `Skeleton`, `DataNature` (hypothèse · prévision · réalisé · suggestion IA : libellé + forme, couleur du module d'origine). Champs de saisie sur `--surface` bordés par `--border-strong` (≥ 3:1). Pages publiques et d'accès : crème de charte conservé (`.surface-marque`).
 
+### Thèmes, typographie, densité et mouvement (ADR-0055, vague 1)
+
+Décision : `docs/adr/ADR-0055-themes-et-design-professionnel.md`. Captures : `docs/refonte-ui/v2/`.
+
+- **Trois thèmes choisis par personne** dans Mon compte › Préférences (pastilles d'aperçu, nom, une ligne de description) : **Lalanda** (défaut, barre pétrole), **Lagune** (clair et aéré, barre blanche), **Ébène** (toujours sombre). Sous Ébène, le réglage clair/sombre et le bouton de l'en-tête sont désactivés, la raison est écrite ; le mode choisi est conservé pour le retour à Lalanda ou Lagune.
+- Enregistré sur le compte (`uiTheme` de `/account/preferences`, défaut `lalanda`, facultatif à l'écriture) et en local (`localStorage['ui-theme']`). Le script anti-flash (`lib/theme-boot.ts`, testé) pose `data-ui-theme` et `data-theme` (mode **affiché**, `dark` sous Ébène) avant le premier paint.
+- **Cinq combinaisons** (Lalanda clair/sombre, Lagune clair/sombre, Ébène), chacune déclarant tous les jetons, dont `--nav-active-fg` et les jetons de graphique `--chart-1` à `--chart-6` et `--chart-grid` (≥ 3:1 sur la surface). Contrastes vérifiés par combinaison dans `tokens.test.ts`.
+- **Police** : IBM Plex Sans (texte), Archivo (titres), IBM Plex Mono (chiffres). **Échelle** : texte 14 px, tableaux 13 px, titres 24/18/15 px, appliquée au texte sans classe de `#contenu` et aux titres de `PageHeader` et `Modal`.
+- **Densité** : rayons 4/6/8 px ; `--control-h` 36 px et `--control-h-sm` 32 px (lus par `Button`), `--row-h` 40 px (tableaux, vague 3).
+- **Mouvement** : `--motion-fast` 120 ms, `--motion-base` 180 ms, `--motion-slow` 240 ms, `--ease-standard`. Seuls `Button`, les onglets `TabsNav` et les liens de navigation ont une transition de couleur au survol. Jamais de chiffres qui comptent, d'apparition au défilement, de rebond ni de transition de page lourde. Sous `prefers-reduced-motion: reduce`, toutes les transitions et animations sont ramenées à zéro.
+
 ### Fenêtres modales
 
 Composant `Modal` de `packages/ui` : `<dialog>` ouvert par `showModal()` (`aria-modal`, titre relié par `aria-labelledby`, description par `aria-describedby`), focus au premier champ, `Tab` piégé, focus rendu à l'élément d'origine. Fermeture par `Échap`, par le bouton Fermer et par un clic sur le fond ; si la saisie a commencé, un bandeau demande « Continuer la saisie » ou « Abandonner » ; pendant un envoi, rien ne ferme. Contenu qui défile sous un en-tête fixe, page derrière figée. Plein écran sous 640 px, largeurs `sm`, `md`, `lg` au-delà ; couleurs par jetons (clair et sombre). Un dialogue imbriqué (`aria-modal` dans le contenu) garde `Échap` et `Tab` tant qu'il a le focus.
@@ -239,7 +250,7 @@ La CSP autorise l’origine de l’API dans `img-src`, sans quoi le navigateur b
 
 ### Thème persisté sur le compte
 
-Le thème choisi suit l’utilisateur d’un appareil à l’autre. Trois emplacements doivent rester d’accord : l’attribut du document (ce qui est affiché), `localStorage` (lu avant le premier paint par le script anti-FOUC de `app/layout.tsx`) et `/account/preferences` (la préférence, qui fait autorité au chargement). `apps/web/src/lib/theme.ts` est le seul écrivain des deux premiers. La valeur `system` n’est jamais écrite dans le stockage local — sa clé est supprimée, faute de quoi le script de démarrage, qui ne connaît que `light` et `dark`, forcerait le mode clair au rechargement suivant.
+Le thème choisi suit l’utilisateur d’un appareil à l’autre (mode clair/sombre et, depuis ADR-0055, thème d’interface `uiTheme`). Trois emplacements doivent rester d’accord : l’attribut du document (ce qui est affiché), `localStorage` (lu avant le premier paint par le script anti-FOUC de `app/layout.tsx`) et `/account/preferences` (la préférence, qui fait autorité au chargement). `apps/web/src/lib/theme.ts` est le seul écrivain des deux premiers. La valeur `system` n’est jamais écrite dans le stockage local — sa clé est supprimée, faute de quoi le script de démarrage, qui ne connaît que `light` et `dark`, forcerait le mode clair au rechargement suivant.
 
 ### Limites annoncées à l’utilisateur
 
