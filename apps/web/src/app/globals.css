@@ -23,7 +23,8 @@
  * Restent ici les rôles FIXES de la marque (identiques dans les deux thèmes) :
  *   --ink / --ink-2 / --on-ink / --on-ink-muted : panneaux sombres « encre »
  *   --stamp : cyan tampon (CTA sur encre, sceau BANCABLE)
- * Le thème est piloté par [data-theme="light"|"dark"] sur <html>.
+ * Le thème est piloté par [data-ui-theme] (lalanda | lagune | ebene) et
+ * [data-theme="light"|"dark"] sur <html> (ADR-0055).
  */
 
 :root {
@@ -69,6 +70,23 @@ body {
   }
   to {
     transform: translateX(0);
+  }
+}
+
+/* ─── Mouvement (ADR-0055) ──────────────────────────────────────
+ * Durées et courbe : jetons `--motion-*` et `--ease-standard` (tokens.css).
+ * Qui demande moins d'animations n'en reçoit AUCUNE : transitions et animations
+ * ramenées à zéro, état final appliqué d'emblée. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
   }
 }
 

@@ -1,22 +1,30 @@
-/* ─── Jetons du design system Lalanda (ADR-0030 § 4) ─────────────────────────
+/* ─── Jetons du design system Lalanda (ADR-0030 § 4, ADR-0055) ──────────────
  *
  * Miroir typé : `src/tokens.ts`. Les deux fichiers doivent dire la même chose :
- * `tokens.test.ts` le vérifie, et vérifie les contrastes des paires employées.
+ * `tokens.test.ts` le vérifie, et vérifie les contrastes des paires employées
+ * pour chacune des cinq combinaisons thème × mode.
  *
  * Les noms historiques (`--background`, `--surface`, `--accent`…) sont gardés :
  * tous les écrans existants lisent déjà leurs couleurs ici, et changent d'aspect
  * sans être réécrits.
  *
- * Le thème est piloté par [data-theme="light"|"dark"] sur <html>, posé avant le
- * premier paint par le script de `apps/web/src/app/layout.tsx`.
+ * Deux attributs sur <html>, posés avant le premier paint par le script de
+ * `apps/web/src/app/layout.tsx` :
+ *   - data-ui-theme="lalanda|lagune|ebene" : le thème choisi par la personne ;
+ *   - data-theme="light|dark" : le mode AFFICHÉ (Ébène impose `dark`, si bien
+ *     que tout ce qui lit `[data-theme='dark']` — logo, images — reste juste).
+ *
+ * Cascade : Lalanda clair est le défaut (`:root`). Chaque bloc déclare TOUS les
+ * jetons de couleur, pour qu'aucune valeur d'un autre thème ne « fuie ».
  */
 
+/* ─── Lalanda clair (défaut) ─────────────────────────────────────────────── */
 :root,
 [data-theme='light'] {
-  --background: #f4f2ed;
+  --background: #f5f4f0;
   --surface: #ffffff;
-  --surface-muted: #ece8df;
-  --border: #d9d3c6;
+  --surface-muted: #f7f5f0;
+  --border: #e2ded5;
   --border-strong: #8f8775;
   --foreground: #14191b;
   --foreground-muted: #575449;
@@ -29,27 +37,33 @@
   --ok: #1b7a36;
   --warn: #8a5a06;
   --ko: #b3261e;
-
-  /* Module d'origine — aussi la couleur de la nature de donnée qu'il produit. */
   --module-build: #005263;
   --module-run: #00758c;
   --module-grow: #9c4f18;
   --nature-hypothese: #4e5a63;
 
-  /* Barre latérale — panneau pétrole. */
+  /* Barre de navigation. */
   --nav-bg: #00323d;
   --nav-fg: #eee7d7;
   --nav-muted: #9fc0c8;
   --nav-border: #0d4855;
   --nav-active-bg: #0b4a58;
+  --nav-active-fg: #ffffff;
   --nav-accent: #00acca;
   --nav-build: #96c9d7;
   --nav-run: #00acca;
   --nav-grow: #e39a5e;
 
-  /* Étiquettes (ADR-0039 § 2.1) : palette FERMÉE. Fond, texte (≥ 4,5:1 sur le
-   * fond) et repère (≥ 3:1 sur la surface). La couleur n'est jamais seule : le
-   * libellé est toujours écrit et le repère change de forme (`Tag`). */
+  /* Graphiques (vague 4) : six séries ≥ 3:1 sur la surface, grille décorative. */
+  --chart-1: #005263;
+  --chart-2: #9c4f18;
+  --chart-3: #0097b2;
+  --chart-4: #b3261e;
+  --chart-5: #b07a12;
+  --chart-6: #948c7b;
+  --chart-grid: #ece8df;
+
+  /* Étiquettes (ADR-0039 § 2.1). */
   --label-gray-bg: #eceae4;
   --label-gray-fg: #3f3d36;
   --label-gray-dot: #6b675c;
@@ -82,6 +96,7 @@
   --shadow-pop: 0 12px 32px -8px rgba(0, 50, 61, 0.28), 0 2px 6px rgba(0, 50, 61, 0.12);
 }
 
+/* ─── Lalanda sombre ─────────────────────────────────────────────────────── */
 [data-theme='dark'] {
   --background: #08181d;
   --surface: #0e232a;
@@ -99,22 +114,33 @@
   --ok: #5cc285;
   --warn: #e0ae4f;
   --ko: #f28b82;
-
   --module-build: #96c9d7;
   --module-run: #3cc4dd;
   --module-grow: #e39a5e;
   --nature-hypothese: #b4c2c8;
 
+  /* Barre de navigation. */
   --nav-bg: #04141a;
   --nav-fg: #eee7d7;
   --nav-muted: #93aeb5;
   --nav-border: #14303a;
   --nav-active-bg: #0f2f39;
+  --nav-active-fg: #ffffff;
   --nav-accent: #3cc4dd;
+  --nav-build: #96c9d7;
+  --nav-run: #00acca;
+  --nav-grow: #e39a5e;
 
-  /* Étiquettes (ADR-0039 § 2.1) : palette FERMÉE. Fond, texte (≥ 4,5:1 sur le
-   * fond) et repère (≥ 3:1 sur la surface). La couleur n'est jamais seule : le
-   * libellé est toujours écrit et le repère change de forme (`Tag`). */
+  /* Graphiques (vague 4) : six séries ≥ 3:1 sur la surface, grille décorative. */
+  --chart-1: #3cc4dd;
+  --chart-2: #e39a5e;
+  --chart-3: #96c9d7;
+  --chart-4: #f28b82;
+  --chart-5: #e0ae4f;
+  --chart-6: #5a7c86;
+  --chart-grid: #1a3640;
+
+  /* Étiquettes (ADR-0039 § 2.1). */
   --label-gray-bg: #24343a;
   --label-gray-fg: #d9dedc;
   --label-gray-dot: #9aa6aa;
@@ -147,10 +173,263 @@
   --shadow-pop: 0 16px 40px -8px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 
+/* ─── Lagune clair : clair et aéré, barre latérale blanche ───────────────── */
+[data-ui-theme='lagune'] {
+  --background: #f3f6f6;
+  --surface: #ffffff;
+  --surface-muted: #f5f8f8;
+  --border: #e1e7e8;
+  --border-strong: #7a8a8e;
+  --foreground: #0e1a1e;
+  --foreground-muted: #4f5d61;
+  --accent: #00687d;
+  --accent-foreground: #ffffff;
+  --accent-soft: #e3f0f2;
+  --focus: #007c93;
+  --danger: #b3261e;
+  --danger-bg: #fbedec;
+  --ok: #1b7a36;
+  --warn: #8a5a06;
+  --ko: #b3261e;
+  --module-build: #005263;
+  --module-run: #00687d;
+  --module-grow: #9c4f18;
+  --nature-hypothese: #4e5a63;
+
+  /* Barre de navigation. */
+  --nav-bg: #ffffff;
+  --nav-fg: #0e1a1e;
+  --nav-muted: #55666a;
+  --nav-border: #e1e7e8;
+  --nav-active-bg: #e3f0f2;
+  --nav-active-fg: #00566a;
+  --nav-accent: #00687d;
+  --nav-build: #005263;
+  --nav-run: #00687d;
+  --nav-grow: #9c4f18;
+
+  /* Graphiques (vague 4) : six séries ≥ 3:1 sur la surface, grille décorative. */
+  --chart-1: #00687d;
+  --chart-2: #c26a2e;
+  --chart-3: #2f98ae;
+  --chart-4: #c2372b;
+  --chart-5: #b98a1a;
+  --chart-6: #7f8e92;
+  --chart-grid: #e8eeef;
+
+  /* Étiquettes (ADR-0039 § 2.1). */
+  --label-gray-bg: #eceae4;
+  --label-gray-fg: #3f3d36;
+  --label-gray-dot: #6b675c;
+  --label-red-bg: #fbe4e1;
+  --label-red-fg: #8e1f17;
+  --label-red-dot: #c2372b;
+  --label-orange-bg: #fce8d6;
+  --label-orange-fg: #8a3b0a;
+  --label-orange-dot: #c25a12;
+  --label-yellow-bg: #faf0c8;
+  --label-yellow-fg: #6b4e00;
+  --label-yellow-dot: #9a7400;
+  --label-green-bg: #e1f2e3;
+  --label-green-fg: #1f5f2c;
+  --label-green-dot: #2e8b45;
+  --label-teal-bg: #dcf0ee;
+  --label-teal-fg: #145a55;
+  --label-teal-dot: #1c8a82;
+  --label-blue-bg: #e0eafb;
+  --label-blue-fg: #1e4796;
+  --label-blue-dot: #2f64d0;
+  --label-purple-bg: #eee5f8;
+  --label-purple-fg: #5b2d8e;
+  --label-purple-dot: #8150c2;
+  --label-pink-bg: #fbe3ef;
+  --label-pink-fg: #8c1d58;
+  --label-pink-dot: #c83d86;
+
+  --shadow-card: 0 1px 2px rgba(20, 25, 27, 0.06), 0 1px 1px rgba(20, 25, 27, 0.04);
+  --shadow-pop: 0 12px 32px -8px rgba(0, 50, 61, 0.28), 0 2px 6px rgba(0, 50, 61, 0.12);
+}
+
+/* ─── Lagune sombre : dérivé du sombre Lalanda, gris plus froids ─────────── */
+[data-ui-theme='lagune'][data-theme='dark'] {
+  --background: #0c1517;
+  --surface: #121e21;
+  --surface-muted: #18272b;
+  --border: #24363b;
+  --border-strong: #5b767d;
+  --foreground: #e8eeef;
+  --foreground-muted: #a3b4b8;
+  --accent: #4fc3d9;
+  --accent-foreground: #03242b;
+  --accent-soft: #133840;
+  --focus: #6ad3e6;
+  --danger: #f28b82;
+  --danger-bg: #2c1715;
+  --ok: #5cc285;
+  --warn: #e0ae4f;
+  --ko: #f28b82;
+  --module-build: #96c9d7;
+  --module-run: #4fc3d9;
+  --module-grow: #e39a5e;
+  --nature-hypothese: #b4c2c8;
+
+  /* Barre de navigation. */
+  --nav-bg: #081013;
+  --nav-fg: #e8eeef;
+  --nav-muted: #93a9ae;
+  --nav-border: #1a2a2e;
+  --nav-active-bg: #143139;
+  --nav-active-fg: #ffffff;
+  --nav-accent: #4fc3d9;
+  --nav-build: #96c9d7;
+  --nav-run: #4fc3d9;
+  --nav-grow: #e39a5e;
+
+  /* Graphiques (vague 4) : six séries ≥ 3:1 sur la surface, grille décorative. */
+  --chart-1: #4fc3d9;
+  --chart-2: #e39a5e;
+  --chart-3: #96c9d7;
+  --chart-4: #f28b82;
+  --chart-5: #e0ae4f;
+  --chart-6: #5b767d;
+  --chart-grid: #1e2e32;
+
+  /* Étiquettes (ADR-0039 § 2.1). */
+  --label-gray-bg: #24343a;
+  --label-gray-fg: #d9dedc;
+  --label-gray-dot: #9aa6aa;
+  --label-red-bg: #3a1c1a;
+  --label-red-fg: #f5b4ad;
+  --label-red-dot: #ef7d72;
+  --label-orange-bg: #3a2414;
+  --label-orange-fg: #f6c49a;
+  --label-orange-dot: #ee9a55;
+  --label-yellow-bg: #352c0f;
+  --label-yellow-fg: #f0d985;
+  --label-yellow-dot: #d9b83a;
+  --label-green-bg: #173323;
+  --label-green-fg: #a6ddb4;
+  --label-green-dot: #5cc285;
+  --label-teal-bg: #12332f;
+  --label-teal-fg: #9edcd4;
+  --label-teal-dot: #43b8ac;
+  --label-blue-bg: #172a47;
+  --label-blue-fg: #adc8f5;
+  --label-blue-dot: #6e9ceb;
+  --label-purple-bg: #2a1f3d;
+  --label-purple-fg: #cdb5f0;
+  --label-purple-dot: #a584dd;
+  --label-pink-bg: #3a1a2b;
+  --label-pink-fg: #f3b0d2;
+  --label-pink-dot: #e07aae;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-pop: 0 16px 40px -8px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+/* ─── Ébène : toujours sombre (vient en dernier : l'emporte sur [data-theme]) */
+[data-ui-theme='ebene'] {
+  --background: #0a171b;
+  --surface: #0f2026;
+  --surface-muted: #13282f;
+  --border: #1f3a42;
+  --border-strong: #55757e;
+  --foreground: #eee7d7;
+  --foreground-muted: #a7bec4;
+  --accent: #3cc4dd;
+  --accent-foreground: #03242b;
+  --accent-soft: #12343d;
+  --focus: #5ad2e8;
+  --danger: #f28b82;
+  --danger-bg: #2c1715;
+  --ok: #5cc285;
+  --warn: #e0ae4f;
+  --ko: #f28b82;
+  --module-build: #96c9d7;
+  --module-run: #3cc4dd;
+  --module-grow: #e39a5e;
+  --nature-hypothese: #b4c2c8;
+
+  /* Barre de navigation. */
+  --nav-bg: #050f12;
+  --nav-fg: #eee7d7;
+  --nav-muted: #8fa9b0;
+  --nav-border: #14262c;
+  --nav-active-bg: #12343d;
+  --nav-active-fg: #ffffff;
+  --nav-accent: #3cc4dd;
+  --nav-build: #96c9d7;
+  --nav-run: #3cc4dd;
+  --nav-grow: #e39a5e;
+
+  /* Graphiques (vague 4) : six séries ≥ 3:1 sur la surface, grille décorative. */
+  --chart-1: #3cc4dd;
+  --chart-2: #e39a5e;
+  --chart-3: #96c9d7;
+  --chart-4: #f28b82;
+  --chart-5: #e0ae4f;
+  --chart-6: #55757e;
+  --chart-grid: #1a333a;
+
+  /* Étiquettes (ADR-0039 § 2.1). */
+  --label-gray-bg: #24343a;
+  --label-gray-fg: #d9dedc;
+  --label-gray-dot: #9aa6aa;
+  --label-red-bg: #3a1c1a;
+  --label-red-fg: #f5b4ad;
+  --label-red-dot: #ef7d72;
+  --label-orange-bg: #3a2414;
+  --label-orange-fg: #f6c49a;
+  --label-orange-dot: #ee9a55;
+  --label-yellow-bg: #352c0f;
+  --label-yellow-fg: #f0d985;
+  --label-yellow-dot: #d9b83a;
+  --label-green-bg: #173323;
+  --label-green-fg: #a6ddb4;
+  --label-green-dot: #5cc285;
+  --label-teal-bg: #12332f;
+  --label-teal-fg: #9edcd4;
+  --label-teal-dot: #43b8ac;
+  --label-blue-bg: #172a47;
+  --label-blue-fg: #adc8f5;
+  --label-blue-dot: #6e9ceb;
+  --label-purple-bg: #2a1f3d;
+  --label-purple-fg: #cdb5f0;
+  --label-purple-dot: #a584dd;
+  --label-pink-bg: #3a1a2b;
+  --label-pink-fg: #f3b0d2;
+  --label-pink-dot: #e07aae;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-pop: 0 16px 40px -8px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+/* ─── Jetons indépendants du thème ───────────────────────────────────────── */
 :root {
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
+  /* Rayons unifiés (ADR-0055). */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  /* Densité : hauteurs de contrôle et de ligne. */
+  --control-h: 36px;
+  --control-h-sm: 32px;
+  --row-h: 40px;
+
+  /* Échelle typographique de l'outil : texte courant 14 px, tableaux 13 px. */
+  --font-size-ui: 0.875rem;
+  --font-size-table: 0.8125rem;
+  --font-size-h1: 1.5rem;
+  --font-size-h2: 1.125rem;
+  --font-size-h3: 0.9375rem;
+
+  /* Mouvement (ADR-0055) : court, sobre, jamais décoratif. Ramené à zéro sous
+   * `prefers-reduced-motion: reduce` (`apps/web/src/app/globals.css`). */
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --motion-slow: 240ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
   --sidebar-width: 16rem;
   --sidebar-rail: 4.5rem;
 }

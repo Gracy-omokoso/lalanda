@@ -4,57 +4,111 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
+  CHART_TOKENS,
+  combinaison,
+  COMBINAISONS,
   contraste,
   LABEL_TOKENS,
+  modeAffiche,
   NAV_TOKENS,
   PAIRES,
+  PAIRES_GRAPHIQUE,
   PAIRES_NAV,
+  SELECTEURS_CSS,
   SEUIL_INTERFACE,
   SEUIL_TEXTE,
   TAG_COLORS,
   THEME_TOKENS,
-  type Theme,
+  UI_THEMES,
+  type Combinaison,
 } from './tokens';
 
 const CSS = readFileSync(fileURLToPath(new URL('./styles/tokens.css', import.meta.url)), 'utf8');
 
-/** Variables déclarées dans le bloc du thème (`:root, [data-theme='light']` ou `[data-theme='dark']`). */
-function blocCss(theme: Theme): Record<string, string> {
-  const entete = theme === 'light' ? ":root,\n[data-theme='light'] {" : "[data-theme='dark'] {";
+/**
+ * Variables de couleur déclarées dans le bloc d'une combinaison. Le sélecteur
+ * est cherché en début de ligne : `[data-theme='dark'] {` est aussi la fin de
+ * `[data-ui-theme='lagune'][data-theme='dark'] {`.
+ */
+function blocCss(c: Combinaison): Record<string, string> {
+  const entete = `\n${SELECTEURS_CSS[c]} {`;
   const debut = CSS.indexOf(entete);
-  expect(debut).toBeGreaterThanOrEqual(0);
-  const corps = CSS.slice(debut + entete.length, CSS.indexOf('}', debut));
+  expect(debut, entete).toBeGreaterThanOrEqual(0);
+  const corps = CSS.slice(debut + entete.length, CSS.indexOf('\n}', debut));
   const vars: Record<string, string> = {};
-  for (const m of corps.matchAll(/--([a-z-]+):\s*(#[0-9a-f]{6})\s*;/gi)) {
+  for (const m of corps.matchAll(/--([a-z0-9-]+):\s*(#[0-9a-f]{6})\s*;/gi)) {
     vars[m[1]!] = m[2]!.toLowerCase();
   }
   return vars;
 }
 
+function attendus(c: Combinaison): Record<string, string> {
+  const out: Record<string, string> = {
+    ...THEME_TOKENS[c],
+    ...NAV_TOKENS[c],
+    ...CHART_TOKENS[c],
+  };
+  for (const cle of TAG_COLORS) {
+    const t = LABEL_TOKENS[c][cle];
+    out[`label-${cle}-bg`] = t.bg;
+    out[`label-${cle}-fg`] = t.fg;
+    out[`label-${cle}-dot`] = t.dot;
+  }
+  return Object.fromEntries(Object.entries(out).map(([k, v]) => [k, v.toLowerCase()]));
+}
+
 describe('jetons — le CSS et le miroir typé disent la même chose', () => {
-  for (const theme of ['light', 'dark'] as const) {
-    it(`thème ${theme}`, () => {
-      const css = blocCss(theme);
-      const attendus = { ...THEME_TOKENS[theme], ...NAV_TOKENS[theme] };
-      for (const [nom, valeur] of Object.entries(attendus)) {
-        expect(css[nom], `--${nom}`).toBe(valeur.toLowerCase());
-      }
+  for (const c of COMBINAISONS) {
+    it(`${c} : le bloc déclare exactement les jetons attendus, aux mêmes valeurs`, () => {
+      // Égalité stricte : un jeton oublié dans un bloc hériterait en silence de
+      // la valeur d'un autre thème.
+      expect(blocCss(c)).toEqual(attendus(c));
     });
   }
+
+  it('les cinq combinaisons déclarent les mêmes noms de jetons', () => {
+    const reference = Object.keys(attendus('lalanda-light')).sort();
+    for (const c of COMBINAISONS) expect(Object.keys(attendus(c)).sort()).toEqual(reference);
+  });
+
+  it('Ébène vient en dernier : il l’emporte sur [data-theme] à spécificité égale', () => {
+    const positions = COMBINAISONS.map((c) => CSS.indexOf(`\n${SELECTEURS_CSS[c]} {`));
+    expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+  });
 });
 
-describe('jetons — contrastes WCAG 2.2 AA', () => {
-  for (const theme of ['light', 'dark'] as const) {
+describe('thèmes et modes', () => {
+  it('trois thèmes, Lalanda par défaut en tête', () => {
+    expect(UI_THEMES).toEqual(['lalanda', 'lagune', 'ebene']);
+  });
+  it('Ébène est toujours sombre, les autres suivent le mode choisi', () => {
+    expect(modeAffiche('ebene', 'light')).toBe('dark');
+    expect(modeAffiche('lagune', 'light')).toBe('light');
+    expect(modeAffiche('lalanda', 'dark')).toBe('dark');
+    expect(combinaison('ebene', 'light')).toBe('ebene');
+    expect(combinaison('lagune', 'dark')).toBe('lagune-dark');
+  });
+});
+
+describe('jetons — contrastes WCAG 2.2 AA, pour chaque thème × mode', () => {
+  for (const c of COMBINAISONS) {
     for (const [avant, arriere, seuil] of PAIRES) {
-      it(`${theme} : ${avant} sur ${arriere} ≥ ${seuil}`, () => {
-        const t = THEME_TOKENS[theme];
+      it(`${c} : ${avant} sur ${arriere} ≥ ${seuil}`, () => {
+        const t = THEME_TOKENS[c];
         expect(contraste(t[avant], t[arriere])).toBeGreaterThanOrEqual(seuil);
       });
     }
     for (const [avant, arriere, seuil] of PAIRES_NAV) {
-      it(`${theme} (barre latérale) : ${avant} sur ${arriere} ≥ ${seuil}`, () => {
-        const t = NAV_TOKENS[theme];
+      it(`${c} (navigation) : ${avant} sur ${arriere} ≥ ${seuil}`, () => {
+        const t = NAV_TOKENS[c];
         expect(contraste(t[avant], t[arriere])).toBeGreaterThanOrEqual(seuil);
+      });
+    }
+    for (const [serie, seuil] of PAIRES_GRAPHIQUE) {
+      it(`${c} (graphique) : ${serie} sur surface ≥ ${seuil}`, () => {
+        expect(contraste(CHART_TOKENS[c][serie], THEME_TOKENS[c].surface)).toBeGreaterThanOrEqual(
+          seuil,
+        );
       });
     }
   }
@@ -73,21 +127,12 @@ describe('contraste()', () => {
   });
 });
 
-describe('étiquettes (ADR-0039 § 2.1) — palette fermée, deux thèmes', () => {
-  for (const theme of ['light', 'dark'] as const) {
-    it(`thème ${theme} : le CSS déclare chaque couleur de la palette`, () => {
-      const css = blocCss(theme);
-      for (const cle of TAG_COLORS) {
-        const t = LABEL_TOKENS[theme][cle];
-        expect(css[`label-${cle}-bg`], `--label-${cle}-bg`).toBe(t.bg.toLowerCase());
-        expect(css[`label-${cle}-fg`], `--label-${cle}-fg`).toBe(t.fg.toLowerCase());
-        expect(css[`label-${cle}-dot`], `--label-${cle}-dot`).toBe(t.dot.toLowerCase());
-      }
-    });
+describe('étiquettes (ADR-0039 § 2.1) — palette fermée, chaque combinaison', () => {
+  for (const c of COMBINAISONS) {
     for (const cle of TAG_COLORS) {
-      it(`${theme} : ${cle} — texte lisible, repère visible`, () => {
-        const t = LABEL_TOKENS[theme][cle];
-        const surface = THEME_TOKENS[theme].surface;
+      it(`${c} : ${cle} — texte lisible, repère visible`, () => {
+        const t = LABEL_TOKENS[c][cle];
+        const surface = THEME_TOKENS[c].surface;
         expect(contraste(t.fg, t.bg)).toBeGreaterThanOrEqual(SEUIL_TEXTE);
         expect(contraste(t.dot, surface)).toBeGreaterThanOrEqual(SEUIL_INTERFACE);
         expect(contraste(t.dot, t.bg)).toBeGreaterThanOrEqual(SEUIL_INTERFACE);
