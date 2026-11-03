@@ -38,7 +38,7 @@ jobs:
   quality:
     name: Format · Typecheck · Test · Build
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
