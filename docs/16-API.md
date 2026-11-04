@@ -1067,6 +1067,15 @@ authentifié capable d'accorder un abonnement).
 5. **Journal.** Chaque événement traité est écrit dans `audit_events` avec
    `actorUserId: 'system'`.
 
+## Aperçu d'un projet (ADR-0057)
+
+| Route | Permission | Réponse |
+|---|---|---|
+| `GET /work/projects/:projectId/overview` | `work.read` | `WorkProjectOverview` (`@lalanda/shared/work`) : `today` (Kinshasa), `health { status: on_track \| at_risk \| off_track, reasons[] }`, `totals { open, done, overdue, unassigned, milestones }`, `openByAssignee[]`, `weeks[8] { weekStart, done, total }` (cumuls), `upcomingMilestones[≤5]`, `overdueTasks[≤10]`, `commentCounts { taskId: n }` ; projet d'une autre organisation : `404` |
+
+Calcul pur `computeWorkProjectOverview`, tâches de premier niveau (les commentaires couvrent toutes les
+tâches). Règle de santé : ADR-0057 § 2. Lecture seule, aucun montant.
+
 ## API publique
 
 Réservée aux offres compatibles. Clés à portée limitée, rotation, quotas, journal d’utilisation et documentation séparée. Aucune API publique avant stabilisation des contrats internes.

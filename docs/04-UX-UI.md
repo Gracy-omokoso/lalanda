@@ -137,6 +137,18 @@ Décision : `docs/adr/ADR-0056-ecran-factures-et-tableau-de-bord.md`. Captures (
 - **Écran Factures** : en-tête compact (titre, Journal, Nouveau document) ; quatre cartes avec mini-courbe (facturé et encaissé sur 12 mois, reste à encaisser, retard) ; courbe facturé/encaissé, anneau par statut, meilleurs clients ; onglets de statut **avec compteurs**, recherche et type sur une barre ; **tableau dense** (`--row-h`, colonnes Numéro, Client, Type, Émise le, Montant TTC, Statut, Aperçu), ligne entière cliquable, étiquette de statut et de règlement (« En retard · 5 j »). Sur téléphone : cartes deux par deux sans mini-courbe, liste compacte à la place du tableau, aucun défilement horizontal à 375 px.
 - Tous les chiffres viennent de `GET /sales/invoices/stats` (docs/16) : l'écran n'additionne rien. Chargement : blocs à la place des cartes ; échec : phrase et « Réessayer », la liste reste utilisable ; organisation sans facture émise : cartes à zéro et une phrase à la place des graphiques.
 
+### Intérieur d'un projet façon Asana (ADR-0057)
+
+Décision : `docs/adr/ADR-0057-interieur-projet-facon-asana.md`. Captures : `docs/refonte-ui/v4/`.
+
+- **En-tête** : pastille de couleur du projet, nom, étiquette de santé (**En bonne voie / À risque / En retard**, règle écrite en infobulle), statut propre s'il n'est pas actif, pile d'avatars (responsable et assignés), **Partager** (`members.invite`, vers Organisation › Membres) ; repères (client, devis, responsable, dates, progression) sur une ligne.
+- **Onglets** : Aperçu (défaut) · Liste · Tableau · Chronologie · Calendrier · Fichiers · Marge · Réglages. `/projets/<id>?tache=<id>` ouvre la Liste et le panneau.
+- **Aperçu** : description, statut et quatre chiffres, anneau d'avancement, barres par responsable, courbe sur 8 semaines, jalons à venir, retards (clic : panneau). Chiffres du serveur seulement.
+- **Liste** : groupes repliables par colonne, lignes de 40 px, cercle à cocher (180 ms), nom modifiable sur place, avatar, échéance rouge/verte écrite, priorité, étiquettes, compteurs ; « + Ajouter une tâche » en bas de chaque groupe (Entrée enchaîne, Échap ferme) ; « + Ajouter une section » (gestionnaire). Téléphone : métadonnées sous le nom, aucun défilement horizontal à 375 px.
+- **Tableau** : cartes épurées, ajout en ligne en bas de colonne, glisser-déposer et menu « Déplacer… ».
+- **Panneau** : « Marquer comme terminée », titre grand éditable, grille de champs enregistrés à la volée, description, sous-tâches à cercles, pièces, temps, puis fil commentaires + activité (avatars, mentions surlignées), zone de commentaire collée en bas ; Échap ferme ; ouverture en 180 ms.
+- Animations CSS seulement, coupées sous `prefers-reduced-motion` (règle globale). Lecteur : aucun contrôle d'écriture affiché.
+
 ### Fenêtres modales
 
 Composant `Modal` de `packages/ui` : `<dialog>` ouvert par `showModal()` (`aria-modal`, titre relié par `aria-labelledby`, description par `aria-describedby`), focus au premier champ, `Tab` piégé, focus rendu à l'élément d'origine. Fermeture par `Échap`, par le bouton Fermer et par un clic sur le fond ; si la saisie a commencé, un bandeau demande « Continuer la saisie » ou « Abandonner » ; pendant un envoi, rien ne ferme. Contenu qui défile sous un en-tête fixe, page derrière figée. Plein écran sous 640 px, largeurs `sm`, `md`, `lg` au-delà ; couleurs par jetons (clair et sombre). Un dialogue imbriqué (`aria-modal` dans le contenu) garde `Échap` et `Tab` tant qu'il a le focus.

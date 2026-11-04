@@ -163,3 +163,8 @@ Décideurs :
   SVG maison (`packages/ui`), `GET /sales/invoices/stats` calculé par le moteur (TTC, devise de
   référence, taux figé sur la facture, retard = échéance dépassée et non soldée), tableau dense.
   Statut : **proposé** (3 nov. 2026).
+- [ADR-0057](ADR-0057-interieur-projet-facon-asana.md) — Intérieur d'un projet façon Asana : onglet
+  Aperçu par défaut (santé En bonne voie / À risque / En retard calculée par
+  `GET /work/projects/:id/overview`), Liste groupée à lignes denses et ajout en ligne, Tableau épuré,
+  panneau de tâche à champs enregistrés à la volée et fil commentaires + activité.
+  Statut : **proposé** (4 nov. 2026).
