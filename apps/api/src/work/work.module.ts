@@ -45,6 +45,8 @@ import { WorkCommentsService } from './work-comments.service.js';
 import { WorkMembersController } from './work-members.controller.js';
 import { WorkMembersService } from './work-members.service.js';
 import { WorkNotifier } from './work-notifier.js';
+import { WorkOverviewController } from './work-overview.controller.js';
+import { WorkOverviewService } from './work-overview.service.js';
 import { WorkProjectsController } from './work-projects.controller.js';
 import { WorkProjectsService } from './work-projects.service.js';
 import { WorkDueRemindersJob } from './work-reminders.job.js';
@@ -110,6 +112,8 @@ import {
     WorkTimeController,
     // ADR-0045 — H5 (§ 6.3) : feuille de temps hebdomadaire en lecture.
     WorkTimesheetsController,
+    // ADR-0057 : aperçu d'un projet (santé, avancement, charge, jalons).
+    WorkOverviewController,
   ],
   providers: [
     WorkMembersService,
@@ -136,6 +140,7 @@ import {
     { provide: STOCK_AGENDA_SOURCE, useExisting: StockAgendaSource },
     { provide: ASSETS_AGENDA_SOURCE, useExisting: AssetsAgendaSource },
     WorkTimesheetsService,
+    WorkOverviewService,
   ],
   exports: [
     MongooseModule,

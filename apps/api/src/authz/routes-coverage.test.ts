@@ -119,6 +119,7 @@ import { WorkAttachmentsController } from '../work/work-attachments.controller.j
 import { WorkCommentsController } from '../work/work-comments.controller.js';
 import { WorkMembersController } from '../work/work-members.controller.js';
 import { WorkProjectsController } from '../work/work-projects.controller.js';
+import { WorkOverviewController } from '../work/work-overview.controller.js';
 import { WorkSettingsController } from '../work/work-settings.controller.js';
 import { WorkTasksController } from '../work/work-tasks.controller.js';
 import { WorkTimeController } from '../work/work-time.controller.js';
@@ -253,6 +254,7 @@ const CONTROLEURS = [
   WorkSettingsController,
   WorkMembersController,
   WorkProjectsController,
+  WorkOverviewController,
   WorkTasksController,
   WorkCommentsController,
   WorkAttachmentsController,
@@ -854,6 +856,7 @@ describe('couverture des routes par le RBAC', () => {
       'WorkProjectsController.restore': ['work.manage'],
       'WorkProjectsController.remove': ['work.manage'],
       'WorkProjectsController.activityOf': ['work.read'],
+      'WorkOverviewController.overview': ['work.read'],
       'WorkTasksController.listProject': ['work.read'],
       'WorkTasksController.create': ['work.update'],
       'WorkTasksController.list': ['work.read'],
