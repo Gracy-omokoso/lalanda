@@ -607,3 +607,29 @@ L’hypothèse de départ était l’inverse — le badge à 16 px se réduit en
 ### Ce qui n’est pas fait ici
 
 Le filigrane des PDF (`logo-lalanda-for-filgran25.png`) relève des exports, pas de l’interface : il n’est pas copié sous `public/`.
+
+## Accueil des projets et Mes tâches — implémenté, ADR-0058
+
+Captures : `docs/refonte-ui/v4/` (portefeuille dans les trois thèmes, Mes tâches bureau et
+téléphone, état vide).
+
+- **`/projets`** : en-tête (Mes tâches, **Nouveau projet** pour `work.manage`) ; trois chiffres
+  de l'organisation (projets actifs, tâches en retard en rouge s'il y en a, terminées cette
+  semaine) ; filtres segmentés **Mes projets · Tous · Archivés** (`aria-pressed`) et recherche
+  locale (nom, client, sans accents) ; **tableau dense** (`--row-h`) : pastille de couleur, nom et
+  client, statut de santé en `StatusPill` (texte + point, raison en infobulle et pour les lecteurs
+  d'écran), barre d'avancement (`--chart-1`, allongement 240 ms) et « 3/7 · 42 % », pile d'avatars
+  (5 + « +N »), échéance (rouge et « dépassée » si passée), retards. Sous 768 px, des **cartes**
+  portent les mêmes informations. États vides propres au filtre (aucun projet, aucun projet à moi,
+  aucun archivé, recherche sans résultat).
+- **`/projets/mes-taches`** : onglets **Liste · Calendrier · Temps** communs aux trois vues (titre
+  « Mes tâches ») ; ajout rapide (titre, projet actif, échéance ; assignée à soi, `work.update`) ;
+  sections **En retard · Aujourd'hui · Cette semaine · Plus tard · Sans échéance** (semaine civile
+  de Kinshasa, jusqu'au dimanche) ; ligne d'une tâche : **cercle à cocher** (rôle `checkbox`,
+  libellé « Terminer #n titre », coche tracée en 180 ms puis la ligne sort), titre (toute la ligne
+  ouvre la tâche), projet avec sa pastille, badges inchangés (bloquée, absence, priorité,
+  échéance écrite). Relances, approbations et éléments RH, stocks et contrats gardent leur ligne.
+- Mouvement : 120 ms (survol), 180 ms (coche), 240 ms (barres), tous coupés sous
+  `prefers-reduced-motion`. Couleur jamais seule : statut, échéance et retards sont écrits.
+- Atomes : `projets/_components/equipe-elements.tsx` (`CercleCocher`, `Avatar`, `PileAvatars`,
+  `PastilleProjet`, `OngletsMesTaches`).
