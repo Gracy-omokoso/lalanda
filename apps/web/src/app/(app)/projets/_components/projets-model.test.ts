@@ -40,21 +40,30 @@ describe('permissions — actions servies par le serveur, jamais un rôle', () =
 });
 
 describe('onglets du projet (point de branchement L3b)', () => {
-  it('Calendrier et Chronologie (lot L3b) sont livrés et affichés, dans l’ordre du § 8', () => {
+  // ADR-0057 : Aperçu en tête, Tableau (segment `kanban`), Chronologie avant Calendrier.
+  it('Calendrier et Chronologie (lot L3b) sont livrés et affichés, dans l’ordre d’ADR-0057', () => {
     const visibles = ongletsVisibles(['work.read', 'work.manage']).map((o) => o.segment);
-    expect(visibles).toEqual(['liste', 'kanban', 'calendrier', 'chronologie', 'reglages']);
+    expect(visibles).toEqual([
+      'apercu',
+      'liste',
+      'kanban',
+      'chronologie',
+      'calendrier',
+      'reglages',
+    ]);
   });
   it('Réglages exige work.manage', () => {
-    const sansGestion = ['liste', 'kanban', 'calendrier', 'chronologie'];
+    const sansGestion = ['apercu', 'liste', 'kanban', 'chronologie', 'calendrier'];
     expect(ongletsVisibles(['work.read']).map((o) => o.segment)).toEqual(sansGestion);
     expect(ongletsVisibles(null).map((o) => o.segment)).toEqual(sansGestion);
   });
   it('Marge exige treasury.read (lot L4a)', () => {
     expect(ongletsVisibles(['work.read', 'treasury.read']).map((o) => o.segment)).toEqual([
+      'apercu',
       'liste',
       'kanban',
-      'calendrier',
       'chronologie',
+      'calendrier',
       'marge',
     ]);
   });
@@ -63,6 +72,7 @@ describe('onglets du projet (point de branchement L3b)', () => {
       o.segment === 'chronologie' ? { ...o, livre: false } : o,
     );
     expect(ongletsVisibles(['work.read'], retire).map((o) => o.segment)).toEqual([
+      'apercu',
       'liste',
       'kanban',
       'calendrier',

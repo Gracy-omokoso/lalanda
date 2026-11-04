@@ -1,10 +1,13 @@
 'use client';
 
-// En-tête d'un projet et ses onglets (ADR-0039 § 8) : nom, nature, client,
-// devis, responsable, dates, progression ; puis Liste · Kanban · (Calendrier ·
-// Chronologie, lot L3b) · Réglages. Les onglets viennent de `onglets-projet.ts`.
+// En-tête d'un projet façon Asana (ADR-0039 § 8, ADR-0057) : pastille de
+// couleur, nom, statut de santé calculé par le serveur (En bonne voie / À
+// risque / En retard), pile d'avatars de l'équipe du projet et « Partager »
+// (gestion des membres, `members.invite`) ; une ligne de repères (client,
+// devis, responsable, dates) ; puis les onglets de `onglets-projet.ts`.
 
-import { Badge, PageHeader, Skeleton, TabsNav } from '@lalanda/ui';
+import { Skeleton, StatusPill, TabsNav } from '@lalanda/ui';
+import { FolderKanban, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -12,7 +15,9 @@ import { renderNextLink } from '@/components/next-link';
 
 import { useShell } from '../../_components/shell-context';
 
-import { Alerte, BOUTON_PETIT } from './elements';
+import { SANTE, phraseSante } from './apercu-model';
+import { Alerte, BOUTON_PETIT, PileAvatars } from './elements';
+import { teinteAvatar } from './liste-model';
 import { PropositionFacture } from './marge/proposition-facture';
 import { ONGLET_DEFAUT, ongletDuChemin, ongletsVisibles } from './onglets-projet';
 import { useProjet } from './project-context';
@@ -24,6 +29,7 @@ import {
   hrefProjet,
   progression,
 } from './projets-model';
+import { membresConnus } from './taches-model';
 
 export function EnteteProjet(): React.ReactElement {
   const { actions } = useShell();
@@ -39,6 +45,7 @@ export function EnteteProjet(): React.ReactElement {
     recharger,
     factureProposee,
     fermerPropositionFacture,
+    apercu,
   } = useProjet();
 
   const courant = ongletDuChemin(pathname) ?? ONGLET_DEFAUT;
@@ -72,52 +79,79 @@ export function EnteteProjet(): React.ReactElement {
     openTaskCount: premier.filter((t) => !t.done).length,
     doneTaskCount: premier.filter((t) => t.done).length,
   });
+  // Personnes du projet : responsable, puis responsables des tâches (pas toute l'organisation).
+  const equipe = membresConnus(project, tasks);
+  const teinte = teinteAvatar(project.id);
+  const partager = actions !== null && actions.includes('members.invite');
 
   return (
-    <div className="flex min-w-0 flex-col gap-4">
-      <Link href={PROJETS_BASE} className="text-sm underline-offset-2 hover:underline">
+    <div className="flex min-w-0 flex-col gap-3">
+      <Link
+        href={PROJETS_BASE}
+        className="self-start text-sm text-[var(--foreground-muted)] underline-offset-2 hover:text-[var(--foreground)] hover:underline"
+      >
         ← Tous les projets
       </Link>
-      <PageHeader
-        module="run"
-        moduleLabel="Exploiter · Projets"
-        title={<span className="break-words">{project.name}</span>}
-        description={project.description ?? undefined}
-        descriptionMobile
-      />
-      <dl className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
-        <div className="flex items-center gap-2">
-          <dt className="sr-only">Statut</dt>
-          <dd>
-            <Badge tone={project.status === 'active' ? 'info' : 'neutral'}>
-              {STATUTS_PROJET[project.status]}
-            </Badge>
-          </dd>
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+        <span
+          aria-hidden="true"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-md)]"
+          style={{ background: `var(--label-${teinte}-bg)`, color: `var(--label-${teinte}-fg)` }}
+        >
+          <FolderKanban className="h-5 w-5" />
+        </span>
+        <h1 className="min-w-0 break-words font-[family-name:var(--font-heading,inherit)] text-[length:var(--font-size-h1)] font-semibold leading-tight">
+          {project.name}
+        </h1>
+        {apercu && project.status !== 'archived' ? (
+          <StatusPill tone={SANTE[apercu.health.status].tone} title={phraseSante(apercu.health)}>
+            {SANTE[apercu.health.status].label}
+          </StatusPill>
+        ) : null}
+        {project.status !== 'active' ? (
+          <StatusPill tone="draft">{STATUTS_PROJET[project.status]}</StatusPill>
+        ) : null}
+        <span className="ml-auto flex items-center gap-2">
+          <PileAvatars membres={equipe} max={5} />
+          {partager ? (
+            <Link
+              href="/organisation/membres"
+              className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-md)] bg-[var(--accent)] px-3 text-sm font-medium text-[var(--accent-foreground)] transition-opacity duration-[var(--motion-fast)] hover:opacity-90"
+              title="Inviter des membres et régler leurs rôles"
+            >
+              <UserPlus aria-hidden="true" className="h-4 w-4" />
+              Partager
+            </Link>
+          ) : null}
+        </span>
+      </div>
+      <dl className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-[var(--foreground-muted)]">
+        <div className="flex gap-1">
           <dt className="sr-only">Nature</dt>
-          <dd className="text-[var(--foreground-muted)]">{NATURES_PROJET[project.kind]}</dd>
+          <dd>{NATURES_PROJET[project.kind]}</dd>
         </div>
         {project.links.customerName ? (
           <div className="flex gap-1">
-            <dt className="text-[var(--foreground-muted)]">Client :</dt>
-            <dd>{project.links.customerName}</dd>
+            <dt>Client :</dt>
+            <dd className="text-[var(--foreground)]">{project.links.customerName}</dd>
           </div>
         ) : null}
         {project.links.opportunityTitle ? (
           <div className="flex gap-1">
-            <dt className="text-[var(--foreground-muted)]">Opportunité :</dt>
-            <dd>{project.links.opportunityTitle}</dd>
+            <dt>Opportunité :</dt>
+            <dd className="text-[var(--foreground)]">{project.links.opportunityTitle}</dd>
           </div>
         ) : null}
         {project.links.quotes.length > 0 ? (
           <div className="flex gap-1">
-            <dt className="text-[var(--foreground-muted)]">Devis :</dt>
+            <dt>Devis :</dt>
             <dd>
               {project.links.quotes.map((q, i) => (
                 <span key={q.quoteId}>
                   {i > 0 ? ', ' : null}
                   <Link
                     href={`/ventes/devis/${encodeURIComponent(q.quoteId)}`}
-                    className="underline underline-offset-2"
+                    className="text-[var(--foreground)] underline underline-offset-2"
                   >
                     {q.number ?? 'brouillon'}
                   </Link>
@@ -127,31 +161,20 @@ export function EnteteProjet(): React.ReactElement {
           </div>
         ) : null}
         <div className="flex gap-1">
-          <dt className="text-[var(--foreground-muted)]">Responsable :</dt>
-          <dd>{project.owner?.name ?? 'aucun'}</dd>
+          <dt>Responsable :</dt>
+          <dd className="text-[var(--foreground)]">{project.owner?.name ?? 'aucun'}</dd>
         </div>
         {project.startDate || project.dueDate ? (
           <div className="flex gap-1">
-            <dt className="text-[var(--foreground-muted)]">Dates :</dt>
-            <dd>
+            <dt>Dates :</dt>
+            <dd className="text-[var(--foreground)]">
               {formatJour(project.startDate)} → {formatJour(project.dueDate)}
             </dd>
           </div>
         ) : null}
-        <div className="flex min-w-[12rem] items-center gap-2">
+        <div className="flex gap-1">
           <dt className="sr-only">Progression</dt>
-          <dd className="flex items-center gap-2">
-            <span
-              aria-hidden="true"
-              className="h-1.5 w-24 overflow-hidden rounded-full bg-[var(--surface-muted)]"
-            >
-              <span
-                className="block h-full bg-[var(--module-run)]"
-                style={{ width: `${prog.pourcent}%` }}
-              />
-            </span>
-            <span className="text-[var(--foreground-muted)]">{prog.texte}</span>
-          </dd>
+          <dd>{prog.texte}</dd>
         </div>
       </dl>
       {project.status === 'archived' ? (

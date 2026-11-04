@@ -1,11 +1,12 @@
 import { redirect } from 'next/navigation';
 
-import { ONGLET_DEFAUT } from '../_components/onglets-projet';
+import { ongletDEntree } from '../_components/onglets-projet';
 import { hrefProjet } from '../_components/projets-model';
 
 /**
- * `/projets/<id>` → onglet par défaut, requête conservée : le lien d'une
- * notification (`/projets/<id>?tache=<id>`, ADR-0039 § 2.11) ouvre la tâche.
+ * `/projets/<id>` → onglet par défaut (Aperçu, ADR-0057), requête conservée.
+ * Le lien d'une notification (`/projets/<id>?tache=<id>`, ADR-0039 § 2.11)
+ * mène à la Liste, panneau de la tâche ouvert.
  */
 export default async function ProjetIndex({
   params,
@@ -15,10 +16,11 @@ export default async function ProjetIndex({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<never> {
   const { id } = await params;
+  const requete = await searchParams;
   const recherche = new URLSearchParams();
-  for (const [k, v] of Object.entries(await searchParams)) {
+  for (const [k, v] of Object.entries(requete)) {
     if (typeof v === 'string') recherche.set(k, v);
   }
   const q = recherche.toString();
-  redirect(`${hrefProjet(id, ONGLET_DEFAUT)}${q ? `?${q}` : ''}`);
+  redirect(`${hrefProjet(id, ongletDEntree(requete))}${q ? `?${q}` : ''}`);
 }

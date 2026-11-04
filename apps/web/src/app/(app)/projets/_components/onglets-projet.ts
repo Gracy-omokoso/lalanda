@@ -22,22 +22,42 @@ export interface OngletProjet {
   livre: boolean;
 }
 
-/** Ordre d'affichage (ADR-0039 § 8). Temps, Activité : lots suivants. */
+/**
+ * Ordre d'affichage (ADR-0039 § 8, revu par ADR-0057 « façon Asana ») : Aperçu,
+ * Liste, Tableau, Chronologie, Calendrier, Fichiers, Marge, Réglages. Les
+ * SEGMENTS ne changent pas (liens existants, notifications) : seul le libellé
+ * « Kanban » devient « Tableau », et « Documents » devient « Fichiers ».
+ */
 export const ONGLETS_PROJET: readonly OngletProjet[] = [
+  // ADR-0057 : santé, avancement, charge, jalons et retards.
+  { segment: 'apercu', label: 'Aperçu', action: null, livre: true },
   { segment: 'liste', label: 'Liste', action: null, livre: true },
-  { segment: 'kanban', label: 'Kanban', action: null, livre: true },
+  { segment: 'kanban', label: 'Tableau', action: null, livre: true },
   // Lot L3b — vues temporelles.
-  { segment: 'calendrier', label: 'Calendrier', action: null, livre: true },
   { segment: 'chronologie', label: 'Chronologie', action: null, livre: true },
+  { segment: 'calendrier', label: 'Calendrier', action: null, livre: true },
+  // ADR-0046 — S9 : documents liés et équipements affectés au projet.
+  { segment: 'documents', label: 'Fichiers', action: 'docs.read', livre: true },
   // Lot L4a — marge encaissée (la carte signale elle-même un `sales.read` manquant).
   { segment: 'marge', label: 'Marge', action: 'treasury.read', livre: true },
-  // ADR-0046 — S9 : documents liés et équipements affectés au projet.
-  { segment: 'documents', label: 'Documents', action: 'docs.read', livre: true },
   { segment: 'reglages', label: 'Réglages', action: 'work.manage', livre: true },
 ];
 
-/** Onglet par défaut de `/projets/[id]`. */
-export const ONGLET_DEFAUT = 'liste';
+/** Onglet par défaut de `/projets/[id]` (ADR-0057 : l'Aperçu). */
+export const ONGLET_DEFAUT = 'apercu';
+
+/**
+ * Onglet où ouvrir un lien de tâche (`/projets/<id>?tache=<id>`, notifications) :
+ * la Liste, pour voir la tâche dans son groupe à côté du panneau.
+ */
+export const ONGLET_TACHE = 'liste';
+
+/** Onglet cible de `/projets/<id>` selon la requête (pur, testé). */
+export function ongletDEntree(requete: Readonly<Record<string, unknown>>): string {
+  return typeof requete['tache'] === 'string' && requete['tache'] !== ''
+    ? ONGLET_TACHE
+    : ONGLET_DEFAUT;
+}
 
 export function ongletsVisibles(
   actions: readonly OrgAction[] | null,

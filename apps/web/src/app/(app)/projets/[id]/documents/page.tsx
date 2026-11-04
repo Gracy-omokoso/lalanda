@@ -8,7 +8,7 @@ import type { Metadata } from 'next';
 import { EntityAssetsPanel } from '@/components/entity-assets-panel';
 import { EntityDocumentsPanel } from '@/components/entity-documents-panel';
 
-export const metadata: Metadata = { title: 'Projet — Documents — Lalanda' };
+export const metadata: Metadata = { title: 'Projet — Fichiers — Lalanda' };
 
 export default async function ProjetDocumentsPage({
   params,
