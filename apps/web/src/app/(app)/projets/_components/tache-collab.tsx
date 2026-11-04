@@ -22,7 +22,8 @@ import { workApi } from '@/lib/work-api';
 
 import { useProfil } from '../../_components/profile-context';
 
-import { BOUTON_DANGER, BOUTON_PETIT, CHAMP } from './elements';
+import { Avatar, BOUTON_DANGER, BOUTON_PETIT, CHAMP } from './elements';
+import { filTache } from './fil-model';
 import { useProjet } from './project-context';
 import {
   aujourdhui,
@@ -49,12 +50,13 @@ export function Collaboration({
   detail: WorkTaskDetail;
   onChange: () => void;
 }): React.ReactElement {
+  // Façon Asana (ADR-0057) : pièces et temps, puis le fil (commentaires ET
+  // activité, du plus ancien au plus récent), zone de commentaire collée en bas.
   return (
     <>
-      <Commentaires detail={detail} onChange={onChange} />
       <PiecesJointes detail={detail} onChange={onChange} />
       <Temps detail={detail} onChange={onChange} />
-      <Historique taskId={detail.id} />
+      <Fil detail={detail} onChange={onChange} />
     </>
   );
 }
@@ -223,16 +225,17 @@ function Redaction({
   );
 }
 
-function Commentaires({
+function Fil({
   detail,
   onChange,
 }: {
   detail: WorkTaskDetail;
   onChange: () => void;
 }): React.ReactElement {
-  const { travailler, gerer } = useProjet();
+  const { travailler, gerer, project, members } = useProjet();
   const { profil } = useProfil();
   const [items, setItems] = useState<WorkCommentView[] | null>(null);
+  const [activites, setActivites] = useState<WorkActivityView[]>([]);
   const [erreur, setErreur] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
   const [edition, setEdition] = useState<string | null>(null);
@@ -245,8 +248,14 @@ function Commentaires({
         setErreur(null);
       })
       .catch((err: unknown) => setErreur(messageWork(err, 'Commentaires indisponibles.')));
+    // Route propre à la tâche : les 100 derniers événements. Non bloquant.
+    workApi
+      .listTaskActivity(detail.id, { limit: 100 })
+      .then((p) => setActivites(p.items))
+      .catch(() => setActivites([]));
   }, [detail.id]);
-  useEffect(() => charger(), [charger]);
+  // Relu à chaque nouvelle révision de la tâche (un champ changé = une activité).
+  useEffect(() => charger(), [charger, detail.revision]);
 
   async function geste(f: () => Promise<unknown>, repli: string): Promise<boolean> {
     setEnvoi(true);
@@ -264,104 +273,156 @@ function Commentaires({
     }
   }
 
+  // Valeurs lisibles des différentiels : colonnes ET membres (un changement de
+  // responsable porte des identifiants, jamais affichés tels quels).
+  const colonnes = new Map<string, string>([
+    ...(project?.columns ?? []).map((c): [string, string] => [c.key, c.label]),
+    ...members.map((m): [string, string] => [m.userId, m.name]),
+  ]);
+  const fil = items ? filTache(items, activites) : [];
+  const nb = items ? items.filter((c) => !c.deletedAt).length : null;
+
   return (
-    <Section
-      id="com-titre"
-      titre={`Commentaires${items ? ` (${items.filter((c) => !c.deletedAt).length})` : ''}`}
+    <section
+      aria-labelledby="com-titre"
+      className="flex flex-col gap-3 border-t border-[var(--border)] pt-4"
     >
+      <h3 id="com-titre" className="text-sm font-semibold">
+        Commentaires et activité{nb !== null ? ` (${nb} commentaire${nb > 1 ? 's' : ''})` : ''}
+      </h3>
       <Erreur message={erreur} />
-      {items === null ? null : items.length === 0 ? (
-        <p className="text-sm text-[var(--foreground-muted)]">Aucun commentaire.</p>
+      {items === null ? null : fil.length === 0 ? (
+        <p className="text-sm text-[var(--foreground-muted)]">
+          Aucun commentaire. Posez une question, « @ » pour mentionner un membre.
+        </p>
       ) : (
         <ol className="flex flex-col gap-3">
-          {items.map((c) => {
+          {fil.map((e) => {
+            if (e.type === 'activite') {
+              const a = e.activite;
+              return (
+                <li
+                  key={e.id}
+                  className="flex items-center gap-2 pl-1 text-xs text-[var(--foreground-muted)]"
+                >
+                  <Avatar name={a.actor.name} cle={a.actor.userId} taille={20} />
+                  <span className="min-w-0">
+                    {libelleActivite(a, colonnes)}
+                    <span aria-hidden="true"> · </span>
+                    <time dateTime={a.at}>{formatInstant(a.at)}</time>
+                  </span>
+                </li>
+              );
+            }
+            const c = e.commentaire;
             const auteur = profil !== null && c.author.userId === profil.id;
             return (
-              <li
-                key={c.id}
-                className="flex flex-col gap-1 rounded-[var(--radius-md)] bg-[var(--surface)] p-3 text-sm"
-              >
-                <p className="text-xs text-[var(--foreground-muted)]">
-                  <span className="font-medium text-[var(--foreground)]">{c.author.name}</span> ·{' '}
-                  {formatInstant(c.createdAt)}
-                  {c.editedAt && !c.deletedAt ? ' · modifié' : ''}
-                </p>
-                {c.deletedAt ? (
-                  <p className="italic text-[var(--foreground-muted)]">Commentaire supprimé</p>
-                ) : edition === c.id ? (
-                  <Redaction
-                    id={`com-edit-${c.id}`}
-                    label="Modifier le commentaire"
-                    initial={decoderMentions(c.body, c.mentions)}
-                    envoi={envoi}
-                    libelleEnvoi="Enregistrer"
-                    onAnnuler={() => setEdition(null)}
-                    onEnvoyer={async (corps) => {
-                      const ok = await geste(
-                        () =>
-                          workApi.updateComment(c.id, { ...corps, expectedRevision: c.revision }),
-                        'Modification impossible.',
-                      );
-                      if (ok) setEdition(null);
-                      return ok;
-                    }}
-                  />
-                ) : (
-                  <p className="whitespace-pre-wrap break-words">
-                    {segmentsCommentaire(c.body, c.mentions).map((s, i) =>
-                      s.type === 'texte' ? (
-                        <span key={i}>{s.texte}</span>
-                      ) : (
-                        <strong key={i} className="font-semibold text-[var(--accent)]">
-                          @{s.nom}
-                        </strong>
-                      ),
-                    )}
+              <li key={e.id} className="flex gap-2.5 text-sm">
+                <Avatar name={c.author.name} cle={c.author.userId} taille={28} />
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <p className="text-xs text-[var(--foreground-muted)]">
+                    <span className="font-semibold text-[var(--foreground)]">{c.author.name}</span>{' '}
+                    <time dateTime={c.createdAt}>{formatInstant(c.createdAt)}</time>
+                    {c.editedAt && !c.deletedAt ? ' · modifié' : ''}
                   </p>
-                )}
-                {!c.deletedAt && edition !== c.id && travailler && (auteur || gerer) ? (
-                  <div className="flex gap-2">
-                    {auteur ? (
+                  {c.deletedAt ? (
+                    <p className="italic text-[var(--foreground-muted)]">Commentaire supprimé</p>
+                  ) : edition === c.id ? (
+                    <Redaction
+                      id={`com-edit-${c.id}`}
+                      label="Modifier le commentaire"
+                      initial={decoderMentions(c.body, c.mentions)}
+                      envoi={envoi}
+                      libelleEnvoi="Enregistrer"
+                      onAnnuler={() => setEdition(null)}
+                      onEnvoyer={async (corps) => {
+                        const ok = await geste(
+                          () =>
+                            workApi.updateComment(c.id, {
+                              ...corps,
+                              expectedRevision: c.revision,
+                            }),
+                          'Modification impossible.',
+                        );
+                        if (ok) setEdition(null);
+                        return ok;
+                      }}
+                    />
+                  ) : (
+                    <p className="whitespace-pre-wrap break-words">
+                      {segmentsCommentaire(c.body, c.mentions).map((s, i) =>
+                        s.type === 'texte' ? (
+                          <span key={i}>{s.texte}</span>
+                        ) : (
+                          <strong
+                            key={i}
+                            className="rounded-[var(--radius-sm)] bg-[var(--accent-soft)] px-0.5 font-semibold text-[var(--accent)]"
+                          >
+                            @{s.nom}
+                          </strong>
+                        ),
+                      )}
+                    </p>
+                  )}
+                  {!c.deletedAt && edition !== c.id && travailler && (auteur || gerer) ? (
+                    <div className="flex gap-3 text-xs">
+                      {auteur ? (
+                        <button
+                          type="button"
+                          className="text-[var(--foreground-muted)] underline-offset-2 hover:underline"
+                          onClick={() => setEdition(c.id)}
+                        >
+                          Modifier
+                        </button>
+                      ) : null}
                       <button
                         type="button"
-                        className={BOUTON_PETIT}
-                        onClick={() => setEdition(c.id)}
+                        className="text-[var(--danger)] underline-offset-2 hover:underline"
+                        disabled={envoi}
+                        onClick={() => {
+                          if (window.confirm('Supprimer ce commentaire ?')) {
+                            void geste(
+                              () => workApi.deleteComment(c.id),
+                              'Suppression impossible.',
+                            );
+                          }
+                        }}
                       >
-                        Modifier
+                        Supprimer
                       </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      className={BOUTON_DANGER}
-                      disabled={envoi}
-                      onClick={() => {
-                        if (window.confirm('Supprimer ce commentaire ?')) {
-                          void geste(() => workApi.deleteComment(c.id), 'Suppression impossible.');
-                        }
-                      }}
-                    >
-                      Supprimer
-                    </button>
-                  </div>
-                ) : null}
+                    </div>
+                  ) : null}
+                </div>
               </li>
             );
           })}
         </ol>
       )}
       {travailler ? (
-        <Redaction
-          id="com-nouveau"
-          label="Nouveau commentaire"
-          initial={{ texte: '', choisis: [] }}
-          envoi={envoi}
-          libelleEnvoi="Commenter"
-          onEnvoyer={(corps) =>
-            geste(() => workApi.createComment(detail.id, corps), 'Envoi du commentaire impossible.')
-          }
-        />
+        <div className="sticky bottom-0 z-10 -mx-4 border-t border-[var(--border)] bg-[var(--background)] px-4 py-3 sm:-mx-5 sm:px-5">
+          <div className="flex gap-2.5">
+            {profil ? (
+              <Avatar name={profil.name || profil.email} cle={profil.id} taille={28} />
+            ) : null}
+            <div className="min-w-0 flex-1">
+              <Redaction
+                id="com-nouveau"
+                label="Nouveau commentaire"
+                initial={{ texte: '', choisis: [] }}
+                envoi={envoi}
+                libelleEnvoi="Commenter"
+                onEnvoyer={(corps) =>
+                  geste(
+                    () => workApi.createComment(detail.id, corps),
+                    'Envoi du commentaire impossible.',
+                  )
+                }
+              />
+            </div>
+          </div>
+        </div>
       ) : null}
-    </Section>
+    </section>
   );
 }
 
@@ -517,6 +578,7 @@ function Temps({
   const [duree, setDuree] = useState('');
   const [note, setNote] = useState('');
   const [erreurDuree, setErreurDuree] = useState<string | null>(null);
+  const [saisie, setSaisie] = useState(false);
 
   const charger = useCallback(() => {
     workApi
@@ -600,7 +662,16 @@ function Temps({
       ) : items ? (
         <p className="text-sm text-[var(--foreground-muted)]">Aucun temps saisi.</p>
       ) : null}
-      {travailler ? (
+      {travailler && !saisie ? (
+        <button
+          type="button"
+          className="self-start text-sm text-[var(--accent)] underline-offset-2 hover:underline"
+          onClick={() => setSaisie(true)}
+        >
+          + Saisir du temps
+        </button>
+      ) : null}
+      {travailler && saisie ? (
         <form
           onSubmit={(e) => void saisir(e)}
           noValidate
@@ -655,65 +726,10 @@ function Temps({
           ) : null}
         </form>
       ) : null}
-      <p className="text-xs text-[var(--foreground-muted)]">
-        Minutes seulement : aucun coût n’est affiché ici.
-      </p>
-    </Section>
-  );
-}
-
-// ─── Historique ─────────────────────────────────────────────────────────────
-
-function Historique({ taskId }: { taskId: string }): React.ReactElement {
-  const { project } = useProjet();
-  const [items, setItems] = useState<WorkActivityView[] | null>(null);
-  const [erreur, setErreur] = useState<string | null>(null);
-  const [ouvert, setOuvert] = useState(false);
-
-  useEffect(() => {
-    if (!ouvert) return;
-    // Route propre à la tâche (`GET /work/tasks/:taskId/activity`) : les 100
-    // derniers événements, le plus récent d'abord.
-    workApi
-      .listTaskActivity(taskId, { limit: 100 })
-      .then((p) => {
-        setItems(p.items);
-        setErreur(null);
-      })
-      .catch((err: unknown) => setErreur(messageWork(err, 'Historique indisponible.')));
-  }, [ouvert, taskId]);
-
-  const colonnes = new Map((project?.columns ?? []).map((c) => [c.key, c.label]));
-  return (
-    <Section id="hist-titre" titre="Historique">
-      <button
-        type="button"
-        className={`${BOUTON_PETIT} self-start`}
-        aria-expanded={ouvert}
-        onClick={() => setOuvert((o) => !o)}
-      >
-        {ouvert ? 'Masquer l’historique' : 'Afficher l’historique'}
-      </button>
-      {ouvert ? (
-        <>
-          <Erreur message={erreur} />
-          {items === null ? null : items.length === 0 ? (
-            <p className="text-sm text-[var(--foreground-muted)]">
-              Aucun événement récent pour cette tâche.
-            </p>
-          ) : (
-            <ol className="flex flex-col gap-1 text-sm">
-              {items.map((a) => (
-                <li key={a.id}>
-                  <span className="text-xs text-[var(--foreground-muted)]">
-                    {formatInstant(a.at)}
-                  </span>{' '}
-                  {libelleActivite(a, colonnes)}
-                </li>
-              ))}
-            </ol>
-          )}
-        </>
+      {saisie ? (
+        <p className="text-xs text-[var(--foreground-muted)]">
+          Minutes seulement : aucun coût n’est affiché ici.
+        </p>
       ) : null}
     </Section>
   );
