@@ -44,6 +44,8 @@ import type { SalesContractMyTaskItem } from '@lalanda/shared/sales-contracts';
 import type { StockMyTaskItem } from '@lalanda/shared/stock';
 import {
   groupMyTasks,
+  kinshasaWeekStart,
+  weekEnd,
   type MyTaskEntry,
   type MyTaskItem,
   type MyTasksView,
@@ -223,4 +225,36 @@ export function instantDeplace(dueAt: string, jour: string): string {
   }
   const heure = new Date(t + HEURE_MS).toISOString().slice(11, 19);
   return new Date(`${jour}T${heure}+01:00`).toISOString();
+}
+
+// ── Sections façon Asana (ADR-0058 § 3) ─────────────────────────────────────
+//
+// Le serveur rend « en retard · aujourd'hui · 7 jours · plus tard · sans date ».
+// L'écran les présente en semaine CIVILE : « Cette semaine » = du lendemain au
+// dimanche de la semaine de `asOf` (jour de Kinshasa du serveur), le reste de
+// « 7 jours » rejoint « Plus tard ». L'ordre du serveur (échéance, priorité,
+// rang) est conservé dans chaque section. Le dimanche, « Cette semaine » est vide.
+
+export type CleSection = 'overdue' | 'today' | 'thisWeek' | 'later' | 'noDate';
+
+export const SECTIONS_MES_TACHES: readonly { cle: CleSection; titre: string; vide: string }[] = [
+  { cle: 'overdue', titre: 'En retard', vide: 'Rien en retard. Bravo.' },
+  { cle: 'today', titre: 'Aujourd’hui', vide: 'Rien d’autre pour aujourd’hui.' },
+  { cle: 'thisWeek', titre: 'Cette semaine', vide: 'Rien d’autre cette semaine.' },
+  { cle: 'later', titre: 'Plus tard', vide: 'Rien de plus lointain.' },
+  { cle: 'noDate', titre: 'Sans échéance', vide: 'Aucune tâche sans échéance.' },
+];
+
+export type SectionsMesTaches = Record<CleSection, MyTaskEntry[]>;
+
+export function sectionsMesTaches(v: MyTasksView): SectionsMesTaches {
+  const dimanche = weekEnd(kinshasaWeekStart(v.asOf));
+  const avenir = [...v.next7Days, ...v.later];
+  return {
+    overdue: v.overdue,
+    today: v.today,
+    thisWeek: avenir.filter((e) => e.dueDate !== null && e.dueDate <= dimanche),
+    later: avenir.filter((e) => e.dueDate === null || e.dueDate > dimanche),
+    noDate: v.noDate,
+  };
 }
