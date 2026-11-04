@@ -72,11 +72,17 @@ export function kinshasaDayStartInstant(day: string): Date {
   return new Date(`${day}T00:00:00+01:00`);
 }
 
-/** Pastille d'un projet : couleur stable tirée de son identifiant (palette fermée, sans gris). */
+/**
+ * Pastille d'un projet : couleur stable tirée de son identifiant (FNV-1a), dans la
+ * palette fermée des étiquettes, sans gris ni rouge (le rouge se lirait « alerte »).
+ */
 export function projectColor(projectId: string): WorkLabelColor {
-  const palette = WORK_LABEL_COLORS.filter((c) => c !== 'gray');
-  let h = 0;
-  for (let i = 0; i < projectId.length; i += 1) h = (h * 31 + projectId.charCodeAt(i)) >>> 0;
+  const palette = WORK_LABEL_COLORS.filter((c) => c !== 'gray' && c !== 'red');
+  let h = 0x811c9dc5;
+  for (let i = 0; i < projectId.length; i += 1) {
+    h ^= projectId.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
   return palette[h % palette.length]!;
 }
 

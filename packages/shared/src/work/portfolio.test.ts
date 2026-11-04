@@ -65,6 +65,12 @@ describe('avancement, couleur, requête', () => {
     const c = projectColor('65f0a1b2c3d4e5f601234567');
     expect(projectColor('65f0a1b2c3d4e5f601234567')).toBe(c);
     expect(c).not.toBe('gray');
+    expect(c).not.toBe('red');
+    const ids = Array.from(
+      { length: 40 },
+      (_, i) => `6aebb0bfa2b52bab8a6d12${(i + 16).toString(16)}`,
+    );
+    expect(new Set(ids.map(projectColor)).size).toBeGreaterThanOrEqual(5);
   });
   it('filtre par défaut « all », filtre inconnu refusé', () => {
     expect(WorkPortfolioQuery.parse({}).scope).toBe('all');

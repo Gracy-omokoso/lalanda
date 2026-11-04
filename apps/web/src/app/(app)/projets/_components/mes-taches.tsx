@@ -66,7 +66,7 @@ import {
   titreElementRh,
   totalMesTaches,
 } from './mes-taches-model';
-import { PROJETS_BASE, hrefProjet, hrefTache, messageWork, peutTravailler } from './projets-model';
+import { PROJETS_BASE, hrefTache, messageWork, peutTravailler } from './projets-model';
 
 export function MesTaches(): React.ReactElement {
   const { actions } = useShell();
@@ -363,7 +363,7 @@ function AjoutRapide({ moi, onAjoute }: { moi: string; onAjoute: () => void }): 
     <form
       onSubmit={(e) => void ajouter(e)}
       aria-label="Ajouter une tâche pour moi"
-      className="flex flex-col gap-2 rounded-[var(--radius-lg)] border border-dashed border-[var(--border-strong)] bg-[var(--surface)] p-2 sm:flex-row sm:items-center"
+      className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 rounded-[var(--radius-lg)] border border-dashed border-[var(--border-strong)] bg-[var(--surface)] p-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,13rem)_9.5rem_auto] sm:items-center"
     >
       <label htmlFor="mt-ajout" className="sr-only">
         Nouvelle tâche
@@ -374,53 +374,46 @@ function AjoutRapide({ moi, onAjoute }: { moi: string; onAjoute: () => void }): 
         onChange={(e) => setTitre(e.target.value)}
         placeholder="＋ Ajouter une tâche…"
         maxLength={300}
-        className={`${CHAMP} min-w-0 flex-1 border-transparent bg-transparent`}
+        className={`${CHAMP} col-span-2 border-transparent bg-transparent sm:col-span-1`}
         aria-invalid={erreur !== null && titre.trim() === '' ? true : undefined}
       />
-      <div className="flex min-w-0 gap-2">
-        <label htmlFor="mt-ajout-projet" className="sr-only">
-          Projet
-        </label>
-        <select
-          id="mt-ajout-projet"
-          value={projet}
-          onChange={(e) => setProjet(e.target.value)}
-          className={`${CHAMP} min-w-0 flex-1 sm:w-48 sm:flex-none`}
-          disabled={projets === null}
-        >
-          {(projets ?? []).map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-        <label htmlFor="mt-ajout-echeance" className="sr-only">
-          Échéance
-        </label>
-        <input
-          id="mt-ajout-echeance"
-          type="date"
-          value={echeance}
-          onChange={(e) => setEcheance(e.target.value)}
-          className={`${CHAMP} w-36 shrink-0`}
-        />
-        <button
-          type="submit"
-          disabled={envoi || projets === null}
-          className={buttonClasses('primary', 'md', 'shrink-0')}
-        >
-          {envoi ? 'Ajout…' : 'Ajouter'}
-        </button>
-      </div>
+      <label htmlFor="mt-ajout-projet" className="sr-only">
+        Projet
+      </label>
+      <select
+        id="mt-ajout-projet"
+        value={projet}
+        onChange={(e) => setProjet(e.target.value)}
+        className={`${CHAMP} col-span-2 sm:col-span-1`}
+        disabled={projets === null}
+      >
+        {(projets ?? []).map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name}
+          </option>
+        ))}
+      </select>
+      <label htmlFor="mt-ajout-echeance" className="sr-only">
+        Échéance
+      </label>
+      <input
+        id="mt-ajout-echeance"
+        type="date"
+        value={echeance}
+        onChange={(e) => setEcheance(e.target.value)}
+        className={CHAMP}
+      />
+      <button
+        type="submit"
+        disabled={envoi || projets === null}
+        className={buttonClasses('primary', 'md')}
+      >
+        {envoi ? 'Ajout…' : 'Ajouter'}
+      </button>
       {erreur ? (
-        <p role="alert" className="text-xs text-[var(--danger)] sm:basis-full">
+        <p role="alert" className="col-span-full text-xs text-[var(--danger)]">
           {erreur}
         </p>
-      ) : null}
-      {projet ? (
-        <Link href={hrefProjet(projet)} className="sr-only">
-          Ouvrir le projet choisi
-        </Link>
       ) : null}
     </form>
   );

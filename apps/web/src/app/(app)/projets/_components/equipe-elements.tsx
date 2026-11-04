@@ -77,10 +77,10 @@ export function PileAvatars({
   return (
     <span className="flex items-center" aria-label={`${total} membre${total > 1 ? 's' : ''}`}>
       {membres.map((m, i) => (
-        <Avatar key={m.userId} membre={m} className={i > 0 ? '-ml-1.5' : ''} />
+        <Avatar key={m.userId} membre={m} className={i > 0 ? '-ml-1' : ''} />
       ))}
       {reste > 0 ? (
-        <span className="-ml-1.5 inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-[var(--surface-muted)] px-1 text-[0.625rem] font-semibold text-[var(--foreground-muted)] ring-2 ring-[var(--surface)]">
+        <span className="-ml-1 inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-[var(--surface-muted)] px-1 text-[0.625rem] font-semibold text-[var(--foreground-muted)] ring-2 ring-[var(--surface)]">
           +{reste}
         </span>
       ) : null}
