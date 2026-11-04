@@ -15,6 +15,7 @@
 // à l'autre) : changer d'onglet ne relit rien.
 
 import type {
+  WorkProjectOverview,
   WorkProjectView,
   WorkSettingsView,
   WorkTaskView,
@@ -32,6 +33,7 @@ import {
 } from 'react';
 
 import { workApi, type WorkMemberOption } from '@/lib/work-api';
+import { workOverviewApi } from '@/lib/work-overview-api';
 
 import { useShell } from '../../_components/shell-context';
 
@@ -68,6 +70,15 @@ export interface ContexteProjet {
   tacheOuverte: string | null;
   ouvrirTache: (taskId: string) => void;
   fermerTache: () => void;
+  /**
+   * Aperçu calculé par le serveur (ADR-0057) : santé, charge, courbe, compteurs
+   * de commentaires. `null` tant qu'il n'est pas lu (ou s'il a échoué : non bloquant).
+   * Relu (avec un léger délai) après chaque écriture de tâche.
+   */
+  apercu: WorkProjectOverview | null;
+  /** Nombre de commentaires d'une tâche (0 si inconnu). */
+  nbCommentaires: (taskId: string) => number;
+  rafraichirApercu: () => void;
   /** Droits confirmés par le serveur (confort d'affichage). */
   travailler: boolean;
   gerer: boolean;
@@ -102,6 +113,8 @@ export function ProjetProvider({
   const [avertissements, setAvertissements] = useState<string[]>([]);
   const [factureProposee, setFactureProposee] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
+  const [apercu, setApercu] = useState<WorkProjectOverview | null>(null);
+  const [tickApercu, setTickApercu] = useState(0);
   const tasksRef = useRef<WorkTaskView[]>([]);
   tasksRef.current = tasks;
 
@@ -131,6 +144,35 @@ export function ProjetProvider({
     };
   }, [projectId, version]);
 
+  // Aperçu (ADR-0057) : lu au montage, puis relu 600 ms après la dernière écriture.
+  useEffect(() => {
+    let annule = false;
+    const minuteur = setTimeout(
+      () => {
+        workOverviewApi
+          .getOverview(projectId)
+          .then((o) => {
+            if (!annule) setApercu(o);
+          })
+          .catch(() => {
+            // Non bloquant : les vues restent utilisables sans l'aperçu.
+          });
+      },
+      tickApercu === 0 ? 0 : 600,
+    );
+    return () => {
+      annule = true;
+      clearTimeout(minuteur);
+    };
+  }, [projectId, version, tickApercu]);
+
+  const rafraichirApercu = useCallback(() => setTickApercu((v) => v + 1), []);
+
+  const nbCommentaires = useCallback(
+    (taskId: string) => apercu?.commentCounts[taskId] ?? 0,
+    [apercu],
+  );
+
   // Membres détenant `work.read` (`GET /work/members`) ; repli sur les membres cités.
   useEffect(() => {
     let annule = false;
@@ -156,6 +198,7 @@ export function ProjetProvider({
 
   const setTasks = useCallback((f: (t: WorkTaskView[]) => WorkTaskView[]) => {
     setTasksState((t) => recalculerBlocages(f(t)));
+    setTickApercu((v) => v + 1);
   }, []);
 
   const appliquerEcriture = useCallback(
@@ -227,6 +270,9 @@ export function ProjetProvider({
       tacheOuverte,
       ouvrirTache,
       fermerTache,
+      apercu,
+      nbCommentaires,
+      rafraichirApercu,
       travailler:
         actions !== null && actions.includes('work.update') && project?.status !== 'archived',
       gerer: actions !== null && actions.includes('work.manage'),
@@ -248,6 +294,9 @@ export function ProjetProvider({
       tacheOuverte,
       ouvrirTache,
       fermerTache,
+      apercu,
+      nbCommentaires,
+      rafraichirApercu,
       actions,
     ],
   );

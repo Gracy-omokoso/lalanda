@@ -4,11 +4,11 @@
 // tâche, case « terminer », et le hook `useFiltres`.
 
 import type { WorkTaskView } from '@lalanda/shared/work';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { workApi } from '@/lib/work-api';
 
-import { BOUTON_PETIT, CHAMP } from './elements';
+import { BOUTON_PETIT, CHAMP, CercleCoche } from './elements';
 import { useProjet } from './project-context';
 import { PRIORITES } from './projets-model';
 import { filtresActifs, filtresVides, type FiltresTaches } from './taches-model';
@@ -178,12 +178,123 @@ export function AjoutRapide({
   );
 }
 
+/**
+ * « + Ajouter une tâche » en ligne, en bas d'un groupe (Liste) ou d'une colonne
+ * (Tableau) : un clic ouvre le champ ; Entrée crée la tâche et garde le champ
+ * ouvert pour enchaîner ; Échap ou un champ vide quitté referme.
+ */
+export function AjoutEnLigne({
+  columnKey,
+  idPrefixe,
+  variante = 'ligne',
+}: {
+  columnKey: string;
+  idPrefixe: string;
+  variante?: 'ligne' | 'carte';
+}): React.ReactElement | null {
+  const { projectId, travailler, appliquerEcriture, signalerErreur } = useProjet();
+  const [ouvert, setOuvert] = useState(false);
+  const [titre, setTitre] = useState('');
+  const [envoi, setEnvoi] = useState(false);
+  const champ = useRef<HTMLInputElement>(null);
+  if (!travailler) return null;
+
+  async function ajouter(): Promise<void> {
+    const t = titre.trim();
+    if (!t) return;
+    // Le champ se vide aussitôt : on peut taper la suivante pendant l'envoi.
+    setTitre('');
+    setEnvoi(true);
+    try {
+      appliquerEcriture(await workApi.createTask(projectId, { title: t, columnKey }));
+    } catch (err) {
+      setTitre((courant) => (courant === '' ? t : courant));
+      signalerErreur(err, 'Création de la tâche impossible.');
+    } finally {
+      setEnvoi(false);
+    }
+  }
+
+  const id = `${idPrefixe}-ajout-ligne`;
+  const ligne = variante === 'ligne';
+  if (!ouvert) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          setOuvert(true);
+          requestAnimationFrame(() => champ.current?.focus());
+        }}
+        className={
+          ligne
+            ? 'flex h-[var(--row-h)] w-full items-center gap-2 px-3 text-left text-sm text-[var(--foreground-muted)] transition-colors duration-[var(--motion-fast)] hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)] sm:pl-9'
+            : 'flex w-full items-center gap-1.5 rounded-[var(--radius-md)] px-2 py-1.5 text-left text-sm text-[var(--foreground-muted)] transition-colors duration-[var(--motion-fast)] hover:bg-[var(--surface)] hover:text-[var(--foreground)]'
+        }
+      >
+        <span aria-hidden="true">+</span> Ajouter une tâche
+      </button>
+    );
+  }
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        void ajouter();
+      }}
+      className={
+        ligne
+          ? 'flex h-[var(--row-h)] items-center gap-2 px-3 sm:pl-9'
+          : 'flex flex-col gap-1.5 rounded-[var(--radius-md)] border border-[var(--accent)] bg-[var(--surface)] p-2'
+      }
+    >
+      <label htmlFor={id} className="sr-only">
+        Nom de la nouvelle tâche
+      </label>
+      <input
+        id={id}
+        ref={champ}
+        value={titre}
+        onChange={(e) => setTitre(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            e.stopPropagation();
+            setTitre('');
+            setOuvert(false);
+          }
+        }}
+        onBlur={() => {
+          if (titre.trim() === '' && !envoi) setOuvert(false);
+        }}
+        placeholder="Nom de la tâche, puis Entrée"
+        maxLength={300}
+        className={
+          ligne
+            ? 'h-8 min-w-0 flex-1 rounded-[var(--radius-sm)] border border-[var(--accent)] bg-[var(--surface)] px-2 text-sm outline-none'
+            : 'min-w-0 bg-transparent text-sm outline-none'
+        }
+      />
+      <span className="sr-only" aria-live="polite">
+        {envoi ? 'Création…' : ''}
+      </span>
+    </form>
+  );
+}
+
 /** Case « terminée » : terminer (colonne `done`) ou rouvrir (première `todo`). */
-export function CaseTerminee({ task }: { task: WorkTaskView }): React.ReactElement {
+export function CaseTerminee({
+  task,
+  taille,
+}: {
+  task: WorkTaskView;
+  taille?: 16 | 18 | 22;
+}): React.ReactElement {
   const { travailler, appliquerEcriture, signalerErreur } = useProjet();
   const [envoi, setEnvoi] = useState(false);
+  // Affichage optimiste : le cercle se coche tout de suite, la réponse fait foi.
+  const [optimiste, setOptimiste] = useState<boolean | null>(null);
   async function basculer(): Promise<void> {
     setEnvoi(true);
+    setOptimiste(!task.done);
     try {
       appliquerEcriture(
         task.done
@@ -194,16 +305,16 @@ export function CaseTerminee({ task }: { task: WorkTaskView }): React.ReactEleme
       signalerErreur(err, 'Changement d’état impossible.');
     } finally {
       setEnvoi(false);
+      setOptimiste(null);
     }
   }
   return (
-    <input
-      type="checkbox"
-      className="h-4 w-4 shrink-0"
-      checked={task.done}
+    <CercleCoche
+      coche={optimiste ?? task.done}
+      taille={taille}
       disabled={!travailler || envoi}
-      onChange={() => void basculer()}
-      aria-label={
+      onClick={() => void basculer()}
+      label={
         task.done
           ? `Rouvrir #${task.number} ${task.title}`
           : `Terminer #${task.number} ${task.title}`
