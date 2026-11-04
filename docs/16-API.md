@@ -972,6 +972,23 @@ colonnes, toujours dans l'organisation de la session.
 | `GET /work/projects/:projectId/rebillable-expenses` | `work.read` + `sales.read` + `treasury.read` | lignes `rebillable` imputées au projet, remboursées ou soldées par une avance : `{ key, reportId, reportNumber, lineIndex, spentOn, category, label « Frais NF… — {libellé} », currency, amount, merchant }`, **sans nom** ; aucune facture créée ; projet d'une autre organisation : `404` |
 | `GET /work/timesheets?userId=&week=` | `work.read` (+ `work.manage` ou manager pour autrui) | jours : `attendanceMinutes` (minutes pointées, moteur `attendanceDays`) et constat `PROJECT_TIME_ABOVE_ATTENDANCE`, **information seulement** ; rendus si le pointage est activé et que l'appelant est le membre, son manager ou `hr.read` (jamais au seul titre de `work.manage`) |
 
+## Accueil des projets (portefeuille) — implémenté, ADR-0058
+
+| Route | Droit | Effet |
+|---|---|---|
+| `GET /work/portfolio?scope=mine\|all\|archived` | `work.read` (+ fonction `run_work`) | projets de l'organisation active (`all` : non archivés, défaut ; `mine` : responsable, ou assigné ou abonné d'une tâche ; `archived`), au plus 500, `truncated` au-delà |
+
+Réponse `WorkPortfolioView` (`@lalanda/shared/work`, `portfolio.ts`) : `asOf` (jour de Kinshasa),
+`scope`, `stats` (`activeProjects`, `overdueTasks`, `completedThisWeek` depuis lundi 0 h Kinshasa,
+`weekStart` — **projets non archivés de l'organisation, quel que soit le filtre**), `items[]` :
+`id`, `name`, `kind`, `status`, `color` (clé de la palette des étiquettes, tirée de l'identifiant),
+`health` (`on_track` · `at_risk` · `late` · `closed`, règle d'ADR-0058 § 2), `customerName`,
+`owner`, `dueDate`, `totalTaskCount`, `doneTaskCount`, `overdueTaskCount`, `overdueMilestoneCount`,
+`progressPercent` (entier), `members[]` (≤ 5) et `memberCount`, `mine`, `updatedAt`. Filtre inconnu
+ou paramètre en trop : `400`. Lecture seule ; aucune donnée d'une autre organisation (test e2e
+`work/work-portfolio.e2e.test.ts`, qui couvre aussi le parcours inviter → accepter → assigner →
+Mes tâches → notification).
+
 ## Brief du matin — implémenté (ADR-0033)
 
 L'organisation est toujours celle de la session ; aucun corps ni paramètre ne la désigne.

@@ -1,12 +1,19 @@
 'use client';
 
-// `/projets` — liste des projets (ADR-0039 § 8) : filtres statut, nature,
-// recherche ; « Nouveau projet » pour `work.manage`, avec client, opportunité et
-// devis liés (contrat `CreateWorkProjectBody.links`). Compteurs et prochain
-// jalon viennent de l'API (`WorkProjectSummary`) ; rien n'est recalculé ici.
+// `/projets` — accueil des projets façon Asana (ADR-0058) : chiffres de
+// l'organisation, filtres Mes projets · Tous · Archivés, recherche, tableau dense
+// (cartes sur téléphone) avec pastille, statut de santé, avancement, membres,
+// échéance et retards ; « Nouveau projet » pour `work.manage`, avec client,
+// opportunité et devis liés (ADR-0039 § 8). Tout vient de `GET /work/portfolio` :
+// rien n'est recalculé ici.
 
-import type { WorkProjectKind, WorkProjectStatus, WorkProjectSummary } from '@lalanda/shared/work';
-import { Badge, EmptyState, Modal, PageHeader, Skeleton, buttonClasses } from '@lalanda/ui';
+import type {
+  WorkPortfolioProject,
+  WorkPortfolioScope,
+  WorkPortfolioView,
+} from '@lalanda/shared/work';
+import { EmptyState, Modal, PageHeader, Skeleton, StatusPill, buttonClasses } from '@lalanda/ui';
+import { Plus, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -14,22 +21,30 @@ import { useCallback, useEffect, useState } from 'react';
 import { api, type CustomerView } from '@/lib/api';
 import { crmApi, type OpportunitySummary, type QuoteSummary } from '@/lib/api-crm';
 import { workApi, type WorkMemberOption } from '@/lib/work-api';
+import { workPortfolioApi } from '@/lib/work-portfolio-api';
 
 import { useShell } from '../../_components/shell-context';
 
-import { Alerte, BOUTON_PETIT, CHAMP, Champ, Responsable, aria } from './elements';
+import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from './elements';
+import { PastilleProjet, PileAvatars } from './equipe-elements';
+import {
+  FILTRES_PORTEFEUILLE,
+  cartesPortefeuille,
+  etatVide,
+  filtrerProjets,
+  raisonSante,
+  statutAffiche,
+  texteAvancement,
+} from './portefeuille-model';
 import {
   MES_TACHES_HREF,
   NATURES_PROJET,
-  STATUTS_PROJET,
-  aujourdhui,
   formatJour,
   formulaireProjet,
   hrefProjet,
   messageWork,
   peutGerer,
   preparerProjet,
-  progression,
   type FormulaireProjet,
 } from './projets-model';
 
@@ -259,115 +274,274 @@ function NouveauProjet({ onAnnule }: { onAnnule: () => void }): React.ReactEleme
   );
 }
 
-function CarteProjet({ p, today }: { p: WorkProjectSummary; today: string }): React.ReactElement {
-  const prog = progression(p);
+const CARTE = 'rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)]';
+
+/** Barre d'avancement (pourcentage rendu par l'API) ; le texte l'accompagne toujours. */
+function Avancement({ p }: { p: WorkPortfolioProject }): React.ReactElement {
   return (
-    // Carte entièrement cliquable : le lien du nom est étiré sur toute la carte.
-    <li className="relative flex min-w-0 flex-col gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-4 transition hover:border-[var(--module-run)] hover:shadow-[var(--shadow-pop)]">
-      <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
-        <Link
-          href={hrefProjet(p.id)}
-          className="min-w-0 break-words font-display text-base font-semibold underline-offset-2 hover:underline after:absolute after:inset-0 after:rounded-[inherit] after:content-['']"
-        >
-          {p.name}
-        </Link>
-        <Badge tone={p.status === 'active' ? 'info' : 'neutral'}>{STATUTS_PROJET[p.status]}</Badge>
-      </div>
-      <p className="text-xs text-[var(--foreground-muted)]">
-        {NATURES_PROJET[p.kind]}
-        {p.customerName ? ` · ${p.customerName}` : ''}
-      </p>
-      <div className="flex items-center gap-2 text-xs">
+    <span className="flex min-w-0 items-center gap-2 text-xs">
+      <span
+        aria-hidden="true"
+        className="h-1.5 w-20 shrink-0 overflow-hidden rounded-full bg-[var(--surface-muted)]"
+      >
         <span
-          aria-hidden="true"
-          className="h-1.5 w-20 shrink-0 overflow-hidden rounded-full bg-[var(--surface-muted)]"
-        >
-          <span
-            className="block h-full bg-[var(--module-run)]"
-            style={{ width: `${prog.pourcent}%` }}
-          />
-        </span>
-        <span className="text-[var(--foreground-muted)]">{prog.texte}</span>
-      </div>
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        {p.overdueTaskCount > 0 ? (
-          <Badge tone="danger">{p.overdueTaskCount} en retard</Badge>
-        ) : null}
-        {p.nextMilestone ? (
-          <Badge tone={p.nextMilestone.dueDate < today ? 'danger' : 'neutral'}>
-            <span aria-hidden="true">◆</span> Jalon « {p.nextMilestone.title} » ·{' '}
-            {formatJour(p.nextMilestone.dueDate, false)}
-          </Badge>
-        ) : null}
-        {p.dueDate ? (
-          <span className="text-[var(--foreground-muted)]">Fin prévue {formatJour(p.dueDate)}</span>
-        ) : null}
-      </div>
-      <Responsable name={p.owner?.name ?? null} />
-    </li>
+          className="block h-full origin-left rounded-full bg-[var(--chart-1)] chart-grow"
+          style={{ width: `${p.progressPercent}%` }}
+        />
+      </span>
+      <span className="whitespace-nowrap tabular-nums text-[var(--foreground-muted)]">
+        {texteAvancement(p)}
+      </span>
+    </span>
   );
 }
 
-type FiltreStatut = '' | WorkProjectStatus;
+function Statut({ p }: { p: WorkPortfolioProject }): React.ReactElement {
+  const s = statutAffiche(p);
+  return (
+    <StatusPill tone={s.ton} title={raisonSante(p)}>
+      {s.libelle}
+      <span className="sr-only"> — {raisonSante(p)}</span>
+    </StatusPill>
+  );
+}
+
+function EcheanceProjet({
+  p,
+  today,
+}: {
+  p: WorkPortfolioProject;
+  today: string;
+}): React.ReactElement {
+  if (!p.dueDate) return <span className="text-xs text-[var(--foreground-muted)]">—</span>;
+  const depassee = p.health !== 'closed' && p.dueDate < today;
+  return (
+    <span
+      className={`whitespace-nowrap text-xs tabular-nums ${depassee ? 'font-medium text-[var(--danger)]' : 'text-[var(--foreground-muted)]'}`}
+    >
+      {formatJour(p.dueDate)}
+      {depassee ? <span className="sr-only"> (dépassée)</span> : null}
+    </span>
+  );
+}
+
+function Retards({ n }: { n: number }): React.ReactElement {
+  return n > 0 ? (
+    <span className="whitespace-nowrap text-xs font-medium tabular-nums text-[var(--danger)]">
+      {n} en retard
+    </span>
+  ) : (
+    <span className="text-xs text-[var(--foreground-muted)]">
+      <span aria-hidden="true">—</span>
+      <span className="sr-only">aucune tâche en retard</span>
+    </span>
+  );
+}
+
+/** Tableau dense (écran large) : une ligne par projet, toute la ligne ouvre le projet. */
+function TableauProjets({
+  items,
+  today,
+}: {
+  items: readonly WorkPortfolioProject[];
+  today: string;
+}): React.ReactElement {
+  return (
+    <div className={`${CARTE} overflow-hidden max-md:hidden`}>
+      <table className="w-full table-fixed border-collapse text-sm">
+        <caption className="sr-only">Projets, avec leur statut, avancement et échéance</caption>
+        <thead>
+          <tr className="border-b border-[var(--border)] text-left text-xs font-medium text-[var(--foreground-muted)]">
+            <th scope="col" className="w-[34%] px-4 py-2 font-medium">
+              Projet
+            </th>
+            <th scope="col" className="w-[15%] px-2 py-2 font-medium">
+              Statut
+            </th>
+            <th scope="col" className="w-[18%] px-2 py-2 font-medium">
+              Avancement
+            </th>
+            <th scope="col" className="w-[12%] px-2 py-2 font-medium">
+              Membres
+            </th>
+            <th scope="col" className="w-[11%] px-2 py-2 font-medium">
+              Échéance
+            </th>
+            <th scope="col" className="w-[10%] px-2 py-2 pr-4 font-medium">
+              Retards
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-[var(--border)]">
+          {items.map((p) => (
+            <tr
+              key={p.id}
+              className="relative h-[var(--row-h)] transition-colors duration-[var(--motion-fast)] hover:bg-[var(--surface-muted)] motion-reduce:transition-none"
+            >
+              <td className="px-4 py-2">
+                <span className="flex min-w-0 items-center gap-2.5">
+                  <PastilleProjet couleur={p.color} />
+                  <span className="flex min-w-0 flex-col">
+                    <Link
+                      href={hrefProjet(p.id)}
+                      className="truncate font-medium underline-offset-2 after:absolute after:inset-0 hover:underline"
+                    >
+                      {p.name}
+                    </Link>
+                    <span className="truncate text-xs text-[var(--foreground-muted)]">
+                      {p.customerName ?? NATURES_PROJET[p.kind]}
+                    </span>
+                  </span>
+                </span>
+              </td>
+              <td className="px-2 py-2">
+                <Statut p={p} />
+              </td>
+              <td className="px-2 py-2">
+                <Avancement p={p} />
+              </td>
+              <td className="px-2 py-2">
+                <PileAvatars membres={p.members} total={p.memberCount} />
+              </td>
+              <td className="px-2 py-2">
+                <EcheanceProjet p={p} today={today} />
+              </td>
+              <td className="px-2 py-2 pr-4">
+                <Retards n={p.overdueTaskCount} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Cartes (téléphone et tablette) : mêmes informations, empilées. */
+function CartesProjets({
+  items,
+  today,
+}: {
+  items: readonly WorkPortfolioProject[];
+  today: string;
+}): React.ReactElement {
+  return (
+    <ul className="grid gap-2 sm:grid-cols-2 md:hidden">
+      {items.map((p) => (
+        <li
+          key={p.id}
+          className={`${CARTE} relative flex min-w-0 flex-col gap-2.5 p-3 transition-colors duration-[var(--motion-fast)] hover:border-[var(--border-strong)] motion-reduce:transition-none`}
+        >
+          <div className="flex min-w-0 items-start justify-between gap-2">
+            <span className="flex min-w-0 items-center gap-2">
+              <PastilleProjet couleur={p.color} />
+              <Link
+                href={hrefProjet(p.id)}
+                className="min-w-0 truncate font-medium underline-offset-2 after:absolute after:inset-0 hover:underline"
+              >
+                {p.name}
+              </Link>
+            </span>
+            <Statut p={p} />
+          </div>
+          <span className="truncate text-xs text-[var(--foreground-muted)]">
+            {p.customerName ?? NATURES_PROJET[p.kind]}
+          </span>
+          <Avancement p={p} />
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+            <PileAvatars membres={p.members} total={p.memberCount} />
+            <span className="flex items-center gap-3">
+              <Retards n={p.overdueTaskCount} />
+              <EcheanceProjet p={p} today={today} />
+            </span>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Chiffres({ vue }: { vue: WorkPortfolioView | null }): React.ReactElement {
+  if (vue === null) {
+    return (
+      <ul className="grid grid-cols-3 gap-2 sm:gap-3" aria-busy="true">
+        {[0, 1, 2].map((i) => (
+          <li key={i}>
+            <Skeleton className="h-[68px] rounded-[var(--radius-lg)]" />
+          </li>
+        ))}
+      </ul>
+    );
+  }
+  return (
+    <ul className="grid grid-cols-3 gap-2 sm:gap-3" aria-label="Chiffres des projets">
+      {cartesPortefeuille(vue).map((c) => (
+        <li key={c.id} className={`${CARTE} flex min-w-0 flex-col gap-0.5 px-3 py-2.5 sm:px-3.5`}>
+          <span className="truncate text-xs text-[var(--foreground-muted)]">{c.libelle}</span>
+          <span
+            className={`font-mono text-lg font-medium tabular-nums ${c.alerte ? 'text-[var(--danger)]' : ''}`}
+          >
+            {c.valeur}
+          </span>
+          <span className="truncate text-xs text-[var(--foreground-muted)] max-sm:hidden">
+            {c.note}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export function ListeProjets(): React.ReactElement {
   const { actions } = useShell();
   const gerer = peutGerer(actions);
-  const [statut, setStatut] = useState<FiltreStatut>('');
-  const [nature, setNature] = useState<'' | WorkProjectKind>('');
-  const [q, setQ] = useState('');
+  const [scope, setScope] = useState<WorkPortfolioScope>('all');
   const [recherche, setRecherche] = useState('');
-  const [items, setItems] = useState<WorkProjectSummary[] | null>(null);
-  const [curseur, setCurseur] = useState<string | null>(null);
+  const [vue, setVue] = useState<WorkPortfolioView | null>(null);
+  const [chiffres, setChiffres] = useState<WorkPortfolioView | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [creation, setCreation] = useState(false);
-  const today = aujourdhui();
 
-  const charger = useCallback(
-    (suite: string | null) => {
-      workApi
-        .listProjects({
-          ...(statut ? { status: statut } : {}),
-          ...(nature ? { kind: nature } : {}),
-          ...(recherche ? { q: recherche } : {}),
-          cursor: suite,
-        })
-        .then((page) => {
-          setItems((avant) => (suite && avant ? [...avant, ...page.items] : page.items));
-          setCurseur(page.nextCursor);
-          setErreur(null);
-        })
-        .catch((err: unknown) => setErreur(messageWork(err, 'Impossible de charger les projets.')));
-    },
-    [statut, nature, recherche],
+  const charger = useCallback(() => {
+    setVue(null);
+    workPortfolioApi
+      .get(scope)
+      .then((v) => {
+        setVue(v);
+        setChiffres(v);
+        setErreur(null);
+      })
+      .catch((err: unknown) => setErreur(messageWork(err, 'Impossible de charger les projets.')));
+  }, [scope]);
+
+  useEffect(() => charger(), [charger]);
+
+  const items = vue ? filtrerProjets(vue.items, recherche) : null;
+  const vide = etatVide(scope, recherche, gerer);
+  const boutonCreer = (
+    <button
+      type="button"
+      className={buttonClasses('primary', 'md')}
+      onClick={() => setCreation(true)}
+    >
+      <Plus aria-hidden="true" className="h-4 w-4" />
+      Nouveau projet
+    </button>
   );
 
-  useEffect(() => {
-    setItems(null);
-    charger(null);
-  }, [charger]);
-
   return (
-    <section className="flex min-w-0 flex-col gap-5">
+    <section className="flex min-w-0 flex-col gap-4">
       <PageHeader
         module="run"
         moduleLabel="Exploiter"
         title="Projets"
-        description="Projets clients et internes : tâches, responsables, échéances, Kanban. Les projets archivés sont masqués par défaut."
+        description="Tous les projets de l’équipe : où ils en sont, qui y travaille, ce qui est en retard."
         actions={
           <>
             <Link href={MES_TACHES_HREF} className={buttonClasses('secondary', 'md')}>
               Mes tâches
             </Link>
-            {gerer ? (
-              <button
-                type="button"
-                className={buttonClasses('primary', 'md')}
-                onClick={() => setCreation(true)}
-              >
-                Nouveau projet
-              </button>
-            ) : null}
+            {gerer ? boutonCreer : null}
           </>
         }
       />
@@ -380,68 +554,50 @@ export function ListeProjets(): React.ReactElement {
         <NouveauProjet onAnnule={() => setCreation(false)} />
       </Modal>
 
-      <form
-        role="search"
-        className="flex flex-wrap items-end gap-3"
-        onSubmit={(e) => {
-          e.preventDefault();
-          setRecherche(q.trim());
-        }}
-      >
-        <div className="flex min-w-0 flex-1 basis-48 flex-col gap-1.5">
-          <label htmlFor="pj-q" className="text-sm font-medium">
-            Rechercher
+      <Chiffres vue={chiffres} />
+
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div
+          role="group"
+          aria-label="Filtrer les projets"
+          className="inline-flex w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-0.5 sm:w-auto"
+        >
+          {FILTRES_PORTEFEUILLE.map((f) => (
+            <button
+              key={f.cle}
+              type="button"
+              aria-pressed={scope === f.cle}
+              onClick={() => setScope(f.cle)}
+              className="h-8 flex-1 rounded-[calc(var(--radius-md)-2px)] px-3 text-[13px] font-medium text-[var(--foreground-muted)] transition-colors duration-[var(--motion-fast)] hover:text-[var(--foreground)] aria-pressed:bg-[var(--accent-soft)] aria-pressed:text-[var(--accent)] motion-reduce:transition-none sm:flex-none"
+            >
+              {f.libelle}
+            </button>
+          ))}
+        </div>
+        <div className="relative sm:w-64">
+          <label htmlFor="pj-q" className="sr-only">
+            Rechercher un projet
           </label>
+          <Search
+            aria-hidden="true"
+            className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--foreground-muted)]"
+          />
           <input
             id="pj-q"
             type="search"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onBlur={() => setRecherche(q.trim())}
-            className={CHAMP}
+            value={recherche}
+            onChange={(e) => setRecherche(e.target.value)}
+            className={`${CHAMP} pl-8`}
             maxLength={100}
-            placeholder="Nom du projet"
+            placeholder="Projet ou client"
           />
         </div>
-        <div className="flex basis-36 flex-col gap-1.5">
-          <label htmlFor="pj-statut" className="text-sm font-medium">
-            Statut
-          </label>
-          <select
-            id="pj-statut"
-            value={statut}
-            onChange={(e) => setStatut(e.target.value as FiltreStatut)}
-            className={CHAMP}
-          >
-            <option value="">Non archivés</option>
-            {(Object.keys(STATUTS_PROJET) as WorkProjectStatus[]).map((s) => (
-              <option key={s} value={s}>
-                {STATUTS_PROJET[s]}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex basis-36 flex-col gap-1.5">
-          <label htmlFor="pj-nature-f" className="text-sm font-medium">
-            Nature
-          </label>
-          <select
-            id="pj-nature-f"
-            value={nature}
-            onChange={(e) => setNature(e.target.value as '' | WorkProjectKind)}
-            className={CHAMP}
-          >
-            <option value="">Toutes</option>
-            <option value="client">Clients</option>
-            <option value="internal">Internes</option>
-          </select>
-        </div>
-      </form>
+      </div>
 
       {erreur ? (
         <Alerte
           action={
-            <button type="button" className={BOUTON_PETIT} onClick={() => charger(null)}>
+            <button type="button" className={BOUTON_PETIT} onClick={charger}>
               Réessayer
             </button>
           }
@@ -452,49 +608,26 @@ export function ListeProjets(): React.ReactElement {
 
       {items === null ? (
         erreur ? null : (
-          <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" aria-busy="true">
-            {[0, 1, 2].map((i) => (
-              <li key={i}>
-                <Skeleton className="h-40 rounded-[var(--radius-lg)]" />
-              </li>
+          <div className="flex flex-col gap-2" aria-busy="true">
+            {[0, 1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-[var(--row-h)] rounded-[var(--radius-md)]" />
             ))}
-          </ul>
+          </div>
         )
       ) : items.length === 0 ? (
         <EmptyState
-          title={recherche || statut || nature ? 'Aucun projet ne correspond' : 'Aucun projet'}
-          description={
-            gerer
-              ? 'Créez un projet client ou interne pour y organiser les tâches de l’équipe.'
-              : 'Un Propriétaire, un Administrateur ou un Dirigeant peut créer le premier projet.'
-          }
-          action={
-            gerer ? (
-              <button
-                type="button"
-                className={buttonClasses('primary', 'md')}
-                onClick={() => setCreation(true)}
-              >
-                Nouveau projet
-              </button>
-            ) : undefined
-          }
+          title={vide.titre}
+          description={vide.texte}
+          action={vide.creer ? boutonCreer : undefined}
         />
       ) : (
         <>
-          <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {items.map((p) => (
-              <CarteProjet key={p.id} p={p} today={today} />
-            ))}
-          </ul>
-          {curseur ? (
-            <button
-              type="button"
-              className={buttonClasses('secondary', 'md', 'self-center')}
-              onClick={() => charger(curseur)}
-            >
-              Afficher plus
-            </button>
+          <TableauProjets items={items} today={vue!.asOf} />
+          <CartesProjets items={items} today={vue!.asOf} />
+          {vue!.truncated ? (
+            <p className="text-xs text-[var(--foreground-muted)]">
+              Seuls les 500 projets les plus récemment modifiés sont affichés.
+            </p>
           ) : null}
         </>
       )}

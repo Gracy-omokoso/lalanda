@@ -16,12 +16,18 @@ import type { HrMyTaskItem } from '@lalanda/shared/hr';
 import type { PurchasesMyTaskItem } from '@lalanda/shared/purchases';
 import type { SalesContractMyTaskItem } from '@lalanda/shared/sales-contracts';
 import type { StockMyTaskItem } from '@lalanda/shared/stock';
-import type { MyTasksView, WorkMyTaskItem } from '@lalanda/shared/work';
+import {
+  projectColor,
+  type MyTasksView,
+  type WorkMyTaskItem,
+  type WorkProjectSummary,
+} from '@lalanda/shared/work';
 import { EmptyState, PageHeader, Skeleton, buttonClasses } from '@lalanda/ui';
 import { ClipboardCheck, FileSignature, Scale } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
+import { useSession } from '@/lib/auth-client';
 import { crmAgendaApi } from '@/lib/crm-agenda-api';
 import { workApi } from '@/lib/work-api';
 
@@ -33,11 +39,14 @@ import {
   Alerte,
   BOUTON_PETIT,
   BloqueeBadge,
+  CHAMP,
   Echeance,
   PrioriteBadge,
 } from './elements';
+import { CercleCocher, OngletsMesTaches, PastilleProjet } from './equipe-elements';
 import {
-  GROUPES_MES_TACHES,
+  SECTIONS_MES_TACHES,
+  sectionsMesTaches,
   PASTILLE_RELANCE,
   PASTILLE_APPROBATION,
   appliquerTache,
@@ -61,6 +70,8 @@ import { PROJETS_BASE, hrefTache, messageWork, peutTravailler } from './projets-
 
 export function MesTaches(): React.ReactElement {
   const { actions } = useShell();
+  const { data: session } = useSession();
+  const moi = session?.user?.id ?? null;
   const travailler = peutTravailler(actions);
   const cocherRelances = peutCocherRelance(actions);
   const [vue, setVue] = useState<MyTasksView | null>(null);
@@ -97,42 +108,33 @@ export function MesTaches(): React.ReactElement {
   async function terminer(t: WorkMyTaskItem): Promise<void> {
     try {
       const r = await workApi.completeTask(t.id, t.revision);
+      // Laisse la coche se tracer (180 ms) avant de retirer la ligne.
+      await new Promise((ok) => setTimeout(ok, 180));
       setVue((v) => (v ? appliquerTache(v, r.task, dueSoon) : v));
       setAnnonce(`#${t.number} « ${t.title} » terminée.`);
     } catch (err) {
       setErreur(messageWork(err, 'Impossible de terminer la tâche.'));
       charger();
+      throw err;
     }
   }
 
+  const sections = vue ? sectionsMesTaches(vue) : null;
+
   return (
-    <section className="flex min-w-0 flex-col gap-5">
+    <section className="flex min-w-0 flex-col gap-4">
       <PageHeader
         module="run"
         moduleLabel="Exploiter · Projets"
         title="Mes tâches"
         description="Les tâches qui vous sont assignées, tous projets confondus, de la plus urgente à la plus lointaine."
         actions={
-          <>
-            <Link
-              href={`${PROJETS_BASE}/mes-taches/calendrier`}
-              className={buttonClasses('secondary', 'md')}
-            >
-              Calendrier
-            </Link>
-            {/* ADR-0045 — H7 : la semaine en lecture, croisée avec les absences. */}
-            <Link
-              href={`${PROJETS_BASE}/mes-taches/temps`}
-              className={buttonClasses('secondary', 'md')}
-            >
-              Feuille de temps
-            </Link>
-            <Link href={PROJETS_BASE} className={buttonClasses('secondary', 'md')}>
-              Tous les projets
-            </Link>
-          </>
+          <Link href={PROJETS_BASE} className={buttonClasses('secondary', 'md')}>
+            Tous les projets
+          </Link>
         }
       />
+      <OngletsMesTaches actif="liste" />
       <p className="sr-only" aria-live="polite">
         {annonce}
       </p>
@@ -147,6 +149,7 @@ export function MesTaches(): React.ReactElement {
           <p>{erreur}</p>
         </Alerte>
       ) : null}
+      {travailler && moi ? <AjoutRapide moi={moi} onAjoute={charger} /> : null}
       {/* ADR-0045 — H5 (§ 6.2) : tâches que j'ai créées dont l'assigné sera absent à l'échéance. */}
       {vue && (vue.absenceFindings?.length ?? 0) > 0 ? (
         <section
@@ -174,7 +177,7 @@ export function MesTaches(): React.ReactElement {
           </ul>
         </section>
       ) : null}
-      {vue === null ? (
+      {vue === null || sections === null ? (
         erreur ? null : (
           <div aria-busy="true" className="flex flex-col gap-3">
             <Skeleton className="h-24 w-full" />
@@ -184,7 +187,11 @@ export function MesTaches(): React.ReactElement {
       ) : totalMesTaches(vue) === 0 ? (
         <EmptyState
           title="Aucune tâche ouverte pour vous"
-          description="Quand une tâche vous sera assignée dans un projet, elle apparaîtra ici."
+          description={
+            travailler
+              ? 'Ajoutez une tâche ci-dessus, ou attendez qu’on vous en assigne une dans un projet : elle apparaîtra ici, rangée par échéance.'
+              : 'Quand une tâche vous sera assignée dans un projet, elle apparaîtra ici.'
+          }
           action={
             <Link href={PROJETS_BASE} className={buttonClasses('secondary', 'md')}>
               Voir les projets
@@ -192,24 +199,28 @@ export function MesTaches(): React.ReactElement {
           }
         />
       ) : (
-        <div className="flex flex-col gap-6">
-          {GROUPES_MES_TACHES.map((g) => {
-            const liste = vue[g.cle];
+        <div className="flex flex-col gap-5">
+          {SECTIONS_MES_TACHES.map((g) => {
+            const liste = sections[g.cle];
             return (
-              <section key={g.cle} aria-labelledby={`mt-${g.cle}`} className="flex flex-col gap-2">
+              <section
+                key={g.cle}
+                aria-labelledby={`mt-${g.cle}`}
+                className="flex flex-col gap-1.5"
+              >
                 <h2
                   id={`mt-${g.cle}`}
-                  className="flex items-baseline gap-2 text-base font-semibold"
+                  className={`flex items-baseline gap-2 text-[13px] font-semibold ${g.cle === 'overdue' && liste.length > 0 ? 'text-[var(--danger)]' : ''}`}
                 >
                   {g.titre}
-                  <span className="text-sm font-normal text-[var(--foreground-muted)]">
-                    ({liste.length})
+                  <span className="text-xs font-normal text-[var(--foreground-muted)] tabular-nums">
+                    {liste.length}
                   </span>
                 </h2>
                 {liste.length === 0 ? (
-                  <p className="text-sm text-[var(--foreground-muted)]">{g.vide}</p>
+                  <p className="px-1 text-xs text-[var(--foreground-muted)]">{g.vide}</p>
                 ) : (
-                  <ul className="flex flex-col divide-y divide-[var(--border)] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)]">
+                  <ul className="flex flex-col divide-y divide-[var(--border)] overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)]">
                     {liste.map((t) =>
                       estElementContrat(t) ? (
                         <LigneContrat key={t.id} e={t} today={vue.asOf} dueSoonDays={dueSoon} />
@@ -229,39 +240,14 @@ export function MesTaches(): React.ReactElement {
                           onCocher={() => void cocherRelance(t)}
                         />
                       ) : (
-                        <li
+                        <LigneTache
                           key={t.id}
-                          className="flex min-w-0 flex-col gap-1.5 px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3"
-                        >
-                          <div className="flex min-w-0 flex-1 items-start gap-2">
-                            <input
-                              type="checkbox"
-                              className="mt-0.5 h-4 w-4 shrink-0"
-                              checked={false}
-                              disabled={!travailler}
-                              aria-label={`Terminer #${t.number} ${t.title}`}
-                              onChange={() => void terminer(t)}
-                            />
-                            <span className="flex min-w-0 flex-col">
-                              <Link
-                                href={hrefTache(t.projectId, t.id)}
-                                className="break-words text-sm font-medium underline-offset-2 hover:underline"
-                              >
-                                <span className="text-[var(--foreground-muted)]">#{t.number}</span>{' '}
-                                {t.title}
-                              </Link>
-                              <span className="truncate text-xs text-[var(--foreground-muted)]">
-                                {t.projectName}
-                              </span>
-                            </span>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-2 pl-6 sm:pl-0">
-                            {t.blocked ? <BloqueeBadge /> : null}
-                            <AbsenceBadges t={t} />
-                            <PrioriteBadge priority={t.priority} />
-                            <Echeance task={t} today={vue.asOf} dueSoonDays={dueSoon} />
-                          </div>
-                        </li>
+                          t={t}
+                          today={vue.asOf}
+                          dueSoonDays={dueSoon}
+                          peutCocher={travailler}
+                          onTerminer={() => terminer(t)}
+                        />
                       ),
                     )}
                   </ul>
@@ -272,6 +258,164 @@ export function MesTaches(): React.ReactElement {
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * Ligne dense d'une tâche (ADR-0058 § 3) : cercle à cocher, titre, projet avec sa
+ * pastille, échéance colorée et écrite. Toute la ligne ouvre la tâche ; le cercle
+ * reste cliquable au-dessus du lien étiré.
+ */
+function LigneTache({
+  t,
+  today,
+  dueSoonDays,
+  peutCocher,
+  onTerminer,
+}: {
+  t: WorkMyTaskItem;
+  today: string;
+  dueSoonDays: number;
+  peutCocher: boolean;
+  onTerminer: () => Promise<void>;
+}): React.ReactElement {
+  return (
+    <li className="relative flex min-h-[var(--row-h)] min-w-0 flex-col gap-1 px-3 py-1.5 transition-colors duration-[var(--motion-fast)] hover:bg-[var(--surface-muted)] motion-reduce:transition-none sm:flex-row sm:items-center sm:gap-3">
+      <div className="flex min-w-0 flex-1 items-center gap-2.5">
+        <span className="relative z-10 flex">
+          <CercleCocher
+            libelle={`Terminer #${t.number} ${t.title}`}
+            desactive={!peutCocher}
+            onCocher={onTerminer}
+          />
+        </span>
+        <Link
+          href={hrefTache(t.projectId, t.id)}
+          className="min-w-0 truncate text-sm font-medium underline-offset-2 after:absolute after:inset-0 hover:underline"
+        >
+          {t.title}
+        </Link>
+      </div>
+      <div className="flex min-w-0 flex-wrap items-center gap-2 pl-9 sm:flex-nowrap sm:pl-0">
+        <span className="inline-flex min-w-0 max-w-[14rem] items-center gap-1.5 text-xs text-[var(--foreground-muted)]">
+          <PastilleProjet couleur={projectColor(t.projectId)} taille="sm" />
+          <span className="truncate">{t.projectName}</span>
+        </span>
+        {t.blocked ? <BloqueeBadge /> : null}
+        <AbsenceBadges t={t} />
+        <PrioriteBadge priority={t.priority} />
+        <Echeance task={t} today={today} dueSoonDays={dueSoonDays} />
+      </div>
+    </li>
+  );
+}
+
+/**
+ * Ajout rapide (ADR-0058 § 3) : titre, projet, échéance facultative ; la tâche
+ * est assignée à l'appelant et rejoint sa section. Projets actifs seulement.
+ */
+function AjoutRapide({ moi, onAjoute }: { moi: string; onAjoute: () => void }): React.ReactElement {
+  const [projets, setProjets] = useState<WorkProjectSummary[] | null>(null);
+  const [titre, setTitre] = useState('');
+  const [projet, setProjet] = useState('');
+  const [echeance, setEcheance] = useState('');
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState<string | null>(null);
+
+  useEffect(() => {
+    workApi
+      .listProjects({ status: 'active', limit: 100 })
+      .then((p) => {
+        setProjets(p.items);
+        setProjet((avant) => avant || (p.items[0]?.id ?? ''));
+      })
+      .catch(() => setProjets([]));
+  }, []);
+
+  if (projets !== null && projets.length === 0) return <></>;
+
+  async function ajouter(e: React.FormEvent): Promise<void> {
+    e.preventDefault();
+    const t = titre.trim();
+    if (t === '' || projet === '') {
+      setErreur(t === '' ? 'Donnez un titre à la tâche.' : 'Choisissez un projet.');
+      return;
+    }
+    setEnvoi(true);
+    setErreur(null);
+    try {
+      await workApi.createTask(projet, {
+        title: t,
+        assigneeUserId: moi,
+        ...(echeance ? { dueDate: echeance } : {}),
+      });
+      setTitre('');
+      setEcheance('');
+      onAjoute();
+    } catch (err) {
+      setErreur(messageWork(err, 'Impossible d’ajouter la tâche.'));
+    } finally {
+      setEnvoi(false);
+    }
+  }
+
+  return (
+    <form
+      onSubmit={(e) => void ajouter(e)}
+      aria-label="Ajouter une tâche pour moi"
+      className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 rounded-[var(--radius-lg)] border border-dashed border-[var(--border-strong)] bg-[var(--surface)] p-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,13rem)_9.5rem_auto] sm:items-center"
+    >
+      <label htmlFor="mt-ajout" className="sr-only">
+        Nouvelle tâche
+      </label>
+      <input
+        id="mt-ajout"
+        value={titre}
+        onChange={(e) => setTitre(e.target.value)}
+        placeholder="＋ Ajouter une tâche…"
+        maxLength={300}
+        className={`${CHAMP} col-span-2 border-transparent bg-transparent sm:col-span-1`}
+        aria-invalid={erreur !== null && titre.trim() === '' ? true : undefined}
+      />
+      <label htmlFor="mt-ajout-projet" className="sr-only">
+        Projet
+      </label>
+      <select
+        id="mt-ajout-projet"
+        value={projet}
+        onChange={(e) => setProjet(e.target.value)}
+        className={`${CHAMP} col-span-2 sm:col-span-1`}
+        disabled={projets === null}
+      >
+        {(projets ?? []).map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name}
+          </option>
+        ))}
+      </select>
+      <label htmlFor="mt-ajout-echeance" className="sr-only">
+        Échéance
+      </label>
+      <input
+        id="mt-ajout-echeance"
+        type="date"
+        value={echeance}
+        onChange={(e) => setEcheance(e.target.value)}
+        className={CHAMP}
+      />
+      <button
+        type="submit"
+        disabled={envoi || projets === null}
+        className={buttonClasses('primary', 'md')}
+      >
+        {envoi ? 'Ajout…' : 'Ajouter'}
+      </button>
+      {erreur ? (
+        <p role="alert" className="col-span-full text-xs text-[var(--danger)]">
+          {erreur}
+        </p>
+      ) : null}
+    </form>
   );
 }
 

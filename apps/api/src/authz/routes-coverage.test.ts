@@ -120,6 +120,8 @@ import { WorkCommentsController } from '../work/work-comments.controller.js';
 import { WorkMembersController } from '../work/work-members.controller.js';
 import { WorkProjectsController } from '../work/work-projects.controller.js';
 import { WorkOverviewController } from '../work/work-overview.controller.js';
+// ADR-0058 : accueil des projets (portefeuille).
+import { WorkPortfolioController } from '../work/work-portfolio.controller.js';
 import { WorkSettingsController } from '../work/work-settings.controller.js';
 import { WorkTasksController } from '../work/work-tasks.controller.js';
 import { WorkTimeController } from '../work/work-time.controller.js';
@@ -298,6 +300,8 @@ const CONTROLEURS = [
   // ADR-0045 — H5 : rapports et registre ; feuille de temps en lecture.
   HrReportsController,
   WorkTimesheetsController,
+  // ADR-0058 : accueil des projets (portefeuille).
+  WorkPortfolioController,
   // ADR-0045 — H4 : documents, listes d'entrée et de sortie, échéances.
   HrDocumentsController,
   HrChecklistsController,
@@ -2907,5 +2911,14 @@ describe('ADR-0047 : factures des abonnements', () => {
       expect(Reflect.getMetadata(REQUIRED_PLATFORM_ACTIONS_KEY, methode), cle).toEqual([action]);
       expect(Reflect.getMetadata(P2_REAUTH_KEY, methode) === true, cle).toBe(reauth);
     }
+  });
+});
+
+// ADR-0058
+describe('ADR-0058 : accueil des projets (portefeuille)', () => {
+  it('une seule route, en lecture, sous `work.read`', () => {
+    const routes = TOUTES_LES_ROUTES.filter((r) => r.cle.startsWith('WorkPortfolioController.'));
+    expect(routes.map((r) => r.cle)).toEqual(['WorkPortfolioController.get']);
+    expect(routes[0]!.actions).toEqual(['work.read']);
   });
 });

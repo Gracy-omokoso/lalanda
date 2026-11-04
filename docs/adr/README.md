@@ -168,3 +168,8 @@ Décideurs :
   `GET /work/projects/:id/overview`), Liste groupée à lignes denses et ajout en ligne, Tableau épuré,
   panneau de tâche à champs enregistrés à la volée et fil commentaires + activité.
   Statut : **proposé** (4 nov. 2026).
+- [ADR-0058](ADR-0058-accueil-projets-et-mes-taches-equipe.md) — Accueil des projets et « Mes tâches »
+  façon Asana : `GET /work/portfolio` (santé en bonne voie / à risque / en retard, avancement, membres,
+  chiffres de l'organisation), sections de semaine civile de Kinshasa, cercle à cocher, ajout rapide,
+  couleur de projet tirée de l'identifiant ; piège du rôle « Lecteur » à l'invitation. Statut :
+  **proposé** (4 nov. 2026).

@@ -49,6 +49,9 @@ import { WorkOverviewController } from './work-overview.controller.js';
 import { WorkOverviewService } from './work-overview.service.js';
 import { WorkProjectsController } from './work-projects.controller.js';
 import { WorkProjectsService } from './work-projects.service.js';
+// ADR-0058 : accueil des projets (portefeuille).
+import { WorkPortfolioController } from './work-portfolio.controller.js';
+import { WorkPortfolioService } from './work-portfolio.service.js';
 import { WorkDueRemindersJob } from './work-reminders.job.js';
 import { WorkSettingsController } from './work-settings.controller.js';
 import { WorkSettingsService } from './work-settings.service.js';
@@ -114,6 +117,8 @@ import {
     WorkTimesheetsController,
     // ADR-0057 : aperçu d'un projet (santé, avancement, charge, jalons).
     WorkOverviewController,
+    // ADR-0058 : accueil des projets (portefeuille), lecture.
+    WorkPortfolioController,
   ],
   providers: [
     WorkMembersService,
@@ -141,6 +146,7 @@ import {
     { provide: ASSETS_AGENDA_SOURCE, useExisting: AssetsAgendaSource },
     WorkTimesheetsService,
     WorkOverviewService,
+    WorkPortfolioService,
   ],
   exports: [
     MongooseModule,

@@ -11,3 +11,5 @@ export * from './views.js';
 export * from './timesheets.js';
 // ADR-0057 : aperçu d'un projet (santé, avancement, charge, jalons).
 export * from './overview.js';
+// ADR-0058 : accueil des projets (portefeuille), santé et chiffres.
+export * from './portfolio.js';

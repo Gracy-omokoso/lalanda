@@ -37,6 +37,7 @@ import { bandeauxAbsence } from './absences-model';
 import { appliquerCorps } from './calendar-model';
 import { CalendrierTaches, type TacheCalendrierUI } from './calendar-vue';
 import { Alerte, BOUTON_PETIT } from './elements';
+import { OngletsMesTaches } from './equipe-elements';
 import {
   PASTILLE_APPROBATION,
   PASTILLE_RELANCE,
@@ -59,13 +60,7 @@ import {
   sousTitreRelance,
   titreElementRh,
 } from './mes-taches-model';
-import {
-  MES_TACHES_HREF,
-  aujourdhui,
-  hrefTache,
-  messageWork,
-  peutTravailler,
-} from './projets-model';
+import { PROJETS_BASE, aujourdhui, hrefTache, messageWork, peutTravailler } from './projets-model';
 import { messagesAvertissements } from './taches-model';
 
 /** Élément du calendrier : la forme lue par la vue, et l'élément d'origine. */
@@ -248,14 +243,15 @@ export function CalendrierMesTaches(): React.ReactElement {
       <PageHeader
         module="run"
         moduleLabel="Exploiter · Projets"
-        title="Mes tâches — calendrier"
+        title="Mes tâches"
         description="Vos tâches non terminées, tous projets confondus, posées sur leur échéance."
         actions={
-          <Link href={MES_TACHES_HREF} className={buttonClasses('secondary', 'md')}>
-            Vue liste
+          <Link href={PROJETS_BASE} className={buttonClasses('secondary', 'md')}>
+            Tous les projets
           </Link>
         }
       />
+      <OngletsMesTaches actif="calendrier" />
       {erreur ? (
         <Alerte
           action={

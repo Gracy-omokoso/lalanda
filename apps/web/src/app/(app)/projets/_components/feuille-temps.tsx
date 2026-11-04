@@ -18,7 +18,8 @@ import { workApi, type WorkMemberOption } from '@/lib/work-api';
 import { useShell } from '../../_components/shell-context';
 
 import { Alerte, BOUTON_PETIT } from './elements';
-import { MES_TACHES_HREF, messageWork, peutLire } from './projets-model';
+import { OngletsMesTaches } from './equipe-elements';
+import { PROJETS_BASE, messageWork, peutLire } from './projets-model';
 import {
   aPresence,
   enteteJour,
@@ -84,14 +85,15 @@ export function FeuilleTemps(): React.ReactElement {
       <PageHeader
         module="run"
         moduleLabel="Exploiter · Projets"
-        title="Feuille de temps"
+        title="Mes tâches"
         description="Votre semaine en lecture : le temps saisi sur les tâches, les absences accordées et les jours fériés. Rien ne se saisit ni ne se valide ici."
         actions={
-          <Link href={MES_TACHES_HREF} className={buttonClasses('secondary', 'md')}>
-            Mes tâches
+          <Link href={PROJETS_BASE} className={buttonClasses('secondary', 'md')}>
+            Tous les projets
           </Link>
         }
       />
+      <OngletsMesTaches actif="temps" />
       {chargees && !lecture ? (
         <p className="text-sm text-[var(--foreground-muted)]">
           Les projets ne sont pas ouverts à votre rôle.
