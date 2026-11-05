@@ -285,5 +285,5 @@ function csvField(v: string): string {
 /** Modèle .csv : « ; », UTF-8 avec BOM, fins de ligne CRLF. */
 export function buildImportTemplateCsv(): Buffer {
   const lines = [HEADERS, ...IMPORT_EXAMPLE].map((r) => r.map(csvField).join(';'));
-  return Buffer.from(`﻿${lines.join('\r\n')}\r\n`, 'utf8');
+  return Buffer.from(`\uFEFF${lines.join('\r\n')}\r\n`, 'utf8');
 }

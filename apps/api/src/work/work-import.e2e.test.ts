@@ -12,7 +12,7 @@ import { e2eSuite } from '../__tests__/e2e-utils.js';
 import { useWorkFixture } from '../__tests__/work-e2e-fixtures.js';
 import { WorkTasksService } from './work-tasks.service.js';
 
-const csv = (lines: string[]) => Buffer.from(`﻿${lines.join('\r\n')}\r\n`, 'utf8');
+const csv = (lines: string[]) => Buffer.from(`\uFEFF${lines.join('\r\n')}\r\n`, 'utf8');
 
 e2eSuite('import d’un fichier de tâches (ADR-0062)', () => {
   const f = useWorkFixture('wimport');

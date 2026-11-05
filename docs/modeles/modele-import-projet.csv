@@ -1,0 +1,12 @@
+﻿Section;Tâche;Description;Responsable (e-mail);Début;Échéance;Priorité;Jalon;Dépend de;Étiquettes;Sous-tâche de;Estimation (heures)
+Préparation;"Étudier les emplacements (Gombe, Limete, Ngaliema)";"Repérer 3 emplacements, comparer loyers et passage";;02/11/2026;13/11/2026;Haute;Non;;Étude;;16
+Préparation;Établir le budget d’ouverture;"Loyer, travaux, stock initial, caution";;09/11/2026;20/11/2026;Haute;Non;2;Finances;;8
+Préparation;Bail signé;;;;27/11/2026;Urgente;Oui;"2, 3";Juridique;;
+Aménagement;Aménager la boutique;"Peinture, électricité, rayonnages, enseigne";;30/11/2026;18/12/2026;Moyenne;Non;4;Travaux;;40
+Aménagement;Installer l’électricité et le groupe électrogène;;;30/11/2026;05/12/2026;Haute;Non;;Travaux;5;12
+Aménagement;Poser les rayonnages et la caisse;;;07/12/2026;12/12/2026;Moyenne;Non;;Travaux;5;10
+Approvisionnement;Commander le stock initial;"Fournisseurs de Kinshasa ; délais de livraison à confirmer";;23/11/2026;11/12/2026;Haute;Non;3;Achats;;12
+Approvisionnement;Réceptionner et étiqueter le stock;;;14/12/2026;19/12/2026;Moyenne;Non;8;Achats;;16
+Lancement;"Ouvrir les paiements Mobile Money (M-Pesa, Orange Money)";;;23/11/2026;04/12/2026;Moyenne;Non;;Finances;;3
+Lancement;"Préparer la campagne d’ouverture (WhatsApp, Facebook)";;;07/12/2026;19/12/2026;Moyenne;Non;;Marketing;;12
+Lancement;Ouverture de la boutique;;;;21/12/2026;Haute;Oui;"5, 9, 11";;;
