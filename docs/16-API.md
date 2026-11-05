@@ -989,6 +989,44 @@ ou paramètre en trop : `400`. Lecture seule ; aucune donnée d'une autre organi
 `work/work-portfolio.e2e.test.ts`, qui couvre aussi le parcours inviter → accepter → assigner →
 Mes tâches → notification).
 
+## Équipes, membres d'un projet et visibilité — implémenté, ADR-0060
+
+| Route | Droit | Effet |
+|---|---|---|
+| `GET /hr/teams` · `GET /hr/teams/:teamId` | `hr.read` (+ fonction `hr`) | `TeamView` : `id`, `name`, `description`, `lead`, `members[]` (`userId`, `name`), `memberCount`, `projectCount`, `revision` |
+| `GET /hr/teams/candidates` | `hr.read` | membres de l'organisation proposés (`userId`, `name` ; ni e-mail ni rôle) |
+| `POST /hr/teams` · `PUT /hr/teams/:teamId` | `hr.manage` | `CreateTeamBody` / `UpdateTeamBody` (`@lalanda/shared/hr`, `teams.ts`) ; nom unique `409 HR_TEAM_NAME_EXISTS` ; utilisateur hors organisation `404 MEMBER_NOT_FOUND` |
+| `POST /hr/teams/:teamId/members` · `DELETE /hr/teams/:teamId/members/:userId` · `DELETE /hr/teams/:teamId` | `hr.manage` | membres (≤ 200), suppression (`204`) |
+| `GET /work/teams` | `work.read` (+ `run_work`) | `{ items: WorkTeamRef[] }` (`teamId`, `name`, `memberCount`) |
+| `GET /work/projects/:projectId/members` | `work.read` | `WorkProjectMembersView` : `visibility`, `owner`, `users[]` (`canUpdate`), `teams[]` (membres courants), `memberCount`, `canManage` |
+| `POST /work/projects/:projectId/members` | `work.manage` | `AddProjectMembersBody` `{ userIds?, teamIds? }` ; `400 WORK_MEMBER_NOT_ELIGIBLE` (sans `work.read`), `404 HR_TEAM_NOT_FOUND`, `409 WORK_PROJECT_MEMBER_LIMIT` / `WORK_PROJECT_TEAM_LIMIT` |
+| `DELETE /work/projects/:projectId/members/users/:userId` · `…/teams/:teamId` | `work.manage` | retrait ; `404 WORK_MEMBER_NOT_FOUND` |
+
+`POST /work/projects` et `PUT /work/projects/:projectId` acceptent `visibility`
+(`organization` · `private`) ; `WorkProjectView.visibility` et `WorkPortfolioProject.visibility`
+la rendent. **Visibilité** : sur toute route du module, une ressource d'un projet privé hors
+portée répond `404` (garde `WorkVisibilityGuard` sur `projectId`, `taskId`, `commentId`,
+`attachmentId`, `entryId` du chemin et `projectId`, `taskId` de la requête) ; les listes
+(`/work/projects`, `/work/portfolio`, `/work/tasks`, `/work/my-tasks`, `/work/time-entries`,
+`/work/timesheets`, `/notifications`, `/notifications/unread-count`, `/morning-brief`) l'excluent.
+
+## Paramètres des Projets — implémenté, ADR-0061
+
+| Route | Droit | Effet |
+|---|---|---|
+| `GET /work/notification-preferences` | `work.read` | `WorkNotificationPreferencesView` de l'appelant : `events.<événement>` `{ bell, email }` (8 événements), `digest` `{ enabled, hour, workingDaysOnly }`, `revision` (0 : défauts) |
+| `PUT /work/notification-preferences` | `work.read` | `PutWorkNotificationPreferencesBody` (strict, révision attendue, `409 STALE_REVISION`) |
+| `GET` · `PUT /work/settings` | `work.read` · `work.manage` | **champs ajoutés, facultatifs à l'écriture** : `projectCreatorRoles` (`null` ou rôles détenant `work.manage`, sinon `400 WORK_CREATOR_ROLE_INVALID`), `defaultVisibility`, `defaultView` (`overview` · `list` · `board`), `workingDays` (1 = lundi … 7), `autoArchiveCompletedDays` (1–365 ou `null`), `managersModerateComments`, `showTaskNumbers` |
+
+Effets : `POST /work/projects` (et depuis un devis ou une opportunité) → `403
+WORK_PROJECT_CREATION_RESTRICTED` hors des rôles listés (la direction crée toujours) ; commentaire
+d'autrui modifié ou supprimé par un gestionnaire seulement si `managersModerateComments`. Tâches :
+`color` (`yellow` · `orange` · `pink` · `purple` · `blue` · `teal` · `green` · `gray` · `null`) dans
+`POST /work/projects/:projectId/tasks` et `PATCH /work/tasks/:taskId`, rendu par `WorkTaskView.color`.
+Types de notification ajoutés : `work.task_status_changed`, `work.added_to_project`,
+`work.project_at_risk`. Tâches récurrentes : `work.project-watch` (horaire), `work.daily-digest`
+(15 min).
+
 ## Brief du matin — implémenté (ADR-0033)
 
 L'organisation est toujours celle de la session ; aucun corps ni paramètre ne la désigne.
