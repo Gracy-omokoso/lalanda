@@ -35,6 +35,7 @@ import { MorningBriefService } from '../morning-brief/morning-brief.service.js';
 import { AiActionsController } from './ai-actions.controller.js';
 import { LalaVocalController } from './lala-vocal.controller.js';
 import { LalaController } from './lala.controller.js';
+import { WorkAiPlanController } from '../work/work-ai-plan.controller.js';
 
 const SRC = fileURLToPath(new URL('..', import.meta.url));
 const AI_DIR = fileURLToPath(new URL('.', import.meta.url));
@@ -68,6 +69,11 @@ const FICHIERS_QUI_PARLENT_AU_MODELE = [
   'idea-lab/idea-lab.module.ts',
   'morning-brief/morning-brief-ai.service.ts',
   'morning-brief/morning-brief.module.ts',
+  // ADR-0063 : « Construire avec l'IA ». Le contexte ne porte que le formulaire et des
+  // références `m1, m2…` avec des prénoms (ni identifiant, ni e-mail, ni chiffre).
+  'work/work-ai-plan.service.ts',
+  'work/work-ai-plan.simulated.ts',
+  'work/work.module.ts',
 ].sort();
 
 type Controleur = { prototype: object; name: string };
@@ -81,6 +87,7 @@ const ROUTES_DU_MODELE: { ctrl: Controleur; methode: string; actions: Action[] }
   { ctrl: MorningBriefController, methode: 'explanation', actions: ['analytics.read'] },
   { ctrl: BusinessPlanController, methode: 'draft', actions: ['canvas.update'] },
   { ctrl: IdeaLabController, methode: 'assist', actions: ['canvas.update'] },
+  { ctrl: WorkAiPlanController, methode: 'propose', actions: ['work.manage'] },
 ];
 
 describe('contextes servis au modèle (ADR-0040 § 4.4)', () => {
