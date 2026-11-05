@@ -8,7 +8,10 @@ import {
   corpsPreferences,
   createurs,
   libelleHeure,
+  libelleEtatSlack,
   ongletParametres,
+  ongletsVisibles,
+  retourSlack,
   toutLeCanal,
 } from './parametres-model';
 
@@ -40,7 +43,7 @@ describe('paramètres des Projets (ADR-0061)', () => {
   it('mes notifications : bascule et corps', () => {
     const p = defaultWorkNotificationPreferences();
     const q = basculerCanal(p, 'mentioned', 'email');
-    expect(q.events.mentioned).toEqual({ bell: true, email: false });
+    expect(q.events.mentioned).toEqual({ bell: true, email: false, slack: true });
     expect(p.events.mentioned.email).toBe(true); // immuable
     const sans = toutLeCanal(p, 'email', false);
     expect(Object.values(sans.events).every((c) => !c.email && c.bell)).toBe(true);
@@ -50,6 +53,26 @@ describe('paramètres des Projets (ADR-0061)', () => {
       digest: q.digest,
     });
     expect(libelleHeure(7)).toBe('07 h 00');
+  });
+
+  it('Slack (ADR-0064) : onglet réservé à la direction, colonne Slack, retours OAuth', () => {
+    expect(ongletParametres('slack', true, false)).toBe('notifications');
+    expect(ongletParametres('slack', false, true)).toBe('slack');
+    expect(ongletsVisibles(true, false).map((o) => o.id)).toEqual([
+      'notifications',
+      'comportement',
+    ]);
+    expect(ongletsVisibles(false, true).map((o) => o.id)).toEqual(['notifications', 'slack']);
+    const p = defaultWorkNotificationPreferences();
+    expect(p.events.task_assigned.slack).toBe(true);
+    expect(p.events.task_overdue.slack).toBe(false);
+    expect(basculerCanal(p, 'task_overdue', 'slack').events.task_overdue.slack).toBe(true);
+    expect(Object.values(toutLeCanal(p, 'slack', false).events).every((c) => !c.slack)).toBe(true);
+    expect(retourSlack(null)).toBeNull();
+    expect(retourSlack('connecte')?.ton).toBe('succes');
+    expect(retourSlack('erreur-session')?.message).toContain('même session');
+    expect(retourSlack('n-importe-quoi')?.ton).toBe('erreur');
+    expect(libelleEtatSlack('reconnect_required')).toBe('À reconnecter');
   });
 
   it('comportement : les réglages existants sont repris tels quels', () => {

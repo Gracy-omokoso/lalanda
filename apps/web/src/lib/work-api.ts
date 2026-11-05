@@ -42,6 +42,12 @@ import type {
   WorkNotificationPreferencesView,
   WorkProjectMembersView,
   WorkTeamRef,
+  // ADR-0064 : notifications par Slack.
+  PutWorkProjectSlackChannelBody,
+  SlackChannelOption,
+  SlackConnectStart,
+  SlackConnectionView,
+  WorkProjectSlackChannelView,
 } from '@lalanda/shared/work';
 
 import { API_URL, jsonRequest, salesQuery } from './api';
@@ -337,4 +343,22 @@ export const workApi = {
       method: 'PUT',
       body,
     }),
+
+  // ── ADR-0064 : notifications par Slack ──────────────────────────────────
+  getSlack: () => jsonRequest<SlackConnectionView>('/work/slack', { method: 'GET' }),
+  connectSlack: () =>
+    jsonRequest<SlackConnectStart>('/work/slack/connect', { method: 'POST', body: {} }),
+  disconnectSlack: () => jsonRequest<SlackConnectionView>('/work/slack', { method: 'DELETE' }),
+  listSlackChannels: () =>
+    jsonRequest<{ items: SlackChannelOption[] }>('/work/slack/channels', { method: 'GET' }),
+  getProjectSlackChannel: (projectId: string) =>
+    jsonRequest<WorkProjectSlackChannelView>(
+      `/work/projects/${encodeURIComponent(projectId)}/slack-channel`,
+      { method: 'GET' },
+    ),
+  putProjectSlackChannel: (projectId: string, body: PutWorkProjectSlackChannelBody) =>
+    jsonRequest<WorkProjectSlackChannelView>(
+      `/work/projects/${encodeURIComponent(projectId)}/slack-channel`,
+      { method: 'PUT', body },
+    ),
 };

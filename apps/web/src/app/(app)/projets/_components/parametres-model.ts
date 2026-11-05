@@ -17,18 +17,96 @@ import {
 export const ONGLETS_PARAMETRES = [
   { id: 'notifications', label: 'Mes notifications' },
   { id: 'comportement', label: 'Comportement des projets' },
+  // ADR-0064 : connexion de l'espace Slack (`organization.manage`).
+  { id: 'slack', label: 'Slack' },
 ] as const;
 export type OngletParametres = (typeof ONGLETS_PARAMETRES)[number]['id'];
 
-export function ongletParametres(v: string | null, gerer: boolean): OngletParametres {
-  return v === 'comportement' && gerer ? 'comportement' : 'notifications';
+/** Canaux réglables d'un événement. */
+export type CanalNotification = 'bell' | 'email' | 'slack';
+
+export function ongletParametres(
+  v: string | null,
+  gerer: boolean,
+  diriger = false,
+): OngletParametres {
+  if (v === 'comportement' && gerer) return 'comportement';
+  if (v === 'slack' && diriger) return 'slack';
+  return 'notifications';
 }
 
-/** Bascule un canal (cloche ou e-mail) d'un événement. */
+/** Onglets visibles : « Comportement » pour `work.manage`, « Slack » pour `organization.manage`. */
+export function ongletsVisibles(
+  gerer: boolean,
+  diriger: boolean,
+): (typeof ONGLETS_PARAMETRES)[number][] {
+  return ONGLETS_PARAMETRES.filter(
+    (o) =>
+      o.id === 'notifications' ||
+      (o.id === 'comportement' && gerer) ||
+      (o.id === 'slack' && diriger),
+  );
+}
+
+/**
+ * Retour de l'aller-retour Slack (`?slack=…` posé par l'API) : message affiché et ton.
+ * `null` si le paramètre est absent ou inconnu (rien à dire).
+ */
+export function retourSlack(
+  v: string | null,
+): { ton: 'succes' | 'info' | 'erreur'; message: string } | null {
+  switch (v) {
+    case null:
+      return null;
+    case 'connecte':
+      return { ton: 'succes', message: 'Espace Slack connecté. Les notifications peuvent partir.' };
+    case 'annule':
+      return { ton: 'info', message: 'Connexion annulée dans Slack : rien n’a changé.' };
+    case 'erreur-etat':
+      return {
+        ton: 'erreur',
+        message: 'Le lien de connexion a expiré ou n’est pas valide. Recommencez depuis cet écran.',
+      };
+    case 'erreur-session':
+      return {
+        ton: 'erreur',
+        message:
+          'La connexion doit être terminée par la personne qui l’a lancée, dans la même session.',
+      };
+    case 'erreur-droit':
+      return {
+        ton: 'erreur',
+        message: 'Seuls le Propriétaire et l’Administrateur peuvent connecter Slack.',
+      };
+    case 'erreur-indisponible':
+      return { ton: 'erreur', message: 'Slack n’est pas encore disponible sur Lalanda.' };
+    default:
+      return {
+        ton: 'erreur',
+        message: 'Slack n’a pas confirmé la connexion. Réessayez dans quelques instants.',
+      };
+  }
+}
+
+/** Libellé de l'état d'une connexion. */
+export function libelleEtatSlack(status: string | null): string {
+  switch (status) {
+    case 'active':
+      return 'Connecté';
+    case 'reconnect_required':
+      return 'À reconnecter';
+    case 'uninstalled':
+      return 'Application retirée de Slack — à reconnecter';
+    default:
+      return 'Non connecté';
+  }
+}
+
+/** Bascule un canal (cloche, e-mail ou Slack) d'un événement. */
 export function basculerCanal(
   p: WorkNotificationPreferences,
   event: WorkNotificationEvent,
-  canal: 'bell' | 'email',
+  canal: CanalNotification,
 ): WorkNotificationPreferences {
   return {
     ...p,
@@ -39,7 +117,7 @@ export function basculerCanal(
 /** Tout couper ou tout rétablir sur un canal. */
 export function toutLeCanal(
   p: WorkNotificationPreferences,
-  canal: 'bell' | 'email',
+  canal: CanalNotification,
   valeur: boolean,
 ): WorkNotificationPreferences {
   const events = { ...p.events };

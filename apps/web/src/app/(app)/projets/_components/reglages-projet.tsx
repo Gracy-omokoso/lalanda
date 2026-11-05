@@ -23,6 +23,7 @@ import { useState } from 'react';
 
 import { workApi } from '@/lib/work-api';
 
+import { CanalSlack } from './canal-slack';
 import { Alerte, BOUTON_DANGER, BOUTON_PETIT, CHAMP, Champ } from './elements';
 import { useProjet } from './project-context';
 import {
@@ -59,6 +60,8 @@ export function ReglagesProjet(): React.ReactElement {
   return (
     <div className="flex min-w-0 flex-col gap-8">
       <InfosProjet />
+      {/* ADR-0064 : canal Slack du projet. */}
+      <CanalSlack projectId={project.id} />
       <Colonnes />
       <Etiquettes />
       <CycleDeVie />

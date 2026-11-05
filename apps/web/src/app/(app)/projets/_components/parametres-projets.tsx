@@ -7,18 +7,22 @@
 // visibilité et vue par défaut, jours ouvrés, « échéance proche », archivage
 // automatique, modération des commentaires, numéros de tâche. Les colonnes de départ
 // et les étiquettes restent dans « Réglages » d'un projet (même document serveur).
+// « Slack » (`organization.manage`, ADR-0064) : connecter l'espace Slack de
+// l'organisation ; la colonne Slack de « Mes notifications » n'apparaît qu'une fois
+// l'organisation connectée.
 
 import {
   WORK_NOTIFICATION_EVENTS,
   WORK_NOTIFICATION_EVENT_LABELS,
+  type SlackConnectionView,
   type WorkDefaultView,
   type WorkNotificationPreferencesView,
   type WorkProjectVisibility,
   type WorkSettingsView,
   type WorkWeekday,
 } from '@lalanda/shared/work';
-import { PageHeader, Skeleton, TabsNav, buttonClasses } from '@lalanda/ui';
-import { Bell, Mail } from 'lucide-react';
+import { PageHeader, Skeleton, StatusPill, TabsNav, buttonClasses } from '@lalanda/ui';
+import { Bell, Mail, MessageSquare } from 'lucide-react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useId, useState } from 'react';
 
@@ -32,15 +36,17 @@ import { Alerte } from './elements';
 import {
   HEURES_RESUME,
   JOURS,
-  ONGLETS_PARAMETRES,
   ROLES_CREATEURS,
   basculerCanal,
   basculerJour,
   corpsComportement,
   corpsPreferences,
   createurs,
+  libelleEtatSlack,
   libelleHeure,
   ongletParametres,
+  ongletsVisibles,
+  retourSlack,
   toutLeCanal,
 } from './parametres-model';
 import { messageWork } from './projets-model';
@@ -104,12 +110,18 @@ function MesNotifications(): React.ReactElement {
   const [vue, setVue] = useState<WorkNotificationPreferencesView | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [enregistre, setEnregistre] = useState(false);
+  // ADR-0064 : la colonne Slack n'apparaît que si l'organisation est connectée.
+  const [slack, setSlack] = useState(false);
 
   useEffect(() => {
     workApi
       .getNotificationPreferences()
       .then(setVue)
       .catch((err: unknown) => setErreur(messageWork(err, 'Vos préférences sont illisibles.')));
+    workApi
+      .getSlack()
+      .then((v) => setSlack(v.connected))
+      .catch(() => setSlack(false));
   }, []);
 
   async function enregistrer(next: WorkNotificationPreferencesView): Promise<void> {
@@ -137,7 +149,11 @@ function MesNotifications(): React.ReactElement {
     <div className="flex flex-col gap-4">
       <Carte
         titre="Événements"
-        description="Choisissez, pour chaque événement, la cloche de Lalanda et/ou un e-mail. Vous n’êtes jamais notifié de vos propres gestes."
+        description={
+          slack
+            ? 'Choisissez, pour chaque événement, la cloche de Lalanda, un e-mail et/ou un message privé Slack. Vous n’êtes jamais notifié de vos propres gestes.'
+            : 'Choisissez, pour chaque événement, la cloche de Lalanda et/ou un e-mail. Vous n’êtes jamais notifié de vos propres gestes.'
+        }
       >
         <table className="w-full text-sm">
           <thead>
@@ -157,6 +173,14 @@ function MesNotifications(): React.ReactElement {
                   E-mail
                 </span>
               </th>
+              {slack ? (
+                <th scope="col" className="w-20 py-2 text-center font-medium">
+                  <span className="inline-flex items-center gap-1">
+                    <MessageSquare aria-hidden="true" className="h-3.5 w-3.5" />
+                    Slack
+                  </span>
+                </th>
+              ) : null}
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--border)]">
@@ -181,6 +205,18 @@ function MesNotifications(): React.ReactElement {
                     onChange={() => void enregistrer({ ...vue, ...basculerCanal(vue, e, 'email') })}
                   />
                 </td>
+                {slack ? (
+                  <td className="text-center">
+                    <Interrupteur
+                      id={`${id}-${e}-s`}
+                      coche={vue.events[e].slack}
+                      libelle={`Slack : ${WORK_NOTIFICATION_EVENT_LABELS[e]}`}
+                      onChange={() =>
+                        void enregistrer({ ...vue, ...basculerCanal(vue, e, 'slack') })
+                      }
+                    />
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>
@@ -200,6 +236,15 @@ function MesNotifications(): React.ReactElement {
           >
             Cloche partout
           </button>
+          {slack ? (
+            <button
+              type="button"
+              className={buttonClasses('secondary', 'sm')}
+              onClick={() => void enregistrer({ ...vue, ...toutLeCanal(vue, 'slack', false) })}
+            >
+              Couper tous les messages Slack
+            </button>
+          ) : null}
         </div>
       </Carte>
 
@@ -489,13 +534,189 @@ function Comportement(): React.ReactElement {
   );
 }
 
+/** ADR-0064 : connexion de l'espace Slack de l'organisation (`organization.manage`). */
+function OngletSlack({ retour }: { retour: string | null }): React.ReactElement {
+  const [vue, setVue] = useState<SlackConnectionView | null>(null);
+  const [erreur, setErreur] = useState<string | null>(null);
+  const [occupe, setOccupe] = useState(false);
+  const message = retourSlack(retour);
+
+  useEffect(() => {
+    workApi
+      .getSlack()
+      .then(setVue)
+      .catch((err: unknown) => setErreur(messageWork(err, 'L’état de Slack est illisible.')));
+  }, []);
+
+  async function connecter(): Promise<void> {
+    setErreur(null);
+    setOccupe(true);
+    try {
+      const { authorizeUrl } = await workApi.connectSlack();
+      window.location.assign(authorizeUrl);
+    } catch (err) {
+      setErreur(messageWork(err, 'Connexion à Slack impossible pour le moment.'));
+      setOccupe(false);
+    }
+  }
+
+  async function deconnecter(): Promise<void> {
+    if (
+      !window.confirm(
+        'Déconnecter Slack ? Plus aucune notification ne partira vers Slack, et l’accès de l’application sera révoqué.',
+      )
+    ) {
+      return;
+    }
+    setErreur(null);
+    setOccupe(true);
+    try {
+      setVue(await workApi.disconnectSlack());
+    } catch (err) {
+      setErreur(messageWork(err, 'Déconnexion impossible.'));
+    } finally {
+      setOccupe(false);
+    }
+  }
+
+  if (vue === null)
+    return erreur ? (
+      <Alerte>
+        <p>{erreur}</p>
+      </Alerte>
+    ) : (
+      <Skeleton className="h-48 w-full" />
+    );
+
+  const aReconnecter = vue.status === 'reconnect_required' || vue.status === 'uninstalled';
+
+  return (
+    <div className="flex flex-col gap-4">
+      {message ? (
+        message.ton === 'erreur' ? (
+          <Alerte>
+            <p>{message.message}</p>
+          </Alerte>
+        ) : (
+          <p
+            role="status"
+            className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--accent-soft)] p-3 text-sm"
+          >
+            {message.message}
+          </p>
+        )
+      ) : null}
+      <Carte
+        titre="Espace Slack de l’organisation"
+        description="Chaque membre reçoit ses notifications des Projets en message privé du bot « Lalanda », selon ses préférences. Un projet peut aussi publier dans un canal. Seule votre organisation utilise cette connexion."
+      >
+        {!vue.connected ? (
+          <div className="flex flex-col items-start gap-3 text-sm">
+            <StatusPill tone="draft">Non connecté</StatusPill>
+            {vue.available ? (
+              <p className="text-[var(--foreground-muted)]">
+                Vous serez redirigé vers Slack pour choisir l’espace et autoriser l’application
+                Lalanda, puis ramené ici.
+              </p>
+            ) : (
+              <p className="text-[var(--foreground-muted)]">
+                Slack n’est pas encore disponible sur Lalanda : l’application Slack de la plateforme
+                n’est pas configurée. Rien ne change pour vos notifications (cloche et e-mail).
+              </p>
+            )}
+            <button
+              type="button"
+              className={buttonClasses('primary', 'sm')}
+              disabled={!vue.available || occupe}
+              onClick={() => void connecter()}
+            >
+              Connecter Slack
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusPill tone={aReconnecter ? 'late' : 'ok'}>
+                {libelleEtatSlack(vue.status)}
+              </StatusPill>
+              <span className="font-medium">{vue.teamName}</span>
+            </div>
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+              <dt className="text-[var(--foreground-muted)]">Connecté par</dt>
+              <dd>{vue.connectedBy?.name ?? '—'}</dd>
+              <dt className="text-[var(--foreground-muted)]">Le</dt>
+              <dd>
+                {vue.connectedAt
+                  ? new Date(vue.connectedAt).toLocaleString('fr-FR', {
+                      dateStyle: 'long',
+                      timeStyle: 'short',
+                    })
+                  : '—'}
+              </dd>
+              {vue.stats ? (
+                <>
+                  <dt className="text-[var(--foreground-muted)]">Envois</dt>
+                  <dd>
+                    {vue.stats.sent} remis · {vue.stats.unmatched} introuvable
+                    {vue.stats.unmatched > 1 ? 's' : ''} dans Slack · {vue.stats.failed} échec
+                    {vue.stats.failed > 1 ? 's' : ''}
+                  </dd>
+                </>
+              ) : null}
+            </dl>
+            {aReconnecter ? (
+              <p className="text-[var(--foreground-muted)]">
+                Slack a retiré l’accès de l’application : plus aucun message ne part. Reconnectez
+                l’espace pour reprendre les envois.
+              </p>
+            ) : (
+              <p className="text-xs text-[var(--foreground-muted)]">
+                Un membre est retrouvé dans Slack par son adresse e-mail Lalanda ; s’il n’y figure
+                pas, rien ne lui est envoyé.
+              </p>
+            )}
+            {vue.canManage ? (
+              <div className="flex flex-wrap gap-2">
+                {aReconnecter ? (
+                  <button
+                    type="button"
+                    className={buttonClasses('primary', 'sm')}
+                    disabled={!vue.available || occupe}
+                    onClick={() => void connecter()}
+                  >
+                    Reconnecter Slack
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className={buttonClasses('secondary', 'sm')}
+                  disabled={occupe}
+                  onClick={() => void deconnecter()}
+                >
+                  Déconnecter
+                </button>
+              </div>
+            ) : null}
+          </div>
+        )}
+      </Carte>
+      {erreur ? (
+        <Alerte>
+          <p>{erreur}</p>
+        </Alerte>
+      ) : null}
+    </div>
+  );
+}
+
 export function ParametresProjets(): React.ReactElement {
   const { actions } = useShell();
   const pathname = usePathname();
   const params = useSearchParams();
   const gerer = actions !== null && actions.includes('work.manage');
-  const onglet = ongletParametres(params.get('onglet'), gerer);
-  const onglets = ONGLETS_PARAMETRES.filter((o) => o.id === 'notifications' || gerer);
+  const diriger = actions !== null && actions.includes('organization.manage');
+  const onglet = ongletParametres(params.get('onglet'), gerer, diriger);
+  const onglets = ongletsVisibles(gerer, diriger);
 
   return (
     <section className="flex flex-col gap-5">
@@ -503,7 +724,7 @@ export function ParametresProjets(): React.ReactElement {
         module="run"
         moduleLabel="Projets"
         title="Paramètres"
-        description="Vos notifications, et le comportement des projets de l’organisation."
+        description="Vos notifications, le comportement des projets et la connexion Slack de l’organisation."
       />
       <TabsNav
         label="Paramètres des Projets"
@@ -514,7 +735,13 @@ export function ParametresProjets(): React.ReactElement {
         }))}
         renderLink={renderNextLink}
       />
-      {onglet === 'comportement' ? <Comportement /> : <MesNotifications />}
+      {onglet === 'comportement' ? (
+        <Comportement />
+      ) : onglet === 'slack' ? (
+        <OngletSlack retour={params.get('slack')} />
+      ) : (
+        <MesNotifications />
+      )}
     </section>
   );
 }

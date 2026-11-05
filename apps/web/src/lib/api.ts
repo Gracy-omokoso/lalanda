@@ -1827,7 +1827,16 @@ export interface IntegrationSecretView {
 }
 
 export interface IntegrationView {
-  provider: 'openai' | 'stripe' | 'paypal' | 'smtp' | 'r2' | 'elevenlabs' | 'zeptomail';
+  provider:
+    | 'openai'
+    | 'stripe'
+    | 'paypal'
+    | 'smtp'
+    | 'r2'
+    | 'elevenlabs'
+    | 'zeptomail'
+    // ADR-0064 : application Slack de la plateforme.
+    | 'slack';
   label: string;
   enabled: boolean;
   config: Record<string, string | number | boolean>;

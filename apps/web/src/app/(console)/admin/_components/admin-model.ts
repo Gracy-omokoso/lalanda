@@ -289,6 +289,8 @@ const LIBELLES_CHAMPS: Record<string, string> = {
   bucketSnapshots: 'Bucket des instantanés',
   bucketUploads: 'Bucket des téléversements',
   forcePathStyle: 'Forcer le style de chemin',
+  // Slack (ADR-0064) — `clientId` et `clientSecret` reprennent les libellés PayPal.
+  signingSecret: 'Secret de signature (Signing Secret)',
 };
 
 export function libelleChamp(nom: string): string {
@@ -325,6 +327,14 @@ const AIDES_CHAMPS: Partial<Record<IntegrationProvider, Record<string, string>>>
   },
   paypal: {
     clientId: 'Identifiant public de l’application, stocké en clair.',
+  },
+  slack: {
+    clientId:
+      'Client ID de l’application Slack « Lalanda » (api.slack.com › Basic Information) — public, stocké en clair.',
+    clientSecret:
+      'Client Secret de la même page. Sert à l’échange OAuth quand une organisation connecte son espace Slack.',
+    signingSecret:
+      'Signing Secret de la même page : authentifie les événements envoyés par Slack (désinstallation, révocation).',
   },
   smtp: {
     user: 'Identifiant du compte d’envoi, stocké en clair.',
