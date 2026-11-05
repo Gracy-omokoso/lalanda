@@ -306,12 +306,19 @@ describe('visibilité des blocs par rôle (S21a)', () => {
     for (const role of ORG_ROLES) {
       // ADR-0040 § 4.2 : le Commercial n'a pas `project.read` ; ADR-0045 § 4.2 : le
       // Responsable RH non plus ; ADR-0046 § 8.2 : ni le Magasinier ; ADR-0049 § 8.2 : ni
-      // l'Expert-comptable (externe).
+      // l'Expert-comptable (externe) ; ADR-0059 § 2 : ni le Salarié, ni le Manager, ni le
+      // Stagiaire, ni l'Invité externe (projets BUILD : pas de `project.read`).
       expect(blocVisible('projets', role, sansContexte), role).toBe(
-        role !== 'sales_rep' &&
-          role !== 'hr_manager' &&
-          role !== 'storekeeper' &&
-          role !== 'external_accountant',
+        ![
+          'sales_rep',
+          'hr_manager',
+          'storekeeper',
+          'external_accountant',
+          'employee',
+          'team_manager',
+          'intern',
+          'guest',
+        ].includes(role),
       );
     }
   });

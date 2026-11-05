@@ -360,6 +360,38 @@ e2eSuite('invitations (brief §6, docs/12-ROLES-PERMISSIONS.md)', () => {
       expect(moi.body.customized).toBe(true);
     }, 90_000);
 
+    it('ADR-0059 — sans rôle précisé, l’invitation porte le Salarié (`employee`)', async () => {
+      const tag = uniqueTag();
+      const owner = makeUser('a59role', tag);
+      const invitee = makeUser('a59roleinv', tag);
+      const cookies = await registerAndLogin(owner);
+      const inviteeCookies = await registerAndLogin(invitee);
+      const orgId = await getPrimaryOrgId(cookies);
+      const inv = await request(server())
+        .post(`/organizations/${orgId}/invitations`)
+        .set('Cookie', cookies)
+        .send({ email: invitee.email });
+      expect(inv.status, JSON.stringify(inv.body)).toBe(201);
+      expect(inv.body.invitation.role).toBe('employee');
+      const acc = await request(server())
+        .post('/invitations/accept')
+        .set('Cookie', inviteeCookies)
+        .send({ token: inv.body.token });
+      expect(acc.status, JSON.stringify(acc.body)).toBe(201);
+      const moi = await request(server())
+        .get('/me/permissions')
+        .set('Cookie', [...inviteeCookies, `active_org_id=${orgId}`]);
+      expect(moi.body.role).toBe('employee');
+      expect(moi.body.actions).toEqual([
+        'analytics.read',
+        'work.read',
+        'work.update',
+        'leave.request',
+        'expenses.claim',
+        'attendance.clock',
+      ]);
+    }, 90_000);
+
     it('critère 11 — « Lecteur + crm.manage » par un Administrateur : appartenance avec cet écart', async () => {
       process.env['MEMBER_PERMISSIONS_ENABLED'] = 'true';
       const tag = uniqueTag();

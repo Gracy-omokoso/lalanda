@@ -51,6 +51,8 @@ e2eSuite('ADR-0041 A3 — appelants sur les droits effectifs', () => {
   function eteindre(): void {
     process.env['MEMBER_PERMISSIONS_ENABLED'] = 'false';
   }
+  // ADR-0059 : allumé par défaut ; ces tests partent coupés et l'allument explicitement.
+  beforeAll(() => eteindre());
   afterEach(() => eteindre());
   afterAll(() => {
     if (INTERRUPTEUR === undefined) delete process.env['MEMBER_PERMISSIONS_ENABLED'];

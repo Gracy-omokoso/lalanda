@@ -156,25 +156,45 @@ export const RANG_DE_PRIVILEGE: Readonly<Record<OrgRole, number>> = {
   hr_manager: 6,
   // ADR-0046 § 8.2 : le Magasinier au rang 7 ; les suivants glissent d'un cran.
   storekeeper: 7,
-  // ADR-0049 § 8.2 : l'Expert-comptable (externe) au rang 8 ; les suivants glissent d'un cran.
-  external_accountant: 8,
-  project_manager: 9,
-  advisor: 10,
-  viewer: 11,
+  // ADR-0059 § 3 : Manager, Salarié et Stagiaire aux rangs 8 à 10 ; les suivants glissent
+  // de trois crans ; l'Invité externe ferme la marche.
+  team_manager: 8,
+  employee: 9,
+  intern: 10,
+  // ADR-0049 § 8.2 : l'Expert-comptable (externe) au rang 8 (11 depuis ADR-0059).
+  external_accountant: 11,
+  project_manager: 12,
+  advisor: 13,
+  viewer: 14,
+  guest: 15,
 };
+
+/**
+ * ADR-0059 § 4 — rôle proposé à l'invitation : le Salarié. Miroir de
+ * `DEFAULT_INVITATION_ROLE` (`apps/api/src/authz/permissions.ts`).
+ */
+export const ROLE_INVITATION_PAR_DEFAUT: OrgRole = 'employee';
 
 /**
  * Rôle proposé par défaut à l'invitation.
  *
- * `viewer` — le moins puissant — et non le plus utile. Un rôle par défaut
- * généreux se retrouve attribué par inadvertance à chaque invitation expédiée
- * sans lire le formulaire (docs/17 § Autorisation, moindre privilège). À défaut,
- * le moins puissant des rôles proposables, selon le rang.
+ * ADR-0059 § 4 : le **Salarié** (`employee`) quand l'acteur peut l'attribuer — tout le
+ * personnel entre dans Lalanda, et le Salarié ne voit aucune donnée financière (le
+ * Lecteur, ancien défaut, lisait ventes, trésorerie, achats et comptabilité). Un rôle par
+ * défaut généreux se retrouve attribué par inadvertance à chaque invitation expédiée sans
+ * lire le formulaire (docs/17 § Autorisation, moindre privilège) : à défaut du Salarié, le
+ * moins puissant des rôles proposables INTERNES, selon le rang — jamais l'Invité externe,
+ * qu'on choisit sciemment.
  */
 export function roleParDefaut(options: readonly RoleOption[]): OrgRole | null {
   const proposables = rolesProposables(options);
   if (proposables.length === 0) return null;
-  return proposables.reduce((moindre, o) =>
+  if (proposables.some((o) => o.value === ROLE_INVITATION_PAR_DEFAUT)) {
+    return ROLE_INVITATION_PAR_DEFAUT;
+  }
+  const internes = proposables.filter((o) => o.value !== 'guest');
+  const candidats = internes.length > 0 ? internes : proposables;
+  return candidats.reduce((moindre, o) =>
     RANG_DE_PRIVILEGE[o.value] > RANG_DE_PRIVILEGE[moindre.value] ? o : moindre,
   ).value;
 }

@@ -1,13 +1,15 @@
 // Article « Travailler à plusieurs ».
 //
 // Sources vérifiées dans le code au moment de la rédaction :
-//  - rôles et matrice : apps/api/src/authz/permissions.ts (9 rôles org dont le
-//    Commercial d'ADR-0040, 28 actions, libellés FR, R1 dernier propriétaire,
+//  - rôles et matrice : apps/api/src/authz/permissions.ts (16 rôles org dont le
+//    Commercial d'ADR-0040 et, d'ADR-0059, Salarié, Manager / Chef d'équipe, Stagiaire et
+//    Invité externe ; 57 actions, libellés FR, R1 dernier propriétaire,
 //    R2 séparation des tâches, R7 anti-escalade, project_manager NON ATTRIBUABLE)
 //  - trésorerie réservée à `treasury.read` (ADR-0040 § 4.4) : brief du matin et
 //    GROW la masquent au Commercial et au Conseiller
 //  - invitations : apps/api/src/organizations/invitations.controller.ts et
-//    invitations.service.ts (TTL 7 jours, rôle viewer par défaut, correspondance
+//    invitations.service.ts (TTL 7 jours, rôle employee — Salarié — par défaut
+//    depuis ADR-0059, correspondance
 //    d'adresse obligatoire) + apps/web/.../members/_components/invite-panel.tsx
 //  - restrictions par projet : permissions.ts (`allow_project` se comporte comme
 //    `allow`) — AUCUNE collection d'assignation de projet n'existe.
@@ -72,7 +74,7 @@ export const TRAVAILLER_A_PLUSIEURS: ArticleAide = {
             {
               titre: 'Créez l’invitation',
               texte:
-                'Depuis l’espace **Membres**, indiquez l’adresse email de la personne et choisissez son rôle. Le rôle proposé par défaut est **Lecteur**, le moins permissif — c’est volontaire. Vous pouvez ensuite ajuster ses autorisations avec « Personnaliser les autorisations » (voir [plus bas](/aide/travailler-a-plusieurs#personnaliser)).',
+                'Depuis l’espace **Membres**, indiquez l’adresse email de la personne et choisissez son rôle. Le rôle proposé par défaut est **Salarié** : il travaille sur les projets et les tâches, demande ses congés et déclare ses frais, sans voir aucune donnée financière. Vous pouvez ensuite ajuster ses autorisations avec « Personnaliser les autorisations » (voir [plus bas](/aide/travailler-a-plusieurs#personnaliser)).',
             },
             {
               titre: 'Copiez le lien affiché et envoyez-le',
@@ -111,7 +113,7 @@ export const TRAVAILLER_A_PLUSIEURS: ArticleAide = {
         {
           type: 'paragraphe',
           texte:
-            'Huit rôles sont attribuables. Choisissez le moins permissif qui permette à la personne de faire son travail — vous pourrez toujours l’élargir ensuite.',
+            'Choisissez le moins permissif qui permette à la personne de faire son travail — vous pourrez toujours l’élargir ensuite. Pour le personnel, partez du **Salarié**.',
         },
         {
           type: 'tableau',
@@ -154,8 +156,24 @@ export const TRAVAILLER_A_PLUSIEURS: ArticleAide = {
             ],
             [
               '**Lecteur**',
-              'Consultation seule.',
+              'Consultation seule, finances comprises. Ne coche pas de tâche.',
               'Toute personne qui doit seulement être informée.',
+            ],
+            [
+              '**Salarié** (par défaut)',
+              'Voit les projets, **coche ses tâches**, commente, saisit son temps ; demande ses congés, déclare ses frais, pointe. **Ne voit aucune donnée financière** (ni ventes, ni trésorerie, ni achats, ni comptabilité).',
+              'Tout membre du personnel.',
+            ],
+            [
+              '**Manager / Chef d’équipe**',
+              'Comme le Salarié, et **crée, règle et archive les projets**. Ne valide pas encore les congés de son équipe.',
+              'Qui pilote une équipe ou des projets.',
+            ],
+            ['**Stagiaire**', 'Les mêmes droits que le Salarié.', 'Un stagiaire, un apprenti.'],
+            [
+              '**Invité externe**',
+              'Voit et fait avancer les projets et les tâches, **rien d’autre**. Aujourd’hui il voit tous les projets de l’organisation ; la limite à « ses » projets arrive bientôt.',
+              'Un client ou un prestataire extérieur.',
             ],
           ],
           legende:

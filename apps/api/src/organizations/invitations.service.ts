@@ -20,6 +20,7 @@ import {
 } from '../authz/authz.service.js';
 import {
   canGrantRole,
+  DEFAULT_INVITATION_ROLE,
   isAssignableRole,
   normalizeOrgRole,
   validateOverrides,
@@ -105,7 +106,7 @@ export class InvitationsService {
     await this.actorRole(input.invitedBy, input.organizationId);
     const requestedGrants = input.grants ?? [];
     const requestedRevokes = input.revokes ?? [];
-    // Interrupteur éteint : une invitation n'accepte pas d'écart (refus explicite).
+    // Interrupteur coupé (`false` explicite) : une invitation n'accepte pas d'écart.
     assertPermissionsWritable(requestedGrants, requestedRevokes);
     const actorDoc = await this.membershipModel
       .findOne({ userId: input.invitedBy, organizationId: input.organizationId })
@@ -115,8 +116,9 @@ export class InvitationsService {
     const actor = actorDoc ? memberPermissionsOf(actorDoc) : undefined;
     if (!actor) throw new ForbiddenException({ code: 'UNKNOWN_ROLE' });
 
-    // Défaut `viewer` — moindre privilège (ADR-0012 §7).
-    const role: OrgRole = input.role ?? 'viewer';
+    // ADR-0059 § 4 : défaut `employee` (Salarié). Moindre exposition (ADR-0012 §7) :
+    // ni lecture des ventes, de la trésorerie, des achats ni de la comptabilité.
+    const role: OrgRole = input.role ?? DEFAULT_INVITATION_ROLE;
 
     // R7 — une invitation ne doit jamais servir d'escalade de privilège : on ne
     // peut inviter qu'à un rôle dont l'ensemble d'actions est un sous-ensemble du

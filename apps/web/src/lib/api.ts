@@ -244,10 +244,12 @@ export interface TemplateSummary {
 
 // ─── Rôles d'organisation (S20a — ADR-0012 §1) ─────────────────
 /**
- * Les 12 rôles d'organisation (le neuvième, `sales_rep` « Commercial », d'ADR-0040
+ * Les 16 rôles d'organisation (le neuvième, `sales_rep` « Commercial », d'ADR-0040
  * § 4.2 ; le dixième, `hr_manager` « Responsable RH », d'ADR-0045 § 4.2 ; le onzième,
  * `storekeeper` « Magasinier », d'ADR-0046 § 8.2 ; le douzième, `external_accountant`
- * « Expert-comptable (externe) », d'ADR-0049 § 8.2). Miroir de `apps/api/src/authz/permissions.ts`,
+ * « Expert-comptable (externe) », d'ADR-0049 § 8.2 ; les treizième à seizième, `employee`
+ * « Salarié », `team_manager` « Manager / Chef d'équipe », `intern` « Stagiaire » et `guest`
+ * « Invité externe », d'ADR-0059 § 2). Miroir de `apps/api/src/authz/permissions.ts`,
  * SOURCE DE VÉRITÉ — le web ne peut pas importer de l'API.
  *
  * Volontairement limité à l'union de slugs : les LIBELLÉS et les DESCRIPTIONS ne
@@ -272,6 +274,12 @@ export const ORG_ROLES = [
   'storekeeper',
   // ADR-0049 — K0 : Expert-comptable externe (consulte et exporte la comptabilité).
   'external_accountant',
+  // ADR-0059 — rôles de l'équipe : Salarié (rôle par défaut à l'invitation), Manager /
+  // Chef d'équipe, Stagiaire, Invité externe.
+  'employee',
+  'team_manager',
+  'intern',
+  'guest',
 ] as const;
 
 export type OrgRole = (typeof ORG_ROLES)[number];

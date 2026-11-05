@@ -51,6 +51,8 @@ e2eSuite('ADR-0041 A2 — écarts lus par la garde et /me/permissions', () => {
   function eteindre(): void {
     process.env['MEMBER_PERMISSIONS_ENABLED'] = 'false';
   }
+  // ADR-0059 : allumé par défaut ; ces tests partent coupés et l'allument explicitement.
+  beforeAll(() => eteindre());
 
   async function inscrire(cle: string): Promise<Compte> {
     const email = `a2-${cle}-${tag}@lalanda-test.local`.toLowerCase();

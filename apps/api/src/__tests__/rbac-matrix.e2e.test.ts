@@ -83,7 +83,7 @@ const PLAN_PROJETS_ILLIMITES: Plan | undefined = PLANS.find(
 );
 
 /**
- * Les onze rôles réellement attribuables — `project_manager` exclu (voir en-tête).
+ * Les quinze rôles réellement attribuables — `project_manager` exclu (voir en-tête).
  * `sales_rep` (Commercial, ADR-0040 § 4.2), `hr_manager` (Responsable RH, ADR-0045
  * § 4.2), `storekeeper` (Magasinier, ADR-0046 § 8.2) puis `external_accountant`
  * (Expert-comptable externe, ADR-0049 § 8.2) sont les derniers.
@@ -108,6 +108,12 @@ const ROLES_TESTES = [
   'storekeeper',
   // ADR-0049 — K0 : invité par le Propriétaire, seul à pouvoir l'attribuer.
   'external_accountant',
+  // ADR-0059 § 2 : Salarié, Manager / Chef d'équipe, Stagiaire, Invité externe — aucune
+  // finance ; chacun passe sur toutes les sondes, le brief et GROW.
+  'employee',
+  'team_manager',
+  'intern',
+  'guest',
 ] as const satisfies readonly OrgRole[];
 
 type RoleTeste = (typeof ROLES_TESTES)[number];
@@ -224,6 +230,12 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
     // ADR-0049 — K0 : le mois 11 est pris par le test ⚙ du Comptable ; l'Expert-comptable
     // n'a pas `period.close`, sa sonde ne ferme rien.
     external_accountant: 12,
+    // ADR-0059 : aucun des quatre n'a `period.close` ; leur sonde est refusée et ne ferme
+    // rien, le mois est sans effet.
+    employee: 12,
+    team_manager: 12,
+    intern: 12,
+    guest: 12,
   };
 
   function creerCompte(role: RoleTeste): { email: string; password: string; name: string } {
@@ -1347,13 +1359,10 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
         .set('Cookie', cookiesDe(role));
       // ADR-0045 : le Responsable RH ne lit pas les projets BUILD non plus ; ADR-0046 : ni
       // le Magasinier ; ADR-0049 : ni l'Expert-comptable (externe).
+      // ADR-0059 : ni le Salarié, ni le Manager, ni le Stagiaire, ni l'Invité externe — lu dans la
+      // matrice (`project.read`) plutôt que recopié.
       expect(res.status, `${role} : ${JSON.stringify(res.body)}`).toBe(
-        role === 'sales_rep' ||
-          role === 'hr_manager' ||
-          role === 'storekeeper' ||
-          role === 'external_accountant'
-          ? 403
-          : 200,
+        ORG_PERMISSION_MATRIX[role]['project.read'] === 'deny' ? 403 : 200,
       );
     }
   }, 90_000);

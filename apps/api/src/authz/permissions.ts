@@ -7,11 +7,12 @@
 // et l'interface consomment `can()` / `canPlatform()`.
 //
 // Trois ensembles fermés (docs/26 « états représentés par unions fermées ») :
-//   1. ORG_ROLES       — les 12 rôles d'organisation (ADR-0012 §1 ; le neuvième,
+//   1. ORG_ROLES       — les 16 rôles d'organisation (ADR-0012 §1 ; le neuvième,
 //                        `sales_rep`, d'ADR-0040 § 4.2 ; le dixième, `hr_manager`,
 //                        d'ADR-0045 § 4.2 ; le onzième, `storekeeper`, d'ADR-0046
 //                        § 8.2 ; le douzième, `external_accountant`, d'ADR-0049
-//                        § 8.2);
+//                        § 8.2 ; les treizième à seizième, `employee`, `team_manager`,
+//                        `intern` et `guest`, d'ADR-0059 § 2);
 //   2. PLATFORM_ROLES  — les 6 rôles plateforme, préfixés `platform_` (§2);
 //   3. ACTIONS         — les 57 actions granulaires, dans l'ordre de docs/12
 //                        (la seizième, `fiscal.manage`, vient d'ADR-0021 §8 ;
@@ -52,11 +53,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Les 12 rôles d'organisation (ADR-0012 §1). Le neuvième, `sales_rep` (« Commercial »),
+ * Les 16 rôles d'organisation (ADR-0012 §1). Le neuvième, `sales_rep` (« Commercial »),
  * vient d'ADR-0040 § 4.2 ; le dixième, `hr_manager` (« Responsable RH »), d'ADR-0045
  * § 4.2 ; le onzième, `storekeeper` (« Magasinier »), d'ADR-0046 § 8.2 ; le douzième,
  * `external_accountant` (« Expert-comptable (externe) »), d'ADR-0049 § 8.2 : ajoutés EN FIN
- * de liste (ordre de fusion, comme les actions).
+ * de liste (ordre de fusion, comme les actions). Les treizième à seizième, `employee`
+ * (« Salarié »), `team_manager` (« Manager / Chef d'équipe »), `intern` (« Stagiaire ») et
+ * `guest` (« Invité externe »), viennent d'ADR-0059 § 2, en fin de liste eux aussi.
  *
  * Slugs en anglais `snake_case` (docs/26 « noms de code en anglais »). `owner`
  * conserve la valeur de l'ancien modèle : la migration S20a n'a donc aucun
@@ -81,6 +84,16 @@ export const ORG_ROLES = [
   'storekeeper',
   // ADR-0049 — K0 : EXTERNE ; consulte et exporte la comptabilité, n'écrit rien.
   'external_accountant',
+  // ADR-0059 — rôles de l'équipe : tout le personnel travaille dans Lalanda.
+  // Salarié : projets, tâches, libre-service RH ; aucune finance. Rôle par défaut.
+  'employee',
+  // Manager / Chef d'équipe : Salarié + gouverner les projets (`work.manage`).
+  'team_manager',
+  // Stagiaire : comme le Salarié.
+  'intern',
+  // Invité externe (client, freelance) : projets et tâches seulement ; borné à ses
+  // projets dès la v1.15 (`PROJECT_SCOPED_ROLES`).
+  'guest',
 ] as const;
 
 export type OrgRole = (typeof ORG_ROLES)[number];
@@ -116,12 +129,20 @@ export const ORG_ROLE_RANK: Readonly<Record<OrgRole, number>> = {
   // ADR-0046 § 8.2 : le Magasinier s'insère au rang 7 ; les suivants glissent d'un
   // cran. Le rang n'est pas un droit : aucun accès ne change.
   storekeeper: 7,
-  // ADR-0049 § 8.2 : l'Expert-comptable (externe) s'insère au rang 8 ; les suivants glissent
-  // d'un cran. Le rang n'est pas un droit : aucun accès ne change.
-  external_accountant: 8,
-  project_manager: 9,
-  advisor: 10,
-  viewer: 11,
+  // ADR-0059 § 3 : le Manager, le Salarié et le Stagiaire s'insèrent aux rangs 8 à 10, après
+  // le Magasinier ; les suivants glissent de trois crans. L'Invité externe ferme la marche
+  // (rang 15) : une personne propriétaire d'une organisation et invitée d'une autre ouvre la
+  // sienne. Le rang n'est pas un droit : aucun accès ne change.
+  team_manager: 8,
+  employee: 9,
+  intern: 10,
+  // ADR-0049 § 8.2 : l'Expert-comptable (externe) s'insère au rang 8 (11 depuis ADR-0059) ; les
+  // suivants glissent d'un cran. Le rang n'est pas un droit : aucun accès ne change.
+  external_accountant: 11,
+  project_manager: 12,
+  advisor: 13,
+  viewer: 14,
+  guest: 15,
 };
 
 /**
@@ -324,7 +345,7 @@ export type OrgGrant = 'allow' | 'deny' | 'allow_sod' | 'allow_project' | 'condi
 /**
  * MATRICE RÔLE ORGANISATION × ACTION — transcription littérale d'ADR-0012 §3.
  *
- * Le type impose 12 rôles × 57 actions : oublier une case ne compile pas.
+ * Le type impose 16 rôles × 57 actions : oublier une case ne compile pas.
  * `permissions.test.ts` redéclare cette matrice en littéral (elle n'est PAS
  * importée d'ici) : toute modification de production casse le test et force une
  * mise à jour consciente de l'ADR et de docs/12. C'est le garde-fou central.
@@ -1221,6 +1242,278 @@ export const ORG_PERMISSION_MATRIX: Readonly<Record<OrgRole, Readonly<Record<Act
       'attendance.clock': 'deny',
       'performance.read': 'deny',
     },
+    // Salarié — « travaille sur les projets et les tâches ; ses absences, ses frais, son
+    // pointage » (ADR-0059 § 2). Rôle PAR DÉFAUT à l'invitation (`DEFAULT_INVITATION_ROLE`).
+    // Six actions sur cinquante-sept, socle compris : aucun accès financier (ni ventes, ni
+    // trésorerie, ni achats, ni comptabilité, ni plan, ni valeur de stock).
+    employee: {
+      'organization.manage': 'deny',
+      'billing.manage': 'deny',
+      'members.invite': 'deny',
+      'project.create': 'deny',
+      'project.read': 'deny',
+      'project.update': 'deny',
+      'canvas.update': 'deny',
+      'inputs.update': 'deny',
+      'plan.calculate': 'deny',
+      'plan.approve': 'deny',
+      'actuals.import': 'deny',
+      'period.close': 'deny',
+      // Socle (ADR-0041, décision n° 4) : Accueil, brief, cloche des notifications.
+      'analytics.read': 'allow',
+      'report.export': 'deny',
+      'audit.read': 'deny',
+      'fiscal.manage': 'deny',
+      'sales.read': 'deny',
+      'sales.manage': 'deny',
+      'sales.invoice': 'deny',
+      'sales.receipt': 'deny',
+      'treasury.read': 'deny',
+      'treasury.manage': 'deny',
+      'crm.read': 'deny',
+      'crm.manage': 'deny',
+      // ADR-0059 § 2 : travailler sur les projets et les tâches qu'on lui confie.
+      'work.read': 'allow',
+      'work.update': 'allow',
+      'work.manage': 'deny',
+      'sales.quote': 'deny',
+      'purchase.read': 'deny',
+      'purchase.request': 'deny',
+      'purchase.manage': 'deny',
+      'purchase.approve': 'deny',
+      'payables.pay': 'deny',
+      'hr.read': 'deny',
+      'hr.manage': 'deny',
+      'hr.sensitive.read': 'deny',
+      // Libre-service RH (ADR-0045, ADR-0051) : ses absences, ses frais, son pointage ; rien
+      // d'autre des RH (sa fiche se lit par le socle, routes « moi »).
+      'leave.request': 'allow',
+      'leave.approve': 'deny',
+      // Ni stocks, ni équipements, ni bibliothèque : accordables par ajout si besoin.
+      'stock.read': 'deny',
+      'stock.move': 'deny',
+      'stock.count': 'deny',
+      'stock.manage': 'deny',
+      'assets.read': 'deny',
+      'assets.manage': 'deny',
+      'docs.read': 'deny',
+      'docs.manage': 'deny',
+      // Aucune finance (ADR-0059 § 2) : ni ventes, ni trésorerie, ni achats, ni comptabilité.
+      'accounting.read': 'deny',
+      'accounting.post': 'deny',
+      'accounting.close': 'deny',
+      'accounting.export': 'deny',
+      'accounting.manage': 'deny',
+      'sales.contract': 'deny',
+      'sales.contract.approve': 'deny',
+      'expenses.claim': 'allow',
+      'expenses.approve': 'deny',
+      'attendance.clock': 'allow',
+      'performance.read': 'deny',
+    },
+    // Manager / Chef d'équipe — « Salarié + gouverner les projets » (ADR-0059 § 2). Sept actions :
+    // il crée, règle et archive des projets ; il ne voit pas plus de finance que le Salarié.
+    team_manager: {
+      'organization.manage': 'deny',
+      'billing.manage': 'deny',
+      'members.invite': 'deny',
+      'project.create': 'deny',
+      'project.read': 'deny',
+      'project.update': 'deny',
+      'canvas.update': 'deny',
+      'inputs.update': 'deny',
+      'plan.calculate': 'deny',
+      'plan.approve': 'deny',
+      'actuals.import': 'deny',
+      'period.close': 'deny',
+      // Socle (ADR-0041, décision n° 4) : Accueil, brief, cloche des notifications.
+      'analytics.read': 'allow',
+      'report.export': 'deny',
+      'audit.read': 'deny',
+      'fiscal.manage': 'deny',
+      'sales.read': 'deny',
+      'sales.manage': 'deny',
+      'sales.invoice': 'deny',
+      'sales.receipt': 'deny',
+      'treasury.read': 'deny',
+      'treasury.manage': 'deny',
+      'crm.read': 'deny',
+      'crm.manage': 'deny',
+      // ADR-0059 § 2 : Salarié + `work.manage` (créer, régler, archiver des projets). La validation
+      // RH de son équipe arrive avec les équipes (v1.15), pas dans cette version.
+      'work.read': 'allow',
+      'work.update': 'allow',
+      'work.manage': 'allow',
+      'sales.quote': 'deny',
+      'purchase.read': 'deny',
+      'purchase.request': 'deny',
+      'purchase.manage': 'deny',
+      'purchase.approve': 'deny',
+      'payables.pay': 'deny',
+      'hr.read': 'deny',
+      'hr.manage': 'deny',
+      'hr.sensitive.read': 'deny',
+      // Libre-service RH (ADR-0045, ADR-0051) : ses absences, ses frais, son pointage ; rien
+      // d'autre des RH (sa fiche se lit par le socle, routes « moi »).
+      'leave.request': 'allow',
+      'leave.approve': 'deny',
+      // Ni stocks, ni équipements, ni bibliothèque : accordables par ajout si besoin.
+      'stock.read': 'deny',
+      'stock.move': 'deny',
+      'stock.count': 'deny',
+      'stock.manage': 'deny',
+      'assets.read': 'deny',
+      'assets.manage': 'deny',
+      'docs.read': 'deny',
+      'docs.manage': 'deny',
+      // Aucune finance (ADR-0059 § 2) : ni ventes, ni trésorerie, ni achats, ni comptabilité.
+      'accounting.read': 'deny',
+      'accounting.post': 'deny',
+      'accounting.close': 'deny',
+      'accounting.export': 'deny',
+      'accounting.manage': 'deny',
+      'sales.contract': 'deny',
+      'sales.contract.approve': 'deny',
+      'expenses.claim': 'allow',
+      'expenses.approve': 'deny',
+      'attendance.clock': 'allow',
+      'performance.read': 'deny',
+    },
+    // Stagiaire — « comme le Salarié » (ADR-0059 § 2). Même ligne que `employee` : la seule
+    // différence voulue (n'assigner une tâche qu'à soi-même) relève du module `work`, pas
+    // d'une action.
+    intern: {
+      'organization.manage': 'deny',
+      'billing.manage': 'deny',
+      'members.invite': 'deny',
+      'project.create': 'deny',
+      'project.read': 'deny',
+      'project.update': 'deny',
+      'canvas.update': 'deny',
+      'inputs.update': 'deny',
+      'plan.calculate': 'deny',
+      'plan.approve': 'deny',
+      'actuals.import': 'deny',
+      'period.close': 'deny',
+      // Socle (ADR-0041, décision n° 4) : Accueil, brief, cloche des notifications.
+      'analytics.read': 'allow',
+      'report.export': 'deny',
+      'audit.read': 'deny',
+      'fiscal.manage': 'deny',
+      'sales.read': 'deny',
+      'sales.manage': 'deny',
+      'sales.invoice': 'deny',
+      'sales.receipt': 'deny',
+      'treasury.read': 'deny',
+      'treasury.manage': 'deny',
+      'crm.read': 'deny',
+      'crm.manage': 'deny',
+      // ADR-0059 § 2 : identique au Salarié en droits. « N'assigner qu'à soi-même » n'est pas
+      // une action : la règle n'est pas exprimable dans la matrice (décision ouverte n° 3).
+      'work.read': 'allow',
+      'work.update': 'allow',
+      'work.manage': 'deny',
+      'sales.quote': 'deny',
+      'purchase.read': 'deny',
+      'purchase.request': 'deny',
+      'purchase.manage': 'deny',
+      'purchase.approve': 'deny',
+      'payables.pay': 'deny',
+      'hr.read': 'deny',
+      'hr.manage': 'deny',
+      'hr.sensitive.read': 'deny',
+      // Libre-service RH (ADR-0045, ADR-0051) : ses absences, ses frais, son pointage ; rien
+      // d'autre des RH (sa fiche se lit par le socle, routes « moi »).
+      'leave.request': 'allow',
+      'leave.approve': 'deny',
+      // Ni stocks, ni équipements, ni bibliothèque : accordables par ajout si besoin.
+      'stock.read': 'deny',
+      'stock.move': 'deny',
+      'stock.count': 'deny',
+      'stock.manage': 'deny',
+      'assets.read': 'deny',
+      'assets.manage': 'deny',
+      'docs.read': 'deny',
+      'docs.manage': 'deny',
+      // Aucune finance (ADR-0059 § 2) : ni ventes, ni trésorerie, ni achats, ni comptabilité.
+      'accounting.read': 'deny',
+      'accounting.post': 'deny',
+      'accounting.close': 'deny',
+      'accounting.export': 'deny',
+      'accounting.manage': 'deny',
+      'sales.contract': 'deny',
+      'sales.contract.approve': 'deny',
+      'expenses.claim': 'allow',
+      'expenses.approve': 'deny',
+      'attendance.clock': 'allow',
+      'performance.read': 'deny',
+    },
+    // Invité externe — « client ou freelance sur un projet » (ADR-0059 § 2). Trois actions, socle
+    // compris. EXTERNE comme le Conseiller : aucune donnée de l'organisation hors projets et
+    // tâches. Borné à ses projets dès la v1.15 (`PROJECT_SCOPED_ROLES`).
+    guest: {
+      'organization.manage': 'deny',
+      'billing.manage': 'deny',
+      'members.invite': 'deny',
+      'project.create': 'deny',
+      'project.read': 'deny',
+      'project.update': 'deny',
+      'canvas.update': 'deny',
+      'inputs.update': 'deny',
+      'plan.calculate': 'deny',
+      'plan.approve': 'deny',
+      'actuals.import': 'deny',
+      'period.close': 'deny',
+      // Socle (ADR-0041, décision n° 4), exigé par toute autre action : Accueil et cloche.
+      'analytics.read': 'allow',
+      'report.export': 'deny',
+      'audit.read': 'deny',
+      'fiscal.manage': 'deny',
+      'sales.read': 'deny',
+      'sales.manage': 'deny',
+      'sales.invoice': 'deny',
+      'sales.receipt': 'deny',
+      'treasury.read': 'deny',
+      'treasury.manage': 'deny',
+      'crm.read': 'deny',
+      'crm.manage': 'deny',
+      // ADR-0059 § 2 : projets et tâches seulement. La restriction « ses projets » est câblée
+      // par le lot des membres de projet (v1.15) via `PROJECT_SCOPED_ROLES`.
+      'work.read': 'allow',
+      'work.update': 'allow',
+      'work.manage': 'deny',
+      'sales.quote': 'deny',
+      'purchase.read': 'deny',
+      'purchase.request': 'deny',
+      'purchase.manage': 'deny',
+      'purchase.approve': 'deny',
+      'payables.pay': 'deny',
+      'hr.read': 'deny',
+      'hr.manage': 'deny',
+      'hr.sensitive.read': 'deny',
+      // Externe : ni absences, ni frais, ni pointage.
+      'leave.request': 'deny',
+      'leave.approve': 'deny',
+      'stock.read': 'deny',
+      'stock.move': 'deny',
+      'stock.count': 'deny',
+      'stock.manage': 'deny',
+      'assets.read': 'deny',
+      'assets.manage': 'deny',
+      'docs.read': 'deny',
+      'docs.manage': 'deny',
+      'accounting.read': 'deny',
+      'accounting.post': 'deny',
+      'accounting.close': 'deny',
+      'accounting.export': 'deny',
+      'accounting.manage': 'deny',
+      'sales.contract': 'deny',
+      'sales.contract.approve': 'deny',
+      'expenses.claim': 'deny',
+      'expenses.approve': 'deny',
+      'attendance.clock': 'deny',
+      'performance.read': 'deny',
+    },
   };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1914,6 +2207,23 @@ export function isAssignableRole(role: OrgRole): boolean {
 }
 
 export const ASSIGNABLE_ORG_ROLES: readonly OrgRole[] = ORG_ROLES.filter(isAssignableRole);
+
+/**
+ * ADR-0059 § 4 : rôle proposé par défaut à l'invitation, et appliqué par le serveur quand
+ * l'invitation ne nomme pas de rôle. Le Salarié et non plus le Lecteur : « tout le monde
+ * devra être sur Lalanda » (la dirigeante, 5 nov. 2026), et le Salarié — qui travaille sur
+ * les tâches sans voir aucune donnée financière — expose MOINS que le Lecteur, qui lit les
+ * ventes, la trésorerie, les achats et la comptabilité.
+ */
+export const DEFAULT_INVITATION_ROLE: OrgRole = 'employee';
+
+/**
+ * ADR-0059 § 5 : rôles dont la lecture des projets et des tâches (`work.read`) sera BORNÉE
+ * aux projets dont la personne est membre. Le câblage appartient au lot « membres de
+ * projet » (v1.15, `apps/api/src/work/`), qui lit cette constante ; d'ici là, un Invité
+ * externe voit les projets de l'organisation comme un Salarié (limite documentée).
+ */
+export const PROJECT_SCOPED_ROLES: readonly OrgRole[] = ['guest'];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Séparation des tâches (R2)
@@ -3392,6 +3702,11 @@ export const ORG_ROLE_LABELS: Readonly<Record<OrgRole, string>> = {
   hr_manager: 'Responsable RH',
   storekeeper: 'Magasinier',
   external_accountant: 'Expert-comptable (externe)',
+  // ADR-0059 § 2.
+  employee: 'Salarié',
+  team_manager: 'Manager / Chef d’équipe',
+  intern: 'Stagiaire',
+  guest: 'Invité externe',
 };
 
 /** Description courte d'un rôle — affichée sous le sélecteur de rôle. */
@@ -3415,6 +3730,15 @@ export const ORG_ROLE_DESCRIPTIONS: Readonly<Record<OrgRole, string>> = {
   // ADR-0049 § 8.2.
   external_accountant:
     "Consulte et exporte la comptabilité de l'organisation pour la réviser. N'écrit rien : ni écriture, ni vente, ni paiement. Externe à l'organisation.",
+  // ADR-0059 § 2.
+  employee:
+    'Travaille sur les projets et les tâches (cocher, commenter, saisir son temps) ; demande ses congés, déclare ses frais, pointe. Ne voit aucune donnée financière.',
+  team_manager:
+    'Comme le Salarié, et crée, règle et archive les projets de son équipe. Ne voit aucune donnée financière.',
+  intern:
+    'Comme le Salarié : projets et tâches, ses congés, ses frais, son pointage. Ne voit aucune donnée financière.',
+  guest:
+    "Client ou prestataire externe : consulte et fait avancer les projets et les tâches, rien d'autre. Bientôt limité aux projets auxquels il est ajouté.",
 };
 
 export const PLATFORM_ROLE_LABELS: Readonly<Record<PlatformRole, string>> = {
