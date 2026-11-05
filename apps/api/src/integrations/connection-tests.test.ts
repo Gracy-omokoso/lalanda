@@ -546,3 +546,62 @@ describe('test de connexion ZeptoMail — aucun email ne peut partir', () => {
     }
   });
 });
+
+// ─── Slack : code invalide, aucune installation (ADR-0064) ───────────────────
+
+describe('test de connexion Slack — identifiants validés, rien d’installé', () => {
+  const original = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = original;
+  });
+
+  const SIGNATURE = '0123456789abcdef0123456789abcdef';
+
+  function simuler(reponse: unknown, status = 200): { vues: Request[] } {
+    const vues: Request[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      vues.push(new Request(typeof input === 'string' ? input : String(input), init));
+      return new Response(JSON.stringify(reponse), { status });
+    }) as typeof fetch;
+    return { vues };
+  }
+
+  function entree(signingSecret = SIGNATURE): ConnectionTestInput {
+    return {
+      provider: 'slack',
+      config: { clientId: '1234.5678' },
+      secrets: { clientSecret: 'secret-client-slack-de-test', signingSecret },
+    };
+  }
+
+  it('`invalid_code` prouve les identifiants : le code envoyé est inventé', async () => {
+    const { vues } = simuler({ ok: false, error: 'invalid_code' });
+    const res = await tester.test(entree());
+    expect(res.ok).toBe(true);
+    expect(vues).toHaveLength(1);
+    expect(vues[0]!.url).toBe('https://slack.com/api/oauth.v2.access');
+    const corps = new URLSearchParams(await vues[0]!.text());
+    expect(corps.get('code')).toBe('lalanda-test-de-connexion');
+    expect(corps.get('client_id')).toBe('1234.5678');
+    expect(res.detail).not.toContain('secret-client-slack-de-test');
+  });
+
+  it('`bad_client_secret` est un échec', async () => {
+    simuler({ ok: false, error: 'bad_client_secret' });
+    const res = await tester.test(entree());
+    expect(res.ok).toBe(false);
+    expect(res.detail).toContain('bad_client_secret');
+  });
+
+  it('une réponse `ok` n’est jamais comptée pour un succès', async () => {
+    simuler({ ok: true });
+    expect((await tester.test(entree())).ok).toBe(false);
+  });
+
+  it('un secret de signature mal formé échoue sans appel réseau', async () => {
+    const { vues } = simuler({ ok: false, error: 'invalid_code' });
+    const res = await tester.test(entree('pas-un-secret-slack'));
+    expect(res.ok).toBe(false);
+    expect(vues).toHaveLength(0);
+  });
+});

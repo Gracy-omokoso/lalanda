@@ -40,6 +40,8 @@ describe('le catalogue des fournisseurs', () => {
       'elevenlabs',
       // ADR-0014 — chemin d'envoi préféré, SMTP conservé en repli.
       'zeptomail',
+      // ADR-0064 — application Slack de la plateforme (notifications des Projets).
+      'slack',
     ]);
   });
 
@@ -181,6 +183,21 @@ describe('les arbitrages nommés par ADR-0013 sont bien ceux du code', () => {
     // déclarer donnerait à croire qu'elle est lue par le transport, ce qui est
     // faux tant que `MailCredentialsProvider` lit l'environnement.
     expect(PROVIDER_SPECS.zeptomail.config).not.toContain('fromAddress');
+  });
+});
+
+describe('Slack — ADR-0064', () => {
+  it('range `clientId` en config et les deux secrets de l’application en secret', () => {
+    // `clientId` est public (il figure dans l'adresse d'autorisation) ; `clientSecret`
+    // et `signingSecret` ne doivent jamais être stockés en clair.
+    expect(PROVIDER_SPECS.slack.config).toEqual(['clientId']);
+    expect(PROVIDER_SPECS.slack.secrets).toEqual(['clientSecret', 'signingSecret']);
+  });
+
+  it('ne déclare aucun jeton de bot : il appartient au coffre de chaque organisation', () => {
+    for (const nom of [...PROVIDER_SPECS.slack.secrets, ...PROVIDER_SPECS.slack.config]) {
+      expect(nom.toLowerCase()).not.toContain('token');
+    }
   });
 });
 

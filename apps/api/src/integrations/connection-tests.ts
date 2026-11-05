@@ -110,6 +110,8 @@ async function runProviderTest(input: ConnectionTestInput): Promise<string> {
       return testElevenLabs(input);
     case 'zeptomail':
       return testZeptoMail(input);
+    case 'slack':
+      return testSlack(input);
   }
 }
 
@@ -515,6 +517,59 @@ async function testZeptoMail(input: ConnectionTestInput): Promise<string> {
   return (
     `Jeton accepté par ${cible.host} — la charge incomplète a été refusée à la validation ` +
     `(HTTP ${res.status}${motif ? ` : ${motif}` : ''}). Aucun email n'a été envoyé.`
+  );
+}
+
+// ─── Slack : oauth.v2.access avec un code invalide, rien n'est installé ────────
+
+/** Code d'échange délibérément invalide : il ne peut correspondre à aucune installation. */
+export const SLACK_TEST_CODE = 'lalanda-test-de-connexion';
+
+/**
+ * Validation des identifiants de l'application Slack SANS rien installer — ADR-0064.
+ *
+ * Slack n'expose aucune route de lecture authentifiée par le seul couple
+ * `client_id` / `client_secret`. Le test appelle donc `oauth.v2.access` avec un code
+ * inventé : Slack vérifie les identifiants AVANT le code. Des identifiants acceptés
+ * répondent `invalid_code` (succès attendu) ; refusés, `invalid_client_id` ou
+ * `bad_client_secret`. Aucun code valide n'étant fourni, aucune installation ni aucun
+ * jeton ne peut en sortir.
+ *
+ * Le secret de signature ne se vérifie pas à distance (il ne sert qu'à authentifier
+ * les événements REÇUS) : seule sa forme est contrôlée — 32 caractères hexadécimaux.
+ */
+async function testSlack(input: ConnectionTestInput): Promise<string> {
+  const clientSecret = requireSecret(input, 'clientSecret');
+  const signingSecret = requireSecret(input, 'signingSecret');
+  const clientId = str(input.config, 'clientId');
+  if (!clientId) throw new Error('`clientId` absent : test impossible.');
+  if (!/^[0-9a-f]{32}$/i.test(signingSecret.trim())) {
+    throw new Error(
+      'Le secret de signature ne ressemble pas à celui de Slack (32 caractères hexadécimaux, ' +
+        'page « Basic Information » › « Signing Secret »).',
+    );
+  }
+  const res = await fetch('https://slack.com/api/oauth.v2.access', {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      code: SLACK_TEST_CODE,
+    }).toString(),
+  });
+  if (!res.ok) throw new Error(`Slack a refusé la requête (HTTP ${res.status}).`);
+  const body = (await res.json()) as { ok?: boolean; error?: unknown };
+  const error = typeof body.error === 'string' ? body.error : '';
+  if (error === 'invalid_code' || error === 'code_already_used') {
+    return 'Identifiants de l’application acceptés par Slack — aucun espace n’a été connecté.';
+  }
+  if (error === 'invalid_client_id' || error === 'bad_client_secret') {
+    throw new Error(`Slack a refusé les identifiants de l’application (${error}).`);
+  }
+  throw new Error(
+    `Réponse inattendue de Slack (${body.ok ? 'ok' : error || 'sans code'}) : les identifiants ` +
+      `ne sont pas validés par ce résultat.`,
   );
 }
 

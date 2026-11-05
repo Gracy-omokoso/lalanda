@@ -68,6 +68,7 @@ import { OrganizationSecretsService } from './organization-secrets.service.js';
 import { MasterKeyring } from './secrets-crypto.js';
 import { SecretsService } from './secrets.service.js';
 import { SessionReauthController } from './session-reauth.controller.js';
+import { SlackApi } from '../slack/slack-api.js';
 
 // ── Valeurs sentinelles ──────────────────────────────────────────────────────
 
@@ -93,6 +94,11 @@ const SECRETS_SENTINELLES: Record<IntegrationProvider, Record<string, string>> =
   r2: { secretKey: 'ANTIFUITE-r2-9a4c81d5f37b' },
   elevenlabs: { apiKey: 'ANTIFUITE-elevenlabs-2b7e40f1a6c8' },
   zeptomail: { sendMailToken: 'ANTIFUITE-zeptomail-7d3f62a0c94e' },
+  // ADR-0064 : secrets de l'application Slack de la plateforme.
+  slack: {
+    clientSecret: 'ANTIFUITE-slack-client-1e8c47b2d90f',
+    signingSecret: 'ANTIFUITE-slack-signing-6a2d91f0b7c3',
+  },
 };
 
 /** `config` valide au regard de la liste blanche de chaque fournisseur. */
@@ -106,6 +112,8 @@ const CONFIG_SENTINELLE: Record<IntegrationProvider, Record<string, string | num
   // ZeptoMail ne déclare qu'`apiUrl` (ADR-0014) : le centre de données Zoho.
   // Rien d'autre n'est non secret dans cette fiche.
   zeptomail: { apiUrl: 'https://api.zeptomail.exemple.test/v1.1/email' },
+  // `clientId` Slack : identifiant public, figure dans l'adresse d'autorisation.
+  slack: { clientId: '1234567890.0987654321' },
 };
 
 /** Toutes les valeurs en clair du parc — la liste que rien ne doit contenir. */
@@ -585,9 +593,11 @@ describe("l'audit ne porte jamais la valeur — ADR-0013 §6", () => {
 
 /** Jeton e-MCF inventé (≥ 12 caractères : `last4` existe). */
 const JETON_EMCF = 'ANTIFUITE-emcf-5b9e27c1d04a8f63';
+/** ADR-0064 : jeton du bot Slack d'une organisation (inventé). */
+const JETON_SLACK = 'xoxb-ANTIFUITE-slack-4c0e93a7b15d';
 /** Mot de passe soumis à `POST /me/reauth`. */
 const MOT_DE_PASSE_MEMBRE = 'ANTIFUITE-membre-mdp-81d3f6a0c2e9';
-const SECRETS_ORGANISATION = [JETON_EMCF, MOT_DE_PASSE_MEMBRE];
+const SECRETS_ORGANISATION = [JETON_EMCF, MOT_DE_PASSE_MEMBRE, JETON_SLACK];
 
 function exigerAucuneFuiteOrganisation(label: string, payload: unknown): void {
   chargesInspectees += 1;
@@ -791,6 +801,47 @@ describe('coffre de portée organisation — aucune sortie ne contient le jeton 
   it('le détecteur voit le jeton e-MCF et le mot de passe (la campagne n’est pas vaine)', () => {
     expect(fuitesDe({ t: JETON_EMCF }, SECRETS_ORGANISATION)).toHaveLength(1);
     expect(fuitesDe(new Error(MOT_DE_PASSE_MEMBRE), SECRETS_ORGANISATION)).toHaveLength(1);
+  });
+});
+
+describe('jeton du bot Slack — coffre d’organisation et client HTTP (ADR-0064)', () => {
+  const REF_SLACK: OrganizationSecretRef = {
+    organizationId: 'org-antifuite-slack',
+    kind: 'slack_bot_token',
+    ownerId: 'bot',
+  };
+  const keyring = MasterKeyring.of([{ keyId: 'k-slack', key: randomBytes(32) }], 'k-slack');
+
+  it('put, describe, resolve, destroy, erreurs Slack et journaux ne portent jamais le jeton', async () => {
+    const { model, store } = modeleOrganisationEnMemoire();
+    const coffre = new OrganizationSecretsService(model, keyring);
+    const journaux = await journauxPendant(async () => {
+      exigerAucuneFuiteOrganisation('put', await coffre.put(REF_SLACK, JETON_SLACK, 'user-1'));
+      exigerAucuneFuiteOrganisation('describe', await coffre.describe(REF_SLACK));
+      const secret = await coffre.resolve(REF_SLACK);
+      expect(secret?.expose()).toBe(JETON_SLACK); // le coffre n'est pas vide
+      exigerAucuneFuiteOrganisation('Secret résolu', secret);
+      for (const d of store.values()) {
+        exigerAucuneFuiteOrganisation('document', JSON.parse(JSON.stringify(d)));
+        console.log(d);
+      }
+      // Un refus de Slack (jeton révoqué) : l'erreur ne recopie ni jeton ni corps.
+      const api = new SlackApi();
+      api.http = async () =>
+        new Response(JSON.stringify({ ok: false, error: 'token_revoked' }), { status: 200 });
+      const err = await capturer(() =>
+        api.postMessage(JETON_SLACK, { channel: 'C123', text: 't', blocks: [] }),
+      );
+      exigerAucuneFuiteOrganisation('SlackApiError', err);
+      console.warn(err);
+      await coffre.destroy(REF_SLACK);
+      expect(await coffre.resolve(REF_SLACK)).toBeNull();
+    });
+    exigerAucuneFuiteOrganisation('journaux Slack', journaux);
+  });
+
+  it('le détecteur voit le jeton du bot (la campagne n’est pas vaine)', () => {
+    expect(fuitesDe({ t: JETON_SLACK }, SECRETS_ORGANISATION)).toHaveLength(1);
   });
 });
 

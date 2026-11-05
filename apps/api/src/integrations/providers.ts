@@ -38,6 +38,10 @@ export const INTEGRATION_PROVIDERS = [
   'r2',
   'elevenlabs',
   'zeptomail',
+  // ADR-0064 : application Slack « Lalanda » (distribuée), installée par chaque
+  // organisation dans son propre espace. Identifiants de la PLATEFORME seulement : le
+  // jeton du bot de chaque organisation vit dans le coffre d'organisation.
+  'slack',
 ] as const;
 
 export type IntegrationProvider = (typeof INTEGRATION_PROVIDERS)[number];
@@ -207,6 +211,24 @@ export const PROVIDER_SPECS: Readonly<Record<IntegrationProvider, ProviderSpec>>
     testDescription:
       'Appel de /v1.1/email avec une charge délibérément incomplète — ' +
       'le jeton est validé, aucun email ne part.',
+  },
+  slack: {
+    label: 'Slack (application Lalanda)',
+    // `clientSecret` ouvre l'échange OAuth (code → jeton de bot) ; `signingSecret`
+    // authentifie les événements reçus de Slack (`X-Slack-Signature`). Les deux sont
+    // des secrets entiers. Noms identiques à ceux de la page « Basic Information » de
+    // api.slack.com, pour que l'opératrice n'ait rien à traduire.
+    secrets: ['clientSecret', 'signingSecret'],
+    requiredSecrets: ['clientSecret', 'signingSecret'],
+    // `clientId` est un IDENTIFIANT public — il figure en clair dans l'adresse
+    // d'autorisation que voit chaque navigateur. Même raisonnement que `paypal.clientId`.
+    config: ['clientId'],
+    requiredConfig: ['clientId'],
+    // Vide : Slack n'a jamais transité par l'environnement (verrou `providers.test.ts`).
+    envFallback: {},
+    testDescription:
+      'Appel de oauth.v2.access avec un code volontairement invalide — les identifiants ' +
+      'sont validés, aucune installation ni aucun jeton n’est créé.',
   },
 };
 

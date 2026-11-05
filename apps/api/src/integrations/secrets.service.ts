@@ -150,6 +150,24 @@ export class SecretsService {
   }
 
   /**
+   * Valeur NON secrète de `config` d'un fournisseur (ADR-0064 : `slack.clientId`).
+   *
+   * Même interrupteur que `resolve()` (ADR-0017) : intégration absente ou désactivée
+   * → `null`. Aucun secours par l'environnement : `config` n'en a jamais eu. Pas de
+   * cache : une lecture d'un document déjà indexé, et une désactivation doit valoir
+   * à l'appel suivant.
+   */
+  async configValue(provider: IntegrationProvider, key: string): Promise<string | null> {
+    if (!PROVIDER_SPECS[provider].config.includes(key)) return null;
+    const doc = await this.model.findOne({ provider, scope: 'platform' }).exec();
+    if (!doc || !doc.enabled) return null;
+    const value = (doc.config as Record<string, unknown> | undefined)?.[key];
+    if (value === undefined || value === null) return null;
+    const text = String(value).trim();
+    return text === '' ? null : text;
+  }
+
+  /**
    * Source effective, SANS déchiffrer — alimente la vue de lecture d'`/admin`.
    *
    * Ne passe pas par `resolve()` : afficher une page d'administration ne doit

@@ -20,10 +20,13 @@ import type { Secret } from './secret-value.js';
 /**
  * Natures de secret d'organisation — liste fermée.
  *
- * Un seul élément aujourd'hui : le jeton e-MCF d'un point de vente (ADR-0021 §4.1).
- * Le jeton est lié à UN e-MCF, pas au contribuable : d'où `ownerId` ci-dessous.
+ * - `dgi_emcf_token` : le jeton e-MCF d'un point de vente (ADR-0021 §4.1). Le jeton
+ *   est lié à UN e-MCF, pas au contribuable : d'où `ownerId` ci-dessous.
+ * - `slack_bot_token` : le jeton du bot Slack de l'organisation (ADR-0064 § 2), un seul
+ *   par organisation (`ownerId` constant). Ajout pur à la liste fermée, décidé par
+ *   ADR-0064 : aucun type ni aucune méthode du contrat ne change.
  */
-export const ORGANIZATION_SECRET_KINDS = ['dgi_emcf_token'] as const;
+export const ORGANIZATION_SECRET_KINDS = ['dgi_emcf_token', 'slack_bot_token'] as const;
 export type OrganizationSecretKind = (typeof ORGANIZATION_SECRET_KINDS)[number];
 
 /** Adresse d'un secret : organisation, nature, objet propriétaire (le point de vente). */
