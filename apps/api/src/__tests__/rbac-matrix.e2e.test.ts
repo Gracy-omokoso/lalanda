@@ -1410,7 +1410,21 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
       const indicators = await request(serveur()).get('/grow/indicators').set('Cookie', c);
       const journey = await request(serveur()).get('/grow/journey').set('Cookie', c);
       const profile = await request(serveur()).get('/grow/profile').set('Cookie', c);
-      for (const res of [health, indicators, journey, profile]) {
+      for (const res of [journey, profile]) {
+        expect(res.status, `${role} ${JSON.stringify(res.body)}`).toBe(200);
+      }
+      // ADR-0059, décision n° 1 : santé et indicateurs à qui lit les ventes, et au Conseiller.
+      const chiffres = role === 'advisor' || ORG_PERMISSION_MATRIX[role]['sales.read'] === 'allow';
+      if (!chiffres) {
+        for (const res of [health, indicators]) {
+          expect(res.status, role).toBe(403);
+          expect(res.body.code, role).toBe('GROW_FIGURES_RESTRICTED');
+        }
+        expect(JSON.stringify([journey.body, profile.body]), role).not.toContain('424242');
+        expect(profile.body.declaredCash, role).toBeNull();
+        continue;
+      }
+      for (const res of [health, indicators]) {
         expect(res.status, `${role} ${JSON.stringify(res.body)}`).toBe(200);
       }
       const corps = JSON.stringify([health.body, indicators.body, journey.body, profile.body]);

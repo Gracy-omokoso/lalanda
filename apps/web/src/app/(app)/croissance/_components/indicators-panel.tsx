@@ -23,15 +23,26 @@ import {
   GROUPES_INDICATEURS,
   lireMontant,
   messageErreur,
+  refusAcces,
   refusForfait,
   valeurIndicateur,
 } from './grow-model';
-import { Bloc, Chargement, Erreur, Hypotheses, Pastille, RefusForfait, Sources } from './grow-ui';
+import {
+  Bloc,
+  Chargement,
+  Erreur,
+  Hypotheses,
+  Pastille,
+  RefusAcces,
+  RefusForfait,
+  Sources,
+} from './grow-ui';
 
 export function IndicatorsPanel(): React.ReactElement {
   const [vue, setVue] = useState<GrowIndicatorsView | null>(null);
   const [profil, setProfil] = useState<GrowProfileResponse | null>(null);
   const [refus, setRefus] = useState<string | null>(null);
+  const [refusDroits, setRefusDroits] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [chargement, setChargement] = useState(true);
 
@@ -42,9 +53,12 @@ export function IndicatorsPanel(): React.ReactElement {
       setProfil(await growApi.getProfile());
       setVue(await growApi.getIndicators());
       setRefus(null);
+      setRefusDroits(null);
     } catch (err) {
+      const a = refusAcces(err);
       const r = refusForfait(err);
-      if (r) setRefus(r);
+      if (a) setRefusDroits(a);
+      else if (r) setRefus(r);
       else setErreur(messageErreur(err, 'Impossible de charger les indicateurs.'));
     } finally {
       setChargement(false);
@@ -56,6 +70,7 @@ export function IndicatorsPanel(): React.ReactElement {
   }, [charger]);
 
   if (chargement) return <Chargement />;
+  if (refusDroits) return <RefusAcces message={refusDroits} />;
   if (refus) return <RefusForfait message={refus} />;
   if (erreur || !vue || !profil) {
     return (

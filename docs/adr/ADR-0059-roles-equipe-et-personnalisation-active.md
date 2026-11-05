@@ -148,7 +148,7 @@ sans `project.read`, mais les indicateurs calculés **sur les factures** (chiffr
 restent visibles à tout détenteur du socle. C'est déjà le cas du Magasinier, du Responsable RH et du
 Commercial ; avec le Salarié et l'Invité externe, cela touche tout le personnel et des externes.
 Corriger touche des rôles existants (le Conseiller, banquier ou mentor, a besoin de ces indicateurs
-sans `sales.read`) : **décision ouverte n° 1**.
+sans `sales.read`) : décision n° 1, **tranchée le 5 nov. 2026** (voir plus bas).
 
 ## Critères d'acceptation (testables)
 
@@ -165,10 +165,12 @@ sans `sales.read`) : **décision ouverte n° 1**.
 
 ## Décisions ouvertes — elles appartiennent à la dirigeante
 
-1. **Croissance et socle** (risque ci-dessus) : fermer les indicateurs tirés des factures à qui n'a
-   pas `sales.read` (en gardant une exception pour le Conseiller), ou créer une action
-   « Consulter la santé et les indicateurs ». *Défaut : inchangé dans cette version, à trancher
-   avant d'inviter des externes.*
+1. **Croissance et socle** — *tranchée par la dirigeante le 5 nov. 2026* : la santé
+   (`GET /grow/health`) et les indicateurs (`GET /grow/indicators`) sont réservés à qui lit les
+   ventes (`sales.read`, par son rôle ou par un écart individuel), plus le Conseiller. Les autres
+   reçoivent un 403 `GROW_FIGURES_RESTRICTED` et l'écran l'explique ; le profil et le parcours
+   restent ouverts à `analytics.read`. Perdent ces chiffres : Salarié, Manager, Stagiaire, Invité,
+   Responsable RH, Magasinier, Chef de projet et Expert-comptable externe.
 2. **Salarié et bibliothèque** : ajouter `docs.read` (règlement intérieur, politiques) au
    Salarié, au Manager et au Stagiaire. *Défaut : non (accordable par personne).*
 3. **Stagiaire** : « n'assigner une tâche qu'à soi-même », à câbler dans le module `work` (v1.15).

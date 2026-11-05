@@ -667,8 +667,9 @@ promotion vers un projet, assistance IA) de `canvas.update`, régler son IA de
 - `PROJECT_SCOPED_ROLES = ['guest']` : restriction aux projets dont il est membre, câblée en v1.15.
   D'ici là l'Invité externe voit tous les projets de l'organisation.
 - Interrupteur `MEMBER_PERMISSIONS_ENABLED` : allumé sauf `false` explicite.
-- Risque ouvert (décision n° 1 d'ADR-0059) : le socle ouvre l'espace Croissance, dont les
-  indicateurs tirés des factures restent visibles sans `sales.read`.
+- Croissance (décision n° 1 d'ADR-0059, tranchée le 5 nov. 2026) : la santé et les indicateurs
+  sont réservés à qui a `sales.read` (rôle ou écart individuel) et au Conseiller ; les autres
+  gardent le profil et le parcours.
 
 ## Règles critiques
 
