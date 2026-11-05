@@ -13,6 +13,7 @@ import {
   GROW_TABS,
   lireMontant,
   messageErreur,
+  refusAcces,
   refusForfait,
   segmentCroissance,
   valeurIndicateur,
@@ -90,6 +91,14 @@ describe('erreurs', () => {
     };
     expect(refusForfait(err)).toBe('Non inclus dans Free.');
     expect(refusForfait({ status: 403, detail: { code: 'FORBIDDEN' } })).toBeNull();
+    // ADR-0059, décision n° 1 : chiffres réservés, distinct du refus de forfait.
+    const droits = {
+      status: 403,
+      detail: { code: 'GROW_FIGURES_RESTRICTED', message: 'Réservé.' },
+    };
+    expect(refusAcces(droits)).toBe('Réservé.');
+    expect(refusForfait(droits)).toBeNull();
+    expect(refusAcces(err)).toBeNull();
     expect(messageErreur({ status: 403, detail: {} }, 'x')).toMatch(/rôle/);
     expect(
       messageErreur(

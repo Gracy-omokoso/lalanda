@@ -18,7 +18,7 @@
 // elle-même. Ici, toute modification d'une case de production casse le test, ce
 // qui force une mise à jour CONSCIENTE de l'ADR et de docs/12.
 //
-// 12 rôles × 57 actions + 6 rôles plateforme × 57 actions = 1026 cases vérifiées.
+// 16 rôles × 57 actions + 6 rôles plateforme × 57 actions = 1254 cases vérifiées.
 
 import { describe, expect, it } from 'vitest';
 
@@ -34,8 +34,12 @@ import { SALES_CONTRACT_ERROR_CODES } from '@lalanda/shared/sales-contracts';
 
 import {
   ACTIONS,
+  ASSIGNABLE_ORG_ROLES,
+  DEFAULT_INVITATION_ROLE,
   NO_OVERRIDES,
   ORG_PERMISSION_MATRIX,
+  PROJECT_SCOPED_ROLES,
+  requiredActionsOf,
   ORG_ROLES,
   ORG_ROLE_DESCRIPTIONS,
   ORG_ROLE_LABELS,
@@ -123,105 +127,112 @@ const ORDRE_ORG: readonly OrgRole[] = [
   'storekeeper',
   // ADR-0049 § 8.2 : douzième, en fin de liste.
   'external_accountant',
+  // ADR-0059 § 2 : treizième à seizième, en fin de liste.
+  'employee',
+  'team_manager',
+  'intern',
+  'guest',
 ];
 
-//                                        PRO ADM DIR CPT ANA CDP CON LEC COM RH  MAG EXP
+// ADR-0059 § 2 : quatre colonnes de plus — Salarié (SAL), Manager / Chef d'équipe (MGR),
+// Stagiaire (STA), Invité externe (INV). Aucune finance ; le Manager gouverne les projets.
+//                                        PRO ADM DIR CPT ANA CDP CON LEC COM RH  MAG EXP SAL MGR STA INV
 const ATTENDU_ORG: Record<Action, string> = {
-  'organization.manage': 'A   A   .   .   .   .   .   .   .   .   .   .',
-  'billing.manage': 'A   .   .   .   .   .   .   .   .   .   .   .',
-  'members.invite': 'A   A   .   .   .   .   .   .   .   .   .   .',
-  'project.create': 'A   A   A   .   .   .   .   .   .   .   .   .',
-  'project.read': 'A   A   A   A   A   P   A   A   .   .   .   .',
-  'project.update': 'A   A   A   .   .   P   .   .   .   .   .   .',
-  'canvas.update': 'A   A   A   .   A   P   .   .   .   .   .   .',
-  'inputs.update': 'A   A   A   .   A   P   .   .   .   .   .   .',
-  'plan.calculate': 'A   A   A   .   A   P   .   .   .   .   .   .',
-  'plan.approve': 'S   .   S   .   .   .   .   .   .   .   .   .',
-  'actuals.import': 'A   A   A   A   .   .   .   .   .   .   .   .',
-  'period.close': 'A   .   A   C   .   .   .   .   .   .   .   .',
-  'analytics.read': 'A   A   A   A   A   P   A   A   A   A   A   A',
-  'report.export': 'A   A   A   A   A   P   .   .   .   .   .   .',
-  'audit.read': 'A   A   A   .   .   .   .   .   .   .   .   .',
+  'organization.manage': 'A   A   .   .   .   .   .   .   .   .   .   .   .   .   .   .',
+  'billing.manage': 'A   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .',
+  'members.invite': 'A   A   .   .   .   .   .   .   .   .   .   .   .   .   .   .',
+  'project.create': 'A   A   A   .   .   .   .   .   .   .   .   .   .   .   .   .',
+  'project.read': 'A   A   A   A   A   P   A   A   .   .   .   .   .   .   .   .',
+  'project.update': 'A   A   A   .   .   P   .   .   .   .   .   .   .   .   .   .',
+  'canvas.update': 'A   A   A   .   A   P   .   .   .   .   .   .   .   .   .   .',
+  'inputs.update': 'A   A   A   .   A   P   .   .   .   .   .   .   .   .   .   .',
+  'plan.calculate': 'A   A   A   .   A   P   .   .   .   .   .   .   .   .   .   .',
+  'plan.approve': 'S   .   S   .   .   .   .   .   .   .   .   .   .   .   .   .',
+  'actuals.import': 'A   A   A   A   .   .   .   .   .   .   .   .   .   .   .   .',
+  'period.close': 'A   .   A   C   .   .   .   .   .   .   .   .   .   .   .   .',
+  'analytics.read': 'A   A   A   A   A   P   A   A   A   A   A   A   A   A   A   A',
+  'report.export': 'A   A   A   A   A   P   .   .   .   .   .   .   .   .   .   .',
+  'audit.read': 'A   A   A   .   .   .   .   .   .   .   .   .   .   .   .   .',
   // ADR-0021 §8 : autorité financière seulement (Propriétaire, Directeur financier).
-  'fiscal.manage': 'A   .   A   .   .   .   .   .   .   .   .   .',
+  'fiscal.manage': 'A   .   A   .   .   .   .   .   .   .   .   .   .   .   .   .',
   // ADR-0022 § S25c.1 : données maîtres de vente. Analyste et Lecteur consultent ;
   // le Conseiller, externe, ne voit pas le fichier clients ; le Chef de projet n'a rien.
-  'sales.read': 'A   A   A   A   A   .   .   A   A   .   .   .',
-  'sales.manage': 'A   A   A   A   .   .   .   .   .   .   .   .',
+  'sales.read': 'A   A   A   A   A   .   .   A   A   .   .   .   .   .   .   .',
+  'sales.manage': 'A   A   A   A   .   .   .   .   .   .   .   .   .   .   .   .',
   // ADR-0023 § S25e.11 : émettre et normaliser engagent le contribuable. Propriétaire,
   // Directeur financier et Comptable ; l'Administrateur prépare mais n'émet pas.
-  'sales.invoice': 'A   .   A   A   .   .   .   .   .   .   .   .',
+  'sales.invoice': 'A   .   A   A   .   .   .   .   .   .   .   .   .   .   .   .',
   // ADR-0031 § 4 : enregistrer l'argent reçu, même population que `sales.invoice`.
-  'sales.receipt': 'A   .   A   A   .   .   .   .   .   .   .   .',
+  'sales.receipt': 'A   .   A   A   .   .   .   .   .   .   .   .   .   .   .   .',
   // ADR-0034 § 8 : trésorerie. Le Conseiller (externe) ne voit pas le détail des
   // dépenses ; l'Administrateur consulte mais n'enregistre pas de décaissement.
-  'treasury.read': 'A   A   A   A   A   .   .   A   .   .   .   .',
-  'treasury.manage': 'A   .   A   A   .   .   .   .   .   .   .   .',
+  'treasury.read': 'A   A   A   A   A   .   .   A   .   .   .   .   .   .   .   .',
+  'treasury.manage': 'A   .   A   A   .   .   .   .   .   .   .   .   .   .   .   .',
   // ADR-0035 § 3 : le CRM suit la répartition de `sales.read` / `sales.manage`.
-  'crm.read': 'A   A   A   A   A   .   .   A   A   .   .   .',
-  'crm.manage': 'A   A   A   A   .   .   .   .   A   .   .   .',
+  'crm.read': 'A   A   A   A   A   .   .   A   A   .   .   .   .   .   .   .',
+  'crm.manage': 'A   A   A   A   .   .   .   .   A   .   .   .   .   .   .   .',
   // ADR-0039 § 7 : projets et tâches du RUN. Le Lecteur lit ; Comptable et Analyste
   // travaillent sans gouverner ; le Conseiller (externe) et le Chef de projet n'ont rien.
-  'work.read': 'A   A   A   A   A   .   .   A   A   A   A   .',
-  'work.update': 'A   A   A   A   A   .   .   .   A   A   A   .',
-  'work.manage': 'A   A   A   .   .   .   .   .   .   .   .   .',
+  'work.read': 'A   A   A   A   A   .   .   A   A   A   A   .   A   A   A   A',
+  'work.update': 'A   A   A   A   A   .   .   .   A   A   A   .   A   A   A   A',
+  'work.manage': 'A   A   A   .   .   .   .   .   .   .   .   .   .   A   .   .',
   // ADR-0040 § 4.1 : préparer les devis. Iso-privilège avec `sales.manage`, plus
   // le Commercial (COM) ; convertir un devis exige en plus `sales.manage`.
-  'sales.quote': 'A   A   A   A   .   .   .   .   A   .   .   .',
+  'sales.quote': 'A   A   A   A   .   .   .   .   A   .   .   .   .   .   .   .',
   // ADR-0044 § 4.1 : achats et fournisseurs. `purchase.read` suit `treasury.read`
   // (sans le Commercial) ; demander est ouvert à tout rôle interne qui travaille ;
   // préparer suit `sales.manage` ; approuver est une autorité de dépense (ⓢ) ;
   // payer suit `treasury.manage`.
-  'purchase.read': 'A   A   A   A   A   .   .   A   .   .   .   .',
-  'purchase.request': 'A   A   A   A   A   .   .   .   .   .   .   .',
-  'purchase.manage': 'A   A   A   A   .   .   .   .   .   .   .   .',
-  'purchase.approve': 'S   .   S   .   .   .   .   .   .   .   .   .',
-  'payables.pay': 'A   .   A   A   .   .   .   .   .   .   .   .',
+  'purchase.read': 'A   A   A   A   A   .   .   A   .   .   .   .   .   .   .   .',
+  'purchase.request': 'A   A   A   A   A   .   .   .   .   .   .   .   .   .   .   .',
+  'purchase.manage': 'A   A   A   A   .   .   .   .   .   .   .   .   .   .   .   .',
+  'purchase.approve': 'S   .   S   .   .   .   .   .   .   .   .   .   .   .   .   .',
+  'payables.pay': 'A   .   A   A   .   .   .   .   .   .   .   .   .   .   .   .',
   // ADR-0045 § 4.1 : ressources humaines. Le registre (lecture, gestion) : Propriétaire,
   // Administrateur, Directeur financier, Responsable RH ; les données sensibles : le moins
   // de personnes possible (ni Administrateur, ni Comptable) ; demander une absence : tout
   // rôle interne ; valider : autorité RH (ⓢ). Le manager n'a besoin d'aucune action.
-  'hr.read': 'A   A   A   .   .   .   .   .   .   A   .   .',
-  'hr.manage': 'A   A   A   .   .   .   .   .   .   A   .   .',
-  'hr.sensitive.read': 'A   .   A   .   .   .   .   .   .   A   .   .',
-  'leave.request': 'A   A   A   A   A   .   .   A   A   A   A   .',
-  'leave.approve': 'S   .   S   .   .   .   .   .   .   S   .   .',
+  'hr.read': 'A   A   A   .   .   .   .   .   .   A   .   .   .   .   .   .',
+  'hr.manage': 'A   A   A   .   .   .   .   .   .   A   .   .   .   .   .   .',
+  'hr.sensitive.read': 'A   .   A   .   .   .   .   .   .   A   .   .   .   .   .   .',
+  'leave.request': 'A   A   A   A   A   .   .   A   A   A   A   .   A   A   A   .',
+  'leave.approve': 'S   .   S   .   .   .   .   .   .   S   .   .   .   .   .   .',
   // ADR-0046 § 8.1 : stocks, équipements, documents. Les quantités ne révèlent ni prix ni
   // dette (le Commercial les lit pour promettre une livraison) ; mouvementer est un geste
   // opérationnel (pas le Comptable : séparation garde / enregistrement) ; compter : ceux
   // qui sortent la marchandise et le Comptable ; `stock.manage` change des valeurs (ⓢ, pas
   // le Magasinier) ; la bibliothèque à tout rôle interne, le Conseiller externe exclu.
-  'stock.read': 'A   A   A   A   A   .   .   A   A   .   A   .',
-  'stock.move': 'A   A   A   .   .   .   .   .   .   .   A   .',
-  'stock.count': 'A   A   A   A   .   .   .   .   .   .   A   .',
-  'stock.manage': 'S   S   S   S   .   .   .   .   .   .   .   .',
-  'assets.read': 'A   A   A   A   A   .   .   A   .   A   A   .',
-  'assets.manage': 'A   A   A   A   .   .   .   .   .   .   .   .',
-  'docs.read': 'A   A   A   A   A   .   .   A   A   A   A   .',
-  'docs.manage': 'A   A   A   A   .   .   .   .   .   A   .   .',
+  'stock.read': 'A   A   A   A   A   .   .   A   A   .   A   .   .   .   .   .',
+  'stock.move': 'A   A   A   .   .   .   .   .   .   .   A   .   .   .   .   .',
+  'stock.count': 'A   A   A   A   .   .   .   .   .   .   A   .   .   .   .   .',
+  'stock.manage': 'S   S   S   S   .   .   .   .   .   .   .   .   .   .   .   .',
+  'assets.read': 'A   A   A   A   A   .   .   A   .   A   A   .   .   .   .   .',
+  'assets.manage': 'A   A   A   A   .   .   .   .   .   .   .   .   .   .   .   .',
+  'docs.read': 'A   A   A   A   A   .   .   A   A   A   A   .   .   .   .   .',
+  'docs.manage': 'A   A   A   A   .   .   .   .   .   A   .   .   .   .   .   .',
   // ADR-0049 § 8.1 : comptabilité. La lecture agrège ce que ces rôles lisent déjà
   // (`sales.read`, `treasury.read`, `purchase.read`) ; ni Commercial, ni Responsable RH, ni
   // Magasinier (sans trésorerie), ni Conseiller (externe, sans les livres). Écrire et
   // paramétrer : Propriétaire, Directeur financier, Comptable (ⓢ) ; clôturer : les mêmes,
   // sans ⚙ (la réouverture est au Propriétaire) ; exporter : les mêmes et l'Expert-comptable.
-  'accounting.read': 'A   A   A   A   A   .   .   A   .   .   .   A',
-  'accounting.post': 'S   .   S   S   .   .   .   .   .   .   .   .',
-  'accounting.close': 'A   .   A   A   .   .   .   .   .   .   .   .',
-  'accounting.export': 'A   .   A   A   .   .   .   .   .   .   .   A',
-  'accounting.manage': 'S   .   S   S   .   .   .   .   .   .   .   .',
+  'accounting.read': 'A   A   A   A   A   .   .   A   .   .   .   A   .   .   .   .',
+  'accounting.post': 'S   .   S   S   .   .   .   .   .   .   .   .   .   .   .   .',
+  'accounting.close': 'A   .   A   A   .   .   .   .   .   .   .   .   .   .   .   .',
+  'accounting.export': 'A   .   A   A   .   .   .   .   .   .   .   A   .   .   .   .',
+  'accounting.manage': 'S   .   S   S   .   .   .   .   .   .   .   .   .   .   .   .',
   // ADR-0050 § 8.1 : préparer contrats, avenants et commandes — iso-privilège avec
   // `sales.quote` (le Commercial prépare le contrat de l'affaire qu'il a gagnée) ;
   // approuver, constater une reconduction, résilier : Propriétaire et Directeur financier (ⓢ).
-  'sales.contract': 'A   A   A   A   .   .   .   .   A   .   .   .',
-  'sales.contract.approve': 'S   .   S   .   .   .   .   .   .   .   .   .',
+  'sales.contract': 'A   A   A   A   .   .   .   .   A   .   .   .   .   .   .   .',
+  'sales.contract.approve': 'S   .   S   .   .   .   .   .   .   .   .   .   .   .   .   .',
   // ADR-0051 § 5.1 : déclarer ses frais et pointer suivent `leave.request` (tout rôle
   // interne qui travaille) ; valider frais et avances suit `purchase.approve` (autorité de
   // dépense, ⓢ) ; lire objectifs et évaluations : Propriétaire et Responsable RH seuls —
   // ni Directeur financier, ni Administrateur (décision ouverte n° 12).
-  'expenses.claim': 'A   A   A   A   A   .   .   A   A   A   A   .',
-  'expenses.approve': 'S   .   S   .   .   .   .   .   .   .   .   .',
-  'attendance.clock': 'A   A   A   A   A   .   .   A   A   A   A   .',
-  'performance.read': 'A   .   .   .   .   .   .   .   .   A   .   .',
+  'expenses.claim': 'A   A   A   A   A   .   .   A   A   A   A   .   A   A   A   .',
+  'expenses.approve': 'S   .   S   .   .   .   .   .   .   .   .   .   .   .   .   .',
+  'attendance.clock': 'A   A   A   A   A   .   .   A   A   A   A   .   A   A   A   .',
+  'performance.read': 'A   .   .   .   .   .   .   .   .   A   .   .   .   .   .   .',
 };
 
 const CODE_VERS_GRANT: Record<string, string> = {
@@ -342,7 +353,7 @@ function cellules(ligne: string): string[] {
 }
 
 describe('matrice rôle organisation × action (ADR-0012 §3)', () => {
-  it('déclare exactement les 12 rôles et les 57 actions de docs/12', () => {
+  it('déclare exactement les 16 rôles et les 57 actions de docs/12', () => {
     expect([...ORG_ROLES]).toEqual([...ORDRE_ORG]);
     expect(ACTIONS).toHaveLength(57);
     // Ajoutée en fin de liste, comme dans docs/12 (ADR-0021 §8).
@@ -785,7 +796,7 @@ describe('rang de privilège (correction du tri de l’organisation primaire)', 
     expect(ORG_ROLE_RANK.owner).toBe(0);
   });
 
-  it('couvre les 12 rôles avec des rangs distincts', () => {
+  it('couvre les 16 rôles avec des rangs distincts', () => {
     const rangs = ORG_ROLES.map((r) => ORG_ROLE_RANK[r]);
     expect(new Set(rangs).size).toBe(ORG_ROLES.length);
   });
@@ -813,7 +824,7 @@ describe('compatibilité N-1 des anciens rôles', () => {
     expect(normalizeOrgRole('owner')).toBe('owner');
   });
 
-  it('les 12 slugs se normalisent en eux-mêmes', () => {
+  it('les 16 slugs se normalisent en eux-mêmes', () => {
     for (const role of ORG_ROLES) expect(normalizeOrgRole(role)).toBe(role);
   });
 
@@ -878,9 +889,15 @@ describe('cohérence structurelle de la matrice', () => {
       'admin',
       'advisor',
       'analyst',
+      // ADR-0059 § 2 : l'Administrateur détient les actions du Salarié, du Manager, du
+      // Stagiaire et de l'Invité externe.
+      'employee',
+      'guest',
+      'intern',
       'sales_rep',
       // ADR-0046 § 8.2 : l'Administrateur détient les neuf actions du Magasinier.
       'storekeeper',
+      'team_manager',
       'viewer',
     ]);
   });
@@ -906,9 +923,15 @@ describe('cohérence structurelle de la matrice', () => {
       'admin',
       'advisor',
       'analyst',
+      // ADR-0059 § 2 : l'Administrateur détient les actions du Salarié, du Manager, du
+      // Stagiaire et de l'Invité externe.
+      'employee',
+      'guest',
+      'intern',
       'sales_rep',
       // ADR-0046 § 8.2 : l'Administrateur détient les neuf actions du Magasinier.
       'storekeeper',
+      'team_manager',
       'viewer',
     ]);
     expect(PLATFORM_FORBIDDEN_ACTIONS).not.toContain('sales.read');
@@ -927,9 +950,15 @@ describe('cohérence structurelle de la matrice', () => {
       'admin',
       'advisor',
       'analyst',
+      // ADR-0059 § 2 : l'Administrateur détient les actions du Salarié, du Manager, du
+      // Stagiaire et de l'Invité externe.
+      'employee',
+      'guest',
+      'intern',
       'sales_rep',
       // ADR-0046 § 8.2 : l'Administrateur détient les neuf actions du Magasinier.
       'storekeeper',
+      'team_manager',
       'viewer',
     ]);
   });
@@ -946,9 +975,15 @@ describe('cohérence structurelle de la matrice', () => {
       'admin',
       'advisor',
       'analyst',
+      // ADR-0059 § 2 : l'Administrateur détient les actions du Salarié, du Manager, du
+      // Stagiaire et de l'Invité externe.
+      'employee',
+      'guest',
+      'intern',
       'sales_rep',
       // ADR-0046 § 8.2 : l'Administrateur détient les neuf actions du Magasinier.
       'storekeeper',
+      'team_manager',
       'viewer',
     ]);
   });
@@ -971,9 +1006,15 @@ describe('cohérence structurelle de la matrice', () => {
       'admin',
       'advisor',
       'analyst',
+      // ADR-0059 § 2 : l'Administrateur détient les actions du Salarié, du Manager, du
+      // Stagiaire et de l'Invité externe.
+      'employee',
+      'guest',
+      'intern',
       'sales_rep',
       // ADR-0046 § 8.2 : l'Administrateur détient les neuf actions du Magasinier.
       'storekeeper',
+      'team_manager',
       'viewer',
     ]);
     expect(grantableRoles('viewer').sort()).toEqual(['advisor', 'viewer']);
@@ -993,9 +1034,15 @@ describe('cohérence structurelle de la matrice', () => {
       'admin',
       'advisor',
       'analyst',
+      // ADR-0059 § 2 : l'Administrateur détient les actions du Salarié, du Manager, du
+      // Stagiaire et de l'Invité externe.
+      'employee',
+      'guest',
+      'intern',
       'sales_rep',
       // ADR-0046 § 8.2 : l'Administrateur détient les neuf actions du Magasinier.
       'storekeeper',
+      'team_manager',
       'viewer',
     ]);
     expect(PLATFORM_FORBIDDEN_ACTIONS).not.toContain('crm.read');
@@ -1025,9 +1072,15 @@ describe('cohérence structurelle de la matrice', () => {
       'admin',
       'advisor',
       'analyst',
+      // ADR-0059 § 2 : l'Administrateur détient les actions du Salarié, du Manager, du
+      // Stagiaire et de l'Invité externe.
+      'employee',
+      'guest',
+      'intern',
       'sales_rep',
       // ADR-0046 § 8.2 : l'Administrateur détient les neuf actions du Magasinier.
       'storekeeper',
+      'team_manager',
       'viewer',
     ]);
     expect(grantableRoles('viewer').sort()).toEqual(['advisor', 'viewer']);
@@ -1092,9 +1145,11 @@ describe('ADR-0040 § 4 — rôle Commercial et action `sales.quote`', () => {
     // ADR-0045 § 4.2 : le Responsable RH s'insère au rang 6 ; ADR-0046 § 8.2 : le
     // Magasinier au rang 7 ; ADR-0049 § 8.2 : l'Expert-comptable au rang 8 ; les suivants
     // glissent.
-    expect(ORG_ROLE_RANK.project_manager).toBe(9);
-    expect(ORG_ROLE_RANK.advisor).toBe(10);
-    expect(ORG_ROLE_RANK.viewer).toBe(11);
+    // ADR-0059 § 3 : Manager, Salarié et Stagiaire aux rangs 8 à 10 ; les suivants glissent
+    // de trois crans.
+    expect(ORG_ROLE_RANK.project_manager).toBe(12);
+    expect(ORG_ROLE_RANK.advisor).toBe(13);
+    expect(ORG_ROLE_RANK.viewer).toBe(14);
     expect(ORG_ROLE_LABELS.sales_rep).toBe('Commercial');
     expect(ORG_ROLE_DESCRIPTIONS.sales_rep.length).toBeGreaterThan(20);
   });
@@ -1213,16 +1268,30 @@ describe('ADR-0044 § 4 — achats et fournisseurs (lot P0)', () => {
     // ADR-0046 ajoute le onzième, `storekeeper` ; ADR-0049 le douzième, `external_accountant`.
     expect(
       ORG_ROLES.filter(
-        (r) => r !== 'hr_manager' && r !== 'storekeeper' && r !== 'external_accountant',
+        (r) =>
+          r !== 'hr_manager' &&
+          r !== 'storekeeper' &&
+          r !== 'external_accountant' &&
+          // ADR-0059 § 2.
+          r !== 'employee' &&
+          r !== 'team_manager' &&
+          r !== 'intern' &&
+          r !== 'guest',
       ),
     ).toHaveLength(9);
     expect(grantableRoles('admin').sort()).toEqual([
       'admin',
       'advisor',
       'analyst',
+      // ADR-0059 § 2 : l'Administrateur détient les actions du Salarié, du Manager, du
+      // Stagiaire et de l'Invité externe.
+      'employee',
+      'guest',
+      'intern',
       'sales_rep',
       // ADR-0046 § 8.2 : l'Administrateur détient les neuf actions du Magasinier.
       'storekeeper',
+      'team_manager',
       'viewer',
     ]);
     expect(grantableRoles('viewer').sort()).toEqual(['advisor', 'viewer']);
@@ -1384,6 +1453,10 @@ describe('ADR-0045 § 4 — ressources humaines et rôle Responsable RH (lot H0)
       'hr_manager',
       // ADR-0046 § 8.2 : le Magasinier demande ses absences, comme tout membre interne.
       'storekeeper',
+      // ADR-0059 § 2 : Salarié, Manager et Stagiaire aussi ; pas l'Invité externe.
+      'employee',
+      'team_manager',
+      'intern',
     ]);
   });
 
@@ -1438,8 +1511,8 @@ describe('ADR-0045 § 4 — ressources humaines et rôle Responsable RH (lot H0)
     expect(ORG_ROLE_RANK.sales_rep).toBe(5);
     expect(ORG_ROLE_RANK.hr_manager).toBe(6);
     // ADR-0046 § 8.2 : le Magasinier s'insère au rang 7 ; ADR-0049 § 8.2 : l'Expert-comptable
-    // au rang 8.
-    expect(ORG_ROLE_RANK.project_manager).toBe(9);
+    // au rang 8 (11 depuis ADR-0059 § 3, qui insère trois rôles aux rangs 8 à 10).
+    expect(ORG_ROLE_RANK.project_manager).toBe(12);
     expect(ORG_ROLE_LABELS.hr_manager).toBe('Responsable RH');
     expect(ORG_ROLE_DESCRIPTIONS.hr_manager).toBe(
       'Dossiers du personnel, absences et documents RH. Ne voit ni la trésorerie, ni les ventes, ni les achats.',
@@ -1468,9 +1541,15 @@ describe('ADR-0045 § 4 — ressources humaines et rôle Responsable RH (lot H0)
       'admin',
       'advisor',
       'analyst',
+      // ADR-0059 § 2 : l'Administrateur détient les actions du Salarié, du Manager, du
+      // Stagiaire et de l'Invité externe.
+      'employee',
+      'guest',
+      'intern',
       'sales_rep',
       // ADR-0046 § 8.2 : l'Administrateur détient les neuf actions du Magasinier.
       'storekeeper',
+      'team_manager',
       'viewer',
     ]);
     expect(grantableRoles('owner')).toContain('hr_manager');
@@ -1724,9 +1803,11 @@ describe('ADR-0046 § 8 — stocks, équipements, documents et rôle Magasinier 
     expect(ORG_ROLE_RANK.hr_manager).toBe(6);
     expect(ORG_ROLE_RANK.storekeeper).toBe(7);
     // ADR-0049 § 8.2 : l'Expert-comptable s'insère au rang 8.
-    expect(ORG_ROLE_RANK.project_manager).toBe(9);
-    expect(ORG_ROLE_RANK.advisor).toBe(10);
-    expect(ORG_ROLE_RANK.viewer).toBe(11);
+    // ADR-0059 § 3 : Manager, Salarié et Stagiaire aux rangs 8 à 10 ; les suivants glissent
+    // de trois crans.
+    expect(ORG_ROLE_RANK.project_manager).toBe(12);
+    expect(ORG_ROLE_RANK.advisor).toBe(13);
+    expect(ORG_ROLE_RANK.viewer).toBe(14);
     expect(ORG_ROLE_LABELS.storekeeper).toBe('Magasinier');
     expect(ORG_ROLE_DESCRIPTIONS.storekeeper).toBe(
       'Réceptionne, range, sort et compte le stock ; consulte le matériel et les documents. Ne voit ni les prix d’achat, ni la valeur du stock, ni la trésorerie, ni les ventes.',
@@ -1752,7 +1833,9 @@ describe('ADR-0046 § 8 — stocks, équipements, documents et rôle Magasinier 
       ),
     ).toEqual(['owner', 'admin']);
     // Le Magasinier n'attribue que des rôles inclus dans les siens : aucun qui écrive.
-    expect(grantableRoles('storekeeper')).toEqual(['storekeeper']);
+    // ADR-0059 § 2 : Salarié, Stagiaire et Invité externe sont des sous-ensembles stricts de
+    // sa ligne ; sans `members.invite`, il ne les attribue pas pour autant.
+    expect(grantableRoles('storekeeper')).toEqual(['storekeeper', 'employee', 'intern', 'guest']);
   });
 
   it('dépendances satisfaites par chaque ligne de la matrice', () => {
@@ -2135,10 +2218,13 @@ describe('ADR-0049 § 8 — comptabilité et rôle Expert-comptable (lot K0)', (
 
   it('rang 8, après le Magasinier ; libellé et description du § 8.2', () => {
     expect(ORG_ROLE_RANK.storekeeper).toBe(7);
-    expect(ORG_ROLE_RANK.external_accountant).toBe(8);
-    expect(ORG_ROLE_RANK.project_manager).toBe(9);
-    expect(ORG_ROLE_RANK.advisor).toBe(10);
-    expect(ORG_ROLE_RANK.viewer).toBe(11);
+    // ADR-0059 § 3 : glissé au rang 11.
+    expect(ORG_ROLE_RANK.external_accountant).toBe(11);
+    // ADR-0059 § 3 : Manager, Salarié et Stagiaire aux rangs 8 à 10 ; les suivants glissent
+    // de trois crans.
+    expect(ORG_ROLE_RANK.project_manager).toBe(12);
+    expect(ORG_ROLE_RANK.advisor).toBe(13);
+    expect(ORG_ROLE_RANK.viewer).toBe(14);
     expect(ORG_ROLE_LABELS.external_accountant).toBe('Expert-comptable (externe)');
     expect(ORG_ROLE_DESCRIPTIONS.external_accountant).toBe(
       "Consulte et exporte la comptabilité de l'organisation pour la réviser. N'écrit rien : ni écriture, ni vente, ni paiement. Externe à l'organisation.",
@@ -2175,8 +2261,14 @@ describe('ADR-0049 § 8 — comptabilité et rôle Expert-comptable (lot K0)', (
       'admin',
       'advisor',
       'analyst',
+      // ADR-0059 § 2 : l'Administrateur détient les actions du Salarié, du Manager, du
+      // Stagiaire et de l'Invité externe.
+      'employee',
+      'guest',
+      'intern',
       'sales_rep',
       'storekeeper',
+      'team_manager',
       'viewer',
     ]);
   });
@@ -2513,13 +2605,20 @@ describe('ADR-0050 § 8 — contrats et commandes clients (lot V0)', () => {
   });
 
   it('§ 8.2 — aucun rôle nouveau ; R7 inchangé', () => {
-    expect(ORG_ROLES).toHaveLength(12);
+    // ADR-0059 ajoute les treizième à seizième (Salarié, Manager, Stagiaire, Invité).
+    expect(ORG_ROLES).toHaveLength(16);
     expect(grantableRoles('admin').sort()).toEqual([
       'admin',
       'advisor',
       'analyst',
+      // ADR-0059 § 2 : l'Administrateur détient les actions du Salarié, du Manager, du
+      // Stagiaire et de l'Invité externe.
+      'employee',
+      'guest',
+      'intern',
       'sales_rep',
       'storekeeper',
+      'team_manager',
       'viewer',
     ]);
     expect(grantableRoles('viewer').sort()).toEqual(['advisor', 'viewer']);
@@ -2749,13 +2848,20 @@ describe('ADR-0051 § 5 — frais, avances, présences, évaluations (lot H8)', 
   });
 
   it('§ 5.2 — aucun rôle nouveau ; R7 : l’Administrateur attribue les mêmes rôles', () => {
-    expect(ORG_ROLES).toHaveLength(12);
+    // ADR-0059 ajoute les treizième à seizième (Salarié, Manager, Stagiaire, Invité).
+    expect(ORG_ROLES).toHaveLength(16);
     expect(grantableRoles('admin').sort()).toEqual([
       'admin',
       'advisor',
       'analyst',
+      // ADR-0059 § 2 : l'Administrateur détient les actions du Salarié, du Manager, du
+      // Stagiaire et de l'Invité externe.
+      'employee',
+      'guest',
+      'intern',
       'sales_rep',
       'storekeeper',
+      'team_manager',
       'viewer',
     ]);
     expect(grantableRoles('viewer').sort()).toEqual(['advisor', 'viewer']);
@@ -3179,5 +3285,132 @@ describe('ADR-0051 § 3.5 — `reviewCloseDecision`', () => {
       }
     }
     expect(HR_PERFORMANCE_ERROR_CODES).toContain('REVIEW_CLOSE_FORBIDDEN');
+  });
+});
+
+describe('ADR-0059 — rôles de l’équipe : Salarié, Manager, Stagiaire, Invité externe', () => {
+  const tenues = (role: OrgRole): Action[] =>
+    ACTIONS.filter((a) => can(role, a, { canClosePeriods: true }));
+  const SALARIE: readonly Action[] = [
+    'analytics.read',
+    'work.read',
+    'work.update',
+    'leave.request',
+    'expenses.claim',
+    'attendance.clock',
+  ];
+  // Familles financières : aucune n'est ouverte aux quatre rôles (§ 2).
+  const FINANCE = (a: Action): boolean =>
+    a.startsWith('sales.') ||
+    a.startsWith('treasury.') ||
+    a.startsWith('purchase.') ||
+    a.startsWith('accounting.') ||
+    a.startsWith('crm.') ||
+    a === 'payables.pay' ||
+    a === 'fiscal.manage' ||
+    a === 'billing.manage' ||
+    a === 'report.export' ||
+    a === 'actuals.import' ||
+    a === 'period.close' ||
+    a.startsWith('plan.') ||
+    a === 'inputs.update' ||
+    a === 'canvas.update' ||
+    a.startsWith('project.') ||
+    a.startsWith('stock.') ||
+    a === 'expenses.approve' ||
+    a === 'hr.sensitive.read';
+
+  it('Salarié : six actions — tâches, libre-service RH, socle — et rien d’autre', () => {
+    expect(tenues('employee')).toEqual(SALARIE);
+  });
+
+  it('Manager / Chef d’équipe : Salarié + `work.manage`, sans validation RH (v1.15)', () => {
+    expect(tenues('team_manager')).toEqual([
+      'analytics.read',
+      'work.read',
+      'work.update',
+      'work.manage',
+      'leave.request',
+      'expenses.claim',
+      'attendance.clock',
+    ]);
+    expect(can('team_manager', 'leave.approve', NO_OVERRIDES)).toBe(false);
+    expect(can('team_manager', 'hr.read', NO_OVERRIDES)).toBe(false);
+  });
+
+  it('Stagiaire : la même ligne que le Salarié (§ 2, décision ouverte n° 3)', () => {
+    expect(ORG_PERMISSION_MATRIX.intern).toEqual(ORG_PERMISSION_MATRIX.employee);
+  });
+
+  it('Invité externe : projets et tâches, socle compris ; ni RH ni pointage', () => {
+    expect(tenues('guest')).toEqual(['analytics.read', 'work.read', 'work.update']);
+    expect(PROJECT_SCOPED_ROLES).toEqual(['guest']);
+  });
+
+  it('aucune donnée financière pour les quatre rôles', () => {
+    for (const role of ['employee', 'team_manager', 'intern', 'guest'] as const) {
+      for (const action of ACTIONS.filter(FINANCE)) {
+        expect(can(role, action, NO_OVERRIDES), `${role} × ${action}`).toBe(false);
+      }
+      expect(canSeeStockValues(role, NO_OVERRIDES), role).toBe(false);
+    }
+  });
+
+  it('dépendances satisfaites par chaque nouvelle ligne', () => {
+    for (const role of ['employee', 'team_manager', 'intern', 'guest'] as const) {
+      const set = new Set(tenues(role));
+      for (const a of set) {
+        for (const r of requiredActionsOf(a))
+          expect(set.has(r), `${role} : ${a} ⇒ ${r}`).toBe(true);
+      }
+    }
+  });
+
+  it('attribuables ; Propriétaire et Administrateur les attribuent (R7), pas réservés', () => {
+    for (const role of ['employee', 'team_manager', 'intern', 'guest'] as const) {
+      expect(ASSIGNABLE_ORG_ROLES).toContain(role);
+      expect(OWNER_ONLY_ROLES).not.toContain(role);
+      expect(canGrantRole('owner', role), role).toBe(true);
+      expect(canGrantRole('admin', role), role).toBe(true);
+      // Le Directeur financier aussi (sous-ensemble), mais sans `members.invite`.
+      expect(canGrantRole('finance_director', role), role).toBe(true);
+    }
+    // Le Lecteur ne travaille pas sur les tâches : il n'attribue aucun de ces rôles.
+    expect(canGrantRole('viewer', 'employee')).toBe(false);
+    // Le Salarié n'attribue pas le Manager (il n'a pas `work.manage`).
+    expect(canGrantRole('employee', 'team_manager')).toBe(false);
+  });
+
+  it('aucun n’est approbateur ; aucune case ⓢ, ⚙ ni P', () => {
+    for (const role of ['employee', 'team_manager', 'intern', 'guest'] as const) {
+      expect(APPROVER_ROLES).not.toContain(role);
+      for (const action of ACTIONS) {
+        expect(['allow', 'deny']).toContain(ORG_PERMISSION_MATRIX[role][action]);
+      }
+    }
+  });
+
+  it('rôle par défaut à l’invitation : le Salarié, qui expose moins que le Lecteur', () => {
+    expect(DEFAULT_INVITATION_ROLE).toBe('employee');
+    const lecteur = new Set(tenues('viewer'));
+    const lus = ACTIONS.filter((a) => a.endsWith('.read') && FINANCE(a));
+    expect(lus.filter((a) => lecteur.has(a)).length).toBeGreaterThan(0);
+    expect(lus.filter((a) => can('employee', a, NO_OVERRIDES))).toEqual([]);
+  });
+
+  it('rangs 8 à 10 après le Magasinier, l’Invité externe en dernier ; libellés et descriptions', () => {
+    expect(ORG_ROLE_RANK.storekeeper).toBe(7);
+    expect(ORG_ROLE_RANK.team_manager).toBe(8);
+    expect(ORG_ROLE_RANK.employee).toBe(9);
+    expect(ORG_ROLE_RANK.intern).toBe(10);
+    expect(ORG_ROLE_RANK.guest).toBe(15);
+    expect(Math.max(...ORG_ROLES.map((r) => ORG_ROLE_RANK[r]))).toBe(ORG_ROLE_RANK.guest);
+    expect(ORG_ROLE_LABELS.employee).toBe('Salarié');
+    expect(ORG_ROLE_LABELS.team_manager).toBe('Manager / Chef d’équipe');
+    expect(ORG_ROLE_LABELS.intern).toBe('Stagiaire');
+    expect(ORG_ROLE_LABELS.guest).toBe('Invité externe');
+    for (const role of ['employee', 'team_manager', 'intern', 'guest'] as const) {
+      expect(ORG_ROLE_DESCRIPTIONS[role].length, role).toBeGreaterThan(40);
+    }
   });
 });

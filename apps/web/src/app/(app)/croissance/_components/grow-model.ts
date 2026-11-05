@@ -67,6 +67,19 @@ export function refusForfait(err: unknown): string | null {
   return null;
 }
 
+/**
+ * Refus des chiffres (santé, indicateurs) faute de droit : réservés à la direction
+ * et à la finance (ADR-0059, décision n° 1). `null` pour toute autre erreur.
+ */
+export function refusAcces(err: unknown): string | null {
+  const e = err as ApiError;
+  const d = e?.detail as { code?: unknown; message?: unknown } | undefined;
+  if (e?.status === 403 && d?.code === 'GROW_FIGURES_RESTRICTED') {
+    return typeof d.message === 'string' ? d.message : 'Réservé à la direction et à la finance.';
+  }
+  return null;
+}
+
 /** Message lisible d'une erreur d'API. */
 export function messageErreur(err: unknown, defaut: string): string {
   const e = err as ApiError;

@@ -35,7 +35,7 @@ import {
 } from './permissions.js';
 
 const ON = { MEMBER_PERMISSIONS_ENABLED: 'true' } as NodeJS.ProcessEnv;
-const OFF = {} as NodeJS.ProcessEnv;
+const OFF = { MEMBER_PERMISSIONS_ENABLED: 'false' } as NodeJS.ProcessEnv;
 
 interface FakeMembership {
   organizationId: string;
@@ -78,12 +78,16 @@ function rng(seed: number): () => number {
 }
 
 describe('interrupteur MEMBER_PERMISSIONS_ENABLED', () => {
-  it('est éteint par défaut et ne s’allume que sur la valeur exacte « true »', () => {
-    expect(memberPermissionsEnabled(OFF)).toBe(false);
-    expect(memberPermissionsEnabled({ MEMBER_PERMISSIONS_ENABLED: '1' } as NodeJS.ProcessEnv)).toBe(
-      false,
-    );
+  it('ADR-0059 : allumé par défaut, coupé seulement par la valeur explicite « false »', () => {
+    expect(memberPermissionsEnabled({} as NodeJS.ProcessEnv)).toBe(true);
     expect(memberPermissionsEnabled(ON)).toBe(true);
+    expect(memberPermissionsEnabled({ MEMBER_PERMISSIONS_ENABLED: '' } as NodeJS.ProcessEnv)).toBe(
+      true,
+    );
+    expect(memberPermissionsEnabled(OFF)).toBe(false);
+    expect(
+      memberPermissionsEnabled({ MEMBER_PERMISSIONS_ENABLED: ' FALSE ' } as NodeJS.ProcessEnv),
+    ).toBe(false);
   });
 });
 
@@ -213,7 +217,7 @@ describe('AuthzService', () => {
       revokes: ['crm.manage'],
       permissionsRevision: 3,
     };
-    delete process.env['MEMBER_PERMISSIONS_ENABLED'];
+    process.env['MEMBER_PERMISSIONS_ENABLED'] = 'false';
     const off = await harnais([doc]).service.resolveOrgRole('u', 'org');
     expect(off?.context).toEqual({ canClosePeriods: false });
 
@@ -256,7 +260,7 @@ describe('AuthzService', () => {
     expect(await service.countApprovers('org')).toBe(2);
     expect(await service.holdersOf('org', 'plan.approve')).toEqual(['o', 'v']);
 
-    delete process.env['MEMBER_PERMISSIONS_ENABLED'];
+    process.env['MEMBER_PERMISSIONS_ENABLED'] = 'false';
     expect(await service.countApprovers('org')).toBe(2);
     expect(await service.holdersOf('org', 'plan.approve')).toEqual(['o', 'fd']);
   });
@@ -291,7 +295,7 @@ describe('AuthzService', () => {
     expect(await service.countApprovers('org')).toBe(2);
     expect(await service.countApprovers('org', 'plan.approve')).toBe(2);
 
-    delete process.env['MEMBER_PERMISSIONS_ENABLED'];
+    process.env['MEMBER_PERMISSIONS_ENABLED'] = 'false';
     // Interrupteur éteint : par titre seulement (Propriétaire, Directeur financier).
     expect(await service.countApprovers('org', 'purchase.approve')).toBe(2);
     expect(await service.holdersOf('org', 'purchase.approve')).toEqual(['o', 'fd']);
@@ -319,10 +323,10 @@ describe('catalogue des autorisations (ADR-0041 § 5, § 6)', () => {
   const catalog = buildAuthzCatalog();
 
   it('dit si la personnalisation est ouverte (interrupteur, lu à chaque appel)', () => {
-    expect(buildAuthzCatalog({}).memberPermissionsEnabled).toBe(false);
-    expect(buildAuthzCatalog({ MEMBER_PERMISSIONS_ENABLED: 'true' }).memberPermissionsEnabled).toBe(
-      true,
-    );
+    expect(buildAuthzCatalog({}).memberPermissionsEnabled).toBe(true);
+    expect(
+      buildAuthzCatalog({ MEMBER_PERMISSIONS_ENABLED: 'false' }).memberPermissionsEnabled,
+    ).toBe(false);
   });
 
   it('chaque action figure dans exactement un domaine et a un libellé', () => {

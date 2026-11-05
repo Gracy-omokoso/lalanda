@@ -1,21 +1,24 @@
 // Article « Travailler à plusieurs ».
 //
 // Sources vérifiées dans le code au moment de la rédaction :
-//  - rôles et matrice : apps/api/src/authz/permissions.ts (9 rôles org dont le
-//    Commercial d'ADR-0040, 28 actions, libellés FR, R1 dernier propriétaire,
+//  - rôles et matrice : apps/api/src/authz/permissions.ts (16 rôles org dont le
+//    Commercial d'ADR-0040 et, d'ADR-0059, Salarié, Manager / Chef d'équipe, Stagiaire et
+//    Invité externe ; 57 actions, libellés FR, R1 dernier propriétaire,
 //    R2 séparation des tâches, R7 anti-escalade, project_manager NON ATTRIBUABLE)
 //  - trésorerie réservée à `treasury.read` (ADR-0040 § 4.4) : brief du matin et
 //    GROW la masquent au Commercial et au Conseiller
 //  - invitations : apps/api/src/organizations/invitations.controller.ts et
-//    invitations.service.ts (TTL 7 jours, rôle viewer par défaut, correspondance
+//    invitations.service.ts (TTL 7 jours, rôle employee — Salarié — par défaut
+//    depuis ADR-0059, correspondance
 //    d'adresse obligatoire) + apps/web/.../members/_components/invite-panel.tsx
 //  - restrictions par projet : permissions.ts (`allow_project` se comporte comme
 //    `allow`) — AUCUNE collection d'assignation de projet n'existe.
 //  - autorisations par membre (ADR-0041) : permissions.ts (`validateOverrides`,
 //    `ACTION_DEPENDENCIES`, `SOD_PAIRS`, `NON_DELEGABLE_ACTIONS`, `BASE_ACTION`),
 //    organizations/members.service.ts (`setPermissions`, `changeRole` qui efface
-//    l'écart), interrupteur `MEMBER_PERMISSIONS_ENABLED` ÉTEINT par défaut
-//    (`409 MEMBER_PERMISSIONS_DISABLED`), notification `/compte`.
+//    l'écart), interrupteur `MEMBER_PERMISSIONS_ENABLED` ALLUMÉ par défaut depuis
+//    ADR-0059 (coupé seulement par `false` explicite : `409 MEMBER_PERMISSIONS_DISABLED`),
+//    notification `/compte`.
 //
 // TROIS LIMITES CRITIQUES écrites ici telles qu'elles sont AUJOURD'HUI :
 //   1. l'invitation part par email (`MailService.sendInvitation`), mais l'écran
@@ -71,7 +74,7 @@ export const TRAVAILLER_A_PLUSIEURS: ArticleAide = {
             {
               titre: 'Créez l’invitation',
               texte:
-                'Depuis l’espace **Membres**, indiquez l’adresse email de la personne et choisissez son rôle. Le rôle proposé par défaut est **Lecteur**, le moins permissif — c’est volontaire. Vous pouvez ensuite ajuster ses autorisations avec « Personnaliser les autorisations » (voir [plus bas](/aide/travailler-a-plusieurs#personnaliser)).',
+                'Depuis l’espace **Membres**, indiquez l’adresse email de la personne et choisissez son rôle. Le rôle proposé par défaut est **Salarié** : il travaille sur les projets et les tâches, demande ses congés et déclare ses frais, sans voir aucune donnée financière. Vous pouvez ensuite ajuster ses autorisations avec « Personnaliser les autorisations » (voir [plus bas](/aide/travailler-a-plusieurs#personnaliser)).',
             },
             {
               titre: 'Copiez le lien affiché et envoyez-le',
@@ -110,7 +113,7 @@ export const TRAVAILLER_A_PLUSIEURS: ArticleAide = {
         {
           type: 'paragraphe',
           texte:
-            'Huit rôles sont attribuables. Choisissez le moins permissif qui permette à la personne de faire son travail — vous pourrez toujours l’élargir ensuite.',
+            'Choisissez le moins permissif qui permette à la personne de faire son travail — vous pourrez toujours l’élargir ensuite. Pour le personnel, partez du **Salarié**.',
         },
         {
           type: 'tableau',
@@ -153,8 +156,24 @@ export const TRAVAILLER_A_PLUSIEURS: ArticleAide = {
             ],
             [
               '**Lecteur**',
-              'Consultation seule.',
+              'Consultation seule, finances comprises. Ne coche pas de tâche.',
               'Toute personne qui doit seulement être informée.',
+            ],
+            [
+              '**Salarié** (par défaut)',
+              'Voit les projets, **coche ses tâches**, commente, saisit son temps ; demande ses congés, déclare ses frais, pointe. **Ne voit aucune donnée financière** (ni ventes, ni trésorerie, ni achats, ni comptabilité).',
+              'Tout membre du personnel.',
+            ],
+            [
+              '**Manager / Chef d’équipe**',
+              'Comme le Salarié, et **crée, règle et archive les projets**. Ne valide pas encore les congés de son équipe.',
+              'Qui pilote une équipe ou des projets.',
+            ],
+            ['**Stagiaire**', 'Les mêmes droits que le Salarié.', 'Un stagiaire, un apprenti.'],
+            [
+              '**Invité externe**',
+              'Voit et fait avancer les projets et les tâches, **rien d’autre**. Il ne voit que les projets où il est ajouté, personnellement ou par une équipe.',
+              'Un client ou un prestataire extérieur.',
             ],
           ],
           legende:
@@ -193,13 +212,6 @@ export const TRAVAILLER_A_PLUSIEURS: ArticleAide = {
             'Le rôle est un **titre** et un point de départ. Pour une personne précise, vous pouvez **ajouter** une autorisation que son titre n’a pas (un Commercial qui doit consulter la trésorerie) ou en **retirer** une qu’il a (un Comptable qui ne doit pas émettre de facture). Le titre reste affiché ; la liste des membres signale l’écart par un badge « personnalisé (+1 −1) ».',
         },
         {
-          type: 'note',
-          ton: 'limite',
-          titre: 'Cette personnalisation n’est peut-être pas encore active sur votre espace',
-          texte:
-            'Elle s’active espace par espace. Tant qu’elle ne l’est pas, la grille des autorisations reste **consultable en lecture seule** et l’application l’indique (« sera bientôt disponible ») : seul le titre s’attribue.',
-        },
-        {
           type: 'etapes',
           items: [
             {
@@ -215,7 +227,7 @@ export const TRAVAILLER_A_PLUSIEURS: ArticleAide = {
             {
               titre: 'Enregistrez',
               texte:
-                'Un motif facultatif peut accompagner le changement ; il est conservé dans le journal d’audit. Si quelqu’un a modifié la même fiche entre-temps, l’application la recharge et vous demande de vérifier avant de recommencer.',
+                'Rien n’est appliqué tant que vous n’avez pas cliqué sur **Enregistrer** : tant qu’une modification attend, un bandeau « modifications non enregistrées » reste visible en bas de la fiche. Un motif facultatif peut accompagner le changement ; il est conservé dans le journal d’audit. Si quelqu’un a modifié la même fiche entre-temps, l’application la recharge et vous demande de vérifier avant de recommencer.',
             },
           ],
         },

@@ -21,6 +21,7 @@ import {
   nomAffiche,
   raisonNonModifiable,
   raisonNonRevocable,
+  ROLE_INVITATION_PAR_DEFAUT,
   roleParDefaut,
   rolesProposables,
   sousTitre,
@@ -140,9 +141,9 @@ describe('rôle par défaut à l’invitation', () => {
     expect(rolesProposables(options).map((o) => o.value)).toEqual(['admin', 'sales_rep', 'viewer']);
   });
 
-  it('le rang miroir couvre les douze rôles, sans ex æquo', () => {
+  it('le rang miroir couvre les seize rôles, sans ex æquo', () => {
     const roles = Object.keys(RANG_DE_PRIVILEGE) as OrgRole[];
-    expect(roles).toHaveLength(12);
+    expect(roles).toHaveLength(16);
     expect(new Set(roles.map((r) => RANG_DE_PRIVILEGE[r])).size).toBe(roles.length);
     expect(RANG_DE_PRIVILEGE.owner).toBe(0);
     expect(RANG_DE_PRIVILEGE.sales_rep).toBe(5);
@@ -150,9 +151,34 @@ describe('rôle par défaut à l’invitation', () => {
     expect(RANG_DE_PRIVILEGE.hr_manager).toBe(6);
     // ADR-0046 § 8.2.
     expect(RANG_DE_PRIVILEGE.storekeeper).toBe(7);
-    // ADR-0049 § 8.2.
-    expect(RANG_DE_PRIVILEGE.external_accountant).toBe(8);
-    expect(RANG_DE_PRIVILEGE.viewer).toBe(11);
+    // ADR-0059 § 3.
+    expect(RANG_DE_PRIVILEGE.team_manager).toBe(8);
+    expect(RANG_DE_PRIVILEGE.employee).toBe(9);
+    expect(RANG_DE_PRIVILEGE.intern).toBe(10);
+    // ADR-0049 § 8.2, glissé par ADR-0059.
+    expect(RANG_DE_PRIVILEGE.external_accountant).toBe(11);
+    expect(RANG_DE_PRIVILEGE.viewer).toBe(14);
+    expect(RANG_DE_PRIVILEGE.guest).toBe(15);
+  });
+
+  it('ADR-0059 — le Salarié est proposé par défaut dès qu’il est attribuable', () => {
+    const options = [
+      option({ value: 'admin' }),
+      option({ value: 'viewer' }),
+      option({ value: 'employee', label: 'Salarié' }),
+      option({ value: 'team_manager', label: 'Manager / Chef d’équipe' }),
+      option({ value: 'intern', label: 'Stagiaire' }),
+      option({ value: 'guest', label: 'Invité externe' }),
+    ];
+    expect(roleParDefaut(options)).toBe('employee');
+    expect(ROLE_INVITATION_PAR_DEFAUT).toBe('employee');
+  });
+
+  it('ADR-0059 — l’Invité externe n’est jamais le défaut, même s’il est le moins puissant', () => {
+    expect(roleParDefaut([option({ value: 'admin' }), option({ value: 'guest' })])).toBe('admin');
+    expect(roleParDefaut([option({ value: 'viewer' }), option({ value: 'guest' })])).toBe('viewer');
+    // Seul proposable : on le propose (aucun autre choix possible).
+    expect(roleParDefaut([option({ value: 'guest' })])).toBe('guest');
   });
 
   it('l’Expert-comptable, en fin de liste, n’est pas pris pour le moins puissant (ADR-0049)', () => {

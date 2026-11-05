@@ -399,7 +399,7 @@ e2eSuite('projets privés, membres et équipes — ADR-0060', () => {
     });
   });
 
-  describe('rôle limité aux projets dont il est membre (pont de fusion `guest`)', () => {
+  describe('rôle limité aux projets dont il est membre (Invité externe, ADR-0059)', () => {
     it('isProjectScopedRole', () => {
       expect(isProjectScopedRole('guest')).toBe(true);
       expect(isProjectScopedRole('viewer')).toBe(false);
@@ -411,7 +411,7 @@ e2eSuite('projets privés, membres et équipes — ADR-0060', () => {
       const asGuest = (userId: string) =>
         access.scopeOf(f.orgId(), {
           userId,
-          role: 'guest' as never,
+          role: 'guest',
           context: NO_OVERRIDES,
         });
       // L'Analyste a été retiré du projet privé : rien ne lui est ouvert.

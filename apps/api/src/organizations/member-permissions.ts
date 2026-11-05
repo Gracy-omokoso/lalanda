@@ -91,10 +91,10 @@ export function sameState(a: PermissionsState, b: PermissionsState): boolean {
 }
 
 /**
- * Interrupteur éteint : toute écriture d'un écart NON VIDE est refusée
- * explicitement (ADR-0041 § 9.1 — l'écriture reste derrière l'interrupteur tant
- * que toutes les instances et le lot A3 ne lisent pas les écarts). Un écart vide
- * reste accepté : il ne change rien à ce que l'application décide.
+ * Interrupteur coupé (`MEMBER_PERMISSIONS_ENABLED=false`, ADR-0059 : allumé par
+ * défaut) : toute écriture d'un écart NON VIDE est refusée explicitement (ADR-0041
+ * § 9.1). Un écart vide reste accepté : il ne change rien à ce que l'application
+ * décide.
  */
 export function assertPermissionsWritable(
   grants: readonly Action[],
@@ -109,8 +109,8 @@ export function permissionsDisabled(): ConflictException {
   return new ConflictException({
     code: 'MEMBER_PERMISSIONS_DISABLED',
     message:
-      "La personnalisation des autorisations n'est pas encore activée sur cette instance. " +
-      'Seul le titre peut être attribué.',
+      'La personnalisation des autorisations est coupée sur cette instance ' +
+      '(MEMBER_PERMISSIONS_ENABLED=false). Seul le titre peut être attribué.',
   });
 }
 

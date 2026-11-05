@@ -17,16 +17,14 @@
 
 import { Types } from 'mongoose';
 
+import { PROJECT_SCOPED_ROLES } from '../authz/permissions.js';
+
 /**
- * Rôle « limité aux projets dont il est membre ».
- *
- * PONT DE FUSION (ADR-0060 § 5) : un chantier parallèle ajoute le rôle `guest` et
- * exporte `PROJECT_SCOPED_ROLES` depuis `authz/permissions.ts`. À la fusion, ce corps
- * devient `PROJECT_SCOPED_ROLES.includes(role)`. D'ici là, la chaîne est comparée
- * telle quelle (aucun rôle de cette branche n'est limité).
+ * Rôle « limité aux projets dont il est membre » : `PROJECT_SCOPED_ROLES` d'ADR-0059
+ * (aujourd'hui l'Invité externe, `guest`).
  */
 export function isProjectScopedRole(role: string): boolean {
-  return role === 'guest';
+  return (PROJECT_SCOPED_ROLES as readonly string[]).includes(role);
 }
 
 /**

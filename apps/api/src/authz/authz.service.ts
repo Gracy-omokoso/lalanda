@@ -47,18 +47,22 @@ export interface MemberOverrides {
 }
 
 /**
- * ADR-0041 § 9.1 — interrupteur `MEMBER_PERMISSIONS_ENABLED`, ÉTEINT par défaut.
+ * ADR-0041 § 9.1 — interrupteur `MEMBER_PERMISSIONS_ENABLED`, ALLUMÉ par défaut depuis
+ * ADR-0059 (v1.14.0).
  *
- * L'ADR l'allume seulement quand toutes les instances lisent les écarts ET que le
- * lot A3 (appelants qui décident encore par rôle) est fusionné. Tant qu'il est
- * éteint, la lecture elle-même traite tout écart stocké comme vide : sinon le guard
- * appliquerait un retrait que les décisions par rôle d'A3 ignoreraient encore — un
- * état incohérent. Éteint, l'application se comporte exactement comme avant ADR-0041.
+ * L'ADR-0041 l'allumait quand toutes les instances liraient les écarts ET que le lot A3
+ * (appelants qui décidaient encore par rôle) serait fusionné : c'est le cas depuis la
+ * v1.10 (lots A1 à A5). Il était pourtant resté éteint en production, faute d'une
+ * variable posée : la grille s'affichait en lecture seule et la dirigeante ne pouvait
+ * ni accorder ni retirer une autorisation. ADR-0059 inverse le défaut : seule la valeur
+ * explicite `false` (casse et espaces ignorés) coupe la personnalisation. Coupé, la
+ * lecture traite tout écart stocké comme vide et l'application se comporte exactement
+ * comme avant ADR-0041 (retour arrière sans migration).
  *
  * Lu à chaque appel (pas de mémoïsation) : les tests l'allument et l'éteignent.
  */
 export function memberPermissionsEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env['MEMBER_PERMISSIONS_ENABLED'] === 'true';
+  return env['MEMBER_PERMISSIONS_ENABLED']?.trim().toLowerCase() !== 'false';
 }
 
 const NO_MEMBER_OVERRIDES: Readonly<MemberOverrides> = Object.freeze({ grants: [], revokes: [] });

@@ -208,6 +208,11 @@ export function MemberPermissionsPanel({
   const actuel = ecartAEnvoyer(catalogue, ligne, initiale, membre.canClosePeriods);
   const modifie = !memeEcart(aEnvoyer, actuel);
   const surTitre = ecartVu.grants.length === 0 && ecartVu.revokes.length === 0;
+  // ADR-0059 : combien de cases diffèrent de l'état enregistré — dit en clair que
+  // rien n'est appliqué avant « Enregistrer » (retour de la dirigeante, v1.14.0).
+  const enAttente =
+    [...selection].filter((a) => !initiale.has(a)).length +
+    [...initiale].filter((a) => !selection.has(a)).length;
   const idPrefixe = `autorisations-${membre.userId}`;
 
   async function enregistrer(): Promise<void> {
@@ -276,7 +281,25 @@ export function MemberPermissionsPanel({
       ) : null}
 
       {verrou === null ? (
-        <div className="flex flex-col gap-2">
+        <div
+          className={`flex flex-col gap-2 ${
+            modifie
+              ? 'sticky bottom-0 z-10 -mx-3 -mb-3 rounded-b-lg border-t border-[var(--accent)] bg-[var(--background)] p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.08)]'
+              : ''
+          }`}
+        >
+          {modifie ? (
+            <p role="status" className="text-sm font-medium text-[var(--accent)]">
+              {enAttente > 1
+                ? `${enAttente} modifications non enregistrées`
+                : '1 modification non enregistrée'}{' '}
+              — cliquez sur « Enregistrer » pour les appliquer.
+            </p>
+          ) : (
+            <p className="text-xs text-[var(--foreground-muted)]">
+              Cochez ou décochez une autorisation, puis cliquez sur « Enregistrer ».
+            </p>
+          )}
           <label htmlFor={`${idPrefixe}-motif`} className="text-xs font-medium">
             Motif (facultatif, visible dans le journal d’audit)
           </label>
@@ -295,7 +318,7 @@ export function MemberPermissionsPanel({
               onClick={() => void enregistrer()}
               className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--accent-foreground)] transition hover:opacity-90 disabled:opacity-50"
             >
-              {occupe ? 'Enregistrement…' : 'Enregistrer'}
+              {occupe ? 'Enregistrement…' : 'Enregistrer les autorisations'}
             </button>
             <button
               type="button"

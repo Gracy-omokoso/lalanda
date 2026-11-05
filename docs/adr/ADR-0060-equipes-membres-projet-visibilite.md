@@ -130,10 +130,9 @@ aux personnes ajoutées et aux membres des équipes ajoutées (ADR-0061 § 2).
 2. sinon, `organization.manage` → `all` ;
 3. sinon → `deny` : les projets privés dont il n'est ni responsable, ni membre, ni membre d'une équipe.
 
-**Pont de fusion** : `isProjectScopedRole(role: string)` vaut aujourd'hui `role === 'guest'`
-(`apps/api/src/work/work-access.ts`) ; à la fusion du chantier « accès et rôles », son corps devient
-`PROJECT_SCOPED_ROLES.includes(role)`. C'est le seul endroit où un nom de rôle apparaît hors de
-`permissions.ts`, et il est marqué comme tel.
+**Rôle limité** : `isProjectScopedRole(role)` (`apps/api/src/work/work-access.ts`) vaut
+`PROJECT_SCOPED_ROLES.includes(role)`, la liste d'ADR-0059 (aujourd'hui `guest`). Câblé à la fusion
+du 5 nov. 2026 : aucun nom de rôle n'apparaît plus hors de `permissions.ts`.
 
 Notifications : `WorkNotifier` n'émet jamais vers un destinataire qui ne voit pas le projet ; à la
 lecture, le module de notifications applique un **filtre enregistré** par le module `work`

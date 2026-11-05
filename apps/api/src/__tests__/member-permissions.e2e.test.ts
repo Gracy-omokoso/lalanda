@@ -12,7 +12,7 @@
 import type { INestApplication } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import request from 'supertest';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import 'reflect-metadata';
 
@@ -45,7 +45,7 @@ e2eSuite('ADR-0041 A4 — routes de gestion des autorisations par membre', () =>
     process.env['MEMBER_PERMISSIONS_ENABLED'] = 'true';
   }
   function eteindre(): void {
-    delete process.env['MEMBER_PERMISSIONS_ENABLED'];
+    process.env['MEMBER_PERMISSIONS_ENABLED'] = 'false';
   }
 
   async function inscrire(cle: string): Promise<Compte> {
@@ -164,14 +164,17 @@ e2eSuite('ADR-0041 A4 — routes de gestion des autorisations par membre', () =>
   });
 
   afterAll(async () => {
-    if (INTERRUPTEUR === undefined) eteindre();
+    if (INTERRUPTEUR === undefined) delete process.env['MEMBER_PERMISSIONS_ENABLED'];
     else process.env['MEMBER_PERMISSIONS_ENABLED'] = INTERRUPTEUR;
     await teardown(app, emails);
   }, E2E_HOOK_TIMEOUT_MS);
 
-  // ── Interrupteur éteint ─────────────────────────────────────────────────────
+  // ── Interrupteur coupé ──────────────────────────────────────────────────────
 
-  describe('interrupteur éteint (défaut)', () => {
+  // ADR-0059 : allumé par défaut ; ce bloc le coupe explicitement (`false`).
+  describe('interrupteur coupé (`false` explicite)', () => {
+    beforeEach(() => eteindre());
+
     it('PATCH …/permissions → 409 MEMBER_PERMISSIONS_DISABLED, rien n’est écrit', async () => {
       const res = await ecart('owner', org, 'commercial', { grants: ['treasury.read'] });
       expect(res.status).toBe(409);
