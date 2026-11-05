@@ -122,7 +122,10 @@ export class WorkProjectMembersService {
       users: userIds
         .map((id) => {
           const m = perms.get(id);
-          return { ...ref(id), canUpdate: m !== undefined && can(m.role, 'work.update', m.context) };
+          return {
+            ...ref(id),
+            canUpdate: m !== undefined && can(m.role, 'work.update', m.context),
+          };
         })
         .sort(byName),
       teams: teamViews,

@@ -7,7 +7,11 @@
 // l'équipe plus tard donne accès). Lecture pour qui voit le projet ; modification
 // pour `work.manage`. L'accès réel est décidé par l'API, jamais par cet écran.
 
-import type { WorkProjectMembersView, WorkProjectVisibility, WorkTeamRef } from '@lalanda/shared/work';
+import type {
+  WorkProjectMembersView,
+  WorkProjectVisibility,
+  WorkTeamRef,
+} from '@lalanda/shared/work';
 import { StatusPill, buttonClasses } from '@lalanda/ui';
 import { Building2, Lock, UserMinus, UserPlus, UsersRound } from 'lucide-react';
 import { useCallback, useEffect, useId, useState } from 'react';
@@ -84,7 +88,12 @@ export function MembresProjet(): React.ReactElement {
     setErreur(null);
     setEnvoi(true);
     try {
-      setProject(await workApi.updateProject(projectId, { expectedRevision: project.revision, visibility: v }));
+      setProject(
+        await workApi.updateProject(projectId, {
+          expectedRevision: project.revision,
+          visibility: v,
+        }),
+      );
       recharger();
     } catch (err) {
       setErreur(message(err, 'La visibilité n’a pas pu être changée.'));
@@ -123,7 +132,9 @@ export function MembresProjet(): React.ReactElement {
               <label
                 key={v}
                 className={`flex cursor-pointer items-start gap-3 rounded-[var(--radius-md)] border p-3 text-sm transition-colors ${
-                  actif ? 'border-[var(--accent)] bg-[var(--surface-muted)]' : 'border-[var(--border)] bg-[var(--surface)]'
+                  actif
+                    ? 'border-[var(--accent)] bg-[var(--surface-muted)]'
+                    : 'border-[var(--border)] bg-[var(--surface)]'
                 } ${!modifiable ? 'cursor-default' : ''}`}
               >
                 <input
@@ -138,7 +149,9 @@ export function MembresProjet(): React.ReactElement {
                     <Icone aria-hidden="true" className="h-4 w-4" />
                     {VISIBILITES[v].label}
                   </span>
-                  <span className="text-xs text-[var(--foreground-muted)]">{VISIBILITES[v].phrase}</span>
+                  <span className="text-xs text-[var(--foreground-muted)]">
+                    {VISIBILITES[v].phrase}
+                  </span>
                 </span>
               </label>
             );
@@ -153,12 +166,23 @@ export function MembresProjet(): React.ReactElement {
             onSubmit={(e) => {
               e.preventDefault();
               if (personne === '') return;
-              void agir(workApi.addProjectMembers(projectId, { userIds: [personne] }), 'Le membre n’a pas pu être ajouté.');
+              void agir(
+                workApi.addProjectMembers(projectId, { userIds: [personne] }),
+                'Le membre n’a pas pu être ajouté.',
+              );
             }}
           >
-            <label className="flex min-w-44 flex-1 flex-col gap-1 text-sm" htmlFor={`${id}-personne`}>
+            <label
+              className="flex min-w-44 flex-1 flex-col gap-1 text-sm"
+              htmlFor={`${id}-personne`}
+            >
               Ajouter une personne
-              <select id={`${id}-personne`} className={CHAMP} value={personne} onChange={(e) => setPersonne(e.target.value)}>
+              <select
+                id={`${id}-personne`}
+                className={CHAMP}
+                value={personne}
+                onChange={(e) => setPersonne(e.target.value)}
+              >
                 <option value="">Choisir…</option>
                 {personnesAjoutables(members, vue).map((m) => (
                   <option key={m.userId} value={m.userId}>
@@ -167,7 +191,11 @@ export function MembresProjet(): React.ReactElement {
                 ))}
               </select>
             </label>
-            <button type="submit" className={buttonClasses('primary', 'sm')} disabled={personne === ''}>
+            <button
+              type="submit"
+              className={buttonClasses('primary', 'sm')}
+              disabled={personne === ''}
+            >
               <UserPlus aria-hidden="true" className="h-4 w-4" />
               Ajouter
             </button>
@@ -177,13 +205,23 @@ export function MembresProjet(): React.ReactElement {
             onSubmit={(e) => {
               e.preventDefault();
               if (equipe === '') return;
-              void agir(workApi.addProjectMembers(projectId, { teamIds: [equipe] }), 'L’équipe n’a pas pu être ajoutée.');
+              void agir(
+                workApi.addProjectMembers(projectId, { teamIds: [equipe] }),
+                'L’équipe n’a pas pu être ajoutée.',
+              );
             }}
           >
             <label className="flex min-w-44 flex-1 flex-col gap-1 text-sm" htmlFor={`${id}-equipe`}>
               Ajouter une équipe entière
-              <select id={`${id}-equipe`} className={CHAMP} value={equipe} onChange={(e) => setEquipe(e.target.value)}>
-                <option value="">{equipes.length === 0 ? 'Aucune équipe (RH › Équipes)' : 'Choisir…'}</option>
+              <select
+                id={`${id}-equipe`}
+                className={CHAMP}
+                value={equipe}
+                onChange={(e) => setEquipe(e.target.value)}
+              >
+                <option value="">
+                  {equipes.length === 0 ? 'Aucune équipe (RH › Équipes)' : 'Choisir…'}
+                </option>
                 {equipesAjoutables(equipes, vue).map((t) => (
                   <option key={t.teamId} value={t.teamId}>
                     {libelleEquipe(t)}
@@ -191,13 +229,18 @@ export function MembresProjet(): React.ReactElement {
                 ))}
               </select>
             </label>
-            <button type="submit" className={buttonClasses('secondary', 'sm')} disabled={equipe === ''}>
+            <button
+              type="submit"
+              className={buttonClasses('secondary', 'sm')}
+              disabled={equipe === ''}
+            >
               <UsersRound aria-hidden="true" className="h-4 w-4" />
               Ajouter l’équipe
             </button>
           </form>
           <p className="text-xs text-[var(--foreground-muted)] md:col-span-2">
-            Une équipe ajoutée donne accès à tous ses membres, y compris ceux qui la rejoindront plus tard.
+            Une équipe ajoutée donne accès à tous ses membres, y compris ceux qui la rejoindront
+            plus tard.
           </p>
         </div>
       ) : null}
@@ -215,7 +258,9 @@ export function MembresProjet(): React.ReactElement {
                 </li>
               ) : null}
               {vue.users.length === 0 && !vue.owner ? (
-                <li className="px-3 py-3 text-sm text-[var(--foreground-muted)]">Personne n’est ajouté un à un.</li>
+                <li className="px-3 py-3 text-sm text-[var(--foreground-muted)]">
+                  Personne n’est ajouté un à un.
+                </li>
               ) : null}
               {vue.users.map((u) => (
                 <li key={u.userId} className="flex items-center gap-3 px-3 py-2 text-sm">
@@ -223,7 +268,9 @@ export function MembresProjet(): React.ReactElement {
                   <span className="min-w-0 flex-1 break-words">
                     {u.name}
                     {!u.canUpdate ? (
-                      <span className="ml-2 text-xs text-[var(--foreground-muted)]">lecture seule</span>
+                      <span className="ml-2 text-xs text-[var(--foreground-muted)]">
+                        lecture seule
+                      </span>
                     ) : null}
                   </span>
                   {modifiable ? (
@@ -232,7 +279,10 @@ export function MembresProjet(): React.ReactElement {
                       className={BOUTON_PETIT}
                       disabled={envoi}
                       onClick={() =>
-                        void agir(workApi.removeProjectUser(projectId, u.userId), 'Le membre n’a pas pu être retiré.')
+                        void agir(
+                          workApi.removeProjectUser(projectId, u.userId),
+                          'Le membre n’a pas pu être retiré.',
+                        )
                       }
                     >
                       <UserMinus aria-hidden="true" className="mr-1 inline h-3.5 w-3.5" />
@@ -257,8 +307,13 @@ export function MembresProjet(): React.ReactElement {
                     className="flex flex-col gap-2 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm"
                   >
                     <div className="flex items-center gap-3">
-                      <UsersRound aria-hidden="true" className="h-4 w-4 text-[var(--foreground-muted)]" />
-                      <span className="min-w-0 flex-1 font-medium break-words">{libelleEquipe(t)}</span>
+                      <UsersRound
+                        aria-hidden="true"
+                        className="h-4 w-4 text-[var(--foreground-muted)]"
+                      />
+                      <span className="min-w-0 flex-1 font-medium break-words">
+                        {libelleEquipe(t)}
+                      </span>
                       <PileAvatars membres={t.members} max={4} taille={24} />
                       {modifiable ? (
                         <button
@@ -266,7 +321,10 @@ export function MembresProjet(): React.ReactElement {
                           className={BOUTON_PETIT}
                           disabled={envoi}
                           onClick={() =>
-                            void agir(workApi.removeProjectTeam(projectId, t.teamId), 'L’équipe n’a pas pu être retirée.')
+                            void agir(
+                              workApi.removeProjectTeam(projectId, t.teamId),
+                              'L’équipe n’a pas pu être retirée.',
+                            )
                           }
                         >
                           Retirer<span className="sr-only"> l’équipe {t.name}</span>
@@ -274,7 +332,9 @@ export function MembresProjet(): React.ReactElement {
                       ) : null}
                     </div>
                     {t.members.length > 0 ? (
-                      <p className="text-xs text-[var(--foreground-muted)]">{t.members.map((m) => m.name).join(', ')}</p>
+                      <p className="text-xs text-[var(--foreground-muted)]">
+                        {t.members.map((m) => m.name).join(', ')}
+                      </p>
                     ) : null}
                   </li>
                 ))}

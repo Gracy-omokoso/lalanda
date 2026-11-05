@@ -4,7 +4,12 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import type { HydratedDocument, Types } from 'mongoose';
 
-@Schema({ collection: 'work_notification_preferences', timestamps: true, strict: true, minimize: false })
+@Schema({
+  collection: 'work_notification_preferences',
+  timestamps: true,
+  strict: true,
+  minimize: false,
+})
 export class WorkNotificationPreferencesDoc {
   @Prop({ type: String, required: true })
   organizationId!: string;

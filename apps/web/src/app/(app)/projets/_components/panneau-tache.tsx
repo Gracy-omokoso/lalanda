@@ -480,7 +480,11 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
             Couleur
           </dt>
           <dd>
-            <div role="radiogroup" aria-labelledby="tache-couleur" className="flex flex-wrap items-center gap-1.5">
+            <div
+              role="radiogroup"
+              aria-labelledby="tache-couleur"
+              className="flex flex-wrap items-center gap-1.5"
+            >
               {[null, ...COULEURS_CARTE].map((c) => {
                 const choisie = (d.color ?? null) === c;
                 return (
@@ -494,14 +498,28 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
                     onClick={() =>
                       void agir(
                         async () =>
-                          apres(await workApi.patchTask(d.id, { expectedRevision: d.revision, color: c })),
+                          apres(
+                            await workApi.patchTask(d.id, {
+                              expectedRevision: d.revision,
+                              color: c,
+                            }),
+                          ),
                         'Couleur non enregistrée.',
                       )
                     }
                     className={`h-6 w-6 rounded-full border transition-shadow ${
-                      choisie ? 'ring-2 ring-[var(--accent)] ring-offset-1 ring-offset-[var(--surface)]' : ''
+                      choisie
+                        ? 'ring-2 ring-[var(--accent)] ring-offset-1 ring-offset-[var(--surface)]'
+                        : ''
                     } ${c ? 'border-transparent' : 'border-dashed border-[var(--border-strong)] bg-[var(--surface)]'}`}
-                    style={c ? { background: `var(--card-${c}-bg)`, boxShadow: `inset 0 0 0 2px var(--card-${c}-dot)` } : undefined}
+                    style={
+                      c
+                        ? {
+                            background: `var(--card-${c}-bg)`,
+                            boxShadow: `inset 0 0 0 2px var(--card-${c}-dot)`,
+                          }
+                        : undefined
+                    }
                   >
                     <span className="sr-only">{c ? LIBELLES_COULEUR[c] : 'Aucune couleur'}</span>
                   </button>

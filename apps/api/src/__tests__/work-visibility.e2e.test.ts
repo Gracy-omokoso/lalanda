@@ -106,9 +106,7 @@ e2eSuite('projets privés, membres et équipes — ADR-0060', () => {
       // Sélecteur des Projets (work.read).
       const picker = await f.get('viewer', '/work/teams');
       expect(picker.status).toBe(200);
-      expect(picker.body.items).toEqual([
-        { teamId, name: 'Équipe chantier', memberCount: 1 },
-      ]);
+      expect(picker.body.items).toEqual([{ teamId, name: 'Équipe chantier', memberCount: 1 }]);
     });
   });
 
@@ -123,7 +121,10 @@ e2eSuite('projets privés, membres et équipes — ADR-0060', () => {
       expect(p.body.visibility).toBe('private');
       privateId = p.body.id;
 
-      const o = await f.post('owner', '/work/projects', { name: 'Chantier ouvert', kind: 'internal' });
+      const o = await f.post('owner', '/work/projects', {
+        name: 'Chantier ouvert',
+        kind: 'internal',
+      });
       expect(o.status).toBe(201);
       expect(o.body.visibility).toBe('organization');
       orgProjectId = o.body.id;
@@ -133,7 +134,9 @@ e2eSuite('projets privés, membres et équipes — ADR-0060', () => {
         teamIds: [teamId],
       });
       expect(add.status, JSON.stringify(add.body)).toBe(201);
-      expect(add.body.users.map((u: { userId: string }) => u.userId)).toContain(f.userId('analyst'));
+      expect(add.body.users.map((u: { userId: string }) => u.userId)).toContain(
+        f.userId('analyst'),
+      );
       expect(add.body.teams[0].members.map((m: { userId: string }) => m.userId)).toEqual([
         f.userId('viewer'),
       ]);
@@ -194,16 +197,20 @@ e2eSuite('projets privés, membres et équipes — ADR-0060', () => {
           .status,
       ).toBe(404);
       expect(
-        (await f.put('accountant', `/work/comments/${commentId}`, {
-          expectedRevision: 1,
-          body: 'x',
-        })).status,
+        (
+          await f.put('accountant', `/work/comments/${commentId}`, {
+            expectedRevision: 1,
+            body: 'x',
+          })
+        ).status,
       ).toBe(404);
       expect(
-        (await f.put('accountant', `/work/time-entries/${entryId}`, {
-          expectedRevision: 1,
-          minutes: 10,
-        })).status,
+        (
+          await f.put('accountant', `/work/time-entries/${entryId}`, {
+            expectedRevision: 1,
+            minutes: 10,
+          })
+        ).status,
       ).toBe(404);
     });
 

@@ -147,9 +147,7 @@ export class WorkNotifier {
     recipients: readonly (string | null | undefined)[],
     actorUserId: string | null,
   ): Promise<string[]> {
-    const ids = [
-      ...new Set(recipients.filter((r): r is string => !!r && r !== actorUserId)),
-    ];
+    const ids = [...new Set(recipients.filter((r): r is string => !!r && r !== actorUserId))];
     if (ids.length === 0) return [];
     const perms = await this.members.permissions(organizationId, ids);
     const out: string[] = [];

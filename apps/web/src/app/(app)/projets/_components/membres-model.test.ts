@@ -31,7 +31,9 @@ describe('membres d’un projet (ADR-0060)', () => {
   });
 
   it('phrases d’accès selon la visibilité', () => {
-    expect(phraseAcces({ visibility: 'organization', memberCount: 0 })).toContain('Tous les membres');
+    expect(phraseAcces({ visibility: 'organization', memberCount: 0 })).toContain(
+      'Tous les membres',
+    );
     expect(phraseAcces({ visibility: 'private', memberCount: 1 })).toBe(
       '1 personne a accès à ce projet, en plus de la direction.',
     );

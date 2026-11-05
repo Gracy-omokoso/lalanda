@@ -227,7 +227,12 @@ export class WorkProject {
   columns!: WorkColumn[];
 
   /** ADR-0060 § 3 : `organization` (défaut, tous les projets antérieurs) ou `private`. */
-  @Prop({ type: String, required: true, enum: ['organization', 'private'], default: 'organization' })
+  @Prop({
+    type: String,
+    required: true,
+    enum: ['organization', 'private'],
+    default: 'organization',
+  })
   visibility!: 'organization' | 'private';
 
   /** ADR-0060 § 4 : utilisateurs ajoutés un à un (membres de l'organisation, `work.read`). */

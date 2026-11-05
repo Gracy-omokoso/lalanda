@@ -86,7 +86,9 @@ export class WorkSettingsService {
   }
 
   /** ADR-0061 § 3 : comportement de plusieurs organisations (tâches récurrentes). */
-  async behaviorsOf(organizationIds: readonly string[]): Promise<Map<string, WorkBehaviorSettings>> {
+  async behaviorsOf(
+    organizationIds: readonly string[],
+  ): Promise<Map<string, WorkBehaviorSettings>> {
     const docs = await this.settings
       .find({ organizationId: { $in: [...organizationIds] } })
       .lean<SettingsLean[]>()

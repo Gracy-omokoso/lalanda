@@ -97,12 +97,15 @@ export function corpsComportement(
     labels: s.labels,
     defaultColumns: s.defaultColumns,
     dueSoonDays: patch.dueSoonDays ?? s.dueSoonDays,
-    projectCreatorRoles: patch.projectCreatorRoles !== undefined ? patch.projectCreatorRoles : s.projectCreatorRoles,
+    projectCreatorRoles:
+      patch.projectCreatorRoles !== undefined ? patch.projectCreatorRoles : s.projectCreatorRoles,
     defaultVisibility: patch.defaultVisibility ?? s.defaultVisibility,
     defaultView: patch.defaultView ?? s.defaultView,
     workingDays: patch.workingDays ?? s.workingDays,
     autoArchiveCompletedDays:
-      patch.autoArchiveCompletedDays !== undefined ? patch.autoArchiveCompletedDays : s.autoArchiveCompletedDays,
+      patch.autoArchiveCompletedDays !== undefined
+        ? patch.autoArchiveCompletedDays
+        : s.autoArchiveCompletedDays,
     managersModerateComments: patch.managersModerateComments ?? s.managersModerateComments,
     showTaskNumbers: patch.showTaskNumbers ?? s.showTaskNumbers,
   };

@@ -94,7 +94,12 @@ export class WorkDigestJob implements OnModuleInit {
       if (claim.modifiedCount !== 1) continue;
       report.claimed += 1;
       try {
-        const sent = await this.serve(c.organizationId, c.userId, today, prefs.digest.workingDaysOnly);
+        const sent = await this.serve(
+          c.organizationId,
+          c.userId,
+          today,
+          prefs.digest.workingDaysOnly,
+        );
         report[sent ? 'sent' : 'skipped'] += 1;
       } catch (err) {
         report.skipped += 1;
@@ -124,7 +129,12 @@ export class WorkDigestJob implements OnModuleInit {
       this.access.scopeOf(organizationId, { userId, role: member.role, context: member.context }),
     ]);
     const and: Record<string, unknown>[] = [
-      { organizationId, assigneeUserId: userId, done: false, dueDate: { $ne: null, $lte: soonEnd } },
+      {
+        organizationId,
+        assigneeUserId: userId,
+        done: false,
+        dueDate: { $ne: null, $lte: soonEnd },
+      },
     ];
     if (archived.length > 0) and.push({ projectId: { $nin: archived } });
     const visible = projectIdFilter(scope);
@@ -161,9 +171,10 @@ export class WorkDigestJob implements OnModuleInit {
     ]);
     const to = who.get(userId)?.email;
     if (!to) return false;
-    const dateLabel = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'full', timeZone: 'UTC' }).format(
-      new Date(`${today}T00:00:00Z`),
-    );
+    const dateLabel = new Intl.DateTimeFormat('fr-FR', {
+      dateStyle: 'full',
+      timeZone: 'UTC',
+    }).format(new Date(`${today}T00:00:00Z`));
     await this.mail.sendWorkDigest({
       to,
       organizationName: org ? String(org['name'] ?? '') : '',

@@ -191,10 +191,20 @@ function FicheEquipe({
         </div>
         {gerer ? (
           <span className="flex gap-2">
-            <button type="button" className={BOUTON_PETIT} onClick={onEditer} aria-haspopup="dialog">
+            <button
+              type="button"
+              className={BOUTON_PETIT}
+              onClick={onEditer}
+              aria-haspopup="dialog"
+            >
               Modifier
             </button>
-            <button type="button" className={BOUTON_DANGER} onClick={onSupprimer} aria-haspopup="dialog">
+            <button
+              type="button"
+              className={BOUTON_DANGER}
+              onClick={onSupprimer}
+              aria-haspopup="dialog"
+            >
               Supprimer
             </button>
           </span>
@@ -274,7 +284,11 @@ function FicheEquipe({
               ))}
             </select>
           </label>
-          <button type="submit" className={buttonClasses('primary', 'sm')} disabled={envoi || choix === ''}>
+          <button
+            type="submit"
+            className={buttonClasses('primary', 'sm')}
+            disabled={envoi || choix === ''}
+          >
             <UserPlus aria-hidden="true" className="h-4 w-4" />
             Ajouter
           </button>
@@ -366,7 +380,11 @@ export function Equipes(): React.ReactElement {
       {lecture === null ? (
         <Chargement />
       ) : !lecture.ok ? (
-        <EchecLecture erreur={lecture.erreur} repli="Les équipes sont illisibles." onReessayer={recharger} />
+        <EchecLecture
+          erreur={lecture.erreur}
+          repli="Les équipes sont illisibles."
+          onReessayer={recharger}
+        />
       ) : equipes.length === 0 ? (
         <p className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border-strong)] p-6 text-center text-sm text-[var(--foreground-muted)]">
           Aucune équipe n’est encore créée.
@@ -391,7 +409,9 @@ export function Equipes(): React.ReactElement {
                   >
                     <span className="flex min-w-0 flex-1 flex-col">
                       <span className="font-medium break-words">{t.name}</span>
-                      <span className="text-xs text-[var(--foreground-muted)]">{resumeEquipe(t)}</span>
+                      <span className="text-xs text-[var(--foreground-muted)]">
+                        {resumeEquipe(t)}
+                      </span>
                     </span>
                     <PileAvatars membres={t.members} max={3} taille={24} />
                   </button>
@@ -436,7 +456,11 @@ export function Equipes(): React.ReactElement {
       ) : null}
 
       {suppression !== null ? (
-        <Modal open onClose={() => setSuppression(null)} title={`Supprimer « ${suppression.name} » ?`}>
+        <Modal
+          open
+          onClose={() => setSuppression(null)}
+          title={`Supprimer « ${suppression.name} » ?`}
+        >
           <div className="flex flex-col gap-4 text-sm">
             <p>
               {suppression.projectCount > 0

@@ -258,7 +258,9 @@ function Carte({
           className={`min-w-0 break-words text-left font-medium leading-snug after:absolute after:inset-0 after:content-[''] ${t.done ? 'text-[var(--foreground-muted)] line-through' : ''}`}
         >
           {numero ? (
-            <span className="mr-1 text-xs font-normal text-[var(--foreground-muted)]">{numero}</span>
+            <span className="mr-1 text-xs font-normal text-[var(--foreground-muted)]">
+              {numero}
+            </span>
           ) : null}
           {t.title}
         </button>

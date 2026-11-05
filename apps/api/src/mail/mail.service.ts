@@ -246,11 +246,7 @@ export class TemplatedMailService extends MailService {
     const path = /^\/[^/]/.test(href) ? href : '/projets';
     return this.transport.send({
       to,
-      ...renderWorkNotification(
-        content,
-        `${webUrl()}${path}`,
-        `${webUrl()}/projets/parametres`,
-      ),
+      ...renderWorkNotification(content, `${webUrl()}${path}`, `${webUrl()}/projets/parametres`),
     });
   }
 

@@ -516,7 +516,10 @@ export class WorkProjectsService {
       await this.checkColumnChange(organizationId, projectId, current.columns, body.columns);
       assign('columns', body.columns);
     }
-    if (body.visibility !== undefined && body.visibility !== (current.visibility ?? 'organization')) {
+    if (
+      body.visibility !== undefined &&
+      body.visibility !== (current.visibility ?? 'organization')
+    ) {
       assign('visibility', body.visibility);
       // ADR-0060 § 4 : passer en privé garde l'auteur du geste parmi les membres.
       if (body.visibility === 'private' && !(current.memberUserIds ?? []).includes(actor.userId)) {

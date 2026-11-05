@@ -1,7 +1,4 @@
-import {
-  defaultWorkNotificationPreferences,
-  type WorkSettingsView,
-} from '@lalanda/shared/work';
+import { defaultWorkNotificationPreferences, type WorkSettingsView } from '@lalanda/shared/work';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -47,7 +44,11 @@ describe('paramètres des Projets (ADR-0061)', () => {
     expect(p.events.mentioned.email).toBe(true); // immuable
     const sans = toutLeCanal(p, 'email', false);
     expect(Object.values(sans.events).every((c) => !c.email && c.bell)).toBe(true);
-    expect(corpsPreferences(q, 2)).toEqual({ expectedRevision: 2, events: q.events, digest: q.digest });
+    expect(corpsPreferences(q, 2)).toEqual({
+      expectedRevision: 2,
+      events: q.events,
+      digest: q.digest,
+    });
     expect(libelleHeure(7)).toBe('07 h 00');
   });
 
@@ -58,7 +59,9 @@ describe('paramètres des Projets (ADR-0061)', () => {
     expect(c.expectedRevision).toBe(3);
     expect(c.defaultView).toBe('board');
     expect(c.autoArchiveCompletedDays).toBe(30);
-    expect(corpsComportement(reglages, { autoArchiveCompletedDays: null }).autoArchiveCompletedDays).toBeNull();
+    expect(
+      corpsComportement(reglages, { autoArchiveCompletedDays: null }).autoArchiveCompletedDays,
+    ).toBeNull();
   });
 
   it('jours ouvrés : jamais vides, triés', () => {

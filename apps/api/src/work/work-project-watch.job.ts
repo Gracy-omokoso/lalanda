@@ -194,10 +194,7 @@ export class WorkProjectWatchJob implements OnModuleInit {
         recipients,
         kind: 'work.project_at_risk',
         projectId: id,
-        title:
-          alert === 'late'
-            ? `Projet en retard : ${p.name}`
-            : `Projet à risque : ${p.name}`,
+        title: alert === 'late' ? `Projet en retard : ${p.name}` : `Projet à risque : ${p.name}`,
         actorUserId: null,
         dedupeKey: `work.project_at_risk:${id}:${alert}:${today}`,
       });
@@ -217,7 +214,11 @@ export class WorkProjectWatchJob implements OnModuleInit {
         .find(
           {
             organizationId: p.organizationId,
-            _id: { $in: teamIds.filter((t) => Types.ObjectId.isValid(t)).map((t) => new Types.ObjectId(t)) },
+            _id: {
+              $in: teamIds
+                .filter((t) => Types.ObjectId.isValid(t))
+                .map((t) => new Types.ObjectId(t)),
+            },
           },
           { projection: { leadUserId: 1, memberUserIds: 1 } },
         )

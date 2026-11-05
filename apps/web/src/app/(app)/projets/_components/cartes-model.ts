@@ -5,11 +5,7 @@
 // contrastes vérifiés dans `packages/ui/src/tokens.test.ts`. Sans couleur : la carte
 // garde exactement son affichage actuel.
 
-import {
-  WORK_CARD_COLORS,
-  WORK_CARD_COLOR_LABELS,
-  type WorkCardColor,
-} from '@lalanda/shared/work';
+import { WORK_CARD_COLORS, WORK_CARD_COLOR_LABELS, type WorkCardColor } from '@lalanda/shared/work';
 
 export { WORK_CARD_COLORS as COULEURS_CARTE, WORK_CARD_COLOR_LABELS as LIBELLES_COULEUR };
 

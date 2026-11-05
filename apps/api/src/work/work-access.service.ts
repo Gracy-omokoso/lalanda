@@ -72,7 +72,10 @@ export class WorkAccessService implements OnModuleInit {
         return scope.ids.length === 0 ? null : { 'source.projectId': { $nin: [...scope.ids] } };
       }
       return {
-        $or: [{ 'source.module': { $ne: 'work' } }, { 'source.projectId': { $in: [...scope.ids] } }],
+        $or: [
+          { 'source.module': { $ne: 'work' } },
+          { 'source.projectId': { $in: [...scope.ids] } },
+        ],
       };
     });
   }
@@ -106,7 +109,9 @@ export class WorkAccessService implements OnModuleInit {
       .find({ organizationId, visibility: 'private', $nor: mine }, { _id: 1 })
       .lean<{ _id: unknown }[]>()
       .exec();
-    return hidden.length === 0 ? ALL_PROJECTS : { kind: 'deny', ids: hidden.map((d) => String(d._id)) };
+    return hidden.length === 0
+      ? ALL_PROJECTS
+      : { kind: 'deny', ids: hidden.map((d) => String(d._id)) };
   }
 
   /**

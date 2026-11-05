@@ -77,7 +77,9 @@ e2eSuite('paramètres des Projets : notifications, comportement, couleurs (ADR-0
       f.notifications.length = 0;
       mails.length = 0;
       await task(p.id, { title: 'Défaut', assigneeUserId: f.userId('analyst') });
-      expect(f.notifications.filter((n) => n.recipientUserId === f.userId('analyst'))).toHaveLength(1);
+      expect(f.notifications.filter((n) => n.recipientUserId === f.userId('analyst'))).toHaveLength(
+        1,
+      );
       const mail = mails.find((m) => m.subject.includes('vous a assigné'));
       expect(mail?.to).toContain('wset-analyst');
       expect(mail?.text).toContain('/projets/');
@@ -169,7 +171,8 @@ e2eSuite('paramètres des Projets : notifications, comportement, couleurs (ADR-0
         digest: { enabled: true, hour: 9, workingDaysOnly: false },
       });
       const job = f.app().get(WorkDigestJob);
-      const at = (hourUtc: number) => new Date(`${today}T${String(hourUtc).padStart(2, '0')}:30:00Z`);
+      const at = (hourUtc: number) =>
+        new Date(`${today}T${String(hourUtc).padStart(2, '0')}:30:00Z`);
 
       mails.length = 0;
       // 7 h 30 à Kinshasa (6 h 30 UTC) : trop tôt pour 9 h.
@@ -273,7 +276,9 @@ e2eSuite('paramètres des Projets : notifications, comportement, couleurs (ADR-0
       expect(refused.status).toBe(403);
       expect(refused.body.code).toBe('WORK_PROJECT_CREATION_RESTRICTED');
       // L'Administrateur (direction) crée toujours.
-      expect((await f.post('admin', '/work/projects', { name: 'Admin', kind: 'internal' })).status).toBe(201);
+      expect(
+        (await f.post('admin', '/work/projects', { name: 'Admin', kind: 'internal' })).status,
+      ).toBe(201);
       await settings({ projectCreatorRoles: null });
       expect((await create()).status).toBe(201);
     });
@@ -324,7 +329,11 @@ e2eSuite('paramètres des Projets : notifications, comportement, couleurs (ADR-0
         dueDate: '2028-01-10',
         assigneeUserId: f.userId('analyst'),
       });
-      await task(p.id, { title: 'Pour mardi', dueDate: '2028-01-11', assigneeUserId: f.userId('analyst') });
+      await task(p.id, {
+        title: 'Pour mardi',
+        dueDate: '2028-01-11',
+        assigneeUserId: f.userId('analyst'),
+      });
       await settings({ dueSoonDays: 1, workingDays: [1, 2, 3, 4, 5] });
       f.notifications.length = 0;
       await f.app().get(WorkDueRemindersJob).run(new Date('2028-01-07T09:00:00Z'));

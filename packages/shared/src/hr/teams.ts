@@ -7,7 +7,14 @@
 
 import { z } from 'zod';
 
-import { HrExpectedRevision, HrId, hrFr, hrIssue, hrOptionalText, hrRequiredText } from './common.js';
+import {
+  HrExpectedRevision,
+  HrId,
+  hrFr,
+  hrIssue,
+  hrOptionalText,
+  hrRequiredText,
+} from './common.js';
 
 /** Bornes techniques des équipes. */
 export const HR_TEAM_LIMITS = {
@@ -52,7 +59,9 @@ export type UpdateTeamBody = z.output<typeof UpdateTeamBody>;
 
 /** `POST /hr/teams/:teamId/members` — ajoute des membres (déjà présents : ignorés). */
 export const AddTeamMembersBody = z
-  .object({ userIds: uniqueIds(HR_TEAM_LIMITS.membersMax).min(1, { message: 'Au moins un membre.' }) })
+  .object({
+    userIds: uniqueIds(HR_TEAM_LIMITS.membersMax).min(1, { message: 'Au moins un membre.' }),
+  })
   .strict();
 export type AddTeamMembersBody = z.output<typeof AddTeamMembersBody>;
 

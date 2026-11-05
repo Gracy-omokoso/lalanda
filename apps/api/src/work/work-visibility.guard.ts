@@ -51,7 +51,13 @@ export class WorkVisibilityGuard implements CanActivate {
     }
     const attachmentId = str(params['attachmentId']);
     if (attachmentId) {
-      await this.access.assertAttached('attachment', orgId, attachmentId, actor, attachmentNotFound);
+      await this.access.assertAttached(
+        'attachment',
+        orgId,
+        attachmentId,
+        actor,
+        attachmentNotFound,
+      );
     }
     const entryId = str(params['entryId']);
     if (entryId) {

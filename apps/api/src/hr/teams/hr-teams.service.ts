@@ -93,7 +93,10 @@ export class HrTeamsService {
             .toArray(),
     ]);
     const usageBy = new Map(usage.map((u) => [u._id, u.n]));
-    const ref = (id: string): TeamMemberView => ({ userId: id, name: names.get(id) ?? FORMER_MEMBER });
+    const ref = (id: string): TeamMemberView => ({
+      userId: id,
+      name: names.get(id) ?? FORMER_MEMBER,
+    });
     return docs.map((d) => {
       const members = membersWithLead(d.leadUserId, d.memberUserIds)
         .map(ref)

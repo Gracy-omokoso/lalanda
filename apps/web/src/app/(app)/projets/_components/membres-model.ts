@@ -44,7 +44,9 @@ export function equipesAjoutables(
 }
 
 /** « 7 personnes ont accès » / phrase de la visibilité organisation. */
-export function phraseAcces(vue: Pick<WorkProjectMembersView, 'visibility' | 'memberCount'>): string {
+export function phraseAcces(
+  vue: Pick<WorkProjectMembersView, 'visibility' | 'memberCount'>,
+): string {
   if (vue.visibility === 'organization') return VISIBILITES.organization.phrase;
   const n = vue.memberCount;
   return `${n} personne${n > 1 ? 's ont' : ' a'} accès à ce projet, en plus de la direction.`;

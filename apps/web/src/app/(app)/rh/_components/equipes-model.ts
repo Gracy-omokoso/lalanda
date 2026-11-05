@@ -24,7 +24,11 @@ export function formEquipe(t: TeamView | null): FormEquipe {
 }
 
 export type ResultatEquipe =
-  | { ok: true; corps: Required<Pick<CreateTeamBody, 'name'>> & Omit<CreateTeamBody, 'name' | 'memberUserIds'> }
+  | {
+      ok: true;
+      corps: Required<Pick<CreateTeamBody, 'name'>> &
+        Omit<CreateTeamBody, 'name' | 'memberUserIds'>;
+    }
   | { ok: false; erreur: string };
 
 /** Contrôle de saisie avant l'envoi (mêmes bornes que l'API). */
@@ -33,7 +37,8 @@ export function validerEquipe(f: FormEquipe): ResultatEquipe {
   if (name === '') return { ok: false, erreur: 'Le nom de l’équipe est obligatoire.' };
   if (name.length > 80) return { ok: false, erreur: '80 caractères au plus.' };
   const description = f.description.trim();
-  if (description.length > 1000) return { ok: false, erreur: 'Description : 1 000 caractères au plus.' };
+  if (description.length > 1000)
+    return { ok: false, erreur: 'Description : 1 000 caractères au plus.' };
   return {
     ok: true,
     corps: {
