@@ -27,6 +27,7 @@ import { useShell } from '../../_components/shell-context';
 
 import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from './elements';
 import { PastilleProjet, PileAvatars } from './equipe-elements';
+import { ChoixCreation } from './import-entrees';
 import {
   FILTRES_PORTEFEUILLE,
   cartesPortefeuille,
@@ -551,6 +552,8 @@ export function ListeProjets(): React.ReactElement {
         title="Nouveau projet"
         size="lg"
       >
+        {/* ADR-0062 / ADR-0063 : importer un fichier, construire avec l'IA. */}
+        <ChoixCreation />
         <NouveauProjet onAnnule={() => setCreation(false)} />
       </Modal>
 

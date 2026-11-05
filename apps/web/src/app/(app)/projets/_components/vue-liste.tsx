@@ -15,6 +15,7 @@ import { useState } from 'react';
 import { workApi } from '@/lib/work-api';
 
 import { AjoutEnLigne, BarreFiltres, CaseTerminee, useFiltres } from './barre-taches';
+import { BoutonImporterTaches } from './import-entrees';
 import {
   AbsenceBadges,
   Avatar,
@@ -56,6 +57,12 @@ export function VueListe(): React.ReactElement {
   return (
     <div className="flex min-w-0 flex-col gap-4">
       <BarreFiltres filtres={filtres} onChange={setFiltres} idPrefixe="liste" />
+      {/* ADR-0062 : importer les tâches d'un fichier dans ce projet (work.update). */}
+      {travailler ? (
+        <div className="-mt-2 flex justify-end">
+          <BoutonImporterTaches projectId={project.id} />
+        </div>
+      ) : null}
       {tasks.length === 0 ? (
         <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border-strong)] p-5 text-center">
           <p className="text-sm font-medium">Ajoutez votre première tâche</p>
