@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { SlackApi, SlackApiError, realSlackHttp } from './slack-api.js';
+import { SlackApi, SlackApiError, realSlackHttp, slackApiBase } from './slack-api.js';
 import { lalandaLink, slackEscape, slackWorkMessage } from './slack-messages.js';
 import {
   SLACK_STATE_TTL_MS,
@@ -251,6 +251,21 @@ describe('client Slack simulé', () => {
   it('le fetch réel refuse de partir pendant les tests', async () => {
     await expect(realSlackHttp('https://slack.com/api/auth.test', {})).rejects.toThrow(
       /refusé pendant les tests/,
+    );
+  });
+});
+
+describe('faux Slack local', () => {
+  it('seulement hors production et seulement en boucle locale', () => {
+    expect(slackApiBase({})).toBe('https://slack.com/api');
+    expect(slackApiBase({ SLACK_API_BASE_URL: 'http://127.0.0.1:3399/api/' })).toBe(
+      'http://127.0.0.1:3399/api',
+    );
+    expect(
+      slackApiBase({ SLACK_API_BASE_URL: 'http://127.0.0.1:3399/api', NODE_ENV: 'production' }),
+    ).toBe('https://slack.com/api');
+    expect(slackApiBase({ SLACK_API_BASE_URL: 'https://pirate.test/api' })).toBe(
+      'https://slack.com/api',
     );
   });
 });

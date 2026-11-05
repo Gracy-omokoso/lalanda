@@ -24,6 +24,23 @@ import { Injectable } from '@nestjs/common';
 
 export const SLACK_API_BASE = 'https://slack.com/api';
 
+/**
+ * Base de l'API. `SLACK_API_BASE_URL` permet de brancher un faux Slack LOCAL en
+ * développement (captures d'écran, essais à la main) ; elle est IGNORÉE en
+ * production, où seule `https://slack.com/api` est jamais jointe.
+ */
+export function slackApiBase(env: NodeJS.ProcessEnv = process.env): string {
+  const override = env['SLACK_API_BASE_URL']?.trim();
+  if (
+    override &&
+    env['NODE_ENV'] !== 'production' &&
+    /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//.test(`${override}/`)
+  ) {
+    return override.replace(/\/+$/, '');
+  }
+  return SLACK_API_BASE;
+}
+
 /** Attente maximale honorée sur un `Retry-After` (secondes). Au-delà : échec compté. */
 export const SLACK_RETRY_AFTER_MAX_S = 30;
 /** Nombre de nouvelles tentatives après un 429. */
@@ -105,7 +122,7 @@ export class SlackApi {
     }
 
     for (let attempt = 0; ; attempt += 1) {
-      const res = await this.http(`${SLACK_API_BASE}/${method}`, {
+      const res = await this.http(`${slackApiBase()}/${method}`, {
         method: 'POST',
         headers,
         ...(body !== undefined ? { body } : {}),
