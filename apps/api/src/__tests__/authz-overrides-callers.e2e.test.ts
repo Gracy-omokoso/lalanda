@@ -49,11 +49,11 @@ e2eSuite('ADR-0041 A3 — appelants sur les droits effectifs', () => {
     process.env['MEMBER_PERMISSIONS_ENABLED'] = 'true';
   }
   function eteindre(): void {
-    delete process.env['MEMBER_PERMISSIONS_ENABLED'];
+    process.env['MEMBER_PERMISSIONS_ENABLED'] = 'false';
   }
   afterEach(() => eteindre());
   afterAll(() => {
-    if (INTERRUPTEUR === undefined) eteindre();
+    if (INTERRUPTEUR === undefined) delete process.env['MEMBER_PERMISSIONS_ENABLED'];
     else process.env['MEMBER_PERMISSIONS_ENABLED'] = INTERRUPTEUR;
   });
 

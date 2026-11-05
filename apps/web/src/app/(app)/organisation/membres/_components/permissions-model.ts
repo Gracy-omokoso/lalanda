@@ -370,8 +370,10 @@ export function avertissementChangementTitre(
 
 // ─── Verrou de la fiche ─────────────────────────────────────────────────────
 
+// ADR-0059 : la personnalisation est allumée par défaut ; ce message ne paraît plus
+// que si l'instance l'a coupée explicitement (`MEMBER_PERMISSIONS_ENABLED=false`).
 export const MESSAGE_PERSONNALISATION_A_VENIR =
-  'La personnalisation des autorisations sera bientôt disponible. Pour l’instant, seul le titre s’attribue.';
+  'La personnalisation des autorisations est désactivée sur cette instance. Pour l’instant, seul le titre s’attribue : contactez le support Lalanda.';
 
 /** Verrou global d'une fiche de membre (G2, G3, G1), ou `null`. */
 export function verrouFiche(

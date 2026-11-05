@@ -266,7 +266,7 @@ describe('verrou de la fiche', () => {
     expect(verrouFiche({ ...membre, manageable: false }, 'u1', false)).toMatch(
       /que vous n’avez pas/u,
     );
-    expect(verrouFiche(membre, 'u1', true)).toMatch(/bientôt disponible/u);
+    expect(verrouFiche(membre, 'u1', true)).toMatch(/désactivée sur cette instance/u);
   });
 });
 

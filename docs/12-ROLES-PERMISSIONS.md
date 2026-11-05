@@ -270,7 +270,8 @@ sont inchangés.
 - Les actions sont regroupées en domaines avec des libellés en français (ADR-0041 § 5) : sept,
   puis huit avec « Achats et fournisseurs » (ADR-0044, lot P0).
 - **Lot A4 appliqué** (routes de gestion, invitation avec écart, audit strict, révision,
-  notification) **derrière l'interrupteur `MEMBER_PERMISSIONS_ENABLED`, éteint** : voir docs/16.
+  notification) derrière l'interrupteur `MEMBER_PERMISSIONS_ENABLED` : voir docs/16. **Allumé par
+  défaut depuis ADR-0059 (v1.14.0)** ; seule la valeur explicite `false` le coupe.
 
 ### ADR-0044 — achats et fournisseurs (appliqué, lot P0)
 

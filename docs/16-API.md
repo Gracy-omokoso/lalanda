@@ -211,7 +211,7 @@ Un bloc fermé vaut `null` et **n’est jamais chargé** — pas de requête, do
 
 **Codes d’erreur propres à cet espace** : `400 INVALID_REQUEST`, `403 FORBIDDEN`, `403 NO_ORGANIZATION`, `404 ORG_NOT_FOUND`.
 
-## Autorisations par membre — implémenté derrière l'interrupteur (ADR-0041 A4)
+## Autorisations par membre — implémenté, actif par défaut (ADR-0041 A4, ADR-0059)
 
 `apps/api/src/organizations/` (`members.*`, `invitations.*`, `member-permissions.ts`). Toutes
 les écritures sont gardées par `organization.manage` (invitation : `members.invite`), décidées
@@ -238,7 +238,9 @@ GET   /authz/catalog                                     domaines, libellés, d�
   `close-right`), `400 PERMISSION_NOT_DELEGABLE`, `400 PERMISSION_OVERRIDE_REDUNDANT`,
   `400 PERMISSION_DEPENDENCY_MISSING`, `409 SOD_CONFLICT`, `409 OWNER_PERMISSIONS_FIXED`,
   `409 STALE_REVISION`, `404 MEMBER_NOT_FOUND`, `403 INVITATION_INVITER_NO_LONGER_AUTHORIZED`.
-- **Interrupteur `MEMBER_PERMISSIONS_ENABLED` éteint** (défaut) : `…/permissions` répond
+- **Interrupteur `MEMBER_PERMISSIONS_ENABLED`** : **allumé par défaut** depuis ADR-0059 (v1.14.0) ;
+  `GET /authz/catalog` publie `memberPermissionsEnabled: true`. **Coupé** (valeur explicite
+  `false`) : `…/permissions` répond
   `409 MEMBER_PERMISSIONS_DISABLED` ; un écart non vide est refusé de même sur `…/role`, à
   l'invitation et à l'acceptation d'une invitation qui en porte un. Le titre seul fonctionne
   comme avant.

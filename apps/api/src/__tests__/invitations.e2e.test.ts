@@ -270,7 +270,8 @@ e2eSuite('invitations (brief §6, docs/12-ROLES-PERMISSIONS.md)', () => {
   //
   // Validé À L'ENVOI contre les droits effectifs de l'invitant, puis REVALIDÉ À
   // L'ACCEPTATION contre ses droits effectifs du moment. Interrupteur
-  // `MEMBER_PERMISSIONS_ENABLED` éteint : une invitation n'accepte pas d'écart.
+  // `MEMBER_PERMISSIONS_ENABLED` allumé par défaut (ADR-0059) ; coupé (`false`
+  // explicite), une invitation n'accepte pas d'écart.
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe('ADR-0041 — A4 : invitation avec écart', () => {
@@ -315,7 +316,7 @@ e2eSuite('invitations (brief §6, docs/12-ROLES-PERMISSIONS.md)', () => {
     }
 
     it('interrupteur éteint : une invitation avec écart → 409 MEMBER_PERMISSIONS_DISABLED', async () => {
-      delete process.env['MEMBER_PERMISSIONS_ENABLED'];
+      process.env['MEMBER_PERMISSIONS_ENABLED'] = 'false';
       const tag = uniqueTag();
       const owner = makeUser('a4off', tag);
       const invitee = makeUser('a4offinv', tag);
@@ -328,6 +329,36 @@ e2eSuite('invitations (brief §6, docs/12-ROLES-PERMISSIONS.md)', () => {
       expect(res.status).toBe(409);
       expect(res.body.code).toBe('MEMBER_PERMISSIONS_DISABLED');
     }, 60_000);
+
+    it('ADR-0059 — interrupteur absent (défaut) : l’invitation avec écart est acceptée', async () => {
+      delete process.env['MEMBER_PERMISSIONS_ENABLED'];
+      const tag = uniqueTag();
+      const owner = makeUser('a59defaut', tag);
+      const invitee = makeUser('a59defautinv', tag);
+      const cookies = await registerAndLogin(owner);
+      const inviteeCookies = await registerAndLogin(invitee);
+      const orgId = await getPrimaryOrgId(cookies);
+
+      const catalogue = await request(server()).get('/authz/catalog').set('Cookie', cookies);
+      expect(catalogue.status).toBe(200);
+      expect(catalogue.body.memberPermissionsEnabled).toBe(true);
+
+      const inv = await request(server())
+        .post(`/organizations/${orgId}/invitations`)
+        .set('Cookie', cookies)
+        .send({ email: invitee.email, role: 'viewer', grants: ['crm.manage'] });
+      expect(inv.status, JSON.stringify(inv.body)).toBe(201);
+      const acc = await request(server())
+        .post('/invitations/accept')
+        .set('Cookie', inviteeCookies)
+        .send({ token: inv.body.token });
+      expect(acc.status, JSON.stringify(acc.body)).toBe(201);
+      const moi = await request(server())
+        .get('/me/permissions')
+        .set('Cookie', [...inviteeCookies, `active_org_id=${orgId}`]);
+      expect(moi.body.actions).toContain('crm.manage');
+      expect(moi.body.customized).toBe(true);
+    }, 90_000);
 
     it('critère 11 — « Lecteur + crm.manage » par un Administrateur : appartenance avec cet écart', async () => {
       process.env['MEMBER_PERMISSIONS_ENABLED'] = 'true';
@@ -438,7 +469,7 @@ e2eSuite('invitations (brief §6, docs/12-ROLES-PERMISSIONS.md)', () => {
         .send({ email: invitee.email, role: 'viewer', revokes: ['treasury.read'] });
       expect(inv.status, JSON.stringify(inv.body)).toBe(201);
 
-      delete process.env['MEMBER_PERMISSIONS_ENABLED'];
+      process.env['MEMBER_PERMISSIONS_ENABLED'] = 'false';
       const acc = await request(server())
         .post('/invitations/accept')
         .set('Cookie', inviteeCookies)

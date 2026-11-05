@@ -49,7 +49,7 @@ e2eSuite('ADR-0041 A2 — écarts lus par la garde et /me/permissions', () => {
     process.env['MEMBER_PERMISSIONS_ENABLED'] = 'true';
   }
   function eteindre(): void {
-    delete process.env['MEMBER_PERMISSIONS_ENABLED'];
+    process.env['MEMBER_PERMISSIONS_ENABLED'] = 'false';
   }
 
   async function inscrire(cle: string): Promise<Compte> {
@@ -143,7 +143,7 @@ e2eSuite('ADR-0041 A2 — écarts lus par la garde et /me/permissions', () => {
   });
 
   afterAll(async () => {
-    if (INTERRUPTEUR === undefined) eteindre();
+    if (INTERRUPTEUR === undefined) delete process.env['MEMBER_PERMISSIONS_ENABLED'];
     else process.env['MEMBER_PERMISSIONS_ENABLED'] = INTERRUPTEUR;
     await teardown(app, emails);
   }, E2E_HOOK_TIMEOUT_MS);
