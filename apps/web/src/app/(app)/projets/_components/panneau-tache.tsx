@@ -32,6 +32,7 @@ import {
   aria,
 } from './elements';
 import { colonnesKanban, placer } from './kanban-model';
+import { COULEURS_CARTE, LIBELLES_COULEUR, numeroVisible } from './cartes-model';
 import { useProjet } from './project-context';
 import { PRIORITES, codeWork, formatJour, formatMinutes, messageWork } from './projets-model';
 import { Collaboration } from './tache-collab';
@@ -266,9 +267,11 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
           </span>
         )}
         <span className="flex items-center gap-1">
-          <span className="hidden text-xs text-[var(--foreground-muted)] sm:inline">
-            #{d.number}
-          </span>
+          {numeroVisible(d.number, ctx.settings?.showTaskNumbers) ? (
+            <span className="hidden text-xs text-[var(--foreground-muted)] sm:inline">
+              #{d.number}
+            </span>
+          ) : null}
           <button
             type="button"
             className="inline-flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] text-lg leading-none text-[var(--foreground-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]"
@@ -470,6 +473,41 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
                 </option>
               ))}
             </select>
+          </dd>
+
+          {/* ADR-0061 § 4 : couleur de la carte (post-it), palette fermée de 8 pastels. */}
+          <dt className="self-start pt-1 text-[var(--foreground-muted)]" id="tache-couleur">
+            Couleur
+          </dt>
+          <dd>
+            <div role="radiogroup" aria-labelledby="tache-couleur" className="flex flex-wrap items-center gap-1.5">
+              {[null, ...COULEURS_CARTE].map((c) => {
+                const choisie = (d.color ?? null) === c;
+                return (
+                  <button
+                    key={c ?? 'aucune'}
+                    type="button"
+                    role="radio"
+                    aria-checked={choisie}
+                    disabled={!ecrire || envoi}
+                    title={c ? LIBELLES_COULEUR[c] : 'Aucune couleur'}
+                    onClick={() =>
+                      void agir(
+                        async () =>
+                          apres(await workApi.patchTask(d.id, { expectedRevision: d.revision, color: c })),
+                        'Couleur non enregistrée.',
+                      )
+                    }
+                    className={`h-6 w-6 rounded-full border transition-shadow ${
+                      choisie ? 'ring-2 ring-[var(--accent)] ring-offset-1 ring-offset-[var(--surface)]' : ''
+                    } ${c ? 'border-transparent' : 'border-dashed border-[var(--border-strong)] bg-[var(--surface)]'}`}
+                    style={c ? { background: `var(--card-${c}-bg)`, boxShadow: `inset 0 0 0 2px var(--card-${c}-dot)` } : undefined}
+                  >
+                    <span className="sr-only">{c ? LIBELLES_COULEUR[c] : 'Aucune couleur'}</span>
+                  </button>
+                );
+              })}
+            </div>
           </dd>
 
           <dt

@@ -28,6 +28,11 @@ describe('onglets du projet (ADR-0057)', () => {
     expect(ongletDEntree({})).toBe('apercu');
     expect(ongletDEntree({ tache: 'abc' })).toBe('liste');
     expect(ongletDEntree({ tache: '' })).toBe('apercu');
+    // ADR-0061 § 3 : vue par défaut des réglages ; une tâche demandée l'emporte.
+    expect(ongletDEntree({}, 'board')).toBe('kanban');
+    expect(ongletDEntree({}, 'list')).toBe('liste');
+    expect(ongletDEntree({}, 'overview')).toBe('apercu');
+    expect(ongletDEntree({ tache: 'abc' }, 'board')).toBe('liste');
   });
   it('ordre façon Asana, segments conservés, droits respectés', () => {
     expect(ongletsVisibles(['work.read']).map((o) => o.label)).toEqual([

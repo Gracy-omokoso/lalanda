@@ -24,6 +24,7 @@ import {
   PrioriteBadge,
 } from './elements';
 import { groupesListe } from './liste-model';
+import { LIBELLES_COULEUR, stylePastille } from './cartes-model';
 import { useProjet } from './project-context';
 import { cleDepuisLibelle, messageWork } from './projets-model';
 import { filtrerTaches, filtresActifs } from './taches-model';
@@ -170,6 +171,15 @@ function LigneTache({
       >
         <CaseTerminee task={t} />
         {profondeur === 1 ? <span className="sr-only">Sous-tâche : </span> : null}
+        {t.color ? (
+          <span
+            data-couleur={t.color}
+            title={`Couleur : ${LIBELLES_COULEUR[t.color]}`}
+            aria-hidden="true"
+            className="h-2.5 w-2.5 shrink-0 rounded-full"
+            style={stylePastille(t.color)}
+          />
+        ) : null}
         <NomEditable t={t} />
         <span className="flex shrink-0 items-center gap-2 text-xs text-[var(--foreground-muted)]">
           {t.subtaskCount > 0 ? (

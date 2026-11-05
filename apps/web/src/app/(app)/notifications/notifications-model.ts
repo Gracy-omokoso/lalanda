@@ -48,6 +48,19 @@ export const LIBELLES_TYPES: Record<NotificationKind, { label: string; aide: str
     label: 'Jalon terminé',
     aide: 'Un jalon d’un projet dont vous êtes responsable est terminé.',
   },
+  // ADR-0061 § 2 : réglables aussi dans Projets › Paramètres (cloche et e-mail).
+  'work.task_status_changed': {
+    label: 'Statut d’une tâche changé',
+    aide: 'Une de vos tâches change de colonne.',
+  },
+  'work.added_to_project': {
+    label: 'Ajout à un projet',
+    aide: 'Vous êtes ajouté à un projet, seul ou avec votre équipe.',
+  },
+  'work.project_at_risk': {
+    label: 'Projet à risque',
+    aide: 'Un de vos projets passe à risque ou en retard.',
+  },
   // ADR-0040 — C4 § 5.4 : relances et opportunités du CRM.
   'crm.activity_assigned': {
     label: 'Relance assignée',

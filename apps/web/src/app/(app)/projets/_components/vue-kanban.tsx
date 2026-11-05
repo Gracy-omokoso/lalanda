@@ -38,6 +38,7 @@ import {
   repereCategorie,
   type ColonneKanban,
 } from './kanban-model';
+import { numeroVisible, styleCarte } from './cartes-model';
 import { useProjet } from './project-context';
 import { CATEGORIES_COLONNE } from './projets-model';
 import { filtrerTaches } from './taches-model';
@@ -224,8 +225,10 @@ function Carte({
   onDragOver: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent) => void;
 }): React.ReactElement {
-  const { nbCommentaires } = useProjet();
+  const { nbCommentaires, settings } = useProjet();
   const commentaires = nbCommentaires(t.id);
+  // ADR-0061 : couleur post-it (aucune : affichage actuel) et numéro selon les réglages.
+  const numero = numeroVisible(t.number, settings?.showTaskNumbers);
   const options = travailler ? optionsDeplacement(colonnes, t) : [];
   const idMenu = `deplacer-${t.id}`;
   return (
@@ -235,6 +238,8 @@ function Carte({
       onDragEnd={onDragEnd}
       onDragOver={onDragOver}
       onDrop={onDrop}
+      style={styleCarte(t.color)}
+      data-couleur={t.color ?? undefined}
       className={`group/carte relative flex min-w-0 flex-col gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-3 text-sm shadow-[var(--shadow-card)] transition-[border-color,box-shadow] duration-[var(--motion-fast)] hover:border-[var(--border-strong)] ${glissee ? 'opacity-50' : ''} ${travailler ? 'cursor-grab active:cursor-grabbing' : ''}`}
     >
       {indicateur ? (
@@ -252,6 +257,9 @@ function Carte({
           onClick={onOuvrir}
           className={`min-w-0 break-words text-left font-medium leading-snug after:absolute after:inset-0 after:content-[''] ${t.done ? 'text-[var(--foreground-muted)] line-through' : ''}`}
         >
+          {numero ? (
+            <span className="mr-1 text-xs font-normal text-[var(--foreground-muted)]">{numero}</span>
+          ) : null}
           {t.title}
         </button>
       </div>

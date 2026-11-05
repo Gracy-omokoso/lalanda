@@ -242,11 +242,13 @@ describe('sous-options', () => {
 });
 
 describe('Projets (ADR-0039 § 8)', () => {
-  it('se déroule sur « Mes tâches » et « Tous les projets », sous `work.read`', () => {
+  it('se déroule sur « Mes tâches », « Tous les projets » et « Paramètres », sous `work.read`', () => {
     const [projets] = appsVisibles(['work.read'], 'run');
     expect(projets!.sousOptions.map((s) => [s.label, s.href])).toEqual([
       ['Mes tâches', '/projets/mes-taches'],
       ['Tous les projets', '/projets'],
+      // ADR-0061 : mes notifications pour chacun ; le comportement pour `work.manage`.
+      ['Paramètres', '/projets/parametres'],
     ]);
     expect(projets!.sousOptions.every((s) => s.action === 'work.read')).toBe(true);
   });
@@ -261,6 +263,8 @@ describe('Projets (ADR-0039 § 8)', () => {
     expect(appActive('/projets/abc/kanban')).toBe('projets');
     expect(sousOptionActive('/projets/mes-taches')).toBe('projets-mes-taches');
     expect(sousOptionActive('/projets/abc/liste')).toBe('projets-tous');
+    // ADR-0061 : paramètres de la rubrique Projets.
+    expect(sousOptionActive('/projets/parametres')).toBe('projets-parametres');
     expect(appActive('/projets-archives')).toBeNull();
     expect(appActive('/initiatives/abc')).toBe('initiatives');
   });
@@ -502,6 +506,7 @@ describe('ADR-0045 § 8 — application Ressources humaines (H6)', () => {
       'Évaluations',
       'Collaborateurs',
       'Services',
+      'Équipes',
       'Organigramme',
       'Échéances',
       'Rapports',
@@ -525,6 +530,8 @@ describe('ADR-0045 § 8 — application Ressources humaines (H6)', () => {
       'rh-planning',
       'rh-collaborateurs',
       'rh-services',
+      // ADR-0060
+      'rh-equipes',
       'rh-organigramme',
       'rh-echeances',
       'rh-rapports',

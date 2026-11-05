@@ -84,7 +84,7 @@ interface ErreurApi {
   detail?: unknown;
 }
 
-function codeDe(err: unknown): string | null {
+export function codeDe(err: unknown): string | null {
   const detail = (err as ErreurApi | null)?.detail;
   if (typeof detail !== 'object' || detail === null) return null;
   const code = (detail as { code?: unknown }).code;
