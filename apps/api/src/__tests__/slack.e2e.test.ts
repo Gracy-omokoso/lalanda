@@ -59,7 +59,7 @@ e2eSuite('notifications des Projets par Slack (ADR-0064)', () => {
   const sleeps: number[] = [];
   const mails: MailMessage[] = [];
   let nextToken = TOKEN_A;
-  let nextTeam = { id: 'TTEAMA0001', name: 'Espace Go freelance' };
+  const nextTeam = { id: 'TTEAMA0001', name: 'Espace Go freelance' };
 
   const notifier = () => f.app().get(SlackNotifier);
   const flush = () => notifier().flush();
@@ -126,7 +126,6 @@ e2eSuite('notifications des Projets par Slack (ADR-0064)', () => {
       { userId: 'platform-admin', platformRole: 'platform_super_admin', ip: null, userAgent: null },
       false,
     );
-    f.app().get(IntegrationsService);
     // Cache de 60 s de `SecretsService` : invalidé par l'écriture elle-même.
   }
 
