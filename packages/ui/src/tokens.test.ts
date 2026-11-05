@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
+  CARD_COLORS,
+  CARD_TOKENS,
   CHART_TOKENS,
   combinaison,
   COMBINAISONS,
@@ -53,6 +55,10 @@ function attendus(c: Combinaison): Record<string, string> {
     out[`label-${cle}-bg`] = t.bg;
     out[`label-${cle}-fg`] = t.fg;
     out[`label-${cle}-dot`] = t.dot;
+  }
+  for (const cle of CARD_COLORS) {
+    out[`card-${cle}-bg`] = CARD_TOKENS[c][cle].bg;
+    out[`card-${cle}-dot`] = CARD_TOKENS[c][cle].dot;
   }
   return Object.fromEntries(Object.entries(out).map(([k, v]) => [k, v.toLowerCase()]));
 }
@@ -141,5 +147,26 @@ describe('étiquettes (ADR-0039 § 2.1) — palette fermée, chaque combinaison'
   }
   it('neuf couleurs, sans doublon', () => {
     expect(new Set(TAG_COLORS).size).toBe(9);
+  });
+});
+
+describe('cartes post-it (ADR-0061 § 4) — texte du thème lisible, liseré visible', () => {
+  for (const c of COMBINAISONS) {
+    for (const cle of CARD_COLORS) {
+      it(`${c} : ${cle} — texte ≥ 4,5:1, texte secondaire ≥ 4,5:1, liseré ≥ 3:1`, () => {
+        const t = CARD_TOKENS[c][cle];
+        const theme = THEME_TOKENS[c];
+        expect(contraste(theme.foreground, t.bg)).toBeGreaterThanOrEqual(SEUIL_TEXTE);
+        expect(contraste(theme['foreground-muted'], t.bg)).toBeGreaterThanOrEqual(SEUIL_TEXTE);
+        expect(contraste(t.dot, theme.surface)).toBeGreaterThanOrEqual(SEUIL_INTERFACE);
+      });
+    }
+  }
+  it('huit teintes, sans doublon ; claires en clair, sombres en sombre', () => {
+    expect(new Set(CARD_COLORS).size).toBe(8);
+    for (const cle of CARD_COLORS) {
+      expect(contraste(CARD_TOKENS['lalanda-light'][cle].bg, '#000000')).toBeGreaterThan(15);
+      expect(contraste(CARD_TOKENS.ebene[cle].bg, '#FFFFFF')).toBeGreaterThan(10);
+    }
   });
 });

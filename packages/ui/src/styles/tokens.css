@@ -92,6 +92,24 @@
   --label-pink-fg: #8c1d58;
   --label-pink-dot: #c83d86;
 
+  /* ADR-0061 § 4 : cartes de tâche façon post-it (pastels clairs). */
+  --card-yellow-bg: #fff4b8;
+  --card-yellow-dot: #9a7400;
+  --card-orange-bg: #ffe3c7;
+  --card-orange-dot: #c25a12;
+  --card-pink-bg: #fcddeb;
+  --card-pink-dot: #c83d86;
+  --card-purple-bg: #e9dffa;
+  --card-purple-dot: #8150c2;
+  --card-blue-bg: #dcebfd;
+  --card-blue-dot: #2f64d0;
+  --card-teal-bg: #d3f2ec;
+  --card-teal-dot: #1c8a82;
+  --card-green-bg: #ddf3d5;
+  --card-green-dot: #2e8b45;
+  --card-gray-bg: #ecebe6;
+  --card-gray-dot: #6b675c;
+
   --shadow-card: 0 1px 2px rgba(20, 25, 27, 0.06), 0 1px 1px rgba(20, 25, 27, 0.04);
   --shadow-pop: 0 12px 32px -8px rgba(0, 50, 61, 0.28), 0 2px 6px rgba(0, 50, 61, 0.12);
 }
@@ -168,6 +186,24 @@
   --label-pink-bg: #3a1a2b;
   --label-pink-fg: #f3b0d2;
   --label-pink-dot: #e07aae;
+
+  /* ADR-0061 § 4 : cartes de tâche, pastels désaturés sombres. */
+  --card-yellow-bg: #3a341c;
+  --card-yellow-dot: #d9b83a;
+  --card-orange-bg: #3d2a1c;
+  --card-orange-dot: #ee9a55;
+  --card-pink-bg: #3b2230;
+  --card-pink-dot: #e07aae;
+  --card-purple-bg: #2f2840;
+  --card-purple-dot: #a584dd;
+  --card-blue-bg: #1f2e45;
+  --card-blue-dot: #6e9ceb;
+  --card-teal-bg: #183632;
+  --card-teal-dot: #43b8ac;
+  --card-green-bg: #1f3524;
+  --card-green-dot: #5cc285;
+  --card-gray-bg: #2e3436;
+  --card-gray-dot: #9aa6aa;
 
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-pop: 0 16px 40px -8px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
@@ -246,6 +282,24 @@
   --label-pink-fg: #8c1d58;
   --label-pink-dot: #c83d86;
 
+  /* ADR-0061 § 4 : cartes de tâche façon post-it (pastels clairs). */
+  --card-yellow-bg: #fff4b8;
+  --card-yellow-dot: #9a7400;
+  --card-orange-bg: #ffe3c7;
+  --card-orange-dot: #c25a12;
+  --card-pink-bg: #fcddeb;
+  --card-pink-dot: #c83d86;
+  --card-purple-bg: #e9dffa;
+  --card-purple-dot: #8150c2;
+  --card-blue-bg: #dcebfd;
+  --card-blue-dot: #2f64d0;
+  --card-teal-bg: #d3f2ec;
+  --card-teal-dot: #1c8a82;
+  --card-green-bg: #ddf3d5;
+  --card-green-dot: #2e8b45;
+  --card-gray-bg: #ecebe6;
+  --card-gray-dot: #6b675c;
+
   --shadow-card: 0 1px 2px rgba(20, 25, 27, 0.06), 0 1px 1px rgba(20, 25, 27, 0.04);
   --shadow-pop: 0 12px 32px -8px rgba(0, 50, 61, 0.28), 0 2px 6px rgba(0, 50, 61, 0.12);
 }
@@ -323,6 +377,24 @@
   --label-pink-fg: #f3b0d2;
   --label-pink-dot: #e07aae;
 
+  /* ADR-0061 § 4 : cartes de tâche, pastels désaturés sombres. */
+  --card-yellow-bg: #3a341c;
+  --card-yellow-dot: #d9b83a;
+  --card-orange-bg: #3d2a1c;
+  --card-orange-dot: #ee9a55;
+  --card-pink-bg: #3b2230;
+  --card-pink-dot: #e07aae;
+  --card-purple-bg: #2f2840;
+  --card-purple-dot: #a584dd;
+  --card-blue-bg: #1f2e45;
+  --card-blue-dot: #6e9ceb;
+  --card-teal-bg: #183632;
+  --card-teal-dot: #43b8ac;
+  --card-green-bg: #1f3524;
+  --card-green-dot: #5cc285;
+  --card-gray-bg: #2e3436;
+  --card-gray-dot: #9aa6aa;
+
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-pop: 0 16px 40px -8px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
 }
@@ -399,6 +471,24 @@
   --label-pink-bg: #3a1a2b;
   --label-pink-fg: #f3b0d2;
   --label-pink-dot: #e07aae;
+
+  /* ADR-0061 § 4 : cartes de tâche, pastels désaturés sombres. */
+  --card-yellow-bg: #3a341c;
+  --card-yellow-dot: #d9b83a;
+  --card-orange-bg: #3d2a1c;
+  --card-orange-dot: #ee9a55;
+  --card-pink-bg: #3b2230;
+  --card-pink-dot: #e07aae;
+  --card-purple-bg: #2f2840;
+  --card-purple-dot: #a584dd;
+  --card-blue-bg: #1f2e45;
+  --card-blue-dot: #6e9ceb;
+  --card-teal-bg: #183632;
+  --card-teal-dot: #43b8ac;
+  --card-green-bg: #1f3524;
+  --card-green-dot: #5cc285;
+  --card-gray-bg: #2e3436;
+  --card-gray-dot: #9aa6aa;
 
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-pop: 0 16px 40px -8px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
