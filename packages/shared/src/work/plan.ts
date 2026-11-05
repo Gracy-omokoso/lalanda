@@ -459,6 +459,8 @@ export interface WorkAiPlanDraft {
   /** Identifiant de la ligne de journal (relie la création à la proposition). */
   draftId: string;
   summary: string;
+  /** Description proposée pour le projet (objectif, sprints), modifiable à la relecture. */
+  description: string;
   sprints: (WorkSprint & { goal: string })[];
   /** Tâches au format commun du plan (jalons compris, `isMilestone`). */
   tasks: WorkPlanTask[];

@@ -124,6 +124,8 @@ import { WorkOverviewController } from '../work/work-overview.controller.js';
 import { WorkPortfolioController } from '../work/work-portfolio.controller.js';
 // ADR-0062 : import d'un fichier de tâches.
 import { WorkImportController } from '../work/work-import.controller.js';
+// ADR-0063 : construction d'un plan par l'IA.
+import { WorkAiPlanController } from '../work/work-ai-plan.controller.js';
 import { WorkSettingsController } from '../work/work-settings.controller.js';
 import { WorkTasksController } from '../work/work-tasks.controller.js';
 import { WorkTimeController } from '../work/work-time.controller.js';
@@ -306,6 +308,8 @@ const CONTROLEURS = [
   WorkPortfolioController,
   // ADR-0062 : import d'un fichier de tâches.
   WorkImportController,
+  // ADR-0063 : construction d'un plan par l'IA.
+  WorkAiPlanController,
   // ADR-0045 — H4 : documents, listes d'entrée et de sortie, échéances.
   HrDocumentsController,
   HrChecklistsController,
@@ -872,6 +876,9 @@ describe('couverture des routes par le RBAC', () => {
       'WorkImportController.preview': ['work.update'],
       'WorkImportController.importProject': ['work.manage'],
       'WorkImportController.importTasks': ['work.update'],
+      // ADR-0063 : proposer un plan (IA) et créer le projet relu — gouverner.
+      'WorkAiPlanController.propose': ['work.manage'],
+      'WorkAiPlanController.create': ['work.manage'],
       'WorkTasksController.listProject': ['work.read'],
       'WorkTasksController.create': ['work.update'],
       'WorkTasksController.list': ['work.read'],

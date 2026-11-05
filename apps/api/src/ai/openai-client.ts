@@ -9,7 +9,17 @@
 //   rattrape pour retomber sur son repli déterministe.
 
 import type { OpenAIChatClient } from './ai-actions.service.js';
-import { resolveAiLimits, type AiLimits } from './ai-limits.js';
+import { AI_LIMITS_BOUNDS, resolveAiLimits, type AiLimits } from './ai-limits.js';
+
+/** Valeur d'appel bornée ; absente ou invalide : la borne globale. */
+function perCall(
+  value: number | undefined,
+  fallback: number,
+  b: { min: number; max: number },
+): number {
+  if (value === undefined || !Number.isInteger(value)) return fallback;
+  return Math.min(Math.max(value, b.min), b.max);
+}
 
 interface OpenAIChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -164,15 +174,26 @@ export async function createOpenAIClient(
   const OpenAICtor: OpenAIConstructor = 'default' in mod ? mod.default : mod.OpenAI;
 
   return {
-    async chatJson({ system, user, model }) {
+    async chatJson({ system, user, model, maxOutputTokens, timeoutMs }) {
       const apiKey = await resolveApiKey();
       if (!apiKey) throw new OpenAIKeyUnavailableError();
+      // ADR-0063 : un appelant peut demander une borne propre, toujours encadrée.
+      const maxTokens = perCall(
+        maxOutputTokens,
+        limits.maxOutputTokens,
+        AI_LIMITS_BOUNDS.maxOutputTokens,
+      );
+      const deadline = perCall(
+        timeoutMs,
+        limits.requestTimeoutMs,
+        AI_LIMITS_BOUNDS.requestTimeoutMs,
+      );
 
       // Le SDK est instancié ici et jeté ensuite : il ne conserve donc aucune
       // clé entre deux appels, et une clé remplacée dans /admin prend effet dès
       // l'expiration du cache de 60 s.
       const client: OpenAIInstance = new OpenAICtor({ apiKey });
-      const res = await runWithDeadline(limits.requestTimeoutMs, (signal) =>
+      const res = await runWithDeadline(deadline, (signal) =>
         client.chat.completions.create(
           {
             model,
@@ -182,17 +203,17 @@ export async function createOpenAIClient(
             ],
             response_format: { type: 'json_object' },
             temperature: 0.2,
-            max_tokens: limits.maxOutputTokens,
+            max_tokens: maxTokens,
           },
           // `timeout` borne aussi le SDK lui-même; `signal` libère la connexion
           // dès que notre propre délai a mordu.
-          { signal, timeout: limits.requestTimeoutMs },
+          { signal, timeout: deadline },
         ),
       );
 
       const choice = res.choices[0];
       if (choice?.finish_reason === 'length') {
-        throw new OpenAITruncatedResponseError(limits.maxOutputTokens);
+        throw new OpenAITruncatedResponseError(maxTokens);
       }
       const content = choice?.message?.content;
       if (!content) throw new Error('Réponse OpenAI vide');

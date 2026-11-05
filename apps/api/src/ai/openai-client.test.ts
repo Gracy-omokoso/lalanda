@@ -65,6 +65,22 @@ describe('createOpenAIClient — borne de jetons en sortie', () => {
     expect(body.max_tokens).toBe(777);
   });
 
+  it('ADR-0063 : une borne par appel est appliquée, toujours encadrée', async () => {
+    createMock.mockResolvedValue(okResponse('{"actions":[]}'));
+    const client = await createOpenAIClient(keyOk, {
+      maxOutputTokens: 777,
+      requestTimeoutMs: 5_000,
+    });
+    await client?.chatJson({ ...PROMPT, maxOutputTokens: 4_096, timeoutMs: 45_000 });
+    await client?.chatJson({ ...PROMPT, maxOutputTokens: 1_000_000, timeoutMs: 10 });
+    const first = createMock.mock.calls[0] as [{ max_tokens?: number }, { timeout?: number }];
+    const second = createMock.mock.calls[1] as [{ max_tokens?: number }, { timeout?: number }];
+    expect(first[0].max_tokens).toBe(4_096);
+    expect(first[1].timeout).toBe(45_000);
+    expect(second[0].max_tokens).toBe(4_096);
+    expect(second[1].timeout).toBe(1_000);
+  });
+
   it('réponse tronquée (finish_reason="length") → erreur typée, pas de JSON incomplet renvoyé', async () => {
     // Le modèle a été coupé en plein JSON : le contenu est syntaxiquement faux.
     createMock.mockResolvedValue(okResponse('{"actions":[{"ratio":"dscr","sugg', 'length'));

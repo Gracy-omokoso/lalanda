@@ -63,6 +63,11 @@ import { WorkTimeService } from './work-time.service.js';
 import { WorkImportController } from './work-import.controller.js';
 import { WorkImportService } from './work-import.service.js';
 import { WorkPlanBuilder } from './work-plan-builder.js';
+// ADR-0063 : construction d'un plan par l'IA (quota et client IA partagés).
+import { AiModule, OPENAI_CHAT_CLIENT } from '../ai/ai.module.js';
+import { WorkAiPlanController } from './work-ai-plan.controller.js';
+import { WorkAiPlanLog, WorkAiPlanLogSchema } from './work-ai-plan.schema.js';
+import { WORK_AI_CHAT_CLIENT, WorkAiPlanService } from './work-ai-plan.service.js';
 import {
   WorkActivity,
   WorkActivitySchema,
@@ -98,6 +103,8 @@ import {
     // ADR-0046 — S7 (§ 6.7) : inventaires, « À traiter », maintenances, lecture seule.
     StockAgendaModule,
     AssetsAgendaModule,
+    // ADR-0063 : `AiQuotaService` et le client OpenAI partagé.
+    AiModule,
     MongooseModule.forFeature([
       { name: WorkSettings.name, schema: WorkSettingsSchema },
       { name: WorkProject.name, schema: WorkProjectSchema },
@@ -107,6 +114,7 @@ import {
       { name: WorkTimeEntry.name, schema: WorkTimeEntrySchema },
       { name: WorkMemberRate.name, schema: WorkMemberRateSchema },
       { name: WorkActivity.name, schema: WorkActivitySchema },
+      { name: WorkAiPlanLog.name, schema: WorkAiPlanLogSchema },
     ]),
   ],
   controllers: [
@@ -125,6 +133,8 @@ import {
     WorkPortfolioController,
     // ADR-0062 : import d'un fichier de tâches (aperçu, import, modèle).
     WorkImportController,
+    // ADR-0063 : proposition de plan par l'IA, création depuis un plan relu.
+    WorkAiPlanController,
   ],
   providers: [
     WorkMembersService,
@@ -156,6 +166,8 @@ import {
     // ADR-0062 / ADR-0063 : créateur commun d'un projet depuis un plan, import de fichier.
     WorkPlanBuilder,
     WorkImportService,
+    WorkAiPlanService,
+    { provide: WORK_AI_CHAT_CLIENT, useExisting: OPENAI_CHAT_CLIENT },
   ],
   exports: [
     MongooseModule,

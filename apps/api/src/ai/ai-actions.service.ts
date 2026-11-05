@@ -25,7 +25,18 @@ import {
 
 /** Injectable pour permettre le mock en test (aucun appel réseau réel). */
 export interface OpenAIChatClient {
-  chatJson(args: { system: string; user: string; model: string }): Promise<string>;
+  chatJson(args: {
+    system: string;
+    user: string;
+    model: string;
+    /**
+     * Plafond de jetons en sortie POUR CET APPEL (ADR-0063 : un plan de projet
+     * dépasse le défaut). Borné par `AI_LIMITS_BOUNDS` ; absent : borne globale.
+     */
+    maxOutputTokens?: number;
+    /** Délai maximal pour cet appel, borné par `AI_LIMITS_BOUNDS` ; absent : borne globale. */
+    timeoutMs?: number;
+  }): Promise<string>;
 }
 
 const DEFAULT_MODEL = 'gpt-4o-mini';
