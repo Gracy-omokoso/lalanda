@@ -195,3 +195,9 @@ Décideurs :
   proposé (JSON strict validé par zod, dates tirées des sprints calculés par le serveur, sprints en
   étiquettes « Sprint N »), corrigé et signalé, relu puis créé par le même créateur que l'import ; quota
   IA commun et journal. Statut : **proposé** (5 nov. 2026).
+- [ADR-0064](ADR-0064-notifications-projets-par-slack.md) — Notifications des Projets par Slack : une
+  application « Lalanda » distribuée, connectée par chaque organisation à son espace (OAuth v2,
+  `state` signé, jeton du bot au coffre d'organisation), messages privés selon la nouvelle colonne
+  Slack des préférences, canal facultatif par projet (confirmation pour un projet privé), envoi non
+  bloquant, Events API signée, interrupteur `/admin` + `SLACK_ENABLED`. Statut : **proposé**
+  (5 nov. 2026).

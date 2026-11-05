@@ -668,6 +668,29 @@ téléphone, état vide).
   couleur, rien ne change. Contrastes ≥ 4,5:1 (texte et texte secondaire) dans les 5 combinaisons,
   liseré ≥ 3:1 (`tokens.test.ts`). Captures `tableau-postit-lalanda.png`, `tableau-postit-ebene.png`.
 
+## Slack dans les Projets — implémenté, ADR-0064
+
+Captures : `docs/refonte-ui/v6/` (`slack-non-disponible.png`, `slack-non-connecte.png`,
+`slack-connecte.png`, `projets-notifications-colonne-slack.png`, `projet-canal-slack.png`,
+`projet-canal-slack-prive.png`), connexion simulée par un faux Slack local.
+
+- **Projets › Paramètres › Slack** (onglet visible pour `organization.manage`) : carte « Espace Slack
+  de l'organisation ». Non connecté : pastille **Non connecté**, phrase expliquant la redirection vers
+  Slack et bouton **Connecter Slack** ; application non configurée : même carte, bouton désactivé et
+  « Slack n'est pas encore disponible sur Lalanda… Rien ne change pour vos notifications ».
+  Connecté : pastille **Connecté** + nom de l'espace, « Connecté par », « Le », « Envois » (remis,
+  introuvables, échecs), bouton **Déconnecter** (confirmation). À reconnecter : pastille rouge
+  **À reconnecter**, explication, bouton **Reconnecter Slack**. Retour de Slack : bandeau
+  (succès ou erreur écrite en clair selon `?slack=`).
+- **Mes notifications** : troisième colonne **Slack** (icône bulle) à côté de Cloche et E-mail, et
+  bouton **Couper tous les messages Slack**, seulement si l'organisation est connectée.
+- **Réglages d'un projet › Canal Slack** (gestionnaires) : pastille d'état (**Publie**, **Aucun
+  canal**, **En pause**, **Slack non connecté**), « Publie dans #canal » + **Retirer le canal**,
+  liste **Canal public** ou **Ou identifiant du canal** (`C…`), et pour un projet privé une **case de
+  confirmation** obligatoire (« tout le canal verra ses événements… ») avant **Publier dans ce
+  canal**. Projet passé en privé sans confirmation : « En pause » et explication.
+- Couleur jamais seule (états écrits), champs étiquetés, cases et interrupteurs au clavier.
+
 ## Importer un fichier et Construire avec l'IA — implémenté, ADR-0062 et ADR-0063
 
 Captures : `docs/refonte-ui/v5/` (`import-apercu.png`, `import-resultat.png`, `ia-formulaire.png`,

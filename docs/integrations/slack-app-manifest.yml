@@ -1,0 +1,42 @@
+# Manifeste de l'application Slack « Lalanda » — ADR-0064.
+#
+# À coller sur https://api.slack.com/apps › Create New App › From a manifest (format YAML).
+# AUCUNE clé ici : Client ID, Client Secret et Signing Secret sont générés par Slack et se
+# saisissent dans la console /admin de Lalanda (voir docs/integrations/slack.md).
+#
+# Les portées sont le minimum utile et doivent rester identiques à `SLACK_BOT_SCOPES`
+# (packages/shared/src/work/slack.ts).
+display_information:
+  name: Lalanda
+  description: Notifications des Projets Lalanda dans Slack.
+  long_description: >-
+    Lalanda envoie à chaque membre, en message privé, les notifications des Projets qu'il a
+    choisies (tâche assignée, mention, échéance…), et peut publier les événements d'un projet
+    dans un canal public. Chaque organisation connecte son propre espace Slack depuis
+    Projets › Paramètres › Slack ; aucune organisation ne voit ni n'utilise la connexion d'une
+    autre. Lalanda n'envoie aucune donnée financière dans Slack.
+  background_color: "#0f3d4a"
+features:
+  bot_user:
+    display_name: Lalanda
+    always_online: false
+oauth_config:
+  redirect_urls:
+    - https://api.lalanda.co/slack/oauth/callback
+  scopes:
+    bot:
+      - chat:write
+      - chat:write.public
+      - users:read
+      - users:read.email
+      - im:write
+      - channels:read
+settings:
+  event_subscriptions:
+    request_url: https://api.lalanda.co/slack/events
+    bot_events:
+      - app_uninstalled
+      - tokens_revoked
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false

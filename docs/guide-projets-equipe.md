@@ -168,6 +168,29 @@ délai d'échéance proche, **archivage automatique** des projets terminés apr�
 modification et suppression des commentaires des autres par les gestionnaires, affichage des
 numéros de tâche (#12).
 
+## 8 bis. Slack (ADR-0064)
+
+Les notifications des Projets peuvent aussi arriver **dans Slack**, en message privé du bot
+« Lalanda ».
+
+- **Connecter** (Propriétaire ou Administrateur) : Projets › Paramètres › onglet **Slack** ›
+  **Connecter Slack**, choisir l'espace Slack de l'organisation, **Autoriser**. L'écran affiche
+  l'espace connecté, qui l'a connecté et quand. **Déconnecter** coupe tout et révoque l'accès. Si
+  l'onglet dit « Slack n'est pas encore disponible », l'application Slack de la plateforme n'est pas
+  encore configurée : rien ne change pour la cloche et l'e-mail.
+- **Mes notifications** : une colonne **Slack** apparaît une fois l'organisation connectée. Par
+  défaut : tâche assignée et mention. Le résumé quotidien reste par e-mail.
+- Vous êtes retrouvé dans Slack **par votre adresse e-mail Lalanda** ; avec une autre adresse dans
+  Slack, vous ne recevez rien.
+- **Canal d'un projet** (gestionnaires) : Réglages du projet › **Canal Slack** › choisir un canal
+  public (ou coller son identifiant `C…`) › **Publier dans ce canal**. Le canal reçoit les tâches
+  assignées et déplacées et l'alerte « projet à risque ». Pour un projet **privé**, il faut cocher
+  la confirmation : tout le canal verra ses événements.
+- **« À reconnecter »** : Slack a retiré l'accès ; le Propriétaire clique **Reconnecter Slack**.
+
+Pour la dirigeante (création de l'application Slack, identifiants à saisir dans `/admin`) :
+[docs/integrations/slack.md](integrations/slack.md).
+
 ## 9. Couleur des cartes (post-it)
 
 Dans le panneau d'une tâche, ligne **Couleur** : 8 teintes pastel (jaune, abricot, rose, lilas,

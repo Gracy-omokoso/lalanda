@@ -1029,6 +1029,32 @@ Types de notification ajoutés : `work.task_status_changed`, `work.added_to_proj
 `work.project_at_risk`. Tâches récurrentes : `work.project-watch` (horaire), `work.daily-digest`
 (15 min).
 
+## Notifications des Projets par Slack — implémenté, ADR-0064
+
+Fonction d'offre `run_work` sous `/work`, organisation active seulement (aucun identifiant
+d'organisation en paramètre). Aucune route ne renvoie le jeton du bot ni un secret de l'application.
+
+| Route | Droit | Rôle |
+|---|---|---|
+| `GET /work/slack` | `work.read` | `SlackConnectionView` : `available`, `connected`, `status` (`active` · `reconnect_required` · `uninstalled`), `teamName`, `connectedBy`, `connectedAt`, `stats` (`sent`, `unmatched`, `failed`), `canManage` |
+| `POST /work/slack/connect` | `organization.manage` | `{ authorizeUrl }` (200) ; `503 SLACK_NOT_AVAILABLE` si l'application n'est pas configurée, désactivée ou `SLACK_ENABLED=false` |
+| `DELETE /work/slack` | `organization.manage` | révoque (`auth.revoke`, sauf espace partagé par une autre organisation active), détruit le jeton → vue ; `404 SLACK_NOT_CONNECTED` |
+| `GET /work/slack/channels` | `work.manage` | `{ items: [{ id, name }] }` canaux publics ; `404 SLACK_NOT_CONNECTED`, `409 SLACK_UNAVAILABLE` |
+| `GET /work/projects/:projectId/slack-channel` | `work.read` | `WorkProjectSlackChannelView` : `connected`, `projectPrivate`, `channel` (`id`, `name`, `privateConfirmed`, `setAt`), `publishing`, `canManage` |
+| `PUT /work/projects/:projectId/slack-channel` | `work.manage` | `{ channelId: 'C…' \| null, channelName?, confirmPrivate? }` ; `409 SLACK_NOT_CONNECTED`, `400 SLACK_PRIVATE_PROJECT_CONFIRMATION_REQUIRED` ; projet hors portée 404 |
+| `GET /slack/oauth/callback?code&state[&error]` | publique | `302` vers `<WEB_URL>/projets/parametres?onglet=slack&slack=connecte` (ou `annule`, `erreur-etat`, `erreur-session`, `erreur-droit`, `erreur-code`, `erreur-indisponible`, `erreur-echange`, `erreur-coffre`) |
+| `POST /slack/events` | publique, signée | `X-Slack-Signature` + `X-Slack-Request-Timestamp` (< 5 min) ; `url_verification` → `{ challenge }`, `app_uninstalled`, `tokens_revoked` → `{ ok: true }` ; sinon `401 SLACK_SIGNATURE_INVALID` |
+
+- `state` OAuth : organisation, utilisateur, échéance 10 min, signé HMAC-SHA256 (clé dérivée
+  d'`AUTH_SECRET`) ; au retour, la session doit être celle de cet utilisateur et détenir
+  `organization.manage` dans l'organisation du `state`.
+- `GET|PUT /work/notification-preferences` : chaque événement porte `{ bell, email, slack }` ;
+  `slack` facultatif au `PUT` (absent : valeur enregistrée gardée).
+- Fournisseur `/admin/integrations/slack` : `config.clientId` ; secrets `clientSecret`,
+  `signingSecret`.
+- Audit : `slack.connected`, `slack.reconnected`, `slack.disconnected`, `slack.app_uninstalled`,
+  `slack.tokens_revoked`, `slack.project_channel_set`, `slack.project_channel_removed`.
+
 ## Import de fichier et construction par l'IA — implémenté, ADR-0062 et ADR-0063
 
 Fonction d'offre `run_work`, organisation active ; un projet d'une autre organisation répond 404.
