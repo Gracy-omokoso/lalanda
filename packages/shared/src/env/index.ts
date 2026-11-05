@@ -291,6 +291,22 @@ export const ApiEnvSchema = CommonEnvSchema.extend({
   SECRETS_MASTER_KEY_ID: z.string().min(1).default('k1'),
 
   /**
+   * Interrupteur d'exploitation des envois Slack (ADR-0064 § 8, cohérent avec
+   * ADR-0017). Allumé par défaut : Slack fonctionne dès que l'application est
+   * configurée et activée dans `/admin`. Seule la valeur `false` (casse ignorée)
+   * coupe TOUT — connexions et envois — sans toucher aux connexions enregistrées.
+   * Lu à chaque appel par `apps/api/src/slack/` : la valeur ici n'est que validée.
+   */
+  SLACK_ENABLED: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .refine((v) => v === 'true' || v === 'false', {
+      error: 'SLACK_ENABLED vaut true ou false.',
+    })
+    .optional(),
+
+  /**
    * Clé PRÉCÉDENTE, présente uniquement le temps d'une rotation (ADR-0013 §3).
    * Retirer après `secrets:rewrap` et vérification qu'aucun document ne porte
    * plus l'ancien `keyId`.

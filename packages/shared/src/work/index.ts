@@ -21,3 +21,5 @@ export * from './notification-preferences.js';
 export * from './card-colors.js';
 // ADR-0062 / ADR-0063 : plan de projet commun à l'import de fichier et à l'IA.
 export * from './plan.js';
+// ADR-0064 : notifications des Projets par Slack (connexion, canal d'un projet).
+export * from './slack.js';

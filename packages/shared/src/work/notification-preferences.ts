@@ -1,9 +1,11 @@
 // Mes notifications des Projets — préférences PAR UTILISATEUR (ADR-0061 § 2).
 //
-// Pour chaque événement : cloche (boîte in-app) oui/non, e-mail oui/non. Plus un
-// résumé quotidien par e-mail (oui/non, heure de Kinshasa, jours ouvrés seulement).
-// Sans document : valeurs par défaut — cloche partout, e-mail pour l'assignation, la
-// mention et l'échéance dépassée, pas de résumé. Le serveur APPLIQUE ces préférences
+// Pour chaque événement : cloche (boîte in-app) oui/non, e-mail oui/non, Slack oui/non
+// (ADR-0064 : message privé du bot, seulement si l'organisation a connecté son espace
+// Slack). Plus un résumé quotidien par e-mail (oui/non, heure de Kinshasa, jours ouvrés
+// seulement — jamais sur Slack dans cette version). Sans document : valeurs par défaut —
+// cloche partout, e-mail pour l'assignation, la mention et l'échéance dépassée, Slack
+// pour l'assignation et la mention, pas de résumé. Le serveur APPLIQUE ces préférences
 // à l'émission (`WorkNotifier`, rappels, résumé) : rien n'est décoratif.
 
 import { z } from 'zod';
@@ -50,6 +52,8 @@ export function workEventOf(kind: string): WorkNotificationEvent | null {
 export interface WorkNotificationChannels {
   bell: boolean;
   email: boolean;
+  /** ADR-0064 : message privé Slack. Sans effet tant que l'organisation n'est pas connectée. */
+  slack: boolean;
 }
 
 export interface WorkDigestPreferences {
@@ -76,10 +80,17 @@ const EMAIL_BY_DEFAULT: readonly WorkNotificationEvent[] = [
   'task_overdue',
 ];
 
+/** ADR-0064 § 4 : Slack activé par défaut pour l'assignation et la mention seulement. */
+export const SLACK_BY_DEFAULT: readonly WorkNotificationEvent[] = ['task_assigned', 'mentioned'];
+
 export function defaultWorkNotificationPreferences(): WorkNotificationPreferences {
   const events = {} as Record<WorkNotificationEvent, WorkNotificationChannels>;
   for (const e of WORK_NOTIFICATION_EVENTS) {
-    events[e] = { bell: true, email: EMAIL_BY_DEFAULT.includes(e) };
+    events[e] = {
+      bell: true,
+      email: EMAIL_BY_DEFAULT.includes(e),
+      slack: SLACK_BY_DEFAULT.includes(e),
+    };
   }
   return { events, digest: { enabled: false, hour: 7, workingDaysOnly: true } };
 }
@@ -101,6 +112,7 @@ export function resolveWorkNotificationPreferences(
       base.events[e] = {
         bell: typeof s.bell === 'boolean' ? s.bell : base.events[e].bell,
         email: typeof s.email === 'boolean' ? s.email : base.events[e].email,
+        slack: typeof s.slack === 'boolean' ? s.slack : base.events[e].slack,
       };
     }
   }
@@ -120,6 +132,9 @@ const Channels = z
   .object({
     bell: z.boolean({ error: 'Vrai ou faux attendu.' }),
     email: z.boolean({ error: 'Vrai ou faux attendu.' }),
+    // ADR-0064 : facultatif — un ancien client qui n'envoie pas la colonne Slack garde
+    // la valeur enregistrée (le serveur la reprend), au lieu de la remettre au défaut.
+    slack: z.boolean({ error: 'Vrai ou faux attendu.' }).optional(),
   })
   .strict();
 
