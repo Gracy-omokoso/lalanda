@@ -36,6 +36,10 @@ Le support ne voit jamais les données financières sans consentement explicite,
 | Responsable RH (`hr_manager`, ADR-0045, implémenté) | dossiers du personnel, absences et documents RH ; objectifs et évaluations (ADR-0051) ; ni trésorerie, ni ventes, ni achats, ni validation des frais |
 | Magasinier (`storekeeper`, ADR-0046, appliqué au lot S0) | sort, transfère et compte le stock ; consulte le matériel et les documents ; ni prix d'achat, ni valeur du stock, ni trésorerie, ni ventes |
 | Expert-comptable externe (`external_accountant`, ADR-0049, appliqué au lot K0) | consulte et exporte la comptabilité ; n'écrit rien ; attribuable par le seul Propriétaire |
+| Salarié (`employee`, ADR-0059, appliqué) — **rôle par défaut à l'invitation** | projets et tâches (voir, cocher, commenter, saisir son temps) ; ses congés, ses frais, son pointage ; aucune donnée financière |
+| Manager / Chef d'équipe (`team_manager`, ADR-0059, appliqué) | Salarié + créer, régler, archiver des projets (`work.manage`) ; pas de validation RH avant les équipes (v1.15) |
+| Stagiaire (`intern`, ADR-0059, appliqué) | mêmes droits que le Salarié |
+| Invité externe (`guest`, ADR-0059, appliqué) | client ou freelance : projets et tâches seulement ; borné à ses projets en v1.15 (`PROJECT_SCOPED_ROLES`) |
 
 ## Actions granulaires
 
@@ -246,11 +250,12 @@ sont inchangés.
   `project.read` effectif : raison `REALISE_MASQUE`.
 - Tests : matrice 9 × 28 + 6 × 28 = **420** cases.
 
-### Proposé, ADR-0041 — autorisations par membre (non appliqué)
+### ADR-0041 — autorisations par membre (appliqué, actif par défaut depuis ADR-0059)
 
-> **Statut : proposé** par [ADR-0041](adr/ADR-0041-autorisations-par-membre.md) (29 oct. 2026),
-> à la demande de la dirigeante. Rien de ce qui suit n'est encore dans le code ; les lots A1 à A5
-> l'appliquent **après** le lot C0 d'ADR-0040.
+> **Statut : appliqué** par les lots A1 à A5 d'[ADR-0041](adr/ADR-0041-autorisations-par-membre.md)
+> (29 oct. 2026, v1.10). L'interrupteur `MEMBER_PERMISSIONS_ENABLED`, resté éteint en production
+> faute de variable posée, est **allumé par défaut** depuis
+> [ADR-0059](adr/ADR-0059-roles-equipe-et-personnalisation-active.md) (v1.14.0).
 
 - **Le rôle devient un titre et un modèle de départ.** Chaque appartenance porte des **ajouts**
   (`grants`) et des **retraits** (`revokes`) d'actions, vides par défaut. Droits effectifs =
@@ -639,6 +644,32 @@ promotion vers un projet, assistance IA) de `canvas.update`, régler son IA de
   `admin-platform-isolation.e2e.test.ts` (critères 1 à 3, les deux sens, routes découvertes sur
   l'application montée), bloc ADR-0053 de `rbac-matrix.e2e.test.ts`.
 
+### ADR-0059 — rôles de l'équipe et personnalisation active (appliqué, v1.14.0)
+
+> **Statut : accepté et appliqué** par [ADR-0059](adr/ADR-0059-roles-equipe-et-personnalisation-active.md)
+> (5 nov. 2026). Matrice vérifiée par `permissions.test.ts` (16 × 57 + 6 × 57 = **1 254** cases)
+> et sur le réseau par `rbac-matrix.e2e.test.ts` (quinze rôles attribuables).
+
+| Action | SAL | MGR | STA | INV |
+|---|:--:|:--:|:--:|:--:|
+| `analytics.read` (socle) | ✓ | ✓ | ✓ | ✓ |
+| `work.read`, `work.update` | ✓ | ✓ | ✓ | ✓ |
+| `work.manage` | ✗ | ✓ | ✗ | ✗ |
+| `leave.request`, `expenses.claim`, `attendance.clock` | ✓ | ✓ | ✓ | ✗ |
+| les 50 autres actions | ✗ | ✗ | ✗ | ✗ |
+
+- SAL Salarié (`employee`), MGR Manager / Chef d'équipe (`team_manager`), STA Stagiaire
+  (`intern`), INV Invité externe (`guest`). Tous attribuables, aucun réservé au Propriétaire,
+  aucun approbateur. Rangs 8 (MGR), 9 (SAL), 10 (STA), 15 (INV) ; l'Expert-comptable, le Chef de
+  projet, le Conseiller et le Lecteur passent à 11, 12, 13 et 14.
+- **Rôle par défaut à l'invitation : `employee`** (`DEFAULT_INVITATION_ROLE`), côté serveur et
+  écran ; il remplace `viewer`. Les membres existants gardent leur rôle (aucune migration).
+- `PROJECT_SCOPED_ROLES = ['guest']` : restriction aux projets dont il est membre, câblée en v1.15.
+  D'ici là l'Invité externe voit tous les projets de l'organisation.
+- Interrupteur `MEMBER_PERMISSIONS_ENABLED` : allumé sauf `false` explicite.
+- Risque ouvert (décision n° 1 d'ADR-0059) : le socle ouvre l'espace Croissance, dont les
+  indicateurs tirés des factures restent visibles sans `sales.read`.
+
 ## Règles critiques
 
 - Un propriétaire ne peut pas retirer le dernier propriétaire sans transfert.
@@ -650,7 +681,7 @@ promotion vers un projet, assistance IA) de `canvas.update`, régler son IA de
 
 ## Invitations
 
-Une invitation expire, est liée à une organisation, indique rôle et projets, et peut être révoquée. Une adresse déjà membre ne crée pas de doublon.
+Une invitation expire, est liée à une organisation, indique rôle et projets, et peut être révoquée. Une adresse déjà membre ne crée pas de doublon. Sans rôle précisé, l'invitation porte le rôle **Salarié** (`employee`, ADR-0059 § 4).
 
 ## Tests obligatoires
 

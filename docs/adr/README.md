@@ -173,3 +173,8 @@ Décideurs :
   chiffres de l'organisation), sections de semaine civile de Kinshasa, cercle à cocher, ajout rapide,
   couleur de projet tirée de l'identifiant ; piège du rôle « Lecteur » à l'invitation. Statut :
   **proposé** (4 nov. 2026).
+- [ADR-0059](ADR-0059-roles-equipe-et-personnalisation-active.md) — Rôles de l'équipe et
+  personnalisation des accès active : Salarié (`employee`, rôle par défaut à l'invitation, aucune
+  donnée financière), Manager / Chef d'équipe (`team_manager`, + `work.manage`), Stagiaire
+  (`intern`), Invité externe (`guest`, `PROJECT_SCOPED_ROLES` pour la v1.15) ; interrupteur
+  `MEMBER_PERMISSIONS_ENABLED` allumé sauf `false` explicite. Statut : **accepté** (5 nov. 2026).

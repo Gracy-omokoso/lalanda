@@ -10,12 +10,31 @@ e-mail et **Rôle**). Après l'envoi, un **lien d'invitation** s'affiche : on pe
 l'envoyer autrement (WhatsApp) si l'e-mail tarde. Le membre crée son compte avec **la même adresse**,
 puis accepte l'invitation (bandeau en haut de l'écran, ou le lien).
 
-**Attention au rôle** : le rôle proposé par défaut est **Lecteur**. Un Lecteur voit les projets mais
-**ne peut ni cocher une tâche, ni en être responsable, ni saisir son temps**. Pour l'équipe, choisir
-**Analyste** (ou Commercial, Comptable, Responsable RH, Magasinier selon le métier). Seuls le
-Propriétaire, l'Administrateur et le Directeur financier peuvent **créer, archiver ou régler** un
-projet. Les rôles Conseiller, Chef de projet (plans financiers) et Expert-comptable externe n'ont pas accès
-aux projets.
+**Le bon rôle** (depuis la v1.14.0, ADR-0059) : le rôle proposé par défaut est **Salarié**. Un
+Salarié **voit les projets, coche ses tâches, commente, en est responsable et saisit son temps** ; il
+demande aussi ses congés, déclare ses frais et pointe. Il **ne voit aucune donnée financière** (ni
+ventes, ni trésorerie, ni achats, ni comptabilité). Selon la personne :
+
+| Rôle | Pour qui | Projets et tâches |
+|---|---|---|
+| **Salarié** (défaut) | tout membre du personnel | voit, coche, commente, saisit son temps |
+| **Manager / Chef d'équipe** | qui pilote une équipe ou des projets | comme le Salarié, et **crée, règle, archive** des projets |
+| **Stagiaire** | stagiaire, apprenti | comme le Salarié |
+| **Invité externe** | client, freelance | voit et fait avancer les projets et les tâches, rien d'autre |
+| Commercial, Comptable, Responsable RH, Magasinier, Analyste | selon le métier | travaillent sur les tâches, sans régler les projets |
+
+Créer, archiver ou régler un projet : Propriétaire, Administrateur, Directeur financier et Manager /
+Chef d'équipe. Le **Lecteur** voit les projets mais ne peut ni cocher une tâche ni en être
+responsable. Les rôles Conseiller, Chef de projet (plans financiers) et Expert-comptable externe
+n'ont pas accès aux projets.
+
+**Ajuster une personne** : dans **Organisation › Membres**, « Voir les autorisations » sur sa ligne ;
+cochez ou décochez une autorisation, puis cliquez sur **Enregistrer les autorisations** (rien n'est
+appliqué avant). À l'invitation, « Personnaliser les autorisations » fait la même chose.
+
+> Limite connue : l'Invité externe voit aujourd'hui **tous** les projets de l'organisation, comme un
+> Salarié. La restriction « seulement les projets où il est ajouté » arrive avec les membres de
+> projet (v1.15). D'ici là, n'invitez un client que si cela ne pose pas de problème.
 
 ## 2. Créer un projet
 

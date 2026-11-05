@@ -224,7 +224,7 @@ PATCH /organizations/:orgId/members/:userId/permissions  { grants, revokes, expe
 PATCH /organizations/:orgId/members/:userId/role         { role, grants?, revokes?, expectedRevision?, reason? }
 PATCH /organizations/:orgId/members/:userId/close-right  { value, expectedRevision? }
 POST  /organizations/:orgId/transfer-ownership           efface l'écart des deux personnes
-POST  /organizations/:orgId/invitations                  { email, role?, grants?, revokes? }
+POST  /organizations/:orgId/invitations                  { email, role?, grants?, revokes? }  role omis ⇒ employee (ADR-0059)
 POST  /invitations/accept                                revalide l'écart contre l'invitant du moment
 GET   /organizations/:orgId/members                      + grants, revokes, effective, customized, permissionsRevision
 GET   /authz/catalog                                     domaines, libellés, dépendances, paires, non délégables,
