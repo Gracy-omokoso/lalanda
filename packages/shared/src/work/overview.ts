@@ -8,7 +8,8 @@
 // dans le panneau de son parent), comme la progression de l'en-tête et du
 // Kanban. Les compteurs de commentaires, eux, couvrent toutes les tâches.
 //
-// Règle du statut du projet (« santé »), au jour de Kinshasa :
+// Règle du statut du projet (« santé »), au jour de Kinshasa — LA règle unique,
+// reprise par l'accueil des projets (`portfolio.ts`, ADR-0058) :
 // - « En retard » (`off_track`) : l'échéance du projet est dépassée alors que
 //   des tâches restent ouvertes, OU au moins 3 tâches ouvertes sont en retard
 //   et elles font au moins le quart des tâches ouvertes ;
@@ -21,9 +22,9 @@
 
 import type { WorkMemberRef } from './views.js';
 
-export type WorkProjectHealth = 'on_track' | 'at_risk' | 'off_track';
+export type WorkOverviewHealth = 'on_track' | 'at_risk' | 'off_track';
 
-export type WorkProjectHealthReason =
+export type WorkOverviewHealthReason =
   'PROJECT_DUE_PASSED' | 'MANY_OVERDUE_TASKS' | 'OVERDUE_TASKS' | 'PROJECT_DUE_SOON';
 
 export interface WorkOverviewTaskRef {
@@ -49,8 +50,8 @@ export interface WorkProjectOverview {
   /** Jour de Kinshasa du calcul. */
   today: string;
   health: {
-    status: WorkProjectHealth;
-    reasons: WorkProjectHealthReason[];
+    status: WorkOverviewHealth;
+    reasons: WorkOverviewHealthReason[];
   };
   totals: {
     open: number;
@@ -117,21 +118,21 @@ function ref(t: WorkOverviewTaskInput): WorkOverviewTaskRef {
   };
 }
 
-export function projectHealth(input: {
+export function overviewHealth(input: {
   status: string;
   projectDueDate: string | null;
   today: string;
   open: number;
   done: number;
   overdue: number;
-}): { status: WorkProjectHealth; reasons: WorkProjectHealthReason[] } {
+}): { status: WorkOverviewHealth; reasons: WorkOverviewHealthReason[] } {
   const { open, done, overdue, today, projectDueDate } = input;
   if (input.status === 'completed') return { status: 'on_track', reasons: [] };
-  const off: WorkProjectHealthReason[] = [];
+  const off: WorkOverviewHealthReason[] = [];
   if (projectDueDate !== null && projectDueDate < today && open > 0) off.push('PROJECT_DUE_PASSED');
   if (overdue >= 3 && overdue * 4 >= open) off.push('MANY_OVERDUE_TASKS');
   if (off.length > 0) return { status: 'off_track', reasons: off };
-  const risk: WorkProjectHealthReason[] = [];
+  const risk: WorkOverviewHealthReason[] = [];
   if (overdue > 0) risk.push('OVERDUE_TASKS');
   const total = open + done;
   if (
@@ -210,7 +211,7 @@ export function computeWorkProjectOverview(input: {
   return {
     projectId: input.projectId,
     today,
-    health: projectHealth({
+    health: overviewHealth({
       status: input.status,
       projectDueDate: input.projectDueDate,
       today,

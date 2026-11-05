@@ -6,7 +6,8 @@
 
 import { z } from 'zod';
 
-import { WORK_AT_RISK_OVERDUE_TASKS, WORK_LABEL_COLORS, type WorkLabelColor } from './constants.js';
+import { WORK_LABEL_COLORS, type WorkLabelColor } from './constants.js';
+import { overviewHealth } from './overview.js';
 import type { WorkProjectKind, WorkProjectStatus } from './constants.js';
 import { addDays, isCalendarDay } from './scheduling.js';
 import type { WorkMemberRef } from './views.js';
@@ -26,12 +27,10 @@ export const WORK_PORTFOLIO_MAX = 500;
 export const WORK_PORTFOLIO_AVATARS = 5;
 
 /**
- * Santé d'un projet (ADR-0058 § 2) :
- * - `late` — En retard : l'échéance du projet est passée et des tâches restent ouvertes ;
- * - `at_risk` — À risque : un jalon en retard, ou au moins `WORK_AT_RISK_OVERDUE_TASKS`
- *   tâches en retard (seuil S7 d'ADR-0039 § 6.5, le même que le brief du matin) ;
- * - `on_track` — En bonne voie : sinon ;
- * - `closed` — projet terminé ou archivé : la santé ne s'applique plus.
+ * Santé d'un projet sur l'accueil : la MÊME règle que l'Aperçu du projet
+ * (`overviewHealth`, ADR-0057), pour qu'un projet ne soit jamais « À risque »
+ * d'un côté et « En bonne voie » de l'autre. `late` correspond à `off_track` ;
+ * `closed` — projet terminé ou archivé : la santé ne s'applique plus.
  */
 export type WorkProjectHealth = 'on_track' | 'at_risk' | 'late' | 'closed';
 
@@ -39,6 +38,7 @@ export interface ProjectHealthInput {
   status: WorkProjectStatus;
   dueDate: string | null;
   openTaskCount: number;
+  doneTaskCount: number;
   overdueTaskCount: number;
   overdueMilestoneCount: number;
 }
@@ -46,11 +46,16 @@ export interface ProjectHealthInput {
 export function projectHealth(p: ProjectHealthInput, today: string): WorkProjectHealth {
   if (!isCalendarDay(today)) throw new RangeError(`Date invalide : ${today}`);
   if (p.status === 'completed' || p.status === 'archived') return 'closed';
-  if (p.dueDate !== null && p.dueDate < today && p.openTaskCount > 0) return 'late';
-  if (p.overdueMilestoneCount > 0 || p.overdueTaskCount >= WORK_AT_RISK_OVERDUE_TASKS) {
-    return 'at_risk';
-  }
-  return 'on_track';
+  const { status } = overviewHealth({
+    status: p.status,
+    projectDueDate: p.dueDate,
+    today,
+    open: p.openTaskCount,
+    done: p.doneTaskCount,
+    // Un jalon est une tâche : il compte déjà dans les tâches en retard.
+    overdue: p.overdueTaskCount,
+  });
+  return status === 'off_track' ? 'late' : status;
 }
 
 /** Pourcentage de tâches terminées, entier arrondi vers le bas (0 sans tâche). */

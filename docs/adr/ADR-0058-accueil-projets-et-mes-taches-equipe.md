@@ -34,12 +34,17 @@ voit tous les projets de son organisation. « Mes projets » = responsable du pr
 abonné d'au moins une tâche. Il n'existe **pas** de liste de membres d'un projet : un membre de
 l'organisation « rejoint » un projet quand on lui en confie la responsabilité ou une tâche.
 
-### 2. Santé d'un projet (règle simple, documentée)
+### 2. Santé d'un projet — la règle unique d'ADR-0057
+
+L'accueil applique **exactement** la règle de l'Aperçu d'un projet (ADR-0057, `overviewHealth` dans
+`packages/shared/src/work/overview.ts`) : un projet ne peut pas être « À risque » dans sa page et
+« En bonne voie » sur l'accueil. Unifiée à la fusion du 5 nov. 2026 (les deux chantiers parallèles
+avaient écrit deux règles différentes).
 
 | Santé | Règle |
 |---|---|
-| **En retard** | l'échéance du projet est passée (jour de Kinshasa) et des tâches restent ouvertes |
-| **À risque** | sinon : au moins un **jalon** en retard, ou au moins **3** tâches en retard (seuil S7 d'ADR-0039 § 6.5, le même que le brief du matin) |
+| **En retard** | échéance du projet passée avec des tâches ouvertes, ou au moins 3 tâches en retard représentant au moins le quart des tâches ouvertes |
+| **À risque** | sinon : au moins une tâche en retard (un jalon est une tâche), ou échéance du projet dans les 7 jours avec moins de 75 % des tâches terminées |
 | **En bonne voie** | sinon |
 | *Terminé / Archivé* | statut du projet : la santé ne s'applique plus |
 
@@ -83,5 +88,5 @@ reporté.
 1. Faut-il une vraie liste de membres par projet (et des projets privés) ? Aujourd'hui tout le monde
    voit tout.
 2. Couleur choisie par projet (champ stocké) plutôt que tirée de l'identifiant ?
-3. Seuil « à risque » (S7) : 3 tâches en retard, ou un pourcentage des tâches ouvertes ?
+3. Seuils de santé (3 retards / quart des tâches ouvertes, 7 jours / 75 %) : à ajuster à l'usage (point ouvert commun avec ADR-0057).
 4. Rôle par défaut de l'invitation : passer à « Analyste » pour les équipes qui utilisent Projets ?

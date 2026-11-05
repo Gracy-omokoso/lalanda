@@ -14,6 +14,7 @@ const base: ProjectHealthInput = {
   status: 'active',
   dueDate: '2026-11-30',
   openTaskCount: 4,
+  doneTaskCount: 4,
   overdueTaskCount: 0,
   overdueMilestoneCount: 0,
 };
@@ -22,15 +23,17 @@ describe('santé d’un projet (ADR-0058 § 2)', () => {
   it('en bonne voie sans retard', () => {
     expect(projectHealth(base, '2026-11-04')).toBe('on_track');
   });
-  it('à risque : un jalon en retard, ou trois tâches en retard (seuil S7)', () => {
-    expect(projectHealth({ ...base, overdueMilestoneCount: 1 }, '2026-11-04')).toBe('at_risk');
-    expect(projectHealth({ ...base, overdueTaskCount: 2 }, '2026-11-04')).toBe('on_track');
-    expect(projectHealth({ ...base, overdueTaskCount: 3 }, '2026-11-04')).toBe('at_risk');
+  it('même règle que l’Aperçu (ADR-0057) : une tâche en retard suffit pour « à risque »', () => {
+    expect(projectHealth({ ...base, overdueTaskCount: 1 }, '2026-11-04')).toBe('at_risk');
+    // 3 retards sur 4 tâches ouvertes : au moins le quart → en retard.
+    expect(projectHealth({ ...base, overdueTaskCount: 3 }, '2026-11-04')).toBe('late');
+    // Échéance dans les 7 jours et moins de 75 % terminées → à risque.
+    expect(projectHealth(base, '2026-11-25')).toBe('at_risk');
   });
   it('en retard : échéance du projet passée avec des tâches ouvertes', () => {
     expect(projectHealth(base, '2026-12-01')).toBe('late');
-    // Le jour même de l'échéance, le projet n'est pas encore en retard.
-    expect(projectHealth(base, '2026-11-30')).toBe('on_track');
+    // Le jour même de l'échéance, le projet n'est pas encore en retard (mais à risque).
+    expect(projectHealth(base, '2026-11-30')).toBe('at_risk');
     // Échéance passée mais plus rien d'ouvert : pas en retard.
     expect(projectHealth({ ...base, openTaskCount: 0 }, '2026-12-01')).toBe('on_track');
   });

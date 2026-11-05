@@ -2,21 +2,21 @@
 // serveur (`GET /work/projects/:id/overview`) ; ici, seulement des libellés.
 
 import type {
-  WorkProjectHealth,
-  WorkProjectHealthReason,
+  WorkOverviewHealth,
+  WorkOverviewHealthReason,
   WorkProjectOverview,
 } from '@lalanda/shared/work';
 import type { StatusTone } from '@lalanda/ui';
 
 import { formatJour } from './projets-model';
 
-export const SANTE: Record<WorkProjectHealth, { label: string; tone: StatusTone }> = {
+export const SANTE: Record<WorkOverviewHealth, { label: string; tone: StatusTone }> = {
   on_track: { label: 'En bonne voie', tone: 'ok' },
   at_risk: { label: 'À risque', tone: 'wait' },
   off_track: { label: 'En retard', tone: 'late' },
 };
 
-const RAISONS: Record<WorkProjectHealthReason, string> = {
+const RAISONS: Record<WorkOverviewHealthReason, string> = {
   PROJECT_DUE_PASSED: 'l’échéance du projet est dépassée et des tâches restent ouvertes',
   MANY_OVERDUE_TASKS: 'au moins 3 tâches en retard, soit le quart des tâches ouvertes ou plus',
   OVERDUE_TASKS: 'des tâches sont en retard',

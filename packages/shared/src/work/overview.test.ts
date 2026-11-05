@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   computeWorkProjectOverview,
   mondayOf,
-  projectHealth,
+  overviewHealth,
   type WorkOverviewTaskInput,
 } from './overview.js';
 
@@ -37,18 +37,18 @@ describe('mondayOf', () => {
   });
 });
 
-describe('projectHealth', () => {
+describe('overviewHealth', () => {
   const base = { status: 'active', projectDueDate: null, today: '2026-11-04' };
   it('en bonne voie sans retard', () => {
-    expect(projectHealth({ ...base, open: 5, done: 5, overdue: 0 }).status).toBe('on_track');
-    expect(projectHealth({ ...base, open: 0, done: 0, overdue: 0 }).status).toBe('on_track');
+    expect(overviewHealth({ ...base, open: 5, done: 5, overdue: 0 }).status).toBe('on_track');
+    expect(overviewHealth({ ...base, open: 0, done: 0, overdue: 0 }).status).toBe('on_track');
   });
   it('à risque dès une tâche en retard', () => {
-    const h = projectHealth({ ...base, open: 10, done: 0, overdue: 1 });
+    const h = overviewHealth({ ...base, open: 10, done: 0, overdue: 1 });
     expect(h).toEqual({ status: 'at_risk', reasons: ['OVERDUE_TASKS'] });
   });
   it('à risque : échéance du projet dans 7 jours et moins de 75 % terminé', () => {
-    const h = projectHealth({
+    const h = overviewHealth({
       ...base,
       projectDueDate: '2026-11-10',
       open: 3,
@@ -57,20 +57,21 @@ describe('projectHealth', () => {
     });
     expect(h.reasons).toEqual(['PROJECT_DUE_SOON']);
     expect(
-      projectHealth({ ...base, projectDueDate: '2026-11-10', open: 2, done: 6, overdue: 0 }).status,
+      overviewHealth({ ...base, projectDueDate: '2026-11-10', open: 2, done: 6, overdue: 0 })
+        .status,
     ).toBe('on_track');
   });
   it('en retard : échéance passée avec des tâches ouvertes, ou ≥ 3 retards et ≥ 25 %', () => {
     expect(
-      projectHealth({ ...base, projectDueDate: '2026-11-03', open: 1, done: 9, overdue: 0 })
+      overviewHealth({ ...base, projectDueDate: '2026-11-03', open: 1, done: 9, overdue: 0 })
         .reasons,
     ).toEqual(['PROJECT_DUE_PASSED']);
-    expect(projectHealth({ ...base, open: 12, done: 0, overdue: 3 }).status).toBe('off_track');
-    expect(projectHealth({ ...base, open: 13, done: 0, overdue: 3 }).status).toBe('at_risk');
+    expect(overviewHealth({ ...base, open: 12, done: 0, overdue: 3 }).status).toBe('off_track');
+    expect(overviewHealth({ ...base, open: 13, done: 0, overdue: 3 }).status).toBe('at_risk');
   });
   it('un projet terminé est en bonne voie', () => {
     expect(
-      projectHealth({
+      overviewHealth({
         status: 'completed',
         projectDueDate: '2026-01-01',
         today: '2026-11-04',

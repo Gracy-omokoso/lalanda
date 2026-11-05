@@ -128,6 +128,7 @@ export class WorkPortfolioService {
             status: d.status,
             dueDate: d.dueDate ?? null,
             openTaskCount: c?.open ?? 0,
+            doneTaskCount: done,
             overdueTaskCount: c?.overdue ?? 0,
             overdueMilestoneCount: c?.overdueMilestones ?? 0,
           },
