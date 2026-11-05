@@ -21,15 +21,18 @@ aux projets.
 
 **Projets › Nouveau projet** : nom, nature (client ou interne), responsable, début, échéance,
 description ; pour un projet client, le client, le devis accepté et l'opportunité si votre rôle les
-voit. Le projet s'ouvre aussitôt sur sa liste de tâches.
+voit. Le projet s'ouvre sur son **Aperçu** ; les onglets **Liste**, **Tableau**, **Chronologie**, **Calendrier**, **Fichiers** donnent les autres vues.
 
 L'accueil **Projets** montre tous les projets : statut (**En bonne voie**, **À risque**, **En
 retard**), avancement (tâches terminées), membres, échéance et tâches en retard. Filtres **Mes
 projets · Tous · Archivés** et recherche par nom ou client. En haut : projets actifs, tâches en
 retard, tâches terminées cette semaine.
 
-- **En retard** : l'échéance du projet est passée et des tâches restent ouvertes.
-- **À risque** : un jalon est en retard, ou au moins 3 tâches sont en retard.
+- **En retard** : l'échéance du projet est passée avec des tâches ouvertes, ou au moins 3 tâches
+  sont en retard et elles font au moins le quart des tâches ouvertes.
+- **À risque** : au moins une tâche est en retard, ou l'échéance du projet tombe dans les 7 jours
+  avec moins de 75 % des tâches terminées.
+- Le même statut s'affiche sur l'accueil et dans l'Aperçu du projet.
 
 ## 3. « Ajouter des membres » à un projet
 
@@ -40,9 +43,12 @@ apparaît alors sur la ligne du projet, et le projet dans ses « Mes projets ».
 
 ## 4. Créer, assigner et cocher une tâche
 
-1. Dans le projet, champ **« Ajouter une tâche… »** : tapez le titre, validez.
-2. Cliquez le titre : le panneau de la tâche s'ouvre. Choisissez le **Responsable**, l'**Échéance**,
-   la **Priorité**, une description.
+1. Dans l'onglet **Liste** (ou **Tableau**), **« + Ajouter une tâche »** en bas d'une section :
+   tapez le titre, **Entrée** — le champ reste ouvert pour enchaîner la suivante, **Échap** le ferme.
+2. Cliquez la ligne (ailleurs que sur le titre, qui se modifie sur place) ou **Détails** : le
+   panneau de la tâche s'ouvre à droite. Choisissez le **Responsable**, l'**Échéance**,
+   la **Priorité**, une description. Chaque champ s'enregistre dès qu'on le change (pas de bouton
+   « Enregistrer »).
 3. Le responsable reçoit une **notification** (cloche en haut à droite) qui ouvre la tâche.
 4. Pour terminer : cochez la tâche (dans le projet, ou d'un clic sur le **cercle** dans Mes tâches).
 
