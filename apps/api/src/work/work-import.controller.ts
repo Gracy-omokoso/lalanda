@@ -99,8 +99,7 @@ const NewProjectQuery = z
 
 @Controller('work')
 @RequireFeature('run_work') // ADR-0053 — P4
-// ADR-0060 : un projet privé hors portée répond 404 (`projectId` du chemin ou de la requête).
-@UseGuards(AuthGuard, PermissionsGuard, WorkVisibilityGuard)
+@UseGuards(AuthGuard, PermissionsGuard, WorkVisibilityGuard) // ADR-0060 : projet privé hors portée → 404
 export class WorkImportController {
   constructor(@Inject(WorkImportService) private readonly imports: WorkImportService) {}
 
