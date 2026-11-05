@@ -17,9 +17,9 @@ export class WorkNotificationPreferencesDoc {
   @Prop({ type: String, required: true })
   userId!: string;
 
-  /** `{ <événement>: { bell, email } }` — complété par les défauts à la lecture. */
+  /** `{ <événement>: { bell, email, slack } }` — complété par les défauts à la lecture. */
   @Prop({ type: Object, default: {} })
-  events!: Record<string, { bell: boolean; email: boolean }>;
+  events!: Record<string, { bell: boolean; email: boolean; slack?: boolean }>;
 
   @Prop({ type: Object, default: {} })
   digest!: { enabled?: boolean; hour?: number; workingDaysOnly?: boolean };

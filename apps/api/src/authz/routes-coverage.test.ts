@@ -132,6 +132,10 @@ import { WorkImportController } from '../work/work-import.controller.js';
 // ADR-0063 : construction d'un plan par l'IA.
 import { WorkAiPlanController } from '../work/work-ai-plan.controller.js';
 import { WorkSettingsController } from '../work/work-settings.controller.js';
+// ADR-0064 : notifications des Projets par Slack.
+import { SlackController } from '../slack/slack.controller.js';
+import { WorkSlackController } from '../slack/work-slack.controller.js';
+import { WorkSlackChannelController } from '../work/work-slack-channel.controller.js';
 import { WorkTasksController } from '../work/work-tasks.controller.js';
 import { WorkTimeController } from '../work/work-time.controller.js';
 import { AuditController } from './audit.controller.js';
@@ -319,6 +323,10 @@ const CONTROLEURS = [
   WorkImportController,
   // ADR-0063 : construction d'un plan par l'IA.
   WorkAiPlanController,
+  // ADR-0064 : connexion Slack de l'organisation, retour OAuth et événements, canal d'un projet.
+  WorkSlackController,
+  SlackController,
+  WorkSlackChannelController,
   // ADR-0045 — H4 : documents, listes d'entrée et de sortie, échéances.
   HrDocumentsController,
   HrChecklistsController,
@@ -361,6 +369,16 @@ const CONTROLEURS = [
  */
 const SANS_PERMISSION: Record<string, string> = {
   'HealthController.check': 'Sonde publique — aucune authentification, aucune donnée.',
+  // ADR-0064 § 2 et § 6 — appelées par Slack ou par le navigateur qui en revient.
+  'SlackController.callback':
+    'Retour OAuth de Slack. Le `state` signé (HMAC, échéance 10 min) porte organisation et ' +
+    'utilisateur ; la session courante doit être celle de cet utilisateur et détenir ' +
+    '`organization.manage` dans CETTE organisation (vérifié dans le service). Toujours une ' +
+    'redirection vers l’écran, jamais une donnée.',
+  'SlackController.events':
+    'Events API de Slack (`app_uninstalled`, `tokens_revoked`, `url_verification`). Aucune ' +
+    'session possible : la signature `X-Slack-Signature` (HMAC SHA-256, horodatage < 5 min, ' +
+    'comparaison à temps constant) fait autorité ; sans elle, 401.',
   'OrganizationsController.list':
     "Liste les organisations de l'appelant. Antérieure à tout contexte d'organisation : " +
     "c'est la route qui permet d'en choisir une.",

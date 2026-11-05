@@ -198,6 +198,14 @@ export class WorkProjectWatchJob implements OnModuleInit {
         actorUserId: null,
         dedupeKey: `work.project_at_risk:${id}:${alert}:${today}`,
       });
+      // ADR-0064 § 3 : une publication dans le canal Slack du projet, s'il en a un.
+      this.notifier.channelEvent({
+        organizationId: p.organizationId,
+        projectId: id,
+        eventLabel: alert === 'late' ? 'Projet en retard' : 'Projet à risque',
+        title: p.name,
+        href: `/projets/${id}`,
+      });
       alerted += 1;
     }
     return alerted;

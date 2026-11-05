@@ -80,6 +80,9 @@ import { WorkPlanBuilder } from './work-plan-builder.js';
 // ADR-0063 : construction d'un plan par l'IA (quota et client IA partagés).
 import { AiModule, OPENAI_CHAT_CLIENT } from '../ai/ai.module.js';
 import { WorkAiPlanController } from './work-ai-plan.controller.js';
+// ADR-0064 : notifications par Slack (messages privés, canal d'un projet).
+import { SlackModule } from '../slack/slack.module.js';
+import { WorkSlackChannelController } from './work-slack-channel.controller.js';
 import { WorkAiPlanLog, WorkAiPlanLogSchema } from './work-ai-plan.schema.js';
 import { WORK_AI_CHAT_CLIENT, WorkAiPlanService } from './work-ai-plan.service.js';
 import {
@@ -119,6 +122,8 @@ import {
     AssetsAgendaModule,
     // ADR-0063 : `AiQuotaService` et le client OpenAI partagé.
     AiModule,
+    // ADR-0064 : `SlackNotifier` (facultatif pour `WorkNotifier`) et canal d'un projet.
+    SlackModule,
     MongooseModule.forFeature([
       { name: WorkSettings.name, schema: WorkSettingsSchema },
       { name: WorkProject.name, schema: WorkProjectSchema },
@@ -137,6 +142,8 @@ import {
     ]),
   ],
   controllers: [
+    // ADR-0064
+    WorkSlackChannelController,
     WorkSettingsController,
     WorkMembersController,
     WorkProjectsController,

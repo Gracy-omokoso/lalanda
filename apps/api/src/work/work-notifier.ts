@@ -24,6 +24,11 @@ import {
   noNotifications,
   type NotificationsPort,
 } from '../notifications/notifications.port.js';
+import {
+  SLACK_NOTIFIER,
+  type SlackDirectMessage,
+  type SlackNotifierPort,
+} from '../slack/slack-notifier.service.js';
 import { taskHref } from './work.common.js';
 import { WorkAccessService } from './work-access.service.js';
 import { WorkMembersService } from './work-members.service.js';
@@ -65,10 +70,18 @@ export class WorkNotifier {
     @Inject(MembersService) private readonly identities: MembersService,
     @InjectConnection() private readonly connection: Connection,
     @Optional() @Inject(MailService) mail: MailService | null = null,
+    @Optional() @Inject(SLACK_NOTIFIER) slack: SlackNotifierPort | null = null,
   ) {
     this.port = port ?? noNotifications;
     this.mail = mail;
+    this.slack = slack;
   }
+
+  /**
+   * ADR-0064 : envoi Slack, NON BLOQUANT (le port rend la main aussitôt). Facultatif :
+   * sans module Slack, rien ne part. Remplaçable par les tests.
+   */
+  slack: SlackNotifierPort | null;
 
   /** Remplaçable par les tests (aucun envoi réel : transport de test). */
   mail: MailService | null;
@@ -86,6 +99,7 @@ export class WorkNotifier {
       inputs.map((i) => i.recipientUserId),
     );
     const emailTo: NotificationInput[] = [];
+    const slackTo: SlackDirectMessage[] = [];
     for (const input of inputs) {
       const event = workEventOf(input.kind);
       const channels = event ? prefs.get(input.recipientUserId)?.events[event] : undefined;
@@ -97,6 +111,22 @@ export class WorkNotifier {
         }
       }
       if (event && channels?.email) emailTo.push(input);
+      // ADR-0064 § 4 : message privé Slack, mêmes destinataires filtrés que l'e-mail.
+      if (event && channels?.slack) {
+        slackTo.push({
+          recipientUserId: input.recipientUserId,
+          eventLabel: WORK_NOTIFICATION_EVENT_LABELS[event],
+          title: input.title,
+          href: input.href,
+        });
+      }
+    }
+    if (slackTo.length > 0 && this.slack) {
+      try {
+        this.slack.direct(organizationId, inputs[0]!.source.projectId ?? '', slackTo);
+      } catch (err) {
+        this.warn(inputs[0]!, err);
+      }
     }
     if (emailTo.length === 0 || !this.mail) return;
     try {
@@ -186,6 +216,29 @@ export class WorkNotifier {
         ...(n.dedupeKey ? { dedupeKey: n.dedupeKey } : {}),
       })),
     );
+  }
+
+  /**
+   * ADR-0064 § 3 : événement publié dans le canal Slack du projet, s'il en a un. Une
+   * fois par geste (pas par destinataire), titre à la troisième personne. Le module
+   * Slack vérifie la connexion, le canal et la règle des projets privés. Jamais
+   * d'exception remontée au geste.
+   */
+  channelEvent(n: {
+    organizationId: string;
+    projectId: string;
+    eventLabel: string;
+    title: string;
+    href: string;
+  }): void {
+    if (!this.slack) return;
+    try {
+      this.slack.channel({ ...n, title: boundedTitle(n.title) });
+    } catch (err) {
+      this.logger.warn(
+        `Événement Slack du projet non publié : ${err instanceof Error ? err.name : 'erreur'}`,
+      );
+    }
   }
 
   /** ADR-0061 § 2 : événement de projet (ajouté au projet, projet à risque). */

@@ -59,8 +59,20 @@ export class WorkNotificationPreferencesService {
   ): Promise<WorkNotificationPreferencesView> {
     const current = await this.get(organizationId, userId);
     if (current.revision !== body.expectedRevision) staleRevision(current.revision);
+    // ADR-0064 : la colonne Slack est facultative dans le corps — absente (ancien
+    // client), la valeur enregistrée est gardée au lieu de revenir au défaut.
+    const events = Object.fromEntries(
+      Object.entries(body.events).map(([e, c]) => [
+        e,
+        {
+          bell: c.bell,
+          email: c.email,
+          slack: c.slack ?? current.events[e as keyof typeof current.events].slack,
+        },
+      ]),
+    );
     const values = {
-      events: body.events,
+      events,
       digest: body.digest,
       digestEnabled: body.digest.enabled,
     };

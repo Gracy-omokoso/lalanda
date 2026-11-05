@@ -71,6 +71,7 @@ import {
   oid,
   projectArchived,
   staleRevision,
+  taskHref,
   taskNotFound,
   type WorkActor,
 } from './work.common.js';
@@ -875,6 +876,14 @@ export class WorkTasksService {
     assigneeUserId: string,
     actor: WorkActor,
   ): Promise<void> {
+    // ADR-0064 § 3 : le canal Slack du projet voit toute assignation, auto-assignation comprise.
+    this.notifier.channelEvent({
+      organizationId,
+      projectId: task.projectId,
+      eventLabel: 'Tâche assignée',
+      title: `#${task.number} ${task.title} — assignée par ${await this.actorName(actor)}`,
+      href: taskHref(task.projectId, task.id),
+    });
     if (assigneeUserId === actor.userId) return;
     await this.notifier.taskEvent({
       organizationId,
@@ -1261,6 +1270,16 @@ export class WorkTasksService {
     await this.activity.record(organizationId, entries);
     // ADR-0061 § 2 : « statut (colonne) d'une de mes tâches changé » — l'assigné, s'il
     // n'est pas l'auteur du geste (préférences et visibilité appliquées par le notifier).
+    // ADR-0064 § 3 : tout changement de colonne est publié dans le canal du projet.
+    if (column.key !== current.columnKey) {
+      this.notifier.channelEvent({
+        organizationId,
+        projectId: current.projectId,
+        eventLabel: column.category === 'done' ? 'Tâche terminée' : 'Tâche déplacée',
+        title: `${await this.actorName(actor)} a déplacé #${current.number} ${current.title} vers « ${column.label} »`,
+        href: taskHref(current.projectId, taskId),
+      });
+    }
     if (column.key !== current.columnKey && current.assigneeUserId) {
       await this.notifier.taskEvent({
         organizationId,
