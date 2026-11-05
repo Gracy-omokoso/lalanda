@@ -34,6 +34,43 @@ retard, tâches terminées cette semaine.
   avec moins de 75 % des tâches terminées.
 - Le même statut s'affiche sur l'accueil et dans l'Aperçu du projet.
 
+## 2 bis. Importer un fichier
+
+Vous avez déjà votre plan dans Excel ? **Projets › Nouveau projet › Importer un fichier** (ou, dans un
+projet, onglet **Liste › Importer des tâches**).
+
+1. Téléchargez le **modèle** (Excel ou CSV). L'onglet **Guide** explique chaque colonne ; l'onglet
+   **Tâches** montre un exemple (ouverture d'une boutique à Kinshasa). Une ligne par tâche ; seule la
+   colonne **Tâche** est obligatoire. Dates en **JJ/MM/AAAA**. Responsable = **adresse e-mail** d'un
+   membre. **Dépend de** et **Sous-tâche de** : le **numéro de ligne** du fichier (l'en-tête est la
+   ligne 1) ou le nom exact de la tâche. Priorité : Basse, Moyenne, Haute, Urgente. Jalon : Oui/Non.
+   Estimation : en heures (1,5 ou 1h30).
+2. Choisissez votre fichier : Lalanda affiche un **aperçu** — rien n'est encore créé. Chaque ligne est
+   **Prête**, **Corrigée** (par exemple : responsable inconnu → importée sans responsable ; dépendance
+   introuvable → ignorée) ou **Écartée** (par exemple : date illisible). Corrigez le fichier et
+   choisissez-le de nouveau, ou cochez la case pour importer seulement les lignes valides.
+3. **Importer** : tout est créé d'un coup (ou rien, en cas d'incident). Les sections inconnues
+   deviennent des colonnes du Tableau, les étiquettes inconnues sont créées.
+
+Limites : 2 Mo, 2 000 lignes, pas de macro ni de formule (seules les valeurs sont lues). Seuls ceux qui
+peuvent **gérer** les projets créent un projet ou de nouvelles sections et étiquettes.
+
+## 2 ter. Construire avec l'IA
+
+**Projets › Nouveau projet › Construire avec l'IA** : nom, dates de début et **butoir**, **objectif**,
+contexte, livrables, contraintes et risques, **équipe** (l'IA ne voit que les prénoms), durée des
+sprints (1, 2 ou 3 semaines), niveau de détail. **Proposer un plan**.
+
+L'IA **propose** des jalons, des sprints et des tâches (avec estimation, priorité, dépendances et un
+responsable parmi l'équipe choisie). Lalanda vérifie la proposition : les dates viennent du calendrier
+des sprints, une date hors de la période est ramenée, une boucle de dépendances est cassée, un
+responsable inconnu est retiré — chaque correction est listée. **Relisez** : changez un titre, une
+échéance ou un responsable, retirez une tâche, ou **Régénérez** (chaque proposition compte un message
+IA dans le quota du mois). Rien n'est créé tant que vous n'avez pas cliqué **Créer le projet**.
+
+Les sprints deviennent des **étiquettes « Sprint 1 », « Sprint 2 »…** : filtrez la Liste ou le
+Tableau par étiquette pour voir un sprint. Leurs dates et objectifs sont dans la description du projet.
+
 ## 3. « Ajouter des membres » à un projet
 
 Il n'y a pas de liste de membres par projet : **tous les membres de l'organisation qui ont accès aux

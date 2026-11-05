@@ -989,6 +989,48 @@ ou paramètre en trop : `400`. Lecture seule ; aucune donnée d'une autre organi
 `work/work-portfolio.e2e.test.ts`, qui couvre aussi le parcours inviter → accepter → assigner →
 Mes tâches → notification).
 
+## Import de fichier et construction par l'IA — implémenté, ADR-0062 et ADR-0063
+
+Fonction d'offre `run_work`, organisation active ; un projet d'une autre organisation répond 404.
+
+| Route | Droit | Rôle |
+|---|---|---|
+| `GET /work/import/template.xlsx` | `work.read` | modèle (onglets « Guide » et « Tâches », exemple) |
+| `GET /work/import/template.csv` | `work.read` | modèle CSV (`;`, UTF-8 avec BOM) |
+| `POST /work/import/preview?projectId=` | `work.update` | aperçu `WorkImportPreview` ; **rien n'est écrit** |
+| `POST /work/import/projects?name=&kind=&ownerUserId=&startDate=&dueDate=&description=&skipInvalid=` | `work.manage` | nouveau projet depuis le fichier → `WorkPlanApplyResult` (201) |
+| `POST /work/projects/:projectId/import?skipInvalid=` | `work.update` | tâches du fichier dans le projet → `WorkPlanApplyResult` (201) |
+| `POST /work/ai/plan` | `work.manage` | proposition `WorkAiPlanDraft` (corps `WorkAiPlanRequestBody`) ; quota IA |
+| `POST /work/plans/projects` | `work.manage` | créer le projet relu (corps `CreateProjectFromPlanBody`, `origin: 'ai'`, `aiDraftId`) |
+
+- **Fichier** : corps **brut** (`application/octet-stream`), nom en en-tête `X-File-Name` (encodé URI,
+  informatif) ; format déduit du contenu ; 2 Mo (413 `IMPORT_FILE_TOO_LARGE`), 2 000 lignes ; classeur à
+  macros refusé (`IMPORT_FILE_MACRO`), illisible (`IMPORT_FILE_UNREADABLE`), vide (`IMPORT_FILE_EMPTY`).
+  60 envois par heure et par utilisateur.
+- **Aperçu** : `rows[]` (ligne, référence `L<n>`, titre, section, responsable résolu, dates, priorité,
+  jalon, `dependsOn` en numéros de ligne, étiquettes, `parentRow`, `estimateMinutes`, `valid`),
+  `issues[]` (`row`, `column`, `severity: error | warning`, `code`, `message` en français), `counts`
+  (`rows`, `valid`, `invalid`, `warnings`, `milestones`, `subtasks`, `dependencies`), `newSections`,
+  `newLabels`, `ignoredColumns`.
+- **Import** : l'écran renvoie le même fichier, relu à l'identique. Lignes écartées sans
+  `skipInvalid=true` → 422 `IMPORT_HAS_ERRORS` ; aucune ligne valide → 422 `IMPORT_NOTHING_TO_IMPORT`.
+  Création **tout ou rien** par `WorkPlanBuilder` (vérification complète, puis services existants,
+  compensation en cas d'échec). Erreurs de création : 400 `INVALID_REQUEST` (structure du plan :
+  `WORK_PLAN_REF_UNKNOWN`, `WORK_DEPENDENCY_CYCLE`, `WORK_SUBTASK_DEPTH`…), 403
+  `WORK_PLAN_SECTION_FORBIDDEN` / `WORK_PLAN_LABEL_FORBIDDEN`, 409 `WORK_PLAN_COLUMN_LIMIT`,
+  `WORK_PLAN_LABEL_LIMIT`, `WORK_TASK_LIMIT`, `WORK_PROJECT_LIMIT`.
+- **Résultat** `WorkPlanApplyResult` : `projectId`, `projectName`, `createdTasks` (premier niveau, jalons
+  compris), `createdSubtasks`, `createdMilestones`, `createdDependencies`, `createdColumns`,
+  `createdLabels`, `warnings`. Trace `audit_events` `work.plan.project_created` /
+  `work.plan.tasks_imported` (`origin`).
+- **IA** : `WorkAiPlanDraft` = `draftId`, `summary`, `description` (proposée pour le projet),
+  `sprints[]` (numéro, `Sprint N`, dates calculées par le serveur, objectif), `tasks[]` (format du plan,
+  dates = sprint, étiquette `Sprint N`, jalons `isMilestone`), `corrections[]`, `mention`. Quota épuisé :
+  403 `AI_QUOTA_EXCEEDED` avant tout appel ; IA indisponible 503 `WORK_AI_UNAVAILABLE` (coupe-circuit :
+  503 `WORK_AI_DISABLED`) ; réponse inutilisable 422 `WORK_AI_INVALID_RESPONSE` (non décomptée) ;
+  membre choisi hors de l'organisation 404 ; sans `work.update` 400 `WORK_ASSIGNEE_NOT_ELIGIBLE`.
+  20 propositions par heure et par utilisateur.
+
 ## Brief du matin — implémenté (ADR-0033)
 
 L'organisation est toujours celle de la session ; aucun corps ni paramètre ne la désigne.

@@ -173,3 +173,11 @@ Décideurs :
   chiffres de l'organisation), sections de semaine civile de Kinshasa, cercle à cocher, ajout rapide,
   couleur de projet tirée de l'identifiant ; piège du rôle « Lecteur » à l'invitation. Statut :
   **proposé** (4 nov. 2026).
+- [ADR-0062](ADR-0062-import-projet-fichier.md) — Importer un projet ou des tâches depuis un fichier
+  Excel ou CSV : modèle téléchargeable (onglets Guide et Tâches), lecture sûre (`exceljs` sans formule ni
+  macro, CSV `;`/`,` avec BOM), aperçu ligne par ligne (erreurs et corrections), import tout ou rien par
+  un créateur commun (`WorkPlanBuilder`). Statut : **proposé** (5 nov. 2026).
+- [ADR-0063](ADR-0063-construire-projet-avec-ia.md) — « Construire avec l'IA » : plan Scrum/Agile
+  proposé (JSON strict validé par zod, dates tirées des sprints calculés par le serveur, sprints en
+  étiquettes « Sprint N »), corrigé et signalé, relu puis créé par le même créateur que l'import ; quota
+  IA commun et journal. Statut : **proposé** (5 nov. 2026).

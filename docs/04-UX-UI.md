@@ -645,3 +645,37 @@ téléphone, état vide).
   `prefers-reduced-motion`. Couleur jamais seule : statut, échéance et retards sont écrits.
 - Atomes : `projets/_components/equipe-elements.tsx` (`CercleCocher`, `Avatar`, `PileAvatars`,
   `PastilleProjet`, `OngletsMesTaches`).
+
+## Importer un fichier et Construire avec l'IA — implémenté, ADR-0062 et ADR-0063
+
+Captures : `docs/refonte-ui/v5/` (`import-apercu.png`, `import-resultat.png`, `ia-formulaire.png`,
+`ia-relecture.png`).
+
+- **Entrées** : la fenêtre **Nouveau projet** (`work.manage`) commence par deux raccourcis,
+  **Importer un fichier** et **Construire avec l'IA**, puis le formulaire habituel. Dans un projet,
+  la **Liste** porte **Importer des tâches** (`work.update`).
+- **`/projets/importer`** (`?projet=<id>` pour un projet existant), en trois étapes numérotées :
+  1. modèles **Excel** et **CSV** à télécharger (le classeur a un onglet « Guide ») ;
+  2. zone de dépôt (« Cliquez pour choisir un fichier .xlsx ou .csv », 2 Mo et 2 000 lignes) — le choix
+     lance l'**aperçu** (« Lecture du fichier… »), rien n'est écrit ;
+  3. quatre compteurs (lues, prêtes, **en erreur** en rouge, corrigées), phrase « Sera créé : … »
+     (tâches, sous-tâches, jalons, dépendances, sections et étiquettes à créer), colonnes ignorées,
+     tableau des lignes (numéro de ligne du fichier, état **Prête · Corrigée · Écartée** en
+     `StatusPill`, tâche et problèmes écrits « Erreur · … » ou « À vérifier · … », section,
+     responsable, dates, priorité, dépendances, estimation), filtre « Seulement les lignes à
+     vérifier » ; pour un nouveau projet : nom (prérempli depuis le nom du fichier), responsable,
+     nature, dates. S'il reste des lignes en erreur, une **case de confirmation** est exigée et le
+     bouton dit « Importer les N lignes valides ». Résultat : ce qui a été créé, « Ouvrir le projet ».
+- **`/projets/construire-ia`** : formulaire (nom, dates de début et butoir, objectif, contexte,
+  livrables, contraintes et risques, durée des sprints avec le nombre de sprints calculé, niveau de
+  détail, **équipe** en puces à cocher — « elle ne voit que leur prénom ») ; **Proposer un plan**
+  (« L'IA prépare un plan… 10 à 40 secondes »). **Relecture** : mention « Proposition de l'IA :
+  relisez-la… rien n'est créé sans votre confirmation », résumé, corrections apportées par Lalanda
+  (dépliables), description du projet modifiable, **Jalons** puis un bloc par **sprint** (dates,
+  objectif, nombre de tâches) ; chaque tâche : titre modifiable, responsable, échéance, estimation,
+  détails (priorité, étiquettes, « attend T2 »), bouton **Retirer**. Boutons **Créer le projet (N
+  éléments)**, **Régénérer** (« compte un message IA dans le quota du mois »), **Modifier le
+  formulaire**. Erreurs en clair : IA indisponible, quota épuisé (message du serveur avec la date de
+  remise à zéro), proposition inutilisable (non décomptée).
+- Couleur jamais seule (états et sévérités écrits) ; champs étiquetés (`sr-only` dans la relecture) ;
+  tableau d'aperçu défilant horizontalement sur téléphone.
