@@ -59,6 +59,10 @@ import { WorkTasksController } from './work-tasks.controller.js';
 import { WorkTasksService } from './work-tasks.service.js';
 import { WorkTimeController } from './work-time.controller.js';
 import { WorkTimeService } from './work-time.service.js';
+// ADR-0062 : import d'un fichier de tâches ; créateur commun depuis un plan.
+import { WorkImportController } from './work-import.controller.js';
+import { WorkImportService } from './work-import.service.js';
+import { WorkPlanBuilder } from './work-plan-builder.js';
 import {
   WorkActivity,
   WorkActivitySchema,
@@ -119,6 +123,8 @@ import {
     WorkOverviewController,
     // ADR-0058 : accueil des projets (portefeuille), lecture.
     WorkPortfolioController,
+    // ADR-0062 : import d'un fichier de tâches (aperçu, import, modèle).
+    WorkImportController,
   ],
   providers: [
     WorkMembersService,
@@ -147,6 +153,9 @@ import {
     WorkTimesheetsService,
     WorkOverviewService,
     WorkPortfolioService,
+    // ADR-0062 / ADR-0063 : créateur commun d'un projet depuis un plan, import de fichier.
+    WorkPlanBuilder,
+    WorkImportService,
   ],
   exports: [
     MongooseModule,

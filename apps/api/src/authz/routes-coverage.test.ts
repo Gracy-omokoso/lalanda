@@ -122,6 +122,8 @@ import { WorkProjectsController } from '../work/work-projects.controller.js';
 import { WorkOverviewController } from '../work/work-overview.controller.js';
 // ADR-0058 : accueil des projets (portefeuille).
 import { WorkPortfolioController } from '../work/work-portfolio.controller.js';
+// ADR-0062 : import d'un fichier de tâches.
+import { WorkImportController } from '../work/work-import.controller.js';
 import { WorkSettingsController } from '../work/work-settings.controller.js';
 import { WorkTasksController } from '../work/work-tasks.controller.js';
 import { WorkTimeController } from '../work/work-time.controller.js';
@@ -302,6 +304,8 @@ const CONTROLEURS = [
   WorkTimesheetsController,
   // ADR-0058 : accueil des projets (portefeuille).
   WorkPortfolioController,
+  // ADR-0062 : import d'un fichier de tâches.
+  WorkImportController,
   // ADR-0045 — H4 : documents, listes d'entrée et de sortie, échéances.
   HrDocumentsController,
   HrChecklistsController,
@@ -861,6 +865,13 @@ describe('couverture des routes par le RBAC', () => {
       'WorkProjectsController.remove': ['work.manage'],
       'WorkProjectsController.activityOf': ['work.read'],
       'WorkOverviewController.overview': ['work.read'],
+      // ADR-0062 : modèle (lire), aperçu et import dans un projet (travailler),
+      // nouveau projet depuis un fichier (gouverner).
+      'WorkImportController.templateXlsx': ['work.read'],
+      'WorkImportController.templateCsv': ['work.read'],
+      'WorkImportController.preview': ['work.update'],
+      'WorkImportController.importProject': ['work.manage'],
+      'WorkImportController.importTasks': ['work.update'],
       'WorkTasksController.listProject': ['work.read'],
       'WorkTasksController.create': ['work.update'],
       'WorkTasksController.list': ['work.read'],
