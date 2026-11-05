@@ -111,6 +111,8 @@ export interface WorkPortfolioProject {
   memberCount: number;
   /** Vrai si l'appelant est responsable, assigné ou abonné d'une tâche du projet. */
   mine: boolean;
+  /** ADR-0060 : `private` affiche un cadenas. */
+  visibility: 'organization' | 'private';
   updatedAt: string;
 }
 

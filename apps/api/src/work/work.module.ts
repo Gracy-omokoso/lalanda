@@ -59,6 +59,20 @@ import { WorkTasksController } from './work-tasks.controller.js';
 import { WorkTasksService } from './work-tasks.service.js';
 import { WorkTimeController } from './work-time.controller.js';
 import { WorkTimeService } from './work-time.service.js';
+// ADR-0060 : visibilité des projets, membres (utilisateurs et équipes).
+import { WorkAccessService } from './work-access.service.js';
+import { WorkProjectMembersController } from './work-project-members.controller.js';
+import { WorkProjectMembersService } from './work-project-members.service.js';
+import { WorkVisibilityGuard } from './work-visibility.guard.js';
+// ADR-0061 : préférences de notification (cloche, e-mail, résumé quotidien).
+import { WorkNotificationPreferencesController } from './preferences/work-notification-preferences.controller.js';
+import {
+  WorkNotificationPreferencesDoc,
+  WorkNotificationPreferencesSchema,
+} from './preferences/work-notification-preferences.schema.js';
+import { WorkNotificationPreferencesService } from './preferences/work-notification-preferences.service.js';
+import { WorkDigestJob } from './preferences/work-digest.job.js';
+import { WorkProjectWatchJob } from './work-project-watch.job.js';
 import {
   WorkActivity,
   WorkActivitySchema,
@@ -103,6 +117,11 @@ import {
       { name: WorkTimeEntry.name, schema: WorkTimeEntrySchema },
       { name: WorkMemberRate.name, schema: WorkMemberRateSchema },
       { name: WorkActivity.name, schema: WorkActivitySchema },
+      // ADR-0061 § 2
+      {
+        name: WorkNotificationPreferencesDoc.name,
+        schema: WorkNotificationPreferencesSchema,
+      },
     ]),
   ],
   controllers: [
@@ -119,6 +138,10 @@ import {
     WorkOverviewController,
     // ADR-0058 : accueil des projets (portefeuille), lecture.
     WorkPortfolioController,
+    // ADR-0060 : membres d'un projet, équipes proposées.
+    WorkProjectMembersController,
+    // ADR-0061 : mes notifications des Projets.
+    WorkNotificationPreferencesController,
   ],
   providers: [
     WorkMembersService,
@@ -147,6 +170,14 @@ import {
     WorkTimesheetsService,
     WorkOverviewService,
     WorkPortfolioService,
+    // ADR-0060 : portée des appelants, garde de visibilité, membres d'un projet.
+    WorkAccessService,
+    WorkVisibilityGuard,
+    WorkProjectMembersService,
+    // ADR-0061 : préférences de notification, résumé quotidien, veille des projets.
+    WorkNotificationPreferencesService,
+    WorkDigestJob,
+    WorkProjectWatchJob,
   ],
   exports: [
     MongooseModule,
@@ -157,6 +188,9 @@ import {
     WorkProjectsService,
     WorkTasksService,
     WorkBriefSource,
+    // ADR-0060 : la garde de visibilité sert aussi aux contrôleurs de `work/billing/**`.
+    WorkAccessService,
+    WorkVisibilityGuard,
   ],
 })
 export class WorkModule {}

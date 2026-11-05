@@ -27,7 +27,11 @@ import {
   renderNormalizedInvoicingDisabled,
   renderPasswordReset,
   renderSalesDocumentMail,
+  renderWorkDigest,
+  renderWorkNotification,
   type SalesDocumentMailContent,
+  type WorkDigestMailContent,
+  type WorkNotificationMailContent,
   type MorningBriefMailContent,
   type NormalizationAlertCause,
 } from './mail.templates.js';
@@ -108,6 +112,20 @@ export interface SalesDocumentMail extends SalesDocumentMailContent {
 }
 
 /**
+ * Notification des Projets doublée par e-mail (ADR-0061 § 2). `href` : chemin
+ * RELATIF de l'application (`/projets/<id>?tache=<id>`), jamais une URL absolue.
+ */
+export interface WorkNotificationMail extends WorkNotificationMailContent {
+  to: string;
+  href: string;
+}
+
+/** Résumé quotidien des Projets (ADR-0061 § 2), au plus un par jour. */
+export interface WorkDigestMail extends WorkDigestMailContent {
+  to: string;
+}
+
+/**
  * Contrat d'envoi du produit. Voir l'en-tête de fichier.
  *
  * Aucune méthode ne LÈVE sur échec d'envoi : toutes retournent un
@@ -126,6 +144,8 @@ export abstract class MailService {
   abstract sendNormalizationAlert(input: NormalizationAlertMail): Promise<MailDeliveryResult>;
   abstract sendMorningBrief(input: MorningBriefMail): Promise<MailDeliveryResult>;
   abstract sendSalesDocument(input: SalesDocumentMail): Promise<MailDeliveryResult>;
+  abstract sendWorkNotification(input: WorkNotificationMail): Promise<MailDeliveryResult>;
+  abstract sendWorkDigest(input: WorkDigestMail): Promise<MailDeliveryResult>;
 }
 
 /** Implémentation par défaut : rendu des gabarits puis remise au transport. */
@@ -217,6 +237,32 @@ export class TemplatedMailService extends MailService {
       fromName: `${content.organizationName} via Lalanda`,
       attachments: [attachment],
       redactInLogs: true,
+    });
+  }
+
+  async sendWorkNotification(input: WorkNotificationMail): Promise<MailDeliveryResult> {
+    const { to, href, ...content } = input;
+    // Chemin relatif seulement : une URL absolue fournie par un appelant n'est jamais suivie.
+    const path = /^\/[^/]/.test(href) ? href : '/projets';
+    return this.transport.send({
+      to,
+      ...renderWorkNotification(
+        content,
+        `${webUrl()}${path}`,
+        `${webUrl()}/projets/parametres`,
+      ),
+    });
+  }
+
+  async sendWorkDigest(input: WorkDigestMail): Promise<MailDeliveryResult> {
+    const { to, ...content } = input;
+    return this.transport.send({
+      to,
+      ...renderWorkDigest(
+        content,
+        `${webUrl()}/projets/mes-taches`,
+        `${webUrl()}/projets/parametres`,
+      ),
     });
   }
 }

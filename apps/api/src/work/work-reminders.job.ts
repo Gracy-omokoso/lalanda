@@ -15,7 +15,7 @@
 // tâche ne crée donc pas de doublon ; changer l'échéance rouvre le rappel. Les
 // tâches des projets archivés sont ignorées.
 
-import { WORK_LIMITS, addDays, kinshasaDayOf } from '@lalanda/shared/work';
+import { WORK_LIMITS, addDays, dueSoonEnd, kinshasaDayOf } from '@lalanda/shared/work';
 import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
@@ -71,7 +71,9 @@ export class WorkDueRemindersJob implements OnModuleInit {
     const report: DueRemindersReport = { claimed: 0, notified: 0, skipped: 0 };
     if (kinshasaHour(now) < WORK_DUE_REMINDERS_HOUR) return report;
     const today = kinshasaDayOf(now);
-    const horizon = addDays(today, WORK_LIMITS.dueSoonDaysMax);
+    // ADR-0061 § 3 : « échéance proche » compte des JOURS OUVRÉS ; borne large (un
+    // week-end et des jours fermés allongent la fenêtre calendaire).
+    const horizon = addDays(today, WORK_LIMITS.dueSoonDaysMax * 7);
     const pending = (soonEnd: string) => ({
       done: false,
       assigneeUserId: { $ne: null },
@@ -89,10 +91,15 @@ export class WorkDueRemindersJob implements OnModuleInit {
 
     const orgs = (await this.tasks.distinct('organizationId', pending(horizon)).exec()) as string[];
     const dueSoon = await this.settings.dueSoonDaysOf(orgs);
+    const behaviors = await this.settings.behaviorsOf(orgs);
     for (const organizationId of orgs) {
       if (report.claimed >= WORK_DUE_REMINDERS_BATCH) break;
       const archived = await this.projects.archivedIds(organizationId);
-      const soonEnd = addDays(today, dueSoon.get(organizationId) ?? WORK_LIMITS.dueSoonDaysDefault);
+      const soonEnd = dueSoonEnd(
+        today,
+        dueSoon.get(organizationId) ?? WORK_LIMITS.dueSoonDaysDefault,
+        behaviors.get(organizationId)?.workingDays ?? [1, 2, 3, 4, 5],
+      );
       const docs = await this.tasks
         .find(
           {

@@ -10,7 +10,7 @@
 // membership vérifiée (e-mail), jamais d'une requête. Les projets archivés
 // sont exclus, comme dans « Mes tâches » (`GET /work/my-tasks`).
 
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
@@ -18,6 +18,10 @@ import type { BriefWorkInput, BriefWorkTaskInput } from '@lalanda/engine';
 import { kinshasaDayOf } from '@lalanda/shared/work';
 
 import type { WorkSource } from '../../morning-brief/morning-brief.ports.js';
+import { NO_OVERRIDES } from '../../authz/permissions.js';
+import { projectDocFilter } from '../work-access.js';
+import { WorkAccessService } from '../work-access.service.js';
+import { WorkMembersService } from '../work-members.service.js';
 import {
   WorkProject,
   WorkTask,
@@ -45,11 +49,24 @@ export class WorkBriefSource implements WorkSource {
   constructor(
     @InjectModel(WorkProject.name) private readonly projects: Model<WorkProjectDocument>,
     @InjectModel(WorkTask.name) private readonly tasks: Model<WorkTaskDocument>,
+    @Inject(WorkAccessService) private readonly access: WorkAccessService,
+    @Inject(WorkMembersService) private readonly members: WorkMembersService,
   ) {}
 
   async workOf(organizationId: string, userId: string, now: Date): Promise<BriefWorkInput> {
+    // ADR-0060 § 5 : seulement les projets que le destinataire peut ouvrir (écran et
+    // e-mail). Droits relus à chaque brief : un ancien membre ne voit rien.
+    const member = await this.members.permissionsOf(organizationId, userId);
+    const scope = await this.access.scopeOf(organizationId, {
+      userId,
+      role: member?.role,
+      context: member?.context ?? NO_OVERRIDES,
+    });
     const projects = (await this.projects
-      .find({ organizationId, status: { $ne: 'archived' } }, { _id: 1, status: 1 })
+      .find(
+        { organizationId, status: { $ne: 'archived' }, ...projectDocFilter(scope) },
+        { _id: 1, status: 1 },
+      )
       .lean()
       .exec()) as unknown as ProjectRow[];
     if (projects.length === 0) return { status: 'known', tasks: [], truncated: false };

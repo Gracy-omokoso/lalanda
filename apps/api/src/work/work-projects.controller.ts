@@ -50,12 +50,13 @@ import { WorkIdPipe, workActorOf } from './work.common.js';
 import { WorkActivityService } from './work-activity.service.js';
 import { WorkProjectsService } from './work-projects.service.js';
 import { RequireFeature } from '../billing/feature.guard.js';
+import { WorkVisibilityGuard } from './work-visibility.guard.js';
 
 type User = { id: string };
 
 @Controller('work/projects')
 @RequireFeature('run_work') // ADR-0053 — P4
-@UseGuards(AuthGuard, PermissionsGuard)
+@UseGuards(AuthGuard, PermissionsGuard, WorkVisibilityGuard)
 export class WorkProjectsController {
   constructor(
     @Inject(WorkProjectsService) private readonly projects: WorkProjectsService,
@@ -66,11 +67,13 @@ export class WorkProjectsController {
   @RequirePermission('work.read')
   async list(
     @CurrentOrgId() orgId: string,
+    @CurrentUser() user: User,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Query() query: unknown,
   ): Promise<WorkPage<WorkProjectSummary>> {
     const parsed = ListWorkProjectsQuery.safeParse(query);
     if (!parsed.success) invalidRequest(parsed.error, 'Paramètres de liste invalides.');
-    return this.projects.list(orgId, parsed.data);
+    return this.projects.list(orgId, parsed.data, workActorOf(user, perms));
   }
 
   @Post()

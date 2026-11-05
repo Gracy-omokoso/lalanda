@@ -76,6 +76,29 @@ export class WorkSettings {
   @Prop({ type: Number, required: true })
   dueSoonDays!: number;
 
+  // ── ADR-0061 § 3 : comportement des projets (absents : défauts de `DEFAULT_WORK_BEHAVIOR`) ──
+
+  @Prop({ type: [String], default: undefined })
+  projectCreatorRoles?: string[] | null;
+
+  @Prop({ type: String, enum: ['organization', 'private'], default: undefined })
+  defaultVisibility?: 'organization' | 'private';
+
+  @Prop({ type: String, enum: ['overview', 'list', 'board'], default: undefined })
+  defaultView?: 'overview' | 'list' | 'board';
+
+  @Prop({ type: [Number], default: undefined })
+  workingDays?: number[];
+
+  @Prop({ type: Number, default: undefined })
+  autoArchiveCompletedDays?: number | null;
+
+  @Prop({ type: Boolean, default: undefined })
+  managersModerateComments?: boolean;
+
+  @Prop({ type: Boolean, default: undefined })
+  showTaskNumbers?: boolean;
+
   @Prop({ type: Number, required: true, default: 1 })
   revision!: number;
 
@@ -203,8 +226,24 @@ export class WorkProject {
   @Prop({ type: [WorkColumnDocSchema], required: true })
   columns!: WorkColumn[];
 
-  @Prop({ type: String, required: true, enum: ['organization'], default: 'organization' })
-  visibility!: 'organization';
+  /** ADR-0060 § 3 : `organization` (défaut, tous les projets antérieurs) ou `private`. */
+  @Prop({ type: String, required: true, enum: ['organization', 'private'], default: 'organization' })
+  visibility!: 'organization' | 'private';
+
+  /** ADR-0060 § 4 : utilisateurs ajoutés un à un (membres de l'organisation, `work.read`). */
+  @Prop({ type: [String], default: [] })
+  memberUserIds!: string[];
+
+  /** ADR-0060 § 4 : équipes ajoutées (`hr_teams`), membres résolus à chaque lecture. */
+  @Prop({ type: [String], default: [] })
+  memberTeamIds!: string[];
+
+  /**
+   * ADR-0061 § 2 : dernier état de santé signalé (`at_risk`, `late`) — un projet ne
+   * notifie « passé à risque » qu'à l'entrée dans l'état ; `null` quand il redevient sain.
+   */
+  @Prop({ type: String, default: null })
+  healthAlert!: 'at_risk' | 'late' | null;
 
   /** Compteur des numéros de tâche (`$inc` atomique) ; jamais décrémenté. */
   @Prop({ type: Number, required: true, default: 0 })
@@ -240,6 +279,10 @@ export type WorkProjectLean = WorkProject & { _id: Types.ObjectId };
 export const WorkProjectSchema = SchemaFactory.createForClass(WorkProject);
 WorkProjectSchema.index({ organizationId: 1, status: 1, updatedAt: -1 });
 WorkProjectSchema.index({ organizationId: 1, 'links.customerId': 1 });
+// ADR-0060 : portée d'un appelant (projets privés, membres directs, équipes).
+WorkProjectSchema.index({ organizationId: 1, visibility: 1 });
+WorkProjectSchema.index({ organizationId: 1, memberUserIds: 1 });
+WorkProjectSchema.index({ organizationId: 1, memberTeamIds: 1 });
 WorkProjectSchema.index({ organizationId: 1, 'links.opportunityId': 1 });
 WorkProjectSchema.index(
   { organizationId: 1, 'source.quoteId': 1 },
@@ -370,6 +413,14 @@ export class WorkTask {
 
   @Prop({ type: Number, default: null })
   estimateMinutes!: number | null;
+
+  /** ADR-0061 § 4 : couleur de carte (clé de `WORK_CARD_COLORS`), `null` : aucune. */
+  @Prop({
+    type: String,
+    default: null,
+    enum: ['yellow', 'orange', 'pink', 'purple', 'blue', 'teal', 'green', 'gray', null],
+  })
+  color!: string | null;
 
   @Prop({ type: WorkTaskSourceSchema, default: null })
   source!: WorkTaskSourceDoc | null;

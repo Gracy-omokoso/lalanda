@@ -529,7 +529,11 @@ export class WorkBillingService {
     actor: WorkActor,
   ): Promise<WorkProjectView> {
     const { name } = input;
-    const columns = (await this.settings.get(organizationId)).defaultColumns;
+    // ADR-0061 § 3 : mêmes réglages de création qu'un projet ordinaire.
+    await this.projects.assertCanCreate(organizationId, actor);
+    const settings = await this.settings.get(organizationId);
+    const columns = settings.defaultColumns;
+    const visibility = settings.defaultVisibility;
     const todo = columns.find((c) => c.category === 'todo') ?? columns[0]!;
     const taskCount = input.seeds.length + (input.milestone ? 1 : 0);
 
@@ -547,7 +551,9 @@ export class WorkBillingService {
         links: input.links,
         source: input.source,
         columns,
-        visibility: 'organization',
+        visibility,
+        memberUserIds: visibility === 'private' ? [actor.userId] : [],
+        memberTeamIds: [],
         taskSeq: taskCount,
         searchKey: searchKeyOf([name]),
         revision: 1,

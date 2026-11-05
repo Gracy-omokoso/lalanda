@@ -13,3 +13,9 @@ export * from './timesheets.js';
 export * from './overview.js';
 // ADR-0058 : accueil des projets (portefeuille), santé et chiffres.
 export * from './portfolio.js';
+// ADR-0060 : membres d'un projet (utilisateurs et équipes), visibilité.
+export * from './members.js';
+// ADR-0061 : comportement des projets, préférences de notification, couleurs des cartes.
+export * from './behavior.js';
+export * from './notification-preferences.js';
+export * from './card-colors.js';
