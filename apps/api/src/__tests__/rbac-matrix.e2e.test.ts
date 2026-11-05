@@ -1070,6 +1070,16 @@ e2eSuite('matrice rôle × action réellement appliquée par les guards (S20a)',
       .send({ name: `Sonde RUN ${tag}`, kind: 'internal' });
     expect(res.status, `projet RUN de sondage : ${JSON.stringify(res.body)}`).toBe(201);
     projetWork = res.body.id as string;
+    // ADR-0059 § 5 / ADR-0060 : l'Invité externe ne voit que les projets dont il est
+    // membre ; on l'ajoute à la sonde pour éprouver ses droits `work.*`, pas sa portée
+    // (couverte par work-visibility.e2e.test.ts).
+    const ajout = await request(serveur())
+      .post(`/work/projects/${projetWork}/members`)
+      .set('Cookie', cookiesDe('owner'))
+      .send({ userIds: [await userIdDe('guest')] });
+    expect(ajout.status, `Invité membre de la sonde : ${JSON.stringify(ajout.body)}`).toBeLessThan(
+      300,
+    );
     return projetWork;
   }
 

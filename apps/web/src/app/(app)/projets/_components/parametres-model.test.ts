@@ -71,7 +71,9 @@ describe('paramètres des Projets (ADR-0061)', () => {
   });
 
   it('créateurs : tous cochés → null (tous les gestionnaires)', () => {
-    expect(createurs(null, 'finance_director', false)).toEqual(['owner', 'admin']);
-    expect(createurs(['owner', 'admin'], 'finance_director', true)).toBeNull();
+    expect(createurs(null, 'finance_director', false)).toEqual(['owner', 'admin', 'team_manager']);
+    expect(createurs(['owner', 'admin', 'team_manager'], 'finance_director', true)).toBeNull();
+    // ADR-0059 : le Manager / Chef d'équipe se décoche comme les autres.
+    expect(createurs(null, 'team_manager', false)).toEqual(['owner', 'admin', 'finance_director']);
   });
 });
