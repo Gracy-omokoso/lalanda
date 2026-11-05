@@ -122,6 +122,11 @@ import { WorkProjectsController } from '../work/work-projects.controller.js';
 import { WorkOverviewController } from '../work/work-overview.controller.js';
 // ADR-0058 : accueil des projets (portefeuille).
 import { WorkPortfolioController } from '../work/work-portfolio.controller.js';
+// ADR-0060 : membres d'un projet et équipes.
+import { WorkProjectMembersController } from '../work/work-project-members.controller.js';
+import { HrTeamsController } from '../hr/teams/hr-teams.controller.js';
+// ADR-0061 : mes notifications des Projets.
+import { WorkNotificationPreferencesController } from '../work/preferences/work-notification-preferences.controller.js';
 // ADR-0062 : import d'un fichier de tâches.
 import { WorkImportController } from '../work/work-import.controller.js';
 // ADR-0063 : construction d'un plan par l'IA.
@@ -306,6 +311,10 @@ const CONTROLEURS = [
   WorkTimesheetsController,
   // ADR-0058 : accueil des projets (portefeuille).
   WorkPortfolioController,
+  // ADR-0060 : membres d'un projet (utilisateurs, équipes) ; équipes RH.
+  WorkProjectMembersController,
+  HrTeamsController,
+  WorkNotificationPreferencesController,
   // ADR-0062 : import d'un fichier de tâches.
   WorkImportController,
   // ADR-0063 : construction d'un plan par l'IA.
@@ -2938,5 +2947,39 @@ describe('ADR-0058 : accueil des projets (portefeuille)', () => {
     const routes = TOUTES_LES_ROUTES.filter((r) => r.cle.startsWith('WorkPortfolioController.'));
     expect(routes.map((r) => r.cle)).toEqual(['WorkPortfolioController.get']);
     expect(routes[0]!.actions).toEqual(['work.read']);
+  });
+});
+
+// ADR-0060 et ADR-0061
+describe('ADR-0060 et ADR-0061 : équipes, membres d’un projet, mes notifications', () => {
+  it('chaque route déclare sa permission', () => {
+    const attendu: Record<string, Action[]> = {
+      // ADR-0060 : équipes — lecture large (`hr.read`), gestion RH et direction (`hr.manage`).
+      'HrTeamsController.list': ['hr.read'],
+      'HrTeamsController.get': ['hr.read'],
+      'HrTeamsController.candidates': ['hr.read'],
+      'HrTeamsController.create': ['hr.manage'],
+      'HrTeamsController.update': ['hr.manage'],
+      'HrTeamsController.addMembers': ['hr.manage'],
+      'HrTeamsController.removeMember': ['hr.manage'],
+      'HrTeamsController.remove': ['hr.manage'],
+      // ADR-0060 : membres d'un projet ; équipes proposées aux Projets.
+      'WorkProjectMembersController.teams': ['work.read'],
+      'WorkProjectMembersController.get': ['work.read'],
+      'WorkProjectMembersController.add': ['work.manage'],
+      'WorkProjectMembersController.removeUser': ['work.manage'],
+      'WorkProjectMembersController.removeTeam': ['work.manage'],
+      // ADR-0061 : préférences PERSONNELLES de l'appelant.
+      'WorkNotificationPreferencesController.get': ['work.read'],
+      'WorkNotificationPreferencesController.put': ['work.read'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) =>
+      /^(HrTeams|WorkProjectMembers|WorkNotificationPreferences)Controller\./.test(r.cle),
+    );
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+    }
   });
 });

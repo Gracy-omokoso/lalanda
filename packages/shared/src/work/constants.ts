@@ -22,8 +22,12 @@ export type WorkProjectStatus = (typeof WORK_PROJECT_STATUSES)[number];
 export const WORK_PROJECT_EDITABLE_STATUSES = ['active', 'on_hold', 'completed'] as const;
 export type WorkProjectEditableStatus = (typeof WORK_PROJECT_EDITABLE_STATUSES)[number];
 
-/** Visibilité réservée (ADR-0039 O7) : une seule valeur en R1. */
-export const WORK_PROJECT_VISIBILITIES = ['organization'] as const;
+/**
+ * Visibilité d'un projet (ADR-0039 O7, ouverte par ADR-0060 § 3) : `organization`
+ * (tout détenteur de `work.read`, défaut et valeur de tous les projets antérieurs) ou
+ * `private` (membres directs, membres de ses équipes, responsable, direction).
+ */
+export const WORK_PROJECT_VISIBILITIES = ['organization', 'private'] as const;
 export type WorkProjectVisibility = (typeof WORK_PROJECT_VISIBILITIES)[number];
 
 /** Catégorie d'une colonne du Kanban (ADR-0039 § 2.2). */
@@ -71,6 +75,9 @@ export const WORK_ACTIVITY_KINDS = [
   'project.archived',
   'project.restored',
   'project.completed',
+  // ADR-0060 § 4 : membres (utilisateurs, équipes) et visibilité.
+  'project.member_added',
+  'project.member_removed',
   'task.created',
   'task.updated',
   'task.moved',

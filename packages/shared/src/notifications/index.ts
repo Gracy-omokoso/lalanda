@@ -17,6 +17,11 @@ export const NOTIFICATION_KINDS = [
   'work.task_due_soon',
   'work.task_overdue',
   'work.milestone_completed',
+  // ADR-0061 § 2 : statut (colonne) d'une de mes tâches changé, ajouté à un projet,
+  // projet passé à risque. Refiltrés à la lecture par `work.read` ET par la visibilité.
+  'work.task_status_changed',
+  'work.added_to_project',
+  'work.project_at_risk',
   // ADR-0040 — C4 § 5.4 : relances et opportunités du CRM. `crm.opportunity_won`
   // est déclaré ici et émis par le lot C7 (opportunité gagnée → projet).
   'crm.activity_assigned',

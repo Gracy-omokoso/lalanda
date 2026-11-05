@@ -28,6 +28,7 @@ const projet = (p: Partial<WorkPortfolioProject>): WorkPortfolioProject => ({
   members: [],
   memberCount: 0,
   mine: false,
+  visibility: 'organization',
   updatedAt: '2026-11-04T10:00:00.000Z',
   ...p,
 });

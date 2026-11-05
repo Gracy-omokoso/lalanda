@@ -27,7 +27,9 @@ import { Inject, Injectable } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import type { Connection, Model } from 'mongoose';
 
-import { isWorkId, oid } from './work.common.js';
+import { isWorkId, oid, type WorkActor } from './work.common.js';
+import { projectDocFilter, type WorkProjectScope } from './work-access.js';
+import { WorkAccessService } from './work-access.service.js';
 import { WorkMembersService } from './work-members.service.js';
 import {
   WorkProject,
@@ -58,18 +60,26 @@ export class WorkPortfolioService {
     @InjectModel(WorkTask.name) private readonly tasks: Model<WorkTaskDocument>,
     @InjectConnection() private readonly connection: Connection,
     @Inject(WorkMembersService) private readonly members: WorkMembersService,
+    @Inject(WorkAccessService) private readonly access: WorkAccessService,
   ) {}
 
   async portfolio(
     organizationId: string,
-    userId: string,
+    actor: WorkActor,
     query: WorkPortfolioQuery,
     now: Date = new Date(),
   ): Promise<WorkPortfolioView> {
+    const userId = actor.userId;
     const today = kinshasaDayOf(now);
     const archived = query.scope === 'archived';
+    // ADR-0060 § 5 : projets et chiffres limités à la portée de l'appelant.
+    const scope = await this.access.scopeOf(organizationId, actor);
     const docs = await this.projects
-      .find({ organizationId, status: archived ? 'archived' : { $ne: 'archived' } })
+      .find({
+        organizationId,
+        status: archived ? 'archived' : { $ne: 'archived' },
+        ...projectDocFilter(scope),
+      })
       .sort({ updatedAt: -1, _id: -1 })
       .limit(WORK_PORTFOLIO_MAX + 1)
       .lean<WorkProjectLean[]>()
@@ -80,7 +90,7 @@ export class WorkPortfolioService {
 
     const [counters, stats] = await Promise.all([
       this.counters(organizationId, ids, userId, today),
-      this.stats(organizationId, today),
+      this.stats(organizationId, today, scope),
     ]);
     const countBy = new Map(counters.map((c) => [c._id, c]));
 
@@ -145,6 +155,8 @@ export class WorkPortfolioService {
         members,
         memberCount: memberIds.length,
         mine: d.ownerUserId === userId || (c?.mine ?? 0) > 0,
+        // ADR-0060 : cadenas des projets privés sur l'accueil.
+        visibility: d.visibility ?? 'organization',
         updatedAt: new Date(d.updatedAt).toISOString(),
       };
     });
@@ -198,10 +210,17 @@ export class WorkPortfolioService {
   }
 
   /** Chiffres de l'organisation, projets non archivés (quel que soit le filtre). */
-  private async stats(organizationId: string, today: string): Promise<WorkPortfolioStats> {
+  private async stats(
+    organizationId: string,
+    today: string,
+    scope: WorkProjectScope,
+  ): Promise<WorkPortfolioStats> {
     const weekStart = kinshasaWeekStart(today);
     const open = await this.projects
-      .find({ organizationId, status: { $ne: 'archived' } }, { _id: 1, status: 1 })
+      .find(
+        { organizationId, status: { $ne: 'archived' }, ...projectDocFilter(scope) },
+        { _id: 1, status: 1 },
+      )
       .lean<{ _id: unknown; status: string }[]>()
       .exec();
     const ids = open.map((p) => String(p._id));

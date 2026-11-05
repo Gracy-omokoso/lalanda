@@ -646,6 +646,28 @@ téléphone, état vide).
 - Atomes : `projets/_components/equipe-elements.tsx` (`CercleCocher`, `Avatar`, `PileAvatars`,
   `PastilleProjet`, `OngletsMesTaches`).
 
+## Équipes, membres et paramètres des Projets — implémenté, ADR-0060 et ADR-0061
+
+- **RH › Équipes** (`/rh/equipes`) : liste à gauche (nom, « 3 membres · 2 projets », pile
+  d'avatars), fiche à droite (`?equipe=<id>`) : description, responsable, membres (Retirer),
+  « Ajouter un membre de l'organisation », Modifier, Supprimer (fenêtre de confirmation qui dit
+  combien de projets perdent l'accès). Capture `docs/refonte-ui/v5/rh-equipes.png`.
+- **Partager** (en-tête d'un projet) → `/projets/<id>/membres` : « Qui voit ce projet ? » (deux
+  cartes radio : Toute l'organisation, Membres seulement), ajout d'une personne ou d'une équipe
+  entière, listes Personnes (Responsable en `StatusPill`) et Équipes (membres courants). Un projet
+  privé porte un cadenas « Privé » dans l'en-tête. Lecture pour tous, modification `work.manage`.
+  Capture `projet-membres.png`.
+- **Projets › Paramètres** (`/projets/parametres`), onglets `TabsNav` : **Mes notifications**
+  (tableau d'interrupteurs Cloche / E-mail par événement, résumé quotidien : interrupteur, heure,
+  jours ouvrés) et **Comportement des projets** (`work.manage` : créateurs, visibilité et vue par
+  défaut, jours ouvrés en boutons bascule, échéance proche, archivage automatique, modération,
+  numéros). Enregistrement immédiat, « Enregistré. » annoncé (`aria-live`). Captures
+  `projets-parametres-notifications.png`, `projets-parametres-comportement.png`.
+- **Cartes post-it** : nuancier dans le panneau de tâche (`role="radiogroup"`, 8 teintes + Aucune) ;
+  Tableau : fond `--card-<clé>-bg` et liseré gauche `--card-<clé>-dot` ; Liste : pastille. Sans
+  couleur, rien ne change. Contrastes ≥ 4,5:1 (texte et texte secondaire) dans les 5 combinaisons,
+  liseré ≥ 3:1 (`tokens.test.ts`). Captures `tableau-postit-lalanda.png`, `tableau-postit-ebene.png`.
+
 ## Importer un fichier et Construire avec l'IA — implémenté, ADR-0062 et ADR-0063
 
 Captures : `docs/refonte-ui/v5/` (`import-apercu.png`, `import-resultat.png`, `ia-formulaire.png`,

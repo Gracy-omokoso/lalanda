@@ -316,6 +316,9 @@ const LIBELLES_ACTIVITE: Record<WorkActivityKind, string> = {
   'project.archived': 'a archivé le projet',
   'project.restored': 'a restauré le projet',
   'project.completed': 'a terminé le projet',
+  // ADR-0060 § 4
+  'project.member_added': 'a ajouté des membres au projet',
+  'project.member_removed': 'a retiré un membre du projet',
   'task.created': 'a créé la tâche',
   'task.updated': 'a modifié la tâche',
   'task.moved': 'a déplacé la tâche',

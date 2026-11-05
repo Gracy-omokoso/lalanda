@@ -59,6 +59,20 @@ import { WorkTasksController } from './work-tasks.controller.js';
 import { WorkTasksService } from './work-tasks.service.js';
 import { WorkTimeController } from './work-time.controller.js';
 import { WorkTimeService } from './work-time.service.js';
+// ADR-0060 : visibilité des projets, membres (utilisateurs et équipes).
+import { WorkAccessService } from './work-access.service.js';
+import { WorkProjectMembersController } from './work-project-members.controller.js';
+import { WorkProjectMembersService } from './work-project-members.service.js';
+import { WorkVisibilityGuard } from './work-visibility.guard.js';
+// ADR-0061 : préférences de notification (cloche, e-mail, résumé quotidien).
+import { WorkNotificationPreferencesController } from './preferences/work-notification-preferences.controller.js';
+import {
+  WorkNotificationPreferencesDoc,
+  WorkNotificationPreferencesSchema,
+} from './preferences/work-notification-preferences.schema.js';
+import { WorkNotificationPreferencesService } from './preferences/work-notification-preferences.service.js';
+import { WorkDigestJob } from './preferences/work-digest.job.js';
+import { WorkProjectWatchJob } from './work-project-watch.job.js';
 // ADR-0062 : import d'un fichier de tâches ; créateur commun depuis un plan.
 import { WorkImportController } from './work-import.controller.js';
 import { WorkImportService } from './work-import.service.js';
@@ -114,6 +128,11 @@ import {
       { name: WorkTimeEntry.name, schema: WorkTimeEntrySchema },
       { name: WorkMemberRate.name, schema: WorkMemberRateSchema },
       { name: WorkActivity.name, schema: WorkActivitySchema },
+      // ADR-0061 § 2
+      {
+        name: WorkNotificationPreferencesDoc.name,
+        schema: WorkNotificationPreferencesSchema,
+      },
       { name: WorkAiPlanLog.name, schema: WorkAiPlanLogSchema },
     ]),
   ],
@@ -131,6 +150,10 @@ import {
     WorkOverviewController,
     // ADR-0058 : accueil des projets (portefeuille), lecture.
     WorkPortfolioController,
+    // ADR-0060 : membres d'un projet, équipes proposées.
+    WorkProjectMembersController,
+    // ADR-0061 : mes notifications des Projets.
+    WorkNotificationPreferencesController,
     // ADR-0062 : import d'un fichier de tâches (aperçu, import, modèle).
     WorkImportController,
     // ADR-0063 : proposition de plan par l'IA, création depuis un plan relu.
@@ -163,6 +186,14 @@ import {
     WorkTimesheetsService,
     WorkOverviewService,
     WorkPortfolioService,
+    // ADR-0060 : portée des appelants, garde de visibilité, membres d'un projet.
+    WorkAccessService,
+    WorkVisibilityGuard,
+    WorkProjectMembersService,
+    // ADR-0061 : préférences de notification, résumé quotidien, veille des projets.
+    WorkNotificationPreferencesService,
+    WorkDigestJob,
+    WorkProjectWatchJob,
     // ADR-0062 / ADR-0063 : créateur commun d'un projet depuis un plan, import de fichier.
     WorkPlanBuilder,
     WorkImportService,
@@ -178,6 +209,9 @@ import {
     WorkProjectsService,
     WorkTasksService,
     WorkBriefSource,
+    // ADR-0060 : la garde de visibilité sert aussi aux contrôleurs de `work/billing/**`.
+    WorkAccessService,
+    WorkVisibilityGuard,
   ],
 })
 export class WorkModule {}

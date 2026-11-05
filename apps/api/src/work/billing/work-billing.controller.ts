@@ -59,10 +59,11 @@ import {
   type PreparedInvoiceView,
 } from './work-billing.service.js';
 import { RequireFeature } from '../../billing/feature.guard.js';
+import { WorkVisibilityGuard } from '../work-visibility.guard.js';
 
 @Controller('work')
 @RequireFeature('run_work') // ADR-0053 — P4
-@UseGuards(AuthGuard, PermissionsGuard)
+@UseGuards(AuthGuard, PermissionsGuard, WorkVisibilityGuard)
 export class WorkBillingController {
   constructor(
     @Inject(WorkBillingService) private readonly billing: WorkBillingService,

@@ -433,6 +433,73 @@ export function renderMorningBrief(input: MorningBriefMailContent, url: string):
   return { ...rendered, subject: `${PRODUCT} — brief du matin, ${input.organizationName}` };
 }
 
+// ── Projets : notification et résumé quotidien (ADR-0061 § 2) ───────────────
+
+/** Notification d'un événement des Projets, doublée par e-mail selon les préférences. */
+export interface WorkNotificationMailContent {
+  organizationName: string;
+  /** Titre figé à l'émission (« Kevin vous a assigné #12 Poser le carrelage »). */
+  title: string;
+  /** Libellé de l'événement (« Une tâche m'est assignée »). */
+  eventLabel: string;
+}
+
+export function renderWorkNotification(
+  input: WorkNotificationMailContent,
+  url: string,
+  preferencesUrl: string,
+): RenderedMail {
+  const rendered = layout({
+    heading: input.title,
+    paragraphs: [`${input.organizationName} — ${input.eventLabel}.`],
+    ctaLabel: 'Ouvrir dans Lalanda',
+    ctaUrl: url,
+    footnotes: [
+      `Vous recevez cet e-mail parce que l’envoi est activé pour « ${input.eventLabel} ». Réglez vos notifications : ${preferencesUrl}`,
+    ],
+  });
+  return { ...rendered, subject: `${PRODUCT} — ${input.title}` };
+}
+
+/** Résumé quotidien des Projets : SES tâches, des nombres et des titres, rien d'autre. */
+export interface WorkDigestMailContent {
+  organizationName: string;
+  dateLabel: string;
+  overdue: string[];
+  today: string[];
+  soon: string[];
+  /** Notifications non lues de la boîte des Projets. */
+  unread: number;
+}
+
+export function renderWorkDigest(
+  input: WorkDigestMailContent,
+  url: string,
+  preferencesUrl: string,
+): RenderedMail {
+  const section = (titre: string, lignes: string[]): string[] =>
+    lignes.length > 0 ? [`${titre} (${lignes.length}) :`, ...lignes.map((l) => `• ${l}`)] : [];
+  const lines = [
+    ...section('En retard', input.overdue),
+    ...section('À rendre aujourd’hui', input.today),
+    ...section('Échéance proche', input.soon),
+  ];
+  const rendered = layout({
+    heading: `Vos projets — ${input.organizationName}`,
+    paragraphs: [
+      `Résumé du ${input.dateLabel}.`,
+      ...(lines.length > 0 ? lines : ['Aucune tâche en retard, du jour ou à échéance proche.']),
+      `Notifications non lues : ${input.unread}.`,
+    ],
+    ctaLabel: 'Ouvrir Mes tâches',
+    ctaUrl: url,
+    footnotes: [
+      `Vous recevez ce résumé parce que vous l’avez activé. Le désactiver : ${preferencesUrl}`,
+    ],
+  });
+  return { ...rendered, subject: `${PRODUCT} — vos projets, ${input.dateLabel}` };
+}
+
 /**
  * Date lisible en français, en UTC.
  *

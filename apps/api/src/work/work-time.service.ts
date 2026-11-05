@@ -15,6 +15,8 @@
 // ≤ `workedOn`. Le coût n'est jamais stocké : il se calcule à la lecture, dans le
 // moteur (lot L4a, marge). Journalisé dans `audit_events` (`work.rate.set|removed`).
 
+import { projectIdFilter } from './work-access.js';
+import { WorkAccessService } from './work-access.service.js';
 import {
   WORK_LIMITS,
   addDays,
@@ -81,6 +83,7 @@ export class WorkTimeService {
     @Inject(WorkMembersService) private readonly members: WorkMembersService,
     @Inject(WorkActivityService) private readonly activity: WorkActivityService,
     @Inject(AuditService) private readonly audit: AuditService,
+    @Inject(WorkAccessService) private readonly access: WorkAccessService,
   ) {}
 
   // ── Lecture ──────────────────────────────────────────────────────────────
@@ -140,6 +143,9 @@ export class WorkTimeService {
       await this.taskService.requireOwn(organizationId, query.taskId);
       and.push({ taskId: query.taskId });
     }
+    // ADR-0060 § 5 : saisies des projets privés hors portée exclues.
+    const visible = projectIdFilter(await this.access.scopeOf(organizationId, actor));
+    if (Object.keys(visible).length > 0) and.push(visible);
     if (query.userId) and.push({ userId: query.userId === 'me' ? actor.userId : query.userId });
     if (query.from) and.push({ workedOn: { $gte: query.from } });
     if (query.to) and.push({ workedOn: { $lte: query.to } });

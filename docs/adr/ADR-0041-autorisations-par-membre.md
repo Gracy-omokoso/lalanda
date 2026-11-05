@@ -1,7 +1,8 @@
 # ADR-0041 — Autorisations par membre : le rôle comme titre et modèle de départ, ajouts et retraits d'actions
 
-Statut : Proposed
-Date : 2026-10-29
+Statut : Accepted — appliqué (lots A1 à A5, v1.10) ; interrupteur **allumé par défaut** depuis
+[ADR-0059](ADR-0059-roles-equipe-et-personnalisation-active.md) (v1.14.0, 5 nov. 2026)
+Date : 2026-10-29 (amendé le 2026-11-05)
 Décideurs : Gracy Omokoso (dirigeante) — **demande du 29 oct. 2026**, transcrite telle quelle
 (§ Contexte) ; CTO Lalanda (contrat technique). Les choix marqués « proposition » sont soumis à
 la dirigeante (§ Décisions ouvertes).
@@ -15,6 +16,14 @@ la dirigeante (§ Décisions ouvertes).
 > par ajouts. **S'insère dans R2 après le lot C0 d'[ADR-0040](ADR-0040-crm-complet.md)** (rôle
 > Commercial `sales_rep`, action `sales.quote`), qui possède `permissions.ts` : tous les chiffres
 > ci-dessous comptent **9 rôles et 28 actions**.
+
+> **Amendement du 5 nov. 2026 ([ADR-0059](ADR-0059-roles-equipe-et-personnalisation-active.md)).**
+> Les conditions du § 9.1 sont remplies depuis la v1.10 (A3, A4 et A5 fusionnés, toutes les
+> instances lisent les écarts), mais la variable `MEMBER_PERMISSIONS_ENABLED=true` n'a jamais été
+> posée en production : la grille restait en lecture seule (« la personnalisation des accès n'est
+> pas fonctionnelle », la dirigeante, 5 nov. 2026). **Le défaut est inversé** : l'interrupteur est
+> allumé sauf `MEMBER_PERMISSIONS_ENABLED=false` explicite, qui reste le retour arrière sans
+> migration (les écarts stockés sont alors lus comme vides).
 
 ## Contexte
 
@@ -400,7 +409,8 @@ reste 2 (champs additifs). L'index `{ organizationId, role }` reste ; un index
 **Compatibilité N-1** : une ancienne instance d'API ignorerait `revokes` et rendrait un droit
 retiré. L'écran et la route d'écriture restent derrière l'interrupteur
 `MEMBER_PERMISSIONS_ENABLED` (désactivé), allumé **seulement** quand toutes les instances lisent
-les écarts **et** que le lot A3 (§ 12) est fusionné (consigne de déploiement, docs/24).
+les écarts **et** que le lot A3 (§ 12) est fusionné (consigne de déploiement, docs/24). *Amendé
+par ADR-0059 : conditions remplies, allumé par défaut, `false` explicite pour couper.*
 
 #### 9.2 La décision : `permissions.ts`
 

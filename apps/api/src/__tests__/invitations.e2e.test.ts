@@ -104,10 +104,10 @@ e2eSuite('invitations (brief §6, docs/12-ROLES-PERMISSIONS.md)', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.invitation.email).toBe(invitee.email.toLowerCase());
-    // S20a : le rôle par défaut d'une invitation passe de `member` à `viewer`.
-    // Changement VOULU (ADR-0012 §7) — moindre privilège : inviter sans préciser
-    // de rôle ne doit accorder aucun droit d'écriture.
-    expect(res.body.invitation.role).toBe('viewer');
+    // S20a : le rôle par défaut d'une invitation passait de `member` à `viewer` ;
+    // ADR-0059 § 4 : il devient `employee` (Salarié) — aucune donnée financière,
+    // seulement le travail sur les tâches et le libre-service RH.
+    expect(res.body.invitation.role).toBe('employee');
     expect(res.body.invitation.acceptedAt).toBeNull();
     expect(res.body.token).toMatch(/^[0-9a-f]{64}$/);
   }, 30_000);
@@ -186,8 +186,8 @@ e2eSuite('invitations (brief §6, docs/12-ROLES-PERMISSIONS.md)', () => {
       (o) => o.id === ownerOrgId,
     );
     expect(found).toBeDefined();
-    // Idem : l'invitation sans rôle explicite crée désormais un `viewer`.
-    expect(found?.role).toBe('viewer');
+    // Idem : l'invitation sans rôle explicite crée un `employee` (ADR-0059 § 4).
+    expect(found?.role).toBe('employee');
 
     // Pending vide (pour ce token) après acceptation.
     const after = await request(app.getHttpServer())
@@ -270,7 +270,8 @@ e2eSuite('invitations (brief §6, docs/12-ROLES-PERMISSIONS.md)', () => {
   //
   // Validé À L'ENVOI contre les droits effectifs de l'invitant, puis REVALIDÉ À
   // L'ACCEPTATION contre ses droits effectifs du moment. Interrupteur
-  // `MEMBER_PERMISSIONS_ENABLED` éteint : une invitation n'accepte pas d'écart.
+  // `MEMBER_PERMISSIONS_ENABLED` allumé par défaut (ADR-0059) ; coupé (`false`
+  // explicite), une invitation n'accepte pas d'écart.
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe('ADR-0041 — A4 : invitation avec écart', () => {
@@ -315,7 +316,7 @@ e2eSuite('invitations (brief §6, docs/12-ROLES-PERMISSIONS.md)', () => {
     }
 
     it('interrupteur éteint : une invitation avec écart → 409 MEMBER_PERMISSIONS_DISABLED', async () => {
-      delete process.env['MEMBER_PERMISSIONS_ENABLED'];
+      process.env['MEMBER_PERMISSIONS_ENABLED'] = 'false';
       const tag = uniqueTag();
       const owner = makeUser('a4off', tag);
       const invitee = makeUser('a4offinv', tag);
@@ -328,6 +329,68 @@ e2eSuite('invitations (brief §6, docs/12-ROLES-PERMISSIONS.md)', () => {
       expect(res.status).toBe(409);
       expect(res.body.code).toBe('MEMBER_PERMISSIONS_DISABLED');
     }, 60_000);
+
+    it('ADR-0059 — interrupteur absent (défaut) : l’invitation avec écart est acceptée', async () => {
+      delete process.env['MEMBER_PERMISSIONS_ENABLED'];
+      const tag = uniqueTag();
+      const owner = makeUser('a59defaut', tag);
+      const invitee = makeUser('a59defautinv', tag);
+      const cookies = await registerAndLogin(owner);
+      const inviteeCookies = await registerAndLogin(invitee);
+      const orgId = await getPrimaryOrgId(cookies);
+
+      const catalogue = await request(server()).get('/authz/catalog').set('Cookie', cookies);
+      expect(catalogue.status).toBe(200);
+      expect(catalogue.body.memberPermissionsEnabled).toBe(true);
+
+      const inv = await request(server())
+        .post(`/organizations/${orgId}/invitations`)
+        .set('Cookie', cookies)
+        .send({ email: invitee.email, role: 'viewer', grants: ['crm.manage'] });
+      expect(inv.status, JSON.stringify(inv.body)).toBe(201);
+      const acc = await request(server())
+        .post('/invitations/accept')
+        .set('Cookie', inviteeCookies)
+        .send({ token: inv.body.token });
+      expect(acc.status, JSON.stringify(acc.body)).toBe(201);
+      const moi = await request(server())
+        .get('/me/permissions')
+        .set('Cookie', [...inviteeCookies, `active_org_id=${orgId}`]);
+      expect(moi.body.actions).toContain('crm.manage');
+      expect(moi.body.customized).toBe(true);
+    }, 90_000);
+
+    it('ADR-0059 — sans rôle précisé, l’invitation porte le Salarié (`employee`)', async () => {
+      const tag = uniqueTag();
+      const owner = makeUser('a59role', tag);
+      const invitee = makeUser('a59roleinv', tag);
+      const cookies = await registerAndLogin(owner);
+      const inviteeCookies = await registerAndLogin(invitee);
+      const orgId = await getPrimaryOrgId(cookies);
+      const inv = await request(server())
+        .post(`/organizations/${orgId}/invitations`)
+        .set('Cookie', cookies)
+        .send({ email: invitee.email });
+      expect(inv.status, JSON.stringify(inv.body)).toBe(201);
+      expect(inv.body.invitation.role).toBe('employee');
+      const acc = await request(server())
+        .post('/invitations/accept')
+        .set('Cookie', inviteeCookies)
+        .send({ token: inv.body.token });
+      expect(acc.status, JSON.stringify(acc.body)).toBe(201);
+      const moi = await request(server())
+        .get('/me/permissions')
+        .set('Cookie', [...inviteeCookies, `active_org_id=${orgId}`]);
+      expect(moi.body.role).toBe('employee');
+      expect(moi.body.actions).toEqual([
+        'analytics.read',
+        'work.read',
+        'work.update',
+        'leave.request',
+        'expenses.claim',
+        'attendance.clock',
+      ]);
+    }, 90_000);
 
     it('critère 11 — « Lecteur + crm.manage » par un Administrateur : appartenance avec cet écart', async () => {
       process.env['MEMBER_PERMISSIONS_ENABLED'] = 'true';
@@ -438,7 +501,7 @@ e2eSuite('invitations (brief §6, docs/12-ROLES-PERMISSIONS.md)', () => {
         .send({ email: invitee.email, role: 'viewer', revokes: ['treasury.read'] });
       expect(inv.status, JSON.stringify(inv.body)).toBe(201);
 
-      delete process.env['MEMBER_PERMISSIONS_ENABLED'];
+      process.env['MEMBER_PERMISSIONS_ENABLED'] = 'false';
       const acc = await request(server())
         .post('/invitations/accept')
         .set('Cookie', inviteeCookies)

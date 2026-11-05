@@ -1,7 +1,7 @@
 # Guide de l'équipe — Projets et Mes tâches dans Lalanda
 
 Une page pour démarrer. Menu de gauche : **RUN › Opérations › Projets** (sous-entrées « Mes
-tâches » et « Tous les projets »).
+tâches », « Tous les projets » et « Paramètres »).
 
 ## 1. Avant de commencer : le bon rôle
 
@@ -10,12 +10,30 @@ e-mail et **Rôle**). Après l'envoi, un **lien d'invitation** s'affiche : on pe
 l'envoyer autrement (WhatsApp) si l'e-mail tarde. Le membre crée son compte avec **la même adresse**,
 puis accepte l'invitation (bandeau en haut de l'écran, ou le lien).
 
-**Attention au rôle** : le rôle proposé par défaut est **Lecteur**. Un Lecteur voit les projets mais
-**ne peut ni cocher une tâche, ni en être responsable, ni saisir son temps**. Pour l'équipe, choisir
-**Analyste** (ou Commercial, Comptable, Responsable RH, Magasinier selon le métier). Seuls le
-Propriétaire, l'Administrateur et le Directeur financier peuvent **créer, archiver ou régler** un
-projet. Les rôles Conseiller, Chef de projet (plans financiers) et Expert-comptable externe n'ont pas accès
-aux projets.
+**Le bon rôle** (depuis la v1.14.0, ADR-0059) : le rôle proposé par défaut est **Salarié**. Un
+Salarié **voit les projets, coche ses tâches, commente, en est responsable et saisit son temps** ; il
+demande aussi ses congés, déclare ses frais et pointe. Il **ne voit aucune donnée financière** (ni
+ventes, ni trésorerie, ni achats, ni comptabilité). Selon la personne :
+
+| Rôle | Pour qui | Projets et tâches |
+|---|---|---|
+| **Salarié** (défaut) | tout membre du personnel | voit, coche, commente, saisit son temps |
+| **Manager / Chef d'équipe** | qui pilote une équipe ou des projets | comme le Salarié, et **crée, règle, archive** des projets |
+| **Stagiaire** | stagiaire, apprenti | comme le Salarié |
+| **Invité externe** | client, freelance | voit et fait avancer les projets et les tâches, rien d'autre |
+| Commercial, Comptable, Responsable RH, Magasinier, Analyste | selon le métier | travaillent sur les tâches, sans régler les projets |
+
+Créer, archiver ou régler un projet : Propriétaire, Administrateur, Directeur financier et Manager /
+Chef d'équipe. Le **Lecteur** voit les projets mais ne peut ni cocher une tâche ni en être
+responsable. Les rôles Conseiller, Chef de projet (plans financiers) et Expert-comptable externe
+n'ont pas accès aux projets.
+
+**Ajuster une personne** : dans **Organisation › Membres**, « Voir les autorisations » sur sa ligne ;
+cochez ou décochez une autorisation, puis cliquez sur **Enregistrer les autorisations** (rien n'est
+appliqué avant). À l'invitation, « Personnaliser les autorisations » fait la même chose.
+
+> L'Invité externe ne voit **que les projets où il est ajouté** (personnellement ou par une équipe),
+> quelle que soit leur visibilité. Ajoutez-le au projet après avoir accepté son invitation.
 
 ## 2. Créer un projet
 
@@ -71,12 +89,32 @@ IA dans le quota du mois). Rien n'est créé tant que vous n'avez pas cliqué **
 Les sprints deviennent des **étiquettes « Sprint 1 », « Sprint 2 »…** : filtrez la Liste ou le
 Tableau par étiquette pour voir un sprint. Leurs dates et objectifs sont dans la description du projet.
 
-## 3. « Ajouter des membres » à un projet
+## 3. Membres d'un projet et visibilité (ADR-0060)
 
-Il n'y a pas de liste de membres par projet : **tous les membres de l'organisation qui ont accès aux
-projets voient tous les projets**. Une personne « rejoint » un projet quand on la nomme
-**responsable du projet** (Réglages du projet) ou qu'on lui **assigne une tâche**. Son avatar
-apparaît alors sur la ligne du projet, et le projet dans ses « Mes projets ».
+Dans un projet, le bouton **Partager** (en haut à droite) ouvre **Membres et accès** :
+
+- **Qui voit ce projet ?** — **Toute l'organisation** (par défaut : tous ceux qui ont accès aux
+  Projets) ou **Membres seulement** (projet **privé**, marqué d'un cadenas « Privé »). Un projet
+  privé n'est visible que de ses membres, de son responsable et de la direction (Propriétaire,
+  Administrateur) : pour les autres, il **n'existe pas** (ni dans les listes, ni dans la recherche,
+  ni dans Mes tâches, le calendrier, les notifications ou le brief du matin).
+- **Ajouter une personne** : un membre de l'organisation qui a accès aux Projets.
+- **Ajouter une équipe entière** (équipes créées dans **RH › Équipes**) : tous ses membres
+  accèdent au projet, **y compris ceux qui rejoindront l'équipe plus tard** ; quitter l'équipe, ou
+  retirer l'équipe du projet, retire l'accès.
+- Seuls les gestionnaires (Propriétaire, Administrateur, Directeur financier) modifient les membres
+  et la visibilité ; chacun voit qui a accès.
+
+Une personne apparaît aussi sur la ligne du projet quand elle en est **responsable** ou qu'on lui
+**assigne une tâche**. La visibilité se choisit aussi dans **Nouveau projet**.
+
+## 3 bis. Équipes (RH › Équipes)
+
+Une **équipe** regroupe des personnes qui travaillent ensemble, **au-delà des services** (ex. « Équipe
+chantier » : un poseur, un commercial, la responsable des achats). **RH › Équipes › Nouvelle
+équipe** : nom, description, responsable (il fait partie de l'équipe), puis **Ajouter un membre**.
+Les responsables RH et la direction gèrent les équipes ; ceux qui lisent les dossiers RH les
+consultent. La fiche dit à combien de projets l'équipe est ajoutée.
 
 ## 4. Créer, assigner et cocher une tâche
 
@@ -114,8 +152,30 @@ Dans le panneau d'une tâche, section **Temps passé** : **Jour**, **Durée** (p
 **Note** facultative, puis **Saisir**. Pas de jour futur. Le total s'affiche sur la tâche et dans
 l'onglet **Temps** de Mes tâches.
 
+## 8. Paramètres (Projets › Paramètres, ADR-0061)
+
+**Mes notifications** (chacun pour soi) : pour chaque événement — tâche assignée, mention,
+commentaire sur une tâche suivie, échéance proche, échéance dépassée, statut d'une de mes tâches
+changé, ajout à un projet, projet passé à risque — **Cloche** oui/non et **E-mail** oui/non. Par
+défaut : cloche partout ; e-mail pour l'assignation, la mention et l'échéance dépassée.
+**Résumé quotidien par e-mail** : vos tâches en retard, du jour et proches, à l'heure choisie
+(Kinshasa), une fois par jour, les jours ouvrés seulement si vous le cochez.
+
+**Comportement des projets** (gestionnaires) : qui peut créer un projet (la direction le peut
+toujours), visibilité et vue par défaut (Aperçu, Liste ou Tableau) des nouveaux projets, **jours
+ouvrés** (l'« échéance proche » compte des jours ouvrés : un vendredi, « 1 jour » atteint le lundi),
+délai d'échéance proche, **archivage automatique** des projets terminés après N jours (ou jamais),
+modification et suppression des commentaires des autres par les gestionnaires, affichage des
+numéros de tâche (#12).
+
+## 9. Couleur des cartes (post-it)
+
+Dans le panneau d'une tâche, ligne **Couleur** : 8 teintes pastel (jaune, abricot, rose, lilas,
+bleu, menthe, vert, gris) ou **Aucune**. La carte du **Tableau** prend la couleur (fond et liseré) ;
+la **Liste** montre une petite pastille. Les teintes restent lisibles en Lalanda, Lagune et Ébène.
+
 ## Bon à savoir
 
-- Les rappels « échéance proche » et « en retard » arrivent dans la cloche (en ligne, pas par
-  e-mail).
+- Les rappels « échéance proche » et « en retard » arrivent dans la cloche, et par e-mail si vous
+  l'avez choisi (« échéance dépassée » : e-mail activé par défaut).
 - Archiver un projet le retire des listes et de Mes tâches ; on le retrouve sous **Archivés**.

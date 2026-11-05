@@ -48,6 +48,16 @@ import {
 import type { NotificationInput, NotificationsPort } from './notifications.port.js';
 import { heldActions, knownKinds, rejectEmission, retentionDays } from './notifications.rules.js';
 
+/**
+ * Filtre de lecture d'un producteur (ADR-0060 § 5) : condition Mongo AJOUTÉE au
+ * filtre du destinataire, ou `null`. Ne doit jamais élargir la lecture.
+ */
+export type NotificationReadFilter = (
+  organizationId: string,
+  userId: string,
+  member: MemberPermissions,
+) => Promise<Record<string, unknown> | null>;
+
 /** Horloge injectable (tests). */
 export const NOTIFICATIONS_CLOCK = Symbol('NOTIFICATIONS_CLOCK');
 export type NotificationsClock = () => Date;
@@ -280,6 +290,19 @@ export class NotificationsService implements NotificationsPort {
    * l'organisation active, dont il détient encore l'action requise. `null` s'il
    * n'est pas (ou plus) membre : rien n'est visible.
    */
+  // ── ADR-0060 § 5 : filtres de lecture fournis par les producteurs ──────
+
+  private readonly readFilters: NotificationReadFilter[] = [];
+
+  /**
+   * Un module producteur ajoute un filtre de lecture (ex. `work` : notifications des
+   * projets privés que le destinataire ne voit plus). Le module de notifications ne
+   * connaît toujours aucun producteur : il applique les filtres enregistrés, rien de plus.
+   */
+  registerReadFilter(filter: NotificationReadFilter): void {
+    this.readFilters.push(filter);
+  }
+
   private async visibleFilter(
     organizationId: string,
     userId: string,
@@ -287,6 +310,11 @@ export class NotificationsService implements NotificationsPort {
     const member = await this.membershipOf(organizationId, userId);
     if (!member) return null;
     const held: Action[] = heldActions(member.role, member.context);
+    const extra: Record<string, unknown>[] = [];
+    for (const f of this.readFilters) {
+      const clause = await f(organizationId, userId, member);
+      if (clause && Object.keys(clause).length > 0) extra.push(clause);
+    }
     // `expiresAt` : le moniteur TTL de MongoDB passe toutes les 60 s environ ;
     // une ligne échue n'est plus servie, même avant sa suppression.
     return {
@@ -294,6 +322,7 @@ export class NotificationsService implements NotificationsPort {
       recipientUserId: userId,
       requiredAction: { $in: held },
       expiresAt: { $gt: this.clock() },
+      ...(extra.length > 0 ? { $and: extra } : {}),
     };
   }
 }

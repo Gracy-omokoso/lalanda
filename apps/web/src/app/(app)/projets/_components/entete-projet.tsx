@@ -3,11 +3,11 @@
 // En-tête d'un projet façon Asana (ADR-0039 § 8, ADR-0057) : pastille de
 // couleur, nom, statut de santé calculé par le serveur (En bonne voie / À
 // risque / En retard), pile d'avatars de l'équipe du projet et « Partager »
-// (gestion des membres, `members.invite`) ; une ligne de repères (client,
+// (membres du projet et visibilité, ADR-0060) ; une ligne de repères (client,
 // devis, responsable, dates) ; puis les onglets de `onglets-projet.ts`.
 
 import { Skeleton, StatusPill, TabsNav } from '@lalanda/ui';
-import { FolderKanban, UserPlus } from 'lucide-react';
+import { FolderKanban, Lock, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -82,7 +82,9 @@ export function EnteteProjet(): React.ReactElement {
   // Personnes du projet : responsable, puis responsables des tâches (pas toute l'organisation).
   const equipe = membresConnus(project, tasks);
   const teinte = teinteAvatar(project.id);
-  const partager = actions !== null && actions.includes('members.invite');
+  // ADR-0060 : « Partager » ouvre les membres du projet (personnes, équipes, visibilité).
+  // Tout lecteur du projet voit qui y a accès ; seul `work.manage` modifie.
+  const partager = actions !== null && actions.includes('work.read');
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
@@ -111,13 +113,22 @@ export function EnteteProjet(): React.ReactElement {
         {project.status !== 'active' ? (
           <StatusPill tone="draft">{STATUTS_PROJET[project.status]}</StatusPill>
         ) : null}
+        {project.visibility === 'private' ? (
+          <span
+            className="inline-flex items-center gap-1 text-xs text-[var(--foreground-muted)]"
+            title="Projet privé : visible de ses membres et de la direction"
+          >
+            <Lock aria-hidden="true" className="h-3.5 w-3.5" />
+            Privé
+          </span>
+        ) : null}
         <span className="ml-auto flex items-center gap-2">
           <PileAvatars membres={equipe} max={5} />
           {partager ? (
             <Link
-              href="/organisation/membres"
+              href={hrefProjet(project.id, 'membres')}
               className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-md)] bg-[var(--accent)] px-3 text-sm font-medium text-[var(--accent-foreground)] transition-opacity duration-[var(--motion-fast)] hover:opacity-90"
-              title="Inviter des membres et régler leurs rôles"
+              title="Membres du projet, équipes et visibilité"
             >
               <UserPlus aria-hidden="true" className="h-4 w-4" />
               Partager

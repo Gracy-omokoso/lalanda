@@ -22,6 +22,7 @@ import {
   addDays,
   dependencyConflicts,
   detectCycle,
+  dueSoonEnd,
   groupMyTasks,
   isBlocked,
   kinshasaDayOf,
@@ -40,6 +41,7 @@ import {
   type WorkTaskDetail,
   type WorkTaskView,
   type WorkAbsenceFindingView,
+  type WorkCardColor,
   type WorkTaskWriteResult,
   type WorkWarning,
 } from '@lalanda/shared/work';
@@ -92,6 +94,8 @@ import {
   type SalesContractsAgendaReader,
   type StockAgendaReader,
 } from './my-tasks.ports.js';
+import { projectIdFilter } from './work-access.js';
+import { WorkAccessService } from './work-access.service.js';
 import { WorkActivityService, type ActivityInput } from './work-activity.service.js';
 import { WORK_ABSENCES_SOURCE, type WorkAbsencesSource } from './work-absences.port.js';
 import { dropAttachmentObjects } from './work-attachments.storage.js';
@@ -143,6 +147,8 @@ export class WorkTasksService {
     @Inject(WorkActivityService) private readonly activity: WorkActivityService,
     @Inject(WorkNotifier) private readonly notifier: WorkNotifier,
     @Inject(ObjectStorageService) private readonly storage: ObjectStorageService,
+    // ADR-0060 § 5 : portée de l'appelant (projets privés).
+    @Inject(WorkAccessService) private readonly access: WorkAccessService,
     // ADR-0040 — C4 : relances CRM, facultatives (tests, module absent).
     @Optional() @Inject(CRM_AGENDA_SOURCE) crmAgenda: CrmAgendaReader | null = null,
     // ADR-0044 — P3 (§ 6.5) : approbations d'achat, facultatives (tests, module absent).
@@ -316,6 +322,7 @@ export class WorkTasksService {
       blocked: isBlocked({ blockedBy }, ctx.doneById),
       loggedMinutes: d.loggedMinutes ?? 0,
       estimateMinutes: d.estimateMinutes ?? null,
+      color: (d.color ?? null) as WorkCardColor | null,
       subtaskCount: sub?.total ?? 0,
       doneSubtaskCount: sub?.done ?? 0,
       revision: d.revision,
@@ -388,6 +395,9 @@ export class WorkTasksService {
       const archived = await this.projects.archivedIds(organizationId);
       if (archived.length > 0) and.push({ projectId: { $nin: archived } });
     }
+    // ADR-0060 § 5 : tâches des projets privés hors portée exclues (calendrier, recherche).
+    const visible = projectIdFilter(await this.access.scopeOf(organizationId, actor));
+    if (Object.keys(visible).length > 0) and.push(visible);
     if (query.assignee) {
       and.push({ assigneeUserId: query.assignee === 'me' ? actor.userId : query.assignee });
     }
@@ -460,6 +470,12 @@ export class WorkTasksService {
       done: false,
     };
     if (archived.length > 0) filter['projectId'] = { $nin: archived };
+    // ADR-0060 § 5 : une tâche assignée dans un projet devenu invisible (retiré de
+    // l'équipe, projet passé en privé) disparaît de « Mes tâches ».
+    const visible = projectIdFilter(await this.access.scopeOf(organizationId, actor));
+    if (Object.keys(visible).length > 0) {
+      filter['$and'] = [visible];
+    }
     // ADR-0041 § 9.4 (A3) : un retrait de `crm.read` masque les relances CRM.
     const crmVisible = actorCan(actor, 'crm.read');
     // ADR-0044 — P3 (§ 6.5) : approbations d'achat, pour les détenteurs EFFECTIFS de
@@ -549,8 +565,14 @@ export class WorkTasksService {
       ...salesContracts.items,
     ];
     const today = kinshasaDayOf(now);
-    const { dueSoonDays } = await this.settings.get(organizationId);
-    const groups = groupMyTasks(items, today, dueSoonDays);
+    const { dueSoonDays, workingDays } = await this.settings.get(organizationId);
+    // ADR-0061 § 3 : la fenêtre « échéance proche » compte des jours OUVRÉS ; convertie
+    // en jours calendaires pour le regroupement (vendredi + 1 jour ouvré → lundi).
+    const soonEnd = dueSoonEnd(today, dueSoonDays, workingDays);
+    const calendarSpan = Math.round(
+      (Date.parse(`${soonEnd}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000,
+    );
+    const groups = groupMyTasks(items, today, calendarSpan);
     return {
       asOf: today,
       ...groups,
@@ -566,7 +588,13 @@ export class WorkTasksService {
       ...(this.absenceSource === null
         ? {}
         : {
-            absenceFindings: await this.absenceFindingsOf(organizationId, actor, archived, today),
+            absenceFindings: await this.absenceFindingsOf(
+              organizationId,
+              actor,
+              archived,
+              today,
+              visible,
+            ),
           }),
     };
   }
@@ -581,6 +609,7 @@ export class WorkTasksService {
     actor: WorkActor,
     archived: readonly string[],
     today: string,
+    visible: Record<string, unknown>,
   ): Promise<WorkAbsenceFindingView[]> {
     const filter: Record<string, unknown> = {
       organizationId,
@@ -590,6 +619,8 @@ export class WorkTasksService {
       dueDate: { $ne: null, $gte: today, $lte: addDays(today, 366) },
     };
     if (archived.length > 0) filter['projectId'] = { $nin: [...archived] };
+    // ADR-0060 § 5 : mêmes projets visibles que « Mes tâches ».
+    if (Object.keys(visible).length > 0) filter['$and'] = [visible];
     const docs = await this.tasks
       .find(filter, LIGHT)
       .sort({ dueDate: 1, _id: 1 })
@@ -973,6 +1004,7 @@ export class WorkTasksService {
       blockedBy: [],
       loggedMinutes: 0,
       estimateMinutes: body.estimateMinutes ?? null,
+      color: body.color ?? null,
       source: null,
       billing: null,
       reminders: { dueSoonFor: null, overdueFor: null },
@@ -1051,6 +1083,7 @@ export class WorkTasksService {
     if (body.description !== undefined) assign('description', body.description);
     if (body.priority !== undefined) assign('priority', body.priority);
     if (body.estimateMinutes !== undefined) assign('estimateMinutes', body.estimateMinutes);
+    if (body.color !== undefined) assign('color', body.color);
     if (body.isMilestone !== undefined) assign('isMilestone', body.isMilestone);
     if (body.startDate !== undefined) assign('startDate', body.startDate);
     if (body.dueDate !== undefined) assign('dueDate', body.dueDate);
@@ -1226,6 +1259,19 @@ export class WorkTasksService {
       entries.push({ ...base, kind: nowDone ? 'task.completed' : 'task.reopened' });
     }
     await this.activity.record(organizationId, entries);
+    // ADR-0061 § 2 : « statut (colonne) d'une de mes tâches changé » — l'assigné, s'il
+    // n'est pas l'auteur du geste (préférences et visibilité appliquées par le notifier).
+    if (column.key !== current.columnKey && current.assigneeUserId) {
+      await this.notifier.taskEvent({
+        organizationId,
+        recipients: [current.assigneeUserId],
+        kind: 'work.task_status_changed',
+        projectId: current.projectId,
+        taskId,
+        title: `${await this.actorName(actor)} a déplacé #${current.number} ${current.title} vers « ${column.label} »`,
+        actorUserId: actor.userId,
+      });
+    }
     const suggestions =
       nowDone && !current.done && current.isMilestone
         ? await this.onMilestoneDone(organizationId, project, current, actor)

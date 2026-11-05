@@ -32,9 +32,14 @@ import {
   WORK_PROJECT_EDITABLE_STATUSES,
   WORK_PROJECT_KINDS,
   WORK_PROJECT_STATUSES,
+  WORK_PROJECT_VISIBILITIES,
   WORK_RATE_CURRENCIES,
 } from './constants.js';
 import { isCalendarDay } from './scheduling.js';
+// ADR-0061 § 3 : comportement des projets (champs facultatifs des réglages).
+import { workBehaviorFields } from './behavior.js';
+// ADR-0061 § 4 : couleur de carte (post-it).
+import { WORK_CARD_COLORS } from './card-colors.js';
 
 type RawIssue = z.core.$ZodRawIssue;
 type Ctx = z.RefinementCtx;
@@ -261,6 +266,7 @@ export const PutWorkSettingsBody = z
       .int()
       .min(WORK_LIMITS.dueSoonDaysMin)
       .max(WORK_LIMITS.dueSoonDaysMax),
+    ...workBehaviorFields,
   })
   .strict();
 export type PutWorkSettingsBody = z.output<typeof PutWorkSettingsBody>;
@@ -283,6 +289,10 @@ const projectFields = {
   startDate: WorkDay.nullable().optional(),
   dueDate: WorkDay.nullable().optional(),
   links: WorkProjectLinksSchema.optional(),
+  // ADR-0060 § 3 : absente à la création, la visibilité par défaut des réglages.
+  visibility: z
+    .enum(WORK_PROJECT_VISIBILITIES, fr('Visibilité : organization ou private.'))
+    .optional(),
 };
 
 /** `POST /work/projects`. Colonnes absentes : celles des réglages. */
@@ -310,6 +320,7 @@ export const UpdateWorkProjectBody = z
     dueDate: projectFields.dueDate,
     links: projectFields.links,
     columns: WorkColumnsSchema.optional(),
+    visibility: projectFields.visibility,
   })
   .strict()
   .superRefine(checkDates);
@@ -387,6 +398,8 @@ const taskFields = {
     .max(WORK_LIMITS.estimateMinutesMax)
     .nullable()
     .optional(),
+  // ADR-0061 § 4 : `null` retire la couleur.
+  color: z.enum(WORK_CARD_COLORS, fr('Couleur hors de la palette.')).nullable().optional(),
 };
 
 /** Jalon : pas de date de début (durée nulle) ; échéance exigée à la création. */
@@ -442,6 +455,7 @@ export const PatchWorkTaskBody = z
     dueDate: taskFields.dueDate,
     isMilestone: taskFields.isMilestone,
     estimateMinutes: taskFields.estimateMinutes,
+    color: taskFields.color,
   })
   .strict()
   .superRefine((v, ctx) => {

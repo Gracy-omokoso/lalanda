@@ -31,6 +31,9 @@ import type {
   WorkSuggestionCode,
   WorkWarningCode,
 } from './constants.js';
+// ADR-0061 § 3 : comportement des projets.
+import type { WorkBehaviorSettings } from './behavior.js';
+import type { WorkCardColor } from './card-colors.js';
 
 /** Avertissement non bloquant rendu avec une écriture réussie. */
 export interface WorkWarning {
@@ -59,7 +62,7 @@ export interface WorkMemberRef {
 
 // ── Réglages ────────────────────────────────────────────────────────────────
 
-export interface WorkSettingsView {
+export interface WorkSettingsView extends WorkBehaviorSettings {
   labels: WorkLabel[];
   defaultColumns: WorkColumn[];
   dueSoonDays: number;
@@ -184,6 +187,8 @@ export interface WorkTaskView {
   doneSubtaskCount: number;
   revision: number;
   updatedAt: string;
+  /** ADR-0061 § 4 : couleur de carte (post-it) ; `null` ou absent : aucune. */
+  color?: WorkCardColor | null;
   /**
    * ADR-0045 — H5 (§ 6.2) : absence APPROUVÉE de l'assigné en cours aujourd'hui
    * (badge « Absent du … au … »). Jamais le type ni le motif. Absent du contrat

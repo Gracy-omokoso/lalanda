@@ -44,6 +44,7 @@ import { WorkActivityService } from './work-activity.service.js';
 import { dropAttachmentObjects } from './work-attachments.storage.js';
 import { WorkMembersService } from './work-members.service.js';
 import { WorkNotifier } from './work-notifier.js';
+import { WorkSettingsService } from './work-settings.service.js';
 import { WorkTasksService } from './work-tasks.service.js';
 import {
   WorkAttachment,
@@ -85,7 +86,17 @@ export class WorkCommentsService {
     @Inject(WorkActivityService) private readonly activity: WorkActivityService,
     @Inject(WorkNotifier) private readonly notifier: WorkNotifier,
     @Inject(ObjectStorageService) private readonly storage: ObjectStorageService,
+    @Inject(WorkSettingsService) private readonly settings: WorkSettingsService,
   ) {}
+
+  /**
+   * ADR-0061 § 3 : un gestionnaire (`work.manage`) modère-t-il les commentaires des
+   * autres ? Réglage `managersModerateComments` (défaut : oui).
+   */
+  private async moderates(organizationId: string, actor: WorkActor): Promise<boolean> {
+    if (!actorCan(actor, 'work.manage')) return false;
+    return (await this.settings.get(organizationId)).managersModerateComments;
+  }
 
   private async requireOwn(organizationId: string, commentId: string): Promise<WorkCommentLean> {
     if (!isWorkId(commentId)) commentNotFound();
@@ -285,8 +296,11 @@ export class WorkCommentsService {
     actor: WorkActor,
   ): Promise<WorkCommentView> {
     const current = await this.requireOwn(organizationId, commentId);
-    if (current.authorUserId !== actor.userId) {
-      forbidden('WORK_COMMENT_NOT_AUTHOR', 'Seul l’auteur modifie son commentaire.');
+    if (current.authorUserId !== actor.userId && !(await this.moderates(organizationId, actor))) {
+      forbidden(
+        'WORK_COMMENT_NOT_AUTHOR',
+        'Seul l’auteur modifie son commentaire (les gestionnaires aussi, si les réglages le permettent).',
+      );
     }
     if (current.deletedAt) {
       conflict('WORK_COMMENT_DELETED', 'Ce commentaire est supprimé.');
@@ -337,10 +351,10 @@ export class WorkCommentsService {
 
   async remove(organizationId: string, commentId: string, actor: WorkActor): Promise<void> {
     const current = await this.requireOwn(organizationId, commentId);
-    if (current.authorUserId !== actor.userId && !actorCan(actor, 'work.manage')) {
+    if (current.authorUserId !== actor.userId && !(await this.moderates(organizationId, actor))) {
       forbidden(
         'WORK_COMMENT_NOT_AUTHOR',
-        'Seul l’auteur, ou un gestionnaire des projets, supprime un commentaire.',
+        'Seul l’auteur, ou un gestionnaire si les réglages le permettent, supprime un commentaire.',
       );
     }
     if (current.deletedAt) return;

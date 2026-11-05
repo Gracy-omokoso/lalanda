@@ -121,6 +121,19 @@ export function RefusForfait({ message }: { message: string }): React.ReactEleme
   );
 }
 
+export function RefusAcces({ message }: { message: string }): React.ReactElement {
+  return (
+    <EtatVide titre="Réservé à la direction et à la finance">
+      <p>{message}</p>
+      <p className="mt-2">
+        <Link href="/croissance/parcours" className="underline hover:text-[var(--accent)]">
+          Ouvrir le parcours
+        </Link>
+      </p>
+    </EtatVide>
+  );
+}
+
 export function Erreur({
   message,
   onRetry,

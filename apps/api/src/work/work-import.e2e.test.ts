@@ -186,6 +186,24 @@ e2eSuite('import d’un fichier de tâches (ADR-0062)', () => {
     );
   });
 
+  it('projet privé (ADR-0060) : hors des membres, 404 à l’aperçu comme à l’import', async () => {
+    const prive = await f.post('owner', '/work/projects', {
+      name: 'Projet privé import',
+      kind: 'internal',
+      visibility: 'private',
+    });
+    expect(prive.status, JSON.stringify(prive.body)).toBe(201);
+    const id = prive.body.id as string;
+    expect(
+      (await upload('analyst', `/work/import/preview?projectId=${id}`, fichier())).status,
+    ).toBe(404);
+    expect((await upload('analyst', `/work/projects/${id}/import`, fichier())).status).toBe(404);
+    // Le propriétaire (direction) importe normalement.
+    expect((await upload('owner', `/work/import/preview?projectId=${id}`, fichier())).status).toBe(
+      200,
+    );
+  });
+
   it('un responsable d’une autre organisation n’est jamais reconnu', async () => {
     const body = csv(['Tâche;Responsable', `A;wimport-ownerB-x@lalanda-test.local`]);
     const res = await upload('owner', '/work/import/preview', body);

@@ -14,12 +14,13 @@ import { CurrentOrgId } from '../auth/current-user.decorator.js';
 import { RequirePermission } from '../authz/authz.decorators.js';
 import { PermissionsGuard } from '../authz/permissions.guard.js';
 import { RequireFeature } from '../billing/feature.guard.js';
+import { WorkVisibilityGuard } from './work-visibility.guard.js';
 import { WorkIdPipe } from './work.common.js';
 import { WorkOverviewService } from './work-overview.service.js';
 
 @Controller('work/projects')
 @RequireFeature('run_work') // ADR-0053 — P4
-@UseGuards(AuthGuard, PermissionsGuard)
+@UseGuards(AuthGuard, PermissionsGuard, WorkVisibilityGuard)
 export class WorkOverviewController {
   constructor(@Inject(WorkOverviewService) private readonly overviews: WorkOverviewService) {}
 

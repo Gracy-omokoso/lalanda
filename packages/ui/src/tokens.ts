@@ -457,3 +457,57 @@ export const LABEL_TOKENS = {
   'lagune-dark': ETIQUETTES_SOMBRE,
   ebene: ETIQUETTES_SOMBRE,
 } as const satisfies Record<Combinaison, Record<TagColor, Etiquette>>;
+
+// ─── Couleurs des cartes, façon post-it (ADR-0061 § 4) ────────────────────────
+
+/**
+ * Palette FERMÉE des cartes de tâche : mêmes clés que `WORK_CARD_COLORS`
+ * (`@lalanda/shared/work`). Huit pastels CLAIRS en Lalanda et Lagune clairs ;
+ * versions désaturées SOMBRES en mode sombre et en Ébène. Variables
+ * `--card-<clé>-bg` (fond de la carte : le texte du thème, `foreground` et
+ * `foreground-muted`, y reste ≥ 4,5:1) et `--card-<clé>-dot` (liseré et pastille
+ * de la Liste : ≥ 3:1 sur la surface).
+ */
+export const CARD_COLORS = [
+  'yellow',
+  'orange',
+  'pink',
+  'purple',
+  'blue',
+  'teal',
+  'green',
+  'gray',
+] as const;
+export type CardColor = (typeof CARD_COLORS)[number];
+
+type Carte = { bg: string; dot: string };
+
+const CARTES_CLAIR = {
+  yellow: { bg: '#FFF4B8', dot: '#9A7400' },
+  orange: { bg: '#FFE3C7', dot: '#C25A12' },
+  pink: { bg: '#FCDDEB', dot: '#C83D86' },
+  purple: { bg: '#E9DFFA', dot: '#8150C2' },
+  blue: { bg: '#DCEBFD', dot: '#2F64D0' },
+  teal: { bg: '#D3F2EC', dot: '#1C8A82' },
+  green: { bg: '#DDF3D5', dot: '#2E8B45' },
+  gray: { bg: '#ECEBE6', dot: '#6B675C' },
+} as const satisfies Record<CardColor, Carte>;
+
+const CARTES_SOMBRE = {
+  yellow: { bg: '#3A341C', dot: '#D9B83A' },
+  orange: { bg: '#3D2A1C', dot: '#EE9A55' },
+  pink: { bg: '#3B2230', dot: '#E07AAE' },
+  purple: { bg: '#2F2840', dot: '#A584DD' },
+  blue: { bg: '#1F2E45', dot: '#6E9CEB' },
+  teal: { bg: '#183632', dot: '#43B8AC' },
+  green: { bg: '#1F3524', dot: '#5CC285' },
+  gray: { bg: '#2E3436', dot: '#9AA6AA' },
+} as const satisfies Record<CardColor, Carte>;
+
+export const CARD_TOKENS = {
+  'lalanda-light': CARTES_CLAIR,
+  'lalanda-dark': CARTES_SOMBRE,
+  'lagune-light': CARTES_CLAIR,
+  'lagune-dark': CARTES_SOMBRE,
+  ebene: CARTES_SOMBRE,
+} as const satisfies Record<Combinaison, Record<CardColor, Carte>>;

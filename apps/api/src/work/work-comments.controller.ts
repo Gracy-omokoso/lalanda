@@ -38,12 +38,13 @@ import { invalidRequest } from '../sales/sales.errors.js';
 import { WorkIdPipe, workActorOf } from './work.common.js';
 import { WorkCommentsService } from './work-comments.service.js';
 import { RequireFeature } from '../billing/feature.guard.js';
+import { WorkVisibilityGuard } from './work-visibility.guard.js';
 
 type User = { id: string };
 
 @Controller('work')
 @RequireFeature('run_work') // ADR-0053 — P4
-@UseGuards(AuthGuard, PermissionsGuard)
+@UseGuards(AuthGuard, PermissionsGuard, WorkVisibilityGuard)
 export class WorkCommentsController {
   constructor(@Inject(WorkCommentsService) private readonly comments: WorkCommentsService) {}
 

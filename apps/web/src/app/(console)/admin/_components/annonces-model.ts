@@ -53,6 +53,11 @@ export const LIBELLES_ROLES_ORG: Record<OrgRole, string> = {
   hr_manager: 'Responsable RH',
   storekeeper: 'Magasinier',
   external_accountant: 'Expert-comptable externe',
+  // ADR-0059 § 2.
+  employee: 'Salarié',
+  team_manager: 'Manager / Chef d’équipe',
+  intern: 'Stagiaire',
+  guest: 'Invité externe',
 };
 
 export const LIBELLES_ETATS_ABONNEMENT: Record<

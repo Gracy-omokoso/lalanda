@@ -212,6 +212,13 @@ export const NAV_APPS: readonly NavApp[] = [
         action: 'work.read',
       },
       { id: 'projets-tous', href: '/projets', label: 'Tous les projets', action: 'work.read' },
+      // ADR-0061 : mes notifications (chacun) et comportement des projets (`work.manage`).
+      {
+        id: 'projets-parametres',
+        href: '/projets/parametres',
+        label: 'Paramètres',
+        action: 'work.read',
+      },
     ],
   },
   // ADR-0045 § 8 — H6 : Ressources humaines, JUSTE APRÈS Projets (le travail,
@@ -286,6 +293,8 @@ export const NAV_APPS: readonly NavApp[] = [
         action: 'hr.read',
       },
       { id: 'rh-services', href: '/rh/services', label: 'Services', action: 'hr.read' },
+      // ADR-0060 : équipes (utilisateurs, au-delà des services), servies aux Projets.
+      { id: 'rh-equipes', href: '/rh/equipes', label: 'Équipes', action: 'hr.read' },
       {
         id: 'rh-organigramme',
         href: '/rh/organigramme',
@@ -769,6 +778,8 @@ export const RH_SOUS_OPTIONS_PREVUES = [
   'rh-evaluations',
   'rh-collaborateurs',
   'rh-services',
+  // ADR-0060
+  'rh-equipes',
   'rh-organigramme',
   'rh-echeances',
   'rh-rapports',

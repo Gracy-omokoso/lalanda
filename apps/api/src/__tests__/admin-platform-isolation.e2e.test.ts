@@ -2,7 +2,7 @@
 //
 // Critère 1 : un opérateur sans aucune appartenance ouvre la console ; sans rôle
 // plateforme, il reçoit 403 FORBIDDEN (jamais NO_ORGANIZATION).
-// Critère 2 : les 12 rôles d'organisation, Propriétaire compris, sans rôle plateforme,
+// Critère 2 : les rôles d'organisation, Propriétaire compris, sans rôle plateforme,
 // reçoivent 403 sur TOUTES les routes de la console, découvertes par introspection de
 // l'application montée — une route de console nouvelle est couverte d'office.
 // Critère 3 : les 6 rôles plateforme, sans appartenance, reçoivent 403 NO_ORGANIZATION ou
@@ -11,7 +11,7 @@
 // Critère 15 (volet P0) : chaque rôle plateforme, `platform_billing` compris, ouvre
 // `GET /admin/overview` ; `/me/platform-access` rend ses actions plateforme.
 //
-// Les appartenances des 12 rôles sont posées en base : cette suite mesure la garde des
+// Les appartenances de tous les rôles sont posées en base : cette suite mesure la garde des
 // routes plateforme, pas le parcours d'invitation (déjà prouvé par `rbac-matrix`), et le
 // Chef de projet n'est pas attribuable par invitation.
 
@@ -330,10 +330,10 @@ e2eSuite('ADR-0053 — P0 : console sans organisation, isolation dans les deux s
     expect(res.status, JSON.stringify(res.body)).toBe(400);
   });
 
-  it('critère 2 — les 12 rôles d’organisation, sans rôle plateforme : 403 sur toute la console', async () => {
+  it('critère 2 — les rôles d’organisation, sans rôle plateforme : 403 sur toute la console', async () => {
     const consoleGardee = routes.filter((r) => r.console && r.plateforme);
     expect(consoleGardee.length).toBeGreaterThan(15);
-    expect(ROLES_ORG).toHaveLength(12);
+    expect(ROLES_ORG).toHaveLength(16); // 12 + les 4 rôles d'ADR-0059
     const ecarts: string[] = [];
     for (const role of ROLES_ORG) {
       viderLimiteur();

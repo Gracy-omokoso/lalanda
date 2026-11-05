@@ -15,6 +15,8 @@
 // Rendue au membre lui-même, à son manager et aux lecteurs RH (`hr.read`) seulement
 // (§ 4 : les pointages ne se lisent pas au titre de `work.manage`).
 
+import { inScope, PRIVATE_PROJECT_LABEL } from '../work-access.js';
+import { WorkAccessService } from '../work-access.service.js';
 import { weeklyTimesheet } from '@lalanda/engine';
 import {
   addDays,
@@ -51,6 +53,7 @@ export class WorkTimesheetsService {
     @InjectModel(WorkTimeEntry.name) private readonly time: Model<WorkTimeEntryDocument>,
     @Inject(WorkMembersService) private readonly members: WorkMembersService,
     @Inject(WorkProjectsService) private readonly projects: WorkProjectsService,
+    @Inject(WorkAccessService) private readonly access: WorkAccessService,
     @Optional() @Inject(WORK_ABSENCES_SOURCE) absences: WorkAbsencesSource | null = null,
   ) {
     this.absences = absences ?? noWorkAbsences;
@@ -103,12 +106,13 @@ export class WorkTimesheetsService {
       week,
       { today, attendance },
     );
-    const [refs, names] = await Promise.all([
+    const [refs, names, scope] = await Promise.all([
       this.members.refs([userId]),
       this.projects.namesOf(
         organizationId,
         result.projects.map((p) => p.projectId),
       ),
+      this.access.scopeOf(organizationId, actor),
     ]);
     return {
       version: result.version,
@@ -116,7 +120,14 @@ export class WorkTimesheetsService {
       week: result.week,
       employeeLinked: context.employeeLinked,
       days: result.days,
-      projects: result.projects.map((p) => ({ ...p, projectName: names.get(p.projectId) ?? '' })),
+      // ADR-0060 § 5 : le temps de la personne reste compté, mais le nom d'un projet
+      // privé que le LECTEUR ne voit pas est masqué.
+      projects: result.projects.map((p) => ({
+        ...p,
+        projectName: inScope(scope, p.projectId)
+          ? (names.get(p.projectId) ?? '')
+          : PRIVATE_PROJECT_LABEL,
+      })),
       totalMinutes: result.totalMinutes,
       findings: result.findings,
     };

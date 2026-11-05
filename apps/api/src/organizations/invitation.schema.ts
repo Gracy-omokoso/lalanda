@@ -1,7 +1,13 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import type { HydratedDocument } from 'mongoose';
 
-import { ACTIONS, ORG_ROLES, type Action, type OrgRole } from '../authz/permissions.js';
+import {
+  ACTIONS,
+  DEFAULT_INVITATION_ROLE,
+  ORG_ROLES,
+  type Action,
+  type OrgRole,
+} from '../authz/permissions.js';
 
 /**
  * Invitation d'un email à rejoindre une organisation (brief §6, docs/12-ROLES-PERMISSIONS.md).
@@ -33,13 +39,19 @@ export class Invitation {
    * « indique rôle et projets ». S20a : l'un des 8 rôles de docs/12 (les projets
    * restent hors périmètre, faute d'assignations de projet).
    *
-   * Défaut `viewer` — moindre privilège (ADR-0012 §7) : inviter sans préciser de
-   * rôle ne doit jamais accorder de droit d'écriture.
+   * Défaut `employee` (Salarié, ADR-0059 § 4), qui remplace `viewer` : inviter sans
+   * préciser de rôle n'ouvre AUCUNE donnée financière (le Lecteur lisait ventes,
+   * trésorerie, achats et comptabilité) ; il ouvre le travail sur les tâches.
    *
    * Le rôle est figé à la CRÉATION et revalidé à l'ACCEPTATION : entre les deux,
    * l'inviteur a pu être rétrogradé. Voir `InvitationsService.acceptByToken`.
    */
-  @Prop({ type: String, required: true, enum: ORG_ROLES as unknown as string[], default: 'viewer' })
+  @Prop({
+    type: String,
+    required: true,
+    enum: ORG_ROLES as unknown as string[],
+    default: DEFAULT_INVITATION_ROLE,
+  })
   role!: OrgRole;
 
   /**

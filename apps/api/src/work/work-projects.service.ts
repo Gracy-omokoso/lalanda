@@ -27,7 +27,9 @@ import { beforeTimeCursor, decodeTimeCursor, encodeTimeCursor } from '../crm/tim
 import { escapeRegex, normalizeForSearch, searchKeyOf } from '../sales/search.js';
 import { ObjectStorageService } from '../storage/object-storage.service.js';
 import {
+  actorCan,
   conflict,
+  forbidden,
   invalid,
   invalidCursor,
   iso,
@@ -39,6 +41,8 @@ import {
   staleRevision,
   type WorkActor,
 } from './work.common.js';
+import { projectDocFilter } from './work-access.js';
+import { WorkAccessService } from './work-access.service.js';
 import { WorkActivityService } from './work-activity.service.js';
 import { dropAttachmentObjects } from './work-attachments.storage.js';
 import { WorkMembersService } from './work-members.service.js';
@@ -90,6 +94,7 @@ export class WorkProjectsService {
     @Inject(WorkActivityService) private readonly activity: WorkActivityService,
     @Inject(AuditService) private readonly audit: AuditService,
     @Inject(ObjectStorageService) private readonly storage: ObjectStorageService,
+    @Inject(WorkAccessService) private readonly access: WorkAccessService,
   ) {}
 
   // ── Lecture ──────────────────────────────────────────────────────────────
@@ -134,8 +139,12 @@ export class WorkProjectsService {
   async list(
     organizationId: string,
     query: ListWorkProjectsQuery,
+    actor: WorkActor,
   ): Promise<WorkPage<WorkProjectSummary>> {
     const and: Record<string, unknown>[] = [{ organizationId }];
+    // ADR-0060 § 5 : projets privés hors portée exclus côté serveur (liste et recherche `q`).
+    const visible = projectDocFilter(await this.access.scopeOf(organizationId, actor));
+    if (Object.keys(visible).length > 0) and.push(visible);
     and.push(query.status ? { status: query.status } : { status: { $ne: 'archived' } });
     if (query.kind) and.push({ kind: query.kind });
     if (query.customerId) and.push({ 'links.customerId': query.customerId });
@@ -284,7 +293,7 @@ export class WorkProjectsService {
       // ADR-0040 — C7 : origine devis ou opportunité.
       source: projectSourceViewOf(d.source),
       columns: d.columns.map((c) => ({ key: c.key, label: c.label, category: c.category })),
-      visibility: 'organization',
+      visibility: d.visibility ?? 'organization',
       archivedAt: iso(d.archivedAt),
       completedAt: iso(d.completedAt),
       revision: d.revision,
@@ -371,11 +380,28 @@ export class WorkProjectsService {
     }
   }
 
+  /**
+   * ADR-0061 § 3 : « qui peut créer un projet ». La route exige déjà `work.manage` ;
+   * le réglage RESTREINT aux rôles listés. La direction (`organization.manage`) crée
+   * toujours. Vaut aussi pour la création depuis un devis ou une opportunité.
+   */
+  async assertCanCreate(organizationId: string, actor: WorkActor): Promise<void> {
+    if (actorCan(actor, 'organization.manage')) return;
+    const roles = (await this.settings.get(organizationId)).projectCreatorRoles;
+    if (roles === null) return;
+    if (actor.role !== undefined && roles.includes(actor.role)) return;
+    forbidden(
+      'WORK_PROJECT_CREATION_RESTRICTED',
+      'Les réglages de l’organisation réservent la création de projets à d’autres rôles.',
+    );
+  }
+
   async create(
     organizationId: string,
     body: CreateWorkProjectBody,
     actor: WorkActor,
   ): Promise<WorkProjectView> {
+    await this.assertCanCreate(organizationId, actor);
     await this.assertLimit(organizationId);
     const ownerUserId = body.ownerUserId ?? null;
     if (ownerUserId) {
@@ -393,7 +419,11 @@ export class WorkProjectsService {
       quoteIds: body.links?.quoteIds ?? [],
     };
     await this.checkLinks(organizationId, links);
-    const columns = body.columns ?? (await this.settings.get(organizationId)).defaultColumns;
+    const settings = await this.settings.get(organizationId);
+    const columns = body.columns ?? settings.defaultColumns;
+    // ADR-0061 § 3 : visibilité par défaut des réglages ; ADR-0060 § 4 : un projet privé
+    // compte son créateur parmi ses membres (sinon il le perdrait de vue en le créant).
+    const visibility = body.visibility ?? settings.defaultVisibility;
     const created = await this.projects.create({
       organizationId,
       name: body.name,
@@ -406,7 +436,9 @@ export class WorkProjectsService {
       links,
       source: null,
       columns,
-      visibility: 'organization',
+      visibility,
+      memberUserIds: visibility === 'private' ? [actor.userId] : [],
+      memberTeamIds: [],
       taskSeq: 0,
       searchKey: searchKeyOf([body.name]),
       revision: 1,
@@ -483,6 +515,16 @@ export class WorkProjectsService {
     if (body.columns !== undefined) {
       await this.checkColumnChange(organizationId, projectId, current.columns, body.columns);
       assign('columns', body.columns);
+    }
+    if (
+      body.visibility !== undefined &&
+      body.visibility !== (current.visibility ?? 'organization')
+    ) {
+      assign('visibility', body.visibility);
+      // ADR-0060 § 4 : passer en privé garde l'auteur du geste parmi les membres.
+      if (body.visibility === 'private' && !(current.memberUserIds ?? []).includes(actor.userId)) {
+        set['memberUserIds'] = [...(current.memberUserIds ?? []), actor.userId];
+      }
     }
     let statusKind: 'project.completed' | null = null;
     if (body.status !== undefined && body.status !== current.status) {

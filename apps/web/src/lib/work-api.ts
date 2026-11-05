@@ -36,6 +36,12 @@ import type {
   WorkTaskDetail,
   WorkTaskView,
   WorkTaskWriteResult,
+  // ADR-0060 et ADR-0061 : membres, équipes, préférences de notification.
+  AddProjectMembersBody,
+  PutWorkNotificationPreferencesBody,
+  WorkNotificationPreferencesView,
+  WorkProjectMembersView,
+  WorkTeamRef,
 } from '@lalanda/shared/work';
 
 import { API_URL, jsonRequest, salesQuery } from './api';
@@ -296,5 +302,39 @@ export const workApi = {
   timeSummary: (projectId: string) =>
     jsonRequest<TimeSummaryView>(`/work/projects/${id(projectId)}/time-summary`, {
       method: 'GET',
+    }),
+
+  // ─── ADR-0060 : membres d'un projet et équipes ────────────────────────────
+  listTeams: () =>
+    jsonRequest<WorkItems<WorkTeamRef>>('/work/teams', { method: 'GET' }).then((r) => r.items),
+  getProjectMembers: (projectId: string) =>
+    jsonRequest<WorkProjectMembersView>(`/work/projects/${id(projectId)}/members`, {
+      method: 'GET',
+    }),
+  addProjectMembers: (projectId: string, body: AddProjectMembersBody) =>
+    jsonRequest<WorkProjectMembersView>(`/work/projects/${id(projectId)}/members`, {
+      method: 'POST',
+      body,
+    }),
+  removeProjectUser: (projectId: string, userId: string) =>
+    jsonRequest<WorkProjectMembersView>(
+      `/work/projects/${id(projectId)}/members/users/${id(userId)}`,
+      { method: 'DELETE' },
+    ),
+  removeProjectTeam: (projectId: string, teamId: string) =>
+    jsonRequest<WorkProjectMembersView>(
+      `/work/projects/${id(projectId)}/members/teams/${id(teamId)}`,
+      { method: 'DELETE' },
+    ),
+
+  // ─── ADR-0061 : mes notifications ─────────────────────────────────────────
+  getNotificationPreferences: () =>
+    jsonRequest<WorkNotificationPreferencesView>('/work/notification-preferences', {
+      method: 'GET',
+    }),
+  putNotificationPreferences: (body: PutWorkNotificationPreferencesBody) =>
+    jsonRequest<WorkNotificationPreferencesView>('/work/notification-preferences', {
+      method: 'PUT',
+      body,
     }),
 };

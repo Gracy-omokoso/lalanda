@@ -87,6 +87,8 @@ function NouveauProjet({ onAnnule }: { onAnnule: () => void }): React.ReactEleme
     }
   }, [ventes, crm]);
 
+  const [visibilite, setVisibilite] = useState<'' | 'organization' | 'private'>('');
+
   async function creer(e: React.FormEvent): Promise<void> {
     e.preventDefault();
     const p = preparerProjet(f);
@@ -98,7 +100,10 @@ function NouveauProjet({ onAnnule }: { onAnnule: () => void }): React.ReactEleme
     setErreur(null);
     setChamps({});
     try {
-      const projet = await workApi.createProject(p.corps);
+      // ADR-0060 : visibilité choisie ; sinon celle des réglages (ADR-0061).
+      const projet = await workApi.createProject(
+        visibilite === '' ? p.corps : { ...p.corps, visibility: visibilite },
+      );
       router.push(hrefProjet(projet.id));
     } catch (err) {
       setErreur(messageWork(err, 'Création impossible.'));
@@ -144,6 +149,19 @@ function NouveauProjet({ onAnnule }: { onAnnule: () => void }): React.ReactEleme
           ))}
         </div>
       </fieldset>
+      {/* ADR-0060 : qui voit le projet (défaut : réglage « visibilité par défaut »). */}
+      <Champ id="pj-visibilite" label="Visibilité">
+        <select
+          id="pj-visibilite"
+          value={visibilite}
+          onChange={(e) => setVisibilite(e.target.value as typeof visibilite)}
+          className={CHAMP}
+        >
+          <option value="">Par défaut (réglages des Projets)</option>
+          <option value="organization">Toute l’organisation</option>
+          <option value="private">Membres seulement (privé)</option>
+        </select>
+      </Champ>
       <Champ id="pj-resp" label="Responsable du projet" erreur={champs['ownerUserId']}>
         <select
           id="pj-resp"

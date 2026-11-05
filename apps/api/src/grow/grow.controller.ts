@@ -2,8 +2,8 @@
 //
 //   GET    /grow/profile          analytics.read   fiche GROW + projets sélectionnables
 //   GET    /grow/journey          analytics.read   étape suggérée, conditions, checklists
-//   GET    /grow/health           analytics.read   score de santé          (forfait : actualsEnabled)
-//   GET    /grow/indicators       analytics.read   indicateurs investisseurs (forfait : actualsEnabled)
+//   GET    /grow/health           analytics.read   score de santé          (forfait : actualsEnabled ; chiffres)
+//   GET    /grow/indicators       analytics.read   indicateurs investisseurs (forfait : actualsEnabled ; chiffres)
 //   PUT    /grow/profile          inputs.update    projet de référence, étape, articles récurrents
 //   PUT    /grow/checklist/:itemId inputs.update   point de checklist manuel
 //   PUT    /grow/declared-cash    actuals.import   solde de trésorerie déclaré
@@ -15,6 +15,11 @@
 // déclaré, soldes des comptes, autonomie) n'est lu ni rendu, sur les cinq lectures.
 // Sans `project.read`, aucun chiffre du réalisé (consommation, marges, croissance du
 // CA réalisé, autonomie) n'est rendu (amendement d'ADR-0032 du 1er nov. 2026).
+//
+// ADR-0059, décision n° 1 (tranchée le 5 nov. 2026) : santé et indicateurs sont
+// réservés à la direction et à la finance, c'est-à-dire à qui lit les ventes
+// (`sales.read`, rôle ou écart individuel), plus le Conseiller. Le profil et le
+// parcours restent ouverts à `analytics.read`.
 
 import {
   Body,
@@ -58,6 +63,21 @@ import { RequireFeature } from '../billing/feature.guard.js';
 
 /** Code du refus de forfait (ADR-0032 § 6). */
 export const GROW_PLAN_ERROR_CODE = 'PLAN_FEATURE_UNAVAILABLE' as const;
+
+/** Code du refus des chiffres de Croissance (ADR-0059, décision n° 1). */
+export const GROW_FIGURES_ERROR_CODE = 'GROW_FIGURES_RESTRICTED' as const;
+
+/** Santé et indicateurs : qui lit les ventes, et le Conseiller (ADR-0059, décision n° 1). */
+function assertCanReadGrowFigures(perms: CurrentOrgPermissionsValue | undefined): void {
+  if (perms !== undefined) {
+    if (perms.role === 'advisor' || can(perms.role, 'sales.read', perms.context)) return;
+  }
+  throw new ForbiddenException({
+    code: GROW_FIGURES_ERROR_CODE,
+    message:
+      'La santé de l’entreprise et les indicateurs sont réservés à la direction et à la finance. Votre parcours reste accessible.',
+  });
+}
 
 export interface GrowProfileResponse extends GrowProfileView {
   projects: { id: string; name: string; currency: string }[];
@@ -159,6 +179,7 @@ export class GrowController {
     @CurrentOrgId() orgId: string,
     @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
   ): Promise<GrowHealthResponse> {
+    assertCanReadGrowFigures(perms);
     await this.assertPlanAllowsGrow(orgId);
     const s = await this.reader.snapshot(orgId, new Date(), accessOf(perms));
     return { asOf: s.asOf, health: s.health, faits: s.indicators.faits };
@@ -170,6 +191,7 @@ export class GrowController {
     @CurrentOrgId() orgId: string,
     @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
   ): Promise<GrowIndicatorsResult> {
+    assertCanReadGrowFigures(perms);
     await this.assertPlanAllowsGrow(orgId);
     const s = await this.reader.snapshot(orgId, new Date(), accessOf(perms));
     // Noms des clients : seulement pour qui lit le fichier clients (`sales.read`).

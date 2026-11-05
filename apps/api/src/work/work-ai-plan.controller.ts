@@ -27,6 +27,7 @@ import { invalidRequest } from '../sales/sales.errors.js';
 import { UserThrottlerGuard } from '../security/user-throttler.guard.js';
 import { workActorOf } from './work.common.js';
 import { WorkAiPlanService } from './work-ai-plan.service.js';
+import { WorkVisibilityGuard } from './work-visibility.guard.js';
 
 type User = { id: string };
 
@@ -35,7 +36,8 @@ export const AI_PLANS_PER_HOUR = 20;
 
 @Controller('work')
 @RequireFeature('run_work') // ADR-0053 — P4
-@UseGuards(AuthGuard, PermissionsGuard)
+// ADR-0060 : un projet privé hors portée répond 404 (`projectId` du chemin ou de la requête).
+@UseGuards(AuthGuard, PermissionsGuard, WorkVisibilityGuard)
 export class WorkAiPlanController {
   constructor(@Inject(WorkAiPlanService) private readonly plans: WorkAiPlanService) {}
 

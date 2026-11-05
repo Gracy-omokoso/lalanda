@@ -932,7 +932,7 @@ function prng(seed: number): () => number {
 }
 
 describe('ADR-0041 § 9.5 — propriété : tout écart accepté est sûr', () => {
-  it('15 000 tirages à graine fixe', () => {
+  it('20 000 tirages à graine fixe', () => {
     const rand = prng(41_2026);
     const pick = <T>(xs: readonly T[]): T => xs[Math.floor(rand() * xs.length)] as T;
     const subset = <T>(xs: readonly T[], p: number): T[] => xs.filter(() => rand() < p);
@@ -955,8 +955,9 @@ describe('ADR-0041 § 9.5 — propriété : tout écart accepté est sûr', () =
     // ADR-0045 : 5 000 tirages — à 38 actions et 10 rôles, 3 000 tirages ne donnaient plus
     // que 75 acceptations. ADR-0046 : 10 000 tirages — à 46 actions et 11 rôles, 5 000
     // tirages ne donnaient plus que 60 acceptations. ADR-0049 : 15 000 tirages — à 51 actions
-    // et 12 rôles, 10 000 tirages ne donnaient plus que 95 acceptations.
-    for (let i = 0; i < 15000; i++) {
+    // et 12 rôles, 10 000 tirages ne donnaient plus que 95 acceptations. ADR-0059 : 20 000
+    // tirages — à 16 rôles, 15 000 tirages ne donnaient plus que 91 acceptations.
+    for (let i = 0; i < 20000; i++) {
       // Acteur souvent Propriétaire ou Directeur financier : sinon presque tout est escalade.
       const actorRole =
         rand() < 0.5 ? pick(['owner', 'finance_director'] as const) : pick(ORG_ROLES);
@@ -1057,5 +1058,5 @@ describe('ADR-0041 § 9.5 — propriété : tout écart accepté est sûr', () =
       'SELF_PERMISSIONS_FORBIDDEN',
       'SOD_CONFLICT',
     ]);
-  }, 90_000); // 15 000 tirages : marge sous charge (CI)
+  }, 120_000); // 20 000 tirages : marge sous charge (CI)
 });

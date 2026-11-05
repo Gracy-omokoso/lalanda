@@ -11,6 +11,8 @@
 // (`useProjet()`, `project-context.tsx`) fournit projet, tâches, réglages,
 // membres et l'ouverture du panneau de tâche.
 
+import { defaultViewSegment, type WorkDefaultView } from '@lalanda/shared/work';
+
 import type { OrgAction } from '@/lib/api';
 
 export interface OngletProjet {
@@ -52,11 +54,17 @@ export const ONGLET_DEFAUT = 'apercu';
  */
 export const ONGLET_TACHE = 'liste';
 
-/** Onglet cible de `/projets/<id>` selon la requête (pur, testé). */
-export function ongletDEntree(requete: Readonly<Record<string, unknown>>): string {
-  return typeof requete['tache'] === 'string' && requete['tache'] !== ''
-    ? ONGLET_TACHE
-    : ONGLET_DEFAUT;
+/**
+ * Onglet cible de `/projets/<id>` selon la requête (pur, testé). ADR-0061 § 3 : sans
+ * tâche demandée, la vue par défaut des réglages de l'organisation (Aperçu, Liste
+ * ou Tableau) ; à défaut, l'Aperçu.
+ */
+export function ongletDEntree(
+  requete: Readonly<Record<string, unknown>>,
+  vueParDefaut: WorkDefaultView | null = null,
+): string {
+  if (typeof requete['tache'] === 'string' && requete['tache'] !== '') return ONGLET_TACHE;
+  return vueParDefaut ? defaultViewSegment(vueParDefaut) : ONGLET_DEFAUT;
 }
 
 export function ongletsVisibles(

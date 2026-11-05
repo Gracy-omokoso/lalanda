@@ -23,11 +23,14 @@
 // Propriétaire, seul à pouvoir l'attribuer (`roleOptions`) ; il lit et exporte la
 // comptabilité, rien d'autre. En fin de liste, sans être le moindre privilège.
 //
+// ADR-0059 : le Salarié (`employee`) est le rôle proposé par défaut (`roleParDefaut`) ;
+// Manager / Chef d'équipe, Stagiaire et Invité externe s'ajoutent au sélecteur.
+//
 // ADR-0041 — A5 : après le titre, « Personnaliser les autorisations » ouvre la
 // même grille que la fiche du membre, préremplie par la ligne du titre. Fermée,
 // elle dit en une phrase ce que le titre donne. L'invitation porte l'écart ;
-// interrupteur éteint, la grille est en lecture seule et l'invitation part avec
-// le titre seul.
+// interrupteur coupé (`false` explicite, ADR-0059), la grille est en lecture seule et
+// l'invitation part avec le titre seul.
 
 import { Modal, buttonClasses } from '@lalanda/ui';
 import { Plus } from 'lucide-react';
@@ -83,7 +86,7 @@ export function InvitePanel({
 }: InvitePanelProps): React.ReactElement {
   const defaut = roleParDefaut(roleOptions);
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<OrgRole>(defaut ?? 'viewer');
+  const [role, setRole] = useState<OrgRole>(defaut ?? 'employee');
   const [personnaliser, setPersonnaliser] = useState(false);
   const [selection, setSelection] = useState<Set<OrgAction> | null>(null);
   const [messageGrille, setMessageGrille] = useState<string | null>(null);
@@ -138,7 +141,7 @@ export function InvitePanel({
       setLienCree(`${lienBase}?token=${token}`);
       setEmail('');
       // Le rôle N'EST PAS réinitialisé : inviter une équipe se fait en rafale,
-      // et repartir de `viewer` à chaque envoi ferait rater le rôle voulu une
+      // et repartir du Salarié à chaque envoi ferait rater le rôle voulu une
       // fois sur deux. L'adresse, elle, doit changer à chaque fois.
       await onChanged();
     } catch (err) {

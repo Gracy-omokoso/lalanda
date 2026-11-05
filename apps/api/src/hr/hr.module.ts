@@ -105,6 +105,8 @@ import {
 } from './planning/planning.schemas.js';
 // ADR-0051 — H15 : objectifs individuels et évaluations (module autonome).
 import { HrPerformanceModule } from './performance/hr-performance.module.js';
+// ADR-0060 : équipes (membres = utilisateurs), servies aux Projets.
+import { HrTeamsModule } from './teams/hr-teams.module.js';
 
 @Module({
   imports: [
@@ -116,6 +118,8 @@ import { HrPerformanceModule } from './performance/hr-performance.module.js';
     TreasuryModule,
     // ADR-0051 — H15
     HrPerformanceModule,
+    // ADR-0060
+    HrTeamsModule,
     MongooseModule.forFeature([
       // ADR-0045 — H2 : réglages, services, fiches, données sensibles ; adhésions
       // (lien membre, destinataires de l'alerte bancaire) ; journal (débit de `reveal`).
