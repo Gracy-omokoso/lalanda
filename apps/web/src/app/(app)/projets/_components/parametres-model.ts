@@ -76,6 +76,8 @@ export const ROLES_CREATEURS = [
   { role: 'owner', label: 'Propriétaire', direction: true },
   { role: 'admin', label: 'Administrateur', direction: true },
   { role: 'finance_director', label: 'Directeur financier', direction: false },
+  // ADR-0059 : le Manager / Chef d'équipe gère aussi les projets.
+  { role: 'team_manager', label: 'Manager / Chef d’équipe', direction: false },
 ] as const;
 
 /** Bascule un jour ouvré ; refuse de retirer le dernier. */
