@@ -104,10 +104,10 @@ e2eSuite('invitations (brief §6, docs/12-ROLES-PERMISSIONS.md)', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.invitation.email).toBe(invitee.email.toLowerCase());
-    // S20a : le rôle par défaut d'une invitation passe de `member` à `viewer`.
-    // Changement VOULU (ADR-0012 §7) — moindre privilège : inviter sans préciser
-    // de rôle ne doit accorder aucun droit d'écriture.
-    expect(res.body.invitation.role).toBe('viewer');
+    // S20a : le rôle par défaut d'une invitation passait de `member` à `viewer` ;
+    // ADR-0059 § 4 : il devient `employee` (Salarié) — aucune donnée financière,
+    // seulement le travail sur les tâches et le libre-service RH.
+    expect(res.body.invitation.role).toBe('employee');
     expect(res.body.invitation.acceptedAt).toBeNull();
     expect(res.body.token).toMatch(/^[0-9a-f]{64}$/);
   }, 30_000);
@@ -186,8 +186,8 @@ e2eSuite('invitations (brief §6, docs/12-ROLES-PERMISSIONS.md)', () => {
       (o) => o.id === ownerOrgId,
     );
     expect(found).toBeDefined();
-    // Idem : l'invitation sans rôle explicite crée désormais un `viewer`.
-    expect(found?.role).toBe('viewer');
+    // Idem : l'invitation sans rôle explicite crée un `employee` (ADR-0059 § 4).
+    expect(found?.role).toBe('employee');
 
     // Pending vide (pour ce token) après acceptation.
     const after = await request(app.getHttpServer())
