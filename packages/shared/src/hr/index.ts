@@ -29,3 +29,6 @@ export * from './performance.js';
 
 // ADR-0051 — H14 (liens : « Mes tâches », frais refacturables)
 export * from './links.js';
+
+// ADR-0060 — équipes (membres = utilisateurs de l'organisation), servies aux Projets
+export * from './teams.js';
