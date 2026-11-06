@@ -14,6 +14,7 @@ import type { ReceiptView } from '@/lib/api';
 import type { CarteTableau } from '../../_components/dashboard-ui';
 import {
   compact,
+  moisCourt,
   moisLong,
   montantEntier,
   nombre,
@@ -45,7 +46,7 @@ export function cartesEncaissements(s: ReceiptStats): CarteTableau[] {
       valeur: montantEntier(s.thisMonth.amount, d),
       note:
         s.thisMonth.count === 0
-          ? `Rien de reçu en ${moisLong(s.to)}`
+          ? 'Rien de reçu ce mois'
           : pluriel(s.thisMonth.count, 'encaissement', 'encaissements'),
       ton: 'normal',
       serie,
@@ -56,7 +57,7 @@ export function cartesEncaissements(s: ReceiptStats): CarteTableau[] {
       id: 'precedent',
       label: 'Vs mois précédent',
       valeur: s.changePercent === null ? '—' : variation(s.changePercent),
-      note: `${montantEntier(s.previousMonth.amount, d)} en ${moisLong(s.previousMonth.month)}`,
+      note: `${montantEntier(s.previousMonth.amount, d)} en ${moisCourt(s.previousMonth.month)}`,
       ton: 'normal',
       serie: s.months.map((m) => m.count),
       couleur: 2,

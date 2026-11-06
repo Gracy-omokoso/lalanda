@@ -60,7 +60,7 @@ describe('cartes du tableau des encaissements', () => {
     expect(mois!.valeur).toBe(`110${NB}000${NB}CDF`);
     expect(mois!.note).toBe('11 encaissements');
     expect(precedent!.valeur).toBe(`+10${NB}%`);
-    expect(precedent!.note).toBe(`100${NB}000${NB}CDF en octobre 2026`);
+    expect(precedent!.note).toBe(`100${NB}000${NB}CDF en oct.`);
     expect(delai!.valeur).toBe(`14${NB}j`);
     expect(restant!).toMatchObject({ valeur: `166${NB}000${NB}CDF`, ton: 'alerte' });
     expect(restant!.note).toBe(`dont 116${NB}000${NB}CDF en retard`);

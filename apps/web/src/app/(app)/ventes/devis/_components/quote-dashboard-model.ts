@@ -69,7 +69,7 @@ export function cartesDevis(s: QuoteStats): CarteTableau[] {
       valeur: c.ratePercent === null ? '—' : `${c.ratePercent}${INSECABLE}%`,
       note:
         c.sent === 0
-          ? `Aucun devis envoyé sur ${c.windowDays} jours`
+          ? `Rien d’envoyé sur ${c.windowDays}${INSECABLE}j`
           : `${pluriel(c.accepted, 'accepté', 'acceptés')} sur ${pluriel(c.sent, 'envoyé', 'envoyés')}`,
       ton: 'normal',
       serie: s.months.map((m) => m.accepted),
@@ -82,7 +82,7 @@ export function cartesDevis(s: QuoteStats): CarteTableau[] {
       valeur: montantEntier(s.acceptedThisMonth.amount, d),
       note: avecAutres(
         s.acceptedThisMonth.count === 0
-          ? `Rien d’accepté en ${moisLong(s.to)}`
+          ? 'Aucun devis accepté'
           : pluriel(s.acceptedThisMonth.count, 'devis accepté', 'devis acceptés'),
         s.acceptedThisMonth.notConvertible,
       ),

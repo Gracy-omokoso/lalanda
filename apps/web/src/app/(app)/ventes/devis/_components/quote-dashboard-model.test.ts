@@ -82,7 +82,7 @@ describe('cartes du tableau des devis', () => {
     });
     const [, taux, , expirent] = cartesDevis(s);
     expect(taux!.valeur).toBe('—');
-    expect(taux!.note).toBe('Aucun devis envoyé sur 90 jours');
+    expect(taux!.note).toBe(`Rien d’envoyé sur 90${NB}j`);
     expect(expirent!).toMatchObject({ note: 'Aucun devis à relancer', ton: 'normal' });
   });
 

@@ -312,10 +312,7 @@ function TableauDevis({ items, gerer, asOf }: LignesProps): React.ReactElement {
             Numéro
           </th>
           <th scope="col" className="px-2 py-[7px] font-medium">
-            Client
-          </th>
-          <th scope="col" className="hidden px-2 py-[7px] font-medium xl:table-cell">
-            Objet
+            Client et objet
           </th>
           <th scope="col" className="px-2 py-[7px] font-medium">
             Valable jusqu’au
@@ -350,9 +347,11 @@ function TableauDevis({ items, gerer, asOf }: LignesProps): React.ReactElement {
                   <span className="text-[11px] text-[var(--foreground-muted)]">v{d.version}</span>
                 </span>
               </td>
-              <td className="truncate px-2 font-medium">{d.customerName ?? 'Client sans fiche'}</td>
-              <td className="hidden truncate px-2 text-[var(--foreground-muted)] xl:table-cell">
-                {d.title ?? '—'}
+              <td className="truncate px-2">
+                <span className="font-medium">{d.customerName ?? 'Client sans fiche'}</span>
+                {d.title ? (
+                  <span className="text-[var(--foreground-muted)]"> · {d.title}</span>
+                ) : null}
               </td>
               <td className="px-2 text-[var(--foreground-muted)]">{formatJour(d.validUntil)}</td>
               <td className="truncate px-2 text-right font-mono tabular-nums">{montant(d)}</td>

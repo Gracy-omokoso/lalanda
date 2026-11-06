@@ -87,7 +87,7 @@ export function QuoteDashboard({
               fullLabels={stats.months.map((m) => moisLong(m.month))}
               series={series}
               formatValue={(v) => `${v.toLocaleString('fr-FR')} devis`}
-              formatTick={(v) => v.toLocaleString('fr-FR')}
+              formatTick={(v) => (Number.isInteger(v) ? v.toLocaleString('fr-FR') : '')}
               endLabelSeriesId="acceptes"
               height={164}
             />

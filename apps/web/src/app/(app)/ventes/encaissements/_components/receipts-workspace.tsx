@@ -263,7 +263,7 @@ export function ReceiptsWorkspace(): React.ReactElement {
                 {ouvertes.map((v) => (
                   <li
                     key={v.invoiceId}
-                    className="flex flex-col gap-2 px-3 py-2.5 transition-colors duration-[var(--motion-fast)] hover:bg-[var(--surface-muted)] sm:px-4 md:grid md:grid-cols-[150px_minmax(0,1fr)_110px_minmax(150px,auto)_auto] md:items-center md:gap-3"
+                    className="flex flex-col gap-2 px-3 py-2.5 transition-colors duration-[var(--motion-fast)] hover:bg-[var(--surface-muted)] sm:px-4 md:grid md:grid-cols-[130px_minmax(0,1fr)_160px_minmax(150px,auto)_auto] md:items-center md:gap-3"
                   >
                     <span className="flex items-center justify-between gap-2 md:contents">
                       <span className="truncate font-mono text-xs">{v.number ?? '—'}</span>
