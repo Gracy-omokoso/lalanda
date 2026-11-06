@@ -38,6 +38,7 @@ import { HrExpenseAgendaReader } from '../agenda/hr-expense-agenda.reader.js';
 import type { EmployeeLean } from '../employees/employee.schema.js';
 import { engineEmployeeOf } from '../scope/hr-scope.service.js';
 import { hrSettingsViewOf } from '../settings/hr-settings.service.js';
+import { usersLedBy } from '../teams/team-leads.js';
 
 /** Absences lues au plus pour un brief : un tableau de bord n'est pas un export. */
 export const MAX_BRIEF_ABSENCES = 2000;
@@ -96,6 +97,9 @@ export class HrBriefSource implements HrSource {
       },
     });
     const today = kinshasaDayOf(now);
+    // ADR-0066 § 1 : le responsable d'une équipe RH tient l'étape manager de ses membres.
+    const leadsTeam = (await usersLedBy(this.connection, organizationId, userId)).size > 0;
+    const validator = scope.isManager || leadsTeam;
 
     // Portée des absences : toute l'organisation (`hr.read`) ou l'équipe d'un manager.
     const scoped = scope.seesAll
@@ -105,7 +109,7 @@ export class HrBriefSource implements HrSource {
 
     const [absences, pending, deadlines] = await Promise.all([
       absencesVisible ? this.absencesOf(organizationId, scoped, today) : Promise.resolve(null),
-      scope.holdsLeaveApprove || scope.isManager
+      scope.holdsLeaveApprove || validator
         ? this.approvals
             .pendingFor(organizationId, userId, scope.holdsLeaveApprove)
             .then((p) => p.requests.length)
@@ -119,7 +123,7 @@ export class HrBriefSource implements HrSource {
       organizationId,
       userId,
       actions,
-      scope.isManager,
+      validator,
       today,
     );
     return {
