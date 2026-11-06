@@ -310,7 +310,7 @@ export class WorkNotifier {
   /**
    * ADR-0066 § 5 : remet les assignations d'un lot — par personne, UNE notification
    * (« 12 tâches vous ont été assignées dans le projet X ») sur chaque canal choisi
-   * (cloche, e-mail, Slack), et UN événement dans le canal Slack du projet. Une seule
+   * (cloche, e-mail, Slack, WhatsApp), et UN événement dans le canal Slack du projet. Une seule
    * tâche : la notification habituelle d'un geste unitaire. L'auteur n'est jamais
    * notifié de ses propres assignations (le canal du projet, lui, les voit).
    */
