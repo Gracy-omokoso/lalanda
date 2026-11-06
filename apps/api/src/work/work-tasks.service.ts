@@ -102,7 +102,7 @@ import { WorkActivityService, type ActivityInput } from './work-activity.service
 import { WORK_ABSENCES_SOURCE, type WorkAbsencesSource } from './work-absences.port.js';
 import { dropAttachmentObjects } from './work-attachments.storage.js';
 import { WorkMembersService } from './work-members.service.js';
-import { WorkNotifier } from './work-notifier.js';
+import { WorkNotifier, type WorkAssignmentBatch } from './work-notifier.js';
 import { WorkProjectMembersService } from './work-project-members.service.js';
 import { WorkProjectsService } from './work-projects.service.js';
 import { WorkSettingsService } from './work-settings.service.js';
@@ -992,6 +992,11 @@ export class WorkTasksService {
     projectId: string,
     body: CreateWorkTaskBody,
     actor: WorkActor,
+    /**
+     * ADR-0066 § 5 : création de masse (import, IA) — l'assignation est RETENUE dans ce
+     * lot au lieu d'être notifiée tout de suite (`WorkNotifier.flushAssignments`).
+     */
+    opts: { assignments?: WorkAssignmentBatch } = {},
   ): Promise<WorkTaskWriteResult> {
     const project = await this.projects.requireWritable(organizationId, projectId);
     const count = await this.tasks.countDocuments({ organizationId, projectId }).exec();
@@ -1103,7 +1108,9 @@ export class WorkTasksService {
     if (assigneeUserId && addMember) {
       await this.addAssigneeAsMember(organizationId, projectId, assigneeUserId, actor);
     }
-    if (assigneeUserId) {
+    if (assigneeUserId && opts.assignments) {
+      opts.assignments.add(assigneeUserId, { taskId: id, number, title: body.title });
+    } else if (assigneeUserId) {
       await this.notifyAssigned(
         organizationId,
         { id, projectId, number, title: body.title },

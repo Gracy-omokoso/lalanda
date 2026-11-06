@@ -45,6 +45,40 @@ export interface TaskNotification {
   dedupeKey?: string;
 }
 
+/** Tâche assignée, retenue par un lot (import, création par l'IA). */
+export interface BatchedAssignment {
+  taskId: string;
+  number: number;
+  title: string;
+}
+
+/**
+ * ADR-0066 § 5 (risque d'ADR-0062) : assignations d'un même geste de masse (import d'un
+ * fichier, projet construit avec l'IA), retenues PAR PERSONNE pendant l'écriture puis
+ * remises en une fois (`WorkNotifier.flushAssignments`) — et seulement si le plan entier
+ * a été écrit : une création compensée n'envoie rien. Les gestes unitaires ne passent
+ * jamais par ici.
+ */
+export class WorkAssignmentBatch {
+  private readonly byUser = new Map<string, BatchedAssignment[]>();
+
+  add(assigneeUserId: string, task: BatchedAssignment): void {
+    const list = this.byUser.get(assigneeUserId) ?? [];
+    list.push(task);
+    this.byUser.set(assigneeUserId, list);
+  }
+
+  /** Personnes et leurs tâches, dans l'ordre d'assignation. */
+  entries(): [string, readonly BatchedAssignment[]][] {
+    return [...this.byUser.entries()];
+  }
+}
+
+/** « 12 tâches vous ont été assignées dans le projet X » (pur, testé). */
+export function groupedAssignmentTitle(count: number, projectName: string): string {
+  return `${count} tâches vous ont été assignées dans le projet ${projectName}`;
+}
+
 /** Titre borné à 200 caractères (figé à l'émission). */
 export function boundedTitle(title: string): string {
   const max = NOTIFICATION_LIMITS.titleMax;
@@ -241,6 +275,62 @@ export class WorkNotifier {
     }
   }
 
+  /**
+   * ADR-0066 § 5 : remet les assignations d'un lot — par personne, UNE notification
+   * (« 12 tâches vous ont été assignées dans le projet X ») sur chaque canal choisi
+   * (cloche, e-mail, Slack), et UN événement dans le canal Slack du projet. Une seule
+   * tâche : la notification habituelle d'un geste unitaire. L'auteur n'est jamais
+   * notifié de ses propres assignations (le canal du projet, lui, les voit).
+   */
+  async flushAssignments(n: {
+    organizationId: string;
+    projectId: string;
+    projectName: string;
+    batch: WorkAssignmentBatch;
+    actorUserId: string;
+  }): Promise<void> {
+    const entries = n.batch.entries();
+    if (entries.length === 0) return;
+    const refs = await this.members.refs([n.actorUserId, ...entries.map(([u]) => u)]);
+    const nameOf = (id: string) => WorkMembersService.refOf(refs, id).name;
+    const actorName = nameOf(n.actorUserId);
+    for (const [assignee, tasks] of entries) {
+      const first = tasks[0]!;
+      const single = tasks.length === 1;
+      this.channelEvent({
+        organizationId: n.organizationId,
+        projectId: n.projectId,
+        eventLabel: single ? 'Tâche assignée' : 'Tâches assignées',
+        title: single
+          ? `#${first.number} ${first.title} — assignée par ${actorName}`
+          : `${tasks.length} tâches assignées à ${nameOf(assignee)} par ${actorName}`,
+        href: single ? taskHref(n.projectId, first.taskId) : `/projets/${n.projectId}/liste`,
+      });
+      if (assignee === n.actorUserId) continue;
+      if (single) {
+        await this.taskEvent({
+          organizationId: n.organizationId,
+          recipients: [assignee],
+          kind: 'work.task_assigned',
+          projectId: n.projectId,
+          taskId: first.taskId,
+          title: `${actorName} vous a assigné #${first.number} ${first.title}`,
+          actorUserId: n.actorUserId,
+        });
+      } else {
+        await this.projectEvent({
+          organizationId: n.organizationId,
+          recipients: [assignee],
+          kind: 'work.task_assigned',
+          projectId: n.projectId,
+          title: groupedAssignmentTitle(tasks.length, n.projectName),
+          actorUserId: n.actorUserId,
+          href: `/projets/${n.projectId}/liste`,
+        });
+      }
+    }
+  }
+
   /** ADR-0061 § 2 : événement de projet (ajouté au projet, projet à risque). */
   async projectEvent(n: ProjectNotification): Promise<void> {
     const recipients = await this.visibleRecipients(
@@ -262,7 +352,7 @@ export class WorkNotifier {
           projectId: n.projectId,
         },
         title: boundedTitle(n.title),
-        href: `/projets/${n.projectId}`,
+        href: n.href ?? `/projets/${n.projectId}`,
         actorUserId: n.actorUserId,
         ...(n.dedupeKey ? { dedupeKey: n.dedupeKey } : {}),
       })),
@@ -278,4 +368,6 @@ export interface ProjectNotification {
   title: string;
   actorUserId: string | null;
   dedupeKey?: string;
+  /** Lien relatif de l'application ; défaut : la page du projet. */
+  href?: string;
 }
