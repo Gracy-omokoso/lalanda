@@ -201,3 +201,8 @@ Décideurs :
   Slack des préférences, canal facultatif par projet (confirmation pour un projet privé), envoi non
   bloquant, Events API signée, interrupteur `/admin` + `SLACK_ENABLED`. Statut : **proposé**
   (5 nov. 2026).
+- [ADR-0067](ADR-0067-ecrans-devis-et-encaissements.md) — Écrans Devis et Encaissements sur le modèle
+  de Factures : cartes, courbes sur 12 mois, répartitions (statuts, moyens de paiement), onglets à
+  compteurs, tableau dense ; `GET /sales/quotes/stats` et `GET /sales/receipts/stats` calculés par le
+  moteur, devise de référence et taux figé sur la facture comme ADR-0056 (devis : autres devises à
+  part, jamais converties) ; tri des devis par validité. Statut : **proposé** (6 nov. 2026).

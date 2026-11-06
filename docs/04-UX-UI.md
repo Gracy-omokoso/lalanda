@@ -137,6 +137,15 @@ Décision : `docs/adr/ADR-0056-ecran-factures-et-tableau-de-bord.md`. Captures (
 - **Écran Factures** : en-tête compact (titre, Journal, Nouveau document) ; quatre cartes avec mini-courbe (facturé et encaissé sur 12 mois, reste à encaisser, retard) ; courbe facturé/encaissé, anneau par statut, meilleurs clients ; onglets de statut **avec compteurs**, recherche et type sur une barre ; **tableau dense** (`--row-h`, colonnes Numéro, Client, Type, Émise le, Montant TTC, Statut, Aperçu), ligne entière cliquable, étiquette de statut et de règlement (« En retard · 5 j »). Sur téléphone : cartes deux par deux sans mini-courbe, liste compacte à la place du tableau, aucun défilement horizontal à 375 px.
 - Tous les chiffres viennent de `GET /sales/invoices/stats` (docs/16) : l'écran n'additionne rien. Chargement : blocs à la place des cartes ; échec : phrase et « Réessayer », la liste reste utilisable ; organisation sans facture émise : cartes à zéro et une phrase à la place des graphiques.
 
+### Écrans Devis et Encaissements (ADR-0067)
+
+Décision : `docs/adr/ADR-0067-ecrans-devis-et-encaissements.md`. Captures (Lalanda clair et sombre, Lagune, Ébène, téléphone, état vide) : `docs/refonte-ui/v7/`.
+
+- **Même dessin que Factures** : en-tête compact propre (plus d'en-tête d'espace « Ventes »), quatre cartes (mini-courbe sur grand écran, deux par ligne sur téléphone), graphiques maison, onglets de statut avec compteurs du serveur, recherche, tableau dense avec `StatusPill`, liste compacte sur téléphone, squelette, bandeau d'échec, état vide avec l'action principale. Briques communes : `ventes/_components/dashboard-ui.tsx`.
+- **Devis** : cartes « Devis en cours » (montant et nombre), « Transformation, 90 j », « Accepté ce mois », « Expirent sous 7 jours » (ton orangé s'il y en a) ; un montant d'une autre devise s'écrit à côté (« + 3 190 USD »), jamais converti. Courbe émis/acceptés sur 12 mois, anneau par statut. Liste : onglets Tous, Brouillons, Envoyés, Acceptés, Refusés, Expirés ; tri « Plus récents » ou « Validité la plus proche » ; colonnes Numéro (version), Client et objet, Valable jusqu'au, Montant TTC, Statut (« Expire dans 3 j », « Accepté · facturé »), Aperçu ; « Afficher plus » conservé.
+- **Encaissements** : cartes « Encaissé ce mois », « Vs mois précédent » (variation et montant du mois précédent), « Délai moyen d'encaissement » (90 j), « Restant dû » (rouge s'il y a du retard) ; courbe de l'encaissé sur 12 mois, barres par moyen de paiement (Mobile Money, virement, espèces…). Puis factures à encaisser (échéance, « Encaisser » qui remplit et fait défiler jusqu'au formulaire), saisie d'un encaissement, liste (onglets Enregistrés, Annulés, Tous ; recherche par facture ou référence ; annulation motivée), pont vers le réalisé.
+- Tous les chiffres viennent de `GET /sales/quotes/stats` et `GET /sales/receipts/stats` (docs/16) : l'écran n'additionne et ne convertit rien.
+
 ### Intérieur d'un projet façon Asana (ADR-0057)
 
 Décision : `docs/adr/ADR-0057-interieur-projet-facon-asana.md`. Captures : `docs/refonte-ui/v4/`.
