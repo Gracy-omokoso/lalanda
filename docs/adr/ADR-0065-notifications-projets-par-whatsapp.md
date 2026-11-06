@@ -10,7 +10,7 @@ Décideur : Gracy Omokoso (dirigeante de Go freelance SARLU).
 > [ADR-0060](ADR-0060-equipes-membres-projet-visibilite.md) (visibilité),
 > [ADR-0061](ADR-0061-parametres-projets-notifications-couleurs.md) (préférences) et reprend le modèle
 > de [ADR-0064](ADR-0064-notifications-projets-par-slack.md) (Slack). **Aucune action ajoutée** à
-> `authz/permissions.ts`. Cible : v1.18.0.
+> `authz/permissions.ts`. Cible : v1.20.0.
 
 ## Contexte
 
