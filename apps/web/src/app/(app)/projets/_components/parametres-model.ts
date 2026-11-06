@@ -37,7 +37,7 @@ export const NUMERO_WHATSAPP_INITIAL = '+243 ';
 export type EtapeWhatsApp = 'indisponible' | 'saisie' | 'code' | 'verifie' | 'a-reprendre';
 
 export function etapeWhatsApp(v: WhatsAppView): EtapeWhatsApp {
-  if (!v.available && v.number?.status !== 'verified') return 'indisponible';
+  if (!v.available) return 'indisponible';
   const n = v.number;
   if (!n) return 'saisie';
   if (n.code) return 'code';

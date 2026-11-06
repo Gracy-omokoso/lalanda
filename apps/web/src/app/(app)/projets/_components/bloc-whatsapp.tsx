@@ -113,6 +113,9 @@ export function BlocWhatsApp({
       {etape === 'indisponible' ? (
         <p className="text-sm text-[var(--foreground-muted)]">
           {libelleIndisponibleWhatsApp(vue.unavailableReason)}
+          {n
+            ? ` Votre numéro ${n.phoneMasked} reste enregistré : les envois reprendront dès que WhatsApp sera de retour.`
+            : ''}
         </p>
       ) : null}
 
@@ -238,7 +241,7 @@ export function BlocWhatsApp({
         </div>
       ) : null}
 
-      {n && etape !== 'indisponible' && !changer ? (
+      {n && !changer ? (
         <div className="flex flex-wrap gap-2">
           {etape === 'verifie' ? (
             <button

@@ -106,6 +106,12 @@ describe('paramètres des Projets (ADR-0061)', () => {
     expect(colonneWhatsApp(indispo).visible).toBe(false);
     expect(libelleIndisponibleWhatsApp('not_configured')).toContain('pas encore disponible');
     expect(libelleIndisponibleWhatsApp('switched_off')).toContain('coupé');
+    expect(
+      etapeWhatsApp({
+        ...indispo,
+        number: { ...numero, status: 'verified' },
+      }),
+    ).toBe('indisponible');
     const code = {
       ...base,
       number: {
