@@ -573,14 +573,11 @@ e2eSuite('notifications des Projets par WhatsApp (ADR-0065)', () => {
     });
 
     it('statuts : jamais de recul (lu > remis > envoyé), autre numéro ignoré', async () => {
-      const log = await f
-        .db()
-        .collection('whatsapp_messages')
-        .findOne({
-          organizationId: f.orgId(),
-          template: 'lalanda_tache_assignee',
-          status: 'accepted',
-        });
+      const log = await f.db().collection('whatsapp_messages').findOne({
+        organizationId: f.orgId(),
+        template: 'lalanda_tache_assignee',
+        status: 'accepted',
+      });
       const id = String(log?.['wamid']);
       const st = (status: string) => ({
         id,
@@ -603,14 +600,11 @@ e2eSuite('notifications des Projets par WhatsApp (ADR-0065)', () => {
     });
 
     it('échec annoncé (131026) : numéro « à vérifier »', async () => {
-      const log = await f
-        .db()
-        .collection('whatsapp_messages')
-        .findOne({
-          organizationId: f.orgId(),
-          template: 'lalanda_tache_assignee',
-          status: 'accepted',
-        });
+      const log = await f.db().collection('whatsapp_messages').findOne({
+        organizationId: f.orgId(),
+        template: 'lalanda_tache_assignee',
+        status: 'accepted',
+      });
       const r = await webhook(
         change({
           statuses: [
