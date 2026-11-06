@@ -68,7 +68,12 @@ e2eSuite('import : notifications d’assignation regroupées — ADR-0066 § 5',
   it('montage : par défaut, l’assignation part par cloche, e-mail et Slack', async () => {
     const prefs = await f.get('analyst', '/work/notification-preferences');
     expect(prefs.status).toBe(200);
-    expect(prefs.body.events.task_assigned).toEqual({ bell: true, email: true, slack: true });
+    expect(prefs.body.events.task_assigned).toEqual({
+      bell: true,
+      email: true,
+      slack: true,
+      whatsapp: true,
+    });
     const p = await f.post('owner', '/work/projects', {
       name: 'Boutique Matonge',
       kind: 'internal',
