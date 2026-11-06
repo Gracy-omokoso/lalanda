@@ -207,3 +207,14 @@ Décideurs :
   jamais montré aux autres, quatrième colonne WhatsApp des préférences, modèles en liste fermée (fr),
   webhook signé (statuts, « STOP »), plafond mensuel par organisation, jeton refusé signalé dans
   `/admin`, interrupteur `/admin` + `WHATSAPP_ENABLED`. Statut : **proposé** (6 nov. 2026).
+- [ADR-0066](ADR-0066-suites-equipes-projets.md) — Suites des équipes et des Projets : le
+  responsable d'une équipe RH valide l'étape manager de son équipe (décision n° 4 d'ADR-0059), le
+  Stagiaire n'assigne qu'à lui-même (`SELF_ASSIGN_ONLY_ROLES`, décision n° 3), notifications d'un
+  import regroupées par personne et par canal, numéros de tâche dans la Chronologie et le
+  Calendrier, assigner dans un projet privé ajoute l'assigné aux membres (gestionnaire) ou est
+  refusé. Statut : **accepté** (6 nov. 2026).
+- [ADR-0067](ADR-0067-ecrans-devis-et-encaissements.md) — Écrans Devis et Encaissements sur le modèle
+  de Factures : cartes, courbes sur 12 mois, répartitions (statuts, moyens de paiement), onglets à
+  compteurs, tableau dense ; `GET /sales/quotes/stats` et `GET /sales/receipts/stats` calculés par le
+  moteur, devise de référence et taux figé sur la facture comme ADR-0056 (devis : autres devises à
+  part, jamais converties) ; tri des devis par validité. Statut : **proposé** (6 nov. 2026).

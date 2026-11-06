@@ -164,6 +164,8 @@ export const ListQuotesQuerySchema = z
       .refine(isObjectIdHex, 'Identifiant d’opportunité invalide.')
       .optional(),
     q: z.string().trim().min(1).max(100).optional(),
+    /** ADR-0067 : `recent` (création décroissante, défaut) ou `valid_until` (validité croissante). */
+    sort: z.enum(['recent', 'valid_until']).default('recent'),
     limit: z
       .string()
       .regex(/^\d{1,3}$/, 'Limite : un entier de 1 à 100.')

@@ -88,7 +88,10 @@ export function VueChronologie(): React.ReactElement {
     appliquerEcriture,
     signalerErreur,
     recharger,
+    settings,
   } = useProjet();
+  // ADR-0066 § 4 : le réglage « numéros de tâche » vaut aussi pour la Chronologie.
+  const numeros = settings?.showTaskNumbers !== false;
   const bureau = useBureau();
   const editable = travailler && bureau;
   const [echelle, setEchelle] = useState<Echelle>('jour');
@@ -145,7 +148,9 @@ export function VueChronologie(): React.ReactElement {
     const corps = corpsDates(t, dates);
     if (corps === null) return;
     setTasks((liste) => liste.map((x) => (x.id === t.id ? { ...x, ...dates } : x)));
-    setAnnonce(`#${t.number} : ${datesEnMots(dates.startDate, dates.dueDate)}.`);
+    setAnnonce(
+      `${numeros ? `#${t.number}` : `« ${t.title} »`} : ${datesEnMots(dates.startDate, dates.dueDate)}.`,
+    );
     workApi
       .patchTask(t.id, corps)
       .then(appliquerEcriture)
@@ -297,7 +302,7 @@ export function VueChronologie(): React.ReactElement {
                     type="button"
                     onClick={() => ouvrirTache(t.id)}
                     className={`flex min-w-0 flex-1 items-center gap-1 px-2 text-left text-xs ${r.depth === 1 ? 'pl-5' : ''}`}
-                    title={descriptionBarre(t, r)}
+                    title={descriptionBarre(t, r, numeros)}
                   >
                     {r.shape === 'milestone' ? (
                       <span aria-hidden="true" className="text-[var(--accent)]">
@@ -307,7 +312,10 @@ export function VueChronologie(): React.ReactElement {
                     <span
                       className={`truncate ${t.done ? 'text-[var(--foreground-muted)] line-through' : ''}`}
                     >
-                      <span className="text-[var(--foreground-muted)]">#{t.number}</span> {t.title}
+                      {numeros ? (
+                        <span className="text-[var(--foreground-muted)]">#{t.number} </span>
+                      ) : null}
+                      {t.title}
                     </span>
                     {r.conflict ? (
                       <span className="ml-auto shrink-0 font-medium text-[var(--danger)]">
@@ -505,7 +513,7 @@ export function VueChronologie(): React.ReactElement {
                     ? 'var(--border-strong)'
                     : 'var(--accent)';
                 const yBarre = b.yLigne + (HAUTEUR_LIGNE - HAUTEUR_BARRE) / 2;
-                const libelle = `${descriptionBarre(t, row)}${editable ? '. Flèches pour modifier les dates, Entrée pour valider ou ouvrir.' : '. Entrée pour ouvrir.'}`;
+                const libelle = `${descriptionBarre(t, row, numeros)}${editable ? '. Flèches pour modifier les dates, Entrée pour valider ou ouvrir.' : '. Entrée pour ouvrir.'}`;
                 return (
                   <g
                     key={b.taskId}
@@ -523,7 +531,7 @@ export function VueChronologie(): React.ReactElement {
                     className="outline-none focus-visible:[&>.focus]:opacity-100"
                     style={{ cursor: editable ? 'grab' : 'pointer' }}
                   >
-                    <title>{descriptionBarre(t, row)}</title>
+                    <title>{descriptionBarre(t, row, numeros)}</title>
                     {/* Anneau de focus visible (le `outline` ne s'applique pas au SVG partout). */}
                     <rect
                       className="focus opacity-0"
@@ -715,7 +723,10 @@ export function VueChronologie(): React.ReactElement {
                     onClick={() => ouvrirTache(taskId)}
                     className="text-left underline-offset-2 hover:underline"
                   >
-                    <span className="text-[var(--foreground-muted)]">#{t.number}</span> {t.title}
+                    {numeros ? (
+                      <span className="text-[var(--foreground-muted)]">#{t.number} </span>
+                    ) : null}
+                    {t.title}
                   </button>
                 </li>
               );

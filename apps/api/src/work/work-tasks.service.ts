@@ -64,6 +64,7 @@ import { ObjectStorageService } from '../storage/object-storage.service.js';
 import {
   actorCan,
   conflict,
+  forbidden,
   invalid,
   invalidCursor,
   iso,
@@ -95,13 +96,14 @@ import {
   type SalesContractsAgendaReader,
   type StockAgendaReader,
 } from './my-tasks.ports.js';
-import { projectIdFilter } from './work-access.js';
+import { isSelfAssignOnlyRole, projectIdFilter } from './work-access.js';
 import { WorkAccessService } from './work-access.service.js';
 import { WorkActivityService, type ActivityInput } from './work-activity.service.js';
 import { WORK_ABSENCES_SOURCE, type WorkAbsencesSource } from './work-absences.port.js';
 import { dropAttachmentObjects } from './work-attachments.storage.js';
 import { WorkMembersService } from './work-members.service.js';
-import { WorkNotifier } from './work-notifier.js';
+import { WorkNotifier, type WorkAssignmentBatch } from './work-notifier.js';
+import { WorkProjectMembersService } from './work-project-members.service.js';
 import { WorkProjectsService } from './work-projects.service.js';
 import { WorkSettingsService } from './work-settings.service.js';
 import {
@@ -133,6 +135,25 @@ interface ViewContext {
 /** ADR-0045 — H5 : constats d'absence lus au plus dans « Mes tâches » du créateur. */
 const ABSENCE_FINDINGS_MAX = 200;
 
+/**
+ * ADR-0066 § 2 : un rôle « assignation à soi seulement » (`isSelfAssignOnlyRole`, liste
+ * `SELF_ASSIGN_ONLY_ROLES`) n'assigne qu'à lui-même ou laisse sans responsable, et ne
+ * retire ni ne remplace le responsable d'une tâche qui n'est pas la sienne.
+ */
+export function assertSelfAssignment(
+  actor: WorkActor,
+  from: string | null,
+  to: string | null,
+): void {
+  if (!isSelfAssignOnlyRole(actor.role)) return;
+  if ((to !== null && to !== actor.userId) || (from !== null && from !== actor.userId)) {
+    forbidden(
+      'WORK_ASSIGN_SELF_ONLY',
+      'Votre rôle permet de vous assigner une tâche, ou de la laisser sans responsable, mais pas de l’assigner à quelqu’un d’autre ni de réassigner la tâche d’un collègue.',
+    );
+  }
+}
+
 @Injectable()
 export class WorkTasksService {
   private readonly logger = new Logger('WorkTasks');
@@ -150,6 +171,8 @@ export class WorkTasksService {
     @Inject(ObjectStorageService) private readonly storage: ObjectStorageService,
     // ADR-0060 § 5 : portée de l'appelant (projets privés).
     @Inject(WorkAccessService) private readonly access: WorkAccessService,
+    // ADR-0066 § 3 : l'assigné d'un projet qu'il ne voit pas en devient membre direct.
+    @Inject(WorkProjectMembersService) private readonly projectMembers: WorkProjectMembersService,
     // ADR-0040 — C4 : relances CRM, facultatives (tests, module absent).
     @Optional() @Inject(CRM_AGENDA_SOURCE) crmAgenda: CrmAgendaReader | null = null,
     // ADR-0044 — P3 (§ 6.5) : approbations d'achat, facultatives (tests, module absent).
@@ -920,6 +943,48 @@ export class WorkTasksService {
       : [];
   }
 
+  // ── Assigné et visibilité du projet (ADR-0066 § 3) ───────────────────────
+
+  /** Le membre `userId` voit-il ce projet (visibilité, rôle limité, équipes) ? */
+  async assigneeSees(organizationId: string, projectId: string, userId: string): Promise<boolean> {
+    const m = await this.members.permissionsOf(organizationId, userId);
+    if (m === undefined) return false;
+    return this.access.userSees(organizationId, userId, m.role, m.context, projectId);
+  }
+
+  /**
+   * Un responsable doit voir le projet de sa tâche. S'il ne le voit pas (projet privé
+   * dont il n'est pas membre, Invité externe hors du projet) : un gestionnaire
+   * (`work.manage`) l'AJOUTE comme membre direct (historique et notification « ajouté
+   * au projet ») ; sinon `400 WORK_ASSIGNEE_NOT_MEMBER`. Le refus est rendu AVANT toute
+   * écriture ; l'ajout suit l'écriture de la tâche (`addAssigneeAsMember`).
+   */
+  private async membershipNeeded(
+    organizationId: string,
+    projectId: string,
+    assigneeUserId: string,
+    actor: WorkActor,
+  ): Promise<boolean> {
+    if (await this.assigneeSees(organizationId, projectId, assigneeUserId)) return false;
+    if (!actorCan(actor, 'work.manage')) {
+      invalid(
+        'assigneeUserId',
+        'WORK_ASSIGNEE_NOT_MEMBER',
+        'Cette personne ne voit pas ce projet : demandez à un gestionnaire de l’ajouter aux membres du projet, puis assignez-lui la tâche.',
+      );
+    }
+    return true;
+  }
+
+  private async addAssigneeAsMember(
+    organizationId: string,
+    projectId: string,
+    assigneeUserId: string,
+    actor: WorkActor,
+  ): Promise<void> {
+    await this.projectMembers.add(organizationId, projectId, { userIds: [assigneeUserId] }, actor);
+  }
+
   // ── Création ─────────────────────────────────────────────────────────────
 
   async create(
@@ -927,6 +992,11 @@ export class WorkTasksService {
     projectId: string,
     body: CreateWorkTaskBody,
     actor: WorkActor,
+    /**
+     * ADR-0066 § 5 : création de masse (import, IA) — l'assignation est RETENUE dans ce
+     * lot au lieu d'être notifiée tout de suite (`WorkNotifier.flushAssignments`).
+     */
+    opts: { assignments?: WorkAssignmentBatch } = {},
   ): Promise<WorkTaskWriteResult> {
     const project = await this.projects.requireWritable(organizationId, projectId);
     const count = await this.tasks.countDocuments({ organizationId, projectId }).exec();
@@ -965,6 +1035,7 @@ export class WorkTasksService {
       ? this.columnOf(project, body.columnKey)
       : this.firstTodo(project);
     const assigneeUserId = body.assigneeUserId ?? null;
+    assertSelfAssignment(actor, null, assigneeUserId);
     if (assigneeUserId) {
       await this.members.requireEligible(
         organizationId,
@@ -974,6 +1045,9 @@ export class WorkTasksService {
         'assigneeUserId',
       );
     }
+    const addMember = assigneeUserId
+      ? await this.membershipNeeded(organizationId, projectId, assigneeUserId, actor)
+      : false;
     const followers = body.followerUserIds ?? [];
     await this.members.requireEligible(
       organizationId,
@@ -1031,7 +1105,12 @@ export class WorkTasksService {
       data: { number, title: body.title.slice(0, 300) },
     });
     await this.projects.touch(organizationId, projectId);
-    if (assigneeUserId) {
+    if (assigneeUserId && addMember) {
+      await this.addAssigneeAsMember(organizationId, projectId, assigneeUserId, actor);
+    }
+    if (assigneeUserId && opts.assignments) {
+      opts.assignments.add(assigneeUserId, { taskId: id, number, title: body.title });
+    } else if (assigneeUserId) {
       await this.notifyAssigned(
         organizationId,
         { id, projectId, number, title: body.title },
@@ -1113,6 +1192,10 @@ export class WorkTasksService {
     const assigneeChanged =
       body.assigneeUserId !== undefined &&
       (body.assigneeUserId ?? null) !== (current.assigneeUserId ?? null);
+    if (assigneeChanged) {
+      assertSelfAssignment(actor, current.assigneeUserId ?? null, body.assigneeUserId ?? null);
+    }
+    let addMember = false;
     if (assigneeChanged && body.assigneeUserId) {
       await this.members.requireEligible(
         organizationId,
@@ -1120,6 +1203,12 @@ export class WorkTasksService {
         'work.update',
         'WORK_ASSIGNEE_NOT_ELIGIBLE',
         'assigneeUserId',
+      );
+      addMember = await this.membershipNeeded(
+        organizationId,
+        current.projectId,
+        body.assigneeUserId,
+        actor,
       );
     }
     const update: Record<string, unknown> = { $set: set, $inc: { revision: 1 } };
@@ -1161,6 +1250,9 @@ export class WorkTasksService {
       });
     }
     await this.activity.record(organizationId, entries);
+    if (assigneeChanged && body.assigneeUserId && addMember) {
+      await this.addAssigneeAsMember(organizationId, current.projectId, body.assigneeUserId, actor);
+    }
     if (assigneeChanged && body.assigneeUserId) {
       await this.notifyAssigned(
         organizationId,

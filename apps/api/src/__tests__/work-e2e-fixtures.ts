@@ -26,7 +26,9 @@ import { dbOf, makeE2EApp, registerAndLogin } from './e2e-utils.js';
 import { E2E_HOOK_TIMEOUT_MS } from './e2e-timeouts.js';
 
 export const WORK_ROLES = ['owner', 'admin', 'accountant', 'analyst', 'advisor', 'viewer'] as const;
-export type WorkRole = (typeof WORK_ROLES)[number];
+/** Rôles invités à la demande d'une suite (ADR-0059, ADR-0066). */
+export const WORK_EXTRA_ROLES = ['intern', 'team_manager', 'employee', 'guest'] as const;
+export type WorkRole = (typeof WORK_ROLES)[number] | (typeof WORK_EXTRA_ROLES)[number];
 export type WorkAccount = WorkRole | 'ownerB';
 
 export interface WorkFixture {
@@ -50,7 +52,10 @@ export interface WorkFixture {
   issueCodes: (res: request.Response) => string[];
 }
 
-export function useWorkFixture(prefix: string): WorkFixture {
+export function useWorkFixture(
+  prefix: string,
+  opts: { extraRoles?: readonly (typeof WORK_EXTRA_ROLES)[number][] } = {},
+): WorkFixture {
   const tag = randomBytes(4).toString('hex');
   // Base propre à la suite (motif de `treasury.e2e`) : vaut aussi quand
   // `MONGODB_URI` ne vient que du `.env`, lu après le fichier de setup.
@@ -110,7 +115,11 @@ export function useWorkFixture(prefix: string): WorkFixture {
     cookies.owner = await registerAndLogin(app, account('owner'));
     const orgs = await request(server()).get('/organizations').set('Cookie', cookies.owner);
     orgId = (orgs.body.organizations as { id: string }[])[0]!.id;
-    for (const role of WORK_ROLES.filter((r) => r !== 'owner')) {
+    const invited: WorkRole[] = [
+      ...WORK_ROLES.filter((r) => r !== 'owner'),
+      ...(opts.extraRoles ?? []),
+    ];
+    for (const role of invited) {
       const inv = await request(server())
         .post(`/organizations/${orgId}/invitations`)
         .set('Cookie', cookies.owner)

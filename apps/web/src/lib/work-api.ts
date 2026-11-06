@@ -69,6 +69,18 @@ export interface WorkMemberOption extends WorkMemberRef {
   canUpdate: boolean;
   /** Détient `work.manage` : peut gérer les projets. */
   canManage: boolean;
+  /**
+   * ADR-0066 § 3 : voit le projet demandé (`GET /work/members?projectId=`) ; absent sans
+   * projet. Un responsable doit voir le projet de sa tâche.
+   */
+  seesProject?: boolean;
+}
+
+/** `GET /work/members?projectId=` : membres et règle d'assignation de l'appelant. */
+export interface WorkMembersForProject {
+  items: WorkMemberOption[];
+  /** ADR-0066 § 2 : l'appelant n'assigne qu'à lui-même (Stagiaire). */
+  assignSelfOnly: boolean;
 }
 
 /** Nombre de pages lues au plus pour reconstituer une liste complète. */
@@ -165,6 +177,16 @@ export const workApi = {
     jsonRequest<WorkItems<WorkMemberOption>>('/work/members', { method: 'GET' }).then(
       (r) => r.items,
     ),
+  /** ADR-0066 : membres avec `seesProject` pour ce projet, et `assignSelfOnly` de l'appelant. */
+  listMembersForProject: (projectId: string) =>
+    jsonRequest<Partial<WorkMembersForProject>>(
+      `/work/members?projectId=${encodeURIComponent(projectId)}`,
+      { method: 'GET' },
+    ).then((r): WorkMembersForProject => ({
+      items: r.items ?? [],
+      // Instance N-1 : champ absent → règle habituelle.
+      assignSelfOnly: r.assignSelfOnly === true,
+    })),
 
   // ─── Projets ──────────────────────────────────────────────────────────────
   listProjects: (query: ListWorkProjectsParams = {}) =>

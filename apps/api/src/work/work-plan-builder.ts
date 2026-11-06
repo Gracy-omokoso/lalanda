@@ -10,7 +10,8 @@
 //      5 000 tâches par projet) ;
 //   2. écrit par les SERVICES existants du module (réglages, projets, tâches,
 //      dépendances) — jamais directement en base : mêmes règles, même historique,
-//      mêmes notifications qu'une saisie à la main ;
+//      mêmes notifications qu'une saisie à la main — sauf l'assignation, REGROUPÉE par
+//      personne et remise après l'écriture complète (ADR-0066 § 5) ;
 //   3. en cas d'échec en cours de route, ANNULE proprement : projet neuf
 //      supprimé (avec son contenu), ou tâches créées retirées d'un projet
 //      existant ; étiquettes et colonnes ajoutées remises comme avant (au mieux).
@@ -38,6 +39,7 @@ import type { Model } from 'mongoose';
 import { AuditService } from '../authz/audit.service.js';
 import { actorCan, conflict, forbidden, invalidMany, type WorkActor } from './work.common.js';
 import { WorkMembersService } from './work-members.service.js';
+import { WorkAssignmentBatch, WorkNotifier } from './work-notifier.js';
 import { WorkProjectsService } from './work-projects.service.js';
 import { WorkSettingsService } from './work-settings.service.js';
 import { WorkTasksService } from './work-tasks.service.js';
@@ -155,6 +157,7 @@ export class WorkPlanBuilder {
     @Inject(WorkSettingsService) private readonly settings: WorkSettingsService,
     @Inject(WorkMembersService) private readonly members: WorkMembersService,
     @Inject(AuditService) private readonly audit: AuditService,
+    @Inject(WorkNotifier) private readonly notifier: WorkNotifier,
   ) {}
 
   /** Créer un projet et toutes ses tâches (`work.manage`). */
@@ -192,7 +195,17 @@ export class WorkPlanBuilder {
         },
         actor,
       );
-      const counts = await this.writeTasks(organizationId, created.id, tasks, prepared, actor);
+      // ADR-0066 § 5 : une notification groupée par personne, après l'écriture complète.
+      const batch = new WorkAssignmentBatch();
+      const counts = await this.writeTasks(
+        organizationId,
+        created.id,
+        tasks,
+        prepared,
+        actor,
+        [],
+        batch,
+      );
       const result: WorkPlanApplyResult = {
         projectId: created.id,
         projectName: created.name,
@@ -208,6 +221,13 @@ export class WorkPlanBuilder {
         'work.plan.project_created',
         result,
       );
+      await this.notifier.flushAssignments({
+        organizationId,
+        projectId: created.id,
+        projectName: created.name,
+        batch,
+        actorUserId: actor.userId,
+      });
       return result;
     } catch (err) {
       if (created)
@@ -255,6 +275,7 @@ export class WorkPlanBuilder {
         );
         columnsChanged = true;
       }
+      const batch = new WorkAssignmentBatch();
       const counts = await this.writeTasks(
         organizationId,
         projectId,
@@ -262,6 +283,7 @@ export class WorkPlanBuilder {
         prepared,
         actor,
         createdTop,
+        batch,
       );
       const result: WorkPlanApplyResult = {
         projectId,
@@ -278,6 +300,13 @@ export class WorkPlanBuilder {
         'work.plan.tasks_imported',
         result,
       );
+      await this.notifier.flushAssignments({
+        organizationId,
+        projectId,
+        projectName: project.name,
+        batch,
+        actorUserId: actor.userId,
+      });
       return result;
     } catch (err) {
       for (const id of createdTop.reverse()) {
@@ -441,6 +470,7 @@ export class WorkPlanBuilder {
     p: Prepared,
     actor: WorkActor,
     createdTop: string[] = [],
+    batch?: WorkAssignmentBatch,
   ): Promise<
     Omit<WorkPlanApplyResult, 'projectId' | 'projectName' | 'createdColumns' | 'createdLabels'>
   > {
@@ -476,6 +506,7 @@ export class WorkPlanBuilder {
           parentTaskId: t.parentRef ? (ids.get(t.parentRef) ?? null) : null,
         },
         actor,
+        batch ? { assignments: batch } : {},
       );
       ids.set(t.ref, res.task.id);
       if (t.parentRef) createdSubtasks += 1;

@@ -32,6 +32,7 @@ import {
   useState,
 } from 'react';
 
+import { useSession } from '@/lib/auth-client';
 import { workApi, type WorkMemberOption } from '@/lib/work-api';
 import { workOverviewApi } from '@/lib/work-overview-api';
 
@@ -82,6 +83,10 @@ export interface ContexteProjet {
   /** Droits confirmés par le serveur (confort d'affichage). */
   travailler: boolean;
   gerer: boolean;
+  /** Compte de l'utilisateur connecté, `null` tant que la session n'est pas lue. */
+  moi: string | null;
+  /** ADR-0066 § 2 : l'appelant n'assigne qu'à lui-même (Stagiaire), dit par le serveur. */
+  assignerSoiSeulement: boolean;
 }
 
 const Contexte = createContext<ContexteProjet | null>(null);
@@ -108,6 +113,9 @@ export function ProjetProvider({
   const [tasks, setTasksState] = useState<WorkTaskView[]>([]);
   const [settings, setSettings] = useState<WorkSettingsView | null>(null);
   const [membresApi, setMembresApi] = useState<WorkMemberOption[] | null>(null);
+  const [assignerSoiSeulement, setAssignerSoiSeulement] = useState(false);
+  const { data: session } = useSession();
+  const moi = session?.user?.id ?? null;
   const [erreur, setErreur] = useState<string | null>(null);
   const [chargement, setChargement] = useState(true);
   const [avertissements, setAvertissements] = useState<string[]>([]);
@@ -173,13 +181,17 @@ export function ProjetProvider({
     [apercu],
   );
 
-  // Membres détenant `work.read` (`GET /work/members`) ; repli sur les membres cités.
+  // Membres détenant `work.read` (`GET /work/members?projectId=`) avec `seesProject`
+  // (ADR-0066 § 3) et la règle d'assignation de l'appelant ; repli sur les membres cités.
+  // Relus avec le projet : un membre ajouté devient proposable.
   useEffect(() => {
     let annule = false;
     workApi
-      .listMembers()
+      .listMembersForProject(projectId)
       .then((r) => {
-        if (!annule) setMembresApi(r);
+        if (annule) return;
+        setMembresApi(r.items);
+        setAssignerSoiSeulement(r.assignSelfOnly);
       })
       .catch(() => {
         if (!annule) setMembresApi(null);
@@ -187,7 +199,7 @@ export function ProjetProvider({
     return () => {
       annule = true;
     };
-  }, []);
+  }, [projectId, version]);
 
   const members = useMemo(
     () => membresApi ?? membresConnus(project, tasks),
@@ -276,8 +288,12 @@ export function ProjetProvider({
       travailler:
         actions !== null && actions.includes('work.update') && project?.status !== 'archived',
       gerer: actions !== null && actions.includes('work.manage'),
+      moi,
+      assignerSoiSeulement,
     }),
     [
+      moi,
+      assignerSoiSeulement,
       projectId,
       project,
       tasks,

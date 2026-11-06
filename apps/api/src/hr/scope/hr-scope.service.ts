@@ -12,8 +12,8 @@
 import { hrViewerScope, type HrEmployeeInput, type HrViewerScope } from '@lalanda/engine';
 import type { HrSettingsView, HrViewerRelation } from '@lalanda/shared/hr';
 import { Inject, Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import type { Model } from 'mongoose';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import type { Connection, Model } from 'mongoose';
 
 import type { CurrentOrgPermissionsValue } from '../../authz/current-org-permissions.decorator.js';
 import { effectiveActions, type Action, type OrgRole } from '../../authz/permissions.js';
@@ -23,6 +23,7 @@ import {
   type EmployeeLean,
 } from '../employees/employee.schema.js';
 import { HrSettingsService } from '../settings/hr-settings.service.js';
+import { usersLedBy } from '../teams/team-leads.js';
 
 export interface HrViewer {
   userId: string;
@@ -33,6 +34,14 @@ export interface HrViewer {
   /** Toutes les fiches de l'organisation (anonymisées comprises). */
   employees: readonly EmployeeLean[];
   byId: ReadonlyMap<string, EmployeeLean>;
+  /**
+   * ADR-0066 § 1 : comptes des membres des équipes RH dont le lecteur est responsable
+   * (lui exclu). Relation lue à chaque requête ; elle n'ouvre QUE les demandes à
+   * valider (absences, notes de frais, avances de frais), jamais la fiche ni le dossier.
+   */
+  ledUserIds: ReadonlySet<string>;
+  /** Fiches (non anonymisées) reliées à `ledUserIds`. */
+  ledEmployeeIds: readonly string[];
 }
 
 /** Entrée du moteur pour une fiche (aucune donnée sensible). */
@@ -59,6 +68,7 @@ export class HrScopeService {
   constructor(
     @InjectModel(Employee.name) private readonly employees: Model<EmployeeDocument>,
     @Inject(HrSettingsService) private readonly settings: HrSettingsService,
+    @InjectConnection() private readonly connection: Connection,
   ) {}
 
   async viewerOf(
@@ -66,9 +76,10 @@ export class HrScopeService {
     userId: string,
     perms: CurrentOrgPermissionsValue | undefined,
   ): Promise<HrViewer> {
-    const [employees, settings] = await Promise.all([
+    const [employees, settings, ledUserIds] = await Promise.all([
       this.employees.find({ organizationId }).lean<EmployeeLean[]>().exec(),
       this.settings.view(organizationId),
+      usersLedBy(this.connection, organizationId, userId),
     ]);
     // Sans droits résolus (route mal câblée, accès délégué), moindre privilège : aucun.
     const actions = new Set<Action>(perms ? effectiveActions(perms.role, perms.context) : []);
@@ -89,6 +100,10 @@ export class HrScopeService {
       settings,
       employees,
       byId: new Map(employees.map((e) => [String(e._id), e])),
+      ledUserIds,
+      ledEmployeeIds: employees
+        .filter((e) => e.status !== 'anonymized' && !!e.userId && ledUserIds.has(e.userId))
+        .map((e) => String(e._id)),
     };
   }
 

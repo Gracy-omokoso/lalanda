@@ -40,6 +40,7 @@ import {
   managerUserIdOf,
   type ApprovalStep,
 } from '../expenses/hr-expenses.common.js';
+import { usersLedBy } from '../teams/team-leads.js';
 
 /** Pièces lues au plus par nature et par organisation (borne de sûreté). */
 export const HR_LINKS_SCAN_MAX = 2_000;
@@ -114,12 +115,14 @@ export class HrExpenseAgendaReader {
     today: string,
   ): Promise<HrLinksResult> {
     const has = (a: Action) => actor.actions.has(a);
-    const [settingsDoc, employeeRows] = await Promise.all([
+    const [settingsDoc, employeeRows, ledUserIds] = await Promise.all([
       this.connection.collection('hr_settings').findOne({ organizationId }),
       this.connection
         .collection('hr_employees')
         .find({ organizationId }, { projection: EMPLOYEE_PROJECTION })
         .toArray() as unknown as Promise<EmployeeLean[]>,
+      // ADR-0066 § 1 : responsable d'équipe RH, relation relue à chaque appel.
+      usersLedBy(this.connection, organizationId, actor.userId),
     ]);
     const employees = new Map(employeeRows.map((e) => [idOf(e), e]));
     const self = employeeRows.find((e) => e.userId === actor.userId && e.status !== 'anonymized');
@@ -131,14 +134,14 @@ export class HrExpenseAgendaReader {
     const presence = presenceSettingsViewOf(settingsDoc as Raw | null);
 
     // Chaque lecture derrière sa garde : rien n'est lu pour qui ne peut pas agir.
-    const approvable = isManager || has('expenses.approve');
+    const approvable = isManager || ledUserIds.size > 0 || has('expenses.approve');
     const payer = has('payables.pay');
     const settleRead = selfId !== null || has('expenses.approve');
     const decider = presence.attendance.enabled && (isManager || has('hr.manage'));
 
     const [approvals, toPay, toSettle, corrections] = await Promise.all([
       approvable
-        ? this.approvalsOf(organizationId, actor, employees, expenses.allowSoleApprover)
+        ? this.approvalsOf(organizationId, actor, employees, expenses.allowSoleApprover, ledUserIds)
         : Promise.resolve({ items: [] as HrLinkPiece[], truncated: false }),
       payer
         ? this.toPayOf(organizationId, actor, employees, expenses.allowSoleApprover)
@@ -166,6 +169,7 @@ export class HrExpenseAgendaReader {
     actor: HrLinksActor,
     employees: ReadonlyMap<string, EmployeeLean>,
     allowSoleApprover: boolean,
+    ledUserIds: ReadonlySet<string>,
   ): Promise<{ items: HrLinkPiece[]; truncated: boolean }> {
     const projection = {
       number: 1,
@@ -198,6 +202,7 @@ export class HrExpenseAgendaReader {
       actions: actor.actions,
       approverCount,
       allowSoleApprover,
+      ledUserIds,
     };
     const items: HrLinkPiece[] = [];
     const consider = (

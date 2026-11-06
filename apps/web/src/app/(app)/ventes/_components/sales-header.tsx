@@ -7,8 +7,12 @@
 import { PageHeader } from '@lalanda/ui';
 import { usePathname } from 'next/navigation';
 
-/** Écrans de l'espace qui ont leur propre en-tête (ADR-0056). */
-export const ECRANS_A_EN_TETE_PROPRE: readonly string[] = ['/ventes/factures'];
+/** Écrans de l'espace qui ont leur propre en-tête (ADR-0056, ADR-0067). */
+export const ECRANS_A_EN_TETE_PROPRE: readonly string[] = [
+  '/ventes/factures',
+  '/ventes/devis',
+  '/ventes/encaissements',
+];
 
 export function SalesHeader(): React.ReactElement | null {
   const pathname = usePathname();

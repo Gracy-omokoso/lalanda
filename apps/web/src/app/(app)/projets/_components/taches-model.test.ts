@@ -11,11 +11,15 @@ import {
   filtresActifs,
   filtresVides,
   formulaireTache,
+  horsDuProjet,
   insererMention,
+  LIBELLE_MOI,
   libelleActivite,
   membresConnus,
   messagesAvertissements,
   requeteMention,
+  responsableVerrouille,
+  responsablesProposes,
   segmentsCommentaire,
   suggestionsMention,
 } from './taches-model';
@@ -192,5 +196,33 @@ describe('historique', () => {
     expect(libelleActivite({ actor: KEVIN, kind: 'comment.added', data: {} })).toBe(
       'Kevin Mbala a commenté',
     );
+  });
+});
+
+describe('ADR-0066 — sélecteur de responsable', () => {
+  const m = (userId: string, canUpdate: boolean, seesProject?: boolean) => ({
+    userId,
+    name: `Nom ${userId}`,
+    canUpdate,
+    canManage: false,
+    ...(seesProject !== undefined ? { seesProject } : {}),
+  });
+  const membres = [m('a', true, true), m('b', true, false), m('c', false, true), m('d', true)];
+
+  it('§ 3 — seules les personnes qui voient le projet (inconnu : proposé)', () => {
+    expect(
+      responsablesProposes(membres, { moi: 'a', soiSeulement: false }).map((o) => o.userId),
+    ).toEqual(['a', 'd']);
+    expect(horsDuProjet(membres)).toBe(1);
+  });
+
+  it('§ 2 — Stagiaire : « Moi » seulement, verrouillé sur la tâche d’un autre', () => {
+    const regle = { moi: 'a', soiSeulement: true };
+    expect(responsablesProposes(membres, regle)).toEqual([{ userId: 'a', name: LIBELLE_MOI }]);
+    expect(responsablesProposes(membres, { moi: null, soiSeulement: true })).toEqual([]);
+    expect(responsableVerrouille('b', regle)).toBe(true);
+    expect(responsableVerrouille('a', regle)).toBe(false);
+    expect(responsableVerrouille(null, regle)).toBe(false);
+    expect(responsableVerrouille('b', { moi: 'a', soiSeulement: false })).toBe(false);
   });
 });

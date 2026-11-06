@@ -263,7 +263,10 @@ export class HrEmployeesService {
         : null,
       private: self ? await this.privates.summary(self.organizationId, String(self._id)) : null,
       isManager: viewer.scope.isManager,
-      canApprove: viewer.scope.isManager || viewer.scope.holdsLeaveApprove,
+      isTeamLead: viewer.ledUserIds.size > 0,
+      ledEmployeeIds: [...viewer.ledEmployeeIds],
+      canApprove:
+        viewer.scope.isManager || viewer.ledUserIds.size > 0 || viewer.scope.holdsLeaveApprove,
       directReportIds: viewer.scope.directReportIds,
       teamEmployeeIds: viewer.scope.teamEmployeeIds,
       orgChartVisible: viewer.scope.orgChartVisible,

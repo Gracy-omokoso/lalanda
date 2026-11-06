@@ -2224,6 +2224,16 @@ export const DEFAULT_INVITATION_ROLE: OrgRole = 'employee';
  */
 export const PROJECT_SCOPED_ROLES: readonly OrgRole[] = ['guest'];
 
+/**
+ * ADR-0066 § 2 (tranche la décision ouverte n° 3 d'ADR-0059) : rôles qui créent et font
+ * avancer des tâches mais n'en assignent qu'À EUX-MÊMES (ou les laissent sans
+ * responsable) et ne réassignent jamais la tâche d'un autre (`403
+ * WORK_ASSIGN_SELF_ONLY`). Ce n'est pas une action de la matrice : la règle vit dans le
+ * module `work` (`isSelfAssignOnlyRole`, `apps/api/src/work/work-access.ts`), qui lit
+ * cette liste ; aucun nom de rôle n'est écrit ailleurs.
+ */
+export const SELF_ASSIGN_ONLY_ROLES: readonly OrgRole[] = ['intern'];
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Séparation des tâches (R2)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2407,6 +2417,12 @@ export interface LeaveApprovalInput {
    * (relation vérifiée par le service sur la fiche, jamais un rôle).
    */
   readonly isDesignatedManager: boolean;
+  /**
+   * ADR-0066 § 1 : l'approbateur est le responsable (`leadUserId`) d'une équipe RH dont
+   * le bénéficiaire est membre (relation lue à chaque requête, jamais un rôle). Tient
+   * l'étape `manager` comme le manager désigné ; absent = `false`.
+   */
+  readonly isTeamLead?: boolean;
   /** L'approbateur détient `leave.approve` dans ses droits EFFECTIFS (ADR-0041). */
   readonly holdsLeaveApprove: boolean;
   /** Validations DÉJÀ portées par la demande (étapes précédentes), sans celle en cours. */
@@ -2450,8 +2466,9 @@ export type LeaveApprovalDecision =
  * Ordre des contrôles (le premier refus gagne) :
  *   1. on ne valide (ni ne refuse) pas sa propre absence, sauf **approbateur unique** :
  *      `allowSoleApprover`, un seul détenteur effectif de `leave.approve`, et c'est lui ;
- *   2. étape `manager` : le manager désigné, ou un détenteur de `leave.approve` en
- *      suppléance ; étape `hr` : un détenteur de `leave.approve` ;
+ *   2. étape `manager` : le manager désigné ou le responsable d'une équipe du
+ *      bénéficiaire (ADR-0066), ou un détenteur de `leave.approve` en suppléance ;
+ *      étape `hr` : un détenteur de `leave.approve` ;
  *   3. pour valider, il n'a pas déjà validé une étape de la demande, sauf approbateur
  *      unique (il tient alors l'étape RH qu'il a déjà tenue comme manager, marqué).
  * Un refus clôt la demande à n'importe quelle étape : le contrôle 3 ne s'y applique pas.
@@ -2465,7 +2482,7 @@ export function leaveApprovalDecision(input: LeaveApprovalInput): LeaveApprovalD
 
   let onBehalfOfManager = false;
   if (input.step === 'manager') {
-    if (!input.isDesignatedManager) {
+    if (!input.isDesignatedManager && input.isTeamLead !== true) {
       if (!input.holdsLeaveApprove) return { ok: false, code: 'LEAVE_NOT_YOUR_STEP' };
       onBehalfOfManager = true;
     }
@@ -2966,6 +2983,11 @@ export interface ExpenseApprovalInput {
    * (relation vérifiée par le service sur la fiche, jamais un rôle).
    */
   readonly isDesignatedManager: boolean;
+  /**
+   * ADR-0066 § 1 : responsable d'une équipe RH dont le bénéficiaire est membre. Tient
+   * l'étape `manager` (jamais une avance sur salaire) ; absent = `false`.
+   */
+  readonly isTeamLead?: boolean;
   /** L'approbateur détient `expenses.approve` dans ses droits EFFECTIFS (ADR-0041). */
   readonly holdsExpensesApprove: boolean;
   /** L'approbateur détient `hr.sensitive.read` (exigé pour une avance sur salaire). */
@@ -3017,8 +3039,9 @@ export type ExpenseApprovalDecision =
  *   2. le bénéficiaire ne valide ni ne refuse, puis l'auteur d'une saisie pour autrui non
  *      plus, sauf **approbateur unique** (`allowSoleApprover`, un seul détenteur effectif
  *      d'`expenses.approve`, et c'est lui) ;
- *   3. étape `manager` : le manager désigné, ou un détenteur d'`expenses.approve` en
- *      suppléance ; étape `finance` : un détenteur d'`expenses.approve` ;
+ *   3. étape `manager` : le manager désigné ou le responsable d'une équipe du
+ *      bénéficiaire (ADR-0066), ou un détenteur d'`expenses.approve` en suppléance ;
+ *      étape `finance` : un détenteur d'`expenses.approve` ;
  *   4. pour valider, il n'a pas déjà tenu une étape, sauf approbateur unique (marqué).
  * Un refus clôt la note à n'importe quelle étape : le contrôle 4 ne s'y applique pas.
  */
@@ -3036,7 +3059,7 @@ export function expenseApprovalDecision(input: ExpenseApprovalInput): ExpenseApp
 
   let onBehalfOfManager = false;
   if (input.step === 'manager' && !input.salaryAdvance) {
-    if (!input.isDesignatedManager) {
+    if (!input.isDesignatedManager && input.isTeamLead !== true) {
       if (!input.holdsExpensesApprove) return { ok: false, code: 'EXPENSE_NOT_YOUR_STEP' };
       onBehalfOfManager = true;
     }

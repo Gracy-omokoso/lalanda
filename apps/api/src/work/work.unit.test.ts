@@ -11,7 +11,7 @@ import {
   sanitizeFileName,
 } from './work-attachments.service.js';
 import { workAttachmentObjectKey } from './work-attachments.storage.js';
-import { boundedTitle } from './work-notifier.js';
+import { WorkAssignmentBatch, boundedTitle, groupedAssignmentTitle } from './work-notifier.js';
 import { kinshasaHour } from './work-reminders.job.js';
 import { isoWeekStart } from './work-time.service.js';
 import {
@@ -161,5 +161,21 @@ describe('outils du module', () => {
     expect(decodeAscCursor(`${raw}x`)).toBeNull();
     expect(decodeAscCursor('!!')).toBeNull();
     expect(afterAscCursor('createdAt', back!)).toHaveProperty('$or');
+  });
+});
+
+describe('ADR-0066 § 5 — assignations d’un import regroupées', () => {
+  it('retient par personne, dans l’ordre, et nomme le groupe', () => {
+    const batch = new WorkAssignmentBatch();
+    batch.add('u1', { taskId: 't1', number: 1, title: 'A' });
+    batch.add('u2', { taskId: 't2', number: 2, title: 'B' });
+    batch.add('u1', { taskId: 't3', number: 3, title: 'C' });
+    expect(batch.entries().map(([u, t]) => [u, t.map((x) => x.number)])).toEqual([
+      ['u1', [1, 3]],
+      ['u2', [2]],
+    ]);
+    expect(groupedAssignmentTitle(12, 'Boutique')).toBe(
+      '12 tâches vous ont été assignées dans le projet Boutique',
+    );
   });
 });

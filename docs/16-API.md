@@ -456,7 +456,7 @@ Contrat : [ADR-0031](adr/ADR-0031-encaissements-et-realise.md). Organisation act
 
 | Méthode et chemin | Permission |
 |---|---|
-| `GET /sales/receipts` (`status`, `invoiceId`, `from`, `to`, `limit`) · `GET /sales/receipts/:id` · `GET /sales/receipts/summary` (`from`, `to`) | `sales.read` |
+| `GET /sales/receipts` (`status`, `invoiceId`, `from`, `to`, `limit`) · `GET /sales/receipts/:id` · `GET /sales/receipts/summary` (`from`, `to`) · `GET /sales/receipts/stats` (ADR-0067) | `sales.read` |
 | `POST /sales/receipts` · `PUT /sales/receipts/:id` `{ receipt, expectedRevision }` · `POST /sales/receipts/:id/cancel` `{ reason, expectedRevision }` | `sales.receipt` |
 | `GET /sales/settlements?invoiceIds=a,b` ou `?open=true&currency=USD` · `GET /sales/settlements/:invoiceId` | `sales.read` |
 | `PUT /sales/settlements/:invoiceId/due-date` `{ dueDate: "AAAA-MM-JJ" \| null }` | `sales.manage` |
@@ -474,6 +474,16 @@ Intégration avec la trésorerie (26 oct. 2026, amendements d'ADR-0031 et ADR-00
 Réponse : `currency` et `currencySource` (`accounting_book` : monnaie de tenue de la comptabilité ; `default_cdf`), `asOf`, `from`, `to` ; `months[]` (`billed`, `collected` signés, `outstanding`, `overdue` en fin de mois) ; `totals` (`billed`, `collected`, `collectedRatePercent`, `invoiceCount`, `creditNoteCount`) ; `outstanding` et `overdue` au jour (`amount`, `count`) ; `categories[]` (`paid`, `to_collect`, `overdue`, `draft`, `pending_normalization`, `normalization_failed`, `credit_note`, `other_final`) ; `statusCounts` (mêmes définitions que les filtres de `GET /sales/invoices`) ; `topCustomers[]` (5) ; `excluded` (`deposits`, `testSeries`, `notConvertible[]` par devise avec total) ; `truncated` (au-delà de 20 000 documents) ; `version`.
 
 Règles (ADR-0056 § 3) : montants TTC dans la devise de référence, **au taux figé sur la facture** (total CDF normalisé, conversion du document ou contre-valeur USD) ; sans taux, exclus et comptés. Facturé = FV/EV finaux hors essai moins avoirs FA/EA finaux ; acomptes exclus et comptés. Encaissé = part réglée à l'émission + lettrages − remboursements à l'émission des avoirs. Retard = facture finale, échéance dépassée, non soldée (`computeSettlement`).
+
+## Ventes — tableaux de bord des devis et des encaissements — implémenté (ADR-0067)
+
+Mêmes principes que `GET /sales/invoices/stats` : `months` facultatif (1 à 24, défaut 12), tout autre paramètre `400 INVALID_REQUEST` ; `sales.read`, organisation active ; contrats zod `@lalanda/shared/sales-invoices` ; calcul du moteur (`receivables`, version `1.0.0`), rien n'est stocké ; `currency`, `currencySource`, `asOf`, `from`, `to`, `truncated` (au-delà de 20 000 documents), `version`.
+
+`GET /sales/quotes/stats` (fonctionnalité `quotes`, `QuoteStatsSchema`, moteur `computeQuoteStats`) : `months[]` (`sent` au mois du premier envoi, `accepted`, `acceptedAmount`) ; `open`, `acceptedThisMonth`, `expiringSoon` (+ `until`, `withinDays` = 7) au format `{ count, amount, notConvertible[] }` ; `conversion` (`windowDays` = 90, `since`, `sent`, `accepted`, `ratePercent`) ; `statusCounts` (`all`, `draft`, `sent`, `accepted`, `refused`, `expired` : définitions de `GET /sales/quotes`) ; `converted` ; `excluded` (`withoutAmount`, `notConvertible[]`). Un devis ne porte aucun taux : hors devise de référence, il est compté à part avec son total dans sa devise.
+
+`GET /sales/receipts/stats` (fonctionnalité `normalized_invoicing`, `ReceiptStatsSchema`, moteur `computeReceiptStats`) : `months[]` (`collected`, `count`) ; `totals` ; `thisMonth` ; `previousMonth` (`month`, `amount`, `count`) ; `changePercent` ; `averageDelay` (`windowDays` = 90, `since`, `days`, `allocations`) ; `outstanding` et `overdue` (identiques à ceux de `GET /sales/invoices/stats`) ; `byMethod[]` (six moyens d'ADR-0031) ; `statusCounts` (`all`, `recorded`, `cancelled` : définitions de `GET /sales/receipts`) ; `excluded.notConvertible[]` (lettrages sur une facture sans taux figé). Encaissements annulés et paiements déclarés à l'émission hors montants.
+
+`GET /sales/quotes` accepte `sort` : `recent` (défaut) ou `valid_until` (validité croissante) ; le curseur est propre au tri (`400 INVALID_CURSOR` sinon).
 
 ## Ventes — normalisation DGI — implémenté (S25f, ADR-0024 chantier F2)
 
@@ -519,7 +529,7 @@ Un devis est un document **distinct** du pro forma : `DV{AA}{MM}-NNNNNN` (hors s
 
 | Méthode et chemin | Effet |
 |---|---|
-| `GET /sales/quotes?status=&customerId=&opportunityId=&q=&cursor=` | liste ; `status` : `draft`, `sent`, `accepted`, `refused`, `expired` (dérivé : envoyé, validité passée) |
+| `GET /sales/quotes?status=&customerId=&opportunityId=&q=&sort=&cursor=` | liste ; `status` : `draft`, `sent`, `accepted`, `refused`, `expired` (dérivé : envoyé, validité passée) |
 | `POST /sales/quotes` · `PUT /sales/quotes/:id` (brouillon, `expectedRevision`) | `{ opportunityId?, title?, notes?, validUntil?, currency, priceMode, customer, lines }` |
 | `DELETE /sales/quotes/:id` | brouillon v1 jamais envoyé ; sinon `409 QUOTE_NOT_DELETABLE` |
 | `POST /sales/quotes/:id/send` · `/accept` · `/refuse` (`reason?`) · `/new-version` | `{ expectedRevision }` ; `409 QUOTE_STATUS_CONFLICT`, `409 QUOTE_NOT_READY` (`details.blockers`) |
@@ -1011,6 +1021,18 @@ portée répond `404` (garde `WorkVisibilityGuard` sur `projectId`, `taskId`, `c
 `attachmentId`, `entryId` du chemin et `projectId`, `taskId` de la requête) ; les listes
 (`/work/projects`, `/work/portfolio`, `/work/tasks`, `/work/my-tasks`, `/work/time-entries`,
 `/work/timesheets`, `/notifications`, `/notifications/unread-count`, `/morning-brief`) l'excluent.
+
+## Suites des équipes et des Projets — implémenté, ADR-0066
+
+| Route | Changement |
+|---|---|
+| `GET /hr/me` | + `isTeamLead` (responsable d'au moins une équipe RH comptant un autre membre), `ledEmployeeIds` (fiches de ses membres, lui exclu) ; `canApprove` le compte |
+| `GET /hr/leave-approvals/pending` · `POST /hr/leave-requests/:id/approve` · `…/reject` | le responsable d'une équipe RH tient l'étape `manager` des demandes de ses membres (`isTeamLead`) ; étape `hr`, sa propre demande, hors équipe : refus habituels (`403 LEAVE_NOT_YOUR_STEP`, `409 SELF_APPROVAL_FORBIDDEN`) |
+| `GET /hr/expense-reports?view=a-valider` · `GET /hr/expense-reports/:id` · `POST …/approve` · `…/reject` · `GET /hr/advances` · `POST /hr/advances/:id/approve` · `…/reject` | idem pour les notes de frais et les avances de **frais** (jamais une avance sur salaire) ; il voit les notes et avances de ses membres hors brouillons, comme le manager ; étape `finance` : `403 EXPENSE_NOT_YOUR_STEP` |
+| `GET /work/members` | + `assignSelfOnly` (l'appelant n'assigne qu'à lui-même) ; `?projectId=` ajoute `seesProject` à chaque membre (projet hors portée : 404) |
+| `POST /work/projects/:projectId/tasks` · `PATCH /work/tasks/:taskId` | rôle de `SELF_ASSIGN_ONLY_ROLES` (Stagiaire) : responsable soi ou aucun, jamais la tâche d'un autre → `403 WORK_ASSIGN_SELF_ONLY` ; assigné qui ne voit pas le projet : ajouté membre direct si l'acteur a `work.manage` (historique `project.member_added`, notification `work.added_to_project`), sinon `400 INVALID_REQUEST` (problème `WORK_ASSIGNEE_NOT_MEMBER` sur `assigneeUserId`) |
+| `POST /work/import/preview` | avertissements `IMPORT_ASSIGNEE_SELF_ONLY` (Stagiaire) et `IMPORT_ASSIGNEE_NOT_MEMBER` (projet existant, sans `work.manage`) : la ligne est importée sans responsable |
+| `POST /work/import/projects` · `POST /work/projects/:projectId/import` · `POST /work/plans/projects` | assignations **regroupées** : par personne, une notification `work.task_assigned` « N tâches vous ont été assignées dans le projet X » (lien `/projets/<id>/liste`) par canal choisi (cloche, e-mail, Slack) et un événement par personne dans le canal Slack du projet ; une seule tâche : notification habituelle ; rien si l'import échoue |
 
 ## Paramètres des Projets — implémenté, ADR-0061
 

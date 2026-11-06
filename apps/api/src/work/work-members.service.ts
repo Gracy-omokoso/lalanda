@@ -22,6 +22,7 @@ import {
 import { can, type Action, type OrgRole } from '../authz/permissions.js';
 import { MembersService } from '../organizations/members.service.js';
 import { Membership, type MembershipDocument } from '../organizations/membership.schema.js';
+import { seesProjectAudience, type WorkProjectAudience } from './work-access.js';
 import { invalid, memberNotFound } from './work.common.js';
 
 /** Membre de l'organisation et ce qu'il peut faire dans le module. */
@@ -30,6 +31,11 @@ export interface WorkMemberView extends WorkMemberRef {
   canUpdate: boolean;
   /** Peut gérer les projets (`work.manage`). */
   canManage: boolean;
+  /**
+   * ADR-0066 § 3 : voit le projet demandé (`GET /work/members?projectId=`). Absent sans
+   * projet. Un responsable doit voir le projet de sa tâche.
+   */
+  seesProject?: boolean;
 }
 
 const FORMER_MEMBER = 'Ancien membre';
@@ -129,7 +135,7 @@ export class WorkMembersService {
   }
 
   /** Membres détenant `work.read` (sélecteurs de responsable et mentions). */
-  async list(organizationId: string): Promise<WorkMemberView[]> {
+  async list(organizationId: string, audience?: WorkProjectAudience): Promise<WorkMemberView[]> {
     const members = await this.permissions(organizationId);
     const readers = [...members].filter(([, m]) => can(m.role, 'work.read', m.context));
     const refs = await this.refs(readers.map(([id]) => id));
@@ -138,6 +144,14 @@ export class WorkMembersService {
         ...WorkMembersService.refOf(refs, id),
         canUpdate: can(m.role, 'work.update', m.context),
         canManage: can(m.role, 'work.manage', m.context),
+        ...(audience
+          ? {
+              seesProject: seesProjectAudience(
+                { userId: id, role: m.role, context: m.context },
+                audience,
+              ),
+            }
+          : {}),
       }))
       .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
   }

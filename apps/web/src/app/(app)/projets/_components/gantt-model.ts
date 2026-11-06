@@ -387,6 +387,8 @@ export function phrasesConflits(tasks: readonly TacheTexte[]): { taskId: string;
 export function descriptionBarre(
   t: Pick<WorkTaskView, 'number' | 'title' | 'done'>,
   row: Pick<GanttRow, 'shape' | 'start' | 'end' | 'conflict'>,
+  /** ADR-0066 § 4 : réglage `showTaskNumbers` (vrai par défaut). */
+  numeros = true,
 ): string {
   const dates =
     row.shape === 'milestone'
@@ -395,7 +397,7 @@ export function descriptionBarre(
         ? `le ${formatJour(row.end)}`
         : `du ${formatJour(row.start)} au ${formatJour(row.end)}`;
   return [
-    `#${t.number} ${t.title}`,
+    numeros ? `#${t.number} ${t.title}` : t.title,
     dates,
     t.done ? 'terminée' : null,
     row.conflict ? 'conflit de dates avec un prédécesseur' : null,

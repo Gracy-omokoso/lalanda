@@ -341,12 +341,24 @@ e2eSuite('projets privés, membres et équipes — ADR-0060', () => {
     });
 
     it('une notification n’est jamais émise vers qui ne voit pas le projet', async () => {
-      f.notifications.length = 0;
+      // ADR-0066 § 3 : assigner un non-membre l'ajoute aux membres (gestionnaire) ; on
+      // le retire ensuite : il ne voit plus le projet et n'est plus jamais notifié.
       const t = await f.post('owner', `/work/projects/${privateId}/tasks`, {
         title: 'Assignée à un non-membre',
         assigneeUserId: f.userId('accountant'),
       });
       expect(t.status, JSON.stringify(t.body)).toBe(201);
+      const out = await f.del(
+        'owner',
+        `/work/projects/${privateId}/members/users/${f.userId('accountant')}`,
+      );
+      expect(out.status, JSON.stringify(out.body)).toBeLessThan(300);
+      expect((await f.get('accountant', `/work/projects/${privateId}`)).status).toBe(404);
+      f.notifications.length = 0;
+      const done = await f.post('owner', `/work/tasks/${t.body.task.id}/complete`, {
+        expectedRevision: t.body.task.revision,
+      });
+      expect(done.status, JSON.stringify(done.body)).toBe(200);
       expect(f.notifications.map((n) => n.recipientUserId)).not.toContain(f.userId('accountant'));
     });
   });

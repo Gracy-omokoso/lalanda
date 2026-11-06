@@ -24,9 +24,18 @@
 // vers le haut à chaque conversion. Aucune horloge : `asOf` est fourni.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { CENT, divRound, parseFixed, type Fixed } from '../invoice-totals/decimal.js';
+import type { Fixed } from '../invoice-totals/decimal.js';
 import { isCalendarDate, monthOfDate } from './calendar.js';
 import { formatPositive, formatSigned, trustedAmount } from './money.js';
+import {
+  addMonths,
+  convertAtRatio,
+  lastDayOf,
+  percentOf,
+  referenceRatioOf,
+  type Ratio,
+  type StatsCurrency,
+} from './reference-rate.js';
 import { computeSettlement } from './settlement.js';
 import type { DecimalString } from '../invoice-totals/types.js';
 import type { CalendarDate, CalendarMonth } from './types.js';
@@ -34,7 +43,7 @@ import type { CalendarDate, CalendarMonth } from './types.js';
 /** Version du calcul du tableau de bord des factures. */
 export const INVOICE_STATS_VERSION = '1.0.0';
 
-export type StatsCurrency = 'CDF' | 'USD';
+export type { StatsCurrency };
 
 const FINAL: readonly string[] = ['issued', 'normalized'];
 const SALE_TYPES: readonly string[] = ['FV', 'EV'];
@@ -151,63 +160,9 @@ export interface InvoiceStatsResult {
   version: string;
 }
 
-/** Ratio figé document → référence : montant × num / den. `null` : non convertible. */
-type Ratio = { num: Fixed; den: Fixed } | null;
-
-const ONE: Fixed = parseFixed('1') as Fixed;
-
-function fixed(value: string, what: string): Fixed {
-  const v = parseFixed(value);
-  if (v === null) throw new RangeError(`${what} illisible : ${JSON.stringify(value)}`);
-  return v;
-}
-
-function ratioOf(doc: InvoiceStatsDocument, ref: StatsCurrency): Ratio {
-  if (doc.currency === ref) return { num: ONE, den: ONE };
-  const total = doc.total === null ? null : fixed(doc.total, 'Total');
-  if (ref === 'CDF') {
-    if (doc.normalizedTotalCdf !== null && total !== null && total > 0n) {
-      return { num: fixed(doc.normalizedTotalCdf, 'Total normalisé'), den: total };
-    }
-    const c = doc.conversion;
-    if (c !== null && c.from === doc.currency && c.to === 'CDF') {
-      const rate = fixed(c.rate, 'Taux');
-      if (rate > 0n) return { num: rate, den: ONE };
-    }
-    return null;
-  }
-  // Référence USD, document CDF : contre-valeur figée sur la facture.
-  if (doc.usdCounterValue !== null && total !== null && total > 0n) {
-    return { num: fixed(doc.usdCounterValue, 'Contre-valeur USD'), den: total };
-  }
-  return null;
-}
-
-/** Montant converti, arrondi au centime demi vers le haut. */
-function convert(amount: Fixed, ratio: { num: Fixed; den: Fixed }): Fixed {
-  return divRound(amount * ratio.num, ratio.den * CENT, 'half_up') * CENT;
-}
-
-function addMonths(month: CalendarMonth, delta: number): CalendarMonth {
-  const y = Number(month.slice(0, 4));
-  const m = Number(month.slice(5, 7)) - 1 + delta;
-  const year = y + Math.floor(m / 12);
-  const mm = ((m % 12) + 12) % 12;
-  return `${year}-${String(mm + 1).padStart(2, '0')}`;
-}
-
-function lastDayOf(month: CalendarMonth): CalendarDate {
-  const y = Number(month.slice(0, 4));
-  const m = Number(month.slice(5, 7));
-  const leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
-  const d = m === 2 ? (leap ? 29 : 28) : [4, 6, 9, 11].includes(m) ? 30 : 31;
-  return `${month}-${String(d).padStart(2, '0')}`;
-}
-
-function percent(num: Fixed, den: Fixed): number | null {
-  if (den <= 0n) return null;
-  return Number(divRound(num * 100n, den, 'half_up'));
-}
+const ratioOf = referenceRatioOf;
+const convert = convertAtRatio;
+const percent = percentOf;
 
 interface Settleable {
   doc: InvoiceStatsDocument;

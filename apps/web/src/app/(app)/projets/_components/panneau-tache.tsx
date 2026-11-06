@@ -16,6 +16,7 @@ import {
   type WorkTaskWriteResult,
 } from '@lalanda/shared/work';
 import { Tag } from '@lalanda/ui';
+import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { workApi } from '@/lib/work-api';
@@ -34,7 +35,14 @@ import {
 import { colonnesKanban, placer } from './kanban-model';
 import { COULEURS_CARTE, LIBELLES_COULEUR, numeroVisible } from './cartes-model';
 import { useProjet } from './project-context';
-import { PRIORITES, codeWork, formatJour, formatMinutes, messageWork } from './projets-model';
+import {
+  PRIORITES,
+  PROJETS_BASE,
+  codeWork,
+  formatJour,
+  formatMinutes,
+  messageWork,
+} from './projets-model';
 import { Collaboration } from './tache-collab';
 
 /** Champ « à plat » de la grille : bordure au survol et au focus seulement. */
@@ -44,7 +52,10 @@ import {
   candidatsDependance,
   diffTache,
   formulaireTache,
+  horsDuProjet,
   messagesAvertissements,
+  responsableVerrouille,
+  responsablesProposes,
   type FormulaireTache,
 } from './taches-model';
 
@@ -105,6 +116,8 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
     members,
     travailler,
     gerer,
+    moi,
+    assignerSoiSeulement,
     fermerTache,
     appliquerEcriture,
     setTasks,
@@ -179,7 +192,12 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
   const d = detail;
   const ecrire = travailler;
   const labels = settings?.labels ?? [];
-  const eligibles = members.filter((m) => m.canUpdate);
+  // ADR-0066 § 2 et § 3 : « Moi » seulement pour un Stagiaire ; sinon les personnes qui
+  // voient le projet. Le serveur reste juge.
+  const regleAssignation = { moi, soiSeulement: assignerSoiSeulement };
+  const eligibles = responsablesProposes(members, regleAssignation);
+  const respVerrouille = responsableVerrouille(d.assignee?.userId ?? null, regleAssignation);
+  const nbHorsProjet = gerer && !assignerSoiSeulement ? horsDuProjet(members) : 0;
   const candidats = candidatsDependance(tasks, d);
 
   async function changerColonne(columnKey: string): Promise<void> {
@@ -372,6 +390,12 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
               value={f.assigneeUserId}
               onChange={(e) => void sauver({ assigneeUserId: e.target.value })}
               className={CHAMP_PLAT}
+              disabled={respVerrouille}
+              aria-describedby={
+                respVerrouille || assignerSoiSeulement || nbHorsProjet > 0
+                  ? 'tache-resp-aide'
+                  : undefined
+              }
             >
               <option value="">Aucun responsable</option>
               {d.assignee && !eligibles.some((m) => m.userId === d.assignee!.userId) ? (
@@ -383,6 +407,31 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
                 </option>
               ))}
             </select>
+            {respVerrouille || assignerSoiSeulement ? (
+              <span
+                id="tache-resp-aide"
+                className="basis-full text-xs text-[var(--foreground-muted)]"
+              >
+                {respVerrouille
+                  ? 'Cette tâche est assignée à un collègue : votre rôle ne permet pas de la réassigner.'
+                  : 'Votre rôle permet de vous assigner une tâche, ou de la laisser sans responsable.'}
+              </span>
+            ) : nbHorsProjet > 0 ? (
+              <span
+                id="tache-resp-aide"
+                className="basis-full text-xs text-[var(--foreground-muted)]"
+              >
+                {nbHorsProjet === 1
+                  ? '1 personne ne voit pas ce projet. '
+                  : `${nbHorsProjet} personnes ne voient pas ce projet. `}
+                <Link
+                  href={`${PROJETS_BASE}/${project.id}/membres`}
+                  className="font-medium text-[var(--primary)] underline-offset-2 hover:underline"
+                >
+                  Ajouter un membre
+                </Link>
+              </span>
+            ) : null}
             {/* ADR-0045 — H5 : assigné absent (jours seulement), constat d'échéance. */}
             {d.assigneeAbsence || d.dueDateAbsence ? (
               <span className="flex basis-full flex-wrap items-center gap-1">

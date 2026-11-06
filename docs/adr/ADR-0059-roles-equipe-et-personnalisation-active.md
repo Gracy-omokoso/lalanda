@@ -173,10 +173,16 @@ sans `sales.read`) : décision n° 1, **tranchée le 5 nov. 2026** (voir plus ba
    Responsable RH, Magasinier, Chef de projet et Expert-comptable externe.
 2. **Salarié et bibliothèque** : ajouter `docs.read` (règlement intérieur, politiques) au
    Salarié, au Manager et au Stagiaire. *Défaut : non (accordable par personne).*
-3. **Stagiaire** : « n'assigner une tâche qu'à soi-même », à câbler dans le module `work` (v1.15).
-   *Défaut : même droits que le Salarié.*
-4. **Manager et validation RH** : étape `manager` des absences et des frais pour le Manager de
-   l'équipe. *Défaut : avec les équipes, v1.15.*
+3. **Stagiaire** : « n'assigner une tâche qu'à soi-même » — *tranchée le 6 nov. 2026*
+   ([ADR-0066](ADR-0066-suites-equipes-projets.md) § 2) : `SELF_ASSIGN_ONLY_ROLES = ['intern']`
+   (`permissions.ts`), règle du module `work` (`403 WORK_ASSIGN_SELF_ONLY`) ; il s'assigne ou laisse
+   sans responsable, ne réassigne pas la tâche d'un autre. Aucune action ajoutée.
+4. **Manager et validation RH** — *tranchée le 6 nov. 2026*
+   ([ADR-0066](ADR-0066-suites-equipes-projets.md) § 1) : le **responsable d'une équipe RH** tient
+   l'étape `manager` des absences, notes de frais et avances de frais des autres membres de son
+   équipe (relation, pas un droit : quel que soit son rôle, sans `leave.approve` ni
+   `expenses.approve`), jamais pour lui-même, l'étape RH ou finance restant requise ; retiré de
+   l'équipe, il perd le droit.
 
 ## Liens
 

@@ -45,6 +45,11 @@ export interface ApproverContext {
   /** Détenteurs effectifs de `leave.approve` dans l'organisation (`countApprovers`). */
   approverCount: number;
   allowSoleApprover: boolean;
+  /**
+   * ADR-0066 § 1 : comptes des membres des équipes RH dont l'appelant est responsable
+   * (lui exclu, `usersLedBy`). Absent = aucun.
+   */
+  ledUserIds?: ReadonlySet<string>;
 }
 
 /** Décision de séparation des tâches pour l'étape en cours, `null` si rien n'est en attente. */
@@ -63,6 +68,7 @@ export function decisionOn(
     beneficiaryUserId,
     step,
     isDesignatedManager: managerUserId !== null && managerUserId === ctx.userId,
+    isTeamLead: beneficiaryUserId !== null && (ctx.ledUserIds?.has(beneficiaryUserId) ?? false),
     holdsLeaveApprove: ctx.holdsLeaveApprove,
     priorApproverUserIds: r.approvals.filter((a) => a.decision === 'approved').map((a) => a.userId),
     approverCountInOrg: ctx.approverCount,

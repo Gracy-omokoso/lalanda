@@ -77,7 +77,7 @@ continue d'enregistrer), défauts = comportement antérieur.
 | Échéance proche (`dueSoonDays`) | 1 | existant, désormais en jours ouvrés |
 | Archivage automatique (`autoArchiveCompletedDays`) | jamais | `work.project-watch` archive les projets `completed` depuis N jours (historique `project.archived`, auteur `system`) |
 | Modération des commentaires (`managersModerateComments`) | oui | les gestionnaires modifient **et** suppriment les commentaires des autres ; non : l'auteur seul (avant : suppression seulement) |
-| Numéros de tâche (`showTaskNumbers`) | oui | `#12` sur les cartes du Tableau et dans le panneau |
+| Numéros de tâche (`showTaskNumbers`) | oui | `#12` sur les cartes du Tableau et dans le panneau ; aussi la Chronologie et le Calendrier ([ADR-0066](ADR-0066-suites-equipes-projets.md) § 4) |
 
 Pas de nouvelle action : la restriction des créateurs s'ajoute à `work.manage` exigé par la route.
 

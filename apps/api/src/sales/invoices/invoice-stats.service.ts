@@ -5,7 +5,11 @@
 // délègue TOUT calcul au moteur (`computeInvoiceStats`). Rien n'est stocké : le
 // tableau se recalcule à chaque lecture et ne peut pas diverger de la liste.
 
-import { computeInvoiceStats, type InvoiceStatsDocument } from '@lalanda/engine';
+import {
+  computeInvoiceStats,
+  type InvoiceStatsDocument,
+  type ReceiptStatsReceipt,
+} from '@lalanda/engine';
 import type { InvoiceStats, InvoiceStatsCurrencySource } from '@lalanda/shared/sales-invoices';
 import { INVOICE_STATS_DEFAULT_MONTHS } from '@lalanda/shared/sales-invoices';
 import { Inject, Injectable } from '@nestjs/common';
@@ -72,7 +76,17 @@ export class InvoiceStatsService {
     return { currency: 'CDF', source: 'default_cdf' };
   }
 
-  async stats(organizationId: string, months?: number): Promise<InvoiceStats> {
+  /**
+   * Données lues pour les tableaux de bord des ventes (factures, ADR-0056 ;
+   * encaissements, ADR-0067) : devise de référence, documents de vente (bornés),
+   * encaissements de TOUS statuts. Aucun calcul.
+   */
+  async inputs(organizationId: string): Promise<{
+    reference: { currency: 'CDF' | 'USD'; source: InvoiceStatsCurrencySource };
+    documents: InvoiceStatsDocument[];
+    receipts: ReceiptStatsReceipt[];
+    truncated: boolean;
+  }> {
     const [reference, docs, receipts, dueDates] = await Promise.all([
       this.referenceCurrency(organizationId),
       this.invoices
@@ -98,7 +112,10 @@ export class InvoiceStatsService {
         .lean()
         .exec() as unknown as Promise<StatsInvoice[]>,
       this.receipts
-        .find({ organizationId, status: 'recorded' }, { receivedOn: 1, allocations: 1 })
+        .find(
+          { organizationId },
+          { status: 1, receivedOn: 1, currency: 1, method: 1, allocations: 1 },
+        )
         .lean()
         .exec(),
       this.settlements
@@ -134,18 +151,37 @@ export class InvoiceStatsService {
       };
     });
 
+    return {
+      reference,
+      documents,
+      receipts: receipts.map((r) => ({
+        id: String(r._id),
+        status: r.status,
+        receivedOn: r.receivedOn,
+        currency: r.currency,
+        method: r.method,
+        allocations: r.allocations.map((a) => ({ invoiceId: a.invoiceId, amount: a.amount })),
+      })),
+      truncated,
+    };
+  }
+
+  async stats(organizationId: string, months?: number): Promise<InvoiceStats> {
+    const { reference, documents, receipts, truncated } = await this.inputs(organizationId);
     const result = computeInvoiceStats({
       referenceCurrency: reference.currency,
       asOf: this.settlementsService.today(),
       months: months ?? INVOICE_STATS_DEFAULT_MONTHS,
       documents,
-      allocations: receipts.flatMap((r) =>
-        r.allocations.map((a) => ({
-          invoiceId: a.invoiceId,
-          amount: a.amount,
-          receivedOn: r.receivedOn,
-        })),
-      ),
+      allocations: receipts
+        .filter((r) => r.status === 'recorded')
+        .flatMap((r) =>
+          r.allocations.map((a) => ({
+            invoiceId: a.invoiceId,
+            amount: a.amount,
+            receivedOn: r.receivedOn,
+          })),
+        ),
     });
 
     return { ...result, currencySource: reference.source, truncated };
