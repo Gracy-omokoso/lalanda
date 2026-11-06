@@ -213,6 +213,24 @@ const MESSAGES_WORK: Record<string, string> = {
     'Quelqu’un a modifié cet élément entre-temps. La vue a été rechargée : refaites votre geste.',
   WORK_DATES_INVERTED: 'L’échéance précède la date de début.',
   WORK_MILESTONE_NEEDS_DATE: 'Un jalon exige une échéance.',
+  // ADR-0065 : numéro WhatsApp.
+  WHATSAPP_NOT_AVAILABLE: 'WhatsApp n’est pas disponible sur Lalanda pour le moment.',
+  WHATSAPP_PHONE_INVALID:
+    'Numéro invalide : saisissez-le au format international, par exemple +243 81 234 5678.',
+  WHATSAPP_PHONE_UNREACHABLE:
+    'WhatsApp ne peut pas joindre ce numéro. Vérifiez qu’il est bien inscrit sur WhatsApp.',
+  WHATSAPP_ALREADY_VERIFIED: 'Ce numéro est déjà vérifié.',
+  WHATSAPP_CODE_RATE_LIMITED: 'Trois codes au plus par heure : réessayez un peu plus tard.',
+  WHATSAPP_QUOTA_REACHED:
+    'Le plafond mensuel d’envois WhatsApp de votre organisation est atteint : réessayez le mois prochain.',
+  WHATSAPP_SEND_FAILED:
+    'WhatsApp n’a pas accepté l’envoi du code. Réessayez dans quelques instants.',
+  WHATSAPP_NO_PENDING_CODE: 'Aucun code en attente : demandez un nouveau code.',
+  WHATSAPP_CODE_EXPIRED: 'Ce code a expiré : demandez-en un nouveau.',
+  WHATSAPP_CODE_TOO_MANY_ATTEMPTS: 'Trop d’essais : demandez un nouveau code.',
+  WHATSAPP_CODE_INVALID: 'Code incorrect. Vérifiez le message reçu sur WhatsApp.',
+  WHATSAPP_NUMBER_NOT_VERIFIED:
+    'Vérifiez d’abord votre numéro WhatsApp pour activer cette notification.',
   WORK_MILESTONE_HAS_START: 'Un jalon n’a pas de date de début.',
   WORK_SUBTASK_DEPTH: 'Une sous-tâche ne peut pas avoir elle-même de sous-tâche.',
   WORK_ASSIGNEE_NOT_ELIGIBLE: 'Ce membre ne peut pas être responsable d’une tâche.',

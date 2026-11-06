@@ -1,4 +1,8 @@
-import { defaultWorkNotificationPreferences, type WorkSettingsView } from '@lalanda/shared/work';
+import {
+  defaultWorkNotificationPreferences,
+  type WhatsAppView,
+  type WorkSettingsView,
+} from '@lalanda/shared/work';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -8,7 +12,12 @@ import {
   corpsPreferences,
   createurs,
   libelleHeure,
+  colonneWhatsApp,
+  etapeWhatsApp,
+  explicationReprise,
   libelleEtatSlack,
+  libelleEtatWhatsApp,
+  libelleIndisponibleWhatsApp,
   ongletParametres,
   ongletsVisibles,
   retourSlack,
@@ -43,7 +52,7 @@ describe('paramètres des Projets (ADR-0061)', () => {
   it('mes notifications : bascule et corps', () => {
     const p = defaultWorkNotificationPreferences();
     const q = basculerCanal(p, 'mentioned', 'email');
-    expect(q.events.mentioned).toEqual({ bell: true, email: false, slack: true });
+    expect(q.events.mentioned).toEqual({ bell: true, email: false, slack: true, whatsapp: true });
     expect(p.events.mentioned.email).toBe(true); // immuable
     const sans = toutLeCanal(p, 'email', false);
     expect(Object.values(sans.events).every((c) => !c.email && c.bell)).toBe(true);
@@ -73,6 +82,56 @@ describe('paramètres des Projets (ADR-0061)', () => {
     expect(retourSlack('erreur-session')?.message).toContain('même session');
     expect(retourSlack('n-importe-quoi')?.ton).toBe('erreur');
     expect(libelleEtatSlack('reconnect_required')).toBe('À reconnecter');
+  });
+
+  it('WhatsApp (ADR-0065) : étapes du bloc, colonne active seulement avec un numéro vérifié', () => {
+    const base: WhatsAppView = {
+      available: true,
+      unavailableReason: null,
+      number: null,
+      codesLeftThisHour: 3,
+      quota: { month: '2026-11', used: 0, limit: 1000, reached: false },
+    };
+    const numero = {
+      phone: '+243812345612',
+      phoneMasked: '+243 81 *** **12',
+      verifiedAt: null,
+      code: null,
+    };
+    expect(etapeWhatsApp(base)).toBe('saisie');
+    expect(colonneWhatsApp(base)).toEqual({ visible: true, active: false });
+    expect(colonneWhatsApp(null)).toEqual({ visible: false, active: false });
+    const indispo = { ...base, available: false, unavailableReason: 'not_configured' as const };
+    expect(etapeWhatsApp(indispo)).toBe('indisponible');
+    expect(colonneWhatsApp(indispo).visible).toBe(false);
+    expect(libelleIndisponibleWhatsApp('not_configured')).toContain('pas encore disponible');
+    expect(libelleIndisponibleWhatsApp('switched_off')).toContain('coupé');
+    const code = {
+      ...base,
+      number: {
+        ...numero,
+        status: 'pending' as const,
+        code: {
+          sentAt: '2026-11-06T10:00:00Z',
+          expiresAt: '2026-11-06T10:10:00Z',
+          attemptsLeft: 5,
+        },
+      },
+    };
+    expect(etapeWhatsApp(code)).toBe('code');
+    const ok = { ...base, number: { ...numero, status: 'verified' as const } };
+    expect(etapeWhatsApp(ok)).toBe('verifie');
+    expect(colonneWhatsApp(ok)).toEqual({ visible: true, active: true });
+    const stop = { ...base, number: { ...numero, status: 'opted_out' as const } };
+    expect(etapeWhatsApp(stop)).toBe('a-reprendre');
+    expect(explicationReprise('opted_out')).toContain('STOP');
+    expect(explicationReprise('to_verify')).toContain('pas pu remettre');
+    expect(libelleEtatWhatsApp('to_verify')).toBe('À vérifier');
+    const p = defaultWorkNotificationPreferences();
+    expect(basculerCanal(p, 'task_overdue', 'whatsapp').events.task_overdue.whatsapp).toBe(false);
+    expect(Object.values(toutLeCanal(p, 'whatsapp', false).events).every((c) => !c.whatsapp)).toBe(
+      true,
+    );
   });
 
   it('comportement : les réglages existants sont repris tels quels', () => {

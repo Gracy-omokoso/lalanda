@@ -15,6 +15,7 @@ import {
   WORK_NOTIFICATION_EVENTS,
   WORK_NOTIFICATION_EVENT_LABELS,
   type SlackConnectionView,
+  type WhatsAppView,
   type WorkDefaultView,
   type WorkNotificationPreferencesView,
   type WorkProjectVisibility,
@@ -22,7 +23,7 @@ import {
   type WorkWeekday,
 } from '@lalanda/shared/work';
 import { PageHeader, Skeleton, StatusPill, TabsNav, buttonClasses } from '@lalanda/ui';
-import { Bell, Mail, MessageSquare } from 'lucide-react';
+import { Bell, Mail, MessageSquare, Smartphone } from 'lucide-react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useId, useState } from 'react';
 
@@ -32,6 +33,7 @@ import { workApi } from '@/lib/work-api';
 import { useShell } from '../../_components/shell-context';
 import { CHAMP } from '../../ventes/_components/form-ui';
 
+import { BlocWhatsApp } from './bloc-whatsapp';
 import { Alerte } from './elements';
 import {
   HEURES_RESUME,
@@ -40,6 +42,7 @@ import {
   basculerCanal,
   basculerJour,
   corpsComportement,
+  colonneWhatsApp,
   corpsPreferences,
   createurs,
   libelleEtatSlack,
@@ -112,6 +115,9 @@ function MesNotifications(): React.ReactElement {
   const [enregistre, setEnregistre] = useState(false);
   // ADR-0064 : la colonne Slack n'apparaît que si l'organisation est connectée.
   const [slack, setSlack] = useState(false);
+  // ADR-0065 : bloc WhatsApp (numéro de l'appelant) et colonne WhatsApp.
+  const [whatsapp, setWhatsapp] = useState<WhatsAppView | null>(null);
+  const colonneWa = colonneWhatsApp(whatsapp);
 
   useEffect(() => {
     workApi
@@ -122,6 +128,10 @@ function MesNotifications(): React.ReactElement {
       .getSlack()
       .then((v) => setSlack(v.connected))
       .catch(() => setSlack(false));
+    workApi
+      .getWhatsApp()
+      .then(setWhatsapp)
+      .catch(() => setWhatsapp(null));
   }, []);
 
   async function enregistrer(next: WorkNotificationPreferencesView): Promise<void> {
@@ -145,15 +155,20 @@ function MesNotifications(): React.ReactElement {
       <Skeleton className="h-64 w-full" />
     );
 
+  const canaux = [
+    'la cloche de Lalanda',
+    'un e-mail',
+    ...(slack ? ['un message privé Slack'] : []),
+    ...(colonneWa.visible ? ['un message WhatsApp'] : []),
+  ];
+  const listeCanaux = `${canaux.slice(0, -1).join(', ')} et/ou ${canaux[canaux.length - 1]}`;
+
   return (
     <div className="flex flex-col gap-4">
+      {whatsapp ? <BlocWhatsApp vue={whatsapp} onChange={setWhatsapp} /> : null}
       <Carte
         titre="Événements"
-        description={
-          slack
-            ? 'Choisissez, pour chaque événement, la cloche de Lalanda, un e-mail et/ou un message privé Slack. Vous n’êtes jamais notifié de vos propres gestes.'
-            : 'Choisissez, pour chaque événement, la cloche de Lalanda et/ou un e-mail. Vous n’êtes jamais notifié de vos propres gestes.'
-        }
+        description={`Choisissez, pour chaque événement, ${listeCanaux}. Vous n’êtes jamais notifié de vos propres gestes.`}
       >
         <table className="w-full text-sm">
           <thead>
@@ -178,6 +193,14 @@ function MesNotifications(): React.ReactElement {
                   <span className="inline-flex items-center gap-1">
                     <MessageSquare aria-hidden="true" className="h-3.5 w-3.5" />
                     Slack
+                  </span>
+                </th>
+              ) : null}
+              {colonneWa.visible ? (
+                <th scope="col" className="w-24 py-2 text-center font-medium">
+                  <span className="inline-flex items-center gap-1">
+                    <Smartphone aria-hidden="true" className="h-3.5 w-3.5" />
+                    WhatsApp
                   </span>
                 </th>
               ) : null}
@@ -217,6 +240,19 @@ function MesNotifications(): React.ReactElement {
                     />
                   </td>
                 ) : null}
+                {colonneWa.visible ? (
+                  <td className="text-center">
+                    <Interrupteur
+                      id={`${id}-${e}-w`}
+                      coche={colonneWa.active && vue.events[e].whatsapp}
+                      disabled={!colonneWa.active}
+                      libelle={`WhatsApp : ${WORK_NOTIFICATION_EVENT_LABELS[e]}`}
+                      onChange={() =>
+                        void enregistrer({ ...vue, ...basculerCanal(vue, e, 'whatsapp') })
+                      }
+                    />
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>
@@ -245,7 +281,21 @@ function MesNotifications(): React.ReactElement {
               Couper tous les messages Slack
             </button>
           ) : null}
+          {colonneWa.active ? (
+            <button
+              type="button"
+              className={buttonClasses('secondary', 'sm')}
+              onClick={() => void enregistrer({ ...vue, ...toutLeCanal(vue, 'whatsapp', false) })}
+            >
+              Couper tous les messages WhatsApp
+            </button>
+          ) : null}
         </div>
+        {colonneWa.visible && !colonneWa.active ? (
+          <p className="text-xs text-[var(--foreground-muted)]">
+            La colonne WhatsApp s’active une fois votre numéro vérifié.
+          </p>
+        ) : null}
       </Carte>
 
       <Carte

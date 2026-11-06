@@ -1836,7 +1836,9 @@ export interface IntegrationView {
     | 'elevenlabs'
     | 'zeptomail'
     // ADR-0064 : application Slack de la plateforme.
-    | 'slack';
+    | 'slack'
+    // ADR-0065 : numéro WhatsApp commun de la plateforme.
+    | 'whatsapp';
   label: string;
   enabled: boolean;
   config: Record<string, string | number | boolean>;

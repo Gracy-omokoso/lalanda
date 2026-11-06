@@ -12,6 +12,9 @@ import {
   type WorkNotificationEvent,
   type WorkNotificationPreferences,
   type WorkSettingsView,
+  type WhatsAppNumberStatus,
+  type WhatsAppUnavailableReason,
+  type WhatsAppView,
 } from '@lalanda/shared/work';
 
 export const ONGLETS_PARAMETRES = [
@@ -23,7 +26,71 @@ export const ONGLETS_PARAMETRES = [
 export type OngletParametres = (typeof ONGLETS_PARAMETRES)[number]['id'];
 
 /** Canaux réglables d'un événement. */
-export type CanalNotification = 'bell' | 'email' | 'slack';
+export type CanalNotification = 'bell' | 'email' | 'slack' | 'whatsapp';
+
+// ── ADR-0065 : WhatsApp ───────────────────────────────────────────────────────
+
+/** Valeur proposée dans le champ du numéro (indicatif de la RDC). */
+export const NUMERO_WHATSAPP_INITIAL = '+243 ';
+
+/** Étape du bloc « WhatsApp » de « Mes notifications ». */
+export type EtapeWhatsApp = 'indisponible' | 'saisie' | 'code' | 'verifie' | 'a-reprendre';
+
+export function etapeWhatsApp(v: WhatsAppView): EtapeWhatsApp {
+  if (!v.available && v.number?.status !== 'verified') return 'indisponible';
+  const n = v.number;
+  if (!n) return 'saisie';
+  if (n.code) return 'code';
+  if (n.status === 'verified') return 'verifie';
+  if (n.status === 'pending') return 'saisie';
+  return 'a-reprendre';
+}
+
+/**
+ * Colonne WhatsApp du tableau : visible quand le fournisseur est disponible ; ses
+ * interrupteurs ne s'allument qu'avec un numéro vérifié (le serveur refuse sinon).
+ */
+export function colonneWhatsApp(v: WhatsAppView | null): { visible: boolean; active: boolean } {
+  if (!v || !v.available) return { visible: false, active: false };
+  return { visible: true, active: v.number?.status === 'verified' };
+}
+
+export function libelleIndisponibleWhatsApp(r: WhatsAppUnavailableReason | null): string {
+  switch (r) {
+    case 'switched_off':
+      return 'WhatsApp est momentanément coupé sur Lalanda. Vos autres notifications continuent.';
+    case 'provider_error':
+      return 'WhatsApp est momentanément indisponible : l’équipe Lalanda a été prévenue. Vos autres notifications continuent.';
+    default:
+      return 'WhatsApp n’est pas encore disponible sur Lalanda. Rien ne change pour vos notifications (cloche et e-mail).';
+  }
+}
+
+export function libelleEtatWhatsApp(status: WhatsAppNumberStatus | null): string {
+  switch (status) {
+    case 'verified':
+      return 'Vérifié';
+    case 'pending':
+      return 'Code envoyé';
+    case 'to_verify':
+      return 'À vérifier';
+    case 'opted_out':
+      return 'Désactivé par « STOP »';
+    default:
+      return 'Aucun numéro';
+  }
+}
+
+/** Explication d'un numéro à reprendre (« à vérifier », « STOP »). */
+export function explicationReprise(status: WhatsAppNumberStatus | null): string | null {
+  if (status === 'to_verify') {
+    return 'WhatsApp n’a pas pu remettre de message à ce numéro. Vérifiez-le, puis demandez un nouveau code.';
+  }
+  if (status === 'opted_out') {
+    return 'Vous avez répondu « STOP » : plus aucun message ne vous est envoyé. Demandez un nouveau code pour réactiver WhatsApp.';
+  }
+  return null;
+}
 
 export function ongletParametres(
   v: string | null,

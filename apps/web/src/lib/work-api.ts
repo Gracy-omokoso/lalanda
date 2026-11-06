@@ -48,6 +48,8 @@ import type {
   SlackConnectStart,
   SlackConnectionView,
   WorkProjectSlackChannelView,
+  // ADR-0065 : notifications par WhatsApp.
+  WhatsAppView,
 } from '@lalanda/shared/work';
 
 import { API_URL, jsonRequest, salesQuery } from './api';
@@ -361,4 +363,13 @@ export const workApi = {
       `/work/projects/${encodeURIComponent(projectId)}/slack-channel`,
       { method: 'PUT', body },
     ),
+
+  // ── ADR-0065 : notifications par WhatsApp (numéro de l'appelant seulement) ──
+  getWhatsApp: () => jsonRequest<WhatsAppView>('/work/whatsapp', { method: 'GET' }),
+  requestWhatsAppCode: (phone: string) =>
+    jsonRequest<WhatsAppView>('/work/whatsapp/number', { method: 'POST', body: { phone } }),
+  verifyWhatsAppCode: (code: string) =>
+    jsonRequest<WhatsAppView>('/work/whatsapp/number/verify', { method: 'POST', body: { code } }),
+  removeWhatsAppNumber: () =>
+    jsonRequest<WhatsAppView>('/work/whatsapp/number', { method: 'DELETE' }),
 };

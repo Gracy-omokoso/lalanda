@@ -291,6 +291,14 @@ const LIBELLES_CHAMPS: Record<string, string> = {
   forcePathStyle: 'Forcer le style de chemin',
   // Slack (ADR-0064) — `clientId` et `clientSecret` reprennent les libellés PayPal.
   signingSecret: 'Secret de signature (Signing Secret)',
+  // WhatsApp (ADR-0065)
+  accessToken: 'Jeton d’accès permanent (utilisateur système)',
+  appSecret: 'Clé secrète de l’application Meta',
+  verifyToken: 'Jeton de vérification du webhook',
+  phoneNumberId: 'Identifiant du numéro de téléphone',
+  businessAccountId: 'Identifiant du compte WhatsApp Business',
+  apiVersion: 'Version de la Graph API',
+  monthlyLimitPerOrganization: 'Plafond mensuel d’envois par organisation',
 };
 
 export function libelleChamp(nom: string): string {
@@ -338,6 +346,19 @@ const AIDES_CHAMPS: Partial<Record<IntegrationProvider, Record<string, string>>>
   },
   smtp: {
     user: 'Identifiant du compte d’envoi, stocké en clair.',
+  },
+  whatsapp: {
+    accessToken:
+      'Jeton PERMANENT d’un utilisateur système Meta (permissions whatsapp_business_messaging et whatsapp_business_management). Un jeton refusé par Meta pendant un envoi est signalé ici et suspend les envois jusqu’au prochain test réussi.',
+    appSecret:
+      'Paramètres de l’app › Général › Clé secrète : vérifie la signature X-Hub-Signature-256 des webhooks.',
+    verifyToken:
+      'Chaîne de votre choix (16 caractères au moins), saisie à l’identique dans la configuration du webhook chez Meta.',
+    phoneNumberId: 'WhatsApp › Configuration de l’API : « Identifiant de numéro de téléphone ».',
+    businessAccountId: 'Même page : « Identifiant du compte WhatsApp Business ».',
+    apiVersion: 'Facultatif : v24.0 par défaut.',
+    monthlyLimitPerOrganization:
+      'Facultatif : 1 000 par défaut. Codes de vérification compris ; au-delà, plus aucun envoi WhatsApp pour l’organisation jusqu’au mois suivant (heure de Kinshasa).',
   },
 };
 
