@@ -201,3 +201,9 @@ Décideurs :
   Slack des préférences, canal facultatif par projet (confirmation pour un projet privé), envoi non
   bloquant, Events API signée, interrupteur `/admin` + `SLACK_ENABLED`. Statut : **proposé**
   (5 nov. 2026).
+- [ADR-0066](ADR-0066-suites-equipes-projets.md) — Suites des équipes et des Projets : le
+  responsable d'une équipe RH valide l'étape manager de son équipe (décision n° 4 d'ADR-0059), le
+  Stagiaire n'assigne qu'à lui-même (`SELF_ASSIGN_ONLY_ROLES`, décision n° 3), notifications d'un
+  import regroupées par personne et par canal, numéros de tâche dans la Chronologie et le
+  Calendrier, assigner dans un projet privé ajoute l'assigné aux membres (gestionnaire) ou est
+  refusé. Statut : **accepté** (6 nov. 2026).

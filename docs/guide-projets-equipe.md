@@ -19,7 +19,7 @@ ventes, ni trésorerie, ni achats, ni comptabilité). Selon la personne :
 |---|---|---|
 | **Salarié** (défaut) | tout membre du personnel | voit, coche, commente, saisit son temps |
 | **Manager / Chef d'équipe** | qui pilote une équipe ou des projets | comme le Salarié, et **crée, règle, archive** des projets |
-| **Stagiaire** | stagiaire, apprenti | comme le Salarié |
+| **Stagiaire** | stagiaire, apprenti | comme le Salarié, mais **ne s'assigne qu'à lui-même** une tâche (ou la laisse sans responsable) |
 | **Invité externe** | client, freelance | voit et fait avancer les projets et les tâches, rien d'autre |
 | Commercial, Comptable, Responsable RH, Magasinier, Analyste | selon le métier | travaillent sur les tâches, sans régler les projets |
 
@@ -68,7 +68,9 @@ projet, onglet **Liste › Importer des tâches**).
    introuvable → ignorée) ou **Écartée** (par exemple : date illisible). Corrigez le fichier et
    choisissez-le de nouveau, ou cochez la case pour importer seulement les lignes valides.
 3. **Importer** : tout est créé d'un coup (ou rien, en cas d'incident). Les sections inconnues
-   deviennent des colonnes du Tableau, les étiquettes inconnues sont créées.
+   deviennent des colonnes du Tableau, les étiquettes inconnues sont créées. Chaque personne reçoit
+   **une seule** notification pour l'ensemble (« 12 tâches vous ont été assignées dans le projet X »),
+   par la cloche, l'e-mail ou Slack selon ses réglages — pas une par tâche.
 
 Limites : 2 Mo, 2 000 lignes, pas de macro ni de formule (seules les valeurs sont lues). Seuls ceux qui
 peuvent **gérer** les projets créent un projet ou de nouvelles sections et étiquettes.
@@ -116,6 +118,15 @@ chantier » : un poseur, un commercial, la responsable des achats). **RH › Éq
 Les responsables RH et la direction gèrent les équipes ; ceux qui lisent les dossiers RH les
 consultent. La fiche dit à combien de projets l'équipe est ajoutée.
 
+**Le responsable d'une équipe valide son équipe** (ADR-0066) : il voit dans **RH › Mon espace ›
+Absences à valider** et **Frais à valider** (et dans Mes tâches) les demandes d'absence, notes de
+frais et avances de frais des membres de son équipe, et les valide à l'étape « manager » — comme le
+manager inscrit sur leur fiche. L'étape RH ou comptable suivante reste nécessaire si votre
+organisation l'a prévue. Il ne valide jamais ses propres demandes, ne voit pas les dossiers de ses
+membres, ni les avances sur salaire. Retiré de l'équipe, il ne voit plus rien.
+*À savoir* : l'étape « manager » n'existe que si la fiche du collaborateur a un manager renseigné
+(RH › Collaborateurs) ; sinon la demande va directement aux RH.
+
 ## 4. Créer, assigner et cocher une tâche
 
 1. Dans l'onglet **Liste** (ou **Tableau**), **« + Ajouter une tâche »** en bas d'une section :
@@ -125,6 +136,10 @@ consultent. La fiche dit à combien de projets l'équipe est ajoutée.
    la **Priorité**, une description. Chaque champ s'enregistre dès qu'on le change (pas de bouton
    « Enregistrer »).
 3. Le responsable reçoit une **notification** (cloche en haut à droite) qui ouvre la tâche.
+   Le sélecteur ne propose que les personnes **qui voient le projet**. Dans un projet privé, un
+   gestionnaire qui assigne quelqu'un hors du projet l'**ajoute aux membres** (il est prévenu) ;
+   les autres voient « N personnes ne voient pas ce projet » et demandent l'ajout. Un **Stagiaire**
+   ne voit que « Moi » : il prend une tâche libre ou la rend, mais ne la donne pas à un collègue.
 4. Pour terminer : cochez la tâche (dans le projet, ou d'un clic sur le **cercle** dans Mes tâches).
 
 ## 5. Commenter et mentionner
@@ -166,7 +181,7 @@ toujours), visibilité et vue par défaut (Aperçu, Liste ou Tableau) des nouvea
 ouvrés** (l'« échéance proche » compte des jours ouvrés : un vendredi, « 1 jour » atteint le lundi),
 délai d'échéance proche, **archivage automatique** des projets terminés après N jours (ou jamais),
 modification et suppression des commentaires des autres par les gestionnaires, affichage des
-numéros de tâche (#12).
+numéros de tâche (#12) — sur le Tableau, le panneau, la **Chronologie** et le **Calendrier**.
 
 ## 8 bis. Slack (ADR-0064)
 

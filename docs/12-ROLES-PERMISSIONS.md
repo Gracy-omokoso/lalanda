@@ -37,8 +37,8 @@ Le support ne voit jamais les données financières sans consentement explicite,
 | Magasinier (`storekeeper`, ADR-0046, appliqué au lot S0) | sort, transfère et compte le stock ; consulte le matériel et les documents ; ni prix d'achat, ni valeur du stock, ni trésorerie, ni ventes |
 | Expert-comptable externe (`external_accountant`, ADR-0049, appliqué au lot K0) | consulte et exporte la comptabilité ; n'écrit rien ; attribuable par le seul Propriétaire |
 | Salarié (`employee`, ADR-0059, appliqué) — **rôle par défaut à l'invitation** | projets et tâches (voir, cocher, commenter, saisir son temps) ; ses congés, ses frais, son pointage ; aucune donnée financière |
-| Manager / Chef d'équipe (`team_manager`, ADR-0059, appliqué) | Salarié + créer, régler, archiver des projets (`work.manage`) ; pas de validation RH avant les équipes (v1.15) |
-| Stagiaire (`intern`, ADR-0059, appliqué) | mêmes droits que le Salarié |
+| Manager / Chef d'équipe (`team_manager`, ADR-0059, appliqué) | Salarié + créer, régler, archiver des projets (`work.manage`) ; la validation RH de son équipe vient de la **relation** (manager désigné de la fiche, ou responsable d'une équipe RH, ADR-0066 § 1), pas du rôle |
+| Stagiaire (`intern`, ADR-0059, appliqué) | mêmes droits que le Salarié ; n'assigne une tâche qu'à lui-même (`SELF_ASSIGN_ONLY_ROLES`, ADR-0066 § 2) |
 | Invité externe (`guest`, ADR-0059, appliqué) | client ou freelance : projets et tâches seulement ; borné aux projets dont il est membre (`PROJECT_SCOPED_ROLES`, ADR-0060) |
 
 ## Actions granulaires
@@ -666,6 +666,15 @@ promotion vers un projet, assistance IA) de `canvas.update`, régler son IA de
   écran ; il remplace `viewer`. Les membres existants gardent leur rôle (aucune migration).
 - `PROJECT_SCOPED_ROLES = ['guest']` : restriction aux projets dont il est membre (personnellement
   ou par une équipe), câblée en v1.15 (ADR-0060).
+- `SELF_ASSIGN_ONLY_ROLES = ['intern']` (ADR-0066 § 2, décision n° 3 d'ADR-0059 tranchée le 6 nov.
+  2026) : crée et fait avancer des tâches, mais n'assigne qu'à lui-même (ou sans responsable) et ne
+  réassigne pas la tâche d'un autre — `403 WORK_ASSIGN_SELF_ONLY`. Règle du module `work`, pas une
+  action : la matrice est inchangée.
+- **Responsable d'équipe** (ADR-0066 § 1, décision n° 4 d'ADR-0059 tranchée le 6 nov. 2026) : le
+  `leadUserId` d'une équipe RH tient l'étape `manager` des absences, notes de frais et avances de
+  frais des autres membres, quel que soit son rôle, sans `leave.approve` ni `expenses.approve` ;
+  jamais sa propre demande, jamais l'étape RH ou finance, jamais une avance sur salaire, aucun accès
+  au dossier. Relation lue à chaque requête (`isTeamLead`).
 - Interrupteur `MEMBER_PERMISSIONS_ENABLED` : allumé sauf `false` explicite.
 - Croissance (décision n° 1 d'ADR-0059, tranchée le 5 nov. 2026) : la santé et les indicateurs
   sont réservés à qui a `sales.read` (rôle ou écart individuel) et au Conseiller ; les autres

@@ -1012,6 +1012,18 @@ portée répond `404` (garde `WorkVisibilityGuard` sur `projectId`, `taskId`, `c
 (`/work/projects`, `/work/portfolio`, `/work/tasks`, `/work/my-tasks`, `/work/time-entries`,
 `/work/timesheets`, `/notifications`, `/notifications/unread-count`, `/morning-brief`) l'excluent.
 
+## Suites des équipes et des Projets — implémenté, ADR-0066
+
+| Route | Changement |
+|---|---|
+| `GET /hr/me` | + `isTeamLead` (responsable d'au moins une équipe RH comptant un autre membre), `ledEmployeeIds` (fiches de ses membres, lui exclu) ; `canApprove` le compte |
+| `GET /hr/leave-approvals/pending` · `POST /hr/leave-requests/:id/approve` · `…/reject` | le responsable d'une équipe RH tient l'étape `manager` des demandes de ses membres (`isTeamLead`) ; étape `hr`, sa propre demande, hors équipe : refus habituels (`403 LEAVE_NOT_YOUR_STEP`, `409 SELF_APPROVAL_FORBIDDEN`) |
+| `GET /hr/expense-reports?view=a-valider` · `GET /hr/expense-reports/:id` · `POST …/approve` · `…/reject` · `GET /hr/advances` · `POST /hr/advances/:id/approve` · `…/reject` | idem pour les notes de frais et les avances de **frais** (jamais une avance sur salaire) ; il voit les notes et avances de ses membres hors brouillons, comme le manager ; étape `finance` : `403 EXPENSE_NOT_YOUR_STEP` |
+| `GET /work/members` | + `assignSelfOnly` (l'appelant n'assigne qu'à lui-même) ; `?projectId=` ajoute `seesProject` à chaque membre (projet hors portée : 404) |
+| `POST /work/projects/:projectId/tasks` · `PATCH /work/tasks/:taskId` | rôle de `SELF_ASSIGN_ONLY_ROLES` (Stagiaire) : responsable soi ou aucun, jamais la tâche d'un autre → `403 WORK_ASSIGN_SELF_ONLY` ; assigné qui ne voit pas le projet : ajouté membre direct si l'acteur a `work.manage` (historique `project.member_added`, notification `work.added_to_project`), sinon `400 INVALID_REQUEST` (problème `WORK_ASSIGNEE_NOT_MEMBER` sur `assigneeUserId`) |
+| `POST /work/import/preview` | avertissements `IMPORT_ASSIGNEE_SELF_ONLY` (Stagiaire) et `IMPORT_ASSIGNEE_NOT_MEMBER` (projet existant, sans `work.manage`) : la ligne est importée sans responsable |
+| `POST /work/import/projects` · `POST /work/projects/:projectId/import` · `POST /work/plans/projects` | assignations **regroupées** : par personne, une notification `work.task_assigned` « N tâches vous ont été assignées dans le projet X » (lien `/projets/<id>/liste`) par canal choisi (cloche, e-mail, Slack) et un événement par personne dans le canal Slack du projet ; une seule tâche : notification habituelle ; rien si l'import échoue |
+
 ## Paramètres des Projets — implémenté, ADR-0061
 
 | Route | Droit | Effet |

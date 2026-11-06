@@ -114,14 +114,16 @@ nom et dates du projet, bouton **Importer**. Dans un projet, la Liste porte **Im
 
 ## Conséquences
 
-- Chaque tâche assignée à l'import envoie la notification d'assignation habituelle (même chemin que la
-  saisie) : un gros import peut en envoyer beaucoup à une même personne.
+- Chaque tâche assignée à l'import envoyait la notification d'assignation habituelle : un gros import
+  pouvait en envoyer beaucoup à une même personne. *Regroupées depuis ADR-0066 § 5.*
 - Écritures une par une par les services : quelques secondes pour 200 lignes, davantage vers 2 000.
 - Les étiquettes et colonnes créées restent si l'utilisateur supprime ensuite le projet.
 
 ## Points ouverts
 
 1. Regrouper les notifications d'assignation d'un import en une seule (« 12 tâches vous ont été
-   assignées ») ?
+   assignées ») ? — *tranché le 6 nov. 2026* ([ADR-0066](ADR-0066-suites-equipes-projets.md) § 5) :
+   oui, une par personne et par canal (cloche, e-mail, Slack), après l'écriture complète ; une seule
+   tâche garde la notification habituelle ; IA comprise.
 2. Mettre à jour des tâches existantes (import « fusion » par numéro `#12`) : hors périmètre.
 3. Import de dates de début de projet / responsable depuis le fichier (aujourd'hui : écran).

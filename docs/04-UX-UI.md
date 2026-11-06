@@ -668,6 +668,28 @@ téléphone, état vide).
   couleur, rien ne change. Contrastes ≥ 4,5:1 (texte et texte secondaire) dans les 5 combinaisons,
   liseré ≥ 3:1 (`tokens.test.ts`). Captures `tableau-postit-lalanda.png`, `tableau-postit-ebene.png`.
 
+## Suites des équipes et des Projets — implémenté, ADR-0066
+
+Captures : `docs/refonte-ui/v7/` (`rh-a-valider-responsable-equipe.png`,
+`selecteur-responsable-stagiaire.png`, `notification-groupee.png`, `chronologie-numeros.png`,
+`chronologie-sans-numeros.png`).
+
+- **RH › Mon espace** : pour un responsable d'équipe, le bandeau offre **Absences à valider** et
+  **Frais à valider** (comme pour un manager) ; « Absences à valider » liste les demandes de ses
+  membres, avec « Étape : manager » et les boutons Valider / Refuser. Sous-titre : « … comme
+  manager, comme responsable d'équipe ou comme validateur ». **Mes frais** : « À valider pour mon
+  équipe ». Aucune entrée de menu ajoutée (le menu « À valider » reste aux détenteurs de
+  `leave.approve`).
+- **Panneau de tâche › Responsable** : Stagiaire → « Aucun responsable » et **Moi** seulement, aide
+  « Votre rôle permet de vous assigner une tâche, ou de la laisser sans responsable » ; tâche d'un
+  collègue : sélecteur désactivé et « … votre rôle ne permet pas de la réassigner ». Autres rôles : les
+  personnes qui **voient le projet** ; pour un gestionnaire, « N personnes ne voient pas ce projet.
+  **Ajouter un membre** » (lien vers `/projets/<id>/membres`). Aide liée par `aria-describedby`.
+- **Notification groupée** (cloche, e-mail, Slack) : « 12 tâches vous ont été assignées dans le projet
+  X », ouvre la **Liste** du projet.
+- **Chronologie** et **Calendrier** du projet : `#12` devant le titre suit le réglage « Numéros de
+  tâche » (lignes, barres, infobulles, puces, agenda, annonces lues par les lecteurs d'écran).
+
 ## Slack dans les Projets — implémenté, ADR-0064
 
 Captures : `docs/refonte-ui/v6/` (`slack-non-disponible.png`, `slack-non-connecte.png`,

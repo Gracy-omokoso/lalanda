@@ -120,6 +120,10 @@ projet n'est réécrit (un identifiant d'équipe disparu ne donne plus rien).
 Historique `project.member_added` / `project.member_removed` ; notification « ajouté à un projet »
 aux personnes ajoutées et aux membres des équipes ajoutées (ADR-0061 § 2).
 
+*Depuis [ADR-0066](ADR-0066-suites-equipes-projets.md) § 3* : assigner une tâche à quelqu'un qui ne
+voit pas le projet l'en rend **membre direct** si l'acteur a `work.manage`, sinon
+`400 WORK_ASSIGNEE_NOT_MEMBER` ; `GET /work/members?projectId=` dit qui voit le projet (`seesProject`).
+
 ### 5. Portée, rôles limités, notifications
 
 `WorkAccessService.scopeOf(organisation, appelant)` :
