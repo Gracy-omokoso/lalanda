@@ -691,6 +691,33 @@ Captures : `docs/refonte-ui/v6/` (`slack-non-disponible.png`, `slack-non-connect
   canal**. Projet passé en privé sans confirmation : « En pause » et explication.
 - Couleur jamais seule (états écrits), champs étiquetés, cases et interrupteurs au clavier.
 
+## WhatsApp dans les Projets — implémenté, ADR-0065
+
+Captures : `docs/refonte-ui/v7/` (`whatsapp-fournisseur-indisponible.png`,
+`whatsapp-numero-non-verifie.png`, `whatsapp-code-envoye.png`, `whatsapp-verifie.png`,
+`projets-notifications-colonne-whatsapp.png`), envois simulés par un faux Meta local.
+
+- **Mes notifications › bloc « WhatsApp »** (en tête, pour chacun) : titre, phrase « Votre numéro reste
+  privé : aucun autre membre ne le voit », pastille d'état écrite (**Aucun numéro**, **Code envoyé**,
+  **Vérifié**, **À vérifier**, **Désactivé par « STOP »**, **Indisponible**).
+  - Saisie : champ **Votre numéro WhatsApp** (`type=tel`, `+243 ` proposé), bouton **Recevoir un
+    code**, aide (format international, demandes restantes dans l'heure).
+  - Code envoyé : « Code envoyé au +243 81 *** **12, valable jusqu'à … (n essais restants) », champ
+    **Code reçu sur WhatsApp** (6 chiffres, `autocomplete=one-time-code`), **Vérifier**, **Renvoyer un
+    code**, **Changer de numéro**.
+  - Vérifié : numéro complet (à son seul titulaire) et date, rappel « Répondez STOP… »,
+    **Changer de numéro**, **Retirer mon numéro** (confirmation).
+  - À vérifier / STOP : explication en clair puis la saisie, numéro prérempli.
+  - Indisponible : raison écrite (pas encore disponible, coupé, momentanément indisponible) ; si un
+    numéro existe, « reste enregistré » et **Retirer mon numéro**.
+  - Plafond atteint : bandeau d'alerte (« plus aucun message WhatsApp ne part jusqu'au mois
+    prochain »).
+- **Tableau des événements** : quatrième colonne **WhatsApp** (icône téléphone) après Cloche, E-mail et
+  Slack, visible si WhatsApp est disponible ; interrupteurs désactivés (et « La colonne WhatsApp
+  s'active une fois votre numéro vérifié ») tant que le numéro n'est pas vérifié ; bouton **Couper
+  tous les messages WhatsApp**.
+- Couleur jamais seule (états écrits), champs étiquetés, messages d'erreur en clair.
+
 ## Importer un fichier et Construire avec l'IA — implémenté, ADR-0062 et ADR-0063
 
 Captures : `docs/refonte-ui/v5/` (`import-apercu.png`, `import-resultat.png`, `ia-formulaire.png`,

@@ -201,3 +201,9 @@ Décideurs :
   Slack des préférences, canal facultatif par projet (confirmation pour un projet privé), envoi non
   bloquant, Events API signée, interrupteur `/admin` + `SLACK_ENABLED`. Statut : **proposé**
   (5 nov. 2026).
+- [ADR-0065](ADR-0065-notifications-projets-par-whatsapp.md) — Notifications des Projets par
+  WhatsApp : API WhatsApp Business Cloud de Meta, un numéro « Lalanda » commun, numéro de chaque
+  personne prouvé par un code à 6 chiffres (empreinte seule, 10 min, 5 essais, 3 codes/heure) et
+  jamais montré aux autres, quatrième colonne WhatsApp des préférences, modèles en liste fermée (fr),
+  webhook signé (statuts, « STOP »), plafond mensuel par organisation, jeton refusé signalé dans
+  `/admin`, interrupteur `/admin` + `WHATSAPP_ENABLED`. Statut : **proposé** (6 nov. 2026).

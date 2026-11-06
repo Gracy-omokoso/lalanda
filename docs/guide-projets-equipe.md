@@ -191,6 +191,31 @@ Les notifications des Projets peuvent aussi arriver **dans Slack**, en message p
 Pour la dirigeante (création de l'application Slack, identifiants à saisir dans `/admin`) :
 [docs/integrations/slack.md](integrations/slack.md).
 
+## 8 ter. WhatsApp (ADR-0065)
+
+Les notifications importantes des Projets peuvent arriver **sur WhatsApp**, depuis le numéro
+« Lalanda ».
+
+- **Votre numéro** : Projets › Paramètres › **Mes notifications** › bloc **WhatsApp** › saisissez votre
+  numéro (`+243 81 …` ; un numéro commençant par `0` est compris) › **Recevoir un code** › saisissez le
+  code à 6 chiffres reçu sur WhatsApp › **Vérifier**. Le code vaut 10 minutes ; 5 essais ; 3 codes par
+  heure au plus.
+- **Votre numéro reste privé** : aucun autre membre, ni le Propriétaire, ne le voit.
+- **Quels messages** : une fois le numéro vérifié, la colonne **WhatsApp** s'active. Par défaut :
+  tâche assignée, mention, échéance dépassée. Vous ne recevez jamais vos propres gestes, ni rien
+  d'un projet que vous ne voyez pas. Le résumé quotidien reste par e-mail.
+- **Tout arrêter** : répondez **STOP** (ou **ARRET**) à un message de Lalanda, ou **Retirer mon
+  numéro**. Pour reprendre après un STOP, redemandez un code.
+- **« À vérifier »** : WhatsApp n'a pas pu remettre un message à ce numéro ; vérifiez-le et
+  redemandez un code.
+- **Plafond atteint** : l'organisation a envoyé son quota de messages WhatsApp du mois ; la cloche
+  et l'e-mail continuent.
+- Si le bloc dit « WhatsApp n'est pas encore disponible », la plateforme n'est pas encore branchée :
+  rien ne change pour vos autres notifications.
+
+Pour la dirigeante (compte Meta, modèles à faire approuver, valeurs à saisir dans `/admin`) :
+[docs/integrations/whatsapp.md](integrations/whatsapp.md).
+
 ## 9. Couleur des cartes (post-it)
 
 Dans le panneau d'une tâche, ligne **Couleur** : 8 teintes pastel (jaune, abricot, rose, lilas,

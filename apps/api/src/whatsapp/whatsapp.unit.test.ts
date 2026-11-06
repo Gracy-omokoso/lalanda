@@ -1,5 +1,8 @@
 // Tests unitaires de l'intégration WhatsApp — ADR-0065. Aucun appel réel à Meta.
 
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -142,6 +145,20 @@ describe('modèles', () => {
       expect(t.body).not.toMatch(/\}\}\s*\{\{/);
       // Aucune donnée financière dans le texte figé.
       expect(t.body).not.toMatch(/montant|facture|USD|CDF|€|\$/i);
+    }
+  });
+
+  it('le guide de la dirigeante recopie le texte EXACT à soumettre à Meta', () => {
+    const guide = readFileSync(
+      resolve(dirname(fileURLToPath(import.meta.url)), '../../../../docs/integrations/whatsapp.md'),
+      'utf8',
+    );
+    for (const t of Object.values(WHATSAPP_TEMPLATES)) {
+      expect(guide, t.name).toContain(`\`${t.name}\``);
+      expect(guide, t.name).toContain(t.body);
+      if (t.footer) expect(guide, t.name).toContain(t.footer);
+      if (t.button.type === 'URL') expect(guide, t.name).toContain(t.button.url);
+      for (const ex of t.examples) expect(guide, `${t.name} exemple`).toContain(ex);
     }
   });
 

@@ -1055,6 +1055,30 @@ d'organisation en paramètre). Aucune route ne renvoie le jeton du bot ni un sec
 - Audit : `slack.connected`, `slack.reconnected`, `slack.disconnected`, `slack.app_uninstalled`,
   `slack.tokens_revoked`, `slack.project_channel_set`, `slack.project_channel_removed`.
 
+## Notifications des Projets par WhatsApp — implémenté, ADR-0065
+
+Fonction d'offre `run_work` sous `/work`. Routes **personnelles** : organisation active ET utilisateur
+de la session ; aucun identifiant de personne accepté ; le numéro n'est renvoyé qu'à son titulaire.
+Aucune route ne renvoie un secret du fournisseur ni un code.
+
+| Route | Droit | Rôle |
+|---|---|---|
+| `GET /work/whatsapp` | `work.read` | `WhatsAppView` : `available`, `unavailableReason` (`not_configured` · `switched_off` · `provider_error`), `number` (`phone`, `phoneMasked`, `status` `pending` · `verified` · `to_verify` · `opted_out`, `verifiedAt`, `code` `{ sentAt, expiresAt, attemptsLeft }`), `codesLeftThisHour`, `quota` (`month`, `used`, `limit`, `reached`) |
+| `POST /work/whatsapp/number` | `work.read` | `{ phone }` → code envoyé (200, vue) ; `400 WHATSAPP_PHONE_INVALID`, `409 WHATSAPP_ALREADY_VERIFIED`, `429 WHATSAPP_CODE_RATE_LIMITED` (`details.retryAt`), `409 WHATSAPP_QUOTA_REACHED`, `422 WHATSAPP_PHONE_UNREACHABLE`, `502 WHATSAPP_SEND_FAILED`, `503 WHATSAPP_NOT_AVAILABLE` (`details.reason`) |
+| `POST /work/whatsapp/number/verify` | `work.read` | `{ code }` (6 chiffres) → vue ; `400 WHATSAPP_CODE_INVALID` (`details.attemptsLeft`), `404 WHATSAPP_NO_PENDING_CODE`, `410 WHATSAPP_CODE_EXPIRED`, `429 WHATSAPP_CODE_TOO_MANY_ATTEMPTS` |
+| `DELETE /work/whatsapp/number` | `work.read` | numéro et code effacés → vue (historique des demandes gardé) |
+| `GET /whatsapp/webhook?hub.mode&hub.verify_token&hub.challenge` | publique | `200 text/plain` = `hub.challenge` ; sinon `403 WHATSAPP_VERIFY_TOKEN_INVALID` |
+| `POST /whatsapp/webhook` | publique, signée | `X-Hub-Signature-256` (HMAC-SHA256 du corps brut, `appSecret`) ; statuts `sent` · `delivered` · `read` · `failed`, messages « STOP » / « ARRET » → `{ ok: true }` ; sinon `401 WHATSAPP_SIGNATURE_INVALID` |
+
+- `GET|PUT /work/notification-preferences` : chaque événement porte `{ bell, email, slack, whatsapp }` ;
+  `whatsapp` facultatif au `PUT` (absent : valeur enregistrée gardée) ; l'allumer sans numéro vérifié
+  → `409 WHATSAPP_NUMBER_NOT_VERIFIED`.
+- Fournisseur `/admin/integrations/whatsapp` : `config.phoneNumberId`, `config.businessAccountId`,
+  `config.apiVersion` (défaut `v24.0`), `config.monthlyLimitPerOrganization` (défaut 1 000) ; secrets
+  `accessToken`, `appSecret`, `verifyToken`.
+- Audit (sans numéro) : `whatsapp.code_sent`, `whatsapp.number_verified`, `whatsapp.number_removed`,
+  `whatsapp.opted_out`.
+
 ## Import de fichier et construction par l'IA — implémenté, ADR-0062 et ADR-0063
 
 Fonction d'offre `run_work`, organisation active ; un projet d'une autre organisation répond 404.
