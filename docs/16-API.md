@@ -456,7 +456,7 @@ Contrat : [ADR-0031](adr/ADR-0031-encaissements-et-realise.md). Organisation act
 
 | Méthode et chemin | Permission |
 |---|---|
-| `GET /sales/receipts` (`status`, `invoiceId`, `from`, `to`, `limit`) · `GET /sales/receipts/:id` · `GET /sales/receipts/summary` (`from`, `to`) | `sales.read` |
+| `GET /sales/receipts` (`status`, `invoiceId`, `from`, `to`, `limit`) · `GET /sales/receipts/:id` · `GET /sales/receipts/summary` (`from`, `to`) · `GET /sales/receipts/stats` (ADR-0067) | `sales.read` |
 | `POST /sales/receipts` · `PUT /sales/receipts/:id` `{ receipt, expectedRevision }` · `POST /sales/receipts/:id/cancel` `{ reason, expectedRevision }` | `sales.receipt` |
 | `GET /sales/settlements?invoiceIds=a,b` ou `?open=true&currency=USD` · `GET /sales/settlements/:invoiceId` | `sales.read` |
 | `PUT /sales/settlements/:invoiceId/due-date` `{ dueDate: "AAAA-MM-JJ" \| null }` | `sales.manage` |
@@ -474,6 +474,16 @@ Intégration avec la trésorerie (26 oct. 2026, amendements d'ADR-0031 et ADR-00
 Réponse : `currency` et `currencySource` (`accounting_book` : monnaie de tenue de la comptabilité ; `default_cdf`), `asOf`, `from`, `to` ; `months[]` (`billed`, `collected` signés, `outstanding`, `overdue` en fin de mois) ; `totals` (`billed`, `collected`, `collectedRatePercent`, `invoiceCount`, `creditNoteCount`) ; `outstanding` et `overdue` au jour (`amount`, `count`) ; `categories[]` (`paid`, `to_collect`, `overdue`, `draft`, `pending_normalization`, `normalization_failed`, `credit_note`, `other_final`) ; `statusCounts` (mêmes définitions que les filtres de `GET /sales/invoices`) ; `topCustomers[]` (5) ; `excluded` (`deposits`, `testSeries`, `notConvertible[]` par devise avec total) ; `truncated` (au-delà de 20 000 documents) ; `version`.
 
 Règles (ADR-0056 § 3) : montants TTC dans la devise de référence, **au taux figé sur la facture** (total CDF normalisé, conversion du document ou contre-valeur USD) ; sans taux, exclus et comptés. Facturé = FV/EV finaux hors essai moins avoirs FA/EA finaux ; acomptes exclus et comptés. Encaissé = part réglée à l'émission + lettrages − remboursements à l'émission des avoirs. Retard = facture finale, échéance dépassée, non soldée (`computeSettlement`).
+
+## Ventes — tableaux de bord des devis et des encaissements — implémenté (ADR-0067)
+
+Mêmes principes que `GET /sales/invoices/stats` : `months` facultatif (1 à 24, défaut 12), tout autre paramètre `400 INVALID_REQUEST` ; `sales.read`, organisation active ; contrats zod `@lalanda/shared/sales-invoices` ; calcul du moteur (`receivables`, version `1.0.0`), rien n'est stocké ; `currency`, `currencySource`, `asOf`, `from`, `to`, `truncated` (au-delà de 20 000 documents), `version`.
+
+`GET /sales/quotes/stats` (fonctionnalité `quotes`, `QuoteStatsSchema`, moteur `computeQuoteStats`) : `months[]` (`sent` au mois du premier envoi, `accepted`, `acceptedAmount`) ; `open`, `acceptedThisMonth`, `expiringSoon` (+ `until`, `withinDays` = 7) au format `{ count, amount, notConvertible[] }` ; `conversion` (`windowDays` = 90, `since`, `sent`, `accepted`, `ratePercent`) ; `statusCounts` (`all`, `draft`, `sent`, `accepted`, `refused`, `expired` : définitions de `GET /sales/quotes`) ; `converted` ; `excluded` (`withoutAmount`, `notConvertible[]`). Un devis ne porte aucun taux : hors devise de référence, il est compté à part avec son total dans sa devise.
+
+`GET /sales/receipts/stats` (fonctionnalité `normalized_invoicing`, `ReceiptStatsSchema`, moteur `computeReceiptStats`) : `months[]` (`collected`, `count`) ; `totals` ; `thisMonth` ; `previousMonth` (`month`, `amount`, `count`) ; `changePercent` ; `averageDelay` (`windowDays` = 90, `since`, `days`, `allocations`) ; `outstanding` et `overdue` (identiques à ceux de `GET /sales/invoices/stats`) ; `byMethod[]` (six moyens d'ADR-0031) ; `statusCounts` (`all`, `recorded`, `cancelled` : définitions de `GET /sales/receipts`) ; `excluded.notConvertible[]` (lettrages sur une facture sans taux figé). Encaissements annulés et paiements déclarés à l'émission hors montants.
+
+`GET /sales/quotes` accepte `sort` : `recent` (défaut) ou `valid_until` (validité croissante) ; le curseur est propre au tri (`400 INVALID_CURSOR` sinon).
 
 ## Ventes — normalisation DGI — implémenté (S25f, ADR-0024 chantier F2)
 
@@ -519,7 +529,7 @@ Un devis est un document **distinct** du pro forma : `DV{AA}{MM}-NNNNNN` (hors s
 
 | Méthode et chemin | Effet |
 |---|---|
-| `GET /sales/quotes?status=&customerId=&opportunityId=&q=&cursor=` | liste ; `status` : `draft`, `sent`, `accepted`, `refused`, `expired` (dérivé : envoyé, validité passée) |
+| `GET /sales/quotes?status=&customerId=&opportunityId=&q=&sort=&cursor=` | liste ; `status` : `draft`, `sent`, `accepted`, `refused`, `expired` (dérivé : envoyé, validité passée) |
 | `POST /sales/quotes` · `PUT /sales/quotes/:id` (brouillon, `expectedRevision`) | `{ opportunityId?, title?, notes?, validUntil?, currency, priceMode, customer, lines }` |
 | `DELETE /sales/quotes/:id` | brouillon v1 jamais envoyé ; sinon `409 QUOTE_NOT_DELETABLE` |
 | `POST /sales/quotes/:id/send` · `/accept` · `/refuse` (`reason?`) · `/new-version` | `{ expectedRevision }` ; `409 QUOTE_STATUS_CONFLICT`, `409 QUOTE_NOT_READY` (`details.blockers`) |

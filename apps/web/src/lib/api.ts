@@ -3037,8 +3037,10 @@ export interface ActualsSyncReport {
 // ADR-0052 — O0 : contrat du statut de complétude (`@lalanda/shared/organization-setup`).
 import type { OrganizationSetupView } from '@lalanda/shared/organization-setup';
 // ADR-0056 — tableau de bord des factures.
-import type { InvoiceStats } from '@lalanda/shared/sales-invoices';
+import type { InvoiceStats, ReceiptStats } from '@lalanda/shared/sales-invoices';
 export type { InvoiceStats } from '@lalanda/shared/sales-invoices';
+// ADR-0067 — tableaux de bord des devis et des encaissements.
+export type { QuoteStats, ReceiptStats } from '@lalanda/shared/sales-invoices';
 export type {
   OrganizationSetupCapability,
   OrganizationSetupStep,
@@ -4048,6 +4050,8 @@ export const api = {
     query: { status?: 'recorded' | 'cancelled' | 'all'; invoiceId?: string; limit?: number } = {},
   ) =>
     jsonRequest<{ items: ReceiptView[] }>(`/sales/receipts${salesQuery(query)}`, { method: 'GET' }),
+  /** ADR-0067 : cartes, graphiques et compteurs de l'écran Encaissements. */
+  getReceiptStats: () => jsonRequest<ReceiptStats>(`/sales/receipts/stats`, { method: 'GET' }),
   getReceiptsSummary: () =>
     jsonRequest<ReceiptsSummary>(`/sales/receipts/summary`, { method: 'GET' }),
   createReceipt: (body: ReceiptBody) =>
