@@ -23,3 +23,7 @@ export {
 export * from './outstanding.js';
 // ADR-0056 : tableau de bord des factures (cartes, graphiques, compteurs).
 export * from './invoice-stats.js';
+// ADR-0067 : tableaux de bord des devis et des encaissements.
+export { convertAtRatio, referenceRatioOf, type ReferenceRateDocument } from './reference-rate.js';
+export * from './quote-stats.js';
+export * from './receipt-stats.js';
