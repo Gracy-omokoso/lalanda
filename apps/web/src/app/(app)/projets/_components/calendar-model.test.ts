@@ -218,4 +218,11 @@ describe('relances du CRM dans le calendrier (ADR-0040 — C4)', () => {
       'Relance « Rappeler ACME »',
     );
   });
+
+  it('ADR-0066 § 4 — sans numéros de tâche : le titre seul ; la relance inchangée', () => {
+    expect(nomElement({ number: 12, title: 'Livrer' }, false)).toBe('Livrer');
+    expect(nomElement({ number: 0, title: 'Rappeler ACME', etiquette: 'Relance' }, false)).toBe(
+      'Relance « Rappeler ACME »',
+    );
+  });
 });

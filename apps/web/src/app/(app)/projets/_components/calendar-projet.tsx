@@ -40,6 +40,8 @@ export function CalendrierProjet(): React.ReactElement {
       dueSoonDays={settings?.dueSoonDays ?? 1}
       peutDeplacer={travailler}
       idPrefixe="calendrier"
+      // ADR-0066 § 4 : le réglage « numéros de tâche » vaut aussi pour le Calendrier.
+      numeros={settings?.showTaskNumbers !== false}
       onOuvrir={(t) => ouvrirTache(t.id)}
       onDeplacer={(t, corps) => {
         setTasks((liste) => liste.map((x) => (x.id === t.id ? appliquerCorps(x, corps) : x)));

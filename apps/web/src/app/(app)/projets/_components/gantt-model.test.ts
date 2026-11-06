@@ -238,6 +238,8 @@ describe('textes', () => {
   it('description d’une barre', () => {
     const { rows } = ganttRows([A, B, J]);
     expect(descriptionBarre(A, rows[0]!)).toBe('#1 Achat, du 2 nov. 2026 au 4 nov. 2026');
+    // ADR-0066 § 4 : réglage « numéros de tâche » coupé.
+    expect(descriptionBarre(A, rows[0]!, false)).toBe('Achat, du 2 nov. 2026 au 4 nov. 2026');
     expect(descriptionBarre(J, rows[2]!)).toBe(
       '#3 Livraison, jalon le 9 nov. 2026, conflit de dates avec un prédécesseur',
     );

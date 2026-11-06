@@ -15,7 +15,7 @@
 //   Sur bureau, la même liste est proposée par le bouton « Liste ».
 
 import { addDays } from '@lalanda/shared/work';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import { BOUTON_PETIT } from './elements';
 import {
@@ -46,15 +46,29 @@ export interface TacheCalendrierUI extends TacheDeplacable {
   etiquette?: string;
 }
 
+/**
+ * ADR-0066 § 4 : les numéros de tâche suivent le réglage `showTaskNumbers` (vrai par
+ * défaut). Contexte local : la puce, la ligne d'agenda et la liste le lisent.
+ */
+const NumerosVisibles = createContext(true);
+
 /** Numéro de tâche, ou signe de la relance (forme, pas seulement couleur). */
-function Repere({ t, className }: { t: TacheCalendrierUI; className: string }): React.ReactElement {
-  return t.etiquette ? (
-    <span aria-hidden="true" className={className}>
-      ↻
-    </span>
-  ) : (
-    <span className={className}>#{t.number}</span>
-  );
+function Repere({
+  t,
+  className,
+}: {
+  t: TacheCalendrierUI;
+  className: string;
+}): React.ReactElement | null {
+  const numeros = useContext(NumerosVisibles);
+  if (t.etiquette) {
+    return (
+      <span aria-hidden="true" className={className}>
+        ↻
+      </span>
+    );
+  }
+  return numeros ? <span className={className}>#{t.number}</span> : null;
 }
 
 const TYPE_GLISSE = 'application/x-lalanda-tache-calendrier';
@@ -77,6 +91,7 @@ export function CalendrierTaches<T extends TacheCalendrierUI>({
   sousTitre,
   idPrefixe,
   bandeaux,
+  numeros = true,
 }: {
   taches: readonly T[];
   today: string;
@@ -93,6 +108,8 @@ export function CalendrierTaches<T extends TacheCalendrierUI>({
    * absent »). Ni type, ni couleur propre : une forme (⊘) et un texte.
    */
   bandeaux?: ReadonlyMap<string, readonly string[]>;
+  /** ADR-0066 § 4 : afficher « #12 » (réglage `showTaskNumbers`, vrai par défaut). */
+  numeros?: boolean;
 }): React.ReactElement {
   const [vue, setVue] = useState<VueCalendrier>('mois');
   const [liste, setListe] = useState(false);
@@ -146,14 +163,14 @@ export function CalendrierTaches<T extends TacheCalendrierUI>({
     const cible = addDays(t.dueDate, attente.delta);
     const corps = corpsDeplacement(t, cible);
     if (corps === null) return;
-    setAnnonce(`Échéance de ${nomElement(t)} déplacée au ${libelleJour(cible)}.`);
+    setAnnonce(`Échéance de ${nomElement(t, numeros)} déplacée au ${libelleJour(cible)}.`);
     onDeplacer(t, corps);
   }
 
   function deplacerVers(t: T, cible: string): void {
     const corps = corpsDeplacement(t, cible);
     if (corps === null) return;
-    setAnnonce(`Échéance de ${nomElement(t)} déplacée au ${libelleJour(cible)}.`);
+    setAnnonce(`Échéance de ${nomElement(t, numeros)} déplacée au ${libelleJour(cible)}.`);
     onDeplacer(t, corps);
   }
 
@@ -197,286 +214,288 @@ export function CalendrierTaches<T extends TacheCalendrierUI>({
   const id = (s: string) => `${idPrefixe}-${s}`;
 
   return (
-    <div ref={racine} className="flex min-w-0 flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            className={BOUTON_PETIT}
-            onClick={() => setAncre(decaler(vue, ancre, -1))}
+    <NumerosVisibles.Provider value={numeros}>
+      <div ref={racine} className="flex min-w-0 flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              className={BOUTON_PETIT}
+              onClick={() => setAncre(decaler(vue, ancre, -1))}
+            >
+              <span aria-hidden="true">‹ </span>
+              {vue === 'mois' ? 'Mois précédent' : 'Semaine précédente'}
+            </button>
+            <button type="button" className={BOUTON_PETIT} onClick={() => setAncre(today)}>
+              Aujourd’hui
+            </button>
+            <button
+              type="button"
+              className={BOUTON_PETIT}
+              onClick={() => setAncre(decaler(vue, ancre, 1))}
+            >
+              {vue === 'mois' ? 'Mois suivant' : 'Semaine suivante'}
+              <span aria-hidden="true"> ›</span>
+            </button>
+          </div>
+          <h2
+            id={id('titre')}
+            className="text-base font-semibold first-letter:uppercase"
+            aria-live="polite"
           >
-            <span aria-hidden="true">‹ </span>
-            {vue === 'mois' ? 'Mois précédent' : 'Semaine précédente'}
-          </button>
-          <button type="button" className={BOUTON_PETIT} onClick={() => setAncre(today)}>
-            Aujourd’hui
-          </button>
-          <button
-            type="button"
-            className={BOUTON_PETIT}
-            onClick={() => setAncre(decaler(vue, ancre, 1))}
-          >
-            {vue === 'mois' ? 'Mois suivant' : 'Semaine suivante'}
-            <span aria-hidden="true"> ›</span>
-          </button>
+            {p.titre}
+          </h2>
+          <div className="flex items-center gap-1.5">
+            <div role="group" aria-label="Période affichée" className="flex">
+              {(['mois', 'semaine'] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  aria-pressed={vue === v}
+                  onClick={() => setVue(v)}
+                  className={`${BOUTON_PETIT} ${v === 'mois' ? 'rounded-r-none' : '-ml-px rounded-l-none'} aria-pressed:border-[var(--accent)] aria-pressed:bg-[var(--accent-soft)] aria-pressed:text-[var(--accent)]`}
+                >
+                  {v === 'mois' ? 'Mois' : 'Semaine'}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              aria-pressed={liste}
+              onClick={() => setListe(!liste)}
+              className={`${BOUTON_PETIT} hidden md:inline-flex aria-pressed:border-[var(--accent)] aria-pressed:bg-[var(--accent-soft)] aria-pressed:text-[var(--accent)]`}
+            >
+              Liste
+            </button>
+          </div>
         </div>
-        <h2
-          id={id('titre')}
-          className="text-base font-semibold first-letter:uppercase"
-          aria-live="polite"
+
+        <p className="sr-only" aria-live="polite">
+          {annonce}
+        </p>
+        {peutDeplacer ? (
+          <p className="hidden text-xs text-[var(--foreground-muted)] md:block">
+            {liste
+              ? 'Chaque tâche a un menu « Déplacer l’échéance ».'
+              : 'Glissez une tâche vers un autre jour pour changer son échéance. Au clavier : flèches sur la tâche (← → un jour, ↑ ↓ une semaine), puis Entrée ; Échap annule.'}
+          </p>
+        ) : null}
+
+        {/* Grille : bureau seulement, et seulement hors vue liste. */}
+        <div
+          className={liste ? 'hidden' : 'hidden md:block'}
+          aria-labelledby={id('titre')}
+          role="region"
         >
-          {p.titre}
-        </h2>
-        <div className="flex items-center gap-1.5">
-          <div role="group" aria-label="Période affichée" className="flex">
-            {(['mois', 'semaine'] as const).map((v) => (
-              <button
-                key={v}
-                type="button"
-                aria-pressed={vue === v}
-                onClick={() => setVue(v)}
-                className={`${BOUTON_PETIT} ${v === 'mois' ? 'rounded-r-none' : '-ml-px rounded-l-none'} aria-pressed:border-[var(--accent)] aria-pressed:bg-[var(--accent-soft)] aria-pressed:text-[var(--accent)]`}
-              >
-                {v === 'mois' ? 'Mois' : 'Semaine'}
-              </button>
+          <div className="grid grid-cols-7 border-b border-[var(--border)] pb-1 text-xs font-medium text-[var(--foreground-muted)]">
+            {JOURS_COURTS.map((j) => (
+              <div key={j} className="px-1.5" aria-hidden="true">
+                {j}
+              </div>
             ))}
           </div>
-          <button
-            type="button"
-            aria-pressed={liste}
-            onClick={() => setListe(!liste)}
-            className={`${BOUTON_PETIT} hidden md:inline-flex aria-pressed:border-[var(--accent)] aria-pressed:bg-[var(--accent-soft)] aria-pressed:text-[var(--accent)]`}
-          >
-            Liste
-          </button>
-        </div>
-      </div>
-
-      <p className="sr-only" aria-live="polite">
-        {annonce}
-      </p>
-      {peutDeplacer ? (
-        <p className="hidden text-xs text-[var(--foreground-muted)] md:block">
-          {liste
-            ? 'Chaque tâche a un menu « Déplacer l’échéance ».'
-            : 'Glissez une tâche vers un autre jour pour changer son échéance. Au clavier : flèches sur la tâche (← → un jour, ↑ ↓ une semaine), puis Entrée ; Échap annule.'}
-        </p>
-      ) : null}
-
-      {/* Grille : bureau seulement, et seulement hors vue liste. */}
-      <div
-        className={liste ? 'hidden' : 'hidden md:block'}
-        aria-labelledby={id('titre')}
-        role="region"
-      >
-        <div className="grid grid-cols-7 border-b border-[var(--border)] pb-1 text-xs font-medium text-[var(--foreground-muted)]">
-          {JOURS_COURTS.map((j) => (
-            <div key={j} className="px-1.5" aria-hidden="true">
-              {j}
-            </div>
-          ))}
-        </div>
-        <div className="flex flex-col">
-          {semaines.map((s) => {
-            const lignes = vue === 'mois' ? LIGNES_MOIS : Math.max(4, s.lignes);
-            const hauteur = HAUTEUR_NUMERO + lignes * HAUTEUR_PUCE + (vue === 'mois' ? 22 : 8);
-            return (
-              <div key={s.jours[0]} className="relative" style={{ minHeight: hauteur }}>
-                {/* Fond : les cases-jours (cibles du dépôt). */}
-                <div className="absolute inset-0 grid grid-cols-7">
-                  {s.jours.map((jour, col) => {
-                    const horsMois = vue === 'mois' && jour.slice(0, 7) !== p.mois;
-                    const estAujourdhui = jour === today;
-                    const n = s.masquees[col] ?? 0;
-                    return (
-                      <div
-                        key={jour}
-                        onDragOver={(e) => {
-                          if (glisse === null) return;
-                          e.preventDefault();
-                          if (survol !== jour) setSurvol(jour);
-                        }}
-                        onDragLeave={(e) => {
-                          if (!e.currentTarget.contains(e.relatedTarget as Node | null))
-                            setSurvol(null);
-                        }}
-                        onDrop={(e) => deposer(e, jour)}
-                        className={`relative border-b border-r border-[var(--border)] first:border-l ${horsMois ? 'bg-[var(--surface-muted)]' : 'bg-[var(--surface)]'} ${survol === jour ? 'outline outline-2 -outline-offset-2 outline-[var(--accent)]' : ''}`}
-                      >
-                        <span
-                          className={`absolute left-1 top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs ${estAujourdhui ? 'bg-[var(--accent)] font-semibold text-[var(--accent-foreground)]' : horsMois ? 'text-[var(--foreground-muted)]' : ''}`}
+          <div className="flex flex-col">
+            {semaines.map((s) => {
+              const lignes = vue === 'mois' ? LIGNES_MOIS : Math.max(4, s.lignes);
+              const hauteur = HAUTEUR_NUMERO + lignes * HAUTEUR_PUCE + (vue === 'mois' ? 22 : 8);
+              return (
+                <div key={s.jours[0]} className="relative" style={{ minHeight: hauteur }}>
+                  {/* Fond : les cases-jours (cibles du dépôt). */}
+                  <div className="absolute inset-0 grid grid-cols-7">
+                    {s.jours.map((jour, col) => {
+                      const horsMois = vue === 'mois' && jour.slice(0, 7) !== p.mois;
+                      const estAujourdhui = jour === today;
+                      const n = s.masquees[col] ?? 0;
+                      return (
+                        <div
+                          key={jour}
+                          onDragOver={(e) => {
+                            if (glisse === null) return;
+                            e.preventDefault();
+                            if (survol !== jour) setSurvol(jour);
+                          }}
+                          onDragLeave={(e) => {
+                            if (!e.currentTarget.contains(e.relatedTarget as Node | null))
+                              setSurvol(null);
+                          }}
+                          onDrop={(e) => deposer(e, jour)}
+                          className={`relative border-b border-r border-[var(--border)] first:border-l ${horsMois ? 'bg-[var(--surface-muted)]' : 'bg-[var(--surface)]'} ${survol === jour ? 'outline outline-2 -outline-offset-2 outline-[var(--accent)]' : ''}`}
                         >
-                          <span aria-hidden="true">{Number(jour.slice(8))}</span>
-                          <span className="sr-only">
-                            {libelleJour(jour)}
-                            {estAujourdhui ? ', aujourd’hui' : ''}
-                          </span>
-                        </span>
-                        {estAujourdhui ? (
                           <span
-                            className="absolute right-1 top-1 text-[0.65rem] font-medium text-[var(--accent)]"
-                            aria-hidden="true"
+                            className={`absolute left-1 top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs ${estAujourdhui ? 'bg-[var(--accent)] font-semibold text-[var(--accent-foreground)]' : horsMois ? 'text-[var(--foreground-muted)]' : ''}`}
                           >
-                            Aujourd’hui
-                          </span>
-                        ) : null}
-                        {(bandeaux?.get(jour)?.length ?? 0) > 0 ? (
-                          <Bandeau
-                            textes={bandeaux!.get(jour)!}
-                            className="absolute bottom-0.5 right-1 max-w-[60%]"
-                          />
-                        ) : null}
-                        {n > 0 ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setVue('semaine');
-                              setAncre(jour);
-                            }}
-                            className="absolute bottom-0.5 left-1 text-[0.7rem] font-medium text-[var(--accent)] underline-offset-2 hover:underline"
-                          >
-                            +{n} autre{n > 1 ? 's' : ''}
+                            <span aria-hidden="true">{Number(jour.slice(8))}</span>
                             <span className="sr-only">
-                              {' '}
-                              le {libelleJour(jour)}, voir la semaine
+                              {libelleJour(jour)}
+                              {estAujourdhui ? ', aujourd’hui' : ''}
                             </span>
-                          </button>
-                        ) : null}
-                      </div>
-                    );
-                  })}
+                          </span>
+                          {estAujourdhui ? (
+                            <span
+                              className="absolute right-1 top-1 text-[0.65rem] font-medium text-[var(--accent)]"
+                              aria-hidden="true"
+                            >
+                              Aujourd’hui
+                            </span>
+                          ) : null}
+                          {(bandeaux?.get(jour)?.length ?? 0) > 0 ? (
+                            <Bandeau
+                              textes={bandeaux!.get(jour)!}
+                              className="absolute bottom-0.5 right-1 max-w-[60%]"
+                            />
+                          ) : null}
+                          {n > 0 ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setVue('semaine');
+                                setAncre(jour);
+                              }}
+                              className="absolute bottom-0.5 left-1 text-[0.7rem] font-medium text-[var(--accent)] underline-offset-2 hover:underline"
+                            >
+                              +{n} autre{n > 1 ? 's' : ''}
+                              <span className="sr-only">
+                                {' '}
+                                le {libelleJour(jour)}, voir la semaine
+                              </span>
+                            </button>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {/* Avant-plan : les tâches, placées sur la grille des jours. */}
+                  <ul
+                    className={`relative grid grid-cols-7 gap-y-0.5 px-0.5 ${glisse !== null ? 'pointer-events-none' : ''}`}
+                    style={{
+                      paddingTop: HAUTEUR_NUMERO,
+                      gridTemplateRows: `repeat(${Math.max(1, s.lignes)}, ${HAUTEUR_PUCE - 2}px)`,
+                    }}
+                  >
+                    {s.segments.map((seg) => {
+                      const t = parId.get(seg.taskId);
+                      if (!t) return null;
+                      return (
+                        <Puce
+                          key={`${seg.taskId}-${seg.colDebut}`}
+                          t={affichees.find((x) => x.id === t.id) ?? t}
+                          seg={seg}
+                          today={today}
+                          dueSoonDays={dueSoonDays}
+                          peutDeplacer={peutDeplacer}
+                          enAttente={attente?.taskId === t.id}
+                          glissee={glisse?.taskId === t.id}
+                          onOuvrir={() => onOuvrir(t)}
+                          onKeyDown={(e) => toucheSurPuce(e, t)}
+                          onDragStart={(e) => {
+                            const r = e.currentTarget.getBoundingClientRect();
+                            const span = seg.colFin - seg.colDebut + 1;
+                            const col = Math.min(
+                              span - 1,
+                              Math.max(0, Math.floor(((e.clientX - r.left) / r.width) * span)),
+                            );
+                            e.dataTransfer.setData(TYPE_GLISSE, t.id);
+                            e.dataTransfer.effectAllowed = 'move';
+                            const jourSaisi = s.jours[seg.colDebut + col]!;
+                            // Après le départ du glisser : modifier le DOM pendant
+                            // `dragstart` l'annule dans certains navigateurs.
+                            setTimeout(() => setGlisse({ taskId: t.id, jourSaisi }), 0);
+                          }}
+                          onDragEnd={() => {
+                            setGlisse(null);
+                            setSurvol(null);
+                          }}
+                        />
+                      );
+                    })}
+                  </ul>
                 </div>
-                {/* Avant-plan : les tâches, placées sur la grille des jours. */}
-                <ul
-                  className={`relative grid grid-cols-7 gap-y-0.5 px-0.5 ${glisse !== null ? 'pointer-events-none' : ''}`}
-                  style={{
-                    paddingTop: HAUTEUR_NUMERO,
-                    gridTemplateRows: `repeat(${Math.max(1, s.lignes)}, ${HAUTEUR_PUCE - 2}px)`,
-                  }}
-                >
-                  {s.segments.map((seg) => {
-                    const t = parId.get(seg.taskId);
-                    if (!t) return null;
-                    return (
-                      <Puce
-                        key={`${seg.taskId}-${seg.colDebut}`}
-                        t={affichees.find((x) => x.id === t.id) ?? t}
-                        seg={seg}
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Liste par jour (agenda) : toujours sur téléphone, sur demande sur bureau. */}
+        <section className={liste ? '' : 'md:hidden'} aria-label={`Échéances, ${p.titre}`}>
+          {/* ADR-0045 — H5 : absences de la période, jour par jour, avant les échéances. */}
+          {bandeaux && [...bandeaux.keys()].some((j) => j >= p.debut && j <= p.fin) ? (
+            <ul aria-label="Absences de la période" className="mb-3 flex flex-col gap-1 text-xs">
+              {[...bandeaux.entries()]
+                .filter(([j]) => j >= p.debut && j <= p.fin)
+                .sort(([a], [b]) => (a < b ? -1 : 1))
+                .map(([j, textes]) => (
+                  <li key={j} className="flex flex-wrap items-center gap-1.5">
+                    <span className="font-medium first-letter:uppercase">
+                      {libelleJour(j, false)}
+                    </span>
+                    <Bandeau textes={textes} />
+                  </li>
+                ))}
+            </ul>
+          ) : null}
+          {jours.length === 0 ? (
+            <p className="rounded-[var(--radius-md)] border border-dashed border-[var(--border-strong)] px-4 py-6 text-center text-sm text-[var(--foreground-muted)]">
+              Aucune échéance sur cette période.
+            </p>
+          ) : (
+            <ol className="flex flex-col gap-4">
+              {jours.map((j) => (
+                <li key={j.jour} className="flex flex-col gap-1.5">
+                  <h3 className="flex items-center gap-2 text-sm font-semibold first-letter:uppercase">
+                    {libelleJour(j.jour, false)}
+                    {j.jour === today ? (
+                      <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[0.7rem] font-medium text-[var(--accent)]">
+                        Aujourd’hui
+                      </span>
+                    ) : null}
+                  </h3>
+                  <ul className="flex flex-col divide-y divide-[var(--border)] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)]">
+                    {j.taches.map((t) => (
+                      <LigneAgenda
+                        key={t.id}
+                        t={t}
                         today={today}
                         dueSoonDays={dueSoonDays}
                         peutDeplacer={peutDeplacer}
-                        enAttente={attente?.taskId === t.id}
-                        glissee={glisse?.taskId === t.id}
-                        onOuvrir={() => onOuvrir(t)}
-                        onKeyDown={(e) => toucheSurPuce(e, t)}
-                        onDragStart={(e) => {
-                          const r = e.currentTarget.getBoundingClientRect();
-                          const span = seg.colFin - seg.colDebut + 1;
-                          const col = Math.min(
-                            span - 1,
-                            Math.max(0, Math.floor(((e.clientX - r.left) / r.width) * span)),
-                          );
-                          e.dataTransfer.setData(TYPE_GLISSE, t.id);
-                          e.dataTransfer.effectAllowed = 'move';
-                          const jourSaisi = s.jours[seg.colDebut + col]!;
-                          // Après le départ du glisser : modifier le DOM pendant
-                          // `dragstart` l'annule dans certains navigateurs.
-                          setTimeout(() => setGlisse({ taskId: t.id, jourSaisi }), 0);
+                        sousTitre={sousTitre?.(t) ?? null}
+                        onOuvrir={() => onOuvrir(parId.get(t.id) ?? t)}
+                        onDeplacer={(jour) => {
+                          const orig = parId.get(t.id);
+                          if (orig) deplacerVers(orig, jour);
                         }}
-                        onDragEnd={() => {
-                          setGlisse(null);
-                          setSurvol(null);
-                        }}
+                        idMenu={id(`deplacer-${t.id}`)}
                       />
-                    );
-                  })}
-                </ul>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Liste par jour (agenda) : toujours sur téléphone, sur demande sur bureau. */}
-      <section className={liste ? '' : 'md:hidden'} aria-label={`Échéances, ${p.titre}`}>
-        {/* ADR-0045 — H5 : absences de la période, jour par jour, avant les échéances. */}
-        {bandeaux && [...bandeaux.keys()].some((j) => j >= p.debut && j <= p.fin) ? (
-          <ul aria-label="Absences de la période" className="mb-3 flex flex-col gap-1 text-xs">
-            {[...bandeaux.entries()]
-              .filter(([j]) => j >= p.debut && j <= p.fin)
-              .sort(([a], [b]) => (a < b ? -1 : 1))
-              .map(([j, textes]) => (
-                <li key={j} className="flex flex-wrap items-center gap-1.5">
-                  <span className="font-medium first-letter:uppercase">
-                    {libelleJour(j, false)}
-                  </span>
-                  <Bandeau textes={textes} />
+                    ))}
+                  </ul>
                 </li>
               ))}
-          </ul>
-        ) : null}
-        {jours.length === 0 ? (
-          <p className="rounded-[var(--radius-md)] border border-dashed border-[var(--border-strong)] px-4 py-6 text-center text-sm text-[var(--foreground-muted)]">
-            Aucune échéance sur cette période.
-          </p>
-        ) : (
-          <ol className="flex flex-col gap-4">
-            {jours.map((j) => (
-              <li key={j.jour} className="flex flex-col gap-1.5">
-                <h3 className="flex items-center gap-2 text-sm font-semibold first-letter:uppercase">
-                  {libelleJour(j.jour, false)}
-                  {j.jour === today ? (
-                    <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[0.7rem] font-medium text-[var(--accent)]">
-                      Aujourd’hui
-                    </span>
-                  ) : null}
-                </h3>
-                <ul className="flex flex-col divide-y divide-[var(--border)] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)]">
-                  {j.taches.map((t) => (
-                    <LigneAgenda
-                      key={t.id}
-                      t={t}
-                      today={today}
-                      dueSoonDays={dueSoonDays}
-                      peutDeplacer={peutDeplacer}
-                      sousTitre={sousTitre?.(t) ?? null}
-                      onOuvrir={() => onOuvrir(parId.get(t.id) ?? t)}
-                      onDeplacer={(jour) => {
-                        const orig = parId.get(t.id);
-                        if (orig) deplacerVers(orig, jour);
-                      }}
-                      idMenu={id(`deplacer-${t.id}`)}
-                    />
-                  ))}
-                </ul>
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
+            </ol>
+          )}
+        </section>
 
-      {nonPlacees.length > 0 ? (
-        <details className="text-sm">
-          <summary className="cursor-pointer text-[var(--foreground-muted)]">
-            {nonPlacees.length} tâche{nonPlacees.length > 1 ? 's' : ''} sans échéance (absente
-            {nonPlacees.length > 1 ? 's' : ''} du calendrier)
-          </summary>
-          <ul className="mt-2 flex flex-col gap-1">
-            {nonPlacees.map((t) => (
-              <li key={t.id}>
-                <button
-                  type="button"
-                  onClick={() => onOuvrir(t)}
-                  className="text-left underline-offset-2 hover:underline"
-                >
-                  <Repere t={t} className="text-[var(--foreground-muted)]" /> {t.title}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </details>
-      ) : null}
-    </div>
+        {nonPlacees.length > 0 ? (
+          <details className="text-sm">
+            <summary className="cursor-pointer text-[var(--foreground-muted)]">
+              {nonPlacees.length} tâche{nonPlacees.length > 1 ? 's' : ''} sans échéance (absente
+              {nonPlacees.length > 1 ? 's' : ''} du calendrier)
+            </summary>
+            <ul className="mt-2 flex flex-col gap-1">
+              {nonPlacees.map((t) => (
+                <li key={t.id}>
+                  <button
+                    type="button"
+                    onClick={() => onOuvrir(t)}
+                    className="text-left underline-offset-2 hover:underline"
+                  >
+                    <Repere t={t} className="text-[var(--foreground-muted)]" /> {t.title}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
+      </div>
+    </NumerosVisibles.Provider>
   );
 }
 
@@ -528,6 +547,7 @@ function Puce({
   onDragStart: (e: React.DragEvent) => void;
   onDragEnd: () => void;
 }): React.ReactElement {
+  const numeros = useContext(NumerosVisibles);
   const etat = etatEcheance(t, today, dueSoonDays);
   const enRetard = etat === 'en_retard';
   const jalon = seg.forme === 'jalon';
@@ -541,7 +561,7 @@ function Puce({
         : 'border-[var(--accent)]/40 bg-[var(--accent-soft)] text-[var(--foreground)]';
   const libelle = [
     jalon ? 'Jalon' : (t.etiquette ?? 'Tâche'),
-    t.etiquette ? t.title : `#${t.number} ${t.title}`,
+    t.etiquette ? t.title : nomElement(t, numeros),
     libelleEtendue(t),
     t.done ? 'terminée' : null,
     etat ? LIBELLES_ECHEANCE[etat] : null,
@@ -607,6 +627,7 @@ function LigneAgenda({
   onDeplacer: (jour: string) => void;
   idMenu: string;
 }): React.ReactElement {
+  const numeros = useContext(NumerosVisibles);
   const etat = etatEcheance(t, today, dueSoonDays);
   const options = peutDeplacer ? optionsEcheance(t, today) : [];
   return (
@@ -650,7 +671,7 @@ function LigneAgenda({
       {options.length > 0 ? (
         <span className="shrink-0">
           <label htmlFor={idMenu} className="sr-only">
-            Déplacer l’échéance de {nomElement(t)} (actuellement {formatJour(t.dueDate)})
+            Déplacer l’échéance de {nomElement(t, numeros)} (actuellement {formatJour(t.dueDate)})
           </label>
           <select
             id={idMenu}

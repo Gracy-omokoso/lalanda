@@ -394,7 +394,11 @@ export interface NommableCalendrier {
   etiquette?: string;
 }
 
-/** « #12 Livrer » pour une tâche ; « Relance « Rappeler ACME » » pour une relance. */
-export function nomElement(t: NommableCalendrier): string {
-  return t.etiquette ? `${t.etiquette} « ${t.title} »` : `#${t.number} ${t.title}`;
+/**
+ * « #12 Livrer » pour une tâche ; « Relance « Rappeler ACME » » pour une relance.
+ * ADR-0066 § 4 : sans numéros de tâche (réglage `showTaskNumbers`), « Livrer ».
+ */
+export function nomElement(t: NommableCalendrier, numeros = true): string {
+  if (t.etiquette) return `${t.etiquette} « ${t.title} »`;
+  return numeros ? `#${t.number} ${t.title}` : t.title;
 }
