@@ -83,6 +83,8 @@ import { WorkAiPlanController } from './work-ai-plan.controller.js';
 // ADR-0064 : notifications par Slack (messages privés, canal d'un projet).
 import { SlackModule } from '../slack/slack.module.js';
 import { WorkSlackChannelController } from './work-slack-channel.controller.js';
+// ADR-0065 : notifications par WhatsApp (numéro vérifié de chaque personne).
+import { WhatsAppModule } from '../whatsapp/whatsapp.module.js';
 import { WorkAiPlanLog, WorkAiPlanLogSchema } from './work-ai-plan.schema.js';
 import { WORK_AI_CHAT_CLIENT, WorkAiPlanService } from './work-ai-plan.service.js';
 import {
@@ -124,6 +126,8 @@ import {
     AiModule,
     // ADR-0064 : `SlackNotifier` (facultatif pour `WorkNotifier`) et canal d'un projet.
     SlackModule,
+    // ADR-0065 : `WhatsAppNotifier` (facultatif pour `WorkNotifier` et les préférences).
+    WhatsAppModule,
     MongooseModule.forFeature([
       { name: WorkSettings.name, schema: WorkSettingsSchema },
       { name: WorkProject.name, schema: WorkProjectSchema },

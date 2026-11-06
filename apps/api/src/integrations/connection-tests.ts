@@ -634,7 +634,8 @@ async function testWhatsApp(input: ConnectionTestInput): Promise<string> {
       `Meta a refusé la lecture du numéro (HTTP ${res.status}${code !== null ? `, code ${code}` : ''}).`,
     );
   }
-  const display = typeof body['display_phone_number'] === 'string' ? body['display_phone_number'] : '';
+  const display =
+    typeof body['display_phone_number'] === 'string' ? body['display_phone_number'] : '';
   const name = typeof body['verified_name'] === 'string' ? body['verified_name'] : '';
   if (!display) {
     throw new Error('Réponse inattendue de Meta : le numéro WhatsApp n’est pas reconnu.');

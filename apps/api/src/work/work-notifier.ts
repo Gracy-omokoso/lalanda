@@ -29,6 +29,11 @@ import {
   type SlackDirectMessage,
   type SlackNotifierPort,
 } from '../slack/slack-notifier.service.js';
+import {
+  WHATSAPP_NOTIFIER,
+  type WhatsAppNotifierPort,
+  type WhatsAppWorkMessage,
+} from '../whatsapp/whatsapp-notifier.service.js';
 import { taskHref } from './work.common.js';
 import { WorkAccessService } from './work-access.service.js';
 import { WorkMembersService } from './work-members.service.js';
@@ -71,11 +76,19 @@ export class WorkNotifier {
     @InjectConnection() private readonly connection: Connection,
     @Optional() @Inject(MailService) mail: MailService | null = null,
     @Optional() @Inject(SLACK_NOTIFIER) slack: SlackNotifierPort | null = null,
+    @Optional() @Inject(WHATSAPP_NOTIFIER) whatsapp: WhatsAppNotifierPort | null = null,
   ) {
     this.port = port ?? noNotifications;
     this.mail = mail;
     this.slack = slack;
+    this.whatsapp = whatsapp;
   }
+
+  /**
+   * ADR-0065 : envoi WhatsApp, NON BLOQUANT (le port rend la main aussitôt). Facultatif :
+   * sans module WhatsApp, rien ne part. Remplaçable par les tests.
+   */
+  whatsapp: WhatsAppNotifierPort | null;
 
   /**
    * ADR-0064 : envoi Slack, NON BLOQUANT (le port rend la main aussitôt). Facultatif :
@@ -100,6 +113,7 @@ export class WorkNotifier {
     );
     const emailTo: NotificationInput[] = [];
     const slackTo: SlackDirectMessage[] = [];
+    const whatsappTo: WhatsAppWorkMessage[] = [];
     for (const input of inputs) {
       const event = workEventOf(input.kind);
       const channels = event ? prefs.get(input.recipientUserId)?.events[event] : undefined;
@@ -119,6 +133,24 @@ export class WorkNotifier {
           title: input.title,
           href: input.href,
         });
+      }
+      // ADR-0065 § 4 : modèle WhatsApp, mêmes destinataires filtrés que l'e-mail ; le
+      // module WhatsApp n'envoie qu'aux numéros vérifiés.
+      if (event && channels?.whatsapp) {
+        whatsappTo.push({
+          recipientUserId: input.recipientUserId,
+          event,
+          eventLabel: WORK_NOTIFICATION_EVENT_LABELS[event],
+          title: input.title,
+          href: input.href,
+        });
+      }
+    }
+    if (whatsappTo.length > 0 && this.whatsapp) {
+      try {
+        this.whatsapp.direct(organizationId, inputs[0]!.source.projectId ?? '', whatsappTo);
+      } catch (err) {
+        this.warn(inputs[0]!, err);
       }
     }
     if (slackTo.length > 0 && this.slack) {

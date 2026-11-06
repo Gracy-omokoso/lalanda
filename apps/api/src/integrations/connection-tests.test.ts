@@ -645,7 +645,10 @@ describe('test de connexion WhatsApp — lecture du numéro, aucun envoi', () =>
   }
 
   it('GET du numéro avec le jeton en Bearer ; aucun POST /messages', async () => {
-    const { vues } = simuler({ display_phone_number: '+243 81 000 0000', verified_name: 'Lalanda' });
+    const { vues } = simuler({
+      display_phone_number: '+243 81 000 0000',
+      verified_name: 'Lalanda',
+    });
     const res = await tester.test(entree());
     expect(res.ok).toBe(true);
     expect(vues).toHaveLength(1);

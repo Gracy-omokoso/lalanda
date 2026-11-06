@@ -10,11 +10,15 @@ import {
   type WorkNotificationPreferences,
   type WorkNotificationPreferencesView,
 } from '@lalanda/shared/work';
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 
 import { isDuplicateKey } from '../../sales/sales.errors.js';
+import {
+  WHATSAPP_NOTIFIER,
+  type WhatsAppNotifierPort,
+} from '../../whatsapp/whatsapp-notifier.service.js';
 import { staleRevision } from '../work.common.js';
 import {
   WorkNotificationPreferencesDoc,
@@ -27,6 +31,9 @@ export class WorkNotificationPreferencesService {
   constructor(
     @InjectModel(WorkNotificationPreferencesDoc.name)
     private readonly prefs: Model<WorkNotificationPreferencesDocument>,
+    @Optional()
+    @Inject(WHATSAPP_NOTIFIER)
+    private readonly whatsapp: WhatsAppNotifierPort | null = null,
   ) {}
 
   async get(organizationId: string, userId: string): Promise<WorkNotificationPreferencesView> {
@@ -61,15 +68,30 @@ export class WorkNotificationPreferencesService {
     if (current.revision !== body.expectedRevision) staleRevision(current.revision);
     // ADR-0064 : la colonne Slack est facultative dans le corps — absente (ancien
     // client), la valeur enregistrée est gardée au lieu de revenir au défaut.
+    // ADR-0065 § 3 : même règle pour WhatsApp ; ALLUMER un événement exige un numéro
+    // vérifié (garder une valeur déjà enregistrée, elle, est toujours permis).
+    const turnsOnWhatsApp = Object.entries(body.events).some(
+      ([e, c]) => c.whatsapp === true && !current.events[e as keyof typeof current.events].whatsapp,
+    );
+    if (turnsOnWhatsApp && !(await this.whatsapp?.isVerified(organizationId, userId))) {
+      throw new ConflictException({
+        code: 'WHATSAPP_NUMBER_NOT_VERIFIED',
+        message: 'Vérifiez d’abord votre numéro WhatsApp pour activer cette notification.',
+      });
+    }
     const events = Object.fromEntries(
-      Object.entries(body.events).map(([e, c]) => [
-        e,
-        {
-          bell: c.bell,
-          email: c.email,
-          slack: c.slack ?? current.events[e as keyof typeof current.events].slack,
-        },
-      ]),
+      Object.entries(body.events).map(([e, c]) => {
+        const stored = current.events[e as keyof typeof current.events];
+        return [
+          e,
+          {
+            bell: c.bell,
+            email: c.email,
+            slack: c.slack ?? stored.slack,
+            whatsapp: c.whatsapp ?? stored.whatsapp,
+          },
+        ];
+      }),
     );
     const values = {
       events,

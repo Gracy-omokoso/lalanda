@@ -380,7 +380,7 @@ e2eSuite('notifications des Projets par Slack (ADR-0064)', () => {
 
     it('préférence Slack coupée : aucun message ; colonne Slack enregistrée', async () => {
       const cur = await f.get('analyst', '/work/notification-preferences');
-      expect(cur.body.events.task_assigned).toEqual({ bell: true, email: true, slack: true });
+      expect(cur.body.events.task_assigned).toMatchObject({ bell: true, email: true, slack: true });
       expect(cur.body.events.task_overdue.slack).toBe(false);
       const events = {
         ...cur.body.events,

@@ -65,18 +65,36 @@ e2eSuite('paramètres des Projets : notifications, comportement, couleurs (ADR-0
       expect(res.status).toBe(200);
       expect(res.body.revision).toBe(0);
       // ADR-0064 : colonne Slack — activée pour l'assignation et la mention seulement.
-      expect(res.body.events.task_assigned).toEqual({ bell: true, email: true, slack: true });
-      expect(res.body.events.mentioned).toEqual({ bell: true, email: true, slack: true });
-      expect(res.body.events.task_overdue).toEqual({ bell: true, email: true, slack: false });
+      // ADR-0065 : colonne WhatsApp — assignation, mention et échéance dépassée.
+      expect(res.body.events.task_assigned).toEqual({
+        bell: true,
+        email: true,
+        slack: true,
+        whatsapp: true,
+      });
+      expect(res.body.events.mentioned).toEqual({
+        bell: true,
+        email: true,
+        slack: true,
+        whatsapp: true,
+      });
+      expect(res.body.events.task_overdue).toEqual({
+        bell: true,
+        email: true,
+        slack: false,
+        whatsapp: true,
+      });
       expect(res.body.events.comment_on_followed).toEqual({
         bell: true,
         email: false,
         slack: false,
+        whatsapp: false,
       });
       expect(res.body.events.task_status_changed).toEqual({
         bell: true,
         email: false,
         slack: false,
+        whatsapp: false,
       });
       expect(res.body.digest).toEqual({ enabled: false, hour: 7, workingDaysOnly: true });
     });

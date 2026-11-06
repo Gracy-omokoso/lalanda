@@ -194,7 +194,12 @@ export class SecretsService {
         { provider, scope: 'platform' },
         {
           $set: {
-            lastTest: { at: new Date(), status: 'failed', detail: detail.slice(0, 300), forced: false },
+            lastTest: {
+              at: new Date(),
+              status: 'failed',
+              detail: detail.slice(0, 300),
+              forced: false,
+            },
           },
         },
       )

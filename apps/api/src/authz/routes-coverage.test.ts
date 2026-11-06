@@ -136,6 +136,9 @@ import { WorkSettingsController } from '../work/work-settings.controller.js';
 import { SlackController } from '../slack/slack.controller.js';
 import { WorkSlackController } from '../slack/work-slack.controller.js';
 import { WorkSlackChannelController } from '../work/work-slack-channel.controller.js';
+// ADR-0065 : notifications des Projets par WhatsApp.
+import { WhatsappController } from '../whatsapp/whatsapp.controller.js';
+import { WorkWhatsappController } from '../whatsapp/work-whatsapp.controller.js';
 import { WorkTasksController } from '../work/work-tasks.controller.js';
 import { WorkTimeController } from '../work/work-time.controller.js';
 import { AuditController } from './audit.controller.js';
@@ -327,6 +330,9 @@ const CONTROLEURS = [
   WorkSlackController,
   SlackController,
   WorkSlackChannelController,
+  // ADR-0065 : numéro WhatsApp de l'appelant, webhook Meta.
+  WorkWhatsappController,
+  WhatsappController,
   // ADR-0045 — H4 : documents, listes d'entrée et de sortie, échéances.
   HrDocumentsController,
   HrChecklistsController,
@@ -379,6 +385,15 @@ const SANS_PERMISSION: Record<string, string> = {
     'Events API de Slack (`app_uninstalled`, `tokens_revoked`, `url_verification`). Aucune ' +
     'session possible : la signature `X-Slack-Signature` (HMAC SHA-256, horodatage < 5 min, ' +
     'comparaison à temps constant) fait autorité ; sans elle, 401.',
+  // ADR-0065 § 5 — appelées par Meta, jamais par un navigateur.
+  'WhatsappController.verify':
+    'Poignée de main du webhook Meta (`hub.mode=subscribe`). Aucune session possible : ' +
+    'le `hub.verify_token` doit égaler le jeton de vérification du fournisseur (comparaison ' +
+    'à temps constant) ; sinon 403. Ne renvoie que `hub.challenge`, aucune donnée.',
+  'WhatsappController.events':
+    'Webhook Meta (statuts de livraison, « STOP »). Aucune session possible : la signature ' +
+    '`X-Hub-Signature-256` (HMAC SHA-256 du corps brut avec la clé secrète de l’application, ' +
+    'comparaison à temps constant) fait autorité ; sans elle, 401. Ne renvoie aucune donnée.',
   'OrganizationsController.list':
     "Liste les organisations de l'appelant. Antérieure à tout contexte d'organisation : " +
     "c'est la route qui permet d'en choisir une.",
