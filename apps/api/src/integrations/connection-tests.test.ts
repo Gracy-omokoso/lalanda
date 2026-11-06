@@ -605,3 +605,80 @@ describe('test de connexion Slack — identifiants validés, rien d’installé'
     expect(vues).toHaveLength(0);
   });
 });
+
+// ─── WhatsApp : lecture du numéro, aucun message (ADR-0065) ──────────────────
+
+describe('test de connexion WhatsApp — lecture du numéro, aucun envoi', () => {
+  const original = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = original;
+  });
+
+  const APP_SECRET = 'fedcba9876543210fedcba9876543210';
+  const JETON = 'EAAG-ANTIFUITE-jeton-whatsapp-de-test';
+
+  function simuler(reponse: unknown, status = 200): { vues: Request[] } {
+    const vues: Request[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      vues.push(new Request(typeof input === 'string' ? input : String(input), init));
+      return new Response(JSON.stringify(reponse), { status });
+    }) as typeof fetch;
+    return { vues };
+  }
+
+  function entree(
+    overrides: { appSecret?: string; verifyToken?: string; apiVersion?: string } = {},
+  ): ConnectionTestInput {
+    return {
+      provider: 'whatsapp',
+      config: {
+        phoneNumberId: '109876543210987',
+        businessAccountId: '209876543210987',
+        ...(overrides.apiVersion ? { apiVersion: overrides.apiVersion } : {}),
+      },
+      secrets: {
+        accessToken: JETON,
+        appSecret: overrides.appSecret ?? APP_SECRET,
+        verifyToken: overrides.verifyToken ?? 'verification-webhook-lalanda',
+      },
+    };
+  }
+
+  it('GET du numéro avec le jeton en Bearer ; aucun POST /messages', async () => {
+    const { vues } = simuler({ display_phone_number: '+243 81 000 0000', verified_name: 'Lalanda' });
+    const res = await tester.test(entree());
+    expect(res.ok).toBe(true);
+    expect(vues).toHaveLength(1);
+    expect(vues[0]!.method).toBe('GET');
+    expect(vues[0]!.url).toBe(
+      'https://graph.facebook.com/v24.0/109876543210987?fields=display_phone_number,verified_name',
+    );
+    expect(vues[0]!.headers.get('authorization')).toBe(`Bearer ${JETON}`);
+    expect(res.detail).toContain('Lalanda');
+    expect(res.detail).not.toContain(JETON);
+  });
+
+  it('version configurée respectée ; version invalide → défaut', async () => {
+    const a = simuler({ display_phone_number: '+243 81 000 0000' });
+    await tester.test(entree({ apiVersion: 'v25.0' }));
+    expect(a.vues[0]!.url).toContain('/v25.0/');
+    const b = simuler({ display_phone_number: '+243 81 000 0000' });
+    await tester.test(entree({ apiVersion: '../autre' }));
+    expect(b.vues[0]!.url).toContain('/v24.0/');
+  });
+
+  it('jeton refusé (code 190) : échec explicite, jeton jamais recopié', async () => {
+    simuler({ error: { code: 190, message: `Invalid OAuth access token ${JETON}` } }, 401);
+    const res = await tester.test(entree());
+    expect(res.ok).toBe(false);
+    expect(res.detail).toContain('190');
+    expect(res.detail).not.toContain(JETON);
+  });
+
+  it('secret d’application ou jeton de vérification mal formés : échec sans appel', async () => {
+    const a = simuler({ display_phone_number: 'x' });
+    expect((await tester.test(entree({ appSecret: 'court' }))).ok).toBe(false);
+    expect((await tester.test(entree({ verifyToken: 'court' }))).ok).toBe(false);
+    expect(a.vues).toHaveLength(0);
+  });
+});

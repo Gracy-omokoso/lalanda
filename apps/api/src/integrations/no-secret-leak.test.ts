@@ -99,6 +99,12 @@ const SECRETS_SENTINELLES: Record<IntegrationProvider, Record<string, string>> =
     clientSecret: 'ANTIFUITE-slack-client-1e8c47b2d90f',
     signingSecret: 'ANTIFUITE-slack-signing-6a2d91f0b7c3',
   },
+  // ADR-0065 : secrets du numéro WhatsApp de la plateforme.
+  whatsapp: {
+    accessToken: 'ANTIFUITE-whatsapp-jeton-3f9a07c2e81b',
+    appSecret: 'ANTIFUITE-whatsapp-app-5c1e8d4a92f0',
+    verifyToken: 'ANTIFUITE-whatsapp-verif-7b2d60e9a1c4',
+  },
 };
 
 /** `config` valide au regard de la liste blanche de chaque fournisseur. */
@@ -114,6 +120,8 @@ const CONFIG_SENTINELLE: Record<IntegrationProvider, Record<string, string | num
   zeptomail: { apiUrl: 'https://api.zeptomail.exemple.test/v1.1/email' },
   // `clientId` Slack : identifiant public, figure dans l'adresse d'autorisation.
   slack: { clientId: '1234567890.0987654321' },
+  // Identifiants Meta : publics dans le gestionnaire WhatsApp.
+  whatsapp: { phoneNumberId: '109876543210987', businessAccountId: '209876543210987' },
 };
 
 /** Toutes les valeurs en clair du parc — la liste que rien ne doit contenir. */

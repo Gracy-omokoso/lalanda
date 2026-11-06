@@ -42,6 +42,10 @@ export const INTEGRATION_PROVIDERS = [
   // organisation dans son propre espace. Identifiants de la PLATEFORME seulement : le
   // jeton du bot de chaque organisation vit dans le coffre d'organisation.
   'slack',
+  // ADR-0065 : numéro WhatsApp « Lalanda » commun (API WhatsApp Business Cloud de
+  // Meta). Identifiants de la PLATEFORME ; les numéros des personnes vivent dans
+  // `whatsapp_recipients`, jamais ici.
+  'whatsapp',
 ] as const;
 
 export type IntegrationProvider = (typeof INTEGRATION_PROVIDERS)[number];
@@ -229,6 +233,26 @@ export const PROVIDER_SPECS: Readonly<Record<IntegrationProvider, ProviderSpec>>
     testDescription:
       'Appel de oauth.v2.access avec un code volontairement invalide — les identifiants ' +
       'sont validés, aucune installation ni aucun jeton n’est créé.',
+  },
+  whatsapp: {
+    label: 'WhatsApp (numéro Lalanda, Meta)',
+    // `accessToken` : jeton PERMANENT d'un utilisateur système Meta (permissions
+    // `whatsapp_business_messaging` et `whatsapp_business_management`) — il envoie au
+    // nom de la plateforme. `appSecret` : clé de l'application Meta, vérifie la
+    // signature `X-Hub-Signature-256` des webhooks. `verifyToken` : chaîne choisie par
+    // l'opératrice pour la poignée de main du webhook. Tous trois sont des secrets.
+    secrets: ['accessToken', 'appSecret', 'verifyToken'],
+    requiredSecrets: ['accessToken', 'appSecret', 'verifyToken'],
+    // Identifiants Meta (publics dans le gestionnaire WhatsApp), version de la Graph
+    // API (défaut `v24.0`) et plafond mensuel d'envois par organisation (défaut 1 000,
+    // ADR-0065 § 6). Aucun n'ouvre quoi que ce soit sans le jeton.
+    config: ['phoneNumberId', 'businessAccountId', 'apiVersion', 'monthlyLimitPerOrganization'],
+    requiredConfig: ['phoneNumberId', 'businessAccountId'],
+    // Vide : WhatsApp n'a jamais transité par l'environnement (verrou `providers.test.ts`).
+    envFallback: {},
+    testDescription:
+      'Lecture du numéro WhatsApp (GET /<phoneNumberId>) avec le jeton — aucun message ' +
+      'n’est envoyé, aucune conversation n’est facturée.',
   },
 };
 

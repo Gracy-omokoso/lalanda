@@ -168,6 +168,40 @@ export class SecretsService {
   }
 
   /**
+   * Résultat du dernier test de connexion d'un fournisseur (ADR-0065 § 5), ou `null`.
+   * Un échec SUSPEND les envois WhatsApp jusqu'au prochain test réussi : c'est ainsi
+   * qu'un jeton refusé par Meta est « signalé dans `/admin` ». Pas de cache : une
+   * lecture d'un document indexé, et une réparation doit valoir à l'appel suivant.
+   */
+  async lastTestStatus(provider: IntegrationProvider): Promise<'ok' | 'failed' | null> {
+    const doc = await this.model
+      .findOne({ provider, scope: 'platform' }, { lastTest: 1 })
+      .lean<{ lastTest?: { status?: string } | null }>()
+      .exec();
+    const status = doc?.lastTest?.status;
+    return status === 'ok' || status === 'failed' ? status : null;
+  }
+
+  /**
+   * Échec constaté À L'USAGE (ADR-0065 § 5 : jeton refusé par Meta pendant un envoi).
+   * Inscrit comme dernier test en échec, avec un détail SANS valeur secrète (fourni par
+   * l'appelant, qui n'y met qu'un code) : `/admin` l'affiche, et le prochain test de
+   * connexion réussi l'efface. Aucun secret n'est lu ni modifié.
+   */
+  async reportRuntimeFailure(provider: IntegrationProvider, detail: string): Promise<void> {
+    await this.model
+      .updateOne(
+        { provider, scope: 'platform' },
+        {
+          $set: {
+            lastTest: { at: new Date(), status: 'failed', detail: detail.slice(0, 300), forced: false },
+          },
+        },
+      )
+      .exec();
+  }
+
+  /**
    * Source effective, SANS déchiffrer — alimente la vue de lecture d'`/admin`.
    *
    * Ne passe pas par `resolve()` : afficher une page d'administration ne doit

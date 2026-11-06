@@ -348,6 +348,8 @@ describe('vue de lecture — la seule forme jamais renvoyée (ADR-0013 §4)', ()
       'zeptomail',
       // ADR-0064
       'slack',
+      // ADR-0065
+      'whatsapp',
     ]);
     for (const vue of vues) {
       expect(vue.enabled).toBe(false);

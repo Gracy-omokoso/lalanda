@@ -42,6 +42,8 @@ describe('le catalogue des fournisseurs', () => {
       'zeptomail',
       // ADR-0064 — application Slack de la plateforme (notifications des Projets).
       'slack',
+      // ADR-0065 — numéro WhatsApp commun de la plateforme (notifications des Projets).
+      'whatsapp',
     ]);
   });
 
@@ -197,6 +199,26 @@ describe('Slack — ADR-0064', () => {
   it('ne déclare aucun jeton de bot : il appartient au coffre de chaque organisation', () => {
     for (const nom of [...PROVIDER_SPECS.slack.secrets, ...PROVIDER_SPECS.slack.config]) {
       expect(nom.toLowerCase()).not.toContain('token');
+    }
+  });
+});
+
+describe('WhatsApp — ADR-0065', () => {
+  it('range les identifiants Meta en config et les trois secrets en secret', () => {
+    expect(PROVIDER_SPECS.whatsapp.config).toEqual([
+      'phoneNumberId',
+      'businessAccountId',
+      'apiVersion',
+      'monthlyLimitPerOrganization',
+    ]);
+    expect(PROVIDER_SPECS.whatsapp.secrets).toEqual(['accessToken', 'appSecret', 'verifyToken']);
+    expect(PROVIDER_SPECS.whatsapp.requiredSecrets).toEqual(PROVIDER_SPECS.whatsapp.secrets);
+  });
+
+  it('aucun secours par l’environnement, aucun nom de secret en config', () => {
+    expect(PROVIDER_SPECS.whatsapp.envFallback).toEqual({});
+    for (const nom of PROVIDER_SPECS.whatsapp.config) {
+      expect(nom.toLowerCase()).not.toMatch(/token|secret/);
     }
   });
 });

@@ -42,6 +42,7 @@ import { connect as tlsConnect } from 'node:tls';
 
 import { sanitizeProviderMessage } from './redaction.js';
 import type { IntegrationProvider } from './providers.js';
+import { whatsappApiBase, whatsappApiVersion } from '../whatsapp/whatsapp-config.js';
 
 export interface ConnectionTestResult {
   ok: boolean;
@@ -112,6 +113,8 @@ async function runProviderTest(input: ConnectionTestInput): Promise<string> {
       return testZeptoMail(input);
     case 'slack':
       return testSlack(input);
+    case 'whatsapp':
+      return testWhatsApp(input);
   }
 }
 
@@ -571,6 +574,72 @@ async function testSlack(input: ConnectionTestInput): Promise<string> {
     `Réponse inattendue de Slack (${body.ok ? 'ok' : error || 'sans code'}) : les identifiants ` +
       `ne sont pas validés par ce résultat.`,
   );
+}
+
+// ─── WhatsApp : lecture du numéro, aucun message (ADR-0065 § 1) ──────────────
+
+/**
+ * Validation des identifiants WhatsApp SANS rien envoyer — ADR-0065.
+ *
+ * `GET /<version>/<phoneNumberId>?fields=display_phone_number,verified_name` avec le
+ * jeton : une LECTURE, gratuite, qui prouve à la fois que le jeton est valide et qu'il
+ * a accès à ce numéro. Aucune conversation n'est ouverte, rien n'est facturé.
+ *
+ * Le secret de l'application et le jeton de vérification ne se testent pas à distance
+ * (ils authentifient ce que Meta nous ENVOIE) : seule leur forme est contrôlée — 32
+ * hexadécimaux pour l'App Secret, 16 caractères au moins pour le jeton de vérification.
+ */
+async function testWhatsApp(input: ConnectionTestInput): Promise<string> {
+  const accessToken = requireSecret(input, 'accessToken');
+  const appSecret = requireSecret(input, 'appSecret');
+  const verifyToken = requireSecret(input, 'verifyToken');
+  const phoneNumberId = str(input.config, 'phoneNumberId').trim();
+  const businessAccountId = str(input.config, 'businessAccountId').trim();
+  if (!/^\d{5,25}$/.test(phoneNumberId)) {
+    throw new Error('`phoneNumberId` absent ou mal formé (chiffres seulement) : test impossible.');
+  }
+  if (!/^\d{5,25}$/.test(businessAccountId)) {
+    throw new Error('`businessAccountId` absent ou mal formé (chiffres seulement).');
+  }
+  if (!/^[0-9a-f]{32}$/i.test(appSecret.trim())) {
+    throw new Error(
+      'La clé secrète de l’application ne ressemble pas à celle de Meta (32 caractères ' +
+        'hexadécimaux, « Paramètres de l’app › Général › Clé secrète »).',
+    );
+  }
+  if (verifyToken.trim().length < 16) {
+    throw new Error('Le jeton de vérification du webhook doit compter 16 caractères au moins.');
+  }
+  const version = whatsappApiVersion(str(input.config, 'apiVersion'));
+  const url =
+    `${whatsappApiBase()}/${version}/${encodeURIComponent(phoneNumberId)}` +
+    '?fields=display_phone_number,verified_name';
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: { authorization: `Bearer ${accessToken}`, accept: 'application/json' },
+  });
+  let body: Record<string, unknown> = {};
+  try {
+    body = (await res.json()) as Record<string, unknown>;
+  } catch {
+    body = {};
+  }
+  if (!res.ok) {
+    const err = (body['error'] ?? {}) as Record<string, unknown>;
+    const code = typeof err['code'] === 'number' ? err['code'] : null;
+    if (code === 190 || res.status === 401) {
+      throw new Error('Meta a refusé le jeton d’accès (code 190) : jeton invalide ou expiré.');
+    }
+    throw new Error(
+      `Meta a refusé la lecture du numéro (HTTP ${res.status}${code !== null ? `, code ${code}` : ''}).`,
+    );
+  }
+  const display = typeof body['display_phone_number'] === 'string' ? body['display_phone_number'] : '';
+  const name = typeof body['verified_name'] === 'string' ? body['verified_name'] : '';
+  if (!display) {
+    throw new Error('Réponse inattendue de Meta : le numéro WhatsApp n’est pas reconnu.');
+  }
+  return `Numéro WhatsApp ${display}${name ? ` (${name})` : ''} reconnu par Meta — aucun message envoyé.`;
 }
 
 /** Message d'erreur de l'API, borné, ou chaîne vide si la réponse est illisible. */
