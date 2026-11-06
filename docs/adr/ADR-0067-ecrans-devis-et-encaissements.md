@@ -7,7 +7,7 @@ Décideur : Gracy Omokoso (dirigeante de Go freelance SARLU).
 > Prolonge [ADR-0056](ADR-0056-ecran-factures-et-tableau-de-bord.md) (écran Factures, modèle des
 > écrans suivants) à **RUN › Ventes › Devis** ([ADR-0035](ADR-0035-crm-et-devis.md)) et
 > **RUN › Ventes › Encaissements** ([ADR-0031](ADR-0031-encaissements-et-realise.md)). Version
-> visée : 1.19.0. Ne change aucune règle de devis, d'encaissement ni de facture.
+> visée : 1.18.0. Ne change aucune règle de devis, d'encaissement ni de facture.
 
 ## Contexte
 
