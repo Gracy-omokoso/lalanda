@@ -214,6 +214,41 @@ export function decoderMentions(
   return { texte, choisis };
 }
 
+// ─── Sélecteur de responsable (ADR-0066 § 2) ────────────────────────────────
+
+export interface OptionResponsable {
+  userId: string;
+  name: string;
+}
+
+/** Libellé de soi-même dans le sélecteur d'un Stagiaire. */
+export const LIBELLE_MOI = 'Moi';
+
+/**
+ * Personnes proposées comme responsable d'une tâche (pur, testé) :
+ *   - un rôle « assignation à soi seulement » (Stagiaire, dit par le serveur) : « Moi » ;
+ *   - sinon, les membres qui peuvent être responsables (`canUpdate`).
+ * Le serveur reste juge (`403 WORK_ASSIGN_SELF_ONLY`).
+ */
+export function responsablesProposes(
+  members: readonly WorkMemberOption[],
+  opts: { moi: string | null; soiSeulement: boolean },
+): OptionResponsable[] {
+  if (opts.soiSeulement) return opts.moi ? [{ userId: opts.moi, name: LIBELLE_MOI }] : [];
+  return members.filter((m) => m.canUpdate).map((m) => ({ userId: m.userId, name: m.name }));
+}
+
+/**
+ * Un Stagiaire ne réassigne pas la tâche d'un autre : le sélecteur est verrouillé
+ * quand le responsable actuel n'est pas lui.
+ */
+export function responsableVerrouille(
+  assigneeUserId: string | null,
+  opts: { moi: string | null; soiSeulement: boolean },
+): boolean {
+  return opts.soiSeulement && assigneeUserId !== null && assigneeUserId !== opts.moi;
+}
+
 // ─── Formulaire du panneau de tâche ─────────────────────────────────────────
 
 export interface FormulaireTache {

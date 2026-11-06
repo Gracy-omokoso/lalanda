@@ -64,6 +64,7 @@ import { ObjectStorageService } from '../storage/object-storage.service.js';
 import {
   actorCan,
   conflict,
+  forbidden,
   invalid,
   invalidCursor,
   iso,
@@ -95,7 +96,7 @@ import {
   type SalesContractsAgendaReader,
   type StockAgendaReader,
 } from './my-tasks.ports.js';
-import { projectIdFilter } from './work-access.js';
+import { isSelfAssignOnlyRole, projectIdFilter } from './work-access.js';
 import { WorkAccessService } from './work-access.service.js';
 import { WorkActivityService, type ActivityInput } from './work-activity.service.js';
 import { WORK_ABSENCES_SOURCE, type WorkAbsencesSource } from './work-absences.port.js';
@@ -132,6 +133,25 @@ interface ViewContext {
 
 /** ADR-0045 — H5 : constats d'absence lus au plus dans « Mes tâches » du créateur. */
 const ABSENCE_FINDINGS_MAX = 200;
+
+/**
+ * ADR-0066 § 2 : un rôle « assignation à soi seulement » (`isSelfAssignOnlyRole`, liste
+ * `SELF_ASSIGN_ONLY_ROLES`) n'assigne qu'à lui-même ou laisse sans responsable, et ne
+ * retire ni ne remplace le responsable d'une tâche qui n'est pas la sienne.
+ */
+export function assertSelfAssignment(
+  actor: WorkActor,
+  from: string | null,
+  to: string | null,
+): void {
+  if (!isSelfAssignOnlyRole(actor.role)) return;
+  if ((to !== null && to !== actor.userId) || (from !== null && from !== actor.userId)) {
+    forbidden(
+      'WORK_ASSIGN_SELF_ONLY',
+      'Votre rôle permet de vous assigner une tâche, ou de la laisser sans responsable, mais pas de l’assigner à quelqu’un d’autre ni de réassigner la tâche d’un collègue.',
+    );
+  }
+}
 
 @Injectable()
 export class WorkTasksService {
@@ -965,6 +985,7 @@ export class WorkTasksService {
       ? this.columnOf(project, body.columnKey)
       : this.firstTodo(project);
     const assigneeUserId = body.assigneeUserId ?? null;
+    assertSelfAssignment(actor, null, assigneeUserId);
     if (assigneeUserId) {
       await this.members.requireEligible(
         organizationId,
@@ -1113,6 +1134,9 @@ export class WorkTasksService {
     const assigneeChanged =
       body.assigneeUserId !== undefined &&
       (body.assigneeUserId ?? null) !== (current.assigneeUserId ?? null);
+    if (assigneeChanged) {
+      assertSelfAssignment(actor, current.assigneeUserId ?? null, body.assigneeUserId ?? null);
+    }
     if (assigneeChanged && body.assigneeUserId) {
       await this.members.requireEligible(
         organizationId,

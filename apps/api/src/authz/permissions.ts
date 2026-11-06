@@ -2224,6 +2224,16 @@ export const DEFAULT_INVITATION_ROLE: OrgRole = 'employee';
  */
 export const PROJECT_SCOPED_ROLES: readonly OrgRole[] = ['guest'];
 
+/**
+ * ADR-0066 § 2 (tranche la décision ouverte n° 3 d'ADR-0059) : rôles qui créent et font
+ * avancer des tâches mais n'en assignent qu'À EUX-MÊMES (ou les laissent sans
+ * responsable) et ne réassignent jamais la tâche d'un autre (`403
+ * WORK_ASSIGN_SELF_ONLY`). Ce n'est pas une action de la matrice : la règle vit dans le
+ * module `work` (`isSelfAssignOnlyRole`, `apps/api/src/work/work-access.ts`), qui lit
+ * cette liste ; aucun nom de rôle n'est écrit ailleurs.
+ */
+export const SELF_ASSIGN_ONLY_ROLES: readonly OrgRole[] = ['intern'];
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Séparation des tâches (R2)
 // ─────────────────────────────────────────────────────────────────────────────

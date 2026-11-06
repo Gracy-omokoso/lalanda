@@ -45,6 +45,8 @@ import {
   diffTache,
   formulaireTache,
   messagesAvertissements,
+  responsableVerrouille,
+  responsablesProposes,
   type FormulaireTache,
 } from './taches-model';
 
@@ -105,6 +107,8 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
     members,
     travailler,
     gerer,
+    moi,
+    assignerSoiSeulement,
     fermerTache,
     appliquerEcriture,
     setTasks,
@@ -179,7 +183,10 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
   const d = detail;
   const ecrire = travailler;
   const labels = settings?.labels ?? [];
-  const eligibles = members.filter((m) => m.canUpdate);
+  // ADR-0066 § 2 : « Moi » seulement pour un Stagiaire. Le serveur reste juge.
+  const regleAssignation = { moi, soiSeulement: assignerSoiSeulement };
+  const eligibles = responsablesProposes(members, regleAssignation);
+  const respVerrouille = responsableVerrouille(d.assignee?.userId ?? null, regleAssignation);
   const candidats = candidatsDependance(tasks, d);
 
   async function changerColonne(columnKey: string): Promise<void> {
@@ -372,6 +379,10 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
               value={f.assigneeUserId}
               onChange={(e) => void sauver({ assigneeUserId: e.target.value })}
               className={CHAMP_PLAT}
+              disabled={respVerrouille}
+              aria-describedby={
+                respVerrouille || assignerSoiSeulement ? 'tache-resp-aide' : undefined
+              }
             >
               <option value="">Aucun responsable</option>
               {d.assignee && !eligibles.some((m) => m.userId === d.assignee!.userId) ? (
@@ -383,6 +394,16 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
                 </option>
               ))}
             </select>
+            {respVerrouille || assignerSoiSeulement ? (
+              <span
+                id="tache-resp-aide"
+                className="basis-full text-xs text-[var(--foreground-muted)]"
+              >
+                {respVerrouille
+                  ? 'Cette tâche est assignée à un collègue : votre rôle ne permet pas de la réassigner.'
+                  : 'Votre rôle permet de vous assigner une tâche, ou de la laisser sans responsable.'}
+              </span>
+            ) : null}
             {/* ADR-0045 — H5 : assigné absent (jours seulement), constat d'échéance. */}
             {d.assigneeAbsence || d.dueDateAbsence ? (
               <span className="flex basis-full flex-wrap items-center gap-1">

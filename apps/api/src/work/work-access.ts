@@ -17,7 +17,7 @@
 
 import { Types } from 'mongoose';
 
-import { PROJECT_SCOPED_ROLES } from '../authz/permissions.js';
+import { PROJECT_SCOPED_ROLES, SELF_ASSIGN_ONLY_ROLES } from '../authz/permissions.js';
 
 /**
  * Rôle « limité aux projets dont il est membre » : `PROJECT_SCOPED_ROLES` d'ADR-0059
@@ -25,6 +25,14 @@ import { PROJECT_SCOPED_ROLES } from '../authz/permissions.js';
  */
 export function isProjectScopedRole(role: string): boolean {
   return (PROJECT_SCOPED_ROLES as readonly string[]).includes(role);
+}
+
+/**
+ * Rôle qui n'assigne une tâche qu'à lui-même : `SELF_ASSIGN_ONLY_ROLES` d'ADR-0066 § 2
+ * (aujourd'hui le Stagiaire, `intern`). `undefined` (accès délégué) : non concerné.
+ */
+export function isSelfAssignOnlyRole(role: string | undefined): boolean {
+  return role !== undefined && (SELF_ASSIGN_ONLY_ROLES as readonly string[]).includes(role);
 }
 
 /**

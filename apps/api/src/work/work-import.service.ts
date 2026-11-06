@@ -27,6 +27,7 @@ import {
   tableToPlan,
   type ImportMember,
 } from './work-import.parser.js';
+import { isSelfAssignOnlyRole } from './work-access.js';
 import { WorkMembersService } from './work-members.service.js';
 import { WorkPlanBuilder, normalizeLabel } from './work-plan-builder.js';
 import { WorkProjectsService } from './work-projects.service.js';
@@ -127,6 +128,28 @@ export class WorkImportService {
         (i) => i.severity === 'warning',
       ).length;
     }
+    // ADR-0066 § 2 : un rôle « assignation à soi seulement » n'assigne pas les autres.
+    // Leur tâche est importée sans responsable, et l'aperçu le dit.
+    if (isSelfAssignOnlyRole(actor.role)) {
+      const refRow = new Map(result.preview.rows.map((r) => [r.ref, r]));
+      for (const t of result.tasks) {
+        if (!t.assigneeUserId || t.assigneeUserId === actor.userId) continue;
+        const row = refRow.get(t.ref)!;
+        result.preview.issues.push({
+          row: row.row,
+          column: 'Responsable',
+          severity: 'warning',
+          code: 'IMPORT_ASSIGNEE_SELF_ONLY',
+          message:
+            'Votre rôle ne permet d’assigner une tâche qu’à vous-même : tâche importée sans responsable.',
+        });
+        t.assigneeUserId = null;
+        row.assignee = null;
+      }
+    }
+    result.preview.counts.warnings = result.preview.issues.filter(
+      (i) => i.severity === 'warning',
+    ).length;
     result.preview.issues.sort((a, b) => (a.row ?? 0) - (b.row ?? 0));
     return result;
   }
