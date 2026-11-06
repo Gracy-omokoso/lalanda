@@ -110,6 +110,11 @@ export interface ExpenseApproverContext {
   /** Détenteurs effectifs d'`expenses.approve` (`countApprovers`). */
   approverCount: number;
   allowSoleApprover: boolean;
+  /**
+   * ADR-0066 § 1 : comptes des membres des équipes RH dont l'appelant est responsable
+   * (lui exclu, `usersLedBy`). Absent = aucun.
+   */
+  ledUserIds?: ReadonlySet<string>;
 }
 
 /** Décision de séparation des tâches pour l'étape en cours ; `null` si rien n'attend. */
@@ -131,6 +136,7 @@ export function expenseDecisionOn(
     step,
     salaryAdvance,
     isDesignatedManager: managerUserId !== null && managerUserId === ctx.userId,
+    isTeamLead: beneficiaryUserId !== null && (ctx.ledUserIds?.has(beneficiaryUserId) ?? false),
     holdsExpensesApprove: ctx.actions.has('expenses.approve'),
     holdsHrSensitiveRead: ctx.actions.has('hr.sensitive.read'),
     priorApproverUserIds: d.approvals.filter((a) => a.decision === 'approved').map((a) => a.userId),

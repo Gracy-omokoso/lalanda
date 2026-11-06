@@ -80,6 +80,7 @@ import {
   HrExpensesNotifier,
 } from '../expenses/hr-expenses-notifier.js';
 import { HrExpensesSettingsService } from '../expenses/hr-expenses-settings.service.js';
+import { teamLeadsOf } from '../teams/team-leads.js';
 import {
   EmployeeAdvance,
   type EmployeeAdvanceDocument,
@@ -121,7 +122,8 @@ export class HrAdvancesService {
       userId: viewer.userId,
       actions: viewer.actions,
       selfEmployeeId: viewer.scope.selfEmployeeId,
-      teamEmployeeIds: viewer.scope.teamEmployeeIds,
+      // Manager désigné et responsable d'équipe RH (ADR-0066 § 1).
+      teamEmployeeIds: [...viewer.scope.teamEmployeeIds, ...viewer.ledEmployeeIds],
     });
   }
 
@@ -514,8 +516,12 @@ export class HrAdvancesService {
     const step = currentStepOf(a);
     if (step === null) return [];
     if (step === 'manager') {
+      // Manager désigné et responsables des équipes du bénéficiaire (ADR-0066 § 1).
       const m = managerUserIdOf(employee, viewer.byId);
-      return m ? [m] : [];
+      const leads = await teamLeadsOf(this.connection, organizationId, employee.userId ?? null);
+      return [...new Set([...(m ? [m] : []), ...leads])].filter(
+        (u) => u !== employee.userId && u !== a.createdBy,
+      );
     }
     let holders = await this.notifier.holdersOf(organizationId, 'expenses.approve');
     if (a.kind === 'salary') {
@@ -596,6 +602,7 @@ export class HrAdvancesService {
         actions: viewer.actions,
         approverCount,
         allowSoleApprover: s.allowSoleApprover,
+        ledUserIds: viewer.ledUserIds,
       },
       decision,
       a.kind === 'salary',

@@ -8,7 +8,7 @@
 import { ClipboardCheck, HandCoins, Receipt } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { AdvanceStatus } from '@lalanda/shared/hr';
 
@@ -63,7 +63,12 @@ export function FraisAvances(): React.ReactElement {
   const params = useSearchParams();
   const vue = vueFrais(params.get('vue'), actions);
   const moi = useMoi();
-  const equipe = useEquipe(moi.estManager);
+  const equipeHierarchique = useEquipe(moi.estManager);
+  // ADR-0066 § 1 : le responsable d'une équipe RH tient aussi l'étape « manager ».
+  const equipe = useMemo(
+    () => [...new Set([...equipeHierarchique, ...moi.membresMenes])],
+    [equipeHierarchique, moi.membresMenes],
+  );
   const [notes, setNotes] = useState<Lecture<ExpenseReportPage> | null>(null);
   const [avances, setAvances] = useState<Lecture<AdvancePage> | null>(null);
   const [ouvert, setOuvert] = useState<Ouvert>(null);

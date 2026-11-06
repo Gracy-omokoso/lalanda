@@ -100,6 +100,7 @@ import {
   type LeaveRequestLean,
   type StoredApproval,
 } from './leave-request.schema.js';
+import { teamLeadsOf } from '../teams/team-leads.js';
 import type { LeaveTypeLean } from './leave-type.schema.js';
 
 /** Demandes de « moi » servies avec la fiche (les plus récentes). */
@@ -607,8 +608,10 @@ export class HrLeaveService {
     if (step === null) return;
     let recipients: string[];
     if (step === 'manager') {
+      // Manager désigné et responsables des équipes du demandeur (ADR-0066 § 1).
       const m = managerUserIdOf(employee, viewer.byId);
-      recipients = m ? [m] : [];
+      const leads = await teamLeadsOf(this.connection, organizationId, employee.userId ?? null);
+      recipients = [...new Set([...(m ? [m] : []), ...leads])];
     } else {
       const prior = new Set(r.approvals.map((a) => a.userId));
       recipients = (await this.notifier.approversOf(organizationId)).filter(

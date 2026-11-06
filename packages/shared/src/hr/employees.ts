@@ -370,7 +370,15 @@ export interface HrMeView {
   employee: EmployeeView | null;
   private: EmployeePrivateSummary | null;
   isManager: boolean;
-  /** Manager d'au moins un collaborateur, ou détenteur de `leave.approve`. */
+  /**
+   * ADR-0066 § 1 : responsable d'au moins une équipe RH comptant un autre membre. Il
+   * valide l'étape « manager » des absences, notes de frais et avances de frais de ses
+   * membres, sans voir leur dossier.
+   */
+  isTeamLead: boolean;
+  /** Fiches des membres de ses équipes RH (lui exclu) : demandes qu'il peut valider. */
+  ledEmployeeIds: string[];
+  /** Manager, responsable d'équipe, ou détenteur de `leave.approve`. */
   canApprove: boolean;
   directReportIds: string[];
   teamEmployeeIds: string[];

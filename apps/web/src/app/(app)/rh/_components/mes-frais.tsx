@@ -6,7 +6,7 @@
 import { buttonClasses } from '@lalanda/ui';
 import { HandCoins, Receipt } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   rh2Api,
@@ -44,7 +44,12 @@ type Ouvert =
 export function MesFrais(): React.ReactElement {
   const { actions, moi: lectureMoi } = useAccesRh();
   const moi = useMoi();
-  const equipe = useEquipe(moi.estManager);
+  const equipeHierarchique = useEquipe(moi.estManager);
+  // ADR-0066 § 1 : le responsable d'une équipe RH tient aussi l'étape « manager ».
+  const equipe = useMemo(
+    () => [...new Set([...equipeHierarchique, ...moi.membresMenes])],
+    [equipeHierarchique, moi.membresMenes],
+  );
   const [notes, setNotes] = useState<Lecture<ExpenseReportPage> | null>(null);
   const [avances, setAvances] = useState<Lecture<AdvancePage> | null>(null);
   const [reglages, setReglages] = useState<HrExpensesAdvancesSettingsView | null>(null);
@@ -110,7 +115,7 @@ export function MesFrais(): React.ReactElement {
         sousTitre="Vos notes de frais et vos avances. Prenez le ticket en photo depuis votre téléphone ; Lalanda calcule les totaux et ce qui vous reste dû."
         actions={
           <>
-            {moi.estManager ? (
+            {moi.estManager || moi.estResponsableEquipe ? (
               <Link href={lienFrais('a-valider')} className={buttonClasses('secondary', 'sm')}>
                 À valider pour mon équipe
               </Link>

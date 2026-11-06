@@ -17,7 +17,15 @@ describe('Mon espace', () => {
     expect(
       etatMoi({
         ok: true,
-        valeur: { employee: null, balances: [], requests: [], isManager: false, canApprove: false },
+        valeur: {
+          employee: null,
+          balances: [],
+          requests: [],
+          isManager: false,
+          isTeamLead: false,
+          ledEmployeeIds: [],
+          canApprove: false,
+        },
       }).etat,
     ).toBe('pret');
   });

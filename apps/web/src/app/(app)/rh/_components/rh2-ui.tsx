@@ -21,7 +21,11 @@ import { nomAffiche, type Ton } from './rh-model';
 import { enregistrerFichier } from './rh-ui';
 
 /** Ma fiche et mon compte, lus dans `GET /hr/me` par la coquille. */
-export function useMoi(): Moi & { estManager: boolean } {
+export function useMoi(): Moi & {
+  estManager: boolean;
+  estResponsableEquipe: boolean;
+  membresMenes: string[];
+} {
   const { moi } = useAccesRh();
   return useMemo(() => {
     const v = moi?.ok ? moi.valeur : null;
@@ -29,6 +33,9 @@ export function useMoi(): Moi & { estManager: boolean } {
       employeeId: v?.employee?.id ?? null,
       userId: v?.employee?.userId ?? null,
       estManager: v?.isManager === true,
+      // ADR-0066 § 1 : responsable d'une équipe RH (valide l'étape « manager »).
+      estResponsableEquipe: v?.isTeamLead === true,
+      membresMenes: v?.ledEmployeeIds ?? [],
     };
   }, [moi]);
 }

@@ -4,7 +4,8 @@
 // LECTURE SEULE, partagée par `GET /hr/leave-approvals/pending` et par la source
 // « Mes tâches » (`HR_AGENDA_SOURCE`). Une demande y figure si la séparation des
 // tâches (`leaveApprovalDecision`) laisse l'appelant la VALIDER à l'étape en cours :
-// manager désigné, ou détenteur effectif de `leave.approve` ; jamais la sienne, sauf
+// manager désigné, responsable d'une équipe RH du demandeur (ADR-0066), ou détenteur
+// effectif de `leave.approve` ; jamais la sienne, sauf
 // approbateur unique ; jamais une étape RH après avoir tenu l'étape manager.
 
 import { HR_SETTINGS_DEFAULTS } from '@lalanda/shared/hr';
@@ -24,6 +25,7 @@ import {
   type LeaveRequestDocument,
   type LeaveRequestLean,
 } from '../leave/leave-request.schema.js';
+import { usersLedBy } from '../teams/team-leads.js';
 import {
   LeaveType,
   type LeaveTypeDocument,
@@ -56,17 +58,19 @@ export class HrLeaveApprovalsReader {
     userId: string,
     holdsLeaveApprove: boolean,
   ): Promise<ApproverContext> {
-    const [settings, approverCount] = await Promise.all([
+    const [settings, approverCount, ledUserIds] = await Promise.all([
       this.connection
         .collection('hr_settings')
         .findOne({ organizationId }, { projection: { allowSoleApprover: 1 } }),
       this.authz.countApprovers(organizationId, 'leave.approve'),
+      // ADR-0066 § 1 : responsable d'équipe, relation relue à chaque appel.
+      usersLedBy(this.connection, organizationId, userId),
     ]);
     const allow =
       typeof settings?.['allowSoleApprover'] === 'boolean'
         ? (settings['allowSoleApprover'] as boolean)
         : HR_SETTINGS_DEFAULTS.allowSoleApprover;
-    return { userId, holdsLeaveApprove, approverCount, allowSoleApprover: allow };
+    return { userId, holdsLeaveApprove, approverCount, allowSoleApprover: allow, ledUserIds };
   }
 
   async pendingFor(

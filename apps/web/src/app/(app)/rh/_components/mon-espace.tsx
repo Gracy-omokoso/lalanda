@@ -16,6 +16,7 @@ import { hrAdminApi } from '@/lib/api-hr-admin';
 import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { DemandeAbsence } from './demande-absence';
+import { lienFrais } from './frais-model';
 import { LIBELLES_CATEGORIE } from './documents-model';
 import {
   etatMoi,
@@ -108,6 +109,11 @@ export function MonEspace(): React.ReactElement {
             <Link href={LIEN_A_VALIDER} className={BOUTON_PETIT}>
               Absences à valider
             </Link>
+            {etat.moi.isManager || etat.moi.isTeamLead ? (
+              <Link href={lienFrais('a-valider')} className={BOUTON_PETIT}>
+                Frais à valider
+              </Link>
+            ) : null}
           </div>
         ) : null}
       </Bandeau>

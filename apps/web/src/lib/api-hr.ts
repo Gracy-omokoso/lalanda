@@ -302,6 +302,10 @@ export interface HrMeView {
   documents?: HrMyDocument[];
   checklistItems?: HrMyChecklistItem[];
   isManager: boolean;
+  /** ADR-0066 § 1 : responsable d'une équipe RH (valide l'étape « manager » de ses membres). */
+  isTeamLead: boolean;
+  /** Fiches des membres de ses équipes RH (lui exclu). */
+  ledEmployeeIds: string[];
   canApprove: boolean;
 }
 
@@ -436,7 +440,11 @@ export function employeeFromApi(e: ApiEmployee): HrEmployeeView {
   };
 }
 
-export function meFromApi(m: ApiMe & Partial<ApiMeExtras>): HrMeView {
+/** ADR-0066 : champs absents d'une instance N-1 (avant les responsables d'équipe). */
+type ApiMeTolerant = Omit<ApiMe, 'isTeamLead' | 'ledEmployeeIds'> &
+  Partial<Pick<ApiMe, 'isTeamLead' | 'ledEmployeeIds'>>;
+
+export function meFromApi(m: ApiMeTolerant & Partial<ApiMeExtras>): HrMeView {
   return {
     // ADR-0045 — H7 : mes documents visibles et mes éléments de liste (lot H4).
     ...(m.documents
@@ -458,6 +466,9 @@ export function meFromApi(m: ApiMe & Partial<ApiMeExtras>): HrMeView {
     balances: m.balances,
     requests: m.requests,
     isManager: m.isManager,
+    // Instance N-1 : champs absents → aucun rôle de responsable d'équipe.
+    isTeamLead: m.isTeamLead === true,
+    ledEmployeeIds: Array.isArray(m.ledEmployeeIds) ? m.ledEmployeeIds : [],
     canApprove: m.canApprove,
   };
 }
@@ -520,7 +531,7 @@ export function orgChartFromApi(c: ApiOrgChart): HrOrgChartResponse {
 export const hrApi = {
   // Moi, mon équipe (§ 3.1)
   getMe: async () =>
-    meFromApi(await jsonRequest<ApiMe & Partial<ApiMeExtras>>('/hr/me', { method: 'GET' })),
+    meFromApi(await jsonRequest<ApiMeTolerant & Partial<ApiMeExtras>>('/hr/me', { method: 'GET' })),
   getTeam: async () => teamFromApi(await jsonRequest<ApiTeam>('/hr/team', { method: 'GET' })),
 
   // Collaborateurs (§ 3.1) — aucune route sensible ici.

@@ -1616,6 +1616,20 @@ describe('ADR-0045 § 4.3 — `leaveApprovalDecision` (séparation des tâches d
     expect(decide({ step: 'hr' })).toEqual({ ok: false, code: 'LEAVE_NOT_YOUR_STEP' });
   });
 
+  it('ADR-0066 § 1 — le responsable d’équipe tient l’étape manager, jamais l’étape RH ni la sienne', () => {
+    const lead = { approverUserId: 'L', isDesignatedManager: false, isTeamLead: true };
+    expect(decide(lead)).toEqual({ ok: true, soleApprover: false, onBehalfOfManager: false });
+    expect(decide({ ...lead, step: 'hr' })).toEqual({ ok: false, code: 'LEAVE_NOT_YOUR_STEP' });
+    expect(decide({ ...lead, beneficiaryUserId: 'L' })).toEqual({
+      ok: false,
+      code: 'SELF_APPROVAL_FORBIDDEN',
+    });
+    expect(decide({ ...lead, isTeamLead: false })).toEqual({
+      ok: false,
+      code: 'LEAVE_NOT_YOUR_STEP',
+    });
+  });
+
   it('suppléance : un détenteur de `leave.approve` tient l’étape manager, marquée', () => {
     expect(
       decide({ approverUserId: 'RH', isDesignatedManager: false, holdsLeaveApprove: true }),
@@ -2908,6 +2922,35 @@ describe('ADR-0051 § 3.1, § 3.2 — `expenseApprovalDecision`', () => {
         createdBy: 'rh',
       }),
     ).toEqual({ ok: false, code: 'CREATOR_APPROVAL_FORBIDDEN' });
+  });
+
+  it('ADR-0066 § 1 — le responsable d’équipe tient l’étape manager, ni la finance ni une avance sur salaire', () => {
+    const lead = {
+      ...base,
+      approverUserId: 'l',
+      step: 'manager' as const,
+      isTeamLead: true,
+      holdsExpensesApprove: false,
+      holdsHrSensitiveRead: false,
+      priorApproverUserIds: [],
+    };
+    expect(expenseApprovalDecision(lead)).toEqual({
+      ok: true,
+      soleApprover: false,
+      onBehalfOfManager: false,
+    });
+    expect(expenseApprovalDecision({ ...lead, step: 'finance' })).toEqual({
+      ok: false,
+      code: 'EXPENSE_NOT_YOUR_STEP',
+    });
+    expect(expenseApprovalDecision({ ...lead, salaryAdvance: true })).toEqual({
+      ok: false,
+      code: 'ADVANCE_SALARY_NOT_YOUR_STEP',
+    });
+    expect(expenseApprovalDecision({ ...lead, beneficiaryUserId: 'l', createdBy: 'l' })).toEqual({
+      ok: false,
+      code: 'SELF_APPROVAL_FORBIDDEN',
+    });
   });
 
   it('critère 3 — le manager tient l’étape manager, puis ne tient pas l’étape finance', () => {

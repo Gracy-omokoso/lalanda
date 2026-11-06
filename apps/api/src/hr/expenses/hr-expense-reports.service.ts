@@ -127,6 +127,7 @@ import {
   HR_MY_EXPENSES_HREF,
   HrExpensesNotifier,
 } from './hr-expenses-notifier.js';
+import { teamLeadsOf } from '../teams/team-leads.js';
 import { HrExpensesSettingsService } from './hr-expenses-settings.service.js';
 
 const WORK_PROJECTS = 'work_projects';
@@ -143,12 +144,16 @@ export interface ReportAccess {
 
 export function reportAccessOf(
   r: Pick<ExpenseReportLean, 'employeeId' | 'createdBy'>,
-  viewer: Pick<HrViewer, 'userId' | 'actions' | 'scope'>,
+  viewer: Pick<HrViewer, 'userId' | 'actions' | 'scope'> &
+    Partial<Pick<HrViewer, 'ledEmployeeIds'>>,
 ): ReportAccess {
   return {
     self: viewer.scope.selfEmployeeId === r.employeeId,
     creator: r.createdBy === viewer.userId,
-    manager: viewer.scope.teamEmployeeIds.includes(r.employeeId),
+    // Manager désigné (équipe hiérarchique) ou responsable d'équipe RH (ADR-0066 § 1).
+    manager:
+      viewer.scope.teamEmployeeIds.includes(r.employeeId) ||
+      (viewer.ledEmployeeIds ?? []).includes(r.employeeId),
     approver: viewer.actions.has('expenses.approve'),
     payer: viewer.actions.has('payables.pay'),
     hrRead: viewer.actions.has('hr.read'),
@@ -401,6 +406,7 @@ export class HrExpenseReportsService {
       actions: viewer.actions,
       approverCount,
       allowSoleApprover: s.allowSoleApprover,
+      ledUserIds: viewer.ledUserIds,
     };
   }
 
@@ -418,8 +424,10 @@ export class HrExpenseReportsService {
     if (self) mine.push({ employeeId: self });
     const or: Record<string, unknown>[] = [...mine];
     if (all) or.push({ status: { $ne: 'draft' } });
-    else if (viewer.scope.teamEmployeeIds.length > 0) {
-      or.push({ employeeId: { $in: [...viewer.scope.teamEmployeeIds] }, status: { $ne: 'draft' } });
+    else {
+      // Manager désigné et responsable d'équipe RH (ADR-0066 § 1) : hors brouillons.
+      const team = new Set([...viewer.scope.teamEmployeeIds, ...viewer.ledEmployeeIds]);
+      if (team.size > 0) or.push({ employeeId: { $in: [...team] }, status: { $ne: 'draft' } });
     }
     const and: Record<string, unknown>[] = [{ organizationId }, { $or: or }];
     if (query.employeeId !== undefined) {
@@ -955,8 +963,12 @@ export class HrExpenseReportsService {
     if (step === null) return;
     let recipients: string[];
     if (step === 'manager') {
+      // Manager désigné et responsables des équipes du bénéficiaire (ADR-0066 § 1).
       const m = managerUserIdOf(employee, viewer.byId);
-      recipients = m ? [m] : [];
+      const leads = await teamLeadsOf(this.connection, organizationId, employee.userId ?? null);
+      recipients = [...new Set([...(m ? [m] : []), ...leads])].filter(
+        (u) => u !== employee.userId && u !== r.createdBy,
+      );
     } else {
       const prior = new Set(r.approvals.map((a) => a.userId));
       recipients = (await this.notifier.holdersOf(organizationId, 'expenses.approve')).filter(
