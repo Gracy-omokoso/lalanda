@@ -120,6 +120,26 @@ export interface QuoteConversionResult {
   amountsDiffer: boolean;
 }
 
+/** Curseur du tri par validité : base64url de `{ "u": "AAAA-MM-JJ", "i": id }`. */
+function encodeValidUntilCursor(validUntil: string, id: string): string {
+  return Buffer.from(JSON.stringify({ u: validUntil, i: id }), 'utf8').toString('base64url');
+}
+
+function decodeValidUntilCursor(raw: string): { validUntil: string; id: Types.ObjectId } | null {
+  if (!/^[A-Za-z0-9_-]+$/.test(raw)) return null;
+  try {
+    const parsed: unknown = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8'));
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    const { u, i } = parsed as Record<string, unknown>;
+    if (typeof u !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(u)) return null;
+    if (typeof i !== 'string' || !isObjectIdHex(i)) return null;
+    if (encodeValidUntilCursor(u, i) !== raw) return null;
+    return { validUntil: u, id: new Types.ObjectId(i) };
+  } catch {
+    return null;
+  }
+}
+
 export function quoteNotFound(): never {
   throw new NotFoundException({ code: 'QUOTE_NOT_FOUND', message: 'Devis introuvable.' });
 }
@@ -187,6 +207,34 @@ export class QuotesService {
     if (query.q !== undefined) {
       const term = normalizeForSearch(query.q);
       if (term !== '') and.push({ searchKey: { $regex: escapeRegex(term) } });
+    }
+    if (query.sort === 'valid_until') {
+      // ADR-0067 : validité croissante (le devis qui expire le plus tôt d'abord).
+      if (query.cursor !== undefined) {
+        const cursor = decodeValidUntilCursor(query.cursor);
+        if (cursor === null) invalidCursor();
+        and.push({
+          $or: [
+            { validUntil: { $gt: cursor.validUntil } },
+            { validUntil: cursor.validUntil, _id: { $gt: cursor.id } },
+          ],
+        });
+      }
+      const docs = await this.quotes
+        .find({ $and: and })
+        .sort({ validUntil: 1, _id: 1 })
+        .limit(query.limit + 1)
+        .lean<QuoteLean[]>()
+        .exec();
+      const page = docs.slice(0, query.limit);
+      const last = page[page.length - 1];
+      return {
+        items: page.map((q) => this.summary(q, today)),
+        nextCursor:
+          docs.length > query.limit && last
+            ? encodeValidUntilCursor(last.validUntil, String(last._id))
+            : null,
+      };
     }
     if (query.cursor !== undefined) {
       const cursor = decodeTimeCursor(query.cursor);

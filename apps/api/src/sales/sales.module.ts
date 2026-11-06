@@ -41,6 +41,7 @@ import {
   SalesInvoiceSettlementSchema,
 } from './receipts/invoice-settlement.schema.js';
 import { SalesReceipt, SalesReceiptSchema } from './receipts/receipt.schema.js';
+import { ReceiptStatsService } from './receipts/receipt-stats.service.js';
 import { ReceiptsController } from './receipts/receipts.controller.js';
 import { ReceiptsService } from './receipts/receipts.service.js';
 import { SettlementClock, SettlementsService } from './receipts/settlements.service.js';
@@ -143,6 +144,7 @@ import { ReferenceRefreshJob } from './normalization/reference-refresh.job.js';
     InvoiceDraftsService,
     InvoiceFreezingService,
     InvoiceStatsService,
+    ReceiptStatsService,
     CreditNotesService,
     InvoiceDocumentsService,
     // ADR-0042 : envoi des documents de vente par e-mail (audit, remise au transport).
@@ -188,6 +190,8 @@ import { ReferenceRefreshJob } from './normalization/reference-refresh.job.js';
     CustomersService,
     // ADR-0047 : les factures des abonnements Lalanda s'émettent par le même circuit.
     InvoiceFreezingService,
+    // ADR-0067 : le tableau des devis lit la même devise de référence que les factures.
+    InvoiceStatsService,
   ],
 })
 export class SalesModule {}

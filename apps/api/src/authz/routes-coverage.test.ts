@@ -743,6 +743,7 @@ describe('couverture des routes par le RBAC', () => {
       // ET lecture des ventes.
       'ReceiptsController.list': ['sales.read'],
       'ReceiptsController.summary': ['sales.read'],
+      'ReceiptsController.stats': ['sales.read'],
       'ReceiptsController.get': ['sales.read'],
       'ReceiptsController.create': ['sales.receipt'],
       'ReceiptsController.put': ['sales.receipt'],
@@ -791,6 +792,7 @@ describe('couverture des routes par le RBAC', () => {
       // ADR-0040 — C0 : écriture sous `sales.quote` ; convertir exige aussi
       // `sales.manage` (le brouillon de facture reste un geste de facturation).
       'QuotesController.list': ['sales.read'],
+      'QuotesController.stats': ['sales.read'],
       'QuotesController.get': ['sales.read'],
       'QuotesController.pdf': ['sales.read'],
       'QuotesController.create': ['sales.quote'],

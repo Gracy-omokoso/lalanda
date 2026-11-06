@@ -34,6 +34,8 @@ import {
   SettlementsQuerySchema,
   SummaryQuerySchema,
 } from './receipts.dto.js';
+import { ReceiptStatsQuerySchema, type ReceiptStats } from '@lalanda/shared/sales-invoices';
+import { ReceiptStatsService } from './receipt-stats.service.js';
 import { ReceiptsService, type ReceiptView, type ReceiptsSummary } from './receipts.service.js';
 import { SettlementsService, type SettlementView } from './settlements.service.js';
 import { RequireFeature } from '../../billing/feature.guard.js';
@@ -52,6 +54,7 @@ export class ReceiptsController {
   constructor(
     @Inject(ReceiptsService) private readonly receipts: ReceiptsService,
     @Inject(SettlementsService) private readonly settlements: SettlementsService,
+    @Inject(ReceiptStatsService) private readonly receiptStats: ReceiptStatsService,
   ) {}
 
   @Get('receipts')
@@ -71,6 +74,18 @@ export class ReceiptsController {
     const parsed = SummaryQuerySchema.safeParse(query);
     if (!parsed.success) invalidRequest(parsed.error, 'Paramètres invalides.');
     return this.receipts.summary(orgId, parsed.data.from, parsed.data.to);
+  }
+
+  /**
+   * ADR-0067 : tableau de bord de l'écran Encaissements (cartes, graphiques,
+   * compteurs des filtres). Déclarée AVANT `receipts/:receiptId`.
+   */
+  @Get('receipts/stats')
+  @RequirePermission('sales.read')
+  async stats(@CurrentOrgId() orgId: string, @Query() query: unknown): Promise<ReceiptStats> {
+    const parsed = ReceiptStatsQuerySchema.safeParse(query);
+    if (!parsed.success) invalidRequest(parsed.error, 'Paramètres invalides.');
+    return this.receiptStats.stats(orgId, parsed.data.months);
   }
 
   @Get('receipts/:receiptId')

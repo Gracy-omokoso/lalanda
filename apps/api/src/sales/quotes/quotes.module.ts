@@ -24,6 +24,7 @@ import {
 import { QuotesController } from './quotes.controller.js';
 import { QuotesFromOpportunityController } from './quotes-from-opportunity.controller.js';
 import { QuotesService } from './quotes.service.js';
+import { QuoteStatsService } from './quote-stats.service.js';
 
 @Module({
   imports: [
@@ -40,6 +41,6 @@ import { QuotesService } from './quotes.service.js';
   ],
   // ADR-0040 — C2 : devis prérempli depuis une opportunité (contrôleur à part).
   controllers: [QuotesController, QuotesFromOpportunityController],
-  providers: [QuotesService, QuoteDocumentsService],
+  providers: [QuotesService, QuoteDocumentsService, QuoteStatsService],
 })
 export class QuotesModule {}

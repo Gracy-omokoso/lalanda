@@ -38,7 +38,9 @@ import type { DocumentEmailDraft, DocumentEmailResult } from '../documents/docum
 import { documentEmailInputOf, senderOf } from '../documents/invoice-documents.controller.js';
 import { invalidRequest } from '../sales.errors.js';
 import type { InvoiceActor } from '../invoices/invoice.types.js';
+import { QuoteStatsQuerySchema, type QuoteStats } from '@lalanda/shared/sales-invoices';
 import { QuoteDocumentsService } from './quote-documents.service.js';
+import { QuoteStatsService } from './quote-stats.service.js';
 import {
   QuotesService,
   type QuoteConversionResult,
@@ -74,6 +76,7 @@ export class QuotesController {
   constructor(
     @Inject(QuotesService) private readonly quotes: QuotesService,
     @Inject(QuoteDocumentsService) private readonly documents: QuoteDocumentsService,
+    @Inject(QuoteStatsService) private readonly statsService: QuoteStatsService,
   ) {}
 
   @Get()
@@ -82,6 +85,18 @@ export class QuotesController {
     const parsed = ListQuotesQuerySchema.safeParse(query);
     if (!parsed.success) invalidRequest(parsed.error, 'Paramètres de liste invalides.');
     return this.quotes.list(orgId, parsed.data);
+  }
+
+  /**
+   * ADR-0067 : tableau de bord de l'écran Devis (cartes, graphiques, compteurs des
+   * filtres). Déclarée AVANT `:quoteId`, qui la capturerait sinon.
+   */
+  @Get('stats')
+  @RequirePermission('sales.read')
+  async stats(@CurrentOrgId() orgId: string, @Query() query: unknown): Promise<QuoteStats> {
+    const parsed = QuoteStatsQuerySchema.safeParse(query);
+    if (!parsed.success) invalidRequest(parsed.error, 'Paramètres invalides.');
+    return this.statsService.stats(orgId, parsed.data.months);
   }
 
   @Post()
