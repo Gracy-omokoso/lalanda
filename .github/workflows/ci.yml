@@ -38,7 +38,7 @@ jobs:
   quality:
     name: Format · Typecheck · Test · Build
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
@@ -91,8 +91,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          docker run -d --name lalanda-ci-mongo -p 27017:27017 "$MONGO_IMAGE" \
-            --replSet rs0 --bind_ip_all --port 27017
+          docker run -d --name lalanda-ci-mongo --restart on-failure -p 27017:27017 "$MONGO_IMAGE" \
+            --replSet rs0 --bind_ip_all --port 27017 --wiredTigerCacheSizeGB 1
 
           echo "Attente de la disponibilité de mongod…"
           for i in $(seq 1 60); do
