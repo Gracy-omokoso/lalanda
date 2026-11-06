@@ -2,10 +2,13 @@
 //
 // Pour chaque événement : cloche (boîte in-app) oui/non, e-mail oui/non, Slack oui/non
 // (ADR-0064 : message privé du bot, seulement si l'organisation a connecté son espace
-// Slack). Plus un résumé quotidien par e-mail (oui/non, heure de Kinshasa, jours ouvrés
-// seulement — jamais sur Slack dans cette version). Sans document : valeurs par défaut —
-// cloche partout, e-mail pour l'assignation, la mention et l'échéance dépassée, Slack
-// pour l'assignation et la mention, pas de résumé. Le serveur APPLIQUE ces préférences
+// Slack), WhatsApp oui/non (ADR-0065 : message par modèle Meta, seulement si la
+// personne a vérifié son numéro). Plus un résumé quotidien par e-mail (oui/non, heure de
+// Kinshasa, jours ouvrés seulement — jamais sur Slack ni WhatsApp dans cette version).
+// Sans document : valeurs par défaut — cloche partout, e-mail pour l'assignation, la
+// mention et l'échéance dépassée, Slack pour l'assignation et la mention, WhatsApp pour
+// l'assignation, la mention et l'échéance dépassée (effectif une fois le numéro
+// vérifié), pas de résumé. Le serveur APPLIQUE ces préférences
 // à l'émission (`WorkNotifier`, rappels, résumé) : rien n'est décoratif.
 
 import { z } from 'zod';
@@ -54,6 +57,11 @@ export interface WorkNotificationChannels {
   email: boolean;
   /** ADR-0064 : message privé Slack. Sans effet tant que l'organisation n'est pas connectée. */
   slack: boolean;
+  /**
+   * ADR-0065 : message WhatsApp (modèle Meta). Sans effet tant que la personne n'a pas
+   * vérifié son numéro, ou que WhatsApp n'est pas disponible sur la plateforme.
+   */
+  whatsapp: boolean;
 }
 
 export interface WorkDigestPreferences {
@@ -83,6 +91,16 @@ const EMAIL_BY_DEFAULT: readonly WorkNotificationEvent[] = [
 /** ADR-0064 § 4 : Slack activé par défaut pour l'assignation et la mention seulement. */
 export const SLACK_BY_DEFAULT: readonly WorkNotificationEvent[] = ['task_assigned', 'mentioned'];
 
+/**
+ * ADR-0065 § 4 : WhatsApp activé par défaut pour l'assignation, la mention et l'échéance
+ * dépassée — les seuls événements qui valent un message payant sur le téléphone.
+ */
+export const WHATSAPP_BY_DEFAULT: readonly WorkNotificationEvent[] = [
+  'task_assigned',
+  'mentioned',
+  'task_overdue',
+];
+
 export function defaultWorkNotificationPreferences(): WorkNotificationPreferences {
   const events = {} as Record<WorkNotificationEvent, WorkNotificationChannels>;
   for (const e of WORK_NOTIFICATION_EVENTS) {
@@ -90,6 +108,7 @@ export function defaultWorkNotificationPreferences(): WorkNotificationPreference
       bell: true,
       email: EMAIL_BY_DEFAULT.includes(e),
       slack: SLACK_BY_DEFAULT.includes(e),
+      whatsapp: WHATSAPP_BY_DEFAULT.includes(e),
     };
   }
   return { events, digest: { enabled: false, hour: 7, workingDaysOnly: true } };
@@ -113,6 +132,7 @@ export function resolveWorkNotificationPreferences(
         bell: typeof s.bell === 'boolean' ? s.bell : base.events[e].bell,
         email: typeof s.email === 'boolean' ? s.email : base.events[e].email,
         slack: typeof s.slack === 'boolean' ? s.slack : base.events[e].slack,
+        whatsapp: typeof s.whatsapp === 'boolean' ? s.whatsapp : base.events[e].whatsapp,
       };
     }
   }
@@ -135,6 +155,8 @@ const Channels = z
     // ADR-0064 : facultatif — un ancien client qui n'envoie pas la colonne Slack garde
     // la valeur enregistrée (le serveur la reprend), au lieu de la remettre au défaut.
     slack: z.boolean({ error: 'Vrai ou faux attendu.' }).optional(),
+    // ADR-0065 : même règle pour la colonne WhatsApp.
+    whatsapp: z.boolean({ error: 'Vrai ou faux attendu.' }).optional(),
   })
   .strict();
 

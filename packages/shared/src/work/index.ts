@@ -23,3 +23,5 @@ export * from './card-colors.js';
 export * from './plan.js';
 // ADR-0064 : notifications des Projets par Slack (connexion, canal d'un projet).
 export * from './slack.js';
+// ADR-0065 : notifications des Projets par WhatsApp (numéro vérifié, quota).
+export * from './whatsapp.js';

@@ -307,6 +307,22 @@ export const ApiEnvSchema = CommonEnvSchema.extend({
     .optional(),
 
   /**
+   * Interrupteur d'exploitation des envois WhatsApp (ADR-0065 § 7, cohérent avec
+   * ADR-0017). Allumé par défaut : WhatsApp fonctionne dès que le fournisseur est
+   * configuré et activé dans `/admin`. Seule la valeur `false` (casse ignorée) coupe
+   * TOUT envoi — codes de vérification et notifications — sans toucher aux numéros
+   * enregistrés. Lu à chaque appel par `apps/api/src/whatsapp/`.
+   */
+  WHATSAPP_ENABLED: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .refine((v) => v === 'true' || v === 'false', {
+      error: 'WHATSAPP_ENABLED vaut true ou false.',
+    })
+    .optional(),
+
+  /**
    * Clé PRÉCÉDENTE, présente uniquement le temps d'une rotation (ADR-0013 §3).
    * Retirer après `secrets:rewrap` et vérification qu'aucun document ne porte
    * plus l'ancien `keyId`.

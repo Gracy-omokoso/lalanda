@@ -28,7 +28,7 @@ describe('Slack — contrats (ADR-0064)', () => {
     expect(avecSlack).toEqual(['task_assigned', 'mentioned']);
     // Document antérieur sans colonne Slack : complété par le défaut.
     const r = resolveWorkNotificationPreferences({ events: { mentioned: { bell: false } } });
-    expect(r.events.mentioned).toEqual({ bell: false, email: true, slack: true });
+    expect(r.events.mentioned).toEqual({ bell: false, email: true, slack: true, whatsapp: true });
   });
 
   it('PUT des préférences : colonne Slack facultative, booléenne', () => {
