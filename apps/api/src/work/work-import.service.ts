@@ -32,6 +32,7 @@ import { WorkMembersService } from './work-members.service.js';
 import { WorkPlanBuilder, normalizeLabel } from './work-plan-builder.js';
 import { WorkProjectsService } from './work-projects.service.js';
 import { WorkSettingsService } from './work-settings.service.js';
+import { WorkTasksService } from './work-tasks.service.js';
 
 /** Erreur de fichier → réponse HTTP (413 pour la taille, 400 sinon). */
 export function importFileFailure(err: unknown): never {
@@ -52,6 +53,7 @@ export class WorkImportService {
     @Inject(WorkProjectsService) private readonly projects: WorkProjectsService,
     @Inject(WorkSettingsService) private readonly settings: WorkSettingsService,
     @Inject(WorkPlanBuilder) private readonly builder: WorkPlanBuilder,
+    @Inject(WorkTasksService) private readonly tasks: WorkTasksService,
   ) {}
 
   /** Membres de l'ORGANISATION ACTIVE seulement, avec leur e-mail (correspondance du responsable). */
@@ -127,6 +129,34 @@ export class WorkImportService {
       result.preview.counts.warnings = result.preview.issues.filter(
         (i) => i.severity === 'warning',
       ).length;
+    }
+    // ADR-0066 § 3 : sans `work.manage`, on n'assigne pas quelqu'un qui ne voit pas le
+    // projet (le gestionnaire, lui, l'ajoute aux membres à l'import).
+    if (project && !actorCan(actor, 'work.manage')) {
+      const assignees = [
+        ...new Set(result.tasks.map((t) => t.assigneeUserId).filter((u): u is string => !!u)),
+      ];
+      const blind = new Set<string>();
+      for (const u of assignees) {
+        if (!(await this.tasks.assigneeSees(organizationId, String(project._id), u))) blind.add(u);
+      }
+      if (blind.size > 0) {
+        const refRow = new Map(result.preview.rows.map((r) => [r.ref, r]));
+        for (const t of result.tasks) {
+          if (!t.assigneeUserId || !blind.has(t.assigneeUserId)) continue;
+          const row = refRow.get(t.ref)!;
+          result.preview.issues.push({
+            row: row.row,
+            column: 'Responsable',
+            severity: 'warning',
+            code: 'IMPORT_ASSIGNEE_NOT_MEMBER',
+            message:
+              'Cette personne ne voit pas ce projet et votre rôle ne permet pas d’ajouter des membres : tâche importée sans responsable.',
+          });
+          t.assigneeUserId = null;
+          row.assignee = null;
+        }
+      }
     }
     // ADR-0066 § 2 : un rôle « assignation à soi seulement » n'assigne pas les autres.
     // Leur tâche est importée sans responsable, et l'aperçu le dit.

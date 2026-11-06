@@ -40,6 +40,7 @@ import {
   ORG_PERMISSION_MATRIX,
   PROJECT_SCOPED_ROLES,
   requiredActionsOf,
+  SELF_ASSIGN_ONLY_ROLES,
   ORG_ROLES,
   ORG_ROLE_DESCRIPTIONS,
   ORG_ROLE_LABELS,
@@ -3388,6 +3389,11 @@ describe('ADR-0059 — rôles de l’équipe : Salarié, Manager, Stagiaire, Inv
   it('Invité externe : projets et tâches, socle compris ; ni RH ni pointage', () => {
     expect(tenues('guest')).toEqual(['analytics.read', 'work.read', 'work.update']);
     expect(PROJECT_SCOPED_ROLES).toEqual(['guest']);
+  });
+
+  it('ADR-0066 § 2 — le Stagiaire seul n’assigne qu’à lui-même (règle du module work)', () => {
+    expect(SELF_ASSIGN_ONLY_ROLES).toEqual(['intern']);
+    expect(tenues('intern')).toEqual(tenues('employee'));
   });
 
   it('aucune donnée financière pour les quatre rôles', () => {

@@ -30,6 +30,7 @@ import {
   projectArchived,
   type WorkActor,
 } from './work.common.js';
+import type { WorkProjectAudience } from './work-access.js';
 import { HR_TEAMS_COLLECTION } from './work-access.service.js';
 import { WorkActivityService } from './work-activity.service.js';
 import { WorkMembersService } from './work-members.service.js';
@@ -76,6 +77,18 @@ export class WorkProjectMembersService {
         { projection: { name: 1, leadUserId: 1, memberUserIds: 1 } },
       )
       .toArray()) as unknown as TeamRead[];
+  }
+
+  /** ADR-0066 § 3 : visibilité et comptes qui appartiennent au projet (404 s'il n'existe pas). */
+  async audienceOf(organizationId: string, projectId: string): Promise<WorkProjectAudience> {
+    const project = await this.projects.requireOwn(organizationId, projectId);
+    const teams = await this.teamsOf(organizationId, project.memberTeamIds ?? []);
+    const members = new Set<string>([
+      ...(project.memberUserIds ?? []),
+      ...teams.flatMap(teamMemberIds),
+      ...(project.ownerUserId ? [project.ownerUserId] : []),
+    ]);
+    return { visibility: project.visibility ?? 'organization', members };
   }
 
   /** `GET /work/teams` — équipes de l'organisation (sélecteur), sans leurs membres. */

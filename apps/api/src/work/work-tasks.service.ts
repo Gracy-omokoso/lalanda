@@ -103,6 +103,7 @@ import { WORK_ABSENCES_SOURCE, type WorkAbsencesSource } from './work-absences.p
 import { dropAttachmentObjects } from './work-attachments.storage.js';
 import { WorkMembersService } from './work-members.service.js';
 import { WorkNotifier } from './work-notifier.js';
+import { WorkProjectMembersService } from './work-project-members.service.js';
 import { WorkProjectsService } from './work-projects.service.js';
 import { WorkSettingsService } from './work-settings.service.js';
 import {
@@ -170,6 +171,8 @@ export class WorkTasksService {
     @Inject(ObjectStorageService) private readonly storage: ObjectStorageService,
     // ADR-0060 § 5 : portée de l'appelant (projets privés).
     @Inject(WorkAccessService) private readonly access: WorkAccessService,
+    // ADR-0066 § 3 : l'assigné d'un projet qu'il ne voit pas en devient membre direct.
+    @Inject(WorkProjectMembersService) private readonly projectMembers: WorkProjectMembersService,
     // ADR-0040 — C4 : relances CRM, facultatives (tests, module absent).
     @Optional() @Inject(CRM_AGENDA_SOURCE) crmAgenda: CrmAgendaReader | null = null,
     // ADR-0044 — P3 (§ 6.5) : approbations d'achat, facultatives (tests, module absent).
@@ -940,6 +943,48 @@ export class WorkTasksService {
       : [];
   }
 
+  // ── Assigné et visibilité du projet (ADR-0066 § 3) ───────────────────────
+
+  /** Le membre `userId` voit-il ce projet (visibilité, rôle limité, équipes) ? */
+  async assigneeSees(organizationId: string, projectId: string, userId: string): Promise<boolean> {
+    const m = await this.members.permissionsOf(organizationId, userId);
+    if (m === undefined) return false;
+    return this.access.userSees(organizationId, userId, m.role, m.context, projectId);
+  }
+
+  /**
+   * Un responsable doit voir le projet de sa tâche. S'il ne le voit pas (projet privé
+   * dont il n'est pas membre, Invité externe hors du projet) : un gestionnaire
+   * (`work.manage`) l'AJOUTE comme membre direct (historique et notification « ajouté
+   * au projet ») ; sinon `400 WORK_ASSIGNEE_NOT_MEMBER`. Le refus est rendu AVANT toute
+   * écriture ; l'ajout suit l'écriture de la tâche (`addAssigneeAsMember`).
+   */
+  private async membershipNeeded(
+    organizationId: string,
+    projectId: string,
+    assigneeUserId: string,
+    actor: WorkActor,
+  ): Promise<boolean> {
+    if (await this.assigneeSees(organizationId, projectId, assigneeUserId)) return false;
+    if (!actorCan(actor, 'work.manage')) {
+      invalid(
+        'assigneeUserId',
+        'WORK_ASSIGNEE_NOT_MEMBER',
+        'Cette personne ne voit pas ce projet : demandez à un gestionnaire de l’ajouter aux membres du projet, puis assignez-lui la tâche.',
+      );
+    }
+    return true;
+  }
+
+  private async addAssigneeAsMember(
+    organizationId: string,
+    projectId: string,
+    assigneeUserId: string,
+    actor: WorkActor,
+  ): Promise<void> {
+    await this.projectMembers.add(organizationId, projectId, { userIds: [assigneeUserId] }, actor);
+  }
+
   // ── Création ─────────────────────────────────────────────────────────────
 
   async create(
@@ -995,6 +1040,9 @@ export class WorkTasksService {
         'assigneeUserId',
       );
     }
+    const addMember = assigneeUserId
+      ? await this.membershipNeeded(organizationId, projectId, assigneeUserId, actor)
+      : false;
     const followers = body.followerUserIds ?? [];
     await this.members.requireEligible(
       organizationId,
@@ -1052,6 +1100,9 @@ export class WorkTasksService {
       data: { number, title: body.title.slice(0, 300) },
     });
     await this.projects.touch(organizationId, projectId);
+    if (assigneeUserId && addMember) {
+      await this.addAssigneeAsMember(organizationId, projectId, assigneeUserId, actor);
+    }
     if (assigneeUserId) {
       await this.notifyAssigned(
         organizationId,
@@ -1137,6 +1188,7 @@ export class WorkTasksService {
     if (assigneeChanged) {
       assertSelfAssignment(actor, current.assigneeUserId ?? null, body.assigneeUserId ?? null);
     }
+    let addMember = false;
     if (assigneeChanged && body.assigneeUserId) {
       await this.members.requireEligible(
         organizationId,
@@ -1144,6 +1196,12 @@ export class WorkTasksService {
         'work.update',
         'WORK_ASSIGNEE_NOT_ELIGIBLE',
         'assigneeUserId',
+      );
+      addMember = await this.membershipNeeded(
+        organizationId,
+        current.projectId,
+        body.assigneeUserId,
+        actor,
       );
     }
     const update: Record<string, unknown> = { $set: set, $inc: { revision: 1 } };
@@ -1185,6 +1243,9 @@ export class WorkTasksService {
       });
     }
     await this.activity.record(organizationId, entries);
+    if (assigneeChanged && body.assigneeUserId && addMember) {
+      await this.addAssigneeAsMember(organizationId, current.projectId, body.assigneeUserId, actor);
+    }
     if (assigneeChanged && body.assigneeUserId) {
       await this.notifyAssigned(
         organizationId,

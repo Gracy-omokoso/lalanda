@@ -214,7 +214,7 @@ export function decoderMentions(
   return { texte, choisis };
 }
 
-// ─── Sélecteur de responsable (ADR-0066 § 2) ────────────────────────────────
+// ─── Sélecteur de responsable (ADR-0066 § 2 et § 3) ─────────────────────────
 
 export interface OptionResponsable {
   userId: string;
@@ -227,15 +227,23 @@ export const LIBELLE_MOI = 'Moi';
 /**
  * Personnes proposées comme responsable d'une tâche (pur, testé) :
  *   - un rôle « assignation à soi seulement » (Stagiaire, dit par le serveur) : « Moi » ;
- *   - sinon, les membres qui peuvent être responsables (`canUpdate`).
- * Le serveur reste juge (`403 WORK_ASSIGN_SELF_ONLY`).
+ *   - sinon, les membres qui peuvent être responsables (`canUpdate`) ET voient le
+ *     projet (`seesProject`, absent = inconnu → proposé : le serveur tranche).
+ * Le serveur reste juge (`403 WORK_ASSIGN_SELF_ONLY`, `400 WORK_ASSIGNEE_NOT_MEMBER`).
  */
 export function responsablesProposes(
   members: readonly WorkMemberOption[],
   opts: { moi: string | null; soiSeulement: boolean },
 ): OptionResponsable[] {
   if (opts.soiSeulement) return opts.moi ? [{ userId: opts.moi, name: LIBELLE_MOI }] : [];
-  return members.filter((m) => m.canUpdate).map((m) => ({ userId: m.userId, name: m.name }));
+  return members
+    .filter((m) => m.canUpdate && m.seesProject !== false)
+    .map((m) => ({ userId: m.userId, name: m.name }));
+}
+
+/** Membres qui pourraient être responsables mais ne voient pas le projet. */
+export function horsDuProjet(members: readonly WorkMemberOption[]): number {
+  return members.filter((m) => m.canUpdate && m.seesProject === false).length;
 }
 
 /**

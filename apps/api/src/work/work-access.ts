@@ -17,7 +17,13 @@
 
 import { Types } from 'mongoose';
 
-import { PROJECT_SCOPED_ROLES, SELF_ASSIGN_ONLY_ROLES } from '../authz/permissions.js';
+import {
+  can,
+  PROJECT_SCOPED_ROLES,
+  SELF_ASSIGN_ONLY_ROLES,
+  type OrgPermissionContext,
+  type OrgRole,
+} from '../authz/permissions.js';
 
 /**
  * Rôle « limité aux projets dont il est membre » : `PROJECT_SCOPED_ROLES` d'ADR-0059
@@ -87,4 +93,25 @@ export function membershipClauses(
   const clauses: Record<string, unknown>[] = [{ ownerUserId: userId }, { memberUserIds: userId }];
   if (teamIds.length > 0) clauses.push({ memberTeamIds: { $in: [...teamIds] } });
   return clauses;
+}
+
+/** Audience d'un projet : sa visibilité et les comptes qui y appartiennent. */
+export interface WorkProjectAudience {
+  visibility: 'organization' | 'private';
+  /** Responsable, membres directs et membres courants de ses équipes. */
+  members: ReadonlySet<string>;
+}
+
+/**
+ * ADR-0066 § 3 : un membre donné voit-il le projet ? Même règle que `scopeOf`, sur une
+ * audience déjà lue (sélecteur de responsable : une lecture pour toute la liste).
+ */
+export function seesProjectAudience(
+  member: { userId: string; role: OrgRole; context: OrgPermissionContext },
+  audience: WorkProjectAudience,
+): boolean {
+  const belongs = audience.members.has(member.userId);
+  if (isProjectScopedRole(member.role)) return belongs;
+  if (can(member.role, 'organization.manage', member.context)) return true;
+  return audience.visibility !== 'private' || belongs;
 }

@@ -11,6 +11,7 @@ import {
   filtresActifs,
   filtresVides,
   formulaireTache,
+  horsDuProjet,
   insererMention,
   LIBELLE_MOI,
   libelleActivite,
@@ -199,18 +200,20 @@ describe('historique', () => {
 });
 
 describe('ADR-0066 — sélecteur de responsable', () => {
-  const m = (userId: string, canUpdate: boolean) => ({
+  const m = (userId: string, canUpdate: boolean, seesProject?: boolean) => ({
     userId,
     name: `Nom ${userId}`,
     canUpdate,
     canManage: false,
+    ...(seesProject !== undefined ? { seesProject } : {}),
   });
-  const membres = [m('a', true), m('b', true), m('c', false), m('d', true)];
+  const membres = [m('a', true, true), m('b', true, false), m('c', false, true), m('d', true)];
 
-  it('les membres qui peuvent être responsables', () => {
+  it('§ 3 — seules les personnes qui voient le projet (inconnu : proposé)', () => {
     expect(
       responsablesProposes(membres, { moi: 'a', soiSeulement: false }).map((o) => o.userId),
-    ).toEqual(['a', 'b', 'd']);
+    ).toEqual(['a', 'd']);
+    expect(horsDuProjet(membres)).toBe(1);
   });
 
   it('§ 2 — Stagiaire : « Moi » seulement, verrouillé sur la tâche d’un autre', () => {
