@@ -27,6 +27,7 @@ import type {
   CrmOverview,
   CrmTimelinePage,
 } from '@lalanda/shared/crm';
+import type { QuoteStats } from '@lalanda/shared/sales-invoices';
 
 export type {
   CrmAccountListItem,
@@ -439,6 +440,8 @@ export interface ListQuotesQuery {
   customerId?: string;
   opportunityId?: string;
   q?: string;
+  /** ADR-0067 : `recent` (défaut) ou `valid_until` (validité croissante). */
+  sort?: 'recent' | 'valid_until';
   limit?: number;
   cursor?: string | null;
 }
@@ -607,6 +610,8 @@ export const crmApi = {
     jsonRequest<void>(`/crm/activities/${id(activityId)}`, { method: 'DELETE' }),
 
   // ─── Devis ────────────────────────────────────────────────────────────────
+  /** ADR-0067 : cartes, graphiques et compteurs de l'écran Devis. */
+  getQuoteStats: () => jsonRequest<QuoteStats>(`/sales/quotes/stats`, { method: 'GET' }),
   listQuotes: (query: ListQuotesQuery = {}) =>
     jsonRequest<Page<QuoteSummary>>(`/sales/quotes${salesQuery(query)}`, { method: 'GET' }),
   getQuote: (quoteId: string) =>
