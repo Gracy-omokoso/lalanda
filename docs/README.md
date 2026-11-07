@@ -56,6 +56,7 @@ Le dossier `docs/` constitue la source de vérité du produit. Les décisions m�
 - [25 — Sprints](25-SPRINTS.md)
 - [26 — Conventions](26-CONVENTIONS.md)
 - [28 — Conformité légale](28-CONFORMITE-LEGALE.md)
+- [30 — Couverture RH et correspondance ISO](30-COUVERTURE-RH-REFERENTIEL.md)
 - [ADR](adr/README.md)
 
 ## Cartographie cible
