@@ -1,6 +1,8 @@
 // Jours fériés légaux de la RDC proposés à l'organisation (ADR-0068 § 5).
 //
-// Donnée PAYS, sourcée, datée et versionnée (docs/09) : chaque date proposée est
+// Donnée PAYS, sourcée, datée et versionnée (docs/09), tenue HORS de `hr/` : le module
+// RH ne code aucun férié (ADR-0045, critère 21) ; il reçoit cette liste comme une
+// proposition. : chaque date proposée est
 // marquée « à vérifier » par l'API tant qu'une personne RH ne l'a pas confirmée.
 // Aucune règle de report (férié tombant un dimanche) ni journée « chômée et payée »
 // décidée par arrêté ponctuel n'est calculée ici : seulement la liste du texte.

@@ -43,6 +43,5 @@ export * from './advances.js';
 export * from './attendance.js';
 export * from './planning.js';
 export * from './performance.js';
-// ADR-0068 — matricules, numéros de poste, jours fériés de la RDC proposés
+// ADR-0068 — matricules et numéros de poste
 export * from './numbering.js';
-export * from './country-holidays.js';

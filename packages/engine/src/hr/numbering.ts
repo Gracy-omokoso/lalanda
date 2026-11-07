@@ -100,7 +100,7 @@ export function sequenceRankOf(prefix: string, value: string): number | null {
   if (pk === '' || !vk.startsWith(pk)) return null;
   const rest = vk.slice(pk.length);
   if (!/^\d{1,15}$/.test(rest)) return null;
-  const rank = Number(rest);
+  const rank = parseInt(rest, 10);
   return rank >= 1 && Number.isSafeInteger(rank) ? rank : null;
 }
 
