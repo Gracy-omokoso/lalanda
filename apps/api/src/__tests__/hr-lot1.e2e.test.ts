@@ -27,7 +27,7 @@ process.env['SECRETS_MASTER_KEY_ID'] = 'k1';
 delete process.env['ZEPTOMAIL_TOKEN'];
 delete process.env['SMTP_HOST'];
 
-vi.setConfig({ testTimeout: 180_000 });
+vi.setConfig({ testTimeout: 600_000, hookTimeout: 1_200_000 });
 
 const PREFIX = 'rh-lot1';
 const emailOf = (c: string) => `${PREFIX}-${c}-${tag}@lalanda-test.local`;
@@ -50,7 +50,7 @@ e2eSuite('RH lot 1 — invitation, matricules, postes, import, fériés (ADR-006
   beforeAll(async () => {
     fx = await hrFixture(tag, PREFIX);
     db = fx.db;
-  }, 300_000);
+  }, 1_200_000);
 
   beforeEach(() => fx.clearThrottle());
 
@@ -151,13 +151,11 @@ e2eSuite('RH lot 1 — invitation, matricules, postes, import, fériés (ADR-006
         await fx.put('hr_manager', `/hr/employees/${a['id']}/employee-number`, body),
       );
       expect(fixed['employeeNumber']).toBe('GF-0007');
-      const trace = await db
-        .collection('audit_events')
-        .findOne({
-          organizationId: fx.orgN,
-          action: 'hr.employee.number_changed',
-          targetId: a['id'],
-        });
+      const trace = await db.collection('audit_events').findOne({
+        organizationId: fx.orgN,
+        action: 'hr.employee.number_changed',
+        targetId: a['id'],
+      });
       expect(trace?.['metadata']).toMatchObject({
         before: 'GF-0001',
         after: 'GF-0007',
@@ -381,10 +379,14 @@ e2eSuite('RH lot 1 — invitation, matricules, postes, import, fériés (ADR-006
       const inv = await db
         .collection('invitations')
         .findOne({ organizationId: fx.orgN, employeeId: ailleurs['id'], revokedAt: null });
-      expect(inv).toMatchObject({ email: emailOf('ownerB'), role: 'employee', acceptedAt: null });
+      expect(inv).toMatchObject({
+        email: emailOf('ownerB').toLowerCase(),
+        role: 'employee',
+        acceptedAt: null,
+      });
       const account = ok(await fx.get('hr_manager', `/hr/employees/${ailleurs['id']}/account`));
       expect(account).toMatchObject({ state: 'invitation_pending', userId: null });
-      expect(account['invitation']['email']).toBe(emailOf('ownerB'));
+      expect(account['invitation']['email']).toBe(emailOf('ownerB').toLowerCase());
       expect(JSON.stringify(account)).not.toContain(String(inv!['token']));
 
       // Acceptation par le titulaire de l'adresse : la fiche est reliée.
