@@ -518,3 +518,19 @@ Un fichier = un seul écrivain par lot (règle d'ADR-0011). Zones de conflit : `
 - [docs/09 — Country Packs](../09-COUNTRY-PACKS.md), [docs/28 — Conformité légale](../28-CONFORMITE-LEGALE.md),
   [docs/30 — Couverture RH et correspondance ISO](../30-COUVERTURE-RH-REFERENTIEL.md).
 - Référentiel RH fourni par la dirigeante (domaine 9, § VI), hors dépôt.
+
+## Amendement du 7 nov. 2026 — taux confirmés par l'expert-comptable
+
+La dirigeante rapporte que l'expert-comptable a confirmé, le 7 nov. 2026 :
+
+| Paramètre | Valeur |
+|---|---|
+| CNSS part salariale | 5 % |
+| CNSS part patronale | 13 % (pensions 5 %, risques professionnels 1,5 %, prestations familiales 6,5 %) |
+| INPP | 3 % de 1 à 50 salariés, 2 % de 51 à 300, 1 % au-delà |
+| ONEM | 0,5 % (arrêté n° 30/CAB/MIN.ET/EAN/JDO/8/2025) |
+| IRPP | remplace l'IPR depuis le 1er janv. 2026 ; barème annuel 3 % / 15 % / 30 % / 40 %, bornes 1 944 000, 21 600 000 et 43 200 000 CDF |
+
+Ces valeurs sont portées dans le pack `cd-2026` (révision n° 3). Restent à confirmer : le plafond
+et l'assiette de la CNSS, la réduction pour personnes à charge, le plafond de 30 % de l'IRPP, le SMIG
+et les majorations d'heures supplémentaires (questions P-C et P-J ci-dessus).
