@@ -10,6 +10,8 @@ import { useState } from 'react';
 import { EntityAssetsPanel } from '@/components/entity-assets-panel';
 
 import { lignesDossier } from './collaborateurs-model';
+// ADR-0068 : compte Lalanda (invitation) et matricule.
+import { FicheCompte } from './fiche-compte';
 import { FicheFormulaire } from './fiche-formulaire';
 import { useFiche } from './fiche-chrome';
 import { useAccesRh } from './rh-access';
@@ -50,6 +52,7 @@ export function FicheDossier(): React.ReactElement {
           ))}
         </dl>
       </Panneau>
+      <FicheCompte />
       {fiche.notes ? (
         <Panneau titre="Notes" icone={NotebookPen} id="rh-fiche-notes">
           <p className="text-sm whitespace-pre-line break-words">{fiche.notes}</p>

@@ -276,6 +276,8 @@ export function lignesDossier(
     ['Fin de contrat', e.contractEndDate ? formatJour(e.contractEndDate) : null],
     ['Date de sortie', e.endDate ? formatJour(e.endDate) : null],
     ['Matricule', e.employeeNumber],
+    // ADR-0068 § 3 : numéro du poste du référentiel.
+    ['Numéro de poste', e.positionNumber],
     ['Lieu de travail', e.workLocation],
     ['E-mail professionnel', e.workEmail],
     ['Téléphone professionnel', e.workPhone],
