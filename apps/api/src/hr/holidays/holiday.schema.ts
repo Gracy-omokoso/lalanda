@@ -26,6 +26,14 @@ export class Holiday {
   @Prop({ type: Boolean, required: true, default: false })
   recurring!: boolean;
 
+  /** ADR-0068 § 5 : date proposée (jours fériés de la RDC) non encore confirmée. */
+  @Prop({ type: Boolean, default: false })
+  toVerify!: boolean;
+
+  /** ADR-0068 § 5 : source citée d'une date proposée ; `null` pour une saisie. */
+  @Prop({ type: String, default: null })
+  source!: string | null;
+
   @Prop({ type: String, required: true })
   createdBy!: string;
 

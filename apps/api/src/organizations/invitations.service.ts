@@ -9,7 +9,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
-import type { ClientSession, Connection, Model } from 'mongoose';
+import { Types, type ClientSession, type Connection, type Model } from 'mongoose';
 
 import { AuditService } from '../authz/audit.service.js';
 import {
@@ -102,6 +102,8 @@ export class InvitationsService {
     /** ADR-0041 § 6 — écart choisi dès l'invitation. */
     grants?: Action[];
     revokes?: Action[];
+    /** ADR-0068 § 1 — fiche à relier à l'acceptation. */
+    employeeId?: string | null;
   }): Promise<InvitationDocument> {
     await this.actorRole(input.invitedBy, input.organizationId);
     const requestedGrants = input.grants ?? [];
@@ -179,6 +181,7 @@ export class InvitationsService {
               revokes,
               token: generateToken(),
               expiresAt: new Date(Date.now() + DEFAULT_TTL_MS),
+              employeeId: input.employeeId ?? null,
               _schemaVersion: MEMBERSHIP_SCHEMA_VERSION,
             },
           ],
@@ -383,7 +386,72 @@ export class InvitationsService {
       await inv.save();
     }
 
+    // ADR-0068 § 1 : la fiche portée par l'invitation est reliée au compte qui accepte.
+    await this.linkInvitedEmployee(inv, userId);
+
     return { invitation: inv, organizationId: inv.organizationId };
+  }
+
+  /**
+   * ADR-0068 § 1 — relie la fiche de l'invitation au compte qui l'accepte : même
+   * organisation, fiche reliée à PERSONNE, non anonymisée. L'unicité
+   * `{ organizationId, userId }` (index de `hr_employees`) refuse un compte déjà relié à
+   * une autre fiche : rien n'est relié, le journal le dit. Collection lue par la
+   * connexion : ce module n'importe pas les RH. Une panne ici n'annule pas l'acceptation.
+   */
+  private async linkInvitedEmployee(inv: InvitationDocument, userId: string): Promise<void> {
+    const employeeId = inv.employeeId ?? null;
+    if (!employeeId || !Types.ObjectId.isValid(employeeId)) return;
+    let linked = false;
+    let reason: string | null = null;
+    try {
+      const res = await this.connection.collection('hr_employees').updateOne(
+        {
+          _id: new Types.ObjectId(employeeId),
+          organizationId: inv.organizationId,
+          userId: null,
+          status: { $ne: 'anonymized' },
+        },
+        { $set: { userId, updatedBy: userId, updatedAt: new Date() }, $inc: { revision: 1 } },
+      );
+      linked = res.modifiedCount === 1;
+      if (!linked) reason = 'EMPLOYEE_NOT_LINKABLE';
+    } catch (err) {
+      if ((err as { code?: number } | null)?.code !== 11000) throw err;
+      reason = 'EMPLOYEE_USER_ALREADY_LINKED';
+    }
+    await this.audit.record({
+      organizationId: inv.organizationId,
+      actorUserId: userId,
+      actorRole: normalizeOrgRole(inv.role) ?? 'unknown',
+      action: linked ? 'hr.employee.account_linked' : 'hr.employee.account_link_skipped',
+      targetType: 'employee',
+      targetId: employeeId,
+      metadata: { invitationId: String(inv._id), ...(reason ? { reason } : {}) },
+    });
+  }
+
+  /** ADR-0068 § 1 — dernière invitation non acceptée ni révoquée d'une fiche. */
+  async openForEmployee(
+    organizationId: string,
+    employeeId: string,
+  ): Promise<InvitationDocument | null> {
+    return this.invModel
+      .findOne({ organizationId, employeeId, acceptedAt: null, revokedAt: null })
+      .sort({ createdAt: -1 })
+      .exec();
+  }
+
+  /** ADR-0068 § 1 — invitation en attente pour une adresse (sans considérer l'expiration). */
+  async pendingForEmail(organizationId: string, email: string): Promise<InvitationDocument | null> {
+    return this.invModel
+      .findOne({
+        organizationId,
+        email: email.trim().toLowerCase(),
+        acceptedAt: null,
+        revokedAt: null,
+      })
+      .exec();
   }
 
   /**

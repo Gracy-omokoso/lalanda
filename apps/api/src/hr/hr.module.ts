@@ -107,6 +107,18 @@ import {
 import { HrPerformanceModule } from './performance/hr-performance.module.js';
 // ADR-0060 : équipes (membres = utilisateurs), servies aux Projets.
 import { HrTeamsModule } from './teams/hr-teams.module.js';
+// ADR-0068 : invitation depuis la fiche, matricules, postes, import, fériés proposés.
+import { HrEmployeeAccountController } from './employees/hr-employee-account.controller.js';
+import { HrEmployeeInvitationsService } from './employees/hr-employee-invitations.service.js';
+import { HrEmployeeNumbersController } from './employees/hr-employee-numbers.controller.js';
+import { HrNumberingController } from './numbering/hr-numbering.controller.js';
+import { HrNumberingService } from './numbering/hr-numbering.service.js';
+import { HrPositionsController } from './positions/hr-positions.controller.js';
+import { HrPositionsService } from './positions/hr-positions.service.js';
+import { Position, PositionSchema } from './positions/position.schema.js';
+import { HrEmployeeImportController } from './employees/hr-employee-import.controller.js';
+import { HrEmployeeImportService } from './employees/hr-employee-import.service.js';
+import { HrCountryHolidaysController } from './holidays/hr-country-holidays.controller.js';
 
 @Module({
   imports: [
@@ -148,6 +160,8 @@ import { HrTeamsModule } from './teams/hr-teams.module.js';
       { name: ExpenseReport.name, schema: ExpenseReportSchema },
       { name: EmployeeAdvance.name, schema: EmployeeAdvanceSchema },
       { name: HrCounter.name, schema: HrCounterSchema },
+      // ADR-0068 : référentiel des postes.
+      { name: Position.name, schema: PositionSchema },
     ]),
   ],
   controllers: [
@@ -173,6 +187,13 @@ import { HrTeamsModule } from './teams/hr-teams.module.js';
     // ADR-0051 — H10
     HrExpenseReportsController,
     HrAdvancesController,
+    // ADR-0068
+    HrNumberingController,
+    HrPositionsController,
+    HrEmployeeAccountController,
+    HrEmployeeNumbersController,
+    HrEmployeeImportController,
+    HrCountryHolidaysController,
   ],
   providers: [
     MasterKeyringProvider,
@@ -222,6 +243,11 @@ import { HrTeamsModule } from './teams/hr-teams.module.js';
     HrExpenseReportsService,
     HrAdvancesService,
     HrAdvanceRemindersService,
+    // ADR-0068 : matricules et numéros de poste, référentiel des postes, invitation.
+    HrNumberingService,
+    HrPositionsService,
+    HrEmployeeInvitationsService,
+    HrEmployeeImportService,
   ],
   exports: [
     // ADR-0045 — H2

@@ -23,6 +23,7 @@ import {
   OrgChartQuery,
   UpdateEmployeeBody,
   type EmployeeDetailView,
+  type EmployeeInvitationResult,
   type EmployeeExitResult,
   type EmployeePage,
   type EmployeeView,
@@ -54,7 +55,7 @@ import {
 } from '../../authz/current-org-permissions.decorator.js';
 import { CurrentOrgRole } from '../../authz/current-org-role.decorator.js';
 import { PermissionsGuard } from '../../authz/permissions.guard.js';
-import type { OrgRole } from '../../authz/permissions.js';
+import { can, type OrgRole } from '../../authz/permissions.js';
 import { invalidRequest } from '../../sales/sales.errors.js';
 import type { HrActor } from '../departments/hr-departments.service.js';
 import { HrPrivateService } from '../private/hr-private.service.js';
@@ -66,8 +67,13 @@ import { HrEmployeesService } from './hr-employees.service.js';
 import { HrChecklistsService } from '../checklists/hr-checklists.service.js';
 import { HrDocumentsService } from '../documents/hr-documents.service.js';
 import { RequireFeature } from '../../billing/feature.guard.js';
+// ADR-0068 § 1 : « Inviter sur Lalanda » à l'enregistrement de la fiche.
+import { HrEmployeeInvitationsService } from './hr-employee-invitations.service.js';
 
-type User = { id: string };
+type User = { id: string; name?: string | null };
+
+/** Fiche enregistrée et issue de l'invitation demandée (`null` : non demandée). */
+type EmployeeWriteResult = EmployeeView & { invitation: EmployeeInvitationResult | null };
 
 function actorOf(user: User, role: OrgRole | undefined): HrActor {
   return { userId: user.id, role: role ?? 'unknown' };
@@ -86,7 +92,39 @@ export class HrEmployeesController {
     // ADR-0045 — H4
     @Inject(HrDocumentsService) private readonly documents: HrDocumentsService,
     @Inject(HrChecklistsService) private readonly checklists: HrChecklistsService,
+    // ADR-0068
+    @Inject(HrEmployeeInvitationsService)
+    private readonly invitations: HrEmployeeInvitationsService,
   ) {}
+
+  /**
+   * ADR-0068 § 1 : `invite: true` → lier un membre ou inviter. `members.invite` est
+   * lu sur les droits EFFECTIFS : sans lui, la fiche est enregistrée et rien ne part.
+   */
+  private async withInvitation(
+    orgId: string,
+    user: User,
+    role: OrgRole | undefined,
+    perms: CurrentOrgPermissionsValue | undefined,
+    view: EmployeeView,
+    invite: boolean | undefined,
+  ): Promise<EmployeeWriteResult> {
+    if (invite !== true) return { ...view, invitation: null };
+    const invitation = await this.invitations.invite(orgId, view.id, {
+      ...actorOf(user, role),
+      name: user.name ?? null,
+      canInvite: perms ? can(perms.role, 'members.invite', perms.context) : false,
+    });
+    if (invitation.outcome !== 'linked') return { ...view, invitation };
+    return {
+      ...(
+        await this.employees.withNames(orgId, [
+          this.employees.view(await this.employees.requireOwn(orgId, view.id), true),
+        ])
+      )[0]!,
+      invitation,
+    };
+  }
 
   @Get('employees')
   @RequirePermission('hr.read')
@@ -102,11 +140,13 @@ export class HrEmployeesController {
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
     @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Body() body: unknown,
-  ): Promise<EmployeeView> {
+  ): Promise<EmployeeWriteResult> {
     const parsed = CreateEmployeeBody.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error);
-    return this.employees.create(orgId, parsed.data, actorOf(user, role));
+    const view = await this.employees.create(orgId, parsed.data, actorOf(user, role));
+    return this.withInvitation(orgId, user, role, perms, view, parsed.data.invite);
   }
 
   // Déclarée AVANT `:employeeId` : « from-members » n'est pas un identifiant.
@@ -159,12 +199,14 @@ export class HrEmployeesController {
     @CurrentOrgId() orgId: string,
     @CurrentUser() user: User,
     @CurrentOrgRole() role: OrgRole | undefined,
+    @CurrentOrgPermissions() perms: CurrentOrgPermissionsValue | undefined,
     @Param('employeeId') employeeId: string,
     @Body() body: unknown,
-  ): Promise<EmployeeView> {
+  ): Promise<EmployeeWriteResult> {
     const parsed = UpdateEmployeeBody.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error);
-    return this.employees.update(orgId, employeeId, parsed.data, actorOf(user, role));
+    const view = await this.employees.update(orgId, employeeId, parsed.data, actorOf(user, role));
+    return this.withInvitation(orgId, user, role, perms, view, parsed.data.invite);
   }
 
   @Post('employees/:employeeId/exit')

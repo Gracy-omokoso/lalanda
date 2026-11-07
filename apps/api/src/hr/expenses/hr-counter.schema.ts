@@ -12,8 +12,10 @@ export class HrCounter {
   @Prop({ type: String, required: true })
   organizationId!: string;
 
-  @Prop({ type: String, required: true, enum: ['NF', 'AV'] })
-  kind!: 'NF' | 'AV';
+  // ADR-0068 : `EMP` (matricules) et `POS` (numéros de poste), NON annuels (`year: 0`),
+  // jamais décrémentés (`$inc` et `$max` seulement).
+  @Prop({ type: String, required: true, enum: ['NF', 'AV', 'EMP', 'POS'] })
+  kind!: 'NF' | 'AV' | 'EMP' | 'POS';
 
   @Prop({ type: Number, required: true })
   year!: number;

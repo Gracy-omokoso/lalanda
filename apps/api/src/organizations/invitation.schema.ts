@@ -82,6 +82,14 @@ export class Invitation {
   @Prop({ type: Date, default: null })
   revokedAt!: Date | null;
 
+  /**
+   * ADR-0068 § 1 — fiche collaborateur (`hr_employees`) à relier au compte qui
+   * ACCEPTE l'invitation, dans l'organisation de l'invitation seulement. `null` : une
+   * invitation ordinaire.
+   */
+  @Prop({ type: String, default: null })
+  employeeId!: string | null;
+
   @Prop({ type: Number, required: true, default: 1 })
   _schemaVersion!: number;
 }
@@ -98,4 +106,10 @@ InvitationSchema.index(
     partialFilterExpression: { acceptedAt: null, revokedAt: null },
     name: 'uniq_pending_by_org_email',
   },
+);
+
+// ADR-0068 : invitation en cours d'une fiche collaborateur.
+InvitationSchema.index(
+  { organizationId: 1, employeeId: 1, createdAt: -1 },
+  { partialFilterExpression: { employeeId: { $type: 'string' } }, name: 'invitation_by_employee' },
 );

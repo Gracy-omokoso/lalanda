@@ -15,6 +15,7 @@ import {
   HR_JOB_TITLE_TO_COMPLETE,
   employeeNumberKey,
   type CreateEmployeeBody,
+  type EmployeePositionChoice,
   type EmployeeExitResult,
   type EmployeePage,
   type EmployeeView,
@@ -29,7 +30,7 @@ import {
 } from '@lalanda/shared/hr';
 import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
-import { Types, type Connection, type Model } from 'mongoose';
+import { Types, type ClientSession, type Connection, type Model } from 'mongoose';
 
 import { AuditService } from '../../authz/audit.service.js';
 import { Membership, type MembershipDocument } from '../../organizations/membership.schema.js';
@@ -64,6 +65,9 @@ import {
 } from '../scope/hr-errors.js';
 import { engineEmployeeOf, type HrViewer } from '../scope/hr-scope.service.js';
 import { HrSettingsService } from '../settings/hr-settings.service.js';
+// ADR-0068 : matricules automatiques et référentiel des postes.
+import { HrNumberingService } from '../numbering/hr-numbering.service.js';
+import { HrPositionsService } from '../positions/hr-positions.service.js';
 import { Employee, type EmployeeDocument, type EmployeeLean } from './employee.schema.js';
 import {
   HR_EMPLOYEE_LIFECYCLE,
@@ -92,6 +96,9 @@ export function employeeViewOf(
     workEmail: e.workEmail ?? null,
     workPhone: e.workPhone ?? null,
     jobTitle: e.jobTitle,
+    // ADR-0068 : numéro du poste posé par `withNames` (copie d'affichage).
+    positionId: e.positionId ?? null,
+    positionNumber: null,
     departmentId: e.departmentId ?? null,
     // ADR-0045 — H3 : copies d'affichage posées par `withNames`.
     departmentName: null,
@@ -163,6 +170,9 @@ export class HrEmployeesService {
     @Inject(HR_EMPLOYEE_LIFECYCLE) lifecycle: HrEmployeeLifecycle | null,
     // ADR-0045 — H3 : exceptions d'acquisition (`leavePolicyOverrides`).
     @InjectModel(LeaveType.name) private readonly leaveTypes: Model<LeaveTypeDocument>,
+    // ADR-0068
+    @Inject(HrNumberingService) private readonly numbering: HrNumberingService,
+    @Inject(HrPositionsService) private readonly positions: HrPositionsService,
   ) {
     this.lifecycle = lifecycle ?? noHrEmployeeLifecycle;
   }
@@ -226,7 +236,8 @@ export class HrEmployeesService {
     const managerIds = [
       ...new Set(views.map((v) => v.managerEmployeeId).filter((v): v is string => !!v)),
     ].filter(isObjectIdHex);
-    const [departments, settings, managers] = await Promise.all([
+    const positionIds = views.map((v) => v.positionId).filter((v): v is string => !!v);
+    const [departments, settings, managers, positionNumbers] = await Promise.all([
       this.departments.all(organizationId),
       this.settings.view(organizationId),
       managerIds.length === 0
@@ -238,6 +249,7 @@ export class HrEmployeesService {
             )
             .lean<EmployeeLean[]>()
             .exec(),
+      this.positions.numbersOf(organizationId, positionIds),
     ]);
     const dept = new Map(departments.map((d) => [String(d._id), d.name]));
     const types = new Map(settings.contractTypes.map((t) => [t.key, t.label]));
@@ -246,6 +258,7 @@ export class HrEmployeesService {
       v.departmentName = v.departmentId ? (dept.get(v.departmentId) ?? null) : null;
       v.managerName = v.managerEmployeeId ? (names.get(v.managerEmployeeId) ?? null) : null;
       v.contractTypeLabel = types.get(v.contractType) ?? null;
+      v.positionNumber = v.positionId ? (positionNumbers.get(v.positionId) ?? null) : null;
     }
     return views;
   }
@@ -375,10 +388,15 @@ export class HrEmployeesService {
       workPattern: body.workPattern ?? null,
       workLocation: body.workLocation ?? null,
       notes: body.notes ?? null,
+      positionId: null,
     };
     this.checkShape(fields, settings);
     await this.checkRefs(organizationId, null, fields);
-    const id = await this.insert(organizationId, fields, actor);
+    // ADR-0068 § 3 : remplacement poste pour poste → un poste VACANT de l'organisation.
+    if (body.position?.mode === 'replacement') {
+      await this.positions.requireOpen(organizationId, body.position.positionId);
+    }
+    const id = await this.insertNumbered(organizationId, fields, actor, body.position ?? null);
     await this.audit.record({
       organizationId,
       actorUserId: actor.userId,
@@ -399,9 +417,31 @@ export class HrEmployeesService {
     const current = await this.requireOwn(organizationId, employeeId);
     if (current.revision !== body.expectedRevision) staleRevision(current.revision);
     if (current.status === 'anonymized') anonymized();
-    const { expectedRevision: _r, ...changes } = body;
+    // ADR-0068 : `invite` (traité par le contrôleur) et `position` ne sont pas des champs.
+    const { expectedRevision: _r, invite: _i, position, ...changes } = body;
     const set: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(changes)) if (v !== undefined) set[k] = v;
+    // ADR-0068 § 2 : un matricule posé ne se change plus ici (droit RH administrateur,
+    // `PUT /hr/employees/:id/employee-number`). Le même numéro renvoyé n'est pas un changement.
+    if ('employeeNumber' in set) {
+      const next = set['employeeNumber'] as string | null;
+      const same =
+        (next === null && current.employeeNumber === null) ||
+        (next !== null &&
+          current.employeeNumberKey !== null &&
+          employeeNumberKey(next) === current.employeeNumberKey);
+      if (same) delete set['employeeNumber'];
+      else if (current.employeeNumber !== null) employeeNumberLocked();
+    }
+    if (position && current.positionId) {
+      conflict(
+        'EMPLOYEE_HAS_POSITION',
+        'Ce collaborateur occupe déjà un poste : sa sortie libère le poste.',
+      );
+    }
+    if (position?.mode === 'replacement') {
+      await this.positions.requireOpen(organizationId, position.positionId);
+    }
     const merged = { ...current, ...set } as EmployeeLean;
     // La cohérence n'est vérifiée que si l'un de ses champs change : une fiche ancienne
     // reste modifiable même si un réglage a changé depuis.
@@ -448,8 +488,19 @@ export class HrEmployeesService {
       action: 'hr.employee.updated',
       targetType: 'employee',
       targetId: employeeId,
-      metadata: { fields: Object.keys(changes).filter((k) => k !== 'notes') },
+      metadata: {
+        fields: Object.keys(changes).filter(
+          (k) => k !== 'notes' && (k !== 'employeeNumber' || 'employeeNumber' in set),
+        ),
+      },
     });
+    if (typeof set['employeeNumber'] === 'string') {
+      await this.numbering.reserveManual(organizationId, set['employeeNumber']);
+    }
+    if (position) {
+      const fresh = await this.requireOwn(organizationId, employeeId);
+      await this.assignPosition(organizationId, fresh, position, actor);
+    }
     return this.named(
       organizationId,
       this.view(await this.requireOwn(organizationId, employeeId), true),
@@ -476,7 +527,7 @@ export class HrEmployeesService {
         lastName: 'À compléter',
       };
       created.push(
-        await this.insert(
+        await this.insertNumbered(
           organizationId,
           {
             firstName,
@@ -496,8 +547,10 @@ export class HrEmployeesService {
             workPattern: null,
             workLocation: null,
             notes: null,
+            positionId: null,
           },
           actor,
+          null,
         ),
       );
     }
@@ -564,6 +617,8 @@ export class HrEmployeesService {
         )
         .exec();
       if (res.matchedCount !== 1) staleRevision(current.revision + 1);
+      // ADR-0068 § 3 : le poste redevient vacant (non supprimé), historique clos.
+      await this.positions.release(organizationId, employeeId, body.endDate, actor.userId, session);
       await this.lifecycle.onExit({
         organizationId,
         employeeId,
@@ -621,6 +676,21 @@ export class HrEmployeesService {
     if (res.matchedCount !== 1) {
       staleRevision((await this.requireOwn(organizationId, employeeId)).revision);
     }
+    // ADR-0068 § 3 : reprend son poste s'il est encore vacant, sinon perd le lien.
+    if (current.positionId) {
+      const back = await this.positions.retake(
+        organizationId,
+        current.positionId,
+        employeeId,
+        current.startDate,
+        actor.userId,
+      );
+      if (!back) {
+        await this.employees
+          .updateOne({ _id: current._id, organizationId }, { $set: { positionId: null } })
+          .exec();
+      }
+    }
     await this.audit.record({
       organizationId,
       actorUserId: actor.userId,
@@ -673,6 +743,8 @@ export class HrEmployeesService {
             $set: {
               ...anon,
               ...keysOf(anon),
+              // ADR-0068 § 2 : le matricule affiché s'efface, sa RÉSERVATION reste (jamais réutilisé).
+              employeeNumberKey: current.employeeNumberKey ?? null,
               userId: null,
               workPhone: null,
               workLocation: null,
@@ -755,26 +827,230 @@ export class HrEmployeesService {
       | 'updatedAt'
     >,
     actor: HrActor,
+    session?: ClientSession,
   ): Promise<string> {
-    try {
-      const created = await this.employees.create({
-        organizationId,
-        ...fields,
-        ...keysOf(fields),
-        endDate: null,
-        exitCategory: null,
-        status: 'active',
-        leavePolicyOverrides: null,
-        revision: 1,
-        createdBy: actor.userId,
-        updatedBy: actor.userId,
-        _schemaVersion: 1,
-      });
-      return String(created._id);
-    } catch (err) {
-      this.duplicate(err);
-      throw err;
+    // Erreurs BRUTES : `insertNumbered` reconnaît un matricule tiré déjà porté.
+    const [created] = await this.employees.create(
+      [
+        {
+          organizationId,
+          ...fields,
+          ...keysOf(fields),
+          endDate: null,
+          exitCategory: null,
+          status: 'active',
+          leavePolicyOverrides: null,
+          revision: 1,
+          createdBy: actor.userId,
+          updatedBy: actor.userId,
+          _schemaVersion: 1,
+        },
+      ],
+      session ? { session } : {},
+    );
+    return String(created!._id);
+  }
+
+  /**
+   * ADR-0068 § 2 et § 3 : matricule saisi conservé (et compteur poussé au-dessus), sinon
+   * tiré ; poste nouveau ou remplacé pourvu dans la même transaction que la fiche.
+   */
+  private async insertNumbered(
+    organizationId: string,
+    fields: Parameters<HrEmployeesService['insert']>[1],
+    actor: HrActor,
+    position: EmployeePositionChoice | null,
+  ): Promise<string> {
+    const manual = fields.employeeNumber;
+    for (let attempt = 0; ; attempt += 1) {
+      const employeeNumber = manual ?? (await this.numbering.nextEmployeeNumber(organizationId));
+      try {
+        const id = position
+          ? await inHrTransaction(this.connection, async (session) => {
+              const positionId =
+                position.mode === 'replacement'
+                  ? position.positionId
+                  : await this.positions.insert(
+                      organizationId,
+                      { title: fields.jobTitle, departmentId: fields.departmentId },
+                      actor,
+                      session,
+                    );
+              const created = await this.insert(
+                organizationId,
+                { ...fields, employeeNumber, positionId },
+                actor,
+                session,
+              );
+              await this.positions.fill(
+                organizationId,
+                positionId,
+                created,
+                fields.startDate,
+                actor.userId,
+                session,
+              );
+              return created;
+            })
+          : await this.insert(organizationId, { ...fields, employeeNumber }, actor);
+        if (manual) await this.numbering.reserveManual(organizationId, manual);
+        return id;
+      } catch (err) {
+        const pattern = (err as { keyPattern?: Record<string, unknown> }).keyPattern ?? {};
+        if (
+          manual === null &&
+          attempt < 3 &&
+          isDuplicateKey(err) &&
+          'employeeNumberKey' in pattern
+        ) {
+          continue;
+        }
+        this.duplicate(err);
+        throw err;
+      }
     }
+  }
+
+  /** ADR-0068 § 3 : poste d'une fiche qui n'en a pas (modification). */
+  private async assignPosition(
+    organizationId: string,
+    current: EmployeeLean,
+    position: EmployeePositionChoice,
+    actor: HrActor,
+  ): Promise<void> {
+    await inHrTransaction(this.connection, async (session) => {
+      const positionId =
+        position.mode === 'replacement'
+          ? position.positionId
+          : await this.positions.insert(
+              organizationId,
+              { title: current.jobTitle, departmentId: current.departmentId ?? null },
+              actor,
+              session,
+            );
+      const res = await this.employees
+        .updateOne(
+          { _id: current._id, organizationId, positionId: null },
+          { $set: { positionId, updatedBy: actor.userId }, $inc: { revision: 1 } },
+          { session },
+        )
+        .exec();
+      if (res.matchedCount !== 1) {
+        conflict('EMPLOYEE_HAS_POSITION', 'Ce collaborateur occupe déjà un poste.');
+      }
+      await this.positions.fill(
+        organizationId,
+        positionId,
+        String(current._id),
+        current.startDate,
+        actor.userId,
+        session,
+      );
+    });
+  }
+
+  // ── ADR-0068 § 2 : matricule ─────────────────────────────────────────────
+
+  /** Fiche ancienne sans matricule : en tirer un. */
+  async assignAutoNumber(
+    organizationId: string,
+    employeeId: string,
+    expectedRevision: number,
+    actor: HrActor,
+  ): Promise<EmployeeView> {
+    const current = await this.requireOwn(organizationId, employeeId);
+    if (current.revision !== expectedRevision) staleRevision(current.revision);
+    if (current.status === 'anonymized') anonymized();
+    if (current.employeeNumber !== null) employeeNumberLocked();
+    for (let attempt = 0; ; attempt += 1) {
+      const employeeNumber = await this.numbering.nextEmployeeNumber(organizationId);
+      try {
+        await this.writeNumber(current, employeeNumber, actor);
+        break;
+      } catch (err) {
+        if (attempt < 3 && isDuplicateKey(err)) continue;
+        this.duplicate(err);
+        throw err;
+      }
+    }
+    await this.audit.record({
+      organizationId,
+      actorUserId: actor.userId,
+      actorRole: actor.role,
+      action: 'hr.employee.number_assigned',
+      targetType: 'employee',
+      targetId: employeeId,
+    });
+    return this.named(
+      organizationId,
+      this.view(await this.requireOwn(organizationId, employeeId), true),
+    );
+  }
+
+  /** Correction d'un matricule posé : droit RH administrateur (route), motif, audit STRICT. */
+  async changeNumber(
+    organizationId: string,
+    employeeId: string,
+    body: { expectedRevision: number; employeeNumber: string; reason: string },
+    actor: HrActor,
+  ): Promise<EmployeeView> {
+    const current = await this.requireOwn(organizationId, employeeId);
+    if (current.revision !== body.expectedRevision) staleRevision(current.revision);
+    if (current.status === 'anonymized') anonymized();
+    if (current.employeeNumberKey === employeeNumberKey(body.employeeNumber)) {
+      return this.named(organizationId, this.view(current, true));
+    }
+    await inHrTransaction(this.connection, async (session) => {
+      try {
+        await this.writeNumber(current, body.employeeNumber, actor, session);
+      } catch (err) {
+        this.duplicate(err);
+        throw err;
+      }
+      await this.audit.recordStrict(
+        {
+          organizationId,
+          actorUserId: actor.userId,
+          actorRole: actor.role,
+          action: 'hr.employee.number_changed',
+          targetType: 'employee',
+          targetId: employeeId,
+          metadata: {
+            before: current.employeeNumber,
+            after: body.employeeNumber,
+            reason: body.reason,
+          },
+        },
+        { session },
+      );
+    });
+    // L'ancien numéro reste RÉSERVÉ par le compteur s'il suivait le format : il n'est
+    // jamais retiré ; le nouveau pousse le compteur s'il le suit.
+    await this.numbering.reserveManual(organizationId, body.employeeNumber);
+    return this.named(
+      organizationId,
+      this.view(await this.requireOwn(organizationId, employeeId), true),
+    );
+  }
+
+  private async writeNumber(
+    current: EmployeeLean,
+    employeeNumber: string,
+    actor: HrActor,
+    session?: ClientSession,
+  ): Promise<void> {
+    const merged = { ...current, employeeNumber };
+    const res = await this.employees
+      .updateOne(
+        { _id: current._id, organizationId: current.organizationId, revision: current.revision },
+        {
+          $set: { employeeNumber, ...keysOf(merged), updatedBy: actor.userId },
+          $inc: { revision: 1 },
+        },
+        session ? { session } : {},
+      )
+      .exec();
+    if (res.matchedCount !== 1) staleRevision(current.revision + 1);
   }
 
   private duplicate(err: unknown): void {
@@ -896,6 +1172,13 @@ export class HrEmployeesService {
     }
     return out;
   }
+}
+
+function employeeNumberLocked(): never {
+  conflict(
+    'EMPLOYEE_NUMBER_LOCKED',
+    'Le matricule ne se modifie plus après la création : un responsable RH peut le corriger avec un motif.',
+  );
 }
 
 function anonymized(): never {

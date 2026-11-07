@@ -39,6 +39,8 @@ import {
   type HrWorkPattern,
 } from './constants.js';
 import type { EmployeePrivateSummary } from './private.js';
+// ADR-0068 : poste choisi à la création, invitation depuis la fiche.
+import { EmployeePositionChoice } from './onboarding.js';
 // ADR-0045 — H3 : exceptions d'acquisition, soldes et demandes de « moi » et de l'équipe.
 import {
   LeavePolicyOverridesSchema,
@@ -124,6 +126,9 @@ export const CreateEmployeeBody = z
     contractType: contractTypeKey,
     startDate: HrCalendarDay,
     ...employeeFields,
+    // ADR-0068 § 1 et § 3 : « Inviter sur Lalanda » (absent = non) ; poste (absent = sans poste).
+    invite: z.boolean().optional(),
+    position: EmployeePositionChoice.optional(),
   })
   .strict();
 export type CreateEmployeeBody = z.output<typeof CreateEmployeeBody>;
@@ -140,6 +145,9 @@ export const UpdateEmployeeBody = z
     ...employeeFields,
     // ADR-0045 — H3 : acquisition propre au collaborateur, par type d'absence (§ 2.1).
     leavePolicyOverrides: LeavePolicyOverridesSchema.optional(),
+    // ADR-0068 : inviter à l'enregistrement ; poste pour une fiche qui n'en a pas.
+    invite: z.boolean().optional(),
+    position: EmployeePositionChoice.optional(),
   })
   .strict();
 export type UpdateEmployeeBody = z.output<typeof UpdateEmployeeBody>;
@@ -210,6 +218,9 @@ export interface EmployeeView {
   workEmail: string | null;
   workPhone: string | null;
   jobTitle: string;
+  /** ADR-0068 § 3 : poste du référentiel (`null` : sans poste) et son numéro (copie d'affichage). */
+  positionId: string | null;
+  positionNumber: string | null;
   departmentId: string | null;
   /** ADR-0045 — H3 : nom du service (copie d'affichage, lue à la requête). */
   departmentName: string | null;

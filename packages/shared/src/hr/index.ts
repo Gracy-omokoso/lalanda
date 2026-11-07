@@ -32,3 +32,6 @@ export * from './links.js';
 
 // ADR-0060 — équipes (membres = utilisateurs de l'organisation), servies aux Projets
 export * from './teams.js';
+
+// ADR-0068 — RH lot 1 (invitation depuis la fiche, matricules, postes, import, fériés proposés)
+export * from './onboarding.js';

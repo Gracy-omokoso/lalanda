@@ -52,6 +52,10 @@ export class Employee {
   @Prop({ type: String, required: true })
   jobTitle!: string;
 
+  /** ADR-0068 § 3 : poste du référentiel (`hr_positions`), `null` = sans poste. */
+  @Prop({ type: String, default: null })
+  positionId!: string | null;
+
   @Prop({ type: String, default: null })
   departmentId!: string | null;
 

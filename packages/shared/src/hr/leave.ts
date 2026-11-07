@@ -242,6 +242,10 @@ export interface HolidayView {
   label: string;
   halfDay: HrHolidayHalf | null;
   recurring: boolean;
+  /** ADR-0068 § 5 : date proposée (jours fériés de la RDC) non encore confirmée. */
+  toVerify: boolean;
+  /** ADR-0068 § 5 : source citée d'une date proposée, `null` pour une saisie. */
+  source: string | null;
   createdAt: string;
 }
 

@@ -24,13 +24,15 @@ function holidayNotFound(): never {
   throw new NotFoundException({ code: 'HOLIDAY_NOT_FOUND', message: 'Jour férié introuvable.' });
 }
 
-function viewOf(h: HolidayLean): HolidayView {
+export function holidayViewOf(h: HolidayLean): HolidayView {
   return {
     id: String(h._id),
     date: h.date,
     label: h.label,
     halfDay: h.halfDay ?? null,
     recurring: h.recurring,
+    toVerify: h.toVerify === true,
+    source: h.source ?? null,
     createdAt: new Date(h.createdAt).toISOString(),
   };
 }
@@ -63,7 +65,7 @@ export class HrHolidaysService {
       .sort({ date: 1, _id: 1 })
       .lean<HolidayLean[]>()
       .exec();
-    return { items: docs.map(viewOf) };
+    return { items: docs.map(holidayViewOf) };
   }
 
   async create(
@@ -95,7 +97,7 @@ export class HrHolidaysService {
       metadata: { date: body.date },
     });
     const doc = await this.holidays.findById(id).lean<HolidayLean>().exec();
-    return viewOf(doc!);
+    return holidayViewOf(doc!);
   }
 
   async remove(organizationId: string, holidayId: string, actor: HrActor): Promise<void> {

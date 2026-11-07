@@ -365,6 +365,13 @@ const CONTROLEURS = [
   // ADR-0053 — P4 : fonctionnalités par offre (console et `GET /me/features`).
   AdminFeaturesController,
   MeFeaturesController,
+  // ADR-0068 — RH lot 1 : postes, matricules, compte du collaborateur, import, fériés proposés.
+  HrNumberingController,
+  HrPositionsController,
+  HrEmployeeAccountController,
+  HrEmployeeNumbersController,
+  HrEmployeeImportController,
+  HrCountryHolidaysController,
 ];
 
 /**
@@ -2913,6 +2920,13 @@ describe('ADR-0053 — P8 : double authentification de la console', () => {
 
 import { PlatformSubscriptionInvoicesController } from '../subscription-invoices/platform-subscription-invoices.controller.js';
 import { SubscriptionInvoicesController } from '../subscription-invoices/subscription-invoices.controller.js';
+// ADR-0068 — RH lot 1
+import { HrEmployeeAccountController } from '../hr/employees/hr-employee-account.controller.js';
+import { HrEmployeeImportController } from '../hr/employees/hr-employee-import.controller.js';
+import { HrEmployeeNumbersController } from '../hr/employees/hr-employee-numbers.controller.js';
+import { HrCountryHolidaysController } from '../hr/holidays/hr-country-holidays.controller.js';
+import { HrNumberingController } from '../hr/numbering/hr-numbering.controller.js';
+import { HrPositionsController } from '../hr/positions/hr-positions.controller.js';
 
 const CONTROLEURS_ADR47 = [SubscriptionInvoicesController, PlatformSubscriptionInvoicesController];
 (CONTROLEURS as unknown[]).push(...CONTROLEURS_ADR47);
@@ -3010,6 +3024,44 @@ describe('ADR-0060 et ADR-0061 : équipes, membres d’un projet, mes notificati
     };
     const routes = TOUTES_LES_ROUTES.filter((r) =>
       /^(HrTeams|WorkProjectMembers|WorkNotificationPreferences)Controller\./.test(r.cle),
+    );
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+    }
+  });
+});
+
+// ADR-0068 — RH lot 1
+describe('ADR-0068 : invitation depuis la fiche, matricules, postes, import, fériés proposés', () => {
+  it('chaque route déclare sa permission ; inviter exige `members.invite` EN PLUS de `hr.manage`', () => {
+    const attendu: Record<string, Action[]> = {
+      'HrNumberingController.get': ['hr.read'],
+      'HrNumberingController.update': ['hr.manage'],
+      'HrPositionsController.list': ['hr.read'],
+      'HrPositionsController.get': ['hr.read'],
+      'HrPositionsController.create': ['hr.manage'],
+      'HrPositionsController.update': ['hr.manage'],
+      'HrPositionsController.remove': ['hr.manage'],
+      'HrEmployeeAccountController.account': ['hr.read'],
+      'HrEmployeeAccountController.invite': ['hr.manage', 'members.invite'],
+      'HrEmployeeAccountController.resend': ['hr.manage', 'members.invite'],
+      'HrEmployeeAccountController.cancel': ['hr.manage', 'members.invite'],
+      // Fiche ancienne sans matricule : `hr.manage` ; correction : droit RH administrateur.
+      'HrEmployeeNumbersController.auto': ['hr.manage'],
+      'HrEmployeeNumbersController.change': ['hr.sensitive.read', 'hr.manage'],
+      'HrEmployeeImportController.template': ['hr.read'],
+      'HrEmployeeImportController.preview': ['hr.manage'],
+      'HrEmployeeImportController.apply': ['hr.manage'],
+      'HrCountryHolidaysController.proposal': ['hr.manage'],
+      'HrCountryHolidaysController.load': ['hr.manage'],
+      'HrCountryHolidaysController.verify': ['hr.manage'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) =>
+      /^Hr(Numbering|Positions|EmployeeAccount|EmployeeNumbers|EmployeeImport|CountryHolidays)Controller\./.test(
+        r.cle,
+      ),
     );
     expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
     for (const [cle, actions] of Object.entries(attendu)) {
