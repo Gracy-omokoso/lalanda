@@ -511,6 +511,8 @@ describe('ADR-0045 § 8 — application Ressources humaines (H6)', () => {
       'Échéances',
       'Rapports',
       'Réglages',
+      // ADR-0068
+      'Postes',
     ]);
     expect(complet.sousOptions.map((s) => s.id)).toEqual([...RH_SOUS_OPTIONS_PREVUES]);
     const hrefs = rh.sousOptions.map((s) => s.href);
