@@ -17,6 +17,8 @@ import { hrAdminApi, type HrSettingsFull } from '@/lib/api-hr-admin';
 import { Alerte, BOUTON_PETIT, CHAMP } from '../../ventes/_components/form-ui';
 
 import { FeriesReglages, ModelesReglages, TypesAbsenceReglages } from './reglages-listes';
+// ADR-0068 § 2 : matricules.
+import { MatriculesReglages } from './lot1-reglages';
 import {
   LIBELLES_CALENDRIER_EQUIPE,
   LIBELLES_CIRCUIT,
@@ -183,6 +185,7 @@ export function ReglagesRh(): React.ReactElement {
           <TypesAbsenceReglages modifier={modifier} />
           <FeriesReglages modifier={modifier} />
           <ModelesReglages modifier={modifier} />
+          <MatriculesReglages modifier={modifier} />
 
           <Modal
             open={modifier && edition === 'general'}

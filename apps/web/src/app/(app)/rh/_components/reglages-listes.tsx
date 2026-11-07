@@ -20,6 +20,10 @@ import {
 
 import { Alerte, BOUTON_DANGER, BOUTON_PETIT, CHAMP } from '../../ventes/_components/form-ui';
 
+// ADR-0068 § 5 : jours fériés de la RDC proposés, « à vérifier ».
+import { hrLot1Api } from '@/lib/api-hr-lot1';
+
+import { ChargerFeriesRdc } from './lot1-reglages';
 import { LIBELLES_LISTE, libelleAssigneModele, libelleDecalage } from './parcours-model';
 import {
   FORM_FERIE_VIDE,
@@ -431,6 +435,8 @@ export function FeriesReglages({ modifier }: { modifier: boolean }): React.React
   const [version, setVersion] = useState(0);
   const [creation, setCreation] = useState(false);
   const [aSupprimer, setASupprimer] = useState<HolidayView | null>(null);
+  const [rdc, setRdc] = useState(false);
+  const [info, setInfo] = useState<string | null>(null);
 
   useEffect(() => {
     let annule = false;
@@ -471,13 +477,28 @@ export function FeriesReglages({ modifier }: { modifier: boolean }): React.React
               Ajouter un jour
             </button>
           ) : null}
+          {modifier ? (
+            <button
+              type="button"
+              className={buttonClasses('secondary', 'sm')}
+              aria-haspopup="dialog"
+              onClick={() => setRdc(true)}
+            >
+              Charger les jours fériés de la RDC
+            </button>
+          ) : null}
         </span>
       }
     >
       <p className="text-xs text-[var(--foreground-muted)]">
-        Liste vide par défaut : Lalanda ne publie pas le calendrier légal des jours fériés.
-        Saisissez ceux que votre organisation observe ; ils ne sont pas décomptés des absences.
+        Saisissez les jours que votre organisation observe, ou chargez ceux de la RDC proposés par
+        Lalanda (source citée, chaque date « à vérifier »). Ils ne sont pas décomptés des absences.
       </p>
+      {info ? (
+        <p className="text-xs" role="status">
+          {info}
+        </p>
+      ) : null}
       {lecture === null ? (
         <Chargement />
       ) : !lecture.ok ? (
@@ -498,6 +519,24 @@ export function FeriesReglages({ modifier }: { modifier: boolean }): React.React
                   {libelleFerie(h)}
                 </span>
               </span>
+              {h.toVerify ? <Badge tone="warning">À vérifier</Badge> : null}
+              {modifier && h.toVerify ? (
+                <button
+                  type="button"
+                  className={BOUTON_PETIT}
+                  title={h.source ?? undefined}
+                  onClick={() => {
+                    void hrLot1Api
+                      .verifyHoliday(h.id)
+                      .then(() => setVersion((v) => v + 1))
+                      .catch((err: unknown) =>
+                        setInfo(messageRh(err, 'La confirmation a échoué.')),
+                      );
+                  }}
+                >
+                  Confirmer<span className="sr-only"> {h.label}</span>
+                </button>
+              ) : null}
               {modifier ? (
                 <button
                   type="button"
@@ -525,6 +564,24 @@ export function FeriesReglages({ modifier }: { modifier: boolean }): React.React
             setVersion((v) => v + 1);
           }}
         />
+      </Modal>
+      <Modal
+        open={modifier && rdc}
+        onClose={() => setRdc(false)}
+        title={`Jours fériés de la RDC — ${an}`}
+        size="md"
+      >
+        {rdc ? (
+          <ChargerFeriesRdc
+            annee={an}
+            onAnnuler={() => setRdc(false)}
+            onCharge={(m) => {
+              setRdc(false);
+              setInfo(m);
+              setVersion((v) => v + 1);
+            }}
+          />
+        ) : null}
       </Modal>
       {aSupprimer ? (
         <DialogueDecision
