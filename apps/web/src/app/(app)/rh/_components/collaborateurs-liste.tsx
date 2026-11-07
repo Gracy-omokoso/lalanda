@@ -83,15 +83,21 @@ export function CollaborateursListe(): React.ReactElement {
         sousTitre="Le registre du personnel : poste, service, manager, dates. Les données sensibles n’apparaissent jamais dans une liste."
         actions={
           gerer ? (
-            <button
-              type="button"
-              className={buttonClasses('primary', 'sm')}
-              aria-haspopup="dialog"
-              onClick={() => setCreation(true)}
-            >
-              <Plus aria-hidden="true" className="h-4 w-4" />
-              Nouveau collaborateur
-            </button>
+            <span className="flex flex-wrap gap-2">
+              {/* ADR-0068 § 4 : reprise du registre existant. */}
+              <Link href="/rh/collaborateurs/import" className={buttonClasses('secondary', 'sm')}>
+                Importer
+              </Link>
+              <button
+                type="button"
+                className={buttonClasses('primary', 'sm')}
+                aria-haspopup="dialog"
+                onClick={() => setCreation(true)}
+              >
+                <Plus aria-hidden="true" className="h-4 w-4" />
+                Nouveau collaborateur
+              </button>
+            </span>
           ) : null
         }
       >
@@ -143,7 +149,7 @@ export function CollaborateursListe(): React.ReactElement {
         open={gerer && creation}
         onClose={() => setCreation(false)}
         title="Nouveau collaborateur"
-        description="Le nom, le poste et la date d’entrée suffisent. Les données sensibles s’ajoutent ensuite depuis la fiche."
+        description="Le nom, le poste et la date d’entrée suffisent ; le matricule est attribué automatiquement. Les données sensibles s’ajoutent ensuite depuis la fiche."
         size="lg"
       >
         <FicheFormulaire
