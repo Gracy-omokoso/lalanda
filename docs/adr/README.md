@@ -218,3 +218,11 @@ Décideurs :
   compteurs, tableau dense ; `GET /sales/quotes/stats` et `GET /sales/receipts/stats` calculés par le
   moteur, devise de référence et taux figé sur la facture comme ADR-0056 (devis : autres devises à
   part, jamais converties) ; tri des devis par validité. Statut : **proposé** (6 nov. 2026).
+- [ADR-0070](ADR-0070-paie-rdc.md) — Paie RDC (proposition) : pack de paie `cd-paie` daté et sourcé
+  (IRPP de la loi n° 23/053 en remplacement de l'IPR depuis le 1ᵉʳ janv. 2026, CNSS du décret
+  n° 18/041, INPP, ONEM, SMIG, tous « à confirmer par l'expert-comptable »), mode simulation par
+  défaut, douze cas de référence signés avant tout bulletin réel, rubriques, éléments variables
+  (absences, proposition d'heures depuis le pointage, retenue des avances d'ADR-0051), bulletins
+  sans modification (rectificatif), écritures `payroll.*` vers ADR-0049 (compte d'attente tant que le
+  pack v3 n'a pas les comptes sociaux), dépense possédée par la paie dans ADR-0034, états
+  préparatoires sans dépôt ; écarts relevés dans `cd-2026`. Statut : **proposé** (7 nov. 2026).
