@@ -77,6 +77,16 @@ const MESSAGES: Record<string, string> = {
   APPROVER_ALREADY_APPROVED:
     'Vous avez déjà validé une étape de cette demande : l’étape suivante revient à une autre personne.',
   SECRETS_NOT_CONFIGURED: 'Le coffre des données sensibles n’est pas configuré sur ce serveur.',
+  // ADR-0068
+  EMPLOYEE_NUMBER_LOCKED:
+    'Le matricule ne se modifie plus après la création : un responsable RH peut le corriger avec un motif.',
+  POSITION_NOT_OPEN: 'Ce poste n’est pas vacant : choisissez un poste vacant ou un nouveau poste.',
+  POSITION_FILLED: 'Un poste pourvu ne se supprime pas : la sortie du titulaire le libère.',
+  POSITION_NOT_FOUND: 'Poste introuvable.',
+  EMPLOYEE_HAS_POSITION: 'Ce collaborateur occupe déjà un poste.',
+  INVITATION_NOT_FOUND: 'Aucune invitation en cours pour ce collaborateur.',
+  IMPORT_HAS_ERRORS:
+    'Des lignes sont en erreur : corrigez le fichier, ou confirmez l’import des seules lignes valides.',
 };
 
 interface ErreurApi {

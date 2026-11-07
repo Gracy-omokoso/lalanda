@@ -16,6 +16,8 @@ const fiche: EmployeeView = {
   workEmail: null,
   workPhone: null,
   jobTitle: 'Comptable',
+  positionId: null,
+  positionNumber: null,
   departmentId: null,
   departmentName: null,
   managerEmployeeId: null,

@@ -78,6 +78,9 @@ export interface HrEmployeeListItem {
   workEmail: string | null;
   workPhone: string | null;
   workLocation: string | null;
+  /** ADR-0068 § 3 : poste du référentiel et son numéro, si l'API les sert. */
+  positionId?: string | null;
+  positionNumber?: string | null;
 }
 
 /** Fiche (dossier non sensible). */
@@ -123,6 +126,10 @@ export interface HrEmployeeInput {
   workLocation?: string | null;
   notes?: string | null;
   userId?: string | null;
+  /** ADR-0068 § 1 : « Inviter sur Lalanda » à l'enregistrement. */
+  invite?: boolean;
+  /** ADR-0068 § 3 : nouveau poste, ou remplacement poste pour poste d'un poste vacant. */
+  position?: { mode: 'new' } | { mode: 'replacement'; positionId: string };
 }
 
 export interface HrEmployeeUpdateInput extends HrEmployeeInput {
@@ -430,6 +437,9 @@ export function employeeFromApi(e: ApiEmployee): HrEmployeeView {
     workEmail: e.workEmail,
     workPhone: e.workPhone,
     workLocation: e.workLocation,
+    // ADR-0068 : poste du référentiel (instance N-1 : absent → sans poste).
+    positionId: e.positionId ?? null,
+    positionNumber: e.positionNumber ?? null,
     probationEndDate: e.probationEndDate,
     contractEndDate: e.contractEndDate,
     exitCategory: e.exitCategory,
