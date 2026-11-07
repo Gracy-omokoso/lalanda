@@ -536,6 +536,8 @@ describe('ADR-0045 § 8 — application Ressources humaines (H6)', () => {
       'rh-echeances',
       'rh-rapports',
       'rh-reglages',
+      // ADR-0068
+      'rh-postes',
     ]);
   });
 
