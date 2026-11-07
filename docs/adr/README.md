@@ -218,3 +218,11 @@ Décideurs :
   compteurs, tableau dense ; `GET /sales/quotes/stats` et `GET /sales/receipts/stats` calculés par le
   moteur, devise de référence et taux figé sur la facture comme ADR-0056 (devis : autres devises à
   part, jamais converties) ; tri des devis par validité. Statut : **proposé** (6 nov. 2026).
+- [ADR-0068](ADR-0068-rh-invitation-matricules-postes.md) — RH lot 1 : créer un collaborateur l'invite
+  sur Lalanda (membre relié tout de suite, sinon invitation d'ADR-0041 portant la fiche, reliée à
+  l'acceptation ; `members.invite` exigé ; réponse identique qu'un compte existe ailleurs ou non ;
+  rôle Salarié), matricule automatique `GF-0001` jamais réutilisé (compteur `EMP` de `hr_counters`,
+  réservation gardée à l'anonymisation, correction par le droit RH administrateur avec motif),
+  référentiel des postes `POS-001` (remplacement poste pour poste, sortie = poste vacant), import du
+  personnel CSV/XLSX, jours fériés de la RDC proposés « à vérifier » (ordonnance n° 23/042 du 30 mars
+  2023 via l'ACP). Statut : **accepté** (7 nov. 2026).
