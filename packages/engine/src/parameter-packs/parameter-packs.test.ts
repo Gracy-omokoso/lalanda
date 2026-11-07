@@ -30,7 +30,7 @@ describe('ParameterPack — parsing YAML', () => {
     expect(pack.devise_secondaire).toBe('CDF');
     expect(pack.params['ibp_taux']?.valeur).toBe(0.3);
     expect(pack.params['tva_taux_normal']?.valeur).toBe(0.16);
-    expect(pack.params['cnss_employeur_pct']?.valeur).toBe(0.05);
+    expect(pack.params['cnss_employeur_pct']?.valeur).toBe(0.13);
   });
 
   it('parse les 4 packs de lancement sans erreur', () => {
@@ -192,6 +192,20 @@ describe('cd-2026 — révision n° 2 (taux réduits de TVA 2026)', () => {
     expect(revision!.parametres).toEqual(
       expect.arrayContaining(['tva_taux_reduit', 'tva_taux_reduit_1pct']),
     );
+    for (const id of revision!.parametres) expect(pack.params[id], id).toBeDefined();
+  });
+
+  it('révision n° 3 : charges sociales et IRPP confirmés par l’expert-comptable', () => {
+    const p = (id: string) => pack.params[id]?.valeur;
+    expect(p('cnss_employeur_pct')).toBe(0.13);
+    expect(p('cnss_salarie_pct')).toBe(0.05);
+    expect([p('inpp_pct'), p('inpp_pct_51_300'), p('inpp_pct_301_plus')]).toEqual([
+      0.03, 0.02, 0.01,
+    ]);
+    expect(p('onem_pct')).toBe(0.005);
+    expect(p('charges_sociales_employeur_pct_total')).toBeCloseTo(0.13 + 0.03 + 0.005, 10);
+    const revision = pack.revisions?.find((r) => r.numero === 3);
+    expect(revision?.date).toBe('2026-11-07');
     for (const id of revision!.parametres) expect(pack.params[id], id).toBeDefined();
   });
 
