@@ -10,7 +10,7 @@
 // est le jour de Kinshasa calculé par l'appelant.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { addDays, dayNumber } from '../treasury/calendar.js';
+import { addDays, dayNumber, partsOf } from '../treasury/calendar.js';
 import { centsOf, checkCurrency, checkDay, divHalfUp, formatCents } from './money.js';
 import { payablesAging } from './payables.js';
 import type { CurrencyAging, PurchaseCurrency } from './types.js';
@@ -60,8 +60,8 @@ function checkMonths(months: number): number {
 
 /** `AAAA-MM` décalé de `delta` mois. */
 export function shiftMonth(month: string, delta: number): string {
-  const y = Number(month.slice(0, 4));
-  const m = Number(month.slice(5, 7)) - 1 + delta;
+  const { year: y, month: mo } = partsOf(`${month}-01`);
+  const m = mo - 1 + delta;
   const year = y + Math.floor(m / 12);
   const mm = ((m % 12) + 12) % 12;
   return `${String(year).padStart(4, '0')}-${String(mm + 1).padStart(2, '0')}`;
@@ -73,17 +73,22 @@ export function monthWindow(asOf: string, months: number): string[] {
   return Array.from({ length: months }, (_, i) => shiftMonth(to, i - (months - 1)));
 }
 
+/** Entier exact déjà arrondi (pourcentage, jours) → nombre JSON. */
+function toSmallInt(v: bigint): number {
+  return Number.parseInt(v.toString(), 10);
+}
+
 /** (a − b) / b en % entier, demi vers le haut (en valeur absolue) ; `null` si b = 0. */
 export function changePercentOf(current: bigint, previous: bigint): number | null {
   if (previous <= 0n) return null;
   const diff = current - previous;
   const abs = divHalfUp((diff < 0n ? -diff : diff) * 100n, previous);
-  return Number(diff < 0n ? -abs : abs);
+  return toSmallInt(diff < 0n ? -abs : abs);
 }
 
 /** Moyenne simple de jours entiers, arrondie au jour demi vers le haut ; `null` sans valeur. */
 function averageDays(sum: number, count: number): number | null {
-  return count === 0 ? null : Number(divHalfUp(BigInt(sum), BigInt(count)));
+  return count === 0 ? null : toSmallInt(divHalfUp(BigInt(sum), BigInt(count)));
 }
 
 /** Devises rangées du plus de documents au moins ; égalité : ordre alphabétique. */
