@@ -3139,3 +3139,33 @@ describe('ADR-0069 : cartes de service et cartes de visite', () => {
     }
   });
 });
+
+// ── ADR-0072 : documents RH générés (attestation, certificat de travail) ──────
+import { HrGeneratedDocumentsController } from '../hr/generated-documents/hr-generated-documents.controller.js';
+
+const CONTROLEURS_0072 = [HrGeneratedDocumentsController];
+(CONTROLEURS as unknown[]).push(...CONTROLEURS_0072);
+TOUTES_LES_ROUTES.push(
+  ...CONTROLEURS_0072.flatMap((c) => routesDe(c as new (...args: never[]) => unknown)),
+);
+
+describe('ADR-0072 : documents RH générés', () => {
+  it('générer et prévisualiser exigent hr.manage ; registre et réglages lus avec hr.read', () => {
+    const attendu: Record<string, Action[]> = {
+      'HrGeneratedDocumentsController.getSettings': ['hr.read'],
+      'HrGeneratedDocumentsController.putSettings': ['hr.manage'],
+      'HrGeneratedDocumentsController.list': ['hr.read'],
+      'HrGeneratedDocumentsController.preview': ['hr.manage'],
+      'HrGeneratedDocumentsController.generate': ['hr.manage'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) =>
+      r.cle.startsWith('HrGeneratedDocumentsController.'),
+    );
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+      expect(SANS_PERMISSION[cle], cle).toBeUndefined();
+    }
+  });
+});
