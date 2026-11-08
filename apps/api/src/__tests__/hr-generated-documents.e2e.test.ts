@@ -17,7 +17,7 @@ import 'reflect-metadata';
 import type { Db } from 'mongodb';
 import { ObjectId } from 'mongodb';
 import { randomBytes } from 'node:crypto';
-import request from 'supertest';
+import type request from 'supertest';
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 
 import { PdfRenderingService } from '../reports/pdf-rendering.service.js';
