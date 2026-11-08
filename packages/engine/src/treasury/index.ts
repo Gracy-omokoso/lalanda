@@ -27,3 +27,16 @@ export {
   SCENARIO_BOUNDS,
 } from './forecast.js';
 export { centsOf as treasuryCentsOf, formatCents as treasuryFormatCents } from './money.js';
+export {
+  computeAccountStats,
+  computeExpenseStats,
+  TREASURY_STATS_VERSION,
+  type AccountCurrencyStats,
+  type AccountStats,
+  type AccountStatsInput,
+  type ExpenseCurrencyStats,
+  type ExpenseStats,
+  type ExpenseStatsExpense,
+  type ExpenseStatsInput,
+  type TreasuryStatsAmountCount,
+} from './stats.js';

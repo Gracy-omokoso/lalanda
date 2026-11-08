@@ -30,3 +30,27 @@ export {
   splitAllocation,
 } from './payables.js';
 export { purchasesSummary } from './summary.js';
+export {
+  computePayablesStats,
+  computePurchaseOrderStats,
+  computeSupplierInvoiceStats,
+  PAYABLES_DUE_WITHIN_DAYS,
+  PURCHASE_OPEN_ORDER_STATUSES,
+  PURCHASES_DELAY_WINDOW_DAYS,
+  PURCHASES_STATS_VERSION,
+  type PayablesCurrencyStats,
+  type PayablesStats,
+  type PayablesStatsInput,
+  type PayablesStatsInvoice,
+  type PayablesStatsPayment,
+  type PurchaseOrderCurrencyStats,
+  type PurchaseOrderStats,
+  type PurchaseOrderStatsInput,
+  type PurchaseOrderStatsOrder,
+  type PurchaseStatsAmountCount,
+  type PurchaseStatsMonthPoint,
+  type SupplierInvoiceCurrencyStats,
+  type SupplierInvoiceStats,
+  type SupplierInvoiceStatsInput,
+  type SupplierInvoiceStatsInvoice,
+} from './stats.js';
