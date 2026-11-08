@@ -120,7 +120,7 @@ export function buildEmployeeImportTemplateCsv(): string {
     '+243 810 000 000',
     'Kinshasa',
   ].join(';');
-  return `﻿${head}\r\n${example}\r\n`;
+  return `\uFEFF${head}\r\n${example}\r\n`;
 }
 
 interface PreparedRow {
