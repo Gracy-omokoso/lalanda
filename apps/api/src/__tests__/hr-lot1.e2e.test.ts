@@ -749,4 +749,71 @@ e2eSuite('RH lot 1 — invitation, matricules, postes, import, fériés (ADR-006
     });
   });
 
+  describe('e-mail changé avec invitation en attente (amendement du 8 nov. 2026)', () => {
+    it('l’ancienne invitation est révoquée ; « Inviter » coché : une nouvelle part', async () => {
+      const ancien = `ancien-${tag}@lalanda-test.local`;
+      const nouveau = `changee-${tag}@lalanda-test.local`;
+      const e = ok(
+        await fx.post(
+          'owner',
+          '/hr/employees',
+          fiche('Adresse', { workEmail: ancien, invite: true }),
+        ),
+        201,
+      );
+      expect(e['invitation']['outcome']).toBe('invitation_sent');
+      // Sans « Inviter » : l'ancienne est révoquée, rien ne part (même sans `members.invite`).
+      const sansInvite = ok(
+        await fx.put('hr_manager', `/hr/employees/${e['id']}`, {
+          expectedRevision: e['revision'],
+          workEmail: `autre-${tag}@lalanda-test.local`,
+        }),
+      );
+      expect(sansInvite['invitation']).toBeNull();
+      expect(
+        await db.collection('invitations').countDocuments({
+          organizationId: fx.orgN,
+          employeeId: e['id'],
+          revokedAt: null,
+          acceptedAt: null,
+        }),
+      ).toBe(0);
+      expect(ok(await fx.get('hr_manager', `/hr/employees/${e['id']}/account`))['state']).toBe(
+        'none',
+      );
+      // Réinvitation, puis changement d'adresse avec « Inviter » coché.
+      ok(await fx.post('owner', `/hr/employees/${e['id']}/invitation`));
+      const r = ok(
+        await fx.put('owner', `/hr/employees/${e['id']}`, {
+          expectedRevision: await rev(e['id']),
+          workEmail: nouveau,
+          invite: true,
+        }),
+      );
+      expect(r['invitation']['outcome']).toBe('invitation_sent');
+      const open = await db
+        .collection('invitations')
+        .find({ organizationId: fx.orgN, employeeId: e['id'], revokedAt: null })
+        .toArray();
+      expect(open.map((i) => i['email'])).toEqual([nouveau]);
+      // Même adresse renvoyée : rien n'est révoqué.
+      ok(
+        await fx.put('owner', `/hr/employees/${e['id']}`, {
+          expectedRevision: await rev(e['id']),
+          workEmail: nouveau,
+        }),
+      );
+      expect(
+        await db
+          .collection('invitations')
+          .countDocuments({ organizationId: fx.orgN, employeeId: e['id'], revokedAt: null }),
+      ).toBe(1);
+      const traces = await db.collection('audit_events').countDocuments({
+        organizationId: fx.orgN,
+        action: 'hr.employee.invitation_revoked',
+        targetId: e['id'],
+      });
+      expect(traces).toBe(2);
+    });
+  });
 });
