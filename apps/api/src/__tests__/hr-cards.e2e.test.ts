@@ -80,12 +80,13 @@ e2eSuite('RH — cartes de service et de visite (ADR-0069)', () => {
   const rendered: string[] = [];
   const id = { A: '', C: '', X: '' };
 
-  const raw = (c: HrAccount, method: 'put' | 'post', path: string, body: Buffer, type: string) =>
-    request(fx.app.getHttpServer())
-      [method](path)
+  const raw = (c: HrAccount, method: 'put' | 'post', path: string, body: Buffer, type: string) => {
+    const agent = request(fx.app.getHttpServer());
+    return (method === 'put' ? agent.put(path) : agent.post(path))
       .set('Cookie', fx.as(c))
       .set('content-type', type)
       .send(body);
+  };
   const binary = (r: request.Test) =>
     r.buffer(true).parse((res, cb) => {
       const chunks: Buffer[] = [];
