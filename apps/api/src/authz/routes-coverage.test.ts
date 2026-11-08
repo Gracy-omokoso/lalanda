@@ -3144,21 +3144,23 @@ describe('ADR-0069 : cartes de service et cartes de visite', () => {
 // ADR-0068, amendement du 8 nov. 2026 : changement de poste, modèle d'import XLSX
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { HrEmployeeImportTemplateController } from '../hr/employees/hr-employee-import-template.controller.js';
 import { HrPositionChangeController } from '../hr/positions/hr-position-change.controller.js';
 
-const CONTROLEURS_ADR68_SUITE = [HrPositionChangeController];
+const CONTROLEURS_ADR68_SUITE = [HrPositionChangeController, HrEmployeeImportTemplateController];
 (CONTROLEURS as unknown[]).push(...CONTROLEURS_ADR68_SUITE);
 TOUTES_LES_ROUTES.push(
   ...CONTROLEURS_ADR68_SUITE.flatMap((c) => routesDe(c as new (...args: never[]) => unknown)),
 );
 
 describe('ADR-0068, amendement du 8 nov. 2026', () => {
-  it('changer de poste exige `hr.manage`', () => {
+  it('changer de poste exige `hr.manage` ; le modèle XLSX, `hr.read`', () => {
     const attendu: Record<string, Action[]> = {
       'HrPositionChangeController.change': ['hr.manage'],
+      'HrEmployeeImportTemplateController.templateXlsx': ['hr.read'],
     };
     const routes = TOUTES_LES_ROUTES.filter((r) =>
-      /^HrPositionChangeController\./.test(r.cle),
+      /^Hr(PositionChange|EmployeeImportTemplate)Controller\./.test(r.cle),
     );
     expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
     for (const [cle, actions] of Object.entries(attendu)) {

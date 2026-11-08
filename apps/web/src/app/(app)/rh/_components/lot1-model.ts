@@ -2,7 +2,7 @@
 // libellés de l'état du compte et des postes. Aucune règle métier : l'API reste juge.
 
 import type { OrgAction } from '@/lib/api';
-import type { EmployeeAccountView, PositionView } from '@/lib/api-hr-lot1';
+import type { EmployeeAccountView, EmployeeImportPreview, PositionView } from '@/lib/api-hr-lot1';
 
 type Actions = readonly OrgAction[] | null;
 
@@ -101,4 +101,20 @@ export function corpsChangementPoste(input: {
     ...(input.effectiveDate ? { effectiveDate: input.effectiveDate } : {}),
     ...(jobTitle ? { jobTitle } : {}),
   };
+}
+
+// ── Amendement du 8 nov. 2026 : manager à l'import ──────────────────────────
+
+/** Colonne « Manager » de l'aperçu : nom de l'existant, « ligne N », ou tiret. */
+export function libelleManagerImport(
+  r: Pick<EmployeeImportPreview['rows'][number], 'manager' | 'managerRef'>,
+): string {
+  switch (r.manager.kind) {
+    case 'existing':
+      return r.manager.displayName;
+    case 'row':
+      return `Ligne ${r.manager.row} du fichier`;
+    default:
+      return r.managerRef ?? '—';
+  }
 }

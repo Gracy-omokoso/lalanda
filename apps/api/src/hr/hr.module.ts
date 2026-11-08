@@ -124,6 +124,7 @@ import { HrCardsModule } from './cards/hr-cards.module.js';
 // ADR-0068, amendement du 8 nov. 2026 : changement de poste.
 import { HrPositionChangeController } from './positions/hr-position-change.controller.js';
 import { HrPositionChangeService } from './positions/hr-position-change.service.js';
+import { HrEmployeeImportTemplateController } from './employees/hr-employee-import-template.controller.js';
 
 @Module({
   imports: [
@@ -203,6 +204,7 @@ import { HrPositionChangeService } from './positions/hr-position-change.service.
     HrCountryHolidaysController,
     // ADR-0068, amendement du 8 nov. 2026
     HrPositionChangeController,
+    HrEmployeeImportTemplateController,
   ],
   providers: [
     MasterKeyringProvider,

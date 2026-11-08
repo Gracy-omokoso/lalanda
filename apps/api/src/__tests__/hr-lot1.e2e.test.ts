@@ -659,4 +659,94 @@ e2eSuite('RH lot 1 — invitation, matricules, postes, import, fériés (ADR-006
       expect(audit).toHaveLength(2);
     });
   });
+
+  describe('import : service, manager, modèle XLSX (amendement du 8 nov. 2026)', () => {
+    it('managers existants ou du fichier (deux passes), cycle refusé, services créés sur option', async () => {
+      const chef = ok(
+        await fx.post(
+          'hr_manager',
+          '/hr/employees',
+          fiche('Chef import', { workEmail: `chef-imp-${tag}@lalanda-test.local` }),
+        ),
+        201,
+      );
+      const head = 'Nom;Prénom;Poste;Service;Manager;Date d’entrée;E-mail professionnel;Matricule';
+      const csv = Buffer.from(
+        [
+          `\uFEFF${head}`,
+          `Lukusa;Anne;Directrice;Direction ${tag};CHEF-IMP-${tag}@lalanda-test.local;01/02/2024;anne-${tag}@lalanda-test.local;`,
+          `Mpiana;Joël;Adjoint;Direction ${tag};anne-${tag}@lalanda-test.local;01/03/2024;;GF-0700`,
+          `Kalala;Eve;Agent;Direction ${tag};GF-0700;01/04/2024;;`,
+          `Boyi;Cycle;Agent;;GF-0702;01/04/2024;;GF-0701`,
+          `Boyo;Cycle;Agent;;GF-0701;01/04/2024;;GF-0702`,
+          `Nsimba;Inconnu;Agent;;GF-9999;01/04/2024;;`,
+        ].join('\r\n'),
+        'utf8',
+      );
+      const sans = ok(await upload('/hr/employees/import/preview', csv));
+      expect(sans['rows'][0]['issues']).toEqual([
+        expect.objectContaining({ level: 'warning', field: 'department' }),
+      ]);
+      expect(sans['rows'][0]['newDepartment']).toBe(false);
+      const p = ok(await upload('/hr/employees/import/preview?createDepartments=true', csv));
+      expect(p['counts']).toMatchObject({ total: 6, valid: 3, invalid: 3 });
+      expect(p['rows'][0]).toMatchObject({
+        newDepartment: true,
+        manager: { kind: 'existing', employeeId: chef['id'] },
+      });
+      expect(p['rows'][1]['manager']).toEqual({ kind: 'row', row: 2 });
+      expect(p['rows'][2]['manager']).toEqual({ kind: 'row', row: 3 });
+      const managerIssue = (i: number) =>
+        p['rows'][i]['issues'].find((x: { field: string }) => x.field === 'manager')?.['message'];
+      expect(managerIssue(3)).toContain('Cycle');
+      expect(managerIssue(4)).toContain('Cycle');
+      expect(managerIssue(5)).toContain('introuvable');
+      const applied = ok(
+        await upload('/hr/employees/import/apply?skipInvalid=true&createDepartments=true', csv),
+        201,
+      );
+      expect(applied['skippedRows']).toEqual([5, 6, 7]);
+      expect(applied['createdDepartments']).toEqual([`Direction ${tag}`]);
+      expect(applied['created'].map((c: { manager: string }) => c.manager)).toEqual([
+        'linked',
+        'linked',
+        'linked',
+      ]);
+      const [anne, joel, eve] = applied['created'].map((c: { employeeId: string }) => c.employeeId);
+      const docs = await db
+        .collection('hr_employees')
+        .find({ _id: { $in: [anne, joel, eve].map((x: string) => new ObjectId(x)) } })
+        .toArray();
+      const by = new Map(docs.map((d) => [String(d['_id']), d]));
+      expect(by.get(anne)!['managerEmployeeId']).toBe(chef['id']);
+      expect(by.get(joel)!['managerEmployeeId']).toBe(anne);
+      expect(by.get(eve)!['managerEmployeeId']).toBe(joel);
+      const dept = await db
+        .collection('hr_departments')
+        .findOne({ organizationId: fx.orgN, name: `Direction ${tag}` });
+      expect(by.get(anne)!['departmentId']).toBe(String(dept!['_id']));
+    });
+
+    it('modèle XLSX téléchargeable et relu par l’aperçu', async () => {
+      const tpl = await request(fx.app.getHttpServer())
+        .get('/hr/employees/import/template.xlsx')
+        .set('Cookie', fx.as('hr_manager'))
+        .buffer(true)
+        .parse((res, cb) => {
+          const chunks: Buffer[] = [];
+          res.on('data', (c: Buffer) => chunks.push(c));
+          res.on('end', () => cb(null, Buffer.concat(chunks)));
+        });
+      expect(tpl.status).toBe(200);
+      expect(tpl.headers['content-type']).toContain('spreadsheetml');
+      const buf = tpl.body as Buffer;
+      expect(buf.subarray(0, 2).toString()).toBe('PK');
+      const p = ok(await upload('/hr/employees/import/preview?createDepartments=true', buf));
+      expect(p['format']).toBe('xlsx');
+      expect(p['columns'].map((c: { field: string | null }) => c.field)).toContain('manager');
+      expect(p['counts']).toMatchObject({ total: 2, valid: 2, invalid: 0 });
+      expect(p['rows'][1]['manager']).toEqual({ kind: 'row', row: 2 });
+    });
+  });
+
 });
