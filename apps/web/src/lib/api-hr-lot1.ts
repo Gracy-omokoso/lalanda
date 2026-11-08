@@ -129,6 +129,23 @@ export const hrLot1Api = {
       body: { expectedRevision },
     }),
 
+  // Changement de poste (amendement du 8 nov. 2026) : le matricule ne change jamais.
+  changePosition: async (
+    employeeId: string,
+    body: {
+      expectedRevision: number;
+      position: { mode: 'new' } | { mode: 'replacement'; positionId: string };
+      effectiveDate?: string;
+      jobTitle?: string;
+    },
+  ): Promise<HrEmployeeView> =>
+    employeeFromApi(
+      await jsonRequest<EmployeeView>(`/hr/employees/${id(employeeId)}/position-change`, {
+        method: 'POST',
+        body,
+      }),
+    ),
+
   // Compte Lalanda d'un collaborateur (§ 1)
   getAccount: (employeeId: string) =>
     jsonRequest<EmployeeAccountView>(`/hr/employees/${id(employeeId)}/account`, { method: 'GET' }),

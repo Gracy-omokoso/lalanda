@@ -549,4 +549,114 @@ e2eSuite('RH lot 1 — invitation, matricules, postes, import, fériés (ADR-006
       code(await fx.get('hr_manager', '/hr/holidays/country/cd?year=2020'), 400, 'INVALID_REQUEST');
     });
   });
+
+  // ── Amendement du 8 nov. 2026 ────────────────────────────────────────────
+
+  describe('changement de poste (amendement du 8 nov. 2026)', () => {
+    it('mutation vers un poste vacant puis un nouveau poste ; matricule inchangé ; historiques', async () => {
+      const e = ok(
+        await fx.post(
+          'hr_manager',
+          '/hr/employees',
+          fiche('Muté', {
+            jobTitle: 'Caissier',
+            startDate: '2025-01-06',
+            position: { mode: 'new' },
+          }),
+        ),
+        201,
+      );
+      const ancien = e['positionId'] as string;
+      const cible = ok(await fx.post('hr_manager', '/hr/positions', { title: 'Comptable' }), 201);
+      // La modification ordinaire renvoie vers « Changer de poste ».
+      code(
+        await fx.put('hr_manager', `/hr/employees/${e['id']}`, {
+          expectedRevision: e['revision'],
+          position: { mode: 'replacement', positionId: cible['id'] },
+        }),
+        409,
+        'EMPLOYEE_HAS_POSITION',
+      );
+      const url = `/hr/employees/${e['id']}/position-change`;
+      const corps = {
+        expectedRevision: e['revision'],
+        position: { mode: 'replacement', positionId: cible['id'] },
+        effectiveDate: '2026-11-02',
+      };
+      code(await fx.post('analyst', url, corps), 403, 'FORBIDDEN');
+      code(await fx.post('ownerB', url, corps), 404, 'EMPLOYEE_NOT_FOUND');
+      code(
+        await fx.post('hr_manager', url, { ...corps, effectiveDate: '2024-12-31' }),
+        400,
+        'INVALID_REQUEST',
+      );
+      code(
+        await fx.post('hr_manager', url, {
+          ...corps,
+          position: { mode: 'replacement', positionId: ancien },
+        }),
+        409,
+        'POSITION_UNCHANGED',
+      );
+      code(
+        await fx.post('hr_manager', url, { ...corps, expectedRevision: 99 }),
+        409,
+        'STALE_REVISION',
+      );
+      const m = ok(await fx.post('hr_manager', url, corps));
+      expect(m).toMatchObject({
+        positionId: cible['id'],
+        positionNumber: cible['positionNumber'],
+        jobTitle: 'Comptable',
+        employeeNumber: e['employeeNumber'],
+      });
+      const libere = ok(await fx.get('hr_manager', `/hr/positions/${ancien}`));
+      expect(libere).toMatchObject({ status: 'open', holderEmployeeId: null });
+      expect(libere['holders']).toEqual([
+        expect.objectContaining({ employeeId: e['id'], from: '2025-01-06', to: '2026-11-02' }),
+      ]);
+      const pourvu = ok(await fx.get('hr_manager', `/hr/positions/${cible['id']}`));
+      expect(pourvu).toMatchObject({ status: 'filled', holderEmployeeId: e['id'] });
+      expect(pourvu['holders']).toEqual([
+        expect.objectContaining({ employeeId: e['id'], from: '2026-11-02', to: null }),
+      ]);
+      // Un poste pourvu (par quelqu'un d'autre) ne se choisit pas.
+      const autre = ok(
+        await fx.post('hr_manager', '/hr/employees', fiche('Autre', { position: { mode: 'new' } })),
+        201,
+      );
+      code(
+        await fx.post('hr_manager', url, {
+          expectedRevision: m['revision'],
+          position: { mode: 'replacement', positionId: autre['positionId'] },
+        }),
+        409,
+        'POSITION_NOT_OPEN',
+      );
+      // Nouveau poste : numéro attribué, intitulé demandé.
+      const n = ok(
+        await fx.post('hr_manager', url, {
+          expectedRevision: m['revision'],
+          position: { mode: 'new' },
+          jobTitle: 'Chef comptable',
+          effectiveDate: '2026-11-05',
+        }),
+      );
+      expect(n['positionId']).not.toBe(cible['id']);
+      expect(n).toMatchObject({ jobTitle: 'Chef comptable', employeeNumber: e['employeeNumber'] });
+      expect(ok(await fx.get('hr_manager', `/hr/positions/${cible['id']}`))).toMatchObject({
+        status: 'open',
+        holderEmployeeId: null,
+      });
+      const audit = await db
+        .collection('audit_events')
+        .find({
+          organizationId: fx.orgN,
+          action: 'hr.employee.position_changed',
+          targetId: e['id'],
+        })
+        .toArray();
+      expect(audit).toHaveLength(2);
+    });
+  });
 });

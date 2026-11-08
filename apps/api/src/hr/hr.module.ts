@@ -121,6 +121,9 @@ import { HrEmployeeImportService } from './employees/hr-employee-import.service.
 import { HrCountryHolidaysController } from './holidays/hr-country-holidays.controller.js';
 // ADR-0069 : cartes de service (badge vérifiable) et cartes de visite.
 import { HrCardsModule } from './cards/hr-cards.module.js';
+// ADR-0068, amendement du 8 nov. 2026 : changement de poste.
+import { HrPositionChangeController } from './positions/hr-position-change.controller.js';
+import { HrPositionChangeService } from './positions/hr-position-change.service.js';
 
 @Module({
   imports: [
@@ -198,6 +201,8 @@ import { HrCardsModule } from './cards/hr-cards.module.js';
     HrEmployeeNumbersController,
     HrEmployeeImportController,
     HrCountryHolidaysController,
+    // ADR-0068, amendement du 8 nov. 2026
+    HrPositionChangeController,
   ],
   providers: [
     MasterKeyringProvider,
@@ -252,6 +257,8 @@ import { HrCardsModule } from './cards/hr-cards.module.js';
     HrPositionsService,
     HrEmployeeInvitationsService,
     HrEmployeeImportService,
+    // ADR-0068, amendement du 8 nov. 2026
+    HrPositionChangeService,
   ],
   exports: [
     // ADR-0045 — H2

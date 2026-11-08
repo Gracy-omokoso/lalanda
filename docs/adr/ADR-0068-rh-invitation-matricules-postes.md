@@ -185,3 +185,79 @@ liste des fériés vide faute de source.
 [ADR-0051](ADR-0051-rh-frais-avances-presences-evaluations.md) ·
 [ADR-0059](ADR-0059-roles-equipe-et-personnalisation-active.md) ·
 [ADR-0062](ADR-0062-import-projet-fichier.md) · docs/09 (Country Packs)
+
+## Amendement du 8 novembre 2026 — manques du lot 1 comblés
+
+Statut : **Accepted** (demande de la dirigeante, Go freelance démarre le 9 nov. 2026). Le lot 1 est en
+production depuis v1.21.0 ; cet amendement **ajoute** sans retirer. Aucune action ajoutée à
+`authz/permissions.ts`.
+
+### A1. Changer le poste d'une fiche qui en a déjà un (mutation)
+
+- `PUT /hr/employees/:id` garde son refus `409 EMPLOYEE_HAS_POSITION` (message : « utilisez
+  Changer de poste »). La mutation passe par **`POST /hr/employees/:id/position-change`**
+  (`hr.manage`), corps `{ expectedRevision, position, effectiveDate?, jobTitle?, departmentId? }` :
+  `position` = `{ mode: 'replacement', positionId }` (poste **vacant** de l'organisation, autre que le
+  poste actuel : `409 POSITION_UNCHANGED`) ou `{ mode: 'new' }` (numéro de poste tiré).
+- **Une seule transaction** : la fiche pointe le nouveau poste (révision attendue, statut `active`
+  exigé : `409 EMPLOYEE_NOT_ACTIVE`), l'ancien poste redevient **vacant** et son historique est clos à
+  la date d'effet, le nouveau est pourvu et son historique ouvert à la même date, trace d'audit
+  **stricte** `hr.employee.position_changed` (anciens et nouveaux identifiants de poste, date).
+- **Le matricule ne change jamais** : la route ne le lit ni ne l'écrit.
+- Date d'effet (défaut : aujourd'hui) : moteur `positionChangeCheck` ; elle ne précède ni l'entrée
+  (`DATE_BEFORE_START`) ni le début de l'occupation actuelle (`DATE_BEFORE_CURRENT_HOLDING`). Une date
+  future est admise (mutation enregistrée d'avance ; le poste est pourvu dès l'enregistrement).
+- Intitulé et service de la fiche : ceux demandés, sinon ceux du poste vacant choisi (service de la
+  fiche si le poste n'en a pas), sinon ceux de la fiche (nouveau poste).
+- Écran : bouton **« Changer de poste »** dans « Compte Lalanda et matricule » de la fiche
+  (`hr.manage`, fiche active qui occupe un poste).
+
+### A2. Import : service et manager
+
+- Colonne **Service** : un nom de service **actif** existant ; sinon, si l'option **« Créer les
+  services inconnus »** est cochée (`createDepartments=true` sur l'aperçu et l'application), le
+  service est créé à l'application (un par nom distinct, audit `hr.department.created`) ; sinon,
+  avertissement et fiche sans service (comportement de v1.21.0). Un nom qui désigne un service
+  **archivé** n'est jamais recréé : avertissement, sans service.
+- Colonne **Manager** : matricule ou e-mail professionnel d'un collaborateur **existant** de
+  l'organisation **ou** d'une **ligne du même fichier**. Résolution en **deux passes** (moteur
+  `resolveImportManagers`) : passe 1, chaque référence vers un existant ou une ligne ; passe 2, cycles
+  refusés par la règle existante `reportingCycle`, puis propagation (manager sur une ligne écartée →
+  ligne écartée). Erreurs ligne par ligne dans l'aperçu : manager introuvable, ambigu, plus actif,
+  soi-même, ligne du manager en erreur, cycle.
+- Application : passe 1 crée les fiches (manager existant posé à la création) ; passe 2 pose le
+  manager des lignes qui désignent une ligne du fichier, par la modification ordinaire (mêmes
+  contrôles, même audit). Le résultat dit, ligne par ligne, `manager: none | linked | not_linked`
+  (`not_linked` : la ligne du manager n'a pas pu être créée) et liste `createdDepartments`.
+
+### A3. Modèle d'import XLSX
+
+- `GET /hr/employees/import/template.xlsx` (`hr.read`) en plus du CSV : onglets « Guide » puis
+  « Collaborateurs », dates en texte `JJ/MM/AAAA`. Bibliothèque **`exceljs`**, déjà dépendance de
+  l'API et utilisée par le modèle des projets (ADR-0062) : aucune dépendance ajoutée. Le lecteur
+  `readTable` choisit déjà la première feuille qui n'est pas « Guide ».
+
+### A4. Changement d'e-mail avec invitation en attente
+
+- Quand une modification de la fiche porte `workEmail` et qu'une invitation **non acceptée, non
+  révoquée** liée à la fiche vise une **autre** adresse (ou que l'adresse est effacée), cette
+  invitation est **révoquée** (trace `hr.employee.invitation_revoked`, motif `work_email_changed`).
+  Cette révocation n'exige que `hr.manage` : elle retire un accès à une adresse qui n'est plus celle du
+  collaborateur, elle n'en donne aucun.
+- Si « Inviter sur Lalanda » est coché (`invite: true`), une nouvelle invitation part à la nouvelle
+  adresse, aux règles du § 1 (dont `members.invite`). Aucun courriel réel dans les tests.
+
+### Critères d'acceptation ajoutés
+
+10. Mutation vers un poste vacant puis vers un nouveau poste : matricule inchangé, ancien poste
+    vacant, historiques des deux postes à jour, deux traces d'audit ; poste pourvu refusé.
+11. Import avec services inconnus créés (option) et managers existants ou du fichier ; cycle refusé
+    ligne par ligne ; manager du fichier posé à l'application.
+12. Modèle XLSX téléchargeable et relu par l'aperçu.
+13. E-mail modifié avec invitation en attente : l'ancienne est révoquée, une nouvelle part si
+    « Inviter » est coché, trace d'audit.
+
+### Décisions ouvertes ajoutées
+
+5. Faut-il interdire une date d'effet future pour un changement de poste (aujourd'hui admise) ?
+6. La mutation doit-elle aussi proposer de changer le manager (aujourd'hui : modification ordinaire) ?

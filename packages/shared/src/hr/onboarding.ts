@@ -5,7 +5,7 @@
 
 import { z } from 'zod';
 
-import { HrExpectedRevision, HrId, hrFr, hrRequiredText } from './common.js';
+import { HrCalendarDay, HrExpectedRevision, HrId, hrFr, hrRequiredText } from './common.js';
 import { HR_LIMITS } from './constants.js';
 
 // ── Matricules (§ 2) ────────────────────────────────────────────────────────
@@ -249,3 +249,22 @@ export interface CountryHolidaysLoadResult {
   created: number;
   alreadyPresent: number;
 }
+
+// ── Amendement du 8 nov. 2026 : changement de poste ─────────────────────────
+
+/**
+ * `POST /hr/employees/:id/position-change` — mutation vers un poste VACANT
+ * (`replacement`) ou un poste créé (`new`). Le matricule ne change jamais.
+ * `effectiveDate` absente = aujourd'hui. `jobTitle` / `departmentId` absents : ceux
+ * du poste choisi (remplacement) ou ceux de la fiche (nouveau poste).
+ */
+export const ChangeEmployeePositionBody = z
+  .object({
+    expectedRevision: HrExpectedRevision,
+    position: EmployeePositionChoice,
+    effectiveDate: HrCalendarDay.optional(),
+    jobTitle: hrRequiredText(HR_LIMITS.jobTitle, 'Intitulé du poste').optional(),
+    departmentId: HrId.nullable().optional(),
+  })
+  .strict();
+export type ChangeEmployeePositionBody = z.output<typeof ChangeEmployeePositionBody>;

@@ -17,10 +17,12 @@ Règles de lecture :
 - **Livré** : présent dans `apps/api/src/hr/*`, `packages/engine/src/hr/*` ou
   `apps/web/src/app/(app)/rh/*` (ou un autre module cité). Une fonction seulement décrite dans un ADR
   n'est pas comptée.
-- **En cours** : deux lots menés ailleurs, **non comptés comme livrés** :
-  - **ADR-0068** — invitation à la création de la fiche, matricules jamais réutilisés, référentiel des
-    postes, import CSV des collaborateurs, jours fériés de la RDC ;
-  - **ADR-0069** — cartes de service à QR de vérification, cartes de visite.
+- **Livrés depuis la première rédaction** (8 nov. 2026) :
+  - **ADR-0068** — livré (v1.21.0) : invitation à la création de la fiche, matricules jamais
+    réutilisés, référentiel des postes, import CSV/XLSX des collaborateurs, jours fériés de la RDC ;
+    amendement du 8 nov. 2026 : changement de poste, service et manager à l'import, modèle XLSX,
+    invitation révoquée quand l'e-mail change ;
+  - **ADR-0069** — livré (v1.22.0) : cartes de service à QR de vérification, cartes de visite.
 - **Proposé** : décrit dans un ADR au statut Proposed sans code (par exemple ADR-0070, paie).
 - Priorité : **P1** (bloquant pour démarrer), **P2** (dans les trois mois), **P3** (plus tard ou
   grande entreprise).
@@ -62,21 +64,21 @@ enquêtes, signature électronique, référentiel des postes et des compétences
 |---|---|---|---|---|---|
 | 1 | Stratégie et gouvernance RH | indicateurs de base (rapports RH) ; rôles et audit | politique RH documentée, budget RH, risques humains, rapport de direction | budgets (non livrés) ; bibliothèque de documents (ADR-0046) pour les politiques | P3 |
 | 2 | Planification des effectifs | effectif actuel par service ; besoins de planning à court terme (`staffing-needs`) | plan prévisionnel des effectifs, coût prévisionnel de main-d'œuvre relié au prévisionnel BUILD | paie (ADR-0070, proposé) ; moteur financier | P3 |
-| 3 | Organisation des postes et emplois | organigramme, services, ligne hiérarchique ; intitulé de poste en **texte libre** | fiches de poste, classification et grades, pesée | **référentiel des postes (ADR-0068, en cours)** | P2 |
+| 3 | Organisation des postes et emplois | organigramme, services, ligne hiérarchique ; intitulé de poste en **texte libre** | fiches de poste, classification et grades, pesée | **référentiel des postes (ADR-0068, livré (v1.21.0))** | P2 |
 
 ### B. Acquisition et intégration des talents
 
 | # | Domaine | Couvert aujourd'hui | Manque | Dépend de | Priorité |
 |---|---|---|---|---|---|
 | 4 | Recrutement et sélection | **rien** | demandes, offres, candidatures, entretiens, offre d'embauche, passage du candidat à la fiche | référentiel des postes (ADR-0068) ; formulaire public (motif d'ADR-0048) ; ADR à écrire | P2 |
-| 5 | Intégration (onboarding) | liste d'entrée, documents d'accueil, équipements affectés, fin de période d'essai rappelée, objectifs | création du matricule garanti unique dans le temps, invitation au compte à la création, signature du contrat | **ADR-0068 (en cours)** pour matricule et invitation ; signature électronique : aucun ADR | P1 (matricule, invitation) |
+| 5 | Intégration (onboarding) | liste d'entrée, documents d'accueil, équipements affectés, fin de période d'essai rappelée, objectifs | création du matricule garanti unique dans le temps, invitation au compte à la création, signature du contrat | **ADR-0068, livré (v1.21.0)** pour matricule et invitation ; signature électronique : aucun ADR | P1 (matricule, invitation) |
 
 ### C. Administration et opérations RH
 
 | # | Domaine | Couvert aujourd'hui | Manque | Dépend de | Priorité |
 |---|---|---|---|---|---|
-| 6 | Administration du personnel | dossier, pièces, données sensibles, échéances CDD et essai, export du registre, anonymisation | attestations et certificats de travail générés, avenants modèles, historique des promotions et mutations, personnes à charge, **import en masse** | **import CSV (ADR-0068, en cours)** ; modèles de documents ; personnes à charge : section sensible nouvelle (ADR-0070 § 4.5) | P1 (import, attestation) |
-| 7 | Présences et temps de travail | pointage simple, corrections, retards, plannings, feuille de temps des projets | heures supplémentaires, télétravail, astreintes, contrôle des repos ; **jours fériés RDC** | jours fériés (ADR-0068, en cours) ; durée légale : question au juriste (ADR-0051 J3) ; ADR-0070 § 5.2 | P2 |
+| 6 | Administration du personnel | dossier, pièces, données sensibles, échéances CDD et essai, export du registre, anonymisation | attestations et certificats de travail générés, avenants modèles, historique des promotions et mutations, personnes à charge, **import en masse** | **import CSV (ADR-0068, livré (v1.21.0))** ; modèles de documents ; personnes à charge : section sensible nouvelle (ADR-0070 § 4.5) | P1 (import, attestation) |
+| 7 | Présences et temps de travail | pointage simple, corrections, retards, plannings, feuille de temps des projets | heures supplémentaires, télétravail, astreintes, contrôle des repos ; **jours fériés RDC** | jours fériés (ADR-0068, livré (v1.21.0)) ; durée légale : question au juriste (ADR-0051 J3) ; ADR-0070 § 5.2 | P2 |
 | 8 | Congés et absences | types paramétrés, demandes, validation, soldes, acquisition, calendrier, justificatifs, absentéisme | droits légaux préremplis (aucun, par principe), planning annuel des congés, remplacement | jours fériés (ADR-0068) ; Country Pack sourcé pour les droits | P1 (jours fériés) |
 | 9 | Gestion de la paie | **rien** (exclue par ADR-0045, ADR-0051, ADR-0054 D6) ; avances sur salaire sans retenue calculée | tout le domaine | **ADR-0070 (proposé)** ; expert-comptable ; ADR-0068 | P1 |
 | 10 | Rémunération et avantages | salaire de base déclaré, chiffré, historisé | grilles, primes, avantages, allocations familiales, assurance santé, équité salariale | ADR-0070 ; question au juriste (allocations familiales, P-J3) | P2 |
@@ -87,8 +89,8 @@ enquêtes, signature électronique, référentiel des postes et des compétences
 |---|---|---|---|---|---|
 | 11 | Formation et compétences | **rien** (le diplôme est une catégorie de document) | besoins, plan, sessions, présences, évaluation, obligations réglementaires | référentiel des postes et des compétences ; INPP (financement) ; ADR à écrire | P3 |
 | 12 | Gestion de la performance | objectifs individuels, cycles, auto-évaluation et évaluation manager, partage, accusé | objectifs d'équipe, 360°, plans d'amélioration, lien à la rémunération | paie (ADR-0070) pour le lien rémunération | P3 |
-| 13 | Carrières et mobilité | changement de poste, de service ou de manager par modification de la fiche (audit) | historique de carrière lisible, demandes de mutation | référentiel des postes (ADR-0068) | P3 |
-| 14 | Talents et succession | **rien** | 9-box, plans de succession, postes critiques | évaluations (livré), postes (en cours) | P3 |
+| 13 | Carrières et mobilité | changement de poste, de service ou de manager par modification de la fiche (audit) | historique de carrière lisible, demandes de mutation | référentiel des postes (ADR-0068, livré (v1.21.0)) ; « Changer de poste » avec historique des titulaires (amendement du 8 nov. 2026) | P3 |
+| 14 | Talents et succession | **rien** | 9-box, plans de succession, postes critiques | évaluations (livré), postes (ADR-0068, livré (v1.21.0)) | P3 |
 
 ### E. Relations sociales et conformité
 
@@ -107,17 +109,18 @@ enquêtes, signature électronique, référentiel des postes et des compétences
 |---|---|---|---|---|---|
 | 21 | Mobilité internationale | pièces d'identité et titres de séjour avec expiration rappelée | dossiers d'expatriation, permis de travail suivis, fiscalité des expatriés | ADR-0070 (P-C13) | P3 |
 | 22 | Départs (offboarding) | sortie avec catégorie, liste de départ, annulation des absences futures, reprise des équipements, analyse des sorties | retrait d'accès **automatique** (proposé seulement), solde de tout compte, certificat de travail | paie (ADR-0070, lot ultérieur) ; modèles de documents | P2 |
-| 23 | SIRH | rôles, permissions par membre, circuits de validation, notifications, dossiers numériques, règles de congés, pointage configurable, audit | intégration paie, signature électronique, import en masse | ADR-0068 (import, en cours) ; ADR-0070 | P1 (import) |
+| 23 | SIRH | rôles, permissions par membre, circuits de validation, notifications, dossiers numériques, règles de congés, pointage configurable, audit | intégration paie, signature électronique, import en masse | ADR-0068 (import, livré en v1.21.0) ; ADR-0070 | P1 (import) |
 | 24 | Reporting et analytique | effectif, mouvements, taux de sortie, absentéisme, ancienneté, échéances | masse salariale, coûts de recrutement et de formation, pyramide des âges (la date de naissance est sensible et non exploitée, par minimisation) | paie (ADR-0070) ; recrutement ; formation | P2 |
 | 25 | Audit et amélioration continue | journal d'audit strict sur les données sensibles, `reveal` limité | revue de conformité des dossiers (pièces manquantes, expirées), suivi d'actions correctives | rapports (livré) | P2 |
 
-### Lots en cours, rappel
+### Lots livrés depuis, rappel
 
-- **ADR-0068** touche les domaines 3, 5, 6, 7, 8 et 23. Tant qu'il n'est pas fusionné : pas de
-  matricule garanti non réutilisé, poste en texte libre, saisie une par une, jours fériés à saisir à
-  la main.
-- **ADR-0069** touche les domaines 5 (remise de la carte à l'entrée), 20 et 22 (carte invalidée à la
-  sortie par sa vérification QR). Rien n'en est livré.
+- **ADR-0068**, livré (v1.21.0), touche les domaines 3, 5, 6, 7, 8, 13 et 23 : matricule jamais
+  réutilisé, référentiel des postes, import en masse, jours fériés proposés « à vérifier » ;
+  l'amendement du 8 nov. 2026 ajoute le changement de poste (domaine 13) et le service et le manager
+  à l'import.
+- **ADR-0069**, livré (v1.22.0), touche les domaines 5 (remise de la carte à l'entrée), 20 et 22
+  (carte invalidée à la sortie par sa vérification QR).
 
 ## 3. Les cinq manques les plus importants pour une PME congolaise qui démarre lundi
 
@@ -125,10 +128,10 @@ enquêtes, signature électronique, référentiel des postes et des compétences
    elle calcule ailleurs et ressaisit. Voie proposée : ADR-0070, lot P0 puis P2 (export des éléments
    variables), simulation ensuite, réel après relecture de l'expert-comptable.
 2. **Import des collaborateurs et matricules stables** (domaines 5, 6, 23) : saisir trente fiches une
-   par une décourage ; un matricule réutilisé fausse la CNSS et les bulletins. Voie : ADR-0068 (en
-   cours).
+   par une décourage ; un matricule réutilisé fausse la CNSS et les bulletins. Voie : ADR-0068, livré
+   (v1.21.0).
 3. **Jours fériés de la RDC** (domaines 7, 8) : la liste vide fausse les décomptes d'absence dès le
-   premier congé. Voie : ADR-0068 (en cours), sourcé et daté.
+   premier congé. Voie : ADR-0068, livré (v1.21.0), sourcé et daté.
 4. **Documents générés** (domaines 6, 22) : attestation de travail, certificat de travail, contrat et
    avenant depuis un modèle. Aucun ADR ; à cadrer après ADR-0068.
 5. **Retrait des accès à la sortie et discipline tracée** (domaines 16, 22) : aujourd'hui la sortie
@@ -195,7 +198,7 @@ cours ou proposé, cité.
 | A.6.2 Termes et conditions du contrat de travail | contrat et avenants en documents RH | contrats générés depuis un modèle, signature (manque n° 4) |
 | A.6.3 Sensibilisation, enseignement et formation à la sécurité de l'information | — | accusé de lecture, formation (domaines 11, 20) |
 | A.6.4 Processus disciplinaire | — | domaine 16 (aucun ADR) |
-| A.6.5 Responsabilités consécutives à la fin ou à la modification du contrat de travail | liste de départ, reprise des équipements, annulation des absences futures ; retrait d'accès proposé | retrait d'accès imposé ou tracé (manque n° 5) ; carte de service invalidée (ADR-0069, en cours) |
+| A.6.5 Responsabilités consécutives à la fin ou à la modification du contrat de travail | liste de départ, reprise des équipements, annulation des absences futures ; retrait d'accès proposé | retrait d'accès imposé ou tracé (manque n° 5) ; carte de service invalidée (ADR-0069, livré (v1.22.0)) |
 | A.6.6 Accords de confidentialité ou de non-divulgation | dépôt du document signé (catégorie « autre ») | catégorie dédiée et rappel d'expiration |
 | A.6.7 Travail à distance | — | télétravail (domaine 7) |
 | A.6.8 Déclaration des événements liés à la sécurité de l'information | — (hors RH) | — |

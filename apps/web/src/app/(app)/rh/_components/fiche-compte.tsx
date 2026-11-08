@@ -14,7 +14,13 @@ import { LIBELLES_INVITATION, hrLot1Api, type EmployeeAccountView } from '@/lib/
 import { Alerte, BOUTON_PETIT, CHAMP, Champ } from '../../ventes/_components/form-ui';
 
 import { useFiche } from './fiche-chrome';
-import { libelleEtatCompte, peutCorrigerMatricule, peutInviterSurLalanda } from './lot1-model';
+import { ChangementPoste } from './fiche-poste';
+import {
+  libelleEtatCompte,
+  peutChangerDePoste,
+  peutCorrigerMatricule,
+  peutInviterSurLalanda,
+} from './lot1-model';
 import { useAccesRh } from './rh-access';
 import { formatJour, messageRh, peutGererRh } from './rh-model';
 import { Chargement, Panneau } from './rh-ui';
@@ -30,6 +36,9 @@ export function FicheCompte(): React.ReactElement | null {
   const [erreur, setErreur] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
   const [correction, setCorrection] = useState(false);
+  // Amendement du 8 nov. 2026 : changement de poste.
+  const changerPoste = gerer && peutChangerDePoste(actions, fiche);
+  const [mutation, setMutation] = useState(false);
 
   const relire = useCallback(() => {
     hrLot1Api
@@ -67,6 +76,16 @@ export function FicheCompte(): React.ReactElement | null {
               <span className="text-xs text-[var(--foreground-muted)]">· Poste</span>
               <span className="font-medium">{fiche.positionNumber}</span>
             </>
+          ) : null}
+          {changerPoste ? (
+            <button
+              type="button"
+              className={BOUTON_PETIT}
+              aria-haspopup="dialog"
+              onClick={() => setMutation(true)}
+            >
+              Changer de poste
+            </button>
           ) : null}
           {gerer && fiche.employeeNumber === null ? (
             <button
@@ -193,6 +212,21 @@ export function FicheCompte(): React.ReactElement | null {
           onAnnuler={() => setCorrection(false)}
           onFait={(msg) => {
             setCorrection(false);
+            setMessage(msg);
+          }}
+        />
+      </Modal>
+      <Modal
+        open={changerPoste && mutation}
+        onClose={() => setMutation(false)}
+        title="Changer de poste"
+        description="Mutation vers un poste vacant ou un nouveau poste. L’ancien poste redevient vacant ; l’historique des titulaires est conservé."
+        size="sm"
+      >
+        <ChangementPoste
+          onAnnuler={() => setMutation(false)}
+          onFait={(msg) => {
+            setMutation(false);
             setMessage(msg);
           }}
         />
