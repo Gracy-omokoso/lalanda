@@ -4,10 +4,10 @@
 // totaux du mois par catégorie (moteur), dépenses récurrentes et échéances à
 // confirmer. Fonctionne SANS projet ni plan : RUN est utilisable seul.
 
-import { Modal, buttonClasses } from '@lalanda/ui';
+import { Modal, StatusPill, buttonClasses } from '@lalanda/ui';
 import { Plus } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import {
   codeOf,
@@ -15,13 +15,27 @@ import {
   treasuryApi,
   type DueOccurrence,
   type ExpenseCategoryView,
-  type ExpenseSummary,
   type ExpenseView,
   type RecurrenceFrequency,
   type RecurringExpenseView,
   type TreasuryAccountView,
   type TreasuryCurrency,
 } from '@/lib/treasury-api';
+
+import {
+  BOUTON_LIGNE,
+  BOUTON_PRINCIPAL,
+  CHAMP_COMPACT,
+  EnTeteEcran,
+  IconePlus,
+  OngletsStatut,
+  RechercheListe,
+  SelecteurDevise,
+} from '@/components/tableau-de-bord/briques';
+import { contient, nombre } from '@/components/tableau-de-bord/format';
+import { TableauChiffres } from '@/components/tableau-de-bord/tableau';
+import { useTableau } from '@/components/tableau-de-bord/use-tableau';
+import { runStatsApi } from '@/lib/api-run-stats';
 
 import { lireMontantSaisi } from '../../ventes/_components/sales-model';
 import { Bandeau, Section, useAccesTresorerie } from '../_components/treasury-access';
@@ -44,6 +58,15 @@ import {
   libelleDate,
   libelleMois,
 } from '../_components/treasury-model';
+import {
+  ONGLETS_DEPENSES,
+  barresCategoriesDepenses,
+  cartesDepenses,
+  compteursDepenses,
+  noteDepenses,
+  statutDepense,
+  type OngletDepenses,
+} from '../_components/tableau-tresorerie-model';
 
 const CHAMP =
   'w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)] disabled:opacity-60';
@@ -97,7 +120,10 @@ export default function DepensesPage(): React.ReactElement {
   const [mois, setMois] = useState(moisCourant());
   const [filtreCategorie, setFiltreCategorie] = useState('');
   const [depenses, setDepenses] = useState<ExpenseView[]>([]);
-  const [synthese, setSynthese] = useState<ExpenseSummary | null>(null);
+  const [statut, setStatut] = useState<OngletDepenses>('recorded');
+  const [q, setQ] = useState('');
+  const [devise, setDevise] = useState<TreasuryCurrency | null>(null);
+  const [rev, setRev] = useState(0);
   const [regles, setRegles] = useState<RecurringExpenseView[]>([]);
   const [echeances, setEcheances] = useState<DueOccurrence[]>([]);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -114,26 +140,25 @@ export default function DepensesPage(): React.ReactElement {
     try {
       const from = `${mois}-01`;
       const to = finDeMois(mois);
-      const [liste, somme, r, e] = await Promise.all([
+      const [liste, r, e] = await Promise.all([
         treasuryApi.listExpenses({
           from,
           to,
           category: filtreCategorie || undefined,
-          status: 'all',
+          status: statut,
           limit: 200,
         }),
-        treasuryApi.expenseSummary({ from, to }),
         treasuryApi.listRecurring(),
         treasuryApi.dueOccurrences(),
       ]);
       setDepenses(liste.items);
-      setSynthese(somme);
+      setRev((v) => v + 1);
       setRegles(r.items);
       setEcheances(e.items);
     } catch (err) {
       setErreur(messageOf(err));
     }
-  }, [mois, filtreCategorie]);
+  }, [mois, filtreCategorie, statut]);
 
   useEffect(() => {
     void treasuryApi
@@ -160,11 +185,18 @@ export default function DepensesPage(): React.ReactElement {
   }, [form.supplierName]);
   useEffect(() => () => (apercu ? URL.revokeObjectURL(apercu.url) : undefined), [apercu]);
 
-  const libelleCategorie = useMemo(
-    () => new Map(categories.map((c) => [c.code, c.label])),
-    [categories],
-  );
   const comptesDevise = comptes.filter((c) => c.currency === form.currency);
+
+  // ADR-0071 : chiffres du moteur ; les compteurs des onglets portent sur le mois
+  // affiché. Relus après chaque enregistrement (`rev`). Un échec ne bloque rien.
+  const {
+    stats,
+    etat: etatStats,
+    reessayer,
+  } = useTableau(() => runStatsApi.expenses(mois), `${mois}-${rev}`);
+  const bloc = stats
+    ? (stats.byCurrency.find((c) => c.currency === devise) ?? stats.byCurrency[0] ?? null)
+    : null;
 
   async function enregistrer(e: React.FormEvent): Promise<void> {
     e.preventDefault();
@@ -265,25 +297,149 @@ export default function DepensesPage(): React.ReactElement {
     }
   }
 
-  const totauxParCategorie = (synthese?.byMonth ?? []).filter((r) => r.month === mois);
+  const visibles = depenses.filter((d) => contient([d.label, d.supplierName, d.reference], q));
+
+  // ADR-0051 — H16 et ADR-0044 : marques des dépenses possédées (note de frais,
+  // paiement fournisseur), récurrence ; inchangées.
+  function mentions(d: ExpenseView): React.ReactElement | null {
+    const paiement = lienPaiement(d);
+    const noteFrais = lienNoteFrais(d);
+    if (!d.supplierName && !d.recurringExpenseId && !noteFrais && !paiement) return null;
+    return (
+      <span className="block text-xs text-[var(--foreground-muted)]">
+        {d.supplierName ? <span className="block truncate">{d.supplierName}</span> : null}
+        {d.recurringExpenseId ? <span className="block">Échéance récurrente</span> : null}
+        {noteFrais ? (
+          <span className="block">
+            <span className="mr-1 inline-flex items-center rounded-full border border-[var(--border)] px-2 py-0.5 text-[0.7rem] font-medium">
+              {MARQUE_NOTE_DE_FRAIS}
+            </span>
+            {MENTION_POSSEDEE_RH}{' '}
+            {d.origin?.kind === 'expense_report' && d.origin.settledByAdvanceId
+              ? `${MENTION_SOLDEE_PAR_AVANCE} `
+              : null}
+            <Link href={noteFrais.href} className="underline underline-offset-2">
+              {noteFrais.libelle}
+            </Link>
+          </span>
+        ) : null}
+        {paiement ? (
+          <span className="block">
+            {MENTION_POSSEDEE}{' '}
+            <Link href={paiement.href} className="underline underline-offset-2">
+              {paiement.libelle}
+            </Link>
+          </span>
+        ) : null}
+      </span>
+    );
+  }
+
+  function gestesLigne(d: ExpenseView): React.ReactElement {
+    const gestes = gestesTresorerie(d, gerer);
+    const paiement = lienPaiement(d);
+    return (
+      <span className="inline-flex flex-wrap justify-end gap-1.5">
+        {d.attachment ? (
+          <button type="button" className={BOUTON_LIGNE} onClick={() => void voir(d)}>
+            Pièce
+          </button>
+        ) : gestes.joindre ? (
+          <label className={`${BOUTON_LIGNE} cursor-pointer`}>
+            Joindre
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="sr-only"
+              onChange={(e) => void joindre(d, e.target.files?.[0])}
+            />
+          </label>
+        ) : null}
+        {gestes.annuler ? (
+          <button type="button" className={BOUTON_LIGNE} onClick={() => void annuler(d)}>
+            Annuler
+          </button>
+        ) : paiement && d.status !== 'cancelled' ? (
+          <span className="text-xs text-[var(--foreground-muted)]">Lecture seule</span>
+        ) : null}
+      </span>
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-6">
-      {gerer ? (
-        <div className="flex justify-end">
-          <button
-            type="button"
-            className={buttonClasses('primary', 'md')}
-            onClick={() => {
-              setErreurCreation(null);
-              setCreation(true);
-            }}
-          >
-            <Plus aria-hidden="true" className="h-4 w-4" />
-            Nouvelle dépense
-          </button>
-        </div>
-      ) : null}
+    <div aria-labelledby="dep-titre" className="flex min-w-0 flex-col gap-3.5">
+      <EnTeteEcran
+        id="dep-titre"
+        titre="Dépenses"
+        sousTitre="Ce qui est sorti de vos comptes, avec sa pièce justificative."
+        detail="Montant réellement payé ; fonctionne sans projet ni plan. Les dépenses récurrentes prévoient, elles ne paient rien."
+        action={
+          gerer ? (
+            <button
+              type="button"
+              className={BOUTON_PRINCIPAL}
+              onClick={() => {
+                setErreurCreation(null);
+                setCreation(true);
+              }}
+            >
+              <IconePlus />
+              Nouvelle dépense
+            </button>
+          ) : null
+        }
+      />
+
+      <TableauChiffres
+        etat={etatStats}
+        libelle="Chiffres des dépenses"
+        texteErreur="Les chiffres des dépenses sont momentanément indisponibles. La liste reste à jour."
+        onReessayer={reessayer}
+        outils={
+          stats && bloc ? (
+            <SelecteurDevise
+              devises={stats.byCurrency.map((c) => c.currency)}
+              valeur={bloc.currency}
+              onChange={setDevise}
+            />
+          ) : null
+        }
+        cartes={stats && bloc ? cartesDepenses(stats, bloc) : stats ? [] : null}
+        vide={
+          stats && !bloc
+            ? {
+                titre: 'Pas encore de dépense',
+                texte:
+                  'Enregistrez ce que vous payez (loyer, transport, fournitures…) : la courbe des 12 derniers mois et la répartition par catégorie apparaîtront ici.',
+              }
+            : null
+        }
+        courbe={
+          bloc
+            ? {
+                titre: 'Dépensé, 12 derniers mois',
+                nom: `Dépenses enregistrées par mois, en ${bloc.currency}`,
+                mois: bloc.months.map((m) => m.month),
+                valeurs: bloc.months.map((m) => nombre(m.amount)),
+                serie: 'Dépensé',
+                unite: bloc.currency,
+              }
+            : null
+        }
+        repartition={
+          bloc
+            ? {
+                titre: 'Par catégorie, ce mois',
+                nom: `Dépenses du mois en cours par catégorie, en ${bloc.currency}`,
+                barres: barresCategoriesDepenses(bloc),
+                vide: 'Aucune dépense ce mois.',
+                couleur: 3,
+              }
+            : null
+        }
+        note={stats && bloc ? noteDepenses(stats, bloc.currency) : null}
+      />
+
       {erreur ? <Bandeau ton="erreur">{erreur}</Bandeau> : null}
       {info ? <Bandeau>{info}</Bandeau> : null}
 
@@ -467,20 +623,35 @@ export default function DepensesPage(): React.ReactElement {
         </div>
       </Modal>
 
-      <Section
-        titre={`Dépenses de ${libelleMois(mois)}`}
-        actions={
-          <div className="flex flex-wrap gap-2">
+      <section
+        aria-label={`Dépenses de ${libelleMois(mois)}`}
+        className="flex min-w-0 flex-col overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)]"
+      >
+        <div className="flex flex-col gap-2 border-b border-[var(--border)] p-2 sm:px-3 lg:flex-row lg:items-center lg:gap-3">
+          <OngletsStatut
+            options={ONGLETS_DEPENSES}
+            valeur={statut}
+            compteurs={stats && stats.listMonth === mois ? compteursDepenses(stats) : null}
+            onChange={setStatut}
+          />
+          <div className="flex min-w-0 flex-1 flex-wrap gap-2">
+            <RechercheListe
+              id="dep-q"
+              label="Rechercher une dépense"
+              valeur={q}
+              onChange={setQ}
+              placeholder="Libellé, fournisseur ou référence"
+            />
             <input
               type="month"
               aria-label="Mois"
-              className={CHAMP + ' w-40'}
+              className={`${CHAMP_COMPACT} w-[9.5rem] shrink-0`}
               value={mois}
               onChange={(e) => setMois(e.target.value || moisCourant())}
             />
             <select
               aria-label="Catégorie"
-              className={CHAMP + ' w-56'}
+              className={`${CHAMP_COMPACT} min-w-0 max-w-full shrink sm:w-52`}
               value={filtreCategorie}
               onChange={(e) => setFiltreCategorie(e.target.value)}
             >
@@ -492,130 +663,104 @@ export default function DepensesPage(): React.ReactElement {
               ))}
             </select>
           </div>
-        }
-      >
-        {totauxParCategorie.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
-            {totauxParCategorie.map((t) => (
-              <span
-                key={`${t.currency}-${t.category}`}
-                className="rounded-full border border-[var(--border)] px-3 py-1 text-xs"
-              >
-                {libelleCategorie.get(t.category) ?? t.category} :{' '}
-                <span className="tabular-nums font-medium">
-                  {formatMontantSigne(t.total, t.currency)}
-                </span>
-              </span>
-            ))}
-          </div>
-        ) : null}
-        {depenses.length === 0 ? (
-          <p className="text-sm text-[var(--foreground-muted)]">Aucune dépense ce mois-ci.</p>
+        </div>
+        {visibles.length === 0 ? (
+          <p className="px-4 py-10 text-center text-sm text-[var(--foreground-muted)]">
+            {q.trim() !== '' || filtreCategorie !== '' || statut !== 'recorded'
+              ? 'Aucune dépense ne correspond à ces critères.'
+              : `Aucune dépense en ${libelleMois(mois)}.`}
+          </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase text-[var(--foreground-muted)]">
-                <tr>
-                  <th className="py-2 pr-3">Date</th>
-                  <th className="py-2 pr-3">Libellé</th>
-                  <th className="py-2 pr-3">Catégorie</th>
-                  <th className="py-2 pr-3 text-right">Montant</th>
-                  <th className="py-2 pr-3">Pièce</th>
-                  <th className="py-2" />
+          <>
+            <table className="hidden w-full table-fixed border-collapse text-[13px] md:table">
+              <caption className="sr-only">Dépenses de {libelleMois(mois)}</caption>
+              <colgroup>
+                <col className="w-[96px]" />
+                <col />
+                <col className="w-[190px]" />
+                <col className="w-[140px]" />
+                <col className="w-[130px]" />
+                <col className="w-[150px]" />
+              </colgroup>
+              <thead>
+                <tr className="border-b border-[var(--border)] bg-[var(--surface-muted)] text-left text-xs font-medium text-[var(--foreground-muted)]">
+                  <th scope="col" className="px-4 py-[7px] font-medium">
+                    Date
+                  </th>
+                  <th scope="col" className="px-2 py-[7px] font-medium">
+                    Libellé
+                  </th>
+                  <th scope="col" className="px-2 py-[7px] font-medium">
+                    Catégorie
+                  </th>
+                  <th scope="col" className="px-2 py-[7px] text-right font-medium">
+                    Montant payé
+                  </th>
+                  <th scope="col" className="py-[7px] pl-4 pr-2 font-medium">
+                    Statut
+                  </th>
+                  <th scope="col" className="px-4 py-[7px] font-medium">
+                    <span className="sr-only">Actions</span>
+                  </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[var(--border)]">
-                {depenses.map((d) => {
-                  const gestes = gestesTresorerie(d, gerer);
-                  const paiement = lienPaiement(d);
-                  // ADR-0051 — H16 : marque « Note de frais » (dépense possédée par les RH).
-                  const noteFrais = lienNoteFrais(d);
+              <tbody>
+                {visibles.map((d) => {
+                  const statutLigne = statutDepense(d);
                   return (
                     <tr
                       key={d.id}
-                      className={d.status === 'cancelled' ? 'opacity-50 line-through' : ''}
+                      className="min-h-[var(--row-h)] border-b border-[var(--border)] align-middle transition-colors duration-[var(--motion-fast)] last:border-b-0 hover:bg-[var(--surface-muted)]"
                     >
-                      <td className="py-2 pr-3 whitespace-nowrap">{libelleDate(d.spentOn)}</td>
-                      <td className="py-2 pr-3">
-                        {d.label}
-                        {d.supplierName ? (
-                          <span className="block text-xs text-[var(--foreground-muted)]">
-                            {d.supplierName}
-                          </span>
-                        ) : null}
-                        {d.recurringExpenseId ? (
-                          <span className="block text-xs text-[var(--foreground-muted)]">
-                            Échéance récurrente
-                          </span>
-                        ) : null}
-                        {noteFrais ? (
-                          <span className="block text-xs text-[var(--foreground-muted)]">
-                            <span className="mr-1 inline-flex items-center rounded-full border border-[var(--border)] px-2 py-0.5 text-[0.7rem] font-medium">
-                              {MARQUE_NOTE_DE_FRAIS}
-                            </span>
-                            {MENTION_POSSEDEE_RH}{' '}
-                            {d.origin?.kind === 'expense_report' && d.origin.settledByAdvanceId
-                              ? `${MENTION_SOLDEE_PAR_AVANCE} `
-                              : null}
-                            <Link href={noteFrais.href} className="underline underline-offset-2">
-                              {noteFrais.libelle}
-                            </Link>
-                          </span>
-                        ) : null}
-                        {paiement ? (
-                          <span className="block text-xs text-[var(--foreground-muted)]">
-                            {MENTION_POSSEDEE}{' '}
-                            <Link href={paiement.href} className="underline underline-offset-2">
-                              {paiement.libelle}
-                            </Link>
-                          </span>
-                        ) : null}
+                      <td className="px-4 py-1.5 whitespace-nowrap text-[var(--foreground-muted)]">
+                        {libelleDate(d.spentOn)}
                       </td>
-                      <td className="py-2 pr-3">{d.categoryLabel}</td>
-                      <td className="py-2 pr-3 text-right tabular-nums whitespace-nowrap">
+                      <td className="px-2 py-1.5">
+                        <span className="block truncate font-medium">{d.label}</span>
+                        {mentions(d)}
+                      </td>
+                      <td className="truncate px-2 py-1.5 text-[var(--foreground-muted)]">
+                        {d.categoryLabel}
+                      </td>
+                      <td className="truncate px-2 py-1.5 text-right font-mono tabular-nums">
                         {formatMontantSigne(d.amount, d.currency)}
                       </td>
-                      <td className="py-2 pr-3">
-                        {d.attachment ? (
-                          <button type="button" className={PETIT} onClick={() => void voir(d)}>
-                            Voir
-                          </button>
-                        ) : gestes.joindre ? (
-                          <label className={PETIT + ' cursor-pointer'}>
-                            Joindre
-                            <input
-                              type="file"
-                              accept="image/png,image/jpeg,image/webp"
-                              className="sr-only"
-                              onChange={(e) => void joindre(d, e.target.files?.[0])}
-                            />
-                          </label>
-                        ) : (
-                          <span className="text-xs text-[var(--foreground-muted)]">—</span>
-                        )}
+                      <td className="py-1.5 pl-4 pr-2">
+                        <StatusPill tone={statutLigne.ton}>{statutLigne.label}</StatusPill>
                       </td>
-                      <td className="py-2 text-right">
-                        {gestes.annuler ? (
-                          <button type="button" className={PETIT} onClick={() => void annuler(d)}>
-                            Annuler
-                          </button>
-                        ) : d.status === 'cancelled' ? (
-                          <span className="text-xs">Annulée</span>
-                        ) : paiement ? (
-                          <span className="text-xs text-[var(--foreground-muted)]">
-                            Lecture seule
-                          </span>
-                        ) : null}
-                      </td>
+                      <td className="px-4 py-1.5 text-right">{gestesLigne(d)}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-          </div>
+            <ul className="divide-y divide-[var(--border)] md:hidden">
+              {visibles.map((d) => {
+                const statutLigne = statutDepense(d);
+                return (
+                  <li key={d.id} className="flex flex-col gap-1 px-3 py-2.5">
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="truncate text-sm font-medium">{d.label}</span>
+                      <StatusPill tone={statutLigne.ton}>{statutLigne.label}</StatusPill>
+                    </span>
+                    <span className="flex items-center justify-between gap-2 text-xs text-[var(--foreground-muted)]">
+                      <span className="truncate">
+                        {libelleDate(d.spentOn)} · {d.categoryLabel}
+                      </span>
+                      <span className="shrink-0 font-mono text-[13px] text-[var(--foreground)]">
+                        {formatMontantSigne(d.amount, d.currency)}
+                      </span>
+                    </span>
+                    {mentions(d)}
+                    <span className="flex flex-wrap justify-end gap-2">{gestesLigne(d)}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
         )}
         {apercu ? (
-          <figure className="flex flex-col items-start gap-2">
+          <figure className="flex flex-col items-start gap-2 border-t border-[var(--border)] p-3">
             {/* Octets assainis par l'API, servis en URL d'objet locale. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -628,7 +773,7 @@ export default function DepensesPage(): React.ReactElement {
             </button>
           </figure>
         ) : null}
-      </Section>
+      </section>
 
       <RecurringSection
         regles={regles}

@@ -22,6 +22,17 @@ import {
   type TreasurySettingsView,
 } from '@/lib/treasury-api';
 
+import {
+  BOUTON_PRINCIPAL,
+  EnTeteEcran,
+  IconePlus,
+  SelecteurDevise,
+} from '@/components/tableau-de-bord/briques';
+import { nombre } from '@/components/tableau-de-bord/format';
+import { TableauChiffres } from '@/components/tableau-de-bord/tableau';
+import { useTableau } from '@/components/tableau-de-bord/use-tableau';
+import { runStatsApi } from '@/lib/api-run-stats';
+
 import { lireMontantSaisi } from '../../ventes/_components/sales-model';
 import { Bandeau, Section, useAccesTresorerie } from '../_components/treasury-access';
 import {
@@ -38,6 +49,7 @@ import {
   lireMontantSigne,
   lirePourcent,
 } from '../_components/treasury-model';
+import { barresComptes, cartesComptes, noteComptes } from '../_components/tableau-tresorerie-model';
 
 const CHAMP =
   'w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)] disabled:opacity-60';
@@ -78,6 +90,8 @@ export default function ComptesPage(): React.ReactElement {
     void charger();
   }
   const [reglages, setReglages] = useState<TreasurySettingsView | null>(null);
+  const [rev, setRev] = useState(0);
+  const [deviseTableau, setDeviseTableau] = useState<TreasuryCurrency | null>(null);
 
   const charger = useCallback(async () => {
     setErreur(null);
@@ -92,6 +106,7 @@ export default function ComptesPage(): React.ReactElement {
       setPrevision(f);
       setMouvements(m.items);
       setReglages(s);
+      setRev((v) => v + 1);
     } catch (err) {
       setErreur(messageOf(err));
     }
@@ -103,25 +118,93 @@ export default function ComptesPage(): React.ReactElement {
 
   const nom = new Map((page?.items ?? []).map((a) => [a.id, a.name]));
 
+  // ADR-0071 : chiffres du moteur sur les comptes réels, relus après chaque
+  // chargement (`rev`) ; un échec ne bloque pas l'écran.
+  const {
+    stats,
+    etat: etatStats,
+    reessayer,
+  } = useTableau(() => runStatsApi.accounts(), `comptes-${rev}`);
+  const bloc = stats
+    ? (stats.byCurrency.find((c) => c.currency === deviseTableau) ?? stats.byCurrency[0] ?? null)
+    : null;
+
   return (
-    <div className="flex flex-col gap-6">
+    <div aria-labelledby="cpt-titre" className="flex min-w-0 flex-col gap-3.5">
+      <EnTeteEcran
+        id="cpt-titre"
+        titre="Comptes"
+        sousTitre="Caisse, banque et mobile money : vos soldes réels et ce qu’il vous restera."
+        detail="Les soldes partent du solde d’ouverture et de tous les mouvements enregistrés ; la prévision est une estimation, et l’écran le dit."
+        action={
+          gerer ? (
+            <button
+              type="button"
+              className={BOUTON_PRINCIPAL}
+              onClick={() => ouvrirCreation('compte')}
+            >
+              <IconePlus />
+              Nouveau compte
+            </button>
+          ) : null
+        }
+      />
+
+      <TableauChiffres
+        etat={etatStats}
+        libelle="Chiffres des comptes"
+        texteErreur="Les chiffres des comptes sont momentanément indisponibles. Les soldes ci-dessous restent à jour."
+        onReessayer={reessayer}
+        outils={
+          stats && bloc ? (
+            <SelecteurDevise
+              devises={stats.byCurrency.map((c) => c.currency)}
+              valeur={bloc.currency}
+              onChange={setDeviseTableau}
+            />
+          ) : null
+        }
+        cartes={stats && bloc ? cartesComptes(stats, bloc) : stats ? [] : null}
+        vide={
+          stats && !bloc
+            ? {
+                titre: 'Pas encore de compte',
+                texte:
+                  'Créez votre caisse, votre compte bancaire ou votre compte mobile money : le solde de fin de mois sur 12 mois et le solde par compte apparaîtront ici.',
+              }
+            : null
+        }
+        courbe={
+          bloc
+            ? {
+                titre: 'Solde de fin de mois, 12 mois',
+                nom: `Solde total des comptes actifs en fin de mois, en ${bloc.currency}`,
+                mois: bloc.months.map((m) => m.month),
+                valeurs: bloc.months.map((m) => nombre(m.closingBalance)),
+                serie: 'Solde',
+                unite: bloc.currency,
+              }
+            : null
+        }
+        repartition={
+          bloc
+            ? {
+                titre: 'Solde par compte',
+                nom: `Solde de chaque compte actif au jour, en ${bloc.currency}`,
+                barres: barresComptes(bloc),
+                vide: 'Aucun compte actif.',
+                couleur: 2,
+              }
+            : null
+        }
+        note={stats && bloc ? noteComptes(stats, bloc.currency) : null}
+      />
+
       {erreur ? <Bandeau ton="erreur">{erreur}</Bandeau> : null}
 
       <Section
         titre="Comptes et soldes"
         description={`Soldes au ${page ? libelleDate(page.asOf) : '…'}, calculés à partir du solde d’ouverture et de tous les mouvements enregistrés.`}
-        actions={
-          gerer ? (
-            <button
-              type="button"
-              className={buttonClasses('primary', 'sm')}
-              onClick={() => ouvrirCreation('compte')}
-            >
-              <Plus aria-hidden="true" className="h-4 w-4" />
-              Nouveau compte
-            </button>
-          ) : undefined
-        }
       >
         {page && page.items.length === 0 ? (
           <p className="text-sm text-[var(--foreground-muted)]">
