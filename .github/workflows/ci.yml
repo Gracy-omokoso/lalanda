@@ -91,7 +91,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          docker run -d --name lalanda-ci-mongo --restart on-failure -p 27017:27017 "$MONGO_IMAGE" \
+          docker run -d --name lalanda-ci-mongo --restart on-failure -p 127.0.0.1:27017:27017 "$MONGO_IMAGE" \
             --replSet rs0 --bind_ip_all --port 27017 --wiredTigerCacheSizeGB 1
 
           echo "Attente de la disponibilité de mongod…"
@@ -109,11 +109,14 @@ jobs:
             sleep 2
           done
 
-          # Membre déclaré sur localhost:27017 : c'est l'adresse que le runner
+          # Membre déclaré sur 127.0.0.1:27017 : c'est l'adresse que le runner
           # utilise, et `directConnection=true` évite toute redécouverte de
-          # topologie sur un hostname qu'il ne saurait pas résoudre.
+          # topologie sur un hostname qu'il ne saurait pas résoudre. IPv4 et non
+          # `localhost` : `localhost` se résolvait parfois en [::1], et ces
+          # connexions, relayées par docker-proxy, étaient coupées sous charge
+          # (« connection <monitor> to [::1]:27017 closed » sur v1.25.0).
           docker exec lalanda-ci-mongo mongosh --quiet --eval '
-            rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "localhost:27017" }] })
+            rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "127.0.0.1:27017" }] })
           '
 
           echo "Attente de l'élection du primaire…"
@@ -188,7 +191,7 @@ jobs:
           # apps/api/src/__tests__/e2e-utils.ts) et active le rapport JSON
           # consommé par l'étape de vérification suivante.
           LALANDA_REQUIRE_E2E: '1'
-          MONGODB_URI: mongodb://localhost:27017/${{ env.MONGODB_DB }}?replicaSet=rs0&directConnection=true
+          MONGODB_URI: mongodb://127.0.0.1:27017/${{ env.MONGODB_DB }}?replicaSet=rs0&directConnection=true
           MONGODB_DB: ${{ env.MONGODB_DB }}
           # Secrets FACTICES, valides uniquement pour la CI : aucun service externe
           # n'est appelé par les tests. AUTH_SECRET doit faire ≥ 32 caractères
