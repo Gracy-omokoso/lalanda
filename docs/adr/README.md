@@ -242,3 +242,9 @@ Décideurs :
   sans modification (rectificatif), écritures `payroll.*` vers ADR-0049 (compte d'attente tant que le
   pack v3 n'a pas les comptes sociaux), dépense possédée par la paie dans ADR-0034, états
   préparatoires sans dépôt ; écarts relevés dans `cd-2026`. Statut : **proposé** (7 nov. 2026).
+- [ADR-0071](ADR-0071-ecrans-achats-et-tresorerie.md) — Écrans Achats (Factures fournisseurs, À
+  payer, Commandes) et Trésorerie (Dépenses, Comptes) sur le modèle d'ADR-0067 : briques mises en
+  commun (`components/tableau-de-bord`), cinq routes `…/stats` calculées par le moteur (achats et
+  trésorerie), mêmes droits que les listes, borne de lecture 20 000, par devise et jamais converties ;
+  dû, échu, sous 7/30 jours, délai moyen de paiement, dépenses par catégorie, solde par compte.
+  Version visée 1.23.0. Statut : **proposé** (8 nov. 2026).
