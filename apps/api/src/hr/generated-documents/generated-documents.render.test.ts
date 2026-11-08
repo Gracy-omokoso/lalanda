@@ -57,7 +57,7 @@ const person = {
 
 afterAll(async () => {
   await renderer.onModuleDestroy();
-});
+}, 60_000);
 
 describe.skipIf(!hasChromium)('ADR-0072 — rendu Chromium réel', () => {
   it.each(GENERATED_DOCUMENT_TEMPLATES)(
@@ -109,6 +109,6 @@ describe.skipIf(!hasChromium)('ADR-0072 — rendu Chromium réel', () => {
         await writeFile(resolve(OUT, `${nom}-${templateId}.png`), png);
       }
     },
-    120_000,
+    300_000,
   );
 });

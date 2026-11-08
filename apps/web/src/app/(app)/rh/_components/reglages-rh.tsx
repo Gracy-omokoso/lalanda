@@ -19,6 +19,8 @@ import { Alerte, BOUTON_PETIT, CHAMP } from '../../ventes/_components/form-ui';
 import { FeriesReglages, ModelesReglages, TypesAbsenceReglages } from './reglages-listes';
 // ADR-0068 § 2 : matricules.
 import { MatriculesReglages } from './lot1-reglages';
+// ADR-0072 : attestations et certificats de travail.
+import { DocumentsGeneresReglages } from './documents-generes-reglages';
 import {
   LIBELLES_CALENDRIER_EQUIPE,
   LIBELLES_CIRCUIT,
@@ -186,6 +188,7 @@ export function ReglagesRh(): React.ReactElement {
           <FeriesReglages modifier={modifier} />
           <ModelesReglages modifier={modifier} />
           <MatriculesReglages modifier={modifier} />
+          <DocumentsGeneresReglages modifier={modifier} />
 
           <Modal
             open={modifier && edition === 'general'}
