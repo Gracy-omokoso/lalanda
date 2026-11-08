@@ -14,8 +14,9 @@ export class HrCounter {
 
   // ADR-0068 : `EMP` (matricules) et `POS` (numéros de poste), NON annuels (`year: 0`),
   // jamais décrémentés (`$inc` et `$max` seulement).
-  @Prop({ type: String, required: true, enum: ['NF', 'AV', 'EMP', 'POS'] })
-  kind!: 'NF' | 'AV' | 'EMP' | 'POS';
+  // ADR-0072 : `ATT` (attestations) et `CT` (certificats de travail), ANNUELS, `$inc` seulement.
+  @Prop({ type: String, required: true, enum: ['NF', 'AV', 'EMP', 'POS', 'ATT', 'CT'] })
+  kind!: 'NF' | 'AV' | 'EMP' | 'POS' | 'ATT' | 'CT';
 
   @Prop({ type: Number, required: true })
   year!: number;

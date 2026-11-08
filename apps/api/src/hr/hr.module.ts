@@ -121,6 +121,17 @@ import { HrEmployeeImportService } from './employees/hr-employee-import.service.
 import { HrCountryHolidaysController } from './holidays/hr-country-holidays.controller.js';
 // ADR-0069 : cartes de service (badge vérifiable) et cartes de visite.
 import { HrCardsModule } from './cards/hr-cards.module.js';
+// ADR-0072 : documents RH générés (attestation, certificat de travail).
+import { BrandingModule } from '../branding/branding.module.js';
+import { PdfModule } from '../reports/pdf.module.js';
+import {
+  HrGeneratedDocument,
+  HrGeneratedDocumentSchema,
+  HrGeneratedDocumentSettings,
+  HrGeneratedDocumentSettingsSchema,
+} from './generated-documents/generated-document.schemas.js';
+import { HrGeneratedDocumentsController } from './generated-documents/hr-generated-documents.controller.js';
+import { HrGeneratedDocumentsService } from './generated-documents/hr-generated-documents.service.js';
 
 @Module({
   imports: [
@@ -136,6 +147,9 @@ import { HrCardsModule } from './cards/hr-cards.module.js';
     HrTeamsModule,
     // ADR-0069
     HrCardsModule,
+    // ADR-0072
+    BrandingModule,
+    PdfModule,
     MongooseModule.forFeature([
       // ADR-0045 — H2 : réglages, services, fiches, données sensibles ; adhésions
       // (lien membre, destinataires de l'alerte bancaire) ; journal (débit de `reveal`).
@@ -166,6 +180,9 @@ import { HrCardsModule } from './cards/hr-cards.module.js';
       { name: HrCounter.name, schema: HrCounterSchema },
       // ADR-0068 : référentiel des postes.
       { name: Position.name, schema: PositionSchema },
+      // ADR-0072 : registre des pièces générées et réglages.
+      { name: HrGeneratedDocument.name, schema: HrGeneratedDocumentSchema },
+      { name: HrGeneratedDocumentSettings.name, schema: HrGeneratedDocumentSettingsSchema },
     ]),
   ],
   controllers: [
@@ -198,6 +215,8 @@ import { HrCardsModule } from './cards/hr-cards.module.js';
     HrEmployeeNumbersController,
     HrEmployeeImportController,
     HrCountryHolidaysController,
+    // ADR-0072
+    HrGeneratedDocumentsController,
   ],
   providers: [
     MasterKeyringProvider,
@@ -252,6 +271,8 @@ import { HrCardsModule } from './cards/hr-cards.module.js';
     HrPositionsService,
     HrEmployeeInvitationsService,
     HrEmployeeImportService,
+    // ADR-0072
+    HrGeneratedDocumentsService,
   ],
   exports: [
     // ADR-0045 — H2
