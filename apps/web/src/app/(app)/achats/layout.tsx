@@ -1,6 +1,5 @@
-import { PageHeader } from '@lalanda/ui';
-
 import { AchatsChrome } from './_components/achats-access';
+import { AchatsHeader } from './_components/achats-header';
 
 /**
  * Application Achats (module RUN) — ADR-0044 § 8, lot P7.
@@ -10,6 +9,9 @@ import { AchatsChrome } from './_components/achats-access';
  * L'en-tête et la frontière d'accès (`purchase.read`) sont communs à tous les
  * écrans, y compris ceux du lot P8 (réceptions, factures, à payer), qui
  * utilisent cette coquille sans l'écrire.
+ *
+ * ADR-0071 : Factures fournisseurs, À payer et Commandes portent leur propre
+ * en-tête compact (`AchatsHeader`).
  */
 export default function AchatsLayout({
   children,
@@ -18,12 +20,7 @@ export default function AchatsLayout({
 }): React.ReactElement {
   return (
     <section className="flex flex-col gap-5 sm:gap-6">
-      <PageHeader
-        module="run"
-        moduleLabel="Exploiter"
-        title="Achats"
-        description="Vos fournisseurs, vos demandes d’achat et leurs approbations, vos bons de commande, réceptions, factures fournisseurs et paiements. Les montants sont ceux calculés par Lalanda ; ce que vous pouvez faire dépend de vos droits."
-      />
+      <AchatsHeader />
       <AchatsChrome>{children}</AchatsChrome>
     </section>
   );
