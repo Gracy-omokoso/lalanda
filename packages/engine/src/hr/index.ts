@@ -45,3 +45,5 @@ export * from './planning.js';
 export * from './performance.js';
 // ADR-0068 — matricules et numéros de poste
 export * from './numbering.js';
+// ADR-0068, amendement du 8 nov. 2026 — changement de poste, manager à l'import
+export * from './lot1-suite.js';

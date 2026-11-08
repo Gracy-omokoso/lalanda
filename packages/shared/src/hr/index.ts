@@ -37,3 +37,5 @@ export * from './teams.js';
 export * from './onboarding.js';
 // ADR-0069 — cartes de service (badge vérifiable) et cartes de visite
 export * from './cards.js';
+// ADR-0072 — documents RH générés (attestation, certificat de travail)
+export * from './generated-documents.js';

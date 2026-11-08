@@ -8,7 +8,7 @@ Décideur : Gracy Omokoso (dirigeante de Go freelance SARLU).
 > [ADR-0067](ADR-0067-ecrans-devis-et-encaissements.md) (modèle des écrans refaits) à
 > **RUN › Achats** ([ADR-0044](ADR-0044-achats-et-fournisseurs.md)) — Factures fournisseurs,
 > À payer, Commandes — et à **RUN › Trésorerie** ([ADR-0034](ADR-0034-depenses-et-tresorerie.md))
-> — Dépenses, Comptes. Version visée : 1.23.0. Ne change **aucune** règle d'achat, de paiement, de
+> — Dépenses, Comptes. Version visée : 1.25.0. Ne change **aucune** règle d'achat, de paiement, de
 > rapprochement, de dépense ni de solde : les chiffres sont des lectures des règles existantes.
 
 ## Contexte

@@ -125,7 +125,7 @@ export function employeeViewOf(
   };
 }
 
-function keysOf(e: {
+export function keysOf(e: {
   firstName: string;
   lastName: string;
   preferredName: string | null;
@@ -436,7 +436,7 @@ export class HrEmployeesService {
     if (position && current.positionId) {
       conflict(
         'EMPLOYEE_HAS_POSITION',
-        'Ce collaborateur occupe déjà un poste : sa sortie libère le poste.',
+        'Ce collaborateur occupe déjà un poste : utilisez « Changer de poste » sur sa fiche.',
       );
     }
     if (position?.mode === 'replacement') {

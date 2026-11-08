@@ -17,6 +17,8 @@ import { useFiche } from './fiche-chrome';
 import { useAccesRh } from './rh-access';
 import { peutGererRh } from './rh-model';
 import { Panneau } from './rh-ui';
+// ADR-0072 : attestation et certificat de travail générés depuis la fiche.
+import { DocumentsGeneres } from './documents-generes';
 
 export function FicheDossier(): React.ReactElement {
   const { fiche, contrats, remplacer } = useFiche();
@@ -53,6 +55,7 @@ export function FicheDossier(): React.ReactElement {
         </dl>
       </Panneau>
       <FicheCompte />
+      <DocumentsGeneres />
       {fiche.notes ? (
         <Panneau titre="Notes" icone={NotebookPen} id="rh-fiche-notes">
           <p className="text-sm whitespace-pre-line break-words">{fiche.notes}</p>

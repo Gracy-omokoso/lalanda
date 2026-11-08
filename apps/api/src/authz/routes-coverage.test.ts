@@ -3140,6 +3140,67 @@ describe('ADR-0069 : cartes de service et cartes de visite', () => {
   });
 });
 
+// ── ADR-0072 : documents RH générés (attestation, certificat de travail) ──────
+import { HrGeneratedDocumentsController } from '../hr/generated-documents/hr-generated-documents.controller.js';
+
+const CONTROLEURS_0072 = [HrGeneratedDocumentsController];
+(CONTROLEURS as unknown[]).push(...CONTROLEURS_0072);
+TOUTES_LES_ROUTES.push(
+  ...CONTROLEURS_0072.flatMap((c) => routesDe(c as new (...args: never[]) => unknown)),
+);
+
+describe('ADR-0072 : documents RH générés', () => {
+  it('générer et prévisualiser exigent hr.manage ; registre et réglages lus avec hr.read', () => {
+    const attendu: Record<string, Action[]> = {
+      'HrGeneratedDocumentsController.getSettings': ['hr.read'],
+      'HrGeneratedDocumentsController.putSettings': ['hr.manage'],
+      'HrGeneratedDocumentsController.list': ['hr.read'],
+      'HrGeneratedDocumentsController.preview': ['hr.manage'],
+      'HrGeneratedDocumentsController.generate': ['hr.manage'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) =>
+      r.cle.startsWith('HrGeneratedDocumentsController.'),
+    );
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+      expect(SANS_PERMISSION[cle], cle).toBeUndefined();
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADR-0068, amendement du 8 nov. 2026 : changement de poste, modèle d'import XLSX
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { HrEmployeeImportTemplateController } from '../hr/employees/hr-employee-import-template.controller.js';
+import { HrPositionChangeController } from '../hr/positions/hr-position-change.controller.js';
+
+const CONTROLEURS_ADR68_SUITE = [HrPositionChangeController, HrEmployeeImportTemplateController];
+(CONTROLEURS as unknown[]).push(...CONTROLEURS_ADR68_SUITE);
+TOUTES_LES_ROUTES.push(
+  ...CONTROLEURS_ADR68_SUITE.flatMap((c) => routesDe(c as new (...args: never[]) => unknown)),
+);
+
+describe('ADR-0068, amendement du 8 nov. 2026', () => {
+  it('changer de poste exige `hr.manage` ; le modèle XLSX, `hr.read`', () => {
+    const attendu: Record<string, Action[]> = {
+      'HrPositionChangeController.change': ['hr.manage'],
+      'HrEmployeeImportTemplateController.templateXlsx': ['hr.read'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) =>
+      /^Hr(PositionChange|EmployeeImportTemplate)Controller\./.test(r.cle),
+    );
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+      expect(SANS_PERMISSION[cle], cle).toBeUndefined();
+    }
+  });
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ADR-0071 : tableaux de bord des écrans Achats et Trésorerie
 // ─────────────────────────────────────────────────────────────────────────────

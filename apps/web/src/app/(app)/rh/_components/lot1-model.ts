@@ -2,7 +2,7 @@
 // libellés de l'état du compte et des postes. Aucune règle métier : l'API reste juge.
 
 import type { OrgAction } from '@/lib/api';
-import type { EmployeeAccountView, PositionView } from '@/lib/api-hr-lot1';
+import type { EmployeeAccountView, EmployeeImportPreview, PositionView } from '@/lib/api-hr-lot1';
 
 type Actions = readonly OrgAction[] | null;
 
@@ -67,4 +67,54 @@ export function corpsPoste(
   if (choix === 'new') return { mode: 'new' };
   if (choix.startsWith('pos:')) return { mode: 'replacement', positionId: choix.slice(4) };
   return undefined;
+}
+
+// ── Amendement du 8 nov. 2026 : changement de poste ─────────────────────────
+
+/** « Changer de poste » : gestionnaire RH, fiche active qui occupe déjà un poste. */
+export const peutChangerDePoste = (
+  x: Actions,
+  fiche: { status: string; positionId?: string | null },
+): boolean => a(x, 'hr.manage') && fiche.status === 'active' && !!fiche.positionId;
+
+/**
+ * Corps de `POST /hr/employees/:id/position-change` depuis l'écran. Choix vide →
+ * `null` (rien à envoyer). Intitulé vide : celui du poste choisi ou de la fiche.
+ */
+export function corpsChangementPoste(input: {
+  expectedRevision: number;
+  choix: ChoixPoste;
+  effectiveDate: string;
+  jobTitle: string;
+}): {
+  expectedRevision: number;
+  position: { mode: 'new' } | { mode: 'replacement'; positionId: string };
+  effectiveDate?: string;
+  jobTitle?: string;
+} | null {
+  const position = corpsPoste(input.choix);
+  if (!position) return null;
+  const jobTitle = input.jobTitle.trim();
+  return {
+    expectedRevision: input.expectedRevision,
+    position,
+    ...(input.effectiveDate ? { effectiveDate: input.effectiveDate } : {}),
+    ...(jobTitle ? { jobTitle } : {}),
+  };
+}
+
+// ── Amendement du 8 nov. 2026 : manager à l'import ──────────────────────────
+
+/** Colonne « Manager » de l'aperçu : nom de l'existant, « ligne N », ou tiret. */
+export function libelleManagerImport(
+  r: Pick<EmployeeImportPreview['rows'][number], 'manager' | 'managerRef'>,
+): string {
+  switch (r.manager.kind) {
+    case 'existing':
+      return r.manager.displayName;
+    case 'row':
+      return `Ligne ${r.manager.row} du fichier`;
+    default:
+      return r.managerRef ?? '—';
+  }
 }

@@ -254,6 +254,8 @@ export const HR_DOCUMENT_CATEGORIES = [
   'leave_justification',
   'onboarding',
   'other',
+  // ADR-0072 : attestations et certificats de travail générés depuis la fiche.
+  'attestation',
 ] as const;
 export type HrDocumentCategory = (typeof HR_DOCUMENT_CATEGORIES)[number];
 
@@ -266,7 +268,7 @@ export const HR_SENSITIVE_DOCUMENT_CATEGORIES: readonly HrDocumentCategory[] = O
 
 /** Catégories visibles du collaborateur par défaut (`visibleToEmployee`). */
 export const HR_EMPLOYEE_VISIBLE_DOCUMENT_CATEGORIES: readonly HrDocumentCategory[] = Object.freeze(
-  ['contract', 'amendment', 'onboarding'],
+  ['contract', 'amendment', 'onboarding', 'attestation'],
 );
 
 // ── Listes d'entrée et de sortie (§ 2.9) ────────────────────────────────────

@@ -31,6 +31,8 @@ export const LIBELLES_CATEGORIE: Record<HrDocumentCategory, string> = {
   leave_justification: 'Justificatif d’absence',
   onboarding: 'Accueil',
   other: 'Autre',
+  // ADR-0072
+  attestation: 'Attestation / certificat',
 };
 
 /** Le lecteur peut-il déposer un document sur cette fiche ? */
