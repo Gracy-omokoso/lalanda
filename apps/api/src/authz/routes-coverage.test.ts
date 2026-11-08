@@ -3139,3 +3139,49 @@ describe('ADR-0069 : cartes de service et cartes de visite', () => {
     }
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADR-0071 : tableaux de bord des écrans Achats et Trésorerie
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { PurchasesStatsController } from '../purchases/stats/purchases-stats.controller.js';
+import { TreasuryStatsController } from '../treasury/treasury-stats.controller.js';
+
+const CONTROLEURS_0071 = [PurchasesStatsController, TreasuryStatsController];
+(CONTROLEURS as unknown[]).push(...CONTROLEURS_0071);
+TOUTES_LES_ROUTES.push(
+  ...CONTROLEURS_0071.flatMap((c) => routesDe(c as new (...args: never[]) => unknown)),
+);
+
+describe('ADR-0071 — tableaux de bord des achats et de la trésorerie', () => {
+  it('chaque tableau de bord exige le même droit que la liste de son écran', () => {
+    const attendu: Record<string, string[]> = {
+      'PurchasesStatsController.invoices': ['purchase.read'],
+      'PurchasesStatsController.payables': ['purchase.read'],
+      'PurchasesStatsController.orders': ['purchase.read'],
+      'TreasuryStatsController.expenses': ['treasury.read'],
+      'TreasuryStatsController.accounts': ['treasury.read'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter(
+      (r) =>
+        r.cle.startsWith('PurchasesStatsController.') ||
+        r.cle.startsWith('TreasuryStatsController.'),
+    );
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+      expect(SANS_PERMISSION[cle], cle).toBeUndefined();
+    }
+    // Les listes de référence portent bien ces mêmes droits.
+    for (const [liste, droit] of [
+      ['SupplierInvoicesController.list', 'purchase.read'],
+      ['SupplierPaymentsController.payables', 'purchase.read'],
+      ['PurchaseOrdersController.list', 'purchase.read'],
+      ['TreasuryExpensesController.list', 'treasury.read'],
+      ['TreasuryAccountsController.list', 'treasury.read'],
+    ] as const) {
+      expect(TOUTES_LES_ROUTES.find((r) => r.cle === liste)?.actions, liste).toEqual([droit]);
+    }
+  });
+});

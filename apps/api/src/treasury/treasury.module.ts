@@ -53,6 +53,10 @@ import {
   TreasurySettingsSchema,
 } from './treasury.schemas.js';
 
+// ADR-0071 — tableaux de bord des écrans
+import { TreasuryStatsController } from './treasury-stats.controller.js';
+import { TreasuryStatsService } from './treasury-stats.service.js';
+
 @Module({
   imports: [
     // `AuthGuard` résout l'organisation active via `OrganizationsService`.
@@ -74,8 +78,16 @@ import {
       { name: ActualPeriod.name, schema: ActualPeriodSchema },
     ]),
   ],
-  controllers: [TreasuryExpensesController, TreasuryAccountsController, TreasuryActualsController],
+  // ADR-0071 : `TreasuryStatsController` AVANT les dépenses et les comptes.
+  controllers: [
+    TreasuryStatsController,
+    TreasuryExpensesController,
+    TreasuryAccountsController,
+    TreasuryActualsController,
+  ],
   providers: [
+    // ADR-0071
+    TreasuryStatsService,
     TreasuryAccountsService,
     TreasuryExpensesService,
     TreasuryRecurringService,

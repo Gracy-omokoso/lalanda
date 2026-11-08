@@ -59,6 +59,9 @@ import { SupplierOverviewController } from './overview/supplier-overview.control
 import { SupplierOverviewService } from './overview/supplier-overview.service.js';
 import { PurchasesSummaryController } from './payables/purchases-summary.controller.js';
 import { PurchasesSummaryService } from './payables/purchases-summary.service.js';
+// ADR-0071 — tableaux de bord des écrans
+import { PurchasesStatsController } from './stats/purchases-stats.controller.js';
+import { PurchasesStatsService } from './stats/purchases-stats.service.js';
 import { PurchasesRemindersModule } from './reminders/purchases-reminders.module.js';
 
 @Module({
@@ -92,6 +95,8 @@ import { PurchasesRemindersModule } from './reminders/purchases-reminders.module
     ]),
   ],
   controllers: [
+    // ADR-0071 : AVANT les factures et les commandes (`stats` n'est pas un identifiant).
+    PurchasesStatsController,
     // ADR-0044 — P2
     PurchaseSuppliersController,
     // ADR-0044 — P3
@@ -139,6 +144,8 @@ import { PurchasesRemindersModule } from './reminders/purchases-reminders.module
     SupplierOverviewService,
     // ADR-0044 — P6 : résumé engagé, facturé, payé (moteur `purchasesSummary`).
     PurchasesSummaryService,
+    // ADR-0071
+    PurchasesStatsService,
   ],
   exports: [
     SuppliersService,

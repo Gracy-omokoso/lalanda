@@ -89,6 +89,10 @@
     "./sales-invoices": {
       "types": "./dist/sales-invoices/index.d.ts",
       "import": "./dist/sales-invoices/index.js"
+    },
+    "./treasury": {
+      "types": "./dist/treasury/index.d.ts",
+      "import": "./dist/treasury/index.js"
     }
   },
   "scripts": {
