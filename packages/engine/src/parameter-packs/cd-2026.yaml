@@ -14,7 +14,7 @@ devise_principale: USD
 devise_secondaire: CDF
 label: 'RDC — 2026'
 description: >
-  Fiscalité congolaise 2026. IBP 30 %, TVA 16 %, INSS/CNSS 5 %+5 %, INPP 2 %, ONEM 0.2 %.
+  Fiscalité congolaise 2026. IBP 30 %, TVA 16 %, CNSS 5 % salarié + 13 % employeur, INPP 3 %, ONEM 0,5 %.
   Devise principale USD, affichage secondaire CDF au taux BCC du jour de génération.
 
 # Révisions en place (docs/09 § Modèle de version, erratum) : la révision 1 est
@@ -25,10 +25,31 @@ revisions:
     date: '2026-10-18'
     objet: 'Taux réduit de TVA corrigé à 5 % (groupe C), taux de 1 % ajouté (groupe O), seuil d’assujettissement marqué à confirmer.'
     parametres: [tva_taux_reduit, tva_taux_reduit_1pct, tva_seuil_assujettissement_cdf]
+  - numero: 3
+    date: '2026-11-07'
+    objet: "Charges sociales et IRPP confirmés par l'expert-comptable : CNSS employeur 13 %, INPP par tranche d'effectif, ONEM 0,5 %, IRPP en remplacement de l'IPR (ADR-0070)."
+    parametres:
+      [
+        cnss_employeur_pct,
+        cnss_salarie_pct,
+        inpp_pct,
+        inpp_pct_51_300,
+        inpp_pct_301_plus,
+        onem_pct,
+        charges_sociales_employeur_pct_total,
+        ipr_taux_moyen_estimatif,
+        irpp_tranche_1_plafond_cdf,
+        irpp_tranche_2_plafond_cdf,
+        irpp_tranche_3_plafond_cdf,
+        irpp_taux_tranche_1,
+        irpp_taux_tranche_2,
+        irpp_taux_tranche_3,
+        irpp_taux_tranche_4,
+      ]
 
 avertissement: >
   Ce pack reflète les règles fiscales et sociales RDC connues à la date de rédaction.
-  Certains barèmes indexés sur l'inflation (IPR, plafond INSS) et les taxes locales
+  Certains barèmes indexés sur l'inflation (IRPP, plafond CNSS) et les taxes locales
   (patente communale) doivent être vérifiés auprès d'un expert-comptable OHADA agréé
   avant tout dépôt de dossier bancaire.
 
@@ -70,37 +91,74 @@ params:
     a_confirmer: true
 
   # ─── Charges sociales sur salaires ───────────────────────────
+  # Révision n° 3 (7 nov. 2026, ADR-0070) : taux confirmé par l'expert-comptable le 7 nov. 2026.
   cnss_employeur_pct:
-    valeur: 0.05
-    aide: 'INSS (ex-CNSS) — part patronale sur salaires bruts.'
-    source: 'Loi 016/2002 régime général sécurité sociale'
+    valeur: 0.13
+    aide: 'CNSS — part patronale sur salaires bruts : pensions 5 %, risques professionnels 1,5 %, prestations familiales 6,5 %.'
+    source: "Décret n° 18/041 du 24 nov. 2018 ; confirmé par l'expert-comptable le 7 nov. 2026"
   cnss_salarie_pct:
     valeur: 0.05
-    aide: 'INSS — part salariale, précomptée sur le brut.'
-    source: 'Loi 016/2002'
+    aide: 'CNSS — part salariale, précomptée sur le brut.'
+    source: "Décret n° 18/041 du 24 nov. 2018 ; confirmé par l'expert-comptable le 7 nov. 2026"
   inpp_pct:
+    valeur: 0.03
+    aide: 'INPP — contribution patronale à la formation professionnelle, entreprise de 1 à 50 salariés.'
+    source: "Loi INPP ; confirmé par l'expert-comptable le 7 nov. 2026"
+  inpp_pct_51_300:
     valeur: 0.02
-    aide: 'Institut National de Préparation Professionnelle — formation.'
-    source: 'Loi INPP'
+    aide: 'INPP — entreprise de 51 à 300 salariés.'
+    source: "Loi INPP ; confirmé par l'expert-comptable le 7 nov. 2026"
+  inpp_pct_301_plus:
+    valeur: 0.01
+    aide: 'INPP — entreprise de plus de 300 salariés.'
+    source: "Loi INPP ; confirmé par l'expert-comptable le 7 nov. 2026"
   onem_pct:
-    valeur: 0.002
-    aide: "Office National de l'Emploi."
-    source: 'Décret ONEM'
+    valeur: 0.005
+    aide: "Office National de l'Emploi — contribution patronale."
+    source: "Arrêté n° 30/CAB/MIN.ET/EAN/JDO/8/2025 (en vigueur le 5 août 2025) ; confirmé par l'expert-comptable le 7 nov. 2026"
   charges_sociales_employeur_pct_total:
-    valeur: 0.072
-    aide: 'Total charges sociales patronales = INSS 5 % + INPP 2 % + ONEM 0.2 %.'
+    valeur: 0.165
+    aide: 'Total charges sociales patronales = CNSS 13 % + INPP 3 % (1 à 50 salariés) + ONEM 0,5 %.'
+    source: "confirmé par l'expert-comptable le 7 nov. 2026"
 
-  # ─── IPR (barème progressif) ─────────────────────────────────
-  # Barème par tranches mensuelles en CDF. Modélisation simplifiée par un taux moyen
-  # constaté pour usage dans le prévisionnel — le calcul exact vient dans la feuille
-  # paie détaillée quand elle sera modélisée (S7-full).
+  # ─── IRPP (ex-IPR, barème progressif annuel) ─────────────────
+  # Depuis le 1er janv. 2026, l'IRPP remplace l'IPR (loi n° 23/053) ; barème annuel
+  # inchangé. Le prévisionnel garde un taux moyen ; le calcul exact viendra avec la
+  # paie (ADR-0070).
   ipr_taux_moyen_estimatif:
     valeur: 0.15
     aide: >
-      Taux moyen IPR appliqué en simulation. Le barème réel est progressif
-      3 % / 15 % / 30 % / 40 % par tranches mensuelles (bornes indexées inflation).
-    source: 'Code impôts RDC — voir barème détaillé DGI'
+      Taux moyen d'IRPP (ex-IPR) appliqué en simulation. Le barème réel est progressif
+      3 % / 15 % / 30 % / 40 % par tranches annuelles.
+    source: 'Loi n° 23/053 (IRPP) ; taux moyen estimatif de Lalanda, non confirmé'
     a_confirmer: true
+  irpp_tranche_1_plafond_cdf:
+    valeur: 1944000
+    unite: 'CDF par an'
+    aide: 'IRPP — plafond de la tranche à 3 %.'
+    source: "Loi n° 23/053 ; confirmé par l'expert-comptable le 7 nov. 2026"
+  irpp_tranche_2_plafond_cdf:
+    valeur: 21600000
+    unite: 'CDF par an'
+    aide: 'IRPP — plafond de la tranche à 15 %.'
+    source: "Loi n° 23/053 ; confirmé par l'expert-comptable le 7 nov. 2026"
+  irpp_tranche_3_plafond_cdf:
+    valeur: 43200000
+    unite: 'CDF par an'
+    aide: 'IRPP — plafond de la tranche à 30 % ; 40 % au-delà.'
+    source: "Loi n° 23/053 ; confirmé par l'expert-comptable le 7 nov. 2026"
+  irpp_taux_tranche_1:
+    valeur: 0.03
+    source: "Loi n° 23/053 ; confirmé par l'expert-comptable le 7 nov. 2026"
+  irpp_taux_tranche_2:
+    valeur: 0.15
+    source: "Loi n° 23/053 ; confirmé par l'expert-comptable le 7 nov. 2026"
+  irpp_taux_tranche_3:
+    valeur: 0.30
+    source: "Loi n° 23/053 ; confirmé par l'expert-comptable le 7 nov. 2026"
+  irpp_taux_tranche_4:
+    valeur: 0.40
+    source: "Loi n° 23/053 ; confirmé par l'expert-comptable le 7 nov. 2026"
 
   # ─── Précompte BIC (retenue à la source fournisseurs) ────────
   precompte_bic_non_immatricule_pct:
