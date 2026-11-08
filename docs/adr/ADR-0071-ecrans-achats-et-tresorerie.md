@@ -45,7 +45,8 @@ d'Achats et de Trésorerie, comme Ventes).
 
 Mêmes droits et même fonctionnalité que la liste de chaque écran ; organisation active ; rien n'est
 stocké ; borne de lecture **20 000 documents** par collection (`truncated: true` au-delà, chiffres
-partiels annoncés à l'écran). Le jour de référence est le jour de Kinshasa. Contrats zod partagés :
+partiels annoncés à l'écran) ; Comptes relit le grand livre de la liste des comptes, en entier, pour que
+les soldes concordent. Le jour de référence est le jour de Kinshasa. Contrats zod partagés :
 `@lalanda/shared/purchases` (`*StatsSchema`) et `@lalanda/shared/treasury`.
 
 ### 3. Devises : jamais converties

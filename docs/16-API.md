@@ -485,6 +485,24 @@ Mêmes principes que `GET /sales/invoices/stats` : `months` facultatif (1 à 24,
 
 `GET /sales/quotes` accepte `sort` : `recent` (défaut) ou `valid_until` (validité croissante) ; le curseur est propre au tri (`400 INVALID_CURSOR` sinon).
 
+## Achats et trésorerie — tableaux de bord des écrans — implémenté (ADR-0071)
+
+Lecture seule, organisation active, rien n'est stocké ; `months` facultatif (1 à 24, défaut 12), tout autre paramètre `400 INVALID_REQUEST` ; réponses `asOf` (jour de Kinshasa), `from`, `to`, `truncated` (au-delà de 20 000 documents par collection), `version` (`1.0.0`). Montants **par devise** (`byCurrency[]`, la devise la plus fournie d'abord), jamais convertis.
+
+| Méthode et chemin | Permission, fonctionnalité | Contrat, moteur |
+|---|---|---|
+| `GET /purchases/invoices/stats` | `purchase.read`, `purchases` | `SupplierInvoiceStatsSchema`, `computeSupplierInvoiceStats` |
+| `GET /purchases/payables/stats` | `purchase.read`, `purchases` | `PayablesStatsSchema`, `computePayablesStats` |
+| `GET /purchases/orders/stats` | `purchase.read`, `purchases` | `PurchaseOrderStatsSchema`, `computePurchaseOrderStats` |
+| `GET /treasury/expenses/stats?month=AAAA-MM` | `treasury.read`, `treasury` | `ExpenseStatsSchema` (`@lalanda/shared/treasury`), `computeExpenseStats` |
+| `GET /treasury/accounts/stats` | `treasury.read`, `treasury` | `AccountStatsSchema`, `computeAccountStats` |
+
+- Factures : `statusCounts` (`all`, `draft`, `variance`, `validated`, `overdue`, `disputed` : filtres de `GET /purchases/invoices`) ; par devise `months[]`, `thisMonth`, `previousMonth`, `changePercent`, `outstanding`, `overdue`, `disputed`, `drafts`, `variances`, `byCategory[]` (`label`).
+- À payer : `dueSoonDays`, `groupCounts` (`overdue`, `soon`, `later`, `disputed`) ; par devise `due`, `overdue`, `dueWithin7`, `dueWithin30`, `disputed`, payé par mois, `averageDelay` (90 j), `aging` (tranches de `payablesAging`), `topSuppliers[]` (cinq, nom de la fiche).
+- Commandes : `statusCounts` (`all`, `mine`, `draft`, `submitted`, `order` : filtres de `GET /purchases/orders`), `byStatus[]` ; par devise commandé par mois (date d'approbation, total TTC), `open`, `pendingApproval`, `averageApprovalDelay` (90 j).
+- Dépenses : `listMonth`, `statusCounts` (`recorded`, `cancelled`, `all` du mois affiché) ; par devise dépensé par mois, `thisMonth`, `previousMonth`, `changePercent`, `monthlyAverage` (mois complets), `byCategoryThisMonth[]` (`label`), `withoutAttachmentThisMonth`.
+- Comptes : par devise `balance` (= `totalsByCurrency` de `GET /treasury/accounts`), `activeAccounts`, `overdrawn`, `months[]` (`inflows`, `outflows`, `closingBalance`), `thisMonth` (`net`), `accounts[]` (nom, solde). Le grand livre est celui de la liste des comptes (`truncated` toujours `false`).
+
 ## Ventes — normalisation DGI — implémenté (S25f, ADR-0024 chantier F2)
 
 Contrat : ADR-0024 § 9. `POST …/normalize` envoie, compare et confirme d'un seul tenant ; un refus de la DGI n'est pas une erreur HTTP (200 avec l'état). La route est idempotente : une requête renvoyée (double clic, navigateur) trouve la prise en main et rend l'état courant sans rien envoyer.

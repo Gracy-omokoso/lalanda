@@ -146,6 +146,18 @@ Décision : `docs/adr/ADR-0067-ecrans-devis-et-encaissements.md`. Captures (Lala
 - **Encaissements** : cartes « Encaissé ce mois », « Vs mois précédent » (variation et montant du mois précédent), « Délai moyen d'encaissement » (90 j), « Restant dû » (rouge s'il y a du retard) ; courbe de l'encaissé sur 12 mois, barres par moyen de paiement (Mobile Money, virement, espèces…). Puis factures à encaisser (échéance, « Encaisser » qui remplit et fait défiler jusqu'au formulaire), saisie d'un encaissement, liste (onglets Enregistrés, Annulés, Tous ; recherche par facture ou référence ; annulation motivée), pont vers le réalisé.
 - Tous les chiffres viennent de `GET /sales/quotes/stats` et `GET /sales/receipts/stats` (docs/16) : l'écran n'additionne et ne convertit rien.
 
+### Écrans Achats et Trésorerie (ADR-0071)
+
+Décision : `docs/adr/ADR-0071-ecrans-achats-et-tresorerie.md` (proposé).
+
+- **Même dessin que Devis et Encaissements**, briques mises en commun dans `apps/web/src/components/tableau-de-bord/` (`briques.tsx`, `format.ts`, `tableau.tsx`, `use-tableau.ts`) ; `ventes/_components/dashboard-ui.tsx` les réexporte. En-tête compact propre sur Factures fournisseurs, À payer, Commandes, Dépenses et Comptes (plus d'en-tête d'espace « Achats » ou « Trésorerie » sur ces écrans).
+- **Une devise à la fois** : un sélecteur CDF / USD apparaît quand les deux existent ; rien n'est converti ni additionné entre devises (ADR-0034, ADR-0044).
+- **Factures fournisseurs** : « Facturé ce mois » (variation), « Reste à payer » (dont litiges), « En retard » (rouge), « À traiter » (brouillons, dont en écart) ; courbe du facturé sur 12 mois, barres par catégorie d'imputation ; onglets Toutes, Brouillons, En écart, Validées, En retard, En litige avec compteurs ; tableau Numéro, Fournisseur et référence, Échéance, Total TTC, Reste à payer, Statut.
+- **À payer** : « Dû aux fournisseurs », « Échu », « À payer sous 7 jours » (et sous 30), « Délai moyen de paiement » (90 j) ; courbe du payé, barres d'ancienneté ; onglets En retard, Sous N jours, Plus tard, En litige ; « Payer » sur chaque ligne (paiement groupé inchangé) ; doublons probables en bas.
+- **Commandes** : « Commandé ce mois », « Commandes ouvertes », « À approuver », « Délai moyen d'approbation » ; courbe des commandes approuvées, barres par statut ; onglets Toutes, Mes demandes, Brouillons, À approuver, Bons de commande.
+- **Dépenses** : « Dépensé ce mois », « Vs mois précédent », « Première catégorie du mois », « Sans pièce justificative » ; courbe sur 12 mois, barres par catégorie du mois ; onglets Enregistrées, Annulées, Toutes (compteurs du mois affiché), recherche, mois et catégorie ; échéances à confirmer et dépenses récurrentes inchangées.
+- **Comptes** : « Solde total », « Entrées du mois », « Sorties du mois », « Comptes à découvert » ; courbe du solde de fin de mois, solde par compte. L'écran rappelle que ce sont les comptes **réels** : la trésorerie mensuelle des plans BUILD est une vue simplifiée, jamais la référence. Mouvements, virements et prévision inchangés.
+
 ### Intérieur d'un projet façon Asana (ADR-0057)
 
 Décision : `docs/adr/ADR-0057-interieur-projet-facon-asana.md`. Captures : `docs/refonte-ui/v4/`.
