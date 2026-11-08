@@ -242,3 +242,11 @@ Décideurs :
   sans modification (rectificatif), écritures `payroll.*` vers ADR-0049 (compte d'attente tant que le
   pack v3 n'a pas les comptes sociaux), dépense possédée par la paie dans ADR-0034, états
   préparatoires sans dépôt ; écarts relevés dans `cd-2026`. Statut : **proposé** (7 nov. 2026).
+- [ADR-0072](ADR-0072-documents-rh-generes.md) — Documents RH générés : attestation de travail
+  (ou d'emploi) et certificat de travail depuis la fiche, trois modèles A4 aux couleurs de
+  l'identité, en-tête tiré de la fiche fiscale, signataire, lieu et date choisis à la génération,
+  numéros `ATT-AAAA-NNNN` / `CT-AAAA-NNNN` jamais réutilisés (`hr_counters`), PDF rangé dans les
+  documents RH de la fiche (chiffré s'il est sensible) avec registre et audit ; certificat limité
+  aux mentions de l'art. 79 du Code du travail (« aucune autre indication »), jamais de motif de
+  sortie ni de salaire ; points juridiques « à revoir avec le juriste ». Contrats et avenants hors
+  périmètre. Statut : **accepté** (8 nov. 2026).
