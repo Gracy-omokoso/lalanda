@@ -1,0 +1,16 @@
+{
+  "format": "lalanda.modele-carte",
+  "formatVersion": 1,
+  "contract": 1,
+  "id": "exemple.badge-ruban",
+  "name": "Ruban",
+  "description": "Carte de service horizontale : ruban de marque, photo, identité ; QR posé par Lalanda.",
+  "version": "1.0.0",
+  "kind": "badge",
+  "orientation": "horizontal",
+  "faces": ["recto", "verso"],
+  "qr": { "face": "recto", "x": 66, "y": 31.5, "size": 16 },
+  "author": { "name": "Lalanda (exemple)", "email": null, "url": null },
+  "license": "proprietary",
+  "fonts": []
+}

@@ -55,6 +55,11 @@ export interface PngRenderOptions {
   height: number;
   /** Densité (1 à 2) : 1,5 donne une vignette nette sans alourdir la réponse. */
   deviceScaleFactor?: number;
+  /**
+   * ADR-0069 : densité d'impression (300 dpi = 3,125) d'une carte. Lève le plafond
+   * de 2 pour cette capture seulement ; bornée à 3,125 (le cadre reste petit).
+   */
+  printScale?: number;
 }
 
 export interface PdfRenderOptions {
@@ -71,6 +76,11 @@ export interface PdfRenderOptions {
    */
   headerTemplate?: string;
   footerTemplate?: string;
+  /**
+   * ADR-0069 : format de page explicite (`"85.6mm"`, `"53.98mm"`) à la place de
+   * l'A4 — cartes de service et de visite.
+   */
+  size?: { width: string; height: string };
 }
 
 /** Forme PDF d'une date UTC : `D:AAAAMMJJhhmmss+00'00'` (même longueur que Chromium). */
@@ -209,9 +219,13 @@ export class PdfRenderingService implements OnModuleDestroy {
       });
       if (viewport) {
         await page.setViewport({
-          width: viewport.width,
-          height: viewport.height,
-          deviceScaleFactor: Math.min(2, Math.max(1, viewport.deviceScaleFactor ?? 1)),
+          // Le protocole exige des entiers ; la capture (`clip`) garde la taille exacte.
+          width: Math.ceil(viewport.width),
+          height: Math.ceil(viewport.height),
+          deviceScaleFactor:
+            viewport.printScale !== undefined
+              ? Math.min(3.125, Math.max(1, viewport.printScale))
+              : Math.min(2, Math.max(1, viewport.deviceScaleFactor ?? 1)),
         });
       }
       await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT_MS });
@@ -252,7 +266,7 @@ export class PdfRenderingService implements OnModuleDestroy {
       // networkidle0 était flaky avec setContent (pas de navigation → 30s timeout systématique).
       await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT_MS });
       const pdf = await page.pdf({
-        format: 'A4',
+        ...(opts.size ? { width: opts.size.width, height: opts.size.height } : { format: 'A4' }),
         printBackground: true,
         margin: opts.margin ?? { top: '0', bottom: '0', left: '0', right: '0' },
         timeout: PAGE_TIMEOUT_MS,

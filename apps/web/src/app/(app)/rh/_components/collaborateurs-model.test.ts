@@ -133,14 +133,20 @@ describe('formulaire de fiche (dossier non sensible)', () => {
 });
 
 describe('fiche', () => {
-  it('cinq onglets dans l’ordre prévu (H7 livre sensible, documents, parcours)', () => {
+  it('six onglets dans l’ordre prévu (H7 ; ADR-0069 ajoute les cartes)', () => {
     expect(ONGLETS_FICHE.map((o) => o.id)).toEqual([...ONGLETS_FICHE_PREVUS]);
   });
 
   it('onglets visibles selon les actions et la relation', () => {
     const ids = (x: Parameters<typeof ongletsVisibles>[0], soi: boolean) =>
       ongletsVisibles(x, soi).map((o) => o.id);
-    expect(ids(['hr.read'], false)).toEqual(['dossier', 'absences', 'documents', 'parcours']);
+    expect(ids(['hr.read'], false)).toEqual([
+      'dossier',
+      'absences',
+      'documents',
+      'parcours',
+      'cartes',
+    ]);
     expect(ids(['hr.read', 'hr.sensitive.read'], false)).toEqual([...ONGLETS_FICHE_PREVUS]);
     // Le manager (sans hr.read) : dossier et absences seulement.
     expect(ids(['leave.request'], false)).toEqual(['dossier', 'absences']);

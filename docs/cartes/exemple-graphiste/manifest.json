@@ -1,0 +1,25 @@
+{
+  "format": "lalanda.modele-carte-graphiste",
+  "formatVersion": 1,
+  "id": "exemple.visite-graphiste",
+  "name": "Graphiste (exemple)",
+  "description": "Carte de visite horizontale : fonds fournis par le graphiste, zones nommées superposées par Lalanda.",
+  "version": "1.0.0",
+  "kind": "business",
+  "orientation": "horizontal",
+  "faces": ["recto", "verso"],
+  "backgrounds": { "recto": "images/fond-recto.png", "verso": "images/fond-verso.png" },
+  "author": { "name": "Lalanda (exemple)", "email": null, "url": null },
+  "license": "proprietary",
+  "fonts": [],
+  "zones": [
+    { "name": "nom-complet", "face": "recto", "x": 6, "y": 8, "width": 50, "height": 7, "font": "manrope", "size": 13, "weight": 700, "color": "#111827" },
+    { "name": "poste", "face": "recto", "x": 6, "y": 15.5, "width": 50, "height": 5, "font": "manrope", "size": 8, "weight": 600, "color": "#0f766e" },
+    { "name": "telephone", "face": "recto", "x": 6, "y": 34, "width": 50, "height": 4, "size": 7.5, "color": "#111827" },
+    { "name": "email", "face": "recto", "x": 6, "y": 38.5, "width": 50, "height": 4, "size": 7.5, "color": "#111827" },
+    { "name": "site", "face": "recto", "x": 6, "y": 43, "width": 50, "height": 4, "size": 7.5, "color": "#111827" },
+    { "name": "logo", "face": "verso", "x": 22.5, "y": 14, "width": 40, "height": 16 },
+    { "name": "slogan", "face": "verso", "x": 10, "y": 33, "width": 65, "height": 5, "size": 8, "align": "center", "color": "#ffffff" },
+    { "name": "qr-vcard", "face": "verso", "x": 66, "y": 36, "width": 14, "height": 14 }
+  ]
+}

@@ -35,3 +35,5 @@ export * from './teams.js';
 
 // ADR-0068 — RH lot 1 (invitation depuis la fiche, matricules, postes, import, fériés proposés)
 export * from './onboarding.js';
+// ADR-0069 — cartes de service (badge vérifiable) et cartes de visite
+export * from './cards.js';

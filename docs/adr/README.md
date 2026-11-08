@@ -226,6 +226,14 @@ Décideurs :
   référentiel des postes `POS-001` (remplacement poste pour poste, sortie = poste vacant), import du
   personnel CSV/XLSX, jours fériés de la RDC proposés « à vérifier » (ordonnance n° 23/042 du 30 mars
   2023 via l'ACP). Statut : **accepté** (7 nov. 2026).
+- [ADR-0069](ADR-0069-cartes-de-service-et-de-visite.md) — Cartes de service et cartes de visite :
+  badge CR80 (ISO/IEC 7810 ID-1) avec QR de vérification (jeton aléatoire de 144 bits, révocable,
+  réémis en cas de perte) vers la page publique `/v/<jeton>` (« En fonction » / « N'est plus en
+  fonction » / « Carte non valide », débit borné, aucun oracle), photo facultative et consentie dans
+  `hr_card_profiles` (exception documentée à ADR-0045 § 2.1), carte de visite 85 × 55 mm (fond perdu
+  3 mm), vingt modèles Lalanda aux couleurs de l'identité, PDF vectoriel, PNG 300 dpi, planche et
+  lot ; paquets sur mesure (code, motif ADR-0029 ; graphiste, fonds 300 dpi et zones en mm).
+  Statut : **accepté** (7 nov. 2026).
 - [ADR-0070](ADR-0070-paie-rdc.md) — Paie RDC (proposition) : pack de paie `cd-paie` daté et sourcé
   (IRPP de la loi n° 23/053 en remplacement de l'IPR depuis le 1ᵉʳ janv. 2026, CNSS du décret
   n° 18/041, INPP, ONEM, SMIG, tous « à confirmer par l'expert-comptable »), mode simulation par

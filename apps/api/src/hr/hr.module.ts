@@ -119,6 +119,8 @@ import { Position, PositionSchema } from './positions/position.schema.js';
 import { HrEmployeeImportController } from './employees/hr-employee-import.controller.js';
 import { HrEmployeeImportService } from './employees/hr-employee-import.service.js';
 import { HrCountryHolidaysController } from './holidays/hr-country-holidays.controller.js';
+// ADR-0069 : cartes de service (badge vérifiable) et cartes de visite.
+import { HrCardsModule } from './cards/hr-cards.module.js';
 
 @Module({
   imports: [
@@ -132,6 +134,8 @@ import { HrCountryHolidaysController } from './holidays/hr-country-holidays.cont
     HrPerformanceModule,
     // ADR-0060
     HrTeamsModule,
+    // ADR-0069
+    HrCardsModule,
     MongooseModule.forFeature([
       // ADR-0045 — H2 : réglages, services, fiches, données sensibles ; adhésions
       // (lien membre, destinataires de l'alerte bancaire) ; journal (débit de `reveal`).

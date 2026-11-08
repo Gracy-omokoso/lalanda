@@ -513,6 +513,8 @@ describe('ADR-0045 § 8 — application Ressources humaines (H6)', () => {
       'Réglages',
       // ADR-0068
       'Postes',
+      // ADR-0069
+      'Cartes',
     ]);
     expect(complet.sousOptions.map((s) => s.id)).toEqual([...RH_SOUS_OPTIONS_PREVUES]);
     const hrefs = rh.sousOptions.map((s) => s.href);
@@ -540,6 +542,8 @@ describe('ADR-0045 § 8 — application Ressources humaines (H6)', () => {
       'rh-reglages',
       // ADR-0068
       'rh-postes',
+      // ADR-0069
+      'rh-cartes',
     ]);
   });
 

@@ -3070,3 +3070,72 @@ describe('ADR-0068 : invitation depuis la fiche, matricules, postes, import, fé
     }
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADR-0069 : cartes de service (badge vérifiable) et cartes de visite
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { HrCardsController } from '../hr/cards/hr-cards.controller.js';
+import { PublicCardsController } from '../hr/cards/public-cards.controller.js';
+
+const CONTROLEURS_0069 = [HrCardsController, PublicCardsController];
+(CONTROLEURS as unknown[]).push(...CONTROLEURS_0069);
+TOUTES_LES_ROUTES.push(
+  ...CONTROLEURS_0069.flatMap((c) => routesDe(c as new (...args: never[]) => unknown)),
+);
+// Consultées par QUICONQUE tient la carte (contrôle d'accès, client, administration) :
+// aucune session ne peut exister. Le jeton (144 bits, aléatoire, révocable, remplacé à
+// chaque émission) fait autorité et n'ouvre que SA carte ; débit borné avant toute
+// lecture (empreinte d'IP et jeton) ; inconnu, révoqué, remplacé ou fiche anonymisée :
+// même réponse `{ valid: false }` (ADR-0069 § 4).
+Object.assign(SANS_PERMISSION, {
+  'PublicCardsController.verify':
+    'Vérification publique d’une carte de service par son jeton : prénom nom, poste, ' +
+    'organisation (nom, logo signé), « En fonction » / « N’est plus en fonction », photo ' +
+    'seulement avec second accord. Ni matricule, ni service, ni coordonnées ; aucun oracle ' +
+    '(ADR-0069 § 4).',
+  'PublicCardsController.photo':
+    'Photo d’une carte vérifiée, servie seulement si le jeton est valide ET que la personne ' +
+    'a consenti à la photo ET à sa publication ; 404 unique sinon ; en-têtes inertes ' +
+    '(nosniff, sandbox) ; débit borné (ADR-0069 § 4).',
+});
+
+describe('ADR-0069 : cartes de service et cartes de visite', () => {
+  it('chaque route interne déclare hr.read (lecture, export) ou hr.manage (écriture)', () => {
+    const attendu: Record<string, Action[]> = {
+      'HrCardsController.getSettings': ['hr.read'],
+      'HrCardsController.putSettings': ['hr.manage'],
+      'HrCardsController.preview': ['hr.read'],
+      'HrCardsController.listPackages': ['hr.read'],
+      'HrCardsController.installPackage': ['hr.manage'],
+      'HrCardsController.batch': ['hr.read'],
+      'HrCardsController.getProfile': ['hr.read'],
+      'HrCardsController.getPhoto': ['hr.read'],
+      'HrCardsController.putConsent': ['hr.manage'],
+      'HrCardsController.putPhoto': ['hr.manage'],
+      'HrCardsController.removePhoto': ['hr.manage'],
+      'HrCardsController.issue': ['hr.manage'],
+      'HrCardsController.revoke': ['hr.manage'],
+      'HrCardsController.export': ['hr.read'],
+    };
+    const routes = TOUTES_LES_ROUTES.filter((r) => r.cle.startsWith('HrCardsController.'));
+    expect(routes.map((r) => r.cle).sort()).toEqual(Object.keys(attendu).sort());
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = routes.find((r) => r.cle === cle);
+      expect(route!.actions, cle).toEqual(actions);
+      expect(SANS_PERMISSION[cle], cle).toBeUndefined();
+    }
+  });
+
+  it('les deux seules routes publiques sont celles de la vérification, justifiées', () => {
+    const routes = TOUTES_LES_ROUTES.filter((r) => r.cle.startsWith('PublicCardsController.'));
+    expect(routes.map((r) => r.cle).sort()).toEqual([
+      'PublicCardsController.photo',
+      'PublicCardsController.verify',
+    ]);
+    for (const r of routes) {
+      expect(r.actions ?? [], r.cle).toEqual([]);
+      expect(SANS_PERMISSION[r.cle], r.cle).toBeTruthy();
+    }
+  });
+});

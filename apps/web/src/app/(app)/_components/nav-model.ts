@@ -307,6 +307,8 @@ export const NAV_APPS: readonly NavApp[] = [
       { id: 'rh-reglages', href: '/rh/reglages', label: 'Réglages', action: 'hr.read' },
       // ADR-0068 § 3 : référentiel des postes (numéros de poste).
       { id: 'rh-postes', href: '/rh/postes', label: 'Postes', action: 'hr.read' },
+      // ADR-0069 : cartes de service et de visite (modèles, réglages, lots).
+      { id: 'rh-cartes', href: '/rh/cartes', label: 'Cartes', action: 'hr.read' },
     ],
   },
   // ADR-0040 § 8.1 (amende ADR-0038 § 2) — le CRM est une application RUN à
@@ -788,6 +790,8 @@ export const RH_SOUS_OPTIONS_PREVUES = [
   'rh-reglages',
   // ADR-0068
   'rh-postes',
+  // ADR-0069
+  'rh-cartes',
 ] as const;
 
 /** Ordre cible des sous-options des Stocks (ADR-0046, lot S8), toutes livrées. */

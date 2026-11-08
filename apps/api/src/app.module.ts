@@ -63,7 +63,10 @@ import { SubscriptionInvoicesModule } from './subscription-invoices/subscription
         // ADR-0048 § 7 : aucune ligne d'accès automatique (qui porte l'adresse
         // distante) pour les routes publiques du formulaire de prospects.
         autoLogging: {
-          ignore: (req) => (req.url ?? '').startsWith('/public/lead-forms/'),
+          ignore: (req) =>
+            (req.url ?? '').startsWith('/public/lead-forms/') ||
+            // ADR-0069 : le jeton de vérification d'une carte n'entre pas dans les journaux.
+            (req.url ?? '').startsWith('/public/cards/'),
         },
         redact: {
           paths: ['req.headers.authorization', 'req.headers.cookie'],

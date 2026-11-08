@@ -1,0 +1,94 @@
+/* Mesures en mm : la carte fait 85,6 × 53,98 mm (le conteneur a déjà cette taille). */
+.ruban {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 12mm;
+  padding: 0 3mm;
+  background-color: var(--lalanda-accent);
+  color: var(--lalanda-on-accent);
+}
+.logo {
+  height: 7mm;
+  max-width: 40mm;
+}
+.org {
+  font-family: var(--lalanda-font-display);
+  font-weight: 700;
+  font-size: 3mm;
+}
+.type {
+  font-size: 1.8mm;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3mm;
+}
+.corps {
+  display: flex;
+  gap: 3mm;
+  padding: 3mm;
+}
+.photo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20mm;
+  height: 25mm;
+  border-radius: 1.5mm;
+  background-color: var(--lalanda-soft);
+}
+.photo-img {
+  width: 20mm;
+  height: 25mm;
+  object-fit: cover;
+  border-radius: 1.5mm;
+}
+.initiales {
+  font-family: var(--lalanda-font-display);
+  font-size: 7mm;
+  font-weight: 700;
+  color: var(--lalanda-accent);
+}
+.identite {
+  width: 38mm;
+}
+.nom {
+  margin: 0;
+  font-family: var(--lalanda-font-display);
+  font-size: 3.8mm;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.poste {
+  margin: 1.2mm 0 0 0;
+  font-size: 2.5mm;
+  font-weight: 600;
+  color: var(--lalanda-accent);
+}
+.service,
+.matricule {
+  margin: 0.8mm 0 0 0;
+  font-size: 2mm;
+  color: #4b5563;
+}
+.verso {
+  padding: 4mm;
+}
+.org-verso {
+  margin: 0 0 2mm 0;
+  font-family: var(--lalanda-font-display);
+  font-size: 3mm;
+  font-weight: 700;
+  color: var(--lalanda-accent);
+}
+.texte {
+  margin: 0 0 1.4mm 0;
+  font-size: 2.1mm;
+  line-height: 1.35;
+  color: #374151;
+}
+.serie {
+  margin: 0;
+  font-size: 1.7mm;
+  color: #6b7280;
+}

@@ -13,3 +13,5 @@ CLAUDE.md
 
 # Copies de travail des agents (git worktrees imbriqués) : chacune a ses propres contrôles.
 .claude/worktrees/
+# ADR-0069 : copies à l'identique des guides de docs/cartes (docs/ n'est pas formaté)
+apps/web/public/guides/

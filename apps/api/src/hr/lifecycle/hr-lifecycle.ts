@@ -27,6 +27,16 @@ export interface HrDocumentsLifecycle {
   onExit?(event: HrEmployeeLifecycleEvent & { endDate: string }): Promise<void>;
 }
 
+/**
+ * ADR-0069 : effets d'une anonymisation sur les cartes (photo effacée, jeton de
+ * vérification retiré). Fourni par `HrCardsModule`.
+ */
+export const HR_CARDS_LIFECYCLE = Symbol('HR_CARDS_LIFECYCLE');
+
+export interface HrCardsLifecycle {
+  onAnonymize(event: HrEmployeeLifecycleEvent): Promise<void>;
+}
+
 @Injectable()
 export class HrLifecycleHub implements HrEmployeeLifecycle {
   private readonly logger = new Logger('HrLifecycle');
@@ -36,6 +46,10 @@ export class HrLifecycleHub implements HrEmployeeLifecycle {
     @Optional()
     @Inject(HR_DOCUMENTS_LIFECYCLE)
     private readonly documents: HrDocumentsLifecycle | null,
+    // ADR-0069
+    @Optional()
+    @Inject(HR_CARDS_LIFECYCLE)
+    private readonly cards: HrCardsLifecycle | null = null,
   ) {}
 
   async onExit(event: HrEmployeeLifecycleEvent & { endDate: string }): Promise<void> {
@@ -50,5 +64,7 @@ export class HrLifecycleHub implements HrEmployeeLifecycle {
 
   async onAnonymize(event: HrEmployeeLifecycleEvent): Promise<void> {
     await this.documents?.onAnonymize(event);
+    // ADR-0069 : photo de carte effacée, jeton retiré (carte « non valide »).
+    await this.cards?.onAnonymize(event);
   }
 }

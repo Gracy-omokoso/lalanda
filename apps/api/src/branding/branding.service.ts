@@ -657,6 +657,23 @@ export class BrandingService {
         if (err?.code !== 11000) throw err;
       });
   }
+
+  /**
+   * ADR-0069 : logos COURANTS de l'organisation, octets relus et vérifiés contre
+   * leur empreinte, prêts pour le rendu d'une carte (`data:`). Un logo illisible
+   * est omis (la carte retombe sur le monogramme) plutôt que de bloquer l'export.
+   */
+  async currentLogosForRender(
+    organizationId: string,
+  ): Promise<{ identity: FrozenIdentity; logos: Record<LogoVariant, RenderLogo | null> }> {
+    const identity = this.identityOf(await this.state(organizationId));
+    const logos = {} as Record<LogoVariant, RenderLogo | null>;
+    for (const v of LOGO_VARIANTS) {
+      const ref = identity.logos[v];
+      logos[v] = ref ? await this.renderLogo(organizationId, ref).catch(() => null) : null;
+    }
+    return { identity, logos };
+  }
 }
 
 /** Options d'un paquet (manifeste validé) dans la forme attendue par la résolution. */

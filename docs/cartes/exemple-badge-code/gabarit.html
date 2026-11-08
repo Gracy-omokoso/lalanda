@@ -1,0 +1,27 @@
+{{#face.recto}}
+<div class="ruban">
+  {{#organization.logoLight}}<img class="logo" src="{{organization.logoLight}}" alt="" />{{/organization.logoLight}}
+  {{^organization.logoLight}}<span class="org">{{organization.name}}</span>{{/organization.logoLight}}
+  <span class="type">{{card.kindLabel}}</span>
+</div>
+<div class="corps">
+  <div class="photo">
+    {{#person.hasPhoto}}<img class="photo-img" src="{{person.photo}}" alt="" />{{/person.hasPhoto}}
+    {{^person.hasPhoto}}<span class="initiales">{{person.initials}}</span>{{/person.hasPhoto}}
+  </div>
+  <div class="identite">
+    <p class="nom">{{person.displayName}}</p>
+    <p class="poste">{{person.jobTitle}}</p>
+    {{#person.department}}<p class="service">{{person.department}}</p>{{/person.department}}
+    {{#person.employeeNumber}}<p class="matricule">Matricule {{person.employeeNumber}}</p>{{/person.employeeNumber}}
+  </div>
+</div>
+{{/face.recto}}
+{{#face.verso}}
+<div class="verso">
+  <p class="org-verso">{{organization.name}}</p>
+  <p class="texte">Carte personnelle, propriété de {{organization.name}}. À restituer à la fin des fonctions.</p>
+  {{#organization.phone}}<p class="texte">Carte trouvée ? {{organization.phone}}</p>{{/organization.phone}}
+  {{#card.serial}}<p class="serie">Émission n° {{card.serial}}</p>{{/card.serial}}
+</div>
+{{/face.verso}}

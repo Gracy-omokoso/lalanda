@@ -143,7 +143,11 @@ export const CONSOLE_RESPONSE_HEADERS: Readonly<Record<string, string>> = {
  * qui ouvre le lien pour le vérifier doit voir le formulaire, pas `/accueil`).
  * Le jeton fait autorité côté API ; ce classement n'est que l'aiguillage.
  */
-export const PUBLIC_FORM_PREFIXES = ['/f'] as const;
+export const PUBLIC_FORM_PREFIXES = [
+  '/f',
+  // ADR-0069 : vérification publique d'une carte de service (`/v/<jeton>`).
+  '/v',
+] as const;
 
 /** Ce chemin est-il une page publique de formulaire (ADR-0048) ? */
 export function isPublicFormPath(pathname: string): boolean {

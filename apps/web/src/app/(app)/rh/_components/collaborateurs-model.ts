@@ -203,7 +203,7 @@ export function managersProposes(
 // ── Fiche (onglets) ─────────────────────────────────────────────────────────
 
 export interface OngletFiche {
-  id: 'dossier' | 'absences' | 'sensible' | 'documents' | 'parcours';
+  id: 'dossier' | 'absences' | 'sensible' | 'documents' | 'parcours' | 'cartes';
   libelle: string;
   /** Segment après `/rh/collaborateurs/[id]` (vide pour le dossier). */
   segment: string;
@@ -219,6 +219,8 @@ export const ONGLETS_FICHE: readonly OngletFiche[] = [
   { id: 'absences', libelle: 'Absences et soldes', segment: 'absences' },
   { id: 'documents', libelle: 'Documents', segment: 'documents' },
   { id: 'parcours', libelle: 'Entrées et sorties', segment: 'parcours' },
+  // ADR-0069
+  { id: 'cartes', libelle: 'Cartes', segment: 'cartes' },
 ];
 
 export const ONGLETS_FICHE_PREVUS = [
@@ -227,6 +229,8 @@ export const ONGLETS_FICHE_PREVUS = [
   'absences',
   'documents',
   'parcours',
+  // ADR-0069
+  'cartes',
 ] as const;
 
 /**
@@ -247,6 +251,9 @@ export function ongletsVisibles(
       case 'documents':
         return estSoi || has('hr.read');
       case 'parcours':
+        return has('hr.read');
+      // ADR-0069 : cartes — RH seulement (décision ouverte n° 1 : pas de libre-service).
+      case 'cartes':
         return has('hr.read');
       default:
         return true;

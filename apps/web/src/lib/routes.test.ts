@@ -339,3 +339,13 @@ describe('ADR-0049 — K8 : comptabilité', () => {
     expect(isProtectedPath('/comptabilites')).toBe(false);
   });
 });
+
+describe('ADR-0069 : vérification publique d’une carte de service', () => {
+  it('`/v/<jeton>` est joignable sans session et n’est ni marketing ni authentification', () => {
+    expect(isPublicFormPath('/v/AbCdEfGhIjKlMnOpQrStUvWx')).toBe(true);
+    expect(isProtectedPath('/v/AbCdEfGhIjKlMnOpQrStUvWx')).toBe(false);
+    expect(isMarketingPath('/v/AbCdEfGhIjKlMnOpQrStUvWx')).toBe(false);
+    expect(isPublicFormPath('/ventes/x')).toBe(false);
+    expect(isPublicFormPath('/v')).toBe(false);
+  });
+});
