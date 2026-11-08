@@ -21,6 +21,14 @@ on:
   push:
     tags: ['v*']
 
+# Un seul déploiement à la fois : deux tags poussés à quelques minutes d'écart
+# (v1.24.0 puis v1.25.0, 8 nov. 2026) lançaient deux déploiements en parallèle,
+# et la production gardait celui qui finissait en dernier. Le suivant attend
+# désormais la fin du précédent ; aucun n'est annulé en cours de route.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
 # (S22e) Principe du moindre privilège : `packages: write` ne vaut que pour le job
 # qui pousse sur GHCR. Au niveau du workflow, le job `deploy` — celui qui détient
 # la clé SSH de production — en héritait sans jamais s'en servir.
