@@ -129,6 +129,23 @@ export const hrLot1Api = {
       body: { expectedRevision },
     }),
 
+  // Changement de poste (amendement du 8 nov. 2026) : le matricule ne change jamais.
+  changePosition: async (
+    employeeId: string,
+    body: {
+      expectedRevision: number;
+      position: { mode: 'new' } | { mode: 'replacement'; positionId: string };
+      effectiveDate?: string;
+      jobTitle?: string;
+    },
+  ): Promise<HrEmployeeView> =>
+    employeeFromApi(
+      await jsonRequest<EmployeeView>(`/hr/employees/${id(employeeId)}/position-change`, {
+        method: 'POST',
+        body,
+      }),
+    ),
+
   // Compte Lalanda d'un collaborateur (§ 1)
   getAccount: (employeeId: string) =>
     jsonRequest<EmployeeAccountView>(`/hr/employees/${id(employeeId)}/account`, { method: 'GET' }),
@@ -153,21 +170,34 @@ export const hrLot1Api = {
   },
 
   // Import du personnel (§ 4)
-  downloadImportTemplate: async (): Promise<Blob> => {
-    const res = await fetch(`${API_URL}/hr/employees/import/template.csv`, {
+  downloadImportTemplate: async (format: 'csv' | 'xlsx' = 'csv'): Promise<Blob> => {
+    const res = await fetch(`${API_URL}/hr/employees/import/template.${format}`, {
       method: 'GET',
       credentials: 'include',
     });
     if (!res.ok) throw await erreur(res);
     return res.blob();
   },
-  previewImport: (file: File) =>
-    envoyerFichier<EmployeeImportPreview>('/hr/employees/import/preview', file),
-  applyImport: (file: File, options: { invite: boolean; skipInvalid: boolean }) =>
+  // Amendement du 8 nov. 2026 : `createDepartments` crée les services inconnus.
+  previewImport: (
+    file: File,
+    options: { createDepartments: boolean } = { createDepartments: false },
+  ) =>
+    envoyerFichier<EmployeeImportPreview>(
+      `/hr/employees/import/preview${salesQuery({
+        createDepartments: String(options.createDepartments),
+      })}`,
+      file,
+    ),
+  applyImport: (
+    file: File,
+    options: { invite: boolean; skipInvalid: boolean; createDepartments?: boolean },
+  ) =>
     envoyerFichier<EmployeeImportResult>(
       `/hr/employees/import/apply${salesQuery({
         invite: String(options.invite),
         skipInvalid: String(options.skipInvalid),
+        createDepartments: String(options.createDepartments === true),
       })}`,
       file,
     ),

@@ -5,7 +5,7 @@
 
 import { z } from 'zod';
 
-import { HrExpectedRevision, HrId, hrFr, hrRequiredText } from './common.js';
+import { HrCalendarDay, HrExpectedRevision, HrId, hrFr, hrRequiredText } from './common.js';
 import { HR_LIMITS } from './constants.js';
 
 // ── Matricules (§ 2) ────────────────────────────────────────────────────────
@@ -188,6 +188,8 @@ export const EMPLOYEE_IMPORT_FIELDS = [
   'workEmail',
   'workPhone',
   'workLocation',
+  // Amendement du 8 nov. 2026 : matricule ou e-mail professionnel du manager.
+  'manager',
 ] as const;
 export type EmployeeImportField = (typeof EMPLOYEE_IMPORT_FIELDS)[number];
 
@@ -209,6 +211,15 @@ export interface EmployeeImportRowView {
   contractType: string | null;
   startDate: string | null;
   workEmail: string | null;
+  /** Amendement du 8 nov. 2026 : service à créer à l'import (option cochée). */
+  newDepartment: boolean;
+  /** Référence du manager telle que lue (matricule ou e-mail), `null` : aucun. */
+  managerRef: string | null;
+  /** Manager résolu : collaborateur existant, ligne du fichier, ou aucun. */
+  manager:
+    | { kind: 'none' }
+    | { kind: 'existing'; employeeId: string; displayName: string }
+    | { kind: 'row'; row: number };
   issues: EmployeeImportIssue[];
 }
 
@@ -226,8 +237,12 @@ export interface EmployeeImportResult {
     employeeId: string;
     employeeNumber: string | null;
     invitation: EmployeeInviteOutcome;
+    /** Amendement du 8 nov. 2026 : `not_linked` = manager (ligne du fichier) non posé. */
+    manager: 'none' | 'linked' | 'not_linked';
   }[];
   skippedRows: number[];
+  /** Services créés par l'import (option « Créer les services inconnus »). */
+  createdDepartments: string[];
 }
 
 // ── Jours fériés proposés (§ 5) ─────────────────────────────────────────────
@@ -249,3 +264,22 @@ export interface CountryHolidaysLoadResult {
   created: number;
   alreadyPresent: number;
 }
+
+// ── Amendement du 8 nov. 2026 : changement de poste ─────────────────────────
+
+/**
+ * `POST /hr/employees/:id/position-change` — mutation vers un poste VACANT
+ * (`replacement`) ou un poste créé (`new`). Le matricule ne change jamais.
+ * `effectiveDate` absente = aujourd'hui. `jobTitle` / `departmentId` absents : ceux
+ * du poste choisi (remplacement) ou ceux de la fiche (nouveau poste).
+ */
+export const ChangeEmployeePositionBody = z
+  .object({
+    expectedRevision: HrExpectedRevision,
+    position: EmployeePositionChoice,
+    effectiveDate: HrCalendarDay.optional(),
+    jobTitle: hrRequiredText(HR_LIMITS.jobTitle, 'Intitulé du poste').optional(),
+    departmentId: HrId.nullable().optional(),
+  })
+  .strict();
+export type ChangeEmployeePositionBody = z.output<typeof ChangeEmployeePositionBody>;

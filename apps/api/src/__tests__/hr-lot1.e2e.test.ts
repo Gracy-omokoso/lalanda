@@ -549,4 +549,271 @@ e2eSuite('RH lot 1 — invitation, matricules, postes, import, fériés (ADR-006
       code(await fx.get('hr_manager', '/hr/holidays/country/cd?year=2020'), 400, 'INVALID_REQUEST');
     });
   });
+
+  // ── Amendement du 8 nov. 2026 ────────────────────────────────────────────
+
+  describe('changement de poste (amendement du 8 nov. 2026)', () => {
+    it('mutation vers un poste vacant puis un nouveau poste ; matricule inchangé ; historiques', async () => {
+      const e = ok(
+        await fx.post(
+          'hr_manager',
+          '/hr/employees',
+          fiche('Muté', {
+            jobTitle: 'Caissier',
+            startDate: '2025-01-06',
+            position: { mode: 'new' },
+          }),
+        ),
+        201,
+      );
+      const ancien = e['positionId'] as string;
+      const cible = ok(await fx.post('hr_manager', '/hr/positions', { title: 'Comptable' }), 201);
+      // La modification ordinaire renvoie vers « Changer de poste ».
+      code(
+        await fx.put('hr_manager', `/hr/employees/${e['id']}`, {
+          expectedRevision: e['revision'],
+          position: { mode: 'replacement', positionId: cible['id'] },
+        }),
+        409,
+        'EMPLOYEE_HAS_POSITION',
+      );
+      const url = `/hr/employees/${e['id']}/position-change`;
+      const corps = {
+        expectedRevision: e['revision'],
+        position: { mode: 'replacement', positionId: cible['id'] },
+        effectiveDate: '2026-11-02',
+      };
+      code(await fx.post('analyst', url, corps), 403, 'FORBIDDEN');
+      code(await fx.post('ownerB', url, corps), 404, 'EMPLOYEE_NOT_FOUND');
+      code(
+        await fx.post('hr_manager', url, { ...corps, effectiveDate: '2024-12-31' }),
+        400,
+        'INVALID_REQUEST',
+      );
+      code(
+        await fx.post('hr_manager', url, {
+          ...corps,
+          position: { mode: 'replacement', positionId: ancien },
+        }),
+        409,
+        'POSITION_UNCHANGED',
+      );
+      code(
+        await fx.post('hr_manager', url, { ...corps, expectedRevision: 99 }),
+        409,
+        'STALE_REVISION',
+      );
+      const m = ok(await fx.post('hr_manager', url, corps));
+      expect(m).toMatchObject({
+        positionId: cible['id'],
+        positionNumber: cible['positionNumber'],
+        jobTitle: 'Comptable',
+        employeeNumber: e['employeeNumber'],
+      });
+      const libere = ok(await fx.get('hr_manager', `/hr/positions/${ancien}`));
+      expect(libere).toMatchObject({ status: 'open', holderEmployeeId: null });
+      expect(libere['holders']).toEqual([
+        expect.objectContaining({ employeeId: e['id'], from: '2025-01-06', to: '2026-11-02' }),
+      ]);
+      const pourvu = ok(await fx.get('hr_manager', `/hr/positions/${cible['id']}`));
+      expect(pourvu).toMatchObject({ status: 'filled', holderEmployeeId: e['id'] });
+      expect(pourvu['holders']).toEqual([
+        expect.objectContaining({ employeeId: e['id'], from: '2026-11-02', to: null }),
+      ]);
+      // Un poste pourvu (par quelqu'un d'autre) ne se choisit pas.
+      const autre = ok(
+        await fx.post('hr_manager', '/hr/employees', fiche('Autre', { position: { mode: 'new' } })),
+        201,
+      );
+      code(
+        await fx.post('hr_manager', url, {
+          expectedRevision: m['revision'],
+          position: { mode: 'replacement', positionId: autre['positionId'] },
+        }),
+        409,
+        'POSITION_NOT_OPEN',
+      );
+      // Nouveau poste : numéro attribué, intitulé demandé.
+      const n = ok(
+        await fx.post('hr_manager', url, {
+          expectedRevision: m['revision'],
+          position: { mode: 'new' },
+          jobTitle: 'Chef comptable',
+          effectiveDate: '2026-11-05',
+        }),
+      );
+      expect(n['positionId']).not.toBe(cible['id']);
+      expect(n).toMatchObject({ jobTitle: 'Chef comptable', employeeNumber: e['employeeNumber'] });
+      expect(ok(await fx.get('hr_manager', `/hr/positions/${cible['id']}`))).toMatchObject({
+        status: 'open',
+        holderEmployeeId: null,
+      });
+      const audit = await db
+        .collection('audit_events')
+        .find({
+          organizationId: fx.orgN,
+          action: 'hr.employee.position_changed',
+          targetId: e['id'],
+        })
+        .toArray();
+      expect(audit).toHaveLength(2);
+    });
+  });
+
+  describe('import : service, manager, modèle XLSX (amendement du 8 nov. 2026)', () => {
+    it('managers existants ou du fichier (deux passes), cycle refusé, services créés sur option', async () => {
+      const chef = ok(
+        await fx.post(
+          'hr_manager',
+          '/hr/employees',
+          fiche('Chef import', { workEmail: `chef-imp-${tag}@lalanda-test.local` }),
+        ),
+        201,
+      );
+      const head = 'Nom;Prénom;Poste;Service;Manager;Date d’entrée;E-mail professionnel;Matricule';
+      const csv = Buffer.from(
+        [
+          `\uFEFF${head}`,
+          `Lukusa;Anne;Directrice;Direction ${tag};CHEF-IMP-${tag}@lalanda-test.local;01/02/2024;anne-${tag}@lalanda-test.local;`,
+          `Mpiana;Joël;Adjoint;Direction ${tag};anne-${tag}@lalanda-test.local;01/03/2024;;GF-0700`,
+          `Kalala;Eve;Agent;Direction ${tag};GF-0700;01/04/2024;;`,
+          `Boyi;Cycle;Agent;;GF-0702;01/04/2024;;GF-0701`,
+          `Boyo;Cycle;Agent;;GF-0701;01/04/2024;;GF-0702`,
+          `Nsimba;Inconnu;Agent;;GF-9999;01/04/2024;;`,
+        ].join('\r\n'),
+        'utf8',
+      );
+      const sans = ok(await upload('/hr/employees/import/preview', csv));
+      expect(sans['rows'][0]['issues']).toEqual([
+        expect.objectContaining({ level: 'warning', field: 'department' }),
+      ]);
+      expect(sans['rows'][0]['newDepartment']).toBe(false);
+      const p = ok(await upload('/hr/employees/import/preview?createDepartments=true', csv));
+      expect(p['counts']).toMatchObject({ total: 6, valid: 3, invalid: 3 });
+      expect(p['rows'][0]).toMatchObject({
+        newDepartment: true,
+        manager: { kind: 'existing', employeeId: chef['id'] },
+      });
+      expect(p['rows'][1]['manager']).toEqual({ kind: 'row', row: 2 });
+      expect(p['rows'][2]['manager']).toEqual({ kind: 'row', row: 3 });
+      const managerIssue = (i: number) =>
+        p['rows'][i]['issues'].find((x: { field: string }) => x.field === 'manager')?.['message'];
+      expect(managerIssue(3)).toContain('Cycle');
+      expect(managerIssue(4)).toContain('Cycle');
+      expect(managerIssue(5)).toContain('introuvable');
+      const applied = ok(
+        await upload('/hr/employees/import/apply?skipInvalid=true&createDepartments=true', csv),
+        201,
+      );
+      expect(applied['skippedRows']).toEqual([5, 6, 7]);
+      expect(applied['createdDepartments']).toEqual([`Direction ${tag}`]);
+      expect(applied['created'].map((c: { manager: string }) => c.manager)).toEqual([
+        'linked',
+        'linked',
+        'linked',
+      ]);
+      const [anne, joel, eve] = applied['created'].map((c: { employeeId: string }) => c.employeeId);
+      const docs = await db
+        .collection('hr_employees')
+        .find({ _id: { $in: [anne, joel, eve].map((x: string) => new ObjectId(x)) } })
+        .toArray();
+      const by = new Map(docs.map((d) => [String(d['_id']), d]));
+      expect(by.get(anne)!['managerEmployeeId']).toBe(chef['id']);
+      expect(by.get(joel)!['managerEmployeeId']).toBe(anne);
+      expect(by.get(eve)!['managerEmployeeId']).toBe(joel);
+      const dept = await db
+        .collection('hr_departments')
+        .findOne({ organizationId: fx.orgN, name: `Direction ${tag}` });
+      expect(by.get(anne)!['departmentId']).toBe(String(dept!['_id']));
+    });
+
+    it('modèle XLSX téléchargeable et relu par l’aperçu', async () => {
+      const tpl = await request(fx.app.getHttpServer())
+        .get('/hr/employees/import/template.xlsx')
+        .set('Cookie', fx.as('hr_manager'))
+        .buffer(true)
+        .parse((res, cb) => {
+          const chunks: Buffer[] = [];
+          res.on('data', (c: Buffer) => chunks.push(c));
+          res.on('end', () => cb(null, Buffer.concat(chunks)));
+        });
+      expect(tpl.status).toBe(200);
+      expect(tpl.headers['content-type']).toContain('spreadsheetml');
+      const buf = tpl.body as Buffer;
+      expect(buf.subarray(0, 2).toString()).toBe('PK');
+      const p = ok(await upload('/hr/employees/import/preview?createDepartments=true', buf));
+      expect(p['format']).toBe('xlsx');
+      expect(p['columns'].map((c: { field: string | null }) => c.field)).toContain('manager');
+      expect(p['counts']).toMatchObject({ total: 2, valid: 2, invalid: 0 });
+      expect(p['rows'][1]['manager']).toEqual({ kind: 'row', row: 2 });
+    });
+  });
+
+  describe('e-mail changé avec invitation en attente (amendement du 8 nov. 2026)', () => {
+    it('l’ancienne invitation est révoquée ; « Inviter » coché : une nouvelle part', async () => {
+      const ancien = `ancien-${tag}@lalanda-test.local`;
+      const nouveau = `changee-${tag}@lalanda-test.local`;
+      const e = ok(
+        await fx.post(
+          'owner',
+          '/hr/employees',
+          fiche('Adresse', { workEmail: ancien, invite: true }),
+        ),
+        201,
+      );
+      expect(e['invitation']['outcome']).toBe('invitation_sent');
+      // Sans « Inviter » : l'ancienne est révoquée, rien ne part (même sans `members.invite`).
+      const sansInvite = ok(
+        await fx.put('hr_manager', `/hr/employees/${e['id']}`, {
+          expectedRevision: e['revision'],
+          workEmail: `autre-${tag}@lalanda-test.local`,
+        }),
+      );
+      expect(sansInvite['invitation']).toBeNull();
+      expect(
+        await db.collection('invitations').countDocuments({
+          organizationId: fx.orgN,
+          employeeId: e['id'],
+          revokedAt: null,
+          acceptedAt: null,
+        }),
+      ).toBe(0);
+      expect(ok(await fx.get('hr_manager', `/hr/employees/${e['id']}/account`))['state']).toBe(
+        'none',
+      );
+      // Réinvitation, puis changement d'adresse avec « Inviter » coché.
+      ok(await fx.post('owner', `/hr/employees/${e['id']}/invitation`));
+      const r = ok(
+        await fx.put('owner', `/hr/employees/${e['id']}`, {
+          expectedRevision: await rev(e['id']),
+          workEmail: nouveau,
+          invite: true,
+        }),
+      );
+      expect(r['invitation']['outcome']).toBe('invitation_sent');
+      const open = await db
+        .collection('invitations')
+        .find({ organizationId: fx.orgN, employeeId: e['id'], revokedAt: null })
+        .toArray();
+      expect(open.map((i) => i['email'])).toEqual([nouveau]);
+      // Même adresse renvoyée : rien n'est révoqué.
+      ok(
+        await fx.put('owner', `/hr/employees/${e['id']}`, {
+          expectedRevision: await rev(e['id']),
+          workEmail: nouveau,
+        }),
+      );
+      expect(
+        await db
+          .collection('invitations')
+          .countDocuments({ organizationId: fx.orgN, employeeId: e['id'], revokedAt: null }),
+      ).toBe(1);
+      const traces = await db.collection('audit_events').countDocuments({
+        organizationId: fx.orgN,
+        action: 'hr.employee.invitation_revoked',
+        targetId: e['id'],
+      });
+      expect(traces).toBe(2);
+    });
+  });
 });

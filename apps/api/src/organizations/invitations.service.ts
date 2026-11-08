@@ -442,6 +442,17 @@ export class InvitationsService {
       .exec();
   }
 
+  /** ADR-0068, amendement du 8 nov. 2026 — toutes les invitations ouvertes d'une fiche. */
+  async allOpenForEmployee(
+    organizationId: string,
+    employeeId: string,
+  ): Promise<InvitationDocument[]> {
+    return this.invModel
+      .find({ organizationId, employeeId, acceptedAt: null, revokedAt: null })
+      .sort({ createdAt: 1 })
+      .exec();
+  }
+
   /** ADR-0068 § 1 — invitation en attente pour une adresse (sans considérer l'expiration). */
   async pendingForEmail(organizationId: string, email: string): Promise<InvitationDocument | null> {
     return this.invModel

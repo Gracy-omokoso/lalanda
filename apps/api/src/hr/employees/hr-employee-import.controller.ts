@@ -1,8 +1,10 @@
 // Import du personnel existant — ADR-0068 § 4.
 //
 //   GET  /hr/employees/import/template.csv                 hr.read    modèle (« ; », BOM)
-//   POST /hr/employees/import/preview                      hr.manage  aperçu, rien n'est écrit
-//   POST /hr/employees/import/apply?invite=&skipInvalid=   hr.manage  crée les lignes valides
+//   POST /hr/employees/import/preview?createDepartments=   hr.manage  aperçu, rien n'est écrit
+//   POST /hr/employees/import/apply?invite=&skipInvalid=&createDepartments=
+//                                                          hr.manage  crée les lignes valides
+//   (modèle .xlsx : `HrEmployeeImportTemplateController`, amendement du 8 nov. 2026)
 //
 // Le fichier est le CORPS BRUT (2 Mo au plus), comme l'import des projets (ADR-0062).
 // `invite=true` invite les lignes qui ont un e-mail ; sans `members.invite` (droits
@@ -49,7 +51,9 @@ import {
 } from './hr-employee-import.service.js';
 
 const flag = z.enum(['true', 'false']).optional();
-const ApplyQuery = z.object({ invite: flag, skipInvalid: flag }).strict();
+const ApplyQuery = z.object({ invite: flag, skipInvalid: flag, createDepartments: flag }).strict();
+// Amendement du 8 nov. 2026 : créer les services inconnus du fichier.
+const PreviewQuery = z.object({ createDepartments: flag }).strict();
 
 async function fileOf(req: Request): Promise<Buffer> {
   const read = await readRequestBody(req, WORK_PLAN_LIMITS.importFileMaxBytes);
@@ -99,11 +103,16 @@ export class HrEmployeeImportController {
   @RequirePermission('hr.manage')
   async preview(
     @CurrentOrgId() orgId: string,
+    @Query() query: unknown,
     @Req() req: Request,
   ): Promise<EmployeeImportPreview> {
+    const parsed = PreviewQuery.safeParse(query);
+    if (!parsed.success) invalidRequest(parsed.error, 'Paramètres invalides.');
     const body = await fileOf(req);
     try {
-      return await this.imports.preview(orgId, body);
+      return await this.imports.preview(orgId, body, {
+        createDepartments: parsed.data.createDepartments === 'true',
+      });
     } catch (err) {
       fileError(err);
     }
@@ -130,7 +139,11 @@ export class HrEmployeeImportController {
       out = await this.imports.apply(
         orgId,
         body,
-        { invite: parsed.data.invite === 'true', skipInvalid: parsed.data.skipInvalid === 'true' },
+        {
+          invite: parsed.data.invite === 'true',
+          skipInvalid: parsed.data.skipInvalid === 'true',
+          createDepartments: parsed.data.createDepartments === 'true',
+        },
         {
           userId: user.id,
           role: role ?? 'unknown',

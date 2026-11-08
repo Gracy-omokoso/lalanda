@@ -206,6 +206,11 @@ export class HrEmployeesController {
     const parsed = UpdateEmployeeBody.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error);
     const view = await this.employees.update(orgId, employeeId, parsed.data, actorOf(user, role));
+    // Amendement du 8 nov. 2026 : e-mail changé → l'invitation en attente vers l'ancienne
+    // adresse est révoquée ; « Inviter » coché → une nouvelle part à la nouvelle adresse.
+    if (parsed.data.workEmail !== undefined) {
+      await this.invitations.revokeForChangedEmail(orgId, employeeId, actorOf(user, role));
+    }
     return this.withInvitation(orgId, user, role, perms, view, parsed.data.invite);
   }
 

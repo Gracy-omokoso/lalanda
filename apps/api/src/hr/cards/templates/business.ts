@@ -169,7 +169,7 @@ const bande: CardTemplateDef = {
   description: 'Bande basse de couleur portant les coordonnées ; verso monogramme.',
   displayFont: null,
   render(d, t, f) {
-    const { o, s, W, H } = box(f);
+    const { o, s, H } = box(f);
     const ns = fitSize(d.displayName, 4.3, 3, 0.1, 18);
     const bandH = 19;
     return {

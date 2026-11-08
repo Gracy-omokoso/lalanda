@@ -132,6 +132,10 @@ import {
 } from './generated-documents/generated-document.schemas.js';
 import { HrGeneratedDocumentsController } from './generated-documents/hr-generated-documents.controller.js';
 import { HrGeneratedDocumentsService } from './generated-documents/hr-generated-documents.service.js';
+// ADR-0068, amendement du 8 nov. 2026 : changement de poste.
+import { HrPositionChangeController } from './positions/hr-position-change.controller.js';
+import { HrPositionChangeService } from './positions/hr-position-change.service.js';
+import { HrEmployeeImportTemplateController } from './employees/hr-employee-import-template.controller.js';
 
 @Module({
   imports: [
@@ -217,6 +221,9 @@ import { HrGeneratedDocumentsService } from './generated-documents/hr-generated-
     HrCountryHolidaysController,
     // ADR-0072
     HrGeneratedDocumentsController,
+    // ADR-0068, amendement du 8 nov. 2026
+    HrPositionChangeController,
+    HrEmployeeImportTemplateController,
   ],
   providers: [
     MasterKeyringProvider,
@@ -273,6 +280,8 @@ import { HrGeneratedDocumentsService } from './generated-documents/hr-generated-
     HrEmployeeImportService,
     // ADR-0072
     HrGeneratedDocumentsService,
+    // ADR-0068, amendement du 8 nov. 2026
+    HrPositionChangeService,
   ],
   exports: [
     // ADR-0045 — H2

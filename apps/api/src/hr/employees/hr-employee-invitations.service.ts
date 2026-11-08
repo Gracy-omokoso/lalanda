@@ -145,6 +145,38 @@ export class HrEmployeeInvitationsService {
     });
   }
 
+  /**
+   * Amendement du 8 nov. 2026 : l'e-mail professionnel de la fiche a changé (ou a été
+   * effacé). Toute invitation ouverte liée à la fiche qui vise une AUTRE adresse est
+   * révoquée et tracée. `hr.manage` suffit : on retire un accès, on n'en donne aucun.
+   * Renvoie le nombre d'invitations révoquées.
+   */
+  async revokeForChangedEmail(
+    organizationId: string,
+    employeeId: string,
+    actor: HrActor,
+  ): Promise<number> {
+    const e = await this.fiches.requireOwn(organizationId, employeeId);
+    const email = e.workEmail ? e.workEmail.trim().toLowerCase() : null;
+    const open = await this.invitations.allOpenForEmployee(organizationId, employeeId);
+    let revoked = 0;
+    for (const inv of open) {
+      if (email !== null && inv.email === email) continue;
+      await this.invitations.revoke(actor.userId, organizationId, String(inv._id));
+      revoked += 1;
+      await this.audit.record({
+        organizationId,
+        actorUserId: actor.userId,
+        actorRole: actor.role,
+        action: 'hr.employee.invitation_revoked',
+        targetType: 'employee',
+        targetId: employeeId,
+        metadata: { invitationId: String(inv._id), reason: 'work_email_changed' },
+      });
+    }
+    return revoked;
+  }
+
   // ── Interne ──────────────────────────────────────────────────────────────
 
   /** Identifiant du compte MEMBRE de l'organisation qui porte cette adresse, sinon `null`. */

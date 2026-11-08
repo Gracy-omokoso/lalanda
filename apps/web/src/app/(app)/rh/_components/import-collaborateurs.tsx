@@ -5,6 +5,8 @@
 // création des lignes valides. Les matricules du fichier sont conservés ; les autres
 // sont attribués. Option : inviter sur Lalanda les lignes qui ont un e-mail
 // (`members.invite` exigé : sans lui, rien ne part). L'API reste juge.
+// Amendement du 8 nov. 2026 : modèle .xlsx, colonne Manager (existant ou ligne du
+// fichier), option « Créer les services inconnus ».
 
 import { Badge, buttonClasses } from '@lalanda/ui';
 import { FileUp, Upload } from 'lucide-react';
@@ -20,7 +22,7 @@ import {
 
 import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
-import { peutInviterSurLalanda } from './lot1-model';
+import { libelleManagerImport, peutInviterSurLalanda } from './lot1-model';
 import { useAccesRh } from './rh-access';
 import { RH_BASE, formatJour, lienCollaborateur, messageRh, peutGererRh } from './rh-model';
 import { Bandeau, PhraseSection } from './rh-ui';
@@ -33,6 +35,7 @@ export function ImportCollaborateurs(): React.ReactElement {
   const [apercu, setApercu] = useState<EmployeeImportPreview | null>(null);
   const [resultat, setResultat] = useState<EmployeeImportResult | null>(null);
   const [inviter, setInviter] = useState(true);
+  const [creerServices, setCreerServices] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
 
@@ -44,14 +47,14 @@ export function ImportCollaborateurs(): React.ReactElement {
     );
   }
 
-  async function lireFichier(f: File): Promise<void> {
+  async function lireFichier(f: File, creer = creerServices): Promise<void> {
     setFichier(f);
     setApercu(null);
     setResultat(null);
     setErreur(null);
     setEnvoi(true);
     try {
-      setApercu(await hrLot1Api.previewImport(f));
+      setApercu(await hrLot1Api.previewImport(f, { createDepartments: creer }));
     } catch (err) {
       setErreur(messageRh(err, 'Le fichier n’a pas pu être lu.'));
     } finally {
@@ -68,6 +71,7 @@ export function ImportCollaborateurs(): React.ReactElement {
         await hrLot1Api.applyImport(fichier, {
           invite: peutInviter && inviter,
           skipInvalid: apercu.counts.invalid > 0,
+          createDepartments: creerServices,
         }),
       );
     } catch (err) {
@@ -77,13 +81,13 @@ export function ImportCollaborateurs(): React.ReactElement {
     }
   }
 
-  async function modele(): Promise<void> {
+  async function modele(format: 'csv' | 'xlsx'): Promise<void> {
     try {
-      const blob = await hrLot1Api.downloadImportTemplate();
+      const blob = await hrLot1Api.downloadImportTemplate(format);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'modele-import-collaborateurs.csv';
+      a.download = `modele-import-collaborateurs.${format}`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
@@ -98,9 +102,14 @@ export function ImportCollaborateurs(): React.ReactElement {
         titre="Importer des collaborateurs"
         sousTitre="Reprenez votre registre du personnel depuis Excel (.xlsx) ou un fichier .csv. Rien n’est créé avant votre confirmation ; les matricules du fichier sont conservés."
         actions={
-          <button type="button" className={BOUTON_PETIT} onClick={() => void modele()}>
-            Télécharger le modèle (.csv)
-          </button>
+          <span className="flex flex-wrap gap-2">
+            <button type="button" className={BOUTON_PETIT} onClick={() => void modele('xlsx')}>
+              Télécharger le modèle (.xlsx)
+            </button>
+            <button type="button" className={BOUTON_PETIT} onClick={() => void modele('csv')}>
+              Modèle (.csv)
+            </button>
+          </span>
         }
       >
         <label className="flex flex-wrap items-center gap-3 text-sm">
@@ -120,8 +129,19 @@ export function ImportCollaborateurs(): React.ReactElement {
           <span className="text-xs text-[var(--foreground-muted)]">
             {fichier
               ? fichier.name
-              : 'Colonnes : Matricule, Nom, Prénom, Poste, Service, Type de contrat, Date d’entrée, Fin de contrat, E-mail professionnel, Téléphone, Lieu de travail.'}
+              : 'Colonnes : Matricule, Nom, Prénom, Poste, Service, Manager (matricule ou e-mail), Type de contrat, Date d’entrée, Fin de contrat, E-mail professionnel, Téléphone, Lieu de travail.'}
           </span>
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={creerServices}
+            onChange={(e) => {
+              setCreerServices(e.target.checked);
+              if (fichier) void lireFichier(fichier, e.target.checked);
+            }}
+          />
+          Créer les services inconnus du fichier
         </label>
       </Bandeau>
 
@@ -150,13 +170,14 @@ export function ImportCollaborateurs(): React.ReactElement {
             </p>
           ) : null}
           <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--border)]">
-            <table className="w-full min-w-[44rem] text-sm">
+            <table className="w-full min-w-[52rem] text-sm">
               <thead className="bg-[var(--surface-muted)] text-left text-xs text-[var(--foreground-muted)]">
                 <tr>
                   <th className="px-3 py-2 font-medium">Ligne</th>
                   <th className="px-3 py-2 font-medium">Collaborateur</th>
                   <th className="px-3 py-2 font-medium">Matricule</th>
                   <th className="px-3 py-2 font-medium">Poste</th>
+                  <th className="px-3 py-2 font-medium">Manager</th>
                   <th className="px-3 py-2 font-medium">Entrée</th>
                   <th className="px-3 py-2 font-medium">Contrôle</th>
                 </tr>
@@ -177,7 +198,13 @@ export function ImportCollaborateurs(): React.ReactElement {
                     <td className="px-3 py-2 break-words">
                       {r.jobTitle || '—'}
                       {r.departmentName ? ` · ${r.departmentName}` : ''}
+                      {r.newDepartment ? (
+                        <span className="block text-xs text-[var(--foreground-muted)]">
+                          service à créer
+                        </span>
+                      ) : null}
                     </td>
+                    <td className="px-3 py-2 break-words">{libelleManagerImport(r)}</td>
                     <td className="px-3 py-2">{r.startDate ? formatJour(r.startDate) : '—'}</td>
                     <td className="px-3 py-2">
                       {r.issues.length === 0 ? (
@@ -236,6 +263,9 @@ export function ImportCollaborateurs(): React.ReactElement {
         <div className="flex flex-col gap-3 text-sm">
           <p role="status">
             {resultat.created.length} collaborateur(s) créé(s)
+            {resultat.createdDepartments.length > 0
+              ? ` ; service(s) créé(s) : ${resultat.createdDepartments.join(', ')}`
+              : ''}
             {resultat.skippedRows.length > 0
               ? ` ; ligne(s) écartée(s) : ${resultat.skippedRows.join(', ')}`
               : ''}
@@ -249,6 +279,9 @@ export function ImportCollaborateurs(): React.ReactElement {
                 </Link>
                 <span className="text-xs text-[var(--foreground-muted)]">
                   {LIBELLES_INVITATION[c.invitation]}
+                  {c.manager === 'not_linked'
+                    ? ' · manager non posé (sa ligne n’a pas été créée)'
+                    : ''}
                 </span>
               </li>
             ))}
