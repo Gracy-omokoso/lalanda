@@ -30,7 +30,6 @@ import {
   checkTemplate,
   parseTemplate,
   renderTemplate,
-  type MustacheNode,
 } from '../../../sales/documents/templates/custom/mustache.js';
 import {
   filesFromArchive,

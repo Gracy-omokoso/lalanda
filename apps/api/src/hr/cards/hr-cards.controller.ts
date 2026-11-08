@@ -22,6 +22,7 @@ import {
   CardExportQuery,
   CardPreviewQuery,
   CardRevisionBody,
+  CardTemplateRef,
   PutCardConsentBody,
   PutCardSettingsBody,
   type CardPackageView,
@@ -65,7 +66,6 @@ import { RequireFeature } from '../../billing/feature.guard.js';
 import { invalidRequest } from '../../sales/sales.errors.js';
 import { PACKAGE_LIMITS } from '../../sales/documents/templates/custom/package-files.js';
 import { UserThrottlerGuard } from '../../security/user-throttler.guard.js';
-import { CardTemplateRef } from '@lalanda/shared/hr';
 import type { CardValidationReport } from './custom/card-package.js';
 import { HrCardsService, type CardActor, type CardFile } from './hr-cards.service.js';
 
