@@ -3,7 +3,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { validateAndSanitizeImage } from '../account/image-validation.js';
-import { rgbaPng, solidPng } from '../sales/documents/testing/template-fixtures.js';
+import { solidPng } from '../sales/documents/testing/template-fixtures.js';
+import { rgbaPng } from './png-fixtures.js';
 import { pngAlpha } from './png-alpha.js';
 
 function sanitized(b: Buffer): Buffer {

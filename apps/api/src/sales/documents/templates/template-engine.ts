@@ -10,6 +10,8 @@
 // gabarit 1.0.0), octet pour octet celle d'avant les modèles — c'est elle qui
 // imprime les documents gelés sans champ `presentation`.
 
+import { patternTileGeometry } from '@lalanda/shared/branding';
+
 import {
   esc,
   invoiceFooterTemplate,
@@ -139,9 +141,7 @@ export function patternLayer(
 export function patternDeclarations(p: RenderPattern, rasterScale: number): string {
   if (!PATTERN_URI.test(p.dataUri)) throw new Error('Motif : URI de données refusée.');
   const scale = p.raster ? rasterScale : 1;
-  const w = Math.max(4, Math.round(p.width * scale));
-  const h = Math.max(4, Math.round(p.height * scale));
-  const opacity = Math.min(0.2, Math.max(0, p.opacity));
+  const { w, h, opacity } = patternTileGeometry(p.width, p.height, p.opacity, scale);
   return `background-image: url("${p.dataUri}"); background-repeat: repeat; background-size: ${w}px ${h}px; opacity: ${opacity.toFixed(2)};`;
 }
 

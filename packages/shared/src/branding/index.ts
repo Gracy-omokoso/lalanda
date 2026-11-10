@@ -200,6 +200,24 @@ export function patternTileSize(id: string): { w: number; h: number } {
 }
 
 /**
+ * Géométrie de la tuile imprimée : taille en pixels CSS (au moins 4, mise à
+ * l'échelle pour un PNG téléversé) et opacité bornée à 20 %. Hors de
+ * `sales/documents`, qui ne fait que de la mise en forme (ADR-0025).
+ */
+export function patternTileGeometry(
+  width: number,
+  height: number,
+  opacity: number,
+  scale: number,
+): { w: number; h: number; opacity: number } {
+  return {
+    w: Math.max(4, Math.round(width * scale)),
+    h: Math.max(4, Math.round(height * scale)),
+    opacity: Math.min(0.2, Math.max(0, opacity)),
+  };
+}
+
+/**
  * URI `data:` d'une tuile (SVG encodé en pourcentage : ni guillemet, ni
  * parenthèse, utilisable tel quel dans `url("…")`).
  */
