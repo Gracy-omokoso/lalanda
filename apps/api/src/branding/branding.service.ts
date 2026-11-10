@@ -20,6 +20,18 @@
 
 import { createHash } from 'node:crypto';
 
+import {
+  BRAND_PATTERNS,
+  clampIntensity,
+  effectiveLogoChoice,
+  isLogoChoice,
+  isPatternId,
+  patternDataUri,
+  patternTileSize,
+  type BrandPatternSetting,
+  type LogoChoice,
+} from '@lalanda/shared/branding';
+
 import { ConflictException, Inject, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { ClientSession, Model } from 'mongoose';
@@ -44,11 +56,13 @@ import {
   isInvoiceTemplateId,
   type FrozenIdentity,
   type FrozenLogoRef,
+  type FrozenPattern,
   type FrozenPresentation,
   type InvoiceTemplateId,
   type LogoVariant,
   type Palette,
   type RenderLogo,
+  type RenderPattern,
   type TemplateFontChoice,
   type TemplateOptions,
   type TemplateOptionsInput,
@@ -58,10 +72,13 @@ import {
   ObjectStorageService,
   ObjectStorageUnavailableError,
 } from '../storage/object-storage.service.js';
+import { brandAssetUrlFor } from './brand-asset-url.js';
 import type {
   PutBrandIdentityInput,
   PutCustomTemplateInput,
   PutInvoiceTemplateInput,
+  PutLogoChoiceInput,
+  PutPatternInput,
 } from './branding.dto.js';
 import {
   OrganizationBrand,
@@ -91,8 +108,25 @@ export interface BrandState {
   secondaryColor: string | null;
   font: string | null;
   invoiceTemplate: OrganizationBrand['invoiceTemplate'];
+  /** Choix ENREGISTRÉ (`null` : déduit, voir `logoChoiceOf`). ADR-0073 § 1. */
+  logoChoice: LogoChoice | null;
+  favicon: AssetLean | null;
+  patternImage: AssetLean | null;
+  pattern: BrandPatternSetting;
   revision: number;
   updatedAt: Date | null;
+}
+
+/** Image d'une organisation : usage et champ de l'identité qui la relie. */
+export type BrandImageKind = 'favicon' | 'pattern';
+const IMAGE_FIELD: Record<BrandImageKind, 'favicon' | 'patternImage'> = {
+  favicon: 'favicon',
+  pattern: 'patternImage',
+};
+
+/** Couleur d'un motif de la bibliothèque sur une facture : l'accent, noir en « noir et blanc ». */
+export function invoicePatternColor(options: TemplateOptions): string {
+  return options.palette === 'mono' ? '#111111' : options.accent;
 }
 
 /** Entrées de cache : octets d'un logo IMMUABLE, clé `organisation:assetId:sha256`. */
@@ -148,9 +182,11 @@ export class BrandingService {
       .findOne({ organizationId }, null, session ? { session } : {})
       .lean<BrandLean>()
       .exec();
-    const ids = LOGO_VARIANTS.map((v) => doc?.logos?.[v] ?? null).filter(
-      (x): x is string => typeof x === 'string',
-    );
+    const ids = [
+      ...LOGO_VARIANTS.map((v) => doc?.logos?.[v] ?? null),
+      doc?.favicon ?? null,
+      doc?.patternImage ?? null,
+    ].filter((x): x is string => typeof x === 'string');
     const found =
       ids.length > 0
         ? await this.assets
@@ -169,9 +205,97 @@ export class BrandingService {
       secondaryColor: doc?.secondaryColor ?? null,
       font: doc?.font ?? null,
       invoiceTemplate: doc?.invoiceTemplate ?? null,
+      logoChoice: isLogoChoice(doc?.logoChoice) ? doc.logoChoice : null,
+      favicon: doc?.favicon ? (found.find((a) => a.assetId === doc.favicon) ?? null) : null,
+      patternImage: doc?.patternImage
+        ? (found.find((a) => a.assetId === doc.patternImage) ?? null)
+        : null,
+      pattern: patternSettingOf(doc?.pattern),
       revision: doc?.revision ?? 0,
       updatedAt: doc?.updatedAt ?? null,
     };
+  }
+
+  /** Choix de logo EFFECTIF : enregistré, sinon déduit des logos téléversés (ADR-0073 § 1). */
+  logoChoiceOf(state: BrandState): LogoChoice {
+    return effectiveLogoChoice(state.logoChoice, {
+      primary: state.logos.primary !== null,
+      horizontal: state.logos.horizontal !== null,
+      symbol: state.logos.symbol !== null,
+    });
+  }
+
+  /**
+   * Motif à FIGER (ADR-0073 § 4) : `null` sans motif, ou si l'image choisie a été
+   * retirée. La couleur d'un motif de la bibliothèque est résolue ici, figée.
+   */
+  patternToFreeze(state: BrandState, color: string): FrozenPattern | null {
+    const p = state.pattern;
+    if (p.source === 'library' && p.libraryId && isPatternId(p.libraryId)) {
+      return {
+        source: 'library',
+        id: p.libraryId,
+        color: HEX_COLOR.test(color) ? color : '#111111',
+        intensity: clampIntensity(p.intensity),
+      };
+    }
+    if (p.source === 'upload' && state.patternImage) {
+      const a = state.patternImage;
+      return {
+        source: 'upload',
+        image: {
+          assetId: a.assetId,
+          sha256: a.sha256,
+          contentType: a.contentType,
+          width: a.width,
+          height: a.height,
+        },
+        intensity: clampIntensity(p.intensity),
+      };
+    }
+    return null;
+  }
+
+  /** Motif prêt au rendu ; l'image téléversée est relue et vérifiée contre son empreinte. */
+  async renderPattern(organizationId: string, p: FrozenPattern): Promise<RenderPattern> {
+    const opacity = clampIntensity(p.intensity) / 100;
+    if (p.source === 'library') {
+      const size = patternTileSize(p.id);
+      return {
+        dataUri: patternDataUri(p.id, p.color),
+        width: size.w,
+        height: size.h,
+        raster: false,
+        opacity,
+      };
+    }
+    const l = await this.renderLogo(organizationId, p.image);
+    return { dataUri: l.dataUri, width: l.width, height: l.height, raster: true, opacity };
+  }
+
+  /**
+   * Motif COURANT d'un document non figé (cartes, documents RH) dans la couleur
+   * demandée. Une image illisible est omise (pas de motif) plutôt que de bloquer.
+   */
+  async currentPatternForRender(
+    organizationId: string,
+    color: string,
+    state?: BrandState,
+  ): Promise<RenderPattern | null> {
+    const s = state ?? (await this.state(organizationId));
+    const frozen = this.patternToFreeze(s, color);
+    if (!frozen) return null;
+    return this.renderPattern(organizationId, frozen).catch(() => null);
+  }
+
+  /** URL signée du favicon de l'organisation, ou `null` (favicon Lalanda). */
+  async faviconUrl(organizationId: string): Promise<string | null> {
+    try {
+      const s = await this.state(organizationId);
+      return s.favicon ? brandAssetUrlFor(s.favicon.assetId) : null;
+    } catch {
+      return null;
+    }
   }
 
   /** Empreinte de l'identité COURANTE (ce que le gel recopie). */
@@ -196,6 +320,7 @@ export class BrandingService {
         state.secondaryColor && HEX_COLOR.test(state.secondaryColor) ? state.secondaryColor : null,
       font: isBodyFont(state.font) ? state.font : null,
       logos,
+      logoChoice: this.logoChoiceOf(state),
     };
   }
 
@@ -229,16 +354,17 @@ export class BrandingService {
       // Paquet introuvable (ne devrait pas arriver : jamais supprimé) :
       // présentation d'origine plutôt qu'une facture impossible à geler.
       if (!pkg) return null;
-      return this.customPresentation(pkg, this.optionsInput(state), this.identityOf(state));
+      const p = this.customPresentation(pkg, this.optionsInput(state), this.identityOf(state));
+      return withPattern(p, this.patternToFreeze(state, invoicePatternColor(p.options)));
     }
     if (!isInvoiceTemplateId(id)) return null;
     const template = latestTemplate(id);
     const identity = this.identityOf(state);
-    return {
-      template: { id: template.id, version: template.version },
-      options: resolveOptions(template, this.optionsInput(state), identity),
-      identity,
-    };
+    const options = resolveOptions(template, this.optionsInput(state), identity);
+    return withPattern(
+      { template: { id: template.id, version: template.version }, options, identity },
+      this.patternToFreeze(state, invoicePatternColor(options)),
+    );
   }
 
   /** Présentation d'un paquet sur mesure (ADR-0029 § 7) : référence figée et options résolues. */
@@ -279,7 +405,7 @@ export class BrandingService {
         ? this.optionsInput(state)
         : null;
     const choices = pkg.manifest.options.fonts;
-    return this.customPresentation(
+    const p = this.customPresentation(
       pkg,
       {
         palette: override.palette ?? saved?.palette ?? null,
@@ -289,6 +415,7 @@ export class BrandingService {
       },
       this.identityOf(state),
     );
+    return withPattern(p, this.patternToFreeze(state, invoicePatternColor(p.options)));
   }
 
   /**
@@ -313,11 +440,11 @@ export class BrandingService {
           ? override.font
           : (saved?.font ?? null),
     };
-    return {
-      template: { id: template.id, version: template.version },
-      options: resolveOptions(template, input, identity),
-      identity,
-    };
+    const options = resolveOptions(template, input, identity);
+    return withPattern(
+      { template: { id: template.id, version: template.version }, options, identity },
+      this.patternToFreeze(state, invoicePatternColor(options)),
+    );
   }
 
   /**
@@ -345,7 +472,15 @@ export class BrandingService {
       const ref = p.identity.logos[v];
       logos[v] = ref ? await this.renderLogo(organizationId, ref) : null;
     }
-    return { template, options: p.options, identity: p.identity, logos };
+    // Motif figé (ADR-0073) : absent des présentations d'avant, donc aucun.
+    const pattern = p.pattern ? await this.renderPattern(organizationId, p.pattern) : null;
+    return {
+      template,
+      options: p.options,
+      identity: p.identity,
+      logos,
+      ...(pattern ? { pattern } : {}),
+    };
   }
 
   private async renderLogo(organizationId: string, ref: FrozenLogoRef): Promise<RenderLogo> {
@@ -401,7 +536,11 @@ export class BrandingService {
     const linked = await this.brands
       .exists({
         organizationId: asset.organizationId,
-        $or: LOGO_VARIANTS.map((v) => ({ [`logos.${v}`]: assetId })),
+        $or: [
+          ...LOGO_VARIANTS.map((v) => ({ [`logos.${v}`]: assetId })),
+          { favicon: assetId },
+          { patternImage: assetId },
+        ],
       })
       .exec();
     if (!linked) return null;
@@ -644,6 +783,10 @@ export class BrandingService {
             secondaryColor: null,
             font: null,
             invoiceTemplate: null,
+            logoChoice: null,
+            favicon: null,
+            patternImage: null,
+            pattern: null,
             revision: 0,
             updatedBy: null,
             _schemaVersion: 1,
@@ -663,16 +806,192 @@ export class BrandingService {
    * leur empreinte, prêts pour le rendu d'une carte (`data:`). Un logo illisible
    * est omis (la carte retombe sur le monogramme) plutôt que de bloquer l'export.
    */
-  async currentLogosForRender(
-    organizationId: string,
-  ): Promise<{ identity: FrozenIdentity; logos: Record<LogoVariant, RenderLogo | null> }> {
-    const identity = this.identityOf(await this.state(organizationId));
+  async currentLogosForRender(organizationId: string): Promise<{
+    identity: FrozenIdentity;
+    logos: Record<LogoVariant, RenderLogo | null>;
+    /** ADR-0073 : choix effectif, et l'état pour résoudre le motif courant. */
+    logoChoice: LogoChoice;
+    state: BrandState;
+  }> {
+    const state = await this.state(organizationId);
+    const identity = this.identityOf(state);
     const logos = {} as Record<LogoVariant, RenderLogo | null>;
     for (const v of LOGO_VARIANTS) {
       const ref = identity.logos[v];
       logos[v] = ref ? await this.renderLogo(organizationId, ref).catch(() => null) : null;
     }
-    return { identity, logos };
+    return { identity, logos, logoChoice: this.logoChoiceOf(state), state };
+  }
+
+  // ── Identité visuelle v2 (ADR-0073) ─────────────────────────────────────────
+
+  async putLogoChoice(
+    organizationId: string,
+    input: PutLogoChoiceInput,
+    actor: BrandActor,
+  ): Promise<void> {
+    await this.ensure(organizationId);
+    const res = await this.brands
+      .updateOne(
+        { organizationId, revision: input.expectedRevision },
+        { $set: { logoChoice: input.logoChoice, updatedBy: actor.userId }, $inc: { revision: 1 } },
+      )
+      .exec();
+    if (res.matchedCount !== 1) staleRevision((await this.state(organizationId)).revision);
+    await this.audit.record({
+      organizationId,
+      actorUserId: actor.userId,
+      actorRole: actor.role,
+      action: 'organization.brand_logo_choice_updated',
+      targetType: 'organization',
+      targetId: organizationId,
+      metadata: { logoChoice: input.logoChoice },
+    });
+  }
+
+  async putPattern(
+    organizationId: string,
+    input: PutPatternInput,
+    actor: BrandActor,
+  ): Promise<void> {
+    if (input.source === 'upload') {
+      const s = await this.state(organizationId);
+      if (!s.patternImage) {
+        throw new ConflictException({
+          code: 'PATTERN_IMAGE_MISSING',
+          message: 'Téléversez d’abord votre motif (PNG transparent).',
+        });
+      }
+    }
+    const pattern: BrandPatternSetting = {
+      source: input.source,
+      libraryId: input.source === 'library' ? input.libraryId : null,
+      intensity: clampIntensity(input.intensity),
+    };
+    await this.ensure(organizationId);
+    const res = await this.brands
+      .updateOne(
+        { organizationId, revision: input.expectedRevision },
+        { $set: { pattern, updatedBy: actor.userId }, $inc: { revision: 1 } },
+      )
+      .exec();
+    if (res.matchedCount !== 1) staleRevision((await this.state(organizationId)).revision);
+    await this.audit.record({
+      organizationId,
+      actorUserId: actor.userId,
+      actorRole: actor.role,
+      action: 'organization.brand_pattern_updated',
+      targetType: 'organization',
+      targetId: organizationId,
+      metadata: { ...pattern },
+    });
+  }
+
+  /**
+   * Téléverse un favicon ou un motif (octets DÉJÀ assainis et contrôlés) et le
+   * relie à l'identité. L'ancien objet n'est pas supprimé : un document figé
+   * peut désigner un ancien motif.
+   */
+  async uploadImage(
+    organizationId: string,
+    kind: BrandImageKind,
+    image: ImageAcceptance,
+    actor: BrandActor,
+  ): Promise<void> {
+    const assetId = await this.storeAsset(organizationId, kind, image, actor);
+    await this.ensure(organizationId);
+    await this.brands
+      .updateOne(
+        { organizationId },
+        { $set: { [IMAGE_FIELD[kind]]: assetId, updatedBy: actor.userId }, $inc: { revision: 1 } },
+      )
+      .exec();
+    await this.audit.record({
+      organizationId,
+      actorUserId: actor.userId,
+      actorRole: actor.role,
+      action:
+        kind === 'favicon'
+          ? 'organization.brand_favicon_uploaded'
+          : 'organization.brand_pattern_uploaded',
+      targetType: 'organization_brand_asset',
+      targetId: assetId,
+      metadata: {
+        contentType: image.contentType,
+        bytes: image.bytes.length,
+        width: image.width,
+        height: image.height,
+      },
+    });
+  }
+
+  /** Détache le favicon ou le motif téléversé. Idempotent ; l'objet est conservé. */
+  async removeImage(
+    organizationId: string,
+    kind: BrandImageKind,
+    actor: BrandActor,
+  ): Promise<boolean> {
+    const field = IMAGE_FIELD[kind];
+    const set: Record<string, unknown> = { [field]: null, updatedBy: actor.userId };
+    const res = await this.brands
+      .updateOne(
+        { organizationId, [field]: { $type: 'string' } },
+        { $set: set, $inc: { revision: 1 } },
+      )
+      .exec();
+    if (res.modifiedCount !== 1) return false;
+    // Motif téléversé retiré alors qu'il était choisi : plus de motif.
+    if (kind === 'pattern') {
+      await this.brands
+        .updateOne(
+          { organizationId, 'pattern.source': 'upload' },
+          { $set: { 'pattern.source': 'none' } },
+        )
+        .exec();
+    }
+    await this.audit.record({
+      organizationId,
+      actorUserId: actor.userId,
+      actorRole: actor.role,
+      action:
+        kind === 'favicon'
+          ? 'organization.brand_favicon_removed'
+          : 'organization.brand_pattern_removed',
+      targetType: 'organization',
+      targetId: organizationId,
+      metadata: {},
+    });
+    return true;
+  }
+
+  /** Objet + enregistrement immuable d'une image (même ordre que `uploadLogo`). */
+  private async storeAsset(
+    organizationId: string,
+    kind: 'logo' | BrandImageKind,
+    image: ImageAcceptance,
+    actor: BrandActor,
+  ): Promise<string> {
+    const bucket = this.storage.uploadsBucket();
+    if (!bucket) {
+      const a = this.storage.availability();
+      throw new ObjectStorageUnavailableError(a.available ? 'Bucket absent.' : a.reason);
+    }
+    const assetId = newObjectId();
+    const objectKey = brandAssetObjectKey(assetId);
+    await this.storage.putObject(bucket, objectKey, image.bytes, image.contentType);
+    await this.assets.create({
+      assetId,
+      organizationId,
+      objectKey,
+      contentType: image.contentType,
+      width: image.width,
+      height: image.height,
+      byteSize: image.bytes.length,
+      sha256: sha256Hex(image.bytes),
+      createdBy: actor.userId,
+      kind,
+    });
+    return assetId;
   }
 }
 
@@ -693,3 +1012,23 @@ export function optionsSourceOf(m: TemplateManifest): {
     palettes,
   };
 }
+
+/** Réglage de motif normalisé (valeurs hors liste ⇒ aucun motif). */
+export function patternSettingOf(raw: unknown): BrandPatternSetting {
+  const p = (raw ?? null) as Partial<BrandPatternSetting> | null;
+  const source = p?.source === 'library' || p?.source === 'upload' ? p.source : 'none';
+  const libraryId = isPatternId(p?.libraryId) ? p.libraryId : null;
+  return {
+    source: source === 'library' && libraryId === null ? 'none' : source,
+    libraryId,
+    intensity: clampIntensity(p?.intensity),
+  };
+}
+
+/** Ajoute le motif à une présentation seulement s'il y en a un (présentation d'avant sinon). */
+function withPattern(p: FrozenPresentation, pattern: FrozenPattern | null): FrozenPresentation {
+  return pattern ? { ...p, pattern } : p;
+}
+
+/** Bibliothèque exposée à l'écran (identifiants et noms). */
+export const PATTERN_LIBRARY = BRAND_PATTERNS;

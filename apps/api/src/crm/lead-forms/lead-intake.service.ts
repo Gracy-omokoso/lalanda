@@ -11,6 +11,7 @@
 // `crm.activity_assigned`), jamais d'opportunité sauf réglage explicite, puis la
 // preuve du consentement. L'IP n'est jamais écrite : seulement son empreinte.
 
+import { logoOrderFor } from '@lalanda/shared/branding';
 import {
   LEAD_FORM_ACCOUNT_ORIGIN,
   LEAD_FORM_DEFAULT_LABELS,
@@ -99,6 +100,7 @@ export class LeadIntakeService {
       successMessage: form.successMessage,
       branding: form.showBranding ? await this.brandingOf(form.organizationId) : null,
       ticket: mintLeadFormTicket(String(form._id), nowMs),
+      faviconUrl: await this.branding.faviconUrl(form.organizationId),
     };
   }
 
@@ -108,7 +110,11 @@ export class LeadIntakeService {
   ): Promise<{ logoUrl: string | null; color: string | null } | null> {
     try {
       const state = await this.branding.state(organizationId);
-      const logo = state.logos.primary ?? state.logos.horizontal ?? state.logos.symbol;
+      // ADR-0073 § 1 : le choix unique de l'organisation, repli sur l'autre forme.
+      const logo =
+        logoOrderFor(this.branding.logoChoiceOf(state))
+          .map((v) => state.logos[v])
+          .find((l) => l !== null) ?? null;
       if (!logo) return null;
       const color =
         state.primaryColor && HEX_COLOR.test(state.primaryColor) ? state.primaryColor : null;

@@ -4,6 +4,7 @@
 
 import { createHash } from 'node:crypto';
 
+import { patternDataUri } from '@lalanda/shared/branding';
 import { describe, expect, it } from 'vitest';
 
 import { esc } from '../invoice-document-html.js';
@@ -84,9 +85,10 @@ describe('catalogue', () => {
     ]);
     expect(templateCatalog()).toHaveLength(6);
     // ADR-0028 § 4 : toutes les versions publiées restent ; le choix pointe la dernière.
-    expect(templateAt('bandeau', '1.1.0')).toBe(latestTemplate('bandeau'));
+    expect(templateAt('bandeau', '1.2.0')).toBe(latestTemplate('bandeau'));
+    expect(templateAt('bandeau', '1.1.0')?.version).toBe('1.1.0');
     expect(templateAt('bandeau', '1.0.0')?.version).toBe('1.0.0');
-    expect(templateCatalog().map((t) => t.version)).toEqual(Array(6).fill('1.1.0'));
+    expect(templateCatalog().map((t) => t.version)).toEqual(Array(6).fill('1.2.0'));
     expect(templateAt('bandeau', '9.9.9')).toBeNull();
     expect(templateAt('inconnu', '1.0.0')).toBeNull();
   });
@@ -470,5 +472,161 @@ describe('vue API : présentation figée (ADR-0028 § 6)', () => {
       version: '1.0.0',
       options: { palette: 'mono', accent: '#7f1d1d', font: 'fraunces+inter' },
     });
+  });
+});
+
+// ── Identité visuelle v2 (ADR-0073) : versions 1.2.0 ─────────────────────────
+
+/**
+ * Empreintes du rendu 1.1.0 (même méthode que `EMPREINTES_1_0_0`), relevées le
+ * 10 nov. 2026 AVANT l'ajout de 1.2.0, du motif de fond et du choix de logo :
+ * une facture gelée avec `…@1.1.0` se réimprime octet pour octet.
+ */
+const EMPREINTES_1_1_0: Record<string, string> = {
+  classique: 'f1e92ef20e3c8fb8149b87dc03d2c4f3686487fd69c346e21415e6b97513f67d',
+  bandeau: '2a095690077a4de630a0f756a75dd090c86ea4e7a282515f92620e130e04100f',
+  laterale: '26fbdfe2cbb63bf995a3ea1f2341b6fd9eef519d43b08b909b637cd903bd50c3',
+  minimal: '787392b92bc4a907d0976ff7a55783ee4219d60623c23e006e0f59c770a615dd',
+  compacte: '4df7ef3266e9d00c7245a070cd61cb2f479c3a51b0bc4751a33678a51ed1f1bc',
+  editoriale: '09ecb02ee56cb8a0f468fc31f1ff60565f06513d9e70988ceb9456318cc7574c',
+};
+
+function onlyLogos(variants: readonly LogoVariantId[]): ResolvedPresentation['logos'] {
+  const all = renderLogos(true);
+  const out = renderLogos(false);
+  for (const v of variants) out[v] = all[v];
+  return out;
+}
+
+type LogoVariantId = 'primary' | 'horizontal' | 'symbol' | 'light';
+
+function v2Html(
+  id: (typeof INVOICE_TEMPLATE_IDS)[number],
+  opts: {
+    logos?: readonly LogoVariantId[];
+    logoChoice?: 'square' | 'horizontal';
+    pattern?: ResolvedPresentation['pattern'];
+  } = {},
+): string {
+  const t = templateAt(id, '1.2.0')!;
+  const m = modelFor(normalizedTest(), t);
+  return renderDocumentHtml(m, QR, {
+    template: t,
+    options: t.defaults,
+    identity: { ...IDENTITY, ...(opts.logoChoice ? { logoChoice: opts.logoChoice } : {}) },
+    logos: onlyLogos(opts.logos ?? []),
+    ...(opts.pattern !== undefined ? { pattern: opts.pattern } : {}),
+  }).html;
+}
+
+const LIB_PATTERN = {
+  dataUri: patternDataUri('losanges', '#0f5132'),
+  width: 24,
+  height: 24,
+  raster: false,
+  opacity: 0.08,
+};
+
+describe('ADR-0073 — identité visuelle v2 (modèles 1.2.0)', () => {
+  it.each(INVOICE_TEMPLATE_IDS)(
+    '%s@1.1.0 : rendu inchangé, octet pour octet (factures déjà gelées)',
+    (id) => {
+      expect(empreinte(templateAt(id, '1.1.0')!)).toBe(EMPREINTES_1_1_0[id]);
+    },
+  );
+
+  it.each(INVOICE_TEMPLATE_IDS)(
+    '%s@1.2.0 : toutes les mentions DGI, avec et sans logo, avec et sans motif',
+    (id) => {
+      const t = templateAt(id, '1.2.0')!;
+      for (const [, m] of documentCases(t)) {
+        for (const logos of [[], ['primary', 'horizontal', 'symbol', 'light']] as const) {
+          for (const pattern of [null, LIB_PATTERN]) {
+            expect(() =>
+              renderDocumentHtml(m, m.security ? QR : null, {
+                template: t,
+                options: t.defaults,
+                identity: { ...IDENTITY, logoChoice: 'horizontal' },
+                logos: onlyLogos(logos),
+                pattern,
+              }),
+            ).not.toThrow();
+          }
+        }
+      }
+    },
+  );
+
+  it.each(INVOICE_TEMPLATE_IDS)(
+    '%s@1.2.0 : le choix carré ou horizontal décide du logo imprimé',
+    (id) => {
+      const all = ['primary', 'horizontal', 'symbol'] as const;
+      const square = v2Html(id, { logos: all, logoChoice: 'square' });
+      const horizontal = v2Html(id, { logos: all, logoChoice: 'horizontal' });
+      // Sur fond de couleur, la version claire passe devant (absente ici).
+      expect(square).toContain('data-variant="primary"');
+      expect(square).not.toContain('data-variant="horizontal"');
+      expect(horizontal).toContain('data-variant="horizontal"');
+      expect(horizontal).not.toContain('data-variant="primary"');
+      // Repli : le carré manque ⇒ l'horizontal ; l'horizontal manque ⇒ le carré.
+      expect(v2Html(id, { logos: ['horizontal'], logoChoice: 'square' })).toContain(
+        'data-variant="horizontal"',
+      );
+      expect(v2Html(id, { logos: ['primary'], logoChoice: 'horizontal' })).toContain(
+        'data-variant="primary"',
+      );
+      // Sans choix enregistré : déduit (horizontal seul ⇒ horizontal).
+      expect(v2Html(id, { logos: ['horizontal', 'symbol'] })).toContain('data-variant="symbol"');
+    },
+  );
+
+  it.each(INVOICE_TEMPLATE_IDS)(
+    '%s@1.2.0 : avec un logo, le nom n’est écrit qu’une fois (bloc légal, texte normal)',
+    (id) => {
+      const t = templateAt(id, '1.2.0')!;
+      const m = modelFor(normalizedTest(), t);
+      const title = esc(m.seller.title);
+      // Occurrences du nom seul (le client « Client Exemple SARL » le contient).
+      const count = (h: string) => h.split(new RegExp(`>(?:${title})<`)).length - 1;
+      const withLogo = v2Html(id, { logos: ['primary'] });
+      const without = v2Html(id);
+      // Le titre HTML de l'onglet (<title>) ne porte pas la raison sociale.
+      expect(count(withLogo)).toBe(1);
+      expect(withLogo).not.toContain(`font-weight:700">${title}`);
+      // Avant toute configuration : initiales + nom, comme en 1.1.0.
+      expect(count(without)).toBeGreaterThanOrEqual(1);
+      const v11 = renderDocumentHtml(m, QR, {
+        template: templateAt(id, '1.1.0')!,
+        options: t.defaults,
+        identity: IDENTITY,
+        logos: onlyLogos([]),
+      }).html;
+      expect(count(without)).toBe(count(v11));
+    },
+  );
+
+  it('motif : posé par le moteur sous le contenu, absent sans réglage, cadre DGI sur blanc', () => {
+    const with_ = v2Html('classique', { pattern: LIB_PATTERN });
+    const without = v2Html('classique');
+    expect(with_).toContain('<div class="lx-pattern" aria-hidden="true"></div>');
+    expect(with_).toContain('z-index: -1');
+    expect(with_).toContain('opacity: 0.08');
+    expect(with_).toContain('background:#ffffff">');
+    expect(without).not.toContain('lx-pattern');
+    // Opacité bornée à 20 % quoi qu'on demande.
+    expect(v2Html('minimal', { pattern: { ...LIB_PATTERN, opacity: 0.9 } })).toContain(
+      'opacity: 0.20',
+    );
+    // Aucune ressource distante, URI contrôlée.
+    expect(() =>
+      v2Html('classique', {
+        pattern: { ...LIB_PATTERN, dataUri: 'https://exemple.cd/motif.png' },
+      }),
+    ).toThrow(/URI/);
+    expect(() =>
+      v2Html('classique', {
+        pattern: { ...LIB_PATTERN, dataUri: 'data:image/svg+xml,a")%3Bbackground:url("x' },
+      }),
+    ).toThrow(/URI/);
   });
 });

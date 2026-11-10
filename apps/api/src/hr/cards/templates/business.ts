@@ -9,7 +9,9 @@ import type { CardData, CardTheme } from '../card-model.js';
 import { fitSize } from '../card-model.js';
 import { baseCss, contacts, esc, logo, m, vcardQr, type CardTemplateDef } from './parts.js';
 
-const V = '1.0.0';
+// 1.1.0 (10 nov. 2026, ADR-0073) : logo selon le choix unique de l'organisation ;
+// nom de marque retiré à côté du logo quand un logo est imprimé ; motif de fond.
+const V = '1.1.0';
 
 function box(f: CardFormat) {
   const o = f.bleed;
@@ -346,11 +348,12 @@ const editoB: CardTemplateDef = {
       .v5 .lg { position: absolute; left: ${m(s)}; bottom: ${m(s)}; height: 6.5mm; max-width: 32mm; }
       .v5v .mono { left: ${m(s)}; right: ${m(s)}; top: ${m(H / 2 - 20)}; text-align: center; font-family: ${t.display}; font-size: 22mm; font-weight: 700; color: ${t.accent}; line-height: 1; }
       .v5v .org { left: ${m(s)}; right: ${m(s)}; top: ${m(H / 2 + 5)}; text-align: center; font-family: ${t.display}; font-size: 3mm; font-weight: 600; }
+      .v5v .vlg { left: ${m(s)}; right: ${m(s)}; top: ${m(H / 2 - 16)}; height: 18mm; justify-content: center; }
       .v5v .slg { left: ${m(s)}; right: ${m(s)}; top: ${m(H / 2 + 10.5)}; text-align: center; font-size: 2.2mm; color: ${t.muted}; }
       .v5v .site { left: ${m(s)}; right: ${m(s)}; bottom: ${m(s)}; text-align: center; font-size: 2mm; letter-spacing: 0.3mm; }
       .v5v .qrw { position: absolute; left: 0; right: 0; top: ${m(s)}; display: flex; justify-content: center; }`,
-      recto: `<div class="bc v5"><div class="abs t"></div><div class="abs kick">${esc(d.org.name)}</div><div class="abs who"><div class="name">${esc(d.displayName)}</div><div class="title">${esc(d.jobTitle)}</div></div>${contacts(d)}<div class="abs b"></div>${logo(d, t, false)}</div>`,
-      verso: `<div class="bc v5v"><div class="qrw">${vcardQr(d, 14)}</div><div class="abs mono">${esc(d.org.initials)}</div><div class="abs org">${esc(d.org.name)}</div>${slogan(d, 'abs slg')}${site(d, 'abs site')}</div>`,
+      recto: `<div class="bc v5"><div class="abs t"></div><div class="abs kick">${d.org.logo ? '' : esc(d.org.name)}</div><div class="abs who"><div class="name">${esc(d.displayName)}</div><div class="title">${esc(d.jobTitle)}</div></div>${contacts(d)}<div class="abs b"></div>${logo(d, t, false)}</div>`,
+      verso: `<div class="bc v5v"><div class="qrw">${vcardQr(d, 14)}</div>${d.org.logo ? logo(d, t, false, 'lg abs vlg') : `<div class="abs mono">${esc(d.org.initials)}</div><div class="abs org">${esc(d.org.name)}</div>`}${slogan(d, 'abs slg')}${site(d, 'abs site')}</div>`,
     };
   },
 };

@@ -31,6 +31,15 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import {
+  FAVICON_LIMITS,
+  LOGO_CHOICES,
+  LOGO_CHOICE_LABELS,
+  PATTERN_IMAGE_LIMITS,
+  PATTERN_INTENSITY,
+  type BrandPatternSetting,
+  type LogoChoice,
+} from '@lalanda/shared/branding';
 import type { Request } from 'express';
 
 import {
@@ -57,8 +66,20 @@ import {
 import { UserThrottlerGuard } from '../security/user-throttler.guard.js';
 import { ObjectStorageUnavailableError } from '../storage/object-storage.service.js';
 import { BRAND_ASSET_URL_TTL_SECONDS, brandAssetUrlFor } from './brand-asset-url.js';
-import { LogoVariantSchema, PutBrandIdentitySchema } from './branding.dto.js';
-import { BrandingService, type BrandActor, type BrandState } from './branding.service.js';
+import {
+  LogoVariantSchema,
+  PutBrandIdentitySchema,
+  PutLogoChoiceSchema,
+  PutPatternSchema,
+} from './branding.dto.js';
+import {
+  BrandingService,
+  PATTERN_LIBRARY,
+  type BrandActor,
+  type BrandImageKind,
+  type BrandState,
+} from './branding.service.js';
+import { pngAlpha } from './png-alpha.js';
 
 export interface BrandLogoView {
   variant: LogoVariant;
@@ -89,6 +110,41 @@ export interface BrandView {
     urlTtlSeconds: number;
     storageAvailable: boolean;
   };
+  // ── ADR-0073 ──
+  /** Choix enregistré (`null` : déduit des logos) et choix effectif. */
+  logoChoice: LogoChoice | null;
+  effectiveLogoChoice: LogoChoice;
+  logoChoices: { id: LogoChoice; label: string }[];
+  favicon: BrandImageView | null;
+  patternImage: BrandImageView | null;
+  pattern: BrandPatternSetting;
+  patterns: { id: string; label: string }[];
+  imageLimits: {
+    favicon: typeof FAVICON_LIMITS;
+    pattern: typeof PATTERN_IMAGE_LIMITS;
+    intensity: typeof PATTERN_INTENSITY;
+  };
+}
+
+/** Favicon ou motif téléversé (URL signée, révoquée au remplacement). */
+export interface BrandImageView {
+  assetId: string;
+  url: string;
+  width: number;
+  height: number;
+  byteSize: number;
+}
+
+function imageViewOf(a: BrandState['favicon']): BrandImageView | null {
+  return a
+    ? {
+        assetId: a.assetId,
+        url: brandAssetUrlFor(a.assetId),
+        width: a.width,
+        height: a.height,
+        byteSize: a.byteSize,
+      }
+    : null;
 }
 
 export function brandViewOf(state: BrandState, storageAvailable: boolean): BrandView {
@@ -124,6 +180,22 @@ export function brandViewOf(state: BrandState, storageAvailable: boolean): Brand
       acceptedTypes: ACCEPTED_IMAGE_TYPES,
       urlTtlSeconds: BRAND_ASSET_URL_TTL_SECONDS,
       storageAvailable,
+    },
+    logoChoice: state.logoChoice,
+    effectiveLogoChoice:
+      state.logoChoice ??
+      (state.logos.horizontal && !state.logos.primary && !state.logos.symbol
+        ? 'horizontal'
+        : 'square'),
+    logoChoices: LOGO_CHOICES.map((id) => ({ id, label: LOGO_CHOICE_LABELS[id] })),
+    favicon: imageViewOf(state.favicon),
+    patternImage: imageViewOf(state.patternImage),
+    pattern: state.pattern,
+    patterns: PATTERN_LIBRARY.map((p) => ({ id: p.id, label: p.label })),
+    imageLimits: {
+      favicon: FAVICON_LIMITS,
+      pattern: PATTERN_IMAGE_LIMITS,
+      intensity: PATTERN_INTENSITY,
     },
   };
 }
@@ -260,5 +332,186 @@ export class BrandingController {
       actorOf(user, role),
     );
     return { ...(await this.view(orgId)), removed };
+  }
+
+  // ── Identité visuelle v2 (ADR-0073) ──────────────────────────────────────────
+
+  @Put('logo-choice')
+  @RequirePermission('organization.manage')
+  async putLogoChoice(
+    @CurrentOrgId() orgId: string,
+    @CurrentUser() user: { id: string },
+    @CurrentOrgRole() role: OrgRole | undefined,
+    @Body() body: unknown,
+  ): Promise<BrandView> {
+    const parsed = PutLogoChoiceSchema.safeParse(body);
+    if (!parsed.success) invalidBody(parsed.error);
+    await this.branding.putLogoChoice(orgId, parsed.data, actorOf(user, role));
+    return this.view(orgId);
+  }
+
+  @Put('pattern')
+  @RequirePermission('organization.manage')
+  async putPattern(
+    @CurrentOrgId() orgId: string,
+    @CurrentUser() user: { id: string },
+    @CurrentOrgRole() role: OrgRole | undefined,
+    @Body() body: unknown,
+  ): Promise<BrandView> {
+    const parsed = PutPatternSchema.safeParse(body);
+    if (!parsed.success) invalidBody(parsed.error);
+    await this.branding.putPattern(orgId, parsed.data, actorOf(user, role));
+    return this.view(orgId);
+  }
+
+  /** Favicon : PNG carré (512 × 512 conseillé). Vingt envois par heure, comme les logos. */
+  @Post('favicon')
+  @HttpCode(201)
+  @RequirePermission('organization.manage')
+  @Throttle({ default: { ttl: 3_600_000, limit: 20 } })
+  @UseGuards(UserThrottlerGuard)
+  async uploadFavicon(
+    @CurrentOrgId() orgId: string,
+    @CurrentUser() user: { id: string },
+    @CurrentOrgRole() role: OrgRole | undefined,
+    @Req() req: Request,
+  ): Promise<BrandView> {
+    return this.uploadImage(orgId, 'favicon', req, actorOf(user, role));
+  }
+
+  @Delete('favicon')
+  @RequirePermission('organization.manage')
+  async removeFavicon(
+    @CurrentOrgId() orgId: string,
+    @CurrentUser() user: { id: string },
+    @CurrentOrgRole() role: OrgRole | undefined,
+  ): Promise<BrandView & { removed: boolean }> {
+    const removed = await this.branding.removeImage(orgId, 'favicon', actorOf(user, role));
+    return { ...(await this.view(orgId)), removed };
+  }
+
+  /** Motif : PNG TRANSPARENT (canal alpha vérifié sur les pixels). */
+  @Post('pattern-image')
+  @HttpCode(201)
+  @RequirePermission('organization.manage')
+  @Throttle({ default: { ttl: 3_600_000, limit: 20 } })
+  @UseGuards(UserThrottlerGuard)
+  async uploadPatternImage(
+    @CurrentOrgId() orgId: string,
+    @CurrentUser() user: { id: string },
+    @CurrentOrgRole() role: OrgRole | undefined,
+    @Req() req: Request,
+  ): Promise<BrandView> {
+    return this.uploadImage(orgId, 'pattern', req, actorOf(user, role));
+  }
+
+  @Delete('pattern-image')
+  @RequirePermission('organization.manage')
+  async removePatternImage(
+    @CurrentOrgId() orgId: string,
+    @CurrentUser() user: { id: string },
+    @CurrentOrgRole() role: OrgRole | undefined,
+  ): Promise<BrandView & { removed: boolean }> {
+    const removed = await this.branding.removeImage(orgId, 'pattern', actorOf(user, role));
+    return { ...(await this.view(orgId)), removed };
+  }
+
+  /**
+   * Même porte que les logos (type annoncé non cru, corps borné AVANT lecture,
+   * `validateAndSanitizeImage`, octets reconstruits), puis les règles propres :
+   * PNG seulement ; favicon carré ; motif transparent.
+   */
+  private async uploadImage(
+    orgId: string,
+    kind: BrandImageKind,
+    req: Request,
+    actor: BrandActor,
+  ): Promise<BrandView> {
+    const limits = kind === 'favicon' ? FAVICON_LIMITS : PATTERN_IMAGE_LIMITS;
+    const what = kind === 'favicon' ? 'Le favicon' : 'Le motif';
+    const annonce = (req.headers['content-type'] ?? '').split(';')[0]!.trim().toLowerCase();
+    if (annonce && annonce !== 'image/png' && annonce !== 'application/octet-stream') {
+      throw new UnsupportedMediaTypeException({
+        code: 'UNSUPPORTED_IMAGE_TYPE',
+        message: `${what} doit être un PNG (le SVG est refusé).`,
+      });
+    }
+    const lecture = await readRequestBody(req, limits.maxBytes);
+    if (!lecture.ok) {
+      if (lecture.reason === 'TOO_LARGE') {
+        throw imageRejection(
+          'FILE_TOO_LARGE',
+          `${what} dépasse ${Math.round(limits.maxBytes / 1024)} Kio.`,
+        );
+      }
+      throw new BadRequestException({ code: 'UPLOAD_ABORTED', message: 'Envoi interrompu.' });
+    }
+    const verdict = validateAndSanitizeImage(lecture.body);
+    if (!verdict.ok) throw imageRejection(verdict.code, verdict.message);
+    if (verdict.contentType !== 'image/png') {
+      throw imageRejection('UNSUPPORTED_IMAGE_TYPE', `${what} doit être un PNG.`);
+    }
+    const { width: w, height: h } = verdict;
+    if (
+      w < limits.minDimension ||
+      h < limits.minDimension ||
+      w > limits.maxDimension ||
+      h > limits.maxDimension
+    ) {
+      throw imageRejection(
+        'IMAGE_DIMENSIONS_REJECTED',
+        `${what} doit mesurer de ${limits.minDimension} à ${limits.maxDimension} pixels de côté (reçu : ${w} × ${h}).`,
+      );
+    }
+    if (kind === 'favicon' && w !== h) {
+      throw imageRejection(
+        'IMAGE_DIMENSIONS_REJECTED',
+        `Le favicon doit être carré (${FAVICON_LIMITS.recommended} × ${FAVICON_LIMITS.recommended} conseillé ; reçu : ${w} × ${h}).`,
+      );
+    }
+    if (kind === 'pattern') {
+      const alpha = pngAlpha(verdict.bytes);
+      if (!alpha.ok) throw new HttpException({ code: alpha.code, message: alpha.message }, 422);
+      if (alpha.transparentShare < PATTERN_IMAGE_LIMITS.minTransparentShare) {
+        throw new HttpException(
+          {
+            code: 'PATTERN_NOT_TRANSPARENT',
+            message: `Le motif est presque entièrement opaque (${Math.round(alpha.transparentShare * 100)} % de pixels transparents) : il faut un fond transparent.`,
+          },
+          422,
+        );
+      }
+    }
+    try {
+      await this.branding.uploadImage(orgId, kind, verdict, actor);
+    } catch (cause) {
+      throw storageFailure(cause);
+    }
+    return this.view(orgId);
+  }
+}
+
+function invalidBody(error: Parameters<typeof issuesOf>[0]): never {
+  throw new BadRequestException({
+    code: 'INVALID_REQUEST',
+    message: 'Corps de requête invalide.',
+    details: { issues: issuesOf(error) },
+  });
+}
+
+/**
+ * Favicon de l'organisation ACTIVE (ADR-0073 § 3), pour l'icône des onglets de
+ * tout membre : seulement une URL signée (24 h) d'une image publique par nature,
+ * ou `null` (favicon Lalanda). Aucune permission métier : la session et
+ * l'appartenance à l'organisation (`AuthGuard`) suffisent.
+ */
+@Controller('organizations/current/favicon')
+@UseGuards(AuthGuard, PermissionsGuard)
+export class BrandFaviconController {
+  constructor(@Inject(BrandingService) private readonly branding: BrandingService) {}
+
+  @Get()
+  async get(@CurrentOrgId() orgId: string): Promise<{ url: string | null }> {
+    return { url: await this.branding.faviconUrl(orgId) };
   }
 }

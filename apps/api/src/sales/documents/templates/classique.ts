@@ -7,15 +7,18 @@ import {
   HT_TOTAL_LABEL,
   commentsHtml,
   creditRefHtml,
+  dgiFrameBg,
   div,
   duplicateBadge,
   each,
   esc,
   lineSubs,
   logo,
+  markPrefs,
   natureBadges,
   operatorHtml,
   paymentsHtml,
+  printsLogo,
   securityGrid,
   specificTaxRow,
   stateLines,
@@ -25,7 +28,13 @@ import type { InvoiceTemplate, TemplateRenderInput } from './template.contract.j
 const COLS = '3fr 0.7fr 0.6fr 1fr 1.3fr 1.3fr';
 const GCOLS = '0.8fr 0.7fr 1.3fr 1.2fr 1.3fr';
 
-function render({ document: m, dgi, brand, theme }: TemplateRenderInput, withHtTotal = false) {
+function render(
+  { document: m, dgi, brand, theme }: TemplateRenderInput,
+  withHtTotal = false,
+  v2 = false,
+) {
+  const prefs = markPrefs(brand, ['primary', 'symbol', 'horizontal'], v2);
+  const hideName = v2 && printsLogo(brand, prefs);
   const css = `
   .doc { padding: 0 48px; font-family: ${theme.body}; font-size: 11px; line-height: 1.45; color: #111827; display: flex; flex-direction: column; gap: 16px; }
   .dgi-test-band, .dgi-sample-band { border: 1.5px solid #b91c1c; background: #fef2f2; color: #b91c1c; font-weight: 700; text-align: center; padding: 6px; font-size: 11px; }
@@ -44,9 +53,9 @@ function render({ document: m, dgi, brand, theme }: TemplateRenderInput, withHtT
     ${dgi.testBand}${dgi.sampleBand}
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px">
       <div style="display:flex;gap:14px;align-items:flex-start">
-        ${logo(brand, theme, ['primary', 'symbol', 'horizontal'], { w: 120, h: 52 }, `width:52px;height:52px;border-radius:10px;background:${theme.accent};color:${theme.onAccent};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;letter-spacing:0.5px`)}
+        ${logo(brand, theme, prefs, { w: 120, h: 52 }, `width:52px;height:52px;border-radius:10px;background:${theme.accent};color:${theme.onAccent};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;letter-spacing:0.5px`)}
         <div style="display:flex;flex-direction:column;gap:1px">
-          ${div(m.seller.title, 'font-size:15px;font-weight:700')}
+          ${hideName ? div(m.seller.title) : div(m.seller.title, 'font-size:15px;font-weight:700')}
           ${each(m.seller.lines, (l) => div(l))}
         </div>
       </div>
@@ -100,7 +109,7 @@ function render({ document: m, dgi, brand, theme }: TemplateRenderInput, withHtT
     </div>
     ${
       m.security
-        ? `<div style="border:1px solid #111827;border-radius:8px;padding:12px 14px;display:flex;gap:16px;align-items:center;break-inside:avoid">
+        ? `<div style="border:1px solid #111827;border-radius:8px;padding:12px 14px;display:flex;gap:16px;align-items:center;break-inside:avoid${dgiFrameBg(v2)}">
         <div class="qr" style="width:110px;height:110px;flex-shrink:0">${dgi.qrSvg}</div>
         <div style="display:flex;flex-direction:column;gap:3px;flex:1">
           ${div(DGI_LABELS.securityTitle, 'font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:0.5px')}
@@ -135,4 +144,16 @@ export const CLASSIQUE: InvoiceTemplate = {
   ...CLASSIQUE_1_0_0,
   version: '1.1.0',
   render: (input) => render(input, true),
+};
+
+/**
+ * Version 1.2.0 — identité visuelle v2 (ADR-0073, 10 nov. 2026) : logo selon le
+ * choix unique de l'organisation ; nom de marque retiré de la zone du logo quand
+ * un logo s'imprime (la raison sociale reste dans le bloc d'identité légale, en
+ * texte normal) ; cadre DGI sur fond blanc (motif de fond posé par le moteur).
+ */
+export const CLASSIQUE_1_2_0: InvoiceTemplate = {
+  ...CLASSIQUE_1_0_0,
+  version: '1.2.0',
+  render: (input) => render(input, true, true),
 };

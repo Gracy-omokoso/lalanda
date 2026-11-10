@@ -383,3 +383,62 @@ describe('guides téléchargeables', () => {
     }
   });
 });
+
+// ── ADR-0073 : identité visuelle v2 sur les cartes ───────────────────────────
+
+describe('ADR-0073 — logo, nom de marque et motif sur les cartes', () => {
+  const LOGO = {
+    dataUri: 'data:image/png;base64,iVBORw0KGgo=',
+    width: 96,
+    height: 96,
+  };
+  const t = cardThemeOf(
+    { primaryColor: '#0f766e', secondaryColor: null, font: 'inter' },
+    'brand',
+    null,
+  );
+
+  it('avec un logo, aucune carte n’écrit le nom de marque à côté (ni monogramme)', () => {
+    for (const def of BUILTIN_CARD_TEMPLATES) {
+      const f = cardFormat(def.kind, def.orientation);
+      const d = sampleCardData(
+        def.kind,
+        { ...ORG, name: 'Kivu Logistique Marque', logo: LOGO },
+        { verify: QR, vcard: QR },
+        'lalanda.co/v',
+      );
+      const out = def.render(d, t, f);
+      for (const face of [out.recto, out.verso]) {
+        expect(face, def.id).not.toContain('mono-name');
+        expect(face, def.id).not.toContain('>Kivu Logistique Marque<');
+      }
+      expect(def.version, def.id).toBe('1.1.0');
+    }
+  });
+
+  it('sans logo : monogramme et nom, comme avant', () => {
+    const def = builtinCardTemplate(DEFAULT_CARD_TEMPLATE.badge)!;
+    const d = sampleCardData('badge', ORG, { verify: QR, vcard: null }, 'lalanda.co/v');
+    expect(def.render(d, t, cardFormat(def.kind, def.orientation)).recto).toContain('mono-name');
+  });
+
+  it('motif : couche du moteur sous le contenu de chaque face, absente sans réglage', () => {
+    const def = builtinCardTemplate(DEFAULT_CARD_TEMPLATE.business)!;
+    const f = cardFormat(def.kind, def.orientation);
+    const d = sampleCardData('business', ORG, { verify: null, vcard: QR }, 'lalanda.co/v');
+    const card = renderBuiltinCard(def, d, t, f, ['recto', 'verso']);
+    const pattern = {
+      dataUri: 'data:image/svg+xml,%3Csvg%3E%3C%2Fsvg%3E',
+      width: 14,
+      height: 14,
+      raster: false,
+      opacity: 0.1,
+    };
+    const without = pagesDocument({ format: f, fonts: t.fonts, cards: [card] });
+    const withP = pagesDocument({ format: f, fonts: t.fonts, cards: [{ ...card, pattern }] });
+    expect(without).not.toContain('z-index:-1');
+    expect(withP.split('z-index:-1').length - 1).toBe(2);
+    expect(withP).toContain('isolation:isolate');
+    expect(withP).toContain('opacity: 0.10');
+  });
+});

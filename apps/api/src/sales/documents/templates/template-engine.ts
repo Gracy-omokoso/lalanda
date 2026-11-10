@@ -32,6 +32,7 @@ import {
   type LogoVariant,
   type PageMargins,
   type RenderLogo,
+  type RenderPattern,
   type TemplateOptions,
 } from './template.contract.js';
 
@@ -57,6 +58,8 @@ export interface ResolvedPresentation {
   options: TemplateOptions;
   identity: FrozenIdentity;
   logos: Record<LogoVariant, RenderLogo | null>;
+  /** Motif de fond prêt au rendu (ADR-0073 § 4) ; absent ou `null` : aucun. */
+  pattern?: RenderPattern | null;
 }
 
 export interface RenderedDocumentHtml {
@@ -104,6 +107,44 @@ function checkedLogos(
   return out;
 }
 
+const PATTERN_URI =
+  /^data:image\/(?:png;base64,[A-Za-z0-9+/]+={0,2}|svg\+xml,[A-Za-z0-9%._~!*-]+)$/;
+
+/**
+ * Couche du motif de fond (ADR-0073 § 4), posée par le MOTEUR sous tout le
+ * contenu et répétée sur chaque page (`position: fixed`). Le fond du `body` est
+ * rendu transparent pour la laisser voir (le fond blanc de la page reste celui
+ * de `html`) ; tout bloc qui a son propre fond — cadre DGI, QR — la masque.
+ * Sans motif : chaînes vides, le HTML est celui d'avant ADR-0073 octet pour octet.
+ * `rasterScale` : réduction d'une image téléversée (0,5 : 512 px ⇒ 256 px CSS).
+ */
+export function patternLayer(
+  p: RenderPattern | null,
+  rasterScale: number,
+): { css: string; html: string } {
+  if (!p) return { css: '', html: '' };
+  return {
+    css: `
+  body { background: transparent; }
+  .lx-pattern { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: -1; pointer-events: none; ${patternDeclarations(p, rasterScale)} }`,
+    html: '<div class="lx-pattern" aria-hidden="true"></div>\n',
+  };
+}
+
+/**
+ * Déclarations CSS de la tuile (image, répétition, taille, opacité bornée à
+ * 20 %). L'URI est contrôlée : PNG en base64 ou SVG encodé en pourcentage, sans
+ * guillemet ni parenthèse — elle ne peut pas sortir de `url("…")`.
+ */
+export function patternDeclarations(p: RenderPattern, rasterScale: number): string {
+  if (!PATTERN_URI.test(p.dataUri)) throw new Error('Motif : URI de données refusée.');
+  const scale = p.raster ? rasterScale : 1;
+  const w = Math.max(4, Math.round(p.width * scale));
+  const h = Math.max(4, Math.round(p.height * scale));
+  const opacity = Math.min(0.2, Math.max(0, p.opacity));
+  return `background-image: url("${p.dataUri}"); background-repeat: repeat; background-size: ${w}px ${h}px; opacity: ${opacity.toFixed(2)};`;
+}
+
 /**
  * HTML imprimé d'un document. Déterministe : même document, même présentation
  * (figée), mêmes octets de logo ⇒ même HTML. Lève `TemplateDgiContentError` si
@@ -137,7 +178,11 @@ export function renderDocumentHtml(
       sampleBand: m.sample ? `<div class="dgi-sample-band">${esc(m.sample.banner)}</div>` : '',
       qrSvg: qr,
     },
-    brand: { logos: checkedLogos(presentation.logos), initials: initialsOf(m.seller.title) },
+    brand: {
+      logos: checkedLogos(presentation.logos),
+      initials: initialsOf(m.seller.title),
+      ...(identity.logoChoice ? { logoChoice: identity.logoChoice } : {}),
+    },
     theme,
     options,
   });
@@ -148,6 +193,8 @@ export function renderDocumentHtml(
       ? `<div class="dgi-watermark sample"${m.test ? ' style="top:62%"' : ''}>${esc(m.sample.mark)}</div>`
       : '');
 
+  const pattern = patternLayer(presentation.pattern ?? null, 0.5);
+
   const html = `<!doctype html>
 <html lang="fr">
 <head>
@@ -156,10 +203,10 @@ export function renderDocumentHtml(
   <title>${esc(m.title)} — ${esc(m.reference.value)}</title>
   <style>${BASE_CSS}
 ${fontFacesCss(theme.fonts)}
-${out.css}</style>
+${out.css}${pattern.css}</style>
 </head>
 <body data-template="${esc(template.id)}@${esc(template.version)}">
-${out.body}
+${pattern.html}${out.body}
 ${watermark}
 </body>
 </html>`;

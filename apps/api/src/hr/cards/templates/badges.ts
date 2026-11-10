@@ -19,7 +19,9 @@ import {
   type CardTemplateDef,
 } from './parts.js';
 
-const V = '1.0.0';
+// 1.1.0 (10 nov. 2026, ADR-0073) : logo selon le choix unique de l'organisation ;
+// nom de marque retiré à côté du logo quand un logo est imprimé ; motif de fond.
+const V = '1.1.0';
 
 const nameHtml = (first: string, last: string) =>
   `${esc(first)} <b>${esc(last.toLocaleUpperCase('fr'))}</b>`;
@@ -382,7 +384,7 @@ const partage: CardTemplateDef = {
         ${logo(d, t, true)}
         <div class="abs kick">Carte de service</div>
         ${photo(d, 'ph abs')}
-        <div class="abs side">${esc(d.org.name)}</div>
+        <div class="abs side">${d.org.logo ? '' : esc(d.org.name)}</div>
         <div class="abs who"><div class="name">${esc(d.firstName)}<br/>${esc(d.lastName.toLocaleUpperCase('fr'))}</div><div class="title">${esc(d.jobTitle)}</div>${d.department ? `<div class="dept">${esc(d.department)}</div>` : ''}</div>
         <div class="abs foot">${matricule(d)}<div class="vfy">Vérifier<br/><b>${esc(d.verifyLabel)}</b></div></div>
         ${verifyQr(d, 15.5)}
@@ -423,7 +425,7 @@ const editoV: CardTemplateDef = {
       .t10 .mid .mat { color: ${t.ink}; margin-bottom: 0.8mm; }`,
       recto: `<div class="t10">
         <div class="abs margin"></div>
-        <div class="abs vert">${esc(d.org.name)} · Carte de service</div>
+        <div class="abs vert">${d.org.logo ? '' : `${esc(d.org.name)} · `}Carte de service</div>
         ${photo(d, 'ph abs')}
         <div class="abs hr"></div>
         <div class="abs who"><div class="first">${esc(d.firstName)}</div><div class="last">${esc(d.lastName.toLocaleUpperCase('fr'))}</div><div class="title">${esc(d.jobTitle)}</div>${d.department ? `<div class="dept">${esc(d.department)}</div>` : ''}</div>

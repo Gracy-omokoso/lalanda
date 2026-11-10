@@ -33,7 +33,7 @@ import { LalaVocalController } from '../ai/lala-vocal.controller.js';
 import { AuthProvidersController } from '../auth/auth-providers.controller.js';
 import { BillingController } from '../billing/billing.controller.js';
 import { BrandAssetImageController } from '../branding/brand-asset-image.controller.js';
-import { BrandingController } from '../branding/branding.controller.js';
+import { BrandFaviconController, BrandingController } from '../branding/branding.controller.js';
 import { BusinessPlanOrgController } from '../business-plan/business-plan-org.controller.js';
 import { BusinessPlanController } from '../business-plan/business-plan.controller.js';
 import { CanvasController } from '../canvas/canvas.controller.js';
@@ -3244,5 +3244,52 @@ describe('ADR-0071 — tableaux de bord des achats et de la trésorerie', () => 
     ] as const) {
       expect(TOUTES_LES_ROUTES.find((r) => r.cle === liste)?.actions, liste).toEqual([droit]);
     }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADR-0073 : identité visuelle v2 (choix de logo, favicon, motifs de fond)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// `BrandFaviconController` est importé en tête, avec `BrandingController`.
+
+const CONTROLEURS_0073 = [BrandFaviconController];
+(CONTROLEURS as unknown[]).push(...CONTROLEURS_0073);
+TOUTES_LES_ROUTES.push(
+  ...CONTROLEURS_0073.flatMap((c) => routesDe(c as new (...args: never[]) => unknown)),
+);
+Object.assign(SANS_PERMISSION, {
+  'BrandFaviconController.get':
+    'Favicon de l’organisation ACTIVE pour l’icône des onglets de tout membre (ADR-0073 § 3). ' +
+    'Session et appartenance exigées (AuthGuard) ; ne renvoie qu’une URL signée (24 h) d’une ' +
+    'image publique par nature, ou null. Aucune donnée métier.',
+});
+
+describe('ADR-0073 — identité visuelle v2', () => {
+  it('les réglages de l’identité exigent organization.manage, comme les logos', () => {
+    const attendu: Record<string, string[]> = {
+      'BrandingController.putLogoChoice': ['organization.manage'],
+      'BrandingController.putPattern': ['organization.manage'],
+      'BrandingController.uploadFavicon': ['organization.manage'],
+      'BrandingController.removeFavicon': ['organization.manage'],
+      'BrandingController.uploadPatternImage': ['organization.manage'],
+      'BrandingController.removePatternImage': ['organization.manage'],
+    };
+    for (const [cle, actions] of Object.entries(attendu)) {
+      const route = TOUTES_LES_ROUTES.find((r) => r.cle === cle);
+      expect(route?.actions, cle).toEqual(actions);
+      expect(SANS_PERMISSION[cle], cle).toBeUndefined();
+    }
+    // Mêmes droits que le téléversement d'un logo.
+    expect(
+      TOUTES_LES_ROUTES.find((r) => r.cle === 'BrandingController.uploadLogo')?.actions,
+    ).toEqual(['organization.manage']);
+  });
+
+  it('le favicon des membres est la seule route sans permission métier, et justifiée', () => {
+    const routes = TOUTES_LES_ROUTES.filter((r) => r.cle.startsWith('BrandFaviconController.'));
+    expect(routes.map((r) => r.cle)).toEqual(['BrandFaviconController.get']);
+    expect(routes[0]!.actions ?? []).toEqual([]);
+    expect(SANS_PERMISSION['BrandFaviconController.get']).toBeDefined();
   });
 });

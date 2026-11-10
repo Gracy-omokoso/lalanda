@@ -13,8 +13,10 @@ import {
   esc,
   lineSubs,
   logo,
+  markPrefs,
   natureBadges,
   operatorHtml,
+  printsLogo,
   securityGrid,
   stateLines,
 } from './parts.js';
@@ -22,7 +24,13 @@ import type { InvoiceTemplate, TemplateRenderInput } from './template.contract.j
 
 const COLS = '3fr 0.6fr 0.5fr 0.9fr 1.2fr 1.2fr';
 
-function render({ document: m, dgi, brand, theme }: TemplateRenderInput, withHtTotal = false) {
+function render(
+  { document: m, dgi, brand, theme }: TemplateRenderInput,
+  withHtTotal = false,
+  v2 = false,
+) {
+  const prefs = markPrefs(brand, ['primary', 'symbol', 'horizontal'], v2);
+  const hideName = v2 && printsLogo(brand, prefs);
   const css = `
   .doc { padding: 4px 60px 0; font-family: ${theme.body}; font-size: 10.5px; line-height: 1.5; color: #1c1917; display: flex; flex-direction: column; gap: 18px; }
   .dgi-test-band, .dgi-sample-band { text-align: center; color: #b91c1c; font-weight: 600; font-size: 10.5px; border: 1px solid #b91c1c; padding: 5px; }
@@ -36,9 +44,9 @@ function render({ document: m, dgi, brand, theme }: TemplateRenderInput, withHtT
   <div class="doc">
     ${dgi.testBand}${dgi.sampleBand}
     <div style="display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center">
-      ${logo(brand, theme, ['primary', 'symbol', 'horizontal'], { w: 160, h: 56 }, `width:50px;height:50px;border:1.5px solid ${theme.accent};color:${theme.accent};border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:${theme.display};font-size:18px;font-weight:600`)}
-      ${div(m.seller.title, `font-family:${theme.display};font-size:20px;font-weight:600`)}
-      <div style="color:#44403c">${m.seller.lines.map((l) => `<span>${esc(l)}</span>`).join(' · ')}</div>
+      ${logo(brand, theme, prefs, { w: 160, h: 56 }, `width:50px;height:50px;border:1.5px solid ${theme.accent};color:${theme.accent};border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:${theme.display};font-size:18px;font-weight:600`)}
+      ${hideName ? '' : div(m.seller.title, `font-family:${theme.display};font-size:20px;font-weight:600`)}
+      <div style="color:#44403c">${hideName ? `<span>${esc(m.seller.title)}</span> · ` : ''}${m.seller.lines.map((l) => `<span>${esc(l)}</span>`).join(' · ')}</div>
     </div>
     <div style="display:flex;align-items:center;gap:14px">
       <div style="flex:1;height:1px;background:${theme.accent}"></div>
@@ -126,4 +134,16 @@ export const EDITORIALE: InvoiceTemplate = {
   ...EDITORIALE_1_0_0,
   version: '1.1.0',
   render: (input) => render(input, true),
+};
+
+/**
+ * Version 1.2.0 — identité visuelle v2 (ADR-0073, 10 nov. 2026) : logo selon le
+ * choix unique de l'organisation ; nom de marque retiré de la zone du logo quand
+ * un logo s'imprime (la raison sociale reste dans le bloc d'identité légale, en
+ * texte normal) ; cadre DGI sur fond blanc (motif de fond posé par le moteur).
+ */
+export const EDITORIALE_1_2_0: InvoiceTemplate = {
+  ...EDITORIALE_1_0_0,
+  version: '1.2.0',
+  render: (input) => render(input, true, true),
 };

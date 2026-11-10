@@ -93,6 +93,10 @@
     "./treasury": {
       "types": "./dist/treasury/index.d.ts",
       "import": "./dist/treasury/index.js"
+    },
+    "./branding": {
+      "types": "./dist/branding/index.d.ts",
+      "import": "./dist/branding/index.js"
     }
   },
   "scripts": {

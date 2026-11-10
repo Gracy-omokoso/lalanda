@@ -14,6 +14,8 @@ import type { CardFace } from '@lalanda/shared/hr';
 
 import { esc } from '../../sales/documents/invoice-document-html.js';
 import { fontFacesCss, type FontId } from '../../sales/documents/templates/invoice-fonts.js';
+import type { RenderPattern } from '../../sales/documents/templates/template.contract.js';
+import { patternDeclarations } from '../../sales/documents/templates/template-engine.js';
 import { bleedBox, mm, sheetLayout, SHEET, type CardFormat } from './card-formats.js';
 
 export interface RenderedFace {
@@ -28,6 +30,8 @@ export interface RenderedCard {
   /** Fond de page (variante sombre) — appliqué à la boîte de la face. */
   paper: string;
   sample: boolean;
+  /** Motif de fond (ADR-0073 § 4), posé par le moteur sous tout le contenu de la face. */
+  pattern?: RenderPattern | null;
 }
 
 export interface CardDocumentInput {
@@ -50,7 +54,13 @@ function faceBox(
   overlay: string,
 ) {
   const b = bleedBox(f);
-  return `<div class="lx-c${i} lx-wrap"><div class="lx-face lx-${face.face}" style="width:${mm(b.width)};height:${mm(b.height)};background:${esc(card.paper)}">${face.html}${overlay}${card.sample ? '<div class="lx-sample">EXEMPLE</div>' : ''}</div></div>`;
+  // Motif : couche `z-index: -1` dans la face isolée (au-dessus du fond de la
+  // face, sous tout son contenu ; un bloc qui a son propre fond la masque).
+  // Image téléversée réduite au quart (512 px ⇒ 128 px CSS ≈ 34 mm).
+  const layer = card.pattern
+    ? `<div style="position:absolute;top:0;left:0;right:0;bottom:0;z-index:-1;pointer-events:none;${esc(patternDeclarations(card.pattern, 0.25))}" aria-hidden="true"></div>`
+    : '';
+  return `<div class="lx-c${i} lx-wrap"><div class="lx-face lx-${face.face}" style="width:${mm(b.width)};height:${mm(b.height)};background:${esc(card.paper)}${layer ? ';isolation:isolate' : ''}">${layer}${face.html}${overlay}${card.sample ? '<div class="lx-sample">EXEMPLE</div>' : ''}</div></div>`;
 }
 
 function head(css: string, pageW: number, pageH: number): string {

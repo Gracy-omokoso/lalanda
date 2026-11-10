@@ -16,12 +16,18 @@ import {
   isBodyFont,
   type FontId,
 } from '../../sales/documents/templates/invoice-fonts.js';
+import { patternDeclarations } from '../../sales/documents/templates/template-engine.js';
+import type { RenderPattern } from '../../sales/documents/templates/template.contract.js';
 import { longDate, type DocContent } from './generated-document-content.js';
 
+// Version 2 (10 nov. 2026, ADR-0073) : logo selon le choix unique de
+// l'organisation, nom retiré de l'en-tête quand un logo s'imprime (il reste au
+// pied avec les identifiants légaux), motif de fond facultatif. Les pièces déjà
+// générées sont des PDF rangés : elles ne changent pas.
 export const GENERATED_TEMPLATE_VERSIONS: Readonly<Record<GeneratedDocumentTemplateId, number>> = {
-  classique: 1,
-  bandeau: 1,
-  marge: 1,
+  classique: 2,
+  bandeau: 2,
+  marge: 2,
 };
 
 export function templateRef(id: GeneratedDocumentTemplateId): string {
@@ -63,6 +69,8 @@ export interface DocRenderInput {
   signatory: { name: string; title: string };
   /** Aperçu : filigrane « APERÇU — sans valeur ». */
   preview: boolean;
+  /** Motif de fond (ADR-0073 § 4) ; absent ou `null` : aucun. */
+  pattern?: RenderPattern | null;
 }
 
 const HEX = /^#[0-9a-f]{6}$/;
@@ -106,8 +114,9 @@ function initialsBox(org: DocOrganization, cls: string): string {
   return `<div class="${cls}">${esc(org.initials)}</div>`;
 }
 
-function orgBlock(org: DocOrganization, cls: string): string {
-  return `<div class="${cls}"><div class="org-name">${esc(org.name)}</div>${org.contactLines
+/** Bloc de l'employeur ; sans le nom quand un logo est imprimé à côté (ADR-0073 § 2). */
+function orgBlock(org: DocOrganization, cls: string, withLogo = false): string {
+  return `<div class="${cls}">${withLogo ? '' : `<div class="org-name">${esc(org.name)}</div>`}${org.contactLines
     .map((l) => `<div>${esc(l)}</div>`)
     .join('')}</div>`;
 }
@@ -182,7 +191,7 @@ const LAYOUTS: Readonly<Record<GeneratedDocumentTemplateId, Layout>> = {
 .logo { max-height: 22mm; max-width: 60mm; }
 .ini { width: 18mm; height: 18mm; border-radius: 2mm; background: ${t.accent}; color: ${t.onAccent}; font-weight: 700; font-size: 14pt; display: flex; align-items: center; justify-content: center; }
 .org { text-align: right; font-size: 8.5pt; color: #374151; max-width: 95mm; }`,
-    header: `<div class="head">${i.org.logo ? logoImg(i.org.logo, 'logo') : initialsBox(i.org, 'ini')}${orgBlock(i.org, 'org')}</div>`,
+    header: `<div class="head">${i.org.logo ? logoImg(i.org.logo, 'logo') : initialsBox(i.org, 'ini')}${orgBlock(i.org, 'org', i.org.logo !== null)}</div>`,
   }),
   bandeau: (i, t) => ({
     css: `
@@ -198,7 +207,7 @@ const LAYOUTS: Readonly<Record<GeneratedDocumentTemplateId, Layout>> = {
         : i.org.logo && t.onAccent !== '#ffffff'
           ? logoImg(i.org.logo, 'logo')
           : initialsBox(i.org, 'ini')
-    }${orgBlock(i.org, 'org')}</div>`,
+    }${orgBlock(i.org, 'org', i.org.logoLight !== null || (i.org.logo !== null && t.onAccent !== '#ffffff'))}</div>`,
   }),
   marge: (i, t) => ({
     css: `
@@ -208,7 +217,7 @@ const LAYOUTS: Readonly<Record<GeneratedDocumentTemplateId, Layout>> = {
 .ini { width: 16mm; height: 16mm; background: ${t.accent}; color: ${t.onAccent}; font-weight: 700; font-size: 13pt; display: flex; align-items: center; justify-content: center; }
 .org { font-size: 8.5pt; color: #374151; }
 h1 { text-align: left; border-left: 1.2mm solid ${t.accent}; padding-left: 3mm; }`,
-    header: `<div class="side"></div><div class="head">${i.org.logo ? logoImg(i.org.logo, 'logo') : initialsBox(i.org, 'ini')}${orgBlock(i.org, 'org')}</div>`,
+    header: `<div class="side"></div><div class="head">${i.org.logo ? logoImg(i.org.logo, 'logo') : initialsBox(i.org, 'ini')}${orgBlock(i.org, 'org', i.org.logo !== null)}</div>`,
   }),
 };
 
@@ -228,7 +237,11 @@ ${BASE_CSS(t)}
 ${layout.css}
 </style>
 </head>
-<body><div class="page">${layout.header}<div class="content"><h1>${esc(i.content.title)}</h1>${bodyHtml(i.content)}</div>${signatureHtml(i)}${footerHtml(i)}${
+<body><div class="page"${i.pattern ? ' style="isolation:isolate"' : ''}>${
+    i.pattern
+      ? `<div style="position:absolute;top:0;left:0;right:0;bottom:0;z-index:-1;pointer-events:none;${esc(patternDeclarations(i.pattern, 0.5))}" aria-hidden="true"></div>`
+      : ''
+  }${layout.header}<div class="content"><h1>${esc(i.content.title)}</h1>${bodyHtml(i.content)}</div>${signatureHtml(i)}${footerHtml(i)}${
     i.preview ? '<div class="watermark">APERÇU — SANS VALEUR</div>' : ''
   }</div></body></html>`;
 }

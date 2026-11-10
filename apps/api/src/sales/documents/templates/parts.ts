@@ -5,6 +5,8 @@
 // le vérificateur de contenu (`dgi-content.ts`) cherche chaque mention, échappée,
 // telle quelle.
 
+import { deducedLogoChoice, logoOrderFor } from '@lalanda/shared/branding';
+
 import { esc } from '../invoice-document-html.js';
 import type { DocumentLine, InvoiceDocumentModel } from '../invoice-document.model.js';
 import { DGI_LABELS } from './dgi-content.js';
@@ -135,3 +137,39 @@ export const HT_TOTAL_LABEL = 'Total HT';
 
 /** Fragment de texte échappé. */
 export const t = esc;
+
+// ── Identité visuelle v2 (ADR-0073), versions 1.2.0 des modèles ─────────────
+
+/**
+ * Ordre des déclinaisons d'un emplacement de logo. Versions publiées avant
+ * 1.2.0 (`v2 = false`) : l'ordre FIGÉ du modèle, inchangé. À partir de 1.2.0 :
+ * le choix unique de l'organisation (« carré » ou « horizontal », repli sur
+ * l'autre forme), précédé de la version claire sur un fond de couleur.
+ */
+export function markPrefs(
+  brand: TemplateBrand,
+  legacy: readonly LogoVariant[],
+  v2: boolean,
+  onDark = false,
+): readonly LogoVariant[] {
+  if (!v2) return legacy;
+  const choice =
+    brand.logoChoice ??
+    deducedLogoChoice({
+      primary: brand.logos.primary !== null,
+      horizontal: brand.logos.horizontal !== null,
+      symbol: brand.logos.symbol !== null,
+    });
+  const order = logoOrderFor(choice);
+  return onDark ? ['light', ...order] : order;
+}
+
+/** Un logo s'imprime-t-il à cet emplacement (sinon : initiales) ? */
+export function printsLogo(brand: TemplateBrand, prefs: readonly LogoVariant[]): boolean {
+  return prefs.some((v) => brand.logos[v] !== null && brand.logos[v] !== undefined);
+}
+
+/** Fond blanc du cadre DGI en 1.2.0 : le motif de fond ne passe pas sous le QR. */
+export function dgiFrameBg(v2: boolean): string {
+  return v2 ? ';background:#ffffff' : '';
+}

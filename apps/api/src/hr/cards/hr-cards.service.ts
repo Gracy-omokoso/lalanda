@@ -34,6 +34,7 @@ import {
   type PutCardConsentInput,
   type PutCardSettingsInput,
 } from '@lalanda/shared/hr';
+import { logoOrderFor } from '@lalanda/shared/branding';
 import { employeeStatusOf } from '@lalanda/engine';
 import {
   ConflictException,
@@ -51,7 +52,7 @@ import { isValidObjectId } from 'mongoose';
 import type { ImageAcceptance } from '../../account/image-validation.js';
 import { AuditService } from '../../authz/audit.service.js';
 import { brandAssetUrlFor } from '../../branding/brand-asset-url.js';
-import { BrandingService } from '../../branding/branding.service.js';
+import { BrandingService, type BrandState } from '../../branding/branding.service.js';
 import {
   Organization,
   type OrganizationDocument,
@@ -124,6 +125,7 @@ import {
 } from './templates/registry.js';
 import { vcardOf } from './vcard.js';
 import type { FontId } from '../../sales/documents/templates/invoice-fonts.js';
+import type { RenderPattern } from '../../sales/documents/templates/template.contract.js';
 
 export interface CardActor {
   userId: string;
@@ -686,17 +688,34 @@ export class HrCardsService {
     identity: CardIdentity;
     logo: CardImage | null;
     logoLight: CardImage | null;
+    brand: BrandState;
   }> {
-    const { identity, logos } = await this.branding.currentLogosForRender(organizationId);
+    const { identity, logos, logoChoice, state } =
+      await this.branding.currentLogosForRender(organizationId);
+    // ADR-0073 § 1 : le choix unique de l'organisation, repli sur l'autre forme.
+    const mark = logoOrderFor(logoChoice)
+      .map((v) => logos[v])
+      .find((l) => l !== null);
     return {
       identity: {
         primaryColor: identity.primaryColor,
         secondaryColor: identity.secondaryColor,
         font: identity.font,
       },
-      logo: logos.primary ?? logos.horizontal ?? logos.symbol ?? null,
+      logo: mark ?? null,
       logoLight: logos.light ?? null,
+      brand: state,
     };
+  }
+
+  /** Motif courant (ADR-0073 § 4) dans la couleur de la carte : accent, sinon encre. */
+  private async patternFor(
+    organizationId: string,
+    brand: BrandState,
+    theme: CardTheme,
+  ): Promise<RenderPattern | null> {
+    const color = theme.variant === 'brand' ? theme.accentInk : theme.ink;
+    return this.branding.currentPatternForRender(organizationId, color, brand);
   }
 
   private async orgName(organizationId: string): Promise<string> {
@@ -807,7 +826,7 @@ export class HrCardsService {
         message: `Ce modèle n’est pas un modèle de ${CARD_KIND_LABELS[kind].toLowerCase()}.`,
       });
     }
-    const { identity, logo, logoLight } = await this.identity(organizationId);
+    const { identity, logo, logoLight, brand } = await this.identity(organizationId);
     const theme = cardThemeOf(
       identity,
       settings[kind].variant,
@@ -825,6 +844,7 @@ export class HrCardsService {
       : [];
     const departments = new Map(depts.map((d) => [String(d._id), d.name]));
     const orgName = await this.orgName(organizationId);
+    const pattern = await this.patternFor(organizationId, brand, theme);
     const profiles = await this.profiles
       .find({ organizationId, employeeId: { $in: employees.map((e) => String(e._id)) } })
       .lean<HrCardProfileLean[]>()
@@ -862,7 +882,7 @@ export class HrCardsService {
           departments,
         },
       );
-      cards.push(tpl.render(d, theme, faces));
+      cards.push(withCardPattern(tpl.render(d, theme, faces), pattern));
       names.push(fileSlug(d.displayName));
     }
     return {
@@ -940,9 +960,10 @@ export class HrCardsService {
   ): Promise<CardFile> {
     const tpl = await this.resolveTemplate(organizationId, templateRef);
     const settings = await this.settings(organizationId);
-    const { identity, logo, logoLight } = await this.identity(organizationId);
+    const { identity, logo, logoLight, brand } = await this.identity(organizationId);
     const ks = settings[tpl.kind];
     const theme = cardThemeOf(identity, q.variant ?? ks.variant, ks.accent, tpl.displayFont);
+    const pattern = await this.patternFor(organizationId, brand, theme);
     const verify = await qrCodeSvg(cardVerifyUrl('EXEMPLE-0000000000000000'.slice(0, 24)));
     const vcard = await qrCodeSvg(
       vcardOf({
@@ -975,7 +996,7 @@ export class HrCardsService {
     const job: CardExportJob = {
       format: tpl.format,
       fonts: [...new Set<FontId>([...theme.fonts, ...tpl.extraFonts])],
-      cards: [tpl.render(d, theme, faces)],
+      cards: [withCardPattern(tpl.render(d, theme, faces), pattern)],
       extraCss: tpl.extraCss,
     };
     const slug = templateRef.replace(/[^a-z0-9-]/g, '-');
@@ -1021,7 +1042,10 @@ export class HrCardsService {
     const { p, e } = hit;
     const exited = employeeStatusOf(engineEmployeeOf(e), hrToday()) === 'exited';
     const brand = await this.branding.state(p.organizationId);
-    const logo = brand.logos.primary ?? brand.logos.horizontal ?? brand.logos.symbol ?? null;
+    const logo =
+      logoOrderFor(this.branding.logoChoiceOf(brand))
+        .map((v) => brand.logos[v])
+        .find((a) => a !== null) ?? null;
     const firstName = e.preferredName?.trim() || e.firstName;
     return {
       valid: true,
@@ -1030,6 +1054,7 @@ export class HrCardsService {
       organization: {
         name: await this.orgName(p.organizationId),
         logoUrl: logo ? brandAssetUrlFor(logo.assetId) : null,
+        faviconUrl: brand.favicon ? brandAssetUrlFor(brand.favicon.assetId) : null,
       },
       status: exited ? 'inactive' : 'active',
       statusLabel: exited ? 'N’est plus en fonction' : 'En fonction',
@@ -1203,4 +1228,9 @@ export class HrCardsService {
     this.compiledCache.set(key, compiled);
     return compiled;
   }
+}
+
+/** Ajoute le motif à une carte rendue, seulement s'il y en a un (ADR-0073 § 4). */
+function withCardPattern(card: RenderedCard, pattern: RenderPattern | null): RenderedCard {
+  return pattern ? { ...card, pattern } : card;
 }

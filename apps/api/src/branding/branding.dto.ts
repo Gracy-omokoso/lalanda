@@ -1,6 +1,12 @@
 // Corps de requête de l'identité visuelle et du modèle de facture — ADR-0028 § 7.
 // Schémas `.strict()` : un champ inconnu est refusé, jamais ignoré.
 
+import {
+  LOGO_CHOICES,
+  PATTERN_INTENSITY,
+  PATTERN_SOURCES,
+  isPatternId,
+} from '@lalanda/shared/branding';
 import { z } from 'zod';
 
 import { BODY_FONT_IDS } from '../sales/documents/templates/invoice-fonts.js';
@@ -67,3 +73,33 @@ export const PutCustomTemplateSchema = z
   })
   .strict();
 export type PutCustomTemplateInput = z.infer<typeof PutCustomTemplateSchema>;
+
+// ── Identité visuelle v2 (ADR-0073) ─────────────────────────────────────────
+
+/** Choix de logo unique ; `null` : revenir au choix déduit des logos téléversés. */
+export const PutLogoChoiceSchema = z
+  .object({
+    logoChoice: z.enum(LOGO_CHOICES).nullable(),
+    expectedRevision: z.number().int().min(0),
+  })
+  .strict();
+export type PutLogoChoiceInput = z.infer<typeof PutLogoChoiceSchema>;
+
+/** Motif de fond : aucun, un motif de la bibliothèque, ou l'image téléversée. */
+export const PutPatternSchema = z
+  .object({
+    source: z.enum(PATTERN_SOURCES),
+    libraryId: z
+      .string()
+      .max(40)
+      .refine((v) => isPatternId(v), 'Motif inconnu.')
+      .nullable(),
+    intensity: z.number().int().min(PATTERN_INTENSITY.min).max(PATTERN_INTENSITY.max),
+    expectedRevision: z.number().int().min(0),
+  })
+  .strict()
+  .refine((v) => v.source !== 'library' || v.libraryId !== null, {
+    message: 'Choisissez un motif de la bibliothèque.',
+    path: ['libraryId'],
+  });
+export type PutPatternInput = z.infer<typeof PutPatternSchema>;

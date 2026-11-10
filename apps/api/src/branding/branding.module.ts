@@ -9,7 +9,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 
 import { OrganizationsModule } from '../organizations/organizations.module.js';
 import { BrandAssetImageController } from './brand-asset-image.controller.js';
-import { BrandingController } from './branding.controller.js';
+import { BrandFaviconController, BrandingController } from './branding.controller.js';
 import {
   OrganizationBrand,
   OrganizationBrandAsset,
@@ -33,7 +33,7 @@ import { TemplatePackagesService } from './template-packages.service.js';
       { name: InvoiceTemplatePackage.name, schema: InvoiceTemplatePackageSchema },
     ]),
   ],
-  controllers: [BrandingController, BrandAssetImageController],
+  controllers: [BrandingController, BrandAssetImageController, BrandFaviconController],
   providers: [BrandingService, TemplatePackagesService],
   exports: [BrandingService, TemplatePackagesService],
 })

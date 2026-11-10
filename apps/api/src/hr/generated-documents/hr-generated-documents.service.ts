@@ -15,6 +15,7 @@
 // année au jour de Kinshasa ; un échec après tirage laisse un trou, jamais un doublon.
 // Regénérer = nouvelle pièce ; l'ancienne reste.
 
+import { logoOrderFor } from '@lalanda/shared/branding';
 import {
   ATTESTATION_TITLES,
   DEFAULT_ATTESTATION_CLOSING,
@@ -38,6 +39,7 @@ import { isValidObjectId, type Connection, type Model } from 'mongoose';
 
 import { AuditService } from '../../authz/audit.service.js';
 import { BrandingService } from '../../branding/branding.service.js';
+import type { RenderPattern } from '../../sales/documents/templates/template.contract.js';
 import { OrganizationsService } from '../../organizations/organizations.service.js';
 import { PdfRenderingService } from '../../reports/pdf-rendering.service.js';
 import { conflict, isDuplicateKey, staleRevision } from '../../sales/sales.errors.js';
@@ -59,6 +61,7 @@ import {
   generatedDocumentHtml,
   GENERATED_TEMPLATE_VERSIONS,
   templateRef,
+  themeOf,
   type DocOrganization,
 } from './generated-document-render.js';
 import {
@@ -398,6 +401,7 @@ export class HrGeneratedDocumentsService {
     templateId: GeneratedDocumentTemplateId;
     sensitive: boolean;
     options: Record<string, boolean>;
+    pattern: RenderPattern | null;
   }> {
     const e = this.employeeOf(viewer, employeeId);
     const today = hrToday();
@@ -414,7 +418,19 @@ export class HrGeneratedDocumentsService {
       .collection('organization_fiscal_profiles')
       .findOne({ organizationId })) as FiscalLike | null;
     const employer = organizationOf(orgName, fiscal);
-    const { identity, logos } = await this.branding.currentLogosForRender(organizationId);
+    const { identity, logos, logoChoice, state } =
+      await this.branding.currentLogosForRender(organizationId);
+    // ADR-0073 § 4 : motif courant, dans la couleur de l'identité.
+    const docTheme = themeOf({
+      primaryColor: identity.primaryColor,
+      secondaryColor: identity.secondaryColor,
+      font: identity.font,
+    });
+    const pattern = await this.branding.currentPatternForRender(
+      organizationId,
+      docTheme.accentInk,
+      state,
+    );
 
     const department =
       e.departmentId && isValidObjectId(e.departmentId)
@@ -516,7 +532,11 @@ export class HrGeneratedDocumentsService {
       org: {
         ...employer,
         initials: initialsOf(employer.name),
-        logo: logos.primary ?? logos.horizontal ?? logos.symbol ?? null,
+        // ADR-0073 § 1 : le choix unique de l'organisation, repli sur l'autre forme.
+        logo:
+          logoOrderFor(logoChoice)
+            .map((v) => logos[v])
+            .find((l) => l !== null) ?? null,
         logoLight: logos.light ?? null,
       },
       identity: {
@@ -527,6 +547,7 @@ export class HrGeneratedDocumentsService {
       templateId,
       sensitive,
       options,
+      pattern,
     };
   }
 
@@ -546,6 +567,7 @@ export class HrGeneratedDocumentsService {
       place: input.place,
       signatory: input.signatory,
       preview,
+      pattern: p.pattern,
     });
     // Date de métadonnées figée à la date de la pièce : même pièce ⇒ mêmes octets.
     return this.renderer.render(html, { fixedDate: new Date(`${input.issuedOn}T00:00:00Z`) });

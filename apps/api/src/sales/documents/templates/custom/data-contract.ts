@@ -13,6 +13,8 @@
 // Règle d'évolution : AJOUTER une variable garde le contrat 1 ; en retirer une
 // ou en changer le sens ouvre le contrat 2 (et le moteur sert les deux).
 
+import { logoOrderFor } from '@lalanda/shared/branding';
+
 import type { InvoiceDocumentModel } from '../../invoice-document.model.js';
 import { DGI_LABELS } from '../dgi-content.js';
 import { HT_TOTAL_LABEL } from '../parts.js';
@@ -161,7 +163,12 @@ export function templateDataOf(
 ): DataValue {
   const logos: Record<string, DataValue> = {};
   for (const v of LOGO_VARIANTS) logos[v] = brand.logos[v] ? logoToken(v) : null;
-  const preferred = (['primary', 'horizontal', 'symbol'] as const).find((v) => brand.logos[v]);
+  // ADR-0073 : le logo préféré suit le choix unique de l'organisation quand la
+  // présentation le porte ; absent (présentations gelées avant), l'ordre d'origine.
+  const order = brand.logoChoice
+    ? logoOrderFor(brand.logoChoice)
+    : (['primary', 'horizontal', 'symbol'] as const);
+  const preferred = order.find((v) => brand.logos[v]);
   return {
     document: {
       title: m.title,

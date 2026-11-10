@@ -164,7 +164,7 @@ describe('ADR-0072 — mise en page', () => {
     expect(h).toContain('Directrice générale');
     expect(h).not.toContain('APERÇU');
     expect(html(id, true)).toContain('APERÇU — SANS VALEUR');
-    expect(templateRef(id)).toBe(`${id}@1`);
+    expect(templateRef(id)).toBe(`${id}@2`);
   });
 
   it('les trois modèles ont des compositions distinctes', () => {
@@ -172,5 +172,53 @@ describe('ADR-0072 — mise en page', () => {
       html(id).split('<body>')[1]!.slice(0, 80),
     );
     expect(new Set(bodies).size).toBe(3);
+  });
+});
+
+// ── ADR-0073 : identité visuelle v2 sur les attestations et certificats ──────
+
+describe('ADR-0073 — logo, nom et motif des documents RH', () => {
+  const LOGO = { dataUri: 'data:image/png;base64,iVBORw0KGgo=', width: 96, height: 96 };
+  const base = (templateId: (typeof GENERATED_DOCUMENT_TEMPLATES)[number]) => ({
+    templateId,
+    content: certificateContent({ ...employee, endDate: '2026-11-07' }, org.name, {
+      jobs: null,
+      socialSecurityNumber: null,
+    }),
+    org: { ...org, logo: LOGO, logoLight: LOGO },
+    identity: { primaryColor: '#1f4e79', secondaryColor: null, font: null },
+    number: 'CT-2026-0002',
+    issuedOn: '2026-11-08',
+    place: 'Kinshasa',
+    signatory: { name: 'Gracy Exemple', title: 'Directrice générale' },
+    preview: false,
+  });
+
+  it.each(GENERATED_DOCUMENT_TEMPLATES)(
+    '%s : avec un logo, le nom quitte l’en-tête et reste au pied avec les identifiants',
+    (id) => {
+      const h = generatedDocumentHtml(base(id));
+      expect(h).not.toContain('class="org-name"');
+      expect(h).toContain(`<div class="foot-ids">${org.name}`);
+      expect(h).toContain('RCCM');
+    },
+  );
+
+  it.each(GENERATED_DOCUMENT_TEMPLATES)('%s : sans logo, le nom reste dans l’en-tête', (id) => {
+    expect(html(id)).toContain('class="org-name"');
+  });
+
+  it('motif : sous le contenu, absent sans réglage', () => {
+    const pattern = {
+      dataUri: 'data:image/svg+xml,%3Csvg%3E%3C%2Fsvg%3E',
+      width: 14,
+      height: 14,
+      raster: false,
+      opacity: 0.08,
+    };
+    const h = generatedDocumentHtml({ ...base('classique'), pattern });
+    expect(h).toContain('z-index:-1');
+    expect(h).toContain('isolation:isolate');
+    expect(generatedDocumentHtml(base('classique'))).not.toContain('z-index:-1');
   });
 });

@@ -201,7 +201,12 @@ export type PublicCardView =
       valid: true;
       displayName: string;
       jobTitle: string;
-      organization: { name: string; logoUrl: string | null };
+      organization: {
+        name: string;
+        logoUrl: string | null;
+        /** Favicon de l'organisation (ADR-0073 § 3), sinon celui de Lalanda. */
+        faviconUrl?: string | null;
+      };
       status: 'active' | 'inactive';
       statusLabel: string;
       photoUrl: string | null;

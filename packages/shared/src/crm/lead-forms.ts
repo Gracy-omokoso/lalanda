@@ -341,6 +341,8 @@ export interface PublicLeadFormView {
   branding: { logoUrl: string | null; color: string | null } | null;
   /** Ticket signé de remplissage, à renvoyer tel quel avec la soumission. */
   ticket: string;
+  /** Favicon de l'organisation (ADR-0073 § 3), sinon celui de Lalanda. */
+  faviconUrl?: string | null;
 }
 
 export interface PublicLeadSubmissionResult {

@@ -8,14 +8,17 @@ import {
   HT_TOTAL_LABEL,
   commentsHtml,
   creditRefHtml,
+  dgiFrameBg,
   div,
   duplicateBadge,
   each,
   esc,
   lineSubs,
   logo,
+  markPrefs,
   natureBadges,
   operatorHtml,
+  printsLogo,
   securityGrid,
   specificTaxRow,
   stateLines,
@@ -24,8 +27,21 @@ import type { InvoiceTemplate, TemplateRenderInput } from './template.contract.j
 
 const COLS = '2.6fr 0.7fr 0.6fr 0.9fr 1.2fr 1.2fr';
 
-function render({ document: m, dgi, brand, theme }: TemplateRenderInput, withHtTotal = false) {
+function render(
+  { document: m, dgi, brand, theme }: TemplateRenderInput,
+  withHtTotal = false,
+  v2 = false,
+) {
   const dark = theme.onSide === '#ffffff';
+  const prefs = markPrefs(
+    brand,
+    dark
+      ? ['light', 'symbol', 'primary', 'horizontal']
+      : ['primary', 'symbol', 'horizontal', 'light'],
+    v2,
+    dark,
+  );
+  const hideName = v2 && printsLogo(brand, prefs);
   const css = `
   .doc { font-family: ${theme.body}; font-size: 11px; line-height: 1.45; color: #111827; display: flex; align-items: stretch; min-height: 268mm; }
   .side { width: 210px; flex-shrink: 0; background: ${theme.side}; color: ${theme.onSide}; padding: 28px 22px 24px; display: flex; flex-direction: column; gap: 20px; }
@@ -40,9 +56,9 @@ function render({ document: m, dgi, brand, theme }: TemplateRenderInput, withHtT
   const body = `
   <div class="doc">
     <div class="side">
-      ${logo(brand, theme, dark ? ['light', 'symbol', 'primary', 'horizontal'] : ['primary', 'symbol', 'horizontal', 'light'], { w: 150, h: 64 }, `width:64px;height:64px;border-radius:14px;background:${theme.onSide};color:${theme.side};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:22px`, { onDark: dark })}
+      ${logo(brand, theme, prefs, { w: 150, h: 64 }, `width:64px;height:64px;border-radius:14px;background:${theme.onSide};color:${theme.side};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:22px`, { onDark: dark })}
       <div style="display:flex;flex-direction:column;gap:2px">
-        ${div(m.seller.title, 'font-size:15px;font-weight:700')}
+        ${hideName ? div(m.seller.title, 'word-break:break-word') : div(m.seller.title, 'font-size:15px;font-weight:700')}
         ${each(m.seller.lines, (l) => div(l, 'opacity:0.9;word-break:break-word'))}
       </div>
       <div style="display:flex;flex-direction:column;gap:2px">
@@ -104,7 +120,7 @@ function render({ document: m, dgi, brand, theme }: TemplateRenderInput, withHtT
       </div>
       ${
         m.security
-          ? `<div style="border-top:1.5px solid #111827;padding-top:10px;display:flex;flex-direction:column;gap:3px;break-inside:avoid">
+          ? `<div style="border-top:1.5px solid #111827;padding-top:10px;display:flex;flex-direction:column;gap:3px;break-inside:avoid${dgiFrameBg(v2)}">
         ${div(DGI_LABELS.securityTitle, 'font-weight:700;text-transform:uppercase;letter-spacing:0.5px')}
         ${securityGrid(m, theme, { labelStyle: 'color:#4b5563' })}
       </div>`
@@ -137,4 +153,16 @@ export const LATERALE: InvoiceTemplate = {
   ...LATERALE_1_0_0,
   version: '1.1.0',
   render: (input) => render(input, true),
+};
+
+/**
+ * Version 1.2.0 — identité visuelle v2 (ADR-0073, 10 nov. 2026) : logo selon le
+ * choix unique de l'organisation ; nom de marque retiré de la zone du logo quand
+ * un logo s'imprime (la raison sociale reste dans le bloc d'identité légale, en
+ * texte normal) ; cadre DGI sur fond blanc (motif de fond posé par le moteur).
+ */
+export const LATERALE_1_2_0: InvoiceTemplate = {
+  ...LATERALE_1_0_0,
+  version: '1.2.0',
+  render: (input) => render(input, true, true),
 };

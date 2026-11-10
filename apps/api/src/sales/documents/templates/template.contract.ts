@@ -19,6 +19,8 @@
 // Aujourd'hui, seuls les six modèles du dépôt existent.
 
 import type { InvoiceDocumentModel } from '../invoice-document.model.js';
+import type { LogoChoice } from '@lalanda/shared/branding';
+
 import type { BodyFontId, EditorialFontPair, FontId } from './invoice-fonts.js';
 
 export const INVOICE_TEMPLATE_IDS = [
@@ -100,6 +102,11 @@ export interface FrozenIdentity {
   secondaryColor: HexColor | null;
   font: BodyFontId | null;
   logos: Record<LogoVariant, FrozenLogoRef | null>;
+  /**
+   * Choix de logo RÉSOLU au gel (ADR-0073 § 1). Absent des présentations gelées
+   * avant ADR-0073 : leur rendu ne change pas.
+   */
+  logoChoice?: LogoChoice;
 }
 
 /**
@@ -126,6 +133,27 @@ export interface FrozenPresentation {
   package?: FrozenPackageRef;
   options: TemplateOptions;
   identity: FrozenIdentity;
+  /**
+   * Motif de fond figé (ADR-0073 § 4). Absent ou `null` : aucun motif — c'est le
+   * cas de toutes les présentations gelées avant ADR-0073.
+   */
+  pattern?: FrozenPattern | null;
+}
+
+/** Motif figé : bibliothèque (identifiant + couleur) ou image téléversée (immuable). */
+export type FrozenPattern =
+  | { source: 'library'; id: string; color: HexColor; intensity: number }
+  | { source: 'upload'; image: FrozenLogoRef; intensity: number };
+
+/** Motif prêt au rendu : tuile en `data:`, taille de la tuile, opacité (0–1). */
+export interface RenderPattern {
+  dataUri: string;
+  /** Taille NATURELLE de la tuile en pixels (SVG : pixels CSS ; PNG : pixels image). */
+  width: number;
+  height: number;
+  /** `true` pour une image téléversée (réduite à l'affichage, voir `patternLayer`). */
+  raster: boolean;
+  opacity: number;
 }
 
 // ── Entrée d'un rendu ────────────────────────────────────────────────────────
@@ -141,6 +169,11 @@ export interface TemplateBrand {
   logos: Record<LogoVariant, RenderLogo | null>;
   /** Initiales du vendeur, à défaut de logo. */
   initials: string;
+  /**
+   * Choix de logo (ADR-0073), présent seulement si la présentation le porte :
+   * absent, chaque modèle garde l'ordre de ses versions publiées.
+   */
+  logoChoice?: LogoChoice;
 }
 
 /** Couleurs et polices dérivées des options (`theme.ts`) : le modèle n'en calcule aucune. */

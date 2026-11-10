@@ -7,15 +7,18 @@ import {
   HT_TOTAL_LABEL,
   commentsHtml,
   creditRefHtml,
+  dgiFrameBg,
   div,
   duplicateBadge,
   each,
   esc,
   lineSubs,
   logo,
+  markPrefs,
   natureBadges,
   operatorHtml,
   paymentsHtml,
+  printsLogo,
   securityGrid,
   specificTaxRow,
   stateLines,
@@ -24,9 +27,22 @@ import type { InvoiceTemplate, TemplateRenderInput } from './template.contract.j
 
 const COLS = '3fr 0.7fr 0.6fr 1fr 1.3fr 1.3fr';
 
-function render({ document: m, dgi, brand, theme }: TemplateRenderInput, withHtTotal = false) {
+function render(
+  { document: m, dgi, brand, theme }: TemplateRenderInput,
+  withHtTotal = false,
+  v2 = false,
+) {
   const [nameLine, ...otherSeller] = m.seller.lines;
   const dark = theme.onAccent === '#ffffff';
+  const prefs = markPrefs(
+    brand,
+    dark
+      ? ['light', 'symbol', 'primary', 'horizontal']
+      : ['primary', 'symbol', 'horizontal', 'light'],
+    v2,
+    dark,
+  );
+  const hideName = v2 && printsLogo(brand, prefs);
   const css = `
   .doc { font-family: ${theme.body}; font-size: 11px; line-height: 1.45; color: #111827; display: flex; flex-direction: column; }
   .dgi-test-band, .dgi-sample-band { background: #b91c1c; color: #ffffff; font-weight: 700; text-align: center; padding: 5px; font-size: 10.5px; letter-spacing: 0.3px; text-transform: uppercase; }
@@ -43,10 +59,14 @@ function render({ document: m, dgi, brand, theme }: TemplateRenderInput, withHtT
     ${dgi.testBand}${dgi.sampleBand}
     <div class="band">
       <div style="display:flex;gap:14px;align-items:center">
-        ${logo(brand, theme, dark ? ['light', 'symbol', 'primary', 'horizontal'] : ['primary', 'symbol', 'horizontal', 'light'], { w: 140, h: 54 }, `width:54px;height:54px;border-radius:50%;border:2px solid ${theme.onAccent};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px`, { onDark: dark })}
+        ${logo(brand, theme, prefs, { w: 140, h: 54 }, `width:54px;height:54px;border-radius:50%;border:2px solid ${theme.onAccent};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px`, { onDark: dark })}
         <div style="display:flex;flex-direction:column">
-          ${div(m.seller.title, 'font-size:17px;font-weight:700')}
-          ${nameLine ? div(nameLine, 'opacity:0.9') : ''}
+          ${
+            hideName
+              ? ''
+              : `${div(m.seller.title, 'font-size:17px;font-weight:700')}
+          ${nameLine ? div(nameLine, 'opacity:0.9') : ''}`
+          }
         </div>
       </div>
       <div style="text-align:right">
@@ -61,7 +81,7 @@ function render({ document: m, dgi, brand, theme }: TemplateRenderInput, withHtT
       <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px">
         <div style="display:flex;flex-direction:column;gap:1px">
           <div class="cap">Vendeur</div>
-          ${each(otherSeller, (l) => div(l))}
+          ${hideName ? `${div(m.seller.title)}${nameLine ? div(nameLine) : ''}` : ''}${each(otherSeller, (l) => div(l))}
         </div>
         <div style="display:flex;flex-direction:column;gap:1px">
           <div class="cap">Facturé à</div>
@@ -112,7 +132,7 @@ function render({ document: m, dgi, brand, theme }: TemplateRenderInput, withHtT
       </div>
       ${
         m.security
-          ? `<div style="border:1.5px solid ${theme.accent};border-radius:10px;padding:12px 14px;display:flex;gap:16px;align-items:center;break-inside:avoid">
+          ? `<div style="border:1.5px solid ${theme.accent};border-radius:10px;padding:12px 14px;display:flex;gap:16px;align-items:center;break-inside:avoid${dgiFrameBg(v2)}">
           <div class="qr" style="width:110px;height:110px;flex-shrink:0">${dgi.qrSvg}</div>
           <div style="display:flex;flex-direction:column;gap:3px;flex:1">
             ${div(DGI_LABELS.securityTitle, `font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:${theme.accent}`)}
@@ -148,4 +168,16 @@ export const BANDEAU: InvoiceTemplate = {
   ...BANDEAU_1_0_0,
   version: '1.1.0',
   render: (input) => render(input, true),
+};
+
+/**
+ * Version 1.2.0 — identité visuelle v2 (ADR-0073, 10 nov. 2026) : logo selon le
+ * choix unique de l'organisation ; nom de marque retiré de la zone du logo quand
+ * un logo s'imprime (la raison sociale reste dans le bloc d'identité légale, en
+ * texte normal) ; cadre DGI sur fond blanc (motif de fond posé par le moteur).
+ */
+export const BANDEAU_1_2_0: InvoiceTemplate = {
+  ...BANDEAU_1_0_0,
+  version: '1.2.0',
+  render: (input) => render(input, true, true),
 };

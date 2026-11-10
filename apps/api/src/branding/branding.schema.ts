@@ -46,6 +46,13 @@ export class OrganizationBrandAsset {
   @Prop({ type: String, required: true })
   createdBy!: string;
 
+  /**
+   * Usage de l'image (ADR-0073) : `logo` (défaut, toutes les images d'avant),
+   * `favicon` ou `pattern` (motif de fond). Même immuabilité que les logos.
+   */
+  @Prop({ type: String, default: 'logo' })
+  kind!: 'logo' | 'favicon' | 'pattern';
+
   createdAt!: Date;
 
   @Prop({ type: Number, default: 1 })
@@ -90,6 +97,30 @@ export class OrganizationBrand {
     id: string;
     packageId?: string;
     options: { palette: string | null; accent: string | null; font: string | null };
+  } | null;
+
+  /**
+   * Choix de logo unique de l'organisation (ADR-0073 § 1) : `square` (principal,
+   * sinon symbole) ou `horizontal`. `null` (identités d'avant) : déduit de ce qui
+   * est téléversé (`effectiveLogoChoice`).
+   */
+  @Prop({ type: String, default: null })
+  logoChoice!: 'square' | 'horizontal' | null;
+
+  /** Favicon de l'organisation (`assetId`, `kind: 'favicon'`), ou `null` (favicon Lalanda). */
+  @Prop({ type: String, default: null })
+  favicon!: string | null;
+
+  /** Motif téléversé par l'organisation (`assetId`, `kind: 'pattern'`), ou `null`. */
+  @Prop({ type: String, default: null })
+  patternImage!: string | null;
+
+  /** Motif de fond choisi (ADR-0073 § 4) ; `null` : aucun motif. */
+  @Prop({ type: Object, default: null })
+  pattern!: {
+    source: 'none' | 'library' | 'upload';
+    libraryId: string | null;
+    intensity: number;
   } | null;
 
   @Prop({ type: Number, default: 0 })
