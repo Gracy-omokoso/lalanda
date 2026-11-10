@@ -256,3 +256,12 @@ Décideurs :
   aux mentions de l'art. 79 du Code du travail (« aucune autre indication »), jamais de motif de
   sortie ni de salaire ; points juridiques « à revoir avec le juriste ». Contrats et avenants hors
   périmètre. Statut : **accepté** (8 nov. 2026).
+- [ADR-0073](ADR-0073-identite-visuelle-v2.md) — Identité visuelle v2 : un seul choix de logo pour
+  toute l'organisation (« carré » = principal puis symbole, « horizontal » = horizontal ; repli sur
+  l'autre forme, choix déduit des logos pour les identités d'avant), nom de marque retiré de la zone
+  du logo dès qu'un logo s'imprime (raison sociale toujours au bloc légal des factures), favicon
+  d'organisation (PNG carré, espace et pages publiques), motifs de fond (onze motifs SVG du dépôt ou
+  PNG transparent vérifié sur les pixels, intensité 3–20 %, aucun motif sous le cadre DGI) sur
+  factures, devis, avoirs, cartes, attestations et certificats ; modèles de facture 1.2.0, versions
+  1.0.0 et 1.1.0 inchangées octet pour octet ; présentation figée étendue de champs facultatifs.
+  Statut : **accepté** (10 nov. 2026).
