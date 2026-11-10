@@ -4,14 +4,16 @@
 // d'image déduit du contenu, SVG refusé, couleurs `#RRGGBB`, police en liste
 // fermée). Ce module évite seulement d'envoyer ce qui serait refusé.
 
+import { markVariantFor, patternDataUri, type LogoChoice } from '@lalanda/shared/branding';
+
 import type { LogoVariant } from '@/lib/api';
 
 /** Usage de chaque déclinaison, dit à l'utilisateur. */
 export const LOGO_VARIANT_HINTS: Record<LogoVariant, string> = {
-  primary: 'Le logo complet, utilisé par défaut (Classique, Éditoriale).',
-  horizontal: 'Logo et nom sur une ligne : en-têtes étroits (Minimal).',
-  symbol: 'Le symbole seul, sans texte : petits emplacements (Compacte).',
-  light: 'Version claire, posée sur un fond de couleur (Bandeau, Latérale).',
+  primary: 'Le logo carré complet : c’est lui qu’impriment les documents en « Logo carré ».',
+  horizontal: 'Logo et nom sur une ligne : imprimé partout en « Logo horizontal ».',
+  symbol: 'Le symbole seul : remplace le logo carré s’il manque.',
+  light: 'Version claire, posée sur un fond de couleur (bandeaux, colonnes, cartes sombres).',
 };
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
@@ -52,4 +54,39 @@ export function preControleFichier(
     return 'Format non accepté : PNG, JPEG ou WebP.';
   }
   return null;
+}
+
+// ── Identité visuelle v2 (ADR-0073) ─────────────────────────────────────────
+
+/** Déclinaison réellement imprimée pour un choix, d'après les logos présents. */
+export function varianteImprimee(
+  choix: LogoChoice,
+  logos: Record<LogoVariant, unknown>,
+): 'primary' | 'horizontal' | 'symbol' | null {
+  return markVariantFor(choix, {
+    primary: Boolean(logos.primary),
+    horizontal: Boolean(logos.horizontal),
+    symbol: Boolean(logos.symbol),
+  });
+}
+
+/** Pré-contrôle d'un favicon ou d'un motif : PNG seulement, taille bornée. */
+export function preControlePng(
+  f: { size: number; type: string; name: string },
+  maxBytes: number,
+): string | null {
+  if (f.type === 'image/svg+xml' || f.name.toLowerCase().endsWith('.svg')) {
+    return 'Le SVG n’est pas accepté : exportez l’image en PNG.';
+  }
+  if (f.type !== '' && f.type !== 'image/png') return 'Format attendu : PNG.';
+  if (f.size > maxBytes) {
+    return `Fichier trop lourd (${tailleLisible(f.size)}) : ${tailleLisible(maxBytes)} au plus.`;
+  }
+  return null;
+}
+
+/** Motif de la bibliothèque en `data:` pour une vignette (même SVG que les PDF). */
+export function vignetteMotif(id: string, couleur: string | null): string {
+  const c = couleur && /^#[0-9a-f]{6}$/.test(couleur) ? couleur : '#1f4e79';
+  return patternDataUri(id, c);
 }

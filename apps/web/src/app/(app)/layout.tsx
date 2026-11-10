@@ -1,4 +1,5 @@
 import { AppShell } from './_components/app-shell';
+import { OrganizationFavicon } from './_components/organization-favicon';
 import { ThemeSync } from './_components/theme-sync';
 
 /**
@@ -11,6 +12,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }): 
     <>
       {/* Applique le thème enregistré sur le compte (S20b). N'affiche rien. */}
       <ThemeSync />
+      {/* Favicon de l'organisation active (ADR-0073 § 3). N'affiche rien. */}
+      <OrganizationFavicon />
       <AppShell>{children}</AppShell>
     </>
   );

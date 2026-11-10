@@ -1038,7 +1038,7 @@ async function invoiceTemplatePreviewRequest(
  * l'extension : c'est le navigateur qui le renseigne, et c'est l'API qui
  * tranche pour de bon en analysant le contenu.
  */
-async function binaryRequest<T>(path: string, file: Blob): Promise<T> {
+export async function binaryRequest<T>(path: string, file: Blob): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     method: 'POST',
     credentials: 'include',

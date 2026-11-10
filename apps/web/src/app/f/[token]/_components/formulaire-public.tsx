@@ -12,6 +12,7 @@ import { buttonClasses } from '@lalanda/ui';
 import { useCallback, useEffect, useId, useState } from 'react';
 
 import { PublicFormError, publicLeadFormApi, type PublicLeadFormView } from '@/lib/api-lead-forms';
+import { applyFavicon } from '@/lib/favicon';
 
 import {
   SAISIE,
@@ -46,6 +47,8 @@ export function FormulairePublic({ token }: { token: string }): React.ReactEleme
       try {
         const v = await publicLeadFormApi.config(token);
         setVue(v);
+        // ADR-0073 § 3 : favicon de l'organisation, sinon celui de Lalanda.
+        applyFavicon(v.faviconUrl ?? null);
         if (!garderSaisie) {
           const source =
             typeof window === 'undefined'

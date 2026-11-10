@@ -10,6 +10,7 @@ import { BadgeCheck, CircleSlash, ShieldAlert } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { verifierCarte, type PublicCardView } from '@/lib/api-hr-cards';
+import { applyFavicon } from '@/lib/favicon';
 
 type Etat = PublicCardView | { erreur: 'reseau' | 'debit' } | null;
 
@@ -19,7 +20,11 @@ export function VerificationCarte({ token }: { token: string }): React.ReactElem
   useEffect(() => {
     let annule = false;
     void verifierCarte(token).then((r) => {
-      if (!annule) setEtat(r);
+      if (!annule) {
+        setEtat(r);
+        // ADR-0073 § 3 : favicon de l'organisation, sinon celui de Lalanda.
+        applyFavicon(r && 'valid' in r && r.valid ? (r.organization.faviconUrl ?? null) : null);
+      }
     });
     return () => {
       annule = true;
