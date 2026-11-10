@@ -300,8 +300,18 @@ e2eSuite('Formulaire public de prospects (ADR-0048)', () => {
       const res = await publicGet(form['token']);
       const view = ok(res);
       expect(Object.keys(view).sort()).toEqual(
-        ['branding', 'consent', 'fields', 'intro', 'successMessage', 'ticket', 'title'].sort(),
+        [
+          'branding',
+          'consent',
+          'faviconUrl', // ADR-0073 § 3 : URL signée d'une image publique, ou null
+          'fields',
+          'intro',
+          'successMessage',
+          'ticket',
+          'title',
+        ].sort(),
       );
+      expect(view['faviconUrl']).toBeNull();
       expect(view['consent']).toEqual({ text: LEAD_FORM_DEFAULT_CONSENT, policyUrl: POLICY });
       expect((view['fields'] as any[]).map((f) => f.key)).toEqual([
         'name',

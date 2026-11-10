@@ -337,7 +337,7 @@ e2eSuite('RH — documents générés (ADR-0072)', () => {
       .sort({ createdAt: -1 })
       .limit(1)
       .next();
-    expect(row!['templateId']).toBe('marge@1');
+    expect(row!['templateId']).toBe('marge@2'); // version 2 : ADR-0073
   });
 
   it('isolation : la fiche d’une autre organisation est introuvable', async () => {

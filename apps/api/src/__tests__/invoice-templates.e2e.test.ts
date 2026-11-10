@@ -490,14 +490,14 @@ e2eSuite('modèles de facture et identité visuelle (ADR-0028)', () => {
       const choix = await choisir('bandeau', { accent: '#1d4ed8' });
       expect(choix.current).toMatchObject({
         templateId: 'bandeau',
-        version: '1.1.0',
+        version: '1.2.0',
         resolved: { palette: 'brand', accent: '#1d4ed8', font: 'manrope' },
       });
 
       // Brouillon : imprimé avec le modèle courant.
       const d = await brouillonPret(asN(), customerN);
       const pro = text(await pdf(asN(), d.id));
-      expect(pro).toContain('data-template="bandeau@1.1.0"');
+      expect(pro).toContain('data-template="bandeau@1.2.0"');
       expect(pro).toContain('PRO FORMA — non valable comme facture');
 
       // Brouillon : aucune présentation figée dans la vue.
@@ -510,14 +510,14 @@ e2eSuite('modèles de facture et identité visuelle (ADR-0028)', () => {
         kind: 'template',
         templateId: 'bandeau',
         templateLabel: 'Bandeau',
-        version: '1.1.0',
+        version: '1.2.0',
         options: { palette: 'brand', accent: '#1d4ed8', font: 'manrope' },
       });
       const doc = await enBase(v.id);
       const p = doc?.['presentation'] as Record<string, any>;
       const b = await brand();
       expect(p).toEqual({
-        template: { id: 'bandeau', version: '1.1.0' },
+        template: { id: 'bandeau', version: '1.2.0' },
         options: { palette: 'brand', accent: '#1d4ed8', font: 'manrope' },
         identity: {
           primaryColor: '#0f5132',
@@ -541,6 +541,8 @@ e2eSuite('modèles de facture et identité visuelle (ADR-0028)', () => {
               height: 96,
             },
           },
+          // ADR-0073 : choix de logo résolu au gel (déduit : un logo principal ⇒ carré).
+          logoChoice: 'square',
         },
       });
       // L'empreinte du contenu couvre la présentation ; le journal reste chaîné.
@@ -551,11 +553,11 @@ e2eSuite('modèles de facture et identité visuelle (ADR-0028)', () => {
       const original = await pdf(asN(), v.id);
       expect(original.status).toBe(200);
       const avant = text(original);
-      expect(avant).toContain('data-template="bandeau@1.1.0"');
+      expect(avant).toContain('data-template="bandeau@1.2.0"');
       expect(avant).toContain(
         `src="data:image/png;base64,${testLogoBytes('light').toString('base64')}"`,
       );
-      expect(avant).toContain('modèle Bandeau 1.1.0');
+      expect(avant).toContain('modèle Bandeau 1.2.0');
       // ADR-0028, décision ouverte n° 1 : la version 1.1.0 imprime le Total HT.
       expect(avant).toContain('>Total HT<');
       expect(avant).toContain(v.normalization.codeDefDgi);
@@ -588,11 +590,11 @@ e2eSuite('modèles de facture et identité visuelle (ADR-0028)', () => {
       expect(text(apres)).toBe(avant);
       // Le duplicata reprend la présentation FIGÉE.
       const dup = text(await duplicata(asN(), v.id));
-      expect(dup).toContain('data-template="bandeau@1.1.0"');
+      expect(dup).toContain('data-template="bandeau@1.2.0"');
       expect(dup).toContain('DUPLICATA n° 1');
       // Un nouveau brouillon suit le modèle d'aujourd'hui.
       const d2 = await brouillonPret(asN(), customerN);
-      expect(text(await pdf(asN(), d2.id))).toContain('data-template="minimal@1.1.0"');
+      expect(text(await pdf(asN(), d2.id))).toContain('data-template="minimal@1.2.0"');
 
       // Révocation : l'ancienne URL du logo remplacé ne sert plus rien.
       expect((await request(server()).get(chemin(ancienneUrl))).status).toBe(404);
@@ -663,7 +665,7 @@ e2eSuite('modèles de facture et identité visuelle (ADR-0028)', () => {
       'inline; filename="apercu-modele-compacte.pdf"',
     );
     const t = text(res);
-    expect(t).toContain('data-template="compacte@1.1.0"');
+    expect(t).toContain('data-template="compacte@1.2.0"');
     expect(t).toContain('class="dgi-watermark sample">EXEMPLE<');
     expect(t).toContain('Exemple fictif — aperçu du modèle');
     expect(t).toContain('Exemple SARL'); // fiche fiscale de l'organisation
@@ -684,7 +686,7 @@ e2eSuite('modèles de facture et identité visuelle (ADR-0028)', () => {
     );
     expect(vignette.status).toBe(200);
     expect(vignette.headers['content-type']).toContain('image/png');
-    expect(text(vignette)).toContain('data-template="bandeau@1.1.0"');
+    expect(text(vignette)).toContain('data-template="bandeau@1.2.0"');
     expect(pngSpy).toHaveBeenCalledWith(expect.any(String), {
       width: 794,
       height: 1123,
