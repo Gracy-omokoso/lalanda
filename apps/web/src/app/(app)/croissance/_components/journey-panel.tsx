@@ -4,6 +4,7 @@
 // explicites, étape déclarée par l'utilisateur, conditions et checklists.
 // Ouvert à toutes les offres : aucun indicateur financier n'y est calculé.
 
+import { Checkbox, Field, Select } from '@lalanda/ui';
 import { useCallback, useEffect, useState } from 'react';
 
 import {
@@ -96,26 +97,16 @@ export function JourneyPanel(): React.ReactElement {
           <span className="text-xs opacity-70">Règles {journey.reglesVersion}</span>
         </div>
         <div className="doc-card flex flex-col gap-2 px-4 py-3">
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-mono text-[0.62rem] font-medium uppercase tracking-[0.1em] opacity-70">
-              Votre étape
-            </span>
-            <select
-              className="rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm disabled:opacity-60"
+          <Field label="Votre étape" disabled={!acces.declarer}>
+            <Select<JourneyStage | ''>
               value={journey.declaree ?? ''}
-              disabled={!acces.declarer}
-              onChange={(e) =>
-                void declarer(e.target.value === '' ? null : (e.target.value as JourneyStage))
-              }
-            >
-              <option value="">Suivre la suggestion</option>
-              {JOURNEY_STAGES.map((s) => (
-                <option key={s} value={s}>
-                  {LIBELLES_ETAPES[s]}
-                </option>
-              ))}
-            </select>
-          </label>
+              onChange={(v) => void declarer(v === '' ? null : v)}
+              options={[
+                { value: '', label: 'Suivre la suggestion' },
+                ...JOURNEY_STAGES.map((s) => ({ value: s, label: LIBELLES_ETAPES[s] })),
+              ]}
+            />
+          </Field>
           {!acces.declarer ? (
             <span className="text-xs opacity-70">Consultation seule pour votre rôle.</span>
           ) : null}
@@ -204,13 +195,12 @@ function Etape({
             {etape.checklist.map((i) => (
               <li key={i.id} className="flex items-start gap-2">
                 {i.mode === 'manuel' ? (
-                  <input
-                    type="checkbox"
-                    className="mt-1"
+                  <Checkbox
+                    className="mt-0.5"
                     aria-label={i.libelle}
                     checked={i.fait === true}
                     disabled={!peutCocher}
-                    onChange={(e) => onCocher(i.id, e.target.checked)}
+                    onChange={(coche) => onCocher(i.id, coche)}
                   />
                 ) : (
                   <span aria-hidden="true" className="mt-0.5 w-4 text-center">

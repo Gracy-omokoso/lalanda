@@ -7,6 +7,7 @@
 // se contente d'afficher `atteinte`, `statut` et, quand la mesure n'existe pas,
 // de le dire explicitement — jamais un 0 par défaut (ADR-0011, risque n°4).
 
+import { Field, SubmitButton, TextInput } from '@lalanda/ui';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -184,35 +185,30 @@ export function ObjectivesPanel({ projectId }: { projectId: string }): React.Rea
               Mes cibles ({currency})
             </legend>
             {OBJECTIVE_KEYS.map((key) => (
-              <label key={key} className="flex flex-col gap-1 text-sm">
-                <span className="font-medium">{OBJECTIVE_META[key].label}</span>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    step="any"
-                    min={0}
-                    inputMode="decimal"
-                    value={form[key]}
-                    placeholder="—"
-                    onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-                    className="fig w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
-                  />
-                  <span className="w-10 text-xs text-[var(--foreground-muted)]">{currency}</span>
-                </div>
-                <span className="text-xs italic text-[var(--foreground-muted)]">
-                  {OBJECTIVE_META[key].aide}
-                </span>
-              </label>
+              <Field
+                key={key}
+                label={OBJECTIVE_META[key].label}
+                hint={OBJECTIVE_META[key].aide}
+                size="full"
+              >
+                <TextInput
+                  type="number"
+                  step="any"
+                  min={0}
+                  inputMode="decimal"
+                  value={form[key]}
+                  placeholder="—"
+                  onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                  className="fig"
+                  trailing={<span className="pr-2">{currency}</span>}
+                />
+              </Field>
             ))}
           </fieldset>
           <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="submit"
-              disabled={saving}
-              className="rounded-md bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-[var(--accent-foreground)] transition hover:opacity-90 disabled:opacity-50"
-            >
-              {saving ? 'Enregistrement…' : 'Enregistrer les objectifs'}
-            </button>
+            <SubmitButton busy={saving} busyLabel="Enregistrement…" className="max-sm:h-11">
+              Enregistrer les objectifs
+            </SubmitButton>
             {savedAt ? (
               <span className="text-xs text-[var(--foreground-muted)]">
                 Enregistré à {new Date(savedAt).toLocaleTimeString('fr-FR')}

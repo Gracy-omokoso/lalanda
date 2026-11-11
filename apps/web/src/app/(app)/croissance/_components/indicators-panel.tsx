@@ -6,6 +6,7 @@
 // indicateurs dépendent : projet de référence, solde de trésorerie, articles
 // récurrents.
 
+import { Button, Checkbox, DatePicker, Field, FormGrid, Select, TextInput } from '@lalanda/ui';
 import { useCallback, useEffect, useState } from 'react';
 
 import { api, type CatalogItemView } from '@/lib/api';
@@ -225,11 +226,6 @@ function Declarations({
     }
   }
 
-  const champ =
-    'rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm disabled:opacity-60';
-  const bouton =
-    'rounded-md border border-[var(--border-strong)] px-4 py-2 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-60';
-
   return (
     <Bloc titre="Vos déclarations">
       <p className="text-sm text-[var(--foreground-muted)]">
@@ -245,26 +241,33 @@ function Declarations({
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="doc-card flex flex-col gap-3 px-4 py-3">
           <h3 className="font-medium">Initiative de référence et revenus récurrents</h3>
-          <label className="flex flex-col gap-1 text-sm">
-            Initiative dont le réalisé représente l’entreprise
-            <select
-              className={champ}
-              value={projet}
+          <FormGrid>
+            <Field
+              label="Initiative dont le réalisé représente l’entreprise"
+              size="full"
               disabled={!acces.declarer || envoi}
-              onChange={(e) => setProjet(e.target.value)}
             >
-              <option value="">
-                {profil.projects.length === 1 ? 'La seule initiative (par défaut)' : 'Non choisi'}
-              </option>
-              {profil.projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} ({p.currency})
-                </option>
-              ))}
-            </select>
-          </label>
-          <fieldset className="flex flex-col gap-1 text-sm">
-            <legend className="mb-1">
+              <Select<string>
+                value={projet}
+                onChange={setProjet}
+                options={[
+                  {
+                    value: '',
+                    label:
+                      profil.projects.length === 1
+                        ? 'La seule initiative (par défaut)'
+                        : 'Non choisi',
+                  },
+                  ...profil.projects.map((p) => ({
+                    value: p.id,
+                    label: `${p.name} (${p.currency})`,
+                  })),
+                ]}
+              />
+            </Field>
+          </FormGrid>
+          <fieldset className="flex flex-col gap-2 text-sm">
+            <legend className="mb-1 font-medium">
               Articles du catalogue facturés comme revenus récurrents
             </legend>
             {catalogue === null ? (
@@ -275,31 +278,26 @@ function Declarations({
               <p className="text-xs text-[var(--foreground-muted)]">Aucun article actif.</p>
             ) : (
               catalogue.map((item) => (
-                <label key={item.id} className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    disabled={!acces.declarer || envoi}
-                    checked={recurrents.includes(item.id)}
-                    onChange={(e) =>
-                      setRecurrents((cur) =>
-                        e.target.checked ? [...cur, item.id] : cur.filter((id) => id !== item.id),
-                      )
-                    }
-                  />
-                  {item.name}
-                </label>
+                <Checkbox
+                  key={item.id}
+                  disabled={!acces.declarer || envoi}
+                  checked={recurrents.includes(item.id)}
+                  onChange={(coche) =>
+                    setRecurrents((cur) =>
+                      coche ? [...cur, item.id] : cur.filter((id) => id !== item.id),
+                    )
+                  }
+                  label={item.name}
+                />
               ))
             )}
           </fieldset>
           {acces.declarer ? (
-            <button
-              type="button"
-              className={bouton}
-              disabled={envoi}
-              onClick={() => void enregistrerFiche()}
-            >
-              Enregistrer
-            </button>
+            <div>
+              <Button busy={envoi} onClick={() => void enregistrerFiche()}>
+                Enregistrer
+              </Button>
+            </div>
           ) : (
             <p className="text-xs text-[var(--foreground-muted)]">
               Votre rôle permet de consulter ces déclarations, pas de les modifier.
@@ -321,52 +319,34 @@ function Declarations({
           ) : (
             <p className="text-sm text-[var(--foreground-muted)]">Aucun solde déclaré.</p>
           )}
-          <div className="flex flex-wrap gap-2">
-            <label className="flex flex-col gap-1 text-sm">
-              Montant
-              <input
-                className={champ}
+          <FormGrid>
+            <Field label="Montant" size="sm" disabled={!acces.declarerTresorerie || envoi}>
+              <TextInput
                 inputMode="decimal"
+                className="fig"
                 value={montant}
-                disabled={!acces.declarerTresorerie || envoi}
                 onChange={(e) => setMontant(e.target.value)}
               />
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              Devise
-              <input
-                className={`${champ} w-20 uppercase`}
+            </Field>
+            <Field label="Devise" size="xs" disabled={!acces.declarerTresorerie || envoi}>
+              <TextInput
+                className="uppercase"
                 maxLength={3}
                 value={devise}
-                disabled={!acces.declarerTresorerie || envoi}
                 onChange={(e) => setDevise(e.target.value.toUpperCase())}
               />
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              Date du solde
-              <input
-                type="date"
-                className={champ}
-                value={date}
-                disabled={!acces.declarerTresorerie || envoi}
-                onChange={(e) => setDate(e.target.value)}
-              />
-            </label>
-          </div>
+            </Field>
+            <Field label="Date du solde" size="sm" disabled={!acces.declarerTresorerie || envoi}>
+              <DatePicker value={date} onChange={setDate} />
+            </Field>
+          </FormGrid>
           {acces.declarerTresorerie ? (
             <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                className={bouton}
-                disabled={envoi}
-                onClick={() => void enregistrerSolde()}
-              >
+              <Button busy={envoi} onClick={() => void enregistrerSolde()}>
                 Déclarer ce solde
-              </button>
+              </Button>
               {profil.declaredCash ? (
-                <button
-                  type="button"
-                  className={bouton}
+                <Button
                   disabled={envoi}
                   onClick={() =>
                     void growApi
@@ -378,7 +358,7 @@ function Declarations({
                   }
                 >
                   Retirer
-                </button>
+                </Button>
               ) : null}
             </div>
           ) : (

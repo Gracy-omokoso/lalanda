@@ -12,7 +12,7 @@
 //
 // L'IA n'est appelée que sur un clic : chaque appel consomme le quota du mois.
 
-import { Alert, Badge, Button, DataNature } from '@lalanda/ui';
+import { Alert, Badge, Button, DataNature, Field, Select, TextArea } from '@lalanda/ui';
 import { useCallback, useEffect, useState } from 'react';
 
 import {
@@ -252,28 +252,29 @@ function RattachementPlan(props: {
         <Alert tone="warning">Tableaux indisponibles : {vue.plan.error}</Alert>
       ) : null}
       {vue.permissions.write ? (
-        <label className="flex flex-wrap items-center gap-2 text-sm">
-          <span>Version du plan :</span>
-          <select
-            className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1"
+        <Field
+          label="Version du plan"
+          size="lg"
+          className="max-w-md"
+          hint={
+            vue.planChoices.length === 0
+              ? 'Validez d’abord le plan financier dans l’onglet Résultats.'
+              : undefined
+          }
+        >
+          <Select<string>
             disabled={props.occupe}
-            value={vue.planVersion ?? ''}
-            onChange={(e) => props.onChange(e.target.value === '' ? null : Number(e.target.value))}
-          >
-            <option value="">Aucune (brouillon)</option>
-            {vue.planChoices.map((p) => (
-              <option key={p.version} value={p.version}>
-                v{p.version} du {dateFr(p.approvedAt)}
-                {p.status === 'superseded' ? ' (remplacée)' : ''}
-              </option>
-            ))}
-          </select>
-          {vue.planChoices.length === 0 ? (
-            <span className="text-xs text-[var(--foreground-muted)]">
-              Validez d’abord le plan financier dans l’onglet Résultats.
-            </span>
-          ) : null}
-        </label>
+            value={vue.planVersion === null ? '' : String(vue.planVersion)}
+            onChange={(v) => props.onChange(v === '' ? null : Number(v))}
+            options={[
+              { value: '', label: 'Aucune (brouillon)' },
+              ...vue.planChoices.map((p) => ({
+                value: String(p.version),
+                label: `v${p.version} du ${dateFr(p.approvedAt)}${p.status === 'superseded' ? ' (remplacée)' : ''}`,
+              })),
+            ]}
+          />
+        </Field>
       ) : null}
     </section>
   );
@@ -339,9 +340,9 @@ function SectionBloc(props: {
 
       {vue.permissions.write ? (
         <>
-          <textarea
+          <TextArea
             aria-label={`Texte de la section ${s.title}`}
-            className="min-h-32 rounded-md border border-[var(--border)] bg-[var(--surface)] p-2 text-sm"
+            className="min-h-32"
             value={texte}
             maxLength={12000}
             onChange={(e) => setTexte(e.target.value)}
@@ -395,10 +396,10 @@ function SectionBloc(props: {
             Aide IA : proposer un brouillon de cette section
           </summary>
           <div className="mt-2 flex flex-col gap-2">
-            <textarea
+            <TextArea
               aria-label={`Vos réponses aux questions de la section ${s.title}`}
               placeholder="Vos réponses aux questions guides (facultatif)"
-              className="min-h-20 rounded-md border border-[var(--border)] bg-[var(--surface)] p-2 text-sm"
+              className="min-h-20"
               value={notes}
               maxLength={2000}
               onChange={(e) => setNotes(e.target.value)}

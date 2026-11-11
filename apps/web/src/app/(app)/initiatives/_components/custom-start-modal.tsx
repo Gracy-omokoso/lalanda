@@ -30,6 +30,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { ChoiceCards, TextArea, TextInput } from '@lalanda/ui';
+
 import { Infobulle } from '@/components/infobulle';
 import { api, type CanvasBlocks, type TemplateDriverMeta, type TemplateMeta } from '@/lib/api';
 
@@ -543,29 +545,13 @@ function ChampQuestion({
   if (question.kind === 'choix') {
     const valeur = reponses[question.id] ?? '';
     return (
-      <fieldset className="flex flex-col gap-2">
-        <legend className="sr-only">{question.question}</legend>
-        {question.options.map((option) => (
-          <label
-            key={option}
-            className={`flex cursor-pointer items-center gap-2.5 rounded-lg border p-3 text-sm transition ${
-              valeur === option
-                ? 'border-[var(--accent)] bg-[var(--accent)]/5'
-                : 'border-[var(--border)] hover:border-[var(--accent)]/40'
-            }`}
-          >
-            <input
-              type="radio"
-              name={question.id}
-              value={option}
-              checked={valeur === option}
-              onChange={() => onRepondre(question.id, option)}
-              className="accent-[var(--accent)]"
-            />
-            <span className="font-medium">{option}</span>
-          </label>
-        ))}
-      </fieldset>
+      <ChoiceCards<string>
+        aria-label={question.question}
+        columns={1}
+        value={valeur}
+        onChange={(option) => onRepondre(question.id, option)}
+        options={question.options.map((option) => ({ value: option, label: option }))}
+      />
     );
   }
 
@@ -578,7 +564,7 @@ function ChampQuestion({
         <label htmlFor={champId} className="sr-only">
           {question.question}
         </label>
-        <input
+        <TextInput
           id={champId}
           type="text"
           autoFocus
@@ -586,7 +572,6 @@ function ChampQuestion({
           placeholder={question.placeholder}
           value={valeur}
           onChange={(e) => onRepondre(question.id, e.target.value)}
-          className="w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
         />
       </div>
     );
@@ -604,7 +589,7 @@ function ChampQuestion({
           libelle="Où va cette réponse"
         />
       </span>
-      <textarea
+      <TextArea
         id={champId}
         rows={4}
         autoFocus
@@ -613,7 +598,7 @@ function ChampQuestion({
         value={valeur}
         onChange={(e) => onRepondre(question.id, e.target.value)}
         aria-describedby={`${champId}-aide`}
-        className="w-full resize-y rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm leading-snug outline-none transition focus:border-[var(--accent)]"
+        className="resize-y leading-snug"
       />
     </div>
   );

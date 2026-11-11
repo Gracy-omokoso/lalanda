@@ -10,6 +10,8 @@
 // - le niveau est doublé par un préfixe textuel (« Erreur : », « À vérifier : ») :
 //   jamais d'information portée par la seule couleur (docs/04-UX-UI.md).
 
+import { TextInput } from '@lalanda/ui';
+
 import { Infobulle } from '@/components/infobulle';
 import type { TemplateDriverMeta } from '@/lib/api';
 
@@ -98,7 +100,7 @@ export function WizardField({
       </div>
 
       <div className="flex items-center gap-2">
-        <input
+        <TextInput
           id={fieldId}
           name={driver.id}
           type="text"
@@ -111,12 +113,8 @@ export function WizardField({
           {...(describedBy ? { 'aria-describedby': describedBy } : {})}
           {...(hasError ? { 'aria-errormessage': issueId } : {})}
           className={[
-            'fig w-full rounded-md border bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition',
-            hasError
-              ? 'border-[var(--danger)] bg-[var(--danger-bg)]'
-              : hasWarning
-                ? 'border-[var(--warn)]'
-                : 'border-[var(--border)] focus:border-[var(--accent)]',
+            'fig',
+            hasError ? 'bg-[var(--danger-bg)]' : hasWarning ? 'border-[var(--warn)]' : '',
           ].join(' ')}
         />
         {suffix ? (

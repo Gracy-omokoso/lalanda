@@ -5,7 +5,18 @@
 // assistance IA sur demande (suggestions appliquées au formulaire seulement) ;
 // passage vers le Canvas d'un projet existant ou nouveau.
 
-import { Button, DataNature } from '@lalanda/ui';
+import {
+  Button,
+  DataNature,
+  DatePicker,
+  EntityPicker,
+  Field,
+  FormGrid,
+  Select,
+  TextArea,
+  TextInput,
+  correspondRecherche,
+} from '@lalanda/ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -35,9 +46,6 @@ import {
   type FicheForm,
 } from './idea-model';
 
-const CHAMP =
-  'rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm disabled:opacity-70';
-
 const LIBELLES_HYPOTHESES = {
   a_tester: 'À tester',
   confirmee: 'Confirmée',
@@ -62,18 +70,14 @@ function Texte({
   aide?: string;
 }): React.ReactElement {
   return (
-    <label className="flex flex-col gap-1 text-sm">
-      <span className="font-medium">{label}</span>
-      {aide && <span className="text-xs text-[var(--foreground-muted)]">{aide}</span>}
-      <textarea
+    <Field label={label} hint={aide} size="full" disabled={disabled}>
+      <TextArea
         value={value}
         onChange={(e) => onChange(e.target.value)}
         maxLength={max}
         rows={rows}
-        disabled={disabled}
-        className={CHAMP}
       />
-    </label>
+    </Field>
   );
 }
 
@@ -175,76 +179,68 @@ export function IdeaFichePanel({ id }: { id: string }): React.ReactElement {
 
       <Bloc titre="La fiche" aside={<DataNature nature="hypothese" />}>
         <div className="doc-card flex flex-col gap-4 p-4">
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium">Nom de l’idée</span>
-            <input
-              value={form.title}
-              onChange={(e) => maj({ title: e.target.value })}
-              maxLength={120}
+          <FormGrid>
+            <Field label="Nom de l’idée" size="lg" disabled={lecture}>
+              <TextInput
+                value={form.title}
+                onChange={(e) => maj({ title: e.target.value })}
+                maxLength={120}
+              />
+            </Field>
+            <Texte
+              label="Problème"
+              aide="Ce que vit le client aujourd’hui, avec ses mots."
+              value={form.problem}
+              onChange={(v) => maj({ problem: v })}
+              max={1000}
               disabled={lecture}
-              className={CHAMP}
             />
-          </label>
-          <Texte
-            label="Problème"
-            aide="Ce que vit le client aujourd’hui, avec ses mots."
-            value={form.problem}
-            onChange={(v) => maj({ problem: v })}
-            max={1000}
-            disabled={lecture}
-          />
-          <Texte
-            label="Client cible"
-            aide="Qui, où, et comment le joindre."
-            value={form.target}
-            onChange={(v) => maj({ target: v })}
-            max={1000}
-            disabled={lecture}
-          />
-          <Texte
-            label="Solution"
-            value={form.solution}
-            onChange={(v) => maj({ solution: v })}
-            max={1000}
-            disabled={lecture}
-          />
-          <Texte
-            label="Modèle de revenus envisagé"
-            aide="Qui paie, quoi, et comment (vente, abonnement, commission…)."
-            value={form.revenueModel}
-            onChange={(v) => maj({ revenueModel: v })}
-            max={1000}
-            rows={2}
-            disabled={lecture}
-          />
-          <div className="grid gap-3 sm:grid-cols-[8rem_1fr]">
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium">Pays (ISO)</span>
-              <input
+            <Texte
+              label="Client cible"
+              aide="Qui, où, et comment le joindre."
+              value={form.target}
+              onChange={(v) => maj({ target: v })}
+              max={1000}
+              disabled={lecture}
+            />
+            <Texte
+              label="Solution"
+              value={form.solution}
+              onChange={(v) => maj({ solution: v })}
+              max={1000}
+              disabled={lecture}
+            />
+            <Texte
+              label="Modèle de revenus envisagé"
+              aide="Qui paie, quoi, et comment (vente, abonnement, commission…)."
+              value={form.revenueModel}
+              onChange={(v) => maj({ revenueModel: v })}
+              max={1000}
+              rows={2}
+              disabled={lecture}
+            />
+            <Field label="Pays (ISO)" size="xs" disabled={lecture}>
+              <TextInput
                 value={form.country}
                 onChange={(e) => maj({ country: e.target.value })}
                 maxLength={2}
-                disabled={lecture}
-                className={CHAMP}
+                className="uppercase"
               />
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium">Marché, en mots</span>
-              <input
+            </Field>
+            <Field label="Marché, en mots" size="lg" disabled={lecture}>
+              <TextInput
                 value={form.market}
                 onChange={(e) => maj({ market: e.target.value })}
                 maxLength={300}
-                disabled={lecture}
-                className={CHAMP}
               />
-            </label>
-          </div>
+            </Field>
+          </FormGrid>
 
           <fieldset className="flex flex-col gap-2">
             <legend className="text-sm font-medium">Alternatives existantes</legend>
             {form.alternatives.map((a, i) => (
               <div key={i} className="grid gap-2 sm:grid-cols-3">
-                <input
+                <TextInput
                   aria-label={`Alternative ${i + 1} : nom`}
                   placeholder="Nom"
                   value={a.name}
@@ -256,9 +252,8 @@ export function IdeaFichePanel({ id }: { id: string }): React.ReactElement {
                       ),
                     })
                   }
-                  className={CHAMP}
                 />
-                <input
+                <TextInput
                   aria-label={`Alternative ${i + 1} : description`}
                   placeholder="Ce qu’elle fait, son prix observé"
                   value={a.description}
@@ -270,9 +265,8 @@ export function IdeaFichePanel({ id }: { id: string }): React.ReactElement {
                       ),
                     })
                   }
-                  className={CHAMP}
                 />
-                <input
+                <TextInput
                   aria-label={`Alternative ${i + 1} : source`}
                   placeholder="D’où vient l’information"
                   value={a.source}
@@ -284,7 +278,6 @@ export function IdeaFichePanel({ id }: { id: string }): React.ReactElement {
                       ),
                     })
                   }
-                  className={CHAMP}
                 />
               </div>
             ))}
@@ -311,7 +304,7 @@ export function IdeaFichePanel({ id }: { id: string }): React.ReactElement {
             <legend className="text-sm font-medium">Hypothèses clés</legend>
             {form.hypotheses.map((h, i) => (
               <div key={h.id} className="grid gap-2 sm:grid-cols-[1fr_10rem]">
-                <input
+                <TextInput
                   aria-label={`Hypothèse ${i + 1}`}
                   value={h.text}
                   disabled={lecture}
@@ -323,29 +316,23 @@ export function IdeaFichePanel({ id }: { id: string }): React.ReactElement {
                       ),
                     })
                   }
-                  className={CHAMP}
                 />
-                <select
+                <Select<(typeof HYPOTHESIS_STATUSES)[number]>
                   aria-label={`Statut de l’hypothèse ${i + 1}`}
                   value={h.status}
                   disabled={lecture}
-                  onChange={(e) =>
+                  onChange={(status) =>
                     maj({
                       hypotheses: form.hypotheses.map((x) =>
-                        x.id === h.id
-                          ? { ...x, status: e.target.value as (typeof HYPOTHESIS_STATUSES)[number] }
-                          : x,
+                        x.id === h.id ? { ...x, status } : x,
                       ),
                     })
                   }
-                  className={CHAMP}
-                >
-                  {HYPOTHESIS_STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {LIBELLES_HYPOTHESES[s]}
-                    </option>
-                  ))}
-                </select>
+                  options={HYPOTHESIS_STATUSES.map((s) => ({
+                    value: s,
+                    label: LIBELLES_HYPOTHESES[s],
+                  }))}
+                />
               </div>
             ))}
             {!lecture && form.hypotheses.length < 20 && (
@@ -374,80 +361,68 @@ export function IdeaFichePanel({ id }: { id: string }): React.ReactElement {
               Lalanda n’estime aucun marché et n’accepte aucun chiffre sans sa provenance. Elle
               n’est reprise dans aucun plan.
             </p>
-            <div className="grid gap-2 sm:grid-cols-3">
-              <input
-                aria-label="Valeur"
-                placeholder="Valeur"
-                inputMode="decimal"
-                value={m.value}
-                disabled={lecture}
-                onChange={(e) => maj({ marche: { ...m, value: e.target.value } })}
-                className={CHAMP}
-              />
-              <select
-                aria-label="Unité"
-                value={m.unit}
-                disabled={lecture}
-                onChange={(e) =>
-                  maj({ marche: { ...m, unit: e.target.value as (typeof MARKET_UNITS)[number] } })
-                }
-                className={CHAMP}
-              >
-                {MARKET_UNITS.map((u) => (
-                  <option key={u} value={u}>
-                    {LIBELLES_UNITES[u]}
-                  </option>
-                ))}
-              </select>
-              {m.unit === 'montant' && (
-                <input
-                  aria-label="Devise"
-                  placeholder="Devise (USD, CDF…)"
-                  maxLength={3}
-                  value={m.currency}
-                  disabled={lecture}
-                  onChange={(e) => maj({ marche: { ...m, currency: e.target.value } })}
-                  className={CHAMP}
+            <FormGrid>
+              <Field label="Valeur" size="sm" disabled={lecture}>
+                <TextInput
+                  placeholder="Valeur"
+                  inputMode="decimal"
+                  className="fig"
+                  value={m.value}
+                  onChange={(e) => maj({ marche: { ...m, value: e.target.value } })}
                 />
+              </Field>
+              <Field label="Unité" size="md" disabled={lecture}>
+                <Select<(typeof MARKET_UNITS)[number]>
+                  value={m.unit}
+                  onChange={(unit) => maj({ marche: { ...m, unit } })}
+                  options={MARKET_UNITS.map((u) => ({ value: u, label: LIBELLES_UNITES[u] }))}
+                />
+              </Field>
+              {m.unit === 'montant' && (
+                <Field label="Devise" size="xs" disabled={lecture}>
+                  <TextInput
+                    placeholder="USD, CDF…"
+                    maxLength={3}
+                    value={m.currency}
+                    onChange={(e) => maj({ marche: { ...m, currency: e.target.value } })}
+                  />
+                </Field>
               )}
-            </div>
-            <input
-              aria-label="Périmètre"
-              placeholder="Ce qui est compté (ex. commerçantes de poisson des marchés de Kinshasa)"
-              value={m.scope}
-              disabled={lecture}
-              maxLength={300}
-              onChange={(e) => maj({ marche: { ...m, scope: e.target.value } })}
-              className={CHAMP}
-            />
-            <div className="grid gap-2 sm:grid-cols-[1fr_10rem]">
-              <input
-                aria-label="Source (obligatoire)"
-                placeholder="Source (obligatoire) : étude, institut, comptage…"
-                value={m.source}
+              <Field label="Périmètre" size="full" disabled={lecture}>
+                <TextInput
+                  placeholder="Ce qui est compté (ex. commerçantes de poisson des marchés de Kinshasa)"
+                  value={m.scope}
+                  maxLength={300}
+                  onChange={(e) => maj({ marche: { ...m, scope: e.target.value } })}
+                />
+              </Field>
+              <Field
+                label="Source"
+                size="lg"
                 disabled={lecture}
-                maxLength={300}
-                onChange={(e) => maj({ marche: { ...m, source: e.target.value } })}
-                className={CHAMP}
-              />
-              <input
-                aria-label="Date de la source"
-                type="date"
-                value={m.sourceDate}
-                disabled={lecture}
-                onChange={(e) => maj({ marche: { ...m, sourceDate: e.target.value } })}
-                className={CHAMP}
-              />
-            </div>
-            <input
-              aria-label="Lien vers la source"
-              placeholder="Lien vers la source (facultatif)"
-              value={m.sourceUrl}
-              disabled={lecture}
-              maxLength={500}
-              onChange={(e) => maj({ marche: { ...m, sourceUrl: e.target.value } })}
-              className={CHAMP}
-            />
+                hint="Obligatoire dès qu’une taille de marché est renseignée."
+              >
+                <TextInput
+                  placeholder="Étude, institut, comptage…"
+                  value={m.source}
+                  maxLength={300}
+                  onChange={(e) => maj({ marche: { ...m, source: e.target.value } })}
+                />
+              </Field>
+              <Field label="Date de la source" size="sm" disabled={lecture}>
+                <DatePicker
+                  value={m.sourceDate}
+                  onChange={(sourceDate) => maj({ marche: { ...m, sourceDate } })}
+                />
+              </Field>
+              <Field label="Lien vers la source" optional size="full" disabled={lecture}>
+                <TextInput
+                  value={m.sourceUrl}
+                  maxLength={500}
+                  onChange={(e) => maj({ marche: { ...m, sourceUrl: e.target.value } })}
+                />
+              </Field>
+            </FormGrid>
           </fieldset>
 
           {!lecture && (
@@ -570,19 +545,21 @@ export function IdeaFichePanel({ id }: { id: string }): React.ReactElement {
               Canvas et l’assistant de saisie habituels.
             </p>
             <div className="flex flex-wrap items-center gap-2">
-              <select
+              <EntityPicker<{ id: string; name: string }>
                 aria-label="Initiative existante"
-                value={projetChoisi}
-                onChange={(e) => setProjetChoisi(e.target.value)}
-                className={CHAMP}
-              >
-                <option value="">Choisir une initiative existante…</option>
-                {(projets ?? []).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+                className="w-full sm:w-72"
+                value={(projets ?? []).find((p) => p.id === projetChoisi) ?? null}
+                onChange={(p) => setProjetChoisi(p?.id ?? '')}
+                search={async (q) =>
+                  (projets ?? []).filter((p) => correspondRecherche([p.name], q))
+                }
+                refreshKey={projets?.length ?? -1}
+                getKey={(p) => p.id}
+                getLabel={(p) => p.name}
+                placeholder="Choisir une initiative existante…"
+                debounceMs={0}
+                emptyText="Aucune initiative ne correspond."
+              />
               <Button disabled={projetChoisi === ''} onClick={() => void promouvoir()}>
                 Ajouter au Canvas de cette initiative
               </Button>

@@ -3,7 +3,16 @@
 // Liste des idées de l'organisation (ADR-0036 § 1) : création rapide, état de la
 // validation (score du moteur ou « indisponible »), expériences, passage au plan.
 
-import { Button, DataNature, Modal } from '@lalanda/ui';
+import {
+  Button,
+  DataNature,
+  Field,
+  FormGrid,
+  Modal,
+  SubmitButton,
+  TextArea,
+  TextInput,
+} from '@lalanda/ui';
 import { Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -108,30 +117,29 @@ export function IdeasPanel(): React.ReactElement {
           aria-label="Nouvelle idée"
           className="flex flex-col gap-3"
         >
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium">Nom de l’idée</span>
-            <input
-              value={titre}
-              onChange={(e) => setTitre(e.target.value)}
-              maxLength={120}
-              required
-              className="rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium">Le problème que vous voulez résoudre</span>
-            <textarea
-              value={probleme}
-              onChange={(e) => setProbleme(e.target.value)}
-              maxLength={1000}
-              rows={2}
-              className="rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2"
-            />
-          </label>
+          <FormGrid>
+            <Field label="Nom de l’idée" required size="lg">
+              <TextInput
+                value={titre}
+                onChange={(e) => setTitre(e.target.value)}
+                maxLength={120}
+                required
+                autoFocus
+              />
+            </Field>
+            <Field label="Le problème que vous voulez résoudre" size="full">
+              <TextArea
+                value={probleme}
+                onChange={(e) => setProbleme(e.target.value)}
+                maxLength={1000}
+                rows={2}
+              />
+            </Field>
+          </FormGrid>
           <div className="flex flex-wrap items-center gap-3">
-            <Button type="submit" variant="primary" busy={enCours}>
+            <SubmitButton busy={enCours} busyLabel="Création…" className="max-sm:h-11">
               Créer l’idée
-            </Button>
+            </SubmitButton>
             <span className="text-xs text-[var(--foreground-muted)]">
               {actives.length + rangees.length} / {vue.limits.ideas} idées
             </span>

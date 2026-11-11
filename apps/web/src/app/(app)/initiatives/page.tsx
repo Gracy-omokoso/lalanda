@@ -5,7 +5,17 @@
 // clairement séparées, pas un vrai wizard multi-étapes — plus rapide pour un
 // utilisateur habitué et lisible pour un nouveau.
 
-import { Modal, PageHeader, buttonClasses } from '@lalanda/ui';
+import {
+  ChoiceCards,
+  Field,
+  FormGrid,
+  Modal,
+  PageHeader,
+  Select,
+  SubmitButton,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import { Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -387,60 +397,38 @@ export default function ProjectsPage(): React.ReactElement {
             <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--foreground-muted)]">
               1. Contexte fiscal de l’initiative
             </legend>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <label className="flex min-w-0 flex-col gap-1.5 text-sm">
-                <span className="font-medium">Pays</span>
-                <select
+            <FormGrid>
+              <Field label="Pays" size="md">
+                <Select<string>
                   value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                  className="w-full min-w-0 truncate rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
-                >
-                  {COUNTRIES.map((c) => (
-                    <option key={c.code} value={c.code}>
-                      {c.flag} {c.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex min-w-0 flex-col gap-1.5 text-sm">
-                <span className="font-medium">Cadre fiscal</span>
-                <select
+                  onChange={setCountry}
+                  options={COUNTRIES.map((c) => ({ value: c.code, label: `${c.flag} ${c.label}` }))}
+                />
+              </Field>
+              <Field label="Cadre fiscal" size="md" disabled={!packs}>
+                <Select<string>
                   value={packSlug}
-                  onChange={(e) => {
-                    const slug = e.target.value;
+                  onChange={(slug) => {
                     setPackSlug(slug);
                     const p = packs?.find((x) => x.slug === slug);
                     if (p) setCurrency(p.devise_principale);
                   }}
-                  disabled={!packs}
-                  className="w-full min-w-0 truncate rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)] disabled:opacity-50"
-                >
-                  {packsForCountry.length === 0 ? (
-                    <option>Chargement…</option>
-                  ) : (
-                    packsForCountry.map((p) => (
-                      <option key={p.slug} value={p.slug}>
-                        {p.label} · {p.systeme_comptable}
-                      </option>
-                    ))
-                  )}
-                </select>
-              </label>
-              <label className="flex min-w-0 flex-col gap-1.5 text-sm">
-                <span className="font-medium">Devise d&apos;affichage</span>
-                <select
+                  loading={packsForCountry.length === 0}
+                  placeholder="Chargement…"
+                  options={packsForCountry.map((p) => ({
+                    value: p.slug,
+                    label: `${p.label} · ${p.systeme_comptable}`,
+                  }))}
+                />
+              </Field>
+              <Field label="Devise d’affichage" size="sm">
+                <Select<string>
                   value={currency}
-                  onChange={(e) => setCurrency(e.target.value)}
-                  className="w-full min-w-0 truncate rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
-                >
-                  {currencyOptions.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
+                  onChange={setCurrency}
+                  options={currencyOptions.map((c) => ({ value: c, label: c }))}
+                />
+              </Field>
+            </FormGrid>
             {selectedPack?.description ? (
               <p className="text-xs italic text-[var(--foreground-muted)]">
                 {selectedPack.description}
@@ -458,78 +446,63 @@ export default function ProjectsPage(): React.ReactElement {
             ) : orderedTemplates.length === 0 ? (
               <p className="text-xs text-[var(--foreground-muted)]">Aucun template disponible.</p>
             ) : (
-              <div className="grid gap-2 sm:grid-cols-2">
-                {orderedTemplates.map((t) => {
+              <ChoiceCards<string>
+                aria-label="Template sectoriel"
+                value={templateSlug}
+                onChange={(slug) => {
+                  setTemplateSlug(slug);
+                  // (S23b) Le modèle générique ouvre son modal à CHAQUE choix, y
+                  // compris quand il est déjà sélectionné : l'utilisateur qui
+                  // reclique cherche précisément à revoir les deux chemins.
+                  if (slug === CUSTOM_TEMPLATE_SLUG) setModalCustom(true);
+                }}
+                options={orderedTemplates.map((t) => {
                   const meta = templateMeta(t.slug);
-                  const active = templateSlug === t.slug;
-                  return (
-                    <label
-                      key={t.slug}
-                      className={`flex cursor-pointer flex-col gap-1 rounded-lg border p-3 text-sm transition ${
-                        active
-                          ? 'border-[var(--accent)] bg-[var(--accent)]/5'
-                          : 'border-[var(--border)] hover:border-[var(--accent)]/40'
-                      }`}
-                    >
-                      <span className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="templateSlug"
-                          value={t.slug}
-                          checked={active}
-                          onChange={() => setTemplateSlug(t.slug)}
-                          // (S23b) Le modèle générique ouvre son modal à CHAQUE
-                          // clic, y compris quand il est déjà sélectionné :
-                          // `onChange` ne se déclenche pas sur un radio déjà
-                          // coché, et l'utilisateur qui reclique cherche
-                          // précisément à revoir les deux chemins.
-                          onClick={() => {
-                            if (t.slug === CUSTOM_TEMPLATE_SLUG) setModalCustom(true);
-                          }}
-                          className="accent-[var(--accent)]"
-                        />
-                        <span className="font-medium">{meta.label}</span>
+                  return {
+                    value: t.slug,
+                    label: (
+                      <span className="flex flex-wrap items-center gap-2">
+                        {meta.label}
                         {t.secteur ? (
-                          <span className="ml-auto rounded bg-[var(--surface-muted)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--foreground-muted)]">
+                          <span className="rounded bg-[var(--surface-muted)] px-1.5 py-0.5 text-[10px] font-normal uppercase tracking-wide text-[var(--foreground-muted)]">
                             {t.secteur}
                           </span>
                         ) : null}
                       </span>
-                      {meta.description ? (
-                        <span className="text-xs text-[var(--foreground-muted)]">
-                          {meta.description}
-                        </span>
-                      ) : null}
-                    </label>
-                  );
+                    ),
+                    description: meta.description || undefined,
+                  };
                 })}
-              </div>
+              />
             )}
           </fieldset>
 
           {/* Section 3 — Nom + créer */}
-          <fieldset className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <label className="flex flex-1 flex-col gap-1.5 text-sm">
-              <span className="font-medium">Nom de l’initiative</span>
-              <input
-                ref={nomRef}
-                type="text"
-                required
-                maxLength={200}
-                placeholder="Ex : Restaurant du centre-ville 2026"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                className="w-full min-w-0 truncate rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={creating || !newName.trim() || !templateSlug || !packSlug}
-              className="rounded-md bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-[var(--accent-foreground)] transition hover:opacity-90 disabled:opacity-50"
-            >
-              {creating ? 'Création…' : 'Créer l’initiative'}
-            </button>
-          </fieldset>
+          <div className="flex flex-col gap-3">
+            <FormGrid>
+              <Field label="Nom de l’initiative" required size="lg">
+                <TextInput
+                  ref={nomRef}
+                  type="text"
+                  required
+                  maxLength={200}
+                  placeholder="Ex : Restaurant du centre-ville 2026"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                />
+              </Field>
+            </FormGrid>
+            <div className="flex flex-col sm:flex-row sm:justify-end">
+              <SubmitButton
+                busy={creating}
+                busyLabel="Création…"
+                disabled={!newName.trim() || !templateSlug || !packSlug}
+                className="max-sm:h-11"
+              >
+                Créer l’initiative
+              </SubmitButton>
+            </div>
+          </div>
           {planLimit !== null ? (
             <div
               role="alert"

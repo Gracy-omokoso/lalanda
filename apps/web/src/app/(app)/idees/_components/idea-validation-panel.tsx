@@ -4,7 +4,17 @@
 // AVEC une preuve par critère, le score du moteur (ou « indisponible » et ce qui
 // manque), la checklist d'expériences et leurs résultats. L'écran ne calcule rien.
 
-import { Button, DataNature } from '@lalanda/ui';
+import {
+  Button,
+  Checkbox,
+  DataNature,
+  Field,
+  FormGrid,
+  SegmentedControl,
+  Select,
+  TextArea,
+  TextInput,
+} from '@lalanda/ui';
 import { useCallback, useEffect, useState } from 'react';
 
 import {
@@ -34,9 +44,6 @@ import {
   tonNiveau,
   type ExperienceForm,
 } from './idea-model';
-
-const CHAMP =
-  'rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm disabled:opacity-70';
 
 const NOTES = [0, 1, 2, 3, 4] as const;
 
@@ -84,52 +91,37 @@ function CritereLigne({
           Ce critère ne compte que si la fiche porte une taille de marché avec sa source.
         </p>
       )}
-      <div className="grid gap-2 sm:grid-cols-[8rem_1fr]">
-        <select
-          aria-labelledby={id}
-          aria-label="Note"
-          value={note}
-          disabled={lecture}
-          onChange={(e) => setNote(e.target.value)}
-          className={CHAMP}
-        >
-          <option value="">Note…</option>
-          {NOTES.map((n) => (
-            <option key={n} value={n}>
-              {n}
-            </option>
-          ))}
-        </select>
-        <textarea
-          aria-label={`Preuve — ${critere.libelle}`}
-          placeholder="Votre preuve : ce que vous avez vu, entendu, mesuré."
-          value={preuve}
-          maxLength={1000}
-          rows={2}
-          disabled={lecture}
-          onChange={(e) => setPreuve(e.target.value)}
-          className={CHAMP}
-        />
-      </div>
+      <FormGrid>
+        <Field label="Note" size="md" group disabled={lecture} hint="De 0 à 4.">
+          <SegmentedControl<string>
+            value={note}
+            onChange={setNote}
+            options={NOTES.map((n) => ({ value: String(n), label: String(n) }))}
+          />
+        </Field>
+        <Field label="Preuve" size="full" disabled={lecture}>
+          <TextArea
+            placeholder="Votre preuve : ce que vous avez vu, entendu, mesuré."
+            value={preuve}
+            maxLength={1000}
+            rows={2}
+            onChange={(e) => setPreuve(e.target.value)}
+          />
+        </Field>
+      </FormGrid>
       {experiences.length > 0 && (
-        <fieldset className="flex flex-wrap gap-3 text-xs">
-          <legend className="sr-only">Expériences citées en preuve</legend>
+        <fieldset className="flex flex-wrap gap-x-4 gap-y-2">
+          <legend className="mb-1 text-xs font-medium">Expériences citées en preuve</legend>
           {experiences.map((e) => (
-            <label key={e.id} className="flex items-center gap-1">
-              <input
-                type="checkbox"
-                disabled={lecture}
-                checked={liees.includes(e.id)}
-                onChange={(ev) =>
-                  setLiees(
-                    ev.target.checked
-                      ? [...liees, e.id].slice(0, 5)
-                      : liees.filter((x) => x !== e.id),
-                  )
-                }
-              />
-              {e.title}
-            </label>
+            <Checkbox
+              key={e.id}
+              disabled={lecture}
+              checked={liees.includes(e.id)}
+              onChange={(coche) =>
+                setLiees(coche ? [...liees, e.id].slice(0, 5) : liees.filter((x) => x !== e.id))
+              }
+              label={e.title}
+            />
           ))}
         </fieldset>
       )}
@@ -166,119 +158,100 @@ function ExperienceEditeur({
   const [f, setF] = useState<ExperienceForm>(initial);
   return (
     <div className="flex flex-col gap-2 rounded-md border border-[var(--border)] p-3">
-      <div className="grid gap-2 sm:grid-cols-3">
-        <select
-          aria-label="Type"
-          value={f.type}
-          onChange={(e) => setF({ ...f, type: e.target.value as ExperienceForm['type'] })}
-          className={CHAMP}
-        >
-          {EXPERIMENT_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {LIBELLES_TYPES[t]}
-            </option>
-          ))}
-        </select>
-        <input
-          aria-label="Titre"
-          value={f.title}
-          maxLength={120}
-          onChange={(e) => setF({ ...f, title: e.target.value })}
-          className={CHAMP}
-        />
-        <select
-          aria-label="Statut"
-          value={f.status}
-          onChange={(e) => setF({ ...f, status: e.target.value as ExperienceForm['status'] })}
-          className={CHAMP}
-        >
-          {EXPERIMENT_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {LIBELLES_STATUTS[s]}
-            </option>
-          ))}
-        </select>
-      </div>
-      <input
-        aria-label="Hypothèse testée"
-        placeholder="Hypothèse testée"
-        value={f.hypothesis}
-        maxLength={500}
-        onChange={(e) => setF({ ...f, hypothesis: e.target.value })}
-        className={CHAMP}
-      />
-      <div className="grid gap-2 sm:grid-cols-3">
-        {CHAMPS_RESULTATS[f.type].map((c) => {
+      <FormGrid>
+        <Field label="Type" size="md">
+          <Select<ExperienceForm['type']>
+            value={f.type}
+            onChange={(type) => setF({ ...f, type })}
+            options={EXPERIMENT_TYPES.map((t) => ({ value: t, label: LIBELLES_TYPES[t] }))}
+          />
+        </Field>
+        <Field label="Titre" size="lg">
+          <TextInput
+            value={f.title}
+            maxLength={120}
+            onChange={(e) => setF({ ...f, title: e.target.value })}
+          />
+        </Field>
+        <Field label="Statut" size="md">
+          <Select<ExperienceForm['status']>
+            value={f.status}
+            onChange={(status) => setF({ ...f, status })}
+            options={EXPERIMENT_STATUSES.map((st) => ({ value: st, label: LIBELLES_STATUTS[st] }))}
+          />
+        </Field>
+        <Field label="Hypothèse testée" size="full">
+          <TextInput
+            value={f.hypothesis}
+            maxLength={500}
+            onChange={(e) => setF({ ...f, hypothesis: e.target.value })}
+          />
+        </Field>
+        {CHAMPS_RESULTATS[f.type].map((c, i) => {
           const k = c.cle as keyof ExperienceForm['resultats'];
           return (
-            <input
-              key={c.cle}
-              aria-label={c.libelle}
-              placeholder={c.libelle}
-              inputMode="numeric"
-              value={f.resultats[k]}
-              onChange={(e) => setF({ ...f, resultats: { ...f.resultats, [k]: e.target.value } })}
-              className={CHAMP}
-            />
+            <Field key={c.cle} label={c.libelle} size="sm" newRow={i === 0}>
+              <TextInput
+                inputMode="numeric"
+                className="fig"
+                value={f.resultats[k]}
+                onChange={(e) => setF({ ...f, resultats: { ...f.resultats, [k]: e.target.value } })}
+              />
+            </Field>
           );
         })}
         {f.type !== 'autre' && (
-          <input
-            aria-label="Critère de réussite (%)"
-            placeholder="Critère de réussite (%)"
-            inputMode="numeric"
-            value={f.targetPct}
-            onChange={(e) => setF({ ...f, targetPct: e.target.value })}
-            className={CHAMP}
-          />
+          <Field label="Critère de réussite (%)" size="sm">
+            <TextInput
+              inputMode="numeric"
+              className="fig"
+              value={f.targetPct}
+              onChange={(e) => setF({ ...f, targetPct: e.target.value })}
+            />
+          </Field>
         )}
-      </div>
-      {f.type === 'pre_commande' && (
-        <div className="grid gap-2 sm:grid-cols-2">
-          <input
-            aria-label="Montant déclaré des pré-commandes"
-            placeholder="Montant déclaré (facultatif)"
-            inputMode="decimal"
-            value={f.montant}
-            onChange={(e) => setF({ ...f, montant: e.target.value })}
-            className={CHAMP}
+        {f.type === 'pre_commande' && (
+          <>
+            <Field label="Montant déclaré des pré-commandes" optional size="sm" newRow>
+              <TextInput
+                inputMode="decimal"
+                className="fig"
+                value={f.montant}
+                onChange={(e) => setF({ ...f, montant: e.target.value })}
+              />
+            </Field>
+            <Field label="Devise" size="xs">
+              <TextInput
+                placeholder="USD, CDF…"
+                maxLength={3}
+                value={f.devise}
+                onChange={(e) => setF({ ...f, devise: e.target.value })}
+              />
+            </Field>
+          </>
+        )}
+        {f.status === 'terminee' && (
+          <Field label="Conclusion" size="md" newRow>
+            <Select<ExperienceForm['conclusion']>
+              value={f.conclusion}
+              onChange={(conclusion) => setF({ ...f, conclusion })}
+              placeholder="Conclusion…"
+              options={EXPERIMENT_CONCLUSIONS.map((c) => ({
+                value: c,
+                label: LIBELLES_CONCLUSIONS[c],
+              }))}
+            />
+          </Field>
+        )}
+        <Field label="Notes" size="full" hint="Sans nom ni coordonnées de personnes.">
+          <TextArea
+            value={f.notes}
+            maxLength={2000}
+            rows={2}
+            onChange={(e) => setF({ ...f, notes: e.target.value })}
           />
-          <input
-            aria-label="Devise"
-            placeholder="Devise (USD, CDF…)"
-            maxLength={3}
-            value={f.devise}
-            onChange={(e) => setF({ ...f, devise: e.target.value })}
-            className={CHAMP}
-          />
-        </div>
-      )}
-      {f.status === 'terminee' && (
-        <select
-          aria-label="Conclusion"
-          value={f.conclusion}
-          onChange={(e) =>
-            setF({ ...f, conclusion: e.target.value as ExperienceForm['conclusion'] })
-          }
-          className={CHAMP}
-        >
-          <option value="">Conclusion…</option>
-          {EXPERIMENT_CONCLUSIONS.map((c) => (
-            <option key={c} value={c}>
-              {LIBELLES_CONCLUSIONS[c]}
-            </option>
-          ))}
-        </select>
-      )}
-      <textarea
-        aria-label="Notes"
-        placeholder="Notes (sans nom ni coordonnées de personnes)"
-        value={f.notes}
-        maxLength={2000}
-        rows={2}
-        onChange={(e) => setF({ ...f, notes: e.target.value })}
-        className={CHAMP}
-      />
+        </Field>
+      </FormGrid>
       <div className="flex gap-2">
         <Button size="sm" variant="primary" onClick={() => void onSave(f)}>
           Enregistrer l’expérience

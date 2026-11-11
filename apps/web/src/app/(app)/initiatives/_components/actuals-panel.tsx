@@ -12,6 +12,7 @@
 // Sans plan validé, l'API répond 409 NO_APPROVED_PLAN : on l'affiche tel quel
 // plutôt que d'inventer une référence.
 
+import { Button, Field, Select, SubmitButton, TextInput } from '@lalanda/ui';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
@@ -239,20 +240,13 @@ export function ActualsPanel({ projectId }: { projectId: string }): React.ReactE
             Saisie mensuelle observée, comparée au plan validé. Aucune saisie ne modifie le plan.
           </p>
         </div>
-        <label className="flex items-center gap-2 text-sm">
-          <span className="text-xs text-[var(--foreground-muted)]">Exercice</span>
-          <select
-            value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
-            className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)]"
-          >
-            {YEARS.map((y) => (
-              <option key={y} value={y}>
-                Année {y}
-              </option>
-            ))}
-          </select>
-        </label>
+        <Field label="Exercice" size="sm" className="w-36">
+          <Select<string>
+            value={String(year)}
+            onChange={(v) => setYear(Number(v))}
+            options={YEARS.map((y) => ({ value: String(y), label: `Année ${y}` }))}
+          />
+        </Field>
       </header>
 
       {error ? (
@@ -457,37 +451,36 @@ export function ActualsPanel({ projectId }: { projectId: string }): React.ReactE
                 }}
                 className="flex flex-wrap items-end gap-3 rounded-md border border-[var(--border)] bg-[var(--surface-muted)] p-3"
               >
-                <label className="flex min-w-[18rem] flex-1 flex-col gap-1 text-sm">
-                  <span className="text-xs font-medium">
-                    Motif de réouverture de {monthLabel(reopenMonth)} (obligatoire, journalisé)
-                  </span>
-                  <input
+                <Field
+                  label={`Motif de réouverture de ${monthLabel(reopenMonth)}`}
+                  required
+                  hint="Journalisé."
+                  className="min-w-[18rem] flex-1"
+                >
+                  <TextInput
                     type="text"
                     required
                     autoFocus
                     value={reopenReason}
                     onChange={(e) => setReopenReason(e.target.value)}
                     placeholder="Ex. facture fournisseur reçue après la clôture"
-                    className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)]"
                   />
-                </label>
-                <button
-                  type="submit"
-                  disabled={busy || reopenReason.trim() === ''}
-                  className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--accent-foreground)] transition hover:opacity-90 disabled:opacity-40"
+                </Field>
+                <SubmitButton
+                  busy={busy}
+                  busyLabel="Réouverture…"
+                  disabled={reopenReason.trim() === ''}
                 >
                   Rouvrir
-                </button>
-                <button
-                  type="button"
+                </SubmitButton>
+                <Button
                   onClick={() => {
                     setReopenMonth(null);
                     setReopenReason('');
                   }}
-                  className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-sm transition hover:bg-[var(--surface-muted)]"
                 >
                   Annuler
-                </button>
+                </Button>
               </form>
             ) : null}
 
