@@ -15,13 +15,17 @@
 //    annoncer d'étape faite. Ensuite, l'état renvoyé (`NormalizationStatus`).
 // 5. Une coupure côté navigateur ne RENVOIE JAMAIS la requête : on relit le
 //    document et l'on affiche son état (`conduiteApresEchecNormaliser`).
+//
+// ADR-0074 : choix du taux en cartes, date du taux en `DatePicker`, taux saisi à
+// la largeur d'un taux (texte transmis tel quel ; le serveur le contrôle).
 
+import { ChoiceCards, DatePicker, Field, FormGrid, TextInput } from '@lalanda/ui';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { api, type ExchangeRateReference, type InvoiceView } from '@/lib/api';
 
-import { Alerte, BOUTON, CHAMP, Pastille, aria } from '../../_components/form-ui';
+import { Alerte, BOUTON, Pastille } from '../../_components/form-ui';
 import { formatDate } from '../../_components/sales-model';
 
 import { AmountsPanel } from './amounts-panel';
@@ -240,75 +244,45 @@ export function NormalizeDialog({
             </p>
           ) : etatRef === 'pret' && ref ? (
             <>
-              <label className="flex items-start gap-2 text-sm">
-                <input
-                  type="radio"
-                  name="choix-taux"
-                  checked={choix === 'officiel'}
-                  onChange={() => setChoix('officiel')}
-                  className="mt-1"
-                />
-                <span>
-                  Taux officiel : <strong>{formatTauxChange(ref.rate)}</strong>
-                  <span className="block text-xs text-[var(--foreground-muted)]">
-                    Taux du {formatDateDgi(ref.date)}, publié par la DGI (
-                    {ref.environment === 'test' ? 'environnement de test' : 'production'}), relevé
-                    le {formatDate(ref.fetchedAt)}.
-                  </span>
-                </span>
-              </label>
-              <label className="flex items-start gap-2 text-sm">
-                <input
-                  type="radio"
-                  name="choix-taux"
-                  checked={choix === 'autre'}
-                  onChange={() => setChoix('autre')}
-                  className="mt-1"
-                />
-                <span>Un autre taux</span>
-              </label>
+              <ChoiceCards<ChoixTaux>
+                aria-label="Taux retenu"
+                value={choix}
+                onChange={setChoix}
+                options={[
+                  {
+                    value: 'officiel',
+                    label: (
+                      <>
+                        Taux officiel : <strong>{formatTauxChange(ref.rate)}</strong>
+                      </>
+                    ),
+                    description: `Taux du ${formatDateDgi(ref.date)}, publié par la DGI (${
+                      ref.environment === 'test' ? 'environnement de test' : 'production'
+                    }), relevé le ${formatDate(ref.fetchedAt)}.`,
+                  },
+                  { value: 'autre', label: 'Un autre taux' },
+                ]}
+              />
               {choix === 'autre' ? (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="norm-taux" className="text-sm">
-                      Taux (CDF pour 1 USD)
-                    </label>
-                    <input
-                      id="norm-taux"
+                <FormGrid>
+                  <Field
+                    id="norm-taux"
+                    label="Taux (CDF pour 1 USD)"
+                    size="sm"
+                    hint={rappelTolerance(ref)}
+                    error={champs['rate']}
+                  >
+                    <TextInput
                       inputMode="decimal"
                       value={taux}
                       onChange={(e) => setTaux(e.target.value)}
-                      className={CHAMP}
-                      {...aria('norm-taux', champs['rate'], true)}
+                      className="text-right tabular-nums"
                     />
-                    <p id="norm-taux-aide" className="text-xs text-[var(--foreground-muted)]">
-                      {rappelTolerance(ref)}
-                    </p>
-                    {champs['rate'] ? (
-                      <p id="norm-taux-erreur" className="text-xs font-medium text-[var(--danger)]">
-                        {champs['rate']}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="norm-date" className="text-sm">
-                      Date du taux
-                    </label>
-                    <input
-                      id="norm-date"
-                      type="date"
-                      value={date}
-                      onChange={(e) => setDate(e.target.value)}
-                      className={CHAMP}
-                      {...aria('norm-date', champs['date'])}
-                    />
-                    {champs['date'] ? (
-                      <p id="norm-date-erreur" className="text-xs font-medium text-[var(--danger)]">
-                        {champs['date']}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
+                  </Field>
+                  <Field id="norm-date" label="Date du taux" size="sm" error={champs['date']}>
+                    <DatePicker value={date} onChange={setDate} shortcuts={['today']} />
+                  </Field>
+                </FormGrid>
               ) : null}
             </>
           ) : (

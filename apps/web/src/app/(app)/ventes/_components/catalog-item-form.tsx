@@ -79,6 +79,7 @@ export function CatalogItemForm({
   onRechargerGroupes,
   onFermer,
   enModal = false,
+  nomInitial = '',
 }: {
   fiche: Exclude<FicheOuverte, null>;
   gerer: boolean;
@@ -90,10 +91,15 @@ export function CatalogItemForm({
   onFermer: (enregistre?: CatalogItemView) => void;
   /** Création dans la fenêtre modale : son en-tête porte le titre et la fermeture. */
   enModal?: boolean;
+  /** Création rapide depuis une ligne de document : désignation tapée dans le sélecteur. */
+  nomInitial?: string;
 }): React.ReactElement {
   const id = fiche.mode === 'edition' ? fiche.id : null;
   const [vue, setVue] = useState<CatalogItemView | null>(null);
-  const [form, setForm] = useState<FormulaireArticle>(() => formulaireArticle(null));
+  const [form, setForm] = useState<FormulaireArticle>(() => ({
+    ...formulaireArticle(null),
+    name: nomInitial,
+  }));
   const [chargement, setChargement] = useState(id !== null);
   const [erreurChargement, setErreurChargement] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);

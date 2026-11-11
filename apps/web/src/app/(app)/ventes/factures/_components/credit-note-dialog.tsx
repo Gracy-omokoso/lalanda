@@ -3,7 +3,10 @@
 // Créer un avoir sur une facture finale (ADR-0023 § S25e.5) : la nature, puis
 // un avoir total (toutes les quantités restantes) ou partiel (lignes choisies
 // ensuite). L'API crée un BROUILLON d'avoir prérempli ; rien n'est émis ici.
+//
+// ADR-0074 : nature et étendue en cartes de choix (`ChoiceCards`) ; même appel.
 
+import { ChoiceCards, Field, FormGrid } from '@lalanda/ui';
 import { useState } from 'react';
 
 import { api, type CreditNoteNature, type CreditNoteScope, type InvoiceView } from '@/lib/api';
@@ -53,62 +56,49 @@ export function CreditNoteDialog({
 
   return (
     <Dialogue titre={`Créer un avoir — facture n° ${reference}`} onFermer={onFermer}>
-      <fieldset className="flex flex-col gap-2">
-        <legend className="mb-1 text-sm font-semibold">Nature de l’avoir</legend>
-        {NATURES.map((n) => (
-          <label key={n} className="flex items-start gap-2 text-sm">
-            <input
-              type="radio"
-              name="nature-avoir"
-              checked={nature === n}
-              onChange={() => setNature(n)}
-              className="mt-1"
-            />
-            <span>
-              <span className="font-medium">{NATURE_LABELS[n].court}</span>{' '}
-              <span className="font-mono text-xs">({n})</span>
-              <span className="block text-xs text-[var(--foreground-muted)]">
-                {NATURE_LABELS[n].aide}
-              </span>
-            </span>
-          </label>
-        ))}
-      </fieldset>
+      <FormGrid>
+        <Field id="avoir-nature" label="Nature de l’avoir" group required size="full">
+          <ChoiceCards<CreditNoteNature>
+            value={nature ?? ''}
+            onChange={(n) => {
+              setNature(n);
+              setErreur(null);
+            }}
+            options={NATURES.map((n) => ({
+              value: n,
+              label: (
+                <>
+                  {NATURE_LABELS[n].court} <span className="font-mono text-xs">({n})</span>
+                </>
+              ),
+              description: NATURE_LABELS[n].aide,
+            }))}
+          />
+        </Field>
 
-      {nature !== null && nature !== 'RRR' ? (
-        <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1 text-sm font-semibold">Étendue</legend>
-          <label className="flex items-start gap-2 text-sm">
-            <input
-              type="radio"
-              name="portee-avoir"
-              checked={portee === 'remaining'}
-              onChange={() => setPortee('remaining')}
-              className="mt-1"
+        {nature !== null && nature !== 'RRR' ? (
+          <Field
+            id="avoir-portee"
+            label="Étendue"
+            group
+            size="full"
+            hint="Les lignes reprennent la désignation et le prix unitaire de la facture d’origine ; seule la quantité varie, au plus ce qui reste à créditer."
+          >
+            <ChoiceCards<CreditNoteScope>
+              value={portee}
+              onChange={setPortee}
+              options={[
+                {
+                  value: 'remaining',
+                  label: 'Total — reprendre toutes les quantités restantes',
+                  description: 'Vous pourrez encore réduire les quantités dans le brouillon.',
+                },
+                { value: 'empty', label: 'Partiel — choisir les lignes et les quantités' },
+              ]}
             />
-            <span>
-              Total — reprendre toutes les quantités restantes
-              <span className="block text-xs text-[var(--foreground-muted)]">
-                Vous pourrez encore réduire les quantités dans le brouillon.
-              </span>
-            </span>
-          </label>
-          <label className="flex items-start gap-2 text-sm">
-            <input
-              type="radio"
-              name="portee-avoir"
-              checked={portee === 'empty'}
-              onChange={() => setPortee('empty')}
-              className="mt-1"
-            />
-            <span>Partiel — choisir les lignes et les quantités</span>
-          </label>
-          <p className="text-xs text-[var(--foreground-muted)]">
-            Les lignes reprennent la désignation et le prix unitaire de la facture d’origine ; seule
-            la quantité varie, au plus ce qui reste à créditer.
-          </p>
-        </fieldset>
-      ) : null}
+          </Field>
+        ) : null}
+      </FormGrid>
 
       {erreur ? (
         <Alerte>
