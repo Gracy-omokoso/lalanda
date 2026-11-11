@@ -6,17 +6,20 @@
 // d'emplacement, et un champ de quantité qui sélectionne son contenu au focus
 // (leçon de R3 : un nombre prérempli se remplace d'un geste, au téléphone aussi).
 
-import { useEffect, useState } from 'react';
+import { EntityPicker, Select, TextInput, cn, type SelectOption } from '@lalanda/ui';
+import { useCallback, useState } from 'react';
 
 import { stockApi, type StockItemView, type StockLocationView } from '@/lib/api-stock';
 
-import { Alerte, BOUTON_PETIT, CHAMP } from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
+import { ArticleFormulaire } from './article-formulaire';
 import { useAccesStocks } from './stocks-access';
 import {
   LIBELLES_TYPE_EMPLACEMENT,
   PHRASE_PAS_ENCORE,
   messageStocks,
+  peutGererStocks,
   statutDe,
 } from './stocks-model';
 
@@ -71,7 +74,8 @@ export const CARTE =
 
 /**
  * Champ décimal : clavier numérique au téléphone, contenu sélectionné au focus
- * (une valeur préremplie se remplace sans l'effacer chiffre par chiffre).
+ * (une valeur préremplie se remplace sans l'effacer chiffre par chiffre). Relié
+ * à son `Field` (ADR-0074) : identifiant, aide et erreur viennent du contexte.
  */
 export function ChampNombre(
   props: Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type' | 'inputMode'> & {
@@ -80,12 +84,12 @@ export function ChampNombre(
 ): React.ReactElement {
   const { grand, className, onFocus, ...reste } = props;
   return (
-    <input
+    <TextInput
       {...reste}
       type="text"
       inputMode="decimal"
       autoComplete="off"
-      className={`${CHAMP} tabular-nums ${grand ? 'py-3 text-lg' : ''} ${className ?? ''}`}
+      className={cn('tabular-nums', grand && 'h-12 text-lg max-sm:h-12', className)}
       onFocus={(e) => {
         e.currentTarget.select();
         onFocus?.(e);
@@ -94,115 +98,138 @@ export function ChampNombre(
   );
 }
 
-/** Choix d'un emplacement actif (liste du contexte). */
+/** Choix d'un emplacement actif (liste du contexte), en `Select` (ADR-0074 § 3). */
 export function ChoixEmplacement({
   id,
   valeur,
   onChange,
   vide,
   exclure,
-  aria,
+  ariaLabel,
 }: {
-  id: string;
+  /** Identifiant ; sinon celui du `Field` englobant. */
+  id?: string;
   valeur: string;
   onChange: (id: string) => void;
   /** Libellé de l'option vide ; absent : pas d'option vide. */
   vide?: string;
   exclure?: string;
-  aria?: Record<string, unknown>;
+  /** Nom accessible hors `Field` (filtre sans libellé visible). */
+  ariaLabel?: string;
 }): React.ReactElement {
   const { emplacements } = useAccesStocks();
   const liste: StockLocationView[] = emplacements?.ok ? emplacements.valeur : [];
+  const options: SelectOption[] = [
+    ...(vide !== undefined ? [{ value: '', label: vide }] : []),
+    ...liste
+      .filter((l) => l.id !== exclure)
+      .map((l) => ({
+        value: l.id,
+        label: `${l.name}${l.isDefault ? ' (par défaut)' : ''}`,
+        description: LIBELLES_TYPE_EMPLACEMENT[l.kind],
+      })),
+  ];
   return (
-    <select
-      id={id}
-      className={CHAMP}
+    <Select
+      {...(id !== undefined ? { id } : {})}
+      {...(ariaLabel !== undefined ? { 'aria-label': ariaLabel } : {})}
       value={valeur}
-      onChange={(e) => onChange(e.target.value)}
-      {...aria}
-    >
-      {vide !== undefined ? <option value="">{vide}</option> : null}
-      {liste
-        .filter((l) => l.id !== exclure)
-        .map((l) => (
-          <option key={l.id} value={l.id}>
-            {l.name} — {LIBELLES_TYPE_EMPLACEMENT[l.kind]}
-            {l.isDefault ? ' (par défaut)' : ''}
-          </option>
-        ))}
-    </select>
+      onChange={onChange}
+      options={options}
+      placeholder="Choisir un emplacement"
+      loading={emplacements === null}
+      emptyText="Aucun emplacement actif."
+    />
   );
 }
 
+/** Article tel que le sélecteur le connaît : la fiche lue, ou son seul identifiant. */
+type ArticleChoisi = Pick<StockItemView, 'id' | 'name'> &
+  Partial<Pick<StockItemView, 'code' | 'unit'>>;
+
 /**
- * Choix d'un article actif par recherche (`GET /stock/items?q=`). Rend l'article
- * choisi entier (nom et unité, pour l'affichage) ; seul son identifiant part à l'API.
+ * Choix d'un article actif par recherche (`GET /stock/items?active=true&limit=50&q=`,
+ * la même qu'avant), en `EntityPicker` (ADR-0074 § 4). Rend l'article choisi
+ * entier (nom et unité, pour l'affichage) ; seul son identifiant part à l'API.
+ * `creer` : « + » qui ouvre la fiche article complète en fenêtre, seulement avec
+ * `stock.manage` (le droit de `POST /stock/items` ; l'API reste juge).
  */
 export function ChoixArticle({
   id,
   valeur,
   onChange,
   nomInitial,
-  aria,
+  creer = false,
 }: {
-  id: string;
+  /** Identifiant ; sinon celui du `Field` englobant. */
+  id?: string;
   valeur: string;
   onChange: (article: StockItemView | null) => void;
   nomInitial?: string | null;
-  aria?: Record<string, unknown>;
+  /** Propose la création rapide (avec `stock.manage`). */
+  creer?: boolean;
 }): React.ReactElement {
-  const [q, setQ] = useState('');
-  const [liste, setListe] = useState<StockItemView[]>([]);
+  const { actions } = useAccesStocks();
+  const peutCreer = creer && actions !== null && peutGererStocks(actions);
+  const [choisi, setChoisi] = useState<ArticleChoisi | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
 
-  useEffect(() => {
-    let annule = false;
-    const t = setTimeout(() => {
-      stockApi
-        .listItems({ active: 'true', limit: 50, ...(q.trim() ? { q: q.trim() } : {}) })
-        .then((p) => {
-          if (annule) return;
-          setListe(p.items);
-          setErreur(null);
-        })
-        .catch((err: unknown) => {
-          if (!annule) setErreur(messageStocks(err, 'Articles illisibles.'));
-        });
-    }, 200);
-    return () => {
-      annule = true;
-      clearTimeout(t);
-    };
-  }, [q]);
+  // Un identifiant reçu sans fiche (préremplissage) garde le nom connu.
+  const affiche: ArticleChoisi | null =
+    valeur === ''
+      ? null
+      : choisi?.id === valeur
+        ? choisi
+        : { id: valeur, name: nomInitial ?? 'Article choisi' };
+
+  const chercher = useCallback(async (q: string): Promise<StockItemView[]> => {
+    try {
+      const p = await stockApi.listItems({ active: 'true', limit: 50, ...(q ? { q } : {}) });
+      setErreur(null);
+      return p.items;
+    } catch (err) {
+      setErreur(messageStocks(err, 'Articles illisibles.'));
+      throw err;
+    }
+  }, []);
+
+  function choisir(a: ArticleChoisi | null): void {
+    setChoisi(a);
+    // La liste et la création rendent des fiches complètes.
+    onChange(a as StockItemView | null);
+  }
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <input
-        type="search"
-        aria-label="Rechercher un article"
-        placeholder="Rechercher un article (nom ou code)…"
-        className={CHAMP}
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <EntityPicker<ArticleChoisi>
+        {...(id !== undefined ? { id } : {})}
+        value={affiche}
+        onChange={choisir}
+        search={chercher}
+        getKey={(a) => a.id}
+        getLabel={(a) => a.name}
+        getDescription={(a) =>
+          [a.code, a.unit ? `unité : ${a.unit}` : null].filter(Boolean).join(' · ') || null
+        }
+        placeholder="Nom ou code de l’article"
+        recentKey="stocks.articles"
+        emptyText="Aucun article actif ne correspond."
+        debounceMs={200}
+        createTitle="Nouvel article"
+        createButtonLabel="Créer un article"
+        createSize="lg"
+        {...(peutCreer
+          ? {
+              createForm: ({ initialText, onCreated }) => (
+                <ArticleFormulaire
+                  article={null}
+                  nomInitial={initialText}
+                  onEnregistre={onCreated}
+                />
+              ),
+            }
+          : {})}
       />
-      <select
-        id={id}
-        className={CHAMP}
-        value={valeur}
-        onChange={(e) => onChange(liste.find((s) => s.id === e.target.value) ?? null)}
-        {...aria}
-      >
-        <option value="">Choisir un article</option>
-        {valeur !== '' && !liste.some((s) => s.id === valeur) ? (
-          <option value={valeur}>{nomInitial ?? 'Article choisi'}</option>
-        ) : null}
-        {liste.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.code ? `${s.code} — ` : ''}
-            {s.name} ({s.unit})
-          </option>
-        ))}
-      </select>
       {erreur ? <p className="text-xs text-[var(--danger)]">{erreur}</p> : null}
     </div>
   );

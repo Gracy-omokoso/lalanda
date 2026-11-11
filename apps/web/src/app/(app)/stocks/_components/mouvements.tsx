@@ -5,7 +5,7 @@
 // Ajout seul : une annulation apparaît comme un mouvement inverse. Coûts
 // d'entrée seulement pour un rôle qui voit les valeurs.
 
-import { Badge } from '@lalanda/ui';
+import { Badge, DatePicker, Field, FormGrid, Select } from '@lalanda/ui';
 import { History } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -13,7 +13,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { stockApi, type StockItemView, type StockLedgerEntryView } from '@/lib/api-stock';
 
-import { Alerte, BOUTON_PETIT, CHAMP, Champ } from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   FILTRES_VIDES,
@@ -113,65 +113,43 @@ export function Mouvements(): React.ReactElement {
         titre="Mouvements"
         sousTitre="Le grand livre : chaque entrée et chaque sortie, jamais effacée."
       >
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <div className="sm:col-span-2">
-            <Champ id="mvt-article" label="Article">
-              <ChoixArticle
-                id="mvt-article"
-                valeur={articleId}
-                nomInitial={article?.name ?? null}
-                onChange={(a) =>
-                  router.replace(a ? `${pathname}?article=${encodeURIComponent(a.id)}` : pathname)
-                }
-              />
-            </Champ>
-          </div>
-          <Champ id="mvt-emplacement" label="Emplacement">
+        <FormGrid>
+          <Field id="mvt-article" label="Article" size="lg">
+            <ChoixArticle
+              valeur={articleId}
+              nomInitial={article?.name ?? null}
+              onChange={(a) =>
+                router.replace(a ? `${pathname}?article=${encodeURIComponent(a.id)}` : pathname)
+              }
+            />
+          </Field>
+          <Field id="mvt-emplacement" label="Emplacement" size="md">
             <ChoixEmplacement
-              id="mvt-emplacement"
               valeur={filtres.locationId}
               vide="Tous"
               onChange={(v) => setFiltres((f) => ({ ...f, locationId: v }))}
             />
-          </Champ>
-          <Champ id="mvt-nature" label="Nature">
-            <select
-              id="mvt-nature"
-              className={CHAMP}
+          </Field>
+          <Field id="mvt-nature" label="Nature" size="md" newRow>
+            <Select<FiltresMouvements['kind']>
               value={filtres.kind}
-              onChange={(e) =>
-                setFiltres((f) => ({ ...f, kind: e.target.value as FiltresMouvements['kind'] }))
-              }
-            >
-              <option value="">Toutes</option>
-              {OPTIONS_NATURE.map((o) => (
-                <option key={o.valeur} value={o.valeur}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </Champ>
-          <div className="grid grid-cols-2 gap-2">
-            <Champ id="mvt-du" label="Du">
-              <input
-                id="mvt-du"
-                type="date"
-                className={CHAMP}
-                value={filtres.from}
-                onChange={(e) => setFiltres((f) => ({ ...f, from: e.target.value }))}
-              />
-            </Champ>
-            <Champ id="mvt-au" label="Au">
-              <input
-                id="mvt-au"
-                type="date"
-                className={CHAMP}
-                value={filtres.to}
-                onChange={(e) => setFiltres((f) => ({ ...f, to: e.target.value }))}
-              />
-            </Champ>
-          </div>
-        </div>
+              onChange={(v) => setFiltres((f) => ({ ...f, kind: v }))}
+              options={[
+                { value: '', label: 'Toutes' },
+                ...OPTIONS_NATURE.map((o) => ({ value: o.valeur, label: o.label })),
+              ]}
+            />
+          </Field>
+          <Field id="mvt-du" label="Du" size="sm">
+            <DatePicker
+              value={filtres.from}
+              onChange={(v) => setFiltres((f) => ({ ...f, from: v }))}
+            />
+          </Field>
+          <Field id="mvt-au" label="Au" size="sm">
+            <DatePicker value={filtres.to} onChange={(v) => setFiltres((f) => ({ ...f, to: v }))} />
+          </Field>
+        </FormGrid>
       </Bandeau>
 
       {erreurFiltre ? (

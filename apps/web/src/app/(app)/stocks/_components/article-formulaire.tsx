@@ -3,8 +3,24 @@
 // Création ou modification d'un article stocké (ADR-0046 § 2.1), dans le `Modal`
 // de `@lalanda/ui` (`stock.manage`). Aucune quantité ni valeur n'est saisie ici :
 // le stock initial passe par un premier inventaire (§ 2.7).
+//
+// ADR-0074 : grille sémantique, nature et devise en segments, article du
+// catalogue en `Select` (même lecture), suivi en interrupteur. Sert aussi de
+// création rapide depuis le choix d'un article (`nomInitial`).
 
-import { buttonClasses } from '@lalanda/ui';
+import {
+  Button,
+  Field,
+  FormGrid,
+  FormSection,
+  SegmentedControl,
+  Select,
+  SubmitButton,
+  Switch,
+  TextArea,
+  TextInput,
+  type SelectOption,
+} from '@lalanda/ui';
 import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 
@@ -12,19 +28,18 @@ import { api, type CatalogItemView } from '@/lib/api';
 import { stockApi, type StockItemView } from '@/lib/api-stock';
 
 import { ChoixFournisseur } from '../../achats/_components/commande-formulaire';
-import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from '../../ventes/_components/form-ui';
+import { Alerte } from '../../ventes/_components/form-ui';
 
 import { formulaireArticle, preparerArticle, type FormulaireArticle } from './articles-model';
 import { useAccesStocks } from './stocks-access';
 import { LIBELLES_NATURE_ARTICLE, messageStocks } from './stocks-model';
 import { ChampNombre, ChoixEmplacement } from './stocks-ui';
 
+/** Article du catalogue de vente (biens), même lecture qu'avant (100 au plus). */
 function ChoixCatalogue({
-  id,
   valeur,
   onChange,
 }: {
-  id: string;
   valeur: string;
   onChange: (v: string) => void;
 }): React.ReactElement {
@@ -43,29 +58,39 @@ function ChoixCatalogue({
       annule = true;
     };
   }, []);
+  const items = liste ?? [];
+  const options: SelectOption[] = [
+    { value: '', label: 'Aucun lien (article non vendu)' },
+    ...(valeur !== '' && !items.some((c) => c.id === valeur)
+      ? [{ value: valeur, label: 'Article du catalogue lié' }]
+      : []),
+    ...items.map((c) => ({
+      value: c.id,
+      label: c.name,
+      ...(c.code ? { description: c.code, keywords: c.code } : {}),
+    })),
+  ];
   return (
-    <select id={id} className={CHAMP} value={valeur} onChange={(e) => onChange(e.target.value)}>
-      <option value="">Aucun lien (article non vendu)</option>
-      {valeur !== '' && !(liste ?? []).some((c) => c.id === valeur) ? (
-        <option value={valeur}>Article du catalogue lié</option>
-      ) : null}
-      {(liste ?? []).map((c) => (
-        <option key={c.id} value={c.id}>
-          {c.code ? `${c.code} — ` : ''}
-          {c.name}
-        </option>
-      ))}
-    </select>
+    <Select
+      value={valeur}
+      onChange={onChange}
+      options={options}
+      loading={liste === null}
+      emptyText="Aucun bien au catalogue."
+    />
   );
 }
 
 export function ArticleFormulaire({
   article,
+  nomInitial,
   onEnregistre,
   onSale,
 }: {
   /** `null` : création. */
   article: StockItemView | null;
+  /** Nom pré-rempli d'une création rapide (texte tapé dans le choix d'article). */
+  nomInitial?: string;
   onEnregistre: (a: StockItemView) => void;
   onSale?: (sale: boolean) => void;
 }): React.ReactElement {
@@ -73,7 +98,10 @@ export function ArticleFormulaire({
   const { actions } = useAccesStocks();
   const lireVentes = actions?.includes('sales.read') ?? false;
   const lireAchats = actions?.includes('purchase.read') ?? false;
-  const [f, setF] = useState<FormulaireArticle>(() => formulaireArticle(article));
+  const [f, setF] = useState<FormulaireArticle>(() => {
+    const base = formulaireArticle(article);
+    return article === null && nomInitial ? { ...base, name: nomInitial } : base;
+  });
   const [champs, setChamps] = useState<Record<string, string>>({});
   const [erreur, setErreur] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
@@ -107,161 +135,148 @@ export function ArticleFormulaire({
   }
 
   return (
-    <form noValidate onSubmit={(e) => void enregistrer(e)} className="flex flex-col gap-4">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="sm:col-span-2">
-          <Champ id={`${id}-nom`} label="Nom de l’article" requis erreur={champs['name']}>
-            <input
-              id={`${id}-nom`}
-              className={CHAMP}
-              value={f.name}
-              maxLength={200}
-              placeholder="Ciment gris 50 kg"
-              onChange={(e) => maj({ name: e.target.value })}
-              {...aria(`${id}-nom`, champs['name'])}
-            />
-          </Champ>
-        </div>
-        <Champ id={`${id}-code`} label="Code" aide="Facultatif, unique." erreur={champs['code']}>
-          <input
-            id={`${id}-code`}
-            className={CHAMP}
+    <form noValidate onSubmit={(e) => void enregistrer(e)} className="flex flex-col gap-5">
+      <FormGrid>
+        <Field id={`${id}-nom`} label="Nom de l’article" required size="lg" error={champs['name']}>
+          <TextInput
+            value={f.name}
+            maxLength={200}
+            placeholder="Ciment gris 50 kg"
+            autoFocus={article === null}
+            onChange={(e) => maj({ name: e.target.value })}
+          />
+        </Field>
+        <Field
+          id={`${id}-code`}
+          label="Code"
+          size="sm"
+          hint="Facultatif, unique."
+          error={champs['code']}
+        >
+          <TextInput
             value={f.code}
             maxLength={40}
             onChange={(e) => maj({ code: e.target.value })}
-            {...aria(`${id}-code`, champs['code'], true)}
           />
-        </Champ>
-        <Champ id={`${id}-nature`} label="Nature">
-          <select
-            id={`${id}-nature`}
-            className={CHAMP}
+        </Field>
+        <Field id={`${id}-nature`} label="Nature" size="lg" newRow group>
+          <SegmentedControl<FormulaireArticle['kind']>
             value={f.kind}
-            onChange={(e) => maj({ kind: e.target.value as FormulaireArticle['kind'] })}
-          >
-            {Object.entries(LIBELLES_NATURE_ARTICLE).map(([k, l]) => (
-              <option key={k} value={k}>
-                {l}
-              </option>
-            ))}
-          </select>
-        </Champ>
-        <Champ
+            onChange={(v) => maj({ kind: v })}
+            options={Object.entries(LIBELLES_NATURE_ARTICLE).map(([k, l]) => ({
+              value: k as FormulaireArticle['kind'],
+              label: l,
+            }))}
+          />
+        </Field>
+        <Field
           id={`${id}-unite`}
           label="Unité de stock"
-          requis
-          aide="Ne change plus après le premier mouvement."
-          erreur={champs['unit']}
+          required
+          size="sm"
+          hint="Ne change plus après le premier mouvement."
+          error={champs['unit']}
         >
-          <input
-            id={`${id}-unite`}
-            className={CHAMP}
+          <TextInput
             value={f.unit}
             maxLength={20}
             onChange={(e) => maj({ unit: e.target.value })}
-            {...aria(`${id}-unite`, champs['unit'], true)}
           />
-        </Champ>
-        <Champ
+        </Field>
+        <Field
           id={`${id}-devise`}
           label="Devise de coût"
-          aide="Devise de valorisation ; aucun taux n’est jamais appliqué."
+          size="sm"
+          group
+          newRow
+          hint="Devise de valorisation ; aucun taux n’est jamais appliqué."
         >
-          <select
-            id={`${id}-devise`}
-            className={CHAMP}
+          <SegmentedControl<'USD' | 'CDF'>
             value={f.costCurrency}
-            onChange={(e) => maj({ costCurrency: e.target.value as 'USD' | 'CDF' })}
-            aria-describedby={`${id}-devise-aide`}
-          >
-            <option value="USD">USD</option>
-            <option value="CDF">CDF</option>
-          </select>
-        </Champ>
-        <Champ id={`${id}-emplacement`} label="Emplacement par défaut">
+            onChange={(v) => maj({ costCurrency: v })}
+            options={[
+              { value: 'USD', label: 'USD' },
+              { value: 'CDF', label: 'CDF' },
+            ]}
+          />
+        </Field>
+        <Field id={`${id}-emplacement`} label="Emplacement par défaut" size="md">
           <ChoixEmplacement
-            id={`${id}-emplacement`}
             valeur={f.defaultLocationId}
             onChange={(v) => maj({ defaultLocationId: v })}
             vide="Celui de l’organisation"
           />
-        </Champ>
-        <label className="flex items-center gap-2 self-end text-sm">
-          <input
-            type="checkbox"
+        </Field>
+        <div className="@lg:col-span-12">
+          <Switch
             checked={f.tracked}
-            onChange={(e) => maj({ tracked: e.target.checked })}
+            onChange={(v) => maj({ tracked: v })}
+            label="Suivre les quantités de cet article"
           />
-          Suivre les quantités de cet article
-        </label>
+        </div>
         {lireVentes ? (
-          <Champ
+          <Field
             id={`${id}-catalogue`}
             label="Article du catalogue de vente"
-            aide="Ses ventes sortiront de ce stock. Seuls les biens peuvent être liés."
+            size="lg"
+            newRow
+            hint="Ses ventes sortiront de ce stock. Seuls les biens peuvent être liés."
           >
-            <ChoixCatalogue
-              id={`${id}-catalogue`}
-              valeur={f.catalogItemId}
-              onChange={(v) => maj({ catalogItemId: v })}
-            />
-          </Champ>
+            <ChoixCatalogue valeur={f.catalogItemId} onChange={(v) => maj({ catalogItemId: v })} />
+          </Field>
         ) : null}
         {lireAchats ? (
-          <Champ id={`${id}-fournisseur`} label="Fournisseur habituel">
+          <Field id={`${id}-fournisseur`} label="Fournisseur habituel" size="lg" newRow>
             <ChoixFournisseur
               id={`${id}-fournisseur`}
               valeur={f.preferredSupplierId}
               onChange={(s) => maj({ preferredSupplierId: s?.id ?? '' })}
             />
-          </Champ>
+          </Field>
         ) : null}
-        <div className="sm:col-span-2">
-          <Champ id={`${id}-desc`} label="Description" erreur={champs['description']}>
-            <textarea
-              id={`${id}-desc`}
-              rows={2}
-              className={CHAMP}
-              value={f.description}
-              maxLength={2000}
-              onChange={(e) => maj({ description: e.target.value })}
-            />
-          </Champ>
-        </div>
-      </div>
+        <Field
+          id={`${id}-desc`}
+          label="Description"
+          size="full"
+          optional
+          error={champs['description']}
+        >
+          <TextArea
+            rows={2}
+            value={f.description}
+            maxLength={2000}
+            onChange={(e) => maj({ description: e.target.value })}
+          />
+        </Field>
+      </FormGrid>
 
-      <fieldset className="grid gap-3 sm:grid-cols-3">
-        <legend className="mb-2 text-sm font-semibold">Seuil de réapprovisionnement</legend>
-        <Champ
+      <FormSection title="Seuil de réapprovisionnement">
+        <Field
           id={`${id}-min`}
           label="Seuil d’alerte"
-          aide="Vide : aucun seuil."
-          erreur={champs['minQuantity']}
+          size="sm"
+          hint="Vide : aucun seuil."
+          error={champs['minQuantity']}
         >
           <ChampNombre
-            id={`${id}-min`}
             value={f.minQuantity}
             onChange={(e) => maj({ minQuantity: e.target.value })}
-            {...aria(`${id}-min`, champs['minQuantity'], true)}
           />
-        </Champ>
-        <Champ id={`${id}-cible`} label="Quantité visée" erreur={champs['targetQuantity']}>
+        </Field>
+        <Field id={`${id}-cible`} label="Quantité visée" size="sm" error={champs['targetQuantity']}>
           <ChampNombre
-            id={`${id}-cible`}
             value={f.targetQuantity}
             onChange={(e) => maj({ targetQuantity: e.target.value })}
-            {...aria(`${id}-cible`, champs['targetQuantity'])}
           />
-        </Champ>
-        <Champ id={`${id}-seuil-emplacement`} label="Pour">
+        </Field>
+        <Field id={`${id}-seuil-emplacement`} label="Pour" size="md">
           <ChoixEmplacement
-            id={`${id}-seuil-emplacement`}
             valeur={f.reorderLocationId}
             onChange={(v) => maj({ reorderLocationId: v })}
             vide="Tous les emplacements"
           />
-        </Champ>
-      </fieldset>
+        </Field>
+      </FormSection>
 
       <fieldset className="flex flex-col gap-3">
         <legend className="text-sm font-semibold">Autres unités</legend>
@@ -272,15 +287,14 @@ export function ArticleFormulaire({
           <p className="text-xs text-[var(--danger)]">{champs['conversions']}</p>
         ) : null}
         {f.conversions.map((c, i) => (
-          <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2">
-            <Champ
+          <div key={i} className="grid grid-cols-[1fr_1fr_auto] items-start gap-2">
+            <Field
               id={`${id}-conv-${i}-u`}
               label="1 unité de"
-              erreur={champs[`conversion-${i}-unit`]}
+              size="full"
+              error={champs[`conversion-${i}-unit`]}
             >
-              <input
-                id={`${id}-conv-${i}-u`}
-                className={CHAMP}
+              <TextInput
                 value={c.unit}
                 maxLength={20}
                 placeholder="carton"
@@ -292,14 +306,14 @@ export function ArticleFormulaire({
                   })
                 }
               />
-            </Champ>
-            <Champ
+            </Field>
+            <Field
               id={`${id}-conv-${i}-f`}
               label={`= combien de ${f.unit || 'unités'}`}
-              erreur={champs[`conversion-${i}-factor`]}
+              size="full"
+              error={champs[`conversion-${i}-factor`]}
             >
               <ChampNombre
-                id={`${id}-conv-${i}-f`}
                 value={c.factor}
                 onChange={(e) =>
                   maj({
@@ -309,26 +323,26 @@ export function ArticleFormulaire({
                   })
                 }
               />
-            </Champ>
-            <button
-              type="button"
-              className={`${BOUTON_PETIT} self-end`}
+            </Field>
+            <Button
+              size="sm"
+              className="mt-6 max-sm:h-11"
               aria-label={`Retirer la conversion ${i + 1}`}
               onClick={() => maj({ conversions: f.conversions.filter((_, j) => j !== i) })}
             >
               <Trash2 aria-hidden="true" className="h-4 w-4" />
-            </button>
+            </Button>
           </div>
         ))}
-        <button
-          type="button"
-          className={`${BOUTON_PETIT} inline-flex items-center gap-1 self-start`}
+        <Button
+          size="sm"
+          className="self-start max-sm:h-11"
           disabled={f.conversions.length >= 5}
           onClick={() => maj({ conversions: [...f.conversions, { unit: '', factor: '' }] })}
         >
           <Plus aria-hidden="true" className="h-4 w-4" />
           Ajouter une unité
-        </button>
+        </Button>
       </fieldset>
 
       {erreur ? (
@@ -336,13 +350,9 @@ export function ArticleFormulaire({
           <p>{erreur}</p>
         </Alerte>
       ) : null}
-      <button
-        type="submit"
-        disabled={envoi}
-        className={buttonClasses('primary', 'md', 'self-start')}
-      >
-        {envoi ? 'Enregistrement…' : article === null ? 'Créer l’article' : 'Enregistrer'}
-      </button>
+      <SubmitButton busy={envoi} busyLabel="Enregistrement…" className="self-start max-sm:w-full">
+        {article === null ? 'Créer l’article' : 'Enregistrer'}
+      </SubmitButton>
     </form>
   );
 }

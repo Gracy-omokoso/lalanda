@@ -3,7 +3,16 @@
 // Emplacements — ADR-0046 § 2.2 : entrepôts, magasins, véhicules, chantiers.
 // Liste en cartes ; création et modification en fenêtre modale (`stock.manage`).
 
-import { Badge, Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Badge,
+  Field,
+  FormGrid,
+  Modal,
+  Select,
+  SubmitButton,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import { MapPin, Plus, Warehouse } from 'lucide-react';
 import Link from 'next/link';
 import { useId, useState } from 'react';
@@ -11,7 +20,7 @@ import { useId, useState } from 'react';
 import { stockApi, type StockLocationView } from '@/lib/api-stock';
 
 import { ChoixMembre } from '../../crm/_components/crm-ui';
-import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   formulaireEmplacement,
@@ -74,65 +83,56 @@ function FormulaireEmplacementVue({
 
   return (
     <form noValidate onSubmit={(e) => void enregistrer(e)} className="flex flex-col gap-4">
-      <Champ id={`${id}-nom`} label="Nom" requis erreur={champs['name']}>
-        <input
-          id={`${id}-nom`}
-          className={CHAMP}
-          value={f.name}
-          maxLength={120}
-          placeholder="Chantier Gombe"
-          onChange={(e) => maj({ name: e.target.value })}
-          {...aria(`${id}-nom`, champs['name'])}
-        />
-      </Champ>
-      <Champ id={`${id}-type`} label="Type">
-        <select
-          id={`${id}-type`}
-          className={CHAMP}
-          value={f.kind}
-          onChange={(e) => maj({ kind: e.target.value as FormulaireEmplacement['kind'] })}
-        >
-          {Object.entries(LIBELLES_TYPE_EMPLACEMENT).map(([k, l]) => (
-            <option key={k} value={k}>
-              {l}
-            </option>
-          ))}
-        </select>
-      </Champ>
-      <Champ id={`${id}-adresse`} label="Adresse" erreur={champs['address']}>
-        <input
-          id={`${id}-adresse`}
-          className={CHAMP}
-          value={f.address}
-          maxLength={300}
-          onChange={(e) => maj({ address: e.target.value })}
-        />
-      </Champ>
-      <Champ
-        id={`${id}-responsable`}
-        label="Responsable"
-        aide="Reçoit les alertes et les rappels d’inventaire de cet emplacement."
-      >
-        <ChoixMembre
+      <FormGrid>
+        <Field id={`${id}-nom`} label="Nom" required size="lg" error={champs['name']}>
+          <TextInput
+            value={f.name}
+            maxLength={120}
+            placeholder="Chantier Gombe"
+            autoFocus={emplacement === null}
+            onChange={(e) => maj({ name: e.target.value })}
+          />
+        </Field>
+        <Field id={`${id}-type`} label="Type" size="md">
+          <Select<FormulaireEmplacement['kind']>
+            value={f.kind}
+            onChange={(v) => maj({ kind: v })}
+            options={Object.entries(LIBELLES_TYPE_EMPLACEMENT).map(([k, l]) => ({
+              value: k as FormulaireEmplacement['kind'],
+              label: l,
+            }))}
+          />
+        </Field>
+        <Field id={`${id}-adresse`} label="Adresse" size="full" error={champs['address']}>
+          <TextInput
+            value={f.address}
+            maxLength={300}
+            onChange={(e) => maj({ address: e.target.value })}
+          />
+        </Field>
+        <Field
           id={`${id}-responsable`}
-          valeur={f.responsibleUserId}
-          onChange={(v) => maj({ responsibleUserId: v })}
-          membres={membres}
-          vide="Aucun"
-        />
-      </Champ>
+          label="Responsable"
+          size="lg"
+          hint="Reçoit les alertes et les rappels d’inventaire de cet emplacement."
+        >
+          <ChoixMembre
+            id={`${id}-responsable`}
+            valeur={f.responsibleUserId}
+            onChange={(v) => maj({ responsibleUserId: v })}
+            membres={membres}
+            vide="Aucun"
+          />
+        </Field>
+      </FormGrid>
       {erreur ? (
         <Alerte>
           <p>{erreur}</p>
         </Alerte>
       ) : null}
-      <button
-        type="submit"
-        disabled={envoi}
-        className={buttonClasses('primary', 'md', 'self-start')}
-      >
-        {envoi ? 'Enregistrement…' : emplacement === null ? 'Créer l’emplacement' : 'Enregistrer'}
-      </button>
+      <SubmitButton busy={envoi} busyLabel="Enregistrement…" className="self-start max-sm:w-full">
+        {emplacement === null ? 'Créer l’emplacement' : 'Enregistrer'}
+      </SubmitButton>
     </form>
   );
 }

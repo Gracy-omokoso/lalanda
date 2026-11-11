@@ -7,14 +7,14 @@
 // compté (bouton désactivé avec sa raison sinon). Comptage à l'aveugle : la
 // quantité théorique n'est jamais affichée au compteur.
 
-import { Badge } from '@lalanda/ui';
-import { ArrowLeft, Check, ClipboardCheck, Scale } from 'lucide-react';
+import { Badge, TextInput } from '@lalanda/ui';
+import { ArrowLeft, Check, ClipboardCheck, Scale, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useId, useState } from 'react';
 
 import { stockApi, type StockCountLineView, type StockCountView } from '@/lib/api-stock';
 
-import { Alerte, BOUTON_PETIT, CHAMP } from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { DialogueMotif } from './dialogue-motif';
 import {
@@ -299,13 +299,14 @@ export function InventaireFiche({ countId }: { countId: string }): React.ReactEl
           id="inv-lignes"
         >
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <input
+            <TextInput
               type="search"
               aria-label="Rechercher un article de l’inventaire"
               placeholder="Rechercher un article…"
-              className={`${CHAMP} sm:max-w-xs`}
+              className="sm:max-w-xs"
               value={recherche}
               onChange={(e) => setRecherche(e.target.value)}
+              leading={<Search aria-hidden="true" className="h-4 w-4" />}
             />
             {saisie ? (
               <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrer les lignes">

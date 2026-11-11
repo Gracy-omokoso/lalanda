@@ -5,13 +5,13 @@
 // facture. Résolution en fenêtre modale ; « classer » avec motif. Une ligne ne
 // disparaît qu'une fois résolue ou classée.
 
-import { Badge, Modal, buttonClasses } from '@lalanda/ui';
+import { Badge, Field, FormGrid, Modal, SubmitButton, buttonClasses } from '@lalanda/ui';
 import { Inbox } from 'lucide-react';
 import { useCallback, useEffect, useId, useState } from 'react';
 
 import { stockApi, type StockPendingLineView } from '@/lib/api-stock';
 
-import { Alerte, BOUTON_PETIT, Champ, aria } from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   FILTRES_A_TRAITER,
@@ -103,83 +103,93 @@ function Resolution({
           <p className="text-sm text-[var(--foreground-muted)]">{droit.raison}</p>
         ) : (
           <>
-            {c.article ? (
-              <Champ id={`${id}-article`} label="Article" requis erreur={champs['article']}>
-                <ChoixArticle
+            <FormGrid>
+              {c.article ? (
+                <Field
                   id={`${id}-article`}
-                  valeur={s.itemId}
-                  onChange={(a) => setS({ ...s, itemId: a?.id ?? '' })}
-                  aria={aria(`${id}-article`, champs['article'])}
-                />
-              </Champ>
-            ) : null}
-            {c.facteur ? (
-              <Champ
-                id={`${id}-facteur`}
-                label={`1 ${vue.unite ?? 'unité'} = combien d’unités de stock`}
-                requis
-                erreur={champs['facteur']}
-              >
-                <ChampNombre
+                  label="Article"
+                  required
+                  size="full"
+                  error={champs['article']}
+                >
+                  <ChoixArticle
+                    valeur={s.itemId}
+                    creer
+                    onChange={(a) => setS({ ...s, itemId: a?.id ?? '' })}
+                  />
+                </Field>
+              ) : null}
+              {c.facteur ? (
+                <Field
                   id={`${id}-facteur`}
-                  value={s.factor}
-                  onChange={(e) => setS({ ...s, factor: e.target.value })}
-                  {...aria(`${id}-facteur`, champs['facteur'])}
-                />
-              </Champ>
-            ) : null}
-            {c.quantite ? (
-              <Champ
-                id={`${id}-quantite`}
-                label="Quantité revenue"
-                requis
-                aide="Au plus la quantité créditée par l’avoir."
-                erreur={champs['quantite']}
-              >
-                <ChampNombre
+                  label={`1 ${vue.unite ?? 'unité'} = combien d’unités de stock`}
+                  required
+                  size="md"
+                  error={champs['facteur']}
+                >
+                  <ChampNombre
+                    value={s.factor}
+                    onChange={(e) => setS({ ...s, factor: e.target.value })}
+                  />
+                </Field>
+              ) : null}
+              {c.quantite ? (
+                <Field
                   id={`${id}-quantite`}
-                  value={s.quantity}
-                  onChange={(e) => setS({ ...s, quantity: e.target.value })}
-                  {...aria(`${id}-quantite`, champs['quantite'], true)}
-                />
-              </Champ>
-            ) : null}
-            {c.emplacement ? (
-              <Champ id={`${id}-emplacement`} label="Rangé à" requis erreur={champs['emplacement']}>
-                <ChoixEmplacement
+                  label="Quantité revenue"
+                  required
+                  size="sm"
+                  hint="Au plus la quantité créditée par l’avoir."
+                  error={champs['quantite']}
+                >
+                  <ChampNombre
+                    value={s.quantity}
+                    onChange={(e) => setS({ ...s, quantity: e.target.value })}
+                  />
+                </Field>
+              ) : null}
+              {c.emplacement ? (
+                <Field
                   id={`${id}-emplacement`}
-                  valeur={s.locationId}
-                  vide="Choisir"
-                  onChange={(v) => setS({ ...s, locationId: v })}
-                  aria={aria(`${id}-emplacement`, champs['emplacement'])}
-                />
-              </Champ>
-            ) : null}
-            {c.cout ? (
-              <Champ
-                id={`${id}-cout`}
-                label={`Coût unitaire${devise ? ` (${devise})` : ''}`}
-                requis
-                aide="Dans la devise de l’article ; aucun taux n’est appliqué."
-                erreur={champs['cout']}
-              >
-                <ChampNombre
+                  label="Rangé à"
+                  required
+                  size="md"
+                  newRow
+                  error={champs['emplacement']}
+                >
+                  <ChoixEmplacement
+                    valeur={s.locationId}
+                    vide="Choisir"
+                    onChange={(v) => setS({ ...s, locationId: v })}
+                  />
+                </Field>
+              ) : null}
+              {c.cout ? (
+                <Field
                   id={`${id}-cout`}
-                  value={s.unitCost}
-                  onChange={(e) => setS({ ...s, unitCost: e.target.value })}
-                  {...aria(`${id}-cout`, champs['cout'], true)}
-                />
-              </Champ>
-            ) : null}
+                  label={`Coût unitaire${devise ? ` (${devise})` : ''}`}
+                  required
+                  size="md"
+                  newRow
+                  hint="Dans la devise de l’article ; aucun taux n’est appliqué."
+                  error={champs['cout']}
+                >
+                  <ChampNombre
+                    value={s.unitCost}
+                    onChange={(e) => setS({ ...s, unitCost: e.target.value })}
+                  />
+                </Field>
+              ) : null}
+            </FormGrid>
             {erreur ? (
               <Alerte>
                 <p>{erreur}</p>
               </Alerte>
             ) : null}
             <div className="flex flex-wrap gap-2">
-              <button type="submit" disabled={envoi} className={buttonClasses('primary', 'md')}>
-                {envoi ? 'Enregistrement…' : 'Résoudre'}
-              </button>
+              <SubmitButton busy={envoi} busyLabel="Enregistrement…" className="max-sm:w-full">
+                Résoudre
+              </SubmitButton>
               <button
                 type="button"
                 disabled={envoi}

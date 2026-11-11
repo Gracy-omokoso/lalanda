@@ -4,15 +4,15 @@
 // création en fenêtre modale (`stock.manage`, `?nouveau=1`). Quantités et valeurs
 // rendues par l'API ; les valeurs n'apparaissent qu'aux rôles qui les voient.
 
-import { Badge, Modal, buttonClasses } from '@lalanda/ui';
-import { Package, Plus } from 'lucide-react';
+import { Badge, Modal, TextInput, buttonClasses } from '@lalanda/ui';
+import { Package, Plus, Search } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
 import { stockApi, type StockItemView } from '@/lib/api-stock';
 
-import { BOUTON_PETIT, CHAMP } from '../../ventes/_components/form-ui';
+import { BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { ArticleFormulaire } from './article-formulaire';
 import { FILTRES_ARTICLES, requeteArticles, type FiltreArticles } from './articles-model';
@@ -89,13 +89,14 @@ export function ArticlesListe(): React.ReactElement {
         }
       >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <input
+          <TextInput
             type="search"
             aria-label="Rechercher un article"
             placeholder="Rechercher par nom ou code…"
-            className={`${CHAMP} sm:max-w-xs`}
+            className="sm:max-w-xs"
             value={q}
             onChange={(e) => setQ(e.target.value)}
+            leading={<Search aria-hidden="true" className="h-4 w-4" />}
           />
           <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrer les articles">
             {FILTRES_ARTICLES.map((f) => (

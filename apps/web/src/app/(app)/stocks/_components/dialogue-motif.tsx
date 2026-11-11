@@ -4,10 +4,10 @@
 // ligne à traiter classée), reprise des achats avec les messages des stocks.
 // Le motif obligatoire est vérifié ici ; l'API le revérifie et reste juge.
 
-import { Modal, buttonClasses } from '@lalanda/ui';
+import { Button, Field, Modal, TextArea } from '@lalanda/ui';
 import { useId, useState } from 'react';
 
-import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from '../../ventes/_components/form-ui';
+import { Alerte } from '../../ventes/_components/form-ui';
 
 import { messageStocks } from './stocks-model';
 
@@ -66,35 +66,34 @@ export function DialogueMotif({
       size="sm"
       busy={envoi}
       footer={
-        <div className="flex flex-wrap justify-end gap-2">
-          <button type="button" className={BOUTON_PETIT} onClick={onFermer} disabled={envoi}>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+          <Button size="sm" onClick={onFermer} disabled={envoi} className="max-sm:h-11">
             Retour
-          </button>
-          <button
-            type="button"
-            className={buttonClasses('primary', 'sm')}
-            disabled={envoi}
+          </Button>
+          <Button
+            size="sm"
+            variant="primary"
+            busy={envoi}
+            className="max-sm:h-11"
             onClick={() => void valider()}
           >
             {envoi ? 'Envoi…' : bouton}
-          </button>
+          </Button>
         </div>
       }
     >
       <div className="flex flex-col gap-3 text-sm">
         {children}
         {motif === 'obligatoire' ? (
-          <Champ id={`${id}-motif`} label={libelle} requis erreur={champ}>
-            <textarea
-              id={`${id}-motif`}
+          <Field id={`${id}-motif`} label={libelle} required size="full" error={champ}>
+            <TextArea
               rows={3}
-              className={CHAMP}
               value={texte}
               maxLength={1000}
+              autoFocus
               onChange={(e) => setTexte(e.target.value)}
-              {...aria(`${id}-motif`, champ)}
             />
-          </Champ>
+          </Field>
         ) : null}
         {erreur ? (
           <Alerte>

@@ -4,7 +4,17 @@
 // (`stock.manage`, `?nouveau=1`) : emplacement, tous les articles ou une
 // sélection (inventaire tournant), comptage à l'aveugle, compteurs désignés.
 
-import { Badge, Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Badge,
+  Checkbox,
+  ChoiceCards,
+  Field,
+  FormGrid,
+  Modal,
+  SubmitButton,
+  Switch,
+  buttonClasses,
+} from '@lalanda/ui';
 import { ClipboardCheck, Plus, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -12,7 +22,7 @@ import { useCallback, useEffect, useId, useState } from 'react';
 
 import { stockApi, type StockCountView } from '@/lib/api-stock';
 
-import { Alerte, BOUTON_PETIT, Champ, aria } from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   FILTRES_INVENTAIRES,
@@ -80,46 +90,41 @@ function NouvelInventaire({
 
   return (
     <form noValidate onSubmit={(e) => void creer(e)} className="flex flex-col gap-4">
-      <Champ
-        id={`${id}-emplacement`}
-        label="Emplacement à compter"
-        requis
-        erreur={champs['location']}
-      >
-        <ChoixEmplacement
+      <FormGrid>
+        <Field
           id={`${id}-emplacement`}
-          valeur={f.locationId}
-          vide="Choisir"
-          onChange={(v) => maj({ locationId: v })}
-          aria={aria(`${id}-emplacement`, champs['location'])}
-        />
-      </Champ>
-      <fieldset className="flex flex-col gap-2">
-        <legend className="mb-1 text-sm font-medium">Articles comptés</legend>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="radio"
-            name={`${id}-portee`}
-            checked={f.scope === 'all'}
-            onChange={() => maj({ scope: 'all' })}
+          label="Emplacement à compter"
+          required
+          size="lg"
+          error={champs['location']}
+        >
+          <ChoixEmplacement
+            valeur={f.locationId}
+            vide="Choisir"
+            onChange={(v) => maj({ locationId: v })}
           />
-          Tous les articles suivis présents ou seuillés à cet emplacement
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="radio"
-            name={`${id}-portee`}
-            checked={f.scope === 'items'}
-            onChange={() => maj({ scope: 'items' })}
+        </Field>
+        <Field id={`${id}-portee`} label="Articles comptés" size="full" group>
+          <ChoiceCards<FormulaireInventaire['scope']>
+            value={f.scope}
+            onChange={(v) => maj({ scope: v })}
+            options={[
+              {
+                value: 'all',
+                label: 'Tous les articles',
+                description: 'Tous les articles suivis présents ou seuillés à cet emplacement.',
+              },
+              {
+                value: 'items',
+                label: 'Une sélection d’articles',
+                description: 'Inventaire tournant : seuls les articles choisis sont comptés.',
+              },
+            ]}
           />
-          Une sélection d’articles (inventaire tournant)
-        </label>
-      </fieldset>
-      {f.scope === 'items' ? (
-        <div className="flex flex-col gap-2">
-          <Champ id={`${id}-article`} label="Ajouter un article" erreur={champs['items']}>
+        </Field>
+        {f.scope === 'items' ? (
+          <Field id={`${id}-article`} label="Ajouter un article" size="lg" error={champs['items']}>
             <ChoixArticle
-              id={`${id}-article`}
               valeur={choix}
               onChange={(a) => {
                 setChoix('');
@@ -129,62 +134,52 @@ function NouvelInventaire({
                 }
               }}
             />
-          </Champ>
-          {f.itemIds.length > 0 ? (
-            <ul className="flex flex-wrap gap-2">
-              {f.itemIds.map((i) => (
-                <li key={i}>
-                  <button
-                    type="button"
-                    className={`${BOUTON_PETIT} inline-flex items-center gap-1`}
-                    aria-label={`Retirer ${noms[i] ?? 'l’article'}`}
-                    onClick={() => maj({ itemIds: f.itemIds.filter((x) => x !== i) })}
-                  >
-                    {noms[i] ?? 'Article'}
-                    <X aria-hidden="true" className="h-3 w-3" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
+          </Field>
+        ) : null}
+      </FormGrid>
+      {f.scope === 'items' && f.itemIds.length > 0 ? (
+        <ul className="flex flex-wrap gap-2">
+          {f.itemIds.map((i) => (
+            <li key={i}>
+              <button
+                type="button"
+                className={`${BOUTON_PETIT} inline-flex items-center gap-1`}
+                aria-label={`Retirer ${noms[i] ?? 'l’article'}`}
+                onClick={() => maj({ itemIds: f.itemIds.filter((x) => x !== i) })}
+              >
+                {noms[i] ?? 'Article'}
+                <X aria-hidden="true" className="h-3 w-3" />
+              </button>
+            </li>
+          ))}
+        </ul>
       ) : null}
-      <label className="flex items-start gap-2 text-sm">
-        <input
-          type="checkbox"
-          className="mt-1"
-          checked={f.blind}
-          onChange={(e) => maj({ blind: e.target.checked })}
-        />
-        <span>
-          Comptage à l’aveugle
-          <span className="block text-xs text-[var(--foreground-muted)]">
-            Le compteur ne voit pas la quantité attendue : il compte ce qu’il voit.
-          </span>
-        </span>
-      </label>
+      <Switch
+        checked={f.blind}
+        onChange={(v) => maj({ blind: v })}
+        label="Comptage à l’aveugle"
+        description="Le compteur ne voit pas la quantité attendue : il compte ce qu’il voit."
+      />
       {membres.length > 0 ? (
         <fieldset className="flex flex-col gap-1">
           <legend className="mb-1 text-sm font-medium">Compteurs</legend>
           <p className="text-xs text-[var(--foreground-muted)]">
             L’inventaire apparaît dans leurs tâches. Seuls les rôles qui comptent pourront saisir.
           </p>
-          <div className="grid gap-1 sm:grid-cols-2">
+          <div className="grid gap-2 sm:grid-cols-2">
             {membres.map((m) => (
-              <label key={m.userId} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={f.assignees.includes(m.userId)}
-                  onChange={(e) =>
-                    maj({
-                      assignees: e.target.checked
-                        ? [...f.assignees, m.userId]
-                        : f.assignees.filter((x) => x !== m.userId),
-                    })
-                  }
-                />
-                {m.name}
-              </label>
+              <Checkbox
+                key={m.userId}
+                checked={f.assignees.includes(m.userId)}
+                onChange={(v) =>
+                  maj({
+                    assignees: v
+                      ? [...f.assignees, m.userId]
+                      : f.assignees.filter((x) => x !== m.userId),
+                  })
+                }
+                label={m.name}
+              />
             ))}
           </div>
         </fieldset>
@@ -194,13 +189,9 @@ function NouvelInventaire({
           <p>{erreur}</p>
         </Alerte>
       ) : null}
-      <button
-        type="submit"
-        disabled={envoi}
-        className={buttonClasses('primary', 'md', 'self-start')}
-      >
-        {envoi ? 'Création…' : 'Créer l’inventaire'}
-      </button>
+      <SubmitButton busy={envoi} busyLabel="Création…" className="self-start max-sm:w-full">
+        Créer l’inventaire
+      </SubmitButton>
     </form>
   );
 }

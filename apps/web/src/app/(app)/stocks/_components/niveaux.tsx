@@ -3,15 +3,13 @@
 // Niveaux par emplacement — ADR-0046 § 2.5, § 5.1 : le stock en temps réel,
 // filtrable par emplacement et « sous le seuil ». Quantités servies par l'API.
 
-import { Badge } from '@lalanda/ui';
+import { Badge, Field, Switch } from '@lalanda/ui';
 import { Layers } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
 import { stockApi, type StockLevelRowView, type StockReorderAlertView } from '@/lib/api-stock';
-
-import { BOUTON_PETIT, Champ } from '../../ventes/_components/form-ui';
 
 import { alerteDe, etatNiveau, requeteNiveaux } from './niveaux-model';
 import { useAccesStocks } from './stocks-access';
@@ -62,25 +60,20 @@ export function Niveaux(): React.ReactElement {
         titre="Niveaux par emplacement"
         sousTitre="Le stock en temps réel, article par article et emplacement par emplacement."
       >
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div className="sm:w-80">
-            <Champ id="niveaux-emplacement" label="Emplacement">
-              <ChoixEmplacement
-                id="niveaux-emplacement"
-                valeur={emplacement}
-                vide="Tous les emplacements"
-                onChange={(v) => filtrer(v, sousSeuil)}
-              />
-            </Champ>
-          </div>
-          <button
-            type="button"
-            className={BOUTON_PETIT}
-            aria-pressed={sousSeuil}
-            onClick={() => filtrer(emplacement, !sousSeuil)}
-          >
-            Sous le seuil seulement
-          </button>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-6">
+          <Field id="niveaux-emplacement" label="Emplacement" size="full" className="sm:w-80">
+            <ChoixEmplacement
+              valeur={emplacement}
+              vide="Tous les emplacements"
+              onChange={(v) => filtrer(v, sousSeuil)}
+            />
+          </Field>
+          <Switch
+            className="sm:pb-2"
+            checked={sousSeuil}
+            onChange={(v) => filtrer(emplacement, v)}
+            label="Sous le seuil seulement"
+          />
         </div>
       </Bandeau>
 

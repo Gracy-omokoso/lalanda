@@ -6,7 +6,17 @@
 // passer » écrit les mouvements ; le disponible est jugé par l'API.
 
 import { STOCK_DEFAULT_ADJUSTMENT_REASONS } from '@lalanda/shared/stock';
-import { buttonClasses } from '@lalanda/ui';
+import {
+  Button,
+  DatePicker,
+  Field,
+  FormGrid,
+  SegmentedControl,
+  Select,
+  SubmitButton,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 
@@ -18,7 +28,7 @@ import {
 } from '@/lib/api-stock';
 import { workApi } from '@/lib/work-api';
 
-import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from '../../ventes/_components/form-ui';
+import { Alerte } from '../../ventes/_components/form-ui';
 
 import {
   emplacementsDuBon,
@@ -138,105 +148,89 @@ export function BonFormulaire({
       className="flex flex-col gap-4"
     >
       <p className="text-sm text-[var(--foreground-muted)]">{LIBELLES_BON[kind]}</p>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <FormGrid>
         {e.depart ? (
-          <Champ
+          <Field
             id={`${id}-de`}
             label={kind === 'adjustment' ? 'Emplacement' : 'Depuis'}
-            requis
-            erreur={champs['from']}
+            required
+            size="md"
+            error={champs['from']}
           >
             <ChoixEmplacement
-              id={`${id}-de`}
               valeur={f.fromLocationId}
               vide="Choisir"
               onChange={(v) => maj({ fromLocationId: v })}
-              aria={aria(`${id}-de`, champs['from'])}
             />
-          </Champ>
+          </Field>
         ) : null}
         {e.arrivee ? (
-          <Champ id={`${id}-vers`} label="Vers" requis erreur={champs['to']}>
+          <Field id={`${id}-vers`} label="Vers" required size="md" error={champs['to']}>
             <ChoixEmplacement
-              id={`${id}-vers`}
               valeur={f.toLocationId}
               vide="Choisir"
-              exclure={kind === 'transfer' ? f.fromLocationId : undefined}
+              {...(kind === 'transfer' ? { exclure: f.fromLocationId } : {})}
               onChange={(v) => maj({ toLocationId: v })}
-              aria={aria(`${id}-vers`, champs['to'])}
             />
-          </Champ>
+          </Field>
         ) : null}
-        <Champ id={`${id}-date`} label="Date" requis erreur={champs['postedOn']}>
-          <input
-            id={`${id}-date`}
-            type="date"
-            max={aujourdhui}
-            className={CHAMP}
+        <Field id={`${id}-date`} label="Date" required size="sm" error={champs['postedOn']}>
+          <DatePicker
             value={f.postedOn}
-            onChange={(ev) => maj({ postedOn: ev.target.value })}
-            {...aria(`${id}-date`, champs['postedOn'])}
+            max={aujourdhui}
+            shortcuts={['today']}
+            onChange={(v) => maj({ postedOn: v })}
           />
-        </Champ>
+        </Field>
         {kind === 'issue' ? (
           <>
-            <Champ id={`${id}-projet`} label="Projet consommateur" aide="Facultatif.">
-              <select
-                id={`${id}-projet`}
-                className={CHAMP}
+            <Field id={`${id}-projet`} label="Projet consommateur" size="lg" newRow optional>
+              <Select
                 value={f.workProjectId}
-                onChange={(ev) => maj({ workProjectId: ev.target.value })}
-              >
-                <option value="">Aucun (consommation interne)</option>
-                {projets.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </Champ>
-            <Champ id={`${id}-pour`} label="Remis à" erreur={champs['recipient']}>
-              <input
-                id={`${id}-pour`}
-                className={CHAMP}
+                onChange={(v) => maj({ workProjectId: v })}
+                options={[
+                  { value: '', label: 'Aucun (consommation interne)' },
+                  ...projets.map((p) => ({ value: p.id, label: p.name })),
+                ]}
+              />
+            </Field>
+            <Field id={`${id}-pour`} label="Remis à" size="md" error={champs['recipient']}>
+              <TextInput
                 value={f.recipient}
                 maxLength={500}
                 placeholder="Nom du bénéficiaire"
                 onChange={(ev) => maj({ recipient: ev.target.value })}
               />
-            </Champ>
+            </Field>
           </>
         ) : null}
         {kind === 'adjustment' ? (
           <>
-            <Champ id={`${id}-motif`} label="Motif" requis erreur={champs['reason']}>
-              <select
-                id={`${id}-motif`}
-                className={CHAMP}
+            <Field
+              id={`${id}-motif`}
+              label="Motif"
+              required
+              size="md"
+              newRow
+              error={champs['reason']}
+            >
+              <Select
                 value={f.reason}
-                onChange={(ev) => maj({ reason: ev.target.value })}
-                {...aria(`${id}-motif`, champs['reason'])}
-              >
-                <option value="">Choisir un motif</option>
-                {motifs.map((m) => (
-                  <option key={m.key} value={m.key}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
-            </Champ>
-            <Champ id={`${id}-precision`} label="Précision" erreur={champs['reasonNote']}>
-              <input
-                id={`${id}-precision`}
-                className={CHAMP}
+                onChange={(v) => maj({ reason: v })}
+                placeholder="Choisir un motif"
+                options={motifs.map((m) => ({ value: m.key, label: m.label }))}
+              />
+            </Field>
+            <Field id={`${id}-precision`} label="Précision" size="lg" error={champs['reasonNote']}>
+              <TextInput
                 value={f.reasonNote}
                 maxLength={500}
                 onChange={(ev) => maj({ reasonNote: ev.target.value })}
               />
-            </Champ>
+            </Field>
           </>
         ) : null}
-      </div>
+      </FormGrid>
 
       <fieldset className="flex flex-col gap-3">
         <legend className="text-sm font-semibold">Articles</legend>
@@ -246,64 +240,66 @@ export function BonFormulaire({
         {f.lignes.map((l, i) => (
           <div
             key={i}
-            className={`grid gap-2 rounded-[var(--radius-md)] border border-[var(--border)] p-3 ${kind === 'adjustment' ? 'sm:grid-cols-[2fr_auto_1fr_auto]' : 'sm:grid-cols-[2fr_1fr_auto]'}`}
+            className={`grid items-start gap-2 rounded-[var(--radius-md)] border border-[var(--border)] p-3 ${kind === 'adjustment' ? 'sm:grid-cols-[2fr_auto_1fr_auto]' : 'sm:grid-cols-[2fr_1fr_auto]'}`}
           >
-            <Champ id={`${id}-l${i}-art`} label="Article" erreur={champs[`ligne-${i}-item`]}>
+            <Field
+              id={`${id}-l${i}-art`}
+              label="Article"
+              size="full"
+              error={champs[`ligne-${i}-item`]}
+            >
               <ChoixArticle
-                id={`${id}-l${i}-art`}
                 valeur={l.itemId}
                 nomInitial={l.itemName || null}
+                creer
                 onChange={(a) =>
                   majLigne(i, { itemId: a?.id ?? '', itemName: a?.name ?? '', unit: a?.unit ?? '' })
                 }
-                aria={aria(`${id}-l${i}-art`, champs[`ligne-${i}-item`])}
               />
-            </Champ>
+            </Field>
             {kind === 'adjustment' ? (
-              <Champ id={`${id}-l${i}-sens`} label="Sens">
-                <select
-                  id={`${id}-l${i}-sens`}
-                  className={CHAMP}
+              <Field id={`${id}-l${i}-sens`} label="Sens" size="full" group>
+                <SegmentedControl<LigneBon['sens']>
                   value={l.sens}
-                  onChange={(ev) => majLigne(i, { sens: ev.target.value as LigneBon['sens'] })}
-                >
-                  <option value="out">Retirer</option>
-                  <option value="in">Ajouter</option>
-                </select>
-              </Champ>
+                  onChange={(v) => majLigne(i, { sens: v })}
+                  options={[
+                    { value: 'out', label: 'Retirer' },
+                    { value: 'in', label: 'Ajouter' },
+                  ]}
+                />
+              </Field>
             ) : null}
-            <Champ
+            <Field
               id={`${id}-l${i}-q`}
               label={l.unit ? `Quantité (${l.unit})` : 'Quantité'}
-              erreur={champs[`ligne-${i}-quantity`]}
+              size="full"
+              error={champs[`ligne-${i}-quantity`]}
             >
               <ChampNombre
-                id={`${id}-l${i}-q`}
                 value={l.quantity}
                 onChange={(ev) => majLigne(i, { quantity: ev.target.value })}
-                {...aria(`${id}-l${i}-q`, champs[`ligne-${i}-quantity`])}
               />
-            </Champ>
-            <button
-              type="button"
-              className={`${BOUTON_PETIT} self-end`}
+            </Field>
+            <Button
+              size="sm"
+              className="self-start sm:mt-6 max-sm:h-11"
               disabled={f.lignes.length === 1}
               aria-label={`Retirer la ligne ${i + 1}`}
               onClick={() => maj({ lignes: f.lignes.filter((_, j) => j !== i) })}
             >
               <Trash2 aria-hidden="true" className="h-4 w-4" />
-            </button>
+            </Button>
           </div>
         ))}
-        <button
-          type="button"
-          className={`${BOUTON_PETIT} inline-flex items-center gap-1 self-start`}
+        <Button
+          size="sm"
+          className="self-start max-sm:h-11"
           disabled={f.lignes.length >= 100}
           onClick={() => maj({ lignes: [...f.lignes, ligneBonVide()] })}
         >
           <Plus aria-hidden="true" className="h-4 w-4" />
           Ajouter un article
-        </button>
+        </Button>
       </fieldset>
 
       {erreur ? (
@@ -312,9 +308,9 @@ export function BonFormulaire({
         </Alerte>
       ) : null}
       <div className="flex flex-wrap gap-2">
-        <button type="submit" disabled={envoi} className={buttonClasses('primary', 'md')}>
-          {envoi ? 'Enregistrement…' : 'Enregistrer et passer'}
-        </button>
+        <SubmitButton busy={envoi} busyLabel="Enregistrement…" className="max-sm:w-full">
+          Enregistrer et passer
+        </SubmitButton>
         <button
           type="button"
           disabled={envoi}

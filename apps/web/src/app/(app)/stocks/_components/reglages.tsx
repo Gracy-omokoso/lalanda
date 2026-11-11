@@ -5,13 +5,13 @@
 // d'ajustement. Lecture `stock.read` ; modification `stock.manage`.
 
 import { STOCK_SALES_ISSUE_MODES } from '@lalanda/shared/stock';
-import { buttonClasses } from '@lalanda/ui';
+import { Button, ChoiceCards, Field, FormGrid, SubmitButton, Switch, TextInput } from '@lalanda/ui';
 import { Plus, Settings, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { stockApi, type StockSettingsView } from '@/lib/api-stock';
 
-import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from '../../ventes/_components/form-ui';
+import { Alerte } from '../../ventes/_components/form-ui';
 
 import {
   LIBELLES_MODE_VENTE,
@@ -98,23 +98,17 @@ export function Reglages(): React.ReactElement {
         <fieldset disabled={!gerer || envoi} className="flex flex-col gap-5">
           <Panneau titre="Sortie de stock à la vente" id="reglages-vente">
             <div className="flex flex-col gap-2">
-              {STOCK_SALES_ISSUE_MODES.map((m) => (
-                <label key={m} className="flex items-start gap-2 text-sm">
-                  <input
-                    type="radio"
-                    name="mode-vente"
-                    className="mt-1"
-                    checked={f.salesIssueMode === m}
-                    onChange={() => maj({ salesIssueMode: m })}
-                  />
-                  <span>
-                    {LIBELLES_MODE_VENTE[m].titre}
-                    <span className="block text-xs text-[var(--foreground-muted)]">
-                      {LIBELLES_MODE_VENTE[m].aide}
-                    </span>
-                  </span>
-                </label>
-              ))}
+              <ChoiceCards<FormulaireReglages['salesIssueMode']>
+                aria-label="Sortie de stock à la vente"
+                value={f.salesIssueMode}
+                onChange={(v) => maj({ salesIssueMode: v })}
+                disabled={!gerer || envoi}
+                options={STOCK_SALES_ISSUE_MODES.map((m) => ({
+                  value: m,
+                  label: LIBELLES_MODE_VENTE[m].titre,
+                  description: LIBELLES_MODE_VENTE[m].aide,
+                }))}
+              />
               <p className="text-xs text-[var(--foreground-muted)]">
                 Les avoirs sont toujours proposés dans « À traiter » : une remise n’a pas de retour
                 physique.
@@ -123,39 +117,30 @@ export function Reglages(): React.ReactElement {
           </Panneau>
 
           <Panneau titre="Sorties, transferts et ajustements" id="reglages-negatif">
-            <label className="flex items-start gap-2 text-sm">
-              <input
-                type="checkbox"
-                className="mt-1"
-                checked={f.allowNegativeManualMoves}
-                onChange={(e) => maj({ allowNegativeManualMoves: e.target.checked })}
-              />
-              <span>
-                Permettre de sortir plus que le disponible
-                <span className="block text-xs text-[var(--foreground-muted)]">
-                  Décoché (recommandé) : un bon qui dépasse le stock est refusé. Les ventes émises
-                  sortent toujours, avec une alerte.
-                </span>
-              </span>
-            </label>
+            <Switch
+              checked={f.allowNegativeManualMoves}
+              onChange={(v) => maj({ allowNegativeManualMoves: v })}
+              disabled={!gerer || envoi}
+              label="Permettre de sortir plus que le disponible"
+              description="Désactivé (recommandé) : un bon qui dépasse le stock est refusé. Les ventes émises sortent toujours, avec une alerte."
+            />
           </Panneau>
 
           <Panneau titre="Inventaires" id="reglages-inventaires">
-            <div className="sm:w-64">
-              <Champ
+            <FormGrid>
+              <Field
                 id="reglages-rappel"
                 label="Rappel d’inventaire tous les (jours)"
-                aide="0 : aucun rappel."
-                erreur={champs['countReminderDays']}
+                size="md"
+                hint="0 : aucun rappel."
+                error={champs['countReminderDays']}
               >
                 <ChampNombre
-                  id="reglages-rappel"
                   value={f.countReminderDays}
                   onChange={(e) => maj({ countReminderDays: e.target.value })}
-                  {...aria('reglages-rappel', champs['countReminderDays'], true)}
                 />
-              </Champ>
-            </div>
+              </Field>
+            </FormGrid>
           </Panneau>
 
           <Panneau titre="Motifs d’ajustement" id="reglages-motifs">
@@ -166,9 +151,8 @@ export function Reglages(): React.ReactElement {
               {f.motifs.map((m, i) => (
                 <li key={m.key} className="flex items-start gap-2">
                   <div className="flex-1">
-                    <input
+                    <TextInput
                       aria-label={`Motif ${i + 1}`}
-                      className={CHAMP}
                       value={m.label}
                       maxLength={60}
                       onChange={(e) =>
@@ -184,20 +168,20 @@ export function Reglages(): React.ReactElement {
                       <p className="text-xs text-[var(--danger)]">{champs[`motif-${i}`]}</p>
                     ) : null}
                   </div>
-                  <button
-                    type="button"
-                    className={BOUTON_PETIT}
+                  <Button
+                    size="sm"
+                    className="max-sm:h-11"
                     aria-label={`Retirer le motif ${m.label || i + 1}`}
                     onClick={() => maj({ motifs: f.motifs.filter((_, j) => j !== i) })}
                   >
                     <Trash2 aria-hidden="true" className="h-4 w-4" />
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>
-            <button
-              type="button"
-              className={`${BOUTON_PETIT} inline-flex items-center gap-1 self-start`}
+            <Button
+              size="sm"
+              className="self-start max-sm:h-11"
               disabled={f.motifs.length >= 20}
               onClick={() =>
                 maj({
@@ -216,7 +200,7 @@ export function Reglages(): React.ReactElement {
             >
               <Plus aria-hidden="true" className="h-4 w-4" />
               Ajouter un motif
-            </button>
+            </Button>
           </Panneau>
         </fieldset>
 
@@ -231,13 +215,13 @@ export function Reglages(): React.ReactElement {
           </p>
         ) : null}
         {gerer ? (
-          <button
-            type="submit"
-            disabled={envoi}
-            className={buttonClasses('primary', 'md', 'self-start')}
+          <SubmitButton
+            busy={envoi}
+            busyLabel="Enregistrement…"
+            className="self-start max-sm:w-full"
           >
-            {envoi ? 'Enregistrement…' : 'Enregistrer les réglages'}
-          </button>
+            Enregistrer les réglages
+          </SubmitButton>
         ) : null}
       </form>
     </section>
