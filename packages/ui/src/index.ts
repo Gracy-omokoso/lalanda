@@ -13,3 +13,16 @@ export * from './components/modal.js';
 export * from './charts-geometry.js';
 export * from './components/charts.js';
 export * from './components/status-pill.js';
+// ADR-0074 : système de formulaires (champs, listes, sélecteur d'entité, dates, code, choix).
+export * from './forms/logic.js';
+export * from './forms/money.js';
+export * from './forms/popover.js';
+export * from './forms/field.js';
+export * from './forms/listbox.js';
+export * from './forms/select.js';
+export * from './forms/entity-picker.js';
+export * from './forms/otp-input.js';
+export * from './forms/date-picker.js';
+export * from './forms/choices.js';
+export * from './forms/inputs.js';
+export * from './forms/form-kit.js';
