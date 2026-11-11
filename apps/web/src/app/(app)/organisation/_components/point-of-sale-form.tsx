@@ -14,6 +14,7 @@
 // Le serveur teste le jeton auprès de la DGI AVANT toute écriture : un refus
 // signifie que RIEN n'a été enregistré. Le formulaire le dit.
 
+import { Button, Field, FormGrid, SegmentedControl, SubmitButton, TextInput } from '@lalanda/ui';
 import { useState } from 'react';
 
 import type { EdefEnvironment, PointOfSaleView } from '@/lib/api';
@@ -25,9 +26,6 @@ import {
   libelleEnvironnement,
   messageFiscal,
 } from './fiscal-model';
-
-const CHAMP =
-  'w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)] aria-[invalid=true]:border-[var(--danger)] disabled:opacity-50';
 
 export interface NouveauPointDeVente {
   label: string;
@@ -68,13 +66,18 @@ function ChampJeton({
   erreur: string | null;
   libelle: string;
 }): React.ReactElement {
+  // ADR-0074 : `Field` + `TextInput` masqué (pas de `PasswordInput` : le jeton
+  // n'a pas de bouton « Afficher », il ne se relit jamais à l'écran).
   return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-medium">
-        {libelle}
-      </label>
-      <input
-        id={id}
+    <Field
+      id={id}
+      label={libelle}
+      required
+      size="full"
+      error={erreur ?? undefined}
+      hint="Le jeton fourni par la DGI pour cet e-MCF. Il est vérifié auprès de la DGI avant d’être enregistré, chiffré, puis n’est plus jamais affiché : seuls ses quatre derniers caractères restent visibles."
+    >
+      <TextInput
         type="password"
         value={valeur}
         onChange={(e) => onChange(e.target.value.trim())}
@@ -86,21 +89,9 @@ function ChampJeton({
         data-1p-ignore=""
         data-lpignore="true"
         required
-        aria-invalid={erreur ? true : undefined}
-        aria-describedby={`${id}-aide${erreur ? ` ${id}-erreur` : ''}`}
-        className={`${CHAMP} font-mono`}
+        className="font-mono"
       />
-      <p id={`${id}-aide`} className="text-xs text-[var(--foreground-muted)]">
-        Le jeton fourni par la DGI pour cet e-MCF. Il est vérifié auprès de la DGI avant d’être
-        enregistré, chiffré, puis n’est plus jamais affiché : seuls ses quatre derniers caractères
-        restent visibles.
-      </p>
-      {erreur ? (
-        <p id={`${id}-erreur`} className="text-xs font-medium text-[var(--danger)]">
-          {erreur}
-        </p>
-      ) : null}
-    </div>
+    </Field>
   );
 }
 
@@ -157,80 +148,67 @@ export function PointOfSaleCreateForm({
       aria-label="Nouveau point de vente"
       className="flex flex-col gap-4"
     >
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="pdv-label" className="text-sm font-medium">
-            Nom du point de vente
-          </label>
-          <input
-            id="pdv-label"
+      <FormGrid>
+        <Field
+          id="pdv-label"
+          label="Nom du point de vente"
+          required
+          size="lg"
+          hint="Un nom pour vous y retrouver. Il n’est pas transmis à la DGI."
+        >
+          <TextInput
             value={label}
             onChange={(e) => setLabel(e.target.value)}
             maxLength={80}
             required
+            autoFocus
             placeholder="Boutique Gombe"
-            aria-describedby="pdv-label-aide"
-            className={CHAMP}
           />
-          <p id="pdv-label-aide" className="text-xs text-[var(--foreground-muted)]">
-            Un nom pour vous y retrouver. Il n’est pas transmis à la DGI.
-          </p>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="pdv-nim" className="text-sm font-medium">
-            NIM attendu
-          </label>
-          <input
-            id="pdv-nim"
+        </Field>
+        <Field
+          id="pdv-nim"
+          label="NIM attendu"
+          optional
+          size="sm"
+          hint="S’il est renseigné, le jeton n’est accepté que si la DGI renvoie ce même numéro d’e-MCF."
+        >
+          <TextInput
             value={nim}
             onChange={(e) => setNim(e.target.value)}
             maxLength={32}
             autoComplete="off"
             spellCheck={false}
-            aria-describedby="pdv-nim-aide"
-            className={`${CHAMP} font-mono`}
+            className="font-mono"
           />
-          <p id="pdv-nim-aide" className="text-xs text-[var(--foreground-muted)]">
-            Facultatif. S’il est renseigné, le jeton n’est accepté que si la DGI renvoie ce même
-            numéro d’e-MCF.
-          </p>
-        </div>
-      </div>
-
-      <fieldset className="flex flex-col gap-2">
-        <legend className="text-sm font-medium">Environnement DGI</legend>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="radio"
-            name="pdv-env"
-            checked={environment === 'test'}
-            onChange={() => setEnvironment('test')}
-          />
-          Mode test
-        </label>
-        <label
-          className={`flex items-center gap-2 text-sm ${productionDisponible ? '' : 'opacity-60'}`}
+        </Field>
+        <Field
+          id="pdv-env"
+          label="Environnement DGI"
+          group
+          size="full"
+          newRow
+          hint={
+            <>
+              {productionDisponible ? null : (
+                <span id="pdv-env-ferme" className="block">
+                  {PHRASE_PRODUCTION_FERMEE}
+                </span>
+              )}
+              L’environnement est fixé à la création : un jeton de test ne fonctionne pas en
+              production, et inversement.
+            </>
+          }
         >
-          <input
-            type="radio"
-            name="pdv-env"
-            checked={environment === 'production'}
-            onChange={() => setEnvironment('production')}
-            disabled={!productionDisponible}
-            aria-describedby={productionDisponible ? undefined : 'pdv-env-ferme'}
+          <SegmentedControl<EdefEnvironment>
+            value={environment}
+            onChange={setEnvironment}
+            options={[
+              { value: 'test', label: 'Mode test' },
+              { value: 'production', label: 'Production', disabled: !productionDisponible },
+            ]}
           />
-          Production
-        </label>
-        {productionDisponible ? null : (
-          <p id="pdv-env-ferme" className="text-xs text-[var(--foreground-muted)]">
-            {PHRASE_PRODUCTION_FERMEE}
-          </p>
-        )}
-        <p className="text-xs text-[var(--foreground-muted)]">
-          L’environnement est fixé à la création : un jeton de test ne fonctionne pas en production,
-          et inversement.
-        </p>
-      </fieldset>
+        </Field>
+      </FormGrid>
 
       <ChampJeton
         id="pdv-jeton"
@@ -246,22 +224,19 @@ export function PointOfSaleCreateForm({
       {erreur ? <ErreurFiscale erreur={erreur} /> : null}
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row">
-        <button
-          type="button"
-          onClick={onAnnuler}
-          className="rounded-md border border-[var(--border)] px-4 py-2 text-sm"
-        >
+        <Button onClick={onAnnuler} className="max-sm:h-11">
           Annuler
-        </button>
-        <button
-          type="submit"
-          disabled={envoi || label.trim() === '' || jeton === ''}
-          className="rounded-md border border-[var(--border-strong)] px-4 py-2 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-50"
+        </Button>
+        <SubmitButton
+          variant="secondary"
+          showShortcut={false}
+          busy={envoi}
+          busyLabel="Vérification auprès de la DGI…"
+          disabled={label.trim() === '' || jeton === ''}
+          className="max-sm:h-11"
         >
-          {envoi
-            ? 'Vérification auprès de la DGI…'
-            : `Vérifier et ajouter (${libelleEnvironnement(environment)})`}
-        </button>
+          {`Vérifier et ajouter (${libelleEnvironnement(environment)})`}
+        </SubmitButton>
       </div>
     </form>
   );
@@ -319,24 +294,19 @@ export function PointOfSaleTokenForm({
       </p>
       {erreur ? <ErreurFiscale erreur={erreur} /> : null}
       <div className="flex flex-col-reverse gap-2 sm:flex-row">
-        <button
-          type="button"
-          onClick={onAnnuler}
-          className="rounded-md border border-[var(--border)] px-4 py-2 text-sm"
-        >
+        <Button onClick={onAnnuler} className="max-sm:h-11">
           Annuler
-        </button>
-        <button
-          type="submit"
-          disabled={envoi || jeton === ''}
-          className="rounded-md border border-[var(--border-strong)] px-4 py-2 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-50"
+        </Button>
+        <SubmitButton
+          variant="secondary"
+          showShortcut={false}
+          busy={envoi}
+          busyLabel="Vérification auprès de la DGI…"
+          disabled={jeton === ''}
+          className="max-sm:h-11"
         >
-          {envoi
-            ? 'Vérification auprès de la DGI…'
-            : reactivation
-              ? 'Vérifier et réactiver'
-              : 'Vérifier et remplacer'}
-        </button>
+          {reactivation ? 'Vérifier et réactiver' : 'Vérifier et remplacer'}
+        </SubmitButton>
       </div>
     </form>
   );
@@ -372,51 +342,41 @@ export function PointOfSaleEditForm({
 
   return (
     <form onSubmit={(e) => void envoyer(e)} className="flex flex-col gap-3">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor={`pdv-label-${point.id}`} className="text-sm font-medium">
-            Nom du point de vente
-          </label>
-          <input
-            id={`pdv-label-${point.id}`}
+      <FormGrid>
+        <Field id={`pdv-label-${point.id}`} label="Nom du point de vente" required size="lg">
+          <TextInput
             value={label}
             onChange={(e) => setLabel(e.target.value)}
             maxLength={80}
             required
-            className={CHAMP}
           />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor={`pdv-nim-${point.id}`} className="text-sm font-medium">
-            NIM attendu
-          </label>
-          <input
-            id={`pdv-nim-${point.id}`}
+        </Field>
+        <Field id={`pdv-nim-${point.id}`} label="NIM attendu" optional size="sm">
+          <TextInput
             value={nim}
             onChange={(e) => setNim(e.target.value)}
             maxLength={32}
             autoComplete="off"
             spellCheck={false}
-            className={`${CHAMP} font-mono`}
+            className="font-mono"
           />
-        </div>
-      </div>
+        </Field>
+      </FormGrid>
       {erreur ? <ErreurFiscale erreur={erreur} /> : null}
       <div className="flex flex-col-reverse gap-2 sm:flex-row">
-        <button
-          type="button"
-          onClick={onAnnuler}
-          className="rounded-md border border-[var(--border)] px-4 py-2 text-sm"
-        >
+        <Button onClick={onAnnuler} className="max-sm:h-11">
           Annuler
-        </button>
-        <button
-          type="submit"
-          disabled={envoi || label.trim() === ''}
-          className="rounded-md border border-[var(--border-strong)] px-4 py-2 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-50"
+        </Button>
+        <SubmitButton
+          variant="secondary"
+          showShortcut={false}
+          busy={envoi}
+          busyLabel="Enregistrement…"
+          disabled={label.trim() === ''}
+          className="max-sm:h-11"
         >
-          {envoi ? 'Enregistrement…' : 'Enregistrer'}
-        </button>
+          Enregistrer
+        </SubmitButton>
       </div>
     </form>
   );

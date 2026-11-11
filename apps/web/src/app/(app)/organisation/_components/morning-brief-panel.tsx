@@ -9,6 +9,7 @@
 // Aucune action n'est exécutée depuis cet écran : chaque recommandation mène à
 // la page où l'utilisateur agit lui-même.
 
+import { Switch } from '@lalanda/ui';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -331,35 +332,26 @@ function Reglages(props: {
       <h3 id="brief-reglages" className="text-sm font-semibold uppercase tracking-wide">
         Réglages
       </h3>
-      <label className="flex items-start gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={props.prefs.emailDaily}
-          disabled={enCours}
-          onChange={(e) => void appliquer(() => morningBriefApi.setEmailDaily(e.target.checked))}
-          className="mt-1"
-        />
-        <span>
-          Recevoir ce brief par e-mail chaque matin vers 7 h (heure de Kinshasa). L’e-mail reprend
-          les chiffres, alertes et recommandations — jamais de texte rédigé par l’IA.
-        </span>
-      </label>
+      {/* ADR-0074 : réglages qui prennent effet tels quels → interrupteurs. */}
+      <Switch
+        checked={props.prefs.emailDaily}
+        disabled={enCours}
+        onChange={(v) => void appliquer(() => morningBriefApi.setEmailDaily(v))}
+        label="Recevoir ce brief par e-mail chaque matin vers 7 h (heure de Kinshasa)"
+        description="L’e-mail reprend les chiffres, alertes et recommandations — jamais de texte rédigé par l’IA."
+      />
       {props.vue.canManageAi ? (
-        <label className="flex items-start gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={props.prefs.aiEnabled}
-            disabled={enCours || props.prefs.aiDisabledBy === 'platform'}
-            onChange={(e) => void appliquer(() => morningBriefApi.setAiEnabled(e.target.checked))}
-            className="mt-1"
-          />
-          <span>
-            Permettre l’explication par l’IA pour toute l’organisation.
-            {props.prefs.aiDisabledBy === 'platform'
-              ? ' Actuellement désactivée par Lalanda pour toutes les organisations.'
-              : ''}
-          </span>
-        </label>
+        <Switch
+          checked={props.prefs.aiEnabled}
+          disabled={enCours || props.prefs.aiDisabledBy === 'platform'}
+          onChange={(v) => void appliquer(() => morningBriefApi.setAiEnabled(v))}
+          label="Permettre l’explication par l’IA pour toute l’organisation"
+          {...(props.prefs.aiDisabledBy === 'platform'
+            ? {
+                description: 'Actuellement désactivée par Lalanda pour toutes les organisations.',
+              }
+            : {})}
+        />
       ) : null}
       {erreur ? (
         <p role="alert" className="text-sm text-[var(--danger)]">

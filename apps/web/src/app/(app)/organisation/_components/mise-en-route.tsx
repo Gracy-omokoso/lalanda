@@ -17,6 +17,7 @@ import type {
 import { isDeferrableStep } from '@lalanda/shared/organization-setup';
 import {
   buttonClasses,
+  Checkbox,
   Modal,
   MODULES,
   PageHeader,
@@ -581,12 +582,7 @@ function ChoixModules(): React.ReactElement {
               key={m}
               className={`flex cursor-pointer items-start gap-3 rounded-[var(--radius-lg)] border p-4 transition-colors ${coche ? 'border-[var(--accent)] bg-[var(--accent-soft)]' : 'border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border-strong)]'}`}
             >
-              <input
-                type="checkbox"
-                checked={coche}
-                onChange={() => basculer(m)}
-                className="mt-1 h-4 w-4 accent-[var(--accent)]"
-              />
+              <Checkbox checked={coche} onChange={() => basculer(m)} className="mt-0.5" />
               <span className="flex flex-col gap-0.5">
                 <span className="text-sm font-semibold">
                   <span className={`font-mono tracking-[0.08em] ${COULEUR_MODULE[m]}`}>

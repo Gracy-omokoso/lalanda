@@ -13,6 +13,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
+import { Select } from '@lalanda/ui';
 import { PLATFORM_MIRROR_ACTOR_ID, PLATFORM_MIRROR_ACTOR_LABEL } from '@lalanda/shared/platform';
 
 import { api, type AuditEventView } from '@/lib/api';
@@ -77,26 +78,23 @@ export function AuditPanel(): React.ReactElement {
         <p className="max-w-xl text-sm text-[var(--foreground-muted)]">
           Qui a fait quoi, sur quoi, et quand. Le journal ne se modifie pas : chaque ligne y reste.
         </p>
-        <div className="flex flex-col gap-1">
+        <div className="flex w-full flex-col gap-1 sm:w-72">
           <label
             htmlFor="filtre-action"
             className="font-mono text-[0.62rem] font-medium uppercase tracking-[0.1em] text-[var(--foreground-muted)]"
           >
             Filtrer par action
           </label>
-          <select
+          <Select
             id="filtre-action"
             value={filtre}
-            onChange={(e) => setFiltre(e.target.value)}
-            className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)]"
-          >
-            <option value="">Toutes les actions</option>
-            {actions.map((a) => (
-              <option key={a} value={a}>
-                {a}
-              </option>
-            ))}
-          </select>
+            onChange={setFiltre}
+            options={[
+              { value: '', label: 'Toutes les actions' },
+              ...actions.map((a) => ({ value: a, label: a })),
+            ]}
+            searchPlaceholder="Rechercher une action…"
+          />
         </div>
       </div>
 

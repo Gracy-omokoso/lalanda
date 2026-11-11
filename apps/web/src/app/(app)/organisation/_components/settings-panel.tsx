@@ -10,6 +10,7 @@
 // profit de l'identité visuelle (ADR-0028, décision ouverte n° 6, 21 oct. 2026).
 // Une valeur déjà enregistrée reste en base, sans être affichée ni modifiée.
 
+import { Field, FormGrid, Select, SubmitButton, TextInput } from '@lalanda/ui';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -110,59 +111,56 @@ export function SettingsPanel(): React.ReactElement {
         {notice ?? ''}
       </span>
 
-      <Champ
-        id="org-nom"
-        label="Nom de l’organisation"
-        aide="Affiché dans l’application, les rapports et les invitations."
-      >
-        <input
+      <FormGrid>
+        <Field
           id="org-nom"
-          value={nom}
-          onChange={(e) => setNom(e.target.value)}
-          maxLength={100}
-          required
-          aria-describedby="org-nom-aide"
-          className={CHAMP}
-        />
-      </Champ>
+          label="Nom de l’organisation"
+          size="lg"
+          hint="Affiché dans l’application, les rapports et les invitations."
+        >
+          <TextInput
+            value={nom}
+            onChange={(e) => setNom(e.target.value)}
+            maxLength={100}
+            required
+          />
+        </Field>
 
-      <Champ
-        id="org-pays"
-        label="Pays par défaut"
-        aide="Code ISO à deux lettres (CD pour la RDC). Sert de valeur par défaut aux nouvelles initiatives ; les initiatives existantes gardent la leur."
-      >
-        <input
+        <Field
           id="org-pays"
-          value={pays}
-          onChange={(e) => setPays(e.target.value.toUpperCase())}
-          maxLength={2}
-          minLength={2}
-          required
-          aria-describedby="org-pays-aide"
-          className={`${CHAMP} uppercase`}
-        />
-      </Champ>
+          label="Pays par défaut"
+          size="xs"
+          newRow
+          hint="Code ISO à deux lettres (CD pour la RDC). Sert de valeur par défaut aux nouvelles initiatives ; les initiatives existantes gardent la leur."
+        >
+          <TextInput
+            value={pays}
+            onChange={(e) => setPays(e.target.value.toUpperCase())}
+            maxLength={2}
+            minLength={2}
+            required
+            className="uppercase"
+          />
+        </Field>
 
-      <Champ
-        id="org-devise"
-        label="Devise d’affichage par défaut"
-        aide="N’altère aucun chiffre déjà validé : un plan figé reste retrouvable à l’identique."
-      >
-        <select
+        <Field
           id="org-devise"
-          value={devise}
-          onChange={(e) => setDevise(e.target.value as DisplayCurrency)}
-          aria-describedby="org-devise-aide"
-          className={CHAMP}
+          label="Devise d’affichage par défaut"
+          size="sm"
+          newRow
+          hint="N’altère aucun chiffre déjà validé : un plan figé reste retrouvable à l’identique."
         >
           {/* Liste servie par l'API — l'interface ne la code pas en dur. */}
-          {(vue?.options.currencies ?? [devise]).map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-      </Champ>
+          <Select<DisplayCurrency>
+            value={devise}
+            onChange={setDevise}
+            options={(vue?.options.currencies ?? [devise]).map((c) => ({
+              value: c as DisplayCurrency,
+              label: c,
+            }))}
+          />
+        </Field>
+      </FormGrid>
 
       {/* L'ancien champ « Logo (URL) » est retiré (ADR-0028, décision ouverte n° 6) :
           le logo se gère dans l'identité visuelle, qui le joint aux factures. */}
@@ -175,13 +173,15 @@ export function SettingsPanel(): React.ReactElement {
       </p>
 
       <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="submit"
-          disabled={occupe}
-          className="rounded-md border border-[var(--border-strong)] px-4 py-2 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-50"
+        <SubmitButton
+          variant="secondary"
+          showShortcut={false}
+          busy={occupe}
+          busyLabel="Enregistrement…"
+          className="max-sm:h-11 max-sm:w-full"
         >
-          {occupe ? 'Enregistrement…' : 'Enregistrer'}
-        </button>
+          Enregistrer
+        </SubmitButton>
         <span className="fig text-xs text-[var(--foreground-muted)]">
           {vue?.updatedAt
             ? `Dernière modification : ${formatDateHeure(vue.updatedAt)}`
@@ -190,33 +190,5 @@ export function SettingsPanel(): React.ReactElement {
         </span>
       </div>
     </form>
-  );
-}
-
-const CHAMP =
-  'w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)] disabled:opacity-50';
-
-/** Champ étiqueté avec son aide reliée par `aria-describedby` (docs/04). */
-function Champ({
-  id,
-  label,
-  aide,
-  children,
-}: {
-  id: string;
-  label: string;
-  aide: string;
-  children: React.ReactNode;
-}): React.ReactElement {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-medium">
-        {label}
-      </label>
-      {children}
-      <p id={`${id}-aide`} className="text-xs text-[var(--foreground-muted)]">
-        {aide}
-      </p>
-    </div>
   );
 }

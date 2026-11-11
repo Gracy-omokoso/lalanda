@@ -11,6 +11,15 @@
 // concordance avec le NIF que la DGI renvoie au test d'un jeton. L'interface
 // ne prétend donc pas valider un NIF.
 
+import {
+  Field,
+  FormSection,
+  PhoneInput,
+  Select,
+  SubmitButton,
+  Switch,
+  TextInput,
+} from '@lalanda/ui';
 import { useCallback, useEffect, useState } from 'react';
 
 import { api, type FiscalLegalForm, type FiscalProfileView } from '@/lib/api';
@@ -183,272 +192,219 @@ export function FiscalProfilePanel({
           </div>
         ) : null}
 
-        <fieldset className="flex flex-col gap-4">
-          <legend className="mb-2 text-sm font-semibold">Identité</legend>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Champ id="fp-legalName" label="Dénomination" requis erreur={champs.legalName}>
-              <input
-                id="fp-legalName"
-                value={form.legalName}
-                onChange={(e) => maj('legalName', e.target.value)}
-                maxLength={200}
-                required
-                className={CHAMP}
-                {...aria('fp-legalName', champs.legalName)}
-              />
-            </Champ>
-            <Champ
-              id="fp-tradeName"
-              label="Enseigne"
-              aide="Facultatif. Le nom commercial, s’il diffère de la dénomination."
-              erreur={champs.tradeName}
+        <FormSection title="Identité">
+          <Field id="fp-legalName" label="Dénomination" required size="lg" error={champs.legalName}>
+            <TextInput
+              value={form.legalName}
+              onChange={(e) => maj('legalName', e.target.value)}
+              maxLength={200}
+              required
+            />
+          </Field>
+          <Field
+            id="fp-tradeName"
+            label="Enseigne"
+            optional
+            size="lg"
+            newRow
+            hint="Le nom commercial, s’il diffère de la dénomination."
+            error={champs.tradeName}
+          >
+            <TextInput
+              value={form.tradeName}
+              onChange={(e) => maj('tradeName', e.target.value)}
+              maxLength={200}
+            />
+          </Field>
+          <Field
+            id="fp-legalForm"
+            label="Forme juridique"
+            optional
+            size="md"
+            newRow
+            error={champs.legalForm}
+          >
+            {/* Liste servie par l'API — l'interface ne la code pas en dur. */}
+            <Select<FiscalLegalForm | ''>
+              value={form.legalForm}
+              onChange={(v) => maj('legalForm', v)}
+              options={[
+                { value: '', label: 'Non précisée' },
+                ...formes.map((f) => ({ value: f.value, label: f.label })),
+              ]}
+            />
+          </Field>
+          {form.legalForm === 'autre' ? (
+            <Field
+              id="fp-legalFormOther"
+              label="Précisez la forme juridique"
+              required
+              size="md"
+              error={champs.legalFormOther}
             >
-              <input
-                id="fp-tradeName"
-                value={form.tradeName}
-                onChange={(e) => maj('tradeName', e.target.value)}
-                maxLength={200}
-                className={CHAMP}
-                {...aria('fp-tradeName', champs.tradeName, true)}
-              />
-            </Champ>
-            <Champ
-              id="fp-legalForm"
-              label="Forme juridique"
-              aide="Facultatif."
-              erreur={champs.legalForm}
-            >
-              <select
-                id="fp-legalForm"
-                value={form.legalForm}
-                onChange={(e) => maj('legalForm', e.target.value as FiscalLegalForm | '')}
-                className={CHAMP}
-                {...aria('fp-legalForm', champs.legalForm, true)}
-              >
-                <option value="">Non précisée</option>
-                {/* Liste servie par l'API — l'interface ne la code pas en dur. */}
-                {formes.map((f) => (
-                  <option key={f.value} value={f.value}>
-                    {f.label}
-                  </option>
-                ))}
-              </select>
-            </Champ>
-            {form.legalForm === 'autre' ? (
-              <Champ
-                id="fp-legalFormOther"
-                label="Précisez la forme juridique"
-                requis
-                erreur={champs.legalFormOther}
-              >
-                <input
-                  id="fp-legalFormOther"
-                  value={form.legalFormOther}
-                  onChange={(e) => maj('legalFormOther', e.target.value)}
-                  maxLength={100}
-                  required
-                  className={CHAMP}
-                  {...aria('fp-legalFormOther', champs.legalFormOther)}
-                />
-              </Champ>
-            ) : null}
-          </div>
-        </fieldset>
-
-        <fieldset className="flex flex-col gap-4">
-          <legend className="mb-2 text-sm font-semibold">Identifiants</legend>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Champ
-              id="fp-nif"
-              label="NIF"
-              requis
-              aide={
-                nifVerrouille
-                  ? 'Verrouillé tant que la facture normalisée est activée. Désactivez-la pour le modifier.'
-                  : 'Numéro d’identification fiscale. Les espaces et tirets sont retirés à l’enregistrement.'
-              }
-              erreur={champs.nif}
-            >
-              <input
-                id="fp-nif"
-                value={form.nif}
-                onChange={(e) => maj('nif', e.target.value)}
-                readOnly={nifVerrouille}
-                aria-readonly={nifVerrouille}
-                maxLength={40}
-                required
-                autoComplete="off"
-                spellCheck={false}
-                className={`${CHAMP} font-mono uppercase ${nifVerrouille ? 'opacity-70' : ''}`}
-                {...aria('fp-nif', champs.nif, true)}
-              />
-            </Champ>
-            <Champ id="fp-rccm" label="RCCM" aide="Facultatif." erreur={champs.rccm}>
-              <input
-                id="fp-rccm"
-                value={form.rccm}
-                onChange={(e) => maj('rccm', e.target.value)}
-                maxLength={64}
-                className={CHAMP}
-                {...aria('fp-rccm', champs.rccm, true)}
-              />
-            </Champ>
-            <Champ
-              id="fp-nationalId"
-              label="Identification nationale"
-              aide="Facultatif."
-              erreur={champs.nationalId}
-            >
-              <input
-                id="fp-nationalId"
-                value={form.nationalId}
-                onChange={(e) => maj('nationalId', e.target.value)}
-                maxLength={64}
-                className={CHAMP}
-                {...aria('fp-nationalId', champs.nationalId, true)}
-              />
-            </Champ>
-            <div className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium">Assujettie à la TVA</span>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={form.vatRegistered}
-                  onChange={(e) => maj('vatRegistered', e.target.checked)}
-                  className="h-4 w-4"
-                />
-                Oui, l’organisation est assujettie à la TVA
-              </label>
-              {champs.vatRegistered ? (
-                <p className="text-xs text-[var(--danger)]">{champs.vatRegistered}</p>
-              ) : null}
-            </div>
-          </div>
-        </fieldset>
-
-        <fieldset className="flex flex-col gap-4">
-          <legend className="mb-2 text-sm font-semibold">Siège</legend>
-          <p className="-mt-2 text-xs text-[var(--foreground-muted)]">
-            L’adresse du siège. Celle de chaque lieu de vente est celle que la DGI associe à son
-            e-MCF.
-          </p>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Champ id="fp-line1" label="Adresse" requis erreur={champs.line1}>
-              <input
-                id="fp-line1"
-                value={form.line1}
-                onChange={(e) => maj('line1', e.target.value)}
-                maxLength={200}
-                required
-                autoComplete="address-line1"
-                className={CHAMP}
-                {...aria('fp-line1', champs.line1)}
-              />
-            </Champ>
-            <Champ id="fp-line2" label="Complément" aide="Facultatif." erreur={champs.line2}>
-              <input
-                id="fp-line2"
-                value={form.line2}
-                onChange={(e) => maj('line2', e.target.value)}
-                maxLength={200}
-                autoComplete="address-line2"
-                className={CHAMP}
-                {...aria('fp-line2', champs.line2, true)}
-              />
-            </Champ>
-            <Champ id="fp-commune" label="Commune" aide="Facultatif." erreur={champs.commune}>
-              <input
-                id="fp-commune"
-                value={form.commune}
-                onChange={(e) => maj('commune', e.target.value)}
-                maxLength={100}
-                className={CHAMP}
-                {...aria('fp-commune', champs.commune, true)}
-              />
-            </Champ>
-            <Champ id="fp-city" label="Ville" requis erreur={champs.city}>
-              <input
-                id="fp-city"
-                value={form.city}
-                onChange={(e) => maj('city', e.target.value)}
+              <TextInput
+                value={form.legalFormOther}
+                onChange={(e) => maj('legalFormOther', e.target.value)}
                 maxLength={100}
                 required
-                autoComplete="address-level2"
-                className={CHAMP}
-                {...aria('fp-city', champs.city)}
               />
-            </Champ>
-            <Champ id="fp-province" label="Province" aide="Facultatif." erreur={champs.province}>
-              <input
-                id="fp-province"
-                value={form.province}
-                onChange={(e) => maj('province', e.target.value)}
-                maxLength={100}
-                className={CHAMP}
-                {...aria('fp-province', champs.province, true)}
-              />
-            </Champ>
-            <Champ
-              id="fp-country"
-              label="Pays"
-              requis
-              aide="Code ISO à deux lettres (CD pour la RDC). La facture normalisée exige un siège en RDC."
-              erreur={champs.country}
-            >
-              <input
-                id="fp-country"
-                value={form.country}
-                onChange={(e) => maj('country', e.target.value.toUpperCase())}
-                maxLength={2}
-                required
-                className={`${CHAMP} uppercase`}
-                {...aria('fp-country', champs.country, true)}
-              />
-            </Champ>
-          </div>
-        </fieldset>
+            </Field>
+          ) : null}
+        </FormSection>
 
-        <fieldset className="flex flex-col gap-4">
-          <legend className="mb-2 text-sm font-semibold">Contact</legend>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Champ id="fp-phone" label="Téléphone" requis erreur={champs.phone}>
-              <input
-                id="fp-phone"
-                type="tel"
-                value={form.phone}
-                onChange={(e) => maj('phone', e.target.value)}
-                maxLength={20}
-                required
-                autoComplete="tel"
-                placeholder="+243 …"
-                className={CHAMP}
-                {...aria('fp-phone', champs.phone)}
-              />
-            </Champ>
-            <Champ id="fp-email" label="Adresse e-mail" requis erreur={champs.email}>
-              <input
-                id="fp-email"
-                type="email"
-                value={form.email}
-                onChange={(e) => maj('email', e.target.value)}
-                maxLength={254}
-                required
-                autoComplete="email"
-                className={CHAMP}
-                {...aria('fp-email', champs.email)}
-              />
-            </Champ>
-          </div>
-        </fieldset>
+        <FormSection title="Identifiants">
+          <Field
+            id="fp-nif"
+            label="NIF"
+            required
+            size="sm"
+            hint={
+              nifVerrouille
+                ? 'Verrouillé tant que la facture normalisée est activée. Désactivez-la pour le modifier.'
+                : 'Numéro d’identification fiscale. Les espaces et tirets sont retirés à l’enregistrement.'
+            }
+            error={champs.nif}
+          >
+            <TextInput
+              value={form.nif}
+              onChange={(e) => maj('nif', e.target.value)}
+              readOnly={nifVerrouille}
+              aria-readonly={nifVerrouille}
+              maxLength={40}
+              required
+              autoComplete="off"
+              spellCheck={false}
+              className="font-mono uppercase"
+            />
+          </Field>
+          <Field id="fp-rccm" label="RCCM" optional size="md" error={champs.rccm}>
+            <TextInput
+              value={form.rccm}
+              onChange={(e) => maj('rccm', e.target.value)}
+              maxLength={64}
+            />
+          </Field>
+          <Field
+            id="fp-nationalId"
+            label="Identification nationale"
+            optional
+            size="md"
+            error={champs.nationalId}
+          >
+            <TextInput
+              value={form.nationalId}
+              onChange={(e) => maj('nationalId', e.target.value)}
+              maxLength={64}
+            />
+          </Field>
+          <Field
+            id="fp-vat"
+            label="Assujettie à la TVA"
+            size="full"
+            newRow
+            error={champs.vatRegistered}
+          >
+            <Switch
+              checked={form.vatRegistered}
+              onChange={(v) => maj('vatRegistered', v)}
+              label="Oui, l’organisation est assujettie à la TVA"
+            />
+          </Field>
+        </FormSection>
+
+        <FormSection
+          title="Siège"
+          description="L’adresse du siège. Celle de chaque lieu de vente est celle que la DGI associe à son e-MCF."
+        >
+          <Field id="fp-line1" label="Adresse" required size="full" error={champs.line1}>
+            <TextInput
+              value={form.line1}
+              onChange={(e) => maj('line1', e.target.value)}
+              maxLength={200}
+              required
+              autoComplete="address-line1"
+            />
+          </Field>
+          <Field id="fp-line2" label="Complément" optional size="full" error={champs.line2}>
+            <TextInput
+              value={form.line2}
+              onChange={(e) => maj('line2', e.target.value)}
+              maxLength={200}
+              autoComplete="address-line2"
+            />
+          </Field>
+          <Field id="fp-commune" label="Commune" optional size="md" error={champs.commune}>
+            <TextInput
+              value={form.commune}
+              onChange={(e) => maj('commune', e.target.value)}
+              maxLength={100}
+            />
+          </Field>
+          <Field id="fp-city" label="Ville" required size="md" error={champs.city}>
+            <TextInput
+              value={form.city}
+              onChange={(e) => maj('city', e.target.value)}
+              maxLength={100}
+              required
+              autoComplete="address-level2"
+            />
+          </Field>
+          <Field id="fp-province" label="Province" optional size="md" error={champs.province}>
+            <TextInput
+              value={form.province}
+              onChange={(e) => maj('province', e.target.value)}
+              maxLength={100}
+            />
+          </Field>
+          <Field
+            id="fp-country"
+            label="Pays"
+            required
+            size="xs"
+            hint="Code ISO à deux lettres (CD pour la RDC). La facture normalisée exige un siège en RDC."
+            error={champs.country}
+          >
+            <TextInput
+              value={form.country}
+              onChange={(e) => maj('country', e.target.value.toUpperCase())}
+              maxLength={2}
+              required
+              className="uppercase"
+            />
+          </Field>
+        </FormSection>
+
+        <FormSection title="Contact">
+          <Field id="fp-phone" label="Téléphone" required size="md" error={champs.phone}>
+            <PhoneInput
+              value={form.phone}
+              onChange={(v) => maj('phone', v)}
+              maxLength={20}
+              required
+            />
+          </Field>
+          <Field id="fp-email" label="Adresse e-mail" required size="md" error={champs.email}>
+            <TextInput
+              type="email"
+              value={form.email}
+              onChange={(e) => maj('email', e.target.value)}
+              maxLength={254}
+              required
+              autoComplete="email"
+            />
+          </Field>
+        </FormSection>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-          <button
-            type="submit"
-            disabled={occupe}
-            className="rounded-md border border-[var(--border-strong)] px-4 py-2 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-50"
+          <SubmitButton
+            variant="secondary"
+            showShortcut={false}
+            busy={occupe}
+            busyLabel="Enregistrement…"
+            className="max-sm:h-11 max-sm:w-full"
           >
-            {occupe ? 'Enregistrement…' : 'Enregistrer la fiche'}
-          </button>
+            Enregistrer la fiche
+          </SubmitButton>
           <span className="fig text-xs text-[var(--foreground-muted)]">
             {vue?.profile?.updatedAt
               ? `Dernière modification : ${formatDateHeure(vue.profile.updatedAt)}`
@@ -460,63 +416,5 @@ export function FiscalProfilePanel({
         </div>
       </form>
     </section>
-  );
-}
-
-const CHAMP =
-  'w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)] aria-[invalid=true]:border-[var(--danger)] disabled:opacity-50';
-
-/** `aria-invalid` et `aria-describedby` reliant l'aide et l'erreur du champ. */
-function aria(
-  id: string,
-  erreur: string | undefined,
-  avecAide = false,
-): { 'aria-invalid'?: true; 'aria-describedby'?: string } {
-  const ids = [avecAide ? `${id}-aide` : null, erreur ? `${id}-erreur` : null].filter(Boolean);
-  return {
-    ...(erreur ? { 'aria-invalid': true as const } : {}),
-    ...(ids.length > 0 ? { 'aria-describedby': ids.join(' ') } : {}),
-  };
-}
-
-function Champ({
-  id,
-  label,
-  aide,
-  requis = false,
-  erreur,
-  children,
-}: {
-  id: string;
-  label: string;
-  aide?: string;
-  requis?: boolean;
-  erreur?: string | undefined;
-  children: React.ReactNode;
-}): React.ReactElement {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-medium">
-        {label}
-        {requis ? (
-          <span className="text-[var(--foreground-muted)]" aria-hidden="true">
-            {' '}
-            *
-          </span>
-        ) : null}
-        {requis ? <span className="sr-only"> (obligatoire)</span> : null}
-      </label>
-      {children}
-      {aide ? (
-        <p id={`${id}-aide`} className="text-xs text-[var(--foreground-muted)]">
-          {aide}
-        </p>
-      ) : null}
-      {erreur ? (
-        <p id={`${id}-erreur`} className="text-xs font-medium text-[var(--danger)]">
-          {erreur}
-        </p>
-      ) : null}
-    </div>
   );
 }

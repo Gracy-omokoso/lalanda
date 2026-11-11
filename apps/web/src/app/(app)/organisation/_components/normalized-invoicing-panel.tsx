@@ -13,7 +13,7 @@
 // - pour une erreur venant de la DGI, son code et son libellé sont montrés
 //   tels quels.
 
-import { Modal } from '@lalanda/ui';
+import { Field, Modal, TextArea } from '@lalanda/ui';
 import { Plus } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -131,8 +131,6 @@ const BOUTON =
   'rounded-md border border-[var(--border-strong)] px-4 py-2 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-50';
 const BOUTON_DANGER =
   'rounded-md border border-[var(--danger)]/60 px-4 py-2 text-sm font-medium text-[var(--danger)] transition hover:bg-[var(--danger-bg)] disabled:opacity-50';
-const ZONE =
-  'w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)]';
 
 /** Motif de 20 à 500 caractères, avec compteur annoncé. */
 function ChampMotif({
@@ -149,25 +147,27 @@ function ChampMotif({
   facultatif?: boolean;
 }) {
   const erreur = facultatif && valeur.trim() === '' ? null : erreurMotif(valeur);
+  // ADR-0074 : `Field` + `TextArea` ; l'aide garde le compteur et l'erreur
+  // (texte inchangé), reliée par `aria-describedby`.
   return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-medium">
-        {libelle}
-      </label>
-      <textarea
-        id={id}
+    <Field
+      id={id}
+      label={libelle}
+      size="full"
+      hint={
+        <>
+          {facultatif ? 'Facultatif. ' : ''}De 20 à 500 caractères — {valeur.trim().length} saisi
+          {valeur.trim().length > 1 ? 's' : ''}.{valeur.trim() !== '' && erreur ? ` ${erreur}` : ''}
+        </>
+      }
+    >
+      <TextArea
         value={valeur}
         onChange={(e) => onChange(e.target.value)}
         rows={3}
         maxLength={MOTIF_MAX}
-        aria-describedby={`${id}-aide`}
-        className={ZONE}
       />
-      <p id={`${id}-aide`} className="text-xs text-[var(--foreground-muted)]">
-        {facultatif ? 'Facultatif. ' : ''}De 20 à 500 caractères — {valeur.trim().length} saisi
-        {valeur.trim().length > 1 ? 's' : ''}.{valeur.trim() !== '' && erreur ? ` ${erreur}` : ''}
-      </p>
-    </div>
+    </Field>
   );
 }
 

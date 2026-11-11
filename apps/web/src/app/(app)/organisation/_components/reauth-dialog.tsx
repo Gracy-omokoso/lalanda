@@ -18,6 +18,7 @@
 // La boîte n'ouvre aucun droit : elle prouve seulement la présence de la
 // personne. Le serveur vérifie la fenêtre à chaque écriture.
 
+import { Button, Field, PasswordInput, SubmitButton } from '@lalanda/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api } from '@/lib/api';
@@ -185,39 +186,35 @@ function ReauthModal({
 
       {mode === 'password' ? (
         <form onSubmit={(e) => void confirmer(e)} className="mt-4 flex flex-col gap-3">
-          <label htmlFor="reauth-mdp" className="text-sm font-medium">
-            Mot de passe
-          </label>
-          <input
-            id="reauth-mdp"
-            type="password"
-            value={motDePasse}
-            onChange={(e) => setMotDePasse(e.target.value)}
-            autoComplete="current-password"
-            autoFocus
-            required
-            className="w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)]"
-          />
+          {/* ADR-0074 : `PasswordInput` (bouton « Afficher ») ; même requête
+              `POST /me/reauth`, rien d'autre n'est appelé. */}
+          <Field id="reauth-mdp" label="Mot de passe" size="full">
+            <PasswordInput
+              value={motDePasse}
+              onChange={(e) => setMotDePasse(e.target.value)}
+              autoComplete="current-password"
+              autoFocus
+              required
+            />
+          </Field>
           {erreur ? (
             <p role="alert" className="text-sm text-[var(--danger)]">
               {erreur}
             </p>
           ) : null}
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={() => onFermer(false)}
-              className="rounded-md border border-[var(--border)] px-4 py-2 text-sm"
-            >
+            <Button onClick={() => onFermer(false)} className="max-sm:h-11">
               Annuler
-            </button>
-            <button
-              type="submit"
-              disabled={envoi || motDePasse === ''}
-              className="rounded-md border border-[var(--accent)] bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--accent-foreground)] transition disabled:opacity-50"
+            </Button>
+            <SubmitButton
+              showShortcut={false}
+              busy={envoi}
+              busyLabel="Vérification…"
+              disabled={motDePasse === ''}
+              className="max-sm:h-11"
             >
-              {envoi ? 'Vérification…' : 'Confirmer et poursuivre'}
-            </button>
+              Confirmer et poursuivre
+            </SubmitButton>
           </div>
         </form>
       ) : (

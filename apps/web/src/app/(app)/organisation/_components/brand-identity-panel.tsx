@@ -8,6 +8,7 @@
 // remplacé n'est pas effacé : les documents déjà émis le gardent (réimpression à
 // l'identique). Le 403 d'un rôle sans droit est un état expliqué, pas une panne.
 
+import { Field, Select, TextInput } from '@lalanda/ui';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -26,8 +27,6 @@ import {
 } from './brand-model';
 import { estRefus, formatDateHeure, messageErreur } from './organization-model';
 
-const CHAMP =
-  'w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)] disabled:opacity-50';
 const BOUTON =
   'rounded-md border border-[var(--border-strong)] px-3 py-1.5 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-50';
 const CARTE = 'flex flex-col gap-3 rounded-xl border border-[var(--border)] p-4';
@@ -544,28 +543,22 @@ export function BrandIdentityPanel(): React.ReactElement {
           valeur={secondaire}
           onChange={setSecondaire}
         />
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="brand-police" className="text-sm font-medium">
-            Police
-          </label>
-          <select
-            id="brand-police"
+        <Field
+          id="brand-police"
+          label="Police"
+          size="md"
+          className="max-w-sm"
+          hint="Polices libres (licence OFL) intégrées aux PDF : le rendu est identique partout."
+        >
+          <Select
             value={police}
-            onChange={(e) => setPolice(e.target.value)}
-            aria-describedby="brand-police-aide"
-            className={CHAMP}
-          >
-            <option value="">Celle du modèle</option>
-            {vue.fonts.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.label}
-              </option>
-            ))}
-          </select>
-          <p id="brand-police-aide" className="text-xs text-[var(--foreground-muted)]">
-            Polices libres (licence OFL) intégrées aux PDF : le rendu est identique partout.
-          </p>
-        </div>
+            onChange={setPolice}
+            options={[
+              { value: '', label: 'Celle du modèle' },
+              ...vue.fonts.map((f) => ({ value: f.id, label: f.label })),
+            ]}
+          />
+        </Field>
         <div className="flex flex-wrap items-center gap-3">
           <button type="submit" disabled={occupe !== null} className={BOUTON}>
             {occupe === 'identite' ? 'Enregistrement…' : 'Enregistrer'}
@@ -839,7 +832,7 @@ function ChampCouleur({
           onChange={(e) => onChange(e.target.value)}
           className="h-9 w-12 cursor-pointer rounded border border-[var(--border)] bg-transparent"
         />
-        <input
+        <TextInput
           id={id}
           value={valeur}
           onChange={(e) => onChange(e.target.value)}
@@ -847,7 +840,7 @@ function ChampCouleur({
           maxLength={7}
           aria-describedby={`${id}-aide`}
           aria-invalid={valide === undefined}
-          className={`${CHAMP} max-w-[10rem] font-mono uppercase`}
+          className="max-w-[10rem] font-mono uppercase"
         />
         {valeur !== '' ? (
           <button type="button" className={BOUTON} onClick={() => onChange('')}>

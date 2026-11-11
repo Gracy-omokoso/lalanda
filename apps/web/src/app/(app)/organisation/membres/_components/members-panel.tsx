@@ -14,6 +14,7 @@
 // la fiche des autorisations du membre (`MemberPermissionsPanel`). Changer le
 // titre efface l'écart : l'écran prévient avant de confirmer (décision n° 1).
 
+import { Button, EntityPicker, Switch, correspondRecherche } from '@lalanda/ui';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
@@ -231,30 +232,21 @@ export function MembersPanel({
                 </div>
 
                 {afficheDroitCloture(m) ? (
-                  <label className="flex items-start gap-2 text-xs sm:max-w-xs">
-                    <input
-                      type="checkbox"
-                      checked={m.canClosePeriods}
-                      disabled={motifRole !== null || occupe}
-                      onChange={(e) =>
-                        void ecrire(
-                          m.userId,
-                          e.target.checked
-                            ? 'Droit de clôture accordé.'
-                            : 'Droit de clôture retiré.',
-                          () => api.setMemberCloseRight(orgId, m.userId, e.target.checked),
-                        )
-                      }
-                      className="mt-0.5"
-                    />
-                    <span>
-                      <span className="font-medium">Autoriser la clôture des périodes</span>
-                      <span className="block text-[var(--foreground-muted)]">
-                        Droit accordé au cas par cas, refusé par défaut. Seul le Comptable peut le
-                        recevoir.
-                      </span>
-                    </span>
-                  </label>
+                  // ADR-0074 : le droit s'applique tel quel → interrupteur.
+                  <Switch
+                    className="sm:max-w-xs"
+                    checked={m.canClosePeriods}
+                    disabled={motifRole !== null || occupe}
+                    onChange={(coche) =>
+                      void ecrire(
+                        m.userId,
+                        coche ? 'Droit de clôture accordé.' : 'Droit de clôture retiré.',
+                        () => api.setMemberCloseRight(orgId, m.userId, coche),
+                      )
+                    }
+                    label="Autoriser la clôture des périodes"
+                    description="Droit accordé au cas par cas, refusé par défaut. Seul le Comptable peut le recevoir."
+                  />
                 ) : null}
               </div>
 
@@ -351,28 +343,34 @@ function TransferBlock({
           <label htmlFor="transfert-cible" className="sr-only">
             Nouveau propriétaire
           </label>
-          <select
-            id="transfert-cible"
-            value={choix}
-            disabled={occupe}
-            onChange={(e) => setChoix(e.target.value)}
-            className="flex-1 rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)] disabled:opacity-50"
-          >
-            <option value="">Choisir un membre…</option>
-            {cibles.map((c) => (
-              <option key={c.userId} value={c.userId}>
-                {nomAffiche(c)} — {c.roleLabel}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            disabled={choix === '' || occupe}
+          {/* ADR-0074 : membre existant → `EntityPicker` sur la liste chargée, sans
+              « + » (un membre s'invite, il ne se crée pas ici). */}
+          <div className="min-w-0 flex-1">
+            <EntityPicker<MemberView>
+              id="transfert-cible"
+              value={cibles.find((c) => c.userId === choix) ?? null}
+              onChange={(c) => setChoix(c?.userId ?? '')}
+              search={async (q) =>
+                cibles.filter((c) => correspondRecherche([nomAffiche(c), c.email, c.roleLabel], q))
+              }
+              refreshKey={cibles.length}
+              getKey={(c) => c.userId}
+              getLabel={(c) => nomAffiche(c)}
+              getDescription={(c) => c.roleLabel}
+              placeholder="Choisir un membre…"
+              disabled={occupe}
+              debounceMs={0}
+              emptyText="Aucun membre ne correspond."
+            />
+          </div>
+          <Button
+            disabled={choix === ''}
+            busy={occupe}
             onClick={() => onTransfer(choix)}
-            className="rounded-md border border-[var(--border-strong)] px-4 py-2 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-50"
+            className="max-sm:h-11"
           >
             {occupe ? 'Transfert…' : 'Transférer'}
-          </button>
+          </Button>
         </div>
       )}
     </div>

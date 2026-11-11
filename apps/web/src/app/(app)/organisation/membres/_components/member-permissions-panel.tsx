@@ -16,6 +16,7 @@
 // Tout se joue au clavier (cases natives, boutons natifs) et sur une colonne
 // sur téléphone.
 
+import { Checkbox, Field, TextInput } from '@lalanda/ui';
 import { useEffect, useMemo, useState } from 'react';
 
 import type { OrgAction } from '@/lib/api';
@@ -114,14 +115,13 @@ export function GrilleAutorisations({
                 <li key={ligne.action} className="flex flex-col gap-0.5 text-sm">
                   <div className="flex items-start justify-between gap-2">
                     <label htmlFor={id} className="flex min-w-0 items-start gap-2">
-                      <input
+                      <Checkbox
                         id={id}
-                        type="checkbox"
                         checked={ligne.coche}
                         disabled={indisponible}
                         aria-describedby={indisponible ? `${id}-raison` : undefined}
                         onChange={() => onBasculer?.(ligne.action)}
-                        className="mt-1 h-4 w-4 shrink-0"
+                        className="mt-0.5 shrink-0"
                       />
                       <span className={indisponible ? 'text-[var(--foreground-muted)]' : undefined}>
                         {libelle}
@@ -300,17 +300,15 @@ export function MemberPermissionsPanel({
               Cochez ou décochez une autorisation, puis cliquez sur « Enregistrer ».
             </p>
           )}
-          <label htmlFor={`${idPrefixe}-motif`} className="text-xs font-medium">
-            Motif (facultatif, visible dans le journal d’audit)
-          </label>
-          <input
+          <Field
             id={`${idPrefixe}-motif`}
-            type="text"
-            maxLength={280}
-            value={motif}
-            onChange={(e) => setMotif(e.target.value)}
-            className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)]"
-          />
+            label="Motif"
+            optional
+            size="full"
+            hint="Visible dans le journal d’audit."
+          >
+            <TextInput maxLength={280} value={motif} onChange={(e) => setMotif(e.target.value)} />
+          </Field>
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <button
               type="button"

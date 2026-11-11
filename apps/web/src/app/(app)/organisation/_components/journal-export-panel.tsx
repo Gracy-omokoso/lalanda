@@ -5,6 +5,7 @@
 // lignes, totaux par groupe, éléments DGI et l'état de vérification de la
 // chaîne ; échanges avec l'e-MCF. Réservé à `fiscal.manage` (comme l'onglet).
 
+import { DatePicker, Field, FormGrid, Select, SubmitButton } from '@lalanda/ui';
 import { useState } from 'react';
 
 import { api } from '@/lib/api';
@@ -18,11 +19,6 @@ import {
   requeteExport,
 } from './journal-export-model';
 import { messageFiscal } from './fiscal-model';
-
-const BOUTON =
-  'rounded-md border border-[var(--border-strong)] px-4 py-2 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-50';
-const CHAMP =
-  'rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm outline-none transition focus:border-[var(--accent)]';
 
 function telecharger(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
@@ -73,59 +69,55 @@ export function JournalExportPanel(): React.ReactElement {
         </p>
       </div>
       <form
-        className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end"
+        className="flex flex-col gap-3"
         onSubmit={(e) => {
           e.preventDefault();
           void exporter();
         }}
         noValidate
       >
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="export-du" className="text-sm">
-            Du
-          </label>
-          <input
-            id="export-du"
-            type="date"
-            value={periode.from}
-            onChange={(e) => setPeriode((p) => ({ ...p, from: e.target.value }))}
-            className={CHAMP}
-            aria-describedby={erreurDates ? 'export-erreur-dates' : undefined}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="export-au" className="text-sm">
-            Au (inclus)
-          </label>
-          <input
-            id="export-au"
-            type="date"
-            value={periode.to}
-            onChange={(e) => setPeriode((p) => ({ ...p, to: e.target.value }))}
-            className={CHAMP}
-            aria-describedby={erreurDates ? 'export-erreur-dates' : undefined}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="export-format" className="text-sm">
-            Contenu
-          </label>
-          <select
-            id="export-format"
-            value={choix}
-            onChange={(e) => setChoix(e.target.value as ChoixExport)}
-            className={CHAMP}
+        <FormGrid>
+          <Field id="export-du" label="Du" size="sm">
+            <DatePicker
+              value={periode.from}
+              onChange={(v) => setPeriode((p) => ({ ...p, from: v }))}
+              {...(periode.to ? { max: periode.to } : {})}
+              shortcuts={['today']}
+              {...(erreurDates ? { 'aria-describedby': 'export-erreur-dates' } : {})}
+            />
+          </Field>
+          <Field id="export-au" label="Au (inclus)" size="sm">
+            <DatePicker
+              value={periode.to}
+              onChange={(v) => setPeriode((p) => ({ ...p, to: v }))}
+              {...(periode.from ? { min: periode.from } : {})}
+              shortcuts={['today', 'endOfMonth']}
+              {...(erreurDates ? { 'aria-describedby': 'export-erreur-dates' } : {})}
+            />
+          </Field>
+          <Field id="export-format" label="Contenu" size="md">
+            <Select<ChoixExport>
+              value={choix}
+              onChange={setChoix}
+              options={(Object.keys(LIBELLES_EXPORT) as ChoixExport[]).map((c) => ({
+                value: c,
+                label: LIBELLES_EXPORT[c],
+              }))}
+            />
+          </Field>
+        </FormGrid>
+        <div>
+          <SubmitButton
+            variant="secondary"
+            showShortcut={false}
+            busy={envoi}
+            busyLabel="Export en cours…"
+            disabled={erreurDates !== null}
+            className="max-sm:h-11 max-sm:w-full"
           >
-            {(Object.keys(LIBELLES_EXPORT) as ChoixExport[]).map((c) => (
-              <option key={c} value={c}>
-                {LIBELLES_EXPORT[c]}
-              </option>
-            ))}
-          </select>
+            Exporter le journal
+          </SubmitButton>
         </div>
-        <button type="submit" className={BOUTON} disabled={envoi || erreurDates !== null}>
-          {envoi ? 'Export en cours…' : 'Exporter le journal'}
-        </button>
       </form>
       {erreurDates ? (
         <p id="export-erreur-dates" className="text-xs font-medium text-[var(--danger)]">

@@ -10,6 +10,10 @@
 // « Chef de projet » existe dans la documentation, un utilisateur qui l'y a lu
 // doit comprendre pourquoi il ne peut pas le choisir, et non se demander s'il a
 // mal lu.
+//
+// ADR-0074 : `Select` de `@lalanda/ui` (options désactivées gardées).
+
+import { Select, type SelectOption } from '@lalanda/ui';
 
 import type { OrgRole, RoleOption } from '@/lib/api';
 
@@ -34,6 +38,12 @@ export function RoleSelect({
   ariaLabel,
 }: RoleSelectProps): React.ReactElement {
   const selected = options.find((o) => o.value === value) ?? null;
+  const choix: SelectOption<OrgRole>[] = options.map((o) => ({
+    value: o.value,
+    label: o.grantable ? o.label : `${o.label} — hors de votre portée`,
+    disabled: !o.grantable,
+  }));
+  const nom = label === null ? ariaLabel : undefined;
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -42,22 +52,16 @@ export function RoleSelect({
           {label}
         </label>
       )}
-      <select
+      <Select<OrgRole>
         id={id}
         value={value}
-        aria-label={label === null ? ariaLabel : undefined}
-        aria-describedby={selected ? `${id}-desc` : undefined}
+        onChange={onChange}
+        options={choix}
         disabled={disabled}
-        onChange={(e) => onChange(e.target.value as OrgRole)}
-        className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)] disabled:opacity-50"
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value} disabled={!o.grantable}>
-            {o.label}
-            {o.grantable ? '' : ' — hors de votre portée'}
-          </option>
-        ))}
-      </select>
+        searchable={false}
+        {...(nom ? { 'aria-label': nom } : {})}
+        {...(selected ? { 'aria-describedby': `${id}-desc` } : {})}
+      />
       {/* La description du rôle sélectionné, pas une liste : c'est au moment du
           choix qu'elle sert, et `aria-describedby` la lie au contrôle. */}
       <p id={`${id}-desc`} className="text-xs text-[var(--foreground-muted)]">

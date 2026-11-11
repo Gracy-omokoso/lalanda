@@ -32,7 +32,7 @@
 // interrupteur coupé (`false` explicite, ADR-0059), la grille est en lecture seule et
 // l'invitation part avec le titre seul.
 
-import { Modal, buttonClasses } from '@lalanda/ui';
+import { Field, Modal, SubmitButton, TextInput, buttonClasses } from '@lalanda/ui';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
 
@@ -226,20 +226,21 @@ export function InvitePanel({
             className="flex flex-col gap-4"
           >
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-              <div className="flex flex-1 flex-col gap-1.5">
-                <label htmlFor="invite-email" className="text-sm font-medium">
-                  Inviter une adresse email
-                </label>
-                <input
-                  id="invite-email"
+              <Field
+                id="invite-email"
+                label="Inviter une adresse email"
+                required
+                className="flex-1"
+              >
+                <TextInput
                   type="email"
                   required
+                  autoComplete="off"
                   placeholder="collegue@exemple.cd"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
                 />
-              </div>
+              </Field>
               <div className="sm:w-64">
                 <RoleSelect
                   id="invite-role"
@@ -250,13 +251,15 @@ export function InvitePanel({
                   disabled={busy !== null}
                 />
               </div>
-              <button
-                type="submit"
+              <SubmitButton
+                showShortcut={false}
+                busy={busy === 'creation'}
+                busyLabel="Envoi…"
                 disabled={busy !== null || email.trim() === ''}
-                className="rounded-md bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-[var(--accent-foreground)] transition hover:opacity-90 disabled:opacity-50 sm:mt-[1.65rem]"
+                className="max-sm:h-11 sm:mt-[1.65rem]"
               >
-                {busy === 'creation' ? 'Envoi…' : 'Inviter'}
-              </button>
+                Inviter
+              </SubmitButton>
             </div>
 
             {catalogue && ligne && params ? (
