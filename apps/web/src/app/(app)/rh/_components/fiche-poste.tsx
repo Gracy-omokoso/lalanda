@@ -4,13 +4,15 @@
 // vers un poste vacant du référentiel ou un nouveau poste numéroté. L'ancien poste
 // redevient vacant, l'historique des titulaires des deux postes est tenu à jour, le
 // matricule ne change jamais. L'API reste juge (poste vacant, dates, droits).
+//
+// ADR-0074 : poste en `Select` (groupe des vacants), date d'effet en `DatePicker`.
 
-import { buttonClasses } from '@lalanda/ui';
+import { Button, DatePicker, Field, FormGrid, Select, SubmitButton, TextInput } from '@lalanda/ui';
 import { useEffect, useId, useState } from 'react';
 
 import { hrLot1Api, type PositionView } from '@/lib/api-hr-lot1';
 
-import { Alerte, BOUTON_PETIT, CHAMP, Champ } from '../../ventes/_components/form-ui';
+import { Alerte } from '../../ventes/_components/form-ui';
 
 import { useFiche } from './fiche-chrome';
 import { corpsChangementPoste, optionPoste, type ChoixPoste } from './lot1-model';
@@ -73,70 +75,76 @@ export function ChangementPoste({
         Poste actuel : <strong>{fiche.positionNumber ?? '—'}</strong> · {fiche.jobTitle}. Matricule{' '}
         <strong>{fiche.employeeNumber ?? '—'}</strong> (inchangé).
       </p>
-      <Champ
-        id={`${id}-poste`}
-        label="Nouveau poste"
-        requis
-        aide="Poste vacant : même numéro de poste, la personne en devient titulaire. Nouveau poste : un numéro est attribué."
-      >
-        <select
+      <FormGrid>
+        <Field
           id={`${id}-poste`}
-          className={CHAMP}
-          value={choix}
-          onChange={(e) => setChoix(e.target.value as ChoixPoste)}
+          label="Nouveau poste"
+          required
+          size="lg"
+          hint="Poste vacant : même numéro de poste, la personne en devient titulaire. Nouveau poste : un numéro est attribué."
         >
-          <option value="">Choisir…</option>
-          <option value="new">Nouveau poste (numéro attribué)</option>
-          {vacants && vacants.length > 0 ? (
-            <optgroup label="Postes vacants">
-              {vacants.map((p) => (
-                <option key={p.id} value={`pos:${p.id}`}>
-                  {optionPoste(p)}
-                </option>
-              ))}
-            </optgroup>
-          ) : null}
-        </select>
-      </Champ>
-      <Champ
-        id={`${id}-date`}
-        label="Date d’effet"
-        requis
-        aide="Fin d’occupation de l’ancien poste et début du nouveau."
-      >
-        <input
+          <Select<ChoixPoste>
+            value={choix}
+            onChange={setChoix}
+            placeholder="Choisir…"
+            loading={vacants === null}
+            options={[
+              { value: 'new', label: 'Nouveau poste (numéro attribué)' },
+              ...(vacants ?? []).map((p) => ({
+                value: `pos:${p.id}` as ChoixPoste,
+                label: optionPoste(p),
+                group: 'Postes vacants',
+              })),
+            ]}
+          />
+        </Field>
+        <Field
           id={`${id}-date`}
-          type="date"
-          className={CHAMP}
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-        />
-      </Champ>
-      <Champ
-        id={`${id}-intitule`}
-        label="Intitulé affiché sur la fiche"
-        aide="Laissez vide : intitulé du poste vacant choisi, ou intitulé actuel pour un nouveau poste."
-      >
-        <input
+          label="Date d’effet"
+          required
+          size="sm"
+          newRow
+          hint="Fin d’occupation de l’ancien poste et début du nouveau."
+        >
+          <DatePicker
+            value={date}
+            onChange={setDate}
+            shortcuts={['today', 'endOfMonth', 'plus30']}
+          />
+        </Field>
+        <Field
           id={`${id}-intitule`}
-          className={CHAMP}
-          value={intitule}
-          maxLength={120}
-          onChange={(e) => setIntitule(e.target.value)}
-        />
-      </Champ>
+          label="Intitulé affiché sur la fiche"
+          optional
+          size="lg"
+          newRow
+          hint="Laissez vide : intitulé du poste vacant choisi, ou intitulé actuel pour un nouveau poste."
+        >
+          <TextInput
+            value={intitule}
+            maxLength={120}
+            onChange={(e) => setIntitule(e.target.value)}
+          />
+        </Field>
+      </FormGrid>
       {erreur ? (
         <Alerte>
           <p>{erreur}</p>
         </Alerte>
       ) : null}
-      <div className="flex justify-end gap-2">
-        <button type="button" className={BOUTON_PETIT} onClick={onAnnuler} disabled={envoi}>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <Button size="sm" onClick={onAnnuler} disabled={envoi} className="max-sm:h-11">
           Annuler
-        </button>
-        <button type="submit" className={buttonClasses('primary', 'sm')} disabled={envoi}>
-          {envoi ? 'Changement…' : 'Changer de poste'}
-        </button>
+        </Button>
+        <SubmitButton
+          busy={envoi}
+          busyLabel="Changement…"
+          showShortcut={false}
+          size="sm"
+          className="max-sm:h-11"
+        >
+          Changer de poste
+        </SubmitButton>
       </div>
     </form>
   );

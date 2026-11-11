@@ -5,8 +5,23 @@
 // validation (droit dédié : `leave.approve` en plus de `hr.manage`) ; types
 // d'absence, jours fériés et modèles de listes (`reglages-listes.tsx`). Lecture
 // `hr.read` ; chaque modification s'ouvre en fenêtre modale.
+//
+// ADR-0074 : listes en `Select`, visibilités et circuit en cartes de choix,
+// validateur unique en interrupteur, grille sémantique. Mêmes champs envoyés.
 
-import { Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Button,
+  Checkbox,
+  ChoiceCards,
+  Field,
+  FormSection,
+  Modal,
+  Select,
+  SubmitButton,
+  Switch,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import { CalendarCog, Scale, Settings2 } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 
@@ -14,7 +29,7 @@ import { HR_APPROVAL_FLOWS, HR_WEEKDAYS, type HrApprovalFlow } from '@lalanda/sh
 
 import { hrAdminApi, type HrSettingsFull } from '@/lib/api-hr-admin';
 
-import { Alerte, BOUTON_PETIT, CHAMP } from '../../ventes/_components/form-ui';
+import { Alerte } from '../../ventes/_components/form-ui';
 
 import { FeriesReglages, ModelesReglages, TypesAbsenceReglages } from './reglages-listes';
 // ADR-0068 § 2 : matricules.
@@ -41,8 +56,6 @@ import {
 import { useAccesRh } from './rh-access';
 import { lire, messageRh, peutLireRh, type Lecture } from './rh-model';
 import { Bandeau, Chargement, EchecLecture, Panneau, PhraseSection } from './rh-ui';
-
-const LABEL = 'flex min-w-0 flex-col gap-1 text-xs font-medium';
 
 export function ReglagesRh(): React.ReactElement {
   const { actions } = useAccesRh();
@@ -242,13 +255,18 @@ function Erreurs({ erreurs }: { erreurs: string[] }): React.ReactElement | null 
 
 function Pied({ envoi, onAnnuler }: { envoi: boolean; onAnnuler: () => void }): React.ReactElement {
   return (
-    <div className="flex flex-wrap justify-end gap-2">
-      <button type="button" className={BOUTON_PETIT} onClick={onAnnuler} disabled={envoi}>
+    <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+      <Button onClick={onAnnuler} disabled={envoi} className="max-sm:h-11">
         Annuler
-      </button>
-      <button type="submit" className={buttonClasses('primary', 'sm')} disabled={envoi}>
-        {envoi ? 'Enregistrement…' : 'Enregistrer'}
-      </button>
+      </Button>
+      <SubmitButton
+        busy={envoi}
+        busyLabel="Enregistrement…"
+        showShortcut={false}
+        className="max-sm:h-11"
+      >
+        Enregistrer
+      </SubmitButton>
     </div>
   );
 }
@@ -290,70 +308,47 @@ function FormulaireGeneral({
 
   return (
     <form className="flex flex-col gap-5" onSubmit={(e) => void envoyer(e)} noValidate>
-      <fieldset className="flex flex-col gap-2">
-        <legend className="text-sm font-semibold">Semaine de travail</legend>
-        <p className="text-xs text-[var(--foreground-muted)]">
-          Sert au seul décompte des jours d’absence et à la feuille de temps. Une fiche peut avoir
-          sa propre semaine.
-        </p>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {HR_WEEKDAYS.map((d) => (
-            <label key={d} className={LABEL}>
-              {LIBELLES_JOUR[d]}
-              <select
-                className={CHAMP}
-                value={f.semaine[d]}
-                onChange={(e) =>
-                  maj({ semaine: { ...f.semaine, [d]: e.target.value as '0' | '0.5' | '1' } })
-                }
-              >
-                {(['1', '0.5', '0'] as const).map((v) => (
-                  <option key={v} value={v}>
-                    {LIBELLES_FRACTION[v]}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ))}
-        </div>
-      </fieldset>
+      <FormSection
+        title="Semaine de travail"
+        description="Sert au seul décompte des jours d’absence et à la feuille de temps. Une fiche peut avoir sa propre semaine."
+      >
+        {HR_WEEKDAYS.map((d) => (
+          <Field key={d} id={`${id}-jour-${d}`} label={LIBELLES_JOUR[d]} size="sm">
+            <Select<'0' | '0.5' | '1'>
+              value={f.semaine[d]}
+              onChange={(v) => maj({ semaine: { ...f.semaine, [d]: v } })}
+              options={(['1', '0.5', '0'] as const).map((v) => ({
+                value: v,
+                label: LIBELLES_FRACTION[v] ?? v,
+              }))}
+            />
+          </Field>
+        ))}
+      </FormSection>
 
-      <fieldset className="flex flex-col gap-2">
-        <legend className="text-sm font-semibold">Année de congé</legend>
-        <div className="grid grid-cols-2 gap-3 sm:max-w-sm">
-          <label className={LABEL}>
-            Jour
-            <select
-              className={CHAMP}
-              value={f.debutJour}
-              onChange={(e) => maj({ debutJour: e.target.value })}
-            >
-              {Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0')).map((j) => (
-                <option key={j} value={j}>
-                  {Number(j)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className={LABEL}>
-            Mois
-            <select
-              className={CHAMP}
-              value={f.debutMois}
-              onChange={(e) => maj({ debutMois: e.target.value })}
-            >
-              {MOIS.map((m, i) => (
-                <option key={m} value={String(i + 1).padStart(2, '0')}>
-                  {m}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      </fieldset>
+      <FormSection title="Année de congé">
+        <Field id={`${id}-debut-jour`} label="Jour" size="xs">
+          <Select<string>
+            value={f.debutJour}
+            onChange={(v) => maj({ debutJour: v })}
+            searchable={false}
+            options={Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0')).map(
+              (j) => ({ value: j, label: String(Number(j)) }),
+            )}
+          />
+        </Field>
+        <Field id={`${id}-debut-mois`} label="Mois" size="sm">
+          <Select<string>
+            value={f.debutMois}
+            onChange={(v) => maj({ debutMois: v })}
+            searchable={false}
+            options={MOIS.map((m, i) => ({ value: String(i + 1).padStart(2, '0'), label: m }))}
+          />
+        </Field>
+      </FormSection>
 
-      <fieldset className="flex flex-col gap-2">
-        <legend className="text-sm font-semibold">Types de contrat</legend>
+      <fieldset className="flex min-w-0 flex-col gap-2">
+        <legend className="mb-1 text-sm font-semibold">Types de contrat</legend>
         <p className="text-xs text-[var(--foreground-muted)]">
           Libellés informatifs, sans effet juridique calculé. « Date de fin » rend la fin de contrat
           obligatoire sur la fiche.
@@ -362,11 +357,10 @@ function FormulaireGeneral({
           {f.contrats.map((c, i) => (
             <li
               key={c.key}
-              className="grid grid-cols-1 items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] p-2 sm:grid-cols-[1fr_auto_auto]"
+              className="grid grid-cols-1 items-center gap-x-4 gap-y-2 rounded-[var(--radius-md)] border border-[var(--border)] p-2 sm:grid-cols-[1fr_auto_auto]"
             >
-              <input
+              <TextInput
                 aria-label={`Libellé du type ${i + 1}`}
-                className={CHAMP}
                 value={c.label}
                 onChange={(e) =>
                   maj({
@@ -376,49 +370,38 @@ function FormulaireGeneral({
                   })
                 }
               />
-              <label className="flex items-center gap-1.5 text-xs">
-                <input
-                  type="checkbox"
-                  checked={c.hasEndDate}
-                  onChange={(e) =>
-                    maj({
-                      contrats: f.contrats.map((x, j) =>
-                        j === i ? { ...x, hasEndDate: e.target.checked } : x,
-                      ),
-                    })
-                  }
-                />
-                Date de fin
-              </label>
-              <label className="flex items-center gap-1.5 text-xs">
-                <input
-                  type="checkbox"
-                  checked={c.active}
-                  onChange={(e) =>
-                    maj({
-                      contrats: f.contrats.map((x, j) =>
-                        j === i ? { ...x, active: e.target.checked } : x,
-                      ),
-                    })
-                  }
-                />
-                Proposé
-              </label>
+              <Checkbox
+                checked={c.hasEndDate}
+                label="Date de fin"
+                onChange={(oui) =>
+                  maj({
+                    contrats: f.contrats.map((x, j) => (j === i ? { ...x, hasEndDate: oui } : x)),
+                  })
+                }
+              />
+              <Checkbox
+                checked={c.active}
+                label="Proposé"
+                onChange={(oui) =>
+                  maj({
+                    contrats: f.contrats.map((x, j) => (j === i ? { ...x, active: oui } : x)),
+                  })
+                }
+              />
             </li>
           ))}
         </ul>
         <div className="flex flex-wrap gap-2">
-          <input
+          <TextInput
             aria-label="Nouveau type de contrat"
             placeholder="Nouveau type de contrat"
-            className={`${CHAMP} sm:max-w-xs`}
+            className="sm:max-w-xs"
             value={nouveau}
             onChange={(e) => setNouveau(e.target.value)}
           />
-          <button
-            type="button"
-            className={BOUTON_PETIT}
+          <Button
             disabled={nouveau.trim() === ''}
+            className="max-sm:h-11"
             onClick={() => {
               maj({
                 contrats: [
@@ -438,106 +421,89 @@ function FormulaireGeneral({
             }}
           >
             Ajouter
-          </button>
+          </Button>
         </div>
       </fieldset>
 
-      <fieldset className="flex flex-col gap-2">
-        <legend className="text-sm font-semibold">Rappels (jours d’avance, 0 à 120)</legend>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <label className={LABEL}>
-            Fin de période d’essai
-            <input
-              inputMode="numeric"
-              className={CHAMP}
-              value={f.rappelEssai}
-              onChange={(e) => maj({ rappelEssai: e.target.value })}
-            />
-          </label>
-          <label className={LABEL}>
-            Fin de contrat
-            <input
-              inputMode="numeric"
-              className={CHAMP}
-              value={f.rappelContrat}
-              onChange={(e) => maj({ rappelContrat: e.target.value })}
-            />
-          </label>
-          <label className={LABEL}>
-            Document qui expire
-            <input
-              inputMode="numeric"
-              className={CHAMP}
-              value={f.rappelDocument}
-              onChange={(e) => maj({ rappelDocument: e.target.value })}
-            />
-          </label>
-        </div>
-      </fieldset>
+      <FormSection title="Rappels" description="Jours d’avance, de 0 à 120.">
+        <Field id={`${id}-rappel-essai`} label="Fin de période d’essai" size="sm">
+          <TextInput
+            inputMode="numeric"
+            value={f.rappelEssai}
+            trailing="jours"
+            onChange={(e) => maj({ rappelEssai: e.target.value })}
+          />
+        </Field>
+        <Field id={`${id}-rappel-contrat`} label="Fin de contrat" size="sm">
+          <TextInput
+            inputMode="numeric"
+            value={f.rappelContrat}
+            trailing="jours"
+            onChange={(e) => maj({ rappelContrat: e.target.value })}
+          />
+        </Field>
+        <Field id={`${id}-rappel-document`} label="Document qui expire" size="sm">
+          <TextInput
+            inputMode="numeric"
+            value={f.rappelDocument}
+            trailing="jours"
+            onChange={(e) => maj({ rappelDocument: e.target.value })}
+          />
+        </Field>
+      </FormSection>
 
-      <fieldset className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <legend className="mb-2 text-sm font-semibold">Visibilité</legend>
-        <label className={LABEL}>
-          Calendrier des absences
-          <select
-            className={CHAMP}
+      <FormSection title="Visibilité">
+        <Field id={`${id}-calendrier`} label="Calendrier des absences" group size="full">
+          <ChoiceCards<FormReglages['calendrierEquipe']>
             value={f.calendrierEquipe}
-            onChange={(e) =>
-              maj({ calendrierEquipe: e.target.value as FormReglages['calendrierEquipe'] })
-            }
-          >
-            {Object.entries(LIBELLES_CALENDRIER_EQUIPE).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className={LABEL}>
-          Organigramme
-          <select
-            className={CHAMP}
+            onChange={(v) => maj({ calendrierEquipe: v })}
+            columns={1}
+            options={(
+              Object.entries(LIBELLES_CALENDRIER_EQUIPE) as [
+                FormReglages['calendrierEquipe'],
+                string,
+              ][]
+            ).map(([k, v]) => ({ value: k, label: v }))}
+          />
+        </Field>
+        <Field id={`${id}-organigramme`} label="Organigramme" group size="full">
+          <ChoiceCards<FormReglages['organigramme']>
             value={f.organigramme}
-            onChange={(e) => maj({ organigramme: e.target.value as FormReglages['organigramme'] })}
-          >
-            {Object.entries(LIBELLES_ORGANIGRAMME).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
-          </select>
-        </label>
-      </fieldset>
+            onChange={(v) => maj({ organigramme: v })}
+            columns={1}
+            options={(
+              Object.entries(LIBELLES_ORGANIGRAMME) as [FormReglages['organigramme'], string][]
+            ).map(([k, v]) => ({ value: k, label: v }))}
+          />
+        </Field>
+      </FormSection>
 
-      <fieldset className="flex flex-col gap-2">
-        <legend className="text-sm font-semibold">Conservation après la sortie</legend>
-        <p id={`${id}-conservation`} className="text-xs text-[var(--foreground-muted)]">
-          Vide : aucune purge automatique. Lalanda ne fixe aucune durée : elle se décide avec votre
-          conseil juridique.
-        </p>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <label className={LABEL}>
-            Effacer les données sensibles après (mois)
-            <input
-              inputMode="numeric"
-              className={CHAMP}
-              value={f.conservationMois}
-              aria-describedby={`${id}-conservation`}
-              onChange={(e) => maj({ conservationMois: e.target.value })}
-            />
-          </label>
-          <label className={LABEL}>
-            Anonymiser le dossier après (ans)
-            <input
-              inputMode="numeric"
-              className={CHAMP}
-              value={f.anonymisationAns}
-              aria-describedby={`${id}-conservation`}
-              onChange={(e) => maj({ anonymisationAns: e.target.value })}
-            />
-          </label>
-        </div>
-      </fieldset>
+      <FormSection
+        title="Conservation après la sortie"
+        description="Vide : aucune purge automatique. Lalanda ne fixe aucune durée : elle se décide avec votre conseil juridique."
+      >
+        <Field
+          id={`${id}-conservation-mois`}
+          label="Effacer les données sensibles après"
+          optional
+          size="md"
+        >
+          <TextInput
+            inputMode="numeric"
+            value={f.conservationMois}
+            trailing="mois"
+            onChange={(e) => maj({ conservationMois: e.target.value })}
+          />
+        </Field>
+        <Field id={`${id}-anonymisation`} label="Anonymiser le dossier après" optional size="md">
+          <TextInput
+            inputMode="numeric"
+            value={f.anonymisationAns}
+            trailing="ans"
+            onChange={(e) => maj({ anonymisationAns: e.target.value })}
+          />
+        </Field>
+      </FormSection>
 
       <Erreurs erreurs={erreurs} />
       <Pied envoi={envoi} onAnnuler={onAnnuler} />
@@ -554,6 +520,7 @@ function FormulaireCircuit({
   onAnnuler: () => void;
   onEnregistre: () => void;
 }): React.ReactElement {
+  const id = useId();
   const [flux, setFlux] = useState<HrApprovalFlow>(reglages.approvalFlow);
   const [seul, setSeul] = useState(reglages.allowSoleApprover);
   const [erreurs, setErreurs] = useState<string[]>([]);
@@ -579,36 +546,20 @@ function FormulaireCircuit({
 
   return (
     <form className="flex flex-col gap-4" onSubmit={(e) => void envoyer(e)}>
-      <fieldset className="flex flex-col gap-2">
-        <legend className="text-sm font-semibold">Qui valide une absence ?</legend>
-        {HR_APPROVAL_FLOWS.map((v) => (
-          <label key={v} className="flex items-center gap-2 text-sm">
-            <input
-              type="radio"
-              name="circuit"
-              value={v}
-              checked={flux === v}
-              onChange={() => setFlux(v)}
-            />
-            {LIBELLES_CIRCUIT[v]}
-          </label>
-        ))}
-      </fieldset>
-      <label className="flex items-start gap-2 text-sm">
-        <input
-          type="checkbox"
-          className="mt-0.5"
-          checked={seul}
-          onChange={(e) => setSeul(e.target.checked)}
+      <Field id={`${id}-circuit`} label="Qui valide une absence ?" group size="full">
+        <ChoiceCards<HrApprovalFlow>
+          value={flux}
+          onChange={setFlux}
+          columns={1}
+          options={HR_APPROVAL_FLOWS.map((v) => ({ value: v, label: LIBELLES_CIRCUIT[v] }))}
         />
-        <span>
-          <span className="font-medium">Validateur unique</span>
-          <span className="block text-xs text-[var(--foreground-muted)]">
-            Si l’organisation ne compte qu’une personne qui valide les absences, elle peut valider
-            les siennes ; la décision le mentionne.
-          </span>
-        </span>
-      </label>
+      </Field>
+      <Switch
+        checked={seul}
+        onChange={setSeul}
+        label="Validateur unique"
+        description="Si l’organisation ne compte qu’une personne qui valide les absences, elle peut valider les siennes ; la décision le mentionne."
+      />
       <Erreurs erreurs={erreurs} />
       <Pied envoi={envoi} onAnnuler={onAnnuler} />
     </form>

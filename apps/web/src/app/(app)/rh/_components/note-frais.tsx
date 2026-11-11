@@ -6,8 +6,25 @@
 // le reste à rembourser sont ceux du moteur, par l'API ; l'écran ne fait aucune somme.
 // Le justificatif se dépose ligne par ligne (photo du ticket depuis le téléphone) et
 // se relit avec la session, jamais par une adresse publique.
+//
+// ADR-0074 : devise en segments, catégorie et moyen en `Select`, dates en
+// `DatePicker`, montants en `MoneyInput` (mise en forme seulement : `lireLigne` et
+// `lireMontantSaisi` lisent toujours la saisie). Lignes repérées par leur position.
 
-import { Badge, Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Badge,
+  Button,
+  Checkbox,
+  DatePicker,
+  Field,
+  FormGrid,
+  Modal,
+  MoneyInput,
+  SegmentedControl,
+  Select,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import { useEffect, useId, useState } from 'react';
 
 import {
@@ -22,7 +39,7 @@ import { rh2Api } from '@/lib/api-rh-2';
 import { treasuryApi, type TreasuryAccountView } from '@/lib/treasury-api';
 
 import { WorkProjectSelect } from '../../tresorerie/_components/work-project-select';
-import { BOUTON_PETIT, BOUTON_DANGER, CHAMP, Champ } from '../../ventes/_components/form-ui';
+import { BOUTON_PETIT, BOUTON_DANGER } from '../../ventes/_components/form-ui';
 
 import {
   ACCEPT_JUSTIFICATIF,
@@ -113,44 +130,38 @@ export function NoteFormulaire({
       size="lg"
       busy={envoi}
       footer={
-        <div className="flex flex-wrap justify-end gap-2">
-          <button type="button" className={BOUTON_PETIT} onClick={onFermer} disabled={envoi}>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+          <Button size="sm" onClick={onFermer} disabled={envoi} className="max-sm:h-11">
             Retour
-          </button>
-          <button
-            type="button"
-            className={buttonClasses('primary', 'sm')}
-            disabled={envoi}
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            busy={envoi}
             onClick={() => void enregistrer()}
+            className="max-sm:h-11"
           >
             {envoi ? 'Enregistrement…' : 'Enregistrer le brouillon'}
-          </button>
+          </Button>
         </div>
       }
     >
       <div className="flex flex-col gap-4 text-sm">
-        <div className="grid gap-3 sm:grid-cols-[1fr_10rem]">
-          <Champ id={`${id}-titre`} label="Titre" requis>
-            <input
-              id={`${id}-titre`}
-              className={CHAMP}
-              value={titre}
-              maxLength={120}
-              onChange={(e) => setTitre(e.target.value)}
-            />
-          </Champ>
-          <Champ id={`${id}-devise`} label="Devise" requis>
-            <select
-              id={`${id}-devise`}
-              className={CHAMP}
+        <FormGrid>
+          <Field id={`${id}-titre`} label="Titre" required size="lg">
+            <TextInput value={titre} maxLength={120} onChange={(e) => setTitre(e.target.value)} />
+          </Field>
+          <Field id={`${id}-devise`} label="Devise" required group size="sm">
+            <SegmentedControl<'CDF' | 'USD'>
               value={devise}
-              onChange={(e) => setDevise(e.target.value as 'CDF' | 'USD')}
-            >
-              <option value="USD">USD</option>
-              <option value="CDF">CDF</option>
-            </select>
-          </Champ>
-        </div>
+              onChange={setDevise}
+              options={[
+                { value: 'USD', label: 'USD' },
+                { value: 'CDF', label: 'CDF' },
+              ]}
+            />
+          </Field>
+        </FormGrid>
         <ol className="flex flex-col gap-3">
           {lignes.map((l, i) => (
             <li
@@ -171,96 +182,81 @@ export function NoteFormulaire({
                   </button>
                 ) : null}
               </div>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <Champ id={`${id}-${i}-date`} label="Date" requis>
-                  <input
-                    id={`${id}-${i}-date`}
-                    type="date"
-                    max={jour}
-                    className={CHAMP}
+              <FormGrid>
+                <Field id={`${id}-${i}-date`} label="Date" required size="sm">
+                  <DatePicker
                     value={l.spentOn}
-                    onChange={(e) => changer(i, { spentOn: e.target.value })}
+                    max={jour}
+                    required
+                    onChange={(v) => changer(i, { spentOn: v })}
+                    shortcuts={['today']}
                   />
-                </Champ>
-                <Champ id={`${id}-${i}-cat`} label="Catégorie" requis>
-                  <select
-                    id={`${id}-${i}-cat`}
-                    className={CHAMP}
+                </Field>
+                <Field id={`${id}-${i}-cat`} label="Catégorie" required size="md">
+                  <Select<SaisieLigne['category']>
                     value={l.category}
-                    onChange={(e) =>
-                      changer(i, { category: e.target.value as SaisieLigne['category'] })
-                    }
-                  >
-                    <option value="">— Choisir —</option>
-                    {CATEGORIES_LIGNE.map((c) => (
-                      <option key={c} value={c}>
-                        {LIBELLES_CATEGORIE[c]}
-                      </option>
-                    ))}
-                  </select>
-                </Champ>
-                <Champ id={`${id}-${i}-montant`} label={`Montant (${devise})`} requis>
-                  <input
-                    id={`${id}-${i}-montant`}
-                    inputMode="decimal"
-                    className={CHAMP}
-                    value={l.amount}
-                    placeholder="15,00"
-                    onChange={(e) => changer(i, { amount: e.target.value })}
+                    placeholder="— Choisir —"
+                    onChange={(v) => changer(i, { category: v })}
+                    options={CATEGORIES_LIGNE.map((c) => ({
+                      value: c,
+                      label: LIBELLES_CATEGORIE[c],
+                    }))}
                   />
-                </Champ>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Champ id={`${id}-${i}-lib`} label="Ce qui a été payé" requis>
-                  <input
-                    id={`${id}-${i}-lib`}
-                    className={CHAMP}
+                </Field>
+                <Field id={`${id}-${i}-montant`} label="Montant" required size="sm">
+                  <MoneyInput
+                    value={l.amount}
+                    currency={devise}
+                    placeholder="15,00"
+                    onChange={(v) => changer(i, { amount: v })}
+                  />
+                </Field>
+                <Field id={`${id}-${i}-lib`} label="Ce qui a été payé" required size="lg" newRow>
+                  <TextInput
                     value={l.label}
                     maxLength={200}
                     placeholder="Taxi aéroport – bureau"
                     onChange={(e) => changer(i, { label: e.target.value })}
                   />
-                </Champ>
-                <Champ id={`${id}-${i}-march`} label="Commerçant (facultatif)">
-                  <input
-                    id={`${id}-${i}-march`}
-                    className={CHAMP}
+                </Field>
+                <Field id={`${id}-${i}-march`} label="Commerçant" optional size="md">
+                  <TextInput
                     value={l.merchant}
                     maxLength={120}
                     onChange={(e) => changer(i, { merchant: e.target.value })}
                   />
-                </Champ>
-              </div>
-              <WorkProjectSelect
-                value={l.workProjectId}
-                className={CHAMP}
-                onChange={(p) =>
-                  changer(i, { workProjectId: p, rebillable: p ? l.rebillable : false })
-                }
-              />
-              {l.workProjectId ? (
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={l.rebillable}
-                    onChange={(e) => changer(i, { rebillable: e.target.checked })}
-                  />
-                  À refacturer au client (simple marque : aucune facture n’est créée)
-                </label>
-              ) : null}
-              <Champ
-                id={`${id}-${i}-motif`}
-                label="Pas de ticket ? Dites pourquoi"
-                aide="Exigé si la ligne n’a pas de justificatif quand votre organisation le demande."
-              >
-                <input
-                  id={`${id}-${i}-motif`}
-                  className={CHAMP}
-                  value={l.missingReceiptReason}
-                  maxLength={300}
-                  onChange={(e) => changer(i, { missingReceiptReason: e.target.value })}
+                </Field>
+                <WorkProjectSelect
+                  id={`${id}-${i}-projet`}
+                  value={l.workProjectId}
+                  onChange={(p) =>
+                    changer(i, { workProjectId: p, rebillable: p ? l.rebillable : false })
+                  }
                 />
-              </Champ>
+                {l.workProjectId ? (
+                  <div className="col-span-full">
+                    <Checkbox
+                      checked={l.rebillable}
+                      onChange={(c) => changer(i, { rebillable: c })}
+                      label="À refacturer au client"
+                      description="Simple marque : aucune facture n’est créée."
+                    />
+                  </div>
+                ) : null}
+                <Field
+                  id={`${id}-${i}-motif`}
+                  label="Pas de ticket ? Dites pourquoi"
+                  optional
+                  size="full"
+                  hint="Exigé si la ligne n’a pas de justificatif quand votre organisation le demande."
+                >
+                  <TextInput
+                    value={l.missingReceiptReason}
+                    maxLength={300}
+                    onChange={(e) => changer(i, { missingReceiptReason: e.target.value })}
+                  />
+                </Field>
+              </FormGrid>
             </li>
           ))}
         </ol>
@@ -333,6 +329,11 @@ export function PaiementDialogue({
   }, [devise]);
 
   async function payer(): Promise<void> {
+    // La date était `required` en natif : même exigence avant l'envoi.
+    if (jour === '') {
+      setErreur('Indiquez la date du paiement.');
+      return;
+    }
     if (compteObligatoire && compte === '') {
       setErreur('Choisissez le compte qui paie.');
       return;
@@ -362,74 +363,64 @@ export function PaiementDialogue({
       size="sm"
       busy={envoi}
       footer={
-        <div className="flex flex-wrap justify-end gap-2">
-          <button type="button" className={BOUTON_PETIT} onClick={onFermer} disabled={envoi}>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+          <Button size="sm" onClick={onFermer} disabled={envoi} className="max-sm:h-11">
             Retour
-          </button>
-          <button
-            type="button"
-            className={buttonClasses('primary', 'sm')}
-            disabled={envoi}
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            busy={envoi}
             onClick={() => void payer()}
+            className="max-sm:h-11"
           >
             {envoi ? 'Enregistrement…' : 'Enregistrer le paiement'}
-          </button>
+          </Button>
         </div>
       }
     >
       <div className="flex flex-col gap-3 text-sm">
-        <Champ id={`${id}-jour`} label="Date du paiement" requis>
-          <input
-            id={`${id}-jour`}
-            type="date"
-            className={CHAMP}
-            value={jour}
-            onChange={(e) => setJour(e.target.value)}
-          />
-        </Champ>
-        <Champ
-          id={`${id}-compte`}
-          label="Compte qui paie"
-          requis={compteObligatoire}
-          aide={`Comptes actifs en ${devise}. Les coordonnées bancaires du collaborateur ne sont jamais affichées ici.`}
-        >
-          <select
+        <FormGrid>
+          <Field id={`${id}-jour`} label="Date du paiement" required size="sm">
+            <DatePicker value={jour} required onChange={setJour} shortcuts={['today']} />
+          </Field>
+          <Field
             id={`${id}-compte`}
-            className={CHAMP}
-            value={compte}
-            onChange={(e) => setCompte(e.target.value)}
+            label="Compte qui paie"
+            required={compteObligatoire}
+            size="lg"
+            newRow
+            hint={`Comptes actifs en ${devise}. Les coordonnées bancaires du collaborateur ne sont jamais affichées ici.`}
           >
-            <option value="">{compteObligatoire ? '— Choisir —' : '— Sans compte —'}</option>
-            {(comptes ?? []).map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </Champ>
-        <Champ id={`${id}-moyen`} label="Moyen" requis>
-          <select
-            id={`${id}-moyen`}
-            className={CHAMP}
-            value={moyen}
-            onChange={(e) => setMoyen(e.target.value as HrPaymentMethod)}
-          >
-            {HR_PAYMENT_METHODS.map((m) => (
-              <option key={m} value={m}>
-                {HR_PAYMENT_METHOD_LABELS[m]}
-              </option>
-            ))}
-          </select>
-        </Champ>
-        <Champ id={`${id}-ref`} label="Référence (facultatif)">
-          <input
-            id={`${id}-ref`}
-            className={CHAMP}
-            value={reference}
-            maxLength={120}
-            onChange={(e) => setReference(e.target.value)}
-          />
-        </Champ>
+            <Select<string>
+              value={compte}
+              onChange={setCompte}
+              loading={comptes === null}
+              options={[
+                { value: '', label: compteObligatoire ? '— Choisir —' : '— Sans compte —' },
+                ...(comptes ?? []).map((c) => ({ value: c.id, label: c.name })),
+              ]}
+            />
+          </Field>
+          <Field id={`${id}-moyen`} label="Moyen" required size="md" newRow>
+            <Select<HrPaymentMethod>
+              value={moyen}
+              onChange={setMoyen}
+              options={HR_PAYMENT_METHODS.map((m) => ({
+                value: m,
+                label: HR_PAYMENT_METHOD_LABELS[m],
+              }))}
+            />
+          </Field>
+          <Field id={`${id}-ref`} label="Référence" optional size="md">
+            <TextInput
+              value={reference}
+              maxLength={120}
+              onChange={(e) => setReference(e.target.value)}
+              className="font-mono"
+            />
+          </Field>
+        </FormGrid>
         <ErreurAction erreur={erreur} />
       </div>
     </Modal>

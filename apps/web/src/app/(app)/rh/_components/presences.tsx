@@ -5,8 +5,21 @@
 // (l'heure du serveur, rien d'autre), ma semaine (minutes et constats du moteur), mes
 // demandes de correction ; pour le manager ou les RH, la semaine d'une personne et les
 // corrections à décider.
+//
+// ADR-0074 : personne en `EntityPicker`, jour en `DatePicker` (heures natives).
 
-import { Badge, Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Badge,
+  Button,
+  DatePicker,
+  EntityPicker,
+  Field,
+  FormGrid,
+  Modal,
+  TextInput,
+  buttonClasses,
+  correspondRecherche,
+} from '@lalanda/ui';
 import { Clock } from 'lucide-react';
 import { useCallback, useEffect, useId, useState } from 'react';
 
@@ -18,7 +31,7 @@ import {
   type HrPresenceSettingsView,
 } from '@/lib/api-rh-2';
 
-import { BOUTON_PETIT, CHAMP, Champ } from '../../ventes/_components/form-ui';
+import { BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   LIBELLES_SOURCE,
@@ -121,6 +134,11 @@ function PresencesActives({
   const [decision, setDecision] = useState<{ id: string; accepter: boolean } | null>(null);
   const relire = useCallback(() => setVersion((v) => v + 1), []);
   const jours = joursSemaine(lundi);
+  // ADR-0074 § 4 : la personne se choisit en tapant son nom (« Moi » en tête).
+  const choixPersonnes = [
+    ...(employeeId ? [{ id: employeeId, nom: 'Moi' }] : []),
+    ...personnes.filter((p) => p.id !== employeeId).map((p) => ({ id: p.id, nom: nomAffiche(p) })),
+  ];
 
   useEffect(() => {
     if (!equipe) return;
@@ -223,21 +241,22 @@ function PresencesActives({
         action={
           <div className="flex flex-wrap items-center gap-2">
             {equipe && personnes.length > 0 ? (
-              <select
+              <EntityPicker<{ id: string; nom: string }>
                 aria-label="Personne"
-                className={`${CHAMP} w-auto`}
-                value={cible ?? ''}
-                onChange={(e) => setCible(e.target.value || null)}
-              >
-                {employeeId ? <option value={employeeId}>Moi</option> : null}
-                {personnes
-                  .filter((p) => p.id !== employeeId)
-                  .map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {nomAffiche(p)}
-                    </option>
-                  ))}
-              </select>
+                className="w-full sm:w-64"
+                value={choixPersonnes.find((p) => p.id === cible) ?? null}
+                onChange={(p) => {
+                  if (p) setCible(p.id);
+                }}
+                search={async (q) => choixPersonnes.filter((p) => correspondRecherche([p.nom], q))}
+                refreshKey={choixPersonnes.length}
+                getKey={(p) => p.id}
+                getLabel={(p) => p.nom}
+                placeholder="Choisir une personne"
+                debounceMs={0}
+                clearable={false}
+                emptyText="Aucun collaborateur actif ne correspond."
+              />
             ) : null}
             <button
               type="button"
@@ -437,6 +456,11 @@ function DemandeCorrection({
   const [envoi, setEnvoi] = useState(false);
 
   async function envoyer(): Promise<void> {
+    // Le jour était `required` ; le calendrier peut être vidé au clavier.
+    if (jour === '') {
+      setErreur('Le jour est obligatoire.');
+      return;
+    }
     const proposed: { kind: 'in' | 'out'; at: string }[] = [];
     for (const [kind, h] of [
       ['in', arrivee],
@@ -484,61 +508,42 @@ function DemandeCorrection({
       size="sm"
       busy={envoi}
       footer={
-        <div className="flex flex-wrap justify-end gap-2">
-          <button type="button" className={BOUTON_PETIT} onClick={onFermer} disabled={envoi}>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+          <Button onClick={onFermer} disabled={envoi} className="max-sm:h-11">
             Retour
-          </button>
-          <button
-            type="button"
-            className={buttonClasses('primary', 'sm')}
-            disabled={envoi}
+          </Button>
+          <Button
+            variant="primary"
+            busy={envoi}
             onClick={() => void envoyer()}
+            className="max-sm:h-11"
           >
             {envoi ? 'Envoi…' : 'Envoyer'}
-          </button>
+          </Button>
         </div>
       }
     >
       <div className="flex flex-col gap-3 text-sm">
-        <Champ id={`${id}-jour`} label="Jour" requis>
-          <input
-            id={`${id}-jour`}
-            type="date"
-            max={aujourdhui()}
-            className={CHAMP}
-            value={jour}
-            onChange={(e) => setJour(e.target.value)}
-          />
-        </Champ>
-        <div className="grid grid-cols-2 gap-3">
-          <Champ id={`${id}-in`} label="Arrivée (heure de Kinshasa)">
-            <input
-              id={`${id}-in`}
-              type="time"
-              className={CHAMP}
-              value={arrivee}
-              onChange={(e) => setArrivee(e.target.value)}
+        <FormGrid>
+          <Field id={`${id}-jour`} label="Jour" required size="sm">
+            <DatePicker
+              value={jour}
+              max={aujourdhui()}
+              required
+              onChange={setJour}
+              shortcuts={['today']}
             />
-          </Champ>
-          <Champ id={`${id}-out`} label="Départ">
-            <input
-              id={`${id}-out`}
-              type="time"
-              className={CHAMP}
-              value={depart}
-              onChange={(e) => setDepart(e.target.value)}
-            />
-          </Champ>
-        </div>
-        <Champ id={`${id}-motif`} label="Motif" requis>
-          <input
-            id={`${id}-motif`}
-            className={CHAMP}
-            value={motif}
-            maxLength={300}
-            onChange={(e) => setMotif(e.target.value)}
-          />
-        </Champ>
+          </Field>
+          <Field id={`${id}-in`} label="Arrivée (heure de Kinshasa)" size="sm" newRow>
+            <TextInput type="time" value={arrivee} onChange={(e) => setArrivee(e.target.value)} />
+          </Field>
+          <Field id={`${id}-out`} label="Départ" size="sm">
+            <TextInput type="time" value={depart} onChange={(e) => setDepart(e.target.value)} />
+          </Field>
+          <Field id={`${id}-motif`} label="Motif" required size="full" newRow>
+            <TextInput value={motif} maxLength={300} onChange={(e) => setMotif(e.target.value)} />
+          </Field>
+        </FormGrid>
         <ErreurAction erreur={erreur} />
       </div>
     </Modal>

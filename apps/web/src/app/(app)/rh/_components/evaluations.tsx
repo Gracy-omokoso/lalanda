@@ -8,8 +8,24 @@
 // la fenêtre et s'efface dès que l'onglet est quitté. Aucune note n'est produite :
 // une note est choisie par l'évaluateur dans l'échelle saisie par l'organisation.
 // L'évalué et l'évaluateur ne clôturent pas.
+//
+// ADR-0074 : réponses en `TextArea`, note en `Select` (échelle de l'organisation),
+// période et échéance en `DatePicker`, auto-évaluation en interrupteur, personnes
+// évaluées en cases stylées.
 
-import { Badge, Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Badge,
+  Checkbox,
+  DatePicker,
+  Field,
+  FormGrid,
+  Modal,
+  Select,
+  Switch,
+  TextArea,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import { ClipboardList, Users } from 'lucide-react';
 import { useCallback, useEffect, useId, useState } from 'react';
 
@@ -25,7 +41,7 @@ import {
   type ReviewSectionContentView,
 } from '@/lib/api-rh-2';
 
-import { BOUTON_PETIT, CHAMP, Champ } from '../../ventes/_components/form-ui';
+import { BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   LIBELLES_SECTION,
@@ -569,47 +585,47 @@ function RedactionSection({
       }
     >
       <div className="flex flex-col gap-3 text-sm">
-        {champs.map((c) => (
-          <Champ key={c.id} id={`${id}-${c.id}`} label={c.title}>
-            <textarea
-              id={`${id}-${c.id}`}
-              rows={4}
-              className={CHAMP}
-              value={reponses[c.id] ?? ''}
-              maxLength={20000}
-              onChange={(e) => setReponses((r) => ({ ...r, [c.id]: e.target.value }))}
-            />
-          </Champ>
-        ))}
-        {echelles.map((c) => (
-          <Champ
-            key={c.id}
-            id={`${id}-n-${c.id}`}
-            label={`${c.title} — votre choix`}
-            aide="Aucune note n’est proposée ni calculée."
-          >
-            <select
+        <FormGrid>
+          {champs.map((c) => (
+            <Field key={c.id} id={`${id}-${c.id}`} label={c.title} size="full">
+              <TextArea
+                rows={4}
+                value={reponses[c.id] ?? ''}
+                maxLength={20000}
+                onChange={(e) => setReponses((r) => ({ ...r, [c.id]: e.target.value }))}
+              />
+            </Field>
+          ))}
+          {echelles.map((c) => (
+            <Field
+              key={c.id}
               id={`${id}-n-${c.id}`}
-              className={CHAMP}
-              value={notes[c.id] === undefined ? '' : String(notes[c.id])}
-              onChange={(e) =>
-                setNotes((n) => {
-                  const copie = { ...n };
-                  if (e.target.value === '') delete copie[c.id];
-                  else copie[c.id] = Number(e.target.value);
-                  return copie;
-                })
-              }
+              label={`${c.title} — votre choix`}
+              size="lg"
+              newRow
+              hint="Aucune note n’est proposée ni calculée."
             >
-              <option value="">— Pas de note —</option>
-              {valeursEchelle(c.scale!).map((v) => (
-                <option key={v.valeur} value={v.valeur}>
-                  {v.libelle}
-                </option>
-              ))}
-            </select>
-          </Champ>
-        ))}
+              <Select<string>
+                value={notes[c.id] === undefined ? '' : String(notes[c.id])}
+                onChange={(v) =>
+                  setNotes((n) => {
+                    const copie = { ...n };
+                    if (v === '') delete copie[c.id];
+                    else copie[c.id] = Number(v);
+                    return copie;
+                  })
+                }
+                options={[
+                  { value: '', label: '— Pas de note —' },
+                  ...valeursEchelle(c.scale!).map((v) => ({
+                    value: String(v.valeur),
+                    label: v.libelle,
+                  })),
+                ]}
+              />
+            </Field>
+          ))}
+        </FormGrid>
         <ErreurAction erreur={erreur} />
       </div>
     </Modal>
@@ -651,6 +667,11 @@ function NouvelleCampagne({
   async function creer(): Promise<void> {
     if (libelle.trim() === '') {
       setErreur('Donnez un nom à la campagne.');
+      return;
+    }
+    // Les dates étaient `required` en natif : même exigence avant l'envoi.
+    if (du === '' || au === '' || echeance === '') {
+      setErreur('Renseignez la période et l’échéance.');
       return;
     }
     setErreur(null);
@@ -704,68 +725,46 @@ function NouvelleCampagne({
         </div>
       }
     >
-      <div className="flex flex-col gap-3 text-sm">
-        <Champ id={`${id}-l`} label="Nom" requis>
-          <input
-            id={`${id}-l`}
-            className={CHAMP}
-            value={libelle}
-            maxLength={120}
-            onChange={(e) => setLibelle(e.target.value)}
-          />
-        </Champ>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Champ id={`${id}-du`} label="Période : du" requis>
-            <input
-              id={`${id}-du`}
-              type="date"
-              className={CHAMP}
-              value={du}
-              onChange={(e) => setDu(e.target.value)}
+      <div className="flex flex-col gap-4 text-sm">
+        <FormGrid>
+          <Field id={`${id}-l`} label="Nom" required size="lg">
+            <TextInput
+              value={libelle}
+              maxLength={120}
+              onChange={(e) => setLibelle(e.target.value)}
             />
-          </Champ>
-          <Champ id={`${id}-au`} label="au" requis>
-            <input
-              id={`${id}-au`}
-              type="date"
-              className={CHAMP}
-              value={au}
-              onChange={(e) => setAu(e.target.value)}
-            />
-          </Champ>
-          <Champ id={`${id}-e`} label="Échéance" requis>
-            <input
-              id={`${id}-e`}
-              type="date"
-              className={CHAMP}
+          </Field>
+          <Field id={`${id}-du`} label="Période : du" required size="sm" newRow>
+            <DatePicker value={du} onChange={setDu} required />
+          </Field>
+          <Field id={`${id}-au`} label="au" required size="sm">
+            <DatePicker value={au} onChange={setAu} required />
+          </Field>
+          <Field id={`${id}-e`} label="Échéance" required size="sm">
+            <DatePicker
               value={echeance}
-              onChange={(e) => setEcheance(e.target.value)}
+              onChange={setEcheance}
+              required
+              shortcuts={['today', 'endOfMonth', 'plus30']}
             />
-          </Champ>
-        </div>
-        <label className="flex items-center gap-2">
-          <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} />
-          Prévoir une auto-évaluation
-        </label>
+          </Field>
+        </FormGrid>
+        <Switch checked={auto} onChange={setAuto} label="Prévoir une auto-évaluation" />
         <fieldset className="flex flex-col gap-1">
-          <legend className="text-sm font-medium">Personnes évaluées</legend>
+          <legend className="mb-1 text-sm font-semibold">Personnes évaluées</legend>
           {personnes.length === 0 ? (
             <PhraseSection>Aucun collaborateur actif lisible.</PhraseSection>
           ) : (
             <div className="grid max-h-60 gap-1 overflow-y-auto sm:grid-cols-2">
               {personnes.map((p) => (
-                <label key={p.id} className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={choisis.includes(p.id)}
-                    onChange={(e) =>
-                      setChoisis((c) =>
-                        e.target.checked ? [...c, p.id] : c.filter((x) => x !== p.id),
-                      )
-                    }
-                  />
-                  {nomAffiche(p)}
-                </label>
+                <Checkbox
+                  key={p.id}
+                  checked={choisis.includes(p.id)}
+                  onChange={(coche) =>
+                    setChoisis((c) => (coche ? [...c, p.id] : c.filter((x) => x !== p.id)))
+                  }
+                  label={nomAffiche(p)}
+                />
               ))}
             </div>
           )}

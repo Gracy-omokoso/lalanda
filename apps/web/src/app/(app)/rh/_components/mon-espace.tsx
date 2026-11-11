@@ -5,7 +5,7 @@
 // leur annulation. Mes documents (téléchargement) et mes éléments de liste
 // (cochables par l'assigné) : lot H7, servis par `GET /hr/me` depuis H4.
 
-import { buttonClasses } from '@lalanda/ui';
+import { Checkbox, buttonClasses } from '@lalanda/ui';
 import { CalendarPlus, ClipboardCheck, FileText, IdCard, Plane, Wallet } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -190,36 +190,32 @@ export function MonEspace(): React.ReactElement {
                 {etat.moi.checklistItems.map((i) => (
                   <li key={`${i.checklistId}-${i.itemId}`} className="flex items-start gap-3 py-2">
                     {/* ADR-0045 — H7 : l'assigné coche son élément (§ 3.3). */}
-                    <input
+                    <Checkbox
                       id={`moi-${i.checklistId}-${i.itemId}`}
-                      type="checkbox"
-                      className="mt-1 h-4 w-4 shrink-0"
+                      className="min-w-0 flex-1"
                       checked={i.doneAt !== null}
-                      onChange={(e) => {
+                      onChange={(coche) => {
                         setErreurListe(null);
                         hrAdminApi
-                          .setChecklistItemDone(i.checklistId, i.itemId, e.target.checked)
+                          .setChecklistItemDone(i.checklistId, i.itemId, coche)
                           .then(() => relireMoi())
                           .catch((err: unknown) =>
                             setErreurListe(messageRh(err, 'L’élément n’a pas pu être coché.')),
                           );
                       }}
-                    />
-                    <label
-                      htmlFor={`moi-${i.checklistId}-${i.itemId}`}
-                      className="flex min-w-0 flex-1 flex-col"
-                    >
-                      <span className="break-words">
-                        {i.label} — {i.employeeName}
-                      </span>
-                      <span className="text-xs text-[var(--foreground-muted)]">
-                        {i.doneAt
+                      label={
+                        <span className="break-words">
+                          {i.label} — {i.employeeName}
+                        </span>
+                      }
+                      description={
+                        i.doneAt
                           ? 'Fait'
                           : i.dueDate
                             ? `Pour le ${formatJour(i.dueDate)}`
-                            : 'À faire'}
-                      </span>
-                    </label>
+                            : 'À faire'
+                      }
+                    />
                   </li>
                 ))}
               </ul>

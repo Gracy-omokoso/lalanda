@@ -3,16 +3,27 @@
 // Collaborateurs — ADR-0045 § 3.1 et § 8 : liste triée par nom (API), recherche,
 // statut, service ; cartes entièrement cliquables ; création en fenêtre modale
 // (`hr.manage`). Aucune donnée sensible n'est lue ni affichée.
+//
+// ADR-0074 : filtres sur `Field` + `TextInput`/`Select`, statut en segments.
 
-import { Badge, Modal, buttonClasses } from '@lalanda/ui';
-import { Plus, Users } from 'lucide-react';
+import {
+  Badge,
+  Field,
+  FormGrid,
+  Modal,
+  SegmentedControl,
+  Select,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
+import { Plus, Search, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
 import { hrApi, type HrEmployeeListItem } from '@/lib/api-hr';
 
-import { BOUTON_PETIT, CHAMP } from '../../ventes/_components/form-ui';
+import { BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   FILTRES_COLLABORATEURS_INITIAUX,
@@ -101,48 +112,44 @@ export function CollaborateursListe(): React.ReactElement {
           ) : null
         }
       >
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          <input
-            type="search"
-            aria-label="Rechercher un collaborateur"
-            placeholder="Rechercher par nom, poste ou matricule…"
-            className={`${CHAMP} sm:max-w-sm`}
-            value={filtres.q}
-            onChange={(e) => setFiltres({ ...filtres, q: e.target.value })}
-          />
-          <select
-            aria-label="Service"
-            className={`${CHAMP} sm:w-auto`}
-            value={filtres.departmentId}
-            onChange={(e) => setFiltres({ ...filtres, departmentId: e.target.value })}
-          >
-            <option value="">Tous les services</option>
-            {services.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          <div className="flex gap-1" role="group" aria-label="Statut">
-            {(
-              [
-                ['active', 'Actifs'],
-                ['exited', 'Sortis'],
-                ['', 'Tous'],
-              ] as const
-            ).map(([v, l]) => (
-              <button
-                key={l}
-                type="button"
-                className={BOUTON_PETIT}
-                aria-pressed={filtres.statut === v}
-                onClick={() => setFiltres({ ...filtres, statut: v })}
-              >
-                {l}
-              </button>
-            ))}
-          </div>
-        </div>
+        <form
+          role="search"
+          aria-label="Rechercher un collaborateur"
+          onSubmit={(e) => e.preventDefault()}
+        >
+          <FormGrid>
+            <Field id="rh-col-q" label="Rechercher" size="lg">
+              <TextInput
+                type="search"
+                placeholder="Nom, poste ou matricule…"
+                value={filtres.q}
+                onChange={(e) => setFiltres({ ...filtres, q: e.target.value })}
+                leading={<Search aria-hidden="true" className="h-4 w-4" />}
+              />
+            </Field>
+            <Field id="rh-col-service" label="Service" size="md">
+              <Select<string>
+                value={filtres.departmentId}
+                onChange={(v) => setFiltres({ ...filtres, departmentId: v })}
+                options={[
+                  { value: '', label: 'Tous les services' },
+                  ...services.map((s) => ({ value: s.id, label: s.name })),
+                ]}
+              />
+            </Field>
+            <Field id="rh-col-statut" label="Statut" group size="md" newRow>
+              <SegmentedControl<FiltresCollaborateurs['statut']>
+                value={filtres.statut}
+                onChange={(v) => setFiltres({ ...filtres, statut: v })}
+                options={[
+                  { value: 'active', label: 'Actifs' },
+                  { value: 'exited', label: 'Sortis' },
+                  { value: '', label: 'Tous' },
+                ]}
+              />
+            </Field>
+          </FormGrid>
+        </form>
       </Bandeau>
 
       <Modal

@@ -4,14 +4,12 @@
 // Cartes entièrement cliquables vers l'onglet de la fiche concernée ; délais
 // rendus par l'API, jamais recomptés ici.
 
-import { Badge } from '@lalanda/ui';
+import { Badge, Field, FormGrid, Select } from '@lalanda/ui';
 import { CalendarClock } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { hrAdminApi, type HrDeadlinesView } from '@/lib/api-hr-admin';
-
-import { CHAMP } from '../../ventes/_components/form-ui';
 
 import {
   HORIZONS,
@@ -80,36 +78,29 @@ export function Echeances(): React.ReactElement {
             ))}
           </div>
         ) : null}
-        <div className="grid gap-3 sm:grid-cols-2 lg:max-w-2xl">
-          <label className="flex min-w-0 flex-col gap-1 text-xs font-medium">
-            Horizon
-            <select
-              className={CHAMP}
-              value={horizon === null ? '' : String(horizon)}
-              onChange={(e) => setHorizon(horizonDepuis(e.target.value))}
-            >
-              {HORIZONS.map((h) => (
-                <option key={String(h)} value={h === null ? '' : String(h)}>
-                  {libelleHorizon(h)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex min-w-0 flex-col gap-1 text-xs font-medium">
-            Nature
-            <select
-              className={CHAMP}
-              value={nature}
-              onChange={(e) => setNature(e.target.value as NatureEcheance | '')}
-            >
-              <option value="">Toutes</option>
-              {NATURES_ECHEANCE.map((k) => (
-                <option key={k} value={k}>
-                  {LIBELLES_ECHEANCE[k]}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="lg:max-w-2xl">
+          <FormGrid>
+            <Field label="Horizon" size="md">
+              <Select<string>
+                value={horizon === null ? '' : String(horizon)}
+                onChange={(v) => setHorizon(horizonDepuis(v))}
+                options={HORIZONS.map((h) => ({
+                  value: h === null ? '' : String(h),
+                  label: libelleHorizon(h),
+                }))}
+              />
+            </Field>
+            <Field label="Nature" size="md">
+              <Select<NatureEcheance | ''>
+                value={nature}
+                onChange={setNature}
+                options={[
+                  { value: '', label: 'Toutes' },
+                  ...NATURES_ECHEANCE.map((k) => ({ value: k, label: LIBELLES_ECHEANCE[k] })),
+                ]}
+              />
+            </Field>
+          </FormGrid>
         </div>
       </Bandeau>
 

@@ -5,13 +5,16 @@
 // par sa FORME (bordure pointillée) et son texte, pas seulement sa couleur ; un
 // type confidentiel arrive « Absent » et garde la couleur commune (§ 8 : aucune
 // couleur ne trahit le type).
+//
+// ADR-0074 : affichage en segments, portée en `Select`.
 
+import { SegmentedControl, Select } from '@lalanda/ui';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useId, useMemo, useState } from 'react';
 
 import { hrApi, type HrCalendarScope, type HrCalendarView } from '@/lib/api-hr';
 
-import { BOUTON_PETIT, CHAMP } from '../../ventes/_components/form-ui';
+import { BOUTON_PETIT } from '../../ventes/_components/form-ui';
 import { JOURS_COURTS, jourSemaine } from '../../projets/_components/calendar-model';
 
 import {
@@ -110,37 +113,24 @@ export function CalendrierAbsences({
         >
           {p.titre}
         </h3>
-        <div className="flex gap-1" role="group" aria-label="Affichage">
-          {(['mois', 'semaine'] as const).map((v) => (
-            <button
-              key={v}
-              type="button"
-              className={BOUTON_PETIT}
-              aria-pressed={vue === v}
-              onClick={() => setVue(v)}
-            >
-              {v === 'mois' ? 'Mois' : 'Semaine'}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl<VueCalendrier>
+          aria-label="Affichage"
+          value={vue}
+          onChange={setVue}
+          options={[
+            { value: 'mois', label: 'Mois' },
+            { value: 'semaine', label: 'Semaine' },
+          ]}
+        />
         {portees.length > 1 ? (
-          <>
-            <label htmlFor={`${id}-portee`} className="sr-only">
-              Absences de
-            </label>
-            <select
-              id={`${id}-portee`}
-              className={`${CHAMP} w-auto`}
-              value={portee}
-              onChange={(e) => setPortee(e.target.value as HrCalendarScope)}
-            >
-              {portees.map((s) => (
-                <option key={s} value={s}>
-                  {LIBELLES_PORTEE[s]}
-                </option>
-              ))}
-            </select>
-          </>
+          <Select<HrCalendarScope>
+            id={`${id}-portee`}
+            aria-label="Absences de"
+            className="w-full sm:w-56"
+            value={portee}
+            onChange={setPortee}
+            options={portees.map((s) => ({ value: s, label: LIBELLES_PORTEE[s] }))}
+          />
         ) : null}
       </div>
 

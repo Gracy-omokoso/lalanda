@@ -6,21 +6,28 @@
 // formulaire multipart, rien dans l'URL. Téléchargement inerte (l'API sert la pièce
 // en pièce jointe) ; l'expiration est rappelée, le délai restant vit dans
 // « Échéances ».
+//
+// ADR-0074 : catégorie en `Select`, dates en `DatePicker`, grille sémantique,
+// options en interrupteurs. Mêmes champs envoyés, même `validerDocument`.
 
-import { Badge, Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Badge,
+  DatePicker,
+  Field,
+  FormGrid,
+  Modal,
+  Select,
+  Switch,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import { Download, FileText, Lock, Trash2, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useId, useState } from 'react';
 
 import { hrAdminApi, type HrDocumentView } from '@/lib/api-hr-admin';
 
-import {
-  Alerte,
-  BOUTON_DANGER,
-  BOUTON_PETIT,
-  CHAMP,
-  Champ,
-} from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_DANGER, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   ACCEPT_DOCUMENT,
@@ -267,91 +274,75 @@ function EnvoiDocument({
 
   return (
     <form className="flex flex-col gap-4" onSubmit={(e) => void envoyer(e)} noValidate>
-      <Champ id={`${id}-fichier`} label="Fichier" requis>
-        <input
-          id={`${id}-fichier`}
-          type="file"
-          accept={ACCEPT_DOCUMENT}
-          className={CHAMP}
-          onChange={(e) => setFichier(e.target.files?.[0] ?? null)}
-        />
-      </Champ>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Champ id={`${id}-categorie`} label="Catégorie" requis>
-          <select
-            id={`${id}-categorie`}
-            className={CHAMP}
+      <FormGrid>
+        <Field id={`${id}-fichier`} label="Fichier" required size="full">
+          <TextInput
+            type="file"
+            accept={ACCEPT_DOCUMENT}
+            className="py-1.5"
+            onChange={(e) => setFichier(e.target.files?.[0] ?? null)}
+          />
+        </Field>
+        <Field
+          id={`${id}-categorie`}
+          label="Catégorie"
+          required
+          size="md"
+          newRow
+          disabled={categories.length === 1}
+        >
+          <Select<FormDocument['category']>
             value={f.category}
-            disabled={categories.length === 1}
-            onChange={(e) => setF(changerCategorie(f, e.target.value as FormDocument['category']))}
-          >
-            {categories.map((c) => (
-              <option key={c} value={c}>
-                {LIBELLES_CATEGORIE[c]}
-              </option>
-            ))}
-          </select>
-        </Champ>
-        <Champ id={`${id}-libelle`} label="Libellé" requis>
-          <input
-            id={`${id}-libelle`}
-            className={CHAMP}
+            onChange={(v) => setF(changerCategorie(f, v))}
+            options={categories.map((c) => ({ value: c, label: LIBELLES_CATEGORIE[c] }))}
+          />
+        </Field>
+        <Field id={`${id}-libelle`} label="Libellé" required size="md">
+          <TextInput
             value={f.label}
             maxLength={120}
             autoComplete="off"
             onChange={(e) => setF({ ...f, label: e.target.value })}
           />
-        </Champ>
-        <Champ id={`${id}-emis`} label="Délivré le">
-          <input
-            id={`${id}-emis`}
-            type="date"
-            className={CHAMP}
+        </Field>
+        <Field id={`${id}-emis`} label="Délivré le" optional size="sm" newRow>
+          <DatePicker
             value={f.issuedOn}
-            onChange={(e) => setF({ ...f, issuedOn: e.target.value })}
+            onChange={(v) => setF({ ...f, issuedOn: v })}
+            shortcuts={['today']}
           />
-        </Champ>
-        <Champ
+        </Field>
+        <Field
           id={`${id}-expire`}
           label="Expire le"
-          aide="Facultatif. Un rappel est envoyé avant l’expiration."
+          optional
+          size="sm"
+          hint="Un rappel est envoyé avant l’expiration."
         >
-          <input
-            id={`${id}-expire`}
-            type="date"
-            className={CHAMP}
+          <DatePicker
             value={f.expiresOn}
-            onChange={(e) => setF({ ...f, expiresOn: e.target.value })}
+            onChange={(v) => setF({ ...f, expiresOn: v })}
+            shortcuts={['endOfYear']}
           />
-        </Champ>
-      </div>
-      <label className="flex items-start gap-2 text-sm">
-        <input
-          type="checkbox"
-          className="mt-0.5"
-          checked={f.sensitive}
-          disabled={sensibleImpose}
-          onChange={(e) => setF({ ...f, sensitive: e.target.checked })}
-        />
-        <span>
-          <span className="font-medium">Pièce sensible</span>
-          <span className="block text-xs text-[var(--foreground-muted)]">
-            {sensibleImpose
-              ? 'Toujours sensible pour cette catégorie : la pièce est chiffrée par Lalanda.'
-              : 'Chiffrée par Lalanda et réservée aux personnes habilitées.'}
-          </span>
-        </span>
-      </label>
+        </Field>
+      </FormGrid>
+      <Switch
+        label="Pièce sensible"
+        description={
+          sensibleImpose
+            ? 'Toujours sensible pour cette catégorie : la pièce est chiffrée par Lalanda.'
+            : 'Chiffrée par Lalanda et réservée aux personnes habilitées.'
+        }
+        checked={f.sensitive}
+        disabled={sensibleImpose}
+        onChange={(v) => setF({ ...f, sensitive: v })}
+      />
       {categories.length > 1 ? (
-        <label className="flex items-start gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="mt-0.5"
-            checked={f.visibleToEmployee}
-            onChange={(e) => setF({ ...f, visibleToEmployee: e.target.checked })}
-          />
-          <span className="font-medium">Visible du collaborateur dans son espace</span>
-        </label>
+        <Switch
+          label="Visible du collaborateur dans son espace"
+          checked={f.visibleToEmployee}
+          onChange={(v) => setF({ ...f, visibleToEmployee: v })}
+        />
       ) : null}
       {erreurs.length > 0 ? (
         <Alerte>

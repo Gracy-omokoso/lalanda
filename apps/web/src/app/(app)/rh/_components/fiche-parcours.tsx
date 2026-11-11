@@ -5,22 +5,31 @@
 // (fenêtre modale), réintégration d'une sortie future, anonymisation avec
 // confirmation forte. Chaque élément de liste apparaît aussi dans « Mes tâches »
 // de son assigné (l'API le sert) ; ici, l'assigné ou `hr.manage` coche.
+//
+// ADR-0074 : éléments de liste en cases stylées, modèle et nature de sortie en
+// `Select`, date de sortie en `DatePicker`. Mêmes champs envoyés, même
+// validation (`validerSortie`).
 
-import { Badge, Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Badge,
+  Button,
+  Checkbox,
+  DatePicker,
+  Field,
+  FormGrid,
+  Modal,
+  Select,
+  SubmitButton,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import { ClipboardCheck, DoorOpen, ShieldOff, Undo2, UserMinus } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useId, useState } from 'react';
 
 import { hrAdminApi, type ChecklistTemplateView, type ChecklistView } from '@/lib/api-hr-admin';
 
-import {
-  Alerte,
-  BOUTON_DANGER,
-  BOUTON_PETIT,
-  CHAMP,
-  Champ,
-  aria,
-} from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_DANGER, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { useFiche } from './fiche-chrome';
 import {
@@ -184,28 +193,30 @@ export function FicheParcours(): React.ReactElement {
                       ? true
                       : peutCocher(actions, i, monUserId) && fiche.status !== 'anonymized';
                     return (
-                      <li key={i.id} className="flex items-start gap-3 py-2">
-                        <input
+                      <li key={i.id} className="py-2">
+                        <Checkbox
                           id={`el-${l.id}-${i.id}`}
-                          type="checkbox"
-                          className="mt-1 h-4 w-4 shrink-0"
                           checked={i.doneAt !== null}
                           disabled={!cochable}
-                          onChange={(e) => void cocher(l, i.id, e.target.checked)}
+                          onChange={(fait) => void cocher(l, i.id, fait)}
+                          label={
+                            <span className={`break-words ${i.doneAt ? 'line-through' : ''}`}>
+                              {i.label}
+                            </span>
+                          }
+                          description={
+                            <>
+                              <span
+                                className={
+                                  etat.retard ? 'font-medium text-[var(--danger)]' : undefined
+                                }
+                              >
+                                {etat.texte} · Assigné : {libelleAssigne(i, monUserId)}
+                              </span>
+                              {i.note ? <span className="block">{i.note}</span> : null}
+                            </>
+                          }
                         />
-                        <label htmlFor={`el-${l.id}-${i.id}`} className="flex min-w-0 flex-col">
-                          <span className={`break-words ${i.doneAt ? 'line-through' : ''}`}>
-                            {i.label}
-                          </span>
-                          <span
-                            className={`text-xs ${etat.retard ? 'font-medium text-[var(--danger)]' : 'text-[var(--foreground-muted)]'}`}
-                          >
-                            {etat.texte} · Assigné : {libelleAssigne(i, monUserId)}
-                          </span>
-                          {i.note ? (
-                            <span className="text-xs text-[var(--foreground-muted)]">{i.note}</span>
-                          ) : null}
-                        </label>
                       </li>
                     );
                   })}
@@ -376,6 +387,11 @@ function LancerListe({
       className="flex flex-col gap-4"
       onSubmit={(e) => {
         e.preventDefault();
+        // Contrôle à l'envoi (le `<select>` natif ne pouvait pas rester vide).
+        if (choix === '') {
+          setErreur('Choisissez un modèle.');
+          return;
+        }
         setEnvoi(true);
         setErreur(null);
         onLancer(choix)
@@ -383,32 +399,36 @@ function LancerListe({
           .finally(() => setEnvoi(false));
       }}
     >
-      <Champ id={`${id}-modele`} label="Modèle" requis>
-        <select
-          id={`${id}-modele`}
-          className={CHAMP}
-          value={choix}
-          onChange={(e) => setChoix(e.target.value)}
-        >
-          {modeles.map((m) => (
-            <option key={m.id} value={m.id}>
-              {LIBELLES_LISTE[m.kind]} — {m.label} ({m.items.length} éléments)
-            </option>
-          ))}
-        </select>
-      </Champ>
+      <FormGrid>
+        <Field id={`${id}-modele`} label="Modèle" required size="full">
+          <Select<string>
+            value={choix}
+            onChange={setChoix}
+            options={modeles.map((m) => ({
+              value: m.id,
+              label: `${LIBELLES_LISTE[m.kind]} — ${m.label}`,
+              description: `${m.items.length} éléments`,
+            }))}
+          />
+        </Field>
+      </FormGrid>
       {erreur ? (
         <Alerte>
           <p>{erreur}</p>
         </Alerte>
       ) : null}
-      <div className="flex flex-wrap justify-end gap-2">
-        <button type="button" className={BOUTON_PETIT} onClick={onAnnuler} disabled={envoi}>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+        <Button onClick={onAnnuler} disabled={envoi} className="max-sm:h-11">
           Annuler
-        </button>
-        <button type="submit" className={buttonClasses('primary', 'sm')} disabled={envoi}>
-          {envoi ? 'Lancement…' : 'Lancer la liste'}
-        </button>
+        </Button>
+        <SubmitButton
+          busy={envoi}
+          busyLabel="Lancement…"
+          showShortcut={false}
+          className="max-sm:h-11"
+        >
+          Lancer la liste
+        </SubmitButton>
       </div>
     </form>
   );
@@ -451,54 +471,49 @@ function FormulaireSortie({
 
   return (
     <form className="flex flex-col gap-4" onSubmit={(e) => void envoyer(e)} noValidate>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Champ id={`${id}-date`} label="Date de sortie" requis erreur={erreurs.endDate}>
-          <input
-            id={`${id}-date`}
-            type="date"
-            className={CHAMP}
+      <FormGrid>
+        <Field id={`${id}-date`} label="Date de sortie" required size="sm" error={erreurs.endDate}>
+          <DatePicker
             value={f.endDate}
-            onChange={(e) => setF({ ...f, endDate: e.target.value })}
-            {...aria(`${id}-date`, erreurs.endDate)}
+            onChange={(v) => setF({ ...f, endDate: v })}
+            required
+            shortcuts={['today', 'endOfMonth', 'plus30']}
           />
-        </Champ>
-        <Champ
+        </Field>
+        <Field
           id={`${id}-nature`}
           label="Nature de la sortie"
-          requis
-          erreur={erreurs.exitCategory}
-          aide="Sert aux rapports. Le motif détaillé se note dans les données sensibles."
+          required
+          size="md"
+          error={erreurs.exitCategory}
+          hint="Sert aux rapports. Le motif détaillé se note dans les données sensibles."
         >
-          <select
-            id={`${id}-nature`}
-            className={CHAMP}
+          <Select<FormSortie['exitCategory']>
             value={f.exitCategory}
-            onChange={(e) =>
-              setF({ ...f, exitCategory: e.target.value as FormSortie['exitCategory'] })
-            }
-            {...aria(`${id}-nature`, erreurs.exitCategory, true)}
-          >
-            <option value="">Choisir…</option>
-            {CATEGORIES_SORTIE.map((c) => (
-              <option key={c} value={c}>
-                {LIBELLES_SORTIE[c]}
-              </option>
-            ))}
-          </select>
-        </Champ>
-      </div>
+            placeholder="Choisir…"
+            required
+            onChange={(v) => setF({ ...f, exitCategory: v })}
+            options={CATEGORIES_SORTIE.map((c) => ({ value: c, label: LIBELLES_SORTIE[c] }))}
+          />
+        </Field>
+      </FormGrid>
       {erreur ? (
         <Alerte>
           <p>{erreur}</p>
         </Alerte>
       ) : null}
-      <div className="flex flex-wrap justify-end gap-2">
-        <button type="button" className={BOUTON_PETIT} onClick={onAnnuler} disabled={envoi}>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+        <Button onClick={onAnnuler} disabled={envoi} className="max-sm:h-11">
           Annuler
-        </button>
-        <button type="submit" className={buttonClasses('primary', 'sm')} disabled={envoi}>
-          {envoi ? 'Enregistrement…' : 'Enregistrer la sortie'}
-        </button>
+        </Button>
+        <SubmitButton
+          busy={envoi}
+          busyLabel="Enregistrement…"
+          showShortcut={false}
+          className="max-sm:h-11"
+        >
+          Enregistrer la sortie
+        </SubmitButton>
       </div>
     </form>
   );
@@ -557,20 +572,22 @@ function Anonymisation({
     >
       <div className="flex flex-col gap-3 text-sm">
         <p>{PHRASE_ANONYMISATION}</p>
-        <Champ
-          id={`${id}-nom`}
-          label={`Pour confirmer, tapez « ${nom} »`}
-          aide="Le bouton s’active quand le nom est retapé à l’identique."
-        >
-          <input
+        <FormGrid>
+          <Field
             id={`${id}-nom`}
-            className={CHAMP}
-            value={saisie}
-            autoComplete="off"
-            onChange={(e) => setSaisie(e.target.value)}
-            {...aria(`${id}-nom`, undefined, true)}
-          />
-        </Champ>
+            label={`Pour confirmer, tapez « ${nom} »`}
+            required
+            size="full"
+            hint="Le bouton s’active quand le nom est retapé à l’identique."
+          >
+            <TextInput
+              value={saisie}
+              autoComplete="off"
+              spellCheck={false}
+              onChange={(e) => setSaisie(e.target.value)}
+            />
+          </Field>
+        </FormGrid>
         {erreur ? (
           <Alerte>
             <p>{erreur}</p>

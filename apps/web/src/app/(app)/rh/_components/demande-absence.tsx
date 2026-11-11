@@ -4,13 +4,28 @@
 // modales). Les types d'absence sont lus (`GET /hr/leave-types`, lecture de tout
 // membre) ; le nombre de jours est calculé par l'API à l'envoi et affiché tel que
 // rendu, jamais par l'écran.
+//
+// ADR-0074 : type en `Select`, jours en `DatePicker`, demi-journées en
+// segments. Mêmes champs envoyés, même validation (`validerDemande`).
 
-import { Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Button,
+  DatePicker,
+  Field,
+  Form,
+  FormGrid,
+  Modal,
+  SegmentedControl,
+  Select,
+  SubmitButton,
+  TextArea,
+  buttonClasses,
+} from '@lalanda/ui';
 import { useEffect, useId, useState } from 'react';
 
 import { hrApi, type LeaveRequestView, type LeaveTypeView } from '@/lib/api-hr';
 
-import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from '../../ventes/_components/form-ui';
+import { Alerte } from '../../ventes/_components/form-ui';
 
 import {
   aideType,
@@ -141,117 +156,106 @@ function Formulaire({
   }
 
   return (
-    <form className="flex flex-col gap-4" onSubmit={(e) => void envoyer(e)} noValidate>
-      <Champ
-        id={`${id}-type`}
-        label="Type d’absence"
-        requis
-        erreur={erreurs.typeId}
-        aide={aideType(type)}
-      >
-        <select
+    <Form onSubmit={(e) => void envoyer(e)} className="flex flex-col gap-4">
+      <FormGrid>
+        <Field
           id={`${id}-type`}
-          className={CHAMP}
-          value={f.typeId}
-          disabled={types === null}
-          onChange={(e) => maj({ typeId: e.target.value })}
-          {...aria(`${id}-type`, erreurs.typeId, aideType(type) !== undefined)}
+          label="Type d’absence"
+          required
+          size="lg"
+          error={erreurs.typeId}
+          hint={aideType(type)}
         >
-          <option value="">{types === null ? 'Chargement…' : 'Choisir…'}</option>
-          {(types ?? []).map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.label}
-            </option>
-          ))}
-        </select>
-      </Champ>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Champ id={`${id}-debut`} label="Premier jour" requis erreur={erreurs.debut}>
-          <input
-            id={`${id}-debut`}
-            type="date"
-            className={CHAMP}
-            value={f.debut}
-            onChange={(e) => maj({ debut: e.target.value })}
-            {...aria(`${id}-debut`, erreurs.debut)}
+          <Select<string>
+            value={f.typeId}
+            disabled={types === null}
+            loading={types === null}
+            onChange={(v) => maj({ typeId: v })}
+            placeholder={types === null ? 'Chargement…' : 'Choisir…'}
+            options={(types ?? []).map((t) => ({ value: t.id, label: t.label }))}
           />
-        </Champ>
-        <Champ
+        </Field>
+        <Field
+          id={`${id}-debut`}
+          label="Premier jour"
+          required
+          size="sm"
+          newRow
+          error={erreurs.debut}
+        >
+          <DatePicker
+            value={f.debut}
+            onChange={(v) => maj({ debut: v })}
+            shortcuts={['today', 'plus7']}
+          />
+        </Field>
+        <Field
           id={`${id}-fin`}
           label="Dernier jour"
-          erreur={erreurs.fin}
-          aide="Laisser vide pour une seule journée."
+          optional
+          size="sm"
+          error={erreurs.fin}
+          hint="Laisser vide pour une seule journée."
         >
-          <input
-            id={`${id}-fin`}
-            type="date"
-            className={CHAMP}
+          <DatePicker
             value={f.fin}
-            min={f.debut || undefined}
-            onChange={(e) => maj({ fin: e.target.value })}
-            {...aria(`${id}-fin`, erreurs.fin, true)}
+            {...(f.debut ? { min: f.debut } : {})}
+            onChange={(v) => maj({ fin: v })}
+            shortcuts={['plus7', 'endOfMonth']}
           />
-        </Champ>
-      </div>
+        </Field>
 
-      {demi ? (
-        unJour(f) ? (
-          <Champ id={`${id}-demi`} label="Durée de la journée">
-            <select
-              id={`${id}-demi`}
-              className={CHAMP}
-              value={f.demiUnique}
-              onChange={(e) => maj({ demiUnique: e.target.value as FormDemande['demiUnique'] })}
-            >
-              <option value="full">Journée entière</option>
-              <option value="am">Matin seulement</option>
-              <option value="pm">Après-midi seulement</option>
-            </select>
-          </Champ>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Champ id={`${id}-demi-debut`} label="Le premier jour">
-              <select
-                id={`${id}-demi-debut`}
-                className={CHAMP}
-                value={f.demiDebut}
-                onChange={(e) => maj({ demiDebut: e.target.value as FormDemande['demiDebut'] })}
-              >
-                <option value="full">Journée entière</option>
-                <option value="pm">À partir de l’après-midi</option>
-              </select>
-            </Champ>
-            <Champ id={`${id}-demi-fin`} label="Le dernier jour">
-              <select
-                id={`${id}-demi-fin`}
-                className={CHAMP}
-                value={f.demiFin}
-                onChange={(e) => maj({ demiFin: e.target.value as FormDemande['demiFin'] })}
-              >
-                <option value="full">Journée entière</option>
-                <option value="am">Jusqu’à midi</option>
-              </select>
-            </Champ>
-          </div>
-        )
-      ) : null}
+        {demi ? (
+          unJour(f) ? (
+            <Field id={`${id}-demi`} label="Durée de la journée" group size="full" newRow>
+              <SegmentedControl<FormDemande['demiUnique']>
+                value={f.demiUnique}
+                onChange={(v) => maj({ demiUnique: v })}
+                options={[
+                  { value: 'full', label: 'Journée entière' },
+                  { value: 'am', label: 'Matin' },
+                  { value: 'pm', label: 'Après-midi' },
+                ]}
+              />
+            </Field>
+          ) : (
+            <>
+              <Field id={`${id}-demi-debut`} label="Le premier jour" group size="md" newRow>
+                <SegmentedControl<FormDemande['demiDebut']>
+                  value={f.demiDebut}
+                  onChange={(v) => maj({ demiDebut: v })}
+                  options={[
+                    { value: 'full', label: 'Journée entière' },
+                    { value: 'pm', label: 'Dès l’après-midi' },
+                  ]}
+                />
+              </Field>
+              <Field id={`${id}-demi-fin`} label="Le dernier jour" group size="md">
+                <SegmentedControl<FormDemande['demiFin']>
+                  value={f.demiFin}
+                  onChange={(v) => maj({ demiFin: v })}
+                  options={[
+                    { value: 'full', label: 'Journée entière' },
+                    { value: 'am', label: 'Jusqu’à midi' },
+                  ]}
+                />
+              </Field>
+            </>
+          )
+        ) : null}
 
-      <Champ
-        id={`${id}-motif`}
-        label="Motif"
-        erreur={erreurs.motif}
-        aide="Facultatif. Pour une absence confidentielle, seuls vous et les ressources humaines le lisent."
-      >
-        <textarea
+        <Field
           id={`${id}-motif`}
-          rows={3}
-          className={CHAMP}
-          value={f.motif}
-          onChange={(e) => maj({ motif: e.target.value })}
-          {...aria(`${id}-motif`, erreurs.motif, true)}
-        />
-      </Champ>
+          label="Motif"
+          optional
+          size="full"
+          newRow
+          error={erreurs.motif}
+          hint="Pour une absence confidentielle, seuls vous et les ressources humaines le lisent."
+        >
+          <TextArea value={f.motif} onChange={(e) => maj({ motif: e.target.value })} />
+        </Field>
+      </FormGrid>
 
       {erreur ? (
         <Alerte>
@@ -259,18 +263,19 @@ function Formulaire({
         </Alerte>
       ) : null}
 
-      <div className="flex flex-wrap justify-end gap-2">
-        <button type="button" className={BOUTON_PETIT} onClick={onFermer} disabled={envoi}>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+        <Button onClick={onFermer} disabled={envoi} className="max-sm:h-11">
           Annuler
-        </button>
-        <button
-          type="submit"
-          className={buttonClasses('primary', 'sm')}
-          disabled={envoi || types === null}
+        </Button>
+        <SubmitButton
+          busy={envoi}
+          busyLabel="Envoi…"
+          disabled={types === null}
+          className="max-sm:h-11"
         >
-          {envoi ? 'Envoi…' : 'Envoyer la demande'}
-        </button>
+          Envoyer la demande
+        </SubmitButton>
       </div>
-    </form>
+    </Form>
   );
 }

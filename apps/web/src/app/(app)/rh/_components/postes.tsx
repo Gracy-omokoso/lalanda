@@ -5,21 +5,31 @@
 // historique. Un poste se pourvoit depuis la fiche d'un collaborateur (« Nouveau
 // poste » ou « Remplacement poste pour poste ») ; la sortie du titulaire le rend
 // vacant. Seul un poste vacant se supprime. L'API reste juge.
+//
+// ADR-0074 : filtre de statut en segments ; service en `EntityPicker` avec
+// « + » (fiche service complète en fenêtre, sous `hr.manage`).
 
-import { Badge, Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Badge,
+  Button,
+  EntityPicker,
+  Field,
+  FormGrid,
+  Modal,
+  SegmentedControl,
+  SubmitButton,
+  TextInput,
+  buttonClasses,
+  correspondRecherche,
+} from '@lalanda/ui';
 import { Briefcase, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useId, useState } from 'react';
 
+import type { HrDepartmentView } from '@/lib/api-hr';
 import { hrLot1Api, type PositionDetailView, type PositionView } from '@/lib/api-hr-lot1';
 
-import {
-  Alerte,
-  BOUTON_DANGER,
-  BOUTON_PETIT,
-  CHAMP,
-  Champ,
-} from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_DANGER, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { LIBELLES_STATUT_POSTE } from './lot1-model';
 import { useReferentielsRh } from './referentiels';
@@ -34,6 +44,7 @@ import {
   type Lecture,
 } from './rh-model';
 import { Bandeau, Chargement, EchecLecture, PhraseSection } from './rh-ui';
+import { FormulaireService } from './services';
 
 type Filtre = 'current' | 'open' | 'filled' | 'deleted';
 
@@ -107,19 +118,12 @@ export function Postes(): React.ReactElement {
           ) : null
         }
       >
-        <div className="flex flex-wrap gap-1" role="group" aria-label="Statut">
-          {FILTRES.map(([v, l]) => (
-            <button
-              key={v}
-              type="button"
-              className={BOUTON_PETIT}
-              aria-pressed={filtre === v}
-              onClick={() => setFiltre(v)}
-            >
-              {l}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl<Filtre>
+          aria-label="Statut"
+          value={filtre}
+          onChange={setFiltre}
+          options={FILTRES.map(([v, l]) => ({ value: v, label: l }))}
+        />
       </Bandeau>
 
       {erreur ? (
@@ -283,7 +287,15 @@ function FormulairePoste({
   onEnregistre: () => void;
 }): React.ReactElement {
   const id = useId();
-  const { services } = useReferentielsRh(false);
+  const { actions } = useAccesRh();
+  const gererServices = peutGererRh(actions);
+  // Les collaborateurs ne servent qu'à la création rapide d'un service (responsable).
+  const { services, employes } = useReferentielsRh(gererServices);
+  const [servicesAjoutes, setServicesAjoutes] = useState<HrDepartmentView[]>([]);
+  const tousServices = [
+    ...services,
+    ...servicesAjoutes.filter((a) => !services.some((s) => s.id === a.id)),
+  ];
   const [titre, setTitre] = useState(poste?.title ?? '');
   const [service, setService] = useState(poste?.departmentId ?? '');
   const [erreur, setErreur] = useState<string | null>(null);
@@ -316,43 +328,74 @@ function FormulairePoste({
     }
   }
 
+  const serviceChoisi = tousServices.find((s) => s.id === service) ?? null;
+
   return (
     <form className="flex flex-col gap-4" onSubmit={(e) => void envoyer(e)} noValidate>
-      <Champ id={`${id}-titre`} label="Intitulé" requis>
-        <input
-          id={`${id}-titre`}
-          className={CHAMP}
-          value={titre}
-          onChange={(e) => setTitre(e.target.value)}
-        />
-      </Champ>
-      <Champ id={`${id}-service`} label="Service">
-        <select
+      <FormGrid>
+        <Field id={`${id}-titre`} label="Intitulé" required size="lg">
+          <TextInput value={titre} onChange={(e) => setTitre(e.target.value)} />
+        </Field>
+        <Field
           id={`${id}-service`}
-          className={CHAMP}
-          value={service}
-          onChange={(e) => setService(e.target.value)}
+          label="Service"
+          size="lg"
+          newRow
+          hint={
+            gererServices
+              ? 'Tapez pour chercher. Service absent : « + » le crée sans quitter le poste.'
+              : 'Tapez pour chercher. Vide : aucun service.'
+          }
         >
-          <option value="">Aucun service</option>
-          {services.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-      </Champ>
+          <EntityPicker<HrDepartmentView>
+            value={serviceChoisi}
+            onChange={(s) => setService(s?.id ?? '')}
+            search={async (q) =>
+              tousServices
+                .filter((s) => correspondRecherche([s.name], q))
+                .sort((a, b) => a.name.localeCompare(b.name, 'fr'))
+            }
+            refreshKey={tousServices.length}
+            getKey={(s) => s.id}
+            getLabel={(s) => s.name}
+            getDescription={(s) => tousServices.find((p) => p.id === s.parentId)?.name ?? null}
+            placeholder="Aucun service"
+            debounceMs={0}
+            emptyText="Aucun service ne correspond."
+            createTitle="Nouveau service"
+            createButtonLabel="Créer un service"
+            {...(gererServices
+              ? {
+                  createForm: ({ initialText, onCreated, onCancel }) => (
+                    <FormulaireService
+                      service={null}
+                      services={tousServices}
+                      employes={employes}
+                      nomInitial={initialText}
+                      onEnregistre={(cree) => {
+                        setServicesAjoutes((l) => [...l, cree]);
+                        onCreated(cree);
+                      }}
+                      onAnnuler={onCancel}
+                    />
+                  ),
+                }
+              : {})}
+          />
+        </Field>
+      </FormGrid>
       {erreur ? (
         <Alerte>
           <p>{erreur}</p>
         </Alerte>
       ) : null}
-      <div className="flex justify-end gap-2">
-        <button type="button" className={BOUTON_PETIT} onClick={onAnnuler} disabled={envoi}>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <Button size="sm" onClick={onAnnuler} disabled={envoi} className="max-sm:h-11">
           Annuler
-        </button>
-        <button type="submit" className={buttonClasses('primary', 'sm')} disabled={envoi}>
-          {envoi ? 'Enregistrement…' : 'Enregistrer'}
-        </button>
+        </Button>
+        <SubmitButton size="sm" busy={envoi} busyLabel="Enregistrement…" className="max-sm:h-11">
+          Enregistrer
+        </SubmitButton>
       </div>
     </form>
   );

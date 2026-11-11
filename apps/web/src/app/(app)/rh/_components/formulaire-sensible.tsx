@@ -13,12 +13,25 @@ import {
   type HrCurrency,
   type HrIdDocumentKind,
 } from '@lalanda/shared/hr';
-import { buttonClasses } from '@lalanda/ui';
+import {
+  Button,
+  DatePicker,
+  Field,
+  FormGrid,
+  MoneyInput,
+  PhoneInput,
+  SegmentedControl,
+  Select,
+  SubmitButton,
+  TextArea,
+  TextInput,
+  type FieldSize,
+} from '@lalanda/ui';
 import { useId, useState } from 'react';
 
 import type { HrPrivateField, HrPrivateSections } from '@/lib/api-hr-admin';
 
-import { Alerte, BOUTON_DANGER, BOUTON_PETIT, CHAMP } from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_DANGER, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   LIBELLES_PERIODE_SALAIRE,
@@ -34,7 +47,10 @@ import {
   type FormSensible,
 } from './sensible-model';
 
-const LABEL = 'flex min-w-0 flex-col gap-1 text-xs font-medium';
+// ADR-0074 : champs à la largeur de la donnée (`Field` + `FormGrid`), dates en
+// `DatePicker`, montant en `MoneyInput` (même chaîne décimale que le lecteur du
+// modèle), téléphones en `PhoneInput`, listes en `Select`, nature du moyen de
+// paiement en segments. Mêmes champs envoyés, même validation (`validerSensible`).
 
 function Texte({
   label,
@@ -42,35 +58,70 @@ function Texte({
   onChange,
   type = 'text',
   multi = false,
+  size = 'md',
+  newRow = false,
 }: {
   label: string;
   valeur: string;
   onChange: (v: string) => void;
   type?: string;
   multi?: boolean;
+  size?: FieldSize;
+  newRow?: boolean;
 }): React.ReactElement {
   return (
-    <label className={LABEL}>
-      {label}
+    <Field label={label} size={multi ? 'full' : size} newRow={newRow}>
       {multi ? (
-        <textarea
+        <TextArea
           rows={4}
-          className={CHAMP}
           value={valeur}
           autoComplete="off"
           onChange={(e) => onChange(e.target.value)}
         />
       ) : (
-        <input
+        <TextInput
           type={type}
-          className={CHAMP}
           value={valeur}
           autoComplete="off"
           spellCheck={false}
           onChange={(e) => onChange(e.target.value)}
         />
       )}
-    </label>
+    </Field>
+  );
+}
+
+function ChampDate({
+  label,
+  valeur,
+  onChange,
+  newRow = false,
+}: {
+  label: string;
+  valeur: string;
+  onChange: (v: string) => void;
+  newRow?: boolean;
+}): React.ReactElement {
+  return (
+    <Field label={label} size="sm" newRow={newRow}>
+      <DatePicker value={valeur} onChange={onChange} shortcuts={['today']} />
+    </Field>
+  );
+}
+
+function Telephone({
+  label,
+  valeur,
+  onChange,
+}: {
+  label: string;
+  valeur: string;
+  onChange: (v: string) => void;
+}): React.ReactElement {
+  return (
+    <Field label={label} size="md">
+      <PhoneInput value={valeur} autoComplete="off" onChange={onChange} />
+    </Field>
   );
 }
 
@@ -84,9 +135,9 @@ function Ligne({
   children: React.ReactNode;
 }): React.ReactElement {
   return (
-    <fieldset className="flex flex-col gap-3 rounded-[var(--radius-md)] border border-[var(--border)] p-3">
+    <fieldset className="flex min-w-0 flex-col gap-3 rounded-[var(--radius-md)] border border-[var(--border)] p-3">
       <legend className="px-1 text-xs font-semibold">{titre}</legend>
-      <div className="grid gap-3 sm:grid-cols-2">{children}</div>
+      <FormGrid>{children}</FormGrid>
       <button type="button" className={`${BOUTON_DANGER} self-start`} onClick={onRetirer}>
         Retirer
       </button>
@@ -168,51 +219,39 @@ export function FormulaireSensible<F extends HrPrivateField>({
           </p>
           {f.salaires.map((s, i) => (
             <Ligne key={i} titre={`Salaire ${i + 1}`} onRetirer={() => retirer('salaires', i)}>
-              <Texte
+              <ChampDate
                 label="En vigueur depuis le"
-                type="date"
                 valeur={s.effectiveFrom}
                 onChange={(v) => majLigne('salaires', i, { effectiveFrom: v })}
               />
-              <Texte
-                label="Montant"
-                valeur={s.amount}
-                onChange={(v) => majLigne('salaires', i, { amount: v })}
-              />
-              <label className={LABEL}>
-                Devise
-                <select
-                  className={CHAMP}
+              <Field label="Montant" size="sm">
+                <MoneyInput
+                  value={s.amount}
+                  currency={s.currency}
+                  autoComplete="off"
+                  onChange={(v) => majLigne('salaires', i, { amount: v })}
+                />
+              </Field>
+              <Field label="Devise" size="sm" group>
+                <SegmentedControl<HrCurrency>
                   value={s.currency}
-                  onChange={(e) =>
-                    majLigne('salaires', i, { currency: e.target.value as HrCurrency })
-                  }
-                >
-                  {HR_CURRENCIES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className={LABEL}>
-                Période
-                <select
-                  className={CHAMP}
+                  onChange={(v) => majLigne('salaires', i, { currency: v })}
+                  options={HR_CURRENCIES.map((c) => ({ value: c, label: c }))}
+                />
+              </Field>
+              <Field label="Période" size="sm">
+                <Select<HrCompensationPeriod>
                   value={s.period}
-                  onChange={(e) =>
-                    majLigne('salaires', i, { period: e.target.value as HrCompensationPeriod })
-                  }
-                >
-                  {HR_COMPENSATION_PERIODS.map((p) => (
-                    <option key={p} value={p}>
-                      {LIBELLES_PERIODE_SALAIRE[p]}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  onChange={(v) => majLigne('salaires', i, { period: v })}
+                  options={HR_COMPENSATION_PERIODS.map((p) => ({
+                    value: p,
+                    label: LIBELLES_PERIODE_SALAIRE[p],
+                  }))}
+                />
+              </Field>
               <Texte
                 label="Note (facultative)"
+                size="full"
                 valeur={s.note}
                 onChange={(v) => majLigne('salaires', i, { note: v })}
               />
@@ -230,21 +269,19 @@ export function FormulaireSensible<F extends HrPrivateField>({
         <>
           {f.comptes.map((c, i) => (
             <Ligne key={i} titre={`Moyen ${i + 1}`} onRetirer={() => retirer('comptes', i)}>
-              <label className={LABEL}>
-                Nature
-                <select
-                  className={CHAMP}
+              <Field label="Nature" size="full" group>
+                <SegmentedControl<'bank' | 'mobile_money'>
                   value={c.kind}
-                  onChange={(e) =>
-                    majLigne('comptes', i, { kind: e.target.value as 'bank' | 'mobile_money' })
-                  }
-                >
-                  <option value="bank">Compte bancaire</option>
-                  <option value="mobile_money">Mobile money</option>
-                </select>
-              </label>
+                  onChange={(v) => majLigne('comptes', i, { kind: v })}
+                  options={[
+                    { value: 'bank', label: 'Compte bancaire' },
+                    { value: 'mobile_money', label: 'Mobile money' },
+                  ]}
+                />
+              </Field>
               <Texte
                 label={c.kind === 'bank' ? 'Banque' : 'Opérateur'}
+                newRow
                 valeur={c.nom}
                 onChange={(v) => majLigne('comptes', i, { nom: v })}
               />
@@ -263,11 +300,13 @@ export function FormulaireSensible<F extends HrPrivateField>({
                 <>
                   <Texte
                     label="IBAN (facultatif)"
+                    size="lg"
                     valeur={c.iban}
                     onChange={(v) => majLigne('comptes', i, { iban: v })}
                   />
                   <Texte
                     label="BIC (facultatif)"
+                    size="sm"
                     valeur={c.swift}
                     onChange={(v) => majLigne('comptes', i, { swift: v })}
                   />
@@ -288,10 +327,9 @@ export function FormulaireSensible<F extends HrPrivateField>({
 
       {champ === 'identity' ? (
         <>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Texte
+          <FormGrid>
+            <ChampDate
               label="Date de naissance (facultative)"
-              type="date"
               valeur={f.birthDate}
               onChange={(v) => maj({ birthDate: v })}
             />
@@ -300,39 +338,32 @@ export function FormulaireSensible<F extends HrPrivateField>({
               valeur={f.nationality}
               onChange={(v) => maj({ nationality: v })}
             />
-          </div>
+          </FormGrid>
           {f.pieces.map((p, i) => (
             <Ligne key={i} titre={`Pièce ${i + 1}`} onRetirer={() => retirer('pieces', i)}>
-              <label className={LABEL}>
-                Nature
-                <select
-                  className={CHAMP}
+              <Field label="Nature" size="md">
+                <Select<HrIdDocumentKind>
                   value={p.kind}
-                  onChange={(e) =>
-                    majLigne('pieces', i, { kind: e.target.value as HrIdDocumentKind })
-                  }
-                >
-                  {HR_ID_DOCUMENT_KINDS.map((k) => (
-                    <option key={k} value={k}>
-                      {LIBELLES_PIECE[k]}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  onChange={(v) => majLigne('pieces', i, { kind: v })}
+                  options={HR_ID_DOCUMENT_KINDS.map((k) => ({
+                    value: k,
+                    label: LIBELLES_PIECE[k],
+                  }))}
+                />
+              </Field>
               <Texte
                 label="Numéro"
                 valeur={p.number}
                 onChange={(v) => majLigne('pieces', i, { number: v })}
               />
-              <Texte
+              <ChampDate
                 label="Délivrée le (facultatif)"
-                type="date"
+                newRow
                 valeur={p.issuedOn}
                 onChange={(v) => majLigne('pieces', i, { issuedOn: v })}
               />
-              <Texte
+              <ChampDate
                 label="Expire le (facultatif)"
-                type="date"
                 valeur={p.expiresOn}
                 onChange={(v) => majLigne('pieces', i, { expiresOn: v })}
               />
@@ -348,11 +379,15 @@ export function FormulaireSensible<F extends HrPrivateField>({
 
       {champ === 'personalContact' ? (
         <>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Texte label="Adresse" valeur={f.address} onChange={(v) => maj({ address: v })} />
+          <FormGrid>
             <Texte
+              label="Adresse"
+              size="full"
+              valeur={f.address}
+              onChange={(v) => maj({ address: v })}
+            />
+            <Telephone
               label="Téléphone personnel"
-              type="tel"
               valeur={f.personalPhone}
               onChange={(v) => maj({ personalPhone: v })}
             />
@@ -362,7 +397,7 @@ export function FormulaireSensible<F extends HrPrivateField>({
               valeur={f.personalEmail}
               onChange={(v) => maj({ personalEmail: v })}
             />
-          </div>
+          </FormGrid>
           {f.contacts.map((c, i) => (
             <Ligne
               key={i}
@@ -379,9 +414,8 @@ export function FormulaireSensible<F extends HrPrivateField>({
                 valeur={c.relation}
                 onChange={(v) => majLigne('contacts', i, { relation: v })}
               />
-              <Texte
+              <Telephone
                 label="Téléphone"
-                type="tel"
                 valeur={c.phone}
                 onChange={(v) => majLigne('contacts', i, { phone: v })}
               />
@@ -396,7 +430,9 @@ export function FormulaireSensible<F extends HrPrivateField>({
       ) : null}
 
       {champ === 'exitNote' ? (
-        <Texte label="Motif détaillé" multi valeur={f.note} onChange={(v) => maj({ note: v })} />
+        <FormGrid>
+          <Texte label="Motif détaillé" multi valeur={f.note} onChange={(v) => maj({ note: v })} />
+        </FormGrid>
       ) : null}
 
       {erreurs.length > 0 ? (
@@ -410,13 +446,18 @@ export function FormulaireSensible<F extends HrPrivateField>({
           </Alerte>
         </div>
       ) : null}
-      <div className="flex flex-wrap justify-end gap-2">
-        <button type="button" className={BOUTON_PETIT} onClick={onAnnuler} disabled={envoi}>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+        <Button onClick={onAnnuler} disabled={envoi} className="max-sm:h-11">
           Annuler
-        </button>
-        <button type="submit" className={buttonClasses('primary', 'sm')} disabled={envoi}>
-          {envoi ? 'Enregistrement…' : 'Enregistrer'}
-        </button>
+        </Button>
+        <SubmitButton
+          busy={envoi}
+          busyLabel="Enregistrement…"
+          showShortcut={false}
+          className="max-sm:h-11"
+        >
+          Enregistrer
+        </SubmitButton>
       </div>
     </form>
   );

@@ -4,10 +4,27 @@
 // d'absence, jours fériés (liste VIDE par défaut : Lalanda ne publie aucun
 // calendrier légal), modèles de listes d'accueil et de départ. Créations et
 // modifications en fenêtre modale ; l'API reste juge.
+//
+// ADR-0074 : listes en `Select`, choix courts en segments, réglages en
+// interrupteurs, date en `DatePicker` (sans fériés marqués : décision ouverte
+// n° 1), grille sémantique. Mêmes champs envoyés, mêmes validations.
 
-import { Badge, Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Badge,
+  Button,
+  DatePicker,
+  Field,
+  FormGrid,
+  Modal,
+  SegmentedControl,
+  Select,
+  SubmitButton,
+  Switch,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import { CalendarDays, ClipboardList, Tags } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 
 import { HR_CHECKLIST_ASSIGNEE_ROLES } from '@lalanda/shared/hr';
 
@@ -18,7 +35,7 @@ import {
   type LeaveTypeFull,
 } from '@/lib/api-hr-admin';
 
-import { Alerte, BOUTON_DANGER, BOUTON_PETIT, CHAMP } from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_DANGER, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 // ADR-0068 § 5 : jours fériés de la RDC proposés, « à vérifier ».
 import { hrLot1Api } from '@/lib/api-hr-lot1';
@@ -41,8 +58,6 @@ import {
 } from './reglages-model';
 import { aujourdhui, lire, messageRh, type Lecture } from './rh-model';
 import { Chargement, DialogueDecision, EchecLecture, Panneau, PhraseSection } from './rh-ui';
-
-const LABEL = 'flex min-w-0 flex-col gap-1 text-xs font-medium';
 
 function Erreurs({ erreurs }: { erreurs: string[] }): React.ReactElement | null {
   if (erreurs.length === 0) return null;
@@ -67,13 +82,18 @@ function Pied({
   libelle?: string;
 }): React.ReactElement {
   return (
-    <div className="flex flex-wrap justify-end gap-2">
-      <button type="button" className={BOUTON_PETIT} onClick={onAnnuler} disabled={envoi}>
+    <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+      <Button onClick={onAnnuler} disabled={envoi} className="max-sm:h-11">
         Annuler
-      </button>
-      <button type="submit" className={buttonClasses('primary', 'sm')} disabled={envoi}>
-        {envoi ? 'Enregistrement…' : libelle}
-      </button>
+      </Button>
+      <SubmitButton
+        busy={envoi}
+        busyLabel="Enregistrement…"
+        showShortcut={false}
+        className="max-sm:h-11"
+      >
+        {libelle}
+      </SubmitButton>
     </div>
   );
 }
@@ -89,20 +109,7 @@ function Case({
   checked: boolean;
   onChange: (v: boolean) => void;
 }): React.ReactElement {
-  return (
-    <label className="flex items-start gap-2 text-sm">
-      <input
-        type="checkbox"
-        className="mt-0.5"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-      />
-      <span>
-        <span className="font-medium">{label}</span>
-        {aide ? <span className="block text-xs text-[var(--foreground-muted)]">{aide}</span> : null}
-      </span>
-    </label>
-  );
+  return <Switch checked={checked} onChange={onChange} label={label} description={aide} />;
 }
 
 /** Une lecture de liste rechargée à la demande. */
@@ -250,6 +257,7 @@ function FormulaireType({
   onAnnuler: () => void;
   onEnregistre: () => void;
 }): React.ReactElement {
+  const id = useId();
   const [f, setF] = useState<FormTypeAbsence>(() => formTypeAbsence(type));
   const [erreurs, setErreurs] = useState<string[]>([]);
   const [envoi, setEnvoi] = useState(false);
@@ -280,111 +288,115 @@ function FormulaireType({
 
   return (
     <form className="flex flex-col gap-4" onSubmit={(e) => void envoyer(e)} noValidate>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className={LABEL}>
-          Libellé
-          <input
-            className={CHAMP}
+      <FormGrid>
+        <Field id={`${id}-libelle`} label="Libellé" size="md">
+          <TextInput
             value={f.label}
             maxLength={60}
             onChange={(e) => maj({ label: e.target.value })}
           />
-        </label>
-        <label className={LABEL}>
-          Plus petite durée demandable
-          <select
-            className={CHAMP}
+        </Field>
+        <Field id={`${id}-unite`} label="Plus petite durée demandable" group size="md">
+          <SegmentedControl<FormTypeAbsence['unit']>
             value={f.unit}
-            onChange={(e) => maj({ unit: e.target.value as FormTypeAbsence['unit'] })}
-          >
-            <option value="day">La journée</option>
-            <option value="half_day">La demi-journée</option>
-          </select>
-        </label>
-      </div>
+            onChange={(v) => maj({ unit: v })}
+            options={[
+              { value: 'day', label: 'La journée' },
+              { value: 'half_day', label: 'La demi-journée' },
+            ]}
+          />
+        </Field>
+      </FormGrid>
       <Case
         label="Débite un solde"
         checked={f.deductsFromBalance}
         onChange={(v) => maj({ deductsFromBalance: v })}
       />
       {f.deductsFromBalance ? (
-        <fieldset className="flex flex-col gap-3 rounded-[var(--radius-md)] border border-[var(--border)] p-3">
+        <fieldset className="flex min-w-0 flex-col gap-3 rounded-[var(--radius-md)] border border-[var(--border)] p-3">
           <legend className="px-1 text-xs font-semibold">
             Solde (valeurs de votre organisation)
           </legend>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <label className={LABEL}>
-              Acquisition
-              <select
-                className={CHAMP}
+          <FormGrid>
+            <Field id={`${id}-acquisition`} label="Acquisition" size="md">
+              <Select<FormTypeAbsence['acquisition']>
                 value={f.acquisition}
-                onChange={(e) =>
-                  maj({ acquisition: e.target.value as FormTypeAbsence['acquisition'] })
-                }
-              >
-                <option value="none">Aucune (attributions manuelles)</option>
-                <option value="monthly">Chaque mois</option>
-                <option value="yearly">Chaque année</option>
-              </select>
-            </label>
+                onChange={(v) => maj({ acquisition: v })}
+                options={[
+                  { value: 'none', label: 'Aucune (attributions manuelles)' },
+                  { value: 'monthly', label: 'Chaque mois' },
+                  { value: 'yearly', label: 'Chaque année' },
+                ]}
+              />
+            </Field>
             {f.acquisition !== 'none' ? (
-              <label className={LABEL}>
-                Jours acquis
-                <input
+              <Field id={`${id}-jours`} label="Jours acquis" size="xs">
+                <TextInput
                   inputMode="decimal"
-                  className={CHAMP}
                   value={f.jours}
                   onChange={(e) => maj({ jours: e.target.value })}
                 />
-              </label>
+              </Field>
             ) : null}
             {f.acquisition === 'yearly' ? (
-              <label className={LABEL}>
-                Acquis
-                <select
-                  className={CHAMP}
+              <Field id={`${id}-le`} label="Acquis" size="md" newRow>
+                <Select<FormTypeAbsence['le']>
                   value={f.le}
-                  onChange={(e) => maj({ le: e.target.value as FormTypeAbsence['le'] })}
-                >
-                  <option value="leave_year_start">au début de l’année de congé</option>
-                  <option value="anniversary">à la date anniversaire d’entrée</option>
-                </select>
-              </label>
+                  onChange={(v) => maj({ le: v })}
+                  options={[
+                    { value: 'leave_year_start', label: 'au début de l’année de congé' },
+                    { value: 'anniversary', label: 'à la date anniversaire d’entrée' },
+                  ]}
+                />
+              </Field>
             ) : null}
             {f.acquisition !== 'none' ? (
-              <label className={LABEL}>
-                Prorata
-                <select
-                  className={CHAMP}
+              <Field
+                id={`${id}-prorata`}
+                label="Prorata"
+                size="md"
+                newRow={f.acquisition !== 'yearly'}
+              >
+                <Select<FormTypeAbsence['proration']>
                   value={f.proration}
-                  onChange={(e) =>
-                    maj({ proration: e.target.value as FormTypeAbsence['proration'] })
-                  }
-                >
-                  <option value="calendar_days">Au prorata des jours de présence</option>
-                  <option value="none">Sans prorata</option>
-                </select>
-              </label>
+                  onChange={(v) => maj({ proration: v })}
+                  options={[
+                    { value: 'calendar_days', label: 'Au prorata des jours de présence' },
+                    { value: 'none', label: 'Sans prorata' },
+                  ]}
+                />
+              </Field>
             ) : null}
-            <label className={LABEL}>
-              Report maximal (jours, vide = illimité)
-              <input
+            <Field
+              id={`${id}-report`}
+              label="Report maximal"
+              optional
+              size="sm"
+              newRow
+              hint="Vide : illimité."
+            >
+              <TextInput
                 inputMode="decimal"
-                className={CHAMP}
                 value={f.reportMax}
+                trailing="jours"
                 onChange={(e) => maj({ reportMax: e.target.value })}
               />
-            </label>
-            <label className={LABEL}>
-              Report perdu après (mois, vide = jamais)
-              <input
+            </Field>
+            <Field
+              id={`${id}-report-expire`}
+              label="Report perdu après"
+              optional
+              size="sm"
+              hint="Vide : jamais."
+            >
+              <TextInput
                 inputMode="numeric"
-                className={CHAMP}
                 value={f.reportExpireMois}
+                trailing="mois"
                 onChange={(e) => maj({ reportExpireMois: e.target.value })}
               />
-            </label>
-          </div>
+            </Field>
+          </FormGrid>
           <Case
             label="Solde négatif permis"
             checked={f.allowNegative}
@@ -455,18 +467,16 @@ export function FeriesReglages({ modifier }: { modifier: boolean }): React.React
       id="rh-reg-feries"
       action={
         <span className="flex flex-wrap items-center gap-2">
-          <select
+          <Select<string>
             aria-label="Année"
-            className={`${CHAMP} w-auto`}
-            value={an}
-            onChange={(e) => setAn(Number(e.target.value))}
-          >
-            {[annee - 1, annee, annee + 1].map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
+            className="w-28"
+            value={String(an)}
+            onChange={(v) => setAn(Number(v))}
+            options={[annee - 1, annee, annee + 1].map((y) => ({
+              value: String(y),
+              label: String(y),
+            }))}
+          />
           {modifier ? (
             <button
               type="button"
@@ -610,6 +620,7 @@ function FormulaireFerie({
   onAnnuler: () => void;
   onEnregistre: () => void;
 }): React.ReactElement {
+  const id = useId();
   const [f, setF] = useState<FormFerie>(FORM_FERIE_VIDE);
   const [erreurs, setErreurs] = useState<string[]>([]);
   const [envoi, setEnvoi] = useState(false);
@@ -635,36 +646,29 @@ function FormulaireFerie({
 
   return (
     <form className="flex flex-col gap-3" onSubmit={(e) => void envoyer(e)} noValidate>
-      <label className={LABEL}>
-        Date
-        <input
-          type="date"
-          className={CHAMP}
-          value={f.date}
-          onChange={(e) => setF({ ...f, date: e.target.value })}
-        />
-      </label>
-      <label className={LABEL}>
-        Libellé
-        <input
-          className={CHAMP}
-          value={f.label}
-          maxLength={80}
-          onChange={(e) => setF({ ...f, label: e.target.value })}
-        />
-      </label>
-      <label className={LABEL}>
-        Durée
-        <select
-          className={CHAMP}
-          value={f.demi}
-          onChange={(e) => setF({ ...f, demi: e.target.value as FormFerie['demi'] })}
-        >
-          <option value="">Journée entière</option>
-          <option value="am">Matin seulement</option>
-          <option value="pm">Après-midi seulement</option>
-        </select>
-      </label>
+      <FormGrid>
+        <Field id={`${id}-date`} label="Date" size="sm">
+          <DatePicker value={f.date} onChange={(v) => setF({ ...f, date: v })} />
+        </Field>
+        <Field id={`${id}-libelle`} label="Libellé" size="lg" newRow>
+          <TextInput
+            value={f.label}
+            maxLength={80}
+            onChange={(e) => setF({ ...f, label: e.target.value })}
+          />
+        </Field>
+        <Field id={`${id}-duree`} label="Durée" group size="full">
+          <SegmentedControl<FormFerie['demi']>
+            value={f.demi}
+            onChange={(v) => setF({ ...f, demi: v })}
+            options={[
+              { value: '', label: 'Journée entière' },
+              { value: 'am', label: 'Matin' },
+              { value: 'pm', label: 'Après-midi' },
+            ]}
+          />
+        </Field>
+      </FormGrid>
       <Case
         label="Chaque année à la même date"
         checked={f.recurring}
@@ -805,6 +809,7 @@ function FormulaireModele({
   onAnnuler: () => void;
   onEnregistre: () => void;
 }): React.ReactElement {
+  const id = useId();
   const [f, setF] = useState<FormModele>(() => formModele(modele));
   const [erreurs, setErreurs] = useState<string[]>([]);
   const [envoi, setEnvoi] = useState(false);
@@ -840,81 +845,80 @@ function FormulaireModele({
 
   return (
     <form className="flex flex-col gap-4" onSubmit={(e) => void envoyer(e)} noValidate>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className={LABEL}>
-          Nature
-          <select
-            className={CHAMP}
+      <FormGrid>
+        <Field
+          id={`${id}-nature`}
+          label="Nature"
+          group
+          size="md"
+          {...(modele !== null ? { hint: 'La nature d’un modèle existant ne change pas.' } : {})}
+        >
+          <SegmentedControl<FormModele['kind']>
             value={f.kind}
             disabled={modele !== null}
-            onChange={(e) => setF({ ...f, kind: e.target.value as FormModele['kind'] })}
-          >
-            <option value="onboarding">{LIBELLES_LISTE.onboarding}</option>
-            <option value="offboarding">{LIBELLES_LISTE.offboarding}</option>
-          </select>
-        </label>
-        <label className={LABEL}>
-          Libellé
-          <input
-            className={CHAMP}
+            onChange={(v) => setF({ ...f, kind: v })}
+            options={[
+              { value: 'onboarding', label: LIBELLES_LISTE.onboarding },
+              { value: 'offboarding', label: LIBELLES_LISTE.offboarding },
+            ]}
+          />
+        </Field>
+        <Field id={`${id}-libelle`} label="Libellé" size="lg" newRow>
+          <TextInput
             value={f.label}
             maxLength={120}
             onChange={(e) => setF({ ...f, label: e.target.value })}
           />
-        </label>
-      </div>
+        </Field>
+      </FormGrid>
       {f.items.map((l, i) => (
         <fieldset
           key={l.id ?? `n-${i}`}
-          className="grid gap-3 rounded-[var(--radius-md)] border border-[var(--border)] p-3 sm:grid-cols-2"
+          className="flex min-w-0 flex-col gap-3 rounded-[var(--radius-md)] border border-[var(--border)] p-3"
         >
           <legend className="px-1 text-xs font-semibold">Élément {i + 1}</legend>
-          <label className={`${LABEL} sm:col-span-2`}>
-            Libellé
-            <input
-              className={CHAMP}
-              value={l.label}
-              maxLength={200}
-              onChange={(e) => majLigne(i, { label: e.target.value })}
-            />
-          </label>
-          <label className={LABEL}>
-            Assigné à
-            <select
-              className={CHAMP}
-              value={l.assignee}
-              onChange={(e) =>
-                majLigne(i, { assignee: e.target.value as FormModele['items'][number]['assignee'] })
-              }
+          <FormGrid>
+            <Field id={`${id}-el-${i}-libelle`} label="Libellé" size="full">
+              <TextInput
+                value={l.label}
+                maxLength={200}
+                onChange={(e) => majLigne(i, { label: e.target.value })}
+              />
+            </Field>
+            <Field id={`${id}-el-${i}-assigne`} label="Assigné à" size="md">
+              <Select<FormModele['items'][number]['assignee']>
+                value={l.assignee}
+                onChange={(v) => majLigne(i, { assignee: v })}
+                options={HR_CHECKLIST_ASSIGNEE_ROLES.map((r) => ({
+                  value: r,
+                  label: libelleAssigneModele(r),
+                }))}
+              />
+            </Field>
+            <Field
+              id={`${id}-el-${i}-echeance`}
+              label="Échéance"
+              size="sm"
+              hint="En jours ; négatif : avant."
             >
-              {HR_CHECKLIST_ASSIGNEE_ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {libelleAssigneModele(r)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className={LABEL}>
-            Échéance (jours, négatif = avant)
-            <input
-              inputMode="numeric"
-              className={CHAMP}
-              value={l.offsetDays}
-              onChange={(e) => majLigne(i, { offsetDays: e.target.value })}
-            />
-          </label>
-          <label className={`${LABEL} sm:col-span-2`}>
-            Note (facultative)
-            <input
-              className={CHAMP}
-              value={l.note}
-              maxLength={500}
-              onChange={(e) => majLigne(i, { note: e.target.value })}
-            />
-          </label>
+              <TextInput
+                inputMode="numeric"
+                value={l.offsetDays}
+                trailing="jours"
+                onChange={(e) => majLigne(i, { offsetDays: e.target.value })}
+              />
+            </Field>
+            <Field id={`${id}-el-${i}-note`} label="Note" optional size="full">
+              <TextInput
+                value={l.note}
+                maxLength={500}
+                onChange={(e) => majLigne(i, { note: e.target.value })}
+              />
+            </Field>
+          </FormGrid>
           <button
             type="button"
-            className={`${BOUTON_DANGER} justify-self-start`}
+            className={`${BOUTON_DANGER} self-start`}
             onClick={() => setF({ ...f, items: f.items.filter((_, j) => j !== i) })}
           >
             Retirer l’élément

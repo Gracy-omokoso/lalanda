@@ -7,8 +7,10 @@
 // La photo est FACULTATIVE et n'est acceptée qu'après l'enregistrement du
 // consentement du collaborateur (date et auteur conservés). Lecture `hr.read`,
 // écriture `hr.manage` ; l'API refuse de toute façon.
+//
+// ADR-0074 : consentements en cases stylées (accords). Mêmes champs envoyés.
 
-import { Badge, buttonClasses } from '@lalanda/ui';
+import { Badge, Checkbox, buttonClasses } from '@lalanda/ui';
 import { BadgeCheck, Camera, Download, IdCard, RefreshCw, ShieldOff, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
@@ -194,53 +196,41 @@ export function FicheCartes(): React.ReactElement {
               <>
                 <fieldset className="flex flex-col gap-2">
                   <legend className="sr-only">Consentement du collaborateur</legend>
-                  <label className="flex items-start gap-2">
-                    <input
-                      type="checkbox"
-                      checked={p.consent.photo}
-                      disabled={occupe !== null}
-                      onChange={(e) =>
-                        void agir(
-                          'consent',
-                          () =>
-                            hrCardsApi.putConsent(fiche.id, {
-                              expectedRevision: p.revision,
-                              photo: e.target.checked,
-                              photoPublic: e.target.checked ? p.consent.photoPublic : false,
-                            }),
-                          'Consentement non enregistré.',
-                        )
-                      }
-                    />
-                    <span>
-                      Le collaborateur accepte de figurer en photo sur sa carte.{' '}
-                      <span className="text-[var(--foreground-muted)]">
-                        Décocher retire le consentement et efface la photo.
-                      </span>
-                    </span>
-                  </label>
-                  <label className="flex items-start gap-2">
-                    <input
-                      type="checkbox"
-                      checked={p.consent.photoPublic}
-                      disabled={occupe !== null || !p.consent.photo}
-                      onChange={(e) =>
-                        void agir(
-                          'consent',
-                          () =>
-                            hrCardsApi.putConsent(fiche.id, {
-                              expectedRevision: p.revision,
-                              photo: true,
-                              photoPublic: e.target.checked,
-                            }),
-                          'Consentement non enregistré.',
-                        )
-                      }
-                    />
-                    <span>
-                      Il accepte aussi qu’elle s’affiche sur la page publique de vérification.
-                    </span>
-                  </label>
+                  <Checkbox
+                    checked={p.consent.photo}
+                    disabled={occupe !== null}
+                    label="Le collaborateur accepte de figurer en photo sur sa carte."
+                    description="Décocher retire le consentement et efface la photo."
+                    onChange={(coche) =>
+                      void agir(
+                        'consent',
+                        () =>
+                          hrCardsApi.putConsent(fiche.id, {
+                            expectedRevision: p.revision,
+                            photo: coche,
+                            photoPublic: coche ? p.consent.photoPublic : false,
+                          }),
+                        'Consentement non enregistré.',
+                      )
+                    }
+                  />
+                  <Checkbox
+                    checked={p.consent.photoPublic}
+                    disabled={occupe !== null || !p.consent.photo}
+                    label="Il accepte aussi qu’elle s’affiche sur la page publique de vérification."
+                    onChange={(coche) =>
+                      void agir(
+                        'consent',
+                        () =>
+                          hrCardsApi.putConsent(fiche.id, {
+                            expectedRevision: p.revision,
+                            photo: true,
+                            photoPublic: coche,
+                          }),
+                        'Consentement non enregistré.',
+                      )
+                    }
+                  />
                 </fieldset>
                 <div className="flex flex-wrap gap-2">
                   <input

@@ -7,8 +7,12 @@
 // (2) génération par lot (sélection de collaborateurs → PDF, planche A4 ou ZIP de
 // PNG 300 dpi) ; (3) modèles sur mesure (paquet code ou gabarit graphiste) et
 // guides téléchargeables. Lecture `hr.read`, écriture `hr.manage`.
+//
+// ADR-0074 : variante et format en `Select`, coordonnées en `Field` sur la
+// grille sémantique, options d'impression en interrupteurs, sélection du lot
+// en cases stylées. Mêmes champs envoyés.
 
-import { buttonClasses } from '@lalanda/ui';
+import { Checkbox, Field, FormGrid, Select, Switch, TextInput, buttonClasses } from '@lalanda/ui';
 import { Download, FileArchive, IdCard, Upload } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 
@@ -22,7 +26,7 @@ import {
   type CardVariant,
 } from '@/lib/api-hr-cards';
 
-import { Alerte, BOUTON_PETIT, CHAMP, Champ } from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 import {
   LIBELLE_ORIENTATION,
   LIBELLE_TYPE,
@@ -229,34 +233,31 @@ export function CartesRh(): React.ReactElement {
             ))}
           </div>
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Champ id={`${id}-variante`} label="Variante de couleur">
-            <select
-              id={`${id}-variante`}
-              className={CHAMP}
+        <FormGrid>
+          <Field id={`${id}-variante`} label="Variante de couleur" size="md" disabled={!gerer}>
+            <Select<CardVariant>
               value={ks.variant}
-              disabled={!gerer}
-              onChange={(e) => majType({ variant: e.target.value as CardVariant })}
-            >
-              {(Object.keys(LIBELLE_VARIANTE) as CardVariant[]).map((v) => (
-                <option key={v} value={v}>
-                  {LIBELLE_VARIANTE[v]}
-                </option>
-              ))}
-            </select>
-          </Champ>
-          <Champ
+              onChange={(v) => majType({ variant: v })}
+              options={(Object.keys(LIBELLE_VARIANTE) as CardVariant[]).map((v) => ({
+                value: v,
+                label: LIBELLE_VARIANTE[v],
+              }))}
+            />
+          </Field>
+          <Field
             id={`${id}-accent`}
             label="Couleur d’accent"
-            aide="Vide : couleur principale de l’identité visuelle."
+            size="md"
+            hint="Vide : couleur principale de l’identité visuelle."
           >
             <div className="flex items-center gap-2">
               <input
                 id={`${id}-accent`}
                 type="color"
-                className="h-9 w-12 rounded border border-[var(--border-strong)]"
+                className="h-9 w-12 rounded-[var(--radius-sm)] border border-[var(--border-strong)] max-sm:h-11"
                 value={ks.accent ?? '#1f4e79'}
                 disabled={!gerer}
+                aria-describedby={`${id}-accent-aide`}
                 onChange={(e) => majType({ accent: e.target.value.toLowerCase() })}
               />
               {ks.accent ? (
@@ -270,8 +271,8 @@ export function CartesRh(): React.ReactElement {
                 </button>
               ) : null}
             </div>
-          </Champ>
-        </div>
+          </Field>
+        </FormGrid>
         <p className="text-xs text-[var(--foreground-muted)]">
           Les aperçus utilisent un collaborateur fictif. Les modèles enregistrés s’appliquent après
           « Enregistrer ».
@@ -294,28 +295,33 @@ export function CartesRh(): React.ReactElement {
         <h2 id={`${id}-contenu`} className="text-base font-semibold">
           Contenu imprimé
         </h2>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <FormGrid>
           {(
             [
-              ['address', 'Adresse de l’organisation'],
-              ['website', 'Site'],
-              ['phone', 'Téléphone de l’organisation'],
-              ['slogan', 'Slogan'],
+              ['address', 'Adresse de l’organisation', 'full'],
+              ['website', 'Site', 'md'],
+              ['phone', 'Téléphone de l’organisation', 'md'],
+              ['slogan', 'Slogan', 'lg'],
             ] as const
-          ).map(([k, label]) => (
-            <Champ key={k} id={`${id}-${k}`} label={label}>
-              <input
-                id={`${id}-${k}`}
-                className={CHAMP}
+          ).map(([k, label, taille]) => (
+            <Field
+              key={k}
+              id={`${id}-${k}`}
+              label={label}
+              size={taille}
+              newRow={k === 'slogan'}
+              disabled={!gerer}
+            >
+              <TextInput
                 maxLength={160}
                 value={b[k] ?? ''}
-                disabled={!gerer}
+                inputMode={k === 'website' ? 'url' : k === 'phone' ? 'tel' : undefined}
                 onChange={(e) => setBrouillon({ ...b, [k]: e.target.value })}
               />
-            </Champ>
+            </Field>
           ))}
-        </div>
-        <div className="flex flex-col gap-2 text-sm">
+        </FormGrid>
+        <div className="flex flex-col gap-3">
           {(
             [
               ['showEmployeeNumber', 'Imprimer le matricule (s’il est renseigné)'],
@@ -323,15 +329,13 @@ export function CartesRh(): React.ReactElement {
               ['vcardQr', 'QR de contact (vCard) au verso de la carte de visite'],
             ] as const
           ).map(([k, label]) => (
-            <label key={k} className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={b[k]}
-                disabled={!gerer}
-                onChange={(e) => setBrouillon({ ...b, [k]: e.target.checked })}
-              />
-              {label}
-            </label>
+            <Switch
+              key={k}
+              label={label}
+              checked={b[k]}
+              disabled={!gerer}
+              onChange={(v) => setBrouillon({ ...b, [k]: v })}
+            />
           ))}
         </div>
         {gerer ? (
@@ -400,50 +404,54 @@ function Lot({ type }: { type: CardKind }): React.ReactElement {
         Génération par lot — {LIBELLE_TYPE[type].toLowerCase()}
       </h2>
       {alerte ? <Alerte>{alerte}</Alerte> : null}
-      <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-        <Champ id={`${id}-q`} label="Rechercher un collaborateur">
-          <input
-            id={`${id}-q`}
-            className={CHAMP}
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-        </Champ>
-        <Champ id={`${id}-format`} label="Format">
-          <select
-            id={`${id}-format`}
-            className={CHAMP}
+      <FormGrid>
+        <Field id={`${id}-q`} label="Rechercher un collaborateur" size="md">
+          <TextInput type="search" value={q} onChange={(e) => setQ(e.target.value)} />
+        </Field>
+        <Field id={`${id}-format`} label="Format" size="lg">
+          <Select<CardBatchFormat>
             value={format}
-            onChange={(e) => setFormat(e.target.value as CardBatchFormat)}
-          >
-            <option value="pdf">PDF, une page par face (imprimeur, imprimante à cartes)</option>
-            <option value="sheet">Planche A4 avec traits de coupe (imprimante de bureau)</option>
-            <option value="png-zip">Archive ZIP de PNG 300 dpi</option>
-          </select>
-        </Champ>
-      </div>
+            onChange={setFormat}
+            options={[
+              {
+                value: 'pdf',
+                label: 'PDF, une page par face',
+                description: 'Imprimeur, imprimante à cartes.',
+              },
+              {
+                value: 'sheet',
+                label: 'Planche A4 avec traits de coupe',
+                description: 'Imprimante de bureau.',
+              },
+              { value: 'png-zip', label: 'Archive ZIP de PNG 300 dpi' },
+            ]}
+          />
+        </Field>
+      </FormGrid>
       {liste === null ? (
         <Chargement texte="Chargement des collaborateurs…" />
       ) : (
         <div className="max-h-72 overflow-auto rounded-[var(--radius-md)] border border-[var(--border)]">
-          <label className="flex items-center gap-2 border-b border-[var(--border)] px-3 py-2 text-sm font-medium">
-            <input
-              type="checkbox"
-              checked={tous.length > 0 && tous.every((x) => sel.includes(x))}
-              onChange={(e) => setSel(e.target.checked ? tous.slice(0, 100) : [])}
-            />
-            Tout sélectionner ({tous.length})
-          </label>
+          <Checkbox
+            className="border-b border-[var(--border)] px-3 py-2"
+            label={<span className="font-medium">Tout sélectionner ({tous.length})</span>}
+            checked={tous.length > 0 && tous.every((x) => sel.includes(x))}
+            indeterminate={sel.length > 0 && !tous.every((x) => sel.includes(x))}
+            onChange={(coche) => setSel(coche ? tous.slice(0, 100) : [])}
+          />
           {liste.map((e) => (
-            <label key={e.id} className="flex items-center gap-2 px-3 py-1.5 text-sm">
-              <input
-                type="checkbox"
-                checked={sel.includes(e.id)}
-                onChange={() => setSel((s) => basculerSelection(s, e.id))}
-              />
-              <span>{nomAffiche(e)}</span>
-              <span className="text-[var(--foreground-muted)]">{e.jobTitle}</span>
-            </label>
+            <Checkbox
+              key={e.id}
+              className="px-3 py-1.5"
+              label={
+                <>
+                  {nomAffiche(e)}{' '}
+                  <span className="text-[var(--foreground-muted)]">{e.jobTitle}</span>
+                </>
+              }
+              checked={sel.includes(e.id)}
+              onChange={() => setSel((s) => basculerSelection(s, e.id))}
+            />
           ))}
         </div>
       )}

@@ -5,8 +5,22 @@
 // le manager (son équipe) ou les RH saisissent des brouillons, publient, copient une
 // semaine. Les constats et le sous-effectif viennent du moteur : des signaux, jamais
 // des refus. Aucune affectation automatique.
+//
+// ADR-0074 : personne en `EntityPicker`, jour en `DatePicker` (heures natives).
 
-import { Badge, Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Badge,
+  Button,
+  Checkbox,
+  DatePicker,
+  EntityPicker,
+  Field,
+  FormGrid,
+  Modal,
+  TextInput,
+  buttonClasses,
+  correspondRecherche,
+} from '@lalanda/ui';
 import { CalendarRange } from 'lucide-react';
 import { useCallback, useEffect, useId, useState } from 'react';
 
@@ -19,7 +33,7 @@ import {
   type ShiftView,
 } from '@/lib/api-rh-2';
 
-import { BOUTON_PETIT, CHAMP, Champ } from '../../ventes/_components/form-ui';
+import { BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   LIBELLES_STATUT_CRENEAU,
@@ -349,10 +363,17 @@ function NouveauCreneau({
       annule = true;
     };
   }, [portee]);
+  // ADR-0074 § 4 : la personne se choisit en tapant son nom.
+  const choix = personnes.map((p) => ({ id: p.id, nom: nomAffiche(p) }));
 
   async function creer(): Promise<void> {
     if (personne === '') {
       setErreur('Choisissez la personne.');
+      return;
+    }
+    // Le jour était `required` ; le calendrier peut être vidé au clavier.
+    if (jour === '') {
+      setErreur('Le jour est obligatoire.');
       return;
     }
     setErreur(null);
@@ -393,17 +414,12 @@ function NouveauCreneau({
             </button>
           ) : (
             <>
-              <button type="button" className={BOUTON_PETIT} onClick={onFermer} disabled={envoi}>
+              <Button onClick={onFermer} disabled={envoi}>
                 Retour
-              </button>
-              <button
-                type="button"
-                className={buttonClasses('primary', 'sm')}
-                disabled={envoi}
-                onClick={() => void creer()}
-              >
+              </Button>
+              <Button variant="primary" busy={envoi} onClick={() => void creer()}>
                 {envoi ? 'Enregistrement…' : 'Créer le brouillon'}
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -423,76 +439,43 @@ function NouveauCreneau({
         </div>
       ) : (
         <div className="flex flex-col gap-3 text-sm">
-          <Champ id={`${id}-p`} label="Personne" requis>
-            <select
-              id={`${id}-p`}
-              className={CHAMP}
-              value={personne}
-              onChange={(e) => setPersonne(e.target.value)}
-            >
-              <option value="">— Choisir —</option>
-              {personnes.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {nomAffiche(p)}
-                </option>
-              ))}
-            </select>
-          </Champ>
-          <Champ id={`${id}-j`} label="Jour" requis>
-            <input
-              id={`${id}-j`}
-              type="date"
-              className={CHAMP}
-              value={jour}
-              onChange={(e) => setJour(e.target.value)}
-            />
-          </Champ>
-          <div className="grid grid-cols-2 gap-3">
-            <Champ id={`${id}-d`} label="Début" requis>
-              <input
-                id={`${id}-d`}
-                type="time"
-                className={CHAMP}
-                value={debut}
-                onChange={(e) => setDebut(e.target.value)}
+          <FormGrid>
+            <Field id={`${id}-p`} label="Personne" required size="lg">
+              <EntityPicker<{ id: string; nom: string }>
+                value={choix.find((p) => p.id === personne) ?? null}
+                onChange={(p) => setPersonne(p?.id ?? '')}
+                search={async (q) => choix.filter((p) => correspondRecherche([p.nom], q))}
+                refreshKey={choix.length}
+                getKey={(p) => p.id}
+                getLabel={(p) => p.nom}
+                placeholder="Tapez un nom"
+                debounceMs={0}
+                emptyText="Aucun collaborateur actif ne correspond."
               />
-            </Champ>
-            <Champ id={`${id}-f`} label="Fin" requis>
-              <input
-                id={`${id}-f`}
-                type="time"
-                className={CHAMP}
-                value={fin}
-                onChange={(e) => setFin(e.target.value)}
+            </Field>
+            <Field id={`${id}-j`} label="Jour" required size="sm" newRow>
+              <DatePicker value={jour} required onChange={setJour} shortcuts={['today', 'plus7']} />
+            </Field>
+            <Field id={`${id}-d`} label="Début" required size="xs" newRow>
+              <TextInput type="time" value={debut} onChange={(e) => setDebut(e.target.value)} />
+            </Field>
+            <Field id={`${id}-f`} label="Fin" required size="xs">
+              <TextInput type="time" value={fin} onChange={(e) => setFin(e.target.value)} />
+            </Field>
+            <div className="col-span-full">
+              <Checkbox checked={lendemain} onChange={setLendemain} label="Finit le lendemain" />
+            </div>
+            <Field id={`${id}-l`} label="Lieu" optional size="md" newRow>
+              <TextInput value={lieu} maxLength={120} onChange={(e) => setLieu(e.target.value)} />
+            </Field>
+            <Field id={`${id}-t`} label="Intitulé" optional size="md">
+              <TextInput
+                value={libelle}
+                maxLength={60}
+                onChange={(e) => setLibelle(e.target.value)}
               />
-            </Champ>
-          </div>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={lendemain}
-              onChange={(e) => setLendemain(e.target.checked)}
-            />
-            Finit le lendemain
-          </label>
-          <Champ id={`${id}-l`} label="Lieu (facultatif)">
-            <input
-              id={`${id}-l`}
-              className={CHAMP}
-              value={lieu}
-              maxLength={120}
-              onChange={(e) => setLieu(e.target.value)}
-            />
-          </Champ>
-          <Champ id={`${id}-t`} label="Intitulé (facultatif)">
-            <input
-              id={`${id}-t`}
-              className={CHAMP}
-              value={libelle}
-              maxLength={60}
-              onChange={(e) => setLibelle(e.target.value)}
-            />
-          </Champ>
+            </Field>
+          </FormGrid>
           <ErreurAction erreur={erreur} />
         </div>
       )}

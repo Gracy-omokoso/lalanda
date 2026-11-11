@@ -5,12 +5,12 @@
 // phrase d'indisponibilité (route pas encore livrée : 404, jamais de donnée
 // inventée) et une fenêtre de décision avec commentaire.
 
-import { Badge, Modal, buttonClasses } from '@lalanda/ui';
+import { Badge, Button, Field, Modal, TextArea } from '@lalanda/ui';
 import { useId, useState } from 'react';
 
 import type { LeaveRequestView } from '@/lib/api-hr';
 
-import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   LIBELLES_STATUT_DEMANDE,
@@ -160,40 +160,35 @@ export function DialogueDecision({
       busy={envoi}
       dirty={texte.trim() !== ''}
       footer={
-        <div className="flex flex-wrap justify-end gap-2">
-          <button type="button" className={BOUTON_PETIT} onClick={onFermer} disabled={envoi}>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+          <Button size="sm" onClick={onFermer} disabled={envoi} className="max-sm:h-11">
             Retour
-          </button>
-          <button
-            type="button"
-            className={buttonClasses('primary', 'sm')}
-            disabled={envoi}
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            busy={envoi}
             onClick={() => void valider()}
+            className="max-sm:h-11"
           >
             {envoi ? 'Envoi…' : bouton}
-          </button>
+          </Button>
         </div>
       }
     >
       <div className="flex flex-col gap-3 text-sm">
         {children}
         {commentaire !== 'aucun' ? (
-          <Champ
+          <Field
             id={`${id}-texte`}
             label={libelle}
-            requis={commentaire === 'obligatoire'}
-            erreur={champ}
+            required={commentaire === 'obligatoire'}
+            optional={commentaire === 'facultatif'}
+            size="full"
+            error={champ}
           >
-            <textarea
-              id={`${id}-texte`}
-              rows={3}
-              className={CHAMP}
-              value={texte}
-              maxLength={2000}
-              onChange={(e) => setTexte(e.target.value)}
-              {...aria(`${id}-texte`, champ)}
-            />
-          </Champ>
+            <TextArea value={texte} maxLength={2000} onChange={(e) => setTexte(e.target.value)} />
+          </Field>
         ) : null}
         {erreur ? (
           <Alerte>

@@ -4,14 +4,27 @@
 // l'onglet « Dossier » : relié / invitation en attente (renvoyer, annuler) / sans
 // compte (inviter) ; correction du matricule par le droit RH administrateur, avec
 // motif ; attribution d'un matricule à une fiche ancienne qui n'en a pas.
+//
+// ADR-0074 : correction du matricule sur `Field` (matricule à sa largeur, motif
+// pleine largeur). Mêmes champs envoyés, même contrôle à l'envoi.
 
-import { Badge, Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Badge,
+  Button,
+  Field,
+  FormGrid,
+  Modal,
+  SubmitButton,
+  TextArea,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import { KeyRound } from 'lucide-react';
 import { useCallback, useEffect, useId, useState } from 'react';
 
 import { LIBELLES_INVITATION, hrLot1Api, type EmployeeAccountView } from '@/lib/api-hr-lot1';
 
-import { Alerte, BOUTON_PETIT, CHAMP, Champ } from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { useFiche } from './fiche-chrome';
 import { ChangementPoste } from './fiche-poste';
@@ -275,40 +288,41 @@ function CorrectionMatricule({
 
   return (
     <form className="flex flex-col gap-4" onSubmit={(e) => void envoyer(e)} noValidate>
-      <Champ id={`${id}-num`} label="Nouveau matricule" requis>
-        <input
-          id={`${id}-num`}
-          className={CHAMP}
-          value={numero}
-          onChange={(e) => setNumero(e.target.value)}
-        />
-      </Champ>
-      <Champ
-        id={`${id}-motif`}
-        label="Motif"
-        requis
-        aide="Par exemple : erreur de saisie à la création."
-      >
-        <textarea
+      <FormGrid>
+        <Field id={`${id}-num`} label="Nouveau matricule" required size="sm">
+          <TextInput
+            value={numero}
+            className="font-mono"
+            onChange={(e) => setNumero(e.target.value)}
+          />
+        </Field>
+        <Field
           id={`${id}-motif`}
-          rows={2}
-          className={CHAMP}
-          value={motif}
-          onChange={(e) => setMotif(e.target.value)}
-        />
-      </Champ>
+          label="Motif"
+          required
+          size="full"
+          hint="Par exemple : erreur de saisie à la création."
+        >
+          <TextArea rows={2} value={motif} onChange={(e) => setMotif(e.target.value)} />
+        </Field>
+      </FormGrid>
       {erreur ? (
         <Alerte>
           <p>{erreur}</p>
         </Alerte>
       ) : null}
-      <div className="flex justify-end gap-2">
-        <button type="button" className={BOUTON_PETIT} onClick={onAnnuler} disabled={envoi}>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <Button onClick={onAnnuler} disabled={envoi} className="max-sm:h-11">
           Annuler
-        </button>
-        <button type="submit" className={buttonClasses('primary', 'sm')} disabled={envoi}>
-          {envoi ? 'Correction…' : 'Corriger'}
-        </button>
+        </Button>
+        <SubmitButton
+          busy={envoi}
+          busyLabel="Correction…"
+          showShortcut={false}
+          className="max-sm:h-11"
+        >
+          Corriger
+        </SubmitButton>
       </div>
     </form>
   );

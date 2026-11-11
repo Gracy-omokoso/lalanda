@@ -7,8 +7,22 @@
 // lieu et date, options ; aperçu PDF (filigrané, rien n'est tiré ni stocké) puis
 // génération. La pièce est rangée dans les documents RH de la fiche ; le registre
 // liste les numéros. L'API reste juge de tout.
+//
+// ADR-0074 : type, mise en page et titre en `Select`, dates en `DatePicker`,
+// grille sémantique, mentions en cases stylées, visibilité en interrupteur.
+// Mêmes champs envoyés, même `validerForm`.
 
-import { Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Checkbox,
+  DatePicker,
+  Field,
+  FormGrid,
+  Modal,
+  Select,
+  Switch,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import { Eye, FilePlus2, FileSignature, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 
@@ -19,7 +33,7 @@ import {
   type GeneratedDocumentView,
 } from '@/lib/api-hr-generated-documents';
 
-import { Alerte, BOUTON_PETIT, CHAMP, Champ } from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 import {
   ATTESTATION_TITLE_LABELS,
   GENERATED_DOCUMENT_KIND_LABELS,
@@ -210,20 +224,12 @@ function FormulaireGeneration({
     }
   };
 
-  const case_ = (
-    cle: 'visible' | 'contrat' | 'service' | 'matricule' | 'adresse',
-    texte: string,
-  ) => (
-    <label className="flex items-start gap-2 text-sm">
-      <input
-        type="checkbox"
-        className="mt-1"
-        checked={form[cle]}
-        onChange={(ev) => maj({ [cle]: ev.target.checked })}
-      />
-      <span>{texte}</span>
-    </label>
+  const case_ = (cle: 'contrat' | 'service' | 'matricule' | 'adresse', texte: string) => (
+    <Checkbox label={texte} checked={form[cle]} onChange={(v) => maj({ [cle]: v })} />
   );
+  const modeles = reglages?.templates ?? [{ id: 'classique', label: 'Classique', version: 1 }];
+  const majEmploi = (i: number, patch: Partial<FormDocumentGenere['emplois'][number]>) =>
+    maj({ emplois: form.emplois.map((x, k) => (k === i ? { ...x, ...patch } : x)) });
 
   return (
     <form
@@ -234,97 +240,69 @@ function FormulaireGeneration({
       }}
     >
       {alerte ? <Alerte>{alerte}</Alerte> : null}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Champ id={`${id}-type`} label="Type de document" requis>
-          <select
-            id={`${id}-type`}
-            className={CHAMP}
+      <FormGrid>
+        <Field id={`${id}-type`} label="Type de document" required size="md">
+          <Select<GeneratedDocumentKind>
             value={form.kind}
-            onChange={(ev) =>
-              setForm(formInitial(fiche, reglages, ev.target.value as GeneratedDocumentKind, today))
-            }
-          >
-            {types.map((t) => (
-              <option key={t} value={t}>
-                {GENERATED_DOCUMENT_KIND_LABELS[t]}
-              </option>
-            ))}
-          </select>
-        </Champ>
-        <Champ id={`${id}-modele`} label="Mise en page">
-          <select
-            id={`${id}-modele`}
-            className={CHAMP}
+            onChange={(v) => setForm(formInitial(fiche, reglages, v, today))}
+            options={types.map((t) => ({ value: t, label: GENERATED_DOCUMENT_KIND_LABELS[t] }))}
+          />
+        </Field>
+        <Field id={`${id}-modele`} label="Mise en page" size="md">
+          <Select<FormDocumentGenere['templateId']>
             value={form.templateId}
-            onChange={(ev) =>
-              maj({ templateId: ev.target.value as FormDocumentGenere['templateId'] })
-            }
-          >
-            {(reglages?.templates ?? [{ id: 'classique', label: 'Classique', version: 1 }]).map(
-              (t) => (
-                <option key={t.id} value={t.id}>
-                  {t.label}
-                </option>
-              ),
-            )}
-          </select>
-        </Champ>
+            onChange={(v) => maj({ templateId: v })}
+            options={modeles.map((t) => ({
+              value: t.id as FormDocumentGenere['templateId'],
+              label: t.label,
+            }))}
+          />
+        </Field>
         {form.kind === 'attestation' ? (
-          <Champ id={`${id}-titre`} label="Titre">
-            <select
-              id={`${id}-titre`}
-              className={CHAMP}
+          <Field id={`${id}-titre`} label="Titre" size="md" newRow>
+            <Select<FormDocumentGenere['title']>
               value={form.title}
-              onChange={(ev) => maj({ title: ev.target.value as FormDocumentGenere['title'] })}
-            >
-              {Object.entries(ATTESTATION_TITLE_LABELS).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
-                </option>
-              ))}
-            </select>
-          </Champ>
+              onChange={(v) => maj({ title: v })}
+              options={(
+                Object.entries(ATTESTATION_TITLE_LABELS) as [FormDocumentGenere['title'], string][]
+              ).map(([k, v]) => ({ value: k, label: v }))}
+            />
+          </Field>
         ) : null}
-        <Champ id={`${id}-nom`} label="Signataire (nom)" requis erreur={erreurs['signataireNom']}>
-          <input
-            id={`${id}-nom`}
-            className={CHAMP}
+        <Field
+          id={`${id}-nom`}
+          label="Signataire (nom)"
+          required
+          size="md"
+          newRow
+          error={erreurs['signataireNom']}
+        >
+          <TextInput
             value={form.signataireNom}
+            autoComplete="name"
             onChange={(ev) => maj({ signataireNom: ev.target.value })}
           />
-        </Champ>
-        <Champ
+        </Field>
+        <Field
           id={`${id}-qualite`}
           label="Qualité du signataire"
-          requis
-          erreur={erreurs['signataireQualite']}
+          required
+          size="md"
+          error={erreurs['signataireQualite']}
         >
-          <input
-            id={`${id}-qualite`}
-            className={CHAMP}
+          <TextInput
             placeholder="Directrice générale"
             value={form.signataireQualite}
             onChange={(ev) => maj({ signataireQualite: ev.target.value })}
           />
-        </Champ>
-        <Champ id={`${id}-lieu`} label="Fait à" requis erreur={erreurs['lieu']}>
-          <input
-            id={`${id}-lieu`}
-            className={CHAMP}
-            value={form.lieu}
-            onChange={(ev) => maj({ lieu: ev.target.value })}
-          />
-        </Champ>
-        <Champ id={`${id}-date`} label="Le" requis erreur={erreurs['date']}>
-          <input
-            id={`${id}-date`}
-            type="date"
-            className={CHAMP}
-            value={form.date}
-            onChange={(ev) => maj({ date: ev.target.value })}
-          />
-        </Champ>
-      </div>
+        </Field>
+        <Field id={`${id}-lieu`} label="Fait à" required size="md" newRow error={erreurs['lieu']}>
+          <TextInput value={form.lieu} onChange={(ev) => maj({ lieu: ev.target.value })} />
+        </Field>
+        <Field id={`${id}-date`} label="Le" required size="sm" error={erreurs['date']}>
+          <DatePicker value={form.date} onChange={(v) => maj({ date: v })} shortcuts={['today']} />
+        </Field>
+      </FormGrid>
 
       {form.kind === 'attestation' ? (
         <fieldset className="flex flex-col gap-2">
@@ -343,59 +321,39 @@ function FormulaireGeneration({
         <fieldset className="flex flex-col gap-3">
           <legend className="mb-1 text-sm font-medium">Nature des services prestés</legend>
           {form.emplois.map((j, i) => (
-            <div key={i} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto_auto_auto]">
-              <input
-                aria-label={`Emploi ${i + 1}`}
-                className={CHAMP}
-                value={j.title}
-                onChange={(ev) =>
-                  maj({
-                    emplois: form.emplois.map((x, k) =>
-                      k === i ? { ...x, title: ev.target.value } : x,
-                    ),
-                  })
-                }
-              />
-              <input
-                aria-label={`Début de l’emploi ${i + 1}`}
-                type="date"
-                className={CHAMP}
-                value={j.from}
-                onChange={(ev) =>
-                  maj({
-                    emplois: form.emplois.map((x, k) =>
-                      k === i ? { ...x, from: ev.target.value } : x,
-                    ),
-                  })
-                }
-              />
-              <input
-                aria-label={`Fin de l’emploi ${i + 1}`}
-                type="date"
-                className={CHAMP}
-                value={j.to}
-                onChange={(ev) =>
-                  maj({
-                    emplois: form.emplois.map((x, k) =>
-                      k === i ? { ...x, to: ev.target.value } : x,
-                    ),
-                  })
-                }
-              />
+            <div
+              key={i}
+              className="flex flex-col gap-2 rounded-[var(--radius-md)] border border-[var(--border)] p-3"
+            >
+              <FormGrid>
+                <Field
+                  id={`${id}-emploi-${i}`}
+                  label={`Emploi ${i + 1}`}
+                  required
+                  size="lg"
+                  error={erreurs[`emploi-${i}`]}
+                >
+                  <TextInput
+                    value={j.title}
+                    onChange={(ev) => majEmploi(i, { title: ev.target.value })}
+                  />
+                </Field>
+                <Field id={`${id}-emploi-${i}-du`} label="Du" required size="sm" newRow>
+                  <DatePicker value={j.from} onChange={(v) => majEmploi(i, { from: v })} />
+                </Field>
+                <Field id={`${id}-emploi-${i}-au`} label="Au" required size="sm">
+                  <DatePicker value={j.to} onChange={(v) => majEmploi(i, { to: v })} />
+                </Field>
+              </FormGrid>
               <button
                 type="button"
-                className={BOUTON_PETIT}
-                aria-label={`Retirer l’emploi ${i + 1}`}
+                className={`${BOUTON_PETIT} self-end`}
                 disabled={form.emplois.length === 1}
                 onClick={() => maj({ emplois: form.emplois.filter((_, k) => k !== i) })}
               >
-                <Trash2 aria-hidden="true" className="h-4 w-4" />
+                <Trash2 aria-hidden="true" className="mr-1 inline h-3.5 w-3.5" />
+                Retirer l’emploi {i + 1}
               </button>
-              {erreurs[`emploi-${i}`] ? (
-                <p className="text-xs text-[var(--danger)] sm:col-span-4">
-                  {erreurs[`emploi-${i}`]}
-                </p>
-              ) : null}
             </div>
           ))}
           {form.emplois.length < 10 ? (
@@ -415,23 +373,30 @@ function FormulaireGeneration({
               Ajouter un emploi
             </button>
           ) : null}
-          <Champ
-            id={`${id}-cnss`}
-            label="N° d’immatriculation CNSS"
-            aide="Mention prévue par l’article 79. Laissé vide, le certificat indique « non communiqué » et reste incomplet."
-            erreur={erreurs['cnss']}
-          >
-            <input
+          <FormGrid>
+            <Field
               id={`${id}-cnss`}
-              className={CHAMP}
-              value={form.cnss}
-              onChange={(ev) => maj({ cnss: ev.target.value })}
-            />
-          </Champ>
+              label="N° d’immatriculation CNSS"
+              optional
+              size="md"
+              hint="Mention prévue par l’article 79. Laissé vide, le certificat indique « non communiqué » et reste incomplet."
+              error={erreurs['cnss']}
+            >
+              <TextInput
+                value={form.cnss}
+                className="font-mono"
+                onChange={(ev) => maj({ cnss: ev.target.value })}
+              />
+            </Field>
+          </FormGrid>
         </fieldset>
       )}
 
-      {case_('visible', 'Visible du collaborateur dans « Mon espace »')}
+      <Switch
+        label="Visible du collaborateur dans « Mon espace »"
+        checked={form.visible}
+        onChange={(v) => maj({ visible: v })}
+      />
       <p className="text-xs text-[var(--foreground-muted)]">{phraseType(form.kind)}</p>
 
       {apercu ? (

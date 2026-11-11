@@ -4,22 +4,28 @@
 // création et modification en fenêtre modale, archivage confirmé (`hr.manage`).
 // L'API refuse un cycle, une profondeur de plus de huit niveaux et l'archivage
 // d'un service encore occupé ; l'écran traduit ses refus.
+//
+// ADR-0074 : service parent et responsable en `EntityPicker` (sans « + » : la
+// fenêtre est déjà celle de création d'un service), grille sémantique.
 
-import { Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Button,
+  EntityPicker,
+  Field,
+  FormGrid,
+  Modal,
+  SubmitButton,
+  TextInput,
+  buttonClasses,
+  correspondRecherche,
+} from '@lalanda/ui';
 import { Building2, Network, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useId, useState } from 'react';
 
 import { hrApi, type HrDepartmentView, type HrEmployeeListItem } from '@/lib/api-hr';
 
-import {
-  Alerte,
-  BOUTON_DANGER,
-  BOUTON_PETIT,
-  CHAMP,
-  Champ,
-  aria,
-} from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_DANGER, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { useAccesRh } from './rh-access';
 import {
@@ -91,69 +97,77 @@ export function FormulaireService({
     }
   }
 
+  const parents = parentsPossibles(services, service?.id ?? null);
+  const parentChoisi = parents.find((s) => s.id === f.parentId) ?? null;
+  const responsables = employes.map((e) => ({ id: e.id, nom: nomAffiche(e) }));
+  const responsableChoisi = responsables.find((e) => e.id === f.headEmployeeId) ?? null;
+
   return (
     <form className="flex flex-col gap-4" onSubmit={(e) => void envoyer(e)} noValidate>
-      <Champ id={`${id}-nom`} label="Nom du service" requis erreur={champ}>
-        <input
-          id={`${id}-nom`}
-          className={CHAMP}
-          value={f.name}
-          onChange={(e) => setF({ ...f, name: e.target.value })}
-          {...aria(`${id}-nom`, champ)}
-        />
-      </Champ>
-      <Champ
-        id={`${id}-parent`}
-        label="Rattaché à"
-        aide="Laisser vide pour un service de premier niveau."
-      >
-        <select
+      <FormGrid>
+        <Field id={`${id}-nom`} label="Nom du service" required size="lg" error={champ}>
+          <TextInput
+            value={f.name}
+            autoFocus={service === null}
+            onChange={(e) => setF({ ...f, name: e.target.value })}
+          />
+        </Field>
+        <Field
           id={`${id}-parent`}
-          className={CHAMP}
-          value={f.parentId}
-          onChange={(e) => setF({ ...f, parentId: e.target.value })}
-          {...aria(`${id}-parent`, undefined, true)}
+          label="Rattaché à"
+          size="lg"
+          newRow
+          hint="Tapez pour chercher. Vide : service de premier niveau."
         >
-          <option value="">Aucun (premier niveau)</option>
-          {parentsPossibles(services, service?.id ?? null).map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-      </Champ>
-      <Champ
-        id={`${id}-resp`}
-        label="Responsable affiché"
-        aide="Affiché sur l’organigramme. Il ne devient pas le manager des membres du service : la ligne hiérarchique se règle sur chaque fiche."
-      >
-        <select
+          <EntityPicker<HrDepartmentView>
+            value={parentChoisi}
+            onChange={(s) => setF({ ...f, parentId: s?.id ?? '' })}
+            search={async (q) =>
+              parents
+                .filter((s) => correspondRecherche([s.name], q))
+                .sort((a, b) => a.name.localeCompare(b.name, 'fr'))
+            }
+            refreshKey={parents.length}
+            getKey={(s) => s.id}
+            getLabel={(s) => s.name}
+            getDescription={(s) => services.find((p) => p.id === s.parentId)?.name ?? null}
+            placeholder="Aucun (premier niveau)"
+            debounceMs={0}
+            emptyText="Aucun service ne correspond."
+          />
+        </Field>
+        <Field
           id={`${id}-resp`}
-          className={CHAMP}
-          value={f.headEmployeeId}
-          onChange={(e) => setF({ ...f, headEmployeeId: e.target.value })}
-          {...aria(`${id}-resp`, undefined, true)}
+          label="Responsable affiché"
+          size="lg"
+          newRow
+          hint="Affiché sur l’organigramme. Il ne devient pas le manager des membres du service : la ligne hiérarchique se règle sur chaque fiche."
         >
-          <option value="">Aucun</option>
-          {employes.map((e) => (
-            <option key={e.id} value={e.id}>
-              {nomAffiche(e)}
-            </option>
-          ))}
-        </select>
-      </Champ>
+          <EntityPicker<{ id: string; nom: string }>
+            value={responsableChoisi}
+            onChange={(e) => setF({ ...f, headEmployeeId: e?.id ?? '' })}
+            search={async (q) => responsables.filter((e) => correspondRecherche([e.nom], q))}
+            refreshKey={responsables.length}
+            getKey={(e) => e.id}
+            getLabel={(e) => e.nom}
+            placeholder="Aucun"
+            debounceMs={0}
+            emptyText="Aucun collaborateur actif ne correspond."
+          />
+        </Field>
+      </FormGrid>
       {erreur ? (
         <Alerte>
           <p>{erreur}</p>
         </Alerte>
       ) : null}
-      <div className="flex flex-wrap justify-end gap-2">
-        <button type="button" className={BOUTON_PETIT} onClick={onAnnuler} disabled={envoi}>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+        <Button size="sm" onClick={onAnnuler} disabled={envoi} className="max-sm:h-11">
           Annuler
-        </button>
-        <button type="submit" className={buttonClasses('primary', 'sm')} disabled={envoi}>
-          {envoi ? 'Enregistrement…' : service ? 'Enregistrer' : 'Créer le service'}
-        </button>
+        </Button>
+        <SubmitButton size="sm" busy={envoi} busyLabel="Enregistrement…" className="max-sm:h-11">
+          {service ? 'Enregistrer' : 'Créer le service'}
+        </SubmitButton>
       </div>
     </form>
   );

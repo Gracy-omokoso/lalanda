@@ -5,8 +5,10 @@
 // décoratives : chaque valeur est écrite en texte, et chaque bloc propose son
 // tableau équivalent. Export du registre non sensible (CSV) avec `hr.read` et
 // `hr.manage` ; aucune donnée salariale nulle part.
+//
+// ADR-0074 : période et service en `Select` (même lecture `periodeDepuis`).
 
-import { buttonClasses } from '@lalanda/ui';
+import { Field, FormGrid, Select, buttonClasses } from '@lalanda/ui';
 import {
   BarChart3,
   Download,
@@ -22,7 +24,7 @@ import type { HrDepartmentView } from '@/lib/api-hr';
 import { hrApi } from '@/lib/api-hr';
 import { hrAdminApi, type HrReportsView } from '@/lib/api-hr-admin';
 
-import { Alerte, CHAMP } from '../../ventes/_components/form-ui';
+import { Alerte } from '../../ventes/_components/form-ui';
 
 import {
   LIBELLES_PERIODE,
@@ -133,33 +135,25 @@ export function RapportsRh(): React.ReactElement {
           ) : null
         }
       >
-        <div className="grid gap-3 sm:grid-cols-2 lg:max-w-2xl">
-          <label className="flex min-w-0 flex-col gap-1 text-xs font-medium">
-            Période
-            <select
-              className={CHAMP}
+        <FormGrid className="lg:max-w-3xl">
+          <Field id="rh-rapports-periode" label="Période" size="md">
+            <Select<Periode>
               value={periode}
-              onChange={(e) => setPeriode(periodeDepuis(e.target.value))}
-            >
-              {PERIODES.map((p) => (
-                <option key={p} value={p}>
-                  {LIBELLES_PERIODE[p]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex min-w-0 flex-col gap-1 text-xs font-medium">
-            Service
-            <select className={CHAMP} value={service} onChange={(e) => setService(e.target.value)}>
-              <option value="">Toute l’organisation</option>
-              {services.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+              onChange={(v) => setPeriode(periodeDepuis(v))}
+              options={PERIODES.map((p) => ({ value: p, label: LIBELLES_PERIODE[p] }))}
+            />
+          </Field>
+          <Field id="rh-rapports-service" label="Service" size="md">
+            <Select<string>
+              value={service}
+              onChange={setService}
+              options={[
+                { value: '', label: 'Toute l’organisation' },
+                ...services.map((s) => ({ value: s.id, label: s.name })),
+              ]}
+            />
+          </Field>
+        </FormGrid>
         <p className="text-xs text-[var(--foreground-muted)]">
           Chiffres calculés par Lalanda. Aucune donnée salariale ni sensible ;{' '}
           {exporter

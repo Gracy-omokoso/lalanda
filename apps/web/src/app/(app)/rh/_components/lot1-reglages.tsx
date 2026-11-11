@@ -3,8 +3,19 @@
 // Réglages du lot 1 RH (ADR-0068) : matricules (préfixe dérivé du nom de
 // l'organisation, largeur) et jours fériés de la RDC proposés « à vérifier ».
 // L'API reste juge ; chaque modification s'ouvre en fenêtre modale.
+//
+// ADR-0074 : préfixe en `TextInput`, nombre de chiffres en `Select`.
 
-import { Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Button,
+  Field,
+  FormGrid,
+  Modal,
+  Select,
+  SubmitButton,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import { Hash } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 
@@ -14,7 +25,7 @@ import {
   type EmployeeNumberingView,
 } from '@/lib/api-hr-lot1';
 
-import { Alerte, BOUTON_PETIT, CHAMP, Champ } from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { formatJour, lire, messageRh, type Lecture } from './rh-model';
 import { Chargement, EchecLecture, Panneau } from './rh-ui';
@@ -134,45 +145,52 @@ function FormulaireMatricules({
 
   return (
     <form className="flex flex-col gap-4" onSubmit={(e) => void envoyer(e)} noValidate>
-      <Champ
-        id={`${id}-prefixe`}
-        label="Préfixe"
-        aide={`Laisser vide : ${valeur.defaultPrefix} (tiré du nom de l’organisation). Lettres, chiffres ou « - _ / . », 10 au plus.`}
-      >
-        <input
+      <FormGrid>
+        <Field
           id={`${id}-prefixe`}
-          className={CHAMP}
-          value={prefixe}
-          placeholder={valeur.defaultPrefix}
-          onChange={(e) => setPrefixe(e.target.value)}
-        />
-      </Champ>
-      <Champ id={`${id}-largeur`} label="Nombre de chiffres" aide="De 3 à 8 ; 4 donne GF-0001.">
-        <select
-          id={`${id}-largeur`}
-          className={CHAMP}
-          value={largeur}
-          onChange={(e) => setLargeur(Number(e.target.value))}
+          label="Préfixe"
+          optional
+          size="sm"
+          hint={`Laisser vide : ${valeur.defaultPrefix} (tiré du nom de l’organisation). Lettres, chiffres ou « - _ / . », 10 au plus.`}
         >
-          {[3, 4, 5, 6, 7, 8].map((n) => (
-            <option key={n} value={n}>
-              {n}
-            </option>
-          ))}
-        </select>
-      </Champ>
+          <TextInput
+            value={prefixe}
+            placeholder={valeur.defaultPrefix}
+            className="font-mono"
+            onChange={(e) => setPrefixe(e.target.value)}
+          />
+        </Field>
+        <Field
+          id={`${id}-largeur`}
+          label="Nombre de chiffres"
+          size="xs"
+          newRow
+          hint="De 3 à 8 ; 4 donne GF-0001."
+        >
+          <Select<string>
+            value={String(largeur)}
+            onChange={(v) => setLargeur(Number(v))}
+            options={[3, 4, 5, 6, 7, 8].map((n) => ({ value: String(n), label: String(n) }))}
+          />
+        </Field>
+      </FormGrid>
       {erreur ? (
         <Alerte>
           <p>{erreur}</p>
         </Alerte>
       ) : null}
-      <div className="flex justify-end gap-2">
-        <button type="button" className={BOUTON_PETIT} onClick={onAnnuler} disabled={envoi}>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <Button onClick={onAnnuler} disabled={envoi} className="max-sm:h-11">
           Annuler
-        </button>
-        <button type="submit" className={buttonClasses('primary', 'sm')} disabled={envoi}>
-          {envoi ? 'Enregistrement…' : 'Enregistrer'}
-        </button>
+        </Button>
+        <SubmitButton
+          busy={envoi}
+          busyLabel="Enregistrement…"
+          showShortcut={false}
+          className="max-sm:h-11"
+        >
+          Enregistrer
+        </SubmitButton>
       </div>
     </form>
   );

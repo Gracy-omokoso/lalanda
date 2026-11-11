@@ -4,9 +4,24 @@
 // Une équipe regroupe des utilisateurs de l'organisation, au-delà des services ;
 // ajoutée à un projet, elle y donne accès à ses membres courants. Lecture `hr.read`,
 // gestion `hr.manage` (création, modification, membres, suppression confirmée).
+//
+// ADR-0074 : responsable et membre à ajouter en `EntityPicker` sur les
+// utilisateurs de l'organisation (sans « + » : un utilisateur s'invite depuis
+// l'organisation, pas depuis une équipe).
 
 import type { TeamMemberView, TeamView } from '@lalanda/shared/hr';
-import { Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Button,
+  EntityPicker,
+  Field,
+  FormGrid,
+  Modal,
+  SubmitButton,
+  TextArea,
+  TextInput,
+  buttonClasses,
+  correspondRecherche,
+} from '@lalanda/ui';
 import { FolderKanban, Plus, UserMinus, UserPlus, UsersRound } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useId, useState } from 'react';
@@ -14,14 +29,7 @@ import { useCallback, useEffect, useId, useState } from 'react';
 import { teamsApi } from '@/lib/teams-api';
 
 import { Avatar, PileAvatars } from '../../projets/_components/elements';
-import {
-  Alerte,
-  BOUTON_DANGER,
-  BOUTON_PETIT,
-  CHAMP,
-  Champ,
-  aria,
-} from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_DANGER, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   candidatsAjoutables,
@@ -78,60 +86,62 @@ function FormulaireEquipe({
     }
   }
 
+  const responsable = candidats.find((c) => c.userId === f.leadUserId) ?? null;
+
   return (
     <form className="flex flex-col gap-4" onSubmit={(e) => void envoyer(e)} noValidate>
-      <Champ id={`${id}-nom`} label="Nom de l’équipe" requis erreur={champ}>
-        <input
-          id={`${id}-nom`}
-          className={CHAMP}
-          value={f.name}
-          maxLength={80}
-          onChange={(e) => setF({ ...f, name: e.target.value })}
-          {...aria(`${id}-nom`, champ)}
-        />
-      </Champ>
-      <Champ id={`${id}-desc`} label="Description" aide="Ce que fait l’équipe, en une phrase.">
-        <textarea
+      <FormGrid>
+        <Field id={`${id}-nom`} label="Nom de l’équipe" required size="lg" error={champ}>
+          <TextInput
+            value={f.name}
+            maxLength={80}
+            onChange={(e) => setF({ ...f, name: e.target.value })}
+          />
+        </Field>
+        <Field
           id={`${id}-desc`}
-          className={`${CHAMP} min-h-20`}
-          value={f.description}
-          maxLength={1000}
-          onChange={(e) => setF({ ...f, description: e.target.value })}
-          {...aria(`${id}-desc`, undefined, true)}
-        />
-      </Champ>
-      <Champ
-        id={`${id}-resp`}
-        label="Responsable"
-        aide="Le responsable fait partie de l’équipe. Il peut venir de n’importe quel service."
-      >
-        <select
-          id={`${id}-resp`}
-          className={CHAMP}
-          value={f.leadUserId}
-          onChange={(e) => setF({ ...f, leadUserId: e.target.value })}
-          {...aria(`${id}-resp`, undefined, true)}
+          label="Description"
+          optional
+          size="full"
+          hint="Ce que fait l’équipe, en une phrase."
         >
-          <option value="">Aucun</option>
-          {candidats.map((c) => (
-            <option key={c.userId} value={c.userId}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-      </Champ>
+          <TextArea
+            value={f.description}
+            maxLength={1000}
+            onChange={(e) => setF({ ...f, description: e.target.value })}
+          />
+        </Field>
+        <Field
+          id={`${id}-resp`}
+          label="Responsable"
+          size="lg"
+          hint="Le responsable fait partie de l’équipe. Il peut venir de n’importe quel service."
+        >
+          <EntityPicker<TeamMemberView>
+            value={responsable}
+            onChange={(c) => setF({ ...f, leadUserId: c?.userId ?? '' })}
+            search={async (q) => candidats.filter((c) => correspondRecherche([c.name], q))}
+            refreshKey={candidats.length}
+            getKey={(c) => c.userId}
+            getLabel={(c) => c.name}
+            placeholder="Aucun"
+            debounceMs={0}
+            emptyText="Aucun membre de l’organisation ne correspond."
+          />
+        </Field>
+      </FormGrid>
       {erreur ? (
         <Alerte>
           <p>{erreur}</p>
         </Alerte>
       ) : null}
-      <div className="flex flex-wrap justify-end gap-2">
-        <button type="button" className={BOUTON_PETIT} onClick={onAnnuler} disabled={envoi}>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+        <Button size="sm" onClick={onAnnuler} disabled={envoi} className="max-sm:h-11">
           Annuler
-        </button>
-        <button type="submit" className={buttonClasses('primary', 'sm')} disabled={envoi}>
-          {envoi ? 'Enregistrement…' : equipe ? 'Enregistrer' : 'Créer l’équipe'}
-        </button>
+        </Button>
+        <SubmitButton size="sm" busy={envoi} busyLabel="Enregistrement…" className="max-sm:h-11">
+          {equipe ? 'Enregistrer' : 'Créer l’équipe'}
+        </SubmitButton>
       </div>
     </form>
   );
@@ -157,6 +167,7 @@ function FicheEquipe({
   const [erreur, setErreur] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
   const ajoutables = candidatsAjoutables(candidats, equipe);
+  const choisi = ajoutables.find((c) => c.userId === choix) ?? null;
 
   async function agir(p: Promise<TeamView>, repli: string): Promise<void> {
     setErreur(null);
@@ -258,7 +269,7 @@ function FicheEquipe({
 
       {gerer ? (
         <form
-          className="flex flex-wrap items-end gap-2"
+          className="flex flex-col gap-2 sm:flex-row sm:items-end"
           onSubmit={(e) => {
             e.preventDefault();
             if (choix === '') return;
@@ -268,22 +279,23 @@ function FicheEquipe({
             );
           }}
         >
-          <label className="flex min-w-48 flex-1 flex-col gap-1 text-sm" htmlFor={`${id}-ajout`}>
-            Ajouter un membre de l’organisation
-            <select
-              id={`${id}-ajout`}
-              className={CHAMP}
-              value={choix}
-              onChange={(e) => setChoix(e.target.value)}
-            >
-              <option value="">Choisir…</option>
-              {ajoutables.map((c) => (
-                <option key={c.userId} value={c.userId}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <Field
+            id={`${id}-ajout`}
+            label="Ajouter un membre de l’organisation"
+            className="min-w-0 sm:max-w-sm sm:flex-1"
+          >
+            <EntityPicker<TeamMemberView>
+              value={choisi}
+              onChange={(c) => setChoix(c?.userId ?? '')}
+              search={async (q) => ajoutables.filter((c) => correspondRecherche([c.name], q))}
+              refreshKey={ajoutables.length}
+              getKey={(c) => c.userId}
+              getLabel={(c) => c.name}
+              placeholder="Tapez un nom…"
+              debounceMs={0}
+              emptyText="Aucun membre à ajouter ne correspond."
+            />
+          </Field>
           <button
             type="submit"
             className={buttonClasses('primary', 'sm')}

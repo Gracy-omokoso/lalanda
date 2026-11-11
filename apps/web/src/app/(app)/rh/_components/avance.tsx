@@ -7,8 +7,23 @@
 // (`kind: null`) et l'écran dit alors « Avance ». Le motif d'une avance sur salaire ne
 // s'affiche qu'après « Afficher le motif » (lecture journalisée), dans l'état de
 // l'écran seulement. Aucun plafond n'est posé par Lalanda ; le reste dû vient du moteur.
+//
+// ADR-0074 : nature et devise en segments, montants en `MoneyInput` (mise en forme
+// seulement : `lireMontantSaisi` lit toujours la saisie), date en `DatePicker`.
 
-import { Badge, Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Badge,
+  Button,
+  DatePicker,
+  Field,
+  FormGrid,
+  Modal,
+  MoneyInput,
+  SegmentedControl,
+  TextArea,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import { useId, useState } from 'react';
 
 import { HR_PAYMENT_METHOD_LABELS, type AdvanceView } from '@lalanda/shared/hr';
@@ -16,7 +31,7 @@ import { HR_PAYMENT_METHOD_LABELS, type AdvanceView } from '@lalanda/shared/hr';
 import type { OrgAction } from '@/lib/api';
 import { rh2Api } from '@/lib/api-rh-2';
 
-import { BOUTON_PETIT, CHAMP, Champ } from '../../ventes/_components/form-ui';
+import { BOUTON_PETIT } from '../../ventes/_components/form-ui';
 import { lireMontantSaisi } from '../../ventes/_components/sales-model';
 
 import {
@@ -86,86 +101,73 @@ export function AvanceFormulaire({
       size="sm"
       busy={envoi}
       footer={
-        <div className="flex flex-wrap justify-end gap-2">
-          <button type="button" className={BOUTON_PETIT} onClick={onFermer} disabled={envoi}>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+          <Button size="sm" onClick={onFermer} disabled={envoi} className="max-sm:h-11">
             Retour
-          </button>
-          <button
-            type="button"
-            className={buttonClasses('primary', 'sm')}
-            disabled={envoi}
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            busy={envoi}
             onClick={() => void demander()}
+            className="max-sm:h-11"
           >
             {envoi ? 'Envoi…' : 'Envoyer la demande'}
-          </button>
+          </Button>
         </div>
       }
     >
       <div className="flex flex-col gap-3 text-sm">
-        {salaireOuvert ? (
-          <Champ id={`${id}-nature`} label="Nature" requis>
-            <select
-              id={`${id}-nature`}
-              className={CHAMP}
-              value={nature}
-              onChange={(e) => setNature(e.target.value as 'expenses' | 'salary')}
-            >
-              <option value="expenses">Avance de frais (mission)</option>
-              <option value="salary">Avance sur salaire</option>
-            </select>
-          </Champ>
-        ) : null}
-        <div className="grid grid-cols-[1fr_7rem] gap-3">
-          <Champ id={`${id}-montant`} label="Montant" requis>
-            <input
-              id={`${id}-montant`}
-              inputMode="decimal"
-              className={CHAMP}
-              value={somme}
-              onChange={(e) => setSomme(e.target.value)}
-            />
-          </Champ>
-          <Champ id={`${id}-devise`} label="Devise" requis>
-            <select
-              id={`${id}-devise`}
-              className={CHAMP}
+        <FormGrid>
+          {salaireOuvert ? (
+            <Field id={`${id}-nature`} label="Nature" required group size="full">
+              <SegmentedControl<'expenses' | 'salary'>
+                value={nature}
+                onChange={setNature}
+                options={[
+                  { value: 'expenses', label: 'Avance de frais (mission)' },
+                  { value: 'salary', label: 'Avance sur salaire' },
+                ]}
+              />
+            </Field>
+          ) : null}
+          <Field id={`${id}-montant`} label="Montant" required size="sm" newRow>
+            <MoneyInput value={somme} currency={devise} onChange={setSomme} />
+          </Field>
+          <Field id={`${id}-devise`} label="Devise" required group size="sm">
+            <SegmentedControl<'CDF' | 'USD'>
               value={devise}
-              onChange={(e) => setDevise(e.target.value as 'CDF' | 'USD')}
-            >
-              <option value="USD">USD</option>
-              <option value="CDF">CDF</option>
-            </select>
-          </Champ>
-        </div>
-        {nature === 'expenses' ? (
-          <Champ id={`${id}-objet`} label="Objet de la mission (facultatif)">
-            <input
-              id={`${id}-objet`}
-              className={CHAMP}
-              value={objet}
-              maxLength={200}
-              onChange={(e) => setObjet(e.target.value)}
+              onChange={setDevise}
+              options={[
+                { value: 'USD', label: 'USD' },
+                { value: 'CDF', label: 'CDF' },
+              ]}
             />
-          </Champ>
-        ) : null}
-        <Champ
-          id={`${id}-motif`}
-          label="Motif (facultatif)"
-          aide={
-            nature === 'salary'
-              ? 'Confidentiel : chiffré, jamais montré à votre manager.'
-              : undefined
-          }
-        >
-          <textarea
+          </Field>
+          {nature === 'expenses' ? (
+            <Field id={`${id}-objet`} label="Objet de la mission" optional size="full">
+              <TextInput value={objet} maxLength={200} onChange={(e) => setObjet(e.target.value)} />
+            </Field>
+          ) : null}
+          <Field
             id={`${id}-motif`}
-            rows={2}
-            className={CHAMP}
-            value={motif}
-            maxLength={500}
-            onChange={(e) => setMotif(e.target.value)}
-          />
-        </Champ>
+            label="Motif"
+            optional
+            size="full"
+            hint={
+              nature === 'salary'
+                ? 'Confidentiel : chiffré, jamais montré à votre manager.'
+                : undefined
+            }
+          >
+            <TextArea
+              rows={2}
+              value={motif}
+              maxLength={500}
+              onChange={(e) => setMotif(e.target.value)}
+            />
+          </Field>
+        </FormGrid>
         <ErreurAction erreur={erreur} />
       </div>
     </Modal>
@@ -476,7 +478,8 @@ function RetourEspeces({
   onFait: (v: AdvanceView) => void;
 }): React.ReactElement {
   const id = useId();
-  const [somme, setSomme] = useState(avance.outstanding.replace('.', ','));
+  // Chaîne décimale de l'API (`12.50`) : `MoneyInput` l'affiche « 12,50 ».
+  const [somme, setSomme] = useState(avance.outstanding);
   const [jour, setJour] = useState(aujourdhui());
   const [erreur, setErreur] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
@@ -485,6 +488,11 @@ function RetourEspeces({
     const m = lireMontantSaisi(somme);
     if (!m.ok) {
       setErreur(m.erreur);
+      return;
+    }
+    // La date était `required` en natif : même exigence avant l'envoi.
+    if (jour === '') {
+      setErreur('Indiquez la date du retour.');
       return;
     }
     setErreur(null);
@@ -515,40 +523,31 @@ function RetourEspeces({
       size="sm"
       busy={envoi}
       footer={
-        <div className="flex flex-wrap justify-end gap-2">
-          <button type="button" className={BOUTON_PETIT} onClick={onFermer} disabled={envoi}>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+          <Button size="sm" onClick={onFermer} disabled={envoi} className="max-sm:h-11">
             Retour
-          </button>
-          <button
-            type="button"
-            className={buttonClasses('primary', 'sm')}
-            disabled={envoi}
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            busy={envoi}
             onClick={() => void enregistrer()}
+            className="max-sm:h-11"
           >
             {envoi ? 'Enregistrement…' : 'Enregistrer'}
-          </button>
+          </Button>
         </div>
       }
     >
       <div className="flex flex-col gap-3 text-sm">
-        <Champ id={`${id}-montant`} label={`Montant rendu (${avance.currency})`} requis>
-          <input
-            id={`${id}-montant`}
-            inputMode="decimal"
-            className={CHAMP}
-            value={somme}
-            onChange={(e) => setSomme(e.target.value)}
-          />
-        </Champ>
-        <Champ id={`${id}-jour`} label="Date" requis>
-          <input
-            id={`${id}-jour`}
-            type="date"
-            className={CHAMP}
-            value={jour}
-            onChange={(e) => setJour(e.target.value)}
-          />
-        </Champ>
+        <FormGrid>
+          <Field id={`${id}-montant`} label="Montant rendu" required size="sm">
+            <MoneyInput value={somme} currency={avance.currency} onChange={setSomme} />
+          </Field>
+          <Field id={`${id}-jour`} label="Date" required size="sm">
+            <DatePicker value={jour} required onChange={setJour} shortcuts={['today']} />
+          </Field>
+        </FormGrid>
         <ErreurAction erreur={erreur} />
       </div>
     </Modal>

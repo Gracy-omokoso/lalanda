@@ -5,8 +5,20 @@
 // ceux de tous (`performance.read`). Le collaborateur propose, le manager ou les RH
 // valident — jamais le collaborateur pour lui-même. Aucun avancement calculé : chaque
 // déclaration est posée par une personne.
+//
+// ADR-0074 : période en `DatePicker`, résultat en `Select`, champs en `Field`.
 
-import { Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Button,
+  DatePicker,
+  Field,
+  FormGrid,
+  Modal,
+  Select,
+  TextArea,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import { Target } from 'lucide-react';
 import { useCallback, useEffect, useId, useState } from 'react';
 
@@ -14,7 +26,7 @@ import type { GoalFinalStatus } from '@lalanda/shared/hr';
 
 import { rh2Api, type GoalView, type HrPerformanceSettingsView } from '@/lib/api-rh-2';
 
-import { BOUTON_PETIT, CHAMP, Champ } from '../../ventes/_components/form-ui';
+import { BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   LIBELLES_STATUT_OBJECTIF,
@@ -315,6 +327,11 @@ function NouvelObjectif({
       setErreur('Donnez un titre à l’objectif.');
       return;
     }
+    // Les dates étaient `required` en natif : même exigence avant l'envoi.
+    if (du === '' || au === '') {
+      setErreur('Indiquez la période de l’objectif (du… au…).');
+      return;
+    }
     setErreur(null);
     setEnvoi(true);
     try {
@@ -341,70 +358,49 @@ function NouvelObjectif({
       size="md"
       busy={envoi}
       footer={
-        <div className="flex flex-wrap justify-end gap-2">
-          <button type="button" className={BOUTON_PETIT} onClick={onFermer} disabled={envoi}>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+          <Button size="sm" onClick={onFermer} disabled={envoi} className="max-sm:h-11">
             Retour
-          </button>
-          <button
-            type="button"
-            className={buttonClasses('primary', 'sm')}
-            disabled={envoi}
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            busy={envoi}
             onClick={() => void creer()}
+            className="max-sm:h-11"
           >
             {envoi ? 'Envoi…' : 'Proposer'}
-          </button>
+          </Button>
         </div>
       }
     >
       <div className="flex flex-col gap-3 text-sm">
-        <Champ id={`${id}-t`} label="Titre" requis>
-          <input
-            id={`${id}-t`}
-            className={CHAMP}
-            value={titre}
-            maxLength={200}
-            onChange={(e) => setTitre(e.target.value)}
-          />
-        </Champ>
-        <div className="grid grid-cols-2 gap-3">
-          <Champ id={`${id}-du`} label="Du" requis>
-            <input
-              id={`${id}-du`}
-              type="date"
-              className={CHAMP}
-              value={du}
-              onChange={(e) => setDu(e.target.value)}
-            />
-          </Champ>
-          <Champ id={`${id}-au`} label="Au" requis>
-            <input
-              id={`${id}-au`}
-              type="date"
-              className={CHAMP}
+        <FormGrid>
+          <Field id={`${id}-t`} label="Titre" required size="full">
+            <TextInput value={titre} maxLength={200} onChange={(e) => setTitre(e.target.value)} />
+          </Field>
+          <Field id={`${id}-du`} label="Du" required size="sm" newRow>
+            <DatePicker value={du} required onChange={setDu} shortcuts={['today']} />
+          </Field>
+          <Field id={`${id}-au`} label="Au" required size="sm">
+            <DatePicker
               value={au}
-              onChange={(e) => setAu(e.target.value)}
+              required
+              onChange={setAu}
+              shortcuts={['endOfMonth', 'endOfYear']}
             />
-          </Champ>
-        </div>
-        <Champ id={`${id}-d`} label="Description (facultatif)">
-          <textarea
-            id={`${id}-d`}
-            rows={3}
-            className={CHAMP}
-            value={description}
-            maxLength={2000}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </Champ>
-        <Champ id={`${id}-m`} label="Comment saura-t-on que c’est atteint ? (facultatif)">
-          <input
-            id={`${id}-m`}
-            className={CHAMP}
-            value={mesure}
-            maxLength={300}
-            onChange={(e) => setMesure(e.target.value)}
-          />
-        </Champ>
+          </Field>
+          <Field id={`${id}-d`} label="Description" optional size="full">
+            <TextArea
+              value={description}
+              maxLength={2000}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </Field>
+          <Field id={`${id}-m`} label="Comment saura-t-on que c’est atteint ?" optional size="full">
+            <TextInput value={mesure} maxLength={300} onChange={(e) => setMesure(e.target.value)} />
+          </Field>
+        </FormGrid>
         <ErreurAction erreur={erreur} />
       </div>
     </Modal>
@@ -457,41 +453,35 @@ function Avancement({
       size="sm"
       busy={envoi}
       footer={
-        <div className="flex flex-wrap justify-end gap-2">
-          <button type="button" className={BOUTON_PETIT} onClick={onFermer} disabled={envoi}>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+          <Button size="sm" onClick={onFermer} disabled={envoi} className="max-sm:h-11">
             Retour
-          </button>
-          <button
-            type="button"
-            className={buttonClasses('primary', 'sm')}
-            disabled={envoi}
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            busy={envoi}
             onClick={() => void envoyer()}
+            className="max-sm:h-11"
           >
             Enregistrer
-          </button>
+          </Button>
         </div>
       }
     >
       <div className="flex flex-col gap-3 text-sm">
-        <Champ id={`${id}-p`} label="Où en êtes-vous ? (%, facultatif)">
-          <input
-            id={`${id}-p`}
-            inputMode="numeric"
-            className={CHAMP}
-            value={pourcent}
-            onChange={(e) => setPourcent(e.target.value)}
-          />
-        </Champ>
-        <Champ id={`${id}-n`} label="Note" requis>
-          <textarea
-            id={`${id}-n`}
-            rows={3}
-            className={CHAMP}
-            value={note}
-            maxLength={1000}
-            onChange={(e) => setNote(e.target.value)}
-          />
-        </Champ>
+        <FormGrid>
+          <Field id={`${id}-p`} label="Où en êtes-vous ? (%)" optional size="xs">
+            <TextInput
+              inputMode="numeric"
+              value={pourcent}
+              onChange={(e) => setPourcent(e.target.value)}
+            />
+          </Field>
+          <Field id={`${id}-n`} label="Note" required size="full" newRow>
+            <TextArea value={note} maxLength={1000} onChange={(e) => setNote(e.target.value)} />
+          </Field>
+        </FormGrid>
         <ErreurAction erreur={erreur} />
       </div>
     </Modal>
@@ -532,18 +522,13 @@ function Resultat({
         onFait();
       }}
     >
-      <select
-        aria-label="Résultat"
-        className={CHAMP}
-        value={statut}
-        onChange={(e) => setStatut(e.target.value as GoalFinalStatus)}
-      >
-        {STATUTS_FINAUX_OBJECTIF.map((s) => (
-          <option key={s} value={s}>
-            {LIBELLES_FINAUX[s]}
-          </option>
-        ))}
-      </select>
+      <Field label="Résultat" size="md">
+        <Select<GoalFinalStatus>
+          value={statut}
+          onChange={setStatut}
+          options={STATUTS_FINAUX_OBJECTIF.map((x) => ({ value: x, label: LIBELLES_FINAUX[x] }))}
+        />
+      </Field>
     </DialogueDecision>
   );
 }

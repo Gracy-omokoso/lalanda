@@ -4,8 +4,20 @@
 // lieu et signataire proposés, textes de l'attestation (bornés, sans HTML, champs
 // nommés). Le certificat de travail n'a aucun texte personnalisable (art. 79 :
 // « aucune autre indication »). Lecture `hr.read`, modification `hr.manage`.
+//
+// ADR-0074 : mise en page en `Select`, grille sémantique, textes en `TextArea`.
 
-import { Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Button,
+  Field,
+  FormGrid,
+  Modal,
+  Select,
+  SubmitButton,
+  TextArea,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import { FileSignature } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 
@@ -16,7 +28,7 @@ import {
   type GeneratedDocumentSettingsView,
 } from '@/lib/api-hr-generated-documents';
 
-import { Alerte, CHAMP, Champ } from '../../ventes/_components/form-ui';
+import { Alerte } from '../../ventes/_components/form-ui';
 import { lire, messageRh, type Lecture } from './rh-model';
 import { Chargement, EchecLecture, Panneau } from './rh-ui';
 
@@ -181,84 +193,78 @@ function Formulaire({
       }}
     >
       {alerte ? <Alerte>{alerte}</Alerte> : null}
-      <Champ id={`${id}-modele`} label="Mise en page par défaut">
-        <select
-          id={`${id}-modele`}
-          className={CHAMP}
-          value={templateId}
-          onChange={(ev) => setTemplateId(ev.target.value as typeof templateId)}
-        >
-          {v.templates.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.label}
-            </option>
-          ))}
-        </select>
-      </Champ>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Champ id={`${id}-lieu`} label="Lieu proposé">
-          <input
-            id={`${id}-lieu`}
-            className={CHAMP}
-            maxLength={L.place}
-            value={lieu}
-            onChange={(ev) => setLieu(ev.target.value)}
+      <FormGrid>
+        <Field id={`${id}-modele`} label="Mise en page par défaut" size="md">
+          <Select<typeof templateId>
+            value={templateId}
+            onChange={setTemplateId}
+            options={v.templates.map((t) => ({ value: t.id, label: t.label }))}
           />
-        </Champ>
-        <Champ id={`${id}-nom`} label="Signataire proposé">
-          <input
-            id={`${id}-nom`}
-            className={CHAMP}
+        </Field>
+        <Field id={`${id}-lieu`} label="Lieu proposé" optional size="md" newRow>
+          <TextInput maxLength={L.place} value={lieu} onChange={(ev) => setLieu(ev.target.value)} />
+        </Field>
+        <Field
+          id={`${id}-nom`}
+          label="Signataire proposé"
+          optional
+          size="md"
+          newRow
+          hint="Nom et qualité vont ensemble : les deux, ou aucun."
+        >
+          <TextInput
             maxLength={L.signatoryName}
             value={nom}
+            autoComplete="name"
             onChange={(ev) => setNom(ev.target.value)}
           />
-        </Champ>
-        <Champ id={`${id}-qualite`} label="Qualité">
-          <input
-            id={`${id}-qualite`}
-            className={CHAMP}
+        </Field>
+        <Field id={`${id}-qualite`} label="Qualité" optional size="md">
+          <TextInput
             maxLength={L.signatoryTitle}
             value={qualite}
             onChange={(ev) => setQualite(ev.target.value)}
           />
-        </Champ>
-      </div>
-      <Champ
-        id={`${id}-intro`}
-        label="Introduction de l’attestation"
-        aide={`${L.intro} caractères au plus, sans balise. Champs : ${v.fields.map((f) => `{${f}}`).join(', ')}.`}
-      >
-        <textarea
+        </Field>
+        <Field
           id={`${id}-intro`}
-          className={CHAMP}
-          rows={4}
-          maxLength={L.intro}
-          value={intro}
-          onChange={(ev) => setIntro(ev.target.value)}
-        />
-      </Champ>
-      <Champ
-        id={`${id}-fin`}
-        label="Formule finale de l’attestation"
-        aide={`${L.closing} caractères au plus, sans balise.`}
-      >
-        <textarea
+          label="Introduction de l’attestation"
+          size="full"
+          hint={`${L.intro} caractères au plus, sans balise. Champs : ${v.fields.map((f) => `{${f}}`).join(', ')}.`}
+        >
+          <TextArea
+            rows={4}
+            maxLength={L.intro}
+            value={intro}
+            onChange={(ev) => setIntro(ev.target.value)}
+          />
+        </Field>
+        <Field
           id={`${id}-fin`}
-          className={CHAMP}
-          rows={2}
-          maxLength={L.closing}
-          value={fin}
-          onChange={(ev) => setFin(ev.target.value)}
-        />
-      </Champ>
-      <div className="flex justify-end gap-2">
-        <button type="button" className={buttonClasses('ghost', 'sm')} onClick={onAnnuler}>
+          label="Formule finale de l’attestation"
+          size="full"
+          hint={`${L.closing} caractères au plus, sans balise.`}
+        >
+          <TextArea
+            rows={2}
+            maxLength={L.closing}
+            value={fin}
+            onChange={(ev) => setFin(ev.target.value)}
+          />
+        </Field>
+      </FormGrid>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <Button variant="ghost" onClick={onAnnuler} className="max-sm:h-11">
           Annuler
-        </button>
-        <button type="submit" className={buttonClasses('primary', 'sm')} disabled={occupe}>
-          {occupe ? 'Enregistrement…' : 'Enregistrer'}
-        </button>
+        </Button>
+        <SubmitButton
+          busy={occupe}
+          busyLabel="Enregistrement…"
+          showShortcut={false}
+          className="max-sm:h-11"
+        >
+          Enregistrer
+        </SubmitButton>
       </div>
     </form>
   );

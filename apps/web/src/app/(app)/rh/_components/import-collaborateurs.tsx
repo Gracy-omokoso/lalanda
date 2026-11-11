@@ -7,8 +7,10 @@
 // (`members.invite` exigé : sans lui, rien ne part). L'API reste juge.
 // Amendement du 8 nov. 2026 : modèle .xlsx, colonne Manager (existant ou ligne du
 // fichier), option « Créer les services inconnus ».
+//
+// ADR-0074 : les deux options sont des interrupteurs ; le fichier reste un champ natif.
 
-import { Badge, buttonClasses } from '@lalanda/ui';
+import { Badge, Switch, buttonClasses } from '@lalanda/ui';
 import { FileUp, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -132,17 +134,14 @@ export function ImportCollaborateurs(): React.ReactElement {
               : 'Colonnes : Matricule, Nom, Prénom, Poste, Service, Manager (matricule ou e-mail), Type de contrat, Date d’entrée, Fin de contrat, E-mail professionnel, Téléphone, Lieu de travail.'}
           </span>
         </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={creerServices}
-            onChange={(e) => {
-              setCreerServices(e.target.checked);
-              if (fichier) void lireFichier(fichier, e.target.checked);
-            }}
-          />
-          Créer les services inconnus du fichier
-        </label>
+        <Switch
+          checked={creerServices}
+          onChange={(oui) => {
+            setCreerServices(oui);
+            if (fichier) void lireFichier(fichier, oui);
+          }}
+          label="Créer les services inconnus du fichier"
+        />
       </Bandeau>
 
       {erreur ? (
@@ -227,15 +226,12 @@ export function ImportCollaborateurs(): React.ReactElement {
               </tbody>
             </table>
           </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={peutInviter && inviter}
-              disabled={!peutInviter}
-              onChange={(e) => setInviter(e.target.checked)}
-            />
-            Inviter sur Lalanda les collaborateurs qui ont un e-mail professionnel
-          </label>
+          <Switch
+            checked={peutInviter && inviter}
+            disabled={!peutInviter}
+            onChange={setInviter}
+            label="Inviter sur Lalanda les collaborateurs qui ont un e-mail professionnel"
+          />
           {!peutInviter ? (
             <p className="text-xs text-[var(--foreground-muted)]">
               Vous n’avez pas le droit d’inviter : les fiches seront créées sans invitation, un
