@@ -5,8 +5,12 @@
 // fournisseur, projet, compte CRM, équipement, article). La recherche ne part qu'aux
 // listes des modules, chacune sous sa propre permission ; seul l'IDENTIFIANT choisi
 // part ensuite à l'API. Un chargeur indisponible (rôle, lot absent) rend une liste vide.
+//
+// ADR-0074 § 4 : un seul champ « tape pour chercher » (`EntityPicker`) remplace
+// l'ancien couple « Rechercher » + liste déroulante ; l'API publique est inchangée.
 
-import { useEffect, useState } from 'react';
+import { EntityPicker } from '@lalanda/ui';
+import { useCallback, useState } from 'react';
 
 import { api } from '@/lib/api';
 import { assetsApi } from '@/lib/api-assets';
@@ -15,8 +19,6 @@ import { hrApi } from '@/lib/api-hr';
 import { purchasesApi } from '@/lib/api-purchases';
 import { stockApi } from '@/lib/api-stock';
 import { workApi } from '@/lib/work-api';
-
-import { CHAMP } from '../app/(app)/ventes/_components/form-ui';
 
 export interface OptionEntite {
   id: string;
@@ -131,59 +133,60 @@ export function ChoixEntite({
   aria?: Record<string, unknown>;
   vide?: string;
 }): React.ReactElement {
-  const [q, setQ] = useState('');
-  const [liste, setListe] = useState<OptionEntite[]>([]);
+  // Option choisie telle que la liste l'a rendue ; un identifiant reçu sans
+  // libellé (valeur posée par l'écran) reste affiché « Élément choisi ».
+  const [choisie, setChoisie] = useState<OptionEntite | null>(null);
   const [echec, setEchec] = useState(false);
+  const valeurAffichee: OptionEntite | null =
+    valeur === ''
+      ? null
+      : choisie?.id === valeur
+        ? choisie
+        : { id: valeur, label: 'Élément choisi' };
 
-  useEffect(() => {
-    let annule = false;
-    const charger = chargeur(type, organizationId);
-    const t = setTimeout(() => {
-      charger(q)
-        .then((items) => {
-          if (annule) return;
-          setListe(items);
+  // Même chargeur qu'avant (liste du module, sous sa propre permission) ; un
+  // échec garde son message : la liste n'est pas lisible avec ce rôle.
+  const chercher = useCallback(
+    (q: string): Promise<OptionEntite[]> =>
+      chargeur(
+        type,
+        organizationId,
+      )(q).then(
+        (items) => {
           setEchec(false);
-        })
-        .catch(() => {
-          if (annule) return;
-          setListe([]);
+          return items;
+        },
+        (e: unknown) => {
           setEchec(true);
-        });
-    }, 200);
-    return () => {
-      annule = true;
-      clearTimeout(t);
-    };
-  }, [q, type, organizationId]);
+          throw e;
+        },
+      ),
+    [type, organizationId],
+  );
+
+  const ariaInvalide = aria?.['aria-invalid'] === true || aria?.['aria-invalid'] === 'true';
+  const ariaDecrit =
+    typeof aria?.['aria-describedby'] === 'string' ? aria['aria-describedby'] : undefined;
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <input
-        type="search"
-        aria-label="Rechercher"
-        placeholder="Rechercher…"
-        className={CHAMP}
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-      />
-      <select
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <EntityPicker<OptionEntite>
         id={id}
-        className={CHAMP}
-        value={valeur}
-        onChange={(e) => onChange(liste.find((o) => o.id === e.target.value) ?? null)}
-        {...aria}
-      >
-        <option value="">{vide}</option>
-        {valeur !== '' && !liste.some((o) => o.id === valeur) ? (
-          <option value={valeur}>Élément choisi</option>
-        ) : null}
-        {liste.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.label}
-          </option>
-        ))}
-      </select>
+        value={valeurAffichee}
+        onChange={(o) => {
+          setChoisie(o);
+          onChange(o);
+        }}
+        search={chercher}
+        refreshKey={`${type}:${organizationId ?? ''}`}
+        getKey={(o) => o.id}
+        getLabel={(o) => o.label}
+        placeholder={vide === 'Choisir…' ? 'Tapez pour rechercher…' : vide}
+        emptyText="Aucun élément ne correspond."
+        debounceMs={200}
+        {...(ariaInvalide ? { 'aria-invalid': true } : {})}
+        {...(ariaDecrit ? { 'aria-describedby': ariaDecrit } : {})}
+      />
       {echec ? (
         <p className="text-xs text-[var(--foreground-muted)]">
           Cette liste n’est pas lisible avec votre rôle.

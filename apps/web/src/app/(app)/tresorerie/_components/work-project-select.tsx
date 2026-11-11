@@ -6,8 +6,12 @@
 // la liste vient de `GET /work/projects` ; un refus (403) ou une erreur masque
 // le champ — rattacher une dépense reste possible plus tard. Le serveur vérifie
 // de toute façon que le projet est de l'organisation et non archivé.
+//
+// ADR-0074 : `Field` + `Select` de `@lalanda/ui` (recherche dès huit projets,
+// client du projet en sous-texte), largeur d'un intitulé (`lg`).
 
 import type { WorkProjectSummary } from '@lalanda/shared/work';
+import { Field, Select } from '@lalanda/ui';
 import { useEffect, useState } from 'react';
 
 import { workBillingApi } from '@/lib/work-billing-api';
@@ -15,12 +19,19 @@ import { workBillingApi } from '@/lib/work-billing-api';
 export function WorkProjectSelect({
   value,
   onChange,
-  className,
+  id,
+  size = 'lg',
 }: {
   /** Identifiant du projet, ou `''` pour « aucun ». */
   value: string;
   onChange: (projectId: string) => void;
-  className: string;
+  /**
+   * Classes de l'ancien `<select>` natif ; gardé pour la compatibilité des
+   * appelants, sans effet : le `Select` porte son propre style (ADR-0074).
+   */
+  className?: string;
+  id?: string;
+  size?: 'md' | 'lg' | 'full';
 }): React.ReactElement | null {
   const [projets, setProjets] = useState<WorkProjectSummary[] | null>(null);
 
@@ -41,20 +52,26 @@ export function WorkProjectSelect({
 
   if (projets === null) return null;
   return (
-    <label className="flex flex-col gap-1 text-sm">
-      Projet (facultatif)
-      <select className={className} value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="">— Aucun projet —</option>
-        {projets.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-            {p.customerName ? ` — ${p.customerName}` : ''}
-          </option>
-        ))}
-      </select>
-      <span className="text-xs text-[var(--foreground-muted)]">
-        La dépense compte alors dans la marge du projet ; rien d’autre ne change.
-      </span>
-    </label>
+    <Field
+      label="Projet"
+      optional
+      size={size}
+      hint="La dépense compte alors dans la marge du projet ; rien d’autre ne change."
+      {...(id ? { id } : {})}
+    >
+      <Select<string>
+        value={value}
+        onChange={onChange}
+        options={[
+          { value: '', label: '— Aucun projet —' },
+          ...projets.map((p) => ({
+            value: p.id,
+            label: p.name,
+            ...(p.customerName ? { description: p.customerName, keywords: p.customerName } : {}),
+          })),
+        ]}
+        searchPlaceholder="Rechercher un projet…"
+      />
+    </Field>
   );
 }

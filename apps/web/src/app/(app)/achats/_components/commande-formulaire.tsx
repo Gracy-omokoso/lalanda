@@ -3,17 +3,38 @@
 // Nouvelle demande d'achat (ADR-0044 § 2.3), dans le `Modal` de `@lalanda/ui`.
 // Elle naît BROUILLON ; on la soumet depuis sa fiche. Aucun total n'est affiché
 // ici : le moteur les calcule à l'enregistrement et la fiche les montre.
+//
+// ADR-0074 : fournisseur en `EntityPicker` (tape pour chercher, « + » pour le
+// créer sans quitter la demande), date en `DatePicker`, montants en
+// `MoneyInput` (mise en forme seulement : la valeur reste la chaîne décimale
+// lue par `preparerCommande`), largeurs sémantiques. Mêmes champs envoyés.
 
-import { buttonClasses } from '@lalanda/ui';
+import {
+  DatePicker,
+  EntityPicker,
+  ErrorSummary,
+  Field,
+  Form,
+  FormGrid,
+  FormSection,
+  MoneyInput,
+  SegmentedControl,
+  SubmitButton,
+  TextArea,
+  TextInput,
+  resumerErreurs,
+  useBlurValidation,
+} from '@lalanda/ui';
 import { Plus, Trash2 } from 'lucide-react';
-import { useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 
-import { purchasesApi, type SupplierListItem } from '@/lib/api-purchases';
+import { purchasesApi, type SupplierView } from '@/lib/api-purchases';
 import { stockApi } from '@/lib/api-stock';
 
-import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from '../../ventes/_components/form-ui';
+import { useShell } from '../../_components/shell-context';
+import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
-import { messageAchats } from './achats-model';
+import { messageAchats, peutGererAchats } from './achats-model';
 import { lignesPreremplies, type ArticlePrerempli } from './commande-prefill-model';
 import {
   MENTION_TAXES,
@@ -23,67 +44,97 @@ import {
   type FormulaireCommande,
   type LigneSaisie,
 } from './commandes-model';
+import { NouveauFournisseur } from './fournisseur-formulaire';
 
+/** Fournisseur tel que le sélecteur le connaît : la fiche lue, ou son seul identifiant. */
+type FournisseurChoisi = Pick<SupplierView, 'id' | 'name'> &
+  Partial<Pick<SupplierView, 'nif' | 'defaultCurrency'>>;
+
+/**
+ * Choix d'un fournisseur actif (ADR-0074 § 4) : on tape un nom ou un NIF (même
+ * recherche qu'avant, `GET /purchases/suppliers?active=true&limit=50&q=…`) ;
+ * absent, « + » ouvre la fiche fournisseur en fenêtre, pré-remplie avec le
+ * texte tapé, et la fiche créée est choisie d'office. Le « + » n'existe qu'avec
+ * `purchase.manage` (le droit de la route de création ; l'API reste juge).
+ */
 export function ChoixFournisseur({
   id,
   valeur,
   onChange,
+  creer,
+  placeholder = 'Nom ou NIF du fournisseur',
 }: {
   id: string;
   valeur: string;
-  onChange: (s: SupplierListItem | null) => void;
+  onChange: (s: SupplierView | null) => void;
+  /** Force (ou retire) la création rapide ; défaut : selon `purchase.manage`. */
+  creer?: boolean;
+  placeholder?: string;
 }): React.ReactElement {
-  const [q, setQ] = useState('');
-  const [liste, setListe] = useState<SupplierListItem[]>([]);
+  const { actions } = useShell();
+  const peutCreer = creer ?? (actions !== null && peutGererAchats(actions));
+  const [choisi, setChoisi] = useState<FournisseurChoisi | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
 
-  useEffect(() => {
-    let annule = false;
-    const t = setTimeout(() => {
-      purchasesApi
-        .listSuppliers({ active: 'true', limit: 50, ...(q.trim() ? { q: q.trim() } : {}) })
-        .then((p) => {
-          if (annule) return;
-          setListe(p.items);
-          setErreur(null);
-        })
-        .catch((err: unknown) => {
-          if (!annule) setErreur(messageAchats(err, 'Fournisseurs illisibles.'));
-        });
-    }, 200);
-    return () => {
-      annule = true;
-      clearTimeout(t);
-    };
-  }, [q]);
+  // Un identifiant reçu sans fiche (préremplissage) reste « Fournisseur choisi ».
+  const affiche: FournisseurChoisi | null =
+    valeur === ''
+      ? null
+      : choisi?.id === valeur
+        ? choisi
+        : { id: valeur, name: 'Fournisseur choisi' };
+
+  const chercher = useCallback(async (q: string): Promise<SupplierView[]> => {
+    try {
+      const p = await purchasesApi.listSuppliers({
+        active: 'true',
+        limit: 50,
+        ...(q ? { q } : {}),
+      });
+      setErreur(null);
+      return p.items;
+    } catch (err) {
+      setErreur(messageAchats(err, 'Fournisseurs illisibles.'));
+      throw err;
+    }
+  }, []);
+
+  function choisir(s: FournisseurChoisi | null): void {
+    setChoisi(s);
+    // La liste et la création rendent des fiches complètes.
+    onChange(s as SupplierView | null);
+  }
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <input
-        type="search"
-        aria-label="Rechercher un fournisseur"
-        placeholder="Rechercher un fournisseur…"
-        className={CHAMP}
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-      />
-      <select
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <EntityPicker<FournisseurChoisi>
         id={id}
-        className={CHAMP}
-        value={valeur}
-        onChange={(e) => onChange(liste.find((s) => s.id === e.target.value) ?? null)}
-      >
-        <option value="">À choisir avant la soumission</option>
-        {valeur !== '' && !liste.some((s) => s.id === valeur) ? (
-          <option value={valeur}>Fournisseur choisi</option>
-        ) : null}
-        {liste.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.name}
-            {s.nif ? ` — NIF ${s.nif}` : ''}
-          </option>
-        ))}
-      </select>
+        value={affiche}
+        onChange={choisir}
+        search={chercher}
+        getKey={(s) => s.id}
+        getLabel={(s) => s.name}
+        getDescription={(s) => (s.nif ? `NIF ${s.nif}` : null)}
+        placeholder={placeholder}
+        recentKey="achats.fournisseurs"
+        emptyText="Aucun fournisseur actif ne correspond."
+        debounceMs={200}
+        createTitle="Nouveau fournisseur"
+        createButtonLabel="Créer un fournisseur"
+        createSize="lg"
+        {...(peutCreer
+          ? {
+              createForm: ({ initialText, onCreated, onCancel }) => (
+                <NouveauFournisseur
+                  enModal
+                  nomInitial={initialText}
+                  onCree={(_, fiche) => onCreated(fiche)}
+                  onAnnuler={onCancel}
+                />
+              ),
+            }
+          : {})}
+      />
       {erreur ? <p className="text-xs text-[var(--danger)]">{erreur}</p> : null}
     </div>
   );
@@ -137,18 +188,28 @@ export function NouvelleDemande({
       annule = true;
     };
   }, [cleArticles]);
-  const [champs, setChamps] = useState<Record<string, string>>({});
   const [erreur, setErreur] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
 
+  // Validation à la sortie du champ (ADR-0074 § 9) : les règles de l'envoi.
+  const { errors, touch, validateAll, submitCount } = useBlurValidation<string>(() => {
+    const p = preparerCommande(f);
+    return p.ok ? {} : p.champs;
+  });
+  // Erreurs de `preparerCommande` : à la sortie du champ, ou toutes après un essai.
+  const affiches: Record<string, string | undefined> = errors;
+  const idc = (cle: string): string => `${id}-${cle}`;
+
   const majLigne = (i: number, patch: Partial<LigneSaisie>) =>
     setF((p) => ({ ...p, lignes: p.lignes.map((l, j) => (j === i ? { ...l, ...patch } : l)) }));
+  const majTaxe = (i: number, patch: Partial<FormulaireCommande['taxes'][number]>) =>
+    setF((p) => ({ ...p, taxes: p.taxes.map((x, j) => (j === i ? { ...x, ...patch } : x)) }));
 
   async function creer(e: React.FormEvent): Promise<void> {
     e.preventDefault();
     setErreur(null);
+    validateAll();
     const p = preparerCommande(f);
-    setChamps(p.ok ? {} : p.champs);
     if (!p.ok) return;
     setEnvoi(true);
     try {
@@ -161,233 +222,296 @@ export function NouvelleDemande({
     }
   }
 
+  const resume = resumerErreurs(affiches, [
+    { cle: 'title', id: idc('titre'), libelle: 'Objet de la demande' },
+    { cle: 'expectedOn', id: idc('date'), libelle: 'Livraison souhaitée' },
+    { cle: 'deliveryAddress', id: idc('adresse'), libelle: 'Adresse de livraison' },
+    { cle: 'justification', id: idc('justif'), libelle: 'Justification' },
+    { cle: 'lignes', id: '', libelle: 'Lignes' },
+    ...f.lignes.flatMap((_, i) => [
+      {
+        cle: `ligne-${i}-label`,
+        id: idc(`ligne-${i}-label`),
+        libelle: `Ligne ${i + 1}, désignation`,
+      },
+      {
+        cle: `ligne-${i}-quantity`,
+        id: idc(`ligne-${i}-quantity`),
+        libelle: `Ligne ${i + 1}, quantité`,
+      },
+      {
+        cle: `ligne-${i}-unitPrice`,
+        id: idc(`ligne-${i}-unitPrice`),
+        libelle: `Ligne ${i + 1}, prix unitaire`,
+      },
+    ]),
+    ...f.taxes.flatMap((_, i) => [
+      { cle: `taxe-${i}-label`, id: idc(`taxe-${i}-label`), libelle: `Taxe ${i + 1}, libellé` },
+      { cle: `taxe-${i}-amount`, id: idc(`taxe-${i}-montant`), libelle: `Taxe ${i + 1}, montant` },
+    ]),
+  ]);
+
   return (
-    <form noValidate onSubmit={(e) => void creer(e)} className="flex flex-col gap-4">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="sm:col-span-2">
-          <Champ id={`${id}-titre`} label="Objet de la demande" requis erreur={champs['title']}>
-            <input
-              id={`${id}-titre`}
-              className={CHAMP}
+    <Form onSubmit={(e) => void creer(e)} className="flex min-w-0 flex-col gap-5">
+      <ErrorSummary errors={resume} submitCount={submitCount} />
+      <fieldset disabled={envoi} className="flex min-w-0 flex-col gap-6">
+        <FormGrid>
+          <Field
+            id={idc('titre')}
+            label="Objet de la demande"
+            required
+            size="full"
+            error={affiches['title']}
+          >
+            <TextInput
               value={f.title}
               maxLength={200}
               placeholder="Fournitures de bureau du trimestre"
               onChange={(e) => setF({ ...f, title: e.target.value })}
-              {...aria(`${id}-titre`, champs['title'])}
+              onBlur={() => touch('title')}
             />
-          </Champ>
-        </div>
-        <Champ id={`${id}-fournisseur`} label="Fournisseur">
-          <ChoixFournisseur
-            id={`${id}-fournisseur`}
-            valeur={f.supplierId}
-            onChange={(s) =>
-              setF((p) => ({
-                ...p,
-                supplierId: s?.id ?? '',
-                currency: s?.defaultCurrency ?? p.currency,
-              }))
-            }
-          />
-        </Champ>
-        <Champ id={`${id}-devise`} label="Devise" aide="Ne change plus après la soumission.">
-          <select
-            id={`${id}-devise`}
-            className={CHAMP}
-            value={f.currency}
-            onChange={(e) => setF({ ...f, currency: e.target.value as 'USD' | 'CDF' })}
-            aria-describedby={`${id}-devise-aide`}
+          </Field>
+          <Field
+            id={idc('fournisseur')}
+            label="Fournisseur"
+            optional
+            size="lg"
+            newRow
+            hint="Tapez un nom ou un NIF. Absent : « + » le crée sans quitter la demande. À choisir avant la soumission."
           >
-            <option value="USD">USD</option>
-            <option value="CDF">CDF</option>
-          </select>
-        </Champ>
-        <Champ id={`${id}-date`} label="Livraison souhaitée" erreur={champs['expectedOn']}>
-          <input
-            id={`${id}-date`}
-            type="date"
-            className={CHAMP}
-            value={f.expectedOn}
-            onChange={(e) => setF({ ...f, expectedOn: e.target.value })}
-            {...aria(`${id}-date`, champs['expectedOn'])}
-          />
-        </Champ>
-        <Champ
-          id={`${id}-adresse`}
-          label="Adresse de livraison"
-          aide="Vide : le siège de l’organisation."
-          erreur={champs['deliveryAddress']}
-        >
-          <input
-            id={`${id}-adresse`}
-            className={CHAMP}
-            value={f.deliveryAddress}
-            maxLength={500}
-            onChange={(e) => setF({ ...f, deliveryAddress: e.target.value })}
-            {...aria(`${id}-adresse`, champs['deliveryAddress'], true)}
-          />
-        </Champ>
-        <div className="sm:col-span-2">
-          <Champ id={`${id}-justif`} label="Justification" erreur={champs['justification']}>
-            <textarea
-              id={`${id}-justif`}
+            <ChoixFournisseur
+              id={idc('fournisseur')}
+              valeur={f.supplierId}
+              onChange={(s) =>
+                setF((p) => ({
+                  ...p,
+                  supplierId: s?.id ?? '',
+                  currency: s?.defaultCurrency ?? p.currency,
+                }))
+              }
+            />
+          </Field>
+          <Field
+            id={idc('devise')}
+            label="Devise"
+            group
+            size="sm"
+            hint="Ne change plus après la soumission."
+          >
+            <SegmentedControl<'USD' | 'CDF'>
+              value={f.currency}
+              onChange={(v) => setF((p) => ({ ...p, currency: v }))}
+              options={[
+                { value: 'USD', label: 'USD' },
+                { value: 'CDF', label: 'CDF' },
+              ]}
+            />
+          </Field>
+          <Field
+            id={idc('date')}
+            label="Livraison souhaitée"
+            optional
+            size="sm"
+            newRow
+            error={affiches['expectedOn']}
+          >
+            <DatePicker
+              value={f.expectedOn}
+              onChange={(v) => {
+                setF((p) => ({ ...p, expectedOn: v }));
+                touch('expectedOn');
+              }}
+              onBlur={() => touch('expectedOn')}
+              shortcuts={['plus7', 'plus30', 'endOfMonth']}
+            />
+          </Field>
+          <Field
+            id={idc('adresse')}
+            label="Adresse de livraison"
+            optional
+            size="lg"
+            hint="Vide : le siège de l’organisation."
+            error={affiches['deliveryAddress']}
+          >
+            <TextInput
+              value={f.deliveryAddress}
+              maxLength={500}
+              onChange={(e) => setF({ ...f, deliveryAddress: e.target.value })}
+              onBlur={() => touch('deliveryAddress')}
+            />
+          </Field>
+          <Field
+            id={idc('justif')}
+            label="Justification"
+            optional
+            size="full"
+            error={affiches['justification']}
+          >
+            <TextArea
               rows={2}
-              className={CHAMP}
               value={f.justification}
               maxLength={2000}
               onChange={(e) => setF({ ...f, justification: e.target.value })}
+              onBlur={() => touch('justification')}
             />
-          </Champ>
-        </div>
-      </div>
+          </Field>
+        </FormGrid>
 
-      <fieldset className="flex flex-col gap-3">
-        <legend className="text-sm font-semibold">Lignes</legend>
-        {champs['lignes'] ? (
-          <p className="text-xs text-[var(--danger)]">{champs['lignes']}</p>
-        ) : null}
-        {f.lignes.map((l, i) => {
-          const k = (c: string) => `ligne-${i}-${c}`;
-          return (
-            <div
-              key={i}
-              className="grid gap-2 rounded-[var(--radius-md)] border border-[var(--border)] p-3 sm:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto]"
-            >
-              <Champ id={`${id}-${k('label')}`} label="Désignation" erreur={champs[k('label')]}>
-                <input
-                  id={`${id}-${k('label')}`}
-                  className={CHAMP}
-                  value={l.label}
-                  maxLength={200}
-                  onChange={(e) => majLigne(i, { label: e.target.value })}
-                  {...aria(`${id}-${k('label')}`, champs[k('label')])}
-                />
-              </Champ>
-              <Champ id={`${id}-${k('kind')}`} label="Nature">
-                <select
-                  id={`${id}-${k('kind')}`}
-                  className={CHAMP}
-                  value={l.kind}
-                  onChange={(e) => majLigne(i, { kind: e.target.value as LigneSaisie['kind'] })}
-                >
-                  <option value="goods">Bien</option>
-                  <option value="service">Service</option>
-                </select>
-              </Champ>
-              <Champ id={`${id}-${k('quantity')}`} label="Quantité" erreur={champs[k('quantity')]}>
-                <input
-                  id={`${id}-${k('quantity')}`}
-                  inputMode="decimal"
-                  className={CHAMP}
-                  value={l.quantity}
-                  onFocus={(e) => e.currentTarget.select()}
-                  onChange={(e) => majLigne(i, { quantity: e.target.value })}
-                  {...aria(`${id}-${k('quantity')}`, champs[k('quantity')])}
-                />
-              </Champ>
-              <Champ id={`${id}-${k('unit')}`} label="Unité">
-                <input
-                  id={`${id}-${k('unit')}`}
-                  className={CHAMP}
-                  value={l.unit}
-                  maxLength={20}
-                  placeholder="pièce, h…"
-                  onChange={(e) => majLigne(i, { unit: e.target.value })}
-                />
-              </Champ>
-              <Champ
-                id={`${id}-${k('unitPrice')}`}
-                label={`Prix unitaire HT (${f.currency})`}
-                erreur={champs[k('unitPrice')]}
+        <fieldset className="flex min-w-0 flex-col gap-3">
+          <legend className="mb-1 text-sm font-semibold">Lignes</legend>
+          {affiches['lignes'] ? (
+            <p className="text-xs font-medium text-[var(--danger)]">{affiches['lignes']}</p>
+          ) : null}
+          {f.lignes.map((l, i) => {
+            const k = (c: string) => idc(`ligne-${i}-${c}`);
+            const err = (c: string) => affiches[`ligne-${i}-${c}`];
+            return (
+              <div
+                key={i}
+                className="flex min-w-0 flex-col gap-2 rounded-[var(--radius-md)] border border-[var(--border)] p-3"
               >
-                <input
-                  id={`${id}-${k('unitPrice')}`}
-                  inputMode="decimal"
-                  className={CHAMP}
-                  value={l.unitPrice}
-                  onChange={(e) => majLigne(i, { unitPrice: e.target.value })}
-                  {...aria(`${id}-${k('unitPrice')}`, champs[k('unitPrice')])}
-                />
-              </Champ>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono text-[0.7rem] uppercase tracking-[0.08em] text-[var(--foreground-muted)]">
+                    Ligne {i + 1}
+                  </span>
+                  <button
+                    type="button"
+                    className={`${BOUTON_PETIT} inline-flex h-8 w-8 items-center justify-center p-0 max-sm:h-10 max-sm:w-10`}
+                    disabled={f.lignes.length === 1}
+                    aria-label={`Retirer la ligne ${i + 1}`}
+                    onClick={() =>
+                      setF((p) => ({ ...p, lignes: p.lignes.filter((_, j) => j !== i) }))
+                    }
+                  >
+                    <Trash2 aria-hidden="true" className="h-4 w-4" />
+                  </button>
+                </div>
+                <FormGrid>
+                  <Field id={k('label')} label="Désignation" size="lg" error={err('label')}>
+                    <TextInput
+                      value={l.label}
+                      maxLength={200}
+                      onChange={(e) => majLigne(i, { label: e.target.value })}
+                      onBlur={() => touch(`ligne-${i}-label`)}
+                    />
+                  </Field>
+                  <Field id={k('kind')} label="Nature" group size="sm">
+                    <SegmentedControl<LigneSaisie['kind']>
+                      value={l.kind}
+                      onChange={(v) => majLigne(i, { kind: v })}
+                      options={[
+                        { value: 'goods', label: 'Bien' },
+                        { value: 'service', label: 'Service' },
+                      ]}
+                    />
+                  </Field>
+                  <Field
+                    id={k('quantity')}
+                    label="Quantité"
+                    size="xs"
+                    newRow
+                    error={err('quantity')}
+                  >
+                    <TextInput
+                      inputMode="decimal"
+                      value={l.quantity}
+                      onFocus={(e) => e.currentTarget.select()}
+                      onChange={(e) => majLigne(i, { quantity: e.target.value })}
+                      onBlur={() => touch(`ligne-${i}-quantity`)}
+                      className="text-right tabular-nums"
+                    />
+                  </Field>
+                  <Field id={k('unit')} label="Unité" optional size="xs">
+                    <TextInput
+                      value={l.unit}
+                      maxLength={20}
+                      placeholder="pièce, h…"
+                      onChange={(e) => majLigne(i, { unit: e.target.value })}
+                    />
+                  </Field>
+                  <Field
+                    id={k('unitPrice')}
+                    label="Prix unitaire HT"
+                    size="sm"
+                    error={err('unitPrice')}
+                  >
+                    <MoneyInput
+                      value={l.unitPrice}
+                      currency={f.currency}
+                      onChange={(v) => majLigne(i, { unitPrice: v })}
+                      onBlur={() => touch(`ligne-${i}-unitPrice`)}
+                    />
+                  </Field>
+                </FormGrid>
+              </div>
+            );
+          })}
+          <button
+            type="button"
+            className={`${BOUTON_PETIT} inline-flex items-center gap-1 self-start max-sm:h-11`}
+            disabled={f.lignes.length >= 100}
+            onClick={() => setF((p) => ({ ...p, lignes: [...p.lignes, ligneVide()] }))}
+          >
+            <Plus aria-hidden="true" className="h-4 w-4" />
+            Ajouter une ligne
+          </button>
+        </fieldset>
+
+        <FormSection title="Taxes du devis fournisseur" description={MENTION_TAXES}>
+          {f.taxes.map((t, i) => (
+            <div key={i} className="col-span-full flex min-w-0 items-end gap-2">
+              <FormGrid className="min-w-0 flex-1">
+                <Field
+                  id={idc(`taxe-${i}-label`)}
+                  label="Libellé"
+                  size="md"
+                  error={affiches[`taxe-${i}-label`]}
+                >
+                  <TextInput
+                    value={t.label}
+                    maxLength={60}
+                    onChange={(e) => majTaxe(i, { label: e.target.value })}
+                    onBlur={() => touch(`taxe-${i}-label`)}
+                  />
+                </Field>
+                <Field
+                  id={idc(`taxe-${i}-montant`)}
+                  label="Montant"
+                  size="sm"
+                  error={affiches[`taxe-${i}-amount`]}
+                >
+                  <MoneyInput
+                    value={t.amount}
+                    currency={f.currency}
+                    onChange={(v) => majTaxe(i, { amount: v })}
+                    onBlur={() => touch(`taxe-${i}-amount`)}
+                  />
+                </Field>
+              </FormGrid>
               <button
                 type="button"
-                className={`${BOUTON_PETIT} self-end`}
-                disabled={f.lignes.length === 1}
-                aria-label={`Retirer la ligne ${i + 1}`}
-                onClick={() => setF((p) => ({ ...p, lignes: p.lignes.filter((_, j) => j !== i) }))}
+                className={`${BOUTON_PETIT} mb-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center p-0 max-sm:h-11 max-sm:w-11`}
+                aria-label={`Retirer la taxe ${i + 1}`}
+                onClick={() => setF((p) => ({ ...p, taxes: p.taxes.filter((_, j) => j !== i) }))}
               >
                 <Trash2 aria-hidden="true" className="h-4 w-4" />
               </button>
             </div>
-          );
-        })}
-        <button
-          type="button"
-          className={`${BOUTON_PETIT} inline-flex items-center gap-1 self-start`}
-          disabled={f.lignes.length >= 100}
-          onClick={() => setF((p) => ({ ...p, lignes: [...p.lignes, ligneVide()] }))}
-        >
-          <Plus aria-hidden="true" className="h-4 w-4" />
-          Ajouter une ligne
-        </button>
-      </fieldset>
-
-      <fieldset className="flex flex-col gap-3">
-        <legend className="text-sm font-semibold">Taxes du devis fournisseur</legend>
-        <p className="text-xs text-[var(--foreground-muted)]">{MENTION_TAXES}</p>
-        {f.taxes.map((t, i) => (
-          <div key={i} className="grid gap-2 sm:grid-cols-[2fr_1fr_auto]">
-            <Champ id={`${id}-taxe-${i}-label`} label="Libellé" erreur={champs[`taxe-${i}-label`]}>
-              <input
-                id={`${id}-taxe-${i}-label`}
-                className={CHAMP}
-                value={t.label}
-                maxLength={60}
-                onChange={(e) =>
-                  setF((p) => ({
-                    ...p,
-                    taxes: p.taxes.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)),
-                  }))
-                }
-              />
-            </Champ>
-            <Champ
-              id={`${id}-taxe-${i}-montant`}
-              label={`Montant (${f.currency})`}
-              erreur={champs[`taxe-${i}-amount`]}
-            >
-              <input
-                id={`${id}-taxe-${i}-montant`}
-                inputMode="decimal"
-                className={CHAMP}
-                value={t.amount}
-                onChange={(e) =>
-                  setF((p) => ({
-                    ...p,
-                    taxes: p.taxes.map((x, j) => (j === i ? { ...x, amount: e.target.value } : x)),
-                  }))
-                }
-              />
-            </Champ>
+          ))}
+          <div className="col-span-full">
             <button
               type="button"
-              className={`${BOUTON_PETIT} self-end`}
-              aria-label={`Retirer la taxe ${i + 1}`}
-              onClick={() => setF((p) => ({ ...p, taxes: p.taxes.filter((_, j) => j !== i) }))}
+              className={`${BOUTON_PETIT} inline-flex items-center gap-1 max-sm:h-11`}
+              disabled={f.taxes.length >= 5}
+              onClick={() =>
+                setF((p) => ({ ...p, taxes: [...p.taxes, { label: 'TVA', amount: '' }] }))
+              }
             >
-              <Trash2 aria-hidden="true" className="h-4 w-4" />
+              <Plus aria-hidden="true" className="h-4 w-4" />
+              Ajouter une taxe
             </button>
           </div>
-        ))}
-        <button
-          type="button"
-          className={`${BOUTON_PETIT} inline-flex items-center gap-1 self-start`}
-          disabled={f.taxes.length >= 5}
-          onClick={() => setF((p) => ({ ...p, taxes: [...p.taxes, { label: 'TVA', amount: '' }] }))}
-        >
-          <Plus aria-hidden="true" className="h-4 w-4" />
-          Ajouter une taxe
-        </button>
+        </FormSection>
       </fieldset>
 
       <p className="text-xs text-[var(--foreground-muted)]">
@@ -399,13 +523,11 @@ export function NouvelleDemande({
           <p>{erreur}</p>
         </Alerte>
       ) : null}
-      <button
-        type="submit"
-        disabled={envoi}
-        className={buttonClasses('primary', 'md', 'self-start')}
-      >
-        {envoi ? 'Enregistrement…' : 'Enregistrer le brouillon'}
-      </button>
-    </form>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <SubmitButton busy={envoi} busyLabel="Enregistrement…" className="max-sm:h-11">
+          Enregistrer le brouillon
+        </SubmitButton>
+      </div>
+    </Form>
   );
 }

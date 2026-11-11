@@ -4,8 +4,11 @@
 // `@lalanda/ui` : totale (« Tout est arrivé ») ou partielle (quantités ligne à
 // ligne). Aucune quantité n'est additionnée ici : le reste à recevoir est rendu par
 // l'API après l'enregistrement.
+//
+// ADR-0074 : date en `DatePicker` (bornée à aujourd'hui comme avant), quantités
+// à la largeur d'une quantité, composants de `@lalanda/ui`. Mêmes champs envoyés.
 
-import { Modal, buttonClasses } from '@lalanda/ui';
+import { Button, DatePicker, Field, FormGrid, Modal, TextArea, TextInput } from '@lalanda/ui';
 import { useId, useState } from 'react';
 
 import {
@@ -14,7 +17,7 @@ import {
   type PurchaseReceptionWriteResult,
 } from '@/lib/api-purchases-payables';
 
-import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { formatJour, messageAchats } from './achats-model';
 import { numeroCommande } from './commandes-model';
@@ -92,18 +95,18 @@ export function FenetreReception({
       size="lg"
       busy={envoi}
       footer={
-        <div className="flex flex-wrap justify-end gap-2">
-          <button type="button" className={BOUTON_PETIT} onClick={onFermer} disabled={envoi}>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+          <Button onClick={onFermer} disabled={envoi} className="max-sm:h-11">
             Retour
-          </button>
-          <button
-            type="button"
-            className={buttonClasses('primary', 'sm')}
-            disabled={envoi}
+          </Button>
+          <Button
+            variant="primary"
+            busy={envoi}
             onClick={() => void enregistrer()}
+            className="max-sm:h-11"
           >
             {envoi ? 'Enregistrement…' : 'Enregistrer la réception'}
-          </button>
+          </Button>
         </div>
       }
     >
@@ -113,37 +116,40 @@ export function FenetreReception({
             {avertissement}
           </p>
         ) : null}
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Champ id={`${id}-date`} label="Reçue le" requis erreur={champs['receivedOn']}>
-            <input
-              id={`${id}-date`}
-              type="date"
-              max={aujourdhui}
-              className={CHAMP}
+        <FormGrid>
+          <Field id={`${id}-date`} label="Reçue le" required size="sm" error={champs['receivedOn']}>
+            <DatePicker
               value={f.receivedOn}
-              onChange={(e) => setF({ ...f, receivedOn: e.target.value })}
-              {...aria(`${id}-date`, champs['receivedOn'])}
+              max={aujourdhui}
+              onChange={(v) => setF({ ...f, receivedOn: v })}
+              shortcuts={['today']}
             />
-          </Champ>
-          <Champ id={`${id}-bl`} label="N° du bon de livraison" erreur={champs['deliveryNoteRef']}>
-            <input
-              id={`${id}-bl`}
-              className={CHAMP}
+          </Field>
+          <Field
+            id={`${id}-bl`}
+            label="N° du bon de livraison"
+            optional
+            size="md"
+            error={champs['deliveryNoteRef']}
+          >
+            <TextInput
               value={f.deliveryNoteRef}
               maxLength={100}
               onChange={(e) => setF({ ...f, deliveryNoteRef: e.target.value })}
-              {...aria(`${id}-bl`, champs['deliveryNoteRef'])}
+              className="font-mono"
             />
-          </Champ>
-        </div>
+          </Field>
+        </FormGrid>
 
-        <fieldset className="flex flex-col gap-2">
-          <legend className="flex w-full flex-wrap items-center justify-between gap-2 text-sm font-medium">
-            Quantités reçues
-            <button type="button" className={BOUTON_PETIT} onClick={() => setF(toutRecu(f))}>
-              Tout est arrivé (quantités commandées)
-            </button>
-          </legend>
+        <fieldset className="flex min-w-0 flex-col gap-2">
+          <legend className="mb-1 text-sm font-semibold">Quantités reçues</legend>
+          <button
+            type="button"
+            className={`${BOUTON_PETIT} self-start max-sm:h-11`}
+            onClick={() => setF(toutRecu(f))}
+          >
+            Tout est arrivé (quantités commandées)
+          </button>
           {dejaRecu ? (
             <p className="text-xs text-[var(--foreground-muted)]">
               Des réceptions sont déjà enregistrées : saisissez seulement ce qui arrive aujourd’hui.
@@ -176,49 +182,56 @@ export function FenetreReception({
                     </span>
                   ) : null}
                 </div>
-                <div className="sm:w-36">
-                  <Champ id={`${id}-q-${i}`} label="Reçu aujourd’hui" erreur={champs[`ligne-${i}`]}>
-                    <input
-                      id={`${id}-q-${i}`}
-                      inputMode="decimal"
-                      className={CHAMP}
-                      value={l.saisie}
-                      placeholder="0"
-                      onChange={(e) => majLigne(i, e.target.value)}
-                      {...aria(`${id}-q-${i}`, champs[`ligne-${i}`])}
-                    />
-                  </Champ>
-                </div>
+                <Field
+                  id={`${id}-q-${i}`}
+                  label="Reçu aujourd’hui"
+                  className="sm:w-36"
+                  error={champs[`ligne-${i}`]}
+                >
+                  <TextInput
+                    inputMode="decimal"
+                    value={l.saisie}
+                    placeholder="0"
+                    onChange={(e) => majLigne(i, e.target.value)}
+                    className="text-right tabular-nums"
+                    {...(l.unit ? { trailing: l.unit } : {})}
+                  />
+                </Field>
               </li>
             ))}
           </ul>
         </fieldset>
 
-        <Champ id={`${id}-note`} label="Note" erreur={champs['note']}>
-          <textarea
-            id={`${id}-note`}
-            rows={2}
-            className={CHAMP}
-            value={f.note}
-            maxLength={1000}
-            onChange={(e) => setF({ ...f, note: e.target.value })}
-          />
-        </Champ>
-        <Champ
-          id={`${id}-piece`}
-          label="Bon de livraison scanné (facultatif)"
-          aide="PDF (10 Mio) ou photo PNG, JPEG, WebP (2 Mio)."
-          erreur={champs['piece']}
-        >
-          <input
+        <FormGrid>
+          <Field id={`${id}-note`} label="Note" optional size="full" error={champs['note']}>
+            <TextArea
+              rows={2}
+              value={f.note}
+              maxLength={1000}
+              onChange={(e) => setF({ ...f, note: e.target.value })}
+            />
+          </Field>
+          <Field
             id={`${id}-piece`}
-            type="file"
-            accept={TYPES_PIECE}
-            className="text-sm"
-            onChange={(e) => setPiece(e.target.files?.[0] ?? null)}
-            {...aria(`${id}-piece`, champs['piece'], true)}
-          />
-        </Champ>
+            label="Bon de livraison scanné"
+            optional
+            size="full"
+            hint="PDF (10 Mio) ou photo PNG, JPEG, WebP (2 Mio)."
+            error={champs['piece']}
+          >
+            {({ id: idPiece, describedBy, invalid }) => (
+              <input
+                id={idPiece}
+                type="file"
+                accept={TYPES_PIECE}
+                className="text-sm file:mr-3 file:rounded-[var(--radius-sm)] file:border file:border-[var(--border-strong)] file:bg-[var(--surface)] file:px-3 file:py-1.5 file:text-sm file:font-medium"
+                onChange={(e) => setPiece(e.target.files?.[0] ?? null)}
+                aria-describedby={describedBy}
+                aria-invalid={invalid || undefined}
+              />
+            )}
+          </Field>
+        </FormGrid>
         {erreur ? (
           <Alerte>
             <p>{erreur}</p>

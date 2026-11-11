@@ -7,8 +7,27 @@
 //
 // Aucun total n'est calculé ici : le total TTC est recopié tel qu'imprimé et l'API
 // vérifie l'addition ; un doublon de référence est signalé avec la facture existante.
+//
+// ADR-0074 : fournisseur en `EntityPicker` avec création rapide, dates en
+// `DatePicker` (bornées à aujourd'hui comme avant), devise en segments,
+// montants en `MoneyInput` (mise en forme seulement : la valeur reste la chaîne
+// décimale lue par `preparerFacture`), validation à la sortie du champ.
 
-import { Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Button,
+  DatePicker,
+  ErrorSummary,
+  Field,
+  FormGrid,
+  Modal,
+  MoneyInput,
+  SegmentedControl,
+  Select,
+  TextInput,
+  estRaccourciEnregistrer,
+  resumerErreurs,
+  useBlurValidation,
+} from '@lalanda/ui';
 import { Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useId, useState } from 'react';
@@ -17,7 +36,7 @@ import { purchasesPayablesApi, type SupplierInvoiceView } from '@/lib/api-purcha
 import { treasuryApi, type ExpenseCategoryView } from '@/lib/treasury-api';
 
 import { WorkProjectSelect } from '../../tresorerie/_components/work-project-select';
-import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 import { formatMontant } from '../../ventes/_components/sales-model';
 
 import { lienFacture, messageAchats } from './achats-model';
@@ -130,8 +149,21 @@ export function FenetreFacture({
         : p,
     );
 
+  // Validation à la sortie du champ (ADR-0074 § 9) : les règles de l'envoi.
+  const {
+    errors: erreursSaisie,
+    touch,
+    validateAll,
+    submitCount: soumissions,
+  } = useBlurValidation<string>(() => {
+    if (f === null) return {};
+    const p = preparerFacture(f, aujourdhui);
+    return p.ok ? {} : p.champs;
+  });
+
   async function enregistrer(): Promise<void> {
     if (f === null) return;
+    validateAll();
     setErreur(null);
     setDoublon(null);
     setEcartTotal(null);
@@ -160,6 +192,15 @@ export function FenetreFacture({
     }
   }
 
+  // Erreurs de la saisie (sortie du champ, ou toutes après un essai), et refus
+  // de la pièce jointe, vérifiée seulement à l'enregistrement.
+  const affiches: Record<string, string | undefined> = {
+    ...erreursSaisie,
+    ...(champs['piece'] ? { piece: champs['piece'] } : {}),
+  };
+  const mettreTaxe = (i: number, patch: Partial<FormulaireFacture['taxes'][number]>) =>
+    f ? maj({ taxes: f.taxes.map((x, j) => (j === i ? { ...x, ...patch } : x)) }) : undefined;
+
   return (
     <Modal
       open
@@ -169,18 +210,19 @@ export function FenetreFacture({
       size="lg"
       busy={envoi}
       footer={
-        <div className="flex flex-wrap justify-end gap-2">
-          <button type="button" className={BOUTON_PETIT} onClick={onFermer} disabled={envoi}>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+          <Button onClick={onFermer} disabled={envoi} className="max-sm:h-11">
             Retour
-          </button>
-          <button
-            type="button"
-            className={buttonClasses('primary', 'sm')}
-            disabled={envoi || f === null}
+          </Button>
+          <Button
+            variant="primary"
+            busy={envoi}
+            disabled={f === null}
             onClick={() => void enregistrer()}
+            className="max-sm:h-11"
           >
             {envoi ? 'Enregistrement…' : 'Enregistrer le brouillon'}
-          </button>
+          </Button>
         </div>
       }
     >
@@ -195,159 +237,202 @@ export function FenetreFacture({
           </p>
         )
       ) : (
-        <div className="flex flex-col gap-4 text-sm">
-          <div className="grid gap-3 sm:grid-cols-2">
+        <div
+          className="flex min-w-0 flex-col gap-5 text-sm"
+          // Cmd/Ctrl+Entrée enregistre, comme dans les autres formulaires (ADR-0074 § 9).
+          onKeyDown={(e) => {
+            if (estRaccourciEnregistrer(e) && !envoi) {
+              e.preventDefault();
+              void enregistrer();
+            }
+          }}
+        >
+          <ErrorSummary
+            errors={resumerErreurs(affiches, [
+              { cle: 'supplierId', id: `${id}-fournisseur`, libelle: 'Fournisseur' },
+              { cle: 'supplierReference', id: `${id}-ref`, libelle: 'N° de la facture' },
+              { cle: 'invoiceDate', id: `${id}-date`, libelle: 'Date de la facture' },
+              { cle: 'receivedOn', id: `${id}-recue`, libelle: 'Reçue le' },
+              { cle: 'dueDate', id: `${id}-echeance`, libelle: 'Échéance' },
+              { cle: 'subtotal', id: `${id}-ht`, libelle: 'Sous-total HT' },
+              { cle: 'total', id: `${id}-ttc`, libelle: 'Total TTC' },
+              { cle: 'deductibleVat', id: `${id}-tva`, libelle: 'TVA déductible' },
+              { cle: 'piece', id: `${id}-piece`, libelle: 'Facture scannée' },
+            ])}
+            submitCount={soumissions}
+          />
+          <FormGrid>
             {source.type === 'libre' ? (
-              <Champ
+              <Field
                 id={`${id}-fournisseur`}
                 label="Fournisseur"
-                requis
-                erreur={champs['supplierId']}
+                required
+                size="lg"
+                hint="Tapez un nom ou un NIF. Absent : « + » le crée sans quitter la facture."
+                error={affiches['supplierId']}
               >
                 <ChoixFournisseur
                   id={`${id}-fournisseur`}
                   valeur={f.supplierId}
-                  onChange={(s) =>
+                  onChange={(s) => {
                     maj({
                       supplierId: s?.id ?? '',
                       currency: s?.defaultCurrency ?? f.currency,
-                    })
-                  }
+                    });
+                    touch('supplierId');
+                  }}
                 />
-              </Champ>
+              </Field>
             ) : null}
-            <Champ
+            <Field
               id={`${id}-ref`}
               label={
                 f.kind === 'credit_note'
                   ? 'N° de l’avoir du fournisseur'
                   : 'N° de la facture du fournisseur'
               }
-              requis
-              aide="Tel qu’imprimé : il sert à repérer une facture saisie deux fois."
-              erreur={champs['supplierReference']}
+              required
+              size="md"
+              newRow
+              hint="Tel qu’imprimé : il sert à repérer une facture saisie deux fois."
+              error={affiches['supplierReference']}
             >
-              <input
-                id={`${id}-ref`}
-                className={CHAMP}
+              <TextInput
                 value={f.supplierReference}
                 maxLength={100}
                 onChange={(e) => maj({ supplierReference: e.target.value })}
-                {...aria(`${id}-ref`, champs['supplierReference'], true)}
+                onBlur={() => touch('supplierReference')}
+                className="font-mono"
               />
-            </Champ>
-            <Champ id={`${id}-devise`} label="Devise">
-              <select
-                id={`${id}-devise`}
-                className={CHAMP}
+            </Field>
+            <Field id={`${id}-devise`} label="Devise" group size="sm">
+              <SegmentedControl<'USD' | 'CDF'>
                 value={f.currency}
                 disabled={source.type !== 'libre'}
-                onChange={(e) => maj({ currency: e.target.value as 'USD' | 'CDF' })}
-              >
-                <option value="USD">USD</option>
-                <option value="CDF">CDF</option>
-              </select>
-            </Champ>
-            <Champ
+                onChange={(v) => maj({ currency: v })}
+                options={[
+                  { value: 'USD', label: 'USD' },
+                  { value: 'CDF', label: 'CDF' },
+                ]}
+              />
+            </Field>
+            <Field
               id={`${id}-date`}
               label="Date de la facture"
-              requis
-              erreur={champs['invoiceDate']}
+              required
+              size="sm"
+              newRow
+              error={affiches['invoiceDate']}
             >
-              <input
-                id={`${id}-date`}
-                type="date"
-                max={aujourdhui}
-                className={CHAMP}
+              <DatePicker
                 value={f.invoiceDate}
-                onChange={(e) => maj({ invoiceDate: e.target.value })}
-                {...aria(`${id}-date`, champs['invoiceDate'])}
-              />
-            </Champ>
-            <Champ id={`${id}-recue`} label="Reçue le" requis erreur={champs['receivedOn']}>
-              <input
-                id={`${id}-recue`}
-                type="date"
                 max={aujourdhui}
-                className={CHAMP}
-                value={f.receivedOn}
-                onChange={(e) => maj({ receivedOn: e.target.value })}
-                {...aria(`${id}-recue`, champs['receivedOn'])}
+                onChange={(v) => {
+                  maj({ invoiceDate: v });
+                  touch('invoiceDate');
+                }}
+                onBlur={() => touch('invoiceDate')}
+                shortcuts={['today']}
               />
-            </Champ>
-            <Champ
+            </Field>
+            <Field
+              id={`${id}-recue`}
+              label="Reçue le"
+              required
+              size="sm"
+              error={affiches['receivedOn']}
+            >
+              <DatePicker
+                value={f.receivedOn}
+                max={aujourdhui}
+                onChange={(v) => {
+                  maj({ receivedOn: v });
+                  touch('receivedOn');
+                }}
+                onBlur={() => touch('receivedOn')}
+                shortcuts={['today']}
+              />
+            </Field>
+            <Field
               id={`${id}-echeance`}
               label="Échéance"
-              aide="Vide : déduite des conditions de paiement du fournisseur."
-              erreur={champs['dueDate']}
+              optional
+              size="sm"
+              hint="Vide : déduite des conditions de paiement du fournisseur."
+              error={affiches['dueDate']}
             >
-              <input
-                id={`${id}-echeance`}
-                type="date"
-                className={CHAMP}
+              <DatePicker
                 value={f.dueDate}
-                onChange={(e) => maj({ dueDate: e.target.value })}
-                {...aria(`${id}-echeance`, champs['dueDate'], true)}
+                {...(f.invoiceDate ? { min: f.invoiceDate } : {})}
+                onChange={(v) => {
+                  maj({ dueDate: v });
+                  touch('dueDate');
+                }}
+                onBlur={() => touch('dueDate')}
+                shortcuts={['plus30', 'endOfMonth']}
               />
-            </Champ>
-          </div>
+            </Field>
+          </FormGrid>
 
           {f.lignes.length > 0 ? (
-            <fieldset className="flex flex-col gap-2">
-              <legend className="text-sm font-medium">Lignes facturées (HT)</legend>
-              {champs['lignes'] ? (
-                <p className="text-xs font-medium text-[var(--danger)]">{champs['lignes']}</p>
+            <fieldset className="flex min-w-0 flex-col gap-2">
+              <legend className="mb-1 text-sm font-semibold">Lignes facturées (HT)</legend>
+              {affiches['lignes'] ? (
+                <p className="text-xs font-medium text-[var(--danger)]">{affiches['lignes']}</p>
               ) : null}
               <ul className="flex flex-col divide-y divide-[var(--border)] rounded-[var(--radius-md)] border border-[var(--border)]">
                 {f.lignes.map((l, i) => (
                   <li
                     key={`${l.orderLineId ?? 'libre'}-${i}`}
-                    className="grid gap-2 p-3 sm:grid-cols-[1fr_6rem_8rem_5rem]"
+                    className="flex min-w-0 flex-col gap-2 p-3"
                   >
-                    <span className="self-center font-medium break-words">{l.label}</span>
-                    <Champ
-                      id={`${id}-q-${i}`}
-                      label="Quantité"
-                      erreur={champs[`ligne-${i}-quantity`]}
-                    >
-                      <input
+                    <span className="font-medium break-words">{l.label}</span>
+                    <FormGrid>
+                      <Field
                         id={`${id}-q-${i}`}
-                        inputMode="decimal"
-                        className={CHAMP}
-                        value={l.quantity}
-                        onFocus={(e) => e.currentTarget.select()}
-                        onChange={(e) => majLigne(i, { quantity: e.target.value })}
-                        {...aria(`${id}-q-${i}`, champs[`ligne-${i}-quantity`])}
-                      />
-                    </Champ>
-                    <Champ
-                      id={`${id}-p-${i}`}
-                      label="Prix unitaire HT"
-                      erreur={champs[`ligne-${i}-unitPrice`]}
-                    >
-                      <input
+                        label="Quantité"
+                        size="xs"
+                        error={affiches[`ligne-${i}-quantity`]}
+                      >
+                        <TextInput
+                          inputMode="decimal"
+                          value={l.quantity}
+                          onFocus={(e) => e.currentTarget.select()}
+                          onChange={(e) => majLigne(i, { quantity: e.target.value })}
+                          onBlur={() => touch(`ligne-${i}-quantity`)}
+                          className="text-right tabular-nums"
+                        />
+                      </Field>
+                      <Field
                         id={`${id}-p-${i}`}
-                        inputMode="decimal"
-                        className={CHAMP}
-                        value={l.unitPrice}
-                        onChange={(e) => majLigne(i, { unitPrice: e.target.value })}
-                        {...aria(`${id}-p-${i}`, champs[`ligne-${i}-unitPrice`])}
-                      />
-                    </Champ>
-                    <Champ
-                      id={`${id}-r-${i}`}
-                      label="Remise %"
-                      erreur={champs[`ligne-${i}-discountPercent`]}
-                    >
-                      <input
+                        label="Prix unitaire HT"
+                        size="sm"
+                        error={affiches[`ligne-${i}-unitPrice`]}
+                      >
+                        <MoneyInput
+                          value={l.unitPrice}
+                          currency={f.currency}
+                          onChange={(v) => majLigne(i, { unitPrice: v })}
+                          onBlur={() => touch(`ligne-${i}-unitPrice`)}
+                        />
+                      </Field>
+                      <Field
                         id={`${id}-r-${i}`}
-                        inputMode="decimal"
-                        className={CHAMP}
-                        value={l.discountPercent}
-                        onChange={(e) => majLigne(i, { discountPercent: e.target.value })}
-                        {...aria(`${id}-r-${i}`, champs[`ligne-${i}-discountPercent`])}
-                      />
-                    </Champ>
+                        label="Remise"
+                        optional
+                        size="xs"
+                        error={affiches[`ligne-${i}-discountPercent`]}
+                      >
+                        <TextInput
+                          inputMode="decimal"
+                          value={l.discountPercent}
+                          onChange={(e) => majLigne(i, { discountPercent: e.target.value })}
+                          onBlur={() => touch(`ligne-${i}-discountPercent`)}
+                          trailing="%"
+                          className="text-right tabular-nums"
+                        />
+                      </Field>
+                    </FormGrid>
                   </li>
                 ))}
               </ul>
@@ -356,71 +441,61 @@ export function FenetreFacture({
               </p>
             </fieldset>
           ) : (
-            <Champ id={`${id}-ht`} label="Sous-total HT" requis erreur={champs['subtotal']}>
-              <input
+            <FormGrid>
+              <Field
                 id={`${id}-ht`}
-                inputMode="decimal"
-                className={CHAMP}
-                value={f.subtotal}
-                placeholder="0,00"
-                onChange={(e) => maj({ subtotal: e.target.value })}
-                {...aria(`${id}-ht`, champs['subtotal'])}
-              />
-            </Champ>
+                label="Sous-total HT"
+                required
+                size="sm"
+                error={affiches['subtotal']}
+              >
+                <MoneyInput
+                  value={f.subtotal}
+                  currency={f.currency}
+                  placeholder="0,00"
+                  onChange={(v) => maj({ subtotal: v })}
+                  onBlur={() => touch('subtotal')}
+                />
+              </Field>
+            </FormGrid>
           )}
 
-          <fieldset className="flex flex-col gap-2">
-            <legend className="flex w-full flex-wrap items-center justify-between gap-2 text-sm font-medium">
-              Taxes
-              {f.taxes.length < 5 ? (
-                <button
-                  type="button"
-                  className={BOUTON_PETIT}
-                  onClick={() => maj({ taxes: [...f.taxes, { label: 'TVA', amount: '' }] })}
-                >
-                  <Plus aria-hidden="true" className="mr-1 inline h-3 w-3" />
-                  Ajouter une taxe
-                </button>
-              ) : null}
-            </legend>
+          <fieldset className="flex min-w-0 flex-col gap-2">
+            <legend className="mb-1 text-sm font-semibold">Taxes</legend>
             <p className="text-xs text-[var(--foreground-muted)]">{MENTION_TAXES_FACTURE}</p>
             {f.taxes.map((t, i) => (
-              <div key={i} className="grid grid-cols-[1fr_8rem_auto] items-end gap-2">
-                <Champ id={`${id}-tl-${i}`} label="Libellé" erreur={champs[`taxe-${i}-label`]}>
-                  <input
+              <div key={i} className="flex min-w-0 items-end gap-2">
+                <FormGrid className="min-w-0 flex-1">
+                  <Field
                     id={`${id}-tl-${i}`}
-                    className={CHAMP}
-                    value={t.label}
-                    maxLength={60}
-                    onChange={(e) =>
-                      maj({
-                        taxes: f.taxes.map((x, j) =>
-                          j === i ? { ...x, label: e.target.value } : x,
-                        ),
-                      })
-                    }
-                    {...aria(`${id}-tl-${i}`, champs[`taxe-${i}-label`])}
-                  />
-                </Champ>
-                <Champ id={`${id}-ta-${i}`} label="Montant" erreur={champs[`taxe-${i}-amount`]}>
-                  <input
+                    label="Libellé"
+                    size="md"
+                    error={affiches[`taxe-${i}-label`]}
+                  >
+                    <TextInput
+                      value={t.label}
+                      maxLength={60}
+                      onChange={(e) => mettreTaxe(i, { label: e.target.value })}
+                      onBlur={() => touch(`taxe-${i}-label`)}
+                    />
+                  </Field>
+                  <Field
                     id={`${id}-ta-${i}`}
-                    inputMode="decimal"
-                    className={CHAMP}
-                    value={t.amount}
-                    onChange={(e) =>
-                      maj({
-                        taxes: f.taxes.map((x, j) =>
-                          j === i ? { ...x, amount: e.target.value } : x,
-                        ),
-                      })
-                    }
-                    {...aria(`${id}-ta-${i}`, champs[`taxe-${i}-amount`])}
-                  />
-                </Champ>
+                    label="Montant"
+                    size="sm"
+                    error={affiches[`taxe-${i}-amount`]}
+                  >
+                    <MoneyInput
+                      value={t.amount}
+                      currency={f.currency}
+                      onChange={(v) => mettreTaxe(i, { amount: v })}
+                      onBlur={() => touch(`taxe-${i}-amount`)}
+                    />
+                  </Field>
+                </FormGrid>
                 <button
                   type="button"
-                  className={BOUTON_PETIT}
+                  className={`${BOUTON_PETIT} mb-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center p-0 max-sm:h-11 max-sm:w-11`}
                   aria-label={`Retirer la taxe ${i + 1}`}
                   onClick={() => maj({ taxes: f.taxes.filter((_, j) => j !== i) })}
                 >
@@ -428,157 +503,172 @@ export function FenetreFacture({
                 </button>
               </div>
             ))}
+            {f.taxes.length < 5 ? (
+              <button
+                type="button"
+                className={`${BOUTON_PETIT} inline-flex items-center gap-1 self-start max-sm:h-11`}
+                onClick={() => maj({ taxes: [...f.taxes, { label: 'TVA', amount: '' }] })}
+              >
+                <Plus aria-hidden="true" className="h-4 w-4" />
+                Ajouter une taxe
+              </button>
+            ) : null}
           </fieldset>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Champ
+          <FormGrid>
+            <Field
               id={`${id}-ttc`}
               label="Total TTC"
-              requis
-              aide="Tel qu’imprimé sur la facture."
-              erreur={champs['total']}
+              required
+              size="sm"
+              hint="Tel qu’imprimé sur la facture."
+              error={affiches['total']}
             >
-              <input
-                id={`${id}-ttc`}
-                inputMode="decimal"
-                className={CHAMP}
+              <MoneyInput
                 value={f.total}
+                currency={f.currency}
                 placeholder="0,00"
-                onChange={(e) => maj({ total: e.target.value })}
-                {...aria(`${id}-ttc`, champs['total'], true)}
+                onChange={(v) => maj({ total: v })}
+                onBlur={() => touch('total')}
               />
-            </Champ>
-            <Champ
+            </Field>
+            <Field
               id={`${id}-tva`}
-              label="TVA déductible (facultatif)"
-              aide={MENTION_TVA_DEDUCTIBLE}
-              erreur={champs['deductibleVat']}
+              label="TVA déductible"
+              optional
+              size="sm"
+              hint={MENTION_TVA_DEDUCTIBLE}
+              error={affiches['deductibleVat']}
             >
-              <input
-                id={`${id}-tva`}
-                inputMode="decimal"
-                className={CHAMP}
+              <MoneyInput
                 value={f.deductibleVat}
-                onChange={(e) => maj({ deductibleVat: e.target.value })}
-                {...aria(`${id}-tva`, champs['deductibleVat'], true)}
+                currency={f.currency}
+                onChange={(v) => maj({ deductibleVat: v })}
+                onBlur={() => touch('deductibleVat')}
               />
-            </Champ>
-          </div>
+            </Field>
+          </FormGrid>
 
-          <fieldset className="flex flex-col gap-2">
-            <legend className="flex w-full flex-wrap items-center justify-between gap-2 text-sm font-medium">
+          <fieldset className="flex min-w-0 flex-col gap-2">
+            <legend className="mb-1 text-sm font-semibold">
               Imputation (catégorie de dépense, projet)
-              {f.imputations.length < 20 ? (
-                <button
-                  type="button"
-                  className={BOUTON_PETIT}
-                  onClick={() =>
-                    maj({
-                      imputations: [
-                        ...f.imputations,
-                        { category: '', workProjectId: '', amount: '' },
-                      ],
-                    })
-                  }
-                >
-                  <Plus aria-hidden="true" className="mr-1 inline h-3 w-3" />
-                  Répartir sur une autre catégorie
-                </button>
-              ) : null}
             </legend>
             <p className="text-xs text-[var(--foreground-muted)]">
               Une seule ligne sans montant prend le total. Vide : la catégorie du fournisseur ou de
               la commande est reprise. Le paiement créera les dépenses selon cette répartition.
             </p>
-            {champs['imputations'] ? (
-              <p className="text-xs font-medium text-[var(--danger)]">{champs['imputations']}</p>
+            {affiches['imputations'] ? (
+              <p className="text-xs font-medium text-[var(--danger)]">{affiches['imputations']}</p>
             ) : null}
             {f.imputations.map((x, i) => (
               <div
                 key={i}
-                className="grid gap-2 rounded-[var(--radius-md)] border border-[var(--border)] p-3 sm:grid-cols-2"
+                className="flex min-w-0 flex-col gap-2 rounded-[var(--radius-md)] border border-[var(--border)] p-3"
               >
-                <Champ
-                  id={`${id}-ic-${i}`}
-                  label="Catégorie"
-                  erreur={champs[`imputation-${i}-category`]}
-                >
-                  {categories ? (
-                    <select
-                      id={`${id}-ic-${i}`}
-                      className={CHAMP}
-                      value={x.category}
-                      onChange={(e) => majImputation(i, { category: e.target.value })}
-                      {...aria(`${id}-ic-${i}`, champs[`imputation-${i}-category`])}
-                    >
-                      <option value="">— Reprendre celle du fournisseur —</option>
-                      {categories.map((c) => (
-                        <option key={c.code} value={c.code}>
-                          {c.label}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      id={`${id}-ic-${i}`}
-                      className={CHAMP}
-                      value={x.category}
-                      placeholder="achats"
-                      onChange={(e) => majImputation(i, { category: e.target.value.trim() })}
-                      {...aria(`${id}-ic-${i}`, champs[`imputation-${i}-category`])}
-                    />
-                  )}
-                </Champ>
-                <Champ
-                  id={`${id}-im-${i}`}
-                  label="Montant TTC"
-                  erreur={champs[`imputation-${i}-amount`]}
-                >
-                  <input
+                <FormGrid>
+                  <Field
+                    id={`${id}-ic-${i}`}
+                    label="Catégorie"
+                    size="md"
+                    error={affiches[`imputation-${i}-category`]}
+                  >
+                    {categories ? (
+                      <Select<string>
+                        value={x.category}
+                        onChange={(v) => {
+                          majImputation(i, { category: v });
+                          touch(`imputation-${i}-category`);
+                        }}
+                        options={[
+                          { value: '', label: '— Reprendre celle du fournisseur —' },
+                          ...categories.map((c) => ({
+                            value: c.code,
+                            label: c.label,
+                            keywords: c.code,
+                          })),
+                        ]}
+                      />
+                    ) : (
+                      <TextInput
+                        value={x.category}
+                        placeholder="achats"
+                        onChange={(e) => majImputation(i, { category: e.target.value.trim() })}
+                        onBlur={() => touch(`imputation-${i}-category`)}
+                      />
+                    )}
+                  </Field>
+                  <Field
                     id={`${id}-im-${i}`}
-                    inputMode="decimal"
-                    className={CHAMP}
-                    value={x.amount}
-                    placeholder={f.imputations.length === 1 ? 'Le total' : '0,00'}
-                    onChange={(e) => majImputation(i, { amount: e.target.value })}
-                    {...aria(`${id}-im-${i}`, champs[`imputation-${i}-amount`])}
-                  />
-                </Champ>
-                <div className="sm:col-span-2 flex flex-wrap items-end justify-between gap-2">
+                    label="Montant TTC"
+                    size="sm"
+                    error={affiches[`imputation-${i}-amount`]}
+                  >
+                    <MoneyInput
+                      value={x.amount}
+                      currency={f.currency}
+                      placeholder={f.imputations.length === 1 ? 'Le total' : '0,00'}
+                      onChange={(v) => majImputation(i, { amount: v })}
+                      onBlur={() => touch(`imputation-${i}-amount`)}
+                    />
+                  </Field>
                   <WorkProjectSelect
+                    id={`${id}-ip-${i}`}
                     value={x.workProjectId}
                     onChange={(v) => majImputation(i, { workProjectId: v })}
-                    className={CHAMP}
                   />
-                  {f.imputations.length > 1 ? (
-                    <button
-                      type="button"
-                      className={BOUTON_PETIT}
-                      onClick={() => maj({ imputations: f.imputations.filter((_, j) => j !== i) })}
-                    >
-                      Retirer
-                    </button>
-                  ) : null}
-                </div>
+                </FormGrid>
+                {f.imputations.length > 1 ? (
+                  <button
+                    type="button"
+                    className={`${BOUTON_PETIT} self-end max-sm:h-11`}
+                    onClick={() => maj({ imputations: f.imputations.filter((_, j) => j !== i) })}
+                  >
+                    Retirer
+                  </button>
+                ) : null}
               </div>
             ))}
+            {f.imputations.length < 20 ? (
+              <button
+                type="button"
+                className={`${BOUTON_PETIT} inline-flex items-center gap-1 self-start max-sm:h-11`}
+                onClick={() =>
+                  maj({
+                    imputations: [
+                      ...f.imputations,
+                      { category: '', workProjectId: '', amount: '' },
+                    ],
+                  })
+                }
+              >
+                <Plus aria-hidden="true" className="h-4 w-4" />
+                Répartir sur une autre catégorie
+              </button>
+            ) : null}
           </fieldset>
 
-          <Champ
-            id={`${id}-piece`}
-            label="Facture scannée"
-            aide="PDF (10 Mio) ou photo PNG, JPEG, WebP (2 Mio). Elle peut aussi être jointe plus tard depuis la fiche."
-            erreur={champs['piece']}
-          >
-            <input
+          <FormGrid>
+            <Field
               id={`${id}-piece`}
-              type="file"
-              accept={TYPES_PIECE}
-              className="text-sm"
-              onChange={(e) => setPiece(e.target.files?.[0] ?? null)}
-              {...aria(`${id}-piece`, champs['piece'], true)}
-            />
-          </Champ>
+              label="Facture scannée"
+              optional
+              size="full"
+              hint="PDF (10 Mio) ou photo PNG, JPEG, WebP (2 Mio). Elle peut aussi être jointe plus tard depuis la fiche."
+              error={affiches['piece']}
+            >
+              {({ id: idPiece, describedBy, invalid }) => (
+                <input
+                  id={idPiece}
+                  type="file"
+                  accept={TYPES_PIECE}
+                  className="text-sm file:mr-3 file:rounded-[var(--radius-sm)] file:border file:border-[var(--border-strong)] file:bg-[var(--surface)] file:px-3 file:py-1.5 file:text-sm file:font-medium"
+                  onChange={(e) => setPiece(e.target.files?.[0] ?? null)}
+                  aria-describedby={describedBy}
+                  aria-invalid={invalid || undefined}
+                />
+              )}
+            </Field>
+          </FormGrid>
 
           {erreur ? (
             <Alerte

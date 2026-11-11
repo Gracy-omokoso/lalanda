@@ -8,8 +8,24 @@
 //
 // Aucun montant n'est calculé ici : le reste de chaque facture est recopié de
 // l'API, le montant payé est saisi, l'API vérifie l'égalité.
+//
+// ADR-0074 : date en `DatePicker`, montants en `MoneyInput` (mise en forme
+// seulement), compte et moyen en `Select`, mode en segments, factures en cases
+// stylées, dépense à rattacher en cartes de choix. Mêmes champs envoyés.
 
-import { Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Button,
+  Checkbox,
+  ChoiceCards,
+  DatePicker,
+  Field,
+  FormGrid,
+  Modal,
+  MoneyInput,
+  SegmentedControl,
+  Select,
+  TextInput,
+} from '@lalanda/ui';
 import { AlertTriangle } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 
@@ -22,7 +38,7 @@ import {
 } from '@/lib/api-purchases-payables';
 import { treasuryApi, type TreasuryAccountView } from '@/lib/treasury-api';
 
-import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from '../../ventes/_components/form-ui';
+import { Alerte } from '../../ventes/_components/form-ui';
 import { formatMontant } from '../../ventes/_components/sales-model';
 
 import { useAccesAchats } from './achats-access';
@@ -59,8 +75,8 @@ function ListeImputations({
   onMontant: (invoiceId: string, montant: string) => void;
 }): React.ReactElement {
   return (
-    <fieldset className="flex flex-col gap-2">
-      <legend className="text-sm font-medium">Factures réglées par ce paiement</legend>
+    <fieldset className="flex min-w-0 flex-col gap-2">
+      <legend className="mb-1 text-sm font-semibold">Factures réglées par ce paiement</legend>
       {champs['imputations'] ? (
         <p className="text-xs font-medium text-[var(--danger)]">{champs['imputations']}</p>
       ) : null}
@@ -71,39 +87,30 @@ function ListeImputations({
       ) : (
         <ul className="flex flex-col divide-y divide-[var(--border)] rounded-[var(--radius-md)] border border-[var(--border)]">
           {imputations.map((x) => (
-            <li key={x.invoiceId} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center">
-              <label className="flex min-w-0 flex-1 items-start gap-2">
-                <input
-                  type="checkbox"
-                  className="mt-1"
-                  checked={x.choisie}
-                  onChange={() => onBasculer(x.invoiceId)}
-                />
-                <span className="flex min-w-0 flex-col">
-                  <span className="font-medium break-words">{x.libelle}</span>
-                  <span className="text-xs text-[var(--foreground-muted)]">
-                    Reste à payer {formatMontant(x.reste, devise)} · échéance{' '}
-                    {formatJour(x.echeance)}
-                  </span>
-                </span>
-              </label>
+            <li
+              key={x.invoiceId}
+              className="flex flex-col gap-2 p-3 sm:flex-row sm:items-start sm:justify-between"
+            >
+              <Checkbox
+                checked={x.choisie}
+                onChange={() => onBasculer(x.invoiceId)}
+                label={<span className="font-medium break-words">{x.libelle}</span>}
+                description={`Reste à payer ${formatMontant(x.reste, devise)} · échéance ${formatJour(x.echeance)}`}
+                className="min-w-0 flex-1"
+              />
               {x.choisie ? (
-                <div className="sm:w-40">
-                  <Champ
-                    id={`${idBase}-${x.invoiceId}`}
-                    label="Montant réglé"
-                    erreur={champs[`imputation-${x.invoiceId}`]}
-                  >
-                    <input
-                      id={`${idBase}-${x.invoiceId}`}
-                      inputMode="decimal"
-                      className={CHAMP}
-                      value={x.montant}
-                      onChange={(e) => onMontant(x.invoiceId, e.target.value)}
-                      {...aria(`${idBase}-${x.invoiceId}`, champs[`imputation-${x.invoiceId}`])}
-                    />
-                  </Champ>
-                </div>
+                <Field
+                  id={`${idBase}-${x.invoiceId}`}
+                  label="Montant réglé"
+                  className="sm:w-44"
+                  error={champs[`imputation-${x.invoiceId}`]}
+                >
+                  <MoneyInput
+                    value={x.montant}
+                    currency={devise}
+                    onChange={(v) => onMontant(x.invoiceId, v)}
+                  />
+                </Field>
               ) : null}
             </li>
           ))}
@@ -247,22 +254,23 @@ export function FenetrePaiement({
       size="lg"
       busy={envoi}
       footer={
-        <div className="flex flex-wrap justify-end gap-2">
-          <button type="button" className={BOUTON_PETIT} onClick={onFermer} disabled={envoi}>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+          <Button onClick={onFermer} disabled={envoi} className="max-sm:h-11">
             Retour
-          </button>
-          <button
-            type="button"
-            className={buttonClasses('primary', 'sm')}
-            disabled={envoi || f === null}
+          </Button>
+          <Button
+            variant="primary"
+            busy={envoi}
+            disabled={f === null}
             onClick={() => void enregistrer()}
+            className="max-sm:h-11"
           >
             {envoi
               ? 'Enregistrement…'
               : mode === 'paiement'
                 ? 'Enregistrer le paiement'
                 : 'Rattacher la dépense'}
-          </button>
+          </Button>
         </div>
       }
     >
@@ -292,24 +300,15 @@ export function FenetrePaiement({
               </p>
             ))}
             {peutRattacher ? (
-              <div className="flex flex-wrap gap-2" role="group" aria-label="Mode de saisie">
-                <button
-                  type="button"
-                  className={BOUTON_PETIT}
-                  aria-pressed={mode === 'paiement'}
-                  onClick={() => setMode('paiement')}
-                >
-                  Nouveau paiement
-                </button>
-                <button
-                  type="button"
-                  className={BOUTON_PETIT}
-                  aria-pressed={mode === 'rattachement'}
-                  onClick={() => setMode('rattachement')}
-                >
-                  Rattacher une dépense déjà saisie
-                </button>
-              </div>
+              <SegmentedControl<'paiement' | 'rattachement'>
+                aria-label="Mode de saisie"
+                value={mode}
+                onChange={setMode}
+                options={[
+                  { value: 'paiement', label: 'Nouveau paiement' },
+                  { value: 'rattachement', label: 'Rattacher une dépense déjà saisie' },
+                ]}
+              />
             ) : (
               <p className="text-xs text-[var(--foreground-muted)]">
                 Rattacher une dépense existante est réservé aux rôles qui gèrent la trésorerie.
@@ -318,83 +317,67 @@ export function FenetrePaiement({
           </div>
 
           {mode === 'paiement' ? (
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Champ id={`${id}-date`} label="Payé le" requis erreur={champs['paidOn']}>
-                <input
-                  id={`${id}-date`}
-                  type="date"
-                  max={aujourdhui}
-                  className={CHAMP}
+            <FormGrid>
+              <Field id={`${id}-date`} label="Payé le" required size="sm" error={champs['paidOn']}>
+                <DatePicker
                   value={f.paidOn}
-                  onChange={(e) => setF({ ...f, paidOn: e.target.value })}
-                  {...aria(`${id}-date`, champs['paidOn'])}
+                  max={aujourdhui}
+                  onChange={(v) => setF({ ...f, paidOn: v })}
+                  shortcuts={['today']}
                 />
-              </Champ>
-              <Champ
+              </Field>
+              <Field
                 id={`${id}-montant`}
-                label={`Montant payé (${currency})`}
-                requis
-                aide="Ce qui est sorti du compte ; il doit égaler la somme répartie sur les factures."
-                erreur={champs['amount']}
+                label="Montant payé"
+                required
+                size="sm"
+                hint="Ce qui est sorti du compte ; il doit égaler la somme répartie sur les factures."
+                error={champs['amount']}
               >
-                <input
-                  id={`${id}-montant`}
-                  inputMode="decimal"
-                  className={CHAMP}
+                <MoneyInput
                   value={f.amount}
-                  onChange={(e) => setF({ ...f, amount: e.target.value })}
-                  {...aria(`${id}-montant`, champs['amount'], true)}
+                  currency={currency}
+                  onChange={(v) => setF({ ...f, amount: v })}
                 />
-              </Champ>
-              <Champ id={`${id}-compte`} label="Compte qui a payé">
-                <select
-                  id={`${id}-compte`}
-                  className={CHAMP}
+              </Field>
+              <Field id={`${id}-compte`} label="Compte qui a payé" optional size="md" newRow>
+                <Select<string>
                   value={f.accountId}
-                  onChange={(e) => setF({ ...f, accountId: e.target.value })}
-                >
-                  <option value="">— Non précisé —</option>
-                  {comptes.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </Champ>
-              <Champ id={`${id}-moyen`} label="Moyen">
-                <select
-                  id={`${id}-moyen`}
-                  className={CHAMP}
+                  onChange={(v) => setF({ ...f, accountId: v })}
+                  options={[
+                    { value: '', label: '— Non précisé —' },
+                    ...comptes.map((c) => ({ value: c.id, label: c.name })),
+                  ]}
+                />
+              </Field>
+              <Field id={`${id}-moyen`} label="Moyen" size="md">
+                <Select<SupplierPaymentChannel>
                   value={f.method}
-                  onChange={(e) => setF({ ...f, method: e.target.value as SupplierPaymentChannel })}
-                >
-                  {Object.entries(LIBELLES_MOYEN).map(([v, l]) => (
-                    <option key={v} value={v}>
-                      {l}
-                    </option>
-                  ))}
-                </select>
-              </Champ>
-              <div className="sm:col-span-2">
-                <Champ
-                  id={`${id}-ref`}
-                  label="N° de transaction ou de chèque"
-                  erreur={champs['reference']}
-                >
-                  <input
-                    id={`${id}-ref`}
-                    className={CHAMP}
-                    value={f.reference}
-                    maxLength={100}
-                    onChange={(e) => setF({ ...f, reference: e.target.value })}
-                    {...aria(`${id}-ref`, champs['reference'])}
-                  />
-                </Champ>
-              </div>
-            </div>
+                  onChange={(v) => setF({ ...f, method: v })}
+                  options={(
+                    Object.entries(LIBELLES_MOYEN) as [SupplierPaymentChannel, string][]
+                  ).map(([v, l]) => ({ value: v, label: l }))}
+                />
+              </Field>
+              <Field
+                id={`${id}-ref`}
+                label="N° de transaction ou de chèque"
+                optional
+                size="md"
+                newRow
+                error={champs['reference']}
+              >
+                <TextInput
+                  value={f.reference}
+                  maxLength={100}
+                  onChange={(e) => setF({ ...f, reference: e.target.value })}
+                  className="font-mono"
+                />
+              </Field>
+            </FormGrid>
           ) : (
             <fieldset className="flex flex-col gap-2">
-              <legend className="text-sm font-medium">
+              <legend className="mb-1 text-sm font-semibold">
                 Dépense déjà saisie dans la trésorerie
               </legend>
               {champs['expenseId'] ? (
@@ -407,31 +390,24 @@ export function FenetrePaiement({
                   Aucune dépense directe à ce nom dans cette devise.
                 </p>
               ) : (
-                <ul className="flex flex-col divide-y divide-[var(--border)] rounded-[var(--radius-md)] border border-[var(--border)]">
-                  {depenses.map((d) => (
-                    <li key={d.id}>
-                      <label className="flex items-start gap-2 p-3">
-                        <input
-                          type="radio"
-                          name={`${id}-depense`}
-                          className="mt-1"
-                          checked={depenseId === d.id}
-                          onChange={() => setDepenseId(d.id)}
-                        />
-                        <span className="flex min-w-0 flex-1 flex-col">
-                          <span className="font-medium break-words">{d.label}</span>
-                          <span className="text-xs text-[var(--foreground-muted)]">
-                            {formatJour(d.spentOn)}
-                            {d.supplierName ? ` · ${d.supplierName}` : ''}
+                <Field id={`${id}-depense`} label="Dépense" group size="full">
+                  <ChoiceCards<string>
+                    value={depenseId}
+                    onChange={setDepenseId}
+                    options={depenses.map((d) => ({
+                      value: d.id,
+                      label: (
+                        <span className="flex min-w-0 items-baseline justify-between gap-3">
+                          <span className="min-w-0 break-words">{d.label}</span>
+                          <span className="tabular-nums whitespace-nowrap">
+                            {formatMontant(d.amount, d.currency)}
                           </span>
                         </span>
-                        <span className="tabular-nums whitespace-nowrap">
-                          {formatMontant(d.amount, d.currency)}
-                        </span>
-                      </label>
-                    </li>
-                  ))}
-                </ul>
+                      ),
+                      description: `${formatJour(d.spentOn)}${d.supplierName ? ` · ${d.supplierName}` : ''}`,
+                    }))}
+                  />
+                </Field>
               )}
               <p className="text-xs text-[var(--foreground-muted)]">
                 La dépense devient le paiement : aucune dépense nouvelle n’est créée.
