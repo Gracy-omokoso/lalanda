@@ -21,7 +21,7 @@ import {
   Switch,
   TextInput,
   estRaccourciEnregistrer,
-  useUnsavedChangesWarning,
+  useUnsavedChangesGuard,
 } from '@lalanda/ui';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -214,8 +214,9 @@ export function InvoiceEditor({
   const [dialogue, setDialogue] = useState<'emettre' | 'normaliser' | 'supprimer' | null>(null);
 
   const modifie = JSON.stringify(form) !== reference;
-  // ADR-0074 § 9 : avertissement avant de quitter la page avec un brouillon modifié.
-  useUnsavedChangesWarning(modifie && gerer);
+  // ADR-0074 § 9 et décision n° 3 : avertissement avant de quitter la page avec un
+  // brouillon modifié (rechargement, onglet fermé, lien interne de l'application).
+  const gardeNavigation = useUnsavedChangesGuard(modifie && gerer);
   const desactive = !gerer || envoi;
   const verrouOrigine = form.originInvoiceId !== null;
 
@@ -714,6 +715,7 @@ export function InvoiceEditor({
           ) : null}
         </>
       ) : null}
+      {gardeNavigation}
     </section>
   );
 }

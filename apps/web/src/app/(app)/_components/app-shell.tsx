@@ -26,6 +26,7 @@ import { LegalLinks } from '@/components/legal-links';
 import { AnnoncesBanniere } from './annonces-banniere';
 import { AppHeader } from './app-header';
 import { actionsRapides, appActive, moduleCourant } from './nav-model';
+import { OrganizationHolidays } from './organization-holidays';
 import { PendingInvitationsBanner } from './pending-invitations-banner';
 import { ShellProvider, useShell } from './shell-context';
 import { SidebarNav } from './sidebar';
@@ -36,7 +37,10 @@ const CLE_REPLI = 'lalanda.navigation.repliee';
 export function AppShell({ children }: { children: React.ReactNode }): React.ReactElement {
   return (
     <ShellProvider>
-      <Coquille>{children}</Coquille>
+      {/* ADR-0074, décision n° 1 : fériés de l'organisation dans tous les calendriers. */}
+      <OrganizationHolidays>
+        <Coquille>{children}</Coquille>
+      </OrganizationHolidays>
     </ShellProvider>
   );
 }
