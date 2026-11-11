@@ -105,8 +105,14 @@ export function ListboxMessage({ children }: { children: React.ReactNode }): Rea
 /** Cadre de la liste ouverte : ancrée sous le champ, feuille basse sur téléphone. */
 export const Popover = forwardRef<
   HTMLDivElement,
-  { style: React.CSSProperties | undefined; className?: string; children: React.ReactNode }
->(function Popover({ style, className, children }, ref) {
+  {
+    style: React.CSSProperties | undefined;
+    className?: string;
+    children: React.ReactNode;
+    /** Feuille basse sur téléphone (défaut). `false` : reste ancrée sous le champ. */
+    feuille?: boolean;
+  }
+>(function Popover({ style, className, children, feuille = true }, ref) {
   return (
     <div
       ref={ref}
@@ -115,7 +121,7 @@ export const Popover = forwardRef<
         'z-50 flex flex-col overflow-hidden rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] shadow-[var(--shadow-pop)]',
         // Premier rendu, avant la mesure : sous le champ, comme après.
         style ? null : 'absolute left-0 top-[calc(100%+6px)] w-full',
-        FEUILLE_BASSE,
+        feuille ? FEUILLE_BASSE : null,
         className,
       )}
     >

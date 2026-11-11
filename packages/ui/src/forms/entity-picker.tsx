@@ -21,7 +21,7 @@ import { Modal, type ModalSize } from '../components/modal.js';
 
 import { CONTROL_CLASSES, controlA11y, useField } from './field.js';
 import { ajouterRecent, idSur, prochainIndex } from './logic.js';
-import { ListboxMessage, ListboxOption, Popover, Surligne, VoileTelephone } from './listbox.js';
+import { ListboxMessage, ListboxOption, Popover, Surligne } from './listbox.js';
 import { useAncrage, useAppuiExterieur, useEstTelephone } from './popover.js';
 
 /** Récents par liste (`recentKey`), en mémoire seulement. */
@@ -147,7 +147,9 @@ export function EntityPicker<T>({
   // Focus rendu après la fenêtre de création : il ne rouvre pas la liste.
   const focusSilencieux = useRef(false);
   const tel = useEstTelephone();
-  const style = useAncrage(ouvert && !tel, enveloppe);
+  // Sur téléphone aussi, la liste reste ANCRÉE sous le champ (jamais en feuille
+  // basse) : on doit voir ce que l'on tape.
+  const style = useAncrage(ouvert, enveloppe, tel ? 260 : 320);
 
   // Le libellé suit la valeur tant qu'on n'est pas en train de taper.
   useEffect(() => {
@@ -388,8 +390,7 @@ export function EntityPicker<T>({
 
       {ouvert ? (
         <>
-          {tel ? <VoileTelephone onFermer={abandonner} /> : null}
-          <Popover style={style}>
+          <Popover style={style} feuille={false}>
             <div
               id={idListe}
               role="listbox"

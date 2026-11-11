@@ -15,7 +15,11 @@ export const FEUILLE_BASSE =
   'max-sm:!fixed max-sm:!inset-x-0 max-sm:!bottom-0 max-sm:!top-auto max-sm:!left-0 max-sm:!w-full max-sm:!max-w-none max-sm:max-h-[75dvh] max-sm:rounded-b-none max-sm:rounded-t-[var(--radius-lg)] max-sm:pb-[max(0.5rem,env(safe-area-inset-bottom))]';
 
 export interface PositionPopover {
-  top: number;
+  /** Bord haut (liste sous le champ). */
+  top: number | null;
+  /** Bord bas, depuis le bas de l'écran (liste au-dessus du champ : collée au champ quelle
+   * que soit sa hauteur réelle). */
+  bottom: number | null;
   left: number;
   minWidth: number;
   maxHeight: number;
@@ -38,8 +42,14 @@ export function placerPopover(
   const maxHeight = Math.min(hauteurVoulue, place);
   const largeur = Math.max(ancre.width, largeurVoulue);
   const left = Math.max(marge, Math.min(ancre.left, ecran.width - largeur - marge));
-  const top = dessus ? ancre.top - ECART_POPOVER - maxHeight : ancre.bottom + ECART_POPOVER;
-  return { top, left, minWidth: ancre.width, maxHeight, dessus };
+  return {
+    top: dessus ? null : ancre.bottom + ECART_POPOVER,
+    bottom: dessus ? ecran.height - ancre.top + ECART_POPOVER : null,
+    left,
+    minWidth: ancre.width,
+    maxHeight,
+    dessus,
+  };
 }
 
 export function useEstTelephone(): boolean {
@@ -91,7 +101,7 @@ export function useAncrage(
   if (!ouvert || !pos) return undefined;
   return {
     position: 'fixed',
-    top: pos.top,
+    ...(pos.top !== null ? { top: pos.top } : { bottom: pos.bottom ?? 0 }),
     left: pos.left,
     minWidth: pos.minWidth,
     maxHeight: pos.maxHeight,

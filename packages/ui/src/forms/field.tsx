@@ -67,7 +67,7 @@ export function controlA11y(
  * rouge, désactivé lisible. Le focus visible vient de `globals.css`.
  */
 export const CONTROL_CLASSES =
-  'h-[var(--control-h)] w-full min-w-0 rounded-[var(--radius-md)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-sm text-[var(--foreground)] placeholder:text-[color-mix(in_srgb,var(--foreground-muted)_75%,transparent)] transition-colors duration-[var(--motion-fast)] ease-[var(--ease-standard)] hover:border-[color-mix(in_srgb,var(--accent)_55%,var(--border-strong))] focus:border-[var(--accent)] aria-[invalid=true]:border-[var(--danger)] disabled:cursor-not-allowed disabled:bg-[var(--surface-muted)] disabled:opacity-70 read-only:bg-[var(--surface-muted)] max-sm:h-11 max-sm:text-base';
+  'h-[var(--control-h)] w-full min-w-0 rounded-[var(--radius-md)] border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-sm text-[var(--foreground)] placeholder:text-[color-mix(in_srgb,var(--foreground-muted)_75%,transparent)] transition-colors duration-[var(--motion-fast)] ease-[var(--ease-standard)] hover:border-[color-mix(in_srgb,var(--accent)_55%,var(--border-strong))] focus:border-[var(--accent)] aria-[invalid=true]:border-[var(--danger)] disabled:cursor-not-allowed disabled:bg-[var(--surface-muted)] disabled:opacity-70 max-sm:h-11 max-sm:text-base';
 
 export interface FormGridProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
@@ -171,7 +171,8 @@ export function Field({
       className={cn(
         'flex min-w-0 flex-col gap-1.5',
         FIELD_SPANS[size],
-        newRow && '@lg:col-start-1',
+        // Les deux paliers : le `col-span` de @3xl réécrit aussi le début de colonne.
+        newRow && '@lg:col-start-1 @3xl:col-start-1',
         className,
       )}
     >
@@ -240,6 +241,7 @@ export const TextInput = forwardRef<HTMLInputElement, TextInputProps>(function T
         CONTROL_CLASSES,
         leading ? 'pl-9' : null,
         trailing ? 'pr-12' : null,
+        'read-only:bg-[var(--surface-muted)]',
         leading || trailing ? null : className,
       )}
     />
@@ -275,7 +277,11 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(function 
       rows={rows}
       {...props}
       {...a11y}
-      className={cn(CONTROL_CLASSES, 'h-auto min-h-[4.5rem] py-2 leading-relaxed', className)}
+      className={cn(
+        CONTROL_CLASSES,
+        'h-auto min-h-[4.5rem] py-2 leading-relaxed read-only:bg-[var(--surface-muted)]',
+        className,
+      )}
     />
   );
 });

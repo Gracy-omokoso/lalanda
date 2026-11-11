@@ -122,7 +122,7 @@ export function SegmentedControl<V extends string>({
       }}
       className={cn(
         'inline-flex max-w-full gap-0.5 rounded-[var(--radius-md)] border border-[var(--border-strong)] bg-[var(--surface-muted)] p-0.5 aria-[invalid=true]:border-[var(--danger)]',
-        fullWidth && 'flex w-full',
+        fullWidth ? 'flex w-full' : 'self-start',
         className,
       )}
     >

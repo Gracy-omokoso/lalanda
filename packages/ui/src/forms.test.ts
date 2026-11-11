@@ -288,7 +288,9 @@ describe('formulaire', () => {
       300,
     );
     expect(dessus.dessus).toBe(true);
-    expect(dessus.top).toBe(700 - 6 - dessus.maxHeight);
+    // Collée au-dessus du champ, quelle que soit la hauteur réelle de la liste.
+    expect(dessus.top).toBeNull();
+    expect(dessus.bottom).toBe(800 - 700 + 6);
     expect(dessus.left).toBe(1000 - 200 - 8);
   });
 });
