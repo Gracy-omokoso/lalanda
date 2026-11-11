@@ -4,11 +4,30 @@
 // planification et réalisation d'une intervention, garanties, assurances et
 // contrats reliés à un document de la bibliothèque. Toute saisie en fenêtre
 // modale (`assets.manage`) ; les coûts n'apparaissent qu'aux rôles qui les voient.
+//
+// ADR-0074 : grille sémantique, dates en `DatePicker`, natures en `Select`,
+// devise en segments, document de la bibliothèque en `EntityPicker` (même
+// recherche `POST /documents/search`, sans « + » : un document se dépose depuis
+// la bibliothèque).
 
-import { Badge, Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Badge,
+  DatePicker,
+  EntityPicker,
+  Field,
+  FormGrid,
+  Modal,
+  SegmentedControl,
+  Select,
+  SubmitButton,
+  Switch,
+  TextArea,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import { FileText, ShieldCheck, Trash2, Wrench } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 
 import {
   assetsApi,
@@ -20,14 +39,7 @@ import {
 import { documentsApi, type LibraryDocumentView } from '@/lib/api-documents';
 
 import { useShell } from '../../_components/shell-context';
-import {
-  Alerte,
-  BOUTON_DANGER,
-  BOUTON_PETIT,
-  CHAMP,
-  Champ,
-  aria,
-} from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_DANGER, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import {
   LIBELLES_COUVERTURE,
@@ -218,6 +230,7 @@ export function PanneauMaintenance({
   );
 }
 
+/** Coût informatif et sa devise : deux champs de la grille englobante. */
 function CoutDevise({
   id,
   cout,
@@ -229,30 +242,33 @@ function CoutDevise({
   id: string;
   cout: string;
   devise: 'USD' | 'CDF';
-  erreur?: string;
+  erreur?: string | undefined;
   onCout: (v: string) => void;
   onDevise: (v: 'USD' | 'CDF') => void;
 }): React.ReactElement {
   return (
-    <Champ id={id} label="Coût (informatif)" erreur={erreur} aide="Ne crée aucune dépense.">
-      <div className="flex gap-2">
-        <ChampNombre
-          id={id}
-          value={cout}
-          onChange={(e) => onCout(e.target.value)}
-          {...aria(id, erreur, true)}
-        />
-        <select
-          aria-label="Devise"
-          className={`${CHAMP} w-24`}
+    <>
+      <Field
+        id={id}
+        label="Coût (informatif)"
+        size="sm"
+        newRow
+        error={erreur}
+        hint="Ne crée aucune dépense."
+      >
+        <ChampNombre value={cout} onChange={(e) => onCout(e.target.value)} />
+      </Field>
+      <Field id={`${id}-devise`} label="Devise" size="sm" group>
+        <SegmentedControl<'USD' | 'CDF'>
           value={devise}
-          onChange={(e) => onDevise(e.target.value as 'USD' | 'CDF')}
-        >
-          <option value="USD">USD</option>
-          <option value="CDF">CDF</option>
-        </select>
-      </div>
-    </Champ>
+          onChange={onDevise}
+          options={[
+            { value: 'USD', label: 'USD' },
+            { value: 'CDF', label: 'CDF' },
+          ]}
+        />
+      </Field>
+    </>
   );
 }
 
@@ -302,69 +318,60 @@ function DialogueMaintenance({
   return (
     <Modal open onClose={onFermer} busy={envoi} title="Nouvelle intervention" size="md">
       <form noValidate onSubmit={(e) => void valider(e)} className="flex flex-col gap-3">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Champ id={`${id}-nature`} label="Nature">
-            <select
-              id={`${id}-nature`}
-              className={CHAMP}
+        <FormGrid>
+          <Field id={`${id}-nature`} label="Nature" size="md">
+            <Select<AssetMaintenanceKind>
               value={f.kind}
-              onChange={(e) => setF({ ...f, kind: e.target.value as AssetMaintenanceKind })}
-            >
-              {Object.entries(LIBELLES_MAINTENANCE).map(([k, l]) => (
-                <option key={k} value={k}>
-                  {l}
-                </option>
-              ))}
-            </select>
-          </Champ>
-          <Champ
+              onChange={(v) => setF({ ...f, kind: v })}
+              options={Object.entries(LIBELLES_MAINTENANCE).map(([k, l]) => ({
+                value: k as AssetMaintenanceKind,
+                label: l,
+              }))}
+            />
+          </Field>
+          <Field
             id={`${id}-date`}
             label={f.dejaFaite ? 'Faite le' : 'Prévue le'}
-            requis
-            erreur={champs['date']}
+            required
+            size="sm"
+            error={champs['date']}
           >
-            <input
-              id={`${id}-date`}
-              type="date"
-              className={CHAMP}
+            <DatePicker
               value={f.date}
-              onChange={(e) => setF({ ...f, date: e.target.value })}
-              {...aria(`${id}-date`, champs['date'])}
+              shortcuts={f.dejaFaite ? ['today'] : ['today', 'plus7', 'plus30', 'endOfMonth']}
+              onChange={(v) => setF({ ...f, date: v })}
             />
-          </Champ>
-          <label className="flex items-center gap-2 text-sm sm:col-span-2">
-            <input
-              type="checkbox"
+          </Field>
+          <div className="@lg:col-span-12">
+            <Switch
               checked={f.dejaFaite}
-              onChange={(e) => setF({ ...f, dejaFaite: e.target.checked })}
+              onChange={(v) => setF({ ...f, dejaFaite: v })}
+              label="Intervention déjà faite"
             />
-            Intervention déjà faite
-          </label>
+          </div>
           {f.kind === 'preventive' ? (
-            <Champ
+            <Field
               id={`${id}-recurrence`}
               label="Répéter tous les … mois"
-              aide="Vide : pas de répétition. Une fois faite, la suivante est planifiée."
-              erreur={champs['everyMonths']}
+              size="md"
+              hint="Vide : pas de répétition. Une fois faite, la suivante est planifiée."
+              error={champs['everyMonths']}
             >
               <ChampNombre
-                id={`${id}-recurrence`}
                 entier
+                className="max-w-[8rem]"
                 value={f.everyMonths}
                 onChange={(e) => setF({ ...f, everyMonths: e.target.value })}
-                {...aria(`${id}-recurrence`, champs['everyMonths'], true)}
               />
-            </Champ>
+            </Field>
           ) : null}
-          <Champ id={`${id}-par`} label="Réalisée par">
-            <input
-              id={`${id}-par`}
-              className={CHAMP}
+          <Field id={`${id}-par`} label="Réalisée par" size="md">
+            <TextInput
               value={f.performedBy}
               maxLength={120}
               onChange={(e) => setF({ ...f, performedBy: e.target.value })}
             />
-          </Champ>
+          </Field>
           {valeurs ? (
             <CoutDevise
               id={`${id}-cout`}
@@ -375,29 +382,23 @@ function DialogueMaintenance({
               onDevise={(v) => setF({ ...f, currency: v })}
             />
           ) : null}
-        </div>
-        <Champ id={`${id}-note`} label="Note">
-          <textarea
-            id={`${id}-note`}
-            rows={2}
-            className={CHAMP}
-            value={f.note}
-            maxLength={1000}
-            onChange={(e) => setF({ ...f, note: e.target.value })}
-          />
-        </Champ>
+          <Field id={`${id}-note`} label="Note" size="full" optional>
+            <TextArea
+              rows={2}
+              value={f.note}
+              maxLength={1000}
+              onChange={(e) => setF({ ...f, note: e.target.value })}
+            />
+          </Field>
+        </FormGrid>
         {erreur ? (
           <Alerte>
             <p>{erreur}</p>
           </Alerte>
         ) : null}
-        <button
-          type="submit"
-          className={buttonClasses('primary', 'md', 'self-start')}
-          disabled={envoi}
-        >
-          {envoi ? 'Enregistrement…' : 'Enregistrer'}
-        </button>
+        <SubmitButton busy={envoi} busyLabel="Enregistrement…" className="self-start max-sm:w-full">
+          Enregistrer
+        </SubmitButton>
       </form>
     </Modal>
   );
@@ -459,57 +460,48 @@ function DialogueFait({
       size="sm"
     >
       <form noValidate onSubmit={(e) => void valider(e)} className="flex flex-col gap-3">
-        <Champ id={`${id}-le`} label="Faite le" requis erreur={champs['doneOn']}>
-          <input
-            id={`${id}-le`}
-            type="date"
-            className={CHAMP}
-            value={f.doneOn}
-            onChange={(e) => setF({ ...f, doneOn: e.target.value })}
-            {...aria(`${id}-le`, champs['doneOn'])}
-          />
-        </Champ>
-        <Champ id={`${id}-par`} label="Réalisée par">
-          <input
-            id={`${id}-par`}
-            className={CHAMP}
-            value={f.performedBy}
-            maxLength={120}
-            onChange={(e) => setF({ ...f, performedBy: e.target.value })}
-          />
-        </Champ>
-        {valeurs ? (
-          <CoutDevise
-            id={`${id}-cout`}
-            cout={f.cost}
-            devise={f.currency}
-            erreur={champs['cost']}
-            onCout={(v) => setF({ ...f, cost: v })}
-            onDevise={(v) => setF({ ...f, currency: v })}
-          />
-        ) : null}
-        <Champ id={`${id}-note`} label="Note">
-          <textarea
-            id={`${id}-note`}
-            rows={2}
-            className={CHAMP}
-            value={f.note}
-            maxLength={1000}
-            onChange={(e) => setF({ ...f, note: e.target.value })}
-          />
-        </Champ>
+        <FormGrid>
+          <Field id={`${id}-le`} label="Faite le" required size="sm" error={champs['doneOn']}>
+            <DatePicker
+              value={f.doneOn}
+              shortcuts={['today']}
+              onChange={(v) => setF({ ...f, doneOn: v })}
+            />
+          </Field>
+          <Field id={`${id}-par`} label="Réalisée par" size="md" newRow>
+            <TextInput
+              value={f.performedBy}
+              maxLength={120}
+              onChange={(e) => setF({ ...f, performedBy: e.target.value })}
+            />
+          </Field>
+          {valeurs ? (
+            <CoutDevise
+              id={`${id}-cout`}
+              cout={f.cost}
+              devise={f.currency}
+              erreur={champs['cost']}
+              onCout={(v) => setF({ ...f, cost: v })}
+              onDevise={(v) => setF({ ...f, currency: v })}
+            />
+          ) : null}
+          <Field id={`${id}-note`} label="Note" size="full" optional>
+            <TextArea
+              rows={2}
+              value={f.note}
+              maxLength={1000}
+              onChange={(e) => setF({ ...f, note: e.target.value })}
+            />
+          </Field>
+        </FormGrid>
         {erreur ? (
           <Alerte>
             <p>{erreur}</p>
           </Alerte>
         ) : null}
-        <button
-          type="submit"
-          className={buttonClasses('primary', 'md', 'self-start')}
-          disabled={envoi}
-        >
-          {envoi ? 'Enregistrement…' : 'Enregistrer'}
-        </button>
+        <SubmitButton busy={envoi} busyLabel="Enregistrement…" className="self-start max-sm:w-full">
+          Enregistrer
+        </SubmitButton>
       </form>
     </Modal>
   );
@@ -708,57 +700,45 @@ export function PanneauCouvertures({
   );
 }
 
-/** Choix d'un document de la bibliothèque : recherche en CORPS (`POST /documents/search`). */
+/** Document tel que le sélecteur le connaît : la fiche lue, ou son seul identifiant. */
+type DocumentChoisi = Pick<LibraryDocumentView, 'id' | 'title'>;
+
+/**
+ * Choix d'un document de la bibliothèque : même recherche en CORPS qu'avant
+ * (`POST /documents/search`, 50 au plus), en `EntityPicker` (ADR-0074 § 4).
+ */
 function ChoixDocument({
-  id,
   valeur,
   onChange,
 }: {
-  id: string;
   valeur: string;
   onChange: (v: string) => void;
 }): React.ReactElement {
-  const [q, setQ] = useState('');
-  const [liste, setListe] = useState<LibraryDocumentView[]>([]);
-  useEffect(() => {
-    let annule = false;
-    const t = setTimeout(() => {
-      documentsApi
-        .search({ ...(q.trim() ? { text: q.trim() } : {}), limit: 50 })
-        .then((p) => {
-          if (!annule) setListe(p.items);
-        })
-        .catch(() => {
-          if (!annule) setListe([]);
-        });
-    }, 250);
-    return () => {
-      annule = true;
-      clearTimeout(t);
-    };
-  }, [q]);
+  const [choisi, setChoisi] = useState<DocumentChoisi | null>(null);
+  const affiche: DocumentChoisi | null =
+    valeur === '' ? null : choisi?.id === valeur ? choisi : { id: valeur, title: 'Document lié' };
+  const chercher = useCallback(async (q: string): Promise<LibraryDocumentView[]> => {
+    try {
+      const p = await documentsApi.search({ ...(q ? { text: q } : {}), limit: 50 });
+      return p.items;
+    } catch {
+      return [];
+    }
+  }, []);
   return (
-    <div className="flex flex-col gap-1.5">
-      <input
-        type="search"
-        aria-label="Rechercher un document"
-        placeholder="Rechercher un document par son titre…"
-        className={CHAMP}
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-      />
-      <select id={id} className={CHAMP} value={valeur} onChange={(e) => onChange(e.target.value)}>
-        <option value="">Aucun document</option>
-        {valeur !== '' && !liste.some((d) => d.id === valeur) ? (
-          <option value={valeur}>Document lié</option>
-        ) : null}
-        {liste.map((d) => (
-          <option key={d.id} value={d.id}>
-            {d.title}
-          </option>
-        ))}
-      </select>
-    </div>
+    <EntityPicker<DocumentChoisi>
+      value={affiche}
+      onChange={(d) => {
+        setChoisi(d);
+        onChange(d?.id ?? '');
+      }}
+      search={chercher}
+      getKey={(d) => d.id}
+      getLabel={(d) => d.title}
+      placeholder="Aucun document : tapez un titre"
+      emptyText="Aucun document ne correspond."
+      debounceMs={250}
+    />
   );
 }
 
@@ -821,75 +801,72 @@ function DialogueCouverture({
       size="md"
     >
       <form noValidate onSubmit={(e) => void valider(e)} className="flex flex-col gap-3">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Champ id={`${id}-nature`} label="Nature">
-            <select
-              id={`${id}-nature`}
-              className={CHAMP}
+        <FormGrid>
+          <Field id={`${id}-nature`} label="Nature" size="md">
+            <Select<AssetCoverageKind>
               value={f.kind}
               disabled={couverture !== null}
-              onChange={(e) => setF({ ...f, kind: e.target.value as AssetCoverageKind })}
-            >
-              {Object.entries(LIBELLES_COUVERTURE).map(([k, l]) => (
-                <option key={k} value={k}>
-                  {l}
-                </option>
-              ))}
-            </select>
-          </Champ>
-          <Champ id={`${id}-presta`} label="Prestataire" requis erreur={champs['provider']}>
-            <input
-              id={`${id}-presta`}
-              className={CHAMP}
+              onChange={(v) => setF({ ...f, kind: v })}
+              options={Object.entries(LIBELLES_COUVERTURE).map(([k, l]) => ({
+                value: k as AssetCoverageKind,
+                label: l,
+              }))}
+            />
+          </Field>
+          <Field
+            id={`${id}-presta`}
+            label="Prestataire"
+            required
+            size="md"
+            error={champs['provider']}
+          >
+            <TextInput
               value={f.provider}
               maxLength={120}
               onChange={(e) => setF({ ...f, provider: e.target.value })}
-              {...aria(`${id}-presta`, champs['provider'])}
             />
-          </Champ>
-          <Champ id={`${id}-ref`} label="Référence">
-            <input
-              id={`${id}-ref`}
-              className={CHAMP}
+          </Field>
+          <Field id={`${id}-ref`} label="Référence" size="md" newRow>
+            <TextInput
               value={f.reference}
               maxLength={80}
               onChange={(e) => setF({ ...f, reference: e.target.value })}
             />
-          </Champ>
-          <Champ
+          </Field>
+          <Field
             id={`${id}-rappel`}
             label="Rappel (jours avant)"
-            aide="Vide : réglage de l’organisation."
-            erreur={champs['reminderDays']}
+            size="sm"
+            hint="Vide : réglage de l’organisation."
+            error={champs['reminderDays']}
           >
             <ChampNombre
-              id={`${id}-rappel`}
               entier
               value={f.reminderDays}
               onChange={(e) => setF({ ...f, reminderDays: e.target.value })}
-              {...aria(`${id}-rappel`, champs['reminderDays'], true)}
             />
-          </Champ>
-          <Champ id={`${id}-debut`} label="Début" requis erreur={champs['startOn']}>
-            <input
-              id={`${id}-debut`}
-              type="date"
-              className={CHAMP}
+          </Field>
+          <Field
+            id={`${id}-debut`}
+            label="Début"
+            required
+            size="sm"
+            newRow
+            error={champs['startOn']}
+          >
+            <DatePicker
               value={f.startOn}
-              onChange={(e) => setF({ ...f, startOn: e.target.value })}
-              {...aria(`${id}-debut`, champs['startOn'])}
+              shortcuts={['today']}
+              onChange={(v) => setF({ ...f, startOn: v })}
             />
-          </Champ>
-          <Champ id={`${id}-fin`} label="Fin" requis erreur={champs['endOn']}>
-            <input
-              id={`${id}-fin`}
-              type="date"
-              className={CHAMP}
+          </Field>
+          <Field id={`${id}-fin`} label="Fin" required size="sm" error={champs['endOn']}>
+            <DatePicker
               value={f.endOn}
-              onChange={(e) => setF({ ...f, endOn: e.target.value })}
-              {...aria(`${id}-fin`, champs['endOn'])}
+              shortcuts={['endOfYear']}
+              onChange={(v) => setF({ ...f, endOn: v })}
             />
-          </Champ>
+          </Field>
           {valeurs ? (
             <CoutDevise
               id={`${id}-cout`}
@@ -900,32 +877,29 @@ function DialogueCouverture({
               onDevise={(v) => setF({ ...f, currency: v })}
             />
           ) : null}
-        </div>
-        {lireDocs ? (
-          <Champ
-            id={`${id}-doc`}
-            label="Document de la bibliothèque"
-            aide="Police, certificat de garantie…"
-          >
-            <ChoixDocument
+          {lireDocs ? (
+            <Field
               id={`${id}-doc`}
-              valeur={f.documentId}
-              onChange={(v) => setF({ ...f, documentId: v })}
-            />
-          </Champ>
-        ) : null}
+              label="Document de la bibliothèque"
+              size="lg"
+              newRow
+              hint="Police, certificat de garantie…"
+            >
+              <ChoixDocument
+                valeur={f.documentId}
+                onChange={(v) => setF({ ...f, documentId: v })}
+              />
+            </Field>
+          ) : null}
+        </FormGrid>
         {erreur ? (
           <Alerte>
             <p>{erreur}</p>
           </Alerte>
         ) : null}
-        <button
-          type="submit"
-          className={buttonClasses('primary', 'md', 'self-start')}
-          disabled={envoi}
-        >
-          {envoi ? 'Enregistrement…' : 'Enregistrer'}
-        </button>
+        <SubmitButton busy={envoi} busyLabel="Enregistrement…" className="self-start max-sm:w-full">
+          Enregistrer
+        </SubmitButton>
       </form>
     </Modal>
   );

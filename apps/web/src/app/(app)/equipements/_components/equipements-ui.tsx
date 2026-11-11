@@ -5,11 +5,12 @@
 // champ de montant qui sélectionne son contenu au focus, et la liste des
 // catégories partagée par les écrans.
 
+import { TextInput, cn } from '@lalanda/ui';
 import { useEffect, useState } from 'react';
 
 import { assetsApi, type AssetCategoryView } from '@/lib/api-assets';
 
-import { Alerte, BOUTON_PETIT, CHAMP } from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { lire, messageEquipements, type Lecture } from './equipements-model';
 
@@ -62,7 +63,8 @@ export const CARTE =
 
 /**
  * Champ numérique : clavier décimal au téléphone, contenu sélectionné au focus
- * (une valeur préremplie se remplace sans l'effacer chiffre par chiffre).
+ * (une valeur préremplie se remplace sans l'effacer chiffre par chiffre). Relié
+ * à son `Field` (ADR-0074) : identifiant, aide et erreur viennent du contexte.
  */
 export function ChampNombre(
   props: Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type' | 'inputMode'> & {
@@ -71,12 +73,12 @@ export function ChampNombre(
 ): React.ReactElement {
   const { entier, className, onFocus, ...reste } = props;
   return (
-    <input
+    <TextInput
       {...reste}
       type="text"
       inputMode={entier ? 'numeric' : 'decimal'}
       autoComplete="off"
-      className={`${CHAMP} tabular-nums ${className ?? ''}`}
+      className={cn('tabular-nums', className)}
       onFocus={(e) => {
         e.currentTarget.select();
         onFocus?.(e);

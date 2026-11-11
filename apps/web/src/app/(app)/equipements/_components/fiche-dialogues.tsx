@@ -3,8 +3,23 @@
 // Fenêtres de la fiche équipement (ADR-0046 § 3.1, § 3.2) : affectation, retour,
 // cession ou mise au rebut avec confirmation, réintégration. Le refus de
 // chevauchement d'une affectation est affiché en clair dans la fenêtre.
+//
+// ADR-0074 : grille sémantique, dates en `DatePicker`, bénéficiaire en
+// `ChoixEntite` (sur `EntityPicker`, chargeurs par permission inchangés), devise
+// en segments, confirmation de cession en case stylée (jamais cochée d'office).
 
-import { Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Button,
+  Checkbox,
+  DatePicker,
+  Field,
+  FormGrid,
+  Modal,
+  SegmentedControl,
+  Select,
+  TextArea,
+  TextInput,
+} from '@lalanda/ui';
 import { TriangleAlert } from 'lucide-react';
 import { useId, useState } from 'react';
 
@@ -17,7 +32,7 @@ import {
 } from '@/lib/api-assets';
 
 import { useShell } from '../../_components/shell-context';
-import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from '../../ventes/_components/form-ui';
+import { Alerte } from '../../ventes/_components/form-ui';
 
 import {
   LIBELLES_CESSION,
@@ -52,18 +67,20 @@ function Pied({
   danger?: boolean;
 }): React.ReactElement {
   return (
-    <div className="flex flex-wrap justify-end gap-2">
-      <button type="button" className={BOUTON_PETIT} onClick={onAnnuler} disabled={envoi}>
+    <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+      <Button size="sm" onClick={onAnnuler} disabled={envoi} className="max-sm:h-11">
         Annuler
-      </button>
-      <button
+      </Button>
+      <Button
         type="submit"
         form={formId}
-        className={buttonClasses(danger ? 'danger' : 'primary', 'sm')}
-        disabled={envoi}
+        size="sm"
+        variant={danger ? 'danger' : 'primary'}
+        busy={envoi}
+        className="max-sm:h-11"
       >
         {envoi ? 'Envoi…' : bouton}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -132,61 +149,55 @@ export function DialogueAffectation({
         onSubmit={(e) => void valider(e)}
         className="flex flex-col gap-3"
       >
-        <Champ id={`${id}-type`} label="Affecter à">
-          <select
-            id={`${id}-type`}
-            className={CHAMP}
-            value={f.kind}
-            onChange={(e) => setF({ ...f, kind: e.target.value as AssetAssigneeKind, cible: '' })}
-          >
-            {types.map((t) => (
-              <option key={t} value={t}>
-                {LIBELLES_TYPE_BENEFICIAIRE[t]}
-              </option>
-            ))}
-          </select>
-        </Champ>
-        <Champ id={`${id}-cible`} label="Bénéficiaire" requis erreur={champs['cible']}>
-          <ChoixEntite
-            key={f.kind}
+        <FormGrid>
+          <Field id={`${id}-type`} label="Affecter à" size="md">
+            <Select<AssetAssigneeKind>
+              value={f.kind}
+              onChange={(v) => setF({ ...f, kind: v, cible: '' })}
+              options={types.map((t) => ({ value: t, label: LIBELLES_TYPE_BENEFICIAIRE[t] }))}
+            />
+          </Field>
+          <Field
             id={`${id}-cible`}
-            type={f.kind === 'project' ? 'work_project' : f.kind}
-            organizationId={organizationId}
-            valeur={f.cible}
-            onChange={(o) => setF({ ...f, cible: o?.id ?? '' })}
-            aria={aria(`${id}-cible`, champs['cible'])}
-          />
-        </Champ>
-        <Champ id={`${id}-du`} label="Remis le" requis erreur={champs['from']}>
-          <input
-            id={`${id}-du`}
-            type="date"
-            className={CHAMP}
-            value={f.from}
-            onChange={(e) => setF({ ...f, from: e.target.value })}
-            {...aria(`${id}-du`, champs['from'])}
-          />
-        </Champ>
-        <Champ id={`${id}-etat`} label="État à la remise">
-          <input
-            id={`${id}-etat`}
-            className={CHAMP}
-            value={f.conditionOut}
-            maxLength={500}
-            placeholder="Bon état, chargeur fourni"
-            onChange={(e) => setF({ ...f, conditionOut: e.target.value })}
-          />
-        </Champ>
-        <Champ id={`${id}-note`} label="Note">
-          <textarea
-            id={`${id}-note`}
-            rows={2}
-            className={CHAMP}
-            value={f.note}
-            maxLength={1000}
-            onChange={(e) => setF({ ...f, note: e.target.value })}
-          />
-        </Champ>
+            label="Bénéficiaire"
+            required
+            size="lg"
+            newRow
+            error={champs['cible']}
+          >
+            <ChoixEntite
+              key={f.kind}
+              id={`${id}-cible`}
+              type={f.kind === 'project' ? 'work_project' : f.kind}
+              organizationId={organizationId}
+              valeur={f.cible}
+              onChange={(o) => setF({ ...f, cible: o?.id ?? '' })}
+            />
+          </Field>
+          <Field id={`${id}-du`} label="Remis le" required size="sm" newRow error={champs['from']}>
+            <DatePicker
+              value={f.from}
+              shortcuts={['today']}
+              onChange={(v) => setF({ ...f, from: v })}
+            />
+          </Field>
+          <Field id={`${id}-etat`} label="État à la remise" size="full">
+            <TextInput
+              value={f.conditionOut}
+              maxLength={500}
+              placeholder="Bon état, chargeur fourni"
+              onChange={(e) => setF({ ...f, conditionOut: e.target.value })}
+            />
+          </Field>
+          <Field id={`${id}-note`} label="Note" size="full" optional>
+            <TextArea
+              rows={2}
+              value={f.note}
+              maxLength={1000}
+              onChange={(e) => setF({ ...f, note: e.target.value })}
+            />
+          </Field>
+        </FormGrid>
         {erreur ? (
           <Alerte>
             {erreur.chevauchement ? (
@@ -218,12 +229,19 @@ export function DialogueRetour({
   const [on, setOn] = useState(jourKinshasa(new Date()));
   const [etat, setEtat] = useState('');
   const [note, setNote] = useState('');
+  const [champDate, setChampDate] = useState<string | undefined>();
   const [erreur, setErreur] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
 
   async function valider(e: React.FormEvent): Promise<void> {
     e.preventDefault();
     setErreur(null);
+    // Le champ date natif portait le seul contrôle : une date vide ne part pas.
+    if (on === '') {
+      setChampDate('La date de retour est obligatoire.');
+      return;
+    }
+    setChampDate(undefined);
     setEnvoi(true);
     try {
       onFait(
@@ -259,34 +277,22 @@ export function DialogueRetour({
         onSubmit={(e) => void valider(e)}
         className="flex flex-col gap-3"
       >
-        <Champ id={`${id}-le`} label="Rendu le" requis>
-          <input
-            id={`${id}-le`}
-            type="date"
-            className={CHAMP}
-            value={on}
-            onChange={(e) => setOn(e.target.value)}
-          />
-        </Champ>
-        <Champ id={`${id}-etat`} label="État au retour">
-          <input
-            id={`${id}-etat`}
-            className={CHAMP}
-            value={etat}
-            maxLength={500}
-            onChange={(e) => setEtat(e.target.value)}
-          />
-        </Champ>
-        <Champ id={`${id}-note`} label="Note">
-          <textarea
-            id={`${id}-note`}
-            rows={2}
-            className={CHAMP}
-            value={note}
-            maxLength={1000}
-            onChange={(e) => setNote(e.target.value)}
-          />
-        </Champ>
+        <FormGrid>
+          <Field id={`${id}-le`} label="Rendu le" required size="sm" error={champDate}>
+            <DatePicker value={on} shortcuts={['today']} onChange={setOn} />
+          </Field>
+          <Field id={`${id}-etat`} label="État au retour" size="full">
+            <TextInput value={etat} maxLength={500} onChange={(e) => setEtat(e.target.value)} />
+          </Field>
+          <Field id={`${id}-note`} label="Note" size="full" optional>
+            <TextArea
+              rows={2}
+              value={note}
+              maxLength={1000}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </Field>
+        </FormGrid>
         {erreur ? (
           <Alerte>
             <p>{erreur}</p>
@@ -366,92 +372,85 @@ export function DialogueCession({
         onSubmit={(e) => void valider(e)}
         className="flex flex-col gap-3"
       >
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Champ id={`${id}-nature`} label="Nature">
-            <select
-              id={`${id}-nature`}
-              className={CHAMP}
+        <FormGrid>
+          <Field id={`${id}-nature`} label="Nature" size="md">
+            <Select<AssetDisposalKind>
               value={f.kind}
-              onChange={(e) => setF({ ...f, kind: e.target.value as AssetDisposalKind })}
-            >
-              {Object.entries(LIBELLES_CESSION).map(([k, l]) => (
-                <option key={k} value={k}>
-                  {l}
-                </option>
-              ))}
-            </select>
-          </Champ>
-          <Champ id={`${id}-le`} label="Date" requis erreur={champs['on']}>
-            <input
-              id={`${id}-le`}
-              type="date"
-              className={CHAMP}
-              value={f.on}
-              onChange={(e) => setF({ ...f, on: e.target.value })}
-              {...aria(`${id}-le`, champs['on'])}
+              onChange={(v) => setF({ ...f, kind: v })}
+              options={Object.entries(LIBELLES_CESSION).map(([k, l]) => ({
+                value: k as AssetDisposalKind,
+                label: l,
+              }))}
             />
-          </Champ>
+          </Field>
+          <Field id={`${id}-le`} label="Date" required size="sm" error={champs['on']}>
+            <DatePicker
+              value={f.on}
+              shortcuts={['today']}
+              onChange={(v) => setF({ ...f, on: v })}
+            />
+          </Field>
           {f.kind === 'sold' ? (
             <>
               {valeurs ? (
-                <Champ id={`${id}-prix`} label="Prix de cession" erreur={champs['proceeds']}>
-                  <div className="flex gap-2">
+                <>
+                  <Field
+                    id={`${id}-prix`}
+                    label="Prix de cession"
+                    size="sm"
+                    newRow
+                    error={champs['proceeds']}
+                  >
                     <ChampNombre
-                      id={`${id}-prix`}
                       value={f.proceeds}
                       onChange={(e) => setF({ ...f, proceeds: e.target.value })}
-                      {...aria(`${id}-prix`, champs['proceeds'])}
                     />
-                    <select
-                      aria-label="Devise"
-                      className={`${CHAMP} w-24`}
+                  </Field>
+                  <Field id={`${id}-devise`} label="Devise" size="sm" group>
+                    <SegmentedControl<'USD' | 'CDF'>
                       value={f.currency}
-                      onChange={(e) => setF({ ...f, currency: e.target.value as 'USD' | 'CDF' })}
-                    >
-                      <option value="USD">USD</option>
-                      <option value="CDF">CDF</option>
-                    </select>
-                  </div>
-                </Champ>
+                      onChange={(v) => setF({ ...f, currency: v })}
+                      options={[
+                        { value: 'USD', label: 'USD' },
+                        { value: 'CDF', label: 'CDF' },
+                      ]}
+                    />
+                  </Field>
+                </>
               ) : null}
-              <Champ id={`${id}-acheteur`} label="Acheteur">
-                <input
-                  id={`${id}-acheteur`}
-                  className={CHAMP}
+              <Field id={`${id}-acheteur`} label="Acheteur" size="md" newRow={!valeurs}>
+                <TextInput
                   value={f.buyer}
                   maxLength={120}
                   onChange={(e) => setF({ ...f, buyer: e.target.value })}
                 />
-              </Champ>
+              </Field>
             </>
           ) : null}
-        </div>
-        <Champ id={`${id}-motif`} label="Motif" requis erreur={champs['reason']}>
-          <textarea
-            id={`${id}-motif`}
-            rows={2}
-            className={CHAMP}
-            value={f.reason}
-            maxLength={500}
-            onChange={(e) => setF({ ...f, reason: e.target.value })}
-            {...aria(`${id}-motif`, champs['reason'])}
-          />
-        </Champ>
-        <label className="flex items-start gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="mt-0.5"
+          <Field id={`${id}-motif`} label="Motif" required size="full" error={champs['reason']}>
+            <TextArea
+              rows={2}
+              value={f.reason}
+              maxLength={500}
+              onChange={(e) => setF({ ...f, reason: e.target.value })}
+            />
+          </Field>
+        </FormGrid>
+        <div className="flex flex-col gap-1">
+          <Checkbox
             checked={confirme}
-            onChange={(e) => setConfirme(e.target.checked)}
+            onChange={setConfirme}
+            aria-invalid={champs['confirme'] ? true : undefined}
+            aria-describedby={champs['confirme'] ? `${id}-confirme-erreur` : undefined}
+            label={`Je confirme : ${a.name} (${a.number}) sort du parc.`}
+            description="Il pourra être réintégré, avec un motif, par un gestionnaire des équipements."
           />
-          <span>
-            Je confirme : {a.name} ({a.number}) sort du parc. Il pourra être réintégré, avec un
-            motif, par un gestionnaire des équipements.
-            {champs['confirme'] ? (
-              <span className="block text-xs text-[var(--danger)]">{champs['confirme']}</span>
-            ) : null}
-          </span>
-        </label>
+          {champs['confirme'] ? (
+            <p id={`${id}-confirme-erreur`} className="text-xs font-medium text-[var(--danger)]">
+              {champs['confirme']}
+            </p>
+          ) : null}
+        </div>
         {erreur ? (
           <Alerte>
             <p>{erreur}</p>
@@ -515,17 +514,15 @@ export function DialogueReintegration({
         onSubmit={(e) => void valider(e)}
         className="flex flex-col gap-3"
       >
-        <Champ id={`${id}-motif`} label="Motif" requis erreur={champ}>
-          <textarea
-            id={`${id}-motif`}
+        <Field id={`${id}-motif`} label="Motif" required size="full" error={champ}>
+          <TextArea
             rows={3}
-            className={CHAMP}
             value={motif}
             maxLength={500}
+            autoFocus
             onChange={(e) => setMotif(e.target.value)}
-            {...aria(`${id}-motif`, champ)}
           />
-        </Champ>
+        </Field>
         {erreur ? (
           <Alerte>
             <p>{erreur}</p>

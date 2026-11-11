@@ -5,8 +5,8 @@
 // en fenêtre modale (`assets.manage`, `?nouveau=1`), export du registre si
 // `report.export`. Les coûts n'apparaissent qu'aux rôles qui les voient.
 
-import { Badge, Modal, buttonClasses } from '@lalanda/ui';
-import { Download, Laptop, Plus } from 'lucide-react';
+import { Badge, Modal, Select, TextInput, buttonClasses } from '@lalanda/ui';
+import { Download, Laptop, Plus, Search } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -14,7 +14,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { assetsApi, type AssetView } from '@/lib/api-assets';
 
 import { useShell } from '../../_components/shell-context';
-import { Alerte, BOUTON_PETIT, CHAMP } from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { EquipementFormulaire } from './equipement-formulaire';
 import {
@@ -137,27 +137,29 @@ export function Registre(): React.ReactElement {
         }
       >
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-          <input
+          <TextInput
             type="search"
             aria-label="Rechercher un équipement"
             placeholder="Nom, numéro, marque, série…"
-            className={`${CHAMP} lg:max-w-xs`}
+            className="lg:max-w-xs"
             value={texte}
             onChange={(e) => setTexte(e.target.value)}
+            leading={<Search aria-hidden="true" className="h-4 w-4" />}
           />
-          <select
+          <Select
             aria-label="Catégorie"
-            className={`${CHAMP} lg:max-w-[14rem]`}
+            className="lg:max-w-[14rem]"
             value={filtres.categoryId}
-            onChange={(e) => setFiltres({ ...filtres, categoryId: e.target.value })}
-          >
-            <option value="">Toutes les catégories</option>
-            {(categories?.ok ? categories.valeur : []).map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setFiltres({ ...filtres, categoryId: v })}
+            loading={categories === null}
+            options={[
+              { value: '', label: 'Toutes les catégories' },
+              ...(categories?.ok ? categories.valeur : []).map((c) => ({
+                value: c.id,
+                label: c.name,
+              })),
+            ]}
+          />
           <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrer par statut">
             {FILTRES_STATUT.map((f) => (
               <button

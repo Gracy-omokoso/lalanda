@@ -4,14 +4,23 @@
 // à l'activation, modifiables, SANS durée ; délais de rappel ; affichage de
 // l'estimation de gestion. Lecture `assets.read`, écriture `assets.manage`.
 
-import { Badge, Modal, buttonClasses } from '@lalanda/ui';
+import {
+  Badge,
+  Field,
+  FormGrid,
+  Modal,
+  SubmitButton,
+  Switch,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import { Settings, Tags } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 
 import { assetsApi, type AssetCategoryView, type AssetSettingsView } from '@/lib/api-assets';
 
 import { useShell } from '../../_components/shell-context';
-import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from '../../ventes/_components/form-ui';
+import { Alerte, BOUTON_PETIT } from '../../ventes/_components/form-ui';
 
 import { formulaireReglages, preparerReglages, type FormulaireReglages } from './echeances-model';
 import { lire, messageEquipements, peutGererEquipements, type Lecture } from './equipements-model';
@@ -178,28 +187,22 @@ function DialogueCategorie({
       size="sm"
     >
       <form noValidate onSubmit={(e) => void valider(e)} className="flex flex-col gap-3">
-        <Champ id={`${id}-nom`} label="Nom" requis erreur={champ}>
-          <input
-            id={`${id}-nom`}
-            className={CHAMP}
+        <Field id={`${id}-nom`} label="Nom" required size="full" error={champ}>
+          <TextInput
             value={nom}
             maxLength={80}
+            autoFocus
             onChange={(e) => setNom(e.target.value)}
-            {...aria(`${id}-nom`, champ)}
           />
-        </Champ>
+        </Field>
         {erreur ? (
           <Alerte>
             <p>{erreur}</p>
           </Alerte>
         ) : null}
-        <button
-          type="submit"
-          className={buttonClasses('primary', 'md', 'self-start')}
-          disabled={envoi}
-        >
-          {envoi ? 'Enregistrement…' : 'Enregistrer'}
-        </button>
+        <SubmitButton busy={envoi} busyLabel="Enregistrement…" className="self-start max-sm:w-full">
+          Enregistrer
+        </SubmitButton>
       </form>
     </Modal>
   );
@@ -253,47 +256,43 @@ function PanneauReglages({ gerer }: { gerer: boolean }): React.ReactElement {
         <EchecLecture erreur={lecture.erreur} repli="Les réglages sont illisibles." />
       ) : f === null ? null : (
         <form noValidate onSubmit={(e) => void enregistrer(e)} className="flex flex-col gap-3">
-          <fieldset disabled={!gerer} className="flex flex-col gap-3">
-            <Champ
-              id={`${id}-rappel`}
-              label="Rappel avant l’expiration d’une garantie ou assurance (jours)"
-              erreur={champs['reminderDays']}
-            >
-              <ChampNombre
+          <fieldset disabled={!gerer} className="flex flex-col gap-4">
+            <FormGrid>
+              <Field
                 id={`${id}-rappel`}
-                entier
-                value={f.reminderDays}
-                onChange={(e) => setF({ ...f, reminderDays: e.target.value })}
-                {...aria(`${id}-rappel`, champs['reminderDays'])}
-              />
-            </Champ>
-            <Champ
-              id={`${id}-maint`}
-              label="Maintenance « à venir » à partir de (jours)"
-              erreur={champs['maintenanceDueSoonDays']}
-            >
-              <ChampNombre
+                label="Rappel avant l’expiration d’une garantie ou assurance (jours)"
+                size="lg"
+                error={champs['reminderDays']}
+              >
+                <ChampNombre
+                  entier
+                  className="max-w-[8rem]"
+                  value={f.reminderDays}
+                  onChange={(e) => setF({ ...f, reminderDays: e.target.value })}
+                />
+              </Field>
+              <Field
                 id={`${id}-maint`}
-                entier
-                value={f.maintenanceDueSoonDays}
-                onChange={(e) => setF({ ...f, maintenanceDueSoonDays: e.target.value })}
-                {...aria(`${id}-maint`, champs['maintenanceDueSoonDays'])}
-              />
-            </Champ>
-            <label className="flex items-start gap-2 text-sm">
-              <input
-                type="checkbox"
-                className="mt-0.5"
-                checked={f.showDepreciationEstimate}
-                onChange={(e) => setF({ ...f, showDepreciationEstimate: e.target.checked })}
-              />
-              <span>
-                Afficher l’amortissement indicatif
-                <span className="block text-xs text-[var(--foreground-muted)]">
-                  {ETIQUETTE_ESTIMATION}.
-                </span>
-              </span>
-            </label>
+                label="Maintenance « à venir » à partir de (jours)"
+                size="lg"
+                newRow
+                error={champs['maintenanceDueSoonDays']}
+              >
+                <ChampNombre
+                  entier
+                  className="max-w-[8rem]"
+                  value={f.maintenanceDueSoonDays}
+                  onChange={(e) => setF({ ...f, maintenanceDueSoonDays: e.target.value })}
+                />
+              </Field>
+            </FormGrid>
+            <Switch
+              checked={f.showDepreciationEstimate}
+              onChange={(v) => setF({ ...f, showDepreciationEstimate: v })}
+              disabled={!gerer}
+              label="Afficher l’amortissement indicatif"
+              description={`${ETIQUETTE_ESTIMATION}.`}
+            />
           </fieldset>
           {message ? (
             message.ok ? (
@@ -307,13 +306,14 @@ function PanneauReglages({ gerer }: { gerer: boolean }): React.ReactElement {
             )
           ) : null}
           {gerer ? (
-            <button
-              type="submit"
-              className={buttonClasses('primary', 'sm', 'self-start')}
-              disabled={envoi}
+            <SubmitButton
+              size="sm"
+              busy={envoi}
+              busyLabel="Enregistrement…"
+              className="self-start max-sm:h-11 max-sm:w-full"
             >
-              {envoi ? 'Enregistrement…' : 'Enregistrer'}
-            </button>
+              Enregistrer
+            </SubmitButton>
           ) : null}
         </form>
       )}
