@@ -30,6 +30,7 @@
 // et le test avant enregistrement ne protégerait plus de rien.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { TextInput } from '@lalanda/ui';
 import { useCallback, useEffect, useState } from 'react';
 
 import { api, type IntegrationView, type UpdateIntegrationBody } from '@/lib/api';
@@ -259,7 +260,7 @@ function CarteIntegration({
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <input
+                <TextInput
                   id={`${view.provider}-${nom}`}
                   type="password"
                   autoComplete="off"
@@ -270,7 +271,8 @@ function CarteIntegration({
                       ? 'Laisser vide pour conserver la valeur actuelle'
                       : 'Aucune valeur enregistrée'
                   }
-                  className="w-full max-w-md rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 font-mono text-sm"
+                  spellCheck={false}
+                  className="max-w-md font-mono"
                 />
                 {secret.configured && secret.source === 'db' ? (
                   <button
@@ -310,11 +312,12 @@ function CarteIntegration({
                       <span className="ml-1 text-xs text-[var(--foreground-muted)]">(requis)</span>
                     ) : null}
                   </span>
-                  <input
+                  <TextInput
                     type="text"
                     value={config[cle] ?? (actuelle === undefined ? '' : String(actuelle))}
                     onChange={(e) => setConfig((c) => ({ ...c, [cle]: e.target.value }))}
-                    className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 font-mono text-sm"
+                    spellCheck={false}
+                    className="font-mono"
                   />
                   {aide ? (
                     <span className="text-xs text-[var(--foreground-muted)]">{aide}</span>

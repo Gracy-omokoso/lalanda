@@ -22,6 +22,7 @@
 // Réservé au super-administrateur (`platform.audit.export`), avec un motif : l'export
 // est lui-même inscrit au journal, et limité à dix par heure.
 
+import { DatePicker, Field, FormGrid, Select, TextInput } from '@lalanda/ui';
 import { useCallback, useEffect, useState } from 'react';
 
 import { api, type PlatformAuditEventView } from '@/lib/api';
@@ -48,9 +49,6 @@ import {
 } from './journal-model';
 import { SecurityEventsPanel } from './security-events-panel';
 
-const ETIQUETTE =
-  'font-mono text-[0.66rem] uppercase tracking-[0.1em] text-[var(--foreground-muted)]';
-const CHAMP = 'rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm';
 const BOUTON =
   'rounded-md border border-[var(--border)] px-3 py-2 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-40';
 
@@ -106,60 +104,55 @@ export function PlatformAuditPanel(): React.ReactElement {
     setFiltres(saisie);
   };
 
-  const champ = (cle: keyof FiltresJournal) => ({
+  const maj = (cle: keyof FiltresJournal) => (valeur: string) =>
+    setSaisie({ ...saisie, [cle]: valeur });
+  const texte = (cle: keyof FiltresJournal) => ({
     value: saisie[cle],
-    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-      setSaisie({ ...saisie, [cle]: e.target.value }),
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => maj(cle)(e.target.value),
   });
 
   return (
     <div className="flex flex-col gap-8">
       <form onSubmit={appliquer} className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-end gap-3">
-          <label className="flex flex-col gap-1 text-sm">
-            <span className={ETIQUETTE}>Action</span>
-            <select {...champ('action')} className={`${CHAMP} w-72`}>
-              <option value="">Toutes les actions</option>
-              {[
-                ...ACTIONS_FILTRABLES,
-                'platform.organization.viewed',
-                'platform.user.viewed',
-                'platform.audit.exported',
-              ].map((a) => (
-                <option key={a} value={a}>
-                  {libelleActionJournal(a)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className={ETIQUETTE}>Acteur (identifiant)</span>
-            <input {...champ('actorUserId')} className={`${CHAMP} w-60 font-mono`} />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className={ETIQUETTE}>Type de cible</span>
-            <select {...champ('targetType')} className={`${CHAMP} w-44`}>
-              <option value="">Tous</option>
-              {TYPES_CIBLE.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className={ETIQUETTE}>Cible (identifiant)</span>
-            <input {...champ('targetId')} className={`${CHAMP} w-60 font-mono`} />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className={ETIQUETTE}>Du</span>
-            <input type="date" {...champ('from')} className={CHAMP} />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className={ETIQUETTE}>Au</span>
-            <input type="date" {...champ('to')} className={CHAMP} />
-          </label>
-        </div>
+        <FormGrid>
+          <Field label="Action" size="lg">
+            <Select
+              value={saisie.action}
+              onChange={maj('action')}
+              options={[
+                { value: '', label: 'Toutes les actions' },
+                ...[
+                  ...ACTIONS_FILTRABLES,
+                  'platform.organization.viewed',
+                  'platform.user.viewed',
+                  'platform.audit.exported',
+                ].map((a) => ({ value: a, label: libelleActionJournal(a), keywords: a })),
+              ]}
+            />
+          </Field>
+          <Field label="Type de cible" size="sm">
+            <Select
+              value={saisie.targetType}
+              onChange={maj('targetType')}
+              options={[
+                { value: '', label: 'Tous' },
+                ...TYPES_CIBLE.map((t) => ({ value: t, label: t })),
+              ]}
+            />
+          </Field>
+          <Field label="Acteur (identifiant)" size="md" newRow>
+            <TextInput {...texte('actorUserId')} spellCheck={false} className="font-mono" />
+          </Field>
+          <Field label="Cible (identifiant)" size="md">
+            <TextInput {...texte('targetId')} spellCheck={false} className="font-mono" />
+          </Field>
+          <Field label="Du" size="sm" newRow>
+            <DatePicker value={saisie.from} onChange={maj('from')} />
+          </Field>
+          <Field label="Au" size="sm">
+            <DatePicker value={saisie.to} onChange={maj('to')} />
+          </Field>
+        </FormGrid>
         <div className="flex flex-wrap items-center gap-3">
           <button type="submit" className={BOUTON}>
             Appliquer les filtres
@@ -274,21 +267,14 @@ function ExportJournal({ filtres }: { filtres: FiltresJournal }): React.ReactEle
 
   return (
     <div className="flex flex-wrap items-end gap-3 rounded-xl border border-dashed border-[var(--border)] p-4">
-      <label className="flex flex-col gap-1 text-sm">
-        <span className={ETIQUETTE}>Motif de l’export</span>
-        <select
+      <Field label="Motif de l’export" required className="w-full max-w-60">
+        <Select
           value={motif}
-          onChange={(e) => setMotif(e.target.value)}
-          className={`${CHAMP} w-52`}
-        >
-          <option value="">Choisir…</option>
-          {MOTIFS_EXPORT.map((m) => (
-            <option key={m.valeur} value={m.valeur}>
-              {m.libelle}
-            </option>
-          ))}
-        </select>
-      </label>
+          onChange={setMotif}
+          options={MOTIFS_EXPORT.map((m) => ({ value: m.valeur, label: m.libelle }))}
+          placeholder="Choisir…"
+        />
+      </Field>
       <button
         type="button"
         className={BOUTON}

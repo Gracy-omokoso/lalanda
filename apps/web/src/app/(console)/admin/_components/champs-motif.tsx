@@ -3,13 +3,16 @@
 // Champs du motif d'un geste de la console (ADR-0053 — P2) : catégorie, message destiné
 // au client (il paraît dans SON journal, sous « Équipe Lalanda »), note interne (jamais
 // montrée au client).
+//
+// ADR-0074 : catégorie en `Select`, textes en `TextArea`, chacun relié à son libellé par
+// `Field`. Mêmes limites (500 et 1 000 caractères), même contrôle `motifComplet` côté
+// appelant : le bouton reste désactivé tant que le motif n'est pas complet.
+
+import { Field, FormGrid, Select, TextArea } from '@lalanda/ui';
 
 import { CATEGORIES_MOTIF, NOTE_INTERNE_MIN, type MotifSaisi } from './motif-model';
 
-const CHAMP =
-  'w-full max-w-xl rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm';
-const ETIQUETTE =
-  'font-mono text-[0.66rem] uppercase tracking-[0.1em] text-[var(--foreground-muted)]';
+const OPTIONS_CATEGORIE = CATEGORIES_MOTIF.map((c) => ({ value: c.valeur, label: c.libelle }));
 
 export function ChampsMotif({
   motif,
@@ -25,48 +28,41 @@ export function ChampsMotif({
   libelleMessageClient?: string;
 }): React.ReactElement {
   return (
-    <div className="flex flex-col gap-2">
+    <FormGrid className="max-w-xl">
       {avecCategorie ? (
-        <label className="flex flex-col gap-1 text-sm">
-          <span className={ETIQUETTE}>Catégorie de motif</span>
-          <select
+        <Field label="Catégorie de motif" required size="md">
+          <Select<MotifSaisi['reasonCategory']>
             value={motif.reasonCategory}
-            onChange={(e) =>
-              onChange({ ...motif, reasonCategory: e.target.value as MotifSaisi['reasonCategory'] })
-            }
-            className="w-56 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
-          >
-            <option value="">Choisir…</option>
-            {CATEGORIES_MOTIF.map((c) => (
-              <option key={c.valeur} value={c.valeur}>
-                {c.libelle}
-              </option>
-            ))}
-          </select>
-        </label>
+            onChange={(v) => onChange({ ...motif, reasonCategory: v })}
+            options={OPTIONS_CATEGORIE}
+            placeholder="Choisir…"
+          />
+        </Field>
       ) : null}
       {avecMessageClient ? (
-        <label className="flex flex-col gap-1 text-sm">
-          <span className={ETIQUETTE}>{libelleMessageClient}</span>
-          <textarea
+        <Field label={libelleMessageClient} required size="full" newRow>
+          <TextArea
             value={motif.clientMessage}
             onChange={(e) => onChange({ ...motif, clientMessage: e.target.value })}
             rows={2}
             maxLength={500}
-            className={CHAMP}
           />
-        </label>
+        </Field>
       ) : null}
-      <label className="flex flex-col gap-1 text-sm">
-        <span className={ETIQUETTE}>Note interne ({NOTE_INTERNE_MIN} caractères minimum)</span>
-        <textarea
+      <Field
+        label="Note interne"
+        required
+        size="full"
+        newRow
+        hint={`${NOTE_INTERNE_MIN} caractères minimum, jamais montrée au client.`}
+      >
+        <TextArea
           value={motif.internalNote}
           onChange={(e) => onChange({ ...motif, internalNote: e.target.value })}
           rows={2}
           maxLength={1000}
-          className={CHAMP}
         />
-      </label>
-    </div>
+      </Field>
+    </FormGrid>
   );
 }

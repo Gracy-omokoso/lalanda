@@ -9,6 +9,7 @@
 // remboursement : motif, puis approbation par une seconde personne). Les factures sont
 // émises sans normalisation DGI tant que l'homologation n'est pas obtenue.
 
+import { Field, FormGrid, SubmitButton, TextInput } from '@lalanda/ui';
 import { useCallback, useEffect, useState } from 'react';
 
 import {
@@ -29,9 +30,6 @@ import {
   motifValide,
 } from './factures-abonnements-model';
 
-const ETIQUETTE =
-  'font-mono text-[0.66rem] uppercase tracking-[0.1em] text-[var(--foreground-muted)]';
-const CHAMP = 'rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm';
 const BOUTON =
   'rounded-md border border-[var(--border)] px-3 py-2 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-40';
 
@@ -209,31 +207,28 @@ function Vendeur({
       )}
       {peutDesigner ? (
         <form onSubmit={(e) => void designer(e)} className="flex flex-col gap-2">
-          <label className="flex flex-col gap-1 text-sm">
-            <span className={ETIQUETTE}>Identifiant de l’organisation existante</span>
-            <input
-              value={organisation}
-              onChange={(e) => setOrganisation(e.target.value)}
-              className={`${CHAMP} max-w-md font-mono`}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className={ETIQUETTE}>Motif (10 caractères minimum)</span>
-            <input
-              value={motif}
-              onChange={(e) => setMotif(e.target.value)}
-              maxLength={500}
-              className={`${CHAMP} max-w-xl`}
-            />
-          </label>
+          <FormGrid className="max-w-2xl">
+            <Field label="Identifiant de l’organisation existante" required size="lg">
+              <TextInput
+                value={organisation}
+                onChange={(e) => setOrganisation(e.target.value)}
+                spellCheck={false}
+                autoComplete="off"
+                className="font-mono"
+              />
+            </Field>
+            <Field label="Motif" required size="full" newRow hint="10 caractères minimum.">
+              <TextInput value={motif} onChange={(e) => setMotif(e.target.value)} maxLength={500} />
+            </Field>
+          </FormGrid>
           <div>
-            <button
-              type="submit"
-              disabled={envoi || organisation.trim() === '' || !motifValide(motif)}
-              className={BOUTON}
+            <SubmitButton
+              size="sm"
+              busy={envoi}
+              disabled={organisation.trim() === '' || !motifValide(motif)}
             >
               Désigner
-            </button>
+            </SubmitButton>
           </div>
         </form>
       ) : null}
@@ -300,15 +295,9 @@ function PaiementSansFacture({
       ) : null}
       {peutEmettre ? (
         <div className="flex flex-wrap items-end gap-2">
-          <label className="flex flex-col gap-1">
-            <span className={ETIQUETTE}>Motif (10 caractères minimum)</span>
-            <input
-              value={motif}
-              onChange={(e) => setMotif(e.target.value)}
-              maxLength={500}
-              className={`${CHAMP} w-80`}
-            />
-          </label>
+          <Field label="Motif" required hint="10 caractères minimum." className="w-full max-w-md">
+            <TextInput value={motif} onChange={(e) => setMotif(e.target.value)} maxLength={500} />
+          </Field>
           <button
             type="button"
             disabled={envoi || !motifValide(motif)}
@@ -402,15 +391,14 @@ function LigneFacture({
       {cn ? <p className="text-[var(--foreground-muted)]">Motif de l’avoir : {cn.reason}</p> : null}
       {peutEmettre && gestes.demanderAvoir ? (
         <div className="flex flex-wrap items-end gap-2">
-          <label className="flex flex-col gap-1">
-            <span className={ETIQUETTE}>Motif du remboursement (10 caractères minimum)</span>
-            <input
-              value={motif}
-              onChange={(e) => setMotif(e.target.value)}
-              maxLength={500}
-              className={`${CHAMP} w-80`}
-            />
-          </label>
+          <Field
+            label="Motif du remboursement"
+            required
+            hint="10 caractères minimum."
+            className="w-full max-w-md"
+          >
+            <TextInput value={motif} onChange={(e) => setMotif(e.target.value)} maxLength={500} />
+          </Field>
           <button
             type="button"
             disabled={envoi || !motifValide(motif)}

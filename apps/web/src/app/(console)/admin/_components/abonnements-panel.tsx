@@ -12,6 +12,15 @@
 // produit une facture émise par l'organisation vendeuse : volet « Factures des
 // abonnements » (`factures-abonnements-panel.tsx`).
 
+import {
+  DatePicker,
+  Field,
+  FormGrid,
+  Select,
+  SubmitButton,
+  TextArea,
+  TextInput,
+} from '@lalanda/ui';
 import { useCallback, useEffect, useState } from 'react';
 
 import {
@@ -54,7 +63,6 @@ const REAUTH_ABONNEMENTS =
 
 const ETIQUETTE =
   'font-mono text-[0.66rem] uppercase tracking-[0.1em] text-[var(--foreground-muted)]';
-const CHAMP = 'rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm';
 const BOUTON =
   'rounded-md border border-[var(--border)] px-3 py-2 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-40';
 
@@ -138,21 +146,18 @@ function FilePaiements({
       <Titre aide="Demandes de dépôt mobile money ou de virement ouvertes par les clients. Confirmez un dépôt après l’avoir constaté sur le relevé ; refusez-le s’il n’est jamais arrivé. Aucun encaissement n’est fait ici.">
         File des paiements manuels
       </Titre>
-      <label className="flex flex-col gap-1 text-sm">
-        <span className={ETIQUETTE}>État</span>
-        <select
-          value={statut}
-          onChange={(e) => setStatut(e.target.value as AdminManualPaymentStatus | '')}
-          className={`${CHAMP} w-56`}
-        >
-          <option value="">Tous</option>
-          {STATUTS_PAIEMENT.map((s) => (
-            <option key={s.valeur} value={s.valeur}>
-              {s.libelle}
-            </option>
-          ))}
-        </select>
-      </label>
+      <FormGrid className="max-w-xl">
+        <Field label="État" size="md">
+          <Select<AdminManualPaymentStatus | ''>
+            value={statut}
+            onChange={setStatut}
+            options={[
+              { value: '', label: 'Tous' },
+              ...STATUTS_PAIEMENT.map((s) => ({ value: s.valeur, label: s.libelle })),
+            ]}
+          />
+        </Field>
+      </FormGrid>
       {erreur ? <Bandeau ton="echec">{erreur}</Bandeau> : null}
       {lignes === null ? (
         <p className="text-sm text-[var(--foreground-muted)]">Chargement…</p>
@@ -262,28 +267,29 @@ function DecisionPaiement({
 
   return (
     <div className="flex flex-col gap-2">
-      <label className="flex flex-col gap-1 text-sm">
-        <span className={ETIQUETTE}>
-          Note interne — référence de l’opération reçue, ou motif du refus (10 caractères minimum)
-        </span>
-        <textarea
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          rows={2}
-          maxLength={1000}
-          className={`${CHAMP} max-w-xl`}
-        />
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        <span className={ETIQUETTE}>Message destiné au client (facultatif)</span>
-        <textarea
-          value={messageClient}
-          onChange={(e) => setMessageClient(e.target.value)}
-          rows={2}
-          maxLength={500}
-          className={`${CHAMP} max-w-xl`}
-        />
-      </label>
+      <FormGrid className="max-w-xl">
+        <Field
+          label="Note interne"
+          required
+          size="full"
+          hint="Référence de l’opération reçue, ou motif du refus (10 caractères minimum)."
+        >
+          <TextArea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={2}
+            maxLength={1000}
+          />
+        </Field>
+        <Field label="Message destiné au client" optional size="full" newRow>
+          <TextArea
+            value={messageClient}
+            onChange={(e) => setMessageClient(e.target.value)}
+            rows={2}
+            maxLength={500}
+          />
+        </Field>
+      </FormGrid>
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
@@ -438,36 +444,36 @@ function NouvelOctroi({
       onSubmit={(e) => void soumettre(e)}
     >
       <h3 className={ETIQUETTE}>Préparer un octroi</h3>
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1 text-sm">
-          <span className={ETIQUETTE}>Identifiant de l’organisation</span>
-          <input
+      <FormGrid>
+        <Field
+          label="Identifiant de l’organisation"
+          required
+          size="lg"
+          hint="24 caractères, depuis le module Organisations."
+        >
+          <TextInput
             value={organisation}
             onChange={(e) => setOrganisation(e.target.value)}
-            placeholder="24 caractères, depuis le module Organisations"
-            className={`${CHAMP} w-80 font-mono`}
+            spellCheck={false}
+            autoComplete="off"
+            className="font-mono"
           />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className={ETIQUETTE}>Offre accordée</span>
-          <select value={plan} onChange={(e) => setPlan(e.target.value as Plan)} className={CHAMP}>
-            {offres.map((p) => (
-              <option key={p} value={p}>
-                {LIBELLES_PLAN[p]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className={ETIQUETTE}>Échéance (facultative)</span>
-          <input
-            type="date"
+        </Field>
+        <Field label="Offre accordée" size="sm">
+          <Select<Plan>
+            value={plan}
+            onChange={setPlan}
+            options={offres.map((p) => ({ value: p, label: LIBELLES_PLAN[p] }))}
+          />
+        </Field>
+        <Field label="Échéance" optional size="sm">
+          <DatePicker
             value={echeance}
-            onChange={(e) => setEcheance(e.target.value)}
-            className={CHAMP}
+            onChange={setEcheance}
+            shortcuts={['plus30', 'endOfMonth', 'endOfYear']}
           />
-        </label>
-      </div>
+        </Field>
+      </FormGrid>
       <ChampsMotif motif={motif} onChange={setMotif} avecCategorie avecMessageClient />
       <Bandeau ton={secondePersonne ? 'attention' : 'neutre'}>
         {secondePersonne
@@ -475,9 +481,9 @@ function NouvelOctroi({
           : 'Cet octroi prendra effet dès sa préparation.'}
       </Bandeau>
       <div>
-        <button type="submit" disabled={envoi || !pret} className={BOUTON}>
-          {envoi ? 'Enregistrement…' : 'Préparer l’octroi'}
-        </button>
+        <SubmitButton size="sm" busy={envoi} busyLabel="Enregistrement…" disabled={!pret}>
+          Préparer l’octroi
+        </SubmitButton>
       </div>
     </form>
   );
@@ -638,21 +644,18 @@ function TableauAbonnements(): React.ReactElement {
       <Titre aide="Offre souscrite, offre applicable (octroi compris), état et échéances. Métadonnées seulement : aucun contenu d’organisation.">
         Abonnements
       </Titre>
-      <label className="flex flex-col gap-1 text-sm">
-        <span className={ETIQUETTE}>État</span>
-        <select
-          value={statut}
-          onChange={(e) => setStatut(e.target.value as AdminSubscriptionStatus | '')}
-          className={`${CHAMP} w-56`}
-        >
-          <option value="">Tous</option>
-          {STATUTS_ABONNEMENT.map((s) => (
-            <option key={s.valeur} value={s.valeur}>
-              {s.libelle}
-            </option>
-          ))}
-        </select>
-      </label>
+      <FormGrid className="max-w-xl">
+        <Field label="État" size="md">
+          <Select<AdminSubscriptionStatus | ''>
+            value={statut}
+            onChange={setStatut}
+            options={[
+              { value: '', label: 'Tous' },
+              ...STATUTS_ABONNEMENT.map((s) => ({ value: s.valeur, label: s.libelle })),
+            ]}
+          />
+        </Field>
+      </FormGrid>
       {erreur ? <Bandeau ton="echec">{erreur}</Bandeau> : null}
       {lignes === null ? (
         <p className="text-sm text-[var(--foreground-muted)]">Chargement…</p>

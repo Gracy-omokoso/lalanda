@@ -9,6 +9,7 @@
 // inscrit au journal plateforme et paraît au journal du client sous « Équipe Lalanda »
 // avec une raison générique — jamais le nom de l'opérateur ni la note interne.
 
+import { DatePicker, Field, FormGrid, Select, TextInput } from '@lalanda/ui';
 import { useCallback, useEffect, useState } from 'react';
 
 import {
@@ -37,7 +38,6 @@ import { ReauthGate, useReauth } from './reauth-gate';
 const REAUTH_FONCTIONNALITES =
   'Accorder ou lever une dérogation exige une ré-authentification, valable dix minutes. Chaque geste est motivé, inscrit au journal plateforme et paraît au journal du client sous « Équipe Lalanda ».';
 
-const CHAMP = 'rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm';
 const ETIQUETTE =
   'font-mono text-[0.66rem] uppercase tracking-[0.1em] text-[var(--foreground-muted)]';
 
@@ -207,15 +207,14 @@ function LigneDerogation({
       </div>
       {peutDeroger && reauth.ouverte ? (
         <div className="flex flex-wrap items-end gap-2">
-          <label className="flex flex-col gap-1 text-sm">
-            <span className={ETIQUETTE}>Note interne de levée</span>
-            <input
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              maxLength={1000}
-              className={`w-80 ${CHAMP}`}
-            />
-          </label>
+          <Field
+            label="Note interne de levée"
+            required
+            hint="10 caractères minimum."
+            className="w-full max-w-md"
+          >
+            <TextInput value={note} onChange={(e) => setNote(e.target.value)} maxLength={1000} />
+          </Field>
           <button
             type="button"
             disabled={envoi || !noteInterneValide(note)}
@@ -279,43 +278,37 @@ function FormulaireDerogation({
         Une dérogation ouvre une fonctionnalité que l’offre de l’organisation ne comprend pas,
         jusqu’à son échéance (90 jours au plus). Elle ne ferme jamais rien.
       </p>
-      <div className="flex flex-wrap gap-3">
-        <label className="flex flex-col gap-1 text-sm">
-          <span className={ETIQUETTE}>Identifiant de l’organisation</span>
-          <input
+      <FormGrid>
+        <Field
+          label="Identifiant de l’organisation"
+          required
+          size="lg"
+          hint="24 caractères hexadécimaux."
+        >
+          <TextInput
             value={saisie.targetOrganizationId}
             onChange={(e) => setSaisie({ ...saisie, targetOrganizationId: e.target.value })}
-            placeholder="24 caractères hexadécimaux"
-            className={`w-72 font-mono ${CHAMP}`}
+            spellCheck={false}
+            autoComplete="off"
+            className="font-mono"
           />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className={ETIQUETTE}>Fonctionnalité</span>
-          <select
+        </Field>
+        <Field label="Fonctionnalité" required size="md" newRow>
+          <Select<DerogationSaisie['feature']>
             value={saisie.feature}
-            onChange={(e) =>
-              setSaisie({ ...saisie, feature: e.target.value as DerogationSaisie['feature'] })
-            }
-            className={`w-64 ${CHAMP}`}
-          >
-            <option value="">Choisir…</option>
-            {FEATURE_KEYS.map((k) => (
-              <option key={k} value={k}>
-                {libelleFonctionnalite(k)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className={ETIQUETTE}>Échéance</span>
-          <input
-            type="date"
-            value={saisie.echeance}
-            onChange={(e) => setSaisie({ ...saisie, echeance: e.target.value })}
-            className={CHAMP}
+            onChange={(feature) => setSaisie({ ...saisie, feature })}
+            options={FEATURE_KEYS.map((k) => ({ value: k, label: libelleFonctionnalite(k) }))}
+            placeholder="Choisir…"
           />
-        </label>
-      </div>
+        </Field>
+        <Field label="Échéance" required size="sm" hint="90 jours au plus.">
+          <DatePicker
+            value={saisie.echeance}
+            onChange={(echeance) => setSaisie({ ...saisie, echeance })}
+            shortcuts={['plus7', 'plus30', 'endOfMonth']}
+          />
+        </Field>
+      </FormGrid>
       <ChampsMotif
         motif={saisie.motif}
         onChange={(motif) => setSaisie({ ...saisie, motif })}

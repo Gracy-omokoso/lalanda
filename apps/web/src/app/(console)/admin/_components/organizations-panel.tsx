@@ -16,6 +16,8 @@
 // le drapeau est faux, on affiche la RAISON à côté de la ligne plutôt que rien :
 // une commande absente n'explique pas son absence.
 
+import { Field, SegmentedControl, Select, TextInput } from '@lalanda/ui';
+import { Search } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import { api, type AdminOrganizationSummary, type Plan } from '@/lib/api';
@@ -73,18 +75,15 @@ export function OrganizationsPanel(): React.ReactElement {
           void charger(recherche);
         }}
       >
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-mono text-[0.66rem] uppercase tracking-[0.1em] text-[var(--foreground-muted)]">
-            Rechercher
-          </span>
-          <input
+        <Field label="Rechercher" className="w-full max-w-xs">
+          <TextInput
             type="search"
             value={recherche}
             onChange={(e) => setRecherche(e.target.value)}
             placeholder="Nom ou identifiant d’URL"
-            className="w-72 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
+            leading={<Search className="h-4 w-4" aria-hidden="true" />}
           />
-        </label>
+        </Field>
         <button
           type="submit"
           className="rounded-md border border-[var(--border)] px-3 py-2 text-sm font-medium transition hover:border-[var(--accent)]"
@@ -277,18 +276,13 @@ function ChangementPlan({
         supprime rien — seule la création au-delà des limites est bloquée.
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        <select
+        <Select<Plan>
           value={plan}
-          onChange={(e) => setPlan(e.target.value as Plan)}
+          onChange={setPlan}
           aria-label={`Plan de ${org.name}`}
-          className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
-        >
-          {PLANS.map((p) => (
-            <option key={p} value={p}>
-              {LIBELLES_PLAN[p]}
-            </option>
-          ))}
-        </select>
+          options={PLANS.map((p) => ({ value: p, label: LIBELLES_PLAN[p] }))}
+          className="w-56"
+        />
       </div>
       <ChampsMotif motif={motif} onChange={setMotif} avecCategorie avecMessageClient />
       <div>
@@ -369,19 +363,24 @@ function Suspension({
         organisations ne sont pas touchées. Rien n’est supprimé ; le rétablissement est sans perte.
       </p>
       {org.suspended ? null : (
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-mono text-[0.66rem] uppercase tracking-[0.1em] text-[var(--foreground-muted)]">
-            Effet
-          </span>
-          <select
+        <Field
+          label="Effet"
+          group
+          hint={
+            mode === 'read_only'
+              ? 'Les membres consultent et exportent, sans rien modifier.'
+              : 'Toute l’organisation est fermée à ses membres.'
+          }
+        >
+          <SegmentedControl<'read_only' | 'full'>
             value={mode}
-            onChange={(e) => setMode(e.target.value as 'read_only' | 'full')}
-            className="w-56 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
-          >
-            <option value="read_only">Lecture seule</option>
-            <option value="full">Suspension totale</option>
-          </select>
-        </label>
+            onChange={setMode}
+            options={[
+              { value: 'read_only', label: 'Lecture seule' },
+              { value: 'full', label: 'Suspension totale' },
+            ]}
+          />
+        </Field>
       )}
       <ChampsMotif
         motif={motif}

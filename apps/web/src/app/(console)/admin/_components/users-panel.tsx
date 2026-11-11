@@ -16,6 +16,8 @@
 // on désactive le contrôle ET on affiche la raison à côté : un bouton grisé sans
 // explication se lit comme un bug.
 
+import { Field, Select, TextInput } from '@lalanda/ui';
+import { Search } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
 import { api, PLATFORM_ROLES, type AdminUserSummary, type PlatformRole } from '@/lib/api';
@@ -91,18 +93,15 @@ export function UsersPanel(): React.ReactElement {
           void charger(recherche);
         }}
       >
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-mono text-[0.66rem] uppercase tracking-[0.1em] text-[var(--foreground-muted)]">
-            Rechercher un compte
-          </span>
-          <input
+        <Field label="Rechercher un compte" className="w-full max-w-xs">
+          <TextInput
             type="search"
             value={recherche}
             onChange={(e) => setRecherche(e.target.value)}
             placeholder="Adresse e-mail ou nom"
-            className="w-72 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
+            leading={<Search className="h-4 w-4" aria-hidden="true" />}
           />
-        </label>
+        </Field>
         <button
           type="submit"
           className="rounded-md border border-[var(--border)] px-3 py-2 text-sm font-medium transition hover:border-[var(--accent)]"
@@ -254,25 +253,20 @@ function LigneCompte({
         <div className="border-t border-[var(--border)] pt-3">
           <ReauthGate reauth={reauth} description={REAUTH_COMPTES}>
             <div className="flex flex-wrap items-end gap-2">
-              <select
+              <Select<PlatformRole>
                 value={role}
-                onChange={(e) => setRole(e.target.value as PlatformRole)}
+                onChange={setRole}
                 aria-label={`Rôle plateforme à attribuer à ${user.email}`}
                 disabled={attribuables.length === 0}
-                className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
-              >
-                {attribuables.map((r) => (
-                  <option key={r} value={r}>
-                    {libelleRole(r)}
-                  </option>
-                ))}
-              </select>
-              <input
+                options={attribuables.map((r) => ({ value: r, label: libelleRole(r) }))}
+                className="w-56"
+              />
+              <TextInput
                 value={motifRole}
                 onChange={(e) => setMotifRole(e.target.value)}
                 placeholder="Motif de l’attribution (10 caractères minimum)"
                 aria-label="Motif de l’attribution"
-                className="w-80 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
+                className="w-80 max-w-full"
               />
               <button
                 type="button"

@@ -7,6 +7,15 @@
 // approuvé. Canal unique : l'application (bannière et cloche). Aucun e-mail.
 // Chaque écriture passe par la fenêtre de ré-authentification ; l'API juge de tout.
 
+import {
+  Checkbox,
+  DatePicker,
+  Field,
+  FormGrid,
+  SubmitButton,
+  TextArea,
+  TextInput,
+} from '@lalanda/ui';
 import { useCallback, useEffect, useState } from 'react';
 
 import { announcementsApi, type AdminAnnouncementView } from '@/lib/announcements-api';
@@ -39,7 +48,6 @@ const REAUTH_ANNONCES =
 
 const ETIQUETTE =
   'font-mono text-[0.66rem] uppercase tracking-[0.1em] text-[var(--foreground-muted)]';
-const CHAMP = 'rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm';
 const BOUTON =
   'rounded-md border border-[var(--border)] px-3 py-2 text-sm font-medium transition hover:border-[var(--accent)] disabled:opacity-40';
 
@@ -206,107 +214,80 @@ function Redaction({
       <h2 id="rediger-annonce" className="font-display text-lg font-bold tracking-tight">
         Préparer une annonce
       </h2>
-      <label className="flex flex-col gap-1 text-sm">
-        <span className={ETIQUETTE}>Titre</span>
-        <input value={titre} onChange={(e) => setTitre(e.target.value)} className={CHAMP} />
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        <span className={ETIQUETTE}>Texte (brut, sans mise en forme)</span>
-        <textarea
-          value={texte}
-          onChange={(e) => setTexte(e.target.value)}
-          rows={5}
-          className={CHAMP}
-        />
-      </label>
+      <FormGrid>
+        <Field label="Titre" required size="lg">
+          <TextInput value={titre} onChange={(e) => setTitre(e.target.value)} />
+        </Field>
+        <Field label="Texte" required size="full" newRow hint="Texte brut, sans mise en forme.">
+          <TextArea value={texte} onChange={(e) => setTexte(e.target.value)} rows={5} />
+        </Field>
+      </FormGrid>
 
       <fieldset className="flex flex-col gap-3">
         <legend className={ETIQUETTE}>Catégorie de destinataires (critères combinés)</legend>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={saisie.proprietairesSeulement}
-            onChange={(e) => setSaisie({ ...saisie, proprietairesSeulement: e.target.checked })}
-          />
-          Propriétaires seulement
-        </label>
-        <div className="flex flex-wrap gap-3 text-sm">
-          <span className="text-[var(--foreground-muted)]">Offre :</span>
+        <Checkbox
+          checked={saisie.proprietairesSeulement}
+          onChange={(v) => setSaisie({ ...saisie, proprietairesSeulement: v })}
+          label="Propriétaires seulement"
+        />
+        <GroupeCases titre="Offre">
           {OFFRES.map((o) => (
-            <label key={o} className="flex items-center gap-1">
-              <input
-                type="checkbox"
-                checked={saisie.offres.includes(o)}
-                onChange={() => setSaisie({ ...saisie, offres: basculer(saisie.offres, o) })}
-              />
-              {LIBELLES_PLAN[o]}
-            </label>
+            <Checkbox
+              key={o}
+              checked={saisie.offres.includes(o)}
+              onChange={() => setSaisie({ ...saisie, offres: basculer(saisie.offres, o) })}
+              label={LIBELLES_PLAN[o]}
+            />
           ))}
-        </div>
-        <div className="flex flex-wrap gap-3 text-sm">
-          <span className="text-[var(--foreground-muted)]">Abonnement :</span>
-          {ETATS_ABONNEMENT.map((s) => (
-            <label key={s} className="flex items-center gap-1">
-              <input
-                type="checkbox"
-                checked={saisie.etats.includes(s)}
-                onChange={() => setSaisie({ ...saisie, etats: basculer(saisie.etats, s) })}
-              />
-              {LIBELLES_ETATS_ABONNEMENT[s]}
-            </label>
+        </GroupeCases>
+        <GroupeCases titre="Abonnement">
+          {ETATS_ABONNEMENT.map((st) => (
+            <Checkbox
+              key={st}
+              checked={saisie.etats.includes(st)}
+              onChange={() => setSaisie({ ...saisie, etats: basculer(saisie.etats, st) })}
+              label={LIBELLES_ETATS_ABONNEMENT[st]}
+            />
           ))}
-        </div>
-        <div className="flex flex-wrap gap-3 text-sm">
-          <span className="text-[var(--foreground-muted)]">Rôle :</span>
+        </GroupeCases>
+        <GroupeCases titre="Rôle">
           {ROLES_ORG.map((r) => (
-            <label key={r} className="flex items-center gap-1">
-              <input
-                type="checkbox"
-                checked={saisie.roles.includes(r)}
-                onChange={() => setSaisie({ ...saisie, roles: basculer(saisie.roles, r) })}
-              />
-              {LIBELLES_ROLES_ORG[r]}
-            </label>
+            <Checkbox
+              key={r}
+              checked={saisie.roles.includes(r)}
+              onChange={() => setSaisie({ ...saisie, roles: basculer(saisie.roles, r) })}
+              label={LIBELLES_ROLES_ORG[r]}
+            />
           ))}
-        </div>
-        <div className="flex flex-wrap gap-4">
-          <label className="flex flex-col gap-1 text-sm">
-            <span className={ETIQUETTE}>Pays (codes ISO)</span>
-            <input
+        </GroupeCases>
+        <FormGrid>
+          <Field label="Pays (codes ISO)" size="sm" hint="Séparés par une virgule.">
+            <TextInput
               value={saisie.pays}
               onChange={(e) => setSaisie({ ...saisie, pays: e.target.value })}
               placeholder="CD, CG"
-              className={`${CHAMP} w-40`}
             />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className={ETIQUETTE}>Inscrits depuis</span>
-            <input
-              type="date"
+          </Field>
+          <Field label="Inscrits depuis" optional size="sm">
+            <DatePicker
               value={saisie.inscritsApres}
-              onChange={(e) => setSaisie({ ...saisie, inscritsApres: e.target.value })}
-              className={CHAMP}
+              onChange={(v) => setSaisie({ ...saisie, inscritsApres: v })}
             />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className={ETIQUETTE}>Inscrits avant</span>
-            <input
-              type="date"
+          </Field>
+          <Field label="Inscrits avant" optional size="sm">
+            <DatePicker
               value={saisie.inscritsAvant}
-              onChange={(e) => setSaisie({ ...saisie, inscritsAvant: e.target.value })}
-              className={CHAMP}
+              onChange={(v) => setSaisie({ ...saisie, inscritsAvant: v })}
             />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className={ETIQUETTE}>Fin de diffusion</span>
-            <input
-              type="date"
+          </Field>
+          <Field label="Fin de diffusion" optional size="sm">
+            <DatePicker
               value={fin}
-              onChange={(e) => setFin(e.target.value)}
-              className={CHAMP}
+              onChange={setFin}
+              shortcuts={['plus7', 'plus30', 'endOfMonth']}
             />
-          </label>
-        </div>
+          </Field>
+        </FormGrid>
         <p className="text-xs text-[var(--foreground-muted)]">
           {resumeAudience(audienceDepuisSaisie(saisie))}. Sans date de fin : 30 jours après l’envoi
           (soit le {formaterDate(finParDefaut().toISOString())} pour un envoi aujourd’hui).
@@ -322,16 +303,33 @@ function Redaction({
         </Bandeau>
       ) : null}
       <div>
-        <button
-          type="submit"
-          disabled={envoi || !fenetreOuverte || erreurs.length > 0}
-          className={BOUTON}
+        <SubmitButton
+          size="sm"
+          busy={envoi}
+          busyLabel="Enregistrement…"
+          disabled={!fenetreOuverte || erreurs.length > 0}
         >
-          {envoi ? 'Enregistrement…' : 'Enregistrer le brouillon'}
-        </button>
+          Enregistrer le brouillon
+        </SubmitButton>
       </div>
       {retour ? <Bandeau ton={retour.ton}>{retour.texte}</Bandeau> : null}
     </form>
+  );
+}
+
+/** Groupe de cases à cocher titré (offre, état d'abonnement, rôle). */
+function GroupeCases({
+  titre,
+  children,
+}: {
+  titre: string;
+  children: React.ReactNode;
+}): React.ReactElement {
+  return (
+    <fieldset className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+      <legend className="float-left mr-1 text-[var(--foreground-muted)]">{titre} :</legend>
+      {children}
+    </fieldset>
   );
 }
 
@@ -452,17 +450,17 @@ function Detail({
 
       {a.status === 'approved' && peutApprouver ? (
         <div className="flex flex-wrap items-end gap-3">
-          <label className="flex flex-col gap-1">
-            <span className={ETIQUETTE}>
-              Retapez le nombre de destinataires approuvé ({a.audienceCountAtApproval})
-            </span>
-            <input
+          <Field
+            label={`Retapez le nombre de destinataires approuvé (${a.audienceCountAtApproval})`}
+            className="w-full max-w-xs"
+          >
+            <TextInput
               inputMode="numeric"
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
-              className={`${CHAMP} w-40`}
+              autoComplete="off"
             />
-          </label>
+          </Field>
           <button
             type="button"
             disabled={
@@ -483,18 +481,16 @@ function Detail({
 
       {fin !== null ? (
         <div className="flex flex-wrap items-end gap-3">
-          <label className="flex flex-col gap-1">
-            <span className={ETIQUETTE}>
-              {fin === 'retirer'
-                ? 'Motif du retrait (dix caractères au moins, interne)'
-                : 'Motif d’annulation (dix caractères au moins)'}
-            </span>
-            <input
-              value={motif}
-              onChange={(e) => setMotif(e.target.value)}
-              className={`${CHAMP} w-80 max-w-full`}
-            />
-          </label>
+          <Field
+            label={fin === 'retirer' ? 'Motif du retrait' : 'Motif d’annulation'}
+            required
+            hint={
+              fin === 'retirer' ? 'Dix caractères au moins, interne.' : 'Dix caractères au moins.'
+            }
+            className="w-full max-w-md"
+          >
+            <TextInput value={motif} onChange={(e) => setMotif(e.target.value)} />
+          </Field>
           <button
             type="button"
             disabled={envoi || !fenetreOuverte || motif.trim().length < 10}
