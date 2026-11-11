@@ -48,12 +48,13 @@ maîtrise. Seules `lucide-react` (déjà présente) et React sont utilisées.
 | `EntityPicker` | champ « Rechercher » + `<select>` | combobox éditable (`aria-autocomplete="list"`) + `dialog` de création |
 | `OtpInput` | champ code libre | `group` de six champs |
 | `DatePicker`, `DateRangePicker` | `type="date"` | `dialog` non modal + `grid` |
+| `MonthPicker` (phase 3) | `type="month"` | `dialog` non modal + `grid` de douze mois |
 | `SegmentedControl` | radios de 2 à 5 options courtes | `radiogroup` |
 | `ChoiceCards` | radios avec explication | `radiogroup` |
 | `Switch` | case « activer… » | `switch` |
 | `Checkbox` | case native nue | case native stylée (listes à cocher, accords) |
 | `MoneyInput`, `PhoneInput` | `<input>` | — |
-| `Form`, `SubmitButton`, `StickyActions`, `ErrorSummary`, `useBlurValidation`, `useUnsavedChangesWarning` | code répété par écran | `role="alert"`, `aria-busy`, `aria-live` |
+| `Form`, `SubmitButton`, `StickyActions`, `ErrorSummary`, `useBlurValidation`, `useUnsavedChangesWarning`, `useUnsavedChangesGuard`, `ConfirmLeaveDialog` | code répété par écran | `role="alert"`, `aria-busy`, `aria-live`, `alertdialog` |
 
 ### 2. Largeurs sémantiques et grille de 12 colonnes
 
@@ -127,10 +128,16 @@ remplissage automatique iOS/Android (`autocomplete="one-time-code"` sur la premi
 - **Raccourcis** choisis par l'écran : Aujourd'hui, Fin de mois, +7 j, +30 j, Fin d'année (devis :
   +30 j et fin de mois ; fins d'essai et de contrat : aujourd'hui, fin de mois, +30 j).
 - Bornes `min`/`max` (fin de contrat ≥ date d'entrée).
-- **Jours fériés** : le composant accepte des jours marqués (`marks`) mais **n'en invente aucun**.
-  La seule source du dépôt est la liste **saisie par l'organisation** (`GET /hr/holidays`,
-  ADR-0045 § 2.6) ; le moteur ne porte aucune règle légale de férié. Le branchement se fait en
-  phase 2, écran par écran (absences, planning), sous la permission RH.
+- **Jours fériés** : le composant accepte des jours marqués (`marks`, ou un `DateMarksProvider`
+  englobant ; jours récurrents compris) mais **n'en invente aucun** et n'appelle aucune API. La
+  seule source du dépôt est la liste **saisie par l'organisation** (`GET /hr/holidays`,
+  ADR-0045 § 2.6) ; le moteur ne porte aucune règle légale de férié. Depuis la phase 3
+  (décision n° 1), les fériés sont marqués dans **tous** les calendriers : point discret, nom en
+  infobulle et dans le nom accessible du jour, **jamais bloquant**.
+- **Mois** (`MonthPicker`, phase 3) : même famille (popover, feuille basse sur téléphone),
+  grille de douze mois, clavier (flèches = mois et trimestre, Début/Fin = janvier/décembre,
+  Page préc./suiv. = année, Échap), bornes `min`/`max`, saisie tolérante (`11/2026`, `nov. 2026`,
+  `novembre 26`, `2026-11`), affichage « nov. 2026 » ; valeur `AAAA-MM`, celle du `type="month"`.
 - Plage : deux saisies « Du / Au » et un seul calendrier (premier clic = début, second = fin, dans
   l'ordre que l'on veut).
 - Valeur : chaîne ISO `AAAA-MM-JJ` — la même que celle des `type="date"` remplacés.
@@ -167,7 +174,10 @@ remplissage automatique iOS/Android (`autocomplete="one-time-code"` sur la premi
 - **Focus automatique du premier champ** d'un formulaire de création (pas en modification : on ne
   vole pas le focus d'une fiche qu'on consulte).
 - **Avertissement de modifications non enregistrées** avant de quitter ou recharger la page
-  (`beforeunload`) ; les fenêtres modales gardent leur propre confirmation (ADR-0030).
+  (`beforeunload`) et, depuis la phase 3 (décision n° 3), avant de suivre un **lien interne** de
+  l'application (`useUnsavedChangesGuard`, posé par `Form dirty`) : petite fenêtre « Quitter sans
+  enregistrer ? » / « Rester » / « Quitter » ; les fenêtres modales gardent leur propre
+  confirmation (ADR-0030).
 - **Bouton de soumission** avec état de chargement (`aria-busy`, indicateur, libellé
   « Enregistrement… »).
 - **Barre d'actions collante** en bas des longs formulaires (facture, fiche collaborateur), avec
@@ -403,6 +413,37 @@ CRM cherche à la frappe au lieu de lire la liste d'avance ; `stocks-ui` et
 `article-formulaire` s'importent l'un l'autre (rendu seulement) ; un interrupteur (droit de
 clôture, brief du matin) agit au clic, comme la case d'avant.
 
+### Phase 3 — finitions (branche `feat/formulaires-finitions`, 11–12 nov. 2026)
+
+Mêmes règles : mêmes champs envoyés, aucun `*-model.ts`, aucune fonction `preparer*`/`valider*`
+ni aucun lecteur de montant modifiés, `form-ui.tsx` en place, **aucun fichier de `apps/api`
+modifié, aucune route ajoutée**.
+
+- **Case à cocher** (`Checkbox`) : la case s'aligne sur la **première ligne** d'un libellé de
+  plusieurs lignes (boîte de la hauteur d'une ligne, 20 px), au lieu d'être centrée sur le bloc
+  sur téléphone (défaut visible à l'inscription, 375 px) ; cible de 44 px gardée par la marge.
+  `Switch` était déjà aligné sur la première ligne (`items-start`) : inchangé.
+- **`MonthPicker`** (`packages/ui/src/forms/month-picker.tsx`, décision n° 6) et migration des six
+  `type="month"` : comptabilité (`ChoixMois` : exports, livres, vue d'ensemble, écritures), pont
+  des encaissements, réalisé et dépenses de la Trésorerie (mois toujours renseigné, comme avant),
+  finances de la console (Du / Au, contrôle de période inchangé). Plus aucun `type="month"` dans
+  `apps/web`.
+- **Garde de navigation interne** (décision n° 3) : `useUnsavedChangesGuard` capture sur
+  `document` les clics sur les liens de même origine, bouton gauche sans touche de modification,
+  hors `target` autre que `_self`, hors `download`, hors ancre de la même page, hors `mailto:`
+  et `tel:` (`navigationInterne`, testée) ; « Quitter » rejoue le clic sur le même lien (le
+  routeur de Next le traite comme avant) sans redemander au navigateur. Posé par `Form`
+  (`dirty`) et par l'éditeur de facture ; il se tait dès que l'écran n'est plus modifié (envoi
+  réussi, brouillon relu).
+- **Fériés dans tous les calendriers** (décision n° 1) : `OrganizationHolidays`, dans la
+  coquille de l'application, lit les fériés **une fois par organisation** et les passe par
+  `DateMarksProvider` à tous les `DatePicker`/`DateRangePicker`. Route **existante**
+  `GET /hr/holidays` (`analytics.read`, module RH de l'offre, isolée par organisation — e2e
+  `hr-leave` : `viewer` lit, `ownerB` ne voit rien) : la lecture n'exige pas `hr.read`, aucune
+  route n'a donc été ajoutée. Lecture tentée seulement avec `analytics.read` et le module RH
+  (`GET /me/features`), sinon aucun jour marqué. Seuls date, nom (demi-journée et « à vérifier »
+  dits dans le nom) et récurrence passent aux calendriers.
+
 ### Reste à faire
 
 - **Écrans encore sur `Champ`/`CHAMP`** : envoi d'un document par e-mail
@@ -413,11 +454,6 @@ clôture, brief du matin) agit au clic, comme la case d'avant.
   `BOUTON*` et `Pastille` (pas des champs) : son retrait (décision ouverte n° 5) suppose de
   déplacer ces briques (vers `@lalanda/ui` ou un module commun), hors du périmètre des
   formulaires.
-- **Champs « mois »** (`type="month"`) : six usages restent natifs (dépenses, réalisé, pont des
-  encaissements, comptabilité, finances de la console), faute de sélecteur de mois dans
-  `@lalanda/ui` (décision ouverte n° 6).
-- Fériés de l'organisation dans les calendriers des absences et du planning, une fois la
-  décision ouverte n° 1 prise.
 - La connexion des membres (`/login`, phase 1) passe par `Form`, donc `noValidate` : les
   contrôles natifs d'adresse y sont tombés (l'API juge) ; l'inscription les garde.
 
@@ -429,20 +465,40 @@ clôture, brief du matin) agit au clic, comme la case d'avant.
 - Le `<select>` natif garde un intérêt sur téléphone (roue du système) ; `Select` le remplace
   quand même par une feuille basse, pour un rendu et une recherche identiques partout.
 
+## Décisions tranchées (phase 3)
+
+Gracy a autorisé l'équipe à trancher ces points en proposant le meilleur ; chaque choix est
+**une décision du 11 nov. 2026, à revoir avec Gracy**.
+
+1. **Fériés dans le calendrier — tranchée : dans TOUS les calendriers, jamais bloquants.** Les
+   fériés de l'organisation sont marqués (point discret, nom en infobulle) dans chaque
+   `DatePicker`/`DateRangePicker`. Justification : une date d'échéance, de livraison ou de
+   réunion posée un jour de fermeture est une erreur fréquente que l'indication évite, sans rien
+   interdire (une facture peut légitimement être datée d'un férié). Un férié n'est pas une donnée
+   sensible ; la lecture passe par la route existante `GET /hr/holidays`, sous `analytics.read`
+   (presque tous les rôles), pas sous `hr.read` comme l'écrivait la question : **aucune route
+   ajoutée**. Seule la liste saisie par l'organisation est montrée (rien d'inventé).
+2. **Article en création rapide — tranchée : le « + » est gardé** (fiche article complète en
+   fenêtre, sous `sales.manage`, livré en phase 2a). Justification : c'est la demande de la
+   dirigeante (« un bouton plus (+) suffit pour ajouter un nouveau ») ; la fiche complète garde
+   groupe DGI, type et prix obligatoires, donc aucune fiche incomplète.
+3. **Avertissement de navigation interne — tranchée : garde maison sur tous les liens internes**
+   (pas seulement le menu), petite fenêtre « Quitter sans enregistrer ? » (« Rester » par
+   défaut). Justification : perdre une facture ou une fiche en cliquant dans le menu est le cas
+   le plus courant ; la capture des clics ne dépend d'aucune API du routeur et laisse intacts
+   les nouveaux onglets, téléchargements et liens externes. Limite connue : une navigation
+   **programmée** (`router.push` après une action) ou les boutons Précédent/Suivant du
+   navigateur ne sont pas retenus.
+6. **Sélecteur de mois — tranchée : `MonthPicker` dans `@lalanda/ui`.** Justification : même
+   rendu dans tous les navigateurs (Firefox n’offre pas de sélecteur natif de mois : un
+   champ texte nu), affichage français « nov. 2026 », clavier et feuille basse identiques au
+   calendrier ; la valeur `AAAA-MM` ne change pas.
+
 ## Décisions ouvertes
 
-1. **Fériés dans le calendrier** : afficher les fériés de l'organisation dans tous les
-   `DatePicker` de l'outil, ou seulement dans les écrans RH (la lecture exige `hr.read`) ?
-2. **Article en création rapide** depuis une ligne de facture : fiche complète en fenêtre (comme
-   le client) ou pas de **+** du tout (catalogue géré à part) ?
-3. **Avertissement de navigation interne** : `beforeunload` couvre rechargement et fermeture
-   d'onglet ; une navigation par lien de l'application n'est pas interceptée (le routeur de
-   Next 15 n'offre pas d'API pour cela). Faut-il un garde maison sur les liens du menu ?
 4. **Second facteur pour les membres** : la connexion des organisations n'en a pas ; le jour où il
    existera, l'écran en deux temps est prêt (même composant).
 5. **Retrait de `form-ui.tsx`** à la fin de la phase 2 (après migration de tous ses usages).
-6. **Sélecteur de mois** : ajouter un `MonthPicker` à `@lalanda/ui` (filtres et exercices), ou
-   garder le champ natif `type="month"` stylé ?
 7. **Fournisseur d'une dépense directe** (Trésorerie) : l'API reçoit un **nom libre**
    (`supplierName`), pas un identifiant ; le champ reste un texte avec suggestions. Faut-il lier
    la dépense à la fiche fournisseur (changement d'API) ?
