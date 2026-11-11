@@ -341,16 +341,85 @@ Points à surveiller : un téléphone **modifié** part au format `+243 81 234 5
 sensible, WhatsApp) — conforme aux motifs de l'API, déjà le cas de la fiche collaborateur ; le
 nouveau projet cherche les clients à la frappe (50 au plus) au lieu de les lire d'avance.
 
-### Reste à faire (phase 2c)
+### Phase 2c — livré (branche `feat/formulaires-phase2c`)
 
-- Organisation, CRM, Stocks, Équipements, Comptabilité, Initiatives et croissance, Idées,
-  Documents, Console, Compte et transverses (inscription, préférences, formulaire public).
-- **Champs « mois »** (`type="month"`) : filtre « Mois » des dépenses, mois d'ouverture de
-  l'exercice 1 (réalisé, pont des encaissements) restent natifs, faute de sélecteur de mois dans
+Mêmes règles qu'en 2a et 2b : mêmes champs envoyés, aucun `*-model.ts`, aucune fonction
+`preparer*`/`valider*` ni aucun lecteur de montant modifiés, aucun fichier de `apps/api` touché,
+`form-ui.tsx` en place. Un commit par lot.
+
+- **Organisation** : fiche fiscale en sections (forme juridique en `Select`, TVA en `Switch`,
+  téléphone en `PhoneInput`), réglages, point de vente (environnement en segments, jeton
+  toujours masqué), identité visuelle, export du journal (Du / Au bornés l'un par l'autre),
+  journal d'audit, membres (rôle en `Select`, droit de clôture en `Switch`, nouveau
+  propriétaire en `EntityPicker` sans « + » — un membre s'invite —, grille des permissions en
+  `Checkbox`), brief du matin, mise en route, fenêtre de ré-authentification (même requête).
+- **CRM** : `ChoixCompte` et `ChoixMembre` (`crm-ui`) sur `EntityPicker`, même API ; **« + »
+  « Créer un prospect »** sur le choix du compte (contact, nouvelle opportunité, fiche
+  opportunité) par la fiche complète `NouveauProspect`, sous `crm.manage`, droit de
+  `POST /crm/accounts` ; opportunité (montant en `MoneyInput`, devise et source en segments,
+  clôture en `DatePicker`, lignes à identifiants stables), compte (conversion : type DGI en
+  cartes, fiche client en `EntityPicker` ; fusion ; modification), contacts, réglages, réglages
+  du formulaire public, motif de perte, activités, rapports.
+- **Stocks** : `ChoixArticle` en `EntityPicker` avec **« + »** par la fiche article complète
+  (`ArticleFormulaire`, `nomInitial`), sous `stock.manage`, droit de `POST /stock/items`, là
+  seulement où l'appelant le demande (lignes de bon, « À traiter ») ; `ChoixEmplacement` en
+  `Select` ; fiche article, bon, emplacements, inventaires (portée en cartes, compteurs jamais
+  cochés d'office), mouvements, réglages, niveaux, motif.
+- **Équipements** : fiche (sections Acquisition et Amortissement indicatif), affectation,
+  retour, cession (confirmation jamais cochée d'office), réintégration, maintenance et
+  couverture (document en `EntityPicker` sans « + »), registre, réglages.
+- **Comptabilité** : activation (plan en cartes, monnaie en segments, date de bascule),
+  écritures, exports, livres, états, règles (relecture jamais cochée d'office), clôtures.
+- **Initiatives et croissance, Idées** : nouvelle initiative, assistant, démarrage
+  personnalisé, réalisé, éditeur de business plan, objectifs, indicateurs, parcours ; fiche
+  d'idée (initiative en `EntityPicker` sur la liste chargée) et validation (note en segments).
+  Aucune logique d'appel à l'IA touchée.
+- **Documents** : dossier (parent en `EntityPicker`, accès en cartes), dépôt et fiche
+  (`ChoixEntite` repris tel quel, « Document sensible » jamais coché d'office), bibliothèque.
+- **Console** : motif d'un geste (`champs-motif`), abonnements, factures des abonnements,
+  dérogations, annonces, organisations (effet de suspension en segments), comptes, journal
+  plateforme, intégrations (secrets toujours masqués). Mêmes requêtes ; ré-authentification
+  et deux facteurs de la phase 1 inchangés.
+- **Compte et transverses** : inscription (case des conditions **jamais cochée d'office**,
+  `required` et contrôle de `handleSubmit` gardés, validation native conservée par
+  `noValidate={false}`, même `termsVersion`), mot de passe oublié, nouveau mot de passe,
+  préférences (thème et mode en cartes, devise en `Select`), profil, sécurité, souscription
+  (offre en cartes, périodicité en segments, fiche de facturation), préférences de
+  notifications, acceptation des conditions, nouvelle organisation, **formulaire public**
+  `/f/…` (champ piège, ticket, limites et consentement non coché inchangés ; téléphone saisi
+  tel quel).
+
+Contrôles à l'envoi ajoutés : CRM, « Choisissez la fiche client à rattacher. » (l'envoi
+s'arrêtait sans rien dire) ; Équipements, « La date de retour est obligatoire. ».
+
+Restés natifs à dessein : champs fichier, nuancier, curseur d'intensité du motif, champs
+« mois » (finances de la console, comptabilité), cellules du réalisé et cartes du Canvas
+(éditions sur place), recherche de l'aide publique, recherche compacte du tableau de bord,
+zone de saisie de Lala (messagerie).
+
+Points à surveiller : un téléphone **modifié** part au format `+243 81 234 5678` (fiche
+fiscale, comptes et contacts du CRM), conforme aux motifs de l'API ; le choix d'un compte du
+CRM cherche à la frappe au lieu de lire la liste d'avance ; `stocks-ui` et
+`article-formulaire` s'importent l'un l'autre (rendu seulement) ; un interrupteur (droit de
+clôture, brief du matin) agit au clic, comme la case d'avant.
+
+### Reste à faire
+
+- **Écrans encore sur `Champ`/`CHAMP`** : envoi d'un document par e-mail
+  (`ventes/_components/apercu-document.tsx`, hors relevé de la phase 2), titre de tâche
+  (`panneau-tache.tsx`, `aria`), réexport de `projets/_components/elements.tsx` ; `CHAMP` ne
+  sert plus ailleurs qu'aux champs fichier (documents) et au mois de la comptabilité.
+- **`form-ui.tsx` reste importé** par environ 130 fichiers, presque tous pour `Alerte`,
+  `BOUTON*` et `Pastille` (pas des champs) : son retrait (décision ouverte n° 5) suppose de
+  déplacer ces briques (vers `@lalanda/ui` ou un module commun), hors du périmètre des
+  formulaires.
+- **Champs « mois »** (`type="month"`) : six usages restent natifs (dépenses, réalisé, pont des
+  encaissements, comptabilité, finances de la console), faute de sélecteur de mois dans
   `@lalanda/ui` (décision ouverte n° 6).
 - Fériés de l'organisation dans les calendriers des absences et du planning, une fois la
   décision ouverte n° 1 prise.
-- Retrait de `form-ui.tsx` quand plus rien ne l'importe (décision ouverte n° 5).
+- La connexion des membres (`/login`, phase 1) passe par `Form`, donc `noValidate` : les
+  contrôles natifs d'adresse y sont tombés (l'API juge) ; l'inscription les garde.
 
 ## Conséquences
 
