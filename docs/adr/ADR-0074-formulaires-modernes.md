@@ -299,16 +299,58 @@ modifié ; `form-ui.tsx` reste en place.
   listes (factures, devis, commandes, contrats, clients, catalogue).
 - **Trésorerie** : dépenses et règles récurrentes, comptes et mouvements, réalisé.
 
-### Reste à faire (phase 2b)
+### Phase 2b — livré (branche `feat/formulaires-phase2b`)
 
-- **Ventes** : modèles de facture (`invoice-template-gallery`, `custom-template-packages`),
-  `contract-form`, `declare-not-normalized-dialog`.
-- **Achats** : listes et fiches (`fournisseurs-liste`, `commande-fiche`, `dialogue-motif`), filtres.
+Mêmes règles qu'en 2a : mêmes champs envoyés, fonctions `preparer*`/`valider*` et lecteurs de
+montants inchangés, aucun fichier de `apps/api` modifié, `form-ui.tsx` en place. Quand un
+`required` natif disparaît (liste, date, sélecteur d'entité), un contrôle équivalent est fait
+avant l'envoi.
+
+- **Ventes** : modèles de facture (`invoice-template-gallery`, `custom-template-packages` :
+  palette en segments, police en `Select` ; nuancier et dépôt `.zip` restent natifs),
+  `contract-form` (intitulé ; client, lignes et clauses déjà migrés en 2a),
+  `declare-not-normalized-dialog` (motif relié à son aide, son compteur et son erreur).
+- **Achats** : `fournisseurs-liste` (filtre en grille, « Archivés » en interrupteur),
+  `commande-fiche` (décisions), `dialogue-motif`. Il ne reste dans les achats que les champs
+  fichier, natifs par choix.
+- **RH** (tout `rh/`) : absences (`demande-absence`, `calendrier-absences`), présences,
+  planning, échéances, mon espace, frais et avances (`MoneyInput`, `lireMontantSaisi`
+  inchangé), objectifs, évaluations, équipes, services, postes, liste des collaborateurs,
+  rapports, documents générés et leurs réglages, cartes, dossier (`fiche-parcours`,
+  `fiche-poste`, `fiche-documents`, `fiche-cartes`, `fiche-compte`, `formulaire-sensible`),
+  réglages (`reglages-rh`, `reglages-listes`, `lot1-reglages`), import, briques communes
+  (`rh-ui`). Personne d'un créneau ou d'une lecture de présences, responsable et service parent
+  d'un service, responsable et membres d'une équipe, service d'un poste : `EntityPicker` sur la
+  liste déjà chargée. **« + »** seulement pour le service d'un poste (fiche `FormulaireService`
+  complète, sous `hr.manage`, droit de `POST /hr/departments`) ; aucun « + » collaborateur (la
+  fiche complète n'a pas sa place dans un créneau) ni utilisateur (il s'invite depuis
+  l'organisation). **Les fériés ne sont pas ajoutés aux calendriers** : décision ouverte n° 1
+  toujours ouverte (le calendrier des absences affiche, comme avant, ceux que l'API renvoie).
+- **Projets** (tout `projets/`) : tâche (`panneau-tache` : responsable et dépendance en
+  `EntityPicker`, dates, statut, priorité, jalon), collaboration et saisie du temps, filtres,
+  kanban, calendrier, liste, mes tâches, nouveau projet (client en `EntityPicker` avec « + »
+  sous `sales.manage`, fiche client complète en fenêtre), réglages et paramètres, membres
+  (visibilité en cartes), Slack, WhatsApp (`PhoneInput`, `OtpInput` sans envoi automatique),
+  feuille de temps, import, construction par l'IA, proposition de facture. Aucune logique
+  d'appel externe touchée.
+- Restés natifs à dessein : champs fichier, couleur, heures (`type="time"`), mois (décision
+  ouverte n° 6), éditions sur place très compactes (titre de tâche dans sa cellule, ajout en
+  ligne).
+
+Points à surveiller : un téléphone **modifié** part au format `+243 81 234 5678` (dossier
+sensible, WhatsApp) — conforme aux motifs de l'API, déjà le cas de la fiche collaborateur ; le
+nouveau projet cherche les clients à la frappe (50 au plus) au lieu de les lire d'avance.
+
+### Reste à faire (phase 2c)
+
+- Organisation, CRM, Stocks, Équipements, Comptabilité, Initiatives et croissance, Idées,
+  Documents, Console, Compte et transverses (inscription, préférences, formulaire public).
 - **Champs « mois »** (`type="month"`) : filtre « Mois » des dépenses, mois d'ouverture de
   l'exercice 1 (réalisé, pont des encaissements) restent natifs, faute de sélecteur de mois dans
   `@lalanda/ui` (décision ouverte n° 6).
-- Puis l'ordre déjà proposé : **RH** (absences avec les fériés de l'organisation), **Projets**,
-  Organisation, CRM, Stocks, Équipements, Comptabilité, Initiatives, Documents, Console, Compte.
+- Fériés de l'organisation dans les calendriers des absences et du planning, une fois la
+  décision ouverte n° 1 prise.
+- Retrait de `form-ui.tsx` quand plus rien ne l'importe (décision ouverte n° 5).
 
 ## Conséquences
 
