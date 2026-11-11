@@ -236,7 +236,7 @@ export function InvoiceLines({
                     aria-label={`Retirer la ligne ${i + 1}`}
                     title="Retirer la ligne"
                   >
-                    <Trash2 aria-hidden="true" className="h-4 w-4" />
+                    <Trash2 aria-hidden="true" className="h-4 w-4 shrink-0" />
                   </button>
                 </div>
               </div>
@@ -424,7 +424,7 @@ export function InvoiceLines({
                       <MoneyInput
                         value={l.prix}
                         currency={form.currency}
-                        placeholder={l.source === 'catalog' ? 'Prix de l’article' : ''}
+                        placeholder={l.source === 'catalog' ? 'Catalogue' : ''}
                         onChange={(v) => majLigne(i, { prix: v })}
                       />
                     </Field>

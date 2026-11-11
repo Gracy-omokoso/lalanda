@@ -103,7 +103,7 @@ export function PaymentsEditor({
                 aria-label={`Retirer le paiement ${i + 1}`}
                 title="Retirer"
               >
-                <Trash2 aria-hidden="true" className="h-4 w-4" />
+                <Trash2 aria-hidden="true" className="h-4 w-4 shrink-0" />
               </button>
             </li>
           );

@@ -383,7 +383,7 @@ export function NouvelleDemande({
                       setF((p) => ({ ...p, lignes: p.lignes.filter((_, j) => j !== i) }))
                     }
                   >
-                    <Trash2 aria-hidden="true" className="h-4 w-4" />
+                    <Trash2 aria-hidden="true" className="h-4 w-4 shrink-0" />
                   </button>
                 </div>
                 <FormGrid>
@@ -494,7 +494,7 @@ export function NouvelleDemande({
                 aria-label={`Retirer la taxe ${i + 1}`}
                 onClick={() => setF((p) => ({ ...p, taxes: p.taxes.filter((_, j) => j !== i) }))}
               >
-                <Trash2 aria-hidden="true" className="h-4 w-4" />
+                <Trash2 aria-hidden="true" className="h-4 w-4 shrink-0" />
               </button>
             </div>
           ))}

@@ -499,7 +499,7 @@ export function FenetreFacture({
                   aria-label={`Retirer la taxe ${i + 1}`}
                   onClick={() => maj({ taxes: f.taxes.filter((_, j) => j !== i) })}
                 >
-                  <Trash2 aria-hidden="true" className="h-4 w-4" />
+                  <Trash2 aria-hidden="true" className="h-4 w-4 shrink-0" />
                 </button>
               </div>
             ))}

@@ -265,6 +265,51 @@ Ordre proposé : Achats (fournisseur + création rapide), lignes de facture, RH 
 fériés de l'organisation), Projets, puis le reste par module. Chaque lot : mêmes champs, mêmes
 validations, captures clair/sombre/mobile.
 
+## Avancement de la migration
+
+### Phase 2a — livré (branche `feat/formulaires-phase2a`)
+
+Mêmes champs envoyés, mêmes validations (fonctions `preparer*` et lecteurs de montants
+inchangés), même comportement métier ; seule l'interface change. Aucun fichier de `apps/api`
+modifié ; `form-ui.tsx` reste en place.
+
+- **Transverse** : `components/choix-entite.tsx` (ADR-0046) reconstruit sur `EntityPicker`, API
+  publique et chargeurs par permission inchangés (documents, équipements continuent de
+  l'utiliser tels quels) ; `tresorerie/_components/work-project-select.tsx` sur `Field` +
+  `Select`.
+- **Achats** : fiche fournisseur (`fournisseur-formulaire.tsx`, sert aussi de création rapide :
+  `nomInitial`, `enModal`) ; demande d'achat (`commande-formulaire.tsx`) et facture fournisseur
+  (`facture-formulaire.tsx`) avec le **fournisseur en `EntityPicker` et « + »** (fiche complète en
+  fenêtre, sous `purchase.manage`, le droit de la route de création) ; paiement
+  (`paiement-formulaire.tsx`) ; réception (`reception-formulaire.tsx`). `ChoixFournisseur` garde
+  son API : la fiche article de stock et la fiche équipement en profitent sans changement.
+- **Ventes** : lignes de facture, devis et engagements (`invoice-lines.tsx`) avec l'**article en
+  `EntityPicker`** sur le catalogue (même recherche) et **création rapide** par la fiche article
+  complète (`CatalogItemForm` en fenêtre, sous `sales.manage`) — la décision ouverte n° 2 est
+  donc prise dans le sens « fiche complète en fenêtre », à confirmer par la dirigeante ;
+  paiements (`payments-editor.tsx`, **avertissement d'hydratation corrigé** : les identifiants
+  venaient de `nouvelleCle`, compteur de module différent entre serveur et navigateur ; ils
+  viennent maintenant de `useId` et de la position, de même pour les lignes et l'échéancier
+  des contrats) ; avoir (`credit-note-dialog.tsx`) ; normalisation (`normalize-dialog.tsx`, taux
+  en cartes, date du taux) ; fiche article (`catalog-item-form.tsx`) ; commandes (`order-form`,
+  `order-detail`, `order-list`) ; contrats (`contract-detail`, `contract-settings`,
+  `amendments-section`, `clauses-fields`, `signature-form`, `contract-list`) ; engagement
+  (`engagement-document-fields`, `engagement-ui` — client en `EntityPicker` avec « + » —,
+  `quote-engagement-box`) ; encaissements (`receipts-workspace`, `bridge-panel`) ; filtres des
+  listes (factures, devis, commandes, contrats, clients, catalogue).
+- **Trésorerie** : dépenses et règles récurrentes, comptes et mouvements, réalisé.
+
+### Reste à faire (phase 2b)
+
+- **Ventes** : modèles de facture (`invoice-template-gallery`, `custom-template-packages`),
+  `contract-form`, `declare-not-normalized-dialog`.
+- **Achats** : listes et fiches (`fournisseurs-liste`, `commande-fiche`, `dialogue-motif`), filtres.
+- **Champs « mois »** (`type="month"`) : filtre « Mois » des dépenses, mois d'ouverture de
+  l'exercice 1 (réalisé, pont des encaissements) restent natifs, faute de sélecteur de mois dans
+  `@lalanda/ui` (décision ouverte n° 6).
+- Puis l'ordre déjà proposé : **RH** (absences avec les fériés de l'organisation), **Projets**,
+  Organisation, CRM, Stocks, Équipements, Comptabilité, Initiatives, Documents, Console, Compte.
+
 ## Conséquences
 
 - Un écran ne relie plus à la main `aria-describedby`/`aria-invalid` : `Field` le fait.
@@ -285,3 +330,8 @@ validations, captures clair/sombre/mobile.
 4. **Second facteur pour les membres** : la connexion des organisations n'en a pas ; le jour où il
    existera, l'écran en deux temps est prêt (même composant).
 5. **Retrait de `form-ui.tsx`** à la fin de la phase 2 (après migration de tous ses usages).
+6. **Sélecteur de mois** : ajouter un `MonthPicker` à `@lalanda/ui` (filtres et exercices), ou
+   garder le champ natif `type="month"` stylé ?
+7. **Fournisseur d'une dépense directe** (Trésorerie) : l'API reçoit un **nom libre**
+   (`supplierName`), pas un identifiant ; le champ reste un texte avec suggestions. Faut-il lier
+   la dépense à la fiche fournisseur (changement d'API) ?
