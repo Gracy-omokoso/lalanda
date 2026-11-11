@@ -27,7 +27,8 @@ import { api } from '@/lib/api';
 import { Bandeau } from './admin-chrome';
 import { formaterRestant, messageErreur, reauthRestantMs, reauthUtilisable } from './admin-model';
 // ADR-0053 — P8 : mot de passe + code de l'application, ou un code de secours.
-import { messageDeuxFacteurs, secondFacteurDe } from './deux-facteurs-model';
+import { ConfirmationDeuxTemps } from './confirmation-deux-temps';
+import { messageDeuxFacteurs } from './deux-facteurs-model';
 
 export interface Reauth {
   /** La fenêtre est-elle ouverte et assez large pour lancer une écriture ? */
@@ -81,31 +82,6 @@ export function ReauthGate({
   /** ADR-0053 — P2 : texte propre au geste protégé (défaut : intégrations). */
   description?: string;
 }): React.ReactElement {
-  const [motDePasse, setMotDePasse] = useState('');
-  const [code, setCode] = useState('');
-  const [erreur, setErreur] = useState<string | null>(null);
-  const [envoi, setEnvoi] = useState(false);
-  const facteur = secondFacteurDe(code);
-
-  async function confirmer(e: React.FormEvent): Promise<void> {
-    e.preventDefault();
-    if (!facteur) return;
-    setEnvoi(true);
-    setErreur(null);
-    try {
-      await api.confirmReauth(motDePasse, facteur);
-      // Vidé immédiatement : le champ ne doit pas rester rempli derrière un
-      // panneau replié, ni repartir dans un rendu ultérieur.
-      setMotDePasse('');
-      setCode('');
-      reauth.rafraichir();
-    } catch (err) {
-      setErreur(messageDeuxFacteurs(err, messageErreur(err, 'Mot de passe refusé.')));
-    } finally {
-      setEnvoi(false);
-    }
-  }
-
   if (reauth.ouverte) {
     return (
       <div className="flex flex-col gap-4">
@@ -119,10 +95,7 @@ export function ReauthGate({
   }
 
   return (
-    <form
-      className="flex flex-col gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5"
-      onSubmit={(e) => void confirmer(e)}
-    >
+    <section className="flex flex-col gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
       <h2 className="font-display text-lg font-bold tracking-tight">
         Confirmez votre mot de passe et votre code
       </h2>
@@ -130,41 +103,17 @@ export function ReauthGate({
         {description ??
           'Modifier un secret d’intégration exige une ré-authentification, valable dix minutes. Une session volée ne suffit donc pas à remplacer une clé de paiement ou d’envoi d’e-mails. La consultation de l’état des intégrations, elle, reste ouverte sans cette confirmation.'}
       </p>
-      <label className="flex max-w-sm flex-col gap-1 text-sm">
-        <span className="font-mono text-[0.66rem] uppercase tracking-[0.1em] text-[var(--foreground-muted)]">
-          Mot de passe
-        </span>
-        <input
-          type="password"
-          value={motDePasse}
-          onChange={(e) => setMotDePasse(e.target.value)}
-          autoComplete="current-password"
-          className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm"
-        />
-      </label>
-      {/* ADR-0053 — P8 : code de l'application d'authentification, ou un code de secours. */}
-      <label className="flex max-w-sm flex-col gap-1 text-sm">
-        <span className="font-mono text-[0.66rem] uppercase tracking-[0.1em] text-[var(--foreground-muted)]">
-          Code de l’application ou code de secours
-        </span>
-        <input
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-          autoComplete="one-time-code"
-          maxLength={16}
-          className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 font-mono text-sm tracking-widest"
-        />
-      </label>
-      <div>
-        <button
-          type="submit"
-          disabled={envoi || motDePasse === '' || !facteur}
-          className="rounded-md border border-[var(--accent)] px-3 py-2 text-sm font-medium text-[var(--accent)] transition hover:bg-[var(--accent)]/10 disabled:opacity-40"
-        >
-          {envoi ? 'Vérification…' : 'Ouvrir la fenêtre de dix minutes'}
-        </button>
-      </div>
-      {erreur ? <Bandeau ton="echec">{erreur}</Bandeau> : null}
-    </form>
+      {/* ADR-0074 § 10 : mot de passe puis code, sur deux écrans ; un seul envoi, comme avant. */}
+      <ConfirmationDeuxTemps
+        libelleAction="Ouvrir la fenêtre de dix minutes"
+        messageErreur={(err) =>
+          messageDeuxFacteurs(err, messageErreur(err, 'Mot de passe refusé.'))
+        }
+        onConfirmer={async (motDePasse, facteur) => {
+          await api.confirmReauth(motDePasse, facteur);
+          reauth.rafraichir();
+        }}
+      />
+    </section>
   );
 }

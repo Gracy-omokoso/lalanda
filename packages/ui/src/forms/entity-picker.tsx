@@ -40,6 +40,11 @@ export interface EntityPickerProps<T> {
   onChange: (item: T | null) => void;
   /** Recherche (anti-rebond appliqué) ; `signal` annule une recherche dépassée. */
   search: (query: string, signal: AbortSignal) => Promise<readonly T[]>;
+  /**
+   * À changer quand la source de la recherche change (liste locale chargée,
+   * fiche ajoutée) : la recherche ouverte est relancée.
+   */
+  refreshKey?: string | number;
   getKey: (item: T) => string;
   getLabel: (item: T) => string;
   /** Sous-texte (NIF, matricule, service…). */
@@ -84,6 +89,7 @@ export function EntityPicker<T>({
   getLabel,
   getDescription,
   renderItem,
+  refreshKey: rechercheVersion = 0,
   id: idDonne,
   placeholder = 'Tapez pour rechercher…',
   disabled,
@@ -119,6 +125,11 @@ export function EntityPicker<T>({
   const idOption = (i: number): string => `${base}-o${i}`;
   const idChoix = `${base}-choix`;
 
+  // Fonctions passées en ligne par les écrans : lues par référence, pour ne
+  // relancer ni la recherche ni la liste à chaque rendu.
+  const fonctions = useRef({ search, getKey });
+  fonctions.current = { search, getKey };
+
   const libelleChoisi = value ? getLabel(value) : '';
   const [texte, setTexte] = useState(libelleChoisi);
   const [edition, setEdition] = useState(false);
@@ -144,6 +155,7 @@ export function EntityPicker<T>({
   }, [libelleChoisi, edition]);
 
   const requete = edition ? texte : '';
+  const avecCreation = Boolean(createForm);
   const assezDeLettres = requete.trim().length >= minChars;
 
   // Recherche avec anti-rebond ; la précédente est annulée.
@@ -157,7 +169,8 @@ export function EntityPicker<T>({
     setChargement(true);
     setEchec(false);
     const t = setTimeout(() => {
-      search(requete.trim(), ctrl.signal)
+      fonctions.current
+        .search(requete.trim(), ctrl.signal)
         .then((r) => {
           if (!ctrl.signal.aborted) setResultats(r);
         })
@@ -172,9 +185,10 @@ export function EntityPicker<T>({
       ctrl.abort();
       clearTimeout(t);
     };
-  }, [ouvert, requete, assezDeLettres, search, debounceMs]);
+  }, [ouvert, requete, assezDeLettres, debounceMs, rechercheVersion]);
 
   const lignes = useMemo<Ligne<T>[]>(() => {
+    const getKey = fonctions.current.getKey;
     const out: Ligne<T>[] = [];
     const vus = new Set<string>();
     if (requete.trim() === '' && recents.length > 0) {
@@ -187,9 +201,9 @@ export function EntityPicker<T>({
       if (vus.has(getKey(r))) continue;
       out.push({ genre: 'item', item: r, recent: false });
     }
-    if (createForm) out.push({ genre: 'creer' });
+    if (avecCreation) out.push({ genre: 'creer' });
     return out;
-  }, [requete, recents, resultats, createForm, getKey]);
+  }, [requete, recents, resultats, avecCreation]);
   const actives = useMemo(() => lignes.map(() => true), [lignes]);
 
   // Une nouvelle liste : la première fiche active (jamais « Créer » d'office).

@@ -11,12 +11,23 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import {
+  Field,
+  FormGrid,
+  SegmentedControl,
+  Select,
+  StickyActions,
+  SubmitButton,
+  Switch,
+  TextInput,
+  estRaccourciEnregistrer,
+  useUnsavedChangesWarning,
+} from '@lalanda/ui';
 import { useEffect, useMemo, useState } from 'react';
 
 import {
   api,
   type CustomerType,
-  type CustomerView,
   type DocumentCurrency,
   type InvoiceType,
   type InvoiceView,
@@ -24,7 +35,8 @@ import {
   type TaxGroupList,
 } from '@/lib/api';
 
-import { Alerte, BOUTON, BOUTON_DANGER, CHAMP, Pastille, aria } from '../../_components/form-ui';
+import { ChoixClientDocument } from '../../_components/client-picker';
+import { Alerte, BOUTON, BOUTON_DANGER, Pastille } from '../../_components/form-ui';
 import { useAccesVentes } from '../../_components/sales-access';
 import {
   erreursFormulaire,
@@ -110,185 +122,6 @@ function correspondances(f: FormulaireDocument): Record<string, string> {
   return out;
 }
 
-function ChoixClient({
-  form,
-  setForm,
-  verrouille,
-  desactive,
-  erreur,
-  onType,
-}: {
-  form: FormulaireDocument;
-  setForm: React.Dispatch<React.SetStateAction<FormulaireDocument>>;
-  /** Avoir : client repris de la facture d'origine. */
-  verrouille: boolean;
-  /** Lecture seule (rôle, envoi en cours) : champs visibles mais inactifs. */
-  desactive: boolean;
-  erreur: string | undefined;
-  onType: (t: CustomerType | null) => void;
-}): React.ReactElement {
-  const [q, setQ] = useState('');
-  const [clients, setClients] = useState<CustomerView[]>([]);
-  const mode = form.client?.mode ?? 'fiche';
-
-  useEffect(() => {
-    if (verrouille || mode !== 'fiche') return;
-    let annule = false;
-    const t = setTimeout(() => {
-      api
-        .listCustomers({ status: 'active', limit: 50, ...(q.trim() ? { q: q.trim() } : {}) })
-        .then((p) => {
-          if (!annule) setClients(p.items);
-        })
-        .catch(() => undefined);
-    }, 250);
-    return () => {
-      annule = true;
-      clearTimeout(t);
-    };
-  }, [q, mode, verrouille]);
-
-  return (
-    <fieldset
-      className="flex flex-col gap-3"
-      disabled={desactive}
-      aria-describedby={erreur ? 'client-erreur' : undefined}
-    >
-      <legend className="mb-1 text-sm font-semibold">Client</legend>
-      {verrouille ? (
-        <p className="text-sm">
-          {form.client?.nom || 'Vente de comptoir'}{' '}
-          <span className="text-xs text-[var(--foreground-muted)]">
-            (repris de la facture d’origine)
-          </span>
-        </p>
-      ) : (
-        <>
-          <div className="flex flex-wrap gap-4 text-sm">
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="mode-client"
-                checked={mode === 'fiche'}
-                onChange={() => {
-                  setForm((f) => ({ ...f, client: null }));
-                  onType(null);
-                }}
-              />
-              Client enregistré
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="mode-client"
-                checked={mode === 'comptoir'}
-                onChange={() => {
-                  setForm((f) => ({ ...f, client: { mode: 'comptoir', nom: '' } }));
-                  onType('PP');
-                }}
-              />
-              Vente de comptoir (personne physique)
-            </label>
-          </div>
-          {mode === 'fiche' ? (
-            <div className="grid gap-2 sm:grid-cols-2">
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="client-q" className="text-sm">
-                  Rechercher
-                </label>
-                <input
-                  id="client-q"
-                  type="search"
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  placeholder="Nom, NIF ou e-mail"
-                  className={CHAMP}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="client-choix" className="text-sm">
-                  Client
-                </label>
-                <select
-                  id="client-choix"
-                  value={form.client?.mode === 'fiche' ? form.client.customerId : ''}
-                  onChange={(e) => {
-                    const c = clients.find((x) => x.id === e.target.value);
-                    setForm((f) => ({
-                      ...f,
-                      client: c
-                        ? {
-                            mode: 'fiche',
-                            customerId: c.id,
-                            nom: c.name,
-                            printContactDetails: false,
-                          }
-                        : null,
-                    }));
-                    onType(c?.type ?? null);
-                  }}
-                  className={CHAMP}
-                  {...aria('client', erreur)}
-                >
-                  <option value="">
-                    {form.client?.mode === 'fiche' ? form.client.nom : 'Choisir un client…'}
-                  </option>
-                  {clients
-                    .filter((c) => form.client?.mode !== 'fiche' || c.id !== form.client.customerId)
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} — {c.typeLabel}
-                      </option>
-                    ))}
-                  {form.client?.mode === 'fiche' ? (
-                    <option value={form.client.customerId}>{form.client.nom}</option>
-                  ) : null}
-                </select>
-              </div>
-              {form.client?.mode === 'fiche' ? (
-                <label className="flex items-center gap-2 text-sm sm:col-span-2">
-                  <input
-                    type="checkbox"
-                    checked={form.client.printContactDetails}
-                    onChange={(e) =>
-                      setForm((f) =>
-                        f.client?.mode === 'fiche'
-                          ? { ...f, client: { ...f.client, printContactDetails: e.target.checked } }
-                          : f,
-                      )
-                    }
-                  />
-                  Le client demande que ses coordonnées figurent sur le document
-                </label>
-              ) : null}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="client-comptoir" className="text-sm">
-                Nom du client (facultatif)
-              </label>
-              <input
-                id="client-comptoir"
-                value={form.client?.mode === 'comptoir' ? form.client.nom : ''}
-                maxLength={200}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, client: { mode: 'comptoir', nom: e.target.value } }))
-                }
-                className={CHAMP}
-              />
-            </div>
-          )}
-        </>
-      )}
-      {erreur ? (
-        <p id="client-erreur" className="text-xs font-medium text-[var(--danger)]">
-          {erreur}
-        </p>
-      ) : null}
-    </fieldset>
-  );
-}
-
 /**
  * Point de vente e-MCF du document (ADR-0026, écart C6) : affiché d'office
  * quand il n'y en a qu'un actif, à CHOISIR quand il y en a plusieurs.
@@ -336,35 +169,17 @@ function ChoixPointDeVenteChamp({
       ? 'Plusieurs points de vente sont actifs : choisissez celui qui normalisera ce document.'
       : undefined);
   return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor="doc-pdv" className="text-sm font-medium">
-        Point de vente e-MCF
-        <span className="sr-only"> (obligatoire)</span>
-      </label>
-      <select
-        id="doc-pdv"
-        value={choix.selection}
-        onChange={(e) =>
-          setForm((f) => ({ ...f, pointOfSaleId: e.target.value === '' ? null : e.target.value }))
-        }
-        className={CHAMP}
-        disabled={desactive}
-        required
-        {...aria('doc-pdv', message)}
-      >
-        <option value="">Choisir un point de vente…</option>
-        {choix.options.map((p) => (
-          <option key={p.id} value={p.id}>
-            {libellePointDeVente(p)}
-          </option>
-        ))}
-      </select>
-      {message ? (
-        <p id="doc-pdv-erreur" className="text-xs font-medium text-[var(--danger)]">
-          {message}
-        </p>
-      ) : null}
-    </div>
+    <FormGrid>
+      <Field id="doc-pdv" label="Point de vente e-MCF" required size="lg" error={message}>
+        <Select
+          value={choix.selection}
+          onChange={(v) => setForm((f) => ({ ...f, pointOfSaleId: v === '' ? null : v }))}
+          disabled={desactive}
+          placeholder="Choisir un point de vente…"
+          options={choix.options.map((p) => ({ value: p.id, label: libellePointDeVente(p) }))}
+        />
+      </Field>
+    </FormGrid>
   );
 }
 
@@ -399,6 +214,8 @@ export function InvoiceEditor({
   const [dialogue, setDialogue] = useState<'emettre' | 'normaliser' | 'supprimer' | null>(null);
 
   const modifie = JSON.stringify(form) !== reference;
+  // ADR-0074 § 9 : avertissement avant de quitter la page avec un brouillon modifié.
+  useUnsavedChangesWarning(modifie && gerer);
   const desactive = !gerer || envoi;
   const verrouOrigine = form.originInvoiceId !== null;
 
@@ -600,64 +417,82 @@ export function InvoiceEditor({
           e.preventDefault();
           void enregistrer();
         }}
-        className="flex flex-col gap-5"
+        onKeyDown={(e) => {
+          // ADR-0074 § 9 : Cmd/Ctrl+Entrée enregistre le brouillon.
+          if (estRaccourciEnregistrer(e) && gerer && !envoi) {
+            e.preventDefault();
+            e.currentTarget.requestSubmit();
+          }
+        }}
+        className="flex flex-col gap-6"
         noValidate
       >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="doc-type" className="text-sm font-medium">
-              Type de document
-            </label>
-            <select
-              id="doc-type"
+        <FormGrid>
+          <Field
+            id="doc-type"
+            label="Type de document"
+            size="md"
+            hint={
+              avoirLibre
+                ? 'Un avoir rattaché à une facture se crée depuis cette facture (« Créer un avoir ») ; ici, seulement une remise, ristourne ou rabais sans facture d’origine.'
+                : undefined
+            }
+          >
+            <Select<InvoiceType>
               value={form.type}
-              onChange={(e) => {
-                const t = e.target.value as InvoiceType;
-                setForm((f) => ({ ...f, type: t, nature: estAvoir(t) ? 'RRR' : null }));
-              }}
-              className={CHAMP}
-              disabled={desactive || verrouOrigine || vue !== null}
-            >
-              {typesProposes.map((t) => (
-                <option key={t} value={t}>
-                  {TYPE_LABELS[t]}
-                  {estAvoir(t) && !verrouOrigine ? ' — remise, ristourne ou rabais' : ''}
-                </option>
-              ))}
-            </select>
-            {avoirLibre ? (
-              <p className="text-xs text-[var(--foreground-muted)]">
-                Un avoir rattaché à une facture se crée depuis cette facture (« Créer un avoir ») ;
-                ici, seulement une remise, ristourne ou rabais sans facture d’origine.
-              </p>
-            ) : null}
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="doc-devise" className="text-sm font-medium">
-              Devise du document
-            </label>
-            <select
-              id="doc-devise"
-              value={form.currency}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, currency: e.target.value as DocumentCurrency }))
+              onChange={(t) =>
+                setForm((f) => ({ ...f, type: t, nature: estAvoir(t) ? 'RRR' : null }))
               }
-              className={CHAMP}
+              disabled={desactive || verrouOrigine || vue !== null}
+              options={typesProposes.map((t) => ({
+                value: t,
+                label: TYPE_LABELS[t],
+                description:
+                  estAvoir(t) && !verrouOrigine ? 'Remise, ristourne ou rabais' : undefined,
+              }))}
+            />
+          </Field>
+          <Field
+            id="doc-devise"
+            label="Devise du document"
+            group
+            size="sm"
+            hint={`${CURRENCY_LABELS[form.currency]}. Le document est composé et payé dans cette devise ; en facture normalisée, il est converti en CDF au moment de « Normaliser ».`}
+          >
+            <SegmentedControl<DocumentCurrency>
+              value={form.currency}
+              onChange={(c) => setForm((f) => ({ ...f, currency: c }))}
               disabled={desactive || verrouOrigine}
-              aria-describedby="doc-devise-aide"
-            >
-              {(Object.keys(CURRENCY_LABELS) as DocumentCurrency[]).map((c) => (
-                <option key={c} value={c}>
-                  {CURRENCY_LABELS[c]}
-                </option>
-              ))}
-            </select>
-            <p id="doc-devise-aide" className="text-xs text-[var(--foreground-muted)]">
-              Le document est composé et payé dans cette devise. En facture normalisée, il est
-              converti en CDF au moment de « Normaliser ».
-            </p>
-          </div>
-        </div>
+              options={(Object.keys(CURRENCY_LABELS) as DocumentCurrency[]).map((c) => ({
+                value: c,
+                label: c,
+              }))}
+            />
+          </Field>
+          <Field
+            id="mode-prix"
+            label="Mode de prix"
+            group
+            required
+            size="sm"
+            hint={
+              form.priceMode
+                ? PRICE_MODE_DOC_LABELS[form.priceMode]
+                : 'TTC : prix taxes comprises ; HT : prix hors taxes.'
+            }
+            error={erreurs['priceMode']}
+          >
+            <SegmentedControl<'ttc' | 'ht'>
+              value={form.priceMode}
+              onChange={(m) => setForm((f) => ({ ...f, priceMode: m }))}
+              disabled={desactive || verrouOrigine}
+              options={(['ttc', 'ht'] as const).map((m) => ({
+                value: m,
+                label: m.toUpperCase(),
+              }))}
+            />
+          </Field>
+        </FormGrid>
 
         <ChoixPointDeVenteChamp
           form={form}
@@ -667,38 +502,17 @@ export function InvoiceEditor({
           erreur={erreurs['pointOfSaleId']}
         />
 
-        <fieldset className="flex flex-col gap-2" disabled={desactive || verrouOrigine}>
-          <legend className="mb-1 text-sm font-semibold">
-            Mode de prix
-            <span className="sr-only"> (obligatoire)</span>
-          </legend>
-          <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
-            {(['ttc', 'ht'] as const).map((m) => (
-              <label key={m} className="flex items-center gap-2 text-sm">
-                <input
-                  type="radio"
-                  name="mode-prix"
-                  checked={form.priceMode === m}
-                  onChange={() => setForm((f) => ({ ...f, priceMode: m }))}
-                />
-                {PRICE_MODE_DOC_LABELS[m]}
-              </label>
-            ))}
-          </div>
-          {erreurs['priceMode'] ? (
-            <p className="text-xs font-medium text-[var(--danger)]">{erreurs['priceMode']}</p>
-          ) : null}
-        </fieldset>
-
-        <ChoixClient
+        <ChoixClientDocument
           form={form}
           setForm={setForm}
           verrouille={verrouOrigine}
           desactive={desactive}
+          creer={gerer}
           erreur={erreurs['customer']}
+          typeClient={typeClient}
           onType={setTypeClient}
         />
-        {typeClient ? (
+        {typeClient && form.client?.mode !== 'fiche' ? (
           <p className="-mt-3 text-xs text-[var(--foreground-muted)]">
             Type DGI : {libelleTypeClient(typeClient)}
           </p>
@@ -723,69 +537,67 @@ export function InvoiceEditor({
           desactive={desactive}
         />
 
-        <fieldset className="flex flex-col gap-3" disabled={desactive}>
+        <fieldset className="flex min-w-0 flex-col gap-3" disabled={desactive}>
           <legend className="mb-1 text-sm font-semibold">Commentaires</legend>
           {typeClient === 'AO' ? (
             <p className="text-xs text-[var(--foreground-muted)]">
               Ligne A : la référence d’exonération du client (« Réf. Exo. : … ») est ajoutée
               automatiquement.
             </p>
-          ) : aModifiable ? (
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="com-a" className="text-sm">
-                Ligne A — référence de dérogation (groupe D)
-              </label>
-              <input
-                id="com-a"
-                value={form.commentA}
-                maxLength={255}
-                onChange={(e) => setForm((f) => ({ ...f, commentA: e.target.value }))}
-                className={CHAMP}
-                {...aria('com-a', erreurs['comments.A'])}
-              />
-            </div>
           ) : null}
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="com-c" className="text-sm">
-              Ligne C — rappel du code d’une facture d’acompte (facultatif)
-            </label>
-            <input
+          <FormGrid>
+            {typeClient !== 'AO' && aModifiable ? (
+              <Field
+                id="com-a"
+                label="Ligne A — référence de dérogation (groupe D)"
+                size="lg"
+                error={erreurs['comments.A']}
+              >
+                <TextInput
+                  value={form.commentA}
+                  maxLength={255}
+                  onChange={(e) => setForm((f) => ({ ...f, commentA: e.target.value }))}
+                />
+              </Field>
+            ) : null}
+            <Field
               id="com-c"
-              value={form.commentC}
-              maxLength={255}
-              onChange={(e) => setForm((f) => ({ ...f, commentC: e.target.value }))}
-              className={CHAMP}
-              {...aria('com-c', erreurs['comments.C'])}
-            />
-          </div>
-          {form.currency === 'CDF' && modeNormalise ? (
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={form.showUsdCounterValue}
-                onChange={(e) => setForm((f) => ({ ...f, showUsdCounterValue: e.target.checked }))}
+              label="Ligne C — rappel du code d’une facture d’acompte"
+              optional
+              size="lg"
+              newRow
+              error={erreurs['comments.C']}
+            >
+              <TextInput
+                value={form.commentC}
+                maxLength={255}
+                onChange={(e) => setForm((f) => ({ ...f, commentC: e.target.value }))}
               />
-              Indiquer la contre-valeur en dollars sur la facture normalisée
-            </label>
+            </Field>
+          </FormGrid>
+          {form.currency === 'CDF' && modeNormalise ? (
+            <Switch
+              checked={form.showUsdCounterValue}
+              onChange={(v) => setForm((f) => ({ ...f, showUsdCounterValue: v }))}
+              label="Indiquer la contre-valeur en dollars sur la facture normalisée"
+            />
           ) : null}
         </fieldset>
 
         {gerer ? (
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <button type="submit" className={`${BOUTON} font-semibold`} disabled={envoi}>
-              {envoi
-                ? 'Enregistrement…'
-                : vue === null
-                  ? 'Créer le brouillon'
-                  : 'Enregistrer le brouillon'}
-            </button>
-            {modifie && vue ? (
-              <p className="self-center text-xs text-[var(--foreground-muted)]">
-                Modifications non enregistrées : les totaux affichés sont ceux du dernier
-                enregistrement.
-              </p>
-            ) : null}
-          </div>
+          <StickyActions
+            status={
+              modifie && vue
+                ? 'Modifications non enregistrées : les totaux affichés sont ceux du dernier enregistrement.'
+                : modifie
+                  ? 'Brouillon pas encore créé.'
+                  : null
+            }
+          >
+            <SubmitButton busy={envoi} busyLabel="Enregistrement…">
+              {vue === null ? 'Créer le brouillon' : 'Enregistrer le brouillon'}
+            </SubmitButton>
+          </StickyActions>
         ) : null}
       </form>
 

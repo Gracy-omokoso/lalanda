@@ -146,10 +146,13 @@ export function Select<V extends string>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ouvert, actif]);
 
-  // Après une recherche, la première option active.
+  // Après une recherche, la première option active (pas à chaque rendu : les
+  // écrans passent souvent un nouveau tableau d'options).
+  const activesRef = useRef(actives);
+  activesRef.current = actives;
   useEffect(() => {
-    if (ouvert && q !== '') setActif(actives.indexOf(true));
-  }, [q, ouvert, actives]);
+    if (ouvert && q !== '') setActif(activesRef.current.indexOf(true));
+  }, [q, ouvert]);
 
   function surTouche(e: React.KeyboardEvent): void {
     if (!ouvert) {

@@ -5,14 +5,34 @@
 // le salaire, les coordonnées bancaires, l'identité et les coordonnées
 // personnelles se saisissent dans l'onglet des données sensibles (lot H7).
 
-import { buttonClasses } from '@lalanda/ui';
+import {
+  Button,
+  DatePicker,
+  EntityPicker,
+  ErrorSummary,
+  Field,
+  Form,
+  FormGrid,
+  FormSection,
+  PhoneInput,
+  Select,
+  StickyActions,
+  SubmitButton,
+  Switch,
+  TextArea,
+  TextInput,
+  correspondRecherche,
+  resumerErreurs,
+  useBlurValidation,
+  type FieldSize,
+} from '@lalanda/ui';
 import { useEffect, useId, useState } from 'react';
 
-import { hrApi, type HrEmployeeView } from '@/lib/api-hr';
+import { hrApi, type HrDepartmentView, type HrEmployeeView } from '@/lib/api-hr';
 // ADR-0068 : matricule automatique, poste du référentiel, « Inviter sur Lalanda ».
 import { hrLot1Api, type PositionView } from '@/lib/api-hr-lot1';
 
-import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from '../../ventes/_components/form-ui';
+import { Alerte } from '../../ventes/_components/form-ui';
 
 import {
   formCollaborateur,
@@ -31,7 +51,8 @@ import {
 } from './lot1-model';
 import { useReferentielsRh } from './referentiels';
 import { useAccesRh } from './rh-access';
-import { aujourdhui, messageRh } from './rh-model';
+import { aujourdhui, messageRh, peutGererRh } from './rh-model';
+import { FormulaireService } from './services';
 
 export function FicheFormulaire({
   fiche,
@@ -58,6 +79,9 @@ export function FicheFormulaire({
   const sansCompte = !fiche?.userId;
   const invitation = caseInvitation(f.workEmail, choixInvitation);
   const peutInviter = peutInviterSurLalanda(actions);
+  // ADR-0074 § 4 : un service absent se crée depuis la fiche (`hr.manage`, l'API juge).
+  const gererServices = peutGererRh(actions);
+  const [servicesAjoutes, setServicesAjoutes] = useState<HrDepartmentView[]>([]);
   // ADR-0068 § 2 : matricule posé = non modifiable ici ; sinon attribué si laissé vide.
   const matriculeFige = fiche !== null && fiche.employeeNumber !== null;
   const [prochain, setProchain] = useState<string | null>(null);
@@ -86,6 +110,7 @@ export function FicheFormulaire({
 
   async function envoyer(ev: React.FormEvent): Promise<void> {
     ev.preventDefault();
+    validateAll();
     const r = validerCollaborateur(f, contrats, fiche?.id ?? null);
     if (!r.ok) {
       setErreurs(r.erreurs);
@@ -114,202 +139,345 @@ export function FicheFormulaire({
     }
   }
 
+  // ADR-0074 § 9 : une erreur apparaît à la sortie du champ, avec les MÊMES règles qu'à l'envoi.
+  const {
+    errors: erreursSaisie,
+    touch,
+    validateAll,
+    submitCount,
+  } = useBlurValidation<ChampCollaborateur>(() => {
+    const r = validerCollaborateur(f, contrats, fiche?.id ?? null);
+    return r.ok ? {} : r.erreurs;
+  });
+  const erreursVues: ErreursCollaborateur = { ...erreursSaisie, ...erreurs };
+  const idDe = (champ: ChampCollaborateur): string => `${id}-${champ}`;
+
+  // Services : la liste du référentiel, plus ceux créés depuis cette fenêtre.
+  const tousServices = [
+    ...services,
+    ...servicesAjoutes.filter((a) => !services.some((s) => s.id === a.id)),
+  ];
+  const serviceChoisi = tousServices.find((s) => s.id === f.departmentId) ?? null;
+  const managers = managersProposes(employes, fiche?.id ?? null);
+  const managerChoisi = managers.find((m) => m.id === f.managerEmployeeId) ?? null;
+
   const texte = (
     champ: ChampCollaborateur,
     label: string,
-    opts: { requis?: boolean; type?: string; aide?: string; autoComplete?: string } = {},
+    opts: {
+      requis?: boolean;
+      type?: string;
+      aide?: string;
+      autoComplete?: string;
+      taille?: FieldSize;
+      nouvelleLigne?: boolean;
+    } = {},
   ): React.ReactElement => (
-    <Champ
-      id={`${id}-${champ}`}
+    <Field
+      id={idDe(champ)}
       label={label}
-      requis={opts.requis}
-      erreur={erreurs[champ]}
-      aide={opts.aide}
+      required={opts.requis}
+      error={erreursVues[champ]}
+      hint={opts.aide}
+      size={opts.taille ?? 'md'}
+      newRow={opts.nouvelleLigne}
     >
-      <input
-        id={`${id}-${champ}`}
+      <TextInput
         type={opts.type ?? 'text'}
-        className={CHAMP}
         value={f[champ]}
         autoComplete={opts.autoComplete ?? 'off'}
         onChange={(e) => maj({ [champ]: e.target.value } as Partial<FormCollaborateur>)}
-        {...aria(`${id}-${champ}`, erreurs[champ], opts.aide !== undefined)}
+        onBlur={() => touch(champ)}
       />
-    </Champ>
+    </Field>
+  );
+
+  const date = (
+    champ: 'startDate' | 'probationEndDate' | 'contractEndDate',
+    label: string,
+    opts: { requis?: boolean; aide?: string; min?: string } = {},
+  ): React.ReactElement => (
+    <Field
+      id={idDe(champ)}
+      label={label}
+      required={opts.requis}
+      error={erreursVues[champ]}
+      hint={opts.aide}
+      size="sm"
+    >
+      <DatePicker
+        value={f[champ]}
+        onChange={(v) => {
+          maj({ [champ]: v } as Partial<FormCollaborateur>);
+          touch(champ);
+        }}
+        onBlur={() => touch(champ)}
+        required={opts.requis}
+        {...(opts.min ? { min: opts.min } : {})}
+        shortcuts={champ === 'startDate' ? ['today'] : ['today', 'endOfMonth', 'plus30']}
+      />
+    </Field>
+  );
+
+  const resume = resumerErreurs(
+    erreursVues,
+    (
+      [
+        ['firstName', 'Prénom'],
+        ['lastName', 'Nom'],
+        ['preferredName', 'Nom d’usage'],
+        ['employeeNumber', 'Matricule'],
+        ['jobTitle', 'Intitulé du poste'],
+        ['departmentId', 'Service'],
+        ['managerEmployeeId', 'Manager'],
+        ['contractType', 'Type de contrat'],
+        ['startDate', 'Date d’entrée'],
+        ['probationEndDate', 'Fin de période d’essai'],
+        ['contractEndDate', 'Fin de contrat'],
+        ['workLocation', 'Lieu de travail'],
+        ['workEmail', 'E-mail professionnel'],
+        ['workPhone', 'Téléphone professionnel'],
+        ['notes', 'Notes'],
+      ] as const
+    ).map(([cle, libelle]) => ({ cle, id: idDe(cle), libelle })),
   );
 
   return (
-    <form className="flex flex-col gap-4" onSubmit={(e) => void envoyer(e)} noValidate>
-      <div className="grid gap-4 sm:grid-cols-2">
-        {texte('firstName', 'Prénom', { requis: true })}
-        {texte('lastName', 'Nom', { requis: true })}
+    <Form className="flex flex-col gap-5" onSubmit={(e) => void envoyer(e)}>
+      <ErrorSummary errors={submitCount > 0 ? resume : []} submitCount={submitCount} />
+
+      <FormSection title="Identité">
+        {texte('firstName', 'Prénom', { requis: true, autoComplete: 'given-name' })}
+        {texte('lastName', 'Nom', { requis: true, autoComplete: 'family-name' })}
         {texte('preferredName', 'Nom d’usage', { aide: 'Facultatif : le nom affiché partout.' })}
         {matriculeFige ? (
-          <Champ
-            id={`${id}-employeeNumber`}
+          <Field
+            id={idDe('employeeNumber')}
             label="Matricule"
-            aide="Attribué à la création ; un responsable RH peut le corriger depuis le dossier, avec un motif."
+            size="sm"
+            newRow
+            hint="Attribué à la création ; un responsable RH peut le corriger depuis le dossier, avec un motif."
           >
-            <input
-              id={`${id}-employeeNumber`}
-              className={CHAMP}
-              value={fiche?.employeeNumber ?? ''}
-              readOnly
-              aria-readonly="true"
-            />
-          </Champ>
+            <TextInput value={fiche?.employeeNumber ?? ''} readOnly aria-readonly="true" />
+          </Field>
         ) : (
-          texte('employeeNumber', 'Matricule', {
-            aide: `Laisser vide : attribué automatiquement${prochain ? ` (prochain : ${prochain})` : ''}. Saisissez-le pour reprendre un matricule existant.`,
-          })
+          <Field
+            id={idDe('employeeNumber')}
+            label="Matricule"
+            size="sm"
+            newRow
+            optional
+            error={erreursVues.employeeNumber}
+            hint={`Vide : attribué automatiquement${prochain ? ` (prochain : ${prochain})` : ''}. Saisissez-le pour reprendre un matricule existant.`}
+          >
+            <TextInput
+              value={f.employeeNumber}
+              autoComplete="off"
+              className="font-mono"
+              onChange={(e) => maj({ employeeNumber: e.target.value })}
+              onBlur={() => touch('employeeNumber')}
+            />
+          </Field>
         )}
-        {texte('jobTitle', 'Intitulé du poste', { requis: true })}
+      </FormSection>
+
+      <FormSection title="Poste">
+        {texte('jobTitle', 'Intitulé du poste', { requis: true, taille: 'lg' })}
         {choixPossible ? (
-          <Champ
+          <Field
             id={`${id}-position`}
             label="Poste du référentiel"
-            aide="Remplacement poste pour poste : même numéro de poste, nouveau matricule pour la personne."
+            size="lg"
+            hint="Remplacement poste pour poste : même numéro de poste, nouveau matricule pour la personne."
           >
-            <select
-              id={`${id}-position`}
-              className={CHAMP}
+            <Select<ChoixPoste>
               value={choixPoste}
-              onChange={(e) => {
-                const v = e.target.value as ChoixPoste;
+              onChange={(v) => {
                 setChoixPoste(v);
                 const p = vacants.find((x) => `pos:${x.id}` === v);
                 if (p && f.jobTitle.trim() === '') maj({ jobTitle: p.title });
                 if (p?.departmentId && f.departmentId === '') maj({ departmentId: p.departmentId });
               }}
-            >
-              <option value="">Sans poste numéroté</option>
-              <option value="new">Nouveau poste (numéro attribué)</option>
-              {vacants.length > 0 ? (
-                <optgroup label="Remplacement poste pour poste (postes vacants)">
-                  {vacants.map((p) => (
-                    <option key={p.id} value={`pos:${p.id}`}>
-                      {optionPoste(p)}
-                    </option>
-                  ))}
-                </optgroup>
-              ) : null}
-            </select>
-          </Champ>
-        ) : null}
-        <Champ id={`${id}-departmentId`} label="Service" erreur={erreurs.departmentId}>
-          <select
-            id={`${id}-departmentId`}
-            className={CHAMP}
-            value={f.departmentId}
-            onChange={(e) => maj({ departmentId: e.target.value })}
-          >
-            <option value="">Aucun service</option>
-            {services.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </Champ>
-        <Champ
-          id={`${id}-managerEmployeeId`}
-          label="Manager"
-          erreur={erreurs.managerEmployeeId}
-          aide="Il valide les absences de ce collaborateur."
-        >
-          <select
-            id={`${id}-managerEmployeeId`}
-            className={CHAMP}
-            value={f.managerEmployeeId}
-            onChange={(e) => maj({ managerEmployeeId: e.target.value })}
-            {...aria(`${id}-managerEmployeeId`, erreurs.managerEmployeeId, true)}
-          >
-            <option value="">Aucun manager</option>
-            {managersProposes(employes, fiche?.id ?? null).map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.nom}
-              </option>
-            ))}
-          </select>
-        </Champ>
-        <Champ
-          id={`${id}-contractType`}
-          label="Type de contrat"
-          requis
-          erreur={erreurs.contractType}
-        >
-          <select
-            id={`${id}-contractType`}
-            className={CHAMP}
-            value={f.contractType}
-            onChange={(e) => maj({ contractType: e.target.value })}
-            {...aria(`${id}-contractType`, erreurs.contractType)}
-          >
-            <option value="">Choisir…</option>
-            {contrats
-              .filter((c) => c.active || c.key === f.contractType)
-              .map((c) => (
-                <option key={c.key} value={c.key}>
-                  {c.label}
-                </option>
-              ))}
-          </select>
-        </Champ>
-        {texte('startDate', 'Date d’entrée', { requis: true, type: 'date' })}
-        {texte('probationEndDate', 'Fin de période d’essai', {
-          type: 'date',
-          aide: 'Saisie, jamais calculée : Lalanda ne fixe aucune durée d’essai.',
-        })}
-        {texte('contractEndDate', 'Fin de contrat', { type: 'date' })}
-        {texte('workLocation', 'Lieu de travail')}
-        {texte('workEmail', 'E-mail professionnel', { type: 'email' })}
-        {texte('workPhone', 'Téléphone professionnel', { type: 'tel' })}
-      </div>
-      {sansCompte && invitation.visible ? (
-        <div className="flex flex-col gap-1 rounded-[var(--radius-md)] border border-[var(--border)] p-3 text-sm">
-          <label className="flex items-center gap-2 font-medium">
-            <input
-              type="checkbox"
-              checked={invitation.cochee}
-              onChange={(e) => setChoixInvitation(e.target.checked)}
+              options={[
+                { value: '', label: 'Sans poste numéroté' },
+                {
+                  value: 'new',
+                  label: 'Nouveau poste (numéro attribué)',
+                  description: 'Un numéro de poste est créé pour cette personne.',
+                },
+                ...vacants.map((p) => ({
+                  value: `pos:${p.id}` as ChoixPoste,
+                  label: optionPoste(p),
+                  group: 'Remplacement poste pour poste (postes vacants)',
+                })),
+              ]}
             />
-            Inviter sur Lalanda
-          </label>
-          <p className="text-xs text-[var(--foreground-muted)]">
-            {peutInviter
-              ? 'Un membre de l’organisation qui a cette adresse est relié tout de suite ; sinon une invitation part à cette adresse (rôle Salarié) et la fiche est reliée quand la personne l’accepte.'
-              : 'Vous n’avez pas le droit d’inviter : la fiche sera enregistrée sans rien envoyer, et un administrateur pourra l’inviter depuis la fiche.'}
-          </p>
+          </Field>
+        ) : null}
+        <Field
+          id={idDe('departmentId')}
+          label="Service"
+          size="md"
+          newRow
+          error={erreursVues.departmentId}
+          hint={
+            gererServices
+              ? 'Tapez pour chercher. Service absent : « + » le crée sans quitter la fiche.'
+              : 'Tapez pour chercher. Vide : aucun service.'
+          }
+        >
+          <EntityPicker<HrDepartmentView>
+            value={serviceChoisi}
+            onChange={(s) => maj({ departmentId: s?.id ?? '' })}
+            search={async (q) =>
+              tousServices
+                .filter((s) => correspondRecherche([s.name], q))
+                .sort((a, b) => a.name.localeCompare(b.name, 'fr'))
+            }
+            refreshKey={tousServices.length}
+            getKey={(s) => s.id}
+            getLabel={(s) => s.name}
+            getDescription={(s) => tousServices.find((p) => p.id === s.parentId)?.name ?? null}
+            placeholder="Aucun service"
+            debounceMs={0}
+            emptyText="Aucun service ne correspond."
+            createTitle="Nouveau service"
+            createButtonLabel="Créer un service"
+            {...(gererServices
+              ? {
+                  createForm: ({ initialText, onCreated, onCancel }) => (
+                    <FormulaireService
+                      service={null}
+                      services={tousServices}
+                      employes={employes}
+                      nomInitial={initialText}
+                      onEnregistre={(cree) => {
+                        setServicesAjoutes((l) => [...l, cree]);
+                        onCreated(cree);
+                      }}
+                      onAnnuler={onCancel}
+                    />
+                  ),
+                }
+              : {})}
+          />
+        </Field>
+        <Field
+          id={idDe('managerEmployeeId')}
+          label="Manager"
+          size="md"
+          error={erreursVues.managerEmployeeId}
+          hint="Il valide les absences de ce collaborateur."
+        >
+          <EntityPicker<{ id: string; nom: string }>
+            value={managerChoisi}
+            onChange={(m) => maj({ managerEmployeeId: m?.id ?? '' })}
+            search={async (q) => managers.filter((m) => correspondRecherche([m.nom], q))}
+            refreshKey={managers.length}
+            getKey={(m) => m.id}
+            getLabel={(m) => m.nom}
+            placeholder="Aucun manager"
+            debounceMs={0}
+            emptyText="Aucun collaborateur actif ne correspond."
+          />
+        </Field>
+      </FormSection>
+
+      <FormSection title="Contrat">
+        <Field
+          id={idDe('contractType')}
+          label="Type de contrat"
+          required
+          size="md"
+          error={erreursVues.contractType}
+        >
+          <Select
+            value={f.contractType}
+            onChange={(v) => {
+              maj({ contractType: v });
+              touch('contractType');
+            }}
+            onBlur={() => touch('contractType')}
+            placeholder="Choisir…"
+            options={contrats
+              .filter((c) => c.active || c.key === f.contractType)
+              .map((c) => ({
+                value: c.key,
+                label: c.label,
+                description: c.hasEndDate ? 'Avec date de fin' : undefined,
+              }))}
+          />
+        </Field>
+        {date('startDate', 'Date d’entrée', { requis: true })}
+        {date('probationEndDate', 'Fin de période d’essai', {
+          aide: 'Saisie, jamais calculée : Lalanda ne fixe aucune durée d’essai.',
+          ...(f.startDate ? { min: f.startDate } : {}),
+        })}
+        {date('contractEndDate', 'Fin de contrat', f.startDate ? { min: f.startDate } : {})}
+      </FormSection>
+
+      <FormSection title="Coordonnées professionnelles">
+        {texte('workLocation', 'Lieu de travail')}
+        {texte('workEmail', 'E-mail professionnel', { type: 'email', autoComplete: 'off' })}
+        <Field
+          id={idDe('workPhone')}
+          label="Téléphone professionnel"
+          size="md"
+          error={erreursVues.workPhone}
+        >
+          <PhoneInput
+            value={f.workPhone}
+            onChange={(v) => maj({ workPhone: v })}
+            onBlur={() => touch('workPhone')}
+          />
+        </Field>
+      </FormSection>
+
+      {sansCompte && invitation.visible ? (
+        <div className="rounded-[var(--radius-md)] border border-[var(--border)] p-3">
+          <Switch
+            checked={invitation.cochee}
+            onChange={setChoixInvitation}
+            label="Inviter sur Lalanda"
+            description={
+              peutInviter
+                ? 'Un membre de l’organisation qui a cette adresse est relié tout de suite ; sinon une invitation part à cette adresse (rôle Salarié) et la fiche est reliée quand la personne l’accepte.'
+                : 'Vous n’avez pas le droit d’inviter : la fiche sera enregistrée sans rien envoyer, et un administrateur pourra l’inviter depuis la fiche.'
+            }
+          />
         </div>
       ) : null}
-      <Champ
-        id={`${id}-notes`}
-        label="Notes"
-        erreur={erreurs.notes}
-        aide="Ne rien noter ici de médical, de disciplinaire ou de financier : ces notes ne sont pas protégées comme des données sensibles."
-      >
-        <textarea
-          id={`${id}-notes`}
-          rows={3}
-          className={CHAMP}
-          value={f.notes}
-          onChange={(e) => maj({ notes: e.target.value })}
-          {...aria(`${id}-notes`, erreurs.notes, true)}
-        />
-      </Champ>
+
+      <FormGrid>
+        <Field
+          id={idDe('notes')}
+          label="Notes"
+          size="full"
+          error={erreursVues.notes}
+          hint="Ne rien noter ici de médical, de disciplinaire ou de financier : ces notes ne sont pas protégées comme des données sensibles."
+        >
+          <TextArea
+            rows={3}
+            value={f.notes}
+            onChange={(e) => maj({ notes: e.target.value })}
+            onBlur={() => touch('notes')}
+          />
+        </Field>
+      </FormGrid>
+
       {erreur ? (
         <Alerte>
           <p>{erreur}</p>
         </Alerte>
       ) : null}
-      <div className="flex flex-wrap justify-end gap-2">
-        <button type="button" className={BOUTON_PETIT} onClick={onAnnuler} disabled={envoi}>
+      <StickyActions>
+        <Button size="sm" onClick={onAnnuler} disabled={envoi}>
           Annuler
-        </button>
-        <button type="submit" className={buttonClasses('primary', 'sm')} disabled={envoi}>
-          {envoi ? 'Enregistrement…' : fiche ? 'Enregistrer' : 'Créer la fiche'}
-        </button>
-      </div>
-    </form>
+        </Button>
+        <SubmitButton size="sm" busy={envoi} busyLabel="Enregistrement…">
+          {fiche ? 'Enregistrer' : 'Créer la fiche'}
+        </SubmitButton>
+      </StickyActions>
+    </Form>
   );
 }

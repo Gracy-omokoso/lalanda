@@ -64,6 +64,25 @@ export function texteCodesDeSecours(codes: readonly string[], email: string | nu
     .join('\n');
 }
 
+/**
+ * Connexion en deux temps (ADR-0074 § 10) : le mot de passe, PUIS le code, sur deux écrans.
+ * Les deux partent toujours ENSEMBLE dans la même requête (`POST /admin/reauth`, contrat
+ * inchangé) ; l'écran ne vérifie rien seul. Après un refus, on retourne à l'étape fautive :
+ * mot de passe refusé (ou connexion Google à refaire) → étape du mot de passe ; sinon on
+ * reste sur le code, vidé pour une nouvelle saisie.
+ */
+export type EtapeConnexion = 'motdepasse' | 'code';
+
+export function etapeApresErreur(err: unknown): EtapeConnexion {
+  const code = (err as { detail?: { code?: unknown } } | null)?.detail?.code;
+  return code === 'INVALID_PASSWORD' || code === 'REAUTH_GOOGLE_REQUIRED' ? 'motdepasse' : 'code';
+}
+
+/** Le bouton « Continuer » de l'étape du mot de passe. */
+export function motDePassePret(motDePasse: string, facultatif: boolean): boolean {
+  return facultatif || motDePasse !== '';
+}
+
 /** Message d'erreur lisible pour les codes de la double authentification. */
 export function messageDeuxFacteurs(err: unknown, defaut: string): string {
   const detail = (err as { detail?: { code?: unknown } } | null)?.detail;

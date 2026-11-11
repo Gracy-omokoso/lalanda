@@ -11,13 +11,27 @@
 // quelqu'un d'autre a écrit entre-temps (`409 STALE_REVISION`), on le dit et on
 // propose de recharger — jamais d'écrasement silencieux.
 
+import {
+  Button,
+  ChoiceCards,
+  ErrorSummary,
+  Field,
+  Form,
+  FormSection,
+  PhoneInput,
+  SubmitButton,
+  TextArea,
+  TextInput,
+  resumerErreurs,
+  useBlurValidation,
+} from '@lalanda/ui';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
 import { EntityDocumentsPanel } from '@/components/entity-documents-panel';
 import { api, type CustomerView } from '@/lib/api';
 
-import { Alerte, aria, BOUTON, Champ, CHAMP, Pastille } from './form-ui';
+import { Alerte, BOUTON, Pastille } from './form-ui';
 import {
   type ChampClient,
   CUSTOMER_TYPES,
@@ -36,6 +50,25 @@ import {
   requiredFieldsFor,
 } from './sales-model';
 
+/** Ordre et libellés du résumé d'erreurs (ADR-0074 § 9). */
+function RESUME_CHAMPS(
+  type: FormulaireClient['type'],
+): { cle: ChampClient; id: string; libelle: string }[] {
+  return [
+    { cle: 'type', id: 'cl-type', libelle: 'Type de client' },
+    { cle: 'name', id: 'cl-name', libelle: type === '' ? 'Nom' : libelleNom(type) },
+    { cle: 'nif', id: 'cl-nif', libelle: 'NIF' },
+    {
+      cle: 'exemptionReference',
+      id: 'cl-exemption',
+      libelle: 'Référence du document d’exonération',
+    },
+    { cle: 'phone', id: 'cl-phone', libelle: 'Téléphone' },
+    { cle: 'email', id: 'cl-email', libelle: 'Adresse e-mail' },
+    { cle: 'address', id: 'cl-address', libelle: 'Adresse' },
+  ];
+}
+
 const CHAMPS: readonly ChampClient[] = [
   'type',
   'name',
@@ -52,6 +85,7 @@ export function CustomerForm({
   base,
   onFermer,
   enModal = false,
+  nomInitial = '',
 }: {
   fiche: Exclude<FicheOuverte, null>;
   /** `sales.manage` confirmé par le serveur. Sans lui, la fiche est en lecture seule. */
@@ -62,10 +96,16 @@ export function CustomerForm({
   onFermer: (enregistre?: CustomerView) => void;
   /** Création dans la fenêtre modale : son en-tête porte le titre et la fermeture. */
   enModal?: boolean;
+  /** Création rapide (ADR-0074 § 4) : nom repris du texte tapé dans le sélecteur. */
+  nomInitial?: string;
 }): React.ReactElement {
   const id = fiche.mode === 'edition' ? fiche.id : null;
   const [vue, setVue] = useState<CustomerView | null>(null);
-  const [form, setForm] = useState<FormulaireClient>(() => formulaireClient(null));
+  const [form, setForm] = useState<FormulaireClient>(() => ({
+    ...formulaireClient(null),
+    name: nomInitial,
+  }));
+  const [reference, setReference] = useState<string | null>(null);
   const [chargement, setChargement] = useState(id !== null);
   const [erreurChargement, setErreurChargement] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -76,6 +116,23 @@ export function CustomerForm({
   const [occupe, setOccupe] = useState(false);
 
   const lectureSeule = !gerer;
+  const modifie =
+    !lectureSeule &&
+    (reference === null
+      ? JSON.stringify(form) !== JSON.stringify({ ...formulaireClient(null), name: nomInitial })
+      : JSON.stringify(form) !== reference);
+  // Validation à la sortie du champ (ADR-0074 § 9) : mêmes règles que l'envoi.
+  const {
+    errors: erreursSaisie,
+    touch,
+    validateAll,
+    submitCount: soumissions,
+  } = useBlurValidation<ChampClient>(() => {
+    const p = preparerClient(form);
+    return p.ok ? {} : p.champs;
+  });
+  // Erreur du serveur d'abord, sinon celle de la saisie.
+  const champsAffiches: Partial<Record<ChampClient, string>> = { ...erreursSaisie, ...champs };
 
   const charger = useCallback(async (): Promise<void> => {
     if (id === null) return;
@@ -85,6 +142,7 @@ export function CustomerForm({
       const v = await api.getCustomer(id);
       setVue(v);
       setForm(formulaireClient(v));
+      setReference(JSON.stringify(formulaireClient(v)));
       setChamps({});
       setErreur(null);
       setAutres([]);
@@ -115,10 +173,11 @@ export function CustomerForm({
     setAutres([]);
     setPerimee(false);
     setExistant(null);
+    validateAll();
     const prep = preparerClient(form);
     if (!prep.ok) {
+      // Le résumé cliquable (ErrorSummary) liste les champs à compléter.
       setChamps(prep.champs);
-      setErreur('Certains champs sont à compléter.');
       return;
     }
     setChamps({});
@@ -213,9 +272,10 @@ export function CustomerForm({
         ) : null}
       </div>
 
-      <form
+      <Form
         onSubmit={(e) => void enregistrer(e)}
-        noValidate
+        dirty={modifie}
+        autoFocusFirst={vue === null}
         className="flex max-w-3xl flex-col gap-5"
       >
         {erreur ? (
@@ -255,54 +315,34 @@ export function CustomerForm({
           </Alerte>
         ) : null}
 
-        <fieldset disabled={lectureSeule || occupe} className="flex flex-col gap-5">
-          <fieldset
-            className="flex flex-col gap-2"
-            aria-describedby={champs.type ? 'cl-type-erreur' : undefined}
+        <ErrorSummary
+          errors={resumerErreurs(champsAffiches, RESUME_CHAMPS(type))}
+          submitCount={soumissions}
+        />
+
+        <fieldset disabled={lectureSeule || occupe} className="flex min-w-0 flex-col gap-6">
+          <Field
+            id="cl-type"
+            label="Type de client"
+            group
+            required
+            size="full"
+            hint="Le type est celui que la DGI attend sur la facture ; il décide des champs obligatoires."
+            error={champsAffiches.type}
           >
-            <legend className="mb-1 text-sm font-semibold">
-              Type de client
-              <span className="text-[var(--foreground-muted)]" aria-hidden="true">
-                {' '}
-                *
-              </span>
-              <span className="sr-only"> (obligatoire)</span>
-            </legend>
-            <p className="-mt-1 text-xs text-[var(--foreground-muted)]">
-              Le type est celui que la DGI attend sur la facture ; il décide des champs
-              obligatoires.
-            </p>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {CUSTOMER_TYPES.map((t) => (
-                <label
-                  key={t.value}
-                  className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 text-sm transition ${
-                    type === t.value
-                      ? 'border-[var(--accent)]'
-                      : 'border-[var(--border)] hover:border-[var(--border-strong)]'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="cl-type"
-                    value={t.value}
-                    checked={type === t.value}
-                    onChange={() => maj('type', t.value)}
-                    className="mt-0.5 h-4 w-4"
-                  />
-                  <span className="flex flex-col gap-0.5">
-                    <span className="font-medium">{t.label}</span>
-                    <span className="text-xs text-[var(--foreground-muted)]">{t.aide}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
-            {champs.type ? (
-              <p id="cl-type-erreur" className="text-xs font-medium text-[var(--danger)]">
-                {champs.type}
-              </p>
-            ) : null}
-          </fieldset>
+            <ChoiceCards
+              value={type}
+              onChange={(v) => {
+                maj('type', v);
+                touch('type');
+              }}
+              options={CUSTOMER_TYPES.map((t) => ({
+                value: t.value,
+                label: t.label,
+                description: t.aide,
+              }))}
+            />
+          </Field>
 
           {type === '' ? (
             <p className="text-sm text-[var(--foreground-muted)]" aria-live="polite">
@@ -310,134 +350,113 @@ export function CustomerForm({
             </p>
           ) : (
             <>
-              <fieldset className="flex flex-col gap-4">
-                <legend className="mb-2 text-sm font-semibold">Identité</legend>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Champ id="cl-name" label={libelleNom(type)} requis erreur={champs.name}>
-                    <input
-                      id="cl-name"
-                      value={form.name}
-                      onChange={(e) => maj('name', e.target.value)}
-                      maxLength={200}
-                      required
-                      autoComplete="organization"
-                      className={CHAMP}
-                      {...aria('cl-name', champs.name)}
-                    />
-                  </Champ>
-                  <Champ
-                    id="cl-nif"
-                    label="NIF"
-                    requis={requis?.nif === true}
-                    aide={
-                      requis?.nif
-                        ? `Obligatoire pour une ${typeChoisi?.label.toLowerCase() ?? 'ce type'}. Les espaces et tirets sont retirés à l’enregistrement.`
-                        : 'Facultatif pour ce type. Les espaces et tirets sont retirés à l’enregistrement.'
-                    }
-                    erreur={champs.nif}
+              <FormSection title="Identité">
+                <Field
+                  id="cl-name"
+                  label={libelleNom(type)}
+                  required
+                  size="lg"
+                  error={champsAffiches.name}
+                >
+                  <TextInput
+                    value={form.name}
+                    onChange={(e) => maj('name', e.target.value)}
+                    onBlur={() => touch('name')}
+                    maxLength={200}
+                    autoComplete="organization"
+                  />
+                </Field>
+                <Field
+                  id="cl-nif"
+                  label="NIF"
+                  required={requis?.nif === true}
+                  optional={requis?.nif !== true}
+                  size="sm"
+                  hint={
+                    requis?.nif
+                      ? `Obligatoire pour une ${typeChoisi?.label.toLowerCase() ?? 'ce type'}. Espaces et tirets retirés à l’enregistrement.`
+                      : 'Espaces et tirets retirés à l’enregistrement.'
+                  }
+                  error={champsAffiches.nif}
+                >
+                  <TextInput
+                    value={form.nif}
+                    onChange={(e) => maj('nif', e.target.value)}
+                    onBlur={() => touch('nif')}
+                    maxLength={40}
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="font-mono uppercase"
+                  />
+                </Field>
+                {referenceExonerationAdmise(type) ? (
+                  <Field
+                    id="cl-exemption"
+                    label="Référence du document d’exonération"
+                    required
+                    size="full"
+                    hint="Imprimée sur chaque facture de ce client (ligne de commentaire)."
+                    error={champsAffiches.exemptionReference}
                   >
-                    <input
-                      id="cl-nif"
-                      value={form.nif}
-                      onChange={(e) => maj('nif', e.target.value)}
-                      maxLength={40}
-                      required={requis?.nif === true}
-                      autoComplete="off"
-                      spellCheck={false}
-                      className={`${CHAMP} font-mono uppercase`}
-                      {...aria('cl-nif', champs.nif, true)}
+                    <TextInput
+                      value={form.exemptionReference}
+                      onChange={(e) => maj('exemptionReference', e.target.value)}
+                      onBlur={() => touch('exemptionReference')}
+                      maxLength={200}
                     />
-                  </Champ>
-                  {referenceExonerationAdmise(type) ? (
-                    <div className="sm:col-span-2">
-                      <Champ
-                        id="cl-exemption"
-                        label="Référence du document d’exonération"
-                        requis
-                        aide="Imprimée sur chaque facture de ce client (ligne de commentaire)."
-                        erreur={champs.exemptionReference}
-                      >
-                        <input
-                          id="cl-exemption"
-                          value={form.exemptionReference}
-                          onChange={(e) => maj('exemptionReference', e.target.value)}
-                          maxLength={200}
-                          required
-                          className={CHAMP}
-                          {...aria('cl-exemption', champs.exemptionReference, true)}
-                        />
-                      </Champ>
-                    </div>
-                  ) : null}
-                </div>
-              </fieldset>
+                  </Field>
+                ) : null}
+              </FormSection>
 
-              <fieldset className="flex flex-col gap-4">
-                <legend className="mb-2 text-sm font-semibold">Coordonnées</legend>
-                <p className="-mt-2 text-xs text-[var(--foreground-muted)]">
-                  Facultatives. L’adresse est imprimée sur la facture si elle est renseignée.
-                </p>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Champ id="cl-phone" label="Téléphone" erreur={champs.phone}>
-                    <input
-                      id="cl-phone"
-                      type="tel"
-                      value={form.phone}
-                      onChange={(e) => maj('phone', e.target.value)}
-                      maxLength={20}
-                      autoComplete="tel"
-                      placeholder="+243 …"
-                      className={CHAMP}
-                      {...aria('cl-phone', champs.phone)}
-                    />
-                  </Champ>
-                  <Champ id="cl-email" label="Adresse e-mail" erreur={champs.email}>
-                    <input
-                      id="cl-email"
-                      type="email"
-                      value={form.email}
-                      onChange={(e) => maj('email', e.target.value)}
-                      maxLength={254}
-                      autoComplete="email"
-                      className={CHAMP}
-                      {...aria('cl-email', champs.email)}
-                    />
-                  </Champ>
-                  <div className="sm:col-span-2">
-                    <Champ id="cl-address" label="Adresse" erreur={champs.address}>
-                      <textarea
-                        id="cl-address"
-                        value={form.address}
-                        onChange={(e) => maj('address', e.target.value)}
-                        maxLength={255}
-                        rows={2}
-                        autoComplete="street-address"
-                        className={CHAMP}
-                        {...aria('cl-address', champs.address)}
-                      />
-                    </Champ>
-                  </div>
-                </div>
-              </fieldset>
+              <FormSection
+                title="Coordonnées"
+                description="Facultatives. L’adresse est imprimée sur la facture si elle est renseignée."
+              >
+                <Field id="cl-phone" label="Téléphone" size="md" error={champsAffiches.phone}>
+                  <PhoneInput
+                    value={form.phone}
+                    onChange={(v) => maj('phone', v)}
+                    onBlur={() => touch('phone')}
+                    maxLength={20}
+                  />
+                </Field>
+                <Field id="cl-email" label="Adresse e-mail" size="md" error={champsAffiches.email}>
+                  <TextInput
+                    type="email"
+                    inputMode="email"
+                    value={form.email}
+                    onChange={(e) => maj('email', e.target.value)}
+                    onBlur={() => touch('email')}
+                    maxLength={254}
+                    autoComplete="email"
+                  />
+                </Field>
+                <Field id="cl-address" label="Adresse" size="full" error={champsAffiches.address}>
+                  <TextArea
+                    value={form.address}
+                    onChange={(e) => maj('address', e.target.value)}
+                    onBlur={() => touch('address')}
+                    maxLength={255}
+                    rows={2}
+                    autoComplete="street-address"
+                  />
+                </Field>
+              </FormSection>
             </>
           )}
         </fieldset>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-          {lectureSeule ? null : (
-            <button type="submit" disabled={occupe} className={BOUTON}>
-              {occupe
-                ? 'Enregistrement…'
-                : fiche.mode === 'creation'
-                  ? 'Créer le client'
-                  : 'Enregistrer les modifications'}
-            </button>
-          )}
-          <button type="button" onClick={() => onFermer()} className={BOUTON}>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+          <Button onClick={() => onFermer()} className="max-sm:h-11">
             {lectureSeule ? 'Retour à la liste' : 'Annuler'}
-          </button>
+          </Button>
+          {lectureSeule ? null : (
+            <SubmitButton busy={occupe} busyLabel="Enregistrement…" className="max-sm:h-11">
+              {fiche.mode === 'creation' ? 'Créer le client' : 'Enregistrer les modifications'}
+            </SubmitButton>
+          )}
         </div>
-      </form>
+      </Form>
       {/* ADR-0046 — S9 : documents liés à un client existant (présentation O5). */}
       {id !== null && !enModal ? (
         <EntityDocumentsPanel

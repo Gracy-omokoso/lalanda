@@ -265,3 +265,13 @@ Décideurs :
   factures, devis, avoirs, cartes, attestations et certificats ; modèles de facture 1.2.0, versions
   1.0.0 et 1.1.0 inchangées octet pour octet ; présentation figée étendue de champs facultatifs.
   Statut : **accepté** (10 nov. 2026).
+- [ADR-0074](ADR-0074-formulaires-modernes.md) — Formulaires modernes : composants maison dans
+  `@lalanda/ui` sans dépendance (`Field` et grille de 12 colonnes à largeurs sémantiques xs → full
+  par requête de conteneur, `Select` au chevron décollé et liste à 6 px avec recherche dès 8
+  options, `EntityPicker` « tape pour chercher ou crée » avec création rapide pré-remplie en
+  fenêtre, `OtpInput`, `DatePicker`/`DateRangePicker` JJ/MM/AAAA lundi premier, segments, cartes,
+  interrupteur, case, `MoneyInput` texte seulement, `PhoneInput` +243) ; validation à la sortie
+  du champ, résumé d'erreurs, Cmd/Ctrl+Entrée, barre d'actions collante, avertissement de
+  modifications ; console en deux temps (mot de passe, puis code) avec le MÊME envoi unique ;
+  phase 1 : connexion, console, facture, devis, fiche client, fiche collaborateur ; phase 2 listée
+  par module. API inchangée. Statut : **accepté** (11 nov. 2026).

@@ -4,7 +4,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   codeEnrolementValide,
+  etapeApresErreur,
   etatDeuxFacteurs,
+  motDePassePret,
   messageDeuxFacteurs,
   secondFacteurDe,
   texteCodesDeSecours,
@@ -84,5 +86,25 @@ describe('codes de secours et messages', () => {
 
   it('la coquille n’appelle aucune route d’organisation pour la double authentification', () => {
     for (const route of DEUX_FACTEURS_SHELL_CALLS) expect(estRouteOrganisation(route)).toBe(false);
+  });
+});
+
+describe('connexion en deux temps (ADR-0074)', () => {
+  it('mot de passe refusé : retour à l’étape du mot de passe', () => {
+    expect(etapeApresErreur({ detail: { code: 'INVALID_PASSWORD' } })).toBe('motdepasse');
+    expect(etapeApresErreur({ detail: { code: 'REAUTH_GOOGLE_REQUIRED' } })).toBe('motdepasse');
+  });
+
+  it('code refusé, verrou ou panne : on reste sur le code', () => {
+    expect(etapeApresErreur({ detail: { code: 'INVALID_TWO_FACTOR_CODE' } })).toBe('code');
+    expect(etapeApresErreur({ detail: { code: 'TWO_FACTOR_LOCKED' } })).toBe('code');
+    expect(etapeApresErreur(new Error('réseau'))).toBe('code');
+    expect(etapeApresErreur(null)).toBe('code');
+  });
+
+  it('mot de passe exigé, sauf compte Google à l’enrôlement', () => {
+    expect(motDePassePret('', false)).toBe(false);
+    expect(motDePassePret('x', false)).toBe(true);
+    expect(motDePassePret('', true)).toBe(true);
   });
 });

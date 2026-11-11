@@ -1,5 +1,6 @@
 'use client';
 
+import { Field, Form, PasswordInput, SubmitButton, TextInput } from '@lalanda/ui';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
@@ -79,7 +80,7 @@ export default function LoginPage(): React.ReactElement {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+    <Form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col gap-5">
       <div className="flex flex-col gap-1">
         <h2 className="text-2xl font-semibold tracking-tight">Bon retour</h2>
         <p className="text-sm text-[var(--foreground-muted)]">
@@ -93,37 +94,36 @@ export default function LoginPage(): React.ReactElement {
 
       <GoogleButton label="Continuer avec Google" />
 
-      <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium">Email</span>
-        <input
+      <Field label="Email" size="full">
+        <TextInput
           type="email"
           required
           autoComplete="email"
+          inputMode="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
         />
-      </label>
+      </Field>
 
-      <label className="flex flex-col gap-1.5 text-sm">
-        <span className="flex items-center justify-between gap-2">
-          <span className="font-medium">Mot de passe</span>
+      <Field
+        label="Mot de passe"
+        size="full"
+        labelAction={
           <Link
             href="/mot-de-passe-oublie"
             className="text-xs text-[var(--accent)] underline underline-offset-4 hover:opacity-80"
           >
             Mot de passe oublié ?
           </Link>
-        </span>
-        <input
-          type="password"
+        }
+      >
+        <PasswordInput
           required
           autoComplete="current-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
         />
-      </label>
+      </Field>
 
       {verificationSent ? (
         <div
@@ -139,18 +139,17 @@ export default function LoginPage(): React.ReactElement {
       ) : null}
 
       {error ? (
-        <div className="rounded-md border border-[var(--danger)]/30 bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger)]">
+        <div
+          role="alert"
+          className="rounded-md border border-[var(--danger)]/30 bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger)]"
+        >
           {error}
         </div>
       ) : null}
 
-      <button
-        type="submit"
-        disabled={loading}
-        className="mt-2 rounded-md bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-[var(--accent-foreground)] transition hover:opacity-90 disabled:opacity-50"
-      >
-        {loading ? 'Connexion…' : 'Se connecter'}
-      </button>
+      <SubmitButton busy={loading} busyLabel="Connexion…" size="lg" className="mt-2 w-full">
+        Se connecter
+      </SubmitButton>
 
       <p className="text-center text-sm text-[var(--foreground-muted)]">
         Pas encore de compte ?{' '}
@@ -161,6 +160,6 @@ export default function LoginPage(): React.ReactElement {
           Créer un compte
         </Link>
       </p>
-    </form>
+    </Form>
   );
 }

@@ -40,21 +40,28 @@ import {
   type FormService,
 } from './services-model';
 
-function FormulaireService({
+/** Exporté pour la création rapide depuis la fiche collaborateur (ADR-0074 § 4). */
+export function FormulaireService({
   service,
   services,
   employes,
   onEnregistre,
   onAnnuler,
+  nomInitial = '',
 }: {
   service: HrDepartmentView | null;
   services: HrDepartmentView[];
   employes: HrEmployeeListItem[];
-  onEnregistre: () => void;
+  /** Reçoit le service écrit par l'API. */
+  onEnregistre: (ecrit: HrDepartmentView) => void;
   onAnnuler: () => void;
+  /** Création : nom repris du texte tapé dans le sélecteur. */
+  nomInitial?: string;
 }): React.ReactElement {
   const id = useId();
-  const [f, setF] = useState<FormService>(() => formService(service));
+  const [f, setF] = useState<FormService>(() =>
+    service ? formService(service) : { ...formService(null), name: nomInitial },
+  );
   const [champ, setChamp] = useState<string | undefined>();
   const [erreur, setErreur] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
@@ -70,15 +77,13 @@ function FormulaireService({
     setErreur(null);
     setEnvoi(true);
     try {
-      if (service) {
-        await hrApi.updateDepartment(service.id, {
-          ...r.corps,
-          expectedRevision: service.revision,
-        });
-      } else {
-        await hrApi.createDepartment(r.corps);
-      }
-      onEnregistre();
+      const ecrit = service
+        ? await hrApi.updateDepartment(service.id, {
+            ...r.corps,
+            expectedRevision: service.revision,
+          })
+        : await hrApi.createDepartment(r.corps);
+      onEnregistre(ecrit);
     } catch (err) {
       setErreur(messageRh(err, 'Le service n’a pas pu être enregistré.'));
     } finally {
