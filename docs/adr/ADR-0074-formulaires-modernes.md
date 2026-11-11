@@ -442,7 +442,9 @@ modifié, aucune route ajoutée**.
   `hr-leave` : `viewer` lit, `ownerB` ne voit rien) : la lecture n'exige pas `hr.read`, aucune
   route n'a donc été ajoutée. Lecture tentée seulement avec `analytics.read` et le module RH
   (`GET /me/features`), sinon aucun jour marqué. Seuls date, nom (demi-journée et « à vérifier »
-  dits dans le nom) et récurrence passent aux calendriers.
+  dits dans le nom) et récurrence passent aux calendriers. Sous la grille, une **légende** liste
+  les fériés du mois affiché (« 17 nov. — Fermeture de l’atelier ») : l’infobulle n’existe pas
+  au toucher.
 
 ### Reste à faire
 
