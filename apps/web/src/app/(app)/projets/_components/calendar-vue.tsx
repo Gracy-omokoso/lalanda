@@ -15,6 +15,7 @@
 //   Sur bureau, la même liste est proposée par le bouton « Liste ».
 
 import { addDays } from '@lalanda/shared/work';
+import { Select } from '@lalanda/ui';
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import { BOUTON_PETIT } from './elements';
@@ -670,25 +671,18 @@ function LigneAgenda({
       </button>
       {options.length > 0 ? (
         <span className="shrink-0">
-          <label htmlFor={idMenu} className="sr-only">
-            Déplacer l’échéance de {nomElement(t, numeros)} (actuellement {formatJour(t.dueDate)})
-          </label>
-          <select
+          <Select<string>
             id={idMenu}
+            aria-label={`Déplacer l’échéance de ${nomElement(t, numeros)} (actuellement ${formatJour(t.dueDate)})`}
             value=""
-            onChange={(e) => {
-              const o = options.find((x) => x.id === e.target.value);
+            placeholder="Déplacer l’échéance…"
+            onChange={(v) => {
+              const o = options.find((x) => x.id === v);
               if (o) onDeplacer(o.jour);
             }}
-            className="max-w-[14rem] rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface)] px-1.5 py-1 text-xs"
-          >
-            <option value="">Déplacer l’échéance…</option>
-            {options.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+            options={options.map((o) => ({ value: o.id, label: o.label }))}
+            className="w-[14rem] max-w-full"
+          />
         </span>
       ) : null}
     </li>

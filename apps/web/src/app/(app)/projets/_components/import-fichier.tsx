@@ -8,6 +8,10 @@
 // 3. « Importer » renvoie le même fichier, le serveur refait la même lecture et
 // crée tout en une fois par le créateur commun. Une ligne en erreur est écartée,
 // et l'import l'exige confirmé.
+//
+// ADR-0074 : nom, responsable (choix d'un membre en `EntityPicker`, sans
+// création : un membre s'invite depuis l'organisation), nature en segments,
+// dates en `DatePicker`, confirmation en case stylée. Mêmes champs envoyés.
 
 import type {
   WorkImportIssue,
@@ -16,7 +20,21 @@ import type {
   WorkPlanApplyResult,
   WorkProjectView,
 } from '@lalanda/shared/work';
-import { EmptyState, PageHeader, StatusPill, buttonClasses } from '@lalanda/ui';
+import {
+  Button,
+  Checkbox,
+  DatePicker,
+  EmptyState,
+  EntityPicker,
+  Field,
+  FormGrid,
+  PageHeader,
+  SegmentedControl,
+  StatusPill,
+  TextInput,
+  buttonClasses,
+  correspondRecherche,
+} from '@lalanda/ui';
 import { CheckCircle2, Download, FileSpreadsheet, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -27,7 +45,7 @@ import { workPlanApi } from '@/lib/work-plan-api';
 
 import { useShell } from '../../_components/shell-context';
 
-import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from './elements';
+import { Alerte } from './elements';
 import {
   FORMATS_ACCEPTES,
   boutonImport,
@@ -105,22 +123,14 @@ function Modele(): React.ReactElement {
         explique chaque colonne ; l’onglet « Tâches » donne un exemple.
       </p>
       <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          className={buttonClasses('secondary', 'sm')}
-          onClick={() => charger('xlsx')}
-        >
+        <Button size="sm" onClick={() => charger('xlsx')}>
           <Download aria-hidden="true" className="h-4 w-4" />
           Modèle Excel (.xlsx)
-        </button>
-        <button
-          type="button"
-          className={buttonClasses('secondary', 'sm')}
-          onClick={() => charger('csv')}
-        >
+        </Button>
+        <Button size="sm" onClick={() => charger('csv')}>
           <Download aria-hidden="true" className="h-4 w-4" />
           Modèle CSV
-        </button>
+        </Button>
       </div>
       {erreur ? <p className="text-sm text-[var(--danger)]">{erreur}</p> : null}
     </Etape>
@@ -236,15 +246,11 @@ function Apercu({ p }: { p: WorkImportPreview }): React.ReactElement {
       ) : null}
       {p.rows.length > 0 ? (
         <>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={aVerifier}
-              onChange={(e) => setAVerifier(e.target.checked)}
-            />
-            Seulement les lignes à vérifier ({p.counts.invalid} en erreur, {p.counts.warnings}{' '}
-            avertissements)
-          </label>
+          <Checkbox
+            checked={aVerifier}
+            onChange={setAVerifier}
+            label={`Seulement les lignes à vérifier (${p.counts.invalid} en erreur, ${p.counts.warnings} avertissements)`}
+          />
           <div className={`${CARTE} min-w-0 overflow-x-auto`}>
             <table className="w-full border-collapse text-sm">
               <caption className="sr-only">Aperçu des lignes du fichier</caption>
@@ -529,13 +535,9 @@ export function ImportFichier(): React.ReactElement {
               onChange={(e) => void choisir(e.target.files?.[0] ?? null)}
             />
             {fichier && !lecture ? (
-              <button
-                type="button"
-                className={`${BOUTON_PETIT} self-start`}
-                onClick={() => input.current?.click()}
-              >
+              <Button size="sm" className="self-start" onClick={() => input.current?.click()}>
                 Choisir un autre fichier
-              </button>
+              </Button>
             ) : null}
             {lecture ? (
               <p className="text-sm text-[var(--foreground-muted)]" role="status">
@@ -548,85 +550,83 @@ export function ImportFichier(): React.ReactElement {
             <Etape n={3} titre="Vérifiez l’aperçu, puis importez">
               <Apercu p={apercu} />
               {!projectId ? (
-                <div className="grid gap-3 border-t border-[var(--border)] pt-3 sm:grid-cols-2">
-                  <Champ id="imp-nom" label="Nom du projet" requis erreur={champs['name']}>
-                    <input
+                <div className="border-t border-[var(--border)] pt-3">
+                  <FormGrid>
+                    <Field
                       id="imp-nom"
-                      value={f.name}
-                      maxLength={120}
-                      onChange={(e) => setF({ ...f, name: e.target.value })}
-                      className={CHAMP}
-                      {...aria('imp-nom', champs['name'])}
-                    />
-                  </Champ>
-                  <Champ id="imp-resp" label="Responsable du projet">
-                    <select
-                      id="imp-resp"
-                      value={f.ownerUserId}
-                      onChange={(e) => setF({ ...f, ownerUserId: e.target.value })}
-                      className={CHAMP}
+                      label="Nom du projet"
+                      required
+                      size="lg"
+                      error={champs['name']}
                     >
-                      <option value="">Aucun pour l’instant</option>
-                      {membres.map((m) => (
-                        <option key={m.userId} value={m.userId}>
-                          {m.name}
-                        </option>
-                      ))}
-                    </select>
-                  </Champ>
-                  <fieldset className="flex flex-col gap-1.5">
-                    <legend className="text-sm font-medium">Nature</legend>
-                    <div className="flex flex-wrap gap-4 pt-1.5 text-sm">
-                      {(['internal', 'client'] as const).map((k) => (
-                        <label key={k} className="flex items-center gap-2">
-                          <input
-                            type="radio"
-                            name="imp-nature"
-                            checked={f.kind === k}
-                            onChange={() => setF({ ...f, kind: k })}
-                          />
-                          {NATURES_PROJET[k]}
-                        </label>
-                      ))}
-                    </div>
-                  </fieldset>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Champ id="imp-debut" label="Début">
-                      <input
-                        id="imp-debut"
-                        type="date"
+                      <TextInput
+                        value={f.name}
+                        maxLength={120}
+                        onChange={(e) => setF({ ...f, name: e.target.value })}
+                      />
+                    </Field>
+                    <Field
+                      id="imp-resp"
+                      label="Responsable du projet"
+                      optional
+                      size="md"
+                      newRow
+                      hint="Tapez pour chercher parmi les membres qui peuvent travailler sur les projets."
+                    >
+                      <EntityPicker<WorkMemberOption>
+                        value={membres.find((m) => m.userId === f.ownerUserId) ?? null}
+                        onChange={(m) => setF({ ...f, ownerUserId: m?.userId ?? '' })}
+                        search={async (q) =>
+                          membres.filter((m) => correspondRecherche([m.name], q))
+                        }
+                        refreshKey={membres.length}
+                        getKey={(m) => m.userId}
+                        getLabel={(m) => m.name}
+                        placeholder="Aucun pour l’instant"
+                        debounceMs={0}
+                        emptyText="Aucun membre ne correspond."
+                      />
+                    </Field>
+                    <Field id="imp-nature" label="Nature" group size="md">
+                      <SegmentedControl<FormProjet['kind']>
+                        value={f.kind}
+                        onChange={(k) => setF({ ...f, kind: k })}
+                        options={(['internal', 'client'] as const).map((k) => ({
+                          value: k,
+                          label: NATURES_PROJET[k],
+                        }))}
+                      />
+                    </Field>
+                    <Field id="imp-debut" label="Début" optional size="sm" newRow>
+                      <DatePicker
                         value={f.startDate}
-                        onChange={(e) => setF({ ...f, startDate: e.target.value })}
-                        className={CHAMP}
+                        onChange={(v) => setF({ ...f, startDate: v })}
+                        shortcuts={['today']}
                       />
-                    </Champ>
-                    <Champ id="imp-fin" label="Échéance" erreur={champs['dueDate']}>
-                      <input
-                        id="imp-fin"
-                        type="date"
+                    </Field>
+                    <Field
+                      id="imp-fin"
+                      label="Échéance"
+                      optional
+                      size="sm"
+                      error={champs['dueDate']}
+                    >
+                      <DatePicker
                         value={f.dueDate}
-                        onChange={(e) => setF({ ...f, dueDate: e.target.value })}
-                        className={CHAMP}
-                        {...aria('imp-fin', champs['dueDate'])}
+                        onChange={(v) => setF({ ...f, dueDate: v })}
+                        shortcuts={['endOfMonth', 'plus30', 'endOfYear']}
                       />
-                    </Champ>
-                  </div>
+                    </Field>
+                  </FormGrid>
                 </div>
               ) : null}
               {b?.confirmer ? (
-                <label className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-sm">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5"
-                    checked={confirme}
-                    onChange={(e) => setConfirme(e.target.checked)}
-                  />
-                  <span>
-                    J’importe les {apercu.counts.valid} lignes valides et j’écarte les{' '}
-                    {apercu.counts.invalid} lignes en erreur (ou je corrige le fichier et je le
-                    choisis de nouveau).
-                  </span>
-                </label>
+                <Checkbox
+                  checked={confirme}
+                  onChange={setConfirme}
+                  className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-muted)] p-3"
+                  label={`J’importe les ${apercu.counts.valid} lignes valides et j’écarte les ${apercu.counts.invalid} lignes en erreur (ou je corrige le fichier et je le choisis de nouveau).`}
+                />
               ) : null}
               {erreur ? (
                 <Alerte>
@@ -634,14 +634,15 @@ export function ImportFichier(): React.ReactElement {
                 </Alerte>
               ) : null}
               <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={!b?.actif || envoi || (b.confirmer && !confirme)}
-                  className={buttonClasses('primary', 'md')}
+                <Button
+                  variant="primary"
+                  busy={envoi}
+                  disabled={!b?.actif || (b.confirmer && !confirme)}
                   onClick={() => void importer()}
+                  className="max-sm:h-11"
                 >
                   {envoi ? 'Import en cours…' : (b?.libelle ?? 'Importer')}
-                </button>
+                </Button>
               </div>
             </Etape>
           ) : erreur ? (

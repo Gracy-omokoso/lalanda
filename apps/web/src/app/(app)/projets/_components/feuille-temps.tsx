@@ -7,7 +7,7 @@
 // temps depuis les tâches. Totaux et constats viennent du moteur (`weeklyTimesheet`).
 
 import type { WeeklyTimesheetView } from '@lalanda/shared/work';
-import { PageHeader, buttonClasses } from '@lalanda/ui';
+import { PageHeader, Select, buttonClasses } from '@lalanda/ui';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -126,19 +126,16 @@ export function FeuilleTemps(): React.ReactElement {
               Cette semaine
             </button>
             {choisir && membres.length > 0 ? (
-              <select
+              <Select<string>
                 aria-label="Membre"
-                className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface)] px-2 py-1.5 text-xs"
+                className="w-full sm:w-56"
                 value={membre}
-                onChange={(e) => setMembre(e.target.value)}
-              >
-                <option value="">Moi</option>
-                {membres.map((m) => (
-                  <option key={m.userId} value={m.userId}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
+                onChange={setMembre}
+                options={[
+                  { value: '', label: 'Moi' },
+                  ...membres.map((m) => ({ value: m.userId, label: m.name })),
+                ]}
+              />
             ) : null}
           </div>
           <p className="sr-only" aria-live="polite">

@@ -9,9 +9,12 @@
 // « Émettre » reste un geste de l'utilisateur, sur la fiche de la facture.
 //
 // Proposer, jamais imposer : « Plus tard » ferme la proposition sans rien créer.
+//
+// ADR-0074 : contenu du brouillon en cartes de choix (une colonne), boutons
+// `Button`. Même corps envoyé.
 
 import type { WorkProjectView } from '@lalanda/shared/work';
-import { Alert, buttonClasses } from '@lalanda/ui';
+import { Alert, Button, ChoiceCards, buttonClasses } from '@lalanda/ui';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
@@ -120,43 +123,44 @@ export function PropositionFacture({
       title="Jalon terminé : préparer la facture ?"
       action={
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            className={buttonClasses('primary', 'sm')}
-            disabled={enCours || (quoteId !== null && lineCount === null)}
+          <Button
+            variant="primary"
+            size="sm"
+            busy={enCours}
+            disabled={quoteId !== null && lineCount === null}
             onClick={() => void preparer()}
           >
             {enCours ? 'Préparation…' : 'Préparer la facture'}
-          </button>
-          <button type="button" className={buttonClasses('ghost', 'sm')} onClick={onClose}>
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onClose}>
             Plus tard
-          </button>
+          </Button>
         </div>
       }
     >
-      <fieldset className="mt-1 flex flex-col gap-1">
-        <legend className="sr-only">Contenu du brouillon</legend>
-        {lignesDisponibles ? (
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              name={`facture-${taskId}`}
-              checked={source === 'quote_lines'}
-              onChange={() => setSource('quote_lines')}
-            />
-            Reprendre les {lineCount} ligne(s) du devis {quoteNumber ?? ''} à ses prix
-          </label>
-        ) : null}
-        <label className="flex items-center gap-2">
-          <input
-            type="radio"
-            name={`facture-${taskId}`}
-            checked={source === 'empty' || !lignesDisponibles}
-            onChange={() => setSource('empty')}
-          />
-          Brouillon vide, à compléter
-        </label>
-      </fieldset>
+      <ChoiceCards<'quote_lines' | 'empty'>
+        aria-label="Contenu du brouillon"
+        className="mt-1"
+        columns={1}
+        value={lignesDisponibles ? source : 'empty'}
+        onChange={setSource}
+        options={[
+          ...(lignesDisponibles
+            ? [
+                {
+                  value: 'quote_lines' as const,
+                  label: `Reprendre les ${lineCount} ligne(s) du devis ${quoteNumber ?? ''}`.trim(),
+                  description: 'Lignes reprises à leurs prix.',
+                },
+              ]
+            : []),
+          {
+            value: 'empty' as const,
+            label: 'Brouillon vide',
+            description: 'À compléter sur la fiche de la facture.',
+          },
+        ]}
+      />
       {erreur ? <p className="mt-2 text-[var(--danger)]">{erreur}</p> : null}
     </Alert>
   );

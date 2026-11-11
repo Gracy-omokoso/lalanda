@@ -8,6 +8,11 @@
 // de conflit (JAMAIS de décalage automatique des dates) ; puis la collaboration
 // (`tache-collab.tsx`) : commentaires avec mentions, pièces jointes, temps,
 // historique.
+//
+// ADR-0074 : responsable et dépendance en `EntityPicker` (listes locales, sans
+// « + » : un membre s'ajoute depuis l'onglet Membres), dates en `DatePicker`,
+// statut et priorité en `Select`, jalon en interrupteur. Chaque champ s'enregistre
+// toujours seul, à la sortie ou au choix (mêmes corps `diffTache`).
 
 import {
   WORK_PRIORITIES,
@@ -15,7 +20,18 @@ import {
   type WorkTaskView,
   type WorkTaskWriteResult,
 } from '@lalanda/shared/work';
-import { Tag } from '@lalanda/ui';
+import {
+  Button,
+  DatePicker,
+  EntityPicker,
+  Field,
+  Select,
+  Switch,
+  Tag,
+  TextArea,
+  TextInput,
+  correspondRecherche,
+} from '@lalanda/ui';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -27,8 +43,6 @@ import {
   CercleCoche,
   DateEcheance,
   BOUTON_DANGER,
-  BOUTON_PETIT,
-  CHAMP,
   BloqueeBadge,
   aria,
 } from './elements';
@@ -45,9 +59,6 @@ import {
 } from './projets-model';
 import { Collaboration } from './tache-collab';
 
-/** Champ « à plat » de la grille : bordure au survol et au focus seulement. */
-const CHAMP_PLAT =
-  'h-8 min-w-0 max-w-full rounded-[var(--radius-sm)] border border-transparent bg-transparent px-1.5 text-sm transition-colors duration-[var(--motion-fast)] hover:border-[var(--border)] focus:border-[var(--accent)] focus:bg-[var(--surface)] disabled:hover:border-transparent';
 import {
   candidatsDependance,
   diffTache,
@@ -57,6 +68,7 @@ import {
   responsableVerrouille,
   responsablesProposes,
   type FormulaireTache,
+  type OptionResponsable,
 } from './taches-model';
 
 export function PanneauTache(): React.ReactElement | null {
@@ -178,9 +190,9 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
           <h2 id="tache-titre" className="text-base font-semibold">
             Tâche
           </h2>
-          <button type="button" className={BOUTON_PETIT} onClick={fermerTache}>
+          <Button size="sm" onClick={fermerTache}>
             Fermer
-          </button>
+          </Button>
         </div>
         <p role={erreur ? 'alert' : 'status'} className="text-sm text-[var(--foreground-muted)]">
           {erreur ?? 'Chargement de la tâche…'}
@@ -199,6 +211,11 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
   const respVerrouille = responsableVerrouille(d.assignee?.userId ?? null, regleAssignation);
   const nbHorsProjet = gerer && !assignerSoiSeulement ? horsDuProjet(members) : 0;
   const candidats = candidatsDependance(tasks, d);
+  const responsables: OptionResponsable[] =
+    d.assignee && !eligibles.some((m) => m.userId === d.assignee!.userId)
+      ? [{ userId: d.assignee.userId, name: d.assignee.name }, ...eligibles]
+      : eligibles;
+  const responsableChoisi = responsables.find((m) => m.userId === f.assigneeUserId) ?? null;
 
   async function changerColonne(columnKey: string): Promise<void> {
     const cols = colonnesKanban(project!.columns, tasks);
@@ -385,28 +402,23 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
             {d.assignee ? (
               <Avatar name={d.assignee.name} cle={d.assignee.userId} taille={24} />
             ) : null}
-            <select
+            <EntityPicker<OptionResponsable>
               id="tache-resp"
-              value={f.assigneeUserId}
-              onChange={(e) => void sauver({ assigneeUserId: e.target.value })}
-              className={CHAMP_PLAT}
+              value={responsableChoisi}
+              onChange={(m) => void sauver({ assigneeUserId: m?.userId ?? '' })}
+              search={async (q) => responsables.filter((m) => correspondRecherche([m.name], q))}
+              refreshKey={responsables.length}
+              getKey={(m) => m.userId}
+              getLabel={(m) => m.name}
+              placeholder="Aucun responsable"
+              debounceMs={0}
+              emptyText="Aucune personne ne correspond."
               disabled={respVerrouille}
-              aria-describedby={
-                respVerrouille || assignerSoiSeulement || nbHorsProjet > 0
-                  ? 'tache-resp-aide'
-                  : undefined
-              }
-            >
-              <option value="">Aucun responsable</option>
-              {d.assignee && !eligibles.some((m) => m.userId === d.assignee!.userId) ? (
-                <option value={d.assignee.userId}>{d.assignee.name}</option>
-              ) : null}
-              {eligibles.map((m) => (
-                <option key={m.userId} value={m.userId}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
+              className="min-w-0 flex-1 basis-48"
+              {...(respVerrouille || assignerSoiSeulement || nbHorsProjet > 0
+                ? { 'aria-describedby': 'tache-resp-aide' }
+                : {})}
+            />
             {respVerrouille || assignerSoiSeulement ? (
               <span
                 id="tache-resp-aide"
@@ -446,13 +458,15 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
             </label>
           </dt>
           <dd className="flex min-w-0 flex-wrap items-center gap-2">
-            <input
+            <DatePicker
               id="tache-ech"
-              type="date"
               value={f.dueDate}
-              onChange={(e) => void sauver({ dueDate: e.target.value })}
-              className={`${CHAMP_PLAT} w-auto`}
-              {...aria('tache-ech', champs['dueDate'])}
+              onChange={(v) => void sauver({ dueDate: v })}
+              shortcuts={['today', 'plus7', 'endOfMonth']}
+              className="w-44"
+              {...(champs['dueDate']
+                ? { 'aria-invalid': true, 'aria-describedby': 'tache-ech-erreur' }
+                : {})}
             />
             <DateEcheance task={d} today={today} />
             {champs['dueDate'] ? (
@@ -470,12 +484,12 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
                 </label>
               </dt>
               <dd>
-                <input
+                <DatePicker
                   id="tache-debut"
-                  type="date"
                   value={f.startDate}
-                  onChange={(e) => void sauver({ startDate: e.target.value })}
-                  className={`${CHAMP_PLAT} w-auto`}
+                  onChange={(v) => void sauver({ startDate: v })}
+                  shortcuts={['today']}
+                  className="w-44"
                 />
               </dd>
             </>
@@ -484,21 +498,14 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
           <dt className="text-[var(--foreground-muted)]">Projet</dt>
           <dd className="flex min-w-0 flex-wrap items-center gap-2">
             <span className="truncate font-medium">{project.name}</span>
-            <label htmlFor="tache-statut" className="sr-only">
-              Statut (colonne)
-            </label>
-            <select
+            <Select<string>
               id="tache-statut"
+              aria-label="Statut (colonne)"
               value={d.columnKey}
-              onChange={(e) => void changerColonne(e.target.value)}
-              className={`${CHAMP_PLAT} w-auto`}
-            >
-              {project.columns.map((c) => (
-                <option key={c.key} value={c.key}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => void changerColonne(v)}
+              options={project.columns.map((c) => ({ value: c.key, label: c.label }))}
+              className="w-44"
+            />
             {d.blocked ? <BloqueeBadge /> : null}
           </dd>
 
@@ -508,20 +515,13 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
             </label>
           </dt>
           <dd>
-            <select
+            <Select<FormulaireTache['priority']>
               id="tache-prio"
               value={f.priority}
-              onChange={(e) =>
-                void sauver({ priority: e.target.value as FormulaireTache['priority'] })
-              }
-              className={`${CHAMP_PLAT} w-auto`}
-            >
-              {WORK_PRIORITIES.map((p) => (
-                <option key={p} value={p}>
-                  {PRIORITES[p].label}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => void sauver({ priority: v })}
+              options={WORK_PRIORITIES.map((p) => ({ value: p, label: PRIORITES[p].label }))}
+              className="w-44"
+            />
           </dd>
 
           {/* ADR-0061 § 4 : couleur de la carte (post-it), palette fermée de 8 pastels. */}
@@ -639,7 +639,7 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
             </label>
           </dt>
           <dd className="flex items-center gap-2">
-            <input
+            <TextInput
               id="tache-est"
               type="number"
               min={0}
@@ -649,7 +649,7 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
               placeholder="—"
               onChange={(e) => setF({ ...f, estimate: e.target.value })}
               onBlur={() => void sauver({ estimate: f.estimate })}
-              className={`${CHAMP_PLAT} w-24`}
+              className="w-24"
               aria-describedby="tache-est-aide"
             />
             <span id="tache-est-aide" className="text-xs text-[var(--foreground-muted)]">
@@ -661,37 +661,34 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
             <>
               <dt className="text-[var(--foreground-muted)]">Jalon</dt>
               <dd>
-                <label className="inline-flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={f.isMilestone}
-                    onChange={(e) => void sauver({ isMilestone: e.target.checked })}
-                  />
-                  <span>◆ Date unique, sans début</span>
-                </label>
+                <Switch
+                  checked={f.isMilestone}
+                  onChange={(v) => void sauver({ isMilestone: v })}
+                  label={
+                    <>
+                      <span aria-hidden="true">◆ </span>Jalon : date unique, sans début
+                    </>
+                  }
+                />
               </dd>
             </>
           ) : null}
         </dl>
       </fieldset>
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="tache-desc" className="text-sm font-semibold">
-          Description
-        </label>
-        <textarea
-          id="tache-desc"
+      <Field id="tache-desc" label="Description" size="full">
+        <TextArea
           value={f.description}
           readOnly={!ecrire}
           disabled={envoi}
           onChange={(e) => setF({ ...f, description: e.target.value })}
           onBlur={() => void sauver({ description: f.description })}
           placeholder={ecrire ? 'De quoi s’agit-il ? Ajoutez du contexte…' : 'Aucune description.'}
-          className="field-sizing-content min-h-[5rem] w-full resize-y rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none transition-colors duration-[var(--motion-fast)] focus:border-[var(--accent)]"
+          className="field-sizing-content min-h-[5rem] resize-y"
           rows={4}
           maxLength={10000}
         />
-      </div>
+      </Field>
 
       {/* ─── Sous-tâches ─────────────────────────────────────────────────── */}
       {d.parentTaskId === null && !d.isMilestone ? (
@@ -756,21 +753,17 @@ function DetailTache({ taskId }: { taskId: string }): React.ReactElement {
               <label htmlFor="sous-nouvelle" className="sr-only">
                 Nouvelle sous-tâche
               </label>
-              <input
+              <TextInput
                 id="sous-nouvelle"
                 value={nouvelleSous}
                 onChange={(e) => setNouvelleSous(e.target.value)}
                 placeholder="Ajouter une sous-tâche…"
                 maxLength={300}
-                className={CHAMP}
+                className="min-w-0 flex-1"
               />
-              <button
-                type="submit"
-                className={BOUTON_PETIT}
-                disabled={envoi || !nouvelleSous.trim()}
-              >
+              <Button type="submit" busy={envoi} disabled={!nouvelleSous.trim()}>
                 Ajouter
-              </button>
+              </Button>
             </form>
           ) : null}
         </section>
@@ -841,9 +834,8 @@ function Dependances({
                 {p.done ? '✓ terminée' : '○ pas terminée'}
               </span>
               {ecrire ? (
-                <button
-                  type="button"
-                  className={BOUTON_PETIT}
+                <Button
+                  size="sm"
                   disabled={envoi}
                   aria-label={`Retirer la dépendance à #${p.number}`}
                   onClick={() =>
@@ -854,7 +846,7 @@ function Dependances({
                   }
                 >
                   Retirer
-                </button>
+                </Button>
               ) : null}
             </li>
           ))}
@@ -872,26 +864,26 @@ function Dependances({
             }, 'Ajout de la dépendance impossible.');
           }}
         >
-          <label htmlFor="dep-ajout" className="sr-only">
-            Tâche attendue
-          </label>
-          <select
+          <EntityPicker<WorkTaskView>
             id="dep-ajout"
-            value={predecesseur}
-            onChange={(e) => setPredecesseur(e.target.value)}
-            className={CHAMP}
-          >
-            <option value="">Attendre la tâche…</option>
-            {candidats.map((t) => (
-              <option key={t.id} value={t.id}>
-                #{t.number} {t.title}
-                {t.dueDate ? ` (échéance ${formatJour(t.dueDate, false)})` : ''}
-              </option>
-            ))}
-          </select>
-          <button type="submit" className={BOUTON_PETIT} disabled={envoi || !predecesseur}>
+            aria-label="Tâche attendue"
+            value={candidats.find((t) => t.id === predecesseur) ?? null}
+            onChange={(t) => setPredecesseur(t?.id ?? '')}
+            search={async (q) =>
+              candidats.filter((t) => correspondRecherche([t.title, `#${t.number}`], q))
+            }
+            refreshKey={candidats.length}
+            getKey={(t) => t.id}
+            getLabel={(t) => `#${t.number} ${t.title}`}
+            getDescription={(t) => (t.dueDate ? `Échéance ${formatJour(t.dueDate, false)}` : null)}
+            placeholder="Attendre la tâche…"
+            debounceMs={0}
+            emptyText="Aucune tâche ne correspond."
+            className="min-w-0 flex-1"
+          />
+          <Button type="submit" busy={envoi} disabled={!predecesseur}>
             Ajouter
-          </button>
+          </Button>
         </form>
       ) : null}
       {d.successors.length > 0 ? (

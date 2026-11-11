@@ -8,7 +8,7 @@
 // Un clic sur la ligne (hors nom) ou sur « Détails » ouvre le panneau (`?tache=`).
 
 import { WORK_LIMITS, WorkColumnsSchema, type WorkTaskView } from '@lalanda/shared/work';
-import { Skeleton } from '@lalanda/ui';
+import { Button, Skeleton, TextInput } from '@lalanda/ui';
 import { ChevronDown, ChevronRight, GitBranch, MessageSquare } from 'lucide-react';
 import { useState } from 'react';
 
@@ -363,17 +363,17 @@ function AjoutSection(): React.ReactElement | null {
   }
   return (
     <form
-      className="flex flex-col gap-1"
+      className="flex max-w-xl flex-col gap-1.5"
       onSubmit={(e) => {
         e.preventDefault();
         void ajouter();
       }}
     >
-      <label htmlFor="section-nouvelle" className="text-xs font-medium">
+      <label htmlFor="section-nouvelle" className="text-sm font-medium">
         Nouvelle section (colonne « en cours », placée avant « Terminé »)
       </label>
       <div className="flex gap-2">
-        <input
+        <TextInput
           id="section-nouvelle"
           autoFocus
           value={nom}
@@ -385,18 +385,15 @@ function AjoutSection(): React.ReactElement | null {
               setOuvert(false);
             }
           }}
-          className="h-9 min-w-0 flex-1 rounded-[var(--radius-md)] border border-[var(--border-strong)] bg-[var(--surface)] px-2 text-sm"
+          aria-invalid={erreur ? true : undefined}
+          className="flex-1"
         />
-        <button
-          type="submit"
-          disabled={envoi || !nom.trim()}
-          className="rounded-[var(--radius-md)] border border-[var(--border-strong)] px-3 text-sm disabled:opacity-50"
-        >
+        <Button type="submit" disabled={envoi || !nom.trim()} busy={envoi}>
           Ajouter
-        </button>
-        <button type="button" onClick={() => setOuvert(false)} className="px-2 text-sm">
+        </Button>
+        <Button variant="ghost" onClick={() => setOuvert(false)}>
           Annuler
-        </button>
+        </Button>
       </div>
       {erreur ? (
         <p role="alert" className="text-sm text-[var(--danger)]">

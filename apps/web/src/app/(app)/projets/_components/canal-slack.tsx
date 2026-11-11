@@ -8,12 +8,12 @@
 // tout le canal verra ses événements.
 
 import type { SlackChannelOption, WorkProjectSlackChannelView } from '@lalanda/shared/work';
-import { StatusPill, buttonClasses } from '@lalanda/ui';
+import { Button, Checkbox, Field, FormGrid, Select, StatusPill, TextInput } from '@lalanda/ui';
 import { useEffect, useId, useState } from 'react';
 
 import { workApi } from '@/lib/work-api';
 
-import { Alerte, CHAMP } from './elements';
+import { Alerte } from './elements';
 import { etatCanalSlack, valeurCanalSaisi } from './canal-slack-model';
 import { messageWork } from './projets-model';
 
@@ -91,78 +91,65 @@ export function CanalSlack({ projectId }: { projectId: string }): React.ReactEle
               <span>
                 Publie dans <strong>#{vue.channel.name ?? vue.channel.id}</strong>
               </span>
-              <button
-                type="button"
-                className={buttonClasses('secondary', 'sm')}
-                disabled={envoi}
-                onClick={() => void enregistrer(null)}
-              >
+              <Button size="sm" disabled={envoi} onClick={() => void enregistrer(null)}>
                 Retirer le canal
-              </button>
+              </Button>
             </div>
           ) : null}
           {etat.avertissement ? (
             <p className="text-sm text-[var(--foreground-muted)]">{etat.avertissement}</p>
           ) : null}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="flex flex-col gap-1 text-sm" htmlFor={`${id}-liste`}>
-              Canal public
-              <select
-                id={`${id}-liste`}
-                className={CHAMP}
+          <FormGrid>
+            <Field id={`${id}-liste`} label="Canal public" size="md">
+              <Select<string>
                 value={choix}
-                disabled={canaux === null || canaux.length === 0}
-                onChange={(e) => {
-                  setChoix(e.target.value);
+                loading={canaux === null}
+                disabled={canaux !== null && canaux.length === 0}
+                placeholder={canaux === null ? 'Chargement…' : 'Choisir un canal'}
+                emptyText="Aucun canal public."
+                onChange={(v) => {
+                  setChoix(v);
                   setSaisie('');
                 }}
-              >
-                <option value="">{canaux === null ? 'Chargement…' : 'Choisir un canal'}</option>
-                {(canaux ?? []).map((c) => (
-                  <option key={c.id} value={c.id}>
-                    #{c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-sm" htmlFor={`${id}-saisie`}>
-              Ou identifiant du canal
-              <input
-                id={`${id}-saisie`}
-                className={CHAMP}
+                options={(canaux ?? []).map((c) => ({ value: c.id, label: `#${c.name}` }))}
+              />
+            </Field>
+            <Field id={`${id}-saisie`} label="Ou identifiant du canal" size="sm">
+              <TextInput
                 placeholder="C0123456789"
+                className="font-mono"
                 value={saisie}
                 onChange={(e) => {
                   setSaisie(e.target.value);
                   setChoix('');
                 }}
               />
-            </label>
-          </div>
+            </Field>
+          </FormGrid>
           {vue.projectPrivate ? (
-            <label className="flex items-start gap-2 text-sm">
-              <input
-                type="checkbox"
-                className="mt-0.5"
-                checked={confirme}
-                onChange={(e) => setConfirme(e.target.checked)}
-              />
-              <span>
-                Ce projet est <strong>privé</strong>. Je confirme que <strong>tout le canal</strong>{' '}
-                verra ses événements (titres des tâches et du projet), y compris des personnes qui
-                ne sont pas membres du projet.
-              </span>
-            </label>
+            <Checkbox
+              checked={confirme}
+              onChange={setConfirme}
+              label={
+                <span>
+                  Ce projet est <strong>privé</strong>. Je confirme que{' '}
+                  <strong>tout le canal</strong> verra ses événements (titres des tâches et du
+                  projet), y compris des personnes qui ne sont pas membres du projet.
+                </span>
+              }
+            />
           ) : null}
           <div>
-            <button
-              type="button"
-              className={buttonClasses('primary', 'sm')}
-              disabled={envoi || !cible || (vue.projectPrivate && !confirme)}
+            <Button
+              variant="primary"
+              size="sm"
+              busy={envoi}
+              disabled={!cible || (vue.projectPrivate && !confirme)}
               onClick={() => void enregistrer(cible, choisi?.name)}
+              className="max-sm:h-11 max-sm:w-full"
             >
               Publier dans ce canal
-            </button>
+            </Button>
           </div>
         </>
       )}

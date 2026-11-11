@@ -22,7 +22,20 @@ import {
   type WorkSettingsView,
   type WorkWeekday,
 } from '@lalanda/shared/work';
-import { PageHeader, Skeleton, StatusPill, TabsNav, buttonClasses } from '@lalanda/ui';
+import {
+  Button,
+  Checkbox,
+  Field,
+  FormGrid,
+  PageHeader,
+  SegmentedControl,
+  Select,
+  Skeleton,
+  StatusPill,
+  Switch,
+  TabsNav,
+  TextInput,
+} from '@lalanda/ui';
 import { Bell, Mail, MessageSquare, Smartphone } from 'lucide-react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useId, useState } from 'react';
@@ -31,7 +44,6 @@ import { renderNextLink } from '@/components/next-link';
 import { workApi } from '@/lib/work-api';
 
 import { useShell } from '../../_components/shell-context';
-import { CHAMP } from '../../ventes/_components/form-ui';
 
 import { BlocWhatsApp } from './bloc-whatsapp';
 import { Alerte } from './elements';
@@ -54,6 +66,7 @@ import {
 } from './parametres-model';
 import { messageWork } from './projets-model';
 
+/** Interrupteur d'une cellule de tableau : libellé lu seulement (la colonne le dit). */
 function Interrupteur({
   id,
   coche,
@@ -68,21 +81,13 @@ function Interrupteur({
   onChange: () => void;
 }): React.ReactElement {
   return (
-    <label htmlFor={id} className="inline-flex cursor-pointer items-center">
-      <input
-        id={id}
-        type="checkbox"
-        className="peer sr-only"
-        checked={coche}
-        disabled={disabled}
-        onChange={onChange}
-      />
-      <span
-        aria-hidden="true"
-        className="relative h-5 w-9 rounded-full bg-[var(--border-strong)] transition-colors peer-checked:bg-[var(--accent)] peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--accent)] peer-focus-visible:ring-offset-2 peer-disabled:opacity-50 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-[var(--surface)] after:shadow after:transition-transform peer-checked:after:translate-x-4"
-      />
-      <span className="sr-only">{libelle}</span>
-    </label>
+    <Switch
+      id={id}
+      checked={coche}
+      aria-label={libelle}
+      {...(disabled === undefined ? {} : { disabled })}
+      onChange={() => onChange()}
+    />
   );
 }
 
@@ -258,37 +263,33 @@ function MesNotifications(): React.ReactElement {
           </tbody>
         </table>
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            className={buttonClasses('secondary', 'sm')}
+          <Button
+            size="sm"
             onClick={() => void enregistrer({ ...vue, ...toutLeCanal(vue, 'email', false) })}
           >
             Couper tous les e-mails
-          </button>
-          <button
-            type="button"
-            className={buttonClasses('secondary', 'sm')}
+          </Button>
+          <Button
+            size="sm"
             onClick={() => void enregistrer({ ...vue, ...toutLeCanal(vue, 'bell', true) })}
           >
             Cloche partout
-          </button>
+          </Button>
           {slack ? (
-            <button
-              type="button"
-              className={buttonClasses('secondary', 'sm')}
+            <Button
+              size="sm"
               onClick={() => void enregistrer({ ...vue, ...toutLeCanal(vue, 'slack', false) })}
             >
               Couper tous les messages Slack
-            </button>
+            </Button>
           ) : null}
           {colonneWa.active ? (
-            <button
-              type="button"
-              className={buttonClasses('secondary', 'sm')}
+            <Button
+              size="sm"
               onClick={() => void enregistrer({ ...vue, ...toutLeCanal(vue, 'whatsapp', false) })}
             >
               Couper tous les messages WhatsApp
-            </button>
+            </Button>
           ) : null}
         </div>
         {colonneWa.visible && !colonneWa.active ? (
@@ -302,58 +303,50 @@ function MesNotifications(): React.ReactElement {
         titre="Résumé quotidien par e-mail"
         description="Vos tâches en retard, du jour et à échéance proche, et vos notifications non lues — une fois par jour au plus."
       >
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm">
-          <span className="flex items-center gap-2">
-            <Interrupteur
-              id={`${id}-digest`}
-              coche={vue.digest.enabled}
-              libelle="Recevoir le résumé quotidien"
-              onChange={() =>
-                void enregistrer({
-                  ...vue,
-                  digest: { ...vue.digest, enabled: !vue.digest.enabled },
-                })
-              }
-            />
-            <span aria-hidden="true">Recevoir le résumé</span>
-          </span>
-          <label className="flex items-center gap-2 whitespace-nowrap" htmlFor={`${id}-heure`}>
-            À partir de
-            <select
+        <div className="flex flex-col gap-4 text-sm">
+          <Switch
+            id={`${id}-digest`}
+            checked={vue.digest.enabled}
+            label="Recevoir le résumé quotidien"
+            onChange={() =>
+              void enregistrer({
+                ...vue,
+                digest: { ...vue.digest, enabled: !vue.digest.enabled },
+              })
+            }
+          />
+          <FormGrid>
+            <Field
               id={`${id}-heure`}
-              className={`${CHAMP} w-auto`}
-              value={vue.digest.hour}
+              label="À partir de"
+              size="sm"
+              hint="Heure de Kinshasa."
               disabled={!vue.digest.enabled}
-              onChange={(e) =>
-                void enregistrer({
-                  ...vue,
-                  digest: { ...vue.digest, hour: Number(e.target.value) },
-                })
-              }
             >
-              {HEURES_RESUME.map((h) => (
-                <option key={h} value={h}>
-                  {libelleHeure(h)}
-                </option>
-              ))}
-            </select>
-            <span className="text-xs text-[var(--foreground-muted)]">(heure de Kinshasa)</span>
-          </label>
-          <label className="flex items-center gap-2" htmlFor={`${id}-ouvres`}>
-            <input
-              id={`${id}-ouvres`}
-              type="checkbox"
-              checked={vue.digest.workingDaysOnly}
-              disabled={!vue.digest.enabled}
-              onChange={() =>
-                void enregistrer({
-                  ...vue,
-                  digest: { ...vue.digest, workingDaysOnly: !vue.digest.workingDaysOnly },
-                })
-              }
-            />
-            Jours ouvrés seulement
-          </label>
+              <Select<string>
+                value={String(vue.digest.hour)}
+                onChange={(v) =>
+                  void enregistrer({
+                    ...vue,
+                    digest: { ...vue.digest, hour: Number(v) },
+                  })
+                }
+                options={HEURES_RESUME.map((h) => ({ value: String(h), label: libelleHeure(h) }))}
+              />
+            </Field>
+          </FormGrid>
+          <Switch
+            id={`${id}-ouvres`}
+            checked={vue.digest.workingDaysOnly}
+            disabled={!vue.digest.enabled}
+            label="Jours ouvrés seulement"
+            onChange={() =>
+              void enregistrer({
+                ...vue,
+                digest: { ...vue.digest, workingDaysOnly: !vue.digest.workingDaysOnly },
+              })
+            }
+          />
         </div>
       </Carte>
       <p aria-live="polite" className="text-xs text-[var(--foreground-muted)]">
@@ -412,25 +405,24 @@ function Comportement(): React.ReactElement {
         titre="Création des projets"
         description="Parmi les gestionnaires des projets, qui peut en créer. La direction (Propriétaire, Administrateur) le peut toujours."
       >
-        <div className="flex flex-wrap gap-4 text-sm">
-          {ROLES_CREATEURS.map((r) => (
-            <label key={r.role} className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                disabled={r.direction}
-                checked={
-                  r.direction ||
-                  s.projectCreatorRoles === null ||
-                  s.projectCreatorRoles.includes(r.role)
-                }
-                onChange={(e) =>
-                  void enregistrer({
-                    projectCreatorRoles: createurs(s.projectCreatorRoles, r.role, e.target.checked),
-                  })
-                }
-              />
-              {r.label}
-            </label>
+        <div className="flex flex-wrap gap-x-6 gap-y-3 text-sm">
+          {ROLES_CREATEURS.map((r, i) => (
+            <Checkbox
+              key={r.role}
+              id={`${id}-createur-${i}`}
+              disabled={r.direction}
+              checked={
+                r.direction ||
+                s.projectCreatorRoles === null ||
+                s.projectCreatorRoles.includes(r.role)
+              }
+              onChange={(c) =>
+                void enregistrer({
+                  projectCreatorRoles: createurs(s.projectCreatorRoles, r.role, c),
+                })
+              }
+              label={r.label}
+            />
           ))}
         </div>
       </Carte>
@@ -439,35 +431,29 @@ function Comportement(): React.ReactElement {
         titre="Nouveaux projets"
         description="Valeurs proposées à la création ; chaque projet reste modifiable ensuite."
       >
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="flex flex-col gap-1 text-sm" htmlFor={`${id}-vis`}>
-            Visibilité par défaut
-            <select
-              id={`${id}-vis`}
-              className={CHAMP}
+        <FormGrid>
+          <Field id={`${id}-vis`} label="Visibilité par défaut" group size="lg">
+            <SegmentedControl<WorkProjectVisibility>
               value={s.defaultVisibility}
-              onChange={(e) =>
-                void enregistrer({ defaultVisibility: e.target.value as WorkProjectVisibility })
-              }
-            >
-              <option value="organization">Toute l’organisation</option>
-              <option value="private">Membres seulement (privé)</option>
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-sm" htmlFor={`${id}-vue`}>
-            Vue à l’ouverture d’un projet
-            <select
-              id={`${id}-vue`}
-              className={CHAMP}
+              onChange={(v) => void enregistrer({ defaultVisibility: v })}
+              options={[
+                { value: 'organization', label: 'Toute l’organisation' },
+                { value: 'private', label: 'Membres seulement (privé)' },
+              ]}
+            />
+          </Field>
+          <Field id={`${id}-vue`} label="Vue à l’ouverture d’un projet" group size="md" newRow>
+            <SegmentedControl<WorkDefaultView>
               value={s.defaultView}
-              onChange={(e) => void enregistrer({ defaultView: e.target.value as WorkDefaultView })}
-            >
-              <option value="overview">Aperçu</option>
-              <option value="list">Liste</option>
-              <option value="board">Tableau</option>
-            </select>
-          </label>
-        </div>
+              onChange={(v) => void enregistrer({ defaultView: v })}
+              options={[
+                { value: 'overview', label: 'Aperçu' },
+                { value: 'list', label: 'Liste' },
+                { value: 'board', label: 'Tableau' },
+              ]}
+            />
+          </Field>
+        </FormGrid>
         <p className="text-xs text-[var(--foreground-muted)]">
           Colonnes de départ : {s.defaultColumns.map((c) => c.label).join(' → ')}. Elles se règlent
           dans « Réglages » d’un projet (gestionnaires).
@@ -500,23 +486,21 @@ function Comportement(): React.ReactElement {
             );
           })}
         </fieldset>
-        <label className="flex flex-wrap items-center gap-2 text-sm" htmlFor={`${id}-proche`}>
-          « Échéance proche » :
-          <select
-            id={`${id}-proche`}
-            className={`${CHAMP} w-auto`}
-            value={s.dueSoonDays}
-            onChange={(e) => void enregistrer({ dueSoonDays: Number(e.target.value) })}
-          >
-            {Array.from({ length: 15 }, (_, n) => (
-              <option key={n} value={n}>
-                {n === 0
-                  ? 'le jour même'
-                  : `${n} jour${n > 1 ? 's' : ''} ouvré${n > 1 ? 's' : ''} avant`}
-              </option>
-            ))}
-          </select>
-        </label>
+        <FormGrid>
+          <Field id={`${id}-proche`} label="« Échéance proche »" size="md">
+            <Select<string>
+              value={String(s.dueSoonDays)}
+              onChange={(v) => void enregistrer({ dueSoonDays: Number(v) })}
+              options={Array.from({ length: 15 }, (_, n) => ({
+                value: String(n),
+                label:
+                  n === 0
+                    ? 'le jour même'
+                    : `${n} jour${n > 1 ? 's' : ''} ouvré${n > 1 ? 's' : ''} avant`,
+              }))}
+            />
+          </Field>
+        </FormGrid>
       </Carte>
 
       <Carte titre="Archivage et travail en commun">
@@ -534,43 +518,38 @@ function Comportement(): React.ReactElement {
             void enregistrer({ autoArchiveCompletedDays: n });
           }}
         >
-          <label className="flex flex-col gap-1" htmlFor={`${id}-arch`}>
-            Archiver automatiquement les projets terminés après (jours)
-            <input
-              id={`${id}-arch`}
+          <Field
+            id={`${id}-arch`}
+            label="Archiver automatiquement les projets terminés après"
+            className="w-full sm:w-auto"
+            hint="Nombre de jours, de 1 à 365 ; vide : jamais."
+          >
+            <TextInput
               inputMode="numeric"
-              className={`${CHAMP} w-40`}
+              className="w-40"
               placeholder="Jamais"
               value={jours}
               onChange={(e) => setJours(e.target.value)}
             />
-          </label>
-          <button type="submit" className={buttonClasses('secondary', 'sm')}>
+          </Field>
+          <Button type="submit" size="sm" className="max-sm:h-11">
             Appliquer
-          </button>
+          </Button>
         </form>
-        <label className="flex items-center gap-3 text-sm">
-          <Interrupteur
-            id={`${id}-mod`}
-            coche={s.managersModerateComments}
-            libelle="Les gestionnaires modifient et suppriment les commentaires des autres"
-            onChange={() =>
-              void enregistrer({ managersModerateComments: !s.managersModerateComments })
-            }
-          />
-          <span aria-hidden="true">
-            Les gestionnaires peuvent modifier et supprimer les commentaires des autres
-          </span>
-        </label>
-        <label className="flex items-center gap-3 text-sm">
-          <Interrupteur
-            id={`${id}-num`}
-            coche={s.showTaskNumbers}
-            libelle="Afficher les numéros de tâche"
-            onChange={() => void enregistrer({ showTaskNumbers: !s.showTaskNumbers })}
-          />
-          <span aria-hidden="true">Afficher les numéros de tâche (#12)</span>
-        </label>
+        <Switch
+          id={`${id}-mod`}
+          checked={s.managersModerateComments}
+          label="Les gestionnaires peuvent modifier et supprimer les commentaires des autres"
+          onChange={() =>
+            void enregistrer({ managersModerateComments: !s.managersModerateComments })
+          }
+        />
+        <Switch
+          id={`${id}-num`}
+          checked={s.showTaskNumbers}
+          label="Afficher les numéros de tâche (#12)"
+          onChange={() => void enregistrer({ showTaskNumbers: !s.showTaskNumbers })}
+        />
       </Carte>
       <p aria-live="polite" className="text-xs text-[var(--foreground-muted)]">
         {enregistre ? 'Enregistré.' : ' '}
@@ -674,14 +653,14 @@ function OngletSlack({ retour }: { retour: string | null }): React.ReactElement 
                 n’est pas configurée. Rien ne change pour vos notifications (cloche et e-mail).
               </p>
             )}
-            <button
-              type="button"
-              className={buttonClasses('primary', 'sm')}
+            <Button
+              variant="primary"
+              size="sm"
               disabled={!vue.available || occupe}
               onClick={() => void connecter()}
             >
               Connecter Slack
-            </button>
+            </Button>
           </div>
         ) : (
           <div className="flex flex-col gap-3 text-sm">
@@ -728,23 +707,18 @@ function OngletSlack({ retour }: { retour: string | null }): React.ReactElement 
             {vue.canManage ? (
               <div className="flex flex-wrap gap-2">
                 {aReconnecter ? (
-                  <button
-                    type="button"
-                    className={buttonClasses('primary', 'sm')}
+                  <Button
+                    variant="primary"
+                    size="sm"
                     disabled={!vue.available || occupe}
                     onClick={() => void connecter()}
                   >
                     Reconnecter Slack
-                  </button>
+                  </Button>
                 ) : null}
-                <button
-                  type="button"
-                  className={buttonClasses('secondary', 'sm')}
-                  disabled={occupe}
-                  onClick={() => void deconnecter()}
-                >
+                <Button size="sm" disabled={occupe} onClick={() => void deconnecter()}>
                   Déconnecter
-                </button>
+                </Button>
               </div>
             ) : null}
           </div>

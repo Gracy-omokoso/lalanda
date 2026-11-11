@@ -7,6 +7,10 @@
 // Mentions : on écrit « @Nom » (la liste propose les membres) ; à l'envoi, le
 // texte porte `@[userId]` et la liste des mentionnés (vérifiée par le serveur).
 // Rendu : le nom COURANT du membre, en texte brut, jamais de HTML.
+//
+// ADR-0074 : saisie du temps sur `Field` + `DatePicker` (même borne : pas de
+// jour à venir), boutons `Button` ; le champ de commentaire garde sa liste de
+// mentions (combobox maison), posée sur `TextArea`.
 
 import type {
   TimeEntryView,
@@ -16,13 +20,14 @@ import type {
   WorkMemberRef,
   WorkTaskDetail,
 } from '@lalanda/shared/work';
+import { Button, DatePicker, Field, FormGrid, TextArea, TextInput } from '@lalanda/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { workApi } from '@/lib/work-api';
 
 import { useProfil } from '../../_components/profile-context';
 
-import { Avatar, BOUTON_DANGER, BOUTON_PETIT, CHAMP } from './elements';
+import { Avatar, BOUTON_DANGER } from './elements';
 import { filTache } from './fil-model';
 import { useProjet } from './project-context';
 import {
@@ -151,14 +156,13 @@ function Redaction({
       <label htmlFor={id} className="sr-only">
         {label}
       </label>
-      <textarea
+      <TextArea
         id={id}
         ref={zone}
         value={texte}
         rows={3}
         maxLength={5000}
         placeholder="Écrire un commentaire… « @ » pour mentionner un membre"
-        className={CHAMP}
         role="combobox"
         aria-autocomplete="list"
         aria-expanded={ouvert}
@@ -212,13 +216,13 @@ function Redaction({
         </ul>
       ) : null}
       <div className="flex gap-2">
-        <button type="submit" className={BOUTON_PETIT} disabled={envoi || texte.trim() === ''}>
+        <Button type="submit" size="sm" busy={envoi} disabled={texte.trim() === ''}>
           {libelleEnvoi}
-        </button>
+        </Button>
         {onAnnuler ? (
-          <button type="button" className={BOUTON_PETIT} onClick={onAnnuler}>
+          <Button size="sm" onClick={onAnnuler}>
             Annuler
-          </button>
+          </Button>
         ) : null}
       </div>
     </form>
@@ -578,6 +582,7 @@ function Temps({
   const [duree, setDuree] = useState('');
   const [note, setNote] = useState('');
   const [erreurDuree, setErreurDuree] = useState<string | null>(null);
+  const [erreurJour, setErreurJour] = useState<string | null>(null);
   const [saisie, setSaisie] = useState(false);
 
   const charger = useCallback(() => {
@@ -593,6 +598,12 @@ function Temps({
 
   async function saisir(e: React.FormEvent): Promise<void> {
     e.preventDefault();
+    // Le `DatePicker` n'a pas d'attribut natif : un jour vidé au clavier est refusé ici.
+    if (jour === '') {
+      setErreurJour('Le jour est obligatoire.');
+      return;
+    }
+    setErreurJour(null);
     const minutes = lireDuree(duree);
     if (minutes === null) {
       setErreurDuree('Durée illisible : par exemple « 1h30 », « 45 min » ou « 90 ».');
@@ -672,58 +683,37 @@ function Temps({
         </button>
       ) : null}
       {travailler && saisie ? (
-        <form
-          onSubmit={(e) => void saisir(e)}
-          noValidate
-          className="grid gap-2 sm:grid-cols-[8rem_7rem_1fr_auto] sm:items-end"
-        >
-          <div className="flex flex-col gap-1">
-            <label htmlFor="temps-jour" className="text-xs font-medium">
-              Jour
-            </label>
-            <input
-              id="temps-jour"
-              type="date"
-              value={jour}
-              max={aujourdhui()}
-              onChange={(e) => setJour(e.target.value)}
-              className={CHAMP}
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="temps-duree" className="text-xs font-medium">
-              Durée
-            </label>
-            <input
-              id="temps-duree"
-              value={duree}
-              onChange={(e) => setDuree(e.target.value)}
-              placeholder="1h30"
-              className={CHAMP}
-              aria-invalid={erreurDuree ? true : undefined}
-              aria-describedby={erreurDuree ? 'temps-erreur' : undefined}
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="temps-note" className="text-xs font-medium">
-              Note (facultative)
-            </label>
-            <input
-              id="temps-note"
-              value={note}
-              maxLength={500}
-              onChange={(e) => setNote(e.target.value)}
-              className={CHAMP}
-            />
-          </div>
-          <button type="submit" className={BOUTON_PETIT} disabled={envoi || duree.trim() === ''}>
+        <form onSubmit={(e) => void saisir(e)} noValidate className="flex flex-col gap-2">
+          <FormGrid>
+            <Field id="temps-jour" label="Jour" required size="sm" error={erreurJour}>
+              <DatePicker
+                value={jour}
+                max={aujourdhui()}
+                required
+                shortcuts={['today']}
+                onChange={setJour}
+              />
+            </Field>
+            <Field id="temps-duree" label="Durée" required size="xs" error={erreurDuree}>
+              <TextInput
+                value={duree}
+                onChange={(e) => setDuree(e.target.value)}
+                placeholder="1h30"
+              />
+            </Field>
+            <Field id="temps-note" label="Note" optional size="md">
+              <TextInput value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} />
+            </Field>
+          </FormGrid>
+          <Button
+            type="submit"
+            size="sm"
+            busy={envoi}
+            disabled={duree.trim() === ''}
+            className="self-start"
+          >
             Saisir
-          </button>
-          {erreurDuree ? (
-            <p id="temps-erreur" className="text-xs font-medium text-[var(--danger)] sm:col-span-4">
-              {erreurDuree}
-            </p>
-          ) : null}
+          </Button>
         </form>
       ) : null}
       {saisie ? (

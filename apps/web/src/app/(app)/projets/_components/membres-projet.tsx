@@ -12,13 +12,18 @@ import type {
   WorkProjectVisibility,
   WorkTeamRef,
 } from '@lalanda/shared/work';
-import { StatusPill, buttonClasses } from '@lalanda/ui';
+import {
+  Button,
+  ChoiceCards,
+  EntityPicker,
+  Field,
+  StatusPill,
+  correspondRecherche,
+} from '@lalanda/ui';
 import { Building2, Lock, UserMinus, UserPlus, UsersRound } from 'lucide-react';
 import { useCallback, useEffect, useId, useState } from 'react';
 
-import { workApi } from '@/lib/work-api';
-
-import { CHAMP } from '../../ventes/_components/form-ui';
+import { workApi, type WorkMemberOption } from '@/lib/work-api';
 
 import { Alerte, Avatar, BOUTON_PETIT, PileAvatars } from './elements';
 import {
@@ -104,6 +109,8 @@ export function MembresProjet(): React.ReactElement {
 
   const modifiable = gerer && vue?.canManage === true && project?.status !== 'archived';
   const visibilite = project?.visibility ?? vue?.visibility ?? 'organization';
+  const ajoutables = personnesAjoutables(members, vue);
+  const equipesLibres = equipesAjoutables(equipes, vue);
 
   return (
     <section aria-labelledby={`${id}-titre`} className="flex min-w-0 flex-col gap-5">
@@ -122,42 +129,26 @@ export function MembresProjet(): React.ReactElement {
         </Alerte>
       ) : null}
 
-      <fieldset className="flex flex-col gap-2" disabled={!modifiable || envoi}>
-        <legend className="mb-2 text-sm font-semibold">Qui voit ce projet ?</legend>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {(Object.keys(VISIBILITES) as WorkProjectVisibility[]).map((v) => {
+      <Field id={`${id}-visibilite`} label="Qui voit ce projet ?" group size="full">
+        <ChoiceCards<WorkProjectVisibility>
+          value={visibilite}
+          disabled={!modifiable || envoi}
+          onChange={(v) => void changerVisibilite(v)}
+          options={(Object.keys(VISIBILITES) as WorkProjectVisibility[]).map((v) => {
             const Icone = v === 'private' ? Lock : Building2;
-            const actif = visibilite === v;
-            return (
-              <label
-                key={v}
-                className={`flex cursor-pointer items-start gap-3 rounded-[var(--radius-md)] border p-3 text-sm transition-colors ${
-                  actif
-                    ? 'border-[var(--accent)] bg-[var(--surface-muted)]'
-                    : 'border-[var(--border)] bg-[var(--surface)]'
-                } ${!modifiable ? 'cursor-default' : ''}`}
-              >
-                <input
-                  type="radio"
-                  name={`${id}-visibilite`}
-                  className="mt-1"
-                  checked={actif}
-                  onChange={() => void changerVisibilite(v)}
-                />
-                <span className="flex flex-col gap-0.5">
-                  <span className="flex items-center gap-1.5 font-medium">
-                    <Icone aria-hidden="true" className="h-4 w-4" />
-                    {VISIBILITES[v].label}
-                  </span>
-                  <span className="text-xs text-[var(--foreground-muted)]">
-                    {VISIBILITES[v].phrase}
-                  </span>
+            return {
+              value: v,
+              label: (
+                <span className="flex items-center gap-1.5">
+                  <Icone aria-hidden="true" className="h-4 w-4" />
+                  {VISIBILITES[v].label}
                 </span>
-              </label>
-            );
+              ),
+              description: VISIBILITES[v].phrase,
+            };
           })}
-        </div>
-      </fieldset>
+        />
+      </Field>
 
       {modifiable ? (
         <div className="grid gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-4 md:grid-cols-2">
@@ -172,33 +163,29 @@ export function MembresProjet(): React.ReactElement {
               );
             }}
           >
-            <label
-              className="flex min-w-44 flex-1 flex-col gap-1 text-sm"
-              htmlFor={`${id}-personne`}
-            >
-              Ajouter une personne
-              <select
-                id={`${id}-personne`}
-                className={CHAMP}
-                value={personne}
-                onChange={(e) => setPersonne(e.target.value)}
-              >
-                <option value="">Choisir…</option>
-                {personnesAjoutables(members, vue).map((m) => (
-                  <option key={m.userId} value={m.userId}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
+            <Field id={`${id}-personne`} label="Ajouter une personne" className="min-w-44 flex-1">
+              <EntityPicker<WorkMemberOption>
+                value={ajoutables.find((m) => m.userId === personne) ?? null}
+                onChange={(m) => setPersonne(m?.userId ?? '')}
+                search={async (q) => ajoutables.filter((m) => correspondRecherche([m.name], q))}
+                refreshKey={ajoutables.length}
+                getKey={(m) => m.userId}
+                getLabel={(m) => m.name}
+                placeholder="Choisir…"
+                debounceMs={0}
+                emptyText="Aucun membre de l’organisation ne correspond."
+              />
+            </Field>
+            <Button
               type="submit"
-              className={buttonClasses('primary', 'sm')}
+              variant="primary"
+              size="sm"
               disabled={personne === ''}
+              className="max-sm:h-11"
             >
               <UserPlus aria-hidden="true" className="h-4 w-4" />
               Ajouter
-            </button>
+            </Button>
           </form>
           <form
             className="flex flex-wrap items-end gap-2"
@@ -211,32 +198,30 @@ export function MembresProjet(): React.ReactElement {
               );
             }}
           >
-            <label className="flex min-w-44 flex-1 flex-col gap-1 text-sm" htmlFor={`${id}-equipe`}>
-              Ajouter une équipe entière
-              <select
-                id={`${id}-equipe`}
-                className={CHAMP}
-                value={equipe}
-                onChange={(e) => setEquipe(e.target.value)}
-              >
-                <option value="">
-                  {equipes.length === 0 ? 'Aucune équipe (RH › Équipes)' : 'Choisir…'}
-                </option>
-                {equipesAjoutables(equipes, vue).map((t) => (
-                  <option key={t.teamId} value={t.teamId}>
-                    {libelleEquipe(t)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              type="submit"
-              className={buttonClasses('secondary', 'sm')}
-              disabled={equipe === ''}
+            <Field
+              id={`${id}-equipe`}
+              label="Ajouter une équipe entière"
+              className="min-w-44 flex-1"
+              {...(equipes.length === 0 ? { hint: 'Aucune équipe (RH › Équipes).' } : {})}
             >
+              <EntityPicker<WorkTeamRef>
+                value={equipesLibres.find((t) => t.teamId === equipe) ?? null}
+                onChange={(t) => setEquipe(t?.teamId ?? '')}
+                search={async (q) => equipesLibres.filter((t) => correspondRecherche([t.name], q))}
+                refreshKey={equipesLibres.length}
+                getKey={(t) => t.teamId}
+                getLabel={(t) => t.name}
+                getDescription={(t) => libelleEquipe(t)}
+                placeholder="Choisir…"
+                disabled={equipes.length === 0}
+                debounceMs={0}
+                emptyText="Aucune équipe ne correspond."
+              />
+            </Field>
+            <Button type="submit" size="sm" disabled={equipe === ''} className="max-sm:h-11">
               <UsersRound aria-hidden="true" className="h-4 w-4" />
               Ajouter l’équipe
-            </button>
+            </Button>
           </form>
           <p className="text-xs text-[var(--foreground-muted)] md:col-span-2">
             Une équipe ajoutée donne accès à tous ses membres, y compris ceux qui la rejoindront

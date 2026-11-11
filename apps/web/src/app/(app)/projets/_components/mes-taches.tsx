@@ -22,7 +22,17 @@ import {
   type WorkMyTaskItem,
   type WorkProjectSummary,
 } from '@lalanda/shared/work';
-import { EmptyState, PageHeader, Skeleton, buttonClasses } from '@lalanda/ui';
+import {
+  Checkbox,
+  DatePicker,
+  EmptyState,
+  PageHeader,
+  Select,
+  Skeleton,
+  SubmitButton,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import { ClipboardCheck, FileSignature, Scale } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
@@ -39,7 +49,6 @@ import {
   Alerte,
   BOUTON_PETIT,
   BloqueeBadge,
-  CHAMP,
   Echeance,
   PrioriteBadge,
 } from './elements';
@@ -363,53 +372,44 @@ function AjoutRapide({ moi, onAjoute }: { moi: string; onAjoute: () => void }): 
     <form
       onSubmit={(e) => void ajouter(e)}
       aria-label="Ajouter une tâche pour moi"
-      className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 rounded-[var(--radius-lg)] border border-dashed border-[var(--border-strong)] bg-[var(--surface)] p-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,13rem)_9.5rem_auto] sm:items-center"
+      className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 rounded-[var(--radius-lg)] border border-dashed border-[var(--border-strong)] bg-[var(--surface)] p-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,13rem)_10.5rem_auto] sm:items-center"
     >
-      <label htmlFor="mt-ajout" className="sr-only">
-        Nouvelle tâche
-      </label>
-      <input
+      <TextInput
         id="mt-ajout"
+        aria-label="Nouvelle tâche"
         value={titre}
         onChange={(e) => setTitre(e.target.value)}
         placeholder="＋ Ajouter une tâche…"
         maxLength={300}
-        className={`${CHAMP} col-span-2 border-transparent bg-transparent sm:col-span-1`}
+        className="col-span-2 border-transparent bg-transparent sm:col-span-1"
         aria-invalid={erreur !== null && titre.trim() === '' ? true : undefined}
       />
-      <label htmlFor="mt-ajout-projet" className="sr-only">
-        Projet
-      </label>
-      <select
+      <Select<string>
         id="mt-ajout-projet"
+        aria-label="Projet"
         value={projet}
-        onChange={(e) => setProjet(e.target.value)}
-        className={`${CHAMP} col-span-2 sm:col-span-1`}
+        onChange={setProjet}
         disabled={projets === null}
-      >
-        {(projets ?? []).map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
-        ))}
-      </select>
-      <label htmlFor="mt-ajout-echeance" className="sr-only">
-        Échéance
-      </label>
-      <input
-        id="mt-ajout-echeance"
-        type="date"
-        value={echeance}
-        onChange={(e) => setEcheance(e.target.value)}
-        className={CHAMP}
+        loading={projets === null}
+        aria-invalid={erreur !== null && projet === '' ? true : undefined}
+        options={(projets ?? []).map((p) => ({ value: p.id, label: p.name }))}
+        className="col-span-2 sm:col-span-1"
       />
-      <button
-        type="submit"
-        disabled={envoi || projets === null}
-        className={buttonClasses('primary', 'md')}
+      <DatePicker
+        id="mt-ajout-echeance"
+        aria-label="Échéance"
+        value={echeance}
+        onChange={setEcheance}
+        shortcuts={['today', 'plus7', 'endOfMonth']}
+      />
+      <SubmitButton
+        busy={envoi}
+        busyLabel="Ajout…"
+        disabled={projets === null}
+        showShortcut={false}
       >
-        {envoi ? 'Ajout…' : 'Ajouter'}
-      </button>
+        Ajouter
+      </SubmitButton>
       {erreur ? (
         <p role="alert" className="col-span-full text-xs text-[var(--danger)]">
           {erreur}
@@ -619,9 +619,8 @@ function LigneRelance({
   return (
     <li className="flex min-w-0 flex-col gap-1.5 px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3">
       <div className="flex min-w-0 flex-1 items-start gap-2">
-        <input
-          type="checkbox"
-          className="mt-0.5 h-4 w-4 shrink-0"
+        <Checkbox
+          className="mt-0.5 shrink-0"
           checked={false}
           disabled={!peutCocher}
           aria-label={`Marquer faite : ${r.kindLabel.toLowerCase()} « ${r.subject} »`}

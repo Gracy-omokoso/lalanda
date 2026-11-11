@@ -5,9 +5,26 @@
 // corrige titres, dates et responsables, retire des tâches, régénère (compte
 // dans le quota IA) — puis « Créer le projet », par le même créateur que
 // l'import de fichier. Rien n'est créé sans ce dernier clic.
+//
+// ADR-0074 : formulaire sur `Field` + `FormGrid`, dates en `DatePicker`, durée
+// des sprints en segments, niveau de détail en `Select` ; en relecture,
+// responsable en `Select` compact et échéance en `DatePicker`. Mêmes champs,
+// mêmes validations (`preparerIa`, `corpsCreation` inchangés).
 
 import type { WorkAiPlanDraft, WorkPlanTask } from '@lalanda/shared/work';
-import { EmptyState, PageHeader, buttonClasses } from '@lalanda/ui';
+import {
+  Button,
+  DatePicker,
+  EmptyState,
+  Field,
+  FormGrid,
+  PageHeader,
+  SegmentedControl,
+  Select,
+  TextArea,
+  TextInput,
+  buttonClasses,
+} from '@lalanda/ui';
 import { Flag, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -18,7 +35,7 @@ import { workPlanApi } from '@/lib/work-plan-api';
 
 import { useShell } from '../../_components/shell-context';
 
-import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from './elements';
+import { Alerte } from './elements';
 import {
   NIVEAUX_DETAIL,
   corpsCreation,
@@ -35,8 +52,6 @@ import {
 import { PRIORITES, aujourdhui, formatJour, hrefProjet, peutGerer } from './projets-model';
 
 const CARTE = 'rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)]';
-const PETIT_CHAMP =
-  'w-full rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-sm outline-none focus:border-[var(--accent)]';
 
 function Formulaire({
   f,
@@ -58,134 +73,127 @@ function Formulaire({
         : [...f.memberUserIds, id],
     });
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      <Champ id="ia-nom" label="Nom du projet" requis erreur={champs['name']}>
-        <input
-          id="ia-nom"
+    <FormGrid>
+      <Field id="ia-nom" label="Nom du projet" required size="lg" error={champs['name']}>
+        <TextInput
           value={f.name}
           maxLength={120}
           onChange={(e) => setF({ ...f, name: e.target.value })}
-          className={CHAMP}
-          {...aria('ia-nom', champs['name'])}
         />
-      </Champ>
-      <div className="grid grid-cols-2 gap-3">
-        <Champ id="ia-debut" label="Date de début" requis erreur={champs['startDate']}>
-          <input
-            id="ia-debut"
-            type="date"
-            value={f.startDate}
-            onChange={(e) => setF({ ...f, startDate: e.target.value })}
-            className={CHAMP}
-            {...aria('ia-debut', champs['startDate'])}
-          />
-        </Champ>
-        <Champ id="ia-fin" label="Date butoir" requis erreur={champs['dueDate']}>
-          <input
-            id="ia-fin"
-            type="date"
-            value={f.dueDate}
-            onChange={(e) => setF({ ...f, dueDate: e.target.value })}
-            className={CHAMP}
-            {...aria('ia-fin', champs['dueDate'])}
-          />
-        </Champ>
-      </div>
-      <div className="sm:col-span-2">
-        <Champ
-          id="ia-obj"
-          label="Objectif"
-          requis
-          aide="Ce que le projet doit avoir accompli à la date butoir."
-          erreur={champs['objective']}
-        >
-          <textarea
-            id="ia-obj"
-            rows={2}
-            maxLength={2000}
-            value={f.objective}
-            onChange={(e) => setF({ ...f, objective: e.target.value })}
-            className={CHAMP}
-            {...aria('ia-obj', champs['objective'], true)}
-          />
-        </Champ>
-      </div>
-      <Champ id="ia-ctx" label="Contexte" aide="Qui, où, pour quel client ou quel besoin.">
-        <textarea
-          id="ia-ctx"
+      </Field>
+      <Field
+        id="ia-debut"
+        label="Date de début"
+        required
+        size="sm"
+        newRow
+        error={champs['startDate']}
+      >
+        <DatePicker
+          value={f.startDate}
+          required
+          onChange={(v) => setF({ ...f, startDate: v })}
+          shortcuts={['today']}
+        />
+      </Field>
+      <Field id="ia-fin" label="Date butoir" required size="sm" error={champs['dueDate']}>
+        <DatePicker
+          value={f.dueDate}
+          required
+          onChange={(v) => setF({ ...f, dueDate: v })}
+          shortcuts={['endOfMonth', 'plus30', 'endOfYear']}
+        />
+      </Field>
+      <Field
+        id="ia-obj"
+        label="Objectif"
+        required
+        size="full"
+        hint="Ce que le projet doit avoir accompli à la date butoir."
+        error={champs['objective']}
+      >
+        <TextArea
+          rows={2}
+          maxLength={2000}
+          value={f.objective}
+          onChange={(e) => setF({ ...f, objective: e.target.value })}
+        />
+      </Field>
+      <Field
+        id="ia-ctx"
+        label="Contexte"
+        optional
+        size="full"
+        hint="Qui, où, pour quel client ou quel besoin."
+      >
+        <TextArea
           rows={3}
           maxLength={2000}
           value={f.context}
           onChange={(e) => setF({ ...f, context: e.target.value })}
-          className={CHAMP}
-          {...aria('ia-ctx', undefined, true)}
         />
-      </Champ>
-      <Champ
+      </Field>
+      <Field
         id="ia-liv"
         label="Livrables attendus"
-        aide="Un par ligne ou séparés par des virgules."
+        optional
+        size="full"
+        hint="Un par ligne ou séparés par des virgules."
       >
-        <textarea
-          id="ia-liv"
+        <TextArea
           rows={3}
           maxLength={2000}
           value={f.deliverables}
           onChange={(e) => setF({ ...f, deliverables: e.target.value })}
-          className={CHAMP}
-          {...aria('ia-liv', undefined, true)}
         />
-      </Champ>
-      <Champ
+      </Field>
+      <Field
         id="ia-risques"
         label="Contraintes et risques"
-        aide="Budget serré, délestages, fournisseurs, saison des pluies…"
+        optional
+        size="full"
+        hint="Budget serré, délestages, fournisseurs, saison des pluies…"
       >
-        <textarea
-          id="ia-risques"
+        <TextArea
           rows={2}
           maxLength={2000}
           value={f.constraints}
           onChange={(e) => setF({ ...f, constraints: e.target.value })}
-          className={CHAMP}
-          {...aria('ia-risques', undefined, true)}
         />
-      </Champ>
-      <div className="grid grid-cols-2 gap-3">
-        <Champ id="ia-sprint" label="Durée des sprints" erreur={champs['sprintWeeks']}>
-          <select
-            id="ia-sprint"
-            value={f.sprintWeeks}
-            onChange={(e) => setF({ ...f, sprintWeeks: Number(e.target.value) as 1 | 2 | 3 })}
-            className={CHAMP}
-            {...aria('ia-sprint', champs['sprintWeeks'])}
-          >
-            <option value={1}>1 semaine</option>
-            <option value={2}>2 semaines</option>
-            <option value={3}>3 semaines</option>
-          </select>
-        </Champ>
-        <Champ id="ia-detail" label="Niveau de détail">
-          <select
-            id="ia-detail"
-            value={f.detail}
-            onChange={(e) => setF({ ...f, detail: e.target.value as FormulaireIa['detail'] })}
-            className={CHAMP}
-          >
-            {(Object.keys(NIVEAUX_DETAIL) as FormulaireIa['detail'][]).map((k) => (
-              <option key={k} value={k}>
-                {NIVEAUX_DETAIL[k]}
-              </option>
-            ))}
-          </select>
-        </Champ>
-        <p className="col-span-2 text-xs text-[var(--foreground-muted)]" aria-live="polite">
-          {sprints > 0
+      </Field>
+      <Field
+        id="ia-sprint"
+        label="Durée des sprints"
+        group
+        size="md"
+        error={champs['sprintWeeks']}
+        hint={
+          sprints > 0
             ? `${sprints} sprint${sprints > 1 ? 's' : ''} sur la période.`
-            : 'Choisissez les deux dates pour voir les sprints.'}
-        </p>
-      </div>
-      <fieldset className="flex flex-col gap-2 sm:col-span-2">
+            : 'Choisissez les deux dates pour voir les sprints.'
+        }
+      >
+        <SegmentedControl<'1' | '2' | '3'>
+          value={String(f.sprintWeeks) as '1' | '2' | '3'}
+          onChange={(v) => setF({ ...f, sprintWeeks: Number(v) as 1 | 2 | 3 })}
+          options={[
+            { value: '1', label: '1 semaine' },
+            { value: '2', label: '2 semaines' },
+            { value: '3', label: '3 semaines' },
+          ]}
+        />
+      </Field>
+      <Field id="ia-detail" label="Niveau de détail" size="md">
+        <Select<FormulaireIa['detail']>
+          value={f.detail}
+          onChange={(v) => setF({ ...f, detail: v })}
+          options={(Object.keys(NIVEAUX_DETAIL) as FormulaireIa['detail'][]).map((k) => ({
+            value: k,
+            label: NIVEAUX_DETAIL[k],
+          }))}
+        />
+      </Field>
+      <fieldset className="col-span-full flex min-w-0 flex-col gap-2">
         <legend className="text-sm font-medium">Équipe</legend>
         <p className="text-xs text-[var(--foreground-muted)]">
           L’IA propose un responsable parmi ces membres (elle ne voit que leur prénom, jamais leur
@@ -217,7 +225,7 @@ function Formulaire({
           })}
         </div>
       </fieldset>
-    </div>
+    </FormGrid>
   );
 }
 
@@ -234,17 +242,15 @@ function LigneTache({
 }): React.ReactElement {
   const metier = (t.labels ?? []).filter((l) => !/^Sprint \d+$/.test(l));
   return (
-    <li className="grid grid-cols-1 items-start gap-2 border-t border-[var(--border)] px-3 py-2 first:border-t-0 md:grid-cols-[minmax(0,1fr)_10rem_9.5rem_5rem_2rem]">
+    <li className="grid grid-cols-1 items-start gap-2 border-t border-[var(--border)] px-3 py-2 first:border-t-0 md:grid-cols-[minmax(0,1fr)_11rem_10.5rem_5rem_2.25rem]">
       <div className="flex min-w-0 flex-col gap-1">
-        <label className="sr-only" htmlFor={`t-${t.ref}`}>
-          Titre de {t.ref}
-        </label>
-        <input
+        <TextInput
           id={`t-${t.ref}`}
+          aria-label={`Titre de ${t.ref}`}
           value={t.title}
           maxLength={300}
           onChange={(e) => onChange({ title: e.target.value })}
-          className={`${PETIT_CHAMP} font-medium`}
+          className="font-medium"
         />
         <span className="flex flex-wrap items-center gap-x-2 text-xs text-[var(--foreground-muted)]">
           {t.description ? <span className="min-w-0">{t.description}</span> : null}
@@ -256,36 +262,23 @@ function LigneTache({
           <span>· {t.ref}</span>
         </span>
       </div>
-      <div>
-        <label className="sr-only" htmlFor={`r-${t.ref}`}>
-          Responsable de {t.ref}
-        </label>
-        <select
-          id={`r-${t.ref}`}
-          value={t.assigneeUserId ?? ''}
-          onChange={(e) => onChange({ assigneeUserId: e.target.value || null })}
-          className={PETIT_CHAMP}
-        >
-          <option value="">Sans responsable</option>
-          {membres.map((m) => (
-            <option key={m.userId} value={m.userId}>
-              {m.name}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <label className="sr-only" htmlFor={`d-${t.ref}`}>
-          Échéance de {t.ref}
-        </label>
-        <input
-          id={`d-${t.ref}`}
-          type="date"
-          value={t.dueDate ?? ''}
-          onChange={(e) => onChange({ dueDate: e.target.value || null })}
-          className={PETIT_CHAMP}
-        />
-      </div>
+      <Select<string>
+        id={`r-${t.ref}`}
+        aria-label={`Responsable de ${t.ref}`}
+        value={t.assigneeUserId ?? ''}
+        onChange={(v) => onChange({ assigneeUserId: v || null })}
+        options={[
+          { value: '', label: 'Sans responsable' },
+          ...membres.map((m) => ({ value: m.userId, label: m.name })),
+        ]}
+      />
+      <DatePicker
+        id={`d-${t.ref}`}
+        aria-label={`Échéance de ${t.ref}`}
+        value={t.dueDate ?? ''}
+        onChange={(v) => onChange({ dueDate: v || null })}
+        shortcuts={['today', 'plus7', 'endOfMonth']}
+      />
       <span className="pt-1.5 text-xs tabular-nums text-[var(--foreground-muted)]">
         {heures(t.estimateMinutes ?? null)}
       </span>
@@ -342,16 +335,14 @@ function Relecture({
             </ul>
           </details>
         ) : null}
-        <Champ id="ia-desc" label="Description du projet">
-          <textarea
-            id="ia-desc"
+        <Field id="ia-desc" label="Description du projet" optional size="full">
+          <TextArea
             rows={4}
             maxLength={5000}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className={CHAMP}
           />
-        </Champ>
+        </Field>
       </div>
 
       <section className={`${CARTE} overflow-hidden`} aria-labelledby="ia-jalons">
@@ -524,45 +515,39 @@ export function IaConstruire(): React.ReactElement {
       <div className="flex flex-wrap items-center gap-2">
         {relecture ? (
           <>
-            <button
-              type="button"
+            <Button
+              variant="primary"
+              busy={attente === 'creer'}
               disabled={attente !== null || tasks.filter((t) => !t.isMilestone).length === 0}
-              className={buttonClasses('primary', 'md')}
               onClick={() => void creer()}
             >
               {attente === 'creer' ? 'Création…' : `Créer le projet (${tasks.length} éléments)`}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              busy={attente === 'proposer'}
               disabled={attente !== null}
-              className={buttonClasses('secondary', 'md')}
               onClick={() => void proposer()}
             >
               <RefreshCw aria-hidden="true" className="h-4 w-4" />
               Régénérer
-            </button>
-            <button
-              type="button"
-              disabled={attente !== null}
-              className={BOUTON_PETIT}
-              onClick={() => setDraft(null)}
-            >
+            </Button>
+            <Button size="sm" disabled={attente !== null} onClick={() => setDraft(null)}>
               Modifier le formulaire
-            </button>
+            </Button>
             <span className="text-xs text-[var(--foreground-muted)]">
               Régénérer compte un message IA dans le quota du mois.
             </span>
           </>
         ) : (
-          <button
-            type="button"
+          <Button
+            variant="primary"
+            busy={attente === 'proposer'}
             disabled={attente !== null}
-            className={buttonClasses('primary', 'md')}
             onClick={() => void proposer()}
           >
             <Sparkles aria-hidden="true" className="h-4 w-4" />
             {attente === 'proposer' ? 'Proposition en cours…' : 'Proposer un plan'}
-          </button>
+          </Button>
         )}
       </div>
     </section>

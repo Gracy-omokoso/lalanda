@@ -7,7 +7,7 @@
 // n'est montré qu'à son titulaire ; l'écran ne l'envoie qu'aux routes de l'appelant.
 
 import type { WhatsAppView } from '@lalanda/shared/work';
-import { StatusPill, buttonClasses } from '@lalanda/ui';
+import { Button, Field, OtpInput, PhoneInput, StatusPill } from '@lalanda/ui';
 import { useId, useState } from 'react';
 
 import { workApi } from '@/lib/work-api';
@@ -20,9 +20,6 @@ import {
   libelleIndisponibleWhatsApp,
 } from './parametres-model';
 import { messageWork } from './projets-model';
-
-const CHAMP =
-  'h-9 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]';
 
 function heure(iso: string): string {
   return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -131,42 +128,44 @@ export function BlocWhatsApp({
             void demander(numero);
           }}
         >
-          <label htmlFor={`${id}-numero`} className="text-sm font-medium">
-            Votre numéro WhatsApp
-          </label>
-          <div className="flex flex-wrap items-center gap-2">
-            <input
+          <div className="flex flex-wrap items-end gap-2">
+            <Field
               id={`${id}-numero`}
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel"
-              className={`${CHAMP} w-56`}
-              value={numero}
-              onChange={(e) => setNumero(e.target.value)}
-              aria-describedby={`${id}-aide`}
-            />
-            <button
+              label="Votre numéro WhatsApp"
+              className="w-full sm:w-80"
+              hint={
+                <>
+                  Format international (+243 pour la RDC). Un code à 6 chiffres vous sera envoyé sur
+                  WhatsApp ; {vue.codesLeftThisHour} demande
+                  {vue.codesLeftThisHour > 1 ? 's' : ''} possible
+                  {vue.codesLeftThisHour > 1 ? 's' : ''} dans l’heure.
+                </>
+              }
+            >
+              <PhoneInput value={numero} autoComplete="tel" onChange={setNumero} />
+            </Field>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
               type="submit"
-              className={buttonClasses('primary', 'sm')}
+              variant="primary"
+              size="sm"
               disabled={occupe || !vue.available || vue.codesLeftThisHour === 0}
+              className="max-sm:h-11"
             >
               Recevoir un code
-            </button>
+            </Button>
             {changer ? (
-              <button
-                type="button"
-                className={buttonClasses('ghost', 'sm')}
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setChanger(false)}
+                className="max-sm:h-11"
               >
                 Annuler
-              </button>
+              </Button>
             ) : null}
           </div>
-          <p id={`${id}-aide`} className="text-xs text-[var(--foreground-muted)]">
-            Format international (+243 pour la RDC). Un code à 6 chiffres vous sera envoyé sur
-            WhatsApp ; {vue.codesLeftThisHour} demande{vue.codesLeftThisHour > 1 ? 's' : ''}{' '}
-            possible{vue.codesLeftThisHour > 1 ? 's' : ''} dans l’heure.
-          </p>
         </form>
       ) : null}
 
@@ -183,45 +182,38 @@ export function BlocWhatsApp({
             valable jusqu’à {heure(n.code.expiresAt)} ({n.code.attemptsLeft} essai
             {n.code.attemptsLeft > 1 ? 's' : ''} restant{n.code.attemptsLeft > 1 ? 's' : ''}).
           </p>
-          <label htmlFor={`${id}-code`} className="text-sm font-medium">
-            Code reçu sur WhatsApp
-          </label>
+          <Field id={`${id}-code`} label="Code reçu sur WhatsApp" group size="full">
+            <OtpInput value={code} onChange={(v) => setCode(v.replace(/\D/g, '').slice(0, 6))} />
+          </Field>
           <div className="flex flex-wrap items-center gap-2">
-            <input
-              id={`${id}-code`}
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              pattern="\d{6}"
-              maxLength={6}
-              className={`${CHAMP} w-32 text-center tracking-[0.3em] tabular-nums`}
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-            />
-            <button
+            <Button
               type="submit"
-              className={buttonClasses('primary', 'sm')}
+              variant="primary"
+              size="sm"
               disabled={occupe || code.length !== 6}
+              className="max-sm:h-11"
             >
               Vérifier
-            </button>
-            <button
-              type="button"
-              className={buttonClasses('secondary', 'sm')}
+            </Button>
+            <Button
+              size="sm"
               disabled={occupe || vue.codesLeftThisHour === 0 || !vue.available}
               onClick={() => void demander(n.phone)}
+              className="max-sm:h-11"
             >
               Renvoyer un code
-            </button>
-            <button
-              type="button"
-              className={buttonClasses('ghost', 'sm')}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => {
                 setNumero(n.phone);
                 setChanger(true);
               }}
+              className="max-sm:h-11"
             >
               Changer de numéro
-            </button>
+            </Button>
           </div>
         </form>
       ) : null}
@@ -244,25 +236,19 @@ export function BlocWhatsApp({
       {n && !changer ? (
         <div className="flex flex-wrap gap-2">
           {etape === 'verifie' ? (
-            <button
-              type="button"
-              className={buttonClasses('secondary', 'sm')}
+            <Button
+              size="sm"
               onClick={() => {
                 setNumero(n.phone);
                 setChanger(true);
               }}
             >
               Changer de numéro
-            </button>
+            </Button>
           ) : null}
-          <button
-            type="button"
-            className={buttonClasses('ghost', 'sm')}
-            disabled={occupe}
-            onClick={retirer}
-          >
+          <Button variant="ghost" size="sm" disabled={occupe} onClick={retirer}>
             Retirer mon numéro
-          </button>
+          </Button>
         </div>
       ) : null}
 

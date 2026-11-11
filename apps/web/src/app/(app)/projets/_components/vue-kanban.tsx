@@ -4,8 +4,9 @@
 // épurées façon Asana, « + Ajouter une tâche » en bas de chaque colonne) : colonnes = statuts propres au
 // projet. Glisser-déposer entre colonnes ET équivalent clavier / tactile (menu
 // « Déplacer… » sur chaque carte : monter, descendre, vers une colonne) —
-// accessibilité ADR-0030 § 5. Le rang est calculé par `rankBetween` pour
-// l'affichage optimiste ; le serveur fait foi (`POST /work/tasks/:id/move`).
+// accessibilité ADR-0030 § 5 ; ce menu est un `Select`, ADR-0074. Le rang est
+// calculé par `rankBetween` pour l'affichage optimiste ; le serveur fait foi
+// (`POST /work/tasks/:id/move`).
 //
 // Téléphone : une colonne occupe presque l'écran, et la zone du tableau défile
 // horizontalement À L'INTÉRIEUR d'elle-même (la page, elle, ne déborde pas).
@@ -14,7 +15,7 @@
 // échappent au défilement et élargissent tout l'écran sur téléphone.
 
 import type { WorkColumn, WorkTaskView } from '@lalanda/shared/work';
-import { Skeleton } from '@lalanda/ui';
+import { Select, Skeleton } from '@lalanda/ui';
 import { GitBranch, MessageSquare } from 'lucide-react';
 import { useState } from 'react';
 
@@ -296,27 +297,18 @@ function Carte({
           <AbsenceBadges t={t} />
         </span>
         {options.length > 0 ? (
-          <>
-            <label htmlFor={idMenu} className="sr-only">
-              Déplacer #{t.number} {t.title}
-            </label>
-            <select
-              id={idMenu}
-              value=""
-              onChange={(e) => {
-                const o = options.find((x) => x.id === e.target.value);
-                if (o) onDeplacer(o.columnKey, o.index);
-              }}
-              className="max-w-[9rem] rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface)] px-1.5 py-1 text-xs transition-opacity duration-[var(--motion-fast)] focus:opacity-100 sm:opacity-0 sm:group-focus-within/carte:opacity-100 sm:group-hover/carte:opacity-100"
-            >
-              <option value="">Déplacer…</option>
-              {options.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </>
+          <Select<string>
+            id={idMenu}
+            value=""
+            placeholder="Déplacer…"
+            aria-label={`Déplacer #${t.number} ${t.title}`}
+            onChange={(v) => {
+              const o = options.find((x) => x.id === v);
+              if (o) onDeplacer(o.columnKey, o.index);
+            }}
+            options={options.map((o) => ({ value: o.id, label: o.label }))}
+            className="w-[9rem] shrink-0 transition-opacity duration-[var(--motion-fast)] focus-within:opacity-100 sm:opacity-0 sm:group-focus-within/carte:opacity-100 sm:group-hover/carte:opacity-100"
+          />
         ) : null}
       </div>
     </li>

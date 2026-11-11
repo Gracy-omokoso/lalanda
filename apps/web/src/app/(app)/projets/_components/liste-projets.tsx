@@ -12,7 +12,26 @@ import type {
   WorkPortfolioScope,
   WorkPortfolioView,
 } from '@lalanda/shared/work';
-import { EmptyState, Modal, PageHeader, Skeleton, StatusPill, buttonClasses } from '@lalanda/ui';
+import {
+  Button,
+  DatePicker,
+  EmptyState,
+  EntityPicker,
+  Field,
+  Form,
+  FormGrid,
+  Modal,
+  PageHeader,
+  SegmentedControl,
+  Select,
+  Skeleton,
+  StatusPill,
+  SubmitButton,
+  TextArea,
+  TextInput,
+  buttonClasses,
+  correspondRecherche,
+} from '@lalanda/ui';
 import { Plus, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -24,8 +43,9 @@ import { workApi, type WorkMemberOption } from '@/lib/work-api';
 import { workPortfolioApi } from '@/lib/work-portfolio-api';
 
 import { useShell } from '../../_components/shell-context';
+import { CustomerForm } from '../../ventes/_components/customer-form';
 
-import { Alerte, BOUTON_PETIT, CHAMP, Champ, aria } from './elements';
+import { Alerte, BOUTON_PETIT } from './elements';
 import { PastilleProjet, PileAvatars } from './equipe-elements';
 import { ChoixCreation } from './import-entrees';
 import {
@@ -49,6 +69,13 @@ import {
   type FormulaireProjet,
 } from './projets-model';
 
+/** Client tel que le sélecteur le connaît. */
+type ClientProjet = Pick<CustomerView, 'id' | 'name'> & Partial<Pick<CustomerView, 'nif'>>;
+
+// Même lecture qu'avant (clients actifs), servie par la recherche de l'API.
+const chercherClients = async (q: string): Promise<CustomerView[]> =>
+  (await api.listCustomers({ status: 'active', limit: 50, ...(q ? { q } : {}) })).items;
+
 function NouveauProjet({ onAnnule }: { onAnnule: () => void }): React.ReactElement {
   const router = useRouter();
   const { actions } = useShell();
@@ -57,11 +84,13 @@ function NouveauProjet({ onAnnule }: { onAnnule: () => void }): React.ReactEleme
   const [erreur, setErreur] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
   const [membres, setMembres] = useState<WorkMemberOption[]>([]);
-  const [clients, setClients] = useState<CustomerView[]>([]);
+  const [clientChoisi, setClientChoisi] = useState<ClientProjet | null>(null);
   const [opportunites, setOpportunites] = useState<OpportunitySummary[]>([]);
   const [devis, setDevis] = useState<QuoteSummary[]>([]);
   const ventes = actions?.includes('sales.read') ?? false;
   const crm = actions?.includes('crm.read') ?? false;
+  // ADR-0074 § 4 : un client absent se crée sans quitter le projet (`sales.manage`, l'API juge).
+  const creerClient = actions?.includes('sales.manage') ?? false;
 
   useEffect(() => {
     workApi
@@ -70,10 +99,6 @@ function NouveauProjet({ onAnnule }: { onAnnule: () => void }): React.ReactEleme
       .catch(() => setMembres([]));
     // Listes de liaison : seulement si le rôle les lit (sinon l'API répondrait 403).
     if (ventes) {
-      api
-        .listCustomers({ status: 'active', limit: 100 })
-        .then((p) => setClients(p.items))
-        .catch(() => undefined);
       crmApi
         .listQuotes({ status: 'accepted', limit: 100 })
         .then((p) => setDevis(p.items))
@@ -113,183 +138,185 @@ function NouveauProjet({ onAnnule }: { onAnnule: () => void }): React.ReactEleme
 
   const client = f.kind === 'client';
   const devisDuClient = f.customerId ? devis.filter((q) => q.customerId === f.customerId) : devis;
+  const responsable = membres.find((m) => m.userId === f.ownerUserId) ?? null;
 
   return (
-    <form
+    <Form
       onSubmit={(e) => void creer(e)}
-      noValidate
       aria-label="Nouveau projet"
-      className="grid gap-4 sm:grid-cols-2"
+      className="flex flex-col gap-4"
     >
-      <Champ id="pj-nom" label="Nom du projet" requis erreur={champs['name']}>
-        <input
-          id="pj-nom"
-          value={f.name}
-          onChange={(e) => setF({ ...f, name: e.target.value })}
-          className={CHAMP}
-          maxLength={120}
-          autoFocus
-          {...aria('pj-nom', champs['name'])}
-        />
-      </Champ>
-      <fieldset className="flex flex-col gap-1.5">
-        <legend className="text-sm font-medium">Nature</legend>
-        <div className="flex flex-wrap gap-4 pt-1.5 text-sm">
-          {(['client', 'internal'] as const).map((k) => (
-            <label key={k} className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="pj-nature"
-                value={k}
-                checked={f.kind === k}
-                onChange={() => setF({ ...f, kind: k })}
-              />
-              {NATURES_PROJET[k]}
-            </label>
-          ))}
-        </div>
-      </fieldset>
-      {/* ADR-0060 : qui voit le projet (défaut : réglage « visibilité par défaut »). */}
-      <Champ id="pj-visibilite" label="Visibilité">
-        <select
-          id="pj-visibilite"
-          value={visibilite}
-          onChange={(e) => setVisibilite(e.target.value as typeof visibilite)}
-          className={CHAMP}
-        >
-          <option value="">Par défaut (réglages des Projets)</option>
-          <option value="organization">Toute l’organisation</option>
-          <option value="private">Membres seulement (privé)</option>
-        </select>
-      </Champ>
-      <Champ id="pj-resp" label="Responsable du projet" erreur={champs['ownerUserId']}>
-        <select
+      <FormGrid>
+        <Field id="pj-nom" label="Nom du projet" required size="lg" error={champs['name']}>
+          <TextInput
+            value={f.name}
+            onChange={(e) => setF({ ...f, name: e.target.value })}
+            maxLength={120}
+          />
+        </Field>
+        <Field id="pj-nature" label="Nature" group size="md">
+          <SegmentedControl<FormulaireProjet['kind']>
+            value={f.kind}
+            onChange={(k) => setF({ ...f, kind: k })}
+            options={(['client', 'internal'] as const).map((k) => ({
+              value: k,
+              label: NATURES_PROJET[k],
+            }))}
+          />
+        </Field>
+        {/* ADR-0060 : qui voit le projet (défaut : réglage « visibilité par défaut »). */}
+        <Field id="pj-visibilite" label="Visibilité" size="md" newRow>
+          <Select<'' | 'organization' | 'private'>
+            value={visibilite}
+            onChange={setVisibilite}
+            options={[
+              { value: '', label: 'Par défaut (réglages des Projets)' },
+              { value: 'organization', label: 'Toute l’organisation' },
+              { value: 'private', label: 'Membres seulement (privé)' },
+            ]}
+          />
+        </Field>
+        <Field
           id="pj-resp"
-          value={f.ownerUserId}
-          onChange={(e) => setF({ ...f, ownerUserId: e.target.value })}
-          className={CHAMP}
+          label="Responsable du projet"
+          size="md"
+          hint="Tapez pour chercher. Vide : aucun pour l’instant."
+          error={champs['ownerUserId']}
         >
-          <option value="">Aucun pour l’instant</option>
-          {membres.map((m) => (
-            <option key={m.userId} value={m.userId}>
-              {m.name}
-            </option>
-          ))}
-        </select>
-      </Champ>
-      <div className="grid grid-cols-2 gap-3">
-        <Champ id="pj-debut" label="Début" erreur={champs['startDate']}>
-          <input
-            id="pj-debut"
-            type="date"
+          <EntityPicker<WorkMemberOption>
+            value={responsable}
+            onChange={(m) => setF({ ...f, ownerUserId: m?.userId ?? '' })}
+            search={async (q) => membres.filter((m) => correspondRecherche([m.name], q))}
+            refreshKey={membres.length}
+            getKey={(m) => m.userId}
+            getLabel={(m) => m.name}
+            placeholder="Aucun pour l’instant"
+            debounceMs={0}
+            emptyText="Aucun membre ne correspond."
+          />
+        </Field>
+        <Field id="pj-debut" label="Début" size="sm" newRow error={champs['startDate']}>
+          <DatePicker
             value={f.startDate}
-            onChange={(e) => setF({ ...f, startDate: e.target.value })}
-            className={CHAMP}
-            {...aria('pj-debut', champs['startDate'])}
+            onChange={(v) => setF({ ...f, startDate: v })}
+            shortcuts={['today']}
           />
-        </Champ>
-        <Champ id="pj-fin" label="Échéance" erreur={champs['dueDate']}>
-          <input
-            id="pj-fin"
-            type="date"
+        </Field>
+        <Field id="pj-fin" label="Échéance" size="sm" error={champs['dueDate']}>
+          <DatePicker
             value={f.dueDate}
-            onChange={(e) => setF({ ...f, dueDate: e.target.value })}
-            className={CHAMP}
-            {...aria('pj-fin', champs['dueDate'])}
+            onChange={(v) => setF({ ...f, dueDate: v })}
+            shortcuts={['endOfMonth', 'plus30', 'endOfYear']}
           />
-        </Champ>
-      </div>
-      {client && ventes ? (
-        <>
-          <Champ id="pj-client" label="Client" erreur={champs['customerId']}>
-            <select
+        </Field>
+        {client && ventes ? (
+          <>
+            <Field
               id="pj-client"
-              value={f.customerId}
-              onChange={(e) => setF({ ...f, customerId: e.target.value, quoteId: '' })}
-              className={CHAMP}
+              label="Client"
+              size="lg"
+              newRow
+              hint={
+                creerClient
+                  ? 'Tapez un nom, un NIF ou un e-mail. Client absent : « + » le crée sans quitter le projet.'
+                  : 'Tapez un nom, un NIF ou un e-mail.'
+              }
+              error={champs['customerId']}
             >
-              <option value="">Aucun</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </Champ>
-          <Champ
-            id="pj-devis"
-            label="Devis accepté"
-            aide="Le devis reste la référence des montants : aucun montant n’est recopié dans le projet."
-            erreur={champs['quoteId']}
-          >
-            <select
+              <EntityPicker<ClientProjet>
+                value={clientChoisi}
+                onChange={(c) => {
+                  setClientChoisi(c);
+                  setF({ ...f, customerId: c?.id ?? '', quoteId: '' });
+                }}
+                search={chercherClients}
+                getKey={(c) => c.id}
+                getLabel={(c) => c.name}
+                getDescription={(c) => (c.nif ? `NIF ${c.nif}` : null)}
+                placeholder="Aucun"
+                recentKey="ventes.clients"
+                createTitle="Nouveau client"
+                createButtonLabel="Créer un client"
+                createSize="lg"
+                {...(creerClient
+                  ? {
+                      createForm: ({ initialText, onCreated, onCancel }) => (
+                        <CustomerForm
+                          fiche={{ mode: 'creation' }}
+                          gerer
+                          base="/ventes/clients"
+                          enModal
+                          nomInitial={initialText}
+                          onFermer={(c) => (c ? onCreated(c) : onCancel())}
+                        />
+                      ),
+                    }
+                  : {})}
+              />
+            </Field>
+            <Field
               id="pj-devis"
-              value={f.quoteId}
-              onChange={(e) => setF({ ...f, quoteId: e.target.value })}
-              className={CHAMP}
-              {...aria('pj-devis', champs['quoteId'], true)}
+              label="Devis accepté"
+              size="lg"
+              newRow
+              hint="Le devis reste la référence des montants : aucun montant n’est recopié dans le projet."
+              error={champs['quoteId']}
             >
-              <option value="">Aucun</option>
-              {devisDuClient.map((q) => (
-                <option key={q.id} value={q.id}>
-                  {q.number}
-                  {q.title ? ` — ${q.title}` : ''}
-                  {q.customerName ? ` (${q.customerName})` : ''}
-                </option>
-              ))}
-            </select>
-          </Champ>
-        </>
-      ) : null}
-      {client && crm ? (
-        <Champ id="pj-opp" label="Opportunité" erreur={champs['opportunityId']}>
-          <select
-            id="pj-opp"
-            value={f.opportunityId}
-            onChange={(e) => setF({ ...f, opportunityId: e.target.value })}
-            className={CHAMP}
-          >
-            <option value="">Aucune</option>
-            {opportunites.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.title}
-              </option>
-            ))}
-          </select>
-        </Champ>
-      ) : null}
-      <div className="sm:col-span-2">
-        <Champ id="pj-desc" label="Description" erreur={champs['description']}>
-          <textarea
-            id="pj-desc"
+              <Select<string>
+                value={f.quoteId}
+                onChange={(v) => setF({ ...f, quoteId: v })}
+                options={[
+                  { value: '', label: 'Aucun' },
+                  ...devisDuClient.map((q) => ({
+                    value: q.id,
+                    label: `${q.number}${q.title ? ` — ${q.title}` : ''}`,
+                    description: q.customerName ?? undefined,
+                    keywords: q.customerName ?? undefined,
+                  })),
+                ]}
+              />
+            </Field>
+          </>
+        ) : null}
+        {client && crm ? (
+          <Field id="pj-opp" label="Opportunité" size="lg" newRow error={champs['opportunityId']}>
+            <Select<string>
+              value={f.opportunityId}
+              onChange={(v) => setF({ ...f, opportunityId: v })}
+              options={[
+                { value: '', label: 'Aucune' },
+                ...opportunites.map((o) => ({ value: o.id, label: o.title })),
+              ]}
+            />
+          </Field>
+        ) : null}
+        <Field id="pj-desc" label="Description" optional size="full" error={champs['description']}>
+          <TextArea
             value={f.description}
             onChange={(e) => setF({ ...f, description: e.target.value })}
-            className={CHAMP}
             rows={3}
             maxLength={5000}
           />
-        </Champ>
-      </div>
-      <p className="text-xs text-[var(--foreground-muted)] sm:col-span-2">
+        </Field>
+      </FormGrid>
+      <p className="text-xs text-[var(--foreground-muted)]">
         Les colonnes du Kanban sont celles proposées par défaut ; vous pourrez les renommer, en
         ajouter ou les réordonner dans les Réglages du projet.
       </p>
       {erreur ? (
-        <div className="sm:col-span-2">
-          <Alerte>
-            <p>{erreur}</p>
-          </Alerte>
-        </div>
+        <Alerte>
+          <p>{erreur}</p>
+        </Alerte>
       ) : null}
-      <div className="flex flex-wrap gap-2 sm:col-span-2">
-        <button type="submit" disabled={envoi} className={buttonClasses('primary', 'md')}>
-          {envoi ? 'Création…' : 'Créer le projet'}
-        </button>
-        <button type="button" onClick={onAnnule} className={buttonClasses('secondary', 'md')}>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap">
+        <SubmitButton busy={envoi} busyLabel="Création…" className="max-sm:h-11">
+          Créer le projet
+        </SubmitButton>
+        <Button onClick={onAnnule} className="max-sm:h-11">
           Annuler
-        </button>
+        </Button>
       </div>
-    </form>
+    </Form>
   );
 }
 
@@ -578,41 +605,23 @@ export function ListeProjets(): React.ReactElement {
       <Chiffres vue={chiffres} />
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div
-          role="group"
+        <SegmentedControl<WorkPortfolioScope>
           aria-label="Filtrer les projets"
-          className="inline-flex w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-0.5 sm:w-auto"
-        >
-          {FILTRES_PORTEFEUILLE.map((f) => (
-            <button
-              key={f.cle}
-              type="button"
-              aria-pressed={scope === f.cle}
-              onClick={() => setScope(f.cle)}
-              className="h-8 flex-1 rounded-[calc(var(--radius-md)-2px)] px-3 text-[13px] font-medium text-[var(--foreground-muted)] transition-colors duration-[var(--motion-fast)] hover:text-[var(--foreground)] aria-pressed:bg-[var(--accent-soft)] aria-pressed:text-[var(--accent)] motion-reduce:transition-none sm:flex-none"
-            >
-              {f.libelle}
-            </button>
-          ))}
-        </div>
-        <div className="relative sm:w-64">
-          <label htmlFor="pj-q" className="sr-only">
-            Rechercher un projet
-          </label>
-          <Search
-            aria-hidden="true"
-            className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--foreground-muted)]"
-          />
-          <input
-            id="pj-q"
-            type="search"
-            value={recherche}
-            onChange={(e) => setRecherche(e.target.value)}
-            className={`${CHAMP} pl-8`}
-            maxLength={100}
-            placeholder="Projet ou client"
-          />
-        </div>
+          value={scope}
+          onChange={setScope}
+          options={FILTRES_PORTEFEUILLE.map((f) => ({ value: f.cle, label: f.libelle }))}
+        />
+        <TextInput
+          id="pj-q"
+          type="search"
+          aria-label="Rechercher un projet"
+          value={recherche}
+          onChange={(e) => setRecherche(e.target.value)}
+          maxLength={100}
+          placeholder="Projet ou client"
+          leading={<Search aria-hidden="true" className="h-4 w-4" />}
+          className="sm:w-64"
+        />
       </div>
 
       {erreur ? (

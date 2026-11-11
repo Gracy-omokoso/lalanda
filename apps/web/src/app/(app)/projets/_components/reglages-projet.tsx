@@ -17,14 +17,27 @@ import {
   type WorkProjectEditableStatus,
   type WorkProjectKind,
 } from '@lalanda/shared/work';
-import { Tag, buttonClasses } from '@lalanda/ui';
+import {
+  Button,
+  DatePicker,
+  EntityPicker,
+  Field,
+  FormGrid,
+  SegmentedControl,
+  Select,
+  SubmitButton,
+  Tag,
+  TextArea,
+  TextInput,
+  correspondRecherche,
+} from '@lalanda/ui';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { workApi } from '@/lib/work-api';
+import { workApi, type WorkMemberOption } from '@/lib/work-api';
 
 import { CanalSlack } from './canal-slack';
-import { Alerte, BOUTON_DANGER, BOUTON_PETIT, CHAMP, Champ } from './elements';
+import { Alerte, BOUTON_DANGER, BOUTON_PETIT } from './elements';
 import { useProjet } from './project-context';
 import {
   CATEGORIES_COLONNE,
@@ -46,6 +59,8 @@ const COULEURS: Record<WorkLabelColor, string> = {
   purple: 'Violet',
   pink: 'Rose',
 };
+
+const OPTIONS_COULEUR = WORK_LABEL_COLORS.map((c) => ({ value: c, label: COULEURS[c] }));
 
 export function ReglagesProjet(): React.ReactElement {
   const { project, gerer } = useProjet();
@@ -99,6 +114,8 @@ function InfosProjet(): React.ReactElement {
   const [envoi, setEnvoi] = useState(false);
   const [ok, setOk] = useState(false);
   const archive = p.status === 'archived';
+  const bloque = archive || envoi;
+  const responsables = members.filter((m) => m.canUpdate);
 
   async function enregistrer(e: React.FormEvent): Promise<void> {
     e.preventDefault();
@@ -127,93 +144,86 @@ function InfosProjet(): React.ReactElement {
 
   return (
     <Bloc titre="Projet">
-      <form onSubmit={(e) => void enregistrer(e)} className="grid gap-3 sm:grid-cols-2">
-        <fieldset disabled={archive || envoi} className="contents">
-          <Champ id="rg-nom" label="Nom" requis>
-            <input
-              id="rg-nom"
-              value={f.name}
-              maxLength={120}
-              onChange={(e) => setF({ ...f, name: e.target.value })}
-              className={CHAMP}
-            />
-          </Champ>
-          <Champ id="rg-statut" label="Statut">
-            <select
-              id="rg-statut"
-              value={f.status}
-              onChange={(e) => setF({ ...f, status: e.target.value as WorkProjectEditableStatus })}
-              className={CHAMP}
-            >
-              {WORK_PROJECT_EDITABLE_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {STATUTS_PROJET[s]}
-                </option>
-              ))}
-            </select>
-          </Champ>
-          <Champ id="rg-nature" label="Nature">
-            <select
-              id="rg-nature"
-              value={f.kind}
-              onChange={(e) => setF({ ...f, kind: e.target.value as WorkProjectKind })}
-              className={CHAMP}
-            >
-              <option value="client">{NATURES_PROJET.client}</option>
-              <option value="internal">{NATURES_PROJET.internal}</option>
-            </select>
-          </Champ>
-          <Champ id="rg-resp" label="Responsable du projet">
-            <select
+      <form onSubmit={(e) => void enregistrer(e)}>
+        <fieldset disabled={bloque} className="flex min-w-0 flex-col gap-4">
+          <FormGrid>
+            <Field id="rg-nom" label="Nom" required size="lg">
+              <TextInput
+                value={f.name}
+                maxLength={120}
+                onChange={(e) => setF({ ...f, name: e.target.value })}
+              />
+            </Field>
+            <Field id="rg-statut" label="Statut" group size="full" newRow>
+              <SegmentedControl<WorkProjectEditableStatus>
+                value={f.status}
+                disabled={bloque}
+                onChange={(v) => setF({ ...f, status: v })}
+                options={WORK_PROJECT_EDITABLE_STATUSES.map((s) => ({
+                  value: s,
+                  label: STATUTS_PROJET[s],
+                }))}
+              />
+            </Field>
+            <Field id="rg-nature" label="Nature" group size="md" newRow>
+              <SegmentedControl<WorkProjectKind>
+                value={f.kind}
+                disabled={bloque}
+                onChange={(v) => setF({ ...f, kind: v })}
+                options={[
+                  { value: 'client', label: NATURES_PROJET.client },
+                  { value: 'internal', label: NATURES_PROJET.internal },
+                ]}
+              />
+            </Field>
+            <Field
               id="rg-resp"
-              value={f.ownerUserId}
-              onChange={(e) => setF({ ...f, ownerUserId: e.target.value })}
-              className={CHAMP}
+              label="Responsable du projet"
+              size="md"
+              hint="Tapez pour chercher parmi les membres qui peuvent modifier le projet."
             >
-              <option value="">Aucun</option>
-              {members
-                .filter((m) => m.canUpdate)
-                .map((m) => (
-                  <option key={m.userId} value={m.userId}>
-                    {m.name}
-                  </option>
-                ))}
-            </select>
-          </Champ>
-          <Champ id="rg-debut" label="Début">
-            <input
-              id="rg-debut"
-              type="date"
-              value={f.startDate}
-              onChange={(e) => setF({ ...f, startDate: e.target.value })}
-              className={CHAMP}
-            />
-          </Champ>
-          <Champ id="rg-fin" label="Échéance">
-            <input
-              id="rg-fin"
-              type="date"
-              value={f.dueDate}
-              onChange={(e) => setF({ ...f, dueDate: e.target.value })}
-              className={CHAMP}
-            />
-          </Champ>
-          <div className="sm:col-span-2">
-            <Champ id="rg-desc" label="Description">
-              <textarea
-                id="rg-desc"
+              <EntityPicker<WorkMemberOption>
+                value={responsables.find((m) => m.userId === f.ownerUserId) ?? null}
+                onChange={(m) => setF({ ...f, ownerUserId: m?.userId ?? '' })}
+                search={async (q) => responsables.filter((m) => correspondRecherche([m.name], q))}
+                refreshKey={responsables.length}
+                getKey={(m) => m.userId}
+                getLabel={(m) => m.name}
+                placeholder="Aucun"
+                disabled={bloque}
+                debounceMs={0}
+                emptyText="Aucun membre ne correspond."
+              />
+            </Field>
+            <Field id="rg-debut" label="Début" size="sm" newRow>
+              <DatePicker
+                value={f.startDate}
+                disabled={bloque}
+                onChange={(v) => setF({ ...f, startDate: v })}
+                shortcuts={['today']}
+              />
+            </Field>
+            <Field id="rg-fin" label="Échéance" size="sm">
+              <DatePicker
+                value={f.dueDate}
+                disabled={bloque}
+                onChange={(v) => setF({ ...f, dueDate: v })}
+                shortcuts={['endOfMonth', 'plus30', 'endOfYear']}
+              />
+            </Field>
+            <Field id="rg-desc" label="Description" optional size="full">
+              <TextArea
                 rows={3}
                 maxLength={5000}
                 value={f.description}
                 onChange={(e) => setF({ ...f, description: e.target.value })}
-                className={CHAMP}
               />
-            </Champ>
-          </div>
-          <div className="flex items-center gap-3 sm:col-span-2">
-            <button type="submit" className={buttonClasses('primary', 'md')}>
+            </Field>
+          </FormGrid>
+          <div className="flex flex-wrap items-center gap-3">
+            <SubmitButton busy={envoi} showShortcut={false} className="max-sm:h-11 max-sm:w-full">
               Enregistrer
-            </button>
+            </SubmitButton>
             {ok ? (
               <span role="status" className="text-sm text-[var(--ok)]">
                 ✓ Enregistré
@@ -278,42 +288,30 @@ function Colonnes(): React.ReactElement {
               <span className="w-5 text-right text-xs text-[var(--foreground-muted)]">
                 {i + 1}.
               </span>
-              <label htmlFor={`col-${c.key}`} className="sr-only">
-                Libellé de la colonne {i + 1}
-              </label>
-              <input
+              <TextInput
                 id={`col-${c.key}`}
+                aria-label={`Libellé de la colonne ${i + 1}`}
                 value={c.label}
                 maxLength={WORK_LIMITS.columnLabelMax}
                 onChange={(e) =>
                   setCols(cols.map((x) => (x.key === c.key ? { ...x, label: e.target.value } : x)))
                 }
-                className={`${CHAMP} min-w-0 flex-1 basis-32`}
+                className="min-w-0 flex-1 basis-32"
               />
-              <label htmlFor={`cat-${c.key}`} className="sr-only">
-                Catégorie de la colonne {c.label}
-              </label>
-              <select
+              <Select<WorkColumn['category']>
                 id={`cat-${c.key}`}
+                aria-label={`Catégorie de la colonne ${c.label}`}
                 value={c.category}
                 disabled={occupee && p.columns.some((x) => x.key === c.key)}
-                onChange={(e) =>
-                  setCols(
-                    cols.map((x) =>
-                      x.key === c.key
-                        ? { ...x, category: e.target.value as WorkColumn['category'] }
-                        : x,
-                    ),
-                  )
+                onChange={(v) =>
+                  setCols(cols.map((x) => (x.key === c.key ? { ...x, category: v } : x)))
                 }
-                className={`${CHAMP} w-auto`}
-              >
-                {WORK_COLUMN_CATEGORIES.map((k) => (
-                  <option key={k} value={k}>
-                    {CATEGORIES_COLONNE[k]}
-                  </option>
-                ))}
-              </select>
+                options={WORK_COLUMN_CATEGORIES.map((k) => ({
+                  value: k,
+                  label: CATEGORIES_COLONNE[k],
+                }))}
+                className="w-40"
+              />
               <button
                 type="button"
                 className={BOUTON_PETIT}
@@ -365,16 +363,14 @@ function Colonnes(): React.ReactElement {
             setNouvelle('');
           }}
         >
-          <label htmlFor="col-nouvelle" className="sr-only">
-            Nouvelle colonne
-          </label>
-          <input
+          <TextInput
             id="col-nouvelle"
+            aria-label="Nouvelle colonne"
             value={nouvelle}
             maxLength={WORK_LIMITS.columnLabelMax}
             onChange={(e) => setNouvelle(e.target.value)}
             placeholder="Nouvelle colonne"
-            className={CHAMP}
+            className="max-w-xs"
           />
           <button type="submit" className={BOUTON_PETIT} disabled={!nouvelle.trim()}>
             Ajouter
@@ -387,22 +383,18 @@ function Colonnes(): React.ReactElement {
         </Alerte>
       ) : null}
       <div className="flex gap-2">
-        <button
-          type="button"
-          className={buttonClasses('primary', 'md')}
-          disabled={!modifie || envoi || p.status === 'archived'}
+        <Button
+          variant="primary"
+          busy={envoi}
+          disabled={!modifie || p.status === 'archived'}
           onClick={() => void enregistrer()}
         >
           Enregistrer les colonnes
-        </button>
+        </Button>
         {modifie ? (
-          <button
-            type="button"
-            className={buttonClasses('ghost', 'md')}
-            onClick={() => setCols(p.columns)}
-          >
+          <Button variant="ghost" onClick={() => setCols(p.columns)}>
             Annuler
-          </button>
+          </Button>
         ) : null}
       </div>
     </Bloc>
@@ -452,27 +444,17 @@ function Etiquettes(): React.ReactElement {
           {labels.map((l) => (
             <li key={l.key} className="flex flex-wrap items-center gap-2">
               <Tag color={l.color}>{l.label}</Tag>
-              <label htmlFor={`etq-c-${l.key}`} className="sr-only">
-                Couleur de {l.label}
-              </label>
-              <select
+              <Select<WorkLabelColor>
                 id={`etq-c-${l.key}`}
+                aria-label={`Couleur de ${l.label}`}
                 value={l.color}
-                onChange={(e) =>
-                  setLabels(
-                    labels.map((x) =>
-                      x.key === l.key ? { ...x, color: e.target.value as WorkLabelColor } : x,
-                    ),
-                  )
+                onChange={(v) =>
+                  setLabels(labels.map((x) => (x.key === l.key ? { ...x, color: v } : x)))
                 }
-                className={`${CHAMP} w-auto`}
-              >
-                {WORK_LABEL_COLORS.map((c) => (
-                  <option key={c} value={c}>
-                    {COULEURS[c]}
-                  </option>
-                ))}
-              </select>
+                options={OPTIONS_COULEUR}
+                searchable={false}
+                className="w-36"
+              />
               <button
                 type="button"
                 className={BOUTON_DANGER}
@@ -506,32 +488,24 @@ function Etiquettes(): React.ReactElement {
             setNom('');
           }}
         >
-          <label htmlFor="etq-nom" className="sr-only">
-            Nouvelle étiquette
-          </label>
-          <input
+          <TextInput
             id="etq-nom"
+            aria-label="Nouvelle étiquette"
             value={nom}
             maxLength={WORK_LIMITS.labelLabelMax}
             onChange={(e) => setNom(e.target.value)}
             placeholder="Nouvelle étiquette"
-            className={`${CHAMP} min-w-0 flex-1 basis-40`}
+            className="min-w-0 flex-1 basis-40"
           />
-          <label htmlFor="etq-couleur" className="sr-only">
-            Couleur
-          </label>
-          <select
+          <Select<WorkLabelColor>
             id="etq-couleur"
+            aria-label="Couleur"
             value={couleur}
-            onChange={(e) => setCouleur(e.target.value as WorkLabelColor)}
-            className={`${CHAMP} w-auto`}
-          >
-            {WORK_LABEL_COLORS.map((c) => (
-              <option key={c} value={c}>
-                {COULEURS[c]}
-              </option>
-            ))}
-          </select>
+            onChange={setCouleur}
+            options={OPTIONS_COULEUR}
+            searchable={false}
+            className="w-36"
+          />
           <button type="submit" className={BOUTON_PETIT} disabled={!nom.trim()}>
             Ajouter
           </button>
@@ -543,14 +517,14 @@ function Etiquettes(): React.ReactElement {
         </Alerte>
       ) : null}
       <div>
-        <button
-          type="button"
-          className={buttonClasses('primary', 'md')}
-          disabled={!modifie || envoi}
+        <Button
+          variant="primary"
+          busy={envoi}
+          disabled={!modifie}
           onClick={() => void enregistrer()}
         >
           Enregistrer les étiquettes
-        </button>
+        </Button>
       </div>
     </Bloc>
   );
@@ -582,10 +556,8 @@ function CycleDeVie(): React.ReactElement {
         ni dépense rattachée.
       </p>
       <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
+        <Button
           disabled={envoi}
-          className={buttonClasses('secondary', 'md')}
           onClick={() =>
             void geste(
               async () =>
@@ -599,11 +571,10 @@ function CycleDeVie(): React.ReactElement {
           }
         >
           {archive ? 'Restaurer le projet' : 'Archiver le projet'}
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="danger"
           disabled={envoi}
-          className={buttonClasses('danger', 'md')}
           onClick={() => {
             if (!window.confirm(`Supprimer définitivement le projet « ${p.name} » et ses tâches ?`))
               return;
@@ -614,7 +585,7 @@ function CycleDeVie(): React.ReactElement {
           }}
         >
           Supprimer le projet
-        </button>
+        </Button>
       </div>
     </Bloc>
   );

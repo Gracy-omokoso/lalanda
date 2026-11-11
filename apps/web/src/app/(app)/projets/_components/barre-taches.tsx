@@ -1,14 +1,18 @@
 'use client';
 
 // Briques partagées par la vue Liste et le Kanban : filtres, ajout rapide d'une
-// tâche, case « terminer », et le hook `useFiltres`.
+// tâche, case « terminer », et le hook `useFiltres`. ADR-0074 : filtres sur
+// `Field` + `Select`, « Masquer les terminées » en interrupteur ; les champs
+// d'ajout en ligne restent compacts (une ligne, Entrée).
 
 import type { WorkTaskView } from '@lalanda/shared/work';
+import { Button, Field, FormGrid, Select, Switch, TextInput } from '@lalanda/ui';
+import { Search } from 'lucide-react';
 import { useRef, useState } from 'react';
 
 import { workApi } from '@/lib/work-api';
 
-import { BOUTON_PETIT, CHAMP, CercleCoche } from './elements';
+import { CercleCoche } from './elements';
 import { useProjet } from './project-context';
 import { PRIORITES } from './projets-model';
 import { filtresActifs, filtresVides, type FiltresTaches } from './taches-model';
@@ -31,96 +35,66 @@ export function BarreFiltres({
   const labels = settings?.labels ?? [];
   const id = (s: string) => `${idPrefixe}-${s}`;
   return (
-    <div role="search" className="flex flex-wrap items-end gap-2">
-      <div className="flex min-w-0 flex-1 basis-40 flex-col gap-1">
-        <label htmlFor={id('q')} className="text-xs font-medium">
-          Filtrer
-        </label>
-        <input
-          id={id('q')}
-          type="search"
-          value={filtres.texte}
-          onChange={(e) => onChange({ ...filtres, texte: e.target.value })}
-          placeholder="Titre ou #numéro"
-          className={CHAMP}
-        />
-      </div>
-      <div className="flex basis-36 flex-col gap-1">
-        <label htmlFor={id('resp')} className="text-xs font-medium">
-          Responsable
-        </label>
-        <select
-          id={id('resp')}
-          value={filtres.responsable}
-          onChange={(e) => onChange({ ...filtres, responsable: e.target.value })}
-          className={CHAMP}
-        >
-          <option value="">Tous</option>
-          <option value="aucun">Sans responsable</option>
-          {members.map((m) => (
-            <option key={m.userId} value={m.userId}>
-              {m.name}
-            </option>
-          ))}
-        </select>
-      </div>
-      {labels.length > 0 ? (
-        <div className="flex basis-32 flex-col gap-1">
-          <label htmlFor={id('etiq')} className="text-xs font-medium">
-            Étiquette
-          </label>
-          <select
-            id={id('etiq')}
-            value={filtres.etiquette}
-            onChange={(e) => onChange({ ...filtres, etiquette: e.target.value })}
-            className={CHAMP}
-          >
-            <option value="">Toutes</option>
-            {labels.map((l) => (
-              <option key={l.key} value={l.key}>
-                {l.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      ) : null}
-      <div className="flex basis-28 flex-col gap-1">
-        <label htmlFor={id('prio')} className="text-xs font-medium">
-          Priorité
-        </label>
-        <select
-          id={id('prio')}
-          value={filtres.priorite}
-          onChange={(e) =>
-            onChange({ ...filtres, priorite: e.target.value as FiltresTaches['priorite'] })
-          }
-          className={CHAMP}
-        >
-          <option value="">Toutes</option>
-          {(Object.keys(PRIORITES) as (keyof typeof PRIORITES)[]).map((p) => (
-            <option key={p} value={p}>
-              {PRIORITES[p].label}
-            </option>
-          ))}
-        </select>
-      </div>
-      <label className="flex items-center gap-2 pb-2 text-sm">
-        <input
-          type="checkbox"
+    <div role="search" aria-label="Filtrer les tâches" className="flex flex-col gap-2">
+      <FormGrid>
+        <Field id={id('q')} label="Filtrer" size="lg">
+          <TextInput
+            type="search"
+            value={filtres.texte}
+            onChange={(e) => onChange({ ...filtres, texte: e.target.value })}
+            placeholder="Titre ou #numéro"
+            leading={<Search aria-hidden="true" className="h-4 w-4" />}
+          />
+        </Field>
+        <Field id={id('resp')} label="Responsable" size="md">
+          <Select<string>
+            value={filtres.responsable}
+            onChange={(v) => onChange({ ...filtres, responsable: v })}
+            options={[
+              { value: '', label: 'Tous' },
+              { value: 'aucun', label: 'Sans responsable' },
+              ...members.map((m) => ({ value: m.userId, label: m.name })),
+            ]}
+          />
+        </Field>
+        {labels.length > 0 ? (
+          <Field id={id('etiq')} label="Étiquette" size="sm">
+            <Select<string>
+              value={filtres.etiquette}
+              onChange={(v) => onChange({ ...filtres, etiquette: v })}
+              options={[
+                { value: '', label: 'Toutes' },
+                ...labels.map((l) => ({ value: l.key, label: l.label })),
+              ]}
+            />
+          </Field>
+        ) : null}
+        <Field id={id('prio')} label="Priorité" size="sm">
+          <Select<FiltresTaches['priorite']>
+            value={filtres.priorite}
+            onChange={(v) => onChange({ ...filtres, priorite: v })}
+            options={[
+              { value: '', label: 'Toutes' },
+              ...(Object.keys(PRIORITES) as (keyof typeof PRIORITES)[]).map((p) => ({
+                value: p,
+                label: PRIORITES[p].label,
+              })),
+            ]}
+          />
+        </Field>
+      </FormGrid>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <Switch
           checked={filtres.masquerTerminees}
-          onChange={(e) => onChange({ ...filtres, masquerTerminees: e.target.checked })}
+          onChange={(v) => onChange({ ...filtres, masquerTerminees: v })}
+          label="Masquer les terminées"
         />
-        Masquer les terminées
-      </label>
-      {filtresActifs(filtres) ? (
-        <button
-          type="button"
-          className={`${BOUTON_PETIT} mb-1`}
-          onClick={() => onChange(filtresVides())}
-        >
-          Effacer les filtres
-        </button>
-      ) : null}
+        {filtresActifs(filtres) ? (
+          <Button size="sm" onClick={() => onChange(filtresVides())}>
+            Effacer les filtres
+          </Button>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -163,17 +137,17 @@ export function AjoutRapide({
       <label htmlFor={id} className="sr-only">
         Nouvelle tâche
       </label>
-      <input
+      <TextInput
         id={id}
         value={titre}
         onChange={(e) => setTitre(e.target.value)}
         placeholder={compact ? '+ Tâche' : 'Ajouter une tâche…'}
         maxLength={300}
-        className={CHAMP}
+        className="min-w-0 flex-1"
       />
-      <button type="submit" disabled={envoi || titre.trim() === ''} className={BOUTON_PETIT}>
+      <Button type="submit" busy={envoi} disabled={titre.trim() === ''}>
         Ajouter
-      </button>
+      </Button>
     </form>
   );
 }
